@@ -1,42 +1,38 @@
-<form class=\"faserip-item-sheet\">
-    <header class=\"item-header\">
-      <img src=\"{{item.img}}\" data-edit=\"img\" alt=\"Item Image\">
-      <h1><input type=\"text\" name=\"name\" value=\"{{item.name}}\" /></h1>
-    </header>
-  
-    <section class=\"item-details\">
-      <h3>Item Details</h3>
-  
-      {{#if (eq item.type 'power')}}
-        <div class=\"form-group\">
-          <label>Rank:</label>
-          <input type=\"text\" name=\"system.rank\" value=\"{{system.rank}}\" />
-        </div>
-      {{/if}}
-  
-      {{#if (eq item.type 'equipment')}}
-        <div class=\"form-group\">
-          <label>Material Strength:</label>
-          <input type=\"text\" name=\"system.materialStrength\" value=\"{{system.materialStrength}}\" />
-        </div>
-      {{/if}}
-  
-      {{#if (eq item.type 'vehicle')}}
-        <div class=\"form-group\">
-          <label>Speed:</label>
-          <input type=\"number\" name=\"system.speed\" value=\"{{system.speed}}\" />
-        </div>
-        <div class=\"form-group\">
-          <label>Material Strength:</label>
-          <input type=\"text\" name=\"system.materialStrength\" value=\"{{system.materialStrength}}\" />
-        </div>
-      {{/if}}
-  
-      <div class=\"form-group\">
-        <label>Description:</label>
-        <textarea name=\"system.description\">{{system.description}}</textarea>
+<form class="{{cssClass}}" autocomplete="off">
+  <header class="sheet-header">
+    <img class="profile-img" src="{{item.img}}" data-edit="img" title="{{item.name}}" />
+    <h1><input name="name" type="text" value="{{item.name}}" placeholder="Item Name"/></h1>
+  </header>
+
+  <section class="sheet-body">
+    {{#if (eq item.type 'power')}}
+      <div class="form-group">
+        <label>Rank:</label>
+        <input type="text" name="system.rank" value="{{system.rank}}" />
       </div>
-  
-    </header>
-  </form>
-  
+    {{/if}}
+
+    {{#if (eq item.type 'equipment')}}
+      <div class="form-group">
+        <label>Material Strength:</label>
+        <input type="text" name="system.materialStrength" value="{{system.materialStrength}}" />
+      </div>
+    {{/if}}
+
+    {{#if (eq item.type 'vehicle')}}
+      <div class="form-group">
+        <label>Speed:</label>
+        <input type="number" name="system.speed" value="{{system.speed}}" />
+      </div>
+      <div class="form-group">
+        <label>Material Strength:</label>
+        <input type="text" name="system.materialStrength" value="{{system.materialStrength}}" />
+      </div>
+    {{/if}}
+
+    <div class="form-group">
+      <label>Description:</label>
+      <textarea name="system.description">{{system.description}}</textarea>
+    </div>
+  </section>
+</form>

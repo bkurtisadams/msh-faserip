@@ -4,13 +4,13 @@
       "templates": {
         "hero": {
           "abilities": {
-            "fighting": { "value": 10, "label": "Fighting" },
-            "agility": { "value": 10, "label": "Agility" },
-            "strength": { "value": 10, "label": "Strength" },
-            "endurance": { "value": 10 },
-            "reason": { "value": 10 },
-            "intuition": { "value": 10 },
-            "psyche": { "value": 10 }
+            "fighting": { "value": 10, "label": "Fighting", "rank": "Good" },
+            "agility": { "value": 10, "label": "Agility", "rank": "Good" },
+            "strength": { "value": 10, "label": "Strength", "rank": "Good" },
+            "endurance": { "value": 10, "label": "Endurance","rank": "Good" },
+            "reason": { "value": 10, "label": "Reason","rank": "Good" },
+            "intuition": { "value": 10, "label": "Intuition","rank": "Good" },
+            "psyche": { "value": 10, "label": "Psyche","rank": "Good" }
           },
           "attributes": {
             "health": { "value": 40, "max": 40 },

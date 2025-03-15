@@ -1,19 +1,23 @@
 export function rollUniversalTable(rank, roll) {
     const tableRanks = {
       "Shift-0": [66, 95, 100],
-      "Feeble": [66, 95, 100],
-      "Poor": [61, 91, 100],
-      "Typical": [56, 91, 100],
-      "Good": [56, 86, 100],
-      "Excellent": [56, 86, 100],
-      "Remarkable": [56, 86, 100],
-      "Incredible": [56, 86, 100],
-      "Amazing": [51, 86, 100],
-      "Monstrous": [41, 66, 100],
-      "Unearthly": [36, 61, 100],
-      "Shift-X": [31, 56, 95],
-      "Shift-Y": [21, 56, 91],
-      "Shift-Z": [21, 46, 86]
+      "Feeble": [61, 91, 100],
+      "Poor": [56, 86, 100],
+      "Typical": [51, 81, 98],
+      "Good": [46, 75, 98],
+      "Excellent": [41, 71, 95],
+      "Remarkable": [36, 66, 95],
+      "Incredible": [31, 61, 91],
+      "Amazing": [26, 56, 91],
+      "Monstrous": [21, 51, 86],
+      "Unearthly": [16, 46, 86],
+      "Shift-X": [11, 41, 81],
+      "Shift-Y": [7, 41, 81],
+      "Shift-Z": [4, 36, 75],
+      "1000": [2, 36, 75],
+      "3000": [2, 31, 71],
+      "5000": [2, 26, 66],
+      "Beyond": [2, 21, 61]
     };
   
     const thresholds = tableRanks[rank];

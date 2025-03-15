@@ -3,6 +3,7 @@ import { FaseripItem } from './item.js';
 import { FaseripActorSheet } from './actorSheet.js';
 import { FaseripItemSheet } from './itemSheet.js';
 import { rollFeat } from './macros.js';
+import { rollUniversalTable } from "./universalTable.js";
 
 Hooks.once("init", () => {
 
@@ -20,8 +21,10 @@ Hooks.once("init", () => {
 
   // Register Handlebars helpers explicitly
   Handlebars.registerHelper('capitalize', (str) => {
+    if (typeof str !== "string" || !str.length) return "";
     return str.charAt(0).toUpperCase() + str.slice(1);
   });
+  ;
 
   Handlebars.registerHelper('groupBy', (items, key) => {
     const groups = items.reduce((result, item) => {
@@ -33,7 +36,8 @@ Hooks.once("init", () => {
 
   // Explicitly attach your macro functions to game namespace clearly
   game.msh = {
-    rollFeat: rollFeat
+    rollFeat: rollFeat,
+    rollUniversalTable: rollUniversalTable
   };
 
   console.log("Marvel Super Heroes (FASERIP) system initialized!");
