@@ -17,3 +17,5 @@ node_modules/
 
 # Ignore VS Code settings
 .vscode/
+
+desktop.ini
