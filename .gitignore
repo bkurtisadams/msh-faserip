@@ -1,0 +1,17 @@
+# Ignore Foundry-generated data
+packs/*.db~
+packs/*.json~
+
+# Ignore local module/system settings
+module.json~
+system.json~
+
+# Ignore OS-specific files
+.DS_Store
+Thumbs.db
+
+# Ignore node modules if you use Node.js
+node_modules/
+
+# Ignore VS Code settings
+.vscode/
