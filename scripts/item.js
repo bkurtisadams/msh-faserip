@@ -40,7 +40,7 @@ export class FaseripItem extends Item {
         if (!actor) return ui.notifications.error("No actor linked to item!");
     
         const rank = this.system.rank || "Typical";
-        const roll = new Roll("1d100").roll({ async: false }).total;
+        const roll = await new Roll("1d100").evaluate({async: true});
         const result = game.msh.rollUniversalTable(rank, roll);
     
         ChatMessage.create({
