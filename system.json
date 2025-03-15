@@ -19,13 +19,13 @@
         "scripts/itemSheet.js",
         "scripts/universalTable.js",
         "scripts/macros.js"
-        ],
+    ],
     "styles": [
         "styles/global.css",
         "styles/actor-sheet.css",
         "styles/item-sheet.css",
         "styles/karma-dialog.css"
-        ],
+    ],
     "packs": [
         {
             "name": "powers",
@@ -37,39 +37,42 @@
         {
             "name": "talents",
             "label": "Talents",
+            "system": "msh-faserip",
             "path": "./packs/talents.db",
             "type": "Item"
         },
         {
             "name": "contacts",
             "label": "Contacts",
+            "system": "msh-faserip",
             "path": "./packs/contacts.db",
             "type": "Item"
         },
         {
             "name": "equipment",
             "label": "Equipment",
+            "system": "msh-faserip",
             "path": "./packs/equipment.db",
             "type": "Item"
         },
         {
             "name": "vehicles",
             "label": "Vehicles",
+            "system": "msh-faserip",
             "path": "./packs/vehicles.db",
             "type": "Item"
         },
         {
             "name": "headquarters",
             "label": "Headquarters",
+            "system": "msh-faserip",
             "path": "./packs/headquarters.db",
             "type": "Item"
         }
-    ]
-,
+    ],
     "relationships": {},
     "primaryTokenAttribute": "health",
     "gridDistance": 44,
     "gridUnits": "yards",
     "initiative": "1d10 + @abilities.intuition.value"
-  }
-  
+}
