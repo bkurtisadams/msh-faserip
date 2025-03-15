@@ -1,6 +1,8 @@
-# Ignore Foundry-generated data
-packs/*.db~
-packs/*.json~
+# Ignore Foundry-generated compendium data
+packs/
+compendiums/
+*.db
+*.db
 
 # Ignore local module/system settings
 module.json~
