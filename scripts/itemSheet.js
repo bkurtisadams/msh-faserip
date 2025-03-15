@@ -1,23 +1,25 @@
 export class FaseripItemSheet extends ItemSheet {
-    static get defaultOptions() {
-      return mergeObject(super.defaultOptions, {
-        classes: ["faserip-item-sheet"],
-        template: "systems/msh-faserip/templates/item-sheet.html",
-        width: 500,
-        height: "auto",
-        resizable: false
-      });
-    }
+  static get defaultOptions() {
+    return foundry.utils.mergeObject(super.defaultOptions, {
+      classes: ["faserip-item-sheet"],
+      width: 400,
+      height: "auto",
+      template: "systems/msh-faserip/templates/item-sheet.html",
+      resizable: false
+    });
+  }
 
-    getData() {
-      const context = super.getData();  // Retrieve existing sheet data safely
-      context.system = this.actor.system; // add your system data clearly
-      context.items = this.actor.items; // include actor's items clearly
-      return context; 
-    }
-    
+  getData() {
+    const context = super.getData();
 
-    activateListeners(html) {
-      super.activateListeners(html);
-    }
+    // Correct initialization clearly
+    context.item = this.item;
+    context.system = this.item.system;
+
+    return context;
+  }
+
+  activateListeners(html) {
+    super.activateListeners(html);
+  }
 }
