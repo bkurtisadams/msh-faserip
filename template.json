@@ -1,0 +1,73 @@
+{
+    "Actor": {
+      "types": ["hero", "villain", "npc"],
+      "templates": {
+        "hero": {
+          "abilities": {
+            "fighting": { "value": 10, "label": "Fighting" },
+            "agility": { "value": 10, "label": "Agility" },
+            "strength": { "value": 10, "label": "Strength" },
+            "endurance": { "value": 10 },
+            "reason": { "value": 10 },
+            "intuition": { "value": 10 },
+            "psyche": { "value": 10 }
+          },
+          "attributes": {
+            "health": { "value": 40, "max": 40 },
+            "karma": { "value": 30, "max": 30 },
+            "resources": { "rank": "Typical" },
+            "popularity": { "value": 10 }
+          }
+        },
+        "villain": {
+          "abilities": {
+            "fighting": { "value": 10 },
+            "agility": { "value": 10 },
+            "strength": { "value": 10 },
+            "endurance": { "value": 10 },
+            "reason": { "value": 10 },
+            "intuition": { "value": 10 },
+            "psyche": { "value": 10 }
+          },
+          "attributes": {
+            "health": { "value": 40, "max": 40 },
+            "karma": { "value": 30, "max": 30 }
+          }
+        },
+        "npc": {
+          "description": ""
+        }
+      }
+    },
+    "Item": {
+      "types": ["power", "talent", "contact", "equipment", "vehicle", "headquarters"],
+      "templates": {
+        "power": {
+          "powerRank": "Typical",
+          "description": ""
+        },
+        "talent": {
+          "description": ""
+        },
+        "contact": {
+          "description": ""
+        },
+        "equipment": {
+          "description": "",
+          "materialStrength": "Typical"
+        },
+        "vehicle": {
+          "speed": 0,
+          "materialStrength": "Typical",
+          "description": ""
+        },
+        "headquarters": {
+          "location": "",
+          "size": "",
+          "materialStrength": "Typical",
+          "description": ""
+        }
+      }
+    }
+  }
+  

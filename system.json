@@ -1,0 +1,75 @@
+{
+    "name": "msh-faserip",
+    "title": "Marvel Super Heroes (FASERIP)",
+    "description": "Marvel Super Heroes RPG (FASERIP) Advanced Set game system for Foundry VTT v12.",
+    "version": "1.0.0",
+    "minimumCoreVersion": "12",
+    "compatibleCoreVersion": "12",
+    "templateVersion": 2,
+    "author": "bk-adams",
+    "url": "",
+    "manifest": "",
+    "download": "",
+    "license": "LICENSE",
+    "esmodules": [
+        "scripts/init.js",
+        "scripts/actor.js",
+        "scripts/item.js",
+        "scripts/actorSheet.js",
+        "scripts/itemSheet.js",
+        "scripts/universalTable.js",
+        "scripts/macros.js"
+        ],
+    "styles": [
+        "styles/global.css",
+        "styles/actor-sheet.css",
+        "styles/item-sheet.css",
+        "styles/karma-dialog.css"
+        ],
+    "packs": [
+        {
+            "name": "powers",
+            "label": "Powers",
+            "system": "msh-faserip",
+            "path": "./packs/powers.db",
+            "type": "Item"
+        },
+        {
+            "name": "talents",
+            "label": "Talents",
+            "path": "./packs/talents.db",
+            "type": "Item"
+        },
+        {
+            "name": "contacts",
+            "label": "Contacts",
+            "path": "./packs/contacts.db",
+            "type": "Item"
+        },
+        {
+            "name": "equipment",
+            "label": "Equipment",
+            "path": "./packs/equipment.db",
+            "type": "Item"
+        },
+        {
+            "name": "vehicles",
+            "label": "Vehicles",
+            "path": "./packs/vehicles.db",
+            "type": "Item"
+        },
+        {
+            "name": "headquarters",
+            "label": "Headquarters",
+            "path": "./packs/headquarters.db",
+            "type": "Item"
+        }
+    ]
+,
+    "relationships": {},
+    "primaryTokenAttribute": "health",
+    "gridDistance": 44,
+    "gridUnits": "yards",
+    "initiative": "1d10 + @abilities.intuition.value"
+  }
+  

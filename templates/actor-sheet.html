@@ -1,0 +1,53 @@
+<form class="faserip-sheet">
+    <header class="sheet-header flexrow">
+      <img src="{{actor.img}}" data-edit="img" alt="{{actor.name}}" />
+      <h1 class="char-name"><input type="text" name="name" value="{{actor.name}}" /></h1>
+    </header>
+  
+    <section class="primary-abilities">
+      <h2>Primary Abilities (FASERIP)</h2>
+      <div class="abilities-grid">
+        {{#each system.abilities as |ability key|}}
+          <div class="ability flexrow">
+            <label>{{capitalize key}}</label>
+            <input type="number" name="system.abilities.{{key}}.value" value="{{ability.value}}" />
+            <button type="button" class="feat-roll" data-ability="{{key}}">FEAT</button>
+          </div>
+        {{/each}}
+      </div>
+    </section>
+  
+    <section class="secondary-stats">
+      <h2>Secondary Abilities</h2>
+      <div class="stats-grid">
+        <label>Health:</label>
+        <input type="number" name="system.attributes.health.value" value="{{system.attributes.health.value}}" disabled /> / 
+        <span>{{system.attributes.health.max}}</span>
+  
+        <label>Karma:</label>
+        <input type="number" name="system.attributes.karma.value" value="{{system.attributes.karma.value}}" disabled />
+  
+        <label>Resources:</label>
+        <input type="text" name="system.attributes.resources.rank" value="{{system.attributes.resources.rank}}" />
+  
+        <label>Popularity:</label>
+        <input type="number" name="system.attributes.popularity.value" value="{{system.attributes.popularity.value}}" />
+      </div>
+    </section>
+  
+    <section class="item-sections">
+      {{#each (groupBy actor.items 'type') as |items type|}}
+        <div class="item-section">
+          <h3>{{capitalize type}}</h3>
+          <ol class="item-list">
+            {{#each items}}
+              <li class="item flexrow" data-item-id="{{this._id}}">
+                <span>{{this.name}} {{#if this.system.rank}}({{this.system.rank}}){{/if}}</span>
+                <button type="button" class="item-use">Use</button>
+            </li>
+            {{/each}}
+        </ol>
+      {{/each}}
+    </section>
+  </form>
+  
