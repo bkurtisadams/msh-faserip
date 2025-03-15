@@ -5,24 +5,22 @@ export class FaseripActor extends Actor {
 
     const actorData = this.system;
 
-    // Clearly ensure abilities exist
-    actorData.abilities = actorData.abilities || {
-      fighting: { value: 10 },
-      agility: { value: 10 },
-      strength: { value: 10 },
-      endurance: { value: 10 },
-      reason: { value: 10 },
-      intuition: { value: 10 },
-      psyche: { value: 10 }
-    };
+    // Explicitly ensure abilities exist
+    actorData.abilities = actorData.abilities || {};
+    actorData.abilities.fighting = actorData.abilities.fighting || { value: 10 };
+    actorData.abilities.agility = actorData.abilities.agility || { value: 10 };
+    actorData.abilities.strength = actorData.abilities.strength || { value: 10 };
+    actorData.abilities.endurance = actorData.abilities.endurance || { value: 10 };
+    actorData.abilities.reason = actorData.abilities.reason || { value: 10 };
+    actorData.abilities.intuition = actorData.abilities.intuition || { value: 10 };
+    actorData.abilities.psyche = actorData.abilities.psyche || { value: 10 };
 
-    // Clearly ensure attributes exist
-    actorData.attributes = actorData.attributes || {
-      health: { value: 0, max: 0 },
-      karma: { value: 0, max: 0 },
-      resources: { rank: "Typical" },
-      popularity: { value: 0 }
-    };
+    // Clearly ensure attributes exist explicitly
+    actorData.attributes = actorData.attributes || {};
+    actorData.attributes.health = actorData.attributes.health || { value: 0, max: 0 };
+    actorData.attributes.karma = actorData.attributes.karma || { value: 0, max: 0 };
+    actorData.attributes.resources = actorData.attributes.resources || { rank: "Typical" };
+    actorData.attributes.popularity = actorData.attributes.popularity || { value: 0 };
 
     // Automatically calculate Health (F + A + S + E)
     actorData.attributes.health.max = abilitiesTotal([
@@ -57,20 +55,20 @@ export class FaseripActor extends Actor {
 
     if (!this.isEditable) return;
 
-    // Drag-and-drop setup clearly defined
+    // Clearly defined Drag-and-drop
     new DragDrop({
       dragSelector: '.item-list .item',
       dropSelector: '.faserip-sheet',
       callbacks: { drop: this._onDropItem.bind(this) }
     }).bind(html[0]);
 
-    // FEAT rolls for abilities clearly defined
+    // FEAT rolls for abilities
     html.find('.feat-roll').click(ev => {
       const abilityKey = ev.currentTarget.dataset.ability;
       game.msh.rollFeat(this.actor, abilityKey);
     });
 
-    // Item Macro trigger clearly defined
+    // Item Macro trigger
     html.find('.item .item-use').click(ev => {
       const itemId = ev.currentTarget.closest(".item").dataset.itemId;
       const item = this.actor.items.get(itemId);
