@@ -1,7 +1,10 @@
-import { HandlebarsApplicationMixin } from 'foundry.applications.api';
+// Since ActorSheet is available globally, use it directly
+// access HandlebarsApplicationMixin from foundry.applications.api
 
-export class FaseripActorSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
+const { HandlebarsApplicationMixin } = foundry.applications.api;
 
+export class FaseripActorSheet extends HandlebarsApplicationMixin(ActorSheet) {
+  
   static DEFAULT_OPTIONS = {
     ...super.DEFAULT_OPTIONS,
     classes: ["faserip-sheet", "sheet", "actor"],
