@@ -50,39 +50,5 @@ export class FaseripActor extends Actor {
     }
   }
 
-  activateListeners(html) {
-    super.activateListeners(html);
-
-    if (!this.isEditable) return;
-
-    // Clearly defined Drag-and-drop
-    new DragDrop({
-      dragSelector: '.item-list .item',
-      dropSelector: '.faserip-sheet',
-      callbacks: { drop: this._onDropItem.bind(this) }
-    }).bind(html[0]);
-
-    // FEAT rolls for abilities
-    html.find('.feat-roll').click(ev => {
-      const abilityKey = ev.currentTarget.dataset.ability;
-      game.msh.rollFeat(this.actor, abilityKey);
-    });
-
-    // Item Macro trigger
-    html.find('.item .item-use').click(ev => {
-      const itemId = ev.currentTarget.closest(".item").dataset.itemId;
-      const item = this.actor.items.get(itemId);
-      this.itemMacro(item);
-    });
-  }
-
-  itemMacro(item) {
-    if (!item) return ui.notifications.warn("Item not found!");
-    if (item.type === "power") {
-      item.rollItem();
-    } else {
-      ui.notifications.info(`Macro not defined for item type: ${item.type}`);
-    }
-  }
-
+  // Remove the activateListeners method as it will now be handled in the sheet
 }
