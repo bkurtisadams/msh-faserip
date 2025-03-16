@@ -17,31 +17,25 @@ export class FaseripActorSheet extends ActorSheet {
       return context;
     }
   
-    activateListeners(html) {
-      super.activateListeners(html);
-  
-      if (!this.isEditable) return;
-  
-      // Drag-and-drop items
-      new DragDrop({
-        dragSelector: ".item-list .item",
-        dropSelector: ".faserip-sheet",
-        callbacks: { drop: this._onDropItem.bind(this) }
-      }).bind(html[0]);
-  
-      // FEAT Roll buttons
-      html.find(".feat-roll").click(ev => {
-        const abilityKey = ev.currentTarget.dataset.ability;
-        game.msh.rollFeat(this.actor, abilityKey);
-      });
-  
-      // Item macros on sheet
-      html.find(".item .item-use").click(ev => {
-        const itemId = ev.currentTarget.closest(".item").dataset.itemId;
-        const item = this.actor.items.get(itemId);
-        this.itemMacro(item);
-      });
+    // Override activateListeners explicitly
+activateListeners(html) {
+  super.activateListeners(html);
+
+  if (!this.isEditable) return;
+
+  new DragDrop({
+    dragSelector: '.item',
+    dropSelector: '.faserip-sheet',
+    permissions: {
+      dragstart: () => this.isEditable,
+      drop: () => this.isEditable
+    },
+    callbacks: {
+      drop: this._onDropItem.bind(this)
     }
+  }).bind(this.element[0]);
+}
+
   
     itemMacro(item) {
       if (!item) return ui.notifications.warn("Item not found!");
@@ -54,28 +48,51 @@ export class FaseripActorSheet extends ActorSheet {
   
     async _onDropItem(event, data) {
       if (!this.actor.isOwner) return false;
-  
-      let itemData;
-  
-      if (data.type === "Item") {
+    
+      let item;
+    
+      if (data.uuid) {
+        // UUID method (preferred in Foundry v12)
+        const droppedItem = await fromUuid(data.uuid);
+        if (!droppedItem) {
+          ui.notifications.error("The item could not be found.");
+          return false;
+        }
+        item = droppedItem.toObject();
+      } else if (data.type === "Item") {
+        // Fallback method for older data formats (non-UUID)
         if (data.pack) {
           const pack = game.packs.get(data.pack);
-          const item = await pack.getDocument(data.id);
-          item.updateSource({ _id: foundry.utils.randomID() });
-          return this.actor.createEmbeddedDocuments("Item", [item.toObject()]);
-        } else if (data.actorId) {
-          const sourceActor = game.actors.get(data.actorId);
-          const item = sourceActor.items.get(data.id);
-          item.updateSource({ _id: foundry.utils.randomID() });
-          return this.actor.createEmbeddedDocuments("Item", [item.toObject()]);
+          if (!pack) {
+            ui.notifications.error("The compendium pack was not found.");
+            return false;
+          }
+          const document = await pack.getDocument(data.id);
+          item = document.toObject();
         } else {
-          const item = game.items.get(data.id);
-          item.updateSource({ _id: foundry.utils.randomID() });
-          return this.actor.createEmbeddedDocuments("Item", [item.toObject()]);
+          const worldItem = game.items.get(data.id);
+          if (!worldItem) {
+            ui.notifications.error("The item was not found in the world.");
+            return false;
+          }
+          item = duplicate(worldItem);
         }
+      } else {
+        ui.notifications.error("You can only drop items onto this actor.");
+        return false;
       }
-      return false;
-  }
+    
+      if (!item) {
+        ui.notifications.error("Failed to retrieve item data.");
+        return false;
+      }
+    
+      // Ensure no conflicting _id
+      delete item._id;
+    
+      // Create the item as embedded document
+      return this.actor.createEmbeddedDocuments("Item", [item]);
+    }
   
   }
   

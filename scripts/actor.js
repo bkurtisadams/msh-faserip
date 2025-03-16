@@ -85,29 +85,4 @@ export class FaseripActor extends Actor {
     }
   }
 
-  async _onDropItem(event, data) {
-    if (!this.actor.isOwner) return false;
-
-    let itemData;
-
-    if (data.type === "Item") {
-      if (data.pack) {
-        const pack = game.packs.get(data.pack);
-        const item = await pack.getDocument(data.id);
-        item.updateSource({ _id: foundry.utils.randomID() });
-        return this.actor.createEmbeddedDocuments("Item", [item.toObject()]);
-      } else if (data.actorId) {
-        const sourceActor = game.actors.get(data.actorId);
-        const item = sourceActor.items.get(data.id);
-        item.updateSource({ _id: foundry.utils.randomID() });
-        return this.actor.createEmbeddedDocuments("Item", [item.toObject()]);
-      } else {
-        const item = game.items.get(data.id);
-        item.updateSource({ _id: foundry.utils.randomID() });
-        return this.actor.createEmbeddedDocuments("Item", [item.toObject()]);
-      }
-    }
-    return false;
-}
-
 }
