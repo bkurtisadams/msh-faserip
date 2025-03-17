@@ -1,83 +1,315 @@
-/* Scoped specifically to the FASERIP character sheet */
+/* FASERIP Character Sheet Styles */
 .faserip-sheet {
-    font-family: Arial, sans-serif;
-    font-size: 14px;
-    padding: 15px;
-    background-color: #f9f9f9;
-  }
-  
-  .faserip-sheet header {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 15px;
-  }
-  
-  .faserip-sheet header img {
-    width: 64px;
-    height: 64px;
-    border-radius: 8px;
-  }
-  
-  .faserip-sheet .primary-abilities,
-  .faserip-sheet .secondary-stats,
-  .faserip-sheet .item-sections {
-    margin-top: 20px;
-    padding-top: 10px;
-    border-top: 1px solid #ddd;
-  }
-  
-  .faserip-sheet h2, .faserip-sheet h3 {
-    color: #444;
-    margin-bottom: 5px;
-  }
-  
-  .faserip-sheet .abilities-grid,
-  .faserip-sheet .stats-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-    gap: 8px;
-  }
-  
-  .faserip-sheet .ability,
-  .faserip-sheet .stats-grid div {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-  }
-  
-  .faserip-sheet input[type=\"number\"],
-  .faserip-sheet input[type=\"text\"] {
-    width: 60px;
-    text-align: center;
-  }
-  
-  .faserip-sheet .item-list {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-  }
-  
-  .faserip-sheet .item-list .item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 2px 0;
-    border-bottom: 1px dashed #ddd;
-  }
-  
-  .faserip-sheet .item-use,
-  .faserip-sheet .feat-roll {
-    cursor: pointer;
-    padding: 2px 6px;
-    font-size: 12px;
-    border-radius: 4px;
-    background: #eee;
-    border: 1px solid #ccc;
-  }
-  
-  .faserip-sheet .item-use:hover,
-  .faserip-sheet .feat-roll:hover {
-    background: #ddd;
-  }
-  
+  font-family: Arial, sans-serif;
+  background: #f5f5f5;
+  color: #222;
+  padding: 8px;
+}
+
+.sheet-header {
+  display: flex;
+  margin-bottom: 10px;
+  border: 1px solid #8b0000;
+  background: #fff;
+  padding: 5px;
+}
+
+.portrait-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid #ccc;
+  padding-right: 10px;
+}
+
+.portrait {
+  height: 120px;
+  width: 120px;
+  object-fit: contain;
+  border: 1px solid #333;
+}
+
+.hero-name, .hero-identity {
+  margin-top: 5px;
+}
+
+.hero-name label, .hero-identity label {
+  display: block;
+  font-weight: bold;
+  font-size: 12px;
+}
+
+.identity-type {
+  display: flex;
+  gap: 10px;
+  margin-top: 5px;
+}
+
+.logo-container {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 10px;
+}
+
+.marvel-logo {
+  max-width: 100%;
+  max-height: 100px;
+}
+
+.player-info {
+  flex: 1;
+  padding-left: 10px;
+  border-left: 1px solid #ccc;
+}
+
+.form-group {
+  margin-bottom: 5px;
+}
+
+.form-group label {
+  display: block;
+  font-weight: bold;
+  font-size: 12px;
+}
+
+.form-row {
+  display: flex;
+  gap: 10px;
+}
+
+.form-group.half {
+  flex: 1;
+}
+
+/* Abilities section */
+.abilities-container {
+  margin-bottom: 10px;
+  border: 1px solid #8b0000;
+  background: #fff;
+}
+
+.abilities-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.abilities-table th {
+  background: #8b0000;
+  color: white;
+  font-weight: bold;
+  text-align: center;
+  padding: 5px;
+}
+
+.abilities-table td {
+  padding: 3px;
+  text-align: center;
+  border: 1px solid #ccc;
+}
+
+.ability-key {
+  font-weight: bold;
+  font-size: 16px;
+  width: 30px;
+}
+
+/* Attributes section */
+.attributes-container {
+  margin-bottom: 10px;
+  border: 1px solid #8b0000;
+  background: #fff;
+}
+
+.attributes-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.attributes-table th {
+  background: #8b0000;
+  color: white;
+  font-weight: bold;
+  text-align: center;
+  padding: 5px;
+}
+
+.attributes-table td {
+  padding: 5px;
+  text-align: center;
+  border: 1px solid #ccc;
+}
+
+.current-max {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 5px;
+}
+
+.current-max input {
+  width: 50px;
+  text-align: center;
+}
+
+.movement {
+  margin-top: 5px;
+}
+
+.movement label {
+  display: block;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.movement input {
+  width: 40px;
+  text-align: center;
+}
+
+.resistances {
+  padding: 10px;
+}
+
+.resistance-item {
+  display: flex;
+  gap: 5px;
+  margin-bottom: 5px;
+}
+
+/* Tabs */
+.tabs {
+  margin-top: 10px;
+}
+
+.tabs-navigation {
+  display: flex;
+  border-bottom: 2px solid #8b0000;
+}
+
+.tabs-navigation a {
+  padding: 8px 15px;
+  background: #ddd;
+  color: #333;
+  text-decoration: none;
+  border: 1px solid #8b0000;
+  border-bottom: none;
+  margin-right: 2px;
+  border-radius: 5px 5px 0 0;
+}
+
+.tabs-navigation a.active {
+  background: #8b0000;
+  color: white;
+}
+
+.tab-content {
+  border: 1px solid #8b0000;
+  border-top: none;
+  padding: 10px;
+  background: white;
+}
+
+.tab {
+  display: none;
+}
+
+.tab.active {
+  display: block;
+}
+
+.power-item, .talent-item, .contact-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 5px;
+  padding: 5px;
+  border: 1px solid #ddd;
+}
+
+.item-controls {
+  display: flex;
+  gap: 5px;
+}
+
+/* Karma advancement section */
+.karma-advancement {
+  display: flex;
+  flex-wrap: wrap;
+  margin-top: 10px;
+  border: 1px solid #8b0000;
+  padding: 10px;
+  background: white;
+}
+
+.advancement-fund, .karma-pool, .lifetime-total {
+  flex: 1;
+  min-width: 150px;
+  text-align: center;
+  margin-bottom: 10px;
+}
+
+.karma-advancement h3 {
+  color: #8b0000;
+  margin: 0 0 5px 0;
+  font-size: 14px;
+}
+
+.karma-buttons {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.karma-buttons button {
+  background: #8b0000;
+  color: white;
+  border: none;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+
+/* Input styling */
+input[type="text"], input[type="number"], select {
+  border: 1px solid #ccc;
+  padding: 2px 5px;
+  font-size: 13px;
+}
+
+button {
+  cursor: pointer;
+}
+
+/* Draggable items */
+[draggable="true"] {
+  cursor: grab;
+}
+
+[draggable="true"]:active {
+  cursor: grabbing;
+}
+
+/* Fix for tab display */
+.tab {
+  display: none;
+}
+
+.tab.active {
+  display: block !important;
+}
+
+/* Ensure sheet is visible */
+.faserip-sheet {
+  min-height: 400px;
+  background: white;
+  color: black;
+}
+
+/* More visible borders */
+.sheet-header, .abilities-container, .attributes-container {
+  border: 2px solid #8b0000 !important;
+}

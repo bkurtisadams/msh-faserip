@@ -6,26 +6,30 @@ import { rollFeat } from './macros.js';
 import { rollUniversalTable } from "./universalTable.js";
 
 Hooks.once("init", () => {
+  console.log("Marvel Super Heroes (FASERIP) system initializing...");
 
-  // Register custom Document Classes explicitly
+  // Register document classes
   CONFIG.Actor.documentClass = FaseripActor;
   CONFIG.Item.documentClass = FaseripItem;
 
-  // Unregister default sheets explicitly
+  // Register sheet application classes
   Actors.unregisterSheet("core", ActorSheet);
   Items.unregisterSheet("core", ItemSheet);
-
-  // Register your custom Sheets clearly
+  
   Actors.registerSheet("msh-faserip", FaseripActorSheet, { makeDefault: true });
   Items.registerSheet("msh-faserip", FaseripItemSheet, { makeDefault: true });
 
-  // Register Handlebars helpers explicitly
-  Handlebars.registerHelper('capitalize', (str) => {
-    if (typeof str !== "string" || !str.length) return "";
+  // Register Handlebars helpers
+  Handlebars.registerHelper('capitalize', function(str) {
+    if (typeof str !== 'string') return '';
     return str.charAt(0).toUpperCase() + str.slice(1);
   });
-
-  Handlebars.registerHelper('groupBy', (items, key) => {
+  
+  Handlebars.registerHelper('eq', function(a, b) {
+    return a === b;
+  });
+  
+  Handlebars.registerHelper('groupBy', function(items, key) {
     const groups = items.reduce((result, item) => {
       (result[item[key]] = result[item[key]] || []).push(item);
       return result;
@@ -33,11 +37,18 @@ Hooks.once("init", () => {
     return Object.entries(groups).map(([type, items]) => ({ type, items }));
   });
 
-  // Explicitly attach your macro functions to game namespace clearly
+  // Register system macros
   game.msh = {
     rollFeat: rollFeat,
     rollUniversalTable: rollUniversalTable
   };
 
   console.log("Marvel Super Heroes (FASERIP) system initialized!");
+});
+
+// Add a debug hook to help troubleshoot sheet rendering
+Hooks.on("renderActorSheet", (app, html, data) => {
+  console.log("Actor sheet rendered:", app.actor.name);
+  console.log("HTML length:", html.html().length);
+  console.log("Sheet data:", data);
 });

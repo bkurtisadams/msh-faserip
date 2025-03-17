@@ -1,48 +1,255 @@
 <form class="faserip-sheet">
-  <header class="sheet-header flexrow">
-    <img src="{{actor.img}}" data-edit="img" alt="{{actor.name}}" />
-    <h1 class="char-name"><input type="text" name="name" value="{{actor.name}}" /></h1>
-  </header>
-
-  <section class="primary-abilities">
-    <h2>Primary Abilities (FASERIP)</h2>
-    <div class="abilities-grid">
-      {{#each system.abilities as |ability key|}}
-        <div class="ability flexrow">
-          <label>{{capitalize key}}</label>
-          <input type="number" name="system.abilities.{{key}}.value" value="{{ability.value}}" />
-          <button type="button" class="feat-roll" data-ability="{{key}}">FEAT</button>
-        </div>
-      {{/each}}
-    </div>
-  </section>
-
-  <section class="secondary-attributes">
-    <label>Health:</label>
-    <input type="number" name="system.attributes.health.value" value="{{system.attributes.health.value}}" disabled /> /
-    <span>{{system.attributes.health.max}}</span>
-  
-    <label>Karma:</label>
-    <input type="number" name="system.attributes.karma.value" value="{{system.attributes.karma.value}}" disabled /> /
-    <span>{{system.attributes.karma.max}}</span>
-  
-    <label>Resources:</label>
-    <input type="text" name="system.attributes.resources.rank" value="{{system.attributes.resources.rank}}" />
-  </section>
-
-  <section class="item-sections" data-drop-zone="true">
-    {{#each (groupBy items 'type') as |items type|}}
-      <div class="item-section">
-        <h3>{{capitalize type}}</h3>
-        <ol class="item-list">
-          {{#each items}}
-            <li class="item flexrow" data-item-id="{{this._id}}" draggable="true">
-              <span>{{this.name}} {{#if this.system.rank}}({{this.system.rank}}){{/if}}</span>
-              <button type="button" class="item-use">Use</button>
-            </li>
-          {{/each}}
-        </ol>
+  <div class="sheet-header">
+    <div class="portrait-container">
+      <img src="{{actor.img}}" data-edit="img" alt="{{actor.name}}" class="portrait" />
+      <div class="hero-name">
+        <label>Hero's Name</label>
+        <input type="text" name="name" value="{{actor.name}}" />
       </div>
-    {{/each}}
-  </section>
+      <div class="hero-identity">
+        <label>Hero's Identity</label>
+        <input type="text" name="system.identity" value="{{system.identity}}" />
+        <div class="identity-type">
+          <label><input type="radio" name="system.identityType" value="secret" {{#if (eq system.identityType "secret")}}checked{{/if}} /> Secret</label>
+          <label><input type="radio" name="system.identityType" value="public" {{#if (eq system.identityType "public")}}checked{{/if}} /> Public</label>
+        </div>
+      </div>
+    </div>
+    
+    <div class="logo-container">
+      <img src="systems/msh-faserip/assets/marvel-logo.png" class="marvel-logo" />
+    </div>
+    
+    <div class="player-info">
+      <div class="form-group">
+        <label>Player Name</label>
+        <input type="text" name="system.player" value="{{system.player}}" />
+      </div>
+      <div class="form-group">
+        <label>Group Affiliation</label>
+        <input type="text" name="system.group" value="{{system.group}}" />
+      </div>
+      <div class="form-group">
+        <label>Base of Operations</label>
+        <input type="text" name="system.base" value="{{system.base}}" />
+      </div>
+      <div class="form-row">
+        <div class="form-group half">
+          <label>Age</label>
+          <input type="text" name="system.age" value="{{system.age}}" />
+        </div>
+        <div class="form-group half">
+          <label>Origin</label>
+          <input type="text" name="system.origin" value="{{system.origin}}" />
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sheet-body">
+    <div class="abilities-container">
+      <table class="abilities-table">
+        <thead>
+          <tr>
+            <th></th>
+            <th>Initial Roll</th>
+            <th>Initial Rank</th>
+            <th>Current Rank</th>
+            <th>Current Rank #</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{#each system.abilities as |ability key|}}
+            <tr>
+              <td class="ability-key">{{key}}</td>
+              <td><input type="number" name="system.abilities.{{key}}.initialRoll" value="{{ability.initialRoll}}" /></td>
+              <td><input type="text" name="system.abilities.{{key}}.initialRank" value="{{ability.initialRank}}" /></td>
+              <td>
+                <select name="system.abilities.{{key}}.rank">
+                  <option value="Shift-0" {{#if (eq ability.rank "Shift-0")}}selected{{/if}}>Shift-0</option>
+                  <option value="Feeble" {{#if (eq ability.rank "Feeble")}}selected{{/if}}>Feeble</option>
+                  <option value="Poor" {{#if (eq ability.rank "Poor")}}selected{{/if}}>Poor</option>
+                  <option value="Typical" {{#if (eq ability.rank "Typical")}}selected{{/if}}>Typical</option>
+                  <option value="Good" {{#if (eq ability.rank "Good")}}selected{{/if}}>Good</option>
+                  <option value="Excellent" {{#if (eq ability.rank "Excellent")}}selected{{/if}}>Excellent</option>
+                  <option value="Remarkable" {{#if (eq ability.rank "Remarkable")}}selected{{/if}}>Remarkable</option>
+                  <option value="Incredible" {{#if (eq ability.rank "Incredible")}}selected{{/if}}>Incredible</option>
+                  <option value="Amazing" {{#if (eq ability.rank "Amazing")}}selected{{/if}}>Amazing</option>
+                  <option value="Monstrous" {{#if (eq ability.rank "Monstrous")}}selected{{/if}}>Monstrous</option>
+                  <option value="Unearthly" {{#if (eq ability.rank "Unearthly")}}selected{{/if}}>Unearthly</option>
+                </select>
+              </td>
+              <td><input type="number" name="system.abilities.{{key}}.value" value="{{ability.value}}" /></td>
+            </tr>
+          {{/each}}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="attributes-container">
+      <table class="attributes-table">
+        <thead>
+          <tr>
+            <th>Health</th>
+            <th>Karma</th>
+            <th>Resources</th>
+            <th>Popularity</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="health-column">
+              <div class="current-max">
+                <input type="number" name="system.attributes.health.value" value="{{system.attributes.health.value}}" />
+                /
+                <input type="number" name="system.attributes.health.max" value="{{system.attributes.health.max}}" disabled />
+              </div>
+              <div class="movement">
+                <label>Run</label>
+                <input type="number" name="system.movement.run" value="{{system.movement.run}}" />
+              </div>
+            </td>
+            <td class="karma-column">
+              <div class="current-max">
+                <input type="number" name="system.attributes.karma.value" value="{{system.attributes.karma.value}}" />
+                /
+                <input type="number" name="system.attributes.karma.max" value="{{system.attributes.karma.max}}" disabled />
+              </div>
+              <div class="movement">
+                <label>Swim</label>
+                <input type="number" name="system.movement.swim" value="{{system.movement.swim}}" />
+              </div>
+            </td>
+            <td class="resources-column">
+              <select name="system.attributes.resources.rank">
+                <option value="Shift-0" {{#if (eq system.attributes.resources.rank "Shift-0")}}selected{{/if}}>Shift-0</option>
+                <option value="Feeble" {{#if (eq system.attributes.resources.rank "Feeble")}}selected{{/if}}>Feeble</option>
+                <option value="Poor" {{#if (eq system.attributes.resources.rank "Poor")}}selected{{/if}}>Poor</option>
+                <option value="Typical" {{#if (eq system.attributes.resources.rank "Typical")}}selected{{/if}}>Typical</option>
+                <option value="Good" {{#if (eq system.attributes.resources.rank "Good")}}selected{{/if}}>Good</option>
+                <option value="Excellent" {{#if (eq system.attributes.resources.rank "Excellent")}}selected{{/if}}>Excellent</option>
+                <option value="Remarkable" {{#if (eq system.attributes.resources.rank "Remarkable")}}selected{{/if}}>Remarkable</option>
+                <option value="Incredible" {{#if (eq system.attributes.resources.rank "Incredible")}}selected{{/if}}>Incredible</option>
+                <option value="Amazing" {{#if (eq system.attributes.resources.rank "Amazing")}}selected{{/if}}>Amazing</option>
+                <option value="Monstrous" {{#if (eq system.attributes.resources.rank "Monstrous")}}selected{{/if}}>Monstrous</option>
+                <option value="Unearthly" {{#if (eq system.attributes.resources.rank "Unearthly")}}selected{{/if}}>Unearthly</option>
+              </select>
+              <div class="movement">
+                <label>Fly</label>
+                <input type="number" name="system.movement.fly" value="{{system.movement.fly}}" />
+              </div>
+            </td>
+            <td class="popularity-column">
+              <div class="popularity-values">
+                <input type="number" name="system.attributes.popularity.value" value="{{system.attributes.popularity.value}}" />
+                /
+                <input type="number" name="system.attributes.popularity.max" value="{{system.attributes.popularity.max}}" />
+              </div>
+              <div class="movement">
+                <label>Teleport</label>
+                <input type="number" name="system.movement.teleport" value="{{system.movement.teleport}}" />
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      
+      <div class="resistances">
+        <button type="button" class="add-resistance">+ Add Resistance</button>
+        <div class="resistance-list">
+          {{#each system.resistances as |resistance i|}}
+            <div class="resistance-item">
+              <select name="system.resistances.{{i}}.type">
+                <option value="physical" {{#if (eq resistance.type "physical")}}selected{{/if}}>Physical</option>
+                <option value="energy" {{#if (eq resistance.type "energy")}}selected{{/if}}>Energy</option>
+                <option value="mental" {{#if (eq resistance.type "mental")}}selected{{/if}}>Mental</option>
+                <option value="magical" {{#if (eq resistance.type "magical")}}selected{{/if}}>Magical</option>
+              </select>
+              <select name="system.resistances.{{i}}.rank">
+                <!-- Same rank options as above -->
+                <option value="Good" {{#if (eq resistance.rank "Good")}}selected{{/if}}>Good</option>
+                <!-- Add other ranks -->
+              </select>
+              <input type="number" name="system.resistances.{{i}}.value" value="{{resistance.value}}" />
+              <button type="button" class="delete-resistance" data-index="{{i}}"><i class="fas fa-trash"></i></button>
+            </div>
+          {{/each}}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <nav class="tabs-navigation">
+      <a class="item" data-tab="powers"><i class="fas fa-bolt"></i> Powers</a>
+      <a class="item" data-tab="talents"><i class="fas fa-brain"></i> Talents</a>
+      <a class="item" data-tab="contacts"><i class="fas fa-address-book"></i> Contacts</a>
+      <a class="item" data-tab="equipment"><i class="fas fa-toolbox"></i> Equipment</a>
+      <a class="item" data-tab="headquarters"><i class="fas fa-home"></i> Headquarters</a>
+      <a class="item" data-tab="vehicles"><i class="fas fa-car"></i> Vehicles</a>
+    </nav>
+  
+    <section class="tab-content">
+      <div class="tab" data-tab="powers">
+        <!-- Powers tab content -->
+        <button type="button" class="add-power">+ Add Power</button>
+        <div class="powers-list">
+          {{#each powers}}
+          <div class="power-item item" data-item-id="{{this._id}}" draggable="true">
+            <div class="item-name">{{this.name}}</div>
+            <div class="item-rank">{{this.system.rank}}</div>
+            <div class="item-controls">
+              <a class="item-control item-edit"><i class="fas fa-edit"></i></a>
+              <a class="item-control item-delete"><i class="fas fa-trash"></i></a>
+            </div>
+          </div>
+          {{/each}}
+        </div>
+      </div>
+
+      <!-- Similar structure for other tabs -->
+      <div class="tab" data-tab="talents">
+        <button type="button" class="add-talent">+ Add Talent</button>
+        <div class="talents-list">
+          {{#each talents as |talent|}}
+            <div class="talent-item">
+              <input type="text" value="{{talent.name}}" disabled />
+              <button type="button" class="delete-talent" data-id="{{talent._id}}"><i class="fas fa-trash"></i></button>
+            </div>
+          {{/each}}
+        </div>
+      </div>
+
+      <div class="tab" data-tab="contacts">
+        <button type="button" class="add-contact">+ Add Contact</button>
+        <div class="contacts-list">
+          {{#each contacts as |contact|}}
+            <div class="contact-item">
+              <input type="text" value="{{contact.name}}" disabled />
+              <button type="button" class="delete-contact" data-id="{{contact._id}}"><i class="fas fa-trash"></i></button>
+            </div>
+          {{/each}}
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div class="karma-advancement">
+    <div class="advancement-fund">
+      <h3>Advancement Fund</h3>
+      <input type="number" name="system.karma.advancement" value="{{system.karma.advancement}}" />
+    </div>
+    <div class="karma-pool">
+      <h3>Karma Pool</h3>
+      <input type="number" name="system.karma.pool" value="{{system.karma.pool}}" />
+    </div>
+    <div class="lifetime-total">
+      <h3>Lifetime Total</h3>
+      <input type="number" name="system.karma.lifetime" value="{{system.karma.lifetime}}" />
+    </div>
+    <div class="karma-buttons">
+      <button type="button" class="karma-history">View Karma History</button>
+      <button type="button" class="karma-advancement">Karma Advancement</button>
+    </div>
+  </div>
 </form>

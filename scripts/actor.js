@@ -1,54 +1,62 @@
 export class FaseripActor extends Actor {
-
   prepareData() {
     super.prepareData();
 
-    const actorData = this.system;
+    // Get the actor data
+    const system = this.system;
 
-    // Explicitly ensure abilities exist
-    actorData.abilities = actorData.abilities || {};
-    actorData.abilities.fighting = actorData.abilities.fighting || { value: 10 };
-    actorData.abilities.agility = actorData.abilities.agility || { value: 10 };
-    actorData.abilities.strength = actorData.abilities.strength || { value: 10 };
-    actorData.abilities.endurance = actorData.abilities.endurance || { value: 10 };
-    actorData.abilities.reason = actorData.abilities.reason || { value: 10 };
-    actorData.abilities.intuition = actorData.abilities.intuition || { value: 10 };
-    actorData.abilities.psyche = actorData.abilities.psyche || { value: 10 };
-
-    // Clearly ensure attributes exist explicitly
-    actorData.attributes = actorData.attributes || {};
-    actorData.attributes.health = actorData.attributes.health || { value: 0, max: 0 };
-    actorData.attributes.karma = actorData.attributes.karma || { value: 0, max: 0 };
-    actorData.attributes.resources = actorData.attributes.resources || { rank: "Typical" };
-    actorData.attributes.popularity = actorData.attributes.popularity || { value: 0 };
-
-    // Automatically calculate Health (F + A + S + E)
-    actorData.attributes.health.max = abilitiesTotal([
-      abilitiesValue(actorData.abilities.fighting),
-      abilitiesValue(actorData.abilities.agility),
-      abilitiesValue(actorData.abilities.strength),
-      abilitiesValue(actorData.abilities.endurance)
-    ]);
-
-    actorData.attributes.health.value = actorData.attributes.health.max;
-
-    // Automatically calculate Karma (Reason + Intuition + Psyche)
-    actorData.attributes.karma.max = abilitiesTotal([
-      abilitiesValue(actorData.abilities.reason),
-      abilitiesValue(actorData.abilities.intuition),
-      abilitiesValue(actorData.abilities.psyche)
-    ]);
-
-    actorData.attributes.karma.value = actorData.attributes.karma.max;
-
-    function abilitiesValue(attr) {
-      return Number(attr?.value) || 0;
+    // Initialize abilities if not present
+    if (!system.abilities) {
+      system.abilities = {
+        fighting: { value: 10, rank: "Typical" },
+        agility: { value: 10, rank: "Typical" },
+        strength: { value: 10, rank: "Typical" },
+        endurance: { value: 10, rank: "Typical" },
+        reason: { value: 10, rank: "Typical" },
+        intuition: { value: 10, rank: "Typical" },
+        psyche: { value: 10, rank: "Typical" }
+      };
     }
 
-    function abilitiesTotal(arr) {
-      return arr.reduce((sum, num) => sum + num, 0);
+    // Initialize attributes if not present
+    if (!system.attributes) {
+      system.attributes = {
+        health: { value: 40, max: 40 },
+        karma: { value: 30, max: 30 },
+        resources: { rank: "Typical" },
+        popularity: { value: 0, max: 100 }
+      };
     }
+
+    // Initialize other required properties
+    if (!system.karma) {
+      system.karma = {
+        advancement: 0,
+        pool: 30,
+        lifetime: 0
+      };
+    }
+
+    if (!system.movement) {
+      system.movement = {
+        run: 1,
+        swim: 1,
+        fly: 0,
+        teleport: 0
+      };
+    }
+
+    // Calculate Health (F + A + S + E)
+    const fVal = parseInt(system.abilities.fighting?.value) || 0;
+    const aVal = parseInt(system.abilities.agility?.value) || 0;
+    const sVal = parseInt(system.abilities.strength?.value) || 0;
+    const eVal = parseInt(system.abilities.endurance?.value) || 0;
+    system.attributes.health.max = fVal + aVal + sVal + eVal;
+
+    // Calculate Karma (R + I + P)
+    const rVal = parseInt(system.abilities.reason?.value) || 0;
+    const iVal = parseInt(system.abilities.intuition?.value) || 0;
+    const pVal = parseInt(system.abilities.psyche?.value) || 0;
+    system.attributes.karma.max = rVal + iVal + pVal;
   }
-
-  // Remove the activateListeners method as it will now be handled in the sheet
 }

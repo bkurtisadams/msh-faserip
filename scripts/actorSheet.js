@@ -1,170 +1,178 @@
-// Since ActorSheet is available globally, use it directly
-// access HandlebarsApplicationMixin from foundry.applications.api
-
-const { HandlebarsApplicationMixin } = foundry.applications.api;
-
-export class FaseripActorSheet extends HandlebarsApplicationMixin(ActorSheet) {
-  
-  static DEFAULT_OPTIONS = {
-    ...super.DEFAULT_OPTIONS,
-    classes: ["faserip-sheet", "sheet", "actor"],
-    width: 600,
-    height: "auto",
-    // Define drag/drop config in default options
-    dragDrop: [{ dragSelector: '.item', dropSelector: '.faserip-sheet' }],
-    tabs: [{ navSelector: ".tabs", contentSelector: ".sheet-body", initial: "abilities" }],
-    parts: {
-      main: { template: "systems/msh-faserip/templates/actor-sheet.html" }
-    }
-  };
-
-  // Add private property for drag/drop instances
-  #dragDrop;
-
-  constructor(options) {
-    super(options);
-    // Initialize drag/drop in constructor
-    this.#dragDrop = this.#createDragDropHandlers();
-  }
-
-  /**
-   * Create drag-and-drop workflow handlers for this Application
-   * @returns {DragDrop[]}     An array of DragDrop handlers
-   * @private
-   */
-  #createDragDropHandlers() {
-    return this.options.dragDrop.map((d) => {
-      d.permissions = {
-        dragstart: this._canDragStart.bind(this),
-        drop: this._canDragDrop.bind(this),
-      };
-      d.callbacks = {
-        dragstart: this._onDragStart.bind(this),
-        dragover: this._onDragOver.bind(this),
-        drop: this._onDrop.bind(this),
-      };
-      return new DragDrop(d);
+export class FaseripActorSheet extends ActorSheet {
+  static get defaultOptions() {
+    return foundry.utils.mergeObject(super.defaultOptions, {
+      classes: ["faserip-sheet", "sheet", "actor"],
+      width: 600,
+      height: 700,
+      dragDrop: [{ dragSelector: '.item', dropSelector: '.faserip-sheet' }],
+      tabs: [{ navSelector: ".tabs-navigation", contentSelector: ".tab", initial: "powers" }],
+      template: "systems/msh-faserip/templates/actor-sheet.html"
     });
   }
 
-  async _prepareContext() {
-    const context = await super._prepareContext();
-    context.system = this.actor.system;
-    context.items = this.actor.items;
+  /** @override */
+  getData() {
+    const context = super.getData();
+    
+    // Initialize data structure if needed
+    if (!this.actor.system.abilities) {
+      this.actor.update({
+        "system.abilities": {
+          fighting: { value: 10, rank: "Typical" },
+          agility: { value: 10, rank: "Typical" },
+          strength: { value: 10, rank: "Typical" },
+          endurance: { value: 10, rank: "Typical" },
+          reason: { value: 10, rank: "Typical" },
+          intuition: { value: 10, rank: "Typical" },
+          psyche: { value: 10, rank: "Typical" }
+        }
+      });
+    }
+    
+    // Group items by type for easier access in the template
+    context.powers = this.actor.items.filter(item => item.type === "power");
+    context.talents = this.actor.items.filter(item => item.type === "talent");
+    context.contacts = this.actor.items.filter(item => item.type === "contact");
+    context.equipment = this.actor.items.filter(item => item.type === "equipment");
+    context.vehicles = this.actor.items.filter(item => item.type === "vehicle");
+    context.headquarters = this.actor.items.filter(item => item.type === "headquarters");
+    
+    console.log("Sheet context:", context); // Debug logging
+    
     return context;
   }
 
   /** @override */
-  _onRender(context, options) {
-    super._onRender(context, options);
+  activateListeners(html) {
+    super.activateListeners(html);
     
-    // Bind the drag/drop listeners after render
-    this.#dragDrop.forEach(dd => dd.bind(this.element));
+    // Item management
+    html.find('.item-edit').click(this._onItemEdit.bind(this));
+    html.find('.item-delete').click(this._onItemDelete.bind(this));
+    html.find('.add-power').click(this._onAddPower.bind(this));
+    html.find('.add-talent').click(this._onAddTalent.bind(this));
+    html.find('.add-contact').click(this._onAddContact.bind(this));
     
-    // Add FEAT roll event listeners
-    const featRolls = this.element.querySelectorAll('.feat-roll');
-    for (const button of featRolls) {
-      button.addEventListener('click', (event) => {
-        const abilityKey = event.currentTarget.dataset.ability;
-        game.msh.rollFeat(this.actor, abilityKey);
-      });
+    // FEAT rolls
+    html.find('.feat-roll').click(this._onFeatRoll.bind(this));
+    
+    // Add drag-drop handling
+    this._addDragDropListeners(html);
+  }
+  
+  /**
+   * Add drag and drop event listeners to HTML element
+   */
+  _addDragDropListeners(html) {
+    // Set up the drag events
+    const dragItems = html.find('[draggable="true"]');
+    dragItems.each((i, li) => {
+      li.addEventListener("dragstart", this._onDragStart.bind(this));
+    });
+    
+    // Set up the drop target
+    html[0].addEventListener("dragover", this._onDragOver.bind(this));
+    html[0].addEventListener("drop", this._onDrop.bind(this));
+  }
+  
+  /* Event Handler Methods */
+  
+  _onItemEdit(event) {
+    event.preventDefault();
+    const li = event.currentTarget.closest(".item");
+    const itemId = li.dataset.itemId;
+    const item = this.actor.items.get(itemId);
+    item.sheet.render(true);
+  }
+  
+  _onItemDelete(event) {
+    event.preventDefault();
+    const li = event.currentTarget.closest(".item");
+    const itemId = li.dataset.itemId;
+    if (itemId) {
+      this.actor.deleteEmbeddedDocuments("Item", [itemId]);
     }
-    
-    // Add item use event listeners
-    const itemUseButtons = this.element.querySelectorAll('.item .item-use');
-    for (const button of itemUseButtons) {
-      button.addEventListener('click', (event) => {
-        const itemId = event.currentTarget.closest(".item").dataset.itemId;
-        const item = this.actor.items.get(itemId);
-        this.itemMacro(item);
-      });
-    }
   }
-
-  /**
-   * Define whether a user is able to begin a dragstart workflow
-   * @param {string} selector       The candidate HTML selector for dragging
-   * @returns {boolean}             Can the current user drag this selector?
-   * @protected
-   */
-  _canDragStart(selector) {
-    return this.isEditable;
+  
+  _onAddPower(event) {
+    event.preventDefault();
+    this.actor.createEmbeddedDocuments("Item", [{
+      name: "New Power",
+      type: "power",
+      system: { rank: "Typical" }
+    }]);
   }
-
-  /**
-   * Define whether a user is able to conclude a drag-and-drop workflow
-   * @param {string} selector       The candidate HTML selector for the drop target
-   * @returns {boolean}             Can the current user drop on this selector?
-   * @protected
-   */
-  _canDragDrop(selector) {
-    return this.isEditable;
+  
+  _onAddTalent(event) {
+    event.preventDefault();
+    this.actor.createEmbeddedDocuments("Item", [{
+      name: "New Talent",
+      type: "talent"
+    }]);
   }
-
-  /**
-   * Handle the dragstart event
-   * @param {DragEvent} event       The originating dragstart event
-   * @protected
-   */
+  
+  _onAddContact(event) {
+    event.preventDefault();
+    this.actor.createEmbeddedDocuments("Item", [{
+      name: "New Contact",
+      type: "contact"
+    }]);
+  }
+  
+  _onFeatRoll(event) {
+    event.preventDefault();
+    const abilityKey = event.currentTarget.dataset.ability;
+    game.msh.rollFeat(this.actor, abilityKey);
+  }
+  
+  /* Drag and Drop Methods */
+  
   _onDragStart(event) {
     const itemId = event.currentTarget.dataset.itemId;
-    const item = this.actor.items.get(itemId);
-    if (!item) return;
+    if (!itemId) return;
     
-    const dragData = item.toDragData();
-    event.dataTransfer.setData('text/plain', JSON.stringify(dragData));
+    const item = this.actor.items.get(itemId);
+    event.dataTransfer.setData("text/plain", JSON.stringify({
+      type: "Item",
+      uuid: item.uuid,
+      id: item.id,
+      pack: item.pack,
+      name: item.name
+    }));
   }
-
-  /**
-   * Handle dragover event
-   * @param {DragEvent} event     The originating dragover event
-   * @protected
-   */
+  
   _onDragOver(event) {
-    // You can add special handling here if needed
+    event.preventDefault();
+    return false;
   }
-
-  /**
-   * Handle the drop event
-   * @param {DragEvent} event       The originating drop event
-   * @protected
-   */
+  
   async _onDrop(event) {
-    const data = TextEditor.getDragEventData(event);
-    if (!data.type || data.type !== "Item") return ui.notifications.warn("Only items can be dropped.");
-
+    event.preventDefault();
+    
+    // Get dropped data
+    let data;
+    try {
+      data = JSON.parse(event.dataTransfer.getData('text/plain'));
+    } catch (err) {
+      return false;
+    }
+    
+    if (!data || data.type !== "Item") return;
+    
+    // Handle dropped Item
     let item;
-
     if (data.uuid) {
-      const droppedItem = await fromUuid(data.uuid);
-      if (!droppedItem) {
-        ui.notifications.error("Item not found by UUID.");
-        return;
-      }
-      item = droppedItem.toObject();
+      item = await fromUuid(data.uuid);
     } else if (data.pack) {
       const pack = game.packs.get(data.pack);
-      if (!pack) return ui.notifications.error("Compendium pack not found.");
-      const document = await pack.getDocument(data.id);
-      item = document.toObject();
-    } else {
-      item = game.items.get(data.id)?.toObject();
-      if (!item) return ui.notifications.error("World item not found.");
+      item = await pack.getDocument(data.id);
+    } else if (data.id) {
+      item = game.items.get(data.id);
     }
-
-    delete item._id;
-    await this.actor.createEmbeddedDocuments("Item", [item]);
-  }
-
-  /**
-   * Item macro functionality
-   */
-  itemMacro(item) {
-    if (!item) return ui.notifications.warn("Item not found!");
-    if (item.type === "power") {
-      item.rollItem();
-    } else {
-      ui.notifications.info(`Macro not defined for item type: ${item.type}`);
-    }
+    
+    if (!item) return;
+    
+    // Create the owned item
+    return this.actor.createEmbeddedDocuments("Item", [item.toObject()]);
   }
 }
