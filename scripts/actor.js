@@ -5,18 +5,24 @@ export class FaseripActor extends Actor {
     // Get the actor data
     const system = this.system;
 
-    // Initialize abilities if not present
+    // Initialize abilities with complete structure
     if (!system.abilities) {
-      system.abilities = {
-        fighting: { value: 10, rank: "Typical" },
-        agility: { value: 10, rank: "Typical" },
-        strength: { value: 10, rank: "Typical" },
-        endurance: { value: 10, rank: "Typical" },
-        reason: { value: 10, rank: "Typical" },
-        intuition: { value: 10, rank: "Typical" },
-        psyche: { value: 10, rank: "Typical" }
-      };
+      system.abilities = {};
     }
+    
+    // Ensure each ability has all required properties
+    const abilityKeys = ['fighting', 'agility', 'strength', 'endurance', 'reason', 'intuition', 'psyche'];
+    abilityKeys.forEach(key => {
+      if (!system.abilities[key]) {
+        system.abilities[key] = {};
+      }
+      
+      // Set default values if missing
+      if (!system.abilities[key].value) system.abilities[key].value = 10;
+      if (!system.abilities[key].rank) system.abilities[key].rank = "Typical";
+      if (!system.abilities[key].initialRoll) system.abilities[key].initialRoll = "";
+      if (!system.abilities[key].initialRank) system.abilities[key].initialRank = "";
+    });
 
     // Initialize attributes if not present
     if (!system.attributes) {

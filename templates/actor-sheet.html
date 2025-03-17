@@ -59,29 +59,153 @@
           </tr>
         </thead>
         <tbody>
-          {{#each system.abilities as |ability key|}}
-            <tr>
-              <td class="ability-key">{{key}}</td>
-              <td><input type="number" name="system.abilities.{{key}}.initialRoll" value="{{ability.initialRoll}}" /></td>
-              <td><input type="text" name="system.abilities.{{key}}.initialRank" value="{{ability.initialRank}}" /></td>
-              <td>
-                <select name="system.abilities.{{key}}.rank">
-                  <option value="Shift-0" {{#if (eq ability.rank "Shift-0")}}selected{{/if}}>Shift-0</option>
-                  <option value="Feeble" {{#if (eq ability.rank "Feeble")}}selected{{/if}}>Feeble</option>
-                  <option value="Poor" {{#if (eq ability.rank "Poor")}}selected{{/if}}>Poor</option>
-                  <option value="Typical" {{#if (eq ability.rank "Typical")}}selected{{/if}}>Typical</option>
-                  <option value="Good" {{#if (eq ability.rank "Good")}}selected{{/if}}>Good</option>
-                  <option value="Excellent" {{#if (eq ability.rank "Excellent")}}selected{{/if}}>Excellent</option>
-                  <option value="Remarkable" {{#if (eq ability.rank "Remarkable")}}selected{{/if}}>Remarkable</option>
-                  <option value="Incredible" {{#if (eq ability.rank "Incredible")}}selected{{/if}}>Incredible</option>
-                  <option value="Amazing" {{#if (eq ability.rank "Amazing")}}selected{{/if}}>Amazing</option>
-                  <option value="Monstrous" {{#if (eq ability.rank "Monstrous")}}selected{{/if}}>Monstrous</option>
-                  <option value="Unearthly" {{#if (eq ability.rank "Unearthly")}}selected{{/if}}>Unearthly</option>
-                </select>
-              </td>
-              <td><input type="number" name="system.abilities.{{key}}.value" value="{{ability.value}}" /></td>
-            </tr>
-          {{/each}}
+          <tr>
+            <td class="ability-key">F</td>
+            <td><input type="number" name="system.abilities.fighting.initialRoll" value="{{system.abilities.fighting.initialRoll}}" /></td>
+            <td><input type="text" name="system.abilities.fighting.initialRank" value="{{system.abilities.fighting.initialRank}}" /></td>
+            <td>
+              <select name="system.abilities.fighting.rank">
+                <option value="Shift-0" {{#if (eq system.abilities.fighting.rank "Shift-0")}}selected{{/if}}>Shift-0</option>
+                <option value="Feeble" {{#if (eq system.abilities.fighting.rank "Feeble")}}selected{{/if}}>Feeble</option>
+                <option value="Poor" {{#if (eq system.abilities.fighting.rank "Poor")}}selected{{/if}}>Poor</option>
+                <option value="Typical" {{#if (eq system.abilities.fighting.rank "Typical")}}selected{{/if}}>Typical</option>
+                <option value="Good" {{#if (eq system.abilities.fighting.rank "Good")}}selected{{/if}}>Good</option>
+                <option value="Excellent" {{#if (eq system.abilities.fighting.rank "Excellent")}}selected{{/if}}>Excellent</option>
+                <option value="Remarkable" {{#if (eq system.abilities.fighting.rank "Remarkable")}}selected{{/if}}>Remarkable</option>
+                <option value="Incredible" {{#if (eq system.abilities.fighting.rank "Incredible")}}selected{{/if}}>Incredible</option>
+                <option value="Amazing" {{#if (eq system.abilities.fighting.rank "Amazing")}}selected{{/if}}>Amazing</option>
+                <option value="Monstrous" {{#if (eq system.abilities.fighting.rank "Monstrous")}}selected{{/if}}>Monstrous</option>
+                <option value="Unearthly" {{#if (eq system.abilities.fighting.rank "Unearthly")}}selected{{/if}}>Unearthly</option>
+              </select>
+            </td>
+            <td><input type="number" name="system.abilities.fighting.value" value="{{system.abilities.fighting.value}}" /></td>
+          </tr>
+          <tr>
+            <td class="ability-key">A</td>
+            <td><input type="number" name="system.abilities.agility.initialRoll" value="{{system.abilities.agility.initialRoll}}" /></td>
+            <td><input type="text" name="system.abilities.agility.initialRank" value="{{system.abilities.agility.initialRank}}" /></td>
+            <td>
+              <select name="system.abilities.agility.rank">
+                <option value="Shift-0" {{#if (eq system.abilities.agility.rank "Shift-0")}}selected{{/if}}>Shift-0</option>
+                <option value="Feeble" {{#if (eq system.abilities.agility.rank "Feeble")}}selected{{/if}}>Feeble</option>
+                <option value="Poor" {{#if (eq system.abilities.agility.rank "Poor")}}selected{{/if}}>Poor</option>
+                <option value="Typical" {{#if (eq system.abilities.agility.rank "Typical")}}selected{{/if}}>Typical</option>
+                <option value="Good" {{#if (eq system.abilities.agility.rank "Good")}}selected{{/if}}>Good</option>
+                <option value="Excellent" {{#if (eq system.abilities.agility.rank "Excellent")}}selected{{/if}}>Excellent</option>
+                <option value="Remarkable" {{#if (eq system.abilities.agility.rank "Remarkable")}}selected{{/if}}>Remarkable</option>
+                <option value="Incredible" {{#if (eq system.abilities.agility.rank "Incredible")}}selected{{/if}}>Incredible</option>
+                <option value="Amazing" {{#if (eq system.abilities.agility.rank "Amazing")}}selected{{/if}}>Amazing</option>
+                <option value="Monstrous" {{#if (eq system.abilities.agility.rank "Monstrous")}}selected{{/if}}>Monstrous</option>
+                <option value="Unearthly" {{#if (eq system.abilities.agility.rank "Unearthly")}}selected{{/if}}>Unearthly</option>
+              </select>
+            </td>
+            <td><input type="number" name="system.abilities.agility.value" value="{{system.abilities.agility.value}}" /></td>
+          </tr>
+          <tr>
+            <td class="ability-key">S</td>
+            <td><input type="number" name="system.abilities.strength.initialRoll" value="{{system.abilities.strength.initialRoll}}" /></td>
+            <td><input type="text" name="system.abilities.strength.initialRank" value="{{system.abilities.strength.initialRank}}" /></td>
+            <td>
+              <select name="system.abilities.strength.rank">
+                <option value="Shift-0" {{#if (eq system.abilities.strength.rank "Shift-0")}}selected{{/if}}>Shift-0</option>
+                <option value="Feeble" {{#if (eq system.abilities.strength.rank "Feeble")}}selected{{/if}}>Feeble</option>
+                <option value="Poor" {{#if (eq system.abilities.strength.rank "Poor")}}selected{{/if}}>Poor</option>
+                <option value="Typical" {{#if (eq system.abilities.strength.rank "Typical")}}selected{{/if}}>Typical</option>
+                <option value="Good" {{#if (eq system.abilities.strength.rank "Good")}}selected{{/if}}>Good</option>
+                <option value="Excellent" {{#if (eq system.abilities.strength.rank "Excellent")}}selected{{/if}}>Excellent</option>
+                <option value="Remarkable" {{#if (eq system.abilities.strength.rank "Remarkable")}}selected{{/if}}>Remarkable</option>
+                <option value="Incredible" {{#if (eq system.abilities.strength.rank "Incredible")}}selected{{/if}}>Incredible</option>
+                <option value="Amazing" {{#if (eq system.abilities.strength.rank "Amazing")}}selected{{/if}}>Amazing</option>
+                <option value="Monstrous" {{#if (eq system.abilities.strength.rank "Monstrous")}}selected{{/if}}>Monstrous</option>
+                <option value="Unearthly" {{#if (eq system.abilities.strength.rank "Unearthly")}}selected{{/if}}>Unearthly</option>
+              </select>
+            </td>
+            <td><input type="number" name="system.abilities.strength.value" value="{{system.abilities.strength.value}}" /></td>
+          </tr>
+          <tr>
+            <td class="ability-key">E</td>
+            <td><input type="number" name="system.abilities.endurance.initialRoll" value="{{system.abilities.endurance.initialRoll}}" /></td>
+            <td><input type="text" name="system.abilities.endurance.initialRank" value="{{system.abilities.endurance.initialRank}}" /></td>
+            <td>
+              <select name="system.abilities.endurance.rank">
+                <option value="Shift-0" {{#if (eq system.abilities.endurance.rank "Shift-0")}}selected{{/if}}>Shift-0</option>
+                <option value="Feeble" {{#if (eq system.abilities.endurance.rank "Feeble")}}selected{{/if}}>Feeble</option>
+                <option value="Poor" {{#if (eq system.abilities.endurance.rank "Poor")}}selected{{/if}}>Poor</option>
+                <option value="Typical" {{#if (eq system.abilities.endurance.rank "Typical")}}selected{{/if}}>Typical</option>
+                <option value="Good" {{#if (eq system.abilities.endurance.rank "Good")}}selected{{/if}}>Good</option>
+                <option value="Excellent" {{#if (eq system.abilities.endurance.rank "Excellent")}}selected{{/if}}>Excellent</option>
+                <option value="Remarkable" {{#if (eq system.abilities.endurance.rank "Remarkable")}}selected{{/if}}>Remarkable</option>
+                <option value="Incredible" {{#if (eq system.abilities.endurance.rank "Incredible")}}selected{{/if}}>Incredible</option>
+                <option value="Amazing" {{#if (eq system.abilities.endurance.rank "Amazing")}}selected{{/if}}>Amazing</option>
+                <option value="Monstrous" {{#if (eq system.abilities.endurance.rank "Monstrous")}}selected{{/if}}>Monstrous</option>
+                <option value="Unearthly" {{#if (eq system.abilities.endurance.rank "Unearthly")}}selected{{/if}}>Unearthly</option>
+              </select>
+            </td>
+            <td><input type="number" name="system.abilities.endurance.value" value="{{system.abilities.endurance.value}}" /></td>
+          </tr>
+          <tr>
+            <td class="ability-key">R</td>
+            <td><input type="number" name="system.abilities.reason.initialRoll" value="{{system.abilities.reason.initialRoll}}" /></td>
+            <td><input type="text" name="system.abilities.reason.initialRank" value="{{system.abilities.reason.initialRank}}" /></td>
+            <td>
+              <select name="system.abilities.reason.rank">
+                <option value="Shift-0" {{#if (eq system.abilities.reason.rank "Shift-0")}}selected{{/if}}>Shift-0</option>
+                <option value="Feeble" {{#if (eq system.abilities.reason.rank "Feeble")}}selected{{/if}}>Feeble</option>
+                <option value="Poor" {{#if (eq system.abilities.reason.rank "Poor")}}selected{{/if}}>Poor</option>
+                <option value="Typical" {{#if (eq system.abilities.reason.rank "Typical")}}selected{{/if}}>Typical</option>
+                <option value="Good" {{#if (eq system.abilities.reason.rank "Good")}}selected{{/if}}>Good</option>
+                <option value="Excellent" {{#if (eq system.abilities.reason.rank "Excellent")}}selected{{/if}}>Excellent</option>
+                <option value="Remarkable" {{#if (eq system.abilities.reason.rank "Remarkable")}}selected{{/if}}>Remarkable</option>
+                <option value="Incredible" {{#if (eq system.abilities.reason.rank "Incredible")}}selected{{/if}}>Incredible</option>
+                <option value="Amazing" {{#if (eq system.abilities.reason.rank "Amazing")}}selected{{/if}}>Amazing</option>
+                <option value="Monstrous" {{#if (eq system.abilities.reason.rank "Monstrous")}}selected{{/if}}>Monstrous</option>
+                <option value="Unearthly" {{#if (eq system.abilities.reason.rank "Unearthly")}}selected{{/if}}>Unearthly</option>
+              </select>
+            </td>
+            <td><input type="number" name="system.abilities.reason.value" value="{{system.abilities.reason.value}}" /></td>
+          </tr>
+          <tr>
+            <td class="ability-key">I</td>
+            <td><input type="number" name="system.abilities.intuition.initialRoll" value="{{system.abilities.intuition.initialRoll}}" /></td>
+            <td><input type="text" name="system.abilities.intuition.initialRank" value="{{system.abilities.intuition.initialRank}}" /></td>
+            <td>
+              <select name="system.abilities.intuition.rank">
+                <option value="Shift-0" {{#if (eq system.abilities.intuition.rank "Shift-0")}}selected{{/if}}>Shift-0</option>
+                <option value="Feeble" {{#if (eq system.abilities.intuition.rank "Feeble")}}selected{{/if}}>Feeble</option>
+                <option value="Poor" {{#if (eq system.abilities.intuition.rank "Poor")}}selected{{/if}}>Poor</option>
+                <option value="Typical" {{#if (eq system.abilities.intuition.rank "Typical")}}selected{{/if}}>Typical</option>
+                <option value="Good" {{#if (eq system.abilities.intuition.rank "Good")}}selected{{/if}}>Good</option>
+                <option value="Excellent" {{#if (eq system.abilities.intuition.rank "Excellent")}}selected{{/if}}>Excellent</option>
+                <option value="Remarkable" {{#if (eq system.abilities.intuition.rank "Remarkable")}}selected{{/if}}>Remarkable</option>
+                <option value="Incredible" {{#if (eq system.abilities.intuition.rank "Incredible")}}selected{{/if}}>Incredible</option>
+                <option value="Amazing" {{#if (eq system.abilities.intuition.rank "Amazing")}}selected{{/if}}>Amazing</option>
+                <option value="Monstrous" {{#if (eq system.abilities.intuition.rank "Monstrous")}}selected{{/if}}>Monstrous</option>
+                <option value="Unearthly" {{#if (eq system.abilities.intuition.rank "Unearthly")}}selected{{/if}}>Unearthly</option>
+              </select>
+            </td>
+            <td><input type="number" name="system.abilities.intuition.value" value="{{system.abilities.intuition.value}}" /></td>
+          </tr>
+          <tr>
+            <td class="ability-key">P</td>
+            <td><input type="number" name="system.abilities.psyche.initialRoll" value="{{system.abilities.psyche.initialRoll}}" /></td>
+            <td><input type="text" name="system.abilities.psyche.initialRank" value="{{system.abilities.psyche.initialRank}}" /></td>
+            <td>
+              <select name="system.abilities.psyche.rank">
+                <option value="Shift-0" {{#if (eq system.abilities.psyche.rank "Shift-0")}}selected{{/if}}>Shift-0</option>
+                <option value="Feeble" {{#if (eq system.abilities.psyche.rank "Feeble")}}selected{{/if}}>Feeble</option>
+                <option value="Poor" {{#if (eq system.abilities.psyche.rank "Poor")}}selected{{/if}}>Poor</option>
+                <option value="Typical" {{#if (eq system.abilities.psyche.rank "Typical")}}selected{{/if}}>Typical</option>
+                <option value="Good" {{#if (eq system.abilities.psyche.rank "Good")}}selected{{/if}}>Good</option>
+                <option value="Excellent" {{#if (eq system.abilities.psyche.rank "Excellent")}}selected{{/if}}>Excellent</option>
+                <option value="Remarkable" {{#if (eq system.abilities.psyche.rank "Remarkable")}}selected{{/if}}>Remarkable</option>
+                <option value="Incredible" {{#if (eq system.abilities.psyche.rank "Incredible")}}selected{{/if}}>Incredible</option>
+                <option value="Amazing" {{#if (eq system.abilities.psyche.rank "Amazing")}}selected{{/if}}>Amazing</option>
+                <option value="Monstrous" {{#if (eq system.abilities.psyche.rank "Monstrous")}}selected{{/if}}>Monstrous</option>
+                <option value="Unearthly" {{#if (eq system.abilities.psyche.rank "Unearthly")}}selected{{/if}}>Unearthly</option>
+              </select>
+            </td>
+            <td><input type="number" name="system.abilities.psyche.value" value="{{system.abilities.psyche.value}}" /></td>
+          </tr>
         </tbody>
       </table>
     </div>
