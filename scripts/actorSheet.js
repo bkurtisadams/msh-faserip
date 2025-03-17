@@ -4,8 +4,8 @@ export class FaseripActorSheet extends ActorSheet {
       classes: ["faserip-sheet", "sheet", "actor"],
       width: 600,
       height: 700,
-      dragDrop: [{ 
-        dragSelector: ".item", 
+      dragDrop: [{
+        dragSelector: ".item",
         dropSelector: ".sheet-tab-content" // More general drop target
       }],
       // Fix these selectors to exactly match your HTML structure
@@ -15,9 +15,36 @@ export class FaseripActorSheet extends ActorSheet {
   }
 
   /** @override */
+  async _updateObject(event, formData) {
+    // Log the raw form data first
+    console.log("Raw form data:", formData);
+    
+    // Handle form data expansion properly for nested data
+    const expandedData = foundry.utils.expandObject(formData);
+    
+    console.log("Form update object:", expandedData);
+    
+    try {
+      // Log before update - use the correct Foundry V12 utility function
+      console.log("Actor before update:", foundry.utils.duplicate(this.actor.system));
+      
+      // Update using the parent class method which handles all the proper update logic
+      const result = await super._updateObject(event, formData);
+      
+      // Log after update - use the correct Foundry V12 utility function
+      console.log("Actor after update:", foundry.utils.duplicate(this.actor.system));
+      
+      return result;
+    } catch (error) {
+      console.error("Error updating actor:", error);
+      return null;
+    }
+}
+
+  /** @override */
   getData() {
     const context = super.getData();
-    
+
     // Initialize data structure if needed
     if (!this.actor.system.abilities) {
       this.actor.update({
@@ -32,7 +59,7 @@ export class FaseripActorSheet extends ActorSheet {
         }
       });
     }
-    
+
     // Group items by type for easier access in the template
     context.powers = this.actor.items.filter(item => item.type === "power");
     context.talents = this.actor.items.filter(item => item.type === "talent");
@@ -40,15 +67,18 @@ export class FaseripActorSheet extends ActorSheet {
     context.equipment = this.actor.items.filter(item => item.type === "equipment");
     context.vehicles = this.actor.items.filter(item => item.type === "vehicle");
     context.headquarters = this.actor.items.filter(item => item.type === "headquarters");
-    
+
     console.log("Sheet context:", context); // Debug logging
-    
+
     return context;
   }
 
-    /** @override */
-    activateListeners(html) {
-      super.activateListeners(html);
+  /** @override */
+  activateListeners(html) {
+    super.activateListeners(html);
+
+    // ADD THIS FIRST - Handle input changes
+    html.find('input,select,textarea').change(this._onChangeInput.bind(this));
 
     // DEBUG - Log what tab elements we're finding
     console.log("Tabs object:", this._tabs[0]);
@@ -58,74 +88,118 @@ export class FaseripActorSheet extends ActorSheet {
     // Activate tabs - use Foundry's system but with correct selectors
     const tabs = this._tabs[0];
     if (tabs) {
-      // Remove this line - it's causing issues
-      // tabs.bind(html[0]);
-      
-      // Instead, manually set the active tab
+
+      // manually set the active tab
       const activeTab = tabs.active || "powers";
       html.find(`.sheet-tabs-navigation .item[data-tab="${activeTab}"]`).addClass("active");
       html.find(`.tab[data-tab="${activeTab}"]`).addClass("active");
-      
-      // Add our own click handler that works with the sheet structure
+
+      // click handler that works with the sheet structure
       html.find('.sheet-tabs-navigation .item').click(ev => {
         ev.preventDefault();
         const tabName = ev.currentTarget.dataset.tab;
         if (!tabName) return;
-        
+
         // Update UI classes
         html.find('.sheet-tabs-navigation .item').removeClass("active");
         html.find('.tab').removeClass("active");
         ev.currentTarget.classList.add("active");
         html.find(`.tab[data-tab="${tabName}"]`).addClass("active");
-        
-        // Update tabs data structure
+
+        // Update tab state
         tabs.active = tabName;
       });
-  }
 
-      // Activate the first tab by default
-      html.find('.tabs-navigation a:first').click();
-      
-      // Item management
-      html.find('.item-edit').click(this._onItemEdit.bind(this));
-      html.find('.item-delete').click(this._onItemDelete.bind(this));
-      html.find('.add-power').click(this._onAddPower.bind(this));
-      html.find('.add-talent').click(this._onAddTalent.bind(this));
-      html.find('.add-contact').click(this._onAddContact.bind(this));
-      
-      // Power info display
-      html.find('.power-info, .power-image').click(this._onPowerInfo.bind(this));
-      
-      // Power roll
-      html.find('.power-roll').click(this._onPowerRoll.bind(this));
-      
-      // Browse compendium
-      html.find('.browse-compendium').click(this._onBrowseCompendium.bind(this));
-      
-      // FEAT rolls
-      html.find('.feat-roll').click(this._onFeatRoll.bind(this));
-      
-      // Add drag-drop handling
-      this._addDragDropListeners(html);
-      
-      // Debug: Log information about powers
-      console.log("Powers count:", this.actor.items.filter(i => i.type === "power").length);
-      console.log("First tab:", html.find('.tabs-navigation a:first').data('tab'));
+      // Remove this line completely (it's using wrong selector)
+      // html.find('.tabs-navigation a:first').click();;
     }
 
-/**
- * Handle clicking on a power's info icon or image
- * @param {Event} event The originating click event
- * @private
- */
-_onPowerInfo(event) {
-  event.preventDefault();
-  const itemId = event.currentTarget.dataset.itemId;
-  const item = this.actor.items.get(itemId);
-  
-  if (!item) return;
-  
-  const content = `
+    // Activate the first tab by default
+    html.find('.tabs-navigation a:first').click();
+
+    // Item management
+    html.find('.item-edit').click(this._onItemEdit.bind(this));
+    html.find('.item-delete').click(this._onItemDelete.bind(this));
+    html.find('.add-power').click(this._onAddPower.bind(this));
+    html.find('.add-talent').click(this._onAddTalent.bind(this));
+    html.find('.add-contact').click(this._onAddContact.bind(this));
+
+    // Power info display
+    html.find('.power-info, .power-image').click(this._onPowerInfo.bind(this));
+
+    // Power roll
+    html.find('.power-roll').click(this._onPowerRoll.bind(this));
+
+    // Browse compendium
+    html.find('.browse-compendium').click(this._onBrowseCompendium.bind(this));
+
+    // FEAT rolls
+    html.find('.feat-roll').click(this._onFeatRoll.bind(this));
+
+    // Add drag-drop handling
+    this._addDragDropListeners(html);
+
+    // Debug: Log information about powers
+    console.log("Powers count:", this.actor.items.filter(i => i.type === "power").length);
+    console.log("First tab:", html.find('.tabs-navigation a:first').data('tab'));
+  }
+
+  /**
+   * Handle input changes on the sheet
+   * @param {Event} event   The originating change event
+   * @private
+   */
+  _onChangeInput(event) {
+    event.preventDefault();
+    const input = event.currentTarget;
+    const name = input.name;
+    let value = input.value;
+
+    // Handle checkbox/radio inputs
+    if (input.type === "checkbox") {
+      value = input.checked;
+    } else if (input.type === "radio" && !input.checked) {
+      return; // Only handle checked radio buttons
+    }
+
+    console.log(`Input changed: ${name} = ${value}`);
+
+    // Create update data with proper structure
+    const updateData = {};
+    const parts = name.split('.');
+
+    // Simple path like "name"
+    if (parts.length === 1) {
+      updateData[name] = value;
+    }
+    // Nested path like "system.identity"
+    else {
+      let obj = updateData;
+      for (let i = 0; i < parts.length - 1; i++) {
+        const part = parts[i];
+        obj[part] = obj[part] || {};
+        obj = obj[part];
+      }
+      obj[parts[parts.length - 1]] = value;
+    }
+
+    console.log("Updating with:", updateData);
+    return this.actor.update(updateData);
+  }
+
+  /**
+   * Handle clicking on a power's info icon or image
+   * @param {Event} event The originating click event
+   * @private
+   */
+  _onPowerInfo(event) {
+    event.preventDefault();
+    const itemId = event.currentTarget.dataset.itemId;
+    const item = this.actor.items.get(itemId);
+
+    if (!item) return;
+
+    const content = `
     <div class="power-info-dialog">
       <h2>${item.name}</h2>
       <div class="power-details">
@@ -150,73 +224,73 @@ _onPowerInfo(event) {
       </div>
     </div>
   `;
-  
-  new Dialog({
-    title: `Power Information: ${item.name}`,
-    content: content,
-    buttons: {
-      close: {
-        icon: '<i class="fas fa-check"></i>',
-        label: "Close"
-      }
-    },
-    default: "close"
-  }).render(true);
-}
 
-/**
- * Handle power roll button click
- * @param {Event} event The originating click event
- * @private
- */
-_onPowerRoll(event) {
-  event.preventDefault();
-  const itemId = event.currentTarget.dataset.itemId;
-  const item = this.actor.items.get(itemId);
-  
-  if (!item) return;
-  
-  // Call rollItem method from the item
-  if (typeof item.rollItem === 'function') {
-    item.rollItem();
-  } else {
-    // Fallback if item doesn't have rollItem method
-    const roll = new Roll("1d100").evaluate({async: false});
-    const rank = item.system.rank || "Typical";
-    const result = game.msh.rollUniversalTable(rank, roll.total);
-    
-    ChatMessage.create({
-      speaker: ChatMessage.getSpeaker({ actor: this.actor }),
-      content: `
+    new Dialog({
+      title: `Power Information: ${item.name}`,
+      content: content,
+      buttons: {
+        close: {
+          icon: '<i class="fas fa-check"></i>',
+          label: "Close"
+        }
+      },
+      default: "close"
+    }).render(true);
+  }
+
+  /**
+   * Handle power roll button click
+   * @param {Event} event The originating click event
+   * @private
+   */
+  _onPowerRoll(event) {
+    event.preventDefault();
+    const itemId = event.currentTarget.dataset.itemId;
+    const item = this.actor.items.get(itemId);
+
+    if (!item) return;
+
+    // Call rollItem method from the item
+    if (typeof item.rollItem === 'function') {
+      item.rollItem();
+    } else {
+      // Fallback if item doesn't have rollItem method
+      const roll = new Roll("1d100").evaluate({ async: false });
+      const rank = item.system.rank || "Typical";
+      const result = game.msh.rollUniversalTable(rank, roll.total);
+
+      ChatMessage.create({
+        speaker: ChatMessage.getSpeaker({ actor: this.actor }),
+        content: `
         <h3>${item.name} (${rank})</h3>
         <div>Roll: ${roll.total}</div>
         <div>Result: <span style="color:green">${result}</span></div>
         <div>${item.system.description || ''}</div>
       `
-    });
+      });
+    }
   }
-}
 
-/**
- * Handle browsing a compendium
- * @param {Event} event The originating click event 
- * @private
- */
-_onBrowseCompendium(event) {
-  event.preventDefault();
-  const type = event.currentTarget.dataset.type;
-  
-  const packKey = `msh-faserip.${type}`;
-  const pack = game.packs.get(packKey);
-  
-  if (!pack) {
-    ui.notifications.error(`Compendium pack ${packKey} not found.`);
-    return;
+  /**
+   * Handle browsing a compendium
+   * @param {Event} event The originating click event 
+   * @private
+   */
+  _onBrowseCompendium(event) {
+    event.preventDefault();
+    const type = event.currentTarget.dataset.type;
+
+    const packKey = `msh-faserip.${type}`;
+    const pack = game.packs.get(packKey);
+
+    if (!pack) {
+      ui.notifications.error(`Compendium pack ${packKey} not found.`);
+      return;
+    }
+
+    pack.render(true);
   }
-  
-  pack.render(true);
-}
-  
+
   /**
    * Add drag and drop event listeners to HTML element
    */
@@ -226,14 +300,14 @@ _onBrowseCompendium(event) {
     dragItems.each((i, li) => {
       li.addEventListener("dragstart", this._onDragStart.bind(this));
     });
-    
+
     // Set up the drop target
     html[0].addEventListener("dragover", this._onDragOver.bind(this));
     html[0].addEventListener("drop", this._onDrop.bind(this));
   }
-  
+
   /* Event Handler Methods */
-  
+
   _onItemEdit(event) {
     event.preventDefault();
     const li = event.currentTarget.closest(".item");
@@ -241,7 +315,7 @@ _onBrowseCompendium(event) {
     const item = this.actor.items.get(itemId);
     item.sheet.render(true);
   }
-  
+
   _onItemDelete(event) {
     event.preventDefault();
     const li = event.currentTarget.closest(".item");
@@ -250,7 +324,7 @@ _onBrowseCompendium(event) {
       this.actor.deleteEmbeddedDocuments("Item", [itemId]);
     }
   }
-  
+
   _onAddPower(event) {
     event.preventDefault();
     this.actor.createEmbeddedDocuments("Item", [{
@@ -262,7 +336,7 @@ _onBrowseCompendium(event) {
       }
     }]);
   }
-  
+
   _onAddTalent(event) {
     event.preventDefault();
     this.actor.createEmbeddedDocuments("Item", [{
@@ -270,7 +344,7 @@ _onBrowseCompendium(event) {
       type: "talent"
     }]);
   }
-  
+
   _onAddContact(event) {
     event.preventDefault();
     this.actor.createEmbeddedDocuments("Item", [{
@@ -278,19 +352,19 @@ _onBrowseCompendium(event) {
       type: "contact"
     }]);
   }
-  
+
   _onFeatRoll(event) {
     event.preventDefault();
     const abilityKey = event.currentTarget.dataset.ability;
     game.msh.rollFeat(this.actor, abilityKey);
   }
-  
+
   /* Drag and Drop Methods */
-  
+
   _onDragStart(event) {
     const itemId = event.currentTarget.dataset.itemId;
     if (!itemId) return;
-    
+
     const item = this.actor.items.get(itemId);
     event.dataTransfer.setData("text/plain", JSON.stringify({
       type: "Item",
@@ -300,15 +374,15 @@ _onBrowseCompendium(event) {
       name: item.name
     }));
   }
-  
+
   _onDragOver(event) {
     event.preventDefault();
     return false;
   }
-  
+
   async _onDrop(event) {
     event.preventDefault();
-    
+
     try {
       // Get dropped data
       let data;
@@ -319,20 +393,20 @@ _onBrowseCompendium(event) {
         console.error("Could not parse drop data:", err);
         return false;
       }
-      
+
       if (!data) {
         console.warn("No data in drop event");
         return false;
       }
-      
+
       if (data.type !== "Item") {
         console.warn("Dropped data is not an item:", data.type);
         return false;
       }
-      
+
       // Handle dropped Item
       let item;
-      
+
       // First try direct UUID retrieval (most reliable)
       if (data.uuid) {
         try {
@@ -342,7 +416,7 @@ _onBrowseCompendium(event) {
           console.error("Error retrieving item via UUID:", err);
         }
       }
-      
+
       // If no item found yet, try pack + id
       if (!item && data.pack) {
         try {
@@ -357,19 +431,19 @@ _onBrowseCompendium(event) {
           console.error("Error retrieving item from pack:", err);
         }
       }
-      
+
       // Last resort - try world item collection
       if (!item && data.id) {
         item = game.items.get(data.id);
         console.log("Retrieved world item:", item);
       }
-      
+
       if (!item) {
         console.error("Could not retrieve item from drop data:", data);
         ui.notifications.error("Could not find the dropped item.");
         return false;
       }
-      
+
       // Create the owned item
       console.log("Creating embedded document from:", item.toObject());
       return this.actor.createEmbeddedDocuments("Item", [item.toObject()]);

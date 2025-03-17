@@ -1,73 +1,130 @@
 {
-    "Actor": {
-      "types": ["hero", "villain", "npc"],
-      "templates": {
-        "hero": {
-          "abilities": {
-            "fighting": { "value": 10, "label": "Fighting", "rank": "Good" },
-            "agility": { "value": 10, "label": "Agility", "rank": "Good" },
-            "strength": { "value": 10, "label": "Strength", "rank": "Good" },
-            "endurance": { "value": 10, "label": "Endurance","rank": "Good" },
-            "reason": { "value": 10, "label": "Reason","rank": "Good" },
-            "intuition": { "value": 10, "label": "Intuition","rank": "Good" },
-            "psyche": { "value": 10, "label": "Psyche","rank": "Good" }
-          },
-          "attributes": {
-            "health": { "value": 40, "max": 40 },
-            "karma": { "value": 30, "max": 30 },
-            "resources": { "rank": "Typical" },
-            "popularity": { "value": 10 }
+  "Actor": {
+    "types": ["hero", "villain", "npc"],
+    "templates": {
+      "base": {
+        "identity": "",
+        "identityType": "secret",
+        "player": "",
+        "group": "",
+        "base": "",
+        "age": "",
+        "origin": "",
+        "description": ""
+      },
+      "abilities": {
+        "abilities": {
+          "fighting": { "value": 10, "initialRoll": "", "initialRank": "", "rank": "Good" },
+          "agility": { "value": 10, "initialRoll": "", "initialRank": "", "rank": "Good" },
+          "strength": { "value": 10, "initialRoll": "", "initialRank": "", "rank": "Good" },
+          "endurance": { "value": 10, "initialRoll": "", "initialRank": "", "rank": "Good" },
+          "reason": { "value": 10, "initialRoll": "", "initialRank": "", "rank": "Good" },
+          "intuition": { "value": 10, "initialRoll": "", "initialRank": "", "rank": "Good" },
+          "psyche": { "value": 10, "initialRoll": "", "initialRank": "", "rank": "Good" }
+        }
+      },
+      "derived": {
+        "attributes": {
+          "health": { "value": 40, "max": 40 },
+          "karma": { "value": 30, "max": 30 },
+          "resources": { "rank": "Typical", "value": 6 },
+          "popularity": { 
+            "hero": { "value": 10, "max": 100, "isNegative": false },
+            "secretId": { "value": 0, "max": 100, "isNegative": false }
           }
-        },
-        "villain": {
-          "abilities": {
-            "fighting": { "value": 10 },
-            "agility": { "value": 10 },
-            "strength": { "value": 10 },
-            "endurance": { "value": 10 },
-            "reason": { "value": 10 },
-            "intuition": { "value": 10 },
-            "psyche": { "value": 10 }
-          },
-          "attributes": {
-            "health": { "value": 40, "max": 40 },
-            "karma": { "value": 30, "max": 30 }
-          }
-        },
-        "npc": {
-          "description": ""
+        }
+      },
+      "movement": {
+        "movement": {
+          "run": 1,
+          "swim": 1,
+          "fly": 0,
+          "teleport": 0,
+          "other": []
+        }
+      },
+      "progress": {
+        "karma": {
+          "advancement": 0,
+          "pool": 30,
+          "lifetime": 0,
+          "history": []
         }
       }
     },
-    "Item": {
-      "types": ["power", "talent", "contact", "equipment", "vehicle", "headquarters"],
-      "templates": {
-        "power": {
-          "powerRank": "Typical",
-          "description": ""
-        },
-        "talent": {
-          "description": ""
-        },
-        "contact": {
-          "description": ""
-        },
-        "equipment": {
-          "description": "",
-          "materialStrength": "Typical"
-        },
-        "vehicle": {
-          "speed": 0,
-          "materialStrength": "Typical",
-          "description": ""
-        },
-        "headquarters": {
-          "location": "",
-          "size": "",
-          "materialStrength": "Typical",
-          "description": ""
-        }
+    "hero": {
+      "templates": ["base", "abilities", "derived", "movement", "progress"],
+      "powerOrigin": "altered human",
+      "isMutant": false,
+      "resistances": []
+    },
+    "villain": {
+      "templates": ["base", "abilities", "derived", "movement", "progress"],
+      "powerOrigin": "altered human",
+      "isMutant": false,
+      "resistances": []
+    },
+    "npc": {
+      "templates": ["base", "abilities", "derived", "movement", "progress"]
+    }
+  },
+  "Item": {
+    "types": ["power", "talent", "contact", "equipment", "vehicle", "headquarters"],
+    "templates": {
+      "base": {
+        "description": ""
+      },
+      "ranked": {
+        "rank": "Typical",
+        "value": 6
       }
+    },
+    "power": {
+      "templates": ["base", "ranked"],
+      "type": "",
+      "subtype": "",
+      "range": "",
+      "area": "",
+      "duration": "",
+      "limitations": "",
+      "isLimited": false,
+      "isActive": true,
+      "source": "",
+      "stunts": []
+    },
+    "talent": {
+      "templates": ["base"],
+      "bonus": "+1CS",
+      "abilityModified": "",
+      "type": "",
+      "specialty": ""
+    },
+    "contact": {
+      "templates": ["base"],
+      "type": "",
+      "disposition": "Friendly",
+      "specialties": [],
+      "location": ""
+    },
+    "equipment": {
+      "templates": ["base", "ranked"],
+      "subtype": "",
+      "materialStrength": "Typical",
+      "range": "",
+      "damage": 0
+    },
+    "vehicle": {
+      "templates": ["base"],
+      "speed": 0,
+      "materialStrength": "Typical",
+      "handling": ""
+    },
+    "headquarters": {
+      "templates": ["base"],
+      "location": "",
+      "size": "",
+      "materialStrength": "Typical",
+      "features": []
     }
   }
-  
+}
