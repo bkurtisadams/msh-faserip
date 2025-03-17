@@ -4,7 +4,11 @@ export class FaseripActorSheet extends ActorSheet {
       classes: ["faserip-sheet", "sheet", "actor"],
       width: 600,
       height: 700,
-      dragDrop: [{ dragSelector: '.item', dropSelector: '.faserip-sheet' }],
+      // Fix the selectors
+      dragDrop: [{ 
+        dragSelector: ".item", 
+        dropSelector: ".powers-list, .talents-list, .contacts-list, .equipment-list, .headquarters-list, .vehicles-list" 
+      }],
       tabs: [{ navSelector: ".tabs-navigation", contentSelector: ".tab", initial: "powers" }],
       template: "systems/msh-faserip/templates/actor-sheet.html"
     });
@@ -99,7 +103,10 @@ export class FaseripActorSheet extends ActorSheet {
     this.actor.createEmbeddedDocuments("Item", [{
       name: "New Power",
       type: "power",
-      system: { rank: "Typical" }
+      system: {
+        rank: "Typical",
+        description: ""
+      }
     }]);
   }
   
@@ -149,30 +156,74 @@ export class FaseripActorSheet extends ActorSheet {
   async _onDrop(event) {
     event.preventDefault();
     
-    // Get dropped data
-    let data;
     try {
-      data = JSON.parse(event.dataTransfer.getData('text/plain'));
+      // Get dropped data
+      let data;
+      try {
+        data = JSON.parse(event.dataTransfer.getData('text/plain'));
+        console.log("Drop data:", data); // Debugging
+      } catch (err) {
+        console.error("Could not parse drop data:", err);
+        return false;
+      }
+      
+      if (!data) {
+        console.warn("No data in drop event");
+        return false;
+      }
+      
+      if (data.type !== "Item") {
+        console.warn("Dropped data is not an item:", data.type);
+        return false;
+      }
+      
+      // Handle dropped Item
+      let item;
+      
+      // First try direct UUID retrieval (most reliable)
+      if (data.uuid) {
+        try {
+          item = await fromUuid(data.uuid);
+          console.log("Retrieved item via UUID:", item);
+        } catch (err) {
+          console.error("Error retrieving item via UUID:", err);
+        }
+      }
+      
+      // If no item found yet, try pack + id
+      if (!item && data.pack) {
+        try {
+          const pack = game.packs.get(data.pack);
+          if (pack) {
+            item = await pack.getDocument(data.id);
+            console.log("Retrieved item from pack:", item);
+          } else {
+            console.warn("Pack not found:", data.pack);
+          }
+        } catch (err) {
+          console.error("Error retrieving item from pack:", err);
+        }
+      }
+      
+      // Last resort - try world item collection
+      if (!item && data.id) {
+        item = game.items.get(data.id);
+        console.log("Retrieved world item:", item);
+      }
+      
+      if (!item) {
+        console.error("Could not retrieve item from drop data:", data);
+        ui.notifications.error("Could not find the dropped item.");
+        return false;
+      }
+      
+      // Create the owned item
+      console.log("Creating embedded document from:", item.toObject());
+      return this.actor.createEmbeddedDocuments("Item", [item.toObject()]);
     } catch (err) {
+      console.error("Uncaught error in drop handler:", err);
+      ui.notifications.error("Error processing dropped item.");
       return false;
     }
-    
-    if (!data || data.type !== "Item") return;
-    
-    // Handle dropped Item
-    let item;
-    if (data.uuid) {
-      item = await fromUuid(data.uuid);
-    } else if (data.pack) {
-      const pack = game.packs.get(data.pack);
-      item = await pack.getDocument(data.id);
-    } else if (data.id) {
-      item = game.items.get(data.id);
-    }
-    
-    if (!item) return;
-    
-    // Create the owned item
-    return this.actor.createEmbeddedDocuments("Item", [item.toObject()]);
   }
 }
