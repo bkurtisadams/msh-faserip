@@ -46,23 +46,159 @@ export class FaseripActorSheet extends ActorSheet {
     return context;
   }
 
-  /** @override */
-  activateListeners(html) {
-    super.activateListeners(html);
+    /** @override */
+    activateListeners(html) {
+      super.activateListeners(html);
+      
+      // Tab activation - simplified approach
+      html.find('.tabs-navigation a').click(ev => {
+        ev.preventDefault();
+        const tabName = ev.currentTarget.dataset.tab;
+        
+        // Remove active class from all tabs and contents
+        html.find('.tabs-navigation a').removeClass('active');
+        html.find('.tab').removeClass('active');
+        
+        // Add active class to clicked tab and corresponding content
+        ev.currentTarget.classList.add('active');
+        html.find(`.tab[data-tab="${tabName}"]`).addClass('active');
+        
+        console.log(`Tab switched to: ${tabName}`); // Debug log
+      });
+      
+      // Activate the first tab by default
+      html.find('.tabs-navigation a:first').click();
+      
+      // Item management
+      html.find('.item-edit').click(this._onItemEdit.bind(this));
+      html.find('.item-delete').click(this._onItemDelete.bind(this));
+      html.find('.add-power').click(this._onAddPower.bind(this));
+      html.find('.add-talent').click(this._onAddTalent.bind(this));
+      html.find('.add-contact').click(this._onAddContact.bind(this));
+      
+      // Power info display
+      html.find('.power-info, .power-image').click(this._onPowerInfo.bind(this));
+      
+      // Power roll
+      html.find('.power-roll').click(this._onPowerRoll.bind(this));
+      
+      // Browse compendium
+      html.find('.browse-compendium').click(this._onBrowseCompendium.bind(this));
+      
+      // FEAT rolls
+      html.find('.feat-roll').click(this._onFeatRoll.bind(this));
+      
+      // Add drag-drop handling
+      this._addDragDropListeners(html);
+      
+      // Debug: Log information about powers
+      console.log("Powers count:", this.actor.items.filter(i => i.type === "power").length);
+      console.log("First tab:", html.find('.tabs-navigation a:first').data('tab'));
+    }
+
+/**
+ * Handle clicking on a power's info icon or image
+ * @param {Event} event The originating click event
+ * @private
+ */
+_onPowerInfo(event) {
+  event.preventDefault();
+  const itemId = event.currentTarget.dataset.itemId;
+  const item = this.actor.items.get(itemId);
+  
+  if (!item) return;
+  
+  const content = `
+    <div class="power-info-dialog">
+      <h2>${item.name}</h2>
+      <div class="power-details">
+        <div class="label">Rank:</div>
+        <div class="value">${item.system.rank || 'None'}</div>
+        
+        <div class="label">Value:</div>
+        <div class="value">${item.system.value || '0'}</div>
+        
+        <div class="label">Range:</div>
+        <div class="value">${item.system.range || 'None'}</div>
+        
+        <div class="label">Type:</div>
+        <div class="value">${item.system.type || 'None'}</div>
+        
+        <div class="label">Source:</div>
+        <div class="value">${item.system.source || 'None'}</div>
+      </div>
+      
+      <div class="description">
+        ${item.system.description || 'No description available.'}
+      </div>
+    </div>
+  `;
+  
+  new Dialog({
+    title: `Power Information: ${item.name}`,
+    content: content,
+    buttons: {
+      close: {
+        icon: '<i class="fas fa-check"></i>',
+        label: "Close"
+      }
+    },
+    default: "close"
+  }).render(true);
+}
+
+/**
+ * Handle power roll button click
+ * @param {Event} event The originating click event
+ * @private
+ */
+_onPowerRoll(event) {
+  event.preventDefault();
+  const itemId = event.currentTarget.dataset.itemId;
+  const item = this.actor.items.get(itemId);
+  
+  if (!item) return;
+  
+  // Call rollItem method from the item
+  if (typeof item.rollItem === 'function') {
+    item.rollItem();
+  } else {
+    // Fallback if item doesn't have rollItem method
+    const roll = new Roll("1d100").evaluate({async: false});
+    const rank = item.system.rank || "Typical";
+    const result = game.msh.rollUniversalTable(rank, roll.total);
     
-    // Item management
-    html.find('.item-edit').click(this._onItemEdit.bind(this));
-    html.find('.item-delete').click(this._onItemDelete.bind(this));
-    html.find('.add-power').click(this._onAddPower.bind(this));
-    html.find('.add-talent').click(this._onAddTalent.bind(this));
-    html.find('.add-contact').click(this._onAddContact.bind(this));
-    
-    // FEAT rolls
-    html.find('.feat-roll').click(this._onFeatRoll.bind(this));
-    
-    // Add drag-drop handling
-    this._addDragDropListeners(html);
+    ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor: this.actor }),
+      content: `
+        <h3>${item.name} (${rank})</h3>
+        <div>Roll: ${roll.total}</div>
+        <div>Result: <span style="color:green">${result}</span></div>
+        <div>${item.system.description || ''}</div>
+      `
+    });
   }
+}
+
+/**
+ * Handle browsing a compendium
+ * @param {Event} event The originating click event 
+ * @private
+ */
+_onBrowseCompendium(event) {
+  event.preventDefault();
+  const type = event.currentTarget.dataset.type;
+  
+  const packKey = `msh-faserip.${type}`;
+  const pack = game.packs.get(packKey);
+  
+  if (!pack) {
+    ui.notifications.error(`Compendium pack ${packKey} not found.`);
+    return;
+  }
+  
+  pack.render(true);
+}
   
   /**
    * Add drag and drop event listeners to HTML element

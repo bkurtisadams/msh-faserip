@@ -179,59 +179,109 @@
   margin-bottom: 5px;
 }
 
-/* Tabs */
-.tabs {
+/* Tabs - scoped to faserip-sheet */
+/* New sheet-specific tab system that won't interfere with Foundry UI */
+.faserip-sheet .sheet-tabs {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
   margin-top: 10px;
 }
 
-.tabs-navigation {
+.faserip-sheet .sheet-tabs-navigation {
   display: flex;
   border-bottom: 2px solid #8b0000;
+  width: 100%;
 }
 
-.tabs-navigation a {
+.faserip-sheet .sheet-tabs-navigation a {
   padding: 8px 15px;
   background: #ddd;
   color: #333;
-  text-decoration: none;
   border: 1px solid #8b0000;
   border-bottom: none;
   margin-right: 2px;
   border-radius: 5px 5px 0 0;
+  cursor: pointer;
+  text-decoration: none;
 }
 
-.tabs-navigation a.active {
+.faserip-sheet .sheet-tabs-navigation a.active {
   background: #8b0000;
   color: white;
 }
 
-.tab-content {
+.faserip-sheet .sheet-tab-content {
   border: 1px solid #8b0000;
   border-top: none;
   padding: 10px;
+  width: 100%;
   background: white;
 }
 
-.tab {
+.faserip-sheet .sheet-tab {
   display: none;
+  width: 100%;
 }
 
-.tab.active {
+.faserip-sheet .sheet-tab.active {
   display: block;
 }
 
-.power-item, .talent-item, .contact-item {
+/* Power-specific styling */
+.faserip-sheet .powers-controls {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.faserip-sheet .powers-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.faserip-sheet .powers-table th {
+  background: #8b0000;
+  color: white;
+  padding: 5px;
+  text-align: left;
+}
+
+.faserip-sheet .powers-table td {
+  padding: 5px;
+  text-align: left;
+  border-bottom: 1px solid #ddd;
+}
+
+.faserip-sheet .power-name {
   display: flex;
   align-items: center;
   gap: 5px;
-  margin-bottom: 5px;
-  padding: 5px;
-  border: 1px solid #ddd;
 }
 
-.item-controls {
+.faserip-sheet .power-icon {
+  border: 1px solid #ccc;
+}
+
+.faserip-sheet .power-controls {
   display: flex;
-  gap: 5px;
+  gap: 10px;
+  justify-content: center;
+}
+
+.faserip-sheet .item-control {
+  cursor: pointer;
+}
+
+.faserip-sheet .item-control:hover {
+  color: #8b0000;
+}
+
+.faserip-sheet .no-powers {
+  text-align: center;
+  font-style: italic;
+  color: #666;
+  padding: 20px;
 }
 
 /* Karma advancement section */
@@ -312,4 +362,97 @@ button {
 /* More visible borders */
 .sheet-header, .abilities-container, .attributes-container {
   border: 2px solid #8b0000 !important;
+}
+
+/* Powers Tab Styling */
+.powers-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.powers-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 10px;
+}
+
+.powers-table th {
+  background: #8b0000;
+  color: white;
+  font-weight: bold;
+  text-align: center;
+  padding: 5px;
+}
+
+.powers-table td {
+  padding: 5px;
+  text-align: center;
+  border-bottom: 1px solid #ccc;
+}
+
+.power-icon img {
+  width: 32px;
+  height: 32px;
+  border: 1px solid #777;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.power-name {
+  text-align: left;
+  font-weight: bold;
+}
+
+.power-controls {
+  display: flex;
+  justify-content: center;
+  gap: 5px;
+}
+
+.power-controls a {
+  cursor: pointer;
+}
+
+.power-controls a:hover {
+  color: #8b0000;
+}
+
+.no-powers {
+  font-style: italic;
+  color: #777;
+  text-align: center;
+  padding: 20px;
+}
+
+/* Power info dialog */
+.power-info-dialog {
+  max-width: 500px;
+}
+
+.power-info-dialog .dialog-content {
+  padding: 0 10px;
+}
+
+.power-info-dialog h2 {
+  color: #8b0000;
+  border-bottom: 1px solid #ccc;
+  padding-bottom: 5px;
+}
+
+.power-info-dialog .power-details {
+  display: grid;
+  grid-template-columns: 100px 1fr;
+  gap: 5px;
+  margin-bottom: 10px;
+}
+
+.power-info-dialog .power-details .label {
+  font-weight: bold;
+}
+
+.power-info-dialog .description {
+  border-top: 1px solid #ccc;
+  padding-top: 10px;
+  margin-top: 10px;
 }

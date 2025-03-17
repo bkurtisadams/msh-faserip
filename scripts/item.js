@@ -7,6 +7,10 @@ export class FaseripItem extends Item {
     switch (this.type) {
       case "power":
         itemData.rank = itemData.rank || "Typical";
+        itemData.value = itemData.value || 0;
+        itemData.range = itemData.range || "";
+        itemData.type = itemData.type || "";
+        itemData.source = itemData.source || "";
         itemData.description = itemData.description || "";
         break;
   
@@ -58,8 +62,10 @@ export class FaseripItem extends Item {
     ChatMessage.create({
       speaker: ChatMessage.getSpeaker({ actor }),
       content: `
-        <strong>${this.name} (${rank}):</strong> ${roll.total} - <span style="color:green">${result}</span><br>
-        ${this.system.description}
+        <h3>${this.name} (${rank})</h3>
+        <div>Roll: ${roll.total}</div>
+        <div>Result: <span style="color:green">${result}</span></div>
+        <div>${this.system.description || ''}</div>
       `
     });
   }
