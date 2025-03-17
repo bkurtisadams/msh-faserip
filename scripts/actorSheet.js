@@ -4,12 +4,12 @@ export class FaseripActorSheet extends ActorSheet {
       classes: ["faserip-sheet", "sheet", "actor"],
       width: 600,
       height: 700,
-      // Fix the selectors
       dragDrop: [{ 
         dragSelector: ".item", 
-        dropSelector: ".powers-list, .talents-list, .contacts-list, .equipment-list, .headquarters-list, .vehicles-list" 
+        dropSelector: ".sheet-tab-content" // More general drop target
       }],
-      tabs: [{ navSelector: ".tabs-navigation", contentSelector: ".tab", initial: "powers" }],
+      // Fix these selectors to exactly match your HTML structure
+      tabs: [{ navSelector: ".sheet-tabs-navigation .item", contentSelector: ".tab", initial: "powers" }],
       template: "systems/msh-faserip/templates/actor-sheet.html"
     });
   }
@@ -49,23 +49,40 @@ export class FaseripActorSheet extends ActorSheet {
     /** @override */
     activateListeners(html) {
       super.activateListeners(html);
+
+    // DEBUG - Log what tab elements we're finding
+    console.log("Tabs object:", this._tabs[0]);
+    console.log("Tab navigation:", html.find('.sheet-tabs-navigation .item').length);
+    console.log("Tab content:", html.find('.tab').length);
+
+    // Activate tabs - use Foundry's system but with correct selectors
+    const tabs = this._tabs[0];
+    if (tabs) {
+      // Remove this line - it's causing issues
+      // tabs.bind(html[0]);
       
-      // Tab activation - simplified approach
-      html.find('.tabs-navigation a').click(ev => {
+      // Instead, manually set the active tab
+      const activeTab = tabs.active || "powers";
+      html.find(`.sheet-tabs-navigation .item[data-tab="${activeTab}"]`).addClass("active");
+      html.find(`.tab[data-tab="${activeTab}"]`).addClass("active");
+      
+      // Add our own click handler that works with the sheet structure
+      html.find('.sheet-tabs-navigation .item').click(ev => {
         ev.preventDefault();
         const tabName = ev.currentTarget.dataset.tab;
+        if (!tabName) return;
         
-        // Remove active class from all tabs and contents
-        html.find('.tabs-navigation a').removeClass('active');
-        html.find('.tab').removeClass('active');
+        // Update UI classes
+        html.find('.sheet-tabs-navigation .item').removeClass("active");
+        html.find('.tab').removeClass("active");
+        ev.currentTarget.classList.add("active");
+        html.find(`.tab[data-tab="${tabName}"]`).addClass("active");
         
-        // Add active class to clicked tab and corresponding content
-        ev.currentTarget.classList.add('active');
-        html.find(`.tab[data-tab="${tabName}"]`).addClass('active');
-        
-        console.log(`Tab switched to: ${tabName}`); // Debug log
+        // Update tabs data structure
+        tabs.active = tabName;
       });
-      
+  }
+
       // Activate the first tab by default
       html.find('.tabs-navigation a:first').click();
       

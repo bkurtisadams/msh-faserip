@@ -179,22 +179,26 @@
   margin-bottom: 5px;
 }
 
-/* Tabs - scoped to faserip-sheet */
-/* New sheet-specific tab system that won't interfere with Foundry UI */
+/* Tab system - consolidated and fixed */
 .faserip-sheet .sheet-tabs {
   display: flex;
   flex-direction: column;
   width: 100%;
   margin-top: 10px;
+  border: 1px solid #8b0000;
+  background: white;
 }
 
+/* Navigation container */
 .faserip-sheet .sheet-tabs-navigation {
   display: flex;
   border-bottom: 2px solid #8b0000;
   width: 100%;
+  background: #f0f0f0;
 }
 
-.faserip-sheet .sheet-tabs-navigation a {
+/* Tab navigation items - unified selectors */
+.faserip-sheet .sheet-tabs-navigation .item {
   padding: 8px 15px;
   background: #ddd;
   color: #333;
@@ -206,26 +210,20 @@
   text-decoration: none;
 }
 
-.faserip-sheet .sheet-tabs-navigation a.active {
+.faserip-sheet .sheet-tabs-navigation .item.active {
   background: #8b0000;
   color: white;
+  font-weight: bold;
 }
 
+/* Tab content container */
 .faserip-sheet .sheet-tab-content {
-  border: 1px solid #8b0000;
-  border-top: none;
   padding: 10px;
   width: 100%;
+  min-height: 200px;
+  border: 1px solid #8b0000;
+  border-top: none;
   background: white;
-}
-
-.faserip-sheet .sheet-tab {
-  display: none;
-  width: 100%;
-}
-
-.faserip-sheet .sheet-tab.active {
-  display: block;
 }
 
 /* Power-specific styling */
@@ -282,6 +280,15 @@
   font-style: italic;
   color: #666;
   padding: 20px;
+}
+
+/* This rule needs to target the correct elements */
+.faserip-sheet .sheet-tabs-navigation .item {
+  /* styling */
+}
+
+.faserip-sheet .sheet-tabs-navigation .item.active {
+  /* active styling */
 }
 
 /* Karma advancement section */
@@ -341,11 +348,6 @@ button {
 
 [draggable="true"]:active {
   cursor: grabbing;
-}
-
-/* Fix for tab display */
-.tab {
-  display: none;
 }
 
 .tab.active {
