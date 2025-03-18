@@ -27,10 +27,18 @@
         <label>Player Name</label>
         <input type="text" name="system.player" value="{{system.player}}" />
       </div>
+      <!-- 
       <div class="form-group">
         <label>Group Affiliation</label>
-        <input type="text" name="system.group" value="{{system.group}}" />
+        <input type="text" id="group-affiliation" name="system.group" value="{{system.group}}" />
       </div>
+ -->
+      <div class="form-group special-group-field">
+        <label>Group Affiliation</label>
+        <input type="text" id="special-group-field" data-field="system.group" value="{{system.group}}" />
+        <button type="button" class="save-group">Save</button>
+      </div>
+
       <div class="form-group">
         <label>Base of Operations</label>
         <input type="text" name="system.base" value="{{system.base}}" />

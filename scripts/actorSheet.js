@@ -10,52 +10,48 @@ export class FaseripActorSheet extends ActorSheet {
       }],
       // Fix these selectors to exactly match your HTML structure
       tabs: [{ navSelector: ".sheet-tabs-navigation .item", contentSelector: ".tab", initial: "powers" }],
-      template: "systems/msh-faserip/templates/actor-sheet.html"
+      template: "systems/msh-faserip/templates/actor-sheet.html",
+      form: {
+        submitOnChange: true,  // This is crucial - auto-submit on change
+        closeOnSubmit: false   // Don't close the sheet after submitting
+      }
     });
   }
 
-  /** @override */
-  async _updateObject(event, formData) {
-    // Log the raw form data first
-    console.log("Raw form data:", formData);
+/** @override */
+async _updateObject(event, formData) {
+
+  console.log("Raw form data:", formData);
     
-    // Create a clean copy of formData we can safely manipulate
-    const cleanData = foundry.utils.deepClone(formData);
-    
-    // Process form data to fix any type conversion issues
-    for (let [key, value] of Object.entries(cleanData)) {
-        // Convert empty strings for numbers to actual numbers
-        if (value === "" && (key.includes("value") || key.includes("initialRoll"))) {
-            cleanData[key] = 0;
-        }
-        // Convert numeric strings to actual numbers
-        else if (!isNaN(Number(value)) && typeof value === "string" && value.trim() !== "") {
-            cleanData[key] = Number(value);
-        }
+    // Special check for group field
+    if ("system.group" in formData) {
+        console.log("Group field found in submission:", formData["system.group"]);
+    } else {
+        console.log("⚠️ Group field MISSING from submission");
     }
     
-    // Handle form data expansion properly for nested data
-    const expandedData = foundry.utils.expandObject(cleanData);
-    
-    console.log("Form update object:", expandedData);
-    
-    try {
-        // Log before update - use the correct Foundry V12 utility function
-        console.log("Actor before update:", foundry.utils.duplicate(this.actor.system));
-        
-        // Update using the parent class method which handles all the proper update logic
-        // Use the cleaned data instead of the raw formData
-        const result = await super._updateObject(event, cleanData);
-        
-        // Log after update - use the correct Foundry V12 utility function
-        console.log("Actor after update:", foundry.utils.duplicate(this.actor.system));
-        
-        return result;
-    } catch (error) {
-        console.error("Error updating actor:", error);
-        ui.notifications.error("Error updating character sheet: " + error.message);
-        return null;
-    }
+  // Handle nested data structure - expand the data first
+  const expandedData = foundry.utils.expandObject(formData);
+  
+  console.log("Raw form data:", formData);
+  console.log("Expanded data:", expandedData);
+  
+  try {
+      // Log before update for debugging
+      console.log("Actor before update:", foundry.utils.duplicate(this.actor.system));
+      
+      // Let the parent class handle the update with the expanded data
+      const result = await super._updateObject(event, formData);
+      
+      // Log after update to verify changes
+      console.log("Actor after update:", foundry.utils.duplicate(this.actor.system));
+      
+      return result;
+  } catch (error) {
+      console.error("Error updating actor:", error);
+      ui.notifications.error("Error updating character sheet: " + error.message);
+      return null;
+  }
 }
 
   /** @override */
@@ -94,13 +90,29 @@ export class FaseripActorSheet extends ActorSheet {
   activateListeners(html) {
     super.activateListeners(html);
 
-    // ADD THIS FIRST - Handle input changes
-    html.find('input,select,textarea').change(this._onChangeInput.bind(this));
-
     // DEBUG - Log what tab elements we're finding
     console.log("Tabs object:", this._tabs[0]);
     console.log("Tab navigation:", html.find('.sheet-tabs-navigation .item').length);
     console.log("Tab content:", html.find('.tab').length);
+
+    //
+    // Special handler just for group affiliation
+    html.find('input[name="system.group"]').on('blur', (event) => {
+      const value = event.currentTarget.value;
+      console.log("Group field blur event:", value);
+      this.actor.update({"system.group": value});
+    });
+
+    // Button event handler for group
+    html.find('.save-group').click((event) => {
+      const input = html.find('#special-group-field')[0];
+      const value = input.value;
+      const field = input.dataset.field;
+      console.log(`Saving ${field} with value ${value}`);
+      this.actor.update({[field]: value});
+    });
+    //
+    //
 
     // Activate tabs - use Foundry's system but with correct selectors
     const tabs = this._tabs[0];
@@ -127,8 +139,6 @@ export class FaseripActorSheet extends ActorSheet {
         tabs.active = tabName;
       });
 
-      // Remove this line completely (it's using wrong selector)
-      // html.find('.tabs-navigation a:first').click();;
     }
 
     // Activate the first tab by default
@@ -171,27 +181,46 @@ export class FaseripActorSheet extends ActorSheet {
     const input = event.currentTarget;
     const name = input.name;
     let value = input.value;
-  
-    // Handle checkbox/radio inputs
+
+    // Special debug handling for group field
+    if (name === "system.group") {
+      console.log("GROUP FIELD DETECTED!");
+      console.log("Input:", input);
+      console.log("Current value:", value);
+
+      // Try an alternative update approach specifically for this field
+      const updateData = {};
+      updateData["system.group"] = value;
+
+      console.log("Special update for group:", updateData);
+
+      // Log the actor's current data structure
+      console.log("Actor system before update:", foundry.utils.deepClone(this.actor.system));
+
+      return this.actor.update(updateData)
+        .then(() => {
+          console.log("Group update SUCCESS");
+          console.log("Actor system after update:", foundry.utils.deepClone(this.actor.system));
+        })
+        .catch(err => console.error("Group update FAILED:", err));
+    }
+
+    // Regular handling for other fields
     if (input.type === "checkbox") {
       value = input.checked;
     } else if (input.type === "radio" && !input.checked) {
       return; // Only handle checked radio buttons
     }
-  
-    // For number inputs, parse to actual number
-    if (input.type === "number") {
-      value = input.value ? Number(input.value) : null;
-    }
-  
+
     console.log(`Input changed: ${name} = ${value}`);
-  
-    // Create the update data object using the full path
+
     const updateData = {};
     updateData[name] = value;
-  
+
     console.log("Updating with:", updateData);
-    return this.actor.update(updateData);
+    return this.actor.update(updateData)
+      .then(() => console.log(`Successfully updated ${name} to ${value}`))
+      .catch(err => console.error(`Failed to update ${name}:`, err));
   }
 
   /**
