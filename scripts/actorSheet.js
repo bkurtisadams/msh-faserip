@@ -19,25 +19,42 @@ export class FaseripActorSheet extends ActorSheet {
     // Log the raw form data first
     console.log("Raw form data:", formData);
     
+    // Create a clean copy of formData we can safely manipulate
+    const cleanData = foundry.utils.deepClone(formData);
+    
+    // Process form data to fix any type conversion issues
+    for (let [key, value] of Object.entries(cleanData)) {
+        // Convert empty strings for numbers to actual numbers
+        if (value === "" && (key.includes("value") || key.includes("initialRoll"))) {
+            cleanData[key] = 0;
+        }
+        // Convert numeric strings to actual numbers
+        else if (!isNaN(Number(value)) && typeof value === "string" && value.trim() !== "") {
+            cleanData[key] = Number(value);
+        }
+    }
+    
     // Handle form data expansion properly for nested data
-    const expandedData = foundry.utils.expandObject(formData);
+    const expandedData = foundry.utils.expandObject(cleanData);
     
     console.log("Form update object:", expandedData);
     
     try {
-      // Log before update - use the correct Foundry V12 utility function
-      console.log("Actor before update:", foundry.utils.duplicate(this.actor.system));
-      
-      // Update using the parent class method which handles all the proper update logic
-      const result = await super._updateObject(event, formData);
-      
-      // Log after update - use the correct Foundry V12 utility function
-      console.log("Actor after update:", foundry.utils.duplicate(this.actor.system));
-      
-      return result;
+        // Log before update - use the correct Foundry V12 utility function
+        console.log("Actor before update:", foundry.utils.duplicate(this.actor.system));
+        
+        // Update using the parent class method which handles all the proper update logic
+        // Use the cleaned data instead of the raw formData
+        const result = await super._updateObject(event, cleanData);
+        
+        // Log after update - use the correct Foundry V12 utility function
+        console.log("Actor after update:", foundry.utils.duplicate(this.actor.system));
+        
+        return result;
     } catch (error) {
-      console.error("Error updating actor:", error);
-      return null;
+        console.error("Error updating actor:", error);
+        ui.notifications.error("Error updating character sheet: " + error.message);
+        return null;
     }
 }
 
@@ -154,35 +171,25 @@ export class FaseripActorSheet extends ActorSheet {
     const input = event.currentTarget;
     const name = input.name;
     let value = input.value;
-
+  
     // Handle checkbox/radio inputs
     if (input.type === "checkbox") {
       value = input.checked;
     } else if (input.type === "radio" && !input.checked) {
       return; // Only handle checked radio buttons
     }
-
+  
+    // For number inputs, parse to actual number
+    if (input.type === "number") {
+      value = input.value ? Number(input.value) : null;
+    }
+  
     console.log(`Input changed: ${name} = ${value}`);
-
-    // Create update data with proper structure
+  
+    // Create the update data object using the full path
     const updateData = {};
-    const parts = name.split('.');
-
-    // Simple path like "name"
-    if (parts.length === 1) {
-      updateData[name] = value;
-    }
-    // Nested path like "system.identity"
-    else {
-      let obj = updateData;
-      for (let i = 0; i < parts.length - 1; i++) {
-        const part = parts[i];
-        obj[part] = obj[part] || {};
-        obj = obj[part];
-      }
-      obj[parts[parts.length - 1]] = value;
-    }
-
+    updateData[name] = value;
+  
     console.log("Updating with:", updateData);
     return this.actor.update(updateData);
   }
