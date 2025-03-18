@@ -282,15 +282,6 @@
   padding: 20px;
 }
 
-/* This rule needs to target the correct elements */
-.faserip-sheet .sheet-tabs-navigation .item {
-  /* styling */
-}
-
-.faserip-sheet .sheet-tabs-navigation .item.active {
-  /* active styling */
-}
-
 /* Karma advancement section */
 .karma-advancement {
   display: flex;

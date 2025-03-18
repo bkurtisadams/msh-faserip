@@ -19,38 +19,23 @@ export class FaseripActorSheet extends ActorSheet {
   }
 
 /** @override */
+/** @override */
 async _updateObject(event, formData) {
-
+  // Log the raw form data for debugging
   console.log("Raw form data:", formData);
-    
-    // Special check for group field
-    if ("system.group" in formData) {
-        console.log("Group field found in submission:", formData["system.group"]);
-    } else {
-        console.log("⚠️ Group field MISSING from submission");
-    }
-    
-  // Handle nested data structure - expand the data first
-  const expandedData = foundry.utils.expandObject(formData);
-  
-  console.log("Raw form data:", formData);
-  console.log("Expanded data:", expandedData);
   
   try {
-      // Log before update for debugging
-      console.log("Actor before update:", foundry.utils.duplicate(this.actor.system));
-      
-      // Let the parent class handle the update with the expanded data
-      const result = await super._updateObject(event, formData);
-      
-      // Log after update to verify changes
-      console.log("Actor after update:", foundry.utils.duplicate(this.actor.system));
-      
-      return result;
+    // Let the parent class handle the update
+    const result = await super._updateObject(event, formData);
+    
+    // Log after update to verify changes were applied
+    console.log("Actor after update:", this.actor.system);
+    
+    return result;
   } catch (error) {
-      console.error("Error updating actor:", error);
-      ui.notifications.error("Error updating character sheet: " + error.message);
-      return null;
+    console.error("Error updating actor:", error);
+    ui.notifications.error("Error updating character sheet: " + error.message);
+    return null;
   }
 }
 
@@ -89,61 +74,37 @@ async _updateObject(event, formData) {
   /** @override */
   activateListeners(html) {
     super.activateListeners(html);
-
+    
     // DEBUG - Log what tab elements we're finding
     console.log("Tabs object:", this._tabs[0]);
     console.log("Tab navigation:", html.find('.sheet-tabs-navigation .item').length);
     console.log("Tab content:", html.find('.tab').length);
-
-    //
-    // Special handler just for group affiliation
-    html.find('input[name="system.group"]').on('blur', (event) => {
-      const value = event.currentTarget.value;
-      console.log("Group field blur event:", value);
-      this.actor.update({"system.group": value});
-    });
-
-    // Button event handler for group
-    html.find('.save-group').click((event) => {
-      const input = html.find('#special-group-field')[0];
-      const value = input.value;
-      const field = input.dataset.field;
-      console.log(`Saving ${field} with value ${value}`);
-      this.actor.update({[field]: value});
-    });
-    //
-    //
-
+    
     // Activate tabs - use Foundry's system but with correct selectors
     const tabs = this._tabs[0];
     if (tabs) {
-
-      // manually set the active tab
+      // Manually set the active tab
       const activeTab = tabs.active || "powers";
       html.find(`.sheet-tabs-navigation .item[data-tab="${activeTab}"]`).addClass("active");
       html.find(`.tab[data-tab="${activeTab}"]`).addClass("active");
-
-      // click handler that works with the sheet structure
+      
+      // Click handler that works with the sheet structure
       html.find('.sheet-tabs-navigation .item').click(ev => {
         ev.preventDefault();
         const tabName = ev.currentTarget.dataset.tab;
         if (!tabName) return;
-
+        
         // Update UI classes
         html.find('.sheet-tabs-navigation .item').removeClass("active");
         html.find('.tab').removeClass("active");
         ev.currentTarget.classList.add("active");
         html.find(`.tab[data-tab="${tabName}"]`).addClass("active");
-
+        
         // Update tab state
         tabs.active = tabName;
       });
-
     }
-
-    // Activate the first tab by default
-    html.find('.tabs-navigation a:first').click();
-
+    
     // Item management
     html.find('.item-edit').click(this._onItemEdit.bind(this));
     html.find('.item-delete').click(this._onItemDelete.bind(this));
