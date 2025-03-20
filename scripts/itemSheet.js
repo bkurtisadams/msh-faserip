@@ -18,6 +18,9 @@ export class FaseripItemSheet extends ItemSheet {
     else if (this.item.type === 'talent') {
       return `systems/msh-faserip/templates/talent-sheet.html`;
     }
+    else if (this.item.type === 'contact') {
+      return `systems/msh-faserip/templates/contact-sheet.html`;
+    }
     // Fall back to the default item sheet for other types
     return `systems/msh-faserip/templates/item-sheet.html`;
   }

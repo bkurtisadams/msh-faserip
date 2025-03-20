@@ -1,0 +1,42 @@
+<form class="{{cssClass}} contact-sheet" autocomplete="off">
+    <header class="sheet-header">
+      <img class="profile-img" src="{{item.img}}" data-edit="img" title="{{item.name}}" />
+      <h1><input name="name" type="text" value="{{item.name}}" placeholder="Contact Name"/></h1>
+    </header>
+  
+    <section class="sheet-body">
+      <div class="form-group">
+        <label>Contact Type:</label>
+        <select name="system.type">
+          <option value="" {{#if (eq system.type "")}}selected{{/if}}>--Select Type--</option>
+          <option value="Professional" {{#if (eq system.type "Professional")}}selected{{/if}}>Professional</option>
+          <option value="Scientific" {{#if (eq system.type "Scientific")}}selected{{/if}}>Scientific</option>
+          <option value="Political" {{#if (eq system.type "Political")}}selected{{/if}}>Political</option>
+          <option value="Mystic" {{#if (eq system.type "Mystic")}}selected{{/if}}>Mystic</option>
+          <option value="Criminal" {{#if (eq system.type "Criminal")}}selected{{/if}}>Criminal</option>
+          <option value="Hero Group" {{#if (eq system.type "Hero Group")}}selected{{/if}}>Hero Group</option>
+          <option value="Other" {{#if (eq system.type "Other")}}selected{{/if}}>Other</option>
+        </select>
+      </div>
+  
+      <div class="form-group">
+        <label>Disposition:</label>
+        <select name="system.disposition">
+          <option value="Friendly" {{#if (eq system.disposition "Friendly")}}selected{{/if}}>Friendly</option>
+          <option value="Neutral" {{#if (eq system.disposition "Neutral")}}selected{{/if}}>Neutral</option>
+          <option value="Suspicious" {{#if (eq system.disposition "Suspicious")}}selected{{/if}}>Suspicious</option>
+          <option value="Hostile" {{#if (eq system.disposition "Hostile")}}selected{{/if}}>Hostile</option>
+        </select>
+      </div>
+  
+      <div class="form-group">
+        <label>Location:</label>
+        <input type="text" name="system.location" value="{{system.location}}" />
+      </div>
+  
+      <div class="form-group">
+        <label>Description:</label>
+        <textarea name="system.description">{{system.description}}</textarea>
+      </div>
+    </section>
+  </form>

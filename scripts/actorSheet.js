@@ -21,8 +21,9 @@ export class FaseripActorSheet extends ActorSheet {
     
     // Get items sorted by type for display in the template
     context.powers = this.actor.items.filter(item => item.type === "power") || [];
-    // Add this line to get talents
     context.talents = this.actor.items.filter(item => item.type === "talent") || [];
+    // Add this line to get contacts
+    context.contacts = this.actor.items.filter(item => item.type === "contact") || [];
     
     return context;
   }
@@ -162,7 +163,9 @@ html.find('.power-roll').click(ev => {
   }
 });
 
+///////////////////////////////////////////////////////////////////////////////////////////
 // Add Talent button
+///////////////////////////////////////////////////////////////////////////////////////////
 html.find('.add-talent').click(ev => {
   console.log("Add Talent button clicked"); // Debug line
   
@@ -237,6 +240,82 @@ html.find('.talents-list .item-delete').click(ev => {
   }).render(true);
 });
 
+////////////////////////////////////////////////////////////////////////////////////////
+// Add Contact button
+////////////////////////////////////////////////////////////////////////////////////////
+html.find('.add-contact').click(ev => {
+  console.log("Add Contact button clicked"); // Debug line
+  
+  // Create the new contact item data
+  const itemData = {
+    name: "New Contact",
+    type: "contact", 
+    system: {
+      description: "",
+      type: "",
+      disposition: "Friendly",
+      specialties: [],
+      location: ""
+    }
+  };
+  
+  this.actor.createEmbeddedDocuments("Item", [itemData])
+  .then(() => {
+    console.log("Contact created successfully");
+    this.render(false); // Re-render the sheet to show the new contact
+  })
+  .catch(err => console.error("Error creating contact:", err));
+});
+
+// Browse Contacts Compendium button
+html.find('.browse-compendium[data-type="contacts"]').click(ev => {
+  const pack = game.packs.find(p => p.metadata.name === "contacts" && p.metadata.system === "msh-faserip");
+  if (pack) {
+    pack.render(true);
+  } else {
+    ui.notifications.warn("Contacts compendium not found.");
+  }
+});
+
+// Edit contact button
+html.find('.contacts-list .item-edit').click(ev => {
+  const li = $(ev.currentTarget).closest(".contact-item");
+  const itemId = li.data("itemId");
+  const item = this.actor.items.get(itemId);
+  
+  if (item) {
+    item.sheet.render(true);
+  }
+});
+
+// Delete contact button
+html.find('.contacts-list .item-delete').click(ev => {
+  const li = $(ev.currentTarget).closest(".contact-item");
+  const itemId = li.data("itemId");
+  
+  if (!itemId) return;
+  
+  // Confirm deletion
+  new Dialog({
+    title: "Delete Contact",
+    content: "<p>Are you sure you want to delete this contact?</p>",
+    buttons: {
+      delete: {
+        icon: '<i class="fas fa-trash"></i>',
+        label: "Delete",
+        callback: () => {
+          this.actor.deleteEmbeddedDocuments("Item", [itemId]);
+          this.render(false);
+        }
+      },
+      cancel: {
+        icon: '<i class="fas fa-times"></i>',
+        label: "Cancel"
+      }
+    },
+    default: "cancel"
+  }).render(true);
+});
   // Continue with other listeners...
 }
 }
