@@ -71,6 +71,14 @@ async rollItem() {
   // Get color result from universal table
   const colorResult = game.msh.rollUniversalTable(rank, roll.total);
   
+  // Define result meanings
+  const resultMeanings = {
+    "White": "Miss / Failure",
+    "Green": "Hit / Success",
+    "Yellow": "Bullseye / Special Effect",
+    "Red": "Stun / Kill / Maximum Effect"
+  };
+  
   // Create chat message with formatted result
   await ChatMessage.create({
     speaker: ChatMessage.getSpeaker({ actor }),
@@ -80,24 +88,18 @@ async rollItem() {
       <div class="faserip-power-roll">
         <div class="power-header">
           <h3>${this.name}</h3>
-          <div class="power-stats">
-            <span class="power-stat"><strong>Rank:</strong> ${rank} (${value})</span>
-            <span class="power-stat"><strong>Range:</strong> ${range}</span>
-            <span class="power-stat"><strong>Type:</strong> ${type}</span>
+          <div class="power-info">
+            <span><strong>Rank:</strong> ${rank} (${value})</span>
+            <span><strong>Range:</strong> ${range}</span>
+            <span><strong>Type:</strong> ${type}</span>
           </div>
         </div>
         <div class="roll-result">
           <div class="roll-info">
             <span class="roll-number"><strong>Roll:</strong> ${roll.total}</span>
-            <span class="result-color ${colorResult.toLowerCase()}"><strong>Result:</strong> ${colorResult}</span>
-          </div>
-          <div class="result-meaning">
-            <div class="general">
-              <strong>General:</strong> 
-              ${colorResult === "White" ? "Failure" : ""}
-              ${colorResult === "Green" ? "Success" : ""}
-              ${colorResult === "Yellow" ? "Special Success" : ""}
-              ${colorResult === "Red" ? "Spectacular Success" : ""}
+            <div class="result-color ${colorResult.toLowerCase()}">
+              <strong>Result:</strong> ${colorResult}
+              <div class="result-meaning">${resultMeanings[colorResult]}</div>
             </div>
           </div>
         </div>
@@ -109,6 +111,7 @@ async rollItem() {
           border: 2px solid #8b0000;
           border-radius: 5px;
           padding: 10px;
+          margin-bottom: 5px;
         }
         .power-header {
           border-bottom: 1px solid #8b0000;
@@ -119,7 +122,7 @@ async rollItem() {
           color: #8b0000;
           margin: 0 0 5px 0;
         }
-        .power-stats {
+        .power-info {
           display: flex;
           flex-wrap: wrap;
           gap: 10px;
@@ -127,17 +130,18 @@ async rollItem() {
         .roll-result {
           display: flex;
           flex-direction: column;
-          gap: 10px;
+          gap: 5px;
         }
         .roll-info {
           display: flex;
-          gap: 15px;
+          justify-content: space-between;
+          align-items: center;
         }
         .result-color {
-          display: inline-block;
-          padding: 2px 8px;
-          border-radius: 3px;
-          font-weight: bold;
+          padding: 5px 10px;
+          border-radius: 4px;
+          text-align: center;
+          width: 60%;
         }
         .white {
           background-color: #f5f5f5;
@@ -145,22 +149,20 @@ async rollItem() {
           border: 1px solid #ccc;
         }
         .green {
-          background-color: #2a2;
+          background-color: #4CAF50;
           color: white;
         }
         .yellow {
-          background-color: #fd2;
+          background-color: #FFC107;
           color: #333;
         }
         .red {
-          background-color: #c22;
+          background-color: #F44336;
           color: white;
         }
         .result-meaning {
-          background: #f9f9f9;
-          border: 1px solid #ddd;
-          padding: 8px;
-          border-radius: 3px;
+          font-size: 0.9em;
+          margin-top: 2px;
         }
       </style>
     `
