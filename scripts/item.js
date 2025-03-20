@@ -141,64 +141,67 @@ async rollItem() {
           // Create chat message
           await ChatMessage.create({
             speaker: ChatMessage.getSpeaker({ actor }),
-            flavor: `${this.name} (${rank})`,
+            // Remove the flavor text to avoid duplication
+            // flavor: `${this.name} (${rank})`,
             roll: roll,
-            // Inside the ChatMessage.create content section
             content: `
-            <div class="faserip-power-roll">
-              <h3>${this.name} - Power ${actionName}</h3>
-              <div class="roll-info">
-                <div><strong>Base Rank:</strong> ${rank} (${value})</div>
-                <div><strong>Column Shift:</strong> ${shift !== 0 ? `${shift} → ${effectiveRank}` : "None"}</div>
-                <div><strong>Roll:</strong> ${roll.total} + Karma: ${karma} = ${finalRoll}</div>
+              <div class="faserip-power-roll">
+                <h3>${this.name} - ${actionName}</h3>
+                <div class="roll-info">
+                  <div><strong>Base Rank:</strong> ${rank} (${value})</div>
+                  <div><strong>Column Shift:</strong> ${shift !== 0 ? `${shift} → ${effectiveRank}` : "None"}</div>
+                  <div><strong>Roll:</strong> ${roll.total} + Karma: ${karma} = ${finalRoll}</div>
+                </div>
+                <div class="result result-${colorResult.toLowerCase()}">
+                  ${effect} (${colorResult.toUpperCase()})
+                </div>
               </div>
-              <div class="result ${colorResult.toLowerCase()}">
-                ${effect} (${colorResult.toUpperCase()})
-              </div>
-            </div>
-            <style>
-              .faserip-power-roll {
-                font-family: Arial, sans-serif;
-                background: #f5f5f5;
-                border: 1px solid #ccc;
-                border-radius: 5px;
-                padding: 10px;
-              }
-              .faserip-power-roll h3 {
-                color: #8b0000;
-                margin: 0 0 10px 0;
-                border-bottom: 1px solid #ccc;
-                padding-bottom: 5px;
-              }
-              .roll-info {
-                margin-bottom: 10px;
-              }
-              .result {
-                text-align: center;
-                padding: 10px;
-                border-radius: 4px;
-                font-weight: bold;
-                margin-top: 5px;
-                font-size: 1.2em;
-              }
-              .white {
-                background-color: #f0f0f0;
-                color: #333;
-                border: 1px solid #ccc;
-              }
-              .green {
-                background-color: #4CAF50;
-                color: white;
-              }
-              .yellow {
-                background-color: #FFC107;
-                color: #333;
-              }
-              .red {
-                background-color: #F44336;
-                color: white;
-              }
-            </style>
+              <style>
+                .faserip-power-roll {
+                  font-family: Arial, sans-serif;
+                  background: #f9f8f4;
+                  border: 1px solid #ccc;
+                  border-radius: 3px;
+                  padding: 8px;
+                }
+                .faserip-power-roll h3 {
+                  margin: 0 0 8px 0;
+                  border-bottom: 1px solid #ccc;
+                  padding-bottom: 4px;
+                  font-size: 1.1em;
+                }
+                .roll-info {
+                  margin-bottom: 8px;
+                  font-size: 0.95em;
+                }
+                .roll-info div {
+                  margin-bottom: 3px;
+                }
+                .result {
+                  text-align: center;
+                  padding: 6px;
+                  border-radius: 3px;
+                  font-weight: bold;
+                  font-size: 1.1em;
+                }
+                .result-white {
+                  background-color: #f0f0f0;
+                  color: #333;
+                  border: 1px solid #ccc;
+                }
+                .result-green {
+                  background-color: #4CAF50;
+                  color: white;
+                }
+                .result-yellow {
+                  background-color: #FFC107;
+                  color: #333;
+                }
+                .result-red {
+                  background-color: #F44336;
+                  color: white;
+                }
+              </style>
             `
           });
         }
