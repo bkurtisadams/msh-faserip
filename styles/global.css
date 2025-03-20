@@ -618,3 +618,38 @@
 .contact-sheet textarea {
   min-height: 100px;
 }
+
+/* Common controls styling for powers, talents, and contacts */
+.faserip-sheet .item-controls {
+  display: flex;
+  gap: 8px;
+}
+
+.faserip-sheet .item-control {
+  cursor: pointer;
+  color: #666;
+}
+
+.faserip-sheet .item-control:hover {
+  color: #8b0000;
+}
+
+/* Info dialog styling for talents and contacts */
+.talent-details, .contact-details {
+  display: grid;
+  grid-template-columns: 100px 1fr;
+  gap: 5px;
+  margin-bottom: 10px;
+}
+
+.talent-details .label, .contact-details .label {
+  font-weight: bold;
+}
+
+/* More specific selector for the description in info dialogs */
+.talent-details + .description, 
+.contact-details + .description {
+  border-top: 1px solid #ccc;
+  padding-top: 10px;
+  margin-top: 10px;
+}

@@ -199,6 +199,38 @@ html.find('.browse-compendium[data-type="talents"]').click(ev => {
     ui.notifications.warn("Talents compendium not found.");
   }
 });
+
+// Talent info button
+html.find('.talent-info').click(ev => {
+  const li = $(ev.currentTarget).closest(".talent-item");
+  const itemId = li.data("itemId");
+  const item = this.actor.items.get(itemId);
+  
+  if (!item) return;
+  
+  // Create a dialog to show talent information
+  let content = `
+    <h2>${item.name}</h2>
+    <div class="talent-details">
+      <div class="label">Bonus:</div><div>${item.system.bonus || 'None'}</div>
+      <div class="label">Type:</div><div>${item.system.type || 'None'}</div>
+      <div class="label">Specialty:</div><div>${item.system.specialty || 'None'}</div>
+      <div class="label">Ability Modified:</div><div>${item.system.abilityModified ? item.system.abilityModified.charAt(0).toUpperCase() + item.system.abilityModified.slice(1) : 'None'}</div>
+    </div>
+    <div class="description">${item.system.description || 'No description available.'}</div>
+  `;
+  
+  new Dialog({
+    title: "Talent Information",
+    content: content,
+    buttons: {
+      close: {
+        label: "Close"
+      }
+    },
+    width: 400
+  }).render(true);
+});
   
 // Edit talent button
 html.find('.talents-list .item-edit').click(ev => {
@@ -240,6 +272,80 @@ html.find('.talents-list .item-delete').click(ev => {
   }).render(true);
 });
 
+// Talent roll button
+html.find('.talent-roll').click(ev => {
+  const li = $(ev.currentTarget).closest(".talent-item");
+  const itemId = li.data("itemId");
+  const item = this.actor.items.get(itemId);
+  
+  if (!item) return;
+  
+  // Create a simple dialog showing talent roll result
+  const roll = new Roll("1d100").evaluate({async: false});
+  
+  let abilityModified = item.system.abilityModified;
+  let abilityValue = abilityModified ? this.actor.system.abilities[abilityModified].value : null;
+  let abilityRank = abilityModified ? this.actor.system.abilities[abilityModified].rank : null;
+  
+  let bonusText = "";
+  if (abilityModified && abilityRank) {
+    bonusText = `${item.system.bonus} to ${abilityModified.charAt(0).toUpperCase() + abilityModified.slice(1)} (${abilityRank})`;
+  } else {
+    bonusText = item.system.bonus;
+  }
+  
+  let content = `
+    <div class="faserip-talent-roll">
+      <h3>${item.name}</h3>
+      <div class="roll-info">
+        <div><strong>Talent:</strong> ${item.system.type || 'Unknown'} - ${item.system.specialty || 'General'}</div>
+        <div><strong>Bonus:</strong> ${bonusText}</div>
+        <div><strong>Roll:</strong> ${roll.total}</div>
+      </div>
+      <div class="result">
+        ${game.msh.rollUniversalTable ? game.msh.rollUniversalTable(abilityRank || "Typical", roll.total) : "Roll Result"}
+      </div>
+    </div>
+    <style>
+      .faserip-talent-roll {
+        font-family: Arial, sans-serif;
+        background: #f9f8f4;
+        border: 1px solid #ccc;
+        border-radius: 3px;
+        padding: 8px;
+      }
+      .faserip-talent-roll h3 {
+        margin: 0 0 8px 0;
+        border-bottom: 1px solid #ccc;
+        padding-bottom: 4px;
+        font-size: 1.1em;
+      }
+      .roll-info {
+        margin-bottom: 8px;
+        font-size: 0.95em;
+      }
+      .roll-info div {
+        margin-bottom: 3px;
+      }
+      .result {
+        text-align: center;
+        padding: 6px;
+        border-radius: 3px;
+        font-weight: bold;
+        font-size: 1.1em;
+        background: #f0f0f0;
+        border: 1px solid #ccc;
+      }
+    </style>
+  `;
+
+  ChatMessage.create({
+    speaker: ChatMessage.getSpeaker({ actor: this.actor }),
+    content: content,
+    roll: roll
+  });
+});
+
 ////////////////////////////////////////////////////////////////////////////////////////
 // Add Contact button
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -275,6 +381,37 @@ html.find('.browse-compendium[data-type="contacts"]').click(ev => {
   } else {
     ui.notifications.warn("Contacts compendium not found.");
   }
+});
+
+// Contact info button
+html.find('.contact-info').click(ev => {
+  const li = $(ev.currentTarget).closest(".contact-item");
+  const itemId = li.data("itemId");
+  const item = this.actor.items.get(itemId);
+  
+  if (!item) return;
+  
+  // Create a dialog to show contact information
+  let content = `
+    <h2>${item.name}</h2>
+    <div class="contact-details">
+      <div class="label">Type:</div><div>${item.system.type || 'None'}</div>
+      <div class="label">Disposition:</div><div>${item.system.disposition || 'Friendly'}</div>
+      <div class="label">Location:</div><div>${item.system.location || 'Unknown'}</div>
+    </div>
+    <div class="description">${item.system.description || 'No description available.'}</div>
+  `;
+  
+  new Dialog({
+    title: "Contact Information",
+    content: content,
+    buttons: {
+      close: {
+        label: "Close"
+      }
+    },
+    width: 400
+  }).render(true);
 });
 
 // Edit contact button
@@ -316,6 +453,79 @@ html.find('.contacts-list .item-delete').click(ev => {
     default: "cancel"
   }).render(true);
 });
+
+// Contact roll button
+html.find('.contact-roll').click(ev => {
+  const li = $(ev.currentTarget).closest(".contact-item");
+  const itemId = li.data("itemId");
+  const item = this.actor.items.get(itemId);
+  
+  if (!item) return;
+  
+  // Create a simple dialog showing contact roll result
+  const roll = new Roll("1d100").evaluate({async: false});
+  
+  // Determine disposition color
+  let dispositionColor = "#999";
+  switch (item.system.disposition) {
+    case "Friendly": dispositionColor = "#4CAF50"; break;
+    case "Neutral": dispositionColor = "#2196F3"; break;
+    case "Suspicious": dispositionColor = "#FF9800"; break;
+    case "Hostile": dispositionColor = "#F44336"; break;
+  }
+  
+  let content = `
+    <div class="faserip-contact-roll">
+      <h3>${item.name}</h3>
+      <div class="roll-info">
+        <div><strong>Type:</strong> ${item.system.type || 'Unknown'}</div>
+        <div><strong>Disposition:</strong> <span style="color: ${dispositionColor};">${item.system.disposition || 'Friendly'}</span></div>
+        <div><strong>Roll:</strong> ${roll.total}</div>
+      </div>
+      <div class="result">
+        ${roll.total <= 50 ? "Contact provides help/information" : "Contact is unavailable or unwilling"}
+      </div>
+    </div>
+    <style>
+      .faserip-contact-roll {
+        font-family: Arial, sans-serif;
+        background: #f9f8f4;
+        border: 1px solid #ccc;
+        border-radius: 3px;
+        padding: 8px;
+      }
+      .faserip-contact-roll h3 {
+        margin: 0 0 8px 0;
+        border-bottom: 1px solid #ccc;
+        padding-bottom: 4px;
+        font-size: 1.1em;
+      }
+      .roll-info {
+        margin-bottom: 8px;
+        font-size: 0.95em;
+      }
+      .roll-info div {
+        margin-bottom: 3px;
+      }
+      .result {
+        text-align: center;
+        padding: 6px;
+        border-radius: 3px;
+        font-weight: bold;
+        font-size: 1.1em;
+        background: #f0f0f0;
+        border: 1px solid #ccc;
+      }
+    </style>
+  `;
+
+  ChatMessage.create({
+    speaker: ChatMessage.getSpeaker({ actor: this.actor }),
+    content: content,
+    roll: roll
+  });
+});
+
   // Continue with other listeners...
 }
 }
