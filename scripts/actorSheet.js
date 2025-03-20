@@ -21,6 +21,8 @@ export class FaseripActorSheet extends ActorSheet {
     
     // Get items sorted by type for display in the template
     context.powers = this.actor.items.filter(item => item.type === "power") || [];
+    // Add this line to get talents
+    context.talents = this.actor.items.filter(item => item.type === "talent") || [];
     
     return context;
   }
@@ -158,6 +160,31 @@ html.find('.power-roll').click(ev => {
   } else {
     console.error("Could not roll power - item not found or rollItem method not available");
   }
+});
+
+// Add Talent button
+html.find('.add-talent').click(ev => {
+  console.log("Add Talent button clicked"); // Debug line
+  
+  // Create the new talent item data
+  const itemData = {
+    name: "New Talent",
+    type: "talent", 
+    system: {
+      description: "",
+      bonus: "+1CS",
+      abilityModified: "",
+      type: "",
+      specialty: ""
+    }
+  };
+  
+  this.actor.createEmbeddedDocuments("Item", [itemData])
+  .then(() => {
+    console.log("Talent created successfully");
+    this.render(false); // Re-render the sheet to show the new talent
+  })
+  .catch(err => console.error("Error creating talent:", err));
 });
   
   // Continue with other listeners...
