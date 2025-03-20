@@ -653,3 +653,25 @@
   padding-top: 10px;
   margin-top: 10px;
 }
+
+/* Contact notes styling */
+.contact-notes {
+  margin-top: 12px;
+  margin-bottom: 12px;
+  padding: 8px;
+  background-color: #f8f8f8;
+  border: 1px solid #ddd;
+  border-radius: 3px;
+}
+
+.contact-notes h3, .contact-description h3 {
+  margin: 0 0 5px 0;
+  font-size: 14px;
+  color: #8b0000;
+}
+
+.contact-description {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #ccc;
+}

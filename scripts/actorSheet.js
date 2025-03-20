@@ -349,6 +349,7 @@ html.find('.talent-roll').click(ev => {
 ////////////////////////////////////////////////////////////////////////////////////////
 // Add Contact button
 ////////////////////////////////////////////////////////////////////////////////////////
+// Add Contact button
 html.find('.add-contact').click(ev => {
   console.log("Add Contact button clicked"); // Debug line
   
@@ -361,7 +362,8 @@ html.find('.add-contact').click(ev => {
       type: "",
       disposition: "Friendly",
       specialties: [],
-      location: ""
+      location: "",
+      notes: "" // Add notes field
     }
   };
   
@@ -384,6 +386,7 @@ html.find('.browse-compendium[data-type="contacts"]').click(ev => {
 });
 
 // Contact info button
+// Contact info button
 html.find('.contact-info').click(ev => {
   const li = $(ev.currentTarget).closest(".contact-item");
   const itemId = li.data("itemId");
@@ -399,7 +402,18 @@ html.find('.contact-info').click(ev => {
       <div class="label">Disposition:</div><div>${item.system.disposition || 'Friendly'}</div>
       <div class="label">Location:</div><div>${item.system.location || 'Unknown'}</div>
     </div>
-    <div class="description">${item.system.description || 'No description available.'}</div>
+    
+    ${item.system.notes ? `
+    <div class="contact-notes">
+      <h3>Notes:</h3>
+      <div>${item.system.notes}</div>
+    </div>
+    ` : ''}
+    
+    <div class="contact-description">
+      <h3>Description:</h3>
+      <div>${item.system.description || 'No description available.'}</div>
+    </div>
   `;
   
   new Dialog({
@@ -412,7 +426,7 @@ html.find('.contact-info').click(ev => {
     },
     width: 400
   }).render(true);
-});
+});;
 
 // Edit contact button
 html.find('.contacts-list .item-edit').click(ev => {
