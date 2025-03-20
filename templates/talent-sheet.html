@@ -1,0 +1,58 @@
+<form class="{{cssClass}} talent-sheet" autocomplete="off">
+    <header class="sheet-header">
+      <img class="profile-img" src="{{item.img}}" data-edit="img" title="{{item.name}}" />
+      <h1><input name="name" type="text" value="{{item.name}}" placeholder="Talent Name"/></h1>
+    </header>
+  
+    <section class="sheet-body">
+      <div class="form-group">
+        <label>Bonus:</label>
+        <select name="system.bonus">
+          <option value="+1CS" {{#if (eq system.bonus "+1CS")}}selected{{/if}}>+1CS</option>
+          <option value="+2CS" {{#if (eq system.bonus "+2CS")}}selected{{/if}}>+2CS</option>
+          <option value="+3CS" {{#if (eq system.bonus "+3CS")}}selected{{/if}}>+3CS</option>
+          <option value="Special" {{#if (eq system.bonus "Special")}}selected{{/if}}>Special</option>
+        </select>
+      </div>
+  
+      <div class="form-group">
+        <label>Ability Modified:</label>
+        <select name="system.abilityModified">
+          <option value="" {{#if (eq system.abilityModified "")}}selected{{/if}}>None</option>
+          <option value="fighting" {{#if (eq system.abilityModified "fighting")}}selected{{/if}}>Fighting</option>
+          <option value="agility" {{#if (eq system.abilityModified "agility")}}selected{{/if}}>Agility</option>
+          <option value="strength" {{#if (eq system.abilityModified "strength")}}selected{{/if}}>Strength</option>
+          <option value="endurance" {{#if (eq system.abilityModified "endurance")}}selected{{/if}}>Endurance</option>
+          <option value="reason" {{#if (eq system.abilityModified "reason")}}selected{{/if}}>Reason</option>
+          <option value="intuition" {{#if (eq system.abilityModified "intuition")}}selected{{/if}}>Intuition</option>
+          <option value="psyche" {{#if (eq system.abilityModified "psyche")}}selected{{/if}}>Psyche</option>
+        </select>
+      </div>
+  
+      <div class="form-group">
+        <label>Talent Category:</label>
+        <select name="system.type" id="talent-category">
+          <option value="" {{#if (eq system.type "")}}selected{{/if}}>--Select Category--</option>
+          <option value="Weapon Skill" {{#if (eq system.type "Weapon Skill")}}selected{{/if}}>Weapon Skill</option>
+          <option value="Fighting Skill" {{#if (eq system.type "Fighting Skill")}}selected{{/if}}>Fighting Skill</option>
+          <option value="Professional Skill" {{#if (eq system.type "Professional Skill")}}selected{{/if}}>Professional Skill</option>
+          <option value="Scientific Skill" {{#if (eq system.type "Scientific Skill")}}selected{{/if}}>Scientific Skill</option>
+          <option value="Mystic/Mental Skill" {{#if (eq system.type "Mystic/Mental Skill")}}selected{{/if}}>Mystic/Mental Skill</option>
+          <option value="Other" {{#if (eq system.type "Other")}}selected{{/if}}>Other</option>
+        </select>
+      </div>
+  
+      <div class="form-group specialty-group">
+        <label>Specialty:</label>
+        <select name="system.specialty" id="talent-specialty">
+          <option value="" {{#if (eq system.specialty "")}}selected{{/if}}>--Select Specialty--</option>
+          <!-- Specialty options will be populated via JavaScript -->
+        </select>
+      </div>
+  
+      <div class="form-group">
+        <label>Description:</label>
+        <textarea name="system.description">{{system.description}}</textarea>
+      </div>
+    </section>
+  </form>

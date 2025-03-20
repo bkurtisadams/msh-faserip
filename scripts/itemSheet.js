@@ -11,9 +11,12 @@ export class FaseripItemSheet extends ItemSheet {
   }
 
   get template() {
-    // Use a specific template for power items
+    // Use specific templates for different item types
     if (this.item.type === 'power') {
       return `systems/msh-faserip/templates/power-sheet.html`;
+    }
+    else if (this.item.type === 'talent') {
+      return `systems/msh-faserip/templates/talent-sheet.html`;
     }
     // Fall back to the default item sheet for other types
     return `systems/msh-faserip/templates/item-sheet.html`;
@@ -125,7 +128,57 @@ getData() {
         } else {
           console.error("Invalid stunt index:", index, "length:", stunts.length);
         }
-      });;
+      });
     }
+
+    // For talent sheets - handle specialty dropdown
+if (this.item.type === "talent") {
+  // Define talent specialties by category
+  const talentSpecialties = {
+    "Weapon Skill": ["Guns", "Thrown Weapons", "Bows", "Blunt Weapons", "Sharp Weapons", 
+                     "Oriental Weapons", "Marksman", "Weapons Master", "Weapons Specialist"],
+    "Fighting Skill": ["Martial Arts A", "Martial Arts B", "Martial Arts C", "Martial Arts D", 
+                       "Martial Arts E", "Wrestling", "Thrown Objects", "Acrobatics", "Tumbling"],
+    "Professional Skill": ["Medicine", "Law", "Law Enforcement", "Pilot", "Military", 
+                          "Business/Finance", "Journalism", "Engineering", "Criminology", 
+                          "Psychiatry", "Detective/Espionage"],
+    "Scientific Skill": ["Chemistry", "Biology", "Geology", "Genetics", "Archaeology", 
+                         "Physics", "Computers", "Electronics"],
+    "Mystic/Mental Skill": ["Trance", "Mesmerism and Hypnosis", "Sleight of Hand", 
+                           "Resist Domination", "Occult Lore", "Mystic Background"],
+    "Other": ["Artist", "Languages", "First Aid", "Repair/Tinkering", "Trivia", 
+              "Performer", "Animal Training", "Heir to Fortune", "Student", "Leadership"]
+  };
+
+    // Function to update specialty dropdown based on selected category
+    const updateSpecialtyDropdown = () => {
+      const category = html.find('#talent-category').val();
+      const specialtySelect = html.find('#talent-specialty');
+      specialtySelect.empty(); // Clear existing options
+      
+      // Add default option
+      specialtySelect.append($('<option></option>').val('').text('--Select Specialty--'));
+      
+      // If a category is selected, add its specialties
+      if (category && talentSpecialties[category]) {
+        talentSpecialties[category].forEach(specialty => {
+          const option = $('<option></option>').val(specialty).text(specialty);
+          // Select this option if it matches the current specialty
+          if (specialty === this.item.system.specialty) {
+            option.attr('selected', 'selected');
+          }
+          specialtySelect.append(option);
+        });
+      }
+    };
+
+    // Update specialty dropdown when category changes
+    html.find('#talent-category').change(updateSpecialtyDropdown);
+    
+    // Initially populate the dropdown
+    updateSpecialtyDropdown();
+  }
+
+  // end of activeListeners
   }
 }

@@ -516,3 +516,54 @@
   color: #666;
   margin-bottom: 8px;
 }
+
+/* Talents List Styling */
+.faserip-sheet .talents-list {
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  grid-gap: 8px;
+}
+
+.faserip-sheet .talent-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: #f8f8f8;
+  border: 1px solid #ddd;
+  border-radius: 3px;
+}
+
+.faserip-sheet .talent-item:hover {
+  background: #e8e8e8;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.faserip-sheet .talent-name {
+  font-weight: bold;
+  flex: 1;
+}
+
+.faserip-sheet .talent-item .item-controls {
+  display: flex;
+  gap: 8px;
+}
+
+/* Talent Sheet Styling */
+.talent-sheet .form-group {
+  margin-bottom: 12px;
+}
+
+.talent-sheet select, 
+.talent-sheet input, 
+.talent-sheet textarea {
+  width: 100%;
+  padding: 5px;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+}
+
+.talent-sheet textarea {
+  min-height: 100px;
+}
