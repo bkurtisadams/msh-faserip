@@ -450,3 +450,69 @@
 .faserip-sheet .tab:not(.active) {
   display: none;
 }
+
+/* Power Stunts styling */
+.stunt-entry {
+  border: 1px solid #ccc;
+  margin-bottom: 8px;
+  padding: 8px;
+  border-radius: 4px;
+  background: #f9f9f9;
+}
+
+.stunt-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 5px;
+}
+
+.stunt-attempts {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.stunt-count {
+  width: 40px;
+  text-align: center;
+}
+
+.stunt-difficulty {
+  font-weight: bold;
+  padding: 2px 5px;
+  border-radius: 3px;
+}
+
+.difficulty.red {
+  color: white;
+  background-color: #c22;
+}
+
+.difficulty.yellow {
+  color: black;
+  background-color: #fd2;
+}
+
+.difficulty.green {
+  color: white;
+  background-color: #2a2;
+}
+
+.difficulty.mastered {
+  color: white;
+  background-color: #44b;
+}
+
+.stunt-controls {
+  display: flex;
+  justify-content: flex-end;
+  gap: 5px;
+  margin-top: 5px;
+}
+
+.stunt-info {
+  font-style: italic;
+  color: #666;
+  margin-bottom: 8px;
+}
