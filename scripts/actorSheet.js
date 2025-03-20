@@ -186,6 +186,16 @@ html.find('.add-talent').click(ev => {
   })
   .catch(err => console.error("Error creating talent:", err));
 });
+
+// Browse Talents Compendium button
+html.find('.browse-compendium[data-type="talents"]').click(ev => {
+  const pack = game.packs.find(p => p.metadata.name === "talents" && p.metadata.system === "msh-faserip");
+  if (pack) {
+    pack.render(true);
+  } else {
+    ui.notifications.warn("Talents compendium not found.");
+  }
+});
   
   // Continue with other listeners...
 }
