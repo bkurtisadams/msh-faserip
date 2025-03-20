@@ -1,4 +1,4 @@
-import { FaseripActor } from './actor.js';
+import { FaseripActor, FaseripActorModel } from './actor.js';
 import { FaseripItem } from './item.js';
 import { FaseripActorSheet } from './actorSheet.js';
 import { FaseripItemSheet } from './itemSheet.js';
@@ -18,6 +18,12 @@ Hooks.once("init", () => {
   
   Actors.registerSheet("msh-faserip", FaseripActorSheet, { makeDefault: true });
   Items.registerSheet("msh-faserip", FaseripItemSheet, { makeDefault: true });
+
+  // hook to see what's happening when the sheet is closed
+  Hooks.on("closeActorSheet", (sheet, html) => {
+    console.log("HOOK: Actor sheet closed!", sheet.actor.name);
+    console.log("Actor data at close:", sheet.actor.system);
+  });
 
   // Register Handlebars helpers
   Handlebars.registerHelper('capitalize', function(str) {

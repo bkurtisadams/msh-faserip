@@ -70,6 +70,21 @@
             "type": "Item"
         }
     ],
+    "documentTypes": {
+        "Actor": {
+            "hero": {},
+            "villain": {},
+            "npc": {}
+        },
+        "Item": {
+            "power": {},
+            "talent": {},
+            "contact": {},
+            "equipment": {},
+            "vehicle": {},
+            "headquarters": {}
+        }
+    },
     "relationships": {},
     "primaryTokenAttribute": "health",
     "gridDistance": 44,

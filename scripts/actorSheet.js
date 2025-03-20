@@ -1,189 +1,410 @@
 export class FaseripActorSheet extends ActorSheet {
+  /** @override */
   static get defaultOptions() {
     return foundry.utils.mergeObject(super.defaultOptions, {
       classes: ["faserip-sheet", "sheet", "actor"],
       width: 600,
       height: 700,
-      dragDrop: [{
-        dragSelector: ".item",
-        dropSelector: ".sheet-tab-content" // More general drop target
-      }],
-      // Fix these selectors to exactly match your HTML structure
-      tabs: [{ navSelector: ".sheet-tabs-navigation .item", contentSelector: ".tab", initial: "powers" }],
+      tabs: [{ navSelector: ".sheet-tabs", contentSelector: ".sheet-body", initial: "attributes" }],
       template: "systems/msh-faserip/templates/actor-sheet.html",
-      form: {
-        submitOnChange: true,  // This is crucial - auto-submit on change
-        closeOnSubmit: false   // Don't close the sheet after submitting
-      }
+      // Two key options for form submission:
+      submitOnChange: true,
+      closeOnSubmit: false
     });
   }
 
 /** @override */
+static get defaultOptions() {
+  return foundry.utils.mergeObject(super.defaultOptions, {
+    classes: ["faserip-sheet", "sheet", "actor"],
+    width: 600,
+    height: 700,
+    tabs: [{ navSelector: ".sheet-tabs", contentSelector: ".sheet-body", initial: "attributes" }],
+    template: "systems/msh-faserip/templates/actor-sheet.html",
+    submitOnChange: true  // This is crucial
+  });
+}
+
+/** @override */
+getData() {
+  const context = super.getData();
+
+  // Log current data state for debugging
+  console.log("Current actor data before preparing sheet:", this.actor.system);
+
+  // Initialize data structure if needed
+  if (!this.actor.system.abilities) {
+    this.actor.update({
+      "system.abilities": {
+        fighting: { value: 10, rank: "Typical" },
+        agility: { value: 10, rank: "Typical" },
+        strength: { value: 10, rank: "Typical" },
+        endurance: { value: 10, rank: "Typical" },
+        reason: { value: 10, rank: "Typical" },
+        intuition: { value: 10, rank: "Typical" },
+        psyche: { value: 10, rank: "Typical" }
+      }
+    });
+  }
+
+  // Group items by type for easier access in the template
+  context.powers = this.actor.items.filter(item => item.type === "power");
+  context.talents = this.actor.items.filter(item => item.type === "talent");
+  context.contacts = this.actor.items.filter(item => item.type === "contact");
+  context.equipment = this.actor.items.filter(item => item.type === "equipment");
+  context.vehicles = this.actor.items.filter(item => item.type === "vehicle");
+  context.headquarters = this.actor.items.filter(item => item.type === "headquarters");
+
+  console.log("Sheet context prepared:", context); // Debug logging
+
+  return context;
+}
+
+/** @override */
 /** @override */
 async _updateObject(event, formData) {
-  // Log the raw form data for debugging
-  console.log("Raw form data:", formData);
+  console.log("Form submission triggered:", event.type);
+  console.log("Form data received:", formData);
   
-  try {
-    // Let the parent class handle the update
-    const result = await super._updateObject(event, formData);
+  // Explicitly expand the object to handle nested properties
+  const expandedData = foundry.utils.expandObject(formData);
+  console.log("Expanded data:", expandedData);
+  
+  // Update with the expanded data
+  return super._updateObject(event, expandedData);
+}
+
+/** @override */
+activateListeners(html) {
+  super.activateListeners(html);
+  
+  // Connect all form inputs to trigger form submission on change
+  html.find('input, select, textarea').change(this._onChangeInput.bind(this));
+  
+  // Special handler for the group save button
+  html.find('.save-group').click(this._onSaveGroup.bind(this));
+  
+  // DEBUG - Log what tab elements we're finding
+  console.log("Tabs object:", this._tabs[0]);
+  console.log("Tab navigation:", html.find('.sheet-tabs-navigation .item').length);
+  console.log("Tab content:", html.find('.tab').length);
+  
+  // Activate tabs - use Foundry's system but with correct selectors
+  const tabs = this._tabs[0];
+  if (tabs) {
+    // Manually set the active tab
+    const activeTab = tabs.active || "powers";
+    html.find(`.sheet-tabs-navigation .item[data-tab="${activeTab}"]`).addClass("active");
+    html.find(`.tab[data-tab="${activeTab}"]`).addClass("active");
     
-    // Log after update to verify changes were applied
-    console.log("Actor after update:", this.actor.system);
-    
-    return result;
-  } catch (error) {
-    console.error("Error updating actor:", error);
-    ui.notifications.error("Error updating character sheet: " + error.message);
-    return null;
+    // Click handler that works with the sheet structure
+    html.find('.sheet-tabs-navigation .item').click(ev => {
+      ev.preventDefault();
+      const tabName = ev.currentTarget.dataset.tab;
+      if (!tabName) return;
+      
+      // Update UI classes
+      html.find('.sheet-tabs-navigation .item').removeClass("active");
+      html.find('.tab').removeClass("active");
+      ev.currentTarget.classList.add("active");
+      html.find(`.tab[data-tab="${tabName}"]`).addClass("active");
+      
+      // Update tab state
+      tabs.active = tabName;
+    });
+  }
+  
+  // Item management
+  html.find('.item-edit').click(this._onItemEdit.bind(this));
+  html.find('.item-delete').click(this._onItemDelete.bind(this));
+  html.find('.add-power').click(this._onAddPower.bind(this));
+  html.find('.add-talent').click(this._onAddTalent.bind(this));
+  html.find('.add-contact').click(this._onAddContact.bind(this));
+  html.find('.add-equipment').click(this._onAddEquipment.bind(this));
+  html.find('.add-vehicle').click(this._onAddVehicle.bind(this));
+  html.find('.add-headquarters').click(this._onAddHeadquarters.bind(this));
+  html.find('.add-resistance').click(this._onAddResistance.bind(this));
+  html.find('.delete-resistance').click(this._onDeleteResistance.bind(this));
+
+  // Power info display
+  html.find('.power-info, .power-image').click(this._onPowerInfo.bind(this));
+
+  // Power roll
+  html.find('.power-roll').click(this._onPowerRoll.bind(this));
+
+  // Browse compendium
+  html.find('.browse-compendium').click(this._onBrowseCompendium.bind(this));
+
+  // FEAT rolls
+  html.find('.feat-roll').click(this._onFeatRoll.bind(this));
+
+  // Karma management
+  html.find('.karma-history').click(this._onKarmaHistory.bind(this));
+  html.find('.karma-advancement').click(this._onKarmaAdvancement.bind(this));
+
+  // Add drag-drop handling
+  this._addDragDropListeners(html);
+
+  // Debug: Log information about powers
+  console.log("Powers count:", this.actor.items.filter(i => i.type === "power").length);
+  console.log("First tab:", html.find('.tabs-navigation a:first').data('tab'));
+}
+
+/**
+ * Handle input changes on the sheet
+ * @param {Event} event   The originating change event
+ * @private
+ */
+_onChangeInput(event) {
+  // Don't prevent default - let the form handle submission
+  // Just log for debugging
+  console.log(`Input changed: ${event.currentTarget.name} = ${event.currentTarget.value}`);
+  
+  // If this is the special group field that doesn't use 'name' attribute
+  if (event.currentTarget.id === "special-group-field") {
+    const value = event.currentTarget.value;
+    console.log("Special group field changed:", value);
   }
 }
 
-  /** @override */
-  getData() {
-    const context = super.getData();
+/**
+ * Handle saving the group field manually
+ * @param {Event} event   The originating click event
+ * @private
+ */
+_onSaveGroup(event) {
+  event.preventDefault();
+  const groupField = document.getElementById("special-group-field");
+  if (!groupField) return;
+  
+  const value = groupField.value;
+  const dataField = groupField.dataset.field || "system.group";
+  
+  console.log(`Saving special group field: ${dataField} = ${value}`);
+  
+  // Create update data object with the correct path
+  const updateData = {};
+  updateData[dataField] = value;
+  
+  // Update the actor
+  this.actor.update(updateData)
+    .then(() => {
+      ui.notifications.info("Group affiliation saved successfully!");
+      console.log("Group update SUCCESS");
+      console.log("Actor system after update:", foundry.utils.deepClone(this.actor.system));
+    })
+    .catch(err => {
+      console.error("Group update FAILED:", err);
+      ui.notifications.error("Failed to save group affiliation.");
+    });
+}
 
-    // Initialize data structure if needed
-    if (!this.actor.system.abilities) {
-      this.actor.update({
-        "system.abilities": {
-          fighting: { value: 10, rank: "Typical" },
-          agility: { value: 10, rank: "Typical" },
-          strength: { value: 10, rank: "Typical" },
-          endurance: { value: 10, rank: "Typical" },
-          reason: { value: 10, rank: "Typical" },
-          intuition: { value: 10, rank: "Typical" },
-          psyche: { value: 10, rank: "Typical" }
-        }
-      });
+/**
+ * Add a new resistance to the actor
+ * @param {Event} event   The originating click event
+ * @private
+ */
+_onAddResistance(event) {
+  event.preventDefault();
+  
+  // Initialize resistances array if it doesn't exist
+  const resistances = this.actor.system.resistances || [];
+  
+  // Create a new resistance with default values
+  const newResistance = {
+    type: "physical",
+    rank: "Good",
+    value: 10
+  };
+  
+  // Add to the array
+  resistances.push(newResistance);
+  
+  // Update the actor
+  this.actor.update({
+    "system.resistances": resistances
+  })
+    .then(() => ui.notifications.info("Resistance added."))
+    .catch(err => {
+      console.error("Failed to add resistance:", err);
+      ui.notifications.error("Failed to add resistance.");
+    });
+}
+
+/**
+ * Delete a resistance from the actor
+ * @param {Event} event   The originating click event
+ * @private
+ */
+_onDeleteResistance(event) {
+  event.preventDefault();
+  const index = event.currentTarget.dataset.index;
+  if (index === undefined) return;
+  
+  // Get current resistances
+  const resistances = foundry.utils.deepClone(this.actor.system.resistances || []);
+  
+  // Remove the resistance at the given index
+  resistances.splice(index, 1);
+  
+  // Update the actor
+  this.actor.update({
+    "system.resistances": resistances
+  })
+    .then(() => ui.notifications.info("Resistance removed."))
+    .catch(err => {
+      console.error("Failed to remove resistance:", err);
+      ui.notifications.error("Failed to remove resistance.");
+    });
+}
+
+/**
+ * Add a new equipment item to the actor
+ * @param {Event} event   The originating click event
+ * @private
+ */
+_onAddEquipment(event) {
+  event.preventDefault();
+  this.actor.createEmbeddedDocuments("Item", [{
+    name: "New Equipment",
+    type: "equipment",
+    system: {
+      materialStrength: "Typical",
+      description: ""
     }
+  }]);
+}
 
-    // Group items by type for easier access in the template
-    context.powers = this.actor.items.filter(item => item.type === "power");
-    context.talents = this.actor.items.filter(item => item.type === "talent");
-    context.contacts = this.actor.items.filter(item => item.type === "contact");
-    context.equipment = this.actor.items.filter(item => item.type === "equipment");
-    context.vehicles = this.actor.items.filter(item => item.type === "vehicle");
-    context.headquarters = this.actor.items.filter(item => item.type === "headquarters");
+/**
+ * Add a new vehicle item to the actor
+ * @param {Event} event   The originating click event
+ * @private
+ */
+_onAddVehicle(event) {
+  event.preventDefault();
+  this.actor.createEmbeddedDocuments("Item", [{
+    name: "New Vehicle",
+    type: "vehicle",
+    system: {
+      speed: 0,
+      materialStrength: "Typical",
+      description: ""
+    }
+  }]);
+}
 
-    console.log("Sheet context:", context); // Debug logging
+/**
+ * Add a new headquarters item to the actor
+ * @param {Event} event   The originating click event
+ * @private
+ */
+_onAddHeadquarters(event) {
+  event.preventDefault();
+  this.actor.createEmbeddedDocuments("Item", [{
+    name: "New Headquarters",
+    type: "headquarters",
+    system: {
+      location: "",
+      materialStrength: "Typical",
+      description: ""
+    }
+  }]);
+}
 
-    return context;
-  }
-
-  /** @override */
-  activateListeners(html) {
-    super.activateListeners(html);
-    
-    // DEBUG - Log what tab elements we're finding
-    console.log("Tabs object:", this._tabs[0]);
-    console.log("Tab navigation:", html.find('.sheet-tabs-navigation .item').length);
-    console.log("Tab content:", html.find('.tab').length);
-    
-    // Activate tabs - use Foundry's system but with correct selectors
-    const tabs = this._tabs[0];
-    if (tabs) {
-      // Manually set the active tab
-      const activeTab = tabs.active || "powers";
-      html.find(`.sheet-tabs-navigation .item[data-tab="${activeTab}"]`).addClass("active");
-      html.find(`.tab[data-tab="${activeTab}"]`).addClass("active");
+/**
+ * Display karma history dialog
+ * @param {Event} event   The originating click event
+ * @private
+ */
+_onKarmaHistory(event) {
+  event.preventDefault();
+  
+  const karmaHistory = this.actor.system.karma?.history || [];
+  
+  let content = `<h3>Karma History</h3>`;
+  if (karmaHistory.length === 0) {
+    content += `<p>No karma history recorded yet.</p>`;
+  } else {
+    content += `<table class="karma-history-table">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Amount</th>
+          <th>Reason</th>
+        </tr>
+      </thead>
+      <tbody>`;
       
-      // Click handler that works with the sheet structure
-      html.find('.sheet-tabs-navigation .item').click(ev => {
-        ev.preventDefault();
-        const tabName = ev.currentTarget.dataset.tab;
-        if (!tabName) return;
-        
-        // Update UI classes
-        html.find('.sheet-tabs-navigation .item').removeClass("active");
-        html.find('.tab').removeClass("active");
-        ev.currentTarget.classList.add("active");
-        html.find(`.tab[data-tab="${tabName}"]`).addClass("active");
-        
-        // Update tab state
-        tabs.active = tabName;
+    karmaHistory.forEach(entry => {
+      content += `<tr>
+        <td>${entry.date}</td>
+        <td>${entry.amount > 0 ? '+' : ''}${entry.amount}</td>
+        <td>${entry.reason}</td>
+      </tr>`;
+    });
+    
+    content += `</tbody></table>`;
+  }
+  
+  new Dialog({
+    title: "Karma History",
+    content: content,
+    buttons: {
+      close: {
+        icon: '<i class="fas fa-times"></i>',
+        label: "Close"
+      }
+    },
+    default: "close"
+  }).render(true);
+}
+
+/**
+ * Display karma advancement dialog
+ * @param {Event} event   The originating click event
+ * @private
+ */
+_onKarmaAdvancement(event) {
+  event.preventDefault();
+  
+  const advancement = this.actor.system.karma?.advancement || 0;
+  
+  const content = `
+    <h3>Karma Advancement</h3>
+    <p>Current advancement pool: ${advancement}</p>
+    <p>Choose an ability to advance:</p>
+    <div class="karma-advancement-options">
+      <button class="advance-ability" data-ability="fighting">Fighting</button>
+      <button class="advance-ability" data-ability="agility">Agility</button>
+      <button class="advance-ability" data-ability="strength">Strength</button>
+      <button class="advance-ability" data-ability="endurance">Endurance</button>
+      <button class="advance-ability" data-ability="reason">Reason</button>
+      <button class="advance-ability" data-ability="intuition">Intuition</button>
+      <button class="advance-ability" data-ability="psyche">Psyche</button>
+    </div>
+  `;
+  
+  const dialog = new Dialog({
+    title: "Karma Advancement",
+    content: content,
+    buttons: {
+      close: {
+        icon: '<i class="fas fa-times"></i>',
+        label: "Close"
+      }
+    },
+    default: "close",
+    render: html => {
+      html.find('.advance-ability').click(async (ev) => {
+        const ability = ev.currentTarget.dataset.ability;
+        // Logic for handling ability advancement would go here
+        dialog.close();
       });
     }
-    
-    // Item management
-    html.find('.item-edit').click(this._onItemEdit.bind(this));
-    html.find('.item-delete').click(this._onItemDelete.bind(this));
-    html.find('.add-power').click(this._onAddPower.bind(this));
-    html.find('.add-talent').click(this._onAddTalent.bind(this));
-    html.find('.add-contact').click(this._onAddContact.bind(this));
-
-    // Power info display
-    html.find('.power-info, .power-image').click(this._onPowerInfo.bind(this));
-
-    // Power roll
-    html.find('.power-roll').click(this._onPowerRoll.bind(this));
-
-    // Browse compendium
-    html.find('.browse-compendium').click(this._onBrowseCompendium.bind(this));
-
-    // FEAT rolls
-    html.find('.feat-roll').click(this._onFeatRoll.bind(this));
-
-    // Add drag-drop handling
-    this._addDragDropListeners(html);
-
-    // Debug: Log information about powers
-    console.log("Powers count:", this.actor.items.filter(i => i.type === "power").length);
-    console.log("First tab:", html.find('.tabs-navigation a:first').data('tab'));
-  }
-
-  /**
-   * Handle input changes on the sheet
-   * @param {Event} event   The originating change event
-   * @private
-   */
-  _onChangeInput(event) {
-    event.preventDefault();
-    const input = event.currentTarget;
-    const name = input.name;
-    let value = input.value;
-
-    // Special debug handling for group field
-    if (name === "system.group") {
-      console.log("GROUP FIELD DETECTED!");
-      console.log("Input:", input);
-      console.log("Current value:", value);
-
-      // Try an alternative update approach specifically for this field
-      const updateData = {};
-      updateData["system.group"] = value;
-
-      console.log("Special update for group:", updateData);
-
-      // Log the actor's current data structure
-      console.log("Actor system before update:", foundry.utils.deepClone(this.actor.system));
-
-      return this.actor.update(updateData)
-        .then(() => {
-          console.log("Group update SUCCESS");
-          console.log("Actor system after update:", foundry.utils.deepClone(this.actor.system));
-        })
-        .catch(err => console.error("Group update FAILED:", err));
-    }
-
-    // Regular handling for other fields
-    if (input.type === "checkbox") {
-      value = input.checked;
-    } else if (input.type === "radio" && !input.checked) {
-      return; // Only handle checked radio buttons
-    }
-
-    console.log(`Input changed: ${name} = ${value}`);
-
-    const updateData = {};
-    updateData[name] = value;
-
-    console.log("Updating with:", updateData);
-    return this.actor.update(updateData)
-      .then(() => console.log(`Successfully updated ${name} to ${value}`))
-      .catch(err => console.error(`Failed to update ${name}:`, err));
-  }
-
+  });
+  
+  dialog.render(true);
+}
   /**
    * Handle clicking on a power's info icon or image
    * @param {Event} event The originating click event
