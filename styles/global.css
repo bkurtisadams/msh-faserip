@@ -1,20 +1,22 @@
 /* FASERIP Character Sheet Styles */
+/* Scope all selectors to prevent leaking into Foundry UI */
 .faserip-sheet {
   font-family: Arial, sans-serif;
   background: #f5f5f5;
   color: #222;
   padding: 8px;
+  min-height: 400px;
 }
 
-.sheet-header {
+.faserip-sheet .sheet-header {
   display: flex;
   margin-bottom: 10px;
-  border: 1px solid #8b0000;
+  border: 2px solid #8b0000;
   background: #fff;
   padding: 5px;
 }
 
-.portrait-container {
+.faserip-sheet .portrait-container {
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -22,30 +24,32 @@
   padding-right: 10px;
 }
 
-.portrait {
+.faserip-sheet .portrait {
   height: 120px;
   width: 120px;
   object-fit: contain;
   border: 1px solid #333;
 }
 
-.hero-name, .hero-identity {
+.faserip-sheet .hero-name, 
+.faserip-sheet .hero-identity {
   margin-top: 5px;
 }
 
-.hero-name label, .hero-identity label {
+.faserip-sheet .hero-name label, 
+.faserip-sheet .hero-identity label {
   display: block;
   font-weight: bold;
   font-size: 12px;
 }
 
-.identity-type {
+.faserip-sheet .identity-type {
   display: flex;
   gap: 10px;
   margin-top: 5px;
 }
 
-.logo-container {
+.faserip-sheet .logo-container {
   flex: 1;
   display: flex;
   justify-content: center;
@@ -53,49 +57,49 @@
   padding: 10px;
 }
 
-.marvel-logo {
+.faserip-sheet .marvel-logo {
   max-width: 100%;
   max-height: 100px;
 }
 
-.player-info {
+.faserip-sheet .player-info {
   flex: 1;
   padding-left: 10px;
   border-left: 1px solid #ccc;
 }
 
-.form-group {
+.faserip-sheet .form-group {
   margin-bottom: 5px;
 }
 
-.form-group label {
+.faserip-sheet .form-group label {
   display: block;
   font-weight: bold;
   font-size: 12px;
 }
 
-.form-row {
+.faserip-sheet .form-row {
   display: flex;
   gap: 10px;
 }
 
-.form-group.half {
+.faserip-sheet .form-group.half {
   flex: 1;
 }
 
 /* Abilities section */
-.abilities-container {
+.faserip-sheet .abilities-container {
   margin-bottom: 10px;
-  border: 1px solid #8b0000;
+  border: 2px solid #8b0000;
   background: #fff;
 }
 
-.abilities-table {
+.faserip-sheet .abilities-table {
   width: 100%;
   border-collapse: collapse;
 }
 
-.abilities-table th {
+.faserip-sheet .abilities-table th {
   background: #8b0000;
   color: white;
   font-weight: bold;
@@ -103,31 +107,31 @@
   padding: 5px;
 }
 
-.abilities-table td {
+.faserip-sheet .abilities-table td {
   padding: 3px;
   text-align: center;
   border: 1px solid #ccc;
 }
 
-.ability-key {
+.faserip-sheet .ability-key {
   font-weight: bold;
   font-size: 16px;
   width: 30px;
 }
 
 /* Attributes section */
-.attributes-container {
+.faserip-sheet .attributes-container {
   margin-bottom: 10px;
-  border: 1px solid #8b0000;
+  border: 2px solid #8b0000;
   background: #fff;
 }
 
-.attributes-table {
+.faserip-sheet .attributes-table {
   width: 100%;
   border-collapse: collapse;
 }
 
-.attributes-table th {
+.faserip-sheet .attributes-table th {
   background: #8b0000;
   color: white;
   font-weight: bold;
@@ -135,13 +139,13 @@
   padding: 5px;
 }
 
-.attributes-table td {
+.faserip-sheet .attributes-table td {
   padding: 5px;
   text-align: center;
   border: 1px solid #ccc;
 }
 
-.current-max {
+.faserip-sheet .current-max {
   display: flex;
   justify-content: center;
   align-items: center;
@@ -149,37 +153,37 @@
   margin-bottom: 5px;
 }
 
-.current-max input {
+.faserip-sheet .current-max input {
   width: 50px;
   text-align: center;
 }
 
-.movement {
+.faserip-sheet .movement {
   margin-top: 5px;
 }
 
-.movement label {
+.faserip-sheet .movement label {
   display: block;
   font-size: 12px;
   font-weight: bold;
 }
 
-.movement input {
+.faserip-sheet .movement input {
   width: 40px;
   text-align: center;
 }
 
-.resistances {
+.faserip-sheet .resistances {
   padding: 10px;
 }
 
-.resistance-item {
+.faserip-sheet .resistance-item {
   display: flex;
   gap: 5px;
   margin-bottom: 5px;
 }
 
-/* Tab system - consolidated and fixed */
+/* Tab system - use more specific selectors to avoid conflicts */
 .faserip-sheet .sheet-tabs {
   display: flex;
   flex-direction: column;
@@ -197,7 +201,7 @@
   background: #f0f0f0;
 }
 
-/* Tab navigation items - unified selectors */
+/* Tab navigation items - more specific selectors */
 .faserip-sheet .sheet-tabs-navigation .item {
   padding: 8px 15px;
   background: #ddd;
@@ -283,7 +287,7 @@
 }
 
 /* Karma advancement section */
-.karma-advancement {
+.faserip-sheet .karma-advancement {
   display: flex;
   flex-wrap: wrap;
   margin-top: 10px;
@@ -292,20 +296,22 @@
   background: white;
 }
 
-.advancement-fund, .karma-pool, .lifetime-total {
+.faserip-sheet .advancement-fund, 
+.faserip-sheet .karma-pool, 
+.faserip-sheet .lifetime-total {
   flex: 1;
   min-width: 150px;
   text-align: center;
   margin-bottom: 10px;
 }
 
-.karma-advancement h3 {
+.faserip-sheet .karma-advancement h3 {
   color: #8b0000;
   margin: 0 0 5px 0;
   font-size: 14px;
 }
 
-.karma-buttons {
+.faserip-sheet .karma-buttons {
   width: 100%;
   display: flex;
   justify-content: center;
@@ -313,7 +319,7 @@
   margin-top: 10px;
 }
 
-.karma-buttons button {
+.faserip-sheet .karma-buttons button {
   background: #8b0000;
   color: white;
   border: none;
@@ -321,56 +327,46 @@
   cursor: pointer;
 }
 
-/* Input styling */
-input[type="text"], input[type="number"], select {
+/* Input styling - scope to sheet */
+.faserip-sheet input[type="text"], 
+.faserip-sheet input[type="number"], 
+.faserip-sheet select {
   border: 1px solid #ccc;
   padding: 2px 5px;
   font-size: 13px;
 }
 
-button {
+.faserip-sheet button {
   cursor: pointer;
 }
 
-/* Draggable items */
-[draggable="true"] {
+/* Draggable items - scope to sheet */
+.faserip-sheet [draggable="true"] {
   cursor: grab;
 }
 
-[draggable="true"]:active {
+.faserip-sheet [draggable="true"]:active {
   cursor: grabbing;
 }
 
-.tab.active {
-  display: block !important;
-}
-
-/* Ensure sheet is visible */
-.faserip-sheet {
-  min-height: 400px;
-  background: white;
-  color: black;
-}
-
-/* More visible borders */
-.sheet-header, .abilities-container, .attributes-container {
-  border: 2px solid #8b0000 !important;
+.faserip-sheet .tab.active {
+  display: block;
 }
 
 /* Powers Tab Styling */
-.powers-header {
+.faserip-sheet .powers-header {
   display: flex;
   justify-content: space-between;
   margin-bottom: 10px;
 }
 
-.powers-table {
+.faserip-sheet .powers-table {
   width: 100%;
   border-collapse: collapse;
   margin-bottom: 10px;
 }
 
-.powers-table th {
+.faserip-sheet .powers-table th {
   background: #8b0000;
   color: white;
   font-weight: bold;
@@ -378,13 +374,13 @@ button {
   padding: 5px;
 }
 
-.powers-table td {
+.faserip-sheet .powers-table td {
   padding: 5px;
   text-align: center;
   border-bottom: 1px solid #ccc;
 }
 
-.power-icon img {
+.faserip-sheet .power-icon img {
   width: 32px;
   height: 32px;
   border: 1px solid #777;
@@ -392,33 +388,33 @@ button {
   cursor: pointer;
 }
 
-.power-name {
+.faserip-sheet .power-name {
   text-align: left;
   font-weight: bold;
 }
 
-.power-controls {
+.faserip-sheet .power-controls {
   display: flex;
   justify-content: center;
   gap: 5px;
 }
 
-.power-controls a {
+.faserip-sheet .power-controls a {
   cursor: pointer;
 }
 
-.power-controls a:hover {
+.faserip-sheet .power-controls a:hover {
   color: #8b0000;
 }
 
-.no-powers {
+.faserip-sheet .no-powers {
   font-style: italic;
   color: #777;
   text-align: center;
   padding: 20px;
 }
 
-/* Power info dialog */
+/* Power info dialog - use more specific selectors */
 .power-info-dialog {
   max-width: 500px;
 }
@@ -448,4 +444,9 @@ button {
   border-top: 1px solid #ccc;
   padding-top: 10px;
   margin-top: 10px;
+}
+
+/* Hide non-active tabs */
+.faserip-sheet .tab:not(.active) {
+  display: none;
 }
