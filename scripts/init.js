@@ -1,9 +1,8 @@
-import { FaseripActor, FaseripActorModel } from './actor.js';
+// In init.js
+import { FaseripActor } from './actor.js';
 import { FaseripItem } from './item.js';
 import { FaseripActorSheet } from './actorSheet.js';
 import { FaseripItemSheet } from './itemSheet.js';
-import { rollFeat } from './macros.js';
-import { rollUniversalTable } from "./universalTable.js";
 
 Hooks.once("init", () => {
   console.log("Marvel Super Heroes (FASERIP) system initializing...");
@@ -18,43 +17,4 @@ Hooks.once("init", () => {
   
   Actors.registerSheet("msh-faserip", FaseripActorSheet, { makeDefault: true });
   Items.registerSheet("msh-faserip", FaseripItemSheet, { makeDefault: true });
-
-  // hook to see what's happening when the sheet is closed
-  Hooks.on("closeActorSheet", (sheet, html) => {
-    console.log("HOOK: Actor sheet closed!", sheet.actor.name);
-    console.log("Actor data at close:", sheet.actor.system);
-  });
-
-  // Register Handlebars helpers
-  Handlebars.registerHelper('capitalize', function(str) {
-    if (typeof str !== 'string') return '';
-    return str.charAt(0).toUpperCase() + str.slice(1);
-  });
-  
-  Handlebars.registerHelper('eq', function(a, b) {
-    return a === b;
-  });
-  
-  Handlebars.registerHelper('groupBy', function(items, key) {
-    const groups = items.reduce((result, item) => {
-      (result[item[key]] = result[item[key]] || []).push(item);
-      return result;
-    }, {});
-    return Object.entries(groups).map(([type, items]) => ({ type, items }));
-  });
-
-  // Register system macros
-  game.msh = {
-    rollFeat: rollFeat,
-    rollUniversalTable: rollUniversalTable
-  };
-
-  console.log("Marvel Super Heroes (FASERIP) system initialized!");
-});
-
-// Add a debug hook to help troubleshoot sheet rendering
-Hooks.on("renderActorSheet", (app, html, data) => {
-  console.log("Actor sheet rendered:", app.actor.name);
-  console.log("HTML length:", html.html().length);
-  console.log("Sheet data:", data);
 });
