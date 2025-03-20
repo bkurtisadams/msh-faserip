@@ -111,8 +111,8 @@ html.find('.power-info').click(ev => {
   }).render(true);
 });
 
-// Edit power button
-html.find('.item-edit').click(ev => {
+// Edit power button - more specific selector
+html.find('.powers-table .item-edit').click(ev => {
   const li = $(ev.currentTarget).closest(".power-row");
   const itemId = li.data("itemId");
   const item = this.actor.items.get(itemId);
@@ -122,8 +122,8 @@ html.find('.item-edit').click(ev => {
   }
 });
 
-// Delete power button
-html.find('.item-delete').click(ev => {
+// Delete power button - more specific selector
+html.find('.powers-table .item-delete').click(ev => {
   const li = $(ev.currentTarget).closest(".power-row");
   const itemId = li.data("itemId");
   
@@ -197,6 +197,46 @@ html.find('.browse-compendium[data-type="talents"]').click(ev => {
   }
 });
   
+// Edit talent button
+html.find('.talents-list .item-edit').click(ev => {
+  const li = $(ev.currentTarget).closest(".talent-item");
+  const itemId = li.data("itemId");
+  const item = this.actor.items.get(itemId);
+  
+  if (item) {
+    item.sheet.render(true);
+  }
+});
+
+// Delete talent button
+html.find('.talents-list .item-delete').click(ev => {
+  const li = $(ev.currentTarget).closest(".talent-item");
+  const itemId = li.data("itemId");
+  
+  if (!itemId) return;
+  
+  // Confirm deletion
+  new Dialog({
+    title: "Delete Talent",
+    content: "<p>Are you sure you want to delete this talent?</p>",
+    buttons: {
+      delete: {
+        icon: '<i class="fas fa-trash"></i>',
+        label: "Delete",
+        callback: () => {
+          this.actor.deleteEmbeddedDocuments("Item", [itemId]);
+          this.render(false);
+        }
+      },
+      cancel: {
+        icon: '<i class="fas fa-times"></i>',
+        label: "Cancel"
+      }
+    },
+    default: "cancel"
+  }).render(true);
+});
+
   // Continue with other listeners...
 }
 }
