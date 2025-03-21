@@ -156,11 +156,220 @@ html.find('.power-roll').click(ev => {
   const itemId = li.data("itemId");
   const item = this.actor.items.get(itemId);
   
-  if (item && item.rollItem) {
-    item.rollItem();
-  } else {
-    console.error("Could not roll power - item not found or rollItem method not available");
+  if (!item) {
+    console.error("Could not find power item");
+    return;
   }
+  
+  // Define action types based on power type
+  let actionOptions = [];
+  const powerType = item.system.type || "";
+  
+  // Determine appropriate action types based on the power
+  if (powerType.includes("Energy") || powerType.includes("Fire") || powerType.includes("Electric")) {
+    actionOptions = [
+      { value: "Energy (En)", label: "Energy (En)" }
+    ];
+  } else if (powerType.includes("Force") || powerType.includes("Plasma") || powerType.includes("Sonic")) {
+    actionOptions = [
+      { value: "Force (Fo)", label: "Force (Fo)" }
+    ];
+  } else if (powerType.includes("Missile") || powerType.includes("Projectile")) {
+    actionOptions = [
+      { value: "Shooting Attack (Sh)", label: "Shooting Attack (Sh)" },
+      { value: "Throwing Edged (TE)", label: "Throwing Edged (TE)" },
+      { value: "Throwing Blunt (TB)", label: "Throwing Blunt (TB)" }
+    ];
+  } else if (powerType.includes("Mental") || powerType.includes("Psi")) {
+    actionOptions = [
+      { value: "Mental Attack", label: "Mental Attack" }
+    ];
+  } else {
+    // Generic options for unknown power types
+    actionOptions = [
+      { value: "Energy (En)", label: "Energy (En)" },
+      { value: "Force (Fo)", label: "Force (Fo)" },
+      { value: "Shooting Attack (Sh)", label: "Shooting Attack (Sh)" },
+      { value: "Blunt Attack (BA)", label: "Blunt Attack (BA)" },
+      { value: "Edged Attack (EA)", label: "Edged Attack (EA)" },
+      { value: "Grappling (GP)", label: "Grappling (GP)" },
+      { value: "General Power Use", label: "General Power Use" }
+    ];
+  }
+  
+  // Get saved power settings (from item.system or flags)
+  const savedActionType = item.getFlag("msh-faserip", "lastActionType") || "";
+  const savedColumnShift = item.getFlag("msh-faserip", "lastColumnShift") || 0;
+  const skipDiceRoll = item.getFlag("msh-faserip", "skipDiceRoll") || false;
+  
+  // Create action type options HTML, with saved option selected
+  const actionOptionsHTML = actionOptions.map(option => 
+    `<option value="${option.value}" ${option.value === savedActionType ? 'selected' : ''}>${option.label}</option>`
+  ).join('');
+  
+  // Get the power's rank and value
+  const powerRank = item.system.rank || "Typical";
+  const powerValue = item.system.value || 6;
+  
+  // Create dialog for roll options
+  let dialogContent = `
+  <div style="margin-bottom: 10px;">
+    <label style="display: inline-block; width: 120px;">Action Type:</label>
+    <select id="action-type" name="actionType" style="width: 180px;">
+      ${actionOptionsHTML}
+    </select>
+  </div>
+  <div style="margin-bottom: 10px;">
+    <label style="display: inline-block; width: 120px;">Power Rank:</label>
+    <input type="text" id="power-rank" name="powerRank" value="${powerRank}" style="width: 100px;" readonly>
+    <span style="margin-left: 5px;">(${powerValue})</span>
+  </div>
+  <div style="margin-bottom: 10px;">
+    <label style="display: inline-block; width: 120px;">Column Shift:</label>
+    <input type="number" id="shift" name="shift" value="${savedColumnShift}" style="width: 50px;">
+    <span style="color: #666; font-size: 0.9em;">(+ right, - left)</span>
+  </div>
+  <div style="margin-bottom: 10px;">
+    <label style="display: inline-block; width: 120px;">Karma Points:</label>
+    <input type="number" id="karma" name="karma" value="0" min="0" style="width: 50px;">
+  </div>
+  <div style="margin-bottom: 10px;">
+    <label>
+      <input type="checkbox" id="save-settings" name="saveSettings" checked> 
+      Remember these settings for future rolls
+    </label>
+  </div>
+  <div>
+    <label>
+      <input type="checkbox" id="skip-dice" name="skipDice" ${skipDiceRoll ? 'checked' : ''}> 
+      Skip dice animation
+    </label>
+  </div>`;
+
+  new Dialog({
+    title: `Power Roll: ${item.name}`,
+    content: dialogContent,
+    buttons: {
+      roll: {
+        label: "Roll",
+        callback: async (html) => {
+          const actionType = html.find('[name="actionType"]').val();
+          const columnShift = parseInt(html.find('[name="shift"]').val()) || 0;
+          const karma = parseInt(html.find('[name="karma"]').val()) || 0;
+          const saveSettings = html.find('[name="saveSettings"]').is(':checked');
+          const skipDice = html.find('[name="skipDice"]').is(':checked');
+          
+          // Save settings if requested
+          if (saveSettings) {
+            await item.setFlag("msh-faserip", "lastActionType", actionType);
+            await item.setFlag("msh-faserip", "lastColumnShift", columnShift);
+            await item.setFlag("msh-faserip", "skipDiceRoll", skipDice);
+          }
+          
+          // Apply column shifts to get effective rank
+          let effectiveRank = powerRank;
+          if (columnShift !== 0) {
+            const ranks = [
+              "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent", 
+              "Remarkable", "Incredible", "Amazing", "Monstrous", "Unearthly",
+              "Shift-X", "Shift-Y", "Shift-Z", "Class 1000", "Class 3000", "Class 5000", "Beyond"
+            ];
+            const index = ranks.indexOf(powerRank);
+            if (index !== -1) {
+              const newIndex = Math.min(Math.max(index + columnShift, 0), ranks.length - 1);
+              effectiveRank = ranks[newIndex];
+              console.log(`Applied ${columnShift} column shifts to ${powerRank}, now ${effectiveRank}`);
+            }
+          }
+          
+          // Create the roll
+          const roll = new Roll("1d100");
+          
+          // Roll with or without animation
+          if (skipDice) {
+            await roll.evaluate();
+          } else {
+            // Show dice roll animation
+            await roll.evaluate({async: true});
+            await roll.toMessage({
+              speaker: ChatMessage.getSpeaker({ actor: this.actor }),
+              flavor: `${this.actor.name} uses ${item.name}`,
+              rollMode: game.settings.get("core", "rollMode")
+            });
+          }
+          
+          const totalRoll = roll.total + karma;
+          
+          // Get result from universal table
+          const resultColor = game.msh.rollUniversalTable(effectiveRank, totalRoll);
+          
+          // Define action types and results based on color
+          const ACTIONS = {
+            "Blunt Attack (BA)": { white: "Miss", green: "Hit", yellow: "Slam", red: "Stun" },
+            "Edged Attack (EA)": { white: "Miss", green: "Hit", yellow: "Stun", red: "Kill" },
+            "Shooting Attack (Sh)": { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Kill" },
+            "Throwing Edged (TE)": { white: "Miss", green: "Hit", yellow: "Stun", red: "Kill" },
+            "Throwing Blunt (TB)": { white: "Miss", green: "Hit", yellow: "Hit", red: "Stun" },
+            "Energy (En)": { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Kill" },
+            "Force (Fo)": { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Stun" },
+            "Grappling (GP)": { white: "Miss", green: "Miss", yellow: "Partial", red: "Hold" },
+            "Grabbing (Gb)": { white: "Miss", green: "Take", yellow: "Grab", red: "Break" },
+            "Escaping (ES)": { white: "Miss", green: "Miss", yellow: "Escape", red: "Reverse" },
+            "Mental Attack": { white: "Failure", green: "Success", yellow: "Special Effect", red: "Maximum Effect" },
+            "General Power Use": { white: "Failure", green: "Success", yellow: "Special Effect", red: "Maximum Effect" }
+          };
+          
+          // Get the result text based on action type and color
+          let resultText = "";
+          if (ACTIONS[actionType]) {
+            resultText = ACTIONS[actionType][resultColor.toLowerCase()];
+          } else {
+            resultText = resultColor.toUpperCase();
+          }
+          
+          // Create chat message styled to match screenshot
+          let content = `
+            <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
+              <div style="padding: 5px 10px; border-bottom: 1px solid #c0c0c0; font-size: 1.1em; color: #8b0000;">
+                <strong>${this.actor.name} - ${item.name} (${actionType})</strong>
+              </div>
+              <div style="padding: 5px 10px; font-size: 0.9em;">
+                <div>Base Rank: ${powerRank} (${powerValue})</div>
+                <div>Column Shift: ${columnShift} → ${effectiveRank}</div>
+                <div>Roll: ${roll.total} + Karma: ${karma} = ${totalRoll}</div>
+              </div>
+              <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
+                background-color: ${resultColor.toLowerCase() === 'white' ? '#f8f8f8' : 
+                                   resultColor.toLowerCase() === 'green' ? '#4CAF50' : 
+                                   resultColor.toLowerCase() === 'yellow' ? '#FFD700' : 
+                                   '#F44336'}; 
+                color: ${resultColor.toLowerCase() === 'white' || resultColor.toLowerCase() === 'yellow' ? '#333' : 'white'};">
+                ${resultText} (${resultColor.toUpperCase()})
+              </div>
+            </div>
+          `;
+          
+          // Only send formatted chat message if not skipping dice or if we're skipping dice
+          if (skipDice) {
+            // Send the formatted result message
+            ChatMessage.create({
+              speaker: ChatMessage.getSpeaker({ actor: this.actor }),
+              content: content,
+              roll: roll
+            });
+          } else {
+            // Send just the result message without the roll (since it was already shown)
+            ChatMessage.create({
+              speaker: ChatMessage.getSpeaker({ actor: this.actor }),
+              content: content
+            });
+          }
+        }
+      },
+      cancel: { label: "Cancel" }
+    },
+    default: "roll"
+  }).render(true);
 });
 
 ///////////////////////////////////////////////////////////////////////////////////////////
