@@ -852,7 +852,6 @@ html.find('.contacts-list .item-delete').click(ev => {
 });
 
 // Contact roll button
-// Contact roll button - updated to match screenshot styling
 html.find('.contact-roll').click(async ev => {
   const li = $(ev.currentTarget).closest(".contact-item");
   const itemId = li.data("itemId");
@@ -860,24 +859,66 @@ html.find('.contact-roll').click(async ev => {
   
   if (!item) return;
   
-  // Create a dialog for roll options
+  // Get saved contact settings
+  const savedActionType = item.getFlag("msh-faserip", "lastActionType") || "Availability";
+  const savedColumnShift = item.getFlag("msh-faserip", "lastColumnShift") || 0;
+  const skipDiceRoll = item.getFlag("msh-faserip", "skipDiceRoll") || false;
+  
+  // Define contact action types
+  const actionOptions = [
+    { value: "Availability", label: "Availability" },
+    { value: "Information", label: "Information Request" },
+    { value: "Equipment", label: "Equipment Request" },
+    { value: "Assistance", label: "Request Assistance" },
+    { value: "Favor", label: "Request Favor" }
+  ];
+  
+  // Create action type options HTML
+  const actionOptionsHTML = actionOptions.map(option => 
+    `<option value="${option.value}" ${option.value === savedActionType ? 'selected' : ''}>${option.label}</option>`
+  ).join('');
+  
+  // Determine base rank based on disposition
+  let baseRank = "Typical";
+  switch (item.system.disposition) {
+    case "Friendly": baseRank = "Good"; break;
+    case "Neutral": baseRank = "Typical"; break;
+    case "Suspicious": baseRank = "Poor"; break;
+    case "Hostile": baseRank = "Feeble"; break;
+  }
+  
+  // Create dialog for roll options
   let dialogContent = `
   <div style="margin-bottom: 10px;">
-    <label style="display: inline-block; width: 120px;">Action Type:</label>
+    <label style="display: inline-block; width: 120px;">Request Type:</label>
     <select id="action-type" name="actionType" style="width: 180px;">
-      <option value="Availability">Contact Availability</option>
-      <option value="Information">Information Request</option>
-      <option value="Favor">Favor Request</option>
+      ${actionOptionsHTML}
     </select>
   </div>
   <div style="margin-bottom: 10px;">
+    <label style="display: inline-block; width: 120px;">Base Rank:</label>
+    <input type="text" id="base-rank" name="baseRank" value="${baseRank}" style="width: 100px;" readonly>
+  </div>
+  <div style="margin-bottom: 10px;">
     <label style="display: inline-block; width: 120px;">Column Shift:</label>
-    <input type="number" id="shift" name="shift" value="0" style="width: 50px;">
+    <input type="number" id="shift" name="shift" value="${savedColumnShift}" style="width: 50px;">
     <span style="color: #666; font-size: 0.9em;">(+ right, - left)</span>
   </div>
-  <div>
+  <div style="margin-bottom: 10px;">
     <label style="display: inline-block; width: 120px;">Karma Points:</label>
     <input type="number" id="karma" name="karma" value="0" min="0" style="width: 50px;">
+  </div>
+  <div style="margin-bottom: 10px;">
+    <label>
+      <input type="checkbox" id="save-settings" name="saveSettings" checked> 
+      Remember these settings for future rolls
+    </label>
+  </div>
+  <div>
+    <label>
+      <input type="checkbox" id="skip-dice" name="skipDice" ${skipDiceRoll ? 'checked' : ''}> 
+      Skip dice animation
+    </label>
   </div>`;
 
   new Dialog({
@@ -890,17 +931,17 @@ html.find('.contact-roll').click(async ev => {
           const actionType = html.find('[name="actionType"]').val();
           const columnShift = parseInt(html.find('[name="shift"]').val()) || 0;
           const karma = parseInt(html.find('[name="karma"]').val()) || 0;
+          const saveSettings = html.find('[name="saveSettings"]').is(':checked');
+          const skipDice = html.find('[name="skipDice"]').is(':checked');
           
-          // Determine base rank based on disposition
-          let baseRank = "Typical";
-          switch (item.system.disposition) {
-            case "Friendly": baseRank = "Good"; break;
-            case "Neutral": baseRank = "Typical"; break;
-            case "Suspicious": baseRank = "Poor"; break;
-            case "Hostile": baseRank = "Feeble"; break;
+          // Save settings if requested
+          if (saveSettings) {
+            await item.setFlag("msh-faserip", "lastActionType", actionType);
+            await item.setFlag("msh-faserip", "lastColumnShift", columnShift);
+            await item.setFlag("msh-faserip", "skipDiceRoll", skipDice);
           }
           
-          // Apply column shifts
+          // Apply column shifts to get effective rank
           let effectiveRank = baseRank;
           if (columnShift !== 0) {
             const ranks = [
@@ -911,17 +952,30 @@ html.find('.contact-roll').click(async ev => {
             if (index !== -1) {
               const newIndex = Math.min(Math.max(index + columnShift, 0), ranks.length - 1);
               effectiveRank = ranks[newIndex];
+              console.log(`Applied ${columnShift} column shifts to ${baseRank}, now ${effectiveRank}`);
             }
           }
           
-          // Roll the dice
-          const roll = await new Roll("1d100").evaluate();
-          const totalRoll = roll.total + karma;
+          // Create the roll
+          const roll = new Roll("1d100");
           
-          // Get result from universal table
+          // Evaluate the roll
+          await roll.evaluate();
+          
+          // Display the dice roll with flavor text if not skipped
+          if (!skipDice) {
+            await roll.toMessage({
+              speaker: ChatMessage.getSpeaker({ actor: this.actor }),
+              flavor: `${this.actor.name} contacts ${item.name}`,
+              rollMode: game.settings.get("core", "rollMode")
+            });
+          }
+          
+          // Calculate the result
+          const totalRoll = roll.total + karma;
           const resultColor = game.msh.rollUniversalTable(effectiveRank, totalRoll);
           
-          // Define contact results based on color and action type
+          // Define contact results based on action type and color
           const ACTIONS = {
             "Availability": { 
               white: "Unavailable", 
@@ -931,9 +985,21 @@ html.find('.contact-roll').click(async ev => {
             },
             "Information": { 
               white: "No Information", 
-              green: "Limited Information", 
+              green: "Basic Information", 
               yellow: "Good Information", 
-              red: "Excellent Information" 
+              red: "Detailed Information" 
+            },
+            "Equipment": { 
+              white: "No Equipment", 
+              green: "Basic Equipment", 
+              yellow: "Good Equipment", 
+              red: "Excellent Equipment" 
+            },
+            "Assistance": { 
+              white: "No Assistance", 
+              green: "Limited Assistance", 
+              yellow: "Direct Assistance", 
+              red: "Above and Beyond" 
             },
             "Favor": { 
               white: "Refuses", 
@@ -946,13 +1012,17 @@ html.find('.contact-roll').click(async ev => {
           // Get the result text
           const resultText = ACTIONS[actionType][resultColor.toLowerCase()];
           
-          // Create chat message styled to match screenshot
+          // Get contact type for additional context
+          const contactType = item.system.type || "Contact";
+          
+          // Create chat message styled to match others
           let content = `
             <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
               <div style="padding: 5px 10px; border-bottom: 1px solid #c0c0c0; font-size: 1.1em; color: #8b0000;">
-                <strong>${this.actor.name} - Contact: ${item.name} (${actionType})</strong>
+                <strong>${this.actor.name} - ${contactType} Contact: ${item.name} (${actionType})</strong>
               </div>
               <div style="padding: 5px 10px; font-size: 0.9em;">
+                <div>Disposition: ${item.system.disposition}</div>
                 <div>Base Rank: ${baseRank}</div>
                 <div>Column Shift: ${columnShift} → ${effectiveRank}</div>
                 <div>Roll: ${roll.total} + Karma: ${karma} = ${totalRoll}</div>
@@ -969,10 +1039,9 @@ html.find('.contact-roll').click(async ev => {
           `;
           
           // Send to chat
-          ChatMessage.create({
+          await ChatMessage.create({
             speaker: ChatMessage.getSpeaker({ actor: this.actor }),
-            content: content,
-            roll: roll
+            content: content
           });
         }
       },
