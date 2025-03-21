@@ -151,6 +151,7 @@ html.find('.powers-table .item-delete').click(ev => {
 });
 
 // Roll power button
+// Power roll button
 html.find('.power-roll').click(ev => {
   const li = $(ev.currentTarget).closest(".power-row");
   const itemId = li.data("itemId");
@@ -285,12 +286,11 @@ html.find('.power-roll').click(ev => {
           // Create the roll
           const roll = new Roll("1d100");
           
-          // Roll with or without animation
-          if (skipDice) {
-            await roll.evaluate();
-          } else {
-            // Show dice roll animation
-            await roll.evaluate({async: true});
+          // Evaluate the roll
+          await roll.evaluate();
+          
+          // Display the dice roll with flavor text if not skipped
+          if (!skipDice) {
             await roll.toMessage({
               speaker: ChatMessage.getSpeaker({ actor: this.actor }),
               flavor: `${this.actor.name} uses ${item.name}`,
@@ -298,9 +298,8 @@ html.find('.power-roll').click(ev => {
             });
           }
           
+          // Calculate the result
           const totalRoll = roll.total + karma;
-          
-          // Get result from universal table
           const resultColor = game.msh.rollUniversalTable(effectiveRank, totalRoll);
           
           // Define action types and results based on color
@@ -349,21 +348,11 @@ html.find('.power-roll').click(ev => {
             </div>
           `;
           
-          // Only send formatted chat message if not skipping dice or if we're skipping dice
-          if (skipDice) {
-            // Send the formatted result message
-            ChatMessage.create({
-              speaker: ChatMessage.getSpeaker({ actor: this.actor }),
-              content: content,
-              roll: roll
-            });
-          } else {
-            // Send just the result message without the roll (since it was already shown)
-            ChatMessage.create({
-              speaker: ChatMessage.getSpeaker({ actor: this.actor }),
-              content: content
-            });
-          }
+          // Send to chat
+          await ChatMessage.create({
+            speaker: ChatMessage.getSpeaker({ actor: this.actor }),
+            content: content
+          });
         }
       },
       cancel: { label: "Cancel" }
@@ -482,8 +471,6 @@ html.find('.talents-list .item-delete').click(ev => {
 });
 
 // Talent roll button
-// In actorSheet.js, update the talent-roll click handler
-// In actorSheet.js, update the talent-roll click handler
 html.find('.talent-roll').click(async ev => {
   const li = $(ev.currentTarget).closest(".talent-item");
   const itemId = li.data("itemId");
@@ -500,6 +487,11 @@ html.find('.talent-roll').click(async ev => {
     case "Special": talentBonus = 1; break; // Default for special
     default: talentBonus = 0;
   }
+
+  // Get saved talent settings
+  const savedActionType = item.getFlag("msh-faserip", "lastActionType") || "";
+  const savedExtraShift = item.getFlag("msh-faserip", "lastExtraShift") || 0;
+  const skipDiceRoll = item.getFlag("msh-faserip", "skipDiceRoll") || false;
 
   // Define action options based on talent type
   let actionOptions = [];
@@ -568,7 +560,7 @@ html.find('.talent-roll').click(async ev => {
   
   // Create action type options HTML
   const actionOptionsHTML = actionOptions.map(option => 
-    `<option value="${option.value}">${option.label}</option>`
+    `<option value="${option.value}" ${option.value === savedActionType ? 'selected' : ''}>${option.label}</option>`
   ).join('');
   
   // Create dialog for roll options
@@ -586,12 +578,24 @@ html.find('.talent-roll').click(async ev => {
   </div>
   <div style="margin-bottom: 10px;">
     <label style="display: inline-block; width: 120px;">Extra Column Shift:</label>
-    <input type="number" id="shift" name="shift" value="0" style="width: 50px;">
+    <input type="number" id="shift" name="shift" value="${savedExtraShift}" style="width: 50px;">
     <span style="color: #666; font-size: 0.9em;">(additional +/- CS)</span>
   </div>
-  <div>
+  <div style="margin-bottom: 10px;">
     <label style="display: inline-block; width: 120px;">Karma Points:</label>
     <input type="number" id="karma" name="karma" value="0" min="0" style="width: 50px;">
+  </div>
+  <div style="margin-bottom: 10px;">
+    <label>
+      <input type="checkbox" id="save-settings" name="saveSettings" checked> 
+      Remember these settings for future rolls
+    </label>
+  </div>
+  <div>
+    <label>
+      <input type="checkbox" id="skip-dice" name="skipDice" ${skipDiceRoll ? 'checked' : ''}> 
+      Skip dice animation
+    </label>
   </div>`;
 
   new Dialog({
@@ -605,6 +609,15 @@ html.find('.talent-roll').click(async ev => {
           const talentBonus = parseInt(html.find('[name="talentBonus"]').val()) || 0;
           const extraShift = parseInt(html.find('[name="shift"]').val()) || 0;
           const karma = parseInt(html.find('[name="karma"]').val()) || 0;
+          const saveSettings = html.find('[name="saveSettings"]').is(':checked');
+          const skipDice = html.find('[name="skipDice"]').is(':checked');
+          
+          // Save settings if requested
+          if (saveSettings) {
+            await item.setFlag("msh-faserip", "lastActionType", actionType);
+            await item.setFlag("msh-faserip", "lastExtraShift", extraShift);
+            await item.setFlag("msh-faserip", "skipDiceRoll", skipDice);
+          }
           
           // Total column shift is talent bonus plus any extra shifts
           const totalColumnShift = talentBonus + extraShift;
@@ -630,11 +643,23 @@ html.find('.talent-roll').click(async ev => {
             }
           }
           
-          // Roll the dice
-          const roll = await new Roll("1d100").evaluate();
-          const totalRoll = roll.total + karma;
+          // Create the roll
+          const roll = new Roll("1d100");
           
-          // Get result from universal table
+          // Evaluate the roll
+          await roll.evaluate();
+          
+          // Display the dice roll with flavor text if not skipped
+          if (!skipDice) {
+            await roll.toMessage({
+              speaker: ChatMessage.getSpeaker({ actor: this.actor }),
+              flavor: `${this.actor.name} uses ${item.name}`,
+              rollMode: game.settings.get("core", "rollMode")
+            });
+          }
+          
+          // Calculate the result
+          const totalRoll = roll.total + karma;
           const resultColor = game.msh.rollUniversalTable(effectiveRank, totalRoll);
           
           // Format ability name for display
@@ -694,10 +719,9 @@ html.find('.talent-roll').click(async ev => {
           `;
           
           // Send to chat
-          ChatMessage.create({
+          await ChatMessage.create({
             speaker: ChatMessage.getSpeaker({ actor: this.actor }),
-            content: content,
-            roll: roll
+            content: content
           });
         }
       },
