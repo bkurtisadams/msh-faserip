@@ -54,5 +54,37 @@ export class FaseripActor extends Actor {
     if (!system.attributes.karma.value || system.attributes.karma.value > karmaMax) {
       system.attributes.karma.value = karmaMax;
     }
+
+      // Set Resources value based on rank
+  if (system.attributes.resources) {
+    const resourcesRank = system.attributes.resources.rank || "Typical";
+    // Map rank names to values
+    const rankRanges = {
+      "Shift-0": { min: 0, max: 1, default: 0 },
+      "Feeble": { min: 2, max: 3, default: 2 },
+      "Poor": { min: 4, max: 5, default: 4 },
+      "Typical": { min: 6, max: 9, default: 6 },
+      "Good": { min: 10, max: 19, default: 10 },
+      "Excellent": { min: 20, max: 29, default: 20 },
+      "Remarkable": { min: 30, max: 39, default: 30 },
+      "Incredible": { min: 40, max: 49, default: 40 },
+      "Amazing": { min: 50, max: 74, default: 50 },
+      "Monstrous": { min: 75, max: 99, default: 75 },
+      "Unearthly": { min: 100, max: 149, default: 100 },
+      "Shift-X": { min: 150, max: 199, default: 150 },
+      "Shift-Y": { min: 200, max: 499, default: 200 },
+      "Shift-Z": { min: 500, max: 999, default: 500 },
+      "Class 1000": { min: 1000, max: 2999, default: 1000 },
+      "Class 3000": { min: 3000, max: 4999, default: 3000 },
+      "Class 5000": { min: 5000, max: 9999, default: 5000 },
+      "Beyond": { min: 10000, max: Infinity, default: 10000 }
+    };
+    
+    // If value is not set, use the default for the current rank
+    if (!system.attributes.resources.value) {
+      system.attributes.resources.value = rankRanges[resourcesRank]?.default || 6;
+    }
+  }
+
   }
 }

@@ -342,27 +342,19 @@
             </td>
             <td class="resources-column">
               <select name="system.attributes.resources.rank">
-                <option value="Shift-0" {{#if (eq system.attributes.resources.rank "Shift-0" )}}selected{{/if}}>Shift-0
-                </option>
-                <option value="Feeble" {{#if (eq system.attributes.resources.rank "Feeble" )}}selected{{/if}}>Feeble
-                </option>
+                <option value="Shift-0" {{#if (eq system.attributes.resources.rank "Shift-0" )}}selected{{/if}}>Shift-0</option>
+                <option value="Feeble" {{#if (eq system.attributes.resources.rank "Feeble" )}}selected{{/if}}>Feeble</option>
                 <option value="Poor" {{#if (eq system.attributes.resources.rank "Poor" )}}selected{{/if}}>Poor</option>
-                <option value="Typical" {{#if (eq system.attributes.resources.rank "Typical" )}}selected{{/if}}>Typical
-                </option>
+                <option value="Typical" {{#if (eq system.attributes.resources.rank "Typical" )}}selected{{/if}}>Typical</option>
                 <option value="Good" {{#if (eq system.attributes.resources.rank "Good" )}}selected{{/if}}>Good</option>
-                <option value="Excellent" {{#if (eq system.attributes.resources.rank "Excellent" )}}selected{{/if}}>
-                  Excellent</option>
-                <option value="Remarkable" {{#if (eq system.attributes.resources.rank "Remarkable" )}}selected{{/if}}>
-                  Remarkable</option>
-                <option value="Incredible" {{#if (eq system.attributes.resources.rank "Incredible" )}}selected{{/if}}>
-                  Incredible</option>
-                <option value="Amazing" {{#if (eq system.attributes.resources.rank "Amazing" )}}selected{{/if}}>Amazing
-                </option>
-                <option value="Monstrous" {{#if (eq system.attributes.resources.rank "Monstrous" )}}selected{{/if}}>
-                  Monstrous</option>
-                <option value="Unearthly" {{#if (eq system.attributes.resources.rank "Unearthly" )}}selected{{/if}}>
-                  Unearthly</option>
+                <option value="Excellent" {{#if (eq system.attributes.resources.rank "Excellent" )}}selected{{/if}}>Excellent</option>
+                <option value="Remarkable" {{#if (eq system.attributes.resources.rank "Remarkable" )}}selected{{/if}}>Remarkable</option>
+                <option value="Incredible" {{#if (eq system.attributes.resources.rank "Incredible" )}}selected{{/if}}>Incredible</option>
+                <option value="Amazing" {{#if (eq system.attributes.resources.rank "Amazing" )}}selected{{/if}}>Amazing</option>
+                <option value="Monstrous" {{#if (eq system.attributes.resources.rank "Monstrous" )}}selected{{/if}}>Monstrous</option>
+                <option value="Unearthly" {{#if (eq system.attributes.resources.rank "Unearthly" )}}selected{{/if}}>Unearthly</option>
               </select>
+              <input type="number" name="system.attributes.resources.value" value="{{system.attributes.resources.value}}" />
               <div class="movement">
                 <label>Fly</label>
                 <input type="number" name="system.movement.fly" value="{{system.movement.fly}}" />
