@@ -675,3 +675,138 @@
   padding-top: 12px;
   border-top: 1px solid #ccc;
 }
+/* Horizontal layout for abilities section */
+.faserip-sheet .abilities-section {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+/* Primary abilities container styling */
+.faserip-sheet .primary-abilities {
+  flex: 1;
+  min-width: 350px; /* Adjust based on your preference */
+}
+
+/* Secondary abilities container styling */
+.faserip-sheet .secondary-abilities {
+  flex: 1;
+  max-width: 45%; /* Make secondary abilities narrower */
+}
+
+/* Make the initial roll and rank columns narrower */
+.faserip-sheet .abilities-table th.narrow-column {
+  width: 55px; /* Adjust as needed */
+}
+
+/* Make the Current Rank # column narrower */
+.faserip-sheet .abilities-table th:last-child {
+  width: 60px; /* Adjust as needed */
+}
+
+.faserip-sheet .abilities-table input[type="number"],
+.faserip-sheet .abilities-table input[type="text"] {
+  width: 90%; /* Make inputs slightly narrower */
+  box-sizing: border-box;
+}
+
+/* Stack health and karma values vertically */
+.faserip-sheet .stacked-values {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.faserip-sheet .stacked-values input {
+  width: 50px;
+  text-align: center;
+}
+
+.faserip-sheet .stacked-values .divider {
+  font-weight: bold;
+}
+
+/* Movement section styling */
+.faserip-sheet .movement-section {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin: 10px 0;
+  border-top: 1px solid #ccc;
+  padding-top: 10px;
+}
+
+.faserip-sheet .movement-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.faserip-sheet .movement-item label {
+  font-weight: bold;
+  font-size: 12px;
+  margin-bottom: 3px;
+}
+
+.faserip-sheet .movement-item input {
+  width: 40px;
+  text-align: center;
+}
+
+/* Popularity values styling (already stacked in design) */
+.faserip-sheet .popularity-values {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.faserip-sheet .popularity-values input {
+  width: 50px;
+  text-align: center;
+}
+
+/* Responsive layout for smaller screens */
+@media (max-width: 768px) {
+  .faserip-sheet .abilities-section {
+    flex-direction: column;
+  }
+  
+  .faserip-sheet .secondary-abilities {
+    max-width: 100%;
+  }
+}
+
+/* Make Current Rank column narrower with stacked text */
+.faserip-sheet .abilities-table th.narrow-column {
+  width: 55px; /* Adjust as needed */
+  font-size: 0.9em; /* Slightly smaller font */
+}
+
+/* Add tooltips for abbreviated column headers */
+.faserip-sheet th[title] {
+  cursor: help;
+  position: relative;
+}
+
+/* Narrower columns for Resources and Popularity */
+.faserip-sheet .attributes-table th.narrow-column {
+  width: 50px;
+}
+
+/* Ensure the column widths are respected */
+.faserip-sheet .attributes-table {
+  table-layout: fixed;
+}
+
+/* Adjust secondary table column widths */
+.faserip-sheet .attributes-table th:nth-child(1), 
+.faserip-sheet .attributes-table th:nth-child(2) {
+  width: 25%; /* Health and Karma columns */
+}
+
+.faserip-sheet .attributes-table th:nth-child(3), 
+.faserip-sheet .attributes-table th:nth-child(4) {
+  width: 20%; /* Resources and Popularity columns */
+}
