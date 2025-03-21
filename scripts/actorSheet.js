@@ -151,7 +151,6 @@ html.find('.powers-table .item-delete').click(ev => {
 });
 
 // Roll power button
-// Power roll button
 html.find('.power-roll').click(ev => {
   const li = $(ev.currentTarget).closest(".power-row");
   const itemId = li.data("itemId");
@@ -851,6 +850,7 @@ html.find('.contacts-list .item-delete').click(ev => {
   }).render(true);
 });
 
+// Roll Contact button
 // Contact roll button
 html.find('.contact-roll').click(async ev => {
   const li = $(ev.currentTarget).closest(".contact-item");
@@ -878,13 +878,47 @@ html.find('.contact-roll').click(async ev => {
     `<option value="${option.value}" ${option.value === savedActionType ? 'selected' : ''}>${option.label}</option>`
   ).join('');
   
-  // Determine base rank based on disposition
-  let baseRank = "Typical";
-  switch (item.system.disposition) {
-    case "Friendly": baseRank = "Good"; break;
-    case "Neutral": baseRank = "Typical"; break;
-    case "Suspicious": baseRank = "Poor"; break;
-    case "Hostile": baseRank = "Feeble"; break;
+  // Get the hero's popularity
+  const heroPopularity = this.actor.system.attributes?.popularity?.value || 0;
+  const heroPopularityRank = this.actor.system.attributes?.popularity?.rank || "Typical";
+  const isMutant = this.actor.system.powerOrigin === "mutant" || this.actor.system.isMutant;
+  
+  // Get contact type and determine potential resource level
+  const contactType = item.system.type || "General";
+  let resourceLevel = "Typical";
+  
+  // Determine resource level based on contact type (from your provided info)
+  switch (contactType) {
+    case "Law Enforcement": resourceLevel = "Remarkable"; break;
+    case "Military": resourceLevel = "Amazing"; break;
+    case "Business World": resourceLevel = "Incredible"; break;
+    case "Journalism": resourceLevel = "Poor"; break;
+    case "Crime": 
+      // Resources depend on level, let's assume Typical
+      resourceLevel = "Typical"; 
+      break;
+    case "Espionage": resourceLevel = "Incredible"; break;
+    case "Scientific": resourceLevel = "Good"; break;
+    case "State": resourceLevel = "Remarkable"; break;
+    case "National": resourceLevel = "Monstrous"; break;
+    case "International": resourceLevel = "Monstrous"; break;
+    case "Planetary": resourceLevel = "Unearthly"; break;
+    default: resourceLevel = "Typical";
+  }
+  
+  // Determine effective disposition (normally Friendly, but affected by negative popularity)
+  let effectiveDisposition = "Friendly";
+  if (heroPopularity < 0) {
+    effectiveDisposition = "Neutral";
+  }
+  
+  // Map disposition to required FEAT color
+  let requiredFeatColor;
+  switch (effectiveDisposition) {
+    case "Friendly": requiredFeatColor = "Green"; break;
+    case "Neutral": requiredFeatColor = "Yellow"; break;
+    case "Suspicious": requiredFeatColor = "Red"; break;
+    case "Hostile": requiredFeatColor = "Impossible"; break;
   }
   
   // Create dialog for roll options
@@ -896,8 +930,27 @@ html.find('.contact-roll').click(async ev => {
     </select>
   </div>
   <div style="margin-bottom: 10px;">
-    <label style="display: inline-block; width: 120px;">Base Rank:</label>
-    <input type="text" id="base-rank" name="baseRank" value="${baseRank}" style="width: 100px;" readonly>
+    <label style="display: inline-block; width: 120px;">Contact Type:</label>
+    <input type="text" id="contact-type" value="${contactType}" style="width: 180px;" readonly>
+  </div>
+  <div style="margin-bottom: 10px;">
+    <label style="display: inline-block; width: 120px;">Disposition:</label>
+    <input type="text" id="disposition" value="${effectiveDisposition}" style="width: 100px;" readonly>
+    ${heroPopularity < 0 ? 
+      '<span style="color: #aa0000; font-size: 0.9em;"> (Modified due to negative popularity)</span>' : ''}
+  </div>
+  <div style="margin-bottom: 10px;">
+    <label style="display: inline-block; width: 120px;">Popularity:</label>
+    <input type="text" id="popularity-rank" value="${heroPopularityRank}" style="width: 100px;" readonly>
+    <span style="margin-left: 5px;">(${heroPopularity})</span>
+  </div>
+  <div style="margin-bottom: 10px;">
+    <label style="display: inline-block; width: 120px;">Resources:</label>
+    <input type="text" id="resources" value="${resourceLevel}" style="width: 100px;" readonly>
+  </div>
+  <div style="margin-bottom: 10px;">
+    <label style="display: inline-block; width: 120px;">Required Result:</label>
+    <input type="text" id="required-result" value="${requiredFeatColor}" style="width: 100px;" readonly>
   </div>
   <div style="margin-bottom: 10px;">
     <label style="display: inline-block; width: 120px;">Column Shift:</label>
@@ -942,17 +995,31 @@ html.find('.contact-roll').click(async ev => {
           }
           
           // Apply column shifts to get effective rank
-          let effectiveRank = baseRank;
+          let effectiveRank = heroPopularityRank;
           if (columnShift !== 0) {
             const ranks = [
               "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent", 
               "Remarkable", "Incredible", "Amazing", "Monstrous", "Unearthly"
             ];
-            const index = ranks.indexOf(baseRank);
+            const index = ranks.indexOf(effectiveRank);
             if (index !== -1) {
               const newIndex = Math.min(Math.max(index + columnShift, 0), ranks.length - 1);
               effectiveRank = ranks[newIndex];
-              console.log(`Applied ${columnShift} column shifts to ${baseRank}, now ${effectiveRank}`);
+              console.log(`Applied ${columnShift} column shifts to ${heroPopularityRank}, now ${effectiveRank}`);
+            }
+          }
+          
+          // Apply mutant penalty if applicable
+          if (isMutant) {
+            // Apply a -1CS to reflect mutant penalty
+            const ranks = [
+              "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent", 
+              "Remarkable", "Incredible", "Amazing", "Monstrous", "Unearthly"
+            ];
+            const index = ranks.indexOf(effectiveRank);
+            if (index > 0) { // Don't go below Shift-0
+              effectiveRank = ranks[index - 1];
+              console.log(`Applied -1CS mutant penalty, now ${effectiveRank}`);
             }
           }
           
@@ -975,8 +1042,25 @@ html.find('.contact-roll').click(async ev => {
           const totalRoll = roll.total + karma;
           const resultColor = game.msh.rollUniversalTable(effectiveRank, totalRoll);
           
-          // Define contact results based on action type and color
-          const ACTIONS = {
+          // Check if the result meets the required FEAT color
+          let meetsFeatRequirement = false;
+          switch (requiredFeatColor) {
+            case "Green":
+              meetsFeatRequirement = (resultColor.toLowerCase() === "green" || resultColor.toLowerCase() === "yellow" || resultColor.toLowerCase() === "red");
+              break;
+            case "Yellow":
+              meetsFeatRequirement = (resultColor.toLowerCase() === "yellow" || resultColor.toLowerCase() === "red");
+              break;
+            case "Red":
+              meetsFeatRequirement = (resultColor.toLowerCase() === "red");
+              break;
+            case "Impossible":
+              meetsFeatRequirement = false; // Always fails
+              break;
+          }
+          
+          // Define all possible results by color 
+          const ALL_RESULTS = {
             "Availability": { 
               white: "Unavailable", 
               green: "Available (Limited)", 
@@ -992,8 +1076,8 @@ html.find('.contact-roll').click(async ev => {
             "Equipment": { 
               white: "No Equipment", 
               green: "Basic Equipment", 
-              yellow: "Good Equipment", 
-              red: "Excellent Equipment" 
+              yellow: `Good Equipment (up to ${resourceLevel} rank)`, 
+              red: `Excellent Equipment (up to ${resourceLevel} rank)` 
             },
             "Assistance": { 
               white: "No Assistance", 
@@ -1009,11 +1093,19 @@ html.find('.contact-roll').click(async ev => {
             }
           };
           
-          // Get the result text
-          const resultText = ACTIONS[actionType][resultColor.toLowerCase()];
-          
-          // Get contact type for additional context
-          const contactType = item.system.type || "Contact";
+          // Determine the result text
+          let resultText;
+          if (meetsFeatRequirement) {
+            // If requirement met, use the result corresponding to the color rolled
+            resultText = ALL_RESULTS[actionType][resultColor.toLowerCase()];
+          } else {
+            // If requirement not met, show the "failure" result regardless of color
+            if (actionType === "Availability") resultText = "Unavailable";
+            else if (actionType === "Information") resultText = "No Information";
+            else if (actionType === "Equipment") resultText = "No Equipment";
+            else if (actionType === "Assistance") resultText = "No Assistance";
+            else if (actionType === "Favor") resultText = "Refuses";
+          }
           
           // Create chat message styled to match others
           let content = `
@@ -1022,9 +1114,10 @@ html.find('.contact-roll').click(async ev => {
                 <strong>${this.actor.name} - ${contactType} Contact: ${item.name} (${actionType})</strong>
               </div>
               <div style="padding: 5px 10px; font-size: 0.9em;">
-                <div>Disposition: ${item.system.disposition}</div>
-                <div>Base Rank: ${baseRank}</div>
-                <div>Column Shift: ${columnShift} → ${effectiveRank}</div>
+                <div>Popularity: ${heroPopularityRank} (${heroPopularity})</div>
+                <div>Disposition: ${effectiveDisposition} (Required: ${requiredFeatColor})</div>
+                ${isMutant ? '<div style="color: #aa0000;">Mutant Penalty Applied (-1CS)</div>' : ''}
+                <div>Effective Rank: ${heroPopularityRank} ${columnShift !== 0 ? `→ ${effectiveRank} (${columnShift > 0 ? '+' : ''}${columnShift}CS)` : ''}</div>
                 <div>Roll: ${roll.total} + Karma: ${karma} = ${totalRoll}</div>
               </div>
               <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
@@ -1035,6 +1128,10 @@ html.find('.contact-roll').click(async ev => {
                 color: ${resultColor.toLowerCase() === 'white' || resultColor.toLowerCase() === 'yellow' ? '#333' : 'white'};">
                 ${resultText} (${resultColor.toUpperCase()})
               </div>
+              ${!meetsFeatRequirement ? 
+                `<div style="padding: 5px 10px; font-size: 0.9em; color: #aa0000;">Failed to meet required ${requiredFeatColor} result for ${effectiveDisposition} contact</div>` : ''}
+              ${heroPopularity < 0 ? 
+                '<div style="padding: 5px 10px; font-size: 0.9em; color: #aa0000;">Negative popularity affects contact relations</div>' : ''}
             </div>
           `;
           
@@ -1043,6 +1140,12 @@ html.find('.contact-roll').click(async ev => {
             speaker: ChatMessage.getSpeaker({ actor: this.actor }),
             content: content
           });
+          
+          // If hero has negative popularity, using contacts costs Karma
+          if (heroPopularity < 0) {
+            ui.notifications.warn("Negative popularity: Using contacts costs Karma!");
+            // You could implement Karma reduction here if desired
+          }
         }
       },
       cancel: { label: "Cancel" }
