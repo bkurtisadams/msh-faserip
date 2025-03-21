@@ -273,38 +273,84 @@ html.find('.talents-list .item-delete').click(ev => {
 });
 
 // Talent roll button
-html.find('.talent-roll').click(ev => {
+// Talent roll button
+html.find('.talent-roll').click(async ev => { // Changed to async
   const li = $(ev.currentTarget).closest(".talent-item");
   const itemId = li.data("itemId");
   const item = this.actor.items.get(itemId);
-  
+ 
   if (!item) return;
-  
-  // Create a simple dialog showing talent roll result
-  const roll = new Roll("1d100").evaluate({async: false});
-  
+ 
+  // Get ability and bonus information
   let abilityModified = item.system.abilityModified;
-  let abilityValue = abilityModified ? this.actor.system.abilities[abilityModified].value : null;
-  let abilityRank = abilityModified ? this.actor.system.abilities[abilityModified].rank : null;
+  let abilityRank = abilityModified ? this.actor.system.abilities[abilityModified].rank : "Typical";
   
-  let bonusText = "";
-  if (abilityModified && abilityRank) {
-    bonusText = `${item.system.bonus} to ${abilityModified.charAt(0).toUpperCase() + abilityModified.slice(1)} (${abilityRank})`;
-  } else {
-    bonusText = item.system.bonus;
+  // Determine column shifts based on bonus
+  let columnShifts = 0;
+  switch(item.system.bonus) {
+    case "+1CS": columnShifts = 1; break;
+    case "+2CS": columnShifts = 2; break;
+    case "+3CS": columnShifts = 3; break;
+    case "Special": 
+      // Handle special talents
+      columnShifts = 1; // Default to +1CS for Special
+      break;
+  }
+  
+  // Apply column shifts to get effective rank
+  let effectiveRank = abilityRank;
+  if (columnShifts !== 0) {
+    const ranks = [
+      "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent", 
+      "Remarkable", "Incredible", "Amazing", "Monstrous", "Unearthly",
+      "Shift-X", "Shift-Y", "Shift-Z", "Class 1000", "Class 3000", "Class 5000", "Beyond"
+    ];
+    const index = ranks.indexOf(abilityRank);
+    if (index !== -1) {
+      const newIndex = Math.min(Math.max(index + columnShifts, 0), ranks.length - 1);
+      effectiveRank = ranks[newIndex];
+      console.log(`Applied ${columnShifts} column shifts to ${abilityRank}, now ${effectiveRank}`);
+    }
+  }
+  
+  // Roll the dice
+  const roll = new Roll("1d100");
+  await roll.evaluate(); // Changed to await evaluation
+  
+  // Get result from universal table
+  const resultColor = game.msh.rollUniversalTable(effectiveRank, roll.total);
+  
+  // Format ability name for display
+  const abilityName = abilityModified ? 
+    abilityModified.charAt(0).toUpperCase() + abilityModified.slice(1) : 
+    "None";
+  
+  // Create formatted description text
+  let description = "";
+  if (item.system.type === "Weapon Skill" && item.system.specialty === "Blunt Weapons") {
+    description = "Characters with this Talent gain a +1CS to hit when attacking with a weapon that resolves attacks on the Blunt Attacks column of the Battle Effects Table.";
   }
   
   let content = `
     <div class="faserip-talent-roll">
       <h3>${item.name}</h3>
       <div class="roll-info">
-        <div><strong>Talent:</strong> ${item.system.type || 'Unknown'} - ${item.system.specialty || 'General'}</div>
-        <div><strong>Bonus:</strong> ${bonusText}</div>
+        <div><strong>Talent:</strong> ${item.system.type || 'Unknown'} ${item.system.specialty ? '- ' + item.system.specialty : ''}</div>
+        <div><strong>Base Ability:</strong> ${abilityName} (${abilityRank})</div>
+        ${columnShifts !== 0 ? `<div><strong>Column Shift:</strong> ${columnShifts > 0 ? '+' : ''}${columnShifts} → ${effectiveRank}</div>` : ''}
         <div><strong>Roll:</strong> ${roll.total}</div>
       </div>
-      <div class="result">
-        ${game.msh.rollUniversalTable ? game.msh.rollUniversalTable(abilityRank || "Typical", roll.total) : "Roll Result"}
+      <div class="result result-${resultColor.toLowerCase()}">
+        ${resultColor.toUpperCase()}
       </div>
+      ${description ? `
+      <div class="description">
+        ${description}
+      </div>` : ''}
+      ${item.system.description ? `
+      <div class="talent-description">
+        <strong>Description:</strong> ${item.system.description}
+      </div>` : ''}
     </div>
     <style>
       .faserip-talent-roll {
@@ -333,18 +379,40 @@ html.find('.talent-roll').click(ev => {
         border-radius: 3px;
         font-weight: bold;
         font-size: 1.1em;
-        background: #f0f0f0;
+        margin-bottom: 5px;
+      }
+      .result-white {
+        background-color: #f0f0f0;
+        color: #333;
         border: 1px solid #ccc;
+      }
+      .result-green {
+        background-color: #4CAF50;
+        color: white;
+      }
+      .result-yellow {
+        background-color: #FFC107;
+        color: #333;
+      }
+      .result-red {
+        background-color: #F44336;
+        color: white;
+      }
+      .description, .talent-description {
+        font-size: 0.9em;
+        border-top: 1px solid #eee;
+        padding-top: 5px;
+        margin-top: 5px;
       }
     </style>
   `;
-
+  
   ChatMessage.create({
     speaker: ChatMessage.getSpeaker({ actor: this.actor }),
     content: content,
     roll: roll
   });
-});
+});;
 
 ////////////////////////////////////////////////////////////////////////////////////////
 // Add Contact button
