@@ -86,5 +86,10 @@ export class FaseripActor extends Actor {
     }
   }
 
+  // initialize Resistances
+  if (!system.resistances) {
+    system.resistances = [];
+  }
+
   }
 }

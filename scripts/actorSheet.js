@@ -68,6 +68,50 @@ export class FaseripActorSheet extends ActorSheet {
       .catch(err => console.error("Error creating power:", err));
   });
 
+  // Add Resistance listener
+  html.find('.add-resistance').click(ev => {
+    console.log("Add Resistance button clicked");
+    
+    // Check if resistances array exists, if not, create it
+    const resistances = this.actor.system.resistances || [];
+    
+    // Create a new resistance object
+    const newResistance = {
+      type: "physical",  // Default type
+      rank: "Good",      // Default rank
+      value: 10          // Default value
+    };
+    
+    // Add the new resistance to the array
+    resistances.push(newResistance);
+    
+    // Update the actor with the new resistances array
+    this.actor.update({"system.resistances": resistances})
+      .then(() => {
+        console.log("Resistance added successfully");
+        this.render(false); // Re-render the sheet to show the new resistance
+      })
+      .catch(err => console.error("Error adding resistance:", err));
+  });
+
+  // Add delete resistance listener
+  html.find('.delete-resistance').click(ev => {
+    const index = $(ev.currentTarget).data("index");
+    console.log(`Delete resistance at index ${index}`);
+    
+    const resistances = duplicate(this.actor.system.resistances || []);
+    
+    // Remove the resistance at the specified index
+    resistances.splice(index, 1);
+    
+    // Update the actor with the modified resistances array
+    this.actor.update({"system.resistances": resistances})
+      .then(() => {
+        console.log("Resistance deleted successfully");
+        this.render(false); // Re-render the sheet
+      })
+      .catch(err => console.error("Error deleting resistance:", err));
+  });
   // Browse Powers Compendium button
   html.find('.browse-compendium[data-type="powers"]').click(ev => {
     const pack = game.packs.find(p => p.metadata.name === "powers" && p.metadata.system === "msh-faserip");

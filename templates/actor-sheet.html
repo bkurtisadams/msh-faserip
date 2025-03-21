@@ -392,15 +392,31 @@
             {{#each system.resistances as |resistance i|}}
             <div class="resistance-item">
               <select name="system.resistances.{{i}}.type">
-                <option value="physical" {{#if (eq resistance.type "physical" )}}selected{{/if}}>Physical</option>
-                <option value="energy" {{#if (eq resistance.type "energy" )}}selected{{/if}}>Energy</option>
-                <option value="mental" {{#if (eq resistance.type "mental" )}}selected{{/if}}>Mental</option>
-                <option value="magical" {{#if (eq resistance.type "magical" )}}selected{{/if}}>Magical</option>
+                <option value="physical" {{#if (eq resistance.type "physical")}}selected{{/if}}>Physical</option>
+                <option value="energy" {{#if (eq resistance.type "energy")}}selected{{/if}}>Energy</option>
+                <option value="mental" {{#if (eq resistance.type "mental")}}selected{{/if}}>Mental</option>
+                <option value="magical" {{#if (eq resistance.type "magical")}}selected{{/if}}>Magical</option>
+                <option value="fire" {{#if (eq resistance.type "fire")}}selected{{/if}}>Fire</option>
+                <option value="cold" {{#if (eq resistance.type "cold")}}selected{{/if}}>Cold</option>
+                <option value="electricity" {{#if (eq resistance.type "electricity")}}selected{{/if}}>Electricity</option>
+                <option value="radiation" {{#if (eq resistance.type "radiation")}}selected{{/if}}>Radiation</option>
+                <option value="toxin" {{#if (eq resistance.type "toxin")}}selected{{/if}}>Toxin</option>
+                <option value="corrosive" {{#if (eq resistance.type "corrosive")}}selected{{/if}}>Corrosive</option>
+                <option value="disease" {{#if (eq resistance.type "disease")}}selected{{/if}}>Disease</option>
+                <option value="emotion" {{#if (eq resistance.type "emotion")}}selected{{/if}}>Emotion</option>
               </select>
               <select name="system.resistances.{{i}}.rank">
-                <!-- Same rank options as above -->
-                <option value="Good" {{#if (eq resistance.rank "Good" )}}selected{{/if}}>Good</option>
-                <!-- Add other ranks -->
+                <option value="Shift-0" {{#if (eq resistance.rank "Shift-0")}}selected{{/if}}>Shift-0</option>
+                <option value="Feeble" {{#if (eq resistance.rank "Feeble")}}selected{{/if}}>Feeble</option>
+                <option value="Poor" {{#if (eq resistance.rank "Poor")}}selected{{/if}}>Poor</option>
+                <option value="Typical" {{#if (eq resistance.rank "Typical")}}selected{{/if}}>Typical</option>
+                <option value="Good" {{#if (eq resistance.rank "Good")}}selected{{/if}}>Good</option>
+                <option value="Excellent" {{#if (eq resistance.rank "Excellent")}}selected{{/if}}>Excellent</option>
+                <option value="Remarkable" {{#if (eq resistance.rank "Remarkable")}}selected{{/if}}>Remarkable</option>
+                <option value="Incredible" {{#if (eq resistance.rank "Incredible")}}selected{{/if}}>Incredible</option>
+                <option value="Amazing" {{#if (eq resistance.rank "Amazing")}}selected{{/if}}>Amazing</option>
+                <option value="Monstrous" {{#if (eq resistance.rank "Monstrous")}}selected{{/if}}>Monstrous</option>
+                <option value="Unearthly" {{#if (eq resistance.rank "Unearthly")}}selected{{/if}}>Unearthly</option>
               </select>
               <input type="number" name="system.resistances.{{i}}.value" value="{{resistance.value}}" />
               <button type="button" class="delete-resistance" data-index="{{i}}"><i class="fas fa-trash"></i></button>
