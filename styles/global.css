@@ -675,59 +675,105 @@
   padding-top: 12px;
   border-top: 1px solid #ccc;
 }
-/* Horizontal layout for abilities section */
+/* Abilities Section Layout */
 .faserip-sheet .abilities-section {
   display: flex;
   gap: 10px;
   margin-bottom: 10px;
 }
 
-/* Primary abilities container styling */
+/* Primary Abilities (finalized width) */
 .faserip-sheet .primary-abilities {
-  flex: 1;
-  min-width: 350px; /* Adjust based on your preference */
+  flex: 0 0 36%;
+  min-width: 280px;
 }
 
-/* Secondary abilities container styling */
-.faserip-sheet .secondary-abilities {
-  flex: 1;
-  max-width: 45%; /* Make secondary abilities narrower */
+/* Secondary Abilities (finalized width) */
+/* .faserip-sheet .secondary-abilities {
+  flex: 0 0 60%;
+  overflow: visible;
+} */
+
+/* Tables setup */
+.faserip-sheet .abilities-table,
+.faserip-sheet .attributes-table {
+  table-layout: fixed;
+  width: 100%;
 }
 
-/* Make the initial roll and rank columns narrower */
-.faserip-sheet .abilities-table th.narrow-column {
-  width: 55px; /* Adjust as needed */
+/* Narrow first column (FASERIP letters) */
+.faserip-sheet .abilities-table td.ability-key {
+  width: 20px;
+  text-align: center;
 }
 
-/* Make the Current Rank # column narrower */
+/* Column widths for Primary Abilities */
+.faserip-sheet .abilities-table th.narrow-column,
 .faserip-sheet .abilities-table th:last-child {
-  width: 60px; /* Adjust as needed */
+  width: 50px;
 }
 
-.faserip-sheet .abilities-table input[type="number"],
-.faserip-sheet .abilities-table input[type="text"] {
-  width: 90%; /* Make inputs slightly narrower */
+/* Expand Current Rank column width */
+.faserip-sheet .abilities-table th:nth-child(4),
+.faserip-sheet .abilities-table td:nth-child(4) {
+  width: 100px;
+}
+
+/* Adjust inputs/selects for Primary Abilities */
+.faserip-sheet .primary-abilities input[type="number"],
+.faserip-sheet .primary-abilities input[type="text"],
+.faserip-sheet .primary-abilities select {
+  width: 90%;
+  padding: 2px;
+  font-size: 0.7rem;
   box-sizing: border-box;
 }
 
-/* Stack health and karma values vertically */
-.faserip-sheet .stacked-values {
+/* Column widths for Secondary Abilities */
+.faserip-sheet .attributes-table th:nth-child(1),
+.faserip-sheet .attributes-table td:nth-child(1),
+.faserip-sheet .attributes-table th:nth-child(2),
+.faserip-sheet .attributes-table td:nth-child(2) {
+  width: 20%; /* Health & Karma narrower */
+}
+
+.faserip-sheet .attributes-table th:nth-child(3),
+.faserip-sheet .attributes-table td:nth-child(3),
+.faserip-sheet .attributes-table th:nth-child(4),
+.faserip-sheet .attributes-table td:nth-child(4) {
+  width: 30%; /* Resources & Popularity wider */
+}
+
+/* Inputs in Secondary Abilities */
+.faserip-sheet .secondary-abilities input[type="number"],
+.faserip-sheet .secondary-abilities select {
+  width: 90%;
+  box-sizing: border-box;
+  font-size: 0.75rem;
+  padding: 2px;
+}
+
+/* Stacked Values (Health, Karma, Popularity) */
+.faserip-sheet .stacked-values,
+.faserip-sheet .popularity-values {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 2px;
 }
 
-.faserip-sheet .stacked-values input {
+.faserip-sheet .stacked-values input,
+.faserip-sheet .popularity-values input {
   width: 50px;
   text-align: center;
 }
 
-.faserip-sheet .stacked-values .divider {
+.faserip-sheet .stacked-values .divider,
+.faserip-sheet .popularity-values .divider {
   font-weight: bold;
 }
 
-/* Movement section styling */
+/* Movement Section */
 .faserip-sheet .movement-section {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -754,59 +800,27 @@
   text-align: center;
 }
 
-/* Popularity values styling (already stacked in design) */
-.faserip-sheet .popularity-values {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-}
-
-.faserip-sheet .popularity-values input {
-  width: 50px;
-  text-align: center;
-}
-
-/* Responsive layout for smaller screens */
+/* Responsive adjustments */
 @media (max-width: 768px) {
   .faserip-sheet .abilities-section {
     flex-direction: column;
   }
-  
+
+  .faserip-sheet .primary-abilities,
   .faserip-sheet .secondary-abilities {
-    max-width: 100%;
+    flex: 1 1 100%;
+    min-width: unset;
   }
 }
 
-/* Make Current Rank column narrower with stacked text */
-.faserip-sheet .abilities-table th.narrow-column {
-  width: 55px; /* Adjust as needed */
-  font-size: 0.9em; /* Slightly smaller font */
+/* Smaller fonts for table headers */
+.faserip-sheet .attributes-table th,
+.faserip-sheet .abilities-table th {
+  font-size: 0.7rem;
+  padding: 2px;
 }
 
-/* Add tooltips for abbreviated column headers */
-.faserip-sheet th[title] {
-  cursor: help;
-  position: relative;
-}
-
-/* Narrower columns for Resources and Popularity */
-.faserip-sheet .attributes-table th.narrow-column {
-  width: 50px;
-}
-
-/* Ensure the column widths are respected */
-.faserip-sheet .attributes-table {
-  table-layout: fixed;
-}
-
-/* Adjust secondary table column widths */
-.faserip-sheet .attributes-table th:nth-child(1), 
-.faserip-sheet .attributes-table th:nth-child(2) {
-  width: 25%; /* Health and Karma columns */
-}
-
-.faserip-sheet .attributes-table th:nth-child(3), 
-.faserip-sheet .attributes-table th:nth-child(4) {
-  width: 20%; /* Resources and Popularity columns */
+/* Final narrow adjustment for Secondary Abilities */
+.faserip-sheet .secondary-abilities {
+  flex: 0 0 47%; /* Adjusted narrower from 60% */
 }
