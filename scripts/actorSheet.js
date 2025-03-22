@@ -24,6 +24,9 @@ export class FaseripActorSheet extends ActorSheet {
     context.talents = this.actor.items.filter(item => item.type === "talent") || [];
     // Add this line to get contacts
     context.contacts = this.actor.items.filter(item => item.type === "contact") || [];
+
+    // Add the calculated current karma value
+    context.currentKarma = this.actor.currentKarma;
     
     return context;
   }
