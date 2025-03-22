@@ -40,6 +40,15 @@ export class FaseripActorSheet extends ActorSheet {
   // In actorSheet.js, add to the activateListeners function
   activateListeners(html) {
     super.activateListeners(html);
+
+    // Karma History button
+    html.find('.karma-history').click(ev => {
+      // Import dynamically to avoid circular dependencies
+      import('./karma.js').then(module => {
+        const sheet = new module.KarmaSheet(this.actor);
+        sheet.render(true);
+      });
+    });
     
     // Add Power button - more direct approach
     html.find('.add-power').click(ev => {
