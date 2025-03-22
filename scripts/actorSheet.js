@@ -44,6 +44,24 @@ export class FaseripActorSheet extends ActorSheet {
   activateListeners(html) {
     super.activateListeners(html);
 
+    // Biography Toggle Button
+    html.find('.biography-toggle').click(ev => {
+      const bioDetails = html.find('.biography-details');
+      const toggleBtn = $(ev.currentTarget);
+      
+      // Toggle the visibility
+      bioDetails.toggleClass('visible');
+      
+      // Update the button text/icon
+      if (bioDetails.hasClass('visible')) {
+        toggleBtn.text('Biography ▲');
+        toggleBtn.addClass('active');
+      } else {
+        toggleBtn.text('Biography ▼');
+        toggleBtn.removeClass('active');
+      }
+    });
+
     // Karma History button
     html.find('.view-karma-history').click(ev => {
       // Import dynamically to avoid circular dependencies

@@ -65,8 +65,54 @@
       </div>
       
       <div class="biography-container">
-        <label>Biography</label>
-        <input type="text" value="<Toggle to Display>" readonly disabled class="biography-toggle" />
+        <button type="button" class="biography-toggle">Biography ▼</button>
+      </div>
+    </div>
+    
+    <!-- Biography Details (Hidden by Default) -->
+    <div class="biography-details">
+      <div class="bio-row">
+        <div class="bio-field">
+          <label>Race</label>
+          <input type="text" name="system.biography.race" value="{{system.biography.race}}" />
+        </div>
+        <div class="bio-field">
+          <label>Sex</label>
+          <input type="text" name="system.biography.sex" value="{{system.biography.sex}}" />
+        </div>
+        <div class="bio-field">
+          <label>Handedness</label>
+          <input type="text" name="system.biography.handedness" value="{{system.biography.handedness}}" />
+        </div>
+      </div>
+      
+      <div class="bio-row">
+        <div class="bio-field">
+          <label>Height</label>
+          <input type="text" name="system.biography.height" value="{{system.biography.height}}" />
+        </div>
+        <div class="bio-field">
+          <label>Weight</label>
+          <input type="text" name="system.biography.weight" value="{{system.biography.weight}}" />
+        </div>
+      </div>
+      
+      <div class="bio-row">
+        <div class="bio-field">
+          <label>Eye Color</label>
+          <input type="text" name="system.biography.eyeColor" value="{{system.biography.eyeColor}}" />
+        </div>
+        <div class="bio-field">
+          <label>Hair Color</label>
+          <input type="text" name="system.biography.hairColor" value="{{system.biography.hairColor}}" />
+        </div>
+      </div>
+      
+      <div class="bio-row">
+        <div class="bio-field full">
+          <label>History</label>
+          <textarea name="system.biography.history" rows="4">{{system.biography.history}}</textarea>
+        </div>
       </div>
     </div>
   </div>
