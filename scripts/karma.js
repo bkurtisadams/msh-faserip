@@ -648,11 +648,22 @@ export class KarmaSheet extends DocumentSheet {
   }
 
   _onEditKarma(index) {
+    // Get a copy of the history array
     const history = foundry.utils.deepClone(this.object.system.karma?.history || []);
+    
+    // Sort the history array the same way it's displayed
+    history.sort((a, b) => {
+      const dateA = new Date(a.realDate || 0);
+      const dateB = new Date(b.realDate || 0);
+      return dateB - dateA;
+    });
+    
+    // Now access the correct entry based on the sorted index
     if (index < 0 || index >= history.length) return;
     
     const event = history[index];
     
+    // Continue with the dialog creation
     new Dialog({
       title: "Edit Karma Entry",
       content: `
@@ -694,10 +705,23 @@ export class KarmaSheet extends DocumentSheet {
             event.type = formData.get("eventType");
             event.description = formData.get("description");
             
-            // Save back to history array
-            history[index] = event;
+            // Get the original unsorted history
+            const originalHistory = foundry.utils.deepClone(this.object.system.karma?.history || []);
             
-            this._updateKarmaHistory(history);
+            // Find the original entry and update it
+            const originalIndex = originalHistory.findIndex(e => 
+              e.realDate === event.realDate && 
+              e.type === event.type && 
+              e.description === event.description
+            );
+            
+            if (originalIndex !== -1) {
+              originalHistory[originalIndex] = event;
+              this._updateKarmaHistory(originalHistory);
+            } else {
+              // Fallback if entry not found
+              this._updateKarmaHistory(history);
+            }
           }
         },
         cancel: {
