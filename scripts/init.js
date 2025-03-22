@@ -14,6 +14,11 @@ Hooks.once("init", () => {
   // Add the rollUniversalTable function to the namespace
   game.msh.rollUniversalTable = rollUniversalTable;
 
+  // Register Handlebars helpers
+  Handlebars.registerHelper('getFlag', function(object, scope, flag) {
+    return object.getFlag(scope, flag);
+  });
+
   // Register document classes
   CONFIG.Actor.documentClass = FaseripActor;
   CONFIG.Item.documentClass = FaseripItem;

@@ -53,6 +53,7 @@
       </div>
     </div>
     
+    // HTML for the Biography Section
     <div class="hero-info-row three-columns">
       <div class="age-container">
         <label>Age</label>
@@ -65,11 +66,14 @@
       </div>
       
       <div class="biography-container">
-        <button type="button" class="biography-toggle">Biography ▼</button>
+        <button type="button" class="biography-toggle">
+          Biography {{#if isBiographyOpen}}▲{{else}}▼{{/if}}
+        </button>
       </div>
     </div>
     
     <!-- Biography Details (Hidden by Default) -->
+    {{#if isBiographyOpen}}
     <div class="biography-details">
       <div class="bio-row">
         <div class="bio-field">
@@ -115,8 +119,8 @@
         </div>
       </div>
     </div>
-  </div>
-
+    {{/if}}
+    
   <div class="sheet-body">
     <div class="abilities-section">
       <!-- Primary Abilities Container (FASERIP) -->

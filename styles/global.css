@@ -1261,7 +1261,8 @@
 
 .faserip-sheet .marvel-logo-text {
   font-family: 'Arial Black', sans-serif;
-  font-size: 36px;
+  /* font-size: 36px; */
+  font-size: 30px;
   font-weight: 900;
   letter-spacing: -1px;
   color: #000;
@@ -1272,6 +1273,7 @@
 
 .faserip-sheet .super-heroes-text {
   font-family: 'Arial', sans-serif;
+  /* font-size: 16px; */
   font-size: 16px;
   font-weight: bold;
   text-transform: uppercase;
@@ -1281,7 +1283,8 @@
 
 .faserip-sheet .character-sheet-text {
   font-family: 'Arial', sans-serif;
-  font-size: 22px;
+  /* font-size: 22px; */
+  font-size: 18px;
   font-weight: bold;
   text-transform: none;
   line-height: 1;
@@ -1422,10 +1425,9 @@
 
 /* Biography Details Section */
 .faserip-sheet .biography-details {
-  display: none; /* Hidden by default */
   border: 1px solid #ccc;
   padding: 10px;
-  margin-top: -5px;
+  margin-bottom: 5px;
   background-color: #f9f9f9;
 }
 
