@@ -50,6 +50,12 @@ export class FaseripActorSheet extends ActorSheet {
   activateListeners(html) {
     super.activateListeners(html);
 
+     // Initialize drag behavior for powers
+    html.find('.power-row').each((i, row) => {
+      row.setAttribute("draggable", true);
+      row.addEventListener("dragstart", this._onDragStart.bind(this));
+    });
+
     // Biography Toggle Button
     html.find('.biography-toggle').click(ev => {
       ev.preventDefault();
@@ -1232,5 +1238,15 @@ export class FaseripActorSheet extends ActorSheet {
     });
 
     // Continue with other listeners...
+  }
+  _onDragStart(event) {
+    const li = event.currentTarget;
+    const itemId = li.dataset.itemId;
+    const item = this.actor.items.get(itemId);
+    if (item) {
+      const dragData = item.toDragData();
+      // Set the drag data
+      event.dataTransfer.setData("text/plain", JSON.stringify(dragData));
+    }
   }
 }
