@@ -947,3 +947,17 @@
   color: #666;
   padding: 20px;
 }
+/* Clear all Karma button */
+.danger-button {
+  background-color: #d9534f;
+  color: white;
+}
+
+.danger-button:hover {
+  background-color: #c9302c;
+}
+
+.warning {
+  color: #d9534f;
+  font-weight: bold;
+}

@@ -22,12 +22,15 @@
     </header>
   
     <section class="sheet-body">
-      <div class="karma-controls">
-        <button type="button" class="add-karma"><i class="fas fa-plus"></i> Add Karma</button>
-        <button type="button" class="spend-karma"><i class="fas fa-minus"></i> Spend Karma</button>
-        <button type="button" class="import-karma"><i class="fas fa-file-import"></i> Import</button>
-        <button type="button" class="export-karma"><i class="fas fa-file-export"></i> Export</button>
-      </div>
+        <div class="karma-controls">
+            <button type="button" class="add-karma"><i class="fas fa-plus"></i> Add Karma</button>
+            <button type="button" class="spend-karma"><i class="fas fa-minus"></i> Spend Karma</button>
+            <button type="button" class="import-karma"><i class="fas fa-file-import"></i> Import</button>
+            <button type="button" class="export-karma"><i class="fas fa-file-export"></i> Export</button>
+            {{#if isGM}}
+            <button type="button" class="clear-karma danger-button"><i class="fas fa-trash-alt"></i> Clear All Karma Data</button>
+            {{/if}}
+          </div>>
   
       <div class="karma-history-table">
         <table>

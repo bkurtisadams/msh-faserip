@@ -22,6 +22,7 @@ export class KarmaSheet extends DocumentSheet {
       const actorData = this.object.toObject(false);
       
       context.system = actorData.system;
+      context.isGM = game.user.isGM; // check if user is GM
       
       // Ensure karma history exists
       if (!context.system.karma) {
@@ -86,8 +87,51 @@ export class KarmaSheet extends DocumentSheet {
         const index = Number(ev.currentTarget.dataset.index);
         this._onDeleteKarma(index);
       });
+
+      // Clear All Karma button (GM only)
+      if (game.user.isGM) {
+          html.find('.clear-karma').click(ev => this._onClearKarma(ev));
+        }
     }
   
+    _onClearKarma(event) {
+        event.preventDefault();
+        
+        // Create confirmation dialog with warnings
+        new Dialog({
+          title: "Clear All Karma Data",
+          content: `
+            <div class="form-group">
+              <p class="warning">WARNING: This will permanently erase all karma history and reset all karma values to zero.</p>
+              <p>This action cannot be undone. Are you sure you want to proceed?</p>
+            </div>
+          `,
+          buttons: {
+            clear: {
+              icon: '<i class="fas fa-exclamation-triangle"></i>',
+              label: "Clear All Karma Data",
+              callback: async () => {
+                await this.object.update({
+                  "system.karma.history": [],
+                  "system.attributes.karma.value": 0,
+                  "system.karma.lifetime": 0,
+                  "system.karma.advancement": 0,
+                  "system.karma.pool": 0
+                });
+                
+                ui.notifications.info(`All karma data for ${this.object.name} has been cleared.`);
+                this.render();
+              }
+            },
+            cancel: {
+              icon: '<i class="fas fa-times"></i>',
+              label: "Cancel"
+            }
+          },
+          default: "cancel"
+        }).render(true);
+      }
+      
     _onAddKarma(event) {
       event.preventDefault();
   
