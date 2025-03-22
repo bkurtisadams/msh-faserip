@@ -131,7 +131,7 @@ export class KarmaSheet extends DocumentSheet {
           default: "cancel"
         }).render(true);
       }
-      
+
     _onAddKarma(event) {
       event.preventDefault();
   
@@ -310,7 +310,7 @@ export class KarmaSheet extends DocumentSheet {
       // Create file input element
       const input = document.createElement('input');
       input.type = 'file';
-      input.accept = '.csv,.xlsx,.xls';
+      input.accept = '.csv';
       
       input.onchange = e => {
         const file = e.target.files[0];
@@ -330,44 +330,82 @@ export class KarmaSheet extends DocumentSheet {
     }
   
     async _importCSV(file) {
-      // Read the file
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        const csv = e.target.result;
-        
-        // Parse CSV with PapaParse
-        Papa.parse(csv, {
-          header: true,
-          skipEmptyLines: true,
-          complete: (results) => {
-            this._showImportDialog(results.data);
-          },
-          error: (error) => {
-            ui.notifications.error("Error parsing CSV file: " + error.message);
-          }
-        });
-      };
+  try {
+    // Read the file
+    const reader = new FileReader();
+    const text = await new Promise((resolve, reject) => {
+      reader.onload = e => resolve(e.target.result);
+      reader.onerror = e => reject(new Error("File reading failed"));
       reader.readAsText(file);
+    });
+    
+    // Parse CSV manually
+    const lines = text.split(/\r?\n/).filter(line => line.trim());
+    if (lines.length < 2) {
+      ui.notifications.warn("CSV file contains insufficient data");
+      return;
     }
+    
+    // Parse header
+    const headers = this._parseCSVLine(lines[0]);
+    
+    // Parse data rows
+    const data = [];
+    for (let i = 1; i < lines.length; i++) {
+      const values = this._parseCSVLine(lines[i]);
+      if (values.length === headers.length) {
+        const row = {};
+        headers.forEach((header, index) => {
+          row[header] = values[index];
+        });
+        data.push(row);
+      }
+    }
+    
+    this._showImportDialog(data);
+  } catch (error) {
+    console.error("CSV import error:", error);
+    ui.notifications.error("Error importing CSV: " + error.message);
+  }
+}
+
+// Helper method to parse a CSV line
+_parseCSVLine(line) {
+  const values = [];
+  let inQuotes = false;
+  let currentValue = "";
   
-    async _importExcel(file) {
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        const data = new Uint8Array(e.target.result);
-        
-        try {
-          // Parse Excel file with SheetJS
-          const workbook = XLSX.read(data, { type: 'array' });
-          const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-          const jsonData = XLSX.utils.sheet_to_json(firstSheet);
-          
-          this._showImportDialog(jsonData);
-        } catch (error) {
-          ui.notifications.error("Error parsing Excel file: " + error.message);
-        }
-      };
-      reader.readAsArrayBuffer(file);
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    
+    if (char === '"' && !inQuotes) {
+      // Start of quoted field
+      inQuotes = true;
+    } else if (char === '"' && inQuotes && line[i+1] === '"') {
+      // Escaped quote within quoted field
+      currentValue += '"';
+      i++;
+    } else if (char === '"' && inQuotes) {
+      // End of quoted field
+      inQuotes = false;
+    } else if (char === ',' && !inQuotes) {
+      // End of field
+      values.push(currentValue);
+      currentValue = "";
+    } else {
+      // Regular character
+      currentValue += char;
     }
+  }
+  
+  // Add the last field
+  values.push(currentValue);
+  return values;
+}
+  
+async _importExcel(file) {
+    ui.notifications.error("Excel import requires SheetJS library which is not available. Please use CSV format instead.");
+  }
   
     _showImportDialog(data) {
       if (!data || data.length === 0) {
