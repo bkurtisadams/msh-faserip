@@ -1,57 +1,71 @@
 <form class="faserip-sheet" autocomplete="off">
-  <div class="sheet-header">
+  <div class="sheet-header marvel-header">
+    <!-- Character portrait with border -->
     <div class="portrait-container">
       <img src="{{actor.img}}" data-edit="img" alt="{{actor.name}}" class="portrait" />
-      <div class="hero-name">
+    </div>
+    
+    <!-- Marvel Logo and Character Information Sheet text -->
+    <div class="header-title">
+      <div class="marvel-logo-text">MARVEL</div>
+      <div class="super-heroes-text">SUPER HEROES</div>
+      <div class="character-sheet-text">Character<br>Information<br>Sheet</div>
+    </div>
+    
+    <!-- Player information area -->
+    <div class="character-info">
+      <div class="info-row">
+        <label class="info-label">Player Name</label>
+        <input type="text" name="system.player" value="{{system.player}}" class="info-input" />
+      </div>
+    </div>
+  </div>
+
+  <!-- Hero's Name and Identity section -->
+  <div class="identity-section">
+    <div class="hero-info-row">
+      <div class="hero-name-container">
         <label>Hero's Name</label>
         <input type="text" name="name" value="{{actor.name}}" />
       </div>
-      <div class="hero-identity">
-        <label>Hero's Identity</label>
+      
+      <div class="group-container">
+        <label>Group Affiliation</label>
+        <input type="text" name="system.group" value="{{system.group}}" />
+      </div>
+    </div>
+    
+    <div class="hero-info-row">
+      <div class="hero-identity-container">
+        <label>Hero's Identity
+          <span class="identity-type-inline">
+            <label class="radio-label"><input type="radio" name="system.identityType" value="secret" {{#if (eq system.identityType "secret")}}checked{{/if}} /> Secret</label>
+            <label class="radio-label"><input type="radio" name="system.identityType" value="public" {{#if (eq system.identityType "public")}}checked{{/if}} /> Public</label>
+          </span>
+        </label>
         <input type="text" name="system.identity" value="{{system.identity}}" />
-        <div class="identity-type">
-          <label><input type="radio" name="system.identityType" value="secret" {{#if (eq system.identityType "secret"
-              )}}checked{{/if}} /> Secret</label>
-          <label><input type="radio" name="system.identityType" value="public" {{#if (eq system.identityType "public"
-              )}}checked{{/if}} /> Public</label>
-        </div>
       </div>
-    </div>
-
-    <div class="logo-container">
-      <img src="systems/msh-faserip/assets/marvel-logo.png" class="marvel-logo" />
-    </div>
-
-    <div class="player-info">
-      <div class="form-group">
-        <label>Player Name</label>
-        <input type="text" name="system.player" value="{{system.player}}" />
-      </div>
-      <!-- 
-      <div class="form-group">
-        <label>Group Affiliation</label>
-        <input type="text" id="group-affiliation" name="system.group" value="{{system.group}}" />
-      </div>
- -->
-      <div class="form-group special-group-field">
-        <label>Group Affiliation</label>
-        <input type="text" name="system.group" id="special-group-field" data-field="system.group" value="{{system.group}}" />
-        <button type="button" class="save-group">Save</button>
-      </div>
-
-      <div class="form-group">
+      
+      <div class="base-container">
         <label>Base of Operations</label>
         <input type="text" name="system.base" value="{{system.base}}" />
       </div>
-      <div class="form-row">
-        <div class="form-group half">
-          <label>Age</label>
-          <input type="text" name="system.age" value="{{system.age}}" />
-        </div>
-        <div class="form-group half">
-          <label>Origin</label>
-          <input type="text" name="system.origin" value="{{system.origin}}" />
-        </div>
+    </div>
+    
+    <div class="hero-info-row three-columns">
+      <div class="age-container">
+        <label>Age</label>
+        <input type="text" name="system.age" value="{{system.age}}" />
+      </div>
+      
+      <div class="origin-container">
+        <label>Origin</label>
+        <input type="text" name="system.origin" value="{{system.origin}}" />
+      </div>
+      
+      <div class="biography-container">
+        <label>Biography</label>
+        <input type="text" value="<Toggle to Display>" readonly disabled class="biography-toggle" />
       </div>
     </div>
   </div>

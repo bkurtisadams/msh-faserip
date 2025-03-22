@@ -1224,3 +1224,185 @@
 .faserip-sheet .tab-style-button:hover {
   background: #eee;
 }
+/* Marvel Character Sheet Header Styles */
+.faserip-sheet .marvel-header {
+  display: flex;
+  flex-direction: row;
+  border: 1px solid #8b0000;
+  padding: 10px;
+  background-color: white;
+  margin-bottom: 10px;
+}
+
+/* Portrait container */
+.faserip-sheet .portrait-container {
+  flex: 0 0 auto;
+  margin-right: 15px;
+}
+
+.faserip-sheet .portrait {
+  width: 140px;
+  height: 140px;
+  object-fit: cover;
+  border: 1px solid #000;
+}
+
+/* Marvel logo and title */
+.faserip-sheet .header-title {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+}
+
+.faserip-sheet .marvel-logo-text {
+  font-family: 'Arial Black', sans-serif;
+  font-size: 42px;
+  font-weight: 900;
+  letter-spacing: -1px;
+  color: #000;
+  line-height: 0.9;
+  text-transform: uppercase;
+  margin-bottom: 0;
+}
+
+.faserip-sheet .super-heroes-text {
+  font-family: 'Arial', sans-serif;
+  font-size: 18px;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 10px;
+}
+
+.faserip-sheet .character-sheet-text {
+  font-family: 'Arial', sans-serif;
+  font-size: 26px;
+  font-weight: bold;
+  text-transform: none;
+  line-height: 1;
+}
+
+/* Player info area */
+.faserip-sheet .character-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: flex-end;
+  padding-top: 10px;
+}
+
+.faserip-sheet .info-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-bottom: 5px;
+  width: 100%;
+  justify-content: flex-end;
+}
+
+.faserip-sheet .info-label {
+  font-weight: bold;
+  margin-right: 5px;
+}
+
+.faserip-sheet .info-input {
+  width: 200px;
+  padding: 4px;
+  border: 1px solid #ccc;
+}
+
+/* Identity section styling */
+.faserip-sheet .identity-section {
+  border: 1px solid #8b0000;
+  padding: 10px;
+  background-color: white;
+  margin-bottom: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.faserip-sheet .hero-info-row {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+}
+
+.faserip-sheet .hero-info-row.three-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr 2fr;
+  gap: 10px;
+}
+
+.faserip-sheet .hero-name-container,
+.faserip-sheet .hero-identity-container,
+.faserip-sheet .group-container,
+.faserip-sheet .base-container {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+.faserip-sheet .age-container,
+.faserip-sheet .origin-container,
+.faserip-sheet .biography-container {
+  margin-bottom: 0;
+}
+
+.faserip-sheet .hero-name-container label,
+.faserip-sheet .group-container label,
+.faserip-sheet .base-container label,
+.faserip-sheet .age-container label,
+.faserip-sheet .origin-container label,
+.faserip-sheet .biography-container label {
+  display: block;
+  font-weight: bold;
+  margin-bottom: 3px;
+}
+
+.faserip-sheet .hero-identity-container label {
+  display: flex;
+  font-weight: bold;
+  margin-bottom: 3px;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.faserip-sheet .identity-type-inline {
+  display: flex;
+  gap: 10px;
+  font-weight: normal;
+  font-size: 0.85em;
+}
+
+.faserip-sheet .radio-label {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.faserip-sheet .radio-label input[type="radio"] {
+  margin: 0;
+}
+
+.faserip-sheet .hero-name-container input,
+.faserip-sheet .hero-identity-container input,
+.faserip-sheet .group-container input,
+.faserip-sheet .base-container input,
+.faserip-sheet .age-container input,
+.faserip-sheet .origin-container input {
+  width: 100%;
+  padding: 4px;
+  border: 1px solid #ccc;
+}
+
+.faserip-sheet .biography-toggle {
+  width: 100%;
+  padding: 4px;
+  border: 1px solid #ccc;
+  background-color: #f5f5f5;
+  color: #777;
+  font-style: italic;
+}
