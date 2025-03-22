@@ -69,11 +69,14 @@ export class FaseripActorSheet extends ActorSheet {
   });
 
   // Add Resistance listener
-  html.find('.add-resistance').click(ev => {
-    console.log("Add Resistance button clicked");
-    
+  // Add Resistance listener
+html.find('.add-resistance').click(ev => {
+  ev.preventDefault();
+  console.log("Add Resistance button clicked");
+  
+  try {
     // Check if resistances array exists, if not, create it
-    const resistances = this.actor.system.resistances || [];
+    const resistances = foundry.utils.deepClone(this.actor.system.resistances || []);
     
     // Create a new resistance object
     const newResistance = {
@@ -89,29 +92,65 @@ export class FaseripActorSheet extends ActorSheet {
     this.actor.update({"system.resistances": resistances})
       .then(() => {
         console.log("Resistance added successfully");
-        this.render(false); // Re-render the sheet to show the new resistance
+        // Use requestAnimationFrame to ensure we're not interrupting rendering
+        requestAnimationFrame(() => this.render(false));
       })
-      .catch(err => console.error("Error adding resistance:", err));
-  });
+      .catch(err => {
+        console.error("Error adding resistance:", err);
+        ui.notifications.error("Failed to add resistance");
+        // Ensure we remove any "processing" state
+        $(ev.currentTarget).prop("disabled", false);
+      });
+      
+    // Indicate processing
+    $(ev.currentTarget).prop("disabled", true);
+  } catch (error) {
+    console.error("Error in add resistance handler:", error);
+    ui.notifications.error("An error occurred adding resistance");
+  }
+});
 
-  // Add delete resistance listener
-  html.find('.delete-resistance').click(ev => {
-    const index = $(ev.currentTarget).data("index");
-    console.log(`Delete resistance at index ${index}`);
+// Add delete resistance listener
+html.find('.delete-resistance').click(ev => {
+  ev.preventDefault();
+  const button = $(ev.currentTarget);
+  const index = button.data("index");
+  console.log(`Delete resistance at index ${index}`);
+  
+  try {
+    // Use foundry utils for consistency
+    const resistances = foundry.utils.deepClone(this.actor.system.resistances || []);
     
-    const resistances = duplicate(this.actor.system.resistances || []);
+    if (index < 0 || index >= resistances.length) {
+      console.error("Invalid resistance index:", index);
+      return;
+    }
     
     // Remove the resistance at the specified index
     resistances.splice(index, 1);
+    
+    // Disable button to prevent multiple clicks
+    button.prop("disabled", true);
     
     // Update the actor with the modified resistances array
     this.actor.update({"system.resistances": resistances})
       .then(() => {
         console.log("Resistance deleted successfully");
-        this.render(false); // Re-render the sheet
+        // Use requestAnimationFrame to ensure we're not interrupting rendering
+        requestAnimationFrame(() => this.render(false));
       })
-      .catch(err => console.error("Error deleting resistance:", err));
-  });
+      .catch(err => {
+        console.error("Error deleting resistance:", err);
+        ui.notifications.error("Failed to delete resistance");
+        // Re-enable button if there was an error
+        button.prop("disabled", false);
+      });
+  } catch (error) {
+    console.error("Error in delete resistance handler:", error);
+    ui.notifications.error("An error occurred deleting resistance");
+  }
+});
+
   // Browse Powers Compendium button
   html.find('.browse-compendium[data-type="powers"]').click(ev => {
     const pack = game.packs.find(p => p.metadata.name === "powers" && p.metadata.system === "msh-faserip");
