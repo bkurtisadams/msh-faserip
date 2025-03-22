@@ -99,6 +99,15 @@ export class KarmaSheet extends DocumentSheet {
     return totalSpent;
   }
 
+  // Method to calculate current karma
+  _getCurrentKarma() {
+    const totalEarned = this.object.system.karma.lifetime || 0;
+    const totalSpent = this._calculateTotalSpent(this.object.system.karma.history);
+    const advancementFund = this.object.system.karma.advancement || 0;
+    const karmaPool = this.object.system.karma.pool || 0;
+    return Math.max(0, totalEarned - totalSpent - advancementFund - karmaPool);
+  }
+
   activateListeners(html) {
     super.activateListeners(html);
     
@@ -788,16 +797,19 @@ export class KarmaSheet extends DocumentSheet {
       abilityToAdvance = this.element.find('#ability-to-advance').val();
     }
     
+    // Get calculated current karma instead of using attributes.karma.value
+    const currentKarma = this._getCurrentKarma();
+    
     new Dialog({
       title: "Allocate Karma for Advancement",
       content: `
         <form>
           <div class="form-group">
-            <label>Current Karma: ${this.object.system.attributes.karma.value}</label>
+            <label>Current Karma: ${currentKarma}</label>
           </div>
           <div class="form-group">
             <label>Amount to Allocate:</label>
-            <input type="number" name="amount" value="0" min="0" max="${this.object.system.attributes.karma.value}">
+            <input type="number" name="amount" value="0" min="0" max="${currentKarma}">
           </div>
         </form>
       `,
@@ -808,7 +820,7 @@ export class KarmaSheet extends DocumentSheet {
           callback: async (html) => {
             const amount = Number(html.find('[name="amount"]').val());
             
-            if (amount <= 0 || amount > this.object.system.attributes.karma.value) {
+            if (amount <= 0 || amount > currentKarma) {
               ui.notifications.error("Invalid Karma amount.");
               return;
             }
@@ -827,13 +839,11 @@ export class KarmaSheet extends DocumentSheet {
             history.push(karmaEvent);
             
             // Calculate new values
-            let currentKarma = this.object.system.attributes.karma.value - amount;
             let advancementKarma = (this.object.system.karma.advancement || 0) + amount;
             
             // Update the actor
             await this.object.update({
               "system.karma.history": history,
-              "system.attributes.karma.value": currentKarma,
               "system.karma.advancement": advancementKarma,
               "system.karma.advancementPurpose": advancementType,
               "system.karma.advancementDetail": abilityToAdvance
@@ -1009,16 +1019,19 @@ export class KarmaSheet extends DocumentSheet {
   _onContributeToPool(event) {
     event.preventDefault();
     
+    // Get calculated current karma instead of using attributes.karma.value
+    const currentKarma = this._getCurrentKarma();
+    
     new Dialog({
       title: "Contribute to Karma Pool",
       content: `
         <form>
           <div class="form-group">
-            <label>Current Karma: ${this.object.system.attributes.karma.value}</label>
+            <label>Current Karma: ${currentKarma}</label>
           </div>
           <div class="form-group">
             <label>Amount to Contribute:</label>
-            <input type="number" name="amount" value="0" min="0" max="${this.object.system.attributes.karma.value}">
+            <input type="number" name="amount" value="0" min="0" max="${currentKarma}">
           </div>
         </form>
       `,
@@ -1029,7 +1042,7 @@ export class KarmaSheet extends DocumentSheet {
           callback: async (html) => {
             const amount = Number(html.find('[name="amount"]').val());
             
-            if (amount <= 0 || amount > this.object.system.attributes.karma.value) {
+            if (amount <= 0 || amount > currentKarma) {
               ui.notifications.error("Invalid Karma amount.");
               return;
             }
@@ -1048,13 +1061,11 @@ export class KarmaSheet extends DocumentSheet {
             history.push(karmaEvent);
             
             // Calculate new values
-            let currentKarma = this.object.system.attributes.karma.value - amount;
             let poolKarma = (this.object.system.karma.pool || 0) + amount;
             
             // Update the actor
             await this.object.update({
               "system.karma.history": history,
-              "system.attributes.karma.value": currentKarma,
               "system.karma.pool": poolKarma
             });
             
