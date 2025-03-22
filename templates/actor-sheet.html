@@ -598,22 +598,23 @@
     </div>
   </div>
 
-  <div class="karma-advancement">
-    <div class="advancement-fund">
-      <h3>Advancement Fund</h3>
-      <input type="number" name="system.karma.advancement" value="{{system.karma.advancement}}" />
-    </div>
-    <div class="karma-pool">
-      <h3>Karma Pool</h3>
-      <input type="number" name="system.karma.pool" value="{{system.karma.pool}}" />
-    </div>
-    <div class="lifetime-total">
-      <h3>Lifetime Total</h3>
-      <input type="number" name="system.karma.lifetime" value="{{system.karma.lifetime}}" />
+  <div class="karma-section">
+    <div class="karma-values">
+      <div class="karma-current">
+        <label>Current Karma</label>
+        <input type="number" name="system.attributes.karma.value" value="{{system.attributes.karma.value}}" />
+      </div>
+      <div class="karma-advancement">
+        <label>Advancement Fund</label>
+        <input type="number" name="system.karma.advancement" value="{{system.karma.advancement}}" />
+      </div>
+      <div class="karma-pool">
+        <label>Karma Pool</label>
+        <input type="number" name="system.karma.pool" value="{{system.karma.pool}}" />
+      </div>
     </div>
     <div class="karma-buttons">
-      <button type="button" class="karma-history">View Karma History</button>
-      <button type="button" class="karma-advancement">Karma Advancement</button>
+      <button type="button" class="view-karma-history tab-style-button"><i class="fas fa-history"></i> View Karma History</button>
     </div>
   </div>
 </form>

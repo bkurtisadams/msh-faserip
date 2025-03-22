@@ -42,7 +42,7 @@ export class FaseripActorSheet extends ActorSheet {
     super.activateListeners(html);
 
     // Karma History button
-    html.find('.karma-history').click(ev => {
+    html.find('.view-karma-history').click(ev => {
       // Import dynamically to avoid circular dependencies
       import('./karma.js').then(module => {
         const sheet = new module.KarmaSheet(this.actor);

@@ -1155,3 +1155,72 @@
 .karma-sheet .hidden {
   display: none !important;
 }
+
+/* Updated Karma Section for Character Sheet */
+.faserip-sheet .karma-section {
+  margin-top: 10px;
+  border: 1px solid #8b0000;
+  padding: 8px;
+  background: white;
+}
+
+.faserip-sheet .karma-values {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.faserip-sheet .karma-current,
+.faserip-sheet .karma-advancement,
+.faserip-sheet .karma-pool {
+  text-align: center;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  padding: 5px;
+}
+
+.faserip-sheet .karma-current {
+  background-color: #f5f5f5;
+}
+
+.faserip-sheet .karma-advancement {
+  background-color: #e8f5e9;
+}
+
+.faserip-sheet .karma-pool {
+  background-color: #e3f2fd;
+}
+
+.faserip-sheet .karma-values label {
+  display: block;
+  font-weight: bold;
+  font-size: 12px;
+  color: #8b0000;
+  margin-bottom: 4px;
+}
+
+.faserip-sheet .karma-values input {
+  width: 70%;
+  text-align: center;
+  font-weight: bold;
+}
+
+.faserip-sheet .karma-buttons {
+  display: flex;
+  justify-content: center;
+}
+
+.faserip-sheet .tab-style-button {
+  background: #ddd;
+  color: #333;
+  border: 1px solid #8b0000;
+  border-radius: 5px 5px 0 0;
+  padding: 5px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.faserip-sheet .tab-style-button:hover {
+  background: #eee;
+}
