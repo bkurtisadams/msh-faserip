@@ -51,7 +51,11 @@ export class FaseripActor extends Actor {
     system.attributes.karma.max = karmaMax;
     
     // Set karma value to max if not already set or if current exceeds max
-    if (!system.attributes.karma.value || system.attributes.karma.value > karmaMax) {
+    /* if (!system.attributes.karma.value || system.attributes.karma.value > karmaMax) {
+      system.attributes.karma.value = karmaMax;
+    } */
+    // Only initialize Karma value if it's missing completely
+    if (typeof system.attributes.karma.value !== 'number') {
       system.attributes.karma.value = karmaMax;
     }
 
