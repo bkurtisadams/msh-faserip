@@ -46,7 +46,11 @@
       "progress": {
         "karma": {
           "advancement": 0,
-          "pool": 30,
+          "advancementPurpose": "",
+          "advancementDetail": "",
+          "pool": 0,
+          "poolName": "",
+          "poolMembers": [],
           "lifetime": 0,
           "history": []
         }
