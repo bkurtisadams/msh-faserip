@@ -824,3 +824,126 @@
 .faserip-sheet .secondary-abilities {
   flex: 0 0 47%; /* Adjusted narrower from 60% */
 }
+
+/* Karma sheet styles */
+.karma-sheet .karma-summary {
+  display: flex;
+  justify-content: space-between;
+  background: #f0e8d8;
+  padding: 10px;
+  border: 1px solid #8b0000;
+  border-radius: 5px;
+  margin-bottom: 10px;
+}
+
+.karma-sheet .summary-item {
+  text-align: center;
+  flex: 1;
+}
+
+.karma-sheet .summary-item label {
+  font-weight: bold;
+  display: block;
+  margin-bottom: 5px;
+  color: #8b0000;
+}
+
+.karma-sheet .summary-item .value {
+  font-size: 1.5em;
+  font-weight: bold;
+}
+
+.karma-sheet .karma-controls {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.karma-sheet .karma-controls button {
+  background: #8b0000;
+  color: white;
+  border: none;
+  padding: 5px 10px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.karma-sheet .karma-controls button:hover {
+  background: #a30000;
+}
+
+.karma-sheet .karma-history-table {
+  max-height: 400px;
+  overflow-y: auto;
+  border: 1px solid #ccc;
+}
+
+.karma-sheet table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.karma-sheet table th {
+  position: sticky;
+  top: 0;
+  background: #8b0000;
+  color: white;
+  text-align: left;
+  padding: 5px;
+}
+
+.karma-sheet table td {
+  padding: 5px;
+  border-bottom: 1px solid #ddd;
+}
+
+.karma-sheet .karma-amount {
+  font-weight: bold;
+  text-align: right;
+}
+
+.karma-sheet .karma-amount.positive {
+  color: #388e3c;
+}
+
+.karma-sheet .karma-amount.negative {
+  color: #d32f2f;
+}
+
+.karma-sheet .karma-actions {
+  white-space: nowrap;
+  text-align: center;
+}
+
+.karma-sheet .karma-actions a {
+  margin: 0 3px;
+  cursor: pointer;
+}
+
+.karma-sheet .karma-actions a:hover {
+  color: #8b0000;
+}
+
+/* Event type styles */
+.karma-sheet .karma-entry.karma-gain {
+  background-color: #e8f5e9;
+}
+
+.karma-sheet .karma-entry.karma-loss {
+  background-color: #ffebee;
+}
+
+.karma-sheet .karma-entry.karma-die-roll {
+  background-color: #ffcdd2;
+}
+
+.karma-sheet .karma-entry.karma-power-stunt {
+  background-color: #e1bee7;
+}
+
+.karma-sheet .empty-message {
+  text-align: center;
+  font-style: italic;
+  color: #666;
+  padding: 20px;
+}
