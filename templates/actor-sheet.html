@@ -14,9 +14,9 @@
     
     <!-- Player information area -->
     <div class="character-info">
-      <div class="info-row">
-        <label class="info-label">Player Name</label>
-        <input type="text" name="system.player" value="{{system.player}}" class="info-input" />
+      <div class="player-name-container">
+        <label>Player Name</label>
+        <input type="text" name="system.player" value="{{system.player}}" />
       </div>
     </div>
   </div>
@@ -37,12 +37,13 @@
     
     <div class="hero-info-row">
       <div class="hero-identity-container">
-        <label>Hero's Identity
+        <div class="identity-label-row">
+          <label>Hero's Identity</label>
           <span class="identity-type-inline">
             <label class="radio-label"><input type="radio" name="system.identityType" value="secret" {{#if (eq system.identityType "secret")}}checked{{/if}} /> Secret</label>
             <label class="radio-label"><input type="radio" name="system.identityType" value="public" {{#if (eq system.identityType "public")}}checked{{/if}} /> Public</label>
           </span>
-        </label>
+        </div>
         <input type="text" name="system.identity" value="{{system.identity}}" />
       </div>
       

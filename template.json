@@ -10,7 +10,15 @@
         "base": "",
         "age": "",
         "origin": "",
-        "description": ""
+        "description": "",
+        "race": "",
+        "sex": "",
+        "handedness": "",
+        "height": "",
+        "weight": "",
+        "eyeColor": "",
+        "hairColor": "",
+        "history": ""
       },
       "abilities": {
         "abilities": {
