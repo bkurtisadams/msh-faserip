@@ -528,7 +528,7 @@
           </thead>
           <tbody>
             {{#each powers as |power|}}
-            <tr class="power-row item" data-item-id="{{power._id}}">
+              <tr class="power-row item" data-item-id="{{power._id}}" draggable="true">
               <td class="power-name">
                 <img src="{{power.img}}" class="power-icon" width="24" height="24" />
                 {{power.name}}

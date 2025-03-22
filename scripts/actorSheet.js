@@ -1,7 +1,7 @@
 export class FaseripActorSheet extends ActorSheet {
   // Add a property to track the biography toggle state
   _isBiographyOpen = false;
-  
+
   /** @override */
   static get defaultOptions() {
     return foundry.utils.mergeObject(super.defaultOptions, {
@@ -11,7 +11,11 @@ export class FaseripActorSheet extends ActorSheet {
       height: 700,
       tabs: [{ navSelector: ".sheet-tabs", contentSelector: ".sheet-body", initial: "attributes" }],
       submitOnChange: false,
-      closeOnSubmit: false
+      closeOnSubmit: false,
+      // Add drag drop configuration
+      dragDrop: [
+        { dragSelector: ".power-row", dropSelector: null }
+      ]
     });
   }
 
@@ -50,7 +54,7 @@ export class FaseripActorSheet extends ActorSheet {
   activateListeners(html) {
     super.activateListeners(html);
 
-     // Initialize drag behavior for powers
+    // Initialize drag behavior for powers
     html.find('.power-row').each((i, row) => {
       row.setAttribute("draggable", true);
       row.addEventListener("dragstart", this._onDragStart.bind(this));
@@ -64,7 +68,7 @@ export class FaseripActorSheet extends ActorSheet {
       // Re-render the sheet
       this.render(false);
     });
-    
+
     // Handle form changes in biography section
     html.find('.biography-details input, .biography-details textarea').change(ev => {
       const formData = this._getSubmitData();
@@ -1239,14 +1243,40 @@ export class FaseripActorSheet extends ActorSheet {
 
     // Continue with other listeners...
   }
+
+  /**
+ * Check if an item can be dragged
+ */
+  _canDragStart(selector) {
+    return this.isEditable;
+  }
+
+  /**
+ * Support drag-and-drop of item data to Hotbar.
+ * @param {DragEvent} event - The originating drag event.
+ */
   _onDragStart(event) {
     const li = event.currentTarget;
     const itemId = li.dataset.itemId;
+    if (!itemId) return;
+    
     const item = this.actor.items.get(itemId);
-    if (item) {
-      const dragData = item.toDragData();
-      // Set the drag data
-      event.dataTransfer.setData("text/plain", JSON.stringify(dragData));
-    }
+    if (!item) return;
+    
+    // Create the drag data
+    const dragData = {
+      type: "Item",
+      actorId: this.actor.id,
+      itemId: itemId,
+      uuid: item.uuid,
+      img: item.img,
+      name: item.name
+    };
+    
+    // Log for debugging
+    console.log("Power drag started:", dragData);
+    
+    // Set the drag data
+    event.dataTransfer.setData("text/plain", JSON.stringify(dragData));
   }
 }

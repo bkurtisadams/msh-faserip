@@ -14,7 +14,9 @@ Hooks.once("init", () => {
   // Add the rollUniversalTable function to the namespace
   game.msh.rollUniversalTable = rollUniversalTable;
 
+  // add rollItemMacro function to  namespace
   game.msh.rollItemMacro = rollItemMacro;
+
 
   // Register Handlebars helpers
   Handlebars.registerHelper('getFlag', function(object, scope, flag) {
@@ -36,22 +38,42 @@ Hooks.once("init", () => {
 // In init.js, add this after your existing Hooks.once("init", ...) block
 
 // Handle dropping items onto the hotbar to create macros
-Hooks.on("hotbarDrop", (bar, data, slot) => {
-  // Only handle item drops
+// Hook into Foundry's built-in hotbar functionality
+Hooks.on("hotbarDrop", async (bar, data, slot) => {
+  // Only handle items
   if (data.type !== "Item") return;
   
-  // Get the item data
-  createItemMacro(data, slot);
+  // Create a direct command that uses the UUID
+  const command = `
+    const item = await fromUuid("${data.uuid}");
+    if (!item) return ui.notifications.warn("Item not found");
+    const actor = item.parent;
+    if (!actor) return ui.notifications.warn("Actor not found");
+    item.rollItem();
+  `;
   
-  // Return true to indicate the drop was handled
+  // Create the macro data
+  const macroData = {
+    name: data.name,
+    type: "script",
+    img: data.img,
+    command,
+  };
+  
+  // Find an existing macro or create a new one
+  let macro = game.macros.find(m => (m.name === macroData.name) && (m.command === macroData.command));
+  if (!macro) {
+    macro = await Macro.create(macroData, { displaySheet: false });
+  }
+  
+  // Assign the macro to the hotbar slot
+  game.user.assignHotbarMacro(macro, slot);
+  
   return true;
 });
 
 /**
  * Create a macro from an Item drop.
- * @param {Object} data     The dropped data
- * @param {number} slot     The hotbar slot to use
- * @returns {Promise}
  */
 async function createItemMacro(data, slot) {
   // Get the item from the provided data
@@ -75,13 +97,10 @@ async function createItemMacro(data, slot) {
   
   // Assign the macro to the hotbar slot
   game.user.assignHotbarMacro(macro, slot);
-  return false;
 }
 
 /**
- * Roll a power/item directly from a macro.
- * @param {string} itemName
- * @return {Promise}
+ * Roll an item from a macro.
  */
 async function rollItemMacro(itemName) {
   // Get the active actor (character)
