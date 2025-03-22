@@ -4,8 +4,8 @@ export class KarmaSheet extends DocumentSheet {
     return foundry.utils.mergeObject(super.defaultOptions, {
       classes: ["faserip", "sheet", "karma"],
       template: "systems/msh-faserip/templates/karma-sheet.html",
-      width: 600,
-      height: 650,
+      width: 620,
+      height: 480,
       resizable: true,
       closeOnSubmit: false,
       submitOnChange: false,

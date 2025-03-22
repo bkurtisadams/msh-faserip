@@ -1,30 +1,30 @@
 <!-- karma-sheet.html -->
 <form class="karma-sheet" autocomplete="off">
-  <header class="sheet-header">
-    <div class="karma-summary">
-      <div class="summary-item">
-        <label>Current Karma</label>
-        <div class="value">{{currentKarma}}</div>
-      </div>
-      <div class="summary-item">
-        <label>Total Earned</label>
-        <div class="value">{{system.karma.lifetime}}</div>
-      </div>
-      <div class="summary-item">
-        <label>Total Spent</label>
-        <div class="value">{{totalSpent}}</div>
-      </div>
-      <div class="summary-item advancement-fund">
-        <label>Advancement Fund</label>
-        <div class="value">{{system.karma.advancement}}</div>
-      </div>
-      <div class="summary-item karma-pool-summary">
-        <label>Karma Pool</label>
-        <div class="value">{{system.karma.pool}}</div>
-      </div>
+  <!-- Summary Header -->
+  <div class="karma-summary">
+    <div class="summary-item">
+      <label>Current Karma</label>
+      <div class="value">{{currentKarma}}</div>
     </div>
-  </header>
-  
+    <div class="summary-item">
+      <label>Total Earned</label>
+      <div class="value">{{system.karma.lifetime}}</div>
+    </div>
+    <div class="summary-item">
+      <label>Total Spent</label>
+      <div class="value">{{totalSpent}}</div>
+    </div>
+    <div class="summary-item advancement-fund">
+      <label>Advancement Fund</label>
+      <div class="value">{{system.karma.advancement}}</div>
+    </div>
+    <div class="summary-item karma-pool-summary">
+      <label>Karma Pool</label>
+      <div class="value">{{system.karma.pool}}</div>
+    </div>
+  </div>
+
+  <!-- Control Buttons -->
   <div class="karma-controls">
     <button type="button" class="add-karma"><i class="fas fa-plus"></i> Add Karma</button>
     <button type="button" class="spend-karma"><i class="fas fa-minus"></i> Spend Karma</button>
@@ -34,11 +34,12 @@
     <button type="button" class="clear-karma danger-button"><i class="fas fa-trash-alt"></i> Clear All Karma Data</button>
     {{/if}}
   </div>
-  
+
+  <!-- Two Column Layout for Advancement and Pool -->
   <div class="mid-sections">
+    <!-- Advancement Section -->
     <section class="advancement-section">
       <h3>Karma Advancement</h3>
-      
       <div class="advancement-controls">
         <select id="advancement-type">
           <option value="">-- Select Purpose --</option>
@@ -50,7 +51,6 @@
           <option value="talent">Talent Addition</option>
           <option value="contact">Contact Addition</option>
         </select>
-        
         <div id="ability-selector" class="hidden">
           <select id="ability-to-advance">
             <option value="fighting">Fighting</option>
@@ -63,54 +63,42 @@
           </select>
         </div>
       </div>
-      
       <div class="advancement-buttons">
         <button type="button" class="allocate-karma"><i class="fas fa-coins"></i> Allocate Karma</button>
         <button type="button" class="purchase-advancement"><i class="fas fa-level-up-alt"></i> Purchase Advancement</button>
       </div>
-    
       <div class="current-advancement">
         <label>Current Purpose: {{system.karma.advancementPurpose}}</label>
         <label>Karma Set Aside: {{system.karma.advancement}}</label>
       </div>
     </section>
-    
+
+    <!-- Karma Pool Section -->
     <section class="karma-pool-section">
       <h3>Karma Pool</h3>
-      
       <div class="pool-controls">
         <input type="text" id="pool-name" placeholder="Pool Name" value="{{system.karma.poolName}}">
       </div>
-      
       <div class="pool-buttons">
         <button type="button" class="contribute-to-pool"><i class="fas fa-plus"></i> Contribute Karma</button>
         <button type="button" class="withdraw-from-pool"><i class="fas fa-minus"></i> Withdraw Karma</button>
       </div>
-      
       <div class="pool-members">
         <h4>Pool Members</h4>
         <select id="available-characters">
           <option value="">-- Add Member --</option>
-          <!-- Populated with available characters -->
         </select>
         <button type="button" class="add-to-pool"><i class="fas fa-user-plus"></i></button>
-        
-        <div class="member-list">
-          {{#each system.karma.poolMembers}}
-            <div class="pool-member">
-              <span class="member-name">{{this.name}}</span>
-              <button type="button" class="remove-from-pool" data-id="{{this.id}}"><i class="fas fa-times"></i></button>
-            </div>
-          {{/each}}
-        </div>
       </div>
     </section>
   </div>
-  
-  <div class="history-toggle-container">
+
+  <!-- History Toggle Button -->
+  <div class="history-toggle">
     <button type="button" class="toggle-history"><i class="fas fa-history"></i> Toggle History</button>
   </div>
-  
+
+  <!-- Karma History Table -->
   <section class="history-section">
     <h3>Karma History</h3>
     <div class="karma-history-table">
