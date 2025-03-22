@@ -1,0 +1,70 @@
+<!-- karma-sheet.html -->
+<form class="karma-sheet" autocomplete="off">
+    <header class="sheet-header">
+      <div class="karma-summary">
+        <div class="summary-item">
+          <label>Current Karma</label>
+          <div class="value">{{system.attributes.karma.value}}</div>
+        </div>
+        <div class="summary-item">
+          <label>Lifetime Total</label>
+          <div class="value">{{system.karma.lifetime}}</div>
+        </div>
+        <div class="summary-item">
+          <label>Advancement Fund</label>
+          <div class="value">{{system.karma.advancement}}</div>
+        </div>
+        <div class="summary-item">
+          <label>Karma Pool</label>
+          <div class="value">{{system.karma.pool}}</div>
+        </div>
+      </div>
+    </header>
+  
+    <section class="sheet-body">
+      <div class="karma-controls">
+        <button type="button" class="add-karma"><i class="fas fa-plus"></i> Add Karma</button>
+        <button type="button" class="spend-karma"><i class="fas fa-minus"></i> Spend Karma</button>
+        <button type="button" class="import-karma"><i class="fas fa-file-import"></i> Import</button>
+        <button type="button" class="export-karma"><i class="fas fa-file-export"></i> Export</button>
+      </div>
+  
+      <div class="karma-history-table">
+        <table>
+          <thead>
+            <tr>
+              <th>Real Date</th>
+              <th>Game Date</th>
+              <th>Amount</th>
+              <th>Event Type</th>
+              <th>Description</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {{#if system.karma.history.length}}
+              {{#each system.karma.history as |event i|}}
+                <tr class="karma-entry {{event.cssClass}}">
+                  <td>{{event.realDate}}</td>
+                  <td>{{event.gameDate}}</td>
+                  <td class="karma-amount {{#if (lt event.amount 0)}}negative{{else}}positive{{/if}}">
+                    {{#if (lt event.amount 0)}}{{event.amount}}{{else}}+{{event.amount}}{{/if}}
+                  </td>
+                  <td>{{event.type}}</td>
+                  <td>{{event.description}}</td>
+                  <td class="karma-actions">
+                    <a class="edit-karma" data-index="{{i}}"><i class="fas fa-edit"></i></a>
+                    <a class="delete-karma" data-index="{{i}}"><i class="fas fa-trash"></i></a>
+                  </td>
+                </tr>
+              {{/each}}
+            {{else}}
+              <tr>
+                <td colspan="6" class="empty-message">No karma history recorded yet.</td>
+              </tr>
+            {{/if}}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </form>
