@@ -1,0 +1,40 @@
+<form class="karma-pool-sheet" autocomplete="off">
+    <h2>Karma Pool</h2>
+    
+    <div class="karma-summary">
+      <div class="summary-item">
+        <label>Available Karma</label>
+        <div class="value">{{currentKarma}}</div>
+      </div>
+      <div class="summary-item karma-pool-summary">
+        <label>Karma Pool</label>
+        <div class="value">{{system.karma.pool}}</div>
+      </div>
+    </div>
+    
+    <section class="karma-pool-section">
+      <div class="pool-controls">
+        <input type="text" id="pool-name" placeholder="Pool Name" value="{{system.karma.poolName}}">
+      </div>
+      <div class="pool-buttons">
+        <button type="button" class="contribute-to-pool"><i class="fas fa-plus"></i> Contribute Karma</button>
+        <button type="button" class="withdraw-from-pool"><i class="fas fa-minus"></i> Withdraw Karma</button>
+      </div>
+      <div class="pool-members">
+        <h4>Pool Members</h4>
+        <select id="available-characters">
+          <option value="">-- Add Member --</option>
+        </select>
+        <button type="button" class="add-to-pool"><i class="fas fa-user-plus"></i></button>
+        
+        <ul class="members-list">
+          {{#each system.karma.poolMembers as |member|}}
+          <li>
+            {{member.name}} 
+            <a class="remove-from-pool" data-id="{{member.id}}"><i class="fas fa-user-minus"></i></a>
+          </li>
+          {{/each}}
+        </ul>
+      </div>
+    </section>
+  </form>

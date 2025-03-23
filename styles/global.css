@@ -904,139 +904,9 @@
   background-color: #d32f2f !important;
 }
 
-/* Mid sections layout */
+/* Update the mid-sections layout for karma history sheet */
 .karma-sheet .mid-sections {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  margin-bottom: 10px;
-}
-
-/* Advancement section */
-.karma-sheet .advancement-section {
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  padding: 8px;
-  background-color: #f9fff9;
-}
-
-.karma-sheet .advancement-section h3 {
-  color: #2e7d32;
-  margin: 0 0 8px 0;
-  font-size: 1.1em;
-  border-bottom: 1px solid #ddd;
-  padding-bottom: 5px;
-}
-
-.karma-sheet .advancement-controls {
-  margin-bottom: 8px;
-}
-
-.karma-sheet .advancement-controls select {
-  width: 100%;
-  padding: 4px;
-  margin-bottom: 5px;
-  border: 1px solid #ccc;
-  border-radius: 3px;
-}
-
-.karma-sheet .advancement-buttons {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  margin-bottom: 8px;
-}
-
-.karma-sheet .advancement-buttons button {
-  background-color: #8b0000;
-  color: white;
-  border: none;
-  border-radius: 3px;
-  padding: 5px;
-  cursor: pointer;
-}
-
-.karma-sheet .current-advancement {
-  background-color: #f0f0f0;
-  padding: 5px;
-  border-radius: 3px;
-  font-size: 0.9em;
-}
-
-.karma-sheet .current-advancement label {
-  display: block;
-  margin-bottom: 3px;
-}
-
-/* Karma Pool section */
-.karma-sheet .karma-pool-section {
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  padding: 8px;
-  background-color: #f0f7ff;
-}
-
-.karma-sheet .karma-pool-section h3 {
-  color: #1565c0;
-  margin: 0 0 8px 0;
-  font-size: 1.1em;
-  border-bottom: 1px solid #ddd;
-  padding-bottom: 5px;
-}
-
-.karma-sheet .pool-controls {
-  margin-bottom: 8px;
-}
-
-.karma-sheet .pool-controls input {
-  width: 100%;
-  padding: 4px;
-  border: 1px solid #ccc;
-  border-radius: 3px;
-}
-
-.karma-sheet .pool-buttons {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  margin-bottom: 8px;
-}
-
-.karma-sheet .pool-buttons button {
-  background-color: #8b0000;
-  color: white;
-  border: none;
-  border-radius: 3px;
-  padding: 5px;
-  cursor: pointer;
-}
-
-.karma-sheet .pool-members {
-  margin-top: 8px;
-}
-
-.karma-sheet .pool-members h4 {
-  margin: 0 0 5px 0;
-  font-size: 0.9em;
-}
-
-.karma-sheet .pool-members select {
-  width: calc(100% - 35px);
-  display: inline-block;
-  padding: 3px;
-  border: 1px solid #ccc;
-  border-radius: 3px;
-}
-
-.karma-sheet .add-to-pool {
-  display: inline-block;
-  width: 30px;
-  padding: 3px;
-  background-color: #8b0000;
-  color: white;
-  border: none;
-  border-radius: 3px;
-  cursor: pointer;
+  display: none; /* Hide this section since it's moved to separate sheets */
 }
 
 /* History Toggle */
@@ -1055,12 +925,10 @@
   text-align: center;
 }
 
-/* History Section */
+/* Expand karma history section to fill available space */
 .karma-sheet .history-section {
-  margin-top: 10px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  padding: 8px;
+  margin-top: 0; /* Remove top margin */
+  max-height: none; /* Allow full expansion */
 }
 
 .karma-sheet .history-section h3 {
@@ -1072,10 +940,23 @@
 }
 
 .karma-sheet .karma-history-table {
-  max-height: 250px;
-  overflow-y: auto;
-  border: 1px solid #ddd;
-  border-radius: 3px;
+  max-height: 400px; /* Increase max height for more visible entries */
+}
+
+/* Style for the new buttons in karma history sheet */
+.karma-sheet .karma-controls .open-advancement,
+.karma-sheet .karma-controls .open-pool {
+  background-color: #8b0000;
+}
+
+.karma-sheet .karma-controls .open-advancement:hover,
+.karma-sheet .karma-controls .open-pool:hover {
+  background-color: #a30000;
+}
+
+/* Hide elements that are not needed in each specific sheet */
+.hidden {
+  display: none !important;
 }
 
 .karma-sheet table {
@@ -1154,6 +1035,256 @@
 /* Hide by default functionality */
 .karma-sheet .hidden {
   display: none !important;
+}
+
+
+/* Karma Advancement Sheet Styles */
+.karma-advancement-sheet {
+  font-family: Arial, sans-serif;
+  background: #f5f5f5;
+  color: #222;
+  padding: 12px;
+  overflow-y: auto;
+}
+
+.karma-advancement-sheet h2 {
+  color: #8b0000;
+  margin: 0 0 15px 0;
+  border-bottom: 1px solid #ccc;
+  padding-bottom: 5px;
+}
+
+.karma-advancement-sheet .karma-summary {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+.karma-advancement-sheet .summary-item {
+  text-align: center;
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background: #f0f0f0;
+}
+
+.karma-advancement-sheet .summary-item.advancement-fund {
+  background-color: #e8f5e9;
+}
+
+.karma-advancement-sheet .summary-item label {
+  font-weight: bold;
+  color: #2e7d32;
+  display: block;
+  font-size: 0.9em;
+  margin-bottom: 3px;
+}
+
+.karma-advancement-sheet .summary-item .value {
+  font-size: 1.3em;
+  font-weight: bold;
+}
+
+.karma-advancement-sheet .advancement-section {
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 10px;
+  background-color: #f9fff9;
+}
+
+.karma-advancement-sheet .advancement-controls {
+  margin-bottom: 12px;
+}
+
+.karma-advancement-sheet .advancement-controls select {
+  width: 100%;
+  padding: 6px;
+  margin-bottom: 8px;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+}
+
+.karma-advancement-sheet .advancement-buttons {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.karma-advancement-sheet .advancement-buttons button {
+  flex: 1;
+  background-color: #8b0000;
+  color: white;
+  border: none;
+  border-radius: 3px;
+  padding: 8px;
+  cursor: pointer;
+}
+
+.karma-advancement-sheet .current-advancement {
+  background-color: #f0f0f0;
+  padding: 8px;
+  border-radius: 3px;
+  font-size: 0.9em;
+  margin-bottom: 12px;
+}
+
+.karma-advancement-sheet .current-advancement label {
+  display: block;
+  margin-bottom: 5px;
+}
+
+.karma-advancement-sheet .advancement-calculator {
+  border: 1px solid #ddd;
+  padding: 10px;
+  background-color: #fff;
+  margin-top: 12px;
+  border-radius: 3px;
+}
+
+.karma-advancement-sheet .advancement-calculator h3 {
+  margin: 0 0 8px 0;
+  font-size: 1em;
+  color: #2e7d32;
+}
+
+/* Karma Pool Sheet Styles */
+.karma-pool-sheet {
+  font-family: Arial, sans-serif;
+  background: #f5f5f5;
+  color: #222;
+  padding: 12px;
+  overflow-y: auto;
+}
+
+.karma-pool-sheet h2 {
+  color: #8b0000;
+  margin: 0 0 15px 0;
+  border-bottom: 1px solid #ccc;
+  padding-bottom: 5px;
+}
+
+.karma-pool-sheet .karma-summary {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+.karma-pool-sheet .summary-item {
+  text-align: center;
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background: #f0f0f0;
+}
+
+.karma-pool-sheet .summary-item.karma-pool-summary {
+  background-color: #e3f2fd;
+}
+
+.karma-pool-sheet .summary-item label {
+  font-weight: bold;
+  color: #1565c0;
+  display: block;
+  font-size: 0.9em;
+  margin-bottom: 3px;
+}
+
+.karma-pool-sheet .summary-item .value {
+  font-size: 1.3em;
+  font-weight: bold;
+}
+
+.karma-pool-sheet .karma-pool-section {
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 10px;
+  background-color: #f0f7ff;
+}
+
+.karma-pool-sheet .pool-controls {
+  margin-bottom: 12px;
+}
+
+.karma-pool-sheet .pool-controls input {
+  width: 100%;
+  padding: 6px;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+}
+
+.karma-pool-sheet .pool-buttons {
+  display: flex;
+  gap: 8px;
+  margin-bottom: a12px;
+}
+
+.karma-pool-sheet .pool-buttons button {
+  flex: 1;
+  background-color: #8b0000;
+  color: white;
+  border: none;
+  border-radius: 3px;
+  padding: 8px;
+  cursor: pointer;
+}
+
+.karma-pool-sheet .pool-members {
+  margin-top: 12px;
+  border-top: 1px solid #ddd;
+  padding-top: 12px;
+}
+
+.karma-pool-sheet .pool-members h4 {
+  margin: 0 0 8px 0;
+  font-size: 1em;
+  color: #1565c0;
+}
+
+.karma-pool-sheet .pool-members select {
+  width: calc(100% - 40px);
+  display: inline-block;
+  padding: 5px;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+}
+
+.karma-pool-sheet .add-to-pool {
+  display: inline-block;
+  width: 34px;
+  padding: 5px 0;
+  background-color: #8b0000;
+  color: white;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.karma-pool-sheet .members-list {
+  list-style: none;
+  padding: 0;
+  margin: 10px 0 0 0;
+}
+
+.karma-pool-sheet .members-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 5px 8px;
+  background-color: #f5f5f5;
+  border: 1px solid #ddd;
+  margin-bottom: 5px;
+  border-radius: 3px;
+}
+
+.karma-pool-sheet .remove-from-pool {
+  color: #c62828;
+  cursor: pointer;
+}
+
+.karma-pool-sheet .remove-from-pool:hover {
+  color: #b71c1c;
 }
 
 /* Updated Karma Section for Character Sheet */

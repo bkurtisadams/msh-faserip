@@ -1,0 +1,53 @@
+<form class="karma-advancement-sheet" autocomplete="off">
+    <h2>Karma Advancement</h2>
+    
+    <div class="karma-summary">
+      <div class="summary-item">
+        <label>Available Karma</label>
+        <div class="value">{{currentKarma}}</div>
+      </div>
+      <div class="summary-item advancement-fund">
+        <label>Advancement Fund</label>
+        <div class="value">{{system.karma.advancement}}</div>
+      </div>
+    </div>
+    
+    <section class="advancement-section">
+      <div class="advancement-controls">
+        <select id="advancement-type">
+          <option value="">-- Select Purpose --</option>
+          <option value="ability">Ability Advancement</option>
+          <option value="resource">Resource Advancement</option>
+          <option value="popularity">Popularity Advancement</option>
+          <option value="power">Power Advancement</option>
+          <option value="powerAdd">Power Addition</option>
+          <option value="talent">Talent Addition</option>
+          <option value="contact">Contact Addition</option>
+        </select>
+        <div id="ability-selector" class="hidden">
+          <select id="ability-to-advance">
+            <option value="fighting">Fighting</option>
+            <option value="agility">Agility</option>
+            <option value="strength">Strength</option>
+            <option value="endurance">Endurance</option>
+            <option value="reason">Reason</option>
+            <option value="intuition">Intuition</option>
+            <option value="psyche">Psyche</option>
+          </select>
+        </div>
+      </div>
+      <div class="advancement-buttons">
+        <button type="button" class="allocate-karma"><i class="fas fa-coins"></i> Allocate Karma</button>
+        <button type="button" class="purchase-advancement"><i class="fas fa-level-up-alt"></i> Purchase Advancement</button>
+      </div>
+      <div class="current-advancement">
+        <label>Current Purpose: {{system.karma.advancementPurpose}}</label>
+        <label>Karma Set Aside: {{system.karma.advancement}}</label>
+      </div>
+      
+      <div class="advancement-calculator hidden">
+        <h3>Advancement Calculator</h3>
+        <div id="calculator-content"></div>
+      </div>
+    </section>
+  </form>
