@@ -734,7 +734,16 @@ export class KarmaSheet extends DocumentSheet {
   }
 
   _onDeleteKarma(index) {
+    // Get a copy of the history array
     const history = foundry.utils.deepClone(this.object.system.karma?.history || []);
+    
+    // Sort the history array the same way it's displayed
+    history.sort((a, b) => {
+      const dateA = new Date(a.realDate || 0);
+      const dateB = new Date(b.realDate || 0);
+      return dateB - dateA;
+    });
+    
     if (index < 0 || index >= history.length) return;
     
     // Confirm deletion
@@ -746,6 +755,7 @@ export class KarmaSheet extends DocumentSheet {
           icon: '<i class="fas fa-trash"></i>',
           label: "Delete",
           callback: () => {
+            // Remove the entry at the specified index in the sorted array
             history.splice(index, 1);
             this._updateKarmaHistory(history);
           }
