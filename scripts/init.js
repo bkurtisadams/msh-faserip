@@ -13,9 +13,58 @@ Hooks.once("init", () => {
   
   // Add the rollUniversalTable function to the namespace
   game.msh.rollUniversalTable = rollUniversalTable;
+  game.msh.rollItemMacro = function(actorId, itemId) {
+    // Get the actor
+    const actor = game.actors.get(actorId);
+    if (!actor) return ui.notifications.warn(`Actor could not be found.`);
+    
+    // Get the item from the actor
+    const item = actor.items.get(itemId);
+    if (!item) return ui.notifications.warn(`Item ${itemId} could not be found on ${actor.name}.`);
+    
+    // Check if the sheet is already rendered
+    let sheet = Object.values(ui.windows).find(w => w.actor && w.actor.id === actorId);
+    
+    if (sheet) {
+      // Sheet is already open, use it
+      clickRollButton(sheet, item);
+    } else {
+      // Need to open the sheet
+      sheet = actor.sheet.render(true);
+      
+      // Wait for sheet to be fully rendered before clicking
+      sheet._renderInner().then(() => {
+        clickRollButton(sheet, item);
+      });
+    }
+    
+    // Helper function to click the appropriate roll button
+    function clickRollButton(sheet, item) {
+      let selector;
+      
+      // Determine the appropriate selector based on item type
+      if (item.type === "power") {
+        selector = `.power-roll[data-item-id="${itemId}"]`;
+      } else if (item.type === "talent") {
+        selector = `.talent-roll[data-item-id="${itemId}"]`;
+      } else if (item.type === "contact") {
+        selector = `.contact-roll[data-item-id="${itemId}"]`;
+      } else {
+        return ui.notifications.warn(`Unsupported item type: ${item.type}`);
+      }
+      
+      // Find and click the button
+      const element = sheet.element.find(selector);
+      if (element.length) {
+        element[0].click();
+      } else {
+        ui.notifications.warn("Couldn't find roll button. The sheet may need to be updated.");
+      }
+    }
+  };
   
   // Add the rollItemMacro function to the namespace
-  game.msh.rollItemMacro = function(actorId, itemId) {
+  /* game.msh.rollItemMacro = function(actorId, itemId) {
     // Get the actor
     const speaker = ChatMessage.getSpeaker();
     let actor = game.actors.get(actorId);
@@ -77,7 +126,7 @@ Hooks.once("init", () => {
     }
   };
 
-  // Register Handlebars helpers
+ */  // Register Handlebars helpers
   Handlebars.registerHelper('getFlag', function(object, scope, flag) {
     return object.getFlag(scope, flag);
   });
