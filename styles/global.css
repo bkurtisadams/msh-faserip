@@ -537,6 +537,23 @@
   color: #666;
   margin-bottom: 8px;
 }
+/* TALENTS AND CONTACTS */
+/* Icon styling for talents and contacts */
+.faserip-sheet .talent-icon,
+.faserip-sheet .contact-icon {
+  width: 24px;
+  height: 24px;
+  margin-right: 5px;
+  border: 1px solid #ccc;
+  vertical-align: middle;
+}
+
+/* Adjust talent and contact name span to display as flex for proper alignment */
+.faserip-sheet .talent-name,
+.faserip-sheet .contact-name {
+  display: flex;
+  align-items: center;
+}
 
 /* Talents List Styling */
 .faserip-sheet .talents-list {
