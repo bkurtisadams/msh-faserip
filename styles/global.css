@@ -881,15 +881,6 @@
   line-height: 1.2;
 }
 
-
-.karma-sheet .summary-item.advancement-fund {
-  background-color: #e8f5e9;
-}
-
-.karma-sheet .summary-item.karma-pool-summary {
-  background-color: #e3f2fd;
-}
-
 /* Control buttons */
 /* Make buttons row more compact */
 .karma-sheet .karma-controls {
