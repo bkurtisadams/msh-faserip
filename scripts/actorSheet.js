@@ -62,13 +62,19 @@ export class FaseripActorSheet extends ActorSheet {
       }));
     }
   }
-  
+
   // In actorSheet.js, add to the activateListeners function
   activateListeners(html) {
     super.activateListeners(html);
 
     // Add this to make power rows draggable
     html.find('.power-row').each((i, li) => {
+      li.setAttribute("draggable", true);
+      li.addEventListener("dragstart", this._onDragStart.bind(this));
+    });
+
+    // In activateListeners method, add this after your power-row code
+    html.find('.talent-item').each((i, li) => {
       li.setAttribute("draggable", true);
       li.addEventListener("dragstart", this._onDragStart.bind(this));
     });
