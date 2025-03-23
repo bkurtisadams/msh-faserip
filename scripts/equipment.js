@@ -1,8 +1,7 @@
-// equipment.js - place in your system's module directory
+// equipment.js
 export class FaseripEquipmentSheet extends ItemSheet {
-  /** @override */
   static get defaultOptions() {
-    return mergeObject(super.defaultOptions, {
+    return foundry.utils.mergeObject(super.defaultOptions, {
       classes: ["faserip", "sheet", "item", "equipment"],
       template: "systems/msh-faserip/templates/equipment-sheet.html",
       width: 530,
@@ -11,110 +10,24 @@ export class FaseripEquipmentSheet extends ItemSheet {
     });
   }
 
-  /** @override */
   getData() {
-    const data = super.getData();
-
-    // Make sure system exists on the data object
-    if (!data.system) {
-      data.system = {};
-    }
+    // Get base data
+    const context = super.getData();
+    context.item = this.item;
+    context.system = this.item.system;
     
-    // Add any computed data or references needed for the template
-    data.dtypes = ["String", "Number", "Boolean"];
+    // Add custom CSS class based on document type
+    const classes = ["faserip", "sheet", "item", this.item.type];
+    context.cssClass = classes.join(" ");
     
-    // Define equipment categories for dropdowns
-    data.equipmentCategories = [
-      { value: "weapon", label: "Weapon" }, 
-      { value: "armor", label: "Armor" }, 
-      { value: "gear", label: "Gear" }, 
-      { value: "power-item", label: "Power Item" },  // For items that mimic powers
-      { value: "custom", label: "Custom Equipment" }  // For fully custom equipment
-    ];
-    
-    // Weapon types
-    data.weaponTypes = [
-      { value: "melee", label: "Melee Weapon" },
-      { value: "shooting", label: "Shooting Weapon" },
-      { value: "thrown", label: "Thrown Weapon" },
-      { value: "energy", label: "Energy Weapon" },
-      { value: "force", label: "Force Weapon" }
-    ];
-    
-    // Damage types
-    data.damageTypes = [
-      { value: "S", label: "Shooting (S)" },
-      { value: "E", label: "Energy (E)" },
-      { value: "F", label: "Force (F)" },
-      { value: "EA", label: "Edged Attack (EA)" },
-      { value: "BA", label: "Blunt Attack (BA)" }
-    ];
-    
-    // Ammunition types
-    data.ammoTypes = [
-      { value: "Standard", label: "Standard" },
-      { value: "Mercy", label: "Mercy Shot" },
-      { value: "AP", label: "Armor Piercing (AP)" },
-      { value: "Rubber", label: "Rubber Shot" },
-      { value: "Explosive", label: "Explosive Shot" },
-      { value: "Canister", label: "Canister Shot" },
-      { value: "Heat-Seeker", label: "Heat-Seeker" },
-      { value: "Power Pack", label: "Power Pack" }
-    ];
-    
-    // Rank options for various properties
-    data.ranks = [
-      "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent",
-      "Remarkable", "Incredible", "Amazing", "Monstrous", "Unearthly",
-      "Shift-X", "Shift-Y", "Shift-Z"
-    ];
-    
-    // Power types for power items
-    data.powerTypes = [
-      { value: "energy", label: "Energy Control" },
-      { value: "force", label: "Force" },
-      { value: "matter", label: "Matter Control" },
-      { value: "mental", label: "Mental" },
-      { value: "magical", label: "Magical" },
-      { value: "self", label: "Self-Alteration" },
-      { value: "sensory", label: "Sensory" },
-      { value: "travel", label: "Travel" },
-      { value: "custom", label: "Custom" }
-    ];
-    
-    // Ability options for linking power items
-    data.abilities = [
-      { value: "fighting", label: "Fighting" },
-      { value: "agility", label: "Agility" },
-      { value: "strength", label: "Strength" },
-      { value: "endurance", label: "Endurance" },
-      { value: "reason", label: "Reason" },
-      { value: "intuition", label: "Intuition" },
-      { value: "psyche", label: "Psyche" }
-    ];
-    
-    // Ensure custom abilities array exists
-    if (!data.system.customAbilities) {
-      data.system.customAbilities = [];
-    }
-    
-    return data;
+    return context;
   }
 
-/** @override */
-activateListeners(html) {
-  super.activateListeners(html);
-
-  // Handle changes to form inputs
-  html.find('input, select, textarea').change(ev => {
-    this._onSubmit(ev);
-  });
-
-  // Handle category changes specially
-  html.find('.equipment-category-select').change(ev => {
-    // First submit the form to save the category change
-    this._onSubmit(ev).then(() => {
-      // After saving, get the new category and update visibility
+  activateListeners(html) {
+    super.activateListeners(html);
+    
+    // Show/hide category-specific fields when category changes
+    html.find('.equipment-category-select').change(ev => {
       const category = ev.currentTarget.value;
       
       // Hide all category-specific sections first
@@ -131,47 +44,61 @@ activateListeners(html) {
         html.find('.custom-fields').show();
       }
     });
-  });
 
-  // Make sure correct fields are shown on initial load
-  const currentCategory = this.object.system?.category || "gear";
-  if (currentCategory === 'weapon') {
-    html.find('.weapon-fields').show();
-  } else if (currentCategory === 'armor') {
-    html.find('.armor-fields').show();
-  } else if (currentCategory === 'power-item') {
-    html.find('.power-item-fields').show();
-  } else if (currentCategory === 'custom') {
-    html.find('.custom-fields').show();
-  }
-  
-  // Add custom ability handler
-  html.find('.add-custom-ability').click(ev => {
-    const abilities = this.object.system.customAbilities || [];
-    abilities.push({
-      name: "New Ability",
-      description: "",
-      rank: "Typical",
-      damageType: "",
-      range: ""
+    // Make sure correct fields are shown on initial load
+    const currentCategory = this.item.system.category;
+    if (currentCategory === 'weapon') {
+      html.find('.weapon-fields').show();
+    } else if (currentCategory === 'armor') {
+      html.find('.armor-fields').show();
+    } else if (currentCategory === 'power-item') {
+      html.find('.power-item-fields').show();
+    } else if (currentCategory === 'custom') {
+      html.find('.custom-fields').show();
+    }
+    
+    // Add custom ability handler
+    html.find('.add-custom-ability').click(ev => {
+      const stunts = this.item.system.customAbilities || [];
+      stunts.push({
+        name: "New Ability",
+        description: "",
+        rank: "Typical",
+        damageType: "",
+        range: ""
+      });
+      this.item.update({ "system.customAbilities": stunts });
     });
     
-    this.object.update({"system.customAbilities": abilities});
-  });
-  
-  // Remove custom ability handler
-  html.find('.remove-custom-ability').click(ev => {
-    const index = $(ev.currentTarget).data("index");
-    const abilities = duplicate(this.object.system.customAbilities || []);
-    abilities.splice(index, 1);
-    this.object.update({"system.customAbilities": abilities});
-  });
-  
-  // Roll equipment button
-  html.find('.roll-equipment').click(ev => {
-    this.rollEquipment();
-  });
-}
+    // Remove custom ability handler
+    html.find('.remove-custom-ability').click(ev => {
+      const index = parseInt(ev.currentTarget.dataset.index);
+      
+      // Make sure customAbilities exists and is an array
+      let abilities = duplicate(this.item.system.customAbilities);
+      if (!Array.isArray(abilities)) {
+        abilities = [];
+        console.warn("customAbilities was not an array, creating empty array");
+      }
+      
+      // Remove the ability at the specified index
+      if (abilities.length > index) {
+        abilities.splice(index, 1);
+        
+        // Update the item
+        this.item.update({ "system.customAbilities": abilities });
+      } else {
+        console.error("Invalid ability index:", index, "length:", abilities.length);
+      }
+    });
+    
+    // Roll equipment button
+    html.find('.roll-equipment').click(ev => {
+      this.rollEquipment();
+    });
+  }
+
+  // The rest of your equipment.js file (rollEquipment methods, etc.) remains unchanged
   
   // Method to handle equipment rolls
   async rollEquipment() {

@@ -1,4 +1,4 @@
-<form class="{{cssClass}} equipment-sheet" autocomplete="off">
+<form class="{{cssClass}} equipment-sheet" autocomplete="off" submitOnChange>
     <header class="sheet-header">
       <img class="profile-img" src="{{item.img}}" data-edit="img" title="{{item.name}}" />
       <h1><input name="name" type="text" value="{{item.name}}" placeholder="Equipment Name"/></h1>
@@ -136,14 +136,26 @@
     </section>
 
     <!-- Add this to your equipment-sheet.html -->
-<div class="power-item-fields" {{#unless (eq system.category "power-item")}}style="display: none;"{{/unless}}>
-    <div class="form-group">
-      <label>Power Rank:</label>
-      <select name="system.powerRank">
-        {{#each ranks}}
-        <option value="{{this}}" {{#if (eq ../system.powerRank this)}}selected{{/if}}>{{this}}</option>
-        {{/each}}
-      </select>
+    <!-- Power item section in equipment-sheet.html -->
+    <div class="power-item-fields" {{#unless (eq system.category "power-item")}}style="display: none;"{{/unless}}>
+        <div class="form-group">
+          <label>Power Rank:</label>
+          <select name="system.powerRank">
+            <option value="Shift-0" {{#if (eq system.powerRank "Shift-0")}}selected{{/if}}>Shift-0</option>
+            <option value="Feeble" {{#if (eq system.powerRank "Feeble")}}selected{{/if}}>Feeble</option>
+            <option value="Poor" {{#if (eq system.powerRank "Poor")}}selected{{/if}}>Poor</option>
+            <option value="Typical" {{#if (eq system.powerRank "Typical")}}selected{{/if}}>Typical</option>
+            <option value="Good" {{#if (eq system.powerRank "Good")}}selected{{/if}}>Good</option>
+            <option value="Excellent" {{#if (eq system.powerRank "Excellent")}}selected{{/if}}>Excellent</option>
+            <option value="Remarkable" {{#if (eq system.powerRank "Remarkable")}}selected{{/if}}>Remarkable</option>
+            <option value="Incredible" {{#if (eq system.powerRank "Incredible")}}selected{{/if}}>Incredible</option>
+            <option value="Amazing" {{#if (eq system.powerRank "Amazing")}}selected{{/if}}>Amazing</option>
+            <option value="Monstrous" {{#if (eq system.powerRank "Monstrous")}}selected{{/if}}>Monstrous</option>
+            <option value="Unearthly" {{#if (eq system.powerRank "Unearthly")}}selected{{/if}}>Unearthly</option>
+          </select>
+        </div>
+        
+        <!-- Rest of power-item fields -->
     </div>
     
     <div class="form-group">
@@ -227,5 +239,5 @@
       {{/each}}
     </div>
   </div>
-  
+
   </form>
