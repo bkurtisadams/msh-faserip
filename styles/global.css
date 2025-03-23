@@ -859,12 +859,12 @@
 }
 
 /* Add specific background colors */
-.karma-sheet .summary-item.advancement-fund {
-  background-color: #e8f5e9; /* Light green background */
+.karma-sheet .karma-summary div:nth-child(4) {
+  background-color: #e8f5e9; /* Light green background for Advancement Fund */
 }
 
-.karma-sheet .summary-item.karma-pool-summary {
-  background-color: #e3f2fd; /* Light blue background */
+.karma-sheet .karma-summary div:nth-child(5) {
+  background-color: #e3f2fd; /* Light blue background for Karma Pool */
 }
 
 .karma-sheet .summary-item label {
@@ -896,7 +896,7 @@
   border-radius: 3px;
   padding: 4px 8px;
   cursor: pointer;
-  font-size: 0.85em;
+  font-size: 0.75em;
   flex: 1;
   display: flex;
   align-items: center;
@@ -908,9 +908,11 @@
 }
 
 /* Improve button icon + text layout */
-.karma-sheet .karma-controls button i {
-  margin-right: 4px;
-  font-size: 1em;
+.karma-sheet .karma-controls button {
+  /* other properties remain the same */
+  padding: 3px 6px; /* Slightly reduced padding */
+  font-size: 0.75em; /* Smaller text */
+  height: 26px; /* Slightly shorter height */
 }
 
 
@@ -1244,7 +1246,7 @@
 .karma-pool-sheet .pool-buttons {
   display: flex;
   gap: 8px;
-  margin-bottom: a12px;
+  margin-bottom: 12px;
 }
 
 .karma-pool-sheet .pool-buttons button {
