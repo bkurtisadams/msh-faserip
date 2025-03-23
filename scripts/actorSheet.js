@@ -10,7 +10,7 @@ export class FaseripActorSheet extends ActorSheet {
       width: 600,
       height: 700,
       tabs: [{ navSelector: ".sheet-tabs", contentSelector: ".sheet-body", initial: "attributes" }],
-      submitOnChange: false,
+      submitOnChange: true,
       closeOnSubmit: false
     });
   }

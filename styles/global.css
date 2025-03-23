@@ -286,6 +286,27 @@
   padding: 20px;
 }
 
+/* consistent styling across all tab controls */
+/* Shared tab controls styling */
+.faserip-sheet .tab-controls {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.faserip-sheet .tab-controls button {
+  flex: 1;
+  margin: 0 5px;
+}
+
+.faserip-sheet .tab-controls button:first-child {
+  margin-left: 0;
+}
+
+.faserip-sheet .tab-controls button:last-child {
+  margin-right: 0;
+}
+
 /* Karma advancement section */
 .faserip-sheet .karma-advancement {
   display: flex;
