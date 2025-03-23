@@ -46,9 +46,32 @@ export class FaseripActorSheet extends ActorSheet {
     return super._updateObject(event, expandedData);
   }
 
+  _onDragStart(event) {
+    const li = event.currentTarget;
+    const itemId = li.dataset.itemId;
+    const item = this.actor.items.get(itemId);
+    
+    if (item) {
+      // Set up the drag data
+      event.dataTransfer.setData("text/plain", JSON.stringify({
+        type: "Item",
+        actorId: this.actor.id,
+        itemId: item.id,
+        uuid: item.uuid,
+        data: item
+      }));
+    }
+  }
+  
   // In actorSheet.js, add to the activateListeners function
   activateListeners(html) {
     super.activateListeners(html);
+
+    // Add this to make power rows draggable
+    html.find('.power-row').each((i, li) => {
+      li.setAttribute("draggable", true);
+      li.addEventListener("dragstart", this._onDragStart.bind(this));
+    });
 
     // Biography Toggle Button
     html.find('.biography-toggle').click(ev => {

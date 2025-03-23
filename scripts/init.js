@@ -13,6 +13,69 @@ Hooks.once("init", () => {
   
   // Add the rollUniversalTable function to the namespace
   game.msh.rollUniversalTable = rollUniversalTable;
+  
+  // Add the rollItemMacro function to the namespace
+  game.msh.rollItemMacro = function(actorId, itemId) {
+    // Get the actor
+    const speaker = ChatMessage.getSpeaker();
+    let actor = game.actors.get(actorId);
+    
+    // If the actor doesn't exist, try to get it from the speaker
+    if (!actor && speaker.token) actor = game.actors.tokens[speaker.token];
+    if (!actor && speaker.actor) actor = game.actors.get(speaker.actor);
+    
+    // If we still don't have an actor, display an error
+    if (!actor) return ui.notifications.warn(`Actor could not be found.`);
+    
+    // Get the item from the actor
+    const item = actor.items.get(itemId);
+    if (!item) return ui.notifications.warn(`Item ${itemId} could not be found on ${actor.name}.`);
+    
+    // Roll the item based on its type
+    if (item.type === "power") {
+      // Find the appropriate roll button in the sheet and trigger it
+      const sheet = actor.sheet;
+      if (sheet) {
+        sheet.render(true);
+        setTimeout(() => {
+          const element = sheet.element.find(`.power-roll[data-item-id="${itemId}"]`);
+          if (element.length) {
+            element[0].click();
+          } else {
+            ui.notifications.warn("Couldn't find power roll button. The sheet UI may have changed.");
+          }
+        }, 100);
+      }
+    } else if (item.type === "talent") {
+      // Similar approach for talents
+      const sheet = actor.sheet;
+      if (sheet) {
+        sheet.render(true);
+        setTimeout(() => {
+          const element = sheet.element.find(`.talent-roll[data-item-id="${itemId}"]`);
+          if (element.length) {
+            element[0].click();
+          } else {
+            ui.notifications.warn("Couldn't find talent roll button. The sheet UI may have changed.");
+          }
+        }, 100);
+      }
+    } else if (item.type === "contact") {
+      // Similar approach for contacts
+      const sheet = actor.sheet;
+      if (sheet) {
+        sheet.render(true);
+        setTimeout(() => {
+          const element = sheet.element.find(`.contact-roll[data-item-id="${itemId}"]`);
+          if (element.length) {
+            element[0].click();
+          } else {
+            ui.notifications.warn("Couldn't find contact roll button. The sheet UI may have changed.");
+          }
+        }, 100);
+      }
+    }
+  };
 
   // Register Handlebars helpers
   Handlebars.registerHelper('getFlag', function(object, scope, flag) {
@@ -30,3 +93,43 @@ Hooks.once("init", () => {
   Actors.registerSheet("msh-faserip", FaseripActorSheet, { makeDefault: true });
   Items.registerSheet("msh-faserip", FaseripItemSheet, { makeDefault: true });
 });
+
+// Add the hotbarDrop hook
+Hooks.on('hotbarDrop', (bar, data, slot) => {
+  if (data.type === "Item" && data.actorId) {
+    createFaseripItemMacro(data, slot);
+    return false;
+  }
+  return true;
+});
+
+// Define the function to create a macro
+async function createFaseripItemMacro(data, slot) {
+  // Get references to our Actor and Item
+  const actor = game.actors.get(data.actorId);
+  if (!actor) return ui.notifications.warn("Actor not found");
+  
+  const item = actor.items.get(data.itemId);
+  if (!item) return ui.notifications.warn("Item not found");
+  
+  // Create a command string that will call our rollItemMacro function
+  const command = `game.msh.rollItemMacro("${data.actorId}", "${data.itemId}");`;
+  
+  // Create the macro
+  const macroName = `${item.name} (${actor.name})`;
+  let macro = game.macros.find(m => m.name === macroName && m.command === command);
+  
+  if (!macro) {
+    macro = await Macro.create({
+      name: macroName,
+      type: "script",
+      img: item.img || "icons/svg/dice-target.svg",
+      command: command,
+      flags: {"faserip.itemMacro": true}
+    });
+  }
+  
+  // Assign to hotbar slot
+  game.user.assignHotbarMacro(macro, slot);
+  return true;
+}
