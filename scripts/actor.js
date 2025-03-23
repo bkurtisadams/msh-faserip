@@ -36,8 +36,8 @@ export class FaseripActor extends Actor {
     // Update the health max value
     system.attributes.health.max = healthMax;
     
-    // Set health value to max if not already set or if current exceeds max
-    if (!system.attributes.health.value || system.attributes.health.value > healthMax) {
+    // Only initialize Health value if it's missing completely
+    if (typeof system.attributes.health.value !== 'number') {
       system.attributes.health.value = healthMax;
     }
     
