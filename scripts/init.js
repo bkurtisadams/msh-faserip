@@ -3,6 +3,7 @@ import { FaseripActor } from './actor.js';
 import { FaseripItem } from './item.js';
 import { FaseripActorSheet } from './actorSheet.js';
 import { FaseripItemSheet } from './itemSheet.js';
+import { FaseripEquipmentSheet } from './equipment.js';
 import { rollUniversalTable } from './universalTable.js';  // Import your function
 
 Hooks.once("init", () => {
@@ -39,6 +40,7 @@ Hooks.once("init", () => {
     }
     
     // Helper function to click the appropriate roll button
+    // Update the selector determination part in the clickRollButton function
     function clickRollButton(sheet, item) {
       let selector;
       
@@ -49,6 +51,8 @@ Hooks.once("init", () => {
         selector = `.talent-roll[data-item-id="${itemId}"]`;
       } else if (item.type === "contact") {
         selector = `.contact-roll[data-item-id="${itemId}"]`;
+      } else if (item.type === "equipment") {
+        selector = `.equipment-roll[data-item-id="${itemId}"]`;
       } else {
         return ui.notifications.warn(`Unsupported item type: ${item.type}`);
       }
@@ -138,9 +142,18 @@ Hooks.once("init", () => {
   // Register sheet application classes
   Actors.unregisterSheet("core", ActorSheet);
   Items.unregisterSheet("core", ItemSheet);
-  
+
   Actors.registerSheet("msh-faserip", FaseripActorSheet, { makeDefault: true });
-  Items.registerSheet("msh-faserip", FaseripItemSheet, { makeDefault: true });
+  Items.registerSheet("msh-faserip", FaseripItemSheet, { 
+    types: ["power", "talent", "contact", "vehicle", "headquarters"],
+    makeDefault: true 
+  });
+  Items.registerSheet("msh-faserip", FaseripEquipmentSheet, { 
+    types: ["equipment"], 
+    makeDefault: true 
+  });
+
+  // end of hooks.once
 });
 
 // Add the hotbarDrop hook

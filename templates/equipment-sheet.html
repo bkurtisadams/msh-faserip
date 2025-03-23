@@ -1,0 +1,231 @@
+<form class="{{cssClass}} equipment-sheet" autocomplete="off">
+    <header class="sheet-header">
+      <img class="profile-img" src="{{item.img}}" data-edit="img" title="{{item.name}}" />
+      <h1><input name="name" type="text" value="{{item.name}}" placeholder="Equipment Name"/></h1>
+    </header>
+  
+    <section class="sheet-body">
+      <div class="form-group">
+        <label>Category:</label>
+        <select name="system.category" class="equipment-category-select">
+          <option value="weapon" {{#if (eq system.category "weapon")}}selected{{/if}}>Weapon</option>
+          <option value="armor" {{#if (eq system.category "armor")}}selected{{/if}}>Armor</option>
+          <option value="gear" {{#if (eq system.category "gear")}}selected{{/if}}>Gear</option>
+        </select>
+      </div>
+  
+      <div class="form-group">
+        <label>Material Strength:</label>
+        <select name="system.materialStrength">
+          <option value="Shift-0" {{#if (eq system.materialStrength "Shift-0")}}selected{{/if}}>Shift-0</option>
+          <option value="Feeble" {{#if (eq system.materialStrength "Feeble")}}selected{{/if}}>Feeble</option>
+          <option value="Poor" {{#if (eq system.materialStrength "Poor")}}selected{{/if}}>Poor</option>
+          <option value="Typical" {{#if (eq system.materialStrength "Typical")}}selected{{/if}}>Typical</option>
+          <option value="Good" {{#if (eq system.materialStrength "Good")}}selected{{/if}}>Good</option>
+          <option value="Excellent" {{#if (eq system.materialStrength "Excellent")}}selected{{/if}}>Excellent</option>
+          <option value="Remarkable" {{#if (eq system.materialStrength "Remarkable")}}selected{{/if}}>Remarkable</option>
+          <option value="Incredible" {{#if (eq system.materialStrength "Incredible")}}selected{{/if}}>Incredible</option>
+          <option value="Amazing" {{#if (eq system.materialStrength "Amazing")}}selected{{/if}}>Amazing</option>
+          <option value="Monstrous" {{#if (eq system.materialStrength "Monstrous")}}selected{{/if}}>Monstrous</option>
+          <option value="Unearthly" {{#if (eq system.materialStrength "Unearthly")}}selected{{/if}}>Unearthly</option>
+        </select>
+      </div>
+  
+      <div class="form-group">
+        <label>Price (Resource Rank):</label>
+        <select name="system.price">
+          <option value="Shift-0" {{#if (eq system.price "Shift-0")}}selected{{/if}}>Shift-0</option>
+          <option value="Feeble" {{#if (eq system.price "Feeble")}}selected{{/if}}>Feeble</option>
+          <option value="Poor" {{#if (eq system.price "Poor")}}selected{{/if}}>Poor</option>
+          <option value="Typical" {{#if (eq system.price "Typical")}}selected{{/if}}>Typical</option>
+          <option value="Good" {{#if (eq system.price "Good")}}selected{{/if}}>Good</option>
+          <option value="Excellent" {{#if (eq system.price "Excellent")}}selected{{/if}}>Excellent</option>
+          <option value="Remarkable" {{#if (eq system.price "Remarkable")}}selected{{/if}}>Remarkable</option>
+          <option value="Incredible" {{#if (eq system.price "Incredible")}}selected{{/if}}>Incredible</option>
+          <option value="Amazing" {{#if (eq system.price "Amazing")}}selected{{/if}}>Amazing</option>
+          <option value="Monstrous" {{#if (eq system.price "Monstrous")}}selected{{/if}}>Monstrous</option>
+          <option value="Unearthly" {{#if (eq system.price "Unearthly")}}selected{{/if}}>Unearthly</option>
+        </select>
+      </div>
+  
+      <!-- Weapon-specific fields -->
+      <div class="weapon-fields" {{#unless (eq system.category "weapon")}}style="display: none;"{{/unless}}>
+        <div class="form-group">
+          <label>Weapon Type:</label>
+          <select name="system.weaponType">
+            <option value="" {{#if (eq system.weaponType "")}}selected{{/if}}>None</option>
+            <option value="shooting" {{#if (eq system.weaponType "shooting")}}selected{{/if}}>Shooting Weapon</option>
+            <option value="melee" {{#if (eq system.weaponType "melee")}}selected{{/if}}>Melee Weapon</option>
+            <option value="thrown" {{#if (eq system.weaponType "thrown")}}selected{{/if}}>Thrown Weapon</option>
+          </select>
+        </div>
+  
+        <div class="form-group">
+          <label>Range (in areas):</label>
+          <input type="text" name="system.range" value="{{system.range}}" />
+        </div>
+  
+        <div class="form-group">
+          <label>Damage:</label>
+          <input type="text" name="system.damage" value="{{system.damage}}" />
+        </div>
+  
+        <div class="form-group">
+          <label>Damage Type:</label>
+          <select name="system.damageType">
+            <option value="" {{#if (eq system.damageType "")}}selected{{/if}}>None</option>
+            <option value="S" {{#if (eq system.damageType "S")}}selected{{/if}}>Shooting (S)</option>
+            <option value="E" {{#if (eq system.damageType "E")}}selected{{/if}}>Energy (E)</option>
+            <option value="F" {{#if (eq system.damageType "F")}}selected{{/if}}>Force (F)</option>
+            <option value="EA" {{#if (eq system.damageType "EA")}}selected{{/if}}>Edged Attack (EA)</option>
+            <option value="BA" {{#if (eq system.damageType "BA")}}selected{{/if}}>Blunt Attack (BA)</option>
+          </select>
+        </div>
+  
+        <div class="form-row">
+          <div class="form-group half">
+            <label>Rate of Fire:</label>
+            <input type="text" name="system.rate" value="{{system.rate}}" />
+          </div>
+          <div class="form-group half">
+            <label>Shots Before Reload:</label>
+            <input type="text" name="system.shots" value="{{system.shots}}" />
+          </div>
+        </div>
+  
+        <div class="form-group">
+          <label>Ammunition Type:</label>
+          <select name="system.ammoType">
+            <option value="Standard" {{#if (eq system.ammoType "Standard")}}selected{{/if}}>Standard</option>
+            <option value="Mercy" {{#if (eq system.ammoType "Mercy")}}selected{{/if}}>Mercy Shot</option>
+            <option value="AP" {{#if (eq system.ammoType "AP")}}selected{{/if}}>Armor Piercing (AP)</option>
+            <option value="Rubber" {{#if (eq system.ammoType "Rubber")}}selected{{/if}}>Rubber Shot</option>
+            <option value="Explosive" {{#if (eq system.ammoType "Explosive")}}selected{{/if}}>Explosive Shot</option>
+            <option value="Canister" {{#if (eq system.ammoType "Canister")}}selected{{/if}}>Canister Shot</option>
+            <option value="Heat-Seeker" {{#if (eq system.ammoType "Heat-Seeker")}}selected{{/if}}>Heat-Seeker</option>
+            <option value="Power Pack" {{#if (eq system.ammoType "Power Pack")}}selected{{/if}}>Power Pack</option>
+          </select>
+        </div>
+      </div>
+  
+      <!-- Armor-specific fields -->
+      <div class="armor-fields" {{#unless (eq system.category "armor")}}style="display: none;"{{/unless}}>
+        <div class="form-group">
+          <label>Protection Value:</label>
+          <input type="text" name="system.protection" value="{{system.protection}}" />
+        </div>
+  
+        <div class="form-group">
+          <label>Coverage:</label>
+          <select name="system.coverage">
+            <option value="partial" {{#if (eq system.coverage "partial")}}selected{{/if}}>Partial</option>
+            <option value="full" {{#if (eq system.coverage "full")}}selected{{/if}}>Full</option>
+          </select>
+        </div>
+      </div>
+  
+      <div class="form-group">
+        <label>Notes:</label>
+        <textarea name="system.notes" rows="3">{{system.notes}}</textarea>
+      </div>
+  
+      <div class="form-group">
+        <label>Description:</label>
+        <textarea name="system.description" rows="5">{{system.description}}</textarea>
+      </div>
+    </section>
+
+    <!-- Add this to your equipment-sheet.html -->
+<div class="power-item-fields" {{#unless (eq system.category "power-item")}}style="display: none;"{{/unless}}>
+    <div class="form-group">
+      <label>Power Rank:</label>
+      <select name="system.powerRank">
+        {{#each ranks}}
+        <option value="{{this}}" {{#if (eq ../system.powerRank this)}}selected{{/if}}>{{this}}</option>
+        {{/each}}
+      </select>
+    </div>
+    
+    <div class="form-group">
+      <label>Linked Ability:</label>
+      <select name="system.linkedAbility">
+        <option value="fighting" {{#if (eq system.linkedAbility "fighting")}}selected{{/if}}>Fighting</option>
+        <option value="agility" {{#if (eq system.linkedAbility "agility")}}selected{{/if}}>Agility</option>
+        <option value="strength" {{#if (eq system.linkedAbility "strength")}}selected{{/if}}>Strength</option>
+        <option value="endurance" {{#if (eq system.linkedAbility "endurance")}}selected{{/if}}>Endurance</option>
+        <option value="reason" {{#if (eq system.linkedAbility "reason")}}selected{{/if}}>Reason</option>
+        <option value="intuition" {{#if (eq system.linkedAbility "intuition")}}selected{{/if}}>Intuition</option>
+        <option value="psyche" {{#if (eq system.linkedAbility "psyche")}}selected{{/if}}>Psyche</option>
+      </select>
+    </div>
+    
+    <div class="form-group">
+      <label>Power Type:</label>
+      <select name="system.powerType">
+        <option value="energy" {{#if (eq system.powerType "energy")}}selected{{/if}}>Energy</option>
+        <option value="force" {{#if (eq system.powerType "force")}}selected{{/if}}>Force</option>
+        <option value="matter" {{#if (eq system.powerType "matter")}}selected{{/if}}>Matter Control</option>
+        <option value="mental" {{#if (eq system.powerType "mental")}}selected{{/if}}>Mental</option>
+        <option value="magical" {{#if (eq system.powerType "magical")}}selected{{/if}}>Magical</option>
+        <option value="self" {{#if (eq system.powerType "self")}}selected{{/if}}>Self-Alteration</option>
+        <option value="sensory" {{#if (eq system.powerType "sensory")}}selected{{/if}}>Sensory</option>
+        <option value="travel" {{#if (eq system.powerType "travel")}}selected{{/if}}>Travel</option>
+        <option value="custom" {{#if (eq system.powerType "custom")}}selected{{/if}}>Custom</option>
+      </select>
+    </div>
+    
+    <div class="form-group">
+      <label>Range:</label>
+      <input type="text" name="system.powerRange" value="{{system.powerRange}}" />
+    </div>
+  </div>
+  
+  <!-- Custom equipment fields -->
+  <div class="custom-fields" {{#unless (eq system.category "custom")}}style="display: none;"{{/unless}}>
+    <div class="form-group">
+      <label>Custom Abilities:</label>
+      <button type="button" class="add-custom-ability">+ Add Ability</button>
+    </div>
+    
+    <div class="custom-abilities-list">
+      {{#each system.customAbilities as |ability i|}}
+      <div class="custom-ability">
+        <div class="ability-header">
+          <input type="text" name="system.customAbilities.{{i}}.name" value="{{ability.name}}" placeholder="Ability Name"/>
+          <button type="button" class="remove-custom-ability" data-index="{{i}}"><i class="fas fa-trash"></i></button>
+        </div>
+        <div class="ability-details">
+          <div class="form-row">
+            <div class="form-group half">
+              <label>Rank:</label>
+              <select name="system.customAbilities.{{i}}.rank">
+                {{#each ../ranks}}
+                <option value="{{this}}" {{#if (eq ../ability.rank this)}}selected{{/if}}>{{this}}</option>
+                {{/each}}
+              </select>
+            </div>
+            <div class="form-group half">
+              <label>Damage Type:</label>
+              <select name="system.customAbilities.{{i}}.damageType">
+                <option value="" {{#if (eq ability.damageType "")}}selected{{/if}}>None</option>
+                {{#each ../damageTypes}}
+                <option value="{{this}}" {{#if (eq ../ability.damageType this)}}selected{{/if}}>{{this}}</option>
+                {{/each}}
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Range:</label>
+            <input type="text" name="system.customAbilities.{{i}}.range" value="{{ability.range}}" />
+          </div>
+          <div class="form-group">
+            <label>Description:</label>
+            <textarea name="system.customAbilities.{{i}}.description">{{ability.description}}</textarea>
+          </div>
+        </div>
+      </div>
+      {{/each}}
+    </div>
+  </div>
+  
+  </form>

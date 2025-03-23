@@ -25,14 +25,17 @@ export class FaseripActorSheet extends ActorSheet {
     // Get items sorted by type for display in the template
     context.powers = this.actor.items.filter(item => item.type === "power") || [];
     context.talents = this.actor.items.filter(item => item.type === "talent") || [];
-    // Add this line to get contacts
+    // get contacts
     context.contacts = this.actor.items.filter(item => item.type === "contact") || [];
 
-    // Add the calculated current karma value
+    // the calculated current karma value
     context.currentKarma = this.actor.currentKarma;
 
-    // Add the biography toggle state to the context
+    // the biography toggle state to the context
     context.isBiographyOpen = this._isBiographyOpen;
+
+    // equipment
+    context.equipment = this.actor.items.filter(item => item.type === "equipment") || [];
 
     return context;
   }
@@ -1264,6 +1267,150 @@ export class FaseripActorSheet extends ActorSheet {
         },
         default: "roll"
       }).render(true);
+    });
+
+    // Add Equipment button
+    html.find('.add-equipment').click(ev => {
+      console.log("Add Equipment button clicked"); // Debug line
+
+      // Create the new equipment item data
+      const itemData = {
+        name: "New Equipment",
+        type: "equipment",
+        system: {
+          description: "",
+          materialStrength: "Typical",
+          category: "gear",
+          price: "Poor",
+          notes: ""
+        }
+      };
+
+      this.actor.createEmbeddedDocuments("Item", [itemData])
+        .then(items => {
+          console.log("Equipment created successfully");
+          // Open the sheet for the newly created item
+          if (items && items.length > 0) {
+            items[0].sheet.render(true);
+          }
+          this.render(false); // Re-render the actor sheet
+        })
+        .catch(err => console.error("Error creating equipment:", err));
+    });
+
+    // Browse Equipment Compendium button
+    html.find('.browse-compendium[data-type="equipment"]').click(ev => {
+      const pack = game.packs.find(p => p.metadata.name === "equipment" && p.metadata.system === "msh-faserip");
+      if (pack) {
+        pack.render(true);
+      } else {
+        ui.notifications.warn("Equipment compendium not found.");
+      }
+    });
+
+    // Equipment info button
+    html.find('.equipment-info').click(ev => {
+      const li = $(ev.currentTarget).closest(".equipment-item");
+      const itemId = li.data("itemId");
+      const item = this.actor.items.get(itemId);
+
+      if (!item) return;
+
+      // Create a dialog to show equipment information
+      let content = `
+        <h2>${item.name}</h2>
+        <div class="equipment-details">
+          <div class="label">Category:</div><div>${item.system.category || 'None'}</div>
+          <div class="label">Material Strength:</div><div>${item.system.materialStrength || 'Typical'}</div>
+          <div class="label">Price:</div><div>${item.system.price || 'Poor'}</div>`;
+          
+      // Add category-specific details
+      if (item.system.category === "weapon") {
+        content += `
+          <div class="label">Weapon Type:</div><div>${item.system.weaponType || 'None'}</div>
+          <div class="label">Range:</div><div>${item.system.range || 'None'}</div>
+          <div class="label">Damage:</div><div>${item.system.damage || 'None'} (${item.system.damageType || 'None'})</div>
+          <div class="label">Rate:</div><div>${item.system.rate || 'None'}</div>
+          <div class="label">Shots:</div><div>${item.system.shots || 'None'}</div>`;
+      } else if (item.system.category === "armor") {
+        content += `
+          <div class="label">Protection:</div><div>${item.system.protection || 'None'}</div>
+          <div class="label">Coverage:</div><div>${item.system.coverage || 'Partial'}</div>`;
+      } else if (item.system.category === "power-item") {
+        content += `
+          <div class="label">Power Rank:</div><div>${item.system.powerRank || 'Typical'}</div>
+          <div class="label">Power Type:</div><div>${item.system.powerType || 'None'}</div>
+          <div class="label">Linked Ability:</div><div>${item.system.linkedAbility || 'None'}</div>`;
+      }
+      
+      content += `
+        </div>
+        <div class="description">${item.system.description || 'No description available.'}</div>
+        <div class="notes">${item.system.notes ? `<strong>Notes:</strong> ${item.system.notes}` : ''}</div>
+      `;
+
+      new Dialog({
+        title: "Equipment Information",
+        content: content,
+        buttons: {
+          close: {
+            label: "Close"
+          }
+        },
+        width: 400
+      }).render(true);
+    });
+
+    // Edit equipment button
+    html.find('.equipment-list .item-edit').click(ev => {
+      const li = $(ev.currentTarget).closest(".equipment-item");
+      const itemId = li.data("itemId");
+      const item = this.actor.items.get(itemId);
+
+      if (item) {
+        // Open the item sheet for proper editing
+        item.sheet.render(true);
+      }
+    });
+
+    // Delete equipment button
+    html.find('.equipment-list .item-delete').click(ev => {
+      const li = $(ev.currentTarget).closest(".equipment-item");
+      const itemId = li.data("itemId");
+
+      if (!itemId) return;
+
+      // Confirm deletion
+      new Dialog({
+        title: "Delete Equipment",
+        content: "<p>Are you sure you want to delete this equipment?</p>",
+        buttons: {
+          delete: {
+            icon: '<i class="fas fa-trash"></i>',
+            label: "Delete",
+            callback: () => {
+              this.actor.deleteEmbeddedDocuments("Item", [itemId]);
+              this.render(false);
+            }
+          },
+          cancel: {
+            icon: '<i class="fas fa-times"></i>',
+            label: "Cancel"
+          }
+        },
+        default: "cancel"
+      }).render(true);
+    });
+
+    // Roll equipment button
+    html.find('.equipment-roll').click(ev => {
+      const li = $(ev.currentTarget).closest(".equipment-item");
+      const itemId = li.data("itemId");
+      const item = this.actor.items.get(itemId);
+
+      if (item) {
+        item.rollItem();
+      }
     });
 
     // Continue with other listeners...

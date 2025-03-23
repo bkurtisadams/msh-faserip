@@ -120,10 +120,29 @@
     },
     "equipment": {
       "templates": ["base", "ranked"],
-      "subtype": "",
+      "category": "gear", 
       "materialStrength": "Typical",
+      "description": "",
+      "notes": "",
+      "price": "Poor",
+      
+      "weaponType": "",
       "range": "",
-      "damage": 0
+      "damage": "",
+      "damageType": "",
+      "rate": "1",
+      "shots": "",
+      "ammoType": "Standard",
+      
+      "protection": "",
+      "coverage": "partial",
+      
+      "powerRank": "Typical",
+      "linkedAbility": "reason",
+      "powerType": "",
+      "powerRange": "",
+      
+      "customAbilities": []
     },
     "vehicle": {
       "templates": ["base"],

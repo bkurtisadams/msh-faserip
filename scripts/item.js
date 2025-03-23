@@ -1,3 +1,6 @@
+// item.js
+import { FaseripEquipmentSheet } from "./equipment.js";
+
 export class FaseripItem extends Item {
   prepareData() {
     super.prepareData();
@@ -19,9 +22,44 @@ export class FaseripItem extends Item {
         itemData.description = itemData.description || "";
         break;
   
+      // In the prepareData method of your FaseripItem class in item.js
       case "equipment":
+        // Basic equipment properties
         itemData.materialStrength = itemData.materialStrength || "Typical";
         itemData.description = itemData.description || "";
+        itemData.category = itemData.category || "gear"; // weapon, armor, gear, power-item, vehicle-item, custom
+        itemData.notes = itemData.notes || ""; // Additional notes about the equipment
+        itemData.price = itemData.price || "Poor"; // Default price for all equipment
+        
+        // Weapon-specific properties
+        if (itemData.category === "weapon") {
+          itemData.weaponType = itemData.weaponType || ""; // shooting, melee, thrown, energy, force, custom
+          itemData.range = itemData.range || ""; // Range in areas
+          itemData.damage = itemData.damage || ""; // Damage points
+          itemData.damageType = itemData.damageType || ""; // S, E, F, EA, BA, GP, GB, custom
+          itemData.rate = itemData.rate || "1"; // Shots per round
+          itemData.shots = itemData.shots || ""; // Shots before reload
+          itemData.ammoType = itemData.ammoType || "Standard"; // Ammunition type
+        }
+        
+        // Armor-specific properties
+        if (itemData.category === "armor") {
+          itemData.protection = itemData.protection || ""; // Protection value
+          itemData.coverage = itemData.coverage || "partial"; // partial or full
+        }
+        
+        // Power item properties
+        if (itemData.category === "power-item") {
+          itemData.powerRank = itemData.powerRank || "Typical";
+          itemData.linkedAbility = itemData.linkedAbility || "reason";
+          itemData.powerType = itemData.powerType || "";
+          itemData.powerRange = itemData.powerRange || "";
+        }
+        
+        // Custom item properties
+        if (itemData.category === "custom") {
+          itemData.customAbilities = itemData.customAbilities || [];
+        }
         break;
   
       case "vehicle":
@@ -52,10 +90,37 @@ export class FaseripItem extends Item {
   }
 
 // In item.js, replace the rollItem method
+// item.js - Modified rollItem method
 async rollItem() {
   const actor = this.actor;
   if (!actor) return ui.notifications.error("No actor linked to item!");
 
+  // Check item type to determine appropriate roll method
+  switch (this.type) {
+    case "equipment":
+      // For equipment items, delegate to the equipment sheet's roll methods
+      const equipmentSheet = this.sheet;
+      if (equipmentSheet instanceof FaseripEquipmentSheet) {
+        return equipmentSheet.rollEquipment();
+      }
+      break;
+      
+    case "power":
+      // Original power rolling logic
+      this._rollPower();
+      break;
+      
+    // Add cases for other item types as needed (talents, contacts, etc.)
+    
+    default:
+      ui.notifications.warn(`Rolling not implemented for item type: ${this.type}`);
+  }
+}
+
+// Move the original power rolling logic to a separate method
+async _rollPower() {
+  const actor = this.actor;
+  
   // Power information
   const rank = this.system.rank || "Typical";
   const value = this.system.value || 6;
@@ -141,8 +206,6 @@ async rollItem() {
           // Create chat message
           await ChatMessage.create({
             speaker: ChatMessage.getSpeaker({ actor }),
-            // Remove the flavor text to avoid duplication
-            // flavor: `${this.name} (${rank})`,
             roll: roll,
             content: `
               <div class="faserip-power-roll">
@@ -211,4 +274,5 @@ async rollItem() {
     default: "roll"
   }).render(true);
 }
+
 }
