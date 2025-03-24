@@ -44,9 +44,9 @@ export class FaseripEquipmentSheet extends ItemSheet {
         html.find('.custom-fields').show();
       }
     });
-
+  
     // Make sure correct fields are shown on initial load
-    const currentCategory = this.item.system.category;
+    const currentCategory = this.object.system.category;
     if (currentCategory === 'weapon') {
       html.find('.weapon-fields').show();
     } else if (currentCategory === 'armor') {
@@ -59,7 +59,7 @@ export class FaseripEquipmentSheet extends ItemSheet {
     
     // Add custom ability handler
     html.find('.add-custom-ability').click(ev => {
-      const stunts = this.item.system.customAbilities || [];
+      const stunts = this.object.system.customAbilities || [];
       stunts.push({
         name: "New Ability",
         description: "",
@@ -67,7 +67,7 @@ export class FaseripEquipmentSheet extends ItemSheet {
         damageType: "",
         range: ""
       });
-      this.item.update({ "system.customAbilities": stunts });
+      this.object.update({ "system.customAbilities": stunts });
     });
     
     // Remove custom ability handler
@@ -75,7 +75,7 @@ export class FaseripEquipmentSheet extends ItemSheet {
       const index = parseInt(ev.currentTarget.dataset.index);
       
       // Make sure customAbilities exists and is an array
-      let abilities = duplicate(this.item.system.customAbilities);
+      let abilities = duplicate(this.object.system.customAbilities);
       if (!Array.isArray(abilities)) {
         abilities = [];
         console.warn("customAbilities was not an array, creating empty array");
@@ -86,7 +86,7 @@ export class FaseripEquipmentSheet extends ItemSheet {
         abilities.splice(index, 1);
         
         // Update the item
-        this.item.update({ "system.customAbilities": abilities });
+        this.object.update({ "system.customAbilities": abilities });
       } else {
         console.error("Invalid ability index:", index, "length:", abilities.length);
       }
@@ -98,32 +98,7 @@ export class FaseripEquipmentSheet extends ItemSheet {
     });
   }
 
-  // The rest of your equipment.js file (rollEquipment methods, etc.) remains unchanged
-  
-  // Method to handle equipment rolls
-  async rollEquipment() {
-    const item = this.object;
-    const actor = item.actor;
-    
-    if (!actor) return ui.notifications.error("This equipment must be on a character sheet to roll!");
-    
-    switch(item.system.category) {
-      case "weapon":
-        return this._rollWeapon(item, actor);
-      
-      case "power-item":
-        return this._rollPowerItem(item, actor);
-        
-      case "custom":
-        return this._rollCustomAbility(item, actor);
-        
-      default:
-        return ui.notifications.warn("This equipment type cannot be rolled!");
-    }
-  }
-  
-  // Roll a standard weapon attack
-  // Method to handle equipment rolls
+// Method to handle equipment rolls
 async rollEquipment() {
   const item = this.object;
   const actor = item.actor;
@@ -312,7 +287,27 @@ async _rollWeapon(item, actor) {
                   ${effect} (${colorResult.toUpperCase()})
                 </div>
               `
-            });;
+            });
+
+            // Update shots remaining if it's a weapon
+            if (item.system.category === "weapon" && item.system.shots) {
+              // If shotsRemaining is undefined, initialize it
+              let shotsRemaining = item.system.shotsRemaining;
+              if (shotsRemaining === undefined || shotsRemaining === "") {
+                shotsRemaining = item.system.shots;
+              }
+              
+              // Decrement shots remaining
+              shotsRemaining = Math.max(0, parseInt(shotsRemaining) - 1);
+              
+              // Update the item
+              await item.update({"system.shotsRemaining": shotsRemaining});
+              
+              if (shotsRemaining === 0) {
+                ui.notifications.warn(`${item.name} needs to be reloaded!`);
+              }
+            }
+            
           } catch (error) {
             console.error("Error rolling dice:", error);
             ui.notifications.error("Error when rolling dice. See console for details.");

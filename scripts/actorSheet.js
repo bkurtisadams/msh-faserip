@@ -1310,12 +1310,12 @@ export class FaseripActorSheet extends ActorSheet {
 
     // Equipment info button
     html.find('.equipment-info').click(ev => {
-      const li = $(ev.currentTarget).closest(".equipment-item");
+      const li = $(ev.currentTarget).closest(".equipment-row");
       const itemId = li.data("itemId");
       const item = this.actor.items.get(itemId);
-
+    
       if (!item) return;
-
+    
       // Create a dialog to show equipment information
       let content = `
         <h2>${item.name}</h2>
@@ -1331,7 +1331,7 @@ export class FaseripActorSheet extends ActorSheet {
           <div class="label">Range:</div><div>${item.system.range || 'None'}</div>
           <div class="label">Damage:</div><div>${item.system.damage || 'None'} (${item.system.damageType || 'None'})</div>
           <div class="label">Rate:</div><div>${item.system.rate || 'None'}</div>
-          <div class="label">Shots:</div><div>${item.system.shots || 'None'}</div>`;
+          <div class="label">Shots:</div><div>${item.system.shotsRemaining || item.system.shots || 'None'}/${item.system.shots || 'None'}</div>`;
       } else if (item.system.category === "armor") {
         content += `
           <div class="label">Protection:</div><div>${item.system.protection || 'None'}</div>
@@ -1348,7 +1348,7 @@ export class FaseripActorSheet extends ActorSheet {
         <div class="description">${item.system.description || 'No description available.'}</div>
         <div class="notes">${item.system.notes ? `<strong>Notes:</strong> ${item.system.notes}` : ''}</div>
       `;
-
+    
       new Dialog({
         title: "Equipment Information",
         content: content,
@@ -1362,11 +1362,11 @@ export class FaseripActorSheet extends ActorSheet {
     });
 
     // Edit equipment button
-    html.find('.equipment-list .item-edit').click(ev => {
-      const li = $(ev.currentTarget).closest(".equipment-item");
+    html.find('.item-edit').click(ev => {
+      const li = $(ev.currentTarget).closest(".equipment-row");
       const itemId = li.data("itemId");
       const item = this.actor.items.get(itemId);
-
+    
       if (item) {
         // Open the item sheet for proper editing
         item.sheet.render(true);
@@ -1374,12 +1374,12 @@ export class FaseripActorSheet extends ActorSheet {
     });
 
     // Delete equipment button
-    html.find('.equipment-list .item-delete').click(ev => {
-      const li = $(ev.currentTarget).closest(".equipment-item");
+    html.find('.item-delete').click(ev => {
+      const li = $(ev.currentTarget).closest(".equipment-row");
       const itemId = li.data("itemId");
-
+    
       if (!itemId) return;
-
+    
       // Confirm deletion
       new Dialog({
         title: "Delete Equipment",
@@ -1404,12 +1404,33 @@ export class FaseripActorSheet extends ActorSheet {
 
     // Roll equipment button
     html.find('.equipment-roll').click(ev => {
-      const li = $(ev.currentTarget).closest(".equipment-item");
+      const li = $(ev.currentTarget).closest(".equipment-row");
       const itemId = li.data("itemId");
       const item = this.actor.items.get(itemId);
-
+    
       if (item) {
         item.rollItem();
+      }
+    });
+
+    // Reload weapon
+    html.find('.reload-weapon').click(ev => {
+      ev.preventDefault();
+      const li = $(ev.currentTarget).closest(".equipment-row");
+      const itemId = li.data("itemId");
+      const item = this.actor.items.get(itemId);
+      
+      if (item && item.system.category === "weapon") {
+        // Reset shotsRemaining to full shots
+        item.update({"system.shotsRemaining": item.system.shots})
+          .then(() => {
+            ui.notifications.info(`${item.name} reloaded.`);
+            this.render(false);
+          })
+          .catch(err => {
+            console.error("Error reloading weapon:", err);
+            ui.notifications.error("Could not reload weapon.");
+          });
       }
     });
 

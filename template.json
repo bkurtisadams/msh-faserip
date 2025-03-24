@@ -132,6 +132,7 @@
       "damageType": "",
       "rate": "1",
       "shots": "",
+      "shotsRemaining": "",
       "ammoType": "Standard",
       
       "protection": "",
