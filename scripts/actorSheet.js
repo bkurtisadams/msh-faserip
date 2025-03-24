@@ -1534,7 +1534,7 @@ export class FaseripActorSheet extends ActorSheet {
     });
 
     // RESOURCE BUTTON method
-    html.find('.resources-button').click(ev => {
+    html.find('.resources-header-button').click(ev => {
       // Create dialog content with information about Resource FEATs
       const content = `
         <h2>Resource FEATs</h2>

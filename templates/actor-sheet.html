@@ -379,9 +379,7 @@
             <tr>
               <th>Health</th>
               <th>Karma</th>
-              <!-- <th class="narrow-column" title="Resources">Res</th>
-              <th class="narrow-column" title="Popularity">Pop</th> -->
-              <th>Resources</th>
+              <th><button type="button" class="resources-header-button" title="Resource FEAT Information">Resources</button></th>
               <th>Popularity</th>
             </tr>
           </thead>
@@ -404,7 +402,7 @@
                 </div>
               </td>
               <td class="resources-column">
-                <button type="button" class="resources-button">Resources</button>
+                
                 <select name="system.attributes.resources.rank">
                   <option value="Shift-0" {{#if (eq system.attributes.resources.rank "Shift-0" )}}selected{{/if}}>Shift-0</option>
                   <option value="Feeble" {{#if (eq system.attributes.resources.rank "Feeble" )}}selected{{/if}}>Feeble</option>

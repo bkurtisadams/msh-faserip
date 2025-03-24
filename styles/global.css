@@ -888,28 +888,37 @@
 }
 
 /* Add to global.css */
-.faserip-sheet .resources-button {
-  background-color: #4CAF50;  /* A medium green color */
-  border: 1px solid #2E7D32;  /* Darker green border */
-  color: black;
+
+/* Table header styling */
+.faserip-sheet .attributes-table th {
+  /* Ensure consistent height with primary abilities table headers */
+  height: 26px;
+  vertical-align: middle;
+  padding: 2px 5px;
+}
+
+/* Resources header button styling */
+.faserip-sheet .attributes-table th .resources-header-button {
+  background: none;
+  border: none;
+  color: #FFD700; /* Gold color to stand out */
   font-weight: bold;
   cursor: pointer;
-  padding: 2px 6px;
-  border-radius: 3px;
-  margin: 2px 0;
-  font-size: 0.85em;
+  padding: 0;
+  width: 100%;
+  font-size: inherit;
   text-align: center;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  margin: 0;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: normal;
 }
 
-.faserip-sheet .resources-button:hover {
-  background-color: #66BB6A;  /* Lighter green on hover */
-  box-shadow: 0 1px 5px rgba(0,0,0,0.3);
-}
-
-.faserip-sheet .resources-button:active {
-  background-color: #388E3C;  /* Darker green when clicked */
-  box-shadow: inset 0 1px 3px rgba(0,0,0,0.3);
+.faserip-sheet .attributes-table th .resources-header-button:hover {
+  color: #4CAF50; /* Green on hover */
+  text-shadow: 0 0 3px rgba(255, 255, 255, 0.5);
 }
 
 /* Resource dialog styling */
