@@ -469,21 +469,265 @@ export class FaseripRolls {
     }
     
     /**
-     * Roll equipment
-     * @param {Actor} actor - The actor who owns the equipment
-     * @param {Item} equipment - The equipment item to roll
-     * @param {Object} options - Optional configuration for the roll
-     */
+ * Roll equipment
+ * @param {Actor} actor - The actor who owns the equipment
+ * @param {Item} equipment - The equipment item to roll
+ * @param {Object} options - Optional configuration for the roll
+ */
     static async rollEquipment(actor, equipment, options = {}) {
       if (!actor || !equipment) {
         ui.notifications.error("Actor or equipment not found");
         return;
       }
       
-      // Equipment roll functionality would go here - similar pattern to the other roll methods
-      // For brevity, this is a placeholder since equipment rolling wasn't fully implemented in your code
+      // Get equipment information
+      const category = equipment.system.category || "gear";
       
-      ui.notifications.info(`${actor.name} uses ${equipment.name}`);
-      return true;
-    }
+      // Handle different equipment categories
+      if (category === "weapon") {
+        // Roll for weapon attack
+        const rank = equipment.system.materialStrength || "Typical";
+        const damage = equipment.system.damage || "-";
+        const damageType = equipment.system.damageType || "Blunt";
+        const range = equipment.system.range || "None";
+        
+        // Determine default action type based on damage type
+        let defaultAction = "Blunt Attack (BA)";
+        if (damageType === "Edged" || damageType === "Slashing") {
+          defaultAction = "Edged Attack (EA)";
+        } else if (range !== "None" && range !== "") {
+          defaultAction = "Shooting Attack (Sh)";
+        }
+        
+        // Define action types from the Universal Table
+        const ACTIONS = {
+          "Blunt Attack (BA)": { ability: "fighting", results: { white: "Miss", green: "Hit", yellow: "Slam", red: "Stun" }},
+          "Edged Attack (EA)": { ability: "fighting", results: { white: "Miss", green: "Hit", yellow: "Stun", red: "Kill" }},
+          "Shooting Attack (Sh)": { ability: "agility", results: { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Kill" }},
+          "Throwing Edged (TE)": { ability: "agility", results: { white: "Miss", green: "Hit", yellow: "Stun", red: "Kill" }},
+          "Throwing Blunt (TB)": { ability: "agility", results: { white: "Miss", green: "Hit", yellow: "Hit", red: "Stun" }}
+        };
+        
+        // If this is a macro or direct call with options provided
+        if (options.useDirectRoll) {
+          const actionName = options.actionType || defaultAction;
+          const action = ACTIONS[actionName];
+          const shift = parseInt(options.columnShift) || 0;
+          const karma = parseInt(options.karma) || 0;
+          
+          // Get the ability to use (fighting or agility)
+          const abilityKey = action.ability || "fighting";
+          const abilityRank = actor.system.abilities[abilityKey].rank || "Typical";
+          const abilityValue = actor.system.abilities[abilityKey].value || 10;
+          
+          // Apply column shifts if needed
+          let effectiveRank = abilityRank;
+          if (shift !== 0) {
+            const ranks = [
+              "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent", 
+              "Remarkable", "Incredible", "Amazing", "Monstrous", "Unearthly"
+            ];
+            const index = ranks.indexOf(abilityRank);
+            if (index !== -1) {
+              const newIndex = Math.min(Math.max(index + shift, 0), ranks.length - 1);
+              effectiveRank = ranks[newIndex];
+            }
+          }
+          
+          // Create the roll and evaluate it
+          const roll = new Roll("1d100");
+          await roll.evaluate({async: true});
+          
+          // Display dice on screen if not skipped
+          if (!options.skipDice) {
+            await roll.toMessage({
+              speaker: ChatMessage.getSpeaker({ actor }),
+              flavor: `${actor.name} uses ${equipment.name}`,
+              rollMode: game.settings.get("core", "rollMode")
+            });
+          }
+          
+          // Calculate the result
+          const totalRoll = roll.total + karma;
+          const resultColor = game.msh.rollUniversalTable(effectiveRank, totalRoll);
+          const effect = action.results[resultColor.toLowerCase()];
+          
+          // Record ammo use if applicable
+          if (equipment.system.shots && equipment.system.shotsRemaining) {
+            const currentShots = parseInt(equipment.system.shotsRemaining) || 0;
+            if (currentShots > 0) {
+              await equipment.update({"system.shotsRemaining": Math.max(0, currentShots - 1)});
+            } else {
+              ui.notifications.warn(`${equipment.name} is out of ammunition!`);
+            }
+          }
+          
+          // Create chat message with matched styling
+          await ChatMessage.create({
+            speaker: ChatMessage.getSpeaker({ actor }),
+            content: `
+              <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
+                <div style="padding: 5px 10px; border-bottom: 1px solid #c0c0c0; font-size: 1.1em; color: #8b0000;">
+                  <strong>${actor.name} - ${equipment.name} (${actionName})</strong>
+                </div>
+                <div style="padding: 5px 10px; font-size: 0.9em;">
+                  <div>Base Rank: ${abilityRank} (${abilityValue})</div>
+                  <div>Column Shift: ${shift !== 0 ? `${shift} → ${effectiveRank}` : "None"}</div>
+                  <div>Roll: ${roll.total} + Karma: ${karma} = ${totalRoll}</div>
+                </div>
+                <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
+                  background-color: ${resultColor.toLowerCase() === 'white' ? '#f8f8f8' :
+                    resultColor.toLowerCase() === 'green' ? '#4CAF50' :
+                      resultColor.toLowerCase() === 'yellow' ? '#FFD700' :
+                        '#F44336'}; 
+                  color: ${resultColor.toLowerCase() === 'white' || resultColor.toLowerCase() === 'yellow' ? '#333' : 'white'};">
+                  ${effect} (${resultColor.toUpperCase()})
+                </div>
+              </div>
+            `
+          });
+          
+          return { roll, resultColor, effect };
+        }
+        
+        // Otherwise show dialog for interactive roll
+        // Create dialog for roll options
+        let dialogContent = `
+        <div style="margin-bottom: 10px;">
+          <label style="display: inline-block; width: 120px;">Action Type:</label>
+          <select id="action" name="action" style="width: 180px;">
+            ${Object.keys(ACTIONS).map(action => 
+              `<option value="${action}" ${action === defaultAction ? 'selected' : ''}>${action}</option>`
+            ).join('')}
+          </select>
+        </div>
+        <div style="margin-bottom: 10px;">
+          <label style="display: inline-block; width: 120px;">Column Shift:</label>
+          <input type="number" id="shift" name="shift" value="0" style="width: 50px;">
+          <span style="color: #666; font-size: 0.9em;">(+ right, - left)</span>
+        </div>
+        <div style="margin-bottom: 10px;">
+          <label style="display: inline-block; width: 120px;">Karma Points:</label>
+          <input type="number" id="karma" name="karma" value="0" min="0" style="width: 50px;">
+        </div>
+        <div>
+          <label>
+            <input type="checkbox" id="skip-dice" name="skipDice"> 
+            Skip dice animation
+          </label>
+        </div>`;
+    
+        return new Dialog({
+          title: `Equipment Roll: ${equipment.name}`,
+          content: dialogContent,
+          buttons: {
+            roll: {
+              label: "Roll",
+              callback: (html) => {
+                const actionName = html.find('[name="action"]').val();
+                const shift = parseInt(html.find('[name="shift"]').val()) || 0;
+                const karma = parseInt(html.find('[name="karma"]').val()) || 0;
+                const skipDice = html.find('[name="skipDice"]').is(':checked');
+                
+                // Call this method again but with the gathered options
+                return FaseripRolls.rollEquipment(actor, equipment, {
+                  useDirectRoll: true,
+                  actionType: actionName,
+                  columnShift: shift,
+                  karma: karma,
+                  skipDice: skipDice
+                });
+              }
+            },
+            cancel: { label: "Cancel" }
+          },
+          default: "roll"
+        }).render(true);
+      } 
+      else if (category === "power-item") {
+    // For power items, roll using the power mechanism
+    const powerRank = equipment.system.powerRank || "Typical";
+    const powerType = equipment.system.powerType || "";
+    
+    // Use the power roll function
+    return game.msh.rollPower(actor, {
+      name: equipment.name,
+      type: "power",
+      system: {
+        rank: powerRank,
+        value: FaseripRolls._getRankValue(powerRank),
+        type: powerType,
+        range: equipment.system.powerRange || ""
+      },
+      getFlag: () => null // Simple stub for the getFlag method
+    });
+  }
+  else {
+    // For other equipment types, show info message
+    ui.notifications.info(`${actor.name} uses ${equipment.name} (${equipment.system.materialStrength || "Typical"})`);
+    
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor }),
+      content: `
+        <div class="faserip-equipment-use">
+          <h3>${actor.name} uses ${equipment.name}</h3>
+          <div class="equipment-info">
+            <div><strong>Type:</strong> ${category}</div>
+            <div><strong>Material:</strong> ${equipment.system.materialStrength || "Typical"}</div>
+            ${equipment.system.description ? `<div class="description">${equipment.system.description}</div>` : ''}
+          </div>
+        </div>
+        <style>
+          .faserip-equipment-use {
+            font-family: Arial, sans-serif;
+            background: #f9f8f4;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            padding: 8px;
+          }
+          .faserip-equipment-use h3 {
+            margin: 0 0 8px 0;
+            border-bottom: 1px solid #ccc;
+            padding-bottom: 4px;
+            font-size: 1.1em;
+          }
+          .equipment-info {
+            margin-bottom: 8px;
+            font-size: 0.95em;
+          }
+          .equipment-info div {
+            margin-bottom: 3px;
+          }
+          .description {
+            margin-top: 6px;
+            font-style: italic;
+            border-top: 1px dotted #ccc;
+            padding-top: 6px;
+          }
+        </style>
+      `
+    });
+    
+    return true;
+  }
+}
+
+// Helper method to convert rank names to values
+static _getRankValue(rankName) {
+  const rankValues = {
+    "Shift-0": 0,
+    "Feeble": 2,
+    "Poor": 4,
+    "Typical": 6,
+    "Good": 10,
+    "Excellent": 20,
+    "Remarkable": 30,
+    "Incredible": 40,
+    "Amazing": 50,
+    "Monstrous": 75,
+    "Unearthly": 100
+  };
+  
+  return rankValues[rankName] || 6; // Default to Typical if not found
+}
   }

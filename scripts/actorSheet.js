@@ -88,6 +88,12 @@ export class FaseripActorSheet extends ActorSheet {
       li.addEventListener("dragstart", this._onDragStart.bind(this));
     });
 
+    // Equipment rows draggable
+    html.find('.equipment-row').each((i, li) => {
+      li.setAttribute("draggable", true);
+      li.addEventListener("dragstart", this._onDragStart.bind(this));
+    });
+
     // Biography Toggle Button
     html.find('.biography-toggle').click(ev => {
       ev.preventDefault();
