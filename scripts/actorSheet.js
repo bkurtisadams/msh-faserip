@@ -145,50 +145,143 @@ export class FaseripActorSheet extends ActorSheet {
         .catch(err => console.error("Error creating power:", err));
     });
 
-    // Add Resistance listener
-    html.find('.add-resistance').click(ev => {
-      console.log("Add Resistance button clicked");
-
-      // Check if resistances array exists, if not, create it
-      const resistances = this.actor.system.resistances || [];
-
-      // Create a new resistance object
-      const newResistance = {
-        type: "physical",  // Default type
-        rank: "Good",      // Default rank
-        value: 10          // Default value
-      };
-
-      // Add the new resistance to the array
-      resistances.push(newResistance);
-
-      // Update the actor with the new resistances array
-      this.actor.update({ "system.resistances": resistances })
-        .then(() => {
-          console.log("Resistance added successfully");
-          this.render(false); // Re-render the sheet to show the new resistance
-        })
-        .catch(err => console.error("Error adding resistance:", err));
+    // Add Resistance
+    html.find('.add-resistance').click(async (ev) => {
+      ev.preventDefault();
+      
+      // Ensure resistances is always initialized as an array
+      let resistances = foundry.utils.deepClone(this.actor.system.resistances);
+      if (!Array.isArray(resistances)) {
+        resistances = [];
+      }
+    
+      resistances.push({ type: "physical", rank: "Good", value: 10 });
+      await this.actor.update({ "system.resistances": resistances });
     });
 
-    // Add delete resistance listener
-    html.find('.delete-resistance').click(ev => {
+    // Resistance Info Dialog
+    html.find('.resistance-info').click(ev => {
+      ev.preventDefault();
+      const index = Number(ev.currentTarget.dataset.index);
+      const resistance = this.actor.system.resistances[index];
+      if (!resistance) return;
+
+      new Dialog({
+        title: "Resistance Information",
+        content: `
+          <p><strong>Type:</strong> ${resistance.type}</p>
+          <p><strong>Rank:</strong> ${resistance.rank} (${resistance.value})</p>
+        `,
+        buttons: { close: { label: "Close" } }
+      }).render(true);
+    });
+
+    // Resistance edit button
+    html.find('.resistance-edit').click(ev => {
       const index = $(ev.currentTarget).data("index");
-      console.log(`Delete resistance at index ${index}`);
-
-      const resistances = duplicate(this.actor.system.resistances || []);
-
-      // Remove the resistance at the specified index
-      resistances.splice(index, 1);
-
-      // Update the actor with the modified resistances array
-      this.actor.update({ "system.resistances": resistances })
-        .then(() => {
-          console.log("Resistance deleted successfully");
-          this.render(false); // Re-render the sheet
-        })
-        .catch(err => console.error("Error deleting resistance:", err));
+      const resistance = this.actor.system.resistances[index];
+      
+      if (!resistance) return;
+      
+      let content = `
+        <form>
+          <div class="form-group">
+            <label>Resistance Type</label>
+            <select id="resistance-type" name="type">
+              <option value="physical" ${resistance.type === "physical" ? "selected" : ""}>Physical</option>
+              <option value="energy" ${resistance.type === "energy" ? "selected" : ""}>Energy</option>
+              <option value="mental" ${resistance.type === "mental" ? "selected" : ""}>Mental</option>
+              <option value="magical" ${resistance.type === "magical" ? "selected" : ""}>Magical</option>
+              <option value="fire" ${resistance.type === "fire" ? "selected" : ""}>Fire</option>
+              <option value="cold" ${resistance.type === "cold" ? "selected" : ""}>Cold</option>
+              <option value="electricity" ${resistance.type === "electricity" ? "selected" : ""}>Electricity</option>
+              <option value="radiation" ${resistance.type === "radiation" ? "selected" : ""}>Radiation</option>
+              <option value="toxin" ${resistance.type === "toxin" ? "selected" : ""}>Toxin</option>
+              <option value="corrosive" ${resistance.type === "corrosive" ? "selected" : ""}>Corrosive</option>
+              <option value="disease" ${resistance.type === "disease" ? "selected" : ""}>Disease</option>
+              <option value="emotion" ${resistance.type === "emotion" ? "selected" : ""}>Emotion</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Rank</label>
+            <select id="resistance-rank" name="rank">
+              <option value="Shift-0" ${resistance.rank === "Shift-0" ? "selected" : ""}>Shift-0</option>
+              <option value="Feeble" ${resistance.rank === "Feeble" ? "selected" : ""}>Feeble</option>
+              <option value="Poor" ${resistance.rank === "Poor" ? "selected" : ""}>Poor</option>
+              <option value="Typical" ${resistance.rank === "Typical" ? "selected" : ""}>Typical</option>
+              <option value="Good" ${resistance.rank === "Good" ? "selected" : ""}>Good</option>
+              <option value="Excellent" ${resistance.rank === "Excellent" ? "selected" : ""}>Excellent</option>
+              <option value="Remarkable" ${resistance.rank === "Remarkable" ? "selected" : ""}>Remarkable</option>
+              <option value="Incredible" ${resistance.rank === "Incredible" ? "selected" : ""}>Incredible</option>
+              <option value="Amazing" ${resistance.rank === "Amazing" ? "selected" : ""}>Amazing</option>
+              <option value="Monstrous" ${resistance.rank === "Monstrous" ? "selected" : ""}>Monstrous</option>
+              <option value="Unearthly" ${resistance.rank === "Unearthly" ? "selected" : ""}>Unearthly</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Value</label>
+            <input type="number" id="resistance-value" name="value" value="${resistance.value}">
+          </div>
+        </form>
+      `;
+      
+      new Dialog({
+        title: "Edit Resistance",
+        content: content,
+        buttons: {
+          save: {
+            icon: '<i class="fas fa-save"></i>',
+            label: "Save",
+            callback: (html) => {
+              const newType = html.find('#resistance-type').val();
+              const newRank = html.find('#resistance-rank').val();
+              const newValue = parseInt(html.find('#resistance-value').val()) || 0;
+              
+              // Create updated array
+              const resistances = duplicate(this.actor.system.resistances);
+              resistances[index] = {
+                type: newType,
+                rank: newRank,
+                value: newValue
+              };
+              
+              // Update the actor
+              this.actor.update({
+                "system.resistances": resistances
+              });
+            }
+          },
+          cancel: {
+            icon: '<i class="fas fa-times"></i>',
+            label: "Cancel"
+          }
+        },
+        default: "save",
+        width: 400
+      }).render(true);
     });
+
+    // Delete Resistance
+    html.find('.delete-resistance').click(async (ev) => {
+      ev.preventDefault();
+
+      // Use jQuery consistently to access data attributes
+      const index = Number($(ev.currentTarget).data("index"));
+      
+      let resistances = foundry.utils.deepClone(this.actor.system.resistances);
+      if (!Array.isArray(resistances)) {
+        console.error("Resistances is not an array.");
+        return;
+      }
+
+      if (index >= 0 && index < resistances.length) {
+        resistances.splice(index, 1);
+        await this.actor.update({ "system.resistances": resistances });
+      } else {
+        console.error("Invalid resistance index:", index);
+      }
+    });
+
     // Browse Powers Compendium button
     html.find('.browse-compendium[data-type="powers"]').click(ev => {
       const pack = game.packs.find(p => p.metadata.name === "powers" && p.metadata.system === "msh-faserip");
