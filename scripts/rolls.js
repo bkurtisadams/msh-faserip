@@ -475,6 +475,8 @@ export class FaseripRolls {
  * @param {Object} options - Optional configuration for the roll
  */
     static async rollEquipment(actor, equipment, options = {}) {
+      console.log("rollEquipment called", equipment); // Debug
+    
       if (!actor || !equipment) {
         ui.notifications.error("Actor or equipment not found");
         return;
@@ -482,6 +484,38 @@ export class FaseripRolls {
       
       // Get equipment information
       const category = equipment.system.category || "gear";
+      
+      // Check ammunition at the very beginning for weapons
+      if (category === "weapon" && equipment.system.shots) {
+        // Explicitly parse as integer and handle missing/undefined values
+        const currentShots = equipment.system.shotsRemaining !== undefined ? 
+                             parseInt(equipment.system.shotsRemaining) : 0;
+        
+        console.log("Weapon shots check:", equipment.name, currentShots); // Debug
+    
+        if (currentShots <= 0) {
+          // Weapon is out of ammo - show notification and chat message
+          ui.notifications.warn(`${equipment.name} is out of ammunition! Reload required.`);
+          
+          // Create a chat message about being out of ammo
+          await ChatMessage.create({
+            speaker: ChatMessage.getSpeaker({ actor }),
+            content: `
+              <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
+                <div style="padding: 5px 10px; font-size: 1.1em; color: #8b0000; text-align: center;">
+                  <strong>${equipment.name} is out of ammunition!</strong>
+                </div>
+                <div style="padding: 5px 10px; text-align: center;">
+                  <em>Manual reload required before firing again.</em>
+                </div>
+              </div>
+            `
+          });
+          
+          // Return early without rolling dice or performing the attack
+          return { outOfAmmo: true };
+        }
+      }
       
       // Handle different equipment categories
       if (category === "weapon") {
@@ -552,18 +586,6 @@ export class FaseripRolls {
           const resultColor = game.msh.rollUniversalTable(effectiveRank, totalRoll);
           const effect = action.results[resultColor.toLowerCase()];
           
-          // Record ammo use if applicable
-          if (equipment.system.shots && equipment.system.shotsRemaining !== undefined) {
-            const currentShots = parseInt(equipment.system.shotsRemaining) || 0;
-            if (currentShots > 0) {
-              // Reduce ammo by 1
-              await equipment.update({"system.shotsRemaining": currentShots - 1});
-            } else {
-              // Weapon is out of ammo - no auto reload
-              ui.notifications.warn(`${equipment.name} is out of ammunition! Reload required.`);
-            }
-          }
-          
           // Create chat message with matched styling
           await ChatMessage.create({
             speaker: ChatMessage.getSpeaker({ actor }),
@@ -588,6 +610,33 @@ export class FaseripRolls {
               </div>
             `
           });
+
+          // After the roll is complete and the chat message is created, update ammunition:
+          if (category === "weapon" && equipment.system.shots) {
+            const currentShots = equipment.system.shotsRemaining !== undefined ? 
+                                parseInt(equipment.system.shotsRemaining) : 0;
+            
+            if (currentShots > 0) {
+              // Decrement ammunition
+              const newShots = currentShots - 1;
+              console.log(`${equipment.name}: Reducing ammo from ${currentShots} to ${newShots}`);
+              
+              try {
+                // Method 1: Direct item update
+                await equipment.update({"system.shotsRemaining": newShots});
+                
+                // Method 2: Actor embedded document update (as a backup)
+                await actor.updateEmbeddedDocuments("Item", [{
+                  _id: equipment.id,
+                  "system.shotsRemaining": newShots
+                }]);
+                
+                console.log("Ammunition updated successfully");
+              } catch (error) {
+                console.error("Failed to update ammunition:", error);
+              }
+            }
+          }
           
           return { roll, resultColor, effect };
         }
