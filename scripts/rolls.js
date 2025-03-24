@@ -553,12 +553,14 @@ export class FaseripRolls {
           const effect = action.results[resultColor.toLowerCase()];
           
           // Record ammo use if applicable
-          if (equipment.system.shots && equipment.system.shotsRemaining) {
+          if (equipment.system.shots && equipment.system.shotsRemaining !== undefined) {
             const currentShots = parseInt(equipment.system.shotsRemaining) || 0;
             if (currentShots > 0) {
-              await equipment.update({"system.shotsRemaining": Math.max(0, currentShots - 1)});
+              // Reduce ammo by 1
+              await equipment.update({"system.shotsRemaining": currentShots - 1});
             } else {
-              ui.notifications.warn(`${equipment.name} is out of ammunition!`);
+              // Weapon is out of ammo - no auto reload
+              ui.notifications.warn(`${equipment.name} is out of ammunition! Reload required.`);
             }
           }
           

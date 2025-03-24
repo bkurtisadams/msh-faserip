@@ -39,8 +39,9 @@ export class FaseripItem extends Item {
           itemData.damageType = itemData.damageType || ""; // S, E, F, EA, BA, GP, GB, custom
           itemData.rate = itemData.rate || "1"; // Shots per round
           itemData.shots = itemData.shots || ""; // Shots before reload
-          // Initialize shotsRemaining to equal shots if not set
-          if (!itemData.shotsRemaining) {
+
+          // Initialize shotsRemaining to equal shots if not defined
+          if (itemData.shotsRemaining === undefined) {
             itemData.shotsRemaining = itemData.shots;
           }
           itemData.ammoType = itemData.ammoType || "Standard"; // Ammunition type
