@@ -93,31 +93,23 @@ export class FaseripItem extends Item {
     };
   }
 
-// In item.js, replace the rollItem method
-// item.js - Modified rollItem method
-async rollItem() {
-  const actor = this.actor;
-  if (!actor) return ui.notifications.error("No actor linked to item!");
-
-  // Check item type to determine appropriate roll method
+/**
+ * Roll this item
+ */
+rollItem() {
+  // Choose the right roll method based on item type
   switch (this.type) {
-    case "equipment":
-      // For equipment items, delegate to the equipment sheet's roll methods
-      const equipmentSheet = this.sheet;
-      if (equipmentSheet instanceof FaseripEquipmentSheet) {
-        return equipmentSheet.rollEquipment();
-      }
-      break;
-      
     case "power":
-      // Original power rolling logic
-      this._rollPower();
-      break;
-      
-    // Add cases for other item types as needed (talents, contacts, etc.)
-    
+      return game.msh.rollPower(this.actor, this);
+    case "talent":
+      return game.msh.rollTalent(this.actor, this);
+    case "contact":
+      return game.msh.rollContact(this.actor, this);
+    case "equipment":
+      return game.msh.rollEquipment(this.actor, this);
     default:
-      ui.notifications.warn(`Rolling not implemented for item type: ${this.type}`);
+      ui.notifications.warn(`Cannot roll item of type: ${this.type}`);
+      return null;
   }
 }
 
