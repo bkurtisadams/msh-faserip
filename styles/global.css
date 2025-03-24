@@ -887,6 +887,65 @@
   font-weight: bold;
 }
 
+/* Add to global.css */
+.faserip-sheet .resources-button {
+  background-color: #4CAF50;  /* A medium green color */
+  border: 1px solid #2E7D32;  /* Darker green border */
+  color: black;
+  font-weight: bold;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 3px;
+  margin: 2px 0;
+  font-size: 0.85em;
+  text-align: center;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+.faserip-sheet .resources-button:hover {
+  background-color: #66BB6A;  /* Lighter green on hover */
+  box-shadow: 0 1px 5px rgba(0,0,0,0.3);
+}
+
+.faserip-sheet .resources-button:active {
+  background-color: #388E3C;  /* Darker green when clicked */
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.3);
+}
+
+/* Resource dialog styling */
+.resources-dialog .dialog-content {
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+.resources-dialog .dialog-content h2 {
+  color: #8b0000;
+  border-bottom: 1px solid #ccc;
+  padding-bottom: 5px;
+}
+
+.resources-dialog .dialog-content p {
+  margin-bottom: 1em;
+}
+
+.resources-dialog .dialog-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 10px 0;
+}
+
+.resources-dialog .dialog-content th,
+.resources-dialog .dialog-content td {
+  border: 1px solid #ccc;
+  padding: 5px;
+  text-align: left;
+}
+
+.resources-dialog .dialog-content th {
+  background-color: #8b0000;
+  color: white;
+}
+
 /* Movement Section */
 .faserip-sheet .movement-section {
   display: grid;
