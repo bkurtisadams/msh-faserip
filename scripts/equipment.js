@@ -123,213 +123,207 @@ export class FaseripEquipmentSheet extends ItemSheet {
   }
   
   // Roll a standard weapon attack
-  async _rollWeapon(item, actor) {
-    // Determine which ability to use based on weapon type
-    let ability = "strength";
-    if (item.system.weaponType === "shooting" || item.system.weaponType === "energy") {
-      ability = "agility";
-    } else if (item.system.weaponType === "thrown") {
-      ability = "agility";
-    }
-    
-    // Get ability rank and damage type
-    const abilityRank = actor.system.abilities[ability].rank || "Typical";
-    const abilityValue = actor.system.abilities[ability].value || 6;
-    const damageType = item.system.damageType || "S";
-    const damage = item.system.damage || "0";
-    
-    // Get range penalties if applicable
-    let rangeNote = "";
-    if (item.system.weaponType === "shooting" && item.system.range > 1) {
-      rangeNote = `<div><em>Note: Shooting weapons get -1CS per area beyond the first.</em></div>`;
-    }
-    
-    // Create dialog for roll options
-    let dialogContent = `
+  // Method to handle equipment rolls
+async rollEquipment() {
+  const item = this.object;
+  const actor = item.actor;
+  
+  if (!actor) return ui.notifications.error("No actor linked to item!");
+  
+  // Get equipment details
+  const category = item.system.category || "gear";
+  
+  switch(category) {
+    case "weapon":
+      return this._rollWeapon(item, actor);
+      
+    case "power-item":
+      return this._rollPowerItem(item, actor);
+      
+    case "custom":
+      return this._rollCustomAbility(item, actor);
+      
+    default:
+      return ui.notifications.warn("This equipment type cannot be rolled!");
+  }
+}
+
+// Roll a weapon attack
+async _rollWeapon(item, actor) {
+  // Get weapon details
+  const weaponType = item.system.weaponType || "";
+  let ability = "strength";
+  
+  // Determine which ability to use based on weapon type
+  if (weaponType === "shooting" || weaponType === "energy") {
+    ability = "agility";
+  } else if (weaponType === "thrown") {
+    ability = "agility";
+  }
+  
+  // Get ability rank and damage type
+  const abilityRank = actor.system.abilities[ability].rank || "Typical";
+  const abilityValue = actor.system.abilities[ability].value || 6;
+  const damageType = item.system.damageType || "S";
+  const damage = item.system.damage || "0";
+  
+  // Create dialog options
+  // Define action types from the Universal Table
+  const ACTIONS = {
+    "Blunt Attack (BA)": { ability: "fighting", results: { white: "Miss", green: "Hit", yellow: "Slam", red: "Stun" }},
+    "Edged Attack (EA)": { ability: "fighting", results: { white: "Miss", green: "Hit", yellow: "Stun", red: "Kill" }},
+    "Shooting Attack (Sh)": { ability: "agility", results: { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Kill" }},
+    "Throwing Edged (TE)": { ability: "agility", results: { white: "Miss", green: "Hit", yellow: "Stun", red: "Kill" }},
+    "Throwing Blunt (TB)": { ability: "agility", results: { white: "Miss", green: "Hit", yellow: "Hit", red: "Stun" }},
+    "Energy (En)": { ability: "agility", results: { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Kill" }},
+    "Force (Fo)": { ability: "agility", results: { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Stun" }},
+    "Grappling (Gp)": { ability: "strength", results: { white: "Miss", green: "Miss", yellow: "Partial", red: "Hold" }},
+    "Grabbing (Gb)": { ability: "strength", results: { white: "Miss", green: "Take", yellow: "Grab", red: "Break" }},
+    "Escaping (Es)": { ability: "strength", results: { white: "Miss", green: "Miss", yellow: "Escape", red: "Reverse" }}
+  };
+  
+  // Determine default action based on weapon type
+  let defaultAction = "Shooting Attack (Sh)";
+  if (weaponType === "melee" && damageType === "BA") {
+    defaultAction = "Blunt Attack (BA)";
+  } else if (weaponType === "melee" && damageType === "EA") {
+    defaultAction = "Edged Attack (EA)";
+  } else if (weaponType === "thrown") {
+    defaultAction = "Throwing (Th)";
+  }
+  
+  let dialogContent = `
+  <div style="background: #f0e8d8; padding: 10px; border-radius: 5px;">
     <div style="margin-bottom: 10px;">
       <label style="display: inline-block; width: 120px;">Weapon:</label>
       <input type="text" value="${item.name}" readonly style="width: 180px;">
     </div>
     <div style="margin-bottom: 10px;">
-      <label style="display: inline-block; width: 120px;">Ability:</label>
-      <input type="text" value="${ability.charAt(0).toUpperCase() + ability.slice(1)} (${abilityRank})" readonly style="width: 180px;">
-    </div>
-    <div style="margin-bottom: 10px;">
-      <label style="display: inline-block; width: 120px;">Damage:</label>
-      <input type="text" value="${damage}" readonly style="width: 50px;">
-      <span style="margin-left: 5px;">(${damageType})</span>
+      <label style="display: inline-block; width: 120px;">Action Type:</label>
+      <select id="action" name="action" style="width: 180px;">
+        ${Object.keys(ACTIONS).map(action => 
+          `<option value="${action}" ${action === defaultAction ? 'selected' : ''}>${action}</option>`
+        ).join('')}
+      </select>
     </div>
     <div style="margin-bottom: 10px;">
       <label style="display: inline-block; width: 120px;">Target Distance:</label>
       <input type="number" id="distance" name="distance" value="1" min="1" style="width: 50px;"> areas
     </div>
     <div style="margin-bottom: 10px;">
-      <label style="display: inline-block; width: 120px;">Extra Column Shift:</label>
+      <label style="display: inline-block; width: 120px;">Column Shift:</label>
       <input type="number" id="shift" name="shift" value="0" style="width: 50px;">
       <span style="color: #666; font-size: 0.9em;">(+ right, - left)</span>
     </div>
-    <div style="margin-bottom: 10px;">
+    <div>
       <label style="display: inline-block; width: 120px;">Karma Points:</label>
       <input type="number" id="karma" name="karma" value="0" min="0" style="width: 50px;">
     </div>
-    ${rangeNote}`;
+  </div>`;
 
-    return new Dialog({
-      title: `Weapon Attack: ${item.name}`,
-      content: dialogContent,
-      buttons: {
-        roll: {
-          label: "Roll",
-          callback: async (html) => {
-            const distance = parseInt(html.find('[name="distance"]').val()) || 1;
-            const columnShift = parseInt(html.find('[name="shift"]').val()) || 0;
-            const karma = parseInt(html.find('[name="karma"]').val()) || 0;
-            
-            // Calculate range penalty for shooting weapons
-            let rangeShift = 0;
-            if (item.system.weaponType === "shooting" && distance > 1) {
-              rangeShift = -(distance - 1);
-            }
-            
-            // Apply total column shifts to get effective rank
-            const totalShift = columnShift + rangeShift;
-            let effectiveRank = abilityRank;
-            
-            if (totalShift !== 0) {
-              const ranks = [
-                "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent",
-                "Remarkable", "Incredible", "Amazing", "Monstrous", "Unearthly"
-              ];
-              
-              const index = ranks.indexOf(abilityRank);
-              if (index !== -1) {
-                const newIndex = Math.min(Math.max(index + totalShift, 0), ranks.length - 1);
-                effectiveRank = ranks[newIndex];
-              }
-            }
-            
-            // Roll dice and add karma
-            const roll = await new Roll("1d100").evaluate({async: true});
-            const finalRoll = Math.min(100, roll.total + karma);
-            
-            // Get result color
-            const colorResult = game.msh.rollUniversalTable(effectiveRank, finalRoll);
-            
-            // Define results based on attack type
-            const attackResults = {
-              "S": { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Kill" },
-              "E": { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Kill" },
-              "F": { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Stun" },
-              "EA": { white: "Miss", green: "Hit", yellow: "Stun", red: "Kill" },
-              "BA": { white: "Miss", green: "Hit", yellow: "Slam", red: "Stun" }
-            };
-            
-            let resultText = colorResult.toUpperCase();
-            if (attackResults[damageType] && attackResults[damageType][colorResult.toLowerCase()]) {
-              resultText = attackResults[damageType][colorResult.toLowerCase()];
-            }
-            
-            // Handle special ammo types
-            let ammoNote = "";
-            if (item.system.ammoType) {
-              switch(item.system.ammoType) {
-                case "Mercy":
-                  ammoNote = `<div><em>Mercy Shot: Target must make Endurance FEAT vs Remarkable or be knocked out.</em></div>`;
-                  break;
-                case "AP":
-                  ammoNote = `<div><em>Armor Piercing: Target's Body Armor reduced by 2CS.</em></div>`;
-                  break;
-                case "Rubber":
-                  ammoNote = `<div><em>Rubber Shot: Inflicts Slugfest damage instead of Shooting damage.</em></div>`;
-                  break;
-                case "Explosive":
-                  ammoNote = `<div><em>Explosive Shot: Inflicts double damage.</em></div>`;
-                  break;
-                case "Heat-Seeker":
-                  ammoNote = `<div><em>Heat-Seeking: No penalty for range, tracks hottest target.</em></div>`;
-                  break;
-              }
-            }
-            
-            // Create chat message
-            await ChatMessage.create({
-              speaker: ChatMessage.getSpeaker({ actor: actor }),
-              roll: roll,
-              content: `
-                <div class="faserip-weapon-roll">
-                  <h3>${actor.name} attacks with ${item.name}</h3>
-                  <div class="roll-info">
-                    <div><strong>Ability:</strong> ${ability.charAt(0).toUpperCase() + ability.slice(1)} (${abilityRank})</div>
-                    <div><strong>Distance:</strong> ${distance} area${distance > 1 ? 's' : ''}</div>
-                    <div><strong>Column Shift:</strong> ${totalShift !== 0 ? 
-                      `${totalShift > 0 ? '+' : ''}${totalShift}CS → ${effectiveRank}` : 
-                      "None"}</div>
-                    <div><strong>Roll:</strong> ${roll.total} + Karma: ${karma} = ${finalRoll}</div>
-                    <div><strong>Damage:</strong> ${damage} (${damageType})</div>
-                    ${item.system.ammoType ? `<div><strong>Ammo Type:</strong> ${item.system.ammoType}</div>` : ''}
-                    ${item.system.rate ? `<div><strong>Rate of Fire:</strong> ${item.system.rate}</div>` : ''}
-                    ${item.system.shots ? `<div><strong>Shots:</strong> ${item.system.shots}</div>` : ''}
-                  </div>
-                  <div class="result result-${colorResult.toLowerCase()}">
-                    ${resultText} (${colorResult.toUpperCase()})
-                  </div>
-                  ${ammoNote}
-                </div>
-                <style>
-                  .faserip-weapon-roll {
-                    font-family: Arial, sans-serif;
-                    background: #f9f8f4;
-                    border: 1px solid #ccc;
-                    border-radius: 3px;
-                    padding: 8px;
-                  }
-                  .faserip-weapon-roll h3 {
-                    margin: 0 0 8px 0;
-                    border-bottom: 1px solid #ccc;
-                    padding-bottom: 4px;
-                    font-size: 1.1em;
-                  }
-                  .roll-info {
-                    margin-bottom: 8px;
-                    font-size: 0.95em;
-                  }
-                  .roll-info div {
-                    margin-bottom: 3px;
-                  }
-                  .result {
-                    text-align: center;
-                    padding: 6px;
-                    border-radius: 3px;
-                    font-weight: bold;
-                    font-size: 1.1em;
-                  }
-                  .result-white {
-                    background-color: #f0f0f0;
-                    color: #333;
-                    border: 1px solid #ccc;
-                  }
-                  .result-green {
-                    background-color: #4CAF50;
-                    color: white;
-                  }
-                  .result-yellow {
-                    background-color: #FFC107;
-                    color: #333;
-                  }
-                  .result-red {
-                    background-color: #F44336;
-                    color: white;
-                  }
-                </style>
-              `
-            });
+  new Dialog({
+    title: `Weapon Attack: ${item.name}`,
+    content: dialogContent,
+    buttons: {
+      roll: {
+        label: "Roll",
+        callback: async (html) => {
+          const actionName = html.find('[name="action"]').val();
+          const action = ACTIONS[actionName];
+          const distance = parseInt(html.find('[name="distance"]').val()) || 1;
+          const shift = parseInt(html.find('[name="shift"]').val()) || 0;
+          const karma = parseInt(html.find('[name="karma"]').val()) || 0;
+          
+          // Calculate range penalty for shooting weapons
+          let totalShift = shift;
+          if (weaponType === "shooting" && distance > 1) {
+            totalShift -= (distance - 1);
           }
-        },
-        cancel: { label: "Cancel" }
+          
+          // Apply column shifts if needed
+          let effectiveRank = abilityRank;
+          if (totalShift !== 0) {
+            const ranks = [
+              "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent", 
+              "Remarkable", "Incredible", "Amazing", "Monstrous", "Unearthly"
+            ];
+            const index = ranks.indexOf(abilityRank);
+            if (index !== -1) {
+              const newIndex = Math.min(Math.max(index + totalShift, 0), ranks.length - 1);
+              effectiveRank = ranks[newIndex];
+            }
+          }
+          
+          try {
+
+            // Create the roll
+            const roll = new Roll("1d100");
+            await roll.evaluate();
+
+            // Display the dice roll with flavor text
+            await roll.toMessage({
+              speaker: ChatMessage.getSpeaker({ actor }),
+              flavor: `${actor.name} attacks with ${item.name} (${actionName})`,
+              rollMode: game.settings.get("core", "rollMode")
+            });
+
+            // Calculate final roll with karma
+            const finalRoll = Math.min(100, roll.total + karma);
+
+            // Get result color from universal table
+            const colorResult = game.msh.rollUniversalTable(effectiveRank, finalRoll);
+
+            // Get the specific result based on action type and color
+            // This maps directly to the universal table results
+            const effect = action.results[colorResult.toLowerCase()];
+            
+            // Create chat message matching the power roll format exactly
+            // After getting the colorResult and before creating the chat message, add this code:
+
+            // Create the formatted chat message with proper colors
+            await ChatMessage.create({
+              speaker: ChatMessage.getSpeaker({ actor }),
+              content: `
+                <h3 style="color: #8B0000; margin-top: 0;">${actor.name} - ${item.name} (${actionName})</h3>
+                <div style="margin-bottom: 10px;">
+                  <div>Base Rank: ${abilityRank} (${abilityValue})</div>
+                  <div>Column Shift: ${totalShift !== 0 ? `${totalShift} → ${effectiveRank}` : "None"}</div>
+                  <div>Roll: ${roll.total} + Karma: ${karma} = ${finalRoll}</div>
+                  <div>Damage: ${damage} (${damageType})</div>
+                  ${item.system.ammoType ? `<div>Ammo Type: ${item.system.ammoType}</div>` : ''}
+                </div>
+                <div style="
+                  background-color: ${
+                    colorResult.toLowerCase() === 'white' ? '#FFFFFF' : 
+                    colorResult.toLowerCase() === 'green' ? '#4CAF50' : 
+                    colorResult.toLowerCase() === 'yellow' ? '#FFC107' : 
+                    colorResult.toLowerCase() === 'red' ? '#F44336' : '#FFFFFF'
+                  }; 
+                  color: ${
+                    colorResult.toLowerCase() === 'white' ? '#000000' : 
+                    colorResult.toLowerCase() === 'yellow' ? '#000000' : '#FFFFFF'
+                  };
+                  padding: 10px;
+                  text-align: center;
+                  font-weight: bold;
+                  border-radius: 5px;
+                  border: ${colorResult.toLowerCase() === 'white' ? '1px solid #CCCCCC' : 'none'};
+                ">
+                  ${effect} (${colorResult.toUpperCase()})
+                </div>
+              `
+            });;
+          } catch (error) {
+            console.error("Error rolling dice:", error);
+            ui.notifications.error("Error when rolling dice. See console for details.");
+          }
+        }
       },
-      default: "roll"
-    }).render(true);
-  }
+      cancel: { label: "Cancel" }
+    },
+    default: "roll"
+  }).render(true);
+}
   
   // Roll a power-based item
   async _rollPowerItem(item, actor) {
