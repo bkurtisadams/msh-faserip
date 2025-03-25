@@ -955,6 +955,68 @@
   color: white;
 }
 
+/* Popularity Section */
+/* Popularity header button styling */
+.faserip-sheet .attributes-table th .popularity-header-button {
+  background: none;
+  border: none;
+  color: #00BFFF; /* Sky blue color to stand out */
+  font-weight: bold;
+  cursor: pointer;
+  padding: 0;
+  width: 100%;
+  font-size: inherit;
+  text-align: center;
+  margin: 0;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: normal;
+}
+
+.faserip-sheet .attributes-table th .popularity-header-button:hover {
+  color: #FF69B4; /* Hot pink on hover */
+  text-shadow: 0 0 3px rgba(255, 255, 255, 0.5);
+}
+
+/* Popularity dialog styling - add to existing dialog styles */
+.popularity-dialog .dialog-content {
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+.popularity-dialog .dialog-content h2 {
+  color: #8b0000;
+  border-bottom: 1px solid #ccc;
+  padding-bottom: 5px;
+}
+
+.popularity-dialog .dialog-content table.pop-awards {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 10px 0;
+}
+
+.popularity-dialog .dialog-content .pop-awards th,
+.popularity-dialog .dialog-content .pop-awards td {
+  border: 1px solid #ccc;
+  padding: 5px;
+  text-align: left;
+}
+
+.popularity-dialog .dialog-content .pop-awards th {
+  background-color: #8b0000;
+  color: white;
+}
+
+.popularity-dialog .note-box {
+  background-color: #f8f8f8;
+  border-left: 3px solid #8b0000;
+  padding: 10px;
+  margin: 10px 0;
+}
+
 /* Movement Section */
 .faserip-sheet .movement-section {
   display: grid;
