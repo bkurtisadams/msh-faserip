@@ -1750,6 +1750,154 @@ export class FaseripActorSheet extends ActorSheet {
       }).render(true);
     });
 
+    // In actorSheet.js, add to the activateListeners function
+    // Add this after the other listeners but before the end of the function
+
+    // Ability FEAT roll buttons
+    html.find('.ability-key').click(ev => {
+      const abilityKey = ev.currentTarget.textContent.trim().toLowerCase();
+      let abilityName, abilityFullName;
+      
+      // Map the key to the actual ability name
+      switch(abilityKey) {
+        case 'f': abilityName = 'fighting'; abilityFullName = 'Fighting'; break;
+        case 'a': abilityName = 'agility'; abilityFullName = 'Agility'; break;
+        case 's': abilityName = 'strength'; abilityFullName = 'Strength'; break;
+        case 'e': abilityName = 'endurance'; abilityFullName = 'Endurance'; break;
+        case 'r': abilityName = 'reason'; abilityFullName = 'Reason'; break;
+        case 'i': abilityName = 'intuition'; abilityFullName = 'Intuition'; break;
+        case 'p': abilityName = 'psyche'; abilityFullName = 'Psyche'; break;
+        default: return; // Invalid ability key
+      }
+      
+      // Get ability information
+      const ability = this.actor.system.abilities[abilityName];
+      if (!ability) return;
+      
+      const abilityRank = ability.rank;
+      const abilityValue = ability.value;
+      
+      // Get saved settings if they exist
+      const savedColumnShift = this.actor.getFlag("msh-faserip", `last${abilityFullName}ColumnShift`) || 0;
+      const skipDiceRoll = this.actor.getFlag("msh-faserip", `last${abilityFullName}SkipDiceRoll`) || false;
+      
+      // Create dialog for roll options
+      let dialogContent = `
+        <div style="margin-bottom: 10px;">
+          <label style="display: inline-block; width: 120px;">Ability Rank:</label>
+          <input type="text" id="ability-rank" name="abilityRank" value="${abilityRank}" style="width: 100px;" readonly>
+          <span style="margin-left: 5px;">(${abilityValue})</span>
+        </div>
+        <div style="margin-bottom: 10px;">
+          <label style="display: inline-block; width: 120px;">Column Shift:</label>
+          <input type="number" id="shift" name="shift" value="${savedColumnShift}" style="width: 50px;">
+          <span style="color: #666; font-size: 0.9em;">(+ right, - left)</span>
+        </div>
+        <div style="margin-bottom: 10px;">
+          <label style="display: inline-block; width: 120px;">Karma Points:</label>
+          <input type="number" id="karma" name="karma" value="0" min="0" style="width: 50px;">
+        </div>
+        <div style="margin-bottom: 10px;">
+          <label>
+            <input type="checkbox" id="save-settings" name="saveSettings" checked> 
+            Remember column shift for future rolls
+          </label>
+        </div>
+        <div>
+          <label>
+            <input type="checkbox" id="skip-dice" name="skipDice" ${skipDiceRoll ? 'checked' : ''}> 
+            Skip dice animation
+          </label>
+        </div>`;
+      
+      new Dialog({
+        title: `${abilityFullName} FEAT Roll: ${this.actor.name}`,
+        content: dialogContent,
+        buttons: {
+          roll: {
+            label: "Roll",
+            callback: async (html) => {
+              const columnShift = parseInt(html.find('[name="shift"]').val()) || 0;
+              const karma = parseInt(html.find('[name="karma"]').val()) || 0;
+              const saveSettings = html.find('[name="saveSettings"]').is(':checked');
+              const skipDice = html.find('[name="skipDice"]').is(':checked');
+              
+              // Save settings if requested
+              if (saveSettings) {
+                await this.actor.setFlag("msh-faserip", `last${abilityFullName}ColumnShift`, columnShift);
+                await this.actor.setFlag("msh-faserip", `last${abilityFullName}SkipDiceRoll`, skipDice);
+              }
+              
+              // Apply column shifts to get effective rank
+              let effectiveRank = abilityRank;
+              if (columnShift !== 0) {
+                const ranks = [
+                  "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent",
+                  "Remarkable", "Incredible", "Amazing", "Monstrous", "Unearthly",
+                  "Shift-X", "Shift-Y", "Shift-Z", "Class 1000", "Class 3000", "Class 5000", "Beyond"
+                ];
+                const index = ranks.indexOf(abilityRank);
+                if (index !== -1) {
+                  const newIndex = Math.min(Math.max(index + columnShift, 0), ranks.length - 1);
+                  effectiveRank = ranks[newIndex];
+                  console.log(`Applied ${columnShift} column shifts to ${abilityRank}, now ${effectiveRank}`);
+                }
+              }
+              
+              // Create the roll
+              const roll = new Roll("1d100");
+              
+              // Evaluate the roll
+              await roll.evaluate();
+              
+              // Display the dice roll with flavor text if not skipped
+              if (!skipDice) {
+                await roll.toMessage({
+                  speaker: ChatMessage.getSpeaker({ actor: this.actor }),
+                  flavor: `${this.actor.name} makes a ${abilityFullName} FEAT roll`,
+                  rollMode: game.settings.get("core", "rollMode")
+                });
+              }
+              
+              // Calculate the result
+              const totalRoll = roll.total + karma;
+              const resultColor = game.msh.rollUniversalTable(effectiveRank, totalRoll);
+              
+              // Create chat message styled to match your existing output format
+              let content = `
+                <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
+                  <div style="padding: 5px 10px; border-bottom: 1px solid #c0c0c0; font-size: 1.1em; color: #8b0000;">
+                    <strong>${this.actor.name} - ${abilityFullName} FEAT Roll</strong>
+                  </div>
+                  <div style="padding: 5px 10px; font-size: 0.9em;">
+                    <div>Base Rank: ${abilityRank} (${abilityValue})</div>
+                    ${columnShift !== 0 ? `<div>Column Shift: ${columnShift} → ${effectiveRank}</div>` : ''}
+                    <div>Roll: ${roll.total} + Karma: ${karma} = ${totalRoll}</div>
+                  </div>
+                  <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
+                    background-color: ${resultColor.toLowerCase() === 'white' ? '#f8f8f8' :
+                      resultColor.toLowerCase() === 'green' ? '#4CAF50' :
+                        resultColor.toLowerCase() === 'yellow' ? '#FFD700' :
+                          '#F44336'}; 
+                    color: ${resultColor.toLowerCase() === 'white' || resultColor.toLowerCase() === 'yellow' ? '#333' : 'white'};">
+                    ${resultColor.toUpperCase()} RESULT
+                  </div>
+                </div>
+              `;
+              
+              // Send to chat
+              await ChatMessage.create({
+                speaker: ChatMessage.getSpeaker({ actor: this.actor }),
+                content: content
+              });
+            }
+          },
+          cancel: { label: "Cancel" }
+        },
+        default: "roll"
+      }).render(true);
+    });
+    
     // Continue with other listeners...
   }
 

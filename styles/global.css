@@ -1973,3 +1973,26 @@
 .reload-weapon:hover {
   color: #ff0000;
 }
+
+/* Ability FEAT rolls */
+.ability-key {
+  cursor: pointer;
+  font-weight: bold;
+  text-align: center;
+  transition: background-color 0.2s;
+  user-select: none;
+}
+
+.ability-key {
+  cursor: pointer;
+  font-weight: bold;
+  text-align: center;
+  transition: all 0.3s ease;
+  user-select: none;
+}
+
+.ability-key:hover {
+  color: #ff0000;
+  text-shadow: 0 0 5px rgba(255, 0, 0, 0.7);
+  transform: scale(1.1);
+}
