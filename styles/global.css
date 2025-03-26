@@ -1757,10 +1757,11 @@
   width: 100%;
 }
 
+/* Modified: Changed grid layout to maintain flexbox behavior for alignment */
 .faserip-sheet .hero-info-row.three-columns {
-  display: grid;
-  grid-template-columns: 1fr 1fr 2fr;
+  display: flex;
   gap: 10px;
+  align-items: flex-end; /* Align items to the bottom */
 }
 
 .faserip-sheet .hero-name-container,
@@ -1771,10 +1772,20 @@
   margin-bottom: 0;
 }
 
+/* Modified: Match flex property for the three columns */
 .faserip-sheet .age-container,
-.faserip-sheet .origin-container,
-.faserip-sheet .biography-container {
+.faserip-sheet .origin-container {
+  flex: 1;
   margin-bottom: 0;
+}
+
+/* Modified: Adjust the biography container */
+.faserip-sheet .biography-container {
+  flex: 2; /* Keep the 2fr ratio from your grid */
+  margin-bottom: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end; /* Align to bottom */
 }
 
 .faserip-sheet .hero-name-container label,
@@ -1824,10 +1835,18 @@
   border: 1px solid #ccc;
 }
 
+/* Modified: Base container alignment fix */
+.faserip-sheet .base-container {
+  padding-top: 18px; /* Create space to push the base field down */
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
 /* Biography Toggle Button */
 .faserip-sheet .biography-toggle {
   width: 100%;
-  padding: 6px 10px;
+  padding: 4px 10px; /* Reduced padding to match input height */
   text-align: left;
   font-weight: bold;
   background-color: #f0f0f0;
@@ -1835,6 +1854,7 @@
   border-radius: 0;
   cursor: pointer;
   color: #333;
+  height: 28px; /* Match height of input boxes */
 }
 
 .faserip-sheet .biography-toggle:hover {
@@ -1843,6 +1863,21 @@
 
 .faserip-sheet .biography-toggle.active {
   background-color: #d0d0d0;
+}
+
+/* New code for ability-key clickable styling */
+.faserip-sheet .ability-key {
+  cursor: pointer;
+  font-weight: bold;
+  text-align: center;
+  transition: all 0.3s ease;
+  user-select: none;
+}
+
+.faserip-sheet .ability-key:hover {
+  color: #ff0000;
+  text-shadow: 0 0 5px rgba(255, 0, 0, 0.7);
+  transform: scale(1.1);
 }
 
 /* Biography Details Section */
