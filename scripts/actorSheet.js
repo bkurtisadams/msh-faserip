@@ -37,6 +37,13 @@ export class FaseripActorSheet extends ActorSheet {
     // equipment
     context.equipment = this.actor.items.filter(item => item.type === "equipment") || [];
 
+    // Add ranks array for dropdowns
+    context.allRanks = [
+      "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent",
+      "Remarkable", "Incredible", "Amazing", "Monstrous", "Unearthly",
+      "Shift-X", "Shift-Y", "Shift-Z", "Class 1000", "Class 3000", "Class 5000", "Beyond"
+    ];
+
     return context;
   }
 
