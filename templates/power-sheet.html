@@ -1,132 +1,233 @@
 <form class="{{cssClass}} power-sheet" autocomplete="off">
-    <header class="sheet-header">
-      <img class="profile-img" src="{{item.img}}" data-edit="img" title="{{item.name}}" />
-      <h1><input name="name" type="text" value="{{item.name}}" placeholder="Power Name"/></h1>
-    </header>
-  
-    <section class="sheet-body">
-      <div class="form-group">
-        <label>Rank:</label>
-        <select name="system.rank">
-          <option value="Shift-0" {{#if (eq system.rank "Shift-0")}}selected{{/if}}>Shift-0</option>
-          <option value="Feeble" {{#if (eq system.rank "Feeble")}}selected{{/if}}>Feeble</option>
-          <option value="Poor" {{#if (eq system.rank "Poor")}}selected{{/if}}>Poor</option>
-          <option value="Typical" {{#if (eq system.rank "Typical")}}selected{{/if}}>Typical</option>
-          <option value="Good" {{#if (eq system.rank "Good")}}selected{{/if}}>Good</option>
-          <option value="Excellent" {{#if (eq system.rank "Excellent")}}selected{{/if}}>Excellent</option>
-          <option value="Remarkable" {{#if (eq system.rank "Remarkable")}}selected{{/if}}>Remarkable</option>
-          <option value="Incredible" {{#if (eq system.rank "Incredible")}}selected{{/if}}>Incredible</option>
-          <option value="Amazing" {{#if (eq system.rank "Amazing")}}selected{{/if}}>Amazing</option>
-          <option value="Monstrous" {{#if (eq system.rank "Monstrous")}}selected{{/if}}>Monstrous</option>
-          <option value="Unearthly" {{#if (eq system.rank "Unearthly")}}selected{{/if}}>Unearthly</option>
-          <option value="Shift-X" {{#if (eq system.rank "Shift-X")}}selected{{/if}}>Shift-X</option>
-          <option value="Shift-Y" {{#if (eq system.rank "Shift-Y")}}selected{{/if}}>Shift-Y</option>
-          <option value="Shift-Z" {{#if (eq system.rank "Shift-Z")}}selected{{/if}}>Shift-Z</option>
-          <option value="Class 1000" {{#if (eq system.rank "Class 1000")}}selected{{/if}}>Class 1000</option>
-          <option value="Class 3000" {{#if (eq system.rank "Class 3000")}}selected{{/if}}>Class 3000</option>
-          <option value="Class 5000" {{#if (eq system.rank "Class 5000")}}selected{{/if}}>Class 5000</option>
-          <option value="Beyond" {{#if (eq system.rank "Beyond")}}selected{{/if}}>Beyond</option>
+  <header class="sheet-header">
+    <img class="profile-img" src="{{item.img}}" data-edit="img" title="{{item.name}}" />
+    <h1><input name="name" type="text" value="{{item.name}}" placeholder="Power Name"/></h1>
+  </header>
+
+  <section class="sheet-body">
+    <div class="form-group">
+      <label>Rank:</label>
+      <select name="system.rank">
+        <option value="Shift-0" {{#if (eq system.rank "Shift-0")}}selected{{/if}}>Shift-0</option>
+        <option value="Feeble" {{#if (eq system.rank "Feeble")}}selected{{/if}}>Feeble</option>
+        <option value="Poor" {{#if (eq system.rank "Poor")}}selected{{/if}}>Poor</option>
+        <option value="Typical" {{#if (eq system.rank "Typical")}}selected{{/if}}>Typical</option>
+        <option value="Good" {{#if (eq system.rank "Good")}}selected{{/if}}>Good</option>
+        <option value="Excellent" {{#if (eq system.rank "Excellent")}}selected{{/if}}>Excellent</option>
+        <option value="Remarkable" {{#if (eq system.rank "Remarkable")}}selected{{/if}}>Remarkable</option>
+        <option value="Incredible" {{#if (eq system.rank "Incredible")}}selected{{/if}}>Incredible</option>
+        <option value="Amazing" {{#if (eq system.rank "Amazing")}}selected{{/if}}>Amazing</option>
+        <option value="Monstrous" {{#if (eq system.rank "Monstrous")}}selected{{/if}}>Monstrous</option>
+        <option value="Unearthly" {{#if (eq system.rank "Unearthly")}}selected{{/if}}>Unearthly</option>
+        <option value="Shift-X" {{#if (eq system.rank "Shift-X")}}selected{{/if}}>Shift-X</option>
+        <option value="Shift-Y" {{#if (eq system.rank "Shift-Y")}}selected{{/if}}>Shift-Y</option>
+        <option value="Shift-Z" {{#if (eq system.rank "Shift-Z")}}selected{{/if}}>Shift-Z</option>
+        <option value="Class 1000" {{#if (eq system.rank "Class 1000")}}selected{{/if}}>Class 1000</option>
+        <option value="Class 3000" {{#if (eq system.rank "Class 3000")}}selected{{/if}}>Class 3000</option>
+        <option value="Class 5000" {{#if (eq system.rank "Class 5000")}}selected{{/if}}>Class 5000</option>
+        <option value="Beyond" {{#if (eq system.rank "Beyond")}}selected{{/if}}>Beyond</option>
+      </select>
+      <input type="number" name="system.value" value="{{system.value}}" />
+    </div>
+
+    <div class="form-row">
+      <div class="form-group half">
+        <label>Category:</label>
+        <select name="system.category" id="power-category">
+          <option value="" {{#if (eq system.category "")}}selected{{/if}}>-- Select Category --</option>
+          <option value="resistances" {{#if (eq system.category "resistances")}}selected{{/if}}>Resistances</option>
+          <option value="senses" {{#if (eq system.category "senses")}}selected{{/if}}>Senses</option>
+          <option value="movement" {{#if (eq system.category "movement")}}selected{{/if}}>Movement</option>
+          <option value="matterControl" {{#if (eq system.category "matterControl")}}selected{{/if}}>Matter Control</option>
+          <option value="energyControl" {{#if (eq system.category "energyControl")}}selected{{/if}}>Energy Control</option>
+          <option value="bodyControl" {{#if (eq system.category "bodyControl")}}selected{{/if}}>Body Control</option>
+          <option value="distanceAttacks" {{#if (eq system.category "distanceAttacks")}}selected{{/if}}>Distance Attacks</option>
+          <option value="mentalPowers" {{#if (eq system.category "mentalPowers")}}selected{{/if}}>Mental Powers</option>
+          <option value="bodyAlterationsOffensive" {{#if (eq system.category "bodyAlterationsOffensive")}}selected{{/if}}>Body Alterations/Offensive</option>
+          <option value="bodyAlterationsDefensive" {{#if (eq system.category "bodyAlterationsDefensive")}}selected{{/if}}>Body Alterations/Defensive</option>
         </select>
-        <input type="number" name="system.value" value="{{system.value}}" />
-      </div>
-  
-      <div class="form-row">
-        <div class="form-group half">
-          <label>Type:</label>
-          <select name="system.type">
-            {{#each powerTypes}}
-            <option value="{{this}}" {{#if (eq ../system.type this)}}selected{{/if}}>{{this}}</option>
-            {{/each}}
-          </select>
-        </div>
-        <div class="form-group half">
-          <label>Subtype:</label>
-          <input type="text" name="system.subtype" value="{{system.subtype}}" />
-        </div>
-      </div>
-  
-      <div class="form-group">
-        <label>Range:</label>
-        <select name="system.range">
-          {{#each rangeOptions}}
-          <option value="{{this}}" {{#if (eq ../system.range this)}}selected{{/if}}>{{this}}</option>
-          {{/each}}
-        </select>
-        <input type="text" name="system.customRange" value="{{system.customRange}}" 
-               placeholder="Custom range" class="custom-range-input" style="display: none;">
       </div>
       
-      <div class="form-group">
-        <label>Duration:</label>
-        <select name="system.duration">
-          {{#each durationOptions}}
-          <option value="{{this}}" {{#if (eq ../system.duration this)}}selected{{/if}}>{{this}}</option>
-          {{/each}}
+      <div class="form-group half">
+        <label>Type:</label>
+        <select name="system.type" id="power-type">
+          <option value="" {{#if (eq system.type "")}}selected{{/if}}>-- Select Type --</option>
         </select>
       </div>
-  
-      <div class="form-group">
-        <label>Area:</label>
-        <input type="text" name="system.area" value="{{system.area}}" />
-      </div>
-  
-      <div class="form-group">
-        <label>Limitations/Drawbacks:</label>
-        <input type="text" name="system.limitations" value="{{system.limitations}}" />
-      </div>
-  
-      <div class="form-group">
+    </div>
+
+    <div class="form-group">
+      <label>Subtype:</label>
+      <input type="text" name="system.subtype" value="{{system.subtype}}" />
+    </div>
+
+    <div id="special-attributes" class="special-attributes">
+      <!-- Dynamically filled by JS -->
+    </div>
+
+    <div class="form-group">
+      <label>Power Source:</label>
+      <select name="system.source">
+        <option value="natural" {{#if (eq system.source "natural")}}selected{{/if}}>Natural/Inborn</option>
+        <option value="equipment" {{#if (eq system.source "equipment")}}selected{{/if}}>Equipment</option>
+        <option value="mystical" {{#if (eq system.source "mystical")}}selected{{/if}}>Mystical</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label>Range:</label>
+      <select name="system.range" id="range-type">
+        <option value="touch" {{#if (eq system.range "touch")}}selected{{/if}}>Touch Only</option>
+        <option value="rank" {{#if (eq system.range "rank")}}selected{{/if}}>By Rank</option>
+        <option value="custom" {{#if (eq system.range "custom")}}selected{{/if}}>Custom</option>
+        {{#each rangeOptions}}
+        <option value="{{this}}" {{#if (eq ../system.range this)}}selected{{/if}}>{{this}}</option>
+        {{/each}}
+      </select>
+      <input type="text" name="system.customRange" value="{{system.customRange}}" 
+             placeholder="Custom range" class="custom-range-input" 
+             {{#unless (eq system.range "custom")}}style="display: none;"{{/unless}}>
+    </div>
+    
+    <div class="form-group calculated-range" 
+         {{#unless (eq system.range "rank")}}style="display: none;"{{/unless}}>
+      <label>Calculated Range:</label>
+      <input type="text" id="calculated-range-display" value="{{calculatedRange}}" readonly />
+    </div>
+
+    <div class="form-group">
+      <label>Duration:</label>
+      <select name="system.duration" id="duration-type">
+        <option value="instant" {{#if (eq system.duration "instant")}}selected{{/if}}>Instant</option>
+        <option value="concentration" {{#if (eq system.duration "concentration")}}selected{{/if}}>Concentration</option>
+        <option value="sustained" {{#if (eq system.duration "sustained")}}selected{{/if}}>Sustained</option>
+        <option value="permanent" {{#if (eq system.duration "permanent")}}selected{{/if}}>Permanent</option>
+        <option value="custom" {{#if (eq system.duration "custom")}}selected{{/if}}>Custom</option>
+        {{#each durationOptions}}
+        <option value="{{this}}" {{#if (eq ../system.duration this)}}selected{{/if}}>{{this}}</option>
+        {{/each}}
+      </select>
+      <input type="text" name="system.customDuration" value="{{system.customDuration}}" 
+             placeholder="e.g., 1-10 rounds" class="custom-duration-input"
+             {{#unless (eq system.duration "custom")}}style="display: none;"{{/unless}}>
+    </div>
+
+    <div class="form-group">
+      <label>Area:</label>
+      <input type="text" name="system.area" value="{{system.area}}" />
+    </div>
+
+    <div class="form-row special-flags">
+      <div class="form-group third">
         <label>
           <input type="checkbox" name="system.isLimited" {{checked system.isLimited}} />
           Limited Power
         </label>
       </div>
-  
-      <div class="form-group">
+      <div class="form-group third">
         <label>
           <input type="checkbox" name="system.isActive" {{checked system.isActive}} />
-          Power is Active
+          Active Power
         </label>
       </div>
-  
-      <div class="form-group">
-        <label>Description:</label>
-        <textarea name="system.description">{{system.description}}</textarea>
+      <div class="form-group third">
+        <label>
+          <input type="checkbox" name="system.isStarred" {{checked system.isStarred}} />
+          Starred Power (*)
+        </label>
+        <div class="hint">Counts as two powers</div>
       </div>
-  
-      <div class="stunts">
-        <h3>Power Stunts</h3>
-        <p class="stunt-info">Power Stunts allow creative use of powers. Difficulty decreases with practice.</p>
-        <div class="stunt-list">
-          {{#each system.stunts as |stunt i|}}
-          <div class="stunt-entry">
-            <div class="stunt-header">
-              <input type="text" name="system.stunts.{{i}}.name" value="{{stunt.name}}" placeholder="Stunt Name"/>
-              <div class="stunt-attempts">
-                <label>Times Used:</label>
-                <input type="number" name="system.stunts.{{i}}.timesUsed" value="{{stunt.timesUsed}}" min="0" class="stunt-count" />
-                <span class="stunt-difficulty">
-                  {{#if (lt stunt.timesUsed 1)}}
-                  <span class="difficulty red">Red FEAT</span>
-                  {{else if (lt stunt.timesUsed 4)}}
-                  <span class="difficulty yellow">Yellow FEAT</span>
-                  {{else if (lt stunt.timesUsed 10)}}
-                  <span class="difficulty green">Green FEAT</span>
-                  {{else}}
-                  <span class="difficulty mastered">Mastered</span>
-                  {{/if}}
-                </span>
-              </div>
-            </div>
-            <textarea name="system.stunts.{{i}}.description">{{stunt.description}}</textarea>
-            <div class="stunt-controls">
-              <button type="button" class="increment-stunt" data-index="{{i}}"><i class="fas fa-plus"></i> Use</button>
-              <button type="button" class="delete-stunt" data-index="{{i}}"><i class="fas fa-trash"></i></button>
+    </div>
+
+    <div class="form-group">
+      <label>Limitations/Drawbacks:</label>
+      <textarea name="system.limitations">{{system.limitations}}</textarea>
+    </div>
+    
+    <div class="form-row limitation-rank-mod" {{#unless system.isLimited}}style="display: none;"{{/unless}}>
+      <div class="form-group half">
+        <label>Limited To Maximum:</label>
+        <select name="system.limitRankMax">
+          <option value="" {{#if (eq system.limitRankMax "")}}selected{{/if}}>No Limit</option>
+          <option value="Excellent" {{#if (eq system.limitRankMax "Excellent")}}selected{{/if}}>Excellent</option>
+          <option value="Remarkable" {{#if (eq system.limitRankMax "Remarkable")}}selected{{/if}}>Remarkable</option>
+          <option value="Incredible" {{#if (eq system.limitRankMax "Incredible")}}selected{{/if}}>Incredible</option>
+          <option value="Amazing" {{#if (eq system.limitRankMax "Amazing")}}selected{{/if}}>Amazing</option>
+          <option value="Monstrous" {{#if (eq system.limitRankMax "Monstrous")}}selected{{/if}}>Monstrous</option>
+          <option value="Unearthly" {{#if (eq system.limitRankMax "Unearthly")}}selected{{/if}}>Unearthly</option>
+        </select>
+      </div>
+      <div class="form-group half">
+        <label>Column Shift:</label>
+        <input type="number" name="system.limitationColumnShift" value="{{system.limitationColumnShift}}" placeholder="0" />
+      </div>
+    </div>
+
+    <div class="bonus-powers">
+      <h3>Bonus Powers</h3>
+      <div class="bonus-power-list">
+        {{#each system.bonusPowers as |power i|}}
+        <div class="bonus-power-entry">
+          <input type="text" name="system.bonusPowers.{{i}}.name" value="{{power.name}}" placeholder="Bonus Power Name"/>
+          <select name="system.bonusPowers.{{i}}.rank">
+            <option value="Shift-0" {{#if (eq power.rank "Shift-0")}}selected{{/if}}>Shift-0</option>
+            <option value="Feeble" {{#if (eq power.rank "Feeble")}}selected{{/if}}>Feeble</option>
+            <option value="Poor" {{#if (eq power.rank "Poor")}}selected{{/if}}>Poor</option>
+            <option value="Typical" {{#if (eq power.rank "Typical")}}selected{{/if}}>Typical</option>
+            <option value="Good" {{#if (eq power.rank "Good")}}selected{{/if}}>Good</option>
+            <option value="Excellent" {{#if (eq power.rank "Excellent")}}selected{{/if}}>Excellent</option>
+            <option value="Remarkable" {{#if (eq power.rank "Remarkable")}}selected{{/if}}>Remarkable</option>
+            <option value="Incredible" {{#if (eq power.rank "Incredible")}}selected{{/if}}>Incredible</option>
+            <option value="Amazing" {{#if (eq power.rank "Amazing")}}selected{{/if}}>Amazing</option>
+            <option value="Monstrous" {{#if (eq power.rank "Monstrous")}}selected{{/if}}>Monstrous</option>
+            <option value="Unearthly" {{#if (eq power.rank "Unearthly")}}selected{{/if}}>Unearthly</option>
+          </select>
+          <button type="button" class="delete-bonus-power" data-index="{{i}}"><i class="fas fa-trash"></i></button>
+        </div>
+        {{/each}}
+      </div>
+      <button type="button" class="add-bonus-power">+ Add Bonus Power</button>
+    </div>
+
+    <div class="form-group description-field">
+      <label>Description:</label>
+      <textarea name="system.description" rows="5" class="power-description">{{system.description}}</textarea>
+    </div>
+
+    <div class="stunts">
+      <h3>Power Stunts</h3>
+      <p class="stunt-info">Power Stunts allow creative use of powers. Difficulty decreases with practice.</p>
+      <div class="stunt-list">
+        {{#each system.stunts as |stunt i|}}
+        <div class="stunt-entry">
+          <div class="stunt-header">
+            <input type="text" name="system.stunts.{{i}}.name" value="{{stunt.name}}" placeholder="Stunt Name"/>
+            <div class="stunt-attempts">
+              <label>Times Used:</label>
+              <input type="number" name="system.stunts.{{i}}.timesUsed" value="{{stunt.timesUsed}}" min="0" class="stunt-count" />
+              <span class="stunt-difficulty">
+                {{#if (lt stunt.timesUsed 1)}}
+                <span class="difficulty red">Red FEAT (100 Karma)</span>
+                {{else if (lt stunt.timesUsed 4)}}
+                <span class="difficulty yellow">Yellow FEAT (100 Karma)</span>
+                {{else if (lt stunt.timesUsed 10)}}
+                <span class="difficulty green">Green FEAT (100 Karma)</span>
+                {{else}}
+                <span class="difficulty mastered">Mastered (No Karma Cost)</span>
+                {{/if}}
+              </span>
             </div>
           </div>
-          {{/each}}
+          <textarea name="system.stunts.{{i}}.description">{{stunt.description}}</textarea>
+          <div class="stunt-controls">
+            <button type="button" class="increment-stunt" data-index="{{i}}"><i class="fas fa-plus"></i> Use</button>
+            <button type="button" class="roll-stunt" data-index="{{i}}"><i class="fas fa-dice-d20"></i> Roll</button>
+            <button type="button" class="delete-stunt" data-index="{{i}}"><i class="fas fa-trash"></i></button>
+          </div>
         </div>
-        <button type="button" class="add-stunt">+ Add Power Stunt</button>
+        {{/each}}
       </div>
-    </section>
-  </form>
+      <button type="button" class="add-stunt">+ Add Power Stunt</button>
+    </div>
+  </section>
+</form>

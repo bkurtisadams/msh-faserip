@@ -71,6 +71,18 @@ getData() {
 
   activateListeners(html) {
     super.activateListeners(html);
+
+    // Update power type options when category changes
+    html.find('#power-category').change(ev => {
+      const category = ev.currentTarget.value;
+      this._updatePowerTypeOptions(html, category);
+    });
+
+    // If the category is already selected on load, populate the types
+    const selectedCategory = html.find('#power-category').val();
+    if (selectedCategory) {
+      this._updatePowerTypeOptions(html, selectedCategory);
+    }
     
     if (this.item.type === "power") {
       // Initially show/hide custom range field based on current selection
@@ -191,4 +203,78 @@ if (this.item.type === "talent") {
 
   // end of activeListeners
   }
+
+  /**
+ * Update power type options based on selected category
+ */
+_updatePowerTypeOptions(html, category) {
+  const typeSelect = html.find('#power-type');
+  typeSelect.empty();
+  typeSelect.append($('<option value="">-- Select Type --</option>'));
+  
+  // Define power types by category
+  const powerTypesByCategory = {
+    "resistances": [
+      "Resistance to Fire/Heat", "Resistance to Cold", "Resistance to Electricity", 
+      "Resistance to Radiation", "Resistance to Toxins", "Resistance to Corrosives",
+      "Resistance to Emotion Attacks", "Resistance to Mental Attacks", 
+      "Resistance to Magical Attacks", "Resistance to Disease", "Invulnerability"
+    ],
+    "senses": [
+      "Protected Senses", "Enhanced Senses", "Infravision", "Cosmic Awareness",
+      "Combat Sense", "Computer Links", "Emotion Detection", "Energy Detection",
+      "Magic Detection", "Magnetic Detection", "Mutant Detection", "Psionic Detection",
+      "Astral Detection", "Tracking Ability"
+    ],
+    "movement": [
+      "Flight", "Gliding", "Leaping", "Wall-Crawling", "Lightning Speed",
+      "Teleportation", "Levitation", "Swimming", "Climbing", "Digging",
+      "Dimensional Travel"
+    ],
+    "matterControl": [
+      "Earth Control", "Air Control", "Fire Control", "Water Control",
+      "Weather Control", "Density Manipulation Others", "Body Transformation Others",
+      "Animal Transformation Others"
+    ],
+    "energyControl": [
+      "Magnetic Manipulation", "Electrical Manipulation", "Light Manipulation",
+      "Sound Manipulation", "Darkforce Manipulation", "Gravity Manipulation",
+      "Probability Manipulation", "Nullifying Power", "Energy Reflection", "Time Control"
+    ],
+    "bodyControl": [
+      "Growth", "Shrinking", "Density Manipulation Self", "Phasing", "Invisibility",
+      "Plasticity", "Elongation", "Shape-Shifting", "Imitation", "Body Transformation",
+      "Animal Transformation Self", "Raise Lowest Ability", "Blending", "Power Absorption",
+      "Alter Ego"
+    ],
+    "distanceAttacks": [
+      "Projectile Missile", "Ensnaring Missile", "Ice Generation", "Fire Generation",
+      "Energy Generation", "Sound Generation", "Stunning Missile", "Corrosive Missile",
+      "Slashing Missile", "Nullifier Missile", "Darkforce Generation"
+    ],
+    "mentalPowers": [
+      "Telepathy", "Image Generation", "Telekinesis", "Mind Control", "Emotion Control",
+      "Force Field Generation", "Animal Communication and Control", "Mechanical Intuition",
+      "Animal Empathy", "Empathy", "Psi-Screen", "Mental Probe", "Animate Drawings",
+      "Possession", "Transferral", "Astral Projection", "Psionic Attack", "Precognition",
+      "Postcognition", "Plant Control", "Ultimate Skill"
+    ],
+    "bodyAlterationsOffensive": [
+      "Extra Body Parts", "Extra Attacks", "Energy Touch", "Paralyzing Touch",
+      "Claws", "Rotting Touch", "Corrosive Touch", "Health-Drain Touch", "Blinding Touch"
+    ],
+    "bodyAlterationsDefensive": [
+      "Body Armor", "Water Breathing", "Absorption", "Regeneration", "Solar Regeneration",
+      "Recovery", "Life Support", "Pheromones", "Damage Transfer", "Healing", "Immortality"
+    ]
+  };
+  
+  // Add options based on selected category
+  if (powerTypesByCategory[category]) {
+    powerTypesByCategory[category].forEach(type => {
+      const selected = this.item.system.type === type ? 'selected' : '';
+      typeSelect.append($(`<option value="${type}" ${selected}>${type}</option>`));
+    });
+  }
+}
 }

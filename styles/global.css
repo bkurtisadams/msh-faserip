@@ -2031,3 +2031,15 @@
   text-shadow: 0 0 5px rgba(255, 0, 0, 0.7);
   transform: scale(1.1);
 }
+
+.power-description {
+  min-height: 120px;
+  width: 100%;
+  font-family: sans-serif;
+  padding: 5px;
+  resize: vertical; /* Allows the user to resize vertically if needed */
+}
+
+.description-field {
+  margin-bottom: 15px;
+}
