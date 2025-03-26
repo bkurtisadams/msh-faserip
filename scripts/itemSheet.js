@@ -35,6 +35,13 @@ getData() {
   // Add custom CSS class based on document type
   const classes = ["faserip", "sheet", "item", this.item.type];
   context.cssClass = classes.join(" ");
+
+  // Add all rank options for any item type that needs them
+  context.allRanks = [
+    "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent",
+    "Remarkable", "Incredible", "Amazing", "Monstrous", "Unearthly",
+    "Shift-X", "Shift-Y", "Shift-Z", "Class 1000", "Class 3000", "Class 5000", "Beyond"
+  ];
   
   // Add specific data for power items
   if (this.item.type === "power") {
