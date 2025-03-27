@@ -622,15 +622,15 @@
   <div class="contacts-list">
     {{#each contacts as |contact|}}
     <div class="contact-item item" data-item-id="{{contact._id}}">
-      <span class="contact-name">
-        <img src="{{contact.img}}" class="contact-icon" width="24" height="24" />
-        {{contact.name}}
-      </span>
+      <!-- Move roll button to the front -->
+      <a class="item-control contact-roll" title="Roll" data-item-id="{{contact._id}}"><i class="fas fa-dice-d20"></i></a>
+      <!-- Image now functions as info button -->
+      <img src="{{contact.img}}" class="contact-icon contact-info" width="24" height="24" data-item-id="{{contact._id}}" />
+      <span class="contact-name-text">{{contact.name}}</span>
       <div class="item-controls">
-        <a class="item-control contact-info" title="Information" data-item-id="{{contact._id}}"><i class="fas fa-info-circle"></i></a>
+        <!-- Remove info button -->
         <a class="item-control item-edit" title="Edit" data-item-id="{{contact._id}}"><i class="fas fa-edit"></i></a>
         <a class="item-control item-delete" title="Delete" data-item-id="{{contact._id}}"><i class="fas fa-trash"></i></a>
-        <a class="item-control contact-roll" title="Roll" data-item-id="{{contact._id}}"><i class="fas fa-dice-d20"></i></a>
       </div>
     </div>
     {{/each}}
