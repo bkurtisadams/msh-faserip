@@ -23,7 +23,12 @@ static async rollPower(actor, power, options = {}) {
   const skipDiceRoll = power.getFlag("msh-faserip", "skipDiceRoll") || false;
   
   // If this is a direct roll (macro called with options or dialog submitted)
-  if (options.useDirectRoll) {
+  // Check if CTRL is pressed or if this is a direct roll call
+  if (options.useDirectRoll || game.keyboard.isModifierActive(KeyboardManager.MODIFIER_KEYS.CONTROL)) {
+    // Optional notification that CTRL quick roll is being used
+    if (game.keyboard.isModifierActive(KeyboardManager.MODIFIER_KEYS.CONTROL)) {
+      ui.notifications.info("Quick roll with saved settings (CTRL pressed)");
+    }
     // Use provided options from dialog or direct call
     const actionType = options.actionType || savedActionType;
     const columnShift = options.columnShift ?? savedColumnShift;
@@ -239,7 +244,12 @@ static async rollPower(actor, power, options = {}) {
       const skipDiceRoll = talent.getFlag("msh-faserip", "skipDiceRoll") || false;
       
       // If this is a direct roll (called after dialog or with options)
-      if (options.useDirectRoll) {
+      // Check if CTRL is pressed or if this is a direct roll call
+      if (options.useDirectRoll || game.keyboard.isModifierActive(KeyboardManager.MODIFIER_KEYS.CONTROL)) {
+        // Optional notification that CTRL quick roll is being used
+        if (game.keyboard.isModifierActive(KeyboardManager.MODIFIER_KEYS.CONTROL)) {
+          ui.notifications.info("Quick roll with saved settings (CTRL pressed)");
+        }
         // Use provided options from dialog or direct call
         const actionType = options.actionType || savedActionType;
         const extraShift = options.extraShift ?? savedExtraShift;
@@ -526,7 +536,12 @@ static async rollPower(actor, power, options = {}) {
       const skipDiceRoll = contact.getFlag("msh-faserip", "skipDiceRoll") || false;
       
       // If this is a direct roll (called after dialog or with options)
-      if (options.useDirectRoll) {
+      // Check if CTRL is pressed or if this is a direct roll call
+      if (options.useDirectRoll || game.keyboard.isModifierActive(KeyboardManager.MODIFIER_KEYS.CONTROL)) {
+        // Optional notification that CTRL quick roll is being used
+        if (game.keyboard.isModifierActive(KeyboardManager.MODIFIER_KEYS.CONTROL)) {
+          ui.notifications.info("Quick roll with saved settings (CTRL pressed)");
+        }
         // Use provided options
         const actionType = options.actionType || savedActionType;
         const columnShift = options.columnShift ?? savedColumnShift;
@@ -920,7 +935,12 @@ static async rollPower(actor, power, options = {}) {
         };
         
         // If this is a macro or direct call with options provided
-        if (options.useDirectRoll) {
+        // Check if CTRL is pressed or if this is a direct roll call
+        if (options.useDirectRoll || game.keyboard.isModifierActive(KeyboardManager.MODIFIER_KEYS.CONTROL)) {
+          // Optional notification that CTRL quick roll is being used
+          if (game.keyboard.isModifierActive(KeyboardManager.MODIFIER_KEYS.CONTROL)) {
+            ui.notifications.info("Quick roll with saved settings (CTRL pressed)");
+          }
           const actionName = options.actionType || defaultAction;
           const action = ACTIONS[actionName];
           const shift = parseInt(options.columnShift) || 0;
