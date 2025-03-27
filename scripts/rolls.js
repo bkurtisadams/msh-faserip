@@ -5,122 +5,211 @@
 
 export class FaseripRolls {
   
-    /**
-     * Roll a power
-     * @param {Actor} actor - The actor who owns the power
-     * @param {Item} power - The power item to roll
-     * @param {Object} options - Optional configuration for the roll
-     */
-    static async rollPower(actor, power, options = {}) {
-      if (!actor || !power) {
-        ui.notifications.error("Actor or power not found");
-        return;
+ /**
+ * Roll a power
+ * @param {Actor} actor - The actor who owns the power
+ * @param {Item} power - The power item to roll
+ * @param {Object} options - Optional configuration for the roll
+ */
+static async rollPower(actor, power, options = {}) {
+  if (!actor || !power) {
+    ui.notifications.error("Actor or power not found");
+    return;
+  }
+  
+  // Get saved power settings or use defaults
+  const savedActionType = power.getFlag("msh-faserip", "lastActionType") || "";
+  const savedColumnShift = power.getFlag("msh-faserip", "lastColumnShift") || 0;
+  const skipDiceRoll = power.getFlag("msh-faserip", "skipDiceRoll") || false;
+  
+  // If this is a direct roll (macro called with options or dialog submitted)
+  if (options.useDirectRoll) {
+    // Use provided options from dialog or direct call
+    const actionType = options.actionType || savedActionType;
+    const columnShift = options.columnShift ?? savedColumnShift;
+    const karma = options.karma || 0;
+    const skipDice = options.skipDice ?? skipDiceRoll;
+    
+    // Get the power's rank and value
+    const powerRank = power.system.rank || "Typical";
+    const powerValue = power.system.value || 6;
+    
+    // Apply column shifts to get effective rank
+    let effectiveRank = powerRank;
+    if (columnShift !== 0) {
+      const ranks = [
+        "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent",
+        "Remarkable", "Incredible", "Amazing", "Monstrous", "Unearthly",
+        "Shift-X", "Shift-Y", "Shift-Z", "Class 1000", "Class 3000", "Class 5000", "Beyond"
+      ];
+      const index = ranks.indexOf(powerRank);
+      if (index !== -1) {
+        const newIndex = Math.min(Math.max(index + columnShift, 0), ranks.length - 1);
+        effectiveRank = ranks[newIndex];
+        console.log(`Applied ${columnShift} column shifts to ${powerRank}, now ${effectiveRank}`);
       }
-      
-      // Get saved power settings or use defaults
-      const savedActionType = power.getFlag("msh-faserip", "lastActionType") || "";
-      const savedColumnShift = power.getFlag("msh-faserip", "lastColumnShift") || 0;
-      const skipDiceRoll = power.getFlag("msh-faserip", "skipDiceRoll") || false;
-      
-      // Use provided options or fall back to saved settings
-      const actionType = options.actionType || savedActionType;
-      const columnShift = options.columnShift ?? savedColumnShift;
-      const karma = options.karma || 0;
-      const skipDice = options.skipDice ?? skipDiceRoll;
-      
-      // Get the power's rank and value
-      const powerRank = power.system.rank || "Typical";
-      const powerValue = power.system.value || 6;
-      
-      // Apply column shifts to get effective rank
-      let effectiveRank = powerRank;
-      if (columnShift !== 0) {
-        const ranks = [
-          "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent",
-          "Remarkable", "Incredible", "Amazing", "Monstrous", "Unearthly",
-          "Shift-X", "Shift-Y", "Shift-Z", "Class 1000", "Class 3000", "Class 5000", "Beyond"
-        ];
-        const index = ranks.indexOf(powerRank);
-        if (index !== -1) {
-          const newIndex = Math.min(Math.max(index + columnShift, 0), ranks.length - 1);
-          effectiveRank = ranks[newIndex];
-          console.log(`Applied ${columnShift} column shifts to ${powerRank}, now ${effectiveRank}`);
-        }
-      }
-      
-      // Create the roll
-      const roll = new Roll("1d100");
-      
-      // Evaluate the roll
-      await roll.evaluate();
-      
-      // Display the dice roll with flavor text if not skipped
-      if (!skipDice) {
-        await roll.toMessage({
-          speaker: ChatMessage.getSpeaker({ actor: actor }),
-          flavor: `${actor.name} uses ${power.name}`,
-          rollMode: game.settings.get("core", "rollMode")
-        });
-      }
-      
-      // Calculate the result
-      const totalRoll = roll.total + karma;
-      const resultColor = game.msh.rollUniversalTable(effectiveRank, totalRoll);
-      
-      // Define action types and results based on color
-      const ACTIONS = {
-        "Blunt Attack (BA)": { white: "Miss", green: "Hit", yellow: "Slam", red: "Stun" },
-        "Edged Attack (EA)": { white: "Miss", green: "Hit", yellow: "Stun", red: "Kill" },
-        "Shooting Attack (Sh)": { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Kill" },
-        "Throwing Edged (TE)": { white: "Miss", green: "Hit", yellow: "Stun", red: "Kill" },
-        "Throwing Blunt (TB)": { white: "Miss", green: "Hit", yellow: "Hit", red: "Stun" },
-        "Energy (En)": { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Kill" },
-        "Force (Fo)": { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Stun" },
-        "Grappling (GP)": { white: "Miss", green: "Miss", yellow: "Partial", red: "Hold" },
-        "Grabbing (Gb)": { white: "Miss", green: "Take", yellow: "Grab", red: "Break" },
-        "Escaping (ES)": { white: "Miss", green: "Miss", yellow: "Escape", red: "Reverse" },
-        "Mental Attack": { white: "Failure", green: "Success", yellow: "Special Effect", red: "Maximum Effect" },
-        "General Power Use": { white: "Failure", green: "Success", yellow: "Special Effect", red: "Maximum Effect" }
-      };
-      
-      // Get the result text based on action type and color
-      let resultText = "";
-      if (ACTIONS[actionType]) {
-        resultText = ACTIONS[actionType][resultColor.toLowerCase()];
-      } else {
-        resultText = resultColor.toUpperCase();
-      }
-      
-      // Create chat message styled to match screenshot
-      let content = `
-        <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
-          <div style="padding: 5px 10px; border-bottom: 1px solid #c0c0c0; font-size: 1.1em; color: #8b0000;">
-            <strong>${actor.name} - ${power.name} (${actionType})</strong>
-          </div>
-          <div style="padding: 5px 10px; font-size: 0.9em;">
-            <div>Base Rank: ${powerRank} (${powerValue})</div>
-            <div>Column Shift: ${columnShift} → ${effectiveRank}</div>
-            <div>Roll: ${roll.total} + Karma: ${karma} = ${totalRoll}</div>
-          </div>
-          <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
-            background-color: ${resultColor.toLowerCase() === 'white' ? '#f8f8f8' :
-              resultColor.toLowerCase() === 'green' ? '#4CAF50' :
-                resultColor.toLowerCase() === 'yellow' ? '#FFD700' :
-                  '#F44336'}; 
-            color: ${resultColor.toLowerCase() === 'white' || resultColor.toLowerCase() === 'yellow' ? '#333' : 'white'};">
-            ${resultText} (${resultColor.toUpperCase()})
-          </div>
-        </div>
-      `;
-      
-      // Send to chat
-      await ChatMessage.create({
-        speaker: ChatMessage.getSpeaker({ actor: actor }),
-        content: content
-      });
-      
-      return { roll, resultColor, resultText };
     }
+    
+    // Create the roll
+    const roll = new Roll("1d100");
+    
+    // Evaluate the roll
+    await roll.evaluate();
+    
+    // Display the dice roll with flavor text if not skipped
+    if (!skipDice) {
+      await roll.toMessage({
+        speaker: ChatMessage.getSpeaker({ actor: actor }),
+        flavor: `${actor.name} uses ${power.name}`,
+        rollMode: game.settings.get("core", "rollMode")
+      });
+    }
+    
+    // Calculate the result
+    const totalRoll = roll.total + karma;
+    const resultColor = game.msh.rollUniversalTable(effectiveRank, totalRoll);
+    
+    // Define action types and results based on color
+    const ACTIONS = {
+      "Blunt Attack (BA)": { white: "Miss", green: "Hit", yellow: "Slam", red: "Stun" },
+      "Edged Attack (EA)": { white: "Miss", green: "Hit", yellow: "Stun", red: "Kill" },
+      "Shooting Attack (Sh)": { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Kill" },
+      "Throwing Edged (TE)": { white: "Miss", green: "Hit", yellow: "Stun", red: "Kill" },
+      "Throwing Blunt (TB)": { white: "Miss", green: "Hit", yellow: "Hit", red: "Stun" },
+      "Energy (En)": { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Kill" },
+      "Force (Fo)": { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Stun" },
+      "Grappling (GP)": { white: "Miss", green: "Miss", yellow: "Partial", red: "Hold" },
+      "Grabbing (Gb)": { white: "Miss", green: "Take", yellow: "Grab", red: "Break" },
+      "Escaping (ES)": { white: "Miss", green: "Miss", yellow: "Escape", red: "Reverse" },
+      "Mental Attack": { white: "Failure", green: "Success", yellow: "Special Effect", red: "Maximum Effect" },
+      "General Power Use": { white: "Failure", green: "Success", yellow: "Special Effect", red: "Maximum Effect" }
+    };
+    
+    // Get the result text based on action type and color
+    let resultText = "";
+    if (ACTIONS[actionType]) {
+      resultText = ACTIONS[actionType][resultColor.toLowerCase()];
+    } else {
+      resultText = resultColor.toUpperCase();
+    }
+    
+    // Create chat message styled to match screenshot
+    let content = `
+      <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
+        <div style="padding: 5px 10px; border-bottom: 1px solid #c0c0c0; font-size: 1.1em; color: #8b0000;">
+          <strong>${actor.name} - ${power.name} (${actionType})</strong>
+        </div>
+        <div style="padding: 5px 10px; font-size: 0.9em;">
+          <div>Base Rank: ${powerRank} (${powerValue})</div>
+          <div>Column Shift: ${columnShift} → ${effectiveRank}</div>
+          <div>Roll: ${roll.total} + Karma: ${karma} = ${totalRoll}</div>
+        </div>
+        <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
+          background-color: ${resultColor.toLowerCase() === 'white' ? '#f8f8f8' :
+            resultColor.toLowerCase() === 'green' ? '#4CAF50' :
+              resultColor.toLowerCase() === 'yellow' ? '#FFD700' :
+                '#F44336'}; 
+          color: ${resultColor.toLowerCase() === 'white' || resultColor.toLowerCase() === 'yellow' ? '#333' : 'white'};">
+          ${resultText} (${resultColor.toUpperCase()})
+        </div>
+      </div>
+    `;
+    
+    // Send to chat
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor: actor }),
+      content: content
+    });
+    
+    return { roll, resultColor, resultText };
+  } else {
+    // First call - show dialog to select options
+    // Define action types from the Universal Table
+    const ACTIONS = {
+      "Blunt Attack (BA)": { ability: "fighting", results: { white: "Miss", green: "Hit", yellow: "Slam", red: "Stun" }},
+      "Edged Attack (EA)": { ability: "fighting", results: { white: "Miss", green: "Hit", yellow: "Stun", red: "Kill" }},
+      "Shooting Attack (Sh)": { ability: "agility", results: { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Kill" }},
+      "Throwing Edged (TE)": { ability: "agility", results: { white: "Miss", green: "Hit", yellow: "Stun", red: "Kill" }},
+      "Throwing Blunt (TB)": { ability: "agility", results: { white: "Miss", green: "Hit", yellow: "Hit", red: "Stun" }},
+      "Energy (En)": { ability: "agility", results: { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Kill" }},
+      "Force (Fo)": { ability: "agility", results: { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Stun" }},
+      "Grappling (GP)": { ability: "strength", results: { white: "Miss", green: "Miss", yellow: "Partial", red: "Hold" }},
+      "Grabbing (Gb)": { ability: "strength", results: { white: "Miss", green: "Take", yellow: "Grab", red: "Break" }},
+      "Escaping (ES)": { ability: "strength", results: { white: "Miss", green: "Miss", yellow: "Escape", red: "Reverse" }},
+      "Mental Attack": { ability: "psyche", results: { white: "Failure", green: "Success", yellow: "Special Effect", red: "Maximum Effect" }},
+      "General Power Use": { ability: "none", results: { white: "Failure", green: "Success", yellow: "Special Effect", red: "Maximum Effect" }}
+    };
+    
+    // Create dialog for roll options
+    let dialogContent = `
+    <div style="background: #f0e8d8; padding: 10px; border-radius: 5px;">
+      <div style="margin-bottom: 10px;">
+        <label style="display: inline-block; width: 120px;">Action Type:</label>
+        <select id="action" name="action" style="width: 180px;">
+          ${Object.keys(ACTIONS).map(action => 
+            `<option value="${action}" ${action === savedActionType ? 'selected' : ''}>${action}</option>`
+          ).join('')}
+        </select>
+      </div>
+      <div style="margin-bottom: 10px;">
+        <label style="display: inline-block; width: 120px;">Column Shift:</label>
+        <input type="number" id="shift" name="shift" value="${savedColumnShift}" style="width: 50px;">
+        <span style="color: #666; font-size: 0.9em;">(+ right, - left)</span>
+      </div>
+      <div style="margin-bottom: 10px;">
+        <label style="display: inline-block; width: 120px;">Karma Points:</label>
+        <input type="number" id="karma" name="karma" value="0" min="0" style="width: 50px;">
+      </div>
+      <div>
+        <label>
+          <input type="checkbox" id="skip-dice" name="skipDice" ${skipDiceRoll ? 'checked' : ''}> 
+          Skip dice animation
+        </label>
+      </div>
+      <div style="margin-top: 10px;">
+        <label>
+          <input type="checkbox" id="save-settings" name="saveSettings" checked> 
+          Remember these settings for future rolls
+        </label>
+      </div>
+    </div>`;
+
+    return new Dialog({
+      title: `Power Roll: ${power.name} (${power.system.rank})`,
+      content: dialogContent,
+      buttons: {
+        roll: {
+          label: "Roll",
+          callback: async (html) => {
+            const actionType = html.find('[name="action"]').val();
+            const columnShift = parseInt(html.find('[name="shift"]').val()) || 0;
+            const karma = parseInt(html.find('[name="karma"]').val()) || 0;
+            const skipDice = html.find('[name="skipDice"]').is(':checked');
+            const saveSettings = html.find('[name="saveSettings"]').is(':checked');
+            
+            // Save settings if requested
+            if (saveSettings) {
+              await power.setFlag("msh-faserip", "lastActionType", actionType);
+              await power.setFlag("msh-faserip", "lastColumnShift", columnShift);
+              await power.setFlag("msh-faserip", "skipDiceRoll", skipDice);
+            }
+            
+            // Call this method again but with the gathered options
+            return FaseripRolls.rollPower(actor, power, {
+              useDirectRoll: true,
+              actionType: actionType,
+              columnShift: columnShift,
+              karma: karma,
+              skipDice: skipDice
+            });
+          }
+        },
+        cancel: { label: "Cancel" }
+      },
+      default: "roll"
+    }).render(true);
+  }
+}
     
     /**
      * Roll a talent
@@ -149,118 +238,274 @@ export class FaseripRolls {
       const savedExtraShift = talent.getFlag("msh-faserip", "lastExtraShift") || 0;
       const skipDiceRoll = talent.getFlag("msh-faserip", "skipDiceRoll") || false;
       
-      // Use provided options or fall back to saved settings
-      const actionType = options.actionType || savedActionType;
-      const extraShift = options.extraShift ?? savedExtraShift;
-      const karma = options.karma || 0;
-      const skipDice = options.skipDice ?? skipDiceRoll;
-      
-      // Total column shift is talent bonus plus any extra shifts
-      const totalColumnShift = talentBonus + extraShift;
-      
-      // Get ability information
-      let abilityModified = talent.system.abilityModified;
-      let abilityRank = abilityModified ? actor.system.abilities[abilityModified].rank : "Typical";
-      let abilityValue = abilityModified ? actor.system.abilities[abilityModified].value : 6;
-      
-      // Apply column shifts to get effective rank
-      let effectiveRank = abilityRank;
-      if (totalColumnShift !== 0) {
-        const ranks = [
-          "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent",
-          "Remarkable", "Incredible", "Amazing", "Monstrous", "Unearthly",
-          "Shift-X", "Shift-Y", "Shift-Z", "Class 1000", "Class 3000", "Class 5000", "Beyond"
-        ];
-        const index = ranks.indexOf(abilityRank);
-        if (index !== -1) {
-          const newIndex = Math.min(Math.max(index + totalColumnShift, 0), ranks.length - 1);
-          effectiveRank = ranks[newIndex];
-          console.log(`Applied ${totalColumnShift} column shifts to ${abilityRank}, now ${effectiveRank}`);
-        }
-      }
-      
-      // Create the roll
-      const roll = new Roll("1d100");
-      
-      // Evaluate the roll
-      await roll.evaluate();
-      
-      // Display the dice roll with flavor text if not skipped
-      if (!skipDice) {
-        await roll.toMessage({
-          speaker: ChatMessage.getSpeaker({ actor: actor }),
-          flavor: `${actor.name} uses ${talent.name}`,
-          rollMode: game.settings.get("core", "rollMode")
-        });
-      }
-      
-      // Calculate the result
-      const totalRoll = roll.total + karma;
-      const resultColor = game.msh.rollUniversalTable(effectiveRank, totalRoll);
-      
-      // Format ability name for display
-      const abilityName = abilityModified ?
-        abilityModified.charAt(0).toUpperCase() + abilityModified.slice(1) :
-        "None";
-      
-      // Define action types and results based on color
-      const ACTIONS = {
-        // Combat results
-        "Blunt Attack (BA)": { white: "Miss", green: "Hit", yellow: "Slam", red: "Stun" },
-        "Edged Attack (EA)": { white: "Miss", green: "Hit", yellow: "Stun", red: "Kill" },
-        "Shooting Attack (Sh)": { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Kill" },
-        "Grappling (GP)": { white: "Miss", green: "Miss", yellow: "Partial", red: "Hold" },
-        "Grabbing (Gb)": { white: "Miss", green: "Take", yellow: "Grab", red: "Break" },
-        "Escaping (ES)": { white: "Miss", green: "Miss", yellow: "Escape", red: "Reverse" },
+      // If this is a direct roll (called after dialog or with options)
+      if (options.useDirectRoll) {
+        // Use provided options from dialog or direct call
+        const actionType = options.actionType || savedActionType;
+        const extraShift = options.extraShift ?? savedExtraShift;
+        const karma = options.karma || 0;
+        const skipDice = options.skipDice ?? skipDiceRoll;
         
-        // Non-combat results
-        "Knowledge Check": { white: "No Knowledge", green: "Basic Knowledge", yellow: "Good Knowledge", red: "Expert Knowledge" },
-        "Practical Application": { white: "Failure", green: "Basic Success", yellow: "Good Success", red: "Excellent Success" },
-        "Analysis": { white: "Failed Analysis", green: "Basic Analysis", yellow: "Detailed Analysis", red: "Complete Analysis" },
-        "Research": { white: "No Results", green: "Basic Results", yellow: "Good Results", red: "Breakthrough" },
-        "Technical Application": { white: "Failure", green: "Works Minimally", yellow: "Works Well", red: "Works Perfectly" },
-        "Mental Power": { white: "No Effect", green: "Minor Effect", yellow: "Moderate Effect", red: "Major Effect" },
-        "Mystical Knowledge": { white: "No Insight", green: "Minor Insight", yellow: "Significant Insight", red: "Complete Insight" },
-        "Skill Use": { white: "Failure", green: "Basic Success", yellow: "Good Success", red: "Excellent Success" }
-      };
-      
-      // Get the result text - if action type doesn't have specific results, use color names
-      let resultText = "";
-      if (ACTIONS[actionType]) {
-        resultText = ACTIONS[actionType][resultColor.toLowerCase()];
+        // Total column shift is talent bonus plus any extra shifts
+        const totalColumnShift = talentBonus + extraShift;
+        
+        // Get ability information
+        let abilityModified = talent.system.abilityModified;
+        let abilityRank = abilityModified ? actor.system.abilities[abilityModified].rank : "Typical";
+        let abilityValue = abilityModified ? actor.system.abilities[abilityModified].value : 6;
+        
+        // Apply column shifts to get effective rank
+        let effectiveRank = abilityRank;
+        if (totalColumnShift !== 0) {
+          const ranks = [
+            "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent",
+            "Remarkable", "Incredible", "Amazing", "Monstrous", "Unearthly",
+            "Shift-X", "Shift-Y", "Shift-Z", "Class 1000", "Class 3000", "Class 5000", "Beyond"
+          ];
+          const index = ranks.indexOf(abilityRank);
+          if (index !== -1) {
+            const newIndex = Math.min(Math.max(index + totalColumnShift, 0), ranks.length - 1);
+            effectiveRank = ranks[newIndex];
+            console.log(`Applied ${totalColumnShift} column shifts to ${abilityRank}, now ${effectiveRank}`);
+          }
+        }
+        
+        // Create the roll
+        const roll = new Roll("1d100");
+        
+        // Evaluate the roll
+        await roll.evaluate();
+        
+        // Display the dice roll with flavor text if not skipped
+        if (!skipDice) {
+          await roll.toMessage({
+            speaker: ChatMessage.getSpeaker({ actor: actor }),
+            flavor: `${actor.name} uses ${talent.name}`,
+            rollMode: game.settings.get("core", "rollMode")
+          });
+        }
+        
+        // Calculate the result
+        const totalRoll = roll.total + karma;
+        const resultColor = game.msh.rollUniversalTable(effectiveRank, totalRoll);
+        
+        // Format ability name for display
+        const abilityName = abilityModified ?
+          abilityModified.charAt(0).toUpperCase() + abilityModified.slice(1) :
+          "None";
+        
+        // Define action types and results based on color
+        const ACTIONS = {
+          // Combat results
+          "Blunt Attack (BA)": { white: "Miss", green: "Hit", yellow: "Slam", red: "Stun" },
+          "Edged Attack (EA)": { white: "Miss", green: "Hit", yellow: "Stun", red: "Kill" },
+          "Shooting Attack (Sh)": { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Kill" },
+          "Grappling (GP)": { white: "Miss", green: "Miss", yellow: "Partial", red: "Hold" },
+          "Grabbing (Gb)": { white: "Miss", green: "Take", yellow: "Grab", red: "Break" },
+          "Escaping (ES)": { white: "Miss", green: "Miss", yellow: "Escape", red: "Reverse" },
+          
+          // Non-combat results
+          "Knowledge Check": { white: "No Knowledge", green: "Basic Knowledge", yellow: "Good Knowledge", red: "Expert Knowledge" },
+          "Practical Application": { white: "Failure", green: "Basic Success", yellow: "Good Success", red: "Excellent Success" },
+          "Analysis": { white: "Failed Analysis", green: "Basic Analysis", yellow: "Detailed Analysis", red: "Complete Analysis" },
+          "Research": { white: "No Results", green: "Basic Results", yellow: "Good Results", red: "Breakthrough" },
+          "Technical Application": { white: "Failure", green: "Works Minimally", yellow: "Works Well", red: "Works Perfectly" },
+          "Mental Power": { white: "No Effect", green: "Minor Effect", yellow: "Moderate Effect", red: "Major Effect" },
+          "Mystical Knowledge": { white: "No Insight", green: "Minor Insight", yellow: "Significant Insight", red: "Complete Insight" },
+          "Skill Use": { white: "Failure", green: "Basic Success", yellow: "Good Success", red: "Excellent Success" }
+        };
+        
+        // Get the result text - if action type doesn't have specific results, use color names
+        let resultText = "";
+        if (ACTIONS[actionType]) {
+          resultText = ACTIONS[actionType][resultColor.toLowerCase()];
+        } else {
+          resultText = resultColor.toUpperCase();
+        }
+        
+        // Create chat message styled to match screenshot
+        let content = `
+          <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
+            <div style="padding: 5px 10px; border-bottom: 1px solid #c0c0c0; font-size: 1.1em; color: #8b0000;">
+              <strong>${actor.name} - ${abilityName} Roll (${actionType})</strong>
+            </div>
+            <div style="padding: 5px 10px; font-size: 0.9em;">
+              <div>Base Rank: ${abilityRank} (${abilityValue})</div>
+              <div>Column Shift: ${totalColumnShift} → ${effectiveRank}</div>
+              <div>Roll: ${roll.total} + Karma: ${karma} = ${totalRoll}</div>
+            </div>
+            <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
+              background-color: ${resultColor.toLowerCase() === 'white' ? '#f8f8f8' :
+                resultColor.toLowerCase() === 'green' ? '#4CAF50' :
+                  resultColor.toLowerCase() === 'yellow' ? '#FFD700' :
+                    '#F44336'}; 
+              color: ${resultColor.toLowerCase() === 'white' || resultColor.toLowerCase() === 'yellow' ? '#333' : 'white'};">
+              ${resultText} (${resultColor.toUpperCase()})
+            </div>
+          </div>
+        `;
+        
+        // Send to chat
+        await ChatMessage.create({
+          speaker: ChatMessage.getSpeaker({ actor: actor }),
+          content: content
+        });
+        
+        return { roll, resultColor, resultText };
       } else {
-        resultText = resultColor.toUpperCase();
+        // First call - show dialog to select options
+        // Define action options based on talent type
+        let actionOptions = [];
+    
+        // Get talent type and specialty
+        const talentType = talent.system.type || "";
+        const talentSpecialty = talent.system.specialty || "";
+    
+        // Assign appropriate action types based on talent type
+        if (talentType === "Weapon Skill") {
+          // Weapon skill actions
+          if (talentSpecialty === "Blunt Weapons") {
+            actionOptions = [
+              { value: "Blunt Attack (BA)", label: "Blunt Attack (BA)" }
+            ];
+          } else if (talentSpecialty === "Sharp Weapons" || talentSpecialty === "Edged Weapons") {
+            actionOptions = [
+              { value: "Edged Attack (EA)", label: "Edged Attack (EA)" }
+            ];
+          } else if (talentSpecialty === "Thrown Weapons" || talentSpecialty === "Bows") {
+            actionOptions = [
+              { value: "Shooting Attack (Sh)", label: "Shooting Attack (Sh)" }
+            ];
+          } else {
+            // Generic weapon options
+            actionOptions = [
+              { value: "Blunt Attack (BA)", label: "Blunt Attack (BA)" },
+              { value: "Edged Attack (EA)", label: "Edged Attack (EA)" },
+              { value: "Shooting Attack (Sh)", label: "Shooting Attack (Sh)" }
+            ];
+          }
+        } else if (talentType === "Fighting Skill") {
+          // Fighting skill actions
+          actionOptions = [
+            { value: "Grappling (GP)", label: "Grappling (GP)" },
+            { value: "Grabbing (Gb)", label: "Grabbing (Gb)" },
+            { value: "Escaping (ES)", label: "Escaping (ES)" },
+            { value: "Blunt Attack (BA)", label: "Blunt Attack (BA)" }
+          ];
+        } else if (talentType === "Professional Skill") {
+          // Professional skill actions
+          actionOptions = [
+            { value: "Knowledge Check", label: "Knowledge Check" },
+            { value: "Practical Application", label: "Practical Application" }
+          ];
+        } else if (talentType === "Scientific Skill") {
+          // Scientific skill actions
+          actionOptions = [
+            { value: "Analysis", label: "Analysis" },
+            { value: "Research", label: "Research" },
+            { value: "Technical Application", label: "Technical Application" }
+          ];
+        } else if (talentType === "Mystic/Mental Skill") {
+          // Mystic/Mental skill actions
+          actionOptions = [
+            { value: "Mental Power", label: "Mental Power" },
+            { value: "Mystical Knowledge", label: "Mystical Knowledge" }
+          ];
+        } else {
+          // Default/generic options
+          actionOptions = [
+            { value: "Skill Use", label: "Skill Use" },
+            { value: "Knowledge Check", label: "Knowledge Check" }
+          ];
+        }
+    
+        // Create action type options HTML
+        const actionOptionsHTML = actionOptions.map(option =>
+          `<option value="${option.value}" ${option.value === savedActionType ? 'selected' : ''}>${option.label}</option>`
+        ).join('');
+        
+        // Get ability information for display
+        let abilityModified = talent.system.abilityModified || "none";
+        let abilityLabel = abilityModified ? 
+          abilityModified.charAt(0).toUpperCase() + abilityModified.slice(1) : 
+          "None";
+        
+        // Create dialog for roll options
+        let dialogContent = `
+        <div style="background: #f0e8d8; padding: 10px; border-radius: 5px;">
+          <div style="margin-bottom: 10px;">
+            <label style="display: inline-block; width: 120px;">Action Type:</label>
+            <select id="action-type" name="actionType" style="width: 180px;">
+              ${actionOptionsHTML}
+            </select>
+          </div>
+          <div style="margin-bottom: 10px;">
+            <label style="display: inline-block; width: 120px;">Talent Bonus:</label>
+            <input type="number" id="talent-bonus" name="talentBonus" value="${talentBonus}" style="width: 50px;" readonly>
+            <span style="color: #666; font-size: 0.9em;">(${talent.system.bonus})</span>
+          </div>
+          <div style="margin-bottom: 10px;">
+            <label style="display: inline-block; width: 120px;">Ability Modified:</label>
+            <input type="text" id="ability-modified" value="${abilityLabel}" style="width: 120px;" readonly>
+          </div>
+          <div style="margin-bottom: 10px;">
+            <label style="display: inline-block; width: 120px;">Extra Column Shift:</label>
+            <input type="number" id="shift" name="shift" value="${savedExtraShift}" style="width: 50px;">
+            <span style="color: #666; font-size: 0.9em;">(additional +/- CS)</span>
+          </div>
+          <div style="margin-bottom: 10px;">
+            <label style="display: inline-block; width: 120px;">Karma Points:</label>
+            <input type="number" id="karma" name="karma" value="0" min="0" style="width: 50px;">
+          </div>
+          <div style="margin-bottom: 10px;">
+            <label>
+              <input type="checkbox" id="skip-dice" name="skipDice" ${skipDiceRoll ? 'checked' : ''}> 
+              Skip dice animation
+            </label>
+          </div>
+          <div style="margin-top: 10px;">
+            <label>
+              <input type="checkbox" id="save-settings" name="saveSettings" checked> 
+              Remember these settings for future rolls
+            </label>
+          </div>
+        </div>`;
+    
+        return new Dialog({
+          title: `Talent Roll: ${talent.name}`,
+          content: dialogContent,
+          buttons: {
+            roll: {
+              label: "Roll",
+              callback: async (html) => {
+                const actionType = html.find('[name="actionType"]').val();
+                const extraShift = parseInt(html.find('[name="shift"]').val()) || 0;
+                const karma = parseInt(html.find('[name="karma"]').val()) || 0;
+                const skipDice = html.find('[name="skipDice"]').is(':checked');
+                const saveSettings = html.find('[name="saveSettings"]').is(':checked');
+                
+                // Save settings if requested
+                if (saveSettings) {
+                  await talent.setFlag("msh-faserip", "lastActionType", actionType);
+                  await talent.setFlag("msh-faserip", "lastExtraShift", extraShift);
+                  await talent.setFlag("msh-faserip", "skipDiceRoll", skipDice);
+                }
+                
+                // Call this method again but with the gathered options
+                return FaseripRolls.rollTalent(actor, talent, {
+                  useDirectRoll: true,
+                  actionType: actionType,
+                  extraShift: extraShift,
+                  karma: karma,
+                  skipDice: skipDice
+                });
+              }
+            },
+            cancel: { label: "Cancel" }
+          },
+          default: "roll"
+        }).render(true);
       }
-      
-      // Create chat message styled to match screenshot
-      let content = `
-        <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
-          <div style="padding: 5px 10px; border-bottom: 1px solid #c0c0c0; font-size: 1.1em; color: #8b0000;">
-            <strong>${actor.name} - ${abilityName} Roll (${actionType})</strong>
-          </div>
-          <div style="padding: 5px 10px; font-size: 0.9em;">
-            <div>Base Rank: ${abilityRank} (${abilityValue})</div>
-            <div>Column Shift: ${totalColumnShift} → ${effectiveRank}</div>
-            <div>Roll: ${roll.total} + Karma: ${karma} = ${totalRoll}</div>
-          </div>
-          <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
-            background-color: ${resultColor.toLowerCase() === 'white' ? '#f8f8f8' :
-              resultColor.toLowerCase() === 'green' ? '#4CAF50' :
-                resultColor.toLowerCase() === 'yellow' ? '#FFD700' :
-                  '#F44336'}; 
-            color: ${resultColor.toLowerCase() === 'white' || resultColor.toLowerCase() === 'yellow' ? '#333' : 'white'};">
-            ${resultText} (${resultColor.toUpperCase()})
-          </div>
-        </div>
-      `;
-      
-      // Send to chat
-      await ChatMessage.create({
-        speaker: ChatMessage.getSpeaker({ actor: actor }),
-        content: content
-      });
-      
-      return { roll, resultColor, resultText };
     }
     
     /**
@@ -280,51 +525,53 @@ export class FaseripRolls {
       const savedColumnShift = contact.getFlag("msh-faserip", "lastColumnShift") || 0;
       const skipDiceRoll = contact.getFlag("msh-faserip", "skipDiceRoll") || false;
       
-      // Use provided options or fall back to saved settings
-      const actionType = options.actionType || savedActionType;
-      const columnShift = options.columnShift ?? savedColumnShift;
-      const karma = options.karma || 0;
-      const skipDice = options.skipDice ?? skipDiceRoll;
-      
-      // Get the hero's popularity
-      const heroPopularity = actor.system.attributes?.popularity?.value || 0;
-      const heroPopularityRank = actor.system.attributes?.popularity?.rank || "Typical";
-      const isMutant = actor.system.powerOrigin === "mutant" || actor.system.isMutant;
-      
-      // Get contact type
-      const contactType = contact.system.type || "General";
-      
-      // Determine effective disposition (normally Friendly, but affected by negative popularity)
-      let effectiveDisposition = "Friendly";
-      if (heroPopularity < 0) {
-        effectiveDisposition = "Neutral";
-      }
-      
-      // Map disposition to required FEAT color
-      let requiredFeatColor;
-      switch (effectiveDisposition) {
-        case "Friendly": requiredFeatColor = "Green"; break;
-        case "Neutral": requiredFeatColor = "Yellow"; break;
-        case "Suspicious": requiredFeatColor = "Red"; break;
-        case "Hostile": requiredFeatColor = "Impossible"; break;
-      }
-      
-      // Apply column shifts to get effective rank
-      let effectiveRank = heroPopularityRank;
-      if (columnShift !== 0) {
-        const ranks = [
-          "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent",
-          "Remarkable", "Incredible", "Amazing", "Monstrous", "Unearthly"
-        ];
-        const index = ranks.indexOf(effectiveRank);
-        if (index !== -1) {
-          const newIndex = Math.min(Math.max(index + columnShift, 0), ranks.length - 1);
-          effectiveRank = ranks[newIndex];
-          console.log(`Applied ${columnShift} column shifts to ${heroPopularityRank}, now ${effectiveRank}`);
+      // If this is a direct roll (called after dialog or with options)
+      if (options.useDirectRoll) {
+        // Use provided options
+        const actionType = options.actionType || savedActionType;
+        const columnShift = options.columnShift ?? savedColumnShift;
+        const karma = options.karma || 0;
+        const skipDice = options.skipDice ?? skipDiceRoll;
+        
+        // Get the hero's popularity
+        const heroPopularity = actor.system.attributes?.popularity?.value || 0;
+        const heroPopularityRank = actor.system.attributes?.popularity?.rank || "Typical";
+        const isMutant = actor.system.powerOrigin === "mutant" || actor.system.isMutant;
+        
+        // Get contact type
+        const contactType = contact.system.type || "General";
+        
+        // Determine effective disposition (normally Friendly, but affected by negative popularity)
+        let effectiveDisposition = "Friendly";
+        if (heroPopularity < 0) {
+          effectiveDisposition = "Neutral";
         }
-      }
-      
-      // Apply mutant penalty if applicable
+        
+        // Map disposition to required FEAT color
+        let requiredFeatColor;
+        switch (effectiveDisposition) {
+          case "Friendly": requiredFeatColor = "Green"; break;
+          case "Neutral": requiredFeatColor = "Yellow"; break;
+          case "Suspicious": requiredFeatColor = "Red"; break;
+          case "Hostile": requiredFeatColor = "Impossible"; break;
+        }
+        
+        // Apply column shifts to get effective rank
+        let effectiveRank = heroPopularityRank;
+        if (columnShift !== 0) {
+          const ranks = [
+            "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent",
+            "Remarkable", "Incredible", "Amazing", "Monstrous", "Unearthly"
+          ];
+          const index = ranks.indexOf(effectiveRank);
+          if (index !== -1) {
+            const newIndex = Math.min(Math.max(index + columnShift, 0), ranks.length - 1);
+            effectiveRank = ranks[newIndex];
+            console.log(`Applied ${columnShift} column shifts to ${heroPopularityRank}, now ${effectiveRank}`);
+          }
+        }
+        
+        // Apply mutant penalty if applicable
       if (isMutant) {
         // Apply a -1CS to reflect mutant penalty
         const ranks = [
@@ -376,6 +623,18 @@ export class FaseripRolls {
       
       // Determine resource level based on contact type (simplified for brevity)
       let resourceLevel = "Typical";
+      switch (contactType) {
+        case "Law Enforcement": resourceLevel = "Remarkable"; break;
+        case "Military": resourceLevel = "Amazing"; break;
+        case "Business World": resourceLevel = "Incredible"; break;
+        case "Journalism": resourceLevel = "Poor"; break;
+        case "Scientific": resourceLevel = "Good"; break;
+        case "State": resourceLevel = "Remarkable"; break;
+        case "National": resourceLevel = "Monstrous"; break;
+        case "International": resourceLevel = "Monstrous"; break;
+        case "Planetary": resourceLevel = "Unearthly"; break;
+        default: resourceLevel = "Typical";
+      }
       
       // Define all possible results by color 
       const ALL_RESULTS = {
@@ -466,7 +725,125 @@ export class FaseripRolls {
       }
       
       return { roll, resultColor, resultText, meetsFeatRequirement };
+    } else {
+      // First call - show dialog to select options
+      // Define contact action types
+      const actionOptions = [
+        { value: "Availability", label: "Availability" },
+        { value: "Information", label: "Information Request" },
+        { value: "Equipment", label: "Equipment Request" },
+        { value: "Assistance", label: "Request Assistance" },
+        { value: "Favor", label: "Request Favor" }
+      ];
+      
+      // Create action type options HTML
+      const actionOptionsHTML = actionOptions.map(option =>
+        `<option value="${option.value}" ${option.value === savedActionType ? 'selected' : ''}>${option.label}</option>`
+      ).join('');
+      
+      // Get the hero's popularity for display
+      const heroPopularity = actor.system.attributes?.popularity?.value || 0;
+      const heroPopularityRank = actor.system.attributes?.popularity?.rank || "Typical";
+      const isMutant = actor.system.powerOrigin === "mutant" || actor.system.isMutant;
+      
+      // Determine effective disposition (normally Friendly, but affected by negative popularity)
+      let effectiveDisposition = "Friendly";
+      if (heroPopularity < 0) {
+        effectiveDisposition = "Neutral";
+      }
+      
+      // Map disposition to required FEAT color
+      let requiredFeatColor;
+      switch (effectiveDisposition) {
+        case "Friendly": requiredFeatColor = "Green"; break;
+        case "Neutral": requiredFeatColor = "Yellow"; break;
+        case "Suspicious": requiredFeatColor = "Red"; break;
+        case "Hostile": requiredFeatColor = "Impossible"; break;
+      }
+      
+      // Create dialog for roll options
+      let dialogContent = `
+      <div style="background: #f0e8d8; padding: 10px; border-radius: 5px;">
+        <div style="margin-bottom: 10px;">
+          <label style="display: inline-block; width: 120px;">Request Type:</label>
+          <select id="action-type" name="actionType" style="width: 180px;">
+            ${actionOptionsHTML}
+          </select>
+        </div>
+        <div style="margin-bottom: 10px;">
+          <label style="display: inline-block; width: 120px;">Popularity:</label>
+          <input type="text" id="popularity-rank" value="${heroPopularityRank}" style="width: 100px;" readonly>
+          <span style="margin-left: 5px;">(${heroPopularity})</span>
+        </div>
+        <div style="margin-bottom: 10px;">
+          <label style="display: inline-block; width: 120px;">Disposition:</label>
+          <input type="text" id="disposition" value="${effectiveDisposition}" style="width: 100px;" readonly>
+          ${heroPopularity < 0 ?
+            '<span style="color: #aa0000; font-size: 0.9em;"> (Modified due to negative popularity)</span>' : ''}
+        </div>
+        <div style="margin-bottom: 10px;">
+          <label style="display: inline-block; width: 120px;">Required Result:</label>
+          <input type="text" id="required-result" value="${requiredFeatColor}" style="width: 100px;" readonly>
+        </div>
+        <div style="margin-bottom: 10px;">
+          <label style="display: inline-block; width: 120px;">Column Shift:</label>
+          <input type="number" id="shift" name="shift" value="${savedColumnShift}" style="width: 50px;">
+          <span style="color: #666; font-size: 0.9em;">(+ right, - left)</span>
+        </div>
+        <div style="margin-bottom: 10px;">
+          <label style="display: inline-block; width: 120px;">Karma Points:</label>
+          <input type="number" id="karma" name="karma" value="0" min="0" style="width: 50px;">
+        </div>
+        <div style="margin-bottom: 10px;">
+          <label>
+            <input type="checkbox" id="skip-dice" name="skipDice" ${skipDiceRoll ? 'checked' : ''}> 
+            Skip dice animation
+          </label>
+        </div>
+        <div style="margin-top: 10px;">
+          <label>
+            <input type="checkbox" id="save-settings" name="saveSettings" checked> 
+            Remember these settings for future rolls
+          </label>
+        </div>
+      </div>`;
+
+      return new Dialog({
+        title: `Contact Roll: ${contact.name}`,
+        content: dialogContent,
+        buttons: {
+          roll: {
+            label: "Roll",
+            callback: async (html) => {
+              const actionType = html.find('[name="actionType"]').val();
+              const columnShift = parseInt(html.find('[name="shift"]').val()) || 0;
+              const karma = parseInt(html.find('[name="karma"]').val()) || 0;
+              const skipDice = html.find('[name="skipDice"]').is(':checked');
+              const saveSettings = html.find('[name="saveSettings"]').is(':checked');
+              
+              // Save settings if requested
+              if (saveSettings) {
+                await contact.setFlag("msh-faserip", "lastActionType", actionType);
+                await contact.setFlag("msh-faserip", "lastColumnShift", columnShift);
+                await contact.setFlag("msh-faserip", "skipDiceRoll", skipDice);
+              }
+              
+              // Call this method again but with the gathered options
+              return FaseripRolls.rollContact(actor, contact, {
+                useDirectRoll: true,
+                actionType: actionType,
+                columnShift: columnShift,
+                karma: karma,
+                skipDice: skipDice
+              });
+            }
+          },
+          cancel: { label: "Cancel" }
+        },
+        default: "roll"
+      }).render(true);
     }
+}
     
     /**
  * Roll equipment
