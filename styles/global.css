@@ -2182,3 +2182,46 @@
 .faserip-sheet .contact-item > *:not(.contact-roll):not(.contact-icon):not(.contact-name-text) {
   cursor: default;
 }
+
+/* Equipment name cell styling for new layout */
+.faserip-sheet .equipment-name {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  cursor: grab; /* Only this area will be draggable */
+}
+
+/* Style for the roll button in its new position */
+.faserip-sheet .equipment-roll {
+  cursor: pointer;
+  color: #555;
+  margin-right: 2px;
+}
+
+.faserip-sheet .equipment-roll:hover {
+  color: #8b0000;
+}
+
+/* Make the equipment icon clickable for info */
+.faserip-sheet .equipment-icon {
+  cursor: pointer;
+  border: 1px solid #ccc;
+  margin-right: 5px;
+}
+
+/* Style for the equipment name text */
+.faserip-sheet .equipment-name-text {
+  flex: 1;
+}
+
+/* Ensure only the name cell is draggable */
+.faserip-sheet .equipment-row td:not(.equipment-name) {
+  cursor: default;
+}
+
+/* Update the controls section spacing */
+.faserip-sheet .equipment-controls {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
