@@ -17,26 +17,53 @@ export class FaseripActorSheet extends ActorSheet {
 
   /** @override */
   getData() {
+    // Get existing data
     const context = super.getData();
-    const actorData = this.actor.toObject(false);
-
-    context.system = actorData.system;
-
-    // Get items sorted by type for display in the template
-    context.powers = this.actor.items.filter(item => item.type === "power") || [];
-    context.talents = this.actor.items.filter(item => item.type === "talent") || [];
-    // get contacts
-    context.contacts = this.actor.items.filter(item => item.type === "contact") || [];
-
-    // the calculated current karma value
-    context.currentKarma = this.actor.currentKarma;
-
-    // the biography toggle state to the context
-    context.isBiographyOpen = this._isBiographyOpen;
-
-    // equipment
-    context.equipment = this.actor.items.filter(item => item.type === "equipment") || [];
-
+    
+    // Make items available to the template
+    context.powers = [];
+    context.talents = [];
+    context.contacts = [];
+    context.equipment = [];
+    context.headquarters = [];
+    context.vehicles = [];
+    
+    // Organize items by type
+    for (let i of context.items) {
+      // Make sure powers have properly formatted bonus powers
+      if (i.type === 'power') {
+        // Ensure bonus powers is an array
+        if (!i.system.bonusPowers) {
+          i.system.bonusPowers = [];
+        } else if (!Array.isArray(i.system.bonusPowers)) {
+          // Fix if it's an object instead of an array
+          const fixedBonusPowers = [];
+          const obj = i.system.bonusPowers;
+          
+          const keys = Object.keys(obj)
+            .filter(key => !isNaN(key))
+            .sort((a, b) => Number(a) - Number(b));
+          
+          for (const key of keys) {
+            fixedBonusPowers.push(obj[key]);
+          }
+          
+          i.system.bonusPowers = fixedBonusPowers;
+        }
+        
+        context.powers.push(i);
+      } else if (i.type === 'talent') {
+        context.talents.push(i);
+      } else if (i.type === 'contact') {
+        context.contacts.push(i);
+      } else if (i.type === 'equipment') {
+        context.equipment.push(i);
+      } else if (i.type === 'headquarters') {
+        context.headquarters.push(i);
+      } else if (i.type === 'vehicle') {
+        context.vehicles.push(i);
+      }
+    }
     // Add ranks array for dropdowns
     context.allRanks = [
       "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent",

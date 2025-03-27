@@ -540,7 +540,7 @@
 
     <!-- Tab content area -->
     <div class="sheet-tab-content">
-      <!-- Powers Tab -->
+      <!-- Powers Tab - Modified with bonus powers display -->
       <div class="tab" data-tab="powers">
         <!-- Powers content here -->
         <div class="powers-controls">
@@ -581,6 +581,48 @@
                     class="fas fa-dice-d20"></i></a>
               </td>
             </tr>
+            
+            <!-- Add bonus powers section -->
+            {{#if power.system.bonusPowers.length}}
+              {{#each power.system.bonusPowers as |bonusPower|}}
+              <tr class="bonus-power-row" data-parent-id="{{power._id}}">
+                <td class="bonus-power-name">
+                  <span class="bonus-power-indicator">↳</span>
+                  {{bonusPower.name}}
+                  {{#unless bonusPower.countsAgainstLimit}}
+                  <span class="bonus-power-free">[Free]</span>
+                  {{/unless}}
+                </td>
+                <td class="bonus-power-rank">{{bonusPower.rank}}</td>
+                <td class="bonus-power-value">
+                  <!-- Calculate value based on rank -->
+                  {{#if (eq bonusPower.rank "Shift-0")}}0{{/if}}
+                  {{#if (eq bonusPower.rank "Feeble")}}2{{/if}}
+                  {{#if (eq bonusPower.rank "Poor")}}4{{/if}}
+                  {{#if (eq bonusPower.rank "Typical")}}6{{/if}}
+                  {{#if (eq bonusPower.rank "Good")}}10{{/if}}
+                  {{#if (eq bonusPower.rank "Excellent")}}20{{/if}}
+                  {{#if (eq bonusPower.rank "Remarkable")}}30{{/if}}
+                  {{#if (eq bonusPower.rank "Incredible")}}40{{/if}}
+                  {{#if (eq bonusPower.rank "Amazing")}}50{{/if}}
+                  {{#if (eq bonusPower.rank "Monstrous")}}75{{/if}}
+                  {{#if (eq bonusPower.rank "Unearthly")}}100{{/if}}
+                  {{#if (eq bonusPower.rank "Shift-X")}}150{{/if}}
+                  {{#if (eq bonusPower.rank "Shift-Y")}}250{{/if}}
+                  {{#if (eq bonusPower.rank "Shift-Z")}}500{{/if}}
+                  {{#if (eq bonusPower.rank "Class 1000")}}1000{{/if}}
+                  {{#if (eq bonusPower.rank "Class 3000")}}3000{{/if}}
+                  {{#if (eq bonusPower.rank "Class 5000")}}5000{{/if}}
+                  {{#if (eq bonusPower.rank "Beyond")}}9999{{/if}}
+                </td>
+                <td class="bonus-power-range">-</td>
+                <td class="bonus-power-type">Bonus</td>
+                <td class="bonus-power-controls">
+                  <!-- No controls for bonus powers, they're managed via the parent power -->
+                </td>
+              </tr>
+              {{/each}}
+            {{/if}}
             {{/each}}
           </tbody>
         </table>

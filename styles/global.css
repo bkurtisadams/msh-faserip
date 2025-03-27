@@ -2128,3 +2128,41 @@
 .delete-bonus-power:hover {
   color: #ff0000;
 }
+
+/* Add to your CSS file */
+
+/* Bonus Powers in character sheet */
+.bonus-power-row {
+  background-color: #f8f8f8;
+  border-top: 1px dashed #ddd;
+}
+
+.bonus-power-indicator {
+  margin-right: 5px;
+  color: #8b0000;
+  font-weight: bold;
+}
+
+.bonus-power-name {
+  font-style: italic;
+  padding-left: 20px;
+}
+
+.bonus-power-free {
+  margin-left: 5px;
+  color: #2a7d2a;
+  font-weight: bold;
+  font-size: 0.85em;
+  padding: 1px 4px;
+  background-color: #e6ffe6;
+  border-radius: 3px;
+}
+
+.bonus-power-rank, 
+.bonus-power-value, 
+.bonus-power-range, 
+.bonus-power-type,
+.bonus-power-controls {
+  font-style: italic;
+  color: #666;
+}
