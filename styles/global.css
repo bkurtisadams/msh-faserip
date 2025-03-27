@@ -2078,3 +2078,55 @@
 .faserip-sheet .power-row td:not(.power-name) {
   cursor: default;
 }
+
+/* Talent item styling to accommodate new layout */
+.faserip-sheet .talent-item {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  background: #f8f8f8;
+  border: 1px solid #ddd;
+  border-radius: 3px;
+}
+
+.faserip-sheet .talent-item:hover {
+  background: #e8e8e8;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+/* Style for the roll button in its new position */
+.faserip-sheet .talent-roll {
+  cursor: pointer;
+  color: #555;
+  margin-right: 5px;
+}
+
+.faserip-sheet .talent-roll:hover {
+  color: #8b0000;
+}
+
+/* Make the talent icon clickable for info */
+.faserip-sheet .talent-icon {
+  cursor: pointer;
+  border: 1px solid #ccc;
+  margin-right: 8px;
+}
+
+/* Style for the talent name text */
+.faserip-sheet .talent-name-text {
+  flex: 1;
+  font-weight: bold;
+  cursor: grab; /* Shows this is draggable */
+}
+
+/* Update the controls section spacing */
+.faserip-sheet .talent-item .item-controls {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+/* Ensure only the intended items are draggable */
+.faserip-sheet .talent-item > *:not(.talent-roll):not(.talent-icon):not(.talent-name-text) {
+  cursor: default;
+}
