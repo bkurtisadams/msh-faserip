@@ -2043,3 +2043,38 @@
 .description-field {
   margin-bottom: 15px;
 }
+
+/* Make the power-name and its contents properly aligned */
+.faserip-sheet .power-name {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* Style the roll button in its new position */
+.faserip-sheet .power-roll {
+  cursor: pointer;
+  color: #555;
+  margin-right: 2px;
+}
+
+.faserip-sheet .power-roll:hover {
+  color: #8b0000;
+}
+
+/* Make the power icon clickable for info */
+.faserip-sheet .power-icon {
+  cursor: pointer;
+  border: 1px solid #ccc;
+}
+
+/* Style for the power name text */
+.faserip-sheet .power-name-text {
+  flex: 1;
+  cursor: grab; /* Shows this is draggable */
+}
+
+/* Ensure only the intended items are draggable */
+.faserip-sheet .power-row td:not(.power-name) {
+  cursor: default;
+}
