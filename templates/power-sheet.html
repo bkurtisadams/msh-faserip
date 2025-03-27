@@ -163,26 +163,34 @@
       </div>
     </div>
 
+    <!-- power-sheet.html - updated bonus powers section -->
     <div class="bonus-powers">
       <h3>Bonus Powers</h3>
+      <div class="bonus-powers-header">
+        <div class="bp-name">Name</div>
+        <div class="bp-rank">Rank</div>
+        <div class="bp-counts-against">Counts Against Limit</div>
+        <div class="bp-actions">Actions</div>
+      </div>
       <div class="bonus-power-list">
         {{#each system.bonusPowers as |power i|}}
         <div class="bonus-power-entry">
-          <input type="text" name="system.bonusPowers.{{i}}.name" value="{{power.name}}" placeholder="Bonus Power Name"/>
-          <select name="system.bonusPowers.{{i}}.rank">
-            <option value="Shift-0" {{#if (eq power.rank "Shift-0")}}selected{{/if}}>Shift-0</option>
-            <option value="Feeble" {{#if (eq power.rank "Feeble")}}selected{{/if}}>Feeble</option>
-            <option value="Poor" {{#if (eq power.rank "Poor")}}selected{{/if}}>Poor</option>
-            <option value="Typical" {{#if (eq power.rank "Typical")}}selected{{/if}}>Typical</option>
-            <option value="Good" {{#if (eq power.rank "Good")}}selected{{/if}}>Good</option>
-            <option value="Excellent" {{#if (eq power.rank "Excellent")}}selected{{/if}}>Excellent</option>
-            <option value="Remarkable" {{#if (eq power.rank "Remarkable")}}selected{{/if}}>Remarkable</option>
-            <option value="Incredible" {{#if (eq power.rank "Incredible")}}selected{{/if}}>Incredible</option>
-            <option value="Amazing" {{#if (eq power.rank "Amazing")}}selected{{/if}}>Amazing</option>
-            <option value="Monstrous" {{#if (eq power.rank "Monstrous")}}selected{{/if}}>Monstrous</option>
-            <option value="Unearthly" {{#if (eq power.rank "Unearthly")}}selected{{/if}}>Unearthly</option>
-          </select>
-          <button type="button" class="delete-bonus-power" data-index="{{i}}"><i class="fas fa-trash"></i></button>
+          <div class="bp-name">
+            <input type="text" name="system.bonusPowers.{{i}}.name" value="{{power.name}}" placeholder="Bonus Power Name"/>
+          </div>
+          <div class="bp-rank">
+            <select name="system.bonusPowers.{{i}}.rank" class="bonus-power-rank">
+              {{#each ../allRanks as |rankOption|}}
+              <option value="{{rankOption}}" {{#if (eq power.rank rankOption)}}selected{{/if}}>{{rankOption}}</option>
+              {{/each}}
+            </select>
+          </div>
+          <div class="bp-counts-against">
+            <input type="checkbox" name="system.bonusPowers.{{i}}.countsAgainstLimit" {{checked power.countsAgainstLimit}} />
+          </div>
+          <div class="bp-actions">
+            <button type="button" class="delete-bonus-power" data-index="{{i}}"><i class="fas fa-trash"></i></button>
+          </div>
         </div>
         {{/each}}
       </div>

@@ -26,48 +26,122 @@ export class FaseripItemSheet extends ItemSheet {
   }
 
   // In itemSheet.js - revised getData() function
-getData() {
-  // Get base data
-  const context = super.getData();
-  context.item = this.item;
-  context.system = this.item.system;
+  getData() {
+    // Get base data
+    const context = super.getData();
+    context.item = this.item;
+    context.system = this.item.system;
+    
+    // Add custom CSS class based on document type
+    const classes = ["faserip", "sheet", "item", this.item.type];
+    context.cssClass = classes.join(" ");
   
-  // Add custom CSS class based on document type
-  const classes = ["faserip", "sheet", "item", this.item.type];
-  context.cssClass = classes.join(" ");
-
-  // Add all rank options for any item type that needs them
-  context.allRanks = [
-    "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent",
-    "Remarkable", "Incredible", "Amazing", "Monstrous", "Unearthly",
-    "Shift-X", "Shift-Y", "Shift-Z", "Class 1000", "Class 3000", "Class 5000", "Beyond"
-  ];
+    // Add all rank options for any item type that needs them
+    context.allRanks = [
+      "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent",
+      "Remarkable", "Incredible", "Amazing", "Monstrous", "Unearthly",
+      "Shift-X", "Shift-Y", "Shift-Z", "Class 1000", "Class 3000", "Class 5000", "Beyond"
+    ];
   
-  // Add specific data for power items
-  if (this.item.type === "power") {
-    // Add power-specific dropdown options
-    context.powerTypes = [
-      "Resistances", "Movement", "Matter Control", "Energy Control", 
-      "Body Control", "Mental", "Sensory", "Self-Alteration", "Other"
-    ];
+    // Add calculated range to context if this is a power and range is set to "rank"
+    if (this.item.type === "power" && this.item.system.range === "rank") {
+      context.calculatedRange = this.item.system.calculatedRange || this._calculateRangeForRank(this.item.system.rank);
+    }
     
-    // Range options - direct options for dropdown
-    context.rangeOptions = [
-      "Touch only", "1 area", "2 areas", "4 areas", "6 areas", "8 areas", 
-      "10 areas", "20 areas", "40 areas", "60 areas", "80 areas", "160 areas", 
-      "400 areas", "Line of Sight", "Custom"
-    ];
-    
-    context.durationOptions = [
-      "Instantaneous", "Concentration", "Maintenance", "Permanent"
-    ];
-    
-    // Make sure to log data for debugging
-    console.log("Power sheet data:", context);
+    // Add specific data for power items
+    if (this.item.type === "power") {
+      // Add power-specific dropdown options
+      context.powerTypes = [
+        "Resistances", "Movement", "Matter Control", "Energy Control", 
+        "Body Control", "Mental", "Sensory", "Self-Alteration", "Other"
+      ];
+      
+      // Range options - direct options for dropdown
+      context.rangeOptions = [
+        "Touch only", "1 area", "2 areas", "4 areas", "6 areas", "8 areas", 
+        "10 areas", "20 areas", "40 areas", "60 areas", "80 areas", "160 areas", 
+        "400 areas", "Line of Sight", "Custom"
+      ];
+      
+      context.durationOptions = [
+        "Instantaneous", "Concentration", "Maintenance", "Permanent"
+      ];
+      
+      // Fix bonusPowers if it's an object with numeric keys instead of an array
+      if (this.item.system.bonusPowers && !Array.isArray(this.item.system.bonusPowers)) {
+        console.warn("bonusPowers is not an array, fixing:", this.item.system.bonusPowers);
+        
+        // Convert object with numeric keys to an array
+        const fixedBonusPowers = [];
+        const bonusPowersObj = this.item.system.bonusPowers;
+        
+        // Get all numeric keys and sort them
+        const keys = Object.keys(bonusPowersObj)
+          .filter(key => !isNaN(key))
+          .sort((a, b) => Number(a) - Number(b));
+        
+        // Push each item into the array in order
+        for (const key of keys) {
+          fixedBonusPowers.push(bonusPowersObj[key]);
+        }
+        
+        // Update the item with the fixed array
+        this.item.update({"system.bonusPowers": fixedBonusPowers});
+      }
+      
+      // Ensure context.system.bonusPowers is an array for the template
+      if (!context.system.bonusPowers) {
+        context.system.bonusPowers = [];
+      } else if (!Array.isArray(context.system.bonusPowers)) {
+        // Create a temporary array for the template rendering
+        const tempArray = [];
+        const obj = context.system.bonusPowers;
+        
+        const keys = Object.keys(obj)
+          .filter(key => !isNaN(key))
+          .sort((a, b) => Number(a) - Number(b));
+        
+        for (const key of keys) {
+          tempArray.push(obj[key]);
+        }
+        
+        context.system.bonusPowers = tempArray;
+      }
+      
+      // Make sure to log data for debugging
+      console.log("Power sheet data:", context);
+    }
+  
+    return context;
   }
 
-  return context;
-}
+  /**
+   * Helper method to calculate range based on rank
+   * @private
+   */
+  _calculateRangeForRank(rank) {
+    switch (rank) {
+      case "Shift-0": return "Contact only";
+      case "Feeble": return "Touch only";
+      case "Poor": return "1 area";
+      case "Typical": return "2 areas";
+      case "Good": return "4 areas";
+      case "Excellent": return "6 areas";
+      case "Remarkable": return "8 areas";
+      case "Incredible": return "10 areas";
+      case "Amazing": return "20 areas";
+      case "Monstrous": return "40 areas";
+      case "Unearthly": return "60 areas";
+      case "Shift-X": return "80 areas";
+      case "Shift-Y": return "160 areas";
+      case "Shift-Z": return "400 areas";
+      case "Class 1000": return "100 miles";
+      case "Class 3000": return "10,000 miles";
+      case "Class 5000": return "1,000,000 miles";
+      case "Beyond": return "Unlimited";
+      default: return "Unknown";
+    }
+  }
 
   activateListeners(html) {
     super.activateListeners(html);
@@ -88,25 +162,38 @@ getData() {
       // Initially show/hide custom range field based on current selection
       const currentRange = this.item.system.range;
       const customRangeInput = html.find('.custom-range-input');
+      const calculatedRangeDiv = html.find('.calculated-range');
       
-      if (currentRange === "Custom") {
+      if (currentRange === "custom") {
         customRangeInput.show();
+        calculatedRangeDiv.hide();
+      } else if (currentRange === "rank") {
+        customRangeInput.hide();
+        calculatedRangeDiv.show();
       } else {
         customRangeInput.hide();
+        calculatedRangeDiv.hide();
       }
       
       // Handle range dropdown changes
       html.find('select[name="system.range"]').change(ev => {
         const selectedRange = ev.currentTarget.value;
+        const customRangeInput = html.find('.custom-range-input');
+        const calculatedRangeDiv = html.find('.calculated-range');
         
-        if (selectedRange === "Custom") {
+        if (selectedRange === "custom") {
           customRangeInput.show();
+          calculatedRangeDiv.hide();
+        } else if (selectedRange === "rank") {
+          customRangeInput.hide();
+          calculatedRangeDiv.show();
+          this._updateCalculatedRangeDisplay();
         } else {
           customRangeInput.hide();
+          calculatedRangeDiv.hide();
         }
       });
       
-      // Add to the activateListeners method in itemSheet.js
       // Handle power stunts
       html.find('.add-stunt').click(ev => {
         const stunts = this.item.system.stunts || [];
@@ -137,19 +224,74 @@ getData() {
           console.warn("Stunts was not an array, creating empty array");
         }
         
-        // Log for debugging
-        console.log("Before delete:", stunts, "index:", index);
-        
         // Remove the stunt at the specified index
         if (stunts.length > index) {
           stunts.splice(index, 1);
-          console.log("After delete:", stunts);
           
           // Update the item
           this.item.update({ "system.stunts": stunts });
         } else {
           console.error("Invalid stunt index:", index, "length:", stunts.length);
         }
+      });
+      
+      // Add bonus power button
+      html.find('.add-bonus-power').click(async ev => {
+        let bonusPowers;
+        
+        // Convert to array if it's not already
+        if (!this.item.system.bonusPowers) {
+          bonusPowers = [];
+        } else if (Array.isArray(this.item.system.bonusPowers)) {
+          bonusPowers = foundry.utils.deepClone(this.item.system.bonusPowers);
+        } else {
+          // Convert object to array
+          bonusPowers = [];
+          const obj = this.item.system.bonusPowers;
+          
+          const keys = Object.keys(obj)
+            .filter(key => !isNaN(key))
+            .sort((a, b) => Number(a) - Number(b));
+          
+          for (const key of keys) {
+            bonusPowers.push(obj[key]);
+          }
+        }
+        
+        // Add the new bonus power
+        bonusPowers.push({
+          name: "New Bonus Power",
+          rank: "Typical",
+          countsAgainstLimit: true
+        });
+        
+        console.log("Adding bonus power, new array:", bonusPowers);
+        
+        // Update the item with the proper array
+        await this.item.update({"system.bonusPowers": bonusPowers});
+      });
+      
+      // Delete bonus power
+      html.find('.delete-bonus-power').click(ev => {
+        const index = parseInt(ev.currentTarget.dataset.index);
+        const bonusPowers = duplicate(this.item.system.bonusPowers);
+        if (bonusPowers.length > index) {
+          bonusPowers.splice(index, 1);
+          this.item.update({ "system.bonusPowers": bonusPowers });
+        }
+      });
+      
+      // Handle rank changes to update calculated range display
+      html.find('select[name="system.rank"]').change(ev => {
+        if (this.item.system.range === "rank") {
+          this._updateCalculatedRangeDisplay();
+        }
+      });
+      
+      // Handle Limited Power checkbox
+      html.find('input[name="system.isLimited"]').change(ev => {
+        const isChecked = ev.currentTarget.checked;
+        html.find('.limitation-rank-mod').toggle(isChecked);
       });
     }
 
@@ -277,4 +419,39 @@ _updatePowerTypeOptions(html, category) {
     });
   }
 }
+
+  /**
+   * Update only the display of calculated range without changing data
+   * @private
+   */
+  _updateCalculatedRangeDisplay() {
+    const rank = this.item.system.rank;
+    const calculatedRange = this._calculateRangeForRank(rank);
+    
+    // Update only the display element
+    const displayElement = document.getElementById("calculated-range-display");
+    if (displayElement) {
+      displayElement.value = calculatedRange;
+    }
+  }
+
+  /**
+   * Calculate and update the range based on power rank
+   * @private
+   */
+  _updateCalculatedRange() {
+    // Only perform calculation if power type is "power" and range is set to "rank"
+    if (this.item.type !== "power" || this.item.system.range !== "rank") return;
+
+    const rank = this.item.system.rank;
+    const calculatedRange = this._calculateRangeForRank(rank);
+
+    // Update the calculated range display
+    const display = document.getElementById("calculated-range-display");
+    if (display) display.value = calculatedRange;
+    
+    // Also update the document if needed
+    this.item.update({ "system.calculatedRange": calculatedRange });
+  }
+
 }
