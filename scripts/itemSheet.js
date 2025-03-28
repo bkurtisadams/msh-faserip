@@ -282,7 +282,7 @@ _updatePowerTypeOptions(html, category) {
 }
 
   // Add this method at the end of the class, before the closing brace
-  async _updateObject(event, formData) {
+  /* async _updateObject(event, formData) {
     // First call the parent method to update the data
     await super._updateObject(event, formData);
     
@@ -290,5 +290,5 @@ _updatePowerTypeOptions(html, category) {
     if (this.item.type === 'headquarters') {
       this.close();
     }
-  }
+  } */
 }
