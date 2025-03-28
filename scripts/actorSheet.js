@@ -37,6 +37,9 @@ export class FaseripActorSheet extends ActorSheet {
     // equipment
     context.equipment = this.actor.items.filter(item => item.type === "equipment") || [];
 
+    // Add this after the other item type filters
+    context.headquarters = this.actor.items.filter(item => item.type === "headquarters") || [];
+
     // Add ranks array for dropdowns
     context.allRanks = [
       "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent",
@@ -1538,6 +1541,90 @@ export class FaseripActorSheet extends ActorSheet {
             ui.notifications.error("Could not reload weapon.");
           });
       }
+    });
+
+    // 
+    // Add Headquarters button
+    html.find('.add-headquarters').click(ev => {
+      console.log("Add Headquarters button clicked"); // Debug line
+
+      // Create the new headquarters item data
+      const itemData = {
+        name: "New Headquarters",
+        type: "headquarters",
+        system: {
+          description: "",
+          location: "",
+          size: "",
+          materialStrength: "Typical",
+          ownership: "owned",
+          purchaseCost: "",
+          rentalCost: "",
+          isRichArea: false,
+          features: ""
+        }
+      };
+
+      this.actor.createEmbeddedDocuments("Item", [itemData])
+        .then(items => {
+          console.log("Headquarters created successfully");
+          // Open the sheet for the newly created item
+          if (items && items.length > 0) {
+            items[0].sheet.render(true);
+          }
+          this.render(false); // Re-render the actor sheet
+        })
+        .catch(err => console.error("Error creating headquarters:", err));
+    });
+
+    // Browse Headquarters Compendium button
+    html.find('.browse-compendium[data-type="headquarters"]').click(ev => {
+      const pack = game.packs.find(p => p.metadata.name === "headquarters" && p.metadata.system === "msh-faserip");
+      if (pack) {
+        pack.render(true);
+      } else {
+        ui.notifications.warn("Headquarters compendium not found.");
+      }
+    });
+
+    // Edit headquarters button
+    html.find('.headquarters-table .item-edit').click(ev => {
+      const li = $(ev.currentTarget).closest(".headquarters-row");
+      const itemId = li.data("itemId");
+      const item = this.actor.items.get(itemId);
+
+      if (item) {
+        item.sheet.render(true);
+      }
+    });
+
+    // Delete headquarters button
+    html.find('.headquarters-table .item-delete').click(ev => {
+      const li = $(ev.currentTarget).closest(".headquarters-row");
+      const itemId = li.data("itemId");
+
+      if (!itemId) return;
+
+      // Confirm deletion
+      new Dialog({
+        title: "Delete Headquarters",
+        content: "<p>Are you sure you want to delete this headquarters?</p>",
+        buttons: {
+          delete: {
+            icon: '<i class="fas fa-trash"></i>',
+            label: "Delete",
+            callback: () => {
+              this.actor.deleteEmbeddedDocuments("Item", [itemId]);
+              this.render(false);
+            }
+          },
+          cancel: {
+            icon: '<i class="fas fa-times"></i>',
+            label: "Cancel"
+          }
+        },
+        default: "cancel"
+      }).render(true);
     });
 
     // RESOURCE BUTTON method

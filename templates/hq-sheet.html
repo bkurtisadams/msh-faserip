@@ -1,0 +1,70 @@
+<form class="faserip-dialog headquarters-dialog">
+    <div class="dialog-header">
+      <h2><img src="{{item.img}}" width="32" height="32"> {{#if item._id}}Edit{{else}}New{{/if}} Headquarters</h2>
+    </div>
+  
+    <div class="dialog-body">
+      <!-- Basic Information Section -->
+      <div class="form-group">
+        <label>Name</label>
+        <input type="text" name="name" value="{{item.name}}" placeholder="Headquarters Name">
+      </div>
+      
+      <div class="form-group">
+        <label>Location</label>
+        <input type="text" name="system.location" value="{{system.location}}" placeholder="Location">
+      </div>
+      
+      <div class="form-group">
+        <label>Size</label>
+        <input type="text" name="system.size" value="{{system.size}}" placeholder="Small, Mid-sized, Large, or Deluxe">
+      </div>
+      
+      <div class="form-group">
+        <label>Material Strength</label>
+        <input type="text" name="system.materialStrength" value="{{system.materialStrength}}" placeholder="Ex: Excellent, Remarkable">
+      </div>
+      
+      <div class="form-group">
+        <label>Ownership</label>
+        <div class="radio-group">
+          <label><input type="radio" name="system.ownership" value="owned" {{#if (eq system.ownership "owned")}}checked{{/if}}> Owned</label>
+          <label><input type="radio" name="system.ownership" value="rented" {{#if (eq system.ownership "rented")}}checked{{/if}}> Rented</label>
+        </div>
+      </div>
+  
+      <div class="form-group">
+        <label>Cost Information</label>
+        <div class="form-row">
+          <div class="form-group half">
+            <label>Purchase Cost</label>
+            <input type="text" name="system.purchaseCost" value="{{system.purchaseCost}}" placeholder="Ex: Amazing, Monstrous">
+          </div>
+          <div class="form-group half">
+            <div class="checkbox-group">
+              <label><input type="checkbox" name="system.isRichArea" {{#if system.isRichArea}}checked{{/if}}> Rich Area (+1CS)</label>
+            </div>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Rental Cost</label>
+          <input type="text" name="system.rentalCost" value="{{system.rentalCost}}" placeholder="Ex: Excellent, Remarkable">
+        </div>
+      </div>
+      
+      <div class="form-group">
+        <label>Features</label>
+        <textarea name="system.features" rows="4" placeholder="List the features and packages of the headquarters">{{system.features}}</textarea>
+      </div>
+      
+      <div class="form-group">
+        <label>Description</label>
+        <textarea name="system.description" rows="4" placeholder="General description and notes">{{system.description}}</textarea>
+      </div>
+    </div>
+  
+    <div class="dialog-footer">
+      <button type="button" class="cancel-button">Cancel</button>
+      <button type="submit" class="submit-button">{{#if item._id}}Update{{else}}Create{{/if}} Headquarters</button>
+    </div>
+  </form>

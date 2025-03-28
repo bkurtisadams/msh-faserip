@@ -916,13 +916,27 @@ static async rollPower(actor, power, options = {}) {
         const damage = equipment.system.damage || "-";
         const damageType = equipment.system.damageType || "Blunt";
         const range = equipment.system.range || "None";
+        // Get the weapon type from the equipment
+      const weaponType = equipment.system.weaponType || "";
         
-        // Determine default action type based on damage type
-        let defaultAction = "Blunt Attack (BA)";
-        if (damageType === "Edged" || damageType === "Slashing") {
+        // Determine default action based on weapon type
+        let defaultAction = "Shooting Attack (Sh)";
+        if (weaponType === "melee" && damageType === "BA") {
+          defaultAction = "Blunt Attack (BA)";
+        } else if (weaponType === "melee" && damageType === "EA") {
           defaultAction = "Edged Attack (EA)";
-        } else if (range !== "None" && range !== "") {
-          defaultAction = "Shooting Attack (Sh)";
+        } else if (weaponType === "thrown" && damageType === "BA") {
+          defaultAction = "Throwing Blunt (TB)";
+        } else if (weaponType === "thrown" && damageType === "EA") {
+          defaultAction = "Throwing Edged (TE)";
+        } else if (weaponType === "energy" || damageType === "E") {
+          defaultAction = "Energy (En)";
+        } else if (weaponType === "force" || damageType === "F") {
+          defaultAction = "Force (Fo)";
+        } else if (weaponType === "grappling" || damageType === "GP") {
+          defaultAction = "Grappling (GP)";
+        } else if (weaponType === "grabbing" || damageType === "Gb") {
+          defaultAction = "Grabbing (Gb)";
         }
         
         // Define action types from the Universal Table
@@ -931,7 +945,12 @@ static async rollPower(actor, power, options = {}) {
           "Edged Attack (EA)": { ability: "fighting", results: { white: "Miss", green: "Hit", yellow: "Stun", red: "Kill" }},
           "Shooting Attack (Sh)": { ability: "agility", results: { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Kill" }},
           "Throwing Edged (TE)": { ability: "agility", results: { white: "Miss", green: "Hit", yellow: "Stun", red: "Kill" }},
-          "Throwing Blunt (TB)": { ability: "agility", results: { white: "Miss", green: "Hit", yellow: "Hit", red: "Stun" }}
+          "Throwing Blunt (TB)": { ability: "agility", results: { white: "Miss", green: "Hit", yellow: "Hit", red: "Stun" }},
+          "Energy (En)": { ability: "agility", results: { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Kill" }},
+          "Force (Fo)": { ability: "agility", results: { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Stun" }},
+          "Grappling (GP)": { ability: "strength", results: { white: "Miss", green: "Miss", yellow: "Partial", red: "Hold" }},
+          "Grabbing (Gb)": { ability: "strength", results: { white: "Miss", green: "Take", yellow: "Grab", red: "Break" }},
+          "Escaping (Es)": { ability: "strength", results: { white: "Miss", green: "Miss", yellow: "Escape", red: "Reverse" }}
         };
         
         // If this is a macro or direct call with options provided
@@ -941,6 +960,30 @@ static async rollPower(actor, power, options = {}) {
           if (game.keyboard.isModifierActive(KeyboardManager.MODIFIER_KEYS.CONTROL)) {
             ui.notifications.info("Quick roll with saved settings (CTRL pressed)");
           }
+
+        // Get the weapon type and damage type from the equipment
+        const weaponType = equipment.system.weaponType || "";
+        const damageType = equipment.system.damageType || "";
+        
+        // Determine default action based on weapon type
+        let defaultAction = "Shooting Attack (Sh)";
+        if (weaponType === "melee" && damageType === "BA") {
+          defaultAction = "Blunt Attack (BA)";
+        } else if (weaponType === "melee" && damageType === "EA") {
+          defaultAction = "Edged Attack (EA)";
+        } else if (weaponType === "thrown" && damageType === "BA") {
+          defaultAction = "Throwing Blunt (TB)";
+        } else if (weaponType === "thrown" && damageType === "EA") {
+          defaultAction = "Throwing Edged (TE)";
+        } else if (damageType === "E") {
+          defaultAction = "Energy (En)";
+        } else if (damageType === "F") {
+          defaultAction = "Force (Fo)";
+        } else if (damageType === "GP") {
+          defaultAction = "Grappling (GP)";
+        } else if (damageType === "Gb") {
+          defaultAction = "Grabbing (Gb)";
+        }
           const actionName = options.actionType || defaultAction;
           const action = ACTIONS[actionName];
           const shift = parseInt(options.columnShift) || 0;

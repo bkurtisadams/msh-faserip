@@ -21,6 +21,9 @@ export class FaseripItemSheet extends ItemSheet {
     else if (this.item.type === 'contact') {
       return `systems/msh-faserip/templates/contact-sheet.html`;
     }
+    else if (this.item.type === 'headquarters') {
+      return `systems/msh-faserip/templates/hq-sheet.html`;
+    }
     // Fall back to the default item sheet for other types
     return `systems/msh-faserip/templates/item-sheet.html`;
   }
@@ -277,4 +280,15 @@ _updatePowerTypeOptions(html, category) {
     });
   }
 }
+
+  // Add this method at the end of the class, before the closing brace
+  async _updateObject(event, formData) {
+    // First call the parent method to update the data
+    await super._updateObject(event, formData);
+    
+    // Then close the sheet if it's a headquarters item
+    if (this.item.type === 'headquarters') {
+      this.close();
+    }
+  }
 }

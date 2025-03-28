@@ -163,8 +163,18 @@ async _rollWeapon(item, actor) {
     defaultAction = "Blunt Attack (BA)";
   } else if (weaponType === "melee" && damageType === "EA") {
     defaultAction = "Edged Attack (EA)";
-  } else if (weaponType === "thrown") {
-    defaultAction = "Throwing (Th)";
+  } else if (weaponType === "thrown" && damageType === "BA") {
+    defaultAction = "Throwing Blunt (TB)";
+  } else if (weaponType === "thrown" && damageType === "EA") {
+    defaultAction = "Throwing Edged (TE)";
+  } else if (weaponType === "energy" || damageType === "E") {
+    defaultAction = "Energy (En)";
+  } else if (weaponType === "force" || damageType === "F") {
+    defaultAction = "Force (Fo)";
+  } else if (weaponType === "grappling" || damageType === "GP") {
+    defaultAction = "Grappling (GP)";
+  } else if (weaponType === "grabbing" || damageType === "Gb") {
+    defaultAction = "Grabbing (Gb)";
   }
   
   let dialogContent = `

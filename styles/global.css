@@ -2225,3 +2225,137 @@
   justify-content: center;
   gap: 8px;
 }
+
+/* Headquarters Dialog Styling */
+.headquarters-dialog .dialog-body {
+  padding: 10px;
+}
+
+.headquarters-dialog .form-group {
+  margin-bottom: 10px;
+}
+
+.headquarters-dialog label {
+  display: block;
+  font-weight: bold;
+  margin-bottom: 5px;
+}
+
+.headquarters-dialog input[type="text"],
+.headquarters-dialog textarea {
+  width: 100%;
+  padding: 5px;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+}
+
+.headquarters-dialog .form-row {
+  display: flex;
+  gap: 10px;
+}
+
+.headquarters-dialog .form-group.half {
+  flex: 1;
+}
+
+.headquarters-dialog .radio-group,
+.headquarters-dialog .checkbox-group {
+  margin-top: 5px;
+}
+
+.headquarters-dialog .radio-group label,
+.headquarters-dialog .checkbox-group label {
+  display: inline-flex;
+  align-items: center;
+  font-weight: normal;
+  margin-right: 10px;
+  margin-bottom: 0;
+}
+
+.headquarters-dialog .radio-group input,
+.headquarters-dialog .checkbox-group input {
+  margin-right: 5px;
+}
+
+.headquarters-dialog textarea {
+  min-height: 80px;
+  resize: vertical;
+}
+
+.headquarters-dialog .dialog-footer {
+  margin-top: 15px;
+  text-align: right;
+}
+
+.headquarters-dialog button {
+  padding: 6px 12px;
+  margin-left: 10px;
+}
+
+/* Headquarters table styles */
+.headquarters-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 10px;
+  table-layout: fixed;
+}
+
+.headquarters-table th {
+  background-color: #8B0000;
+  color: white;
+  font-weight: bold;
+  text-align: left;
+  padding: 3px 5px;
+  font-size: 0.9em;
+}
+
+.headquarters-table td {
+  padding: 3px 5px;
+  border-bottom: 1px solid #ddd;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 0.9em;
+}
+
+/* Column width adjustments */
+.headquarters-table .name-col { width: 30%; }
+.headquarters-table .location-col { width: 25%; }
+.headquarters-table .size-col { width: 10%; }
+.headquarters-table .material-col { width: 10%; }
+.headquarters-table .cost-col { width: 15%; }
+.headquarters-table .actions-col { width: 10%; text-align: center; }
+
+.headquarters-row:hover {
+  background-color: #f5f5f5;
+}
+
+.headquarters-name {
+  display: flex;
+  align-items: center;
+}
+
+.headquarters-icon {
+  margin-right: 5px;
+  vertical-align: middle;
+}
+
+.headquarters-controls {
+  display: flex;
+  justify-content: space-around;
+}
+
+.headquarters-controls a {
+  color: #666;
+}
+
+.headquarters-controls a:hover {
+  color: #8B0000;
+}
+
+.no-headquarters {
+  text-align: center;
+  font-style: italic;
+  color: #666;
+  padding: 20px;
+}

@@ -727,17 +727,47 @@
     <button type="button" class="add-headquarters">+ Add Headquarters</button>
     <button type="button" class="browse-compendium" data-type="headquarters">Browse Headquarters Compendium</button>
   </div>
-  <div class="headquarters-list">
-    {{#each headquarters as |hq|}}
-    <div class="headquarters-item item" data-item-id="{{hq._id}}">
-      <span class="headquarters-name">{{hq.name}}</span>
-      <div class="item-controls">
-        <a class="item-control item-edit" title="Edit" data-item-id="{{hq._id}}"><i class="fas fa-edit"></i></a>
-        <a class="item-control item-delete" title="Delete" data-item-id="{{hq._id}}"><i class="fas fa-trash"></i></a>
-      </div>
-    </div>
-    {{/each}}
-  </div>
+  
+  <table class="headquarters-table">
+    <thead>
+      <tr>
+        <th class="name-col">Name</th>
+        <th class="location-col">Location</th>
+        <th class="size-col">Size</th>
+        <th class="material-col">Material</th>
+        <th class="cost-col">Cost</th>
+        <th class="actions-col">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{#each headquarters as |hq|}}
+      <tr class="headquarters-row item" data-item-id="{{hq._id}}">
+        <td class="headquarters-name">
+          <img src="{{hq.img}}" class="headquarters-icon headquarters-info" width="24" height="24" />
+          <span class="headquarters-name-text">{{hq.name}}</span>
+        </td>
+        <td class="headquarters-location">{{hq.system.location}}</td>
+        <td class="headquarters-size">{{hq.system.size}}</td>
+        <td class="headquarters-material">{{hq.system.materialStrength}}</td>
+        <td class="headquarters-cost">
+          {{#if (eq hq.system.ownership "owned")}}
+          {{hq.system.purchaseCost}} (Owner)
+          {{else}}
+          {{hq.system.rentalCost}} (Rent)
+          {{/if}}
+        </td>
+        <td class="headquarters-controls">
+          <a class="item-control item-edit" title="Edit" data-item-id="{{hq._id}}"><i class="fas fa-edit"></i></a>
+          <a class="item-control item-delete" title="Delete" data-item-id="{{hq._id}}"><i class="fas fa-trash"></i></a>
+        </td>
+      </tr>
+      {{/each}}
+    </tbody>
+  </table>
+  
+  {{#unless headquarters.length}}
+  <p class="no-headquarters">No headquarters added yet.</p>
+  {{/unless}}
 </div>
 
 <!-- Vehicles Tab -->
