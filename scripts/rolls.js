@@ -873,6 +873,11 @@ static async rollPower(actor, power, options = {}) {
         ui.notifications.error("Actor or equipment not found");
         return;
       }
+
+      // Get saved equipment settings - ADD THIS SECTION
+      const savedActionType = equipment.getFlag("msh-faserip", "lastActionType") || "";
+      const savedColumnShift = equipment.getFlag("msh-faserip", "lastColumnShift") || 0;
+      const skipDiceRoll = equipment.getFlag("msh-faserip", "skipDiceRoll") || false;
       
       // Get equipment information
       const category = equipment.system.category || "gear";
@@ -917,7 +922,7 @@ static async rollPower(actor, power, options = {}) {
         const damageType = equipment.system.damageType || "Blunt";
         const range = equipment.system.range || "None";
         // Get the weapon type from the equipment
-      const weaponType = equipment.system.weaponType || "";
+        const weaponType = equipment.system.weaponType || "";
         
         // Determine default action based on weapon type
         let defaultAction = "Shooting Attack (Sh)";
@@ -960,7 +965,7 @@ static async rollPower(actor, power, options = {}) {
           if (game.keyboard.isModifierActive(KeyboardManager.MODIFIER_KEYS.CONTROL)) {
             ui.notifications.info("Quick roll with saved settings (CTRL pressed)");
           }
-
+        
         // Get the weapon type and damage type from the equipment
         const weaponType = equipment.system.weaponType || "";
         const damageType = equipment.system.damageType || "";
@@ -984,10 +989,11 @@ static async rollPower(actor, power, options = {}) {
         } else if (damageType === "Gb") {
           defaultAction = "Grabbing (Gb)";
         }
-          const actionName = options.actionType || defaultAction;
+          const actionName = options.actionType || savedActionType || defaultAction;
           const action = ACTIONS[actionName];
-          const shift = parseInt(options.columnShift) || 0;
+          const shift = parseInt(options.columnShift) || savedColumnShift || 0;
           const karma = parseInt(options.karma) || 0;
+          const skipDice = options.skipDice ?? skipDiceRoll;
           
           // Get the ability to use (fighting or agility)
           const abilityKey = action.ability || "fighting";
@@ -1106,7 +1112,13 @@ static async rollPower(actor, power, options = {}) {
             <input type="checkbox" id="skip-dice" name="skipDice"> 
             Skip dice animation
           </label>
-        </div>`;
+        <div style="margin-top: 10px;">
+        <label>
+          <input type="checkbox" id="save-settings" name="saveSettings" checked> 
+          Remember these settings for future rolls
+        </label>
+      </div>
+    `;
     
         return new Dialog({
           title: `Equipment Roll: ${equipment.name}`,
@@ -1114,11 +1126,19 @@ static async rollPower(actor, power, options = {}) {
           buttons: {
             roll: {
               label: "Roll",
-              callback: (html) => {
+              callback: async (html) => {
                 const actionName = html.find('[name="action"]').val();
                 const shift = parseInt(html.find('[name="shift"]').val()) || 0;
                 const karma = parseInt(html.find('[name="karma"]').val()) || 0;
                 const skipDice = html.find('[name="skipDice"]').is(':checked');
+                const saveSettings = html.find('[name="saveSettings"]').is(':checked');
+
+                // Save settings if requested
+                if (saveSettings) {
+                  await equipment.setFlag("msh-faserip", "lastActionType", actionName);
+                  await equipment.setFlag("msh-faserip", "lastColumnShift", shift);
+                  await equipment.setFlag("msh-faserip", "skipDiceRoll", skipDice);
+                }
                 
                 // Call this method again but with the gathered options
                 return FaseripRolls.rollEquipment(actor, equipment, {
