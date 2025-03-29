@@ -270,25 +270,34 @@ async _rollWeapon(item, actor) {
             const burstScatter = item.system.burstScatter || "none";
             const stunIntensity = item.system.stunIntensity || "";
             const continuingDamage = item.system.continuingDamage || "";
-            const continuingRounds = item.system.continuingDamageRounds || 0;
+            const continuingRounds = item.system.continuingDamageRounds || "";
             const requiresTwoOperators = item.system.requiresTwoOperators || false;
 
             // Add to chat message content
             let additionalInfo = "";
             if (stunIntensity) {
-              additionalInfo += `<div>Stun/Gas Intensity: ${stunIntensity}</div>`;
+              additionalInfo += `<div>Stun/Gas Intensity: ${stunIntensity} (Endurance FEAT to resist)</div>`;
+              if (actionName === "Stunning Attack") {
+                additionalInfo += `<div>Effect: Knockout for 1d10 rounds on failed FEAT</div>`;
+              }
             }
-            if (continuingDamage && continuingRounds > 0) {
-              additionalInfo += `<div>Continuing Damage: ${continuingDamage} for ${continuingRounds} rounds</div>`;
+            if (continuingDamage && continuingRounds) {
+              additionalInfo += `<div>Continuing Damage: ${continuingDamage} for ${continuingRounds}</div>`;
             }
             if (burstScatter !== "none") {
-              additionalInfo += `<div>${burstScatter === "burst" ? "Burst Attack" : "Scatter Attack"}</div>`;
+              additionalInfo += `<div>${burstScatter === "burst" ? "Burst Attack (affects up to 3 adjacent targets)" : "Scatter Attack (affects all in target area)"}</div>`;
             }
             if (requiresTwoOperators) {
               additionalInfo += `<div>Requires Two Operators</div>`;
             }
-
-            // Add this additionalInfo to the chat message content
+            if (legality !== "legal") {
+              const legalText = {
+                "restricted": "Restricted",
+                "military": "Military Only",
+                "illegal": "Illegal"
+              }[legality] || legality;
+              additionalInfo += `<div>Legality: ${legalText}</div>`;
+            }
 
             // Create the formatted chat message with proper colors
             await ChatMessage.create({

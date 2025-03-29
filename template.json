@@ -158,11 +158,12 @@
       "shotsRemaining": "",
       "ammoType": "Standard",
       "specialAmmo": [],
-      "burstScatter": false,
       
+      "burstScatter": "none",
       "stunIntensity": "",
       "continuingDamage": "",
       "continuingDamageRounds": 0,
+      "continuingDamageRandom": false,
       "requiresTwoOperators": false,
       
       "protection": "",
