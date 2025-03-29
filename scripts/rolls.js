@@ -1016,7 +1016,7 @@ static async rollPower(actor, power, options = {}) {
           
           // Create the roll and evaluate it
           const roll = new Roll("1d100");
-          await roll.evaluate({async: true});
+          await roll.evaluate();
           
           // Display dice on screen if not skipped
           if (!options.skipDice) {

@@ -265,18 +265,44 @@ async _rollWeapon(item, actor) {
             // Create chat message matching the power roll format exactly
             // After getting the colorResult and before creating the chat message, add this code:
 
+            // Get additional weapon properties
+            const legality = item.system.legality || "legal";
+            const burstScatter = item.system.burstScatter || "none";
+            const stunIntensity = item.system.stunIntensity || "";
+            const continuingDamage = item.system.continuingDamage || "";
+            const continuingRounds = item.system.continuingDamageRounds || 0;
+            const requiresTwoOperators = item.system.requiresTwoOperators || false;
+
+            // Add to chat message content
+            let additionalInfo = "";
+            if (stunIntensity) {
+              additionalInfo += `<div>Stun/Gas Intensity: ${stunIntensity}</div>`;
+            }
+            if (continuingDamage && continuingRounds > 0) {
+              additionalInfo += `<div>Continuing Damage: ${continuingDamage} for ${continuingRounds} rounds</div>`;
+            }
+            if (burstScatter !== "none") {
+              additionalInfo += `<div>${burstScatter === "burst" ? "Burst Attack" : "Scatter Attack"}</div>`;
+            }
+            if (requiresTwoOperators) {
+              additionalInfo += `<div>Requires Two Operators</div>`;
+            }
+
+            // Add this additionalInfo to the chat message content
+
             // Create the formatted chat message with proper colors
             await ChatMessage.create({
               speaker: ChatMessage.getSpeaker({ actor }),
               content: `
                 <h3 style="color: #8B0000; margin-top: 0;">${actor.name} - ${item.name} (${actionName})</h3>
                 <div style="margin-bottom: 10px;">
-                  <div>Base Rank: ${abilityRank} (${abilityValue})</div>
-                  <div>Column Shift: ${totalShift !== 0 ? `${totalShift} → ${effectiveRank}` : "None"}</div>
-                  <div>Roll: ${roll.total} + Karma: ${karma} = ${finalRoll}</div>
-                  <div>Damage: ${damage} (${damageType})</div>
-                  ${item.system.ammoType ? `<div>Ammo Type: ${item.system.ammoType}</div>` : ''}
-                </div>
+                <div>Base Rank: ${abilityRank} (${abilityValue})</div>
+                <div>Column Shift: ${totalShift !== 0 ? `${totalShift} → ${effectiveRank}` : "None"}</div>
+                <div>Roll: ${roll.total} + Karma: ${karma} = ${finalRoll}</div>
+                <div>Damage: ${damage} (${damageType})</div>
+                ${item.system.ammoType ? `<div>Ammo Type: ${item.system.ammoType}</div>` : ''}
+                ${additionalInfo}
+              </div>
                 <div style="
                   background-color: ${
                     colorResult.toLowerCase() === 'white' ? '#FFFFFF' : 
@@ -439,7 +465,8 @@ async _rollWeapon(item, actor) {
             }
             
             // Roll dice and add karma
-            const roll = await new Roll("1d100").evaluate({async: true});
+            const roll = new Roll("1d100");
+            await roll.evaluate();
             const finalRoll = Math.min(100, roll.total + karma);
             
             // Get result color
@@ -657,7 +684,8 @@ async _rollWeapon(item, actor) {
             }
             
             // Roll dice and add karma
-            const roll = await new Roll("1d100").evaluate({async: true});
+            const roll = new Roll("1d100");
+            await roll.evaluate();
             const finalRoll = Math.min(100, roll.total + karma);
             
             // Get result color

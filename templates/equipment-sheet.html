@@ -108,6 +108,64 @@
             <option value="Power Pack" {{#if (eq system.ammoType "Power Pack")}}selected{{/if}}>Power Pack</option>
           </select>
         </div>
+
+        <div class="form-group">
+          <label>Legality:</label>
+          <select name="system.legality">
+            <option value="legal" {{#if (eq system.legality "legal")}}selected{{/if}}>Legal</option>
+            <option value="restricted" {{#if (eq system.legality "restricted")}}selected{{/if}}>Restricted</option>
+            <option value="military" {{#if (eq system.legality "military")}}selected{{/if}}>Military Only</option>
+            <option value="illegal" {{#if (eq system.legality "illegal")}}selected{{/if}}>Illegal</option>
+          </select>
+        </div>
+        
+        <div class="form-row">
+          <div class="form-group half">
+            <label>Burst/Scatter:</label>
+            <select name="system.burstScatter">
+              <option value="none" {{#if (eq system.burstScatter "none")}}selected{{/if}}>None</option>
+              <option value="burst" {{#if (eq system.burstScatter "burst")}}selected{{/if}}>Burst</option>
+              <option value="scatter" {{#if (eq system.burstScatter "scatter")}}selected{{/if}}>Scatter</option>
+            </select>
+          </div>
+          <div class="form-group half">
+            <label>Requires Two Operators:</label>
+            <input type="checkbox" name="system.requiresTwoOperators" {{checked system.requiresTwoOperators}}/>
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label>Stun/Gas Intensity:</label>
+          <select name="system.stunIntensity">
+            <option value="" {{#if (eq system.stunIntensity "")}}selected{{/if}}>None</option>
+            <option value="Shift-0" {{#if (eq system.stunIntensity "Shift-0")}}selected{{/if}}>Shift-0</option>
+            <option value="Feeble" {{#if (eq system.stunIntensity "Feeble")}}selected{{/if}}>Feeble</option>
+            <option value="Poor" {{#if (eq system.stunIntensity "Poor")}}selected{{/if}}>Poor</option>
+            <option value="Typical" {{#if (eq system.stunIntensity "Typical")}}selected{{/if}}>Typical</option>
+            <option value="Good" {{#if (eq system.stunIntensity "Good")}}selected{{/if}}>Good</option>
+            <option value="Excellent" {{#if (eq system.stunIntensity "Excellent")}}selected{{/if}}>Excellent</option>
+            <option value="Remarkable" {{#if (eq system.stunIntensity "Remarkable")}}selected{{/if}}>Remarkable</option>
+            <option value="Incredible" {{#if (eq system.stunIntensity "Incredible")}}selected{{/if}}>Incredible</option>
+            <option value="Amazing" {{#if (eq system.stunIntensity "Amazing")}}selected{{/if}}>Amazing</option>
+            <option value="Monstrous" {{#if (eq system.stunIntensity "Monstrous")}}selected{{/if}}>Monstrous</option>
+            <option value="Unearthly" {{#if (eq system.stunIntensity "Unearthly")}}selected{{/if}}>Unearthly</option>
+            <option value="Shift-X" {{#if (eq system.stunIntensity "Shift-X")}}selected{{/if}}>Shift-X</option>
+            <option value="Class 1000" {{#if (eq system.stunIntensity "Class 1000")}}selected{{/if}}>Class 1000</option>
+            <option value="Class 3000" {{#if (eq system.stunIntensity "Class 3000")}}selected{{/if}}>Class 3000</option>
+            <option value="Class 5000" {{#if (eq system.stunIntensity "Class 5000")}}selected{{/if}}>Class 5000</option>
+          </select>
+        </div>
+        
+        <div class="form-row">
+          <div class="form-group half">
+            <label>Continuing Damage:</label>
+            <input type="text" name="system.continuingDamage" value="{{system.continuingDamage}}" />
+          </div>
+          <div class="form-group half">
+            <label>Rounds:</label>
+            <input type="number" name="system.continuingDamageRounds" value="{{system.continuingDamageRounds}}" min="0" />
+          </div>
+        </div>
       </div>
   
       <!-- Armor-specific fields -->
