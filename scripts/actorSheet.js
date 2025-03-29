@@ -1422,34 +1422,34 @@ export class FaseripActorSheet extends ActorSheet {
       const li = $(ev.currentTarget).closest(".equipment-row");
       const itemId = li.data("itemId");
       const item = this.actor.items.get(itemId);
-    
+
       if (!item) return;
-    
+
       // Create a dialog to show equipment information
       let content = `
         <h2>${item.name}</h2>
         <div class="equipment-details">
-          <div class="label">Category:</div><div>${item.system.category || 'None'}</div>
-          <div class="label">Material Strength:</div><div>${item.system.materialStrength || 'Typical'}</div>
-          <div class="label">Price:</div><div>${item.system.price || 'Poor'}</div>`;
+          <p><strong>Category:</strong> ${item.system.category || 'None'}</p>
+          <p><strong>Material Strength:</strong> ${item.system.materialStrength || 'Typical'}</p>
+          <p><strong>Price:</strong> ${item.system.price || 'Poor'}</p>`;
           
       // Add category-specific details
       if (item.system.category === "weapon") {
         content += `
-          <div class="label">Weapon Type:</div><div>${item.system.weaponType || 'None'}</div>
-          <div class="label">Range:</div><div>${item.system.range || 'None'}</div>
-          <div class="label">Damage:</div><div>${item.system.damage || 'None'} (${item.system.damageType || 'None'})</div>
-          <div class="label">Rate:</div><div>${item.system.rate || 'None'}</div>
-          <div class="label">Shots:</div><div>${item.system.shotsRemaining || item.system.shots || 'None'}/${item.system.shots || 'None'}</div>`;
+          <p><strong>Weapon Type:</strong> ${item.system.weaponType || 'None'}</p>
+          <p><strong>Range:</strong> ${item.system.range || 'None'}</p>
+          <p><strong>Damage:</strong> ${item.system.damage || 'None'} (${item.system.damageType || 'None'})</p>
+          <p><strong>Rate:</strong> ${item.system.rate || 'None'}</p>
+          <p><strong>Shots:</strong> ${item.system.shotsRemaining || item.system.shots || 'None'}/${item.system.shots || 'None'}</p>`;
       } else if (item.system.category === "armor") {
         content += `
-          <div class="label">Protection:</div><div>${item.system.protection || 'None'}</div>
-          <div class="label">Coverage:</div><div>${item.system.coverage || 'Partial'}</div>`;
+          <p><strong>Protection:</strong> ${item.system.protection || 'None'}</p>
+          <p><strong>Coverage:</strong> ${item.system.coverage || 'Partial'}</p>`;
       } else if (item.system.category === "power-item") {
         content += `
-          <div class="label">Power Rank:</div><div>${item.system.powerRank || 'Typical'}</div>
-          <div class="label">Power Type:</div><div>${item.system.powerType || 'None'}</div>
-          <div class="label">Linked Ability:</div><div>${item.system.linkedAbility || 'None'}</div>`;
+          <p><strong>Power Rank:</strong> ${item.system.powerRank || 'Typical'}</p>
+          <p><strong>Power Type:</strong> ${item.system.powerType || 'None'}</p>
+          <p><strong>Linked Ability:</strong> ${item.system.linkedAbility || 'None'}</p>`;
       }
       
       content += `
@@ -1457,7 +1457,7 @@ export class FaseripActorSheet extends ActorSheet {
         <div class="description">${item.system.description || 'No description available.'}</div>
         <div class="notes">${item.system.notes ? `<strong>Notes:</strong> ${item.system.notes}` : ''}</div>
       `;
-    
+
       new Dialog({
         title: "Equipment Information",
         content: content,
