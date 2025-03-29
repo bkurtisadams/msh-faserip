@@ -39,6 +39,18 @@ export class FaseripItem extends Item {
           itemData.damageType = itemData.damageType || ""; // S, E, F, EA, BA, GP, GB, custom
           itemData.rate = itemData.rate || "1"; // Shots per round
           itemData.shots = itemData.shots || ""; // Shots before reload
+          itemData.burst = itemData.burst ?? false;
+          itemData.scatter = itemData.scatter ?? false;
+          itemData.isIllegal = itemData.isIllegal ?? false;
+          itemData.militaryOnly = itemData.militaryOnly ?? false;
+          itemData.usesPowerPack = itemData.usesPowerPack ?? false;
+          itemData.reloadTime = itemData.reloadTime ?? 1;
+          itemData.twoMan = itemData.twoMan ?? false;
+          itemData.stationary = itemData.stationary ?? false;
+          itemData.stunIntensity = itemData.stunIntensity || "";
+          itemData.controlType = itemData.controlType || "";
+          itemData.payloadType = itemData.payloadType || "";
+
 
           // Initialize shotsRemaining to equal shots if not defined
           if (itemData.shotsRemaining === undefined) {

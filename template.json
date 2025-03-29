@@ -147,6 +147,7 @@
       "description": "",
       "notes": "",
       "price": "Poor",
+      "legality": "legal",
       
       "weaponType": "",
       "range": "",
@@ -156,6 +157,13 @@
       "shots": "",
       "shotsRemaining": "",
       "ammoType": "Standard",
+      "specialAmmo": [],
+      "burstScatter": false,
+      
+      "stunIntensity": "",
+      "continuingDamage": "",
+      "continuingDamageRounds": 0,
+      "requiresTwoOperators": false,
       
       "protection": "",
       "coverage": "partial",
@@ -165,7 +173,20 @@
       "powerType": "",
       "powerRange": "",
       
-      "customAbilities": []
+      "customAbilities": [],
+      
+      "isGrenade": false,
+      "grenadeType": "",
+      "grenadeRadius": 1,
+      
+      "isMissile": false,
+      "missileType": "Standard",
+      "missileBody": "",
+      "missileControl": "",
+      "missileSpeed": "",
+      "guidanceSystem": "",
+      "payload": "",
+      "payloadDamage": ""
     },
     "vehicle": {
       "templates": ["base"],
