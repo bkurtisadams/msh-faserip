@@ -943,6 +943,9 @@ static async rollPower(actor, power, options = {}) {
         } else if (weaponType === "grabbing" || damageType === "Gb") {
           defaultAction = "Grabbing (Gb)";
         }
+        else if (damageType === "Stun" || item.system.stunIntensity) {
+          defaultAction = "Stunning Attack";
+        }
         
         // Define action types from the Universal Table
         const ACTIONS = {
@@ -955,7 +958,8 @@ static async rollPower(actor, power, options = {}) {
           "Force (Fo)": { ability: "agility", results: { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Stun" }},
           "Grappling (GP)": { ability: "strength", results: { white: "Miss", green: "Miss", yellow: "Partial", red: "Hold" }},
           "Grabbing (Gb)": { ability: "strength", results: { white: "Miss", green: "Take", yellow: "Grab", red: "Break" }},
-          "Escaping (Es)": { ability: "strength", results: { white: "Miss", green: "Miss", yellow: "Escape", red: "Reverse" }}
+          "Escaping (Es)": { ability: "strength", results: { white: "Miss", green: "Miss", yellow: "Escape", red: "Reverse" }},
+          "Stunning Attack": { ability: "agility", results: { white: "Miss", green: "Hit", yellow: "Hit", red: "Hit" }}
         };
         
         // If this is a macro or direct call with options provided
