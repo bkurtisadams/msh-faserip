@@ -1080,17 +1080,18 @@ static async rollPower(actor, power, options = {}) {
             <div style="padding: 5px 10px; border-bottom: 1px solid #c0c0c0; font-size: 1.1em; color: #8b0000;">
               <strong>${actor.name} - ${equipment.name} (${actionName})</strong>
             </div>
-            <div style="padding: 5px 10px; font-size: 0.9em;">
+            <div style="padding: 5px 10px; font-size: 1.1em; line-height: 1.3;">
               <div>Base Rank: ${abilityRank} (${abilityValue})</div>
               <div>Column Shift: ${shift !== 0 ? `${shift} → ${effectiveRank}` : "None"}</div>
               <div>Roll: ${roll.total} + Karma: ${karma} = ${totalRoll}</div>
               ${additionalInfo}
             </div>
             <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
-              background-color: ${resultColor.toLowerCase() === 'white' ? '#f8f8f8' :
+              background-color: ${
+                resultColor.toLowerCase() === 'white' ? '#f8f8f8' :
                 resultColor.toLowerCase() === 'green' ? '#4CAF50' :
-                  resultColor.toLowerCase() === 'yellow' ? '#FFD700' :
-                    '#F44336'}; 
+                resultColor.toLowerCase() === 'yellow' ? '#FFC107' :
+                '#F44336'}; 
               color: ${resultColor.toLowerCase() === 'white' || resultColor.toLowerCase() === 'yellow' ? '#333' : 'white'};">
               ${effect} (${resultColor.toUpperCase()})
             </div>
