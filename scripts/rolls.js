@@ -1023,28 +1023,6 @@ static async rollPower(actor, power, options = {}) {
             if (equipment.system.grenadeIntensity) {
               additionalInfo += `<div><strong>Intensity:</strong> ${equipment.system.grenadeIntensity}</div>`;
             }
-          }
-
-          // Get missile properties if applicable
-          if (equipment.system.missileType) {
-            additionalInfo += `<div><strong>Missile Type:</strong> ${equipment.system.missileType}</div>`;
-            if (equipment.system.guidanceSystem) {
-              additionalInfo += `<div><strong>Guidance:</strong> ${equipment.system.guidanceSystem}</div>`;
-            }
-            if (equipment.system.payloadType) {
-              additionalInfo += `<div><strong>Payload:</strong> ${equipment.system.payloadType}</div>`;
-            }
-          }
-
-          // Add to the additionalInfo building section
-          if (equipment.system.grenadeType) {
-            additionalInfo += `<div><strong>Grenade Type:</strong> ${equipment.system.grenadeType}</div>`;
-            if (equipment.system.grenadeRadius) {
-              additionalInfo += `<div><strong>Blast Radius:</strong> ${equipment.system.grenadeRadius} areas</div>`;
-            }
-            if (equipment.system.grenadeIntensity) {
-              additionalInfo += `<div><strong>Intensity:</strong> ${equipment.system.grenadeIntensity}</div>`;
-            }
             if (equipment.system.grenadeDamage) {
               additionalInfo += `<div><strong>Damage:</strong> ${equipment.system.grenadeDamage} ${equipment.system.grenadeDamageType ? `(${equipment.system.grenadeDamageType})` : ''}</div>`;
             }
@@ -1092,29 +1070,34 @@ static async rollPower(actor, power, options = {}) {
           }
           
           // Create chat message with matched styling
-          await ChatMessage.create({
-            speaker: ChatMessage.getSpeaker({ actor }),
-            content: `
-              <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
-                <div style="padding: 5px 10px; border-bottom: 1px solid #c0c0c0; font-size: 1.1em; color: #8b0000;">
-                  <strong>${actor.name} - ${equipment.name} (${actionName})</strong>
-                </div>
-                <div style="padding: 5px 10px; font-size: 0.9em;">
-                  <div>Base Rank: ${abilityRank} (${abilityValue})</div>
-                  <div>Column Shift: ${shift !== 0 ? `${shift} → ${effectiveRank}` : "None"}</div>
-                  <div>Roll: ${roll.total} + Karma: ${karma} = ${totalRoll}</div>
-                  ${additionalInfo}
-                </div>
-                <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
-                  background-color: ${resultColor.toLowerCase() === 'white' ? '#f8f8f8' :
-                    resultColor.toLowerCase() === 'green' ? '#4CAF50' :
-                      resultColor.toLowerCase() === 'yellow' ? '#FFD700' :
-                        '#F44336'}; 
-                  color: ${resultColor.toLowerCase() === 'white' || resultColor.toLowerCase() === 'yellow' ? '#333' : 'white'};">
-                  ${effect} (${resultColor.toUpperCase()})
-                </div>
-              </div>
-            `
+          // Create a single enhanced message that includes the roll and all information
+          const messageContent = `
+          <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
+            <div style="padding: 5px 10px; border-bottom: 1px solid #c0c0c0; font-size: 1.1em; color: #8b0000;">
+              <strong>${actor.name} - ${equipment.name} (${actionName})</strong>
+            </div>
+            <div style="padding: 5px 10px; font-size: 0.9em;">
+              <div>Base Rank: ${abilityRank} (${abilityValue})</div>
+              <div>Column Shift: ${shift !== 0 ? `${shift} → ${effectiveRank}` : "None"}</div>
+              <div>Roll: ${roll.total} + Karma: ${karma} = ${totalRoll}</div>
+              ${additionalInfo}
+            </div>
+            <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
+              background-color: ${resultColor.toLowerCase() === 'white' ? '#f8f8f8' :
+                resultColor.toLowerCase() === 'green' ? '#4CAF50' :
+                  resultColor.toLowerCase() === 'yellow' ? '#FFD700' :
+                    '#F44336'}; 
+              color: ${resultColor.toLowerCase() === 'white' || resultColor.toLowerCase() === 'yellow' ? '#333' : 'white'};">
+              ${effect} (${resultColor.toUpperCase()})
+            </div>
+          </div>
+          `;
+
+          // Display the enhanced message with the roll
+          await roll.toMessage({
+          speaker: ChatMessage.getSpeaker({ actor }),
+          flavor: messageContent,
+          rollMode: game.settings.get("core", "rollMode")
           });
 
           // After the roll is complete and the chat message is created, update ammunition:
