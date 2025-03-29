@@ -369,11 +369,11 @@ async _rollWeapon(item, actor) {
             await roll.evaluate();
 
             // Display the dice roll with flavor text
-            await roll.toMessage({
+            /* await roll.toMessage({
               speaker: ChatMessage.getSpeaker({ actor }),
               flavor: `${actor.name} attacks with ${item.name} (${actionName})`,
               rollMode: game.settings.get("core", "rollMode")
-            });
+            }); */
 
             // Calculate final roll with karma
             const finalRoll = Math.min(100, roll.total + karma);
@@ -425,6 +425,7 @@ async _rollWeapon(item, actor) {
             // Create the formatted chat message with proper colors
             await ChatMessage.create({
               speaker: ChatMessage.getSpeaker({ actor }),
+              roll: roll,
               content: `
                 <h3 style="color: #8B0000; margin-top: 0;">${actor.name} - ${item.name} (${actionName})</h3>
                 <div style="margin-bottom: 10px;">

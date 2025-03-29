@@ -1073,36 +1073,45 @@ static async rollPower(actor, power, options = {}) {
             }
           }
           
-          // Create chat message with matched styling
           // Create a single enhanced message that includes the roll and all information
           const messageContent = `
-          <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
-            <div style="padding: 5px 10px; border-bottom: 1px solid #c0c0c0; font-size: 1.1em; color: #8b0000;">
-              <strong>${actor.name} - ${equipment.name} (${actionName})</strong>
-            </div>
-            <div style="padding: 5px 10px; font-size: 1.1em; line-height: 1.3;">
+          <div>
+            <h3 style="color: #8B0000; margin: 0 0 5px 0; font-size: 1.1em;">${actor.name} - ${equipment.name} (${actionName})</h3>
+            <div style="margin-bottom: 5px; font-size: 0.9em;">
               <div>Base Rank: ${abilityRank} (${abilityValue})</div>
               <div>Column Shift: ${shift !== 0 ? `${shift} → ${effectiveRank}` : "None"}</div>
               <div>Roll: ${roll.total} + Karma: ${karma} = ${totalRoll}</div>
+              ${equipment.system.ammoType !== "Standard" ? `<div>Ammo Effect: ${equipment.system.ammoType}</div>` : ''}
               ${additionalInfo}
             </div>
-            <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
+            <div style="
               background-color: ${
-                resultColor.toLowerCase() === 'white' ? '#f8f8f8' :
-                resultColor.toLowerCase() === 'green' ? '#4CAF50' :
-                resultColor.toLowerCase() === 'yellow' ? '#FFC107' :
-                '#F44336'}; 
-              color: ${resultColor.toLowerCase() === 'white' || resultColor.toLowerCase() === 'yellow' ? '#333' : 'white'};">
+                resultColor.toLowerCase() === 'white' ? '#FFFFFF' : 
+                resultColor.toLowerCase() === 'green' ? '#4CAF50' : 
+                resultColor.toLowerCase() === 'yellow' ? '#FFC107' : 
+                '#F44336'
+              }; 
+              color: ${
+                resultColor.toLowerCase() === 'white' ? '#000000' : 
+                resultColor.toLowerCase() === 'yellow' ? '#000000' : '#FFFFFF'
+              };
+              padding: 8px;
+              text-align: center;
+              font-weight: bold;
+              font-size: 1.1em;
+              border-radius: 3px;
+              border: ${resultColor.toLowerCase() === 'white' ? '1px solid #CCCCCC' : 'none'};
+            ">
               ${effect} (${resultColor.toUpperCase()})
             </div>
           </div>
           `;
 
           // Display the enhanced message with the roll
-          await roll.toMessage({
-          speaker: ChatMessage.getSpeaker({ actor }),
-          flavor: messageContent,
-          rollMode: game.settings.get("core", "rollMode")
+          await ChatMessage.create({
+            speaker: ChatMessage.getSpeaker({ actor }),
+            content: messageContent,
+            roll: roll
           });
 
           // After the roll is complete and the chat message is created, update ammunition:
