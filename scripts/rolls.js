@@ -1000,13 +1000,13 @@ static async rollPower(actor, power, options = {}) {
           await roll.evaluate();
           
           // Display dice on screen if not skipped
-          if (!options.skipDice) {
+          /* if (!options.skipDice) {
             await roll.toMessage({
               speaker: ChatMessage.getSpeaker({ actor }),
               flavor: `${actor.name} uses ${equipment.name}`,
               rollMode: game.settings.get("core", "rollMode")
             });
-          }
+          } */
           
           // Calculate the result
           const totalRoll = roll.total + karma;
@@ -1015,7 +1015,9 @@ static async rollPower(actor, power, options = {}) {
 
           // Get grenade properties if applicable
           let additionalInfo = "";
-          if (equipment.system.grenadeType) {
+          const isGrenade = equipment.name.toLowerCase().includes("grenade") || 
+                  equipment.system.weaponType === "grenade";
+          if (isGrenade && equipment.system.grenadeType) {
             additionalInfo += `<div><strong>Grenade Type:</strong> ${equipment.system.grenadeType}</div>`;
             if (equipment.system.grenadeRadius) {
               additionalInfo += `<div><strong>Blast Radius:</strong> ${equipment.system.grenadeRadius} areas</div>`;
@@ -1028,7 +1030,9 @@ static async rollPower(actor, power, options = {}) {
             }
           }
 
-          if (equipment.system.missileType) {
+          const isMissileLauncher = equipment.name.toLowerCase().includes("missile") || 
+                           equipment.system.weaponType === "missile";
+          if (isGrenade && equipment.system.grenadeType) {
             additionalInfo += `<div><strong>Missile Type:</strong> ${equipment.system.missileType}</div>`;
             if (equipment.system.guidanceSystem) {
               additionalInfo += `<div><strong>Guidance:</strong> ${equipment.system.guidanceSystem}</div>`;
