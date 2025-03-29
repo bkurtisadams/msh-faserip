@@ -162,8 +162,7 @@
       "burstScatter": "none",
       "stunIntensity": "",
       "continuingDamage": "",
-      "continuingDamageRounds": 0,
-      "continuingDamageRandom": false,
+      "continuingDamageRounds": "",
       "requiresTwoOperators": false,
       
       "protection": "",
