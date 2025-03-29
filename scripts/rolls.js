@@ -943,7 +943,7 @@ static async rollPower(actor, power, options = {}) {
         } else if (weaponType === "grabbing" || damageType === "Gb") {
           defaultAction = "Grabbing (Gb)";
         }
-        else if (damageType === "Stun" || item.system.stunIntensity) {
+        else if (damageType === "Stun" || equipment.system.stunIntensity) {
           defaultAction = "Stunning Attack";
         }
         
@@ -970,29 +970,6 @@ static async rollPower(actor, power, options = {}) {
             ui.notifications.info("Quick roll with saved settings (CTRL pressed)");
           }
         
-        // Get the weapon type and damage type from the equipment
-        const weaponType = equipment.system.weaponType || "";
-        const damageType = equipment.system.damageType || "";
-        
-        // Determine default action based on weapon type
-        let defaultAction = "Shooting Attack (Sh)";
-        if (weaponType === "melee" && damageType === "BA") {
-          defaultAction = "Blunt Attack (BA)";
-        } else if (weaponType === "melee" && damageType === "EA") {
-          defaultAction = "Edged Attack (EA)";
-        } else if (weaponType === "thrown" && damageType === "BA") {
-          defaultAction = "Throwing Blunt (TB)";
-        } else if (weaponType === "thrown" && damageType === "EA") {
-          defaultAction = "Throwing Edged (TE)";
-        } else if (damageType === "E") {
-          defaultAction = "Energy (En)";
-        } else if (damageType === "F") {
-          defaultAction = "Force (Fo)";
-        } else if (damageType === "GP") {
-          defaultAction = "Grappling (GP)";
-        } else if (damageType === "Gb") {
-          defaultAction = "Grabbing (Gb)";
-        }
           const actionName = options.actionType || savedActionType || defaultAction;
           const action = ACTIONS[actionName];
           const shift = parseInt(options.columnShift) || savedColumnShift || 0;
