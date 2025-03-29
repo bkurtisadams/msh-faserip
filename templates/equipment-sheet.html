@@ -210,6 +210,24 @@
                 <option value="Unearthly" {{#if (eq system.grenadeIntensity "Unearthly")}}selected{{/if}}>Unearthly</option>
               </select>
             </div>
+
+            <div class="form-group">
+              <label>Damage:</label>
+              <input type="text" name="system.grenadeDamage" value="{{system.grenadeDamage}}" />
+            </div>
+            
+            <div class="form-group">
+              <label>Damage Type:</label>
+              <select name="system.grenadeDamageType">
+                <option value="" {{#if (eq system.grenadeDamageType "")}}selected{{/if}}>None</option>
+                <option value="S" {{#if (eq system.grenadeDamageType "S")}}selected{{/if}}>Shooting (S)</option>
+                <option value="E" {{#if (eq system.grenadeDamageType "E")}}selected{{/if}}>Energy (E)</option>
+                <option value="F" {{#if (eq system.grenadeDamageType "F")}}selected{{/if}}>Force (F)</option>
+                <option value="EA" {{#if (eq system.grenadeDamageType "EA")}}selected{{/if}}>Edged Attack (EA)</option>
+                <option value="BA" {{#if (eq system.grenadeDamageType "BA")}}selected{{/if}}>Blunt Attack (BA)</option>
+              </select>
+            </div>
+
           </div>
         </div>
 
@@ -283,6 +301,30 @@
                 <option value="Amazing" {{#if (eq system.missileSpeed "Amazing")}}selected{{/if}}>Amazing</option>
               </select>
             </div>
+
+            <div class="form-group">
+              <label>Primary Damage:</label>
+              <input type="text" name="system.missileDamage" value="{{system.missileDamage}}" />
+            </div>
+            
+            <div class="form-group">
+              <label>Secondary Damage:</label>
+              <input type="text" name="system.missileSecondaryDamage" value="{{system.missileSecondaryDamage}}" />
+              <p class="hint">Damage to adjacent areas (if applicable)</p>
+            </div>
+            
+            <div class="form-group">
+              <label>Damage Type:</label>
+              <select name="system.missileDamageType">
+                <option value="" {{#if (eq system.missileDamageType "")}}selected{{/if}}>None</option>
+                <option value="S" {{#if (eq system.missileDamageType "S")}}selected{{/if}}>Shooting (S)</option>
+                <option value="E" {{#if (eq system.missileDamageType "E")}}selected{{/if}}>Energy (E)</option>
+                <option value="F" {{#if (eq system.missileDamageType "F")}}selected{{/if}}>Force (F)</option>
+                <option value="EA" {{#if (eq system.missileDamageType "EA")}}selected{{/if}}>Edged Attack (EA)</option>
+                <option value="BA" {{#if (eq system.missileDamageType "BA")}}selected{{/if}}>Blunt Attack (BA)</option>
+              </select>
+            </div>
+            
           </div>
         </div>
 

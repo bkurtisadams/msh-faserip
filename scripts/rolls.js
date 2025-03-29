@@ -1035,6 +1035,61 @@ static async rollPower(actor, power, options = {}) {
               additionalInfo += `<div><strong>Payload:</strong> ${equipment.system.payloadType}</div>`;
             }
           }
+
+          // Add to the additionalInfo building section
+          if (equipment.system.grenadeType) {
+            additionalInfo += `<div><strong>Grenade Type:</strong> ${equipment.system.grenadeType}</div>`;
+            if (equipment.system.grenadeRadius) {
+              additionalInfo += `<div><strong>Blast Radius:</strong> ${equipment.system.grenadeRadius} areas</div>`;
+            }
+            if (equipment.system.grenadeIntensity) {
+              additionalInfo += `<div><strong>Intensity:</strong> ${equipment.system.grenadeIntensity}</div>`;
+            }
+            if (equipment.system.grenadeDamage) {
+              additionalInfo += `<div><strong>Damage:</strong> ${equipment.system.grenadeDamage} ${equipment.system.grenadeDamageType ? `(${equipment.system.grenadeDamageType})` : ''}</div>`;
+            }
+          }
+
+          if (equipment.system.missileType) {
+            additionalInfo += `<div><strong>Missile Type:</strong> ${equipment.system.missileType}</div>`;
+            if (equipment.system.guidanceSystem) {
+              additionalInfo += `<div><strong>Guidance:</strong> ${equipment.system.guidanceSystem}</div>`;
+            }
+            if (equipment.system.payloadType) {
+              additionalInfo += `<div><strong>Payload:</strong> ${equipment.system.payloadType}</div>`;
+            }
+            if (equipment.system.missileDamage) {
+              additionalInfo += `<div><strong>Damage:</strong> ${equipment.system.missileDamage} ${equipment.system.missileDamageType ? `(${equipment.system.missileDamageType})` : ''}</div>`;
+              if (equipment.system.missileSecondaryDamage) {
+                additionalInfo += `<div><strong>Secondary Damage:</strong> ${equipment.system.missileSecondaryDamage} to adjacent areas</div>`;
+              }
+            }
+          }
+
+          // Special ammo effects
+          if (equipment.system.ammoType !== "Standard") {
+            let ammoEffect = "";
+            switch (equipment.system.ammoType) {
+              case "Mercy":
+                ammoEffect = "Target must make Endurance FEAT vs Remarkable drug or be knocked out for 1-10 rounds";
+                break;
+              case "AP":
+                ammoEffect = "Reduces target Body Armor by 2 CS";
+                break;
+              case "Rubber":
+                ammoEffect = "Inflicts Slugfest damage instead of Shooting damage";
+                break;
+              case "Explosive":
+                ammoEffect = "Double normal damage";
+                break;
+              case "Heat-Seeker":
+                ammoEffect = "Seeks hottest source, no penalty for range";
+                break;
+            }
+            if (ammoEffect) {
+              additionalInfo += `<div><strong>Ammo Effect:</strong> ${ammoEffect}</div>`;
+            }
+          }
           
           // Create chat message with matched styling
           await ChatMessage.create({

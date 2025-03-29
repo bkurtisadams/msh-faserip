@@ -61,6 +61,9 @@ export class FaseripItem extends Item {
           itemData.grenadeType = itemData.grenadeType || "";
           itemData.grenadeRadius = itemData.grenadeRadius || 1;
           itemData.grenadeIntensity = itemData.grenadeIntensity || "";
+          // Grenade damage
+          itemData.grenadeDamage = itemData.grenadeDamage || "";
+          itemData.grenadeDamageType = itemData.grenadeDamageType || "";
 
           // Missile properties
           itemData.missileType = itemData.missileType || "";
@@ -69,6 +72,10 @@ export class FaseripItem extends Item {
           itemData.missileBody = itemData.missileBody || "";
           itemData.missileControl = itemData.missileControl || "";
           itemData.missileSpeed = itemData.missileSpeed || "";
+          // Missile damage
+          itemData.missileDamage = itemData.missileDamage || "";
+          itemData.missileSecondaryDamage = itemData.missileSecondaryDamage || "";
+          itemData.missileDamageType = itemData.missileDamageType || "";
 
           // Special ammo tracking
           itemData.specialAmmo = itemData.specialAmmo || {

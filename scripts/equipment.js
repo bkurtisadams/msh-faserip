@@ -26,6 +26,85 @@ export class FaseripEquipmentSheet extends ItemSheet {
   activateListeners(html) {
     super.activateListeners(html);
 
+    // grenade listeners
+    html.find('[name="system.grenadeType"]').change(ev => {
+      const grenadeType = ev.currentTarget.value;
+      let damage = "";
+      let damageType = "";
+      let intensity = "";
+      
+      // Set default values based on grenade type
+      switch (grenadeType) {
+        case "fragmentation":
+          damage = "RM (30)";
+          damageType = "EA";
+          break;
+        case "concussive":
+          damage = "40";
+          damageType = "BA";
+          break;
+        case "sonic":
+          damage = "20";
+          damageType = "E";
+          break;
+        case "flash":
+          damage = "Amazing Intensity";
+          damageType = "";
+          intensity = "Amazing";
+          break;
+        case "tearGas":
+          intensity = "Typical";
+          break;
+        case "knockout":
+          intensity = "Excellent";
+          break;
+        case "smoke":
+          intensity = "Excellent";
+          break;
+        // Add other types as needed
+      }
+      
+      // Update the fields
+      html.find('[name="system.grenadeDamage"]').val(damage);
+      html.find('[name="system.grenadeDamageType"]').val(damageType);
+      
+      // Update intensity if set
+      if (intensity) {
+        html.find('[name="system.grenadeIntensity"]').val(intensity);
+      }
+    });
+
+    html.find('[name="system.payloadType"]').change(ev => {
+      const payloadType = ev.currentTarget.value;
+      let damage = "";
+      let secondaryDamage = "";
+      let damageType = "EA";
+      
+      // Set default damage values based on payload type
+      switch (payloadType) {
+        case "standard":
+          damage = "40";
+          break;
+        case "concentrated":
+          damage = "40";
+          break;
+        case "high-explosive":
+          damage = "70";
+          secondaryDamage = "20";
+          break;
+        case "incendiary":
+          damage = "40";
+          damageType = "E";
+          break;
+        // Add other types as needed
+      }
+      
+      // Update the fields
+      html.find('[name="system.missileDamage"]').val(damage);
+      html.find('[name="system.missileSecondaryDamage"]').val(secondaryDamage);
+      html.find('[name="system.missileDamageType"]').val(damageType);
+    });
+
     // Toggle collapsible sections
     html.find('.collapsible').click(ev => {
       const header = ev.currentTarget;
