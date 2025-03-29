@@ -1048,6 +1048,7 @@ static async rollPower(actor, power, options = {}) {
                   <div>Base Rank: ${abilityRank} (${abilityValue})</div>
                   <div>Column Shift: ${shift !== 0 ? `${shift} → ${effectiveRank}` : "None"}</div>
                   <div>Roll: ${roll.total} + Karma: ${karma} = ${totalRoll}</div>
+                  ${additionalInfo}
                 </div>
                 <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
                   background-color: ${resultColor.toLowerCase() === 'white' ? '#f8f8f8' :
