@@ -51,9 +51,8 @@ export class FaseripItem extends Item {
           itemData.controlType = itemData.controlType || "";
           itemData.payloadType = itemData.payloadType || "";
 
-
-          // Initialize shotsRemaining to equal shots if not defined
-          if (itemData.shotsRemaining === undefined) {
+          // Initialize shotsRemaining to equal shots if not defined or empty
+          if (itemData.shotsRemaining === undefined || itemData.shotsRemaining === "" || itemData.shotsRemaining === null) {
             itemData.shotsRemaining = itemData.shots;
           }
           itemData.ammoType = itemData.ammoType || "Standard"; // Ammunition type
