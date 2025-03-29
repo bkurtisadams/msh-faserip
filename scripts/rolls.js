@@ -1012,6 +1012,29 @@ static async rollPower(actor, power, options = {}) {
           const totalRoll = roll.total + karma;
           const resultColor = game.msh.rollUniversalTable(effectiveRank, totalRoll);
           const effect = action.results[resultColor.toLowerCase()];
+
+          // Get grenade properties if applicable
+          let additionalInfo = "";
+          if (equipment.system.grenadeType) {
+            additionalInfo += `<div><strong>Grenade Type:</strong> ${equipment.system.grenadeType}</div>`;
+            if (equipment.system.grenadeRadius) {
+              additionalInfo += `<div><strong>Blast Radius:</strong> ${equipment.system.grenadeRadius} areas</div>`;
+            }
+            if (equipment.system.grenadeIntensity) {
+              additionalInfo += `<div><strong>Intensity:</strong> ${equipment.system.grenadeIntensity}</div>`;
+            }
+          }
+
+          // Get missile properties if applicable
+          if (equipment.system.missileType) {
+            additionalInfo += `<div><strong>Missile Type:</strong> ${equipment.system.missileType}</div>`;
+            if (equipment.system.guidanceSystem) {
+              additionalInfo += `<div><strong>Guidance:</strong> ${equipment.system.guidanceSystem}</div>`;
+            }
+            if (equipment.system.payloadType) {
+              additionalInfo += `<div><strong>Payload:</strong> ${equipment.system.payloadType}</div>`;
+            }
+          }
           
           // Create chat message with matched styling
           await ChatMessage.create({

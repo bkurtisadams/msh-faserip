@@ -25,6 +25,47 @@ export class FaseripEquipmentSheet extends ItemSheet {
 
   activateListeners(html) {
     super.activateListeners(html);
+
+    // Toggle collapsible sections
+    html.find('.collapsible').click(ev => {
+      const header = ev.currentTarget;
+      const section = header.dataset.section;
+      const content = header.nextElementSibling;
+      const icon = header.querySelector('i');
+      
+      // Toggle the content display
+      if (content.style.display === "none") {
+        content.style.display = "block";
+        icon.classList.remove('fa-chevron-down');
+        icon.classList.add('fa-chevron-up');
+        
+        // Save state
+        this.object.setFlag("msh-faserip", `section_${section}_open`, true);
+      } else {
+        content.style.display = "none";
+        icon.classList.remove('fa-chevron-up');
+        icon.classList.add('fa-chevron-down');
+        
+        // Save state
+        this.object.setFlag("msh-faserip", `section_${section}_open`, false);
+      }
+    });
+
+    // Initialize section states based on saved flags
+    html.find('.collapsible').each((i, el) => {
+      const header = el;
+      const section = header.dataset.section;
+      const content = header.nextElementSibling;
+      const icon = header.querySelector('i');
+      
+      // Check if the section should be open
+      const isOpen = this.object.getFlag("msh-faserip", `section_${section}_open`);
+      if (isOpen) {
+        content.style.display = "block";
+        icon.classList.remove('fa-chevron-down');
+        icon.classList.add('fa-chevron-up');
+      }
+    });
     
     // Show/hide category-specific fields when category changes
     html.find('.equipment-category-select').change(ev => {

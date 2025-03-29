@@ -56,6 +56,29 @@ export class FaseripItem extends Item {
             itemData.shotsRemaining = itemData.shots;
           }
           itemData.ammoType = itemData.ammoType || "Standard"; // Ammunition type
+
+          // Grenade properties
+          itemData.grenadeType = itemData.grenadeType || "";
+          itemData.grenadeRadius = itemData.grenadeRadius || 1;
+          itemData.grenadeIntensity = itemData.grenadeIntensity || "";
+
+          // Missile properties
+          itemData.missileType = itemData.missileType || "";
+          itemData.guidanceSystem = itemData.guidanceSystem || "";
+          itemData.payloadType = itemData.payloadType || "";
+          itemData.missileBody = itemData.missileBody || "";
+          itemData.missileControl = itemData.missileControl || "";
+          itemData.missileSpeed = itemData.missileSpeed || "";
+
+          // Special ammo tracking
+          itemData.specialAmmo = itemData.specialAmmo || {
+            mercy: false,
+            ap: false,
+            rubber: false,
+            explosive: false,
+            canister: false,
+            heatSeeker: false
+          };
         }
         
         // Armor-specific properties

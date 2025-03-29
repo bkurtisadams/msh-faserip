@@ -167,6 +167,163 @@
             <input type="text" name="system.continuingDamageRounds" value="{{system.continuingDamageRounds}}" placeholder="e.g., 5 or 1d10" />
           </div>
         </div>
+
+        <!-- Grenade Fields -->
+        <div class="specialized-section">
+          <div class="section-header collapsible" data-section="grenade-fields">
+            <h3>Grenade Properties</h3>
+            <i class="fas fa-chevron-down"></i>
+          </div>
+          <div class="grenade-fields section-content" style="display: none;">
+            <div class="form-group">
+              <label>Grenade Type:</label>
+              <select name="system.grenadeType">
+                <option value="" {{#if (eq system.grenadeType "")}}selected{{/if}}>None</option>
+                <option value="fragmentation" {{#if (eq system.grenadeType "fragmentation")}}selected{{/if}}>Fragmentation</option>
+                <option value="smoke" {{#if (eq system.grenadeType "smoke")}}selected{{/if}}>Smoke</option>
+                <option value="tearGas" {{#if (eq system.grenadeType "tearGas")}}selected{{/if}}>Tear Gas</option>
+                <option value="knockout" {{#if (eq system.grenadeType "knockout")}}selected{{/if}}>Knock-Out</option>
+                <option value="flash" {{#if (eq system.grenadeType "flash")}}selected{{/if}}>Flash</option>
+                <option value="concussive" {{#if (eq system.grenadeType "concussive")}}selected{{/if}}>Concussive</option>
+                <option value="sonic" {{#if (eq system.grenadeType "sonic")}}selected{{/if}}>Sonic</option>
+              </select>
+            </div>
+            
+            <div class="form-group">
+              <label>Blast Radius (areas):</label>
+              <input type="number" name="system.grenadeRadius" value="{{system.grenadeRadius}}" min="0" step="1"/>
+            </div>
+
+            <div class="form-group">
+              <label>Gas/Stun Intensity:</label>
+              <select name="system.grenadeIntensity">
+                <option value="" {{#if (eq system.grenadeIntensity "")}}selected{{/if}}>None</option>
+                <option value="Feeble" {{#if (eq system.grenadeIntensity "Feeble")}}selected{{/if}}>Feeble</option>
+                <option value="Poor" {{#if (eq system.grenadeIntensity "Poor")}}selected{{/if}}>Poor</option>
+                <option value="Typical" {{#if (eq system.grenadeIntensity "Typical")}}selected{{/if}}>Typical</option>
+                <option value="Good" {{#if (eq system.grenadeIntensity "Good")}}selected{{/if}}>Good</option>
+                <option value="Excellent" {{#if (eq system.grenadeIntensity "Excellent")}}selected{{/if}}>Excellent</option>
+                <option value="Remarkable" {{#if (eq system.grenadeIntensity "Remarkable")}}selected{{/if}}>Remarkable</option>
+                <option value="Incredible" {{#if (eq system.grenadeIntensity "Incredible")}}selected{{/if}}>Incredible</option>
+                <option value="Amazing" {{#if (eq system.grenadeIntensity "Amazing")}}selected{{/if}}>Amazing</option>
+                <option value="Monstrous" {{#if (eq system.grenadeIntensity "Monstrous")}}selected{{/if}}>Monstrous</option>
+                <option value="Unearthly" {{#if (eq system.grenadeIntensity "Unearthly")}}selected{{/if}}>Unearthly</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Missile Fields -->
+        <div class="specialized-section">
+          <div class="section-header collapsible" data-section="missile-fields">
+            <h3>Missile Properties</h3>
+            <i class="fas fa-chevron-down"></i>
+          </div>
+          <div class="missile-fields section-content" style="display: none;">
+            <div class="form-group">
+              <label>Missile Type:</label>
+              <select name="system.missileType">
+                <option value="" {{#if (eq system.missileType "")}}selected{{/if}}>None</option>
+                <option value="standard" {{#if (eq system.missileType "standard")}}selected{{/if}}>Standard</option>
+                <option value="high-tech" {{#if (eq system.missileType "high-tech")}}selected{{/if}}>High-Tech</option>
+                <option value="high-speed" {{#if (eq system.missileType "high-speed")}}selected{{/if}}>High-Speed</option>
+              </select>
+            </div>
+            
+            <div class="form-group">
+              <label>Guidance System:</label>
+              <select name="system.guidanceSystem">
+                <option value="" {{#if (eq system.guidanceSystem "")}}selected{{/if}}>None</option>
+                <option value="wire-guided" {{#if (eq system.guidanceSystem "wire-guided")}}selected{{/if}}>Wire-Guided</option>
+                <option value="tele-guided" {{#if (eq system.guidanceSystem "tele-guided")}}selected{{/if}}>Tele-Guided</option>
+                <option value="computer" {{#if (eq system.guidanceSystem "computer")}}selected{{/if}}>Computer-Guided</option>
+                <option value="radio" {{#if (eq system.guidanceSystem "radio")}}selected{{/if}}>Radio-Linked</option>
+                <option value="heat-seeking" {{#if (eq system.guidanceSystem "heat-seeking")}}selected{{/if}}>Heat-Seeking</option>
+              </select>
+            </div>
+            
+            <div class="form-group">
+              <label>Payload Type:</label>
+              <select name="system.payloadType">
+                <option value="" {{#if (eq system.payloadType "")}}selected{{/if}}>None</option>
+                <option value="standard" {{#if (eq system.payloadType "standard")}}selected{{/if}}>Standard</option>
+                <option value="concentrated" {{#if (eq system.payloadType "concentrated")}}selected{{/if}}>Concentrated Explosive</option>
+                <option value="high-explosive" {{#if (eq system.payloadType "high-explosive")}}selected{{/if}}>High Explosive</option>
+                <option value="incendiary" {{#if (eq system.payloadType "incendiary")}}selected{{/if}}>Incendiary</option>
+                <option value="gas" {{#if (eq system.payloadType "gas")}}selected{{/if}}>Gas</option>
+              </select>
+            </div>
+            
+            <div class="form-group">
+              <label>Body/Structure Rank:</label>
+              <select name="system.missileBody">
+                <option value="" {{#if (eq system.missileBody "")}}selected{{/if}}>None</option>
+                <option value="Typical" {{#if (eq system.missileBody "Typical")}}selected{{/if}}>Typical</option>
+                <option value="Good" {{#if (eq system.missileBody "Good")}}selected{{/if}}>Good</option>
+                <option value="Excellent" {{#if (eq system.missileBody "Excellent")}}selected{{/if}}>Excellent</option>
+                <option value="Remarkable" {{#if (eq system.missileBody "Remarkable")}}selected{{/if}}>Remarkable</option>
+              </select>
+            </div>
+            
+            <div class="form-group">
+              <label>Control Rank:</label>
+              <select name="system.missileControl">
+                <option value="" {{#if (eq system.missileControl "")}}selected{{/if}}>None</option>
+                <option value="Poor" {{#if (eq system.missileControl "Poor")}}selected{{/if}}>Poor</option>
+                <option value="Remarkable" {{#if (eq system.missileControl "Remarkable")}}selected{{/if}}>Remarkable</option>
+                <option value="Incredible" {{#if (eq system.missileControl "Incredible")}}selected{{/if}}>Incredible</option>
+              </select>
+            </div>
+            
+            <div class="form-group">
+              <label>Speed Rank:</label>
+              <select name="system.missileSpeed">
+                <option value="" {{#if (eq system.missileSpeed "")}}selected{{/if}}>None</option>
+                <option value="Excellent" {{#if (eq system.missileSpeed "Excellent")}}selected{{/if}}>Excellent</option>
+                <option value="Amazing" {{#if (eq system.missileSpeed "Amazing")}}selected{{/if}}>Amazing</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Special Ammunition -->
+        <div class="specialized-section">
+          <div class="section-header collapsible" data-section="ammo-fields">
+            <h3>Special Ammunition</h3>
+            <i class="fas fa-chevron-down"></i>
+          </div>
+          <div class="ammo-fields section-content" style="display: none;">
+            <div class="form-group">
+              <label>Available Ammunition Types:</label>
+              <div class="ammo-types-grid">
+                <div class="ammo-type-item">
+                  <input type="checkbox" name="system.specialAmmo.mercy" {{checked system.specialAmmo.mercy}}/>
+                  <label>Mercy Shot</label>
+                </div>
+                <div class="ammo-type-item">
+                  <input type="checkbox" name="system.specialAmmo.ap" {{checked system.specialAmmo.ap}}/>
+                  <label>Armor Piercing</label>
+                </div>
+                <div class="ammo-type-item">
+                  <input type="checkbox" name="system.specialAmmo.rubber" {{checked system.specialAmmo.rubber}}/>
+                  <label>Rubber Shot</label>
+                </div>
+                <div class="ammo-type-item">
+                  <input type="checkbox" name="system.specialAmmo.explosive" {{checked system.specialAmmo.explosive}}/>
+                  <label>Explosive Shot</label>
+                </div>
+                <div class="ammo-type-item">
+                  <input type="checkbox" name="system.specialAmmo.canister" {{checked system.specialAmmo.canister}}/>
+                  <label>Canister Shot</label>
+                </div>
+                <div class="ammo-type-item">
+                  <input type="checkbox" name="system.specialAmmo.heatSeeker" {{checked system.specialAmmo.heatSeeker}}/>
+                  <label>Heat-Seeker</label>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
   
       <!-- Armor-specific fields -->
       <div class="armor-fields" {{#unless (eq system.category "armor")}}style="display: none;"{{/unless}}>
@@ -319,4 +476,42 @@
       line-height: 24px;
       text-align: center;
     }
+
+    .specialized-section {
+    margin-top: 10px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    overflow: hidden;
+  }
+  
+  .section-header {
+    background-color: #f5f5f5;
+    padding: 5px 10px;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  
+  .section-header h3 {
+    margin: 0;
+    font-size: 1.1em;
+  }
+  
+  .section-content {
+    padding: 10px;
+    border-top: 1px solid #ddd;
+  }
+  
+  .ammo-types-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 5px;
+  }
+  
+  .ammo-type-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
   </style>
