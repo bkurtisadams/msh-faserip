@@ -22,6 +22,13 @@ export class FaseripVehicleSheet extends ItemSheet {
       "Shift-X", "Shift-Y", "Shift-Z", "Class 1000", "Class 3000", "Class 5000", "Beyond"
     ];
 
+    context.rankValues = {
+      "Shift-0": 0, "Feeble": 2, "Poor": 4, "Typical": 6, "Good": 10,
+      "Excellent": 20, "Remarkable": 30, "Incredible": 40, "Amazing": 50,
+      "Monstrous": 75, "Unearthly": 100, "Shift-X": 150, "Shift-Y": 200,
+      "Shift-Z": 500, "Class 1000": 1000, "Class 3000": 3000, "Class 5000": 5000, "Beyond": 10000
+    };
+    
     return context;
   }
 

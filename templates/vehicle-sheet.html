@@ -98,8 +98,10 @@
       <div class="form-group">
         <label>Current Body HP</label>
         <input type="number" name="system.bodyHP" value="{{system.bodyHP}}" /> / 
+        <!-- <input type="number" value="{{lookup ../rankValues ../system.body}}" readonly /> -->
         <input type="number" name="system.bodyHPMax" value="{{system.bodyHPMax}}" />
       </div>
+      
       <div class="form-group">
         <label>Body CS Loss</label>
         <input type="number" name="system.bodyCSLoss" value="{{system.bodyCSLoss}}" />
