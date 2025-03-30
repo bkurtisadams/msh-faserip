@@ -1541,7 +1541,90 @@ export class FaseripActorSheet extends ActorSheet {
       }
     });
 
-    // 
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    // Add Vehicle button
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    html.find('.add-vehicle').click(ev => {
+      console.log("Add Vehicle button clicked"); // Debug line
+
+      // Create the new vehicle item data
+      const itemData = {
+        name: "New Vehicle",
+        type: "vehicle",
+        system: {
+          description: "",
+          type: "Road",
+          cost: "Typical",
+          control: "Typical",
+          speed: "Typical",
+          body: "Typical", 
+          protection: "Typical",
+          compartmented: false,
+          features: ""
+        }
+      };
+
+      this.actor.createEmbeddedDocuments("Item", [itemData])
+        .then(items => {
+          console.log("Vehicle created successfully");
+          // Open the sheet for the newly created item
+          if (items && items.length > 0) {
+            items[0].sheet.render(true);
+          }
+          this.render(false); // Re-render the actor sheet
+        })
+        .catch(err => console.error("Error creating vehicle:", err));
+    });
+
+    // Browse Vehicles Compendium button
+    html.find('.browse-compendium[data-type="vehicles"]').click(ev => {
+      const pack = game.packs.find(p => p.metadata.name === "vehicles" && p.metadata.system === "msh-faserip");
+      if (pack) {
+        pack.render(true);
+      } else {
+        ui.notifications.warn("Vehicles compendium not found.");
+      }
+    });
+
+    // Edit vehicle button
+    html.find('.vehicles-table .item-edit').click(ev => {
+      const li = $(ev.currentTarget).closest(".vehicle-row");
+      const itemId = li.data("itemId");
+      const item = this.actor.items.get(itemId);
+
+      if (item) {
+        item.sheet.render(true);
+      }
+    });
+
+    // Delete vehicle button
+    html.find('.vehicles-table .item-delete').click(ev => {
+      const li = $(ev.currentTarget).closest(".vehicle-row");
+      const itemId = li.data("itemId");
+
+      if (!itemId) return;
+
+      // Confirm deletion
+      new Dialog({
+        title: "Delete Vehicle",
+        content: "<p>Are you sure you want to delete this vehicle?</p>",
+        buttons: {
+          delete: {
+            icon: '<i class="fas fa-trash"></i>',
+            label: "Delete",
+            callback: () => {
+              this.actor.deleteEmbeddedDocuments("Item", [itemId]);
+              this.render(false);
+            }
+          },
+          cancel: {
+            icon: '<i class="fas fa-times"></i>',
+            label: "Cancel"
+          }
+        },
+        default: "cancel"
+      }).render(true);
+    }); 
     // Add Headquarters button
     html.find('.add-headquarters').click(ev => {
       console.log("Add Headquarters button clicked"); // Debug line

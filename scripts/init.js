@@ -36,7 +36,6 @@ Hooks.once("init", () => {
     return item.rollItem();
   };
   
-
   // Register Handlebars helpers
   Handlebars.registerHelper('getFlag', function(object, scope, flag) {
     return object.getFlag(scope, flag);
@@ -51,10 +50,13 @@ Hooks.once("init", () => {
   Items.unregisterSheet("core", ItemSheet);
 
   Actors.registerSheet("msh-faserip", FaseripActorSheet, { makeDefault: true });
+  
+  // Make sure to register vehicle items with FaseripItemSheet
   Items.registerSheet("msh-faserip", FaseripItemSheet, { 
-    types: ["power", "talent", "contact", "vehicle", "headquarters"],
+    types: ["power", "talent", "contact", "headquarters", "vehicle"],
     makeDefault: true 
   });
+  
   Items.registerSheet("msh-faserip", FaseripEquipmentSheet, { 
     types: ["equipment"], 
     makeDefault: true 
