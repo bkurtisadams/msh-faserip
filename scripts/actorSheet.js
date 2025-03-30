@@ -1596,6 +1596,36 @@ export class FaseripActorSheet extends ActorSheet {
       }
     });
 
+    html.find('.vehicle-info').click(ev => {
+      const li = $(ev.currentTarget).closest(".vehicle-row");
+      const itemId = li.data("itemId") || $(ev.currentTarget).data("itemId");
+      const item = this.actor.items.get(itemId);
+      if (!item) return;
+    
+      // Show vehicle details in a dialog
+      let content = `
+        <h2>${item.name}</h2>
+        <div class="vehicle-details">
+          <p><strong>Type:</strong> ${item.system.type}</p>
+          <p><strong>Cost:</strong> ${item.system.cost}</p>
+          <p><strong>Control:</strong> ${item.system.control}</p>
+          <p><strong>Speed:</strong> ${item.system.speed}</p>
+          <p><strong>Body:</strong> ${item.system.body}</p>
+          <p><strong>Protection:</strong> ${item.system.protection}</p>
+          <p><strong>Compartmented:</strong> ${item.system.compartmented ? "Yes" : "No"}</p>
+        </div>
+        ${item.system.features ? `<p><strong>Features:</strong> ${item.system.features}</p>` : ''}
+        ${item.system.description ? `<div class="description">${item.system.description}</div>` : ''}
+      `;
+    
+      new Dialog({
+        title: "Vehicle Information",
+        content,
+        buttons: { close: { label: "Close" } },
+        width: 400
+      }).render(true);
+    });
+
     // Edit vehicle button
     html.find('.vehicles-table .item-edit').click(ev => {
       const li = $(ev.currentTarget).closest(".vehicle-row");
@@ -1634,7 +1664,8 @@ export class FaseripActorSheet extends ActorSheet {
         },
         default: "cancel"
       }).render(true);
-    }); 
+    });
+
     // Add Headquarters button
     html.find('.add-headquarters').click(ev => {
       console.log("Add Headquarters button clicked"); // Debug line

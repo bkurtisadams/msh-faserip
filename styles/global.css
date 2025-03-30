@@ -2428,3 +2428,9 @@
   border: 1px solid #ccc;
   border-radius: 3px;
 }
+
+.vehicle-icon {
+  margin-right: 5px;
+  vertical-align: middle;
+  cursor: pointer;
+}
