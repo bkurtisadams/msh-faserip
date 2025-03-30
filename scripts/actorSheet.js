@@ -109,9 +109,9 @@ export class FaseripActorSheet extends ActorSheet {
     });
 
     // Vehicle rows draggable
-    html.find('.vehicle-row').each((i, li) => {
-      li.setAttribute("draggable", true);
-      li.addEventListener("dragstart", this._onDragStart.bind(this));
+    html.find('.vehicle-name').each((i, td) => {
+      td.setAttribute("draggable", true);
+      td.addEventListener("dragstart", this._onDragStart.bind(this));
     });
 
     // Biography Toggle Button
@@ -1596,12 +1596,12 @@ export class FaseripActorSheet extends ActorSheet {
       }
     });
 
+    // Vehicle info button (clickable image)
     html.find('.vehicle-info').click(ev => {
-      const li = $(ev.currentTarget).closest(".vehicle-row");
-      const itemId = li.data("itemId") || $(ev.currentTarget).data("itemId");
+      const itemId = $(ev.currentTarget).data("itemId");
       const item = this.actor.items.get(itemId);
       if (!item) return;
-    
+
       // Show vehicle details in a dialog
       let content = `
         <h2>${item.name}</h2>
@@ -1617,13 +1617,19 @@ export class FaseripActorSheet extends ActorSheet {
         ${item.system.features ? `<p><strong>Features:</strong> ${item.system.features}</p>` : ''}
         ${item.system.description ? `<div class="description">${item.system.description}</div>` : ''}
       `;
-    
+
       new Dialog({
         title: "Vehicle Information",
         content,
         buttons: { close: { label: "Close" } },
         width: 400
       }).render(true);
+    });
+
+    // Make only vehicle-name cells draggable
+    html.find('.vehicle-name').each((i, td) => {
+      td.setAttribute("draggable", true);
+      td.addEventListener("dragstart", this._onDragStart.bind(this));
     });
 
     // Edit vehicle button
@@ -1644,7 +1650,6 @@ export class FaseripActorSheet extends ActorSheet {
 
       if (!itemId) return;
 
-      // Confirm deletion
       new Dialog({
         title: "Delete Vehicle",
         content: "<p>Are you sure you want to delete this vehicle?</p>",
@@ -1665,6 +1670,7 @@ export class FaseripActorSheet extends ActorSheet {
         default: "cancel"
       }).render(true);
     });
+
 
     // Add Headquarters button
     html.find('.add-headquarters').click(ev => {

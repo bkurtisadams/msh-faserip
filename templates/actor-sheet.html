@@ -780,20 +780,20 @@
   <table class="vehicles-table">
     <thead>
       <tr>
-        <th>Name</th>
-        <th>Type</th>
-        <th>Cost</th>
-        <th>Control</th>
-        <th>Speed</th>
-        <th>Body</th>
-        <th>Protection</th>
-        <th>Actions</th>
+        <th class="name-col">Name</th>
+        <th class="type-col">Type</th>
+        <th class="cost-col">Cost</th>
+        <th class="control-col">Ctrl</th>
+        <th class="speed-col">Spd</th>
+        <th class="body-col">Bod</th>
+        <th class="protection-col">Prot</th>
+        <th class="actions-col">Actions</th>
       </tr>
     </thead>
     <tbody>
       {{#each vehicles as |item i|}}
       <tr class="vehicle-row" data-item-id="{{item._id}}">
-        <td class="vehicle-name">
+        <td class="vehicle-name" draggable="true">
           <div class="vehicle-icon vehicle-info" data-item-id="{{item._id}}">
             <img src="{{item.img}}" width="24" height="24" />
           </div>
@@ -804,8 +804,8 @@
         <td title="{{item.system.control}}">{{abbreviateRank item.system.control}}</td>
         <td title="{{item.system.speed}}">{{abbreviateRank item.system.speed}}</td>
         <td title="{{item.system.body}}">{{abbreviateRank item.system.body}}</td>
-        <td>{{item.system.protection}}</td>
-        <!-- <td title="{{item.system.protection}}">{{abbreviateRank item.system.protection}}</td> -->
+        <!-- <td>{{item.system.protection}}</td> -->
+        <td title="{{item.system.protection}}">{{abbreviateRank item.system.protection}}</td>
         <td class="vehicle-controls">
           <a class="item-edit" title="Edit"><i class="fas fa-edit"></i></a>
           <a class="item-delete" title="Delete"><i class="fas fa-trash"></i></a>

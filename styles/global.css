@@ -2386,14 +2386,14 @@
 }
 
 /* Column width adjustments */
-.vehicles-table .name-col { width: 25%; }
-.vehicles-table .type-col { width: 10%; }
-.vehicles-table .cost-col { width: 10%; }
-.vehicles-table .control-col { width: 10%; }
-.vehicles-table .speed-col { width: 10%; }
-.vehicles-table .body-col { width: 10%; }
-.vehicles-table .protection-col { width: 10%; }
-.vehicles-table .actions-col { width: 15%; text-align: center; }
+.vehicles-table .name-col { width: 30%; }
+.vehicles-table .type-col,
+.vehicles-table .cost-col,
+.vehicles-table .control-col,
+.vehicles-table .speed-col,
+.vehicles-table .body-col,
+.vehicles-table .protection-col { width: 8%; }
+.vehicles-table .actions-col { width: 12%; text-align: center; }
 
 .vehicle-row:hover {
   background-color: #f5f5f5;
@@ -2433,4 +2433,12 @@
   margin-right: 5px;
   vertical-align: middle;
   cursor: pointer;
+}
+
+.vehicle-name {
+  cursor: grab;
+}
+
+.vehicle-name:active {
+  cursor: grabbing;
 }
