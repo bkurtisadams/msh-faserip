@@ -2655,6 +2655,40 @@ _rollVehicleControl(vehicle) {
               outcome = ["red", "yellow"].includes(damageColor) ? "No effect" : damageColor === "green" ? "Body -1CS, Control FEAT required" : "Control -1CS, damage to passengers, Control FEAT required";
             }
 
+            // Apply damage effects to the vehicle's system
+            let updateData = {};
+            if (damageLevel === "greater") {
+              if (damageColor === "red") updateData["system.bodyCSLoss"] = (vehicle.system.bodyCSLoss || 0) + 1;
+              if (damageColor === "yellow") updateData["system.speedCSLoss"] = (vehicle.system.speedCSLoss || 0) + 1;
+              if (damageColor === "green") updateData["system.controlCSLoss"] = (vehicle.system.controlCSLoss || 0) + 1;
+              if (damageColor === "white") {
+                updateData["system.bodyCSLoss"] = (vehicle.system.bodyCSLoss || 0) + 1;
+                updateData["system.speedCSLoss"] = (vehicle.system.speedCSLoss || 0) + 1;
+                updateData["system.controlCSLoss"] = (vehicle.system.controlCSLoss || 0) + 1;
+              }
+            } else if (damageLevel === "equal") {
+              if (damageColor === "yellow") updateData["system.bodyCSLoss"] = (vehicle.system.bodyCSLoss || 0) + 1;
+              if (damageColor === "green") updateData["system.speedCSLoss"] = (vehicle.system.speedCSLoss || 0) + 1;
+              if (damageColor === "white") updateData["system.controlCSLoss"] = (vehicle.system.controlCSLoss || 0) + 1;
+            } else {
+              if (damageColor === "green") updateData["system.bodyCSLoss"] = (vehicle.system.bodyCSLoss || 0) + 1;
+              if (damageColor === "white") {
+                updateData["system.controlCSLoss"] = (vehicle.system.controlCSLoss || 0) + 1;
+              }
+            }
+
+            // Apply net passenger damage to vehicle HP
+            const currentHP = vehicle.system.bodyHP ?? 20;
+            updateData["system.bodyHP"] = Math.max(0, currentHP - netDamage);
+
+            // Commit the changes
+            await vehicle.update(updateData);
+
+            // Add a destruction warning if HP hits zero
+            if (updateData["system.bodyHP"] === 0) {
+              outcome += " Vehicle destroyed!";
+            }
+
             crashDetails = `
               <hr>
               <div><strong>Crash Result:</strong></div>
