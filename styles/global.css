@@ -2477,3 +2477,7 @@
   color: orange;
   text-decoration: underline dotted;
 }
+
+.power-row.drag-over {
+  outline: 2px dashed #888;
+}
