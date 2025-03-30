@@ -302,8 +302,6 @@ export class FaseripActorSheet extends ActorSheet {
       }
     });
 
-    // In actorSheet.js, add to your activateListeners function
-
     // Power info button
     html.find('.power-info').click(ev => {
       const li = $(ev.currentTarget).closest(".power-row");
@@ -314,15 +312,15 @@ export class FaseripActorSheet extends ActorSheet {
 
       // Create a dialog to show power information
       let content = `
-    <h2>${item.name}</h2>
-    <div class="power-details">
-      <div class="label">Rank:</div><div>${item.system.rank} (${item.system.value})</div>
-      <div class="label">Type:</div><div>${item.system.type || 'None'}</div>
-      <div class="label">Range:</div><div>${item.system.range || 'None'}</div>
-      <div class="label">Active:</div><div>${item.system.isActive ? 'Yes' : 'No'}</div>
-    </div>
-    <div class="description">${item.system.description || 'No description available.'}</div>
-  `;
+        <h2>${item.name}</h2>
+        <div class="power-details">
+          <p><strong>Rank:</strong> ${item.system.rank} (${item.system.value})</p>
+          <p><strong>Type:</strong> ${item.system.type || 'None'}</p>
+          <p><strong>Range:</strong> ${item.system.range || 'None'}</p>
+          <p><strong>Active:</strong> ${item.system.isActive ? 'Yes' : 'No'}</p>
+        </div>
+        <div class="description">${item.system.description || 'No description available.'}</div>
+      `;
 
       new Dialog({
         title: "Power Information",
