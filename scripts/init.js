@@ -41,6 +41,30 @@ Hooks.once("init", () => {
     return object.getFlag(scope, flag);
   });
 
+  Handlebars.registerHelper('abbreviateRank', function(rank) {
+    const rankMap = {
+      "Shift-0": "Sh-0",
+      "Feeble": "Fe",
+      "Poor": "Pr",
+      "Typical": "Ty",
+      "Good": "Gd",
+      "Excellent": "Ex",
+      "Remarkable": "Rm",
+      "Incredible": "In",
+      "Amazing": "Am",
+      "Monstrous": "Mn",
+      "Unearthly": "Un",
+      "Shift-X": "Sh-X",
+      "Shift-Y": "Sh-Y",
+      "Shift-Z": "Sh-Z",
+      "Class 1000": "1000",
+      "Class 3000": "3000",
+      "Class 5000": "5000",
+      "Beyond": "B"
+    };
+    return rankMap[rank] || rank;
+  });
+
   // Register document classes
   CONFIG.Actor.documentClass = FaseripActor;
   CONFIG.Item.documentClass = FaseripItem;
@@ -61,6 +85,8 @@ Hooks.once("init", () => {
     types: ["equipment"], 
     makeDefault: true 
   });
+
+
 
   // end of hooks.once
 });

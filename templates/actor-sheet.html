@@ -800,11 +800,11 @@
           <div class="vehicle-name-text">{{item.name}}</div>
         </td>
         <td>{{item.system.type}}</td>
-        <td>{{item.system.cost}}</td>
-        <td>{{item.system.control}}</td>
-        <td>{{item.system.speed}}</td>
-        <td>{{item.system.body}}</td>
-        <td>{{item.system.protection}}</td>
+        <td title="{{item.system.cost}}">{{abbreviateRank item.system.cost}}</td>
+        <td title="{{item.system.control}}">{{abbreviateRank item.system.control}}</td>
+        <td title="{{item.system.speed}}">{{abbreviateRank item.system.speed}}</td>
+        <td title="{{item.system.body}}">{{abbreviateRank item.system.body}}</td>
+        <td title="{{item.system.protection}}">{{abbreviateRank item.system.protection}}</td>
         <td class="vehicle-controls">
           <a class="item-edit" title="Edit"><i class="fas fa-edit"></i></a>
           <a class="item-delete" title="Delete"><i class="fas fa-trash"></i></a>
