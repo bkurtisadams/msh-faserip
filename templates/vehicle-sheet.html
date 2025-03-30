@@ -32,7 +32,7 @@
       <div class="form-group">
         <label>Cost</label>
         <select name="system.cost">
-          {{#each ../allRanks}}
+          {{#each allRanks}}
           <option value="{{this}}" {{#if (eq ../system.cost this)}}selected{{/if}}>{{this}}</option>
           {{/each}}
         </select>
@@ -40,7 +40,7 @@
       <div class="form-group">
         <label>Control</label>
         <select name="system.control">
-          {{#each ../allRanks}}
+          {{#each allRanks}}
           <option value="{{this}}" {{#if (eq ../system.control this)}}selected{{/if}}>{{this}}</option>
           {{/each}}
         </select>
@@ -48,15 +48,16 @@
       <div class="form-group">
         <label>Speed</label>
         <select name="system.speed">
-          {{#each ../allRanks}}
-          <option value="{{this}}" {{#if (eq ../system.speed this)}}selected{{/if}}>{{this}}</option>
+          {{#each allRanks}}
+            <option value="{{this}}" {{#if (eq this ../system.speed)}}selected{{/if}}>{{this}}</option>
           {{/each}}
         </select>
+        
       </div>
       <div class="form-group">
         <label>Body</label>
         <select name="system.body">
-          {{#each ../allRanks}}
+          {{#each allRanks}}
           <option value="{{this}}" {{#if (eq ../system.body this)}}selected{{/if}}>{{this}}</option>
           {{/each}}
         </select>
@@ -64,7 +65,7 @@
       <div class="form-group">
         <label>Protection</label>
         <select name="system.protection">
-          {{#each ../allRanks}}
+          {{#each allRanks}}
           <option value="{{this}}" {{#if (eq ../system.protection this)}}selected{{/if}}>{{this}}</option>
           {{/each}}
         </select>
