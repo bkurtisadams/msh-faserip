@@ -198,7 +198,16 @@
       "protection": "Typical",
       "compartmented": false,
       "features": "",
-      "description": ""
+      "description": "",
+
+      "driver": "",
+      "passengers": [],
+      "bodyHP": 20,
+      "bodyHPMax": 20,
+      "bodyCSLoss": 0,
+      "speedCSLoss": 0,
+      "controlCSLoss": 0,
+      "damageLog": []
     },
     "headquarters": {
       "templates": ["base"],
