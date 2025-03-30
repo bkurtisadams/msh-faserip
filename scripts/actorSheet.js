@@ -2564,10 +2564,41 @@ _rollVehicleControl(vehicle) {
   const textColor = (c) => ["white", "yellow"].includes(c) ? "#333" : "white";
 
   const controlRank = vehicle.system.control || "Typical";
-  const controlValue = rankValues[controlRank] ?? 6;
+  const controlCSLoss = vehicle.system.controlCSLoss || 0;
+  const rawControlValue = rankValues[controlRank] ?? 6;
+  const controlValue = Math.max(0, rawControlValue - (controlCSLoss * 2));
+
+  // Figure out adjusted control rank after CS loss
+  const adjustedControlRank = Object.entries(rankValues).find(([_, v]) => v === controlValue)?.[0] || "Unknown";
+
   const usedValue = Math.min(agility, controlValue);
   const baseUsedRank = Object.entries(rankValues).find(([_, v]) => v === usedValue)?.[0] || "Typical";
   const baseRankIndex = rankTable.indexOf(baseUsedRank);
+
+  // 🧱 Prevent control roll if vehicle is destroyed
+  const bodyRank = vehicle.system.body || "Typical";
+  const maxHP = rankValues[bodyRank] ?? 6;
+  const currentHP = vehicle.system.bodyHP ?? maxHP;
+
+  if (currentHP <= 0) {
+    const message = `${actor.name} attempts to operate <strong>${vehicle.name}</strong>, but it is <span style="color:#b00"><strong>destroyed</strong></span> and cannot be controlled.`;
+
+    // UI popup
+    ui.notifications.error(`${vehicle.name} is destroyed and cannot be operated.`);
+
+    // Chat card
+    ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor }),
+      content: `
+        <div style="border:1px solid #aaa; padding:10px; background:#fbeaea; border-radius:5px;">
+          <h3>Vehicle Control Attempt</h3>
+          <p>${message}</p>
+        </div>
+      `
+    });
+
+    return;
+  }
 
   new Dialog({
     title: `Vehicle Control FEAT: ${vehicle.name}`,
@@ -2678,7 +2709,11 @@ _rollVehicleControl(vehicle) {
             }
 
             // Apply net passenger damage to vehicle HP
-            const currentHP = vehicle.system.bodyHP ?? 20;
+            // Calculate max HP from body rank (reuse bodyRank from earlier)
+            const maxHP = rankValues[bodyRank] ?? 6;
+            const currentHP = vehicle.system.bodyHP ?? maxHP;
+
+            // Apply net passenger damage to vehicle HP
             updateData["system.bodyHP"] = Math.max(0, currentHP - netDamage);
 
             // Commit the changes
@@ -2712,6 +2747,7 @@ _rollVehicleControl(vehicle) {
             content: `
               <div style="border:1px solid gray;padding:10px;background:#f5f5f5">
                 <h3>${actor.name} - Vehicle Control FEAT</h3>
+                <p>Control Rank: ${controlRank}${controlCSLoss > 0 ? ` -${controlCSLoss}CS → ${adjustedControlRank}` : ""}</p>
                 <p>Used Rank: ${baseUsedRank} → ${shiftedRank}</p>
                 <p>Roll: ${controlRoll.total} + Karma ${karma} = ${controlTotal}</p>
                 <div style="text-align:center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px;
