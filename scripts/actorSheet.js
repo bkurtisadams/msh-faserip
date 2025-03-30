@@ -37,8 +37,12 @@ export class FaseripActorSheet extends ActorSheet {
     // equipment
     context.equipment = this.actor.items.filter(item => item.type === "equipment") || [];
 
-    // Add this after the other item type filters
+    // headquarters
     context.headquarters = this.actor.items.filter(item => item.type === "headquarters") || [];
+
+    // vehicles
+    context.vehicles = this.actor.items.filter(item => item.type === "vehicle") || [];
+
 
     // Add ranks array for dropdowns
     context.allRanks = [
@@ -100,6 +104,12 @@ export class FaseripActorSheet extends ActorSheet {
 
     // Equipment rows draggable
     html.find('.equipment-row').each((i, li) => {
+      li.setAttribute("draggable", true);
+      li.addEventListener("dragstart", this._onDragStart.bind(this));
+    });
+
+    // Vehicle rows draggable
+    html.find('.vehicle-row').each((i, li) => {
       li.setAttribute("draggable", true);
       li.addEventListener("dragstart", this._onDragStart.bind(this));
     });
