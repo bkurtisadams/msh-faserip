@@ -1,6 +1,7 @@
 <form class="faserip-dialog vehicle-dialog">
   <div class="dialog-header">
-    <h2><img src="{{item.img}}" width="32" height="32"> {{#if item._id}}Edit{{else}}New{{/if}} Vehicle</h2>
+    <!-- <h2><img src="{{item.img}}" width="32" height="32"> {{#if item._id}}Edit{{else}}New{{/if}} Vehicle</h2> -->
+    <h2><img class="profile-img" src="{{item.img}}" data-edit="img" width="32" height="32" title="Click to edit image"> {{#if item._id}}Edit{{else}}New{{/if}} Vehicle</h2>
   </div>
 
   <!-- Tab Navigation -->
