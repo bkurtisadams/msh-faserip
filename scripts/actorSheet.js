@@ -2637,6 +2637,10 @@ _rollVehicleControl(vehicle) {
 
           const controlRoll = new Roll("1d100");
           await controlRoll.evaluate();
+          await controlRoll.toMessage({
+            speaker: ChatMessage.getSpeaker({ actor }),
+            flavor: `${actor.name} makes a Vehicle Control FEAT${stunt ? ` to perform a stunt: ${stuntName}` : ""}`
+          });
 
           const controlTotal = controlRoll.total + karma;
 
