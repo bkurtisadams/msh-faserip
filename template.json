@@ -190,9 +190,15 @@
     },
     "vehicle": {
       "templates": ["base"],
-      "speed": 0,
-      "materialStrength": "Typical",
-      "handling": ""
+      "type": "Road",
+      "cost": "Typical",
+      "control": "Typical",
+      "speed": "Typical",
+      "body": "Typical",
+      "protection": "Typical",
+      "compartmented": false,
+      "features": "",
+      "description": ""
     },
     "headquarters": {
       "templates": ["base"],

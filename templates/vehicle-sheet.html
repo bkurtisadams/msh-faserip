@@ -1,0 +1,141 @@
+<form class="faserip-dialog vehicle-dialog">
+    <div class="dialog-header">
+      <h2><img src="{{item.img}}" width="32" height="32"> {{#if item._id}}Edit{{else}}New{{/if}} Vehicle</h2>
+    </div>
+  
+    <div class="dialog-body">
+      <!-- Basic Information Section -->
+      <div class="form-group">
+        <label>Name</label>
+        <input type="text" name="name" value="{{item.name}}" placeholder="Vehicle Name">
+      </div>
+      
+      <div class="form-group">
+        <label>Type</label>
+        <select name="system.type">
+          <option value="Road" {{#if (eq system.type "Road")}}selected{{/if}}>Road</option>
+          <option value="Off-Road" {{#if (eq system.type "Off-Road")}}selected{{/if}}>Off-Road</option>
+          <option value="Railed" {{#if (eq system.type "Railed")}}selected{{/if}}>Railed</option>
+          <option value="GEV" {{#if (eq system.type "GEV")}}selected{{/if}}>GEV (Ground Effects Vehicle)</option>
+          <option value="Air" {{#if (eq system.type "Air")}}selected{{/if}}>Air</option>
+          <option value="Space" {{#if (eq system.type "Space")}}selected{{/if}}>Space</option>
+          <option value="Water" {{#if (eq system.type "Water")}}selected{{/if}}>Water</option>
+          <option value="Sub" {{#if (eq system.type "Sub")}}selected{{/if}}>Sub</option>
+        </select>
+      </div>
+      
+      <div class="form-group">
+        <label>Cost (Resource Rank)</label>
+        <select name="system.cost">
+          <option value="Shift-0" {{#if (eq system.cost "Shift-0")}}selected{{/if}}>Shift-0</option>
+          <option value="Feeble" {{#if (eq system.cost "Feeble")}}selected{{/if}}>Feeble</option>
+          <option value="Poor" {{#if (eq system.cost "Poor")}}selected{{/if}}>Poor</option>
+          <option value="Typical" {{#if (eq system.cost "Typical")}}selected{{/if}}>Typical</option>
+          <option value="Good" {{#if (eq system.cost "Good")}}selected{{/if}}>Good</option>
+          <option value="Excellent" {{#if (eq system.cost "Excellent")}}selected{{/if}}>Excellent</option>
+          <option value="Remarkable" {{#if (eq system.cost "Remarkable")}}selected{{/if}}>Remarkable</option>
+          <option value="Incredible" {{#if (eq system.cost "Incredible")}}selected{{/if}}>Incredible</option>
+          <option value="Amazing" {{#if (eq system.cost "Amazing")}}selected{{/if}}>Amazing</option>
+          <option value="Monstrous" {{#if (eq system.cost "Monstrous")}}selected{{/if}}>Monstrous</option>
+          <option value="Unearthly" {{#if (eq system.cost "Unearthly")}}selected{{/if}}>Unearthly</option>
+          <option value="Shift-X" {{#if (eq system.cost "Shift-X")}}selected{{/if}}>Shift-X</option>
+          <option value="Shift-Y" {{#if (eq system.cost "Shift-Y")}}selected{{/if}}>Shift-Y</option>
+          <option value="Shift-Z" {{#if (eq system.cost "Shift-Z")}}selected{{/if}}>Shift-Z</option>
+        </select>
+      </div>
+      
+      <div class="form-group">
+        <label>Control</label>
+        <select name="system.control">
+          <option value="Shift-0" {{#if (eq system.control "Shift-0")}}selected{{/if}}>Shift-0</option>
+          <option value="Feeble" {{#if (eq system.control "Feeble")}}selected{{/if}}>Feeble</option>
+          <option value="Poor" {{#if (eq system.control "Poor")}}selected{{/if}}>Poor</option>
+          <option value="Typical" {{#if (eq system.control "Typical")}}selected{{/if}}>Typical</option>
+          <option value="Good" {{#if (eq system.control "Good")}}selected{{/if}}>Good</option>
+          <option value="Excellent" {{#if (eq system.control "Excellent")}}selected{{/if}}>Excellent</option>
+          <option value="Remarkable" {{#if (eq system.control "Remarkable")}}selected{{/if}}>Remarkable</option>
+          <option value="Incredible" {{#if (eq system.control "Incredible")}}selected{{/if}}>Incredible</option>
+          <option value="Amazing" {{#if (eq system.control "Amazing")}}selected{{/if}}>Amazing</option>
+          <option value="Monstrous" {{#if (eq system.control "Monstrous")}}selected{{/if}}>Monstrous</option>
+          <option value="Unearthly" {{#if (eq system.control "Unearthly")}}selected{{/if}}>Unearthly</option>
+        </select>
+      </div>
+      
+      <div class="form-group">
+        <label>Speed</label>
+        <select name="system.speed">
+          <option value="Shift-0" {{#if (eq system.speed "Shift-0")}}selected{{/if}}>Shift-0</option>
+          <option value="Feeble" {{#if (eq system.speed "Feeble")}}selected{{/if}}>Feeble</option>
+          <option value="Poor" {{#if (eq system.speed "Poor")}}selected{{/if}}>Poor</option>
+          <option value="Typical" {{#if (eq system.speed "Typical")}}selected{{/if}}>Typical</option>
+          <option value="Good" {{#if (eq system.speed "Good")}}selected{{/if}}>Good</option>
+          <option value="Excellent" {{#if (eq system.speed "Excellent")}}selected{{/if}}>Excellent</option>
+          <option value="Remarkable" {{#if (eq system.speed "Remarkable")}}selected{{/if}}>Remarkable</option>
+          <option value="Incredible" {{#if (eq system.speed "Incredible")}}selected{{/if}}>Incredible</option>
+          <option value="Amazing" {{#if (eq system.speed "Amazing")}}selected{{/if}}>Amazing</option>
+          <option value="Monstrous" {{#if (eq system.speed "Monstrous")}}selected{{/if}}>Monstrous</option>
+          <option value="Unearthly" {{#if (eq system.speed "Unearthly")}}selected{{/if}}>Unearthly</option>
+          <option value="Shift-X" {{#if (eq system.speed "Shift-X")}}selected{{/if}}>Shift-X</option>
+          <option value="Shift-Y" {{#if (eq system.speed "Shift-Y")}}selected{{/if}}>Shift-Y</option>
+          <option value="Shift-Z" {{#if (eq system.speed "Shift-Z")}}selected{{/if}}>Shift-Z</option>
+        </select>
+      </div>
+      
+      <div class="form-group">
+        <label>Body</label>
+        <select name="system.body">
+          <option value="Shift-0" {{#if (eq system.body "Shift-0")}}selected{{/if}}>Shift-0</option>
+          <option value="Feeble" {{#if (eq system.body "Feeble")}}selected{{/if}}>Feeble</option>
+          <option value="Poor" {{#if (eq system.body "Poor")}}selected{{/if}}>Poor</option>
+          <option value="Typical" {{#if (eq system.body "Typical")}}selected{{/if}}>Typical</option>
+          <option value="Good" {{#if (eq system.body "Good")}}selected{{/if}}>Good</option>
+          <option value="Excellent" {{#if (eq system.body "Excellent")}}selected{{/if}}>Excellent</option>
+          <option value="Remarkable" {{#if (eq system.body "Remarkable")}}selected{{/if}}>Remarkable</option>
+          <option value="Incredible" {{#if (eq system.body "Incredible")}}selected{{/if}}>Incredible</option>
+          <option value="Amazing" {{#if (eq system.body "Amazing")}}selected{{/if}}>Amazing</option>
+          <option value="Monstrous" {{#if (eq system.body "Monstrous")}}selected{{/if}}>Monstrous</option>
+          <option value="Unearthly" {{#if (eq system.body "Unearthly")}}selected{{/if}}>Unearthly</option>
+        </select>
+      </div>
+      
+      <div class="form-group">
+        <label>Protection</label>
+        <select name="system.protection">
+          <option value="None" {{#if (eq system.protection "None")}}selected{{/if}}>None (0)</option>
+          <option value="Shift-0" {{#if (eq system.protection "Shift-0")}}selected{{/if}}>Shift-0</option>
+          <option value="Feeble" {{#if (eq system.protection "Feeble")}}selected{{/if}}>Feeble</option>
+          <option value="Poor" {{#if (eq system.protection "Poor")}}selected{{/if}}>Poor</option>
+          <option value="Typical" {{#if (eq system.protection "Typical")}}selected{{/if}}>Typical</option>
+          <option value="Good" {{#if (eq system.protection "Good")}}selected{{/if}}>Good</option>
+          <option value="Excellent" {{#if (eq system.protection "Excellent")}}selected{{/if}}>Excellent</option>
+          <option value="Remarkable" {{#if (eq system.protection "Remarkable")}}selected{{/if}}>Remarkable</option>
+          <option value="Incredible" {{#if (eq system.protection "Incredible")}}selected{{/if}}>Incredible</option>
+          <option value="Amazing" {{#if (eq system.protection "Amazing")}}selected{{/if}}>Amazing</option>
+          <option value="Monstrous" {{#if (eq system.protection "Monstrous")}}selected{{/if}}>Monstrous</option>
+          <option value="Unearthly" {{#if (eq system.protection "Unearthly")}}selected{{/if}}>Unearthly</option>
+        </select>
+      </div>
+      
+      <div class="form-group">
+        <label>Compartmented</label>
+        <div class="checkbox-group">
+          <label><input type="checkbox" name="system.compartmented" {{#if system.compartmented}}checked{{/if}}> Vehicle is compartmented</label>
+        </div>
+      </div>
+      
+      <div class="form-group">
+        <label>Special Features</label>
+        <textarea name="system.features" rows="4" placeholder="List any special features or equipment">{{system.features}}</textarea>
+      </div>
+      
+      <div class="form-group">
+        <label>Description</label>
+        <textarea name="system.description" rows="4" placeholder="General description and notes">{{system.description}}</textarea>
+      </div>
+    </div>
+  
+    <div class="dialog-footer">
+      <button type="button" class="cancel-button">Cancel</button>
+      <button type="submit" class="submit-button">{{#if item._id}}Update{{else}}Create{{/if}} Vehicle</button>
+    </div>
+  </form>
