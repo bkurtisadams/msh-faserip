@@ -139,6 +139,19 @@
       </div>
     </div>
 
+    <div class="form-group third">
+      <label>
+        <input type="checkbox" name="flags.msh-faserip.isBonusPower" {{checked (getFlag item "msh-faserip" "isBonusPower")}} />
+        Bonus Power
+      </label>
+    </div>
+    <div class="form-group third">
+      <label>
+        <input type="checkbox" name="flags.msh-faserip.isStuntPower" {{checked (getFlag item "msh-faserip" "isStuntPower")}} />
+        Stunt Power
+      </label>
+    </div>
+
     <div class="form-group">
       <label>Limitations/Drawbacks:</label>
       <textarea name="system.limitations">{{system.limitations}}</textarea>
@@ -194,6 +207,13 @@
       <textarea name="system.description" rows="5" class="power-description">{{system.description}}</textarea>
     </div>
 
+    <div class="form-group">
+      <label>
+        <input type="checkbox" name="flags.msh-faserip.hasStunts" {{checked (getFlag item "msh-faserip" "hasStunts")}} />
+        Has Power Stunts
+      </label>
+    </div>
+    
     <div class="stunts">
       <h3>Power Stunts</h3>
       <p class="stunt-info">Power Stunts allow creative use of powers. Difficulty decreases with practice.</p>

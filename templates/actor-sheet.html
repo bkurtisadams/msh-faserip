@@ -563,20 +563,28 @@
             {{#each powers as |power|}}
             <tr class="power-row item" data-item-id="{{power._id}}">
               <td class="power-name">
-                <!-- Roll button moved to front -->
-                <a class="item-control power-roll" title="Roll" data-item-id="{{power._id}}"><i class="fas fa-dice-d20"></i></a>
-                <!-- Image now functions as info button -->
+                <a class="item-control power-roll" title="Roll" data-item-id="{{power._id}}">
+                  <i class="fas fa-dice-d20"></i>
+                </a>
                 <img src="{{power.img}}" class="power-icon power-info" width="24" height="24" data-item-id="{{power._id}}" />
-                <span class="power-name-text">{{power.name}}</span>
+                <span class="power-name-text 
+                             {{#if (getFlag power 'msh-faserip' 'isBonusPower')}} bonus-power {{/if}}
+                             {{#if (getFlag power 'msh-faserip' 'isStuntPower')}} stunt-power {{/if}}">
+                  {{power.name}}
+                </span>
               </td>
+              
               <td class="power-rank">{{power.system.rank}}</td>
               <td class="power-value">{{power.system.value}}</td>
               <td class="power-range">{{power.system.range}}</td>
               <td class="power-type">{{power.system.type}}</td>
               <td class="power-controls">
-                <!-- Info button removed -->
-                <a class="item-control item-edit" title="Edit" data-item-id="{{power._id}}"><i class="fas fa-edit"></i></a>
-                <a class="item-control item-delete" title="Delete" data-item-id="{{power._id}}"><i class="fas fa-trash"></i></a>
+                <a class="item-control item-edit" title="Edit" data-item-id="{{power._id}}">
+                  <i class="fas fa-edit"></i>
+                </a>
+                <a class="item-control item-delete" title="Delete" data-item-id="{{power._id}}">
+                  <i class="fas fa-trash"></i>
+                </a>
               </td>
             </tr>
             {{/each}}
@@ -587,6 +595,7 @@
         <p class="no-powers">No powers added yet.</p>
         {{/unless}}
       </div>
+    </div>
 
 <!-- Talents Tab -->
 <div class="tab" data-tab="talents">

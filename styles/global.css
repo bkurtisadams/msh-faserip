@@ -2457,3 +2457,23 @@
   height: 100%;
   display: block;
 }
+
+.power-tag {
+  margin-left: 5px;
+  font-size: 0.9em;
+}
+.power-tag.bonus {
+  color: green;
+}
+.power-tag.stunt {
+  color: orange;
+}
+
+.power-name-text.bonus-power {
+  color: green;
+  font-style: italic;
+}
+.power-name-text.stunt-power {
+  color: orange;
+  text-decoration: underline dotted;
+}
