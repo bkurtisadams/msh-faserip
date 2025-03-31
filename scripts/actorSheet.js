@@ -9,7 +9,7 @@ export class FaseripActorSheet extends ActorSheet {
     return foundry.utils.mergeObject(super.defaultOptions, {
       classes: ["faserip-sheet", "sheet", "actor"],
       template: "systems/msh-faserip/templates/actor-sheet.html",
-      width: 600,
+      width: 650,
       height: 700,
       tabs: [{ navSelector: ".sheet-tabs-navigation", contentSelector: ".sheet-tab-content", initial: "powers" }],
       submitOnChange: true,
