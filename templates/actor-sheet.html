@@ -610,7 +610,7 @@
       <!-- Tab navigation -->
       <nav class="sheet-tabs-navigation">
         <a class="item" data-tab="powers"><i class="fas fa-bolt"></i> Powers</a>
-        <a class="item" data-tab="magic">Magic</a>
+        <a class="item" data-tab="magic"><i class="fas fa-hat-wizard"></i> Magic</a>
         <a class="item" data-tab="talents"><i class="fas fa-brain"></i> Talents</a>
         <a class="item" data-tab="contacts"><i class="fas fa-address-book"></i> Contacts</a>
         <a class="item" data-tab="equipment"><i class="fas fa-toolbox"></i> Equipment</a>
@@ -679,6 +679,10 @@
 
         <!-- Magic tab -->
         <div class="tab" data-tab="magic">
+          <div class="tab-controls" style="margin-bottom: 10px;">
+            <button type="button" class="add-power"><i class="fas fa-plus"></i> Add Spell</button>
+            <button type="button" class="browse-compendium" data-type="powers"><i class="fas fa-book"></i> Browse Spells Compendium</button>
+          </div>
           <h2>Magic Powers</h2>
           <table class="powers-table">
             <thead>
@@ -698,6 +702,7 @@
                 <td>{{this.system.magic.energyType}}</td>
                 <td>{{this.system.magic.sourceEntity}}</td>
                 <td>
+                  <button type="button" class="magic-cast" data-item-id="{{this._id}}"><i class="fas fa-dice-d20"></i></button>
                   <button type="button" class="item-edit"><i class="fas fa-edit"></i></button>
                   <button type="button" class="item-delete"><i class="fas fa-trash"></i></button>
                 </td>

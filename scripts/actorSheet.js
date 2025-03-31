@@ -82,6 +82,37 @@ export class FaseripActorSheet extends ActorSheet {
       li.addEventListener("dragstart", this._onDragStart.bind(this));
     });
 
+    // Magic spell casting handler
+    html.find('.magic-cast').click(async ev => {
+      const itemId = ev.currentTarget.dataset.itemId;
+      const item = this.actor.items.get(itemId);
+      if (!item?.system?.isMagic) return;
+
+      const abilityKey = item.system.magic.successAbility || "psyche";
+      const ability = this.actor.system.abilities[abilityKey];
+      if (!ability) return ui.notifications.warn(`Missing ability: ${abilityKey}`);
+
+      const roll = new Roll("1d100");
+      await roll.evaluate();
+
+      const resultColor = game.msh.rollUniversalTable(ability.rank, roll.total);
+
+      const chatContent = `
+        <div class="chat-roll">
+          <h3>${this.actor.name} casts <strong>${item.name}</strong> (${abilityKey})</h3>
+          <p><strong>Ability Rank:</strong> ${ability.rank} (${ability.value})</p>
+          <p><strong>Roll:</strong> ${roll.total} → <strong>${resultColor.toUpperCase()}</strong></p>
+        </div>
+      `;
+
+      ChatMessage.create({
+        speaker: ChatMessage.getSpeaker({ actor: this.actor }),
+        content: chatContent,
+        type: CONST.CHAT_MESSAGE_TYPES.ROLL,
+        roll: roll
+      });
+    });
+
     // Talent rows draggable
     html.find('.talent-item').each((i, li) => {
       li.setAttribute("draggable", true);
@@ -156,6 +187,38 @@ export class FaseripActorSheet extends ActorSheet {
           this.render(false); // Re-render the sheet to show the new power
         })
         .catch(err => console.error("Error creating power:", err));
+    });
+
+    // Add Spell button listener
+    html.find('.tab[data-tab="magic"] .add-power').click(ev => {
+      const itemData = {
+        name: "New Spell",
+        type: "power",
+        system: {
+          description: "",
+          rank: "Typical",
+          value: 6,
+          range: "",
+          type: "",
+          subtype: "",
+          isActive: true,
+          isMagic: true,
+          magic: {
+            energyType: "personal",
+            sourceEntity: "",
+            usesCeremony: false,
+            successAbility: "psyche",
+            targetResistsWith: "",
+            backlashNotes: "",
+            castCost: 0
+          }
+        },
+        sort: this.actor.items.size
+      };
+    
+      this.actor.createEmbeddedDocuments("Item", [itemData])
+        .then(() => this.render(false))
+        .catch(err => console.error("Error creating spell:", err));
     });
 
     // Listener for powers
