@@ -506,7 +506,9 @@ export class FaseripActorSheet extends ActorSheet {
       }).render(true);
     });
 
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Roll power button
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     html.find('.power-roll').click(ev => {
       const li = $(ev.currentTarget).closest(".power-row");
       const itemId = li.data("itemId");
@@ -556,6 +558,7 @@ export class FaseripActorSheet extends ActorSheet {
       // Get saved power settings (from item.system or flags)
       const savedActionType = item.getFlag("msh-faserip", "lastActionType") || "";
       const savedColumnShift = item.getFlag("msh-faserip", "lastColumnShift") || 0;
+      const savedDamageCS = item.getFlag("msh-faserip", "lastDamageCS") || 0;
       const skipDiceRoll = item.getFlag("msh-faserip", "skipDiceRoll") || false;
 
       // Create action type options HTML, with saved option selected
@@ -585,6 +588,12 @@ export class FaseripActorSheet extends ActorSheet {
     <input type="number" id="shift" name="shift" value="${savedColumnShift}" style="width: 50px;">
     <span style="color: #666; font-size: 0.9em;">(+ right, - left)</span>
   </div>
+    <div style="margin-bottom: 10px;">
+    <label style="display: inline-block; width: 120px;">Damage CS Modifier:</label>
+    <input type="number" id="damage-cs" name="damageCs" value="${savedDamageCS}" style="width: 50px;">
+    <span style="color: #666; font-size: 0.9em;">(modifies damage rank)</span>
+  </div>
+
   <div style="margin-bottom: 10px;">
     <label style="display: inline-block; width: 120px;">Karma Points:</label>
     <input type="number" id="karma" name="karma" value="0" min="0" style="width: 50px;">
@@ -611,6 +620,7 @@ export class FaseripActorSheet extends ActorSheet {
             callback: async (html) => {
               const actionType = html.find('[name="actionType"]').val();
               const columnShift = parseInt(html.find('[name="shift"]').val()) || 0;
+              const damageCS = parseInt(html.find('[name="damageCs"]').val()) || 0;
               const karma = parseInt(html.find('[name="karma"]').val()) || 0;
               const saveSettings = html.find('[name="saveSettings"]').is(':checked');
               const skipDice = html.find('[name="skipDice"]').is(':checked');
@@ -619,6 +629,8 @@ export class FaseripActorSheet extends ActorSheet {
               if (saveSettings) {
                 await item.setFlag("msh-faserip", "lastActionType", actionType);
                 await item.setFlag("msh-faserip", "lastColumnShift", columnShift);
+                await item.setFlag("msh-faserip", "lastDamageCS", damageCS);
+
                 await item.setFlag("msh-faserip", "skipDiceRoll", skipDice);
               }
 
@@ -637,6 +649,10 @@ export class FaseripActorSheet extends ActorSheet {
                   console.log(`Applied ${columnShift} column shifts to ${powerRank}, now ${effectiveRank}`);
                 }
               }
+
+              const damageRankResult = applyColumnShiftToRank(powerRank, powerValue, damageCS);
+              const damageRankName = damageRankResult.rank;
+              const damageRankValue = damageRankResult.value;
 
               // Create the roll
               const roll = new Roll("1d100");
@@ -690,6 +706,10 @@ export class FaseripActorSheet extends ActorSheet {
               <div style="padding: 5px 10px; font-size: 0.9em;">
                 <div>Base Rank: ${powerRank} (${powerValue})</div>
                 <div>Column Shift: ${columnShift} → ${effectiveRank}</div>
+                ${damageCS !== 0
+                  ? `<div>Damage Column Shift: ${damageCS > 0 ? "+" : ""}${damageCS}CS → <strong>${damageRankName} (${damageRankValue})</strong></div>`
+                  : ""}
+                
                 <div>Roll: ${roll.total} + Karma: ${karma} = ${totalRoll}</div>
               </div>
               <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
