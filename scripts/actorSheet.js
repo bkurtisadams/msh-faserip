@@ -1,3 +1,5 @@
+import { prepareActiveEffectCategories, onManageActiveEffect } from "../helpers/effects.mjs";
+
 export class FaseripActorSheet extends ActorSheet {
   // Add a property to track the biography toggle state
   _isBiographyOpen = false;
@@ -55,6 +57,12 @@ export class FaseripActorSheet extends ActorSheet {
       "Shift-X", "Shift-Y", "Shift-Z", "Class 1000", "Class 3000", "Class 5000", "Beyond"
     ];
 
+    // active effects
+    context.effects = prepareActiveEffectCategories(
+      this.actor.allApplicableEffects ? this.actor.allApplicableEffects() : this.actor.effects
+    );
+    context.editable = this.isEditable; // (if not already present)
+
     return context;
   }
 
@@ -87,6 +95,15 @@ export class FaseripActorSheet extends ActorSheet {
   // In actorSheet.js, add to the activateListeners function
   activateListeners(html) {
     super.activateListeners(html);
+
+    html.on("click", ".effect-control", (ev) => {
+      const row = ev.currentTarget.closest("li");
+      const document =
+        row?.dataset.parentId === this.actor.id
+          ? this.actor
+          : this.actor.items.get(row?.dataset.parentId);
+      onManageActiveEffect(ev, document);
+    });
 
     // Power rows draggable
     html.find('.power-row').each((i, li) => {

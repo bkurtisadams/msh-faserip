@@ -615,6 +615,8 @@
         <a class="item" data-tab="equipment"><i class="fas fa-toolbox"></i> Equipment</a>
         <a class="item" data-tab="headquarters"><i class="fas fa-home"></i> HQ</a>
         <a class="item" data-tab="vehicles"><i class="fas fa-car"></i> Vehicles</a>
+        <a class="item" data-tab="effects"><i class="fas fa-magic"></i> Effects</a>
+
       </nav>
 
       <!-- Tab content area -->
@@ -918,6 +920,42 @@
         </div>
       </div>
     </div>
+
+    <!-- Effects Tab -->
+     
+    <div class="tab" data-tab="effects">
+      <div class="tab-controls">
+        <a class="effect-control" data-action="create" data-effect-type="temporary">
+          <i class="fas fa-plus"></i> Add Effect
+        </a>
+      </div>
+
+      {{#each effects as |section|}}
+      <div class="effect-category">
+        <h3>{{section.label}}</h3>
+        <ol class="effects-list">
+          {{#each section.effects as |effect|}}
+          <li class="effect" data-effect-id="{{effect.id}}" data-parent-id="{{effect.parent.id}}">
+            <div class="effect-name">
+              <img src="{{effect.icon}}" width="24" height="24" /> {{effect.name}}
+            </div>
+            <div class="effect-controls">
+              <a class="effect-control" data-action="edit"><i class="fas fa-edit"></i></a>
+              <a class="effect-control" data-action="toggle"><i class="fas fa-sync"></i></a>
+              <a class="effect-control" data-action="delete"><i class="fas fa-trash"></i></a>
+            </div>
+          </li>
+          {{/each}}
+        </ol>
+      </div>
+      {{/each}}
+
+      {{#unless effects.temporary.effects.length}}
+      <p class="no-effects">No active effects.</p>
+      {{/unless}}
+    </div>
+     
+   
 
       <div class="karma-section">
         <div class="karma-values">
