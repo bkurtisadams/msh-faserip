@@ -39,30 +39,32 @@ export function onManageActiveEffect(event, owner) {
  * @return {object}                   Data for rendering
  */
 export function prepareActiveEffectCategories(effects) {
-  // Define effect header categories
+  // Define effect header categories with simple labels
   const categories = {
     temporary: {
-      type: 'temporary',
-      label: game.i18n.localize('BOILERPLATE.Effect.Temporary'),
+      type: "temporary",
+      label: "Temporary",
       effects: [],
     },
     passive: {
-      type: 'passive',
-      label: game.i18n.localize('BOILERPLATE.Effect.Passive'),
+      type: "passive",
+      label: "Passive",
       effects: [],
     },
     inactive: {
-      type: 'inactive',
-      label: game.i18n.localize('BOILERPLATE.Effect.Inactive'),
+      type: "inactive",
+      label: "Inactive",
       effects: [],
     },
   };
 
-  // Iterate over active effects, classifying them into categories
+  // Classify each effect into the appropriate category
   for (let e of effects) {
     if (e.disabled) categories.inactive.effects.push(e);
     else if (e.isTemporary) categories.temporary.effects.push(e);
     else categories.passive.effects.push(e);
   }
+
   return categories;
 }
+

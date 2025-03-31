@@ -1330,8 +1330,10 @@
  
  /* Final narrow adjustment for Secondary Abilities */
  .faserip-sheet .secondary-abilities {
-  flex: 0 0 47%; /* Adjusted narrower from 60% */
- }
+  flex: 1 1 auto; /* Flex to fill remaining space */
+  min-width: 300px; /* Optional: prevent it from shrinking too much */
+}
+
  
  /* Movement Section */
  .faserip-sheet .movement-section {
