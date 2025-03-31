@@ -610,6 +610,7 @@
       <!-- Tab navigation -->
       <nav class="sheet-tabs-navigation">
         <a class="item" data-tab="powers"><i class="fas fa-bolt"></i> Powers</a>
+        <a class="item" data-tab="magic">Magic</a>
         <a class="item" data-tab="talents"><i class="fas fa-brain"></i> Talents</a>
         <a class="item" data-tab="contacts"><i class="fas fa-address-book"></i> Contacts</a>
         <a class="item" data-tab="equipment"><i class="fas fa-toolbox"></i> Equipment</a>
@@ -674,6 +675,36 @@
           {{#unless powers.length}}
           <p class="no-powers">No powers added yet.</p>
           {{/unless}}
+        </div>
+
+        <!-- Magic tab -->
+        <div class="tab" data-tab="magic">
+          <h2>Magic Powers</h2>
+          <table class="powers-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Rank</th>
+                <th>Energy</th>
+                <th>Source</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {{#each magicPowers}}
+              <tr class="power-row" data-item-id="{{this._id}}">
+                <td>{{this.name}}</td>
+                <td>{{this.system.rank}} ({{this.system.value}})</td>
+                <td>{{this.system.magic.energyType}}</td>
+                <td>{{this.system.magic.sourceEntity}}</td>
+                <td>
+                  <button type="button" class="item-edit"><i class="fas fa-edit"></i></button>
+                  <button type="button" class="item-delete"><i class="fas fa-trash"></i></button>
+                </td>
+              </tr>
+              {{/each}}
+            </tbody>
+          </table>
         </div>
 
         <!-- Talents Tab -->

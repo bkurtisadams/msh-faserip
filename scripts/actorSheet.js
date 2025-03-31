@@ -19,36 +19,23 @@ export class FaseripActorSheet extends ActorSheet {
   getData() {
     const context = super.getData();
     const actorData = this.actor.toObject(false);
-
     context.system = actorData.system;
 
-    // Get items sorted by type for display in the template
     context.powers = this.actor.items.filter(item => item.type === "power") || [];
-    context.powers = this.actor.items
-    .filter(item => item.type === "power")
-    .sort((a, b) => (a.sort || 0) - (b.sort || 0));
+    context.powers = context.powers.sort((a, b) => (a.sort || 0) - (b.sort || 0));
+
+    context.magicPowers = context.powers.filter(p => p.system?.isMagic === true);
+    context.nonMagicPowers = context.powers.filter(p => !p.system?.isMagic);
 
     context.talents = this.actor.items.filter(item => item.type === "talent") || [];
-    // get contacts
     context.contacts = this.actor.items.filter(item => item.type === "contact") || [];
-
-    // the calculated current karma value
-    context.currentKarma = this.actor.currentKarma;
-
-    // the biography toggle state to the context
-    context.isBiographyOpen = this._isBiographyOpen;
-
-    // equipment
     context.equipment = this.actor.items.filter(item => item.type === "equipment") || [];
-
-    // headquarters
     context.headquarters = this.actor.items.filter(item => item.type === "headquarters") || [];
-
-    // vehicles
     context.vehicles = this.actor.items.filter(item => item.type === "vehicle") || [];
 
+    context.currentKarma = this.actor.currentKarma;
+    context.isBiographyOpen = this._isBiographyOpen;
 
-    // Add ranks array for dropdowns
     context.allRanks = [
       "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent",
       "Remarkable", "Incredible", "Amazing", "Monstrous", "Unearthly",
@@ -57,6 +44,7 @@ export class FaseripActorSheet extends ActorSheet {
 
     return context;
   }
+
 
   /** @override */
   _updateObject(event, formData) {
