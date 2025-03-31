@@ -74,6 +74,62 @@
       </select>
     </div>
 
+    <!-- MAGIC SPELLS SECTION -->
+    {{#if system.isMagic}}
+    <div class="form-group">
+      <label>Spell Energy Type</label>
+      <select name="system.magic.energyType">
+        {{#each energyTypes}}
+          <option value="{{this}}" {{#if (eq ../system.magic.energyType this)}}selected{{/if}}>{{this}}</option>
+        {{/each}}
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label>Source Entity</label>
+      <input type="text" name="system.magic.sourceEntity" value="{{system.magic.sourceEntity}}" />
+    </div>
+
+    <div class="form-group">
+      <label>Uses Ceremony?</label>
+      <input type="checkbox" name="system.magic.usesCeremony" {{checked system.magic.usesCeremony}} />
+    </div>
+
+    <div class="form-group">
+      <label>Casting Ability</label>
+      <select name="system.magic.successAbility">
+        {{#each abilities}}
+          <option value="{{this}}" {{#if (eq ../system.magic.successAbility this)}}selected{{/if}}>{{this}}</option>
+        {{/each}}
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label>Target Resists With</label>
+      <select name="system.magic.targetResistsWith">
+        <option value="">None</option>
+        {{#each abilities}}
+          <option value="{{this}}" {{#if (eq ../system.magic.targetResistsWith this)}}selected{{/if}}>{{this}}</option>
+        {{/each}}
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label>Backlash on Failure</label>
+      <textarea name="system.magic.backlashNotes">{{system.magic.backlashNotes}}</textarea>
+    </div>
+
+    <div class="form-group">
+      <label>Cast Cost (Health)</label>
+      <input type="number" name="system.magic.castCost" value="{{system.magic.castCost}}" />
+    </div>
+    {{/if}}
+
+    <!-- Checkbox to enable/disable Magic -->
+    <div class="form-group">
+    <label><input type="checkbox" id="is-magic-checkbox" name="system.isMagic" {{checked system.isMagic}} /> Is this Power a Spell?</label>
+    </div>
+
     <div class="form-group">
       <label>Range:</label>
       <select name="system.range" id="range-type">

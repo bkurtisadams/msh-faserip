@@ -110,7 +110,6 @@
       "limitationColumnShift": 0,
       "bonusPowers": [],
       "stunts": [],
-      
       "attackType": "",
       "damageType": "",
       "mentalEffect": "",
@@ -124,7 +123,17 @@
       "teleportAccuracy": "",
       "controlStrength": "",
       "controlQuantity": "",
-      "calculatedRange": ""
+      "calculatedRange": "",
+      "isMagic": false,
+      "magic": {
+        "energyType": "",
+        "sourceEntity": "",
+        "usesCeremony": false,
+        "successAbility": "psyche",
+        "targetResistsWith": "",
+        "backlashNotes": "",
+        "castCost": 0
+      }
     },
     "talent": {
       "templates": ["base"],

@@ -15,6 +15,18 @@ export class FaseripItem extends Item {
         itemData.type = itemData.type || "";
         itemData.source = itemData.source || "";
         itemData.description = itemData.description || "";
+
+        // Initialize magic-related fields
+        itemData.isMagic = itemData.isMagic ?? false;
+        itemData.magic = itemData.magic || {
+          energyType: "",         // "personal", "universal", "dimensional"
+          sourceEntity: "",       // e.g., "Cyttorak"
+          usesCeremony: false,
+          successAbility: "psyche",  // Default to psyche
+          targetResistsWith: "",
+          backlashNotes: "",
+          castCost: 0
+        };
         break;
   
       case "talent":

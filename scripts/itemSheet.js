@@ -48,6 +48,14 @@ getData() {
     "Remarkable", "Incredible", "Amazing", "Monstrous", "Unearthly",
     "Shift-X", "Shift-Y", "Shift-Z", "Class 1000", "Class 3000", "Class 5000", "Beyond"
   ];
+
+  // If this is a power and marked as magic, include options
+  if (this.item.type === "power") {
+    context.isMagic = context.system.isMagic;
+    context.magic = context.system.magic || {};
+    context.energyTypes = ["personal", "universal", "dimensional"];
+    context.abilities = ["fighting", "agility", "strength", "endurance", "reason", "intuition", "psyche"];
+  }
   
   // Add specific data for power items
   if (this.item.type === "power") {
@@ -78,6 +86,13 @@ getData() {
   activateListeners(html) {
     super.activateListeners(html);
 
+    if (this.item.type === "power") {
+      html.find("#is-magic-checkbox").change(ev => {
+        const isChecked = ev.currentTarget.checked;
+        this.item.update({ "system.isMagic": isChecked });
+      });
+    }
+  
     // Update power type options when category changes
     html.find('#power-category').change(ev => {
       const category = ev.currentTarget.value;
