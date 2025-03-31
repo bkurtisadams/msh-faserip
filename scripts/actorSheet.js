@@ -9,7 +9,7 @@ export class FaseripActorSheet extends ActorSheet {
       template: "systems/msh-faserip/templates/actor-sheet.html",
       width: 600,
       height: 700,
-      tabs: [{ navSelector: ".sheet-tabs", contentSelector: ".sheet-body", initial: "attributes" }],
+      tabs: [{ navSelector: ".sheet-tabs-navigation", contentSelector: ".sheet-tab-content", initial: "powers" }],
       submitOnChange: true,
       closeOnSubmit: false
     });

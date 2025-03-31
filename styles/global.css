@@ -6,213 +6,302 @@
   color: #222;
   padding: 8px;
   min-height: 400px;
-}
-
-.faserip-sheet .sheet-header {
+ }
+ 
+ .faserip-sheet .sheet-header {
   display: flex;
   margin-bottom: 10px;
   border: 2px solid #8b0000;
   background: #fff;
   padding: 5px;
-}
-
-.faserip-sheet .portrait-container {
+ }
+ 
+ .faserip-sheet .portrait-container {
   flex: 1;
   display: flex;
   flex-direction: column;
   border-right: 1px solid #ccc;
   padding-right: 10px;
-}
-
-.faserip-sheet .portrait {
+ }
+ 
+ .faserip-sheet .portrait {
   height: 120px;
   width: 120px;
   object-fit: contain;
   border: 1px solid #333;
-}
-
-.faserip-sheet .hero-name, 
-.faserip-sheet .hero-identity {
+ }
+ 
+ .faserip-sheet .hero-name, 
+ .faserip-sheet .hero-identity {
   margin-top: 5px;
-}
-
-.faserip-sheet .hero-name label, 
-.faserip-sheet .hero-identity label {
+ }
+ 
+ .faserip-sheet .hero-name label, 
+ .faserip-sheet .hero-identity label {
   display: block;
   font-weight: bold;
   font-size: 12px;
-}
-
-.faserip-sheet .identity-type {
+ }
+ 
+ .faserip-sheet .identity-type {
   display: flex;
   gap: 10px;
   margin-top: 5px;
-}
-
-.faserip-sheet .logo-container {
+ }
+ 
+ .faserip-sheet .logo-container {
   flex: 1;
   display: flex;
   justify-content: center;
   align-items: center;
   padding: 10px;
-}
-
-.faserip-sheet .marvel-logo {
+ }
+ 
+ .faserip-sheet .marvel-logo {
   max-width: 100%;
   max-height: 100px;
-}
-
-.faserip-sheet .player-info {
+ }
+ 
+ .faserip-sheet .player-info {
   flex: 1;
   padding-left: 10px;
   border-left: 1px solid #ccc;
-}
-
-.faserip-sheet .form-group {
+ }
+ 
+ .faserip-sheet .form-group {
   margin-bottom: 5px;
-}
-
-.faserip-sheet .form-group label {
+ }
+ 
+ .faserip-sheet .form-group label {
   display: block;
   font-weight: bold;
   font-size: 12px;
-}
-
-.faserip-sheet .form-row {
+ }
+ 
+ .faserip-sheet .form-row {
   display: flex;
   gap: 10px;
-}
-
-.faserip-sheet .form-group.half {
+ }
+ 
+ .faserip-sheet .form-group.half {
   flex: 1;
-}
-
-/* Abilities section */
-.faserip-sheet .abilities-container {
+ }
+ 
+ /* Abilities section */
+ .faserip-sheet .abilities-container {
   margin-bottom: 10px;
   border: 2px solid #8b0000;
   background: #fff;
-}
-
-.faserip-sheet .abilities-table {
+ }
+ 
+ .faserip-sheet .abilities-table {
   width: 100%;
   border-collapse: collapse;
-}
-
-.faserip-sheet .abilities-table th {
+  table-layout: fixed;
+ }
+ 
+ .faserip-sheet .abilities-table th {
   background: #8b0000;
   color: white;
   font-weight: bold;
   text-align: center;
   padding: 5px;
-}
-
-.faserip-sheet .abilities-table td {
+  font-size: 0.7rem;
+ }
+ 
+ .faserip-sheet .abilities-table td {
   padding: 3px;
   text-align: center;
   border: 1px solid #ccc;
-}
-
-.faserip-sheet .ability-key {
+ }
+ 
+ .faserip-sheet .ability-key {
+  cursor: pointer;
   font-weight: bold;
   font-size: 16px;
   width: 30px;
-}
-
-/* Attributes section */
-.faserip-sheet .attributes-container {
+  text-align: center;
+  transition: all 0.3s ease;
+  user-select: none;
+ }
+ 
+ .faserip-sheet .ability-key:hover {
+  color: #ff0000;
+  text-shadow: 0 0 5px rgba(255, 0, 0, 0.7);
+  transform: scale(1.1);
+ }
+ 
+ /* Narrow first column (FASERIP letters) */
+ .faserip-sheet .abilities-table td.ability-key {
+  width: 20px;
+  text-align: center;
+ }
+ 
+ /* Column widths for Primary Abilities */
+ .faserip-sheet .abilities-table th.narrow-column,
+ .faserip-sheet .abilities-table th:last-child {
+  width: 50px;
+ }
+ 
+ /* Expand Current Rank column width */
+ .faserip-sheet .abilities-table th:nth-child(4),
+ .faserip-sheet .abilities-table td:nth-child(4) {
+  width: 100px;
+ }
+ 
+ /* Adjust inputs/selects for Primary Abilities */
+ .faserip-sheet .primary-abilities input[type="number"],
+ .faserip-sheet .primary-abilities input[type="text"],
+ .faserip-sheet .primary-abilities select {
+  width: 90%;
+  padding: 2px;
+  font-size: 0.7rem;
+  box-sizing: border-box;
+ }
+ 
+ /* Attributes section */
+ .faserip-sheet .attributes-container {
   margin-bottom: 10px;
   border: 2px solid #8b0000;
   background: #fff;
-}
-
-.faserip-sheet .attributes-table {
+ }
+ 
+ .faserip-sheet .attributes-table {
   width: 100%;
   border-collapse: collapse;
-}
-
-.faserip-sheet .attributes-table th {
+  table-layout: fixed;
+ }
+ 
+ .faserip-sheet .attributes-table th {
   background: #8b0000;
   color: white;
   font-weight: bold;
   text-align: center;
   padding: 5px;
-}
-
-.faserip-sheet .attributes-table td {
+  font-size: 0.7rem;
+  height: 26px;
+  vertical-align: middle;
+  padding: 2px 5px;
+ }
+ 
+ .faserip-sheet .attributes-table td {
   padding: 5px;
   text-align: center;
   border: 1px solid #ccc;
-}
-
-.faserip-sheet .current-max {
+ }
+ 
+ /* Column widths for Secondary Abilities */
+ .faserip-sheet .attributes-table th:nth-child(1),
+ .faserip-sheet .attributes-table td:nth-child(1),
+ .faserip-sheet .attributes-table th:nth-child(2),
+ .faserip-sheet .attributes-table td:nth-child(2) {
+  width: 20%; /* Health & Karma narrower */
+ }
+ 
+ .faserip-sheet .attributes-table th:nth-child(3),
+ .faserip-sheet .attributes-table td:nth-child(3),
+ .faserip-sheet .attributes-table th:nth-child(4),
+ .faserip-sheet .attributes-table td:nth-child(4) {
+  width: 30%; /* Resources & Popularity wider */
+ }
+ 
+ /* Inputs in Secondary Abilities */
+ .faserip-sheet .secondary-abilities input[type="number"],
+ .faserip-sheet .secondary-abilities select {
+  width: 90%;
+  box-sizing: border-box;
+  font-size: 0.75rem;
+  padding: 2px;
+ }
+ 
+ .faserip-sheet .current-max {
   display: flex;
   justify-content: center;
   align-items: center;
   gap: 5px;
   margin-bottom: 5px;
-}
-
-.faserip-sheet .current-max input {
+ }
+ 
+ .faserip-sheet .current-max input {
   width: 50px;
   text-align: center;
-}
-
-.faserip-sheet .movement {
+ }
+ 
+ .faserip-sheet .movement {
   margin-top: 5px;
-}
-
-.faserip-sheet .movement label {
+ }
+ 
+ .faserip-sheet .movement label {
   display: block;
   font-size: 12px;
   font-weight: bold;
-}
-
-.faserip-sheet .movement input {
+ }
+ 
+ .faserip-sheet .movement input {
   width: 40px;
   text-align: center;
-}
-
-/* Resistances Table Styling */
-.faserip-sheet .resistances {
+ }
+ 
+ /* Stacked Values (Health, Karma, Popularity) */
+ .faserip-sheet .stacked-values,
+ .faserip-sheet .popularity-values {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+ }
+ 
+ .faserip-sheet .stacked-values input,
+ .faserip-sheet .popularity-values input {
+  width: 50px;
+  text-align: center;
+ }
+ 
+ .faserip-sheet .stacked-values .divider,
+ .faserip-sheet .popularity-values .divider {
+  font-weight: bold;
+ }
+ 
+ /* Resistances Table Styling */
+ .faserip-sheet .resistances {
   margin-top: 10px;
   border-top: 1px solid #ccc;
   padding-top: 10px;
-}
-
-.faserip-sheet .resistances-table {
+ }
+ 
+ .faserip-sheet .resistances-table {
   width: 100%;
   border-collapse: collapse;
-}
-
-.faserip-sheet .resistances-table td {
+ }
+ 
+ .faserip-sheet .resistances-table td {
   padding: 5px;
   text-align: left;
   border-bottom: 1px solid #ddd;
-}
-
-.faserip-sheet .resistance-name-col { width: 35%; }
-.faserip-sheet .resistance-rank-col { width: 25%; }
-.faserip-sheet .resistance-value-col { width: 15%; }
-.faserip-sheet .resistance-actions-col { width: 25%; }
-
-.faserip-sheet .resistance-controls {
+ }
+ 
+ .faserip-sheet .resistance-name-col { width: 35%; }
+ .faserip-sheet .resistance-rank-col { width: 25%; }
+ .faserip-sheet .resistance-value-col { width: 15%; }
+ .faserip-sheet .resistance-actions-col { width: 25%; }
+ 
+ .faserip-sheet .resistance-controls {
   display: flex;
   gap: 10px;
   justify-content: center;
-}
-
-.faserip-sheet .resistance-controls a {
+ }
+ 
+ .faserip-sheet .resistance-controls a {
   cursor: pointer;
   color: #666;
-}
-
-.faserip-sheet .resistance-controls a:hover {
+ }
+ 
+ .faserip-sheet .resistance-controls a:hover {
   color: #8b0000;
-}
-
-/* Update the add-resistance button styling */
-.faserip-sheet .add-resistance {
+ }
+ 
+ /* Update the add-resistance button styling */
+ .faserip-sheet .add-resistance {
   background: none;
   color: white;
   border: none;
@@ -227,10 +316,10 @@
   line-height: 16px; /* Match with height */
   display: inline-block;
   vertical-align: middle;
-}
-
-/* Ensure the resistance header height is fixed */
-.faserip-sheet .resistances-table th {
+ }
+ 
+ /* Ensure the resistance header height is fixed */
+ .faserip-sheet .resistances-table th {
   background-color: #8b0000;
   color: white;
   font-size: 0.7rem;
@@ -240,669 +329,31 @@
   text-align: left;
   overflow: hidden; /* Prevent content from expanding */
   white-space: nowrap; /* Keep text on one line */
-}
-
-/* Control the resistance header row specifically */
-.faserip-sheet .resistances-table thead tr {
+ }
+ 
+ /* Control the resistance header row specifically */
+ .faserip-sheet .resistances-table thead tr {
   height: 26px;
   max-height: 26px;
-}
-
-.faserip-sheet .add-resistance:hover {
+ }
+ 
+ .faserip-sheet .add-resistance:hover {
   text-decoration: underline;
-}
-
-.faserip-sheet .resistance-row:hover {
+ }
+ 
+ .faserip-sheet .resistance-row:hover {
   background-color: #f5f5f5;
-}
-
-.faserip-sheet .no-resistances {
+ }
+ 
+ .faserip-sheet .no-resistances {
   text-align: center;
   font-style: italic;
   color: #666;
   padding: 10px;
-}
-
-/* Tab system - use more specific selectors to avoid conflicts */
-.faserip-sheet .sheet-tabs {
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  margin-top: 10px;
-  border: 1px solid #8b0000;
-  background: white;
-}
-
-/* Navigation container */
-.faserip-sheet .sheet-tabs-navigation {
-  display: flex;
-  border-bottom: 2px solid #8b0000;
-  width: 100%;
-  background: #f0f0f0;
-}
-
-/* Tab navigation items - more specific selectors */
-.faserip-sheet .sheet-tabs-navigation .item {
-  padding: 8px 15px;
-  background: #ddd;
-  color: #333;
-  border: 1px solid #8b0000;
-  border-bottom: none;
-  margin-right: 2px;
-  border-radius: 5px 5px 0 0;
-  cursor: pointer;
-  text-decoration: none;
-}
-
-.faserip-sheet .sheet-tabs-navigation .item.active {
-  background: #8b0000;
-  color: white;
-  font-weight: bold;
-}
-
-/* Tab content container */
-.faserip-sheet .sheet-tab-content {
-  padding: 10px;
-  width: 100%;
-  min-height: 200px;
-  border: 1px solid #8b0000;
-  border-top: none;
-  background: white;
-}
-
-/* Power-specific styling */
-.faserip-sheet .powers-controls {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 10px;
-}
-
-.faserip-sheet .powers-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.faserip-sheet .powers-table th {
-  background: #8b0000;
-  color: white;
-  padding: 5px;
-  text-align: left;
-}
-
-.faserip-sheet .powers-table td {
-  padding: 5px;
-  text-align: left;
-  border-bottom: 1px solid #ddd;
-}
-
-.faserip-sheet .power-name {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-
-.faserip-sheet .power-icon {
-  border: 1px solid #ccc;
-}
-
-.faserip-sheet .power-controls {
-  display: flex;
-  gap: 10px;
-  justify-content: center;
-}
-
-.faserip-sheet .item-control {
-  cursor: pointer;
-}
-
-.faserip-sheet .item-control:hover {
-  color: #8b0000;
-}
-
-.faserip-sheet .no-powers {
-  text-align: center;
-  font-style: italic;
-  color: #666;
-  padding: 20px;
-}
-
-/* consistent styling across all tab controls */
-/* Shared tab controls styling */
-.faserip-sheet .tab-controls {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 10px;
-}
-
-.faserip-sheet .tab-controls button {
-  flex: 1;
-  margin: 0 5px;
-}
-
-.faserip-sheet .tab-controls button:first-child {
-  margin-left: 0;
-}
-
-.faserip-sheet .tab-controls button:last-child {
-  margin-right: 0;
-}
-
-/* Karma advancement section */
-.faserip-sheet .karma-advancement {
-  display: flex;
-  flex-wrap: wrap;
-  margin-top: 10px;
-  border: 1px solid #8b0000;
-  padding: 10px;
-  background: white;
-}
-
-.faserip-sheet .advancement-fund, 
-.faserip-sheet .karma-pool, 
-.faserip-sheet .lifetime-total {
-  flex: 1;
-  min-width: 150px;
-  text-align: center;
-  margin-bottom: 10px;
-}
-
-.faserip-sheet .karma-advancement h3 {
-  color: #8b0000;
-  margin: 0 0 5px 0;
-  font-size: 14px;
-}
-
-.faserip-sheet .karma-buttons {
-  width: 100%;
-  display: flex;
-  justify-content: center;
-  gap: 10px;
-  margin-top: 10px;
-}
-
-.faserip-sheet .karma-buttons button {
-  background: #8b0000;
-  color: white;
-  border: none;
-  padding: 5px 10px;
-  cursor: pointer;
-}
-
-/* Input styling - scope to sheet */
-.faserip-sheet input[type="text"], 
-.faserip-sheet input[type="number"], 
-.faserip-sheet select {
-  border: 1px solid #ccc;
-  padding: 2px 5px;
-  font-size: 13px;
-}
-
-.faserip-sheet button {
-  cursor: pointer;
-}
-
-/* Draggable items - scope to sheet */
-.faserip-sheet [draggable="true"] {
-  cursor: grab;
-}
-
-.faserip-sheet [draggable="true"]:active {
-  cursor: grabbing;
-}
-
-.faserip-sheet .tab.active {
-  display: block;
-}
-
-/* Powers Tab Styling */
-.faserip-sheet .powers-header {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 10px;
-}
-
-.faserip-sheet .powers-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-bottom: 10px;
-}
-
-.faserip-sheet .powers-table th {
-  background: #8b0000;
-  color: white;
-  font-weight: bold;
-  text-align: center;
-  padding: 5px;
-}
-
-.faserip-sheet .powers-table td {
-  padding: 5px;
-  text-align: center;
-  border-bottom: 1px solid #ccc;
-}
-
-.faserip-sheet .power-icon img {
-  width: 32px;
-  height: 32px;
-  border: 1px solid #777;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.faserip-sheet .power-name {
-  text-align: left;
-  font-weight: bold;
-}
-
-.faserip-sheet .power-controls {
-  display: flex;
-  justify-content: center;
-  gap: 5px;
-}
-
-.faserip-sheet .power-controls a {
-  cursor: pointer;
-}
-
-.faserip-sheet .power-controls a:hover {
-  color: #8b0000;
-}
-
-.faserip-sheet .no-powers {
-  font-style: italic;
-  color: #777;
-  text-align: center;
-  padding: 20px;
-}
-
-/* Power info dialog - use more specific selectors */
-.power-info-dialog {
-  max-width: 500px;
-}
-
-.power-info-dialog .dialog-content {
-  padding: 0 10px;
-}
-
-.power-info-dialog h2 {
-  color: #8b0000;
-  border-bottom: 1px solid #ccc;
-  padding-bottom: 5px;
-}
-
-.power-info-dialog .power-details {
-  display: grid;
-  grid-template-columns: 100px 1fr;
-  gap: 5px;
-  margin-bottom: 10px;
-}
-
-.power-info-dialog .power-details .label {
-  font-weight: bold;
-}
-
-.power-info-dialog .description {
-  border-top: 1px solid #ccc;
-  padding-top: 10px;
-  margin-top: 10px;
-}
-
-/* Hide non-active tabs */
-.faserip-sheet .tab:not(.active) {
-  display: none;
-}
-
-/* Power Stunts styling */
-.stunt-entry {
-  border: 1px solid #ccc;
-  margin-bottom: 8px;
-  padding: 8px;
-  border-radius: 4px;
-  background: #f9f9f9;
-}
-
-.stunt-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 5px;
-}
-
-.stunt-attempts {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-
-.stunt-count {
-  width: 40px;
-  text-align: center;
-}
-
-.stunt-difficulty {
-  font-weight: bold;
-  padding: 2px 5px;
-  border-radius: 3px;
-}
-
-.difficulty.red {
-  color: white;
-  background-color: #c22;
-}
-
-.difficulty.yellow {
-  color: black;
-  background-color: #fd2;
-}
-
-.difficulty.green {
-  color: white;
-  background-color: #2a2;
-}
-
-.difficulty.mastered {
-  color: white;
-  background-color: #44b;
-}
-
-.stunt-controls {
-  display: flex;
-  justify-content: flex-end;
-  gap: 5px;
-  margin-top: 5px;
-}
-
-.stunt-info {
-  font-style: italic;
-  color: #666;
-  margin-bottom: 8px;
-}
-/* TALENTS AND CONTACTS */
-/* Icon styling for talents and contacts */
-.faserip-sheet .talent-icon,
-.faserip-sheet .contact-icon {
-  width: 24px;
-  height: 24px;
-  margin-right: 5px;
-  border: 1px solid #ccc;
-  vertical-align: middle;
-}
-
-/* Adjust talent and contact name span to display as flex for proper alignment */
-.faserip-sheet .talent-name,
-.faserip-sheet .contact-name {
-  display: flex;
-  align-items: center;
-}
-
-/* Talents List Styling */
-.faserip-sheet .talents-list {
-  margin-top: 10px;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  grid-gap: 8px;
-}
-
-.faserip-sheet .talent-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 8px 12px;
-  background: #f8f8f8;
-  border: 1px solid #ddd;
-  border-radius: 3px;
-}
-
-.faserip-sheet .talent-item:hover {
-  background: #e8e8e8;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-}
-
-.faserip-sheet .talent-name {
-  font-weight: bold;
-  flex: 1;
-}
-
-.faserip-sheet .talent-item .item-controls {
-  display: flex;
-  gap: 8px;
-}
-
-/* Talent Sheet Styling */
-.talent-sheet .form-group {
-  margin-bottom: 12px;
-}
-
-.talent-sheet select, 
-.talent-sheet input, 
-.talent-sheet textarea {
-  width: 100%;
-  padding: 5px;
-  border: 1px solid #ccc;
-  border-radius: 3px;
-}
-
-.talent-sheet textarea {
-  min-height: 100px;
-}
-
-/* Contacts List Styling */
-.faserip-sheet .contacts-list {
-  margin-top: 10px;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  grid-gap: 8px;
-}
-
-.faserip-sheet .contact-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 8px 12px;
-  background: #f8f8f8;
-  border: 1px solid #ddd;
-  border-radius: 3px;
-}
-
-.faserip-sheet .contact-item:hover {
-  background: #e8e8e8;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-}
-
-.faserip-sheet .contact-name {
-  font-weight: bold;
-  flex: 1;
-}
-
-.faserip-sheet .contact-item .item-controls {
-  display: flex;
-  gap: 8px;
-}
-
-/* Contact Sheet Styling */
-.contact-sheet .form-group {
-  margin-bottom: 12px;
-}
-
-.contact-sheet select, 
-.contact-sheet input, 
-.contact-sheet textarea {
-  width: 100%;
-  padding: 5px;
-  border: 1px solid #ccc;
-  border-radius: 3px;
-}
-
-.contact-sheet textarea {
-  min-height: 100px;
-}
-
-/* Common controls styling for powers, talents, and contacts */
-.faserip-sheet .item-controls {
-  display: flex;
-  gap: 8px;
-}
-
-.faserip-sheet .item-control {
-  cursor: pointer;
-  color: #666;
-}
-
-.faserip-sheet .item-control:hover {
-  color: #8b0000;
-}
-
-/* Info dialog styling for talents and contacts */
-.talent-details, .contact-details {
-  display: grid;
-  grid-template-columns: 100px 1fr;
-  gap: 5px;
-  margin-bottom: 10px;
-}
-
-.talent-details .label, .contact-details .label {
-  font-weight: bold;
-}
-
-/* More specific selector for the description in info dialogs */
-.talent-details + .description, 
-.contact-details + .description {
-  border-top: 1px solid #ccc;
-  padding-top: 10px;
-  margin-top: 10px;
-}
-
-/* Contact notes styling */
-.contact-notes {
-  margin-top: 12px;
-  margin-bottom: 12px;
-  padding: 8px;
-  background-color: #f8f8f8;
-  border: 1px solid #ddd;
-  border-radius: 3px;
-}
-
-.contact-notes h3, .contact-description h3 {
-  margin: 0 0 5px 0;
-  font-size: 14px;
-  color: #8b0000;
-}
-
-.contact-description {
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid #ccc;
-}
-/* Abilities Section Layout */
-.faserip-sheet .abilities-section {
-  display: flex;
-  gap: 10px;
-  margin-bottom: 10px;
-}
-
-/* Primary Abilities (finalized width) */
-.faserip-sheet .primary-abilities {
-  flex: 0 0 36%;
-  min-width: 280px;
-}
-
-/* Secondary Abilities (finalized width) */
-/* .faserip-sheet .secondary-abilities {
-  flex: 0 0 60%;
-  overflow: visible;
-} */
-
-/* Tables setup */
-.faserip-sheet .abilities-table,
-.faserip-sheet .attributes-table {
-  table-layout: fixed;
-  width: 100%;
-}
-
-/* Narrow first column (FASERIP letters) */
-.faserip-sheet .abilities-table td.ability-key {
-  width: 20px;
-  text-align: center;
-}
-
-/* Column widths for Primary Abilities */
-.faserip-sheet .abilities-table th.narrow-column,
-.faserip-sheet .abilities-table th:last-child {
-  width: 50px;
-}
-
-/* Expand Current Rank column width */
-.faserip-sheet .abilities-table th:nth-child(4),
-.faserip-sheet .abilities-table td:nth-child(4) {
-  width: 100px;
-}
-
-/* Adjust inputs/selects for Primary Abilities */
-.faserip-sheet .primary-abilities input[type="number"],
-.faserip-sheet .primary-abilities input[type="text"],
-.faserip-sheet .primary-abilities select {
-  width: 90%;
-  padding: 2px;
-  font-size: 0.7rem;
-  box-sizing: border-box;
-}
-
-/* Column widths for Secondary Abilities */
-.faserip-sheet .attributes-table th:nth-child(1),
-.faserip-sheet .attributes-table td:nth-child(1),
-.faserip-sheet .attributes-table th:nth-child(2),
-.faserip-sheet .attributes-table td:nth-child(2) {
-  width: 20%; /* Health & Karma narrower */
-}
-
-.faserip-sheet .attributes-table th:nth-child(3),
-.faserip-sheet .attributes-table td:nth-child(3),
-.faserip-sheet .attributes-table th:nth-child(4),
-.faserip-sheet .attributes-table td:nth-child(4) {
-  width: 30%; /* Resources & Popularity wider */
-}
-
-/* Inputs in Secondary Abilities */
-.faserip-sheet .secondary-abilities input[type="number"],
-.faserip-sheet .secondary-abilities select {
-  width: 90%;
-  box-sizing: border-box;
-  font-size: 0.75rem;
-  padding: 2px;
-}
-
-/* Stacked Values (Health, Karma, Popularity) */
-.faserip-sheet .stacked-values,
-.faserip-sheet .popularity-values {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-}
-
-.faserip-sheet .stacked-values input,
-.faserip-sheet .popularity-values input {
-  width: 50px;
-  text-align: center;
-}
-
-.faserip-sheet .stacked-values .divider,
-.faserip-sheet .popularity-values .divider {
-  font-weight: bold;
-}
-
-/* Add to global.css */
-
-/* Table header styling */
-.faserip-sheet .attributes-table th {
-  /* Ensure consistent height with primary abilities table headers */
-  height: 26px;
-  vertical-align: middle;
-  padding: 2px 5px;
-}
-
-/* Resources header button styling */
-.faserip-sheet .attributes-table th .resources-header-button {
+ }
+ 
+ /* Resources header button styling */
+ .faserip-sheet .attributes-table th .resources-header-button {
   background: none;
   border: none;
   color: #FFD700; /* Gold color to stand out */
@@ -918,50 +369,50 @@
   align-items: center;
   justify-content: center;
   line-height: normal;
-}
-
-.faserip-sheet .attributes-table th .resources-header-button:hover {
+ }
+ 
+ .faserip-sheet .attributes-table th .resources-header-button:hover {
   color: #4CAF50; /* Green on hover */
   text-shadow: 0 0 3px rgba(255, 255, 255, 0.5);
-}
-
-/* Resource dialog styling */
-.resources-dialog .dialog-content {
+ }
+ 
+ /* Resource dialog styling */
+ .resources-dialog .dialog-content {
   max-height: 500px;
   overflow-y: auto;
-}
-
-.resources-dialog .dialog-content h2 {
+ }
+ 
+ .resources-dialog .dialog-content h2 {
   color: #8b0000;
   border-bottom: 1px solid #ccc;
   padding-bottom: 5px;
-}
-
-.resources-dialog .dialog-content p {
+ }
+ 
+ .resources-dialog .dialog-content p {
   margin-bottom: 1em;
-}
-
-.resources-dialog .dialog-content table {
+ }
+ 
+ .resources-dialog .dialog-content table {
   width: 100%;
   border-collapse: collapse;
   margin: 10px 0;
-}
-
-.resources-dialog .dialog-content th,
-.resources-dialog .dialog-content td {
+ }
+ 
+ .resources-dialog .dialog-content th,
+ .resources-dialog .dialog-content td {
   border: 1px solid #ccc;
   padding: 5px;
   text-align: left;
-}
-
-.resources-dialog .dialog-content th {
+ }
+ 
+ .resources-dialog .dialog-content th {
   background-color: #8b0000;
   color: white;
-}
-
-/* Popularity Section */
-/* Popularity header button styling */
-.faserip-sheet .attributes-table th .popularity-header-button {
+ }
+ 
+ /* Popularity Section */
+ /* Popularity header button styling */
+ .faserip-sheet .attributes-table th .popularity-header-button {
   background: none;
   border: none;
   color: #00BFFF; /* Sky blue color to stand out */
@@ -977,104 +428,1321 @@
   align-items: center;
   justify-content: center;
   line-height: normal;
-}
-
-.faserip-sheet .attributes-table th .popularity-header-button:hover {
+ }
+ 
+ .faserip-sheet .attributes-table th .popularity-header-button:hover {
   color: #FF69B4; /* Hot pink on hover */
   text-shadow: 0 0 3px rgba(255, 255, 255, 0.5);
-}
-
-/* Popularity dialog styling - add to existing dialog styles */
-.popularity-dialog .dialog-content {
+ }
+ 
+ /* Popularity dialog styling - add to existing dialog styles */
+ .popularity-dialog .dialog-content {
   max-height: 500px;
   overflow-y: auto;
-}
-
-.popularity-dialog .dialog-content h2 {
+ }
+ 
+ .popularity-dialog .dialog-content h2 {
   color: #8b0000;
   border-bottom: 1px solid #ccc;
   padding-bottom: 5px;
-}
-
-.popularity-dialog .dialog-content table.pop-awards {
+ }
+ 
+ .popularity-dialog .dialog-content table.pop-awards {
   width: 100%;
   border-collapse: collapse;
   margin: 10px 0;
-}
-
-.popularity-dialog .dialog-content .pop-awards th,
-.popularity-dialog .dialog-content .pop-awards td {
+ }
+ 
+ .popularity-dialog .dialog-content .pop-awards th,
+ .popularity-dialog .dialog-content .pop-awards td {
   border: 1px solid #ccc;
   padding: 5px;
   text-align: left;
-}
-
-.popularity-dialog .dialog-content .pop-awards th {
+ }
+ 
+ .popularity-dialog .dialog-content .pop-awards th {
   background-color: #8b0000;
   color: white;
-}
-
-.popularity-dialog .note-box {
+ }
+ 
+ .popularity-dialog .note-box {
   background-color: #f8f8f8;
   border-left: 3px solid #8b0000;
   padding: 10px;
   margin: 10px 0;
-}
+ }
+ 
+ /* Tab system - use more specific selectors to avoid conflicts */
+ .faserip-sheet .sheet-tabs {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  margin-top: 10px;
+  border: 1px solid #8b0000;
+  background: white;
+ }
+ 
+ /* Navigation container */
+ .faserip-sheet .sheet-tabs-navigation {
+  display: flex;
+  border-bottom: 2px solid #8b0000;
+  width: 100%;
+  background: #f0f0f0;
+ }
+ 
+ /* Tab navigation items - more specific selectors */
+ .faserip-sheet .sheet-tabs-navigation .item {
+  padding: 8px 15px;
+  background: #ddd;
+  color: #333;
+  border: 1px solid #8b0000;
+  border-bottom: none;
+  margin-right: 2px;
+  border-radius: 5px 5px 0 0;
+  cursor: pointer;
+  text-decoration: none;
+ }
+ 
+ .faserip-sheet .sheet-tabs-navigation .item.active {
+  background: #8b0000;
+  color: white;
+  font-weight: bold;
+ }
+ 
+ /* Tab content container */
+ .faserip-sheet .sheet-tab-content {
+  display: block;
+  width: 100%;
+  height: auto;
+  padding: 10px;
+  border: none;
+ }
+ 
+ /* Hide all tabs by default */
+ .faserip-sheet .tab {
+  display: none;
+  height: auto;
+  margin: 0;
+  padding: 0;
+ }
+ 
+ /* Only show active tab */
+ .faserip-sheet .tab.active {
+  display: block;
+ }
+ 
+ /* consistent styling across all tab controls */
+ /* Shared tab controls styling */
+ .faserip-sheet .tab-controls {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 10px;
+ }
+ 
+ .faserip-sheet .tab-controls button {
+  flex: 1;
+  margin: 0 5px;
+ }
+ 
+ .faserip-sheet .tab-controls button:first-child {
+  margin-left: 0;
+ }
+ 
+ .faserip-sheet .tab-controls button:last-child {
+  margin-right: 0;
+ }
+ 
+ /* Make talents list and contacts list more compact */
+ .faserip-sheet .talents-list,
+ .faserip-sheet .contacts-list {
+  margin-bottom: 0; /* Remove bottom margin */
+ }
+ 
+ /* Remove any empty space at bottom of tables */
+ .faserip-sheet table {
+  margin-bottom: 0;
+ }
+ 
+ /* Only add bottom margin when there's content */
+ .faserip-sheet .no-powers,
+ .faserip-sheet .no-talents,
+ .faserip-sheet .no-contacts,
+ .faserip-sheet .no-equipment,
+ .faserip-sheet .no-headquarters,
+ .faserip-sheet .no-vehicles {
+  margin: 10px 0;
+  text-align: center;
+  font-style: italic;
+  color: #666;
+  padding: 20px;
+ }
+ 
+ /* Power-specific styling */
+ .faserip-sheet .powers-controls {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 10px;
+ }
+ 
+ .faserip-sheet .powers-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 10px;
+ }
+ 
+ .faserip-sheet .powers-table th {
+  background: #8b0000;
+  color: white;
+  font-weight: bold;
+  text-align: center;
+  padding: 5px;
+ }
+ 
+ .faserip-sheet .powers-table td {
+  padding: 5px;
+  text-align: center;
+  border-bottom: 1px solid #ccc;
+ }
+ 
+ .faserip-sheet .power-name {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  text-align: left;
+  font-weight: bold;
+ }
+ 
+ .faserip-sheet .power-icon {
+  cursor: pointer;
+  border: 1px solid #ccc;
+ }
+ 
+ .faserip-sheet .power-icon img {
+  width: 32px;
+  height: 32px;
+  border: 1px solid #777;
+  border-radius: 4px;
+  cursor: pointer;
+ }
+ 
+ /* Style the roll button in its new position */
+ .faserip-sheet .power-roll {
+  cursor: pointer;
+  color: #555;
+  margin-right: 2px;
+ }
+ 
+ .faserip-sheet .power-roll:hover {
+  color: #8b0000;
+ }
+ 
+ /* Style for the power name text */
+ .faserip-sheet .power-name-text {
+  flex: 1;
+  cursor: grab; /* Shows this is draggable */
+ }
+ 
+ .faserip-sheet .power-controls {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+ }
+ 
+ .faserip-sheet .item-control {
+  cursor: pointer;
+  color: #666;
+ }
+ 
+ .faserip-sheet .item-control:hover {
+  color: #8b0000;
+ }
+ 
+ /* Ensure only the intended items are draggable */
+ .faserip-sheet .power-row td:not(.power-name) {
+  cursor: default;
+ }
+ 
+ .power-row.drag-over {
+  outline: 2px dashed #888;
+ }
+ 
+ .power-tag {
+  margin-left: 5px;
+  font-size: 0.9em;
+ }
+ .power-tag.bonus {
+  color: green;
+ }
+ .power-tag.stunt {
+  color: orange;
+ }
+ 
+ .power-name-text.bonus-power {
+  color: green;
+  font-style: italic;
+ }
+ .power-name-text.stunt-power {
+  color: orange;
+  text-decoration: underline dotted;
+ }
+ 
+ /* Power info dialog - use more specific selectors */
+ .power-info-dialog {
+  max-width: 500px;
+ }
+ 
+ .power-info-dialog .dialog-content {
+  padding: 0 10px;
+ }
+ 
+ .power-info-dialog h2 {
+  color: #8b0000;
+  border-bottom: 1px solid #ccc;
+  padding-bottom: 5px;
+ }
+ 
+ .power-info-dialog .power-details {
+  display: grid;
+  grid-template-columns: 100px 1fr;
+  gap: 5px;
+  margin-bottom: 10px;
+ }
+ 
+ .power-info-dialog .power-details .label {
+  font-weight: bold;
+ }
+ 
+ .power-info-dialog .description {
+  border-top: 1px solid #ccc;
+  padding-top: 10px;
+  margin-top: 10px;
+ }
+ 
+ .power-description {
+  min-height: 120px;
+  width: 100%;
+  font-family: sans-serif;
+  padding: 5px;
+  resize: vertical; /* Allows the user to resize vertically if needed */
+ }
+ 
+ .description-field {
+  margin-bottom: 15px;
+ }
+ 
+ /* Power Stunts styling */
+ .stunt-entry {
+  border: 1px solid #ccc;
+  margin-bottom: 8px;
+  padding: 8px;
+  border-radius: 4px;
+  background: #f9f9f9;
+ }
+ 
+ .stunt-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 5px;
+ }
+ 
+ .stunt-attempts {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+ }
+ 
+ .stunt-count {
+  width: 40px;
+  text-align: center;
+ }
+ 
+ .stunt-difficulty {
+  font-weight: bold;
+  padding: 2px 5px;
+  border-radius: 3px;
+ }
+ 
+ .difficulty.red {
+  color: white;
+  background-color: #c22;
+ }
+ 
+ .difficulty.yellow {
+  color: black;
+  background-color: #fd2;
+ }
+ 
+ .difficulty.green {
+  color: white;
+  background-color: #2a2;
+ }
+ 
+ .difficulty.mastered {
+  color: white;
+  background-color: #44b;
+ }
+ 
+ .stunt-controls {
+  display: flex;
+  justify-content: flex-end;
+  gap: 5px;
+  margin-top: 5px;
+ }
+ 
+ .stunt-info {
+  font-style: italic;
+  color: #666;
+  margin-bottom: 8px;
+ }
+ 
+ /* TALENTS AND CONTACTS */
+ /* Icon styling for talents and contacts */
+ .faserip-sheet .talent-icon,
+ .faserip-sheet .contact-icon {
+  width: 24px;
+  height: 24px;
+  margin-right: 5px;
+  border: 1px solid #ccc;
+  vertical-align: middle;
+  cursor: pointer;
+ }
+ 
+ /* Adjust talent and contact name span to display as flex for proper alignment */
+ .faserip-sheet .talent-name,
+ .faserip-sheet .contact-name {
+  display: flex;
+  align-items: center;
+  font-weight: bold;
+  flex: 1;
+ }
+ 
+ /* Talents List Styling */
+ .faserip-sheet .talents-list {
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  grid-gap: 8px;
+ }
+ 
+ .faserip-sheet .talent-item {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  background: #f8f8f8;
+  border: 1px solid #ddd;
+  border-radius: 3px;
+ }
+ 
+ .faserip-sheet .talent-item:hover {
+  background: #e8e8e8;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+ }
+ 
+ /* Style for the roll button in its new position */
+ .faserip-sheet .talent-roll {
+  cursor: pointer;
+  color: #555;
+  margin-right: 5px;
+ }
+ 
+ .faserip-sheet .talent-roll:hover {
+  color: #8b0000;
+ }
+ 
+ /* Style for the talent name text */
+ .faserip-sheet .talent-name-text {
+  flex: 1;
+  font-weight: bold;
+  cursor: grab; /* Shows this is draggable */
+ }
+ 
+ /* Update the controls section spacing */
+ .faserip-sheet .talent-item .item-controls {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+ }
+ 
+ /* Ensure only the intended items are draggable */
+ .faserip-sheet .talent-item > *:not(.talent-roll):not(.talent-icon):not(.talent-name-text) {
+  cursor: default;
+ }
+ 
+ /* Contacts List Styling */
+ .faserip-sheet .contacts-list {
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  grid-gap: 8px;
+ }
+ 
+ .faserip-sheet .contact-item {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  background: #f8f8f8;
+  border: 1px solid #ddd;
+  border-radius: 3px;
+ }
+ 
+ .faserip-sheet .contact-item:hover {
+  background: #e8e8e8;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+ }
+ 
+ /* Style for the roll button in its new position */
+ .faserip-sheet .contact-roll {
+  cursor: pointer;
+  color: #555;
+  margin-right: 5px;
+ }
+ 
+ .faserip-sheet .contact-roll:hover {
+  color: #8b0000;
+ }
+ 
+ /* Style for the contact name text */
+ .faserip-sheet .contact-name-text {
+  flex: 1;
+  font-weight: bold;
+  cursor: grab; /* Shows this is draggable */
+ }
+ 
+ /* Update the controls section spacing */
+ .faserip-sheet .contact-item .item-controls {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+ }
+ 
+ /* Ensure only the intended items are draggable */
+ .faserip-sheet .contact-item > *:not(.contact-roll):not(.contact-icon):not(.contact-name-text) {
+  cursor: default;
+ }
+ 
+ /* Common controls styling for powers, talents, and contacts */
+ .faserip-sheet .item-controls {
+  display: flex;
+  gap: 8px;
+ }
+ 
+ /* Info dialog styling for talents and contacts */
+ .talent-details, .contact-details {
+  display: grid;
+  grid-template-columns: 100px 1fr;
+  gap: 5px;
+  margin-bottom: 10px;
+ }
+ 
+ .talent-details .label, .contact-details .label {
+  font-weight: bold;
+ }
+ 
+ /* More specific selector for the description in info dialogs */
+ .talent-details + .description, 
+ .contact-details + .description {
+  border-top: 1px solid #ccc;
+  padding-top: 10px;
+  margin-top: 10px;
+ }
+ 
+ /* Contact notes styling */
+ .contact-notes {
+  margin-top: 12px;
+  margin-bottom: 12px;
+  padding: 8px;
+  background-color: #f8f8f8;
+  border: 1px solid #ddd;
+  border-radius: 3px;
+ }
+ 
+ .contact-notes h3, .contact-description h3 {
+  margin: 0 0 5px 0;
+  font-size: 14px;
+  color: #8b0000;
+ }
+ 
+ .contact-description {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #ccc;
+ }
+ 
+ /* Equipment table styles */
+ .equipment-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 10px;
+  table-layout: fixed;
+ }
+ 
+ .equipment-table th {
+  background-color: #8B0000;
+  color: white;
+  font-weight: bold;
+  text-align: left;
+  padding: 3px 5px;
+  font-size: 0.9em;
+ }
+ 
+ .equipment-table td {
+  padding: 3px 5px;
+  border-bottom: 1px solid #ddd;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 0.9em;
+ }
+ 
+ /* Column width adjustments */
+ .equipment-table .name-col { width: 30%; }
+ .equipment-table .material-col { width: 10%; }
+ .equipment-table .damage-col { width: 8%; }
+ .equipment-table .type-col { width: 8%; }
+ .equipment-table .range-col { width: 8%; }
+ .equipment-table .rate-col { width: 7%; }
+ .equipment-table .shots-col { width: 9%; }
+ .equipment-table .actions-col { width: 20%; text-align: center; }
+ 
+ .equipment-row:hover {
+  background-color: #f5f5f5;
+ }
+ 
+ /* Equipment name cell styling for new layout */
+ .faserip-sheet .equipment-name {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  cursor: grab; /* Only this area will be draggable */
+ }
+ 
+ /* Style for the roll button in its new position */
+ .faserip-sheet .equipment-roll {
+  cursor: pointer;
+  color: #555;
+  margin-right: 2px;
+ }
+ 
+ .faserip-sheet .equipment-roll:hover {
+  color: #8b0000;
+ }
+ 
+ /* Make the equipment icon clickable for info */
+ .faserip-sheet .equipment-icon {
+  cursor: pointer;
+  border: 1px solid #ccc;
+  margin-right: 5px;
+ }
+ 
+ /* Style for the equipment name text */
+ .faserip-sheet .equipment-name-text {
+  flex: 1;
+ }
+ 
+ /* Ensure only the name cell is draggable */
+ .faserip-sheet .equipment-row td:not(.equipment-name) {
+  cursor: default;
+ }
+ 
+ /* Update the controls section spacing */
+ .faserip-sheet .equipment-controls {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+ }
+ 
+ .shots-control {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+ }
+ 
+ .reload-weapon {
+  cursor: pointer;
+  color: #8B0000;
+ }
+ 
+ .reload-weapon:hover {
+  color: #ff0000;
+ }
+ 
+ /* Headquarters table styles */
+ .headquarters-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 10px;
+  table-layout: fixed;
+ }
+ 
+ .headquarters-table th {
+  background-color: #8B0000;
+  color: white;
+  font-weight: bold;
+  text-align: left;
+  padding: 3px 5px;
+  font-size: 0.9em;
+ }
 
-/* Movement Section */
-.faserip-sheet .movement-section {
+ .headquarters-table td {
+  padding: 3px 5px;
+  border-bottom: 1px solid #ddd;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 0.9em;
+ }
+ 
+ /* Column width adjustments */
+ .headquarters-table .name-col { width: 30%; }
+ .headquarters-table .location-col { width: 25%; }
+ .headquarters-table .size-col { width: 10%; }
+ .headquarters-table .material-col { width: 10%; }
+ .headquarters-table .cost-col { width: 15%; }
+ .headquarters-table .actions-col { width: 10%; text-align: center; }
+ 
+ .headquarters-row:hover {
+  background-color: #f5f5f5;
+ }
+ 
+ .headquarters-name {
+  display: flex;
+  align-items: center;
+ }
+ 
+ .headquarters-icon {
+  margin-right: 5px;
+  vertical-align: middle;
+ }
+ 
+ .headquarters-controls {
+  display: flex;
+  justify-content: space-around;
+ }
+ 
+ .headquarters-controls a {
+  color: #666;
+ }
+ 
+ .headquarters-controls a:hover {
+  color: #8B0000;
+ }
+ 
+ /* Vehicles table styles */
+ .vehicles-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 10px;
+  table-layout: fixed;
+ }
+ 
+ .vehicles-table th {
+  background-color: #8B0000;
+  color: white;
+  font-weight: bold;
+  text-align: left;
+  padding: 3px 5px;
+  font-size: 0.9em;
+ }
+ 
+ .vehicles-table td {
+  padding: 3px 5px;
+  border-bottom: 1px solid #ddd;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 0.9em;
+ }
+ 
+ /* Column width adjustments */
+ .vehicles-table .roll-col { width: 24px; text-align: center; }
+ .vehicles-table .name-col { width: 30%; }
+ .vehicles-table .type-col,
+ .vehicles-table .cost-col,
+ .vehicles-table .control-col,
+ .vehicles-table .speed-col,
+ .vehicles-table .body-col,
+ .vehicles-table .protection-col { width: 8%; }
+ .vehicles-table .actions-col { width: 12%; text-align: center; }
+ 
+ .vehicle-row:hover {
+  background-color: #f5f5f5;
+ }
+ 
+ .vehicle-control-roll {
+  display: inline-block;
+  padding: 2px;
+  margin: 0 4px 0 0;
+  font-size: 0.9em;
+  color: #333;
+  background: none;
+  border: none;
+  cursor: pointer;
+ }
+ 
+ .vehicle-control-roll i {
+  font-size: 1em;
+ }
+ 
+ .vehicle-control-roll:hover {
+  color: #8B0000;
+ }
+ 
+ .vehicle-controls {
+  display: flex;
+  justify-content: space-around;
+ }
+ 
+ .vehicle-controls a {
+  color: #666;
+ }
+ 
+ .vehicle-controls a:hover {
+  color: #8B0000;
+ }
+ 
+ .vehicle-name {
+  display: flex;
+  align-items: center;
+  cursor: grab;
+ }
+ 
+ .vehicle-name:active {
+  cursor: grabbing;
+ }
+ 
+ .vehicle-icon {
+  margin-right: 5px;
+  vertical-align: middle;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  width: 24px;
+  height: 24px;
+  cursor: pointer;
+ }
+ 
+ .vehicle-icon img {
+  width: 100%;
+  height: 100%;
+  display: block;
+ }
+ 
+ /* Headquarters Dialog Styling */
+ .headquarters-dialog .dialog-body {
+  padding: 10px;
+ }
+ 
+ .headquarters-dialog .form-group {
+  margin-bottom: 10px;
+ }
+ 
+ .headquarters-dialog label {
+  display: block;
+  font-weight: bold;
+  margin-bottom: 5px;
+ }
+ 
+ .headquarters-dialog input[type="text"],
+ .headquarters-dialog textarea {
+  width: 100%;
+  padding: 5px;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+ }
+ 
+ .headquarters-dialog .form-row {
+  display: flex;
+  gap: 10px;
+ }
+ 
+ .headquarters-dialog .form-group.half {
+  flex: 1;
+ }
+ 
+ .headquarters-dialog .radio-group,
+ .headquarters-dialog .checkbox-group {
+  margin-top: 5px;
+ }
+ 
+ .headquarters-dialog .radio-group label,
+ .headquarters-dialog .checkbox-group label {
+  display: inline-flex;
+  align-items: center;
+  font-weight: normal;
+  margin-right: 10px;
+  margin-bottom: 0;
+ }
+ 
+ .headquarters-dialog .radio-group input,
+ .headquarters-dialog .checkbox-group input {
+  margin-right: 5px;
+ }
+ 
+ .headquarters-dialog textarea {
+  min-height: 80px;
+  resize: vertical;
+ }
+ 
+ .headquarters-dialog .dialog-footer {
+  margin-top: 15px;
+  text-align: right;
+ }
+ 
+ .headquarters-dialog button {
+  padding: 6px 12px;
+  margin-left: 10px;
+ }
+ 
+ /* Input styling - scope to sheet */
+ .faserip-sheet input[type="text"], 
+ .faserip-sheet input[type="number"], 
+ .faserip-sheet select {
+  border: 1px solid #ccc;
+  padding: 2px 5px;
+  font-size: 13px;
+ }
+ 
+ .faserip-sheet button {
+  cursor: pointer;
+ }
+ 
+ /* Draggable items - scope to sheet */
+ .faserip-sheet [draggable="true"] {
+  cursor: grab;
+ }
+ 
+ .faserip-sheet [draggable="true"]:active {
+  cursor: grabbing;
+ }
+ 
+ /* Abilities Section Layout */
+ .faserip-sheet .abilities-section {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+ }
+ 
+ /* Primary Abilities (finalized width) */
+ .faserip-sheet .primary-abilities {
+  flex: 0 0 36%;
+  min-width: 280px;
+ }
+ 
+ /* Final narrow adjustment for Secondary Abilities */
+ .faserip-sheet .secondary-abilities {
+  flex: 0 0 47%; /* Adjusted narrower from 60% */
+ }
+ 
+ /* Movement Section */
+ .faserip-sheet .movement-section {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 8px;
   margin: 10px 0;
   border-top: 1px solid #ccc;
   padding-top: 10px;
-}
-
-.faserip-sheet .movement-item {
+ }
+ 
+ .faserip-sheet .movement-item {
   display: flex;
   flex-direction: column;
   align-items: center;
-}
-
-.faserip-sheet .movement-item label {
+ }
+ 
+ .faserip-sheet .movement-item label {
   font-weight: bold;
   font-size: 12px;
   margin-bottom: 3px;
-}
-
-.faserip-sheet .movement-item input {
+ }
+ 
+ .faserip-sheet .movement-item input {
   width: 40px;
   text-align: center;
-}
-
-/* Responsive adjustments */
-@media (max-width: 768px) {
+ }
+ 
+ /* Responsive adjustments */
+ @media (max-width: 768px) {
   .faserip-sheet .abilities-section {
     flex-direction: column;
   }
-
+ 
   .faserip-sheet .primary-abilities,
   .faserip-sheet .secondary-abilities {
     flex: 1 1 100%;
     min-width: unset;
   }
-}
+ }
+ 
+ /* Karma advancement section */
+ .faserip-sheet .karma-advancement {
+  display: flex;
+  flex-wrap: wrap;
+  margin-top: 10px;
+  border: 1px solid #8b0000;
+  padding: 10px;
+  background: white;
+ }
+ 
+ .faserip-sheet .advancement-fund, 
+ .faserip-sheet .karma-pool, 
+ .faserip-sheet .lifetime-total {
+  flex: 1;
+  min-width: 150px;
+  text-align: center;
+  margin-bottom: 10px;
+ }
+ 
+ .faserip-sheet .karma-advancement h3 {
+  color: #8b0000;
+  margin: 0 0 5px 0;
+  font-size: 14px;
+ }
+ 
+ .faserip-sheet .karma-buttons {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 10px;
+ }
+ 
+ .faserip-sheet .karma-buttons button {
+  background: #8b0000;
+  color: white;
+  border: none;
+  padding: 5px 10px;
+  cursor: pointer;
+ }
+ 
+ /* Updated Karma Section for Character Sheet */
+ .faserip-sheet .karma-section {
+  margin-top: 10px;
+  border: 1px solid #8b0000;
+  padding: 8px;
+  background: white;
+ }
+ 
+ /* Fresh approach for karma values */
+ .faserip-sheet .karma-values {
+  display: table !important;
+  width: 100% !important;
+  table-layout: fixed !important;
+  margin-bottom: 8px !important;
+ }
+ 
+ /* Make all boxes exactly the same */
+ .faserip-sheet .karma-current,
+ .faserip-sheet .karma-advancement,
+ .faserip-sheet .karma-pool {
+  display: table-cell !important;
+  vertical-align: middle !important;
+  text-align: center !important;
+  height: 70px !important;
+  padding: 5px !important;
+  border: 1px solid #ccc !important;
+  border-radius: 4px !important;
+ }
+ 
+ .faserip-sheet .karma-current {
+  background-color: #f5f5f5;
+ }
+ 
+ .faserip-sheet .karma-advancement {
+  background-color: #e8f5e9;
+ }
+ 
+ .faserip-sheet .karma-pool {
+  background-color: #e3f2fd;
+ }
+ 
+ /* All labels exactly the same */
+ .faserip-sheet .karma-values label {
+  display: block;
+  font-weight: bold;
+  font-size: 12px;
+  color: #8b0000;
+  margin: 0 0 4px 0;
+  padding: 0;
+  width: 100%;
+  text-align: center;
+  line-height: 1.2;
+ }
+ 
+ /* All inputs exactly the same */
+ .faserip-sheet .karma-values input {
+  width: 70%;
+  text-align: center;
+  font-weight: bold;
+  margin: 0;
+  padding: 4px;
+  height: 28px;
+ }
+ 
+ .faserip-sheet .tab-style-button {
+  background: #ddd;
+  color: #333;
+  border: 1px solid #8b0000;
+  border-radius: 5px 5px 0 0;
+  padding: 5px 10px;
+  font-size: 12px;
+  cursor: pointer;
+ }
+ 
+ .faserip-sheet .tab-style-button:hover {
+  background: #eee;
+ }
+ 
+ /* Marvel Character Sheet Header Styles */
+ .faserip-sheet .marvel-header {
+  display: flex;
+  flex-direction: row;
+  border: 1px solid #8b0000;
+  padding: 10px;
+  background-color: white;
+  margin-bottom: 10px;
+ }
+ 
+ /* Marvel logo and title */
+ .faserip-sheet .header-title {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+ }
+ 
+ .faserip-sheet .marvel-logo-text {
+  font-family: 'Arial Black', sans-serif;
+  font-size: 30px;
+  font-weight: 900;
+  letter-spacing: -1px;
+  color: #000;
+  line-height: 0.9;
+  text-transform: uppercase;
+  margin-bottom: 0;
+ }
+ 
+ .faserip-sheet .super-heroes-text {
+  font-family: 'Arial', sans-serif;
+  font-size: 16px;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 5px;
+ }
+ 
+ .faserip-sheet .character-sheet-text {
+  font-family: 'Arial', sans-serif;
+  font-size: 18px;
+  font-weight: bold;
+  text-transform: none;
+  line-height: 1;
+ }
+ 
+ /* Player info area */
+ .faserip-sheet .character-info {
+  flex: 0 0 200px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: flex-end;
+  padding-top: 0;
+ }
+ 
+ .faserip-sheet .player-name-container {
+  width: 100%;
+  margin-top: 10px;
+ }
+ 
+ .faserip-sheet .player-name-container label {
+  display: block;
+  font-weight: bold;
+  margin-bottom: 3px;
+  text-align: left;
+ }
+ 
+ .faserip-sheet .player-name-container input {
+  width: 100%;
+  padding: 4px;
+  border: 1px solid #ccc;
+ }
+ 
+ /* Identity section styling */
+ .faserip-sheet .identity-section {
+  border: 1px solid #8b0000;
+  padding: 10px;
+  background-color: white;
+  margin-bottom: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+ }
+ 
+ .faserip-sheet .hero-info-row {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+ }
+ 
+ /* Modified: Changed grid layout to maintain flexbox behavior for alignment */
+ .faserip-sheet .hero-info-row.three-columns {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end; /* Align items to the bottom */
+ }
+ 
+ .faserip-sheet .hero-name-container,
+ .faserip-sheet .hero-identity-container,
+ .faserip-sheet .group-container,
+ .faserip-sheet .base-container {
+  flex: 1;
+  margin-bottom: 0;
+ }
+ 
+ /* Modified: Match flex property for the three columns */
+ .faserip-sheet .age-container,
+ .faserip-sheet .origin-container {
+  flex: 1;
+  margin-bottom: 0;
+ }
+ 
+ /* Modified: Adjust the biography container */
+ .faserip-sheet .biography-container {
+  flex: 2; /* Keep the 2fr ratio from your grid */
+  margin-bottom: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end; /* Align to bottom */
+ }
+ 
+ .faserip-sheet .hero-name-container label,
+ .faserip-sheet .group-container label,
+ .faserip-sheet .base-container label,
+ .faserip-sheet .age-container label,
+ .faserip-sheet .origin-container label,
+ .faserip-sheet .biography-container label,
+ .faserip-sheet .hero-identity-container label {
+  display: block;
+  font-weight: bold;
+  margin-bottom: 3px;
+ }
+ 
+ .faserip-sheet .identity-label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 3px;
+ }
+ 
+ .faserip-sheet .identity-type-inline {
+  display: flex;
+  gap: 10px;
+  font-weight: normal;
+  font-size: 0.85em;
+ }
+ 
+ .faserip-sheet .radio-label {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+ }
+ 
+ .faserip-sheet .radio-label input[type="radio"] {
+  margin: 0;
+ }
+ 
+ .faserip-sheet .hero-name-container input,
+ .faserip-sheet .hero-identity-container input,
+ .faserip-sheet .group-container input,
+ .faserip-sheet .base-container input,
+ .faserip-sheet .age-container input,
+ .faserip-sheet .origin-container input {
+  width: 100%;
+  padding: 4px;
+  border: 1px solid #ccc;
+ }
+ 
+ /* Modified: Base container alignment fix */
+ .faserip-sheet .base-container {
+  padding-top: 18px; /* Create space to push the base field down */
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+ }
+ 
+ /* Biography Toggle Button */
+ .faserip-sheet .biography-toggle {
+  width: 100%;
+  padding: 4px 10px; /* Reduced padding to match input height */
+  text-align: left;
+  font-weight: bold;
+  background-color: #f0f0f0;
+  border: 1px solid #ccc;
+  border-radius: 0;
+  cursor: pointer;
+  color: #333;
+  height: 28px; /* Match height of input boxes */
+ }
+ 
+ .faserip-sheet .biography-toggle:hover {
+  background-color: #e0e0e0;
+ }
+ 
+ .faserip-sheet .biography-toggle.active {
+  background-color: #d0d0d0;
+ }
+ 
+ /* Biography Details Section */
+ .faserip-sheet .biography-details {
+  border: 1px solid #ccc;
+  padding: 10px;
+  margin-bottom: 5px;
+  background-color: #f9f9f9;
+ }
+ 
+ .faserip-sheet .biography-details.visible {
+  display: block;
+ }
+ 
+ .faserip-sheet .bio-row {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 8px;
+ }
+ 
+ .faserip-sheet .bio-field {
+  flex: 1;
+ }
+ 
+ .faserip-sheet .bio-field.full {
+  flex: 1 0 100%;
+ }
+ 
+ .faserip-sheet .bio-field label {
+  display: block;
+  font-weight: bold;
+  font-size: 0.9em;
+  margin-bottom: 3px;
+ }
+ 
+ .faserip-sheet .bio-field input,
+ .faserip-sheet .bio-field textarea {
+  width: 100%;
+  padding: 4px;
+  border: 1px solid #ccc;
+ }
+ 
+ .faserip-sheet .bio-field textarea {
+  min-height: 80px;
+  resize: vertical;
+ }
+ 
+ /* Hidden elements */
+ .hidden {
+  display: none !important;
+ }
 
-/* Smaller fonts for table headers */
-.faserip-sheet .attributes-table th,
-.faserip-sheet .abilities-table th {
-  font-size: 0.7rem;
-  padding: 2px;
-}
-
-/* Final narrow adjustment for Secondary Abilities */
-.faserip-sheet .secondary-abilities {
-  flex: 0 0 47%; /* Adjusted narrower from 60% */
-}
-
-/* Karma sheet styles */
-/* Karma sheet styling to match character sheet */
+ /* Karma sheet styles */
 .karma-sheet {
   font-family: Arial, sans-serif;
   background: #f5f5f5;
@@ -1086,7 +1754,6 @@
 }
 
 /* Summary header styling */
-/* Condensed Karma History Sheet Styles */
 .karma-sheet .karma-summary {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
@@ -1130,7 +1797,6 @@
 }
 
 /* Control buttons */
-/* Make buttons row more compact */
 .karma-sheet .karma-controls {
   display: flex;
   gap: 3px;
@@ -1142,27 +1808,18 @@
   color: white;
   border: none;
   border-radius: 3px;
-  padding: 4px 8px;
+  padding: 3px 6px;
   cursor: pointer;
   font-size: 0.75em;
   flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 28px;
-  white-space: nowrap; /* Prevent text wrapping */
+  height: 26px;
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-
-/* Improve button icon + text layout */
-.karma-sheet .karma-controls button {
-  /* other properties remain the same */
-  padding: 3px 6px; /* Slightly reduced padding */
-  font-size: 0.75em; /* Smaller text */
-  height: 26px; /* Slightly shorter height */
-}
-
 
 .karma-sheet .karma-controls button:hover {
   background-color: #a30000;
@@ -1174,11 +1831,6 @@
 
 .karma-sheet .danger-button:hover {
   background-color: #d32f2f !important;
-}
-
-/* Update the mid-sections layout for karma history sheet */
-.karma-sheet .mid-sections {
-  display: none; /* Hide this section since it's moved to separate sheets */
 }
 
 /* History Toggle */
@@ -1199,35 +1851,16 @@
 
 /* Adjust table to start right after the buttons */
 .karma-sheet .history-section {
-  padding: 0; /* Remove padding */
-  border: none; /* Remove border */
+  padding: 0;
+  border: none;
   margin-top: 0;
 }
 
 .karma-sheet .karma-history-table {
   border: 1px solid #ddd;
   border-radius: 3px;
-  margin-top: 0; /* Remove top margin */
-}
-
-.karma-sheet .karma-history-table {
-  max-height: 400px; /* Increase max height for more visible entries */
-}
-
-/* Style for the new buttons in karma history sheet */
-.karma-sheet .karma-controls .open-advancement,
-.karma-sheet .karma-controls .open-pool {
-  background-color: #8b0000;
-}
-
-.karma-sheet .karma-controls .open-advancement:hover,
-.karma-sheet .karma-controls .open-pool:hover {
-  background-color: #a30000;
-}
-
-/* Hide elements that are not needed in each specific sheet */
-.hidden {
-  display: none !important;
+  margin-top: 0;
+  max-height: 400px;
 }
 
 .karma-sheet table {
@@ -1236,8 +1869,6 @@
   font-size: 0.9em;
 }
 
-/* Make the table header more compact */
-/* Ensure table headers are visible and properly styled */
 .karma-sheet table th {
   padding: 4px;
   font-size: 0.85em;
@@ -1247,9 +1878,8 @@
 }
 
 /* Karma History title */
-/* Remove the Karma History heading */
 .karma-sheet h3 {
-  display: none; /* Hide the "Karma History" heading */
+  display: none;
 }
 
 .karma-sheet table td {
@@ -1308,12 +1938,6 @@
   color: #666;
   padding: 10px;
 }
-
-/* Hide by default functionality */
-.karma-sheet .hidden {
-  display: none !important;
-}
-
 
 /* Karma Advancement Sheet Styles */
 .karma-advancement-sheet {
@@ -1564,920 +2188,38 @@
   color: #b71c1c;
 }
 
-/* Updated Karma Section for Character Sheet */
-.faserip-sheet .karma-section {
-  margin-top: 10px;
-  border: 1px solid #8b0000;
-  padding: 8px;
-  background: white;
+/* Talent Sheet Styling */
+.talent-sheet .form-group {
+  margin-bottom: 12px;
 }
 
-/* Fresh approach for karma values */
-.faserip-sheet .karma-values {
-  display: table !important;
-  width: 100% !important;
-  table-layout: fixed !important;
-  margin-bottom: 8px !important;
-}
-
-/* Make all boxes exactly the same */
-.faserip-sheet .karma-current,
-.faserip-sheet .karma-advancement,
-.faserip-sheet .karma-pool {
-  display: table-cell !important;
-  vertical-align: middle !important;
-  text-align: center !important;
-  height: 70px !important;
-  padding: 5px !important;
-  border: 1px solid #ccc !important;
-  border-radius: 4px !important;
-}
-
-.faserip-sheet .karma-current {
-  background-color: #f5f5f5;
-}
-
-.faserip-sheet .karma-advancement {
-  background-color: #e8f5e9;
-}
-
-.faserip-sheet .karma-pool {
-  background-color: #e3f2fd;
-}
-
-/* All labels exactly the same */
-.faserip-sheet .karma-values label {
-  display: block;
-  font-weight: bold;
-  font-size: 12px;
-  color: #8b0000;
-  margin: 0 0 4px 0;
-  padding: 0;
-  width: 100%;
-  text-align: center;
-  line-height: 1.2;
-}
-
-/* All inputs exactly the same */
-.faserip-sheet .karma-values input {
-  width: 70%;
-  text-align: center;
-  font-weight: bold;
-  margin: 0;
-  padding: 4px;
-  height: 28px;
-}
-
-.faserip-sheet .karma-buttons {
-  display: flex;
-  justify-content: center;
-}
-
-.faserip-sheet .tab-style-button {
-  background: #ddd;
-  color: #333;
-  border: 1px solid #8b0000;
-  border-radius: 5px 5px 0 0;
-  padding: 5px 10px;
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.faserip-sheet .tab-style-button:hover {
-  background: #eee;
-}
-
-/* Marvel Character Sheet Header Styles */
-.faserip-sheet .marvel-header {
-  display: flex;
-  flex-direction: row;
-  border: 1px solid #8b0000;
-  padding: 10px;
-  background-color: white;
-  margin-bottom: 10px;
-}
-
-/* Portrait container */
-.faserip-sheet .portrait-container {
-  flex: 0 0 auto;
-  margin-right: 15px;
-  width: 140px;
-  height: 140px;
-}
-
-.faserip-sheet .portrait {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  border: 1px solid #000;
-}
-
-/* Marvel logo and title */
-.faserip-sheet .header-title {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: flex-start;
-}
-
-.faserip-sheet .marvel-logo-text {
-  font-family: 'Arial Black', sans-serif;
-  /* font-size: 36px; */
-  font-size: 30px;
-  font-weight: 900;
-  letter-spacing: -1px;
-  color: #000;
-  line-height: 0.9;
-  text-transform: uppercase;
-  margin-bottom: 0;
-}
-
-.faserip-sheet .super-heroes-text {
-  font-family: 'Arial', sans-serif;
-  /* font-size: 16px; */
-  font-size: 16px;
-  font-weight: bold;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  margin-bottom: 5px;
-}
-
-.faserip-sheet .character-sheet-text {
-  font-family: 'Arial', sans-serif;
-  /* font-size: 22px; */
-  font-size: 18px;
-  font-weight: bold;
-  text-transform: none;
-  line-height: 1;
-}
-
-/* Player info area */
-.faserip-sheet .character-info {
-  flex: 0 0 200px;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-start;
-  align-items: flex-end;
-  padding-top: 0;
-}
-
-.faserip-sheet .player-name-container {
-  width: 100%;
-  margin-top: 10px;
-}
-
-.faserip-sheet .player-name-container label {
-  display: block;
-  font-weight: bold;
-  margin-bottom: 3px;
-  text-align: left;
-}
-
-.faserip-sheet .player-name-container input {
-  width: 100%;
-  padding: 4px;
-  border: 1px solid #ccc;
-}
-
-/* Identity section styling */
-.faserip-sheet .identity-section {
-  border: 1px solid #8b0000;
-  padding: 10px;
-  background-color: white;
-  margin-bottom: 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.faserip-sheet .hero-info-row {
-  display: flex;
-  gap: 10px;
-  width: 100%;
-}
-
-/* Modified: Changed grid layout to maintain flexbox behavior for alignment */
-.faserip-sheet .hero-info-row.three-columns {
-  display: flex;
-  gap: 10px;
-  align-items: flex-end; /* Align items to the bottom */
-}
-
-.faserip-sheet .hero-name-container,
-.faserip-sheet .hero-identity-container,
-.faserip-sheet .group-container,
-.faserip-sheet .base-container {
-  flex: 1;
-  margin-bottom: 0;
-}
-
-/* Modified: Match flex property for the three columns */
-.faserip-sheet .age-container,
-.faserip-sheet .origin-container {
-  flex: 1;
-  margin-bottom: 0;
-}
-
-/* Modified: Adjust the biography container */
-.faserip-sheet .biography-container {
-  flex: 2; /* Keep the 2fr ratio from your grid */
-  margin-bottom: 0;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end; /* Align to bottom */
-}
-
-.faserip-sheet .hero-name-container label,
-.faserip-sheet .group-container label,
-.faserip-sheet .base-container label,
-.faserip-sheet .age-container label,
-.faserip-sheet .origin-container label,
-.faserip-sheet .biography-container label,
-.faserip-sheet .hero-identity-container label {
-  display: block;
-  font-weight: bold;
-  margin-bottom: 3px;
-}
-
-.faserip-sheet .identity-label-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 3px;
-}
-
-.faserip-sheet .identity-type-inline {
-  display: flex;
-  gap: 10px;
-  font-weight: normal;
-  font-size: 0.85em;
-}
-
-.faserip-sheet .radio-label {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-}
-
-.faserip-sheet .radio-label input[type="radio"] {
-  margin: 0;
-}
-
-.faserip-sheet .hero-name-container input,
-.faserip-sheet .hero-identity-container input,
-.faserip-sheet .group-container input,
-.faserip-sheet .base-container input,
-.faserip-sheet .age-container input,
-.faserip-sheet .origin-container input {
-  width: 100%;
-  padding: 4px;
-  border: 1px solid #ccc;
-}
-
-/* Modified: Base container alignment fix */
-.faserip-sheet .base-container {
-  padding-top: 18px; /* Create space to push the base field down */
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-}
-
-/* Biography Toggle Button */
-.faserip-sheet .biography-toggle {
-  width: 100%;
-  padding: 4px 10px; /* Reduced padding to match input height */
-  text-align: left;
-  font-weight: bold;
-  background-color: #f0f0f0;
-  border: 1px solid #ccc;
-  border-radius: 0;
-  cursor: pointer;
-  color: #333;
-  height: 28px; /* Match height of input boxes */
-}
-
-.faserip-sheet .biography-toggle:hover {
-  background-color: #e0e0e0;
-}
-
-.faserip-sheet .biography-toggle.active {
-  background-color: #d0d0d0;
-}
-
-/* New code for ability-key clickable styling */
-.faserip-sheet .ability-key {
-  cursor: pointer;
-  font-weight: bold;
-  text-align: center;
-  transition: all 0.3s ease;
-  user-select: none;
-}
-
-.faserip-sheet .ability-key:hover {
-  color: #ff0000;
-  text-shadow: 0 0 5px rgba(255, 0, 0, 0.7);
-  transform: scale(1.1);
-}
-
-/* Biography Details Section */
-.faserip-sheet .biography-details {
-  border: 1px solid #ccc;
-  padding: 10px;
-  margin-bottom: 5px;
-  background-color: #f9f9f9;
-}
-
-.faserip-sheet .biography-details.visible {
-  display: block;
-}
-
-.faserip-sheet .bio-row {
-  display: flex;
-  gap: 10px;
-  margin-bottom: 8px;
-}
-
-.faserip-sheet .bio-field {
-  flex: 1;
-}
-
-.faserip-sheet .bio-field.full {
-  flex: 1 0 100%;
-}
-
-.faserip-sheet .bio-field label {
-  display: block;
-  font-weight: bold;
-  font-size: 0.9em;
-  margin-bottom: 3px;
-}
-
-.faserip-sheet .bio-field input,
-.faserip-sheet .bio-field textarea {
-  width: 100%;
-  padding: 4px;
-  border: 1px solid #ccc;
-}
-
-.faserip-sheet .bio-field textarea {
-  min-height: 80px;
-  resize: vertical;
-}
-/* Equipment table styles */
-.equipment-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-bottom: 10px;
-  table-layout: fixed;
-}
-
-.equipment-table th {
-  background-color: #8B0000;
-  color: white;
-  font-weight: bold;
-  text-align: left;
-  padding: 3px 5px;
-  font-size: 0.9em;
-}
-
-.equipment-table td {
-  padding: 3px 5px;
-  border-bottom: 1px solid #ddd;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-size: 0.9em;
-}
-
-/* Column width adjustments */
-.equipment-table .name-col { width: 30%; }
-.equipment-table .material-col { width: 10%; }
-.equipment-table .damage-col { width: 8%; }
-.equipment-table .type-col { width: 8%; }
-.equipment-table .range-col { width: 8%; }
-.equipment-table .rate-col { width: 7%; }
-.equipment-table .shots-col { width: 9%; }
-.equipment-table .actions-col { width: 20%; text-align: center; }
-
-.equipment-row:hover {
-  background-color: #f5f5f5;
-}
-
-.equipment-icon {
-  margin-right: 5px;
-  vertical-align: middle;
-}
-
-.equipment-name {
-  display: flex;
-  align-items: center;
-}
-
-.equipment-controls {
-  display: flex;
-  justify-content: space-around;
-}
-
-.equipment-controls a {
-  color: #666;
-}
-
-.equipment-controls a:hover {
-  color: #8B0000;
-}
-
-.no-equipment {
-  text-align: center;
-  font-style: italic;
-  color: #666;
-  padding: 20px;
-}
-
-.shots-control {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.reload-weapon {
-  cursor: pointer;
-  color: #8B0000;
-}
-
-.reload-weapon:hover {
-  color: #ff0000;
-}
-
-/* Ability FEAT rolls */
-.ability-key {
-  cursor: pointer;
-  font-weight: bold;
-  text-align: center;
-  transition: background-color 0.2s;
-  user-select: none;
-}
-
-.ability-key {
-  cursor: pointer;
-  font-weight: bold;
-  text-align: center;
-  transition: all 0.3s ease;
-  user-select: none;
-}
-
-.ability-key:hover {
-  color: #ff0000;
-  text-shadow: 0 0 5px rgba(255, 0, 0, 0.7);
-  transform: scale(1.1);
-}
-
-.power-description {
-  min-height: 120px;
-  width: 100%;
-  font-family: sans-serif;
-  padding: 5px;
-  resize: vertical; /* Allows the user to resize vertically if needed */
-}
-
-.description-field {
-  margin-bottom: 15px;
-}
-
-/* Make the power-name and its contents properly aligned */
-.faserip-sheet .power-name {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-
-/* Style the roll button in its new position */
-.faserip-sheet .power-roll {
-  cursor: pointer;
-  color: #555;
-  margin-right: 2px;
-}
-
-.faserip-sheet .power-roll:hover {
-  color: #8b0000;
-}
-
-/* Make the power icon clickable for info */
-.faserip-sheet .power-icon {
-  cursor: pointer;
-  border: 1px solid #ccc;
-}
-
-/* Style for the power name text */
-.faserip-sheet .power-name-text {
-  flex: 1;
-  cursor: grab; /* Shows this is draggable */
-}
-
-/* Ensure only the intended items are draggable */
-.faserip-sheet .power-row td:not(.power-name) {
-  cursor: default;
-}
-
-/* Talent item styling to accommodate new layout */
-.faserip-sheet .talent-item {
-  display: flex;
-  align-items: center;
-  padding: 8px 12px;
-  background: #f8f8f8;
-  border: 1px solid #ddd;
-  border-radius: 3px;
-}
-
-.faserip-sheet .talent-item:hover {
-  background: #e8e8e8;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-}
-
-/* Style for the roll button in its new position */
-.faserip-sheet .talent-roll {
-  cursor: pointer;
-  color: #555;
-  margin-right: 5px;
-}
-
-.faserip-sheet .talent-roll:hover {
-  color: #8b0000;
-}
-
-/* Make the talent icon clickable for info */
-.faserip-sheet .talent-icon {
-  cursor: pointer;
-  border: 1px solid #ccc;
-  margin-right: 8px;
-}
-
-/* Style for the talent name text */
-.faserip-sheet .talent-name-text {
-  flex: 1;
-  font-weight: bold;
-  cursor: grab; /* Shows this is draggable */
-}
-
-/* Update the controls section spacing */
-.faserip-sheet .talent-item .item-controls {
-  display: flex;
-  gap: 8px;
-  margin-left: auto;
-}
-
-/* Ensure only the intended items are draggable */
-.faserip-sheet .talent-item > *:not(.talent-roll):not(.talent-icon):not(.talent-name-text) {
-  cursor: default;
-}
-
-/* Contact item styling to accommodate new layout */
-.faserip-sheet .contact-item {
-  display: flex;
-  align-items: center;
-  padding: 8px 12px;
-  background: #f8f8f8;
-  border: 1px solid #ddd;
-  border-radius: 3px;
-}
-
-.faserip-sheet .contact-item:hover {
-  background: #e8e8e8;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-}
-
-/* Style for the roll button in its new position */
-.faserip-sheet .contact-roll {
-  cursor: pointer;
-  color: #555;
-  margin-right: 5px;
-}
-
-.faserip-sheet .contact-roll:hover {
-  color: #8b0000;
-}
-
-/* Make the contact icon clickable for info */
-.faserip-sheet .contact-icon {
-  cursor: pointer;
-  border: 1px solid #ccc;
-  margin-right: 8px;
-}
-
-/* Style for the contact name text */
-.faserip-sheet .contact-name-text {
-  flex: 1;
-  font-weight: bold;
-  cursor: grab; /* Shows this is draggable */
-}
-
-/* Update the controls section spacing */
-.faserip-sheet .contact-item .item-controls {
-  display: flex;
-  gap: 8px;
-  margin-left: auto;
-}
-
-/* Ensure only the intended items are draggable */
-.faserip-sheet .contact-item > *:not(.contact-roll):not(.contact-icon):not(.contact-name-text) {
-  cursor: default;
-}
-
-/* Equipment name cell styling for new layout */
-.faserip-sheet .equipment-name {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  cursor: grab; /* Only this area will be draggable */
-}
-
-/* Style for the roll button in its new position */
-.faserip-sheet .equipment-roll {
-  cursor: pointer;
-  color: #555;
-  margin-right: 2px;
-}
-
-.faserip-sheet .equipment-roll:hover {
-  color: #8b0000;
-}
-
-/* Make the equipment icon clickable for info */
-.faserip-sheet .equipment-icon {
-  cursor: pointer;
-  border: 1px solid #ccc;
-  margin-right: 5px;
-}
-
-/* Style for the equipment name text */
-.faserip-sheet .equipment-name-text {
-  flex: 1;
-}
-
-/* Ensure only the name cell is draggable */
-.faserip-sheet .equipment-row td:not(.equipment-name) {
-  cursor: default;
-}
-
-/* Update the controls section spacing */
-.faserip-sheet .equipment-controls {
-  display: flex;
-  justify-content: center;
-  gap: 8px;
-}
-
-/* Headquarters Dialog Styling */
-.headquarters-dialog .dialog-body {
-  padding: 10px;
-}
-
-.headquarters-dialog .form-group {
-  margin-bottom: 10px;
-}
-
-.headquarters-dialog label {
-  display: block;
-  font-weight: bold;
-  margin-bottom: 5px;
-}
-
-.headquarters-dialog input[type="text"],
-.headquarters-dialog textarea {
+.talent-sheet select, 
+.talent-sheet input, 
+.talent-sheet textarea {
   width: 100%;
   padding: 5px;
   border: 1px solid #ccc;
   border-radius: 3px;
 }
 
-.headquarters-dialog .form-row {
-  display: flex;
-  gap: 10px;
+.talent-sheet textarea {
+  min-height: 100px;
 }
 
-.headquarters-dialog .form-group.half {
-  flex: 1;
+/* Contact Sheet Styling */
+.contact-sheet .form-group {
+  margin-bottom: 12px;
 }
 
-.headquarters-dialog .radio-group,
-.headquarters-dialog .checkbox-group {
-  margin-top: 5px;
-}
-
-.headquarters-dialog .radio-group label,
-.headquarters-dialog .checkbox-group label {
-  display: inline-flex;
-  align-items: center;
-  font-weight: normal;
-  margin-right: 10px;
-  margin-bottom: 0;
-}
-
-.headquarters-dialog .radio-group input,
-.headquarters-dialog .checkbox-group input {
-  margin-right: 5px;
-}
-
-.headquarters-dialog textarea {
-  min-height: 80px;
-  resize: vertical;
-}
-
-.headquarters-dialog .dialog-footer {
-  margin-top: 15px;
-  text-align: right;
-}
-
-.headquarters-dialog button {
-  padding: 6px 12px;
-  margin-left: 10px;
-}
-
-/* Headquarters table styles */
-.headquarters-table {
+.contact-sheet select, 
+.contact-sheet input, 
+.contact-sheet textarea {
   width: 100%;
-  border-collapse: collapse;
-  margin-bottom: 10px;
-  table-layout: fixed;
-}
-
-.headquarters-table th {
-  background-color: #8B0000;
-  color: white;
-  font-weight: bold;
-  text-align: left;
-  padding: 3px 5px;
-  font-size: 0.9em;
-}
-
-.headquarters-table td {
-  padding: 3px 5px;
-  border-bottom: 1px solid #ddd;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-size: 0.9em;
-}
-
-/* Column width adjustments */
-.headquarters-table .name-col { width: 30%; }
-.headquarters-table .location-col { width: 25%; }
-.headquarters-table .size-col { width: 10%; }
-.headquarters-table .material-col { width: 10%; }
-.headquarters-table .cost-col { width: 15%; }
-.headquarters-table .actions-col { width: 10%; text-align: center; }
-
-.headquarters-row:hover {
-  background-color: #f5f5f5;
-}
-
-.headquarters-name {
-  display: flex;
-  align-items: center;
-}
-
-.headquarters-icon {
-  margin-right: 5px;
-  vertical-align: middle;
-}
-
-.headquarters-controls {
-  display: flex;
-  justify-content: space-around;
-}
-
-.headquarters-controls a {
-  color: #666;
-}
-
-.headquarters-controls a:hover {
-  color: #8B0000;
-}
-
-.no-headquarters {
-  text-align: center;
-  font-style: italic;
-  color: #666;
-  padding: 20px;
-}
-
-.vehicles-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-bottom: 10px;
-  table-layout: fixed;
-}
-
-.vehicles-table th {
-  background-color: #8B0000;
-  color: white;
-  font-weight: bold;
-  text-align: left;
-  padding: 3px 5px;
-  font-size: 0.9em;
-}
-
-.vehicles-table td {
-  padding: 3px 5px;
-  border-bottom: 1px solid #ddd;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-size: 0.9em;
-}
-
-/* Column width adjustments */
-.vehicles-table .roll-col { width: 24px; text-align: center; }
-.vehicles-table .name-col { width: 30%; }
-.vehicles-table .type-col,
-.vehicles-table .cost-col,
-.vehicles-table .control-col,
-.vehicles-table .speed-col,
-.vehicles-table .body-col,
-.vehicles-table .protection-col { width: 8%; }
-.vehicles-table .actions-col { width: 12%; text-align: center; }
-
-.vehicle-row:hover {
-  background-color: #f5f5f5;
-}
-
-.vehicle-control-roll {
-  display: inline-block;
-  padding: 2px;
-  margin: 0 4px 0 0;
-  font-size: 0.9em;
-  color: #333;
-  background: none;
-  border: none;
-  cursor: pointer;
-}
-
-.vehicle-control-roll i {
-  font-size: 1em;
-}
-
-.vehicle-control-roll:hover {
-  color: #8B0000;
-}
-
-.vehicle-controls {
-  display: flex;
-  justify-content: space-around;
-}
-
-.vehicle-controls a {
-  color: #666;
-}
-
-.vehicle-controls a:hover {
-  color: #8B0000;
-}
-
-.vehicle-name {
-  display: flex;
-  align-items: center;
-  cursor: grab;
-}
-
-.vehicle-name:active {
-  cursor: grabbing;
-}
-
-.vehicle-icon {
-  margin-right: 5px;
-  vertical-align: middle;
+  padding: 5px;
   border: 1px solid #ccc;
   border-radius: 3px;
-  width: 24px;
-  height: 24px;
-  cursor: pointer;
 }
 
-.vehicle-icon img {
-  width: 100%;
-  height: 100%;
-  display: block;
-}
-
-.power-tag {
-  margin-left: 5px;
-  font-size: 0.9em;
-}
-.power-tag.bonus {
-  color: green;
-}
-.power-tag.stunt {
-  color: orange;
-}
-
-.power-name-text.bonus-power {
-  color: green;
-  font-style: italic;
-}
-.power-name-text.stunt-power {
-  color: orange;
-  text-decoration: underline dotted;
-}
-
-.power-row.drag-over {
-  outline: 2px dashed #888;
+.contact-sheet textarea {
+  min-height: 100px;
 }
