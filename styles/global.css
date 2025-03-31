@@ -2223,3 +2223,41 @@
 .contact-sheet textarea {
   min-height: 100px;
 }
+
+/* Style magic table exactly like powers but scoped only to magic */
+.faserip-sheet .magic-table th,
+.faserip-sheet .magic-table td {
+  padding: 5px;
+  text-align: center;
+  border-bottom: 1px solid #ccc;
+  font-size: 0.9em;
+}
+
+.faserip-sheet .magic-table th:first-child,
+.faserip-sheet .magic-table td:first-child {
+  width: 32px;
+  text-align: center;
+}
+
+.faserip-sheet .magic-table td img {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+/* Match action button alignment for magic tab */
+.faserip-sheet .magic-table .item-edit,
+.faserip-sheet .magic-table .item-delete,
+.faserip-sheet .magic-table .magic-cast {
+  margin: 0 2px;
+  cursor: pointer;
+  color: #555;
+}
+
+.faserip-sheet .magic-table .item-edit:hover,
+.faserip-sheet .magic-table .item-delete:hover,
+.faserip-sheet .magic-table .magic-cast:hover {
+  color: #8b0000;
+}

@@ -20,31 +20,39 @@ export class FaseripActorSheet extends ActorSheet {
     const context = super.getData();
     const actorData = this.actor.toObject(false);
     context.system = actorData.system;
-
-    context.powers = this.actor.items.filter(item => item.type === "power") || [];
-    context.powers = context.powers.sort((a, b) => (a.sort || 0) - (b.sort || 0));
-
-    context.magicPowers = context.powers.filter(p => p.system?.isMagic === true);
-    context.nonMagicPowers = context.powers.filter(p => !p.system?.isMagic);
-
+  
+    // Get all powers
+    const allPowers = this.actor.items.filter(item => item.type === "power") || [];
+  
+    // Separate magic and non-magic powers
+    context.magicPowers = allPowers
+      .filter(p => p.system?.isMagic === true)
+      .sort((a, b) => (a.sort || 0) - (b.sort || 0));
+  
+    context.nonMagicPowers = allPowers
+      .filter(p => !p.system?.isMagic)
+      .sort((a, b) => (a.sort || 0) - (b.sort || 0));
+  
+    // Other item types
     context.talents = this.actor.items.filter(item => item.type === "talent") || [];
     context.contacts = this.actor.items.filter(item => item.type === "contact") || [];
     context.equipment = this.actor.items.filter(item => item.type === "equipment") || [];
     context.headquarters = this.actor.items.filter(item => item.type === "headquarters") || [];
     context.vehicles = this.actor.items.filter(item => item.type === "vehicle") || [];
-
+  
+    // Other data
     context.currentKarma = this.actor.currentKarma;
     context.isBiographyOpen = this._isBiographyOpen;
-
+  
+    // Rank list
     context.allRanks = [
       "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent",
       "Remarkable", "Incredible", "Amazing", "Monstrous", "Unearthly",
       "Shift-X", "Shift-Y", "Shift-Z", "Class 1000", "Class 3000", "Class 5000", "Beyond"
     ];
-
+  
     return context;
   }
-
 
   /** @override */
   _updateObject(event, formData) {
@@ -161,11 +169,8 @@ export class FaseripActorSheet extends ActorSheet {
       });
     });
 
-    // Add Power button - more direct approach
-    html.find('.add-power').click(ev => {
-      console.log("Add Power button clicked"); // Debug line
-
-      // Create the new power item data
+    // Add Power button (Powers tab only)
+    html.find('.tab[data-tab="powers"] .add-power').click(ev => {
       const itemData = {
         name: "New Power",
         type: "power",
@@ -176,21 +181,20 @@ export class FaseripActorSheet extends ActorSheet {
           range: "",
           type: "",
           subtype: "",
-          isActive: true
+          isActive: true,
+          isMagic: false
         },
-        sort: this.actor.items.size  // sort added
+        sort: this.actor.items.size
       };
 
       this.actor.createEmbeddedDocuments("Item", [itemData])
-        .then(() => {
-          console.log("Power created successfully");
-          this.render(false); // Re-render the sheet to show the new power
-        })
+        .then(() => this.render(false))
         .catch(err => console.error("Error creating power:", err));
     });
 
     // Add Spell button listener
-    html.find('.tab[data-tab="magic"] .add-power').click(ev => {
+    // Add Spell button (Magic tab)
+    html.find('.add-spell').click(ev => {
       const itemData = {
         name: "New Spell",
         type: "power",
@@ -215,7 +219,7 @@ export class FaseripActorSheet extends ActorSheet {
         },
         sort: this.actor.items.size
       };
-    
+
       this.actor.createEmbeddedDocuments("Item", [itemData])
         .then(() => this.render(false))
         .catch(err => console.error("Error creating spell:", err));
