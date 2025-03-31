@@ -1,5 +1,52 @@
 import { prepareActiveEffectCategories, onManageActiveEffect } from "../helpers/effects.mjs";
 
+/**
+ * Applies a column shift to a FASERIP rank and returns the new rank and its base value.
+ * @param {string} rankName - The current rank (e.g. "Amazing")
+ * @param {number} currentValue - The current numeric value (e.g. 46)
+ * @param {number} csShift - Number of column shifts (positive or negative)
+ * @returns {{ rank: string, value: number }}
+ */
+function applyColumnShiftToRank(rankName, currentValue, csShift) {
+  const rankList = [
+    { name: "Shift-0", min: 0 },
+    { name: "Feeble", min: 1 },
+    { name: "Poor", min: 3 },
+    { name: "Typical", min: 5 },
+    { name: "Good", min: 8 },
+    { name: "Excellent", min: 16 },
+    { name: "Remarkable", min: 26 },
+    { name: "Incredible", min: 36 },
+    { name: "Amazing", min: 46 },
+    { name: "Monstrous", min: 63 },
+    { name: "Unearthly", min: 88 },
+    { name: "Shift-X", min: 126 },
+    { name: "Shift-Y", min: 176 },
+    { name: "Shift-Z", min: 351 },
+    { name: "Class 1000", min: 1000 },
+    { name: "Class 3000", min: 3000 },
+    { name: "Class 5000", min: 5000 },
+    { name: "Beyond", min: 9999 }
+  ];
+
+  // Find current index by name, fallback to value if needed
+  let index = rankList.findIndex(r => r.name === rankName);
+
+  if (index === -1) {
+    // Fallback: try to find by value
+    index = rankList.findIndex(r => currentValue >= r.min);
+    if (index === -1) index = 0;
+  }
+
+  const newIndex = Math.max(0, Math.min(rankList.length - 1, index + csShift));
+  const newRank = rankList[newIndex];
+
+  return {
+    rank: newRank.name,
+    value: newRank.min
+  };
+}
+
 export class FaseripActorSheet extends ActorSheet {
   // Add a property to track the biography toggle state
   _isBiographyOpen = false;
@@ -778,7 +825,7 @@ export class FaseripActorSheet extends ActorSheet {
       }).render(true);
     });
 
-    // Talent roll button
+    // roll talent button
     html.find('.talent-roll').click(async ev => {
       const li = $(ev.currentTarget).closest(".talent-item");
       const itemId = li.data("itemId");
@@ -799,6 +846,7 @@ export class FaseripActorSheet extends ActorSheet {
       // Get saved talent settings
       const savedActionType = item.getFlag("msh-faserip", "lastActionType") || "";
       const savedExtraShift = item.getFlag("msh-faserip", "lastExtraShift") || 0;
+      const savedDamageCS = item.getFlag("msh-faserip", "lastDamageCS") || 0;
       const skipDiceRoll = item.getFlag("msh-faserip", "skipDiceRoll") || false;
 
       // Define action options based on talent type
@@ -873,38 +921,43 @@ export class FaseripActorSheet extends ActorSheet {
 
       // Create dialog for roll options
       let dialogContent = `
-  <div style="margin-bottom: 10px;">
-    <label style="display: inline-block; width: 120px;">Action Type:</label>
-    <select id="action-type" name="actionType" style="width: 180px;">
-      ${actionOptionsHTML}
-    </select>
-  </div>
-  <div style="margin-bottom: 10px;">
-    <label style="display: inline-block; width: 120px;">Talent Bonus:</label>
-    <input type="number" id="talent-bonus" name="talentBonus" value="${talentBonus}" style="width: 50px;" readonly>
-    <span style="color: #666; font-size: 0.9em;">(${item.system.bonus})</span>
-  </div>
-  <div style="margin-bottom: 10px;">
-    <label style="display: inline-block; width: 120px;">Extra Column Shift:</label>
-    <input type="number" id="shift" name="shift" value="${savedExtraShift}" style="width: 50px;">
-    <span style="color: #666; font-size: 0.9em;">(additional +/- CS)</span>
-  </div>
-  <div style="margin-bottom: 10px;">
-    <label style="display: inline-block; width: 120px;">Karma Points:</label>
-    <input type="number" id="karma" name="karma" value="0" min="0" style="width: 50px;">
-  </div>
-  <div style="margin-bottom: 10px;">
-    <label>
-      <input type="checkbox" id="save-settings" name="saveSettings" checked> 
-      Remember these settings for future rolls
-    </label>
-  </div>
-  <div>
-    <label>
-      <input type="checkbox" id="skip-dice" name="skipDice" ${skipDiceRoll ? 'checked' : ''}> 
-      Skip dice animation
-    </label>
-  </div>`;
+        <div style="margin-bottom: 10px;">
+          <label style="display: inline-block; width: 120px;">Action Type:</label>
+          <select id="action-type" name="actionType" style="width: 180px;">
+            ${actionOptionsHTML}
+          </select>
+        </div>
+        <div style="margin-bottom: 10px;">
+          <label style="display: inline-block; width: 120px;">Talent Bonus:</label>
+          <input type="number" id="talent-bonus" name="talentBonus" value="${talentBonus}" style="width: 50px;" readonly>
+          <span style="color: #666; font-size: 0.9em;">(${item.system.bonus})</span>
+        </div>
+        <div style="margin-bottom: 10px;">
+          <label style="display: inline-block; width: 120px;">Extra FEAT CS:</label>
+          <input type="number" id="shift" name="shift" value="${savedExtraShift}" style="width: 50px;">
+          <span style="color: #666; font-size: 0.9em;">(affects FEAT rank)</span>
+        </div>
+        <div style="margin-bottom: 10px;">
+          <label style="display: inline-block; width: 120px;">Damage CS Modifier:</label>
+          <input type="number" id="damage-cs" name="damageCs" value="${savedDamageCS}" style="width: 50px;">
+          <span style="color: #666; font-size: 0.9em;">(modifies damage rank)</span>
+        </div>
+        <div style="margin-bottom: 10px;">
+          <label style="display: inline-block; width: 120px;">Karma Points:</label>
+          <input type="number" id="karma" name="karma" value="0" min="0" style="width: 50px;">
+        </div>
+        <div style="margin-bottom: 10px;">
+          <label>
+            <input type="checkbox" id="save-settings" name="saveSettings" checked> 
+            Remember these settings for future rolls
+          </label>
+        </div>
+        <div>
+          <label>
+            <input type="checkbox" id="skip-dice" name="skipDice" ${skipDiceRoll ? 'checked' : ''}> 
+            Skip dice animation
+          </label>
+        </div>`;
 
       new Dialog({
         title: `Talent Roll: ${item.name}`,
@@ -915,6 +968,8 @@ export class FaseripActorSheet extends ActorSheet {
             callback: async (html) => {
               const actionType = html.find('[name="actionType"]').val();
               const talentBonus = parseInt(html.find('[name="talentBonus"]').val()) || 0;
+              const damageCS = parseInt(html.find('[name="damageCs"]').val()) || 0;
+
               const extraShift = parseInt(html.find('[name="shift"]').val()) || 0;
               const karma = parseInt(html.find('[name="karma"]').val()) || 0;
               const saveSettings = html.find('[name="saveSettings"]').is(':checked');
@@ -924,6 +979,7 @@ export class FaseripActorSheet extends ActorSheet {
               if (saveSettings) {
                 await item.setFlag("msh-faserip", "lastActionType", actionType);
                 await item.setFlag("msh-faserip", "lastExtraShift", extraShift);
+                await item.setFlag("msh-faserip", "lastDamageCS", damageCS);
                 await item.setFlag("msh-faserip", "skipDiceRoll", skipDice);
               }
 
@@ -951,10 +1007,13 @@ export class FaseripActorSheet extends ActorSheet {
                 }
               }
 
+              // 💥 NEW: Apply damage CS to get effective damage rank
+              const damageRankResult = applyColumnShiftToRank(abilityRank, abilityValue, damageCS);
+              const damageRankName = damageRankResult.rank;
+              const damageRankValue = damageRankResult.value;
+
               // Create the roll
               const roll = new Roll("1d100");
-
-              // Evaluate the roll
               await roll.evaluate();
 
               // Display the dice roll with flavor text if not skipped
@@ -1006,25 +1065,28 @@ export class FaseripActorSheet extends ActorSheet {
 
               // Create chat message styled to match screenshot
               let content = `
-            <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
-              <div style="padding: 5px 10px; border-bottom: 1px solid #c0c0c0; font-size: 1.1em; color: #8b0000;">
-                <strong>${this.actor.name} - ${abilityName} Roll (${actionType})</strong>
-              </div>
-              <div style="padding: 5px 10px; font-size: 0.9em;">
-                <div>Base Rank: ${abilityRank} (${abilityValue})</div>
-                <div>Column Shift: ${totalColumnShift} → ${effectiveRank}</div>
-                <div>Roll: ${roll.total} + Karma: ${karma} = ${totalRoll}</div>
-              </div>
-              <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
-                background-color: ${resultColor.toLowerCase() === 'white' ? '#f8f8f8' :
-                  resultColor.toLowerCase() === 'green' ? '#4CAF50' :
-                    resultColor.toLowerCase() === 'yellow' ? '#FFD700' :
-                      '#F44336'}; 
-                color: ${resultColor.toLowerCase() === 'white' || resultColor.toLowerCase() === 'yellow' ? '#333' : 'white'};">
-                ${resultText} (${resultColor.toUpperCase()})
-              </div>
-            </div>
-          `;
+                <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
+                  <div style="padding: 5px 10px; border-bottom: 1px solid #c0c0c0; font-size: 1.1em; color: #8b0000;">
+                    <strong>${this.actor.name} - ${abilityName} Roll (${actionType})</strong>
+                  </div>
+                  <div style="padding: 5px 10px; font-size: 0.9em;">
+                    <div>Base Rank: ${abilityRank} (${abilityValue})</div>
+                    <div>Column Shift: ${totalColumnShift} → ${effectiveRank}</div>
+                    <div>Roll: ${roll.total} + Karma: ${karma} = ${totalRoll}</div>
+                    ${damageCS !== 0
+                      ? `<div>Damage Column Shift: ${damageCS > 0 ? "+" : ""}${damageCS}CS → <strong>${damageRankName} (${damageRankValue})</strong></div>`
+                      : ""}
+                                      </div>
+                  <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
+                    background-color: ${resultColor.toLowerCase() === 'white' ? '#f8f8f8' :
+                      resultColor.toLowerCase() === 'green' ? '#4CAF50' :
+                        resultColor.toLowerCase() === 'yellow' ? '#FFD700' :
+                          '#F44336'}; 
+                    color: ${resultColor.toLowerCase() === 'white' || resultColor.toLowerCase() === 'yellow' ? '#333' : 'white'};">
+                    ${resultText} (${resultColor.toUpperCase()})
+                  </div>
+                </div>
+              `;
 
               // Send to chat
               await ChatMessage.create({
@@ -1300,6 +1362,7 @@ export class FaseripActorSheet extends ActorSheet {
               if (saveSettings) {
                 await item.setFlag("msh-faserip", "lastActionType", actionType);
                 await item.setFlag("msh-faserip", "lastColumnShift", columnShift);
+                await item.setFlag("msh-faserip", "lastDamageCS", damageCS);
                 await item.setFlag("msh-faserip", "skipDiceRoll", skipDice);
               }
 
