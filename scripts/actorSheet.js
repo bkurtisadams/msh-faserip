@@ -61,6 +61,8 @@ export class FaseripActorSheet extends ActorSheet {
     context.effects = prepareActiveEffectCategories(
       this.actor.allApplicableEffects ? this.actor.allApplicableEffects() : this.actor.effects
     );
+    console.log("Prepared effects:", context.effects);
+
     context.editable = this.isEditable; // (if not already present)
 
     return context;
