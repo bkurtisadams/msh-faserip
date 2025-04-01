@@ -1968,7 +1968,9 @@ export class FaseripActorSheet extends ActorSheet {
       }).render(true);
     });
 
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // RESOURCE BUTTON method
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     html.find('.resources-header-button').click(ev => {
       // Create dialog content with information about Resource FEATs
       const content = `
@@ -2066,129 +2068,118 @@ export class FaseripActorSheet extends ActorSheet {
       }).render(true);
     });
 
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Popularity activateListeners method
     html.find('.popularity-header-button').click(ev => {
-      // Create dialog content with information about Popularity and Contacts
       const isMutant = this.actor.system.powerOrigin === "mutant" || this.actor.system.isMutant;
       const hasSecretId = this.actor.system.identityType === "secret";
       const heroPopularity = this.actor.system.attributes.popularity.value;
       const secretIdPopularity = hasSecretId ? (this.actor.system.attributes.popularity.secretId?.value || 0) : 0;
-      
-      const content = `
-      <h2>Popularity & Contacts</h2>
-      
-      <p>Popularity is a measure of the hero's reputation and public image. It depends on what your hero does in public and how the press reacts to them.</p>
-      
-      ${hasSecretId ? `
-      <div class="note-box" style="background-color: #e8f4f8; border-left-color: #00BCD4;">
-        <strong>Secret Identity:</strong> This character has a secret identity with separate Popularity tracking.
-        <br><strong>Hero Identity:</strong> ${heroPopularity} Popularity
-        <br><strong>Secret Identity:</strong> ${secretIdPopularity} Popularity
-        <br><br>If your secret identity is exposed, your Popularity becomes the lower of the two values.
-      </div>
-      ` : `
-      <div class="note-box">
-        <strong>Public Identity:</strong> This character has a public identity with Popularity ${heroPopularity}.
-      </div>
-      `}
-      
-      ${isMutant ? `
-      <div class="note-box" style="background-color: #fff3cd; border-left-color: #ffeeba;">
-        <strong>Mutant Penalty:</strong> This character is a mutant. Any award or penalty to Popularity is reduced by one point.
-      </div>
-      ` : ""}
-      
-      <h3>Popularity Awards and Penalties</h3>
-      <p>Popularity changes based on public actions and media coverage:</p>
-      
-      <table class="pop-awards">
-        <tr>
-          <th>Action</th>
-          <th>Award/Penalty</th>
-        </tr>
-        <tr>
-          <td>Defeat normal villains</td>
-          <td>+0</td>
-        </tr>
-        <tr>
-          <td>Defeat costumed villain</td>
-          <td>+2 ${isMutant ? "(+1 for mutants)" : ""}</td>
-        </tr>
-        <tr>
-          <td>Defeated in public</td>
-          <td>-5 ${isMutant ? "(-4 for mutants)" : ""}</td>
-        </tr>
-        <tr>
-          <td>Accused of crime</td>
-          <td>-1/2 total</td>
-        </tr>
-        <tr>
-          <td>Cleared of charges</td>
-          <td>+10 ${isMutant ? "(+9 for mutants)" : ""}</td>
-        </tr>
-        <tr>
-          <td>Found guilty of charge</td>
-          <td>Reduced to 0</td>
-        </tr>
-        <tr>
-          <td>Media attack</td>
-          <td>-5 ${isMutant ? "(-4 for mutants)" : ""}</td>
-        </tr>
-        <tr>
-          <td>Charity work</td>
-          <td>+1 ${isMutant ? "(+0 for mutants)" : ""}</td>
-        </tr>
-        <tr>
-          <td>Rescues</td>
-          <td>+2 ${isMutant ? "(+1 for mutants)" : ""}</td>
-        </tr>
-      </table>
-      
-      <h3>Negative Popularity</h3>
-      <p>A hero with negative Popularity faces several penalties:</p>
-      <ul>
-        <li>All contacts are considered Neutral rather than Friendly</li>
-        <li>Using Popularity FEATs results in a loss of Karma</li>
-        <li>Getting services or equipment becomes more difficult</li>
-      </ul>
-      
-      <h3>Using Popularity with Contacts</h3>
-      <p>Contacts represent connections your hero has with organizations or individuals. The type of FEAT needed depends on their disposition:</p>
-      <ul>
-        <li><strong>Friendly:</strong> Green FEAT (organizations or individuals with good relations to the hero)</li>
-        <li><strong>Neutral:</strong> Yellow FEAT (people who have no strong feelings either way)</li>
-        <li><strong>Unfriendly:</strong> Red FEAT (people who dislike or distrust the hero)</li>
-        <li><strong>Hostile:</strong> Impossible (sworn enemies or opponents)</li>
-      </ul>
-      
-      <h3>Losing Contacts</h3>
-      <p>Contacts may be lost if the hero performs actions against the Contact's interests. The Judge will call for a Popularity FEAT, and failure means losing that Contact.</p>
-    `;
-      
-      // Create the dialog
+    
+      const dialogContent = `
+        <div style="margin-bottom: 10px;">
+          ${hasSecretId ? `
+            <label style="display: inline-block; width: 120px;">Identity:</label>
+            <select id="identity-type" name="identityType" style="width: 120px;">
+              <option value="hero">Hero Identity (${heroPopularity})</option>
+              <option value="secret">Secret Identity (${secretIdPopularity})</option>
+            </select>
+          ` : `
+            <label style="display: inline-block; width: 120px;">Popularity:</label>
+            <input type="number" id="popularity-value" value="${heroPopularity}" style="width: 50px;" readonly>
+          `}
+          ${isMutant ? '<span style="color: #aa6600; margin-left: 5px;">Mutant (-1 modifier to all results)</span>' : ''}
+        </div>
+    
+        <div style="margin-bottom: 10px;">
+          <label style="display: inline-block; width: 120px;">Target Disposition:</label>
+          <select id="disposition" name="disposition" style="width: 120px;">
+            <option value="friendly">Friendly</option>
+            <option value="neutral" selected>Neutral</option>
+            <option value="unfriendly">Unfriendly</option>
+            <option value="hostile">Hostile</option>
+          </select>
+        </div>
+    
+        <div style="margin-bottom: 10px;">
+          <label style="display: inline-block; width: 120px;">Request Description:</label>
+          <input type="text" id="request-description" style="width: 180px;" placeholder="e.g., Information request">
+        </div>
+    
+        <div style="margin-bottom: 10px;">
+          <label style="display: inline-block; width: 120px;">Column Shift:</label>
+          <input type="number" id="column-shift" name="columnShift" value="0" style="width: 50px;">
+          <span style="color: #666; font-size: 0.9em;">(+ right, - left)</span>
+        </div>
+    
+        <div style="margin-bottom: 15px;">
+          <p style="font-size: 0.9em; margin-top: 5px;">Common modifiers:</p>
+          <ul style="font-size: 0.85em; margin-top: 5px; margin-bottom: 5px; padding-left: 20px;">
+            <li>Target benefits: +2CS</li>
+            <li>Target is placed in danger: -3CS</li>
+            <li>Item value up to Good: -1CS</li>
+            <li>Item value up to Remarkable: -2CS</li>
+            <li>Item might not be returned: -2CS</li>
+            <li>Item is unique: -3CS</li>
+          </ul>
+        </div>
+    
+        <details style="margin-top: 15px; font-size: 0.85em;">
+          <summary style="cursor: pointer; color: #007acc;">📘 Show Full Popularity & Contacts Info</summary>
+          <div style="margin-top: 8px; max-height: 250px; overflow-y: auto; padding-right: 5px;">
+    
+            <h4>Popularity and Contacts</h4>
+            <p>Popularity reflects a hero’s public image and can be increased or decreased by public actions. It can go negative. Karma reflects cosmic success, while Popularity reflects reputation.</p>
+    
+            <h4>Common Awards & Penalties</h4>
+            <ul>
+              <li>Defeat normal villains: +0</li>
+              <li>Defeat costumed villain: +2</li>
+              <li>Defeated in public: -5</li>
+              <li>Accused of crime: -½ total</li>
+              <li>Cleared of charges: +10</li>
+              <li>Found guilty: Reduce to 0</li>
+              <li>Media attack: -5</li>
+              <li>Charity work: +1</li>
+              <li>Public rescue: +2</li>
+            </ul>
+    
+            <h4>Mutant Penalty</h4>
+            <p>Recognized or declared mutants gain or lose 1 less point. They gain no Pop from charity and only +1 from arrests. Losses like public defeat are only -4 instead of -5.</p>
+    
+            <h4>Secret Identities</h4>
+            <p>Each identity tracks its own Popularity. If a secret ID is revealed publicly, the lower value becomes the character’s new total.</p>
+    
+            <h4>Negative Popularity</h4>
+            <ul>
+              <li>All Contacts are treated as Neutral</li>
+              <li>Any use of Popularity results in Karma loss</li>
+            </ul>
+    
+            <h4>Contacts</h4>
+            <p>Contacts are gained through Karma or roleplay. They may be lost if the hero acts against their interest. A failed Popularity FEAT may cause the relationship to worsen.</p>
+          </div>
+        </details>
+      `;
+    
       new Dialog({
-        title: "Popularity & Contacts in FASERIP",
-        content: content,
+        title: `Popularity Roll: ${this.actor.name}`,
+        content: dialogContent,
         buttons: {
-          close: {
-            icon: '<i class="fas fa-times"></i>',
-            label: "Close"
-          },
           roll: {
             icon: '<i class="fas fa-dice-d20"></i>',
-            label: "Make Popularity Roll",
-            callback: () => this._onPopularityRoll()
-          }
+            label: "Roll",
+            callback: html => this._onPopularityRoll(html)
+          },
+          close: { icon: '<i class="fas fa-times"></i>', label: "Close" }
         },
-        default: "close",
-        classes: ["popularity-dialog"]
+        default: "roll"
       }).render(true);
     });
-
-    // In actorSheet.js, add to the activateListeners function
-    // Add this after the other listeners but before the end of the function
-
+        
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Ability FEAT roll buttons
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     html.find('.ability-key').click(ev => {
       const abilityKey = ev.currentTarget.textContent.trim().toLowerCase();
       let abilityName, abilityFullName;
@@ -2495,230 +2486,103 @@ export class FaseripActorSheet extends ActorSheet {
     }).render(true);
   }
 
-  // In actorSheet.js, add as a method to FaseripActorSheet
-  // In actorSheet.js, update the _onPopularityRoll method
-_onPopularityRoll() {
-  const hasSecretId = this.actor.system.identityType === "secret";
-  const popularityValue = this.actor.system.attributes.popularity.value;
-  const secretIdPopValue = hasSecretId ? (this.actor.system.attributes.popularity.secretId?.value || 0) : 0;
-  const isMutant = this.actor.system.powerOrigin === "mutant" || this.actor.system.isMutant;
+  // _onPopularityRoll method
+  _onPopularityRoll(html) {
+    const hasSecretId = this.actor.system.identityType === "secret";
+    const popularityValue = this.actor.system.attributes.popularity.value;
+    const secretIdPopValue = hasSecretId ? (this.actor.system.attributes.popularity.secretId?.value || 0) : 0;
+    const isMutant = this.actor.system.powerOrigin === "mutant" || this.actor.system.isMutant;
   
-  // Create dialog for roll options
-  let dialogContent = `
-    <div style="margin-bottom: 10px;">
-      ${hasSecretId ? `
-        <label style="display: inline-block; width: 120px;">Identity:</label>
-        <select id="identity-type" name="identityType" style="width: 120px;">
-          <option value="hero">Hero Identity (${popularityValue})</option>
-          <option value="secret">Secret Identity (${secretIdPopValue})</option>
-        </select>
-      ` : `
-        <label style="display: inline-block; width: 120px;">Popularity:</label>
-        <input type="number" id="popularity-value" value="${popularityValue}" style="width: 50px;" readonly>
-      `}
-      ${isMutant ? '<span style="color: #aa6600; margin-left: 5px;">Mutant (-1 modifier to all results)</span>' : ''}
-    </div>
-    <div style="margin-bottom: 10px;">
-      <label style="display: inline-block; width: 120px;">Target Disposition:</label>
-      <select id="disposition" name="disposition" style="width: 120px;">
-        <option value="friendly">Friendly</option>
-        <option value="neutral" selected>Neutral</option>
-        <option value="unfriendly">Unfriendly</option>
-        <option value="hostile">Hostile</option>
-      </select>
-    </div>
-    <div style="margin-bottom: 10px;">
-      <label style="display: inline-block; width: 120px;">Request Description:</label>
-      <input type="text" id="request-description" style="width: 180px;" placeholder="e.g., Information request">
-    </div>
-    <div style="margin-bottom: 10px;">
-      <label style="display: inline-block; width: 120px;">Column Shift:</label>
-      <input type="number" id="column-shift" name="columnShift" value="0" style="width: 50px;">
-      <span style="color: #666; font-size: 0.9em;">(+ right, - left)</span>
-    </div>
-    <div style="margin-bottom: 15px;">
-      <p style="font-size: 0.9em; margin-top: 5px;">Common modifiers:</p>
-      <ul style="font-size: 0.85em; margin-top: 5px; margin-bottom: 5px; padding-left: 20px;">
-        <li>Target benefits: +2CS</li>
-        <li>Target is placed in danger: -3CS</li>
-        <li>Item value up to Good: -1CS</li>
-        <li>Item value up to Remarkable: -2CS</li>
-        <li>Item might not be returned: -2CS</li>
-        <li>Item is unique: -3CS</li>
-      </ul>
-    </div>
-  `;
-
-  new Dialog({
-    title: `Popularity Roll: ${this.actor.name}`,
-    content: dialogContent,
-    buttons: {
-      roll: {
-        icon: '<i class="fas fa-dice-d20"></i>',
-        label: "Roll",
-        callback: async (html) => {
-          // Determine which identity's popularity to use
-          let usedPopValue, usedPopRank, identityLabel;
-          
-          // Inside the _onPopularityRoll callback
-          if (hasSecretId) {
-            const identityType = html.find('[id="identity-type"]').val();
-            if (identityType === "secret") {
-              usedPopValue = secretIdPopValue;
-              // Handle case when secret identity popularity might not have a direct rank mapping
-              usedPopRank = this._getPopularityRank(secretIdPopValue);
-              identityLabel = "Secret Identity";
-            } else {
-              usedPopValue = popularityValue;
-              // For hero identity, use the actor's stored rank if available, otherwise calculate
-              usedPopRank = this.actor.system.attributes.popularity.rank || this._getPopularityRank(popularityValue);
-              identityLabel = "Hero Identity";
-            }
-          } else {
-            usedPopValue = popularityValue;
-            // Use the actor's stored rank if available, otherwise calculate
-            usedPopRank = this.actor.system.attributes.popularity.rank || this._getPopularityRank(popularityValue);
-            identityLabel = "Public Identity";
-          }
-          
-          const disposition = html.find('[id="disposition"]').val();
-          const requestDescription = html.find('[id="request-description"]').val() || "request";
-          const columnShift = parseInt(html.find('[id="column-shift"]').val()) || 0;
-          
-          // Determine FEAT color needed based on disposition
-          let featColorNeeded;
-          switch(disposition) {
-            case "friendly":
-              featColorNeeded = "Green";
-              break;
-            case "neutral":
-              featColorNeeded = "Yellow";
-              break;
-            case "unfriendly":
-              featColorNeeded = "Red";
-              break;
-            case "hostile":
-              featColorNeeded = "Impossible";
-              break;
-            default:
-              featColorNeeded = "Yellow";
-          }
-          
-          // If Impossible, warn and abort
-          if (featColorNeeded === "Impossible") {
-            ui.notifications.warn("Hostile targets will not respond to Popularity requests");
-            return;
-          }
-          
-          // Check if negative Popularity
-          const isNegative = usedPopValue < 0;
-          
-          // For negative Popularity, all requests are yellow
-          if (isNegative) {
-            featColorNeeded = "Yellow";
-          }
-          
-          // Create the roll
-          const roll = new Roll("1d100");
-          
-          // Evaluate the roll
-          await roll.evaluate();
-          
-          // Apply any column shifts to rank and get the result color
-          const shiftedRank = applyColumnShiftToRank(usedPopRank, usedPopValue, columnShift);
-          const effectiveRank = shiftedRank.rank;
-          const effectiveValue = shiftedRank.value; // Optional: for display
-
-          const resultColor = game.msh.rollUniversalTable(effectiveRank, roll.total);
-          
-          // Determine success
-          let success = false;
-          if (featColorNeeded === "Green") {
-            success = ["green", "yellow", "red"].includes(resultColor.toLowerCase());
-          } else if (featColorNeeded === "Yellow") {
-            success = ["yellow", "red"].includes(resultColor.toLowerCase());
-          } else if (featColorNeeded === "Red") {
-            success = resultColor.toLowerCase() === "red";
-          }
-          
-          // In the chat message construction inside the Popularity roll callback
-          let content = `
-          <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
-            <div style="padding: 5px 10px; border-bottom: 1px solid #c0c0c0; font-size: 1.1em; color: #8b0000;">
-              <strong>${this.actor.name} - ${identityLabel} Popularity Roll for ${requestDescription}</strong>
-            </div>
-            <div style="padding: 5px 10px; font-size: 0.9em;">
-              <div>Identity: ${identityLabel}</div>
-              <div>Popularity: ${usedPopValue} ${isNegative ? ' (Negative)' : ''}</div>
-              <div>Target Disposition: ${disposition.charAt(0).toUpperCase() + disposition.slice(1)}</div>
-              <div>Required FEAT: ${featColorNeeded}</div>
-              <div>Column Shift: ${columnShift !== 0 ? columnShift > 0 ? `+${columnShift}` : columnShift : '0'}</div>
-              <div>Effective Rank: ${getPopularityRankWithRange(effectiveValue)}</div>
-
-              ${isMutant ? '<div style="color: #aa6600;">Mutant Penalty Applied (-1 to awards/penalties)</div>' : ''}
-              <div>Roll: ${roll.total}</div>
-            </div>
-            <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
-              background-color: ${resultColor.toLowerCase() === 'white' ? '#f8f8f8' :
-                resultColor.toLowerCase() === 'green' ? '#4CAF50' :
-                  resultColor.toLowerCase() === 'yellow' ? '#FFD700' :
-                    '#F44336'}; 
-              color: ${resultColor.toLowerCase() === 'white' || resultColor.toLowerCase() === 'yellow' ? '#333' : 'white'};">
-              ${resultColor.toUpperCase()}
-            </div>
-            <div style="padding: 5px 10px; font-size: 1.1em; text-align: center; font-weight: bold; color: ${success ? '#4CAF50' : '#F44336'};">
-              ${success ? 'SUCCESS: Request Granted' : 'FAILURE: Request Denied'}
-            </div>
-            ${isNegative ? 
-              '<div style="padding: 5px 10px; font-size: 0.9em; color: #aa0000;">Negative Popularity results in Karma loss.</div>' 
-              : ''}
-            ${disposition === "neutral" && !success ? 
-              '<div style="padding: 5px 10px; font-size: 0.9em; color: #aa0000;">The target may become Unfriendly after this failed request.</div>' 
-              : ''}
-            ${disposition === "unfriendly" && !success ? 
-              '<div style="padding: 5px 10px; font-size: 0.9em; color: #aa0000;">The Unfriendly target may turn hostile or attack.</div>' 
-              : ''}
-            <div style="padding: 5px 10px; font-size: 0.9em; background-color: #f8f8f8; border-top: 1px solid #ddd; margin-top: 5px;">
-              <strong>Note:</strong> Popularity value of ${usedPopValue} is treated as ${getPopularityRankWithRange(usedPopValue)} for this roll.
-            </div>
+    const identityType = html.find('#identity-type').val() || "hero";
+    const disposition = html.find('#disposition').val() || "neutral";
+    const requestDescription = html.find('#request-description').val() || "request";
+    const columnShift = parseInt(html.find('#column-shift').val()) || 0;
+  
+    let usedPopValue, identityLabel;
+    if (identityType === "secret") {
+      usedPopValue = secretIdPopValue;
+      identityLabel = "Secret Identity";
+    } else {
+      usedPopValue = popularityValue;
+      identityLabel = hasSecretId ? "Hero Identity" : "Public Identity";
+    }
+  
+    const usedPopRank = this._getPopularityRank(usedPopValue);
+    let featColorNeeded = { friendly: "Green", neutral: "Yellow", unfriendly: "Red", hostile: "Impossible" }[disposition] || "Yellow";
+  
+    if (usedPopValue < 0) featColorNeeded = "Yellow";
+    if (featColorNeeded === "Impossible") {
+      ui.notifications.warn("Hostile targets will not respond to Popularity requests.");
+      return;
+    }
+  
+    const shifted = applyColumnShiftToRank(usedPopRank, usedPopValue, columnShift);
+    const effectiveRank = shifted.rank;
+    const effectiveValue = shifted.value;
+  
+    new Roll("1d100").evaluate().then(roll => {
+      const resultColor = game.msh.rollUniversalTable(effectiveRank, roll.total);
+      const color = resultColor.toLowerCase();
+      const success =
+        (featColorNeeded === "Green" && ["green", "yellow", "red"].includes(color)) ||
+        (featColorNeeded === "Yellow" && ["yellow", "red"].includes(color)) ||
+        (featColorNeeded === "Red" && color === "red");
+  
+      const isNegative = usedPopValue < 0;
+  
+      const content = `
+        <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
+          <div style="padding: 5px 10px; border-bottom: 1px solid #c0c0c0; font-size: 1.1em; color: #8b0000;">
+            <strong>${this.actor.name} - ${identityLabel} Popularity Roll for ${requestDescription}</strong>
           </div>
-          `;
-          
-          // Send to chat
-          await ChatMessage.create({
-            speaker: ChatMessage.getSpeaker({ actor: this.actor }),
-            content: content
-          });
-          
-          // If negative Popularity, prompt for Karma loss
-          if (isNegative) {
-            let karmaLoss = 1;
-            new Dialog({
-              title: "Negative Popularity Karma Loss",
-              content: `<p>Due to negative Popularity, your character loses Karma for this roll.</p>
-                        <div><label>Karma Loss:</label> <input type="number" id="karma-loss" value="${karmaLoss}" min="1"></div>`,
-              buttons: {
-                confirm: {
-                  icon: '<i class="fas fa-check"></i>',
-                  label: "Confirm",
-                  callback: (html) => {
-                    const loss = parseInt(html.find('#karma-loss').val()) || 1;
-                    const currentKarma = this.actor.system.attributes.karma.value;
-                    this.actor.update({"system.attributes.karma.value": Math.max(0, currentKarma - loss)});
-                    ui.notifications.info(`${this.actor.name} lost ${loss} Karma due to negative Popularity.`);
-                  }
-                }
-              },
-              default: "confirm"
-            }).render(true);
-          }
-        }
-      },
-      cancel: { label: "Cancel" }
-    },
-    default: "roll"
-  }).render(true);
-}
+          <div style="padding: 5px 10px; font-size: 0.9em;">
+            <div>Identity: ${identityLabel}</div>
+            <div>Popularity: ${usedPopValue} ${isNegative ? ' (Negative)' : ''}</div>
+            <div>Target Disposition: ${disposition.charAt(0).toUpperCase() + disposition.slice(1)}</div>
+            <div>Required FEAT: ${featColorNeeded}</div>
+            <div>Column Shift: ${columnShift >= 0 ? "+" + columnShift : columnShift}</div>
+            <div>Effective Rank: ${getPopularityRankWithRange(effectiveValue)}</div>
+            <div>Roll: ${roll.total}</div>
+            ${isMutant ? '<div style="color: #aa6600;">Mutant Penalty Applied (-1 to awards/penalties)</div>' : ''}
+          </div>
+          <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px;
+            background-color: ${color === 'white' ? '#f8f8f8' : color === 'green' ? '#4CAF50' :
+              color === 'yellow' ? '#FFD700' : '#F44336'};
+            color: ${color === 'white' || color === 'yellow' ? '#333' : 'white'};">
+            ${resultColor.toUpperCase()}
+          </div>
+          <div style="padding: 5px 10px; font-size: 1.1em; text-align: center; font-weight: bold; color: ${success ? '#4CAF50' : '#F44336'};">
+            ${success ? 'SUCCESS: Request Granted' : 'FAILURE: Request Denied'}
+          </div>
+        </div>
+      `;
+  
+      ChatMessage.create({
+        speaker: ChatMessage.getSpeaker({ actor: this.actor }),
+        content
+      });
+  
+      if (isNegative) {
+        new Dialog({
+          title: "Negative Popularity Karma Loss",
+          content: `<p>You lose Karma due to negative popularity.</p>
+                    <div><label>Karma Loss:</label> <input type="number" id="karma-loss" value="1" min="1"></div>`,
+          buttons: {
+            confirm: {
+              label: "Confirm",
+              callback: html => {
+                const loss = parseInt(html.find('#karma-loss').val()) || 1;
+                const current = this.actor.system.attributes.karma.value;
+                this.actor.update({ "system.attributes.karma.value": Math.max(0, current - loss) });
+                ui.notifications.info(`${this.actor.name} lost ${loss} Karma.`);
+              }
+            }
+          },
+          default: "confirm"
+        }).render(true);
+      }
+    });
+  }
 
 // Add this helper method to the FaseripActorSheet class
 _getPopularityRank(value) {
