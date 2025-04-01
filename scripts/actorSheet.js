@@ -1405,7 +1405,7 @@ export class FaseripActorSheet extends ActorSheet {
               if (saveSettings) {
                 await item.setFlag("msh-faserip", "lastActionType", actionType);
                 await item.setFlag("msh-faserip", "lastColumnShift", columnShift);
-                await item.setFlag("msh-faserip", "lastDamageCS", damageCS);
+                /* await item.setFlag("msh-faserip", "lastDamageCS", damageCS); */
                 await item.setFlag("msh-faserip", "skipDiceRoll", skipDice);
               }
 
