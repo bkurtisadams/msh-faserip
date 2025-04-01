@@ -902,12 +902,15 @@
                     <i class="fas fa-dice-d20"></i>
                   </a>
                 </td>
-                <td class="vehicle-name" draggable="true">
+                <td class="vehicle-name">
                   <div class="vehicle-icon vehicle-info" data-item-id="{{item._id}}">
                     <img src="{{item.img}}" width="24" height="24" />
                   </div>
-                  <div class="vehicle-name-text">{{item.name}}</div>
+                  <span class="vehicle-name-text vehicle-draggable" data-item-id="{{item._id}}" draggable="true">
+                    {{item.name}}
+                  </span>
                 </td>
+                
                 <td>{{item.system.type}}</td>
                 <td title="{{item.system.cost}}">{{abbreviateRank item.system.cost}}</td>
                 <td title="{{item.system.control}}">{{abbreviateRank item.system.control}}</td>

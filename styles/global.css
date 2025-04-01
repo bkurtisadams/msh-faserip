@@ -2229,12 +2229,28 @@
 .faserip-sheet .tab[data-tab="talents"] .drag-over,
 .faserip-sheet .tab[data-tab="contacts"] .drag-over,
 .faserip-sheet .tab[data-tab="equipment"] .drag-over,
-.faserip-sheet .tab[data-tab="headquarters"] .drag-over
- {
+.faserip-sheet .tab[data-tab="headquarters"] .drag-over {
   outline: 2px dashed #aaa;
   background-color: #f0f0f0;
 }
 
-.faserip-sheet .headquarters-draggable {
+.faserip-sheet .vehicle-row.drag-over {
+  outline: 2px dashed #aaa;
+  background-color: #f0f0f0;
+}
+
+.faserip-sheet .headquarters-draggable,
+.faserip-sheet .vehicle-draggable {
   cursor: grab;
 }
+
+.faserip-sheet .vehicle-draggable {
+  cursor: grab;
+  font-weight: bold;
+  flex: 1;
+}
+
+.faserip-sheet .vehicle-draggable:active {
+  cursor: grabbing;
+}
+
