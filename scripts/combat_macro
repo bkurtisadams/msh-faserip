@@ -1,0 +1,247 @@
+const token = canvas.tokens.controlled[0];
+if (!token) return ui.notifications.warn("Select a token to roll.");
+
+const actor = token.actor;
+
+const actionMap = {
+  "Blunt Attack (BA)": { ability: "fighting", results: { white: "Miss", green: "Hit", yellow: "Slam", red: "Stun" } },
+  "Edged Attack (EA)": { ability: "fighting", results: { white: "Miss", green: "Hit", yellow: "Stun", red: "Kill" } },
+  "Shooting Attack (Sh)": { ability: "agility", results: { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Kill" } },
+  "Throwing Edged (TE)": { ability: "agility", results: { white: "Miss", green: "Hit", yellow: "Stun", red: "Kill" } },
+  "Throwing Blunt (TB)": { ability: "agility", results: { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Stun" } },
+  "Energy (En)": { ability: "agility", results: { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Kill" } },
+  "Force (Fo)": { ability: "agility", results: { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Stun" } },
+  "Grappling (Gp)": { ability: "strength", results: { white: "Miss", green: "Miss", yellow: "Partial Hold", red: "Hold" } },
+  "Grabbing (Gb)": { ability: "strength", results: { white: "Miss", green: "Take", yellow: "Grab", red: "Break" } },
+  "Escaping (Es)": { ability: "strength", results: { white: "Miss", green: "Miss", yellow: "Escape", red: "Reverse" } },
+  "Charging (Ch)": { ability: "endurance", results: { white: "Miss", green: "Hit", yellow: "Slam", red: "Stun" } },
+  "Dodging (Do)": { ability: "agility", results: { white: "No Shift", green: "-2CS", yellow: "-4CS", red: "-6CS" } },
+  "Evading (Ev)": { ability: "fighting", results: { white: "Auto-Hit", green: "Evasion", yellow: "Evasion +1CS", red: "Evasion +2CS" } },
+  "Blocking (Bl)": { ability: "strength", results: { white: "-6CS", green: "-4CS", yellow: "-2CS", red: "+1CS" } },
+  "Catching (Ca)": { ability: "agility", results: { white: "Auto-Hit", green: "Miss", yellow: "Damage", red: "Catch" } },
+  "Stun Resistance": { ability: "endurance", results: { white: "1–10 Rounds", green: "1 Round", yellow: "No Effect", red: "No Effect" } },
+  "Kill Resistance": { ability: "endurance", results: { white: "Endurance Loss", green: "E/S", yellow: "No Effect", red: "No Effect" } },
+  "Slam Resistance": { ability: "endurance", results: { white: "Grand Slam", green: "1 Area", yellow: "Stagger", red: "No Slam" } }
+};
+
+const rankList = [
+    { name: "Shift-0", min: 0 }, { name: "Feeble", min: 1 }, { name: "Poor", min: 3 },
+    { name: "Typical", min: 5 }, { name: "Good", min: 8 }, { name: "Excellent", min: 16 },
+    { name: "Remarkable", min: 26 }, { name: "Incredible", min: 36 }, { name: "Amazing", min: 46 },
+    { name: "Monstrous", min: 63 }, { name: "Unearthly", min: 88 }, { name: "Shift-X", min: 126 },
+    { name: "Shift-Y", min: 176 }, { name: "Shift-Z", min: 351 }, { name: "1000", min: 1000 },
+    { name: "3000", min: 3000 }, { name: "5000", min: 5000 }, { name: "Beyond", min: 10000 }
+  ];
+  
+  function stepDownEndurance(currentRank) {
+    const idx = rankList.findIndex(r => r.name === currentRank);
+    return idx > 0 ? rankList[idx - 1].name : "Shift-0";
+  }
+
+const actionTypes = Object.keys(actionMap);
+
+const dialogContent = `
+  <div style="margin-bottom: 10px;">
+    <label style="width: 120px; display:inline-block;">Action Type:</label>
+    <select id="action-type">${actionTypes.map(a => `<option value="${a}">${a}</option>`).join("")}</select>
+  </div>
+  <div style="margin-bottom: 10px;">
+    <label style="width: 120px; display:inline-block;">Column Shift:</label>
+    <input type="number" id="cs" value="0" style="width:50px;" />
+  </div>
+  <div style="margin-bottom: 10px;">
+    <label style="width: 120px; display:inline-block;">Karma Spent:</label>
+    <input type="number" id="karma" value="0" style="width:50px;" />
+  </div>
+  <div style="margin-bottom: 10px;">
+    <label><input type="checkbox" id="show-effect" checked /> Show result explanation</label>
+  </div>
+`;
+
+new Dialog({
+  title: "Universal Table FEAT Roll",
+  content: dialogContent,
+  buttons: {
+    roll: {
+      label: "Roll",
+      callback: async html => {
+        const action = html.find("#action-type").val();
+        const { ability: abilityKey, results: resultMap } = actionMap[action];
+        const cs = parseInt(html.find("#cs").val()) || 0;
+        const karma = parseInt(html.find("#karma").val()) || 0;
+        const showEffect = html.find("#show-effect").is(":checked");
+
+        const ability = actor.system.abilities[abilityKey];
+        const baseRank = ability.rank;
+        const baseValue = ability.value;
+
+        const shifted = applyColumnShiftToRank(baseRank, baseValue, cs);
+        const finalRank = shifted.name;
+
+        const roll = new Roll("1d100");
+        await roll.evaluate();
+
+        const total = roll.total + karma;
+        const resultColor = game.msh.rollUniversalTable(finalRank, total);
+        const resultEffect = resultMap?.[resultColor.toLowerCase()] || "";
+
+        const APPLY_KILL_EFFECT = true; // setting toggle
+        const BLEEDING_ICON = "icons/svg/blood.svg";
+
+        if (karma > 0) {
+          const history = actor.system.karma.history || [];
+          history.push({
+            realDate: new Date().toLocaleDateString(),
+            gameDate: "",
+            amount: -karma,
+            type: "Die Roll",
+            description: `Karma spent on ${action} roll`
+          });
+          await actor.update({ "system.karma.history": history });
+        }
+
+        const colorStyle = resultColor.toLowerCase() === "green" ? "#4CAF50"
+          : resultColor.toLowerCase() === "yellow" ? "#FFD700"
+          : resultColor.toLowerCase() === "red" ? "#F44336" : "#f8f8f8";
+        const textColor = ["yellow", "white"].includes(resultColor.toLowerCase()) ? "#333" : "#fff";
+
+        const content = `
+          <div style="background:#f5f5f0; border:1px solid #c0c0c0; border-radius:3px;">
+            <div style="padding:5px 10px; border-bottom:1px solid #c0c0c0; font-size:1.1em; color:#8b0000;">
+              <strong>${token.name} - ${action}</strong>
+            </div>
+            <div style="padding:5px 10px; font-size:0.9em;">
+              <div>Ability Used: ${abilityKey.charAt(0).toUpperCase() + abilityKey.slice(1)}</div>
+              <div>Base Rank: ${baseRank} (${baseValue})</div>
+              <div>Column Shift: ${cs >= 0 ? "+" : ""}${cs} → ${finalRank}</div>
+              <div>Roll: ${roll.total} + Karma: ${karma} = ${total}</div>
+            </div>
+            <div style="text-align:center; padding:8px; margin:5px; font-weight:bold; font-size:1.1em; border-radius:3px;
+              background-color:${colorStyle}; color:${textColor};">
+              ${resultColor.toUpperCase()}${showEffect && resultEffect ? ` (${resultEffect})` : ""}
+            </div>
+          </div>
+        `;
+
+        await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ token }), content });
+
+        // Handle saving throws
+        if (["Stun", "Kill", "Slam"].includes(resultEffect) && game.user.targets.size > 0) {
+            for (const target of game.user.targets) {
+              const isPlayer = target.actor.hasPlayerOwner;
+              const saveAbility = "endurance";
+              const saveRank = target.actor.system.abilities[saveAbility]?.rank;
+              const saveValue = target.actor.system.abilities[saveAbility]?.value;
+          
+              if (!saveRank || !saveValue) continue;
+          
+              const applyEffect = async (type, tokenTarget) => {
+                if (type === "Stun") {
+                  await tokenTarget.actor.toggleStatusEffect("stunned", { active: true });
+                  ui.notifications.info(`${tokenTarget.name} is now Stunned.`);
+                } else if (type === "Slam") {
+                  await tokenTarget.actor.toggleStatusEffect("prone", { active: true });
+                  ui.notifications.info(`${tokenTarget.name} is now Prone.`);
+                } else if (type === "Kill" && APPLY_KILL_EFFECT) {
+                  await tokenTarget.actor.toggleStatusEffect(BLEEDING_ICON, { active: true });
+                  ui.notifications.info(`${tokenTarget.name} is now Bleeding.`);
+                }
+              };
+          
+              if (isPlayer) {
+                new Dialog({
+                  title: `${resultEffect} Saving Throw`,
+                  content: `<p>${target.name}, you were affected by a ${resultEffect}. Roll Endurance to resist?</p>`,
+                  buttons: {
+                    roll: {
+                      label: "Roll",
+                      callback: async () => {
+                        const saveRoll = new Roll("1d100");
+                        await saveRoll.evaluate();
+                        const color = game.msh.rollUniversalTable(saveRank, saveRoll.total);
+                        const failed = color.toLowerCase() === "white" || (resultEffect === "Stun" && color.toLowerCase() === "green");
+          
+                        let msg = `<strong>${target.name}</strong> rolled <strong>${saveRoll.total}</strong> (${color}) to resist ${resultEffect}.`;
+          
+                        if (failed) {
+                          await applyEffect(resultEffect, target);
+
+                          if (resultEffect === "Kill") {
+                            const currentRankName = target.actor.system.abilities.endurance.rank;
+                            const newRankName = stepDownEndurance(currentRankName);
+                            await target.actor.update({ "system.abilities.endurance.rank": newRankName });
+                            msg += ` <strong>Endurance reduced</strong> from ${currentRankName} to ${newRankName}.`;
+                        }
+
+                        msg += ` ${target.name} is now affected.`;
+                        }
+          
+                        ChatMessage.create({
+                          content: msg,
+                          speaker: ChatMessage.getSpeaker({ token: target })
+                        });
+                      }
+                    },
+                    cancel: { label: "Skip" }
+                  },
+                  default: "roll"
+                }).render(true);
+              } else {
+                const saveRoll = new Roll("1d100");
+                await saveRoll.evaluate();
+                const color = game.msh.rollUniversalTable(saveRank, saveRoll.total);
+                const failed = color.toLowerCase() === "white" || (resultEffect === "Stun" && color.toLowerCase() === "green");
+          
+                let msg = `<strong>${target.name}</strong> auto-rolled <strong>${saveRoll.total}</strong> (${color}) to resist ${resultEffect}.`;
+          
+                if (failed) {
+                    await applyEffect(resultEffect, target);
+                  
+                    if (resultEffect === "Kill") {
+                      const currentRankName = target.actor.system.abilities.endurance.rank;
+                      const newRankName = stepDownEndurance(currentRankName);
+                      await target.actor.update({ "system.abilities.endurance.rank": newRankName });
+                      msg += ` <strong>Endurance reduced</strong> from ${currentRankName} to ${newRankName}.`;
+                    }
+                  
+                    if (resultEffect === "Stun") {
+                        await target.actor.toggleStatusEffect("stunned", { active: true });
+                        msg += ` ${target.name} is now <strong>Stunned</strong>.`;
+                      }
+                    
+                      if (resultEffect === "Slam") {
+                        await target.actor.toggleStatusEffect("prone", { active: true });
+                        msg += ` ${target.name} is now <strong>Prone</strong>.`;
+                      }
+                      
+                    msg += ` ${target.name} is now affected.`;
+                  }
+          
+                ChatMessage.create({
+                  content: msg,
+                  speaker: ChatMessage.getSpeaker({ token: target })
+                });
+              }
+            }
+          }
+      }
+    },
+    cancel: { label: "Cancel" }
+  }
+}).render(true);
+
+// Utility function
+function applyColumnShiftToRank(rankName, currentValue, csShift) {
+  const rankList = [
+    { name: "Shift-0", min: 0 }, { name: "Feeble", min: 1 }, { name: "Poor", min: 3 },
+    { name: "Typical", min: 5 }, { name: "Good", min: 8 }, { name: "Excellent", min: 16 },
+    { name: "Remarkable", min: 26 }, { name: "Incredible", min: 36 }, { name: "Amazing", min: 46 },
+    { name: "Monstrous", min: 63 }, { name: "Unearthly", min: 88 }, { name: "Shift-X", min: 126 },
+    { name: "Shift-Y", min: 176 }, { name: "Shift-Z", min: 351 }, { name: "1000", min: 1000 },
+    { name: "3000", min: 3000 }, { name: "5000", min: 5000 }, { name: "Beyond", min: 10000 }
+  ];
+  let index = rankList.findIndex(r => r.name === rankName);
+  if (index === -1) index = rankList.findIndex(r => currentValue >= r.min);
+  if (index === -1) index = 0;
+  return rankList[Math.max(0, Math.min(rankList.length - 1, index + csShift))];
+}
