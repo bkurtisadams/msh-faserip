@@ -2228,7 +2228,8 @@
 
 .faserip-sheet .tab[data-tab="talents"] .drag-over,
 .faserip-sheet .tab[data-tab="contacts"] .drag-over,
-.faserip-sheet .tab[data-tab="equipment"] .drag-over
+.faserip-sheet .tab[data-tab="equipment"] .drag-over,
+.faserip-sheet .tab[data-tab="headquarters"] .drag-over
  {
   outline: 2px dashed #aaa;
   background-color: #f0f0f0;

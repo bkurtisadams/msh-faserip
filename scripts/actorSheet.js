@@ -121,8 +121,10 @@ export class FaseripActorSheet extends ActorSheet {
       .filter(item => item.type === "equipment")
       .sort((a, b) => (a.sort || 0) - (b.sort || 0));
 
-    // headquarters
-    context.headquarters = this.actor.items.filter(item => item.type === "headquarters") || [];
+    // headquarters made sortable
+    context.headquarters = this.actor.items
+      .filter(item => item.type === "headquarters")
+      .sort((a, b) => (a.sort || 0) - (b.sort || 0));
 
     // vehicles
     context.vehicles = this.actor.items.filter(item => item.type === "vehicle") || [];
@@ -2086,6 +2088,60 @@ export class FaseripActorSheet extends ActorSheet {
       } else {
         ui.notifications.warn("Headquarters compendium not found.");
       }
+    });
+
+    // Make headquarters draggable & sortable w/in the tab
+    html.find('.headquarters-row').each((i, row) => {
+      row.setAttribute("draggable", true);
+      row.addEventListener("dragstart", ev => {
+        const itemId = row.dataset.itemId;
+        ev.dataTransfer.setData("text/plain", JSON.stringify({
+          type: "HeadquartersSort",
+          itemId
+        }));
+      });
+    
+      row.addEventListener("dragover", ev => {
+        ev.preventDefault();
+        row.classList.add("drag-over");
+      });
+    
+      row.addEventListener("dragleave", ev => {
+        row.classList.remove("drag-over");
+      });
+    
+      row.addEventListener("drop", async ev => {
+        row.classList.remove("drag-over");
+        ev.preventDefault();
+    
+        const sourceData = JSON.parse(ev.dataTransfer.getData("text/plain"));
+        if (sourceData.type !== "HeadquartersSort") return;
+    
+        const sourceId = sourceData.itemId;
+        const targetId = row.dataset.itemId;
+        if (!sourceId || !targetId || sourceId === targetId) return;
+    
+        const items = this.actor.items
+          .filter(i => i.type === "headquarters")
+          .sort((a, b) => a.sort - b.sort);
+        const source = items.find(i => i.id === sourceId);
+        const target = items.find(i => i.id === targetId);
+        if (!source || !target) return;
+    
+        const sourceIndex = items.indexOf(source);
+        const targetIndex = items.indexOf(target);
+    
+        items.splice(sourceIndex, 1);
+        items.splice(targetIndex, 0, source);
+    
+        const updates = items.map((item, index) => ({
+          _id: item.id,
+          sort: index
+        }));
+    
+        await this.actor.updateEmbeddedDocuments("Item", updates);
+        this.render();
+      });
     });
 
     // Edit headquarters button
