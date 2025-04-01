@@ -1,5 +1,37 @@
 import { prepareActiveEffectCategories, onManageActiveEffect } from "../helpers/effects.mjs";
 
+const POPULARITY_RANKS = [
+  { name: "Shift-0", min: -9999, max: 0 },
+  { name: "Feeble", min: 1, max: 2 },
+  { name: "Poor", min: 3, max: 4 },
+  { name: "Typical", min: 5, max: 7 },
+  { name: "Good", min: 8, max: 15 },
+  { name: "Excellent", min: 16, max: 25 },
+  { name: "Remarkable", min: 26, max: 35 },
+  { name: "Incredible", min: 36, max: 45 },
+  { name: "Amazing", min: 46, max: 62 },
+  { name: "Monstrous", min: 63, max: 87 },
+  { name: "Unearthly", min: 88, max: 125 },
+  { name: "Shift-X", min: 126, max: 175 },
+  { name: "Shift-Y", min: 176, max: 350 },
+  { name: "Shift-Z", min: 351, max: 999 },
+  { name: "Class 1000", min: 1000, max: 2999 },
+  { name: "Class 3000", min: 3000, max: 4999 },
+  { name: "Class 5000", min: 5000, max: 9999 },
+  { name: "Beyond", min: 10000, max: Infinity }
+];
+
+function getPopularityRankWithRange(value) {
+  for (let i = 0; i < POPULARITY_RANKS.length; i++) {
+    const rank = POPULARITY_RANKS[i];
+    if (value >= rank.min && value <= rank.max) {
+      return `${rank.name} (${rank.min}–${rank.max})`;
+    }
+  }
+  return "Unknown";
+}
+
+
 /**
  * Applies a column shift to a FASERIP rank and returns the new rank and its base value.
  * @param {string} rankName - The current rank (e.g. "Amazing")
@@ -2592,12 +2624,11 @@ _onPopularityRoll() {
           // Evaluate the roll
           await roll.evaluate();
           
-          // Apply any column shifts and get the result color
-          let effectiveRank = usedPopRank;
-          
-          // Implement column shifting logic if needed
-          // ...
-          
+          // Apply any column shifts to rank and get the result color
+          const shiftedRank = applyColumnShiftToRank(usedPopRank, usedPopValue, columnShift);
+          const effectiveRank = shiftedRank.rank;
+          const effectiveValue = shiftedRank.value; // Optional: for display
+
           const resultColor = game.msh.rollUniversalTable(effectiveRank, roll.total);
           
           // Determine success
@@ -2622,6 +2653,8 @@ _onPopularityRoll() {
               <div>Target Disposition: ${disposition.charAt(0).toUpperCase() + disposition.slice(1)}</div>
               <div>Required FEAT: ${featColorNeeded}</div>
               <div>Column Shift: ${columnShift !== 0 ? columnShift > 0 ? `+${columnShift}` : columnShift : '0'}</div>
+              <div>Effective Rank: ${getPopularityRankWithRange(effectiveValue)}</div>
+
               ${isMutant ? '<div style="color: #aa6600;">Mutant Penalty Applied (-1 to awards/penalties)</div>' : ''}
               <div>Roll: ${roll.total}</div>
             </div>
@@ -2646,7 +2679,7 @@ _onPopularityRoll() {
               '<div style="padding: 5px 10px; font-size: 0.9em; color: #aa0000;">The Unfriendly target may turn hostile or attack.</div>' 
               : ''}
             <div style="padding: 5px 10px; font-size: 0.9em; background-color: #f8f8f8; border-top: 1px solid #ddd; margin-top: 5px;">
-              <strong>Note:</strong> Popularity value of ${usedPopValue} is treated as ${usedPopRank} rank for this roll.
+              <strong>Note:</strong> Popularity value of ${usedPopValue} is treated as ${getPopularityRankWithRange(usedPopValue)} for this roll.
             </div>
           </div>
           `;
@@ -2689,23 +2722,23 @@ _onPopularityRoll() {
 
 // Add this helper method to the FaseripActorSheet class
 _getPopularityRank(value) {
-  // Determine the rank based on the value
   if (value <= 0) return "Shift-0";
   if (value <= 2) return "Feeble";
   if (value <= 4) return "Poor";
-  if (value <= 6) return "Typical";
-  if (value <= 10) return "Good";
-  if (value <= 20) return "Excellent";
-  if (value <= 30) return "Remarkable";
-  if (value <= 40) return "Incredible";
-  if (value <= 50) return "Amazing";
-  if (value <= 75) return "Monstrous";
-  if (value <= 100) return "Unearthly";
-  if (value <= 150) return "Shift-X";
-  if (value <= 200) return "Shift-Y";
-  if (value <= 500) return "Shift-Z";
-  if (value <= 1000) return "Class 1000";
-  return "Class 3000";
+  if (value <= 7) return "Typical";
+  if (value <= 15) return "Good";
+  if (value <= 25) return "Excellent";
+  if (value <= 35) return "Remarkable";
+  if (value <= 45) return "Incredible";
+  if (value <= 62) return "Amazing";
+  if (value <= 87) return "Monstrous";
+  if (value <= 125) return "Unearthly";
+  if (value <= 175) return "Shift-X";
+  if (value <= 350) return "Shift-Y";
+  if (value <= 999) return "Shift-Z";
+  if (value <= 3000) return "Class 1000";
+  if (value <= 5000) return "Class 3000";
+  return "Class 5000";
 }
 
 // New method: _rollVehicleControl(vehicle)
