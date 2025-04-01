@@ -536,14 +536,22 @@
                   value="{{system.attributes.resources.value}}" />
               </td>
               <td class="popularity-column">
-                <div class="popularity-values">
-                  <input type="number" name="system.attributes.popularity.value"
-                    value="{{system.attributes.popularity.value}}" />
-                  <div class="divider">/</div>
-                  <input type="number" name="system.attributes.popularity.max"
-                    value="{{system.attributes.popularity.max}}" />
+                <div class="stacked-values popularity-values" style="margin-top: 0;">
+                  <input type="number"
+                         name="system.attributes.popularity.hero.value"
+                         value="{{system.attributes.popularity.hero.value}}"
+                         title="Hero Identity Popularity" />
+              
+                  {{#if (eq system.identityType "secret")}}
+                    <div class="divider">/</div>
+                    <input type="number"
+                           name="system.attributes.popularity.secretId.value"
+                           value="{{system.attributes.popularity.secretId.value}}"
+                           title="Secret Identity Popularity" />
+                  {{/if}}
                 </div>
               </td>
+              
             </tr>
           </tbody>
         </table>
