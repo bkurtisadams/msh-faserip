@@ -105,8 +105,10 @@ export class FaseripActorSheet extends ActorSheet {
       .filter(item => item.type === "talent")
       .sort((a, b) => (a.sort || 0) - (b.sort || 0));
 
-    // get contacts
-    context.contacts = this.actor.items.filter(item => item.type === "contact") || [];
+    // get contacts & make sortable
+    context.contacts = this.actor.items
+      .filter(item => item.type === "contact")
+      .sort((a, b) => (a.sort || 0) - (b.sort || 0));
 
     // the calculated current karma value
     context.currentKarma = this.actor.currentKarma;
@@ -250,6 +252,60 @@ export class FaseripActorSheet extends ActorSheet {
     html.find('.contact-item').each((i, li) => {
       li.setAttribute("draggable", true);
       li.addEventListener("dragstart", this._onDragStart.bind(this));
+    });
+
+    // Contacts made draggable/sortable w/in the contact tab
+    html.find('.contact-item').each((i, row) => {
+      row.setAttribute("draggable", true);
+      row.addEventListener("dragstart", ev => {
+        const itemId = row.dataset.itemId;
+        ev.dataTransfer.setData("text/plain", JSON.stringify({
+          type: "ContactSort",
+          itemId
+        }));
+      });
+    
+      row.addEventListener("dragover", ev => {
+        ev.preventDefault();
+        row.classList.add("drag-over");
+      });
+    
+      row.addEventListener("dragleave", ev => {
+        row.classList.remove("drag-over");
+      });
+    
+      row.addEventListener("drop", async ev => {
+        row.classList.remove("drag-over");
+        ev.preventDefault();
+    
+        const sourceData = JSON.parse(ev.dataTransfer.getData("text/plain"));
+        if (sourceData.type !== "ContactSort") return;
+    
+        const sourceId = sourceData.itemId;
+        const targetId = row.dataset.itemId;
+        if (!sourceId || !targetId || sourceId === targetId) return;
+    
+        const items = this.actor.items
+          .filter(i => i.type === "contact")
+          .sort((a, b) => a.sort - b.sort);
+        const source = items.find(i => i.id === sourceId);
+        const target = items.find(i => i.id === targetId);
+        if (!source || !target) return;
+    
+        const sourceIndex = items.indexOf(source);
+        const targetIndex = items.indexOf(target);
+    
+        items.splice(sourceIndex, 1);
+        items.splice(targetIndex, 0, source);
+    
+        const updates = items.map((item, index) => ({
+          _id: item.id,
+          sort: index
+        }));
+    
+        await this.actor.updateEmbeddedDocuments("Item", updates);
+        this.render();
+      });
     });
 
     // Equipment rows draggable

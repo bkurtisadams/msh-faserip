@@ -2225,3 +2225,9 @@
 .contact-sheet textarea {
   min-height: 100px;
 }
+
+.faserip-sheet .tab[data-tab="talents"] .drag-over,
+.faserip-sheet .tab[data-tab="contacts"] .drag-over {
+  outline: 2px dashed #aaa;
+  background-color: #f0f0f0;
+}

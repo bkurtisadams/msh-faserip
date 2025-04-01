@@ -720,7 +720,7 @@
           </div>
           <div class="contacts-list">
             {{#each contacts as |contact|}}
-            <div class="contact-item item" data-item-id="{{contact._id}}">
+            <div class="contact-item item" data-item-id="{{contact._id}}" draggable="true">
               <a class="item-control contact-roll" title="Roll" data-item-id="{{contact._id}}"><i
                   class="fas fa-dice-d20"></i></a>
               <img src="{{contact.img}}" class="contact-icon contact-info" width="24" height="24"
