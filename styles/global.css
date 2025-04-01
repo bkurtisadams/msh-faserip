@@ -2234,3 +2234,7 @@
   outline: 2px dashed #aaa;
   background-color: #f0f0f0;
 }
+
+.faserip-sheet .headquarters-draggable {
+  cursor: grab;
+}

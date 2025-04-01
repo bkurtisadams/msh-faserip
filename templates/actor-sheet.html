@@ -844,9 +844,10 @@
               {{#each headquarters as |hq|}}
               <tr class="headquarters-row item" data-item-id="{{hq._id}}">
                 <td class="headquarters-name">
-                  <img src="{{hq.img}}" class="headquarters-icon headquarters-info" width="24" height="24" />
-                  <span class="headquarters-name-text">{{hq.name}}</span>
+                  <img src="{{hq.img}}" class="headquarters-icon headquarters-info" data-item-id="{{hq._id}}" width="24" height="24" />
+                  <span class="headquarters-name-text headquarters-draggable" data-item-id="{{hq._id}}" draggable="true">{{hq.name}}</span>
                 </td>
+                
                 <td class="headquarters-location">{{hq.system.location}}</td>
                 <td class="headquarters-size">{{hq.system.size}}</td>
                 <td class="headquarters-material">{{hq.system.materialStrength}}</td>

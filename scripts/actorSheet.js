@@ -2046,8 +2046,9 @@ export class FaseripActorSheet extends ActorSheet {
       }).render(true);
     });
 
-
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Add Headquarters button
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     html.find('.add-headquarters').click(ev => {
       console.log("Add Headquarters button clicked"); // Debug line
 
@@ -2090,17 +2091,50 @@ export class FaseripActorSheet extends ActorSheet {
       }
     });
 
+    // Headquarters info button (clickable image)
+    html.find('.headquarters-info').click(ev => {
+      const itemId = $(ev.currentTarget).data("itemId");
+      const item = this.actor.items.get(itemId);
+      if (!item) return;
+
+      // Show headquarters details in a dialog
+      let content = `
+        <h2>${item.name}</h2>
+        <div class="headquarters-details">
+          <p><strong>Location:</strong> ${item.system.location || 'Unknown'}</p>
+          <p><strong>Size:</strong> ${item.system.size || 'Typical'}</p>
+          <p><strong>Material Strength:</strong> ${item.system.materialStrength || 'Typical'}</p>
+          <p><strong>Ownership:</strong> ${item.system.ownership || 'Owned'}</p>
+          ${item.system.purchaseCost ? `<p><strong>Purchase Cost:</strong> ${item.system.purchaseCost}</p>` : ''}
+          ${item.system.rentalCost ? `<p><strong>Rental Cost:</strong> ${item.system.rentalCost}</p>` : ''}
+          ${item.system.isRichArea ? `<p><strong>Located in Rich Area:</strong> Yes</p>` : ''}
+          ${item.system.features ? `<p><strong>Features:</strong> ${item.system.features}</p>` : ''}
+        </div>
+        ${item.system.description ? `<div class="description">${item.system.description}</div>` : ''}
+      `;
+
+      new Dialog({
+        title: "Headquarters Information",
+        content,
+        buttons: { close: { label: "Close" } },
+        width: 400
+      }).render(true);
+    });
+
     // Make headquarters draggable & sortable w/in the tab
-    html.find('.headquarters-row').each((i, row) => {
-      row.setAttribute("draggable", true);
-      row.addEventListener("dragstart", ev => {
-        const itemId = row.dataset.itemId;
+    html.find('.headquarters-draggable').each((i, el) => {
+      el.setAttribute("draggable", true);
+      el.addEventListener("dragstart", ev => {
+        const itemId = el.dataset.itemId;
         ev.dataTransfer.setData("text/plain", JSON.stringify({
           type: "HeadquartersSort",
           itemId
         }));
       });
+    });
     
+    // Make the entire row a drop target
+    html.find('.headquarters-row').each((i, row) => {
       row.addEventListener("dragover", ev => {
         ev.preventDefault();
         row.classList.add("drag-over");
@@ -2143,7 +2177,7 @@ export class FaseripActorSheet extends ActorSheet {
         this.render();
       });
     });
-
+    
     // Edit headquarters button
     html.find('.headquarters-table .item-edit').click(ev => {
       const li = $(ev.currentTarget).closest(".headquarters-row");
