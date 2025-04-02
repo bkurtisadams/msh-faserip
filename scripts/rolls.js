@@ -300,22 +300,55 @@ export async function openUniversalTableDialog(actor) {
 // end of openUniversalTableDialog  
 }
 
-export async function rollUniversalAction(actionCode, actorId, columnShift = 0, karma = 0) {
-  let actor = game.actors.get(actorId);
+export async function rollUniversalAction(actionCode, actorId, columnShift = null, karma = null) {
+  let actor = game.actors.get(actorId) || canvas.tokens.controlled[0]?.actor || game.user.character;
+  if (!actor) return ui.notifications.warn("No actor found.");
 
-  // Fallback: selected token
-  if (!actor && canvas.tokens?.controlled?.length > 0) {
-    actor = canvas.tokens.controlled[0].actor;
-  }
+  // If columnShift or karma are null, show the dialog instead
+  if (columnShift === null || karma === null) {
+    const savedCS = actor.getFlag("msh-faserip", `cs_${actionCode}`) || 0;
+    const savedKarma = actor.getFlag("msh-faserip", `karma_${actionCode}`) || 0;
 
-  // Fallback: linked character
-  if (!actor && game.user.character) {
-    actor = game.user.character;
-  }
+    new Dialog({
+      title: `FEAT: ${actionCode}`,
+      content: `
+        <form>
+          <div class="form-group">
+            <label>Column Shift</label>
+            <input type="number" name="cs" value="${savedCS}" />
+          </div>
+          <div class="form-group">
+            <label>Karma</label>
+            <input type="number" name="karma" value="${savedKarma}" />
+          </div>
+          <div class="form-group">
+            <label><input type="checkbox" name="remember" checked /> Remember these settings</label>
+          </div>
+        </form>
+      `,
+      buttons: {
+        roll: {
+          label: "Roll",
+          callback: async (html) => {
+            const cs = parseInt(html.find('[name="cs"]').val()) || 0;
+            const karma = parseInt(html.find('[name="karma"]').val()) || 0;
+            const remember = html.find('[name="remember"]').is(":checked");
 
-  if (!actor) {
-    ui.notifications.warn("No actor found. Please select a token or assign a character.");
-    return;
+            if (remember) {
+              await actor.setFlag("msh-faserip", `cs_${actionCode}`, cs);
+              await actor.setFlag("msh-faserip", `karma_${actionCode}`, karma);
+            }
+
+            // Re-call self with real values
+            rollUniversalAction(actionCode, actor.id, cs, karma);
+          }
+        },
+        cancel: { label: "Cancel" }
+      },
+      default: "roll"
+    }).render(true);
+
+    return; // Stop here until dialog result comes in
   }
 
   const label = `FEAT: ${actionCode}`;
@@ -356,11 +389,13 @@ export async function rollUniversalAction(actionCode, actorId, columnShift = 0, 
   </div>
 `;
 
-  ChatMessage.create({
-    user: game.user.id,
+  await roll.toMessage({
     speaker: ChatMessage.getSpeaker({ actor }),
-    content
+    flavor: `${actor.name} uses ${label}`,
+    content,
+    rollMode: game.settings.get("core", "rollMode")
   });
+
 }
 
 
