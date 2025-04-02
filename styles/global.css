@@ -2376,3 +2376,40 @@
   max-height: 90vh;
   overflow: auto;
 }
+
+.rank-table {
+  border: 1px solid #aaa;
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.rank-table th,
+.rank-table td {
+  border: 1px solid #ccc;
+  padding: 2px;
+  text-align: center;
+  font-size: 11px;
+}
+
+.universal-rank-grid {
+  display: grid;
+  grid-template-columns: repeat(18, 1fr);
+  font-size: 11px;
+  border-top: 1px solid #999;
+  margin-top: 10px;
+}
+
+.universal-rank-grid .ut-row {
+  display: contents;
+}
+
+.universal-rank-grid .ut-cell {
+  border: 1px solid #ccc;
+  padding: 2px;
+  text-align: center;
+}
+
+.universal-rank-grid .ut-cell.white { background-color: #ffffff; }
+.universal-rank-grid .ut-cell.green { background-color: #00c000; color: #fff; }
+.universal-rank-grid .ut-cell.yellow { background-color: #ffff00; color: #000; }
+.universal-rank-grid .ut-cell.red    { background-color: #cc0000; color: #fff; }

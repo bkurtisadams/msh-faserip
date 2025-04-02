@@ -1,0 +1,32 @@
+<div class="universal-rank-grid">
+    <div class="ut-row ut-header">
+      <div class="ut-cell">Roll</div>
+      <div class="ut-cell">0</div>
+      <div class="ut-cell">Fe</div>
+      <div class="ut-cell">Pr</div>
+      <div class="ut-cell">Ty</div>
+      <div class="ut-cell">Gd</div>
+      <div class="ut-cell">Ex</div>
+      <div class="ut-cell">Rm</div>
+      <div class="ut-cell">In</div>
+      <div class="ut-cell">Am</div>
+      <div class="ut-cell">Mn</div>
+      <div class="ut-cell">Un</div>
+      <div class="ut-cell">X</div>
+      <div class="ut-cell">Y</div>
+      <div class="ut-cell">Z</div>
+      <div class="ut-cell">1000</div>
+      <div class="ut-cell">3000</div>
+      <div class="ut-cell">5000</div>
+      <div class="ut-cell">B</div>
+    </div>
+  
+    {{#each rankRows}}
+      <div class="ut-row">
+        <div class="ut-cell">{{this.label}}</div>
+        {{#each this.colors}}
+          <div class="ut-cell {{this}}"></div>
+        {{/each}}
+      </div>
+    {{/each}}
+  </div>

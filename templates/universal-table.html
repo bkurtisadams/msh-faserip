@@ -6,7 +6,7 @@
 
   <div class="universal-grid-table">
     {{#each actionTypes}}
-      <div class="column">
+      <div class="column" data-code="{{this.code}}">
         <div class="stack header1">{{this.labelTop}}</div>
         <div class="stack header2">{{this.labelMid}}</div>
         <div class="stack header3 action-code" draggable="true" data-action="{{this.code}}">{{this.code}}</div>
@@ -17,5 +17,14 @@
         <div class="stack red">{{this.red}}</div>
       </div>
     {{/each}}
+  </div>
+
+  <div style="margin-top: 12px;">
+    <button id="toggleRankTable" style="font-size: 11px; padding: 2px 6px; height: 20px;">Toggle Rank Table</button>
+  </div>
+
+  <div id="rankTableContainer" style="display: none; margin-top: 10px; font-size: 12px;">
+    {{> "systems/msh-faserip/templates/universal-rank-table.hbs" }}
+
   </div>
 </div>

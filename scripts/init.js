@@ -9,14 +9,17 @@ import { rollUniversalTable } from './universalTable.js';  // Import your functi
 import { openUniversalTableDialog } from './rolls.js';
 import { rollUniversalAction } from './rolls.js';
 
-Hooks.once("init", () => {
+Hooks.once("init", async () => {
   console.log("Marvel Super Heroes (FASERIP) system initializing...");
+
+  await loadTemplates([
+    "systems/msh-faserip/templates/universal-table.html",
+    "systems/msh-faserip/templates/universal-rank-table.hbs"
+  ]);
 
   // Create the game.msh namespace if it doesn't exist
   game.msh = game.msh || {};
-
   game.msh.rollUniversalAction = rollUniversalAction;
-  
   // Add the rollUniversalTable function to the namespace
   game.msh.rollUniversalTable = rollUniversalTable;
 
@@ -92,8 +95,6 @@ Hooks.once("init", () => {
     types: ["equipment"], 
     makeDefault: true 
   });
-
-
 
   // end of hooks.once
 });
