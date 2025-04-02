@@ -112,7 +112,6 @@ const resultRows = [
 ];
 
 // universal table roll referenced via game.msh.openUniversalTableDialog
-// This function should be placed in a JS module file like `rolls.js` and referenced via game.msh.openUniversalTableDialog
 export async function openUniversalTableDialog(actor) {
   const actionTypes = [
     { labelTop: "Blunt", labelMid: "Attack", code: "BA", ability: "Fighting", white: "Miss", green: "Hit", yellow: "Slam", red: "Stun" },
@@ -296,6 +295,13 @@ export async function openUniversalTableDialog(actor) {
     });
     
   });
+
+  html.find(".action-toggle").on("change", (event) => {
+    const code = event.currentTarget.dataset.code;
+    const visible = event.currentTarget.checked;
+    html.find(`.column[data-code="${code}"]`).toggle(visible);
+  });
+
 });
 // end of openUniversalTableDialog  
 }
