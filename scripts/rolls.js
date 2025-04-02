@@ -157,47 +157,85 @@ export async function openUniversalTableDialog(actor) {
   }).render(true);
 
   Hooks.once("renderDialog", (_app, html) => {
-    html.find("#fontSizeSlider").on("input", (event) => {
-      const size = event.target.value + "px";
-      html.find(".stack").css("font-size", size);
+  // Font size slider logic
+  html.find("#fontSizeSlider").on("input", (event) => {
+    const size = event.target.value + "px";
+    html.find(".stack").css("font-size", size);
+  });
+
+  // Drag and click logic for action buttons
+  html.find(".action-button, .action-code").each((_, el) => {
+    el.addEventListener("dragstart", async ev => {
+      const action = ev.currentTarget.dataset.action;
+      const actor = game.user.character;
+      if (!actor) return;
+
+      const command = `game.msh.rollUniversalAction("${action}", "${actor.id}");`;
+
+      const macro = await Macro.create({
+        name: `FEAT: ${action}`,
+        type: "script",
+        command,
+        img: "icons/svg/dice-target.svg"
+      });
+
+      ev.dataTransfer.setData("text/plain", JSON.stringify({
+        type: "Macro",
+        id: macro.id
+      }));
+    });
+
+    el.addEventListener("click", ev => {
+      const action = ev.currentTarget.dataset.action;
+      game.msh.rollUniversalAction?.(action, game.user.character?.id);
     });
   });
-  
-  Hooks.once("renderDialog", (_app, html) => {
-    html.find(".action-button").each((_, el) => {
-      el.addEventListener("dragstart", ev => {
-        const action = ev.currentTarget.dataset.action;
-        const macroData = {
-          type: "script",
-          command: `game.msh.rollUniversalAction("${action}", game.user.character?.id);`,
-          name: `FEAT: ${action}`,
-        };
-  
-        Macro.create(macroData).then(macro => {
-          ev.dataTransfer.setData("text/plain", JSON.stringify({
-            type: "Macro",
-            id: macro.id
-          }));
-        });
-      });
-  
-      el.addEventListener("click", ev => {
-        const action = ev.currentTarget.dataset.action;
-        game.msh.rollUniversalAction?.(action, game.user.character?.id);
-      });
-    });
-  });
+});
+
   
 }
 
 export function rollUniversalAction(actionCode, actorId) {
-  const actor = game.actors.get(actorId);
-  if (!actor) return ui.notifications.warn("Actor not found");
+  let actor = game.actors.get(actorId);
 
-  // Insert logic to determine rank, modifiers, karma, etc.
-  // For now, just log it:
-  console.log(`Rolling Universal Table Action: ${actionCode} for ${actor.name}`);
+  // Fallback: selected token
+  if (!actor && canvas.tokens?.controlled?.length > 0) {
+    actor = canvas.tokens.controlled[0].actor;
+  }
+
+  // Fallback: linked character
+  if (!actor && game.user.character) {
+    actor = game.user.character;
+  }
+
+  if (!actor) {
+    ui.notifications.warn("No actor found. Please select a token or assign a character.");
+    return;
+  }
+
+  const label = `FEAT: ${actionCode}`;
+  const rank = actor.system.abilities.fighting.rank || "Typical"; // Still hardcoded to Fighting for now
+  const value = actor.system.abilities.fighting.value || 6;
+
+  const roll = new Roll("1d100").roll({ async: false });
+  const color = game.msh.rollUniversalTable(rank, roll.total);
+
+  const content = `
+    <div class="chat-card">
+      <strong>${actor.name}</strong> rolls <strong>${label}</strong><br>
+      <strong>Rank:</strong> ${rank} (${value})<br>
+      <strong>Roll:</strong> ${roll.total}<br>
+      <strong>Result:</strong> ${color.toUpperCase()}
+    </div>
+  `;
+
+  ChatMessage.create({
+    user: game.user.id,
+    speaker: ChatMessage.getSpeaker({ actor }),
+    content
+  });
 }
+
 
 export class FaseripRolls {
   
