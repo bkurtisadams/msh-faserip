@@ -1,4 +1,5 @@
 // File: systems/msh-faserip/rolls.js
+import { applyColumnShiftToRank } from './actorSheet.js';
 
 // This file contains roll functions that can be called directly from macros
 // without requiring the character sheet to be open
@@ -23,6 +24,27 @@ const actionTypes = [
   { code: "Sl", label: "Slam?" },
   { code: "Ki", label: "Kill?" }
 ];
+
+const ACTION_ABILITY_MAP = {
+  BA: "fighting",
+  EA: "fighting",
+  Sh: "agility",
+  TE: "agility",
+  TB: "agility",
+  En: "agility",
+  Fo: "agility",
+  Gp: "strength",
+  Gb: "strength",
+  Es: "strength",
+  Ch: "endurance",
+  Do: "agility",
+  Ev: "fighting",
+  Bl: "strength",
+  Ca: "agility",
+  St: "endurance",
+  Sl: "endurance",
+  Ki: "endurance"
+};
 
 const resultRows = [
   {
@@ -147,15 +169,27 @@ export async function openUniversalTableDialog(actor) {
     resultRows
   });
   
-  new Dialog({
+  const dlg = new Dialog({
     title: "Universal Table",
     content: html,
-    buttons: {}, // ← No buttons at all
+    buttons: {}, // 👈 no close button; rely on top-right X
     render: html => {
-      html.closest(".app").css({ resize: "both", overflow: "auto", width: "900px", height: "600px" });
+      const app = html.closest(".app.dialog");
+      if (app.length) {
+        app.css({
+          width: "1100px",
+          resize: "both",
+          overflow: "auto"
+        });
+  
+        // Center it horizontally
+        const left = Math.max((window.innerWidth - 1100) / 2, 50);
+        app[0].style.left = `${left}px`;
+      }
     }
-  }).render(true);
-
+  });
+  dlg.render(true);
+  
   Hooks.once("renderDialog", (_app, html) => {
   // Font size slider logic
   html.find("#fontSizeSlider").on("input", (event) => {
@@ -187,15 +221,60 @@ export async function openUniversalTableDialog(actor) {
 
     el.addEventListener("click", ev => {
       const action = ev.currentTarget.dataset.action;
-      game.msh.rollUniversalAction?.(action, game.user.character?.id);
+      const actor = game.user.character || canvas.tokens.controlled[0]?.actor;
+    
+      if (!actor) {
+        return ui.notifications.warn("Select a token or assign a character first.");
+      }
+    
+      const savedCS = actor.getFlag("msh-faserip", `cs_${action}`) || 0;
+      const savedKarma = actor.getFlag("msh-faserip", `karma_${action}`) || 0;
+    
+      new Dialog({
+        title: `Roll: ${action}`,
+        content: `
+          <form>
+            <div class="form-group">
+              <label>Column Shift</label>
+              <input type="number" name="cs" value="${savedCS}" />
+            </div>
+            <div class="form-group">
+              <label>Karma</label>
+              <input type="number" name="karma" value="${savedKarma}" />
+            </div>
+            <div class="form-group">
+              <label><input type="checkbox" name="remember" checked /> Remember these settings</label>
+            </div>
+          </form>
+        `,
+        buttons: {
+          roll: {
+            label: "Roll",
+            callback: async (html) => {
+              const cs = parseInt(html.find('[name="cs"]').val()) || 0;
+              const karma = parseInt(html.find('[name="karma"]').val()) || 0;
+              const remember = html.find('[name="remember"]').is(":checked");
+    
+              if (remember) {
+                await actor.setFlag("msh-faserip", `cs_${action}`, cs);
+                await actor.setFlag("msh-faserip", `karma_${action}`, karma);
+              }
+    
+              game.msh.rollUniversalAction(action, actor.id, cs, karma);
+            }
+          },
+          cancel: { label: "Cancel" }
+        },
+        default: "roll"
+      }).render(true);
     });
+    
   });
 });
-
-  
+// end of openUniversalTableDialog  
 }
 
-export function rollUniversalAction(actionCode, actorId) {
+export async function rollUniversalAction(actionCode, actorId, columnShift = 0, karma = 0) {
   let actor = game.actors.get(actorId);
 
   // Fallback: selected token
@@ -214,20 +293,38 @@ export function rollUniversalAction(actionCode, actorId) {
   }
 
   const label = `FEAT: ${actionCode}`;
-  const rank = actor.system.abilities.fighting.rank || "Typical"; // Still hardcoded to Fighting for now
-  const value = actor.system.abilities.fighting.value || 6;
+  const abilityKey = ACTION_ABILITY_MAP[actionCode] || "fighting";
+  const ability = actor.system.abilities[abilityKey] || { rank: "Typical", value: 6 };
 
-  const roll = new Roll("1d100").roll({ async: false });
-  const color = game.msh.rollUniversalTable(rank, roll.total);
+  const rank = applyColumnShiftToRank(ability.rank, ability.value, columnShift).rank;
+  const value = ability.value;
+
+  const roll = new Roll("1d100");
+  await roll.evaluate();
+
+  const total = roll.total + karma;
+  const color = game.msh.rollUniversalTable(rank, total);
 
   const content = `
-    <div class="chat-card">
-      <strong>${actor.name}</strong> rolls <strong>${label}</strong><br>
-      <strong>Rank:</strong> ${rank} (${value})<br>
-      <strong>Roll:</strong> ${roll.total}<br>
-      <strong>Result:</strong> ${color.toUpperCase()}
+  <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
+    <div style="padding: 5px 10px; border-bottom: 1px solid #c0c0c0; font-size: 1.1em; color: #8b0000;">
+      <strong>${actor.name} - ${label}</strong>
     </div>
-  `;
+    <div style="padding: 5px 10px; font-size: 0.9em;">
+      <div>Ability: ${abilityKey.charAt(0).toUpperCase() + abilityKey.slice(1)}</div>
+      <div>Base Rank: ${rank} (${value})</div>
+      ${columnShift !== 0 ? `<div>Column Shift: ${columnShift > 0 ? "+" : ""}${columnShift}</div>` : ""}
+      <div>Roll: ${roll.total} + Karma: ${karma} = <strong>${total}</strong></div>
+    </div>
+    <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
+      background-color: ${color.toLowerCase() === 'white' ? '#f8f8f8' :
+        color.toLowerCase() === 'green' ? '#4CAF50' :
+        color.toLowerCase() === 'yellow' ? '#FFD700' : '#F44336'};
+      color: ${color.toLowerCase() === 'white' || color.toLowerCase() === 'yellow' ? '#333' : 'white'};">
+      ${color.toUpperCase()} RESULT
+    </div>
+  </div>
+`;
 
   ChatMessage.create({
     user: game.user.id,

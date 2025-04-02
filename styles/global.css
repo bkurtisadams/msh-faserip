@@ -2359,3 +2359,8 @@
   margin-top: 12px;
   border-radius: 4px;
 }
+
+.universal-table-wrapper {
+  max-height: 90vh;
+  overflow: auto;
+}

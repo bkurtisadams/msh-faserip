@@ -30,7 +30,7 @@ function getPopularityRankWithRange(value, context) {
  * @param {number} csShift - Number of column shifts (positive or negative)
  * @returns {{ rank: string, value: number }}
  */
-function applyColumnShiftToRank(rankName, currentValue, csShift) {
+export function applyColumnShiftToRank(rankName, currentValue, csShift) {
   const rankList = [
     { name: "Shift-0", min: 0 },
     { name: "Feeble", min: 1 },
