@@ -6,15 +6,22 @@ import { FaseripItemSheet } from './itemSheet.js';
 import { FaseripEquipmentSheet } from './equipment.js';
 import { FaseripRolls } from './rolls.js';
 import { rollUniversalTable } from './universalTable.js';  // Import your function
+import { openUniversalTableDialog } from './rolls.js';
+import { rollUniversalAction } from './rolls.js';
 
 Hooks.once("init", () => {
   console.log("Marvel Super Heroes (FASERIP) system initializing...");
 
   // Create the game.msh namespace if it doesn't exist
   game.msh = game.msh || {};
+
+  game.msh.rollUniversalAction = rollUniversalAction;
   
   // Add the rollUniversalTable function to the namespace
   game.msh.rollUniversalTable = rollUniversalTable;
+
+   // Add the open dialog function safely inside the hook
+   game.msh.openUniversalTableDialog = openUniversalTableDialog;
   
   // Add the roll functions to the namespace
   game.msh.rollPower = FaseripRolls.rollPower;

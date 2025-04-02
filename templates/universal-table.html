@@ -1,0 +1,21 @@
+<div class="universal-table-wrapper">
+  <div class="font-size-control">
+    <label for="fontSizeSlider">Font Size</label>
+    <input type="range" min="9" max="16" value="11" id="fontSizeSlider" />
+  </div>
+
+  <div class="universal-grid-table">
+    {{#each actionTypes}}
+      <div class="column">
+        <div class="stack header1">{{this.labelTop}}</div>
+        <div class="stack header2">{{this.labelMid}}</div>
+        <div class="stack header3 action-code" draggable="true" data-action="{{this.code}}">{{this.code}}</div>
+        <div class="stack header4">{{this.ability}}</div>
+        <div class="stack white">{{this.white}}</div>
+        <div class="stack green">{{this.green}}</div>
+        <div class="stack yellow">{{this.yellow}}</div>
+        <div class="stack red">{{this.red}}</div>
+      </div>
+    {{/each}}
+  </div>
+</div>

@@ -3,6 +3,202 @@
 // This file contains roll functions that can be called directly from macros
 // without requiring the character sheet to be open
 
+const actionTypes = [
+  { code: "BA", label: "Blunt Attacks" },
+  { code: "EA", label: "Edged Attacks" },
+  { code: "Sh", label: "Shooting Attacks" },
+  { code: "TE", label: "Throwing Edged" },
+  { code: "TB", label: "Throwing Blunt" },
+  { code: "En", label: "Energy" },
+  { code: "Fo", label: "Force" },
+  { code: "Gp", label: "Grappling" },
+  { code: "Gb", label: "Grabbing" },
+  { code: "Es", label: "Escaping" },
+  { code: "Ch", label: "Charging" },
+  { code: "Do", label: "Dodging" },
+  { code: "Ev", label: "Evading" },
+  { code: "Bl", label: "Blocking" },
+  { code: "Ca", label: "Catching" },
+  { code: "St", label: "Stun?" },
+  { code: "Sl", label: "Slam?" },
+  { code: "Ki", label: "Kill?" }
+];
+
+const resultRows = [
+  {
+    result: "white",
+    cells: [
+      { value: "Miss", span: 5 }, { value: "Miss", span: 2 }, { value: "Miss", span: 1 },
+      { value: "Miss", span: 1 }, { value: "Miss", span: 1 }, { value: "None", span: 1 },
+      { value: "Autohit", span: 1 }, { value: "-6 CS", span: 1 }, { value: "Autohit", span: 1 },
+      { value: "Miss", span: 1 }, { value: "1–10", span: 1 }, { value: "Gr. Slam", span: 1 },
+      { value: "En. Loss", span: 1 }
+    ]
+  },
+  {
+    result: "green",
+    cells: [
+      { value: "Hit", span: 5 }, { value: "Hit", span: 2 }, { value: "Hit", span: 1 },
+      { value: "Hit", span: 1 }, { value: "Hit", span: 1 }, { value: "-2 CS", span: 1 },
+      { value: "Evasion", span: 1 }, { value: "+4 CS", span: 1 }, { value: "Catch", span: 1 },
+      { value: "1", span: 1 }, { value: "1 area", span: 1 }, { value: "E/S", span: 1 }
+    ]
+  },
+  {
+    result: "yellow",
+    cells: [
+      { value: "Slam", span: 1 }, { value: "Stun", span: 1 }, { value: "Bullseye", span: 1 },
+      { value: "Stun", span: 1 }, { value: "Bullseye", span: 1 }, { value: "Bullseye", span: 1 },
+      { value: "Partial", span: 1 }, { value: "Grab", span: 1 }, { value: "Escape", span: 1 },
+      { value: "Slam", span: 1 }, { value: "-4 CS", span: 1 }, { value: "+1 CS", span: 1 },
+      { value: "+2 CS", span: 1 }, { value: "Catch", span: 1 }, { value: "Damage", span: 1 },
+      { value: "Stagger", span: 1 }, { value: "No", span: 1 }
+    ]
+  },
+  {
+    result: "red",
+    cells: [
+      { value: "Stun", span: 1 }, { value: "Kill", span: 1 }, { value: "Kill", span: 1 },
+      { value: "Kill", span: 1 }, { value: "Stun", span: 1 }, { value: "Kill", span: 1 },
+      { value: "Hold", span: 1 }, { value: "Break", span: 1 }, { value: "Reverse", span: 1 },
+      { value: "Stun", span: 1 }, { value: "-6 CS", span: 1 }, { value: "+2 CS", span: 1 },
+      { value: "+1 CS", span: 1 }, { value: "No", span: 1 }, { value: "No", span: 1 },
+      { value: "No", span: 1 }
+    ]
+  }
+];
+
+// universal table roll referenced via game.msh.openUniversalTableDialog
+// This function should be placed in a JS module file like `rolls.js` and referenced via game.msh.openUniversalTableDialog
+export async function openUniversalTableDialog(actor) {
+  const actionTypes = [
+    { labelTop: "Blunt", labelMid: "Attack", code: "BA", ability: "Fighting", white: "Miss", green: "Hit", yellow: "Slam", red: "Stun" },
+    { labelTop: "Edged", labelMid: "Attack", code: "EA", ability: "Fighting", white: "Miss", green: "Hit", yellow: "Stun", red: "Kill" },
+    { labelTop: "Shooting", labelMid: "Attack", code: "Sh", ability: "Agility", white: "Miss", green: "Hit", yellow: "Bullseye", red: "Kill" },
+    { labelTop: "Throwing", labelMid: "Edged", code: "TE", ability: "Agility", white: "Miss", green: "Hit", yellow: "Stun", red: "Kill" },
+    { labelTop: "Throwing", labelMid: "Blunt", code: "TB", ability: "Agility", white: "Miss", green: "Hit", yellow: "Hit", red: "Stun" },
+    { labelTop: "Energy", labelMid: "Attack", code: "En", ability: "Agility", white: "Miss", green: "Hit", yellow: "Bullseye", red: "Kill" },
+    { labelTop: "Force", labelMid: "Attack", code: "Fo", ability: "Agility", white: "Miss", green: "Hit", yellow: "Bullseye", red: "Stun" },
+    { labelTop: "Grappling", labelMid: "Attack", code: "Gp", ability: "Strength", white: "Miss", green: "Hit", yellow: "Partial", red: "Hold" },
+    { labelTop: "Grabbing", labelMid: "Attack", code: "Gb", ability: "Strength", white: "Miss", green: "Take", yellow: "Grab", red: "Break" },
+    { labelTop: "Escaping", labelMid: "Hold", code: "Es", ability: "Strength", white: "Miss", green: "Miss", yellow: "Escape", red: "Reverse" },
+    { labelTop: "Charging", labelMid: "Attack", code: "Ch", ability: "Endurance", white: "None", green: "Slam", yellow: "Slam", red: "Stun" },
+    { labelTop: "Dodging", labelMid: "Defense", code: "Do", ability: "Agility", white: "Autohit", green: "-2 CS", yellow: "-4 CS", red: "-6 CS" },
+    { labelTop: "Evading", labelMid: "Defense", code: "Ev", ability: "Fighting", white: "Autohit", green: "Evasion", yellow: "+1 CS", red: "+2 CS" },
+    { labelTop: "Blocking", labelMid: "Defense", code: "Bl", ability: "Strength", white: "Autohit", green: "+4 CS", yellow: "+2 CS", red: "+1 CS" },
+    { labelTop: "Catching", labelMid: "Objects", code: "Ca", ability: "Agility", white: "Miss", green: "Catch", yellow: "Catch", red: "No" },
+    { labelTop: "Stun", labelMid: "Check", code: "St", ability: "Endurance", white: "1–10", green: "1", yellow: "Damage", red: "No" },
+    { labelTop: "Slam", labelMid: "Check", code: "Sl", ability: "Endurance", white: "Gr. Slam", green: "1 area", yellow: "Stagger", red: "No" },
+    { labelTop: "Kill", labelMid: "Check", code: "Ki", ability: "Endurance", white: "End. Loss", green: "E/S", yellow: "No", red: "No" }
+  ];
+
+  const actorItems = actor.items.contents;
+  const powers = actorItems.filter(i => i.type === "power");
+  const talents = actorItems.filter(i => i.type === "talent");
+  const equipment = actorItems.filter(i => i.type === "equipment");
+
+  const savedAction = actor.getFlag("msh-faserip", "universalRollAction") || "";
+  const savedSource = actor.getFlag("msh-faserip", "universalRollSource") || "";
+  const savedCS = actor.getFlag("msh-faserip", "universalRollCS") || 0;
+  const savedKarma = actor.getFlag("msh-faserip", "universalRollKarma") || 0;
+
+  const dialogContent = `
+    <form>
+      <div class="form-group">
+        <label>Action Type</label>
+        <select name="action">
+          ${actionTypes.map(type => `<option value="${type}" ${type === savedAction ? "selected" : ""}>${type}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Source</label>
+        <select name="source">
+          <option value="">(Select Power, Talent, or Equipment)</option>
+          <optgroup label="Powers">
+            ${powers.map(p => `<option value="power:${p.id}" ${`power:${p.id}` === savedSource ? "selected" : ""}>${p.name} (${p.system.rank})</option>`).join('')}
+          </optgroup>
+          <optgroup label="Talents">
+            ${talents.map(t => `<option value="talent:${t.id}" ${`talent:${t.id}` === savedSource ? "selected" : ""}>${t.name}</option>`).join('')}
+          </optgroup>
+          <optgroup label="Equipment">
+            ${equipment.map(e => `<option value="equipment:${e.id}" ${`equipment:${e.id}` === savedSource ? "selected" : ""}>${e.name}</option>`).join('')}
+          </optgroup>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Generic Column Shift Modifier</label>
+        <input type="number" name="cs" value="${savedCS}">
+      </div>
+      <div class="form-group">
+        <label>Karma to Spend</label>
+        <input type="number" name="karma" value="${savedKarma}">
+      </div>
+      <div class="form-group">
+        <label>
+          <input type="checkbox" name="save" checked />
+          Remember these settings
+        </label>
+      </div>
+    </form>
+  `;
+
+  const html = await renderTemplate("systems/msh-faserip/templates/universal-table.html", {
+    actionTypes,
+    resultRows
+  });
+  
+  new Dialog({
+    title: "Universal Table",
+    content: html,
+    buttons: {}, // ← No buttons at all
+    render: html => {
+      html.closest(".app").css({ resize: "both", overflow: "auto", width: "900px", height: "600px" });
+    }
+  }).render(true);
+
+  Hooks.once("renderDialog", (_app, html) => {
+    html.find("#fontSizeSlider").on("input", (event) => {
+      const size = event.target.value + "px";
+      html.find(".stack").css("font-size", size);
+    });
+  });
+  
+  Hooks.once("renderDialog", (_app, html) => {
+    html.find(".action-button").each((_, el) => {
+      el.addEventListener("dragstart", ev => {
+        const action = ev.currentTarget.dataset.action;
+        const macroData = {
+          type: "script",
+          command: `game.msh.rollUniversalAction("${action}", game.user.character?.id);`,
+          name: `FEAT: ${action}`,
+        };
+  
+        Macro.create(macroData).then(macro => {
+          ev.dataTransfer.setData("text/plain", JSON.stringify({
+            type: "Macro",
+            id: macro.id
+          }));
+        });
+      });
+  
+      el.addEventListener("click", ev => {
+        const action = ev.currentTarget.dataset.action;
+        game.msh.rollUniversalAction?.(action, game.user.character?.id);
+      });
+    });
+  });
+  
+}
+
+export function rollUniversalAction(actionCode, actorId) {
+  const actor = game.actors.get(actorId);
+  if (!actor) return ui.notifications.warn("Actor not found");
+
+  // Insert logic to determine rank, modifiers, karma, etc.
+  // For now, just log it:
+  console.log(`Rolling Universal Table Action: ${actionCode} for ${actor.name}`);
+}
+
 export class FaseripRolls {
   
  /**

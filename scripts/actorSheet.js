@@ -189,6 +189,12 @@ export class FaseripActorSheet extends ActorSheet {
       onManageActiveEffect(ev, document);
     });
 
+    // universal roll trigger listener
+    html.find('.universal-roll-trigger').click(ev => {
+      ev.preventDefault();
+      game.msh.openUniversalTableDialog?.(this.actor);
+    });
+
     // Power rows draggable
     html.find('.power-row').each((i, li) => {
       li.setAttribute("draggable", true);
