@@ -2300,7 +2300,7 @@
 
 .stack {
   padding: 1px 2px;
-  border-bottom: 1px solid #aaa;
+  border-bottom: none;
   font-size: 11px;
   line-height: 1.1;
   white-space: nowrap;
@@ -2326,6 +2326,7 @@
 .stack.header4 {
   font-style: italic;
   font-size: 10px;
+  border-bottom: 2px solid #000; /* keep and emphasize the divider here */
 }
 
 .stack.white {
@@ -2349,6 +2350,17 @@
   background-color: #cc0000;
   color: white;
   font-weight: bold;
+}
+
+.stack.white,
+.stack.green,
+.stack.yellow,
+.stack.red {
+  border-bottom: 1px solid #666;
+}
+
+.column .stack.red:last-child {
+  border-bottom: none;
 }
 
 .saving-throw-details {

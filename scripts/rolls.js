@@ -46,6 +46,27 @@ const ACTION_ABILITY_MAP = {
   Ki: "endurance"
 };
 
+const ACTION_RESULT_LABELS = {
+  BA: { white: "Miss", green: "Hit", yellow: "Slam", red: "Stun" },
+  EA: { white: "Miss", green: "Hit", yellow: "Stun", red: "Kill" },
+  Sh: { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Kill" },
+  TE: { white: "Miss", green: "Hit", yellow: "Stun", red: "Kill" },
+  TB: { white: "Miss", green: "Hit", yellow: "Hit", red: "Stun" },
+  En: { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Kill" },
+  Fo: { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Stun" },
+  Gp: { white: "Miss", green: "Miss", yellow: "Partial", red: "Hold" },
+  Gb: { white: "Miss", green: "Take", yellow: "Grab", red: "Break" },
+  Es: { white: "Miss", green: "Miss", yellow: "Escape", red: "Reverse" },
+  Ch: { white: "None", green: "Slam", yellow: "Slam", red: "Stun" },
+  Do: { white: "Autohit", green: "-2 CS", yellow: "-4 CS", red: "-6 CS" },
+  Ev: { white: "Autohit", green: "Evasion", yellow: "+1 CS", red: "+2 CS" },
+  Bl: { white: "Autohit", green: "+4 CS", yellow: "+2 CS", red: "+1 CS" },
+  Ca: { white: "Miss", green: "Catch", yellow: "Catch", red: "No" },
+  St: { white: "1–10", green: "1", yellow: "Damage", red: "No" },
+  Sl: { white: "Gr. Slam", green: "1 area", yellow: "Stagger", red: "No" },
+  Ki: { white: "End. Loss", green: "E/S", yellow: "No", red: "No" }
+};
+
 const resultRows = [
   {
     result: "white",
@@ -201,21 +222,26 @@ export async function openUniversalTableDialog(actor) {
   html.find(".action-button, .action-code").each((_, el) => {
     el.addEventListener("dragstart", async ev => {
       const action = ev.currentTarget.dataset.action;
-      const actor = game.user.character;
+      const actor = game.user.character || canvas.tokens.controlled[0]?.actor;
       if (!actor) return;
-
+    
       const command = `game.msh.rollUniversalAction("${action}", "${actor.id}");`;
-
-      const macro = await Macro.create({
-        name: `FEAT: ${action}`,
-        type: "script",
-        command,
-        img: "icons/svg/dice-target.svg"
-      });
-
+    
+      let macro = game.macros.find(m => m.name === `FEAT: ${action}` && m.command === command);
+      if (!macro) {
+        macro = await Macro.create({
+          name: `FEAT: ${action}`,
+          type: "script",
+          command,
+          img: "icons/svg/dice-target.svg",
+          flags: { "faserip.generated": true }
+        });
+      }
+    
+      // Include the macro's UUID so Foundry can resolve it
       ev.dataTransfer.setData("text/plain", JSON.stringify({
         type: "Macro",
-        id: macro.id
+        uuid: macro.uuid
       }));
     });
 
@@ -305,6 +331,9 @@ export async function rollUniversalAction(actionCode, actorId, columnShift = 0, 
   const total = roll.total + karma;
   const color = game.msh.rollUniversalTable(rank, total);
 
+  const labelColor = color.toLowerCase();
+  const resultText = (ACTION_RESULT_LABELS[actionCode] || {})[labelColor] || color.toUpperCase();
+
   const content = `
   <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
     <div style="padding: 5px 10px; border-bottom: 1px solid #c0c0c0; font-size: 1.1em; color: #8b0000;">
@@ -317,12 +346,13 @@ export async function rollUniversalAction(actionCode, actorId, columnShift = 0, 
       <div>Roll: ${roll.total} + Karma: ${karma} = <strong>${total}</strong></div>
     </div>
     <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
-      background-color: ${color.toLowerCase() === 'white' ? '#f8f8f8' :
-        color.toLowerCase() === 'green' ? '#4CAF50' :
-        color.toLowerCase() === 'yellow' ? '#FFD700' : '#F44336'};
-      color: ${color.toLowerCase() === 'white' || color.toLowerCase() === 'yellow' ? '#333' : 'white'};">
-      ${color.toUpperCase()} RESULT
+      background-color: ${labelColor === 'white' ? '#f8f8f8' :
+        labelColor === 'green' ? '#4CAF50' :
+        labelColor === 'yellow' ? '#FFD700' : '#F44336'};
+      color: ${labelColor === 'white' || labelColor === 'yellow' ? '#333' : 'white'};">
+      ${resultText} (${color.toUpperCase()})
     </div>
+
   </div>
 `;
 

@@ -99,11 +99,22 @@ Hooks.once("init", () => {
 });
 
 // Add the hotbarDrop hook
-Hooks.on('hotbarDrop', (bar, data, slot) => {
+Hooks.on('hotbarDrop', async (bar, data, slot) => {
+  // Handle dropping Universal Table action macros
+  if (data.type === "Macro" && data.id) {
+    const macro = game.macros.get(data.id);
+    if (macro) {
+      game.user.assignHotbarMacro(macro, slot);
+      return false;
+    }
+  }
+
+  // Handle dropping items (your existing logic)
   if (data.type === "Item" && data.actorId) {
     createFaseripItemMacro(data, slot);
     return false;
   }
+
   return true;
 });
 
