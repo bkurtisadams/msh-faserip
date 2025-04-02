@@ -1,32 +1,100 @@
-<div class="universal-rank-grid">
-    <div class="ut-row ut-header">
-      <div class="ut-cell">Roll</div>
-      <div class="ut-cell">0</div>
-      <div class="ut-cell">Fe</div>
-      <div class="ut-cell">Pr</div>
-      <div class="ut-cell">Ty</div>
-      <div class="ut-cell">Gd</div>
-      <div class="ut-cell">Ex</div>
-      <div class="ut-cell">Rm</div>
-      <div class="ut-cell">In</div>
-      <div class="ut-cell">Am</div>
-      <div class="ut-cell">Mn</div>
-      <div class="ut-cell">Un</div>
-      <div class="ut-cell">X</div>
-      <div class="ut-cell">Y</div>
-      <div class="ut-cell">Z</div>
-      <div class="ut-cell">1000</div>
-      <div class="ut-cell">3000</div>
-      <div class="ut-cell">5000</div>
-      <div class="ut-cell">B</div>
-    </div>
-  
-    {{#each rankRows}}
-      <div class="ut-row">
-        <div class="ut-cell">{{this.label}}</div>
-        {{#each this.colors}}
-          <div class="ut-cell {{this}}"></div>
-        {{/each}}
-      </div>
-    {{/each}}
-  </div>
+<div class="universal-rank-table">
+  <table>
+    <thead>
+      <tr class="header-top">
+        <th style="color: #000; text-shadow: none;">&nbsp;</th>
+        <th style="color: #000; text-shadow: none;">0</th>
+        <th style="color: #000; text-shadow: none;">Fe</th>
+        <th style="color: #000; text-shadow: none;">Pr</th>
+        <th style="color: #000; text-shadow: none;">Ty</th>
+        <th style="color: #000; text-shadow: none;">Gd</th>
+        <th style="color: #000; text-shadow: none;">Ex</th>
+        <th style="color: #000; text-shadow: none;">Rm</th>
+        <th style="color: #000; text-shadow: none;">In</th>
+        <th style="color: #000; text-shadow: none;">Am</th>
+        <th style="color: #000; text-shadow: none;">Mn</th>
+        <th style="color: #000; text-shadow: none;">Un</th>
+        <th style="color: #000; text-shadow: none;">X</th>
+        <th style="color: #000; text-shadow: none;">Y</th>
+        <th style="color: #000; text-shadow: none;">Z</th>
+        <th style="color: #000; text-shadow: none;">1000</th>
+        <th style="color: #000; text-shadow: none;">3000</th>
+        <th style="color: #000; text-shadow: none;">5000</th>
+        <th style="color: #000; text-shadow: none;">Beyond</th>
+      </tr>
+      <tr>
+        <th></th>
+        <th>Shift</th>
+        <th>Feeble</th>
+        <th>Poor</th>
+        <th>Typical</th>
+        <th>Good</th>
+        <th>Excellent</th>
+        <th>Remarkable</th>
+        <th>Incredible</th>
+        <th>Amazing</th>
+        <th>Monstrous</th>
+        <th>Unearthly</th>
+        <th>Shift</th>
+        <th>Shift</th>
+        <th>Shift</th>
+        <th>Class</th>
+        <th>Class</th>
+        <th>Class</th>
+        <th>Beyond</th>
+      </tr>
+      <tr>
+        <th></th>
+        <th>0</th>
+        <th>2</th>
+        <th>4</th>
+        <th>6</th>
+        <th>10</th>
+        <th>20</th>
+        <th>30</th>
+        <th>40</th>
+        <th>50</th>
+        <th>75</th>
+        <th>100</th>
+        <th>150</th>
+        <th>200</th>
+        <th>500</th>
+        <th>1000</th>
+        <th>3000</th>
+        <th>5000</th>
+        <th>∞</th>
+      </tr>
+      <tr>
+        <th></th>
+        <th>0</th>
+        <th>1-2</th>
+        <th>3-4</th>
+        <th>5-7</th>
+        <th>8-15</th>
+        <th>16-25</th>
+        <th>26-36</th>
+        <th>37-45</th>
+        <th>46-62</th>
+        <th>63-87</th>
+        <th>88-125</th>
+        <th>126-175</th>
+        <th>176-350</th>
+        <th>351+</th>
+        <th>1000</th>
+        <th>3000</th>
+        <th>5000</th>
+        <th>-</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{#each rankRows}}
+        <tr>
+          <th>{{this.label}}</th>
+          {{#each this.colors}}
+            <td class="{{this}}"></td>
+          {{/each}}
+        </tr>
+      {{/each}}
+    </tbody>
+  </table>
+</div>

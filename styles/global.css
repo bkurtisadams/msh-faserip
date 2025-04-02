@@ -2391,25 +2391,63 @@
   font-size: 11px;
 }
 
-.universal-rank-grid {
-  display: grid;
-  grid-template-columns: repeat(18, 1fr);
-  font-size: 11px;
-  border-top: 1px solid #999;
+.universal-rank-table {
+  border: 1px solid #999;
   margin-top: 10px;
+  font-size: 11px;
 }
 
-.universal-rank-grid .ut-row {
-  display: contents;
+.universal-rank-table table {
+  width: 100%;
+  border-collapse: collapse;
+  color: #000; /* Ensure text is readable black */
 }
 
-.universal-rank-grid .ut-cell {
+.universal-rank-table th, 
+.universal-rank-table td {
   border: 1px solid #ccc;
   padding: 2px;
   text-align: center;
 }
 
-.universal-rank-grid .ut-cell.white { background-color: #ffffff; }
-.universal-rank-grid .ut-cell.green { background-color: #00c000; color: #fff; }
-.universal-rank-grid .ut-cell.yellow { background-color: #ffff00; color: #000; }
-.universal-rank-grid .ut-cell.red    { background-color: #cc0000; color: #fff; }
+.universal-rank-table th {
+  color: #000 !important;
+  text-shadow: none !important;
+  font-weight: bold;
+  border: 1px solid #ccc;
+  background-color: #f0f0f0;
+}
+
+.universal-rank-table thead th {
+  font-weight: bold;
+  background-color: #f0f0f0;
+}
+
+.universal-rank-table tbody th {
+  background-color: #e0f0f0; /* Light blue background for the roll numbers */
+  font-weight: bold;
+}
+
+.universal-rank-table td.white { background-color: #ffffff; }
+.universal-rank-table td.green { background-color: #00c000; }
+.universal-rank-table td.yellow { background-color: #ffff00; }
+.universal-rank-table td.red { background-color: #cc0000; }
+
+.universal-rank-table thead > tr:nth-child(1) > th,
+.universal-rank-table thead > tr:nth-child(2) > th,
+.universal-rank-table thead > tr:nth-child(3) > th {
+  background-color: #fff !important;
+  border-bottom: none !important;
+  color: #000 !important;
+  text-shadow: none !important;
+}
+
+.universal-rank-table thead > tr:nth-child(4) > th {
+  background-color: #f0f0f0 !important;
+  border-top: 1px solid #ccc;
+  border-bottom: 1px solid #ccc;
+  color: #000 !important;
+}
+
+
+
