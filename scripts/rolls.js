@@ -296,11 +296,11 @@ export async function openUniversalTableDialog(actor) {
     
   });
 
-  html.find(".action-toggle").on("change", (event) => {
+  /* html.find(".action-toggle").on("change", (event) => {
     const code = event.currentTarget.dataset.code;
     const visible = event.currentTarget.checked;
     html.find(`.column[data-code="${code}"]`).toggle(visible);
-  });
+  }); */
 
 });
 // end of openUniversalTableDialog  
