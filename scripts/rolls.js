@@ -95,6 +95,68 @@ export const rankRows = [
   { label: "100", colors: ["red","red","red","red","red","red","red","red","red","red","red","red","red","red","red","red","red","red"] }
 ];
 
+function highlightResultCell(rankName, rollValue) {
+  console.log("Highlighting:", rankName, rollValue);
+
+  const dialog = document.querySelector(".app.dialog");
+  if (!dialog) {
+    console.warn("No dialog found");
+    return;
+  }
+
+  const rankIndex = getRankIndex(rankName);
+  const rollLabel = getRollLabelFromValue(rollValue);
+  console.log("Looking for:", rollLabel, "Rank Index:", rankIndex);
+
+  const selector = `.universal-rank-table tr[data-roll-label="${rollLabel}"] td:nth-child(${rankIndex + 2})`;
+  const cell = dialog.querySelector(selector);
+
+  if (cell) {
+    console.log("Cell found:", cell);
+    cell.classList.add("highlight-cell");
+    setTimeout(() => cell.classList.remove("highlight-cell"), 1200);
+  } else {
+    console.warn("Cell not found for:", selector);
+  }
+}
+
+
+function getRankIndex(rankName) {
+  const ranks = [
+    "Shift 0", "Feeble", "Poor", "Typical", "Good", "Excellent", "Remarkable", "Incredible",
+    "Amazing", "Monstrous", "Unearthly", "Shift X", "Shift Y", "Shift Z",
+    "Class 1000", "Class 3000", "Class 5000", "Beyond"
+  ];
+  return ranks.indexOf(rankName);
+}
+
+function getRollLabelFromValue(value) {
+  if (value === 1) return "01";
+  if (value <= 3) return "02–03";
+  if (value <= 6) return "04–06";
+  if (value <= 10) return "07–10";
+  if (value <= 15) return "11–15";
+  if (value <= 20) return "16–20";
+  if (value <= 25) return "21–25";
+  if (value <= 30) return "26–30";
+  if (value <= 35) return "31–35";
+  if (value <= 40) return "36–40";
+  if (value <= 45) return "41–45";
+  if (value <= 50) return "46–50";
+  if (value <= 55) return "51–55";
+  if (value <= 60) return "56–60";
+  if (value <= 65) return "61–65";
+  if (value <= 70) return "66–70";
+  if (value <= 75) return "71–75";
+  if (value <= 80) return "76–80";
+  if (value <= 85) return "81–85";
+  if (value <= 90) return "86–90";
+  if (value <= 94) return "91–94";
+  if (value <= 97) return "95–97";
+  if (value <= 99) return "98–99";
+  return "100";
+}
+
 
 const resultRows = [
   {
@@ -431,6 +493,9 @@ export async function rollUniversalAction(actionCode, actorId, columnShift = nul
 
   const total = roll.total + karma;
   const color = game.msh.rollUniversalTable(rank, total);
+
+  // light up the rank table cell
+  highlightResultCell(rank, total);
 
   const labelColor = color.toLowerCase();
   const resultText = (ACTION_RESULT_LABELS[actionCode] || {})[labelColor] || color.toUpperCase();

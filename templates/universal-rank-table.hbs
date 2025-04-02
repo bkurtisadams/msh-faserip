@@ -88,10 +88,10 @@
     </thead>
     <tbody>
       {{#each rankRows}}
-        <tr>
+        <tr data-roll-label="{{this.label}}">
           <th>{{this.label}}</th>
           {{#each this.colors}}
-            <td class="{{this}}"></td>
+            <td class="{{this}} rank-cell" data-color="{{this}}"></td></td>
           {{/each}}
         </tr>
       {{/each}}
