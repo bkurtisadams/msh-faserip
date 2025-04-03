@@ -114,7 +114,7 @@ function highlightResultCell(rankName, rollValue) {
   if (cell) {
     console.log("Cell found:", cell);
     cell.classList.add("highlight-cell");
-    setTimeout(() => cell.classList.remove("highlight-cell"), 1200);
+    setTimeout(() => cell.classList.remove("highlight-cell"), 1000);  // 10 seconds
   } else {
     console.warn("Cell not found for:", selector);
   }
@@ -329,28 +329,28 @@ export async function openUniversalTableDialog(actor) {
         let macro = game.macros.find(m => m.name === `FEAT: ${action}` && m.command === command);
         if (!macro) {
           const iconMap = {
-            BA: "fist",
-            EA: "sword",
-            Sh: "projectile",
-            TE: "blade",
-            TB: "hammer",
-            En: "lightning",
-            Fo: "impact",
-            Gp: "grab",
-            Gb: "hand",
-            Es: "arrows",
-            Ch: "run",
-            Ki: "skull",
-            St: "brain",
-            Sl: "explosion",
-            Do: "shield",
-            Ev: "defense",
-            Bl: "barrier",
-            Ca: "target"
+            BA: "blunt",
+            EA: "edged",
+            Sh: "shooting",
+            TE: "thrown",
+            TB: "thrown_blunt",
+            En: "energy",
+            Fo: "force",
+            Gp: "grapple",
+            Gb: "grab",
+            Es: "escape",
+            Ch: "charge",
+            Ki: "kill",
+            St: "stun",
+            Sl: "slam",
+            Do: "dodge",
+            Ev: "evade",
+            Bl: "block",
+            Ca: "catch",
           };
 
           const iconName = iconMap[action] || "dice-target";
-          const img = `icons/svg/${iconName}.svg`;
+          const img = `systems/msh-faserip/assets/icons/actions/${iconName}.png`; // or .svg if that's what you're using
 
           macro = await Macro.create({
             name: `FEAT: ${action}`,
