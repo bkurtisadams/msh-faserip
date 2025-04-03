@@ -4,27 +4,79 @@ import { applyColumnShiftToRank } from './actorSheet.js';
 
 // This file contains roll functions that can be called directly from macros
 // without requiring the character sheet to be open
+/**
+ * Create a Foundry Item of type "action" based on the actionType definition
+ * @param {Actor} actor - The actor to own the item
+ * @param {Object} actionType - { code, label }
+ * @returns {Promise<Item>} - The created or existing item
+ */
+export async function createActionItemForActor(actor, actionType) {
+  if (!actor || !actionType?.code) return;
+
+  const ACTION_DETAILS = {
+    BA: { ability: "fighting", white: "Miss", green: "Hit", yellow: "Slam", red: "Stun" },
+    EA: { ability: "fighting", white: "Miss", green: "Hit", yellow: "Stun", red: "Kill" },
+    Sh: { ability: "agility",  white: "Miss", green: "Hit", yellow: "Bullseye", red: "Kill" },
+    TE: { ability: "agility",  white: "Miss", green: "Hit", yellow: "Stun", red: "Kill" },
+    TB: { ability: "agility",  white: "Miss", green: "Hit", yellow: "Hit", red: "Stun" },
+    En: { ability: "agility",  white: "Miss", green: "Hit", yellow: "Bullseye", red: "Kill" },
+    Fo: { ability: "agility",  white: "Miss", green: "Hit", yellow: "Bullseye", red: "Stun" },
+    Gp: { ability: "strength", white: "Miss", green: "Miss", yellow: "Partial", red: "Hold" },
+    Gb: { ability: "strength", white: "Miss", green: "Take", yellow: "Grab", red: "Break" },
+    Es: { ability: "strength", white: "Miss", green: "Miss", yellow: "Escape", red: "Reverse" },
+    Ch: { ability: "endurance", white: "Miss", green: "Slam", yellow: "Slam", red: "Stun" },
+    Do: { ability: "agility",  white: "Autohit", green: "-2 CS", yellow: "-4 CS", red: "-6 CS" },
+    Ev: { ability: "fighting", white: "Autohit", green: "Evasion", yellow: "+1 CS", red: "+2 CS" },
+    Bl: { ability: "strength", white: "Autohit", green: "+4 CS", yellow: "+2 CS", red: "+1 CS" },
+    Ca: { ability: "agility",  white: "Miss", green: "Catch", yellow: "Catch", red: "No" },
+    St: { ability: "endurance", white: "1–10", green: "1", yellow: "Damage", red: "No" },
+    Sl: { ability: "endurance", white: "Gr. Slam", green: "1 area", yellow: "Stagger", red: "No" },
+    Ki: { ability: "endurance", white: "End. Loss", green: "E/S", yellow: "No", red: "No" }
+  };
+
+  const existing = actor.items.find(i => i.type === "action" && i.system.code === actionType.code);
+  if (existing) return existing;
+
+  const details = ACTION_DETAILS[actionType.code] || {};
+  const itemData = {
+    name: actionType.label,
+    type: "action",
+    system: {
+      code: actionType.code,
+      ability: details.ability || "fighting",
+      white: details.white || "Miss",
+      green: details.green || "Hit",
+      yellow: details.yellow || "",
+      red: details.red || ""
+    }
+  };
+
+  console.log("Item creation payload:", itemData);
+  const created = await actor.createEmbeddedDocuments("Item", [itemData]);
+  return created[0];
+}
 
 const actionTypes = [
-  { code: "BA", label: "Blunt Attacks" },
-  { code: "EA", label: "Edged Attacks" },
-  { code: "Sh", label: "Shooting Attacks" },
-  { code: "TE", label: "Throwing Edged" },
-  { code: "TB", label: "Throwing Blunt" },
-  { code: "En", label: "Energy" },
-  { code: "Fo", label: "Force" },
-  { code: "Gp", label: "Grappling" },
-  { code: "Gb", label: "Grabbing" },
-  { code: "Es", label: "Escaping" },
-  { code: "Ch", label: "Charging" },
-  { code: "Do", label: "Dodging" },
-  { code: "Ev", label: "Evading" },
-  { code: "Bl", label: "Blocking" },
-  { code: "Ca", label: "Catching" },
-  { code: "St", label: "Stun?" },
-  { code: "Sl", label: "Slam?" },
-  { code: "Ki", label: "Kill?" }
+  { code: "BA", labelTop: "Blunt", labelMid: "Attack", label: "Blunt Attack (BA)" },
+  { code: "EA", labelTop: "Edged", labelMid: "Attack", label: "Edged Attack (EA)" },
+  { code: "Sh", labelTop: "Shooting", labelMid: "Attack", label: "Shooting Attack (Sh)" },
+  { code: "TE", labelTop: "Throwing", labelMid: "Edged", label: "Throwing Edged (TE)" },
+  { code: "TB", labelTop: "Throwing", labelMid: "Blunt", label: "Throwing Blunt (TB)" },
+  { code: "En", labelTop: "Energy", labelMid: "Attack", label: "Energy Attack (En)" },
+  { code: "Fo", labelTop: "Force", labelMid: "Attack", label: "Force Attack (Fo)" },
+  { code: "Gp", labelTop: "Grappling", labelMid: "Attack", label: "Grappling Attack (Gp)" },
+  { code: "Gb", labelTop: "Grabbing", labelMid: "Attack", label: "Grabbing Attack (Gb)" },
+  { code: "Es", labelTop: "Escaping", labelMid: "Hold", label: "Escaping Hold (Es)" },
+  { code: "Ch", labelTop: "Charging", labelMid: "Attack", label: "Charging Attack (Ch)" },
+  { code: "Do", labelTop: "Dodging", labelMid: "Defense", label: "Dodging Defense (Do)" },
+  { code: "Ev", labelTop: "Evading", labelMid: "Defense", label: "Evading Defense (Ev)" },
+  { code: "Bl", labelTop: "Blocking", labelMid: "Defense", label: "Blocking Defense (Bl)" },
+  { code: "Ca", labelTop: "Catching", labelMid: "Objects", label: "Catching Objects (Ca)" },
+  { code: "St", labelTop: "Stun", labelMid: "Check", label: "Stun Check (St)" },
+  { code: "Sl", labelTop: "Slam", labelMid: "Check", label: "Slam Check (Sl)" },
+  { code: "Ki", labelTop: "Kill", labelMid: "Check", label: "Kill Check (Ki)" }
 ];
+
 
 const ACTION_ABILITY_MAP = {
   BA: "fighting",
@@ -205,25 +257,26 @@ const resultRows = [
 // universal table roll referenced via game.msh.openUniversalTableDialog
 export async function openUniversalTableDialog(actor) {
   const actionTypes = [
-    { labelTop: "Blunt", labelMid: "Attack", code: "BA", ability: "Fighting", white: "Miss", green: "Hit", yellow: "Slam", red: "Stun" },
-    { labelTop: "Edged", labelMid: "Attack", code: "EA", ability: "Fighting", white: "Miss", green: "Hit", yellow: "Stun", red: "Kill" },
-    { labelTop: "Shooting", labelMid: "Attack", code: "Sh", ability: "Agility", white: "Miss", green: "Hit", yellow: "Bullseye", red: "Kill" },
-    { labelTop: "Throwing", labelMid: "Edged", code: "TE", ability: "Agility", white: "Miss", green: "Hit", yellow: "Stun", red: "Kill" },
-    { labelTop: "Throwing", labelMid: "Blunt", code: "TB", ability: "Agility", white: "Miss", green: "Hit", yellow: "Hit", red: "Stun" },
-    { labelTop: "Energy", labelMid: "Attack", code: "En", ability: "Agility", white: "Miss", green: "Hit", yellow: "Bullseye", red: "Kill" },
-    { labelTop: "Force", labelMid: "Attack", code: "Fo", ability: "Agility", white: "Miss", green: "Hit", yellow: "Bullseye", red: "Stun" },
-    { labelTop: "Grappling", labelMid: "Attack", code: "Gp", ability: "Strength", white: "Miss", green: "Hit", yellow: "Partial", red: "Hold" },
-    { labelTop: "Grabbing", labelMid: "Attack", code: "Gb", ability: "Strength", white: "Miss", green: "Take", yellow: "Grab", red: "Break" },
-    { labelTop: "Escaping", labelMid: "Hold", code: "Es", ability: "Strength", white: "Miss", green: "Miss", yellow: "Escape", red: "Reverse" },
-    { labelTop: "Charging", labelMid: "Attack", code: "Ch", ability: "Endurance", white: "None", green: "Slam", yellow: "Slam", red: "Stun" },
-    { labelTop: "Dodging", labelMid: "Defense", code: "Do", ability: "Agility", white: "Autohit", green: "-2 CS", yellow: "-4 CS", red: "-6 CS" },
-    { labelTop: "Evading", labelMid: "Defense", code: "Ev", ability: "Fighting", white: "Autohit", green: "Evasion", yellow: "+1 CS", red: "+2 CS" },
-    { labelTop: "Blocking", labelMid: "Defense", code: "Bl", ability: "Strength", white: "Autohit", green: "+4 CS", yellow: "+2 CS", red: "+1 CS" },
-    { labelTop: "Catching", labelMid: "Objects", code: "Ca", ability: "Agility", white: "Miss", green: "Catch", yellow: "Catch", red: "No" },
-    { labelTop: "Stun", labelMid: "Check", code: "St", ability: "Endurance", white: "1–10", green: "1", yellow: "Damage", red: "No" },
-    { labelTop: "Slam", labelMid: "Check", code: "Sl", ability: "Endurance", white: "Gr. Slam", green: "1 area", yellow: "Stagger", red: "No" },
-    { labelTop: "Kill", labelMid: "Check", code: "Ki", ability: "Endurance", white: "End. Loss", green: "E/S", yellow: "No", red: "No" }
+    { labelTop: "Blunt", labelMid: "Attack", label: "Blunt Attack (BA)", code: "BA", ability: "Fighting", white: "Miss", green: "Hit", yellow: "Slam", red: "Stun" },
+    { labelTop: "Edged", labelMid: "Attack", label: "Edged Attack (EA)", code: "EA", ability: "Fighting", white: "Miss", green: "Hit", yellow: "Stun", red: "Kill" },
+    { labelTop: "Shooting", labelMid: "Attack", label: "Shooting Attack (Sh)", code: "Sh", ability: "Agility", white: "Miss", green: "Hit", yellow: "Bullseye", red: "Kill" },
+    { labelTop: "Throwing", labelMid: "Edged", label: "Throwing Edged (TE)", code: "TE", ability: "Agility", white: "Miss", green: "Hit", yellow: "Stun", red: "Kill" },
+    { labelTop: "Throwing", labelMid: "Blunt", label: "Throwing Blunt (TB)", code: "TB", ability: "Agility", white: "Miss", green: "Hit", yellow: "Hit", red: "Stun" },
+    { labelTop: "Energy", labelMid: "Attack", label: "Energy Attack (En)", code: "En", ability: "Agility", white: "Miss", green: "Hit", yellow: "Bullseye", red: "Kill" },
+    { labelTop: "Force", labelMid: "Attack", label: "Force Attack (Fo)", code: "Fo", ability: "Agility", white: "Miss", green: "Hit", yellow: "Bullseye", red: "Stun" },
+    { labelTop: "Grappling", labelMid: "Attack", label: "Grappling Attack (Gp)", code: "Gp", ability: "Strength", white: "Miss", green: "Hit", yellow: "Partial", red: "Hold" },
+    { labelTop: "Grabbing", labelMid: "Attack", label: "Grabbing Attack (Gb)", code: "Gb", ability: "Strength", white: "Miss", green: "Take", yellow: "Grab", red: "Break" },
+    { labelTop: "Escaping", labelMid: "Hold", label: "Escaping Hold (Es)", code: "Es", ability: "Strength", white: "Miss", green: "Miss", yellow: "Escape", red: "Reverse" },
+    { labelTop: "Charging", labelMid: "Attack", label: "Charging Attack (Ch)", code: "Ch", ability: "Endurance", white: "None", green: "Slam", yellow: "Slam", red: "Stun" },
+    { labelTop: "Dodging", labelMid: "Defense", label: "Dodging Defense (Do)", code: "Do", ability: "Agility", white: "Autohit", green: "-2 CS", yellow: "-4 CS", red: "-6 CS" },
+    { labelTop: "Evading", labelMid: "Defense", label: "Evading Defense (Ev)", code: "Ev", ability: "Fighting", white: "Autohit", green: "Evasion", yellow: "+1 CS", red: "+2 CS" },
+    { labelTop: "Blocking", labelMid: "Defense", label: "Blocking Defense (Bl)", code: "Bl", ability: "Strength", white: "Autohit", green: "+4 CS", yellow: "+2 CS", red: "+1 CS" },
+    { labelTop: "Catching", labelMid: "Objects", label: "Catching Objects (Ca)", code: "Ca", ability: "Agility", white: "Miss", green: "Catch", yellow: "Catch", red: "No" },
+    { labelTop: "Stun", labelMid: "Check", label: "Stun Check (St)", code: "St", ability: "Endurance", white: "1–10", green: "1", yellow: "Damage", red: "No" },
+    { labelTop: "Slam", labelMid: "Check", label: "Slam Check (Sl)", code: "Sl", ability: "Endurance", white: "Gr. Slam", green: "1 area", yellow: "Stagger", red: "No" },
+    { labelTop: "Kill", labelMid: "Check", label: "Kill Check (Ki)", code: "Ki", ability: "Endurance", white: "End. Loss", green: "E/S", yellow: "No", red: "No" }
   ];
+  
 
   const actorItems = actor.items.contents;
   const powers = actorItems.filter(i => i.type === "power");
@@ -314,36 +367,33 @@ export async function openUniversalTableDialog(actor) {
       setTimeout(() => {
         html.find(".action-code").each((_, el) => {
           el.addEventListener("dragstart", async ev => {
-            const action = el.dataset.action;
+            const code = el.dataset.action;
             const actor = game.user.character || canvas.tokens.controlled[0]?.actor;
             if (!actor) return;
-    
-            const command = `game.msh.rollUniversalAction("${action}", "${actor.id}");`;
-    
-            let macro = game.macros.find(m => m.name === `FEAT: ${action}` && m.command === command);
-            if (!macro) {
-              const iconMap = {
-                BA: "blunt", EA: "edged", Sh: "shooting", TE: "thrown", TB: "thrown_blunt", En: "energy",
-                Fo: "force", Gp: "grapple", Gb: "grab", Es: "escape", Ch: "charge", Ki: "kill",
-                St: "stun", Sl: "slam", Do: "dodge", Ev: "evade", Bl: "block", Ca: "catch"
-              };
-              const iconName = iconMap[action] || "dice-target";
-              const img = `systems/msh-faserip/assets/icons/actions/${iconName}.png`;
-    
-              macro = await Macro.create({
-                name: `FEAT: ${action}`,
-                type: "script",
-                command,
-                img
-              });
-            }
-    
-            ev.dataTransfer.setData("text/plain", JSON.stringify({
-              type: "Macro",
-              uuid: macro.uuid
-            }));
+          
+            const actionType = actionTypes.find(a => a.code === code);
+            if (!actionType) return;
+            console.log("Dragging action:", actionType.label, actionType);
+          
+            // Create or get existing action item on the actor
+            const item = await createActionItemForActor(actor, actionType);
+            if (!item) return;
+          
+            // Set the payload to mimic dropping a real item
+            const dragPayload = {
+              type: "Item",
+              actorId: actor.id,
+              itemId: item.id,
+              uuid: item.uuid
+            };
+            
+            ev.dataTransfer.setData("application/foundry", JSON.stringify(dragPayload));
+            ev.dataTransfer.setData("text/plain", JSON.stringify(dragPayload)); // ✅ This makes Foundry parse it!
+            console.log("Drag payload set for item:", item.name, item.id);
+          
+            console.log("Drag payload set for item:", item.name, item.id);
           });
-    
+          
           el.addEventListener("click", ev => {
             const action = el.dataset.action;
             const actor = game.user.character || canvas.tokens.controlled[0]?.actor;

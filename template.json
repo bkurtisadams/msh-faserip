@@ -81,7 +81,7 @@
     }
   },
   "Item": {
-    "types": ["power", "talent", "contact", "equipment", "vehicle", "headquarters"],
+    "types": ["power", "talent", "contact", "equipment", "vehicle", "headquarters", "action"],
     "templates": {
       "base": {
         "description": ""
@@ -91,6 +91,16 @@
         "value": 6
       }
     },
+    "action": {
+      "templates": ["base"],
+      "code": "",
+      "ability": "",
+      "white": "",
+      "green": "",
+      "yellow": "",
+      "red": ""
+    },
+
     "power": {
       "templates": ["base", "ranked"],
       "type": "",

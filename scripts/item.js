@@ -151,7 +151,6 @@ export class FaseripItem extends Item {
  * Roll this item
  */
 rollItem() {
-  // Choose the right roll method based on item type
   switch (this.type) {
     case "power":
       return game.msh.rollPower(this.actor, this);
@@ -161,6 +160,8 @@ rollItem() {
       return game.msh.rollContact(this.actor, this);
     case "equipment":
       return game.msh.rollEquipment(this.actor, this);
+    case "action":
+      return game.msh.rollUniversalAction(this.system.code, this.actor.id);
     default:
       ui.notifications.warn(`Cannot roll item of type: ${this.type}`);
       return null;

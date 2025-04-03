@@ -85,34 +85,59 @@ Hooks.once("init", async () => {
 
   Actors.registerSheet("msh-faserip", FaseripActorSheet, { makeDefault: true });
   
-  // Make sure to register vehicle items with FaseripItemSheet
-  Items.registerSheet("msh-faserip", FaseripItemSheet, { 
-    types: ["power", "talent", "contact", "headquarters", "vehicle"],
-    makeDefault: true 
-  });
-  
-  Items.registerSheet("msh-faserip", FaseripEquipmentSheet, { 
-    types: ["equipment"], 
-    makeDefault: true 
-  });
+ // Make sure to register vehicle and action items with FaseripItemSheet
+Items.registerSheet("msh-faserip", FaseripItemSheet, { 
+  types: ["power", "talent", "contact", "headquarters", "vehicle", "action"], // ✅ includes "action"
+  makeDefault: true 
+});
 
-  // end of hooks.once
+Items.registerSheet("msh-faserip", FaseripEquipmentSheet, { 
+  types: ["equipment"], 
+  makeDefault: true 
+});
+
+// end of hooks.once
 });
 
 // Add the hotbarDrop hook
 Hooks.on('hotbarDrop', async (bar, data, slot) => {
-  // Handle dropping Universal Table action macros
-  if (data.type === "Macro" && data.id) {
-    const macro = game.macros.get(data.id);
+  console.log("Hotbar drop triggered:", data);
+
+  // Handle Universal Table macros dropped with UUID
+  if (data.type === "Macro" && data.uuid) {
+    const macro = await fromUuid(data.uuid);
     if (macro) {
+      console.log("Assigning UUID macro to hotbar:", macro);
       game.user.assignHotbarMacro(macro, slot);
       return false;
     }
   }
 
-  // Handle dropping items (your existing logic)
+  // Fallback: handle existing saved macros by ID (e.g., powers, talents)
+  if (data.type === "Macro" && data.id) {
+    const macro = game.macros.get(data.id);
+    if (macro) {
+      console.log("Assigning ID-based macro to hotbar:", macro);
+      game.user.assignHotbarMacro(macro, slot);
+      return false;
+    }
+  }
+
+  // Handle item-based drops (powers, talents, equipment)
   if (data.type === "Item" && data.actorId) {
-    createFaseripItemMacro(data, slot);
+    const actor = game.actors.get(data.actorId);
+    if (!actor) {
+      ui.notifications.warn("Actor not found.");
+      return false;
+    }
+
+    const item = actor.items.get(data.itemId);
+    if (!item) {
+      ui.notifications.warn("Item not found.");
+      return false;
+    }
+
+    await createFaseripItemMacro(data, slot);
     return false;
   }
 
@@ -121,18 +146,24 @@ Hooks.on('hotbarDrop', async (bar, data, slot) => {
 
 // Define the function to create a macro
 async function createFaseripItemMacro(data, slot) {
-  // Get references to our Actor and Item
   const actor = game.actors.get(data.actorId);
   if (!actor) return ui.notifications.warn("Actor not found");
-  
+
   const item = actor.items.get(data.itemId);
   if (!item) return ui.notifications.warn("Item not found");
-  
-  // Create a command string that will call our rollItemMacro function
+
+  // ✅ Debug: Log item data for troubleshooting
+  console.log("Creating macro for item:", item.name, item.type, item);
+
+  // Validate item name
+  if (!item.name || item.name.trim() === "") {
+    ui.notifications.error("Cannot create macro: item name is undefined.");
+    return false;
+  }
+
   const command = `game.msh.rollItemMacro("${data.actorId}", "${data.itemId}");`;
-  
-  // Create the macro
   const macroName = `${item.name} (${actor.name})`;
+
   let macro = game.macros.find(m => m.name === macroName && m.command === command);
   
   if (!macro) {
@@ -141,11 +172,10 @@ async function createFaseripItemMacro(data, slot) {
       type: "script",
       img: item.img || "icons/svg/dice-target.svg",
       command: command,
-      flags: {"faserip.itemMacro": true}
+      flags: { "faserip.itemMacro": true }
     });
   }
-  
-  // Assign to hotbar slot
+
   game.user.assignHotbarMacro(macro, slot);
   return true;
 }
