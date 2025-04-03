@@ -67,32 +67,32 @@ const ACTION_RESULT_LABELS = {
   Sl: { white: "Gr. Slam", green: "1 area", yellow: "Stagger", red: "No" },
   Ki: { white: "End. Loss", green: "E/S", yellow: "No", red: "No" }
 };
-
+                            // 0      Feeble  Poor   Typical  Good    Ex      Rm      In      Am       Mn    Un      Sh X     Sh Y    Sh Z    1000   3000     5000   Beyond
 export const rankRows = [
-  { label: "01", colors: ["white","white","white","white","white","white","white","white","white","white","white","white","white","white","white","white","white","white"] },
-  { label: "02–03", colors: ["white","white","white","white","white","white","white","white","white","white","white","white","white","white","white","white","white","white"] },
-  { label: "04–06", colors: ["white","white","white","white","white","white","white","white","white","white","white","white","white","white","white","green","green","green"] },
-  { label: "07–10", colors: ["white","white","white","white","white","white","white","white","white","white","white","white","white","green","green","green","green","green"] },
+  { label: "01", colors:    ["white","white","white","white","white","white","white","white","white","white","white","white","white","white","white","white","white","white"] },
+  { label: "02–03", colors: ["white","white","white","white","white","white","white","white","white","white","white","white","white","white","green","green","green","green"] },
+  { label: "04–06", colors: ["white","white","white","white","white","white","white","white","white","white","white","white","white","green","green","green","green","green"] },
+  { label: "07–10", colors: ["white","white","white","white","white","white","white","white","white","white","white","white","green","green","green","green","green","green"] },
   { label: "11–15", colors: ["white","white","white","white","white","white","white","white","white","white","white","green","green","green","green","green","green","green"] },
-  { label: "16–20", colors: ["white","white","white","white","white","white","white","white","white","green","green","green","green","green","green","green","green","green"] },
-  { label: "21–25", colors: ["white","white","white","white","white","white","white","green","green","green","green","green","green","green","green","green","green","green"] },
-  { label: "26–30", colors: ["white","white","white","white","white","white","green","green","green","green","green","green","green","green","green","green","green","green"] },
-  { label: "31–35", colors: ["white","white","white","white","white","green","green","green","green","green","green","green","green","green","green","green","green","green"] },
-  { label: "36–40", colors: ["white","white","white","white","green","green","green","green","green","green","green","green","green","green","green","green","green","green"] },
-  { label: "41–45", colors: ["white","white","white","green","green","green","green","green","green","green","green","green","green","green","green","green","green","green"] },
-  { label: "46–50", colors: ["white","white","green","green","green","green","green","green","green","green","green","green","green","green","green","green","green","green"] },
-  { label: "51–55", colors: ["white","green","green","green","green","green","green","green","green","green","green","green","green","green","green","green","green","green"] },
-  { label: "56–60", colors: ["green","green","green","green","green","green","green","green","green","green","green","green","green","green","yellow","yellow","yellow","yellow"] },
-  { label: "61–65", colors: ["green","green","green","green","green","green","green","green","green","green","green","green","yellow","yellow","yellow","yellow","yellow","yellow"] },
-  { label: "66–70", colors: ["green","green","green","green","green","green","green","green","green","green","yellow","yellow","yellow","yellow","yellow","yellow","yellow","red"] },
-  { label: "71–75", colors: ["green","green","green","green","green","green","green","green","green","yellow","yellow","yellow","yellow","yellow","yellow","yellow","red","red"] },
-  { label: "76–80", colors: ["green","green","green","green","green","green","green","green","yellow","yellow","yellow","yellow","yellow","yellow","yellow","red","red","red"] },
-  { label: "81–85", colors: ["green","green","green","green","green","green","green","yellow","yellow","yellow","yellow","yellow","yellow","yellow","red","red","red","red"] },
-  { label: "86–90", colors: ["green","green","green","green","green","green","yellow","yellow","yellow","yellow","yellow","yellow","yellow","red","red","red","red","red"] },
-  { label: "91–94", colors: ["yellow","yellow","yellow","yellow","yellow","yellow","yellow","yellow","yellow","yellow","yellow","red","red","red","red","red","red","red"] },
-  { label: "95–97", colors: ["yellow","yellow","yellow","yellow","yellow","yellow","yellow","yellow","red","red","red","red","red","red","red","red","red","red"] },
-  { label: "98–99", colors: ["red","red","red","red","red","red","red","red","red","red","red","red","red","red","red","red","red","red"] },
-  { label: "100", colors: ["red","red","red","red","red","red","red","red","red","red","red","red","red","red","red","red","red","red"] }
+  { label: "16–20", colors: ["white","white","white","white","white","white","white","white","white","white","green","green","green","green","green","green","green","green"] },
+  { label: "21–25", colors: ["white","white","white","white","white","white","white","white","white","green","green","green","green","green","green","green","green","yellow"] },
+  { label: "26–30", colors: ["white","white","white","white","white","white","white","white","green","green","green","green","green","green","green","green","yellow","yellow"] },
+  { label: "31–35", colors: ["white","white","white","white","white","white","white","green","green","green","green","green","green","green","green","yellow","yellow","yellow"] },
+  { label: "36–40", colors: ["white","white","white","white","white","white","green","green","green","green","green","green","green","yellow","yellow","yellow","yellow","yellow"] },
+  { label: "41–45", colors: ["white","white","white","white","white","green","green","green","green","green","green","yellow","yellow","yellow","yellow","yellow","yellow","yellow"] },
+  { label: "46–50", colors: ["white","white","white","white","green","green","green","green","green","green","yellow","yellow","yellow","yellow","yellow","yellow","yellow","yellow"] },
+  { label: "51–55", colors: ["white","white","white","green","green","green","green","green","green","yellow","yellow","yellow","yellow","yellow","yellow","yellow","yellow","yellow"] },
+  { label: "56–60", colors: ["white","white","green","green","green","green","green","green","yellow","yellow","yellow","yellow","yellow","yellow","yellow","yellow","yellow","yellow"] },
+  { label: "61–65", colors: ["white","green","green","green","green","green","green","yellow","yellow","yellow","yellow","yellow","yellow","yellow","yellow","yellow","yellow"   ,"red"] },
+  { label: "66–70", colors: ["green","green","green","green","green","green","yellow","yellow","yellow","yellow","yellow","yellow","yellow","yellow","yellow","yellow"   ,"red"  ,"red"] },
+  { label: "71–75", colors: ["green","green","green","green","green","yellow","yellow","yellow","yellow","yellow","yellow","yellow","yellow","yellow","yellow"  ,"red"   ,"red"  ,"red"] },
+  { label: "76–80", colors: ["green","green","green","green","yellow","yellow","yellow","yellow","yellow","yellow","yellow","yellow"  ,"red"  ,"red"   ,"red"   ,"red"   ,"red"  ,"red"] },
+  { label: "81–85", colors: ["green","green","green","yellow","yellow","yellow","yellow","yellow","yellow" ,"yellow","yellow","red"   ,"red"  ,"red"   ,"red"   ,"red"   ,"red"  ,"red"] },
+  { label: "86–90", colors: ["green","green","yellow","yellow","yellow","yellow","yellow","yellow","yellow","red"   ,"red"   ,"red"   ,"red"  ,"red"   ,"red"   ,"red"   ,"red"  ,"red"] },
+  { label: "91–94", colors: ["green","yellow","yellow","yellow","yellow","yellow","yellow","red"  ,"red"   ,"red"   ,"red"   ,"red"   ,"red"  ,"red"   ,"red"   ,"red"   ,"red"  ,"red"] },
+  { label: "95–97", colors: ["yellow","yellow","yellow","yellow","yellow","red"  ,"red"  ,"red"   ,"red"   ,"red"   ,"red"   ,"red"   ,"red"  ,"red"   ,"red"   ,"red"   ,"red"  ,"red"] },
+  { label: "98–99", colors: ["yellow","yellow","yellow","red"   ,"red"   ,"red"  ,"red"  ,"red"   ,"red"   ,"red"   ,"red"   ,"red"   ,"red"  ,"red"   ,"red"   ,"red"   ,"red"  ,"red"] },
+  { label: "100", colors:   ["red"   ,"red"   ,"red"   ,"red"   ,"red"   ,"red"  ,"red"  ,"red"   ,"red"   ,"red"   ,"red"   ,"red"   ,"red"  ,"red"   ,"red"   ,"red"   ,"red"  ,"red"] }
 ];
 
 function highlightResultCell(rankName, rollValue) {
