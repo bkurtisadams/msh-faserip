@@ -163,15 +163,21 @@ export class FaseripActorSheet extends ActorSheet {
     const li = event.currentTarget;
     const itemId = li.dataset.itemId;
     const item = this.actor.items.get(itemId);
-    
+    console.log("🔥 Dragging item for hotbar:", {
+      actorId: this.actor.id,
+      itemId: item.id,
+      uuid: item.uuid
+    });
+
+  
     if (item) {
-      // Set up the drag data
       event.dataTransfer.setData("text/plain", JSON.stringify({
         type: "Item",
-        documentName: "Item",  // ← THIS is the magic key
-        uuid: item.uuid
+        actorId: this.actor.id,
+        itemId: item.id,
+        uuid: item.uuid,
+        data: item
       }));
-      
     }
   }
 
@@ -203,7 +209,7 @@ export class FaseripActorSheet extends ActorSheet {
     const item = this.actor.items.get(itemId);
     
     // Default to item drag (for macros/hotbar)
-    let dragData = {
+    /* let dragData = {
       type: "Item",
       uuid: item.uuid
     };
@@ -214,7 +220,26 @@ export class FaseripActorSheet extends ActorSheet {
         type: "TalentSort",
         itemId: itemId
       };
-    }
+    } */
+      let dragData;
+
+      if (ev.shiftKey) {
+        // Sorting drag
+        dragData = {
+          type: "TalentSort",
+          itemId: itemId
+        };
+      } else {
+        // Hotbar macro drag
+        dragData = {
+          type: "Item",
+          actorId: this.actor.id,
+          itemId: item.id,
+          uuid: item.uuid,
+          data: item
+        };
+      }
+      
     
     ev.dataTransfer.setData("text/plain", JSON.stringify(dragData));
   });
@@ -266,12 +291,6 @@ export class FaseripActorSheet extends ActorSheet {
   });
 });
 
-    // Contact rows draggable
-    /* html.find('.contact-item').each((i, li) => {
-      li.setAttribute("draggable", true);
-      li.addEventListener("dragstart", this._onDragStart.bind(this));
-    }); */
-
     // Contacts made draggable/sortable w/in the contact tab
     // Contacts - draggable and sortable
 html.find('.contact-item').each((i, row) => {
@@ -282,7 +301,7 @@ html.find('.contact-item').each((i, row) => {
     const item = this.actor.items.get(itemId);
     
     // Default to item drag (for macros/hotbar)
-    let dragData = {
+    /* let dragData = {
       type: "Item",
       uuid: item.uuid
     };
@@ -293,7 +312,26 @@ html.find('.contact-item').each((i, row) => {
         type: "ContactSort",
         itemId: itemId
       };
-    }
+    } */
+      let dragData;
+
+      if (ev.shiftKey) {
+        // Sorting drag
+        dragData = {
+          type: "ContactSort",
+          itemId: itemId
+        };
+      } else {
+        // Hotbar macro drag
+        dragData = {
+          type: "Item",
+          actorId: this.actor.id,
+          itemId: item.id,
+          uuid: item.uuid,
+          data: item
+        };
+      }
+      
     
     ev.dataTransfer.setData("text/plain", JSON.stringify(dragData));
   });
@@ -354,7 +392,7 @@ html.find('.contact-item').each((i, row) => {
     const item = this.actor.items.get(itemId);
     
     // Default to item drag (for macros/hotbar)
-    let dragData = {
+    /* let dragData = {
       type: "Item",
       uuid: item.uuid
     };
@@ -366,7 +404,26 @@ html.find('.contact-item').each((i, row) => {
         itemId: itemId
       };
     }
-    
+     */
+    let dragData;
+
+    if (ev.shiftKey) {
+      // Sorting drag
+      dragData = {
+        type: "EquipmentSort",
+        itemId: itemId
+      };
+    } else {
+      // Hotbar macro drag
+      dragData = {
+        type: "Item",
+        actorId: this.actor.id,
+        itemId: item.id,
+        uuid: item.uuid,
+        data: item
+      };
+    }
+
     ev.dataTransfer.setData("text/plain", JSON.stringify(dragData));
   });
 
@@ -555,16 +612,22 @@ html.find('.power-row').each((i, row) => {
     const item = this.actor.items.get(itemId);
     
     // Default to item drag (for macros/hotbar)
-    let dragData = {
-      type: "Item",
-      uuid: item.uuid
-    };
-    
-    // If holding shift, do sorting instead
+    let dragData;
+
     if (ev.shiftKey) {
+      // Sorting drag
       dragData = {
         type: "PowerSort",
         itemId: itemId
+      };
+    } else {
+      // Hotbar macro drag
+      dragData = {
+        type: "Item",
+        actorId: this.actor.id,
+        itemId: item.id,
+        uuid: item.uuid,
+        data: item
       };
     }
     
