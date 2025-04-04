@@ -34,18 +34,28 @@ Hooks.once("init", async () => {
   
   // Updated rollItemMacro function
   game.msh.rollItemMacro = async function(actorId, itemId) {
-    // Get the actor
-    const actor = game.actors.get(actorId);
-    if (!actor) return ui.notifications.warn(`Actor could not be found.`);
+      const actor = game.actors.get(actorId);
+      if (!actor) return ui.notifications.warn(`Actor could not be found.`);
     
-    // Get the item from the actor
-    const item = actor.items.get(itemId);
-    if (!item) return ui.notifications.warn(`Item ${itemId} could not be found on ${actor.name}.`);
+      const item = actor.items.get(itemId);
+      if (!item) return ui.notifications.warn(`Item ${itemId} could not be found on ${actor.name}.`);
     
-    // Call the item's roll method directly - no need to open the sheet
-    return item.rollItem();
-  };
-  
+      switch (item.type) {
+        case "power":
+          return game.msh.rollPower(actor, item);
+        case "talent":
+          return game.msh.rollTalent(actor, item);
+        case "contact":
+          return game.msh.rollContact(actor, item);
+        case "equipment":
+          return game.msh.rollEquipment(actor, item);
+        default:
+          ui.notifications.warn(`Cannot roll item of type: ${item.type}`);
+          return null;
+      }
+    };
+
+      
   // Register Handlebars helpers
   Handlebars.registerHelper('getFlag', function(object, scope, flag) {
     return object.getFlag(scope, flag);
@@ -99,25 +109,34 @@ Hooks.once("init", async () => {
   // end of hooks.once
 });
 
-// Add the hotbarDrop hook
-Hooks.on('hotbarDrop', async (bar, data, slot) => {
-  // Handle dropping Universal Table action macros
-  if (data.type === "Macro" && data.id) {
-    const macro = game.macros.get(data.id);
-    if (macro) {
-      game.user.assignHotbarMacro(macro, slot);
-      return false;
-    }
-  }
+// Handle hotbar drops
+Hooks.on("hotbarDrop", async (bar, data, slot) => {
+  if (data.type !== "Item") return false;
 
-  // Handle dropping items (your existing logic)
-  if (data.type === "Item" && data.actorId) {
-    createFaseripItemMacro(data, slot);
+  const item = await Item.fromDropData(data);
+  if (!item || !item.parent) {
+    ui.notifications.warn("You can only create macros for owned Items.");
     return false;
   }
 
-  return true;
+  const command = `game.msh.rollItemMacro("${item.parent.id}", "${item.id}");`;
+  const macroName = `${item.name} (${item.parent.name})`;
+
+  let macro = game.macros.find(m => m.name === macroName && m.command === command);
+  if (!macro) {
+    macro = await Macro.create({
+      name: macroName,
+      type: "script",
+      img: item.img || "icons/svg/dice-target.svg",
+      command,
+      flags: { "faserip.itemMacro": true }
+    });
+  }
+
+  game.user.assignHotbarMacro(macro, slot);
+  return false; // ⬅️ This is what prevents the default behavior
 });
+
 
 // Define the function to create a macro
 async function createFaseripItemMacro(data, slot) {
@@ -149,3 +168,35 @@ async function createFaseripItemMacro(data, slot) {
   game.user.assignHotbarMacro(macro, slot);
   return true;
 }
+
+Hooks.once("ready", () => {
+  Hooks.on("hotbarDrop", async (bar, data, slot) => {
+    // Ensure this is an Item from an Actor
+    if (data.type !== "Item" || !data.uuid?.startsWith("Actor.")) return true;
+
+    // Resolve the item from the UUID
+    const item = await Item.fromDropData(data);
+    if (!item || !item.parent) {
+      ui.notifications.warn("You can only create macros for owned items.");
+      return false;
+    }
+
+    const actor = item.parent;
+    const command = `game.msh.rollItemMacro("${actor.id}", "${item.id}");`;
+    const macroName = `${item.name} (${actor.name})`;
+
+    let macro = game.macros.find(m => m.name === macroName && m.command === command);
+    if (!macro) {
+      macro = await Macro.create({
+        name: macroName,
+        type: "script",
+        img: item.img || "icons/svg/dice-target.svg",
+        command,
+        flags: { "msh-faserip.itemMacro": true }
+      });
+    }
+
+    await game.user.assignHotbarMacro(macro, slot);
+    return false; // ✅ Prevents Foundry's default document macro
+  });
+});

@@ -173,6 +173,7 @@ export class FaseripActorSheet extends ActorSheet {
         uuid: item.uuid,
         data: item
       }));
+      
     }
   }
 
@@ -195,249 +196,316 @@ export class FaseripActorSheet extends ActorSheet {
       game.msh.openUniversalTableDialog?.(this.actor);
     });
 
-    // Power rows draggable
-    html.find('.power-row').each((i, li) => {
-      li.setAttribute("draggable", true);
-      li.addEventListener("dragstart", this._onDragStart.bind(this));
-    });
-
-    // Talent rows draggable & sortable
-    html.find('.talent-item').each((i, li) => {
-      li.setAttribute("draggable", true);
-      li.addEventListener("dragstart", this._onDragStart.bind(this));
-    });
-
+    // Talents - draggable and sortable
     html.find('.talent-item').each((i, row) => {
       row.setAttribute("draggable", true);
-      row.addEventListener("dragstart", ev => {
-        const itemId = row.dataset.itemId;
-        ev.dataTransfer.setData("text/plain", JSON.stringify({
-          type: "TalentSort",
-          itemId
-        }));
-      });
+  
+  row.addEventListener("dragstart", ev => {
+    const itemId = row.dataset.itemId;
+    const item = this.actor.items.get(itemId);
     
-      row.addEventListener("dragover", ev => {
-        ev.preventDefault();
-        row.classList.add("drag-over");
-      });
+    // Default to item drag (for macros/hotbar)
+    let dragData = {
+      type: "Item",
+      actorId: this.actor.id,
+      itemId: itemId,
+      uuid: item.uuid,
+      name: item.name
+    };
     
-      row.addEventListener("dragleave", ev => {
-        row.classList.remove("drag-over");
-      });
+    // If holding shift, do sorting instead
+    if (ev.shiftKey) {
+      dragData = {
+        type: "TalentSort",
+        itemId: itemId
+      };
+    }
     
-      row.addEventListener("drop", async ev => {
-        row.classList.remove("drag-over");
-        ev.preventDefault();
-    
-        const sourceData = JSON.parse(ev.dataTransfer.getData("text/plain"));
-        if (sourceData.type !== "TalentSort") return;
-    
-        const sourceId = sourceData.itemId;
-        const targetId = row.dataset.itemId;
-        if (!sourceId || !targetId || sourceId === targetId) return;
-    
-        const items = this.actor.items
-          .filter(i => i.type === "talent")
-          .sort((a, b) => a.sort - b.sort);
-        const source = items.find(i => i.id === sourceId);
-        const target = items.find(i => i.id === targetId);
-        if (!source || !target) return;
-    
-        const sourceIndex = items.indexOf(source);
-        const targetIndex = items.indexOf(target);
-    
-        items.splice(sourceIndex, 1);
-        items.splice(targetIndex, 0, source);
-    
-        const updates = items.map((item, index) => ({
-          _id: item.id,
-          sort: index
-        }));
-    
-        await this.actor.updateEmbeddedDocuments("Item", updates);
-        this.render();
-      });
-    });
+    ev.dataTransfer.setData("text/plain", JSON.stringify(dragData));
+  });
+
+  row.addEventListener("dragover", ev => {
+    ev.preventDefault();
+    row.classList.add("drag-over");
+  });
+
+  row.addEventListener("dragleave", ev => {
+    row.classList.remove("drag-over");
+  });
+
+  row.addEventListener("drop", async ev => {
+    row.classList.remove("drag-over");
+    ev.preventDefault();
+
+    try {
+      const sourceData = JSON.parse(ev.dataTransfer.getData("text/plain"));
+      if (sourceData.type !== "TalentSort") return;
+
+      const sourceId = sourceData.itemId;
+      const targetId = row.dataset.itemId;
+      if (!sourceId || !targetId || sourceId === targetId) return;
+
+      const items = this.actor.items
+        .filter(i => i.type === "talent")
+        .sort((a, b) => a.sort - b.sort);
+      const source = items.find(i => i.id === sourceId);
+      const target = items.find(i => i.id === targetId);
+      if (!source || !target) return;
+
+      const sourceIndex = items.indexOf(source);
+      const targetIndex = items.indexOf(target);
+
+      items.splice(sourceIndex, 1);
+      items.splice(targetIndex, 0, source);
+
+      const updates = items.map((item, index) => ({
+        _id: item.id,
+        sort: index
+      }));
+
+      await this.actor.updateEmbeddedDocuments("Item", updates);
+      this.render();
+    } catch (err) {
+      console.error("Error in talent drag and drop:", err);
+    }
+  });
+});
 
     // Contact rows draggable
-    html.find('.contact-item').each((i, li) => {
+    /* html.find('.contact-item').each((i, li) => {
       li.setAttribute("draggable", true);
       li.addEventListener("dragstart", this._onDragStart.bind(this));
-    });
+    }); */
 
     // Contacts made draggable/sortable w/in the contact tab
-    html.find('.contact-item').each((i, row) => {
-      row.setAttribute("draggable", true);
-      row.addEventListener("dragstart", ev => {
-        const itemId = row.dataset.itemId;
-        ev.dataTransfer.setData("text/plain", JSON.stringify({
-          type: "ContactSort",
-          itemId
-        }));
-      });
+    // Contacts - draggable and sortable
+html.find('.contact-item').each((i, row) => {
+  row.setAttribute("draggable", true);
+  
+  row.addEventListener("dragstart", ev => {
+    const itemId = row.dataset.itemId;
+    const item = this.actor.items.get(itemId);
     
-      row.addEventListener("dragover", ev => {
-        ev.preventDefault();
-        row.classList.add("drag-over");
-      });
+    // Default to item drag (for macros/hotbar)
+    let dragData = {
+      type: "Item",
+      actorId: this.actor.id,
+      itemId: itemId,
+      uuid: item.uuid,
+      name: item.name
+    };
     
-      row.addEventListener("dragleave", ev => {
-        row.classList.remove("drag-over");
-      });
+    // If holding shift, do sorting instead
+    if (ev.shiftKey) {
+      dragData = {
+        type: "ContactSort",
+        itemId: itemId
+      };
+    }
     
-      row.addEventListener("drop", async ev => {
-        row.classList.remove("drag-over");
-        ev.preventDefault();
-    
-        const sourceData = JSON.parse(ev.dataTransfer.getData("text/plain"));
-        if (sourceData.type !== "ContactSort") return;
-    
-        const sourceId = sourceData.itemId;
-        const targetId = row.dataset.itemId;
-        if (!sourceId || !targetId || sourceId === targetId) return;
-    
-        const items = this.actor.items
-          .filter(i => i.type === "contact")
-          .sort((a, b) => a.sort - b.sort);
-        const source = items.find(i => i.id === sourceId);
-        const target = items.find(i => i.id === targetId);
-        if (!source || !target) return;
-    
-        const sourceIndex = items.indexOf(source);
-        const targetIndex = items.indexOf(target);
-    
-        items.splice(sourceIndex, 1);
-        items.splice(targetIndex, 0, source);
-    
-        const updates = items.map((item, index) => ({
-          _id: item.id,
-          sort: index
-        }));
-    
-        await this.actor.updateEmbeddedDocuments("Item", updates);
-        this.render();
-      });
-    });
+    ev.dataTransfer.setData("text/plain", JSON.stringify(dragData));
+  });
 
-    // Equipment rows draggable
-    html.find('.equipment-row').each((i, li) => {
-      li.setAttribute("draggable", true);
-      li.addEventListener("dragstart", this._onDragStart.bind(this));
-    });
+  row.addEventListener("dragover", ev => {
+    ev.preventDefault();
+    row.classList.add("drag-over");
+  });
 
-    // Equipment made draggable & sortable w/in its tab
+  row.addEventListener("dragleave", ev => {
+    row.classList.remove("drag-over");
+  });
+
+  row.addEventListener("drop", async ev => {
+    row.classList.remove("drag-over");
+    ev.preventDefault();
+
+    try {
+      const sourceData = JSON.parse(ev.dataTransfer.getData("text/plain"));
+      if (sourceData.type !== "ContactSort") return;
+
+      const sourceId = sourceData.itemId;
+      const targetId = row.dataset.itemId;
+      if (!sourceId || !targetId || sourceId === targetId) return;
+
+      const items = this.actor.items
+        .filter(i => i.type === "contact")
+        .sort((a, b) => a.sort - b.sort);
+      const source = items.find(i => i.id === sourceId);
+      const target = items.find(i => i.id === targetId);
+      if (!source || !target) return;
+
+      const sourceIndex = items.indexOf(source);
+      const targetIndex = items.indexOf(target);
+
+      items.splice(sourceIndex, 1);
+      items.splice(targetIndex, 0, source);
+
+      const updates = items.map((item, index) => ({
+        _id: item.id,
+        sort: index
+      }));
+
+      await this.actor.updateEmbeddedDocuments("Item", updates);
+      this.render();
+    } catch (err) {
+      console.error("Error in contact drag and drop:", err);
+    }
+  });
+});
+
+    // Equipment - draggable and sortable
     html.find('.equipment-row').each((i, row) => {
       row.setAttribute("draggable", true);
-      row.addEventListener("dragstart", ev => {
-        const itemId = row.dataset.itemId;
-        ev.dataTransfer.setData("text/plain", JSON.stringify({
-          type: "EquipmentSort",
-          itemId
-        }));
-      });
+  
+    row.addEventListener("dragstart", ev => {
+    const itemId = row.dataset.itemId;
+    const item = this.actor.items.get(itemId);
     
-      row.addEventListener("dragover", ev => {
-        ev.preventDefault();
-        row.classList.add("drag-over");
-      });
+    // Default to item drag (for macros/hotbar)
+    let dragData = {
+      type: "Item",
+      actorId: this.actor.id,
+      itemId: itemId,
+      uuid: item.uuid,
+      name: item.name
+    };
     
-      row.addEventListener("dragleave", ev => {
-        row.classList.remove("drag-over");
-      });
+    // If holding shift, do sorting instead
+    if (ev.shiftKey) {
+      dragData = {
+        type: "EquipmentSort",
+        itemId: itemId
+      };
+    }
     
-      row.addEventListener("drop", async ev => {
-        row.classList.remove("drag-over");
-        ev.preventDefault();
-    
-        const sourceData = JSON.parse(ev.dataTransfer.getData("text/plain"));
-        if (sourceData.type !== "EquipmentSort") return;
-    
-        const sourceId = sourceData.itemId;
-        const targetId = row.dataset.itemId;
-        if (!sourceId || !targetId || sourceId === targetId) return;
-    
-        const items = this.actor.items
-          .filter(i => i.type === "equipment")
-          .sort((a, b) => a.sort - b.sort);
-        const source = items.find(i => i.id === sourceId);
-        const target = items.find(i => i.id === targetId);
-        if (!source || !target) return;
-    
-        const sourceIndex = items.indexOf(source);
-        const targetIndex = items.indexOf(target);
-    
-        items.splice(sourceIndex, 1);
-        items.splice(targetIndex, 0, source);
-    
-        const updates = items.map((item, index) => ({
-          _id: item.id,
-          sort: index
-        }));
-    
-        await this.actor.updateEmbeddedDocuments("Item", updates);
-        this.render();
-      });
-    });
+    ev.dataTransfer.setData("text/plain", JSON.stringify(dragData));
+  });
+
+  row.addEventListener("dragover", ev => {
+    ev.preventDefault();
+    row.classList.add("drag-over");
+  });
+
+  row.addEventListener("dragleave", ev => {
+    row.classList.remove("drag-over");
+  });
+
+  row.addEventListener("drop", async ev => {
+    row.classList.remove("drag-over");
+    ev.preventDefault();
+
+    try {
+      const sourceData = JSON.parse(ev.dataTransfer.getData("text/plain"));
+      if (sourceData.type !== "EquipmentSort") return;
+
+      const sourceId = sourceData.itemId;
+      const targetId = row.dataset.itemId;
+      if (!sourceId || !targetId || sourceId === targetId) return;
+
+      const items = this.actor.items
+        .filter(i => i.type === "equipment")
+        .sort((a, b) => a.sort - b.sort);
+      const source = items.find(i => i.id === sourceId);
+      const target = items.find(i => i.id === targetId);
+      if (!source || !target) return;
+
+      const sourceIndex = items.indexOf(source);
+      const targetIndex = items.indexOf(target);
+
+      items.splice(sourceIndex, 1);
+      items.splice(targetIndex, 0, source);
+
+      const updates = items.map((item, index) => ({
+        _id: item.id,
+        sort: index
+      }));
+
+      await this.actor.updateEmbeddedDocuments("Item", updates);
+      this.render();
+    } catch (err) {
+      console.error("Error in equipment drag and drop:", err);
+    }
+  });
+});
 
     // Vehicle rows draggable
     // Make ONLY the vehicle name draggable
-    html.find('.vehicle-draggable').each((i, el) => {
-      el.setAttribute("draggable", true);
-      el.addEventListener("dragstart", ev => {
-        const itemId = el.dataset.itemId;
-        ev.dataTransfer.setData("text/plain", JSON.stringify({
-          type: "VehicleSort",
-          itemId
-        }));
-      });
-    });
+    // Vehicle dragging - only make the name draggable
+html.find('.vehicle-draggable').each((i, el) => {
+  el.setAttribute("draggable", true);
+  el.addEventListener("dragstart", ev => {
+    const itemId = el.dataset.itemId;
+    const item = this.actor.items.get(itemId);
+    
+    // Default to item drag (for macros/hotbar)
+    let dragData = {
+      type: "Item",
+      actorId: this.actor.id,
+      itemId: itemId,
+      uuid: item.uuid,
+      name: item.name
+    };
+    
+    // If holding shift, do sorting instead
+    if (ev.shiftKey) {
+      dragData = {
+        type: "VehicleSort",
+        itemId: itemId
+      };
+    }
+    
+    ev.dataTransfer.setData("text/plain", JSON.stringify(dragData));
+  });
+});
 
-    // Allow sorting via row drop targets
-    html.find('.vehicle-row').each((i, row) => {
-      row.addEventListener("dragover", ev => {
-        ev.preventDefault();
-        row.classList.add("drag-over");
-      });
+// Allow sorting via row drop targets
+html.find('.vehicle-row').each((i, row) => {
+  row.addEventListener("dragover", ev => {
+    ev.preventDefault();
+    row.classList.add("drag-over");
+  });
 
-      row.addEventListener("dragleave", ev => {
-        row.classList.remove("drag-over");
-      });
+  row.addEventListener("dragleave", ev => {
+    row.classList.remove("drag-over");
+  });
 
-      row.addEventListener("drop", async ev => {
-        row.classList.remove("drag-over");
-        ev.preventDefault();
+  row.addEventListener("drop", async ev => {
+    row.classList.remove("drag-over");
+    ev.preventDefault();
 
-        const sourceData = JSON.parse(ev.dataTransfer.getData("text/plain"));
-        if (sourceData.type !== "VehicleSort") return;
+    try {
+      const sourceData = JSON.parse(ev.dataTransfer.getData("text/plain"));
+      if (sourceData.type !== "VehicleSort") return;
 
-        const sourceId = sourceData.itemId;
-        const targetId = row.dataset.itemId;
-        if (!sourceId || !targetId || sourceId === targetId) return;
+      const sourceId = sourceData.itemId;
+      const targetId = row.dataset.itemId;
+      if (!sourceId || !targetId || sourceId === targetId) return;
 
-        const items = this.actor.items
-          .filter(i => i.type === "vehicle")
-          .sort((a, b) => a.sort - b.sort);
-        const source = items.find(i => i.id === sourceId);
-        const target = items.find(i => i.id === targetId);
-        if (!source || !target) return;
+      const items = this.actor.items
+        .filter(i => i.type === "vehicle")
+        .sort((a, b) => a.sort - b.sort);
+      const source = items.find(i => i.id === sourceId);
+      const target = items.find(i => i.id === targetId);
+      if (!source || !target) return;
 
-        const sourceIndex = items.indexOf(source);
-        const targetIndex = items.indexOf(target);
+      const sourceIndex = items.indexOf(source);
+      const targetIndex = items.indexOf(target);
 
-        items.splice(sourceIndex, 1);
-        items.splice(targetIndex, 0, source);
+      items.splice(sourceIndex, 1);
+      items.splice(targetIndex, 0, source);
 
-        const updates = items.map((item, index) => ({
-          _id: item.id,
-          sort: index
-        }));
+      const updates = items.map((item, index) => ({
+        _id: item.id,
+        sort: index
+      }));
 
-        await this.actor.updateEmbeddedDocuments("Item", updates);
-        this.render();
-      });
-    });
-
+      await this.actor.updateEmbeddedDocuments("Item", updates);
+      this.render();
+    } catch (err) {
+      console.error("Error in vehicle drag and drop:", err);
+    }
+  });
+});
 
     // Biography Toggle Button
     html.find('.biography-toggle').click(ev => {
@@ -492,57 +560,78 @@ export class FaseripActorSheet extends ActorSheet {
     });
 
     // Listener for powers
-    html.find('.power-row').each((i, row) => {
-      row.setAttribute("draggable", true);
-      row.addEventListener("dragstart", ev => {
-        const itemId = row.dataset.itemId;
-        ev.dataTransfer.setData("text/plain", JSON.stringify({
-          type: "PowerSort",
-          itemId
-        }));
-      });
+    // Powers - draggable and sortable
+html.find('.power-row').each((i, row) => {
+  row.setAttribute("draggable", true);
+  
+  row.addEventListener("dragstart", ev => {
+    const itemId = row.dataset.itemId;
+    const item = this.actor.items.get(itemId);
+    
+    // Default to item drag (for macros/hotbar)
+    let dragData = {
+      type: "Item",
+      actorId: this.actor.id,
+      itemId: itemId,
+      uuid: item.uuid,
+      name: item.name
+    };
+    
+    // If holding shift, do sorting instead
+    if (ev.shiftKey) {
+      dragData = {
+        type: "PowerSort",
+        itemId: itemId
+      };
+    }
+    
+    ev.dataTransfer.setData("text/plain", JSON.stringify(dragData));
+  });
 
-      row.addEventListener("dragover", ev => {
-        ev.preventDefault();
-        row.classList.add("drag-over");
-      });
+  row.addEventListener("dragover", ev => {
+    ev.preventDefault();
+    row.classList.add("drag-over");
+  });
 
-      row.addEventListener("dragleave", ev => {
-        row.classList.remove("drag-over");
-      });
+  row.addEventListener("dragleave", ev => {
+    row.classList.remove("drag-over");
+  });
 
-      row.addEventListener("drop", async ev => {
-        row.classList.remove("drag-over");
-        ev.preventDefault();
+  row.addEventListener("drop", async ev => {
+    row.classList.remove("drag-over");
+    ev.preventDefault();
 
-        const sourceData = JSON.parse(ev.dataTransfer.getData("text/plain"));
-        if (sourceData.type !== "PowerSort") return;
+    try {
+      const sourceData = JSON.parse(ev.dataTransfer.getData("text/plain"));
+      if (sourceData.type !== "PowerSort") return;
 
-        const sourceId = sourceData.itemId;
-        const targetId = row.dataset.itemId;
-        if (!sourceId || !targetId || sourceId === targetId) return;
+      const sourceId = sourceData.itemId;
+      const targetId = row.dataset.itemId;
+      if (!sourceId || !targetId || sourceId === targetId) return;
 
-        const items = this.actor.items.filter(i => i.type === "power").sort((a, b) => a.sort - b.sort);
-        const source = items.find(i => i.id === sourceId);
-        const target = items.find(i => i.id === targetId);
-        if (!source || !target) return;
+      const items = this.actor.items.filter(i => i.type === "power").sort((a, b) => a.sort - b.sort);
+      const source = items.find(i => i.id === sourceId);
+      const target = items.find(i => i.id === targetId);
+      if (!source || !target) return;
 
-        const sourceIndex = items.indexOf(source);
-        const targetIndex = items.indexOf(target);
+      const sourceIndex = items.indexOf(source);
+      const targetIndex = items.indexOf(target);
 
-        items.splice(sourceIndex, 1);
-        items.splice(targetIndex, 0, source);
+      items.splice(sourceIndex, 1);
+      items.splice(targetIndex, 0, source);
 
-        const updates = items.map((item, index) => ({
-          _id: item.id,
-          sort: index
-        }));
+      const updates = items.map((item, index) => ({
+        _id: item.id,
+        sort: index
+      }));
 
-        await this.actor.updateEmbeddedDocuments("Item", updates);
-        this.render();
-      });
-    });
-
+      await this.actor.updateEmbeddedDocuments("Item", updates);
+      this.render();
+    } catch (err) {
+      console.error("Error in power drag and drop:", err);
+    }
+  });
+});
 
     // Add Resistance
     html.find('.add-resistance').click(async (ev) => {
@@ -2188,62 +2277,82 @@ export class FaseripActorSheet extends ActorSheet {
       }).render(true);
     });
 
-    // Make headquarters draggable & sortable w/in the tab
-    html.find('.headquarters-draggable').each((i, el) => {
-      el.setAttribute("draggable", true);
-      el.addEventListener("dragstart", ev => {
-        const itemId = el.dataset.itemId;
-        ev.dataTransfer.setData("text/plain", JSON.stringify({
-          type: "HeadquartersSort",
-          itemId
-        }));
-      });
-    });
+    // Headquarters - draggable and sortable
+html.find('.headquarters-draggable').each((i, el) => {
+  el.setAttribute("draggable", true);
+  el.addEventListener("dragstart", ev => {
+    const itemId = el.dataset.itemId;
+    const item = this.actor.items.get(itemId);
     
-    // Make the entire row a drop target
-    html.find('.headquarters-row').each((i, row) => {
-      row.addEventListener("dragover", ev => {
-        ev.preventDefault();
-        row.classList.add("drag-over");
-      });
+    // Default to item drag (for macros/hotbar)
+    let dragData = {
+      type: "Item",
+      actorId: this.actor.id,
+      itemId: itemId,
+      uuid: item.uuid,
+      name: item.name
+    };
     
-      row.addEventListener("dragleave", ev => {
-        row.classList.remove("drag-over");
-      });
+    // If holding shift, do sorting instead
+    if (ev.shiftKey) {
+      dragData = {
+        type: "HeadquartersSort",
+        itemId: itemId
+      };
+    }
     
-      row.addEventListener("drop", async ev => {
-        row.classList.remove("drag-over");
-        ev.preventDefault();
-    
-        const sourceData = JSON.parse(ev.dataTransfer.getData("text/plain"));
-        if (sourceData.type !== "HeadquartersSort") return;
-    
-        const sourceId = sourceData.itemId;
-        const targetId = row.dataset.itemId;
-        if (!sourceId || !targetId || sourceId === targetId) return;
-    
-        const items = this.actor.items
-          .filter(i => i.type === "headquarters")
-          .sort((a, b) => a.sort - b.sort);
-        const source = items.find(i => i.id === sourceId);
-        const target = items.find(i => i.id === targetId);
-        if (!source || !target) return;
-    
-        const sourceIndex = items.indexOf(source);
-        const targetIndex = items.indexOf(target);
-    
-        items.splice(sourceIndex, 1);
-        items.splice(targetIndex, 0, source);
-    
-        const updates = items.map((item, index) => ({
-          _id: item.id,
-          sort: index
-        }));
-    
-        await this.actor.updateEmbeddedDocuments("Item", updates);
-        this.render();
-      });
-    });
+    ev.dataTransfer.setData("text/plain", JSON.stringify(dragData));
+  });
+});
+
+// Make the entire row a drop target
+html.find('.headquarters-row').each((i, row) => {
+  row.addEventListener("dragover", ev => {
+    ev.preventDefault();
+    row.classList.add("drag-over");
+  });
+
+  row.addEventListener("dragleave", ev => {
+    row.classList.remove("drag-over");
+  });
+
+  row.addEventListener("drop", async ev => {
+    row.classList.remove("drag-over");
+    ev.preventDefault();
+
+    try {
+      const sourceData = JSON.parse(ev.dataTransfer.getData("text/plain"));
+      if (sourceData.type !== "HeadquartersSort") return;
+
+      const sourceId = sourceData.itemId;
+      const targetId = row.dataset.itemId;
+      if (!sourceId || !targetId || sourceId === targetId) return;
+
+      const items = this.actor.items
+        .filter(i => i.type === "headquarters")
+        .sort((a, b) => a.sort - b.sort);
+      const source = items.find(i => i.id === sourceId);
+      const target = items.find(i => i.id === targetId);
+      if (!source || !target) return;
+
+      const sourceIndex = items.indexOf(source);
+      const targetIndex = items.indexOf(target);
+
+      items.splice(sourceIndex, 1);
+      items.splice(targetIndex, 0, source);
+
+      const updates = items.map((item, index) => ({
+        _id: item.id,
+        sort: index
+      }));
+
+      await this.actor.updateEmbeddedDocuments("Item", updates);
+      this.render();
+    } catch (err) {
+      console.error("Error in headquarters drag and drop:", err);
+    }
+  });
+});
 
     // Edit headquarters button
     html.find('.headquarters-table .item-edit').click(ev => {
@@ -2604,6 +2713,29 @@ export class FaseripActorSheet extends ActorSheet {
       }).render(true);
     });
     
+    // At the bottom of activateListeners(html), before the closing }
+    new DragDrop({
+      dragSelector: ".power-row, .talent-item, .contact-item, .equipment-row",
+      dropSelector: null,
+      permissions: { dragstart: true },
+      callbacks: {
+        dragstart: (event) => {
+          const li = event.currentTarget;
+          const itemId = li.dataset.itemId;
+          const item = this.actor.items.get(itemId);
+          if (!item) return;
+
+          event.dataTransfer.setData("text/plain", JSON.stringify({
+            type: "Item",
+            actorId: this.actor.id,
+            itemId: item.id,
+            uuid: item.uuid,
+            name: item.name
+          }));
+        }
+      }
+    }).bind(html[0]);
+
     // Continue with other listeners...
   }
 

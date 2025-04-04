@@ -114,7 +114,7 @@ function highlightResultCell(rankName, rollValue) {
   if (cell) {
     console.log("Cell found:", cell);
     cell.classList.add("highlight-cell");
-    setTimeout(() => cell.classList.remove("highlight-cell"), 1000);  // 10 seconds
+    setTimeout(() => cell.classList.remove("highlight-cell"), 15000);  // 15 seconds
   } else {
     console.warn("Cell not found for:", selector);
   }
