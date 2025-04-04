@@ -168,8 +168,10 @@ export class FaseripActorSheet extends ActorSheet {
       // Set up the drag data
       event.dataTransfer.setData("text/plain", JSON.stringify({
         type: "Item",
+        documentName: "Item",  // ← THIS is the magic key
         uuid: item.uuid
       }));
+      
     }
   }
 
@@ -203,12 +205,9 @@ export class FaseripActorSheet extends ActorSheet {
     // Default to item drag (for macros/hotbar)
     let dragData = {
       type: "Item",
-      actorId: this.actor.id,
-      itemId: itemId,
-      uuid: item.uuid,
-      name: item.name
+      uuid: item.uuid
     };
-    
+
     // If holding shift, do sorting instead
     if (ev.shiftKey) {
       dragData = {
@@ -285,10 +284,7 @@ html.find('.contact-item').each((i, row) => {
     // Default to item drag (for macros/hotbar)
     let dragData = {
       type: "Item",
-      actorId: this.actor.id,
-      itemId: itemId,
-      uuid: item.uuid,
-      name: item.name
+      uuid: item.uuid
     };
     
     // If holding shift, do sorting instead
@@ -360,10 +356,7 @@ html.find('.contact-item').each((i, row) => {
     // Default to item drag (for macros/hotbar)
     let dragData = {
       type: "Item",
-      actorId: this.actor.id,
-      itemId: itemId,
-      uuid: item.uuid,
-      name: item.name
+      uuid: item.uuid
     };
     
     // If holding shift, do sorting instead
@@ -436,10 +429,7 @@ html.find('.vehicle-draggable').each((i, el) => {
     // Default to item drag (for macros/hotbar)
     let dragData = {
       type: "Item",
-      actorId: this.actor.id,
-      itemId: itemId,
-      uuid: item.uuid,
-      name: item.name
+      uuid: item.uuid
     };
     
     // If holding shift, do sorting instead
@@ -567,10 +557,7 @@ html.find('.power-row').each((i, row) => {
     // Default to item drag (for macros/hotbar)
     let dragData = {
       type: "Item",
-      actorId: this.actor.id,
-      itemId: itemId,
-      uuid: item.uuid,
-      name: item.name
+      uuid: item.uuid
     };
     
     // If holding shift, do sorting instead
@@ -2283,10 +2270,7 @@ html.find('.headquarters-draggable').each((i, el) => {
     // Default to item drag (for macros/hotbar)
     let dragData = {
       type: "Item",
-      actorId: this.actor.id,
-      itemId: itemId,
-      uuid: item.uuid,
-      name: item.name
+      uuid: item.uuid
     };
     
     // If holding shift, do sorting instead
@@ -2723,8 +2707,10 @@ html.find('.headquarters-row').each((i, row) => {
     
           event.dataTransfer.setData("text/plain", JSON.stringify({
             type: "Item",
+            documentName: "Item",  // ← THIS is the magic key
             uuid: item.uuid
           }));
+          
         }
       }
     }).bind(html[0]);
