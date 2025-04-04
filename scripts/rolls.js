@@ -1,6 +1,49 @@
 // File: systems/msh-faserip/rolls.js
 import { applyColumnShiftToRank } from './actorSheet.js';
-//import { rankRows } from './rank-rows.js';
+
+export function openActionRollDialog(actionCode, actor) {
+  const savedCS = actor.getFlag("msh-faserip", `cs_${actionCode}`) || 0;
+  const savedKarma = actor.getFlag("msh-faserip", `karma_${actionCode}`) || 0;
+
+  new Dialog({
+    title: `Roll: ${actionCode}`,
+    content: `
+      <form>
+        <div class="form-group">
+          <label>Column Shift</label>
+          <input type="number" name="cs" value="${savedCS}" />
+        </div>
+        <div class="form-group">
+          <label>Karma</label>
+          <input type="number" name="karma" value="${savedKarma}" />
+        </div>
+        <div class="form-group">
+          <label><input type="checkbox" name="remember" checked /> Remember these settings</label>
+        </div>
+      </form>
+    `,
+    buttons: {
+      roll: {
+        label: "Roll",
+        callback: async (html) => {
+          const cs = parseInt(html.find('[name="cs"]').val()) || 0;
+          const karma = parseInt(html.find('[name="karma"]').val()) || 0;
+          const remember = html.find('[name="remember"]').is(':checked');
+
+          if (remember) {
+            await actor.setFlag("msh-faserip", `cs_${actionCode}`, cs);
+            await actor.setFlag("msh-faserip", `karma_${actionCode}`, karma);
+          }
+
+          game.msh.rollUniversalAction(actionCode, actor.id, cs, karma);
+        }
+      },
+      cancel: { label: "Cancel" }
+    },
+    default: "roll"
+  }).render(true);
+}
+
 
 // This file contains roll functions that can be called directly from macros
 // without requiring the character sheet to be open
@@ -398,6 +441,9 @@ export async function openUniversalTableDialog(actor) {
             const action = el.dataset.action;
             const actor = game.user.character || canvas.tokens.controlled[0]?.actor;
             if (!actor) return ui.notifications.warn("Select a token or assign a character first.");
+
+            // ✅ Use the new shared dialog
+            game.msh.openActionRollDialog(action, actor);
     
             const savedCS = actor.getFlag("msh-faserip", `cs_${action}`) || 0;
             const savedKarma = actor.getFlag("msh-faserip", `karma_${action}`) || 0;

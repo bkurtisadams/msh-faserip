@@ -150,18 +150,35 @@ export class FaseripItem extends Item {
 /**
  * Roll this item
  */
-rollItem() {
+rollItem(options = {}) {
   switch (this.type) {
     case "power":
-      return game.msh.rollPower(this.actor, this);
+      return game.msh.rollPower(this.actor, this, options);
+
     case "talent":
-      return game.msh.rollTalent(this.actor, this);
+      return game.msh.rollTalent(this.actor, this, options);
+
     case "contact":
-      return game.msh.rollContact(this.actor, this);
+      return game.msh.rollContact(this.actor, this, options);
+
     case "equipment":
-      return game.msh.rollEquipment(this.actor, this);
-    case "action":
-      return game.msh.rollUniversalAction(this.system.code, this.actor.id);
+      return game.msh.rollEquipment(this.actor, this, options);
+
+    case "action": {
+      const code = this.system.code;
+      const actor = this.actor;
+
+      // Fast roll if Ctrl is pressed
+      if (options.useDirectRoll || game.keyboard.isModifierActive(KeyboardManager.MODIFIER_KEYS.CONTROL)) {
+        const savedCS = actor.getFlag("msh-faserip", `cs_${code}`) || 0;
+        const savedKarma = actor.getFlag("msh-faserip", `karma_${code}`) || 0;
+        return game.msh.rollUniversalAction(code, actor.id, savedCS, savedKarma);
+      }
+
+      // Call your shared dialog function
+      return game.msh.openActionRollDialog(code, actor);
+    }
+
     default:
       ui.notifications.warn(`Cannot roll item of type: ${this.type}`);
       return null;
