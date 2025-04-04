@@ -168,12 +168,8 @@ export class FaseripActorSheet extends ActorSheet {
       // Set up the drag data
       event.dataTransfer.setData("text/plain", JSON.stringify({
         type: "Item",
-        actorId: this.actor.id,
-        itemId: item.id,
-        uuid: item.uuid,
-        data: item
+        uuid: item.uuid
       }));
-      
     }
   }
 
@@ -2724,13 +2720,10 @@ html.find('.headquarters-row').each((i, row) => {
           const itemId = li.dataset.itemId;
           const item = this.actor.items.get(itemId);
           if (!item) return;
-
+    
           event.dataTransfer.setData("text/plain", JSON.stringify({
             type: "Item",
-            actorId: this.actor.id,
-            itemId: item.id,
-            uuid: item.uuid,
-            name: item.name
+            uuid: item.uuid
           }));
         }
       }

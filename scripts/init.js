@@ -109,35 +109,6 @@ Hooks.once("init", async () => {
   // end of hooks.once
 });
 
-// Handle hotbar drops
-Hooks.on("hotbarDrop", async (bar, data, slot) => {
-  if (data.type !== "Item") return false;
-
-  const item = await Item.fromDropData(data);
-  if (!item || !item.parent) {
-    ui.notifications.warn("You can only create macros for owned Items.");
-    return false;
-  }
-
-  const command = `game.msh.rollItemMacro("${item.parent.id}", "${item.id}");`;
-  const macroName = `${item.name} (${item.parent.name})`;
-
-  let macro = game.macros.find(m => m.name === macroName && m.command === command);
-  if (!macro) {
-    macro = await Macro.create({
-      name: macroName,
-      type: "script",
-      img: item.img || "icons/svg/dice-target.svg",
-      command,
-      flags: { "faserip.itemMacro": true }
-    });
-  }
-
-  game.user.assignHotbarMacro(macro, slot);
-  return false; // ⬅️ This is what prevents the default behavior
-});
-
-
 // Define the function to create a macro
 async function createFaseripItemMacro(data, slot) {
   // Get references to our Actor and Item
@@ -171,6 +142,7 @@ async function createFaseripItemMacro(data, slot) {
 
 Hooks.once("ready", () => {
   Hooks.on("hotbarDrop", async (bar, data, slot) => {
+    console.log("🔥 hotbarDrop triggered with data:", data);
     // Ensure this is an Item from an Actor
     if (data.type !== "Item" || !data.uuid?.startsWith("Actor.")) return true;
 
@@ -184,6 +156,7 @@ Hooks.once("ready", () => {
     const actor = item.parent;
     const command = `game.msh.rollItemMacro("${actor.id}", "${item.id}");`;
     const macroName = `${item.name} (${actor.name})`;
+    console.log("🎯 Creating macro:", macroName, command);
 
     let macro = game.macros.find(m => m.name === macroName && m.command === command);
     if (!macro) {
