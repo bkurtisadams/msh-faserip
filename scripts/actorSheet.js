@@ -1274,6 +1274,7 @@ export class FaseripActorSheet extends ActorSheet {
     // roll talent button
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     html.find('.talent-roll').click(async ev => {
+      const actor = this.actor;
       const li = $(ev.currentTarget).closest(".talent-item");
       const itemId = li.data("itemId");
       const item = this.actor.items.get(itemId);
@@ -1690,10 +1691,11 @@ export class FaseripActorSheet extends ActorSheet {
         default: "cancel"
       }).render(true);
     });
-
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Roll Contact button
-    // Contact roll button
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     html.find('.contact-roll').click(async ev => {
+      const actor = this.actor;
       const li = $(ev.currentTarget).closest(".contact-item");
       const itemId = li.data("itemId");
       const item = this.actor.items.get(itemId);
@@ -1871,6 +1873,14 @@ export class FaseripActorSheet extends ActorSheet {
               // Evaluate the roll
               await roll.evaluate();
 
+              let cappedTotal = roll.total;
+              let karmaUsed = 0;
+
+              if (karma > 0) {
+                cappedTotal = Math.min(100, roll.total + karma);
+                karmaUsed = cappedTotal - roll.total;
+              }
+
               // Display the dice roll with flavor text if not skipped
               if (!skipDice) {
                 await roll.toMessage({
@@ -1881,9 +1891,9 @@ export class FaseripActorSheet extends ActorSheet {
               }
 
               // Calculate the result
-              const totalRoll = roll.total + karma;
+              //const totalRoll = roll.total + karma;
               const resultColor = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
-              highlightResultCell(effectiveRank, cappedTotal);
+              //highlightResultCell(effectiveRank, cappedTotal);
 
               if (karmaUsed > 0) {
                 const history = foundry.utils.deepClone(this.actor.system.karma?.history || []);
@@ -1892,7 +1902,7 @@ export class FaseripActorSheet extends ActorSheet {
                   gameDate: "",
                   amount: -karmaUsed,
                   type: "Die Roll",
-                  description: `Spent on ${item.name} (Talent)`
+                  description: `Spent on ${item.name} (Contact)`
                 };
                 history.push(newEvent);
                 await this.actor.update({ "system.karma.history": history });
