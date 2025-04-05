@@ -491,30 +491,37 @@ export async function rollUniversalAction(actionCode, actorId, columnShift = nul
   const roll = new Roll("1d100");
   await roll.evaluate();
 
-  const total = roll.total + karma;
-  const cappedTotal = Math.min(100, total);
+  let cappedTotal = roll.total;
+  let karmaUsed = 0;
 
-  // Automatically deduct Karma and add to Karma history
   if (karma > 0) {
+    cappedTotal = Math.min(100, roll.total + karma);
+    karmaUsed = cappedTotal - roll.total;
+  } else {
+    cappedTotal = roll.total;
+  }
+
+  // Log Karma use (only what’s needed to hit 100)
+  if (karmaUsed > 0) {
     const history = foundry.utils.deepClone(actor.system.karma?.history || []);
     const newEvent = {
       realDate: new Date().toLocaleDateString(),
       gameDate: "",
-      amount: -karma,
+      amount: -karmaUsed,
       type: "Die Roll",
       description: `Spent on ${actionCode} roll`
     };
     history.push(newEvent);
 
-    await actor.update({
-      "system.karma.history": history
-    });
+    await actor.update({ "system.karma.history": history });
   }
 
-  const color = game.msh.rollUniversalTable(rank, total);
+  // Determine result color using capped value
+  const color = game.msh.rollUniversalTable(rank, cappedTotal);
+
 
   // light up the rank table cell
-  highlightResultCell(rank, total);
+  highlightResultCell(rank, cappedTotal);
 
   const labelColor = color.toLowerCase();
   const resultText = (ACTION_RESULT_LABELS[actionCode] || {})[labelColor] || color.toUpperCase();
@@ -528,7 +535,9 @@ export async function rollUniversalAction(actionCode, actorId, columnShift = nul
       <div>Ability: ${abilityKey.charAt(0).toUpperCase() + abilityKey.slice(1)}</div>
       <div>Base Rank: ${rank} (${value})</div>
       ${columnShift !== 0 ? `<div>Column Shift: ${columnShift > 0 ? "+" : ""}${columnShift}</div>` : ""}
-      <div>Roll: ${roll.total} + Karma: ${karma} = <strong>${cappedTotal}</strong></div>
+
+      Roll: ${roll.total} + Karma: ${karmaUsed} = <strong>${cappedTotal}</strong>
+
     </div>
     <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
       background-color: ${labelColor === 'white' ? '#f8f8f8' :
