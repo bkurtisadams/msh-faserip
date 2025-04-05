@@ -368,18 +368,34 @@ async _rollWeapon(item, actor) {
             const roll = new Roll("1d100");
             await roll.evaluate();
 
-            // Display the dice roll with flavor text
-            /* await roll.toMessage({
-              speaker: ChatMessage.getSpeaker({ actor }),
-              flavor: `${actor.name} attacks with ${item.name} (${actionName})`,
-              rollMode: game.settings.get("core", "rollMode")
-            }); */
-
             // Calculate final roll with karma
-            const finalRoll = Math.min(100, roll.total + karma);
+            let cappedTotal = roll.total;
+            let karmaUsed = 0;
+
+            if (karma > 0) {
+              cappedTotal = Math.min(100, roll.total + karma);
+              karmaUsed = cappedTotal - roll.total;
+            }
+
+            if (karmaUsed > 0) {
+              console.log("Logging Karma:", karmaUsed);
+              ui.notifications.info(`Logging ${karmaUsed} Karma for ${item.name}`);
+            
+              const history = foundry.utils.deepClone(actor.system.karma?.history || []);
+              const newEvent = {
+                realDate: new Date().toLocaleDateString(),
+                gameDate: "",
+                amount: -karmaUsed,
+                type: "Die Roll",
+                description: `Spent on ${item.name} (Equipment)`
+              };
+              history.push(newEvent);
+            
+              await actor.update({ "system.karma.history": history });
+            }
 
             // Get result color from universal table
-            const colorResult = game.msh.rollUniversalTable(effectiveRank, finalRoll);
+            const colorResult = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
 
             // Get the specific result based on action type and color
             // This maps directly to the universal table results
@@ -431,7 +447,9 @@ async _rollWeapon(item, actor) {
                 <div style="margin-bottom: 10px;">
                 <div>Base Rank: ${abilityRank} (${abilityValue})</div>
                 <div>Column Shift: ${totalShift !== 0 ? `${totalShift} → ${effectiveRank}` : "None"}</div>
-                <div>Roll: ${roll.total} + Karma: ${karma} = ${finalRoll}</div>
+
+                <div>Roll: ${roll.total} + Karma: ${karmaUsed} = ${cappedTotal}</div>
+
                 <div>Damage: ${damage} (${damageType})</div>
                 ${item.system.ammoType ? `<div>Ammo Type: ${item.system.ammoType}</div>` : ''}
                 ${additionalInfo}
@@ -600,10 +618,22 @@ async _rollWeapon(item, actor) {
             // Roll dice and add karma
             const roll = new Roll("1d100");
             await roll.evaluate();
-            const finalRoll = Math.min(100, roll.total + karma);
+            const finalRoll = cappedTotal;
+
+            if (karmaUsed > 0) {
+              const history = foundry.utils.deepClone(actor.system.karma?.history || []);
+              history.push({
+                realDate: new Date().toLocaleDateString(),
+                gameDate: "",
+                amount: -karmaUsed,
+                type: "Die Roll",
+                description: `Spent on ${item.name} (Equipment)`
+              });
+              await actor.update({ "system.karma.history": history });
+            }
             
             // Get result color
-            const colorResult = game.msh.rollUniversalTable(effectiveRank, finalRoll);
+            const colorResult = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
             
             // Define results based on action type
             const actionResults = {
@@ -819,10 +849,32 @@ async _rollWeapon(item, actor) {
             // Roll dice and add karma
             const roll = new Roll("1d100");
             await roll.evaluate();
-            const finalRoll = Math.min(100, roll.total + karma);
+            let cappedTotal = roll.total;
+            let karmaUsed = 0;
+
+            if (karma > 0) {
+              cappedTotal = Math.min(100, roll.total + karma);
+              karmaUsed = cappedTotal - roll.total;
+            }
+
+            if (karmaUsed > 0) {
+              const history = foundry.utils.deepClone(actor.system.karma?.history || []);
+              const newEvent = {
+                realDate: new Date().toLocaleDateString(),
+                gameDate: "",
+                amount: -karmaUsed,
+                type: "Die Roll",
+                description: `Spent on ${ability.name} (Custom Ability)`
+              };
+              history.push(newEvent);
+            
+              await actor.update({
+                "system.karma.history": history
+              });
+            }
             
             // Get result color
-            const colorResult = game.msh.rollUniversalTable(effectiveRank, finalRoll);
+            const colorResult = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
             
             // Define results based on action type
             const RESULTS = {
@@ -864,7 +916,9 @@ async _rollWeapon(item, actor) {
                     <div><strong>Column Shift:</strong> ${columnShift !== 0 ? 
                       `${columnShift > 0 ? '+' : ''}${columnShift}CS → ${effectiveRank}` : 
                       "None"}</div>
-                    <div><strong>Roll:</strong> ${roll.total} + Karma: ${karma} = ${finalRoll}</div>
+
+                    <div><strong>Roll:</strong> ${roll.total} + Karma: ${karmaUsed} = ${cappedTotal}</div>
+
                     ${ability.range ? `<div><strong>Range:</strong> ${ability.range}</div>` : ''}
                     ${ability.damageType ? `<div><strong>Damage Type:</strong> ${ability.damageType}</div>` : ''}
                   </div>

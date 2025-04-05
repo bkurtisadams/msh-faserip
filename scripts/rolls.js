@@ -1556,19 +1556,31 @@ export class FaseripRolls {
         const roll = new Roll("1d100");
         await roll.evaluate();
 
-        // Display dice on screen if not skipped
-        /* if (!options.skipDice) {
-          await roll.toMessage({
-            speaker: ChatMessage.getSpeaker({ actor }),
-            flavor: `${actor.name} uses ${equipment.name}`,
-            rollMode: game.settings.get("core", "rollMode")
-          });
-        } */
-
         // Calculate the result
-        const totalRoll = roll.total + karma;
-        const resultColor = game.msh.rollUniversalTable(effectiveRank, totalRoll);
+        let cappedTotal = roll.total;
+        let karmaUsed = 0;
+
+        if (karma > 0) {
+          cappedTotal = Math.min(100, roll.total + karma);
+          karmaUsed = cappedTotal - roll.total;
+        }
+
+        // ✅ Now use cappedTotal instead of totalRoll
+        const resultColor = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
         const effect = action.results[resultColor.toLowerCase()];
+
+        if (karmaUsed > 0) {
+          const history = foundry.utils.deepClone(actor.system.karma?.history || []);
+          const newEvent = {
+            realDate: new Date().toLocaleDateString(),
+            gameDate: "",
+            amount: -karmaUsed,
+            type: "Die Roll",
+            description: `Spent on ${equipment.name} (Equipment)`
+          };
+          history.push(newEvent);
+          await actor.update({ "system.karma.history": history });
+        }
 
         // Get grenade properties if applicable
         let additionalInfo = "";
@@ -1637,7 +1649,9 @@ export class FaseripRolls {
             <div style="margin-bottom: 5px; font-size: 0.9em;">
               <div>Base Rank: ${abilityRank} (${abilityValue})</div>
               <div>Column Shift: ${shift !== 0 ? `${shift} → ${effectiveRank}` : "None"}</div>
-              <div>Roll: ${roll.total} + Karma: ${karma} = ${totalRoll}</div>
+
+              <div>Roll: ${roll.total} + Karma: ${karmaUsed} = ${cappedTotal}</div>
+
               ${equipment.system.ammoType !== "Standard" ? `<div>Ammo Effect: ${equipment.system.ammoType}</div>` : ''}
               ${additionalInfo}
             </div>
