@@ -108,26 +108,38 @@ Hooks.once("init", async () => {
   // end of hooks.once
 });
 
-// Add the hotbarDrop hook at module level (like in the older file)
-Hooks.on('hotbarDrop', async (bar, data, slot) => {
-  console.log("📦 hotbarDrop received:", data);
-
-  // Handle normal item drops
-  if (data.type === "Item" && data.actorId) {
-    createFaseripItemMacro(data, slot);
-    return false;
+// Define the function to create a macro FIRST
+async function createFaseripItemMacro(data, slot) {
+  // Get references to our Actor and Item
+  const actor = game.actors.get(data.actorId);
+  if (!actor) return ui.notifications.warn("Actor not found");
+  
+  const item = actor.items.get(data.itemId);
+  if (!item) return ui.notifications.warn("Item not found");
+  
+  // Create a command string that will call our rollItemMacro function
+  const command = `game.msh.rollItemMacro("${data.actorId}", "${data.itemId}");`;
+  
+  // Create the macro
+  const macroName = `${item.name} (${actor.name})`;
+  let macro = game.macros.find(m => m.name === macroName && m.command === command);
+  
+  if (!macro) {
+    macro = await Macro.create({
+      name: macroName,
+      type: "script",
+      img: item.img || "icons/svg/dice-target.svg",
+      command: command,
+      flags: {"faserip.itemMacro": true}
+    });
   }
   
-  // Handle universal table action drops
-  if (data.type === "Action" && data.actionId && data.actorId) {
-    createFaseripActionMacro(data, slot);
-    return false;
-  }
-  
+  // Assign to hotbar slot
+  game.user.assignHotbarMacro(macro, slot);
   return true;
-});
+}
 
-// Define the function to create a macro
+// Define function for action macros
 async function createFaseripActionMacro(data, slot) {
   const action = data.actionId;
   const actorId = data.actorId;
@@ -158,3 +170,22 @@ async function createFaseripActionMacro(data, slot) {
   game.user.assignHotbarMacro(macro, slot);
   return true;
 }
+
+// NOW define the hook AFTER the functions it needs to call
+Hooks.on('hotbarDrop', async (bar, data, slot) => {
+  console.log("📦 hotbarDrop received:", data);
+
+  // Handle normal item drops
+  if (data.type === "Item" && data.actorId) {
+    await createFaseripItemMacro(data, slot);
+    return false;
+  }
+  
+  // Handle universal table action drops
+  if (data.type === "Action" && data.actionId && data.actorId) {
+    await createFaseripActionMacro(data, slot);
+    return false;
+  }
+  
+  return true;
+});
