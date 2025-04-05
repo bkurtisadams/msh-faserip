@@ -913,6 +913,7 @@ export class FaseripActorSheet extends ActorSheet {
     // Roll power button
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     html.find('.power-roll').click(ev => {
+      const actor = this.actor;
       const li = $(ev.currentTarget).closest(".power-row");
       const itemId = li.data("itemId");
       const item = this.actor.items.get(itemId);
@@ -1073,8 +1074,28 @@ export class FaseripActorSheet extends ActorSheet {
               }
 
               // Calculate the result
-              const totalRoll = roll.total + karma;
-              const resultColor = game.msh.rollUniversalTable(effectiveRank, totalRoll);
+              let karmaUsed = 0;
+              let cappedTotal = roll.total;
+
+              if (karma > 0) {
+                cappedTotal = Math.min(100, roll.total + karma);
+                karmaUsed = cappedTotal - roll.total;
+              }
+
+              if (karmaUsed > 0) {
+                const history = foundry.utils.deepClone(actor.system.karma?.history || []);
+                const newEvent = {
+                  realDate: new Date().toLocaleDateString(),
+                  gameDate: "",
+                  amount: -karmaUsed,
+                  type: "Die Roll",
+                  description: `Spent on ${item.name}`
+                };
+                history.push(newEvent);
+                await actor.update({ "system.karma.history": history });
+              }
+              
+              const resultColor = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
 
               // Define action types and results based on color
               const ACTIONS = {
@@ -1113,7 +1134,8 @@ export class FaseripActorSheet extends ActorSheet {
                   ? `<div>Damage Column Shift: ${damageCS > 0 ? "+" : ""}${damageCS}CS → <strong>${damageRankName} (${damageRankValue})</strong></div>`
                   : ""}
                 
-                <div>Roll: ${roll.total} + Karma: ${karma} = ${totalRoll}</div>
+                <div>Roll: ${roll.total} + Karma: ${karmaUsed} = ${cappedTotal}</div>
+
               </div>
               <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
                 background-color: ${resultColor.toLowerCase() === 'white' ? '#f8f8f8' :
