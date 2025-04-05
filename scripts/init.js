@@ -109,41 +109,48 @@ Hooks.once("init", async () => {
 });
 
 // Add the hotbarDrop hook at module level (like in the older file)
-Hooks.on('hotbarDrop', (bar, data, slot) => {
+Hooks.on('hotbarDrop', async (bar, data, slot) => {
   console.log("📦 hotbarDrop received:", data);
-  
+
+  // Handle normal item drops
   if (data.type === "Item" && data.actorId) {
     createFaseripItemMacro(data, slot);
-    return false; // Prevent default handling
+    return false;
   }
-  return true; // Allow default handling for other drop types
+  
+  // Handle universal table action drops
+  if (data.type === "Action" && data.actionId && data.actorId) {
+    createFaseripActionMacro(data, slot);
+    return false;
+  }
+  
+  return true;
 });
 
 // Define the function to create a macro
-async function createFaseripItemMacro(data, slot) {
-  // Get references to our Actor and Item
-  const actor = game.actors.get(data.actorId);
-  if (!actor) return ui.notifications.warn("Actor not found");
+async function createFaseripActionMacro(data, slot) {
+  const action = data.actionId;
+  const actorId = data.actorId;
   
-  const item = actor.items.get(data.itemId);
-  if (!item) return ui.notifications.warn("Item not found");
+  if (!action || !actorId) {
+    ui.notifications.warn("Invalid action data");
+    return;
+  }
   
-  console.log(`Creating macro for ${item.name} (${actor.name})`);
-  
-  // Create a command string that will call our rollItemMacro function
-  const command = `game.msh.rollItemMacro("${data.actorId}", "${data.itemId}");`;
+  // Create a command string that will call our rollUniversalAction function
+  const command = `game.msh.rollUniversalAction("${action}", "${actorId}");`;
   
   // Create the macro
-  const macroName = `${item.name} (${actor.name})`;
+  const macroName = data.name || `FEAT: ${action}`;
   let macro = game.macros.find(m => m.name === macroName && m.command === command);
   
   if (!macro) {
     macro = await Macro.create({
       name: macroName,
       type: "script",
-      img: item.img || "icons/svg/dice-target.svg",
+      img: data.img || "icons/svg/dice-target.svg",
       command: command,
-      flags: {"faserip.itemMacro": true}
+      flags: {"faserip.actionMacro": true}
     });
   }
   

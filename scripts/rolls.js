@@ -306,126 +306,115 @@ export async function openUniversalTableDialog(actor) {
   dlg.render(true);
 
   Hooks.once("renderDialog", (_app, html) => {
-
-    html.find("#toggleRankTable").on("click", () => {
-      html.find("#rankTableContainer").toggle();
-    });
-
-    // Font size slider logic
-    html.find("#fontSizeSlider").on("input", (event) => {
-      const size = event.target.value + "px";
-      html.find(".stack").css("font-size", size);
-    });
-
-    // Drag and click logic for action buttons
-    html.find(".action-button, .action-code").each((_, el) => {
-      el.addEventListener("dragstart", async ev => {
-        const action = ev.currentTarget.dataset.action;
-        const actor = game.user.character || canvas.tokens.controlled[0]?.actor;
-        if (!actor) return;
-
-        const command = `game.msh.rollUniversalAction("${action}", "${actor.id}");`;
-
-        let macro = game.macros.find(m => m.name === `FEAT: ${action}` && m.command === command);
-        if (!macro) {
-          const iconMap = {
-            BA: "blunt",
-            EA: "edged",
-            Sh: "shooting",
-            TE: "thrown",
-            TB: "thrown_blunt",
-            En: "energy",
-            Fo: "force",
-            Gp: "grapple",
-            Gb: "grab",
-            Es: "escape",
-            Ch: "charge",
-            Ki: "kill",
-            St: "stun",
-            Sl: "slam",
-            Do: "dodge",
-            Ev: "evade",
-            Bl: "block",
-            Ca: "catch",
-          };
-
-          const iconName = iconMap[action] || "dice-target";
-          const img = `systems/msh-faserip/assets/icons/actions/${iconName}.png`; // or .svg if that's what you're using
-
-          macro = await Macro.create({
+    // Use a small timeout to ensure DOM is fully ready
+    setTimeout(() => {
+      html.find("#toggleRankTable").on("click", () => {
+        html.find("#rankTableContainer").toggle();
+      });
+  
+      // Font size slider logic
+      html.find("#fontSizeSlider").on("input", (event) => {
+        const size = event.target.value + "px";
+        html.find(".stack").css("font-size", size);
+      });
+  
+      // Define icon map for action codes
+      const iconMap = {
+        BA: "blunt",
+        EA: "edged",
+        Sh: "shooting",
+        TE: "thrown",
+        TB: "thrown_blunt",
+        En: "energy",
+        Fo: "force",
+        Gp: "grapple",
+        Gb: "grab",
+        Es: "escape",
+        Ch: "charge",
+        Ki: "kill",
+        St: "stun",
+        Sl: "slam",
+        Do: "dodge",
+        Ev: "evade",
+        Bl: "block",
+        Ca: "catch",
+      };
+  
+      // Drag and click logic for action buttons
+      html.find(".action-code").each((_, el) => {
+        // Ensure element is draggable with visual cue
+        el.setAttribute("draggable", true);
+        el.style.cursor = "grab";
+        
+        el.addEventListener("dragstart", ev => {
+          const action = ev.currentTarget.dataset.action;
+          const actor = game.user.character || canvas.tokens.controlled[0]?.actor;
+          if (!actor) return;
+  
+          // Use the same format as item dragging for consistency
+          const dragData = {
+            type: "Action",
+            actionId: action,
+            actorId: actor.id,
             name: `FEAT: ${action}`,
-            type: "script",
-            command,
-            img
-          });
-
-        }
-
-        // Include the macro's UUID so Foundry can resolve it
-        ev.dataTransfer.setData("text/plain", JSON.stringify({
-          type: "Macro",
-          uuid: macro.uuid
-        }));
-      });
-
-      el.addEventListener("click", ev => {
-        const action = ev.currentTarget.dataset.action;
-        const actor = game.user.character || canvas.tokens.controlled[0]?.actor;
-
-        if (!actor) {
-          return ui.notifications.warn("Select a token or assign a character first.");
-        }
-
-        const savedCS = actor.getFlag("msh-faserip", `cs_${action}`) || 0;
-        const savedKarma = actor.getFlag("msh-faserip", `karma_${action}`) || 0;
-
-        new Dialog({
-          title: `Roll: ${action}`,
-          content: `
-          <form>
-            <div class="form-group">
-              <label>Column Shift</label>
-              <input type="number" name="cs" value="${savedCS}" />
-            </div>
-            <div class="form-group">
-              <label>Karma</label>
-              <input type="number" name="karma" value="${savedKarma}" />
-            </div>
-            <div class="form-group">
-              <label><input type="checkbox" name="remember" checked /> Remember these settings</label>
-            </div>
-          </form>
-        `,
-          buttons: {
-            roll: {
-              label: "Roll",
-              callback: async (html) => {
-                const cs = parseInt(html.find('[name="cs"]').val()) || 0;
-                const karma = parseInt(html.find('[name="karma"]').val()) || 0;
-                const remember = html.find('[name="remember"]').is(":checked");
-
-                if (remember) {
-                  await actor.setFlag("msh-faserip", `cs_${action}`, cs);
-                  await actor.setFlag("msh-faserip", `karma_${action}`, karma);
+            img: `systems/msh-faserip/assets/icons/actions/${iconMap[action] || "dice-target"}.png`
+          };
+          
+          console.log("Action drag started:", dragData);
+          ev.dataTransfer.setData("text/plain", JSON.stringify(dragData));
+        });
+  
+        el.addEventListener("click", ev => {
+          const action = ev.currentTarget.dataset.action;
+          const actor = game.user.character || canvas.tokens.controlled[0]?.actor;
+  
+          if (!actor) {
+            return ui.notifications.warn("Select a token or assign a character first.");
+          }
+  
+          const savedCS = actor.getFlag("msh-faserip", `cs_${action}`) || 0;
+          const savedKarma = actor.getFlag("msh-faserip", `karma_${action}`) || 0;
+  
+          new Dialog({
+            title: `Roll: ${action}`,
+            content: `
+            <form>
+              <div class="form-group">
+                <label>Column Shift</label>
+                <input type="number" name="cs" value="${savedCS}" />
+              </div>
+              <div class="form-group">
+                <label>Karma</label>
+                <input type="number" name="karma" value="${savedKarma}" />
+              </div>
+              <div class="form-group">
+                <label><input type="checkbox" name="remember" checked /> Remember these settings</label>
+              </div>
+            </form>
+          `,
+            buttons: {
+              roll: {
+                label: "Roll",
+                callback: async (html) => {
+                  const cs = parseInt(html.find('[name="cs"]').val()) || 0;
+                  const karma = parseInt(html.find('[name="karma"]').val()) || 0;
+                  const remember = html.find('[name="remember"]').is(":checked");
+  
+                  if (remember) {
+                    await actor.setFlag("msh-faserip", `cs_${action}`, cs);
+                    await actor.setFlag("msh-faserip", `karma_${action}`, karma);
+                  }
+  
+                  game.msh.rollUniversalAction(action, actor.id, cs, karma);
                 }
-
-                game.msh.rollUniversalAction(action, actor.id, cs, karma);
-              }
+              },
+              cancel: { label: "Cancel" }
             },
-            cancel: { label: "Cancel" }
-          },
-          default: "roll"
-        }).render(true);
+            default: "roll"
+          }).render(true);
+        });
       });
-
-    });
-
-    /* html.find(".action-toggle").on("change", (event) => {
-      const code = event.currentTarget.dataset.code;
-      const visible = event.currentTarget.checked;
-      html.find(`.column[data-code="${code}"]`).toggle(visible);
-    }); */
-
+    }, 100); // Small delay to ensure DOM is fully loaded
   });
   // end of openUniversalTableDialog  
 }
