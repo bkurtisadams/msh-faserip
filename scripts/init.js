@@ -108,6 +108,17 @@ Hooks.once("init", async () => {
   // end of hooks.once
 });
 
+// Add the hotbarDrop hook at module level (like in the older file)
+Hooks.on('hotbarDrop', (bar, data, slot) => {
+  console.log("📦 hotbarDrop received:", data);
+  
+  if (data.type === "Item" && data.actorId) {
+    createFaseripItemMacro(data, slot);
+    return false; // Prevent default handling
+  }
+  return true; // Allow default handling for other drop types
+});
+
 // Define the function to create a macro
 async function createFaseripItemMacro(data, slot) {
   // Get references to our Actor and Item
@@ -116,6 +127,8 @@ async function createFaseripItemMacro(data, slot) {
   
   const item = actor.items.get(data.itemId);
   if (!item) return ui.notifications.warn("Item not found");
+  
+  console.log(`Creating macro for ${item.name} (${actor.name})`);
   
   // Create a command string that will call our rollItemMacro function
   const command = `game.msh.rollItemMacro("${data.actorId}", "${data.itemId}");`;
@@ -138,38 +151,3 @@ async function createFaseripItemMacro(data, slot) {
   game.user.assignHotbarMacro(macro, slot);
   return true;
 }
-
-// Add this at the bottom of your init.js file
-Hooks.once("ready", function() {
-  Hooks.on('hotbarDrop', async (bar, data, slot) => {
-    console.log("📦 hotbarDrop received:", data);
-
-    if (data.type !== "Item" || !data.actorId) return true;
-  
-    const actor = game.actors.get(data.actorId);
-    if (!actor) return ui.notifications.warn("Actor not found");
-  
-    const item = actor.items.get(data.itemId);
-    if (!item) return ui.notifications.warn("Item not found");
-  
-    //const command = `game.msh.rollItemMacro("${data.actorId}", "${data.itemId}");`;
-    const command = `game.msh.rollItemMacro("${data.actorId}", "${data.itemId}");`;
-
-    const macroName = `${item.name} (${actor.name})`;
-  
-    let macro = game.macros.find(m => m.name === macroName && m.command === command);
-    if (!macro) {
-      macro = await Macro.create({
-        name: macroName,
-        type: "script",
-        img: item.img || "icons/svg/dice-target.svg",
-        command,
-        flags: { "faserip.itemMacro": true }
-      });
-    }
-  
-    game.user.assignHotbarMacro(macro, slot);
-    return false;
-  });
-  
-});
