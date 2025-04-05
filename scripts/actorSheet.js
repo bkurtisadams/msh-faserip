@@ -200,6 +200,28 @@ export class FaseripActorSheet extends ActorSheet {
       game.msh.openUniversalTableDialog?.(this.actor);
     });
 
+    // Make the universal roll trigger draggable for macros
+    html.find('.universal-roll-trigger').each((i, el) => {
+      el.setAttribute("draggable", true);
+      el.addEventListener("dragstart", ev => {
+        // Use the same format as item drag handling
+        const actorId = this.actor.id;
+        
+        // Create dragData similar to item drag data but for universal table
+        const dragData = {
+          type: "UniversalTable",
+          actorId: actorId,
+          // You can include other data needed for the universal table
+          data: {
+            name: `Universal Table (${this.actor.name})`,
+            img: "icons/svg/d20-grey.svg"
+          }
+        };
+        
+        ev.dataTransfer.setData("text/plain", JSON.stringify(dragData));
+      });
+    });
+
     // Talents - draggable and sortable
     html.find('.talent-item').each((i, row) => {
       row.setAttribute("draggable", true);
