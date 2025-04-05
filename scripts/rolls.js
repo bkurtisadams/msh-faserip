@@ -492,6 +492,8 @@ export async function rollUniversalAction(actionCode, actorId, columnShift = nul
   await roll.evaluate();
 
   const total = roll.total + karma;
+  const cappedTotal = Math.min(100, total);
+
   // Automatically deduct Karma and add to Karma history
   if (karma > 0) {
     const history = foundry.utils.deepClone(actor.system.karma?.history || []);
@@ -526,7 +528,7 @@ export async function rollUniversalAction(actionCode, actorId, columnShift = nul
       <div>Ability: ${abilityKey.charAt(0).toUpperCase() + abilityKey.slice(1)}</div>
       <div>Base Rank: ${rank} (${value})</div>
       ${columnShift !== 0 ? `<div>Column Shift: ${columnShift > 0 ? "+" : ""}${columnShift}</div>` : ""}
-      <div>Roll: ${roll.total} + Karma: ${karma} = <strong>${total}</strong></div>
+      <div>Roll: ${roll.total} + Karma: ${karma} = <strong>${cappedTotal}</strong></div>
     </div>
     <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
       background-color: ${labelColor === 'white' ? '#f8f8f8' :
