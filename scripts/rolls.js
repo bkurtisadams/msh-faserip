@@ -492,6 +492,23 @@ export async function rollUniversalAction(actionCode, actorId, columnShift = nul
   await roll.evaluate();
 
   const total = roll.total + karma;
+  // Automatically deduct Karma and add to Karma history
+  if (karma > 0) {
+    const history = foundry.utils.deepClone(actor.system.karma?.history || []);
+    const newEvent = {
+      realDate: new Date().toLocaleDateString(),
+      gameDate: "",
+      amount: -karma,
+      type: "Die Roll",
+      description: `Spent on ${actionCode} roll`
+    };
+    history.push(newEvent);
+
+    await actor.update({
+      "system.karma.history": history
+    });
+  }
+
   const color = game.msh.rollUniversalTable(rank, total);
 
   // light up the rank table cell
