@@ -1270,7 +1270,9 @@ export class FaseripActorSheet extends ActorSheet {
       }).render(true);
     });
 
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // roll talent button
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     html.find('.talent-roll').click(async ev => {
       const li = $(ev.currentTarget).closest(".talent-item");
       const itemId = li.data("itemId");
@@ -1471,8 +1473,29 @@ export class FaseripActorSheet extends ActorSheet {
               }
 
               // Calculate the result
-              const totalRoll = roll.total + karma;
-              const resultColor = game.msh.rollUniversalTable(effectiveRank, totalRoll);
+              let cappedTotal = roll.total;
+              let karmaUsed = 0;
+
+              if (karma > 0) {
+                cappedTotal = Math.min(100, roll.total + karma);
+                karmaUsed = cappedTotal - roll.total;
+              }
+
+              if (karmaUsed > 0) {
+                const history = foundry.utils.deepClone(this.actor.system.karma?.history || []);
+                const newEvent = {
+                  realDate: new Date().toLocaleDateString(),
+                  gameDate: "",
+                  amount: -karmaUsed,
+                  type: "Die Roll",
+                  description: `Spent on ${item.name} (Talent)`
+                };
+                history.push(newEvent);
+                await this.actor.update({ "system.karma.history": history });
+              }
+              
+              const resultColor = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
+              //highlightResultCell(effectiveRank, cappedTotal);
 
               // Format ability name for display
               const abilityName = abilityModified ?
@@ -1517,7 +1540,9 @@ export class FaseripActorSheet extends ActorSheet {
                   <div style="padding: 5px 10px; font-size: 0.9em;">
                     <div>Base Rank: ${abilityRank} (${abilityValue})</div>
                     <div>Column Shift: ${totalColumnShift} → ${effectiveRank}</div>
-                    <div>Roll: ${roll.total} + Karma: ${karma} = ${totalRoll}</div>
+
+                    <div>Roll: ${roll.total} + Karma: ${karmaUsed} = ${cappedTotal}</div>
+
                     ${damageCS !== 0
                       ? `<div>Damage Column Shift: ${damageCS > 0 ? "+" : ""}${damageCS}CS → <strong>${damageRankName} (${damageRankValue})</strong></div>`
                       : ""}
@@ -1857,7 +1882,21 @@ export class FaseripActorSheet extends ActorSheet {
 
               // Calculate the result
               const totalRoll = roll.total + karma;
-              const resultColor = game.msh.rollUniversalTable(effectiveRank, totalRoll);
+              const resultColor = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
+              highlightResultCell(effectiveRank, cappedTotal);
+
+              if (karmaUsed > 0) {
+                const history = foundry.utils.deepClone(this.actor.system.karma?.history || []);
+                const newEvent = {
+                  realDate: new Date().toLocaleDateString(),
+                  gameDate: "",
+                  amount: -karmaUsed,
+                  type: "Die Roll",
+                  description: `Spent on ${item.name} (Talent)`
+                };
+                history.push(newEvent);
+                await this.actor.update({ "system.karma.history": history });
+              }
 
               // Check if the result meets the required FEAT color
               let meetsFeatRequirement = false;
@@ -1935,8 +1974,10 @@ export class FaseripActorSheet extends ActorSheet {
                 <div>Disposition: ${effectiveDisposition} (Required: ${requiredFeatColor})</div>
                 ${isMutant ? '<div style="color: #aa0000;">Mutant Penalty Applied (-1CS)</div>' : ''}
                 <div>Effective Rank: ${heroPopularityRank} ${columnShift !== 0 ? `→ ${effectiveRank} (${columnShift > 0 ? '+' : ''}${columnShift}CS)` : ''}</div>
-                <div>Roll: ${roll.total} + Karma: ${karma} = ${totalRoll}</div>
-              </div>
+
+                <div>Roll: ${roll.total} + Karma: ${karmaUsed} = ${cappedTotal}</div>
+
+                </div>
               <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
                 background-color: ${resultColor.toLowerCase() === 'white' ? '#f8f8f8' :
                   resultColor.toLowerCase() === 'green' ? '#4CAF50' :
