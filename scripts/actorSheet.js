@@ -203,352 +203,344 @@ export class FaseripActorSheet extends ActorSheet {
     // Talents - draggable and sortable
     html.find('.talent-item').each((i, row) => {
       row.setAttribute("draggable", true);
-  
-  row.addEventListener("dragstart", ev => {
-    const itemId = row.dataset.itemId;
-    const item = this.actor.items.get(itemId);
-    
-    // Default to item drag (for macros/hotbar)
-    /* let dragData = {
-      type: "Item",
-      uuid: item.uuid
-    };
-
-    // If holding shift, do sorting instead
-    if (ev.shiftKey) {
-      dragData = {
-        type: "TalentSort",
-        itemId: itemId
-      };
-    } */
-      let dragData;
-
-      if (ev.shiftKey) {
-        // Sorting drag
-        dragData = {
-          type: "TalentSort",
-          itemId: itemId
-        };
-      } else {
-        // Hotbar macro drag
-        dragData = {
-          type: "Item",
-          actorId: this.actor.id,
-          itemId: item.id,
-          uuid: item.uuid,
-          data: item
-        };
-      }
       
+      row.addEventListener("dragstart", ev => {
+        const itemId = row.dataset.itemId;
+        const item = this.actor.items.get(itemId);
+        
+        let dragData;
     
-    ev.dataTransfer.setData("text/plain", JSON.stringify(dragData));
-  });
-
-  row.addEventListener("dragover", ev => {
-    ev.preventDefault();
-    row.classList.add("drag-over");
-  });
-
-  row.addEventListener("dragleave", ev => {
-    row.classList.remove("drag-over");
-  });
-
-  row.addEventListener("drop", async ev => {
-    row.classList.remove("drag-over");
-    ev.preventDefault();
-
-    try {
-      const sourceData = JSON.parse(ev.dataTransfer.getData("text/plain"));
-      if (sourceData.type !== "TalentSort") return;
-
-      const sourceId = sourceData.itemId;
-      const targetId = row.dataset.itemId;
-      if (!sourceId || !targetId || sourceId === targetId) return;
-
-      const items = this.actor.items
-        .filter(i => i.type === "talent")
-        .sort((a, b) => a.sort - b.sort);
-      const source = items.find(i => i.id === sourceId);
-      const target = items.find(i => i.id === targetId);
-      if (!source || !target) return;
-
-      const sourceIndex = items.indexOf(source);
-      const targetIndex = items.indexOf(target);
-
-      items.splice(sourceIndex, 1);
-      items.splice(targetIndex, 0, source);
-
-      const updates = items.map((item, index) => ({
-        _id: item.id,
-        sort: index
-      }));
-
-      await this.actor.updateEmbeddedDocuments("Item", updates);
-      this.render();
-    } catch (err) {
-      console.error("Error in talent drag and drop:", err);
-    }
-  });
-});
+        if (ev.shiftKey) {
+          // Sorting drag
+          dragData = {
+            type: "TalentSort",
+            itemId: itemId
+          };
+        } else {
+          // Hotbar macro drag - use format from older file that works
+          dragData = {
+            type: "Item",
+            actorId: this.actor.id,
+            itemId: item.id,
+            uuid: item.uuid,
+            data: item
+          };
+        }
+        
+        ev.dataTransfer.setData("text/plain", JSON.stringify(dragData));
+      });
+    
+      row.addEventListener("dragover", ev => {
+        ev.preventDefault();
+        row.classList.add("drag-over");
+      });
+    
+      row.addEventListener("dragleave", ev => {
+        row.classList.remove("drag-over");
+      });
+    
+      row.addEventListener("drop", async ev => {
+        row.classList.remove("drag-over");
+        ev.preventDefault();
+    
+        try {
+          const sourceData = JSON.parse(ev.dataTransfer.getData("text/plain"));
+          if (sourceData.type !== "TalentSort") return;
+    
+          const sourceId = sourceData.itemId;
+          const targetId = row.dataset.itemId;
+          if (!sourceId || !targetId || sourceId === targetId) return;
+    
+          const items = this.actor.items
+            .filter(i => i.type === "talent")
+            .sort((a, b) => a.sort - b.sort);
+          const source = items.find(i => i.id === sourceId);
+          const target = items.find(i => i.id === targetId);
+          if (!source || !target) return;
+    
+          const sourceIndex = items.indexOf(source);
+          const targetIndex = items.indexOf(target);
+    
+          items.splice(sourceIndex, 1);
+          items.splice(targetIndex, 0, source);
+    
+          const updates = items.map((item, index) => ({
+            _id: item.id,
+            sort: index
+          }));
+    
+          await this.actor.updateEmbeddedDocuments("Item", updates);
+          this.render();
+        } catch (err) {
+          console.error("Error in talent drag and drop:", err);
+        }
+      });
+    });
 
     // Contacts made draggable/sortable w/in the contact tab
     // Contacts - draggable and sortable
-html.find('.contact-item').each((i, row) => {
-  row.setAttribute("draggable", true);
-  
-  row.addEventListener("dragstart", ev => {
-    const itemId = row.dataset.itemId;
-    const item = this.actor.items.get(itemId);
-    
-    // Default to item drag (for macros/hotbar)
-    /* let dragData = {
-      type: "Item",
-      uuid: item.uuid
-    };
-    
-    // If holding shift, do sorting instead
-    if (ev.shiftKey) {
-      dragData = {
-        type: "ContactSort",
-        itemId: itemId
-      };
-    } */
-      let dragData;
-
-      if (ev.shiftKey) {
-        // Sorting drag
-        dragData = {
-          type: "ContactSort",
-          itemId: itemId
-        };
-      } else {
-        // Hotbar macro drag
-        dragData = {
-          type: "Item",
-          actorId: this.actor.id,
-          itemId: item.id,
-          uuid: item.uuid,
-          data: item
-        };
-      }
+    html.find('.contact-item').each((i, row) => {
+      row.setAttribute("draggable", true);
       
+      row.addEventListener("dragstart", ev => {
+        const itemId = row.dataset.itemId;
+        const item = this.actor.items.get(itemId);
+        
+        let dragData;
     
-    ev.dataTransfer.setData("text/plain", JSON.stringify(dragData));
-  });
-
-  row.addEventListener("dragover", ev => {
-    ev.preventDefault();
-    row.classList.add("drag-over");
-  });
-
-  row.addEventListener("dragleave", ev => {
-    row.classList.remove("drag-over");
-  });
-
-  row.addEventListener("drop", async ev => {
-    row.classList.remove("drag-over");
-    ev.preventDefault();
-
-    try {
-      const sourceData = JSON.parse(ev.dataTransfer.getData("text/plain"));
-      if (sourceData.type !== "ContactSort") return;
-
-      const sourceId = sourceData.itemId;
-      const targetId = row.dataset.itemId;
-      if (!sourceId || !targetId || sourceId === targetId) return;
-
-      const items = this.actor.items
-        .filter(i => i.type === "contact")
-        .sort((a, b) => a.sort - b.sort);
-      const source = items.find(i => i.id === sourceId);
-      const target = items.find(i => i.id === targetId);
-      if (!source || !target) return;
-
-      const sourceIndex = items.indexOf(source);
-      const targetIndex = items.indexOf(target);
-
-      items.splice(sourceIndex, 1);
-      items.splice(targetIndex, 0, source);
-
-      const updates = items.map((item, index) => ({
-        _id: item.id,
-        sort: index
-      }));
-
-      await this.actor.updateEmbeddedDocuments("Item", updates);
-      this.render();
-    } catch (err) {
-      console.error("Error in contact drag and drop:", err);
-    }
-  });
-});
+        if (ev.shiftKey) {
+          // Sorting drag
+          dragData = {
+            type: "ContactSort",
+            itemId: itemId
+          };
+        } else {
+          // Hotbar macro drag - use format from older file that works
+          dragData = {
+            type: "Item",
+            actorId: this.actor.id,
+            itemId: item.id,
+            uuid: item.uuid,
+            data: item
+          };
+        }
+        
+        ev.dataTransfer.setData("text/plain", JSON.stringify(dragData));
+      });
+    
+      row.addEventListener("dragover", ev => {
+        ev.preventDefault();
+        row.classList.add("drag-over");
+      });
+    
+      row.addEventListener("dragleave", ev => {
+        row.classList.remove("drag-over");
+      });
+    
+      row.addEventListener("drop", async ev => {
+        row.classList.remove("drag-over");
+        ev.preventDefault();
+    
+        try {
+          const sourceData = JSON.parse(ev.dataTransfer.getData("text/plain"));
+          if (sourceData.type !== "ContactSort") return;
+    
+          const sourceId = sourceData.itemId;
+          const targetId = row.dataset.itemId;
+          if (!sourceId || !targetId || sourceId === targetId) return;
+    
+          const items = this.actor.items
+            .filter(i => i.type === "contact")
+            .sort((a, b) => a.sort - b.sort);
+          const source = items.find(i => i.id === sourceId);
+          const target = items.find(i => i.id === targetId);
+          if (!source || !target) return;
+    
+          const sourceIndex = items.indexOf(source);
+          const targetIndex = items.indexOf(target);
+    
+          items.splice(sourceIndex, 1);
+          items.splice(targetIndex, 0, source);
+    
+          const updates = items.map((item, index) => ({
+            _id: item.id,
+            sort: index
+          }));
+    
+          await this.actor.updateEmbeddedDocuments("Item", updates);
+          this.render();
+        } catch (err) {
+          console.error("Error in contact drag and drop:", err);
+        }
+      });
+    });
+    
 
     // Equipment - draggable and sortable
     html.find('.equipment-row').each((i, row) => {
       row.setAttribute("draggable", true);
-  
-    row.addEventListener("dragstart", ev => {
-    const itemId = row.dataset.itemId;
-    const item = this.actor.items.get(itemId);
+      
+      row.addEventListener("dragstart", ev => {
+        const itemId = row.dataset.itemId;
+        const item = this.actor.items.get(itemId);
+        
+        let dragData;
     
-    // Default to item drag (for macros/hotbar)
-    /* let dragData = {
-      type: "Item",
-      uuid: item.uuid
-    };
+        if (ev.shiftKey) {
+          // Sorting drag
+          dragData = {
+            type: "EquipmentSort",
+            itemId: itemId
+          };
+        } else {
+          // Hotbar macro drag - use format from older file that works
+          dragData = {
+            type: "Item",
+            actorId: this.actor.id,
+            itemId: item.id,
+            uuid: item.uuid,
+            data: item
+          };
+        }
+        
+        ev.dataTransfer.setData("text/plain", JSON.stringify(dragData));
+      });
     
-    // If holding shift, do sorting instead
-    if (ev.shiftKey) {
-      dragData = {
-        type: "EquipmentSort",
-        itemId: itemId
-      };
-    }
-     */
-    let dragData;
-
-    if (ev.shiftKey) {
-      // Sorting drag
-      dragData = {
-        type: "EquipmentSort",
-        itemId: itemId
-      };
-    } else {
-      // Hotbar macro drag
-      dragData = {
-        type: "Item",
-        actorId: this.actor.id,
-        itemId: item.id,
-        uuid: item.uuid,
-        data: item
-      };
-    }
-
-    ev.dataTransfer.setData("text/plain", JSON.stringify(dragData));
-  });
-
-  row.addEventListener("dragover", ev => {
-    ev.preventDefault();
-    row.classList.add("drag-over");
-  });
-
-  row.addEventListener("dragleave", ev => {
-    row.classList.remove("drag-over");
-  });
-
-  row.addEventListener("drop", async ev => {
-    row.classList.remove("drag-over");
-    ev.preventDefault();
-
-    try {
-      const sourceData = JSON.parse(ev.dataTransfer.getData("text/plain"));
-      if (sourceData.type !== "EquipmentSort") return;
-
-      const sourceId = sourceData.itemId;
-      const targetId = row.dataset.itemId;
-      if (!sourceId || !targetId || sourceId === targetId) return;
-
-      const items = this.actor.items
-        .filter(i => i.type === "equipment")
-        .sort((a, b) => a.sort - b.sort);
-      const source = items.find(i => i.id === sourceId);
-      const target = items.find(i => i.id === targetId);
-      if (!source || !target) return;
-
-      const sourceIndex = items.indexOf(source);
-      const targetIndex = items.indexOf(target);
-
-      items.splice(sourceIndex, 1);
-      items.splice(targetIndex, 0, source);
-
-      const updates = items.map((item, index) => ({
-        _id: item.id,
-        sort: index
-      }));
-
-      await this.actor.updateEmbeddedDocuments("Item", updates);
-      this.render();
-    } catch (err) {
-      console.error("Error in equipment drag and drop:", err);
-    }
-  });
-});
+      row.addEventListener("dragover", ev => {
+        ev.preventDefault();
+        row.classList.add("drag-over");
+      });
+    
+      row.addEventListener("dragleave", ev => {
+        row.classList.remove("drag-over");
+      });
+    
+      row.addEventListener("drop", async ev => {
+        row.classList.remove("drag-over");
+        ev.preventDefault();
+    
+        try {
+          const sourceData = JSON.parse(ev.dataTransfer.getData("text/plain"));
+          if (sourceData.type !== "EquipmentSort") return;
+    
+          const sourceId = sourceData.itemId;
+          const targetId = row.dataset.itemId;
+          if (!sourceId || !targetId || sourceId === targetId) return;
+    
+          const items = this.actor.items
+            .filter(i => i.type === "equipment")
+            .sort((a, b) => a.sort - b.sort);
+          const source = items.find(i => i.id === sourceId);
+          const target = items.find(i => i.id === targetId);
+          if (!source || !target) return;
+    
+          const sourceIndex = items.indexOf(source);
+          const targetIndex = items.indexOf(target);
+    
+          items.splice(sourceIndex, 1);
+          items.splice(targetIndex, 0, source);
+    
+          const updates = items.map((item, index) => ({
+            _id: item.id,
+            sort: index
+          }));
+    
+          await this.actor.updateEmbeddedDocuments("Item", updates);
+          this.render();
+        } catch (err) {
+          console.error("Error in equipment drag and drop:", err);
+        }
+      });
+    });
 
     // Vehicle rows draggable
     // Make ONLY the vehicle name draggable
     // Vehicle dragging - only make the name draggable
-html.find('.vehicle-draggable').each((i, el) => {
-  el.setAttribute("draggable", true);
-  el.addEventListener("dragstart", ev => {
-    const itemId = el.dataset.itemId;
-    const item = this.actor.items.get(itemId);
-    
-    // Default to item drag (for macros/hotbar)
-    let dragData = {
-      type: "Item",
-      uuid: item.uuid
-    };
-    
-    // If holding shift, do sorting instead
-    if (ev.shiftKey) {
-      dragData = {
-        type: "VehicleSort",
-        itemId: itemId
-      };
-    }
-    
-    ev.dataTransfer.setData("text/plain", JSON.stringify(dragData));
-  });
-});
+    html.find('.vehicle-draggable').each((i, el) => {
+      el.setAttribute("draggable", true);
+      el.addEventListener("dragstart", ev => {
+        const itemId = el.dataset.itemId;
+        const item = this.actor.items.get(itemId);
+        
+        // If shift key is pressed, do sorting, otherwise create a macro
+        let dragData;
+        if (ev.shiftKey) {
+          dragData = {
+            type: "VehicleSort",
+            itemId: itemId
+          };
+        } else {
+          // Hotbar macro drag - use format from older file that works  
+          dragData = {
+            type: "Item",
+            actorId: this.actor.id,
+            itemId: item.id,
+            uuid: item.uuid,
+            data: item
+          };
+        }
+        
+        ev.dataTransfer.setData("text/plain", JSON.stringify(dragData));
+      });
+    });
 
-// Allow sorting via row drop targets
-html.find('.vehicle-row').each((i, row) => {
-  row.addEventListener("dragover", ev => {
-    ev.preventDefault();
-    row.classList.add("drag-over");
-  });
+    // Allow sorting via row drop targets
+    html.find('.vehicle-row').each((i, row) => {
+      row.addEventListener("dragover", ev => {
+        ev.preventDefault();
+        row.classList.add("drag-over");
+      });
 
-  row.addEventListener("dragleave", ev => {
-    row.classList.remove("drag-over");
-  });
+      row.addEventListener("dragleave", ev => {
+        row.classList.remove("drag-over");
+      });
 
-  row.addEventListener("drop", async ev => {
-    row.classList.remove("drag-over");
-    ev.preventDefault();
+      row.addEventListener("drop", async ev => {
+        row.classList.remove("drag-over");
+        ev.preventDefault();
 
-    try {
-      const sourceData = JSON.parse(ev.dataTransfer.getData("text/plain"));
-      if (sourceData.type !== "VehicleSort") return;
+        try {
+          const sourceData = JSON.parse(ev.dataTransfer.getData("text/plain"));
+          if (sourceData.type !== "VehicleSort") return;
 
-      const sourceId = sourceData.itemId;
-      const targetId = row.dataset.itemId;
-      if (!sourceId || !targetId || sourceId === targetId) return;
+          const sourceId = sourceData.itemId;
+          const targetId = row.dataset.itemId;
+          if (!sourceId || !targetId || sourceId === targetId) return;
 
-      const items = this.actor.items
-        .filter(i => i.type === "vehicle")
-        .sort((a, b) => a.sort - b.sort);
-      const source = items.find(i => i.id === sourceId);
-      const target = items.find(i => i.id === targetId);
-      if (!source || !target) return;
+          const items = this.actor.items
+            .filter(i => i.type === "vehicle")
+            .sort((a, b) => a.sort - b.sort);
+          const source = items.find(i => i.id === sourceId);
+          const target = items.find(i => i.id === targetId);
+          if (!source || !target) return;
 
-      const sourceIndex = items.indexOf(source);
-      const targetIndex = items.indexOf(target);
+          const sourceIndex = items.indexOf(source);
+          const targetIndex = items.indexOf(target);
 
-      items.splice(sourceIndex, 1);
-      items.splice(targetIndex, 0, source);
+          items.splice(sourceIndex, 1);
+          items.splice(targetIndex, 0, source);
 
-      const updates = items.map((item, index) => ({
-        _id: item.id,
-        sort: index
-      }));
+          const updates = items.map((item, index) => ({
+            _id: item.id,
+            sort: index
+          }));
 
-      await this.actor.updateEmbeddedDocuments("Item", updates);
-      this.render();
-    } catch (err) {
-      console.error("Error in vehicle drag and drop:", err);
-    }
-  });
-});
+          await this.actor.updateEmbeddedDocuments("Item", updates);
+          this.render();
+        } catch (err) {
+          console.error("Error in vehicle drag and drop:", err);
+        }
+      });
+    });
+
+    // Headquarters - draggable and sortable
+    html.find('.headquarters-draggable').each((i, el) => {
+      el.setAttribute("draggable", true);
+      el.addEventListener("dragstart", ev => {
+        const itemId = el.dataset.itemId;
+        const item = this.actor.items.get(itemId);
+        
+        // If shift key is pressed, do sorting, otherwise create a macro
+        let dragData;
+        if (ev.shiftKey) {
+          dragData = {
+            type: "HeadquartersSort",
+            itemId: itemId
+          };
+        } else {
+          // Hotbar macro drag - use format from older file that works
+          dragData = {
+            type: "Item",
+            actorId: this.actor.id,
+            itemId: item.id,
+            uuid: item.uuid,
+            data: item
+          };
+        }
+        
+        ev.dataTransfer.setData("text/plain", JSON.stringify(dragData));
+      });
+    });
 
     // Biography Toggle Button
     html.find('.biography-toggle').click(ev => {
