@@ -125,20 +125,48 @@ Hooks.on('hotbarDrop', (bar, data, slot) => {
 
 // Define the function to create a macro
 async function createFaseripItemMacro(data, slot) {
-  // Get references to our Actor and Item
-  const actor = game.actors.get(data.actorId);
-  if (!actor) return ui.notifications.warn("Actor not found");
+  // Try to get the item from UUID first
+  let item;
+  if (data.uuid) {
+    try {
+      item = await fromUuid(data.uuid);
+    } catch (error) {
+      console.error("Error retrieving item from UUID:", error);
+    }
+  }
   
-  const item = actor.items.get(data.itemId);
-  if (!item) return ui.notifications.warn("Item not found");
+  // If UUID approach fails, fall back to the old method
+  if (!item) {
+    const actor = game.actors.get(data.actorId);
+    if (!actor) return ui.notifications.warn("Actor not found");
+    
+    item = actor.items.get(data.itemId);
+    if (!item) return ui.notifications.warn("Item not found");
+  }
   
-  console.log(`Creating macro for ${item.name} (${actor.name})`);
+  // Get the parent actor (works for both regular and token actors)
+  const parent = item.parent;
+  console.log(`Creating macro for ${item.name} (${parent.name})`);
   
-  // Create a command string that will call our rollItemMacro function
-  const command = `game.msh.rollItemMacro("${data.actorId}", "${data.itemId}");`;
+  // Create a command that uses UUID for token actors, or falls back to actorId/itemId for compatibility
+  const command = `// Try UUID method first
+const item = await fromUuid("${data.uuid}");
+if (item) {
+  // Determine which roll function to use based on item type
+  switch (item.type) {
+    case "power": game.msh.rollPower(item.parent, item); break;
+    case "talent": game.msh.rollTalent(item.parent, item); break;
+    case "contact": game.msh.rollContact(item.parent, item); break;
+    case "equipment": game.msh.rollEquipment(item.parent, item); break;
+    default: ui.notifications.warn(\`Cannot roll item of type: \${item.type}\`);
+  }
+} else {
+  // Fall back to original method
+  game.msh.rollItemMacro("${data.actorId}", "${data.itemId}");
+}`;
   
   // Create the macro
-  const macroName = `${item.name} (${actor.name})`;
+  const macroName = `${item.name} (${parent.name})`;
   let macro = game.macros.find(m => m.name === macroName && m.command === command);
   
   if (!macro) {
