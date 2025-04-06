@@ -574,8 +574,25 @@ export class FaseripRolls {
       return;
     }
 
+    // Define action types and results based on color
+    const ACTIONS = {
+      "Blunt Attack (BA)": { white: "Miss", green: "Hit", yellow: "Slam", red: "Stun" },
+      "Edged Attack (EA)": { white: "Miss", green: "Hit", yellow: "Stun", red: "Kill" },
+      "Shooting Attack (Sh)": { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Kill" },
+      "Throwing Edged (TE)": { white: "Miss", green: "Hit", yellow: "Stun", red: "Kill" },
+      "Throwing Blunt (TB)": { white: "Miss", green: "Hit", yellow: "Hit", red: "Stun" },
+      "Energy (En)": { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Kill" },
+      "Force (Fo)": { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Stun" },
+      "Grappling (GP)": { white: "Miss", green: "Miss", yellow: "Partial", red: "Hold" },
+      "Grabbing (Gb)": { white: "Miss", green: "Take", yellow: "Grab", red: "Break" },
+      "Escaping (ES)": { white: "Miss", green: "Miss", yellow: "Escape", red: "Reverse" },
+      "Mental Attack": { white: "Failure", green: "Success", yellow: "Special Effect", red: "Maximum Effect" },
+      "General Power Use": { white: "Failure", green: "Success", yellow: "Special Effect", red: "Maximum Effect" }
+    };
+    
     // Get saved power settings or use defaults
-    const savedActionType = power.getFlag("msh-faserip", "lastActionType") || "";
+    const savedActionType = power.getFlag("msh-faserip", "lastActionType");
+    const validActionType = Object.keys(ACTIONS).includes(savedActionType) ? savedActionType : "General Power Use";
     const savedColumnShift = power.getFlag("msh-faserip", "lastColumnShift") || 0;
     const skipDiceRoll = power.getFlag("msh-faserip", "skipDiceRoll") || false;
 
@@ -630,22 +647,6 @@ export class FaseripRolls {
       // Calculate the result
       const totalRoll = roll.total + karma;
       const resultColor = game.msh.rollUniversalTable(effectiveRank, totalRoll);
-
-      // Define action types and results based on color
-      const ACTIONS = {
-        "Blunt Attack (BA)": { white: "Miss", green: "Hit", yellow: "Slam", red: "Stun" },
-        "Edged Attack (EA)": { white: "Miss", green: "Hit", yellow: "Stun", red: "Kill" },
-        "Shooting Attack (Sh)": { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Kill" },
-        "Throwing Edged (TE)": { white: "Miss", green: "Hit", yellow: "Stun", red: "Kill" },
-        "Throwing Blunt (TB)": { white: "Miss", green: "Hit", yellow: "Hit", red: "Stun" },
-        "Energy (En)": { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Kill" },
-        "Force (Fo)": { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Stun" },
-        "Grappling (GP)": { white: "Miss", green: "Miss", yellow: "Partial", red: "Hold" },
-        "Grabbing (Gb)": { white: "Miss", green: "Take", yellow: "Grab", red: "Break" },
-        "Escaping (ES)": { white: "Miss", green: "Miss", yellow: "Escape", red: "Reverse" },
-        "Mental Attack": { white: "Failure", green: "Success", yellow: "Special Effect", red: "Maximum Effect" },
-        "General Power Use": { white: "Failure", green: "Success", yellow: "Special Effect", red: "Maximum Effect" }
-      };
 
       // Get the result text based on action type and color
       let resultText = "";
@@ -709,9 +710,10 @@ export class FaseripRolls {
         <label style="display: inline-block; width: 120px;">Action Type:</label>
         <select id="action" name="action" style="width: 180px;">
           ${Object.keys(ACTIONS).map(action =>
-        `<option value="${action}" ${action === savedActionType ? 'selected' : ''}>${action}</option>`
-      ).join('')}
+            `<option value="${action}" ${action === validActionType ? 'selected' : ''}>${action}</option>`
+          ).join('')}
         </select>
+
       </div>
       <div style="margin-bottom: 10px;">
         <label style="display: inline-block; width: 120px;">Column Shift:</label>
