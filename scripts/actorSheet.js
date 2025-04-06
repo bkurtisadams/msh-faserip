@@ -752,17 +752,24 @@ export class FaseripActorSheet extends ActorSheet {
           <div class="form-group">
             <label>Rank</label>
             <select id="resistance-rank" name="rank">
-              <option value="Shift-0" ${resistance.rank === "Shift-0" ? "selected" : ""}>Shift-0</option>
-              <option value="Feeble" ${resistance.rank === "Feeble" ? "selected" : ""}>Feeble</option>
-              <option value="Poor" ${resistance.rank === "Poor" ? "selected" : ""}>Poor</option>
-              <option value="Typical" ${resistance.rank === "Typical" ? "selected" : ""}>Typical</option>
-              <option value="Good" ${resistance.rank === "Good" ? "selected" : ""}>Good</option>
-              <option value="Excellent" ${resistance.rank === "Excellent" ? "selected" : ""}>Excellent</option>
-              <option value="Remarkable" ${resistance.rank === "Remarkable" ? "selected" : ""}>Remarkable</option>
-              <option value="Incredible" ${resistance.rank === "Incredible" ? "selected" : ""}>Incredible</option>
-              <option value="Amazing" ${resistance.rank === "Amazing" ? "selected" : ""}>Amazing</option>
-              <option value="Monstrous" ${resistance.rank === "Monstrous" ? "selected" : ""}>Monstrous</option>
-              <option value="Unearthly" ${resistance.rank === "Unearthly" ? "selected" : ""}>Unearthly</option>
+              <option value="Shift-0">Shift-0</option>
+              <option value="Feeble">Feeble</option>
+              <option value="Poor">Poor</option>
+              <option value="Typical">Typical</option>
+              <option value="Good">Good</option>
+              <option value="Excellent">Excellent</option>
+              <option value="Remarkable">Remarkable</option>
+              <option value="Incredible">Incredible</option>
+              <option value="Amazing">Amazing</option>
+              <option value="Monstrous">Monstrous</option>
+              <option value="Unearthly">Unearthly</option>
+              <option value="Shift-X">Shift-X</option>
+              <option value="Shift-Y">Shift-Y</option>
+              <option value="Shift-Z">Shift-Z</option>
+              <option value="Class 1000">Class 1000</option>
+              <option value="Class 3000">Class 3000</option>
+              <option value="Class 5000">Class 5000</option>
+              <option value="Beyond">Beyond</option>
             </select>
           </div>
           <div class="form-group">
