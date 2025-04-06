@@ -452,24 +452,24 @@ export class FaseripActorSheet extends ActorSheet {
       });
     });
 
-    // Vehicle rows draggable
-    // Make ONLY the vehicle name draggable
-    // Vehicle dragging - only make the name draggable
-    html.find('.vehicle-draggable').each((i, el) => {
-      el.setAttribute("draggable", true);
-      el.addEventListener("dragstart", ev => {
-        const itemId = el.dataset.itemId;
+    // Make entire vehicle rows draggable (like powers and talents)
+    html.find('.vehicle-row').each((i, row) => {
+      // No need to set draggable="true" here if it's already in the HTML
+      
+      row.addEventListener("dragstart", ev => {
+        const itemId = row.dataset.itemId;
         const item = this.actor.items.get(itemId);
         
-        // If shift key is pressed, do sorting, otherwise create a macro
         let dragData;
+        
         if (ev.shiftKey) {
+          // Sorting drag
           dragData = {
             type: "VehicleSort",
             itemId: itemId
           };
         } else {
-          // Hotbar macro drag - use format from older file that works  
+          // Hotbar macro drag
           dragData = {
             type: "Item",
             actorId: this.actor.id,
@@ -481,10 +481,7 @@ export class FaseripActorSheet extends ActorSheet {
         
         ev.dataTransfer.setData("text/plain", JSON.stringify(dragData));
       });
-    });
 
-    // Allow sorting via row drop targets
-    html.find('.vehicle-row').each((i, row) => {
       row.addEventListener("dragover", ev => {
         ev.preventDefault();
         row.classList.add("drag-over");
@@ -508,7 +505,7 @@ export class FaseripActorSheet extends ActorSheet {
 
           const items = this.actor.items
             .filter(i => i.type === "vehicle")
-            .sort((a, b) => a.sort - b.sort);
+            .sort((a, b) => (a.sort || 0) - (b.sort || 0));
           const source = items.find(i => i.id === sourceId);
           const target = items.find(i => i.id === targetId);
           if (!source || !target) return;
