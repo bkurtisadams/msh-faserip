@@ -31,6 +31,15 @@ Hooks.once("init", async () => {
   game.msh.rollTalent = FaseripRolls.rollTalent;
   game.msh.rollContact = FaseripRolls.rollContact;
   game.msh.rollEquipment = FaseripRolls.rollEquipment;
+
+  // Add the vehicle control roll function
+  game.msh.rollVehicleControl = (actor, vehicle) => {
+    if (actor && actor.sheet && actor.sheet._rollVehicleControl) {
+      return actor.sheet._rollVehicleControl(vehicle);
+    } else {
+      ui.notifications.warn("Could not access vehicle control roll function");
+    }
+  };
   
   // Updated rollItemMacro function
   // Define the rollItemMacro function (in your init.js)
@@ -50,6 +59,7 @@ Hooks.once("init", async () => {
       case "talent": return game.msh.rollTalent(actor, item);
       case "contact": return game.msh.rollContact(actor, item);
       case "equipment": return game.msh.rollEquipment(actor, item);
+      case "vehicle": return actor.sheet._rollVehicleControl(item); // vehicle added
       default:
         return ui.notifications.warn(`Cannot roll item of type: ${item.type}`);
     }
@@ -150,20 +160,21 @@ async function createFaseripItemMacro(data, slot) {
   
   // Create a command that uses UUID for token actors, or falls back to actorId/itemId for compatibility
   const command = `// Try UUID method first
-const item = await fromUuid("${data.uuid}");
-if (item) {
-  // Determine which roll function to use based on item type
-  switch (item.type) {
-    case "power": game.msh.rollPower(item.parent, item); break;
-    case "talent": game.msh.rollTalent(item.parent, item); break;
-    case "contact": game.msh.rollContact(item.parent, item); break;
-    case "equipment": game.msh.rollEquipment(item.parent, item); break;
-    default: ui.notifications.warn(\`Cannot roll item of type: \${item.type}\`);
-  }
-} else {
-  // Fall back to original method
-  game.msh.rollItemMacro("${data.actorId}", "${data.itemId}");
-}`;
+  const item = await fromUuid("${data.uuid}");
+  if (item) {
+    // Determine which roll function to use based on item type
+    switch (item.type) {
+      case "power": game.msh.rollPower(item.parent, item); break;
+      case "talent": game.msh.rollTalent(item.parent, item); break;
+      case "contact": game.msh.rollContact(item.parent, item); break;
+      case "equipment": game.msh.rollEquipment(item.parent, item); break;
+      case "vehicle": game.msh.rollVehicleControl(item.parent, item); break;
+      default: ui.notifications.warn(\`Cannot roll item of type: \${item.type}\`);
+    }
+  } else {
+    // Fall back to original method
+    game.msh.rollItemMacro("${data.actorId}", "${data.itemId}");
+  }`;
   
   // Create the macro
   const macroName = `${item.name} (${parent.name})`;
