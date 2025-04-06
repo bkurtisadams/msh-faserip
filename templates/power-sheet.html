@@ -154,15 +154,11 @@
     <div class="form-group">
       <label>Duration:</label>
       <select name="system.duration" id="duration-type">
-        <option value="instant" {{#if (eq system.duration "instant")}}selected{{/if}}>Instant</option>
-        <option value="concentration" {{#if (eq system.duration "concentration")}}selected{{/if}}>Concentration</option>
-        <option value="sustained" {{#if (eq system.duration "sustained")}}selected{{/if}}>Sustained</option>
-        <option value="permanent" {{#if (eq system.duration "permanent")}}selected{{/if}}>Permanent</option>
-        <option value="custom" {{#if (eq system.duration "custom")}}selected{{/if}}>Custom</option>
         {{#each durationOptions}}
-        <option value="{{this}}" {{#if (eq ../system.duration this)}}selected{{/if}}>{{this}}</option>
+          <option value="{{this}}" {{#if (eq ../system.duration this)}}selected{{/if}}>{{this}}</option>
         {{/each}}
       </select>
+      
       <input type="text" name="system.customDuration" value="{{system.customDuration}}" 
              placeholder="e.g., 1-10 rounds" class="custom-duration-input"
              {{#unless (eq system.duration "custom")}}style="display: none;"{{/unless}}>

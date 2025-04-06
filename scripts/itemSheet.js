@@ -66,7 +66,7 @@ getData() {
     ];
     
     context.durationOptions = [
-      "Instantaneous", "Concentration", "Maintenance", "Permanent"
+      "Instant", "Concentration", "Maintenance", "Permanent"
     ];
     
     // Make sure to log data for debugging
