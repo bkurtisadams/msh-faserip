@@ -662,8 +662,10 @@
                   <a class="item-control power-roll" title="Roll" data-item-id="{{power._id}}">
                     <i class="fas fa-dice-d20"></i>
                   </a>
+                  <!-- Change this line in the powers section of your HTML -->
                   <img src="{{power.img}}" class="power-icon power-info" width="24" height="24"
-                    data-item-id="{{power._id}}" />
+                    data-item-id="{{power._id}}" 
+                    title="Click for info. Shift+drag to reorder." />
                   <span class="power-name-text 
                             {{#if (getFlag power 'msh-faserip' 'isBonusPower')}} bonus-power {{/if}}
                             {{#if (getFlag power 'msh-faserip' 'isStuntPower')}} stunt-power {{/if}}">
@@ -705,8 +707,9 @@
             <div class="talent-item item" data-item-id="{{talent._id}}" draggable="true">
               <a class="item-control talent-roll" title="Roll" data-item-id="{{talent._id}}"><i
                   class="fas fa-dice-d20"></i></a>
-              <img src="{{talent.img}}" class="talent-icon talent-info" width="24" height="24"
-                data-item-id="{{talent._id}}" />
+                  <img src="{{talent.img}}" class="talent-icon talent-info" width="24" height="24"
+                  data-item-id="{{talent._id}}"
+                  title="Click for info. Shift+drag to reorder." />
               <span class="talent-name-text">{{talent.name}}</span>
               <div class="item-controls">
                 <a class="item-control item-edit" title="Edit" data-item-id="{{talent._id}}"><i
@@ -730,8 +733,9 @@
             <div class="contact-item item" data-item-id="{{contact._id}}" draggable="true">
               <a class="item-control contact-roll" title="Roll" data-item-id="{{contact._id}}"><i
                   class="fas fa-dice-d20"></i></a>
-              <img src="{{contact.img}}" class="contact-icon contact-info" width="24" height="24"
-                data-item-id="{{contact._id}}" />
+                  <img src="{{contact.img}}" class="contact-icon contact-info" width="24" height="24"
+                    data-item-id="{{contact._id}}"
+                    title="Click for info. Shift+drag to reorder." />
               <span class="contact-name-text">{{contact.name}}</span>
               <div class="item-controls">
                 <a class="item-control item-edit" title="Edit" data-item-id="{{contact._id}}"><i
@@ -769,11 +773,10 @@
               <tr class="equipment-row item" data-item-id="{{item._id}}"
                 title="{{item.system.category}} - {{item.system.description}}">
                 <td class="equipment-name">
-                  {{#if (or (eq item.system.category "weapon") (eq item.system.category "power-item") (eq
-                  item.system.category "custom"))}}
+                  {{#if (or (eq item.system.category "weapon") (eq item.system.category "power-item") (eq item.system.category "custom"))}}
                   <a class="item-control equipment-roll" title="Roll"><i class="fas fa-dice-d20"></i></a>
                   {{/if}}
-                  <img src="{{item.img}}" class="equipment-icon equipment-info" width="24" height="24" />
+                  <img src="{{item.img}}" class="equipment-icon equipment-info" width="24" height="24" title="Click for info. Shift+drag to reorder." />
                   <span class="equipment-name-text">{{item.name}}</span>
                 </td>
                 <td class="equipment-material">{{item.system.materialStrength}}</td>

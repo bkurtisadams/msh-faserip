@@ -159,17 +159,15 @@ export class FaseripActorSheet extends ActorSheet {
     return super._updateObject(event, expandedData);
   }
 
+  // Replace your existing _onDragStart method with this one
   _onDragStart(event) {
+    // Don't process if shift key is held (let the specific item handlers manage sorting)
+    if (event.shiftKey) return;
+    
     const li = event.currentTarget;
     const itemId = li.dataset.itemId;
     const item = this.actor.items.get(itemId);
-    console.log("🔥 Dragging item for hotbar:", {
-      actorId: this.actor.id,
-      itemId: item.id,
-      uuid: item.uuid
-    });
-
-  
+    
     if (item) {
       event.dataTransfer.setData("text/plain", JSON.stringify({
         type: "Item",
@@ -377,7 +375,6 @@ export class FaseripActorSheet extends ActorSheet {
       });
     });
     
-
     // Equipment - draggable and sortable
     html.find('.equipment-row').each((i, row) => {
       row.setAttribute("draggable", true);
@@ -387,7 +384,7 @@ export class FaseripActorSheet extends ActorSheet {
         const item = this.actor.items.get(itemId);
         
         let dragData;
-    
+
         if (ev.shiftKey) {
           // Sorting drag
           dragData = {
@@ -407,46 +404,46 @@ export class FaseripActorSheet extends ActorSheet {
         
         ev.dataTransfer.setData("text/plain", JSON.stringify(dragData));
       });
-    
+
       row.addEventListener("dragover", ev => {
         ev.preventDefault();
         row.classList.add("drag-over");
       });
-    
+
       row.addEventListener("dragleave", ev => {
         row.classList.remove("drag-over");
       });
-    
+
       row.addEventListener("drop", async ev => {
         row.classList.remove("drag-over");
         ev.preventDefault();
-    
+
         try {
           const sourceData = JSON.parse(ev.dataTransfer.getData("text/plain"));
           if (sourceData.type !== "EquipmentSort") return;
-    
+
           const sourceId = sourceData.itemId;
           const targetId = row.dataset.itemId;
           if (!sourceId || !targetId || sourceId === targetId) return;
-    
+
           const items = this.actor.items
             .filter(i => i.type === "equipment")
             .sort((a, b) => a.sort - b.sort);
           const source = items.find(i => i.id === sourceId);
           const target = items.find(i => i.id === targetId);
           if (!source || !target) return;
-    
+
           const sourceIndex = items.indexOf(source);
           const targetIndex = items.indexOf(target);
-    
+
           items.splice(sourceIndex, 1);
           items.splice(targetIndex, 0, source);
-    
+
           const updates = items.map((item, index) => ({
             _id: item.id,
             sort: index
           }));
-    
+
           await this.actor.updateEmbeddedDocuments("Item", updates);
           this.render();
         } catch (err) {
@@ -619,22 +616,24 @@ export class FaseripActorSheet extends ActorSheet {
     // Listener for powers
     // Powers - draggable and sortable
     html.find('.power-row').each((i, row) => {
-      row.setAttribute("draggable", true);
+      // We don't need to set draggable=true here since it's already in the HTML
       
       row.addEventListener("dragstart", ev => {
+        console.log("Power drag start", ev.shiftKey);
         const itemId = row.dataset.itemId;
         const item = this.actor.items.get(itemId);
         
         let dragData;
-    
+        
         if (ev.shiftKey) {
           // Sorting drag
           dragData = {
             type: "PowerSort",
             itemId: itemId
           };
+          console.log("Power sort drag", dragData);
         } else {
-          // Hotbar macro drag - use format from older file that works
+          // Hotbar macro drag
           dragData = {
             type: "Item",
             actorId: this.actor.id,
@@ -642,48 +641,54 @@ export class FaseripActorSheet extends ActorSheet {
             uuid: item.uuid,
             data: item
           };
+          console.log("Power hotbar drag", dragData);
         }
         
         ev.dataTransfer.setData("text/plain", JSON.stringify(dragData));
       });
-    
+
       row.addEventListener("dragover", ev => {
         ev.preventDefault();
         row.classList.add("drag-over");
       });
-    
+
       row.addEventListener("dragleave", ev => {
         row.classList.remove("drag-over");
       });
-    
+
       row.addEventListener("drop", async ev => {
         row.classList.remove("drag-over");
         ev.preventDefault();
-    
+
         try {
           const sourceData = JSON.parse(ev.dataTransfer.getData("text/plain"));
+          console.log("Drop data", sourceData);
+          
           if (sourceData.type !== "PowerSort") return;
-    
+
           const sourceId = sourceData.itemId;
           const targetId = row.dataset.itemId;
           if (!sourceId || !targetId || sourceId === targetId) return;
-    
-          const items = this.actor.items.filter(i => i.type === "power").sort((a, b) => a.sort - b.sort);
+
+          const items = this.actor.items
+            .filter(i => i.type === "power")
+            .sort((a, b) => (a.sort || 0) - (b.sort || 0));
           const source = items.find(i => i.id === sourceId);
           const target = items.find(i => i.id === targetId);
           if (!source || !target) return;
-    
+
           const sourceIndex = items.indexOf(source);
           const targetIndex = items.indexOf(target);
-    
+
           items.splice(sourceIndex, 1);
           items.splice(targetIndex, 0, source);
-    
+
           const updates = items.map((item, index) => ({
             _id: item.id,
             sort: index
           }));
-    
+
+          console.log("Updating items with new sort order", updates);
           await this.actor.updateEmbeddedDocuments("Item", updates);
           this.render();
         } catch (err) {
