@@ -254,7 +254,7 @@ _updatePowerTypeOptions(html, category) {
     ],
     "matterControl": [
       "Earth Control", "Air Control", "Fire Control", "Water Control",
-      "Weather Control", "Density Manipulation Others", "Body Transformation Others",
+      "Weather Control", "Animate Objects","Density Manipulation Others", "Body Transformation Others",
       "Animal Transformation Others"
     ],
     "energyControl": [
