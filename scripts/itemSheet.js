@@ -42,13 +42,6 @@ getData() {
   const classes = ["faserip", "sheet", "item", this.item.type];
   context.cssClass = classes.join(" ");
 
-  // Add all rank options for any item type that needs them
-  context.allRanks = [
-    "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent",
-    "Remarkable", "Incredible", "Amazing", "Monstrous", "Unearthly",
-    "Shift-X", "Shift-Y", "Shift-Z", "Class 1000", "Class 3000", "Class 5000", "Beyond"
-  ];
-
   // If this is a power and marked as magic, include options
   if (this.item.type === "power") {
     context.isMagic = context.system.isMagic;
@@ -67,9 +60,9 @@ getData() {
     
     // Range options - direct options for dropdown
     context.rangeOptions = [
-      "Touch only", "1 area", "2 areas", "4 areas", "6 areas", "8 areas", 
-      "10 areas", "20 areas", "40 areas", "60 areas", "80 areas", "160 areas", 
-      "400 areas", "Line of Sight", "Custom"
+      "1 area", "2 areas", "4 areas", "6 areas", "8 areas", 
+      "10 areas", "20 areas", "40 areas", "60 areas", "80 areas", 
+      "160 areas", "400 areas", "Line of Sight"
     ];
     
     context.durationOptions = [
@@ -117,13 +110,48 @@ getData() {
       }
       
       // Handle range dropdown changes
+      // Range dropdown listener
       html.find('select[name="system.range"]').change(ev => {
         const selectedRange = ev.currentTarget.value;
-        
-        if (selectedRange === "Custom") {
+        const customRangeInput = html.find('.custom-range-input');
+        const calculatedRangeField = html.find('.calculated-range');
+      
+        if (selectedRange === "custom") {
           customRangeInput.show();
         } else {
           customRangeInput.hide();
+        }
+      
+        if (selectedRange === "rank") {
+          calculatedRangeField.show();
+          const rank = html.find('select[name="system.rank"]').val(); // Use dropdown value, not this.item.system
+          const rangeText = this._getRangeByRank(rank);
+          html.find('#calculated-range-display').val(rangeText);
+          this.item.update({ "system.calculatedRange": rangeText });
+        } else {
+          calculatedRangeField.hide();
+          html.find('#calculated-range-display').val('');
+          this.item.update({ "system.calculatedRange": "" });
+        }
+      });
+
+      // On load, if range is "rank", show the calculated field and fill it
+      const rangeValue = html.find('select[name="system.range"]').val();
+      if (rangeValue === "rank") {
+        const rank = html.find('select[name="system.rank"]').val();
+        const rangeText = this._getRangeByRank(rank);
+        html.find('.calculated-range').show();
+        html.find('#calculated-range-display').val(rangeText);
+      }
+
+      // When Rank dropdown changes, update calculated range if using "By Rank"
+      html.find('select[name="system.rank"]').change(ev => {
+        const newRank = ev.currentTarget.value;
+        const selectedRange = html.find('select[name="system.range"]').val(); // Get current dropdown value
+        if (selectedRange === "rank") {
+          const rangeText = this._getRangeByRank(newRank);
+          html.find('#calculated-range-display').val(rangeText);
+          this.item.update({ "system.calculatedRange": rangeText });
         }
       });
       
@@ -299,14 +327,27 @@ _updatePowerTypeOptions(html, category) {
   }
 }
 
-  // Add this method at the end of the class, before the closing brace
-  /* async _updateObject(event, formData) {
-    // First call the parent method to update the data
-    await super._updateObject(event, formData);
+  _getRangeByRank(rank) {
+    const rankRanges = {
+      "Feeble": "1 area",
+      "Poor": "2 areas",
+      "Typical": "4 areas",
+      "Good": "6 areas",
+      "Excellent": "8 areas",
+      "Remarkable": "10 areas",
+      "Incredible": "20 areas",
+      "Amazing": "40 areas",
+      "Monstrous": "60 areas",
+      "Unearthly": "80 areas",
+      "Shift-X": "160 areas",
+      "Shift-Y": "400 areas",
+      "Shift-Z": "Line of Sight",
+      "Class 1000": "Line of Sight",
+      "Class 3000": "Line of Sight",
+      "Class 5000": "Line of Sight",
+      "Beyond": "Unlimited"
+    };
+    return rankRanges[rank] || "Unknown";
+  }
     
-    // Then close the sheet if it's a headquarters item
-    if (this.item.type === 'headquarters') {
-      this.close();
-    }
-  } */
 }
