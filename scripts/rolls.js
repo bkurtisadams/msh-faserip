@@ -1558,6 +1558,15 @@ export class FaseripRolls {
         const roll = new Roll("1d100");
         await roll.evaluate();
 
+        // Display the dice roll with flavor text if not skipped
+        if (!skipDice) {
+          await roll.toMessage({
+            speaker: ChatMessage.getSpeaker({ actor: actor }),
+            flavor: `${actor.name} equipment ${equipment.name}`,
+            rollMode: game.settings.get("core", "rollMode")
+          });
+        }
+
         // Calculate the result
         let cappedTotal = roll.total;
         let karmaUsed = 0;
