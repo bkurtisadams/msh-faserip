@@ -2538,100 +2538,15 @@ html.find('.headquarters-row').each((i, row) => {
     // RESOURCE BUTTON method
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     html.find('.resources-header-button').click(ev => {
-      // Create dialog content with information about Resource FEATs
-      const content = `
-        <h2>Resource FEATs</h2>
-        
-        <p>Resources are a measure of a character's wealth and buying power. Instead of tracking exact money, the FASERIP system uses Resource FEATs to determine if a character can afford an item.</p>
-        
-        <h3>Using Resources</h3>
-        <p>To purchase anything, a character must make a Resource FEAT. This is the equivalent of a credit check or checking the bank account to see how much cash is available.</p>
-        
-        <h3>Resource FEAT Rules:</h3>
-        <ul>
-          <li>A Resource FEAT may be made once per week.</li>
-          <li>A character cannot purchase an item with a higher rank than their Resource rank.</li>
-          <li>If the item's rank is 3 ranks lower than the Resource rank, purchase is automatic.</li>
-          <li>If 1-2 ranks lower, a green FEAT is needed.</li>
-          <li>If equal to Resource rank, a yellow FEAT is needed.</li>
-        </ul>
-        
-        <h3>Success and Failure</h3>
-        <p>Success means the character can purchase the item. Failure indicates the item is too expensive and the character cannot try for any item of that rank or higher for the next week.</p>
-        
-        <table>
-          <tr>
-            <th>Resource Rank</th>
-            <th>Buying Power</th>
-          </tr>
-          <tr>
-            <td>Shift-0</td>
-            <td>Homeless, no income</td>
-          </tr>
-          <tr>
-            <td>Feeble</td>
-            <td>Poor, struggling to make ends meet</td>
-          </tr>
-          <tr>
-            <td>Poor</td>
-            <td>Low income, basic necessities only</td>
-          </tr>
-          <tr>
-            <td>Typical</td>
-            <td>Average income, modest lifestyle</td>
-          </tr>
-          <tr>
-            <td>Good</td>
-            <td>Comfortable income, can afford luxuries</td>
-          </tr>
-          <tr>
-            <td>Excellent</td>
-            <td>Well-off, upper middle class</td>
-          </tr>
-          <tr>
-            <td>Remarkable</td>
-            <td>Wealthy, significant disposable income</td>
-          </tr>
-          <tr>
-            <td>Incredible</td>
-            <td>Very wealthy, millionaire</td>
-          </tr>
-          <tr>
-            <td>Amazing</td>
-            <td>Extremely wealthy, multi-millionaire</td>
-          </tr>
-          <tr>
-            <td>Monstrous</td>
-            <td>Super-rich, billionaire</td>
-          </tr>
-          <tr>
-            <td>Unearthly</td>
-            <td>Absurdly wealthy, virtually unlimited resources</td>
-          </tr>
-        </table>
-        
-        <h3>Optional Bank Loans</h3>
-        <p>Characters may purchase something up to one rank higher than their Resource rank through a bank loan. The character then must make monthly Resource FEATs of two ranks less for as many months as the rank number of the item.</p>
-      `;
-      
-      // Create the dialog
-      new Dialog({
-        title: "Resources in FASERIP",
-        content: content,
-        buttons: {
-          close: {
-            icon: '<i class="fas fa-times"></i>',
-            label: "Close"
-          },
-          roll: {
-            icon: '<i class="fas fa-dice-d20"></i>',
-            label: "Make Resource Roll",
-            callback: () => this._onResourceRoll()
-          }
-        },
-        default: "close",
-        classes: ["resources-dialog"]
-      }).render(true);
+      ev.preventDefault();
+    
+      // Ctrl+Click opens the info dialog
+      if (ev.ctrlKey) {
+        this._showResourceInfoDialog();
+      } else {
+        // Plain click rolls instantly
+        this._onResourceRoll();
+      }
     });
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2886,13 +2801,76 @@ html.find('.headquarters-row').each((i, row) => {
     // Continue with other listeners...
   }
 
-  // In actorSheet.js, add as a method to FaseripActorSheet
+  _showResourceInfoDialog() {
+    const content = `
+      <h2>Resource FEATs</h2>
+      <p>Resources are a measure of a character's wealth and buying power. Instead of tracking exact money, the FASERIP system uses Resource FEATs to determine if a character can afford an item.</p>
+  
+      <h3>Using Resources</h3>
+      <p>To purchase anything, a character must make a Resource FEAT. This is the equivalent of a credit check or checking the bank account to see how much cash is available.</p>
+  
+      <h3>Resource FEAT Rules:</h3>
+      <ul>
+        <li>A Resource FEAT may be made once per week.</li>
+        <li>A character cannot purchase an item with a higher rank than their Resource rank.</li>
+        <li>If the item's rank is 3 ranks lower than the Resource rank, purchase is automatic.</li>
+        <li>If 1–2 ranks lower, a green FEAT is needed.</li>
+        <li>If equal to Resource rank, a yellow FEAT is needed.</li>
+      </ul>
+  
+      <h3>Success and Failure</h3>
+      <p>Success means the character can purchase the item. Failure indicates the item is too expensive and the character cannot try for any item of that rank or higher for the next week.</p>
+  
+      <table>
+        <tr><th>Resource Rank</th><th>Buying Power</th></tr>
+        <tr><td>Shift-0</td><td>Homeless, no income</td></tr>
+        <tr><td>Feeble</td><td>Poor, struggling to make ends meet</td></tr>
+        <tr><td>Poor</td><td>Low income, basic necessities only</td></tr>
+        <tr><td>Typical</td><td>Average income, modest lifestyle</td></tr>
+        <tr><td>Good</td><td>Comfortable income, can afford luxuries</td></tr>
+        <tr><td>Excellent</td><td>Well-off, upper middle class</td></tr>
+        <tr><td>Remarkable</td><td>Wealthy, significant disposable income</td></tr>
+        <tr><td>Incredible</td><td>Very wealthy, millionaire</td></tr>
+        <tr><td>Amazing</td><td>Extremely wealthy, multi-millionaire</td></tr>
+        <tr><td>Monstrous</td><td>Super-rich, billionaire</td></tr>
+        <tr><td>Unearthly</td><td>Absurdly wealthy, virtually unlimited resources</td></tr>
+      </table>
+  
+      <h3>Optional Bank Loans</h3>
+      <p>Characters may purchase something up to one rank higher than their Resource rank through a bank loan. The character then must make monthly Resource FEATs of two ranks less for as many months as the rank number of the item.</p>
+    `;
+  
+    new Dialog({
+      title: "Resources in FASERIP",
+      content,
+      buttons: {
+        close: {
+          icon: '<i class="fas fa-times"></i>',
+          label: "Close"
+        },
+        roll: {
+          icon: '<i class="fas fa-dice-d20"></i>',
+          label: "Make Resource Roll",
+          callback: () => this._onResourceRoll()
+        }
+      },
+      default: "close",
+      classes: ["resources-dialog"]
+    }).render(true);
+  }
+
+  // Resource Roll method
   _onResourceRoll() {
     const resourceRank = this.actor.system.attributes.resources.rank;
     const resourceValue = this.actor.system.attributes.resources.value;
-    
+  
+    const ranks = [
+      "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent",
+      "Remarkable", "Incredible", "Amazing", "Monstrous", "Unearthly"
+    ];
+  
     // Create dialog for roll options
-    let dialogContent = `
+    const dialogContent = `
       <div style="margin-bottom: 10px;">
         <label style="display: inline-block; width: 120px;">Resource Rank:</label>
         <input type="text" id="resource-rank" value="${resourceRank}" style="width: 100px;" readonly>
@@ -2901,17 +2879,7 @@ html.find('.headquarters-row').each((i, row) => {
       <div style="margin-bottom: 10px;">
         <label style="display: inline-block; width: 120px;">Item Cost Rank:</label>
         <select id="item-rank" name="itemRank" style="width: 120px;">
-          <option value="Shift-0">Shift-0</option>
-          <option value="Feeble">Feeble</option>
-          <option value="Poor">Poor</option>
-          <option value="Typical">Typical</option>
-          <option value="Good">Good</option>
-          <option value="Excellent">Excellent</option>
-          <option value="Remarkable">Remarkable</option>
-          <option value="Incredible">Incredible</option>
-          <option value="Amazing">Amazing</option>
-          <option value="Monstrous">Monstrous</option>
-          <option value="Unearthly">Unearthly</option>
+          ${ranks.map(r => `<option value="${r}">${r}</option>`).join("")}
         </select>
       </div>
       <div style="margin-bottom: 10px;">
@@ -2919,13 +2887,10 @@ html.find('.headquarters-row').each((i, row) => {
         <input type="text" id="item-description" style="width: 180px;" placeholder="e.g., Apartment rent">
       </div>
       <div style="margin-bottom: 10px;">
-        <label>
-          <input type="checkbox" id="bank-loan" name="bankLoan"> 
-          Using a bank loan (allows 1 rank higher purchase)
-        </label>
+        <label><input type="checkbox" id="bank-loan" name="bankLoan"> Using a bank loan (allows 1 rank higher purchase)</label>
       </div>
     `;
-
+  
     new Dialog({
       title: `Resource Roll: ${this.actor.name}`,
       content: dialogContent,
@@ -2934,73 +2899,58 @@ html.find('.headquarters-row').each((i, row) => {
           icon: '<i class="fas fa-dice-d20"></i>',
           label: "Roll",
           callback: async (html) => {
-            const itemRank = html.find('[id="item-rank"]').val();
-            const itemDescription = html.find('[id="item-description"]').val() || "item";
-            const bankLoan = html.find('[id="bank-loan"]').is(':checked');
-            
-            // Determine ranks
-            const ranks = [
-              "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent",
-              "Remarkable", "Incredible", "Amazing", "Monstrous", "Unearthly"
-            ];
-            
+            const itemRank = html.find('#item-rank').val();
+            const itemDescription = html.find('#item-description').val() || "item";
+            const bankLoan = html.find('#bank-loan').is(':checked');
+  
             const resourceIndex = ranks.indexOf(resourceRank);
             const itemIndex = ranks.indexOf(itemRank);
-            
+  
             if (resourceIndex === -1 || itemIndex === -1) {
-              ui.notifications.error("Invalid rank selection");
-              return;
+              return ui.notifications.error("Invalid rank selection");
             }
-            
-            // Check if purchase is possible based on ranks
-            if (itemIndex > resourceIndex && !bankLoan) {
-              ui.notifications.warn("Item rank is higher than resource rank - purchase impossible without a loan");
-              return;
+  
+            // Purchase validation
+            if (itemIndex > resourceIndex + (bankLoan ? 1 : 0)) {
+              return ui.notifications.warn("Item rank is too high for your resources.");
             }
-
-            if (itemIndex > resourceIndex + 1) {
-              ui.notifications.warn("Item rank is too high even with a bank loan");
-              return;
-            }
-
-            // Determine FEAT color needed
+  
+            // Determine required FEAT
             let featColorNeeded;
-            let rankDifference = resourceIndex - itemIndex;
-
+            const rankDifference = resourceIndex - itemIndex;
+  
             if (rankDifference >= 3) {
               featColorNeeded = "Automatic";
             } else if (rankDifference === 1 || rankDifference === 2) {
               featColorNeeded = "Green";
-            } else if (rankDifference === 0) {
+            } else if (rankDifference === 0 || (bankLoan && itemIndex === resourceIndex + 1)) {
               featColorNeeded = "Yellow";
-            } else if (bankLoan && itemIndex === resourceIndex + 1) {
-              featColorNeeded = "Yellow";  // This is what's changed - bank loans use yellow FEAT for initial approval
             }
-
-            // Create the roll
+  
+            // Roll and evaluate
             const roll = new Roll("1d100");
-
-            // Evaluate the roll
             await roll.evaluate();
-
-            // Calculate the result
+  
             const resultColor = game.msh.rollUniversalTable(resourceRank, roll.total);
-
-            // Determine success
+            const resultColorLower = resultColor.toLowerCase();
             let success = false;
-            if (featColorNeeded === "Automatic") {
-              success = true;
-            } else if (featColorNeeded === "Green") {
-              success = ["green", "yellow", "red"].includes(resultColor.toLowerCase());
-            } else if (featColorNeeded === "Yellow") {
-              success = ["yellow", "red"].includes(resultColor.toLowerCase());
-            } else if (featColorNeeded === "Red") {
-              success = resultColor.toLowerCase() === "red";
-            }
-            
-            // Create chat message
-            let content = `
-              <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
+  
+            if (featColorNeeded === "Automatic") success = true;
+            else if (featColorNeeded === "Green") success = ["green", "yellow", "red"].includes(resultColorLower);
+            else if (featColorNeeded === "Yellow") success = ["yellow", "red"].includes(resultColorLower);
+            else if (featColorNeeded === "Red") success = resultColorLower === "red";
+  
+            // Format chat output
+            const colorMap = {
+              white: "#f8f8f8",
+              green: "#4CAF50",
+              yellow: "#FFD700",
+              red: "#F44336"
+            };
+            const textColor = (["white", "yellow"].includes(resultColorLower)) ? "#333" : "white";
+  
+            const chatContent = `
+              <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px;">
                 <div style="padding: 5px 10px; border-bottom: 1px solid #c0c0c0; font-size: 1.1em; color: #8b0000;">
                   <strong>${this.actor.name} - Resource FEAT for ${itemDescription}</strong>
                 </div>
@@ -3011,31 +2961,25 @@ html.find('.headquarters-row').each((i, row) => {
                   <div>Required FEAT: ${featColorNeeded}</div>
                   <div>Roll: ${roll.total}</div>
                 </div>
-                <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
-                  background-color: ${resultColor.toLowerCase() === 'white' ? '#f8f8f8' :
-                    resultColor.toLowerCase() === 'green' ? '#4CAF50' :
-                      resultColor.toLowerCase() === 'yellow' ? '#FFD700' :
-                        '#F44336'}; 
-                  color: ${resultColor.toLowerCase() === 'white' || resultColor.toLowerCase() === 'yellow' ? '#333' : 'white'};">
+                <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px;
+                  background-color: ${colorMap[resultColorLower]}; color: ${textColor};">
                   ${resultColor.toUpperCase()}
                 </div>
                 <div style="padding: 5px 10px; font-size: 1.1em; text-align: center; font-weight: bold; color: ${success ? '#4CAF50' : '#F44336'};">
                   ${success ? 'SUCCESS: Purchase Possible' : 'FAILURE: Cannot Afford'}
                 </div>
-                ${bankLoan && success ? 
-                  `<div style="padding: 5px 10px; font-size: 0.9em; background-color: #fffde7; border: 1px solid #ffd54f; margin-top: 5px;">
-                     <strong>Bank loan approved</strong><br> 
-                     You must make a ${ranks[Math.max(0, resourceIndex-2)]} Resource FEAT each month for ${itemIndex+1} months.
-                     <br>Failure to pay results in the bank reclaiming the item.
-                   </div>` 
-                  : ''}
+                ${bankLoan && success ? `
+                  <div style="padding: 5px 10px; font-size: 0.9em; background-color: #fffde7; border: 1px solid #ffd54f; margin-top: 5px;">
+                    <strong>Bank loan approved</strong><br>
+                    You must make a ${ranks[Math.max(0, resourceIndex - 2)]} Resource FEAT each month for ${itemIndex + 1} months.
+                    <br>Failure to pay results in the bank reclaiming the item.
+                  </div>` : ''}
               </div>
             `;
-            
-            // Send to chat
+  
             await ChatMessage.create({
               speaker: ChatMessage.getSpeaker({ actor: this.actor }),
-              content: content
+              content: chatContent
             });
           }
         },
