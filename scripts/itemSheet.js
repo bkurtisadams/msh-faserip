@@ -200,6 +200,62 @@ getData() {
           console.error("Invalid stunt index:", index, "length:", stunts.length);
         }
       });
+
+      // Handle Power Stunt roll button
+      html.find('.roll-stunt').click(async ev => {
+        const index = parseInt(ev.currentTarget.dataset.index);
+        const stunts = this.item.system.stunts || [];
+        const stunt = stunts[index];
+        const actor = this.item.parent;
+
+        if (!stunt || !actor) return;
+
+        // Mastered stunt = no karma cost
+        if (stunt.timesUsed >= 10) {
+          ui.notifications.info(`Mastered stunt "${stunt.name}" — no Karma required.`);
+          this._rollStunt(actor, this.item, stunt);
+          return;
+        }
+
+        // Confirm Karma cost
+        const confirmed = await Dialog.confirm({
+          title: "Attempt Power Stunt",
+          content: `This attempt costs <strong>100 Karma</strong>. Proceed?`
+        });
+        if (!confirmed) return;
+
+        const currentKarma = actor.system.attributes.karma.value;
+        if (currentKarma < 100) {
+          ui.notifications.error(`${actor.name} doesn't have enough Karma.`);
+          return;
+        }
+
+        // Log Karma spend
+        const history = foundry.utils.deepClone(actor.system.karma.history || []);
+        history.push({
+          realDate: new Date().toLocaleDateString(),
+          gameDate: "", // Fill if needed
+          amount: -100,
+          type: "Power Stunt",
+          description: `Attempted stunt "${stunt.name}" from ${this.item.name}`
+        });
+
+        // Recalculate karma
+        const lifetime = actor.system.karma.lifetime || 0;
+        const spent = history.reduce((sum, e) => e.amount < 0 ? sum + Math.abs(e.amount) : sum, 0);
+        const advancement = actor.system.karma.advancement || 0;
+        const pool = actor.system.karma.pool || 0;
+        const current = Math.max(0, lifetime - spent - advancement - pool);
+
+        await actor.update({
+          "system.karma.history": history,
+          "system.attributes.karma.value": current
+        });
+
+        // Roll the Power Stunt
+        this._rollStunt(actor, this.item, stunt);
+      });
+
     }
 
     // For talent sheets - handle specialty dropdown
@@ -253,6 +309,65 @@ if (this.item.type === "talent") {
   // end of activeListeners
   }
 
+  async _rollStunt(actor, power, stunt) {
+    // Determine FEAT difficulty
+    let requiredColor = "red";
+    if (stunt.timesUsed >= 4 && stunt.timesUsed < 10) requiredColor = "green";
+    else if (stunt.timesUsed >= 1 && stunt.timesUsed <= 3) requiredColor = "yellow";
+  
+    // Get power rank
+    const rank = power.system.rank || "Typical";
+    const rankValue = CONFIG.FASERIP.rankValues[rank] ?? 6;
+  
+    // Roll 1d100
+    const roll = new Roll("1d100");
+    await roll.roll({ async: true });
+  
+    // Determine FEAT result color
+    const color = this._getFeatColor(rankValue, roll.total);
+  
+    // Prepare result text
+    const success = (
+      (requiredColor === "green" && (color === "green" || color === "yellow" || color === "red")) ||
+      (requiredColor === "yellow" && (color === "yellow" || color === "red")) ||
+      (requiredColor === "red" && color === "red")
+    );
+  
+    // Optional: increment timesUsed on success only
+    if (success && stunt.timesUsed < 10) {
+      const stunts = foundry.utils.deepClone(power.system.stunts || []);
+      const idx = stunts.findIndex(s => s.name === stunt.name);
+      if (idx !== -1) {
+        stunts[idx].timesUsed++;
+        await power.update({ "system.stunts": stunts });
+      }
+    }
+  
+    // Chat output
+    const resultMsg = `
+      <strong>${actor.name}</strong> attempts Power Stunt: <em>${stunt.name}</em><br>
+      Power Rank: <strong>${rank}</strong> (${rankValue})<br>
+      Required FEAT: <strong>${requiredColor.toUpperCase()}</strong><br>
+      Roll: <strong>${roll.total}</strong> → Result: <span style="color:${color}">${color.toUpperCase()}</span><br>
+      <strong>${success ? "✅ Success!" : "❌ Failure!"}</strong>
+    `;
+  
+    ChatMessage.create({
+      user: game.user.id,
+      speaker: ChatMessage.getSpeaker({ actor }),
+      content: await roll.render() + resultMsg,
+      type: CONST.CHAT_MESSAGE_TYPES.ROLL,
+      roll
+    });
+  }
+  
+  _getFeatColor(rankValue, roll) {
+    if (roll >= 91) return "red";
+    if (roll >= 66) return rankValue >= 36 ? "red" : "yellow";
+    if (roll >= 36) return rankValue >= 16 ? "yellow" : "green";
+    return "green";
+  }
+  
   /**
  * Update power type options based on selected category
  */
