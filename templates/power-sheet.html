@@ -292,8 +292,10 @@
           </div>
           <textarea name="system.stunts.{{i}}.description">{{stunt.description}}</textarea>
           <div class="stunt-controls">
-            <button type="button" class="increment-stunt" data-index="{{i}}"><i class="fas fa-plus"></i> Use</button>
-            <button type="button" class="roll-stunt" data-index="{{i}}"><i class="fas fa-dice-d20"></i> Roll</button>
+            <!-- <button type="button" class="increment-stunt" data-index="{{i}}"><i class="fas fa-plus"></i> Use</button> -->
+            <!-- <button type="button" class="roll-stunt" data-index="{{i}}"><i class="fas fa-dice-d20"></i> Roll</button> -->
+            <button type="button" class="roll-stunt" data-index="{{@index}}">🎲 Roll Power Stunt</button>
+ 
             <button type="button" class="delete-stunt" data-index="{{i}}"><i class="fas fa-trash"></i></button>
           </div>
         </div>

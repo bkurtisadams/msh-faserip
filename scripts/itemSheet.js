@@ -1,3 +1,5 @@
+import { KarmaSheet } from "./karma.js";
+
 // In itemSheet.js
 export class FaseripItemSheet extends ItemSheet {
   static get defaultOptions() {
@@ -207,53 +209,31 @@ getData() {
         const stunts = this.item.system.stunts || [];
         const stunt = stunts[index];
         const actor = this.item.parent;
-
+      
         if (!stunt || !actor) return;
-
-        // Mastered stunt = no karma cost
+      
+        // Mastered stunt = no Karma cost
         if (stunt.timesUsed >= 10) {
           ui.notifications.info(`Mastered stunt "${stunt.name}" — no Karma required.`);
-          this._rollStunt(actor, this.item, stunt);
+          await this._rollStunt(actor, this.item, stunt);
           return;
         }
-
+      
         // Confirm Karma cost
         const confirmed = await Dialog.confirm({
           title: "Attempt Power Stunt",
           content: `This attempt costs <strong>100 Karma</strong>. Proceed?`
         });
         if (!confirmed) return;
-
+      
         const currentKarma = actor.system.attributes.karma.value;
         if (currentKarma < 100) {
           ui.notifications.error(`${actor.name} doesn't have enough Karma.`);
           return;
         }
-
-        // Log Karma spend
-        const history = foundry.utils.deepClone(actor.system.karma.history || []);
-        history.push({
-          realDate: new Date().toLocaleDateString(),
-          gameDate: "", // Fill if needed
-          amount: -100,
-          type: "Power Stunt",
-          description: `Attempted stunt "${stunt.name}" from ${this.item.name}`
-        });
-
-        // Recalculate karma
-        const lifetime = actor.system.karma.lifetime || 0;
-        const spent = history.reduce((sum, e) => e.amount < 0 ? sum + Math.abs(e.amount) : sum, 0);
-        const advancement = actor.system.karma.advancement || 0;
-        const pool = actor.system.karma.pool || 0;
-        const current = Math.max(0, lifetime - spent - advancement - pool);
-
-        await actor.update({
-          "system.karma.history": history,
-          "system.attributes.karma.value": current
-        });
-
-        // Roll the Power Stunt
-        this._rollStunt(actor, this.item, stunt);
+      
+        // Call the actual stunt logic (handles all logging, rolling, and output)
+        await this._rollStunt(actor, this.item, stunt);
       });
 
     }
@@ -310,32 +290,44 @@ if (this.item.type === "talent") {
   }
 
   async _rollStunt(actor, power, stunt) {
-    // Determine FEAT difficulty
-    let requiredColor = "red";
-    if (stunt.timesUsed >= 4 && stunt.timesUsed < 10) requiredColor = "green";
-    else if (stunt.timesUsed >= 1 && stunt.timesUsed <= 3) requiredColor = "yellow";
-  
-    // Get power rank
     const rank = power.system.rank || "Typical";
     const rankValue = CONFIG.FASERIP.rankValues[rank] ?? 6;
   
+    // Determine required FEAT color for the next attempt
+    const nextAttempt = stunt.timesUsed + 1;
+    let requiredColor = "red";
+    if (nextAttempt >= 4 && nextAttempt < 10) requiredColor = "green";
+    else if (nextAttempt >= 1 && nextAttempt <= 3) requiredColor = "yellow";
+  
+    // Prompt for Karma bonus
+    const karmaInput = await Dialog.prompt({
+      title: "Add Karma to Roll?",
+      label: "Optional Karma to add to roll:",
+      callback: html => parseInt(html.find("input").val() || "0"),
+      content: `<input type="number" min="0" value="0" style="width:100%"/>`
+    });
+  
+    const karmaBonus = Number.isNaN(karmaInput) ? 0 : karmaInput;
+  
     // Roll 1d100
     const roll = new Roll("1d100");
-    await roll.roll({ async: true });
+    await roll.evaluate();
+    const total = roll.total + karmaBonus;
   
     // Determine FEAT result color
-    const color = this._getFeatColor(rankValue, roll.total);
-  
-    // Prepare result text
+    const resultColor = this._getFeatColor(rankValue, total);
     const success = (
-      (requiredColor === "green" && (color === "green" || color === "yellow" || color === "red")) ||
-      (requiredColor === "yellow" && (color === "yellow" || color === "red")) ||
-      (requiredColor === "red" && color === "red")
+      (requiredColor === "green" && ["green", "yellow", "red"].includes(resultColor)) ||
+      (requiredColor === "yellow" && ["yellow", "red"].includes(resultColor)) ||
+      (requiredColor === "red" && resultColor === "red")
     );
   
-    // Optional: increment timesUsed on success only
+    // Increment usage count if successful and not yet mastered
     if (success && stunt.timesUsed < 10) {
-      const stunts = foundry.utils.deepClone(power.system.stunts || []);
+      let stunts = Array.isArray(power.system.stunts)
+        ? foundry.utils.deepClone(power.system.stunts)
+        : Object.values(foundry.utils.deepClone(power.system.stunts || {}));
+  
       const idx = stunts.findIndex(s => s.name === stunt.name);
       if (idx !== -1) {
         stunts[idx].timesUsed++;
@@ -343,23 +335,45 @@ if (this.item.type === "talent") {
       }
     }
   
-    // Chat output
-    const resultMsg = `
-      <strong>${actor.name}</strong> attempts Power Stunt: <em>${stunt.name}</em><br>
+    // Log Karma spend (100 base + bonus if applicable)
+    const karmaSheet = new KarmaSheet(actor);
+    await karmaSheet._addKarmaEvent({
+      realDate: new Date().toLocaleDateString(),
+      gameDate: "",
+      amount: -100,
+      type: "Power Stunt",
+      description: `Attempted stunt "${stunt.name}" from ${power.name}`
+    });
+  
+    if (karmaBonus > 0) {
+      await karmaSheet._addKarmaEvent({
+        realDate: new Date().toLocaleDateString(),
+        gameDate: "",
+        amount: -karmaBonus,
+        type: "Karma Bonus",
+        description: `Added ${karmaBonus} Karma to Power Stunt roll for "${stunt.name}"`
+      });
+    }
+  
+    // Display result in chat
+    const chatHtml = `
+      <strong>${actor.name}</strong> attempts <em>${stunt.name}</em> from <strong>${power.name}</strong><br>
       Power Rank: <strong>${rank}</strong> (${rankValue})<br>
-      Required FEAT: <strong>${requiredColor.toUpperCase()}</strong><br>
-      Roll: <strong>${roll.total}</strong> → Result: <span style="color:${color}">${color.toUpperCase()}</span><br>
+      Required FEAT: <strong style="color:${requiredColor}">${requiredColor.toUpperCase()}</strong><br>
+      Roll: <strong>${roll.total}</strong> + Karma: <strong>${karmaBonus}</strong> → <strong>${total}</strong><br>
+      Result: <strong style="color:${resultColor}">${resultColor.toUpperCase()}</strong><br>
+      Karma Spent: <strong>${100 + karmaBonus}</strong><br>
       <strong>${success ? "✅ Success!" : "❌ Failure!"}</strong>
     `;
   
-    ChatMessage.create({
-      user: game.user.id,
+    await roll.toMessage({
       speaker: ChatMessage.getSpeaker({ actor }),
-      content: await roll.render() + resultMsg,
-      type: CONST.CHAT_MESSAGE_TYPES.ROLL,
-      roll
+      flavor: chatHtml,
+      rollMode: game.settings.get("core", "rollMode"),
+      rolls: [roll] // ✅ new format for Foundry v12+
     });
   }
+  
   
   _getFeatColor(rankValue, roll) {
     if (roll >= 91) return "red";
