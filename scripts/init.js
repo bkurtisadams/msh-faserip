@@ -8,6 +8,7 @@ import { FaseripRolls } from './rolls.js';
 import { rollUniversalTable } from './universalTable.js';  // Import your function
 import { openUniversalTableDialog } from './rolls.js';
 import { rollUniversalAction } from './rolls.js';
+import { FaseripInitiative } from './faserip-initiative.js';
 
 Hooks.once("init", async () => {
   console.log("Marvel Super Heroes (FASERIP) system initializing...");
@@ -40,6 +41,18 @@ Hooks.once("init", async () => {
   game.msh.rollContact = FaseripRolls.rollContact;
   game.msh.rollEquipment = FaseripRolls.rollEquipment;
 
+  // Initialize faserip initiative
+  FaseripInitiative.init();
+
+  game.msh.rollFaseripInitiative = () => {
+    if (!game.combat) {
+      ui.notifications.warn("No active combat encounter");
+      return;
+    }
+    
+    FaseripInitiative.rollSideInitiative(game.combat);
+  };
+  
   // Add the vehicle control roll function
   game.msh.rollVehicleControl = (actor, vehicle) => {
     if (actor && actor.sheet && actor.sheet._rollVehicleControl) {

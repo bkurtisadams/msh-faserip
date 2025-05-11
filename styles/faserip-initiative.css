@@ -1,0 +1,135 @@
+/* Ultra-minimal CSS for FASERIP initiative */
+
+/* Initiative display bar */
+.faserip-initiative-bar {
+  font-size: 0.9em;
+  padding: 2px 5px;
+  margin-bottom: 4px;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 3px;
+  text-align: center;
+}
+
+/* Combatant styling */
+.combatant.pc-side {
+  border-left: 3px solid rgba(0, 100, 0, 0.5);
+}
+
+.combatant.npc-side {
+  border-left: 3px solid rgba(139, 0, 0, 0.5);
+}
+
+.combatant.highest-intuition .token-name {
+  font-weight: bold;
+}
+
+.intuition-indicator {
+  color: #8B0000;
+  margin-left: 5px;
+  font-size: 0.8em;
+}
+
+.pc-side .intuition-indicator {
+  color: #006400;
+}
+
+/* Reroll button */
+.combat-control.faserip-reroll {
+  background: #8B0000;
+  color: white;
+  margin-left: 5px;
+  padding: 0 5px;
+  border-radius: 3px;
+}
+
+/* Initiative roll results in chat */
+.faserip-initiative-result {
+  background: rgba(0, 0, 0, 0.05);
+  border: 1px solid #AAA;
+  border-radius: 5px;
+  padding: 10px;
+}
+
+.faserip-initiative-result h2 {
+  margin: 0 0 10px 0;
+  padding-bottom: 5px;
+  text-align: center;
+  border-bottom: 1px solid #DDD;
+  font-size: 1.2em;
+  color: #8B0000;
+}
+
+.initiative-sides {
+  display: flex;
+  justify-content: space-between;
+  gap: 15px;
+  margin-top: 10px;
+}
+
+.faserip-initiative-result .side {
+  flex: 1;
+  padding: 8px;
+  border-radius: 5px;
+  text-align: center;
+  border: 1px solid #AAA;
+}
+
+.pc-side {
+  background: rgba(0, 100, 0, 0.1);
+  border-color: #006400;
+}
+
+.npc-side {
+  background: rgba(139, 0, 0, 0.1);
+  border-color: #8B0000;
+}
+
+.roll-value {
+  font-size: 1.5em;
+  font-weight: bold;
+}
+
+.roll-modifier {
+  font-size: 0.9em;
+  color: #8B0000;
+}
+
+.roll-special {
+  font-size: 0.8em;
+  font-style: italic;
+  margin-top: 2px;
+  color: #555;
+}
+
+.roll-total {
+  font-size: 1.2em;
+  font-weight: bold;
+  margin-top: 5px;
+  padding: 2px 8px;
+  background: #F0F0F0;
+  border-radius: 3px;
+}
+
+.turn-order {
+  font-weight: bold;
+  margin-top: 5px;
+  padding: 3px 0;
+}
+
+.first .turn-order {
+  background: #8B0000;
+  color: white;
+  border-radius: 3px;
+}
+
+.pc-side.first .turn-order {
+  background: #006400;
+}
+
+/* Settings dialog */
+.faserip-initiative-help {
+  margin-top: 15px;
+  background: rgba(0, 0, 0, 0.03);
+  border-radius: 3px;
+  padding: 8px;
+}
