@@ -135,10 +135,14 @@
   background: #006400;
 }
 
-/* Settings dialog */
-.faserip-initiative-help {
-  margin-top: 15px;
-  background: rgba(0, 0, 0, 0.03);
-  border-radius: 3px;
+/* Initiative tie message */
+.faserip-initiative-tie {
+  background: rgba(255, 215, 0, 0.2);
+  border: 1px solid #DAA520;
+  border-radius: 5px;
   padding: 8px;
+  text-align: center;
+  font-weight: bold;
+  font-size: 1.1em;
+  margin-bottom: 5px;
 }

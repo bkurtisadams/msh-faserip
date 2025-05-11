@@ -152,7 +152,7 @@ export class FaseripInitiative {
     const pcHighestName = combat.getFlag("msh-faserip", "pcHighestName") || "";
     const npcHighestName = combat.getFlag("msh-faserip", "npcHighestName") || "";
     
-          // Add compact info below round number
+    // Add compact info below round number
     const roundDisplay = html.find('.combat-round');
     if (roundDisplay.length && roundDisplay.next('.faserip-initiative-bar').length === 0) {
       // Format the Side A (PC) display text
@@ -211,7 +211,9 @@ export class FaseripInitiative {
         // Add star indicator if not already present
         if ($(el).find('.intuition-indicator').length === 0) {
           const mod = side === 'pc' ? pcMod : npcMod;
-          $(el).find('.token-name').after(`<span class="intuition-indicator" title="Highest Intuition (+${mod})"><i class="fas fa-star"></i></span>`);
+          if (mod > 0) {
+            $(el).find('.token-name').after(`<span class="intuition-indicator" title="Highest Intuition (+${mod})"><i class="fas fa-star"></i></span>`);
+          }
         }
       }
       
@@ -231,12 +233,12 @@ export class FaseripInitiative {
           }
           tooltip += ` = ${sideData.total}`;
           
-          // Replace the initiative display with our custom one - just show the actual total
+          // Replace the initiative display with our custom one
           initElement.attr('title', tooltip);
           
           // Only replace the text if we're showing initiative as numbers (not turn order)
           if (combatant.initiative !== null) {
-            // Just show the actual initiative value, not the 1 or 2 sorting value
+            // Show the actual initiative value, hiding the 1 or 2 sorting value
             initElement.html(`<span class="init-roll-display" title="${tooltip}">
               ${sideData.total}
             </span>`);
@@ -370,15 +372,26 @@ export class FaseripInitiative {
       } else if (npcTotal > pcTotal) {
         goesFirst = 'npc';
       } else {
-        // Ties: higher modifier goes first
-        if (pcMod > npcMod) {
-          goesFirst = 'pc';
-        } else if (npcMod > pcMod) {
-          goesFirst = 'npc';
-        } else {
-          // Random if still tied
-          goesFirst = Math.random() < 0.5 ? 'pc' : 'npc';
-        }
+        // In case of a tie, reroll until there is a clear winner
+        console.log("FASERIP Initiative: Tie detected, rerolling...");
+        
+        // Show a message about the tie
+        ChatMessage.create({
+          user: game.user.id,
+          content: `<div class="faserip-initiative-tie">Initiative Tie (${pcTotal} vs ${npcTotal})! Rerolling...</div>`,
+          flavor: `Initiative Tie`,
+        });
+        
+        // Reset rolling flag so we can reroll
+        this.isRolling = false;
+        
+        // Reroll initiative after a short delay
+        setTimeout(() => {
+          this.rollSideInitiative(combat);
+        }, 1000);
+        
+        // Exit current roll process
+        return;
       }
       
       // Store results as flags
@@ -398,18 +411,39 @@ export class FaseripInitiative {
         await game.dice3d.showForRoll(npcRoll, game.user, true);
       }
       
-      // Update combatant initiatives (2 for first side, 1 for second side)
+      // Update combatant initiatives
       const updates = [];
       
+      // Create a map of combatants by side, preserving current display order
+      const pcCombatants = [];
+      const npcCombatants = [];
+      
+      // First pass: categorize by side
       for (const c of combat.combatants) {
         const side = c.actor?.hasPlayerOwner ? 'pc' : 'npc';
-        const initiative = side === goesFirst ? 2 : 1;
-        updates.push({_id: c.id, initiative: initiative});
+        if (side === 'pc') {
+          pcCombatants.push(c);
+        } else {
+          npcCombatants.push(c);
+        }
       }
       
-      // Apply updates with our flag
+      // Second pass: set initiative values (2 for winner side, 1 for loser side)
+      const winningSideCombatants = goesFirst === 'pc' ? pcCombatants : npcCombatants;
+      const losingSideCombatants = goesFirst === 'pc' ? npcCombatants : pcCombatants;
+      
+      // Winner side gets 2, loser side gets 1
+      for (const c of winningSideCombatants) {
+        updates.push({_id: c.id, initiative: 2});
+      }
+      
+      for (const c of losingSideCombatants) {
+        updates.push({_id: c.id, initiative: 1});
+      }
+      
+      // Apply updates but don't render yet
       if (updates.length) {
-        await combat.updateEmbeddedDocuments("Combatant", updates, {faserip: true});
+        await combat.updateEmbeddedDocuments("Combatant", updates, {faserip: true, render: false});
       }
       
       // Send a SINGLE chat message with results
@@ -453,8 +487,25 @@ export class FaseripInitiative {
         sound: CONFIG.sounds.dice
       });
       
+      // Make sure the first combatant of the winning side has focus
+      if (winningSideCombatants.length > 0) {
+        const firstWinnerID = winningSideCombatants[0].id;
+        
+        // Find the turn index for this combatant
+        // We need to recalculate turns first with setupTurns()
+        await combat.setupTurns();
+        
+        // Now find the index
+        const turnIndex = combat.turns.findIndex(t => t.id === firstWinnerID);
+        
+        // If found, set the current turn
+        if (turnIndex !== -1) {
+          await combat.update({turn: turnIndex}, {render: false});
+          console.log(`FASERIP Initiative: Setting focus to combatant at index ${turnIndex}`);
+        }
+      }
+      
       // Update UI
-      combat.setupTurns();
       ui.combat?.render();
       
     } catch (error) {
