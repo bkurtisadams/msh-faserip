@@ -1,13 +1,20 @@
-/* Ultra-minimal CSS for FASERIP initiative */
+/* CSS for FASERIP initiative with improved display */
 
 /* Initiative display bar */
 .faserip-initiative-bar {
   font-size: 0.9em;
-  padding: 2px 5px;
-  margin-bottom: 4px;
+  padding: 3px 6px;
+  margin-bottom: 5px;
   background: rgba(0, 0, 0, 0.05);
-  border-radius: 3px;
+  border-radius: 4px;
   text-align: center;
+  font-weight: 600;
+}
+
+.faserip-initiative-bar .goes-first {
+  font-weight: bold;
+  color: #8B0000;
+  font-style: italic;
 }
 
 /* Combatant styling */
@@ -33,6 +40,15 @@
   color: #006400;
 }
 
+/* Improved initiative display in tracker */
+.init-roll-display {
+  font-size: 0.9em;
+  padding: 2px 4px;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 3px;
+  cursor: help;
+}
+
 /* Reroll button */
 .combat-control.faserip-reroll {
   background: #8B0000;
@@ -44,7 +60,7 @@
 
 /* Initiative roll results in chat */
 .faserip-initiative-result {
-  background: rgba(0, 0, 0, 0.05);
+  background: rgba(0, 0, 0, 0.03);
   border: 1px solid #AAA;
   border-radius: 5px;
   padding: 10px;
@@ -85,24 +101,17 @@
 }
 
 .roll-value {
-  font-size: 1.5em;
+  font-size: 1.8em;
   font-weight: bold;
 }
 
 .roll-modifier {
   font-size: 0.9em;
-  color: #8B0000;
-}
-
-.roll-special {
-  font-size: 0.8em;
-  font-style: italic;
-  margin-top: 2px;
   color: #555;
 }
 
 .roll-total {
-  font-size: 1.2em;
+  font-size: 1.5em;
   font-weight: bold;
   margin-top: 5px;
   padding: 2px 8px;

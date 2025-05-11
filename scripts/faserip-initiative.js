@@ -11,7 +11,7 @@ export class FaseripInitiative {
   static registerSettings() {
     game.settings.register("msh-faserip", "useCustomInitiative", {
       name: "Use FASERIP Initiative Rules",
-      hint: "Enable custom FASERIP initiative rules (side-based initiative with Intuition modifiers).",
+      hint: "Enable side-based initiative with Intuition modifiers.",
       scope: "world",
       config: true,
       type: Boolean,
@@ -23,7 +23,7 @@ export class FaseripInitiative {
     
     game.settings.register("msh-faserip", "autoRerollInitiative", {
       name: "Auto Reroll Initiative Each Round",
-      hint: "Automatically reroll initiative at the start of each new round (FASERIP rules).",
+      hint: "Automatically reroll initiative at the start of each new round.",
       scope: "world",
       config: true,
       type: Boolean,
@@ -146,20 +146,42 @@ export class FaseripInitiative {
     const npcInit = combat.getFlag("msh-faserip", "npcInitiative");
     const pcMod = combat.getFlag("msh-faserip", "pcModifier") || 0;
     const npcMod = combat.getFlag("msh-faserip", "npcModifier") || 0;
+    const pcRoll = combat.getFlag("msh-faserip", "pcRoll");
+    const npcRoll = combat.getFlag("msh-faserip", "npcRoll");
     const goesFirst = combat.getFlag("msh-faserip", "goesFirst");
     const pcHighestName = combat.getFlag("msh-faserip", "pcHighestName") || "";
     const npcHighestName = combat.getFlag("msh-faserip", "npcHighestName") || "";
     
-    // Add compact info below round number
+          // Add compact info below round number
     const roundDisplay = html.find('.combat-round');
     if (roundDisplay.length && roundDisplay.next('.faserip-initiative-bar').length === 0) {
+      // Format the Side A (PC) display text
+      let pcText = `Side A `;
+      if (pcRoll !== undefined) {
+        pcText += `${pcRoll}`;
+        if (pcMod > 0 && pcRoll !== 1) pcText += `+${pcMod}`;
+        pcText += `=${pcInit}`;
+      } else {
+        pcText += `-`;
+      }
+      
+      // Format the Side B (NPC) display text
+      let npcText = `Side B `;
+      if (npcRoll !== undefined) {
+        npcText += `${npcRoll}`;
+        if (npcMod > 0 && npcRoll !== 1) npcText += `+${npcMod}`;
+        npcText += `=${npcInit}`;
+      } else {
+        npcText += `-`;
+      }
+      
       const infoBar = $(`
         <div class="faserip-initiative-bar">
-          PC Side ${pcInit !== undefined ? pcInit : '-'}${pcMod > 0 ? ` (+${pcMod})` : ''}
-          ${goesFirst === 'pc' ? ' Goes First' : ''}
-          - 
-          NPC Side ${npcInit !== undefined ? npcInit : '-'}${npcMod > 0 ? ` (+${npcMod})` : ''}
-          ${goesFirst === 'npc' ? ' Goes First' : ''}
+          ${pcText}
+          ${goesFirst === 'pc' ? ' <span class="goes-first">(First)</span>' : ''}
+          — 
+          ${npcText}
+          ${goesFirst === 'npc' ? ' <span class="goes-first">(First)</span>' : ''}
         </div>
       `);
       
@@ -190,6 +212,35 @@ export class FaseripInitiative {
         if ($(el).find('.intuition-indicator').length === 0) {
           const mod = side === 'pc' ? pcMod : npcMod;
           $(el).find('.token-name').after(`<span class="intuition-indicator" title="Highest Intuition (+${mod})"><i class="fas fa-star"></i></span>`);
+        }
+      }
+      
+      // Replace the initiative number with actual roll+mod info
+      const initElement = $(el).find('.initiative');
+      if (initElement.length) {
+        const sideData = side === 'pc' ? 
+          { total: pcInit, roll: pcRoll, mod: pcMod } : 
+          { total: npcInit, roll: npcRoll, mod: npcMod };
+        
+        if (sideData.total !== undefined) {
+          let tooltip = `${side === 'pc' ? 'Side A' : 'Side B'}: `;
+          if (sideData.roll === 1) {
+            tooltip += `Roll: ${sideData.roll} (no modifier on 1)`;
+          } else {
+            tooltip += `Roll: ${sideData.roll}${sideData.mod > 0 ? ` + ${sideData.mod}` : ''}`;
+          }
+          tooltip += ` = ${sideData.total}`;
+          
+          // Replace the initiative display with our custom one - just show the actual total
+          initElement.attr('title', tooltip);
+          
+          // Only replace the text if we're showing initiative as numbers (not turn order)
+          if (combatant.initiative !== null) {
+            // Just show the actual initiative value, not the 1 or 2 sorting value
+            initElement.html(`<span class="init-roll-display" title="${tooltip}">
+              ${sideData.total}
+            </span>`);
+          }
         }
       }
     });
@@ -256,20 +307,8 @@ export class FaseripInitiative {
             <label>Auto Reroll Each Round:</label>
             <div class="form-fields">
               <input type="checkbox" name="autoRerollInitiative" ${game.settings.get("msh-faserip", "autoRerollInitiative") ? "checked" : ""}>
-              <span class="notes">Automatically reroll initiative at the start of each new round (FASERIP rules)</span>
+              <span class="notes">Automatically reroll initiative at the start of each new round</span>
             </div>
-          </div>
-          <hr>
-          <div class="faserip-initiative-help">
-            <h3>FASERIP Initiative Rules</h3>
-            <p>In the FASERIP system, initiative works as follows:</p>
-            <ul>
-              <li>Each side (PCs and NPCs) rolls 1d10 once</li>
-              <li>Each side adds a modifier based on the character with the highest Intuition rank on that side</li>
-              <li>A roll of 1 is always a 1 (no modifier is applied)</li>
-              <li>The side with the higher total goes first</li>
-              <li>Initiative is rerolled each round</li>
-            </ul>
           </div>
         </form>
       `,
@@ -347,6 +386,8 @@ export class FaseripInitiative {
       await combat.setFlag("msh-faserip", "npcInitiative", npcTotal);
       await combat.setFlag("msh-faserip", "pcModifier", pcMod);
       await combat.setFlag("msh-faserip", "npcModifier", npcMod);
+      await combat.setFlag("msh-faserip", "pcRoll", pcRoll.total);
+      await combat.setFlag("msh-faserip", "npcRoll", npcRoll.total);
       await combat.setFlag("msh-faserip", "goesFirst", goesFirst);
       await combat.setFlag("msh-faserip", "pcHighestName", pcHighest.name);
       await combat.setFlag("msh-faserip", "npcHighestName", npcHighest.name);
@@ -374,31 +415,29 @@ export class FaseripInitiative {
       // Send a SINGLE chat message with results
       const roundInfo = combat.round ? `Round ${combat.round}` : 'Combat Start';
       
-      // Create the chat message content showing which character contributes the modifier
+      // Create clearer chat message content without explanatory text
       const content = `
         <div class="faserip-initiative-result">
           <h2>${roundInfo} - Initiative Results</h2>
           <div class="initiative-sides">
             <div class="side pc-side ${goesFirst === 'pc' ? 'first' : 'second'}">
-              <h3>PC Side</h3>
+              <h3>Side A</h3>
               <div class="roll-result">
                 <div class="roll-value">${pcRoll.total}</div>
-                ${pcMod > 0 && pcRoll.total !== 1 ? 
-                  `<div class="roll-modifier">+${pcMod} (${pcHighest.name})</div>` : ''}
-                ${pcRoll.total === 1 ? 
-                  '<div class="roll-special">(No modifier applied to a roll of 1)</div>' : ''}
+                ${pcMod > 0 ? 
+                  `<div class="roll-modifier">${pcRoll.total === 1 ? '' : `+${pcMod} (${pcHighest.name})`}</div>` : 
+                  ''}
                 <div class="roll-total">${pcTotal}</div>
               </div>
               <div class="turn-order">${goesFirst === 'pc' ? 'Acts First' : 'Acts Second'}</div>
             </div>
             <div class="side npc-side ${goesFirst === 'npc' ? 'first' : 'second'}">
-              <h3>NPC Side</h3>
+              <h3>Side B</h3>
               <div class="roll-result">
                 <div class="roll-value">${npcRoll.total}</div>
-                ${npcMod > 0 && npcRoll.total !== 1 ? 
-                  `<div class="roll-modifier">+${npcMod} (${npcHighest.name})</div>` : ''}
-                ${npcRoll.total === 1 ? 
-                  '<div class="roll-special">(No modifier applied to a roll of 1)</div>' : ''}
+                ${npcMod > 0 ? 
+                  `<div class="roll-modifier">${npcRoll.total === 1 ? '' : `+${npcMod} (${npcHighest.name})`}</div>` : 
+                  ''}
                 <div class="roll-total">${npcTotal}</div>
               </div>
               <div class="turn-order">${goesFirst === 'npc' ? 'Acts First' : 'Acts Second'}</div>
