@@ -9,6 +9,7 @@ import { rollUniversalTable } from './universalTable.js';  // Import your functi
 import { openUniversalTableDialog } from './rolls.js';
 import { rollUniversalAction } from './rolls.js';
 import { FaseripInitiative } from './faserip-initiative.js';
+import { CombatHandler } from './combat-handler.js';
 
 Hooks.once("init", async () => {
   console.log("Marvel Super Heroes (FASERIP) system initializing...");
@@ -26,7 +27,7 @@ Hooks.once("init", async () => {
     "systems/msh-faserip/templates/universal-rank-table.hbs"
   ]);
 
-  // Create the game.msh namespace if it doesn't exist
+  // Create game.msh namespace
   game.msh = game.msh || {};
   game.msh.rollUniversalAction = rollUniversalAction;
   // Add the rollUniversalTable function to the namespace
@@ -40,6 +41,9 @@ Hooks.once("init", async () => {
   game.msh.rollTalent = FaseripRolls.rollTalent;
   game.msh.rollContact = FaseripRolls.rollContact;
   game.msh.rollEquipment = FaseripRolls.rollEquipment;
+
+  // Add the CombatHandler to the namespace
+  game.msh.CombatHandler = CombatHandler;
 
   // Initialize faserip initiative
   FaseripInitiative.init();

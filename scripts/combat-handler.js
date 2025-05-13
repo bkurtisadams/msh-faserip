@@ -1,5 +1,4 @@
-// Suggested location: new file like systems/msh-faserip/scripts/combat-handler.js
-// Or could be part of rolls.js
+// location: systems/msh-faserip/scripts/combat-handler.js
 
 export class CombatHandler {
 
@@ -120,6 +119,8 @@ export class CombatHandler {
         if (target.system.attributes.health.value <= 0) {
             await this.handleZeroHealth(target, attacker);
         }
+
+        console.log("CombatHandler.processAttack called with:", attackData); // Added for debugging
     }
 
     /**
@@ -308,4 +309,4 @@ export class CombatHandler {
 }
 
 // Make it available globally for now, or import where needed
-game.msh.CombatHandler = CombatHandler;
+//game.msh.CombatHandler = CombatHandler;
