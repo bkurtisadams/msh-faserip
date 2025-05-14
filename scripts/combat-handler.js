@@ -173,11 +173,10 @@ export class CombatHandler {
         if (naturalBAPower) {
             const naturalBAValue = CONFIG.FASERIP.rankValues[naturalBAPower.system.rank] || 0;
             if (naturalBAValue > defenses.bodyArmorValue) { // Use the better of item or natural
-                 defenses.bodyArmorValue = naturalBAValue;
-                 defenses.usedBodyArmor = true;
+                defenses.bodyArmorValue = naturalBAValue;
+                defenses.usedBodyArmor = true;
             }
         }
-
 
         // Force Field (power)
         const ffPower = target.items.find(i => i.type === "power" && i.name.toLowerCase().includes("force field") && i.system.isActive);
@@ -186,54 +185,115 @@ export class CombatHandler {
             defenses.usedForceField = true;
         }
 
+        // ========= RESISTANCE HANDLING =========
         console.log("Target resistances:", target.system.resistances);
-        // Resistances (from actor.system.resistances or power)
-        // This is simplified. You'll need to match damageType (e.g., "Energy-Fire") to specific resistances.
-        // Normalize damage type to match resistance types
-        const damageTypeMap = {
-        s: "physical", sh: "physical", ba: "physical", ea: "physical",
-        tb: "physical", te: "physical", gp: "physical", gb: "physical",
-        e: "energy", en: "energy",
-        f: "force", fo: "force",
-        st: "stun", stun: "stun"
+        
+        // First, normalize the resistances data structure
+        let resistancesArray = [];
+        if (Array.isArray(target.system.resistances)) {
+            resistancesArray = target.system.resistances;
+        } else if (typeof target.system.resistances === 'object') {
+            // Convert object with numeric keys to array
+            resistancesArray = Object.values(target.system.resistances);
+        }
+        console.log("Normalized resistances array:", resistancesArray);
+
+        // Normalize damage type
+        let normalizedDamageType = damageType.toLowerCase();
+
+        // If we have a short code, expand it
+        const damageTypeExpansion = {
+            "s": "physical-shooting",
+            "sh": "physical-shooting",
+            "ba": "physical-blunt",
+            "ea": "physical-edged",
+            "tb": "physical-blunt",
+            "te": "physical-edged",
+            "gp": "physical-grapple",
+            "gb": "physical-grab",
+            "e": "energy-energy",
+            "en": "energy-energy",
+            "f": "force",
+            "fo": "force",
+            "st": "stun",
+            "stun": "stun"
         };
-        const normalizedType = damageTypeMap[damageType.toLowerCase()] || damageType.toLowerCase();
 
-        const resistances = Array.isArray(target.system.resistances) ? target.system.resistances : [];
-        const relevantResistance = resistances.find(r =>
-        normalizedType.includes(r.type?.toLowerCase?.() || "")
+        if (damageTypeExpansion[normalizedDamageType]) {
+            normalizedDamageType = damageTypeExpansion[normalizedDamageType];
+        }
+
+        console.log(`Normalized damage type: ${normalizedDamageType}`);
+
+        // Find relevant resistance from system.resistances
+        let relevantResistance = null;
+        
+        // Direct match - exact damage type
+        relevantResistance = resistancesArray.find(r => 
+            r.type?.toLowerCase() === normalizedDamageType
         );
+        console.log("Direct match result:", relevantResistance);
 
+        // Category match - e.g., "physical-blunt" would match "physical"
+        if (!relevantResistance) {
+            const mainCategory = normalizedDamageType.split('-')[0];
+            relevantResistance = resistancesArray.find(r => 
+                r.type?.toLowerCase() === mainCategory
+            );
+            console.log("Category match result:", relevantResistance, "using main category:", mainCategory);
+        }
+
+        // Substring match (fallback)
+        if (!relevantResistance) {
+            relevantResistance = resistancesArray.find(r => 
+                normalizedDamageType.includes(r.type?.toLowerCase() || "")
+            );
+            console.log("Substring match result:", relevantResistance);
+        }
+
+        // If we found a resistance in system.resistances, use it
         if (relevantResistance) {
             defenses.resistanceValue =
                 typeof relevantResistance.value === "number"
                     ? relevantResistance.value
                     : CONFIG.FASERIP.rankValues[relevantResistance.rank] || 0;
             defenses.usedResistance = true;
-            console.log(`✅ Resistance matched: ${relevantResistance.type}, using value = ${defenses.resistanceValue}`);
+            console.log(`✅ Resistance from system.resistances matched: ${relevantResistance.type}, value = ${defenses.resistanceValue}`);
         }
 
-        // Also check for Resistance powers
-        const resPower = target.items.find(i => i.type === "power" && i.name.toLowerCase().startsWith("resistance to") && damageType.toLowerCase().includes(i.name.toLowerCase().replace("resistance to ","")));
+        // Also check for Resistance powers (as an item)
+        const mainCategory = normalizedDamageType.split('-')[0];
+        
+        // Check for any resistance power related to this damage type
+        const resPower = target.items.find(i => {
+            if (i.type !== "power") return false;
+            const powerName = i.name.toLowerCase();
+            
+            // Check if it's a "Resistance to X" power
+            if (powerName.startsWith("resistance to ") || powerName.startsWith("immunity to ")) {
+                // Extract the resistance type from the power name
+                const resType = powerName.replace(/^(resistance|immunity) to /, "").trim();
+                
+                // Check if this resistance type matches our damage type
+                return mainCategory.includes(resType) || resType.includes(mainCategory);
+            }
+            return false;
+        });
+        
         if (resPower) {
+            console.log(`Found resistance power: ${resPower.name}`);
             const powerResVal = typeof resPower.system.value === "number"
                 ? resPower.system.value
                 : CONFIG.FASERIP.rankValues[resPower.system.rank] || 0;
-            if (powerResVal > defenses.resistanceValue) { // Use the better resistance
+                
+            // Use the better of system.resistances or power-based resistance
+            if (powerResVal > defenses.resistanceValue) { 
                 defenses.resistanceValue = powerResVal;
                 defenses.usedResistance = true;
+                console.log(`✅ Using resistance from power: ${resPower.name}, value = ${powerResVal}`);
             }
         }
 
-        if (relevantResistance) {
-            defenses.resistanceValue =
-                typeof relevantResistance.value === "number"
-                    ? relevantResistance.value
-                    : CONFIG.FASERIP.rankValues[relevantResistance.rank] || 0;
-            defenses.usedResistance = true;
-
-            console.log(`✅ Resistance matched: ${relevantResistance.type}, using value = ${defenses.resistanceValue}`);
-        }
         console.log("Final resistanceValue used in damage calc:", defenses.resistanceValue);
 
         if (skipDialog) { // GM might use this to speed things up

@@ -1836,7 +1836,7 @@ export class FaseripRolls {
         });
 
         // Auto-damage handling via CombatHandler
-        const target = Array.from(game.user.targets)[0]?.actor;
+        const target = game.user.targets.first()?.actor;
         if (target) {
           let baseDamage = parseInt(equipment.system.damage);
           if (isNaN(baseDamage)) {

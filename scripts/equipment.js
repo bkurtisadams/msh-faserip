@@ -492,11 +492,48 @@ async _rollWeapon(item, actor) {
               const canBeSlam = effect?.toLowerCase().includes("slam");
               const canBeKill = effect?.toLowerCase().includes("kill");
 
+              // damage type normalization
+              let normalizedDamageType;
+              switch(damageType.toUpperCase()) {
+                case "S":  // need case for "S"
+                case "SH":
+                case "BA":
+                  normalizedDamageType = "Physical-Blunt";
+                  break;
+                case "EA":
+                  normalizedDamageType = "Physical-Edged";
+                  break;
+                case "TE":
+                  normalizedDamageType = "Physical-Edged";
+                  break;
+                case "TB":
+                  normalizedDamageType = "Physical-Blunt";
+                  break;
+                case "E":
+                case "EN":
+                  normalizedDamageType = "Energy-Energy";
+                  break;
+                case "F":
+                case "FO":
+                  normalizedDamageType = "Force";
+                  break;
+                case "GP":
+                  normalizedDamageType = "Physical-Grapple";
+                  break;
+                case "GB":
+                  normalizedDamageType = "Physical-Grab";
+                  break;
+                default:
+                  normalizedDamageType = "Physical-Blunt"; // Changed default to Physical-Blunt
+              }
+              console.log(`Weapon damage type "${damageType}" normalized to "${normalizedDamageType}"`);
+
+              // Update the CombatHandler.processAttack call to use the normalized damage type
               await CombatHandler.processAttack({
                 attacker: actor,
                 target: target,
                 baseDamage: baseDamage,
-                damageType: damageType || "Physical",
+                damageType: normalizedDamageType, // Use normalized type here instead of direct damageType
                 sourceName: item.name,
                 canBeStun,
                 canBeSlam,
