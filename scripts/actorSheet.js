@@ -972,6 +972,7 @@ export class FaseripActorSheet extends ActorSheet {
       const savedActionType = item.getFlag("msh-faserip", "lastActionType") || "";
       const savedColumnShift = item.getFlag("msh-faserip", "lastColumnShift") || 0;
       const savedDamageCS = item.getFlag("msh-faserip", "lastDamageCS") || 0;
+      const savedDamageType = item.getFlag("msh-faserip", "lastDamageType") || "Energy-Energy";
       const skipDiceRoll = item.getFlag("msh-faserip", "skipDiceRoll") || false;
 
       // Create action type options HTML, with saved option selected
@@ -1006,6 +1007,17 @@ export class FaseripActorSheet extends ActorSheet {
     <input type="number" id="damage-cs" name="damageCs" value="${savedDamageCS}" style="width: 50px;">
     <span style="color: #666; font-size: 0.9em;">(modifies damage rank)</span>
   </div>
+  // more control over the damage aspects
+  <div style="margin-bottom: 10px;">
+    <label style="display: inline-block; width: 120px;">Damage Type:</label>
+    <select id="damage-type" name="damageType" style="width: 180px;">
+      <option value="Energy" ${item.system.type?.includes('Energy') ? 'selected' : ''}>Energy</option>
+      <option value="Force" ${item.system.type?.includes('Force') ? 'selected' : ''}>Force</option>
+      <option value="Physical-Blunt" ${item.system.type?.includes('Physical') ? 'selected' : ''}>Physical (Blunt)</option>
+      <option value="Physical-Edged" ${item.system.type?.includes('Edged') ? 'selected' : ''}>Physical (Edged)</option>
+      <option value="Mental" ${item.system.type?.includes('Mental') ? 'selected' : ''}>Mental</option>
+    </select>
+  </div>
 
   <div style="margin-bottom: 10px;">
     <label style="display: inline-block; width: 120px;">Karma Points:</label>
@@ -1035,6 +1047,7 @@ export class FaseripActorSheet extends ActorSheet {
               const columnShift = parseInt(html.find('[name="shift"]').val()) || 0;
               const damageCS = parseInt(html.find('[name="damageCs"]').val()) || 0;
               const karma = parseInt(html.find('[name="karma"]').val()) || 0;
+              const damageType = html.find('[name="damageType"]').val();
               const saveSettings = html.find('[name="saveSettings"]').is(':checked');
               const skipDice = html.find('[name="skipDice"]').is(':checked');
 
@@ -1043,7 +1056,7 @@ export class FaseripActorSheet extends ActorSheet {
                 await item.setFlag("msh-faserip", "lastActionType", actionType);
                 await item.setFlag("msh-faserip", "lastColumnShift", columnShift);
                 await item.setFlag("msh-faserip", "lastDamageCS", damageCS);
-
+                await item.setFlag("msh-faserip", "lastDamageType", damageType);
                 await item.setFlag("msh-faserip", "skipDiceRoll", skipDice);
               }
 
@@ -1162,6 +1175,65 @@ export class FaseripActorSheet extends ActorSheet {
                 speaker: ChatMessage.getSpeaker({ actor: this.actor }),
                 content: content
               });
+
+              // Check if we have a target to apply damage to
+              const target = game.user.targets.first()?.actor;
+
+              if (target && resultColor.toLowerCase() !== "white") {
+                // Determine damage type based on power type/action type
+                let damageType = "Energy-Energy";
+                
+                if (actionType.includes("Blunt")) {
+                  damageType = "Physical-Blunt";
+                } else if (actionType.includes("Edged")) {
+                  damageType = "Physical-Edged";
+                } else if (actionType.includes("Force")) {
+                  damageType = "Force";
+                } else if (actionType.includes("Mental")) {
+                  damageType = "Mental";
+                } else if (item.system.type) {
+                  // Try to determine from power's type
+                  const powerTypeStr = item.system.type.toLowerCase();
+                  if (powerTypeStr.includes("force")) {
+                    damageType = "Force";
+                  } else if (powerTypeStr.includes("mental") || powerTypeStr.includes("psi")) {
+                    damageType = "Mental";
+                  } else if (powerTypeStr.includes("phys")) {
+                    damageType = "Physical-Blunt";
+                  }
+                }
+                
+                // Determine if special effects should apply based on the result and action type
+                const canBeStun = actionType.includes("Blunt") || 
+                                actionType.includes("Force") || 
+                                resultText.toLowerCase().includes("stun");
+                
+                const canBeSlam = actionType.includes("Blunt") || 
+                                resultText.toLowerCase().includes("slam");
+                
+                const canBeKill = actionType.includes("Edged") || 
+                                actionType.includes("Energy") || 
+                                actionType.includes("Shooting") || 
+                                resultText.toLowerCase().includes("kill");
+                
+                // For damage, use the damageRankValue if a damage CS was applied, otherwise use the base power value
+                const baseDamage = damageCS !== 0 ? damageRankValue : powerValue;
+                
+                // Process the attack using the CombatHandler
+                await game.msh.CombatHandler.processAttack({
+                  attacker: this.actor,
+                  target: target,
+                  baseDamage: baseDamage,
+                  damageType: damageType,
+                  sourceName: item.name,
+                  canBeStun,
+                  canBeSlam,
+                  canBeKill,
+                  originalRollResult: resultColor.toLowerCase()
+                });
+              } else if (resultColor.toLowerCase() !== "white" && !target) {
+                ui.notifications.info("No target selected. Damage not applied.");
+              }
             }
           },
           cancel: { label: "Cancel" }

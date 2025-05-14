@@ -189,8 +189,20 @@ export class CombatHandler {
         console.log("Target resistances:", target.system.resistances);
         // Resistances (from actor.system.resistances or power)
         // This is simplified. You'll need to match damageType (e.g., "Energy-Fire") to specific resistances.
+        // Normalize damage type to match resistance types
+        const damageTypeMap = {
+        s: "physical", sh: "physical", ba: "physical", ea: "physical",
+        tb: "physical", te: "physical", gp: "physical", gb: "physical",
+        e: "energy", en: "energy",
+        f: "force", fo: "force",
+        st: "stun", stun: "stun"
+        };
+        const normalizedType = damageTypeMap[damageType.toLowerCase()] || damageType.toLowerCase();
+
         const resistances = Array.isArray(target.system.resistances) ? target.system.resistances : [];
-        const relevantResistance = resistances.find(r => damageType.toLowerCase().includes(r.type?.toLowerCase?.() || ""));
+        const relevantResistance = resistances.find(r =>
+        normalizedType.includes(r.type?.toLowerCase?.() || "")
+        );
 
         if (relevantResistance) {
             defenses.resistanceValue =
@@ -198,7 +210,9 @@ export class CombatHandler {
                     ? relevantResistance.value
                     : CONFIG.FASERIP.rankValues[relevantResistance.rank] || 0;
             defenses.usedResistance = true;
+            console.log(`✅ Resistance matched: ${relevantResistance.type}, using value = ${defenses.resistanceValue}`);
         }
+
         // Also check for Resistance powers
         const resPower = target.items.find(i => i.type === "power" && i.name.toLowerCase().startsWith("resistance to") && damageType.toLowerCase().includes(i.name.toLowerCase().replace("resistance to ","")));
         if (resPower) {
@@ -210,6 +224,17 @@ export class CombatHandler {
                 defenses.usedResistance = true;
             }
         }
+
+        if (relevantResistance) {
+            defenses.resistanceValue =
+                typeof relevantResistance.value === "number"
+                    ? relevantResistance.value
+                    : CONFIG.FASERIP.rankValues[relevantResistance.rank] || 0;
+            defenses.usedResistance = true;
+
+            console.log(`✅ Resistance matched: ${relevantResistance.type}, using value = ${defenses.resistanceValue}`);
+        }
+        console.log("Final resistanceValue used in damage calc:", defenses.resistanceValue);
 
         if (skipDialog) { // GM might use this to speed things up
             return defenses;
