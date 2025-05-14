@@ -1,4 +1,24 @@
 // location: systems/msh-faserip/scripts/combat-handler.js
+const ACTION_RESULT_LABELS = {
+  BA: { white: "Miss", green: "Hit", yellow: "Slam", red: "Stun" },
+  EA: { white: "Miss", green: "Hit", yellow: "Stun", red: "Kill" },
+  Sh: { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Kill" },
+  TE: { white: "Miss", green: "Hit", yellow: "Stun", red: "Kill" },
+  TB: { white: "Miss", green: "Hit", yellow: "Hit", red: "Stun" },
+  En: { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Kill" },
+  Fo: { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Stun" },
+  Gp: { white: "Miss", green: "Miss", yellow: "Partial", red: "Hold" },
+  Gb: { white: "Miss", green: "Take", yellow: "Grab", red: "Break" },
+  Es: { white: "Miss", green: "Miss", yellow: "Escape", red: "Reverse" },
+  Ch: { white: "None", green: "Slam", yellow: "Slam", red: "Stun" },
+  Do: { white: "Autohit", green: "-2 CS", yellow: "-4 CS", red: "-6 CS" },
+  Ev: { white: "Autohit", green: "Evasion", yellow: "+1 CS", red: "+2 CS" },
+  Bl: { white: "Autohit", green: "+4 CS", yellow: "+2 CS", red: "+1 CS" },
+  Ca: { white: "Miss", green: "Catch", yellow: "Catch", red: "No" },
+  St: { white: "1–10", green: "1", yellow: "Damage", red: "No" },
+  Sl: { white: "Gr. Slam", green: "1 area", yellow: "Stagger", red: "No" },
+  Ki: { white: "End. Loss", green: "E/S", yellow: "No", red: "No" }
+};
 
 export class CombatHandler {
 
@@ -166,17 +186,25 @@ export class CombatHandler {
             defenses.usedForceField = true;
         }
 
+        console.log("Target resistances:", target.system.resistances);
         // Resistances (from actor.system.resistances or power)
         // This is simplified. You'll need to match damageType (e.g., "Energy-Fire") to specific resistances.
-        const relevantResistance = target.system.resistances?.find(r => damageType.includes(r.type.toLowerCase())); // Very basic matching
+        const resistances = Array.isArray(target.system.resistances) ? target.system.resistances : [];
+        const relevantResistance = resistances.find(r => damageType.toLowerCase().includes(r.type?.toLowerCase?.() || ""));
+
         if (relevantResistance) {
-            defenses.resistanceValue = CONFIG.FASERIP.rankValues[relevantResistance.rank] || 0;
+            defenses.resistanceValue =
+                typeof relevantResistance.value === "number"
+                    ? relevantResistance.value
+                    : CONFIG.FASERIP.rankValues[relevantResistance.rank] || 0;
             defenses.usedResistance = true;
         }
         // Also check for Resistance powers
         const resPower = target.items.find(i => i.type === "power" && i.name.toLowerCase().startsWith("resistance to") && damageType.toLowerCase().includes(i.name.toLowerCase().replace("resistance to ","")));
         if (resPower) {
-            const powerResVal = CONFIG.FASERIP.rankValues[resPower.system.rank] || 0;
+            const powerResVal = typeof resPower.system.value === "number"
+                ? resPower.system.value
+                : CONFIG.FASERIP.rankValues[resPower.system.rank] || 0;
             if (powerResVal > defenses.resistanceValue) { // Use the better resistance
                 defenses.resistanceValue = powerResVal;
                 defenses.usedResistance = true;

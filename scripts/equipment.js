@@ -1,4 +1,6 @@
 // equipment.js
+import { CombatHandler } from './combat-handler.js';
+
 export class FaseripEquipmentSheet extends ItemSheet {
   static get defaultOptions() {
     return foundry.utils.mergeObject(super.defaultOptions, {
@@ -475,6 +477,35 @@ async _rollWeapon(item, actor) {
                 </div>
               `
             });
+
+            // Automatically apply damage to the targeted token (if any)
+            const target = Array.from(game.user.targets)[0]?.actor;
+
+            if (target) {
+              // Convert damage (string or rank) into number
+              let baseDamage = parseInt(damage);
+              if (isNaN(baseDamage)) {
+                baseDamage = CONFIG.FASERIP.rankValues[damage] || 0;
+              }
+
+              const canBeStun = effect?.toLowerCase().includes("stun") || actionName.toLowerCase().includes("stunning");
+              const canBeSlam = effect?.toLowerCase().includes("slam");
+              const canBeKill = effect?.toLowerCase().includes("kill");
+
+              await CombatHandler.processAttack({
+                attacker: actor,
+                target: target,
+                baseDamage: baseDamage,
+                damageType: damageType || "Physical",
+                sourceName: item.name,
+                canBeStun,
+                canBeSlam,
+                canBeKill,
+                originalRollResult: colorResult.toLowerCase()
+              });
+            } else {
+              ui.notifications.info("No target selected. Damage not applied.");
+            }
 
             // Update shots remaining if it's a weapon
             if (item.system.category === "weapon" && item.system.shots) {

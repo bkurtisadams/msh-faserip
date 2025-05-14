@@ -1,5 +1,7 @@
 // File: systems/msh-faserip/rolls.js
 import { applyColumnShiftToRank } from './actorSheet.js';
+import { CombatHandler } from './combat-handler.js';
+
 //import { rankRows } from './rank-rows.js';
 
 // This file contains roll functions that can be called directly from macros
@@ -1693,6 +1695,33 @@ export class FaseripRolls {
           content: messageContent,
           roll: roll
         });
+
+        // Auto-damage handling via CombatHandler
+        const target = Array.from(game.user.targets)[0]?.actor;
+        if (target) {
+          let baseDamage = parseInt(equipment.system.damage);
+          if (isNaN(baseDamage)) {
+            baseDamage = CONFIG.FASERIP.rankValues[equipment.system.damage] || 0;
+          }
+
+          const canBeStun = effect?.toLowerCase().includes("stun") || resultColor.toLowerCase() === "yellow";
+          const canBeSlam = effect?.toLowerCase().includes("slam");
+          const canBeKill = effect?.toLowerCase().includes("kill");
+
+          await CombatHandler.processAttack({
+            attacker: actor,
+            target: target,
+            baseDamage: baseDamage,
+            damageType: equipment.system.damageType || "Physical",
+            sourceName: equipment.name,
+            canBeStun,
+            canBeSlam,
+            canBeKill,
+            originalRollResult: resultColor.toLowerCase()
+          });
+        } else {
+          ui.notifications.info("No target selected. Damage not applied.");
+        }
 
         // After the roll is complete and the chat message is created, update ammunition:
         if (category === "weapon" && equipment.system.shots) {
