@@ -366,31 +366,177 @@ export class CombatHandler {
      * @returns {String} Text result of the FEAT.
      */
     static async rollSecondaryFeat(target, featType, sourceName) {
-        // Use the generic Universal Action roll from rolls.js
-        // We need to pass the 'actorId' and 'actionCode'
+        // Get the endurance rank for the save
         const enduranceRank = target.system.abilities.endurance.rank;
-        const roll = await new Roll("1d100").evaluate({async: true});
-        const colorResult = game.msh.rollUniversalTable(enduranceRank, roll.total);
-
-        let featResultText = "";
-        const actionCode = featType === "Stun" ? "St" : featType === "Slam" ? "Sl" : "Ki";
-        featResultText = ACTION_RESULT_LABELS[actionCode][colorResult.toLowerCase()];
-
-        // TODO: Apply actual game effects of Stun/Slam/Kill (e.g., status effects, knockback, Endurance loss)
-        if (featType === "Kill" && featResultText === "End. Loss") {
-            const currentEndurance = CONFIG.FASERIP.rankValues[target.system.abilities.endurance.rank] || 0;
-            const newEnduranceRank = Object.keys(CONFIG.FASERIP.rankValues).find(key => (CONFIG.FASERIP.rankValues[key] || 0) < currentEndurance) || "Shift-0";
-            // This is a simplification. Proper rank reduction needs careful handling.
-            ui.notifications.info(`${target.name} loses an Endurance rank! (Now ${newEnduranceRank})`);
-            // await target.update({"system.abilities.endurance.rank": newEnduranceRank}); // Be careful with direct rank updates
-        }
-        if (featType === "Stun" && featResultText === "1–10") {
-             ui.notifications.info(`${target.name} is Stunned for 1d10 rounds!`);
-             // Apply "Stunned" Active Effect
-        }
-
-
-        return `Rolled ${roll.total} on ${enduranceRank} Endurance: ${colorResult} → ${featResultText}`;
+        
+        // Get available Karma
+        const availableKarma = target.system.attributes.karma.value || 0;
+        
+        // Create dialog content
+        const dialogContent = `
+            <div style="text-align: center;">
+                <h2>${target.name} must make a ${featType} save!</h2>
+                <p>The attack from <strong>${sourceName}</strong> requires an Endurance FEAT roll.</p>
+                <div style="margin: 10px 0;">
+                    <p>Endurance Rank: <strong>${enduranceRank}</strong></p>
+                    <hr style="margin: 10px 0;">
+                    <div>
+                        <label>Spend Karma Points:</label>
+                        <input type="number" id="karma-points" min="0" max="${availableKarma}" value="0" style="width: 60px;">
+                        <span style="margin-left: 5px; font-size: 0.9em; color: #666;">(Available: ${availableKarma})</span>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Show dialog to target player (or GM if NPC)
+        return new Promise((resolve) => {
+            // Determine if target is controlled by a player
+            const isPlayerOwned = target.hasPlayerOwner;
+            
+            // Create dialog
+            new Dialog({
+                title: `${featType} Save Required`,
+                content: dialogContent,
+                buttons: {
+                    roll: {
+                        icon: '<i class="fas fa-dice-d20"></i>',
+                        label: "Roll Save",
+                        callback: async (html) => {
+                            // Get karma amount
+                            const karmaSpent = Math.min(
+                                parseInt(html.find('#karma-points').val()) || 0,
+                                availableKarma
+                            );
+                            
+                            // Roll the dice
+                            const roll = await new Roll("1d100").evaluate({async: true});
+                            
+                            // Apply karma to the roll total
+                            const totalRoll = Math.min(100, roll.total + karmaSpent);
+                            
+                            // Determine the result color
+                            const colorResult = game.msh.rollUniversalTable(enduranceRank, totalRoll);
+                            
+                            // Get the result based on action type and color
+                            const actionCode = featType === "Stun" ? "St" : featType === "Slam" ? "Sl" : "Ki";
+                            const featResultText = ACTION_RESULT_LABELS[actionCode][colorResult.toLowerCase()];
+                            
+                            // Deduct karma if spent, using your karma history system
+                            if (karmaSpent > 0) {
+                                // First update karma value
+                                await target.update({
+                                    "system.attributes.karma.value": availableKarma - karmaSpent
+                                });
+                                
+                                // Create a new karma history entry that matches your format
+                                const history = foundry.utils.deepClone(target.system.karma?.history || []);
+                                const newEvent = {
+                                    realDate: new Date().toLocaleDateString(),
+                                    gameDate: game.time?.worldTime ? game.time.worldTime.toString() : "",
+                                    amount: -karmaSpent,
+                                    type: "Save",
+                                    description: `${featType} save against ${sourceName}`
+                                };
+                                history.push(newEvent);
+                                await target.update({ "system.karma.history": history });
+                            }
+                            
+                            // Apply the effects based on result
+                            let effectApplied = false;
+                            
+                            if (featType === "Kill" && featResultText === "End. Loss") {
+                                const currentEndurance = CONFIG.FASERIP.rankValues[target.system.abilities.endurance.rank] || 0;
+                                const newEnduranceRank = Object.keys(CONFIG.FASERIP.rankValues).find(key => 
+                                    (CONFIG.FASERIP.rankValues[key] || 0) < currentEndurance) || "Shift-0";
+                                
+                                ui.notifications.info(`${target.name} loses an Endurance rank! (Now ${newEnduranceRank})`);
+                                // await target.update({"system.abilities.endurance.rank": newEnduranceRank});
+                                effectApplied = true;
+                            }
+                            else if (featType === "Stun" && featResultText === "1–10") {
+                                // Roll stun duration
+                                const stunDuration = await new Roll("1d10").evaluate({async: true});
+                                ui.notifications.info(`${target.name} is Stunned for ${stunDuration.total} rounds!`);
+                                
+                                // Apply "Stunned" Active Effect
+                                const effect = {
+                                    label: "Stunned",
+                                    icon: "icons/svg/daze.svg",
+                                    duration: {
+                                        rounds: stunDuration.total,
+                                        startRound: game.combat?.round || 0
+                                    },
+                                    flags: {
+                                        "msh-faserip": {
+                                            stunned: true
+                                        }
+                                    }
+                                };
+                                
+                                await target.createEmbeddedDocuments("ActiveEffect", [effect]);
+                                effectApplied = true;
+                            }
+                            else if (featType === "Slam" && featResultText === "1 area") {
+                                ui.notifications.info(`${target.name} is slammed back 1 area!`);
+                                effectApplied = true;
+                            }
+                            else if (featType === "Slam" && featResultText === "Stagger") {
+                                ui.notifications.info(`${target.name} staggers but remains in place!`);
+                                effectApplied = true;
+                            }
+                            
+                            // Create chat message to show the result
+                            await ChatMessage.create({
+                                speaker: ChatMessage.getSpeaker({ actor: target }),
+                                content: `
+                                    <div style="background: #f5f5f0; padding: 10px; border-radius: 5px; border: 1px solid #ddd;">
+                                        <h3>${target.name} - ${featType} Save</h3>
+                                        <div>Rolled ${roll.total} ${karmaSpent > 0 ? `+ ${karmaSpent} Karma` : ''} = ${totalRoll} against ${enduranceRank} Endurance</div>
+                                        <div style="margin-top: 10px; text-align: center; padding: 5px; background-color: ${
+                                            colorResult.toLowerCase() === 'white' ? '#f8f8f8' :
+                                            colorResult.toLowerCase() === 'green' ? '#4CAF50' :
+                                            colorResult.toLowerCase() === 'yellow' ? '#FFC107' : '#F44336'
+                                        }; color: ${
+                                            colorResult.toLowerCase() === 'white' || colorResult.toLowerCase() === 'yellow' ? '#333' : 'white'
+                                        }; border-radius: 3px; font-weight: bold;">
+                                            Result: ${featResultText} (${colorResult.toUpperCase()})
+                                        </div>
+                                        ${effectApplied ? `<div style="margin-top: 5px; font-style: italic;">Effect: ${
+                                            featType === "Kill" && featResultText === "End. Loss" ? "Endurance rank reduced" :
+                                            featType === "Stun" && featResultText === "1–10" ? "Stunned for 1d10 rounds" :
+                                            featType === "Slam" && featResultText === "1 area" ? "Knocked back 1 area" :
+                                            featType === "Slam" && featResultText === "Stagger" ? "Staggers in place" :
+                                            "No effect"
+                                        }</div>` : ''}
+                                    </div>
+                                `
+                            });
+                            
+                            // Return the result for the calling method
+                            resolve(`Rolled ${roll.total}${karmaSpent > 0 ? ` + ${karmaSpent} Karma` : ''} = ${totalRoll} on ${enduranceRank} Endurance: ${colorResult} → ${featResultText}`);
+                        }
+                    },
+                    cancel: {
+                        icon: '<i class="fas fa-times"></i>',
+                        label: "Cancel",
+                        callback: () => {
+                            resolve(`${target.name} did not make the ${featType} save.`);
+                        }
+                    }
+                },
+                default: "roll",
+                // For NPCs or if the player isn't available, auto-roll after a delay
+                render: (html) => {
+                    if (!isPlayerOwned) {
+                        setTimeout(() => {
+                            html.find('button[data-button="roll"]').trigger('click');
+                        }, 10000); // Auto-roll for NPCs after 10 seconds
+                    }
+                },
+                close: () => resolve(`${target.name} did not make the ${featType} save.`)
+            }).render(true);
+        });
     }
 
     /**
