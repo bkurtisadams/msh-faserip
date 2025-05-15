@@ -38,110 +38,161 @@ export class CombatHandler {
      *   - skipDefenseDialog: Boolean, if true, tries to auto-apply defenses (GM only maybe).
      */
     static async processAttack(attackData, options = {}) {
-        const {
-            attacker, target, baseDamage, damageType, sourceName,
-            canBeStun = false, canBeSlam = false, canBeKill = false,
-            originalRollResult = "green" // Assume at least a hit if this function is called
-        } = attackData;
+    const {
+        attacker, target, baseDamage, damageType, sourceName,
+        canBeStun = false, canBeSlam = false, canBeKill = false,
+        originalRollResult = "green" // Assume at least a hit if this function is called
+    } = attackData;
 
-        if (!target) {
-            ui.notifications.warn("No target specified for damage.");
-            return;
-        }
+    if (!target) {
+        ui.notifications.warn("No target specified for damage.");
+        return;
+    }
 
-        // 1. Get Defenses from Target
-        let defenseData = await this.getTargetDefenses(target, damageType, baseDamage, options.skipDefenseDialog);
+    // 1. Get Defenses from Target
+    let defenseData = await this.getTargetDefenses(target, damageType, baseDamage, options.skipDefenseDialog);
 
-        // 2. Calculate Net Damage
-        let netDamage = baseDamage;
-        let damageAbsorbed = 0;
+    // 2. Calculate Net Damage
+    let netDamage = baseDamage;
+    let damageAbsorbed = 0;
 
-        if (defenseData.bodyArmorValue > 0) {
-            const baEffective = (damageType.startsWith("Energy")) ? Math.max(0, defenseData.bodyArmorValue - 20) : defenseData.bodyArmorValue;
-            const absorbedByBA = Math.min(netDamage, baEffective);
-            netDamage -= absorbedByBA;
-            damageAbsorbed += absorbedByBA;
-        }
-        if (defenseData.forceFieldValue > 0 && netDamage > 0) { // Force Field applies after BA if both present and active
-            const ffEffective = (damageType.startsWith("Energy")) ? defenseData.forceFieldValue : Math.max(0, defenseData.forceFieldValue - 10);
-            const absorbedByFF = Math.min(netDamage, ffEffective);
-            netDamage -= absorbedByFF;
-            damageAbsorbed += absorbedByFF;
-            // TODO: Handle Force Field overload if damage > ffEffective
-        }
-        if (defenseData.resistanceValue > 0 && netDamage > 0) {
-            const absorbedByRes = Math.min(netDamage, defenseData.resistanceValue);
-            netDamage -= absorbedByRes;
-            damageAbsorbed += absorbedByRes;
-        }
+    if (defenseData.bodyArmorValue > 0) {
+        const baEffective = (damageType.startsWith("Energy")) ? Math.max(0, defenseData.bodyArmorValue - 20) : defenseData.bodyArmorValue;
+        const absorbedByBA = Math.min(netDamage, baEffective);
+        netDamage -= absorbedByBA;
+        damageAbsorbed += absorbedByBA;
+    }
+    if (defenseData.forceFieldValue > 0 && netDamage > 0) { // Force Field applies after BA if both present and active
+        const ffEffective = (damageType.startsWith("Energy")) ? defenseData.forceFieldValue : Math.max(0, defenseData.forceFieldValue - 10);
+        const absorbedByFF = Math.min(netDamage, ffEffective);
+        netDamage -= absorbedByFF;
+        damageAbsorbed += absorbedByFF;
+        // TODO: Handle Force Field overload if damage > ffEffective
+    }
+    if (defenseData.resistanceValue > 0 && netDamage > 0) {
+        const absorbedByRes = Math.min(netDamage, defenseData.resistanceValue);
+        netDamage -= absorbedByRes;
+        damageAbsorbed += absorbedByRes;
+    }
 
-        netDamage = Math.max(0, netDamage); // Damage cannot be negative
+    netDamage = Math.max(0, netDamage); // Damage cannot be negative
 
-        // 3. Apply Net Damage to Target Health
-        if (netDamage > 0) {
-            const currentHealth = target.system.attributes.health.value;
-            const newHealth = Math.max(0, currentHealth - netDamage);
-            await target.update({"system.attributes.health.value": newHealth});
-            ui.notifications.info(`${target.name} takes ${netDamage} damage.`);
-        } else {
-            ui.notifications.info(`${target.name} takes no damage after defenses.`);
-        }
+    // 3. Apply Net Damage to Target Health
+    const currentHealth = target.system.attributes.health.value;
+    const newHealth = Math.max(0, currentHealth - netDamage);
+    await target.update({"system.attributes.health.value": newHealth});
+    
+    if (netDamage > 0) {
+        ui.notifications.info(`${target.name} takes ${netDamage} damage.`);
+    } else {
+        ui.notifications.info(`${target.name} takes no damage after defenses.`);
+    }
 
-        // 4. Create a summary chat message
-        let defenseSummary = `Defenses Applied by ${target.name}:`;
-        if (defenseData.usedBodyArmor) defenseSummary += ` Body Armor (${defenseData.bodyArmorValue}),`;
-        if (defenseData.usedForceField) defenseSummary += ` Force Field (${defenseData.forceFieldValue}),`;
-        if (defenseData.usedResistance) defenseSummary += ` Resistance (${defenseData.resistanceValue} vs ${damageType}),`;
-        if (!defenseData.usedBodyArmor && !defenseData.usedForceField && !defenseData.usedResistance) defenseSummary += " None.";
-        else defenseSummary = defenseSummary.slice(0, -1) + "."; // Remove last comma
+    // 4. Create a summary chat message
+    let defenseSummary = `Defenses Applied by ${target.name}:`;
+    if (defenseData.usedBodyArmor) defenseSummary += ` Body Armor (${defenseData.bodyArmorValue}),`;
+    if (defenseData.usedForceField) defenseSummary += ` Force Field (${defenseData.forceFieldValue}),`;
+    if (defenseData.usedResistance) defenseSummary += ` Resistance (${defenseData.resistanceValue} vs ${damageType}),`;
+    if (!defenseData.usedBodyArmor && !defenseData.usedForceField && !defenseData.usedResistance) defenseSummary += " None.";
+    else defenseSummary = defenseSummary.slice(0, -1) + "."; // Remove last comma
 
-        let chatContent = `
-            <div class="msh-damage-summary">
-                <h4>Damage Resolution: ${sourceName} vs ${target.name}</h4>
-                <p><strong>Base Damage:</strong> ${baseDamage} (${damageType})</p>
-                <p>${defenseSummary}</p>
-                <p><strong>Damage Absorbed:</strong> ${damageAbsorbed}</p>
-                <p><strong>Net Damage Taken:</strong> ${netDamage}</p>
-            </div>
-        `;
+    let chatContent = `
+        <div class="msh-damage-summary">
+            <h4>Damage Resolution: ${sourceName} vs ${target.name}</h4>
+            <p><strong>Base Damage:</strong> ${baseDamage} (${damageType})</p>
+            <p>${defenseSummary}</p>
+            <p><strong>Damage Absorbed:</strong> ${damageAbsorbed}</p>
+            <p><strong>Net Damage Taken:</strong> ${netDamage}</p>
+        </div>
+    `;
 
-        // 5. Handle Secondary Effects (Stun, Slam, Kill) *if damage was inflicted*
-        let secondaryEffectResult = "";
-        if (netDamage > 0) { // Only if some damage got through
-            if (originalRollResult.toLowerCase() === "yellow" || originalRollResult.toLowerCase() === "red") {
-                if (canBeStun && (originalRollResult.toLowerCase() === "yellow" || originalRollResult.toLowerCase() === "red")) {
-                    secondaryEffectResult = await this.rollSecondaryFeat(target, "Stun", sourceName);
-                    chatContent += `<p><strong>Stun Check:</strong> ${secondaryEffectResult}</p>`;
-                }
-                if (canBeSlam && originalRollResult.toLowerCase() === "yellow") { // Slam typically on Yellow
-                    secondaryEffectResult = await this.rollSecondaryFeat(target, "Slam", sourceName);
-                    chatContent += `<p><strong>Slam Check:</strong> ${secondaryEffectResult}</p>`;
-                }
+    // 5. Handle Secondary Effects (Stun, Slam, Kill) *if damage was inflicted*
+    let secondaryEffectResult = "";
+    if (netDamage > 0) { // Only if some damage got through
+        // Determine which secondary effect to apply based on attack type and roll result
+        if (damageType.toLowerCase().includes("blunt")) {
+            // Blunt attack effects
+            if (originalRollResult.toLowerCase() === "yellow" && canBeSlam) {
+                // Yellow result for Blunt typically results in Slam
+                secondaryEffectResult = await this.rollSecondaryFeat(target, "Slam", sourceName);
+                chatContent += `<p><strong>Slam Check:</strong> ${secondaryEffectResult}</p>`;
+            } else if (originalRollResult.toLowerCase() === "red" && canBeStun) {
+                // Red result for Blunt typically results in Stun
+                secondaryEffectResult = await this.rollSecondaryFeat(target, "Stun", sourceName);
+                chatContent += `<p><strong>Stun Check:</strong> ${secondaryEffectResult}</p>`;
             }
-            if (canBeKill && originalRollResult.toLowerCase() === "red") {
+        } else if (damageType.toLowerCase().includes("edged")) {
+            // Edged attack effects
+            if (originalRollResult.toLowerCase() === "yellow" && canBeStun) {
+                // Yellow result for Edged typically results in Stun
+                secondaryEffectResult = await this.rollSecondaryFeat(target, "Stun", sourceName);
+                chatContent += `<p><strong>Stun Check:</strong> ${secondaryEffectResult}</p>`;
+            } else if (originalRollResult.toLowerCase() === "red" && canBeKill) {
+                // Red result for Edged typically results in Kill
                 secondaryEffectResult = await this.rollSecondaryFeat(target, "Kill", sourceName);
                 chatContent += `<p><strong>Kill Check:</strong> ${secondaryEffectResult}</p>`;
             }
-        } else if ( (canBeStun && (originalRollResult.toLowerCase() === "yellow" || originalRollResult.toLowerCase() === "red")) ||
-                    (canBeSlam && originalRollResult.toLowerCase() === "yellow") ||
-                    (canBeKill && originalRollResult.toLowerCase() === "red") ) {
-             chatContent += `<p>No damage inflicted; secondary effects (Stun/Slam/Kill) are negated.</p>`;
+        } else if (damageType.toLowerCase().includes("energy")) {
+            // Energy attack effects
+            if (originalRollResult.toLowerCase() === "yellow" && canBeStun) {
+                // Yellow result for Energy typically results in Stun
+                secondaryEffectResult = await this.rollSecondaryFeat(target, "Stun", sourceName);
+                chatContent += `<p><strong>Stun Check:</strong> ${secondaryEffectResult}</p>`;
+            } else if (originalRollResult.toLowerCase() === "red" && canBeKill) {
+                // Red result for Energy typically results in Kill
+                secondaryEffectResult = await this.rollSecondaryFeat(target, "Kill", sourceName);
+                chatContent += `<p><strong>Kill Check:</strong> ${secondaryEffectResult}</p>`;
+            }
+        } else if (damageType.toLowerCase().includes("force")) {
+            // Force attack effects
+            if (originalRollResult.toLowerCase() === "yellow" && canBeStun) {
+                // Yellow result for Force typically results in Stun
+                secondaryEffectResult = await this.rollSecondaryFeat(target, "Stun", sourceName);
+                chatContent += `<p><strong>Stun Check:</strong> ${secondaryEffectResult}</p>`;
+            } else if (originalRollResult.toLowerCase() === "red" && canBeStun) {
+                // Red result for Force typically results in Stun as well
+                secondaryEffectResult = await this.rollSecondaryFeat(target, "Stun", sourceName);
+                chatContent += `<p><strong>Stun Check:</strong> ${secondaryEffectResult}</p>`;
+            }
+        } else if (damageType.toLowerCase().includes("shooting")) {
+            // Shooting attack effects
+            if (originalRollResult.toLowerCase() === "yellow" && canBeSlam) {
+                // Yellow result for Shooting typically results in Bullseye
+                // Often treated as Slam in implementations
+                secondaryEffectResult = await this.rollSecondaryFeat(target, "Slam", sourceName);
+                chatContent += `<p><strong>Bullseye/Slam Check:</strong> ${secondaryEffectResult}</p>`;
+            } else if (originalRollResult.toLowerCase() === "red" && canBeKill) {
+                // Red result for Shooting typically results in Kill
+                secondaryEffectResult = await this.rollSecondaryFeat(target, "Kill", sourceName);
+                chatContent += `<p><strong>Kill Check:</strong> ${secondaryEffectResult}</p>`;
+            }
         }
-
-
-        await ChatMessage.create({
-            speaker: ChatMessage.getSpeaker({actor: attacker}),
-            content: chatContent
-            // You might want to whisper this to GM and target or make it public
-        });
-
-        // 6. Check for Unconsciousness / Death if Health is 0
-        if (target.system.attributes.health.value <= 0) {
-            await this.handleZeroHealth(target, attacker);
-        }
-
-        console.log("CombatHandler.processAttack called with:", attackData); // Added for debugging
+    } else if ( (canBeStun && (originalRollResult.toLowerCase() === "yellow" || originalRollResult.toLowerCase() === "red")) ||
+                (canBeSlam && originalRollResult.toLowerCase() === "yellow") ||
+                (canBeKill && originalRollResult.toLowerCase() === "red") ) {
+         chatContent += `<p>No damage inflicted; secondary effects (Stun/Slam/Kill) are negated.</p>`;
     }
+
+    await ChatMessage.create({
+        speaker: ChatMessage.getSpeaker({actor: attacker}),
+        content: chatContent
+        // You might want to whisper this to GM and target or make it public
+    });
+
+    // 6. Check for Unconsciousness / Death if Health is 0
+    if (target.system.attributes.health.value <= 0) {
+        // Determine if this is a potentially lethal attack
+        // Energy attacks, Edged attacks, and Shooting attacks can trigger death checks
+        const isLethalDamage = 
+            damageType.toLowerCase().includes("energy") || 
+            damageType.toLowerCase().includes("edged") || 
+            damageType.toLowerCase().includes("shooting");
+            
+        await this.handleZeroHealth(target, attacker, isLethalDamage);
+    }
+
+    console.log("CombatHandler.processAttack called with:", attackData); // Added for debugging
+}
 
     /**
      * Prompts the target (or GM) to apply defenses.
@@ -541,29 +592,65 @@ export class CombatHandler {
 
     /**
      * Handles actor reaching 0 Health.
+     * @param {Object} target - The actor that reached 0 Health.
+     * @param {Object} attacker - The actor that caused the damage.
+     * @param {Boolean} isLethalDamage - Whether the damage was from a potentially lethal source.
      */
-    static async handleZeroHealth(target, attacker) {
+    static async handleZeroHealth(target, attacker, isLethalDamage = false) {
         ui.notifications.warn(`${target.name} has reached 0 Health!`);
-        // Apply "Unconscious" Active Effect
-        // TODO: Implement Active Effects for conditions
-        // const effectData = { label: "Unconscious", icon: "icons/svg/skull.svg", origin: attacker?.uuid, changes: [] };
-        // await target.createEmbeddedDocuments("ActiveEffect", [effectData]);
-
-        // Roll Endurance FEAT vs. Kill (as per rules, pg 31 "Life, Death, and Health")
-        const killCheckResult = await this.rollSecondaryFeat(target, "Kill", "Reaching 0 Health");
-        let chatContent = `<p>${target.name} is Unconscious.</p><p><strong>Death Check:</strong> ${killCheckResult}</p>`;
+        
+        // Generate unconsciousness effect (1-10 rounds)
+        const unconsciousDuration = Math.floor(Math.random() * 10) + 1;
+        const effectData = { 
+            label: "Unconscious", 
+            icon: "icons/svg/skull.svg", 
+            duration: {
+                rounds: unconsciousDuration,
+                startRound: game.combat?.round || 0
+            }
+        };
+        await target.createEmbeddedDocuments("ActiveEffect", [effectData]);
+        
+        let chatContent = `<p>${target.name} is Unconscious for ${unconsciousDuration} rounds.</p>`;
+        
+        // Only lethal damage types can trigger the death process
+        if (isLethalDamage) {
+            // Roll Endurance FEAT vs. Kill (as per rules, pg 31 "Life, Death, and Health")
+            const killCheckResult = await this.rollSecondaryFeat(target, "Kill", "Reaching 0 Health");
+            chatContent += `<p><strong>Death Check:</strong> ${killCheckResult}</p>`;
+            
+            // If Endurance Loss from Kill check, character starts dying
+            if (killCheckResult.includes("End. Loss")) {
+                ui.notifications.error(`${target.name} is dying!`);
+                
+                // Create a Dying effect
+                const dyingEffectData = {
+                    label: "Dying",
+                    icon: "icons/svg/poison.svg",
+                    flags: {
+                        "msh-faserip": {
+                            dying: true,
+                            currentRound: game.combat?.round || 0
+                        }
+                    }
+                };
+                await target.createEmbeddedDocuments("ActiveEffect", [dyingEffectData]);
+                
+                chatContent += `<p>${target.name} is losing Endurance ranks each turn. Help needed!</p>`;
+                
+                // Note: You'd need to implement a combat round listener to handle Endurance loss per turn
+                // This would be defined elsewhere in your code
+            }
+        } else {
+            // Non-lethal (Blunt/Force) damage just causes unconsciousness
+            chatContent += `<p>Knocked out by blunt force/subdual damage. No risk of death.</p>`;
+        }
 
         await ChatMessage.create({
             speaker: ChatMessage.getSpeaker({actor: target}),
             content: chatContent,
             whisper: ChatMessage.getWhisperRecipients("GM") // Whisper to GM
         });
-
-        // If Endurance Loss from Kill check, character starts dying
-        if (killCheckResult.includes("End. Loss")) {
-            ui.notifications.error(`${target.name} is dying!`);
-            // TODO: Implement dying state / Endurance rank loss per turn
-        }
     }
 }
 
