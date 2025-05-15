@@ -1645,6 +1645,53 @@ export class FaseripActorSheet extends ActorSheet {
                 speaker: ChatMessage.getSpeaker({ actor: this.actor }),
                 content: content
               });
+
+              // Check if this is a combat-related talent and there's a target
+              if (resultColor.toLowerCase() !== "white" && actionType.toLowerCase().includes("attack")) {
+                const target = game.user.targets.first()?.actor;
+                
+                if (target) {
+                  // Determine damage type based on talent type/specialty
+                  let damageType = "Physical-Blunt"; // Default for unarmed attacks
+                  
+                  if (actionType.includes("Edged") || 
+                      talentSpecialty?.toLowerCase().includes("edged") || 
+                      talentSpecialty?.toLowerCase().includes("sharp")) {
+                    damageType = "Physical-Edged";
+                  } else if (actionType.includes("Shooting")) {
+                    damageType = "Physical-Shooting";
+                  }
+                  
+                  // Determine if special effects should apply based on the result and action type
+                  const canBeStun = actionType.includes("Blunt") || 
+                                  resultText.toLowerCase().includes("stun");
+                  
+                  const canBeSlam = actionType.includes("Blunt") || 
+                                  resultText.toLowerCase().includes("slam");
+                  
+                  const canBeKill = actionType.includes("Edged") || 
+                                  actionType.includes("Shooting") || 
+                                  resultText.toLowerCase().includes("kill");
+                  
+                  // For damage, use the damageRankValue if a damage CS was applied, otherwise use the base ability value
+                  const baseDamage = damageCS !== 0 ? damageRankValue : abilityValue;
+                  
+                  // Process the attack using the CombatHandler
+                  await game.msh.CombatHandler.processAttack({
+                    attacker: this.actor,
+                    target: target,
+                    baseDamage: baseDamage,
+                    damageType: damageType,
+                    sourceName: item.name,
+                    canBeStun,
+                    canBeSlam,
+                    canBeKill,
+                    originalRollResult: resultColor.toLowerCase()
+                  });
+                } else {
+                  ui.notifications.info("No target selected. Damage not applied.");
+                }
+              }
             }
           },
           cancel: { label: "Cancel" }
