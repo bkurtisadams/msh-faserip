@@ -413,25 +413,26 @@ export class CombatHandler {
 
     // Define new ActiveEffect
     const effect = {
-        label: type === "partial" ? "Partial Hold" : "Full Hold",
-        icon: "icons/svg/net.svg",
-        origin: `Actor.${attackerId}`,
-        flags: {
+    label: type === "partial" ? "Partial Hold" : "Full Hold",
+    icon: "icons/svg/net.svg",  // or your custom icon: "systems/msh-faserip/icons/status/partial-hold.svg"
+    origin: `Actor.${attackerId}`,
+    flags: {
         "msh-faserip": {
-            grappling: true,
-            grapplingType: type,
-            attackerId: attackerId
+        grappling: true,
+        grapplingType: type,
+        attackerId: attackerId
         }
-        },
-        changes: type === "partial"
+    },
+    changes: type === "partial"
         ? [{
             key: "system.effectiveCSMod",
             mode: CONST.ACTIVE_EFFECT_MODES.ADD,
             value: -2
-            }]
+        }]
         : [],
-        disabled: false,
-        duration: {} // Persistent until manually removed
+    duration: {},
+    // THIS makes the token icon appear:
+    statuses: [type === "partial" ? "partial-hold" : "restrained"]
     };
 
     // Apply ActiveEffect to target
