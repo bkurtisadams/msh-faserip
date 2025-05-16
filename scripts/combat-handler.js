@@ -55,27 +55,69 @@ export class CombatHandler {
     // 2. Calculate Net Damage
     let netDamage = baseDamage;
     let damageAbsorbed = 0;
+    let defenseUsed = "None";
 
-    if (defenseData.bodyArmorValue > 0) {
-        const baEffective = (damageType.startsWith("Energy")) ? Math.max(0, defenseData.bodyArmorValue - 20) : defenseData.bodyArmorValue;
-        const absorbedByBA = Math.min(netDamage, baEffective);
-        netDamage -= absorbedByBA;
-        damageAbsorbed += absorbedByBA;
-    }
-    if (defenseData.forceFieldValue > 0 && netDamage > 0) { // Force Field applies after BA if both present and active
-        const ffEffective = (damageType.startsWith("Energy")) ? defenseData.forceFieldValue : Math.max(0, defenseData.forceFieldValue - 10);
-        const absorbedByFF = Math.min(netDamage, ffEffective);
-        netDamage -= absorbedByFF;
-        damageAbsorbed += absorbedByFF;
-        // TODO: Handle Force Field overload if damage > ffEffective
-    }
-    if (defenseData.resistanceValue > 0 && netDamage > 0) {
-        const absorbedByRes = Math.min(netDamage, defenseData.resistanceValue);
-        netDamage -= absorbedByRes;
-        damageAbsorbed += absorbedByRes;
+    // Check if resistance applies to this damage type
+    if (defenseData.resistanceValue > 0 && isResistanceApplicable(damageType, defenseData.resistanceType)) {
+        // If damage is completely below resistance, no damage is taken
+        if (baseDamage <= defenseData.resistanceValue) {
+            netDamage = 0;
+            damageAbsorbed = baseDamage;
+            defenseUsed = `${defenseData.resistanceType} Resistance (Immune)`;
+        } else {
+            // Otherwise, reduce damage by resistance value
+            netDamage = Math.max(0, baseDamage - defenseData.resistanceValue);
+            damageAbsorbed = baseDamage - netDamage;
+            defenseUsed = `${defenseData.resistanceType} Resistance`;
+        }
+    } else {
+        // If no resistance applies, use the higher of Body Armor or Force Field
+        let effectiveBodyArmor = (damageType.startsWith("Energy")) ? Math.max(0, defenseData.bodyArmorValue - 20) : defenseData.bodyArmorValue;
+        let effectiveForceField = (damageType.startsWith("Energy")) ? defenseData.forceFieldValue : Math.max(0, defenseData.forceFieldValue - 10);
+        
+        if (effectiveBodyArmor >= effectiveForceField) {
+            if (effectiveBodyArmor > 0) {
+                const absorbedByBA = Math.min(netDamage, effectiveBodyArmor);
+                netDamage -= absorbedByBA;
+                damageAbsorbed += absorbedByBA;
+                defenseUsed = "Body Armor";
+            }
+        } else {
+            if (effectiveForceField > 0) {
+                const absorbedByFF = Math.min(netDamage, effectiveForceField);
+                netDamage -= absorbedByFF;
+                damageAbsorbed += absorbedByFF;
+                defenseUsed = "Force Field";
+            }
+        }
     }
 
     netDamage = Math.max(0, netDamage); // Damage cannot be negative
+
+    // helper function for resistance
+    function isResistanceApplicable(damageType, resistanceType) {
+        // Map damage types to applicable resistances
+        const resistanceMap = {
+            "Energy-Fire": ["fire", "heat"],
+            "Energy-Cold": ["cold"],
+            "Energy-Electricity": ["electricity"],
+            "Energy-Radiation": ["radiation"],
+            "Physical-Toxic": ["toxin", "poison"],
+            "Physical-Corrosive": ["corrosive", "acid"],
+            "Mental": ["mental", "emotion"],
+            "Magic": ["magic", "magical"],
+            "Disease": ["disease"]
+        };
+        
+        // Check if resistance applies to this damage type
+        for (const [damageKey, resistances] of Object.entries(resistanceMap)) {
+            if (damageType.toLowerCase().includes(damageKey.toLowerCase())) {
+                return resistances.includes(resistanceType.toLowerCase());
+            }
+        }
+        
+        return false;
+    }
 
     // 3. Apply Net Damage to Target Health
     const currentHealth = target.system.attributes.health.value;
