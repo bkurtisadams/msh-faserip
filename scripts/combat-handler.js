@@ -236,6 +236,224 @@ export class CombatHandler {
     console.log("CombatHandler.processAttack called with:", attackData); // Added for debugging
 }
 
+     /**
+     * Processes a wrestling action (Grappling, Grabbing, or Escaping)
+     * @param {Object} actionData - Information about the wrestling action
+     *   - attacker: Actor object of the attacker
+     *   - target: Actor object of the target
+     *   - actionType: "Gp" (Grappling), "Gb" (Grabbing), or "Es" (Escaping)
+     *   - resultColor: white, green, yellow, or red result from the Universal Table
+     *   - sourceName: Name of the action source (talent, power, etc.)
+     */
+    static async processWrestlingAction(actionData) {
+        const { attacker, target, actionType, resultColor, sourceName } = actionData;
+        
+        if (!target) {
+            ui.notifications.warn("No target specified for wrestling action.");
+            return;
+        }
+        
+        console.log("Wrestling action data:", actionData); // Add this debug line
+        
+        // Normalize the action type to handle case differences
+        const normalizedActionType = actionType?.toLowerCase() || "";
+        
+        // Process based on normalized action type
+        if (normalizedActionType === "gp") {
+            return this._processGrappling(attacker, target, resultColor, sourceName);
+        } else if (normalizedActionType === "gb") {
+            return this._processGrabbing(attacker, target, resultColor, sourceName);
+        } else if (normalizedActionType === "es") {
+            return this._processEscaping(attacker, target, resultColor, sourceName);
+        } else {
+            ui.notifications.warn(`Unknown wrestling action type: ${actionType}`);
+        }
+        }
+    
+    /**
+     * Handle grappling attempts
+     * @private
+     */
+    static async _processGrappling(attacker, target, resultColor, sourceName) {
+    // Chat message content to build
+    let chatContent = `
+        <div class="msh-wrestling-summary">
+        <h4>Wrestling Action: ${attacker.name} attempts to grapple ${target.name}</h4>
+    `;
+    
+    switch (resultColor) {
+        case "white":
+        case "green":
+        // Miss - nothing happens
+        chatContent += `<p><strong>Result:</strong> Miss! ${attacker.name} failed to grapple ${target.name}.</p>
+            <p>The attacker may not make other attacks this round.</p>`;
+        break;
+        
+        case "yellow":
+        // Partial hold - apply a status effect with -2CS penalty
+        await this.applyGrapplingEffect(target, "partial", attacker.id);
+        
+        // Compare strengths to determine movement restriction
+        const attackerStrength = attacker.system.abilities.strength.value || 0;
+        const targetStrength = target.system.abilities.strength.value || 0;
+        const canMove = attackerStrength < targetStrength;
+        
+        chatContent += `
+            <p><strong>Result:</strong> Partial Hold! ${attacker.name} has a partial hold on ${target.name}.</p>
+            <p>Target actions at -2CS penalty. ${canMove ? 
+            "Target may still move as their Strength exceeds the attacker's." : 
+            "Target cannot move as attacker's Strength is greater or equal to theirs."}</p>
+            <p><strong>Note:</strong> No damage is inflicted in a Partial Hold.</p>
+        `;
+        break;
+        
+        case "red":
+        // Full hold - apply a status effect for full restraint
+        await this.applyGrapplingEffect(target, "full", attacker.id);
+        
+        // Get attacker's strength for potential damage
+        const strength = attacker.system.abilities.strength.value || 0;
+        
+        chatContent += `
+            <p><strong>Result:</strong> Full Hold! ${attacker.name} has fully restrained ${target.name}.</p>
+            <p>Target is completely restrained and unable to act until they escape.</p>
+            <p>${attacker.name} may perform one action in addition to maintaining the hold.</p>
+            <p><strong>Option:</strong> ${attacker.name} may inflict up to Strength (${strength}) damage to the target.</p>
+            <button class="apply-wrestling-damage" data-attacker="${attacker.id}" data-target="${target.id}" data-hold-type="full">Apply Strength Damage</button>
+        `;
+        break;
+    }
+    
+    chatContent += `</div>`;
+    
+    // Send the chat message
+    const message = await ChatMessage.create({
+        speaker: ChatMessage.getSpeaker({ actor: attacker }),
+        content: chatContent
+    });
+    
+    // Add event listener for the "Apply Strength Damage" button (only for full holds)
+    if (message && resultColor === "red") {
+        // Use Hooks.once to ensure this only runs once after the message is rendered
+        Hooks.once("renderChatMessage", (app, html, data) => {
+        if (app.id === message.id) {
+            // Use jQuery for more reliable event handling
+            html.find('.apply-wrestling-damage').on('click', async function() {
+            const attackerId = this.dataset.attacker;
+            const targetId = this.dataset.target;
+            
+            // Store button reference safely
+            const $button = $(this);
+            
+            // Get actor and target
+            const attackerActor = game.actors.get(attackerId);
+            const targetActor = game.actors.get(targetId);
+            
+            if (attackerActor && targetActor) {
+                // Get attacker's full strength value for damage
+                const strengthValue = attackerActor.system.abilities.strength.value || 0;
+                
+                try {
+                // Process the damage
+                await CombatHandler.processAttack({
+                    attacker: attackerActor,
+                    target: targetActor,
+                    baseDamage: strengthValue,
+                    damageType: "Physical-Blunt",
+                    sourceName: "Wrestling Hold",
+                    canBeStun: false,
+                    canBeSlam: false,
+                    canBeKill: false,
+                    originalRollResult: "green" // Always a hit
+                });
+                
+                // Safely update button text and disable it
+                $button.text("Damage Applied").prop("disabled", true);
+                } catch (error) {
+                console.error("Error applying wrestling damage:", error);
+                ui.notifications.error("Failed to apply wrestling damage");
+                }
+            }
+            });
+        }
+        });
+    }
+    }
+    
+    /**
+     * Handle grabbing attempts (for items)
+     * @private
+     */
+    static async _processGrabbing(attacker, target, resultColor, sourceName) {
+        // Implementation for grabbing items
+        // Would need to know what item is being grabbed
+    }
+    
+    /**
+     * Handle escape attempts
+     * @private
+     */
+    static async _processEscaping(attacker, target, resultColor, sourceName) {
+        // Implementation for escaping from holds
+        // Would check if target is being grappled and by whom
+    }
+    
+    /**
+     * Applies a grappling effect to a target
+     * @param {Object} target - Actor being grappled
+     * @param {String} type - "partial" or "full"
+     * @param {String} attackerId - ID of the attacker
+     */
+    static async applyGrapplingEffect(target, type, attackerId) {
+    // Remove any existing grappling effects from this system
+    const existingEffects = target.effects.filter(e => e.flags["msh-faserip"]?.grappling);
+    if (existingEffects.length > 0) {
+        await target.deleteEmbeddedDocuments("ActiveEffect", existingEffects.map(e => e.id));
+    }
+
+    // Define new ActiveEffect
+    const effect = {
+        label: type === "partial" ? "Partial Hold" : "Full Hold",
+        icon: "icons/svg/net.svg",
+        origin: `Actor.${attackerId}`,
+        flags: {
+        "msh-faserip": {
+            grappling: true,
+            grapplingType: type,
+            attackerId: attackerId
+        }
+        },
+        changes: type === "partial"
+        ? [{
+            key: "system.effectiveCSMod",
+            mode: CONST.ACTIVE_EFFECT_MODES.ADD,
+            value: -2
+            }]
+        : [],
+        disabled: false,
+        duration: {} // Persistent until manually removed
+    };
+
+    // Apply ActiveEffect to target
+    const newEffect = await target.createEmbeddedDocuments("ActiveEffect", [effect]);
+
+    // Send styled chat message
+    await ChatMessage.create({
+        content: `
+        <div style="background-color: ${type === "partial" ? "#FFA500" : "#FF0000"}; color: white; padding: 10px; border-radius: 5px;">
+            <h3>${type === "partial" ? "PARTIAL HOLD" : "FULL HOLD"} APPLIED</h3>
+            <p><strong>${game.actors.get(attackerId)?.name || "Attacker"}</strong> has ${type === "partial" ? "a partial hold on" : "fully restrained"} <strong>${target.name}</strong>.</p>
+            <p>Effect: ${type === "partial" ? "-2CS to all actions" : "Cannot act until freed"}</p>
+            <p><em>This effect will remain until manually removed by the GM.</em></p>
+        </div>
+        `,
+        speaker: ChatMessage.getSpeaker({ alias: "Wrestling Status" })
+    });
+
+    return newEffect;
+    }
+
+
     /**
      * Prompts the target (or GM) to apply defenses.
      * @returns {Object} { bodyArmorValue, forceFieldValue, resistanceValue, usedBodyArmor, usedForceField, usedResistance }

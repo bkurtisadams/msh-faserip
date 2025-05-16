@@ -575,17 +575,30 @@ export async function rollUniversalAction(actionCode, actorId, columnShift = nul
 
     const baseDamage = ability.value;  // Simple default, refine later if needed
 
-    await game.msh.CombatHandler.processAttack({
-      attacker: actor,
-      target,
-      baseDamage,
-      damageType,
-      sourceName: label,
-      canBeStun,
-      canBeSlam,
-      canBeKill,
-      originalRollResult: color.toLowerCase()
-    });
+    // Check if this is a wrestling action
+    if (["Gp", "Gb", "Es"].includes(actionCode)) {
+      // For wrestling actions, we need to handle differently
+      await game.msh.CombatHandler.processWrestlingAction({
+        attacker: actor,
+        target,
+        actionType: actionCode,
+        resultColor: color.toLowerCase(),
+        sourceName: label
+      });
+    } else {
+      // Regular damage processing for non-wrestling actions
+      await game.msh.CombatHandler.processAttack({
+        attacker: actor,
+        target,
+        baseDamage,
+        damageType,
+        sourceName: label,
+        canBeStun,
+        canBeSlam,
+        canBeKill,
+        originalRollResult: color.toLowerCase()
+      });
+    }
   } else {
     ui.notifications.info("No target selected — result shown, but no damage processed.");
   }
@@ -1077,75 +1090,98 @@ export class FaseripRolls {
         content: content
       });
 
-      // ADD COMBAT HANDLER INTEGRATION HERE
+      // COMBAT HANDLER INTEGRATION
       // Check if we have a target to apply damage to
       const target = game.user.targets.first()?.actor;
 
-      if (target && resultColor.toLowerCase() !== "white" && actionType.toLowerCase().includes("attack")) {
-        // Determine damage type based on talent type/action type if not specified
-        let finalDamageType = damageType;
-        if (!finalDamageType) {
-          if (actionType.includes("Blunt")) {
-            finalDamageType = "Physical-Blunt";
-          } else if (actionType.includes("Edged")) {
-            finalDamageType = "Physical-Edged";
-          } else if (actionType.includes("Force")) {
-            finalDamageType = "Force";
-          } else if (actionType.includes("Mental")) {
-            finalDamageType = "Mental";
-          } else {
-            // Try to determine from talent type/specialty
-            const talentType = talent.system.type?.toLowerCase() || "";
-            const talentSpecialty = talent.system.specialty?.toLowerCase() || "";
-            
-            if (talentSpecialty.includes("blunt")) {
+      // Define wrestling actions
+      const wrestlingActions = ["Grappling (GP)", "Grabbing (Gb)", "Escaping (ES)"];
+
+      // Check if this is either an attack action or a wrestling action
+      if (target && resultColor.toLowerCase() !== "white" && 
+        (actionType.toLowerCase().includes("attack") || wrestlingActions.includes(actionType))) {
+        
+        // Handle wrestling actions differently
+        if (wrestlingActions.includes(actionType)) {
+          // Extract action code (GP, Gb, ES) from action type
+          const actionCode = actionType.match(/\(([^)]+)\)/)?.[1]?.toLowerCase();
+          console.log(`Processing wrestling action ${actionType} with lowercase code ${actionCode}`);
+          
+          // Use the wrestling-specific handler
+          await game.msh.CombatHandler.processWrestlingAction({
+            attacker: actor,
+            target,
+            actionType: actionCode,
+            resultColor: resultColor.toLowerCase(),
+            sourceName: talent.name
+          });
+        } else {
+          // Regular attack processing
+          let finalDamageType = damageType;
+          if (!finalDamageType) {
+            if (actionType.includes("Blunt")) {
               finalDamageType = "Physical-Blunt";
-            } else if (talentSpecialty.includes("sharp") || talentSpecialty.includes("edged")) {
+            } else if (actionType.includes("Edged")) {
               finalDamageType = "Physical-Edged";
-            } else if (talentSpecialty.includes("thrown")) {
-              if (talentSpecialty.includes("knife") || talentSpecialty.includes("star")) {
-                finalDamageType = "Physical-Edged";
-              } else {
-                finalDamageType = "Physical-Blunt";
-              }
-            } else if (talentType.includes("fight")) {
-              finalDamageType = "Physical-Blunt";
+            } else if (actionType.includes("Force")) {
+              finalDamageType = "Force";
+            } else if (actionType.includes("Mental")) {
+              finalDamageType = "Mental";
             } else {
-              finalDamageType = "Physical-Blunt"; // Default
+              // Try to determine from talent type/specialty
+              const talentType = talent.system.type?.toLowerCase() || "";
+              const talentSpecialty = talent.system.specialty?.toLowerCase() || "";
+              
+              if (talentSpecialty.includes("blunt")) {
+                finalDamageType = "Physical-Blunt";
+              } else if (talentSpecialty.includes("sharp") || talentSpecialty.includes("edged")) {
+                finalDamageType = "Physical-Edged";
+              } else if (talentSpecialty.includes("thrown")) {
+                if (talentSpecialty.includes("knife") || talentSpecialty.includes("star")) {
+                  finalDamageType = "Physical-Edged";
+                } else {
+                  finalDamageType = "Physical-Blunt";
+                }
+              } else if (talentType.includes("fight")) {
+                finalDamageType = "Physical-Blunt";
+              } else {
+                finalDamageType = "Physical-Blunt"; // Default
+              }
             }
           }
+          
+          // Determine if special effects should apply based on the result and action type
+          const canBeStun = actionType.includes("Blunt") || 
+                          actionType.includes("Force") || 
+                          resultText.toLowerCase().includes("stun");
+          
+          const canBeSlam = actionType.includes("Blunt") || 
+                          resultText.toLowerCase().includes("slam");
+          
+          const canBeKill = actionType.includes("Edged") || 
+                          actionType.includes("Energy") || 
+                          actionType.includes("Shooting") || 
+                          resultText.toLowerCase().includes("kill");
+          
+          // For damage, use the damageRankValue if a damage CS was applied, otherwise use the base ability value
+          const baseDamage = damageCS && damageRankValue ? damageRankValue : abilityValue;
+          
+          // Process the attack using the CombatHandler
+          await game.msh.CombatHandler.processAttack({
+            attacker: actor,
+            target: target,
+            baseDamage: baseDamage,
+            damageType: finalDamageType,
+            sourceName: talent.name,
+            canBeStun,
+            canBeSlam,
+            canBeKill,
+            originalRollResult: resultColor.toLowerCase()
+          });
         }
-        
-        // Determine if special effects should apply based on the result and action type
-        const canBeStun = actionType.includes("Blunt") || 
-                        actionType.includes("Force") || 
-                        resultText.toLowerCase().includes("stun");
-        
-        const canBeSlam = actionType.includes("Blunt") || 
-                        resultText.toLowerCase().includes("slam");
-        
-        const canBeKill = actionType.includes("Edged") || 
-                        actionType.includes("Energy") || 
-                        actionType.includes("Shooting") || 
-                        resultText.toLowerCase().includes("kill");
-        
-        // For damage, use the damageRankValue if a damage CS was applied, otherwise use the base ability value
-        const baseDamage = damageCS && damageRankValue ? damageRankValue : abilityValue;
-        
-        // Process the attack using the CombatHandler
-        await game.msh.CombatHandler.processAttack({
-          attacker: actor,
-          target: target,
-          baseDamage: baseDamage,
-          damageType: finalDamageType,
-          sourceName: talent.name,
-          canBeStun,
-          canBeSlam,
-          canBeKill,
-          originalRollResult: resultColor.toLowerCase()
-        });
-      } else if (resultColor.toLowerCase() !== "white" && !target && actionType.toLowerCase().includes("attack")) {
-        ui.notifications.info("No target selected. Damage not applied.");
+      } else if (resultColor.toLowerCase() !== "white" && !target && 
+                (actionType.toLowerCase().includes("attack") || wrestlingActions.includes(actionType))) {
+        ui.notifications.info("No target selected. Effect not applied.");
       }
 
       return { roll, resultColor, resultText };
