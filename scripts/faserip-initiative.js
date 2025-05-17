@@ -16,9 +16,13 @@ export class FaseripInitiative {
       config: true,
       type: Boolean,
       default: true,
-      onChange: () => {
-        ui.combat?.render();
+      onChange: (value) => {
+      // If enabled, sort combatants in all combats
+      if (value) {
+        game.combats?.forEach(c => this._sortCombatantsBySide(c));
       }
+      ui.combat?.render();
+    }
     });
 
     // Add a new setting for manual side assignment
@@ -57,7 +61,14 @@ export class FaseripInitiative {
     this.registerSettings();
     
     // Apply hooks - we add a small delay to ensure this happens after core Foundry initialization
-    setTimeout(() => this._registerHooks(), 100);
+    setTimeout(() => {
+      this._registerHooks();
+      
+      // Sort combatants in all existing combats
+      if (game.settings.get("msh-faserip", "useCustomInitiative")) {
+        game.combats?.forEach(c => this._sortCombatantsBySide(c));
+      }
+    }, 100);
   }
   
   /**
@@ -116,14 +127,17 @@ export class FaseripInitiative {
    * When a combatant is added, assign side
    */
   static async _onCreateCombatant(combatant, options, userId) {
-    if (!game.settings.get("msh-faserip", "useCustomInitiative")) return; //Modify the _onCreateCombatant method to respect manual assignment
+    if (!game.settings.get("msh-faserip", "useCustomInitiative")) return;
     
-    // Only auto-assign if not manually set
+    // Only set the side if it hasn't been manually set
     if (combatant.getFlag("msh-faserip", "side") === undefined) {
       // Set side flag based on PC/NPC status
       const isPC = combatant.actor?.hasPlayerOwner;
       await combatant.setFlag("msh-faserip", "side", isPC ? "pc" : "npc");
     }
+    
+    // Re-sort combatants by side
+    await this._sortCombatantsBySide(combatant.parent);
   }
   
   /**
@@ -559,6 +573,9 @@ export class FaseripInitiative {
         }
       }
       
+      // After setting up everything, sort combatants
+      await this._sortCombatantsBySide(combat);
+      
       // Update UI
       ui.combat?.render();
       
@@ -629,8 +646,51 @@ export class FaseripInitiative {
     // Update side flag
     await combatant.setFlag("msh-faserip", "side", newSide);
     
+    // Re-sort combatants by side
+    await this._sortCombatantsBySide(combat);
+    
     // Re-render combat tracker
     ui.combat?.render();
   }
 
+  /**
+ * Sort combatants by side when combat is updated
+ */
+  static async _sortCombatantsBySide(combat) {
+    if (!game.settings.get("msh-faserip", "useCustomInitiative")) return;
+    
+    // Get all combatants
+    const combatants = combat.combatants.contents;
+    
+    // Sort them by side (pc/Side A first, then npc/Side B)
+    const sorted = combatants.sort((a, b) => {
+      const sideA = a.getFlag("msh-faserip", "side") || (a.actor?.hasPlayerOwner ? "pc" : "npc");
+      const sideB = b.getFlag("msh-faserip", "side") || (b.actor?.hasPlayerOwner ? "pc" : "npc");
+      
+      // Sort primarily by side
+      if (sideA === "pc" && sideB === "npc") return -1;
+      if (sideA === "npc" && sideB === "pc") return 1;
+      
+      // If same side, keep original order
+      return 0;
+    });
+    
+    // Calculate new sort values
+    const updates = sorted.map((c, i) => {
+      return {
+        _id: c.id,
+        flags: {
+          core: {
+            // The sortValue in Foundry determines display order
+            sortValue: i
+          }
+        }
+      };
+    });
+    
+    // Apply the updates if any
+    if (updates.length > 0) {
+      await combat.updateEmbeddedDocuments("Combatant", updates, {render: false});
+    }
+  }  
 }
