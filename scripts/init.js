@@ -15,6 +15,23 @@ Hooks.once("init", async () => {
   console.log("Marvel Super Heroes (FASERIP) system initializing...");
 
   CONFIG.FASERIP = CONFIG.FASERIP || {};
+
+  // Register custom grappling effects so they show token HUD icons and work with ActiveEffect.statuses
+  CONFIG.statusEffects.push(
+    {
+      id: "partial-hold",
+      label: "Partial Hold",
+      icon: "systems/msh-faserip/assets/icons/effects/partial-hold.svg",
+      flags: { "msh-faserip": { grappling: true } }
+    },
+    {
+      id: "full-hold",
+      label: "Full Hold",
+      icon: "systems/msh-faserip/assets/icons/effects/full-hold.svg",
+      flags: { "msh-faserip": { grappling: true } }
+    }
+  );
+
   CONFIG.FASERIP.rankValues = {
     "Shift 0": 0, "Feeble": 2, "Poor": 4, "Typical": 6, "Good": 10, "Excellent": 20,
     "Remarkable": 30, "Incredible": 40, "Amazing": 50, "Monstrous": 75,
