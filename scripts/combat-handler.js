@@ -49,6 +49,13 @@ export class CombatHandler {
         return;
     }
 
+    // Make sure we have actor references
+    const attackerActor = attacker.actor || attacker;
+    const targetActor = target.actor || target;
+    
+    console.log(`Process Attack: Using attacker: ${attackerActor.name}`);
+    console.log(`Process Attack: Using target: ${targetActor.name}`);
+
     // 1. Get Defenses from Target
     let defenseData = await this.getTargetDefenses(target, damageType, baseDamage, options.skipDefenseDialog);
 
@@ -120,15 +127,26 @@ export class CombatHandler {
     }
 
     // 3. Apply Net Damage to Target Health
-    const currentHealth = target.system.attributes.health.value;
+    // First determine if we're dealing with a token or actor
+    const isToken = target.document?.documentName === "Token" || target.documentName === "Token";
+    const targetTokenData = isToken ? (target.document || target) : null;
+    const isUnlinkedToken = isToken && targetTokenData && !targetTokenData.actorLink;
+
+    console.log(`Target is token: ${isToken}`);
+    console.log(`Target is unlinked token: ${isUnlinkedToken}`);
+    console.log(`Target name: ${targetActor.name}`);
+
+    // Get current health and calculate new health
+    const currentHealth = targetActor.system.attributes.health.value;
     const newHealth = Math.max(0, currentHealth - netDamage);
-    await target.update({"system.attributes.health.value": newHealth});
-    
-    if (netDamage > 0) {
-        ui.notifications.info(`${target.name} takes ${netDamage} damage.`);
-    } else {
-        ui.notifications.info(`${target.name} takes no damage after defenses.`);
-    }
+
+    console.log("Before health update:", currentHealth);
+    console.log("New health to set:", newHealth);
+
+    // Apply health update to the actor
+    console.log(isUnlinkedToken ? "Updating unlinked token actor data" : "Updating actor or linked token");
+    await targetActor.update({"system.attributes.health.value": newHealth});
+    console.log("After health update:", targetActor.system.attributes.health.value);
 
     // 4. Create a summary chat message
     let defenseSummary = `Defenses Applied by ${target.name}:`;
@@ -275,109 +293,148 @@ export class CombatHandler {
      * @private
      */
     static async _processGrappling(attacker, target, resultColor, sourceName) {
-    // Chat message content to build
-    let chatContent = `
-        <div class="msh-wrestling-summary">
-        <h4>Wrestling Action: ${attacker.name} attempts to grapple ${target.name}</h4>
-    `;
-    
-    switch (resultColor) {
-        case "white":
-        case "green":
-        // Miss - nothing happens
-        chatContent += `<p><strong>Result:</strong> Miss! ${attacker.name} failed to grapple ${target.name}.</p>
-            <p>The attacker may not make other attacks this round.</p>`;
-        break;
+        // First, determine if the attacker and target are tokens or actors
+        const isAttackerToken = attacker.document?.documentName === "Token" || attacker.documentName === "Token";
+        const isTargetToken = target.document?.documentName === "Token" || target.documentName === "Token";
+
+        // Get the proper actor references
+        const attackerActor = isAttackerToken ? attacker.actor || attacker : attacker;
+        const targetActor = isTargetToken ? target.actor || target : target;
+
+        // Get proper names
+        const attackerName = attackerActor.name;
+        const targetName = targetActor.name;
+
+        // Get proper IDs to use in the button
+        const attackerId = isAttackerToken ? attacker.id : attackerActor.id;
+        const targetId = isTargetToken ? target.id : targetActor.id;
+
+        // Log useful debugging info
+        console.log(`Grappling: Attacker is token: ${isAttackerToken}, ID: ${attackerId}`);
+        console.log(`Grappling: Target is token: ${isTargetToken}, ID: ${targetId}`);
         
-        case "yellow":
-        // Partial hold - apply a status effect with -2CS penalty
-        await this.applyGrapplingEffect(target, "partial", attacker.id);
-        
-        // Compare strengths to determine movement restriction
-        const attackerStrength = attacker.system.abilities.strength.value || 0;
-        const targetStrength = target.system.abilities.strength.value || 0;
-        const canMove = attackerStrength < targetStrength;
-        
-        chatContent += `
-            <p><strong>Result:</strong> Partial Hold! ${attacker.name} has a partial hold on ${target.name}.</p>
-            <p>Target actions at -2CS penalty. ${canMove ? 
-            "Target may still move as their Strength exceeds the attacker's." : 
-            "Target cannot move as attacker's Strength is greater or equal to theirs."}</p>
-            <p><strong>Note:</strong> No damage is inflicted in a Partial Hold.</p>
+        // Chat message content to build
+        let chatContent = `
+            <div class="msh-wrestling-summary">
+            <h4>Wrestling Action: ${attackerName} attempts to grapple ${targetName}</h4>
         `;
-        break;
         
-        case "red":
-        // Full hold - apply a status effect for full restraint
-        await this.applyGrapplingEffect(target, "full", attacker.id);
+        switch (resultColor) {
+            case "white":
+            case "green":
+            // Miss - nothing happens
+            chatContent += `<p><strong>Result:</strong> Miss! ${attackerName} failed to grapple ${targetName}.</p>
+                <p>The attacker may not make other attacks this round.</p>`;
+            break;
+            
+            case "yellow":
+            // Partial hold - apply a status effect with -2CS penalty
+            await this.applyGrapplingEffect(targetActor, "partial", attackerActor.id);
+            
+            // Compare strengths to determine movement restriction
+            const attackerStrength = attackerActor.system.abilities.strength.value || 0;
+            const targetStrength = targetActor.system.abilities.strength.value || 0;
+            const canMove = attackerStrength < targetStrength;
+            
+            chatContent += `
+                <p><strong>Result:</strong> Partial Hold! ${attackerName} has a partial hold on ${targetName}.</p>
+                <p>Target actions at -2CS penalty. ${canMove ? 
+                "Target may still move as their Strength exceeds the attacker's." : 
+                "Target cannot move as attacker's Strength is greater or equal to theirs."}</p>
+                <p><strong>Note:</strong> No damage is inflicted in a Partial Hold.</p>
+            `;
+            break;
+            
+            case "red":
+            // Full hold - apply a status effect for full restraint
+            await this.applyGrapplingEffect(targetActor, "full", attackerActor.id);
+            
+            // Get attacker's strength for potential damage
+            const strength = attackerActor.system.abilities.strength.value || 0;
+            
+            chatContent += `
+                <p><strong>Result:</strong> Full Hold! ${attackerName} has fully restrained ${targetName}.</p>
+                <p>Target is completely restrained and unable to act until they escape.</p>
+                <p>${attackerName} may perform one action in addition to maintaining the hold.</p>
+                <p><strong>Option:</strong> ${attackerName} may inflict up to Strength (${strength}) damage to the target.</p>
+                <button class="apply-wrestling-damage" data-attacker="${attackerId}" data-target="${targetId}" data-hold-type="full">Apply Strength Damage</button>
+            `;
+            break;
+        }
         
-        // Get attacker's strength for potential damage
-        const strength = attacker.system.abilities.strength.value || 0;
+        chatContent += `</div>`;
         
-        chatContent += `
-            <p><strong>Result:</strong> Full Hold! ${attacker.name} has fully restrained ${target.name}.</p>
-            <p>Target is completely restrained and unable to act until they escape.</p>
-            <p>${attacker.name} may perform one action in addition to maintaining the hold.</p>
-            <p><strong>Option:</strong> ${attacker.name} may inflict up to Strength (${strength}) damage to the target.</p>
-            <button class="apply-wrestling-damage" data-attacker="${attacker.id}" data-target="${target.id}" data-hold-type="full">Apply Strength Damage</button>
-        `;
-        break;
-    }
-    
-    chatContent += `</div>`;
-    
-    // Send the chat message
-    const message = await ChatMessage.create({
-        speaker: ChatMessage.getSpeaker({ actor: attacker }),
-        content: chatContent
-    });
-    
-    // Add event listener for the "Apply Strength Damage" button (only for full holds)
-    if (message && resultColor === "red") {
-        // Use Hooks.once to ensure this only runs once after the message is rendered
-        Hooks.once("renderChatMessage", (app, html, data) => {
-        if (app.id === message.id) {
-            // Use jQuery for more reliable event handling
-            html.find('.apply-wrestling-damage').on('click', async function() {
-            const attackerId = this.dataset.attacker;
-            const targetId = this.dataset.target;
-            
-            // Store button reference safely
-            const $button = $(this);
-            
-            // Get actor and target
-            const attackerActor = game.actors.get(attackerId);
-            const targetActor = game.actors.get(targetId);
-            
-            if (attackerActor && targetActor) {
-                // Get attacker's full strength value for damage
-                const strengthValue = attackerActor.system.abilities.strength.value || 0;
-                
-                try {
-                // Process the damage
-                await CombatHandler.processAttack({
-                    attacker: attackerActor,
-                    target: targetActor,
-                    baseDamage: strengthValue,
-                    damageType: "Physical-Blunt",
-                    sourceName: "Wrestling Hold",
-                    canBeStun: false,
-                    canBeSlam: false,
-                    canBeKill: false,
-                    originalRollResult: "green" // Always a hit
+        // Send the chat message
+        const message = await ChatMessage.create({
+            speaker: ChatMessage.getSpeaker({ actor: attackerActor }),
+            content: chatContent
+        });
+        
+        // Add event listener for the "Apply Strength Damage" button (only for full holds)
+        if (message && resultColor === "red") {
+            // Use Hooks.once to ensure this only runs once after the message is rendered
+            Hooks.once("renderChatMessage", (app, html, data) => {
+                if (app.id === message.id) {
+                    // Use jQuery for more reliable event handling
+                    html.find('.apply-wrestling-damage').on('click', async function() {
+                    const clickAttackerId = this.dataset.attacker;
+                    const clickTargetId = this.dataset.target;
+                    
+                    // Store button reference safely
+                    const $button = $(this);
+                    
+                    // Find the tokens on the canvas by their actor IDs
+                    const attackerTokens = canvas.tokens.placeables.filter(t => t.actor?.id === clickAttackerId);
+                    const targetTokens = canvas.tokens.placeables.filter(t => t.actor?.id === clickTargetId);
+                    
+                    // Get the base actor references
+                    const attackerBaseActor = game.actors.get(clickAttackerId);
+                    const targetBaseActor = game.actors.get(clickTargetId);
+                    
+                    console.log(`Wrestling damage: Found ${attackerTokens.length} attacker tokens on canvas`);
+                    console.log(`Wrestling damage: Found ${targetTokens.length} target tokens on canvas`);
+                    
+                    // Determine the best actor references to use
+                    // For tokens, use the token's actor, otherwise use the base actor
+                    const attackerActor = attackerTokens.length > 0 ? attackerTokens[0].actor : attackerBaseActor;
+                    const targetActor = targetTokens.length > 0 ? targetTokens[0].actor : targetBaseActor;
+                    
+                    if (attackerActor && targetActor) {
+                        // Get attacker's strength value for damage
+                        const strengthValue = attackerActor.system.abilities.strength.value || 0;
+                        
+                        try {
+                            console.log(`Wrestling damage: Using attacker: ${attackerActor.name}`);
+                            console.log(`Wrestling damage: Using target: ${targetActor.name}`);
+                            
+                            // Process the damage with actor references
+                            await CombatHandler.processAttack({
+                                attacker: attackerActor,
+                                target: targetActor,
+                                baseDamage: strengthValue,
+                                damageType: "Physical-Blunt",
+                                sourceName: "Wrestling Hold",
+                                canBeStun: false,
+                                canBeSlam: false,
+                                canBeKill: false,
+                                originalRollResult: "green" // Always a hit
+                            });
+                            
+                            // Update button text and disable it
+                            $button.text("Damage Applied").prop("disabled", true);
+                        } catch (error) {
+                            console.error("Error applying wrestling damage:", error);
+                            ui.notifications.error("Failed to apply wrestling damage");
+                            console.error(error); // Log the full error
+                        }
+                    } else {
+                        console.error(`Could not find ${!attackerActor ? "attacker" : "target"} with ID: ${!attackerActor ? clickAttackerId : clickTargetId}`);
+                        ui.notifications.error("Failed to apply wrestling damage: Actor not found");
+                    }
                 });
-                
-                // Safely update button text and disable it
-                $button.text("Damage Applied").prop("disabled", true);
-                } catch (error) {
-                console.error("Error applying wrestling damage:", error);
-                ui.notifications.error("Failed to apply wrestling damage");
                 }
-            }
             });
         }
-        });
-    }
     }
     
     /**
