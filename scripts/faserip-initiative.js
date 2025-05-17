@@ -34,9 +34,14 @@ export class FaseripInitiative {
       type: Boolean,
       default: false,
       onChange: () => {
+        // When this setting changes, update all combats
+        if (game.combats) {
+          game.combats.forEach(c => this._sortCombatantsBySide(c));
+        }
         ui.combat?.render();
       }
     });
+
     
     game.settings.register("msh-faserip", "autoRerollInitiative", {
       name: "Auto Reroll Initiative Each Round",
@@ -131,9 +136,9 @@ export class FaseripInitiative {
     
     // Only set the side if it hasn't been manually set
     if (combatant.getFlag("msh-faserip", "side") === undefined) {
-      // Set side flag based on PC/NPC status
-      const isPC = combatant.actor?.hasPlayerOwner;
-      await combatant.setFlag("msh-faserip", "side", isPC ? "pc" : "npc");
+      // Set side flag based on token disposition instead of just PC/NPC status
+      const defaultSide = this._getDefaultSide(combatant);
+      await combatant.setFlag("msh-faserip", "side", defaultSide);
     }
     
     // Re-sort combatants by side
@@ -208,11 +213,11 @@ export class FaseripInitiative {
       // Enhanced info bar with highest Intuition character names
       const infoBar = $(`
         <div class="faserip-initiative-bar">
-          <span class="side-a">Side A${pcHighestName ? ` (${pcHighestName})` : ''}</span>
+          <span class="side-a">Side A (Friendly)${pcHighestName ? ` - ${pcHighestName}` : ''}</span>
           ${pcText}
           ${goesFirst === 'pc' ? ' <span class="goes-first">(First)</span>' : ''}
           — 
-          <span class="side-b">Side B${npcHighestName ? ` (${npcHighestName})` : ''}</span>
+          <span class="side-b">Side B (Hostile)${npcHighestName ? ` - ${npcHighestName}` : ''}</span>
           ${npcText}
           ${goesFirst === 'npc' ? ' <span class="goes-first">(First)</span>' : ''}
         </div>
@@ -245,7 +250,7 @@ export class FaseripInitiative {
           // Create side toggle button
           const toggleButton = $(`
             <a class="combatant-control side-toggle" title="Toggle Side">
-              <i class="fas fa-exchange-alt"></i> ${side === 'pc' ? 'A' : 'B'}
+              <i class="fas fa-exchange-alt"></i> ${side === 'pc' ? 'A/F' : 'B/H'}
             </a>
           `);
           
@@ -307,21 +312,40 @@ export class FaseripInitiative {
     });
     
     // Add reroll button for existing combats
-    if (combat.round > 0) {
+    if (combat) {
       const headerControls = html.find('.combat-tracker-header .encounter-controls');
-      if (headerControls.length && headerControls.find('.faserip-reroll').length === 0) {
-        const rerollBtn = $(`
-          <a class="combat-control faserip-reroll" title="Reroll Initiative" data-control="rerollInitiative">
-            <i class="fas fa-dice-d10"></i>
-          </a>
-        `);
+      if (headerControls.length) {
+        // Add reroll button if it doesn't exist
+        if (headerControls.find('.faserip-reroll').length === 0) {
+          const rerollBtn = $(`
+            <a class="combat-control faserip-reroll" title="Reroll Initiative" data-control="rerollInitiative">
+              <i class="fas fa-dice-d10"></i>
+            </a>
+          `);
+          
+          headerControls.append(rerollBtn);
+          
+          rerollBtn.click(ev => {
+            ev.preventDefault();
+            this.rollSideInitiative(combat);
+          });
+        }
         
-        headerControls.append(rerollBtn);
-        
-        rerollBtn.click(ev => {
-          ev.preventDefault();
-          this.rollSideInitiative(combat);
-        });
+        // Add sort button if it doesn't exist
+        if (headerControls.find('.faserip-sort').length === 0) {
+          const sortBtn = $(`
+            <a class="combat-control faserip-sort" title="Sort by Side" data-control="sortBySide">
+              <i class="fas fa-sort"></i>
+            </a>
+          `);
+          
+          headerControls.append(sortBtn);
+          
+          sortBtn.click(ev => {
+            ev.preventDefault();
+            this._sortCombatantsBySide(combat);
+          });
+        }
       }
     }
   }
@@ -375,9 +399,10 @@ export class FaseripInitiative {
             <label>Allow Manual Side Assignment:</label>
             <div class="form-fields">
               <input type="checkbox" name="allowManualSides" ${game.settings.get("msh-faserip", "allowManualSides") ? "checked" : ""}>
-              <span class="notes">Enable manual assignment of combatants to Side A or Side B</span>
+              <span class="notes">Enable manual assignment of combatants to Side A (Friendly) or Side B (Hostile)</span>
             </div>
           </div>
+          <p class="notes">By default, friendly and neutral tokens are assigned to Side A, while hostile tokens are assigned to Side B.</p>
         </form>
       `,
       buttons: {
@@ -394,6 +419,19 @@ export class FaseripInitiative {
             game.settings.set("msh-faserip", "allowManualSides", allowManual);
             
             ui.notifications.info("FASERIP Initiative settings saved");
+          }
+        },
+        reset: {
+          icon: '<i class="fas fa-sync"></i>',
+          label: "Reset Sorting",
+          callback: () => {
+            // Apply sorting to the current combat
+            if (game.combat) {
+              FaseripInitiative._sortCombatantsBySide(game.combat);
+              ui.notifications.info("Combat sorting has been reset");
+            } else {
+              ui.notifications.warn("No active combat to reset");
+            }
           }
         },
         cancel: {
@@ -600,9 +638,8 @@ export class FaseripInitiative {
       
       const intuition = c.actor.system.abilities.intuition.value || 0;
       
-      // Use the flag value instead of checking hasPlayerOwner
-      const side = c.getFlag("msh-faserip", "side") || 
-                  (c.actor.hasPlayerOwner ? "pc" : "npc");
+      // Get side using flag or default based on disposition
+      const side = c.getFlag("msh-faserip", "side") || this._getDefaultSide(c);
       
       if (side === "pc" && intuition > pcHighest.intuition) {
         pcHighest = { name: c.name, intuition: intuition };
@@ -613,6 +650,7 @@ export class FaseripInitiative {
     
     return [pcHighest, npcHighest];
   }
+
   
   /**
    * Get initiative modifier based on Intuition
@@ -628,7 +666,9 @@ export class FaseripInitiative {
     return 0;
   }
 
-  // Add a method to toggle combatant side
+  /**
+   * Toggle a combatant's side between A and B
+   */
   static async toggleCombatantSide(combatId, combatantId) {
     const combat = game.combats.get(combatId);
     if (!combat) return;
@@ -638,7 +678,7 @@ export class FaseripInitiative {
     
     // Get current side
     const currentSide = combatant.getFlag("msh-faserip", "side") || 
-                      (combatant.actor?.hasPlayerOwner ? 'pc' : 'npc');
+                      this._getDefaultSide(combatant);
     
     // Toggle side
     const newSide = currentSide === 'pc' ? 'npc' : 'pc';
@@ -648,49 +688,86 @@ export class FaseripInitiative {
     
     // Re-sort combatants by side
     await this._sortCombatantsBySide(combat);
-    
-    // Re-render combat tracker
-    ui.combat?.render();
   }
 
   /**
- * Sort combatants by side when combat is updated
- */
-  static async _sortCombatantsBySide(combat) {
-    if (!game.settings.get("msh-faserip", "useCustomInitiative")) return;
-    
-    // Get all combatants
-    const combatants = combat.combatants.contents;
-    
-    // Sort them by side (pc/Side A first, then npc/Side B)
-    const sorted = combatants.sort((a, b) => {
-      const sideA = a.getFlag("msh-faserip", "side") || (a.actor?.hasPlayerOwner ? "pc" : "npc");
-      const sideB = b.getFlag("msh-faserip", "side") || (b.actor?.hasPlayerOwner ? "pc" : "npc");
+   * Sort combatants by side when combat is updated
+   */
+    static async _sortCombatantsBySide(combat) {
+      if (!combat || !game.settings.get("msh-faserip", "useCustomInitiative")) return;
       
-      // Sort primarily by side
-      if (sideA === "pc" && sideB === "npc") return -1;
-      if (sideA === "npc" && sideB === "pc") return 1;
+      // Get all combatants
+      const combatants = combat.combatants.contents;
+      if (!combatants.length) return;
       
-      // If same side, keep original order
-      return 0;
-    });
+      // Group combatants by side
+      const pcCombatants = [];
+      const npcCombatants = [];
+      
+      // First pass: categorize by side
+      for (const c of combatants) {
+        const side = c.getFlag("msh-faserip", "side") || this._getDefaultSide(c);
+        
+        if (side === 'pc') {
+          pcCombatants.push(c);
+        } else {
+          npcCombatants.push(c);
+        }
+      }
     
-    // Calculate new sort values
-    const updates = sorted.map((c, i) => {
-      return {
+    // Second pass: prepare updates with new sort values
+    const updates = [];
+    
+    // Assign sortValue to ensure proper grouping
+    // PCs come first (lower values), then NPCs
+    let sortValue = 0;
+    
+    // Update PC combatants
+    for (const c of pcCombatants) {
+      updates.push({
         _id: c.id,
         flags: {
           core: {
-            // The sortValue in Foundry determines display order
-            sortValue: i
+            sortValue: sortValue++
           }
         }
-      };
-    });
+      });
+    }
     
-    // Apply the updates if any
-    if (updates.length > 0) {
+    // Update NPC combatants
+    for (const c of npcCombatants) {
+      updates.push({
+        _id: c.id,
+        flags: {
+          core: {
+            sortValue: sortValue++
+          }
+        }
+      });
+    }
+    
+    // Apply updates if needed
+    if (updates.length) {
+      console.log("FASERIP Initiative: Sorting combatants by side", updates);
       await combat.updateEmbeddedDocuments("Combatant", updates, {render: false});
+      
+      // Force combat tracker to re-render
+      ui.combat?.render();
     }
   }  
+
+  /**
+   * Determine the default side for a combatant based on token disposition
+   */
+  static _getDefaultSide(combatant) {
+    // If no actor or token, default to NPC side
+    if (!combatant.actor || !combatant.token) return 'npc';
+    
+    // Get token disposition
+    const token = combatant.token;
+    const disposition = token.disposition;
+    
+    // FRIENDLY (1) and NEUTRAL (0) go to Side A, HOSTILE (-1) goes to Side B
+    return (disposition >= 0) ? 'pc' : 'npc';
+  }
 }
