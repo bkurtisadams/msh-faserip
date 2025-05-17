@@ -20,6 +20,19 @@ export class FaseripInitiative {
         ui.combat?.render();
       }
     });
+
+    // Add a new setting for manual side assignment
+    game.settings.register("msh-faserip", "allowManualSides", {
+      name: "Allow Manual Side Assignment",
+      hint: "Enable manual assignment of combatants to Side A or Side B.",
+      scope: "world",
+      config: true,
+      type: Boolean,
+      default: false,
+      onChange: () => {
+        ui.combat?.render();
+      }
+    });
     
     game.settings.register("msh-faserip", "autoRerollInitiative", {
       name: "Auto Reroll Initiative Each Round",
@@ -103,11 +116,14 @@ export class FaseripInitiative {
    * When a combatant is added, assign side
    */
   static async _onCreateCombatant(combatant, options, userId) {
-    if (!game.settings.get("msh-faserip", "useCustomInitiative")) return;
+    if (!game.settings.get("msh-faserip", "useCustomInitiative")) return; //Modify the _onCreateCombatant method to respect manual assignment
     
-    // Set side flag
-    const isPC = combatant.actor?.hasPlayerOwner;
-    await combatant.setFlag("msh-faserip", "side", isPC ? "pc" : "npc");
+    // Only auto-assign if not manually set
+    if (combatant.getFlag("msh-faserip", "side") === undefined) {
+      // Set side flag based on PC/NPC status
+      const isPC = combatant.actor?.hasPlayerOwner;
+      await combatant.setFlag("msh-faserip", "side", isPC ? "pc" : "npc");
+    }
   }
   
   /**
@@ -134,7 +150,7 @@ export class FaseripInitiative {
   /**
    * Modify combat tracker UI
    */
-  static _onRenderCombatTracker(app, html, data) {
+    static _onRenderCombatTracker(app, html, data) {
     // Only if FASERIP is enabled
     if (!game.settings.get("msh-faserip", "useCustomInitiative")) return;
     
@@ -175,11 +191,14 @@ export class FaseripInitiative {
         npcText += `-`;
       }
       
+      // Enhanced info bar with highest Intuition character names
       const infoBar = $(`
         <div class="faserip-initiative-bar">
+          <span class="side-a">Side A${pcHighestName ? ` (${pcHighestName})` : ''}</span>
           ${pcText}
           ${goesFirst === 'pc' ? ' <span class="goes-first">(First)</span>' : ''}
           — 
+          <span class="side-b">Side B${npcHighestName ? ` (${npcHighestName})` : ''}</span>
           ${npcText}
           ${goesFirst === 'npc' ? ' <span class="goes-first">(First)</span>' : ''}
         </div>
@@ -187,6 +206,9 @@ export class FaseripInitiative {
       
       roundDisplay.after(infoBar);
     }
+    
+    // Check if manual sides are allowed
+    const allowManualSides = game.settings.get("msh-faserip", "allowManualSides");
     
     // Mark combatants with side info
     const combatants = html.find('.combatant');
@@ -201,6 +223,29 @@ export class FaseripInitiative {
       
       // Add side marker
       $(el).addClass(`${side}-side`);
+      
+      // Add side toggle button if manual sides are allowed
+      if (allowManualSides) {
+        // Check if button already exists
+        if ($(el).find('.side-toggle').length === 0) {
+          // Create side toggle button
+          const toggleButton = $(`
+            <a class="combatant-control side-toggle" title="Toggle Side">
+              <i class="fas fa-exchange-alt"></i> ${side === 'pc' ? 'A' : 'B'}
+            </a>
+          `);
+          
+          // Add to controls
+          $(el).find('.combatant-controls').prepend(toggleButton);
+          
+          // Add click handler
+          toggleButton.click(ev => {
+            ev.preventDefault();
+            ev.stopPropagation();
+            FaseripInitiative.toggleCombatantSide(combat.id, combatantId);
+          });
+        }
+      }
       
       // Check if highest Intuition
       if ((side === 'pc' && combatant.name === pcHighestName) || 
@@ -312,6 +357,13 @@ export class FaseripInitiative {
               <span class="notes">Automatically reroll initiative at the start of each new round</span>
             </div>
           </div>
+          <div class="form-group">
+            <label>Allow Manual Side Assignment:</label>
+            <div class="form-fields">
+              <input type="checkbox" name="allowManualSides" ${game.settings.get("msh-faserip", "allowManualSides") ? "checked" : ""}>
+              <span class="notes">Enable manual assignment of combatants to Side A or Side B</span>
+            </div>
+          </div>
         </form>
       `,
       buttons: {
@@ -321,9 +373,11 @@ export class FaseripInitiative {
           callback: (html) => {
             const useCustom = html.find('[name="useCustomInitiative"]').val() === "true";
             const autoReroll = html.find('[name="autoRerollInitiative"]').is(':checked');
+            const allowManual = html.find('[name="allowManualSides"]').is(':checked');
             
             game.settings.set("msh-faserip", "useCustomInitiative", useCustom);
             game.settings.set("msh-faserip", "autoRerollInitiative", autoReroll);
+            game.settings.set("msh-faserip", "allowManualSides", allowManual);
             
             ui.notifications.info("FASERIP Initiative settings saved");
           }
@@ -528,18 +582,15 @@ export class FaseripInitiative {
       if (!c.actor) continue;
       
       const intuition = c.actor.system.abilities.intuition.value || 0;
-      const isPC = c.actor.hasPlayerOwner;
       
-      if (isPC && intuition > pcHighest.intuition) {
+      // Use the flag value instead of checking hasPlayerOwner
+      const side = c.getFlag("msh-faserip", "side") || 
+                  (c.actor.hasPlayerOwner ? "pc" : "npc");
+      
+      if (side === "pc" && intuition > pcHighest.intuition) {
         pcHighest = { name: c.name, intuition: intuition };
-      } else if (!isPC && intuition > npcHighest.intuition) {
+      } else if (side === "npc" && intuition > npcHighest.intuition) {
         npcHighest = { name: c.name, intuition: intuition };
-      }
-      
-      // Ensure side flag is set
-      const side = c.getFlag("msh-faserip", "side");
-      if (!side) {
-        await c.setFlag("msh-faserip", "side", isPC ? "pc" : "npc");
       }
     }
     
@@ -559,4 +610,27 @@ export class FaseripInitiative {
     if (intuition >= 11) return 1;
     return 0;
   }
+
+  // Add a method to toggle combatant side
+  static async toggleCombatantSide(combatId, combatantId) {
+    const combat = game.combats.get(combatId);
+    if (!combat) return;
+    
+    const combatant = combat.combatants.get(combatantId);
+    if (!combatant) return;
+    
+    // Get current side
+    const currentSide = combatant.getFlag("msh-faserip", "side") || 
+                      (combatant.actor?.hasPlayerOwner ? 'pc' : 'npc');
+    
+    // Toggle side
+    const newSide = currentSide === 'pc' ? 'npc' : 'pc';
+    
+    // Update side flag
+    await combatant.setFlag("msh-faserip", "side", newSide);
+    
+    // Re-render combat tracker
+    ui.combat?.render();
+  }
+
 }

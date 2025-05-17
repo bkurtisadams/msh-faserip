@@ -146,3 +146,34 @@
   font-size: 1.1em;
   margin-bottom: 5px;
 }
+
+.faserip-initiative-bar {
+  margin-bottom: 5px;
+  text-align: center;
+  font-weight: bold;
+}
+
+.side-toggle {
+  background: #444;
+  color: white;
+  border-radius: 3px;
+  padding: 0 3px;
+  margin-right: 5px;
+}
+
+.pc-side .side-toggle {
+  background: #4a76b5;
+}
+
+.npc-side .side-toggle {
+  background: #b54a4a;
+}
+
+.highest-intuition {
+  box-shadow: 0 0 5px #ffcc00;
+}
+
+.intuition-indicator {
+  color: #ffcc00;
+  margin-left: 5px;
+}
