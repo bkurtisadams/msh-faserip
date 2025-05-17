@@ -2462,3 +2462,9 @@
   50%  { box-shadow: 0 0 10px rgba(0, 0, 0, 1); }
   100% { box-shadow: 0 0 0px rgba(0, 0, 0, 0.8); }
 }
+
+.damage-just-applied {
+    background-color: #4CAF50 !important;
+    color: white !important;
+    transition: background-color 0.5s ease;
+}

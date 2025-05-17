@@ -377,61 +377,113 @@ export class CombatHandler {
                 if (app.id === message.id) {
                     // Use jQuery for more reliable event handling
                     html.find('.apply-wrestling-damage').on('click', async function() {
-                    const clickAttackerId = this.dataset.attacker;
-                    const clickTargetId = this.dataset.target;
-                    
-                    // Store button reference safely
-                    const $button = $(this);
-                    
-                    // Find the tokens on the canvas by their actor IDs
-                    const attackerTokens = canvas.tokens.placeables.filter(t => t.actor?.id === clickAttackerId);
-                    const targetTokens = canvas.tokens.placeables.filter(t => t.actor?.id === clickTargetId);
-                    
-                    // Get the base actor references
-                    const attackerBaseActor = game.actors.get(clickAttackerId);
-                    const targetBaseActor = game.actors.get(clickTargetId);
-                    
-                    console.log(`Wrestling damage: Found ${attackerTokens.length} attacker tokens on canvas`);
-                    console.log(`Wrestling damage: Found ${targetTokens.length} target tokens on canvas`);
-                    
-                    // Determine the best actor references to use
-                    // For tokens, use the token's actor, otherwise use the base actor
-                    const attackerActor = attackerTokens.length > 0 ? attackerTokens[0].actor : attackerBaseActor;
-                    const targetActor = targetTokens.length > 0 ? targetTokens[0].actor : targetBaseActor;
-                    
-                    if (attackerActor && targetActor) {
-                        // Get attacker's strength value for damage
-                        const strengthValue = attackerActor.system.abilities.strength.value || 0;
+                        const clickAttackerId = this.dataset.attacker;
+                        const clickTargetId = this.dataset.target;
                         
-                        try {
-                            console.log(`Wrestling damage: Using attacker: ${attackerActor.name}`);
-                            console.log(`Wrestling damage: Using target: ${targetActor.name}`);
-                            
-                            // Process the damage with actor references
-                            await CombatHandler.processAttack({
-                                attacker: attackerActor,
-                                target: targetActor,
-                                baseDamage: strengthValue,
-                                damageType: "Physical-Blunt",
-                                sourceName: "Wrestling Hold",
-                                canBeStun: false,
-                                canBeSlam: false,
-                                canBeKill: false,
-                                originalRollResult: "green" // Always a hit
-                            });
-                            
-                            // Update button text and disable it
-                            $button.text("Damage Applied").prop("disabled", true);
-                        } catch (error) {
-                            console.error("Error applying wrestling damage:", error);
-                            ui.notifications.error("Failed to apply wrestling damage");
-                            console.error(error); // Log the full error
+                        // Store button reference safely
+                        const $button = $(this);
+                        
+                        console.log(`Wrestling damage: Processing for attacker ID ${clickAttackerId} and target ID ${clickTargetId}`);
+                        
+                        // Look for tokens on the canvas
+                        let targetToken = null;
+                        let attackerToken = null;
+                        
+                        // First, try to find tokens by ID (if the IDs are token IDs)
+                        for (const token of canvas.tokens.placeables) {
+                            if (token.id === clickTargetId) targetToken = token;
+                            if (token.id === clickAttackerId) attackerToken = token;
                         }
-                    } else {
-                        console.error(`Could not find ${!attackerActor ? "attacker" : "target"} with ID: ${!attackerActor ? clickAttackerId : clickTargetId}`);
-                        ui.notifications.error("Failed to apply wrestling damage: Actor not found");
-                    }
-                });
+                        
+                        // If not found by token ID, try to find by actor ID (tokens representing the actors)
+                        if (!targetToken || !attackerToken) {
+                            for (const token of canvas.tokens.placeables) {
+                                if (!targetToken && token.actor?.id === clickTargetId) targetToken = token;
+                                if (!attackerToken && token.actor?.id === clickAttackerId) attackerToken = token;
+                            }
+                        }
+                        
+                        // Get the base actors as fallback
+                        const attackerBaseActor = game.actors.get(clickAttackerId);
+                        const targetBaseActor = game.actors.get(clickTargetId);
+                        
+                        // Log what we found
+                        console.log(`Wrestling damage: Found target token: ${targetToken?.name || "None"}`);
+                        console.log(`Wrestling damage: Found attacker token: ${attackerToken?.name || "None"}`);
+                        
+                        // Determine the best actor references to use
+                        // Prioritize token actors if available
+                        const attackerActor = attackerToken?.actor || attackerBaseActor;
+                        const targetActor = targetToken?.actor || targetBaseActor;
+                        
+                        if (attackerActor && targetActor) {
+                            // Get attacker's strength value for damage
+                            const strengthValue = attackerActor.system.abilities.strength.value || 0;
+                            
+                            try {
+                                console.log(`Wrestling damage: Using attacker: ${attackerActor.name}`);
+                                console.log(`Wrestling damage: Using target: ${targetActor.name}`);
+                                console.log(`Wrestling damage: Target initial health: ${targetActor.system.attributes.health.value}`);
+                                console.log(`Wrestling damage: Applying ${strengthValue} damage`);
+                                
+                                // For unlinked tokens, we need to ensure we're updating the token actor
+                                // and not the base actor
+                                const isUnlinkedToken = targetToken && !targetToken.document.actorLink;
+                                console.log(`Wrestling damage: Target is unlinked token: ${isUnlinkedToken}`);
+                                
+                                // Track the health before update
+                                const healthBefore = targetActor.system.attributes.health.value;
+                                
+                                // Process the damage
+                                await CombatHandler.processAttack({
+                                    attacker: attackerActor,
+                                    target: targetActor,
+                                    baseDamage: strengthValue,
+                                    damageType: "Physical-Blunt",
+                                    sourceName: "Wrestling Hold",
+                                    canBeStun: false,
+                                    canBeSlam: false,
+                                    canBeKill: false,
+                                    originalRollResult: "green" // Always a hit
+                                });
+                                
+                                // Check if health was updated correctly
+                                console.log(`Wrestling damage: Target health after update: ${targetActor.system.attributes.health.value}`);
+                                
+                                // Force a token refresh in case the health bar update didn't trigger automatically
+                                if (targetToken) {
+                                    targetToken.refresh();
+                                    console.log("Wrestling damage: Refreshed target token");
+                                }
+                                
+                                // Calculate actual damage done
+                                const damageDealt = Math.max(0, healthBefore - targetActor.system.attributes.health.value);
+                                
+                                // Temporarily change button text to show damage was applied
+                                const originalButtonText = $button.text();
+                                $button.text(`Applied ${damageDealt} Damage!`).addClass("damage-just-applied");
+                                
+                                // After a brief delay, revert the button text to allow reuse
+                                setTimeout(() => {
+                                    $button.text(originalButtonText).removeClass("damage-just-applied");
+                                }, 2000); // Revert after 2 seconds
+                                
+                                // Add a notification in chat about the damage being applied
+                                ChatMessage.create({
+                                    content: `<div class="wrestling-damage-notice">${attackerActor.name} applies ${damageDealt} points of Strength damage to ${targetActor.name} while maintaining the hold!</div>`,
+                                    speaker: ChatMessage.getSpeaker({actor: attackerActor})
+                                });
+                                
+                            } catch (error) {
+                                console.error("Error applying wrestling damage:", error);
+                                ui.notifications.error("Failed to apply wrestling damage");
+                                console.error(error); // Log the full error
+                            }
+                        } else {
+                            console.error(`Could not find ${!attackerActor ? "attacker" : "target"} with ID: ${!attackerActor ? clickAttackerId : clickTargetId}`);
+                            ui.notifications.error("Failed to apply wrestling damage: Actor not found");
+                        }
+                    });
                 }
             });
         }
