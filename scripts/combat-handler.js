@@ -411,28 +411,53 @@ export class CombatHandler {
         await target.deleteEmbeddedDocuments("ActiveEffect", existingEffects.map(e => e.id));
     }
 
-    // Define new ActiveEffect
+    // Define effect data based on hold type
+    const isPartial = type === "partial";
+    const label = isPartial ? "Partial Hold" : "Full Hold";
+    const icon = "icons/svg/net.svg";  // or your custom icon
+    
+    // Define the changes to apply
+    const changes = [];
+    
+    // For partial holds, add -2CS modifier
+    if (isPartial) {
+        changes.push({
+        key: "system.effectiveCSMod",
+        mode: CONST.ACTIVE_EFFECT_MODES.ADD,
+        value: -2
+        });
+    } else {
+        // For full holds, apply multiple changes as needed
+        changes.push({
+        key: "system.status.restrained",
+        mode: CONST.ACTIVE_EFFECT_MODES.OVERRIDE,
+        value: true
+        });
+        // Can add additional changes for full hold if needed
+    }
+
+    // Define new ActiveEffect with proper duration
     const effect = {
-    label: type === "partial" ? "Partial Hold" : "Full Hold",
-    icon: "icons/svg/net.svg",  // or your custom icon: "systems/msh-faserip/icons/status/partial-hold.svg"
-    origin: `Actor.${attackerId}`,
-    flags: {
+        label: label,
+        icon: icon,
+        origin: `Actor.${attackerId}`,
+        flags: {
         "msh-faserip": {
-        grappling: true,
-        grapplingType: type,
-        attackerId: attackerId
+            grappling: true,
+            grapplingType: type,
+            attackerId: attackerId
         }
-    },
-    changes: type === "partial"
-        ? [{
-            key: "system.effectiveCSMod",
-            mode: CONST.ACTIVE_EFFECT_MODES.ADD,
-            value: -2
-        }]
-        : [],
-    duration: {},
-    // THIS makes the token icon appear:
-    statuses: [type === "partial" ? "partial-hold" : "restrained"]
+        },
+        changes: changes,
+        duration: {
+        // Set duration if appropriate for your system
+        // rounds: 0,  // 0 = indefinite or until removed
+        startTime: game.time.worldTime,
+        startRound: game.combat?.round || 0,
+        startTurn: game.combat?.turn || 0
+        },
+        // Use appropriate status ID that matches your system's defined statuses
+        statuses: [isPartial ? "partial-hold" : "restrained"]
     };
 
     // Apply ActiveEffect to target
@@ -441,11 +466,11 @@ export class CombatHandler {
     // Send styled chat message
     await ChatMessage.create({
         content: `
-        <div style="background-color: ${type === "partial" ? "#FFA500" : "#FF0000"}; color: white; padding: 10px; border-radius: 5px;">
-            <h3>${type === "partial" ? "PARTIAL HOLD" : "FULL HOLD"} APPLIED</h3>
-            <p><strong>${game.actors.get(attackerId)?.name || "Attacker"}</strong> has ${type === "partial" ? "a partial hold on" : "fully restrained"} <strong>${target.name}</strong>.</p>
-            <p>Effect: ${type === "partial" ? "-2CS to all actions" : "Cannot act until freed"}</p>
-            <p><em>This effect will remain until manually removed by the GM.</em></p>
+        <div style="background-color: ${isPartial ? "#FFA500" : "#FF0000"}; color: white; padding: 10px; border-radius: 5px;">
+        <h3>${isPartial ? "PARTIAL HOLD" : "FULL HOLD"} APPLIED</h3>
+        <p><strong>${game.actors.get(attackerId)?.name || "Attacker"}</strong> has ${isPartial ? "a partial hold on" : "fully restrained"} <strong>${target.name}</strong>.</p>
+        <p>Effect: ${isPartial ? "-2CS to all actions" : "Cannot act until freed"}</p>
+        <p><em>This effect will remain until manually removed by the GM.</em></p>
         </div>
         `,
         speaker: ChatMessage.getSpeaker({ alias: "Wrestling Status" })
@@ -453,6 +478,7 @@ export class CombatHandler {
 
     return newEffect;
     }
+
 
 
     /**
@@ -754,7 +780,7 @@ export class CombatHandler {
                                 await target.update({ "system.karma.history": history });
                             }
                             
-                            // Apply the effects based on result
+                            // Apply the effects based on result using our updated ActiveEffect methods
                             let effectApplied = false;
                             
                             if (featType === "Kill" && featResultText === "End. Loss") {
@@ -763,7 +789,7 @@ export class CombatHandler {
                                     (CONFIG.FASERIP.rankValues[key] || 0) < currentEndurance) || "Shift-0";
                                 
                                 ui.notifications.info(`${target.name} loses an Endurance rank! (Now ${newEnduranceRank})`);
-                                // await target.update({"system.abilities.endurance.rank": newEnduranceRank});
+                                await target.update({"system.abilities.endurance.rank": newEnduranceRank});
                                 effectApplied = true;
                             }
                             else if (featType === "Stun" && featResultText === "1–10") {
@@ -771,30 +797,75 @@ export class CombatHandler {
                                 const stunDuration = await new Roll("1d10").evaluate({async: true});
                                 ui.notifications.info(`${target.name} is Stunned for ${stunDuration.total} rounds!`);
                                 
-                                // Apply "Stunned" Active Effect
-                                const effect = {
-                                    label: "Stunned",
-                                    icon: "icons/svg/daze.svg",
-                                    duration: {
-                                        rounds: stunDuration.total,
-                                        startRound: game.combat?.round || 0
-                                    },
-                                    flags: {
-                                        "msh-faserip": {
-                                            stunned: true
-                                        }
-                                    }
-                                };
-                                
-                                await target.createEmbeddedDocuments("ActiveEffect", [effect]);
+                                // Use our improved stun effect method
+                                await this.applyStunnedEffect(target, stunDuration.total);
                                 effectApplied = true;
                             }
                             else if (featType === "Slam" && featResultText === "1 area") {
                                 ui.notifications.info(`${target.name} is slammed back 1 area!`);
+                                
+                                // Apply a "Slammed" effect with proper ActiveEffect structure
+                                await target.createEmbeddedDocuments("ActiveEffect", [{
+                                    label: "Slammed",
+                                    icon: "icons/svg/falling.svg", 
+                                    flags: {
+                                        "msh-faserip": {
+                                            slammed: true,
+                                            distance: 1 // areas
+                                        }
+                                    },
+                                    changes: [
+                                        {
+                                            key: "system.status.prone", 
+                                            mode: CONST.ACTIVE_EFFECT_MODES.OVERRIDE,
+                                            value: true
+                                        },
+                                        {
+                                            key: "system.effectiveCSMod",
+                                            mode: CONST.ACTIVE_EFFECT_MODES.ADD,
+                                            value: -1
+                                        }
+                                    ],
+                                    duration: {
+                                        rounds: 1,
+                                        startTime: game.time.worldTime,
+                                        startRound: game.combat?.round || 0
+                                    },
+                                    statuses: ["prone"]
+                                }]);
                                 effectApplied = true;
                             }
                             else if (featType === "Slam" && featResultText === "Stagger") {
                                 ui.notifications.info(`${target.name} staggers but remains in place!`);
+                                
+                                // Apply a "Staggered" effect
+                                await target.createEmbeddedDocuments("ActiveEffect", [{
+                                    label: "Staggered",
+                                    icon: "icons/svg/stoned.svg",
+                                    flags: {
+                                        "msh-faserip": {
+                                            staggered: true
+                                        }
+                                    },
+                                    changes: [
+                                        {
+                                            key: "system.effectiveCSMod",
+                                            mode: CONST.ACTIVE_EFFECT_MODES.ADD,
+                                            value: -1
+                                        },
+                                        {
+                                            key: "system.attributes.movement.value",
+                                            mode: CONST.ACTIVE_EFFECT_MODES.MULTIPLY,
+                                            value: 0.5
+                                        }
+                                    ],
+                                    duration: {
+                                        rounds: 1,
+                                        startTime: game.time.worldTime,
+                                        startRound: game.combat?.round || 0
+                                    },
+                                    statuses: ["staggered"]
+                                }]);
                                 effectApplied = true;
                             }
                             
@@ -816,7 +887,7 @@ export class CombatHandler {
                                         </div>
                                         ${effectApplied ? `<div style="margin-top: 5px; font-style: italic;">Effect: ${
                                             featType === "Kill" && featResultText === "End. Loss" ? "Endurance rank reduced" :
-                                            featType === "Stun" && featResultText === "1–10" ? "Stunned for 1d10 rounds" :
+                                            featType === "Stun" && featResultText === "1–10" ? "Stunned for ${stunDuration.total} rounds" :
                                             featType === "Slam" && featResultText === "1 area" ? "Knocked back 1 area" :
                                             featType === "Slam" && featResultText === "Stagger" ? "Staggers in place" :
                                             "No effect"
@@ -862,14 +933,38 @@ export class CombatHandler {
         
         // Generate unconsciousness effect (1-10 rounds)
         const unconsciousDuration = Math.floor(Math.random() * 10) + 1;
-        const effectData = { 
+        
+        // Define the unconsciousness effect with proper changes
+        const effectData = {
             label: "Unconscious", 
-            icon: "icons/svg/skull.svg", 
+            icon: "icons/svg/unconscious.svg",
+            flags: {
+                "msh-faserip": {
+                    unconscious: true
+                }
+            },
+            changes: [
+                {
+                    key: "system.status.unconscious", 
+                    mode: CONST.ACTIVE_EFFECT_MODES.OVERRIDE,
+                    value: true
+                },
+                {
+                    key: "system.attributes.movement.value",
+                    mode: CONST.ACTIVE_EFFECT_MODES.OVERRIDE,
+                    value: 0
+                }
+            ],
             duration: {
                 rounds: unconsciousDuration,
-                startRound: game.combat?.round || 0
-            }
+                startTime: game.time.worldTime,
+                startRound: game.combat?.round || 0,
+                startTurn: game.combat?.turn || 0
+            },
+            statuses: ["unconscious"]
         };
+        
+        // Apply the effect
         await target.createEmbeddedDocuments("ActiveEffect", [effectData]);
         
         let chatContent = `<p>${target.name} is Unconscious for ${unconsciousDuration} rounds.</p>`;
@@ -884,23 +979,69 @@ export class CombatHandler {
             if (killCheckResult.includes("End. Loss")) {
                 ui.notifications.error(`${target.name} is dying!`);
                 
-                // Create a Dying effect
-                const dyingEffectData = {
-                    label: "Dying",
-                    icon: "icons/svg/poison.svg",
-                    flags: {
-                        "msh-faserip": {
-                            dying: true,
-                            currentRound: game.combat?.round || 0
-                        }
-                    }
-                };
-                await target.createEmbeddedDocuments("ActiveEffect", [dyingEffectData]);
+                // Apply dying effect using our dedicated method
+                await this.applyDyingEffect(target);
                 
                 chatContent += `<p>${target.name} is losing Endurance ranks each turn. Help needed!</p>`;
                 
-                // Note: You'd need to implement a combat round listener to handle Endurance loss per turn
-                // This would be defined elsewhere in your code
+                // Let's add code to handle endurance loss per round
+                // Register a hook for combat round advancement
+                Hooks.once("updateCombat", async (combat, changes) => {
+                    // Only handle round changes
+                    if (changes.round && changes.round > combat.previous.round) {
+                        // Check if actor is still dying
+                        const isDying = target.effects.some(e => e.flags["msh-faserip"]?.dying);
+                        if (isDying) {
+                            // Get current endurance rank
+                            const currentRank = target.system.abilities.endurance.rank;
+                            const ranks = Object.keys(CONFIG.FASERIP.rankValues);
+                            
+                            // Find index of current rank
+                            const currentRankIndex = ranks.indexOf(currentRank);
+                            
+                            // If not the lowest rank already, decrease by one rank
+                            if (currentRankIndex > 0) {
+                                const newRank = ranks[currentRankIndex - 1];
+                                await target.update({"system.abilities.endurance.rank": newRank});
+                                
+                                // Send a message to chat
+                                ChatMessage.create({
+                                    content: `<p><strong>${target.name}</strong> is dying! Endurance decreased to ${newRank}.</p>`,
+                                    speaker: ChatMessage.getSpeaker({actor: target})
+                                });
+                            } else {
+                                // Character is dead
+                                ChatMessage.create({
+                                    content: `<p><strong>${target.name}</strong> has died.</p>`,
+                                    speaker: ChatMessage.getSpeaker({actor: target})
+                                });
+                                
+                                // Remove dying effect and add dead effect
+                                const dyingEffects = target.effects.filter(e => e.flags["msh-faserip"]?.dying);
+                                await target.deleteEmbeddedDocuments("ActiveEffect", dyingEffects.map(e => e.id));
+                                
+                                // Add dead effect
+                                await target.createEmbeddedDocuments("ActiveEffect", [{
+                                    label: "Dead",
+                                    icon: "icons/svg/skull.svg",
+                                    flags: {
+                                        "msh-faserip": {
+                                            dead: true
+                                        }
+                                    },
+                                    changes: [
+                                        {
+                                            key: "system.status.dead",
+                                            mode: CONST.ACTIVE_EFFECT_MODES.OVERRIDE,
+                                            value: true
+                                        }
+                                    ],
+                                    statuses: ["dead"]
+                                }]);
+                            }
+                        }
+                    }
+                });
             }
         } else {
             // Non-lethal (Blunt/Force) damage just causes unconsciousness
