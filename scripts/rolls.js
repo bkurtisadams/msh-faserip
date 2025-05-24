@@ -573,7 +573,15 @@ export async function rollUniversalAction(actionCode, actorId, columnShift = nul
     const canBeSlam = ["BA", "EA", "Ch"].includes(actionCode);
     const canBeKill = ["EA", "Sh", "En", "TE"].includes(actionCode);
 
-    const baseDamage = ability.value;  // Simple default, refine later if needed
+    // Determine correct damage source based on action type
+    let baseDamage;
+    if (["BA", "EA", "TB", "Gp", "Gb", "Es", "Ch"].includes(actionCode)) {
+      // Physical attacks use Strength for damage
+      baseDamage = actor.system.abilities.strength.value;
+    } else {
+      // Other attacks (Sh, En, Fo, etc.) use the attack ability for damage
+      baseDamage = ability.value;
+    }
 
     // Check if this is a wrestling action
     if (["Gp", "Gb", "Es"].includes(actionCode)) {
