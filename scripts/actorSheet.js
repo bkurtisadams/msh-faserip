@@ -147,6 +147,21 @@ export class FaseripActorSheet extends ActorSheet {
 
     context.editable = this.isEditable; // (if not already present)
 
+    // karma
+    const karma = context.system.karma || {};
+    const lifetime = karma.lifetime || 0;
+    const advancement = karma.advancement || 0;
+    const pool = karma.pool || 0;
+
+    let spent = 0;
+    if (Array.isArray(karma.history)) {
+      for (const event of karma.history) {
+        if (event.amount < 0) spent += Math.abs(event.amount);
+      }
+    }
+
+    context.currentKarma = Math.max(0, lifetime - spent - advancement - pool);
+
     return context;
   }
 
