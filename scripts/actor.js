@@ -98,26 +98,12 @@ export class FaseripActor extends Actor {
   }
 
   get currentKarma() {
-    // Ensure karma properties exist
-    if (!this.system?.karma) return 0;
-    
-    const totalEarned = this.system.karma.lifetime || 0;
-    let totalSpent = 0;
-    
-    // Calculate total spent from history
-    if (this.system.karma.history && Array.isArray(this.system.karma.history)) {
-      this.system.karma.history.forEach(event => {
-        if (event.amount < 0) {
-          totalSpent += Math.abs(event.amount);
-        }
-      });
-    }
-    
-    const advancementFund = this.system.karma.advancement || 0;
-    const karmaPool = this.system.karma.pool || 0;
-    
-    // Current karma = Total earned - Total spent - Advancement Fund - Karma Pool
-    return Math.max(0, totalEarned - totalSpent - advancementFund - karmaPool);
-  }
+  // Karma is simply the sum of Reason, Intuition, and Psyche
+  const reason = this.system.abilities.reason?.value || 0;
+  const intuition = this.system.abilities.intuition?.value || 0;
+  const psyche = this.system.abilities.psyche?.value || 0;
+  
+  return reason + intuition + psyche;
+}
 
 }
