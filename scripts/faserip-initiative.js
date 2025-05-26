@@ -1,5 +1,4 @@
-// faserip-initiative.js - Final version for Marvel FASERIP initiative
-// Addresses all issues with multiple rolls and proper chat messages
+// faserip-initiative.js - Foundry v13 Compatible version for Marvel FASERIP initiative
 
 export class FaseripInitiative {
   static initialized = false;
@@ -38,27 +37,45 @@ export class FaseripInitiative {
     if (this.initialized) return;
     this.initialized = true;
     
-    console.log("FASERIP Initiative: Initializing");
+    console.log("FASERIP Initiative: Initializing for Foundry v13");
     
     // Register settings
     this.registerSettings();
     
-    // Apply hooks - we add a small delay to ensure this happens after core Foundry initialization
-    setTimeout(() => this._registerHooks(), 100);
+    // Apply hooks with proper v13 timing
+    Hooks.once("ready", () => this._registerHooks());
   }
   
   /**
    * Register all necessary hooks
    */
   static _registerHooks() {
+    console.log("FASERIP Initiative: Registering hooks for v13");
+    
     // CRITICAL: Replace the standard initiative formula
     CONFIG.Combat.initiative = {
       formula: "1d10",
       decimals: 0
     };
     
-    // CRITICAL: Override getRollData to prevent automatic initiative rolling
+    // Override Combat methods using Foundry v13 approach
+    this._patchCombatMethods();
+    
+    // Register hooks
+    Hooks.on("renderCombatTracker", this._onRenderCombatTracker.bind(this));
+    Hooks.on("updateCombat", this._handleUpdateCombat.bind(this));
+    Hooks.on("createCombatant", this._onCreateCombatant.bind(this));
+  }
+  
+  /**
+   * Patch Combat class methods for v13 compatibility
+   */
+  static _patchCombatMethods() {
+    // Store original methods
+    const originalRollInitiative = Combat.prototype.rollInitiative;
     const originalGetRollData = Combat.prototype.getInitiativeRollData;
+    
+    // Override getRollData to prevent automatic initiative rolling
     Combat.prototype.getInitiativeRollData = function(combatant) {
       if (game.settings.get("msh-faserip", "useCustomInitiative")) {
         // If using our system, return minimal data (no formula)
@@ -69,34 +86,25 @@ export class FaseripInitiative {
       return originalGetRollData.call(this, combatant);
     };
     
-    // CRITICAL: Override the rollInitiative method
-    const originalRollInitiative = Combat.prototype.rollInitiative;
+    // Override the rollInitiative method for v13
     Combat.prototype.rollInitiative = function(ids, options={}) {
       // If using our system, use our method instead
       if (game.settings.get("msh-faserip", "useCustomInitiative")) {
-        // If it's already from our system, proceed
+        // If it's already from our system, proceed with original
         if (options.faserip) {
           return originalRollInitiative.call(this, ids, options);
         }
         
-        console.log("FASERIP Initiative: Intercepting rollInitiative");
+        console.log("FASERIP Initiative: Intercepting rollInitiative call");
         
         // Use our side initiative instead
         FaseripInitiative.rollSideInitiative(this);
-        return this;
+        return Promise.resolve(this);
       }
       
       // Otherwise use original method
       return originalRollInitiative.call(this, ids, options);
     };
-    
-    // Additional hooks
-    Hooks.on("renderCombatTracker", this._onRenderCombatTracker.bind(this));
-    Hooks.on("getSceneControlButtons", this._addInitiativeConfigButton.bind(this));
-    Hooks.on("updateCombat", this._handleUpdateCombat.bind(this));
-    
-    // Make sure combatants have side flags
-    Hooks.on("createCombatant", this._onCreateCombatant.bind(this));
   }
   
   /**
@@ -111,7 +119,7 @@ export class FaseripInitiative {
   }
   
   /**
-   * Handle combat updates (round changes)
+   * Handle combat updates (round changes) - Updated for v13
    */
   static _handleUpdateCombat(combat, update, options, userId) {
     // Only proceed if FASERIP and auto-reroll enabled
@@ -120,8 +128,9 @@ export class FaseripInitiative {
       return;
     }
     
-    // Check if round advanced
-    if (update.round && combat.previous?.round && update.round > combat.previous.round) {
+    // Check if round advanced - v13 compatible check
+    const previousRound = foundry.utils.getProperty(options, "previousRound") || combat.previous?.round;
+    if (update.round && previousRound && update.round > previousRound) {
       console.log(`FASERIP Initiative: Round advanced to ${update.round}, rerolling initiative`);
       
       // Wait a moment for update to complete
@@ -130,9 +139,10 @@ export class FaseripInitiative {
       }, 100);
     }
   }
+
   
   /**
-   * Modify combat tracker UI
+   * Modify combat tracker UI - Updated for v13
    */
   static _onRenderCombatTracker(app, html, data) {
     // Only if FASERIP is enabled
@@ -140,6 +150,41 @@ export class FaseripInitiative {
     
     const combat = app.viewed;
     if (!combat) return;
+    
+    // Convert html to jQuery if it isn't already
+    const $html = html instanceof jQuery ? html : $(html);
+    
+    // Add initiative buttons if user is GM
+    if (game.user.isGM) {
+      const headerControls = $html.find('.combat-tracker-header .encounter-controls');
+      if (headerControls.length && headerControls.find('.faserip-initiative-btn').length === 0) {
+        
+        // Add both reroll and settings buttons
+        const buttonContainer = $(`
+          <div class="faserip-initiative-controls">
+            <a class="combat-control faserip-initiative-btn" title="Reroll Initiative" data-action="reroll">
+              <i class="fas fa-dice-d10"></i>
+            </a>
+            <a class="combat-control faserip-settings-btn" title="FASERIP Initiative Settings" data-action="settings">
+              <i class="fas fa-cog"></i>
+            </a>
+          </div>
+        `);
+        
+        headerControls.append(buttonContainer);
+        
+        // Bind click events
+        buttonContainer.find('[data-action="reroll"]').click(ev => {
+          ev.preventDefault();
+          this.rollSideInitiative(combat);
+        });
+        
+        buttonContainer.find('[data-action="settings"]').click(ev => {
+          ev.preventDefault();
+          this._showSettingsDialog();
+        });
+      }
+    }
     
     // Get initiative data
     const pcInit = combat.getFlag("msh-faserip", "pcInitiative");
@@ -153,7 +198,7 @@ export class FaseripInitiative {
     const npcHighestName = combat.getFlag("msh-faserip", "npcHighestName") || "";
     
     // Add compact info below round number
-    const roundDisplay = html.find('.combat-round');
+    const roundDisplay = $html.find('.combat-round');
     if (roundDisplay.length && roundDisplay.next('.faserip-initiative-bar').length === 0) {
       // Format the Side A (PC) display text
       let pcText = `Side A `;
@@ -189,7 +234,7 @@ export class FaseripInitiative {
     }
     
     // Mark combatants with side info
-    const combatants = html.find('.combatant');
+    const combatants = $html.find('.combatant');
     combatants.each((i, el) => {
       const combatantId = el.dataset.combatantId;
       const combatant = combat.combatants.get(combatantId);
@@ -246,46 +291,6 @@ export class FaseripInitiative {
         }
       }
     });
-    
-    // Add reroll button for existing combats
-    if (combat.round > 0) {
-      const headerControls = html.find('.combat-tracker-header .encounter-controls');
-      if (headerControls.length && headerControls.find('.faserip-reroll').length === 0) {
-        const rerollBtn = $(`
-          <a class="combat-control faserip-reroll" title="Reroll Initiative" data-control="rerollInitiative">
-            <i class="fas fa-dice-d10"></i>
-          </a>
-        `);
-        
-        headerControls.append(rerollBtn);
-        
-        rerollBtn.click(ev => {
-          ev.preventDefault();
-          this.rollSideInitiative(combat);
-        });
-      }
-    }
-  }
-  
-  /**
-   * Add settings button to combat controls
-   */
-  static _addInitiativeConfigButton(controls) {
-    const combatControls = controls.find(c => c.name === "combat");
-    if (!combatControls) return;
-    
-    // Only add if not already there
-    if (!combatControls.tools.find(t => t.name === "faseripInitiative")) {
-      combatControls.tools.push({
-        name: "faseripInitiative",
-        title: "FASERIP Initiative Settings",
-        icon: "fas fa-dice-d10",
-        button: true,
-        onClick: () => {
-          this._showSettingsDialog();
-        }
-      });
-    }
   }
   
   /**
@@ -338,7 +343,7 @@ export class FaseripInitiative {
   }
   
   /**
-   * Roll initiative for both sides
+   * Roll initiative for both sides - Updated for v13
    */
   static async rollSideInitiative(combat) {
     if (!combat || this.isRolling) return;
@@ -347,7 +352,7 @@ export class FaseripInitiative {
     this.isRolling = true;
     
     try {
-      console.log("FASERIP Initiative: Rolling side initiative");
+      console.log("FASERIP Initiative: Rolling side initiative (v13)");
       
       // Find the character with highest Intuition on each side
       const [pcHighest, npcHighest] = await this._getHighestIntuitionCharacters(combat);
@@ -357,8 +362,8 @@ export class FaseripInitiative {
       const npcMod = this._getModifierForIntuition(npcHighest.intuition);
       
       // Roll for both sides
-      const pcRoll = await new Roll("1d10").evaluate({async: true});
-      const npcRoll = await new Roll("1d10").evaluate({async: true});
+      const pcRoll = await new Roll("1d10").evaluate();
+      const npcRoll = await new Roll("1d10").evaluate();
       
       // Calculate totals (roll of 1 is always 1)
       const pcTotal = pcRoll.total === 1 ? 1 : pcRoll.total + pcMod;
@@ -405,7 +410,7 @@ export class FaseripInitiative {
       await combat.setFlag("msh-faserip", "pcHighestName", pcHighest.name);
       await combat.setFlag("msh-faserip", "npcHighestName", npcHighest.name);
       
-      // Show 3D dice
+      // Show 3D dice if available
       if (game.dice3d) {
         await game.dice3d.showForRoll(pcRoll, game.user, true);
         await game.dice3d.showForRoll(npcRoll, game.user, true);
@@ -414,7 +419,7 @@ export class FaseripInitiative {
       // Update combatant initiatives
       const updates = [];
       
-      // Create a map of combatants by side, preserving current display order
+      // Create a map of combatants by side
       const pcCombatants = [];
       const npcCombatants = [];
       
@@ -441,15 +446,14 @@ export class FaseripInitiative {
         updates.push({_id: c.id, initiative: 1});
       }
       
-      // Apply updates but don't render yet
+      // Apply updates
       if (updates.length) {
         await combat.updateEmbeddedDocuments("Combatant", updates, {faserip: true, render: false});
       }
       
-      // Send a SINGLE chat message with results
+      // Send chat message with results
       const roundInfo = combat.round ? `Round ${combat.round}` : 'Combat Start';
       
-      // Create clearer chat message content without explanatory text
       const content = `
         <div class="faserip-initiative-result">
           <h2>${roundInfo} - Initiative Results</h2>
@@ -487,18 +491,14 @@ export class FaseripInitiative {
         sound: CONFIG.sounds.dice
       });
       
-      // Make sure the first combatant of the winning side has focus
+      // Set focus to first combatant of winning side
       if (winningSideCombatants.length > 0) {
         const firstWinnerID = winningSideCombatants[0].id;
         
-        // Find the turn index for this combatant
-        // We need to recalculate turns first with setupTurns()
+        // Update turns and set current turn
         await combat.setupTurns();
-        
-        // Now find the index
         const turnIndex = combat.turns.findIndex(t => t.id === firstWinnerID);
         
-        // If found, set the current turn
         if (turnIndex !== -1) {
           await combat.update({turn: turnIndex}, {render: false});
           console.log(`FASERIP Initiative: Setting focus to combatant at index ${turnIndex}`);
