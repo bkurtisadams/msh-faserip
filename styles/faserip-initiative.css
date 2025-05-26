@@ -187,3 +187,32 @@
   border-color: #ffff00;
   color: #ffff00;
 }
+
+/* Add this to your faserip-initiative.css file */
+
+/* Highlight effect for newly activated combatant */
+.combatant.faserip-highlight {
+  background: linear-gradient(90deg, rgba(255, 215, 0, 0.3), transparent);
+  border-left-color: #FFD700 !important;
+  border-left-width: 6px !important;
+  transition: all 0.3s ease-in-out;
+  box-shadow: 0 2px 8px rgba(255, 215, 0, 0.4);
+}
+
+/* Ensure active combatant is clearly visible */
+.combatant.active {
+  background: rgba(0, 0, 0, 0.1);
+  font-weight: bold;
+}
+
+/* Enhanced active state for PC side */
+.combatant.pc-side.active {
+  background: linear-gradient(90deg, rgba(0, 100, 0, 0.2), rgba(0, 100, 0, 0.05));
+  border-left-color: #00ff00;
+}
+
+/* Enhanced active state for NPC side */
+.combatant.npc-side.active {
+  background: linear-gradient(90deg, rgba(139, 0, 0, 0.2), rgba(139, 0, 0, 0.05));
+  border-left-color: #ff0000;
+}

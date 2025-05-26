@@ -496,6 +496,48 @@ export class FaseripInitiative {
         
         if (turnIndex !== -1) {
           await combat.update({turn: turnIndex}, {render: false});
+          
+          // Use v13 compatible DOM manipulation
+          setTimeout(() => {
+            try {
+              // Use built-in scroll method if available
+              if (ui.combat?.scrollToTurn) {
+                ui.combat.scrollToTurn();
+              }
+              
+              // v13 compatible element selection
+              if (ui.combat?.element) {
+                // Convert to jQuery if needed, or use native DOM
+                const $combatElement = ui.combat.element instanceof jQuery ? 
+                  ui.combat.element : $(ui.combat.element);
+                
+                // Find the combatant element
+                const combatantElement = $combatElement.find(`[data-combatant-id="${firstWinnerID}"]`);
+                if (combatantElement.length > 0) {
+                  // Remove active class from all combatants
+                  $combatElement.find('.combatant').removeClass('active');
+                  
+                  // Add active class to the winning side's first combatant
+                  combatantElement.addClass('active');
+                  
+                  // Scroll to the element
+                  combatantElement[0].scrollIntoView({ 
+                    behavior: 'smooth', 
+                    block: 'nearest' 
+                  });
+                  
+                  // Add brief highlight effect
+                  combatantElement.addClass('faserip-highlight');
+                  setTimeout(() => {
+                    combatantElement.removeClass('faserip-highlight');
+                  }, 1000);
+                }
+              }
+            } catch (error) {
+              console.warn("FASERIP Initiative: Could not enhance combat focus:", error);
+            }
+          }, 100);
+          
           console.log(`FASERIP Initiative: Setting focus to combatant at index ${turnIndex}`);
         }
       }

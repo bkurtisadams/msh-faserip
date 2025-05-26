@@ -856,10 +856,11 @@ export class CombatHandler {
                                 availableKarma
                             );
                             
-                            // Roll the dice
-                            const roll = await new Roll("1d100").evaluate({async: true});
-                            
-                            // Apply karma to the roll total
+                            // Create the roll first
+                            const roll = new Roll("1d100");
+                            await roll.evaluate();
+
+                            // Then use the results
                             const totalRoll = Math.min(100, roll.total + karmaSpent);
                             
                             // Determine the result color
@@ -903,7 +904,7 @@ export class CombatHandler {
                             }
                             else if (featType === "Stun" && featResultText === "1–10") {
                                 // Roll stun duration
-                                const stunDuration = await new Roll("1d10").evaluate({async: true});
+                                const stunDuration = await new Roll("1d10").evaluate();
                                 ui.notifications.info(`${target.name} is Stunned for ${stunDuration.total} rounds!`);
                                 
                                 // Use our improved stun effect method
@@ -915,7 +916,7 @@ export class CombatHandler {
                                 
                                 // Apply a "Slammed" effect with proper ActiveEffect structure
                                 await target.createEmbeddedDocuments("ActiveEffect", [{
-                                    label: "Slammed",
+                                    name: "Slammed",
                                     icon: "icons/svg/falling.svg", 
                                     flags: {
                                         "msh-faserip": {
@@ -949,7 +950,7 @@ export class CombatHandler {
                                 
                                 // Apply a "Staggered" effect
                                 await target.createEmbeddedDocuments("ActiveEffect", [{
-                                    label: "Staggered",
+                                    name: "Staggered",
                                     icon: "icons/svg/stoned.svg",
                                     flags: {
                                         "msh-faserip": {
@@ -1045,7 +1046,7 @@ export class CombatHandler {
         
         // Define the unconsciousness effect with proper changes
         const effectData = {
-            label: "Unconscious", 
+            name: "Unconscious", 
             icon: "icons/svg/unconscious.svg",
             flags: {
                 "msh-faserip": {
@@ -1131,7 +1132,7 @@ export class CombatHandler {
                                 
                                 // Add dead effect
                                 await target.createEmbeddedDocuments("ActiveEffect", [{
-                                    label: "Dead",
+                                    name: "Dead",
                                     icon: "icons/svg/skull.svg",
                                     flags: {
                                         "msh-faserip": {
