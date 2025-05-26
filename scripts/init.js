@@ -9,11 +9,29 @@ import { rollUniversalTable } from './universalTable.js';  // Import your functi
 import { openUniversalTableDialog } from './rolls.js';
 import { rollUniversalAction } from './rolls.js';
 import { FaseripInitiative } from './faserip-initiative.js';
+import { CombatHandler } from './combat-handler.js';
 
 Hooks.once("init", async () => {
   console.log("Marvel Super Heroes (FASERIP) system initializing...");
 
   CONFIG.FASERIP = CONFIG.FASERIP || {};
+
+  // Register custom grappling effects so they show token HUD icons and work with ActiveEffect.statuses
+  CONFIG.statusEffects.push(
+    {
+      id: "partial-hold",
+      label: "Partial Hold",
+      icon: "systems/msh-faserip/assets/icons/effects/partial-hold.svg",
+      flags: { "msh-faserip": { grappling: true } }
+    },
+    {
+      id: "full-hold",
+      label: "Full Hold",
+      icon: "systems/msh-faserip/assets/icons/effects/full-hold.svg",
+      flags: { "msh-faserip": { grappling: true } }
+    }
+  );
+
   CONFIG.FASERIP.rankValues = {
     "Shift 0": 0, "Feeble": 2, "Poor": 4, "Typical": 6, "Good": 10, "Excellent": 20,
     "Remarkable": 30, "Incredible": 40, "Amazing": 50, "Monstrous": 75,
@@ -26,7 +44,7 @@ Hooks.once("init", async () => {
     "systems/msh-faserip/templates/universal-rank-table.hbs"
   ]);
 
-  // Create the game.msh namespace if it doesn't exist
+  // Create game.msh namespace
   game.msh = game.msh || {};
   game.msh.rollUniversalAction = rollUniversalAction;
   // Add the rollUniversalTable function to the namespace
@@ -40,6 +58,9 @@ Hooks.once("init", async () => {
   game.msh.rollTalent = FaseripRolls.rollTalent;
   game.msh.rollContact = FaseripRolls.rollContact;
   game.msh.rollEquipment = FaseripRolls.rollEquipment;
+
+  // Add the CombatHandler to the namespace
+  game.msh.CombatHandler = CombatHandler;
 
   // Initialize faserip initiative
   FaseripInitiative.init();

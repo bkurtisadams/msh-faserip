@@ -81,6 +81,7 @@ export class KarmaSheet extends DocumentSheet {
     
     // Current karma = Total earned - Total spent - Advancement Fund - Karma Pool
     context.currentKarma = Math.max(0, totalEarned - context.totalSpent - advancementFund - karmaPool);
+    //context.currentKarma = this.actor.system.attributes.karma.value;
     
     return context;
   }

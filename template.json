@@ -77,7 +77,8 @@
       "resistances": []
     },
     "npc": {
-      "templates": ["base", "abilities", "derived", "movement", "progress"]
+      "templates": ["base", "abilities", "derived", "movement", "progress"],
+      "resistances": []
     }
   },
   "Item": {

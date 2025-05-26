@@ -1,4 +1,6 @@
 // equipment.js
+import { CombatHandler } from './combat-handler.js';
+
 export class FaseripEquipmentSheet extends ItemSheet {
   static get defaultOptions() {
     return foundry.utils.mergeObject(super.defaultOptions, {
@@ -475,6 +477,72 @@ async _rollWeapon(item, actor) {
                 </div>
               `
             });
+
+            // Automatically apply damage to the targeted token (if any)
+            const target = Array.from(game.user.targets)[0]?.actor;
+
+            if (target) {
+              // Convert damage (string or rank) into number
+              let baseDamage = parseInt(damage);
+              if (isNaN(baseDamage)) {
+                baseDamage = CONFIG.FASERIP.rankValues[damage] || 0;
+              }
+
+              const canBeStun = effect?.toLowerCase().includes("stun") || actionName.toLowerCase().includes("stunning");
+              const canBeSlam = effect?.toLowerCase().includes("slam");
+              const canBeKill = effect?.toLowerCase().includes("kill");
+
+              // damage type normalization
+              let normalizedDamageType;
+              switch(damageType.toUpperCase()) {
+                case "S":  // need case for "S"
+                case "SH":
+                case "BA":
+                  normalizedDamageType = "Physical-Blunt";
+                  break;
+                case "EA":
+                  normalizedDamageType = "Physical-Edged";
+                  break;
+                case "TE":
+                  normalizedDamageType = "Physical-Edged";
+                  break;
+                case "TB":
+                  normalizedDamageType = "Physical-Blunt";
+                  break;
+                case "E":
+                case "EN":
+                  normalizedDamageType = "Energy-Energy";
+                  break;
+                case "F":
+                case "FO":
+                  normalizedDamageType = "Force";
+                  break;
+                case "GP":
+                  normalizedDamageType = "Physical-Grapple";
+                  break;
+                case "GB":
+                  normalizedDamageType = "Physical-Grab";
+                  break;
+                default:
+                  normalizedDamageType = "Physical-Blunt"; // Changed default to Physical-Blunt
+              }
+              console.log(`Weapon damage type "${damageType}" normalized to "${normalizedDamageType}"`);
+
+              // Update the CombatHandler.processAttack call to use the normalized damage type
+              await CombatHandler.processAttack({
+                attacker: actor,
+                target: target,
+                baseDamage: baseDamage,
+                damageType: normalizedDamageType, // Use normalized type here instead of direct damageType
+                sourceName: item.name,
+                canBeStun,
+                canBeSlam,
+                canBeKill,
+                originalRollResult: colorResult.toLowerCase()
+              });
+            } else {
+              ui.notifications.info("No target selected. Damage not applied.");
+            }
 
             // Update shots remaining if it's a weapon
             if (item.system.category === "weapon" && item.system.shots) {

@@ -45,12 +45,83 @@ export class KarmaAdvancementSheet extends DocumentSheet {
       
       return Math.max(0, totalEarned - totalSpent - advancementFund - karmaPool);
     }
+
+    // Add this method to the KarmaAdvancementSheet class
+    _onResetAdvancement(event) {
+      event.preventDefault();
+      
+      // If there's no advancement fund, no need to do anything
+      if (!this.object.system.karma.advancement || this.object.system.karma.advancement <= 0) {
+        ui.notifications.warn("No karma is currently allocated to advancement.");
+        return;
+      }
+      
+      // Create confirmation dialog
+      new Dialog({
+        title: "Reset Advancement Fund",
+        content: `
+          <p>Are you sure you want to reset the advancement fund?</p>
+          <p>Current advancement fund: <strong>${this.object.system.karma.advancement}</strong> karma</p>
+          <p>Current advancement purpose: <strong>${this.object.system.karma.advancementPurpose || "None"}</strong></p>
+          <div class="form-group">
+            <label>
+              <input type="checkbox" id="return-karma" checked />
+              Return karma to character's available karma
+            </label>
+          </div>
+        `,
+        buttons: {
+          reset: {
+            icon: '<i class="fas fa-undo"></i>',
+            label: "Reset Advancement",
+            callback: async (html) => {
+              const returnKarma = html.find('#return-karma').is(':checked');
+              const currentAdvancement = this.object.system.karma.advancement || 0;
+              
+              const updateData = {
+                "system.karma.advancement": 0,
+                "system.karma.advancementPurpose": "",
+                "system.karma.advancementDetail": ""
+              };
+              
+              // If returning karma, create a karma event and update current karma
+              if (returnKarma && currentAdvancement > 0) {
+                const karmaEvent = {
+                  realDate: new Date().toLocaleDateString(),
+                  gameDate: "",
+                  amount: currentAdvancement,
+                  type: "Advancement Reset",
+                  description: `Returned ${currentAdvancement} karma from advancement fund`
+                };
+                
+                // Add to history
+                const history = foundry.utils.deepClone(this.object.system.karma?.history || []);
+                history.push(karmaEvent);
+                updateData["system.karma.history"] = history;
+              }
+              
+              // Update the actor
+              await this.object.update(updateData);
+              
+              ui.notifications.info(`Advancement fund reset${returnKarma ? ` and ${currentAdvancement} karma returned` : ""}.`);
+              this.render();
+            }
+          },
+          cancel: {
+            icon: '<i class="fas fa-times"></i>',
+            label: "Cancel"
+          }
+        },
+        default: "cancel"
+      }).render(true);
+    }
   
     activateListeners(html) {
       super.activateListeners(html);
       
       html.find('.allocate-karma').click(ev => this._onAllocateKarma(ev));
       html.find('.purchase-advancement').click(ev => this._onPurchaseAdvancement(ev));
+      html.find('.reset-advancement').click(ev => this._onResetAdvancement(ev));
       
       html.find('#advancement-type').change(ev => {
         const type = ev.currentTarget.value;

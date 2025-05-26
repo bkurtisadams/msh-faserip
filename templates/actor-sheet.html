@@ -133,14 +133,13 @@
             <tr>
               <th>
                 <a class="universal-roll-trigger" title="Universal Table FEAT Roll">
-                  <!-- <i class="fas fa-dice-d20"></i> -->
                   <img src="systems/msh-faserip/assets/universal-table-icon.png" width="16" height="16" />
-
                 </a>
               </th>
-              
-              <th class="narrow-column">Initial<br>Roll</th>
-              <th class="narrow-column">Initial<br>Rank</th>
+              <th class="narrow-column initial toggle-header" 
+                  title="Hold CTRL + click to hide/show initial columns">Initial<br>Roll</th>
+              <th class="narrow-column initial toggle-header" 
+                  title="Hold CTRL + click to hide/show initial columns">Initial<br>Rank</th>
               <th class="narrow-column">Current<br>Rank</th>
               <th class="narrow-column">Current<br>Rank #</th>
             </tr>
@@ -992,8 +991,9 @@
         <div class="karma-values">
           <div class="karma-current">
             <label>Available Karma</label>
-            <input type="number" name="system.attributes.karma.value" value="{{currentKarma}}" />
+            <input type="number" value="{{currentKarma}}" disabled />
           </div>
+
           <div class="karma-advancement">
             <label>Advancement Fund</label>
             <input type="number" name="system.karma.advancement" value="{{system.karma.advancement}}" />

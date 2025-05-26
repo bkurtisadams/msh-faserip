@@ -73,28 +73,11 @@ export class FaseripInitiative {
   static _patchCombatMethods() {
     // Store original methods
     const originalRollInitiative = Combat.prototype.rollInitiative;
-    const originalGetRollData = Combat.prototype.getInitiativeRollData;
-    
-    // Override getRollData to prevent automatic initiative rolling
-    Combat.prototype.getInitiativeRollData = function(combatant) {
-      if (game.settings.get("msh-faserip", "useCustomInitiative")) {
-        // If using our system, return minimal data (no formula)
-        return { formula: "", decimals: 0 };
-      }
-      
-      // Otherwise use original method
-      return originalGetRollData.call(this, combatant);
-    };
     
     // Override the rollInitiative method for v13
     Combat.prototype.rollInitiative = function(ids, options={}) {
-      // If using our system, use our method instead
+      // If using our system, completely bypass normal initiative
       if (game.settings.get("msh-faserip", "useCustomInitiative")) {
-        // If it's already from our system, proceed with original
-        if (options.faserip) {
-          return originalRollInitiative.call(this, ids, options);
-        }
-        
         console.log("FASERIP Initiative: Intercepting rollInitiative call");
         
         // Use our side initiative instead
@@ -176,11 +159,17 @@ export class FaseripInitiative {
         // Bind click events
         buttonContainer.find('[data-action="reroll"]').click(ev => {
           ev.preventDefault();
-          this.rollSideInitiative(combat);
+          ev.stopPropagation();
+          if (combat && combat.id) {
+            this.rollSideInitiative(combat);
+          } else {
+            ui.notifications.warn("No active combat encounter");
+          }
         });
         
         buttonContainer.find('[data-action="settings"]').click(ev => {
           ev.preventDefault();
+          ev.stopPropagation();
           this._showSettingsDialog();
         });
       }
@@ -348,6 +337,12 @@ export class FaseripInitiative {
   static async rollSideInitiative(combat) {
     if (!combat || this.isRolling) return;
     
+    // Validate combat state
+    if (!combat.id || !combat.combatants) {
+      console.warn("FASERIP Initiative: Invalid combat state");
+      return;
+    }
+    
     // Prevent multiple rolls
     this.isRolling = true;
     
@@ -361,7 +356,7 @@ export class FaseripInitiative {
       const pcMod = this._getModifierForIntuition(pcHighest.intuition);
       const npcMod = this._getModifierForIntuition(npcHighest.intuition);
       
-      // Roll for both sides
+      // Roll for both sides using explicit formula
       const pcRoll = await new Roll("1d10").evaluate();
       const npcRoll = await new Roll("1d10").evaluate();
       
@@ -448,7 +443,7 @@ export class FaseripInitiative {
       
       // Apply updates
       if (updates.length) {
-        await combat.updateEmbeddedDocuments("Combatant", updates, {faserip: true, render: false});
+        await combat.updateEmbeddedDocuments("Combatant", updates, {render: false});
       }
       
       // Send chat message with results
@@ -510,6 +505,7 @@ export class FaseripInitiative {
       
     } catch (error) {
       console.error("FASERIP Initiative Error:", error);
+      ui.notifications.error("Failed to roll FASERIP initiative. Check console for details.");
     } finally {
       // Always reset rolling flag when done
       this.isRolling = false;

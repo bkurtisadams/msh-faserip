@@ -1,5 +1,7 @@
 // File: systems/msh-faserip/rolls.js
 import { applyColumnShiftToRank } from './actorSheet.js';
+import { CombatHandler } from './combat-handler.js';
+
 //import { rankRows } from './rank-rows.js';
 
 // This file contains roll functions that can be called directly from macros
@@ -557,6 +559,58 @@ export async function rollUniversalAction(actionCode, actorId, columnShift = nul
     rollMode: game.settings.get("core", "rollMode")
   });
 
+  // AUTOMATION: Process effect if a valid target exists
+  const target = game.user.targets.first()?.actor;
+  if (target) {
+    const damageTypeMap = {
+      BA: "Physical-Blunt", EA: "Physical-Edged", Sh: "Physical-Shooting",
+      TE: "Physical-Edged", TB: "Physical-Blunt", En: "Energy-Energy",
+      Fo: "Force", Gp: "Physical-Grapple", Gb: "Physical-Grab", Ch: "Physical-Charge"
+    };
+
+    const damageType = damageTypeMap[actionCode] || "Unknown";
+    const canBeStun = ["BA", "EA", "Sh", "En", "Fo", "TE", "TB"].includes(actionCode);
+    const canBeSlam = ["BA", "EA", "Ch"].includes(actionCode);
+    const canBeKill = ["EA", "Sh", "En", "TE"].includes(actionCode);
+
+    // Determine correct damage source based on action type
+    let baseDamage;
+    if (["BA", "EA", "TB", "Gp", "Gb", "Es", "Ch"].includes(actionCode)) {
+      // Physical attacks use Strength for damage
+      baseDamage = actor.system.abilities.strength.value;
+    } else {
+      // Other attacks (Sh, En, Fo, etc.) use the attack ability for damage
+      baseDamage = ability.value;
+    }
+
+    // Check if this is a wrestling action
+    if (["Gp", "Gb", "Es"].includes(actionCode)) {
+      // For wrestling actions, we need to handle differently
+      await game.msh.CombatHandler.processWrestlingAction({
+        attacker: actor,
+        target,
+        actionType: actionCode,
+        resultColor: color.toLowerCase(),
+        sourceName: label
+      });
+    } else {
+      // Regular damage processing for non-wrestling actions
+      await game.msh.CombatHandler.processAttack({
+        attacker: actor,
+        target,
+        baseDamage,
+        damageType,
+        sourceName: label,
+        canBeStun,
+        canBeSlam,
+        canBeKill,
+        originalRollResult: color.toLowerCase()
+      });
+    }
+  } else {
+    ui.notifications.info("No target selected — result shown, but no damage processed.");
+  }
+
 }
 
 
@@ -594,6 +648,8 @@ export class FaseripRolls {
     const savedActionType = power.getFlag("msh-faserip", "lastActionType");
     const validActionType = Object.keys(ACTIONS).includes(savedActionType) ? savedActionType : "General Power Use";
     const savedColumnShift = power.getFlag("msh-faserip", "lastColumnShift") || 0;
+    const savedDamageCS = power.getFlag("msh-faserip", "lastDamageCS") || 0; // Add this line
+    const savedDamageType = power.getFlag("msh-faserip", "lastDamageType") || "Energy-Energy"; // Add this line
     const skipDiceRoll = power.getFlag("msh-faserip", "skipDiceRoll") || false;
 
     // If this is a direct roll (macro called with options or dialog submitted)
@@ -606,6 +662,8 @@ export class FaseripRolls {
       // Use provided options from dialog or direct call
       const actionType = options.actionType || savedActionType;
       const columnShift = options.columnShift ?? savedColumnShift;
+      const damageCS = options.damageCS ?? savedDamageCS; // Add this line
+      const damageType = options.damageType || savedDamageType; // Add this line
       const karma = options.karma || 0;
       const skipDice = options.skipDice ?? skipDiceRoll;
 
@@ -628,6 +686,11 @@ export class FaseripRolls {
           console.log(`Applied ${columnShift} column shifts to ${powerRank}, now ${effectiveRank}`);
         }
       }
+
+      // Calculate damage rank based on damage CS
+      const damageRankResult = damageCS ? applyColumnShiftToRank(powerRank, powerValue, damageCS) : null;
+      const damageRankName = damageRankResult?.rank;
+      const damageRankValue = damageRankResult?.value;
 
       // Create the roll
       const roll = new Roll("1d100");
@@ -665,6 +728,9 @@ export class FaseripRolls {
         <div style="padding: 5px 10px; font-size: 0.9em;">
           <div>Base Rank: ${powerRank} (${powerValue})</div>
           <div>Column Shift: ${columnShift} → ${effectiveRank}</div>
+          ${damageCS !== 0 && damageRankName
+            ? `<div>Damage Column Shift: ${damageCS > 0 ? "+" : ""}${damageCS}CS → <strong>${damageRankName} (${damageRankValue})</strong></div>`
+            : ""}
           <div>Roll: ${roll.total} + Karma: ${karma} = ${totalRoll}</div>
         </div>
         <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
@@ -683,6 +749,69 @@ export class FaseripRolls {
         speaker: ChatMessage.getSpeaker({ actor: actor }),
         content: content
       });
+
+      // ADD COMBAT HANDLER INTEGRATION HERE
+      // Check if we have a target to apply damage to
+      const target = game.user.targets.first()?.actor;
+
+      if (target && resultColor.toLowerCase() !== "white") {
+        // Determine damage type based on power type/action type if not specified
+        let finalDamageType = damageType;
+        if (!finalDamageType) {
+          if (actionType.includes("Blunt")) {
+            finalDamageType = "Physical-Blunt";
+          } else if (actionType.includes("Edged")) {
+            finalDamageType = "Physical-Edged";
+          } else if (actionType.includes("Force")) {
+            finalDamageType = "Force";
+          } else if (actionType.includes("Mental")) {
+            finalDamageType = "Mental";
+          } else if (power.system.type) {
+            // Try to determine from power's type
+            const powerTypeStr = power.system.type.toLowerCase();
+            if (powerTypeStr.includes("force")) {
+              finalDamageType = "Force";
+            } else if (powerTypeStr.includes("mental") || powerTypeStr.includes("psi")) {
+              finalDamageType = "Mental";
+            } else if (powerTypeStr.includes("phys")) {
+              finalDamageType = "Physical-Blunt";
+            } else {
+              finalDamageType = "Energy-Energy"; // Default
+            }
+          }
+        }
+        
+        // Determine if special effects should apply based on the result and action type
+        const canBeStun = actionType.includes("Blunt") || 
+                        actionType.includes("Force") || 
+                        resultText.toLowerCase().includes("stun");
+        
+        const canBeSlam = actionType.includes("Blunt") || 
+                        resultText.toLowerCase().includes("slam");
+        
+        const canBeKill = actionType.includes("Edged") || 
+                        actionType.includes("Energy") || 
+                        actionType.includes("Shooting") || 
+                        resultText.toLowerCase().includes("kill");
+        
+        // For damage, use the damageRankValue if a damage CS was applied, otherwise use the base power value
+        const baseDamage = damageCS && damageRankValue ? damageRankValue : powerValue;
+        
+        // Process the attack using the CombatHandler
+        await game.msh.CombatHandler.processAttack({
+          attacker: actor,
+          target: target,
+          baseDamage: baseDamage,
+          damageType: finalDamageType,
+          sourceName: power.name,
+          canBeStun,
+          canBeSlam,
+          canBeKill,
+          originalRollResult: resultColor.toLowerCase()
+        });
+      } else if (resultColor.toLowerCase() !== "white" && !target) {
+        ui.notifications.info("No target selected. Damage not applied.");
+      }
 
       return { roll, resultColor, resultText };
     } else {
@@ -703,6 +832,19 @@ export class FaseripRolls {
         "General Power Use": { ability: "none", results: { white: "Failure", green: "Success", yellow: "Special Effect", red: "Maximum Effect" } }
       };
 
+      // Determine the default damage type based on power type
+      let defaultDamageType = "Energy-Energy";
+      if (power.system.type) {
+        const powerTypeStr = power.system.type.toLowerCase();
+        if (powerTypeStr.includes("force")) {
+          defaultDamageType = "Force";
+        } else if (powerTypeStr.includes("mental") || powerTypeStr.includes("psi")) {
+          defaultDamageType = "Mental";
+        } else if (powerTypeStr.includes("phys")) {
+          defaultDamageType = "Physical-Blunt";
+        }
+      }
+
       // Create dialog for roll options
       let dialogContent = `
     <div style="background: #f0e8d8; padding: 10px; border-radius: 5px;">
@@ -713,12 +855,26 @@ export class FaseripRolls {
             `<option value="${action}" ${action === validActionType ? 'selected' : ''}>${action}</option>`
           ).join('')}
         </select>
-
       </div>
       <div style="margin-bottom: 10px;">
         <label style="display: inline-block; width: 120px;">Column Shift:</label>
         <input type="number" id="shift" name="shift" value="${savedColumnShift}" style="width: 50px;">
         <span style="color: #666; font-size: 0.9em;">(+ right, - left)</span>
+      </div>
+      <div style="margin-bottom: 10px;">
+        <label style="display: inline-block; width: 120px;">Damage CS:</label>
+        <input type="number" id="damage-cs" name="damageCs" value="${savedDamageCS}" style="width: 50px;">
+        <span style="color: #666; font-size: 0.9em;">(modifies damage rank)</span>
+      </div>
+      <div style="margin-bottom: 10px;">
+        <label style="display: inline-block; width: 120px;">Damage Type:</label>
+        <select id="damage-type" name="damageType" style="width: 180px;">
+          <option value="Energy-Energy" ${savedDamageType === "Energy-Energy" || power.system.type?.includes('Energy') ? 'selected' : ''}>Energy</option>
+          <option value="Force" ${savedDamageType === "Force" || power.system.type?.includes('Force') ? 'selected' : ''}>Force</option>
+          <option value="Physical-Blunt" ${savedDamageType === "Physical-Blunt" || power.system.type?.includes('Physical') ? 'selected' : ''}>Physical (Blunt)</option>
+          <option value="Physical-Edged" ${savedDamageType === "Physical-Edged" || power.system.type?.includes('Edged') ? 'selected' : ''}>Physical (Edged)</option>
+          <option value="Mental" ${savedDamageType === "Mental" || power.system.type?.includes('Mental') ? 'selected' : ''}>Mental</option>
+        </select>
       </div>
       <div style="margin-bottom: 10px;">
         <label style="display: inline-block; width: 120px;">Karma Points:</label>
@@ -747,6 +903,8 @@ export class FaseripRolls {
             callback: async (html) => {
               const actionType = html.find('[name="action"]').val();
               const columnShift = parseInt(html.find('[name="shift"]').val()) || 0;
+              const damageCS = parseInt(html.find('[name="damageCs"]').val()) || 0;
+              const damageType = html.find('[name="damageType"]').val();
               const karma = parseInt(html.find('[name="karma"]').val()) || 0;
               const skipDice = html.find('[name="skipDice"]').is(':checked');
               const saveSettings = html.find('[name="saveSettings"]').is(':checked');
@@ -755,6 +913,8 @@ export class FaseripRolls {
               if (saveSettings) {
                 await power.setFlag("msh-faserip", "lastActionType", actionType);
                 await power.setFlag("msh-faserip", "lastColumnShift", columnShift);
+                await power.setFlag("msh-faserip", "lastDamageCS", damageCS);
+                await power.setFlag("msh-faserip", "lastDamageType", damageType);
                 await power.setFlag("msh-faserip", "skipDiceRoll", skipDice);
               }
 
@@ -763,6 +923,8 @@ export class FaseripRolls {
                 useDirectRoll: true,
                 actionType: actionType,
                 columnShift: columnShift,
+                damageCS: damageCS,
+                damageType: damageType,
                 karma: karma,
                 skipDice: skipDice
               });
@@ -800,6 +962,8 @@ export class FaseripRolls {
     // Get saved talent settings
     const savedActionType = talent.getFlag("msh-faserip", "lastActionType") || "";
     const savedExtraShift = talent.getFlag("msh-faserip", "lastExtraShift") || 0;
+    const savedDamageCS = talent.getFlag("msh-faserip", "lastDamageCS") || 0; // Add this line
+    const savedDamageType = talent.getFlag("msh-faserip", "lastDamageType") || "Physical-Blunt"; // Add this line
     const skipDiceRoll = talent.getFlag("msh-faserip", "skipDiceRoll") || false;
 
     // If this is a direct roll (called after dialog or with options)
@@ -812,6 +976,8 @@ export class FaseripRolls {
       // Use provided options from dialog or direct call
       const actionType = options.actionType || savedActionType;
       const extraShift = options.extraShift ?? savedExtraShift;
+      const damageCS = options.damageCS ?? savedDamageCS; // Add this line
+      const damageType = options.damageType || savedDamageType; // Add this line
       const karma = options.karma || 0;
       const skipDice = options.skipDice ?? skipDiceRoll;
 
@@ -838,6 +1004,11 @@ export class FaseripRolls {
           console.log(`Applied ${totalColumnShift} column shifts to ${abilityRank}, now ${effectiveRank}`);
         }
       }
+
+      // Calculate damage rank based on damage CS
+      const damageRankResult = damageCS ? applyColumnShiftToRank(abilityRank, abilityValue, damageCS) : null;
+      const damageRankName = damageRankResult?.rank;
+      const damageRankValue = damageRankResult?.value;
 
       // Create the roll
       const roll = new Roll("1d100");
@@ -869,6 +1040,10 @@ export class FaseripRolls {
         "Blunt Attack (BA)": { white: "Miss", green: "Hit", yellow: "Slam", red: "Stun" },
         "Edged Attack (EA)": { white: "Miss", green: "Hit", yellow: "Stun", red: "Kill" },
         "Shooting Attack (Sh)": { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Kill" },
+        "Throwing Edged (TE)": { white: "Miss", green: "Hit", yellow: "Stun", red: "Kill" },
+        "Throwing Blunt (TB)": { white: "Miss", green: "Hit", yellow: "Hit", red: "Stun" },
+        "Energy (En)": { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Kill" },
+        "Force (Fo)": { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Stun" },
         "Grappling (GP)": { white: "Miss", green: "Miss", yellow: "Partial", red: "Hold" },
         "Grabbing (Gb)": { white: "Miss", green: "Take", yellow: "Grab", red: "Break" },
         "Escaping (ES)": { white: "Miss", green: "Miss", yellow: "Escape", red: "Reverse" },
@@ -901,13 +1076,16 @@ export class FaseripRolls {
             <div style="padding: 5px 10px; font-size: 0.9em;">
               <div>Base Rank: ${abilityRank} (${abilityValue})</div>
               <div>Column Shift: ${totalColumnShift} → ${effectiveRank}</div>
+              ${damageCS !== 0 && damageRankName
+                ? `<div>Damage Column Shift: ${damageCS > 0 ? "+" : ""}${damageCS}CS → <strong>${damageRankName} (${damageRankValue})</strong></div>`
+                : ""}
               <div>Roll: ${roll.total} + Karma: ${karma} = ${totalRoll}</div>
             </div>
             <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
               background-color: ${resultColor.toLowerCase() === 'white' ? '#f8f8f8' :
-          resultColor.toLowerCase() === 'green' ? '#4CAF50' :
-            resultColor.toLowerCase() === 'yellow' ? '#FFD700' :
-              '#F44336'}; 
+                resultColor.toLowerCase() === 'green' ? '#4CAF50' :
+                resultColor.toLowerCase() === 'yellow' ? '#FFD700' :
+                '#F44336'}; 
               color: ${resultColor.toLowerCase() === 'white' || resultColor.toLowerCase() === 'yellow' ? '#333' : 'white'};">
               ${resultText} (${resultColor.toUpperCase()})
             </div>
@@ -919,6 +1097,100 @@ export class FaseripRolls {
         speaker: ChatMessage.getSpeaker({ actor: actor }),
         content: content
       });
+
+      // COMBAT HANDLER INTEGRATION
+      // Check if we have a target to apply damage to
+      const target = game.user.targets.first()?.actor;
+
+      // Define wrestling actions
+      const wrestlingActions = ["Grappling (GP)", "Grabbing (Gb)", "Escaping (ES)"];
+
+      // Check if this is either an attack action or a wrestling action
+      if (target && resultColor.toLowerCase() !== "white" && 
+        (actionType.toLowerCase().includes("attack") || wrestlingActions.includes(actionType))) {
+        
+        // Handle wrestling actions differently
+        if (wrestlingActions.includes(actionType)) {
+          // Extract action code (GP, Gb, ES) from action type
+          const actionCode = actionType.match(/\(([^)]+)\)/)?.[1]?.toLowerCase();
+          console.log(`Processing wrestling action ${actionType} with lowercase code ${actionCode}`);
+          
+          // Use the wrestling-specific handler
+          await game.msh.CombatHandler.processWrestlingAction({
+            attacker: actor,
+            target,
+            actionType: actionCode,
+            resultColor: resultColor.toLowerCase(),
+            sourceName: talent.name
+          });
+        } else {
+          // Regular attack processing
+          let finalDamageType = damageType;
+          if (!finalDamageType) {
+            if (actionType.includes("Blunt")) {
+              finalDamageType = "Physical-Blunt";
+            } else if (actionType.includes("Edged")) {
+              finalDamageType = "Physical-Edged";
+            } else if (actionType.includes("Force")) {
+              finalDamageType = "Force";
+            } else if (actionType.includes("Mental")) {
+              finalDamageType = "Mental";
+            } else {
+              // Try to determine from talent type/specialty
+              const talentType = talent.system.type?.toLowerCase() || "";
+              const talentSpecialty = talent.system.specialty?.toLowerCase() || "";
+              
+              if (talentSpecialty.includes("blunt")) {
+                finalDamageType = "Physical-Blunt";
+              } else if (talentSpecialty.includes("sharp") || talentSpecialty.includes("edged")) {
+                finalDamageType = "Physical-Edged";
+              } else if (talentSpecialty.includes("thrown")) {
+                if (talentSpecialty.includes("knife") || talentSpecialty.includes("star")) {
+                  finalDamageType = "Physical-Edged";
+                } else {
+                  finalDamageType = "Physical-Blunt";
+                }
+              } else if (talentType.includes("fight")) {
+                finalDamageType = "Physical-Blunt";
+              } else {
+                finalDamageType = "Physical-Blunt"; // Default
+              }
+            }
+          }
+          
+          // Determine if special effects should apply based on the result and action type
+          const canBeStun = actionType.includes("Blunt") || 
+                          actionType.includes("Force") || 
+                          resultText.toLowerCase().includes("stun");
+          
+          const canBeSlam = actionType.includes("Blunt") || 
+                          resultText.toLowerCase().includes("slam");
+          
+          const canBeKill = actionType.includes("Edged") || 
+                          actionType.includes("Energy") || 
+                          actionType.includes("Shooting") || 
+                          resultText.toLowerCase().includes("kill");
+          
+          // For damage, use the damageRankValue if a damage CS was applied, otherwise use the base ability value
+          const baseDamage = damageCS && damageRankValue ? damageRankValue : abilityValue;
+          
+          // Process the attack using the CombatHandler
+          await game.msh.CombatHandler.processAttack({
+            attacker: actor,
+            target: target,
+            baseDamage: baseDamage,
+            damageType: finalDamageType,
+            sourceName: talent.name,
+            canBeStun,
+            canBeSlam,
+            canBeKill,
+            originalRollResult: resultColor.toLowerCase()
+          });
+        }
+      } else if (resultColor.toLowerCase() !== "white" && !target && 
+                (actionType.toLowerCase().includes("attack") || wrestlingActions.includes(actionType))) {
+        ui.notifications.info("No target selected. Effect not applied.");
+      }
 
       return { roll, resultColor, resultText };
     } else {
@@ -1023,6 +1295,21 @@ export class FaseripRolls {
             <span style="color: #666; font-size: 0.9em;">(additional +/- CS)</span>
           </div>
           <div style="margin-bottom: 10px;">
+            <label style="display: inline-block; width: 120px;">Damage CS:</label>
+            <input type="number" id="damage-cs" name="damageCs" value="${savedDamageCS}" style="width: 50px;">
+            <span style="color: #666; font-size: 0.9em;">(modifies damage rank)</span>
+          </div>
+          <div style="margin-bottom: 10px;">
+            <label style="display: inline-block; width: 120px;">Damage Type:</label>
+            <select id="damage-type" name="damageType" style="width: 180px;">
+              <option value="Physical-Blunt" ${savedDamageType === "Physical-Blunt" || talentSpecialty?.includes('Blunt') ? 'selected' : ''}>Physical (Blunt)</option>
+              <option value="Physical-Edged" ${savedDamageType === "Physical-Edged" || talentSpecialty?.includes('Edged') || talentSpecialty?.includes('Sharp') ? 'selected' : ''}>Physical (Edged)</option>
+              <option value="Energy-Energy" ${savedDamageType === "Energy-Energy" ? 'selected' : ''}>Energy</option>
+              <option value="Force" ${savedDamageType === "Force" ? 'selected' : ''}>Force</option>
+              <option value="Mental" ${savedDamageType === "Mental" || talentType?.includes('Mental') ? 'selected' : ''}>Mental</option>
+            </select>
+          </div>
+          <div style="margin-bottom: 10px;">
             <label style="display: inline-block; width: 120px;">Karma Points:</label>
             <input type="number" id="karma" name="karma" value="0" min="0" style="width: 50px;">
           </div>
@@ -1049,6 +1336,8 @@ export class FaseripRolls {
             callback: async (html) => {
               const actionType = html.find('[name="actionType"]').val();
               const extraShift = parseInt(html.find('[name="shift"]').val()) || 0;
+              const damageCS = parseInt(html.find('[name="damageCs"]').val()) || 0;
+              const damageType = html.find('[name="damageType"]').val();
               const karma = parseInt(html.find('[name="karma"]').val()) || 0;
               const skipDice = html.find('[name="skipDice"]').is(':checked');
               const saveSettings = html.find('[name="saveSettings"]').is(':checked');
@@ -1057,6 +1346,8 @@ export class FaseripRolls {
               if (saveSettings) {
                 await talent.setFlag("msh-faserip", "lastActionType", actionType);
                 await talent.setFlag("msh-faserip", "lastExtraShift", extraShift);
+                await talent.setFlag("msh-faserip", "lastDamageCS", damageCS);
+                await talent.setFlag("msh-faserip", "lastDamageType", damageType);
                 await talent.setFlag("msh-faserip", "skipDiceRoll", skipDice);
               }
 
@@ -1065,6 +1356,8 @@ export class FaseripRolls {
                 useDirectRoll: true,
                 actionType: actionType,
                 extraShift: extraShift,
+                damageCS: damageCS,
+                damageType: damageType,
                 karma: karma,
                 skipDice: skipDice
               });
@@ -1694,6 +1987,39 @@ export class FaseripRolls {
           roll: roll
         });
 
+        // Auto-damage handling via CombatHandler
+        const target = game.user.targets.first()?.actor;
+        if (target) {
+          let baseDamage = parseInt(equipment.system.damage);
+          if (isNaN(baseDamage)) {
+            baseDamage = CONFIG.FASERIP.rankValues[equipment.system.damage] || 0;
+          }
+
+          const canBeStun = effect?.toLowerCase().includes("stun") || resultColor.toLowerCase() === "yellow";
+          const canBeSlam = effect?.toLowerCase().includes("slam");
+          const canBeKill = effect?.toLowerCase().includes("kill");
+
+          const effectLower = effect?.toLowerCase?.() || "";
+          if (effectLower === "miss") {
+            console.log("🛑 No damage — attack result is Miss.");
+          } else {
+            await CombatHandler.processAttack({
+              attacker: actor,
+              target: target,
+              baseDamage: baseDamage,
+              damageType: equipment.system.damageType || "Physical",
+              sourceName: equipment.name,
+              canBeStun: effectLower.includes("stun") || resultColor.toLowerCase() === "yellow",
+              canBeSlam: effectLower.includes("slam"),
+              canBeKill: effectLower.includes("kill"),
+              originalRollResult: resultColor.toLowerCase()
+            });
+          }
+
+        } else {
+          ui.notifications.info("No target selected. Damage not applied.");
+        }
+
         // After the roll is complete and the chat message is created, update ammunition:
         if (category === "weapon" && equipment.system.shots) {
           const currentShots = equipment.system.shotsRemaining !== undefined ?
@@ -1878,4 +2204,43 @@ export class FaseripRolls {
 
     return rankValues[rankName] || 6; // Default to Typical if not found
   }
+}
+
+async function handleCombatEffect({ actor, target, actionType, resultColor, sourceName, baseDamage = 0 }) {
+  const damageTypeMap = {
+    BA: "Physical-Blunt",
+    EA: "Physical-Edged",
+    Sh: "Physical-Shooting",
+    TE: "Physical-Edged",
+    TB: "Physical-Blunt",
+    En: "Energy-Energy",
+    Fo: "Force",
+    Gp: "Physical-Grapple",
+    Gb: "Physical-Grab",
+    Ch: "Physical-Charge"
+    // Extend as needed
+  };
+
+  const damageType = damageTypeMap[actionType] || "Unknown";
+  const canBeStun = ["BA", "EA", "Sh", "En", "Fo", "TE", "TB"].includes(actionType);
+  const canBeSlam = ["BA", "EA", "Ch"].includes(actionType);
+  const canBeKill = ["EA", "Sh", "En", "TE"].includes(actionType);
+
+  // Bail if no target
+  if (!target) {
+    ui.notifications.warn("No target selected for combat effect.");
+    return;
+  }
+
+  await CombatHandler.processAttack({
+    attacker: actor,
+    target,
+    baseDamage,
+    damageType,
+    sourceName,
+    canBeStun,
+    canBeSlam,
+    canBeKill,
+    originalRollResult: resultColor.toLowerCase()
+  });
 }
