@@ -2468,3 +2468,30 @@
     color: white !important;
     transition: background-color 0.5s ease;
 }
+
+/* Fix the space distribution in universal table dialog */
+.dialog .dialog-buttons {
+    flex-grow: 0 !important;
+    flex-shrink: 0 !important;
+    height: auto !important;
+}
+
+.dialog .dialog-content {
+    flex-grow: 1 !important;
+    height: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
+    max-height: none !important;
+}
+
+.universal-table-wrapper {
+    flex-grow: 1 !important;
+    height: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
+}
+
+#rankTableContainer {
+    flex: 1 !important;
+    min-height: 0 !important;
+}
