@@ -19,8 +19,7 @@
         "scripts/actorSheet.js",
         "scripts/itemSheet.js",
         "scripts/universalTable.js",
-        "scripts/macros.js",
-        "scripts/elevation-integration.js"
+        "scripts/macros.js"
     ],
     "styles": [
         "styles/global.css",
