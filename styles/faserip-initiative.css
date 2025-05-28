@@ -193,7 +193,7 @@
 /* Highlight effect for newly activated combatant */
 .combatant.faserip-highlight {
   background: linear-gradient(90deg, rgba(255, 215, 0, 0.3), transparent);
-  border-left-color: #FFD700 !important;
+  border-left-color: FFC107 !important;
   border-left-width: 6px !important;
   transition: all 0.3s ease-in-out;
   box-shadow: 0 2px 8px rgba(255, 215, 0, 0.4);

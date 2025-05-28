@@ -1177,7 +1177,7 @@ export class FaseripActorSheet extends ActorSheet {
               <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
                 background-color: ${resultColor.toLowerCase() === 'white' ? '#f8f8f8' :
                   resultColor.toLowerCase() === 'green' ? '#4CAF50' :
-                    resultColor.toLowerCase() === 'yellow' ? '#FFD700' :
+                    resultColor.toLowerCase() === 'yellow' ? 'FFC107' :
                       '#F44336'}; 
                 color: ${resultColor.toLowerCase() === 'white' || resultColor.toLowerCase() === 'yellow' ? '#333' : 'white'};">
                 ${resultText} (${resultColor.toUpperCase()})
@@ -1647,7 +1647,7 @@ export class FaseripActorSheet extends ActorSheet {
                   <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
                     background-color: ${resultColor.toLowerCase() === 'white' ? '#f8f8f8' :
                       resultColor.toLowerCase() === 'green' ? '#4CAF50' :
-                        resultColor.toLowerCase() === 'yellow' ? '#FFD700' :
+                        resultColor.toLowerCase() === 'yellow' ? 'FFC107' :
                           '#F44336'}; 
                     color: ${resultColor.toLowerCase() === 'white' || resultColor.toLowerCase() === 'yellow' ? '#333' : 'white'};">
                     ${resultText} (${resultColor.toUpperCase()})
@@ -2134,7 +2134,7 @@ export class FaseripActorSheet extends ActorSheet {
               <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
                 background-color: ${resultColor.toLowerCase() === 'white' ? '#f8f8f8' :
                   resultColor.toLowerCase() === 'green' ? '#4CAF50' :
-                    resultColor.toLowerCase() === 'yellow' ? '#FFD700' :
+                    resultColor.toLowerCase() === 'yellow' ? 'FFC107' :
                       '#F44336'}; 
                 color: ${resultColor.toLowerCase() === 'white' || resultColor.toLowerCase() === 'yellow' ? '#333' : 'white'};">
                 ${resultText} (${resultColor.toUpperCase()})
@@ -2881,7 +2881,7 @@ html.find('.headquarters-row').each((i, row) => {
                   <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
                     background-color: ${resultColor.toLowerCase() === 'white' ? '#f8f8f8' :
                       resultColor.toLowerCase() === 'green' ? '#4CAF50' :
-                        resultColor.toLowerCase() === 'yellow' ? '#FFD700' :
+                        resultColor.toLowerCase() === 'yellow' ? 'FFC107' :
                           '#F44336'}; 
                     color: ${resultColor.toLowerCase() === 'white' || resultColor.toLowerCase() === 'yellow' ? '#333' : 'white'};">
                     ${resultColor.toUpperCase()} RESULT
@@ -3078,7 +3078,7 @@ html.find('.headquarters-row').each((i, row) => {
             const colorMap = {
               white: "#f8f8f8",
               green: "#4CAF50",
-              yellow: "#FFD700",
+              yellow: "FFC107",
               red: "#F44336"
             };
             const textColor = (["white", "yellow"].includes(resultColorLower)) ? "#333" : "white";
@@ -3220,7 +3220,7 @@ html.find('.headquarters-row').each((i, row) => {
         <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px;
           background-color: ${color === 'white' ? '#f8f8f8' :
             color === 'green' ? '#4CAF50' :
-            color === 'yellow' ? '#FFD700' : '#F44336'};
+            color === 'yellow' ? 'FFC107' : '#F44336'};
           color: ${color === 'white' || color === 'yellow' ? '#333' : 'white'};">
           ${resultColor.toUpperCase()}
         </div>
@@ -3288,7 +3288,7 @@ _rollVehicleControl(vehicle) {
   ];
   const rankValues = Object.fromEntries(rankTable.map((r, i) => [r, [0, 2, 4, 6, 10, 20, 30, 40, 50, 75, 100, 150, 200, 500, 1000, 3000, 5000, 10000][i]]));
   const colorStyles = {
-    white: '#f8f8f8', green: '#4CAF50', yellow: '#FFD700', red: '#F44336'
+    white: '#f8f8f8', green: '#4CAF50', yellow: 'FFC107', red: '#F44336'
   };
   const textColor = (c) => ["white", "yellow"].includes(c) ? "#333" : "white";
 
