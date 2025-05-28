@@ -544,7 +544,7 @@ export async function rollUniversalAction(actionCode, actorId, columnShift = nul
     <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
       background-color: ${labelColor === 'white' ? '#f8f8f8' :
       labelColor === 'green' ? '#4CAF50' :
-        labelColor === 'yellow' ? 'FFC107' : '#F44336'};
+        labelColor === 'yellow' ? '#FFC107' : '#F44336'};
       color: ${labelColor === 'white' || labelColor === 'yellow' ? '#333' : 'white'};">
       ${resultText} (${color.toUpperCase()})
     </div>
@@ -760,7 +760,7 @@ export class FaseripRolls {
         <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
           background-color: ${resultColor.toLowerCase() === 'white' ? '#f8f8f8' :
           resultColor.toLowerCase() === 'green' ? '#4CAF50' :
-            resultColor.toLowerCase() === 'yellow' ? 'FFC107' :
+            resultColor.toLowerCase() === 'yellow' ? '#FC107' :
               '#F44336'}; 
           color: ${resultColor.toLowerCase() === 'white' || resultColor.toLowerCase() === 'yellow' ? '#333' : 'white'};">
           ${resultText} (${resultColor.toUpperCase()})
@@ -1648,7 +1648,7 @@ export class FaseripRolls {
           <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
             background-color: ${resultColor.toLowerCase() === 'white' ? '#f8f8f8' :
           resultColor.toLowerCase() === 'green' ? '#4CAF50' :
-            resultColor.toLowerCase() === 'yellow' ? 'FFC107' :
+            resultColor.toLowerCase() === 'yellow' ? '#FFC107' :
               '#F44336'}; 
             color: ${resultColor.toLowerCase() === 'white' || resultColor.toLowerCase() === 'yellow' ? '#333' : 'white'};">
             ${resultText} (${resultColor.toUpperCase()})

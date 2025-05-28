@@ -356,7 +356,7 @@
  .faserip-sheet .attributes-table th .resources-header-button {
   background: none;
   border: none;
-  color: FFC107; /* Gold color to stand out */
+  color: #FFC107; /* Gold color to stand out */
   font-weight: bold;
   cursor: pointer;
   padding: 0;

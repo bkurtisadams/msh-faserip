@@ -101,7 +101,7 @@ new Dialog({
         }
 
         const colorStyle = resultColor.toLowerCase() === "green" ? "#4CAF50"
-          : resultColor.toLowerCase() === "yellow" ? "FFC107"
+          : resultColor.toLowerCase() === "yellow" ? "#FFC107"
           : resultColor.toLowerCase() === "red" ? "#F44336" : "#f8f8f8";
         const textColor = ["yellow", "white"].includes(resultColor.toLowerCase()) ? "#333" : "#fff";
 
