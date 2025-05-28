@@ -446,7 +446,7 @@ export class CombatHandler {
                                 // Process the damage
                                 await CombatHandler.processAttack({
                                     attacker: attackerActor,
-                                    target: targetActor,
+                                    target: target,
                                     baseDamage: strengthValue,
                                     damageType: "Physical-Blunt",
                                     sourceName: "Wrestling Hold",

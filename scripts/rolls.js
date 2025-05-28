@@ -962,8 +962,8 @@ export class FaseripRolls {
     // Get saved talent settings
     const savedActionType = talent.getFlag("msh-faserip", "lastActionType") || "";
     const savedExtraShift = talent.getFlag("msh-faserip", "lastExtraShift") || 0;
-    const savedDamageCS = talent.getFlag("msh-faserip", "lastDamageCS") || 0; // Add this line
-    const savedDamageType = talent.getFlag("msh-faserip", "lastDamageType") || "Physical-Blunt"; // Add this line
+    const savedDamageCS = talent.getFlag("msh-faserip", "lastDamageCS") || 0;
+    const savedDamageType = talent.getFlag("msh-faserip", "lastDamageType") || "Physical-Blunt";
     const skipDiceRoll = talent.getFlag("msh-faserip", "skipDiceRoll") || false;
 
     // If this is a direct roll (called after dialog or with options)
@@ -976,8 +976,8 @@ export class FaseripRolls {
       // Use provided options from dialog or direct call
       const actionType = options.actionType || savedActionType;
       const extraShift = options.extraShift ?? savedExtraShift;
-      const damageCS = options.damageCS ?? savedDamageCS; // Add this line
-      const damageType = options.damageType || savedDamageType; // Add this line
+      const damageCS = options.damageCS ?? savedDamageCS;
+      const damageType = options.damageType || savedDamageType;
       const karma = options.karma || 0;
       const skipDice = options.skipDice ?? skipDiceRoll;
 
@@ -1069,27 +1069,36 @@ export class FaseripRolls {
 
       // Create chat message styled to match screenshot
       let content = `
-          <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
-            <div style="padding: 5px 10px; border-bottom: 1px solid #c0c0c0; font-size: 1.1em; color: #8b0000;">
-              <strong>${actor.name} - ${abilityName} Roll (${actionType})</strong>
-            </div>
-            <div style="padding: 5px 10px; font-size: 0.9em;">
-              <div>Base Rank: ${abilityRank} (${abilityValue})</div>
-              <div>Column Shift: ${totalColumnShift} → ${effectiveRank}</div>
-              ${damageCS !== 0 && damageRankName
-                ? `<div>Damage Column Shift: ${damageCS > 0 ? "+" : ""}${damageCS}CS → <strong>${damageRankName} (${damageRankValue})</strong></div>`
-                : ""}
-              <div>Roll: ${roll.total} + Karma: ${karma} = ${totalRoll}</div>
-            </div>
-            <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
-              background-color: ${resultColor.toLowerCase() === 'white' ? '#f8f8f8' :
-                resultColor.toLowerCase() === 'green' ? '#4CAF50' :
-                resultColor.toLowerCase() === 'yellow' ? 'FFC107' :
-                '#F44336'}; 
-              color: ${resultColor.toLowerCase() === 'white' || resultColor.toLowerCase() === 'yellow' ? '#333' : 'white'};">
-              ${resultText} (${resultColor.toUpperCase()})
-            </div>
+        <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
+          <div style="padding: 5px 10px; border-bottom: 1px solid #c0c0c0; font-size: 1.1em; color: #8b0000;">
+            <strong>${actor.name} - ${abilityName} Roll (${actionType})</strong>
           </div>
+          <div style="padding: 5px 10px; font-size: 0.9em;">
+            <div>Base Rank: ${abilityRank} (${abilityValue})</div>
+            <div>Column Shift: ${totalColumnShift} → ${effectiveRank}</div>
+            ${damageCS !== 0 && damageRankName
+              ? `<div>Damage Column Shift: ${damageCS > 0 ? "+" : ""}${damageCS}CS → <strong>${damageRankName} (${damageRankValue})</strong></div>`
+              : ""}
+            <div>Roll: ${roll.total} + Karma: ${karma} = ${totalRoll}</div>
+          </div>
+          <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; background-color: ${
+            resultText.toLowerCase().includes('partial') ? '#FFC107' :
+            resultText.toLowerCase().includes('hold') ? '#F44336' :
+            resultText.toLowerCase().includes('escape') ? '#FFC107' :
+            resultText.toLowerCase().includes('reverse') ? '#F44336' :
+            resultColor.toLowerCase() === 'white' ? '#f8f8f8' :
+            resultColor.toLowerCase() === 'green' ? '#4CAF50' :
+            resultColor.toLowerCase() === 'yellow' ? '#FFC107' :
+            '#F44336'
+          }; color: ${
+            resultText.toLowerCase().includes('partial') || 
+            resultText.toLowerCase().includes('escape') ||
+            resultColor.toLowerCase() === 'white' || 
+            resultColor.toLowerCase() === 'yellow' ? '#333' : 'white'
+          };">
+            ${resultText} (${resultColor.toUpperCase()})
+          </div>
+        </div>
         `;
 
       // Send to chat
