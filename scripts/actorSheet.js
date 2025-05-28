@@ -999,58 +999,67 @@ export class FaseripActorSheet extends ActorSheet {
       const powerRank = item.system.rank || "Typical";
       const powerValue = item.system.value || 6;
 
+      const powerSpecialty = item?.system?.specialty?.toLowerCase?.() || "";
+      const lowerPowerType = powerType.toLowerCase?.() || "";
+
+      let damageTypeOptions = `
+        <option value="None" ${(savedDamageType === "None" || (!powerSpecialty.includes("blunt") && !powerSpecialty.includes("edged") && !powerSpecialty.includes("sharp") && (lowerPowerType.includes("professional") || lowerPowerType.includes("scientific") || lowerPowerType.includes("mystic")))) ? 'selected' : ''}>No Damage</option>
+        <option value="Physical-Blunt" ${(savedDamageType === "Physical-Blunt" || powerSpecialty.includes("blunt")) ? 'selected' : ''}>Physical (Blunt)</option>
+        <option value="Physical-Edged" ${(savedDamageType === "Physical-Edged" || powerSpecialty.includes("edged") || powerSpecialty.includes("sharp")) ? 'selected' : ''}>Physical (Edged)</option>
+        <option value="Energy-Energy" ${(savedDamageType === "Energy-Energy") ? 'selected' : ''}>Energy</option>
+        <option value="Force" ${(savedDamageType === "Force") ? 'selected' : ''}>Force</option>
+        <option value="Mental" ${(savedDamageType === "Mental" || lowerPowerType.includes("mental")) ? 'selected' : ''}>Mental</option>
+      `;
+
+
       // Create dialog for roll options
       let dialogContent = `
-  <div style="margin-bottom: 10px;">
-    <label style="display: inline-block; width: 120px;">Action Type:</label>
-    <select id="action-type" name="actionType" style="width: 180px;">
-      ${actionOptionsHTML}
-    </select>
-  </div>
-  <div style="margin-bottom: 10px;">
-    <label style="display: inline-block; width: 120px;">Power Rank:</label>
-    <input type="text" id="power-rank" name="powerRank" value="${powerRank}" style="width: 100px;" readonly>
-    <span style="margin-left: 5px;">(${powerValue})</span>
-  </div>
-  <div style="margin-bottom: 10px;">
-    <label style="display: inline-block; width: 120px;">Column Shift:</label>
-    <input type="number" id="shift" name="shift" value="${savedColumnShift}" style="width: 50px;">
-    <span style="color: #666; font-size: 0.9em;">(+ right, - left)</span>
-  </div>
-    <div style="margin-bottom: 10px;">
-    <label style="display: inline-block; width: 120px;">Damage CS Modifier:</label>
-    <input type="number" id="damage-cs" name="damageCs" value="${savedDamageCS}" style="width: 50px;">
-    <span style="color: #666; font-size: 0.9em;">(modifies damage rank)</span>
-  </div>
-  // more control over the damage aspects
-  <div style="margin-bottom: 10px;">
-  <label style="display: inline-block; width: 120px;">Damage Type:</label>
-    <select id="damage-type" name="damageType" style="width: 180px;">
-      <option value="None" ${savedDamageType === "None" || (!talentSpecialty?.includes('Blunt') && !talentSpecialty?.includes('Edged') && !talentSpecialty?.includes('Sharp') && talentType?.includes('Professional') || talentType?.includes('Scientific') || talentType?.includes('Mystic')) ? 'selected' : ''}>No Damage</option>
-      <option value="Physical-Blunt" ${savedDamageType === "Physical-Blunt" || talentSpecialty?.includes('Blunt') ? 'selected' : ''}>Physical (Blunt)</option>
-      <option value="Physical-Edged" ${savedDamageType === "Physical-Edged" || talentSpecialty?.includes('Edged') || talentSpecialty?.includes('Sharp') ? 'selected' : ''}>Physical (Edged)</option>
-      <option value="Energy-Energy" ${savedDamageType === "Energy-Energy" ? 'selected' : ''}>Energy</option>
-      <option value="Force" ${savedDamageType === "Force" ? 'selected' : ''}>Force</option>
-      <option value="Mental" ${savedDamageType === "Mental" || talentType?.includes('Mental') ? 'selected' : ''}>Mental</option>
-    </select>
-  </div>
+        <div style="margin-bottom: 10px;">
+          <label style="display: inline-block; width: 120px;">Action Type:</label>
+          <select id="action-type" name="actionType" style="width: 180px;">
+            ${actionOptionsHTML}
+          </select>
+        </div>
+        <div style="margin-bottom: 10px;">
+          <label style="display: inline-block; width: 120px;">Power Rank:</label>
+          <input type="text" id="power-rank" name="powerRank" value="${powerRank}" style="width: 100px;" readonly>
+          <span style="margin-left: 5px;">(${powerValue})</span>
+        </div>
+        <div style="margin-bottom: 10px;">
+          <label style="display: inline-block; width: 120px;">Column Shift:</label>
+          <input type="number" id="shift" name="shift" value="${savedColumnShift}" style="width: 50px;">
+          <span style="color: #666; font-size: 0.9em;">(+ right, - left)</span>
+        </div>
+          <div style="margin-bottom: 10px;">
+          <label style="display: inline-block; width: 120px;">Damage CS Modifier:</label>
+          <input type="number" id="damage-cs" name="damageCs" value="${savedDamageCS}" style="width: 50px;">
+          <span style="color: #666; font-size: 0.9em;">(modifies damage rank)</span>
+        </div>
 
-  <div style="margin-bottom: 10px;">
-    <label style="display: inline-block; width: 120px;">Karma Points:</label>
-    <input type="number" id="karma" name="karma" value="0" min="0" style="width: 50px;">
-  </div>
-  <div style="margin-bottom: 10px;">
-    <label>
-      <input type="checkbox" id="save-settings" name="saveSettings" checked> 
-      Remember these settings for future rolls
-    </label>
-  </div>
-  <div>
-    <label>
-      <input type="checkbox" id="skip-dice" name="skipDice" ${skipDiceRoll ? 'checked' : ''}> 
-      Skip dice animation
-    </label>
-  </div>`;
+        <!-- more control over the damage aspects -->
+        <div style="margin-bottom: 10px;">
+          <label style="display: inline-block; width: 120px;">Damage Type:</label>
+          <select id="damage-type" name="damageType" style="width: 180px;">
+            ${damageTypeOptions}
+          </select>
+        </div>
+
+        <div style="margin-bottom: 10px;">
+          <label style="display: inline-block; width: 120px;">Karma Points:</label>
+          <input type="number" id="karma" name="karma" value="0" min="0" style="width: 50px;">
+        </div>
+        <div style="margin-bottom: 10px;">
+          <label>
+            <input type="checkbox" id="save-settings" name="saveSettings" checked> 
+            Remember these settings for future rolls
+          </label>
+        </div>
+        <div>
+          <label>
+            <input type="checkbox" id="skip-dice" name="skipDice" ${skipDiceRoll ? 'checked' : ''}> 
+            Skip dice animation
+          </label>
+        </div>`;
 
       new Dialog({
         title: `Power Roll: ${item.name}`,

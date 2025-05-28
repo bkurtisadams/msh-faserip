@@ -654,9 +654,9 @@ export class FaseripRolls {
 
     // If this is a direct roll (macro called with options or dialog submitted)
     // Check if CTRL is pressed or if this is a direct roll call
-    if (options.useDirectRoll || game.keyboard.isModifierActive(KeyboardManager.MODIFIER_KEYS.CONTROL)) {
+    if (options.useDirectRoll || game.keyboard.isModifierActive(foundry.helpers.interaction.KeyboardManager.MODIFIER_KEYS.CONTROL)) {
       // Optional notification that CTRL quick roll is being used
-      if (game.keyboard.isModifierActive(KeyboardManager.MODIFIER_KEYS.CONTROL)) {
+      if (game.keyboard.isModifierActive(foundry.helpers.interaction.KeyboardManager.MODIFIER_KEYS.CONTROL)) {
         ui.notifications.info("Quick roll with saved settings (CTRL pressed)");
       }
       // Use provided options from dialog or direct call
@@ -1005,9 +1005,9 @@ export class FaseripRolls {
 
     // If this is a direct roll (called after dialog or with options)
     // Check if CTRL is pressed or if this is a direct roll call
-    if (options.useDirectRoll || game.keyboard.isModifierActive(KeyboardManager.MODIFIER_KEYS.CONTROL)) {
+    if (options.useDirectRoll || game.keyboard.isModifierActive(foundry.helpers.interaction.KeyboardManager.MODIFIER_KEYS.CONTROL)) {
       // Optional notification that CTRL quick roll is being used
-      if (game.keyboard.isModifierActive(KeyboardManager.MODIFIER_KEYS.CONTROL)) {
+      if (game.keyboard.isModifierActive(foundry.helpers.interaction.KeyboardManager.MODIFIER_KEYS.CONTROL)) {
         ui.notifications.info("Quick roll with saved settings (CTRL pressed)");
       }
       // Use provided options from dialog or direct call
@@ -1481,9 +1481,9 @@ export class FaseripRolls {
 
     // If this is a direct roll (called after dialog or with options)
     // Check if CTRL is pressed or if this is a direct roll call
-    if (options.useDirectRoll || game.keyboard.isModifierActive(KeyboardManager.MODIFIER_KEYS.CONTROL)) {
+    if (options.useDirectRoll || game.keyboard.isModifierActive(foundry.helpers.interaction.KeyboardManager.MODIFIER_KEYS.CONTROL)) {
       // Optional notification that CTRL quick roll is being used
-      if (game.keyboard.isModifierActive(KeyboardManager.MODIFIER_KEYS.CONTROL)) {
+      if (game.keyboard.isModifierActive(foundry.helpers.interaction.KeyboardManager.MODIFIER_KEYS.CONTROL)) {
         ui.notifications.info("Quick roll with saved settings (CTRL pressed)");
       }
       // Use provided options
@@ -1932,9 +1932,9 @@ export class FaseripRolls {
 
       // If this is a macro or direct call with options provided
       // Check if CTRL is pressed or if this is a direct roll call
-      if (options.useDirectRoll || game.keyboard.isModifierActive(KeyboardManager.MODIFIER_KEYS.CONTROL)) {
+      if (options.useDirectRoll || game.keyboard.isModifierActive(foundry.helpers.interaction.KeyboardManager.MODIFIER_KEYS.CONTROL)) {
         // Optional notification that CTRL quick roll is being used
-        if (game.keyboard.isModifierActive(KeyboardManager.MODIFIER_KEYS.CONTROL)) {
+        if (game.keyboard.isModifierActive(foundry.helpers.interaction.KeyboardManager.MODIFIER_KEYS.CONTROL)) {
           ui.notifications.info("Quick roll with saved settings (CTRL pressed)");
         }
 
