@@ -758,10 +758,10 @@ export class FaseripRolls {
           <div>Roll: ${roll.total} + Karma: ${karmaUsed} = ${cappedTotal}</div>
         </div>
         <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
-          background-color: ${resultColor.toLowerCase() === 'white' ? '#f8f8f8' :
-          resultColor.toLowerCase() === 'green' ? '#4CAF50' :
-            resultColor.toLowerCase() === 'yellow' ? '#FC107' :
-              '#F44336'}; 
+          background-color: ${resultColor.toLowerCase() === 'white' ? '#f8f8f8 !important' :
+          resultColor.toLowerCase() === 'green' ? '#4CAF50 !important' :
+            resultColor.toLowerCase() === 'yellow' ? '#FFC107 !important' :
+              '#F44336 !important'};
           color: ${resultColor.toLowerCase() === 'white' || resultColor.toLowerCase() === 'yellow' ? '#333' : 'white'};">
           ${resultText} (${resultColor.toUpperCase()})
         </div>

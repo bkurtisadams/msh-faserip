@@ -206,7 +206,7 @@ async function createFaseripItemMacro(data, slot) {
   if (item) {
     // Determine which roll function to use based on item type
     switch (item.type) {
-      case "power": game.msh.rollPower(item.parent, item); break;
+      case "power": game.msh.rollPower(item.parent, item, {useDirectRoll: false}); break;
       case "talent": game.msh.rollTalent(item.parent, item); break;
       case "contact": game.msh.rollContact(item.parent, item); break;
       case "equipment": game.msh.rollEquipment(item.parent, item); break;
