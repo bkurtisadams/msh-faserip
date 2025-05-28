@@ -157,13 +157,17 @@ export class CombatHandler {
     else defenseSummary = defenseSummary.slice(0, -1) + "."; // Remove last comma
 
     let chatContent = `
-        <div class="msh-damage-summary">
-            <h4>Damage Resolution: ${sourceName} vs ${target.name}</h4>
-            <p><strong>Base Damage:</strong> ${baseDamage} (${damageType})</p>
-            <p>${defenseSummary}</p>
-            <p><strong>Damage Absorbed:</strong> ${damageAbsorbed}</p>
-            <p><strong>Net Damage Taken:</strong> ${netDamage}</p>
-        </div>
+    <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
+    <div style="padding: 5px 10px; border-bottom: 1px solid #c0c0c0; font-size: 1.1em; color: #8b0000;">
+        <strong>Damage Resolution: ${sourceName} vs ${target.name}</strong>
+    </div>
+    <div style="padding: 5px 10px; font-size: 0.9em;">
+        <div><strong>Base Damage:</strong> ${baseDamage} (${damageType})</div>
+        <div>${defenseSummary}</div>
+        <div><strong>Damage Absorbed:</strong> ${damageAbsorbed}</div>
+        <div><strong>Net Damage Taken:</strong> ${netDamage}</div>
+    </div>
+    </div>
     `;
 
     // 5. Handle Secondary Effects (Stun, Slam, Kill) *if damage was inflicted*
@@ -983,26 +987,32 @@ export class CombatHandler {
                             await ChatMessage.create({
                                 speaker: ChatMessage.getSpeaker({ actor: target }),
                                 content: `
-                                    <div style="background: #f5f5f0; padding: 10px; border-radius: 5px; border: 1px solid #ddd;">
-                                        <h3>${target.name} - ${featType} Save</h3>
-                                        <div>Rolled ${roll.total} ${karmaSpent > 0 ? `+ ${karmaSpent} Karma` : ''} = ${totalRoll} against ${enduranceRank} Endurance</div>
-                                        <div style="margin-top: 10px; text-align: center; padding: 5px; background-color: ${
-                                            colorResult.toLowerCase() === 'white' ? '#f8f8f8' :
-                                            colorResult.toLowerCase() === 'green' ? '#4CAF50' :
-                                            colorResult.toLowerCase() === 'yellow' ? '#FFC107' : '#F44336'
-                                        }; color: ${
-                                            colorResult.toLowerCase() === 'white' || colorResult.toLowerCase() === 'yellow' ? '#333' : 'white'
-                                        }; border-radius: 3px; font-weight: bold;">
-                                            Result: ${featResultText} (${colorResult.toUpperCase()})
-                                        </div>
-                                        ${effectApplied ? `<div style="margin-top: 5px; font-style: italic;">Effect: ${
-                                            featType === "Kill" && featResultText === "End. Loss" ? "Endurance rank reduced" :
-                                            featType === "Stun" && featResultText === "1–10" ? "Stunned for ${stunDuration.total} rounds" :
-                                            featType === "Slam" && featResultText === "1 area" ? "Knocked back 1 area" :
-                                            featType === "Slam" && featResultText === "Stagger" ? "Staggers in place" :
-                                            "No effect"
-                                        }</div>` : ''}
-                                    </div>
+                            <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
+                            <div style="padding: 5px 10px; border-bottom: 1px solid #c0c0c0; font-size: 1.1em; color: #8b0000;">
+                                <strong>${target.name} - ${featType} Save</strong>
+                            </div>
+                            <div style="padding: 5px 10px; font-size: 0.9em;">
+                                <div>Rolled ${roll.total} ${karmaSpent > 0 ? `+ ${karmaSpent} Karma` : ''} = ${totalRoll} against ${enduranceRank} Endurance</div>
+                            </div>
+                            <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
+                                background-color: ${
+                                    colorResult.toLowerCase() === 'white' ? '#f8f8f8' :
+                                    colorResult.toLowerCase() === 'green' ? '#4CAF50' :
+                                    colorResult.toLowerCase() === 'yellow' ? '#FFC107' : '#F44336'
+                                }; 
+                                color: ${
+                                    colorResult.toLowerCase() === 'white' || colorResult.toLowerCase() === 'yellow' ? '#333' : 'white'
+                                };">
+                                Result: ${featResultText} (${colorResult.toUpperCase()})
+                            </div>
+                            ${effectApplied ? `<div style="padding: 5px 10px; font-size: 0.9em; font-style: italic;">Effect: ${
+                                featType === "Kill" && featResultText === "End. Loss" ? "Endurance rank reduced" :
+                                featType === "Stun" && featResultText === "1–10" ? `Stunned for ${stunDuration.total} rounds` :
+                                featType === "Slam" && featResultText === "1 area" ? "Knocked back 1 area" :
+                                featType === "Slam" && featResultText === "Stagger" ? "Staggers in place" :
+                                "No effect"
+                            }</div>` : ''}
+                            </div>
                                 `
                             });
                             
@@ -1077,13 +1087,25 @@ export class CombatHandler {
         // Apply the effect
         await target.createEmbeddedDocuments("ActiveEffect", [effectData]);
         
-        let chatContent = `<p>${target.name} is Unconscious for ${unconsciousDuration} rounds.</p>`;
-        
+        let chatContent = `
+        <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
+        <div style="padding: 5px 10px; font-size: 0.9em;">
+            <div>${target.name} is Unconscious for ${unconsciousDuration} rounds.</div>
+        </div>
+        </div>
+        `;
+                
         // Only lethal damage types can trigger the death process
         if (isLethalDamage) {
             // Roll Endurance FEAT vs. Kill (as per rules, pg 31 "Life, Death, and Health")
             const killCheckResult = await this.rollSecondaryFeat(target, "Kill", "Reaching 0 Health");
-            chatContent += `<p><strong>Death Check:</strong> ${killCheckResult}</p>`;
+            chatContent += `
+        <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
+        <div style="padding: 5px 10px; font-size: 0.9em;">
+            <div><strong>Death Check:</strong> ${killCheckResult}</div>
+        </div>
+        </div>
+        `;
             
             // If Endurance Loss from Kill check, character starts dying
             if (killCheckResult.includes("End. Loss")) {
@@ -1092,7 +1114,13 @@ export class CombatHandler {
                 // Apply dying effect using our dedicated method
                 await this.applyDyingEffect(target);
                 
-                chatContent += `<p>${target.name} is losing Endurance ranks each turn. Help needed!</p>`;
+                chatContent += `
+        <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
+        <div style="padding: 5px 10px; font-size: 0.9em;">
+            <div>${target.name} is losing Endurance ranks each turn. Help needed!</div>
+        </div>
+        </div>
+        `;
                 
                 // Let's add code to handle endurance loss per round
                 // Register a hook for combat round advancement
@@ -1116,13 +1144,25 @@ export class CombatHandler {
                                 
                                 // Send a message to chat
                                 ChatMessage.create({
-                                    content: `<p><strong>${target.name}</strong> is dying! Endurance decreased to ${newRank}.</p>`,
+                                    content: `
+        <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
+        <div style="padding: 5px 10px; font-size: 0.9em;">
+            <div><strong>${target.name}</strong> is dying! Endurance decreased to ${newRank}.</div>
+        </div>
+        </div>
+                                    `,
                                     speaker: ChatMessage.getSpeaker({actor: target})
                                 });
                             } else {
                                 // Character is dead
                                 ChatMessage.create({
-                                    content: `<p><strong>${target.name}</strong> has died.</p>`,
+                                    content: `
+        <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
+        <div style="padding: 5px 10px; font-size: 0.9em;">
+            <div><strong>${target.name}</strong> has died.</div>
+        </div>
+        </div>
+                                    `,
                                     speaker: ChatMessage.getSpeaker({actor: target})
                                 });
                                 
@@ -1155,7 +1195,13 @@ export class CombatHandler {
             }
         } else {
             // Non-lethal (Blunt/Force) damage just causes unconsciousness
-            chatContent += `<p>Knocked out by blunt force/subdual damage. No risk of death.</p>`;
+            chatContent += `
+        <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
+        <div style="padding: 5px 10px; font-size: 0.9em;">
+            <div>Knocked out by blunt force/subdual damage. No risk of death.</div>
+        </div>
+        </div>
+        `;
         }
 
         await ChatMessage.create({

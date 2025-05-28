@@ -445,35 +445,30 @@ async _rollWeapon(item, actor) {
               speaker: ChatMessage.getSpeaker({ actor }),
               roll: roll,
               content: `
-                <h3 style="color: #8B0000; margin-top: 0;">${actor.name} - ${item.name} (${actionName})</h3>
-                <div style="margin-bottom: 10px;">
-                <div>Base Rank: ${abilityRank} (${abilityValue})</div>
-                <div>Column Shift: ${totalShift !== 0 ? `${totalShift} → ${effectiveRank}` : "None"}</div>
-
-                <div>Roll: ${roll.total} + Karma: ${karmaUsed} = ${cappedTotal}</div>
-
-                <div>Damage: ${damage} (${damageType})</div>
-                ${item.system.ammoType ? `<div>Ammo Type: ${item.system.ammoType}</div>` : ''}
-                ${additionalInfo}
-              </div>
-                <div style="
-                  background-color: ${
-                    colorResult.toLowerCase() === 'white' ? '#FFFFFF' : 
-                    colorResult.toLowerCase() === 'green' ? '#4CAF50' : 
-                    colorResult.toLowerCase() === 'yellow' ? '#FFC107' : 
-                    colorResult.toLowerCase() === 'red' ? '#F44336' : '#FFFFFF'
-                  }; 
-                  color: ${
-                    colorResult.toLowerCase() === 'white' ? '#000000' : 
-                    colorResult.toLowerCase() === 'yellow' ? '#000000' : '#FFFFFF'
-                  };
-                  padding: 10px;
-                  text-align: center;
-                  font-weight: bold;
-                  border-radius: 5px;
-                  border: ${colorResult.toLowerCase() === 'white' ? '1px solid #CCCCCC' : 'none'};
-                ">
-                  ${effect} (${colorResult.toUpperCase()})
+                <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
+                  <div style="padding: 5px 10px; border-bottom: 1px solid #c0c0c0; font-size: 1.1em; color: #8b0000;">
+                    <strong>${actor.name} - ${item.name} (${actionName})</strong>
+                  </div>
+                  <div style="padding: 5px 10px; font-size: 0.9em;">
+                    <div>Base Rank: ${abilityRank} (${abilityValue})</div>
+                    <div>Column Shift: ${totalShift !== 0 ? `${totalShift > 0 ? '+' : ''}${totalShift}CS → ${effectiveRank}` : `0 → ${effectiveRank}`}</div>
+                    <div>Roll: ${roll.total} + Karma: ${karmaUsed} = ${cappedTotal}</div>
+                    <div>Damage: ${damage} (${damageType})</div>
+                    ${item.system.ammoType ? `<div>Ammo Type: ${item.system.ammoType}</div>` : ''}
+                    ${additionalInfo}
+                  </div>
+                  <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
+                    background-color: ${
+                      colorResult.toLowerCase() === 'white' ? '#f8f8f8' :
+                      colorResult.toLowerCase() === 'green' ? '#4CAF50' :
+                      colorResult.toLowerCase() === 'yellow' ? '#FFC107' :
+                      '#F44336'
+                    }; 
+                    color: ${
+                      colorResult.toLowerCase() === 'white' || colorResult.toLowerCase() === 'yellow' ? '#333' : 'white'
+                    };">
+                    ${effect} (${colorResult.toUpperCase()})
+                  </div>
                 </div>
               `
             });

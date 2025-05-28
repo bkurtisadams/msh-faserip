@@ -4,8 +4,10 @@
     "title": "Marvel Super Heroes (FASERIP)",
     "description": "Marvel Super Heroes RPG (FASERIP) Advanced Set game system for Foundry VTT v13.",
     "version": "1.1.0",
-    "minimumCoreVersion": "13",
-    "compatibleCoreVersion": "13",
+    "compatibility": {
+        "minimum": "13.0",
+        "verified": "13.341"
+        },
     "templateVersion": 2,
     "author": "bk-adams",
     "url": "",
