@@ -319,9 +319,12 @@ export class CombatHandler {
         
         // Chat message content to build
         let chatContent = `
-            <div class="msh-wrestling-summary">
-            <h4>Wrestling Action: ${attackerName} attempts to grapple ${targetName}</h4>
-        `;
+            <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
+            <div style="padding: 5px 10px; border-bottom: 1px solid #c0c0c0; font-size: 1.1em; color: #8b0000;">
+                <strong>Wrestling Action: ${attackerName} attempts to grapple ${targetName}</strong>
+            </div>
+            <div style="padding: 5px 10px; font-size: 0.9em;">
+            `;
         
         switch (resultColor) {
             case "white":
@@ -341,11 +344,11 @@ export class CombatHandler {
             const canMove = attackerStrength < targetStrength;
             
             chatContent += `
-                <p><strong>Result:</strong> Partial Hold! ${attackerName} has a partial hold on ${targetName}.</p>
-                <p>Target actions at -2CS penalty. ${canMove ? 
+                <div><strong>Result:</strong> Partial Hold! ${attackerName} has a partial hold on ${targetName}.</div>
+                <div>Target actions at -2CS penalty. ${canMove ? 
                 "Target may still move as their Strength exceeds the attacker's." : 
-                "Target cannot move as attacker's Strength is greater or equal to theirs."}</p>
-                <p><strong>Note:</strong> No damage is inflicted in a Partial Hold.</p>
+                "Target cannot move as attacker's Strength is greater or equal to theirs."}</div>
+                <div><strong>Note:</strong> No damage is inflicted in a Partial Hold.</div>
             `;
             break;
             
@@ -366,7 +369,9 @@ export class CombatHandler {
             break;
         }
         
-        chatContent += `</div>`;
+        chatContent += `
+            </div>
+            </div>`;
         
         // Send the chat message
         const message = await ChatMessage.create({
@@ -551,7 +556,7 @@ export class CombatHandler {
 
     // Define new ActiveEffect with proper duration
     const effect = {
-        label: label,
+        name: label, // changed from 'Label' to 'name' for v13 compatibility
         icon: icon,
         origin: `Actor.${attackerId}`,
         flags: {
@@ -579,12 +584,16 @@ export class CombatHandler {
     // Send styled chat message
     await ChatMessage.create({
         content: `
-        <div style="background-color: ${isPartial ? "#FFA500" : "#FF0000"}; color: white; padding: 10px; border-radius: 5px;">
-        <h3>${isPartial ? "PARTIAL HOLD" : "FULL HOLD"} APPLIED</h3>
-        <p><strong>${game.actors.get(attackerId)?.name || "Attacker"}</strong> has ${isPartial ? "a partial hold on" : "fully restrained"} <strong>${target.name}</strong>.</p>
-        <p>Effect: ${isPartial ? "-2CS to all actions" : "Cannot act until freed"}</p>
-        <p><em>This effect will remain until manually removed by the GM.</em></p>
-        </div>
+    <div style="background-color: ${isPartial ? "#FFA500" : "#FF0000"}; color: white; padding: 10px; border-radius: 5px; margin-bottom: 5px;">
+    <div style="padding: 5px 10px; font-size: 1.2em; font-weight: bold; text-align: center;">
+        ${isPartial ? "PARTIAL HOLD" : "FULL HOLD"} APPLIED
+    </div>
+    <div style="padding: 5px 10px; font-size: 0.9em;">
+        <div><strong>${game.actors.get(attackerId)?.name || "Attacker"}</strong> has ${isPartial ? "a partial hold on" : "fully restrained"} <strong>${target.name}</strong>.</div>
+        <div>Effect: ${isPartial ? "-2CS to all actions" : "Cannot act until freed"}</div>
+        <div style="font-style: italic;">This effect will remain until manually removed by the GM.</div>
+    </div>
+    </div>
         `,
         speaker: ChatMessage.getSpeaker({ alias: "Wrestling Status" })
     });
