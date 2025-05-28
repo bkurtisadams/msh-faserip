@@ -708,8 +708,32 @@ export class FaseripRolls {
       }
 
       // Calculate the result
-      const totalRoll = roll.total + karma;
-      const resultColor = game.msh.rollUniversalTable(effectiveRank, totalRoll);
+      let cappedTotal = roll.total;
+      let karmaUsed = 0;
+
+      if (karma > 0) {
+        cappedTotal = Math.min(100, roll.total + karma);
+        karmaUsed = cappedTotal - roll.total;
+      } else {
+        cappedTotal = roll.total;
+      }
+
+      // Log Karma use (only what's needed to hit 100)
+      if (karmaUsed > 0) {
+        const history = foundry.utils.deepClone(actor.system.karma?.history || []);
+        const newEvent = {
+          realDate: new Date().toLocaleDateString(),
+          gameDate: "",
+          amount: -karmaUsed,
+          type: "Die Roll",
+          description: `Spent on ${power.name} (Power)`
+        };
+        history.push(newEvent);
+
+        await actor.update({ "system.karma.history": history });
+      }
+
+      const resultColor = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
 
       // Get the result text based on action type and color
       let resultText = "";
@@ -731,7 +755,7 @@ export class FaseripRolls {
           ${damageCS !== 0 && damageRankName
             ? `<div>Damage Column Shift: ${damageCS > 0 ? "+" : ""}${damageCS}CS → <strong>${damageRankName} (${damageRankValue})</strong></div>`
             : ""}
-          <div>Roll: ${roll.total} + Karma: ${karma} = ${totalRoll}</div>
+          <div>Roll: ${roll.total} + Karma: ${karmaUsed} = ${cappedTotal}</div>
         </div>
         <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
           background-color: ${resultColor.toLowerCase() === 'white' ? '#f8f8f8' :
@@ -1026,8 +1050,32 @@ export class FaseripRolls {
       }
 
       // Calculate the result
-      const totalRoll = roll.total + karma;
-      const resultColor = game.msh.rollUniversalTable(effectiveRank, totalRoll);
+      let cappedTotal = roll.total;
+      let karmaUsed = 0;
+
+      if (karma > 0) {
+        cappedTotal = Math.min(100, roll.total + karma);
+        karmaUsed = cappedTotal - roll.total;
+      } else {
+        cappedTotal = roll.total;
+      }
+
+      // Log Karma use (only what's needed to hit 100)
+      if (karmaUsed > 0) {
+        const history = foundry.utils.deepClone(actor.system.karma?.history || []);
+        const newEvent = {
+          realDate: new Date().toLocaleDateString(),
+          gameDate: "",
+          amount: -karmaUsed,
+          type: "Die Roll",
+          description: `Spent on ${talent.name} (Talent)`
+        };
+        history.push(newEvent);
+
+        await actor.update({ "system.karma.history": history });
+      }
+
+      const resultColor = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
 
       // Format ability name for display
       const abilityName = abilityModified ?
@@ -1079,7 +1127,7 @@ export class FaseripRolls {
             ${damageCS !== 0 && damageRankName
               ? `<div>Damage Column Shift: ${damageCS > 0 ? "+" : ""}${damageCS}CS → <strong>${damageRankName} (${damageRankValue})</strong></div>`
               : ""}
-            <div>Roll: ${roll.total} + Karma: ${karma} = ${totalRoll}</div>
+            <div>Roll: ${roll.total} + Karma: ${karmaUsed} = ${cappedTotal}</div>
           </div>
           <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; background-color: ${
             resultText.toLowerCase().includes('partial') ? '#FFC107' :
@@ -1477,8 +1525,32 @@ export class FaseripRolls {
       }
 
       // Calculate the result
-      const totalRoll = roll.total + karma;
-      const resultColor = game.msh.rollUniversalTable(effectiveRank, totalRoll);
+      let cappedTotal = roll.total;
+      let karmaUsed = 0;
+
+      if (karma > 0) {
+        cappedTotal = Math.min(100, roll.total + karma);
+        karmaUsed = cappedTotal - roll.total;
+      } else {
+        cappedTotal = roll.total;
+      }
+
+      // Log Karma use (only what's needed to hit 100)
+      if (karmaUsed > 0) {
+        const history = foundry.utils.deepClone(actor.system.karma?.history || []);
+        const newEvent = {
+          realDate: new Date().toLocaleDateString(),
+          gameDate: "",
+          amount: -karmaUsed,
+          type: "Die Roll",
+          description: `Spent on ${contact.name} (Contact)`
+        };
+        history.push(newEvent);
+
+        await actor.update({ "system.karma.history": history });
+      }
+
+      const resultColor = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
 
       // Check if the result meets the required FEAT color
       let meetsFeatRequirement = false;
@@ -1571,7 +1643,7 @@ export class FaseripRolls {
             <div>Disposition: ${effectiveDisposition} (Required: ${requiredFeatColor})</div>
             ${isMutant ? '<div style="color: #aa0000;">Mutant Penalty Applied (-1CS)</div>' : ''}
             <div>Effective Rank: ${heroPopularityRank} ${columnShift !== 0 ? `→ ${effectiveRank} (${columnShift > 0 ? '+' : ''}${columnShift}CS)` : ''}</div>
-            <div>Roll: ${roll.total} + Karma: ${karma} = ${totalRoll}</div>
+            <div>Roll: ${roll.total} + Karma: ${karmaUsed} = ${cappedTotal}</div>
           </div>
           <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
             background-color: ${resultColor.toLowerCase() === 'white' ? '#f8f8f8' :
@@ -2213,7 +2285,98 @@ export class FaseripRolls {
 
     return rankValues[rankName] || 6; // Default to Typical if not found
   }
+
+    // FIXES FOR rolls.js - Remove the problematic code at the end
+
+// 1. REMOVE this entire section from the end of the file (around line 2038+):
+
+/*
+  static async _updateCurrentKarma(actor) {
+    // Recalculate current karma based on history
+    const totalEarned = actor.system.karma.lifetime || 0;
+    let totalSpent = 0;
+    
+    if (actor.system.karma.history && Array.isArray(actor.system.karma.history)) {
+      actor.system.karma.history.forEach(event => {
+        if (event.amount < 0) {
+          totalSpent += Math.abs(event.amount);
+        }
+      });
+    }
+    
+    const advancementFund = actor.system.karma.advancement || 0;
+    const karmaPool = actor.system.karma.pool || 0;
+    
+    const currentKarma = Math.max(0, totalEarned - totalSpent - advancementFund - karmaPool);
+    
+    // Update current karma value so players see immediate change
+    await actor.update({ "system.attributes.karma.value": currentKarma });
+  }
+
+  // Then call this after updating karma history in each function:
+  if (karmaUsed > 0) {
+    const history = foundry.utils.deepClone(actor.system.karma?.history || []);
+    const newEvent = {
+      realDate: new Date().toLocaleDateString(),
+      gameDate: "",
+      amount: -karmaUsed,
+      type: "Die Roll",
+      description: `Spent on ${sourceName}`
+    };
+    history.push(newEvent);
+
+    await actor.update({ "system.karma.history": history });
+    await FaseripRolls._updateCurrentKarma(actor); // Add this line
+  }
+  // additional class methods
+*/
+
+// 2. REPLACE the end of the FaseripRolls class with this:
+
+  // Helper method to convert rank names to values
+  static _getRankValue(rankName) {
+    const rankValues = {
+      "Shift-0": 0,
+      "Feeble": 2,
+      "Poor": 4,
+      "Typical": 6,
+      "Good": 10,
+      "Excellent": 20,
+      "Remarkable": 30,
+      "Incredible": 40,
+      "Amazing": 50,
+      "Monstrous": 75,
+      "Unearthly": 100
+    };
+
+    return rankValues[rankName] || 6; // Default to Typical if not found
+  }
+
+  // Helper method to update current karma value immediately after spending
+  static async _updateCurrentKarma(actor) {
+    // Recalculate current karma based on history
+    const totalEarned = actor.system.karma.lifetime || 0;
+    let totalSpent = 0;
+    
+    if (actor.system.karma.history && Array.isArray(actor.system.karma.history)) {
+      actor.system.karma.history.forEach(event => {
+        if (event.amount < 0) {
+          totalSpent += Math.abs(event.amount);
+        }
+      });
+    }
+    
+    const advancementFund = actor.system.karma.advancement || 0;
+    const karmaPool = actor.system.karma.pool || 0;
+    
+    const currentKarma = Math.max(0, totalEarned - totalSpent - advancementFund - karmaPool);
+    
+    // Update current karma value so players see immediate change
+    await actor.update({ "system.attributes.karma.value": currentKarma });
+  }
 }
+
+// 3. The handleCombatEffect function should remain outside the class at the very end:
 
 async function handleCombatEffect({ actor, target, actionType, resultColor, sourceName, baseDamage = 0 }) {
   const damageTypeMap = {
@@ -2253,3 +2416,11 @@ async function handleCombatEffect({ actor, target, actionType, resultColor, sour
     originalRollResult: resultColor.toLowerCase()
   });
 }
+
+// 4. OPTIONAL ENHANCEMENT: Add the helper function call after karma logging
+// In each function where karma is logged, you can add this line after 
+// await actor.update({ "system.karma.history": history });
+// 
+// await FaseripRolls._updateCurrentKarma(actor);
+//
+// This will immediately update the current karma display for players.
