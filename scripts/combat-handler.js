@@ -15,7 +15,7 @@ const ACTION_RESULT_LABELS = {
   Ev: { white: "Autohit", green: "Evasion", yellow: "+1 CS", red: "+2 CS" },
   Bl: { white: "Autohit", green: "+4 CS", yellow: "+2 CS", red: "+1 CS" },
   Ca: { white: "Miss", green: "Catch", yellow: "Catch", red: "No" },
-  St: { white: "1–10", green: "1", yellow: "Damage", red: "No" },
+  St: { white: "1–10", green: "1", yellow: "No Effect", red: "No" },
   Sl: { white: "Gr. Slam", green: "1 area", yellow: "Stagger", red: "No" },
   Ki: { white: "End. Loss", green: "E/S", yellow: "No", red: "No" }
 };
@@ -924,14 +924,14 @@ export class CombatHandler {
                             const actionCode = featType === "Stun" ? "St" : featType === "Slam" ? "Sl" : "Ki";
                             const featResultText = ACTION_RESULT_LABELS[actionCode][colorResult.toLowerCase()];
                             
-                            // Deduct karma if spent, using your karma history system
+                            // Deduct karma if spent
                             if (karmaSpent > 0) {
                                 // First update karma value
                                 await target.update({
                                     "system.attributes.karma.value": availableKarma - karmaSpent
                                 });
                                 
-                                // Create a new karma history entry that matches your format
+                                // Create a new karma history entry
                                 const history = foundry.utils.deepClone(target.system.karma?.history || []);
                                 const newEvent = {
                                     realDate: new Date().toLocaleDateString(),
@@ -944,96 +944,355 @@ export class CombatHandler {
                                 await target.update({ "system.karma.history": history });
                             }
                             
-                            // Apply the effects based on result using our updated ActiveEffect methods
+                            // Apply effects and create detailed chat messages based on result
                             let effectApplied = false;
+                            let stunDuration = null;
                             
-                            if (featType === "Kill" && featResultText === "End. Loss") {
-                                const currentEndurance = CONFIG.FASERIP.rankValues[target.system.abilities.endurance.rank] || 0;
-                                const newEnduranceRank = Object.keys(CONFIG.FASERIP.rankValues).find(key => 
-                                    (CONFIG.FASERIP.rankValues[key] || 0) < currentEndurance) || "Shift-0";
-                                
-                                ui.notifications.info(`${target.name} loses an Endurance rank! (Now ${newEnduranceRank})`);
-                                await target.update({"system.abilities.endurance.rank": newEnduranceRank});
-                                effectApplied = true;
-                            }
-                            else if (featType === "Stun" && featResultText === "1–10") {
-                                // Roll stun duration
-                                const stunDuration = await new Roll("1d10").evaluate();
-                                ui.notifications.info(`${target.name} is Stunned for ${stunDuration.total} rounds!`);
-                                
-                                // Use our improved stun effect method
-                                await this.applyStunnedEffect(target, stunDuration.total);
-                                effectApplied = true;
-                            }
-                            else if (featType === "Slam" && featResultText === "1 area") {
-                                ui.notifications.info(`${target.name} is slammed back 1 area!`);
-                                
-                                // Apply a "Slammed" effect with proper ActiveEffect structure
-                                await target.createEmbeddedDocuments("ActiveEffect", [{
-                                    name: "Slammed",
-                                    icon: "icons/svg/falling.svg", 
-                                    flags: {
-                                        "msh-faserip": {
-                                            slammed: true,
-                                            distance: 1 // areas
-                                        }
-                                    },
-                                    changes: [
-                                        {
-                                            key: "system.status.prone", 
-                                            mode: CONST.ACTIVE_EFFECT_MODES.OVERRIDE,
-                                            value: true
-                                        },
-                                        {
-                                            key: "system.effectiveCSMod",
-                                            mode: CONST.ACTIVE_EFFECT_MODES.ADD,
-                                            value: -1
-                                        }
-                                    ],
-                                    duration: {
-                                        rounds: 1,
-                                        startTime: game.time.worldTime,
-                                        startRound: game.combat?.round || 0
-                                    },
-                                    statuses: ["prone"]
-                                }]);
-                                effectApplied = true;
-                            }
-                            else if (featType === "Slam" && featResultText === "Stagger") {
-                                ui.notifications.info(`${target.name} staggers but remains in place!`);
-                                
-                                // Apply a "Staggered" effect
-                                await target.createEmbeddedDocuments("ActiveEffect", [{
-                                    name: "Staggered",
-                                    icon: "icons/svg/stoned.svg",
-                                    flags: {
-                                        "msh-faserip": {
-                                            staggered: true
-                                        }
-                                    },
-                                    changes: [
-                                        {
-                                            key: "system.effectiveCSMod",
-                                            mode: CONST.ACTIVE_EFFECT_MODES.ADD,
-                                            value: -1
-                                        },
-                                        {
-                                            key: "system.attributes.movement.value",
-                                            mode: CONST.ACTIVE_EFFECT_MODES.MULTIPLY,
-                                            value: 0.5
-                                        }
-                                    ],
-                                    duration: {
-                                        rounds: 1,
-                                        startTime: game.time.worldTime,
-                                        startRound: game.combat?.round || 0
-                                    },
-                                    statuses: ["staggered"]
-                                }]);
-                                effectApplied = true;
+                            // =========================
+                            // KILL RESULTS
+                            // =========================
+                            if (featType === "Kill") {
+                                if (featResultText === "End. Loss") {
+                                    const currentEndurance = CONFIG.FASERIP.rankValues[target.system.abilities.endurance.rank] || 0;
+                                    const newEnduranceRank = Object.keys(CONFIG.FASERIP.rankValues).find(key => 
+                                        (CONFIG.FASERIP.rankValues[key] || 0) < currentEndurance) || "Shift-0";
+                                    
+                                    ui.notifications.error(`${target.name} loses an Endurance rank and is dying!`);
+                                    await target.update({"system.abilities.endurance.rank": newEnduranceRank});
+                                    
+                                    // Apply dying effect
+                                    await this.applyDyingEffect(target);
+                                    
+                                    // Create detailed dying status message
+                                    await ChatMessage.create({
+                                        content: `
+                                        <div style="background-color: #8B0000; color: white; padding: 10px; border-radius: 5px; margin: 5px 0;">
+                                            <div style="font-size: 1.2em; font-weight: bold; text-align: center; margin-bottom: 8px;">
+                                                💀 DYING! 💀
+                                            </div>
+                                            <div style="padding: 5px; font-size: 0.9em;">
+                                                <div><strong>${target.name}</strong> suffers Endurance Loss!</div>
+                                                <div style="margin: 5px 0;"><strong>Mechanical Effects:</strong></div>
+                                                <div>• Endurance reduced: ${target.system.abilities.endurance.rank} → ${newEnduranceRank}</div>
+                                                <div>• Will lose 1 Endurance rank per turn</div>
+                                                <div>• Dies when Endurance drops below Shift-0</div>
+                                                <div style="margin-top: 8px;"><strong>How to Help:</strong></div>
+                                                <div>• Spend 50 Karma per round to stabilize</div>
+                                                <div>• Any aid/first aid halts Endurance loss</div>
+                                                <div>• Medicine talent may help at Shift-0</div>
+                                            </div>
+                                        </div>
+                                        `,
+                                        speaker: ChatMessage.getSpeaker({ alias: "Death Save" })
+                                    });
+                                    effectApplied = true;
+                                    
+                                } else if (featResultText === "E/S") {
+                                    // Check if this was an Edged or Shooting attack - this would require attack context
+                                    await ChatMessage.create({
+                                        content: `
+                                        <div style="background-color: #FFC107; color: black; padding: 10px; border-radius: 5px; margin: 5px 0;">
+                                            <div style="font-size: 1.1em; font-weight: bold; text-align: center; margin-bottom: 5px;">
+                                                E/S Result
+                                            </div>
+                                            <div style="padding: 5px; font-size: 0.9em;">
+                                                <div><strong>${target.name}</strong> gets E/S result on Kill save</div>
+                                                <div style="margin: 5px 0;"><strong>Effect:</strong></div>
+                                                <div>• Endurance Loss only if attack was Edged or Shooting</div>
+                                                <div>• If other attack type: No effect</div>
+                                                <div>• GM determines based on attack source</div>
+                                            </div>
+                                        </div>
+                                        `,
+                                        speaker: ChatMessage.getSpeaker({ alias: "Death Save" })
+                                    });
+                                    
+                                } else { // "No effect"
+                                    await ChatMessage.create({
+                                        content: `
+                                        <div style="background-color: #28A745; color: white; padding: 10px; border-radius: 5px; margin: 5px 0;">
+                                            <div style="font-size: 1.1em; font-weight: bold; text-align: center; margin-bottom: 5px;">
+                                                🛡️ DEATH RESISTED 🛡️
+                                            </div>
+                                            <div style="padding: 5px; font-size: 0.9em;">
+                                                <div><strong>${target.name}</strong> resists the lethal damage!</div>
+                                                <div style="margin: 5px 0;"><strong>Effect:</strong></div>
+                                                <div>• No additional effect beyond normal damage</div>
+                                                <div>• Character survives the potentially fatal blow</div>
+                                            </div>
+                                        </div>
+                                        `,
+                                        speaker: ChatMessage.getSpeaker({ alias: "Death Save" })
+                                    });
+                                }
                             }
                             
-                            // Create chat message to show the result
+                            // =========================
+                            // STUN RESULTS
+                            // =========================
+                            else if (featType === "Stun") {
+                                if (featResultText === "1–10") {
+                                    // Roll stun duration for 1-10 rounds
+                                    const stunRoll = await new Roll("1d10").evaluate();
+                                    stunDuration = stunRoll.total;
+                                    ui.notifications.info(`${target.name} is Stunned for ${stunDuration} rounds!`);
+                                    
+                                    // Apply stun effect
+                                    await this.applyStunnedEffect(target, stunDuration);
+                                    
+                                    await ChatMessage.create({
+                                        content: `
+                                        <div style="background-color: #FFA500; color: white; padding: 10px; border-radius: 5px; margin: 5px 0;">
+                                            <div style="font-size: 1.2em; font-weight: bold; text-align: center; margin-bottom: 8px;">
+                                                😵 STUNNED (${stunDuration} rounds) 😵
+                                            </div>
+                                            <div style="padding: 5px; font-size: 0.9em;">
+                                                <div><strong>${target.name}</strong> is knocked out for ${stunDuration} rounds!</div>
+                                                <div style="margin: 5px 0;"><strong>Mechanical Effects:</strong></div>
+                                                <div>• Cannot take any actions</div>
+                                                <div>• Movement reduced to 0</div>
+                                                <div>• Still conscious but incapacitated</div>
+                                                <div>• Effect lasts ${stunDuration} combat rounds</div>
+                                            </div>
+                                        </div>
+                                        `,
+                                        speaker: ChatMessage.getSpeaker({ alias: "Stun Effect" })
+                                    });
+                                    effectApplied = true;
+                                    
+                                } else if (featResultText === "1") {
+                                    // Apply 1-round stun effect
+                                    ui.notifications.info(`${target.name} is Stunned for 1 round!`);
+                                    
+                                    await this.applyStunnedEffect(target, 1);
+                                    
+                                    await ChatMessage.create({
+                                        content: `
+                                        <div style="background-color: #FF8C00; color: white; padding: 10px; border-radius: 5px; margin: 5px 0;">
+                                            <div style="font-size: 1.2em; font-weight: bold; text-align: center; margin-bottom: 8px;">
+                                                😵 STUNNED (1 round) 😵
+                                            </div>
+                                            <div style="padding: 5px; font-size: 0.9em;">
+                                                <div><strong>${target.name}</strong> is knocked down for 1 round!</div>
+                                                <div style="margin: 5px 0;"><strong>Mechanical Effects:</strong></div>
+                                                <div>• Cannot take any actions next round</div>
+                                                <div>• Still conscious but stunned</div>
+                                                <div>• May "play possum" since aware</div>
+                                                <div>• Recovers at start of following round</div>
+                                            </div>
+                                        </div>
+                                        `,
+                                        speaker: ChatMessage.getSpeaker({ alias: "Stun Effect" })
+                                    });
+                                    effectApplied = true;
+                                    
+                                } else { // "No effect"
+                                    await ChatMessage.create({
+                                        content: `
+                                        <div style="background-color: #28A745; color: white; padding: 10px; border-radius: 5px; margin: 5px 0;">
+                                            <div style="font-size: 1.1em; font-weight: bold; text-align: center; margin-bottom: 5px;">
+                                                🛡️ STUN RESISTED 🛡️
+                                            </div>
+                                            <div style="padding: 5px; font-size: 0.9em;">
+                                                <div><strong>${target.name}</strong> shrugs off the stunning blow!</div>
+                                                <div style="margin: 5px 0;"><strong>Effect:</strong></div>
+                                                <div>• No stunning effect</div>
+                                                <div>• Character remains fully functional</div>
+                                                <div>• Can act normally next round</div>
+                                            </div>
+                                        </div>
+                                        `,
+                                        speaker: ChatMessage.getSpeaker({ alias: "Stun Resist" })
+                                    });
+                                }
+                            }
+                            
+                            // =========================
+                            // SLAM RESULTS
+                            // =========================
+                            else if (featType === "Slam") {
+                                if (featResultText === "Gr. Slam") {
+                                    // Grand Slam distance is based on attacker's Strength rank (per FASERIP rules)
+                                    // This function needs access to the attacker - we should pass it in the function parameters
+                                    // For now, use a lookup table based on common strength ranks
+                                    
+                                    // Note: This would be better if we passed the attacker as a parameter
+                                    // The exact distance depends on the attacker's Strength rank:
+                                    const strengthToDistance = {
+                                        "Feeble": 1, "Poor": 2, "Typical": 3, "Good": 4, "Excellent": 5,
+                                        "Remarkable": 6, "Incredible": 7, "Amazing": 8, "Monstrous": 9,
+                                        "Unearthly": 10, "Shift X": 12, "Shift Y": 14, "Shift Z": 16,
+                                        "Class 1000": 32, "Class 3000": 50, "Class 5000": 100
+                                    };
+                                    
+                                    // Default to moderate distance if we can't determine attacker strength
+                                    const slamDistance = 6; // Remarkable strength default
+                                    
+                                    ui.notifications.warn(`${target.name} suffers a Grand Slam - knocked away ${slamDistance} areas!`);
+                                    
+                                    // Apply Grand Slam effect
+                                    await target.createEmbeddedDocuments("ActiveEffect", [{
+                                        name: "Grand Slam",
+                                        icon: "icons/svg/explosion.svg",
+                                        flags: {
+                                            "msh-faserip": {
+                                                grandSlam: true,
+                                                distance: slamDistance
+                                            }
+                                        },
+                                        changes: [
+                                            {
+                                                key: "system.status.prone",
+                                                mode: CONST.ACTIVE_EFFECT_MODES.OVERRIDE,
+                                                value: true
+                                            }
+                                        ],
+                                        duration: {
+                                            rounds: 2,
+                                            startTime: game.time.worldTime,
+                                            startRound: game.combat?.round || 0
+                                        },
+                                        statuses: ["prone"]
+                                    }]);
+                                    
+                                    await ChatMessage.create({
+                                        content: `
+                                        <div style="background-color: #8B0000; color: white; padding: 10px; border-radius: 5px; margin: 5px 0;">
+                                            <div style="font-size: 1.2em; font-weight: bold; text-align: center; margin-bottom: 8px;">
+                                                💥 GRAND SLAM! 💥
+                                            </div>
+                                            <div style="padding: 5px; font-size: 0.9em;">
+                                                <div><strong>${target.name}</strong> is launched away with tremendous force!</div>
+                                                <div style="margin: 5px 0;"><strong>Mechanical Effects:</strong></div>
+                                                <div>• Knocked away distance = attacker's Strength rank</div>
+                                                <div>• Estimated distance: ${slamDistance} areas</div>
+                                                <div>• Speed equals attacker's Strength as ground speed</div>
+                                                <div>• Takes charging damage if hits obstacles</div>
+                                                <div>• Buildings reduce knockback per movement rules</div>
+                                                <div>• Direction: attacker chooses (if damage dealt)</div>
+                                                <div style="margin-top: 8px; font-style: italic; font-size: 0.8em;">
+                                                    Note: Exact distance depends on attacker's Strength rank
+                                                </div>
+                                            </div>
+                                        </div>
+                                        `,
+                                        speaker: ChatMessage.getSpeaker({ alias: "Slam Effect" })
+                                    });
+                                    effectApplied = true;
+                                    
+                                } else if (featResultText === "1 area") {
+                                    ui.notifications.info(`${target.name} is slammed back 1 area!`);
+                                    
+                                    // Apply 1 Area Slam effect
+                                    await target.createEmbeddedDocuments("ActiveEffect", [{
+                                        name: "Slammed (1 Area)",
+                                        icon: "icons/svg/falling.svg", 
+                                        flags: {
+                                            "msh-faserip": {
+                                                slammed: true,
+                                                distance: 1
+                                            }
+                                        },
+                                        changes: [
+                                            {
+                                                key: "system.status.prone", 
+                                                mode: CONST.ACTIVE_EFFECT_MODES.OVERRIDE,
+                                                value: true
+                                            }
+                                        ],
+                                        duration: {
+                                            rounds: 1,
+                                            startTime: game.time.worldTime,
+                                            startRound: game.combat?.round || 0
+                                        },
+                                        statuses: ["prone"]
+                                    }]);
+                                    
+                                    await ChatMessage.create({
+                                        content: `
+                                        <div style="background-color: #DC3545; color: white; padding: 10px; border-radius: 5px; margin: 5px 0;">
+                                            <div style="font-size: 1.2em; font-weight: bold; text-align: center; margin-bottom: 8px;">
+                                                💢 SLAMMED - 1 AREA 💢
+                                            </div>
+                                            <div style="padding: 5px; font-size: 0.9em;">
+                                                <div><strong>${target.name}</strong> is knocked back 1 area!</div>
+                                                <div style="margin: 5px 0;"><strong>Mechanical Effects:</strong></div>
+                                                <div>• Knocked 1 area away from attacker</div>
+                                                <div>• May hit obstacles during knockback</div>
+                                                <div>• Takes damage if slammed into walls/objects</div>
+                                                <div>• Attacker chooses direction (if damage dealt)</div>
+                                                <div>• Target chooses direction (if no damage dealt)</div>
+                                            </div>
+                                        </div>
+                                        `,
+                                        speaker: ChatMessage.getSpeaker({ alias: "Slam Effect" })
+                                    });
+                                    effectApplied = true;
+                                    
+                                } else if (featResultText === "Stagger") {
+                                    ui.notifications.info(`${target.name} staggers but remains in place!`);
+                                    
+                                    // Apply Stagger effect
+                                    await target.createEmbeddedDocuments("ActiveEffect", [{
+                                        name: "Staggered",
+                                        icon: "icons/svg/stoned.svg",
+                                        flags: {
+                                            "msh-faserip": {
+                                                staggered: true
+                                            }
+                                        },
+                                        changes: [],
+                                        duration: {
+                                            rounds: 1,
+                                            startTime: game.time.worldTime,
+                                            startRound: game.combat?.round || 0
+                                        },
+                                        statuses: ["staggered"]
+                                    }]);
+                                    
+                                    await ChatMessage.create({
+                                        content: `
+                                        <div style="background-color: #FFC107; color: black; padding: 10px; border-radius: 5px; margin: 5px 0;">
+                                            <div style="font-size: 1.2em; font-weight: bold; text-align: center; margin-bottom: 8px;">
+                                                😵‍💫 STAGGERED 😵‍💫
+                                            </div>
+                                            <div style="padding: 5px; font-size: 0.9em;">
+                                                <div><strong>${target.name}</strong> staggers from the impact!</div>
+                                                <div style="margin: 5px 0;"><strong>Mechanical Effects:</strong></div>
+                                                <div>• Knocked back a step or two</div>
+                                                <div>• No longer adjacent to attacker</div>
+                                                <div>• Fully capable of combat next round</div>
+                                                <div>• No movement penalty or damage</div>
+                                                <div>• May fall off cliffs if near edges</div>
+                                            </div>
+                                        </div>
+                                        `,
+                                        speaker: ChatMessage.getSpeaker({ alias: "Slam Effect" })
+                                    });
+                                    effectApplied = true;
+                                    
+                                } else { // "No" - No slam effect
+                                    await ChatMessage.create({
+                                        content: `
+                                        <div style="background-color: #28A745; color: white; padding: 10px; border-radius: 5px; margin: 5px 0;">
+                                            <div style="font-size: 1.1em; font-weight: bold; text-align: center; margin-bottom: 5px;">
+                                                🛡️ SLAM RESISTED 🛡️
+                                            </div>
+                                            <div style="padding: 5px; font-size: 0.9em;">
+                                                <div><strong>${target.name}</strong> plants their feet and resists!</div>
+                                                <div style="margin: 5px 0;"><strong>Effect:</strong></div>
+                                                <div>• No knockback effect</div>
+                                                <div>• Remains in current position</div>
+                                                <div>• Still adjacent to attacker</div>
+                                            </div>
+                                        </div>
+                                        `,
+                                        speaker: ChatMessage.getSpeaker({ alias: "Slam Resist" })
+                                    });
+                                }
+                            }
+                            
+                            // Create the main save result chat message
                             await ChatMessage.create({
                                 speaker: ChatMessage.getSpeaker({ actor: target }),
                                 content: `
@@ -1055,13 +1314,6 @@ export class CombatHandler {
                                 };">
                                 Result: ${featResultText} (${colorResult.toUpperCase()})
                             </div>
-                            ${effectApplied ? `<div style="padding: 5px 10px; font-size: 0.9em; font-style: italic;">Effect: ${
-                                featType === "Kill" && featResultText === "End. Loss" ? "Endurance rank reduced" :
-                                featType === "Stun" && featResultText === "1–10" ? `Stunned for ${stunDuration.total} rounds` :
-                                featType === "Slam" && featResultText === "1 area" ? "Knocked back 1 area" :
-                                featType === "Slam" && featResultText === "Stagger" ? "Staggers in place" :
-                                "No effect"
-                            }</div>` : ''}
                             </div>
                                 `
                             });
@@ -1089,6 +1341,72 @@ export class CombatHandler {
                 },
                 close: () => resolve(`${target.name} did not make the ${featType} save.`)
             }).render(true);
+        });
+    }
+
+    /**
+     * Applies a stunned effect to a target for a specified duration
+     * @param {Object} target - The actor to apply the effect to
+     * @param {number} duration - Duration in rounds
+     */
+    static async applyStunnedEffect(target, duration) {
+        // Remove any existing stun effects
+        const existingStunEffects = target.effects.filter(e => e.flags["msh-faserip"]?.stunned);
+        if (existingStunEffects.length > 0) {
+            await target.deleteEmbeddedDocuments("ActiveEffect", existingStunEffects.map(e => e.id));
+        }
+
+        // Create new stun effect
+        const stunEffect = {
+            name: "Stunned",
+            icon: "icons/svg/daze.svg",
+            flags: {
+                "msh-faserip": {
+                    stunned: true,
+                    duration: duration
+                }
+            },
+            changes: [
+                {
+                    key: "system.status.stunned",
+                    mode: CONST.ACTIVE_EFFECT_MODES.OVERRIDE,
+                    value: true
+                },
+                {
+                    key: "system.attributes.movement.value",
+                    mode: CONST.ACTIVE_EFFECT_MODES.OVERRIDE,
+                    value: 0
+                }
+            ],
+            duration: {
+                rounds: duration,
+                startTime: game.time.worldTime,
+                startRound: game.combat?.round || 0,
+                startTurn: game.combat?.turn || 0
+            },
+            statuses: ["stunned"]
+        };
+
+        await target.createEmbeddedDocuments("ActiveEffect", [stunEffect]);
+        
+        // Enhanced chat message with clear mechanical effects
+        await ChatMessage.create({
+            content: `
+            <div style="background-color: #FFA500; color: white; padding: 10px; border-radius: 5px;">
+                <div style="font-size: 1.2em; font-weight: bold; text-align: center;">
+                    STUNNED
+                </div>
+                <div style="padding: 5px 10px; font-size: 0.9em;">
+                    <div><strong>${target.name}</strong> is stunned for ${duration} round${duration > 1 ? 's' : ''}!</div>
+                    <div style="margin-top: 5px;"><strong>Mechanical Effect:</strong></div>
+                    <div>• Cannot take any actions during stunned rounds</div>
+                    <div>• Movement reduced to 0</div>
+                    <div>• Still conscious but completely incapacitated</div>
+                    ${duration === 1 ? '<div>• May "play possum" since still conscious</div>' : ''}
+                </div>
+            </div>
+            `,
+            speaker: ChatMessage.getSpeaker({ alias: "Combat Status" })
         });
     }
 
