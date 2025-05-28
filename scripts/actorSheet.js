@@ -1024,13 +1024,14 @@ export class FaseripActorSheet extends ActorSheet {
   </div>
   // more control over the damage aspects
   <div style="margin-bottom: 10px;">
-    <label style="display: inline-block; width: 120px;">Damage Type:</label>
+  <label style="display: inline-block; width: 120px;">Damage Type:</label>
     <select id="damage-type" name="damageType" style="width: 180px;">
-      <option value="Energy" ${item.system.type?.includes('Energy') ? 'selected' : ''}>Energy</option>
-      <option value="Force" ${item.system.type?.includes('Force') ? 'selected' : ''}>Force</option>
-      <option value="Physical-Blunt" ${item.system.type?.includes('Physical') ? 'selected' : ''}>Physical (Blunt)</option>
-      <option value="Physical-Edged" ${item.system.type?.includes('Edged') ? 'selected' : ''}>Physical (Edged)</option>
-      <option value="Mental" ${item.system.type?.includes('Mental') ? 'selected' : ''}>Mental</option>
+      <option value="None" ${savedDamageType === "None" || (!talentSpecialty?.includes('Blunt') && !talentSpecialty?.includes('Edged') && !talentSpecialty?.includes('Sharp') && talentType?.includes('Professional') || talentType?.includes('Scientific') || talentType?.includes('Mystic')) ? 'selected' : ''}>No Damage</option>
+      <option value="Physical-Blunt" ${savedDamageType === "Physical-Blunt" || talentSpecialty?.includes('Blunt') ? 'selected' : ''}>Physical (Blunt)</option>
+      <option value="Physical-Edged" ${savedDamageType === "Physical-Edged" || talentSpecialty?.includes('Edged') || talentSpecialty?.includes('Sharp') ? 'selected' : ''}>Physical (Edged)</option>
+      <option value="Energy-Energy" ${savedDamageType === "Energy-Energy" ? 'selected' : ''}>Energy</option>
+      <option value="Force" ${savedDamageType === "Force" ? 'selected' : ''}>Force</option>
+      <option value="Mental" ${savedDamageType === "Mental" || talentType?.includes('Mental') ? 'selected' : ''}>Mental</option>
     </select>
   </div>
 

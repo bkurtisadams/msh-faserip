@@ -869,54 +869,67 @@ export class FaseripRolls {
         }
       }
 
-      // Create dialog for roll options
-      let dialogContent = `
-    <div style="background: #f0e8d8; padding: 10px; border-radius: 5px;">
-      <div style="margin-bottom: 10px;">
-        <label style="display: inline-block; width: 120px;">Action Type:</label>
-        <select id="action" name="action" style="width: 180px;">
-          ${Object.keys(ACTIONS).map(action =>
-            `<option value="${action}" ${action === validActionType ? 'selected' : ''}>${action}</option>`
-          ).join('')}
-        </select>
-      </div>
-      <div style="margin-bottom: 10px;">
-        <label style="display: inline-block; width: 120px;">Column Shift:</label>
-        <input type="number" id="shift" name="shift" value="${savedColumnShift}" style="width: 50px;">
-        <span style="color: #666; font-size: 0.9em;">(+ right, - left)</span>
-      </div>
-      <div style="margin-bottom: 10px;">
-        <label style="display: inline-block; width: 120px;">Damage CS:</label>
-        <input type="number" id="damage-cs" name="damageCs" value="${savedDamageCS}" style="width: 50px;">
-        <span style="color: #666; font-size: 0.9em;">(modifies damage rank)</span>
-      </div>
-      <div style="margin-bottom: 10px;">
-        <label style="display: inline-block; width: 120px;">Damage Type:</label>
-        <select id="damage-type" name="damageType" style="width: 180px;">
-          <option value="Energy-Energy" ${savedDamageType === "Energy-Energy" || power.system.type?.includes('Energy') ? 'selected' : ''}>Energy</option>
-          <option value="Force" ${savedDamageType === "Force" || power.system.type?.includes('Force') ? 'selected' : ''}>Force</option>
-          <option value="Physical-Blunt" ${savedDamageType === "Physical-Blunt" || power.system.type?.includes('Physical') ? 'selected' : ''}>Physical (Blunt)</option>
-          <option value="Physical-Edged" ${savedDamageType === "Physical-Edged" || power.system.type?.includes('Edged') ? 'selected' : ''}>Physical (Edged)</option>
-          <option value="Mental" ${savedDamageType === "Mental" || power.system.type?.includes('Mental') ? 'selected' : ''}>Mental</option>
-        </select>
-      </div>
-      <div style="margin-bottom: 10px;">
-        <label style="display: inline-block; width: 120px;">Karma Points:</label>
-        <input type="number" id="karma" name="karma" value="0" min="0" style="width: 50px;">
-      </div>
-      <div>
-        <label>
-          <input type="checkbox" id="skip-dice" name="skipDice" ${skipDiceRoll ? 'checked' : ''}> 
-          Skip dice animation
-        </label>
-      </div>
-      <div style="margin-top: 10px;">
-        <label>
-          <input type="checkbox" id="save-settings" name="saveSettings" checked> 
-          Remember these settings for future rolls
-        </label>
-      </div>
-    </div>`;
+    const powerType = power.system.type?.toLowerCase() || "";
+    const powerSpecialty = power.system.specialty?.toLowerCase() || "";
+
+    const isNonCombatPower = powerType.includes("mental") || powerType.includes("scientific") || powerType.includes("mystic");
+
+    const isSelected = (type) => {
+      if (savedDamageType === type) return true;
+      if (type === "None" && isNonCombatPower) return true;
+      return false;
+    };
+
+    // Create dialog for roll options
+    let dialogContent = `
+      <div style="background: #f0e8d8; padding: 10px; border-radius: 5px;">
+        <div style="margin-bottom: 10px;">
+          <label style="display: inline-block; width: 120px;">Action Type:</label>
+          <select id="action" name="action" style="width: 180px;">
+            ${Object.keys(ACTIONS).map(action =>
+              `<option value="${action}" ${action === validActionType ? 'selected' : ''}>${action}</option>`
+            ).join('')}
+          </select>
+        </div>
+        <div style="margin-bottom: 10px;">
+          <label style="display: inline-block; width: 120px;">Column Shift:</label>
+          <input type="number" id="shift" name="shift" value="${savedColumnShift}" style="width: 50px;">
+          <span style="color: #666; font-size: 0.9em;">(+ right, - left)</span>
+        </div>
+        <div style="margin-bottom: 10px;">
+          <label style="display: inline-block; width: 120px;">Damage CS:</label>
+          <input type="number" id="damage-cs" name="damageCs" value="${savedDamageCS}" style="width: 50px;">
+          <span style="color: #666; font-size: 0.9em;">(modifies damage rank)</span>
+        </div>
+        <div style="margin-bottom: 10px;">
+          <label style="display: inline-block; width: 120px;">Damage Type:</label>
+          <select id="damage-type" name="damageType" style="width: 180px;">
+            <option value="None" ${isSelected("None") ? "selected" : ""}>No Damage</option>
+            <option value="Physical-Blunt" ${isSelected("Physical-Blunt") ? "selected" : ""}>Physical (Blunt)</option>
+            <option value="Physical-Edged" ${isSelected("Physical-Edged") ? "selected" : ""}>Physical (Edged)</option>
+            <option value="Energy-Energy" ${isSelected("Energy-Energy") ? "selected" : ""}>Energy</option>
+            <option value="Force" ${isSelected("Force") ? "selected" : ""}>Force</option>
+            <option value="Mental" ${isSelected("Mental") ? "selected" : ""}>Mental</option>
+          </select>
+        </div>
+        <div style="margin-bottom: 10px;">
+          <label style="display: inline-block; width: 120px;">Karma Points:</label>
+          <input type="number" id="karma" name="karma" value="0" min="0" style="width: 50px;">
+        </div>
+        <div>
+          <label>
+            <input type="checkbox" id="skip-dice" name="skipDice" ${skipDiceRoll ? 'checked' : ''}> 
+            Skip dice animation
+          </label>
+        </div>
+        <div style="margin-top: 10px;">
+          <label>
+            <input type="checkbox" id="save-settings" name="saveSettings" checked> 
+            Remember these settings for future rolls
+          </label>
+        </div>
+      </div>`;
+
 
       return new Dialog({
         title: `Power Roll: ${power.name} (${power.system.rank})`,
@@ -1165,6 +1178,12 @@ export class FaseripRolls {
       // Check if this is either an attack action or a wrestling action
       if (target && resultColor.toLowerCase() !== "white" && 
         (actionType.toLowerCase().includes("attack") || wrestlingActions.includes(actionType))) {
+
+        // Skip damage processing if damage type is "None"
+        if (damageType === "None") {
+          // No damage processing for non-combat talents
+          return { roll, resultColor, resultText };
+        }
         
         // Handle wrestling actions differently
         if (wrestlingActions.includes(actionType)) {
@@ -1328,6 +1347,25 @@ export class FaseripRolls {
         abilityModified.charAt(0).toUpperCase() + abilityModified.slice(1) :
         "None";
 
+      // Determine if talent is non-combat (used to default damage type to "None")
+      const isNonCombatTalent = ["Professional Skill", "Scientific Skill", "Mystic/Mental Skill"].includes(talentType);
+
+      // Determine default selection for each damage type
+      const isSelected = (type) => {
+        if (savedDamageType === type) return true;
+        if (type === "None" && isNonCombatTalent) return true;
+        return false;
+      };
+
+      const damageOptionsHTML = `
+        <option value="None" ${isSelected("None") ? "selected" : ""}>No Damage</option>
+        <option value="Physical-Blunt" ${isSelected("Physical-Blunt") ? "selected" : ""}>Physical (Blunt)</option>
+        <option value="Physical-Edged" ${isSelected("Physical-Edged") ? "selected" : ""}>Physical (Edged)</option>
+        <option value="Energy-Energy" ${isSelected("Energy-Energy") ? "selected" : ""}>Energy</option>
+        <option value="Force" ${isSelected("Force") ? "selected" : ""}>Force</option>
+        <option value="Mental" ${isSelected("Mental") ? "selected" : ""}>Mental</option>
+      `;
+
       // Create dialog for roll options
       let dialogContent = `
         <div style="background: #f0e8d8; padding: 10px; border-radius: 5px;">
@@ -1359,11 +1397,7 @@ export class FaseripRolls {
           <div style="margin-bottom: 10px;">
             <label style="display: inline-block; width: 120px;">Damage Type:</label>
             <select id="damage-type" name="damageType" style="width: 180px;">
-              <option value="Physical-Blunt" ${savedDamageType === "Physical-Blunt" || talentSpecialty?.includes('Blunt') ? 'selected' : ''}>Physical (Blunt)</option>
-              <option value="Physical-Edged" ${savedDamageType === "Physical-Edged" || talentSpecialty?.includes('Edged') || talentSpecialty?.includes('Sharp') ? 'selected' : ''}>Physical (Edged)</option>
-              <option value="Energy-Energy" ${savedDamageType === "Energy-Energy" ? 'selected' : ''}>Energy</option>
-              <option value="Force" ${savedDamageType === "Force" ? 'selected' : ''}>Force</option>
-              <option value="Mental" ${savedDamageType === "Mental" || talentType?.includes('Mental') ? 'selected' : ''}>Mental</option>
+              ${damageOptionsHTML}
             </select>
           </div>
           <div style="margin-bottom: 10px;">
@@ -1383,6 +1417,7 @@ export class FaseripRolls {
             </label>
           </div>
         </div>`;
+
 
       return new Dialog({
         title: `Talent Roll: ${talent.name}`,
