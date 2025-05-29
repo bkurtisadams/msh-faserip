@@ -1624,6 +1624,35 @@ export class CombatHandler {
             whisper: ChatMessage.getWhisperRecipients("GM") // Whisper to GM
         });
     }
+
+    static async applyDyingEffect(target) {
+        // Remove any existing dying effects
+        const existingDyingEffects = target.effects.filter(e => e.flags["msh-faserip"]?.dying);
+        if (existingDyingEffects.length > 0) {
+            await target.deleteEmbeddedDocuments("ActiveEffect", existingDyingEffects.map(e => e.id));
+        }
+
+        // Create dying effect
+        const dyingEffect = {
+            name: "Dying",
+            icon: "icons/svg/skull.svg",
+            flags: {
+                "msh-faserip": {
+                    dying: true
+                }
+            },
+            changes: [
+                {
+                    key: "system.status.dying",
+                    mode: CONST.ACTIVE_EFFECT_MODES.OVERRIDE,
+                    value: true
+                }
+            ],
+            statuses: ["dying"]
+        };
+
+        await target.createEmbeddedDocuments("ActiveEffect", [dyingEffect]);
+    }
 }
 
 // Make it available globally for now, or import where needed
