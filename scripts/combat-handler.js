@@ -866,7 +866,7 @@ export class CombatHandler {
      * Rolls an Endurance FEAT for Stun, Slam, or Kill.
      * @returns {String} Text result of the FEAT.
      */
-    static async rollSecondaryFeat(target, featType, sourceName) {
+    static async rollSecondaryFeat(target, featType, sourceName, attackType = "unknown") {
         // Get the endurance rank for the save
         const enduranceRank = target.system.abilities.endurance.rank;
         
@@ -988,24 +988,70 @@ export class CombatHandler {
                                     effectApplied = true;
                                     
                                 } else if (featResultText === "E/S") {
-                                    // Check if this was an Edged or Shooting attack - this would require attack context
-                                    await ChatMessage.create({
-                                        content: `
-                                        <div style="background-color: #FFC107; color: black; padding: 10px; border-radius: 5px; margin: 5px 0;">
-                                            <div style="font-size: 1.1em; font-weight: bold; text-align: center; margin-bottom: 5px;">
-                                                E/S Result
+                                    // Determine if this attack type qualifies for Endurance Loss
+                                    // Per FASERIP rules: "only if the method of attack was Edged attack in Slugfest or a Shooting attack"
+                                    const edgedOrShooting = attackType.toLowerCase().includes("edged") || 
+                                                        attackType.toLowerCase().includes("shooting") ||
+                                                        attackType.toLowerCase() === "ea" || // Edged Attacks
+                                                        attackType.toLowerCase() === "te" || // Throwing Edged
+                                                        attackType.toLowerCase() === "sh";   // Shooting
+                                    
+                                    if (edgedOrShooting) {
+                                        // Apply Endurance Loss - same as "End. Loss" result
+                                        const currentEndurance = CONFIG.FASERIP.rankValues[target.system.abilities.endurance.rank] || 0;
+                                        const newEnduranceRank = Object.keys(CONFIG.FASERIP.rankValues).find(key => 
+                                            (CONFIG.FASERIP.rankValues[key] || 0) < currentEndurance) || "Shift-0";
+                                        
+                                        ui.notifications.error(`${target.name} loses an Endurance rank and is dying!`);
+                                        await target.update({"system.abilities.endurance.rank": newEnduranceRank});
+                                        
+                                        // Apply dying effect
+                                        await this.applyDyingEffect(target);
+                                        
+                                        await ChatMessage.create({
+                                            content: `
+                                            <div style="background-color: #8B0000; color: white; padding: 10px; border-radius: 5px; margin: 5px 0;">
+                                                <div style="font-size: 1.1em; font-weight: bold; text-align: center; margin-bottom: 5px;">
+                                                    💀 E/S RESULT - ENDURANCE LOSS 💀
+                                                </div>
+                                                <div style="padding: 5px; font-size: 0.9em;">
+                                                    <div><strong>${target.name}</strong> gets E/S result on Kill save</div>
+                                                    <div style="margin: 5px 0;"><strong>Attack Type:</strong> ${attackType} (Edged/Shooting)</div>
+                                                    <div style="margin: 5px 0;"><strong>Effect:</strong> Endurance Loss</div>
+                                                    <div>• Endurance reduced: ${target.system.abilities.endurance.rank} → ${newEnduranceRank}</div>
+                                                    <div>• Character is now dying</div>
+                                                    <div>• Will lose 1 Endurance rank per turn</div>
+                                                    <div style="margin-top: 8px;"><strong>How to Help:</strong></div>
+                                                    <div>• Spend 50 Karma per round to stabilize</div>
+                                                    <div>• Any aid/first aid halts Endurance loss</div>
+                                                </div>
                                             </div>
-                                            <div style="padding: 5px; font-size: 0.9em;">
-                                                <div><strong>${target.name}</strong> gets E/S result on Kill save</div>
-                                                <div style="margin: 5px 0;"><strong>Effect:</strong></div>
-                                                <div>• Endurance Loss only if attack was Edged or Shooting</div>
-                                                <div>• If other attack type: No effect</div>
-                                                <div>• GM determines based on attack source</div>
+                                            `,
+                                            speaker: ChatMessage.getSpeaker({ alias: "Death Save" })
+                                        });
+                                        effectApplied = true;
+                                        
+                                    } else {
+                                        // No Effect for non-edged/shooting attacks
+                                        await ChatMessage.create({
+                                            content: `
+                                            <div style="background-color: #28A745; color: white; padding: 10px; border-radius: 5px; margin: 5px 0;">
+                                                <div style="font-size: 1.1em; font-weight: bold; text-align: center; margin-bottom: 5px;">
+                                                    🛡️ E/S RESULT - NO EFFECT 🛡️
+                                                </div>
+                                                <div style="padding: 5px; font-size: 0.9em;">
+                                                    <div><strong>${target.name}</strong> gets E/S result on Kill save</div>
+                                                    <div style="margin: 5px 0;"><strong>Attack Type:</strong> ${attackType} (Non-Edged/Shooting)</div>
+                                                    <div style="margin: 5px 0;"><strong>Effect:</strong> No Effect</div>
+                                                    <div>• E/S only applies to Edged or Shooting attacks</div>
+                                                    <div>• This attack type does not qualify</div>
+                                                    <div>• Character takes normal damage only</div>
+                                                </div>
                                             </div>
-                                        </div>
-                                        `,
-                                        speaker: ChatMessage.getSpeaker({ alias: "Death Save" })
-                                    });
+                                            `,
+                                            speaker: ChatMessage.getSpeaker({ alias: "Death Save" })
+                                        });
+                                    }
                                     
                                 } else { // "No effect"
                                     await ChatMessage.create({
