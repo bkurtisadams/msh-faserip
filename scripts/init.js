@@ -1,4 +1,7 @@
 // In init.js
+import { runAsGM } from './gm-utils.js';
+game.msh.runAsGM = runAsGM;
+
 import { FaseripActor } from './actor.js';
 import { FaseripItem } from './item.js';
 import { FaseripActorSheet } from './actorSheet.js';

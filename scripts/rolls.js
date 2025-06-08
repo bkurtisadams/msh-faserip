@@ -1,6 +1,7 @@
 // File: systems/msh-faserip/rolls.js
 import { applyColumnShiftToRank } from './actorSheet.js';
 import { CombatHandler } from './combat-handler.js';
+import { runAsGM } from './gm-utils.js';
 
 //import { rankRows } from './rank-rows.js';
 
@@ -595,9 +596,10 @@ export async function rollUniversalAction(actionCode, actorId, columnShift = nul
       });
     } else {
       // Regular damage processing for non-wrestling actions
-      await game.msh.CombatHandler.processAttack({
-        attacker: actor,
-        target,
+      await runAsGM({
+        operation: 'applyCombatHandlerDamage',
+        attackerUuid: actor.uuid,
+        targetActorUuid: target.uuid,
         baseDamage,
         damageType,
         sourceName: label,
