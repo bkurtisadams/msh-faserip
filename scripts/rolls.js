@@ -488,8 +488,16 @@ export async function rollUniversalAction(actionCode, actorId, columnShift = nul
   const abilityKey = ACTION_ABILITY_MAP[actionCode] || "fighting";
   const ability = actor.system.abilities[abilityKey] || { rank: "Typical", value: 6 };
 
-  const rank = applyColumnShiftToRank(ability.rank, ability.value, columnShift).rank;
-  const value = ability.value;
+  // Apply column shifts properly
+  let finalRank = ability.rank;
+  let finalValue = ability.value;
+  
+  if (columnShift !== 0) {
+    const shiftedResult = applyColumnShiftToRank(ability.rank, ability.value, columnShift);
+    finalRank = shiftedResult.rank;
+    finalValue = shiftedResult.value;
+    console.log(`Applied ${columnShift} column shifts to ${ability.rank}, now ${finalRank}`);
+  }
 
   const roll = new Roll("1d100");
   await roll.evaluate();
@@ -504,7 +512,7 @@ export async function rollUniversalAction(actionCode, actorId, columnShift = nul
     cappedTotal = roll.total;
   }
 
-  // Log Karma use (only what’s needed to hit 100)
+  // Log Karma use (only what's needed to hit 100)
   if (karmaUsed > 0) {
     const history = foundry.utils.deepClone(actor.system.karma?.history || []);
     const newEvent = {
@@ -516,18 +524,50 @@ export async function rollUniversalAction(actionCode, actorId, columnShift = nul
     };
     history.push(newEvent);
 
-    await actor.update({ "system.karma.history": history });
+    await actor.update({ 
+      "system.karma.history": history,
+      "system.attributes.karma.value": actor.system.attributes.karma.value - karmaUsed
+    });
   }
 
-  // Determine result color using capped value
-  const color = game.msh.rollUniversalTable(rank, cappedTotal);
+  // Determine result color using capped value and final rank
+  let color, resultText;
+  try {
+    const tableResult = game.msh.rollUniversalTable(finalRank, cappedTotal);
+    
+    // Handle different return types from rollUniversalTable
+    if (typeof tableResult === 'string') {
+      color = tableResult;
+    } else if (tableResult && tableResult.color) {
+      color = tableResult.color;
+    } else {
+      console.warn("Invalid table result:", tableResult);
+      color = "white"; // fallback
+    }
+    
+    // Get the result text from action labels
+    const labelColor = color.toLowerCase();
+    resultText = (ACTION_RESULT_LABELS[actionCode] || {})[labelColor] || color.toUpperCase();
+    
+  } catch (error) {
+    console.error("Error in universal table lookup:", error);
+    color = "white";
+    resultText = "Miss";
+  }
 
+  // Validate that we have valid values
+  if (!color || !resultText) {
+    console.warn("Missing color or resultText, using defaults");
+    color = color || "white";
+    resultText = resultText || "Miss";
+  }
 
-  // light up the rank table cell
-  highlightResultCell(rank, cappedTotal);
+  // Light up the rank table cell
+  if (typeof highlightResultCell === 'function') {
+    highlightResultCell(finalRank, cappedTotal);
+  }
 
   const labelColor = color.toLowerCase();
-  const resultText = (ACTION_RESULT_LABELS[actionCode] || {})[labelColor] || color.toUpperCase();
 
   const content = `
   <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
@@ -536,11 +576,10 @@ export async function rollUniversalAction(actionCode, actorId, columnShift = nul
     </div>
     <div style="padding: 5px 10px; font-size: 0.9em;">
       <div>Ability: ${abilityKey.charAt(0).toUpperCase() + abilityKey.slice(1)}</div>
-      <div>Base Rank: ${rank} (${value})</div>
+      <div>Base Rank: ${ability.rank} (${ability.value})</div>
       ${columnShift !== 0 ? `<div>Column Shift: ${columnShift > 0 ? "+" : ""}${columnShift}</div>` : ""}
-
-      Roll: ${roll.total} + Karma: ${karmaUsed} = <strong>${cappedTotal}</strong>
-
+      ${columnShift !== 0 ? `<div>Final Rank: ${finalRank} (${finalValue})</div>` : ""}
+      <div>Roll: ${roll.total} + Karma: ${karmaUsed} = <strong>${cappedTotal}</strong></div>
     </div>
     <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
       background-color: ${labelColor === 'white' ? '#f8f8f8' :
@@ -549,7 +588,6 @@ export async function rollUniversalAction(actionCode, actorId, columnShift = nul
       color: ${labelColor === 'white' || labelColor === 'yellow' ? '#333' : 'white'};">
       ${resultText} (${color.toUpperCase()})
     </div>
-
   </div>
 `;
 
@@ -581,43 +619,50 @@ export async function rollUniversalAction(actionCode, actorId, columnShift = nul
       baseDamage = actor.system.abilities.strength.value;
     } else {
       // Other attacks (Sh, En, Fo, etc.) use the attack ability for damage
-      baseDamage = ability.value;
+      baseDamage = finalValue; // Use the column-shifted value
     }
 
     // Check if this is a wrestling action
     if (["Gp", "Gb", "Es"].includes(actionCode)) {
       // For wrestling actions, we need to handle differently
-      await game.msh.CombatHandler.processWrestlingAction({
-        attacker: actor,
-        target,
-        actionType: actionCode,
-        resultColor: color.toLowerCase(),
-        sourceName: label
-      });
+      try {
+        await game.msh.CombatHandler.processWrestlingAction({
+          attacker: actor,
+          target,
+          actionType: actionCode,
+          resultColor: color.toLowerCase(),
+          sourceName: label
+        });
+      } catch (error) {
+        console.error("Error processing wrestling action:", error);
+        ui.notifications.error("Failed to process wrestling action");
+      }
     } else {
       // Regular damage processing for non-wrestling actions
-      await runAsGM({
-        operation: 'applyCombatHandlerDamage',
-        attackerUuid: actor.uuid,
-        targetActorUuid: target.uuid,
-        baseDamage,
-        damageType,
-        sourceName: label,
-        canBeStun,
-        canBeSlam,
-        canBeKill,
-        originalRollResult: color.toLowerCase()
-      });
+      try {
+        await game.msh.runAsGM({
+          operation: 'applyCombatHandlerDamage',
+          attackerUuid: actor.uuid,
+          targetActorUuid: target.uuid,
+          baseDamage,
+          damageType,
+          sourceName: label,
+          canBeStun,
+          canBeSlam,
+          canBeKill,
+          originalRollResult: color.toLowerCase()
+        });
+      } catch (error) {
+        console.error("Error processing damage:", error);
+        ui.notifications.error("Failed to process damage");
+      }
     }
   } else {
     ui.notifications.info("No target selected — result shown, but no damage processed.");
   }
-
 }
 
-
 export class FaseripRolls {
-
   /**
   * Roll a power
   * @param {Actor} actor - The actor who owns the power

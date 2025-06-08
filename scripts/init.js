@@ -46,10 +46,32 @@ Hooks.once("init", async () => {
   );
 
   CONFIG.FASERIP.rankValues = {
-    "Shift-0": 0, "Feeble": 2, "Poor": 4, "Typical": 6, "Good": 10, "Excellent": 20,
-    "Remarkable": 30, "Incredible": 40, "Amazing": 50, "Monstrous": 75,
-    "Unearthly": 100, "Shift X": 150, "Shift Y": 200, "Shift Z": 500,
-    "Class 1000": 1000, "Class 3000": 3000, "Class 5000": 5000, "Beyond": 9999
+    "Shift-0": 0, 
+    "Feeble": 2, 
+    "Poor": 4, 
+    "Typical": 6, 
+    "Good": 10, 
+    "Excellent": 20,
+    "Remarkable": 30, 
+    "Incredible": 40, 
+    "Amazing": 50, 
+    "Monstrous": 75,
+    "Unearthly": 100, 
+    "Shift X": 150, 
+    "Shift Y": 200, 
+    "Shift Z": 500,
+    "Class 1000": 1000, 
+    "Class 3000": 3000, 
+    "Class 5000": 5000, 
+    "Beyond": 9999,
+    
+    // Add these alternative formats that might be generated:
+    "Shift-X": 150,
+    "Shift-Y": 200, 
+    "Shift-Z": 500,
+    "Class1000": 1000,
+    "Class3000": 3000,
+    "Class5000": 5000
   };
 
   await loadTemplates([
@@ -59,6 +81,51 @@ Hooks.once("init", async () => {
 
   // Create game.msh namespace
   game.msh = game.msh || {};
+
+  game.msh.getRankValue = function(rankName) {
+    if (!rankName) return 0;
+    
+    // Normalize the rank name
+    let normalizedRank = rankName.toString().trim();
+    
+    // Handle "Class" ranks - remove spaces
+    if (normalizedRank.includes("Class ")) {
+      normalizedRank = normalizedRank.replace("Class ", "Class");
+    }
+    
+    // Try direct lookup first
+    if (CONFIG.FASERIP.rankValues[normalizedRank] !== undefined) {
+      return CONFIG.FASERIP.rankValues[normalizedRank];
+    }
+    
+    // Try common variations
+    const variations = [
+      normalizedRank,
+      normalizedRank.replace(/\s+/g, ""), // Remove all spaces
+      normalizedRank.replace(/\s+/g, " "), // Normalize spaces
+      normalizedRank.replace("-", " "),    // Replace hyphens with spaces
+      normalizedRank.replace(" ", "-")     // Replace spaces with hyphens
+    ];
+    
+    for (const variation of variations) {
+      if (CONFIG.FASERIP.rankValues[variation] !== undefined) {
+        return CONFIG.FASERIP.rankValues[variation];
+      }
+    }
+    
+    console.warn(`Rank "${rankName}" not found in CONFIG.FASERIP.rankValues`);
+    return 0;
+  };
+
+  game.msh.getRankName = function(rankValue) {
+    // Find the rank name that corresponds to this value
+    for (const [name, value] of Object.entries(CONFIG.FASERIP.rankValues)) {
+      if (value === rankValue) {
+        return name;
+      }
+    }
+    return "Unknown";
+  };
   
   game.msh.rollUniversalAction = rollUniversalAction;
   // Add the rollUniversalTable function to the namespace
