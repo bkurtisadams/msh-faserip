@@ -1,6 +1,13 @@
 // In init.js
-import { runAsGM } from './gm-utils.js';
-game.msh.runAsGM = runAsGM;
+import * as GMUtils from './gm-utils.js';
+
+Hooks.once("socketlib.ready", () => {
+  console.log("✅ socketlib.ready triggered");
+  GMUtils.registerSocket();
+  game.msh = game.msh || {};
+  game.msh.runAsGM = GMUtils.runAsGM;
+});
+
 
 import { FaseripActor } from './actor.js';
 import { FaseripItem } from './item.js';
@@ -17,8 +24,11 @@ import { CombatHandler } from './combat-handler.js';
 Hooks.once("init", async () => {
   console.log("Marvel Super Heroes (FASERIP) system initializing...");
 
-  CONFIG.FASERIP = CONFIG.FASERIP || {};
+  // Initialize the game.msh namespace early
+  game.msh = game.msh || {};
 
+  CONFIG.FASERIP = CONFIG.FASERIP || {};
+  
   // Register custom grappling effects so they show token HUD icons and work with ActiveEffect.statuses
   CONFIG.statusEffects.push(
     {
@@ -49,6 +59,7 @@ Hooks.once("init", async () => {
 
   // Create game.msh namespace
   game.msh = game.msh || {};
+  
   game.msh.rollUniversalAction = rollUniversalAction;
   // Add the rollUniversalTable function to the namespace
   game.msh.rollUniversalTable = rollUniversalTable;
@@ -69,10 +80,10 @@ Hooks.once("init", async () => {
   FaseripInitiative.init();
 
   game.msh.rollFaseripInitiative = () => {
-    if (!game.combat) {
-      ui.notifications.warn("No active combat encounter");
-      return;
-    }
+  if (!game.combat) {
+    ui.notifications.warn("No active combat encounter");
+    return;
+  }
     
     FaseripInitiative.rollSideInitiative(game.combat);
   };
@@ -161,6 +172,15 @@ Hooks.once("init", async () => {
   });
 
   // end of hooks.once
+});
+
+// Add a ready hook as a fallback if socketlib.ready doesn't fire properly
+Hooks.once("ready", () => {
+  if (game.modules.get("socketlib")?.active && !game.msh.runAsGM) {
+    console.log("🔄 Attempting to register SocketLib in ready hook");
+    GMUtils.registerSocket();
+    game.msh.runAsGM = GMUtils.runAsGM;
+  }
 });
 
 // Add the hotbarDrop hook at module level (like in the older file)

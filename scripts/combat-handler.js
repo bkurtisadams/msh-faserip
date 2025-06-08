@@ -145,7 +145,12 @@ export class CombatHandler {
 
     // Apply health update to the actor
     console.log(isUnlinkedToken ? "Updating unlinked token actor data" : "Updating actor or linked token");
-    await targetActor.update({"system.attributes.health.value": newHealth});
+    await game.msh.runAsGM({
+        operation: 'adjustTargetHealth',
+        targetActorUuid: targetActor.uuid,
+        newHealth: newHealth
+    });
+
     console.log("After health update:", targetActor.system.attributes.health.value);
 
     // 4. Create a summary chat message
@@ -567,7 +572,11 @@ export class CombatHandler {
     // Remove any existing grappling effects from this system
     const existingEffects = target.effects.filter(e => e.flags["msh-faserip"]?.grappling);
     if (existingEffects.length > 0) {
-        await target.deleteEmbeddedDocuments("ActiveEffect", existingEffects.map(e => e.id));
+        await game.msh.runAsGM({
+            operation: "deleteEmbeddedDocuments",
+            targetActorUuid: target.uuid,
+            args: ["ActiveEffect", existingEffects.map(e => e.id)]
+            });
     }
 
     // Define effect data based on hold type
@@ -620,7 +629,11 @@ export class CombatHandler {
     };
 
     // Apply ActiveEffect to target
-    const newEffect = await target.createEmbeddedDocuments("ActiveEffect", [effect]);
+    const newEffect = await game.socketlib.system.executeAsGM("runGMCommand", {
+  operation: "createEmbeddedDocuments",
+  targetActorUuid: target.uuid,
+  args: ["ActiveEffect", [effect]]
+});
 
     // Send styled chat message
     await ChatMessage.create({
@@ -927,9 +940,13 @@ export class CombatHandler {
                             // Deduct karma if spent
                             if (karmaSpent > 0) {
                                 // First update karma value
-                                await target.update({
+                                await game.socketlib.system.executeAsGM("runGMCommand", {
+  operation: "update",
+  targetActorUuid: target.uuid,
+  args: [{
                                     "system.attributes.karma.value": availableKarma - karmaSpent
-                                });
+                                }]
+});
                                 
                                 // Create a new karma history entry
                                 const history = foundry.utils.deepClone(target.system.karma?.history || []);
@@ -941,7 +958,11 @@ export class CombatHandler {
                                     description: `${featType} save against ${sourceName}`
                                 };
                                 history.push(newEvent);
-                                await target.update({ "system.karma.history": history });
+                                await game.socketlib.system.executeAsGM("runGMCommand", {
+  operation: "update",
+  targetActorUuid: target.uuid,
+  args: [{ "system.karma.history": history }]
+});
                             }
                             
                             // Apply effects and create detailed chat messages based on result
@@ -958,7 +979,11 @@ export class CombatHandler {
                                         (CONFIG.FASERIP.rankValues[key] || 0) < currentEndurance) || "Shift-0";
                                     
                                     ui.notifications.error(`${target.name} loses an Endurance rank and is dying!`);
-                                    await target.update({"system.abilities.endurance.rank": newEnduranceRank});
+                                    await game.socketlib.system.executeAsGM("runGMCommand", {
+  operation: "update",
+  targetActorUuid: target.uuid,
+  args: [{"system.abilities.endurance.rank": newEnduranceRank}]
+});
                                     
                                     // Apply dying effect
                                     await this.applyDyingEffect(target);
@@ -1003,7 +1028,11 @@ export class CombatHandler {
                                             (CONFIG.FASERIP.rankValues[key] || 0) < currentEndurance) || "Shift-0";
                                         
                                         ui.notifications.error(`${target.name} loses an Endurance rank and is dying!`);
-                                        await target.update({"system.abilities.endurance.rank": newEnduranceRank});
+                                        await game.socketlib.system.executeAsGM("runGMCommand", {
+  operation: "update",
+  targetActorUuid: target.uuid,
+  args: [{"system.abilities.endurance.rank": newEnduranceRank}]
+});
                                         
                                         // Apply dying effect
                                         await this.applyDyingEffect(target);
@@ -1177,29 +1206,33 @@ export class CombatHandler {
                                     ui.notifications.warn(`${target.name} suffers a Grand Slam - knocked away ${slamDistance} areas!`);
                                     
                                     // Apply Grand Slam effect
-                                    await target.createEmbeddedDocuments("ActiveEffect", [{
-                                        name: "Grand Slam",
-                                        icon: "icons/svg/explosion.svg",
-                                        flags: {
-                                            "msh-faserip": {
-                                                grandSlam: true,
-                                                distance: slamDistance
-                                            }
-                                        },
-                                        changes: [
-                                            {
-                                                key: "system.status.prone",
-                                                mode: CONST.ACTIVE_EFFECT_MODES.OVERRIDE,
-                                                value: true
-                                            }
-                                        ],
-                                        duration: {
-                                            rounds: 2,
-                                            startTime: game.time.worldTime,
-                                            startRound: game.combat?.round || 0
-                                        },
-                                        statuses: ["prone"]
-                                    }]);
+                                    await game.msh.runAsGM({
+                                        operation: "createEffect",
+                                        targetActorUuid: target.uuid,
+                                        effectData: [{
+                                            name: "Grand Slam",
+                                            icon: "icons/svg/explosion.svg",
+                                            flags: {
+                                                "msh-faserip": {
+                                                    grandSlam: true,
+                                                    distance: slamDistance
+                                                }
+                                            },
+                                            changes: [
+                                                {
+                                                    key: "system.status.prone",
+                                                    mode: CONST.ACTIVE_EFFECT_MODES.OVERRIDE,
+                                                    value: true
+                                                }
+                                            ],
+                                            duration: {
+                                                rounds: 2,
+                                                startTime: game.time.worldTime,
+                                                startRound: game.combat?.round || 0
+                                            },
+                                            statuses: ["prone"]
+                                        }]
+                                    });
                                     
                                     await ChatMessage.create({
                                         content: `
@@ -1230,7 +1263,10 @@ export class CombatHandler {
                                     ui.notifications.info(`${target.name} is slammed back 1 area!`);
                                     
                                     // Apply 1 Area Slam effect
-                                    await target.createEmbeddedDocuments("ActiveEffect", [{
+                                    await game.socketlib.system.executeAsGM("runGMCommand", {
+  operation: "createEmbeddedDocuments",
+  targetActorUuid: target.uuid,
+  args: ["ActiveEffect", [{
                                         name: "Slammed (1 Area)",
                                         icon: "icons/svg/falling.svg", 
                                         flags: {
@@ -1252,7 +1288,8 @@ export class CombatHandler {
                                             startRound: game.combat?.round || 0
                                         },
                                         statuses: ["prone"]
-                                    }]);
+                                    }]]
+});
                                     
                                     await ChatMessage.create({
                                         content: `
@@ -1279,7 +1316,10 @@ export class CombatHandler {
                                     ui.notifications.info(`${target.name} staggers but remains in place!`);
                                     
                                     // Apply Stagger effect
-                                    await target.createEmbeddedDocuments("ActiveEffect", [{
+                                    await game.socketlib.system.executeAsGM("runGMCommand", {
+  operation: "createEmbeddedDocuments",
+  targetActorUuid: target.uuid,
+  args: ["ActiveEffect", [{
                                         name: "Staggered",
                                         icon: "icons/svg/stoned.svg",
                                         flags: {
@@ -1294,7 +1334,8 @@ export class CombatHandler {
                                             startRound: game.combat?.round || 0
                                         },
                                         statuses: ["staggered"]
-                                    }]);
+                                    }]]
+});
                                     
                                     await ChatMessage.create({
                                         content: `
@@ -1399,7 +1440,11 @@ export class CombatHandler {
         // Remove any existing stun effects
         const existingStunEffects = target.effects.filter(e => e.flags["msh-faserip"]?.stunned);
         if (existingStunEffects.length > 0) {
-            await target.deleteEmbeddedDocuments("ActiveEffect", existingStunEffects.map(e => e.id));
+            await game.socketlib.system.executeAsGM("runGMCommand", {
+  operation: "deleteEmbeddedDocuments",
+  targetActorUuid: target.uuid,
+  args: ["ActiveEffect", existingStunEffects.map(e => e.id)]
+});
         }
 
         // Create new stun effect
@@ -1433,7 +1478,11 @@ export class CombatHandler {
             statuses: ["stunned"]
         };
 
-        await target.createEmbeddedDocuments("ActiveEffect", [stunEffect]);
+        await game.socketlib.system.executeAsGM("runGMCommand", {
+  operation: "createEmbeddedDocuments",
+  targetActorUuid: target.uuid,
+  args: ["ActiveEffect", [stunEffect]]
+});
         
         // Enhanced chat message with clear mechanical effects
         await ChatMessage.create({
@@ -1499,7 +1548,11 @@ export class CombatHandler {
         };
         
         // Apply the effect
-        await target.createEmbeddedDocuments("ActiveEffect", [effectData]);
+        await game.socketlib.system.executeAsGM("runGMCommand", {
+  operation: "createEmbeddedDocuments",
+  targetActorUuid: target.uuid,
+  args: ["ActiveEffect", [effectData]]
+});
         
         let chatContent = `
         <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
@@ -1554,7 +1607,11 @@ export class CombatHandler {
                             // If not the lowest rank already, decrease by one rank
                             if (currentRankIndex > 0) {
                                 const newRank = ranks[currentRankIndex - 1];
-                                await target.update({"system.abilities.endurance.rank": newRank});
+                                await game.socketlib.system.executeAsGM("runGMCommand", {
+  operation: "update",
+  targetActorUuid: target.uuid,
+  args: [{"system.abilities.endurance.rank": newRank}]
+});
                                 
                                 // Send a message to chat
                                 ChatMessage.create({
@@ -1582,10 +1639,17 @@ export class CombatHandler {
                                 
                                 // Remove dying effect and add dead effect
                                 const dyingEffects = target.effects.filter(e => e.flags["msh-faserip"]?.dying);
-                                await target.deleteEmbeddedDocuments("ActiveEffect", dyingEffects.map(e => e.id));
+                                await game.socketlib.system.executeAsGM("runGMCommand", {
+  operation: "deleteEmbeddedDocuments",
+  targetActorUuid: target.uuid,
+  args: ["ActiveEffect", dyingEffects.map(e => e.id)]
+});
                                 
                                 // Add dead effect
-                                await target.createEmbeddedDocuments("ActiveEffect", [{
+                                await game.socketlib.system.executeAsGM("runGMCommand", {
+  operation: "createEmbeddedDocuments",
+  targetActorUuid: target.uuid,
+  args: ["ActiveEffect", [{
                                     name: "Dead",
                                     icon: "icons/svg/skull.svg",
                                     flags: {
@@ -1601,7 +1665,8 @@ export class CombatHandler {
                                         }
                                     ],
                                     statuses: ["dead"]
-                                }]);
+                                }]]
+});
                             }
                         }
                     }
@@ -1629,7 +1694,11 @@ export class CombatHandler {
         // Remove any existing dying effects
         const existingDyingEffects = target.effects.filter(e => e.flags["msh-faserip"]?.dying);
         if (existingDyingEffects.length > 0) {
-            await target.deleteEmbeddedDocuments("ActiveEffect", existingDyingEffects.map(e => e.id));
+            await game.socketlib.system.executeAsGM("runGMCommand", {
+  operation: "deleteEmbeddedDocuments",
+  targetActorUuid: target.uuid,
+  args: ["ActiveEffect", existingDyingEffects.map(e => e.id)]
+});
         }
 
         // Create dying effect
@@ -1651,7 +1720,11 @@ export class CombatHandler {
             statuses: ["dying"]
         };
 
-        await target.createEmbeddedDocuments("ActiveEffect", [dyingEffect]);
+        await game.socketlib.system.executeAsGM("runGMCommand", {
+  operation: "createEmbeddedDocuments",
+  targetActorUuid: target.uuid,
+  args: ["ActiveEffect", [dyingEffect]]
+});
     }
 }
 

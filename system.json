@@ -14,6 +14,13 @@
     "manifest": "",
     "download": "",
     "license": "LICENSE",
+    "socket": true,
+    "dependencies": [
+        {
+        "name": "socketlib",
+        "type": "module"
+        }
+    ],
     "esmodules": [
         "scripts/init.js",
         "scripts/actor.js",
@@ -21,8 +28,9 @@
         "scripts/actorSheet.js",
         "scripts/itemSheet.js",
         "scripts/universalTable.js",
-        "scripts/macros.js"
-    ],
+        "scripts/macros.js",
+        "scripts/gm-utils.js"
+        ],
     "styles": [
         "styles/global.css",
         "styles/actor-sheet.css",
