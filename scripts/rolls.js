@@ -98,6 +98,75 @@ export const rankRows = [
   { label: "100", colors:   ["red"   ,"red"   ,"red"   ,"red"   ,"red"   ,"red"  ,"red"  ,"red"   ,"red"   ,"red"   ,"red"   ,"red"   ,"red"  ,"red"   ,"red"   ,"red"   ,"red"  ,"red"] }
 ];
 
+// Add this new function after the existing helper functions
+function calculateRangeInfo(actor, equipment, target) {
+  if (!target || equipment.system.category !== "weapon") {
+    return { penalty: 0, info: "", outOfRange: false };
+  }
+
+  // Simple distance calculation using selected tokens
+  let distance = 0;
+  
+  // Try to get distance from selected tokens
+  if (game.user.targets.size > 0 && canvas.tokens.controlled.length > 0) {
+    const controlledToken = canvas.tokens.controlled[0];
+    const targetToken = Array.from(game.user.targets)[0];
+    
+    // Calculate distance in grid squares
+    const ray = new Ray(controlledToken.center, targetToken.center);
+    distance = Math.round(ray.distance / canvas.scene.grid.size);
+    
+    console.log(`Direct range calculation: ${ray.distance} pixels = ${distance} grid squares`);
+  }
+  
+  const weaponRange = equipment.system.range || getDefaultWeaponRange(equipment);
+  
+  let penalty = 0;
+  let info = "";
+  let outOfRange = false;
+
+  if (distance > weaponRange) {
+    if (equipment.system.weaponType === "power") {
+      penalty = distance - weaponRange;
+      info = `<div><strong>Range Penalty:</strong> -${penalty}CS (${distance} areas, max ${weaponRange})</div>`;
+    } else {
+      outOfRange = true;
+      info = `<div style="color: #cc0000;"><strong>OUT OF RANGE:</strong> ${distance} areas exceeds maximum ${weaponRange} areas</div>`;
+    }
+  } else if (distance > 0) {
+    penalty = distance;
+    info = `<div><strong>Range:</strong> ${distance} areas (-${penalty}CS penalty)</div>`;
+  } else {
+    info = `<div><strong>Range:</strong> Adjacent (no penalty)</div>`;
+  }
+
+  return { penalty, info, outOfRange, distance, maxRange: weaponRange };
+}
+
+function getDefaultWeaponRange(equipment) {
+  // Default ranges based on weapon type
+  const weaponType = equipment.system.weaponType?.toLowerCase() || "";
+  const name = equipment.name.toLowerCase();
+  
+  if (name.includes("rifle")) return 15;
+  if (name.includes("pistol") || name.includes("handgun")) return 5;
+  if (name.includes("shotgun")) return 3;
+  if (name.includes("bow")) return 8;
+  if (name.includes("crossbow")) return 10;
+  if (weaponType === "melee") return 0;
+  if (weaponType === "thrown") {
+    // Use thrower's strength for range
+    const strength = equipment.parent?.system?.abilities?.strength?.rank || "Typical";
+    const strengthRanges = {
+      "Feeble": 1, "Poor": 1, "Typical": 1, "Good": 2, "Excellent": 3,
+      "Remarkable": 4, "Incredible": 5, "Amazing": 6, "Monstrous": 7, "Unearthly": 8
+    };
+    return strengthRanges[strength] || 1;
+  }
+  
+  return 5; // Default range
+}
+
 function highlightResultCell(rankName, rollValue) {
   console.log("Highlighting:", rankName, rollValue);
 
@@ -2177,9 +2246,33 @@ export class FaseripRolls {
 
         const actionName = options.actionType || savedActionType || defaultAction;
         const action = ACTIONS[actionName];
-        const shift = parseInt(options.columnShift) || savedColumnShift || 0;
+        const shift = parseInt(options.columnShift) || savedColumnShift || 0; // Define shift FIRST
         const karma = parseInt(options.karma) || 0;
         const skipDice = options.skipDice ?? skipDiceRoll;
+
+        // NOW calculate range data using the defined shift value
+        const rangeData = calculateRangeInfo(actor, equipment, game.user.targets.first());
+
+        // Check if out of range first
+        if (rangeData.outOfRange) {
+          await ChatMessage.create({
+            speaker: ChatMessage.getSpeaker({ actor }),
+            content: `
+              <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px;">
+                <div style="padding: 5px 10px; color: #cc0000; font-weight: bold; font-size: 1.1em;">
+                  ${equipment.name} - OUT OF RANGE
+                </div>
+                <div style="padding: 5px 10px;">
+                  Target is ${rangeData.distance} areas away, but ${equipment.name} has maximum range of ${rangeData.maxRange} areas.
+                </div>
+              </div>
+            `
+          });
+          return { outOfRange: true };
+        }
+
+        // Apply range penalty to column shift
+        const totalShift = shift - rangeData.penalty; // Now shift is defined
 
         // Get the ability to use (fighting or agility)
         const abilityKey = action.ability || "fighting";
@@ -2369,7 +2462,8 @@ export class FaseripRolls {
             <h3 style="color: #8B0000; margin: 0 0 5px 0; font-size: 1.1em;">${actor.name} - ${equipment.name} (${actionName})</h3>
             <div style="margin-bottom: 5px; font-size: 0.9em;">
               <div>Base Rank: ${abilityRank} (${abilityValue})</div>
-              <div>Column Shift: ${shift !== 0 ? `${shift} → ${effectiveRank}` : "None"}</div>
+              ${rangeData.info}
+              <div>Column Shift: ${totalShift !== 0 ? `${totalShift} → ${effectiveRank}` : "None"}</div>
 
               <div>Roll: ${roll.total} + Karma: ${karmaUsed} = ${cappedTotal}</div>
 
