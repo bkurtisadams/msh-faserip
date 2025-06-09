@@ -98,43 +98,55 @@ export const rankRows = [
   { label: "100", colors:   ["red"   ,"red"   ,"red"   ,"red"   ,"red"   ,"red"  ,"red"  ,"red"   ,"red"   ,"red"   ,"red"   ,"red"   ,"red"  ,"red"   ,"red"   ,"red"   ,"red"  ,"red"] }
 ];
 
+// Power Rank Range Table (based on "Faserip Combat 02.txt")
+const POWER_RANGE_VALUES = {
+  "Shift-0": 0, "Feeble": 0, "Poor": 1, "Typical": 2, "Good": 4,
+  "Excellent": 6, "Remarkable": 8, "Incredible": 10, "Amazing": 20,
+  "Monstrous": 40, "Unearthly": 60, "Shift X": 80, "Shift Y": 160,
+  "Shift Z": 400,
+  // Converted miles to areas (1 mile = 1760 yards/areas)
+  "Class 1000": 176000,   // 100 miles
+  "Class 3000": 17600000, // 10,000 miles
+  "Class 5000": 1760000000, // 1,000,000 miles
+  "Beyond": Infinity      // Unlimited
+};
+
 // Add this new function after the existing helper functions
 function calculateRangeInfo(actor, equipment, target) {
+  // This function is specifically for "weapon" category equipment,
+  // as determined by its usage in FaseripRolls.rollEquipment.
+  // Power-item range penalties are handled separately in rollPower/rollPowerItem.
   if (!target || equipment.system.category !== "weapon") {
-    return { penalty: 0, info: "", outOfRange: false };
+    return { penalty: 0, info: "", outOfRange: false, distance: 0, maxRange: 0 };
   }
 
   // Simple distance calculation using selected tokens
   let distance = 0;
-  
+
   // Try to get distance from selected tokens
   if (game.user.targets.size > 0 && canvas.tokens.controlled.length > 0) {
     const controlledToken = canvas.tokens.controlled[0];
     const targetToken = Array.from(game.user.targets)[0];
-    
+
     // Calculate distance in grid squares
     const ray = new Ray(controlledToken.center, targetToken.center);
     distance = Math.round(ray.distance / canvas.scene.grid.size);
-    
+
     console.log(`Direct range calculation: ${ray.distance} pixels = ${distance} grid squares`);
   }
-  
+
   const weaponRange = equipment.system.range || getDefaultWeaponRange(equipment);
-  
+
   let penalty = 0;
   let info = "";
   let outOfRange = false;
 
+  // For weapons: "-1 CS for each area traveled" up to max range. Beyond max range is out of range.
   if (distance > weaponRange) {
-    if (equipment.system.weaponType === "power") {
-      penalty = distance - weaponRange;
-      info = `<div><strong>Range Penalty:</strong> -${penalty}CS (${distance} areas, max ${weaponRange})</div>`;
-    } else {
-      outOfRange = true;
-      info = `<div style="color: #cc0000;"><strong>OUT OF RANGE:</strong> ${distance} areas exceeds maximum ${weaponRange} areas</div>`;
-    }
+    outOfRange = true;
+    info = `<div style="color: #cc0000;"><strong>OUT OF RANGE:</strong> ${distance} areas exceeds maximum ${weaponRange} areas</div>`;
   } else if (distance > 0) {
-    penalty = distance;
+    penalty = distance; // Penalty is equal to distance for regular weapons
     info = `<div><strong>Range:</strong> ${distance} areas (-${penalty}CS penalty)</div>`;
   } else {
     info = `<div><strong>Range:</strong> Adjacent (no penalty)</div>`;
@@ -813,32 +825,61 @@ export class FaseripRolls {
     const savedActionType = power.getFlag("msh-faserip", "lastActionType");
     const validActionType = Object.keys(ACTIONS).includes(savedActionType) ? savedActionType : "General Power Use";
     const savedColumnShift = power.getFlag("msh-faserip", "lastColumnShift") || 0;
-    const savedDamageCS = power.getFlag("msh-faserip", "lastDamageCS") || 0; // Add this line
-    const savedDamageType = power.getFlag("msh-faserip", "lastDamageType") || "Energy-Energy"; // Add this line
+    const savedDamageCS = power.getFlag("msh-faserip", "lastDamageCS") || 0;
+    const savedDamageType = power.getFlag("msh-faserip", "lastDamageType") || "Energy-Energy";
     const skipDiceRoll = power.getFlag("msh-faserip", "skipDiceRoll") || false;
+
+    // --- NEW: Determine target distance and power range penalty ---
+    let distance = options.distance;
+    if (distance === undefined) { // If distance not passed via options, try to calculate from tokens
+      const targetToken = game.user.targets.first();
+      if (targetToken && canvas.tokens.controlled.length > 0) {
+        const controlledToken = canvas.tokens.controlled[0];
+        const ray = new Ray(controlledToken.center, targetToken.center);
+        distance = Math.round(ray.distance / canvas.scene.grid.size);
+      } else {
+        distance = 0; // Default to adjacent if no target
+      }
+    }
+
+    let powerRangePenalty = 0;
+    let powerRangeInfo = "";
+    const powerRank = power.system.rank || "Typical";
+    const basePowerRange = POWER_RANGE_VALUES[powerRank] || 0; // Use the global POWER_RANGE_VALUES
+
+    if (distance > basePowerRange) {
+      powerRangePenalty = distance - basePowerRange;
+      powerRangeInfo = `<div><strong>Range:</strong> ${distance} areas (Base: ${basePowerRange} areas). Penalty: -${powerRangePenalty}CS.</div>`;
+    } else if (distance > 0) {
+      powerRangeInfo = `<div><strong>Range:</strong> ${distance} areas (within base range of ${basePowerRange} areas). No penalty.</div>`;
+    } else {
+      powerRangeInfo = `<div><strong>Range:</strong> Adjacent (no penalty).</div>`;
+    }
+    // --- END NEW ---
 
     // If this is a direct roll (macro called with options or dialog submitted)
     // Check if CTRL is pressed or if this is a direct roll call
     if (options.useDirectRoll || game.keyboard.isModifierActive(foundry.helpers.interaction.KeyboardManager.MODIFIER_KEYS.CONTROL)) {
-      // Optional notification that CTRL quick roll is being used
       if (game.keyboard.isModifierActive(foundry.helpers.interaction.KeyboardManager.MODIFIER_KEYS.CONTROL)) {
         ui.notifications.info("Quick roll with saved settings (CTRL pressed)");
       }
       // Use provided options from dialog or direct call
       const actionType = options.actionType || savedActionType;
-      const columnShift = options.columnShift ?? savedColumnShift;
-      const damageCS = options.damageCS ?? savedDamageCS; // Add this line
-      const damageType = options.damageType || savedDamageType; // Add this line
+      // --- MODIFIED: Apply powerRangePenalty to the column shift ---
+      const rawColumnShift = options.columnShift ?? savedColumnShift;
+      const totalColumnShift = rawColumnShift - powerRangePenalty; // Apply range penalty here
+      // --- END MODIFIED ---
+      const damageCS = options.damageCS ?? savedDamageCS;
+      const damageType = options.damageType || savedDamageType;
       const karma = options.karma || 0;
       const skipDice = options.skipDice ?? skipDiceRoll;
 
       // Get the power's rank and value
-      const powerRank = power.system.rank || "Typical";
       const powerValue = power.system.value || 6;
 
       // Apply column shifts to get effective rank
       let effectiveRank = powerRank;
-      if (columnShift !== 0) {
+      if (totalColumnShift !== 0) { // Use totalColumnShift here
         const ranks = [
           "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent",
           "Remarkable", "Incredible", "Amazing", "Monstrous", "Unearthly",
@@ -846,9 +887,9 @@ export class FaseripRolls {
         ];
         const index = ranks.indexOf(powerRank);
         if (index !== -1) {
-          const newIndex = Math.min(Math.max(index + columnShift, 0), ranks.length - 1);
+          const newIndex = Math.min(Math.max(index + totalColumnShift, 0), ranks.length - 1); // Use totalColumnShift here
           effectiveRank = ranks[newIndex];
-          console.log(`Applied ${columnShift} column shifts to ${powerRank}, now ${effectiveRank}`);
+          console.log(`Applied ${totalColumnShift} column shifts to ${powerRank}, now ${effectiveRank}`);
         }
       }
 
@@ -963,13 +1004,14 @@ export class FaseripRolls {
         </div>
         <div style="padding: 5px 10px; font-size: 0.9em;">
           <div>Base Rank: ${powerRank} (${powerValue})</div>
-          <div>Column Shift: ${columnShift} → ${effectiveRank}</div>
+          <div>Column Shift: ${totalColumnShift} → ${effectiveRank}</div> <!-- MODIFIED LINE -->
           ${damageCS !== 0 && damageRankName
             ? `<div>Damage Column Shift: ${damageCS > 0 ? "+" : ""}${damageCS}CS → <strong>${damageRankName} (${damageRankValue})</strong></div>`
             : ""}
+          ${powerRangeInfo} <!-- NEW LINE -->
           <div>Roll: ${roll.total} + Karma: ${karmaUsed} = ${cappedTotal}</div>
         </div>
-        <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
+        <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px;
           background-color: ${resultColor.toLowerCase() === 'white' ? '#f8f8f8 !important' :
           resultColor.toLowerCase() === 'green' ? '#4CAF50 !important' :
             resultColor.toLowerCase() === 'yellow' ? '#FFC107 !important' :
@@ -1093,15 +1135,21 @@ export class FaseripRolls {
     };
 
     // Create dialog for roll options
-    let dialogContent = `
+    dialogContent = `
       <div style="background: #f0e8d8; padding: 10px; border-radius: 5px;">
         <div style="margin-bottom: 10px;">
           <label style="display: inline-block; width: 120px;">Action Type:</label>
           <select id="action" name="action" style="width: 180px;">
             ${Object.keys(ACTIONS).map(action =>
-              `<option value="${action}" ${action === validActionType ? 'selected' : ''}>${action}</option>`
+              `<option value="${action}" ${action === validActionType ? 'selected' : ''}>
+                ${action}
+              </option>`
             ).join('')}
           </select>
+        </div>
+        <div style="margin-bottom: 10px;">
+          <label style="display: inline-block; width: 120px;">Target Distance:</label>
+          <input type="number" id="distance" name="distance" value="${distance}" min="0" style="width: 50px;"> areas
         </div>
         <div style="margin-bottom: 10px;">
           <label style="display: inline-block; width: 120px;">Column Shift:</label>
@@ -1130,18 +1178,18 @@ export class FaseripRolls {
         </div>
         <div>
           <label>
-            <input type="checkbox" id="skip-dice" name="skipDice" ${skipDiceRoll ? 'checked' : ''}> 
+            <input type="checkbox" id="skip-dice" name="skipDice" ${skipDiceRoll ? 'checked' : ''}>
             Skip dice animation
           </label>
         </div>
         <div style="margin-top: 10px;">
           <label>
-            <input type="checkbox" id="save-settings" name="saveSettings" checked> 
+            <input type="checkbox" id="save-settings" name="saveSettings" checked>
             Remember these settings for future rolls
           </label>
         </div>
+        ${powerRangeInfo} <!-- NEW LINE -->
       </div>`;
-
 
       return new Dialog({
         title: `Power Roll: ${power.name} (${power.system.rank})`,
@@ -1157,6 +1205,7 @@ export class FaseripRolls {
               const karma = parseInt(html.find('[name="karma"]').val()) || 0;
               const skipDice = html.find('[name="skipDice"]').is(':checked');
               const saveSettings = html.find('[name="saveSettings"]').is(':checked');
+              const dialogDistance = parseInt(html.find('[name="distance"]').val()) || 0; // NEW: Get distance from dialog
 
               // Save settings if requested
               if (saveSettings) {
@@ -1175,7 +1224,8 @@ export class FaseripRolls {
                 damageCS: damageCS,
                 damageType: damageType,
                 karma: karma,
-                skipDice: skipDice
+                skipDice: skipDice,
+                distance: dialogDistance // NEW: Pass distance
               });
             }
           },
@@ -1185,6 +1235,7 @@ export class FaseripRolls {
       }).render(true);
     }
   }
+
 
   /**
    * Roll a talent
