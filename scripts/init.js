@@ -22,6 +22,7 @@ import { FaseripInitiative } from './faserip-initiative.js';
 import { CombatHandler } from './combat-handler.js';
 
 Hooks.once("init", async () => {
+  console.log("FASERIP DEBUG: init hook is running!"); // <-- DEBUG CONSOLE LOG
   console.log("Marvel Super Heroes (FASERIP) system initializing...");
 
   // Initialize the game.msh namespace early
@@ -29,6 +30,20 @@ Hooks.once("init", async () => {
 
   CONFIG.FASERIP = CONFIG.FASERIP || {};
   
+  // <-- NEW/MODIFIED SECTION START -->
+  // Register system settings - THIS IS THE MISSING PART
+  game.settings.register('msh-faserip', 'dailyKarmaEnabled', {
+    name: "Enable Daily Karma",
+    hint: "If enabled, characters gain temporary Karma equal to their Reason+Intuition+Psyche at the start of each session, used before their lifetime Karma pool.",
+    scope: "world", // Can be 'world' or 'client'
+    config: true,   // Show in system settings UI
+    type: Boolean,  // Use the JavaScript Boolean class, not a string "Boolean"
+    default: false, // Default value
+  });
+  console.log("FASERIP DEBUG: dailyKarmaEnabled setting registered."); // <-- DEBUG CONSOLE LOG
+  // <-- NEW/MODIFIED SECTION END -->
+
+
   // Register custom grappling effects so they show token HUD icons and work with ActiveEffect.statuses
   CONFIG.statusEffects.push(
     {

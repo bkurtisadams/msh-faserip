@@ -153,14 +153,24 @@ export class FaseripActorSheet extends ActorSheet {
     const advancement = karma.advancement || 0;
     const pool = karma.pool || 0;
 
+    // <-- NEW/MODIFIED SECTION START -->
+    const dailyKarmaEnabled = game.settings.get("msh-faserip", "dailyKarmaEnabled"); // <-- NEW LINE
+    context.dailyKarmaEnabled = dailyKarmaEnabled; // <-- NEW LINE
+    context.dailyKarmaMax = karma.dailyKarmaMax || 0; // <-- NEW LINE
+    context.dailyKarmaUsed = karma.dailyKarmaUsed || 0; // <-- NEW LINE
+    context.dailyKarmaRemaining = Math.max(0, context.dailyKarmaMax - context.dailyKarmaUsed); // <-- NEW LINE
+    // <-- NEW/MODIFIED SECTION END -->
+
     let spent = 0;
     if (Array.isArray(karma.history)) {
       for (const event of karma.history) {
-        if (event.amount < 0) spent += Math.abs(event.amount);
+        if (event.amount < 0 && event.type !== "Daily Roll") spent += Math.abs(event.amount); // <-- MODIFIED LINE (exclude daily rolls from lifetime spent)
       }
     }
 
-    context.currentKarma = Math.max(0, lifetime - spent - advancement - pool);
+    // context.currentKarma is already calculated in prepareData based on daily/lifetime logic
+    // const currentKarmaValue = Math.max(0, lifetime - spent - advancement - pool); // This line is now redundant
+    // context.currentKarma = currentKarmaValue; // This line is now redundant
 
     return context;
   }
@@ -596,6 +606,18 @@ export class FaseripActorSheet extends ActorSheet {
         sheet.render(true);
       });
     });
+
+    // <-- NEW BUTTON START -->
+    // Reset Daily Karma button (GM-only)
+    if (game.user.isGM) {
+      html.find('.reset-daily-karma-button').click(async ev => {
+        const karmaSheetModule = await import('./karma.js');
+        const sheet = new karmaSheetModule.KarmaSheet(this.actor);
+        await sheet._onResetDailyKarma(ev);
+        this.render(false); // Re-render actor sheet after reset
+      });
+    }
+    // <-- NEW BUTTON END -->
 
     // Add Power button - more direct approach
     html.find('.add-power').click(ev => {
@@ -1121,26 +1143,77 @@ export class FaseripActorSheet extends ActorSheet {
               }
 
               // Calculate the result
-              let karmaUsed = 0;
               let cappedTotal = roll.total;
+              let karmaUsed = 0;
+
+              // <-- NEW/MODIFIED SECTION START -->
+              const dailyKarmaEnabled = game.settings.get("msh-faserip", "dailyKarmaEnabled");
+              let dailyKarmaUsedAmount = 0;
+              let lifetimeKarmaUsedAmount = 0;
 
               if (karma > 0) {
-                cappedTotal = Math.min(100, roll.total + karma);
-                karmaUsed = cappedTotal - roll.total;
+                if (dailyKarmaEnabled && actor.system.karma.dailyKarmaUsed < actor.system.karma.dailyKarmaMax) {
+                  const dailyKarmaRemaining = actor.system.karma.dailyKarmaMax - actor.system.karma.dailyKarmaUsed;
+                  const karmaFromDaily = Math.min(karma, dailyKarmaRemaining);
+                  
+                  dailyKarmaUsedAmount = karmaFromDaily;
+                  karmaUsed += karmaFromDaily;
+
+                  await game.msh.runAsGM({
+                    operation: 'update',
+                    targetActorUuid: actor.uuid,
+                    args: [{ "system.karma.dailyKarmaUsed": actor.system.karma.dailyKarmaUsed + dailyKarmaUsedAmount }]
+                  });
+
+                  const remainingKarmaToSpend = karma - karmaFromDaily;
+                  if (remainingKarmaToSpend > 0) {
+                    cappedTotal = Math.min(100, roll.total + remainingKarmaToSpend);
+                    lifetimeKarmaUsedAmount = cappedTotal - roll.total;
+                    karmaUsed += lifetimeKarmaUsedAmount;
+                  } else {
+                    cappedTotal = Math.min(100, roll.total + karmaFromDaily);
+                  }
+                } else {
+                  cappedTotal = Math.min(100, roll.total + karma);
+                  lifetimeKarmaUsedAmount = cappedTotal - roll.total;
+                  karmaUsed = lifetimeKarmaUsedAmount;
+                }
+              } else {
+                cappedTotal = roll.total;
               }
 
-              if (karmaUsed > 0) {
-                const history = foundry.utils.deepClone(actor.system.karma?.history || []);
-                const newEvent = {
+              const historyUpdates = [];
+              if (dailyKarmaUsedAmount > 0) {
+                historyUpdates.push({
                   realDate: new Date().toLocaleDateString(),
                   gameDate: "",
-                  amount: -karmaUsed,
-                  type: "Die Roll",
-                  description: `Spent on ${item.name}`
-                };
-                history.push(newEvent);
-                await actor.update({ "system.karma.history": history });
+                  amount: -dailyKarmaUsedAmount,
+                  type: "Daily Roll",
+                  description: `Spent daily karma on ${item.name}`
+                });
               }
+              if (lifetimeKarmaUsedAmount > 0) {
+                historyUpdates.push({
+                  realDate: new Date().toLocaleDateString(),
+                  gameDate: "",
+                  amount: -lifetimeKarmaUsedAmount,
+                  type: "Die Roll",
+                  description: `Spent lifetime karma on ${item.name}`
+                });
+              }
+
+              if (historyUpdates.length > 0) {
+                const currentHistory = foundry.utils.deepClone(actor.system.karma?.history || []);
+                const newHistory = currentHistory.concat(historyUpdates);
+                
+                await game.msh.runAsGM({
+                  operation: 'update',
+                  targetActorUuid: actor.uuid,
+                  args: [{ "system.karma.history": newHistory }]
+                });
+                // No need to call _updateCurrentKarma here, prepareData handles it on sheet re-render
+              }
+              // <-- NEW/MODIFIED SECTION END -->
               
               const resultColor = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
 
@@ -1583,23 +1656,74 @@ export class FaseripActorSheet extends ActorSheet {
               let cappedTotal = roll.total;
               let karmaUsed = 0;
 
+              // <-- NEW/MODIFIED SECTION START -->
+              const dailyKarmaEnabled = game.settings.get("msh-faserip", "dailyKarmaEnabled");
+              let dailyKarmaUsedAmount = 0;
+              let lifetimeKarmaUsedAmount = 0;
+
               if (karma > 0) {
-                cappedTotal = Math.min(100, roll.total + karma);
-                karmaUsed = cappedTotal - roll.total;
+                if (dailyKarmaEnabled && actor.system.karma.dailyKarmaUsed < actor.system.karma.dailyKarmaMax) {
+                  const dailyKarmaRemaining = actor.system.karma.dailyKarmaMax - actor.system.karma.dailyKarmaUsed;
+                  const karmaFromDaily = Math.min(karma, dailyKarmaRemaining);
+                  
+                  dailyKarmaUsedAmount = karmaFromDaily;
+                  karmaUsed += karmaFromDaily;
+
+                  await game.msh.runAsGM({
+                    operation: 'update',
+                    targetActorUuid: actor.uuid,
+                    args: [{ "system.karma.dailyKarmaUsed": actor.system.karma.dailyKarmaUsed + dailyKarmaUsedAmount }]
+                  });
+
+                  const remainingKarmaToSpend = karma - karmaFromDaily;
+                  if (remainingKarmaToSpend > 0) {
+                    cappedTotal = Math.min(100, roll.total + remainingKarmaToSpend);
+                    lifetimeKarmaUsedAmount = cappedTotal - roll.total;
+                    karmaUsed += lifetimeKarmaUsedAmount;
+                  } else {
+                    cappedTotal = Math.min(100, roll.total + karmaFromDaily);
+                  }
+                } else {
+                  cappedTotal = Math.min(100, roll.total + karma);
+                  lifetimeKarmaUsedAmount = cappedTotal - roll.total;
+                  karmaUsed = lifetimeKarmaUsedAmount;
+                }
+              } else {
+                cappedTotal = roll.total;
               }
 
-              if (karmaUsed > 0) {
-                const history = foundry.utils.deepClone(this.actor.system.karma?.history || []);
-                const newEvent = {
+              const historyUpdates = [];
+              if (dailyKarmaUsedAmount > 0) {
+                historyUpdates.push({
                   realDate: new Date().toLocaleDateString(),
                   gameDate: "",
-                  amount: -karmaUsed,
-                  type: "Die Roll",
-                  description: `Spent on ${item.name} (Talent)`
-                };
-                history.push(newEvent);
-                await this.actor.update({ "system.karma.history": history });
+                  amount: -dailyKarmaUsedAmount,
+                  type: "Daily Roll",
+                  description: `Spent daily karma on ${item.name} (Talent)`
+                });
               }
+              if (lifetimeKarmaUsedAmount > 0) {
+                historyUpdates.push({
+                  realDate: new Date().toLocaleDateString(),
+                  gameDate: "",
+                  amount: -lifetimeKarmaUsedAmount,
+                  type: "Die Roll",
+                  description: `Spent lifetime karma on ${item.name} (Talent)`
+                });
+              }
+
+              if (historyUpdates.length > 0) {
+                const currentHistory = foundry.utils.deepClone(actor.system.karma?.history || []);
+                const newHistory = currentHistory.concat(historyUpdates);
+                
+                await game.msh.runAsGM({
+                  operation: 'update',
+                  targetActorUuid: actor.uuid,
+                  args: [{ "system.karma.history": newHistory }]
+                });
+                // No need to call _updateCurrentKarma here, prepareData handles it on sheet re-render
+              }
+              // <-- NEW/MODIFIED SECTION END -->
               
               const resultColor = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
               //highlightResultCell(effectiveRank, cappedTotal);
@@ -1626,7 +1750,7 @@ export class FaseripActorSheet extends ActorSheet {
                 "Research": { white: "No Results", green: "Basic Results", yellow: "Good Results", red: "Breakthrough" },
                 "Technical Application": { white: "Failure", green: "Works Minimally", yellow: "Works Well", red: "Works Perfectly" },
                 "Mental Power": { white: "No Effect", green: "Minor Effect", yellow: "Moderate Effect", red: "Major Effect" },
-                "Mystical Knowledge": { white: "No Insight", green: "Minor Insight", yellow: "Significant Insight", red: "Complete Insight" },
+                "Mystical Knowledge":{ white: "No Insight", green: "Minor Insight", yellow: "Significant Insight", red: "Complete Insight" },
                 "Skill Use": { white: "Failure", green: "Basic Success", yellow: "Good Success", red: "Excellent Success" }
               };
 
@@ -2029,10 +2153,74 @@ export class FaseripActorSheet extends ActorSheet {
               let cappedTotal = roll.total;
               let karmaUsed = 0;
 
+              // <-- NEW/MODIFIED SECTION START -->
+              const dailyKarmaEnabled = game.settings.get("msh-faserip", "dailyKarmaEnabled");
+              let dailyKarmaUsedAmount = 0;
+              let lifetimeKarmaUsedAmount = 0;
+
               if (karma > 0) {
-                cappedTotal = Math.min(100, roll.total + karma);
-                karmaUsed = cappedTotal - roll.total;
+                if (dailyKarmaEnabled && actor.system.karma.dailyKarmaUsed < actor.system.karma.dailyKarmaMax) {
+                  const dailyKarmaRemaining = actor.system.karma.dailyKarmaMax - actor.system.karma.dailyKarmaUsed;
+                  const karmaFromDaily = Math.min(karma, dailyKarmaRemaining);
+                  
+                  dailyKarmaUsedAmount = karmaFromDaily;
+                  karmaUsed += karmaFromDaily;
+
+                  await game.msh.runAsGM({
+                    operation: 'update',
+                    targetActorUuid: actor.uuid,
+                    args: [{ "system.karma.dailyKarmaUsed": actor.system.karma.dailyKarmaUsed + dailyKarmaUsedAmount }]
+                  });
+
+                  const remainingKarmaToSpend = karma - karmaFromDaily;
+                  if (remainingKarmaToSpend > 0) {
+                    cappedTotal = Math.min(100, roll.total + remainingKarmaToSpend);
+                    lifetimeKarmaUsedAmount = cappedTotal - roll.total;
+                    karmaUsed += lifetimeKarmaUsedAmount;
+                  } else {
+                    cappedTotal = Math.min(100, roll.total + karmaFromDaily);
+                  }
+                } else {
+                  cappedTotal = Math.min(100, roll.total + karma);
+                  lifetimeKarmaUsedAmount = cappedTotal - roll.total;
+                  karmaUsed = lifetimeKarmaUsedAmount;
+                }
+              } else {
+                cappedTotal = roll.total;
               }
+
+              const historyUpdates = [];
+              if (dailyKarmaUsedAmount > 0) {
+                historyUpdates.push({
+                  realDate: new Date().toLocaleDateString(),
+                  gameDate: "",
+                  amount: -dailyKarmaUsedAmount,
+                  type: "Daily Roll",
+                  description: `Spent daily karma on ${item.name} (Contact)`
+                });
+              }
+              if (lifetimeKarmaUsedAmount > 0) {
+                historyUpdates.push({
+                  realDate: new Date().toLocaleDateString(),
+                  gameDate: "",
+                  amount: -lifetimeKarmaUsedAmount,
+                  type: "Die Roll",
+                  description: `Spent lifetime karma on ${item.name} (Contact)`
+                });
+              }
+
+              if (historyUpdates.length > 0) {
+                const currentHistory = foundry.utils.deepClone(actor.system.karma?.history || []);
+                const newHistory = currentHistory.concat(historyUpdates);
+                
+                await game.msh.runAsGM({
+                  operation: 'update',
+                  targetActorUuid: actor.uuid,
+                  args: [{ "system.karma.history": newHistory }]
+                });
+                // No need to call _updateCurrentKarma here, prepareData handles it on sheet re-render
+              }
+              // <-- NEW/MODIFIED SECTION END -->
 
               // Display the dice roll with flavor text if not skipped
               if (!skipDice) {
@@ -2047,19 +2235,6 @@ export class FaseripActorSheet extends ActorSheet {
               //const totalRoll = roll.total + karma;
               const resultColor = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
               //highlightResultCell(effectiveRank, cappedTotal);
-
-              if (karmaUsed > 0) {
-                const history = foundry.utils.deepClone(this.actor.system.karma?.history || []);
-                const newEvent = {
-                  realDate: new Date().toLocaleDateString(),
-                  gameDate: "",
-                  amount: -karmaUsed,
-                  type: "Die Roll",
-                  description: `Spent on ${item.name} (Contact)`
-                };
-                history.push(newEvent);
-                await this.actor.update({ "system.karma.history": history });
-              }
 
               // Check if the result meets the required FEAT color
               let meetsFeatRequirement = false;
@@ -2874,8 +3049,79 @@ html.find('.headquarters-row').each((i, row) => {
               }
               
               // Calculate the result
-              const totalRoll = roll.total + karma;
-              const resultColor = game.msh.rollUniversalTable(effectiveRank, totalRoll);
+              let cappedTotal = roll.total; // <-- NEW LINE
+              let karmaUsed = 0; // <-- NEW LINE
+
+              // <-- NEW/MODIFIED SECTION START -->
+              const dailyKarmaEnabled = game.settings.get("msh-faserip", "dailyKarmaEnabled");
+              let dailyKarmaUsedAmount = 0;
+              let lifetimeKarmaUsedAmount = 0;
+
+              if (karma > 0) {
+                if (dailyKarmaEnabled && actor.system.karma.dailyKarmaUsed < actor.system.karma.dailyKarmaMax) {
+                  const dailyKarmaRemaining = actor.system.karma.dailyKarmaMax - actor.system.karma.dailyKarmaUsed;
+                  const karmaFromDaily = Math.min(karma, dailyKarmaRemaining);
+                  
+                  dailyKarmaUsedAmount = karmaFromDaily;
+                  karmaUsed += karmaFromDaily;
+
+                  await game.msh.runAsGM({
+                    operation: 'update',
+                    targetActorUuid: actor.uuid,
+                    args: [{ "system.karma.dailyKarmaUsed": actor.system.karma.dailyKarmaUsed + dailyKarmaUsedAmount }]
+                  });
+
+                  const remainingKarmaToSpend = karma - karmaFromDaily;
+                  if (remainingKarmaToSpend > 0) {
+                    cappedTotal = Math.min(100, roll.total + remainingKarmaToSpend);
+                    lifetimeKarmaUsedAmount = cappedTotal - roll.total;
+                    karmaUsed += lifetimeKarmaUsedAmount;
+                  } else {
+                    cappedTotal = Math.min(100, roll.total + karmaFromDaily);
+                  }
+                } else {
+                  cappedTotal = Math.min(100, roll.total + karma);
+                  lifetimeKarmaUsedAmount = cappedTotal - roll.total;
+                  karmaUsed = lifetimeKarmaUsedAmount;
+                }
+              } else {
+                cappedTotal = roll.total;
+              }
+
+              const historyUpdates = [];
+              if (dailyKarmaUsedAmount > 0) {
+                historyUpdates.push({
+                  realDate: new Date().toLocaleDateString(),
+                  gameDate: "",
+                  amount: -dailyKarmaUsedAmount,
+                  type: "Daily Roll",
+                  description: `Spent daily karma on ${abilityFullName} FEAT roll`
+                });
+              }
+              if (lifetimeKarmaUsedAmount > 0) {
+                historyUpdates.push({
+                  realDate: new Date().toLocaleDateString(),
+                  gameDate: "",
+                  amount: -lifetimeKarmaUsedAmount,
+                  type: "Die Roll",
+                  description: `Spent lifetime karma on ${abilityFullName} FEAT roll`
+                });
+              }
+
+              if (historyUpdates.length > 0) {
+                const currentHistory = foundry.utils.deepClone(actor.system.karma?.history || []);
+                const newHistory = currentHistory.concat(historyUpdates);
+                
+                await game.msh.runAsGM({
+                  operation: 'update',
+                  targetActorUuid: actor.uuid,
+                  args: [{ "system.karma.history": newHistory }]
+                });
+                // No need to call _updateCurrentKarma here, prepareData handles it on sheet re-render
+              }
+              // <-- NEW/MODIFIED SECTION END -->
+
+              const resultColor = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
               
               // Create chat message styled to match your existing output format
               let content = `
@@ -2886,7 +3132,7 @@ html.find('.headquarters-row').each((i, row) => {
                   <div style="padding: 5px 10px; font-size: 0.9em;">
                     <div>Base Rank: ${abilityRank} (${abilityValue})</div>
                     ${columnShift !== 0 ? `<div>Column Shift: ${columnShift} → ${effectiveRank}</div>` : ''}
-                    <div>Roll: ${roll.total} + Karma: ${karma} = ${totalRoll}</div>
+                    <div>Roll: ${roll.total} + Karma: ${karmaUsed} = ${cappedTotal}</div>
                   </div>
                   <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
                     background-color: ${resultColor.toLowerCase() === 'white' ? '#f8f8f8' :
@@ -3255,8 +3501,54 @@ html.find('.headquarters-row').each((i, row) => {
             label: "Confirm",
             callback: html => {
               const loss = parseInt(html.find('#karma-loss').val()) || 1;
-              const current = this.actor.system.attributes.karma.value;
-              this.actor.update({ "system.attributes.karma.value": Math.max(0, current - loss) });
+              // <-- NEW/MODIFIED SECTION START -->
+              const dailyKarmaEnabled = game.settings.get("msh-faserip", "dailyKarmaEnabled");
+              let dailyKarmaLoss = 0;
+              let lifetimeKarmaLoss = 0;
+
+              if (dailyKarmaEnabled) {
+                const dailyRemaining = this.actor.system.karma.dailyKarmaMax - this.actor.system.karma.dailyKarmaUsed;
+                dailyKarmaLoss = Math.min(loss, dailyRemaining);
+                lifetimeKarmaLoss = Math.max(0, loss - dailyKarmaLoss);
+              } else {
+                lifetimeKarmaLoss = loss;
+              }
+
+              const historyUpdates = [];
+              if (dailyKarmaLoss > 0) {
+                historyUpdates.push({
+                  realDate: new Date().toLocaleDateString(),
+                  gameDate: "",
+                  amount: -dailyKarmaLoss,
+                  type: "Daily Roll",
+                  description: `Lost daily karma from negative popularity`
+                });
+              }
+              if (lifetimeKarmaLoss > 0) {
+                historyUpdates.push({
+                  realDate: new Date().toLocaleDateString(),
+                  gameDate: "",
+                  amount: -lifetimeKarmaLoss,
+                  type: "Karma Loss",
+                  description: `Lost lifetime karma from negative popularity`
+                });
+              }
+
+              if (historyUpdates.length > 0) {
+                const currentHistory = foundry.utils.deepClone(this.actor.system.karma?.history || []);
+                const newHistory = currentHistory.concat(historyUpdates);
+                
+                game.msh.runAsGM({
+                  operation: 'update',
+                  targetActorUuid: this.actor.uuid,
+                  args: [{ 
+                    "system.karma.history": newHistory,
+                    "system.karma.dailyKarmaUsed": (this.actor.system.karma.dailyKarmaUsed || 0) + dailyKarmaLoss
+                  }]
+                });
+                // No need to call _updateCurrentKarma here, prepareData handles it on sheet re-render
+              }
+              // <-- NEW/MODIFIED SECTION END -->
               ui.notifications.info(`${this.actor.name} lost ${loss} Karma.`);
             }
           }
@@ -3381,7 +3673,77 @@ _rollVehicleControl(vehicle) {
             flavor: `${actor.name} makes a Vehicle Control FEAT${stunt ? ` to perform a stunt: ${stuntName}` : ""}`
           });
 
-          const controlTotal = controlRoll.total + karma;
+          let cappedTotal = controlRoll.total; // <-- NEW LINE
+          let karmaUsed = 0; // <-- NEW LINE
+
+          // <-- NEW/MODIFIED SECTION START -->
+          const dailyKarmaEnabled = game.settings.get("msh-faserip", "dailyKarmaEnabled");
+          let dailyKarmaUsedAmount = 0;
+          let lifetimeKarmaUsedAmount = 0;
+
+          if (karma > 0) {
+            if (dailyKarmaEnabled && actor.system.karma.dailyKarmaUsed < actor.system.karma.dailyKarmaMax) {
+              const dailyKarmaRemaining = actor.system.karma.dailyKarmaMax - actor.system.karma.dailyKarmaUsed;
+              const karmaFromDaily = Math.min(karma, dailyKarmaRemaining);
+              
+              dailyKarmaUsedAmount = karmaFromDaily;
+              karmaUsed += karmaFromDaily;
+
+              await game.msh.runAsGM({
+                operation: 'update',
+                targetActorUuid: actor.uuid,
+                args: [{ "system.karma.dailyKarmaUsed": actor.system.karma.dailyKarmaUsed + dailyKarmaUsedAmount }]
+              });
+
+              const remainingKarmaToSpend = karma - karmaFromDaily;
+              if (remainingKarmaToSpend > 0) {
+                cappedTotal = Math.min(100, controlRoll.total + remainingKarmaToSpend);
+                lifetimeKarmaUsedAmount = cappedTotal - controlRoll.total;
+                karmaUsed += lifetimeKarmaUsedAmount;
+              } else {
+                cappedTotal = Math.min(100, controlRoll.total + karmaFromDaily);
+              }
+            } else {
+              cappedTotal = Math.min(100, controlRoll.total + karma);
+              lifetimeKarmaUsedAmount = cappedTotal - controlRoll.total;
+              karmaUsed = lifetimeKarmaUsedAmount;
+            }
+          } else {
+            cappedTotal = controlRoll.total;
+          }
+
+          const historyUpdates = [];
+          if (dailyKarmaUsedAmount > 0) {
+            historyUpdates.push({
+              realDate: new Date().toLocaleDateString(),
+              gameDate: "",
+              amount: -dailyKarmaUsedAmount,
+              type: "Daily Roll",
+              description: `Spent daily karma on Vehicle Control for ${vehicle.name}`
+            });
+          }
+          if (lifetimeKarmaUsedAmount > 0) {
+            historyUpdates.push({
+              realDate: new Date().toLocaleDateString(),
+              gameDate: "",
+              amount: -lifetimeKarmaUsedAmount,
+              type: "Die Roll",
+              description: `Spent lifetime karma on Vehicle Control for ${vehicle.name}`
+            });
+          }
+
+          if (historyUpdates.length > 0) {
+            const currentHistory = foundry.utils.deepClone(actor.system.karma?.history || []);
+            const newHistory = currentHistory.concat(historyUpdates);
+            
+            await game.msh.runAsGM({
+              operation: 'update',
+              targetActorUuid: actor.uuid,
+              args: [{ "system.karma.history": newHistory }]
+            });
+            // No need to call _updateCurrentKarma here, prepareData handles it on sheet re-render
+          }
+          // <-- NEW/MODIFIED SECTION END -->
 
           const getFEATColor = (rank, total) => {
             const [g, y, r] = {
@@ -3398,7 +3760,7 @@ _rollVehicleControl(vehicle) {
             return "red";
           };
 
-          const featColor = getFEATColor(shiftedRank, controlTotal).toLowerCase();
+          const featColor = getFEATColor(shiftedRank, cappedTotal).toLowerCase(); // <-- MODIFIED: Use cappedTotal
           const isCrash = featColor === "white";
           const stuntFailure = stunt && isCrash;
           let crashDetails = "";
@@ -3492,7 +3854,7 @@ _rollVehicleControl(vehicle) {
                 <h3>${actor.name} - Vehicle Control FEAT</h3>
                 <p>Control Rank: ${controlRank}${controlCSLoss > 0 ? ` -${controlCSLoss}CS → ${adjustedControlRank}` : ""}</p>
                 <p>Used Rank: ${baseUsedRank} → ${shiftedRank}</p>
-                <p>Roll: ${controlRoll.total} + Karma ${karma} = ${controlTotal}</p>
+                <p>Roll: ${controlRoll.total} + Karma ${karmaUsed} = ${cappedTotal}</p> <!-- MODIFIED: use karmaUsed -->
                 <div style="text-align:center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px;
                   background-color: ${colorStyles[featColor]}; color: ${textColor(featColor)};">
                   ${stuntFailure ? `STUNT FAILED – ${stuntName || "Unnamed stunt"}` : (isCrash ? "OUT OF CONTROL!" : "CONTROL MAINTAINED")} (${featColor.toUpperCase()})

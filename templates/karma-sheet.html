@@ -2,7 +2,7 @@
   <!-- Summary Header -->
   <div class="karma-summary">
     <div class="summary-item">
-      <label>Current<br>Karma</label>
+      <label>Available<br>Karma</label>
       <div class="value">{{currentKarma}}</div>
     </div>
     <div class="summary-item">
@@ -21,6 +21,14 @@
       <label>Karma<br>Pool</label>
       <div class="value">{{system.karma.pool}}</div>
     </div>
+    <!-- NEW SECTION: Daily Karma Summary -->
+    {{#if dailyKarmaEnabled}}
+    <div class="summary-item daily-karma-summary">
+      <label>Daily Karma</label>
+      <div class="value">{{dailyKarmaRemaining}} / {{dailyKarmaMax}}</div>
+      <div class="sub-value">(Used: {{dailyKarmaUsed}})</div>
+    </div>
+    {{/if}}
   </div>
 
   <!-- Control Buttons -->
@@ -33,6 +41,12 @@
     <button type="button" class="export-karma"><i class="fas fa-file-export"></i> Export</button>
     {{#if isGM}}
     <button type="button" class="clear-karma danger-button"><i class="fas fa-trash-alt"></i> Clear All Karma Data</button>
+    {{/if}}
+    <!-- NEW BUTTON -->
+    {{#if isGM}}
+      {{#if dailyKarmaEnabled}}
+      <button type="button" class="reset-daily-karma danger-button"><i class="fas fa-redo"></i> Reset Daily Karma</button>
+      {{/if}}
     {{/if}}
   </div>
 

@@ -29,7 +29,12 @@
         "scripts/itemSheet.js",
         "scripts/universalTable.js",
         "scripts/macros.js",
-        "scripts/gm-utils.js"
+        "scripts/gm-utils.js",
+        "scripts/rolls.js",
+        "scripts/combat-handler.js",
+        "scripts/karma.js",
+        "scripts/karmaAdvancement.js",
+        "scripts/karmaPool.js"
         ],
     "styles": [
         "styles/global.css",
@@ -100,5 +105,16 @@
     "relationships": {},
     "primaryTokenAttribute": "health",
     "gridDistance": 44,
-    "gridUnits": "yards"
+    "gridUnits": "yards",
+    "settings": [
+        {
+            "key": "dailyKarmaEnabled",
+            "name": "Enable Daily Karma",
+            "hint": "If enabled, characters gain temporary Karma equal to their Reason+Intuition+Psyche at the start of each session, used before their lifetime Karma pool.",
+            "scope": "world",
+            "config": true,
+            "type": "Boolean",
+            "default": false
+        }
+    ]
 }

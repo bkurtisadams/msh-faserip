@@ -50,6 +50,14 @@ export class KarmaSheet extends DocumentSheet {
     if (!context.system.karma.poolMembers) {
       context.system.karma.poolMembers = [];
     }
+
+    // <-- NEW/MODIFIED SECTION START -->
+    // Daily Karma specific data
+    context.dailyKarmaEnabled = game.settings.get("msh-faserip", "dailyKarmaEnabled"); // <-- NEW LINE
+    context.dailyKarmaMax = context.system.karma.dailyKarmaMax || 0; // <-- NEW LINE
+    context.dailyKarmaUsed = context.system.karma.dailyKarmaUsed || 0; // <-- NEW LINE
+    context.dailyKarmaRemaining = Math.max(0, context.dailyKarmaMax - context.dailyKarmaUsed); // <-- NEW LINE
+    // <-- NEW/MODIFIED SECTION END -->
     
     // Sort history by date descending
     context.system.karma.history.sort((a, b) => {
@@ -64,6 +72,8 @@ export class KarmaSheet extends DocumentSheet {
         event.cssClass = "karma-die-roll";
       } else if (event.type === "Power Stunt") {
         event.cssClass = "karma-power-stunt";
+      } else if (event.type === "Daily Roll") { // <-- NEW LINE
+        event.cssClass = "karma-daily-roll"; // <-- NEW LINE
       } else if (event.amount < 0) {
         event.cssClass = "karma-loss";
       } else if (event.amount > 0) {
@@ -71,28 +81,24 @@ export class KarmaSheet extends DocumentSheet {
       }
     });
     
-    // Calculate total spent karma
-    context.totalSpent = this._calculateTotalSpent(context.system.karma.history);
+    // Calculate total spent karma, excluding 'Daily Roll' entries
+    context.totalSpent = this._calculateTotalSpentLifetime(context.system.karma.history); // <-- MODIFIED LINE
     
-    // Calculate current available karma
-    const totalEarned = context.system.karma.lifetime || 0;
-    const advancementFund = context.system.karma.advancement || 0;
-    const karmaPool = context.system.karma.pool || 0;
-    
-    // Current karma = Total earned - Total spent - Advancement Fund - Karma Pool
-    context.currentKarma = Math.max(0, totalEarned - context.totalSpent - advancementFund - karmaPool);
-    //context.currentKarma = this.actor.system.attributes.karma.value;
+    // Current available karma should directly reflect actor's system.attributes.karma.value
+    // as it's correctly managed by prepareData.
+    context.currentKarma = this.object.system.attributes.karma.value; // <-- MODIFIED LINE
     
     return context;
   }
   
-  // Method to calculate total spent karma
-  _calculateTotalSpent(history) {
+  // Method to calculate total spent karma, excluding "Daily Roll" entries
+  _calculateTotalSpentLifetime(history) { // <-- MODIFIED METHOD NAME
     if (!history || !history.length) return 0;
     
     let totalSpent = 0;
     history.forEach(event => {
-      if (event.amount < 0) {
+      // Only count karma that has been spent (negative amount) AND is not a "Daily Roll"
+      if (event.amount < 0 && event.type !== "Daily Roll") { // <-- MODIFIED LINE
         totalSpent += Math.abs(event.amount);
       }
     });
@@ -100,14 +106,16 @@ export class KarmaSheet extends DocumentSheet {
     return totalSpent;
   }
 
-  // Method to calculate current karma
+  // Method to calculate current karma (this method is now redundant due to prepareData)
+  /*
   _getCurrentKarma() {
     const totalEarned = this.object.system.karma.lifetime || 0;
-    const totalSpent = this._calculateTotalSpent(this.object.system.karma.history);
+    const totalSpent = this._calculateTotalSpentLifetime(this.object.system.karma.history);
     const advancementFund = this.object.system.karma.advancement || 0;
     const karmaPool = this.object.system.karma.pool || 0;
     return Math.max(0, totalEarned - totalSpent - advancementFund - karmaPool);
   }
+  */ // Removed as per prompt discussion
 
   activateListeners(html) {
     super.activateListeners(html);
@@ -158,6 +166,7 @@ export class KarmaSheet extends DocumentSheet {
     // Clear All Karma button (GM only)
     if (game.user.isGM) {
         html.find('.clear-karma').click(ev => this._onClearKarma(ev));
+        html.find('.reset-daily-karma').click(ev => this._onResetDailyKarma(ev)); // <-- NEW LINE
     }
 
     // In the activateListeners method of KarmaSheet class, add:
@@ -179,6 +188,44 @@ export class KarmaSheet extends DocumentSheet {
 
     // other listeners
   }
+
+  // <-- NEW METHOD START -->
+  async _onResetDailyKarma(event) {
+    event.preventDefault();
+    if (!game.user.isGM) {
+      ui.notifications.warn("Only GMs can reset daily karma.");
+      return;
+    }
+  
+    const confirmed = await Dialog.confirm({
+      title: "Reset Daily Karma",
+      content: `Are you sure you want to reset <strong>${this.object.name}</strong>'s daily karma usage to 0? This will make their full daily karma available again.`
+    });
+  
+    if (confirmed) {
+      // Ensure dailyKarmaUsed exists
+      let dailyKarmaUsed = this.object.system.karma.dailyKarmaUsed || 0;
+      
+      // If there was any daily karma used, add a history entry for the reset
+      if (dailyKarmaUsed > 0) {
+        const historyEntry = {
+          realDate: new Date().toLocaleDateString(),
+          gameDate: "",
+          amount: dailyKarmaUsed, // Positive amount to represent "return" to the pool
+          type: "Daily Karma Reset",
+          description: "Daily karma reset by GM"
+        };
+        const currentHistory = foundry.utils.deepClone(this.object.system.karma?.history || []);
+        currentHistory.push(historyEntry);
+        await this.object.update({ "system.karma.history": currentHistory });
+      }
+
+      // Reset dailyKarmaUsed to 0
+      await this.object.update({ "system.karma.dailyKarmaUsed": 0 });
+      ui.notifications.info(`Daily karma for ${this.object.name} has been reset.`);
+    }
+  }
+  // <-- NEW METHOD END -->
 
   _onClearKarma(event) {
       event.preventDefault();
@@ -202,7 +249,9 @@ export class KarmaSheet extends DocumentSheet {
                 "system.attributes.karma.value": 0,
                 "system.karma.lifetime": 0,
                 "system.karma.advancement": 0,
-                "system.karma.pool": 0
+                "system.karma.pool": 0,
+                "system.karma.dailyKarmaUsed": 0, // <-- NEW LINE
+                "system.karma.dailyKarmaMax": 0  // <-- NEW LINE
               });
               
               ui.notifications.info(`All karma data for ${this.object.name} has been cleared.`);
@@ -250,6 +299,7 @@ export class KarmaSheet extends DocumentSheet {
               <option value="Defeat">Defeat (-20/-40)</option>
               <option value="Property Damage">Property Damage (-5 per area)</option>
               <option value="Role-Playing">Role-Playing Bonus</option>
+              <option value="Daily Roll" disabled>Daily Roll (Automated)</option> <!-- NEW LINE -->
             </select>
           </div>
           <div class="form-group">
@@ -327,6 +377,7 @@ export class KarmaSheet extends DocumentSheet {
               <option value="Advancement">Transfer to Advancement Fund</option>
               <option value="Pool">Transfer to Karma Pool</option>
               <option value="Other">Other</option>
+              <option value="Daily Roll" disabled>Daily Roll (Automated)</option> <!-- NEW LINE -->
             </select>
           </div>
           <div class="form-group">
@@ -589,25 +640,49 @@ export class KarmaSheet extends DocumentSheet {
       history = history.concat(data);
     }
     
-    // Calculate totals
-    let karmaTotal = 0;
-    let lifetimeTotal = 0;
+    // Recalculate totals needed for a complete update
+    let totalEarned = 0;
+    let totalSpentLifetime = 0; // Excludes daily rolls
+    let dailyKarmaUsed = 0;
     
     history.forEach(event => {
-      if (event.amount) {
-        karmaTotal += event.amount;
-        if (event.amount > 0) lifetimeTotal += event.amount;
+      const amount = Number(event.amount) || 0;
+      if (amount > 0) {
+        totalEarned += amount;
+      } else { // amount < 0
+        if (event.type === "Daily Roll") { // <-- NEW LINE
+          dailyKarmaUsed += Math.abs(amount); // <-- NEW LINE
+        } else { // <-- NEW LINE
+          totalSpentLifetime += Math.abs(amount); // <-- NEW LINE
+        } // <-- NEW LINE
       }
     });
     
-    // Ensure karma doesn't go negative
-    karmaTotal = Math.max(0, karmaTotal);
-    
+    // Get current advancement fund and karma pool values (they are not affected by history import directly)
+    const advancementFund = this.object.system.karma.advancement || 0;
+    const karmaPool = this.object.system.karma.pool || 0;
+    const dailyKarmaMax = this.object.system.karma.dailyKarmaMax || 0; // <-- NEW LINE
+
+    // Calculate effective karma value based on game setting
+    const dailyKarmaEnabled = game.settings.get("msh-faserip", "dailyKarmaEnabled"); // <-- NEW LINE
+    let currentKarmaValue; // This is system.attributes.karma.value
+
+    if (dailyKarmaEnabled) { // <-- NEW LINE
+        const dailyRemaining = Math.max(0, dailyKarmaMax - dailyKarmaUsed); // <-- NEW LINE
+        currentKarmaValue = dailyRemaining; // <-- NEW LINE
+        if (dailyRemaining <= 0) { // If daily is depleted, fall back to lifetime karma // <-- NEW LINE
+            currentKarmaValue = Math.max(0, totalEarned - totalSpentLifetime - advancementFund - karmaPool); // <-- NEW LINE
+        } // <-- NEW LINE
+    } else { // Use standard lifetime karma calculation if daily karma is not enabled // <-- NEW LINE
+        currentKarmaValue = Math.max(0, totalEarned - totalSpentLifetime - advancementFund - karmaPool); // <-- NEW LINE
+    } // <-- NEW LINE
+
     // Update the actor
     await this.object.update({
       "system.karma.history": history,
-      "system.attributes.karma.value": karmaTotal,
-      "system.karma.lifetime": lifetimeTotal
+      "system.attributes.karma.value": currentKarmaValue, // <-- MODIFIED LINE
+      "system.karma.lifetime": totalEarned,
+      "system.karma.dailyKarmaUsed": dailyKarmaUsed // <-- NEW LINE
     });
     
     ui.notifications.info(`Imported ${data.length} karma entries.`);
@@ -710,17 +785,20 @@ export class KarmaSheet extends DocumentSheet {
             const originalHistory = foundry.utils.deepClone(this.object.system.karma?.history || []);
             
             // Find the original entry and update it
+            // This is a naive way to find the original index, might fail if multiple entries are identical
             const originalIndex = originalHistory.findIndex(e => 
               e.realDate === event.realDate && 
               e.type === event.type && 
-              e.description === event.description
+              e.description === event.description &&
+              e.amount === event.amount // Also compare amount for better uniqueness
             );
             
             if (originalIndex !== -1) {
               originalHistory[originalIndex] = event;
               this._updateKarmaHistory(originalHistory);
             } else {
-              // Fallback if entry not found
+              // Fallback if entry not found (shouldn't happen often if unique enough data)
+              // Or if the order was somehow changed, update the current sorted array
               this._updateKarmaHistory(history);
             }
           }
@@ -778,34 +856,49 @@ export class KarmaSheet extends DocumentSheet {
   }
 
   async _updateKarmaHistory(history) {
-    // Recalculate totals
+    // Recalculate totals needed for a complete update
     let totalEarned = 0;
-    let totalSpent = 0;
+    let totalSpentLifetime = 0; // Excludes daily rolls
+    let dailyKarmaUsed = 0; // <-- NEW LINE
     
     history.forEach(event => {
       const amount = Number(event.amount) || 0;
       if (amount > 0) {
         totalEarned += amount;
-      } else {
-        totalSpent += Math.abs(amount);
+      } else { // amount < 0
+        if (event.type === "Daily Roll") { // <-- NEW LINE
+          dailyKarmaUsed += Math.abs(amount); // <-- NEW LINE
+        } else { // <-- NEW LINE
+          totalSpentLifetime += Math.abs(amount); // <-- NEW LINE
+        } // <-- NEW LINE
       }
     });
     
-    // Get current advancement fund and karma pool values
+    // Get current advancement fund and karma pool values (they are not affected by history changes directly)
     const advancementFund = this.object.system.karma.advancement || 0;
     const karmaPool = this.object.system.karma.pool || 0;
+    const dailyKarmaMax = this.object.system.karma.dailyKarmaMax || 0; // <-- NEW LINE
     
-    // Calculate current available karma
-    let currentKarma = totalEarned - totalSpent - advancementFund - karmaPool;
-    
-    // Ensure karma doesn't go negative
-    currentKarma = Math.max(0, currentKarma);
-    
+    // Calculate effective karma value based on game setting
+    const dailyKarmaEnabled = game.settings.get("msh-faserip", "dailyKarmaEnabled"); // <-- NEW LINE
+    let currentKarmaValue; // This is system.attributes.karma.value
+
+    if (dailyKarmaEnabled) { // <-- NEW LINE
+        const dailyRemaining = Math.max(0, dailyKarmaMax - dailyKarmaUsed); // <-- NEW LINE
+        currentKarmaValue = dailyRemaining; // <-- NEW LINE
+        if (dailyRemaining <= 0) { // If daily is depleted, fall back to lifetime karma // <-- NEW LINE
+            currentKarmaValue = Math.max(0, totalEarned - totalSpentLifetime - advancementFund - karmaPool); // <-- NEW LINE
+        } // <-- NEW LINE
+    } else { // Use standard lifetime karma calculation if daily karma is not enabled // <-- NEW LINE
+        currentKarmaValue = Math.max(0, totalEarned - totalSpentLifetime - advancementFund - karmaPool); // <-- NEW LINE
+    } // <-- NEW LINE
+
     // Update the actor
     await this.object.update({
       "system.karma.history": history,
-      "system.attributes.karma.value": currentKarma,
-      "system.karma.lifetime": totalEarned
+      "system.attributes.karma.value": currentKarmaValue, // <-- MODIFIED LINE
+      "system.karma.lifetime": totalEarned,
+      "system.karma.dailyKarmaUsed": dailyKarmaUsed // <-- NEW LINE
     });
     
     this.render();

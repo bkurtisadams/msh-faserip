@@ -36,7 +36,7 @@
           "health": { "value": 40, "max": 40 },
           "karma": { "value": 30, "max": 30 },
           "resources": { "rank": "Typical", "value": 6 },
-          "popularity": { 
+          "popularity": {
             "hero": { "value": 10, "max": 100, "isNegative": false },
             "secretId": { "value": 0, "max": 100, "isNegative": false }
           }
@@ -60,7 +60,9 @@
           "poolName": "",
           "poolMembers": [],
           "lifetime": 0,
-          "history": []
+          "history": [],
+          "dailyKarmaUsed": 0,
+          "dailyKarmaMax": 0
         }
       }
     },
@@ -152,13 +154,13 @@
     },
     "equipment": {
       "templates": ["base", "ranked"],
-      "category": "gear", 
+      "category": "gear",
       "materialStrength": "Typical",
       "description": "",
       "notes": "",
       "price": "Poor",
       "legality": "legal",
-      
+
       "weaponType": "",
       "range": "",
       "damage": "",
@@ -168,27 +170,27 @@
       "shotsRemaining": "",
       "ammoType": "Standard",
       "specialAmmo": [],
-      
+
       "burstScatter": "none",
       "stunIntensity": "",
       "continuingDamage": "",
       "continuingDamageRounds": "",
       "requiresTwoOperators": false,
-      
+
       "protection": "",
       "coverage": "partial",
-      
+
       "powerRank": "Typical",
       "linkedAbility": "reason",
       "powerType": "",
       "powerRange": "",
-      
+
       "customAbilities": [],
-      
+
       "isGrenade": false,
       "grenadeType": "",
       "grenadeRadius": 1,
-      
+
       "isMissile": false,
       "missileType": "Standard",
       "missileBody": "",

@@ -50,14 +50,55 @@ export class FaseripActor extends Actor {
     // Update the karma max value
     system.attributes.karma.max = karmaMax;
     
-    // Set karma value to max if not already set or if current exceeds max
-    /* if (!system.attributes.karma.value || system.attributes.karma.value > karmaMax) {
-      system.attributes.karma.value = karmaMax;
-    } */
     // Only initialize Karma value if it's missing completely
     if (typeof system.attributes.karma.value !== 'number') {
       system.attributes.karma.value = karmaMax;
     }
+
+    // <-- NEW/MODIFIED SECTION START -->
+    // Initialize karma sub-fields if missing
+    if (!system.karma) {
+      system.karma = {
+        advancement: 0,
+        advancementPurpose: "",
+        advancementDetail: "",
+        pool: 0,
+        poolName: "",
+        poolMembers: [],
+        lifetime: 0,
+        history: [],
+        dailyKarmaUsed: 0,  // <-- NEW LINE
+        dailyKarmaMax: 0    // <-- NEW LINE
+      };
+    }
+
+    // Set dailyKarmaMax based on the sum of Reason, Intuition, Psyche
+    system.karma.dailyKarmaMax = karmaMax; // Using the already calculated karmaMax
+
+    // Determine current available karma, prioritizing daily karma if enabled
+    const dailyKarmaEnabled = game.settings.get("msh-faserip", "dailyKarmaEnabled"); // <-- NEW LINE
+    let effectiveKarmaForRolls = 0; // The value that will be displayed and used for rolls
+
+    if (dailyKarmaEnabled) { // <-- NEW LINE
+      const dailyRemaining = Math.max(0, system.karma.dailyKarmaMax - (system.karma.dailyKarmaUsed || 0)); // <-- NEW LINE
+      effectiveKarmaForRolls = dailyRemaining; // <-- NEW LINE
+      // If daily is depleted, fall back to lifetime karma
+      if (dailyRemaining <= 0) { // <-- NEW LINE
+        const lifetimeSpent = this._calculateTotalSpentLifetime(system.karma.history); // <-- NEW LINE
+        const advancementFund = system.karma.advancement || 0; // <-- NEW LINE
+        const karmaPool = system.karma.pool || 0; // <-- NEW LINE
+        effectiveKarmaForRolls = Math.max(0, system.karma.lifetime - lifetimeSpent - advancementFund - karmaPool); // <-- NEW LINE
+      }
+    } else { // Use standard lifetime karma calculation if daily karma is not enabled
+      const lifetimeSpent = this._calculateTotalSpentLifetime(system.karma.history);
+      const advancementFund = system.karma.advancement || 0;
+      const karmaPool = system.karma.pool || 0;
+      effectiveKarmaForRolls = Math.max(0, system.karma.lifetime - lifetimeSpent - advancementFund - karmaPool);
+    }
+    
+    // Set the attributes.karma.value to the effective karma calculated
+    system.attributes.karma.value = effectiveKarmaForRolls; // <-- MODIFIED LINE (now uses effectiveKarmaForRolls)
+    // <-- NEW/MODIFIED SECTION END -->
 
       // Set Resources value based on rank
   if (system.attributes.resources) {
@@ -105,5 +146,21 @@ export class FaseripActor extends Actor {
   
   return reason + intuition + psyche;
 }
+
+  // <-- NEW/MODIFIED SECTION START -->
+  // Helper method to calculate total spent karma, excluding "Daily Roll" entries
+  _calculateTotalSpentLifetime(history) {
+    if (!history || !history.length) return 0;
+    
+    let totalSpent = 0;
+    history.forEach(event => {
+      // Only count karma that has been spent (negative amount) AND is not a "Daily Roll"
+      if (event.amount < 0 && event.type !== "Daily Roll") { // <-- MODIFIED LINE
+        totalSpent += Math.abs(event.amount);
+      }
+    });
+    return totalSpent;
+  }
+  // <-- NEW/MODIFIED SECTION END -->
 
 }

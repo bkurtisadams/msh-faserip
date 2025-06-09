@@ -1002,10 +1002,28 @@
             <label>Karma Pool</label>
             <input type="number" name="system.karma.pool" value="{{system.karma.pool}}" />
           </div>
+
+          <!-- NEW SECTION: Daily Karma Display -->
+          {{#if dailyKarmaEnabled}}
+          <div class="karma-daily">
+            <label>Daily Karma</label>
+            <div class="stacked-values">
+              <input type="number" value="{{dailyKarmaRemaining}}" disabled />
+              <div class="divider">/</div>
+              <input type="number" value="{{dailyKarmaMax}}" disabled />
+            </div>
+            <span class="daily-karma-used-text">(Used: {{dailyKarmaUsed}})</span>
+          </div>
+          {{/if}}
         </div>
         <div class="karma-buttons">
           <button type="button" class="view-karma-history tab-style-button"><i class="fas fa-history"></i> View Karma
             History</button>
+          {{#if dailyKarmaEnabled}}
+            {{#if isGM}}
+            <button type="button" class="reset-daily-karma-button tab-style-button danger-button"><i class="fas fa-redo"></i> Reset Daily Karma</button>
+            {{/if}}
+          {{/if}}
         </div>
       </div>
 </form>
