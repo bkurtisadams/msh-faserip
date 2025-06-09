@@ -73,7 +73,7 @@ const ACTION_RESULT_LABELS = {
                             // 0      Feeble  Poor   Typical  Good    Ex      Rm      In      Am       Mn    Un      Sh X     Sh Y    Sh Z    1000   3000     5000   Beyond
 export const rankRows = [
   { label: "01", colors:    ["white","white","white","white","white","white","white","white","white","white","white","white","white","white","white","white","white","white"] },
-  { label: "02–03", colors: ["white","white","white","white","white","white","white","white","white","white","white","white","white","white","green","green","green","green"] },
+  { label: "02–03", colors: ["white","white","white","white","white","white","white","white","white","white","white","white","white","green","green","green","green","green"] },
   { label: "04–06", colors: ["white","white","white","white","white","white","white","white","white","white","white","white","white","green","green","green","green","green"] },
   { label: "07–10", colors: ["white","white","white","white","white","white","white","white","white","white","white","white","green","green","green","green","green","green"] },
   { label: "11–15", colors: ["white","white","white","white","white","white","white","white","white","white","white","green","green","green","green","green","green","green"] },
@@ -95,7 +95,7 @@ export const rankRows = [
   { label: "91–94", colors: ["green","yellow","yellow","yellow","yellow","yellow","yellow","red"  ,"red"   ,"red"   ,"red"   ,"red"   ,"red"  ,"red"   ,"red"   ,"red"   ,"red"  ,"red"] },
   { label: "95–97", colors: ["yellow","yellow","yellow","yellow","yellow","red"  ,"red"  ,"red"   ,"red"   ,"red"   ,"red"   ,"red"   ,"red"  ,"red"   ,"red"   ,"red"   ,"red"  ,"red"] },
   { label: "98–99", colors: ["yellow","yellow","yellow","red"   ,"red"   ,"red"  ,"red"  ,"red"   ,"red"   ,"red"   ,"red"   ,"red"   ,"red"  ,"red"   ,"red"   ,"red"   ,"red"  ,"red"] },
-  { label: "100", colors:   ["red"   ,"red"   ,"red"   ,"red"   ,"red"   ,"red"  ,"red"  ,"red"   ,"red"   ,"red"   ,"red"   ,"red"   ,"red"  ,"red"   ,"red"   ,"red"   ,"red"  ,"red"] }
+  { label: "100", colors:   ["red"   ,"red"   ,"red"   ,"red"   ,"red"   ,"red"  ,"red"  ,"red"   ,"red"   ,"red"   ,"red"   ,"red"  ,"red"   ,"red"   ,"red"   ,"red"  ,"red"] }
 ];
 
 // Power Rank Range Table (based on "Faserip Combat 02.txt")
@@ -825,54 +825,53 @@ export class FaseripRolls {
     const savedActionType = power.getFlag("msh-faserip", "lastActionType");
     const validActionType = Object.keys(ACTIONS).includes(savedActionType) ? savedActionType : "General Power Use";
     const savedColumnShift = power.getFlag("msh-faserip", "lastColumnShift") || 0;
-    const savedDamageCS = power.getFlag("msh-faserip", "lastDamageCS") || 0;
-    const savedDamageType = power.getFlag("msh-faserip", "lastDamageType") || "Energy-Energy";
+    const savedDamageCS = power.getFlag("msh-faserip", "lastDamageCS") || 0; // Add this line
+    const savedDamageType = power.getFlag("msh-faserip", "lastDamageType") || "Energy-Energy"; // Add this line
     const skipDiceRoll = power.getFlag("msh-faserip", "skipDiceRoll") || false;
 
-    // --- NEW: Determine target distance and power range penalty ---
-    let distance = options.distance;
-    if (distance === undefined) { // If distance not passed via options, try to calculate from tokens
-      const targetToken = game.user.targets.first();
-      if (targetToken && canvas.tokens.controlled.length > 0) {
-        const controlledToken = canvas.tokens.controlled[0];
-        const ray = new Ray(controlledToken.center, targetToken.center);
-        distance = Math.round(ray.distance / canvas.scene.grid.size);
-      } else {
-        distance = 0; // Default to adjacent if no target
-      }
+    // --- INITIAL DISTANCE FOR DIALOG ---
+    let initialDistance = 0;
+    const targetTokenForInitialDialog = game.user.targets.first();
+    if (targetTokenForInitialDialog && canvas.tokens.controlled.length > 0) {
+      const controlledToken = canvas.tokens.controlled[0];
+      const ray = new Ray(controlledToken.center, targetTokenForInitialDialog.center);
+      initialDistance = Math.round(ray.distance / canvas.scene.grid.size);
     }
-
-    let powerRangePenalty = 0;
-    let powerRangeInfo = "";
-    const powerRank = power.system.rank || "Typical";
-    const basePowerRange = POWER_RANGE_VALUES[powerRank] || 0; // Use the global POWER_RANGE_VALUES
-
-    if (distance > basePowerRange) {
-      powerRangePenalty = distance - basePowerRange;
-      powerRangeInfo = `<div><strong>Range:</strong> ${distance} areas (Base: ${basePowerRange} areas). Penalty: -${powerRangePenalty}CS.</div>`;
-    } else if (distance > 0) {
-      powerRangeInfo = `<div><strong>Range:</strong> ${distance} areas (within base range of ${basePowerRange} areas). No penalty.</div>`;
-    } else {
-      powerRangeInfo = `<div><strong>Range:</strong> Adjacent (no penalty).</div>`;
-    }
-    // --- END NEW ---
+    // --- END INITIAL DISTANCE ---
 
     // If this is a direct roll (macro called with options or dialog submitted)
     // Check if CTRL is pressed or if this is a direct roll call
     if (options.useDirectRoll || game.keyboard.isModifierActive(foundry.helpers.interaction.KeyboardManager.MODIFIER_KEYS.CONTROL)) {
+      // Optional notification that CTRL quick roll is being used
       if (game.keyboard.isModifierActive(foundry.helpers.interaction.KeyboardManager.MODIFIER_KEYS.CONTROL)) {
         ui.notifications.info("Quick roll with saved settings (CTRL pressed)");
       }
       // Use provided options from dialog or direct call
       const actionType = options.actionType || savedActionType;
-      // --- MODIFIED: Apply powerRangePenalty to the column shift ---
       const rawColumnShift = options.columnShift ?? savedColumnShift;
-      const totalColumnShift = rawColumnShift - powerRangePenalty; // Apply range penalty here
-      // --- END MODIFIED ---
-      const damageCS = options.damageCS ?? savedDamageCS;
-      const damageType = options.damageType || savedDamageType;
       const karma = options.karma || 0;
       const skipDice = options.skipDice ?? skipDiceRoll;
+      const damageCS = options.damageCS ?? savedDamageCS;
+      const damageType = options.damageType || savedDamageType;
+
+      // --- RECALCULATE RANGE PENALTY FOR THE ACTUAL ROLL ---
+      let currentRollDistance = options.distance ?? initialDistance; // Use distance from options if available, otherwise initial
+      let powerRangePenalty = 0;
+      let powerRangeInfo = "";
+      const powerRank = power.system.rank || "Typical";
+      const basePowerRange = POWER_RANGE_VALUES[powerRank] || 0;
+
+      if (currentRollDistance > basePowerRange) {
+        powerRangePenalty = currentRollDistance - basePowerRange;
+        powerRangeInfo = `<div><strong>Range:</strong> ${currentRollDistance} areas (Base: ${basePowerRange} areas). Penalty: -${powerRangePenalty}CS.</div>`;
+      } else if (currentRollDistance > 0) {
+        powerRangeInfo = `<div><strong>Range:</strong> ${currentRollDistance} areas (within base range of ${basePowerRange} areas). No penalty.</div>`;
+      } else {
+        powerRangeInfo = `<div><strong>Range:</strong> Adjacent (no penalty).</div>`;
+      }
+      // --- END RECALCULATE ---
+
+      const totalColumnShift = rawColumnShift - powerRangePenalty; // Apply range penalty here
 
       // Get the power's rank and value
       const powerValue = power.system.value || 6;
@@ -947,7 +946,7 @@ export class FaseripRolls {
         } else {
           cappedTotal = Math.min(100, roll.total + karma);
           lifetimeKarmaUsedAmount = cappedTotal - roll.total;
-          karmaUsed = lifetimeKarmaUsedAmount;
+          karmaUsed = cappedTotal - roll.total; // Corrected to only add to karmaUsed if lifetime karma used
         }
       } else {
         cappedTotal = roll.total;
@@ -1004,14 +1003,14 @@ export class FaseripRolls {
         </div>
         <div style="padding: 5px 10px; font-size: 0.9em;">
           <div>Base Rank: ${powerRank} (${powerValue})</div>
-          <div>Column Shift: ${totalColumnShift} → ${effectiveRank}</div> <!-- MODIFIED LINE -->
+          <div>Column Shift: ${totalColumnShift > 0 ? "+" : ""}${totalColumnShift} → ${effectiveRank}</div> <!-- MODIFIED LINE -->
           ${damageCS !== 0 && damageRankName
             ? `<div>Damage Column Shift: ${damageCS > 0 ? "+" : ""}${damageCS}CS → <strong>${damageRankName} (${damageRankValue})</strong></div>`
             : ""}
-          ${powerRangeInfo} <!-- NEW LINE -->
+          ${powerRangeInfo} <!-- This line now uses the re-calculated powerRangeInfo -->
           <div>Roll: ${roll.total} + Karma: ${karmaUsed} = ${cappedTotal}</div>
         </div>
-        <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px;
+        <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
           background-color: ${resultColor.toLowerCase() === 'white' ? '#f8f8f8 !important' :
           resultColor.toLowerCase() === 'green' ? '#4CAF50 !important' :
             resultColor.toLowerCase() === 'yellow' ? '#FFC107 !important' :
@@ -1134,8 +1133,24 @@ export class FaseripRolls {
       return false;
     };
 
+    // --- RECALCULATE powerRangeInfo FOR DIALOG CONTENT ---
+    // This ensures the dialog shows current range info based on selected tokens at render time
+    let dialogPowerRangeInfo = "";
+    const powerRank = power.system.rank || "Typical";
+    const basePowerRange = POWER_RANGE_VALUES[powerRank] || 0;
+
+    if (initialDistance > basePowerRange) {
+      const penalty = initialDistance - basePowerRange;
+      dialogPowerRangeInfo = `<div><strong>Range:</strong> ${initialDistance} areas (Base: ${basePowerRange} areas). Penalty: -${penalty}CS.</div>`;
+    } else if (initialDistance > 0) {
+      dialogPowerRangeInfo = `<div><strong>Range:</strong> ${initialDistance} areas (within base range of ${basePowerRange} areas). No penalty.</div>`;
+    } else {
+      dialogPowerRangeInfo = `<div><strong>Range:</strong> Adjacent (no penalty).</div>`;
+    }
+    // --- END RECALCULATE ---
+
     // Create dialog for roll options
-    dialogContent = `
+    let dialogContent = `
       <div style="background: #f0e8d8; padding: 10px; border-radius: 5px;">
         <div style="margin-bottom: 10px;">
           <label style="display: inline-block; width: 120px;">Action Type:</label>
@@ -1149,7 +1164,7 @@ export class FaseripRolls {
         </div>
         <div style="margin-bottom: 10px;">
           <label style="display: inline-block; width: 120px;">Target Distance:</label>
-          <input type="number" id="distance" name="distance" value="${distance}" min="0" style="width: 50px;"> areas
+          <input type="number" id="distance" name="distance" value="${initialDistance}" min="0" style="width: 50px;"> areas
         </div>
         <div style="margin-bottom: 10px;">
           <label style="display: inline-block; width: 120px;">Column Shift:</label>
@@ -1178,18 +1193,19 @@ export class FaseripRolls {
         </div>
         <div>
           <label>
-            <input type="checkbox" id="skip-dice" name="skipDice" ${skipDiceRoll ? 'checked' : ''}>
+            <input type="checkbox" id="skip-dice" name="skipDice" ${skipDiceRoll ? 'checked' : ''}> 
             Skip dice animation
           </label>
         </div>
         <div style="margin-top: 10px;">
           <label>
-            <input type="checkbox" id="save-settings" name="saveSettings" checked>
+            <input type="checkbox" id="save-settings" name="saveSettings" checked> 
             Remember these settings for future rolls
           </label>
         </div>
-        ${powerRangeInfo} <!-- NEW LINE -->
+        ${dialogPowerRangeInfo} <!-- NEW LINE -->
       </div>`;
+
 
       return new Dialog({
         title: `Power Roll: ${power.name} (${power.system.rank})`,
@@ -1235,7 +1251,6 @@ export class FaseripRolls {
       }).render(true);
     }
   }
-
 
   /**
    * Roll a talent
@@ -2274,17 +2289,17 @@ export class FaseripRolls {
 
       // Define action types from the Universal Table
       const ACTIONS = {
-        "Blunt Attack (BA)": { ability: "fighting", results: { white: "Miss", green: "Hit", yellow: "Slam", red: "Stun" } },
-        "Edged Attack (EA)": { ability: "fighting", results: { white: "Miss", green: "Hit", yellow: "Stun", red: "Kill" } },
-        "Shooting Attack (Sh)": { ability: "agility", results: { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Kill" } },
-        "Throwing Edged (TE)": { ability: "agility", results: { white: "Miss", green: "Hit", yellow: "Stun", red: "Kill" } },
-        "Throwing Blunt (TB)": { ability: "agility", results: { white: "Miss", green: "Hit", yellow: "Hit", red: "Stun" } },
-        "Energy (En)": { ability: "agility", results: { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Kill" } },
-        "Force (Fo)": { ability: "agility", results: { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Stun" } },
-        "Grappling (GP)": { ability: "strength", results: { white: "Miss", green: "Miss", yellow: "Partial", red: "Hold" } },
-        "Grabbing (Gb)": { ability: "strength", results: { white: "Miss", green: "Take", yellow: "Grab", red: "Break" } },
-        "Escaping (Es)": { ability: "strength", results: { white: "Miss", green: "Miss", yellow: "Escape", red: "Reverse" } },
-        "Stunning Attack": { ability: "agility", results: { white: "Miss", green: "Hit", yellow: "Hit", red: "Hit" } }
+        "Blunt Attack (BA)": { ability: "fighting", results: { white: "Miss", green: "Hit", yellow: "Slam", red: "Stun" }},
+        "Edged Attack (EA)": { ability: "fighting", results: { white: "Miss", green: "Hit", yellow: "Stun", red: "Kill" }},
+        "Shooting Attack (Sh)": { ability: "agility", results: { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Kill" }},
+        "Throwing Edged (TE)": { ability: "agility", results: { white: "Miss", green: "Hit", yellow: "Stun", red: "Kill" }},
+        "Throwing Blunt (TB)": { ability: "agility", results: { white: "Miss", green: "Hit", yellow: "Hit", red: "Stun" }},
+        "Energy (En)": { ability: "agility", results: { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Kill" }},
+        "Force (Fo)": { ability: "agility", results: { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Stun" }},
+        "Grappling (GP)": { ability: "strength", results: { white: "Miss", green: "Miss", yellow: "Partial", red: "Hold" }},
+        "Grabbing (Gb)": { ability: "strength", results: { white: "Miss", green: "Take", yellow: "Grab", red: "Break" }},
+        "Escaping (Es)": { ability: "strength", results: { white: "Miss", green: "Miss", yellow: "Escape", red: "Reverse" }},
+        "Stunning Attack": { ability: "agility", results: { white: "No Effect", green: "Partial Effect", yellow: "Stun", red: "Knockout" }}
       };
 
       // If this is a macro or direct call with options provided
@@ -2339,7 +2354,7 @@ export class FaseripRolls {
           ];
           const index = ranks.indexOf(abilityRank);
           if (index !== -1) {
-            const newIndex = Math.min(Math.max(index + shift, 0), ranks.length - 1);
+            const newIndex = Math.min(Math.max(index + totalShift, 0), ranks.length - 1); // Use totalShift here
             effectiveRank = ranks[newIndex];
           }
         }
@@ -2441,7 +2456,7 @@ export class FaseripRolls {
             gameDate: "",
             amount: -karmaUsed,
             type: "Die Roll",
-            description: `Spent on ${equipment.name} (Equipment)`
+            description: `Spent on ${sourceName}`
           };
           history.push(newEvent);
           await actor.update({ "system.karma.history": history });
@@ -2466,7 +2481,7 @@ export class FaseripRolls {
 
         const isMissileLauncher = equipment.name.toLowerCase().includes("missile") ||
           equipment.system.weaponType === "missile";
-        if (isGrenade && equipment.system.grenadeType) {
+        if (isMissileLauncher && equipment.system.missileType) { // Corrected check to isMissileLauncher
           additionalInfo += `<div><strong>Missile Type:</strong> ${equipment.system.missileType}</div>`;
           if (equipment.system.guidanceSystem) {
             additionalInfo += `<div><strong>Guidance:</strong> ${equipment.system.guidanceSystem}</div>`;
@@ -2514,11 +2529,11 @@ export class FaseripRolls {
             <div style="margin-bottom: 5px; font-size: 0.9em;">
               <div>Base Rank: ${abilityRank} (${abilityValue})</div>
               ${rangeData.info}
-              <div>Column Shift: ${totalShift !== 0 ? `${totalShift} → ${effectiveRank}` : "None"}</div>
+              <div>Column Shift: ${totalShift !== 0 ? `${totalShift > 0 ? "+" : ""}${totalShift} → ${effectiveRank}` : "None"}</div>
 
               <div>Roll: ${roll.total} + Karma: ${karmaUsed} = ${cappedTotal}</div>
 
-              ${equipment.system.ammoType !== "Standard" ? `<div>Ammo Effect: ${equipment.system.ammoType}</div>` : ''}
+              ${equipment.system.ammoType ? `<div>Ammo Type: ${equipment.system.ammoType}</div>` : ''}
               ${additionalInfo}
             </div>
             <div style="
@@ -2571,7 +2586,7 @@ export class FaseripRolls {
               baseDamage: baseDamage,
               damageType: equipment.system.damageType || "Physical",
               sourceName: equipment.name,
-              canBeStun: effectLower.includes("stun") || resultColor.toLowerCase() === "yellow",
+              canBeStun: effectLower.includes("stun") || actionName.toLowerCase().includes("stunning"),
               canBeSlam: effectLower.includes("slam"),
               canBeKill: effectLower.includes("kill"),
               originalRollResult: resultColor.toLowerCase()
@@ -2695,7 +2710,7 @@ export class FaseripRolls {
           type: powerType,
           range: equipment.system.powerRange || ""
         },
-        getFlag: () => null // Simple stub for the getFlag method
+        getFlag: (key) => item.getFlag("msh-faserip", key) // Pass through getFlag
       });
     }
     else {
