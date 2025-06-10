@@ -35,6 +35,31 @@ export class FaseripEquipmentSheet extends ItemSheet {
     const classes = ["faserip", "sheet", "item", this.item.type];
     context.cssClass = classes.join(" ");
 
+    // All FASERIP Ranks
+    context.ranks = [
+      "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent",
+      "Remarkable", "Incredible", "Amazing", "Monstrous", "Unearthly",
+      "Shift X", "Shift Y", "Shift Z",
+      "Class 1000", "Class 3000", "Class 5000", "Beyond"
+    ];
+
+    // All FASERIP Combat Damage Types (from Universal Table, p. 100)
+    context.damageTypes = [
+      "S",   // Shooting
+      "E",   // Energy
+      "F",   // Force
+      "EA",  // Edged Attack
+      "BA",  // Blunt Attack
+      "TE",  // Throwing Edged
+      "TB",  // Throwing Blunt
+      "GP",  // Grappling
+      "Gb"   // Grabbing
+      // Note: "Stun" is an *effect* type, not a damage type on the Universal Table column.
+      // If you want a "Stun" damage type, you'd need to define how it maps to the table.
+      // Current weapon sheet already has stunIntensity for weapons that only stun.
+    ];
+    // --- END NEW ---
+
     return context;
   }
 
@@ -64,7 +89,7 @@ export class FaseripEquipmentSheet extends ItemSheet {
           break;
         case "flash":
           damage = "Amazing Intensity";
-          damageType = "";
+          damageType = ""; // Flash often has no direct damage type in the universal table context
           intensity = "Amazing";
           break;
         case "tearGas":
@@ -83,17 +108,15 @@ export class FaseripEquipmentSheet extends ItemSheet {
       html.find('[name="system.grenadeDamage"]').val(damage);
       html.find('[name="system.grenadeDamageType"]').val(damageType);
 
-      // Update intensity if set
-      if (intensity) {
-        html.find('[name="system.grenadeIntensity"]').val(intensity);
-      }
+      // Update intensity if set (and clear if not applicable)
+      html.find('[name="system.grenadeIntensity"]').val(intensity);
     });
 
     html.find('[name="system.payloadType"]').change(ev => {
       const payloadType = ev.currentTarget.value;
       let damage = "";
       let secondaryDamage = "";
-      let damageType = "EA";
+      let damageType = "EA"; // Default for most missiles
 
       // Set default damage values based on payload type
       switch (payloadType) {
@@ -109,7 +132,12 @@ export class FaseripEquipmentSheet extends ItemSheet {
           break;
         case "incendiary":
           damage = "40";
-          damageType = "E";
+          damageType = "E"; // Incendiary deals Energy damage
+          break;
+        case "gas":
+          damage = ""; // Gas payloads deal no direct damage, but apply intensity
+          damageType = "";
+          html.find('[name="system.missileIntensity"]').val("Typical"); // Assuming Typical intensity for gas payload
           break;
         // Add other types as needed
       }
@@ -128,19 +156,16 @@ export class FaseripEquipmentSheet extends ItemSheet {
       const icon = header.querySelector('i');
 
       // Toggle the content display
-      if (content.style.display === "none") {
+      const isOpen = content.style.display !== "none";
+      if (!isOpen) {
         content.style.display = "block";
         icon.classList.remove('fa-chevron-down');
         icon.classList.add('fa-chevron-up');
-
-        // Save state
         this.object.setFlag("msh-faserip", `section_${section}_open`, true);
       } else {
         content.style.display = "none";
         icon.classList.remove('fa-chevron-up');
         icon.classList.add('fa-chevron-down');
-
-        // Save state
         this.object.setFlag("msh-faserip", `section_${section}_open`, false);
       }
     });
@@ -152,18 +177,23 @@ export class FaseripEquipmentSheet extends ItemSheet {
       const content = header.nextElementSibling;
       const icon = header.querySelector('i');
 
-      // Check if the section should be open
       const isOpen = this.object.getFlag("msh-faserip", `section_${section}_open`);
       if (isOpen) {
         content.style.display = "block";
         icon.classList.remove('fa-chevron-down');
         icon.classList.add('fa-chevron-up');
+      } else {
+        // Ensure closed state is consistent on load if flag is false or not set
+        content.style.display = "none";
+        icon.classList.remove('fa-chevron-up');
+        icon.classList.add('fa-chevron-down');
       }
     });
 
     // Show/hide category-specific fields when category changes
     html.find('.equipment-category-select').change(ev => {
       const category = ev.currentTarget.value;
+      this.object.update({"system.category": category}); // Ensure category is saved immediately
 
       // Hide all category-specific sections first
       html.find('.weapon-fields, .armor-fields, .power-item-fields, .custom-fields').hide();
@@ -178,10 +208,12 @@ export class FaseripEquipmentSheet extends ItemSheet {
       } else if (category === 'custom') {
         html.find('.custom-fields').show();
       }
+      this.render(true); // Re-render to ensure all conditional displays are correct
     });
 
     // Make sure correct fields are shown on initial load
     const currentCategory = this.object.system.category;
+    html.find('.weapon-fields, .armor-fields, .power-item-fields, .custom-fields').hide(); // Hide all initially
     if (currentCategory === 'weapon') {
       html.find('.weapon-fields').show();
     } else if (currentCategory === 'armor') {
@@ -193,38 +225,91 @@ export class FaseripEquipmentSheet extends ItemSheet {
     }
 
     // Add custom ability handler
-    html.find('.add-custom-ability').click(ev => {
+    html.find('.add-custom-ability').click(async ev => {
       const stunts = this.object.system.customAbilities || [];
       stunts.push({
         name: "New Ability",
         description: "",
         rank: "Typical",
         damageType: "",
-        range: ""
+        range: "",
+        isPassiveArmor: false, // Initialize new armor fields
+        armorDamageType: ""
       });
-      this.object.update({ "system.customAbilities": stunts });
+      await this.object.update({ "system.customAbilities": stunts }, {diff: false});
+      this.render(true); // Re-render to show the new row immediately
     });
 
     // Remove custom ability handler
-    html.find('.remove-custom-ability').click(ev => {
+    html.find('.remove-custom-ability').click(async ev => {
       const index = parseInt(ev.currentTarget.dataset.index);
 
-      // Make sure customAbilities exists and is an array
-      let abilities = duplicate(this.object.system.customAbilities);
+      let abilities = duplicate(this.object.system.customAbilities || []);
       if (!Array.isArray(abilities)) {
-        abilities = [];
+        abilities = []; // Ensure it's an array for splice to work
         console.warn("customAbilities was not an array, creating empty array");
       }
 
-      // Remove the ability at the specified index
       if (abilities.length > index) {
         abilities.splice(index, 1);
-
-        // Update the item
-        this.object.update({ "system.customAbilities": abilities });
+        await this.object.update({ "system.customAbilities": abilities }, {diff: false});
+        this.render(true); // Re-render to reflect the removal
       } else {
         console.error("Invalid ability index:", index, "length:", abilities.length);
       }
+    });
+
+    // --- NEW LISTENER FOR SAVING DROPDOWN DATA IN CUSTOM ABILITIES ---
+    // This listener captures changes within the custom abilities list to ensure data is saved
+    html.find('.custom-abilities-list').on('change', 'select, input, textarea', async ev => {
+        ev.preventDefault(); // Prevent default form behavior if submitOnChange is global
+
+        const newCustomAbilities = [];
+        const abilityRows = html.find('.custom-ability'); // Get all custom ability rows in the DOM
+
+        // Iterate through each row and reconstruct the ability object from its form elements
+        for (let i = 0; i < abilityRows.length; i++) {
+            const abilityRow = abilityRows[i];
+
+            // Access elements by their name attribute within this specific row
+            const name = abilityRow.querySelector(`[name="system.customAbilities.${i}.name"]`)?.value || "";
+            const description = abilityRow.querySelector(`[name="system.customAbilities.${i}.description"]`)?.value || "";
+            const rank = abilityRow.querySelector(`[name="system.customAbilities.${i}.rank"]`)?.value || "Typical";
+            const damageType = abilityRow.querySelector(`[name="system.customAbilities.${i}.damageType"]`)?.value || "";
+            const range = abilityRow.querySelector(`[name="system.customAbilities.${i}.range"]`)?.value || "";
+            const isPassiveArmor = abilityRow.querySelector(`[name="system.customAbilities.${i}.isPassiveArmor"]`)?.checked || false;
+            const armorDamageType = abilityRow.querySelector(`[name="system.customAbilities.${i}.armorDamageType"]`)?.value || "";
+
+            newCustomAbilities.push({
+                name,
+                description,
+                rank,
+                damageType,
+                range,
+                isPassiveArmor,
+                armorDamageType
+            });
+        }
+
+        // Update the item's data model with the reconstructed array
+        await this.object.update({ "system.customAbilities": newCustomAbilities }, { diff: false });
+        // Re-render the sheet to ensure the UI reflects the saved state accurately
+        // This is crucial for dropdowns to show their 'selected' state and for conditional displays (like armor type)
+        this.render(true);
+    });
+
+    // --- NEW LISTENER FOR TOGGLING ARMOR TYPE DISPLAY IN CUSTOM ABILITIES ---
+    // This makes the 'Armor Type (Specific)' dropdown appear/disappear based on 'Grants Passive Armor' checkbox
+    html.find('.custom-abilities-list').on('change', 'input[name$=".isPassiveArmor"]', async ev => {
+        const checkbox = ev.currentTarget;
+        const abilityRow = checkbox.closest('.custom-ability');
+        const armorTypeSelectGroup = abilityRow.querySelector('.form-group[style*="display: none;"]'); // Target the hidden group
+
+        if (checkbox.checked) {
+            if (armorTypeSelectGroup) armorTypeSelectGroup.style.display = "block";
+        } else {
+            if (armorTypeSelectGroup) armorTypeSelectGroup.style.display = "none";
+        }
     });
 
     // Roll equipment button
