@@ -8,9 +8,9 @@ const POWER_RANGE_VALUES = {
   "Monstrous": 40, "Unearthly": 60, "Shift X": 80, "Shift Y": 160,
   "Shift Z": 400,
   // Converted miles to areas (1 mile = 1760 yards/areas)
-  "Class 1000": 176000,   // 100 miles
-  "Class 3000": 17600000, // 10,000 miles
-  "Class 5000": 1760000000, // 1,000,000 miles
+  "Class 1000": 4000,   // 100 miles
+  "Class 3000": 400000, // 10,000 miles
+  "Class 5000": 40000000, // 1,000,000 miles
   "Beyond": Infinity      // Unlimited
 };
 
