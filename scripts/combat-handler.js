@@ -204,6 +204,36 @@ export class CombatHandler {
     }
 
     netDamage = Math.max(0, netDamage);
+    // 3b. Apply passive armor from equipment-granted powers
+    const allPowers = game.msh.getActorPowers(targetActor);
+    console.log("All powers (including equipment-granted):", allPowers);
+
+    const matchingArmor = allPowers.filter(p => p.isPassiveArmor &&
+    (!p.damageType || p.damageType === damageType));
+    console.log(`Matching passive armor powers for damageType "${damageType}":`, matchingArmor);
+
+    if (matchingArmor.length > 0 && netDamage > 0) {
+    // Use the highest-value passive armor that matches
+    const armorPower = matchingArmor.reduce((best, curr) =>
+        (curr.value ?? 0) > (best.value ?? 0) ? curr : best, { value: 0 });
+
+    console.log("Selected armor power:", armorPower);
+
+    const armorAbsorbed = Math.min(netDamage, armorPower.value ?? 0);
+    console.log(`Passive armor will absorb ${armorAbsorbed} from net damage ${netDamage}`);
+
+    netDamage -= armorAbsorbed;
+    damageAbsorbed += armorAbsorbed;
+
+    defenseDetails.push(`Passive Armor (${armorPower.name || "Unnamed"}) absorbed ${armorAbsorbed} damage`);
+    defenseUsed = defenseUsed === "None" ? "Passive Armor" : `${defenseUsed} + Passive Armor`;
+
+    console.log(`New netDamage after passive armor: ${netDamage}`);
+    console.log(`Total damageAbsorbed so far: ${damageAbsorbed}`);
+    } else {
+    console.log("No applicable passive armor found or netDamage already 0");
+    }
+
 
     console.log(`Damage calculation: ${modifiedBaseDamage} modified base - ${damageAbsorbed} absorbed = ${netDamage} net damage`);
 
@@ -942,6 +972,30 @@ export class CombatHandler {
                 defenses.bodyArmorValue = powerValue;
                 defenses.usedBodyArmor = true;
             }
+        }
+
+        // === Check for passive armor granted by equipment ===
+        const allPowers = game.msh.getActorPowers(target);
+        console.log("All powers (including equipment-granted):", allPowers);
+
+        const applicableArmor = allPowers.filter(p =>
+        p.isPassiveArmor &&
+        typeof p.value === "number" &&
+        p.value > 0 &&
+        (!p.armorDamageType || damageType.toLowerCase().includes(p.armorDamageType.toLowerCase()))
+        );
+
+        console.log(`Matching passive armor powers for damageType "${damageType}":`, applicableArmor);
+
+        let extraArmorValue = 0;
+        for (let armor of applicableArmor) {
+        extraArmorValue += armor.value;
+        }
+
+        if (extraArmorValue > defenses.bodyArmorValue) {
+        defenses.bodyArmorValue = extraArmorValue;
+        defenses.usedBodyArmor = true;
+        console.log(`Passive armor from equipment applied: ${extraArmorValue}`);
         }
 
         // In CombatHandler.getTargetDefenses(), add debugging and fix AP logic

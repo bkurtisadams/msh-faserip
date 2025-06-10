@@ -142,6 +142,32 @@ Hooks.once("init", async () => {
     return "Unknown";
   };
   
+  game.msh.getActorPowers = function(actor) {
+    const items = actor.items.contents ?? actor.items;
+
+    const powers = items
+      .filter(i => i.type === "power")
+      .map(i => foundry.utils.duplicate(i.system));
+
+    for (let item of items) {
+      if (item.type === "equipment" && Array.isArray(item.system.powers)) {
+        for (let power of item.system.powers) {
+          if (power.grantedByEquipment) {
+            powers.push(foundry.utils.duplicate(power));
+          }
+        }
+      }
+    }
+
+    for (let power of powers) {
+      if (typeof power.value === "undefined" && power.rank) {
+        power.value = game.msh.getRankValue(power.rank) ?? 0;
+      }
+    }
+
+    return powers;
+  };
+
   game.msh.rollUniversalAction = rollUniversalAction;
   // Add the rollUniversalTable function to the namespace
   game.msh.rollUniversalTable = rollUniversalTable;

@@ -408,7 +408,8 @@ export async function openUniversalTableDialog(actor) {
   ];
 
   const actorItems = actor.items.contents;
-  const powers = actorItems.filter(i => i.type === "power");
+  const powers = game.msh.getActorPowers(actor);
+
   const talents = actorItems.filter(i => i.type === "talent");
   const equipment = actorItems.filter(i => i.type === "equipment");
 

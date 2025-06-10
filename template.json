@@ -109,6 +109,7 @@
       "isActive": true,
       "isStarred": false,
       "source": "natural",
+      "grantedByEquipment": false,
       "limitRankMax": "",
       "limitationColumnShift": 0,
       "bonusPowers": [],
@@ -186,6 +187,7 @@
       "powerRange": "",
 
       "customAbilities": [],
+      "powers": [],
 
       "isGrenade": false,
       "grenadeType": "",

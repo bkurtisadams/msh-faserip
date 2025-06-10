@@ -66,6 +66,28 @@ export class FaseripEquipmentSheet extends ItemSheet {
   activateListeners(html) {
     super.activateListeners(html);
 
+    html.find(".add-granted-power").on("click", ev => {
+      ev.preventDefault();
+      const powers = duplicate(this.object.system.powers || []);
+      powers.push({
+        name: "",
+        rank: "Typical",
+        value: 6,
+        damageType: "",
+        isPassiveArmor: false,
+        grantedByEquipment: true
+      });
+      this.object.update({ "system.powers": powers });
+    });
+
+    html.find(".remove-granted-power").on("click", ev => {
+      ev.preventDefault();
+      const index = Number(ev.currentTarget.dataset.index);
+      const powers = duplicate(this.object.system.powers || []);
+      powers.splice(index, 1);
+      this.object.update({ "system.powers": powers });
+    });
+
     // grenade listeners
     html.find('[name="system.grenadeType"]').change(ev => {
       const grenadeType = ev.currentTarget.value;
