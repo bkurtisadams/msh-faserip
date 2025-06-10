@@ -2252,6 +2252,22 @@ export class FaseripRolls {
       return;
     }
 
+    // GET AMMO TYPE FIRST - Move this to the top level
+    let currentAmmoType = "standard"; // default
+    if (equipment.system.category === "weapon") {
+      console.log("Weapon system properties:", Object.keys(equipment.system));
+      console.log("Full weapon system data:", equipment.system);
+      if (equipment.system.currentAmmo) {
+        currentAmmoType = equipment.system.currentAmmo.toLowerCase();
+      } else if (equipment.system.ammoType) {
+        currentAmmoType = equipment.system.ammoType.toLowerCase();
+      }
+      console.log(`Weapon ${equipment.name} loaded with: ${currentAmmoType} ammunition`);
+      
+      // Also add debug to see what's available
+      console.log("Weapon system properties:", Object.keys(equipment.system));
+    }
+
     // Get saved equipment settings - ADD THIS SECTION
     const savedActionType = equipment.getFlag("msh-faserip", "lastActionType") || "";
     const savedColumnShift = equipment.getFlag("msh-faserip", "lastColumnShift") || 0;
@@ -2302,6 +2318,17 @@ export class FaseripRolls {
       // Get the weapon type from the equipment
       const weaponType = equipment.system.weaponType || "";
 
+      // Check ammunition at the very beginning for weapons
+      if (equipment.system.shots) {
+        const currentShots = equipment.system.shotsRemaining !== undefined ?
+          parseInt(equipment.system.shotsRemaining) : 0;
+
+        if (currentShots <= 0) {
+          // ... existing out of ammo code ...
+          return { outOfAmmo: true };
+        }
+      }
+
       // Determine default action based on weapon type
       let defaultAction = "Shooting Attack (Sh)";
       if (weaponType === "melee" && damageType === "BA") {
@@ -2343,6 +2370,10 @@ export class FaseripRolls {
       // If this is a macro or direct call with options provided
       // Check if CTRL is pressed or if this is a direct roll call
       if (options.useDirectRoll || game.keyboard.isModifierActive(foundry.helpers.interaction.KeyboardManager.MODIFIER_KEYS.CONTROL)) {
+        console.log("=== ROLL EQUIPMENT DEBUG ===");
+        console.log("Received options:", options);
+        console.log("Ammo type from options:", options.ammoType);
+        console.log("============================");
         // Optional notification that CTRL quick roll is being used
         if (game.keyboard.isModifierActive(foundry.helpers.interaction.KeyboardManager.MODIFIER_KEYS.CONTROL)) {
           ui.notifications.info("Quick roll with saved settings (CTRL pressed)");
@@ -2660,7 +2691,7 @@ export class FaseripRolls {
               canBeKill: effectLower.includes("kill"),
               originalRollResult: resultColor.toLowerCase()
             }, {
-              ammoType: options.ammoType || "standard", // Make sure standard is used
+              ammoType: currentAmmoType, // Use the determined ammo type instead of options.ammoType
               skipDefenseDialog: false
             });
           }
@@ -2743,6 +2774,13 @@ export class FaseripRolls {
               const karma = parseInt(html.find('[name="karma"]').val()) || 0;
               const skipDice = html.find('[name="skipDice"]').is(':checked');
               const saveSettings = html.find('[name="saveSettings"]').is(':checked');
+              
+              console.log("=== DIALOG DEBUG ===");
+              console.log("Current weapon ammo type:", currentAmmoType); // Use the determined ammo type
+              console.log("All form values:", {
+                actionName, shift, karma, skipDice, saveSettings
+              });
+              console.log("===================");
 
               // Save settings if requested
               if (saveSettings) {
@@ -2758,7 +2796,7 @@ export class FaseripRolls {
                 columnShift: shift,
                 karma: karma,
                 skipDice: skipDice,
-                ammoType: html.find('[name="ammoType"]').val() || "standard" // new line for ammo
+                ammoType: currentAmmoType
               });
             }
           },

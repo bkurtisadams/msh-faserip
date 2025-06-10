@@ -166,8 +166,12 @@ export class CombatHandler {
     }
 
     // Apply Resistance (if applicable)
-    if (defenseData.resistanceValue > 0 && netDamage > 0) {
+    // Apply Resistance (FEAT roll to negate, not absorb)
+    /* if (defenseData.resistanceValue > 0 && netDamage > 0) {
         if (isResistanceApplicable(damageType, defenseData.resistanceType)) {
+            console.log(`Target has ${defenseData.resistanceType} resistance - should roll FEAT vs damage intensity`);
+            // Note: Resistance should trigger a FEAT roll, not automatic absorption
+            // For now, treating as additional armor until FEAT roll is implemented
             const resistanceAbsorbed = Math.min(netDamage, defenseData.resistanceValue);
             netDamage -= resistanceAbsorbed;
             damageAbsorbed += resistanceAbsorbed;
@@ -175,15 +179,8 @@ export class CombatHandler {
                 defenseDetails.push(`${defenseData.resistanceType} Resistance absorbed ${resistanceAbsorbed} damage`);
                 defenseUsed = defenseUsed === "None" ? `${defenseData.resistanceType} Resistance` : defenseUsed + ` + ${defenseData.resistanceType} Resistance`;
             }
-            
-            // Check for immunity (complete resistance)
-            if (defenseData.resistanceValue >= modifiedBaseDamage) { // FIXED: use modifiedBaseDamage
-                defenseDetails.push(`Immune to ${damageType} damage`);
-            }
-        } else {
-            console.log(`Resistance ${defenseData.resistanceType} does not apply to ${damageType} damage`);
         }
-    }
+    } */
 
     netDamage = Math.max(0, netDamage);
 
@@ -767,33 +764,47 @@ export class CombatHandler {
             }
         }
 
-        // In CombatHandler.getTargetDefenses(), add AP ammo handling:
-        if (options.ammoType === "ap") {
+        // In CombatHandler.getTargetDefenses(), add debugging and fix AP logic
+        if (options.ammoType && options.ammoType.toLowerCase() === "ap") {
+        console.log("=== AP AMMO DEBUG ===");
+        console.log("Original body armor value:", defenses.bodyArmorValue);
+        
         // Reduce body armor by 2 CS, but not force fields
         if (defenses.bodyArmorValue > 0) {
-            const armorRanks = Object.keys(CONFIG.FASERIP.rankValues);
+            // Create array of rank values in order
+            const rankEntries = Object.entries(CONFIG.FASERIP.rankValues).sort((a, b) => a[1] - b[1]);
             
-            // Find the current armor rank name from the value
-            let currentArmorRank = "";
-            for (const [rankName, rankValue] of Object.entries(CONFIG.FASERIP.rankValues)) {
-            if (rankValue === defenses.bodyArmorValue) {
-                currentArmorRank = rankName;
+            // Find current armor rank
+            let currentRankIndex = -1;
+            for (let i = 0; i < rankEntries.length; i++) {
+            if (rankEntries[i][1] === defenses.bodyArmorValue) {
+                currentRankIndex = i;
                 break;
             }
             }
             
-            // Find the index of the current armor rank
-            const currentArmorIndex = armorRanks.indexOf(currentArmorRank);
+            if (currentRankIndex >= 0) {
+            // Store original values BEFORE making changes
+            const originalArmorValue = defenses.bodyArmorValue;
+            const oldRankName = rankEntries[currentRankIndex][0];
             
-            // Reduce by 2 CS (2 column shifts)
-            const newArmorIndex = Math.max(0, currentArmorIndex - 2);
-            const newArmorRank = armorRanks[newArmorIndex];
+            // Reduce by 2 CS (2 column shifts down)
+            const newRankIndex = Math.max(0, currentRankIndex - 2);
+            const newArmorValue = rankEntries[newRankIndex][1];
+            const newRankName = rankEntries[newRankIndex][0];
             
-            // Update the armor value
-            defenses.bodyArmorValue = CONFIG.FASERIP.rankValues[newArmorRank] || 0;
+            // Update the defense value
+            defenses.bodyArmorValue = newArmorValue;
             
-            console.log(`AP Ammo: Reduced armor from ${currentArmorRank} to ${newArmorRank}`);
+            console.log(`AP Ammo: Reduced armor from ${oldRankName} (${originalArmorValue}) to ${newRankName} (${newArmorValue})`);
+            } else {
+            console.log("Could not find matching rank for armor value:", defenses.bodyArmorValue);
+            }
         }
+        
+        console.log("Final body armor value after AP:", defenses.bodyArmorValue);
+        console.log("====================");
+        
         // Force fields unaffected by AP
         }
 
