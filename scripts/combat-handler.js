@@ -165,22 +165,43 @@ export class CombatHandler {
         }
     }
 
-    // Apply Resistance (if applicable)
-    // Apply Resistance (FEAT roll to negate, not absorb)
-    /* if (defenseData.resistanceValue > 0 && netDamage > 0) {
-        if (isResistanceApplicable(damageType, defenseData.resistanceType)) {
-            console.log(`Target has ${defenseData.resistanceType} resistance - should roll FEAT vs damage intensity`);
-            // Note: Resistance should trigger a FEAT roll, not automatic absorption
-            // For now, treating as additional armor until FEAT roll is implemented
-            const resistanceAbsorbed = Math.min(netDamage, defenseData.resistanceValue);
-            netDamage -= resistanceAbsorbed;
-            damageAbsorbed += resistanceAbsorbed;
-            if (resistanceAbsorbed > 0) {
-                defenseDetails.push(`${defenseData.resistanceType} Resistance absorbed ${resistanceAbsorbed} damage`);
-                defenseUsed = defenseUsed === "None" ? `${defenseData.resistanceType} Resistance` : defenseUsed + ` + ${defenseData.resistanceType} Resistance`;
-            }
+    // Apply Resistance (FEAT roll to potentially negate damage)
+    if (defenseData.resistanceValue > 0 && netDamage > 0) {
+    if (isResistanceApplicable(damageType, defenseData.resistanceType)) {
+        console.log(`Target has ${defenseData.resistanceType} resistance - triggering FEAT roll`);
+        
+        // Trigger resistance FEAT roll and WAIT for result
+        const resistanceResult = await this.rollResistanceFeat(
+        targetActor, // Make sure this is the actor, not the token
+        defenseData.resistanceType, 
+        defenseData.resistanceValue, 
+        modifiedBaseDamage, // Use original damage as intensity
+        sourceName
+        );
+        
+        console.log("Resistance FEAT result:", resistanceResult);
+        
+        if (resistanceResult.success) {
+        // Resistance FEAT succeeded - negate ALL remaining damage
+        const damageNegated = netDamage;
+        netDamage = 0;
+        damageAbsorbed += damageNegated; // Add the negated damage to total absorbed
+        defenseDetails.push(`${defenseData.resistanceType} Resistance FEAT succeeded - ${damageNegated} damage negated`);
+        defenseUsed = defenseUsed === "None" ? `${defenseData.resistanceType} Resistance (FEAT Success)` : defenseUsed + ` + ${defenseData.resistanceType} Resistance (FEAT Success)`;
+        } else {
+        // Resistance FEAT failed - still provides armor value against remaining damage
+        const resistanceArmor = Math.min(netDamage, defenseData.resistanceValue);
+        netDamage -= resistanceArmor;
+        damageAbsorbed += resistanceArmor;
+        if (resistanceArmor > 0) {
+            defenseDetails.push(`${defenseData.resistanceType} Resistance FEAT failed - absorbed ${resistanceArmor} damage as armor`);
+            defenseUsed = defenseUsed === "None" ? `${defenseData.resistanceType} Resistance (Armor)` : defenseUsed + ` + ${defenseData.resistanceType} Resistance (Armor)`;
         }
-    } */
+        }
+    } else {
+        console.log(`Resistance ${defenseData.resistanceType} does not apply to ${damageType} damage`);
+    }
+    }
 
     netDamage = Math.max(0, netDamage);
 
@@ -321,6 +342,165 @@ export class CombatHandler {
     console.log("CombatHandler.processAttack completed"); 
 }
 
+    /**
+     * Rolls a resistance FEAT against incoming damage
+     * @param {Object} target - The target with resistance
+     * @param {String} resistanceType - Type of resistance (e.g., "physical", "fire")
+     * @param {Number} resistanceValue - Rank value of the resistance
+     * @param {Number} damageIntensity - The intensity to resist against
+     * @param {String} sourceName - Name of the attack source
+     * @returns {Object} { success: boolean, resultText: string }
+     */
+    static async rollResistanceFeat(target, resistanceType, resistanceValue, damageIntensity, sourceName) {
+    // Ensure we have the actual actor, not a token
+    const targetActor = target.actor || target;
+    
+    console.log("Rolling resistance FEAT for:", targetActor.name);
+    console.log("Resistance type:", resistanceType, "Value:", resistanceValue);
+    console.log("Damage intensity:", damageIntensity);
+    
+    // Find the resistance rank name from the value
+    let resistanceRank = "Typical";
+    for (const [rankName, rankValue] of Object.entries(CONFIG.FASERIP.rankValues)) {
+        if (rankValue === resistanceValue) {
+        resistanceRank = rankName;
+        break;
+        }
+    }
+    
+    // Get available Karma
+    const availableKarma = targetActor.system.attributes.karma.value || 0;
+    
+    // Create dialog content
+    const dialogContent = `
+        <div style="text-align: center;">
+        <h2>${target.name} - ${resistanceType.charAt(0).toUpperCase() + resistanceType.slice(1)} Resistance FEAT</h2>
+        <p>Attack from <strong>${sourceName}</strong> requires a resistance FEAT roll.</p>
+        <div style="margin: 10px 0;">
+            <p>Resistance Rank: <strong>${resistanceRank}</strong></p>
+            <p>Damage Intensity: <strong>${damageIntensity}</strong></p>
+            <hr style="margin: 10px 0;">
+            <div>
+            <label>Spend Karma Points:</label>
+            <input type="number" id="karma-points" min="0" max="${availableKarma}" value="0" style="width: 60px;">
+            <span style="margin-left: 5px; font-size: 0.9em; color: #666;">(Available: ${availableKarma})</span>
+            </div>
+        </div>
+        </div>
+    `;
+    
+    // Show dialog to target player (or GM if NPC)
+    return new Promise((resolve) => {
+        // Determine if target is controlled by a player
+        const isPlayerOwned = target.hasPlayerOwner;
+        
+        // Create dialog
+        new Dialog({
+        title: `${resistanceType.charAt(0).toUpperCase() + resistanceType.slice(1)} Resistance FEAT`,
+        content: dialogContent,
+        buttons: {
+            roll: {
+            icon: '<i class="fas fa-dice-d20"></i>',
+            label: "Roll Resistance",
+            callback: async (html) => {
+                // Get karma amount
+                const karmaSpent = Math.min(
+                parseInt(html.find('#karma-points').val()) || 0,
+                availableKarma
+                );
+                
+                // Create the roll
+                const roll = new Roll("1d100");
+                await roll.evaluate();
+                
+                // Calculate result with karma
+                const totalRoll = Math.min(100, roll.total + karmaSpent);
+                
+                // Determine the result color against intensity
+                const colorResult = game.msh.rollUniversalTable(resistanceRank, totalRoll);
+                
+                // For resistance, we need to check if the roll beats the damage intensity
+                // This is simplified - you might want to use a more complex intensity table
+                let success = false;
+                if (totalRoll >= damageIntensity) {
+                success = true;
+                }
+                
+                // Deduct karma if spent
+                if (karmaSpent > 0) {
+                await game.msh.runAsGM({
+                    operation: "update",
+                    targetActorUuid: target.uuid,
+                    args: [{ "system.attributes.karma.value": availableKarma - karmaSpent }]
+                });
+                
+                // Create karma history entry
+                const history = foundry.utils.deepClone(target.system.karma?.history || []);
+                const newEvent = {
+                    realDate: new Date().toLocaleDateString(),
+                    gameDate: game.time?.worldTime ? game.time.worldTime.toString() : "",
+                    amount: -karmaSpent,
+                    type: "Resistance",
+                    description: `${resistanceType} resistance against ${sourceName}`
+                };
+                history.push(newEvent);
+                await game.msh.runAsGM({
+                    operation: "update",
+                    targetActorUuid: target.uuid,
+                    args: [{ "system.karma.history": history }]
+                });
+                }
+                
+                // Create result text
+                const resultText = success ? "Success - All damage negated" : "Failed - Resistance provides armor value";
+                
+                // Create chat message showing the resistance roll
+                await ChatMessage.create({
+                speaker: ChatMessage.getSpeaker({ actor: target }),
+                content: `
+                    <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
+                    <div style="padding: 5px 10px; border-bottom: 1px solid #c0c0c0; font-size: 1.1em; color: #8b0000;">
+                        <strong>${target.name} - ${resistanceType.charAt(0).toUpperCase() + resistanceType.slice(1)} Resistance FEAT</strong>
+                    </div>
+                    <div style="padding: 5px 10px; font-size: 0.9em;">
+                        <div>Resistance Rank: ${resistanceRank}</div>
+                        <div>Damage Intensity: ${damageIntensity}</div>
+                        <div>Roll: ${roll.total} + Karma: ${karmaSpent} = ${totalRoll}</div>
+                    </div>
+                    <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
+                        background-color: ${success ? '#4CAF50' : '#F44336'}; 
+                        color: white;">
+                        ${resultText}
+                    </div>
+                    </div>
+                `
+                });
+                
+                // Return the result
+                resolve({ success, resultText });
+            }
+            },
+            cancel: {
+            icon: '<i class="fas fa-times"></i>',
+            label: "No Resistance",
+            callback: () => {
+                resolve({ success: false, resultText: "No resistance attempted" });
+            }
+            }
+        },
+        default: "roll",
+        // For NPCs or if the player isn't available, auto-roll after a delay
+        render: (html) => {
+            if (!isPlayerOwned) {
+            setTimeout(() => {
+                html.find('button[data-button="roll"]').trigger('click');
+            }, 5000); // Auto-roll for NPCs after 5 seconds
+            }
+        },
+        close: () => resolve({ success: false, resultText: "Dialog closed" })
+        }).render(true);
+    });
+    }
      /**
      * Processes a wrestling action (Grappling, Grabbing, or Escaping)
      * @param {Object} actionData - Information about the wrestling action
