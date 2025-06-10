@@ -208,6 +208,11 @@ export class FaseripActorSheet extends ActorSheet {
   activateListeners(html) {
     super.activateListeners(html);
 
+    // Debug resistances data structure
+    console.log("Actor resistances on sheet load:", this.actor.system.resistances);
+    console.log("Resistances type:", typeof this.actor.system.resistances);
+    console.log("Is array:", Array.isArray(this.actor.system.resistances));
+
     html.on("click", ".effect-control", (ev) => {
       const row = ev.currentTarget.closest("li");
       const document =
@@ -765,9 +770,23 @@ export class FaseripActorSheet extends ActorSheet {
     // Resistance edit button
     html.find('.resistance-edit').click(ev => {
       const index = $(ev.currentTarget).data("index");
-      const resistance = this.actor.system.resistances[index];
       
-      if (!resistance) return;
+      // Handle different data structures for resistances
+      let resistances;
+      if (Array.isArray(this.actor.system.resistances)) {
+        resistances = this.actor.system.resistances;
+      } else if (this.actor.system.resistances && typeof this.actor.system.resistances === 'object') {
+        resistances = Object.values(this.actor.system.resistances);
+      } else {
+        resistances = [];
+      }
+      
+      const resistance = resistances[index];
+      
+      if (!resistance) {
+        console.error("No resistance found at index:", index);
+        return;
+      }
       
       let content = `
         <form>
@@ -830,9 +849,15 @@ export class FaseripActorSheet extends ActorSheet {
               const newRank = html.find('#resistance-rank').val();
               const newValue = parseInt(html.find('#resistance-value').val()) || 0;
               
-              // Create updated array
-              const resistances = duplicate(this.actor.system.resistances);
-              resistances[index] = {
+              // Ensure we're working with an array
+              let updatedResistances;
+              if (Array.isArray(this.actor.system.resistances)) {
+                updatedResistances = foundry.utils.deepClone(this.actor.system.resistances);
+              } else {
+                updatedResistances = Object.values(this.actor.system.resistances || {});
+              }
+              
+              updatedResistances[index] = {
                 type: newType,
                 rank: newRank,
                 value: newValue
@@ -840,7 +865,7 @@ export class FaseripActorSheet extends ActorSheet {
               
               // Update the actor
               this.actor.update({
-                "system.resistances": resistances
+                "system.resistances": updatedResistances
               });
             }
           },
@@ -861,17 +886,32 @@ export class FaseripActorSheet extends ActorSheet {
       // Use jQuery consistently to access data attributes
       const index = Number($(ev.currentTarget).data("index"));
       
-      let resistances = foundry.utils.deepClone(this.actor.system.resistances);
-      if (!Array.isArray(resistances)) {
-        console.error("Resistances is not an array.");
-        return;
+      console.log("Delete resistance - index:", index);
+      console.log("Current resistances:", this.actor.system.resistances);
+      console.log("Resistances type:", typeof this.actor.system.resistances);
+      console.log("Is array:", Array.isArray(this.actor.system.resistances));
+      
+      // Handle different data structures
+      let resistances;
+      if (Array.isArray(this.actor.system.resistances)) {
+        resistances = foundry.utils.deepClone(this.actor.system.resistances);
+      } else if (this.actor.system.resistances && typeof this.actor.system.resistances === 'object') {
+        // Convert object to array if needed
+        resistances = Object.values(this.actor.system.resistances);
+        console.log("Converted object to array:", resistances);
+      } else {
+        // Initialize as empty array if undefined
+        resistances = [];
+        console.log("Initialized empty array");
       }
 
       if (index >= 0 && index < resistances.length) {
+        console.log("Removing resistance at index:", index, "Resistance:", resistances[index]);
         resistances.splice(index, 1);
         await this.actor.update({ "system.resistances": resistances });
+        console.log("Updated resistances:", resistances);
       } else {
-        console.error("Invalid resistance index:", index);
+        console.error("Invalid resistance index:", index, "Array length:", resistances.length);
       }
     });
 
