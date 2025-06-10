@@ -1279,26 +1279,12 @@ export class FaseripActorSheet extends ActorSheet {
 
               if (target && resultColor.toLowerCase() !== "white") {
                 // Determine damage type based on power type/action type
-                let damageType = "Energy-Energy";
-                
-                if (actionType.includes("Blunt")) {
-                  damageType = "Physical-Blunt";
-                } else if (actionType.includes("Edged")) {
-                  damageType = "Physical-Edged";
-                } else if (actionType.includes("Force")) {
-                  damageType = "Force";
-                } else if (actionType.includes("Mental")) {
-                  damageType = "Mental";
-                } else if (item.system.type) {
-                  // Try to determine from power's type
-                  const powerTypeStr = item.system.type.toLowerCase();
-                  if (powerTypeStr.includes("force")) {
-                    damageType = "Force";
-                  } else if (powerTypeStr.includes("mental") || powerTypeStr.includes("psi")) {
-                    damageType = "Mental";
-                  } else if (powerTypeStr.includes("phys")) {
-                    damageType = "Physical-Blunt";
-                  }
+                // Use the damage type selected in the dialog
+                let finalDamageType = html.find('[name="damageType"]').val();
+
+                // Only auto-determine if user selected something invalid
+                if (!finalDamageType || finalDamageType === "") {
+                  finalDamageType = "Energy-Energy"; // Default fallback
                 }
                 
                 // Determine if special effects should apply based on the result and action type
@@ -1322,7 +1308,7 @@ export class FaseripActorSheet extends ActorSheet {
                   attacker: this.actor,
                   target: target,
                   baseDamage: baseDamage,
-                  damageType: damageType,
+                  damageType: finalDamageType,
                   sourceName: item.name,
                   canBeStun,
                   canBeSlam,

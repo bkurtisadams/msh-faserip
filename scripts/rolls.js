@@ -997,29 +997,29 @@ export class FaseripRolls {
 
       // Create chat message styled to match screenshot
       let content = `
-      <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
-        <div style="padding: 5px 10px; border-bottom: 1px solid #c0c0c0; font-size: 1.1em; color: #8b0000;">
-          <strong>${actor.name} - ${power.name} (${actionType})</strong>
+        <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
+          <div style="padding: 5px 10px; border-bottom: 1px solid #c0c0c0; font-size: 1.1em; color: #8b0000;">
+            <strong>${actor.name} - ${power.name} (${actionType})</strong>
+          </div>
+          <div style="padding: 5px 10px; font-size: 0.9em;">
+            <div>Base Rank: ${powerRank} (${powerValue})</div>
+            <div>Column Shift: ${totalColumnShift > 0 ? "+" : ""}${totalColumnShift} → ${effectiveRank}</div>
+            ${powerRangeInfo}
+            ${damageCS !== 0 && damageRankName
+              ? `<div>Damage Column Shift: ${damageCS > 0 ? "+" : ""}${damageCS}CS → <strong>${damageRankName} (${damageRankValue})</strong></div>`
+              : ""}
+            <div>Roll: ${roll.total} + Karma: ${karmaUsed} = ${cappedTotal}</div>
+          </div>
+          <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
+            background-color: ${resultColor.toLowerCase() === 'white' ? '#f8f8f8 !important' :
+            resultColor.toLowerCase() === 'green' ? '#4CAF50 !important' :
+              resultColor.toLowerCase() === 'yellow' ? '#FFC107 !important' :
+                '#F44336 !important'};
+            color: ${resultColor.toLowerCase() === 'white' || resultColor.toLowerCase() === 'yellow' ? '#333' : 'white'};">
+            ${resultText} (${resultColor.toUpperCase()})
+          </div>
         </div>
-        <div style="padding: 5px 10px; font-size: 0.9em;">
-          <div>Base Rank: ${powerRank} (${powerValue})</div>
-          <div>Column Shift: ${totalColumnShift > 0 ? "+" : ""}${totalColumnShift} → ${effectiveRank}</div> <!-- MODIFIED LINE -->
-          ${damageCS !== 0 && damageRankName
-            ? `<div>Damage Column Shift: ${damageCS > 0 ? "+" : ""}${damageCS}CS → <strong>${damageRankName} (${damageRankValue})</strong></div>`
-            : ""}
-          ${powerRangeInfo} <!-- This line now uses the re-calculated powerRangeInfo -->
-          <div>Roll: ${roll.total} + Karma: ${karmaUsed} = ${cappedTotal}</div>
-        </div>
-        <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
-          background-color: ${resultColor.toLowerCase() === 'white' ? '#f8f8f8 !important' :
-          resultColor.toLowerCase() === 'green' ? '#4CAF50 !important' :
-            resultColor.toLowerCase() === 'yellow' ? '#FFC107 !important' :
-              '#F44336 !important'};
-          color: ${resultColor.toLowerCase() === 'white' || resultColor.toLowerCase() === 'yellow' ? '#333' : 'white'};">
-          ${resultText} (${resultColor.toUpperCase()})
-        </div>
-      </div>
-    `;
+      `;
 
       // Send to chat
       await ChatMessage.create({
@@ -1165,6 +1165,9 @@ export class FaseripRolls {
         <div style="margin-bottom: 10px;">
           <label style="display: inline-block; width: 120px;">Target Distance:</label>
           <input type="number" id="distance" name="distance" value="${initialDistance}" min="0" style="width: 50px;"> areas
+          <div style="margin-top: 5px; padding: 5px; background: #f9f9f9; border: 1px solid #ddd; border-radius: 3px; font-size: 0.9em;">
+            ${dialogPowerRangeInfo}
+          </div>
         </div>
         <div style="margin-bottom: 10px;">
           <label style="display: inline-block; width: 120px;">Column Shift:</label>
@@ -1203,7 +1206,6 @@ export class FaseripRolls {
             Remember these settings for future rolls
           </label>
         </div>
-        ${dialogPowerRangeInfo} <!-- NEW LINE -->
       </div>`;
 
 
