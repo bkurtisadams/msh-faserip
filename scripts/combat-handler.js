@@ -1135,6 +1135,25 @@ export class CombatHandler {
             }
         }
 
+        // Also check for resistance powers granted via equipment (e.g., goggles, suits)
+        const passiveResistPowers = allPowers.filter(p =>
+            (p.name?.toLowerCase().includes("resistance") || p.name?.toLowerCase().includes("immunity")) &&
+            typeof p.value === "number" &&
+            p.value > 0
+        );
+
+        for (const resPower of passiveResistPowers) {
+            const powerValue = resPower.value;
+            const resistanceType = resPower.damageType?.toLowerCase() || "unknown";
+
+            if (isResistanceApplicable(normalizedDamageType, resistanceType) && powerValue > defenses.resistanceValue) {
+                defenses.resistanceValue = powerValue;
+                defenses.resistanceType = resistanceType;
+                defenses.usedResistance = true;
+                console.log(`✅ Using equipment-granted resistance: ${resPower.name} (${resistanceType}: ${powerValue})`);
+            }
+        }
+
         console.log("Final resistance value:", defenses.resistanceValue);
         console.log("Final defenses:", defenses);
 

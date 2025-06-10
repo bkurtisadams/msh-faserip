@@ -43,21 +43,32 @@ export class FaseripEquipmentSheet extends ItemSheet {
       "Class 1000", "Class 3000", "Class 5000", "Beyond"
     ];
 
-    // All FASERIP Combat Damage Types (from Universal Table, p. 100)
-    context.damageTypes = [
-      "S",   // Shooting
-      "E",   // Energy
-      "F",   // Force
-      "EA",  // Edged Attack
-      "BA",  // Blunt Attack
-      "TE",  // Throwing Edged
-      "TB",  // Throwing Blunt
-      "GP",  // Grappling
-      "Gb"   // Grabbing
-      // Note: "Stun" is an *effect* type, not a damage type on the Universal Table column.
+    // All FASERIP Combat Damage Types + custom resistance types
+context.damageTypes = [
+  "S",    // Shooting
+  "E",    // Energy
+  "F",    // Force
+  "EA",   // Edged Attack
+  "BA",   // Blunt Attack
+  "TE",   // Throwing Edged
+  "TB",   // Throwing Blunt
+  "GP",   // Grappling
+  "Gb",   // Grabbing
+
+  // Extended types used for resistances or passive armor
+  "sensory",
+  "mental",
+  "radiation",
+  "corrosive",
+  "toxin",
+  "magic",
+  "disease",
+  "emotion"
+  // Note: "Stun" is an *effect* type, not a damage type on the Universal Table column.
       // If you want a "Stun" damage type, you'd need to define how it maps to the table.
       // Current weapon sheet already has stunIntensity for weapons that only stun.
-    ];
+];
+
     // --- END NEW ---
 
     return context;
