@@ -8,6 +8,68 @@ import { runAsGM } from './gm-utils.js';
 // This file contains roll functions that can be called directly from macros
 // without requiring the character sheet to be open
 
+// Add this function for power range calculation
+function calculatePowerRangeInfo(actor, power, target) {
+  if (!target) {
+    return { penalty: 0, info: "", outOfRange: false, distance: 0, maxRange: 0 };
+  }
+
+  let distance = 0;
+  let sourceToken = null;
+  let targetToken = null;
+
+  // Determine the source token for the range calculation
+  if (canvas.tokens.controlled.length > 0) {
+    sourceToken = canvas.tokens.controlled[0];
+  } else if (actor instanceof Actor && typeof actor.getActiveTokens === 'function') {
+    sourceToken = actor.getActiveTokens()[0];
+  }
+
+  // Determine the target token for the range calculation
+  if (game.user.targets.size > 0) {
+    targetToken = Array.from(game.user.targets)[0];
+  }
+
+  // Perform distance calculation only if both source and target tokens are found
+  if (sourceToken && targetToken) {
+    // Get the current scene's grid instance
+    const grid = canvas.grid.grid;
+
+    // Get the center pixel coordinates of the tokens
+    const sourcePoint = sourceToken.center;
+    const targetPoint = targetToken.center;
+
+    // Use the V13 BaseGrid API to measure the path distance in grid units
+    const pathResult = grid.measurePath([sourcePoint, targetPoint]);
+    distance = pathResult.distance; // This is the distance in grid units
+
+    const units = grid.units;
+    console.log(`V13 Grid API Power Range: Distance between "${sourceToken.name}" and "${targetToken.name}" is ${distance} ${units}`);
+  } else {
+    console.warn("Could not determine source or target token for power range calculation. Defaulting distance to 0.");
+  }
+
+  // Get the power's base range from POWER_RANGE_VALUES
+  const powerRank = power.system.rank || "Typical";
+  const basePowerRange = POWER_RANGE_VALUES[powerRank] || 0;
+
+  let penalty = 0;
+  let info = "";
+  let outOfRange = false; // Powers are never truly "out of range"
+
+  // Apply range rules for powers: -1 CS penalty for every area past normal max
+  if (distance > basePowerRange) {
+    penalty = distance - basePowerRange;
+    info = `<div style="color: #ff6600;"><strong>Range:</strong> ${distance} areas (Base: ${basePowerRange} areas). Penalty: -${penalty}CS</div>`;
+  } else if (distance > 0) {
+    info = `<div><strong>Range:</strong> ${distance} areas (within base range of ${basePowerRange} areas). No penalty.</div>`;
+  } else {
+    info = `<div><strong>Range:</strong> Adjacent (no penalty).</div>`;
+  }
+
+  return { penalty, info, outOfRange, distance, maxRange: basePowerRange };
+}
+
 const actionTypes = [
   { code: "BA", label: "Blunt Attacks" },
   { code: "EA", label: "Edged Attacks" },
@@ -891,20 +953,29 @@ export class FaseripRolls {
       const damageType = options.damageType || savedDamageType;
 
       // --- RECALCULATE RANGE PENALTY FOR THE ACTUAL ROLL ---
-      let currentRollDistance = options.distance ?? initialDistance; // Use distance from options if available, otherwise initial
-      let powerRangePenalty = 0;
-      let powerRangeInfo = "";
-      const powerRank = power.system.rank || "Typical";
-      const basePowerRange = POWER_RANGE_VALUES[powerRank] || 0;
+      const currentTarget = game.user.targets.first();
+      const powerRangeData = calculatePowerRangeInfo(actor, power, currentTarget);
 
-      if (currentRollDistance > basePowerRange) {
-        powerRangePenalty = currentRollDistance - basePowerRange;
-        powerRangeInfo = `<div><strong>Range:</strong> ${currentRollDistance} areas (Base: ${basePowerRange} areas). Penalty: -${powerRangePenalty}CS.</div>`;
-      } else if (currentRollDistance > 0) {
-        powerRangeInfo = `<div><strong>Range:</strong> ${currentRollDistance} areas (within base range of ${basePowerRange} areas). No penalty.</div>`;
-      } else {
-        powerRangeInfo = `<div><strong>Range:</strong> Adjacent (no penalty).</div>`;
+      // Check if out of range first
+      if (powerRangeData.outOfRange) {
+        await ChatMessage.create({
+          speaker: ChatMessage.getSpeaker({ actor }),
+          content: `
+            <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px;">
+              <div style="padding: 5px 10px; color: #cc0000; font-weight: bold; font-size: 1.1em;">
+                ${power.name} - OUT OF RANGE
+              </div>
+              <div style="padding: 5px 10px;">
+                Target is ${powerRangeData.distance} areas away, but ${power.name} has base range of ${powerRangeData.maxRange} areas.
+              </div>
+            </div>
+          `
+        });
+        return { outOfRange: true };
       }
+
+      const powerRangePenalty = powerRangeData.penalty;
+      const powerRangeInfo = powerRangeData.info;
       // --- END RECALCULATE ---
 
       const totalColumnShift = rawColumnShift - powerRangePenalty; // Apply range penalty here
@@ -1170,19 +1241,9 @@ export class FaseripRolls {
     };
 
     // --- RECALCULATE powerRangeInfo FOR DIALOG CONTENT ---
-    // This ensures the dialog shows current range info based on selected tokens at render time
-    let dialogPowerRangeInfo = "";
-    const powerRank = power.system.rank || "Typical";
-    const basePowerRange = POWER_RANGE_VALUES[powerRank] || 0;
-
-    if (initialDistance > basePowerRange) {
-      const penalty = initialDistance - basePowerRange;
-      dialogPowerRangeInfo = `<div><strong>Range:</strong> ${initialDistance} areas (Base: ${basePowerRange} areas). Penalty: -${penalty}CS.</div>`;
-    } else if (initialDistance > 0) {
-      dialogPowerRangeInfo = `<div><strong>Range:</strong> ${initialDistance} areas (within base range of ${basePowerRange} areas). No penalty.</div>`;
-    } else {
-      dialogPowerRangeInfo = `<div><strong>Range:</strong> Adjacent (no penalty).</div>`;
-    }
+    const initialTarget = game.user.targets.first();
+    const dialogRangeData = calculatePowerRangeInfo(actor, power, initialTarget);
+    const dialogPowerRangeInfo = dialogRangeData.info;
     // --- END RECALCULATE ---
 
     // Create dialog for roll options
@@ -1197,6 +1258,11 @@ export class FaseripRolls {
               </option>`
             ).join('')}
           </select>
+        </div>
+        <div style="margin-bottom: 10px;">
+          <label style="display: inline-block; width: 120px;">Power Range:</label>
+          <input type="text" value="${POWER_RANGE_VALUES[power.system.rank || 'Typical']} areas" style="width: 80px;" readonly>
+          <span style="color: #666; font-size: 0.9em;">(${power.system.rank || 'Typical'} rank)</span>
         </div>
         <div style="margin-bottom: 10px;">
           <label style="display: inline-block; width: 120px;">Target Distance:</label>
