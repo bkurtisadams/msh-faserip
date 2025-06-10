@@ -462,52 +462,75 @@
   </div>
   
   <!-- Custom equipment fields -->
-  <div class="custom-fields" {{#unless (eq system.category "custom")}}style="display: none;"{{/unless}}>
-    <div class="form-group">
-      <label>Custom Abilities:</label>
-      <button type="button" class="add-custom-ability">+ Add Ability</button>
-    </div>
-    
-    <div class="custom-abilities-list">
-      {{#each system.customAbilities as |ability i|}}
-      <div class="custom-ability">
-        <div class="ability-header">
-          <input type="text" name="system.customAbilities.{{i}}.name" value="{{ability.name}}" placeholder="Ability Name"/>
-          <button type="button" class="remove-custom-ability" data-index="{{i}}"><i class="fas fa-trash"></i></button>
+<div class="custom-fields" {{#unless (eq system.category "custom")}}style="display: none;"{{/unless}}>
+  <div class="form-group">
+    <label>Custom Abilities:</label>
+    <button type="button" class="add-custom-ability">+ Add Ability</button>
+  </div>
+  
+  <div class="custom-abilities-list">
+    {{#each system.customAbilities as |ability i|}}
+    <div class="custom-ability">
+      <div class="ability-header">
+        <input type="text" name="system.customAbilities.{{i}}.name" value="{{ability.name}}" placeholder="Ability Name"/>
+        <button type="button" class="remove-custom-ability" data-index="{{i}}"><i class="fas fa-trash"></i></button>
+      </div>
+
+      <div class="ability-details">
+        <div class="form-row">
+          <div class="form-group half">
+            <label>Rank:</label>
+            <select name="system.customAbilities.{{i}}.rank">
+              {{#each ../ranks as |rank|}}
+              <option value="{{rank}}" {{#if (eq ability.rank rank)}}selected{{/if}}>{{rank}}</option>
+              {{/each}}
+            </select>
+          </div>
+
+          <div class="form-group half">
+            <label>Damage Type:</label>
+            <select name="system.customAbilities.{{i}}.damageType">
+              <option value="" {{#if (eq ability.damageType "")}}selected{{/if}}>None</option>
+              {{#each ../damageTypes as |type|}}
+              <option value="{{type}}" {{#if (eq ability.damageType type)}}selected{{/if}}>{{type}}</option>
+              {{/each}}
+            </select>
+          </div>
         </div>
-        <div class="ability-details">
-          <div class="form-row">
-            <div class="form-group half">
-              <label>Rank:</label>
-              <select name="system.customAbilities.{{i}}.rank">
-                {{#each ../ranks}}
-                <option value="{{this}}" {{#if (eq ../ability.rank this)}}selected{{/if}}>{{this}}</option>
-                {{/each}}
-              </select>
-            </div>
-            <div class="form-group half">
-              <label>Damage Type:</label>
-              <select name="system.customAbilities.{{i}}.damageType">
-                <option value="" {{#if (eq ability.damageType "")}}selected{{/if}}>None</option>
-                {{#each ../damageTypes}}
-                <option value="{{this}}" {{#if (eq ../ability.damageType this)}}selected{{/if}}>{{this}}</option>
-                {{/each}}
-              </select>
-            </div>
-          </div>
-          <div class="form-group">
-            <label>Range:</label>
-            <input type="text" name="system.customAbilities.{{i}}.range" value="{{ability.range}}" />
-          </div>
-          <div class="form-group">
-            <label>Description:</label>
-            <textarea name="system.customAbilities.{{i}}.description">{{ability.description}}</textarea>
-          </div>
+
+        <div class="form-group">
+          <label>Range:</label>
+          <input type="text" name="system.customAbilities.{{i}}.range" value="{{ability.range}}" />
+        </div>
+
+        <div class="form-group">
+          <label>Description:</label>
+          <textarea name="system.customAbilities.{{i}}.description">{{ability.description}}</textarea>
+        </div>
+
+        <div class="form-group">
+          <label>
+            <input type="checkbox" name="system.customAbilities.{{i}}.isPassiveArmor" {{checked ability.isPassiveArmor}} />
+            Grants Passive Armor
+          </label>
+        </div>
+
+        <div class="form-group {{#unless ability.isPassiveArmor}}hidden{{/unless}}">
+          <label>Armor Type (Specific):</label>
+          <select name="system.customAbilities.{{i}}.armorDamageType">
+            <option value="" {{#if (eq ability.armorDamageType "")}}selected{{/if}}>None</option>
+            {{#each ../damageTypes as |type|}}
+            <option value="{{type}}" {{#if (eq ability.armorDamageType type)}}selected{{/if}}>{{type}}</option>
+            {{/each}}
+          </select>
         </div>
       </div>
-      {{/each}}
     </div>
+    {{/each}}
   </div>
+</div>
+
+  
 
   </form>
   
