@@ -277,6 +277,28 @@ export class FaseripEquipmentSheet extends ItemSheet {
     const damageType = item.system.damageType || "S";
     const damage = item.system.damage || "0";
 
+    // *** AMMO TYPE CHECKING CODE ***
+    const ammoType = item.system.ammoType || "standard";
+    
+    // Modify damage calculation based on ammo type
+    let finalDamage = damage;
+    let specialEffects = {};
+
+    switch(ammoType) {
+      case "mercy":
+        finalDamage = 0; // No damage
+        specialEffects.mercyShot = true;
+        break;
+      case "explosive":
+        finalDamage = damage * 2; // Double damage
+        break;
+      case "rubber":
+        specialEffects.noSlam = true;
+        // normalizedDamageType will be handled in CombatHandler
+        break;
+    }
+    // *** END OF NEW CODE ***
+
     // Create dialog options
     // Define action types from the Universal Table
     const ACTIONS = {
@@ -321,6 +343,18 @@ export class FaseripEquipmentSheet extends ItemSheet {
         <label style="display: inline-block; width: 120px;">Weapon:</label>
         <input type="text" value="${item.name}" readonly style="width: 180px;">
       </div>
+      <!-- ADD THIS AMMO TYPE SELECTOR -->
+      <div style="margin-bottom: 10px;">
+        <label style="display: inline-block; width: 120px;">Ammo Type:</label>
+        <select name="ammoType" style="width: 180px;">
+          <option value="standard">Standard</option>
+          <option value="ap">Armor Piercing</option>
+          <option value="mercy">Mercy Shot</option>
+          <option value="rubber">Rubber Shot</option>
+          <option value="explosive">Explosive Shot</option>
+        </select>
+      </div>
+      <!-- END ADD -->
       <div style="margin-bottom: 10px;">
         <label style="display: inline-block; width: 120px;">Action Type:</label>
         <select id="action" name="action" style="width: 180px;">
@@ -351,230 +385,238 @@ export class FaseripEquipmentSheet extends ItemSheet {
         roll: {
           label: "Roll",
           callback: async (html) => {
-            const actionName = html.find('[name="action"]').val();
-            const action = ACTIONS[actionName];
-            const distance = parseInt(html.find('[name="distance"]').val()) || 1;
-            const shift = parseInt(html.find('[name="shift"]').val()) || 0;
-            const karma = parseInt(html.find('[name="karma"]').val()) || 0;
+          const actionName = html.find('[name="action"]').val();
+          const action = ACTIONS[actionName];
+          const distance = parseInt(html.find('[name="distance"]').val()) || 1;
+          const shift = parseInt(html.find('[name="shift"]').val()) || 0;
+          const karma = parseInt(html.find('[name="karma"]').val()) || 0;
+          
+          // ADD THIS: Get ammo type from dialog and log it
+          const selectedAmmoType = html.find('[name="ammoType"]').val() || "standard";
+          console.log("Selected ammo type from dialog:", selectedAmmoType);
 
-            // Calculate range penalty for shooting weapons
-            let totalShift = shift;
-            if (weaponType === "shooting" && distance > 1) {
-              totalShift -= (distance - 1);
-            }
+          // Calculate range penalty for shooting weapons
+          let totalShift = shift;
+          if (weaponType === "shooting" && distance > 1) {
+            totalShift -= (distance - 1);
+          }
 
-            // Apply column shifts if needed
-            let effectiveRank = abilityRank;
-            if (totalShift !== 0) {
-              const ranks = [
-                "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent",
-                "Remarkable", "Incredible", "Amazing", "Monstrous", "Unearthly"
-              ];
-              const index = ranks.indexOf(abilityRank);
-              if (index !== -1) {
-                const newIndex = Math.min(Math.max(index + totalShift, 0), ranks.length - 1);
-                effectiveRank = ranks[newIndex];
-              }
-            }
-
-            try {
-
-              // Create the roll
-              const roll = new Roll("1d100");
-              await roll.evaluate();
-
-              // Calculate final roll with karma
-              let cappedTotal = roll.total;
-              let karmaUsed = 0;
-
-              if (karma > 0) {
-                cappedTotal = Math.min(100, roll.total + karma);
-                karmaUsed = cappedTotal - roll.total;
-              }
-
-              if (karmaUsed > 0) {
-                console.log("Logging Karma:", karmaUsed);
-                ui.notifications.info(`Logging ${karmaUsed} Karma for ${item.name}`);
-
-                const history = foundry.utils.deepClone(actor.system.karma?.history || []);
-                const newEvent = {
-                  realDate: new Date().toLocaleDateString(),
-                  gameDate: "",
-                  amount: -karmaUsed,
-                  type: "Die Roll",
-                  description: `Spent on ${item.name} (Equipment)`
-                };
-                history.push(newEvent);
-
-                await actor.update({ "system.karma.history": history });
-              }
-
-              // Get result color from universal table
-              const colorResult = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
-
-              // Get the specific result based on action type and color
-              // This maps directly to the universal table results
-              const effect = action.results[colorResult.toLowerCase()];
-
-              // After getting the colorResult and before creating the chat message, add this code:
-
-              // Get additional weapon properties
-              const legality = item.system.legality || "legal";
-              const burstScatter = item.system.burstScatter || "none";
-              const stunIntensity = item.system.stunIntensity || "";
-              const continuingDamage = item.system.continuingDamage || "";
-              const continuingRounds = item.system.continuingDamageRounds || "";
-              const requiresTwoOperators = item.system.requiresTwoOperators || false;
-
-              // Add to chat message content
-              let additionalInfo = "";
-              if (stunIntensity) {
-                additionalInfo += `<div>Stun/Gas Intensity: ${stunIntensity} (Endurance FEAT to resist)</div>`;
-                if (actionName === "Stunning Attack") {
-                  additionalInfo += `<div>Effect: Knockout for 1d10 rounds on failed FEAT</div>`;
-                }
-              }
-              if (continuingDamage && continuingRounds) {
-                additionalInfo += `<div>Continuing Damage: ${continuingDamage} for ${continuingRounds}</div>`;
-              }
-              if (burstScatter !== "none") {
-                additionalInfo += `<div>${burstScatter === "burst" ? "Burst Attack (affects up to 3 adjacent targets)" : "Scatter Attack (affects all in target area)"}</div>`;
-              }
-              if (requiresTwoOperators) {
-                additionalInfo += `<div>Requires Two Operators</div>`;
-              }
-              if (legality !== "legal") {
-                const legalText = {
-                  "restricted": "Restricted",
-                  "military": "Military Only",
-                  "illegal": "Illegal"
-                }[legality] || legality;
-                additionalInfo += `<div>Legality: ${legalText}</div>`;
-              }
-
-              // Create the formatted chat message with proper colors
-              await ChatMessage.create({
-                speaker: ChatMessage.getSpeaker({ actor }),
-                roll: roll,
-                content: `
-                  <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
-                    <div style="padding: 5px 10px; border-bottom: 1px solid #c0c0c0; font-size: 1.1em; color: #8b0000;">
-                      <strong>${actor.name} - ${item.name} (${actionName})</strong>
-                    </div>
-                    <div style="padding: 5px 10px; font-size: 0.9em;">
-                      <div>Base Rank: ${abilityRank} (${abilityValue})</div>
-                      <div>Column Shift: ${totalShift !== 0 ? `${totalShift > 0 ? '+' : ''}${totalShift}CS → ${effectiveRank}` : `0 → ${effectiveRank}`}</div>
-                      <div>Roll: ${roll.total} + Karma: ${karmaUsed} = ${cappedTotal}</div>
-                      <div>Damage: ${damage} (${damageType})</div>
-                      ${item.system.ammoType ? `<div>Ammo Type: ${item.system.ammoType}</div>` : ''}
-                      ${additionalInfo}
-                    </div>
-                    <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px;
-                      background-color: ${
-                        colorResult.toLowerCase() === 'white' ? '#f8f8f8' :
-                        colorResult.toLowerCase() === 'green' ? '#4CAF50' :
-                        colorResult.toLowerCase() === 'yellow' ? '#FFC107' :
-                        '#F44336'
-                      };
-                      color: ${
-                        colorResult.toLowerCase() === 'white' || colorResult.toLowerCase() === 'yellow' ? '#333' : 'white'
-                      };">
-                      ${effect} (${colorResult.toUpperCase()})
-                    </div>
-                  </div>
-                `
-              });
-
-              // Automatically apply damage to the targeted token (if any)
-              const target = Array.from(game.user.targets)[0]?.actor;
-
-              if (target) {
-                // Convert damage (string or rank) into number
-                let baseDamage = parseInt(damage);
-                if (isNaN(baseDamage)) {
-                  baseDamage = CONFIG.FASERIP.rankValues[damage] || 0;
-                }
-
-                const canBeStun = effect?.toLowerCase().includes("stun") || actionName.toLowerCase().includes("stunning");
-                const canBeSlam = effect?.toLowerCase().includes("slam");
-                const canBeKill = effect?.toLowerCase().includes("kill");
-
-                // damage type normalization
-                let normalizedDamageType;
-                switch (damageType.toUpperCase()) {
-                  case "S": // need case for "S"
-                  case "SH":
-                  case "BA":
-                    normalizedDamageType = "Physical-Blunt";
-                    break;
-                  case "EA":
-                    normalizedDamageType = "Physical-Edged";
-                    break;
-                  case "TE":
-                    normalizedDamageType = "Physical-Edged";
-                    break;
-                  case "TB":
-                    normalizedDamageType = "Physical-Blunt";
-                    break;
-                  case "E":
-                  case "EN":
-                    normalizedDamageType = "Energy-Energy";
-                    break;
-                  case "F":
-                  case "FO":
-                    normalizedDamageType = "Force";
-                    break;
-                  case "GP":
-                    normalizedDamageType = "Physical-Grapple";
-                    break;
-                  case "GB":
-                    normalizedDamageType = "Physical-Grab";
-                    break;
-                  default:
-                    normalizedDamageType = "Physical-Blunt"; // Changed default to Physical-Blunt
-                }
-                console.log(`Weapon damage type "${damageType}" normalized to "${normalizedDamageType}"`);
-
-                // Update the CombatHandler.processAttack call to use the normalized damage type
-                await CombatHandler.processAttack({
-                  attacker: actor,
-                  target: target,
-                  baseDamage: baseDamage,
-                  damageType: normalizedDamageType, // Use normalized type here instead of direct damageType
-                  sourceName: item.name,
-                  canBeStun,
-                  canBeSlam,
-                  canBeKill,
-                  originalRollResult: colorResult.toLowerCase()
-                });
-              } else {
-                ui.notifications.info("No target selected. Damage not applied.");
-              }
-
-              // Update shots remaining if it's a weapon
-              if (item.system.category === "weapon" && item.system.shots) {
-                // If shotsRemaining is undefined, initialize it
-                let shotsRemaining = item.system.shotsRemaining;
-                if (shotsRemaining === undefined || shotsRemaining === "") {
-                  shotsRemaining = item.system.shots;
-                }
-
-                // Decrement shots remaining
-                shotsRemaining = Math.max(0, parseInt(shotsRemaining) - 1);
-
-                // Update the item
-                await item.update({ "system.shotsRemaining": shotsRemaining });
-
-                if (shotsRemaining === 0) {
-                  ui.notifications.warn(`${item.name} needs to be reloaded!`);
-                }
-              }
-
-            } catch (error) {
-              console.error("Error rolling dice:", error);
-              ui.notifications.error("Error when rolling dice. See console for details.");
+          // Apply column shifts if needed
+          let effectiveRank = abilityRank;
+          if (totalShift !== 0) {
+            const ranks = [
+              "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent",
+              "Remarkable", "Incredible", "Amazing", "Monstrous", "Unearthly"
+            ];
+            const index = ranks.indexOf(abilityRank);
+            if (index !== -1) {
+              const newIndex = Math.min(Math.max(index + totalShift, 0), ranks.length - 1);
+              effectiveRank = ranks[newIndex];
             }
           }
+
+          try {
+            // Create the roll
+            const roll = new Roll("1d100");
+            await roll.evaluate();
+
+            // Calculate final roll with karma
+            let cappedTotal = roll.total;
+            let karmaUsed = 0;
+
+            if (karma > 0) {
+              cappedTotal = Math.min(100, roll.total + karma);
+              karmaUsed = cappedTotal - roll.total;
+            }
+
+            if (karmaUsed > 0) {
+              console.log("Logging Karma:", karmaUsed);
+              ui.notifications.info(`Logging ${karmaUsed} Karma for ${item.name}`);
+
+              const history = foundry.utils.deepClone(actor.system.karma?.history || []);
+              const newEvent = {
+                realDate: new Date().toLocaleDateString(),
+                gameDate: "",
+                amount: -karmaUsed,
+                type: "Die Roll",
+                description: `Spent on ${item.name} (Equipment)`
+              };
+              history.push(newEvent);
+
+              await actor.update({ "system.karma.history": history });
+            }
+
+            // Get result color from universal table
+            const colorResult = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
+
+            // Get the specific result based on action type and color
+            const effect = action.results[colorResult.toLowerCase()];
+
+            // Get additional weapon properties
+            const legality = item.system.legality || "legal";
+            const burstScatter = item.system.burstScatter || "none";
+            const stunIntensity = item.system.stunIntensity || "";
+            const continuingDamage = item.system.continuingDamage || "";
+            const continuingRounds = item.system.continuingDamageRounds || "";
+            const requiresTwoOperators = item.system.requiresTwoOperators || false;
+
+            // Add to chat message content
+            let additionalInfo = "";
+            if (stunIntensity) {
+              additionalInfo += `<div>Stun/Gas Intensity: ${stunIntensity} (Endurance FEAT to resist)</div>`;
+              if (actionName === "Stunning Attack") {
+                additionalInfo += `<div>Effect: Knockout for 1d10 rounds on failed FEAT</div>`;
+              }
+            }
+            if (continuingDamage && continuingRounds) {
+              additionalInfo += `<div>Continuing Damage: ${continuingDamage} for ${continuingRounds}</div>`;
+            }
+            if (burstScatter !== "none") {
+              additionalInfo += `<div>${burstScatter === "burst" ? "Burst Attack (affects up to 3 adjacent targets)" : "Scatter Attack (affects all in target area)"}</div>`;
+            }
+            if (requiresTwoOperators) {
+              additionalInfo += `<div>Requires Two Operators</div>`;
+            }
+            if (legality !== "legal") {
+              const legalText = {
+                "restricted": "Restricted",
+                "military": "Military Only",
+                "illegal": "Illegal"
+              }[legality] || legality;
+              additionalInfo += `<div>Legality: ${legalText}</div>`;
+            }
+
+            // Create the formatted chat message with proper colors
+            await ChatMessage.create({
+              speaker: ChatMessage.getSpeaker({ actor }),
+              roll: roll,
+              content: `
+                <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
+                  <div style="padding: 5px 10px; border-bottom: 1px solid #c0c0c0; font-size: 1.1em; color: #8b0000;">
+                    <strong>${actor.name} - ${item.name} (${actionName})</strong>
+                  </div>
+                  <div style="padding: 5px 10px; font-size: 0.9em;">
+                    <div>Base Rank: ${abilityRank} (${abilityValue})</div>
+                    <div>Column Shift: ${totalShift !== 0 ? `${totalShift > 0 ? '+' : ''}${totalShift}CS → ${effectiveRank}` : `0 → ${effectiveRank}`}</div>
+                    <div>Roll: ${roll.total} + Karma: ${karmaUsed} = ${cappedTotal}</div>
+                    <div>Damage: ${damage} (${damageType})</div>
+                    ${selectedAmmoType !== "standard" ? `<div>Ammo Type: ${selectedAmmoType}</div>` : ''}
+                    ${additionalInfo}
+                  </div>
+                  <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px;
+                    background-color: ${
+                      colorResult.toLowerCase() === 'white' ? '#f8f8f8' :
+                      colorResult.toLowerCase() === 'green' ? '#4CAF50' :
+                      colorResult.toLowerCase() === 'yellow' ? '#FFC107' :
+                      '#F44336'
+                    };
+                    color: ${
+                      colorResult.toLowerCase() === 'white' || colorResult.toLowerCase() === 'yellow' ? '#333' : 'white'
+                    };">
+                    ${effect} (${colorResult.toUpperCase()})
+                  </div>
+                </div>
+              `
+            });
+
+            // Automatically apply damage to the targeted token (if any)
+            const target = Array.from(game.user.targets)[0]?.actor;
+
+            if (target) {
+              // Convert damage (string or rank) into number
+              let baseDamage = parseInt(damage);
+              if (isNaN(baseDamage)) {
+                baseDamage = CONFIG.FASERIP.rankValues[damage] || 0;
+              }
+
+              const canBeStun = effect?.toLowerCase().includes("stun") || actionName.toLowerCase().includes("stunning");
+              const canBeSlam = effect?.toLowerCase().includes("slam");
+              const canBeKill = effect?.toLowerCase().includes("kill");
+
+              // damage type normalization
+              let normalizedDamageType;
+              switch (damageType.toUpperCase()) {
+                case "S":
+                case "SH":
+                case "BA":
+                  normalizedDamageType = "Physical-Blunt";
+                  break;
+                case "EA":
+                  normalizedDamageType = "Physical-Edged";
+                  break;
+                case "TE":
+                  normalizedDamageType = "Physical-Edged";
+                  break;
+                case "TB":
+                  normalizedDamageType = "Physical-Blunt";
+                  break;
+                case "E":
+                case "EN":
+                  normalizedDamageType = "Energy-Energy";
+                  break;
+                case "F":
+                case "FO":
+                  normalizedDamageType = "Force";
+                  break;
+                case "GP":
+                  normalizedDamageType = "Physical-Grapple";
+                  break;
+                case "GB":
+                  normalizedDamageType = "Physical-Grab";
+                  break;
+                default:
+                  normalizedDamageType = "Physical-Blunt";
+              }
+              console.log(`Weapon damage type "${damageType}" normalized to "${normalizedDamageType}"`);
+              
+              // ADD THIS: Create special effects object based on ammo type
+              let specialEffects = {};
+              if (selectedAmmoType === "mercy") {
+                specialEffects.mercyShot = true;
+              } else if (selectedAmmoType === "rubber") {
+                specialEffects.noSlam = true;
+              }
+
+              // Update the CombatHandler.processAttack call
+              await CombatHandler.processAttack({
+                attacker: actor,
+                target: target,
+                baseDamage: baseDamage,
+                damageType: normalizedDamageType,
+                sourceName: item.name,
+                canBeStun,
+                canBeSlam,
+                canBeKill,
+                originalRollResult: colorResult.toLowerCase()
+              }, {
+                ammoType: selectedAmmoType,  // ← Use the local variable
+                specialEffects: specialEffects,  // ← Use the local variable
+                skipDefenseDialog: false
+              });
+            } else {
+              ui.notifications.info("No target selected. Damage not applied.");
+            }
+
+            // Update shots remaining if it's a weapon
+            if (item.system.category === "weapon" && item.system.shots) {
+              let shotsRemaining = item.system.shotsRemaining;
+              if (shotsRemaining === undefined || shotsRemaining === "") {
+                shotsRemaining = item.system.shots;
+              }
+
+              shotsRemaining = Math.max(0, parseInt(shotsRemaining) - 1);
+              await item.update({ "system.shotsRemaining": shotsRemaining });
+
+              if (shotsRemaining === 0) {
+                ui.notifications.warn(`${item.name} needs to be reloaded!`);
+              }
+            }
+
+          } catch (error) {
+            console.error("Error rolling dice:", error);
+            ui.notifications.error("Error when rolling dice. See console for details.");
+          }
+        }
         },
         cancel: { label: "Cancel" }
       },

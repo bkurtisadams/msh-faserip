@@ -91,12 +91,39 @@ export class CombatHandler {
     
     console.log(`Process Attack: Using attacker: ${attackerActor.name}`);
     console.log(`Process Attack: Using target: ${targetActor.name}`);
+    console.log("Process Attack options:", options);
 
     // 1. Get Defenses from Target
-    let defenseData = await this.getTargetDefenses(target, damageType, baseDamage, options.skipDefenseDialog);
+    let defenseData = await this.getTargetDefenses(target, damageType, baseDamage, options);
 
-    // 2. Calculate Net Damage - FIXED LOGIC
-    let netDamage = baseDamage;
+    // 2. Handle special ammunition effects BEFORE damage calculation
+    let modifiedBaseDamage = baseDamage;
+    let specialEffects = options.specialEffects || {};
+    let modifiedCanBeSlam = canBeSlam; // Create a modifiable copy
+    
+    // Handle Mercy Shot - converts damage to knockout effect
+    if (options.ammoType === "mercy") {
+        if (baseDamage > 0) {
+            specialEffects.mercyKnockout = true;
+            modifiedBaseDamage = 0; // No actual damage
+            console.log("Mercy Shot: Converting damage to knockout effect");
+        }
+    }
+    
+    // Handle Explosive Shot - double damage
+    if (options.ammoType === "explosive") {
+        modifiedBaseDamage = baseDamage * 2;
+        console.log(`Explosive Shot: Damage increased from ${baseDamage} to ${modifiedBaseDamage}`);
+    }
+
+    // Handle Rubber Shot - prevent slam effects
+    if (options.ammoType === "rubber") {
+        modifiedCanBeSlam = false; // Rubber shot ignores slam results
+        console.log("Rubber Shot: Slam effects disabled");
+    }
+
+    // 3. Calculate Net Damage
+    let netDamage = modifiedBaseDamage;
     let damageAbsorbed = 0;
     let defenseUsed = "None";
     let defenseDetails = [];
@@ -107,7 +134,6 @@ export class CombatHandler {
     // Apply Body Armor first (if applicable)
     let effectiveBodyArmor = defenseData.bodyArmorValue;
     if (isEnergyAttack && effectiveBodyArmor > 0) {
-        // Energy attacks reduce body armor effectiveness by 20 points
         effectiveBodyArmor = Math.max(0, effectiveBodyArmor - 20);
         console.log(`Energy attack: Body Armor reduced from ${defenseData.bodyArmorValue} to ${effectiveBodyArmor}`);
     }
@@ -122,15 +148,13 @@ export class CombatHandler {
         }
     }
 
-    // Apply Force Field (if applicable and better than body armor)
+    // Apply Force Field (if applicable)
     let effectiveForceField = defenseData.forceFieldValue;
     if (!isEnergyAttack && effectiveForceField > 0) {
-        // Physical attacks reduce force field effectiveness by 10 points
         effectiveForceField = Math.max(0, effectiveForceField - 10);
         console.log(`Physical attack: Force Field reduced from ${defenseData.forceFieldValue} to ${effectiveForceField}`);
     }
     
-    // Force Field can be used in addition to or instead of Body Armor
     if (effectiveForceField > 0 && netDamage > 0) {
         const ffAbsorbed = Math.min(netDamage, effectiveForceField);
         netDamage -= ffAbsorbed;
@@ -141,7 +165,7 @@ export class CombatHandler {
         }
     }
 
-    // Apply Resistance (if applicable) - AFTER other defenses
+    // Apply Resistance (if applicable)
     if (defenseData.resistanceValue > 0 && netDamage > 0) {
         if (isResistanceApplicable(damageType, defenseData.resistanceType)) {
             const resistanceAbsorbed = Math.min(netDamage, defenseData.resistanceValue);
@@ -153,7 +177,7 @@ export class CombatHandler {
             }
             
             // Check for immunity (complete resistance)
-            if (defenseData.resistanceValue >= baseDamage) {
+            if (defenseData.resistanceValue >= modifiedBaseDamage) { // FIXED: use modifiedBaseDamage
                 defenseDetails.push(`Immune to ${damageType} damage`);
             }
         } else {
@@ -161,11 +185,11 @@ export class CombatHandler {
         }
     }
 
-    netDamage = Math.max(0, netDamage); // Damage cannot be negative
+    netDamage = Math.max(0, netDamage);
 
-    console.log(`Damage calculation: ${baseDamage} base - ${damageAbsorbed} absorbed = ${netDamage} net damage`);
+    console.log(`Damage calculation: ${modifiedBaseDamage} modified base - ${damageAbsorbed} absorbed = ${netDamage} net damage`);
 
-    // 3. Apply Net Damage to Target Health
+    // 4. Apply Net Damage to Target Health
     const isToken = target.document?.documentName === "Token" || target.documentName === "Token";
     const targetTokenData = isToken ? (target.document || target) : null;
     const isUnlinkedToken = isToken && targetTokenData && !targetTokenData.actorLink;
@@ -174,7 +198,6 @@ export class CombatHandler {
     console.log(`Target is unlinked token: ${isUnlinkedToken}`);
     console.log(`Target name: ${targetActor.name}`);
 
-    // Get current health and calculate new health
     const currentHealth = targetActor.system.attributes.health.value;
     const newHealth = Math.max(0, currentHealth - netDamage);
 
@@ -182,8 +205,6 @@ export class CombatHandler {
     console.log("Net damage applied:", netDamage);
     console.log("New health to set:", newHealth);
 
-    // Apply health update to the actor
-    console.log(isUnlinkedToken ? "Updating unlinked token actor data" : "Updating actor or linked token");
     await game.msh.runAsGM({
         operation: 'adjustTargetHealth',
         targetActorUuid: targetActor.uuid,
@@ -192,7 +213,7 @@ export class CombatHandler {
 
     console.log("After health update:", targetActor.system.attributes.health.value);
 
-    // 4. Create a summary chat message
+    // 5. Create chat message
     let defenseSummary = defenseDetails.length > 0 ? defenseDetails.join("; ") : "No defenses applied";
 
     let chatContent = `
@@ -201,7 +222,8 @@ export class CombatHandler {
         <strong>Damage Resolution: ${sourceName} vs ${target.name}</strong>
     </div>
     <div style="padding: 5px 10px; font-size: 0.9em;">
-        <div><strong>Base Damage:</strong> ${baseDamage} (${damageType})</div>
+        <div><strong>Base Damage:</strong> ${baseDamage}${modifiedBaseDamage !== baseDamage ? ` → ${modifiedBaseDamage}` : ''} (${damageType})</div>
+        ${options.ammoType && options.ammoType !== "standard" ? `<div><strong>Ammunition:</strong> ${options.ammoType.charAt(0).toUpperCase() + options.ammoType.slice(1)}</div>` : ''}
         <div><strong>Defenses:</strong> ${defenseSummary}</div>
         <div><strong>Total Damage Absorbed:</strong> ${damageAbsorbed}</div>
         <div><strong>Net Damage Applied:</strong> ${netDamage}</div>
@@ -210,18 +232,24 @@ export class CombatHandler {
     </div>
     `;
 
-    // 5. Handle Secondary Effects (Stun, Slam, Kill) *if damage was inflicted*
+    // 6. Handle special ammunition effects AFTER chat content is defined
+    if (specialEffects.mercyKnockout && modifiedBaseDamage === 0 && baseDamage > 0) {
+        await this.rollSecondaryFeat(target, "Stun", `${sourceName} (Mercy Shot Knockout)`);
+        chatContent += `<p><strong>Mercy Shot:</strong> Remarkable intensity knockout drug applied!</p>`;
+    }
+
+    if (options.ammoType === "rubber" && originalRollResult.toLowerCase() === "yellow" && canBeSlam) {
+        chatContent += `<p><strong>Rubber Shot:</strong> Slam result ignored (rubber ammunition).</p>`;
+    }
+
+    // 7. Handle Secondary Effects - USE modifiedCanBeSlam instead of canBeSlam
     let secondaryEffectResult = "";
-    if (netDamage > 0) { // Only if some damage got through
-        // Determine which secondary effect to apply based on attack type and roll result
+    if (netDamage > 0) {
         if (damageType.toLowerCase().includes("blunt")) {
-            // Blunt attack effects
-            if (originalRollResult.toLowerCase() === "yellow" && canBeSlam) {
-                // Yellow result for Blunt typically results in Slam
+            if (originalRollResult.toLowerCase() === "yellow" && modifiedCanBeSlam) { // FIXED
                 secondaryEffectResult = await this.rollSecondaryFeat(target, "Slam", sourceName);
                 chatContent += `<p><strong>Slam Check:</strong> ${secondaryEffectResult}</p>`;
             } else if (originalRollResult.toLowerCase() === "red" && canBeStun) {
-                // Red result for Blunt typically results in Stun
                 secondaryEffectResult = await this.rollSecondaryFeat(target, "Stun", sourceName);
                 chatContent += `<p><strong>Stun Check:</strong> ${secondaryEffectResult}</p>`;
             }
@@ -693,7 +721,7 @@ export class CombatHandler {
      * Prompts the target (or GM) to apply defenses.
      * @returns {Object} { bodyArmorValue, forceFieldValue, resistanceValue, usedBodyArmor, usedForceField, usedResistance }
      */
-     static async getTargetDefenses(target, damageType, baseDamage, skipDialog = false) {
+     static async getTargetDefenses(target, damageType, baseDamage, options = {}) {
         // Default defense values
         let defenses = {
             bodyArmorValue: 0,
@@ -737,6 +765,36 @@ export class CombatHandler {
                 defenses.bodyArmorValue = powerValue;
                 defenses.usedBodyArmor = true;
             }
+        }
+
+        // In CombatHandler.getTargetDefenses(), add AP ammo handling:
+        if (options.ammoType === "ap") {
+        // Reduce body armor by 2 CS, but not force fields
+        if (defenses.bodyArmorValue > 0) {
+            const armorRanks = Object.keys(CONFIG.FASERIP.rankValues);
+            
+            // Find the current armor rank name from the value
+            let currentArmorRank = "";
+            for (const [rankName, rankValue] of Object.entries(CONFIG.FASERIP.rankValues)) {
+            if (rankValue === defenses.bodyArmorValue) {
+                currentArmorRank = rankName;
+                break;
+            }
+            }
+            
+            // Find the index of the current armor rank
+            const currentArmorIndex = armorRanks.indexOf(currentArmorRank);
+            
+            // Reduce by 2 CS (2 column shifts)
+            const newArmorIndex = Math.max(0, currentArmorIndex - 2);
+            const newArmorRank = armorRanks[newArmorIndex];
+            
+            // Update the armor value
+            defenses.bodyArmorValue = CONFIG.FASERIP.rankValues[newArmorRank] || 0;
+            
+            console.log(`AP Ammo: Reduced armor from ${currentArmorRank} to ${newArmorRank}`);
+        }
+        // Force fields unaffected by AP
         }
 
         // Get Force Field
@@ -836,7 +894,7 @@ export class CombatHandler {
         console.log("Final defenses:", defenses);
 
         // Show dialog if needed (simplified for space)
-        if (!skipDialog && target.hasPlayerOwner && 
+        if (!options.skipDefenseDialog && target.hasPlayerOwner &&
             (defenses.bodyArmorValue > 0 || defenses.forceFieldValue > 0 || defenses.resistanceValue > 0)) {
             // [Dialog code remains the same...]
         }

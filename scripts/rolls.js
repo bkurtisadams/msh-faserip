@@ -113,42 +113,78 @@ const POWER_RANGE_VALUES = {
 
 // Add this new function after the existing helper functions
 function calculateRangeInfo(actor, equipment, target) {
-  // This function is specifically for "weapon" category equipment,
-  // as determined by its usage in FaseripRolls.rollEquipment.
-  // Power-item range penalties are handled separately in rollPower/rollPowerItem.
+  // This function is specifically for "weapon" category equipment.
+  // Power-item range penalties are handled separately.
   if (!target || equipment.system.category !== "weapon") {
     return { penalty: 0, info: "", outOfRange: false, distance: 0, maxRange: 0 };
   }
 
-  // Simple distance calculation using selected tokens
-  let distance = 0;
+  let distance = 0; // This will store the distance in grid units ("areas")
+  let sourceToken = null;
+  let targetToken = null;
 
-  // Try to get distance from selected tokens
-  if (game.user.targets.size > 0 && canvas.tokens.controlled.length > 0) {
-    const controlledToken = canvas.tokens.controlled[0];
-    const targetToken = Array.from(game.user.targets)[0];
-
-    // Calculate distance in grid squares
-    const ray = new Ray(controlledToken.center, targetToken.center);
-    distance = Math.round(ray.distance / canvas.scene.grid.size);
-
-    console.log(`Direct range calculation: ${ray.distance} pixels = ${distance} grid squares`);
+  // Determine the source token for the range calculation
+  if (canvas.tokens.controlled.length > 0) {
+    sourceToken = canvas.tokens.controlled[0];
+  } else if (actor instanceof Actor && typeof actor.getActiveTokens === 'function') {
+    // Fallback: If no token is controlled, try to get a token from the actor.
+    // Ensure actor is an Actor instance and has getActiveTokens method
+    sourceToken = actor.getActiveTokens()[0];
   }
 
+  // Determine the target token for the range calculation
+  // Sticking to the original function's logic of using game.user.targets
+  if (game.user.targets.size > 0) {
+    targetToken = Array.from(game.user.targets)[0];
+  }
+
+  // Perform distance calculation only if both source and target tokens are found
+  if (sourceToken && targetToken) {
+    // Get the current scene's grid instance (which extends BaseGrid)
+    const grid = canvas.grid.grid;
+
+    // Get the center pixel coordinates of the tokens
+    // token.center provides a Point {x, y} which works as Coordinates2D for measurePath
+    const sourcePoint = sourceToken.center;
+    const targetPoint = targetToken.center;
+
+    // Use the V13 BaseGrid API to measure the path distance in grid units
+    // measurePath automatically accounts for grid type (square, hex, gridless)
+    const pathResult = grid.measurePath([sourcePoint, targetPoint]);
+    distance = pathResult.distance; // This is the distance in grid units
+
+    // For debugging/logging purposes, you can get the scene's defined units
+    const units = grid.units;
+    console.log(`V13 Grid API: Distance between "${sourceToken.name}" and "${targetToken.name}" is ${distance} ${units}`);
+
+  } else {
+    // If we couldn't find both tokens, log a warning and return 0 distance
+    console.warn("Could not determine source or target token for range calculation. Defaulting distance to 0.");
+  }
+
+  // Get the weapon's defined range, or a default if not set
+  // This 'weaponRange' should also be in grid units ("areas")
   const weaponRange = equipment.system.range || getDefaultWeaponRange(equipment);
 
   let penalty = 0;
   let info = "";
   let outOfRange = false;
 
+  // Apply range rules based on your system's logic (e.g., Faserip's areas)
   // For weapons: "-1 CS for each area traveled" up to max range. Beyond max range is out of range.
   if (distance > weaponRange) {
     outOfRange = true;
     info = `<div style="color: #cc0000;"><strong>OUT OF RANGE:</strong> ${distance} areas exceeds maximum ${weaponRange} areas</div>`;
   } else if (distance > 0) {
-    penalty = distance; // Penalty is equal to distance for regular weapons
-    info = `<div><strong>Range:</strong> ${distance} areas (-${penalty}CS penalty)</div>`;
+      // Penalty is -1 CS for each FULL area traveled (round down partial areas)
+      penalty = Math.floor(distance);
+      if (penalty > 0) {
+          info = `<div><strong>Range:</strong> ${distance} areas (-${penalty}CS penalty)</div>`;
+      } else {
+          info = `<div><strong>Range:</strong> ${distance} areas (no penalty - within 1 area)</div>`;
+      }
   } else {
+    // Distance is 0, meaning adjacent or self-targeting
     info = `<div><strong>Range:</strong> Adjacent (no penalty)</div>`;
   }
 
@@ -2574,27 +2610,60 @@ export class FaseripRolls {
             baseDamage = CONFIG.FASERIP.rankValues[equipment.system.damage] || 0;
           }
 
+          // DAMAGE TYPE NORMALIZATION HERE
+          // Normalize damage types for combat handler
+          let normalizedDamageType;
+          const weaponType = equipment.system.weaponType || "";
+          const rawDamageType = equipment.system.damageType || "";
+
+          // Normalize damage types for shooting weapons
+          if (weaponType === "shooting" || actionName.includes("Shooting")) {
+            normalizedDamageType = "Physical-Shooting";
+          } else if (actionName.includes("Blunt")) {
+            normalizedDamageType = "Physical-Blunt";
+          } else if (actionName.includes("Edged")) {
+            normalizedDamageType = "Physical-Edged";
+          } else if (actionName.includes("Energy")) {
+            normalizedDamageType = "Energy-Energy";
+          } else if (actionName.includes("Force")) {
+            normalizedDamageType = "Force";
+          } else {
+            // Default based on weapon type
+            normalizedDamageType = "Physical-Shooting"; // Most weapons are shooting
+          }
+
+          console.log(`Weapon damage type: "${rawDamageType}" → "${normalizedDamageType}"`);
+
+          // END OF DAMAGE TYPE NORMALIZATION ↑
+
           const canBeStun = effect?.toLowerCase().includes("stun") || resultColor.toLowerCase() === "yellow";
           const canBeSlam = effect?.toLowerCase().includes("slam");
           const canBeKill = effect?.toLowerCase().includes("kill");
 
+          // Around line 2580 in rollEquipment function
           const effectLower = effect?.toLowerCase?.() || "";
           if (effectLower === "miss") {
             console.log("🛑 No damage — attack result is Miss.");
           } else {
+            // Add debugging for ammo type
+            console.log("Equipment roll options:", options); // Debug line
+            console.log("Ammo type being passed:", options.ammoType || "standard"); // Debug line
+            
             await CombatHandler.processAttack({
               attacker: actor,
               target: target,
               baseDamage: baseDamage,
-              damageType: equipment.system.damageType || "Physical",
+              damageType: normalizedDamageType, // Use the normalized type
               sourceName: equipment.name,
               canBeStun: effectLower.includes("stun") || actionName.toLowerCase().includes("stunning"),
               canBeSlam: effectLower.includes("slam"),
               canBeKill: effectLower.includes("kill"),
               originalRollResult: resultColor.toLowerCase()
+            }, {
+              ammoType: options.ammoType || "standard", // Make sure standard is used
+              skipDefenseDialog: false
             });
           }
-
         } else {
           ui.notifications.info("No target selected. Damage not applied.");
         }
@@ -2688,7 +2757,8 @@ export class FaseripRolls {
                 actionType: actionName,
                 columnShift: shift,
                 karma: karma,
-                skipDice: skipDice
+                skipDice: skipDice,
+                ammoType: html.find('[name="ammoType"]').val() || "standard" // new line for ammo
               });
             }
           },
