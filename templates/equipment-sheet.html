@@ -5,11 +5,13 @@
     </header>
   
     <section class="sheet-body">
-      <div class="form-group">
+            <div class="form-group">
         <label>Category:</label>
         <select name="system.category" class="equipment-category-select">
           <option value="weapon" {{#if (eq system.category "weapon")}}selected{{/if}}>Weapon</option>
           <option value="armor" {{#if (eq system.category "armor")}}selected{{/if}}>Armor</option>
+          <option value="power-item" {{#if (eq system.category "power-item")}}selected{{/if}}>Power Item</option>
+          <option value="custom" {{#if (eq system.category "custom")}}selected{{/if}}>Custom</option>
           <option value="gear" {{#if (eq system.category "gear")}}selected{{/if}}>Gear</option>
         </select>
       </div>
