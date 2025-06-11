@@ -982,6 +982,7 @@ export class FaseripRolls {
       const totalColumnShift = rawColumnShift - powerRangePenalty; // Apply range penalty here
 
       // Get the power's rank and value
+      const powerRank = power.system.rank || "Typical"; // ADD THIS LINE
       const powerValue = power.system.value || 6;
 
       // Apply column shifts to get effective rank
