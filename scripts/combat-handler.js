@@ -1843,7 +1843,7 @@ export class CombatHandler {
             operation: "createEmbeddedDocuments",
             targetActorUuid: target.uuid,
             args: ["ActiveEffect", [effectData]]
-            });
+        });
         
         let chatContent = `
         <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
@@ -1853,131 +1853,79 @@ export class CombatHandler {
         </div>
         `;
                 
-        // Only lethal damage types can trigger the death process
-        if (isLethalDamage) {
-            // Roll Endurance FEAT vs. Kill (as per rules, pg 31 "Life, Death, and Health")
-            const killCheckResult = await this.rollSecondaryFeat(target, "Kill", "Reaching 0 Health");
-            chatContent += `
+        // ALL characters who reach 0 Health must make an Endurance FEAT vs Kill (pg 31)
+        const killCheckResult = await this.rollSecondaryFeat(target, "Kill", "Reaching 0 Health");
+        chatContent += `
         <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
         <div style="padding: 5px 10px; font-size: 0.9em;">
             <div><strong>Death Check:</strong> ${killCheckResult}</div>
         </div>
         </div>
         `;
+
+        // Check the result and determine what happens
+        if (killCheckResult.includes("End. Loss") && isLethalDamage) {
+        // Failed death save with lethal damage = start dying
+        ui.notifications.error(`${target.name} is dying!`);
+        
+        // Apply dying effect using our dedicated method
+        await this.applyDyingEffect(target);
+        
+        // Immediately lose the FIRST Endurance rank
+        const currentRank = target.system.abilities.endurance.rank;
+        const ranks = Object.keys(CONFIG.FASERIP.rankValues);
+        const currentRankIndex = ranks.indexOf(currentRank);
+        
+        if (currentRankIndex > 0) {
+            const newRank = ranks[currentRankIndex - 1];
+            await game.msh.runAsGM({
+                operation: "update",
+                targetActorUuid: target.uuid,
+                args: [{"system.abilities.endurance.rank": newRank}]
+            });
             
-            // If Endurance Loss from Kill check, character starts dying
-            if (killCheckResult.includes("End. Loss")) {
-                ui.notifications.error(`${target.name} is dying!`);
-                
-                // Apply dying effect using our dedicated method
-                await this.applyDyingEffect(target);
-                
-                chatContent += `
-        <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
-        <div style="padding: 5px 10px; font-size: 0.9em;">
-            <div>${target.name} is losing Endurance ranks each turn. Help needed!</div>
-        </div>
-        </div>
-        `;
-                
-                // Let's add code to handle endurance loss per round
-                // Register a hook for combat round advancement
-                Hooks.once("updateCombat", async (combat, changes) => {
-                    // Only handle round changes
-                    if (changes.round && changes.round > combat.previous.round) {
-                        // Check if actor is still dying
-                        const isDying = target.effects.some(e => e.flags["msh-faserip"]?.dying);
-                        if (isDying) {
-                            // Get current endurance rank
-                            const currentRank = target.system.abilities.endurance.rank;
-                            const ranks = Object.keys(CONFIG.FASERIP.rankValues);
-                            
-                            // Find index of current rank
-                            const currentRankIndex = ranks.indexOf(currentRank);
-                            
-                            // If not the lowest rank already, decrease by one rank
-                            if (currentRankIndex > 0) {
-                                const newRank = ranks[currentRankIndex - 1];
-                                await game.msh.runAsGM({
-                                    operation: "update",
-                                    targetActorUuid: target.uuid,
-                                    args: [{"system.abilities.endurance.rank": newRank}]
-                                    });
-                                
-                                // Send a message to chat
-                                ChatMessage.create({
-                                    content: `
-                                    <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
-                                    <div style="padding: 5px 10px; font-size: 0.9em;">
-                                        <div><strong>${target.name}</strong> is dying! Endurance decreased to ${newRank}.</div>
-                                    </div>
-                                    </div>
-                                    `,
-                                    speaker: ChatMessage.getSpeaker({actor: target})
-                                });
-                            } else {
-                                // Character is dead
-                                ChatMessage.create({
-                                    content: `
-                                    <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
-                                    <div style="padding: 5px 10px; font-size: 0.9em;">
-                                        <div><strong>${target.name}</strong> has died.</div>
-                                    </div>
-                                    </div>
-                                    `,
-                                    speaker: ChatMessage.getSpeaker({actor: target})
-                                });
-                                
-                                // Remove dying effect and add dead effect
-                                const dyingEffects = target.effects.filter(e => e.flags["msh-faserip"]?.dying);
-                                await game.msh.runAsGM({
-                                    operation: "deleteEmbeddedDocuments",
-                                    targetActorUuid: target.uuid,
-                                    args: ["ActiveEffect", dyingEffects.map(e => e.id)]
-                                    });
-                                
-                                // Add dead effect
-                                await game.msh.runAsGM({
-                                    operation: "createEmbeddedDocuments",
-                                    targetActorUuid: target.uuid,
-                                    args: ["ActiveEffect", [{
-                                    name: "Dead",
-                                    icon: "icons/svg/skull.svg",
-                                    flags: {
-                                        "msh-faserip": {
-                                            dead: true
-                                        }
-                                    },
-                                    changes: [
-                                        {
-                                            key: "system.status.dead",
-                                            mode: CONST.ACTIVE_EFFECT_MODES.OVERRIDE,
-                                            value: true
-                                        }
-                                    ],
-                                    statuses: ["dead"]
-                                }]]
-});
-                            }
-                        }
-                    }
-                });
-            }
-        } else {
-            // Non-lethal (Blunt/Force) damage just causes unconsciousness
             chatContent += `
-        <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
-        <div style="padding: 5px 10px; font-size: 0.9em;">
-            <div>Knocked out by blunt force/subdual damage. No risk of death.</div>
-        </div>
-        </div>
-        `;
+            <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
+            <div style="padding: 5px 10px; font-size: 0.9em;">
+                <div>${target.name} loses first Endurance rank: ${currentRank} → ${newRank}. Will lose another rank each turn!</div>
+            </div>
+            </div>
+            `;
+        } else {
+            // Already at Shift-0, character dies immediately
+            chatContent += `
+            <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
+            <div style="padding: 5px 10px; font-size: 0.9em;">
+                <div>${target.name} was already at Shift-0 Endurance and dies immediately!</div>
+            </div>
+            </div>
+            `;
+        }
+        } else if (killCheckResult.includes("End. Loss") && !isLethalDamage) {
+            // Failed death save but non-lethal damage = extended unconsciousness only
+            chatContent += `
+            <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
+            <div style="padding: 5px 10px; font-size: 0.9em;">
+                <div>Failed death save but non-lethal damage - extended unconsciousness only.</div>
+            </div>
+            </div>
+            `;
+            
+        } else {
+            // Passed the death save = just unconscious and stable
+            chatContent += `
+            <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
+            <div style="padding: 5px 10px; font-size: 0.9em;">
+                <div>Passed death save - unconscious but stable.</div>
+            </div>
+            </div>
+            `;
         }
 
         await ChatMessage.create({
             speaker: ChatMessage.getSpeaker({actor: target}),
             content: chatContent,
-            whisper: ChatMessage.getWhisperRecipients("GM") // Whisper to GM
+            whisper: ChatMessage.getWhisperRecipients("GM")
         });
     }
 
