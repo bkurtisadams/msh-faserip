@@ -435,7 +435,7 @@ export async function openUniversalTableDialog(actor) {
         <select name="source">
           <option value="">(Select Power, Talent, or Equipment)</option>
           <optgroup label="Powers">
-            ${powers.map(p => `<option value="power:${p.id}" ${`power:${p.id}` === savedSource ? "selected" : ""}>${p.name} (${p.system.rank})</option>`).join('')}
+            ${powers.map(p => `<option value="power:${p.id}" ${`power:${p.id}` === savedSource ? "selected" : ""}>${p.name} (${p.system?.rank || 'Typical'})</option>`).join('')}
           </optgroup>
           <optgroup label="Talents">
             ${talents.map(t => `<option value="talent:${t.id}" ${`talent:${t.id}` === savedSource ? "selected" : ""}>${t.name}</option>`).join('')}
