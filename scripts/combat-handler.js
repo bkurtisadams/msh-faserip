@@ -372,6 +372,62 @@ export class CombatHandler {
     console.log("CombatHandler.processAttack completed"); 
 }
 
+    static async playCombatSFX(damageType, sourceName, rollResult, options = {}) {
+        let soundPath = null;
+        
+        // Determine sound based on damage type and source
+        const lowerDamageType = damageType.toLowerCase();
+        const lowerSourceName = sourceName.toLowerCase();
+        
+        // Weapon-specific sounds
+        if (lowerSourceName.includes("pistol") || lowerSourceName.includes("gun")) {
+            soundPath = "systems/msh-faserip/assets/sfx/gunshot.wav";
+        } else if (lowerSourceName.includes("rifle")) {
+            soundPath = "systems/msh-faserip/assets/sfx/rifle.wav";
+        } else if (lowerSourceName.includes("shotgun")) {
+            soundPath = "systems/msh-faserip/assets/sfx/shotgun.wav";
+        }
+        // Damage type sounds (fallback)
+        else if (lowerDamageType.includes("shooting")) {
+            soundPath = "systems/msh-faserip/assets/sfx/gunshot.wav";
+        } else if (lowerDamageType.includes("blunt")) {
+            soundPath = "systems/msh-faserip/assets/sfx/punch.wav";
+        } else if (lowerDamageType.includes("edged")) {
+            soundPath = "systems/msh-faserip/assets/sfx/blade.wav";
+        } else if (lowerDamageType.includes("energy-fire")) {
+            soundPath = "systems/msh-faserip/assets/sfx/fire-blast.wav";
+        } else if (lowerDamageType.includes("energy-electricity")) {
+            soundPath = "systems/msh-faserip/assets/sfx/lightning.wav";
+        }
+        
+        // Play different sounds for critical results
+        if (rollResult.toLowerCase() === "red" && soundPath) {
+            // Play a more intense version for red results
+            const criticalPath = soundPath.replace(".wav", "-critical.wav");
+            if (await this.soundFileExists(criticalPath)) {
+                soundPath = criticalPath;
+            }
+        }
+        
+        // Handle special ammunition
+        if (options.ammoType === "explosive") {
+            soundPath = "systems/msh-faserip/sounds/explosion.wav";
+        }
+        
+        if (soundPath) {
+            AudioHelper.play({ src: soundPath, volume: 0.8, autoplay: true }, true);
+        }
+    }
+
+    static async soundFileExists(path) {
+        try {
+            const response = await fetch(path, { method: 'HEAD' });
+            return response.ok;
+        } catch {
+            return false;
+        }
+    }
+
     /**
      * Rolls a resistance FEAT against incoming damage
      * @param {Object} target - The target with resistance
