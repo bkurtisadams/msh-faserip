@@ -1267,11 +1267,10 @@ export class FaseripRolls {
           <span style="color: #666; font-size: 0.9em;">(${power.system.rank || 'Typical'} rank)</span>
         </div>
         <div style="margin-bottom: 10px;">
-          <label style="display: inline-block; width: 120px;">Target Distance:</label>
-          <input type="number" id="distance" name="distance" value="${initialDistance}" min="0" style="width: 50px;"> areas
-          <div style="margin-top: 5px; padding: 5px; background: #f9f9f9; border: 1px solid #ddd; border-radius: 3px; font-size: 0.9em;">
+          <div style="padding: 5px; background: #f9f9f9; border: 1px solid #ddd; border-radius: 3px; font-size: 0.9em;">
             ${dialogPowerRangeInfo}
           </div>
+        </div>
         </div>
         <div style="margin-bottom: 10px;">
           <label style="display: inline-block; width: 120px;">Column Shift:</label>
