@@ -237,6 +237,15 @@ export class CombatHandler {
 
     console.log(`Damage calculation: ${modifiedBaseDamage} modified base - ${damageAbsorbed} absorbed = ${netDamage} net damage`);
 
+    // 🎵 ADD SFX HERE - RIGHT AFTER DAMAGE CALCULATION
+    await this.playCombatSFX(damageType, sourceName, originalRollResult, {
+        ...options,
+        netDamage: netDamage,
+        damageAbsorbed: damageAbsorbed,
+        attackerActor: attackerActor,
+        targetActor: targetActor
+    });
+
     // 4. Apply Net Damage to Target Health
     const isToken = target.document?.documentName === "Token" || target.documentName === "Token";
     const targetTokenData = isToken ? (target.document || target) : null;
