@@ -49,13 +49,13 @@ Hooks.once("init", async () => {
     {
       id: "partial-hold",
       label: "Partial Hold",
-      icon: "systems/msh-faserip/assets/icons/effects/partial-hold.svg",
+      icon: "icons/svg/net.svg", // Use existing Foundry icon
       flags: { "msh-faserip": { grappling: true } }
     },
     {
-      id: "full-hold",
+      id: "full-hold", 
       label: "Full Hold",
-      icon: "systems/msh-faserip/assets/icons/effects/full-hold.svg",
+      icon: "icons/svg/paralysis.svg", // Use existing Foundry icon
       flags: { "msh-faserip": { grappling: true } }
     }
   );

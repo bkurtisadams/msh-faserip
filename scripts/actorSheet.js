@@ -1472,36 +1472,68 @@ export class FaseripActorSheet extends ActorSheet {
               });
 
               // Check if this is a combat-related talent and there's a target
-              if (resultColor.toLowerCase() !== "white" && actionType.toLowerCase().includes("attack")) {
-                const target = game.user.targets.first()?.actor;
-                
-                if (target) {
-                  // Determine damage type based on talent type/specialty
-                  let damageType = "Physical-Blunt"; // Default for unarmed attacks
-                  
-                  if (actionType.includes("Edged") || 
-                      talentSpecialty?.toLowerCase().includes("edged") || 
-                      talentSpecialty?.toLowerCase().includes("sharp")) {
-                    damageType = "Physical-Edged";
-                  } else if (actionType.includes("Shooting")) {
-                    damageType = "Physical-Shooting";
-                  }
-                  
-                  // Determine if special effects should apply based on the result and action type
+              // Determine the target early
+              const target = game.user.targets.first()?.actor;
+
+              // Add debug logging
+              console.log("🤼 TALENT WRESTLING DEBUG:");
+              console.log("Action Type:", actionType);
+              console.log("Result Color:", resultColor);
+              console.log("Target exists?", !!target);
+
+              // Define wrestling actions
+              const wrestlingActions = ["Grappling (GP)", "Grabbing (Gb)", "Escaping (ES)"];
+              console.log("Is Wrestling Action?", wrestlingActions.includes(actionType));
+              console.log("Wrestling Actions Array:", wrestlingActions);
+
+              // Check if this is either a normal attack or wrestling action
+              if (target && resultColor.toLowerCase() !== "white" &&
+                  (actionType.toLowerCase().includes("attack") || wrestlingActions.includes(actionType))) {
+
+                // Determine damage type based on talent type/specialty (default to Blunt)
+                let damageType = "Physical-Blunt";
+                if (actionType.includes("Edged") || 
+                    talentSpecialty?.toLowerCase().includes("edged") || 
+                    talentSpecialty?.toLowerCase().includes("sharp")) {
+                  damageType = "Physical-Edged";
+                } else if (actionType.includes("Shooting")) {
+                  damageType = "Physical-Shooting";
+                }
+
+                // Skip if damage type is "None"
+                if (damageType === "None") {
+                  console.log("⚠️ Skipping - damage type is None");
+                  return { roll, resultColor, resultText };
+                }
+
+                // Handle wrestling actions separately
+                if (wrestlingActions.includes(actionType)) {
+                  console.log("🤼 TALENT: Taking wrestling path");
+                  const actionCode = actionType.match(/\(([^)]+)\)/)?.[1]?.toLowerCase();
+                  console.log(`Processing wrestling action ${actionType} with lowercase code ${actionCode}`);
+
+                  await game.msh.CombatHandler.processWrestlingAction({
+                    attacker: actor,
+                    target,
+                    actionType: actionCode,
+                    resultColor: resultColor.toLowerCase(),
+                    sourceName: item.name
+                  });
+                } else {
+                  console.log("🗡️ TALENT: Taking regular attack path");
+
                   const canBeStun = actionType.includes("Blunt") || 
-                                  resultText.toLowerCase().includes("stun");
-                  
+                                    resultText.toLowerCase().includes("stun");
+
                   const canBeSlam = actionType.includes("Blunt") || 
-                                  resultText.toLowerCase().includes("slam");
-                  
+                                    resultText.toLowerCase().includes("slam");
+
                   const canBeKill = actionType.includes("Edged") || 
-                                  actionType.includes("Shooting") || 
-                                  resultText.toLowerCase().includes("kill");
-                  
-                  // For damage, use the damageRankValue if a damage CS was applied, otherwise use the base ability value
+                                    actionType.includes("Shooting") || 
+                                    resultText.toLowerCase().includes("kill");
+
                   const baseDamage = damageCS !== 0 ? damageRankValue : abilityValue;
-                  
-                  // Process the attack using the CombatHandler
+
                   await game.msh.CombatHandler.processAttack({
                     attacker: this.actor,
                     target: target,
@@ -1513,10 +1545,12 @@ export class FaseripActorSheet extends ActorSheet {
                     canBeKill,
                     originalRollResult: resultColor.toLowerCase()
                   });
-                } else {
-                  ui.notifications.info("No target selected. Damage not applied.");
                 }
+
+              } else {
+                ui.notifications.info("No target selected or result color was white. Damage not applied.");
               }
+
             }
           },
           cancel: { label: "Cancel" }
