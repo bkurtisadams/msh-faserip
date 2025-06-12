@@ -74,6 +74,9 @@ export class FaseripActorSheet extends ActorSheet {
   // Add a property to track the biography toggle state
   _isBiographyOpen = false;
   
+  // Add a property for the character creation manager
+  _charCreationManager = null; // NEW PROPERTY
+  
   /** @override */
   static get defaultOptions() {
     return foundry.utils.mergeObject(super.defaultOptions, {
@@ -81,7 +84,8 @@ export class FaseripActorSheet extends ActorSheet {
       template: "systems/msh-faserip/templates/actor-sheet.html",
       width: 650,
       height: 700,
-      tabs: [{ navSelector: ".sheet-tabs-navigation", contentSelector: ".sheet-tab-content", initial: "powers" }],
+      tabs: [{ navSelector: ".sheet-tabs-navigation", contentSelector: ".sheet-tab-content", initial: "powers" },
+        { navSelector: ".sheet-tabs-navigation", contentSelector: ".sheet-tab-content", tab: "create-character", label: "Creator" }],
       submitOnChange: true,
       closeOnSubmit: false
     });
@@ -2859,6 +2863,19 @@ html.find('.headquarters-row').each((i, row) => {
         }
       }
     }).bind(html[0]);
+
+      /** @override */
+  
+    // NEW: Initialize CharacterCreationTabManager if the tab exists
+    // We query html[0] because 'html' in activateListeners is a jQuery object
+    const creationTabElement = html[0].querySelector('.char-creation-tab');
+    if (creationTabElement && !this._charCreationManager) {
+        this._charCreationManager = new CharacterCreationTabManager(this.actor, creationTabElement);
+    } else if (this._charCreationManager) {
+        // If manager already exists (e.g., sheet was re-rendered), ensure it re-renders its content
+        // This is important if `saveGeneratedData` is called on the manager, but the main sheet re-renders.
+        this._charCreationManager.loadGeneratedData(); // Re-load and render on sheet re-open/re-render
+    }
 
     // Continue with other listeners...
   }

@@ -1176,9 +1176,8 @@ export class FaseripRolls {
                         resultText.toLowerCase().includes("slam");
         
         const canBeKill = actionType.includes("Edged") || 
-                        actionType.includes("Energy") || 
-                        actionType.includes("Shooting") || 
-                        resultText.toLowerCase().includes("kill");
+                actionType.includes("Energy") || 
+                actionType.includes("Shooting");
         
         // For damage, use the damageRankValue if a damage CS was applied, otherwise use the base power value
         const baseDamage = damageCS && damageRankValue ? damageRankValue : powerValue;
@@ -1674,8 +1673,8 @@ export class FaseripRolls {
           
           const canBeKill = actionType.includes("Edged") || 
                           actionType.includes("Energy") || 
-                          actionType.includes("Shooting") || 
-                          resultText.toLowerCase().includes("kill");
+                          actionType.includes("Shooting") // || 
+                          //resultText.toLowerCase().includes("kill");
           
           // For damage, use the damageRankValue if a damage CS was applied, otherwise use the base ability value
           const baseDamage = damageCS && damageRankValue ? damageRankValue : abilityValue;
@@ -2734,12 +2733,23 @@ export class FaseripRolls {
 
           // END OF DAMAGE TYPE NORMALIZATION ↑
 
-          const canBeStun = effect?.toLowerCase().includes("stun") || resultColor.toLowerCase() === "yellow";
-          const canBeSlam = effect?.toLowerCase().includes("slam");
-          const canBeKill = effect?.toLowerCase().includes("kill");
+          const actionNameLower = actionName.toLowerCase();
+          const effectLower = effect?.toLowerCase() || "";
+
+          // Apply FASERIP rules: only certain attack types can kill
+          const canBeKill = (actionNameLower.includes("edged") || 
+                            actionNameLower.includes("shooting") || 
+                            actionNameLower.includes("energy")) && 
+                            effectLower.includes("kill");
+
+          const canBeSlam = (actionNameLower.includes("blunt") || 
+                            actionNameLower.includes("shooting")) && 
+                            effectLower.includes("slam");
+
+          const canBeStun = effectLower.includes("stun") || actionNameLower.includes("stunning");
+
 
           // Around line 2580 in rollEquipment function
-          const effectLower = effect?.toLowerCase?.() || "";
           if (effectLower === "miss") {
             console.log("🛑 No damage — attack result is Miss.");
           } else {

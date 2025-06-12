@@ -237,6 +237,13 @@ export class CombatHandler {
 
     console.log(`Damage calculation: ${modifiedBaseDamage} modified base - ${damageAbsorbed} absorbed = ${netDamage} net damage`);
 
+    // Calculate health values and determine if target will reach zero health
+    const currentHealth = targetActor.system.attributes.health.value;
+    const newHealth = Math.max(0, currentHealth - netDamage);
+    const willReachZeroHealth = newHealth <= 0;
+
+    console.log(`Current health: ${currentHealth}, net damage: ${netDamage}, new health: ${newHealth}, will reach zero: ${willReachZeroHealth}`);
+
     // 🎵 ADD SFX HERE - RIGHT AFTER DAMAGE CALCULATION
     await this.playCombatSFX(damageType, sourceName, originalRollResult, {
         ...options,
@@ -254,9 +261,6 @@ export class CombatHandler {
     console.log(`Target is token: ${isToken}`);
     console.log(`Target is unlinked token: ${isUnlinkedToken}`);
     console.log(`Target name: ${targetActor.name}`);
-
-    const currentHealth = targetActor.system.attributes.health.value;
-    const newHealth = Math.max(0, currentHealth - netDamage);
 
     console.log("Before health update:", currentHealth);
     console.log("Net damage applied:", netDamage);
@@ -301,7 +305,7 @@ export class CombatHandler {
 
     // 7. Handle Secondary Effects - USE modifiedCanBeSlam instead of canBeSlam
     let secondaryEffectResult = "";
-    if (netDamage > 0) {
+    if (netDamage > 0 && !willReachZeroHealth) { // BUT ONLY if target won't reach 0 Health
         if (damageType.toLowerCase().includes("blunt")) {
             if (originalRollResult.toLowerCase() === "yellow" && modifiedCanBeSlam) { // FIXED
                 secondaryEffectResult = await this.rollSecondaryFeat(target, "Slam", sourceName);
@@ -356,10 +360,12 @@ export class CombatHandler {
                 chatContent += `<p><strong>Kill Check:</strong> ${secondaryEffectResult}</p>`;
             }
         }
+    } else if (netDamage > 0 && willReachZeroHealth) {
+        chatContent += `<p>Target reduced to 0 Health - unconsciousness supersedes other effects.</p>`;
     } else if ( (canBeStun && (originalRollResult.toLowerCase() === "yellow" || originalRollResult.toLowerCase() === "red")) ||
                 (canBeSlam && originalRollResult.toLowerCase() === "yellow") ||
                 (canBeKill && originalRollResult.toLowerCase() === "red") ) {
-         chatContent += `<p>No damage inflicted; secondary effects (Stun/Slam/Kill) are negated.</p>`;
+        chatContent += `<p>No damage inflicted; secondary effects (Stun/Slam/Kill) are negated.</p>`;
     }
 
     await ChatMessage.create({
@@ -1910,16 +1916,44 @@ export class CombatHandler {
             args: ["ActiveEffect", [effectData]]
         });
         
-        let chatContent = `
-        <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
-        <div style="padding: 5px 10px; font-size: 0.9em;">
-            <div>${target.name} is Unconscious for ${unconsciousDuration} rounds.</div>
-        </div>
-        </div>
-        `;
                 
         // ALL characters who reach 0 Health must make an Endurance FEAT vs Kill (pg 31)
-        const killCheckResult = await this.rollSecondaryFeat(target, "Kill", "Reaching 0 Health");
+        let killCheckResult = "";
+            let chatContent = `
+            <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
+            <div style="padding: 5px 10px; font-size: 0.9em;">
+                <div>${target.name} is Unconscious for ${unconsciousDuration} rounds.</div>
+            </div>
+            </div>
+            `;
+
+            // Only roll Kill check if damage was from a potentially lethal source
+            if (isLethalDamage) {
+                const killCheckResult = await this.rollSecondaryFeat(target, "Kill", "Reaching 0 Health");
+                chatContent += `
+                <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
+                <div style="padding: 5px 10px; font-size: 0.9em;">
+                    <div><strong>Death Check:</strong> ${killCheckResult}</div>
+                </div>
+                </div>
+                `;
+                
+                // [Keep the existing logic for handling Kill check results]
+                if (killCheckResult.includes("End. Loss")) {
+                    // Character starts dying
+                    // [existing code]
+                }
+            } else {
+                // Non-lethal damage - just unconscious, no death possible
+                chatContent += `
+                <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
+                <div style="padding: 5px 10px; font-size: 0.9em;">
+                    <div>Non-lethal damage - unconscious but stable (no death check required).</div>
+                </div>
+                </div>
+                `;
+            }
+
         chatContent += `
         <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
         <div style="padding: 5px 10px; font-size: 0.9em;">
