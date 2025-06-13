@@ -114,7 +114,10 @@ export class FaseripActorSheet extends ActorSheet {
       .filter(item => item.type === "contact")
       .sort((a, b) => (a.sort || 0) - (b.sort || 0));
 
-    // the calculated current karma value
+    // Use availableKarma getter for the bottom left display (lifetime calculation)
+    context.availableKarma = this.actor.availableKarma;
+
+    // Keep currentKarma for R+I+P display if needed elsewhere
     context.currentKarma = this.actor.currentKarma;
 
     // the biography toggle state to the context
@@ -135,7 +138,6 @@ export class FaseripActorSheet extends ActorSheet {
       .filter(item => item.type === "vehicle")
       .sort((a, b) => (a.sort || 0) - (b.sort || 0));
 
-
     // Add ranks array for dropdowns
     context.allRanks = [
       "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent",
@@ -149,32 +151,27 @@ export class FaseripActorSheet extends ActorSheet {
     );
     console.log("Prepared effects:", context.effects);
 
-    context.editable = this.isEditable; // (if not already present)
+    context.editable = this.isEditable;
 
-    // karma
+    // karma - FIX: Define karma variable first
     const karma = context.system.karma || {};
     const lifetime = karma.lifetime || 0;
     const advancement = karma.advancement || 0;
     const pool = karma.pool || 0;
 
-    // <-- NEW/MODIFIED SECTION START -->
-    const dailyKarmaEnabled = game.settings.get("msh-faserip", "dailyKarmaEnabled"); // <-- NEW LINE
-    context.dailyKarmaEnabled = dailyKarmaEnabled; // <-- NEW LINE
-    context.dailyKarmaMax = karma.dailyKarmaMax || 0; // <-- NEW LINE
-    context.dailyKarmaUsed = karma.dailyKarmaUsed || 0; // <-- NEW LINE
-    context.dailyKarmaRemaining = Math.max(0, context.dailyKarmaMax - context.dailyKarmaUsed); // <-- NEW LINE
-    // <-- NEW/MODIFIED SECTION END -->
+    // Daily karma data - FIX: Now karma is defined
+    const dailyKarmaEnabled = game.settings.get("msh-faserip", "dailyKarmaEnabled");
+    context.dailyKarmaEnabled = dailyKarmaEnabled;
+    context.dailyKarmaMax = karma.dailyKarmaMax || 0;
+    context.dailyKarmaUsed = karma.dailyKarmaUsed || 0;
+    context.dailyKarmaRemaining = Math.max(0, context.dailyKarmaMax - context.dailyKarmaUsed);
 
     let spent = 0;
     if (Array.isArray(karma.history)) {
       for (const event of karma.history) {
-        if (event.amount < 0 && event.type !== "Daily Roll") spent += Math.abs(event.amount); // <-- MODIFIED LINE (exclude daily rolls from lifetime spent)
+        if (event.amount < 0 && event.type !== "Daily Roll") spent += Math.abs(event.amount);
       }
     }
-
-    // context.currentKarma is already calculated in prepareData based on daily/lifetime logic
-    // const currentKarmaValue = Math.max(0, lifetime - spent - advancement - pool); // This line is now redundant
-    // context.currentKarma = currentKarmaValue; // This line is now redundant
 
     return context;
   }
