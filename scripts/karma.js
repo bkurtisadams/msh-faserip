@@ -183,13 +183,13 @@ export class KarmaSheet extends DocumentSheet {
     }
 
     // In the activateListeners method of KarmaSheet class, add:
-    html.find('.open-advancement').click(ev => {
+    /* html.find('.open-advancement').click(ev => {
       // Import dynamically to avoid circular dependencies
       import('./karmaAdvancement.js').then(module => {
         const advancementSheet = new module.KarmaAdvancementSheet(this.object);
         advancementSheet.render(true);
       });
-    });
+    }); */
 
     html.find('.open-pool').click(ev => {
       // Import dynamically to avoid circular dependencies
@@ -378,28 +378,42 @@ export class KarmaSheet extends DocumentSheet {
   _onSpendKarma(event) {
     event.preventDefault();
     
+    // Calculate available karma properly
+    const totalEarned = this.object.system.karma.lifetime || 0;
+    const totalSpentLifetime = this._calculateTotalSpentLifetime(this.object.system.karma.history || []);
+    const advancementFund = this.object.system.karma.advancement || 0;
+    const karmaPool = this.object.system.karma.pool || 0;
+    const availableKarma = Math.max(0, totalEarned - totalSpentLifetime - advancementFund - karmaPool);
+    
     new Dialog({
       title: "Spend Karma",
       content: `
         <form>
           <div class="form-group">
+            <label>Available Karma: ${availableKarma}</label>
+          </div>
+          <div class="form-group">
             <label>Spend Type:</label>
             <select name="spendType">
               <option value="Die Roll">Manipulate Die Roll (min 10)</option>
               <option value="Power Stunt">Power Stunt (100)</option>
-              <option value="Advancement">Transfer to Advancement Fund</option>
-              <option value="Pool">Transfer to Karma Pool</option>
+              <option value="Ability Advancement">Ability Advancement</option>
+              <option value="Power Advancement">Power Advancement</option>
+              <option value="Power Addition">Power Addition</option>
+              <option value="Resource Advancement">Resource Advancement</option>
+              <option value="Popularity Advancement">Popularity Advancement</option>
+              <option value="Talent Addition">Talent Addition</option>
+              <option value="Contact Addition">Contact Addition</option>
               <option value="Other">Other</option>
-              <option value="Daily Roll" disabled>Daily Roll (Automated)</option> <!-- NEW LINE -->
             </select>
           </div>
           <div class="form-group">
             <label>Amount:</label>
-            <input type="number" name="amount" value="10" min="1" max="${this.object.system.attributes.karma.value}" />
+            <input type="number" name="amount" value="10" min="1" max="${availableKarma}" />
           </div>
           <div class="form-group">
             <label>Description:</label>
-            <textarea name="description"></textarea>
+            <textarea name="description" placeholder="Describe what you're spending karma on..."></textarea>
           </div>
         </form>
       `,
@@ -407,18 +421,72 @@ export class KarmaSheet extends DocumentSheet {
         spend: {
           icon: '<i class="fas fa-check"></i>',
           label: "Spend",
-          callback: (html) => {
-            const form = html.find("form")[0];
-            const formData = new FormData(form);
+          callback: async (html) => {
+            const spendType = html.find('[name="spendType"]').val();
+            const amount = Number(html.find('[name="amount"]').val());
+            const description = html.find('[name="description"]').val();
             
-            const spendType = formData.get("spendType");
-            const amount = Number(formData.get("amount"));
-            const description = formData.get("description");
-            
-            // Ensure amount is valid
-            if (amount <= 0 || amount > this.object.system.attributes.karma.value) {
+            // Validate amount
+            if (amount <= 0 || amount > availableKarma) {
               ui.notifications.error("Invalid Karma amount.");
               return;
+            }
+            
+            // Validate description for advancement types
+            if (spendType.includes("Advancement") || spendType.includes("Addition")) {
+              if (!description.trim()) {
+                ui.notifications.error("Please provide a description for advancement purchases.");
+                return;
+              }
+            }
+            
+            // Handle specific advancement types with actual character updates
+            let updateData = {};
+            let finalDescription = description || `${spendType}`;
+            
+            if (spendType === "Ability Advancement" && description.trim()) {
+              // Try to parse ability advancement from description
+              // Format: "Fighting 30 to 31" or similar
+              const match = description.match(/(\w+)\s+(\d+)\s+to\s+(\d+)/i);
+              if (match) {
+                const abilityName = match[1].toLowerCase();
+                const newValue = parseInt(match[3]);
+                
+                if (this.object.system.abilities[abilityName]) {
+                  updateData[`system.abilities.${abilityName}.value`] = newValue;
+                  
+                  // Update rank if needed
+                  const newRank = this._getNewRank(newValue);
+                  updateData[`system.abilities.${abilityName}.rank`] = newRank;
+                  
+                  finalDescription = `Advanced ${abilityName} to ${newValue}`;
+                }
+              }
+            }
+            
+            if (spendType === "Resource Advancement" && description.trim()) {
+              // Try to parse resource advancement
+              const match = description.match(/(\d+)\s+to\s+(\d+)/);
+              if (match) {
+                const newValue = parseInt(match[2]);
+                updateData["system.attributes.resources.value"] = newValue;
+                
+                const newRank = this._getNewRank(newValue);
+                updateData["system.attributes.resources.rank"] = newRank;
+                
+                finalDescription = `Advanced Resources to ${newValue}`;
+              }
+            }
+            
+            if (spendType === "Popularity Advancement" && description.trim()) {
+              // Try to parse popularity advancement
+              const match = description.match(/(\d+)\s+to\s+(\d+)/);
+              if (match) {
+                const newValue = parseInt(match[2]);
+                updateData["system.attributes.popularity.hero.value"] = newValue;
+                
+                finalDescription = `Advanced Hero Popularity to ${newValue}`;
+              }
             }
             
             // Create the karma event with negative amount
@@ -427,10 +495,19 @@ export class KarmaSheet extends DocumentSheet {
               gameDate: "",
               amount: -amount,
               type: spendType,
-              description: description
+              description: finalDescription
             };
             
-            this._addKarmaEvent(karmaEvent);
+            // Add to history
+            const history = foundry.utils.deepClone(this.object.system.karma?.history || []);
+            history.push(karmaEvent);
+            updateData["system.karma.history"] = history;
+            
+            // Update the actor
+            await this.object.update(updateData);
+            
+            ui.notifications.info(`Spent ${amount} karma on ${finalDescription}`);
+            this.render();
           }
         },
         cancel: {
@@ -444,16 +521,73 @@ export class KarmaSheet extends DocumentSheet {
         html.find('[name="spendType"]').change(ev => {
           const type = ev.currentTarget.value;
           let amount = 10;
+          let placeholder = "Describe what you're spending karma on...";
           
           switch(type) {
-            case "Die Roll": amount = 10; break;
-            case "Power Stunt": amount = 100; break;
+            case "Die Roll": 
+              amount = 10; 
+              placeholder = "e.g., Spent on Fighting FEAT roll";
+              break;
+            case "Power Stunt": 
+              amount = 100; 
+              placeholder = "e.g., Used Telekinesis to lift a building";
+              break;
+            case "Ability Advancement":
+              amount = 50;
+              placeholder = "e.g., Fighting 30 to 31 (include cresting cost)";
+              break;
+            case "Power Advancement":
+              amount = 100;
+              placeholder = "e.g., Energy Blast from Remarkable to Incredible";
+              break;
+            case "Power Addition":
+              amount = 3000;
+              placeholder = "e.g., Added Flight at Typical rank";
+              break;
+            case "Resource Advancement":
+              amount = 100;
+              placeholder = "e.g., Resources 20 to 21";
+              break;
+            case "Popularity Advancement":
+              amount = 50;
+              placeholder = "e.g., Hero Popularity 15 to 16";
+              break;
+            case "Talent Addition":
+              amount = 1000;
+              placeholder = "e.g., Learned Martial Arts A from NPC";
+              break;
+            case "Contact Addition":
+              amount = 500;
+              placeholder = "e.g., Added Police Contact with Good resources";
+              break;
           }
           
           html.find('[name="amount"]').val(amount);
+          html.find('[name="description"]').attr('placeholder', placeholder);
         });
       }
     }).render(true);
+  }
+
+  _getNewRank(value) {
+    if (value >= 10000) return "Beyond";
+    if (value >= 5000) return "Class 5000";
+    if (value >= 3000) return "Class 3000";
+    if (value >= 1000) return "Class 1000";
+    if (value >= 500) return "Shift-Z";
+    if (value >= 200) return "Shift-Y";
+    if (value >= 150) return "Shift-X";
+    if (value >= 100) return "Unearthly";
+    if (value >= 75) return "Monstrous";
+    if (value >= 50) return "Amazing";
+    if (value >= 40) return "Incredible";
+    if (value >= 30) return "Remarkable";
+    if (value >= 20) return "Excellent";
+    if (value >= 10) return "Good";
+    if (value >= 6) return "Typical";
+    if (value >= 4) return "Poor";
+    if (value >= 2) return "Feeble";
+    return "Shift-0";
   }
 
   _onImportKarma(event) {

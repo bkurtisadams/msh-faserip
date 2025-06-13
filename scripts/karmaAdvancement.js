@@ -1,143 +1,76 @@
 export class KarmaAdvancementSheet extends DocumentSheet {
-    static get defaultOptions() {
-      return foundry.utils.mergeObject(super.defaultOptions, {
-        classes: ["faserip", "sheet", "karma-advancement"],
-        template: "systems/msh-faserip/templates/karma-advancement-sheet.html",
-        width: 480,
-        height: 400,
-        resizable: true,
-        closeOnSubmit: false,
-        submitOnChange: false
-      });
-    }
-  
-    get title() {
-      return `Karma Advancement: ${this.object.name}`;
-    }
-  
-    getData() {
-      const context = super.getData();
-      const actorData = this.object.toObject(false);
-      
-      context.system = actorData.system;
-      
-      // Calculate current available karma
-      context.currentKarma = this._getCurrentKarma();
-      
-      return context;
-    }
-  
-    // In karmaAdvancement.js, replace the existing _getCurrentKarma method with:
-    _getCurrentKarma() {
-      const totalEarned = this.object.system.karma.lifetime || 0;
-      let totalSpentLifetime = 0;
-      
-      if (this.object.system.karma.history && Array.isArray(this.object.system.karma.history)) {
-        this.object.system.karma.history.forEach(event => {
-          // Only count non-daily roll spending toward lifetime spent
-          if (event.amount < 0 && event.type !== "Daily Roll") {
-            totalSpentLifetime += Math.abs(event.amount);
-          }
-        });
-      }
-      
-      const advancementFund = this.object.system.karma.advancement || 0;
-      const karmaPool = this.object.system.karma.pool || 0;
-      
-      return Math.max(0, totalEarned - totalSpentLifetime - advancementFund - karmaPool);
-    }
+  static get defaultOptions() {
+    return foundry.utils.mergeObject(super.defaultOptions, {
+      classes: ["faserip", "sheet", "karma-advancement"],
+      template: "systems/msh-faserip/templates/karma-advancement-sheet.html",
+      width: 480,
+      height: 400,
+      resizable: true,
+      closeOnSubmit: false,
+      submitOnChange: false
+    });
+  }
 
-    // Add this method to the KarmaAdvancementSheet class
-    _onResetAdvancement(event) {
-      event.preventDefault();
-      
-      // If there's no advancement fund, no need to do anything
-      if (!this.object.system.karma.advancement || this.object.system.karma.advancement <= 0) {
-        ui.notifications.warn("No karma is currently allocated to advancement.");
-        return;
-      }
-      
-      // Create confirmation dialog
-      new Dialog({
-        title: "Reset Advancement Fund",
-        content: `
-          <p>Are you sure you want to reset the advancement fund?</p>
-          <p>Current advancement fund: <strong>${this.object.system.karma.advancement}</strong> karma</p>
-          <p>Current advancement purpose: <strong>${this.object.system.karma.advancementPurpose || "None"}</strong></p>
-          <div class="form-group">
-            <label>
-              <input type="checkbox" id="return-karma" checked />
-              Return karma to character's available karma
-            </label>
-          </div>
-        `,
-        buttons: {
-          reset: {
-            icon: '<i class="fas fa-undo"></i>',
-            label: "Reset Advancement",
-            callback: async (html) => {
-              const returnKarma = html.find('#return-karma').is(':checked');
-              const currentAdvancement = this.object.system.karma.advancement || 0;
-              
-              const updateData = {
-                "system.karma.advancement": 0,
-                "system.karma.advancementPurpose": "",
-                "system.karma.advancementDetail": ""
-              };
-              
-              // If returning karma, create a karma event and update current karma
-              if (returnKarma && currentAdvancement > 0) {
-                const karmaEvent = {
-                  realDate: new Date().toLocaleDateString(),
-                  gameDate: "",
-                  amount: currentAdvancement,
-                  type: "Advancement Reset",
-                  description: `Returned ${currentAdvancement} karma from advancement fund`
-                };
-                
-                // Add to history
-                const history = foundry.utils.deepClone(this.object.system.karma?.history || []);
-                history.push(karmaEvent);
-                updateData["system.karma.history"] = history;
-              }
-              
-              // Update the actor
-              await this.object.update(updateData);
-              
-              ui.notifications.info(`Advancement fund reset${returnKarma ? ` and ${currentAdvancement} karma returned` : ""}.`);
-              this.render();
-            }
-          },
-          cancel: {
-            icon: '<i class="fas fa-times"></i>',
-            label: "Cancel"
-          }
-        },
-        default: "cancel"
-      }).render(true);
-    }
-  
-    activateListeners(html) {
-      super.activateListeners(html);
-      
-      html.find('.allocate-karma').click(ev => this._onAllocateKarma(ev));
-      html.find('.purchase-advancement').click(ev => this._onPurchaseAdvancement(ev));
-      html.find('.reset-advancement').click(ev => this._onResetAdvancement(ev));
-      
-      html.find('#advancement-type').change(ev => {
-        const type = ev.currentTarget.value;
-        if (type === "ability") {
-          html.find('#ability-selector').removeClass('hidden');
-        } else {
-          html.find('#ability-selector').addClass('hidden');
+  get title() {
+    return `Karma Advancement: ${this.object.name}`;
+  }
+
+  getData() {
+    const context = super.getData();
+    const actorData = this.object.toObject(false);
+    
+    context.system = actorData.system;
+    
+    // Calculate current available karma (lifetime - spent - advancement - pool)
+    context.currentKarma = this._getCurrentKarma();
+    
+    return context;
+  }
+
+  _getCurrentKarma() {
+    const totalEarned = this.object.system.karma.lifetime || 0;
+    let totalSpentLifetime = 0;
+    
+    if (this.object.system.karma.history && Array.isArray(this.object.system.karma.history)) {
+      this.object.system.karma.history.forEach(event => {
+        // Only count non-daily roll spending toward lifetime spent
+        if (event.amount < 0 && event.type !== "Daily Roll") {
+          totalSpentLifetime += Math.abs(event.amount);
         }
-        this._updateAdvancementCalculator(html, type);
       });
     }
-  
-    // Copy/Paste the advancement-related methods from karma.js here
-    // _onAllocateKarma, _onPurchaseAdvancement, _updateAdvancementCalculator, etc.
-    // New methods for advancement
+    
+    const advancementFund = this.object.system.karma.advancement || 0;
+    const karmaPool = this.object.system.karma.pool || 0;
+    
+    return Math.max(0, totalEarned - totalSpentLifetime - advancementFund - karmaPool);
+  }
+
+  activateListeners(html) {
+    super.activateListeners(html);
+    
+    html.find('.allocate-karma').click(ev => this._onAllocateKarma(ev));
+    html.find('.purchase-advancement').click(ev => this._onPurchaseAdvancement(ev));
+    html.find('.reset-advancement').click(ev => this._onResetAdvancement(ev));
+    
+    html.find('#advancement-type').change(ev => {
+      const type = ev.currentTarget.value;
+      if (type === "ability") {
+        html.find('#ability-selector').removeClass('hidden');
+      } else {
+        html.find('#ability-selector').addClass('hidden');
+      }
+      this._updateAdvancementCalculator(html, type);
+    });
+
+    html.find('#ability-to-advance').change(ev => {
+      const type = html.find('#advancement-type').val();
+      if (type === "ability") {
+        this._updateAdvancementCalculator(html, type);
+      }
+    });
+  }
+
   _onAllocateKarma(event) {
     event.preventDefault();
     
@@ -149,7 +82,7 @@ export class KarmaAdvancementSheet extends DocumentSheet {
     
     const currentAdvancement = this.object.system.karma.advancementPurpose;
     if (currentAdvancement && currentAdvancement !== advancementType) {
-      ui.notifications.warn("You already have karma allocated for " + currentAdvancement + ". You must complete that advancement first.");
+      ui.notifications.warn(`You already have karma allocated for ${currentAdvancement}. You must complete that advancement first.`);
       return;
     }
     
@@ -158,7 +91,6 @@ export class KarmaAdvancementSheet extends DocumentSheet {
       abilityToAdvance = this.element.find('#ability-to-advance').val();
     }
     
-    // Get calculated current karma instead of using attributes.karma.value
     const currentKarma = this._getCurrentKarma();
     
     new Dialog({
@@ -166,7 +98,7 @@ export class KarmaAdvancementSheet extends DocumentSheet {
       content: `
         <form>
           <div class="form-group">
-            <label>Current Karma: ${currentKarma}</label>
+            <label>Current Available Karma: ${currentKarma}</label>
           </div>
           <div class="form-group">
             <label>Amount to Allocate:</label>
@@ -186,30 +118,17 @@ export class KarmaAdvancementSheet extends DocumentSheet {
               return;
             }
             
-            // Create karma event for allocation
-            const karmaEvent = {
-              realDate: new Date().toLocaleDateString(),
-              gameDate: "",
-              amount: -amount,
-              type: "Advancement Allocation",
-              description: `Allocated for ${advancementType}${abilityToAdvance ? ' (' + abilityToAdvance + ')' : ''}`
-            };
+            // FIX: Only update advancement fund, don't create history entry
+            // The history entry represents actual spending, advancement fund is just allocation
+            const newAdvancementKarma = (this.object.system.karma.advancement || 0) + amount;
             
-            // Add to history and update karma
-            const history = foundry.utils.deepClone(this.object.system.karma?.history || []);
-            history.push(karmaEvent);
-            
-            // Calculate new values
-            let advancementKarma = (this.object.system.karma.advancement || 0) + amount;
-            
-            // Update the actor
             await this.object.update({
-              "system.karma.history": history,
-              "system.karma.advancement": advancementKarma,
+              "system.karma.advancement": newAdvancementKarma,
               "system.karma.advancementPurpose": advancementType,
               "system.karma.advancementDetail": abilityToAdvance
             });
             
+            ui.notifications.info(`Allocated ${amount} karma for ${advancementType}`);
             this.render();
           }
         },
@@ -221,67 +140,55 @@ export class KarmaAdvancementSheet extends DocumentSheet {
       default: "allocate"
     }).render(true);
   }
-  
-  _updateAdvancementCalculator(html, type) {
-    const calculatorDiv = html.find('.advancement-calculator');
-    const contentDiv = html.find('#calculator-content');
+
+  _onResetAdvancement(event) {
+    event.preventDefault();
     
-    if (!type) {
-      calculatorDiv.addClass('hidden');
+    const currentAdvancement = this.object.system.karma.advancement || 0;
+    const currentPurpose = this.object.system.karma.advancementPurpose || "";
+    
+    if (currentAdvancement <= 0 && !currentPurpose) {
+      ui.notifications.warn("No karma is currently allocated to advancement.");
       return;
     }
     
-    calculatorDiv.removeClass('hidden');
-    let content = "";
-    
-    switch(type) {
-      case "ability":
-        const ability = html.find('#ability-to-advance').val();
-        const abilityValue = this.object.system.abilities[ability].value;
-        const abilityRank = this.object.system.abilities[ability].rank;
-        const nextNumber = abilityValue + 1;
-        const isCresting = (nextNumber % 10 === 6); // First number of next rank
-        
-        const baseCost = nextNumber;
-        const crestingCost = isCresting ? 400 : 0;
-        const totalCost = baseCost + crestingCost;
-        
-        content = `
-          <p>Current ${ability.charAt(0).toUpperCase() + ability.slice(1)}: ${abilityRank} (${abilityValue})</p>
-          <p>Next Value: ${nextNumber}</p>
-          <p>Base Cost: ${baseCost} Karma</p>
-          ${isCresting ? `<p>Cresting Cost: 400 Karma</p>` : ''}
-          <p><strong>Total Cost: ${totalCost} Karma</strong></p>
-        `;
-        break;
-        
-      case "power":
-        content = `<p>Power Advancement: Cost is 20 × the rank number gained, plus 500 for cresting.</p>`;
-        break;
-      case "powerAdd":
-        content = `<p>Power Addition: Cost is 3000 + (40 × starting rank number)</p>`;
-        break;
-      case "resource":
-        content = `<p>Resource Advancement: Cost is 10 × the rank number, plus 200 for cresting.</p>`;
-        break;
-      case "popularity":
-        content = `<p>Popularity Advancement: Cost is 10 × the current rank number. No cresting cost.</p>`;
-        break;
-      case "talent":
-        content = `<p>Talent Addition: Cost is 2000 from PC, 1000 from NPC.</p>`;
-        break;
-      case "contact":
-        content = `<p>Contact Addition: Cost is 500 + (10 × Contact's Resource rank).</p>`;
-        break;
-    }
-    
-    contentDiv.html(content);
+    new Dialog({
+      title: "Reset Advancement Fund",
+      content: `
+        <p>Are you sure you want to reset the advancement fund?</p>
+        <p>Current advancement fund: <strong>${currentAdvancement}</strong> karma</p>
+        <p>Current advancement purpose: <strong>${currentPurpose || "None"}</strong></p>
+        <p>This will return the karma to your available karma pool.</p>
+      `,
+      buttons: {
+        reset: {
+          icon: '<i class="fas fa-undo"></i>',
+          label: "Reset Advancement",
+          callback: async () => {
+            // FIX: Simply reset the advancement fund, no history entry needed
+            // since allocation didn't create a history entry
+            await this.object.update({
+              "system.karma.advancement": 0,
+              "system.karma.advancementPurpose": "",
+              "system.karma.advancementDetail": ""
+            });
+            
+            ui.notifications.info(`Advancement fund reset. ${currentAdvancement} karma returned to available pool.`);
+            this.render();
+          }
+        },
+        cancel: {
+          icon: '<i class="fas fa-times"></i>',
+          label: "Cancel"
+        }
+      },
+      default: "cancel"
+    }).render(true);
   }
-  
+
   _onPurchaseAdvancement(event) {
     event.preventDefault();
     
-    // Check if there's an advancement purpose selected
     const purpose = this.object.system.karma.advancementPurpose;
     const detail = this.object.system.karma.advancementDetail;
     const availableKarma = this.object.system.karma.advancement || 0;
@@ -304,9 +211,15 @@ export class KarmaAdvancementSheet extends DocumentSheet {
         }
         
         const ability = detail;
-        const abilityValue = this.object.system.abilities[ability].value;
+        const abilityData = this.object.system.abilities[ability];
+        if (!abilityData) {
+          ui.notifications.error("Ability data not found.");
+          return;
+        }
+        
+        const abilityValue = abilityData.value || 0;
         const nextNumber = abilityValue + 1;
-        const isCresting = (nextNumber % 10 === 6);
+        const isCresting = this._isCresting(abilityValue, nextNumber);
         
         const baseCost = nextNumber;
         const crestingCost = isCresting ? 400 : 0;
@@ -314,65 +227,398 @@ export class KarmaAdvancementSheet extends DocumentSheet {
         
         description = `Advanced ${ability} from ${abilityValue} to ${nextNumber}`;
         updateData[`system.abilities.${ability}.value`] = nextNumber;
+        
+        // Update rank if cresting
+        if (isCresting) {
+          const newRank = this._getNewRank(nextNumber);
+          updateData[`system.abilities.${ability}.rank`] = newRank;
+        }
         break;
         
-      // Add other advancement type calculations
-      // These would need to be customized based on your system
+      case "power":
+        // Simple power advancement - ask user for cost
+        this._askForCustomCost("Power Advancement", "Enter the karma cost for this power advancement:", (customCost) => {
+          if (customCost === null) return;
+          this._completePurchase(customCost, `Power advancement (${customCost} karma)`, {});
+        });
+        return;
+        
+      case "powerAdd":
+        // Simple power addition - ask user for cost
+        this._askForCustomCost("Power Addition", "Enter the karma cost for this power addition:", (customCost) => {
+          if (customCost === null) return;
+          this._completePurchase(customCost, `Power addition (${customCost} karma)`, {});
+        });
+        return;
+        
+      case "resource":
+        const resourceRank = this.object.system.attributes.resources.rank || "Typical";
+        const resourceValue = this.object.system.attributes.resources.value || 6;
+        const nextResourceValue = resourceValue + 1;
+        const resourceCresting = this._isCresting(resourceValue, nextResourceValue);
+        
+        const resourceBaseCost = 10 * nextResourceValue;
+        const resourceCrestingCost = resourceCresting ? 200 : 0;
+        cost = resourceBaseCost + resourceCrestingCost;
+        
+        description = `Advanced Resources from ${resourceRank} (${resourceValue}) to ${nextResourceValue}`;
+        updateData["system.attributes.resources.value"] = nextResourceValue;
+        
+        if (resourceCresting) {
+          const newResourceRank = this._getNewRank(nextResourceValue);
+          updateData["system.attributes.resources.rank"] = newResourceRank;
+        }
+        break;
+        
+      case "popularity":
+        const heroPopularity = this.object.system.attributes.popularity.hero?.value || 0;
+        const nextPopularity = heroPopularity + 1;
+        
+        cost = 10 * Math.abs(heroPopularity);
+        description = `Advanced Hero Popularity from ${heroPopularity} to ${nextPopularity}`;
+        updateData["system.attributes.popularity.hero.value"] = nextPopularity;
+        break;
+        
+      case "talent":
+        this._askForCustomCost("Talent Addition", "Enter karma cost (1000 for NPC, 2000 for PC):", (customCost) => {
+          if (customCost === null) return;
+          this._completePurchase(customCost, `Talent addition (${customCost} karma)`, {});
+        });
+        return;
+        
+      case "contact":
+        this._askForCustomCost("Contact Addition", "Enter karma cost (500 + 10×Resource rank):", (customCost) => {
+          if (customCost === null) return;
+          this._completePurchase(customCost, `Contact addition (${customCost} karma)`, {});
+        });
+        return;
+        
+      default:
+        ui.notifications.error("Unknown advancement type.");
+        return;
     }
     
-    if (cost > availableKarma) {
-      ui.notifications.error(`Insufficient karma for this advancement. Need ${cost}, have ${availableKarma}.`);
+    // For ability, resource, and popularity (direct calculations)
+    this._completePurchase(cost, description, updateData);
+  }
+
+  _askForCustomCost(title, message) {
+    return new Promise((resolve) => {
+      new Dialog({
+        title: title,
+        content: `
+          <form>
+            <div class="form-group">
+              <label>${message}</label>
+              <input type="number" name="cost" value="100" min="1">
+            </div>
+          </form>
+        `,
+        buttons: {
+          ok: {
+            label: "OK",
+            callback: (html) => {
+              const cost = parseInt(html.find('[name="cost"]').val()) || 0;
+              resolve(cost);
+            }
+          },
+          cancel: {
+            label: "Cancel",
+            callback: () => resolve(null)
+          }
+        },
+        default: "ok"
+      }).render(true);
+    });
+  }
+
+  _updateAdvancementCalculator(html, type) {
+    const calculatorDiv = html.find('.advancement-calculator');
+    const contentDiv = html.find('#calculator-content');
+    
+    if (!type) {
+      calculatorDiv.addClass('hidden');
       return;
     }
     
-    // Confirm the purchase
+    calculatorDiv.removeClass('hidden');
+    let content = "";
+    
+    switch(type) {
+      case "ability":
+        const ability = html.find('#ability-to-advance').val();
+        if (!ability) {
+          content = `<p>Please select an ability to advance.</p>`;
+          break;
+        }
+        
+        const abilityData = this.object.system.abilities[ability];
+        if (!abilityData) {
+          content = `<p>Ability data not found.</p>`;
+          break;
+        }
+        
+        const abilityValue = abilityData.value || 0;
+        const abilityRank = abilityData.rank || "Typical";
+        const nextNumber = abilityValue + 1;
+        const isCresting = this._isCresting(abilityValue, nextNumber);
+        
+        const baseCost = nextNumber;
+        const crestingCost = isCresting ? 400 : 0;
+        const totalCost = baseCost + crestingCost;
+        
+        content = `
+          <p>Current ${ability.charAt(0).toUpperCase() + ability.slice(1)}: ${abilityRank} (${abilityValue})</p>
+          <p>Next Value: ${nextNumber}</p>
+          <p>Base Cost: ${baseCost} Karma</p>
+          ${isCresting ? `<p>Cresting Cost: 400 Karma</p>` : ''}
+          <p><strong>Total Cost: ${totalCost} Karma</strong></p>
+        `;
+        break;
+        
+      default:
+        content = `<p>Cost calculation for ${type} not yet implemented.</p>`;
+    }
+    
+    contentDiv.html(content);
+  }
+
+  _isCresting(currentValue, nextValue) {
+    // Define rank boundaries (minimum value for each rank)
+    const rankBoundaries = [0, 2, 4, 6, 10, 20, 30, 40, 50, 75, 100, 150, 200, 500, 1000, 3000, 5000, 10000];
+    
+    let currentRankIndex = 0;
+    let nextRankIndex = 0;
+    
+    // Find current rank
+    for (let i = rankBoundaries.length - 1; i >= 0; i--) {
+      if (currentValue >= rankBoundaries[i]) {
+        currentRankIndex = i;
+        break;
+      }
+    }
+    
+    // Find next rank
+    for (let i = rankBoundaries.length - 1; i >= 0; i--) {
+      if (nextValue >= rankBoundaries[i]) {
+        nextRankIndex = i;
+        break;
+      }
+    }
+    
+    return nextRankIndex > currentRankIndex;
+  }
+
+  _getNewRank(value) {
+    if (value >= 10000) return "Beyond";
+    if (value >= 5000) return "Class 5000";
+    if (value >= 3000) return "Class 3000";
+    if (value >= 1000) return "Class 1000";
+    if (value >= 500) return "Shift-Z";
+    if (value >= 200) return "Shift-Y";
+    if (value >= 150) return "Shift-X";
+    if (value >= 100) return "Unearthly";
+    if (value >= 75) return "Monstrous";
+    if (value >= 50) return "Amazing";
+    if (value >= 40) return "Incredible";
+    if (value >= 30) return "Remarkable";
+    if (value >= 20) return "Excellent";
+    if (value >= 10) return "Good";
+    if (value >= 6) return "Typical";
+    if (value >= 4) return "Poor";
+    if (value >= 2) return "Feeble";
+    return "Shift-0";
+  }
+
+async _getPowerAdvancementCost() {
+  return new Promise((resolve) => {
     new Dialog({
-      title: "Confirm Advancement Purchase",
+      title: "Power Advancement Cost",
       content: `
-        <p>You're about to purchase: ${description}</p>
-        <p>Cost: ${cost} Karma</p>
-        <p>Available: ${availableKarma} Karma</p>
-        <p>Remaining: ${availableKarma - cost} Karma</p>
+        <form>
+          <div class="form-group">
+            <label>Power Name:</label>
+            <input type="text" name="powerName" placeholder="Enter power name">
+          </div>
+          <div class="form-group">
+            <label>Current Rank Number:</label>
+            <input type="number" name="currentRank" value="30" min="1">
+          </div>
+          <div class="form-group">
+            <label>Rank Numbers to Advance:</label>
+            <input type="number" name="rankGain" value="1" min="1">
+          </div>
+          <div class="form-group">
+            <label>
+              <input type="checkbox" name="cresting"> Cresting to next rank tier (+500 karma)
+            </label>
+          </div>
+        </form>
       `,
       buttons: {
-        purchase: {
-          icon: '<i class="fas fa-check"></i>',
-          label: "Purchase",
-          callback: async () => {
-            // Create karma event for the purchase
-            const karmaEvent = {
-              realDate: new Date().toLocaleDateString(),
-              gameDate: "",
-              amount: -cost,
-              type: "Advancement Purchase",
-              description: description
-            };
+        calculate: {
+          label: "Calculate Cost",
+          callback: (html) => {
+            const powerName = html.find('[name="powerName"]').val() || "Power";
+            const currentRank = parseInt(html.find('[name="currentRank"]').val()) || 30;
+            const rankGain = parseInt(html.find('[name="rankGain"]').val()) || 1;
+            const cresting = html.find('[name="cresting"]').is(':checked');
             
-            // Update karma advancement
-            const history = foundry.utils.deepClone(this.object.system.karma?.history || []);
-            history.push(karmaEvent);
+            const baseCost = 20 * rankGain;
+            const crestingCost = cresting ? 500 : 0;
+            const totalCost = baseCost + crestingCost;
             
-            // Complete the update
-            updateData["system.karma.history"] = history;
-            updateData["system.karma.advancement"] = availableKarma - cost;
-            
-            // If advancement is complete, clear the purpose
-            if (availableKarma - cost === 0) {
-              updateData["system.karma.advancementPurpose"] = "";
-              updateData["system.karma.advancementDetail"] = "";
-            }
-            
-            await this.object.update(updateData);
-            ui.notifications.info(`Advancement purchased: ${description}`);
-            this.render();
+            resolve({
+              cost: totalCost,
+              description: `Advanced ${powerName} by ${rankGain} rank${rankGain > 1 ? 's' : ''}${cresting ? ' (cresting)' : ''}`
+            });
           }
         },
         cancel: {
-          icon: '<i class="fas fa-times"></i>',
-          label: "Cancel"
+          label: "Cancel",
+          callback: () => resolve(null)
         }
       },
-      default: "purchase"
+      default: "calculate"
     }).render(true);
-  }
-  }
+  });
+}
+
+async _getPowerAdditionCost() {
+  return new Promise((resolve) => {
+    new Dialog({
+      title: "Power Addition Cost",
+      content: `
+        <form>
+          <div class="form-group">
+            <label>New Power Name:</label>
+            <input type="text" name="powerName" placeholder="Enter new power name">
+          </div>
+          <div class="form-group">
+            <label>Starting Rank Number:</label>
+            <input type="number" name="startingRank" value="6" min="1">
+          </div>
+        </form>
+      `,
+      buttons: {
+        calculate: {
+          label: "Calculate Cost",
+          callback: (html) => {
+            const powerName = html.find('[name="powerName"]').val() || "New Power";
+            const startingRank = parseInt(html.find('[name="startingRank"]').val()) || 6;
+            
+            const totalCost = 3000 + (40 * startingRank);
+            
+            resolve({
+              cost: totalCost,
+              description: `Added new power: ${powerName} at rank ${startingRank}`
+            });
+          }
+        },
+        cancel: {
+          label: "Cancel",
+          callback: () => resolve(null)
+        }
+      },
+      default: "calculate"
+    }).render(true);
+  });
+}
+
+async _getTalentAdditionCost() {
+  return new Promise((resolve) => {
+    new Dialog({
+      title: "Talent Addition Cost",
+      content: `
+        <form>
+          <div class="form-group">
+            <label>Talent Name:</label>
+            <input type="text" name="talentName" placeholder="Enter talent name">
+          </div>
+          <div class="form-group">
+            <label>Learning From:</label>
+            <select name="source">
+              <option value="pc">Player Character (2000 karma)</option>
+              <option value="npc">NPC (1000 karma)</option>
+            </select>
+          </div>
+        </form>
+      `,
+      buttons: {
+        calculate: {
+          label: "Calculate Cost",
+          callback: (html) => {
+            const talentName = html.find('[name="talentName"]').val() || "New Talent";
+            const source = html.find('[name="source"]').val();
+            
+            const cost = source === "pc" ? 2000 : 1000;
+            
+            resolve({
+              cost: cost,
+              description: `Learned talent: ${talentName} from ${source === "pc" ? "PC" : "NPC"}`
+            });
+          }
+        },
+        cancel: {
+          label: "Cancel",
+          callback: () => resolve(null)
+        }
+      },
+      default: "calculate"
+    }).render(true);
+  });
+}
+
+async _getContactAdditionCost() {
+  return new Promise((resolve) => {
+    new Dialog({
+      title: "Contact Addition Cost",
+      content: `
+        <form>
+          <div class="form-group">
+            <label>Contact Name:</label>
+            <input type="text" name="contactName" placeholder="Enter contact name">
+          </div>
+          <div class="form-group">
+            <label>Contact's Resource Rank:</label>
+            <select name="resourceRank">
+              <option value="2">Feeble (2)</option>
+              <option value="4">Poor (4)</option>
+              <option value="6">Typical (6)</option>
+              <option value="10">Good (10)</option>
+              <option value="20">Excellent (20)</option>
+              <option value="30">Remarkable (30)</option>
+              <option value="40">Incredible (40)</option>
+              <option value="50">Amazing (50)</option>
+              <option value="75">Monstrous (75)</option>
+              <option value="100">Unearthly (100)</option>
+            </select>
+          </div>
+        </form>
+      `,
+      buttons: {
+        calculate: {
+          label: "Calculate Cost",
+          callback: (html) => {
+            const contactName = html.find('[name="contactName"]').val() || "New Contact";
+            const resourceRank = parseInt(html.find('[name="resourceRank"]').val()) || 6;
+            
+            const totalCost = 500 + (10 * resourceRank);
+            
+            resolve({
+              cost: totalCost,
+              description: `Added contact: ${contactName} (Resource rank ${resourceRank})`
+            });
+          }
+        },
+        cancel: {
+          label: "Cancel",
+          callback: () => resolve(null)
+        }
+      },
+      default: "calculate"
+    }).render(true);
+  });
+}
+}
+
