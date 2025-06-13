@@ -8,61 +8,74 @@ import { runAsGM } from './gm-utils.js';
 // This file contains roll functions that can be called directly from macros
 // without requiring the character sheet to be open
 
-// Add this function for power range calculation
-function calculatePowerRangeInfo(actor, power, target) {
-  if (!target) {
-    return { penalty: 0, info: "", outOfRange: false, distance: 0, maxRange: 0 };
-  }
-
+function measureTokenRangeInAreas(actor, target) {
   let distance = 0;
   let sourceToken = null;
   let targetToken = null;
 
-  // Determine the source token for the range calculation
   if (canvas.tokens.controlled.length > 0) {
     sourceToken = canvas.tokens.controlled[0];
   } else if (actor instanceof Actor && typeof actor.getActiveTokens === 'function') {
     sourceToken = actor.getActiveTokens()[0];
   }
 
-  // Determine the target token for the range calculation
   if (game.user.targets.size > 0) {
     targetToken = Array.from(game.user.targets)[0];
   }
 
-  // Perform distance calculation only if both source and target tokens are found
   if (sourceToken && targetToken) {
-    // Get the current scene's grid instance
     const grid = canvas.grid.grid;
-
-    // Get the center pixel coordinates of the tokens
     const sourcePoint = sourceToken.center;
     const targetPoint = targetToken.center;
-
-    // Use the V13 BaseGrid API to measure the path distance in grid units
     const pathResult = grid.measurePath([sourcePoint, targetPoint]);
-    distance = pathResult.distance; // This is the distance in grid units
+    const rawDistance = pathResult.distance;
+    const rawUnits = (grid.units || "").toLowerCase().trim();
 
-    const units = grid.units;
-    console.log(`V13 Grid API Power Range: Distance between "${sourceToken.name}" and "${targetToken.name}" is ${distance} ${units}`);
+    // Normalize known abbreviations to canonical forms
+    const unitMap = {
+      "feet": "feet", "foot": "feet", "ft": "feet",
+      "yards": "yards", "yard": "yards", "yd": "yards",
+      "meters": "meters", "meter": "meters", "m": "meters",
+      "area": "areas", "areas": "areas"
+    };
+
+    const normalized = unitMap[rawUnits] || "areas";
+
+    switch (normalized) {
+      case "yards":   distance = rawDistance / 44; break;
+      case "feet":    distance = rawDistance / 132; break;
+      case "meters":  distance = rawDistance / 40.23; break;
+      case "areas":   distance = rawDistance; break;
+      default:        distance = rawDistance; // fallback
+    }
+
+    console.log(`Measured distance: ${rawDistance} ${rawUnits} => ${distance.toFixed(2)} areas`);
   } else {
-    console.warn("Could not determine source or target token for power range calculation. Defaulting distance to 0.");
+    console.warn("Unable to determine both source and target tokens. Returning 0.");
   }
 
-  // Get the power's base range from POWER_RANGE_VALUES
+  return distance;
+}
+
+// Add this function for power range calculation
+function calculatePowerRangeInfo(actor, power, target) {
+  if (!target) {
+    return { penalty: 0, info: "", outOfRange: false, distance: 0, maxRange: 0 };
+  }
+
+  const distance = measureTokenRangeInAreas(actor, target);
   const powerRank = power.system.rank || "Typical";
   const basePowerRange = POWER_RANGE_VALUES[powerRank] || 0;
 
   let penalty = 0;
   let info = "";
-  let outOfRange = false; // Powers are never truly "out of range"
+  const outOfRange = false; // Powers don’t have an absolute max range
 
-  // Apply range rules for powers: -1 CS penalty for every area past normal max
   if (distance > basePowerRange) {
     penalty = distance - basePowerRange;
-    info = `<div style="color: #ff6600;"><strong>Range:</strong> ${distance} areas (Base: ${basePowerRange} areas). Penalty: -${penalty}CS</div>`;
+    info = `<div style="color: #ff6600;"><strong>Range:</strong> ${distance.toFixed(1)} areas (Base: ${basePowerRange} areas). Penalty: -${penalty.toFixed(1)}CS</div>`;
   } else if (distance > 0) {
-    info = `<div><strong>Range:</strong> ${distance} areas (within base range of ${basePowerRange} areas). No penalty.</div>`;
+    info = `<div><strong>Range:</strong> ${distance.toFixed(1)} areas (within base range of ${basePowerRange} areas). No penalty.</div>`;
   } else {
     info = `<div><strong>Range:</strong> Adjacent (no penalty).</div>`;
   }
@@ -175,78 +188,26 @@ const POWER_RANGE_VALUES = {
 
 // Add this new function after the existing helper functions
 function calculateRangeInfo(actor, equipment, target) {
-  // This function is specifically for "weapon" category equipment.
-  // Power-item range penalties are handled separately.
   if (!target || equipment.system.category !== "weapon") {
     return { penalty: 0, info: "", outOfRange: false, distance: 0, maxRange: 0 };
   }
 
-  let distance = 0; // This will store the distance in grid units ("areas")
-  let sourceToken = null;
-  let targetToken = null;
-
-  // Determine the source token for the range calculation
-  if (canvas.tokens.controlled.length > 0) {
-    sourceToken = canvas.tokens.controlled[0];
-  } else if (actor instanceof Actor && typeof actor.getActiveTokens === 'function') {
-    // Fallback: If no token is controlled, try to get a token from the actor.
-    // Ensure actor is an Actor instance and has getActiveTokens method
-    sourceToken = actor.getActiveTokens()[0];
-  }
-
-  // Determine the target token for the range calculation
-  // Sticking to the original function's logic of using game.user.targets
-  if (game.user.targets.size > 0) {
-    targetToken = Array.from(game.user.targets)[0];
-  }
-
-  // Perform distance calculation only if both source and target tokens are found
-  if (sourceToken && targetToken) {
-    // Get the current scene's grid instance (which extends BaseGrid)
-    const grid = canvas.grid.grid;
-
-    // Get the center pixel coordinates of the tokens
-    // token.center provides a Point {x, y} which works as Coordinates2D for measurePath
-    const sourcePoint = sourceToken.center;
-    const targetPoint = targetToken.center;
-
-    // Use the V13 BaseGrid API to measure the path distance in grid units
-    // measurePath automatically accounts for grid type (square, hex, gridless)
-    const pathResult = grid.measurePath([sourcePoint, targetPoint]);
-    distance = pathResult.distance; // This is the distance in grid units
-
-    // For debugging/logging purposes, you can get the scene's defined units
-    const units = grid.units;
-    console.log(`V13 Grid API: Distance between "${sourceToken.name}" and "${targetToken.name}" is ${distance} ${units}`);
-
-  } else {
-    // If we couldn't find both tokens, log a warning and return 0 distance
-    console.warn("Could not determine source or target token for range calculation. Defaulting distance to 0.");
-  }
-
-  // Get the weapon's defined range, or a default if not set
-  // This 'weaponRange' should also be in grid units ("areas")
+  const distance = measureTokenRangeInAreas(actor, target);
   const weaponRange = equipment.system.range || getDefaultWeaponRange(equipment);
 
   let penalty = 0;
   let info = "";
   let outOfRange = false;
 
-  // Apply range rules based on your system's logic (e.g., Faserip's areas)
-  // For weapons: "-1 CS for each area traveled" up to max range. Beyond max range is out of range.
   if (distance > weaponRange) {
     outOfRange = true;
-    info = `<div style="color: #cc0000;"><strong>OUT OF RANGE:</strong> ${distance} areas exceeds maximum ${weaponRange} areas</div>`;
+    info = `<div style="color: #cc0000;"><strong>OUT OF RANGE:</strong> ${distance.toFixed(1)} areas exceeds maximum ${weaponRange} areas</div>`;
   } else if (distance > 0) {
-      // Penalty is -1 CS for each FULL area traveled (round down partial areas)
-      penalty = Math.floor(distance);
-      if (penalty > 0) {
-          info = `<div><strong>Range:</strong> ${distance} areas (-${penalty}CS penalty)</div>`;
-      } else {
-          info = `<div><strong>Range:</strong> ${distance} areas (no penalty - within 1 area)</div>`;
-      }
+    penalty = Math.floor(distance);
+    info = penalty > 0
+      ? `<div><strong>Range:</strong> ${distance.toFixed(1)} areas (-${penalty}CS penalty)</div>`
+      : `<div><strong>Range:</strong> ${distance.toFixed(1)} areas (no penalty - within 1 area)</div>`;
   } else {
-    // Distance is 0, meaning adjacent or self-targeting
     info = `<div><strong>Range:</strong> Adjacent (no penalty)</div>`;
   }
 
