@@ -32,15 +32,17 @@ export class KarmaPoolSheet extends DocumentSheet {
       return context;
     }
   
+    // In karmaPool.js, replace the existing _getCurrentKarma method with:
     _getCurrentKarma() {
-      // Same method as in KarmaSheet
+      // Calculate lifetime karma minus spent (excluding daily rolls) minus funds
       const totalEarned = this.object.system.karma.lifetime || 0;
-      let totalSpent = 0;
+      let totalSpentLifetime = 0;
       
       if (this.object.system.karma.history && Array.isArray(this.object.system.karma.history)) {
         this.object.system.karma.history.forEach(event => {
-          if (event.amount < 0) {
-            totalSpent += Math.abs(event.amount);
+          // Only count non-daily roll spending toward lifetime spent
+          if (event.amount < 0 && event.type !== "Daily Roll") {
+            totalSpentLifetime += Math.abs(event.amount);
           }
         });
       }
@@ -48,7 +50,7 @@ export class KarmaPoolSheet extends DocumentSheet {
       const advancementFund = this.object.system.karma.advancement || 0;
       const karmaPool = this.object.system.karma.pool || 0;
       
-      return Math.max(0, totalEarned - totalSpent - advancementFund - karmaPool);
+      return Math.max(0, totalEarned - totalSpentLifetime - advancementFund - karmaPool);
     }
   
     activateListeners(html) {
