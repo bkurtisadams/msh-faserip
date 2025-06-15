@@ -3451,18 +3451,26 @@ export async function rollUniversalAction(actionCode, actorId, columnShift = nul
   });
 
   // Process targets
+  // AUTOMATION: Process effect if targets exist
   if (options.multiAdjacent && game.user.targets.size > 1) {
+    // Multiple adjacent targets - process all with same result
     const targets = Array.from(game.user.targets);
-    console.log(`Processing multiple adjacent targets: ${targets.map(t => t.name).join(', ')}`);
+    console.log(`🎯 DEBUG: Processing multiple adjacent targets with color: "${color}"`);
+    console.log(`🎯 DEBUG: color.toLowerCase(): "${color.toLowerCase()}"`);
+    console.log(`🎯 DEBUG: Should skip damage? ${color.toLowerCase() === "white"}`);
     
     for (const targetToken of targets) {
       const target = targetToken.actor;
       if (target) {
+        console.log(`🎯 DEBUG: About to call processUniversalActionTarget for ${target.name}`);
         await processUniversalActionTarget(actor, target, actionCode, color, finalValue, label);
       }
     }
   } else {
+    // Single target processing
     const target = game.user.targets.first()?.actor;
+    console.log(`🎯 DEBUG: Single target processing with color: "${color}"`);
+    
     if (target) {
       await processUniversalActionTarget(actor, target, actionCode, color, finalValue, label);
     } else {
@@ -3485,6 +3493,14 @@ export async function rollUniversalAction(actionCode, actorId, columnShift = nul
  * @param {String} sourceName - The source name for chat
  */
 async function processUniversalActionTarget(actor, target, actionCode, resultColor, baseDamage, sourceName) {
+  console.log(`🎯 DEBUG: processUniversalActionTarget called with resultColor: "${resultColor}"`);
+  
+  // This should prevent damage on misses
+  if (resultColor.toLowerCase() === "white") {
+    console.log(`🎯 DEBUG: Skipping damage - result was white (miss)`);
+    return; // Should exit early for misses
+  }
+  
   // This is the existing target processing logic from rollUniversalAction
   const damageTypeMap = {
     BA: "Physical-Blunt", EA: "Physical-Edged", Sh: "Physical-Shooting",
