@@ -11,6 +11,8 @@ import { runAsGM } from './gm-utils.js';
 // Helper functions for multiple target/attack handling
 // Add these to the top of rolls.js after the existing helper functions
 
+// Add these helper functions after the imports in rolls.js
+
 /**
  * Check if all selected targets are adjacent to the attacker
  * @param {Token} attackerToken - The attacking token
@@ -55,7 +57,7 @@ function validateAdjacentTargets(attackerToken, targetTokens) {
 function isValidMultiTargetAttack(actionType) {
   const validTypes = [
     "Blunt Attack (BA)",
-    "Escaping (Es)",
+    "Escaping (Es)", 
     "Energy (En)",
     "Force (Fo)"
   ];
@@ -131,6 +133,117 @@ async function rollFightingFeat(actor, intensity) {
   return { success, result: resultText, roll };
 }
 
+/**
+ * Generate the HTML for multiple target/attack options
+ * @param {String} actionType - Current action type to validate against
+ * @returns {String} - HTML string for the options section
+ */
+function generateMultiTargetOptionsHTML(actionType) {
+  const validMultiTarget = isValidMultiTargetAttack(actionType);
+  const validMultiAttack = isValidMultipleAttack(actionType);
+  
+  return `
+    <div style="margin-bottom: 10px; padding: 8px; background: #e8f4f8; border: 1px solid #b8d4da; border-radius: 3px;">
+      <div style="font-weight: bold; margin-bottom: 5px; color: #2c5aa0;">Multiple Target Options:</div>
+      <div style="margin-bottom: 5px;">
+        <label>
+          <input type="checkbox" id="multi-adjacent" name="multiAdjacent" style="margin-right: 5px;" ${validMultiTarget ? '' : 'disabled'}>
+          Multiple Adjacent Targets (-4CS, single roll affects all)
+        </label>
+        <div id="multi-adjacent-note" style="font-size: 0.8em; color: #666; margin-left: 20px; ${validMultiTarget ? '' : 'display: none;'}">
+          Valid for: Blunt, Escaping, Energy, Force attacks only
+        </div>
+      </div>
+      <div style="margin-bottom: 5px;">
+        <label>
+          <input type="checkbox" id="multi-attacks" name="multiAttacks" style="margin-right: 5px;" ${validMultiAttack ? '' : 'disabled'}>
+          Multiple Attacks (requires Fighting FEAT)
+        </label>
+        <div id="multi-attacks-options" style="margin-left: 20px; display: none;">
+          <label style="display: block; margin: 3px 0;">
+            <input type="radio" name="attackCount" value="2" checked style="margin-right: 5px;">
+            2 Attacks (Remarkable FEAT, -1CS each)
+          </label>
+          <label style="display: block; margin: 3px 0;">
+            <input type="radio" name="attackCount" value="3" style="margin-right: 5px;">
+            3 Attacks (Amazing FEAT, -1CS each)
+          </label>
+        </div>
+        <div id="multi-attacks-note" style="font-size: 0.8em; color: #666; margin-left: 20px; ${validMultiAttack ? '' : 'display: none;'}">
+          Valid for: Slugfest and Shooting attacks only
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+/**
+ * Add event handlers for multiple target/attack options
+ * @param {jQuery} html - The dialog HTML element
+ */
+function addMultiTargetEventHandlers(html) {
+  const actionSelect = html.find('#action');
+  const multiAdjacentCheckbox = html.find('#multi-adjacent');
+  const multiAttacksCheckbox = html.find('#multi-attacks');
+  const multiAdjacentNote = html.find('#multi-adjacent-note');
+  const multiAttacksNote = html.find('#multi-attacks-note');
+  const multiAttacksOptions = html.find('#multi-attacks-options');
+
+  // Function to update option availability based on action type
+  function updateMultiOptions() {
+    const selectedAction = actionSelect.val();
+    
+    // Check if action is valid for multiple adjacent targets
+    const validMultiTarget = isValidMultiTargetAttack(selectedAction);
+    multiAdjacentCheckbox.prop('disabled', !validMultiTarget);
+    if (!validMultiTarget) {
+      multiAdjacentCheckbox.prop('checked', false);
+      multiAdjacentNote.hide();
+    } else {
+      multiAdjacentNote.show();
+    }
+    
+    // Check if action is valid for multiple attacks
+    const validMultiAttack = isValidMultipleAttack(selectedAction);
+    multiAttacksCheckbox.prop('disabled', !validMultiAttack);
+    if (!validMultiAttack) {
+      multiAttacksCheckbox.prop('checked', false);
+      multiAttacksOptions.hide();
+      multiAttacksNote.hide();
+    } else {
+      multiAttacksNote.show();
+    }
+  }
+
+  // Mutual exclusion: if one is checked, disable the other
+  multiAdjacentCheckbox.on('change', function() {
+    if (this.checked) {
+      multiAttacksCheckbox.prop('disabled', true).prop('checked', false);
+      multiAttacksOptions.hide();
+    } else {
+      const selectedAction = actionSelect.val();
+      multiAttacksCheckbox.prop('disabled', !isValidMultipleAttack(selectedAction));
+    }
+  });
+
+  multiAttacksCheckbox.on('change', function() {
+    if (this.checked) {
+      multiAdjacentCheckbox.prop('disabled', true).prop('checked', false);
+      multiAttacksOptions.show();
+    } else {
+      multiAttacksOptions.hide();
+      const selectedAction = actionSelect.val();
+      multiAdjacentCheckbox.prop('disabled', !isValidMultiTargetAttack(selectedAction));
+    }
+  });
+
+  // Update options when action type changes
+  actionSelect.on('change', updateMultiOptions);
+  
+  // Initial update
+  updateMultiOptions();
+}
+
 function measureTokenRangeInAreas(actor, target) {
   let distance = 0;
   let sourceToken = null;
@@ -147,7 +260,7 @@ function measureTokenRangeInAreas(actor, target) {
   }
 
   if (sourceToken && targetToken) {
-    const grid = canvas.grid.grid;
+    const grid = canvas.grid;
     const sourcePoint = sourceToken.center;
     const targetPoint = targetToken.center;
     const pathResult = grid.measurePath([sourcePoint, targetPoint]);
@@ -1017,7 +1130,7 @@ export class FaseripRolls {
     const targetTokenForInitialDialog = game.user.targets.first();
     if (targetTokenForInitialDialog && canvas.tokens.controlled.length > 0) {
       const controlledToken = canvas.tokens.controlled[0];
-      const ray = new Ray(controlledToken.center, targetTokenForInitialDialog.center);
+      const ray = new foundry.canvas.geometry.Ray(controlledToken.center, targetTokenForInitialDialog.center);
       initialDistance = Math.round(ray.distance / canvas.scene.grid.size);
     }
     // --- END INITIAL DISTANCE ---
@@ -1063,7 +1176,12 @@ export class FaseripRolls {
       const powerRangeInfo = powerRangeData.info;
       // --- END RECALCULATE ---
 
-      const totalColumnShift = rawColumnShift - powerRangePenalty; // Apply range penalty here
+      let totalColumnShift = rawColumnShift - powerRangePenalty; // Apply range penalty here
+      // Apply -4CS penalty for multiple adjacent targets
+      if (options.multiAdjacent) {
+        totalColumnShift -= 4;
+        console.log("Applied -4CS penalty for multiple adjacent targets");
+      }
 
       // Get the power's rank and value
       const powerRank = power.system.rank || "Typical"; // ADD THIS LINE

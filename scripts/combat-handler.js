@@ -430,7 +430,7 @@ export class CombatHandler {
         }
         
         if (soundPath) {
-            AudioHelper.play({ src: soundPath, volume: 0.8, autoplay: true }, true);
+            foundry.audio.AudioHelper.play({ src: soundPath, volume: 0.8, autoplay: true }, true);
         }
     }
 
