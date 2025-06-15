@@ -13,7 +13,7 @@ import { runAsGM } from './gm-utils.js';
  * @returns {Object} - {valid: boolean, invalidTargets: Array}
  */
 function validateAdjacentTargets(attackerToken, targetTokens) {
-  console.log("🎯 validateAdjacentTargets called (Foundry grid version)");
+  console.log("🎯 validateAdjacentTargets called (Fixed version)");
   console.log("  attackerToken:", attackerToken?.name);
   console.log("  targetTokens:", targetTokens?.map(t => t.name));
   
@@ -23,16 +23,20 @@ function validateAdjacentTargets(attackerToken, targetTokens) {
   }
 
   const invalidTargets = [];
+  const gridSize = canvas.scene.grid.size; // This is the pixel size of one grid square
+  
+  console.log("  Grid size (pixels):", gridSize);
   
   for (const targetToken of targetTokens) {
-    // Use Foundry's built-in distance measurement
+    // Calculate distance in pixels
     const distance = canvas.grid.measureDistance(attackerToken, targetToken);
-    const areas = distance / canvas.scene.grid.distance; // Convert to grid squares/areas
     
-    console.log(`  Distance to ${targetToken.name}: ${distance} units = ${areas.toFixed(1)} areas`);
+    // Convert to grid squares by dividing by grid size in pixels
+    const areas = distance / gridSize;
+    
+    console.log(`  Distance to ${targetToken.name}: ${distance} pixels = ${areas.toFixed(1)} areas`);
     
     // Target must be within 1.5 areas (adjacent including diagonals)
-    // Diagonal distance is ~1.414, so 1.5 should catch all adjacent squares
     if (areas > 1.5) {
       console.log(`  ❌ ${targetToken.name} is NOT adjacent (${areas.toFixed(1)} areas away)`);
       invalidTargets.push(targetToken);
