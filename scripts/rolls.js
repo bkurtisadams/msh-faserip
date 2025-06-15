@@ -3,16 +3,9 @@ import { applyColumnShiftToRank } from './actorSheet.js';
 import { CombatHandler } from './combat-handler.js';
 import { runAsGM } from './gm-utils.js';
 
-//import { rankRows } from './rank-rows.js';
-
-// This file contains roll functions that can be called directly from macros
-// without requiring the character sheet to be open
-
-// Helper functions for multiple target/attack handling
-// Add these to the top of rolls.js after the existing helper functions
-
-// Add these helper functions after the imports in rolls.js
-
+// ============================================
+// HELPER FUNCTIONS (OUTSIDE THE CLASS)
+// ============================================
 /**
  * Check if all selected targets are adjacent to the attacker
  * @param {Token} attackerToken - The attacking token
@@ -20,33 +13,41 @@ import { runAsGM } from './gm-utils.js';
  * @returns {Object} - {valid: boolean, invalidTargets: Array}
  */
 function validateAdjacentTargets(attackerToken, targetTokens) {
-  if (!attackerToken || !targetTokens || targetTokens.length === 0) {
-    return { valid: false, invalidTargets: [] };
+  console.log("🎯 validateAdjacentTargets called (Foundry grid version)");
+  console.log("  attackerToken:", attackerToken?.name);
+  console.log("  targetTokens:", targetTokens?.map(t => t.name));
+  
+  if (!attackerToken || !targetTokens || targetTokens.length < 2) {
+    console.log("  ❌ Invalid input - missing attacker or insufficient targets");
+    return { valid: false, invalidTargets: targetTokens || [] };
   }
 
   const invalidTargets = [];
-  const gridSize = canvas.scene.grid.size;
-  const attackerCenter = attackerToken.center;
-
-  for (const target of targetTokens) {
-    const targetCenter = target.center;
-    const distance = Math.sqrt(
-      Math.pow(attackerCenter.x - targetCenter.x, 2) + 
-      Math.pow(attackerCenter.y - targetCenter.y, 2)
-    );
+  
+  for (const targetToken of targetTokens) {
+    // Use Foundry's built-in distance measurement
+    const distance = canvas.grid.measureDistance(attackerToken, targetToken);
+    const areas = distance / canvas.scene.grid.distance; // Convert to grid squares/areas
     
-    // Adjacent means within 1.5 grid squares (allows diagonal)
-    const maxAdjacentDistance = gridSize * 1.5;
+    console.log(`  Distance to ${targetToken.name}: ${distance} units = ${areas.toFixed(1)} areas`);
     
-    if (distance > maxAdjacentDistance) {
-      invalidTargets.push(target);
+    // Target must be within 1.5 areas (adjacent including diagonals)
+    // Diagonal distance is ~1.414, so 1.5 should catch all adjacent squares
+    if (areas > 1.5) {
+      console.log(`  ❌ ${targetToken.name} is NOT adjacent (${areas.toFixed(1)} areas away)`);
+      invalidTargets.push(targetToken);
+    } else {
+      console.log(`  ✅ ${targetToken.name} is adjacent (${areas.toFixed(1)} areas away)`);
     }
   }
-
-  return {
+  
+  const result = {
     valid: invalidTargets.length === 0,
     invalidTargets: invalidTargets
   };
+  
+  console.log("  Final result:", result.valid ? "✅ All targets adjacent" : "❌ Some targets not adjacent");
+  return result;
 }
 
 /**
@@ -54,15 +55,12 @@ function validateAdjacentTargets(attackerToken, targetTokens) {
  * @param {String} actionType - The action type (e.g., "Blunt Attack (BA)")
  * @returns {Boolean}
  */
-function isValidMultiTargetAttack(actionType) {
-  const validTypes = [
-    "Blunt Attack (BA)",
-    "Escaping (Es)", 
-    "Energy (En)",
-    "Force (Fo)"
-  ];
-  
-  return validTypes.some(type => actionType.includes(type.split(' ')[0]));
+function isValidMultipleAttack(actionCode) {
+  console.log("🎯 isValidMultipleAttack called with:", actionCode);
+  const validActions = ["BA", "EA", "Sh"];
+  const result = validActions.includes(actionCode);
+  console.log("🎯 isValidMultipleAttack result:", result);
+  return result;
 }
 
 /**
@@ -70,93 +68,65 @@ function isValidMultiTargetAttack(actionType) {
  * @param {String} actionType - The action type
  * @returns {Boolean}
  */
-function isValidMultipleAttack(actionType) {
-  const validTypes = [
-    "Blunt Attack (BA)",
-    "Edged Attack (EA)", 
-    "Shooting Attack (Sh)"
-  ];
-  
-  return validTypes.some(type => actionType.includes(type.split(' ')[0]));
+function isValidMultiTargetAttack(actionCode) {
+  console.log("🎯 isValidMultiTargetAttack called with:", actionCode);
+  const validActions = ["BA", "Es", "En", "Fo"];
+  const result = validActions.includes(actionCode);
+  console.log("🎯 isValidMultiTargetAttack result:", result);
+  return result;
 }
 
-/**
- * Roll a Fighting FEAT for multiple attacks
- * @param {Actor} actor - The actor making the FEAT
- * @param {String} intensity - The required intensity ("Remarkable" or "Amazing")
- * @returns {Object} - {success: boolean, result: string, roll: Roll}
- */
-async function rollFightingFeat(actor, intensity) {
-  const fightingRank = actor.system.abilities.fighting.rank;
-  const fightingValue = actor.system.abilities.fighting.value;
-  
-  // Create the roll
-  const roll = new Roll("1d100");
-  await roll.evaluate();
-  
-  const resultColor = game.msh.rollUniversalTable(fightingRank, roll.total);
-  
-  // Determine success based on intensity requirement
-  let success = false;
-  switch (intensity) {
-    case "Remarkable":
-      success = ["green", "yellow", "red"].includes(resultColor.toLowerCase());
-      break;
-    case "Amazing":
-      success = ["yellow", "red"].includes(resultColor.toLowerCase());
-      break;
-  }
-  
-  const resultText = `Fighting FEAT vs ${intensity}: ${roll.total} on ${fightingRank} = ${resultColor.toUpperCase()} - ${success ? "SUCCESS" : "FAILURE"}`;
-  
-  // Create chat message for the FEAT
-  await ChatMessage.create({
-    speaker: ChatMessage.getSpeaker({ actor }),
-    content: `
-      <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
-        <div style="padding: 5px 10px; border-bottom: 1px solid #c0c0c0; font-size: 1.1em; color: #8b0000;">
-          <strong>${actor.name} - Multiple Attack FEAT</strong>
-        </div>
-        <div style="padding: 5px 10px; font-size: 0.9em;">
-          <div>Required Intensity: ${intensity}</div>
-          <div>Fighting Rank: ${fightingRank} (${fightingValue})</div>
-          <div>Roll: ${roll.total}</div>
-        </div>
-        <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
-          background-color: ${success ? '#4CAF50' : '#F44336'}; color: white;">
-          ${success ? "SUCCESS" : "FAILURE"} (${resultColor.toUpperCase()})
-        </div>
-      </div>
-    `
-  });
-  
-  return { success, result: resultText, roll };
-}
 
 /**
  * Generate the HTML for multiple target/attack options
  * @param {String} actionType - Current action type to validate against
  * @returns {String} - HTML string for the options section
  */
-function generateMultiTargetOptionsHTML(actionType) {
-  const validMultiTarget = isValidMultiTargetAttack(actionType);
-  const validMultiAttack = isValidMultipleAttack(actionType);
+function generateMultiTargetOptionsHTML(actionCode) {
+  console.log("🎯 generateMultiTargetOptionsHTML called with actionCode:", actionCode);
   
-  return `
+  const targetCount = game.user.targets.size;
+  const validMultiTarget = isValidMultiTargetAttack(actionCode);
+  const validMultiAttack = isValidMultipleAttack(actionCode);
+  
+  console.log("🎯 targetCount:", targetCount);
+  console.log("🎯 validMultiTarget:", validMultiTarget);
+  console.log("🎯 validMultiAttack:", validMultiAttack);
+  
+  // Only show if at least one option is valid
+  if (!validMultiTarget && !validMultiAttack) {
+    console.log("🎯 No valid options, returning empty string");
+    return "";
+  }
+  
+  console.log("🎯 Generating HTML for multiple target options");
+  
+  let html = `
     <div style="margin-bottom: 10px; padding: 8px; background: #e8f4f8; border: 1px solid #b8d4da; border-radius: 3px;">
       <div style="font-weight: bold; margin-bottom: 5px; color: #2c5aa0;">Multiple Target Options:</div>
+  `;
+  
+  // Single Roll Multiple Targets option
+  if (validMultiTarget) {
+    html += `
       <div style="margin-bottom: 5px;">
         <label>
-          <input type="checkbox" id="multi-adjacent" name="multiAdjacent" style="margin-right: 5px;" ${validMultiTarget ? '' : 'disabled'}>
+          <input type="checkbox" id="multi-adjacent" name="multiAdjacent" style="margin-right: 5px;">
           Multiple Adjacent Targets (-4CS, single roll affects all)
         </label>
-        <div id="multi-adjacent-note" style="font-size: 0.8em; color: #666; margin-left: 20px; ${validMultiTarget ? '' : 'display: none;'}">
-          Valid for: Blunt, Escaping, Energy, Force attacks only
+        <div style="font-size: 0.8em; color: #666; margin-left: 20px;">
+          Targets selected: ${targetCount} | All must be adjacent to attacker
         </div>
       </div>
+    `;
+  }
+  
+  // Multiple Attacks option  
+  if (validMultiAttack) {
+    html += `
       <div style="margin-bottom: 5px;">
         <label>
-          <input type="checkbox" id="multi-attacks" name="multiAttacks" style="margin-right: 5px;" ${validMultiAttack ? '' : 'disabled'}>
+          <input type="checkbox" id="multi-attacks" name="multiAttacks" style="margin-right: 5px;">
           Multiple Attacks (requires Fighting FEAT)
         </label>
         <div id="multi-attacks-options" style="margin-left: 20px; display: none;">
@@ -169,12 +139,15 @@ function generateMultiTargetOptionsHTML(actionType) {
             3 Attacks (Amazing FEAT, -1CS each)
           </label>
         </div>
-        <div id="multi-attacks-note" style="font-size: 0.8em; color: #666; margin-left: 20px; ${validMultiAttack ? '' : 'display: none;'}">
+        <div style="font-size: 0.8em; color: #666; margin-left: 20px;">
           Valid for: Slugfest and Shooting attacks only
         </div>
       </div>
-    </div>
-  `;
+    `;
+  }
+  
+  html += `</div>`;
+  return html;
 }
 
 /**
@@ -182,143 +155,76 @@ function generateMultiTargetOptionsHTML(actionType) {
  * @param {jQuery} html - The dialog HTML element
  */
 function addMultiTargetEventHandlers(html) {
+  console.log("🎨 addMultiTargetEventHandlers called");
+  
   const actionSelect = html.find('#action');
   const multiAdjacentCheckbox = html.find('#multi-adjacent');
   const multiAttacksCheckbox = html.find('#multi-attacks');
-  const multiAdjacentNote = html.find('#multi-adjacent-note');
-  const multiAttacksNote = html.find('#multi-attacks-note');
   const multiAttacksOptions = html.find('#multi-attacks-options');
+
+  // Get the action from the dialog title instead of a select box
+  const dialogTitle = html.closest('.dialog').find('.window-title').text();
+  const actionMatch = dialogTitle.match(/Roll: (\w+)/);
+  const currentAction = actionMatch ? actionMatch[1] : null;
+  
+  console.log("🎨 Current action from dialog title:", currentAction);
 
   // Function to update option availability based on action type
   function updateMultiOptions() {
-    const selectedAction = actionSelect.val();
+    const selectedAction = currentAction; // Use the action from title, not a select
+    
+    console.log("🎨 updateMultiOptions called with action:", selectedAction);
     
     // Check if action is valid for multiple adjacent targets
     const validMultiTarget = isValidMultiTargetAttack(selectedAction);
+    const validMultiAttack = isValidMultipleAttack(selectedAction);
+    
+    console.log("🎨 validMultiTarget:", validMultiTarget);
+    console.log("🎨 validMultiAttack:", validMultiAttack);
+    
     multiAdjacentCheckbox.prop('disabled', !validMultiTarget);
     if (!validMultiTarget) {
       multiAdjacentCheckbox.prop('checked', false);
-      multiAdjacentNote.hide();
-    } else {
-      multiAdjacentNote.show();
     }
     
-    // Check if action is valid for multiple attacks
-    const validMultiAttack = isValidMultipleAttack(selectedAction);
     multiAttacksCheckbox.prop('disabled', !validMultiAttack);
     if (!validMultiAttack) {
       multiAttacksCheckbox.prop('checked', false);
       multiAttacksOptions.hide();
-      multiAttacksNote.hide();
-    } else {
-      multiAttacksNote.show();
     }
   }
 
   // Mutual exclusion: if one is checked, disable the other
   multiAdjacentCheckbox.on('change', function() {
+    console.log("🎨 multiAdjacent checkbox changed:", this.checked);
     if (this.checked) {
       multiAttacksCheckbox.prop('disabled', true).prop('checked', false);
       multiAttacksOptions.hide();
     } else {
-      const selectedAction = actionSelect.val();
-      multiAttacksCheckbox.prop('disabled', !isValidMultipleAttack(selectedAction));
+      const validMultiAttack = isValidMultipleAttack(currentAction);
+      multiAttacksCheckbox.prop('disabled', !validMultiAttack);
     }
   });
 
   multiAttacksCheckbox.on('change', function() {
+    console.log("🎨 multiAttacks checkbox changed:", this.checked);
     if (this.checked) {
       multiAdjacentCheckbox.prop('disabled', true).prop('checked', false);
       multiAttacksOptions.show();
     } else {
       multiAttacksOptions.hide();
-      const selectedAction = actionSelect.val();
-      multiAdjacentCheckbox.prop('disabled', !isValidMultiTargetAttack(selectedAction));
+      const validMultiTarget = isValidMultiTargetAttack(currentAction);
+      multiAdjacentCheckbox.prop('disabled', !validMultiTarget);
     }
   });
 
-  // Update options when action type changes
-  actionSelect.on('change', updateMultiOptions);
-  
   // Initial update
   updateMultiOptions();
 }
 
-function measureTokenRangeInAreas(actor, target) {
-  let distance = 0;
-  let sourceToken = null;
-  let targetToken = null;
-
-  if (canvas.tokens.controlled.length > 0) {
-    sourceToken = canvas.tokens.controlled[0];
-  } else if (actor instanceof Actor && typeof actor.getActiveTokens === 'function') {
-    sourceToken = actor.getActiveTokens()[0];
-  }
-
-  if (game.user.targets.size > 0) {
-    targetToken = Array.from(game.user.targets)[0];
-  }
-
-  if (sourceToken && targetToken) {
-    const grid = canvas.grid;
-    const sourcePoint = sourceToken.center;
-    const targetPoint = targetToken.center;
-    const pathResult = grid.measurePath([sourcePoint, targetPoint]);
-    const rawDistance = pathResult.distance;
-    const rawUnits = (grid.units || "").toLowerCase().trim();
-
-    // Normalize known abbreviations to canonical forms
-    const unitMap = {
-      "feet": "feet", "foot": "feet", "ft": "feet",
-      "yards": "yards", "yard": "yards", "yd": "yards",
-      "meters": "meters", "meter": "meters", "m": "meters",
-      "area": "areas", "areas": "areas"
-    };
-
-    const normalized = unitMap[rawUnits] || "areas";
-
-    switch (normalized) {
-      case "yards":   distance = rawDistance / 44; break;
-      case "feet":    distance = rawDistance / 132; break;
-      case "meters":  distance = rawDistance / 40.23; break;
-      case "areas":   distance = rawDistance; break;
-      default:        distance = rawDistance; // fallback
-    }
-
-    console.log(`Measured distance: ${rawDistance} ${rawUnits} => ${distance.toFixed(2)} areas`);
-  } else {
-    console.warn("Unable to determine both source and target tokens. Returning 0.");
-  }
-
-  return distance;
-}
-
-// Add this function for power range calculation
-function calculatePowerRangeInfo(actor, power, target) {
-  if (!target) {
-    return { penalty: 0, info: "", outOfRange: false, distance: 0, maxRange: 0 };
-  }
-
-  const distance = measureTokenRangeInAreas(actor, target);
-  const powerRank = power.system.rank || "Typical";
-  const basePowerRange = POWER_RANGE_VALUES[powerRank] || 0;
-
-  let penalty = 0;
-  let info = "";
-  const outOfRange = false; // Powers don’t have an absolute max range
-
-  if (distance > basePowerRange) {
-    penalty = distance - basePowerRange;
-    info = `<div style="color: #ff6600;"><strong>Range:</strong> ${distance.toFixed(1)} areas (Base: ${basePowerRange} areas). Penalty: -${penalty.toFixed(1)}CS</div>`;
-  } else if (distance > 0) {
-    info = `<div><strong>Range:</strong> ${distance.toFixed(1)} areas (within base range of ${basePowerRange} areas). No penalty.</div>`;
-  } else {
-    info = `<div><strong>Range:</strong> Adjacent (no penalty).</div>`;
-  }
-
-  return { penalty, info, outOfRange, distance, maxRange: basePowerRange };
-}
-
+// ============================================
+// CONSTANTS AND DATA (OUTSIDE THE CLASS)  
+// ============================================
 const actionTypes = [
   { code: "BA", label: "Blunt Attacks" },
   { code: "EA", label: "Edged Attacks" },
@@ -422,672 +328,9 @@ const POWER_RANGE_VALUES = {
   "Beyond": Infinity      // Unlimited
 };
 
-// Add this new function after the existing helper functions
-function calculateRangeInfo(actor, equipment, target) {
-  if (!target || equipment.system.category !== "weapon") {
-    return { penalty: 0, info: "", outOfRange: false, distance: 0, maxRange: 0 };
-  }
-
-  const distance = measureTokenRangeInAreas(actor, target);
-  const weaponRange = equipment.system.range || getDefaultWeaponRange(equipment);
-
-  let penalty = 0;
-  let info = "";
-  let outOfRange = false;
-
-  if (distance > weaponRange) {
-    outOfRange = true;
-    info = `<div style="color: #cc0000;"><strong>OUT OF RANGE:</strong> ${distance.toFixed(1)} areas exceeds maximum ${weaponRange} areas</div>`;
-  } else if (distance > 0) {
-    penalty = Math.floor(distance);
-    info = penalty > 0
-      ? `<div><strong>Range:</strong> ${distance.toFixed(1)} areas (-${penalty}CS penalty)</div>`
-      : `<div><strong>Range:</strong> ${distance.toFixed(1)} areas (no penalty - within 1 area)</div>`;
-  } else {
-    info = `<div><strong>Range:</strong> Adjacent (no penalty)</div>`;
-  }
-
-  return { penalty, info, outOfRange, distance, maxRange: weaponRange };
-}
-
-function getDefaultWeaponRange(equipment) {
-  // Default ranges based on weapon type
-  const weaponType = equipment.system.weaponType?.toLowerCase() || "";
-  const name = equipment.name.toLowerCase();
-  
-  if (name.includes("rifle")) return 15;
-  if (name.includes("pistol") || name.includes("handgun")) return 5;
-  if (name.includes("shotgun")) return 3;
-  if (name.includes("bow")) return 8;
-  if (name.includes("crossbow")) return 10;
-  if (weaponType === "melee") return 0;
-  if (weaponType === "thrown") {
-    // Use thrower's strength for range
-    const strength = equipment.parent?.system?.abilities?.strength?.rank || "Typical";
-    const strengthRanges = {
-      "Feeble": 1, "Poor": 1, "Typical": 1, "Good": 2, "Excellent": 3,
-      "Remarkable": 4, "Incredible": 5, "Amazing": 6, "Monstrous": 7, "Unearthly": 8
-    };
-    return strengthRanges[strength] || 1;
-  }
-  
-  return 5; // Default range
-}
-
-function highlightResultCell(rankName, rollValue) {
-  console.log("Highlighting:", rankName, rollValue);
-
-  const dialog = document.querySelector(".app.dialog");
-  if (!dialog) {
-    console.warn("No dialog found");
-    return;
-  }
-
-  const rankIndex = getRankIndex(rankName);
-  const rollLabel = getRollLabelFromValue(rollValue);
-  console.log("Looking for:", rollLabel, "Rank Index:", rankIndex);
-
-  const selector = `.universal-rank-table tr[data-roll-label="${rollLabel}"] td:nth-child(${rankIndex + 2})`;
-  const cell = dialog.querySelector(selector);
-
-  if (cell) {
-    console.log("Cell found:", cell);
-    cell.classList.add("highlight-cell");
-    setTimeout(() => cell.classList.remove("highlight-cell"), 15000);  // 15 seconds
-  } else {
-    console.warn("Cell not found for:", selector);
-  }
-}
-
-
-function getRankIndex(rankName) {
-  const ranks = [
-    "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent", "Remarkable", "Incredible",
-    "Amazing", "Monstrous", "Unearthly", "Shift X", "Shift Y", "Shift Z",
-    "Class 1000", "Class 3000", "Class 5000", "Beyond"
-  ];
-  return ranks.indexOf(rankName);
-}
-
-function getRollLabelFromValue(value) {
-  if (value === 1) return "01";
-  if (value <= 3) return "02–03";
-  if (value <= 6) return "04–06";
-  if (value <= 10) return "07–10";
-  if (value <= 15) return "11–15";
-  if (value <= 20) return "16–20";
-  if (value <= 25) return "21–25";
-  if (value <= 30) return "26–30";
-  if (value <= 35) return "31–35";
-  if (value <= 40) return "36–40";
-  if (value <= 45) return "41–45";
-  if (value <= 50) return "46–50";
-  if (value <= 55) return "51–55";
-  if (value <= 60) return "56–60";
-  if (value <= 65) return "61–65";
-  if (value <= 70) return "66–70";
-  if (value <= 75) return "71–75";
-  if (value <= 80) return "76–80";
-  if (value <= 85) return "81–85";
-  if (value <= 90) return "86–90";
-  if (value <= 94) return "91–94";
-  if (value <= 97) return "95–97";
-  if (value <= 99) return "98–99";
-  return "100";
-}
-
-
-const resultRows = [
-  {
-    result: "white",
-    cells: [
-      { value: "Miss", span: 5 }, { value: "Miss", span: 2 }, { value: "Miss", span: 1 },
-      { value: "Miss", span: 1 }, { value: "Miss", span: 1 }, { value: "None", span: 1 },
-      { value: "Autohit", span: 1 }, { value: "-6 CS", span: 1 }, { value: "Autohit", span: 1 },
-      { value: "Miss", span: 1 }, { value: "1–10", span: 1 }, { value: "Gr. Slam", span: 1 },
-      { value: "En. Loss", span: 1 }
-    ]
-  },
-  {
-    result: "green",
-    cells: [
-      { value: "Hit", span: 5 }, { value: "Hit", span: 2 }, { value: "Hit", span: 1 },
-      { value: "Hit", span: 1 }, { value: "Hit", span: 1 }, { value: "-2 CS", span: 1 },
-      { value: "Evasion", span: 1 }, { value: "+4 CS", span: 1 }, { value: "Catch", span: 1 },
-      { value: "1", span: 1 }, { value: "1 area", span: 1 }, { value: "E/S", span: 1 }
-    ]
-  },
-  {
-    result: "yellow",
-    cells: [
-      { value: "Slam", span: 1 }, { value: "Stun", span: 1 }, { value: "Bullseye", span: 1 },
-      { value: "Stun", span: 1 }, { value: "Bullseye", span: 1 }, { value: "Bullseye", span: 1 },
-      { value: "Partial", span: 1 }, { value: "Grab", span: 1 }, { value: "Escape", span: 1 },
-      { value: "Slam", span: 1 }, { value: "-4 CS", span: 1 }, { value: "+1 CS", span: 1 },
-      { value: "+2 CS", span: 1 }, { value: "Catch", span: 1 }, { value: "Damage", span: 1 },
-      { value: "Stagger", span: 1 }, { value: "No", span: 1 }
-    ]
-  },
-  {
-    result: "red",
-    cells: [
-      { value: "Stun", span: 1 }, { value: "Kill", span: 1 }, { value: "Kill", span: 1 },
-      { value: "Kill", span: 1 }, { value: "Stun", span: 1 }, { value: "Kill", span: 1 },
-      { value: "Hold", span: 1 }, { value: "Break", span: 1 }, { value: "Reverse", span: 1 },
-      { value: "Stun", span: 1 }, { value: "-6 CS", span: 1 }, { value: "+2 CS", span: 1 },
-      { value: "+1 CS", span: 1 }, { value: "No", span: 1 }, { value: "No", span: 1 },
-      { value: "No", span: 1 }
-    ]
-  }
-];
-
-// universal table roll referenced via game.msh.openUniversalTableDialog
-export async function openUniversalTableDialog(actor) {
-  const actionTypes = [
-    { labelTop: "Blunt", labelMid: "Attack", code: "BA", ability: "Fighting", white: "Miss", green: "Hit", yellow: "Slam", red: "Stun" },
-    { labelTop: "Edged", labelMid: "Attack", code: "EA", ability: "Fighting", white: "Miss", green: "Hit", yellow: "Stun", red: "Kill" },
-    { labelTop: "Shooting", labelMid: "Attack", code: "Sh", ability: "Agility", white: "Miss", green: "Hit", yellow: "Bullseye", red: "Kill" },
-    { labelTop: "Throwing", labelMid: "Edged", code: "TE", ability: "Agility", white: "Miss", green: "Hit", yellow: "Stun", red: "Kill" },
-    { labelTop: "Throwing", labelMid: "Blunt", code: "TB", ability: "Agility", white: "Miss", green: "Hit", yellow: "Hit", red: "Stun" },
-    { labelTop: "Energy", labelMid: "Attack", code: "En", ability: "Agility", white: "Miss", green: "Hit", yellow: "Bullseye", red: "Kill" },
-    { labelTop: "Force", labelMid: "Attack", code: "Fo", ability: "Agility", white: "Miss", green: "Hit", yellow: "Bullseye", red: "Stun" },
-    { labelTop: "Grappling", labelMid: "Attack", code: "Gp", ability: "Strength", white: "Miss", green: "Hit", yellow: "Partial", red: "Hold" },
-    { labelTop: "Grabbing", labelMid: "Attack", code: "Gb", ability: "Strength", white: "Miss", green: "Take", yellow: "Grab", red: "Break" },
-    { labelTop: "Escaping", labelMid: "Hold", code: "Es", ability: "Strength", white: "Miss", green: "Miss", yellow: "Escape", red: "Reverse" },
-    { labelTop: "Charging", labelMid: "Attack", code: "Ch", ability: "Endurance", white: "None", green: "Slam", yellow: "Slam", red: "Stun" },
-    { labelTop: "Dodging", labelMid: "Defense", code: "Do", ability: "Agility", white: "Autohit", green: "-2 CS", yellow: "-4 CS", red: "-6 CS" },
-    { labelTop: "Evading", labelMid: "Defense", code: "Ev", ability: "Fighting", white: "Autohit", green: "Evasion", yellow: "+1 CS", red: "+2 CS" },
-    { labelTop: "Blocking", labelMid: "Defense", code: "Bl", ability: "Strength", white: "Autohit", green: "+4 CS", yellow: "+2 CS", red: "+1 CS" },
-    { labelTop: "Catching", labelMid: "Objects", code: "Ca", ability: "Agility", white: "Miss", green: "Catch", yellow: "Catch", red: "No" },
-    { labelTop: "Stun", labelMid: "Check", code: "St", ability: "Endurance", white: "1–10", green: "1", yellow: "Damage", red: "No" },
-    { labelTop: "Slam", labelMid: "Check", code: "Sl", ability: "Endurance", white: "Gr. Slam", green: "1 area", yellow: "Stagger", red: "No" },
-    { labelTop: "Kill", labelMid: "Check", code: "Ki", ability: "Endurance", white: "End. Loss", green: "E/S", yellow: "No", red: "No" }
-  ];
-
-  const actorItems = actor.items.contents;
-  const powers = game.msh.getActorPowers(actor);
-
-  const talents = actorItems.filter(i => i.type === "talent");
-  const equipment = actorItems.filter(i => i.type === "equipment");
-
-  const savedAction = actor.getFlag("msh-faserip", "universalRollAction") || "";
-  const savedSource = actor.getFlag("msh-faserip", "universalRollSource") || "";
-  const savedCS = actor.getFlag("msh-faserip", "universalRollCS") || 0;
-  const savedKarma = actor.getFlag("msh-faserip", "universalRollKarma") || 0;
-
-  const dialogContent = `
-    <form>
-      <div class="form-group">
-        <label>Action Type</label>
-        <select name="action">
-          ${actionTypes.map(type => `
-            <option value="${type.code}" ${type.code === savedAction ? "selected" : ""}>
-              ${type.labelTop} ${type.labelMid} (${type.code})
-            </option>`).join('')}
-        </select>
-
-      </div>
-      <div class="form-group">
-        <label>Source</label>
-        <select name="source">
-          <option value="">(Select Power, Talent, or Equipment)</option>
-          <optgroup label="Powers">
-            ${powers.map(p => `<option value="power:${p.id}" ${`power:${p.id}` === savedSource ? "selected" : ""}>${p.name} (${p.system?.rank || 'Typical'})</option>`).join('')}
-          </optgroup>
-          <optgroup label="Talents">
-            ${talents.map(t => `<option value="talent:${t.id}" ${`talent:${t.id}` === savedSource ? "selected" : ""}>${t.name}</option>`).join('')}
-          </optgroup>
-          <optgroup label="Equipment">
-            ${equipment.map(e => `<option value="equipment:${e.id}" ${`equipment:${e.id}` === savedSource ? "selected" : ""}>${e.name}</option>`).join('')}
-          </optgroup>
-        </select>
-      </div>
-      <div class="form-group">
-        <label>Generic Column Shift Modifier</label>
-        <input type="number" name="cs" value="${savedCS}">
-      </div>
-      <div class="form-group">
-        <label>Karma to Spend</label>
-        <input type="number" name="karma" value="${savedKarma}">
-      </div>
-      <div class="form-group">
-        <label>
-          <input type="checkbox" name="save" checked />
-          Remember these settings
-        </label>
-      </div>
-    </form>
-  `;
-
-  const html = await renderTemplate("systems/msh-faserip/templates/universal-table.html", {
-    actionTypes,
-    rankRows  // ✅ now this works
-  });
-
-  const dlg = new Dialog({
-    title: "Universal Table",
-    content: html,
-    buttons: {}, // 👈 no close button; rely on top-right X
-    render: html => {
-      const app = html.closest(".app.dialog");
-      if (app.length) {
-        app.css({
-          width: "1100px",
-          resize: "both",
-          overflow: "auto"
-        });
-
-        // Center it horizontally
-        const left = Math.max((window.innerWidth - 1100) / 2, 50);
-        app[0].style.left = `${left}px`;
-      }
-    }
-  });
-  dlg.render(true);
-
-  Hooks.once("renderDialog", (_app, html) => {
-
-    html.find("#toggleRankTable").on("click", () => {
-      html.find("#rankTableContainer").toggle();
-    });
-
-    // Font size slider logic
-    html.find("#fontSizeSlider").on("input", (event) => {
-      const size = event.target.value + "px";
-      html.find(".stack").css("font-size", size);
-    });
-
-    // Drag and click logic for action buttons
-    html.find(".action-button, .action-code").each((_, el) => {
-      el.addEventListener("dragstart", async ev => {
-        const action = ev.currentTarget.dataset.action;
-        const actor = game.user.character || canvas.tokens.controlled[0]?.actor;
-        if (!actor) return;
-
-        const command = `game.msh.rollUniversalAction("${action}", "${actor.id}");`;
-
-        let macro = game.macros.find(m => m.name === `FEAT: ${action}` && m.command === command);
-        if (!macro) {
-          const iconMap = {
-            BA: "blunt",
-            EA: "edged",
-            Sh: "shooting",
-            TE: "thrown",
-            TB: "thrown_blunt",
-            En: "energy",
-            Fo: "force",
-            Gp: "grapple",
-            Gb: "grab",
-            Es: "escape",
-            Ch: "charge",
-            Ki: "kill",
-            St: "stun",
-            Sl: "slam",
-            Do: "dodge",
-            Ev: "evade",
-            Bl: "block",
-            Ca: "catch",
-          };
-
-          const iconName = iconMap[action] || "dice-target";
-          const img = `systems/msh-faserip/assets/icons/actions/${iconName}.png`; // or .svg if that's what you're using
-
-          macro = await Macro.create({
-            name: `FEAT: ${action}`,
-            type: "script",
-            command,
-            img
-          });
-
-        }
-
-        // Include the macro's UUID so Foundry can resolve it
-        ev.dataTransfer.setData("text/plain", JSON.stringify({
-          type: "Macro",
-          uuid: macro.uuid
-        }));
-      });
-
-      el.addEventListener("click", ev => {
-        const action = ev.currentTarget.dataset.action;
-        const actor = game.user.character || canvas.tokens.controlled[0]?.actor;
-
-        if (!actor) {
-          return ui.notifications.warn("Select a token or assign a character first.");
-        }
-
-        const savedCS = actor.getFlag("msh-faserip", `cs_${action}`) || 0;
-        const savedKarma = actor.getFlag("msh-faserip", `karma_${action}`) || 0;
-
-        new Dialog({
-          title: `Roll: ${action}`,
-          content: `
-          <form>
-            <div class="form-group">
-              <label>Column Shift</label>
-              <input type="number" name="cs" value="${savedCS}" />
-            </div>
-            <div class="form-group">
-              <label>Karma</label>
-              <input type="number" name="karma" value="${savedKarma}" />
-            </div>
-            <div class="form-group">
-              <label><input type="checkbox" name="remember" checked /> Remember these settings</label>
-            </div>
-          </form>
-        `,
-          buttons: {
-            roll: {
-              label: "Roll",
-              callback: async (html) => {
-                const cs = parseInt(html.find('[name="cs"]').val()) || 0;
-                const karma = parseInt(html.find('[name="karma"]').val()) || 0;
-                const remember = html.find('[name="remember"]').is(":checked");
-
-                if (remember) {
-                  await actor.setFlag("msh-faserip", `cs_${action}`, cs);
-                  await actor.setFlag("msh-faserip", `karma_${action}`, karma);
-                }
-
-                game.msh.rollUniversalAction(action, actor.id, cs, karma);
-              }
-            },
-            cancel: { label: "Cancel" }
-          },
-          default: "roll"
-        }).render(true);
-      });
-
-    });
-
-    /* html.find(".action-toggle").on("change", (event) => {
-      const code = event.currentTarget.dataset.code;
-      const visible = event.currentTarget.checked;
-      html.find(`.column[data-code="${code}"]`).toggle(visible);
-    }); */
-
-  });
-  // end of openUniversalTableDialog  
-}
-
-export async function rollUniversalAction(actionCode, actorId, columnShift = null, karma = null) {
-  let actor = game.actors.get(actorId) || canvas.tokens.controlled[0]?.actor || game.user.character;
-  if (!actor) return ui.notifications.warn("No actor found.");
-
-  // If columnShift or karma are null, show the dialog instead
-  if (columnShift === null || karma === null) {
-    const savedCS = actor.getFlag("msh-faserip", `cs_${actionCode}`) || 0;
-    const savedKarma = actor.getFlag("msh-faserip", `karma_${actionCode}`) || 0;
-
-    new Dialog({
-      title: `FEAT: ${actionCode}`,
-      content: `
-        <form>
-          <div class="form-group">
-            <label>Column Shift</label>
-            <input type="number" name="cs" value="${savedCS}" />
-          </div>
-          <div class="form-group">
-            <label>Karma</label>
-            <input type="number" name="karma" value="${savedKarma}" />
-          </div>
-          <div class="form-group">
-            <label><input type="checkbox" name="remember" checked /> Remember these settings</label>
-          </div>
-        </form>
-      `,
-      buttons: {
-        roll: {
-          label: "Roll",
-          callback: async (html) => {
-            const cs = parseInt(html.find('[name="cs"]').val()) || 0;
-            const karma = parseInt(html.find('[name="karma"]').val()) || 0;
-            const remember = html.find('[name="remember"]').is(":checked");
-
-            if (remember) {
-              await actor.setFlag("msh-faserip", `cs_${actionCode}`, cs);
-              await actor.setFlag("msh-faserip", `karma_${actionCode}`, karma);
-            }
-
-            // Re-call self with real values
-            rollUniversalAction(actionCode, actor.id, cs, karma);
-          }
-        },
-        cancel: { label: "Cancel" }
-      },
-      default: "roll"
-    }).render(true);
-
-    return; // Stop here until dialog result comes in
-  }
-
-  const label = `FEAT: ${actionCode}`;
-  const abilityKey = ACTION_ABILITY_MAP[actionCode] || "fighting";
-  const ability = actor.system.abilities[abilityKey] || { rank: "Typical", value: 6 };
-
-  // Apply column shifts properly
-  let finalRank = ability.rank;
-  let finalValue = ability.value;
-  
-  if (columnShift !== 0) {
-    const shiftedResult = applyColumnShiftToRank(ability.rank, ability.value, columnShift);
-    finalRank = shiftedResult.rank;
-    finalValue = shiftedResult.value;
-    console.log(`Applied ${columnShift} column shifts to ${ability.rank}, now ${finalRank}`);
-  }
-
-  const roll = new Roll("1d100");
-  await roll.evaluate();
-
-  let cappedTotal = roll.total;
-  let karmaUsed = 0;
-
- // <-- NEW/MODIFIED SECTION START -->
-  const dailyKarmaEnabled = game.settings.get("msh-faserip", "dailyKarmaEnabled");
-  let dailyKarmaUsedAmount = 0;
-  let lifetimeKarmaUsedAmount = 0;
-  
-  if (karma > 0) {
-    // Prioritize daily karma if enabled and available
-    if (dailyKarmaEnabled && actor.system.karma.dailyKarmaUsed < actor.system.karma.dailyKarmaMax) {
-      const dailyKarmaRemaining = actor.system.karma.dailyKarmaMax - actor.system.karma.dailyKarmaUsed;
-      const karmaFromDaily = Math.min(karma, dailyKarmaRemaining);
-      
-      dailyKarmaUsedAmount = karmaFromDaily;
-      karmaUsed += karmaFromDaily;
-      
-      // Deduct from daily karma first
-      await runAsGM({
-        operation: 'update',
-        targetActorUuid: actor.uuid,
-        args: [{ "system.karma.dailyKarmaUsed": actor.system.karma.dailyKarmaUsed + dailyKarmaUsedAmount }]
-      });
-
-      // If more karma is requested, use lifetime karma
-      const remainingKarmaToSpend = karma - karmaFromDaily;
-      if (remainingKarmaToSpend > 0) {
-        cappedTotal = Math.min(100, roll.total + remainingKarmaToSpend);
-        lifetimeKarmaUsedAmount = cappedTotal - roll.total;
-        karmaUsed += lifetimeKarmaUsedAmount; // Add to total karmaUsed
-      } else {
-        cappedTotal = Math.min(100, roll.total + karmaFromDaily); // Only add daily if no lifetime used
-      }
-    } else { // Daily karma not enabled, or depleted, use lifetime karma directly
-      cappedTotal = Math.min(100, roll.total + karma);
-      lifetimeKarmaUsedAmount = cappedTotal - roll.total;
-      karmaUsed = lifetimeKarmaUsedAmount; // Set total karmaUsed
-    }
-  } else {
-    cappedTotal = roll.total;
-  }
-
-  // Log Karma use
-  const historyUpdates = [];
-  if (dailyKarmaUsedAmount > 0) {
-    historyUpdates.push({
-      realDate: new Date().toLocaleDateString(),
-      gameDate: "",
-      amount: -dailyKarmaUsedAmount,
-      type: "Daily Roll",
-      description: `Spent daily karma on ${actionCode} roll`
-    });
-  }
-  if (lifetimeKarmaUsedAmount > 0) {
-    historyUpdates.push({
-      realDate: new Date().toLocaleDateString(),
-      gameDate: "",
-      amount: -lifetimeKarmaUsedAmount,
-      type: "Die Roll",
-      description: `Spent lifetime karma on ${actionCode} roll`
-    });
-  }
-
-  if (historyUpdates.length > 0) {
-    const currentHistory = foundry.utils.deepClone(actor.system.karma?.history || []);
-    const newHistory = currentHistory.concat(historyUpdates);
-    
-    await runAsGM({
-      operation: 'update',
-      targetActorUuid: actor.uuid,
-      args: [{ "system.karma.history": newHistory }]
-    });
-
-    await FaseripRolls._updateCurrentKarma(actor); // Update displayed karma
-  }
-  // <-- NEW/MODIFIED SECTION END -->
-
-  // Determine result color using capped value and final rank
-  let color, resultText;
-  try {
-    const tableResult = game.msh.rollUniversalTable(finalRank, cappedTotal);
-    
-    // Handle different return types from rollUniversalTable
-    if (typeof tableResult === 'string') {
-      color = tableResult;
-    } else if (tableResult && tableResult.color) {
-      color = tableResult.color;
-    } else {
-      console.warn("Invalid table result:", tableResult);
-      color = "white"; // fallback
-    }
-    
-    // Get the result text from action labels
-    const labelColor = color.toLowerCase();
-    resultText = (ACTION_RESULT_LABELS[actionCode] || {})[labelColor] || color.toUpperCase();
-    
-  } catch (error) {
-    console.error("Error in universal table lookup:", error);
-    color = "white";
-    resultText = "Miss";
-  }
-
-  // Validate that we have valid values
-  if (!color || !resultText) {
-    console.warn("Missing color or resultText, using defaults");
-    color = color || "white";
-    resultText = resultText || "Miss";
-  }
-
-  // Light up the rank table cell
-  if (typeof highlightResultCell === 'function') {
-    highlightResultCell(finalRank, cappedTotal);
-  }
-
-  const labelColor = color.toLowerCase();
-
-  const content = `
-  <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
-    <div style="padding: 5px 10px; border-bottom: 1px solid #c0c0c0; font-size: 1.1em; color: #8b0000;">
-      <strong>${actor.name} - ${label}</strong>
-    </div>
-    <div style="padding: 5px 10px; font-size: 0.9em;">
-      <div>Ability: ${abilityKey.charAt(0).toUpperCase() + abilityKey.slice(1)}</div>
-      <div>Base Rank: ${ability.rank} (${ability.value})</div>
-      ${columnShift !== 0 ? `<div>Column Shift: ${columnShift > 0 ? "+" : ""}${columnShift}</div>` : ""}
-      ${columnShift !== 0 ? `<div>Final Rank: ${finalRank} (${finalValue})</div>` : ""}
-      <div>Roll: ${roll.total} + Karma: ${karmaUsed} = <strong>${cappedTotal}</strong></div>
-    </div>
-    <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
-      background-color: ${labelColor === 'white' ? '#f8f8f8' :
-      labelColor === 'green' ? '#4CAF50' :
-        labelColor === 'yellow' ? '#FFC107' : '#F44336'};
-      color: ${labelColor === 'white' || labelColor === 'yellow' ? '#333' : 'white'};">
-      ${resultText} (${color.toUpperCase()})
-    </div>
-  </div>
-`;
-
-  await roll.toMessage({
-    speaker: ChatMessage.getSpeaker({ actor }),
-    flavor: `${actor.name} uses ${label}`,
-    content,
-    rollMode: game.settings.get("core", "rollMode")
-  });
-
-  // AUTOMATION: Process effect if a valid target exists
-  const target = game.user.targets.first()?.actor;
-  if (target) {
-    const damageTypeMap = {
-      BA: "Physical-Blunt", EA: "Physical-Edged", Sh: "Physical-Shooting",
-      TE: "Physical-Edged", TB: "Physical-Blunt", En: "Energy-Energy",
-      Fo: "Force", Gp: "Physical-Grapple", Gb: "Physical-Grab", Ch: "Physical-Charge"
-    };
-
-    const damageType = damageTypeMap[actionCode] || "Unknown";
-    const canBeStun = ["BA", "EA", "Sh", "En", "Fo", "TE", "TB"].includes(actionCode);
-    const canBeSlam = ["BA", "EA", "Ch"].includes(actionCode);
-    const canBeKill = ["EA", "Sh", "En", "TE"].includes(actionCode);
-
-    // Determine correct damage source based on action type
-    let baseDamage;
-    if (["BA", "EA", "TB", "Gp", "Gb", "Es", "Ch"].includes(actionCode)) {
-      // Physical attacks use Strength for damage
-      baseDamage = actor.system.abilities.strength.value;
-    } else {
-      // Other attacks (Sh, En, Fo, etc.) use the attack ability for damage
-      baseDamage = finalValue; // Use the column-shifted value
-    }
-
-    // Check if this is a wrestling action
-    if (["Gp", "Gb", "Es"].includes(actionCode)) {
-      // For wrestling actions, we need to handle differently
-      try {
-        await game.msh.CombatHandler.processWrestlingAction({
-          attacker: actor,
-          target,
-          actionType: actionCode,
-          resultColor: color.toLowerCase(),
-          sourceName: label
-        });
-      } catch (error) {
-        console.error("Error processing wrestling action:", error);
-        ui.notifications.error("Failed to process wrestling action");
-      }
-    } else {
-      // Regular damage processing for non-wrestling actions
-      try {
-        await game.msh.runAsGM({
-          operation: 'applyCombatHandlerDamage',
-          attackerUuid: actor.uuid,
-          targetActorUuid: target.uuid,
-          baseDamage,
-          damageType,
-          sourceName: label,
-          canBeStun,
-          canBeSlam,
-          canBeKill,
-          originalRollResult: color.toLowerCase()
-        });
-      } catch (error) {
-        console.error("Error processing damage:", error);
-        ui.notifications.error("Failed to process damage");
-      }
-    }
-  } else {
-    ui.notifications.info("No target selected — result shown, but no damage processed.");
-  }
-}
-
+// ============================================
+// MAIN CLASS DEFINITION
+// ============================================
 export class FaseripRolls {
   /**
   * Roll a power
@@ -1463,7 +706,7 @@ export class FaseripRolls {
     } else {
       // First call - show dialog to select options
       // Define action types from the Universal Table
-      const ACTIONS = {
+      /* const ACTIONS = {
         "Blunt Attack (BA)": { ability: "fighting", results: { white: "Miss", green: "Hit", yellow: "Slam", red: "Stun" } },
         "Edged Attack (EA)": { ability: "fighting", results: { white: "Miss", green: "Hit", yellow: "Stun", red: "Kill" } },
         "Shooting Attack (Sh)": { ability: "agility", results: { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Kill" } },
@@ -1476,7 +719,7 @@ export class FaseripRolls {
         "Escaping (ES)": { ability: "strength", results: { white: "Miss", green: "Miss", yellow: "Escape", red: "Reverse" } },
         "Mental Attack": { ability: "psyche", results: { white: "Failure", green: "Success", yellow: "Special Effect", red: "Maximum Effect" } },
         "General Power Use": { ability: "none", results: { white: "Failure", green: "Success", yellow: "Special Effect", red: "Maximum Effect" } }
-      };
+      }; */
 
       // Determine the default damage type based on power type
       let defaultDamageType = "Energy-Energy";
@@ -1752,6 +995,7 @@ export class FaseripRolls {
       }).render(true);
     }
   }
+  
 
   /**
    * Roll a talent
@@ -3455,6 +2699,930 @@ export class FaseripRolls {
     await actor.update({ "system.attributes.karma.value": currentKarma });
   }
 }
+
+
+/**
+ * Roll a Fighting FEAT for multiple attacks
+ * @param {Actor} actor - The actor making the FEAT
+ * @param {String} intensity - The required intensity ("Remarkable" or "Amazing")
+ * @returns {Object} - {success: boolean, result: string, roll: Roll}
+ */
+/* async function rollFightingFeat(actor, intensity) {
+  const fightingRank = actor.system.abilities.fighting.rank;
+  const fightingValue = actor.system.abilities.fighting.value;
+  
+  // Create the roll
+  const roll = new Roll("1d100");
+  await roll.evaluate();
+  
+  const resultColor = game.msh.rollUniversalTable(fightingRank, roll.total);
+  
+  // Determine success based on intensity requirement
+  let success = false;
+  switch (intensity) {
+    case "Remarkable":
+      success = ["green", "yellow", "red"].includes(resultColor.toLowerCase());
+      break;
+    case "Amazing":
+      success = ["yellow", "red"].includes(resultColor.toLowerCase());
+      break;
+  }
+  
+  const resultText = `Fighting FEAT vs ${intensity}: ${roll.total} on ${fightingRank} = ${resultColor.toUpperCase()} - ${success ? "SUCCESS" : "FAILURE"}`;
+  
+  // Create chat message for the FEAT
+  await ChatMessage.create({
+    speaker: ChatMessage.getSpeaker({ actor }),
+    content: `
+      <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
+        <div style="padding: 5px 10px; border-bottom: 1px solid #c0c0c0; font-size: 1.1em; color: #8b0000;">
+          <strong>${actor.name} - Multiple Attack FEAT</strong>
+        </div>
+        <div style="padding: 5px 10px; font-size: 0.9em;">
+          <div>Required Intensity: ${intensity}</div>
+          <div>Fighting Rank: ${fightingRank} (${fightingValue})</div>
+          <div>Roll: ${roll.total}</div>
+        </div>
+        <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
+          background-color: ${success ? '#4CAF50' : '#F44336'}; color: white;">
+          ${success ? "SUCCESS" : "FAILURE"} (${resultColor.toUpperCase()})
+        </div>
+      </div>
+    `
+  });
+  
+  return { success, result: resultText, roll };
+} */
+
+function measureTokenRangeInAreas(actor, target) {
+  let distance = 0;
+  let sourceToken = null;
+  let targetToken = null;
+
+  if (canvas.tokens.controlled.length > 0) {
+    sourceToken = canvas.tokens.controlled[0];
+  } else if (actor instanceof Actor && typeof actor.getActiveTokens === 'function') {
+    sourceToken = actor.getActiveTokens()[0];
+  }
+
+  if (game.user.targets.size > 0) {
+    targetToken = Array.from(game.user.targets)[0];
+  }
+
+  if (sourceToken && targetToken) {
+    const grid = canvas.grid;
+    const sourcePoint = sourceToken.center;
+    const targetPoint = targetToken.center;
+    const pathResult = grid.measurePath([sourcePoint, targetPoint]);
+    const rawDistance = pathResult.distance;
+    const rawUnits = (grid.units || "").toLowerCase().trim();
+
+    // Normalize known abbreviations to canonical forms
+    const unitMap = {
+      "feet": "feet", "foot": "feet", "ft": "feet",
+      "yards": "yards", "yard": "yards", "yd": "yards",
+      "meters": "meters", "meter": "meters", "m": "meters",
+      "area": "areas", "areas": "areas"
+    };
+
+    const normalized = unitMap[rawUnits] || "areas";
+
+    switch (normalized) {
+      case "yards":   distance = rawDistance / 44; break;
+      case "feet":    distance = rawDistance / 132; break;
+      case "meters":  distance = rawDistance / 40.23; break;
+      case "areas":   distance = rawDistance; break;
+      default:        distance = rawDistance; // fallback
+    }
+
+    console.log(`Measured distance: ${rawDistance} ${rawUnits} => ${distance.toFixed(2)} areas`);
+  } else {
+    console.warn("Unable to determine both source and target tokens. Returning 0.");
+  }
+
+  return distance;
+}
+
+// Add this function for power range calculation
+function calculatePowerRangeInfo(actor, power, target) {
+  if (!target) {
+    return { penalty: 0, info: "", outOfRange: false, distance: 0, maxRange: 0 };
+  }
+
+  const distance = measureTokenRangeInAreas(actor, target);
+  const powerRank = power.system.rank || "Typical";
+  const basePowerRange = POWER_RANGE_VALUES[powerRank] || 0;
+
+  let penalty = 0;
+  let info = "";
+  const outOfRange = false; // Powers don’t have an absolute max range
+
+  if (distance > basePowerRange) {
+    penalty = distance - basePowerRange;
+    info = `<div style="color: #ff6600;"><strong>Range:</strong> ${distance.toFixed(1)} areas (Base: ${basePowerRange} areas). Penalty: -${penalty.toFixed(1)}CS</div>`;
+  } else if (distance > 0) {
+    info = `<div><strong>Range:</strong> ${distance.toFixed(1)} areas (within base range of ${basePowerRange} areas). No penalty.</div>`;
+  } else {
+    info = `<div><strong>Range:</strong> Adjacent (no penalty).</div>`;
+  }
+
+  return { penalty, info, outOfRange, distance, maxRange: basePowerRange };
+}
+
+// Add this new function after the existing helper functions
+function calculateRangeInfo(actor, equipment, target) {
+  if (!target || equipment.system.category !== "weapon") {
+    return { penalty: 0, info: "", outOfRange: false, distance: 0, maxRange: 0 };
+  }
+
+  const distance = measureTokenRangeInAreas(actor, target);
+  const weaponRange = equipment.system.range || getDefaultWeaponRange(equipment);
+
+  let penalty = 0;
+  let info = "";
+  let outOfRange = false;
+
+  if (distance > weaponRange) {
+    outOfRange = true;
+    info = `<div style="color: #cc0000;"><strong>OUT OF RANGE:</strong> ${distance.toFixed(1)} areas exceeds maximum ${weaponRange} areas</div>`;
+  } else if (distance > 0) {
+    penalty = Math.floor(distance);
+    info = penalty > 0
+      ? `<div><strong>Range:</strong> ${distance.toFixed(1)} areas (-${penalty}CS penalty)</div>`
+      : `<div><strong>Range:</strong> ${distance.toFixed(1)} areas (no penalty - within 1 area)</div>`;
+  } else {
+    info = `<div><strong>Range:</strong> Adjacent (no penalty)</div>`;
+  }
+
+  return { penalty, info, outOfRange, distance, maxRange: weaponRange };
+}
+
+function getDefaultWeaponRange(equipment) {
+  // Default ranges based on weapon type
+  const weaponType = equipment.system.weaponType?.toLowerCase() || "";
+  const name = equipment.name.toLowerCase();
+  
+  if (name.includes("rifle")) return 15;
+  if (name.includes("pistol") || name.includes("handgun")) return 5;
+  if (name.includes("shotgun")) return 3;
+  if (name.includes("bow")) return 8;
+  if (name.includes("crossbow")) return 10;
+  if (weaponType === "melee") return 0;
+  if (weaponType === "thrown") {
+    // Use thrower's strength for range
+    const strength = equipment.parent?.system?.abilities?.strength?.rank || "Typical";
+    const strengthRanges = {
+      "Feeble": 1, "Poor": 1, "Typical": 1, "Good": 2, "Excellent": 3,
+      "Remarkable": 4, "Incredible": 5, "Amazing": 6, "Monstrous": 7, "Unearthly": 8
+    };
+    return strengthRanges[strength] || 1;
+  }
+  
+  return 5; // Default range
+}
+
+function highlightResultCell(rankName, rollValue) {
+  console.log("Highlighting:", rankName, rollValue);
+
+  const dialog = document.querySelector(".app.dialog");
+  if (!dialog) {
+    console.warn("No dialog found");
+    return;
+  }
+
+  const rankIndex = getRankIndex(rankName);
+  const rollLabel = getRollLabelFromValue(rollValue);
+  console.log("Looking for:", rollLabel, "Rank Index:", rankIndex);
+
+  const selector = `.universal-rank-table tr[data-roll-label="${rollLabel}"] td:nth-child(${rankIndex + 2})`;
+  const cell = dialog.querySelector(selector);
+
+  if (cell) {
+    console.log("Cell found:", cell);
+    cell.classList.add("highlight-cell");
+    setTimeout(() => cell.classList.remove("highlight-cell"), 15000);  // 15 seconds
+  } else {
+    console.warn("Cell not found for:", selector);
+  }
+}
+
+
+function getRankIndex(rankName) {
+  const ranks = [
+    "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent", "Remarkable", "Incredible",
+    "Amazing", "Monstrous", "Unearthly", "Shift X", "Shift Y", "Shift Z",
+    "Class 1000", "Class 3000", "Class 5000", "Beyond"
+  ];
+  return ranks.indexOf(rankName);
+}
+
+function getRollLabelFromValue(value) {
+  if (value === 1) return "01";
+  if (value <= 3) return "02–03";
+  if (value <= 6) return "04–06";
+  if (value <= 10) return "07–10";
+  if (value <= 15) return "11–15";
+  if (value <= 20) return "16–20";
+  if (value <= 25) return "21–25";
+  if (value <= 30) return "26–30";
+  if (value <= 35) return "31–35";
+  if (value <= 40) return "36–40";
+  if (value <= 45) return "41–45";
+  if (value <= 50) return "46–50";
+  if (value <= 55) return "51–55";
+  if (value <= 60) return "56–60";
+  if (value <= 65) return "61–65";
+  if (value <= 70) return "66–70";
+  if (value <= 75) return "71–75";
+  if (value <= 80) return "76–80";
+  if (value <= 85) return "81–85";
+  if (value <= 90) return "86–90";
+  if (value <= 94) return "91–94";
+  if (value <= 97) return "95–97";
+  if (value <= 99) return "98–99";
+  return "100";
+}
+
+
+const resultRows = [
+  {
+    result: "white",
+    cells: [
+      { value: "Miss", span: 5 }, { value: "Miss", span: 2 }, { value: "Miss", span: 1 },
+      { value: "Miss", span: 1 }, { value: "Miss", span: 1 }, { value: "None", span: 1 },
+      { value: "Autohit", span: 1 }, { value: "-6 CS", span: 1 }, { value: "Autohit", span: 1 },
+      { value: "Miss", span: 1 }, { value: "1–10", span: 1 }, { value: "Gr. Slam", span: 1 },
+      { value: "En. Loss", span: 1 }
+    ]
+  },
+  {
+    result: "green",
+    cells: [
+      { value: "Hit", span: 5 }, { value: "Hit", span: 2 }, { value: "Hit", span: 1 },
+      { value: "Hit", span: 1 }, { value: "Hit", span: 1 }, { value: "-2 CS", span: 1 },
+      { value: "Evasion", span: 1 }, { value: "+4 CS", span: 1 }, { value: "Catch", span: 1 },
+      { value: "1", span: 1 }, { value: "1 area", span: 1 }, { value: "E/S", span: 1 }
+    ]
+  },
+  {
+    result: "yellow",
+    cells: [
+      { value: "Slam", span: 1 }, { value: "Stun", span: 1 }, { value: "Bullseye", span: 1 },
+      { value: "Stun", span: 1 }, { value: "Bullseye", span: 1 }, { value: "Bullseye", span: 1 },
+      { value: "Partial", span: 1 }, { value: "Grab", span: 1 }, { value: "Escape", span: 1 },
+      { value: "Slam", span: 1 }, { value: "-4 CS", span: 1 }, { value: "+1 CS", span: 1 },
+      { value: "+2 CS", span: 1 }, { value: "Catch", span: 1 }, { value: "Damage", span: 1 },
+      { value: "Stagger", span: 1 }, { value: "No", span: 1 }
+    ]
+  },
+  {
+    result: "red",
+    cells: [
+      { value: "Stun", span: 1 }, { value: "Kill", span: 1 }, { value: "Kill", span: 1 },
+      { value: "Kill", span: 1 }, { value: "Stun", span: 1 }, { value: "Kill", span: 1 },
+      { value: "Hold", span: 1 }, { value: "Break", span: 1 }, { value: "Reverse", span: 1 },
+      { value: "Stun", span: 1 }, { value: "-6 CS", span: 1 }, { value: "+2 CS", span: 1 },
+      { value: "+1 CS", span: 1 }, { value: "No", span: 1 }, { value: "No", span: 1 },
+      { value: "No", span: 1 }
+    ]
+  }
+];
+
+// ============================================
+// EXPORTED FUNCTIONS (OUTSIDE THE CLASS)
+// ============================================
+// universal table roll referenced via game.msh.openUniversalTableDialog
+export async function openUniversalTableDialog(actor) {
+  const actionTypes = [
+    { labelTop: "Blunt", labelMid: "Attack", code: "BA", ability: "Fighting", white: "Miss", green: "Hit", yellow: "Slam", red: "Stun" },
+    { labelTop: "Edged", labelMid: "Attack", code: "EA", ability: "Fighting", white: "Miss", green: "Hit", yellow: "Stun", red: "Kill" },
+    { labelTop: "Shooting", labelMid: "Attack", code: "Sh", ability: "Agility", white: "Miss", green: "Hit", yellow: "Bullseye", red: "Kill" },
+    { labelTop: "Throwing", labelMid: "Edged", code: "TE", ability: "Agility", white: "Miss", green: "Hit", yellow: "Stun", red: "Kill" },
+    { labelTop: "Throwing", labelMid: "Blunt", code: "TB", ability: "Agility", white: "Miss", green: "Hit", yellow: "Hit", red: "Stun" },
+    { labelTop: "Energy", labelMid: "Attack", code: "En", ability: "Agility", white: "Miss", green: "Hit", yellow: "Bullseye", red: "Kill" },
+    { labelTop: "Force", labelMid: "Attack", code: "Fo", ability: "Agility", white: "Miss", green: "Hit", yellow: "Bullseye", red: "Stun" },
+    { labelTop: "Grappling", labelMid: "Attack", code: "Gp", ability: "Strength", white: "Miss", green: "Hit", yellow: "Partial", red: "Hold" },
+    { labelTop: "Grabbing", labelMid: "Attack", code: "Gb", ability: "Strength", white: "Miss", green: "Take", yellow: "Grab", red: "Break" },
+    { labelTop: "Escaping", labelMid: "Hold", code: "Es", ability: "Strength", white: "Miss", green: "Miss", yellow: "Escape", red: "Reverse" },
+    { labelTop: "Charging", labelMid: "Attack", code: "Ch", ability: "Endurance", white: "None", green: "Slam", yellow: "Slam", red: "Stun" },
+    { labelTop: "Dodging", labelMid: "Defense", code: "Do", ability: "Agility", white: "Autohit", green: "-2 CS", yellow: "-4 CS", red: "-6 CS" },
+    { labelTop: "Evading", labelMid: "Defense", code: "Ev", ability: "Fighting", white: "Autohit", green: "Evasion", yellow: "+1 CS", red: "+2 CS" },
+    { labelTop: "Blocking", labelMid: "Defense", code: "Bl", ability: "Strength", white: "Autohit", green: "+4 CS", yellow: "+2 CS", red: "+1 CS" },
+    { labelTop: "Catching", labelMid: "Objects", code: "Ca", ability: "Agility", white: "Miss", green: "Catch", yellow: "Catch", red: "No" },
+    { labelTop: "Stun", labelMid: "Check", code: "St", ability: "Endurance", white: "1–10", green: "1", yellow: "Damage", red: "No" },
+    { labelTop: "Slam", labelMid: "Check", code: "Sl", ability: "Endurance", white: "Gr. Slam", green: "1 area", yellow: "Stagger", red: "No" },
+    { labelTop: "Kill", labelMid: "Check", code: "Ki", ability: "Endurance", white: "End. Loss", green: "E/S", yellow: "No", red: "No" }
+  ];
+
+  const actorItems = actor.items.contents;
+  const powers = game.msh.getActorPowers(actor);
+
+  const talents = actorItems.filter(i => i.type === "talent");
+  const equipment = actorItems.filter(i => i.type === "equipment");
+
+  const savedAction = actor.getFlag("msh-faserip", "universalRollAction") || "";
+  const savedSource = actor.getFlag("msh-faserip", "universalRollSource") || "";
+  const savedCS = actor.getFlag("msh-faserip", "universalRollCS") || 0;
+  const savedKarma = actor.getFlag("msh-faserip", "universalRollKarma") || 0;
+
+  const dialogContent = `
+    <form>
+      <div class="form-group">
+        <label>Action Type</label>
+        <select name="action">
+          ${actionTypes.map(type => `
+            <option value="${type.code}" ${type.code === savedAction ? "selected" : ""}>
+              ${type.labelTop} ${type.labelMid} (${type.code})
+            </option>`).join('')}
+        </select>
+
+      </div>
+      <div class="form-group">
+        <label>Source</label>
+        <select name="source">
+          <option value="">(Select Power, Talent, or Equipment)</option>
+          <optgroup label="Powers">
+            ${powers.map(p => `<option value="power:${p.id}" ${`power:${p.id}` === savedSource ? "selected" : ""}>${p.name} (${p.system?.rank || 'Typical'})</option>`).join('')}
+          </optgroup>
+          <optgroup label="Talents">
+            ${talents.map(t => `<option value="talent:${t.id}" ${`talent:${t.id}` === savedSource ? "selected" : ""}>${t.name}</option>`).join('')}
+          </optgroup>
+          <optgroup label="Equipment">
+            ${equipment.map(e => `<option value="equipment:${e.id}" ${`equipment:${e.id}` === savedSource ? "selected" : ""}>${e.name}</option>`).join('')}
+          </optgroup>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Generic Column Shift Modifier</label>
+        <input type="number" name="cs" value="${savedCS}">
+      </div>
+      <div class="form-group">
+        <label>Karma to Spend</label>
+        <input type="number" name="karma" value="${savedKarma}">
+      </div>
+      <div class="form-group">
+        <label>
+          <input type="checkbox" name="save" checked />
+          Remember these settings
+        </label>
+      </div>
+    </form>
+  `;
+
+  const html = await renderTemplate("systems/msh-faserip/templates/universal-table.html", {
+    actionTypes,
+    rankRows  // ✅ now this works
+  });
+
+  const dlg = new Dialog({
+    title: "Universal Table",
+    content: html,
+    buttons: {}, // 👈 no close button; rely on top-right X
+    render: html => {
+      const app = html.closest(".app.dialog");
+      if (app.length) {
+        app.css({
+          width: "1100px",
+          resize: "both",
+          overflow: "auto"
+        });
+
+        // Center it horizontally
+        const left = Math.max((window.innerWidth - 1100) / 2, 50);
+        app[0].style.left = `${left}px`;
+      }
+    }
+  });
+  dlg.render(true);
+
+  Hooks.once("renderDialog", (_app, html) => {
+
+    html.find("#toggleRankTable").on("click", () => {
+      html.find("#rankTableContainer").toggle();
+    });
+
+    // Font size slider logic
+    html.find("#fontSizeSlider").on("input", (event) => {
+      const size = event.target.value + "px";
+      html.find(".stack").css("font-size", size);
+    });
+
+    // Drag and click logic for action buttons
+    html.find(".action-button, .action-code").each((_, el) => {
+      el.addEventListener("dragstart", async ev => {
+        const action = ev.currentTarget.dataset.action;
+        const actor = game.user.character || canvas.tokens.controlled[0]?.actor;
+        if (!actor) return;
+
+        const command = `game.msh.rollUniversalAction("${action}", "${actor.id}");`;
+
+        let macro = game.macros.find(m => m.name === `FEAT: ${action}` && m.command === command);
+        if (!macro) {
+          const iconMap = {
+            BA: "blunt",
+            EA: "edged",
+            Sh: "shooting",
+            TE: "thrown",
+            TB: "thrown_blunt",
+            En: "energy",
+            Fo: "force",
+            Gp: "grapple",
+            Gb: "grab",
+            Es: "escape",
+            Ch: "charge",
+            Ki: "kill",
+            St: "stun",
+            Sl: "slam",
+            Do: "dodge",
+            Ev: "evade",
+            Bl: "block",
+            Ca: "catch",
+          };
+
+          const iconName = iconMap[action] || "dice-target";
+          const img = `systems/msh-faserip/assets/icons/actions/${iconName}.png`; // or .svg if that's what you're using
+
+          macro = await Macro.create({
+            name: `FEAT: ${action}`,
+            type: "script",
+            command,
+            img
+          });
+
+        }
+
+        // Include the macro's UUID so Foundry can resolve it
+        ev.dataTransfer.setData("text/plain", JSON.stringify({
+          type: "Macro",
+          uuid: macro.uuid
+        }));
+      });
+
+      el.addEventListener("click", ev => {
+        const action = ev.currentTarget.dataset.action;
+        console.log("🔥 Action button clicked:", action);
+        
+        const actor = game.user.character || canvas.tokens.controlled[0]?.actor;
+
+        if (!actor) {
+          return ui.notifications.warn("Select a token or assign a character first.");
+        }
+
+        console.log("🔥 Actor found:", actor.name);
+
+        const savedCS = actor.getFlag("msh-faserip", `cs_${action}`) || 0;
+        const savedKarma = actor.getFlag("msh-faserip", `karma_${action}`) || 0;
+
+        console.log("🔥 About to call generateMultiTargetOptionsHTML...");
+        
+        // Generate multiple target options based on action type
+        const multiTargetOptionsHTML = generateMultiTargetOptionsHTML(action);
+        
+        console.log("🔥 multiTargetOptionsHTML result:", multiTargetOptionsHTML);
+        console.log("🔥 multiTargetOptionsHTML length:", multiTargetOptionsHTML.length);
+
+        console.log("🔥 Creating dialog...");
+
+        new Dialog({
+          title: `Roll: ${action}`,
+          content: `
+          <form>
+            <div class="form-group">
+              <label>Column Shift</label>
+              <input type="number" name="cs" value="${savedCS}" />
+            </div>
+            <div class="form-group">
+              <label>Karma</label>
+              <input type="number" name="karma" value="${savedKarma}" />
+            </div>
+            ${multiTargetOptionsHTML}
+            <div class="form-group">
+              <label><input type="checkbox" name="remember" checked /> Remember these settings</label>
+            </div>
+          </form>
+        `,
+          buttons: {
+            roll: {
+              label: "Roll",
+              callback: async (html) => {
+                console.log("🚀 Roll button clicked");
+                
+                const cs = parseInt(html.find('[name="cs"]').val()) || 0;
+                const karma = parseInt(html.find('[name="karma"]').val()) || 0;
+                const remember = html.find('[name="remember"]').is(":checked");
+
+                // Get multiple target options
+                const multiAdjacent = html.find('[name="multiAdjacent"]').is(':checked');
+                const multiAttacks = html.find('[name="multiAttacks"]').is(':checked');
+                const attackCount = parseInt(html.find('[name="attackCount"]:checked').val()) || 2;
+
+                console.log("🚀 Form values:");
+                console.log("  cs:", cs);
+                console.log("  karma:", karma);
+                console.log("  multiAdjacent:", multiAdjacent);
+                console.log("  multiAttacks:", multiAttacks);
+                console.log("  attackCount:", attackCount);
+
+                // Validate multiple adjacent targets
+                if (multiAdjacent) {
+                  const targetTokens = Array.from(game.user.targets);
+                  if (targetTokens.length < 2) {
+                    ui.notifications.warn("Multiple adjacent targets requires at least 2 targets selected!");
+                    return;
+                  }
+                  
+                  const attackerToken = canvas.tokens.controlled[0];
+                  if (!attackerToken) {
+                    ui.notifications.warn("No attacker token selected!");
+                    return;
+                  }
+                  
+                  const validation = validateAdjacentTargets(attackerToken, targetTokens);
+                  if (!validation.valid) {
+                    ui.notifications.warn(`Some targets are not adjacent: ${validation.invalidTargets.map(t => t.name).join(', ')}`);
+                    return;
+                  }
+                }
+
+                if (remember) {
+                  await actor.setFlag("msh-faserip", `cs_${action}`, cs);
+                  await actor.setFlag("msh-faserip", `karma_${action}`, karma);
+                }
+
+                game.msh.rollUniversalAction(action, actor.id, cs, karma, {
+                  multiAdjacent,
+                  multiAttacks,
+                  attackCount
+                });
+              }
+            },
+            cancel: { label: "Cancel" }
+          },
+          default: "roll",
+          render: (html) => {
+            console.log("🎨 Dialog render callback called");
+            addMultiTargetEventHandlers(html);
+          }
+        }).render(true);
+
+        console.log("🔥 Dialog created and rendered");
+      });
+
+    });
+
+    /* html.find(".action-toggle").on("change", (event) => {
+      const code = event.currentTarget.dataset.code;
+      const visible = event.currentTarget.checked;
+      html.find(`.column[data-code="${code}"]`).toggle(visible);
+    }); */
+
+  });
+  // end of openUniversalTableDialog  
+}
+
+export async function rollUniversalAction(actionCode, actorId, columnShift = null, karma = null, options = {}) {
+  let actor = game.actors.get(actorId) || canvas.tokens.controlled[0]?.actor || game.user.character;
+  if (!actor) return ui.notifications.warn("No actor found.");
+
+  // If columnShift or karma are null, show the dialog instead
+  if (columnShift === null || karma === null) {
+    // ... existing dialog code stays the same ...
+    return;
+  }
+
+  // Handle multiple attacks first (before rolling)
+  if (options.multiAttacks) {
+    // ... existing multiple attacks code stays the same ...
+    return processMultipleAttackSequence(actor, attackData, options.attackCount, options);
+  }
+
+  const label = `FEAT: ${actionCode}`;
+  const abilityKey = ACTION_ABILITY_MAP[actionCode] || "fighting";
+  const ability = actor.system.abilities[abilityKey] || { rank: "Typical", value: 6 };
+
+  // Calculate total column shift (including multiple adjacent penalty)
+  let totalColumnShift = columnShift;
+  
+  // Apply -4CS penalty for multiple adjacent targets
+  if (options.multiAdjacent) {
+    totalColumnShift -= 4;
+    console.log("Applied -4CS penalty for multiple adjacent targets");
+  }
+
+  // Apply column shifts to get effective rank
+  let finalRank = ability.rank;
+  let finalValue = ability.value;
+  
+  if (totalColumnShift !== 0) {
+    const shiftedResult = applyColumnShiftToRank(ability.rank, ability.value, totalColumnShift);
+    finalRank = shiftedResult.rank;
+    finalValue = shiftedResult.value;
+    console.log(`Applied ${totalColumnShift} column shifts to ${ability.rank}, now ${finalRank}`);
+  }
+
+  // Create and evaluate the roll
+  const roll = new Roll("1d100");
+  await roll.evaluate();
+
+  // Process karma
+  let cappedTotal = roll.total;
+  let karmaUsed = 0;
+
+  // <-- KARMA PROCESSING SECTION (same as before) -->
+  const dailyKarmaEnabled = game.settings.get("msh-faserip", "dailyKarmaEnabled");
+  let dailyKarmaUsedAmount = 0;
+  let lifetimeKarmaUsedAmount = 0;
+  
+  if (karma > 0) {
+    if (dailyKarmaEnabled && actor.system.karma.dailyKarmaUsed < actor.system.karma.dailyKarmaMax) {
+      const dailyKarmaRemaining = actor.system.karma.dailyKarmaMax - actor.system.karma.dailyKarmaUsed;
+      const karmaFromDaily = Math.min(karma, dailyKarmaRemaining);
+      
+      dailyKarmaUsedAmount = karmaFromDaily;
+      karmaUsed += karmaFromDaily;
+
+      await runAsGM({
+        operation: 'update',
+        targetActorUuid: actor.uuid,
+        args: [{ "system.karma.dailyKarmaUsed": actor.system.karma.dailyKarmaUsed + dailyKarmaUsedAmount }]
+      });
+
+      const remainingKarmaToSpend = karma - karmaFromDaily;
+      if (remainingKarmaToSpend > 0) {
+        cappedTotal = Math.min(100, roll.total + remainingKarmaToSpend);
+        lifetimeKarmaUsedAmount = cappedTotal - roll.total;
+        karmaUsed += lifetimeKarmaUsedAmount;
+      } else {
+        cappedTotal = Math.min(100, roll.total + karmaFromDaily);
+      }
+    } else {
+      cappedTotal = Math.min(100, roll.total + karma);
+      lifetimeKarmaUsedAmount = cappedTotal - roll.total;
+      karmaUsed = lifetimeKarmaUsedAmount;
+    }
+  }
+
+  // Update karma history
+  const historyUpdates = [];
+  if (dailyKarmaUsedAmount > 0) {
+    historyUpdates.push({
+      realDate: new Date().toLocaleDateString(),
+      gameDate: "",
+      amount: -dailyKarmaUsedAmount,
+      type: "Daily Roll",
+      description: `Spent daily karma on ${actionCode} roll`
+    });
+  }
+  if (lifetimeKarmaUsedAmount > 0) {
+    historyUpdates.push({
+      realDate: new Date().toLocaleDateString(),
+      gameDate: "",
+      amount: -lifetimeKarmaUsedAmount,
+      type: "Die Roll",
+      description: `Spent lifetime karma on ${actionCode} roll`
+    });
+  }
+
+  if (historyUpdates.length > 0) {
+    const currentHistory = foundry.utils.deepClone(actor.system.karma?.history || []);
+    const newHistory = currentHistory.concat(historyUpdates);
+    
+    await runAsGM({
+      operation: 'update',
+      targetActorUuid: actor.uuid,
+      args: [{ "system.karma.history": newHistory }]
+    });
+
+    await FaseripRolls._updateCurrentKarma(actor);
+  }
+
+  // NOW determine result color using the FINAL rank and capped total
+  let color, resultText;
+  try {
+    color = game.msh.rollUniversalTable(finalRank, cappedTotal);
+    const labelColor = color.toLowerCase();
+    resultText = (ACTION_RESULT_LABELS[actionCode] || {})[labelColor] || color.toUpperCase();
+    
+  } catch (error) {
+    console.error("Error in universal table lookup:", error);
+    color = "white";
+    resultText = "Miss";
+  }
+
+  // Light up the rank table cell using the final rank
+  if (typeof highlightResultCell === 'function') {
+    highlightResultCell(finalRank, cappedTotal);
+  }
+
+  const labelColor = color.toLowerCase();
+
+  // Create chat message
+  const content = `
+  <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
+    <div style="padding: 5px 10px; border-bottom: 1px solid #c0c0c0; font-size: 1.1em; color: #8b0000;">
+      <strong>${actor.name} - ${label}</strong>
+    </div>
+    <div style="padding: 5px 10px; font-size: 0.9em;">
+      <div>Ability: ${abilityKey.charAt(0).toUpperCase() + abilityKey.slice(1)}</div>
+      <div>Base Rank: ${ability.rank} (${ability.value})</div>
+      ${totalColumnShift !== 0 ? `<div>Column Shift: ${totalColumnShift > 0 ? "+" : ""}${totalColumnShift}</div>` : ""}
+      ${totalColumnShift !== 0 ? `<div>Final Rank: ${finalRank} (${finalValue})</div>` : ""}
+      <div>Roll: ${roll.total} + Karma: ${karmaUsed} = <strong>${cappedTotal}</strong></div>
+    </div>
+    <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
+      background-color: ${labelColor === 'white' ? '#f8f8f8' :
+      labelColor === 'green' ? '#4CAF50' :
+        labelColor === 'yellow' ? '#FFC107' : '#F44336'};
+      color: ${labelColor === 'white' || labelColor === 'yellow' ? '#333' : 'white'};">
+      ${resultText} (${color.toUpperCase()})
+    </div>
+  </div>
+  `;
+
+  await roll.toMessage({
+    speaker: ChatMessage.getSpeaker({ actor }),
+    flavor: `${actor.name} uses ${label}`,
+    content,
+    rollMode: game.settings.get("core", "rollMode")
+  });
+
+  // Process targets
+  if (options.multiAdjacent && game.user.targets.size > 1) {
+    const targets = Array.from(game.user.targets);
+    console.log(`Processing multiple adjacent targets: ${targets.map(t => t.name).join(', ')}`);
+    
+    for (const targetToken of targets) {
+      const target = targetToken.actor;
+      if (target) {
+        await processUniversalActionTarget(actor, target, actionCode, color, finalValue, label);
+      }
+    }
+  } else {
+    const target = game.user.targets.first()?.actor;
+    if (target) {
+      await processUniversalActionTarget(actor, target, actionCode, color, finalValue, label);
+    } else {
+      ui.notifications.info("No target selected — result shown, but no damage processed.");
+    }
+  }
+}
+
+// ============================================
+// UTILITY FUNCTIONS (OUTSIDE THE CLASS)
+// ============================================
+
+/**
+ * Process a universal action against a single target
+ * @param {Actor} actor - The attacking actor
+ * @param {Actor} target - The target actor  
+ * @param {String} actionCode - The action code (BA, EA, etc.)
+ * @param {String} resultColor - The roll result color
+ * @param {Number} baseDamage - The base damage value
+ * @param {String} sourceName - The source name for chat
+ */
+async function processUniversalActionTarget(actor, target, actionCode, resultColor, baseDamage, sourceName) {
+  // This is the existing target processing logic from rollUniversalAction
+  const damageTypeMap = {
+    BA: "Physical-Blunt", EA: "Physical-Edged", Sh: "Physical-Shooting",
+    TE: "Physical-Edged", TB: "Physical-Blunt", En: "Energy-Energy",
+    Fo: "Force", Gp: "Physical-Grapple", Gb: "Physical-Grab", Ch: "Physical-Charge"
+  };
+
+  const damageType = damageTypeMap[actionCode] || "Unknown";
+  const canBeStun = ["BA", "EA", "Sh", "En", "Fo", "TE", "TB"].includes(actionCode);
+  const canBeSlam = ["BA", "EA", "Ch"].includes(actionCode);
+  const canBeKill = ["EA", "Sh", "En", "TE"].includes(actionCode);
+
+  // Check if this is a wrestling action
+  if (["Gp", "Gb", "Es"].includes(actionCode)) {
+    try {
+      await game.msh.CombatHandler.processWrestlingAction({
+        attacker: actor,
+        target,
+        actionType: actionCode,
+        resultColor: resultColor.toLowerCase(),
+        sourceName: sourceName
+      });
+    } catch (error) {
+      console.error("Error processing wrestling action:", error);
+      ui.notifications.error("Failed to process wrestling action");
+    }
+  } else {
+    // Regular damage processing for non-wrestling actions
+    try {
+      await game.msh.runAsGM({
+        operation: 'applyCombatHandlerDamage',
+        attackerUuid: actor.uuid,
+        targetActorUuid: target.uuid,
+        baseDamage,
+        damageType,
+        sourceName: sourceName,
+        canBeStun,
+        canBeSlam,
+        canBeKill,
+        originalRollResult: resultColor.toLowerCase()
+      });
+    } catch (error) {
+      console.error("Error processing damage:", error);
+      ui.notifications.error("Failed to process damage");
+    }
+  }
+}
+
+/**
+ * Process multiple attacks with Fighting FEAT and CS penalties
+ * @param {Actor} actor - The attacking actor
+ * @param {Object} attackData - The base attack data
+ * @param {Number} attackCount - Number of attacks (2 or 3)
+ * @param {Object} options - Additional options
+ * @returns {Array} - Array of attack results
+ */
+async function processMultipleAttackSequence(actor, attackData, attackCount, options = {}) {
+  console.log(`Starting multiple attack sequence: ${attackCount} attacks`);
+  
+  // First, roll the Fighting FEAT
+  const featResult = await game.msh.CombatHandler.rollMultipleAttackFeat(actor, attackCount);
+  
+  if (featResult.cancelled) {
+    ui.notifications.info("Multiple attack cancelled");
+    return [];
+  }
+  
+  if (!featResult.success) {
+    // Failed FEAT: Single attack at -3CS
+    console.log("Fighting FEAT failed - single attack with -3CS penalty");
+    
+    // Apply -3CS penalty and make single attack
+    const penalizedAttackData = {
+      ...attackData,
+      sourceName: `${attackData.sourceName} (Failed Multiple Attack)`
+    };
+    
+    return [await makeSingleAttackWithPenalty(actor, penalizedAttackData, -3, options)];
+  }
+  
+  // Success: Multiple attacks at -1CS each
+  console.log(`Fighting FEAT succeeded - proceeding with ${attackCount} attacks at -1CS each`);
+  
+  const results = [];
+  const targets = Array.from(game.user.targets);
+  
+  for (let i = 1; i <= attackCount; i++) {
+    console.log(`Making attack ${i} of ${attackCount}`);
+    
+    const attackResult = await makeSingleAttackWithPenalty(actor, {
+      ...attackData,
+      sourceName: `${attackData.sourceName} (Attack ${i}/${attackCount})`
+    }, -1, { ...options, attackNumber: i, totalAttacks: attackCount });
+    
+    results.push(attackResult);
+    
+    // Small delay between attacks for better visual flow
+    if (i < attackCount) {
+      await new Promise(resolve => setTimeout(resolve, 800));
+    }
+  }
+  
+  // Create summary message
+  await ChatMessage.create({
+    speaker: ChatMessage.getSpeaker({ actor }),
+    content: `
+      <div style="background-color: #e8f5e8; border: 1px solid #4caf50; border-radius: 3px; padding: 8px; margin: 5px 0;">
+        <div style="color: #2e7d32; font-weight: bold; margin-bottom: 5px;">Multiple Attack Sequence Complete</div>
+        <div style="font-size: 0.9em;">
+          <div>${actor.name} completed ${attackCount} attacks.</div>
+          <div>Each attack was made at -1CS due to multiple attack rules.</div>
+        </div>
+      </div>
+    `
+  });
+  
+  return results;
+}
+
+/**
+ * Make a single attack with a CS penalty applied
+ * @param {Actor} actor - The attacking actor
+ * @param {Object} attackData - Attack data
+ * @param {Number} csPenalty - Column shift penalty (negative number)
+ * @param {Object} options - Additional options
+ */
+async function makeSingleAttackWithPenalty(actor, attackData, csPenalty, options = {}) {
+  // This function will need to be implemented differently for each roll type
+  // For now, it's a placeholder that calls the appropriate roll function
+  // The actual implementation will depend on whether this is from rollPower, rollTalent, etc.
+  
+  console.log(`Making single attack with ${csPenalty}CS penalty`);
+  
+  // This is where we'd call the specific roll function with the penalty applied
+  // For now, just return a placeholder result
+  return {
+    penalty: csPenalty,
+    attackData: attackData,
+    options: options
+  };
+}
+
 
 // 3. The handleCombatEffect function should remain outside the class at the very end:
 

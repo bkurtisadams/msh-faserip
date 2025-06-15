@@ -93,6 +93,13 @@ export class CombatHandler {
     console.log(`Process Attack: Using target: ${targetActor.name}`);
     console.log("Process Attack options:", options);
 
+    // Handle multiple attack penalties
+    if (options.multipleAttackPenalty) {
+        console.log(`Applying multiple attack penalty: ${options.multipleAttackPenalty}CS`);
+        // This penalty will need to be applied to the actual roll in the calling function
+        // Since processAttack doesn't do the rolling, just the damage processing
+    }
+
     // 1. Get Defenses from Target
     let defenseData = await this.getTargetDefenses(target, damageType, baseDamage, options);
 
@@ -386,6 +393,217 @@ export class CombatHandler {
 
     console.log("CombatHandler.processAttack completed"); 
 }
+
+    /**
+     * Process multiple attacks (2-3 attacks with Fighting FEAT)
+     * @param {Object} attackData - Standard attack data
+     * @param {Object} multiAttackOptions - { attackCount: 2|3, fightingFeatSuccess: boolean }
+     * @param {Object} options - Standard options
+     */
+    static async processMultipleAttacks(attackData, multiAttackOptions, options = {}) {
+        const { attackCount, fightingFeatSuccess } = multiAttackOptions;
+        const { attacker, target, baseDamage, damageType, sourceName } = attackData;
+        
+        console.log(`Processing ${attackCount} attacks, FEAT success: ${fightingFeatSuccess}`);
+        
+        if (!fightingFeatSuccess) {
+            // Failed FEAT: Only 1 attack at -3CS
+            console.log("Fighting FEAT failed - single attack at -3CS");
+            
+            // Apply -3CS penalty to the attack (this would need to be handled in the calling function)
+            await this.processAttack({
+                ...attackData,
+                sourceName: `${sourceName} (Failed Multiple Attack)`
+            }, {
+                ...options,
+                multipleAttackPenalty: -3
+            });
+            
+            await ChatMessage.create({
+                speaker: ChatMessage.getSpeaker({ actor: attacker }),
+                content: `
+                    <div style="background-color: #ffebee; border: 1px solid #f44336; border-radius: 3px; padding: 8px; margin: 5px 0;">
+                        <div style="color: #d32f2f; font-weight: bold; margin-bottom: 5px;">Multiple Attack Failed</div>
+                        <div style="font-size: 0.9em;">
+                            <div>${attacker.name} failed the Fighting FEAT for multiple attacks.</div>
+                            <div>Result: Single attack only, at -3CS penalty.</div>
+                        </div>
+                    </div>
+                `
+            });
+            return;
+        }
+        
+        // Successful FEAT: Multiple attacks at -1CS each
+        console.log(`Fighting FEAT succeeded - ${attackCount} attacks at -1CS each`);
+        
+        const attackResults = [];
+        
+        for (let i = 1; i <= attackCount; i++) {
+            console.log(`Processing attack ${i} of ${attackCount}`);
+            
+            // Each attack is processed separately with -1CS penalty
+            const result = await this.processAttack({
+                ...attackData,
+                sourceName: `${sourceName} (Attack ${i}/${attackCount})`
+            }, {
+                ...options,
+                multipleAttackPenalty: -1,
+                attackNumber: i,
+                totalAttacks: attackCount
+            });
+            
+            attackResults.push(result);
+            
+            // Small delay between attacks for better visual flow
+            if (i < attackCount) {
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+        }
+        
+        // Summary message
+        await ChatMessage.create({
+            speaker: ChatMessage.getSpeaker({ actor: attacker }),
+            content: `
+                <div style="background-color: #e8f5e8; border: 1px solid #4caf50; border-radius: 3px; padding: 8px; margin: 5px 0;">
+                    <div style="color: #2e7d32; font-weight: bold; margin-bottom: 5px;">Multiple Attack Sequence Complete</div>
+                    <div style="font-size: 0.9em;">
+                        <div>${attacker.name} completed ${attackCount} attacks against ${target.name}.</div>
+                        <div>Each attack was made at -1CS due to multiple attack rules.</div>
+                    </div>
+                </div>
+            `
+        });
+        
+        return attackResults;
+    }
+
+    // Add this to combat-handler.js as a static method of CombatHandler
+
+    /**
+     * Roll Fighting FEAT for multiple attacks and return the result
+     * @param {Actor} actor - The actor attempting multiple attacks  
+     * @param {Number} attackCount - Number of attacks (2 or 3)
+     * @returns {Object} - {success: boolean, intensity: string, roll: Roll}
+     */
+    static async rollMultipleAttackFeat(actor, attackCount) {
+        const intensity = attackCount === 2 ? "Remarkable" : "Amazing";
+        const fightingRank = actor.system.abilities.fighting.rank;
+        const fightingValue = actor.system.abilities.fighting.value;
+        
+        // Get available Karma
+        const availableKarma = actor.system.attributes.karma.value || 0;
+        
+        // Create dialog content
+        const dialogContent = `
+            <div style="text-align: center;">
+                <h2>${actor.name} - Multiple Attack FEAT</h2>
+                <p>Attempting <strong>${attackCount} attacks</strong> requires a Fighting FEAT roll.</p>
+                <div style="margin: 10px 0;">
+                    <p>Fighting Rank: <strong>${fightingRank}</strong></p>
+                    <p>Required Intensity: <strong>${intensity}</strong></p>
+                    <hr style="margin: 10px 0;">
+                    <div>
+                        <label>Spend Karma Points:</label>
+                        <input type="number" id="karma-points" min="0" max="${availableKarma}" value="0" style="width: 60px;">
+                        <span style="margin-left: 5px; font-size: 0.9em; color: #666;">(Available: ${availableKarma})</span>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Show dialog to player
+        return new Promise((resolve) => {
+            new Dialog({
+                title: `Multiple Attack FEAT (${attackCount} attacks)`,
+                content: dialogContent,
+                buttons: {
+                    roll: {
+                        icon: '<i class="fas fa-dice-d20"></i>',
+                        label: "Roll FEAT",
+                        callback: async (html) => {
+                            const karmaSpent = Math.min(
+                                parseInt(html.find('#karma-points').val()) || 0,
+                                availableKarma
+                            );
+                            
+                            // Create the roll
+                            const roll = new Roll("1d100");
+                            await roll.evaluate();
+                            
+                            const totalRoll = Math.min(100, roll.total + karmaSpent);
+                            const resultColor = game.msh.rollUniversalTable(fightingRank, totalRoll);
+                            
+                            // Determine success based on intensity requirement
+                            let success = false;
+                            switch (intensity) {
+                                case "Remarkable":
+                                    success = ["green", "yellow", "red"].includes(resultColor.toLowerCase());
+                                    break;
+                                case "Amazing":
+                                    success = ["yellow", "red"].includes(resultColor.toLowerCase());
+                                    break;
+                            }
+                            
+                            // Deduct karma if spent
+                            if (karmaSpent > 0) {
+                                await game.msh.runAsGM({
+                                    operation: "update",
+                                    targetActorUuid: actor.uuid,
+                                    args: [{ "system.attributes.karma.value": availableKarma - karmaSpent }]
+                                });
+                                
+                                // Add karma history
+                                const history = foundry.utils.deepClone(actor.system.karma?.history || []);
+                                history.push({
+                                    realDate: new Date().toLocaleDateString(),
+                                    gameDate: "",
+                                    amount: -karmaSpent,
+                                    type: "Multiple Attack FEAT",
+                                    description: `Fighting FEAT for ${attackCount} attacks`
+                                });
+                                await game.msh.runAsGM({
+                                    operation: "update",
+                                    targetActorUuid: actor.uuid,
+                                    args: [{ "system.karma.history": history }]
+                                });
+                            }
+                            
+                            // Create chat message for the FEAT result
+                            await ChatMessage.create({
+                                speaker: ChatMessage.getSpeaker({ actor }),
+                                content: `
+                                    <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
+                                        <div style="padding: 5px 10px; border-bottom: 1px solid #c0c0c0; font-size: 1.1em; color: #8b0000;">
+                                            <strong>${actor.name} - Multiple Attack FEAT</strong>
+                                        </div>
+                                        <div style="padding: 5px 10px; font-size: 0.9em;">
+                                            <div>Attempting: ${attackCount} attacks</div>
+                                            <div>Required Intensity: ${intensity}</div>
+                                            <div>Fighting Rank: ${fightingRank} (${fightingValue})</div>
+                                            <div>Roll: ${roll.total} + Karma: ${karmaSpent} = ${totalRoll}</div>
+                                        </div>
+                                        <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
+                                            background-color: ${success ? '#4CAF50' : '#F44336'}; color: white;">
+                                            ${success ? "SUCCESS" : "FAILURE"} (${resultColor.toUpperCase()})
+                                        </div>
+                                    </div>
+                                `
+                            });
+                            
+                            resolve({ success, intensity, roll, totalRoll, resultColor });
+                        }
+                    },
+                    cancel: {
+                        icon: '<i class="fas fa-times"></i>',
+                        label: "Cancel",
+                        callback: () => resolve({ success: false, intensity, cancelled: true })
+                    }
+                },
+                default: "roll"
+            }).render(true);
+        });
+    }
 
     static async playCombatSFX(damageType, sourceName, rollResult, options = {}) {
         let soundPath = null;
