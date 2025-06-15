@@ -8,6 +8,129 @@ import { runAsGM } from './gm-utils.js';
 // This file contains roll functions that can be called directly from macros
 // without requiring the character sheet to be open
 
+// Helper functions for multiple target/attack handling
+// Add these to the top of rolls.js after the existing helper functions
+
+/**
+ * Check if all selected targets are adjacent to the attacker
+ * @param {Token} attackerToken - The attacking token
+ * @param {Array} targetTokens - Array of target tokens
+ * @returns {Object} - {valid: boolean, invalidTargets: Array}
+ */
+function validateAdjacentTargets(attackerToken, targetTokens) {
+  if (!attackerToken || !targetTokens || targetTokens.length === 0) {
+    return { valid: false, invalidTargets: [] };
+  }
+
+  const invalidTargets = [];
+  const gridSize = canvas.scene.grid.size;
+  const attackerCenter = attackerToken.center;
+
+  for (const target of targetTokens) {
+    const targetCenter = target.center;
+    const distance = Math.sqrt(
+      Math.pow(attackerCenter.x - targetCenter.x, 2) + 
+      Math.pow(attackerCenter.y - targetCenter.y, 2)
+    );
+    
+    // Adjacent means within 1.5 grid squares (allows diagonal)
+    const maxAdjacentDistance = gridSize * 1.5;
+    
+    if (distance > maxAdjacentDistance) {
+      invalidTargets.push(target);
+    }
+  }
+
+  return {
+    valid: invalidTargets.length === 0,
+    invalidTargets: invalidTargets
+  };
+}
+
+/**
+ * Check if an attack type is valid for multiple adjacent targets
+ * @param {String} actionType - The action type (e.g., "Blunt Attack (BA)")
+ * @returns {Boolean}
+ */
+function isValidMultiTargetAttack(actionType) {
+  const validTypes = [
+    "Blunt Attack (BA)",
+    "Escaping (Es)",
+    "Energy (En)",
+    "Force (Fo)"
+  ];
+  
+  return validTypes.some(type => actionType.includes(type.split(' ')[0]));
+}
+
+/**
+ * Check if an attack type is valid for multiple attacks
+ * @param {String} actionType - The action type
+ * @returns {Boolean}
+ */
+function isValidMultipleAttack(actionType) {
+  const validTypes = [
+    "Blunt Attack (BA)",
+    "Edged Attack (EA)", 
+    "Shooting Attack (Sh)"
+  ];
+  
+  return validTypes.some(type => actionType.includes(type.split(' ')[0]));
+}
+
+/**
+ * Roll a Fighting FEAT for multiple attacks
+ * @param {Actor} actor - The actor making the FEAT
+ * @param {String} intensity - The required intensity ("Remarkable" or "Amazing")
+ * @returns {Object} - {success: boolean, result: string, roll: Roll}
+ */
+async function rollFightingFeat(actor, intensity) {
+  const fightingRank = actor.system.abilities.fighting.rank;
+  const fightingValue = actor.system.abilities.fighting.value;
+  
+  // Create the roll
+  const roll = new Roll("1d100");
+  await roll.evaluate();
+  
+  const resultColor = game.msh.rollUniversalTable(fightingRank, roll.total);
+  
+  // Determine success based on intensity requirement
+  let success = false;
+  switch (intensity) {
+    case "Remarkable":
+      success = ["green", "yellow", "red"].includes(resultColor.toLowerCase());
+      break;
+    case "Amazing":
+      success = ["yellow", "red"].includes(resultColor.toLowerCase());
+      break;
+  }
+  
+  const resultText = `Fighting FEAT vs ${intensity}: ${roll.total} on ${fightingRank} = ${resultColor.toUpperCase()} - ${success ? "SUCCESS" : "FAILURE"}`;
+  
+  // Create chat message for the FEAT
+  await ChatMessage.create({
+    speaker: ChatMessage.getSpeaker({ actor }),
+    content: `
+      <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
+        <div style="padding: 5px 10px; border-bottom: 1px solid #c0c0c0; font-size: 1.1em; color: #8b0000;">
+          <strong>${actor.name} - Multiple Attack FEAT</strong>
+        </div>
+        <div style="padding: 5px 10px; font-size: 0.9em;">
+          <div>Required Intensity: ${intensity}</div>
+          <div>Fighting Rank: ${fightingRank} (${fightingValue})</div>
+          <div>Roll: ${roll.total}</div>
+        </div>
+        <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
+          background-color: ${success ? '#4CAF50' : '#F44336'}; color: white;">
+          ${success ? "SUCCESS" : "FAILURE"} (${resultColor.toUpperCase()})
+        </div>
+      </div>
+    `
+  });
+  
+  return { success, result: resultText, roll };
+}
+
 function measureTokenRangeInAreas(actor, target) {
   let distance = 0;
   let sourceToken = null;
@@ -1097,66 +1220,125 @@ export class FaseripRolls {
         content: content
       });
 
-      // ADD COMBAT HANDLER INTEGRATION HERE
-      // Check if we have a target to apply damage to
-      const target = game.user.targets.first()?.actor;
-
-      if (target && resultColor.toLowerCase() !== "white") {
-        // Determine damage type based on power type/action type if not specified
-        let finalDamageType = damageType;
-        if (!finalDamageType) {
-          if (actionType.includes("Blunt")) {
-            finalDamageType = "Physical-Blunt";
-          } else if (actionType.includes("Edged")) {
-            finalDamageType = "Physical-Edged";
-          } else if (actionType.includes("Force")) {
-            finalDamageType = "Force";
-          } else if (actionType.includes("Mental")) {
-            finalDamageType = "Mental";
-          } else if (power.system.type) {
-            // Try to determine from power's type
-            const powerTypeStr = power.system.type.toLowerCase();
-            if (powerTypeStr.includes("force")) {
-              finalDamageType = "Force";
-            } else if (powerTypeStr.includes("mental") || powerTypeStr.includes("psi")) {
-              finalDamageType = "Mental";
-            } else if (powerTypeStr.includes("phys")) {
-              finalDamageType = "Physical-Blunt";
-            } else {
-              finalDamageType = "Energy-Energy"; // Default
+      // COMBAT HANDLER INTEGRATION
+      // Check if we have target(s) to apply damage to
+      if (options.multiAdjacent && game.user.targets.size > 1) {
+        // Multiple adjacent targets - single roll with -4CS, applied to all
+        const targets = Array.from(game.user.targets);
+        console.log(`Processing multiple adjacent targets: ${targets.map(t => t.name).join(', ')}`);
+        
+        for (const target of targets) {
+          if (resultColor.toLowerCase() !== "white") {
+            let finalDamageType = damageType;
+            if (!finalDamageType) {
+              if (actionType.includes("Blunt")) {
+                finalDamageType = "Physical-Blunt";
+              } else if (actionType.includes("Edged")) {
+                finalDamageType = "Physical-Edged";
+              } else if (actionType.includes("Force")) {
+                finalDamageType = "Force";
+              } else if (actionType.includes("Mental")) {
+                finalDamageType = "Mental";
+              } else if (power.system.type) {
+                const powerTypeStr = power.system.type.toLowerCase();
+                if (powerTypeStr.includes("force")) {
+                  finalDamageType = "Force";
+                } else if (powerTypeStr.includes("mental") || powerTypeStr.includes("psi")) {
+                  finalDamageType = "Mental";
+                } else if (powerTypeStr.includes("phys")) {
+                  finalDamageType = "Physical-Blunt";
+                } else {
+                  finalDamageType = "Energy-Energy";
+                }
+              }
             }
+            
+            const canBeStun = actionType.includes("Blunt") || 
+                            actionType.includes("Force") || 
+                            resultText.toLowerCase().includes("stun");
+            
+            const canBeSlam = actionType.includes("Blunt") || 
+                            resultText.toLowerCase().includes("slam");
+            
+            const canBeKill = actionType.includes("Edged") || 
+                    actionType.includes("Energy") || 
+                    actionType.includes("Shooting");
+            
+            const baseDamage = damageCS && damageRankValue ? damageRankValue : powerValue;
+            
+            await game.msh.CombatHandler.processAttack({
+              attacker: actor,
+              target: target.actor,
+              baseDamage: baseDamage,
+              damageType: finalDamageType,
+              sourceName: power.name,
+              canBeStun,
+              canBeSlam,
+              canBeKill,
+              originalRollResult: resultColor.toLowerCase()
+            });
           }
         }
-        
-        // Determine if special effects should apply based on the result and action type
-        const canBeStun = actionType.includes("Blunt") || 
-                        actionType.includes("Force") || 
-                        resultText.toLowerCase().includes("stun");
-        
-        const canBeSlam = actionType.includes("Blunt") || 
-                        resultText.toLowerCase().includes("slam");
-        
-        const canBeKill = actionType.includes("Edged") || 
-                actionType.includes("Energy") || 
-                actionType.includes("Shooting");
-        
-        // For damage, use the damageRankValue if a damage CS was applied, otherwise use the base power value
-        const baseDamage = damageCS && damageRankValue ? damageRankValue : powerValue;
-        
-        // Process the attack using the CombatHandler
-        await game.msh.CombatHandler.processAttack({
-          attacker: actor,
-          target: target,
-          baseDamage: baseDamage,
-          damageType: finalDamageType,
-          sourceName: power.name,
-          canBeStun,
-          canBeSlam,
-          canBeKill,
-          originalRollResult: resultColor.toLowerCase()
-        });
-      } else if (resultColor.toLowerCase() !== "white" && !target) {
-        ui.notifications.info("No target selected. Damage not applied.");
+      } else if (options.multiAttacks) {
+        // Handle multiple attacks (this will be more complex)
+        console.log("Multiple attacks not yet implemented");
+        ui.notifications.info("Multiple attacks feature not yet implemented.");
+      } else {
+        // Single target (existing code)
+        const target = game.user.targets.first()?.actor;
+
+        if (target && resultColor.toLowerCase() !== "white") {
+          let finalDamageType = damageType;
+          if (!finalDamageType) {
+            if (actionType.includes("Blunt")) {
+              finalDamageType = "Physical-Blunt";
+            } else if (actionType.includes("Edged")) {
+              finalDamageType = "Physical-Edged";
+            } else if (actionType.includes("Force")) {
+              finalDamageType = "Force";
+            } else if (actionType.includes("Mental")) {
+              finalDamageType = "Mental";
+            } else if (power.system.type) {
+              const powerTypeStr = power.system.type.toLowerCase();
+              if (powerTypeStr.includes("force")) {
+                finalDamageType = "Force";
+              } else if (powerTypeStr.includes("mental") || powerTypeStr.includes("psi")) {
+                finalDamageType = "Mental";
+              } else if (powerTypeStr.includes("phys")) {
+                finalDamageType = "Physical-Blunt";
+              } else {
+                finalDamageType = "Energy-Energy";
+              }
+            }
+          }
+          
+          const canBeStun = actionType.includes("Blunt") || 
+                          actionType.includes("Force") || 
+                          resultText.toLowerCase().includes("stun");
+          
+          const canBeSlam = actionType.includes("Blunt") || 
+                          resultText.toLowerCase().includes("slam");
+          
+          const canBeKill = actionType.includes("Edged") || 
+                  actionType.includes("Energy") || 
+                  actionType.includes("Shooting");
+          
+          const baseDamage = damageCS && damageRankValue ? damageRankValue : powerValue;
+          
+          await game.msh.CombatHandler.processAttack({
+            attacker: actor,
+            target: target,
+            baseDamage: baseDamage,
+            damageType: finalDamageType,
+            sourceName: power.name,
+            canBeStun,
+            canBeSlam,
+            canBeKill,
+            originalRollResult: resultColor.toLowerCase()
+          });
+        } else if (resultColor.toLowerCase() !== "white" && !target) {
+          ui.notifications.info("No target selected. Damage not applied.");
+        }
       }
 
       return { roll, resultColor, resultText };
@@ -1209,6 +1391,7 @@ export class FaseripRolls {
     // --- END RECALCULATE ---
 
     // Create dialog for roll options
+    // Enhanced dialog content with multiple target/attack options
     let dialogContent = `
       <div style="background: #f0e8d8; padding: 10px; border-radius: 5px;">
         <div style="margin-bottom: 10px;">
@@ -1231,12 +1414,45 @@ export class FaseripRolls {
             ${dialogPowerRangeInfo}
           </div>
         </div>
-        </div>
         <div style="margin-bottom: 10px;">
           <label style="display: inline-block; width: 120px;">Column Shift:</label>
           <input type="number" id="shift" name="shift" value="${savedColumnShift}" style="width: 50px;">
           <span style="color: #666; font-size: 0.9em;">(+ right, - left)</span>
         </div>
+        
+        <!-- Multiple Target Options -->
+        <div style="margin-bottom: 10px; padding: 8px; background: #e8f4f8; border: 1px solid #b8d4da; border-radius: 3px;">
+          <div style="font-weight: bold; margin-bottom: 5px; color: #2c5aa0;">Multiple Target Options:</div>
+          <div style="margin-bottom: 5px;">
+            <label>
+              <input type="checkbox" id="multi-adjacent" name="multiAdjacent" style="margin-right: 5px;">
+              Multiple Adjacent Targets (-4CS, single roll affects all)
+            </label>
+            <div id="multi-adjacent-note" style="font-size: 0.8em; color: #666; margin-left: 20px; display: none;">
+              Valid for: Blunt, Escaping, Energy, Force attacks only
+            </div>
+          </div>
+          <div style="margin-bottom: 5px;">
+            <label>
+              <input type="checkbox" id="multi-attacks" name="multiAttacks" style="margin-right: 5px;">
+              Multiple Attacks (requires Fighting FEAT)
+            </label>
+            <div id="multi-attacks-options" style="margin-left: 20px; display: none;">
+              <label style="display: block; margin: 3px 0;">
+                <input type="radio" name="attackCount" value="2" checked style="margin-right: 5px;">
+                2 Attacks (Remarkable FEAT, -1CS each)
+              </label>
+              <label style="display: block; margin: 3px 0;">
+                <input type="radio" name="attackCount" value="3" style="margin-right: 5px;">
+                3 Attacks (Amazing FEAT, -1CS each)
+              </label>
+            </div>
+            <div id="multi-attacks-note" style="font-size: 0.8em; color: #666; margin-left: 20px; display: none;">
+              Valid for: Slugfest and Shooting attacks only
+            </div>
+          </div>
+        </div>
+        
         <div style="margin-bottom: 10px;">
           <label style="display: inline-block; width: 120px;">Damage CS:</label>
           <input type="number" id="damage-cs" name="damageCs" value="${savedDamageCS}" style="width: 50px;">
@@ -1286,7 +1502,40 @@ export class FaseripRolls {
               const karma = parseInt(html.find('[name="karma"]').val()) || 0;
               const skipDice = html.find('[name="skipDice"]').is(':checked');
               const saveSettings = html.find('[name="saveSettings"]').is(':checked');
-              const dialogDistance = parseInt(html.find('[name="distance"]').val()) || 0; // NEW: Get distance from dialog
+              
+              // Get multiple target/attack options
+              const multiAdjacent = html.find('[name="multiAdjacent"]').is(':checked');
+              const multiAttacks = html.find('[name="multiAttacks"]').is(':checked');
+              const attackCount = parseInt(html.find('[name="attackCount"]:checked').val()) || 2;
+
+              // ADD THE DEBUG LOGGING RIGHT HERE:
+              console.log("=== MULTI-TARGET DEBUG ===");
+              console.log("multiAdjacent:", multiAdjacent);
+              console.log("multiAttacks:", multiAttacks);
+              console.log("attackCount:", attackCount);
+              console.log("Selected targets:", Array.from(game.user.targets).map(t => t.name));
+              console.log("========================");
+
+              // Validate target selection for multiple adjacent targets
+              if (multiAdjacent) {
+                const targetTokens = Array.from(game.user.targets);
+                if (targetTokens.length < 2) {
+                  ui.notifications.warn("Multiple adjacent targets requires at least 2 targets selected!");
+                  return;
+                }
+                
+                const attackerToken = canvas.tokens.controlled[0];
+                if (!attackerToken) {
+                  ui.notifications.warn("No attacker token selected!");
+                  return;
+                }
+                
+                const validation = validateAdjacentTargets(attackerToken, targetTokens);
+                if (!validation.valid) {
+                  ui.notifications.warn(`Some targets are not adjacent: ${validation.invalidTargets.map(t => t.name).join(', ')}`);
+                  return;
+                }
+              }
 
               // Save settings if requested
               if (saveSettings) {
@@ -1306,13 +1555,82 @@ export class FaseripRolls {
                 damageType: damageType,
                 karma: karma,
                 skipDice: skipDice,
-                distance: dialogDistance // NEW: Pass distance
+                multiAdjacent: multiAdjacent,
+                multiAttacks: multiAttacks,
+                attackCount: attackCount
               });
             }
           },
           cancel: { label: "Cancel" }
         },
-        default: "roll"
+        default: "roll",
+        render: (html) => {
+          // Get references to the multiple target elements
+          const actionSelect = html.find('#action');
+          const multiAdjacentCheckbox = html.find('#multi-adjacent');
+          const multiAttacksCheckbox = html.find('#multi-attacks');
+          const multiAdjacentNote = html.find('#multi-adjacent-note');
+          const multiAttacksNote = html.find('#multi-attacks-note');
+          const multiAttacksOptions = html.find('#multi-attacks-options');
+
+          // Function to update option availability based on action type
+          function updateMultiOptions() {
+            const selectedAction = actionSelect.val();
+            
+            // Check if action is valid for multiple adjacent targets
+            const validMultiTarget = isValidMultiTargetAttack(selectedAction);
+            multiAdjacentCheckbox.prop('disabled', !validMultiTarget);
+            if (!validMultiTarget) {
+              multiAdjacentCheckbox.prop('checked', false);
+              multiAdjacentNote.hide();
+            }
+            
+            // Check if action is valid for multiple attacks
+            const validMultiAttack = isValidMultipleAttack(selectedAction);
+            multiAttacksCheckbox.prop('disabled', !validMultiAttack);
+            if (!validMultiAttack) {
+              multiAttacksCheckbox.prop('checked', false);
+              multiAttacksOptions.hide();
+              multiAttacksNote.hide();
+            }
+            
+            // Show/hide notes based on validity
+            if (validMultiTarget) {
+              multiAdjacentNote.show();
+            }
+            if (validMultiAttack) {
+              multiAttacksNote.show();
+            }
+          }
+
+          // Mutual exclusion: if one is checked, disable the other
+          multiAdjacentCheckbox.on('change', function() {
+            if (this.checked) {
+              multiAttacksCheckbox.prop('disabled', true).prop('checked', false);
+              multiAttacksOptions.hide();
+            } else {
+              const selectedAction = actionSelect.val();
+              multiAttacksCheckbox.prop('disabled', !isValidMultipleAttack(selectedAction));
+            }
+          });
+
+          multiAttacksCheckbox.on('change', function() {
+            if (this.checked) {
+              multiAdjacentCheckbox.prop('disabled', true).prop('checked', false);
+              multiAttacksOptions.show();
+            } else {
+              multiAttacksOptions.hide();
+              const selectedAction = actionSelect.val();
+              multiAdjacentCheckbox.prop('disabled', !isValidMultiTargetAttack(selectedAction));
+            }
+          });
+
+          // Update options when action type changes
+          actionSelect.on('change', updateMultiOptions);
+          
+          // Initial update
+          updateMultiOptions();
+        }
       }).render(true);
     }
   }
