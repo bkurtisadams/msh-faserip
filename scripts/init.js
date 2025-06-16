@@ -1,11 +1,17 @@
 // In init.js
 import * as GMUtils from './gm-utils.js';
 
-Hooks.once("socketlib.ready", () => {
-  console.log("✅ socketlib.ready triggered");
-  GMUtils.registerSocket();
-  game.msh = game.msh || {};
-  game.msh.runAsGM = GMUtils.runAsGM;
+// Add a ready hook as a fallback if socketlib.ready doesn't fire properly
+Hooks.once("ready", () => {
+  if (game.modules.get("socketlib")?.active && !game.msh.runAsGM) {
+    console.log("🔄 Attempting to register SocketLib in ready hook");
+    GMUtils.registerSocket();
+    game.msh.runAsGM = GMUtils.runAsGM;
+  }
+  
+  // Initialize slam collision handlers
+  initializeSlamHandlers();
+  console.log("MSH FASERIP | Slam collision handlers initialized");
 });
 
 
@@ -20,6 +26,7 @@ import { openUniversalTableDialog } from './rolls.js';
 import { rollUniversalAction } from './rolls.js';
 import { FaseripInitiative } from './faserip-initiative.js';
 import { CombatHandler } from './combat-handler.js';
+import { initializeSlamHandlers } from './charge-damage.js';
 
 Hooks.once("init", async () => {
   console.log("FASERIP DEBUG: init hook is running!"); // <-- DEBUG CONSOLE LOG

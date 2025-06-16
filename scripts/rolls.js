@@ -28,8 +28,9 @@ function validateAdjacentTargets(attackerToken, targetTokens) {
   console.log("  Grid size (pixels):", gridSize);
   
   for (const targetToken of targetTokens) {
-    // Calculate distance in pixels
-    const distance = canvas.grid.measureDistance(attackerToken, targetToken);
+    // Calculate distance in pixels using the new API
+    const pathResult = canvas.grid.measurePath([attackerToken.center, targetToken.center]);
+    const distance = pathResult.distance;
     
     // Convert to grid squares by dividing by grid size in pixels
     const areas = distance / gridSize;
@@ -56,34 +57,40 @@ function validateAdjacentTargets(attackerToken, targetTokens) {
 
 /**
  * Check if an attack type is valid for multiple adjacent targets
- * @param {String} actionType - The action type (e.g., "Blunt Attack (BA)")
- * @returns {Boolean}
- */
-function isValidMultipleAttack(actionCode) {
-  console.log("🎯 isValidMultipleAttack called with:", actionCode);
-  const validActions = ["BA", "EA", "Sh"];
-  const result = validActions.includes(actionCode);
-  console.log("🎯 isValidMultipleAttack result:", result);
-  return result;
-}
-
-/**
- * Check if an attack type is valid for multiple attacks
- * @param {String} actionType - The action type
+ * @param {String} actionCode - The action code (e.g., "BA", "Es", "En", "Fo")
  * @returns {Boolean}
  */
 function isValidMultiTargetAttack(actionCode) {
   console.log("🎯 isValidMultiTargetAttack called with:", actionCode);
+  // Per FASERIP rules: Blunt Slugfest, Escaping, Energy and Force Powers
   const validActions = ["BA", "Es", "En", "Fo"];
   const result = validActions.includes(actionCode);
   console.log("🎯 isValidMultiTargetAttack result:", result);
   return result;
 }
 
+/**
+ * Check if an attack type is valid for multiple attacks
+ * @param {String} actionCode - The action code
+ * @returns {Boolean}
+ */
+function isValidMultipleAttack(actionCode) {
+  console.log("🎯 isValidMultipleAttack called with:", actionCode);
+  // Per FASERIP rules: Slugfest attacks and Shooting only
+  const validActions = ["BA", "EA", "Sh"]; // Slugfest (BA, EA) and Shooting (Sh)
+  const result = validActions.includes(actionCode);
+  console.log("🎯 isValidMultipleAttack result:", result);
+  return result;
+}
 
 /**
  * Generate the HTML for multiple target/attack options
  * @param {String} actionType - Current action type to validate against
+ * @returns {String} - HTML string for the options section
+ */
+/**
+ * Generate the HTML for multiple target/attack options
+ * @param {String} actionCode - Current action code to validate against
  * @returns {String} - HTML string for the options section
  */
 function generateMultiTargetOptionsHTML(actionCode) {
@@ -121,6 +128,9 @@ function generateMultiTargetOptionsHTML(actionCode) {
         <div style="font-size: 0.8em; color: #666; margin-left: 20px;">
           Targets selected: ${targetCount} | All must be adjacent to attacker
         </div>
+        <div style="font-size: 0.8em; color: #888; margin-left: 20px;">
+          Valid for: Blunt Attack, Escaping, Energy, Force
+        </div>
       </div>
     `;
   }
@@ -143,8 +153,8 @@ function generateMultiTargetOptionsHTML(actionCode) {
             3 Attacks (Amazing FEAT, -1CS each)
           </label>
         </div>
-        <div style="font-size: 0.8em; color: #666; margin-left: 20px;">
-          Valid for: Slugfest and Shooting attacks only
+        <div style="font-size: 0.8em; color: #888; margin-left: 20px;">
+          Valid for: Slugfest (Blunt, Edged) and Shooting attacks only
         </div>
       </div>
     `;
@@ -541,9 +551,24 @@ export class FaseripRolls {
         });
         await FaseripRolls._updateCurrentKarma(actor); // Update displayed karma
       }
-      // <-- NEW/MODIFIED SECTION END -->
       
+      // <-- NEW/MODIFIED SECTION END -->
+
+      // DEBUG: Log the universal table call
+      console.log("🎲 DEBUG: About to call rollUniversalTable");
+      console.log("🎲 DEBUG: effectiveRank:", effectiveRank);
+      console.log("🎲 DEBUG: cappedTotal:", cappedTotal);
+      console.log("🎲 DEBUG: Original roll:", roll.total);
+      console.log("🎲 DEBUG: Karma used:", karmaUsed);
+      console.log("🎲 DEBUG: Power rank:", powerRank);
+      console.log("🎲 DEBUG: Total column shift:", totalColumnShift);
+
       const resultColor = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
+
+      console.log("🎲 DEBUG: rollUniversalTable returned:", resultColor);
+      console.log("🎲 DEBUG: resultColor.toLowerCase():", resultColor.toLowerCase());
+
+      // Get the result text based on action type and color
 
       // Get the result text based on action type and color
       let resultText = "";
@@ -688,7 +713,13 @@ export class FaseripRolls {
                   actionType.includes("Energy") || 
                   actionType.includes("Shooting");
           
-          const baseDamage = damageCS && damageRankValue ? damageRankValue : powerValue;
+          // FIX: Blunt attacks use Strength for damage, not power value
+          let baseDamage;
+          if (actionType.includes("Blunt")) {
+            baseDamage = actor.system.abilities.strength.value || 0;
+          } else {
+            baseDamage = damageCS && damageRankValue ? damageRankValue : powerValue;
+          }
           
           await game.msh.CombatHandler.processAttack({
             attacker: actor,
@@ -873,16 +904,25 @@ export class FaseripRolls {
               const multiAttacks = html.find('[name="multiAttacks"]').is(':checked');
               const attackCount = parseInt(html.find('[name="attackCount"]:checked').val()) || 2;
 
-              // ADD THE DEBUG LOGGING RIGHT HERE:
-              console.log("=== MULTI-TARGET DEBUG ===");
+              console.log("=== DIALOG CALLBACK DEBUG ===");
               console.log("multiAdjacent:", multiAdjacent);
               console.log("multiAttacks:", multiAttacks);
               console.log("attackCount:", attackCount);
               console.log("Selected targets:", Array.from(game.user.targets).map(t => t.name));
-              console.log("========================");
+              console.log("=============================");
 
-              // Validate target selection for multiple adjacent targets
+              // Extract action code from action type
+              const actionCodeMatch = actionType.match(/\(([^)]+)\)/);
+              const actionCode = actionCodeMatch ? actionCodeMatch[1] : actionType.split(' ')[0].substring(0, 2).toUpperCase();
+              
+              // VALIDATE MULTIPLE ADJACENT TARGETS
               if (multiAdjacent) {
+                // Check if action type is valid
+                if (!isValidMultiTargetAttack(actionCode)) {
+                  ui.notifications.warn(`${actionType} cannot be used for multiple adjacent targets!`);
+                  return;
+                }
+                
                 const targetTokens = Array.from(game.user.targets);
                 if (targetTokens.length < 2) {
                   ui.notifications.warn("Multiple adjacent targets requires at least 2 targets selected!");
@@ -902,6 +942,27 @@ export class FaseripRolls {
                 }
               }
 
+              // VALIDATE MULTIPLE ATTACKS
+              if (multiAttacks) {
+                // Check if action type is valid
+                if (!isValidMultipleAttack(actionCode)) {
+                  ui.notifications.warn(`${actionType} cannot be used for multiple attacks!`);
+                  return;
+                }
+                
+                // Need at least one target
+                if (game.user.targets.size === 0) {
+                  ui.notifications.warn("Select at least one target for multiple attacks!");
+                  return;
+                }
+              }
+
+              // Mutual exclusion check
+              if (multiAdjacent && multiAttacks) {
+                ui.notifications.warn("Cannot use both multiple adjacent targets and multiple attacks at the same time!");
+                return;
+              }
+
               // Save settings if requested
               if (saveSettings) {
                 await power.setFlag("msh-faserip", "lastActionType", actionType);
@@ -909,6 +970,19 @@ export class FaseripRolls {
                 await power.setFlag("msh-faserip", "lastDamageCS", damageCS);
                 await power.setFlag("msh-faserip", "lastDamageType", damageType);
                 await power.setFlag("msh-faserip", "skipDiceRoll", skipDice);
+              }
+
+              // Handle multiple attacks first (requires Fighting FEAT)
+              if (multiAttacks) {
+                return await processMultipleAttackSequence(actor, power, {
+                  actionType,
+                  columnShift,
+                  damageCS,
+                  damageType,
+                  karma,
+                  skipDice,
+                  attackCount
+                });
               }
 
               // Call this method again but with the gathered options
@@ -934,59 +1008,64 @@ export class FaseripRolls {
           const actionSelect = html.find('#action');
           const multiAdjacentCheckbox = html.find('#multi-adjacent');
           const multiAttacksCheckbox = html.find('#multi-attacks');
-          const multiAdjacentNote = html.find('#multi-adjacent-note');
-          const multiAttacksNote = html.find('#multi-attacks-note');
           const multiAttacksOptions = html.find('#multi-attacks-options');
 
           // Function to update option availability based on action type
           function updateMultiOptions() {
             const selectedAction = actionSelect.val();
             
+            // Extract action code from the selected action
+            const actionCodeMatch = selectedAction.match(/\(([^)]+)\)/);
+            const actionCode = actionCodeMatch ? actionCodeMatch[1] : selectedAction.split(' ')[0].substring(0, 2).toUpperCase();
+            
+            console.log("🎨 updateMultiOptions called with action:", selectedAction, "code:", actionCode);
+            
             // Check if action is valid for multiple adjacent targets
-            const validMultiTarget = isValidMultiTargetAttack(selectedAction);
+            const validMultiTarget = isValidMultiTargetAttack(actionCode);
+            const validMultiAttack = isValidMultipleAttack(actionCode);
+            
+            console.log("🎨 validMultiTarget:", validMultiTarget);
+            console.log("🎨 validMultiAttack:", validMultiAttack);
+            
             multiAdjacentCheckbox.prop('disabled', !validMultiTarget);
             if (!validMultiTarget) {
               multiAdjacentCheckbox.prop('checked', false);
-              multiAdjacentNote.hide();
             }
             
-            // Check if action is valid for multiple attacks
-            const validMultiAttack = isValidMultipleAttack(selectedAction);
             multiAttacksCheckbox.prop('disabled', !validMultiAttack);
             if (!validMultiAttack) {
               multiAttacksCheckbox.prop('checked', false);
               multiAttacksOptions.hide();
-              multiAttacksNote.hide();
-            }
-            
-            // Show/hide notes based on validity
-            if (validMultiTarget) {
-              multiAdjacentNote.show();
-            }
-            if (validMultiAttack) {
-              multiAttacksNote.show();
             }
           }
 
           // Mutual exclusion: if one is checked, disable the other
           multiAdjacentCheckbox.on('change', function() {
+            console.log("🎨 multiAdjacent checkbox changed:", this.checked);
             if (this.checked) {
               multiAttacksCheckbox.prop('disabled', true).prop('checked', false);
               multiAttacksOptions.hide();
             } else {
               const selectedAction = actionSelect.val();
-              multiAttacksCheckbox.prop('disabled', !isValidMultipleAttack(selectedAction));
+              const actionCodeMatch = selectedAction.match(/\(([^)]+)\)/);
+              const actionCode = actionCodeMatch ? actionCodeMatch[1] : selectedAction.split(' ')[0].substring(0, 2).toUpperCase();
+              const validMultiAttack = isValidMultipleAttack(actionCode);
+              multiAttacksCheckbox.prop('disabled', !validMultiAttack);
             }
           });
 
           multiAttacksCheckbox.on('change', function() {
+            console.log("🎨 multiAttacks checkbox changed:", this.checked);
             if (this.checked) {
               multiAdjacentCheckbox.prop('disabled', true).prop('checked', false);
               multiAttacksOptions.show();
             } else {
               multiAttacksOptions.hide();
               const selectedAction = actionSelect.val();
-              multiAdjacentCheckbox.prop('disabled', !isValidMultiTargetAttack(selectedAction));
+              const actionCodeMatch = selectedAction.match(/\(([^)]+)\)/);
+              const actionCode = actionCodeMatch ? actionCodeMatch[1] : selectedAction.split(' ')[0].substring(0, 2).toUpperCase();
+              const validMultiTarget = isValidMultiTargetAttack(actionCode);
+              multiAdjacentCheckbox.prop('disabled', !validMultiTarget);
             }
           });
 
@@ -3500,7 +3579,7 @@ async function processUniversalActionTarget(actor, target, actionCode, resultCol
     console.log(`🎯 DEBUG: Skipping damage - result was white (miss)`);
     return; // Should exit early for misses
   }
-  
+
   // This is the existing target processing logic from rollUniversalAction
   const damageTypeMap = {
     BA: "Physical-Blunt", EA: "Physical-Edged", Sh: "Physical-Shooting",
@@ -3557,8 +3636,17 @@ async function processUniversalActionTarget(actor, target, actionCode, resultCol
  * @param {Object} options - Additional options
  * @returns {Array} - Array of attack results
  */
-async function processMultipleAttackSequence(actor, attackData, attackCount, options = {}) {
-  console.log(`Starting multiple attack sequence: ${attackCount} attacks`);
+/**
+ * Process multiple attacks with Fighting FEAT and CS penalties
+ * @param {Actor} actor - The attacking actor
+ * @param {Item} power - The power being used
+ * @param {Object} options - Attack options
+ * @returns {Array} - Array of attack results
+ */
+async function processMultipleAttackSequence(actor, power, options) {
+  const { attackCount, actionType } = options;
+  
+  console.log(`Starting multiple attack sequence: ${attackCount} attacks with ${power.name}`);
   
   // First, roll the Fighting FEAT
   const featResult = await game.msh.CombatHandler.rollMultipleAttackFeat(actor, attackCount);
@@ -3572,13 +3660,31 @@ async function processMultipleAttackSequence(actor, attackData, attackCount, opt
     // Failed FEAT: Single attack at -3CS
     console.log("Fighting FEAT failed - single attack with -3CS penalty");
     
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor }),
+      content: `
+        <div style="background-color: #ffebee; border: 1px solid #f44336; border-radius: 3px; padding: 8px; margin: 5px 0;">
+          <div style="color: #d32f2f; font-weight: bold; margin-bottom: 5px;">Multiple Attack Failed</div>
+          <div style="font-size: 0.9em;">
+            <div>${actor.name} failed the Fighting FEAT for ${attackCount} attacks.</div>
+            <div>Result: Single attack only, at -3CS penalty.</div>
+          </div>
+        </div>
+      `
+    });
+    
     // Apply -3CS penalty and make single attack
-    const penalizedAttackData = {
-      ...attackData,
-      sourceName: `${attackData.sourceName} (Failed Multiple Attack)`
+    const modifiedOptions = {
+      ...options,
+      columnShift: options.columnShift - 3,
+      multiAttacks: false,
+      attackCount: 1
     };
     
-    return [await makeSingleAttackWithPenalty(actor, penalizedAttackData, -3, options)];
+    return [await FaseripRolls.rollPower(actor, power, {
+      useDirectRoll: true,
+      ...modifiedOptions
+    })];
   }
   
   // Success: Multiple attacks at -1CS each
@@ -3590,10 +3696,18 @@ async function processMultipleAttackSequence(actor, attackData, attackCount, opt
   for (let i = 1; i <= attackCount; i++) {
     console.log(`Making attack ${i} of ${attackCount}`);
     
-    const attackResult = await makeSingleAttackWithPenalty(actor, {
-      ...attackData,
-      sourceName: `${attackData.sourceName} (Attack ${i}/${attackCount})`
-    }, -1, { ...options, attackNumber: i, totalAttacks: attackCount });
+    // Each attack gets -1CS penalty
+    const attackOptions = {
+      ...options,
+      columnShift: options.columnShift - 1,
+      multiAttacks: false, // Prevent recursion
+      attackCount: 1
+    };
+    
+    const attackResult = await FaseripRolls.rollPower(actor, power, {
+      useDirectRoll: true,
+      ...attackOptions
+    });
     
     results.push(attackResult);
     
@@ -3610,7 +3724,7 @@ async function processMultipleAttackSequence(actor, attackData, attackCount, opt
       <div style="background-color: #e8f5e8; border: 1px solid #4caf50; border-radius: 3px; padding: 8px; margin: 5px 0;">
         <div style="color: #2e7d32; font-weight: bold; margin-bottom: 5px;">Multiple Attack Sequence Complete</div>
         <div style="font-size: 0.9em;">
-          <div>${actor.name} completed ${attackCount} attacks.</div>
+          <div>${actor.name} completed ${attackCount} attacks with ${power.name}.</div>
           <div>Each attack was made at -1CS due to multiple attack rules.</div>
         </div>
       </div>
@@ -3684,11 +3798,3 @@ async function handleCombatEffect({ actor, target, actionType, resultColor, sour
     originalRollResult: resultColor.toLowerCase()
   });
 }
-
-// 4. OPTIONAL ENHANCEMENT: Add the helper function call after karma logging
-// In each function where karma is logged, you can add this line after 
-// await actor.update({ "system.karma.history": history });
-// 
-// await FaseripRolls._updateCurrentKarma(actor);
-//
-// This will immediately update the current karma display for players.

@@ -1,3 +1,12 @@
+// combat-handler.js
+import { 
+    calculateChargeDamage, 
+    calculateSlamDamage, 
+    getGrandSlamDistance,
+    processChargeAttack,
+    initializeSlamHandlers  // Add this
+} from './charge-damage.js';
+
 // location: systems/msh-faserip/scripts/combat-handler.js
 const ACTION_RESULT_LABELS = {
   BA: { white: "Miss", green: "Hit", yellow: "Slam", red: "Stun" },
@@ -312,87 +321,78 @@ export class CombatHandler {
 
     // 7. Handle Secondary Effects - USE modifiedCanBeSlam instead of canBeSlam
     let secondaryEffectResult = "";
-    if (netDamage > 0 && !willReachZeroHealth) { // BUT ONLY if target won't reach 0 Health
-        if (damageType.toLowerCase().includes("blunt")) {
-            if (originalRollResult.toLowerCase() === "yellow" && modifiedCanBeSlam) { // FIXED
-                secondaryEffectResult = await this.rollSecondaryFeat(target, "Slam", sourceName);
-                chatContent += `<p><strong>Slam Check:</strong> ${secondaryEffectResult}</p>`;
-            } else if (originalRollResult.toLowerCase() === "red" && canBeStun) {
-                secondaryEffectResult = await this.rollSecondaryFeat(target, "Stun", sourceName);
-                chatContent += `<p><strong>Stun Check:</strong> ${secondaryEffectResult}</p>`;
+        if (netDamage > 0 && !willReachZeroHealth) { // BUT ONLY if target won't reach 0 Health
+            if (damageType.toLowerCase().includes("blunt")) {
+                if (originalRollResult.toLowerCase() === "yellow" && modifiedCanBeSlam) {
+                    secondaryEffectResult = await this.rollSecondaryFeat(target, "Slam", sourceName, damageType, attacker);
+                    chatContent += `<p><strong>Slam Check:</strong> ${secondaryEffectResult}</p>`;
+                } else if (originalRollResult.toLowerCase() === "red" && canBeStun) {
+                    secondaryEffectResult = await this.rollSecondaryFeat(target, "Stun", sourceName, damageType, attacker);
+                    chatContent += `<p><strong>Stun Check:</strong> ${secondaryEffectResult}</p>`;
+                }
+            } else if (damageType.toLowerCase().includes("edged")) {
+                // Edged attack effects
+                if (originalRollResult.toLowerCase() === "yellow" && canBeStun) {
+                    secondaryEffectResult = await this.rollSecondaryFeat(target, "Stun", sourceName, damageType, attacker);
+                    chatContent += `<p><strong>Stun Check:</strong> ${secondaryEffectResult}</p>`;
+                } else if (originalRollResult.toLowerCase() === "red" && canBeKill) {
+                    secondaryEffectResult = await this.rollSecondaryFeat(target, "Kill", sourceName, damageType, attacker);
+                    chatContent += `<p><strong>Kill Check:</strong> ${secondaryEffectResult}</p>`;
+                }
+            } else if (damageType.toLowerCase().includes("energy")) {
+                // Energy attack effects
+                if (originalRollResult.toLowerCase() === "yellow" && canBeStun) {
+                    secondaryEffectResult = await this.rollSecondaryFeat(target, "Stun", sourceName, damageType, attacker);
+                    chatContent += `<p><strong>Stun Check:</strong> ${secondaryEffectResult}</p>`;
+                } else if (originalRollResult.toLowerCase() === "red" && canBeKill) {
+                    secondaryEffectResult = await this.rollSecondaryFeat(target, "Kill", sourceName, damageType, attacker);
+                    chatContent += `<p><strong>Kill Check:</strong> ${secondaryEffectResult}</p>`;
+                }
+            } else if (damageType.toLowerCase().includes("force")) {
+                // Force attack effects
+                if (originalRollResult.toLowerCase() === "yellow" && canBeStun) {
+                    secondaryEffectResult = await this.rollSecondaryFeat(target, "Stun", sourceName, damageType, attacker);
+                    chatContent += `<p><strong>Stun Check:</strong> ${secondaryEffectResult}</p>`;
+                } else if (originalRollResult.toLowerCase() === "red" && canBeStun) {
+                    secondaryEffectResult = await this.rollSecondaryFeat(target, "Stun", sourceName, damageType, attacker);
+                    chatContent += `<p><strong>Stun Check:</strong> ${secondaryEffectResult}</p>`;
+                }
+            } else if (damageType.toLowerCase().includes("shooting")) {
+                // Shooting attack effects
+                if (originalRollResult.toLowerCase() === "yellow" && canBeSlam) {
+                    secondaryEffectResult = await this.rollSecondaryFeat(target, "Slam", sourceName, damageType, attacker);
+                    chatContent += `<p><strong>Bullseye/Slam Check:</strong> ${secondaryEffectResult}</p>`;
+                } else if (originalRollResult.toLowerCase() === "red" && canBeKill) {
+                    secondaryEffectResult = await this.rollSecondaryFeat(target, "Kill", sourceName, damageType, attacker);
+                    chatContent += `<p><strong>Kill Check:</strong> ${secondaryEffectResult}</p>`;
+                }
             }
-        } else if (damageType.toLowerCase().includes("edged")) {
-            // Edged attack effects
-            if (originalRollResult.toLowerCase() === "yellow" && canBeStun) {
-                // Yellow result for Edged typically results in Stun
-                secondaryEffectResult = await this.rollSecondaryFeat(target, "Stun", sourceName);
-                chatContent += `<p><strong>Stun Check:</strong> ${secondaryEffectResult}</p>`;
-            } else if (originalRollResult.toLowerCase() === "red" && canBeKill) {
-                // Red result for Edged typically results in Kill
-                secondaryEffectResult = await this.rollSecondaryFeat(target, "Kill", sourceName);
-                chatContent += `<p><strong>Kill Check:</strong> ${secondaryEffectResult}</p>`;
-            }
-        } else if (damageType.toLowerCase().includes("energy")) {
-            // Energy attack effects
-            if (originalRollResult.toLowerCase() === "yellow" && canBeStun) {
-                // Yellow result for Energy typically results in Stun
-                secondaryEffectResult = await this.rollSecondaryFeat(target, "Stun", sourceName);
-                chatContent += `<p><strong>Stun Check:</strong> ${secondaryEffectResult}</p>`;
-            } else if (originalRollResult.toLowerCase() === "red" && canBeKill) {
-                // Red result for Energy typically results in Kill
-                secondaryEffectResult = await this.rollSecondaryFeat(target, "Kill", sourceName);
-                chatContent += `<p><strong>Kill Check:</strong> ${secondaryEffectResult}</p>`;
-            }
-        } else if (damageType.toLowerCase().includes("force")) {
-            // Force attack effects
-            if (originalRollResult.toLowerCase() === "yellow" && canBeStun) {
-                // Yellow result for Force typically results in Stun
-                secondaryEffectResult = await this.rollSecondaryFeat(target, "Stun", sourceName);
-                chatContent += `<p><strong>Stun Check:</strong> ${secondaryEffectResult}</p>`;
-            } else if (originalRollResult.toLowerCase() === "red" && canBeStun) {
-                // Red result for Force typically results in Stun as well
-                secondaryEffectResult = await this.rollSecondaryFeat(target, "Stun", sourceName);
-                chatContent += `<p><strong>Stun Check:</strong> ${secondaryEffectResult}</p>`;
-            }
-        } else if (damageType.toLowerCase().includes("shooting")) {
-            // Shooting attack effects
-            if (originalRollResult.toLowerCase() === "yellow" && canBeSlam) {
-                // Yellow result for Shooting typically results in Bullseye
-                // Often treated as Slam in implementations
-                secondaryEffectResult = await this.rollSecondaryFeat(target, "Slam", sourceName);
-                chatContent += `<p><strong>Bullseye/Slam Check:</strong> ${secondaryEffectResult}</p>`;
-            } else if (originalRollResult.toLowerCase() === "red" && canBeKill) {
-                // Red result for Shooting typically results in Kill
-                secondaryEffectResult = await this.rollSecondaryFeat(target, "Kill", sourceName);
-                chatContent += `<p><strong>Kill Check:</strong> ${secondaryEffectResult}</p>`;
-            }
+        } else if (netDamage > 0 && willReachZeroHealth) {
+            chatContent += `<p>Target reduced to 0 Health - unconsciousness supersedes other effects.</p>`;
+        } else if ((canBeStun && (originalRollResult.toLowerCase() === "yellow" || originalRollResult.toLowerCase() === "red")) ||
+                    (canBeSlam && originalRollResult.toLowerCase() === "yellow") ||
+                    (canBeKill && originalRollResult.toLowerCase() === "red")) {
+            chatContent += `<p>No damage inflicted; secondary effects (Stun/Slam/Kill) are negated.</p>`;
         }
-    } else if (netDamage > 0 && willReachZeroHealth) {
-        chatContent += `<p>Target reduced to 0 Health - unconsciousness supersedes other effects.</p>`;
-    } else if ( (canBeStun && (originalRollResult.toLowerCase() === "yellow" || originalRollResult.toLowerCase() === "red")) ||
-                (canBeSlam && originalRollResult.toLowerCase() === "yellow") ||
-                (canBeKill && originalRollResult.toLowerCase() === "red") ) {
-        chatContent += `<p>No damage inflicted; secondary effects (Stun/Slam/Kill) are negated.</p>`;
+
+        await ChatMessage.create({
+            speaker: ChatMessage.getSpeaker({actor: attacker}),
+            content: chatContent
+            // You might want to whisper this to GM and target or make it public
+        });
+
+        // 6. Check for Unconsciousness / Death if Health is 0
+        if (newHealth <= 0) {
+            const isLethalDamage = 
+                damageType.toLowerCase().includes("energy") || 
+                damageType.toLowerCase().includes("edged") || 
+                damageType.toLowerCase().includes("shooting");
+                
+            await this.handleZeroHealth(target, attacker, isLethalDamage);
+        }
+
+        console.log("CombatHandler.processAttack completed");
     }
-
-    await ChatMessage.create({
-        speaker: ChatMessage.getSpeaker({actor: attacker}),
-        content: chatContent
-        // You might want to whisper this to GM and target or make it public
-    });
-
-    // 6. Check for Unconsciousness / Death if Health is 0
-    if (newHealth <= 0) {
-        const isLethalDamage = 
-            damageType.toLowerCase().includes("energy") || 
-            damageType.toLowerCase().includes("edged") || 
-            damageType.toLowerCase().includes("shooting");
-            
-        await this.handleZeroHealth(target, attacker, isLethalDamage);
-    }
-
-    console.log("CombatHandler.processAttack completed"); 
-}
 
     /**
      * Process multiple attacks (2-3 attacks with Fighting FEAT)
@@ -1459,7 +1459,7 @@ export class CombatHandler {
      * Rolls an Endurance FEAT for Stun, Slam, or Kill.
      * @returns {String} Text result of the FEAT.
      */
-    static async rollSecondaryFeat(target, featType, sourceName, attackType = "unknown") {
+    static async rollSecondaryFeat(target, featType, sourceName, attackType = "unknown", attacker = null) {
         // Get the endurance rank for the save
         const enduranceRank = target.system.abilities.endurance.rank;
         
@@ -1767,35 +1767,33 @@ export class CombatHandler {
                             // =========================
                             else if (featType === "Slam") {
                                 if (featResultText === "Gr. Slam") {
-                                    // Grand Slam distance is based on attacker's Strength rank (per FASERIP rules)
-                                    // This function needs access to the attacker - we should pass it in the function parameters
-                                    // For now, use a lookup table based on common strength ranks
+                                    // Get attacker's strength rank for distance calculation
+                                    let attackerStrengthRank = "Remarkable"; // Default fallback
+                                    let attackerStrengthValue = 30; // Remarkable default
                                     
-                                    // Note: This would be better if we passed the attacker as a parameter
-                                    // The exact distance depends on the attacker's Strength rank:
-                                    const strengthToDistance = {
-                                        "Feeble": 1, "Poor": 2, "Typical": 3, "Good": 4, "Excellent": 5,
-                                        "Remarkable": 6, "Incredible": 7, "Amazing": 8, "Monstrous": 9,
-                                        "Unearthly": 10, "Shift X": 12, "Shift Y": 14, "Shift Z": 16,
-                                        "Class 1000": 32, "Class 3000": 50, "Class 5000": 100
-                                    };
+                                    if (attacker) {
+                                        attackerStrengthRank = attacker.system.abilities.strength.rank || "Remarkable";
+                                        attackerStrengthValue = attacker.system.abilities.strength.value || 30;
+                                    }
                                     
-                                    // Default to moderate distance if we can't determine attacker strength
-                                    const slamDistance = 6; // Remarkable strength default
+                                    // Calculate actual slam distance based on attacker's strength
+                                    const slamDistance = getGrandSlamDistance(attackerStrengthRank);
                                     
                                     ui.notifications.warn(`${target.name} suffers a Grand Slam - knocked away ${slamDistance} areas!`);
                                     
-                                    // Apply Grand Slam effect
+                                    // Apply Grand Slam effect with proper distance
                                     await game.msh.runAsGM({
-                                        operation: "createEffect",
+                                        operation: "createEmbeddedDocuments",
                                         targetActorUuid: target.uuid,
-                                        effectData: [{
+                                        args: ["ActiveEffect", [{
                                             name: "Grand Slam",
                                             icon: "icons/svg/explosion.svg",
                                             flags: {
                                                 "msh-faserip": {
                                                     grandSlam: true,
-                                                    distance: slamDistance
+                                                    distance: slamDistance,
+                                                    attackerStrength: attackerStrengthRank,
+                                                    slamSpeed: slamDistance // Speed equals distance for Grand Slam
                                                 }
                                             },
                                             changes: [
@@ -1811,9 +1809,10 @@ export class CombatHandler {
                                                 startRound: game.combat?.round || 0
                                             },
                                             statuses: ["prone"]
-                                        }]
+                                        }]]
                                     });
                                     
+                                    // Create the Grand Slam chat message
                                     await ChatMessage.create({
                                         content: `
                                         <div style="background-color: #8B0000; color: white; padding: 10px; border-radius: 5px; margin: 5px 0;">
@@ -1823,20 +1822,30 @@ export class CombatHandler {
                                             <div style="padding: 5px; font-size: 0.9em;">
                                                 <div><strong>${target.name}</strong> is launched away with tremendous force!</div>
                                                 <div style="margin: 5px 0;"><strong>Mechanical Effects:</strong></div>
-                                                <div>• Knocked away distance = attacker's Strength rank</div>
-                                                <div>• Estimated distance: ${slamDistance} areas</div>
-                                                <div>• Speed equals attacker's Strength as ground speed</div>
-                                                <div>• Takes charging damage if hits obstacles</div>
+                                                <div>• Attacker Strength: ${attackerStrengthRank} (${attackerStrengthValue})</div>
+                                                <div>• Knockback Distance: ${slamDistance} areas</div>
+                                                <div>• Launch Speed: ${slamDistance} areas/round</div>
+                                                <div>• Direction: ${attacker ? attacker.name + ' chooses' : 'GM chooses'} (if damage dealt)</div>
+                                                <div style="margin-top: 8px;"><strong>Collision Damage:</strong></div>
+                                                <div>• If target hits obstacle: charging damage applies</div>
                                                 <div>• Buildings reduce knockback per movement rules</div>
-                                                <div>• Direction: attacker chooses (if damage dealt)</div>
-                                                <div style="margin-top: 8px; font-style: italic; font-size: 0.8em;">
-                                                    Note: Exact distance depends on attacker's Strength rank
-                                                </div>
+                                                <div>• Target takes slam damage if hitting walls/objects</div>
+                                            </div>
+                                            <div style="margin-top: 10px; text-align: center;">
+                                                <button class="calculate-slam-collision" 
+                                                        data-target="${target.uuid}" 
+                                                        data-distance="${slamDistance}" 
+                                                        data-speed="${slamDistance}"
+                                                        data-attacker-strength="${attackerStrengthValue}"
+                                                        style="background: #dc3545; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer;">
+                                                    Calculate Collision Damage
+                                                </button>
                                             </div>
                                         </div>
                                         `,
                                         speaker: ChatMessage.getSpeaker({ alias: "Slam Effect" })
                                     });
+                                    
                                     effectApplied = true;
                                     
                                 } else if (featResultText === "1 area") {
@@ -2282,7 +2291,159 @@ export class CombatHandler {
             args: ["ActiveEffect", [dyingEffect]]
             });
     }
+
+    /**
+     * Helper function to get body armor value from an actor
+     * @param {Actor} actor - The actor to check
+     * @returns {Number} - Body armor value
+     */
+    static getBodyArmorValue(actor) {
+        // Check for body armor equipment
+        const armorItems = actor.items.filter(i => 
+            i.type === "equipment" && 
+            i.system.category === "armor" && 
+            i.system.protection
+        );
+        
+        let bodyArmorValue = 0;
+        
+        if (armorItems.length > 0) {
+            const bestArmor = armorItems.reduce((best, current) => {
+                const bestValue = CONFIG.FASERIP?.rankValues?.[best.system.protection] || 0;
+                const currentValue = CONFIG.FASERIP?.rankValues?.[current.system.protection] || 0;
+                return currentValue > bestValue ? current : best;
+            });
+            
+            bodyArmorValue = CONFIG.FASERIP?.rankValues?.[bestArmor.system.protection] || 0;
+        }
+
+        // Check for Body Armor powers
+        const bodyArmorPower = actor.items.find(i => 
+            i.type === "power" && 
+            (i.name.toLowerCase().includes("body armor") || 
+            i.name.toLowerCase().includes("armor") ||
+            i.system.type?.toLowerCase().includes("body armor"))
+        );
+        
+        if (bodyArmorPower) {
+            const powerValue = CONFIG.FASERIP?.rankValues?.[bodyArmorPower.system.rank] || 0;
+            bodyArmorValue = Math.max(bodyArmorValue, powerValue);
+        }
+
+        return bodyArmorValue;
+    }
 }
+
+// Add event listener for collision damage calculation
+Hooks.on("renderChatMessage", (app, html, data) => {
+    html.find('.calculate-slam-collision').on('click', async function() {
+        const targetUuid = this.dataset.target;
+        const slamDistance = parseInt(this.dataset.distance);
+        const slamSpeed = parseInt(this.dataset.speed);
+        const attackerStrength = parseInt(this.dataset.attackerStrength);
+        
+        const targetActor = await fromUuid(targetUuid);
+        if (!targetActor) {
+            ui.notifications.error("Target actor not found!");
+            return;
+        }
+        
+        // Show dialog to get obstacle material strength
+        new Dialog({
+            title: "Slam Collision Damage",
+            content: `
+                <div style="background: #f0e8d8; padding: 10px; border-radius: 5px;">
+                    <p><strong>${targetActor.name}</strong> was slammed ${slamDistance} areas and hits an obstacle!</p>
+                    <div style="margin: 10px 0;">
+                        <label style="display: block; margin-bottom: 5px;">Obstacle Material Strength:</label>
+                        <select id="material-strength" style="width: 100%;">
+                            <option value="2">Feeble (Cardboard, Glass)</option>
+                            <option value="4">Poor (Wood, Plastic)</option>
+                            <option value="6" selected>Typical (Brick Wall)</option>
+                            <option value="10">Good (Stone Wall)</option>
+                            <option value="20">Excellent (Steel Wall)</option>
+                            <option value="30">Remarkable (Reinforced Steel)</option>
+                            <option value="40">Incredible (Super-Strong Material)</option>
+                            <option value="50">Amazing (Nearly Indestructible)</option>
+                            <option value="75">Monstrous (Extremely Durable)</option>
+                            <option value="100">Unearthly (Virtually Indestructible)</option>
+                        </select>
+                    </div>
+                    <div style="margin-top: 10px; padding: 8px; background: #f9f9f9; border-radius: 3px; font-size: 0.9em;">
+                        <strong>Slam Parameters:</strong><br>
+                        • Distance: ${slamDistance} areas<br>
+                        • Speed: ${slamSpeed} areas/round<br>
+                        • Attacker Strength: ${attackerStrength}
+                    </div>
+                </div>
+            `,
+            buttons: {
+                calculate: {
+                    icon: '<i class="fas fa-calculator"></i>',
+                    label: "Calculate Damage",
+                    callback: async (html) => {
+                        const materialStrength = parseInt(html.find('#material-strength').val());
+                        
+                        // Calculate slam damage using the new function
+                        const slamResults = calculateSlamDamage({
+                            characterEndurance: targetActor.system.abilities.endurance.value || 0,
+                            characterBodyArmor: CombatHandler.getBodyArmorValue ? 
+                                CombatHandler.getBodyArmorValue(targetActor) : 0,
+                            objectMaterialStrength: materialStrength,
+                            slamSpeed: slamSpeed,
+                            attackerStrength: attackerStrength
+                        });
+                        
+                        // Create detailed damage report
+                        await ChatMessage.create({
+                            speaker: ChatMessage.getSpeaker({ alias: "Collision Damage" }),
+                            content: `
+                                <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
+                                    <div style="padding: 5px 10px; border-bottom: 1px solid #c0c0c0; font-size: 1.1em; color: #8b0000;">
+                                        <strong>Slam Collision: ${targetActor.name} hits obstacle</strong>
+                                    </div>
+                                    <div style="padding: 5px 10px; font-size: 0.9em;">
+                                        <div><strong>Slam Speed:</strong> ${slamSpeed} areas/round</div>
+                                        <div><strong>Material Strength:</strong> ${materialStrength}</div>
+                                        <div><strong>Character Endurance:</strong> ${targetActor.system.abilities.endurance.value || 0}</div>
+                                        <div><strong>Damage Calculation:</strong> ${slamResults.description}</div>
+                                        ${slamResults.damageToCharacter > 0 ? 
+                                            `<div style="color: #cc0000;"><strong>Damage to ${targetActor.name}:</strong> ${slamResults.damageToCharacter}</div>` : 
+                                            '<div style="color: #28a745;"><strong>No damage taken</strong></div>'
+                                        }
+                                    </div>
+                                </div>
+                            `
+                        });
+                        
+                        // Apply damage if any
+                        if (slamResults.damageToCharacter > 0) {
+                            const currentHealth = targetActor.system.attributes.health.value;
+                            const newHealth = Math.max(0, currentHealth - slamResults.damageToCharacter);
+                            
+                            await game.msh.runAsGM({
+                                operation: 'adjustTargetHealth',
+                                targetActorUuid: targetActor.uuid,
+                                newHealth: newHealth
+                            });
+                            
+                            ui.notifications.info(`${targetActor.name} takes ${slamResults.damageToCharacter} collision damage!`);
+                        }
+                        
+                        // Disable the button to prevent multiple calculations
+                        $(this).prop('disabled', true).text('Damage Calculated');
+                    }
+                },
+                cancel: {
+                    icon: '<i class="fas fa-times"></i>',
+                    label: "Cancel"
+                }
+            },
+            default: "calculate"
+        }).render(true);
+    });
+});
+
 
 // Make it available globally for now, or import where needed
 //game.msh.CombatHandler = CombatHandler;
