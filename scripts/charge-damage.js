@@ -410,6 +410,11 @@ export function initializeSlamHandlers() {
                             
                             // Disable the button to prevent multiple calculations
                             $(this).prop('disabled', true).text('Damage Calculated');
+
+                            // Close the dialog after a short delay
+                            setTimeout(() => {
+                                $(this).closest('.dialog').find('.header-button.close').click();
+                            }, 1500);
                         }
                     },
                     cancel: {

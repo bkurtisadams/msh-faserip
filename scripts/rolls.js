@@ -654,7 +654,13 @@ export class FaseripRolls {
                     actionType.includes("Energy") || 
                     actionType.includes("Shooting");
             
-            const baseDamage = damageCS && damageRankValue ? damageRankValue : powerValue;
+            //const baseDamage = damageCS && damageRankValue ? damageRankValue : powerValue;
+            let baseDamage;
+            if (actionType.includes("Blunt")) {
+              baseDamage = actor.system.abilities.strength.value || 0;
+            } else {
+              baseDamage = damageCS && damageRankValue ? damageRankValue : powerValue;
+            }
             
             await game.msh.CombatHandler.processAttack({
               attacker: actor,
