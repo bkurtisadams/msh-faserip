@@ -1235,15 +1235,34 @@ export class CombatHandler {
             i.system.category === "armor" && 
             i.system.protection
         );
-        
+
         if (armorItems.length > 0) {
             const bestArmor = armorItems.reduce((best, current) => {
-                const bestValue = CONFIG.FASERIP?.rankValues?.[best.system.protection] || 0;
-                const currentValue = CONFIG.FASERIP?.rankValues?.[current.system.protection] || 0;
+                // Handle both numeric values and rank names
+                let bestValue = 0;
+                let currentValue = 0;
+                
+                if (typeof best.system.protection === 'number') {
+                    bestValue = best.system.protection;
+                } else {
+                    bestValue = CONFIG.FASERIP?.rankValues?.[best.system.protection] || 0;
+                }
+                
+                if (typeof current.system.protection === 'number') {
+                    currentValue = current.system.protection;
+                } else {
+                    currentValue = CONFIG.FASERIP?.rankValues?.[current.system.protection] || 0;
+                }
+                
                 return currentValue > bestValue ? current : best;
             });
             
-            defenses.bodyArmorValue = CONFIG.FASERIP?.rankValues?.[bestArmor.system.protection] || 0;
+            // Set the body armor value, handling both numeric and rank name formats
+            if (typeof bestArmor.system.protection === 'number') {
+                defenses.bodyArmorValue = bestArmor.system.protection;
+            } else {
+                defenses.bodyArmorValue = CONFIG.FASERIP?.rankValues?.[bestArmor.system.protection] || 0;
+            }
             defenses.usedBodyArmor = true;
         }
 
@@ -1251,12 +1270,19 @@ export class CombatHandler {
         const bodyArmorPower = target.items.find(i => 
             i.type === "power" && 
             (i.name.toLowerCase().includes("body armor") || 
-             i.name.toLowerCase().includes("armor") ||
-             i.system.type?.toLowerCase().includes("body armor"))
+            i.name.toLowerCase().includes("armor") ||
+            i.system.type?.toLowerCase().includes("body armor"))
         );
-        
+
         if (bodyArmorPower) {
-            const powerValue = CONFIG.FASERIP?.rankValues?.[bodyArmorPower.system.rank] || 0;
+            // Handle both numeric values and rank names for powers too
+            let powerValue = 0;
+            if (typeof bodyArmorPower.system.value === 'number') {
+                powerValue = bodyArmorPower.system.value;
+            } else {
+                powerValue = CONFIG.FASERIP?.rankValues?.[bodyArmorPower.system.rank] || 0;
+            }
+            
             if (powerValue > defenses.bodyArmorValue) {
                 defenses.bodyArmorValue = powerValue;
                 defenses.usedBodyArmor = true;

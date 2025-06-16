@@ -269,6 +269,8 @@ export async function processChargeAttack(attackData) {
  * @returns {Number} - Body armor value
  */
 function getBodyArmorValue(actor) {
+    console.log(`🛡️ DEBUG: Getting body armor for ${actor.name}`);
+    
     // Check for body armor equipment
     const armorItems = actor.items.filter(i => 
         i.type === "equipment" && 
@@ -276,16 +278,39 @@ function getBodyArmorValue(actor) {
         i.system.protection
     );
     
+    console.log(`🛡️ DEBUG: Found ${armorItems.length} armor items:`, armorItems.map(i => `${i.name} (${i.system.protection})`));
+    
     let bodyArmorValue = 0;
     
     if (armorItems.length > 0) {
         const bestArmor = armorItems.reduce((best, current) => {
-            const bestValue = CONFIG.FASERIP?.rankValues?.[best.system.protection] || 0;
-            const currentValue = CONFIG.FASERIP?.rankValues?.[current.system.protection] || 0;
+            // Handle both numeric values and rank names
+            let bestValue = 0;
+            let currentValue = 0;
+            
+            if (typeof best.system.protection === 'number') {
+                bestValue = best.system.protection;
+            } else {
+                bestValue = CONFIG.FASERIP?.rankValues?.[best.system.protection] || 0;
+            }
+            
+            if (typeof current.system.protection === 'number') {
+                currentValue = current.system.protection;
+            } else {
+                currentValue = CONFIG.FASERIP?.rankValues?.[current.system.protection] || 0;
+            }
+            
+            console.log(`🛡️ DEBUG: Comparing armor - ${best.name} (${best.system.protection}=${bestValue}) vs ${current.name} (${current.system.protection}=${currentValue})`);
             return currentValue > bestValue ? current : best;
         });
         
-        bodyArmorValue = CONFIG.FASERIP?.rankValues?.[bestArmor.system.protection] || 0;
+        // Set the body armor value, handling both numeric and rank name formats
+        if (typeof bestArmor.system.protection === 'number') {
+            bodyArmorValue = bestArmor.system.protection;
+        } else {
+            bodyArmorValue = CONFIG.FASERIP?.rankValues?.[bestArmor.system.protection] || 0;
+        }
+        console.log(`🛡️ DEBUG: Best equipment armor: ${bestArmor.name} with protection ${bestArmor.system.protection} = ${bodyArmorValue}`);
     }
 
     // Check for Body Armor powers
@@ -297,10 +322,19 @@ function getBodyArmorValue(actor) {
     );
     
     if (bodyArmorPower) {
-        const powerValue = CONFIG.FASERIP?.rankValues?.[bodyArmorPower.system.rank] || 0;
+        // Handle both numeric values and rank names for powers
+        let powerValue = 0;
+        if (typeof bodyArmorPower.system.value === 'number') {
+            powerValue = bodyArmorPower.system.value;
+        } else {
+            powerValue = CONFIG.FASERIP?.rankValues?.[bodyArmorPower.system.rank] || 0;
+        }
+        console.log(`🛡️ DEBUG: Found body armor power: ${bodyArmorPower.name} with rank ${bodyArmorPower.system.rank} = ${powerValue}`);
         bodyArmorValue = Math.max(bodyArmorValue, powerValue);
+        console.log(`🛡️ DEBUG: Final body armor value after power: ${bodyArmorValue}`);
     }
 
+    console.log(`🛡️ DEBUG: Final body armor value for ${actor.name}: ${bodyArmorValue}`);
     return bodyArmorValue;
 }
 
