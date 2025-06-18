@@ -3577,16 +3577,15 @@ export async function rollUniversalAction(actionCode, actorId, columnShift = nul
  * @param {Number} baseDamage - The base damage value
  * @param {String} sourceName - The source name for chat
  */
+// Around line 3570 in processUniversalActionTarget function
 async function processUniversalActionTarget(actor, target, actionCode, resultColor, baseDamage, sourceName) {
   console.log(`🎯 DEBUG: processUniversalActionTarget called with resultColor: "${resultColor}"`);
   
-  // This should prevent damage on misses
   if (resultColor.toLowerCase() === "white") {
     console.log(`🎯 DEBUG: Skipping damage - result was white (miss)`);
-    return; // Should exit early for misses
+    return;
   }
 
-  // This is the existing target processing logic from rollUniversalAction
   const damageTypeMap = {
     BA: "Physical-Blunt", EA: "Physical-Edged", Sh: "Physical-Shooting",
     TE: "Physical-Edged", TB: "Physical-Blunt", En: "Energy-Energy",
@@ -3597,6 +3596,13 @@ async function processUniversalActionTarget(actor, target, actionCode, resultCol
   const canBeStun = ["BA", "EA", "Sh", "En", "Fo", "TE", "TB"].includes(actionCode);
   const canBeSlam = ["BA", "EA", "Ch"].includes(actionCode);
   const canBeKill = ["EA", "Sh", "En", "TE"].includes(actionCode);
+
+  // FIX: For Blunt Attacks (BA), use Strength for damage, not the rolling ability
+  let finalBaseDamage = baseDamage;
+  if (actionCode === "BA") {
+    finalBaseDamage = actor.system.abilities.strength.value || 0;
+    console.log(`🎯 BA DAMAGE FIX: Using Strength ${finalBaseDamage} instead of Fighting ${baseDamage}`);
+  }
 
   // Check if this is a wrestling action
   if (["Gp", "Gb", "Es"].includes(actionCode)) {
@@ -3619,7 +3625,7 @@ async function processUniversalActionTarget(actor, target, actionCode, resultCol
         operation: 'applyCombatHandlerDamage',
         attackerUuid: actor.uuid,
         targetActorUuid: target.uuid,
-        baseDamage,
+        baseDamage: finalBaseDamage, // Use the corrected damage value
         damageType,
         sourceName: sourceName,
         canBeStun,
