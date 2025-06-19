@@ -3201,46 +3201,149 @@ export async function openUniversalTableDialog(actor) {
       el.addEventListener("dragstart", async ev => {
         const action = ev.currentTarget.dataset.action;
         const actor = game.user.character || canvas.tokens.controlled[0]?.actor;
-        if (!actor) return;
+        if (!actor) {
+          ev.preventDefault();
+          ui.notifications.warn("Select a token or assign a character first.");
+          return;
+        }
 
-        const command = `game.msh.rollUniversalAction("${action}", "${actor.id}");`;
+        console.log("🎯 Creating macro for action:", action);
 
-        let macro = game.macros.find(m => m.name === `FEAT: ${action}` && m.command === command);
+        // Copy EXACTLY what the click handler does - don't open a new dialog
+        const command = `// Universal Action Macro - same pattern as power macros
+      const actor = game.user.character || canvas.tokens.controlled[0]?.actor || game.actors.get("${actor.id}");
+      if (!actor) {
+        return ui.notifications.warn("Select a token or assign a character first.");
+      }
+
+      // Get saved settings for this action (same as clicking the button)
+      const savedCS = actor.getFlag("msh-faserip", "cs_${action}") || 0;
+      const savedKarma = actor.getFlag("msh-faserip", "karma_${action}") || 0;
+
+      // Generate multiple target options (same function used by clicking)
+      function generateMultiTargetOptionsHTML(actionCode) {
+        const targetCount = game.user.targets.size;
+        const validMultiTarget = ["BA", "Es", "En", "Fo"].includes(actionCode);
+        const validMultiAttack = ["BA", "EA", "Sh"].includes(actionCode);
+        
+        if (!validMultiTarget && !validMultiAttack) {
+          return "";
+        }
+        
+        let html = \`
+          <div style="margin-bottom: 10px; padding: 8px; background: #e8f4f8; border: 1px solid #b8d4da; border-radius: 3px;">
+            <div style="font-weight: bold; margin-bottom: 5px; color: #2c5aa0;">Multiple Target Options:</div>
+        \`;
+        
+        if (validMultiTarget) {
+          html += \`
+            <div style="margin-bottom: 5px;">
+              <label>
+                <input type="checkbox" id="multi-adjacent" name="multiAdjacent" style="margin-right: 5px;">
+                Multiple Adjacent Targets (-4CS, single roll affects all)
+              </label>
+              <div style="font-size: 0.8em; color: #666; margin-left: 20px;">
+                Targets selected: \${targetCount} | All must be adjacent to attacker
+              </div>
+            </div>
+          \`;
+        }
+        
+        if (validMultiAttack) {
+          html += \`
+            <div style="margin-bottom: 5px;">
+              <label>
+                <input type="checkbox" id="multi-attacks" name="multiAttacks" style="margin-right: 5px;">
+                Multiple Attacks (requires Fighting FEAT)
+              </label>
+              <div id="multi-attacks-options" style="margin-left: 20px; display: none;">
+                <label style="display: block; margin: 3px 0;">
+                  <input type="radio" name="attackCount" value="2" checked style="margin-right: 5px;">
+                  2 Attacks (Remarkable FEAT, -1CS each)
+                </label>
+                <label style="display: block; margin: 3px 0;">
+                  <input type="radio" name="attackCount" value="3" style="margin-right: 5px;">
+                  3 Attacks (Amazing FEAT, -1CS each)
+                </label>
+              </div>
+            </div>
+          \`;
+        }
+        
+        html += \`</div>\`;
+        return html;
+      }
+
+      const multiTargetOptionsHTML = generateMultiTargetOptionsHTML("${action}");
+
+      // Create the dialog (EXACTLY what clicking the button does)
+      new Dialog({
+        title: \`Roll: ${action}\`,
+        content: \`
+        <form>
+          <div class="form-group">
+            <label>Column Shift</label>
+            <input type="number" name="cs" value="\${savedCS}" />
+          </div>
+          <div class="form-group">
+            <label>Karma</label>
+            <input type="number" name="karma" value="\${savedKarma}" />
+          </div>
+          \${multiTargetOptionsHTML}
+          <div class="form-group">
+            <label><input type="checkbox" name="remember" checked /> Remember these settings</label>
+          </div>
+        </form>
+      \`,
+        buttons: {
+          roll: {
+            label: "Roll",
+            callback: async (html) => {
+              const cs = parseInt(html.find('[name="cs"]').val()) || 0;
+              const karma = parseInt(html.find('[name="karma"]').val()) || 0;
+              const remember = html.find('[name="remember"]').is(":checked");
+              const multiAdjacent = html.find('[name="multiAdjacent"]').is(':checked');
+              const multiAttacks = html.find('[name="multiAttacks"]').is(':checked');
+              const attackCount = parseInt(html.find('[name="attackCount"]:checked').val()) || 2;
+
+              if (remember) {
+                await actor.setFlag("msh-faserip", \`cs_${action}\`, cs);
+                await actor.setFlag("msh-faserip", \`karma_${action}\`, karma);
+              }
+
+              game.msh.rollUniversalAction("${action}", actor.id, cs, karma, {
+                multiAdjacent,
+                multiAttacks,
+                attackCount
+              });
+            }
+          },
+          cancel: { label: "Cancel" }
+        },
+        default: "roll"
+      }).render(true);`;
+
+        let macro = game.macros.find(m => m.name === `FEAT: ${action} (${actor.name})` && m.command === command);
         if (!macro) {
           const iconMap = {
-            BA: "blunt",
-            EA: "edged",
-            Sh: "shooting",
-            TE: "thrown",
-            TB: "thrown_blunt",
-            En: "energy",
-            Fo: "force",
-            Gp: "grapple",
-            Gb: "grab",
-            Es: "escape",
-            Ch: "charge",
-            Ki: "kill",
-            St: "stun",
-            Sl: "slam",
-            Do: "dodge",
-            Ev: "evade",
-            Bl: "block",
-            Ca: "catch",
+            BA: "blunt", EA: "edged", Sh: "shooting", TE: "thrown", TB: "thrown_blunt",
+            En: "energy", Fo: "force", Gp: "grapple", Gb: "grab", Es: "escape",
+            Ch: "charge", Ki: "kill", St: "stun", Sl: "slam", Do: "dodge",
+            Ev: "evade", Bl: "block", Ca: "catch",
           };
 
           const iconName = iconMap[action] || "dice-target";
-          const img = `systems/msh-faserip/assets/icons/actions/${iconName}.png`; // or .svg if that's what you're using
+          const img = `systems/msh-faserip/assets/icons/actions/${iconName}.png`;
 
           macro = await Macro.create({
-            name: `FEAT: ${action}`,
+            name: `FEAT: ${action} (${actor.name})`,
             type: "script",
             command,
-            img
+            img,
+            flags: {"faserip.universalActionMacro": true}
           });
-
         }
 
-        // Include the macro's UUID so Foundry can resolve it
         ev.dataTransfer.setData("text/plain", JSON.stringify({
           type: "Macro",
           uuid: macro.uuid
