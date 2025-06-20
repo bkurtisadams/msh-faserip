@@ -3197,9 +3197,16 @@ export async function openUniversalTableDialog(actor) {
     });
 
     // Drag and click logic for action buttons
-    html.find(".action-button, .action-code").each((_, el) => {
+    // Updated event listener setup - only target the parent .action-button elements
+    html.find(".action-button").each((_, el) => {
       el.addEventListener("dragstart", async ev => {
         const action = ev.currentTarget.dataset.action;
+        if (!action) {
+          ev.preventDefault();
+          ui.notifications.warn("No action code found on element.");
+          return;
+        }
+        
         const actor = game.user.character || canvas.tokens.controlled[0]?.actor;
         if (!actor) {
           ev.preventDefault();
@@ -3211,117 +3218,117 @@ export async function openUniversalTableDialog(actor) {
 
         // Copy EXACTLY what the click handler does - don't open a new dialog
         const command = `// Universal Action Macro - same pattern as power macros
-      const actor = game.user.character || canvas.tokens.controlled[0]?.actor || game.actors.get("${actor.id}");
-      if (!actor) {
-        return ui.notifications.warn("Select a token or assign a character first.");
-      }
-
-      // Get saved settings for this action (same as clicking the button)
-      const savedCS = actor.getFlag("msh-faserip", "cs_${action}") || 0;
-      const savedKarma = actor.getFlag("msh-faserip", "karma_${action}") || 0;
-
-      // Generate multiple target options (same function used by clicking)
-      function generateMultiTargetOptionsHTML(actionCode) {
-        const targetCount = game.user.targets.size;
-        const validMultiTarget = ["BA", "Es", "En", "Fo"].includes(actionCode);
-        const validMultiAttack = ["BA", "EA", "Sh"].includes(actionCode);
-        
-        if (!validMultiTarget && !validMultiAttack) {
-          return "";
+        const actor = game.user.character || canvas.tokens.controlled[0]?.actor || game.actors.get("${actor.id}");
+        if (!actor) {
+          return ui.notifications.warn("Select a token or assign a character first.");
         }
-        
-        let html = \`
-          <div style="margin-bottom: 10px; padding: 8px; background: #e8f4f8; border: 1px solid #b8d4da; border-radius: 3px;">
-            <div style="font-weight: bold; margin-bottom: 5px; color: #2c5aa0;">Multiple Target Options:</div>
-        \`;
-        
-        if (validMultiTarget) {
-          html += \`
-            <div style="margin-bottom: 5px;">
-              <label>
-                <input type="checkbox" id="multi-adjacent" name="multiAdjacent" style="margin-right: 5px;">
-                Multiple Adjacent Targets (-4CS, single roll affects all)
-              </label>
-              <div style="font-size: 0.8em; color: #666; margin-left: 20px;">
-                Targets selected: \${targetCount} | All must be adjacent to attacker
-              </div>
-            </div>
+
+        // Get saved settings for this action (same as clicking the button)
+        const savedCS = actor.getFlag("msh-faserip", "cs_${action}") || 0;
+        const savedKarma = actor.getFlag("msh-faserip", "karma_${action}") || 0;
+
+        // Generate multiple target options (same function used by clicking)
+        function generateMultiTargetOptionsHTML(actionCode) {
+          const targetCount = game.user.targets.size;
+          const validMultiTarget = ["BA", "Es", "En", "Fo"].includes(actionCode);
+          const validMultiAttack = ["BA", "EA", "Sh"].includes(actionCode);
+          
+          if (!validMultiTarget && !validMultiAttack) {
+            return "";
+          }
+          
+          let html = \`
+            <div style="margin-bottom: 10px; padding: 8px; background: #e8f4f8; border: 1px solid #b8d4da; border-radius: 3px;">
+              <div style="font-weight: bold; margin-bottom: 5px; color: #2c5aa0;">Multiple Target Options:</div>
           \`;
-        }
-        
-        if (validMultiAttack) {
-          html += \`
-            <div style="margin-bottom: 5px;">
-              <label>
-                <input type="checkbox" id="multi-attacks" name="multiAttacks" style="margin-right: 5px;">
-                Multiple Attacks (requires Fighting FEAT)
-              </label>
-              <div id="multi-attacks-options" style="margin-left: 20px; display: none;">
-                <label style="display: block; margin: 3px 0;">
-                  <input type="radio" name="attackCount" value="2" checked style="margin-right: 5px;">
-                  2 Attacks (Remarkable FEAT, -1CS each)
+          
+          if (validMultiTarget) {
+            html += \`
+              <div style="margin-bottom: 5px;">
+                <label>
+                  <input type="checkbox" id="multi-adjacent" name="multiAdjacent" style="margin-right: 5px;">
+                  Multiple Adjacent Targets (-4CS, single roll affects all)
                 </label>
-                <label style="display: block; margin: 3px 0;">
-                  <input type="radio" name="attackCount" value="3" style="margin-right: 5px;">
-                  3 Attacks (Amazing FEAT, -1CS each)
-                </label>
+                <div style="font-size: 0.8em; color: #666; margin-left: 20px;">
+                  Targets selected: \${targetCount} | All must be adjacent to attacker
+                </div>
               </div>
-            </div>
-          \`;
+            \`;
+          }
+          
+          if (validMultiAttack) {
+            html += \`
+              <div style="margin-bottom: 5px;">
+                <label>
+                  <input type="checkbox" id="multi-attacks" name="multiAttacks" style="margin-right: 5px;">
+                  Multiple Attacks (requires Fighting FEAT)
+                </label>
+                <div id="multi-attacks-options" style="margin-left: 20px; display: none;">
+                  <label style="display: block; margin: 3px 0;">
+                    <input type="radio" name="attackCount" value="2" checked style="margin-right: 5px;">
+                    2 Attacks (Remarkable FEAT, -1CS each)
+                  </label>
+                  <label style="display: block; margin: 3px 0;">
+                    <input type="radio" name="attackCount" value="3" style="margin-right: 5px;">
+                    3 Attacks (Amazing FEAT, -1CS each)
+                  </label>
+                </div>
+              </div>
+            \`;
+          }
+          
+          html += \`</div>\`;
+          return html;
         }
-        
-        html += \`</div>\`;
-        return html;
-      }
 
-      const multiTargetOptionsHTML = generateMultiTargetOptionsHTML("${action}");
+        const multiTargetOptionsHTML = generateMultiTargetOptionsHTML("${action}");
 
-      // Create the dialog (EXACTLY what clicking the button does)
-      new Dialog({
-        title: \`Roll: ${action}\`,
-        content: \`
-        <form>
-          <div class="form-group">
-            <label>Column Shift</label>
-            <input type="number" name="cs" value="\${savedCS}" />
-          </div>
-          <div class="form-group">
-            <label>Karma</label>
-            <input type="number" name="karma" value="\${savedKarma}" />
-          </div>
-          \${multiTargetOptionsHTML}
-          <div class="form-group">
-            <label><input type="checkbox" name="remember" checked /> Remember these settings</label>
-          </div>
-        </form>
-      \`,
-        buttons: {
-          roll: {
-            label: "Roll",
-            callback: async (html) => {
-              const cs = parseInt(html.find('[name="cs"]').val()) || 0;
-              const karma = parseInt(html.find('[name="karma"]').val()) || 0;
-              const remember = html.find('[name="remember"]').is(":checked");
-              const multiAdjacent = html.find('[name="multiAdjacent"]').is(':checked');
-              const multiAttacks = html.find('[name="multiAttacks"]').is(':checked');
-              const attackCount = parseInt(html.find('[name="attackCount"]:checked').val()) || 2;
+        // Create the dialog (EXACTLY what clicking the button does)
+        new Dialog({
+          title: \`Roll: ${action}\`,
+          content: \`
+          <form>
+            <div class="form-group">
+              <label>Column Shift</label>
+              <input type="number" name="cs" value="\${savedCS}" />
+            </div>
+            <div class="form-group">
+              <label>Karma</label>
+              <input type="number" name="karma" value="\${savedKarma}" />
+            </div>
+            \${multiTargetOptionsHTML}
+            <div class="form-group">
+              <label><input type="checkbox" name="remember" checked /> Remember these settings</label>
+            </div>
+          </form>
+        \`,
+          buttons: {
+            roll: {
+              label: "Roll",
+              callback: async (html) => {
+                const cs = parseInt(html.find('[name="cs"]').val()) || 0;
+                const karma = parseInt(html.find('[name="karma"]').val()) || 0;
+                const remember = html.find('[name="remember"]').is(":checked");
+                const multiAdjacent = html.find('[name="multiAdjacent"]').is(':checked');
+                const multiAttacks = html.find('[name="multiAttacks"]').is(':checked');
+                const attackCount = parseInt(html.find('[name="attackCount"]:checked').val()) || 2;
 
-              if (remember) {
-                await actor.setFlag("msh-faserip", \`cs_${action}\`, cs);
-                await actor.setFlag("msh-faserip", \`karma_${action}\`, karma);
+                if (remember) {
+                  await actor.setFlag("msh-faserip", \`cs_${action}\`, cs);
+                  await actor.setFlag("msh-faserip", \`karma_${action}\`, karma);
+                }
+
+                game.msh.rollUniversalAction("${action}", actor.id, cs, karma, {
+                  multiAdjacent,
+                  multiAttacks,
+                  attackCount
+                });
               }
-
-              game.msh.rollUniversalAction("${action}", actor.id, cs, karma, {
-                multiAdjacent,
-                multiAttacks,
-                attackCount
-              });
-            }
+            },
+            cancel: { label: "Cancel" }
           },
-          cancel: { label: "Cancel" }
-        },
-        default: "roll"
-      }).render(true);`;
+          default: "roll"
+        }).render(true);`;
 
         let macro = game.macros.find(m => m.name === `FEAT: ${action} (${actor.name})` && m.command === command);
         if (!macro) {
@@ -3351,11 +3358,18 @@ export async function openUniversalTableDialog(actor) {
       });
 
       el.addEventListener("click", ev => {
+        // Prevent event bubbling to avoid double-triggers
+        ev.stopPropagation();
+        
         const action = ev.currentTarget.dataset.action;
+        if (!action) {
+          console.warn("🔥 No action found on clicked element:", ev.currentTarget);
+          return;
+        }
+        
         console.log("🔥 Action button clicked:", action);
         
         const actor = game.user.character || canvas.tokens.controlled[0]?.actor;
-
         if (!actor) {
           return ui.notifications.warn("Select a token or assign a character first.");
         }
@@ -3371,9 +3385,6 @@ export async function openUniversalTableDialog(actor) {
         const multiTargetOptionsHTML = generateMultiTargetOptionsHTML(action);
         
         console.log("🔥 multiTargetOptionsHTML result:", multiTargetOptionsHTML);
-        console.log("🔥 multiTargetOptionsHTML length:", multiTargetOptionsHTML.length);
-
-        console.log("🔥 Creating dialog...");
 
         new Dialog({
           title: `Roll: ${action}`,
@@ -3408,14 +3419,7 @@ export async function openUniversalTableDialog(actor) {
                 const multiAttacks = html.find('[name="multiAttacks"]').is(':checked');
                 const attackCount = parseInt(html.find('[name="attackCount"]:checked').val()) || 2;
 
-                console.log("🚀 Form values:");
-                console.log("  cs:", cs);
-                console.log("  karma:", karma);
-                console.log("  multiAdjacent:", multiAdjacent);
-                console.log("  multiAttacks:", multiAttacks);
-                console.log("  attackCount:", attackCount);
-
-                // Validate multiple adjacent targets
+                // Validation for multiple adjacent targets
                 if (multiAdjacent) {
                   const targetTokens = Array.from(game.user.targets);
                   if (targetTokens.length < 2) {
