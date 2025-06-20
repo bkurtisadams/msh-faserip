@@ -3488,8 +3488,114 @@ export async function rollUniversalAction(actionCode, actorId, columnShift = nul
 
   // Handle multiple attacks first (before rolling)
   if (options.multiAttacks) {
-    // ... existing multiple attacks code stays the same ...
-    return processMultipleAttackSequence(actor, attackData, options.attackCount, options);
+    console.log(`Starting multiple universal action sequence: ${options.attackCount} attacks with ${actionCode}`);
+    
+    // First, roll the Fighting FEAT
+    const featIntensity = options.attackCount === 2 ? "Remarkable" : "Amazing";
+    const fightingRank = actor.system.abilities.fighting.rank;
+    const fightingValue = actor.system.abilities.fighting.value;
+    
+    // Create and evaluate the FEAT roll
+    const featRoll = new Roll("1d100");
+    await featRoll.evaluate();
+    
+    const featColor = game.msh.rollUniversalTable(fightingRank, featRoll.total);
+    
+    // Determine success based on intensity requirement
+    let featSuccess = false;
+    switch (featIntensity) {
+      case "Remarkable":
+        featSuccess = ["green", "yellow", "red"].includes(featColor.toLowerCase());
+        break;
+      case "Amazing":
+        featSuccess = ["yellow", "red"].includes(featColor.toLowerCase());
+        break;
+    }
+    
+    // Create FEAT result message
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor }),
+      content: `
+        <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
+          <div style="padding: 5px 10px; border-bottom: 1px solid #c0c0c0; font-size: 1.1em; color: #8b0000;">
+            <strong>${actor.name} - Multiple Attack FEAT</strong>
+          </div>
+          <div style="padding: 5px 10px; font-size: 0.9em;">
+            <div>Required Intensity: ${featIntensity}</div>
+            <div>Fighting Rank: ${fightingRank} (${fightingValue})</div>
+            <div>Roll: ${featRoll.total}</div>
+          </div>
+          <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
+            background-color: ${featSuccess ? '#4CAF50' : '#F44336'}; color: white;">
+            ${featSuccess ? "SUCCESS" : "FAILURE"} (${featColor.toUpperCase()})
+          </div>
+        </div>
+      `
+    });
+    
+    if (!featSuccess) {
+      // Failed FEAT: Single attack at -3CS
+      console.log("Fighting FEAT failed - single attack with -3CS penalty");
+      
+      await ChatMessage.create({
+        speaker: ChatMessage.getSpeaker({ actor }),
+        content: `
+          <div style="background-color: #ffebee; border: 1px solid #f44336; border-radius: 3px; padding: 8px; margin: 5px 0;">
+            <div style="color: #d32f2f; font-weight: bold; margin-bottom: 5px;">Multiple Attack Failed</div>
+            <div style="font-size: 0.9em;">
+              <div>${actor.name} failed the Fighting FEAT for ${options.attackCount} attacks.</div>
+              <div>Result: Single attack only, at -3CS penalty.</div>
+            </div>
+          </div>
+        `
+      });
+      
+      // Make single attack with -3CS penalty
+      return rollUniversalAction(actionCode, actorId, columnShift - 3, karma, {
+        ...options,
+        multiAttacks: false,
+        attackCount: 1
+      });
+    }
+    
+    // Success: Multiple attacks at -1CS each
+    console.log(`Fighting FEAT succeeded - proceeding with ${options.attackCount} attacks at -1CS each`);
+    
+    const results = [];
+    
+    for (let i = 1; i <= options.attackCount; i++) {
+      console.log(`Making attack ${i} of ${options.attackCount}`);
+      
+      // Each attack gets -1CS penalty
+      const attackResult = await rollUniversalAction(actionCode, actorId, columnShift - 1, karma, {
+        ...options,
+        multiAttacks: false, // Prevent recursion
+        attackCount: 1
+      });
+      
+      results.push(attackResult);
+      
+      // Small delay between attacks for better visual flow
+      if (i < options.attackCount) {
+        await new Promise(resolve => setTimeout(resolve, 800));
+      }
+    }
+    
+    // Create summary message
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor }),
+      content: `
+        <div style="background-color: #e8f5e8; border: 1px solid #4caf50; border-radius: 3px; padding: 8px; margin: 5px 0;">
+          <div style="color: #2e7d32; font-weight: bold; margin-bottom: 5px;">Multiple Attack Sequence Complete</div>
+          <div style="font-size: 0.9em;">
+            <div>${actor.name} completed ${options.attackCount} attacks with ${actionCode}.</div>
+            <div>Each attack was made at -1CS due to multiple attack rules.</div>
+          </div>
+        </div>
+      `
+    });
+    
+    return results;
   }
 
   const label = `FEAT: ${actionCode}`;
