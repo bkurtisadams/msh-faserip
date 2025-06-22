@@ -2,7 +2,7 @@
 import { applyColumnShiftToRank } from './actorSheet.js';
 import { CombatHandler } from './combat-handler.js';
 import { runAsGM } from './gm-utils.js';
-import { calculateChargeDamage, getBodyArmorValue } from './charge-damage.js';
+import { calculateChargeDamage, getBodyArmorValue, processChargeAttack } from './charge-damage.js';
 
 // ============================================
 // HELPER FUNCTIONS (OUTSIDE THE CLASS)
@@ -3856,12 +3856,41 @@ export async function rollUniversalAction(actionCode, actorId, columnShift = nul
     const target = game.user.targets.first()?.actor;
     console.log(`🎯 DEBUG: Single target processing with color: "${color}"`);
     
-    if (target && actionCode === "Ca") {
+    if (target && actionCode === "Ch") {
+      // Prompt for areas moved in this charge
+      const areasMovedThrough = await new Promise((resolve) => {
+        new Dialog({
+          title: "Charge Distance",
+          content: `
+            <div class="form-group">
+              <label>How many areas did ${actor.name} move before impact?</label>
+              <input type="number" name="areas" value="1" min="1" max="20" />
+              <div style="font-size: 0.8em; color: #666;">1 area = 10 feet. Distance affects damage and CS bonus.</div>
+            </div>
+          `,
+          buttons: {
+            ok: {
+              label: "Calculate Damage",
+              callback: (html) => resolve(parseInt(html.find('[name="areas"]').val()) || 1)
+            }
+          }
+        }).render(true);
+      });
+      
+      await processChargeAttack({
+        attacker: actor,
+        target: target,
+        areasMovedThrough: areasMovedThrough,
+        rollResult: color
+      });
+    } else if (target && actionCode === "Ca") {
       await processCatchingResult(actor, target, color, actionCode, finalValue, label);
-    } else if (target && actionCode !== "Ca") {
+    } else if (target && actionCode !== "Ca" && actionCode !== "Ch") {
       await processUniversalActionTarget(actor, target, actionCode, color, finalValue, label);
     } else if (actionCode === "Ca") {
       ui.notifications.info("Catching requires a target to be selected.");
+    } else if (actionCode === "Ch") {
+      ui.notifications.info("Charging requires a target to be selected.");
     } else {
       ui.notifications.info("No target selected — result shown, but no damage processed.");
     }
