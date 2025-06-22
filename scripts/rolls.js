@@ -1131,7 +1131,12 @@ export class FaseripRolls {
       const skipDice = options.skipDice ?? skipDiceRoll;
 
       // Total column shift is talent bonus plus any extra shifts
-      const totalColumnShift = talentBonus + extraShift;
+      let totalColumnShift = talentBonus + extraShift;
+
+      if (options.multiAdjacent) {
+        totalColumnShift -= 4;
+        console.log("Applied -4CS penalty for multi-adjacent talent attack");
+      }
 
       // Get ability information
       let abilityModified = talent.system.abilityModified;
@@ -1327,104 +1332,94 @@ export class FaseripRolls {
         content: content
       });
 
-      // COMBAT HANDLER INTEGRATION
-      // Check if we have a target to apply damage to
-      const target = game.user.targets.first()?.actor;
-
-      // Define wrestling actions
+      // --- COMBAT HANDLER INTEGRATION ---
       const wrestlingActions = ["Grappling (GP)", "Grabbing (Gb)", "Escaping (ES)"];
+      const isCombatAction = actionType.toLowerCase().includes("attack") || wrestlingActions.includes(actionType);
 
-      // Check if this is either an attack action or a wrestling action
-      if (target && resultColor.toLowerCase() !== "white" && 
-        (actionType.toLowerCase().includes("attack") || wrestlingActions.includes(actionType))) {
-
+      if (resultColor.toLowerCase() !== "white" && isCombatAction) {
         // Skip damage processing if damage type is "None"
         if (damageType === "None") {
-          // No damage processing for non-combat talents
           return { roll, resultColor, resultText };
         }
-        
-        // Handle wrestling actions differently
-        if (wrestlingActions.includes(actionType)) {
-          // Extract action code (GP, Gb, ES) from action type
-          const actionCode = actionType.match(/\(([^)]+)\)/)?.[1]?.toLowerCase();
-          console.log(`Processing wrestling action ${actionType} with lowercase code ${actionCode}`);
-          
-          // Use the wrestling-specific handler
-          await game.msh.CombatHandler.processWrestlingAction({
-            attacker: actor,
-            target,
-            actionType: actionCode,
-            resultColor: resultColor.toLowerCase(),
-            sourceName: talent.name
-          });
-        } else {
-          // Regular attack processing
-          let finalDamageType = damageType;
-          if (!finalDamageType) {
-            if (actionType.includes("Blunt")) {
-              finalDamageType = "Physical-Blunt";
-            } else if (actionType.includes("Edged")) {
-              finalDamageType = "Physical-Edged";
-            } else if (actionType.includes("Force")) {
-              finalDamageType = "Force";
-            } else if (actionType.includes("Mental")) {
-              finalDamageType = "Mental";
-            } else {
-              // Try to determine from talent type/specialty
-              const talentType = talent.system.type?.toLowerCase() || "";
-              const talentSpecialty = talent.system.specialty?.toLowerCase() || "";
-              
-              if (talentSpecialty.includes("blunt")) {
-                finalDamageType = "Physical-Blunt";
-              } else if (talentSpecialty.includes("sharp") || talentSpecialty.includes("edged")) {
-                finalDamageType = "Physical-Edged";
-              } else if (talentSpecialty.includes("thrown")) {
-                if (talentSpecialty.includes("knife") || talentSpecialty.includes("star")) {
+
+        if (options.multiAdjacent && game.user.targets.size > 1) {
+          const targets = Array.from(game.user.targets);
+          for (const targetToken of targets) {
+            const targetActor = targetToken.actor;
+            if (targetActor) {
+              let finalDamageType = damageType;
+              if (!finalDamageType) {
+                if (actionType.includes("Blunt")) {
+                  finalDamageType = "Physical-Blunt";
+                } else if (actionType.includes("Edged")) {
                   finalDamageType = "Physical-Edged";
                 } else {
-                  finalDamageType = "Physical-Blunt";
+                  const talentSpecialty = talent.system.specialty?.toLowerCase() || "";
+                  if (talentSpecialty.includes("blunt")) {
+                    finalDamageType = "Physical-Blunt";
+                  } else if (talentSpecialty.includes("sharp") || talentSpecialty.includes("edged")) {
+                    finalDamageType = "Physical-Edged";
+                  } else {
+                    finalDamageType = "Physical-Blunt";
+                  }
                 }
-              } else if (talentType.includes("fight")) {
-                finalDamageType = "Physical-Blunt";
-              } else {
-                finalDamageType = "Physical-Blunt"; // Default
               }
+              
+              const canBeStun = actionType.includes("Blunt") || actionType.includes("Force") || resultText.toLowerCase().includes("stun");
+              const canBeSlam = actionType.includes("Blunt") || resultText.toLowerCase().includes("slam");
+              const canBeKill = actionType.includes("Edged") || actionType.includes("Energy") || actionType.includes("Shooting");
+              const baseDamage = damageCS && damageRankValue ? damageRankValue : abilityValue;
+              
+              await game.msh.CombatHandler.processAttack({
+                attacker: actor, target: targetActor, baseDamage,
+                damageType: finalDamageType, sourceName: talent.name,
+                canBeStun, canBeSlam, canBeKill, originalRollResult: resultColor.toLowerCase()
+              });
             }
           }
-          
-          // Determine if special effects should apply based on the result and action type
-          const canBeStun = actionType.includes("Blunt") || 
-                          actionType.includes("Force") || 
-                          resultText.toLowerCase().includes("stun");
-          
-          const canBeSlam = actionType.includes("Blunt") || 
-                          resultText.toLowerCase().includes("slam");
-          
-          const canBeKill = actionType.includes("Edged") || 
-                          actionType.includes("Energy") || 
-                          actionType.includes("Shooting") // || 
-                          //resultText.toLowerCase().includes("kill");
-          
-          // For damage, use the damageRankValue if a damage CS was applied, otherwise use the base ability value
-          const baseDamage = damageCS && damageRankValue ? damageRankValue : abilityValue;
-          
-          // Process the attack using the CombatHandler
-          await game.msh.CombatHandler.processAttack({
-            attacker: actor,
-            target: target,
-            baseDamage: baseDamage,
-            damageType: finalDamageType,
-            sourceName: talent.name,
-            canBeStun,
-            canBeSlam,
-            canBeKill,
-            originalRollResult: resultColor.toLowerCase()
-          });
+        } else {
+          const target = game.user.targets.first()?.actor;
+          if (target) {
+            if (wrestlingActions.includes(actionType)) {
+              const actionCode = actionType.match(/\(([^)]+)\)/)?.[1]?.toLowerCase();
+              await game.msh.CombatHandler.processWrestlingAction({
+                attacker: actor, target, actionType: actionCode,
+                resultColor: resultColor.toLowerCase(), sourceName: talent.name
+              });
+            } else {
+              let finalDamageType = damageType;
+              if (!finalDamageType) {
+                if (actionType.includes("Blunt")) {
+                  finalDamageType = "Physical-Blunt";
+                } else if (actionType.includes("Edged")) {
+                  finalDamageType = "Physical-Edged";
+                } else {
+                  const talentSpecialty = talent.system.specialty?.toLowerCase() || "";
+                  if (talentSpecialty.includes("blunt")) {
+                    finalDamageType = "Physical-Blunt";
+                  } else if (talentSpecialty.includes("sharp") || talentSpecialty.includes("edged")) {
+                    finalDamageType = "Physical-Edged";
+                  } else {
+                    finalDamageType = "Physical-Blunt";
+                  }
+                }
+              }
+              
+              const canBeStun = actionType.includes("Blunt") || actionType.includes("Force") || resultText.toLowerCase().includes("stun");
+              const canBeSlam = actionType.includes("Blunt") || resultText.toLowerCase().includes("slam");
+              const canBeKill = actionType.includes("Edged") || actionType.includes("Energy") || actionType.includes("Shooting");
+              const baseDamage = damageCS && damageRankValue ? damageRankValue : abilityValue;
+              
+              await game.msh.CombatHandler.processAttack({
+                attacker: actor, target, baseDamage,
+                damageType: finalDamageType, sourceName: talent.name,
+                canBeStun, canBeSlam, canBeKill, originalRollResult: resultColor.toLowerCase()
+              });
+            }
+          } else {
+            ui.notifications.info("No target selected. Effect not applied.");
+          }
         }
-      } else if (resultColor.toLowerCase() !== "white" && !target && 
-                (actionType.toLowerCase().includes("attack") || wrestlingActions.includes(actionType))) {
-        ui.notifications.info("No target selected. Effect not applied.");
       }
 
       return { roll, resultColor, resultText };
@@ -1526,7 +1521,28 @@ export class FaseripRolls {
       `;
 
       // Create dialog for roll options
+      // Debug the action code extraction
+      console.log("🎯 actionOptions[0]:", actionOptions[0]);
+      const firstActionCode = actionOptions[0].value.match(/\(([^)]+)\)/)?.[1] || "";
+      console.log("🎯 firstActionCode:", firstActionCode);
+
+      // If we still can't extract it, try a fallback
+      let actionCodeToUse = firstActionCode;
+      if (!actionCodeToUse && actionOptions[0].value.includes("Blunt Attack")) {
+        actionCodeToUse = "BA";
+      } else if (!actionCodeToUse && actionOptions[0].value.includes("Edged Attack")) {
+        actionCodeToUse = "EA";
+      } else if (!actionCodeToUse && actionOptions[0].value.includes("Grappling")) {
+        actionCodeToUse = "Gp";
+      }
+
+      console.log("🎯 actionCodeToUse:", actionCodeToUse);
+      const multiTargetOptionsHTML = generateMultiTargetOptionsHTML(actionCodeToUse);
+      console.log("🎯 multiTargetOptionsHTML:", multiTargetOptionsHTML);
+
+      // Create dialog for roll options
       let dialogContent = `
+        <div id="multi-target-container">${multiTargetOptionsHTML}</div>
         <div style="background: #f0e8d8; padding: 10px; border-radius: 5px;">
           <div style="margin-bottom: 10px;">
             <label style="display: inline-block; width: 120px;">Action Type:</label>
@@ -1592,6 +1608,14 @@ export class FaseripRolls {
               const karma = parseInt(html.find('[name="karma"]').val()) || 0;
               const skipDice = html.find('[name="skipDice"]').is(':checked');
               const saveSettings = html.find('[name="saveSettings"]').is(':checked');
+              const multiAdjacent = html.find('[name="multiAdjacent"]').is(':checked');
+              const multiAttacks = html.find('[name="multiAttacks"]').is(':checked');
+              const attackCount = parseInt(html.find('[name="attackCount"]:checked').val()) || 2;
+              
+              const actionCode = actionType.match(/\(([^)]+)\)/)?.[1] || "";
+              if (multiAdjacent && !isValidMultiTargetAttack(actionCode)) return ui.notifications.warn("This action cannot target multiple adjacent foes.");
+              if (multiAttacks && !isValidMultipleAttack(actionCode)) return ui.notifications.warn("This action cannot be used for multiple attacks.");
+              if (multiAdjacent && multiAttacks) return ui.notifications.warn("Cannot use both multi-target options at once.");
 
               // Save settings if requested
               if (saveSettings) {
@@ -1602,21 +1626,54 @@ export class FaseripRolls {
                 await talent.setFlag("msh-faserip", "skipDiceRoll", skipDice);
               }
 
-              // Call this method again but with the gathered options
+              if (multiAttacks) {
+                return await processMultipleTalentAttackSequence(actor, talent, {
+                  actionType, extraShift, damageCS, damageType, karma, skipDice, attackCount
+                });
+              }
+
               return FaseripRolls.rollTalent(actor, talent, {
                 useDirectRoll: true,
-                actionType: actionType,
-                extraShift: extraShift,
-                damageCS: damageCS,
-                damageType: damageType,
-                karma: karma,
-                skipDice: skipDice
+                actionType, extraShift, damageCS, damageType, karma, skipDice, multiAdjacent
               });
             }
           },
           cancel: { label: "Cancel" }
         },
-        default: "roll"
+        default: "roll",
+        render: (html) => {
+          const actionSelect = html.find('#action-type');
+          const multiContainer = html.find('#multi-target-container');
+
+          function updateMultiOptions() {
+            const selectedAction = actionSelect.val();
+            const actionCode = selectedAction.match(/\(([^)]+)\)/)?.[1] || "";
+            const newOptionsHTML = generateMultiTargetOptionsHTML(actionCode);
+            multiContainer.html(newOptionsHTML);
+            
+            const multiAdjacentCheckbox = multiContainer.find('#multi-adjacent');
+            const multiAttacksCheckbox = multiContainer.find('#multi-attacks');
+            const multiAttacksOptions = multiContainer.find('#multi-attacks-options');
+
+            multiAdjacentCheckbox.on('change', function() {
+              if (this.checked) multiAttacksCheckbox.prop('disabled', true).prop('checked', false).trigger('change');
+              else multiAttacksCheckbox.prop('disabled', !isValidMultipleAttack(actionCode));
+            });
+
+            multiAttacksCheckbox.on('change', function() {
+              if (this.checked) {
+                multiAdjacentCheckbox.prop('disabled', true).prop('checked', false);
+                multiAttacksOptions.show();
+              } else {
+                multiAttacksOptions.hide();
+                multiAdjacentCheckbox.prop('disabled', !isValidMultiTargetAttack(actionCode));
+              }
+            });
+          }
+          
+          actionSelect.on('change', updateMultiOptions);
+          updateMultiOptions();
+        }
       }).render(true);
     }
   }
@@ -3956,6 +4013,45 @@ async function processMultipleAttackSequence(actor, power, options) {
     `
   });
   
+  return results;
+}
+
+// NEW FUNCTION FOR TALENTS
+async function processMultipleTalentAttackSequence(actor, talent, options) {
+  const { attackCount } = options;
+  console.log(`Starting multiple talent attack sequence: ${attackCount} attacks with ${talent.name}`);
+
+  const featResult = await CombatHandler.rollMultipleAttackFeat(actor, attackCount);
+
+  if (featResult.cancelled) {
+    ui.notifications.info("Multiple attack cancelled");
+    return [];
+  }
+
+  if (!featResult.success) {
+    console.log("Fighting FEAT failed - single talent attack with -3CS penalty");
+    const modifiedOptions = { ...options, extraShift: (options.extraShift || 0) - 3, multiAttacks: false, attackCount: 1 };
+    return [await FaseripRolls.rollTalent(actor, talent, { useDirectRoll: true, ...modifiedOptions })];
+  }
+
+  console.log(`Fighting FEAT succeeded - proceeding with ${attackCount} talent attacks at -1CS each`);
+  const results = [];
+  for (let i = 1; i <= attackCount; i++) {
+    const attackOptions = { ...options, extraShift: (options.extraShift || 0) - 1, multiAttacks: false, attackCount: 1 };
+    const attackResult = await FaseripRolls.rollTalent(actor, talent, { useDirectRoll: true, ...attackOptions });
+    results.push(attackResult);
+    if (i < attackCount) await new Promise(resolve => setTimeout(resolve, 800));
+  }
+
+  await ChatMessage.create({
+    speaker: ChatMessage.getSpeaker({ actor }),
+    content: `
+      <div style="background-color: #e8f5e8; border: 1px solid #4caf50; border-radius: 3px; padding: 8px; margin: 5px 0;">
+        <div style="color: #2e7d32; font-weight: bold; margin-bottom: 5px;">Multiple Attack Sequence Complete</div>
+        <p>${actor.name} completed ${attackCount} attacks with talent: ${talent.name}. Each at -1CS.</p>
+      </div>`
+  });
+
   return results;
 }
 

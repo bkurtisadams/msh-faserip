@@ -2425,7 +2425,7 @@ export class CombatHandler {
 }
 
 // Add event listener for collision damage calculation
-Hooks.on("renderChatMessage", (app, html, data) => {
+/* Hooks.on("renderChatMessage", (app, html, data) => {
     html.find('.calculate-slam-collision').on('click', async function() {
         const targetUuid = this.dataset.target;
         const slamDistance = parseInt(this.dataset.distance);
@@ -2532,7 +2532,7 @@ Hooks.on("renderChatMessage", (app, html, data) => {
             default: "calculate"
         }).render(true);
     });
-});
+}); */
 
 
 // Make it available globally for now, or import where needed

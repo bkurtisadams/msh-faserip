@@ -347,9 +347,11 @@ function getBodyArmorValue(actor) {
  * This should be called when the module loads
  */
 export function initializeSlamHandlers() {
+    console.log("🔧 initializeSlamHandlers() called");
     // Add event listener for collision damage calculation
     Hooks.on("renderChatMessage", (app, html, data) => {
         html.find('.calculate-slam-collision').on('click', async function() {
+            console.log("🎯 Collision button clicked");
             const targetUuid = this.dataset.target;
             const slamDistance = parseInt(this.dataset.distance);
             const slamSpeed = parseInt(this.dataset.speed);
@@ -361,103 +363,99 @@ export function initializeSlamHandlers() {
                 return;
             }
             
-            // Show dialog to get obstacle material strength
-            new Dialog({
-                title: "Slam Collision Damage",
-                content: `
-                    <div style="background: #f0e8d8; padding: 10px; border-radius: 5px;">
-                        <p><strong>${targetActor.name}</strong> was slammed ${slamDistance} areas and hits an obstacle!</p>
-                        <div style="margin: 10px 0;">
-                            <label style="display: block; margin-bottom: 5px;">Obstacle Material Strength:</label>
-                            <select id="material-strength" style="width: 100%;">
-                                <option value="2">Feeble (Cardboard, Glass)</option>
-                                <option value="4">Poor (Wood, Plastic)</option>
-                                <option value="6" selected>Typical (Brick Wall)</option>
-                                <option value="10">Good (Stone Wall)</option>
-                                <option value="20">Excellent (Steel Wall)</option>
-                                <option value="30">Remarkable (Reinforced Steel)</option>
-                                <option value="40">Incredible (Super-Strong Material)</option>
-                                <option value="50">Amazing (Nearly Indestructible)</option>
-                                <option value="75">Monstrous (Extremely Durable)</option>
-                                <option value="100">Unearthly (Virtually Indestructible)</option>
+            // Directly prompt for material strength with a simple dropdown
+            const materialOptions = [
+                { value: 2, label: "Feeble (Cardboard, Glass)" },
+                { value: 4, label: "Poor (Wood, Plastic)" },
+                { value: 6, label: "Typical (Brick Wall)" },
+                { value: 10, label: "Good (Stone Wall)" },
+                { value: 20, label: "Excellent (Steel Wall)" },
+                { value: 30, label: "Remarkable (Reinforced Steel)" },
+                { value: 40, label: "Incredible (Super-Strong Material)" },
+                { value: 50, label: "Amazing (Nearly Indestructible)" },
+                { value: 75, label: "Monstrous (Extremely Durable)" },
+                { value: 100, label: "Unearthly (Virtually Indestructible)" }
+            ];
+            
+            // Create simple select dialog without the full Dialog class
+            const selectHtml = materialOptions.map(opt => 
+                `<option value="${opt.value}" ${opt.value === 6 ? 'selected' : ''}>${opt.label}</option>`
+            ).join('');
+            
+            const materialStrength = await new Promise((resolve) => {
+                new Dialog({
+                    title: "Select Obstacle Material",
+                    content: `
+                        <div style="text-align: center; padding: 10px;">
+                            <p><strong>${targetActor.name}</strong> hits an obstacle!</p>
+                            <select id="obstacle-material" style="width: 100%; padding: 5px;">
+                                ${selectHtml}
                             </select>
                         </div>
-                        <div style="margin-top: 10px; padding: 8px; background: #f9f9f9; border-radius: 3px; font-size: 0.9em;">
-                            <strong>Slam Parameters:</strong><br>
-                            • Distance: ${slamDistance} areas<br>
-                            • Speed: ${slamSpeed} areas/round<br>
-                            • Attacker Strength: ${attackerStrength}
-                        </div>
-                    </div>
-                `,
-                buttons: {
-                    calculate: {
-                        icon: '<i class="fas fa-calculator"></i>',
-                        label: "Calculate Damage",
-                        callback: async (html) => {
-                            const materialStrength = parseInt(html.find('#material-strength').val());
-                            
-                            // Calculate slam damage using the function from this module
-                            const slamResults = calculateSlamDamage({
-                                characterEndurance: targetActor.system.abilities.endurance.value || 0,
-                                characterBodyArmor: getBodyArmorValue(targetActor),
-                                objectMaterialStrength: materialStrength,
-                                slamSpeed: slamSpeed,
-                                attackerStrength: attackerStrength
-                            });
-                            
-                            // Create detailed damage report
-                            await ChatMessage.create({
-                                speaker: ChatMessage.getSpeaker({ alias: "Collision Damage" }),
-                                content: `
-                                    <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
-                                        <div style="padding: 5px 10px; border-bottom: 1px solid #c0c0c0; font-size: 1.1em; color: #8b0000;">
-                                            <strong>Slam Collision: ${targetActor.name} hits obstacle</strong>
-                                        </div>
-                                        <div style="padding: 5px 10px; font-size: 0.9em;">
-                                            <div><strong>Slam Speed:</strong> ${slamSpeed} areas/round</div>
-                                            <div><strong>Material Strength:</strong> ${materialStrength}</div>
-                                            <div><strong>Character Endurance:</strong> ${targetActor.system.abilities.endurance.value || 0}</div>
-                                            <div><strong>Damage Calculation:</strong> ${slamResults.description}</div>
-                                            ${slamResults.damageToCharacter > 0 ? 
-                                                `<div style="color: #cc0000;"><strong>Damage to ${targetActor.name}:</strong> ${slamResults.damageToCharacter}</div>` : 
-                                                '<div style="color: #28a745;"><strong>No damage taken</strong></div>'
-                                            }
-                                        </div>
-                                    </div>
-                                `
-                            });
-                            
-                            // Apply damage if any
-                            if (slamResults.damageToCharacter > 0) {
-                                const currentHealth = targetActor.system.attributes.health.value;
-                                const newHealth = Math.max(0, currentHealth - slamResults.damageToCharacter);
-                                
-                                await game.msh.runAsGM({
-                                    operation: 'adjustTargetHealth',
-                                    targetActorUuid: targetActor.uuid,
-                                    newHealth: newHealth
-                                });
-                                
-                                ui.notifications.info(`${targetActor.name} takes ${slamResults.damageToCharacter} collision damage!`);
-                            }
-                            
-                            // Disable the button to prevent multiple calculations
-                            $(this).prop('disabled', true).text('Damage Calculated');
-
-                            // Close the dialog after a short delay
-                            setTimeout(() => {
-                                $(this).closest('.dialog').find('.header-button.close').click();
-                            }, 1500);
+                    `,
+                    buttons: {
+                        ok: {
+                            label: "Calculate Damage",
+                            callback: (html) => resolve(parseInt(html.find('#obstacle-material').val()))
+                        },
+                        cancel: {
+                            label: "No Collision",
+                            callback: () => resolve(null)
                         }
                     },
-                    cancel: {
-                        icon: '<i class="fas fa-times"></i>',
-                        label: "Cancel"
-                    }
-                },
-                default: "calculate"
-            }).render(true);
+                    default: "ok"
+                }).render(true);
+            });
+            
+            if (materialStrength === null) return; // User cancelled
+            
+            // Calculate slam damage using the existing function
+            const slamResults = calculateSlamDamage({
+                characterEndurance: targetActor.system.abilities.endurance.value || 0,
+                characterBodyArmor: getBodyArmorValue(targetActor),
+                objectMaterialStrength: materialStrength,
+                slamSpeed: slamSpeed,
+                attackerStrength: attackerStrength
+            });
+            
+            // Create detailed damage report
+            await ChatMessage.create({
+                speaker: ChatMessage.getSpeaker({ alias: "Collision Damage" }),
+                content: `
+                    <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
+                        <div style="padding: 5px 10px; border-bottom: 1px solid #c0c0c0; font-size: 1.1em; color: #8b0000;">
+                            <strong>Slam Collision: ${targetActor.name} hits obstacle</strong>
+                        </div>
+                        <div style="padding: 5px 10px; font-size: 0.9em;">
+                            <div><strong>Slam Speed:</strong> ${slamSpeed} areas/round</div>
+                            <div><strong>Material Strength:</strong> ${materialStrength}</div>
+                            <div><strong>Character Endurance:</strong> ${targetActor.system.abilities.endurance.value || 0}</div>
+                            <div><strong>Damage Calculation:</strong> ${slamResults.description}</div>
+                            ${slamResults.damageToCharacter > 0 ? 
+                                `<div style="color: #cc0000;"><strong>Damage to ${targetActor.name}:</strong> ${slamResults.damageToCharacter}</div>` : 
+                                '<div style="color: #28a745;"><strong>No damage taken</strong></div>'
+                            }
+                        </div>
+                    </div>
+                `
+            });
+            
+            // Apply damage if any
+            if (slamResults.damageToCharacter > 0) {
+                const currentHealth = targetActor.system.attributes.health.value;
+                const newHealth = Math.max(0, currentHealth - slamResults.damageToCharacter);
+                
+                await game.msh.runAsGM({
+                    operation: 'adjustTargetHealth',
+                    targetActorUuid: targetActor.uuid,
+                    newHealth: newHealth
+                });
+                
+                ui.notifications.info(`${targetActor.name} takes ${slamResults.damageToCharacter} collision damage!`);
+            }
+            
+            // Disable the button to prevent multiple calculations
+            $(this).prop('disabled', true).text('Damage Calculated');
         });
     });
 }
