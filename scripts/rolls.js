@@ -2,6 +2,7 @@
 import { applyColumnShiftToRank } from './actorSheet.js';
 import { CombatHandler } from './combat-handler.js';
 import { runAsGM } from './gm-utils.js';
+import { calculateChargeDamage, getBodyArmorValue } from './charge-damage.js';
 
 // ============================================
 // HELPER FUNCTIONS (OUTSIDE THE CLASS)
@@ -3154,7 +3155,7 @@ export async function openUniversalTableDialog(actor) {
     { labelTop: "Dodging", labelMid: "Defense", code: "Do", ability: "Agility", white: "Autohit", green: "-2 CS", yellow: "-4 CS", red: "-6 CS" },
     { labelTop: "Evading", labelMid: "Defense", code: "Ev", ability: "Fighting", white: "Autohit", green: "Evasion", yellow: "+1 CS", red: "+2 CS" },
     { labelTop: "Blocking", labelMid: "Defense", code: "Bl", ability: "Strength", white: "Autohit", green: "+4 CS", yellow: "+2 CS", red: "+1 CS" },
-    { labelTop: "Catching", labelMid: "Objects", code: "Ca", ability: "Agility", white: "Miss", green: "Catch", yellow: "Catch", red: "No" },
+    { labelTop: "Catching", labelMid: "Objects", code: "Ca", ability: "Agility", white: "Auto-hit", green: "Miss", yellow: "Damage", red: "Catch" },
     { labelTop: "Stun", labelMid: "Check", code: "St", ability: "Endurance", white: "1–10", green: "1", yellow: "Damage", red: "No" },
     { labelTop: "Slam", labelMid: "Check", code: "Sl", ability: "Endurance", white: "Gr. Slam", green: "1 area", yellow: "Stagger", red: "No" },
     { labelTop: "Kill", labelMid: "Check", code: "Ki", ability: "Endurance", white: "End. Loss", green: "E/S", yellow: "No", red: "No" }
@@ -3543,6 +3544,23 @@ export async function rollUniversalAction(actionCode, actorId, columnShift = nul
     return;
   }
 
+  // code for Catching maneuver
+  if (actionCode === "Ca") {
+    const targetToken = game.user.targets.first();
+    const validation = await validateCatchingAttempt(actor, actionCode, targetToken);
+    if (!validation.valid) {
+      return; // Stop execution if validation fails
+    }
+    
+    // Apply -3CS penalty if object is directed against the character
+    const target = targetToken?.actor;
+    const isDirectedAttack = target?.getFlag("msh-faserip", "directedAttack") || false;
+    if (isDirectedAttack) {
+      totalColumnShift -= 3;
+      console.log("Applied -3CS penalty for catching object directed against character");
+    }
+  }
+
   // Handle multiple attacks first (before rolling)
   if (options.multiAttacks) {
     console.log(`Starting multiple universal action sequence: ${options.attackCount} attacks with ${actionCode}`);
@@ -3666,6 +3684,18 @@ export async function rollUniversalAction(actionCode, actorId, columnShift = nul
   if (options.multiAdjacent) {
     totalColumnShift -= 4;
     console.log("Applied -4CS penalty for multiple adjacent targets");
+  }
+
+  // more Catching code
+  // Apply -3CS penalty if object is directed against the character (for catching)
+  if (actionCode === "Ca") {
+    const targetToken = game.user.targets.first();
+    const target = targetToken?.actor;
+    const isDirectedAttack = target?.getFlag("msh-faserip", "directedAttack") || false;
+    if (isDirectedAttack) {
+      totalColumnShift -= 3;
+      console.log("Applied -3CS penalty for catching object directed against character");
+    }
   }
 
   // Apply column shifts to get effective rank
@@ -3826,8 +3856,12 @@ export async function rollUniversalAction(actionCode, actorId, columnShift = nul
     const target = game.user.targets.first()?.actor;
     console.log(`🎯 DEBUG: Single target processing with color: "${color}"`);
     
-    if (target) {
+    if (target && actionCode === "Ca") {
+      await processCatchingResult(actor, target, color, actionCode, finalValue, label);
+    } else if (target && actionCode !== "Ca") {
       await processUniversalActionTarget(actor, target, actionCode, color, finalValue, label);
+    } else if (actionCode === "Ca") {
+      ui.notifications.info("Catching requires a target to be selected.");
     } else {
       ui.notifications.info("No target selected — result shown, but no damage processed.");
     }
@@ -4119,3 +4153,552 @@ async function handleCombatEffect({ actor, target, actionType, resultColor, sour
     originalRollResult: resultColor.toLowerCase()
   });
 }
+
+// Catch functions
+async function validateCatchingAttempt(actor, actionCode, targetToken) {
+  if (actionCode !== "Ca") return { valid: true };
+  
+  const agility = actor.system.abilities.agility;
+  const agilityRank = agility.rank;
+  
+  // Check if there's a selected target (projectile/falling object)
+  if (!targetToken) {
+    ui.notifications.info("No target selected - creating temporary falling object for this catch attempt.");
+    // Create a temporary "falling object" data structure
+    const tempCatchingInfo = await getCatchingInfoDialog();
+    return { 
+      valid: true, 
+      targetType: tempCatchingInfo.objectType,
+      catchingInfo: tempCatchingInfo,
+      isTemporary: true
+    };
+  }
+  
+  const target = targetToken.actor;
+  
+  // Pop up dialog to determine what's being caught
+  const catchingInfo = await new Promise((resolve) => {
+    new Dialog({
+      title: `Catching Attempt: ${target.name}`,
+      content: `
+        <form>
+          <div class="form-group">
+            <label><strong>What is ${actor.name} trying to catch?</strong></label>
+            <select name="objectType" id="objectType">
+              <option value="falling">Falling Object/Character</option>
+              <option value="thrown">Thrown Projectile</option>
+              <option value="arrow">Arrow/Large Thin Projectile</option>
+              <option value="bullet">Bullet/Small Fast Projectile</option>
+            </select>
+          </div>
+          
+          <div class="form-group" id="fallingOptions" style="display: block;">
+            <label><strong>How long has the object/character been falling?</strong></label>
+            <select name="fallDuration">
+              <option value="1">1st Round - 3 floors/round (Typical speed)</option>
+              <option value="2">2nd Round - 6 floors/round (Good speed)</option>
+              <option value="3">3rd Round - 10 floors/round (Excellent speed)</option>
+              <option value="4">4th+ Round - 20 floors/round (Remarkable speed)</option>
+            </select>
+            <!-- 🔴 ADD THE DAMAGE PREVIEW HERE 🔴 -->
+            <div style="font-size: 0.8em; margin-top: 5px; color: #666;">
+              <strong>Impact damage if catch fails (assumes Typical person, concrete ground):</strong><br>
+              • 1st Round: ~12 damage (6 + 6)<br>
+              • 2nd Round: ~18 damage (6 + 12)<br>
+              • 3rd Round: ~26 damage (6 + 20)<br>
+              • 4th+ Round: ~46 damage (6 + 40) - Usually fatal!
+            </div>
+            
+            <div style="margin-top: 10px;">
+              <label><strong>Total fall distance (in floors/stories):</strong></label>
+              <input type="number" name="totalFallDistance" value="10" min="1" max="100" style="width: 60px;">
+              <div style="font-size: 0.8em; color: #666;">Used for impact damage if catch fails</div>
+            </div>
+          </div>
+          
+          <div class="form-group" id="projectileOptions" style="display: none;">
+            <label><strong>Projectile Details</strong></label>
+            <div style="margin: 5px 0;">
+              <label>Damage/Material Strength:</label>
+              <input type="number" name="projectileDamage" value="10" min="1" max="100">
+            </div>
+            <div style="margin: 5px 0;">
+              <label>Speed Rank:</label>
+              <select name="projectileSpeed">
+                <option value="Poor">Poor (2)</option>
+                <option value="Typical">Typical (6)</option>
+                <option value="Good">Good (10)</option>
+                <option value="Excellent">Excellent (20)</option>
+                <option value="Remarkable">Remarkable (30)</option>
+              </select>
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label>
+              <input type="checkbox" name="directedAttack" />
+              This object/attack is specifically directed at ${actor.name} (-3CS penalty)
+            </label>
+          </div>
+          
+          <div class="form-group" id="objectWeight" style="display: block;">
+            <label><strong>Object/Character Weight/Mass</strong></label>
+            <select name="objectMass">
+              <option value="2">Light (Feeble) - Small items, papers</option>
+              <option value="6">Normal (Typical) - Books, small tools, normal person</option>
+              <option value="10">Heavy (Good) - Large books, weapons, large person</option>
+              <option value="20">Very Heavy (Excellent) - Furniture, large objects</option>
+              <option value="30">Extremely Heavy (Remarkable) - Boulders, vehicles</option>
+              <option value="50">Massive (Amazing) - Cars, small buildings</option>
+            </select>
+          </div>
+        </form>
+        
+        <script>
+          document.getElementById('objectType').addEventListener('change', function() {
+            const fallingOptions = document.getElementById('fallingOptions');
+            const projectileOptions = document.getElementById('projectileOptions');
+            const objectWeight = document.getElementById('objectWeight');
+            
+            if (this.value === 'falling') {
+              fallingOptions.style.display = 'block';
+              projectileOptions.style.display = 'none';
+              objectWeight.style.display = 'block';
+            } else {
+              fallingOptions.style.display = 'none';
+              projectileOptions.style.display = 'block';
+              objectWeight.style.display = 'none';
+            }
+          });
+        </script>
+      `,
+      buttons: {
+        attempt: {
+          label: "Attempt Catch",
+          callback: (html) => {
+            const objectType = html.find('[name="objectType"]').val();
+            const fallDuration = parseInt(html.find('[name="fallDuration"]').val()) || 1;
+            const totalFallDistance = parseInt(html.find('[name="totalFallDistance"]').val()) || 10;
+            const directedAttack = html.find('[name="directedAttack"]').is(':checked');
+            const objectMass = parseInt(html.find('[name="objectMass"]').val()) || 6;
+            const projectileDamage = parseInt(html.find('[name="projectileDamage"]').val()) || 10;
+            const projectileSpeed = html.find('[name="projectileSpeed"]').val() || "Good";
+            
+            resolve({
+              objectType,
+              fallDuration,
+              totalFallDistance,
+              directedAttack,
+              objectMass,
+              projectileDamage,
+              projectileSpeed,
+              cancelled: false
+            });
+          }
+        },
+        cancel: {
+          label: "Cancel",
+          callback: () => resolve({ cancelled: true })
+        }
+      },
+      default: "attempt",
+      render: (html) => {
+        // Initialize the form display
+        const objectTypeSelect = html.find('#objectType')[0];
+        if (objectTypeSelect) {
+          objectTypeSelect.dispatchEvent(new Event('change'));
+        }
+      }
+    }).render(true);
+  });
+  
+  if (catchingInfo.cancelled) {
+    return { valid: false };
+  }
+  
+  // Check minimum Agility requirements based on object type
+  const rankValues = {
+    "Shift-0": 0, "Feeble": 2, "Poor": 4, "Typical": 6, "Good": 10,
+    "Excellent": 20, "Remarkable": 30, "Incredible": 40, "Amazing": 50,
+    "Monstrous": 75, "Unearthly": 100, "Shift X": 150, "Shift Y": 200,
+    "Shift Z": 300, "Class 1000": 1000, "Class 3000": 3000, "Class 5000": 5000,
+    "Beyond": 10000
+  };
+  
+  const agilityValue = rankValues[agilityRank] || 6;
+  let requiredAgility = 0;
+  let requiredRank = "";
+  
+  switch (catchingInfo.objectType) {
+    case "bullet":
+    case "small_fast":
+      requiredAgility = 100;
+      requiredRank = "Unearthly";
+      break;
+    case "arrow":
+    case "large_thin":
+      requiredAgility = 50;
+      requiredRank = "Amazing";
+      break;
+    case "thrown":
+    case "projectile":
+      requiredAgility = 30;
+      requiredRank = "Remarkable";
+      break;
+    case "falling":
+    case "character":
+    case "object":
+    default:
+      // Any Agility can catch falling objects/characters
+      requiredAgility = 0;
+      requiredRank = "Any";
+      break;
+  }
+  
+  if (agilityValue < requiredAgility) {
+    ui.notifications.error(`Catching ${catchingInfo.objectType} requires at least ${requiredRank} Agility. ${actor.name} has ${agilityRank}.`);
+    return { valid: false };
+  }
+  
+  // Calculate fall speed and areas moved based on FASERIP rules
+  let fallSpeed, fallSpeedRank, areasMovedThrough;
+  
+  if (catchingInfo.objectType === "falling") {
+    // Use official FASERIP falling speeds
+    switch (catchingInfo.fallDuration) {
+      case 1:
+        fallSpeed = 3;
+        fallSpeedRank = "Typical";
+        areasMovedThrough = 3;
+        break;
+      case 2:
+        fallSpeed = 6;
+        fallSpeedRank = "Good";
+        areasMovedThrough = 6;
+        break;
+      case 3:
+        fallSpeed = 10;
+        fallSpeedRank = "Excellent";
+        areasMovedThrough = 10;
+        break;
+      case 4:
+      default:
+        fallSpeed = 20;
+        fallSpeedRank = "Remarkable";
+        areasMovedThrough = 20;
+        break;
+    }
+  }
+  
+  // Set flags on the target based on the dialog results
+  await target.setFlag("msh-faserip", "projectileType", catchingInfo.objectType);
+  await target.setFlag("msh-faserip", "directedAttack", catchingInfo.directedAttack);
+  await target.setFlag("msh-faserip", "objectWeight", catchingInfo.objectMass);
+  await target.setFlag("msh-faserip", "projectileDamage", catchingInfo.projectileDamage);
+  await target.setFlag("msh-faserip", "projectileSpeed", catchingInfo.projectileSpeed);
+  
+  if (catchingInfo.objectType === "falling") {
+    await target.setFlag("msh-faserip", "fallSpeed", fallSpeedRank);
+    await target.setFlag("msh-faserip", "fallDuration", catchingInfo.fallDuration);
+    await target.setFlag("msh-faserip", "totalFallDistance", catchingInfo.totalFallDistance);
+    await target.setFlag("msh-faserip", "areasMovedThrough", areasMovedThrough);
+  }
+  
+  return { 
+    valid: true, 
+    targetType: catchingInfo.objectType, 
+    requiredRank,
+    catchingInfo,
+    fallSpeed,
+    fallSpeedRank,
+    areasMovedThrough
+  };
+}
+
+// Add this function to process catching results with charge damage integration
+async function processCatchingResult(actor, target, color, actionCode, finalValue, label) {
+  const targetType = target?.getFlag("msh-faserip", "projectileType") || "falling";
+  const isDirectedAttack = target?.getFlag("msh-faserip", "directedAttack") || false;
+  
+  switch (color.toLowerCase()) {
+    // Update the white (Auto-hit) case for falling objects in processCatchingResult:
+    case "white": // Auto-hit
+      if (targetType === "falling") {
+        // Failed catch - falling person hits the catcher AND then hits the ground
+        const fallDuration = target?.getFlag("msh-faserip", "fallDuration") || 1;
+        const totalFallDistance = target?.getFlag("msh-faserip", "totalFallDistance") || 10;
+        const areasMovedThrough = target?.getFlag("msh-faserip", "areasMovedThrough") || 3;
+        const objectWeight = target?.getFlag("msh-faserip", "objectWeight") || 6;
+        
+        // Calculate damage to the catcher (collision)
+        const damageResults = calculateChargeDamage({
+          attackerEndurance: objectWeight,
+          attackerBodyArmor: getBodyArmorValue(target) || 0, // Falling person's armor
+          defenderBodyArmor: getBodyArmorValue(actor),
+          areasMovedThrough: areasMovedThrough,
+          resultColor: "green", // Treat as automatic hit
+          isInanimateObject: false,
+          objectMaterialStrength: 0
+        });
+        
+        // Calculate damage to falling person when they hit ground after collision
+        const fallingPersonEndurance = objectWeight;
+        const fallingPersonArmor = getBodyArmorValue(target) || 0;
+        const groundImpactDamage = Math.max(fallingPersonEndurance, fallingPersonArmor) + (2 * areasMovedThrough);
+        const netGroundDamage = Math.max(0, groundImpactDamage - fallingPersonArmor);
+        
+        await ChatMessage.create({
+          speaker: ChatMessage.getSpeaker({ actor }),
+          content: `
+            <div style="background-color: #ffebee; border: 1px solid #f44336; border-radius: 3px; padding: 8px; margin: 5px 0;">
+              <div style="color: #d32f2f; font-weight: bold;">Catching Failed - Auto-hit!</div>
+              <div style="font-size: 0.9em; margin-top: 5px;">
+                ${actor.name} failed to catch the falling person and is struck by them!<br>
+                <strong>Fall Duration:</strong> Round ${fallDuration} (${areasMovedThrough} floors/round)<br>
+                <strong>Total Fall Distance:</strong> ${totalFallDistance} floors<br>
+                <strong>Person Weight:</strong> ${objectWeight}<br>
+                <strong>Impact Speed:</strong> ${areasMovedThrough} areas/round<br>
+                <br>
+                <strong>Collision Damage:</strong> ${damageResults.description}<br>
+                ${damageResults.damageToDefender > 0 ? 
+                  `<span style="color: #cc0000;"><strong>${actor.name} takes ${damageResults.damageToDefender} collision damage!</strong></span>` : 
+                  '<span style="color: #28a745;"><strong>${actor.name} takes no collision damage (absorbed by armor)</strong></span>'
+                }<br>
+                <br>
+                <strong>Ground Impact:</strong> Falling person then hits the ground<br>
+                <strong>Ground Impact Damage:</strong> ${groundImpactDamage} points (rebounds from concrete)<br>
+                ${netGroundDamage > 0 ? 
+                  `<span style="color: #cc0000;"><strong>${target.name} takes ${netGroundDamage} falling damage!</strong></span>` : 
+                  '<span style="color: #28a745;"><strong>${target.name} takes no falling damage (absorbed by armor)</strong></span>'
+                }
+              </div>
+            </div>
+          `
+        });
+        
+        // Apply collision damage to catcher
+        if (damageResults.damageToDefender > 0) {
+          await game.msh.runAsGM({
+            operation: 'adjustTargetHealth',
+            targetActorUuid: actor.uuid,
+            newHealth: Math.max(0, actor.system.attributes.health.value - damageResults.damageToDefender)
+          });
+        }
+        
+        // Apply ground impact damage to falling person
+        if (netGroundDamage > 0 && target.system?.attributes?.health) {
+          await game.msh.runAsGM({
+            operation: 'adjustTargetHealth',
+            targetActorUuid: target.uuid,
+            newHealth: Math.max(0, target.system.attributes.health.value - netGroundDamage)
+          });
+        }
+        
+      } else {
+        // Existing projectile auto-hit code...
+      }
+      break;
+      
+    case "green": // Miss
+      if (isDirectedAttack) {
+        await ChatMessage.create({
+          speaker: ChatMessage.getSpeaker({ actor }),
+          content: `
+            <div style="background-color: #fff3e0; border: 1px solid #ff9800; border-radius: 3px; padding: 8px; margin: 5px 0;">
+              <div style="color: #f57c00; font-weight: bold;">Catching Missed!</div>
+              <div style="font-size: 0.9em; margin-top: 5px;">
+                ${actor.name} missed catching the object directed at them.<br>
+                The original attack proceeds with +1CS to hit.
+              </div>
+            </div>
+          `
+        });
+        // TODO: Apply +1CS to original attack roll
+      } else if (targetType === "falling") {
+        // Failed to catch falling object/person - they hit the ground!
+        const fallDuration = target?.getFlag("msh-faserip", "fallDuration") || 1;
+        const totalFallDistance = target?.getFlag("msh-faserip", "totalFallDistance") || 10;
+        const areasMovedThrough = target?.getFlag("msh-faserip", "areasMovedThrough") || 3;
+        const objectWeight = target?.getFlag("msh-faserip", "objectWeight") || 6;
+        
+        // Calculate rebound damage from hitting concrete (using corrected falling rules)
+        const personEndurance = objectWeight;
+        const personArmor = getBodyArmorValue(target) || 0;
+        const impactDamage = Math.max(personEndurance, personArmor) + (2 * areasMovedThrough);
+        const concreteStrength = 30; // Remarkable - concrete pavement
+        
+        // Since concrete is stronger than most impacts, full rebound damage applies
+        const reboundDamage = impactDamage;
+        const netDamage = Math.max(0, reboundDamage - personArmor);
+        
+        await ChatMessage.create({
+          speaker: ChatMessage.getSpeaker({ actor }),
+          content: `
+            <div style="background-color: #fff3e0; border: 1px solid #ff9800; border-radius: 3px; padding: 8px; margin: 5px 0;">
+              <div style="color: #f57c00; font-weight: bold;">Catching Missed!</div>
+              <div style="font-size: 0.9em; margin-top: 5px;">
+                ${actor.name} missed catching the falling person.<br>
+                <strong>Fall Duration:</strong> Round ${fallDuration} (${areasMovedThrough} floors/round)<br>
+                <strong>Ground Impact:</strong> ${target.name} hits concrete pavement!<br>
+                <strong>Ground Material:</strong> Remarkable (concrete/asphalt) - ${concreteStrength} strength<br>
+                <strong>Impact Force:</strong> ${impactDamage} points<br>
+                <strong>Rebound Damage:</strong> All impact force rebounds to person<br>
+                ${netDamage > 0 ? 
+                  `<span style="color: #cc0000;"><strong>${target.name} takes ${netDamage} falling damage!</strong></span>` : 
+                  '<span style="color: #28a745;"><strong>No damage taken (absorbed by armor)</strong></span>'
+                }
+              </div>
+            </div>
+          `
+        });
+        
+        // Apply falling damage to the person who hit the ground
+        if (netDamage > 0 && target.system?.attributes?.health) {
+          await game.msh.runAsGM({
+            operation: 'adjustTargetHealth',
+            targetActorUuid: target.uuid,
+            newHealth: Math.max(0, target.system.attributes.health.value - netDamage)
+          });
+        }
+      } else {
+        // Other non-directed projectiles
+        await ChatMessage.create({
+          speaker: ChatMessage.getSpeaker({ actor }),
+          content: `
+            <div style="background-color: #fff3e0; border: 1px solid #ff9800; border-radius: 3px; padding: 8px; margin: 5px 0;">
+              <div style="color: #f57c00; font-weight: bold;">Catching Missed!</div>
+              <div style="font-size: 0.9em; margin-top: 5px;">
+                ${actor.name} missed catching the object.
+              </div>
+            </div>
+          `
+        });
+      }
+      break;
+      
+    case "yellow": // Damage
+      // Calculate damage to the caught object/character
+      const catchDamage = actor.system.abilities.strength.value || 10;
+      
+      await ChatMessage.create({
+        speaker: ChatMessage.getSpeaker({ actor }),
+        content: `
+          <div style="background-color: #fff8e1; border: 1px solid #ffc107; border-radius: 3px; padding: 8px; margin: 5px 0;">
+            <div style="color: #f57c00; font-weight: bold;">Catching Succeeded - With Damage!</div>
+            <div style="font-size: 0.9em; margin-top: 5px;">
+              ${actor.name} caught the object but may have damaged it!<br>
+              <strong>Catch Damage:</strong> ${catchDamage} (based on ${actor.name}'s Strength)<br>
+              ${target.type === "character" ? 
+                `<span style="color: #cc0000;"><strong>${target.name} takes ${catchDamage} damage from rough catch!</strong></span>` :
+                `<strong>Object may be damaged (GM discretion)</strong>`
+              }
+            </div>
+          </div>
+        `
+      });
+      
+      // Apply damage if target is a character
+      if (target.type === "character" || target.system?.attributes?.health) {
+        const targetArmorValue = getBodyArmorValue(target);
+        const netDamage = Math.max(0, catchDamage - targetArmorValue);
+        
+        if (netDamage > 0) {
+          await game.msh.runAsGM({
+            operation: 'adjustTargetHealth',
+            targetActorUuid: target.uuid,
+            newHealth: Math.max(0, target.system.attributes.health.value - netDamage)
+          });
+        }
+      }
+      break;
+      
+    case "red": // Catch
+      await ChatMessage.create({
+        speaker: ChatMessage.getSpeaker({ actor }),
+        content: `
+          <div style="background-color: #e8f5e8; border: 1px solid #4caf50; border-radius: 3px; padding: 8px; margin: 5px 0;">
+            <div style="color: #2e7d32; font-weight: bold;">Perfect Catch!</div>
+            <div style="font-size: 0.9em; margin-top: 5px;">
+              ${actor.name} successfully caught the object with no ill effects!
+            </div>
+          </div>
+        `
+      });
+      break;
+  }
+}
+
+// Add this function to help GMs set up catching scenarios
+// Enhanced setup function for catching scenarios
+async function setupCatchingScenario(token) {
+  if (!token) {
+    ui.notifications.warn("Please select a token representing the object to be caught.");
+    return;
+  }
+  
+  new Dialog({
+    title: "Setup Catching Scenario",
+    content: `
+      <form>
+        <div class="form-group">
+          <label>Object Type</label>
+          <select name="projectileType">
+            <option value="falling">Falling Object/Character</option>
+            <option value="thrown">Thrown Projectile</option>
+            <option value="arrow">Arrow/Large Thin Projectile</option>
+            <option value="bullet">Bullet/Small Fast Projectile</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>
+            <input type="checkbox" name="directedAttack" />
+            Directed against character (-3CS penalty)
+          </label>
+        </div>
+        <div class="form-group">
+          <label>Fall Speed / Object Speed</label>
+          <select name="fallSpeed">
+            <option value="Poor">Poor (2)</option>
+            <option value="Typical">Typical (6)</option>
+            <option value="Good" selected>Good (10)</option>
+            <option value="Excellent">Excellent (20)</option>
+            <option value="Remarkable">Remarkable (30)</option>
+            <option value="Incredible">Incredible (40)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Object Weight/Mass (for falling objects)</label>
+          <input type="number" name="objectWeight" value="10" />
+        </div>
+        <div class="form-group">
+          <label>Projectile Damage (for thrown/shot objects)</label>
+          <input type="number" name="projectileDamage" value="10" />
+        </div>
+      </form>
+    `,
+    buttons: {
+      setup: {
+        label: "Setup",
+        callback: async (html) => {
+          const projectileType = html.find('[name="projectileType"]').val();
+          const directedAttack = html.find('[name="directedAttack"]').is(':checked');
+          const fallSpeed = html.find('[name="fallSpeed"]').val();
+          const objectWeight = parseInt(html.find('[name="objectWeight"]').val()) || 10;
+          const projectileDamage = parseInt(html.find('[name="projectileDamage"]').val()) || 10;
+          
+          await token.actor.setFlag("msh-faserip", "projectileType", projectileType);
+          await token.actor.setFlag("msh-faserip", "directedAttack", directedAttack);
+          await token.actor.setFlag("msh-faserip", "fallSpeed", fallSpeed);
+          await token.actor.setFlag("msh-faserip", "objectWeight", objectWeight);
+          await token.actor.setFlag("msh-faserip", "projectileDamage", projectileDamage);
+          
+          ui.notifications.info(`Catching scenario setup complete for ${token.name}`);
+        }
+      },
+      cancel: { label: "Cancel" }
+    }
+  }).render(true);
+}
+
+// Add this to the global scope for easy GM access
+window.setupCatchingScenario = setupCatchingScenario;

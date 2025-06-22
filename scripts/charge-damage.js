@@ -268,7 +268,7 @@ export async function processChargeAttack(attackData) {
  * @param {Actor} actor - The actor to check
  * @returns {Number} - Body armor value
  */
-function getBodyArmorValue(actor) {
+export function getBodyArmorValue(actor) {
     console.log(`🛡️ DEBUG: Getting body armor for ${actor.name}`);
     
     // Check for body armor equipment
