@@ -614,6 +614,13 @@ export class CombatHandler {
         console.log("  options:", options);
         
         let soundPath = null;
+        let volume = 0.8; // default volume
+        
+        // Determine if this was a hit or miss
+        const isHit = rollResult.toLowerCase() !== "white";
+        const isMiss = rollResult.toLowerCase() === "white";
+        
+        console.log("Hit/Miss status:", isHit ? "HIT" : "MISS");
         
         // Determine sound based on damage type and source
         const lowerDamageType = damageType.toLowerCase();
@@ -623,76 +630,81 @@ export class CombatHandler {
         console.log("  lowerDamageType:", lowerDamageType);
         console.log("  lowerSourceName:", lowerSourceName);
         
-        // Weapon-specific sounds (order matters - check most specific first!)
+        // Weapon-specific sounds (check most specific first)
         if (lowerSourceName.includes("sub-machine gun") || lowerSourceName.includes("submachine gun")) {
             console.log("Match found: sub-machine gun");
-            soundPath = "systems/msh-faserip/assets/sfx/submachine-gun.wav"; // or whatever file you want
+            soundPath = isHit ? "systems/msh-faserip/assets/sfx/submachine-gun.wav" : "systems/msh-faserip/assets/sfx/submachine-gun-miss.wav";
         } else if (lowerSourceName.includes("machine gun")) {
             console.log("Match found: machine gun");
-            soundPath = "systems/msh-faserip/assets/sfx/machine-gun.wav";
+            soundPath = isHit ? "systems/msh-faserip/assets/sfx/machine-gun.wav" : "systems/msh-faserip/assets/sfx/machine-gun-miss.wav";
         } else if (lowerSourceName.includes("rifle")) {
             console.log("Match found: rifle");
-            soundPath = "systems/msh-faserip/assets/sfx/rifle.wav";
+            soundPath = isHit ? "systems/msh-faserip/assets/sfx/rifle.wav" : "systems/msh-faserip/assets/sfx/rifle-miss.wav";
         } else if (lowerSourceName.includes("shotgun")) {
             console.log("Match found: shotgun");
-            soundPath = "systems/msh-faserip/assets/sfx/shotgun.wav";
+            soundPath = isHit ? "systems/msh-faserip/assets/sfx/shotgun.wav" : "systems/msh-faserip/assets/sfx/shotgun-miss.wav";
         } else if (lowerSourceName.includes("pistol") || lowerSourceName.includes("gun")) {
             console.log("Match found: pistol/gun");
-            soundPath = "systems/msh-faserip/assets/sfx/gunshot.wav";
+            soundPath = isHit ? "systems/msh-faserip/assets/sfx/gunshot.wav" : "systems/msh-faserip/assets/sfx/gunshot-miss.wav";
         }
         // Damage type sounds (fallback)
         else if (lowerDamageType.includes("shooting")) {
             console.log("Match found: shooting damage type");
-            soundPath = "systems/msh-faserip/assets/sfx/gunshot.wav";
+            soundPath = isHit ? "systems/msh-faserip/assets/sfx/gunshot.wav" : "systems/msh-faserip/assets/sfx/gunshot-miss.wav";
         } else if (lowerDamageType.includes("blunt")) {
             console.log("Match found: blunt damage type");
-            soundPath = "systems/msh-faserip/assets/sfx/punch.wav";
+            soundPath = isHit ? "systems/msh-faserip/assets/sfx/punch.wav" : "systems/msh-faserip/assets/sfx/punch-miss.wav";
         } else if (lowerDamageType.includes("edged")) {
             console.log("Match found: edged damage type");
-            soundPath = "systems/msh-faserip/assets/sfx/blade.wav";
+            soundPath = isHit ? "systems/msh-faserip/assets/sfx/blade.wav" : "systems/msh-faserip/assets/sfx/blade-miss.wav";
         } else if (lowerDamageType.includes("energy-fire")) {
             console.log("Match found: energy-fire damage type");
-            soundPath = "systems/msh-faserip/assets/sfx/fire-blast.wav";
+            soundPath = isHit ? "systems/msh-faserip/assets/sfx/fire-blast.wav" : "systems/msh-faserip/assets/sfx/fire-blast-miss.wav";
         } else if (lowerDamageType.includes("energy-energy")) {
             console.log("Match found: energy-energy damage type");
-            soundPath = "systems/msh-faserip/assets/sfx/lightning_bolt.wav";
+            soundPath = isHit ? "systems/msh-faserip/assets/sfx/lightning_bolt.wav" : "systems/msh-faserip/assets/sfx/lightning_bolt-miss.wav";
+            volume = 1.0; // Make lightning louder
         } else {
             console.log("No weapon or damage type match found");
+            // Generic hit/miss sounds as fallback
+            if (isHit) {
+                soundPath = "systems/msh-faserip/assets/sfx/generic-hit.wav";
+            } else {
+                soundPath = "systems/msh-faserip/assets/sfx/generic-miss.wav";
+            }
         }
         
         console.log("Initial soundPath:", soundPath);
         
-        // Play different sounds for critical results
-        if (rollResult.toLowerCase() === "red" && soundPath) {
+        // Play different sounds for critical results (only for hits)
+        if (rollResult.toLowerCase() === "red" && soundPath && isHit) {
             console.log("Red result detected, checking for critical version");
-            // Play a more intense version for red results
-            const criticalPath = soundPath.replace(".wav", "-critical.wav");
+            const criticalPath = soundPath.replace(".wav", "-critical.wav").replace(".ogg", "-critical.ogg");
             console.log("Critical path would be:", criticalPath);
             
             if (await this.soundFileExists(criticalPath)) {
                 console.log("Critical version exists, using it");
                 soundPath = criticalPath;
+                volume = Math.min(volume * 1.2, 1.0); // Boost volume for critical hits
             } else {
                 console.log("Critical version does not exist, keeping original");
             }
-        } else if (rollResult.toLowerCase() === "red") {
-            console.log("Red result but no soundPath set");
-        } else {
-            console.log("Not a red result, rollResult is:", rollResult.toLowerCase());
         }
         
-        // Handle special ammunition
-        if (options.ammoType === "explosive") {
+        // Handle special ammunition (only for hits)
+        if (options.ammoType === "explosive" && isHit) {
             console.log("Explosive ammo detected, overriding sound");
             soundPath = "systems/msh-faserip/sounds/explosion.wav";
+            volume = 1.0;
         }
         
         console.log("Final soundPath:", soundPath);
+        console.log("Final volume:", volume);
         
         if (soundPath) {
-            console.log("Attempting to play sound:", soundPath);
+            console.log("Attempting to play sound:", soundPath, "at volume:", volume);
             try {
-                await foundry.audio.AudioHelper.play({ src: soundPath, volume: 0.8, autoplay: true }, true);
+                await foundry.audio.AudioHelper.play({ src: soundPath, volume: volume, autoplay: true }, true);
                 console.log("Sound play command executed successfully");
             } catch (error) {
                 console.error("Error playing sound:", error);
