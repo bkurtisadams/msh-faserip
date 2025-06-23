@@ -2260,8 +2260,14 @@ export class FaseripRolls {
           return { outOfRange: true };
         }
 
-        // Apply range penalty to column shift
-        const totalShift = shift - rangeData.penalty; // Now shift is defined
+        // Apply range penalty to column shift and multi-target penalties
+        let totalShift = shift - rangeData.penalty; // Now shift is defined
+
+        // Apply -4CS penalty for multiple adjacent targets
+        if (options.multiAdjacent) {
+          totalShift -= 4;
+          console.log("Applied -4CS penalty for multiple adjacent targets");
+        }
 
         // Get the ability to use (fighting or agility)
         const abilityKey = action.ability || "fighting";
@@ -2270,7 +2276,7 @@ export class FaseripRolls {
 
         // Apply column shifts if needed
         let effectiveRank = abilityRank;
-        if (shift !== 0) {
+        if (totalShift !== 0) {
           const ranks = [
             "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent",
             "Remarkable", "Incredible", "Amazing", "Monstrous", "Unearthly"
@@ -2299,7 +2305,7 @@ export class FaseripRolls {
         let cappedTotal = roll.total;
         let karmaUsed = 0;
 
-// <-- NEW/MODIFIED SECTION START -->
+        // <-- NEW/MODIFIED SECTION START (same karma handling as rollPower) -->
         const dailyKarmaEnabled = game.settings.get("msh-faserip", "dailyKarmaEnabled");
         let dailyKarmaUsedAmount = 0;
         let lifetimeKarmaUsedAmount = 0;
@@ -2371,19 +2377,6 @@ export class FaseripRolls {
         // ✅ Now use cappedTotal instead of totalRoll
         const resultColor = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
         const effect = action.results[resultColor.toLowerCase()];
-
-        /* if (karmaUsed > 0) {
-          const history = foundry.utils.deepClone(actor.system.karma?.history || []);
-          const newEvent = {
-            realDate: new Date().toLocaleDateString(),
-            gameDate: "",
-            amount: -karmaUsed,
-            type: "Die Roll",
-            description: `Spent on ${sourceName}`
-          };
-          history.push(newEvent);
-          await actor.update({ "system.karma.history": history });
-        } */
 
         // Get grenade properties if applicable
         let additionalInfo = "";
@@ -2487,81 +2480,156 @@ export class FaseripRolls {
           roll: roll
         });
 
-        // Auto-damage handling via CombatHandler
-        const target = game.user.targets.first()?.actor;
-        if (target) {
-          let baseDamage = parseInt(equipment.system.damage);
-          if (isNaN(baseDamage)) {
-            baseDamage = CONFIG.FASERIP.rankValues[equipment.system.damage] || 0;
+        // MULTI-TARGET COMBAT HANDLER INTEGRATION
+        // Check if we have target(s) to apply damage to
+        if (options.multiAdjacent && game.user.targets.size > 1) {
+          // Multiple adjacent targets - single roll with -4CS, applied to all
+          const targets = Array.from(game.user.targets);
+          console.log(`Processing multiple adjacent targets: ${targets.map(t => t.name).join(', ')}`);
+          
+          for (const target of targets) {
+            if (resultColor.toLowerCase() !== "white") {
+              let baseDamage = parseInt(equipment.system.damage);
+              if (isNaN(baseDamage)) {
+                baseDamage = CONFIG.FASERIP.rankValues[equipment.system.damage] || 0;
+              }
+
+              // DAMAGE TYPE NORMALIZATION HERE
+              // Normalize damage types for combat handler
+              let normalizedDamageType;
+              const weaponType = equipment.system.weaponType || "";
+              const rawDamageType = equipment.system.damageType || "";
+
+              // Normalize damage types for shooting weapons
+              if (weaponType === "shooting" || actionName.includes("Shooting")) {
+                normalizedDamageType = "Physical-Shooting";
+              } else if (actionName.includes("Blunt")) {
+                normalizedDamageType = "Physical-Blunt";
+              } else if (actionName.includes("Edged")) {
+                normalizedDamageType = "Physical-Edged";
+              } else if (actionName.includes("Energy")) {
+                normalizedDamageType = "Energy-Energy";
+              } else if (actionName.includes("Force")) {
+                normalizedDamageType = "Force";
+              } else {
+                // Default based on weapon type
+                normalizedDamageType = "Physical-Shooting"; // Most weapons are shooting
+              }
+
+              console.log(`Weapon damage type: "${rawDamageType}" → "${normalizedDamageType}"`);
+
+              const actionNameLower = actionName.toLowerCase();
+              const effectLower = effect?.toLowerCase() || "";
+
+              // Apply FASERIP rules: only certain attack types can kill
+              const canBeKill = (actionNameLower.includes("edged") || 
+                                actionNameLower.includes("shooting") || 
+                                actionNameLower.includes("energy")) && 
+                                effectLower.includes("kill");
+
+              const canBeSlam = (actionNameLower.includes("blunt") || 
+                                actionNameLower.includes("shooting")) && 
+                                effectLower.includes("slam");
+
+              const canBeStun = effectLower.includes("stun") || actionNameLower.includes("stunning");
+              
+              await CombatHandler.processAttack({
+                attacker: actor,
+                target: target.actor,
+                baseDamage: baseDamage,
+                damageType: normalizedDamageType, // Use the normalized type
+                sourceName: equipment.name,
+                canBeStun: canBeStun,
+                canBeSlam: canBeSlam,
+                canBeKill: canBeKill,
+                originalRollResult: resultColor.toLowerCase()
+              }, {
+                ammoType: currentAmmoType, // Use the determined ammo type instead of options.ammoType
+                skipDefenseDialog: false
+              });
+            }
           }
-
-          // DAMAGE TYPE NORMALIZATION HERE
-          // Normalize damage types for combat handler
-          let normalizedDamageType;
-          const weaponType = equipment.system.weaponType || "";
-          const rawDamageType = equipment.system.damageType || "";
-
-          // Normalize damage types for shooting weapons
-          if (weaponType === "shooting" || actionName.includes("Shooting")) {
-            normalizedDamageType = "Physical-Shooting";
-          } else if (actionName.includes("Blunt")) {
-            normalizedDamageType = "Physical-Blunt";
-          } else if (actionName.includes("Edged")) {
-            normalizedDamageType = "Physical-Edged";
-          } else if (actionName.includes("Energy")) {
-            normalizedDamageType = "Energy-Energy";
-          } else if (actionName.includes("Force")) {
-            normalizedDamageType = "Force";
-          } else {
-            // Default based on weapon type
-            normalizedDamageType = "Physical-Shooting"; // Most weapons are shooting
-          }
-
-          console.log(`Weapon damage type: "${rawDamageType}" → "${normalizedDamageType}"`);
-
-          // END OF DAMAGE TYPE NORMALIZATION ↑
-
-          const actionNameLower = actionName.toLowerCase();
-          const effectLower = effect?.toLowerCase() || "";
-
-          // Apply FASERIP rules: only certain attack types can kill
-          const canBeKill = (actionNameLower.includes("edged") || 
-                            actionNameLower.includes("shooting") || 
-                            actionNameLower.includes("energy")) && 
-                            effectLower.includes("kill");
-
-          const canBeSlam = (actionNameLower.includes("blunt") || 
-                            actionNameLower.includes("shooting")) && 
-                            effectLower.includes("slam");
-
-          const canBeStun = effectLower.includes("stun") || actionNameLower.includes("stunning");
-
-
-          // Around line 2580 in rollEquipment function
-          if (effectLower === "miss") {
-            console.log("🛑 No damage — attack result is Miss.");
-          } else {
-            // Add debugging for ammo type
-            console.log("Equipment roll options:", options); // Debug line
-            console.log("Ammo type being passed:", options.ammoType || "standard"); // Debug line
-            
-            await CombatHandler.processAttack({
-              attacker: actor,
-              target: target,
-              baseDamage: baseDamage,
-              damageType: normalizedDamageType, // Use the normalized type
-              sourceName: equipment.name,
-              canBeStun: effectLower.includes("stun") || actionName.toLowerCase().includes("stunning"),
-              canBeSlam: effectLower.includes("slam"),
-              canBeKill: effectLower.includes("kill"),
-              originalRollResult: resultColor.toLowerCase()
-            }, {
-              ammoType: currentAmmoType, // Use the determined ammo type instead of options.ammoType
-              skipDefenseDialog: false
-            });
-          }
+        } else if (options.multiAttacks) {
+          // Handle multiple attacks (this will be more complex)
+          console.log("Multiple attacks not yet implemented for equipment");
+          ui.notifications.info("Multiple attacks feature not yet implemented for equipment.");
         } else {
-          ui.notifications.info("No target selected. Damage not applied.");
+          // Single target (existing code)
+          const target = game.user.targets.first()?.actor;
+          if (target) {
+            let baseDamage = parseInt(equipment.system.damage);
+            if (isNaN(baseDamage)) {
+              baseDamage = CONFIG.FASERIP.rankValues[equipment.system.damage] || 0;
+            }
+
+            // DAMAGE TYPE NORMALIZATION HERE
+            // Normalize damage types for combat handler
+            let normalizedDamageType;
+            const weaponType = equipment.system.weaponType || "";
+            const rawDamageType = equipment.system.damageType || "";
+
+            // Normalize damage types for shooting weapons
+            if (weaponType === "shooting" || actionName.includes("Shooting")) {
+              normalizedDamageType = "Physical-Shooting";
+            } else if (actionName.includes("Blunt")) {
+              normalizedDamageType = "Physical-Blunt";
+            } else if (actionName.includes("Edged")) {
+              normalizedDamageType = "Physical-Edged";
+            } else if (actionName.includes("Energy")) {
+              normalizedDamageType = "Energy-Energy";
+            } else if (actionName.includes("Force")) {
+              normalizedDamageType = "Force";
+            } else {
+              // Default based on weapon type
+              normalizedDamageType = "Physical-Shooting"; // Most weapons are shooting
+            }
+
+            console.log(`Weapon damage type: "${rawDamageType}" → "${normalizedDamageType}"`);
+
+            // END OF DAMAGE TYPE NORMALIZATION ↑
+
+            const actionNameLower = actionName.toLowerCase();
+            const effectLower = effect?.toLowerCase() || "";
+
+            // Apply FASERIP rules: only certain attack types can kill
+            const canBeKill = (actionNameLower.includes("edged") || 
+                              actionNameLower.includes("shooting") || 
+                              actionNameLower.includes("energy")) && 
+                              effectLower.includes("kill");
+
+            const canBeSlam = (actionNameLower.includes("blunt") || 
+                              actionNameLower.includes("shooting")) && 
+                              effectLower.includes("slam");
+
+            const canBeStun = effectLower.includes("stun") || actionNameLower.includes("stunning");
+
+
+            // Around line 2580 in rollEquipment function
+            if (effectLower === "miss") {
+              console.log("🛑 No damage — attack result is Miss.");
+            } else {
+              // Add debugging for ammo type
+              console.log("Equipment roll options:", options); // Debug line
+              console.log("Ammo type being passed:", options.ammoType || "standard"); // Debug line
+              
+              await CombatHandler.processAttack({
+                attacker: actor,
+                target: target,
+                baseDamage: baseDamage,
+                damageType: normalizedDamageType, // Use the normalized type
+                sourceName: equipment.name,
+                canBeStun: effectLower.includes("stun") || actionName.toLowerCase().includes("stunning"),
+                canBeSlam: effectLower.includes("slam"),
+                canBeKill: effectLower.includes("kill"),
+                originalRollResult: resultColor.toLowerCase()
+              }, {
+                ammoType: currentAmmoType, // Use the determined ammo type instead of options.ammoType
+                skipDefenseDialog: false
+              });
+            }
+          } else if (resultColor.toLowerCase() !== "white" && !target) {
+            ui.notifications.info("No target selected. Damage not applied.");
+          }
         }
 
         // After the roll is complete and the chat message is created, update ammunition:
@@ -2595,35 +2663,71 @@ export class FaseripRolls {
       }
 
       // Otherwise show dialog for interactive roll
-      // Create dialog for roll options
+      // Create dialog for roll options with multi-target support
       let dialogContent = `
-        <div style="margin-bottom: 10px;">
-          <label style="display: inline-block; width: 120px;">Action Type:</label>
-          <select id="action" name="action" style="width: 180px;">
-            ${Object.keys(ACTIONS).map(action =>
-        `<option value="${action}" ${action === defaultAction ? 'selected' : ''}>${action}</option>`
-      ).join('')}
-          </select>
-        </div>
-        <div style="margin-bottom: 10px;">
-          <label style="display: inline-block; width: 120px;">Column Shift:</label>
-          <input type="number" id="shift" name="shift" value="0" style="width: 50px;">
-          <span style="color: #666; font-size: 0.9em;">(+ right, - left)</span>
-        </div>
-        <div style="margin-bottom: 10px;">
-          <label style="display: inline-block; width: 120px;">Karma Points:</label>
-          <input type="number" id="karma" name="karma" value="0" min="0" style="width: 50px;">
-        </div>
-        <div>
+        <div style="background: #f0e8d8; padding: 10px; border-radius: 5px;">
+          <div style="margin-bottom: 10px;">
+            <label style="display: inline-block; width: 120px;">Action Type:</label>
+            <select id="action" name="action" style="width: 180px;">
+              ${Object.keys(ACTIONS).map(action =>
+          `<option value="${action}" ${action === defaultAction ? 'selected' : ''}>${action}</option>`
+        ).join('')}
+            </select>
+          </div>
+          <div style="margin-bottom: 10px;">
+            <label style="display: inline-block; width: 120px;">Column Shift:</label>
+            <input type="number" id="shift" name="shift" value="0" style="width: 50px;">
+            <span style="color: #666; font-size: 0.9em;">(+ right, - left)</span>
+          </div>
+
+          <!-- Multiple Target Options -->
+          <div style="margin-bottom: 10px; padding: 8px; background: #e8f4f8; border: 1px solid #b8d4da; border-radius: 3px;">
+            <div style="font-weight: bold; margin-bottom: 5px; color: #2c5aa0;">Multiple Target Options:</div>
+            <div style="margin-bottom: 5px;">
+              <label>
+                <input type="checkbox" id="multi-adjacent" name="multiAdjacent" style="margin-right: 5px;">
+                Multiple Adjacent Targets (-4CS, single roll affects all)
+              </label>
+              <div id="multi-adjacent-note" style="font-size: 0.8em; color: #666; margin-left: 20px; display: none;">
+                Valid for: Blunt, Escaping, Energy, Force attacks only
+              </div>
+            </div>
+            <div style="margin-bottom: 5px;">
+              <label>
+                <input type="checkbox" id="multi-attacks" name="multiAttacks" style="margin-right: 5px;">
+                Multiple Attacks (requires Fighting FEAT)
+              </label>
+              <div id="multi-attacks-options" style="margin-left: 20px; display: none;">
+                <label style="display: block; margin: 3px 0;">
+                  <input type="radio" name="attackCount" value="2" checked style="margin-right: 5px;">
+                  2 Attacks (Remarkable FEAT, -1CS each)
+                </label>
+                <label style="display: block; margin: 3px 0;">
+                  <input type="radio" name="attackCount" value="3" style="margin-right: 5px;">
+                  3 Attacks (Amazing FEAT, -1CS each)
+                </label>
+              </div>
+              <div id="multi-attacks-note" style="font-size: 0.8em; color: #666; margin-left: 20px; display: none;">
+                Valid for: Slugfest and Shooting attacks only
+				</div>
+            </div>
+          </div>
+          
+          <div style="margin-bottom: 10px;">
+            <label style="display: inline-block; width: 120px;">Karma Points:</label>
+            <input type="number" id="karma" name="karma" value="0" min="0" style="width: 50px;">
+          </div>
+          <div>
+            <label>
+              <input type="checkbox" id="skip-dice" name="skipDice"> 
+              Skip dice animation
+            </label>
+          <div style="margin-top: 10px;">
           <label>
-            <input type="checkbox" id="skip-dice" name="skipDice"> 
-            Skip dice animation
+            <input type="checkbox" id="save-settings" name="saveSettings" checked> 
+            Remember these settings for future rolls
           </label>
-        <div style="margin-top: 10px;">
-        <label>
-          <input type="checkbox" id="save-settings" name="saveSettings" checked> 
-          Remember these settings for future rolls
-        </label>
+        </div>
       </div>
     `;
 
@@ -2640,18 +2744,91 @@ export class FaseripRolls {
               const skipDice = html.find('[name="skipDice"]').is(':checked');
               const saveSettings = html.find('[name="saveSettings"]').is(':checked');
               
-              console.log("=== DIALOG DEBUG ===");
+              // Get multiple target/attack options
+              const multiAdjacent = html.find('[name="multiAdjacent"]').is(':checked');
+              const multiAttacks = html.find('[name="multiAttacks"]').is(':checked');
+              const attackCount = parseInt(html.find('[name="attackCount"]:checked').val()) || 2;
+
+              console.log("=== EQUIPMENT DIALOG DEBUG ===");
               console.log("Current weapon ammo type:", currentAmmoType); // Use the determined ammo type
+              console.log("multiAdjacent:", multiAdjacent);
+              console.log("multiAttacks:", multiAttacks);
+              console.log("attackCount:", attackCount);
+              console.log("Selected targets:", Array.from(game.user.targets).map(t => t.name));
               console.log("All form values:", {
                 actionName, shift, karma, skipDice, saveSettings
               });
               console.log("===================");
+
+              // Extract action code from action type
+              const actionCodeMatch = actionName.match(/\(([^)]+)\)/);
+              const actionCode = actionCodeMatch ? actionCodeMatch[1] : actionName.split(' ')[0].substring(0, 2).toUpperCase();
+              
+              // VALIDATE MULTIPLE ADJACENT TARGETS
+              if (multiAdjacent) {
+                // Check if action type is valid
+                if (!isValidMultiTargetAttack(actionCode)) {
+                  ui.notifications.warn(`${actionName} cannot be used for multiple adjacent targets!`);
+                  return;
+                }
+                
+                const targetTokens = Array.from(game.user.targets);
+                if (targetTokens.length < 2) {
+                  ui.notifications.warn("Multiple adjacent targets requires at least 2 targets selected!");
+                  return;
+                }
+                
+                const attackerToken = canvas.tokens.controlled[0];
+                if (!attackerToken) {
+                  ui.notifications.warn("No attacker token selected!");
+                  return;
+                }
+                
+                const validation = validateAdjacentTargets(attackerToken, targetTokens);
+                if (!validation.valid) {
+                  ui.notifications.warn(`Some targets are not adjacent: ${validation.invalidTargets.map(t => t.name).join(', ')}`);
+                  return;
+                }
+              }
+
+              // VALIDATE MULTIPLE ATTACKS
+              if (multiAttacks) {
+                // Check if action type is valid
+                if (!isValidMultipleAttack(actionCode)) {
+                  ui.notifications.warn(`${actionName} cannot be used for multiple attacks!`);
+                  return;
+                }
+                
+                // Need at least one target
+                if (game.user.targets.size === 0) {
+                  ui.notifications.warn("Select at least one target for multiple attacks!");
+                  return;
+                }
+              }
+
+              // Mutual exclusion check
+              if (multiAdjacent && multiAttacks) {
+                ui.notifications.warn("Cannot use both multiple adjacent targets and multiple attacks at the same time!");
+                return;
+              }
 
               // Save settings if requested
               if (saveSettings) {
                 await equipment.setFlag("msh-faserip", "lastActionType", actionName);
                 await equipment.setFlag("msh-faserip", "lastColumnShift", shift);
                 await equipment.setFlag("msh-faserip", "skipDiceRoll", skipDice);
+              }
+
+              // Handle multiple attacks first (requires Fighting FEAT)
+              if (multiAttacks) {
+                return await processMultipleAttackSequence(actor, equipment, {
+                  actionType: actionName,
+                  columnShift: shift,
+                  karma: karma,
+                  skipDice: skipDice,
+                  attackCount: attackCount,
+                  ammoType: currentAmmoType
+                });
               }
 
               // Call this method again but with the gathered options
@@ -2661,13 +2838,88 @@ export class FaseripRolls {
                 columnShift: shift,
                 karma: karma,
                 skipDice: skipDice,
-                ammoType: currentAmmoType
+                ammoType: currentAmmoType,
+                multiAdjacent: multiAdjacent,
+                multiAttacks: multiAttacks,
+                attackCount: attackCount
               });
             }
           },
           cancel: { label: "Cancel" }
         },
-        default: "roll"
+        default: "roll",
+        render: (html) => {
+          // Get references to the multiple target elements
+          const actionSelect = html.find('#action');
+          const multiAdjacentCheckbox = html.find('#multi-adjacent');
+          const multiAttacksCheckbox = html.find('#multi-attacks');
+          const multiAttacksOptions = html.find('#multi-attacks-options');
+
+          // Function to update option availability based on action type
+          function updateMultiOptions() {
+            const selectedAction = actionSelect.val();
+            
+            // Extract action code from the selected action
+            const actionCodeMatch = selectedAction.match(/\(([^)]+)\)/);
+            const actionCode = actionCodeMatch ? actionCodeMatch[1] : selectedAction.split(' ')[0].substring(0, 2).toUpperCase();
+            
+            console.log("🎨 updateMultiOptions called with action:", selectedAction, "code:", actionCode);
+            
+            // Check if action is valid for multiple adjacent targets
+            const validMultiTarget = isValidMultiTargetAttack(actionCode);
+            const validMultiAttack = isValidMultipleAttack(actionCode);
+            
+            console.log("🎨 validMultiTarget:", validMultiTarget);
+            console.log("🎨 validMultiAttack:", validMultiAttack);
+            
+            multiAdjacentCheckbox.prop('disabled', !validMultiTarget);
+            if (!validMultiTarget) {
+              multiAdjacentCheckbox.prop('checked', false);
+            }
+            
+            multiAttacksCheckbox.prop('disabled', !validMultiAttack);
+            if (!validMultiAttack) {
+              multiAttacksCheckbox.prop('checked', false);
+              multiAttacksOptions.hide();
+            }
+          }
+
+          // Mutual exclusion: if one is checked, disable the other
+          multiAdjacentCheckbox.on('change', function() {
+            console.log("🎨 multiAdjacent checkbox changed:", this.checked);
+            if (this.checked) {
+              multiAttacksCheckbox.prop('disabled', true).prop('checked', false);
+              multiAttacksOptions.hide();
+            } else {
+              const selectedAction = actionSelect.val();
+              const actionCodeMatch = selectedAction.match(/\(([^)]+)\)/);
+              const actionCode = actionCodeMatch ? actionCodeMatch[1] : selectedAction.split(' ')[0].substring(0, 2).toUpperCase();
+              const validMultiAttack = isValidMultipleAttack(actionCode);
+              multiAttacksCheckbox.prop('disabled', !validMultiAttack);
+            }
+          });
+
+          multiAttacksCheckbox.on('change', function() {
+            console.log("🎨 multiAttacks checkbox changed:", this.checked);
+            if (this.checked) {
+              multiAdjacentCheckbox.prop('disabled', true).prop('checked', false);
+              multiAttacksOptions.show();
+            } else {
+              multiAttacksOptions.hide();
+              const selectedAction = actionSelect.val();
+              const actionCodeMatch = selectedAction.match(/\(([^)]+)\)/);
+              const actionCode = actionCodeMatch ? actionCodeMatch[1] : selectedAction.split(' ')[0].substring(0, 2).toUpperCase();
+              const validMultiTarget = isValidMultiTargetAttack(actionCode);
+              multiAdjacentCheckbox.prop('disabled', !validMultiTarget);
+            }
+          });
+
+          // Update options when action type changes
+          actionSelect.on('change', updateMultiOptions);
+          
+          // Initial update
+          updateMultiOptions();
+        }
       }).render(true);
     }
     else if (category === "power-item") {
@@ -3856,7 +4108,10 @@ export async function rollUniversalAction(actionCode, actorId, columnShift = nul
     const target = game.user.targets.first()?.actor;
     console.log(`🎯 DEBUG: Single target processing with color: "${color}"`);
     
-    if (target && actionCode === "Ch") {
+    if (actionCode === "Do") {
+      // Handle dodging - pre-action defensive stance (no target needed)
+      await processDodgeResult(actor, color, finalValue, label);
+    } else if (target && actionCode === "Ch") {
       // Prompt for areas moved in this charge
       const areasMovedThrough = await new Promise((resolve) => {
         new Dialog({
@@ -3885,7 +4140,7 @@ export async function rollUniversalAction(actionCode, actorId, columnShift = nul
       });
     } else if (target && actionCode === "Ca") {
       await processCatchingResult(actor, target, color, actionCode, finalValue, label);
-    } else if (target && actionCode !== "Ca" && actionCode !== "Ch") {
+    } else if (target && actionCode !== "Ca" && actionCode !== "Ch" && actionCode !== "Do") {
       await processUniversalActionTarget(actor, target, actionCode, color, finalValue, label);
     } else if (actionCode === "Ca") {
       ui.notifications.info("Catching requires a target to be selected.");
@@ -4731,3 +4986,130 @@ async function setupCatchingScenario(token) {
 
 // Add this to the global scope for easy GM access
 window.setupCatchingScenario = setupCatchingScenario;
+
+async function processDodgeResult(actor, color, finalValue, label) {
+  // First, ask if this is the pre-action phase
+  const isPreActionPhase = await new Promise((resolve) => {
+    new Dialog({
+      title: "Dodge Timing Validation",
+      content: `
+        <div style="text-align: center; padding: 15px;">
+          <h3>Dodge Declaration</h3>
+          <p><strong>${actor.name}</strong> wants to dodge.</p>
+          <p style="margin: 10px 0; font-weight: bold; color: #8b0000;">
+            Is this the pre-action phase?
+          </p>
+          <p style="font-size: 0.9em; color: #666;">
+            According to FASERIP rules, dodging must be declared "at the start of the turn, 
+            as soon as Initiative is determined" - before any other actions are taken.
+          </p>
+        </div>
+      `,
+      buttons: {
+        yes: {
+          icon: '<i class="fas fa-check"></i>',
+          label: "Yes - Pre-Action Phase",
+          callback: () => resolve(true)
+        },
+        no: {
+          icon: '<i class="fas fa-times"></i>',
+          label: "No - Actions Already Started",
+          callback: () => resolve(false)
+        }
+      },
+      default: "yes"
+    }).render(true);
+  });
+
+  if (!isPreActionPhase) {
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor }),
+      content: `
+        <div style="background-color: #ffebee; border: 1px solid #f44336; border-radius: 3px; padding: 8px; margin: 5px 0;">
+          <div style="color: #d32f2f; font-weight: bold;">Dodge Failed - Wrong Timing!</div>
+          <div style="font-size: 0.9em; margin-top: 5px;">
+            ${actor.name} cannot dodge now - dodging must be declared at the start of the turn,
+            as soon as Initiative is determined, before any other actions are taken.
+          </div>
+        </div>
+      `
+    });
+    return;
+  }
+
+  // Convert result color to CS penalty
+  let csPenalty = "";
+  let description = "";
+  
+  switch (color.toLowerCase()) {
+    case "white":
+      csPenalty = "Auto-hit";
+      description = "All attacks automatically hit the dodger this turn.";
+      break;
+    case "green":
+      csPenalty = "-2CS";
+      description = "Attackers suffer -2 Column Shift penalty when targeting the dodger.";
+      break;
+    case "yellow":
+      csPenalty = "-4CS";
+      description = "Attackers suffer -4 Column Shift penalty when targeting the dodger.";
+      break;
+    case "red":
+      csPenalty = "-6CS";
+      description = "Attackers suffer -6 Column Shift penalty when targeting the dodger.";
+      break;
+  }
+
+  // Create comprehensive dodge status message
+  await ChatMessage.create({
+    speaker: ChatMessage.getSpeaker({ actor }),
+    content: `
+      <div style="background-color: #e3f2fd; border: 1px solid #2196f3; border-radius: 3px; margin: 5px 0;">
+        <div style="padding: 8px 12px; border-bottom: 1px solid #2196f3; font-size: 1.2em; color: #1976d2; font-weight: bold;">
+          🏃 DODGE STANCE ACTIVATED 🏃
+        </div>
+        <div style="padding: 10px 12px; font-size: 0.95em;">
+          <div style="margin-bottom: 8px;"><strong>${actor.name}</strong> enters a defensive dodging stance!</div>
+          
+          <div style="background: #f5f5f5; padding: 8px; border-radius: 3px; margin: 8px 0;">
+            <div style="font-weight: bold; color: #1976d2; margin-bottom: 5px;">🎯 Dodge Result: ${csPenalty}</div>
+            <div>${description}</div>
+          </div>
+
+          <div style="background: #fff3e0; padding: 8px; border-radius: 3px; border-left: 3px solid #ff9800;">
+            <div style="font-weight: bold; color: #f57c00; margin-bottom: 5px;">⚠️ Turn Restrictions (GM Enforced):</div>
+            <div>• <strong>Movement:</strong> Only half speed this turn</div>
+            <div>• <strong>Actions:</strong> Maximum ONE other action this turn</div>
+            <div>• <strong>Charging:</strong> Cannot make charging attacks</div>
+            <div>• <strong>Own Attacks:</strong> All attack rolls at -2CS penalty</div>
+          </div>
+
+          <div style="background: #e8f5e8; padding: 8px; border-radius: 3px; border-left: 3px solid #4caf50;">
+            <div style="font-weight: bold; color: #2e7d32; margin-bottom: 5px;">✅ Dodge Limitations:</div>
+            <div>• Only works against attacks the character is aware of</div>
+            <div>• No effect against unexpected/blindsiding attacks</div>
+            <div>• No effect against slugfest and wrestling attacks</div>
+            <div>• Cannot dodge attacks from allies</div>
+            <div>• Cannot dodge sniper attacks from unknown locations</div>
+          </div>
+
+          <div style="margin-top: 10px; padding: 8px; background: #f9f9f9; border-radius: 3px; font-style: italic; text-align: center;">
+            <strong>GM Note:</strong> Apply the ${csPenalty} modifier to all applicable incoming attacks this turn.
+            Remember to enforce movement and action restrictions.
+          </div>
+        </div>
+      </div>
+    `
+  });
+
+  // Optionally set flags on the actor for automated tracking (if desired)
+  // This could be used by other systems to automatically apply penalties
+  await actor.setFlag("msh-faserip", "dodgeStatus", {
+    active: true,
+    csPenalty: csPenalty,
+    turn: game.combat?.turn || 0,
+    round: game.combat?.round || 0
+  });
+
+  ui.notifications.info(`${actor.name} is now dodging with ${csPenalty} effect. GM should enforce restrictions.`);
+}
