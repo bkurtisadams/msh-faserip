@@ -2231,6 +2231,7 @@ html.find('.headquarters-row').each((i, row) => {
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Ability FEAT roll buttons
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    // Find the ability FEAT roll buttons section in activateListeners(html)
     html.find('.ability-key').click(ev => {
       const abilityKey = ev.currentTarget.textContent.trim().toLowerCase();
       let abilityName, abilityFullName;
@@ -2256,7 +2257,20 @@ html.find('.headquarters-row').each((i, row) => {
       
       // Get saved settings if they exist
       const savedColumnShift = this.actor.getFlag("msh-faserip", `last${abilityFullName}ColumnShift`) || 0;
+      const savedIntensity = this.actor.getFlag("msh-faserip", `last${abilityFullName}Intensity`) || "None";
       const skipDiceRoll = this.actor.getFlag("msh-faserip", `last${abilityFullName}SkipDiceRoll`) || false;
+      
+      // Define all available ranks for intensity dropdown
+      const allRanks = [
+        "None", "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent",
+        "Remarkable", "Incredible", "Amazing", "Monstrous", "Unearthly",
+        "Shift-X", "Shift-Y", "Shift-Z", "Class 1000", "Class 3000", "Class 5000", "Beyond"
+      ];
+      
+      // Create options HTML for intensity dropdown
+      const intensityOptionsHTML = allRanks.map(rank => 
+        `<option value="${rank}" ${rank === savedIntensity ? 'selected' : ''}>${rank}</option>`
+      ).join('');
       
       // Create dialog for roll options
       let dialogContent = `
@@ -2264,6 +2278,16 @@ html.find('.headquarters-row').each((i, row) => {
           <label style="display: inline-block; width: 120px;">Ability Rank:</label>
           <input type="text" id="ability-rank" name="abilityRank" value="${abilityRank}" style="width: 100px;" readonly>
           <span style="margin-left: 5px;">(${abilityValue})</span>
+        </div>
+        <div style="margin-bottom: 10px;">
+          <label style="display: inline-block; width: 120px;">Intensity:</label>
+          <select id="intensity" name="intensity" style="width: 120px;">
+            ${intensityOptionsHTML}
+          </select>
+        </div>
+        <div style="margin-bottom: 10px;" id="feat-requirement">
+          <label style="display: inline-block; width: 120px;">Required FEAT:</label>
+          <span id="required-feat-text" style="font-weight: bold;">Any Color</span>
         </div>
         <div style="margin-bottom: 10px;">
           <label style="display: inline-block; width: 120px;">Column Shift:</label>
@@ -2277,7 +2301,7 @@ html.find('.headquarters-row').each((i, row) => {
         <div style="margin-bottom: 10px;">
           <label>
             <input type="checkbox" id="save-settings" name="saveSettings" checked> 
-            Remember column shift for future rolls
+            Remember settings for future rolls
           </label>
         </div>
         <div>
@@ -2287,13 +2311,14 @@ html.find('.headquarters-row').each((i, row) => {
           </label>
         </div>`;
       
-      new Dialog({
+      const dialog = new Dialog({
         title: `${abilityFullName} FEAT Roll: ${this.actor.name}`,
         content: dialogContent,
         buttons: {
           roll: {
             label: "Roll",
             callback: async (html) => {
+              const intensity = html.find('[name="intensity"]').val();
               const columnShift = parseInt(html.find('[name="shift"]').val()) || 0;
               const karma = parseInt(html.find('[name="karma"]').val()) || 0;
               const saveSettings = html.find('[name="saveSettings"]').is(':checked');
@@ -2302,6 +2327,7 @@ html.find('.headquarters-row').each((i, row) => {
               // Save settings if requested
               if (saveSettings) {
                 await this.actor.setFlag("msh-faserip", `last${abilityFullName}ColumnShift`, columnShift);
+                await this.actor.setFlag("msh-faserip", `last${abilityFullName}Intensity`, intensity);
                 await this.actor.setFlag("msh-faserip", `last${abilityFullName}SkipDiceRoll`, skipDice);
               }
               
@@ -2321,6 +2347,52 @@ html.find('.headquarters-row').each((i, row) => {
                 }
               }
               
+              // Determine FEAT requirement and possibility
+              let featRequirement = "Any Color";
+              let isImpossible = false;
+              let isAutomatic = false;
+              
+              if (intensity !== "None") {
+                const { requirement, impossible, automatic } = this._determineFeatRequirement(effectiveRank, intensity);
+                featRequirement = requirement;
+                isImpossible = impossible;
+                isAutomatic = automatic;
+              }
+              
+              // Handle impossible FEAT
+              if (isImpossible) {
+                ui.notifications.warn(`FEAT is impossible: ${effectiveRank} ability vs ${intensity} intensity. Need ability to be within one rank of intensity.`);
+                return;
+              }
+              
+              // Handle automatic FEAT
+              if (isAutomatic) {
+                const content = `
+                  <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
+                    <div style="padding: 5px 10px; border-bottom: 1px solid #c0c0c0; font-size: 1.1em; color: #8b0000;">
+                      <strong>${this.actor.name} - ${abilityFullName} FEAT Roll vs ${intensity}</strong>
+                    </div>
+                    <div style="padding: 5px 10px; font-size: 0.9em;">
+                      <div>Base Rank: ${abilityRank} (${abilityValue})</div>
+                      ${columnShift !== 0 ? `<div>Column Shift: ${columnShift} → ${effectiveRank}</div>` : ''}
+                      <div>Intensity: ${intensity}</div>
+                      <div>Ability rank is 3+ ranks higher than intensity</div>
+                    </div>
+                    <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
+                      background-color: #4CAF50; color: white;">
+                      AUTOMATIC SUCCESS
+                    </div>
+                  </div>
+                `;
+                
+                // Send to chat
+                await ChatMessage.create({
+                  speaker: ChatMessage.getSpeaker({ actor: this.actor }),
+                  content: content
+                });
+                return;
+              }
+              
               // Create the roll
               const roll = new Roll("1d100");
               
@@ -2331,23 +2403,22 @@ html.find('.headquarters-row').each((i, row) => {
               if (!skipDice) {
                 await roll.toMessage({
                   speaker: ChatMessage.getSpeaker({ actor: this.actor }),
-                  flavor: `${this.actor.name} makes a ${abilityFullName} FEAT roll`,
+                  flavor: `${this.actor.name} makes a ${abilityFullName} FEAT roll${intensity !== "None" ? ` vs ${intensity} intensity` : ""}`,
                   rollMode: game.settings.get("core", "rollMode")
                 });
               }
               
-              // Calculate the result
-              let cappedTotal = roll.total; // <-- NEW LINE
-              let karmaUsed = 0; // <-- NEW LINE
+              // Calculate the result with karma
+              let cappedTotal = roll.total;
+              let karmaUsed = 0;
 
-              // <-- NEW/MODIFIED SECTION START -->
               const dailyKarmaEnabled = game.settings.get("msh-faserip", "dailyKarmaEnabled");
               let dailyKarmaUsedAmount = 0;
               let lifetimeKarmaUsedAmount = 0;
 
               if (karma > 0) {
-                if (dailyKarmaEnabled && actor.system.karma.dailyKarmaUsed < actor.system.karma.dailyKarmaMax) {
-                  const dailyKarmaRemaining = actor.system.karma.dailyKarmaMax - actor.system.karma.dailyKarmaUsed;
+                if (dailyKarmaEnabled && this.actor.system.karma.dailyKarmaUsed < this.actor.system.karma.dailyKarmaMax) {
+                  const dailyKarmaRemaining = this.actor.system.karma.dailyKarmaMax - this.actor.system.karma.dailyKarmaUsed;
                   const karmaFromDaily = Math.min(karma, dailyKarmaRemaining);
                   
                   dailyKarmaUsedAmount = karmaFromDaily;
@@ -2355,8 +2426,8 @@ html.find('.headquarters-row').each((i, row) => {
 
                   await game.msh.runAsGM({
                     operation: 'update',
-                    targetActorUuid: actor.uuid,
-                    args: [{ "system.karma.dailyKarmaUsed": actor.system.karma.dailyKarmaUsed + dailyKarmaUsedAmount }]
+                    targetActorUuid: this.actor.uuid,
+                    args: [{ "system.karma.dailyKarmaUsed": this.actor.system.karma.dailyKarmaUsed + dailyKarmaUsedAmount }]
                   });
 
                   const remainingKarmaToSpend = karma - karmaFromDaily;
@@ -2397,29 +2468,34 @@ html.find('.headquarters-row').each((i, row) => {
               }
 
               if (historyUpdates.length > 0) {
-                const currentHistory = foundry.utils.deepClone(actor.system.karma?.history || []);
+                const currentHistory = foundry.utils.deepClone(this.actor.system.karma?.history || []);
                 const newHistory = currentHistory.concat(historyUpdates);
                 
                 await game.msh.runAsGM({
                   operation: 'update',
-                  targetActorUuid: actor.uuid,
+                  targetActorUuid: this.actor.uuid,
                   args: [{ "system.karma.history": newHistory }]
                 });
-                // No need to call _updateCurrentKarma here, prepareData handles it on sheet re-render
               }
-              // <-- NEW/MODIFIED SECTION END -->
 
               const resultColor = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
+              
+              // Check if FEAT succeeded based on intensity requirement
+              let featSuccess = true;
+              if (intensity !== "None") {
+                featSuccess = this._checkFeatSuccess(resultColor, featRequirement);
+              }
               
               // Create chat message styled to match your existing output format
               let content = `
                 <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
                   <div style="padding: 5px 10px; border-bottom: 1px solid #c0c0c0; font-size: 1.1em; color: #8b0000;">
-                    <strong>${this.actor.name} - ${abilityFullName} FEAT Roll</strong>
+                    <strong>${this.actor.name} - ${abilityFullName} FEAT Roll${intensity !== "None" ? ` vs ${intensity}` : ""}</strong>
                   </div>
                   <div style="padding: 5px 10px; font-size: 0.9em;">
                     <div>Base Rank: ${abilityRank} (${abilityValue})</div>
                     ${columnShift !== 0 ? `<div>Column Shift: ${columnShift} → ${effectiveRank}</div>` : ''}
+                    ${intensity !== "None" ? `<div>Intensity: ${intensity} (Required: ${featRequirement})</div>` : ''}
                     <div>Roll: ${roll.total} + Karma: ${karmaUsed} = ${cappedTotal}</div>
                   </div>
                   <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
@@ -2430,6 +2506,11 @@ html.find('.headquarters-row').each((i, row) => {
                     color: ${resultColor.toLowerCase() === 'white' || resultColor.toLowerCase() === 'yellow' ? '#333' : 'white'};">
                     ${resultColor.toUpperCase()} RESULT
                   </div>
+                  ${intensity !== "None" ? `
+                    <div style="padding: 5px 10px; font-size: 1.1em; text-align: center; font-weight: bold; color: ${featSuccess ? '#4CAF50' : '#F44336'};">
+                      ${featSuccess ? 'FEAT SUCCEEDED' : 'FEAT FAILED'}
+                    </div>
+                  ` : ''}
                 </div>
               `;
               
@@ -2442,7 +2523,51 @@ html.find('.headquarters-row').each((i, row) => {
           },
           cancel: { label: "Cancel" }
         },
-        default: "roll"
+        default: "roll",
+        render: html => {
+          // Function to update FEAT requirement display
+          const updateFeatRequirement = () => {
+            const intensity = html.find('#intensity').val();
+            const columnShift = parseInt(html.find('#shift').val()) || 0;
+            const reqText = html.find('#required-feat-text');
+            
+            if (intensity === "None") {
+              reqText.text("Any Color").css('color', '#333');
+              return;
+            }
+            
+            // Apply column shifts to get effective rank
+            let effectiveRank = abilityRank;
+            if (columnShift !== 0) {
+              const ranks = [
+                "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent",
+                "Remarkable", "Incredible", "Amazing", "Monstrous", "Unearthly",
+                "Shift-X", "Shift-Y", "Shift-Z", "Class 1000", "Class 3000", "Class 5000", "Beyond"
+              ];
+              const index = ranks.indexOf(abilityRank);
+              if (index !== -1) {
+                const newIndex = Math.min(Math.max(index + columnShift, 0), ranks.length - 1);
+                effectiveRank = ranks[newIndex];
+              }
+            }
+            
+            const { requirement, impossible, automatic } = this._determineFeatRequirement(effectiveRank, intensity);
+            
+            if (impossible) {
+              reqText.text("IMPOSSIBLE").css('color', '#F44336');
+            } else if (automatic) {
+              reqText.text("AUTOMATIC").css('color', '#4CAF50');
+            } else {
+              reqText.text(requirement).css('color', '#333');
+            }
+          };
+          
+          // Update on intensity or column shift change
+          html.find('#intensity, #shift').on('change', updateFeatRequirement);
+          
+          // Initial update
+          updateFeatRequirement();
+        }
       }).render(true);
     });
     
@@ -2490,6 +2615,79 @@ html.find('.headquarters-row').each((i, row) => {
     }
 
     // Continue with other listeners...
+  }
+
+  /**
+   * Determine FEAT requirement based on ability rank vs intensity
+   * @param {string} abilityRank - The effective ability rank
+   * @param {string} intensity - The intensity rank
+   * @returns {object} - Object with requirement, impossible, and automatic flags
+   */
+  _determineFeatRequirement(abilityRank, intensity) {
+    const ranks = [
+      "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent",
+      "Remarkable", "Incredible", "Amazing", "Monstrous", "Unearthly",
+      "Shift-X", "Shift-Y", "Shift-Z", "Class 1000", "Class 3000", "Class 5000", "Beyond"
+    ];
+    
+    const abilityIndex = ranks.indexOf(abilityRank);
+    const intensityIndex = ranks.indexOf(intensity);
+    
+    if (abilityIndex === -1 || intensityIndex === -1) {
+      return { requirement: "Any Color", impossible: false, automatic: false };
+    }
+    
+    const difference = abilityIndex - intensityIndex;
+    
+    // Impossible: intensity more than one rank higher than ability
+    if (difference < -1) {
+      return { requirement: "Red", impossible: true, automatic: false };
+    }
+    
+    // Automatic: intensity three or more ranks lower than ability  
+    if (difference >= 3) {
+      return { requirement: "Automatic", impossible: false, automatic: true };
+    }
+    
+    // Red FEAT: intensity one rank higher than ability
+    if (difference === -1) {
+      return { requirement: "Red", impossible: false, automatic: false };
+    }
+    
+    // Yellow FEAT: intensity equal to ability
+    if (difference === 0) {
+      return { requirement: "Yellow", impossible: false, automatic: false };
+    }
+    
+    // Green FEAT: intensity one or two ranks lower than ability
+    if (difference === 1 || difference === 2) {
+      return { requirement: "Green", impossible: false, automatic: false };
+    }
+    
+    return { requirement: "Any Color", impossible: false, automatic: false };
+  }
+
+  /**
+   * Check if a FEAT result meets the requirement
+   * @param {string} resultColor - The color result from the universal table
+   * @param {string} requirement - The required FEAT color
+   * @returns {boolean} - Whether the FEAT succeeded
+   */
+  _checkFeatSuccess(resultColor, requirement) {
+    const color = resultColor.toLowerCase();
+    
+    switch (requirement) {
+      case "Green":
+        return ["green", "yellow", "red"].includes(color);
+      case "Yellow":
+        return ["yellow", "red"].includes(color);
+      case "Red":
+        return color === "red";
+      case "Automatic":
+        return true;
+      default:
+        return true; // Any color succeeds if no specific requirement
+    }
   }
 
   _showResourceInfoDialog() {
