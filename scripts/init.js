@@ -1,20 +1,5 @@
 // In init.js
 import * as GMUtils from './gm-utils.js';
-
-// Add a ready hook as a fallback if socketlib.ready doesn't fire properly
-Hooks.once("ready", () => {
-  if (game.modules.get("socketlib")?.active && !game.msh.runAsGM) {
-    console.log("🔄 Attempting to register SocketLib in ready hook");
-    GMUtils.registerSocket();
-    game.msh.runAsGM = GMUtils.runAsGM;
-  }
-  
-  // Initialize slam collision handlers
-  initializeSlamHandlers();
-  console.log("MSH FASERIP | Slam collision handlers initialized");
-});
-
-
 import { FaseripActor } from './actor.js';
 import { FaseripItem } from './item.js';
 import { FaseripActorSheet } from './actorSheet.js';
@@ -49,7 +34,6 @@ Hooks.once("init", async () => {
   });
   console.log("FASERIP DEBUG: dailyKarmaEnabled setting registered."); // <-- DEBUG CONSOLE LOG
   // <-- NEW/MODIFIED SECTION END -->
-
 
   // Register custom grappling effects so they show token HUD icons and work with ActiveEffect.statuses
   CONFIG.statusEffects.push(
@@ -289,12 +273,73 @@ Hooks.once("init", async () => {
   // end of hooks.once
 });
 
-// Add a ready hook as a fallback if socketlib.ready doesn't fire properly
+// Add this hook to your init.js (add it to the existing hooks, not in the ready hook)
+Hooks.on("preCreateActor", (document, data, options, userId) => {
+  console.log("FASERIP: preCreateActor - Type:", document.type);
+  console.log("FASERIP: preCreateActor - Data before fix:", data.prototypeToken);
+  
+  // Initialize prototypeToken if it doesn't exist
+  if (!data.prototypeToken) {
+    data.prototypeToken = {};
+  }
+  
+  // Force the correct disposition based on actor type
+  switch (document.type) {
+    case "hero":
+      data.prototypeToken.disposition = CONST.TOKEN_DISPOSITIONS.FRIENDLY; // 1
+      console.log("FASERIP: Forcing hero disposition to FRIENDLY (1)");
+      break;
+    case "villain":
+      data.prototypeToken.disposition = CONST.TOKEN_DISPOSITIONS.HOSTILE; // -1
+      console.log("FASERIP: Forcing villain disposition to HOSTILE (-1)");
+      break;
+    case "npc":
+    default:
+      data.prototypeToken.disposition = CONST.TOKEN_DISPOSITIONS.NEUTRAL; // 0
+      console.log("FASERIP: Forcing NPC disposition to NEUTRAL (0)");
+      break;
+  }
+  
+  console.log("FASERIP: preCreateActor - Data after fix:", data.prototypeToken);
+});
+
+// CONSOLIDATED READY HOOK - All ready logic in one place
 Hooks.once("ready", () => {
+  // SocketLib registration
   if (game.modules.get("socketlib")?.active && !game.msh.runAsGM) {
     console.log("🔄 Attempting to register SocketLib in ready hook");
     GMUtils.registerSocket();
     game.msh.runAsGM = GMUtils.runAsGM;
+  }
+  
+  // Initialize slam collision handlers
+  initializeSlamHandlers();
+  console.log("MSH FASERIP | Slam collision handlers initialized");
+
+  // Fix prototype token overrides to allow manual disposition changes
+  const currentOverrides = game.settings.get("core", "prototypeTokenOverrides");
+  
+  // Check if disposition overrides exist and remove them
+  if (currentOverrides.hero?.disposition !== undefined || 
+      currentOverrides.villain?.disposition !== undefined || 
+      currentOverrides.npc?.disposition !== undefined) {
+    
+    console.log("FASERIP: Removing automatic disposition overrides to allow manual control");
+    
+    const fixedOverrides = {
+      base: currentOverrides.base,
+      hero: { ...currentOverrides.hero },
+      villain: { ...currentOverrides.villain }, 
+      npc: { ...currentOverrides.npc }
+    };
+    
+    // Remove disposition from the overrides
+    delete fixedOverrides.hero.disposition;
+    delete fixedOverrides.villain.disposition;
+    delete fixedOverrides.npc.disposition;
+    
+    // Apply the fixed overrides
+    game.settings.set("core", "prototypeTokenOverrides", fixedOverrides);
   }
 });
 

@@ -135,6 +135,33 @@ export class FaseripActor extends Actor {
     }
   }
 
+  // ADD THIS NEW METHOD - This will set proper default dispositions
+  // In actor.js - Update the prepareBaseData method
+  prepareBaseData() {
+    super.prepareBaseData();
+    
+    // ALWAYS set the correct disposition based on actor type (remove the undefined check)
+    let defaultDisposition;
+    switch (this.type) {
+      case "hero":
+        defaultDisposition = CONST.TOKEN_DISPOSITIONS.FRIENDLY; // 1
+        break;
+      case "villain":
+        defaultDisposition = CONST.TOKEN_DISPOSITIONS.HOSTILE; // -1
+        break;
+      case "npc":
+      default:
+        defaultDisposition = CONST.TOKEN_DISPOSITIONS.NEUTRAL; // 0
+        break;
+    }
+    
+    // Force set the disposition if it's wrong
+    if (this.prototypeToken.disposition !== defaultDisposition) {
+      console.log(`FASERIP: Correcting disposition for ${this.type} "${this.name}" from ${this.prototypeToken.disposition} to ${defaultDisposition}`);
+      this.prototypeToken.updateSource({ disposition: defaultDisposition });
+    }
+  }
+
   // Getter for available lifetime karma (for bottom left display)
   get availableKarma() {
     const lifetimeSpent = this._calculateTotalSpentLifetime(this.system.karma?.history || []);

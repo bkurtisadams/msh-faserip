@@ -96,8 +96,28 @@ export class FaseripInitiative {
   static async _onCreateCombatant(combatant, options, userId) {
     if (!game.settings.get("msh-faserip", "useCustomInitiative")) return;
     
+    // Determine side based on actor type and disposition
+    let isPC = false;
+    
+    if (combatant.actor.type === "hero") {
+      isPC = true;
+    } else if (combatant.actor.type === "villain") {
+      isPC = false;
+    } else {
+      // For NPCs, check disposition
+      const tokenDisposition = combatant.token?.disposition ?? combatant.actor.prototypeToken.disposition;
+      
+      if (tokenDisposition === CONST.TOKEN_DISPOSITIONS.FRIENDLY) {
+        isPC = true;
+      } else if (tokenDisposition === CONST.TOKEN_DISPOSITIONS.HOSTILE) {
+        isPC = false;
+      } else {
+        // Neutral - use ownership as fallback
+        isPC = combatant.actor.hasPlayerOwner;
+      }
+    }
+    
     // Set side flag
-    const isPC = combatant.actor?.hasPlayerOwner;
     await combatant.setFlag("msh-faserip", "side", isPC ? "pc" : "npc");
   }
   
@@ -419,8 +439,29 @@ export class FaseripInitiative {
       const npcCombatants = [];
       
       // First pass: categorize by side
+      // First pass: categorize by side - UPDATED
       for (const c of combat.combatants) {
-        const side = c.actor?.hasPlayerOwner ? 'pc' : 'npc';
+        // Use the flag we set, or determine it fresh
+        let side = c.getFlag("msh-faserip", "side");
+        
+        if (!side) {
+          // Determine side if flag is missing
+          if (c.actor.type === "hero") {
+            side = 'pc';
+          } else if (c.actor.type === "villain") {
+            side = 'npc';
+          } else {
+            const tokenDisposition = c.token?.disposition ?? c.actor.prototypeToken.disposition;
+            if (tokenDisposition === CONST.TOKEN_DISPOSITIONS.FRIENDLY) {
+              side = 'pc';
+            } else if (tokenDisposition === CONST.TOKEN_DISPOSITIONS.HOSTILE) {
+              side = 'npc';
+            } else {
+              side = c.actor.hasPlayerOwner ? 'pc' : 'npc';
+            }
+          }
+        }
+        
         if (side === 'pc') {
           pcCombatants.push(c);
         } else {
@@ -555,8 +596,8 @@ export class FaseripInitiative {
   }
   
   /**
-   * Get characters with highest Intuition on each side
-   */
+ * Get characters with highest Intuition on each side
+ */
   static async _getHighestIntuitionCharacters(combat) {
     let pcHighest = { name: "None", intuition: 0 };
     let npcHighest = { name: "None", intuition: 0 };
@@ -566,19 +607,38 @@ export class FaseripInitiative {
       if (!c.actor) continue;
       
       const intuition = c.actor.system.abilities.intuition.value || 0;
-      const isPC = c.actor.hasPlayerOwner;
       
+      // Determine side based on actor type and disposition, not just ownership
+      let isPC = false;
+      
+      // First, check actor type
+      if (c.actor.type === "hero") {
+        isPC = true;
+      } else if (c.actor.type === "villain") {
+        isPC = false;
+      } else {
+        // For NPCs, check disposition (token disposition or prototype token disposition)
+        const tokenDisposition = c.token?.disposition ?? c.actor.prototypeToken.disposition;
+        
+        if (tokenDisposition === CONST.TOKEN_DISPOSITIONS.FRIENDLY) {
+          isPC = true;  // Friendly NPCs go with PCs
+        } else if (tokenDisposition === CONST.TOKEN_DISPOSITIONS.HOSTILE) {
+          isPC = false; // Hostile NPCs go with NPCs/villains
+        } else {
+          // Neutral - could go either way, let's use ownership as fallback
+          isPC = c.actor.hasPlayerOwner;
+        }
+      }
+      
+      // Update highest for the appropriate side
       if (isPC && intuition > pcHighest.intuition) {
         pcHighest = { name: c.name, intuition: intuition };
       } else if (!isPC && intuition > npcHighest.intuition) {
         npcHighest = { name: c.name, intuition: intuition };
       }
       
-      // Ensure side flag is set
-      const side = c.getFlag("msh-faserip", "side");
-      if (!side) {
-        await c.setFlag("msh-faserip", "side", isPC ? "pc" : "npc");
-      }
+      // Ensure side flag is set correctly
+      await c.setFlag("msh-faserip", "side", isPC ? "pc" : "npc");
     }
     
     return [pcHighest, npcHighest];
