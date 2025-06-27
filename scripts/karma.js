@@ -58,11 +58,11 @@ export class KarmaSheet extends DocumentSheet {
     context.dailyKarmaUsed = context.system.karma.dailyKarmaUsed || 0;
     context.dailyKarmaRemaining = Math.max(0, context.dailyKarmaMax - context.dailyKarmaUsed);
     
-    // Sort history by date descending
+    // Sort history by date ascending (oldest to newest)
     context.system.karma.history.sort((a, b) => {
       const dateA = new Date(a.realDate || 0);
       const dateB = new Date(b.realDate || 0);
-      return dateB - dateA;
+      return dateA - dateB;
     });
     
     // Add CSS classes based on event type
@@ -874,11 +874,11 @@ export class KarmaSheet extends DocumentSheet {
     // Get a copy of the history array
     const history = foundry.utils.deepClone(this.object.system.karma?.history || []);
     
-    // Sort the history array the same way it's displayed
+    // Sort the history array the same way it's displayed (oldest to newest)
     history.sort((a, b) => {
       const dateA = new Date(a.realDate || 0);
       const dateB = new Date(b.realDate || 0);
-      return dateB - dateA;
+      return dateA - dateB; // Changed from dateB - dateA
     });
     
     // Now access the correct entry based on the sorted index
@@ -963,11 +963,11 @@ export class KarmaSheet extends DocumentSheet {
     // Get a copy of the history array
     const history = foundry.utils.deepClone(this.object.system.karma?.history || []);
     
-    // Sort the history array the same way it's displayed
+    // Sort the history array the same way it's displayed (oldest to newest)
     history.sort((a, b) => {
       const dateA = new Date(a.realDate || 0);
       const dateB = new Date(b.realDate || 0);
-      return dateB - dateA;
+      return dateA - dateB; // Changed from dateB - dateA
     });
     
     if (index < 0 || index >= history.length) return;
