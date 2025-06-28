@@ -209,31 +209,14 @@ export class KarmaSheet extends DocumentSheet {
       ui.notifications.warn("Only GMs can reset daily karma.");
       return;
     }
-  
+
     const confirmed = await Dialog.confirm({
       title: "Reset Daily Karma",
-      content: `Are you sure you want to reset <strong>${this.object.name}</strong>'s daily karma usage to 0? This will make their full daily karma available again.`
+      content: `Are you sure you want to reset <strong>${this.object.name}</strong>'s daily karma usage to 0?`
     });
-  
-    if (confirmed) {
-      // Ensure dailyKarmaUsed exists
-      let dailyKarmaUsed = this.object.system.karma.dailyKarmaUsed || 0;
-      
-      // If there was any daily karma used, add a history entry for the reset
-      if (dailyKarmaUsed > 0) {
-        const historyEntry = {
-          realDate: new Date().toLocaleDateString(),
-          gameDate: "",
-          amount: dailyKarmaUsed, // Positive amount to represent "return" to the pool
-          type: "Daily Karma Reset",
-          description: "Daily karma reset by GM"
-        };
-        const currentHistory = foundry.utils.deepClone(this.object.system.karma?.history || []);
-        currentHistory.push(historyEntry);
-        await this.object.update({ "system.karma.history": currentHistory });
-      }
 
-      // Reset dailyKarmaUsed to 0
+    if (confirmed) {
+      // Simple reset - no history entry needed
       await this.object.update({ "system.karma.dailyKarmaUsed": 0 });
       ui.notifications.info(`Daily karma for ${this.object.name} has been reset.`);
     }
@@ -1002,50 +985,47 @@ export class KarmaSheet extends DocumentSheet {
     this._updateKarmaHistory(history);
   }
 
+  // In _updateKarmaHistory method, remove the daily karma calculation:
   async _updateKarmaHistory(history) {
-    // Recalculate totals needed for a complete update
     let totalEarned = 0;
-    let totalSpentLifetime = 0; // Excludes daily rolls
-    let dailyKarmaUsed = 0; // <-- NEW LINE
+    let totalSpentLifetime = 0;
     
     history.forEach(event => {
       const amount = Number(event.amount) || 0;
       if (amount > 0) {
         totalEarned += amount;
-      } else { // amount < 0
-        if (event.type === "Daily Roll") { // <-- NEW LINE
-          dailyKarmaUsed += Math.abs(amount); // <-- NEW LINE
-        } else { // <-- NEW LINE
-          totalSpentLifetime += Math.abs(amount); // <-- NEW LINE
-        } // <-- NEW LINE
+      } else if (amount < 0) {
+        // All negative entries are lifetime spending
+        totalSpentLifetime += Math.abs(amount);
       }
     });
     
-    // Get current advancement fund and karma pool values (they are not affected by history changes directly)
+    // Keep current daily karma usage unchanged
+    const currentDailyUsed = this.object.system.karma.dailyKarmaUsed || 0;
+    
+    // Calculate display karma
     const advancementFund = this.object.system.karma.advancement || 0;
     const karmaPool = this.object.system.karma.pool || 0;
-    const dailyKarmaMax = this.object.system.karma.dailyKarmaMax || 0; // <-- NEW LINE
+    const dailyKarmaMax = this.object.system.karma.dailyKarmaMax || 0;
     
-    // Calculate effective karma value based on game setting
-    const dailyKarmaEnabled = game.settings.get("msh-faserip", "dailyKarmaEnabled"); // <-- NEW LINE
-    let currentKarmaValue; // This is system.attributes.karma.value
+    const dailyKarmaEnabled = game.settings.get("msh-faserip", "dailyKarmaEnabled");
+    let currentKarmaValue;
 
-    if (dailyKarmaEnabled) { // <-- NEW LINE
-        const dailyRemaining = Math.max(0, dailyKarmaMax - dailyKarmaUsed); // <-- NEW LINE
-        currentKarmaValue = dailyRemaining; // <-- NEW LINE
-        if (dailyRemaining <= 0) { // If daily is depleted, fall back to lifetime karma // <-- NEW LINE
-            currentKarmaValue = Math.max(0, totalEarned - totalSpentLifetime - advancementFund - karmaPool); // <-- NEW LINE
-        } // <-- NEW LINE
-    } else { // Use standard lifetime karma calculation if daily karma is not enabled // <-- NEW LINE
-        currentKarmaValue = Math.max(0, totalEarned - totalSpentLifetime - advancementFund - karmaPool); // <-- NEW LINE
-    } // <-- NEW LINE
+    if (dailyKarmaEnabled) {
+      const dailyRemaining = Math.max(0, dailyKarmaMax - currentDailyUsed);
+      currentKarmaValue = dailyRemaining;
+      if (dailyRemaining <= 0) {
+        currentKarmaValue = Math.max(0, totalEarned - totalSpentLifetime - advancementFund - karmaPool);
+      }
+    } else {
+      currentKarmaValue = Math.max(0, totalEarned - totalSpentLifetime - advancementFund - karmaPool);
+    }
 
-    // Update the actor
     await this.object.update({
       "system.karma.history": history,
-      "system.attributes.karma.value": currentKarmaValue, // <-- MODIFIED LINE
-      "system.karma.lifetime": totalEarned,
-      "system.karma.dailyKarmaUsed": dailyKarmaUsed // <-- NEW LINE
+      "system.attributes.karma.value": currentKarmaValue,
+      "system.karma.lifetime": totalEarned
+      // Don't modify dailyKarmaUsed here
     });
     
     this.render();

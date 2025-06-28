@@ -3266,7 +3266,7 @@ function getDefaultWeaponRange(equipment) {
   if (name.includes("shotgun")) return 3;
   if (name.includes("bow")) return 8;
   if (name.includes("crossbow")) return 10;
-  if (weaponType === "melee") return 0;
+  if (weaponType === "melee") return 1; // Melee weapons can reach 1 area (adjacent)
   if (weaponType === "thrown") {
     // Use thrower's strength for range
     const strength = equipment.parent?.system?.abilities?.strength?.rank || "Typical";

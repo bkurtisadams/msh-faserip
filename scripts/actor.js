@@ -183,7 +183,8 @@ export class FaseripActor extends Actor {
 
     let totalSpent = 0;
     history.forEach(event => {
-      if (event.amount < 0 && event.type !== "Daily Roll") {
+      // Only count negative amounts (spending), and ignore daily roll entries completely
+      if (event.amount < 0) {
         totalSpent += Math.abs(event.amount);
       }
     });

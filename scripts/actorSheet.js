@@ -1446,35 +1446,62 @@ export class FaseripActorSheet extends ActorSheet {
               let dailyKarmaUsedAmount = 0;
               let lifetimeKarmaUsedAmount = 0;
 
+              // Replace the complex daily karma logic with this simpler version:
               if (karma > 0) {
-                if (dailyKarmaEnabled && actor.system.karma.dailyKarmaUsed < actor.system.karma.dailyKarmaMax) {
-                  const dailyKarmaRemaining = actor.system.karma.dailyKarmaMax - actor.system.karma.dailyKarmaUsed;
-                  const karmaFromDaily = Math.min(karma, dailyKarmaRemaining);
-                  
-                  dailyKarmaUsedAmount = karmaFromDaily;
-                  karmaUsed += karmaFromDaily;
+                const dailyKarmaEnabled = game.settings.get("msh-faserip", "dailyKarmaEnabled");
+                let dailyKarmaUsedAmount = 0;
+                let lifetimeKarmaUsedAmount = 0;
 
-                  await game.msh.runAsGM({
-                    operation: 'update',
-                    targetActorUuid: actor.uuid,
-                    args: [{ "system.karma.dailyKarmaUsed": actor.system.karma.dailyKarmaUsed + dailyKarmaUsedAmount }]
-                  });
-
-                  const remainingKarmaToSpend = karma - karmaFromDaily;
-                  if (remainingKarmaToSpend > 0) {
-                    cappedTotal = Math.min(100, roll.total + remainingKarmaToSpend);
-                    lifetimeKarmaUsedAmount = cappedTotal - roll.total;
-                    karmaUsed += lifetimeKarmaUsedAmount;
+                if (dailyKarmaEnabled) {
+                  const dailyRemaining = this.actor.system.karma.dailyKarmaMax - (this.actor.system.karma.dailyKarmaUsed || 0);
+                  if (dailyRemaining > 0) {
+                    // Use daily karma first (no history entry needed)
+                    dailyKarmaUsedAmount = Math.min(karma, dailyRemaining);
+                    cappedTotal = Math.min(100, roll.total + dailyKarmaUsedAmount);
+                    
+                    // Update daily usage immediately
+                    await game.msh.runAsGM({
+                      operation: 'update',
+                      targetActorUuid: this.actor.uuid,
+                      args: [{ "system.karma.dailyKarmaUsed": (this.actor.system.karma.dailyKarmaUsed || 0) + dailyKarmaUsedAmount }]
+                    });
+                    
+                    // If we need more karma than daily provides, use lifetime
+                    const remainingNeeded = karma - dailyKarmaUsedAmount;
+                    if (remainingNeeded > 0) {
+                      lifetimeKarmaUsedAmount = remainingNeeded;
+                      cappedTotal = Math.min(100, cappedTotal + lifetimeKarmaUsedAmount);
+                    }
                   } else {
-                    cappedTotal = Math.min(100, roll.total + karmaFromDaily);
+                    // No daily karma left, use lifetime
+                    lifetimeKarmaUsedAmount = karma;
+                    cappedTotal = Math.min(100, roll.total + lifetimeKarmaUsedAmount);
                   }
                 } else {
-                  cappedTotal = Math.min(100, roll.total + karma);
-                  lifetimeKarmaUsedAmount = cappedTotal - roll.total;
-                  karmaUsed = lifetimeKarmaUsedAmount;
+                  // Daily karma disabled, use lifetime
+                  lifetimeKarmaUsedAmount = karma;
+                  cappedTotal = Math.min(100, roll.total + lifetimeKarmaUsedAmount);
                 }
-              } else {
-                cappedTotal = roll.total;
+
+                // Only create history entry for lifetime karma spending
+                if (lifetimeKarmaUsedAmount > 0) {
+                  const historyEntry = {
+                    realDate: new Date().toLocaleDateString(),
+                    gameDate: "",
+                    amount: -lifetimeKarmaUsedAmount,
+                    type: "Die Roll",
+                    description: `Spent lifetime karma on [ability/power/etc] roll`
+                  };
+                  
+                  const currentHistory = foundry.utils.deepClone(this.actor.system.karma?.history || []);
+                  currentHistory.push(historyEntry);
+                  
+                  await game.msh.runAsGM({
+                    operation: 'update',
+                    targetActorUuid: this.actor.uuid,
+                    args: [{ "system.karma.history": currentHistory }]
+                  });
+                }
               }
 
               const historyUpdates = [];
@@ -2416,35 +2443,62 @@ html.find('.headquarters-row').each((i, row) => {
               let dailyKarmaUsedAmount = 0;
               let lifetimeKarmaUsedAmount = 0;
 
+              // Replace the complex daily karma logic with this simpler version:
               if (karma > 0) {
-                if (dailyKarmaEnabled && this.actor.system.karma.dailyKarmaUsed < this.actor.system.karma.dailyKarmaMax) {
-                  const dailyKarmaRemaining = this.actor.system.karma.dailyKarmaMax - this.actor.system.karma.dailyKarmaUsed;
-                  const karmaFromDaily = Math.min(karma, dailyKarmaRemaining);
-                  
-                  dailyKarmaUsedAmount = karmaFromDaily;
-                  karmaUsed += karmaFromDaily;
+                const dailyKarmaEnabled = game.settings.get("msh-faserip", "dailyKarmaEnabled");
+                let dailyKarmaUsedAmount = 0;
+                let lifetimeKarmaUsedAmount = 0;
 
+                if (dailyKarmaEnabled) {
+                  const dailyRemaining = this.actor.system.karma.dailyKarmaMax - (this.actor.system.karma.dailyKarmaUsed || 0);
+                  if (dailyRemaining > 0) {
+                    // Use daily karma first (no history entry needed)
+                    dailyKarmaUsedAmount = Math.min(karma, dailyRemaining);
+                    cappedTotal = Math.min(100, roll.total + dailyKarmaUsedAmount);
+                    
+                    // Update daily usage immediately
+                    await game.msh.runAsGM({
+                      operation: 'update',
+                      targetActorUuid: this.actor.uuid,
+                      args: [{ "system.karma.dailyKarmaUsed": (this.actor.system.karma.dailyKarmaUsed || 0) + dailyKarmaUsedAmount }]
+                    });
+                    
+                    // If we need more karma than daily provides, use lifetime
+                    const remainingNeeded = karma - dailyKarmaUsedAmount;
+                    if (remainingNeeded > 0) {
+                      lifetimeKarmaUsedAmount = remainingNeeded;
+                      cappedTotal = Math.min(100, cappedTotal + lifetimeKarmaUsedAmount);
+                    }
+                  } else {
+                    // No daily karma left, use lifetime
+                    lifetimeKarmaUsedAmount = karma;
+                    cappedTotal = Math.min(100, roll.total + lifetimeKarmaUsedAmount);
+                  }
+                } else {
+                  // Daily karma disabled, use lifetime
+                  lifetimeKarmaUsedAmount = karma;
+                  cappedTotal = Math.min(100, roll.total + lifetimeKarmaUsedAmount);
+                }
+
+                // Only create history entry for lifetime karma spending
+                if (lifetimeKarmaUsedAmount > 0) {
+                  const historyEntry = {
+                    realDate: new Date().toLocaleDateString(),
+                    gameDate: "",
+                    amount: -lifetimeKarmaUsedAmount,
+                    type: "Die Roll",
+                    description: `Spent lifetime karma on [ability/power/etc] roll`
+                  };
+                  
+                  const currentHistory = foundry.utils.deepClone(this.actor.system.karma?.history || []);
+                  currentHistory.push(historyEntry);
+                  
                   await game.msh.runAsGM({
                     operation: 'update',
                     targetActorUuid: this.actor.uuid,
-                    args: [{ "system.karma.dailyKarmaUsed": this.actor.system.karma.dailyKarmaUsed + dailyKarmaUsedAmount }]
+                    args: [{ "system.karma.history": currentHistory }]
                   });
-
-                  const remainingKarmaToSpend = karma - karmaFromDaily;
-                  if (remainingKarmaToSpend > 0) {
-                    cappedTotal = Math.min(100, roll.total + remainingKarmaToSpend);
-                    lifetimeKarmaUsedAmount = cappedTotal - roll.total;
-                    karmaUsed += lifetimeKarmaUsedAmount;
-                  } else {
-                    cappedTotal = Math.min(100, roll.total + karmaFromDaily);
-                  }
-                } else {
-                  cappedTotal = Math.min(100, roll.total + karma);
-                  lifetimeKarmaUsedAmount = cappedTotal - roll.total;
-                  karmaUsed = lifetimeKarmaUsedAmount;
                 }
-              } else {
-                cappedTotal = roll.total;
               }
 
               const historyUpdates = [];
@@ -3180,35 +3234,62 @@ _rollVehicleControl(vehicle) {
           let dailyKarmaUsedAmount = 0;
           let lifetimeKarmaUsedAmount = 0;
 
+          // Replace the complex daily karma logic with this simpler version:
           if (karma > 0) {
-            if (dailyKarmaEnabled && actor.system.karma.dailyKarmaUsed < actor.system.karma.dailyKarmaMax) {
-              const dailyKarmaRemaining = actor.system.karma.dailyKarmaMax - actor.system.karma.dailyKarmaUsed;
-              const karmaFromDaily = Math.min(karma, dailyKarmaRemaining);
-              
-              dailyKarmaUsedAmount = karmaFromDaily;
-              karmaUsed += karmaFromDaily;
+            const dailyKarmaEnabled = game.settings.get("msh-faserip", "dailyKarmaEnabled");
+            let dailyKarmaUsedAmount = 0;
+            let lifetimeKarmaUsedAmount = 0;
 
-              await game.msh.runAsGM({
-                operation: 'update',
-                targetActorUuid: actor.uuid,
-                args: [{ "system.karma.dailyKarmaUsed": actor.system.karma.dailyKarmaUsed + dailyKarmaUsedAmount }]
-              });
-
-              const remainingKarmaToSpend = karma - karmaFromDaily;
-              if (remainingKarmaToSpend > 0) {
-                cappedTotal = Math.min(100, controlRoll.total + remainingKarmaToSpend);
-                lifetimeKarmaUsedAmount = cappedTotal - controlRoll.total;
-                karmaUsed += lifetimeKarmaUsedAmount;
+            if (dailyKarmaEnabled) {
+              const dailyRemaining = this.actor.system.karma.dailyKarmaMax - (this.actor.system.karma.dailyKarmaUsed || 0);
+              if (dailyRemaining > 0) {
+                // Use daily karma first (no history entry needed)
+                dailyKarmaUsedAmount = Math.min(karma, dailyRemaining);
+                cappedTotal = Math.min(100, roll.total + dailyKarmaUsedAmount);
+                
+                // Update daily usage immediately
+                await game.msh.runAsGM({
+                  operation: 'update',
+                  targetActorUuid: this.actor.uuid,
+                  args: [{ "system.karma.dailyKarmaUsed": (this.actor.system.karma.dailyKarmaUsed || 0) + dailyKarmaUsedAmount }]
+                });
+                
+                // If we need more karma than daily provides, use lifetime
+                const remainingNeeded = karma - dailyKarmaUsedAmount;
+                if (remainingNeeded > 0) {
+                  lifetimeKarmaUsedAmount = remainingNeeded;
+                  cappedTotal = Math.min(100, cappedTotal + lifetimeKarmaUsedAmount);
+                }
               } else {
-                cappedTotal = Math.min(100, controlRoll.total + karmaFromDaily);
+                // No daily karma left, use lifetime
+                lifetimeKarmaUsedAmount = karma;
+                cappedTotal = Math.min(100, roll.total + lifetimeKarmaUsedAmount);
               }
             } else {
-              cappedTotal = Math.min(100, controlRoll.total + karma);
-              lifetimeKarmaUsedAmount = cappedTotal - controlRoll.total;
-              karmaUsed = lifetimeKarmaUsedAmount;
+              // Daily karma disabled, use lifetime
+              lifetimeKarmaUsedAmount = karma;
+              cappedTotal = Math.min(100, roll.total + lifetimeKarmaUsedAmount);
             }
-          } else {
-            cappedTotal = controlRoll.total;
+
+            // Only create history entry for lifetime karma spending
+            if (lifetimeKarmaUsedAmount > 0) {
+              const historyEntry = {
+                realDate: new Date().toLocaleDateString(),
+                gameDate: "",
+                amount: -lifetimeKarmaUsedAmount,
+                type: "Die Roll",
+                description: `Spent lifetime karma on [ability/power/etc] roll`
+              };
+              
+              const currentHistory = foundry.utils.deepClone(this.actor.system.karma?.history || []);
+              currentHistory.push(historyEntry);
+              
+              await game.msh.runAsGM({
+                operation: 'update',
+                targetActorUuid: this.actor.uuid,
+                args: [{ "system.karma.history": currentHistory }]
+              });
+            }
           }
 
           const historyUpdates = [];
