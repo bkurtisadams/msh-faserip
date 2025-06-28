@@ -4138,12 +4138,41 @@ export async function rollUniversalAction(actionCode, actorId, columnShift = nul
         areasMovedThrough: areasMovedThrough,
         rollResult: color
       });
-    } else if (target && actionCode === "Ca") {
-      await processCatchingResult(actor, target, color, actionCode, finalValue, label);
+    } else if (actionCode === "Ca") {
+      if (target) {
+        await processCatchingResult(actor, target, color, actionCode, finalValue, label);
+      } else {
+        ui.notifications.info("Catching requires a target to be selected.");
+      }
+    } else if (target && actionCode === "Ch") {
+      // Prompt for areas moved in this charge
+      const areasMovedThrough = await new Promise((resolve) => {
+        new Dialog({
+          title: "Charge Distance",
+          content: `
+            <div class="form-group">
+              <label>How many areas did ${actor.name} move before impact?</label>
+              <input type="number" name="areas" value="1" min="1" max="20" />
+              <div style="font-size: 0.8em; color: #666;">1 area = 10 feet. Distance affects damage and CS bonus.</div>
+            </div>
+          `,
+          buttons: {
+            ok: {
+              label: "Calculate Damage",
+              callback: (html) => resolve(parseInt(html.find('[name="areas"]').val()) || 1)
+            }
+          }
+        }).render(true);
+      });
+      
+      await processChargeAttack({
+        attacker: actor,
+        target: target,
+        areasMovedThrough: areasMovedThrough,
+        rollResult: color
+      });
     } else if (target && actionCode !== "Ca" && actionCode !== "Ch" && actionCode !== "Do") {
       await processUniversalActionTarget(actor, target, actionCode, color, finalValue, label);
-    } else if (actionCode === "Ca") {
-      ui.notifications.info("Catching requires a target to be selected.");
     } else if (actionCode === "Ch") {
       ui.notifications.info("Charging requires a target to be selected.");
     } else {
@@ -4212,7 +4241,7 @@ async function processUniversalActionTarget(actor, target, actionCode, resultCol
       await game.msh.runAsGM({
         operation: 'applyCombatHandlerDamage',
         attackerUuid: actor.uuid,
-        targetActorUuid: target.uuid,
+        targetActorUuid: target.token?.document.uuid || target.uuid,
         baseDamage: finalBaseDamage, // Use the corrected damage value
         damageType,
         sourceName: sourceName,
@@ -4674,19 +4703,27 @@ async function validateCatchingAttempt(actor, actionCode, targetToken) {
     }
   }
   
-  // Set flags on the target based on the dialog results
-  await target.setFlag("msh-faserip", "projectileType", catchingInfo.objectType);
-  await target.setFlag("msh-faserip", "directedAttack", catchingInfo.directedAttack);
-  await target.setFlag("msh-faserip", "objectWeight", catchingInfo.objectMass);
-  await target.setFlag("msh-faserip", "projectileDamage", catchingInfo.projectileDamage);
-  await target.setFlag("msh-faserip", "projectileSpeed", catchingInfo.projectileSpeed);
-  
+  // Set flags on the target based on the dialog results using GM permissions
+  const flagUpdates = {
+    "flags.msh-faserip.projectileType": catchingInfo.objectType,
+    "flags.msh-faserip.directedAttack": catchingInfo.directedAttack,
+    "flags.msh-faserip.objectWeight": catchingInfo.objectMass,
+    "flags.msh-faserip.projectileDamage": catchingInfo.projectileDamage,
+    "flags.msh-faserip.projectileSpeed": catchingInfo.projectileSpeed
+  };
+
   if (catchingInfo.objectType === "falling") {
-    await target.setFlag("msh-faserip", "fallSpeed", fallSpeedRank);
-    await target.setFlag("msh-faserip", "fallDuration", catchingInfo.fallDuration);
-    await target.setFlag("msh-faserip", "totalFallDistance", catchingInfo.totalFallDistance);
-    await target.setFlag("msh-faserip", "areasMovedThrough", areasMovedThrough);
+    flagUpdates["flags.msh-faserip.fallSpeed"] = fallSpeedRank;
+    flagUpdates["flags.msh-faserip.fallDuration"] = catchingInfo.fallDuration;
+    flagUpdates["flags.msh-faserip.totalFallDistance"] = catchingInfo.totalFallDistance;
+    flagUpdates["flags.msh-faserip.areasMovedThrough"] = areasMovedThrough;
   }
+
+  await runAsGM({
+    operation: 'update',
+    targetActorUuid: target.uuid,
+    args: [flagUpdates]
+  });
   
   return { 
     valid: true, 
@@ -4762,21 +4799,51 @@ async function processCatchingResult(actor, target, color, actionCode, finalValu
         
         // Apply collision damage to catcher
         if (damageResults.damageToDefender > 0) {
-          await game.msh.runAsGM({
+          console.log(`🩸 DEBUG: Applying ${damageResults.damageToDefender} collision damage to ${actor.name}`);
+          console.log(`🩸 DEBUG: Current health: ${actor.system.attributes.health.value}`);
+          console.log(`🩸 DEBUG: Actor UUID: ${actor.uuid}`);
+          console.log(`🩸 DEBUG: Actor type: ${actor.constructor.name}`);
+          console.log(`🩸 DEBUG: Is token actor: ${actor.isToken}`);
+          
+          const newHealth = Math.max(0, actor.system.attributes.health.value - damageResults.damageToDefender);
+          console.log(`🩸 DEBUG: New health should be: ${newHealth}`);
+          
+          // Use the correct actor UUID
+          const actorUuid = actor.isToken ? actor.token.uuid : actor.uuid;
+          console.log(`🩸 DEBUG: Using UUID: ${actorUuid}`);
+          
+          await runAsGM({
             operation: 'adjustTargetHealth',
-            targetActorUuid: actor.uuid,
-            newHealth: Math.max(0, actor.system.attributes.health.value - damageResults.damageToDefender)
+            targetActorUuid: actorUuid,
+            newHealth: newHealth
           });
+          
+          console.log(`🩸 DEBUG: Health update command sent via runAsGM`);
         }
         
-        // Apply ground impact damage to falling person
-        if (netGroundDamage > 0 && target.system?.attributes?.health) {
-          await game.msh.runAsGM({
-            operation: 'adjustTargetHealth',
-            targetActorUuid: target.uuid,
-            newHealth: Math.max(0, target.system.attributes.health.value - netGroundDamage)
-          });
-        }
+      // Apply ground impact damage to falling person
+      if (netGroundDamage > 0 && target.system?.attributes?.health) {
+        console.log(`🩸 DEBUG: Applying ${netGroundDamage} ground damage to ${target.name}`);
+        console.log(`🩸 DEBUG: Current health: ${target.system.attributes.health.value}`);
+        console.log(`🩸 DEBUG: Target UUID: ${target.uuid}`);
+        console.log(`🩸 DEBUG: Target type: ${target.constructor.name}`);
+        console.log(`🩸 DEBUG: Is token actor: ${target.isToken}`);
+        
+        const newHealth = Math.max(0, target.system.attributes.health.value - netGroundDamage);
+        console.log(`🩸 DEBUG: New health should be: ${newHealth}`);
+        
+        // Use the correct actor UUID - if it's a token actor, use the token's actor
+        const actorUuid = target.isToken ? target.token.uuid : target.uuid;
+        console.log(`🩸 DEBUG: Using UUID: ${actorUuid}`);
+        
+        await runAsGM({
+          operation: 'adjustTargetHealth',
+          targetActorUuid: actorUuid,
+          newHealth: newHealth
+        });
+        
+        console.log(`🩸 DEBUG: Health update command sent via runAsGM`);
+      }
         
       } else {
         // Existing projectile auto-hit code...
@@ -4838,11 +4905,20 @@ async function processCatchingResult(actor, target, color, actionCode, finalValu
         
         // Apply falling damage to the person who hit the ground
         if (netDamage > 0 && target.system?.attributes?.health) {
-          await game.msh.runAsGM({
+          console.log(`🩸 DEBUG: Applying ${netDamage} falling damage to ${target.name}`);
+          console.log(`🩸 DEBUG: Current health: ${target.system.attributes.health.value}`);
+          console.log(`🩸 DEBUG: Target UUID: ${target.uuid}`);
+          
+          const newHealth = Math.max(0, target.system.attributes.health.value - netDamage);
+          console.log(`🩸 DEBUG: New health should be: ${newHealth}`);
+          
+          await runAsGM({
             operation: 'adjustTargetHealth',
             targetActorUuid: target.uuid,
-            newHealth: Math.max(0, target.system.attributes.health.value - netDamage)
+            newHealth: newHealth
           });
+          
+          console.log(`🩸 DEBUG: Health update command sent via runAsGM`);
         }
       } else {
         // Other non-directed projectiles
@@ -4889,7 +4965,7 @@ async function processCatchingResult(actor, target, color, actionCode, finalValu
         if (netDamage > 0) {
           await game.msh.runAsGM({
             operation: 'adjustTargetHealth',
-            targetActorUuid: target.uuid,
+              targetActorUuid: target?.actor?.uuid || target.uuid,
             newHealth: Math.max(0, target.system.attributes.health.value - netDamage)
           });
         }

@@ -28,13 +28,34 @@ export function registerSocket() {
 }
 
 async function runGMCommand(data) {
-  const targetActor = data.targetActorUuid ? await fromUuid(data.targetActorUuid) : null;
-  const attacker = data.attackerUuid ? await fromUuid(data.attackerUuid) : null;
+  let targetActor = null;
+  let attacker = null;
+  
+  // Handle target actor - could be Actor UUID or Token UUID
+  if (data.targetActorUuid) {
+    const targetDocument = await fromUuid(data.targetActorUuid);
+    if (targetDocument) {
+      // If it's a Token, get its actor; if it's already an Actor, use it directly
+      targetActor = targetDocument.actor || targetDocument;
+    }
+  }
+  
+  // Handle attacker - could be Actor UUID or Token UUID  
+  if (data.attackerUuid) {
+    const attackerDocument = await fromUuid(data.attackerUuid);
+    if (attackerDocument) {
+      attacker = attackerDocument.actor || attackerDocument;
+    }
+  }
 
   if (data.operation === 'adjustTargetHealth') {
-    if (!targetActor) return;
+    if (!targetActor) {
+      console.error("🏥 GM: No target actor found for UUID:", data.targetActorUuid);
+      return;
+    }
+    console.log(`🏥 GM: Adjusting ${targetActor.name} health from ${targetActor.system.attributes.health.value} to ${data.newHealth}`);
     await targetActor.update({ "system.attributes.health.value": data.newHealth });
-
+    console.log(`🏥 GM: Health update complete for ${targetActor.name}`);
   } else if (data.operation === 'applyCombatHandlerDamage') {
     if (attacker && targetActor) {
       await game.msh.CombatHandler.processAttack({
