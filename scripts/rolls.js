@@ -4241,7 +4241,7 @@ async function processUniversalActionTarget(actor, target, actionCode, resultCol
       await game.msh.runAsGM({
         operation: 'applyCombatHandlerDamage',
         attackerUuid: actor.uuid,
-        targetActorUuid: target.token?.document.uuid || target.uuid,
+        targetActorUuid: target.uuid,
         baseDamage: finalBaseDamage, // Use the corrected damage value
         damageType,
         sourceName: sourceName,
