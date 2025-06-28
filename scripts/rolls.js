@@ -3606,6 +3606,16 @@ export async function openUniversalTableDialog(actor) {
               <label>Karma</label>
               <input type="number" name="karma" value="\${savedKarma}" />
             </div>
+            <div class="form-group">
+              <label>Damage Value</label>
+              <input type="number" name="damageValue" value="" placeholder="Enter weapon/power damage" />
+              <div style="font-size: 0.8em; color: #666;">Leave blank to use ability value</div>
+            </div>
+            <div class="form-group">
+              <label>Weapon/Power Used</label>
+              <input type="text" name="weaponName" value="" placeholder="e.g., Colt .45, Energy Blast, Katana" />
+              <div style="font-size: 0.8em; color: #666;">Optional: For chat display purposes</div>
+            </div>
             \${multiTargetOptionsHTML}
             <div class="form-group">
               <label><input type="checkbox" name="remember" checked /> Remember these settings</label>
@@ -3616,23 +3626,27 @@ export async function openUniversalTableDialog(actor) {
             roll: {
               label: "Roll",
               callback: async (html) => {
-                const cs = parseInt(html.find('[name="cs"]').val()) || 0;
-                const karma = parseInt(html.find('[name="karma"]').val()) || 0;
-                const remember = html.find('[name="remember"]').is(":checked");
-                const multiAdjacent = html.find('[name="multiAdjacent"]').is(':checked');
-                const multiAttacks = html.find('[name="multiAttacks"]').is(':checked');
-                const attackCount = parseInt(html.find('[name="attackCount"]:checked').val()) || 2;
+              const cs = parseInt(html.find('[name="cs"]').val()) || 0;
+              const karma = parseInt(html.find('[name="karma"]').val()) || 0;
+              const damageValue = parseInt(html.find('[name="damageValue"]').val()) || null;
+              const weaponName = html.find('[name="weaponName"]').val().trim();
+              const remember = html.find('[name="remember"]').is(":checked");
+              const multiAdjacent = html.find('[name="multiAdjacent"]').is(':checked');
+              const multiAttacks = html.find('[name="multiAttacks"]').is(':checked');
+              const attackCount = parseInt(html.find('[name="attackCount"]:checked').val()) || 2;
 
-                if (remember) {
-                  await actor.setFlag("msh-faserip", \`cs_${action}\`, cs);
-                  await actor.setFlag("msh-faserip", \`karma_${action}\`, karma);
-                }
+              if (remember) {
+                await actor.setFlag("msh-faserip", \`cs_${action}\`, cs);
+                await actor.setFlag("msh-faserip", \`karma_${action}\`, karma);
+              }
 
-                game.msh.rollUniversalAction("${action}", actor.id, cs, karma, {
-                  multiAdjacent,
-                  multiAttacks,
-                  attackCount
-                });
+              game.msh.rollUniversalAction("${action}", actor.id, cs, karma, {
+                multiAdjacent,
+                multiAttacks,
+                attackCount,
+                customDamage: damageValue,
+                weaponName: weaponName
+              });
               }
             },
             cancel: { label: "Cancel" }
@@ -3708,6 +3722,16 @@ export async function openUniversalTableDialog(actor) {
               <label>Karma</label>
               <input type="number" name="karma" value="${savedKarma}" />
             </div>
+            <div class="form-group">
+              <label>Damage Value</label>
+              <input type="number" name="damageValue" value="" placeholder="Enter weapon/power damage" />
+              <div style="font-size: 0.8em; color: #666;">Leave blank to use ability value</div>
+            </div>
+            <div class="form-group">
+              <label>Weapon/Power Used</label>
+              <input type="text" name="weaponName" value="" placeholder="e.g., Colt .45, Energy Blast, Katana" />
+              <div style="font-size: 0.8em; color: #666;">Optional: For chat display purposes</div>
+            </div>
             ${multiTargetOptionsHTML}
             <div class="form-group">
               <label><input type="checkbox" name="remember" checked /> Remember these settings</label>
@@ -3722,9 +3746,9 @@ export async function openUniversalTableDialog(actor) {
                 
                 const cs = parseInt(html.find('[name="cs"]').val()) || 0;
                 const karma = parseInt(html.find('[name="karma"]').val()) || 0;
+                const damageValue = parseInt(html.find('[name="damageValue"]').val()) || null;
+                const weaponName = html.find('[name="weaponName"]').val().trim();
                 const remember = html.find('[name="remember"]').is(":checked");
-
-                // Get multiple target options
                 const multiAdjacent = html.find('[name="multiAdjacent"]').is(':checked');
                 const multiAttacks = html.find('[name="multiAttacks"]').is(':checked');
                 const attackCount = parseInt(html.find('[name="attackCount"]:checked').val()) || 2;
@@ -3758,7 +3782,9 @@ export async function openUniversalTableDialog(actor) {
                 game.msh.rollUniversalAction(action, actor.id, cs, karma, {
                   multiAdjacent,
                   multiAttacks,
-                  attackCount
+                  attackCount,
+                  customDamage: damageValue,
+                  weaponName: weaponName
                 });
               }
             },
@@ -4058,14 +4084,19 @@ export async function rollUniversalAction(actionCode, actorId, columnShift = nul
   const labelColor = color.toLowerCase();
 
   // Create chat message
+  const weaponInfo = options.weaponName ? `<div>Weapon/Power: ${options.weaponName}</div>` : "";
+  const damageInfo = options.customDamage ? `<div>Damage: ${options.customDamage}</div>` : "";
+
   const content = `
   <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
     <div style="padding: 5px 10px; border-bottom: 1px solid #c0c0c0; font-size: 1.1em; color: #8b0000;">
-      <strong>${actor.name} - ${label}</strong>
+      <strong>${actor.name} - ${options.weaponName || label}</strong>
     </div>
     <div style="padding: 5px 10px; font-size: 0.9em;">
       <div>Ability: ${abilityKey.charAt(0).toUpperCase() + abilityKey.slice(1)}</div>
       <div>Base Rank: ${ability.rank} (${ability.value})</div>
+      ${weaponInfo}
+      ${damageInfo}
       ${totalColumnShift !== 0 ? `<div>Column Shift: ${totalColumnShift > 0 ? "+" : ""}${totalColumnShift}</div>` : ""}
       ${totalColumnShift !== 0 ? `<div>Final Rank: ${finalRank} (${finalValue})</div>` : ""}
       <div>Roll: ${roll.total} + Karma: ${karmaUsed} = <strong>${cappedTotal}</strong></div>
@@ -4100,7 +4131,7 @@ export async function rollUniversalAction(actionCode, actorId, columnShift = nul
       const target = targetToken.actor;
       if (target) {
         console.log(`🎯 DEBUG: About to call processUniversalActionTarget for ${target.name}`);
-        await processUniversalActionTarget(actor, target, actionCode, color, finalValue, label);
+        await processUniversalActionTarget(actor, target, actionCode, color, finalValue, options.weaponName || label, options);
       }
     }
   } else {
@@ -4172,7 +4203,7 @@ export async function rollUniversalAction(actionCode, actorId, columnShift = nul
         rollResult: color
       });
     } else if (target && actionCode !== "Ca" && actionCode !== "Ch" && actionCode !== "Do") {
-      await processUniversalActionTarget(actor, target, actionCode, color, finalValue, label);
+      await processUniversalActionTarget(actor, target, actionCode, color, finalValue, options.weaponName || label, options);
     } else if (actionCode === "Ch") {
       ui.notifications.info("Charging requires a target to be selected.");
     } else {
@@ -4195,7 +4226,7 @@ export async function rollUniversalAction(actionCode, actorId, columnShift = nul
  * @param {String} sourceName - The source name for chat
  */
 // Around line 3570 in processUniversalActionTarget function
-async function processUniversalActionTarget(actor, target, actionCode, resultColor, baseDamage, sourceName) {
+async function processUniversalActionTarget(actor, target, actionCode, resultColor, baseDamage, sourceName, options = {}) {
   console.log(`🎯 DEBUG: processUniversalActionTarget called with resultColor: "${resultColor}"`);
   
   if (resultColor.toLowerCase() === "white") {
@@ -4214,12 +4245,16 @@ async function processUniversalActionTarget(actor, target, actionCode, resultCol
   const canBeSlam = ["BA", "EA", "Ch"].includes(actionCode);
   const canBeKill = ["EA", "Sh", "En", "TE"].includes(actionCode);
 
+  // Use custom damage if provided, otherwise use the calculated damage
+  let finalBaseDamage = options.customDamage || baseDamage;
+
   // FIX: For Blunt Attacks (BA), use Strength for damage, not the rolling ability
-  let finalBaseDamage = baseDamage;
-  if (actionCode === "BA") {
+  if (actionCode === "BA" && !options.customDamage) {
     finalBaseDamage = actor.system.abilities.strength.value || 0;
     console.log(`🎯 BA DAMAGE FIX: Using Strength ${finalBaseDamage} instead of Fighting ${baseDamage}`);
   }
+
+  console.log(`🎯 DEBUG: Final damage being used: ${finalBaseDamage} ${options.customDamage ? '(custom)' : '(calculated)'}`);
 
   // Check if this is a wrestling action
   if (["Gp", "Gb", "Es"].includes(actionCode)) {
