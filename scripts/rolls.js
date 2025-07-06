@@ -2438,12 +2438,15 @@ export class FaseripRolls {
           }
         }
 
+        const baseDamage = isNaN(Number(equipment.system.damage)) ? 0 : Number(equipment.system.damage);
+
         // Create a single enhanced message that includes the roll and all information
         const messageContent = `
           <div>
             <h3 style="color: #8B0000; margin: 0 0 5px 0; font-size: 1.1em;">${actor.name} - ${equipment.name} (${actionName})</h3>
             <div style="margin-bottom: 5px; font-size: 0.9em;">
-              <div>Base Rank: ${abilityRank} (${abilityValue})</div>
+              <div>Attack Ability: ${abilityKey} → ${abilityRank} (${abilityValue})</div>
+              <div>Base Damage: ${baseDamage} (${equipment.system.damage})</div>
               ${rangeData.info}
               <div>Column Shift: ${totalShift !== 0 ? `${totalShift > 0 ? "+" : ""}${totalShift} → ${effectiveRank}` : "None"}</div>
 
@@ -2489,9 +2492,15 @@ export class FaseripRolls {
           
           for (const target of targets) {
             if (resultColor.toLowerCase() !== "white") {
-              let baseDamage = parseInt(equipment.system.damage);
-              if (isNaN(baseDamage)) {
-                baseDamage = CONFIG.FASERIP.rankValues[equipment.system.damage] || 0;
+              let baseDamage;
+              const rawDamage = equipment.system.damage;
+
+              if (typeof rawDamage === "number") {
+                baseDamage = rawDamage;
+              } else if (!isNaN(rawDamage)) {
+                baseDamage = parseInt(rawDamage);
+              } else {
+                baseDamage = CONFIG.FASERIP.rankValues[rawDamage] || 0;
               }
 
               // DAMAGE TYPE NORMALIZATION HERE
@@ -2557,9 +2566,15 @@ export class FaseripRolls {
           // Single target (existing code)
           const target = game.user.targets.first()?.actor;
           if (target) {
-            let baseDamage = parseInt(equipment.system.damage);
-            if (isNaN(baseDamage)) {
-              baseDamage = CONFIG.FASERIP.rankValues[equipment.system.damage] || 0;
+            let baseDamage;
+            const rawDamage = equipment.system.damage;
+
+            if (typeof rawDamage === "number") {
+              baseDamage = rawDamage;
+            } else if (!isNaN(rawDamage)) {
+              baseDamage = parseInt(rawDamage);
+            } else {
+              baseDamage = CONFIG.FASERIP.rankValues[rawDamage] || 0;
             }
 
             // DAMAGE TYPE NORMALIZATION HERE

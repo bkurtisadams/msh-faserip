@@ -71,6 +71,17 @@
           <label>Damage:</label>
           <input type="text" name="system.damage" value="{{system.damage}}" />
         </div>
+
+        <div class="form-group">
+          <label for="system.powerRank">Power Rank</label>
+          <input type="text" name="system.powerRank" value="{{system.powerRank}}" />
+        </div>
+
+        <div class="form-group">
+          <label for="system.treatAsPower">Treat as Power</label>
+          <input type="checkbox" name="system.treatAsPower" {{checked system.treatAsPower}} />
+          <p class="notes">Use powerRank for attack rolls instead of an ability like Agility.</p>
+        </div>
   
         <div class="form-group">
           <label>Damage Type:</label>

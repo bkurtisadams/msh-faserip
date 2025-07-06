@@ -604,6 +604,13 @@ context.damageTypes = [
               additionalInfo += `<div>Legality: ${legalText}</div>`;
             }
 
+            console.log("=== WEAPON DAMAGE DEBUG ===");
+            console.log("item.system.damage:", item.system.damage);
+            console.log("item.system.damageType:", item.system.damageType);
+            console.log("damage variable:", damage);
+            console.log("damageType variable:", damageType);
+            console.log("========================");
+            
             // Create the formatted chat message with proper colors
             await ChatMessage.create({
               speaker: ChatMessage.getSpeaker({ actor }),
