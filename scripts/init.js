@@ -20,8 +20,36 @@ Hooks.once("init", async () => {
   // Initialize the game.msh namespace early
   game.msh = game.msh || {};
 
+  game.msh.FaseripActorSheet = FaseripActorSheet;
+
   CONFIG.FASERIP = CONFIG.FASERIP || {};
-  
+
+  // keyboard control to open Universal Table dialog
+  game.keybindings.register("msh-faserip", "openUniversalTable", {
+    name: "Open Universal Table",
+    hint: "Opens the Universal Table using selected token, open sheet, or fallback actor",
+    category: "FASERIP",
+    editable: [{ key: "KeyU", modifiers: ["Control"] }],
+    onDown: () => {
+      const sheet = Object.values(ui.windows).find(w => w instanceof game.msh.FaseripActorSheet);
+      const actor =
+        sheet?.actor ??
+        canvas.tokens.controlled[0]?.actor ??
+        game.actors.find(a => a.type === "hero" || a.type === "npc") ??
+        game.actors.contents[0]; // fallback to any actor
+
+      if (actor) {
+        game.msh.openUniversalTableDialog?.(actor);
+      } else {
+        ui.notifications.warn("No actor found to use for Universal Table.");
+      }
+
+      return true;
+    },
+    restricted: false,
+    precedence: CONST.KEYBINDING_PRECEDENCE.NORMAL
+  });
+
   // <-- NEW/MODIFIED SECTION START -->
   // Register system settings - THIS IS THE MISSING PART
   game.settings.register('msh-faserip', 'dailyKarmaEnabled', {
@@ -341,6 +369,19 @@ Hooks.once("ready", () => {
     // Apply the fixed overrides
     game.settings.set("core", "prototypeTokenOverrides", fixedOverrides);
   }
+
+  /* document.addEventListener("keydown", async (event) => {
+    // Example: Ctrl + U (can change this to any key combo)
+    if (event.ctrlKey && event.key === "u") {
+      const sheet = Object.values(ui.windows).find(w => w instanceof game.msh.FaseripActorSheet);
+      if (sheet && sheet.actor) {
+        game.msh.openUniversalTableDialog?.(sheet.actor);
+      } else {
+        ui.notifications.warn("No open character sheet found for Universal Table.");
+      }
+    }
+  }); */
+
 });
 
 // Add the hotbarDrop hook at module level (like in the older file)
