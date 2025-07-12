@@ -1,3 +1,55 @@
+import { rollUniversalTable } from './universalTable.js'; // Ensure this exists
+
+/**
+ * Resolve slam effect based on FASERIP rules
+ * Target rolls Endurance FEAT on Universal Table to determine slam outcome
+ * @param {Object} targetData - Object containing endurance info
+ * @param {number} attackerStrength - Attacker's strength value (for Grand Slam distance)
+ * @returns {Object} - Slam resolution results
+ */
+function resolveSlamEffect(targetData, attackerStrength = 0) {
+    const enduranceRank = targetData.enduranceRank || "Typical";
+    const enduranceValue = targetData.enduranceValue || 6;
+
+    const roll = Math.ceil(Math.random() * 100);
+    const colorResult = rollUniversalTable(enduranceRank, roll); // returns 'white', 'green', etc.
+
+    let effect;
+    let knockbackDistance = 0;
+    let description = "";
+
+    switch (colorResult.toLowerCase()) {
+        case 'white':
+            effect = 'No Slam';
+            description = 'Target is not affected by the slam. Takes damage as for a normal hit.';
+            break;
+        case 'green':
+            effect = 'Stagger';
+            description = 'Target is knocked back a step or two, no longer adjacent to attacker.';
+            break;
+        case 'yellow':
+            effect = '1 Area';
+            knockbackDistance = 1;
+            description = 'Target is knocked 1 area away.';
+            break;
+        case 'red':
+            effect = 'Grand Slam';
+            knockbackDistance = getGrandSlamDistance(attackerStrength);
+            description = `Target is knocked away ${knockbackDistance} areas (attacker's strength as ground speed).`;
+            break;
+    }
+
+    console.log(`🎲 Slam Endurance FEAT roll: ${roll} → ${colorResult.toUpperCase()} → ${effect}`);
+    
+    return {
+        effect,
+        roll,
+        colorResult,
+        knockbackDistance,
+        description
+    };
+}
+
 /**
  * Calculate charge damage based on FASERIP rules
  * @param {Object} options - Charge calculation options
@@ -8,6 +60,9 @@
  *   - resultColor: String - Universal table result ("white", "green", "yellow", "red")
  *   - isInanimateObject: Boolean - Whether target is an inanimate object
  *   - objectMaterialStrength: Number - Material strength if inanimate object
+ *   - attackerStrength: Number - Attacker's strength for slam calculations
+ *   - defenderEndurance: Number - Defender's endurance value
+ *   - defenderEnduranceRank: String - Defender's endurance rank
  * @returns {Object} - Damage calculation results
  */
 export function calculateChargeDamage(options) {
@@ -18,7 +73,10 @@ export function calculateChargeDamage(options) {
         areasMovedThrough,
         resultColor,
         isInanimateObject = false,
-        objectMaterialStrength = 0
+        objectMaterialStrength = 0,
+        attackerStrength = 0,
+        defenderEndurance = 6,
+        defenderEnduranceRank = "Typical"
     } = options;
 
     console.log("🏃 Calculating charge damage with options:", options);
@@ -30,9 +88,13 @@ export function calculateChargeDamage(options) {
         damageToAttacker: 0,
         damageToDefender: 0,
         columnShiftBonus: 0,
-        reboundDamage: 0,
         description: "",
-        effectType: "miss"
+        effectType: "miss",
+        slamEffect: null,
+        knockbackDistance: 0,
+        stunEffect: null,
+        stunDuration: 0,
+        reboundDamage: 0
     };
 
     // Calculate column shift bonus for charge (+1CS per area, max +3CS)
@@ -54,14 +116,14 @@ export function calculateChargeDamage(options) {
             break;
     }
 
-    // Calculate damage based on result type
+    // Handle Miss result
     if (results.effectType === "miss") {
         results.description = "Miss - No damage inflicted. Attacker continues moving for half speed.";
         return results;
     }
 
-    // For Hit, Slam, or Stun results
-    // Base damage = max(Endurance, Body Armor) + 2 points per area moved
+    // Calculate damage for Hit, Slam, or Stun results
+    // Damage = max(Endurance, Body Armor) + 2 points per area moved
     results.baseDamage = Math.max(attackerEndurance, attackerBodyArmor);
     results.speedDamage = 2 * areasMovedThrough;
     results.totalDamage = results.baseDamage + results.speedDamage;
@@ -70,49 +132,136 @@ export function calculateChargeDamage(options) {
     console.log(`⚡ Speed damage: ${results.speedDamage} (2 × ${areasMovedThrough} areas)`);
     console.log(`🎯 Total damage: ${results.totalDamage}`);
 
-    // Handle damage absorption and rebound
+    // Determine effective defender armor
     const effectiveDefenderArmor = isInanimateObject ? objectMaterialStrength : defenderBodyArmor;
-    
-    if (effectiveDefenderArmor >= results.totalDamage) {
-        // All damage is absorbed and rebounded
+
+    // Apply FASERIP rebound rules
+    if (effectiveDefenderArmor > results.totalDamage) {
+        // Rebound occurs - armor completely stops the attack
         results.reboundDamage = results.totalDamage;
         results.damageToDefender = 0;
         
-        // Apply rebound damage to attacker, reduced by their armor
-        const netReboundDamage = Math.max(0, results.reboundDamage - attackerBodyArmor);
-        results.damageToAttacker = netReboundDamage;
+        if (attackerBodyArmor >= results.reboundDamage) {
+            results.damageToAttacker = 0;
+            console.log(`🛡️ All damage rebounded (${results.reboundDamage}) but attacker's armor (${attackerBodyArmor}) absorbs it`);
+        } else {
+            results.damageToAttacker = results.reboundDamage - attackerBodyArmor;
+            console.log(`🛡️ Rebound damage: ${results.reboundDamage} - ${attackerBodyArmor} attacker armor = ${results.damageToAttacker}`);
+        }
         
-        console.log(`🛡️ All damage absorbed by ${isInanimateObject ? 'material strength' : 'defender armor'}: ${effectiveDefenderArmor}`);
-        console.log(`↩️ Rebound damage: ${results.reboundDamage} - ${attackerBodyArmor} armor = ${netReboundDamage} to attacker`);
-        
-        results.description = `${isInanimateObject ? 'Object' : 'Defender'} armor (${effectiveDefenderArmor}) absorbs all damage. ` +
-                            `Attacker takes ${netReboundDamage} rebound damage.`;
+        results.description = `${isInanimateObject ? 'Object' : 'Defender'} armor (${effectiveDefenderArmor}) > damage (${results.totalDamage}) - damage rebounded.`;
     } else {
-        // Partial absorption
-        const damageAbsorbed = effectiveDefenderArmor;
-        results.damageToDefender = Math.max(0, results.totalDamage - damageAbsorbed);
+        // Normal damage resolution - no rebound
+        const damageAbsorbed = Math.min(results.totalDamage, effectiveDefenderArmor);
+        results.damageToDefender = results.totalDamage - damageAbsorbed;
         results.damageToAttacker = 0;
         
-        console.log(`🛡️ Damage absorbed: ${damageAbsorbed}`);
-        console.log(`💀 Net damage to ${isInanimateObject ? 'object' : 'defender'}: ${results.damageToDefender}`);
-        
-        results.description = `${results.totalDamage} total damage - ${damageAbsorbed} absorbed = ${results.damageToDefender} damage dealt.`;
+        console.log(`✅ Normal hit: ${results.totalDamage} damage - ${damageAbsorbed} absorbed = ${results.damageToDefender} to defender`);
+        results.description = `${results.totalDamage} damage - ${damageAbsorbed} absorbed = ${results.damageToDefender} damage dealt.`;
     }
 
-    // Add effect description
+    // Handle Slam effects (only if damage was dealt to defender)
+    if (results.effectType === "slam" && results.damageToDefender > 0) {
+        const targetData = {
+            enduranceRank: defenderEnduranceRank,
+            enduranceValue: defenderEndurance
+        };
+        
+        const slamResult = resolveSlamEffect(targetData, attackerStrength);
+        results.slamEffect = slamResult.effect;
+        results.knockbackDistance = slamResult.knockbackDistance;
+        
+        console.log(`🎯 Slam effect resolved: ${slamResult.effect}`);
+        results.description += ` ${slamResult.description}`;
+    }
+
+    // Handle Stun effects (only if damage was dealt to defender)
+    if (results.effectType === "stun" && results.damageToDefender > 0) {
+        const targetData = {
+            enduranceRank: defenderEnduranceRank,
+            enduranceValue: defenderEndurance
+        };
+        
+        // Resolve stun effect
+        const stunResult = resolveStunEffect(targetData);
+        results.stunEffect = stunResult.effect;
+        results.stunDuration = stunResult.stunDuration;
+        
+        console.log(`😵 Stun effect resolved: ${stunResult.effect} (${stunResult.stunDuration} rounds)`);
+        results.description += ` Stun: ${stunResult.description}`;
+        
+        // Stun results can also include slam effects
+        const slamResult = resolveSlamEffect(targetData, attackerStrength);
+        results.slamEffect = slamResult.effect;
+        results.knockbackDistance = slamResult.knockbackDistance;
+        
+        if (slamResult.effect !== "No Slam") {
+            console.log(`🎯 Stun also includes slam: ${slamResult.effect}`);
+            results.description += ` Also ${slamResult.description}`;
+        }
+    }
+
+    // Add effect type to description
     switch (results.effectType) {
         case "hit":
             results.description += " Hit result.";
             break;
         case "slam":
-            results.description += " Slam result - target may be knocked back.";
+            results.description += " Slam result.";
             break;
         case "stun":
-            results.description += " Stun result - target may be stunned.";
+            results.description += " Stun result.";
             break;
     }
 
     return results;
+}
+
+/**
+ * Resolve stun effect based on FASERIP rules
+ * Target rolls Endurance FEAT on Universal Table to determine stun outcome
+ * @param {Object} targetData - Object containing endurance info
+ * @returns {Object} - Stun resolution results
+ */
+function resolveStunEffect(targetData) {
+    const enduranceRank = targetData.enduranceRank || "Typical";
+    const enduranceValue = targetData.enduranceValue || 6;
+
+    const roll = Math.ceil(Math.random() * 100);
+    const colorResult = game.faserip?.getResultColor(enduranceRank, roll) || 'white';
+
+    let effect;
+    let stunDuration = 0;
+    let description = "";
+
+    switch (colorResult.toLowerCase()) {
+        case 'white':
+            effect = '1-10 rounds';
+            stunDuration = Math.ceil(Math.random() * 10); // Roll 1d10
+            description = `Knocked out for ${stunDuration} rounds. May take no actions.`;
+            break;
+        case 'green':
+            effect = '1 round';
+            stunDuration = 1;
+            description = 'Knocked down for 1 round. May take no action next round.';
+            break;
+        case 'yellow':
+        case 'red':
+            effect = 'No effect';
+            stunDuration = 0;
+            description = 'Not affected by the stun result.';
+            break;
+    }
+
+    console.log(`🎲 Stun Endurance FEAT roll: ${roll} → ${colorResult.toUpperCase()} → ${effect}`);
+    
+    return {
+        effect,
+        roll,
+        colorResult,
+        stunDuration,
+        description
+    };
 }
 
 /**
@@ -159,53 +308,84 @@ export function calculateSlamDamage(options) {
 
 /**
  * Get slam distance based on attacker's strength rank (for Grand Slam)
- * @param {String} strengthRank - Attacker's strength rank name
+ * @param {Number} strengthValue - Attacker's strength value
  * @returns {Number} - Distance in areas
  */
-export function getGrandSlamDistance(strengthRank) {
-    const strengthDistances = {
-        "Shift-0": 0,
-        "Feeble": 1,
-        "Poor": 2,
-        "Typical": 3,
-        "Good": 4,
-        "Excellent": 5,
-        "Remarkable": 6,
-        "Incredible": 7,
-        "Amazing": 8,
-        "Monstrous": 9,
-        "Unearthly": 10,
-        "Shift X": 12,
-        "Shift Y": 14,
-        "Shift Z": 16,
-        "Class 1000": 32,
-        "Class 3000": 50,
-        "Class 5000": 100,
-        "Beyond": 200
-    };
-
-    return strengthDistances[strengthRank] || 0;
+export function getGrandSlamDistance(strengthValue) {
+    // Convert strength value to areas for knockback
+    // FASERIP rule: knocked away with speed equal to strength as ground speed
+    if (strengthValue >= 100) return 10; // Unearthly and above
+    if (strengthValue >= 75) return 9;   // Monstrous
+    if (strengthValue >= 50) return 8;   // Amazing
+    if (strengthValue >= 40) return 7;   // Incredible
+    if (strengthValue >= 30) return 6;   // Remarkable
+    if (strengthValue >= 20) return 5;   // Excellent
+    if (strengthValue >= 10) return 4;   // Good
+    if (strengthValue >= 6) return 3;    // Typical
+    if (strengthValue >= 4) return 2;    // Poor
+    if (strengthValue >= 2) return 1;    // Feeble
+    return 0; // Shift-0
 }
 
 /**
- * Process a charge attack with full FASERIP rules
- * @param {Object} attackData - Charge attack data
- *   - attacker: Actor making the charge
- *   - target: Target of the charge
- *   - areasMovedThrough: Number of areas moved
- *   - rollResult: Universal table result color
- * @returns {Object} - Complete charge attack results
+ * Resolve slam endurance feat for a target (for interactive use)
+ * @param {Actor} target - Target actor making the endurance feat
+ * @param {number} attackerStrength - Attacker's strength for grand slam distance
+ * @returns {Object} - Slam resolution results
  */
+async function resolveSlamEnduranceFeat(target, attackerStrength = 0) {
+    const enduranceRank = target.system.abilities?.endurance?.rank || "Typical";
+    const enduranceValue = target.system.abilities?.endurance?.value || 6;
+
+    // Roll 1d100
+    const roll = new Roll("1d100").roll({async: false});
+    await roll.toMessage({flavor: `Slam Endurance FEAT for ${target.name} (${enduranceRank})`});
+
+    // Interpret the result using your Universal Table logic
+    const color = game.faserip?.getResultColor(enduranceRank, roll.total);  
+
+    let outcome = "No Slam";
+    let knockbackDistance = 0;
+
+    switch (color) {
+        case "white":
+            outcome = "No Slam";
+            break;
+        case "green":
+            outcome = "Stagger";
+            break;
+        case "yellow":
+            outcome = "1 Area";
+            knockbackDistance = 1;
+            break;
+        case "red":
+            outcome = "Grand Slam";
+            knockbackDistance = getGrandSlamDistance(attackerStrength);
+            break;
+    }
+
+    return {
+        outcome,
+        knockbackDistance,
+        color,
+        roll: roll.total
+    };
+}
+
+// Rest of the code remains the same...
 export async function processChargeAttack(attackData) {
     const { attacker, target, areasMovedThrough, rollResult } = attackData;
     
     // Get attacker stats
     const attackerEndurance = attacker.system.abilities.endurance.value || 0;
+    const attackerStrength = attacker.system.abilities.strength.value || 0;
     const attackerBodyArmor = getBodyArmorValue(attacker);
     
     // Get target stats
     const isInanimateObject = !target.system?.abilities;
     const defenderBodyArmor = isInanimateObject ? 0 : getBodyArmorValue(target);
+    const defenderEndurance = isInanimateObject ? 0 : (target.system.abilities.endurance.value || 0);
+    const defenderEnduranceRank = isInanimateObject ? "Typical" : (target.system.abilities.endurance.rank || "Typical");
     const objectMaterialStrength = isInanimateObject ? 
         (CONFIG.FASERIP?.rankValues?.[target.system?.materialStrength] || 0) : 0;
 
@@ -214,26 +394,62 @@ export async function processChargeAttack(attackData) {
         attackerEndurance,
         attackerBodyArmor,
         defenderBodyArmor,
+        defenderEndurance,
+        defenderEnduranceRank,
         areasMovedThrough,
         resultColor: rollResult,
         isInanimateObject,
-        objectMaterialStrength
+        objectMaterialStrength,
+        attackerStrength
     });
 
-    // Create chat message with results
+    // Start building chat content
     let chatContent = `
         <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
             <div style="padding: 5px 10px; border-bottom: 1px solid #c0c0c0; font-size: 1.1em; color: #8b0000;">
                 <strong>Charge Attack: ${attacker.name} vs ${target.name}</strong>
             </div>
             <div style="padding: 5px 10px; font-size: 0.9em;">
+                <div><strong>Roll Result:</strong> ${rollResult.toUpperCase()} (${damageResults.effectType})</div>
                 <div><strong>Areas Moved:</strong> ${areasMovedThrough} (+${damageResults.columnShiftBonus}CS bonus)</div>
-                <div><strong>Base Damage:</strong> ${damageResults.baseDamage} (max of Endurance ${attackerEndurance} and Body Armor ${attackerBodyArmor})</div>
+                <div><strong>Attack Stats:</strong> Endurance ${attackerEndurance}, Body Armor ${attackerBodyArmor}</div>
+                <div><strong>Defense Stats:</strong> ${isInanimateObject ? `Material Strength ${objectMaterialStrength}` : `Body Armor ${defenderBodyArmor}`}</div>
+                <hr style="margin: 8px 0;">
+                <div><strong>Base Damage:</strong> ${damageResults.baseDamage} (max of Endurance and Body Armor)</div>
                 <div><strong>Speed Damage:</strong> ${damageResults.speedDamage} (2 × ${areasMovedThrough} areas)</div>
                 <div><strong>Total Damage:</strong> ${damageResults.totalDamage}</div>
+                <hr style="margin: 8px 0;">
                 <div><strong>Result:</strong> ${damageResults.description}</div>
-                ${damageResults.damageToAttacker > 0 ? `<div style="color: #cc0000;"><strong>Attacker takes:</strong> ${damageResults.damageToAttacker} damage</div>` : ''}
-                ${damageResults.damageToDefender > 0 ? `<div style="color: #cc0000;"><strong>Defender takes:</strong> ${damageResults.damageToDefender} damage</div>` : ''}
+                <hr style="margin: 8px 0;">
+                ${damageResults.damageToDefender > 0 ? `<div style="color: #cc0000; font-weight: bold;">📍 ${target.name} takes ${damageResults.damageToDefender} damage</div>` : ''}
+                ${damageResults.damageToAttacker > 0 ? `<div style="color: #cc0000; font-weight: bold;">💥 ${attacker.name} takes ${damageResults.damageToAttacker} rebound damage</div>` : ''}
+    `;
+
+    // Add FEAT roll buttons for slam and stun (don't auto-resolve anymore)
+    if (damageResults.effectType === "slam" && damageResults.damageToDefender > 0 && !isInanimateObject) {
+        chatContent += `
+            <button class="resolve-slam-feat" 
+                    data-target="${target.uuid}" 
+                    data-attacker-strength="${attackerStrength}"
+                    style="margin-top: 8px; padding: 5px 10px; background: #ff6b6b; border: 1px solid #ff5252; border-radius: 3px; cursor: pointer; font-weight: bold;">
+                🎲 ${target.name} Roll Slam Endurance FEAT
+            </button>
+        `;
+    }
+
+    if (damageResults.effectType === "stun" && damageResults.damageToDefender > 0 && !isInanimateObject) {
+        chatContent += `
+            <button class="resolve-stun-feat" 
+                    data-target="${target.uuid}" 
+                    data-attacker-strength="${attackerStrength}"
+                    style="margin-top: 8px; padding: 5px 10px; background: #9c27b0; border: 1px solid #7b1fa2; border-radius: 3px; cursor: pointer; font-weight: bold;">
+                🎲 ${target.name} Roll Stun Endurance FEAT
+            </button>
+        `;
+    }
+
+    // Close the div
+    chatContent += `
             </div>
         </div>
     `;
@@ -263,13 +479,10 @@ export async function processChargeAttack(attackData) {
     return damageResults;
 }
 
-/**
- * Helper function to get body armor value from an actor
- * @param {Actor} actor - The actor to check
- * @returns {Number} - Body armor value
- */
 export function getBodyArmorValue(actor) {
-    console.log(`🛡️ DEBUG: Getting body armor for ${actor.name}`);
+    console.log(`🛡️ Getting body armor for ${actor.name}`);
+    
+    let bodyArmorValue = 0;
     
     // Check for body armor equipment
     const armorItems = actor.items.filter(i => 
@@ -278,39 +491,24 @@ export function getBodyArmorValue(actor) {
         i.system.protection
     );
     
-    console.log(`🛡️ DEBUG: Found ${armorItems.length} armor items:`, armorItems.map(i => `${i.name} (${i.system.protection})`));
-    
-    let bodyArmorValue = 0;
-    
     if (armorItems.length > 0) {
         const bestArmor = armorItems.reduce((best, current) => {
-            // Handle both numeric values and rank names
-            let bestValue = 0;
-            let currentValue = 0;
+            const bestValue = typeof best.system.protection === 'number' ? 
+                best.system.protection : 
+                (CONFIG.FASERIP?.rankValues?.[best.system.protection] || 0);
             
-            if (typeof best.system.protection === 'number') {
-                bestValue = best.system.protection;
-            } else {
-                bestValue = CONFIG.FASERIP?.rankValues?.[best.system.protection] || 0;
-            }
+            const currentValue = typeof current.system.protection === 'number' ? 
+                current.system.protection : 
+                (CONFIG.FASERIP?.rankValues?.[current.system.protection] || 0);
             
-            if (typeof current.system.protection === 'number') {
-                currentValue = current.system.protection;
-            } else {
-                currentValue = CONFIG.FASERIP?.rankValues?.[current.system.protection] || 0;
-            }
-            
-            console.log(`🛡️ DEBUG: Comparing armor - ${best.name} (${best.system.protection}=${bestValue}) vs ${current.name} (${current.system.protection}=${currentValue})`);
             return currentValue > bestValue ? current : best;
         });
         
-        // Set the body armor value, handling both numeric and rank name formats
-        if (typeof bestArmor.system.protection === 'number') {
-            bodyArmorValue = bestArmor.system.protection;
-        } else {
-            bodyArmorValue = CONFIG.FASERIP?.rankValues?.[bestArmor.system.protection] || 0;
-        }
-        console.log(`🛡️ DEBUG: Best equipment armor: ${bestArmor.name} with protection ${bestArmor.system.protection} = ${bodyArmorValue}`);
+        bodyArmorValue = typeof bestArmor.system.protection === 'number' ? 
+            bestArmor.system.protection : 
+            (CONFIG.FASERIP?.rankValues?.[bestArmor.system.protection] || 0);
+        
+        console.log(`🛡️ Best equipment armor: ${bestArmor.name} = ${bodyArmorValue}`);
     }
 
     // Check for Body Armor powers
@@ -322,34 +520,171 @@ export function getBodyArmorValue(actor) {
     );
     
     if (bodyArmorPower) {
-        // Handle both numeric values and rank names for powers
-        let powerValue = 0;
-        if (typeof bodyArmorPower.system.value === 'number') {
-            powerValue = bodyArmorPower.system.value;
-        } else {
-            powerValue = CONFIG.FASERIP?.rankValues?.[bodyArmorPower.system.rank] || 0;
-        }
-        console.log(`🛡️ DEBUG: Found body armor power: ${bodyArmorPower.name} with rank ${bodyArmorPower.system.rank} = ${powerValue}`);
+        const powerValue = typeof bodyArmorPower.system.value === 'number' ? 
+            bodyArmorPower.system.value : 
+            (CONFIG.FASERIP?.rankValues?.[bodyArmorPower.system.rank] || 0);
+        
         bodyArmorValue = Math.max(bodyArmorValue, powerValue);
-        console.log(`🛡️ DEBUG: Final body armor value after power: ${bodyArmorValue}`);
+        console.log(`🛡️ Body armor power: ${bodyArmorPower.name} = ${powerValue}, final = ${bodyArmorValue}`);
     }
 
-    console.log(`🛡️ DEBUG: Final body armor value for ${actor.name}: ${bodyArmorValue}`);
+    console.log(`🛡️ Final body armor for ${actor.name}: ${bodyArmorValue}`);
     return bodyArmorValue;
 }
 
-// ============================================
-// COLLISION DAMAGE EVENT HANDLER
-// ============================================
-
-/**
- * Initialize collision damage event handlers
- * This should be called when the module loads
- */
 export function initializeSlamHandlers() {
     console.log("🔧 initializeSlamHandlers() called");
     // Add event listener for collision damage calculation
     Hooks.on("renderChatMessage", (app, html, data) => {
+        
+        // Handle slam FEAT rolls - FIXED
+        html.find('.resolve-slam-feat').on('click', async function() {
+            console.log("🎲 Slam FEAT button clicked");
+            const targetUuid = this.dataset.target;
+            const attackerStrength = parseInt(this.dataset.attackerStrength);
+            
+            const targetActor = await fromUuid(targetUuid);
+            if (!targetActor) {
+                ui.notifications.error("Target actor not found!");
+                return;
+            }
+            
+            // Make the actual Endurance FEAT roll - FIXED
+            const enduranceRank = targetActor.system.abilities?.endurance?.rank || "Typical";
+            const rollValue = Math.ceil(Math.random() * 100);
+            
+            // Create a simple chat message for the roll instead of using roll.toMessage
+            await ChatMessage.create({
+                speaker: ChatMessage.getSpeaker({ actor: targetActor }),
+                content: `
+                    <div style="background-color: #e8f5e8; border: 1px solid #4caf50; border-radius: 3px; padding: 8px;">
+                        <strong>🎲 ${targetActor.name} Slam Endurance FEAT</strong><br>
+                        Rank: ${enduranceRank}<br>
+                        Roll: <strong>${rollValue}</strong>
+                    </div>
+                `
+            });
+            
+            // Resolve the slam effect based on the roll
+            const color = game.faserip?.getResultColor(enduranceRank, rollValue) || 'white';
+            const slamResult = resolveSlamEffect({
+                enduranceRank: enduranceRank,
+                enduranceValue: targetActor.system.abilities?.endurance?.value || 6
+            }, attackerStrength);
+            
+            // Show the slam result
+            await ChatMessage.create({
+                speaker: ChatMessage.getSpeaker({ actor: targetActor }),
+                content: `
+                    <div style="background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 3px; padding: 10px;">
+                        <strong>🎯 Slam Result for ${targetActor.name}:</strong><br>
+                        Roll: ${rollValue} → ${color.toUpperCase()}<br>
+                        Effect: <strong>${slamResult.effect}</strong><br>
+                        ${slamResult.knockbackDistance > 0 ? `Knockback: ${slamResult.knockbackDistance} areas<br>` : ''}
+                        ${slamResult.description}
+                        ${slamResult.knockbackDistance > 0 ? `
+                            <button class="calculate-slam-collision" 
+                                    data-target="${targetActor.uuid}" 
+                                    data-distance="${slamResult.knockbackDistance}" 
+                                    data-speed="${slamResult.knockbackDistance}" 
+                                    data-attacker-strength="${attackerStrength}"
+                                    style="margin-top: 8px; padding: 5px 10px; background: #d4af37; border: 1px solid #b8941f; border-radius: 3px; cursor: pointer; font-weight: bold;">
+                                🎯 Calculate Collision Damage
+                            </button>
+                        ` : ''}
+                    </div>
+                `
+            });
+            
+            // Disable the button
+            $(this).prop('disabled', true).text('FEAT Rolled');
+        });
+
+        // Handle stun FEAT rolls - FIXED
+        html.find('.resolve-stun-feat').on('click', async function() {
+            console.log("😵 Stun FEAT button clicked");
+            const targetUuid = this.dataset.target;
+            const attackerStrength = parseInt(this.dataset.attackerStrength);
+            
+            const targetActor = await fromUuid(targetUuid);
+            if (!targetActor) {
+                ui.notifications.error("Target actor not found!");
+                return;
+            }
+            
+            // Make the actual Endurance FEAT roll for stun - FIXED
+            const enduranceRank = targetActor.system.abilities?.endurance?.rank || "Typical";
+            const rollValue = Math.ceil(Math.random() * 100);
+            
+            // Create a simple chat message for the roll
+            await ChatMessage.create({
+                speaker: ChatMessage.getSpeaker({ actor: targetActor }),
+                content: `
+                    <div style="background-color: #f3e5f5; border: 1px solid #ce93d8; border-radius: 3px; padding: 8px;">
+                        <strong>🎲 ${targetActor.name} Stun Endurance FEAT</strong><br>
+                        Rank: ${enduranceRank}<br>
+                        Roll: <strong>${rollValue}</strong>
+                    </div>
+                `
+            });
+            
+            // Resolve the stun effect based on the roll
+            const color = game.faserip?.getResultColor(enduranceRank, rollValue) || 'white';
+            const stunResult = resolveStunEffect({
+                enduranceRank: enduranceRank,
+                enduranceValue: targetActor.system.abilities?.endurance?.value || 6
+            });
+            
+            // Also check for slam effect (stun can include slam)
+            const slamResult = resolveSlamEffect({
+                enduranceRank: enduranceRank,
+                enduranceValue: targetActor.system.abilities?.endurance?.value || 6
+            }, attackerStrength);
+            
+            // Show the stun result
+            let stunContent = `
+                <div style="background-color: #f3e5f5; border: 1px solid #ce93d8; border-radius: 3px; padding: 10px;">
+                    <strong>😵 Stun Result for ${targetActor.name}:</strong><br>
+                    Roll: ${rollValue} → ${color.toUpperCase()}<br>
+                    Stun Effect: <strong>${stunResult.effect}</strong><br>
+                    ${stunResult.stunDuration > 0 ? `Duration: ${stunResult.stunDuration} rounds<br>` : ''}
+                    ${stunResult.description}<br>
+            `;
+            
+            // Add slam information if applicable
+            if (slamResult.effect !== "No Slam") {
+                stunContent += `
+                    <br><strong>Also includes slam:</strong> ${slamResult.effect}<br>
+                    ${slamResult.knockbackDistance > 0 ? `Knockback: ${slamResult.knockbackDistance} areas<br>` : ''}
+                `;
+            }
+            
+            stunContent += `</div>`;
+            
+            // Add collision button if there's knockback
+            if (slamResult.knockbackDistance > 0) {
+                stunContent = stunContent.replace('</div>', `
+                    <button class="calculate-slam-collision" 
+                            data-target="${targetActor.uuid}" 
+                            data-distance="${slamResult.knockbackDistance}" 
+                            data-speed="${slamResult.knockbackDistance}" 
+                            data-attacker-strength="${attackerStrength}"
+                            style="margin-top: 8px; padding: 5px 10px; background: #d4af37; border: 1px solid #b8941f; border-radius: 3px; cursor: pointer; font-weight: bold;">
+                        🎯 Calculate Collision Damage
+                    </button>
+                </div>`);
+            }
+            
+            await ChatMessage.create({
+                speaker: ChatMessage.getSpeaker({ actor: targetActor }),
+                content: stunContent
+            });
+            
+            // Disable the button
+            $(this).prop('disabled', true).text('FEAT Rolled');
+        });
+
+        // EXISTING collision damage handler (unchanged)
         html.find('.calculate-slam-collision').on('click', async function() {
             console.log("🎯 Collision button clicked");
             const targetUuid = this.dataset.target;
