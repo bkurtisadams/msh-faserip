@@ -2627,33 +2627,33 @@ html.find('.headquarters-row').each((i, row) => {
     
     // At the bottom of activateListeners(html), before the closing }
     // This serves as a fallback to ensure all draggable items can create macros
-    new DragDrop({
+    new foundry.applications.ux.DragDrop.implementation({
       dragSelector: ".power-row, .talent-item, .contact-item, .equipment-row, .vehicle-draggable, .headquarters-draggable",
       dropSelector: null,
       permissions: { dragstart: true },
       callbacks: {
-        dragstart: (event) => {
-          // Don't interfere with shift+drag for sorting
-          if (event.shiftKey) return;
-          
-          const li = event.currentTarget;
-          const itemId = li.dataset.itemId;
-          const item = this.actor.items.get(itemId);
-          if (!item) return;
+          dragstart: (event) => {
+              // Don't interfere with shift+drag for sorting
+              if (event.shiftKey) return;
+              
+              const li = event.currentTarget;
+              const itemId = li.dataset.itemId;
+              const item = this.actor.items.get(itemId);
+              if (!item) return;
 
-          console.log("🔥 DragDrop handler creating macro for:", item.name);
-          
-          // Use the format from the older file for creating macros
-          event.dataTransfer.setData("text/plain", JSON.stringify({
-            type: "Item",
-            actorId: this.actor.id,
-            itemId: item.id,
-            uuid: item.uuid,
-            data: item
-          }));
-        }
+              console.log("🔥 DragDrop handler creating macro for:", item.name);
+              
+              // Use the format from the older file for creating macros
+              event.dataTransfer.setData("text/plain", JSON.stringify({
+                  type: "Item",
+                  actorId: this.actor.id,
+                  itemId: item.id,
+                  uuid: item.uuid,
+                  data: item
+              }));
+          }
       }
-    }).bind(html[0]);
+  }).bind(html[0]);
 
       /** @override */
   

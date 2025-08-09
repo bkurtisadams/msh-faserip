@@ -31,38 +31,93 @@ const ACTION_RESULT_LABELS = {
 
 // Helper function for resistance - moved outside to avoid scoping issues
 function isResistanceApplicable(damageType, resistanceType) {
-// Map damage types to applicable resistances
-const resistanceMap = {
-    "energy-fire": ["fire", "heat"],
-    "energy-cold": ["cold"],
-    "energy-electricity": ["electricity"],
-    "energy-radiation": ["radiation"],
-    "physical-toxic": ["toxin", "poison"],
-    "physical-corrosive": ["corrosive", "acid"],
-    "mental": ["mental", "emotion"],
-    "magic": ["magic", "magical"],
-    "disease": ["disease"],
-    "physical": ["physical"], // Add general physical resistance
-    "energy": ["energy"] // Add general energy resistance
-};
-
-// Check exact match first
-const normalizedDamageType = damageType.toLowerCase();
-const normalizedResistanceType = resistanceType.toLowerCase();
-
-// Direct match
-if (normalizedDamageType.includes(normalizedResistanceType)) {
-    return true;
-}
-
-// Check mapped resistances
-for (const [damageKey, resistances] of Object.entries(resistanceMap)) {
-    if (normalizedDamageType.includes(damageKey)) {
-    return resistances.includes(normalizedResistanceType);
+    const normalizedDamageType = damageType.toLowerCase();
+    const normalizedResistanceType = resistanceType.toLowerCase();
+    
+    // CRITICAL: Map Energy-Energy to electricity for game balance
+    // Lightning bolts and electrical energy attacks should trigger electricity resistance
+    if ((normalizedDamageType === "energy-energy" || normalizedDamageType.includes("lightning")) && 
+        normalizedResistanceType === "electricity") {
+        console.log("✅ Energy-Energy/Lightning matches Electricity resistance");
+        return true;
     }
-}
-
-return false;
+    
+    // Fire/Heat attacks match fire resistance
+    if ((normalizedDamageType.includes("fire") || normalizedDamageType.includes("heat")) && 
+        (normalizedResistanceType === "fire" || normalizedResistanceType === "heat")) {
+        return true;
+    }
+    
+    // Cold/Ice attacks match cold resistance
+    if ((normalizedDamageType.includes("cold") || normalizedDamageType.includes("ice")) && 
+        normalizedResistanceType === "cold") {
+        return true;
+    }
+    
+    // Radiation attacks match radiation resistance
+    if (normalizedDamageType.includes("radiation") && normalizedResistanceType === "radiation") {
+        return true;
+    }
+    
+    // Toxin/Poison attacks match toxin resistance
+    if ((normalizedDamageType.includes("toxin") || normalizedDamageType.includes("poison")) && 
+        (normalizedResistanceType === "toxin" || normalizedResistanceType === "toxins")) {
+        return true;
+    }
+    
+    // Corrosive/Acid attacks match corrosive resistance
+    if ((normalizedDamageType.includes("corrosive") || normalizedDamageType.includes("acid")) && 
+        (normalizedResistanceType === "corrosive" || normalizedResistanceType === "corrosives")) {
+        return true;
+    }
+    
+    // Mental attacks match mental resistance
+    if (normalizedDamageType.includes("mental") && !normalizedDamageType.includes("emotion") &&
+        normalizedResistanceType === "mental") {
+        return true;
+    }
+    
+    // Emotion attacks match emotion resistance
+    if (normalizedDamageType.includes("emotion") && normalizedResistanceType === "emotion") {
+        return true;
+    }
+    
+    // Magical attacks match magical resistance
+    if ((normalizedDamageType.includes("magic") || normalizedDamageType.includes("magical")) && 
+        (normalizedResistanceType === "magic" || normalizedResistanceType === "magical")) {
+        return true;
+    }
+    
+    // Disease attacks match disease resistance
+    if (normalizedDamageType.includes("disease") && normalizedResistanceType === "disease") {
+        return true;
+    }
+    
+    // Physical attacks (general) match physical resistance
+    if (normalizedDamageType.includes("physical") && normalizedResistanceType === "physical") {
+        return true;
+    }
+    
+    // Energy attacks (general) - but be careful not to overlap with specific types
+    if (normalizedDamageType.includes("energy") && normalizedResistanceType === "energy" &&
+        !normalizedDamageType.includes("energy-energy")) { // Don't match generic energy to electrical attacks
+        return true;
+    }
+    
+    // Direct match
+    if (normalizedDamageType === normalizedResistanceType) {
+        return true;
+    }
+    
+    // Invulnerability check (Class 1000 resistance)
+    if (normalizedResistanceType.includes("invulnerability")) {
+        const invulType = normalizedResistanceType.replace("invulnerability", "").replace("to", "").trim();
+        if (invulType) {
+            return isResistanceApplicable(damageType, invulType);
+        }
+    }
+    
+    return false;
 }
 
 export class CombatHandler {
@@ -181,42 +236,33 @@ export class CombatHandler {
         }
     }
 
-    // Apply Resistance (FEAT roll to potentially negate damage)
+    // Apply Resistance (automatic damage reduction per FASERIP rules)
     if (defenseData.resistanceValue > 0 && netDamage > 0) {
-    if (isResistanceApplicable(damageType, defenseData.resistanceType)) {
-        console.log(`Target has ${defenseData.resistanceType} resistance - triggering FEAT roll`);
-        
-        // Trigger resistance FEAT roll and WAIT for result
-        const resistanceResult = await this.rollResistanceFeat(
-        targetActor, // Make sure this is the actor, not the token
-        defenseData.resistanceType, 
-        defenseData.resistanceValue, 
-        modifiedBaseDamage, // Use original damage as intensity
-        sourceName
-        );
-        
-        console.log("Resistance FEAT result:", resistanceResult);
-        
-        if (resistanceResult.success) {
-        // Resistance FEAT succeeded - negate ALL remaining damage
-        const damageNegated = netDamage;
-        netDamage = 0;
-        damageAbsorbed += damageNegated; // Add the negated damage to total absorbed
-        defenseDetails.push(`${defenseData.resistanceType} Resistance FEAT succeeded - ${damageNegated} damage negated`);
-        defenseUsed = defenseUsed === "None" ? `${defenseData.resistanceType} Resistance (FEAT Success)` : defenseUsed + ` + ${defenseData.resistanceType} Resistance (FEAT Success)`;
+        if (isResistanceApplicable(damageType, defenseData.resistanceType)) {
+            console.log(`Target has ${defenseData.resistanceType} resistance at rank value ${defenseData.resistanceValue}`);
+            
+            // Resistance automatically reduces damage by its rank value
+            const resistanceReduction = Math.min(netDamage, defenseData.resistanceValue);
+            netDamage -= resistanceReduction;
+            damageAbsorbed += resistanceReduction;
+            
+            if (resistanceReduction > 0) {
+                defenseDetails.push(`${defenseData.resistanceType} Resistance absorbed ${resistanceReduction} damage`);
+                defenseUsed = defenseUsed === "None" ? `${defenseData.resistanceType} Resistance` : defenseUsed + ` + ${defenseData.resistanceType} Resistance`;
+            }
+            
+            // Check if attack intensity is below resistance rank (immunity to weak attacks)
+            const attackIntensity = modifiedBaseDamage;
+            if (attackIntensity < defenseData.resistanceValue) {
+                console.log(`Attack intensity (${attackIntensity}) is below resistance rank (${defenseData.resistanceValue}) - NO EFFECT`);
+                netDamage = 0;
+                defenseDetails.push(`Attack too weak to affect ${defenseData.resistanceType} Resistance - NO EFFECT`);
+            }
+            
+            console.log(`Resistance reduced damage by ${resistanceReduction}, remaining damage: ${netDamage}`);
         } else {
-        // Resistance FEAT failed - still provides armor value against remaining damage
-        const resistanceArmor = Math.min(netDamage, defenseData.resistanceValue);
-        netDamage -= resistanceArmor;
-        damageAbsorbed += resistanceArmor;
-        if (resistanceArmor > 0) {
-            defenseDetails.push(`${defenseData.resistanceType} Resistance FEAT failed - absorbed ${resistanceArmor} damage as armor`);
-            defenseUsed = defenseUsed === "None" ? `${defenseData.resistanceType} Resistance (Armor)` : defenseUsed + ` + ${defenseData.resistanceType} Resistance (Armor)`;
+            console.log(`Resistance ${defenseData.resistanceType} does not apply to ${damageType} damage`);
         }
-        }
-    } else {
-        console.log(`Resistance ${defenseData.resistanceType} does not apply to ${damageType} damage`);
-    }
     }
 
     netDamage = Math.max(0, netDamage);
@@ -734,156 +780,290 @@ export class CombatHandler {
      * @param {String} sourceName - Name of the attack source
      * @returns {Object} { success: boolean, resultText: string }
      */
-    static async rollResistanceFeat(target, resistanceType, resistanceValue, damageIntensity, sourceName) {
-    // Ensure we have the actual actor, not a token
-    const targetActor = target.actor || target;
-    
-    console.log("Rolling resistance FEAT for:", targetActor.name);
-    console.log("Resistance type:", resistanceType, "Value:", resistanceValue);
-    console.log("Damage intensity:", damageIntensity);
-    
-    // Find the resistance rank name from the value
-    let resistanceRank = "Typical";
-    for (const [rankName, rankValue] of Object.entries(CONFIG.FASERIP.rankValues)) {
-        if (rankValue === resistanceValue) {
-        resistanceRank = rankName;
-        break;
-        }
-    }
-    
-    // Get available Karma
-    const availableKarma = targetActor.system.attributes.karma.value || 0;
-    
-    // Create dialog content
-    const dialogContent = `
-        <div style="text-align: center;">
-        <h2>${target.name} - ${resistanceType.charAt(0).toUpperCase() + resistanceType.slice(1)} Resistance FEAT</h2>
-        <p>Attack from <strong>${sourceName}</strong> requires a resistance FEAT roll.</p>
-        <div style="margin: 10px 0;">
-            <p>Resistance Rank: <strong>${resistanceRank}</strong></p>
-            <p>Damage Intensity: <strong>${damageIntensity}</strong></p>
-            <hr style="margin: 10px 0;">
-            <div>
-            <label>Spend Karma Points:</label>
-            <input type="number" id="karma-points" min="0" max="${availableKarma}" value="0" style="width: 60px;">
-            <span style="margin-left: 5px; font-size: 0.9em; color: #666;">(Available: ${availableKarma})</span>
-            </div>
-        </div>
-        </div>
-    `;
-    
-    // Show dialog to target player (or GM if NPC)
-    return new Promise((resolve) => {
-        // Determine if target is controlled by a player
-        const isPlayerOwned = target.hasPlayerOwner;
+    /* static async rollResistanceFeat(target, resistanceType, resistanceValue, damageIntensity, sourceName) {
+        const targetActor = target.actor || target;
         
-        // Create dialog
-        new Dialog({
-        title: `${resistanceType.charAt(0).toUpperCase() + resistanceType.slice(1)} Resistance FEAT`,
-        content: dialogContent,
-        buttons: {
-            roll: {
-            icon: '<i class="fas fa-dice-d20"></i>',
-            label: "Roll Resistance",
-            callback: async (html) => {
-                // Get karma amount
-                const karmaSpent = Math.min(
-                parseInt(html.find('#karma-points').val()) || 0,
-                availableKarma
-                );
-                
-                // Create the roll
-                const roll = new Roll("1d100");
-                await roll.evaluate();
-                
-                // Calculate result with karma
-                const totalRoll = Math.min(100, roll.total + karmaSpent);
-                
-                // Determine the result color against intensity
-                const colorResult = game.msh.rollUniversalTable(resistanceRank, totalRoll);
-                
-                // For resistance, we need to check if the roll beats the damage intensity
-                // This is simplified - you might want to use a more complex intensity table
-                let success = false;
-                if (totalRoll >= damageIntensity) {
-                success = true;
+        console.log("Rolling resistance FEAT for:", targetActor.name);
+        console.log("Resistance type:", resistanceType, "Value:", resistanceValue);
+        console.log("Damage intensity:", damageIntensity);
+        
+        // Find the resistance rank name from the value
+        let resistanceRank = "Typical";
+        for (const [rankName, rankValue] of Object.entries(CONFIG.FASERIP.rankValues)) {
+            if (rankValue === resistanceValue) {
+                resistanceRank = rankName;
+                break;
+            }
+        }
+        
+        // Special handling for specific resistance types
+        let featRank = resistanceRank;
+        let featValue = resistanceValue;
+        
+        // Toxin, Emotion, Mental, and Disease resistances have minimum ranks
+        const resistanceTypeLower = resistanceType.toLowerCase();
+        
+        if (resistanceTypeLower.includes("toxin")) {
+            // Toxin resistance is minimum Endurance +1CS
+            const enduranceValue = targetActor.system.abilities.endurance.value || 0;
+            if (resistanceValue < enduranceValue) {
+                featValue = enduranceValue + 10; // Approximate +1CS
+                // Find the new rank
+                for (const [rankName, rankValue] of Object.entries(CONFIG.FASERIP.rankValues)) {
+                    if (rankValue >= featValue) {
+                        featRank = rankName;
+                        break;
+                    }
                 }
+            }
+        } else if (resistanceTypeLower.includes("emotion")) {
+            // Emotion resistance is minimum Intuition +1CS
+            const intuitionValue = targetActor.system.abilities.intuition.value || 0;
+            if (resistanceValue < intuitionValue) {
+                featValue = intuitionValue + 10;
+                for (const [rankName, rankValue] of Object.entries(CONFIG.FASERIP.rankValues)) {
+                    if (rankValue >= featValue) {
+                        featRank = rankName;
+                        break;
+                    }
+                }
+            }
+        } else if (resistanceTypeLower.includes("mental") && !resistanceTypeLower.includes("magical")) {
+            // Mental resistance is minimum Psyche +1CS
+            const psycheValue = targetActor.system.abilities.psyche.value || 0;
+            if (resistanceValue < psycheValue) {
+                featValue = psycheValue + 10;
+                for (const [rankName, rankValue] of Object.entries(CONFIG.FASERIP.rankValues)) {
+                    if (rankValue >= featValue) {
+                        featRank = rankName;
+                        break;
+                    }
+                }
+            }
+        } else if (resistanceTypeLower.includes("disease")) {
+            // Disease resistance is minimum Endurance +1CS
+            const enduranceValue = targetActor.system.abilities.endurance.value || 0;
+            if (resistanceValue < enduranceValue) {
+                featValue = enduranceValue + 10;
+                for (const [rankName, rankValue] of Object.entries(CONFIG.FASERIP.rankValues)) {
+                    if (rankValue >= featValue) {
+                        featRank = rankName;
+                        break;
+                    }
+                }
+            }
+        }
+        
+        // Get available Karma
+        const availableKarma = targetActor.system.attributes.karma.value || 0;
+        
+        // Create dialog content
+        const dialogContent = `
+            <div style="text-align: center;">
+                <h2>${targetActor.name} - ${resistanceType.charAt(0).toUpperCase() + resistanceType.slice(1)} Resistance FEAT</h2>
+                <p>Attack from <strong>${sourceName}</strong> requires a resistance FEAT roll.</p>
+                <div style="margin: 10px 0;">
+                    <p>Resistance Rank: <strong>${featRank}</strong> (${featValue})</p>
+                    <p>Damage Intensity: <strong>${damageIntensity}</strong></p>
+                    <hr style="margin: 10px 0;">
+                    <p style="font-size: 0.9em; color: #666;">
+                        ${resistanceTypeLower.includes("toxin") ? "Using Toxin Resistance instead of Endurance" : ""}
+                        ${resistanceTypeLower.includes("emotion") ? "Using Emotion Resistance instead of Intuition" : ""}
+                        ${resistanceTypeLower.includes("mental") && !resistanceTypeLower.includes("magical") ? "Using Mental Resistance instead of Psyche" : ""}
+                        ${resistanceTypeLower.includes("disease") ? "Using Disease Resistance instead of Endurance" : ""}
+                    </p>
+                    <div>
+                        <label>Spend Karma Points:</label>
+                        <input type="number" id="karma-points" min="0" max="${availableKarma}" value="0" style="width: 60px;">
+                        <span style="margin-left: 5px; font-size: 0.9em; color: #666;">(Available: ${availableKarma})</span>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Show dialog to target player (or GM if NPC)
+        return new Promise((resolve) => {
+            const isPlayerOwned = targetActor.hasPlayerOwner;
+            
+            new Dialog({
+                title: `${resistanceType.charAt(0).toUpperCase() + resistanceType.slice(1)} Resistance FEAT`,
+                content: dialogContent,
+                buttons: {
+                    roll: {
+                        icon: '<i class="fas fa-dice-d20"></i>',
+                        label: "Roll Resistance",
+                        callback: async (html) => {
+                            const karmaSpent = Math.min(
+                                parseInt(html.find('#karma-points').val()) || 0,
+                                availableKarma
+                            );
+                            
+                            const roll = new Roll("1d100");
+                            await roll.evaluate();
+                            
+                            const totalRoll = Math.min(100, roll.total + karmaSpent);
+                            const colorResult = game.msh.rollUniversalTable(featRank, totalRoll);
+                            
+                            // Determine success based on color result
+                            // Generally, Green or better means success
+                            let success = false;
+                            if (["green", "yellow", "red"].includes(colorResult.toLowerCase())) {
+                                success = true;
+                            }
+                            
+                            // Handle karma spending
+                            if (karmaSpent > 0) {
+                                await game.msh.runAsGM({
+                                    operation: "update",
+                                    targetActorUuid: targetActor.uuid,
+                                    args: [{ "system.attributes.karma.value": availableKarma - karmaSpent }]
+                                });
+                            }
+                            
+                            // Create result text
+                            const resultText = success ? 
+                                "Success - All damage negated!" : 
+                                `Failed - Resistance provides ${featValue} armor value`;
+                            
+                            // Special handling for specific resistance types
+                            let specialEffect = "";
+                            if (success) {
+                                if (resistanceTypeLower.includes("fire") || resistanceTypeLower.includes("heat")) {
+                                    specialEffect = `<div style="color: #ff6600;">🔥 Fire/Heat of less than ${featRank} rank has no effect!</div>`;
+                                } else if (resistanceTypeLower.includes("cold")) {
+                                    specialEffect = `<div style="color: #4da6ff;">❄️ Cold/Ice of less than ${featRank} rank has no effect!</div>`;
+                                } else if (resistanceTypeLower.includes("electricity")) {
+                                    specialEffect = `<div style="color: #ffff00;">⚡ Electricity of less than ${featRank} rank has no effect!</div>`;
+                                } else if (resistanceTypeLower.includes("radiation")) {
+                                    specialEffect = `<div style="color: #00ff00;">☢️ Radiation of less than ${featRank} rank has no effect!</div>`;
+                                }
+                            }
+                            
+                            // Create chat message
+                            await ChatMessage.create({
+                                speaker: ChatMessage.getSpeaker({ actor: targetActor }),
+                                content: `
+                                    <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
+                                        <div style="padding: 5px 10px; border-bottom: 1px solid #c0c0c0; font-size: 1.1em; color: #8b0000;">
+                                            <strong>${targetActor.name} - ${resistanceType} Resistance FEAT</strong>
+                                        </div>
+                                        <div style="padding: 5px 10px; font-size: 0.9em;">
+                                            <div>Resistance Rank: ${featRank} (${featValue})</div>
+                                            <div>Roll: ${roll.total} + Karma: ${karmaSpent} = ${totalRoll}</div>
+                                            ${specialEffect}
+                                        </div>
+                                        <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
+                                            background-color: ${success ? '#4CAF50' : '#F44336'}; 
+                                            color: white;">
+                                            ${resultText}
+                                        </div>
+                                    </div>
+                                `
+                            });
+                            
+                            resolve({ success, resultText });
+                        }
+                    },
+                    cancel: {
+                        icon: '<i class="fas fa-times"></i>',
+                        label: "No Resistance",
+                        callback: () => {
+                            resolve({ success: false, resultText: "No resistance attempted" });
+                        }
+                    }
+                },
+                default: "roll",
+                render: (html) => {
+                    if (!isPlayerOwned) {
+                        setTimeout(() => {
+                            html.find('button[data-button="roll"]').trigger('click');
+                        }, 5000);
+                    }
+                }
+            }).render(true);
+        });
+    } */
+
+    /**
+     * Check if a resistance replaces an ability for FEAT rolls
+     * @param {Actor} actor - The actor with potential resistance
+     * @param {String} attackType - Type of attack being made
+     * @param {String} normalAbility - The ability that would normally be used
+     * @returns {Object} - { rank: String, value: Number, source: String }
+     */
+    static getResistanceForFeat(actor, attackType, normalAbility) {
+        const resistances = [];
+        
+        // Check for resistance powers
+        const resPowers = actor.items.filter(i => {
+            if (i.type !== "power") return false;
+            const powerName = i.name.toLowerCase();
+            return powerName.includes("resistance");
+        });
+        
+        for (const resPower of resPowers) {
+            const powerName = resPower.name.toLowerCase();
+            const powerValue = resPower.system.value || CONFIG.FASERIP?.rankValues?.[resPower.system.rank] || 0;
+            const powerRank = resPower.system.rank;
+            
+            // Toxin Resistance replaces Endurance for poison FEATs
+            if (attackType === "toxin" && powerName.includes("toxin") && normalAbility === "endurance") {
+                // Toxin resistance must be at least Endurance +1CS
+                const enduranceValue = actor.system.abilities.endurance.value || 0;
+                const minValue = enduranceValue + 10; // Approximate +1CS
                 
-                // Deduct karma if spent
-                if (karmaSpent > 0) {
-                await game.msh.runAsGM({
-                    operation: "update",
-                    targetActorUuid: target.uuid,
-                    args: [{ "system.attributes.karma.value": availableKarma - karmaSpent }]
-                });
-                
-                // Create karma history entry
-                const history = foundry.utils.deepClone(target.system.karma?.history || []);
-                const newEvent = {
-                    realDate: new Date().toLocaleDateString(),
-                    gameDate: game.time?.worldTime ? game.time.worldTime.toString() : "",
-                    amount: -karmaSpent,
-                    type: "Resistance",
-                    description: `${resistanceType} resistance against ${sourceName}`
+                return {
+                    rank: powerValue >= minValue ? powerRank : actor.system.abilities.endurance.rank,
+                    value: Math.max(powerValue, minValue),
+                    source: "Toxin Resistance"
                 };
-                history.push(newEvent);
-                await game.msh.runAsGM({
-                    operation: "update",
-                    targetActorUuid: target.uuid,
-                    args: [{ "system.karma.history": history }]
-                });
-                }
+            }
+            
+            // Mental Resistance replaces Psyche for mental attacks
+            if (attackType === "mental" && powerName.includes("mental") && normalAbility === "psyche") {
+                const psycheValue = actor.system.abilities.psyche.value || 0;
+                const minValue = psycheValue + 10;
                 
-                // Create result text
-                const resultText = success ? "Success - All damage negated" : "Failed - Resistance provides armor value";
+                return {
+                    rank: powerValue >= minValue ? powerRank : actor.system.abilities.psyche.rank,
+                    value: Math.max(powerValue, minValue),
+                    source: "Mental Resistance"
+                };
+            }
+            
+            // Emotion Resistance replaces Intuition for emotion attacks
+            if (attackType === "emotion" && powerName.includes("emotion") && normalAbility === "intuition") {
+                const intuitionValue = actor.system.abilities.intuition.value || 0;
+                const minValue = intuitionValue + 10;
                 
-                // Create chat message showing the resistance roll
-                await ChatMessage.create({
-                speaker: ChatMessage.getSpeaker({ actor: target }),
-                content: `
-                    <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
-                    <div style="padding: 5px 10px; border-bottom: 1px solid #c0c0c0; font-size: 1.1em; color: #8b0000;">
-                        <strong>${target.name} - ${resistanceType.charAt(0).toUpperCase() + resistanceType.slice(1)} Resistance FEAT</strong>
-                    </div>
-                    <div style="padding: 5px 10px; font-size: 0.9em;">
-                        <div>Resistance Rank: ${resistanceRank}</div>
-                        <div>Damage Intensity: ${damageIntensity}</div>
-                        <div>Roll: ${roll.total} + Karma: ${karmaSpent} = ${totalRoll}</div>
-                    </div>
-                    <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
-                        background-color: ${success ? '#4CAF50' : '#F44336'}; 
-                        color: white;">
-                        ${resultText}
-                    </div>
-                    </div>
-                `
-                });
+                return {
+                    rank: powerValue >= minValue ? powerRank : actor.system.abilities.intuition.rank,
+                    value: Math.max(powerValue, minValue),
+                    source: "Emotion Resistance"
+                };
+            }
+            
+            // Disease Resistance replaces Endurance for disease FEATs
+            if (attackType === "disease" && powerName.includes("disease") && normalAbility === "endurance") {
+                const enduranceValue = actor.system.abilities.endurance.value || 0;
+                const minValue = enduranceValue + 10;
                 
-                // Return the result
-                resolve({ success, resultText });
+                return {
+                    rank: powerValue >= minValue ? powerRank : actor.system.abilities.endurance.rank,
+                    value: Math.max(powerValue, minValue),
+                    source: "Disease Resistance"
+                };
             }
-            },
-            cancel: {
-            icon: '<i class="fas fa-times"></i>',
-            label: "No Resistance",
-            callback: () => {
-                resolve({ success: false, resultText: "No resistance attempted" });
-            }
-            }
-        },
-        default: "roll",
-        // For NPCs or if the player isn't available, auto-roll after a delay
-        render: (html) => {
-            if (!isPlayerOwned) {
-            setTimeout(() => {
-                html.find('button[data-button="roll"]').trigger('click');
-            }, 5000); // Auto-roll for NPCs after 5 seconds
-            }
-        },
-        close: () => resolve({ success: false, resultText: "Dialog closed" })
-        }).render(true);
-    });
+        }
+        
+        // Return normal ability if no resistance applies
+        return {
+            rank: actor.system.abilities[normalAbility].rank,
+            value: actor.system.abilities[normalAbility].value,
+            source: normalAbility.charAt(0).toUpperCase() + normalAbility.slice(1)
+        };
     }
+    
      /**
      * Processes a wrestling action (Grappling, Grabbing, or Escaping)
      * @param {Object} actionData - Information about the wrestling action
@@ -1293,8 +1473,11 @@ export class CombatHandler {
             usedResistance: false
         };
 
+        // Get the actual actor (in case target is a token)
+        const targetActor = target.actor || target;
+
         // Get Body Armor (from equipment)
-        const armorItems = target.items.filter(i => 
+        const armorItems = targetActor.items.filter(i => 
             i.type === "equipment" && 
             i.system.category === "armor" && 
             i.system.protection
@@ -1302,7 +1485,6 @@ export class CombatHandler {
 
         if (armorItems.length > 0) {
             const bestArmor = armorItems.reduce((best, current) => {
-                // Handle both numeric values and rank names
                 let bestValue = 0;
                 let currentValue = 0;
                 
@@ -1321,7 +1503,6 @@ export class CombatHandler {
                 return currentValue > bestValue ? current : best;
             });
             
-            // Set the body armor value, handling both numeric and rank name formats
             if (typeof bestArmor.system.protection === 'number') {
                 defenses.bodyArmorValue = bestArmor.system.protection;
             } else {
@@ -1331,7 +1512,7 @@ export class CombatHandler {
         }
 
         // Get Body Armor from powers
-        const bodyArmorPower = target.items.find(i => 
+        const bodyArmorPower = targetActor.items.find(i => 
             i.type === "power" && 
             (i.name.toLowerCase().includes("body armor") || 
             i.name.toLowerCase().includes("armor") ||
@@ -1339,7 +1520,6 @@ export class CombatHandler {
         );
 
         if (bodyArmorPower) {
-            // Handle both numeric values and rank names for powers too
             let powerValue = 0;
             if (typeof bodyArmorPower.system.value === 'number') {
                 powerValue = bodyArmorPower.system.value;
@@ -1353,76 +1533,68 @@ export class CombatHandler {
             }
         }
 
-        // === Check for passive armor granted by equipment ===
-        const allPowers = game.msh.getActorPowers(target);
+        // Check for passive armor granted by equipment
+        const allPowers = game.msh.getActorPowers(targetActor);
         console.log("All powers (including equipment-granted):", allPowers);
 
         const applicableArmor = allPowers.filter(p =>
-        p.isPassiveArmor &&
-        typeof p.value === "number" &&
-        p.value > 0 &&
-        (!p.armorDamageType || damageType.toLowerCase().includes(p.armorDamageType.toLowerCase()))
+            p.isPassiveArmor &&
+            typeof p.value === "number" &&
+            p.value > 0 &&
+            (!p.armorDamageType || damageType.toLowerCase().includes(p.armorDamageType.toLowerCase()))
         );
 
         console.log(`Matching passive armor powers for damageType "${damageType}":`, applicableArmor);
 
         let extraArmorValue = 0;
         for (let armor of applicableArmor) {
-        extraArmorValue += armor.value;
+            extraArmorValue += armor.value;
         }
 
         if (extraArmorValue > defenses.bodyArmorValue) {
-        defenses.bodyArmorValue = extraArmorValue;
-        defenses.usedBodyArmor = true;
-        console.log(`Passive armor from equipment applied: ${extraArmorValue}`);
+            defenses.bodyArmorValue = extraArmorValue;
+            defenses.usedBodyArmor = true;
+            console.log(`Passive armor from equipment applied: ${extraArmorValue}`);
         }
 
-        // In CombatHandler.getTargetDefenses(), add debugging and fix AP logic
+        // Handle AP ammo
         if (options.ammoType && options.ammoType.toLowerCase() === "ap") {
-        console.log("=== AP AMMO DEBUG ===");
-        console.log("Original body armor value:", defenses.bodyArmorValue);
-        
-        // Reduce body armor by 2 CS, but not force fields
-        if (defenses.bodyArmorValue > 0) {
-            // Create array of rank values in order
-            const rankEntries = Object.entries(CONFIG.FASERIP.rankValues).sort((a, b) => a[1] - b[1]);
+            console.log("=== AP AMMO DEBUG ===");
+            console.log("Original body armor value:", defenses.bodyArmorValue);
             
-            // Find current armor rank
-            let currentRankIndex = -1;
-            for (let i = 0; i < rankEntries.length; i++) {
-            if (rankEntries[i][1] === defenses.bodyArmorValue) {
-                currentRankIndex = i;
-                break;
+            if (defenses.bodyArmorValue > 0) {
+                const rankEntries = Object.entries(CONFIG.FASERIP.rankValues).sort((a, b) => a[1] - b[1]);
+                
+                let currentRankIndex = -1;
+                for (let i = 0; i < rankEntries.length; i++) {
+                    if (rankEntries[i][1] === defenses.bodyArmorValue) {
+                        currentRankIndex = i;
+                        break;
+                    }
+                }
+                
+                if (currentRankIndex >= 0) {
+                    const originalArmorValue = defenses.bodyArmorValue;
+                    const oldRankName = rankEntries[currentRankIndex][0];
+                    
+                    const newRankIndex = Math.max(0, currentRankIndex - 2);
+                    const newArmorValue = rankEntries[newRankIndex][1];
+                    const newRankName = rankEntries[newRankIndex][0];
+                    
+                    defenses.bodyArmorValue = newArmorValue;
+                    
+                    console.log(`AP Ammo: Reduced armor from ${oldRankName} (${originalArmorValue}) to ${newRankName} (${newArmorValue})`);
+                } else {
+                    console.log("Could not find matching rank for armor value:", defenses.bodyArmorValue);
+                }
             }
-            }
             
-            if (currentRankIndex >= 0) {
-            // Store original values BEFORE making changes
-            const originalArmorValue = defenses.bodyArmorValue;
-            const oldRankName = rankEntries[currentRankIndex][0];
-            
-            // Reduce by 2 CS (2 column shifts down)
-            const newRankIndex = Math.max(0, currentRankIndex - 2);
-            const newArmorValue = rankEntries[newRankIndex][1];
-            const newRankName = rankEntries[newRankIndex][0];
-            
-            // Update the defense value
-            defenses.bodyArmorValue = newArmorValue;
-            
-            console.log(`AP Ammo: Reduced armor from ${oldRankName} (${originalArmorValue}) to ${newRankName} (${newArmorValue})`);
-            } else {
-            console.log("Could not find matching rank for armor value:", defenses.bodyArmorValue);
-            }
-        }
-        
-        console.log("Final body armor value after AP:", defenses.bodyArmorValue);
-        console.log("====================");
-        
-        // Force fields unaffected by AP
+            console.log("Final body armor value after AP:", defenses.bodyArmorValue);
+            console.log("====================");
         }
 
         // Get Force Field
-        const ffPower = target.items.find(i => 
+        const ffPower = targetActor.items.find(i => 
             i.type === "power" && 
             i.name.toLowerCase().includes("force field") && 
             i.system.isActive !== false
@@ -1433,22 +1605,203 @@ export class CombatHandler {
             defenses.usedForceField = true;
         }
 
-        // Get Resistances - FIXED
-        console.log("Target resistances:", target.system.resistances);
+        // ========== RESISTANCE SECTION ==========
+        console.log("Checking for resistances on:", targetActor.name);
         
+        // Initialize the resistances array
         let resistancesArray = [];
-        if (Array.isArray(target.system.resistances)) {
-            resistancesArray = target.system.resistances;
-        } else if (typeof target.system.resistances === 'object' && target.system.resistances) {
-            resistancesArray = Object.values(target.system.resistances);
+        
+        // Check system resistances first
+        if (targetActor.system.resistances) {
+            if (Array.isArray(targetActor.system.resistances)) {
+                resistancesArray = [...targetActor.system.resistances];
+            } else if (typeof targetActor.system.resistances === 'object') {
+                resistancesArray = Object.values(targetActor.system.resistances);
+            }
         }
         
-        console.log("Normalized resistances array:", resistancesArray);
+        console.log("System resistances found:", resistancesArray);
 
+        // Check for Resistance powers
+        const resPowers = targetActor.items.filter(i => {
+            if (i.type !== "power") return false;
+            const powerName = i.name.toLowerCase();
+            const powerType = i.system.type?.toLowerCase() || "";
+            
+            return powerName.includes("resistance") || 
+                powerName.includes("immunity") ||
+                powerName.includes("invulnerability") ||
+                powerType.includes("resistance") ||
+                powerType.includes("defensive");
+        });
+        
+        console.log("Resistance powers found:", resPowers.map(p => p.name));
+        
+        // Process each resistance power
+        for (const resPower of resPowers) {
+            const powerName = resPower.name.toLowerCase();
+            let powerValue = resPower.system.value || CONFIG.FASERIP?.rankValues?.[resPower.system.rank] || 0;
+            let powerRank = resPower.system.rank;
+            
+            // CHECK FOR INVULNERABILITY FIRST
+            if (powerName.includes("invulnerability") || 
+                (powerName.includes("immunity") && !powerName.includes("disease"))) {
+                // Invulnerability = Class 1000 resistance
+                powerValue = 1000;
+                powerRank = "Class 1000";
+                
+                // Determine what they're invulnerable to
+                let resistanceType = "";
+                
+                if (powerName.includes("fire") || powerName.includes("heat")) {
+                    resistanceType = "fire";
+                } else if (powerName.includes("electricity") || powerName.includes("electrical") || powerName.includes("lightning")) {
+                    resistanceType = "electricity";
+                } else if (powerName.includes("cold") || powerName.includes("ice") || powerName.includes("frost")) {
+                    resistanceType = "cold";
+                } else if (powerName.includes("radiation")) {
+                    resistanceType = "radiation";
+                } else if (powerName.includes("toxin") || powerName.includes("poison")) {
+                    resistanceType = "toxin";
+                } else if (powerName.includes("corrosive") || powerName.includes("acid")) {
+                    resistanceType = "corrosive";
+                } else if (powerName.includes("mental") || powerName.includes("psychic") || powerName.includes("psionic")) {
+                    resistanceType = "mental";
+                } else if (powerName.includes("magic") || powerName.includes("magical") || powerName.includes("mystic")) {
+                    resistanceType = "magic";
+                } else if (powerName.includes("emotion")) {
+                    resistanceType = "emotion";
+                } else if (powerName.includes("disease") || powerName.includes("biological")) {
+                    resistanceType = "disease";
+                } else if (powerName.includes("physical")) {
+                    resistanceType = "physical";
+                } else if (powerName.includes("energy")) {
+                    resistanceType = "energy";
+                }
+                
+                if (resistanceType) {
+                    resistancesArray.push({
+                        type: resistanceType,
+                        value: 1000, // Class 1000
+                        rank: "Class 1000",
+                        source: resPower.name,
+                        isInvulnerability: true
+                    });
+                    console.log(`Found INVULNERABILITY: ${resPower.name} - Type: ${resistanceType}, Value: 1000`);
+                }
+                
+            } else {
+                // NORMAL RESISTANCE HANDLING (existing code)
+                let resistanceType = "";
+                
+                // Check for specific resistance types in the power name
+                if (powerName.includes("electricity") || powerName.includes("electrical") || powerName.includes("lightning")) {
+                    resistanceType = "electricity";
+                } else if (powerName.includes("fire") || powerName.includes("heat")) {
+                    resistanceType = "fire";
+                } else if (powerName.includes("cold") || powerName.includes("ice") || powerName.includes("frost")) {
+                    resistanceType = "cold";
+                } else if (powerName.includes("radiation") || powerName.includes("radioactive")) {
+                    resistanceType = "radiation";
+                } else if (powerName.includes("toxin") || powerName.includes("poison") || powerName.includes("venom")) {
+                    resistanceType = "toxin";
+                } else if (powerName.includes("corrosive") || powerName.includes("acid")) {
+                    resistanceType = "corrosive";
+                } else if (powerName.includes("mental") || powerName.includes("psychic") || powerName.includes("psionic")) {
+                    resistanceType = "mental";
+                } else if (powerName.includes("magic") || powerName.includes("magical") || powerName.includes("mystic")) {
+                    resistanceType = "magic";
+                } else if (powerName.includes("emotion")) {
+                    resistanceType = "emotion";
+                } else if (powerName.includes("disease") || powerName.includes("biological")) {
+                    resistanceType = "disease";
+                } else if (powerName.includes("physical")) {
+                    resistanceType = "physical";
+                } else if (powerName.includes("energy") && !powerName.includes("electricity")) {
+                    resistanceType = "energy";
+                }
+                
+                // Also check power specialty or description
+                if (!resistanceType && resPower.system.specialty) {
+                    const specialty = resPower.system.specialty.toLowerCase();
+                    if (specialty.includes("electric")) resistanceType = "electricity";
+                    else if (specialty.includes("fire")) resistanceType = "fire";
+                    else if (specialty.includes("cold")) resistanceType = "cold";
+                    else if (specialty.includes("radiation")) resistanceType = "radiation";
+                }
+                
+                if (resistanceType && powerValue > 0) {
+                    resistancesArray.push({
+                        type: resistanceType,
+                        value: powerValue,
+                        rank: powerRank,
+                        source: resPower.name,
+                        isInvulnerability: false
+                    });
+                    console.log(`Found resistance power: ${resPower.name} - Type: ${resistanceType}, Value: ${powerValue}`);
+                }
+            }
+        }
+
+        // Check for equipment-granted resistances
+        const passiveResistPowers = allPowers.filter(p =>
+            (p.name?.toLowerCase().includes("resistance") || p.name?.toLowerCase().includes("immunity")) &&
+            typeof p.value === "number" &&
+            p.value > 0
+        );
+
+        for (const equipResPower of passiveResistPowers) {
+            const powerValue = equipResPower.value;
+            const powerName = equipResPower.name?.toLowerCase() || "";
+            let resistanceType = equipResPower.damageType?.toLowerCase() || "";
+            
+            if (!resistanceType) {
+                if (powerName.includes("electricity")) resistanceType = "electricity";
+                else if (powerName.includes("fire")) resistanceType = "fire";
+                else if (powerName.includes("cold")) resistanceType = "cold";
+                else if (powerName.includes("radiation")) resistanceType = "radiation";
+            }
+
+            if (resistanceType && powerValue > 0) {
+                resistancesArray.push({
+                    type: resistanceType,
+                    value: powerValue,
+                    source: equipResPower.name + " (equipment)"
+                });
+                console.log(`Found equipment resistance: ${equipResPower.name} - Type: ${resistanceType}, Value: ${powerValue}`);
+            }
+        }
+
+        // Now check which resistance applies to the incoming damage
         let normalizedDamageType = damageType.toLowerCase();
         console.log(`Checking resistances for damage type: ${normalizedDamageType}`);
+        console.log(`Available resistances:`, resistancesArray);
+        
+        // SPECIAL HANDLING: Lightning/Energy attacks check electricity resistance
+        if (normalizedDamageType === "energy-energy" || 
+            normalizedDamageType.includes("lightning") ||
+            normalizedDamageType.includes("electric")) {
+            console.log("⚡ Treating Energy-Energy/Lightning as electricity damage for resistance checks");
+            
+            const elecResistance = resistancesArray.find(r => 
+                r.type?.toLowerCase() === "electricity" || 
+                r.type?.toLowerCase() === "electrical"
+            );
+            
+            if (elecResistance) {
+                defenses.resistanceValue = typeof elecResistance.value === "number" 
+                    ? elecResistance.value 
+                    : CONFIG.FASERIP?.rankValues?.[elecResistance.rank] || 0;
+                defenses.resistanceType = "electricity";
+                defenses.usedResistance = true;
+                console.log(`✅ Found Electricity Resistance: ${defenses.resistanceValue} from ${elecResistance.source || 'system'}`);
+                
+                console.log("Final defenses:", defenses);
+                return defenses;
+            }
+        }
 
-        // Find the most specific resistance that applies
+        // Check for other resistance types
         let bestResistance = null;
         let bestSpecificity = 0;
 
@@ -1458,18 +1811,17 @@ export class CombatHandler {
             const resType = resistance.type.toLowerCase();
             let specificity = 0;
             
-            // Check if this resistance applies
             if (isResistanceApplicable(normalizedDamageType, resType)) {
-                // Calculate specificity (more specific matches are preferred)
                 if (normalizedDamageType === resType) {
-                    specificity = 3; // Exact match
-                } else if (normalizedDamageType.includes(resType)) {
-                    specificity = 2; // Substring match
+                    specificity = 3;
+                } else if (normalizedDamageType.includes(resType) || resType.includes(normalizedDamageType)) {
+                    specificity = 2;
                 } else {
-                    specificity = 1; // Category match
+                    specificity = 1;
                 }
                 
-                if (specificity > bestSpecificity) {
+                if (specificity > bestSpecificity || 
+                    (specificity === bestSpecificity && resistance.value > (bestResistance?.value || 0))) {
                     bestResistance = resistance;
                     bestSpecificity = specificity;
                 }
@@ -1482,62 +1834,16 @@ export class CombatHandler {
                 : CONFIG.FASERIP?.rankValues?.[bestResistance.rank] || 0;
             defenses.resistanceType = bestResistance.type;
             defenses.usedResistance = true;
-            console.log(`✅ Using resistance: ${bestResistance.type} (value: ${defenses.resistanceValue})`);
-        }
-
-        // Also check for Resistance powers
-        const resPowers = target.items.filter(i => {
-            if (i.type !== "power") return false;
-            const powerName = i.name.toLowerCase();
-            return powerName.includes("resistance") || powerName.includes("immunity");
-        });
-        
-        for (const resPower of resPowers) {
-            const powerValue = CONFIG.FASERIP?.rankValues?.[resPower.system.rank] || 0;
-            
-            // Try to determine what this resistance applies to
-            const powerName = resPower.name.toLowerCase();
-            let resistanceType = "unknown";
-            
-            if (powerName.includes("physical")) resistanceType = "physical";
-            else if (powerName.includes("energy")) resistanceType = "energy";
-            else if (powerName.includes("fire")) resistanceType = "fire";
-            else if (powerName.includes("cold")) resistanceType = "cold";
-            else if (powerName.includes("electricity")) resistanceType = "electricity";
-            else if (powerName.includes("mental")) resistanceType = "mental";
-            
-            if (isResistanceApplicable(normalizedDamageType, resistanceType) && powerValue > defenses.resistanceValue) {
-                defenses.resistanceValue = powerValue;
-                defenses.resistanceType = resistanceType;
-                defenses.usedResistance = true;
-                console.log(`✅ Using resistance power: ${resPower.name} (${resistanceType}: ${powerValue})`);
-            }
-        }
-
-        // Also check for resistance powers granted via equipment (e.g., goggles, suits)
-        const passiveResistPowers = allPowers.filter(p =>
-            (p.name?.toLowerCase().includes("resistance") || p.name?.toLowerCase().includes("immunity")) &&
-            typeof p.value === "number" &&
-            p.value > 0
-        );
-
-        for (const resPower of passiveResistPowers) {
-            const powerValue = resPower.value;
-            const resistanceType = resPower.damageType?.toLowerCase() || "unknown";
-
-            if (isResistanceApplicable(normalizedDamageType, resistanceType) && powerValue > defenses.resistanceValue) {
-                defenses.resistanceValue = powerValue;
-                defenses.resistanceType = resistanceType;
-                defenses.usedResistance = true;
-                console.log(`✅ Using equipment-granted resistance: ${resPower.name} (${resistanceType}: ${powerValue})`);
-            }
+            console.log(`✅ Using resistance: ${bestResistance.type} (value: ${defenses.resistanceValue}) from ${bestResistance.source || 'system'}`);
+        } else {
+            console.log("❌ No applicable resistance found for damage type:", normalizedDamageType);
         }
 
         console.log("Final resistance value:", defenses.resistanceValue);
         console.log("Final defenses:", defenses);
 
-        // Show dialog if needed (simplified for space)
-        if (!options.skipDefenseDialog && target.hasPlayerOwner &&
+        // Show dialog if needed
+        if (!options.skipDefenseDialog && targetActor.hasPlayerOwner &&
             (defenses.bodyArmorValue > 0 || defenses.forceFieldValue > 0 || defenses.resistanceValue > 0)) {
             // [Dialog code remains the same...]
         }
