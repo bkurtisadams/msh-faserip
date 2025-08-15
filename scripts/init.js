@@ -50,6 +50,71 @@ Hooks.once("init", async () => {
     precedence: CONST.KEYBINDING_PRECEDENCE.NORMAL
   });
 
+  // Team control button
+  // Add this after the keybinding registration and before the settings registration
+  Hooks.on("getSceneControlButtons", function(controlsData) {
+    console.log("FASERIP | getSceneControlButtons fired:", controlsData);
+
+    // 1. Normalize whatever Foundry passed in into an array of group-objects
+    let groupsArray;
+    if (Array.isArray(controlsData)) {
+      groupsArray = controlsData;
+    } else if (controlsData && typeof controlsData === "object") {
+      groupsArray = Object.values(controlsData);
+    } else {
+      console.error("FASERIP | Unexpected controlsData shape:", controlsData);
+      return;
+    }
+
+    // 2. Find the "tokens" group
+    const tokenGroup = groupsArray.find(g => g.name === "tokens" || g.name === "token");
+    console.log("FASERIP | tokenGroup from hook:", tokenGroup);
+    if (!tokenGroup) {
+      console.error("FASERIP | Token controls not found");
+      return;
+    }
+
+    // 3. Build a plain object keyed by each existing tool's name
+    //    (This works whether tokenGroup.tools was originally an array or an object.)
+    const existingToolsObj = {};
+    if (tokenGroup.tools) {
+      // If tokenGroup.tools is array-like, values() gives numeric indices first
+      // If it's already an object, values() gives its property values
+      for (const t of Object.values(tokenGroup.tools)) {
+        if (t && t.name) existingToolsObj[t.name] = t;
+      }
+    }
+
+    // 4. Insert your Team Management button under the "faserip-team" key
+    if (!existingToolsObj["faserip-team"]) {
+      existingToolsObj["faserip-team"] = {
+        name: "faserip-team",
+        title: "Team Management",
+        icon: "fas fa-users-crown",
+        visible: true,
+        button: true,
+        onClick: () => {
+          console.log("FASERIP | Team Management onClick triggered!");
+          import('./teamSheet.js').then(module => {
+            const teamSheet = new module.TeamSheet();
+            teamSheet.render(true);
+          }).catch(error => {
+            console.error("FASERIP: Error importing teamSheet:", error);
+            ui.notifications.error("Could not load Team Sheet");
+          });
+        }
+      };
+      console.log("FASERIP | Added 'faserip-team' to tools object");
+    } else {
+      console.log("FASERIP | 'faserip-team' already existed, skipping re-insert");
+    }
+
+    // 5. Assign the reconstructed tools-object back onto tokenGroup.tools
+    tokenGroup.tools = existingToolsObj;
+
+    console.log("FASERIP | tokenGroup.tools has been rebuilt:", tokenGroup.tools);
+  });
+
   // <-- NEW/MODIFIED SECTION START -->
   // Register system settings - THIS IS THE MISSING PART
   game.settings.register('msh-faserip', 'dailyKarmaEnabled', {
@@ -60,8 +125,38 @@ Hooks.once("init", async () => {
     type: Boolean,  // Use the JavaScript Boolean class, not a string "Boolean"
     default: false, // Default value
   });
+
   console.log("FASERIP DEBUG: dailyKarmaEnabled setting registered."); // <-- DEBUG CONSOLE LOG
   // <-- NEW/MODIFIED SECTION END -->
+  
+  game.settings.register('msh-faserip', 'teamMembers', {
+    name: "Team Members",
+    hint: "List of hero IDs that are part of the team",
+    scope: "world",
+    config: false,
+    type: Array,
+    default: []
+  });
+
+  game.settings.register('msh-faserip', 'defeatedVillains', {
+    name: "Defeated Villains", 
+    hint: "List of villains defeated by the team",
+    scope: "world",
+    config: false,
+    type: Array,
+    default: []
+  });
+
+  game.settings.register('msh-faserip', 'karmaMultiplier', {
+    name: "Karma Multiplier",
+    hint: "Multiplier for karma awards",
+    scope: "world",
+    config: false,
+    type: Number,
+    default: 1
+  });
+
+  console.log("FASERIP DEBUG: Team settings registered.");
 
   // Register custom grappling effects so they show token HUD icons and work with ActiveEffect.statuses
   CONFIG.statusEffects.push(

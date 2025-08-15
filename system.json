@@ -34,14 +34,16 @@
         "scripts/combat-handler.js",
         "scripts/karma.js",
         "scripts/karmaAdvancement.js",
-        "scripts/karmaPool.js"
+        "scripts/karmaPool.js",
+        "scripts/teamSheet.js"
         ],
     "styles": [
         "styles/global.css",
         "styles/actor-sheet.css",
         "styles/item-sheet.css",
         "styles/karma-dialog.css",
-        "styles/faserip-initiative.css"
+        "styles/faserip-initiative.css",
+        "styles/team-tracker.css"
     ],
     "packs": [
         {
@@ -115,6 +117,33 @@
             "config": true,
             "type": "Boolean",
             "default": false
+        },
+        {
+            "key": "teamMembers",
+            "name": "Team Members",
+            "hint": "List of hero IDs that are part of the team",
+            "scope": "world",
+            "config": false,
+            "type": "Array",
+            "default": []
+        },
+        {
+            "key": "defeatedVillains",
+            "name": "Defeated Villains",
+            "hint": "List of villains defeated by the team",
+            "scope": "world",
+            "config": false,
+            "type": "Array",
+            "default": []
+        },
+        {
+            "key": "karmaMultiplier",
+            "name": "Karma Multiplier",
+            "hint": "Multiplier for karma awards",
+            "scope": "world",
+            "config": false,
+            "type": "Number",
+            "default": 1
         }
-    ]
+        ]
 }

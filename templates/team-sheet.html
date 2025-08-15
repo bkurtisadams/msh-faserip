@@ -1,0 +1,186 @@
+<form class="team-tracker" autocomplete="off">
+  <!-- Top Tab Navigation -->
+  <nav class="tracker-tabs">
+    <a class="tab-button active" data-tab="members">
+      <i class="fas fa-users"></i>
+      <span>Members</span>
+    </a>
+    <a class="tab-button" data-tab="awards">
+      <i class="fas fa-trophy"></i>
+      <span>Awards</span>
+    </a>
+    <a class="tab-button" data-tab="logs">
+      <i class="fas fa-scroll"></i>
+      <span>Logs</span>
+    </a>
+  </nav>
+
+  <!-- Tab Content -->
+  <section class="tab-content">
+    <!-- Members Tab -->
+    <div class="tab-panel active" data-tab="members">
+      <div class="members-header">
+        <h3>Team Members</h3>
+        <div class="team-stats">
+          <span class="pool-total">Pool: {{teamPoolTotal}} Karma</span>
+          <button type="button" class="distribute-karma"><i class="fas fa-gift"></i> Award Karma</button>
+        </div>
+      </div>
+      
+      <div class="members-list">
+        {{#each teamMembers as |member|}}
+        <div class="member-card">
+          <div class="member-portrait" data-hero-id="{{member.id}}">
+            <img src="{{member.img}}" alt="{{member.name}}" class="hero-portrait" data-hero-id="{{member.id}}" />
+            <div class="member-name">{{member.name}}</div>
+          </div>
+          
+          <div class="member-stats">
+            <div class="faserip-row">
+              <div class="stat">
+                <label>F</label>
+                <span class="rank">{{abbreviateRank member.fightingRank}}</span>
+                <span class="value">{{member.fighting}}</span>
+              </div>
+              <div class="stat">
+                <label>A</label>
+                <span class="rank">{{abbreviateRank member.agilityRank}}</span>
+                <span class="value">{{member.agility}}</span>
+              </div>
+              <div class="stat">
+                <label>S</label>
+                <span class="rank">{{abbreviateRank member.strengthRank}}</span>
+                <span class="value">{{member.strength}}</span>
+              </div>
+              <div class="stat">
+                <label>E</label>
+                <span class="rank">{{abbreviateRank member.enduranceRank}}</span>
+                <span class="value">{{member.endurance}}</span>
+              </div>
+            </div>
+            <div class="faserip-row">
+              <div class="stat">
+                <label>R</label>
+                <span class="rank">{{abbreviateRank member.reasonRank}}</span>
+                <span class="value">{{member.reason}}</span>
+              </div>
+              <div class="stat">
+                <label>I</label>
+                <span class="rank">{{abbreviateRank member.intuitionRank}}</span>
+                <span class="value">{{member.intuition}}</span>
+              </div>
+              <div class="stat">
+                <label>P</label>
+                <span class="rank">{{abbreviateRank member.psycheRank}}</span>
+                <span class="value">{{member.psyche}}</span>
+              </div>
+              <div class="derived-stat">
+                <label>Health:</label>
+                <span>{{member.health}}/{{member.healthMax}}</span>
+              </div>
+            </div>
+            <div class="secondary-stats">
+              <div class="stat-small">
+                <label>Karma:</label>
+                <span>{{member.karma}}</span>
+              </div>
+              <div class="stat-small">
+                <label>Resources:</label>
+                <span>{{abbreviateRank member.resources}}</span>
+              </div>
+              <div class="stat-small">
+                <label>Popularity:</label>
+                <span>{{member.popularity}}</span>
+              </div>
+              <div class="stat-small">
+                <label>Pool:</label>
+                <span>{{member.poolContribution}}</span>
+              </div>
+            </div>
+          </div>
+          
+          <div class="member-actions">
+            <button type="button" class="hero-settings" data-hero-id="{{member.id}}" title="Settings">
+              <i class="fas fa-cog"></i>
+            </button>
+            <button type="button" class="remove-hero-from-team" data-hero-id="{{member.id}}" title="Remove from Team">
+              <i class="fas fa-user-minus"></i>
+            </button>
+          </div>
+        </div>
+        {{/each}}
+      </div>
+
+      <!-- Available Heroes to Add -->
+      {{#if availableHeroes.length}}
+      <div class="available-heroes">
+        <h4>Available Heroes</h4>
+        <div class="hero-add-list">
+          {{#each availableHeroes as |hero|}}
+          <div class="hero-add-item">
+            <img src="{{hero.img}}" alt="{{hero.name}}" />
+            <span>{{hero.name}}</span>
+            <button type="button" class="add-hero-to-team" data-hero-id="{{hero.id}}">
+              <i class="fas fa-plus"></i>
+            </button>
+          </div>
+          {{/each}}
+        </div>
+      </div>
+      {{/if}}
+    </div>
+
+    <!-- Awards Tab -->
+    <div class="tab-panel" data-tab="awards">
+      <div class="awards-header">
+        <h3>Team Karma Awards</h3>
+        <button type="button" class="clear-awards"><i class="fas fa-broom"></i> Clear Display</button>
+      </div>
+      
+      <div class="awards-list">
+        {{#each karmaAwards as |award|}}
+        <div class="award-entry">
+          <div class="award-date">{{award.date}}</div>
+          <div class="award-member">{{award.member}}</div>
+          <div class="award-amount">+{{award.amount}} Karma</div>
+          <div class="award-reason">{{award.reason}}</div>
+          <div class="award-description">{{award.description}}</div>
+        </div>
+        {{else}}
+        <div class="empty-message">No team karma awards recorded yet.</div>
+        {{/each}}
+      </div>
+    </div>
+
+    <!-- Logs Tab -->
+    <div class="tab-panel" data-tab="logs">
+      <div class="logs-header">
+        <h3>Defeated Villains</h3>
+        <div class="log-actions">
+          <button type="button" class="add-defeated-villain"><i class="fas fa-plus"></i> Add Villain</button>
+          <button type="button" class="clear-logs"><i class="fas fa-trash"></i> Clear Logs</button>
+        </div>
+      </div>
+      
+      <div class="logs-list">
+        {{#each defeatedVillains as |villain|}}
+        <div class="log-entry">
+          <div class="villain-info">
+            <h4>{{villain.name}}</h4>
+            <div class="villain-details">
+              <span class="power-level">{{villain.powerLevel}}</span>
+              <span class="date">{{villain.dateDefeated}}</span>
+            </div>
+            {{#if villain.notes}}<p class="notes">{{villain.notes}}</p>{{/if}}
+          </div>
+          <button type="button" class="remove-villain" data-villain-id="{{villain.id}}">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        {{else}}
+        <div class="empty-message">No defeated villains recorded yet.</div>
+        {{/each}}
+      </div>
+    </div>
+  </section>
+</form>
