@@ -30,7 +30,9 @@ function getPopularityRankWithRange(value, context) {
  * @param {number} csShift - Number of column shifts (positive or negative)
  * @returns {{ rank: string, value: number }}
  */
+// scripts/actorSheet.js  — replace the whole function with this version
 export function applyColumnShiftToRank(rankName, currentValue, csShift) {
+  // Keep the canonical list here
   const rankList = [
     { name: "Shift-0", min: 0 },
     { name: "Feeble", min: 1 },
@@ -52,23 +54,38 @@ export function applyColumnShiftToRank(rankName, currentValue, csShift) {
     { name: "Beyond", min: 9999 }
   ];
 
-  // Find current index by name, fallback to value if needed
-  let index = rankList.findIndex(r => r.name === rankName);
+  // --- normalize input names so "Shift X" and "Shift-X" match
+  const normalize = (s) => {
+    if (!s) return s;
+    return s
+      .replace(/^Shift\s*X$/i, "Shift-X")
+      .replace(/^Shift\s*Y$/i, "Shift-Y")
+      .replace(/^Shift\s*Z$/i, "Shift-Z")
+      .replace(/^Shift\s*0$/i, "Shift-0");
+  };
 
+  const normalizedName = normalize(rankName);
+
+  // 1) Try exact name match
+  let index = rankList.findIndex(r => r.name === normalizedName);
+
+  // 2) Fallback by value: pick the HIGHEST rank whose min <= value
   if (index === -1) {
-    // Fallback: try to find by value
-    index = rankList.findIndex(r => currentValue >= r.min);
+    if (typeof currentValue === "number" && !Number.isNaN(currentValue)) {
+      for (let i = rankList.length - 1; i >= 0; i--) {
+        if (currentValue >= rankList[i].min) { index = i; break; }
+      }
+    }
     if (index === -1) index = 0;
   }
 
-  const newIndex = Math.max(0, Math.min(rankList.length - 1, index + csShift));
+  // Apply column shift and clamp
+  const newIndex = Math.max(0, Math.min(rankList.length - 1, index + (csShift || 0)));
   const newRank = rankList[newIndex];
 
-  return {
-    rank: newRank.name,
-    value: newRank.min
-  };
+  return { rank: newRank.name, value: newRank.min };
 }
+
 
 export class FaseripActorSheet extends ActorSheet {
   // Add a property to track the biography toggle state

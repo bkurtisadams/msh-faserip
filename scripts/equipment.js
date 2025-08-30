@@ -44,34 +44,49 @@ export class FaseripEquipmentSheet extends ItemSheet {
     ];
 
     // All FASERIP Combat Damage Types + custom resistance types
-context.damageTypes = [
-  "S",    // Shooting
-  "E",    // Energy
-  "F",    // Force
-  "EA",   // Edged Attack
-  "BA",   // Blunt Attack
-  "TE",   // Throwing Edged
-  "TB",   // Throwing Blunt
-  "GP",   // Grappling
-  "Gb",   // Grabbing
+    context.damageTypes = [
+      "S",    // Shooting
+      "E",    // Energy
+      "F",    // Force
+      "EA",   // Edged Attack
+      "BA",   // Blunt Attack
+      "TE",   // Throwing Edged
+      "TB",   // Throwing Blunt
+      "GP",   // Grappling
+      "Gb",   // Grabbing
 
-  // Extended types used for resistances or passive armor
-  "sensory",
-  "mental",
-  "radiation",
-  "corrosive",
-  "toxin",
-  "magic",
-  "disease",
-  "emotion"
-  // Note: "Stun" is an *effect* type, not a damage type on the Universal Table column.
-      // If you want a "Stun" damage type, you'd need to define how it maps to the table.
-      // Current weapon sheet already has stunIntensity for weapons that only stun.
-];
+      // Extended types used for resistances or passive armor
+      "sensory",
+      "mental",
+      "radiation",
+      "corrosive",
+      "toxin",
+      "magic",
+      "disease",
+      "emotion"
+      // Note: "Stun" is an *effect* type, not a damage type on the Universal Table column.
+          // If you want a "Stun" damage type, you'd need to define how it maps to the table.
+          // Current weapon sheet already has stunIntensity for weapons that only stun.
+    ];
 
     // --- END NEW ---
 
     return context;
+  }
+
+  /** @override */
+  async _updateObject(event, formData) {
+    // Clean the formData to prevent field contamination
+    const cleanedData = foundry.utils.expandObject(formData);
+    
+    // Detailed debug logging to see what's being submitted
+    /* console.log("Equipment form data being submitted:", cleanedData);
+    console.log("System data specifically:", cleanedData.system);
+    console.log("PowerRank specifically:", cleanedData.system?.powerRank);
+    console.log("Original item data before update:", this.object.system);
+    console.log("Original powerRank before update:", this.object.system?.powerRank); */
+    
+    return super._updateObject(event, cleanedData);
   }
 
   activateListeners(html) {
@@ -224,14 +239,17 @@ context.damageTypes = [
     });
 
     // Show/hide category-specific fields when category changes
-    html.find('.equipment-category-select').change(ev => {
+    html.find('.equipment-category-select').change(async ev => {
       const category = ev.currentTarget.value;
-      this.object.update({"system.category": category}); // Ensure category is saved immediately
-
-      // Hide all category-specific sections first
+      
+      // Prevent multiple rapid updates
+      if (this._categoryUpdateTimeout) {
+        clearTimeout(this._categoryUpdateTimeout);
+      }
+      
+      // Show/hide sections immediately without re-rendering
       html.find('.weapon-fields, .armor-fields, .power-item-fields, .custom-fields').hide();
-
-      // Show the appropriate section based on category
+      
       if (category === 'weapon') {
         html.find('.weapon-fields').show();
       } else if (category === 'armor') {
@@ -241,7 +259,11 @@ context.damageTypes = [
       } else if (category === 'custom') {
         html.find('.custom-fields').show();
       }
-      this.render(true); // Re-render to ensure all conditional displays are correct
+      
+      // Delay the update to prevent conflicts
+      this._categoryUpdateTimeout = setTimeout(() => {
+        this.object.update({"system.category": category});
+      }, 100);
     });
 
     // Make sure correct fields are shown on initial load
@@ -389,9 +411,15 @@ context.damageTypes = [
       ability = "agility";
     }
 
-    // Get ability rank and damage type
-    const abilityRank = actor.system.abilities[ability].rank || "Typical";
-    const abilityValue = actor.system.abilities[ability].value || 6;
+    // Get ability rank and damage type - or use weapon power rank if treating as power
+    let abilityRank, abilityValue;
+    if (item.system.treatAsPower && item.system.weaponPowerRank) {
+      abilityRank = item.system.weaponPowerRank;
+      abilityValue = CONFIG.FASERIP?.rankValues?.[abilityRank] || 6;
+    } else {
+      abilityRank = actor.system.abilities[ability].rank || "Typical";
+      abilityValue = actor.system.abilities[ability].value || 6;
+    }
     const damageType = item.system.damageType || "S";
     const damage = item.system.damage || "0";
 
