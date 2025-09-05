@@ -94,7 +94,8 @@ export class FaseripInitiative {
    * When a combatant is added, assign side
    */
   static async _onCreateCombatant(combatant, options, userId) {
-    if (!game.settings.get("msh-faserip", "useCustomInitiative")) return;
+    // Only execute on GM client
+    if (!game.user.isGM || !game.settings.get("msh-faserip", "useCustomInitiative")) return;
     
     // Determine side based on actor type and disposition
     let isPC = false;
@@ -153,6 +154,16 @@ export class FaseripInitiative {
     
     const combat = app.viewed;
     if (!combat) return;
+
+    // DEBUG: Log what players are seeing
+    console.log("FASERIP Initiative Debug:", {
+      userIsGM: game.user.isGM,
+      userName: game.user.name,
+      pcInit: combat.getFlag("msh-faserip", "pcInitiative"),
+      npcInit: combat.getFlag("msh-faserip", "npcInitiative"),
+      goesFirst: combat.getFlag("msh-faserip", "goesFirst"),
+      allFlags: combat.flags["msh-faserip"]
+    });
     
     // Convert html to jQuery if it isn't already
     const $html = html instanceof jQuery ? html : $(html);
@@ -193,8 +204,9 @@ export class FaseripInitiative {
           this._showSettingsDialog();
         });
       }
-    }
+    } // END OF GM-ONLY SECTION
     
+    // UI DISPLAY CODE - RUNS FOR ALL USERS
     // Get initiative data
     const pcInit = combat.getFlag("msh-faserip", "pcInitiative");
     const npcInit = combat.getFlag("msh-faserip", "npcInitiative");
@@ -205,7 +217,22 @@ export class FaseripInitiative {
     const goesFirst = combat.getFlag("msh-faserip", "goesFirst");
     const pcHighestName = combat.getFlag("msh-faserip", "pcHighestName") || "";
     const npcHighestName = combat.getFlag("msh-faserip", "npcHighestName") || "";
-    
+
+    // ONLY PROCEED WITH UI MODIFICATIONS IF WE HAVE COMPLETE DATA
+    // Check if we have the essential data before modifying UI
+    const hasCompleteInitiativeData = (
+      pcInit !== undefined && 
+      npcInit !== undefined && 
+      goesFirst !== undefined &&
+      pcRoll !== undefined &&
+      npcRoll !== undefined
+    );
+
+    if (!hasCompleteInitiativeData) {
+      console.log("FASERIP Initiative: Waiting for complete flag data...");
+      return; // Exit early if data is incomplete
+    }
+
     // Add compact info below round number
     const roundDisplay = $html.find('.combat-round');
     if (roundDisplay.length && roundDisplay.next('.faserip-initiative-bar').length === 0) {
@@ -355,6 +382,9 @@ export class FaseripInitiative {
    * Roll initiative for both sides - Updated for v13
    */
   static async rollSideInitiative(combat) {
+    // Only execute on GM client
+    if (!game.user.isGM || !combat || this.isRolling) return;
+    
     if (!combat || this.isRolling) return;
     
     // Validate combat state
@@ -414,16 +444,20 @@ export class FaseripInitiative {
         return;
       }
       
-      // Store results as flags
-      await combat.setFlag("msh-faserip", "pcInitiative", pcTotal);
-      await combat.setFlag("msh-faserip", "npcInitiative", npcTotal);
-      await combat.setFlag("msh-faserip", "pcModifier", pcMod);
-      await combat.setFlag("msh-faserip", "npcModifier", npcMod);
-      await combat.setFlag("msh-faserip", "pcRoll", pcRoll.total);
-      await combat.setFlag("msh-faserip", "npcRoll", npcRoll.total);
-      await combat.setFlag("msh-faserip", "goesFirst", goesFirst);
-      await combat.setFlag("msh-faserip", "pcHighestName", pcHighest.name);
-      await combat.setFlag("msh-faserip", "npcHighestName", npcHighest.name);
+      // Store results as flags - BATCH UPDATE
+      const flagUpdates = {
+        "flags.msh-faserip.pcInitiative": pcTotal,
+        "flags.msh-faserip.npcInitiative": npcTotal,
+        "flags.msh-faserip.pcModifier": pcMod,
+        "flags.msh-faserip.npcModifier": npcMod,
+        "flags.msh-faserip.pcRoll": pcRoll.total,
+        "flags.msh-faserip.npcRoll": npcRoll.total,
+        "flags.msh-faserip.goesFirst": goesFirst,
+        "flags.msh-faserip.pcHighestName": pcHighest.name,
+        "flags.msh-faserip.npcHighestName": npcHighest.name
+      };
+
+      await combat.update(flagUpdates);
       
       // Show 3D dice if available
       if (game.dice3d) {
@@ -485,6 +519,39 @@ export class FaseripInitiative {
       // Apply updates
       if (updates.length) {
         await combat.updateEmbeddedDocuments("Combatant", updates, {render: false});
+      }
+
+      // Ensure all combatants have correct side flags (batch operation)
+      const combatantFlagUpdates = [];
+      for (const c of combat.combatants) {
+        const currentSide = c.getFlag("msh-faserip", "side");
+        let correctSide;
+        
+        if (c.actor.type === "hero") {
+          correctSide = 'pc';
+        } else if (c.actor.type === "villain") {
+          correctSide = 'npc';
+        } else {
+          const tokenDisposition = c.token?.disposition ?? c.actor.prototypeToken.disposition;
+          if (tokenDisposition === CONST.TOKEN_DISPOSITIONS.FRIENDLY) {
+            correctSide = 'pc';
+          } else if (tokenDisposition === CONST.TOKEN_DISPOSITIONS.HOSTILE) {
+            correctSide = 'npc';
+          } else {
+            correctSide = c.actor.hasPlayerOwner ? 'pc' : 'npc';
+          }
+        }
+        
+        if (currentSide !== correctSide) {
+          combatantFlagUpdates.push({
+            _id: c.id,
+            "flags.msh-faserip.side": correctSide
+          });
+        }
+      }
+
+      if (combatantFlagUpdates.length > 0) {
+        await combat.updateEmbeddedDocuments("Combatant", combatantFlagUpdates, {render: false});
       }
       
       // Send chat message with results
@@ -598,51 +665,51 @@ export class FaseripInitiative {
   /**
  * Get characters with highest Intuition on each side
  */
-  static async _getHighestIntuitionCharacters(combat) {
-    let pcHighest = { name: "None", intuition: 0 };
-    let npcHighest = { name: "None", intuition: 0 };
+static async _getHighestIntuitionCharacters(combat) {
+  let pcHighest = { name: "None", intuition: 0 };
+  let npcHighest = { name: "None", intuition: 0 };
+  
+  // Check all combatants
+  for (const c of combat.combatants) {
+    if (!c.actor) continue;
     
-    // Check all combatants
-    for (const c of combat.combatants) {
-      if (!c.actor) continue;
+    const intuition = c.actor.system.abilities.intuition.value || 0;
+    
+    // Determine side based on actor type and disposition, not just ownership
+    let isPC = false;
+    
+    // First, check actor type
+    if (c.actor.type === "hero") {
+      isPC = true;
+    } else if (c.actor.type === "villain") {
+      isPC = false;
+    } else {
+      // For NPCs, check disposition (token disposition or prototype token disposition)
+      const tokenDisposition = c.token?.disposition ?? c.actor.prototypeToken.disposition;
       
-      const intuition = c.actor.system.abilities.intuition.value || 0;
-      
-      // Determine side based on actor type and disposition, not just ownership
-      let isPC = false;
-      
-      // First, check actor type
-      if (c.actor.type === "hero") {
-        isPC = true;
-      } else if (c.actor.type === "villain") {
-        isPC = false;
+      if (tokenDisposition === CONST.TOKEN_DISPOSITIONS.FRIENDLY) {
+        isPC = true;  // Friendly NPCs go with PCs
+      } else if (tokenDisposition === CONST.TOKEN_DISPOSITIONS.HOSTILE) {
+        isPC = false; // Hostile NPCs go with NPCs/villains
       } else {
-        // For NPCs, check disposition (token disposition or prototype token disposition)
-        const tokenDisposition = c.token?.disposition ?? c.actor.prototypeToken.disposition;
-        
-        if (tokenDisposition === CONST.TOKEN_DISPOSITIONS.FRIENDLY) {
-          isPC = true;  // Friendly NPCs go with PCs
-        } else if (tokenDisposition === CONST.TOKEN_DISPOSITIONS.HOSTILE) {
-          isPC = false; // Hostile NPCs go with NPCs/villains
-        } else {
-          // Neutral - could go either way, let's use ownership as fallback
-          isPC = c.actor.hasPlayerOwner;
-        }
+        // Neutral - could go either way, let's use ownership as fallback
+        isPC = c.actor.hasPlayerOwner;
       }
-      
-      // Update highest for the appropriate side
-      if (isPC && intuition > pcHighest.intuition) {
-        pcHighest = { name: c.name, intuition: intuition };
-      } else if (!isPC && intuition > npcHighest.intuition) {
-        npcHighest = { name: c.name, intuition: intuition };
-      }
-      
-      // Ensure side flag is set correctly
-      await c.setFlag("msh-faserip", "side", isPC ? "pc" : "npc");
     }
     
-    return [pcHighest, npcHighest];
+    // Update highest for the appropriate side
+    if (isPC && intuition > pcHighest.intuition) {
+      pcHighest = { name: c.name, intuition: intuition };
+    } else if (!isPC && intuition > npcHighest.intuition) {
+      npcHighest = { name: c.name, intuition: intuition };
+    }
+    
+    // REMOVE THIS LINE - don't set flags during this iteration
+    // await c.setFlag("msh-faserip", "side", isPC ? "pc" : "npc");
   }
+  
+  return [pcHighest, npcHighest];
+}
   
   /**
    * Get initiative modifier based on Intuition
