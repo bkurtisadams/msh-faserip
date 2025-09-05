@@ -1465,9 +1465,9 @@ export class FaseripActorSheet extends ActorSheet {
 
               // Replace the complex daily karma logic with this simpler version:
               if (karma > 0) {
-                const dailyKarmaEnabled = game.settings.get("msh-faserip", "dailyKarmaEnabled");
+                /* const dailyKarmaEnabled = game.settings.get("msh-faserip", "dailyKarmaEnabled");
                 let dailyKarmaUsedAmount = 0;
-                let lifetimeKarmaUsedAmount = 0;
+                let lifetimeKarmaUsedAmount = 0; */
 
                 if (dailyKarmaEnabled) {
                   const dailyRemaining = this.actor.system.karma.dailyKarmaMax - (this.actor.system.karma.dailyKarmaUsed || 0);
@@ -1553,6 +1553,8 @@ export class FaseripActorSheet extends ActorSheet {
                 // No need to call _updateCurrentKarma here, prepareData handles it on sheet re-render
               }
               // <-- NEW/MODIFIED SECTION END -->
+
+              const totalKarmaUsed = dailyKarmaUsedAmount + lifetimeKarmaUsedAmount;
 
               // Display the dice roll with flavor text if not skipped
               if (!skipDice) {
@@ -1645,7 +1647,7 @@ export class FaseripActorSheet extends ActorSheet {
                 ${isMutant ? '<div style="color: #aa0000;">Mutant Penalty Applied (-1CS)</div>' : ''}
                 <div>Effective Rank: ${heroPopularityRank} ${columnShift !== 0 ? `→ ${effectiveRank} (${columnShift > 0 ? '+' : ''}${columnShift}CS)` : ''}</div>
 
-                <div>Roll: ${roll.total} + Karma: ${karmaUsed} = ${cappedTotal}</div>
+                <div>Roll: ${roll.total} + Karma: ${totalKarmaUsed} = ${cappedTotal}</div>
 
                 </div>
               <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
@@ -2454,7 +2456,6 @@ html.find('.headquarters-row').each((i, row) => {
               
               // Calculate the result with karma
               let cappedTotal = roll.total;
-              let karmaUsed = 0;
 
               const dailyKarmaEnabled = game.settings.get("msh-faserip", "dailyKarmaEnabled");
               let dailyKarmaUsedAmount = 0;
@@ -2462,10 +2463,6 @@ html.find('.headquarters-row').each((i, row) => {
 
               // Replace the complex daily karma logic with this simpler version:
               if (karma > 0) {
-                const dailyKarmaEnabled = game.settings.get("msh-faserip", "dailyKarmaEnabled");
-                let dailyKarmaUsedAmount = 0;
-                let lifetimeKarmaUsedAmount = 0;
-
                 if (dailyKarmaEnabled) {
                   const dailyRemaining = this.actor.system.karma.dailyKarmaMax - (this.actor.system.karma.dailyKarmaUsed || 0);
                   if (dailyRemaining > 0) {
@@ -2504,7 +2501,7 @@ html.find('.headquarters-row').each((i, row) => {
                     gameDate: "",
                     amount: -lifetimeKarmaUsedAmount,
                     type: "Die Roll",
-                    description: `Spent lifetime karma on [ability/power/etc] roll`
+                    description: `Spent lifetime karma on ${abilityFullName} FEAT roll`
                   };
                   
                   const currentHistory = foundry.utils.deepClone(this.actor.system.karma?.history || []);
@@ -2549,6 +2546,8 @@ html.find('.headquarters-row').each((i, row) => {
                 });
               }
 
+              const totalKarmaUsed = dailyKarmaUsedAmount + lifetimeKarmaUsedAmount;
+
               const resultColor = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
               
               // Check if FEAT succeeded based on intensity requirement
@@ -2567,7 +2566,7 @@ html.find('.headquarters-row').each((i, row) => {
                     <div>Base Rank: ${abilityRank} (${abilityValue})</div>
                     ${columnShift !== 0 ? `<div>Column Shift: ${columnShift} → ${effectiveRank}</div>` : ''}
                     ${intensity !== "None" ? `<div>Intensity: ${intensity} (Required: ${featRequirement})</div>` : ''}
-                    <div>Roll: ${roll.total} + Karma: ${karmaUsed} = ${cappedTotal}</div>
+                    <div>Roll: ${roll.total} + Karma: ${totalKarmaUsed} = ${cappedTotal}</div>
                   </div>
                   <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
                     background-color: ${resultColor.toLowerCase() === 'white' ? '#f8f8f8' :
@@ -3253,16 +3252,16 @@ _rollVehicleControl(vehicle) {
 
           // Replace the complex daily karma logic with this simpler version:
           if (karma > 0) {
-            const dailyKarmaEnabled = game.settings.get("msh-faserip", "dailyKarmaEnabled");
+            /* const dailyKarmaEnabled = game.settings.get("msh-faserip", "dailyKarmaEnabled");
             let dailyKarmaUsedAmount = 0;
-            let lifetimeKarmaUsedAmount = 0;
+            let lifetimeKarmaUsedAmount = 0; */
 
             if (dailyKarmaEnabled) {
               const dailyRemaining = this.actor.system.karma.dailyKarmaMax - (this.actor.system.karma.dailyKarmaUsed || 0);
               if (dailyRemaining > 0) {
                 // Use daily karma first (no history entry needed)
                 dailyKarmaUsedAmount = Math.min(karma, dailyRemaining);
-                cappedTotal = Math.min(100, roll.total + dailyKarmaUsedAmount);
+                cappedTotal = Math.min(100, controlRoll.total + dailyKarmaUsedAmount);
                 
                 // Update daily usage immediately
                 await game.msh.runAsGM({
@@ -3280,12 +3279,12 @@ _rollVehicleControl(vehicle) {
               } else {
                 // No daily karma left, use lifetime
                 lifetimeKarmaUsedAmount = karma;
-                cappedTotal = Math.min(100, roll.total + lifetimeKarmaUsedAmount);
+                cappedTotal = Math.min(100, controlRoll.total + lifetimeKarmaUsedAmount);
               }
             } else {
               // Daily karma disabled, use lifetime
               lifetimeKarmaUsedAmount = karma;
-              cappedTotal = Math.min(100, roll.total + lifetimeKarmaUsedAmount);
+              cappedTotal = Math.min(100, controlRoll.total + lifetimeKarmaUsedAmount);
             }
 
             // Only create history entry for lifetime karma spending
@@ -3341,6 +3340,8 @@ _rollVehicleControl(vehicle) {
             // No need to call _updateCurrentKarma here, prepareData handles it on sheet re-render
           }
           // <-- NEW/MODIFIED SECTION END -->
+
+          const totalKarmaUsed = dailyKarmaUsedAmount + lifetimeKarmaUsedAmount;
 
           const getFEATColor = (rank, total) => {
             const [g, y, r] = {
@@ -3451,7 +3452,7 @@ _rollVehicleControl(vehicle) {
                 <h3>${actor.name} - Vehicle Control FEAT</h3>
                 <p>Control Rank: ${controlRank}${controlCSLoss > 0 ? ` -${controlCSLoss}CS → ${adjustedControlRank}` : ""}</p>
                 <p>Used Rank: ${baseUsedRank} → ${shiftedRank}</p>
-                <p>Roll: ${controlRoll.total} + Karma ${karmaUsed} = ${cappedTotal}</p> <!-- MODIFIED: use karmaUsed -->
+                <p>Roll: ${controlRoll.total} + Karma ${totalKarmaUsed} = ${cappedTotal}</p> <!-- MODIFIED: use karmaUsed -->
                 <div style="text-align:center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px;
                   background-color: ${colorStyles[featColor]}; color: ${textColor(featColor)};">
                   ${stuntFailure ? `STUNT FAILED – ${stuntName || "Unnamed stunt"}` : (isCrash ? "OUT OF CONTROL!" : "CONTROL MAINTAINED")} (${featColor.toUpperCase()})
