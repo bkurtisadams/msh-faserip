@@ -62,9 +62,21 @@
         <input type="text" name="system.age" value="{{system.age}}" />
       </div>
 
-      <div class="origin-container">
+      <!-- <div class="origin-container">
         <label>Origin</label>
         <input type="text" name="system.origin" value="{{system.origin}}" />
+      </div> -->
+
+      <div class="origin-container">
+        <label>Origin</label>
+        <input type="text" name="system.origin" value="{{system.origin}}" list="origin-options" />
+        <datalist id="origin-options">
+          <option value="Altered Human">
+          <option value="Mutant">
+          <option value="Hi-Tech">
+          <option value="Robot">
+          <option value="Alien">
+        </datalist>
       </div>
 
       <div class="biography-container">
