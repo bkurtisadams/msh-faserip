@@ -631,15 +631,13 @@ export class FaseripActorSheet extends ActorSheet {
     });
 
     // <-- NEW BUTTON START -->
-    // Reset Daily Karma button (GM-only)
-    if (game.user.isGM) {
-      html.find('.reset-daily-karma-button').click(async ev => {
-        const karmaSheetModule = await import('./karma.js');
-        const sheet = new karmaSheetModule.KarmaSheet(this.actor);
-        await sheet._onResetDailyKarma(ev);
-        this.render(false); // Re-render actor sheet after reset
-      });
-    }
+    // Reset Daily Karma button (available to all users)
+    html.find('.reset-daily-karma-button').click(async ev => {
+      const karmaSheetModule = await import('./karma.js');
+      const sheet = new karmaSheetModule.KarmaSheet(this.actor);
+      await sheet._onResetDailyKarma(ev);
+      this.render(false); // Re-render actor sheet after reset
+    });
     // <-- NEW BUTTON END -->
 
     // Add Power button - more direct approach

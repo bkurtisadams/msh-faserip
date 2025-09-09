@@ -179,8 +179,10 @@ export class KarmaSheet extends DocumentSheet {
     // Clear All Karma button (GM only)
     if (game.user.isGM) {
         html.find('.clear-karma').click(ev => this._onClearKarma(ev));
-        html.find('.reset-daily-karma').click(ev => this._onResetDailyKarma(ev)); // <-- NEW LINE
     }
+
+    // Reset Daily Karma button (available to all users)
+    html.find('.reset-daily-karma').click(ev => this._onResetDailyKarma(ev));
 
     // In the activateListeners method of KarmaSheet class, add:
     /* html.find('.open-advancement').click(ev => {
@@ -205,10 +207,6 @@ export class KarmaSheet extends DocumentSheet {
   // <-- NEW METHOD START -->
   async _onResetDailyKarma(event) {
     event.preventDefault();
-    if (!game.user.isGM) {
-      ui.notifications.warn("Only GMs can reset daily karma.");
-      return;
-    }
 
     const confirmed = await Dialog.confirm({
       title: "Reset Daily Karma",
