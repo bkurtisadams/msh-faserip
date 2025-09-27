@@ -1434,66 +1434,66 @@ export class FaseripRolls {
       const talentSpecialty = talent.system.specialty || "";
 
       // Assign appropriate action types based on talent type
+      // Define all action options from the Universal Table
+      actionOptions = [
+        { value: "Blunt Attack (BA)", label: "Blunt Attack (BA)" },
+        { value: "Edged Attack (EA)", label: "Edged Attack (EA)" },
+        { value: "Shooting Attack (Sh)", label: "Shooting Attack (Sh)" },
+        { value: "Throwing Edged (TE)", label: "Throwing Edged (TE)" },
+        { value: "Throwing Blunt (TB)", label: "Throwing Blunt (TB)" },
+        { value: "Energy (En)", label: "Energy (En)" },
+        { value: "Force (Fo)", label: "Force (Fo)" },
+        { value: "Grappling (GP)", label: "Grappling (GP)" },
+        { value: "Grabbing (Gb)", label: "Grabbing (Gb)" },
+        { value: "Escaping (ES)", label: "Escaping (ES)" },
+        { value: "Charging (Ch)", label: "Charging (Ch)" },
+        { value: "Dodging (Do)", label: "Dodging (Do)" },
+        { value: "Evading (Ev)", label: "Evading (Ev)" },
+        { value: "Blocking (Bl)", label: "Blocking (Bl)" },
+        { value: "Catching (Ca)", label: "Catching (Ca)" },
+        { value: "Stun Check (St)", label: "Stun Check (St)" },
+        { value: "Slam Check (Sl)", label: "Slam Check (Sl)" },
+        { value: "Kill Check (Ki)", label: "Kill Check (Ki)" },
+        { value: "Knowledge Check", label: "Knowledge Check" },
+        { value: "Practical Application", label: "Practical Application" },
+        { value: "Analysis", label: "Analysis" },
+        { value: "Research", label: "Research" },
+        { value: "Technical Application", label: "Technical Application" },
+        { value: "Mental Power", label: "Mental Power" },
+        { value: "Mystical Knowledge", label: "Mystical Knowledge" },
+        { value: "Skill Use", label: "Skill Use" }
+      ];
+
+      // Suggest a default based on talent type
+      let suggestedDefault = "";
       if (talentType === "Weapon Skill") {
-        // Weapon skill actions
         if (talentSpecialty === "Blunt Weapons") {
-          actionOptions = [
-            { value: "Blunt Attack (BA)", label: "Blunt Attack (BA)" }
-          ];
+          suggestedDefault = "Blunt Attack (BA)";
         } else if (talentSpecialty === "Sharp Weapons" || talentSpecialty === "Edged Weapons") {
-          actionOptions = [
-            { value: "Edged Attack (EA)", label: "Edged Attack (EA)" }
-          ];
+          suggestedDefault = "Edged Attack (EA)";
         } else if (talentSpecialty === "Thrown Weapons" || talentSpecialty === "Bows") {
-          actionOptions = [
-            { value: "Shooting Attack (Sh)", label: "Shooting Attack (Sh)" }
-          ];
+          suggestedDefault = "Shooting Attack (Sh)";
         } else {
-          // Generic weapon options
-          actionOptions = [
-            { value: "Blunt Attack (BA)", label: "Blunt Attack (BA)" },
-            { value: "Edged Attack (EA)", label: "Edged Attack (EA)" },
-            { value: "Shooting Attack (Sh)", label: "Shooting Attack (Sh)" }
-          ];
+          suggestedDefault = "Blunt Attack (BA)";
         }
       } else if (talentType === "Fighting Skill") {
-        // Fighting skill actions
-        actionOptions = [
-          { value: "Grappling (GP)", label: "Grappling (GP)" },
-          { value: "Grabbing (Gb)", label: "Grabbing (Gb)" },
-          { value: "Escaping (ES)", label: "Escaping (ES)" },
-          { value: "Blunt Attack (BA)", label: "Blunt Attack (BA)" }
-        ];
+        suggestedDefault = "Grappling (GP)";
       } else if (talentType === "Professional Skill") {
-        // Professional skill actions
-        actionOptions = [
-          { value: "Knowledge Check", label: "Knowledge Check" },
-          { value: "Practical Application", label: "Practical Application" }
-        ];
+        suggestedDefault = "Knowledge Check";
       } else if (talentType === "Scientific Skill") {
-        // Scientific skill actions
-        actionOptions = [
-          { value: "Analysis", label: "Analysis" },
-          { value: "Research", label: "Research" },
-          { value: "Technical Application", label: "Technical Application" }
-        ];
+        suggestedDefault = "Analysis";
       } else if (talentType === "Mystic/Mental Skill") {
-        // Mystic/Mental skill actions
-        actionOptions = [
-          { value: "Mental Power", label: "Mental Power" },
-          { value: "Mystical Knowledge", label: "Mystical Knowledge" }
-        ];
+        suggestedDefault = "Mental Power";
       } else {
-        // Default/generic options
-        actionOptions = [
-          { value: "Skill Use", label: "Skill Use" },
-          { value: "Knowledge Check", label: "Knowledge Check" }
-        ];
+        suggestedDefault = "Skill Use";
       }
+
+      // Use saved action type or suggested default
+      const defaultActionType = savedActionType || suggestedDefault;
 
       // Create action type options HTML
       const actionOptionsHTML = actionOptions.map(option =>
-        `<option value="${option.value}" ${option.value === savedActionType ? 'selected' : ''}>${option.label}</option>`
+        `<option value="${option.value}" ${option.value === defaultActionType ? 'selected' : ''}>${option.label}</option>`
       ).join('');
 
       // Get ability information for display
