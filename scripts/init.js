@@ -372,6 +372,14 @@ Hooks.once("init", async () => {
     return rankMap[rank] || rank;
   });
 
+  Handlebars.registerHelper('some', function(array, property) {
+    if (!Array.isArray(array)) return false;
+    return array.some(item => {
+      const value = property.split('.').reduce((obj, key) => obj?.[key], item);
+      return Array.isArray(value) ? value.length > 0 : value;
+    });
+  });
+
   // Register document classes
   CONFIG.Actor.documentClass = FaseripActor;
   CONFIG.Item.documentClass = FaseripItem;
@@ -396,7 +404,6 @@ Hooks.once("init", async () => {
   // end of hooks.once
 });
 
-// Add this hook to your init.js (add it to the existing hooks, not in the ready hook)
 Hooks.on("preCreateActor", (document, data, options, userId) => {
   console.log("FASERIP: preCreateActor - Type:", document.type);
   console.log("FASERIP: preCreateActor - Data before fix:", data.prototypeToken);

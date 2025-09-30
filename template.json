@@ -70,13 +70,15 @@
       "templates": ["base", "abilities", "derived", "movement", "progress"],
       "powerOrigin": "altered human",
       "isMutant": false,
-      "resistances": []
+      "resistances": [],
+      "stunts": []
     },
     "villain": {
       "templates": ["base", "abilities", "derived", "movement", "progress"],
       "powerOrigin": "altered human",
       "isMutant": false,
-      "resistances": []
+      "resistances": [],
+      "stunts": []
     },
     "npc": {
       "templates": ["base", "abilities", "derived", "movement", "progress"],
