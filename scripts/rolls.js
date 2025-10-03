@@ -4307,6 +4307,43 @@ async function processUniversalActionTarget(actor, target, actionCode, resultCol
   }
 }
 
+// Rank order used by the Universal Table (low → high).
+const RANKS = [
+  "Feeble","Poor","Typical","Good","Excellent","Remarkable",
+  "Incredible","Amazing","Monstrous","Unearthly","Shift-X","Shift-Y","Shift-Z","Class 1000","Class 3000","Class 5000"
+];
+
+function rankIndex(rankName) {
+  const i = RANKS.findIndex(r => r.toLowerCase() === String(rankName).toLowerCase());
+  return i >= 0 ? i : 0;
+}
+
+/** Highest Fighting rank among selected targets (intensity) */
+function maxDefenderFightingRankName(targets=[]) {
+  let bestIdx = -1, bestName = "Feeble";
+  for (const t of targets) {
+    const a = t?.actor ?? t;
+    const rn = a?.system?.abilities?.fighting?.rank ?? a?.system?.fighting?.rank ?? "Feeble";
+    const idx = rankIndex(rn);
+    if (idx > bestIdx) { bestIdx = idx; bestName = rn; }
+  }
+  return bestName;
+}
+
+/** Color needed for N attacks (core A/MSH: 2=Yellow, 3=Red) */
+function requiredColorForAttackCount(n) {
+  if (n >= 3) return "red";
+  if (n === 2) return "yellow";
+  return "green"; // 1 attack doesn't need the multi-attack FEAT
+}
+
+/** Does rolled color meet the requirement? red > yellow > green */
+function colorMeetsRequirement(rolled, needed) {
+  const order = { white:0, green:1, yellow:2, red:3, auto:4 };
+  return (order[rolled] ?? 0) >= (order[needed] ?? 0);
+}
+
+
 /**
  * Process multiple attacks with Fighting FEAT and CS penalties
  * @param {Actor} actor - The attacking actor
@@ -4323,93 +4360,154 @@ async function processUniversalActionTarget(actor, target, actionCode, resultCol
  * @returns {Array} - Array of attack results
  */
 async function processMultipleAttackSequence(actor, power, options) {
-  const { attackCount, actionType } = options;
-  
-  console.log(`Starting multiple attack sequence: ${attackCount} attacks with ${power.name}`);
-  
-  // First, roll the Fighting FEAT
-  const featResult = await game.msh.CombatHandler.rollMultipleAttackFeat(actor, attackCount);
-  
-  if (featResult.cancelled) {
-    ui.notifications.info("Multiple attack cancelled");
-    return [];
+  const { actionType } = options;
+  let attackCount = Math.max(1, Number(options.attackCount ?? 1));
+  if (attackCount > 3) attackCount = 3; // cap (adjust if you allow more)
+
+  // Only Slugfest (Blunt/Edged) and Shooting qualify per rules
+  const at = String(actionType || "").toLowerCase();
+  const isSlugfest = at.includes("blunt") || at.includes("edged") || at.includes("(ba)") || at.includes("(ea)");
+  const isShooting = at.includes("shoot") || at.includes("(sh)");
+  if (!isSlugfest && !isShooting && attackCount > 1) {
+    ui.notifications.warn("Multiple attacks apply only to Slugfest and Shooting. Performing a single attack.");
+    return [await FaseripRolls.rollPower(actor, power, { useDirectRoll: true, ...options, multiAttacks: false, attackCount: 1 })];
   }
-  
-  if (!featResult.success) {
-    // Failed FEAT: Single attack at -3CS
-    console.log("Fighting FEAT failed - single attack with -3CS penalty");
-    
+
+  // If only one attack, just roll normally
+  if (attackCount === 1) {
+    return [await FaseripRolls.rollPower(actor, power, { useDirectRoll: true, ...options, multiAttacks: false, attackCount: 1 })];
+  }
+
+  // ===== Rank + effective Fighting helpers =====
+  const RANKS = [
+    "Feeble","Poor","Typical","Good","Excellent","Remarkable",
+    "Incredible","Amazing","Monstrous","Unearthly","Shift-X","Shift-Y","Shift-Z","Class 1000","Class 3000","Class 5000"
+  ];
+  const rIdx = (n) => {
+    const i = RANKS.findIndex(r => r.toLowerCase() === String(n).toLowerCase());
+    return i >= 0 ? i : 0;
+  };
+
+  // Resolve the true actor (Actor or Token)
+  const actorDoc = actor?.actor ?? actor;
+
+  // Base Fighting from actor
+  const baseFightingName = (a) =>
+    a?.system?.abilities?.fighting?.rank ??
+    a?.system?.fighting?.rank ??
+    "Feeble";
+
+  // If the *power being used* is Ultimate Skill (Martial Arts) and this is Slugfest,
+  // use the power's rank for the FEAT (fallback to base if missing).
+  const usingUltimateSkill = /ultimate\s*skill/i.test(power?.name || "");
+
+  let attackerFight = baseFightingName(actorDoc);
+  if (usingUltimateSkill && isSlugfest) {
+    // Prefer the power's configured rank if present
+    attackerFight = power?.system?.rank ?? attackerFight;
+  }
+
+  // Intensity required by the rule
+  const intensityForAttacks = (n) => (n >= 3 ? "Amazing" : "Remarkable");
+
+  // Color needed vs intensity delta (standard Intensity FEAT logic)
+  // delta = attackerFightingIdx - intensityIdx
+  // >= +3 → AUTO (no roll)
+  // >=  0 → need GREEN
+  //   -1  → need YELLOW
+  // <= -2 → need RED
+  const neededColorForDelta = (delta) => {
+    if (delta >= 3) return "auto";
+    if (delta >= 0) return "green";
+    if (delta === -1) return "yellow";
+    return "red";
+  };
+  const colorOK = (rolled, needed) => {
+    const order = { white:0, green:1, yellow:2, red:3, auto:4 };
+    return (order[String(rolled).toLowerCase()] ?? 0) >= (order[needed] ?? 0);
+  };
+
+  // Determine attacker Fighting vs required intensity
+  const attackerIdx   = rIdx(attackerFight);
+  const intensityName = intensityForAttacks(attackCount);
+  const intensityIdx  = rIdx(intensityName);
+  const delta         = attackerIdx - intensityIdx;
+  const neededColor   = neededColorForDelta(delta);
+
+  console.log(`Starting multiple attack sequence: ${attackCount} attacks with ${power?.name ?? "Power"}`);
+  console.log(`Multi-attack FEAT: attacker Fighting ${attackerFight} (idx ${attackerIdx}) vs ${intensityName} (idx ${intensityIdx}) → delta ${delta} → need ${neededColor.toUpperCase()}`);
+
+  let featColor = "white";
+  let featSucceeded = false;
+
+  if (neededColor === "auto") {
+    // 3+ ranks higher → automatic success, no roll
+    featColor = "auto";
+    featSucceeded = true;
+    console.log("Multiple attack FEAT auto-succeeds (3+ ranks above intensity).");
+  } else {
+    // Roll your existing Fighting FEAT function; treat color result against neededColor
+    const featResult = await game.msh.CombatHandler.rollMultipleAttackFeat(actorDoc, attackCount, { intensity: intensityName });
+    if (featResult?.cancelled) {
+      ui.notifications.info("Multiple attack cancelled");
+      return [];
+    }
+    featColor = String(featResult?.color ?? (featResult?.success ? "green" : "white")).toLowerCase();
+    featSucceeded = colorOK(featColor, neededColor);
+  }
+
+  if (!featSucceeded) {
+    // Failure → one attack at −3CS
+    console.log("Multiple attack FEAT failed — performing a single attack at −3CS.");
     await ChatMessage.create({
       speaker: ChatMessage.getSpeaker({ actor }),
       content: `
-        <div style="background-color: #ffebee; border: 1px solid #f44336; border-radius: 3px; padding: 8px; margin: 5px 0;">
-          <div style="color: #d32f2f; font-weight: bold; margin-bottom: 5px;">Multiple Attack Failed</div>
-          <div style="font-size: 0.9em;">
-            <div>${actor.name} failed the Fighting FEAT for ${attackCount} attacks.</div>
-            <div>Result: Single attack only, at -3CS penalty.</div>
+        <div style="background:#ffebee;border:1px solid #f44336;border-radius:3px;padding:8px;margin:5px 0;">
+          <div style="color:#d32f2f;font-weight:bold;margin-bottom:5px;">Multiple Attack Failed</div>
+          <div style="font-size:.9em;">
+            <div>${actor.name} attempted ${attackCount} attacks (Intensity: ${intensityName}).</div>
+            <div>Result: Single attack only, at −3CS.</div>
           </div>
-        </div>
-      `
+        </div>`
     });
-    
-    // Apply -3CS penalty and make single attack
+
     const modifiedOptions = {
       ...options,
-      columnShift: options.columnShift - 3,
+      columnShift: (options.columnShift ?? 0) - 3,
       multiAttacks: false,
       attackCount: 1
     };
-    
-    return [await FaseripRolls.rollPower(actor, power, {
-      useDirectRoll: true,
-      ...modifiedOptions
-    })];
+    return [await FaseripRolls.rollPower(actor, power, { useDirectRoll: true, ...modifiedOptions })];
   }
-  
-  // Success: Multiple attacks at -1CS each
-  console.log(`Fighting FEAT succeeded - proceeding with ${attackCount} attacks at -1CS each`);
-  
+
+  // Success → perform N attacks at −1CS each
+  console.log(`Multiple attack FEAT ${featColor.toUpperCase()} — proceeding with ${attackCount} attacks at −1CS each.`);
   const results = [];
-  const targets = Array.from(game.user.targets);
-  
   for (let i = 1; i <= attackCount; i++) {
     console.log(`Making attack ${i} of ${attackCount}`);
-    
-    // Each attack gets -1CS penalty
     const attackOptions = {
       ...options,
-      columnShift: options.columnShift - 1,
-      multiAttacks: false, // Prevent recursion
+      columnShift: (options.columnShift ?? 0) - 1,
+      multiAttacks: false, // prevent recursion
       attackCount: 1
     };
-    
-    const attackResult = await FaseripRolls.rollPower(actor, power, {
-      useDirectRoll: true,
-      ...attackOptions
-    });
-    
+    const attackResult = await FaseripRolls.rollPower(actor, power, { useDirectRoll: true, ...attackOptions });
     results.push(attackResult);
-    
-    // Small delay between attacks for better visual flow
-    if (i < attackCount) {
-      await new Promise(resolve => setTimeout(resolve, 800));
-    }
+    if (i < attackCount) await new Promise(r => setTimeout(r, 800));
   }
-  
-  // Create summary message
+
   await ChatMessage.create({
     speaker: ChatMessage.getSpeaker({ actor }),
     content: `
-      <div style="background-color: #e8f5e8; border: 1px solid #4caf50; border-radius: 3px; padding: 8px; margin: 5px 0;">
-        <div style="color: #2e7d32; font-weight: bold; margin-bottom: 5px;">Multiple Attack Sequence Complete</div>
-        <div style="font-size: 0.9em;">
-          <div>${actor.name} completed ${attackCount} attacks with ${power.name}.</div>
-          <div>Each attack was made at -1CS due to multiple attack rules.</div>
+      <div style="background:#e8f5e8;border:1px solid #4caf50;border-radius:3px;padding:8px;margin:5px 0;">
+        <div style="color:#2e7d32;font-weight:bold;margin-bottom:5px;">Multiple Attack Sequence Complete</div>
+        <div style="font-size:.9em;">
+          <div>${actor.name} completed ${attackCount} attacks with ${power?.name ?? "Power"}.</div>
+          <div>Each attack suffered −1CS.</div>
         </div>
-      </div>
-    `
+      </div>`
   });
-  
+
   return results;
 }
 

@@ -435,56 +435,41 @@ Hooks.on("preCreateActor", (document, data, options, userId) => {
 
 // CONSOLIDATED READY HOOK - All ready logic in one place
 Hooks.once("ready", () => {
-  // SocketLib registration
-  if (game.modules.get("socketlib")?.active && !game.msh.runAsGM) {
-    console.log("🔄 Attempting to register SocketLib in ready hook");
-    GMUtils.registerSocket();
-    game.msh.runAsGM = GMUtils.runAsGM;
-  }
-  
+  // SocketLib + GM handlers (idempotent; gm-utils handles internal checks)
+  console.log("🔄 Registering SocketLib and GM handlers (ready hook)...");
+  GMUtils.registerSocket(); // exposes game.msh.socket and game.msh.runAsGM
+
   // Initialize slam collision handlers
-  initializeSlamHandlers();
+  initializeSlamHandlers?.();
   console.log("MSH FASERIP | Slam collision handlers initialized");
 
   // Fix prototype token overrides to allow manual disposition changes
-  const currentOverrides = game.settings.get("core", "prototypeTokenOverrides");
-  
+  const currentOverrides = game.settings.get("core", "prototypeTokenOverrides") ?? {};
+
   // Check if disposition overrides exist and remove them
-  if (currentOverrides.hero?.disposition !== undefined || 
-      currentOverrides.villain?.disposition !== undefined || 
+  if (currentOverrides.hero?.disposition !== undefined ||
+      currentOverrides.villain?.disposition !== undefined ||
       currentOverrides.npc?.disposition !== undefined) {
-    
+
     console.log("FASERIP: Removing automatic disposition overrides to allow manual control");
-    
+
     const fixedOverrides = {
-      base: currentOverrides.base,
-      hero: { ...currentOverrides.hero },
-      villain: { ...currentOverrides.villain }, 
-      npc: { ...currentOverrides.npc }
+      base: currentOverrides.base ?? {},
+      hero: { ...(currentOverrides.hero ?? {}) },
+      villain: { ...(currentOverrides.villain ?? {}) },
+      npc: { ...(currentOverrides.npc ?? {}) }
     };
-    
-    // Remove disposition from the overrides
+
     delete fixedOverrides.hero.disposition;
     delete fixedOverrides.villain.disposition;
     delete fixedOverrides.npc.disposition;
-    
-    // Apply the fixed overrides
+
     game.settings.set("core", "prototypeTokenOverrides", fixedOverrides);
   }
 
-  /* document.addEventListener("keydown", async (event) => {
-    // Example: Ctrl + U (can change this to any key combo)
-    if (event.ctrlKey && event.key === "u") {
-      const sheet = Object.values(ui.windows).find(w => w instanceof game.msh.FaseripActorSheet);
-      if (sheet && sheet.actor) {
-        game.msh.openUniversalTableDialog?.(sheet.actor);
-      } else {
-        ui.notifications.warn("No open character sheet found for Universal Table.");
-      }
-    }
-  }); */
-
+  /* Optional hotkey block remains commented-out */
 });
+;
 
 // Add the hotbarDrop hook at module level (like in the older file)
 Hooks.on('hotbarDrop', (bar, data, slot) => {

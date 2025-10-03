@@ -328,13 +328,30 @@ export class CombatHandler {
     console.log("Net damage applied:", netDamage);
     console.log("New health to set:", newHealth);
 
-    await game.msh.runAsGM({
-        operation: 'adjustTargetHealth',
+    const update = { "system.attributes.health.value": newHealth };
+
+    try {
+    if (isUnlinkedToken && (game.user.isGM || targetActor.isOwner)) {
+        // Update the token’s own data if it’s an unlinked token
+        await target.document.update(update);
+    } else if (game.user.isGM || targetActor.isOwner) {
+        // Update the actor directly
+        await targetActor.update(update);
+    } else if (game.msh?.socket?.executeAsGM) {
+        // If you’ve got a socketlib GM helper wired up
+        await game.msh.socket.executeAsGM("adjustTargetHealth", {
         targetActorUuid: targetActor.uuid,
-        newHealth: newHealth
-    });
+        newHealth
+        });
+    } else {
+        ui.notifications.warn("Couldn’t update Health: no GM helper available.");
+    }
+    } catch (err) {
+    console.error("Health update failed:", err);
+    }
 
     console.log("After health update:", targetActor.system.attributes.health.value);
+
 
     // 5. Create chat message
     let defenseSummary = defenseDetails.length > 0 ? defenseDetails.join("; ") : "No defenses applied";
@@ -1188,12 +1205,13 @@ export class CombatHandler {
         // Add event listener for the "Apply Strength Damage" button (only for full holds)
         if (message && resultColor === "red") {
             // Use Hooks.once to ensure this only runs once after the message is rendered
-            Hooks.once("renderChatMessage", (app, html, data) => {
-                if (app.id === message.id) {
-                    // Use jQuery for more reliable event handling
-                    html.find('.apply-wrestling-damage').on('click', async function() {
-                    const clickAttackerId = this.dataset.attacker;
-                    const clickTargetId = this.dataset.target;
+            Hooks.once("renderChatMessageHTML", (messageDoc, htmlEl, data) => {
+                if (messageDoc.id !== message.id) return;
+                const btn = htmlEl.querySelector('.apply-wrestling-damage');
+                if (btn) {
+                    btn.addEventListener('click', async (ev) => {
+                    const clickAttackerId = btn.dataset.attacker;
+                    const clickTargetId = btn.dataset.target;
                     
                     // Store button reference safely
                     const $button = $(this);
@@ -2162,142 +2180,159 @@ export class CombatHandler {
                             // SLAM RESULTS
                             // =========================
                             else if (featType === "Slam") {
-                                if (featResultText === "Gr. Slam") {
-                                    // Get attacker's strength rank for distance calculation
-                                    let attackerStrengthRank = "Remarkable"; // Default fallback
-                                    let attackerStrengthValue = 30; // Remarkable default
-                                    
-                                    if (attacker) {
-                                        attackerStrengthRank = attacker.system.abilities.strength.rank || "Remarkable";
-                                        attackerStrengthValue = attacker.system.abilities.strength.value || 30;
+                            const actorDoc = target?.actor ?? target; // token.actor or plain actor
+
+                            if (featResultText === "Gr. Slam") {
+                                // Get attacker's strength rank for distance calculation
+                                let attackerStrengthRank = "Remarkable"; // Default fallback
+                                let attackerStrengthValue = 30;          // Remarkable default
+                                if (attacker) {
+                                attackerStrengthRank = attacker.system?.abilities?.strength?.rank ?? "Remarkable";
+                                attackerStrengthValue = attacker.system?.abilities?.strength?.value ?? 30;
+                                }
+
+                                // Calculate actual slam distance based on attacker's strength
+                                const slamDistance = getGrandSlamDistance(attackerStrengthRank);
+
+                                ui.notifications.warn(`${target.name} suffers a Grand Slam - knocked away ${slamDistance} areas!`);
+
+                                // Build the Active Effect data once (v13+: must include "name")
+                                const effectData = {
+                                name: `Grand Slam (Knockback ${slamDistance} areas)`,
+                                label: `Grand Slam (Knockback ${slamDistance} areas)`,
+                                icon: "systems/msh-faserip/assets/icons/slam.svg",
+                                origin: attacker?.uuid ?? null,
+                                disabled: false,
+                                flags: {
+                                    "msh-faserip": {
+                                    effectType: "grandSlam",
+                                    attackerName: attacker?.name || "",
+                                    attackerStrength: attackerStrengthRank,
+                                    slamSpeed: slamDistance
                                     }
-                                    
-                                    // Calculate actual slam distance based on attacker's strength
-                                    const slamDistance = getGrandSlamDistance(attackerStrengthRank);
-                                    
-                                    ui.notifications.warn(`${target.name} suffers a Grand Slam - knocked away ${slamDistance} areas!`);
-                                    
-                                    // Apply Grand Slam effect with proper distance
-                                    await game.msh.runAsGM({
-                                        operation: "createEmbeddedDocuments",
-                                        targetActorUuid: target.uuid,
-                                        args: ["ActiveEffect", [{
-                                            name: "Grand Slam",
-                                            icon: "icons/svg/explosion.svg",
-                                            flags: {
-                                                "msh-faserip": {
-                                                    grandSlam: true,
-                                                    distance: slamDistance,
-                                                    attackerStrength: attackerStrengthRank,
-                                                    slamSpeed: slamDistance // Speed equals distance for Grand Slam
-                                                }
-                                            },
-                                            changes: [
-                                                {
-                                                    key: "system.status.prone",
-                                                    mode: CONST.ACTIVE_EFFECT_MODES.OVERRIDE,
-                                                    value: true
-                                                }
-                                            ],
-                                            duration: {
-                                                rounds: 2,
-                                                startTime: game.time.worldTime,
-                                                startRound: game.combat?.round || 0
-                                            },
-                                            statuses: ["prone"]
-                                        }]]
-                                    });
-                                    
-                                    // Create the Grand Slam chat message
-                                    await ChatMessage.create({
-                                        content: `
-                                        <div style="background-color: #8B0000; color: white; padding: 10px; border-radius: 5px; margin: 5px 0;">
-                                            <div style="font-size: 1.2em; font-weight: bold; text-align: center; margin-bottom: 8px;">
-                                                💥 GRAND SLAM! 💥
-                                            </div>
-                                            <div style="padding: 5px; font-size: 0.9em;">
-                                                <div><strong>${target.name}</strong> is launched away with tremendous force!</div>
-                                                <div style="margin: 5px 0;"><strong>Mechanical Effects:</strong></div>
-                                                <div>• Attacker Strength: ${attackerStrengthRank} (${attackerStrengthValue})</div>
-                                                <div>• Knockback Distance: ${slamDistance} areas</div>
-                                                <div>• Launch Speed: ${slamDistance} areas/round</div>
-                                                <div>• Direction: ${attacker ? attacker.name + ' chooses' : 'GM chooses'} (if damage dealt)</div>
-                                                <div style="margin-top: 8px;"><strong>Collision Damage:</strong></div>
-                                                <div>• If target hits obstacle: charging damage applies</div>
-                                                <div>• Buildings reduce knockback per movement rules</div>
-                                                <div>• Target takes slam damage if hitting walls/objects</div>
-                                            </div>
-                                            <div style="margin-top: 10px; text-align: center;">
-                                                <button class="calculate-slam-collision" 
-                                                        data-target="${target.uuid}" 
-                                                        data-distance="${slamDistance}" 
-                                                        data-speed="${slamDistance}"
-                                                        data-attacker-strength="${attackerStrengthValue}"
-                                                        style="background: #dc3545; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer;">
-                                                    Calculate Collision Damage
-                                                </button>
-                                            </div>
-                                        </div>
-                                        `,
-                                        speaker: ChatMessage.getSpeaker({ alias: "Slam Effect" })
-                                    });
-                                    
-                                    effectApplied = true;
-                                    
-                                } else if (featResultText === "1 area") {
-                                    ui.notifications.info(`${target.name} is slammed back 1 area!`);
-                                    
-                                    // Apply 1 Area Slam effect
-                                    await game.msh.runAsGM({
-                                        operation: "createEmbeddedDocuments",
-                                        targetActorUuid: target.uuid,
-                                        args: ["ActiveEffect", [{
-                                        name: "Slammed (1 Area)",
-                                        icon: "icons/svg/falling.svg", 
-                                        flags: {
-                                            "msh-faserip": {
-                                                slammed: true,
-                                                distance: 1
-                                            }
-                                        },
-                                        changes: [
-                                            {
-                                                key: "system.status.prone", 
-                                                mode: CONST.ACTIVE_EFFECT_MODES.OVERRIDE,
-                                                value: true
-                                            }
-                                        ],
-                                        duration: {
-                                            rounds: 1,
-                                            startTime: game.time.worldTime,
-                                            startRound: game.combat?.round || 0
-                                        },
-                                        statuses: ["prone"]
-                                    }]]
-});
-                                    
-                                    await ChatMessage.create({
-                                        content: `
-                                        <div style="background-color: #DC3545; color: white; padding: 10px; border-radius: 5px; margin: 5px 0;">
-                                            <div style="font-size: 1.2em; font-weight: bold; text-align: center; margin-bottom: 8px;">
-                                                💢 SLAMMED - 1 AREA 💢
-                                            </div>
-                                            <div style="padding: 5px; font-size: 0.9em;">
-                                                <div><strong>${target.name}</strong> is knocked back 1 area!</div>
-                                                <div style="margin: 5px 0;"><strong>Mechanical Effects:</strong></div>
-                                                <div>• Knocked 1 area away from attacker</div>
-                                                <div>• May hit obstacles during knockback</div>
-                                                <div>• Takes damage if slammed into walls/objects</div>
-                                                <div>• Attacker chooses direction (if damage dealt)</div>
-                                                <div>• Target chooses direction (if no damage dealt)</div>
-                                            </div>
-                                        </div>
-                                        `,
-                                        speaker: ChatMessage.getSpeaker({ alias: "Slam Effect" })
-                                    });
-                                    effectApplied = true;
-                                    
-                                } else if (featResultText === "Stagger") {
+                                },
+                                changes: [
+                                    { key: "system.status.prone", mode: CONST.ACTIVE_EFFECT_MODES.OVERRIDE, value: true }
+                                ],
+                                duration: {
+                                    rounds: 2,
+                                    startTime: game.time.worldTime,
+                                    startRound: game.combat?.round ?? 0
+                                },
+                                statuses: ["prone"]
+                                };
+
+                                // Prefer creating the effect directly if you can (GM or owner)
+                                if (game.user.isGM || actorDoc?.isOwner) {
+                                await actorDoc.createEmbeddedDocuments("ActiveEffect", [effectData]);
+                                } else if (game.msh?.socket?.executeAsGM) {
+                                await game.msh.socket.executeAsGM("createActorEffect", {
+                                    targetActorUuid: actorDoc.uuid,
+                                    effectData
+                                });
+                                } else if (typeof game.msh?.runAsGM === "function") {
+                                // Legacy fallback (kept for compatibility)
+                                await game.msh.runAsGM({
+                                    operation: "createActorEffect",
+                                    targetActorUuid: actorDoc.uuid,
+                                    effectData
+                                });
+                                } else {
+                                ui.notifications.warn("Couldn’t apply Grand Slam effect (no GM helper available). Ask the GM to enable SocketLib.");
+                                }
+
+                                // Grand Slam chat message
+                                await ChatMessage.create({
+                                content: `
+                                <div style="background-color:#8B0000;color:white;padding:10px;border-radius:5px;margin:5px 0;">
+                                    <div style="font-size:1.2em;font-weight:bold;text-align:center;margin-bottom:8px;">💥 GRAND SLAM! 💥</div>
+                                    <div style="padding:5px;font-size:0.9em;">
+                                    <div><strong>${target.name}</strong> is launched away with tremendous force!</div>
+                                    <div style="margin:5px 0;"><strong>Mechanical Effects:</strong></div>
+                                    <div>• Attacker Strength: ${attackerStrengthRank} (${attackerStrengthValue})</div>
+                                    <div>• Knockback Distance: ${slamDistance} areas</div>
+                                    <div>• Launch Speed: ${slamDistance} areas/round</div>
+                                    <div>• Direction: ${attacker ? attacker.name + " chooses" : "GM chooses"} (if damage dealt)</div>
+                                    <div style="margin-top:8px;"><strong>Collision Damage:</strong></div>
+                                    <div>• If target hits obstacle: charging damage applies</div>
+                                    <div>• Buildings reduce knockback per movement rules</div>
+                                    <div>• Target takes slam damage if hitting walls/objects</div>
+                                    </div>
+                                    <div style="margin-top:10px;text-align:center;">
+                                    <button class="calculate-slam-collision"
+                                            data-target="${target.uuid}"
+                                            data-distance="${slamDistance}"
+                                            data-speed="${slamDistance}"
+                                            data-attacker-strength="${attackerStrengthValue}"
+                                            style="background:#dc3545;color:white;border:none;padding:5px 10px;border-radius:3px;cursor:pointer;">
+                                        Calculate Collision Damage
+                                    </button>
+                                    </div>
+                                </div>`,
+                                speaker: ChatMessage.getSpeaker({ alias: "Slam Effect" })
+                                });
+
+                                effectApplied = true;
+
+                            } else if (featResultText === "1 area") {
+                                ui.notifications.info(`${target.name} is slammed back 1 area!`);
+
+                                // Apply 1 Area Slam effect (v13+: must include "name")
+                                const effectData = {
+                                name: "Slammed (1 Area)",
+                                label: "Slammed (1 Area)",
+                                icon: "icons/svg/falling.svg",
+                                origin: attacker?.uuid ?? null,
+                                disabled: false,
+                                flags: { "msh-faserip": { slammed: true, distance: 1 } },
+                                changes: [
+                                    { key: "system.status.prone", mode: CONST.ACTIVE_EFFECT_MODES.OVERRIDE, value: true }
+                                ],
+                                duration: {
+                                    rounds: 1,
+                                    startTime: game.time.worldTime,
+                                    startRound: game.combat?.round ?? 0
+                                },
+                                statuses: ["prone"]
+                                };
+
+                                if (game.user.isGM || actorDoc?.isOwner) {
+                                await actorDoc.createEmbeddedDocuments("ActiveEffect", [effectData]);
+                                } else if (game.msh?.socket?.executeAsGM) {
+                                await game.msh.socket.executeAsGM("createActorEffect", {
+                                    targetActorUuid: actorDoc.uuid,
+                                    effectData
+                                });
+                                } else if (typeof game.msh?.runAsGM === "function") {
+                                await game.msh.runAsGM({
+                                    operation: "createActorEffect",
+                                    targetActorUuid: actorDoc.uuid,
+                                    effectData
+                                });
+                                } else {
+                                ui.notifications.warn("Couldn’t apply Slam effect (no GM helper).");
+                                }
+
+                                await ChatMessage.create({
+                                content: `
+                                <div style="background-color:#DC3545;color:white;padding:10px;border-radius:5px;margin:5px 0;">
+                                    <div style="font-size:1.2em;font-weight:bold;text-align:center;margin-bottom:8px;">💢 SLAMMED - 1 AREA 💢</div>
+                                    <div style="padding:5px;font-size:0.9em;">
+                                    <div><strong>${target.name}</strong> is knocked back 1 area!</div>
+                                    <div style="margin:5px 0;"><strong>Mechanical Effects:</strong></div>
+                                    <div>• Knocked 1 area away from attacker</div>
+                                    <div>• May hit obstacles during knockback</div>
+                                    <div>• Takes damage if slammed into walls/objects</div>
+                                    <div>• Attacker chooses direction (if damage dealt)</div>
+                                    <div>• Target chooses direction (if no damage dealt)</div>
+                                    </div>
+                                </div>`,
+                                speaker: ChatMessage.getSpeaker({ alias: "Slam Effect" })
+                                });
+
+                                effectApplied = true;
+
+                            } else if (featResultText === "Stagger") {
                                     ui.notifications.info(`${target.name} staggers but remains in place!`);
                                     
                                     // Apply Stagger effect
@@ -2421,74 +2456,84 @@ export class CombatHandler {
      * @param {Object} target - The actor to apply the effect to
      * @param {number} duration - Duration in rounds
      */
-    static async applyStunnedEffect(target, duration) {
-        // Remove any existing stun effects
-        const existingStunEffects = target.effects.filter(e => e.flags["msh-faserip"]?.stunned);
-        if (existingStunEffects.length > 0) {
-            await game.msh.runAsGM({
-                operation: "deleteEmbeddedDocuments",
-                targetActorUuid: target.uuid,
-                args: ["ActiveEffect", existingStunEffects.map(e => e.id)]
-                });
-        }
+    // Example signature: async applyStunnedEffect(target, rounds, sourceName)
+    static async applyStunnedEffect(target, rounds = 1, sourceName = "Stun") {
+        try {
+            const actorDoc = target?.actor ?? target; // works for Token or Actor
+            if (!actorDoc) {
+            ui.notifications.warn("No actor found to apply Stunned.");
+            return false;
+            }
 
-        // Create new stun effect
-        const stunEffect = {
-            name: "Stunned",
-            icon: "icons/svg/daze.svg",
-            flags: {
-                "msh-faserip": {
-                    stunned: true,
-                    duration: duration
-                }
-            },
-            changes: [
-                {
-                    key: "system.status.stunned",
-                    mode: CONST.ACTIVE_EFFECT_MODES.OVERRIDE,
-                    value: true
+            // Build the Active Effect for “Stunned”
+            const effectData = {
+                // v13+ requires "name"
+                name: `Stunned (${rounds} rnds)`,
+                // keep label too if other code reads it
+                label: `Stunned (${rounds} rnds)`,
+
+                // nice to have an icon; use any path in your system
+                icon: "systems/msh-faserip/assets/icons/stunned.svg",
+
+                origin: (typeof sourceName === "string" ? null : sourceName?.uuid) ?? null,
+                disabled: false,
+
+                statuses: ["stunned"],
+
+                changes: [
+                    { key: "system.status.stunned", mode: CONST.ACTIVE_EFFECT_MODES.OVERRIDE, value: true }
+                    // add other penalties here if you use them
+                ],
+
+                duration: {
+                    rounds,
+                    startTime: game.time.worldTime,
+                    startRound: game.combat?.round ?? 0
                 },
-                {
-                    key: "system.attributes.movement.value",
-                    mode: CONST.ACTIVE_EFFECT_MODES.OVERRIDE,
-                    value: 0
-                }
-            ],
-            duration: {
-                rounds: duration,
-                startTime: game.time.worldTime,
-                startRound: game.combat?.round || 0,
-                startTurn: game.combat?.turn || 0
-            },
-            statuses: ["stunned"]
-        };
 
-        await game.msh.runAsGM({
-            operation: "createEmbeddedDocuments",
-            targetActorUuid: target.uuid,
-            args: ["ActiveEffect", [stunEffect]]
+                flags: {
+                    "msh-faserip": {
+                    effectType: "stunned",
+                    sourceName: (typeof sourceName === "string" ? sourceName : sourceName?.name) ?? "",
+                    rounds
+                    }
+                }
+                };
+
+
+            // Prefer direct create if the user has permission
+            if (game.user.isGM || actorDoc.isOwner) {
+            await actorDoc.createEmbeddedDocuments("ActiveEffect", [effectData]);
+
+            // Otherwise, use your SocketLib GM helper if available
+            } else if (game.msh?.socket?.executeAsGM) {
+            await game.msh.socket.executeAsGM("createActorEffect", {
+                targetActorUuid: actorDoc.uuid,
+                effectData
             });
-        
-        // Enhanced chat message with clear mechanical effects
-        await ChatMessage.create({
-            content: `
-            <div style="background-color: #FFA500; color: white; padding: 10px; border-radius: 5px;">
-                <div style="font-size: 1.2em; font-weight: bold; text-align: center;">
-                    STUNNED
-                </div>
-                <div style="padding: 5px 10px; font-size: 0.9em;">
-                    <div><strong>${target.name}</strong> is stunned for ${duration} round${duration > 1 ? 's' : ''}!</div>
-                    <div style="margin-top: 5px;"><strong>Mechanical Effect:</strong></div>
-                    <div>• Cannot take any actions during stunned rounds</div>
-                    <div>• Movement reduced to 0</div>
-                    <div>• Still conscious but completely incapacitated</div>
-                    ${duration === 1 ? '<div>• May "play possum" since still conscious</div>' : ''}
-                </div>
-            </div>
-            `,
-            speaker: ChatMessage.getSpeaker({ alias: "Combat Status" })
-        });
+
+            // Legacy fallback if you still keep it around
+            } else if (typeof game.msh?.runAsGM === "function") {
+            await game.msh.runAsGM({
+                operation: "createEmbeddedDocuments",
+                targetActorUuid: actorDoc.uuid,
+                effectData
+            });
+
+            // Last resort: inform but don’t crash
+            } else {
+            ui.notifications.warn("Couldn’t apply Stunned (no GM helper available). Ask the GM to enable SocketLib.");
+            return false;
+            }
+
+            return true;
+        } catch (err) {
+            console.error("applyStunnedEffect failed:", err);
+            ui.notifications.error("Failed to apply Stunned effect. See console.");
+            return false;
+        }
     }
+
 
     /**
      * Handles actor reaching 0 Health.
@@ -2729,117 +2774,3 @@ export class CombatHandler {
         return bodyArmorValue;
     }
 }
-
-// Add event listener for collision damage calculation
-/* Hooks.on("renderChatMessage", (app, html, data) => {
-    html.find('.calculate-slam-collision').on('click', async function() {
-        const targetUuid = this.dataset.target;
-        const slamDistance = parseInt(this.dataset.distance);
-        const slamSpeed = parseInt(this.dataset.speed);
-        const attackerStrength = parseInt(this.dataset.attackerStrength);
-        
-        const targetActor = await fromUuid(targetUuid);
-        if (!targetActor) {
-            ui.notifications.error("Target actor not found!");
-            return;
-        }
-        
-        // Show dialog to get obstacle material strength
-        new Dialog({
-            title: "Slam Collision Damage",
-            content: `
-                <div style="background: #f0e8d8; padding: 10px; border-radius: 5px;">
-                    <p><strong>${targetActor.name}</strong> was slammed ${slamDistance} areas and hits an obstacle!</p>
-                    <div style="margin: 10px 0;">
-                        <label style="display: block; margin-bottom: 5px;">Obstacle Material Strength:</label>
-                        <select id="material-strength" style="width: 100%;">
-                            <option value="2">Feeble (Cardboard, Glass)</option>
-                            <option value="4">Poor (Wood, Plastic)</option>
-                            <option value="6" selected>Typical (Brick Wall)</option>
-                            <option value="10">Good (Stone Wall)</option>
-                            <option value="20">Excellent (Steel Wall)</option>
-                            <option value="30">Remarkable (Reinforced Steel)</option>
-                            <option value="40">Incredible (Super-Strong Material)</option>
-                            <option value="50">Amazing (Nearly Indestructible)</option>
-                            <option value="75">Monstrous (Extremely Durable)</option>
-                            <option value="100">Unearthly (Virtually Indestructible)</option>
-                        </select>
-                    </div>
-                    <div style="margin-top: 10px; padding: 8px; background: #f9f9f9; border-radius: 3px; font-size: 0.9em;">
-                        <strong>Slam Parameters:</strong><br>
-                        • Distance: ${slamDistance} areas<br>
-                        • Speed: ${slamSpeed} areas/round<br>
-                        • Attacker Strength: ${attackerStrength}
-                    </div>
-                </div>
-            `,
-            buttons: {
-                calculate: {
-                    icon: '<i class="fas fa-calculator"></i>',
-                    label: "Calculate Damage",
-                    callback: async (html) => {
-                        const materialStrength = parseInt(html.find('#material-strength').val());
-                        
-                        // Calculate slam damage using the new function
-                        const slamResults = calculateSlamDamage({
-                            characterEndurance: targetActor.system.abilities.endurance.value || 0,
-                            characterBodyArmor: CombatHandler.getBodyArmorValue ? 
-                                CombatHandler.getBodyArmorValue(targetActor) : 0,
-                            objectMaterialStrength: materialStrength,
-                            slamSpeed: slamSpeed,
-                            attackerStrength: attackerStrength
-                        });
-                        
-                        // Create detailed damage report
-                        await ChatMessage.create({
-                            speaker: ChatMessage.getSpeaker({ alias: "Collision Damage" }),
-                            content: `
-                                <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
-                                    <div style="padding: 5px 10px; border-bottom: 1px solid #c0c0c0; font-size: 1.1em; color: #8b0000;">
-                                        <strong>Slam Collision: ${targetActor.name} hits obstacle</strong>
-                                    </div>
-                                    <div style="padding: 5px 10px; font-size: 0.9em;">
-                                        <div><strong>Slam Speed:</strong> ${slamSpeed} areas/round</div>
-                                        <div><strong>Material Strength:</strong> ${materialStrength}</div>
-                                        <div><strong>Character Endurance:</strong> ${targetActor.system.abilities.endurance.value || 0}</div>
-                                        <div><strong>Damage Calculation:</strong> ${slamResults.description}</div>
-                                        ${slamResults.damageToCharacter > 0 ? 
-                                            `<div style="color: #cc0000;"><strong>Damage to ${targetActor.name}:</strong> ${slamResults.damageToCharacter}</div>` : 
-                                            '<div style="color: #28a745;"><strong>No damage taken</strong></div>'
-                                        }
-                                    </div>
-                                </div>
-                            `
-                        });
-                        
-                        // Apply damage if any
-                        if (slamResults.damageToCharacter > 0) {
-                            const currentHealth = targetActor.system.attributes.health.value;
-                            const newHealth = Math.max(0, currentHealth - slamResults.damageToCharacter);
-                            
-                            await game.msh.runAsGM({
-                                operation: 'adjustTargetHealth',
-                                targetActorUuid: targetActor.uuid,
-                                newHealth: newHealth
-                            });
-                            
-                            ui.notifications.info(`${targetActor.name} takes ${slamResults.damageToCharacter} collision damage!`);
-                        }
-                        
-                        // Disable the button to prevent multiple calculations
-                        $(this).prop('disabled', true).text('Damage Calculated');
-                    }
-                },
-                cancel: {
-                    icon: '<i class="fas fa-times"></i>',
-                    label: "Cancel"
-                }
-            },
-            default: "calculate"
-        }).render(true);
-    });
-}); */
-
-
-// Make it available globally for now, or import where needed
-//game.msh.CombatHandler = CombatHandler;
