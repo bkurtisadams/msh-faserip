@@ -4378,6 +4378,24 @@ async function processMultipleAttackSequence(actor, power, options) {
     return [await FaseripRolls.rollPower(actor, power, { useDirectRoll: true, ...options, multiAttacks: false, attackCount: 1 })];
   }
 
+  // ===== CAPTURE TARGETS BEFORE FEAT ROLL =====
+  const selectedTargets = Array.from(game.user.targets);
+  if (selectedTargets.length === 0) {
+    ui.notifications.warn("No targets selected for multiple attacks.");
+    return [];
+  }
+  
+  // Build target array: use selected targets, repeat first target if needed
+  const targets = [];
+  for (let i = 0; i < attackCount; i++) {
+    targets.push(selectedTargets[i] || selectedTargets[0]);
+  }
+  
+  // Notify if using same target multiple times
+  if (selectedTargets.length < attackCount) {
+    ui.notifications.info(`${attackCount} attacks planned but only ${selectedTargets.length} target(s) selected. Remaining attacks will target ${selectedTargets[0].name}.`);
+  }
+
   // ===== Rank + effective Fighting helpers =====
   const RANKS = [
     "Feeble","Poor","Typical","Good","Excellent","Remarkable",
@@ -4411,11 +4429,6 @@ async function processMultipleAttackSequence(actor, power, options) {
   const intensityForAttacks = (n) => (n >= 3 ? "Amazing" : "Remarkable");
 
   // Color needed vs intensity delta (standard Intensity FEAT logic)
-  // delta = attackerFightingIdx - intensityIdx
-  // >= +3 → AUTO (no roll)
-  // >=  0 → need GREEN
-  //   -1  → need YELLOW
-  // <= -2 → need RED
   const neededColorForDelta = (delta) => {
     if (delta >= 3) return "auto";
     if (delta >= 0) return "green";
@@ -4436,6 +4449,7 @@ async function processMultipleAttackSequence(actor, power, options) {
 
   console.log(`Starting multiple attack sequence: ${attackCount} attacks with ${power?.name ?? "Power"}`);
   console.log(`Multi-attack FEAT: attacker Fighting ${attackerFight} (idx ${attackerIdx}) vs ${intensityName} (idx ${intensityIdx}) → delta ${delta} → need ${neededColor.toUpperCase()}`);
+  console.log(`Targets: ${targets.map(t => t.name).join(", ")}`);
 
   let featColor = "white";
   let featSucceeded = false;
@@ -4462,7 +4476,7 @@ async function processMultipleAttackSequence(actor, power, options) {
   }
 
   if (!featSucceeded) {
-    // Failure → one attack at −3CS
+    // Failure → one attack at −3CS against first target
     console.log("Multiple attack FEAT failed — performing a single attack at −3CS.");
     await ChatMessage.create({
       speaker: ChatMessage.getSpeaker({ actor }),
@@ -4471,7 +4485,7 @@ async function processMultipleAttackSequence(actor, power, options) {
           <div style="color:#d32f2f;font-weight:bold;margin-bottom:5px;">Multiple Attack Failed</div>
           <div style="font-size:.9em;">
             <div>${actor.name} attempted ${attackCount} attacks (Intensity: ${intensityName}).</div>
-            <div>Result: Single attack only, at −3CS.</div>
+            <div>Result: Single attack only, at −3CS against ${targets[0].name}.</div>
           </div>
         </div>`
     });
@@ -4485,11 +4499,18 @@ async function processMultipleAttackSequence(actor, power, options) {
     return [await FaseripRolls.rollPower(actor, power, { useDirectRoll: true, ...modifiedOptions })];
   }
 
-  // Success → perform N attacks at −1CS each
+  // Success → perform N attacks at −1CS each against selected targets
   console.log(`Multiple attack FEAT ${featColor.toUpperCase()} — proceeding with ${attackCount} attacks at −1CS each.`);
   const results = [];
+  
   for (let i = 1; i <= attackCount; i++) {
-    console.log(`Making attack ${i} of ${attackCount}`);
+    const currentTarget = targets[i - 1];
+    console.log(`Making attack ${i} of ${attackCount} against ${currentTarget.name}`);
+    
+    // Temporarily clear and set single target for this attack
+    game.user.targets.forEach(t => t.setTarget(false, { user: game.user, releaseOthers: false }));
+    currentTarget.setTarget(true, { user: game.user, releaseOthers: true });
+    
     const attackOptions = {
       ...options,
       columnShift: (options.columnShift ?? 0) - 1,
@@ -4498,8 +4519,17 @@ async function processMultipleAttackSequence(actor, power, options) {
     };
     const attackResult = await FaseripRolls.rollPower(actor, power, { useDirectRoll: true, ...attackOptions });
     results.push(attackResult);
+    
     if (i < attackCount) await new Promise(r => setTimeout(r, 800));
   }
+
+  // Restore original target selection
+  game.user.targets.forEach(t => t.setTarget(false, { user: game.user, releaseOthers: false }));
+  selectedTargets.forEach(t => t.setTarget(true, { user: game.user, releaseOthers: false }));
+
+  // Build target list for chat message
+  const uniqueTargets = [...new Set(targets.map(t => t.name))];
+  const targetList = uniqueTargets.join(", ");
 
   await ChatMessage.create({
     speaker: ChatMessage.getSpeaker({ actor }),
@@ -4508,6 +4538,7 @@ async function processMultipleAttackSequence(actor, power, options) {
         <div style="color:#2e7d32;font-weight:bold;margin-bottom:5px;">Multiple Attack Sequence Complete</div>
         <div style="font-size:.9em;">
           <div>${actor.name} completed ${attackCount} attacks with ${power?.name ?? "Power"}.</div>
+          <div>Targets: ${targetList}</div>
           <div>Each attack suffered −1CS.</div>
         </div>
       </div>`
