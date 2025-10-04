@@ -174,7 +174,12 @@ export class FaseripActorSheet extends ActorSheet {
     const karma = context.system.karma || {};
     const lifetime = karma.lifetime || 0;
     const advancement = karma.advancement || 0;
-    const pool = karma.pool || 0;
+    
+    // Get shared team karma pool from settings
+    context.teamKarmaPool = game.settings.get("msh-faserip", "teamKarmaPoolTotal") || 0;
+    
+    // Individual contribution tracking (for reference)
+    context.poolContribution = karma.poolContribution || 0;
 
     // Daily karma data - FIX: Now karma is defined
     const dailyKarmaEnabled = game.settings.get("msh-faserip", "dailyKarmaEnabled");
@@ -190,7 +195,7 @@ export class FaseripActorSheet extends ActorSheet {
       }
     }
 
-    context.availableKarma = Math.max(0, lifetime - spent - advancement - pool);
+    context.availableKarma = Math.max(0, lifetime - spent - advancement - context.teamKarmaPool);
     return context;
   }
 
@@ -226,6 +231,13 @@ export class FaseripActorSheet extends ActorSheet {
   // In actorSheet.js, add to the activateListeners function
   activateListeners(html) {
     super.activateListeners(html);
+
+    html.find('.open-team-tracker').click(ev => {
+      import('./teamSheet.js').then(module => {
+        const sheet = new module.TeamSheet();
+        sheet.render(true);
+      });
+    });
 
     // Debug resistances data structure
     console.log("Actor resistances on sheet load:", this.actor.system.resistances);

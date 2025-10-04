@@ -57,8 +57,8 @@ export class TeamSheet extends Application {
       resources: hero.system.attributes?.resources?.rank || "Typical",
       popularity: hero.system.attributes?.popularity?.hero?.value || 0,
       
-      // Pool contribution
-      poolContribution: hero.system.karma?.pool || 0
+      // Total lifetime contribution to pool (for tracking only)
+      poolContribution: hero.system.karma?.poolContribution || 0
     }));
 
     // Get all PC heroes for adding to team
@@ -78,8 +78,8 @@ export class TeamSheet extends Application {
     // Get karma multiplier setting
     context.karmaMultiplier = game.settings.get("msh-faserip", "karmaMultiplier") || 1;
     
-    // Calculate team pool total
-    context.teamPoolTotal = context.teamMembers.reduce((total, member) => total + member.poolContribution, 0);
+    // Get the actual shared pool total
+    context.teamPoolTotal = game.settings.get("msh-faserip", "teamKarmaPoolTotal") || 0;
     
     return context;
   }
@@ -105,9 +105,11 @@ export class TeamSheet extends Application {
     html.find('.remove-hero-from-team').click(ev => this._onRemoveHeroFromTeam(ev));
     html.find('.hero-settings').click(ev => this._onHeroSettings(ev));
     
-    // Karma awards
+    // Karma awards and pool management
     html.find('.distribute-karma').click(ev => this._onDistributeKarma(ev));
     html.find('.clear-awards').click(ev => this._onClearAwards(ev));
+    html.find('.donate-to-pool').click(ev => this._onDonateToPool(ev));
+    html.find('.use-pool-karma').click(ev => this._onUsePoolKarma(ev));
 
     // Hero portraits - click to open sheet
     html.find('.hero-portrait').click(ev => {
@@ -116,6 +118,126 @@ export class TeamSheet extends Application {
         if (hero) hero.sheet.render(true);
     });
   }
+
+  _onHeroSettings(event) {
+    const heroId = event.currentTarget.dataset.heroId;
+    const hero = game.actors.get(heroId);
+    
+    new Dialog({
+      title: `${hero.name} - Karma Pool`,
+      content: `
+        <form>
+          <div class="form-group">
+            <label>Personal Karma Available:</label>
+            <input type="number" value="${hero.system.attributes?.karma?.value || 0}" disabled />
+          </div>
+          <div class="form-group">
+            <label>Total Contributed to Pool (Lifetime):</label>
+            <input type="number" value="${hero.system.karma?.poolContribution || 0}" disabled />
+          </div>
+          <div class="form-group">
+            <label>Donate to Pool:</label>
+            <input type="number" name="donateAmount" value="0" min="0" max="${hero.system.attributes?.karma?.value || 0}" />
+            <p style="font-size: 0.9em; color: #666; margin-top: 4px;">This will be deducted from personal karma and added to the team pool.</p>
+          </div>
+        </form>
+      `,
+      buttons: {
+        donate: {
+          icon: '<i class="fas fa-hand-holding-heart"></i>',
+          label: "Donate",
+          callback: async (html) => {
+            const amount = Number(html.find('[name="donateAmount"]').val());
+            if (amount > 0) {
+              await this._donateToPool(hero, amount);
+            }
+          }
+        },
+        cancel: {
+          icon: '<i class="fas fa-times"></i>',
+          label: "Cancel"
+        }
+      },
+      default: "donate"
+    }).render(true);
+  }
+
+  async _donateToPool(hero, amount) {
+  const currentKarma = hero.system.attributes?.karma?.value || 0;
+  
+  if (amount > currentKarma) {
+    ui.notifications.warn(`${hero.name} doesn't have enough karma to donate!`);
+    return;
+  }
+  
+  // Deduct from hero's personal karma
+  const newKarma = currentKarma - amount;
+  
+  // Update hero's total lifetime contribution
+  const totalContribution = (hero.system.karma?.poolContribution || 0) + amount;
+  
+  await hero.update({
+    "system.attributes.karma.value": newKarma,
+    "system.karma.poolContribution": totalContribution
+  });
+  
+  // Add to shared pool
+  const currentPool = game.settings.get("msh-faserip", "teamKarmaPoolTotal") || 0;
+  await game.settings.set("msh-faserip", "teamKarmaPoolTotal", currentPool + amount);
+  
+  ui.notifications.info(`${hero.name} donated ${amount} karma to the team pool!`);
+  this.render();
+}
+
+_onDonateToPool(event) {
+  const heroId = event.currentTarget.dataset.heroId;
+  const hero = game.actors.get(heroId);
+  this._onHeroSettings({ currentTarget: { dataset: { heroId } } });
+}
+
+_onUsePoolKarma(event) {
+  const currentPool = game.settings.get("msh-faserip", "teamKarmaPoolTotal") || 0;
+  
+  new Dialog({
+    title: "Use Team Karma Pool",
+    content: `
+      <form>
+        <div class="form-group">
+          <label>Pool Available:</label>
+          <input type="number" value="${currentPool}" disabled />
+        </div>
+        <div class="form-group">
+          <label>Amount to Use:</label>
+          <input type="number" name="useAmount" value="0" min="0" max="${currentPool}" />
+        </div>
+        <div class="form-group">
+          <label>Reason:</label>
+          <input type="text" name="reason" placeholder="e.g., Critical roll, building project..." />
+        </div>
+      </form>
+    `,
+    buttons: {
+      use: {
+        icon: '<i class="fas fa-hand-sparkles"></i>',
+        label: "Use Karma",
+        callback: async (html) => {
+          const amount = Number(html.find('[name="useAmount"]').val());
+          const reason = html.find('[name="reason"]').val();
+          
+          if (amount > 0 && amount <= currentPool) {
+            await game.settings.set("msh-faserip", "teamKarmaPoolTotal", currentPool - amount);
+            ui.notifications.info(`Used ${amount} karma from team pool${reason ? ': ' + reason : ''}`);
+            this.render();
+          }
+        }
+      },
+      cancel: {
+        icon: '<i class="fas fa-times"></i>',
+        label: "Cancel"
+      }
+    }
+  }).render(true);
+}
 
   async _onAddHeroToTeam(event) {
     const heroId = event.currentTarget.dataset.heroId;
@@ -138,38 +260,6 @@ export class TeamSheet extends Application {
       await game.settings.set("msh-faserip", "teamMembers", teamMembers);
       this.render();
     }
-  }
-
-  _onHeroSettings(event) {
-    const heroId = event.currentTarget.dataset.heroId;
-    const hero = game.actors.get(heroId);
-    
-    new Dialog({
-      title: `${hero.name} - Team Settings`,
-      content: `
-        <form>
-          <div class="form-group">
-            <label>Karma Pool Contribution:</label>
-            <input type="number" name="poolContribution" value="${hero.system.karma?.pool || 0}" min="0" />
-          </div>
-        </form>
-      `,
-      buttons: {
-        save: {
-          icon: '<i class="fas fa-save"></i>',
-          label: "Save",
-          callback: async (html) => {
-            const contribution = Number(html.find('[name="poolContribution"]').val());
-            await hero.update({ "system.karma.pool": contribution });
-            this.render();
-          }
-        },
-        cancel: {
-          icon: '<i class="fas fa-times"></i>',
-          label: "Cancel"
-        }
-      }
-    }).render(true);
   }
 
   _onDistributeKarma(event) {
@@ -254,10 +344,12 @@ export class TeamSheet extends Application {
       history.push(karmaEvent);
       
       const newLifetime = (hero.system.karma.lifetime || 0) + karmaPerHero;
+      const newCurrent = (hero.system.attributes.karma.value || 0) + karmaPerHero;
       
       await hero.update({
         "system.karma.history": history,
-        "system.karma.lifetime": newLifetime
+        "system.karma.lifetime": newLifetime,
+        "system.attributes.karma.value": newCurrent
       });
     }
     
@@ -274,7 +366,7 @@ export class TeamSheet extends Application {
     });
     await game.settings.set("msh-faserip", "teamKarmaAwards", teamAwards);
     
-    ui.notifications.info(`Distributed ${totalKarma} karma split among ${heroes.length} team members (${karmaPerHero} each)`);
+    ui.notifications.info(`Distributed ${totalKarma} karma split among ${heroes.length} team members (${karmaPerHero} each). Heroes can donate to the pool if desired.`);
     this.render();
   }
 

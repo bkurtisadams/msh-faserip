@@ -30,7 +30,7 @@ export class KarmaSheet extends DocumentSheet {
         history: [],
         lifetime: 0,
         advancement: 0,
-        pool: 0
+        poolContribution: 0
       };
     }
     
@@ -44,14 +44,13 @@ export class KarmaSheet extends DocumentSheet {
     if (!context.system.karma.advancementDetail) {
       context.system.karma.advancementDetail = "";
     }
-    if (!context.system.karma.poolName) {
-      context.system.karma.poolName = "";
-    }
-    if (!context.system.karma.poolMembers) {
-      context.system.karma.poolMembers = [];
+    if (!context.system.karma.poolContribution) {
+      context.system.karma.poolContribution = 0;
     }
 
-    // <-- NEW/MODIFIED SECTION START -->
+    // Get shared team karma pool from settings
+    context.teamKarmaPool = game.settings.get("msh-faserip", "teamKarmaPoolTotal") || 0;
+
     // Daily Karma specific data
     context.dailyKarmaEnabled = game.settings.get("msh-faserip", "dailyKarmaEnabled");
     context.dailyKarmaMax = context.system.karma.dailyKarmaMax || 0;
@@ -87,9 +86,8 @@ export class KarmaSheet extends DocumentSheet {
     const totalEarned = context.system.karma.lifetime || 0;
     const totalSpentLifetime = context.totalSpent;
     const advancementFund = context.system.karma.advancement || 0;
-    const karmaPool = context.system.karma.pool || 0;
     
-    context.currentKarma = Math.max(0, totalEarned - totalSpentLifetime - advancementFund - karmaPool);
+    context.currentKarma = Math.max(0, totalEarned - totalSpentLifetime - advancementFund - context.teamKarmaPool);
     
     return context;
   }
@@ -198,6 +196,13 @@ export class KarmaSheet extends DocumentSheet {
       import('./karmaPool.js').then(module => {
         const poolSheet = new module.KarmaPoolSheet(this.object);
         poolSheet.render(true);
+      });
+    });
+
+    html.find('.open-team-tracker').click(ev => {
+      import('./teamSheet.js').then(module => {
+        const sheet = new module.TeamSheet();
+        sheet.render(true);
       });
     });
 

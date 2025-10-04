@@ -128,6 +128,14 @@ Hooks.once("init", async () => {
 
   console.log("FASERIP DEBUG: dailyKarmaEnabled setting registered."); // <-- DEBUG CONSOLE LOG
   // <-- NEW/MODIFIED SECTION END -->
+
+  game.settings.register("msh-faserip", "teamKarmaPoolTotal", {
+    name: "Team Karma Pool Total",
+    scope: "world",
+    config: false,
+    type: Number,
+    default: 0
+  });
   
   game.settings.register("msh-faserip", "teamMembers", {
       name: "Team Members",

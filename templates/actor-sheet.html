@@ -1074,42 +1074,45 @@
     </div>
   </div>
 
-      <div class="karma-section">
-  <div class="karma-values">
-    <div class="karma-current">
-      <label>Available Karma</label>
-      <input type="number" value="{{availableKarma}}" disabled />
-    </div>
-
-    <div class="karma-pool">
-      <label>Karma Pool</label>
-      <input type="number" name="system.karma.pool" value="{{system.karma.pool}}" />
-    </div>
-
-    <!-- Daily Karma Display -->
-    {{#if dailyKarmaEnabled}}
-    <div class="karma-daily">
-      <label>Daily Karma</label>
-      <div class="stacked-values">
-        <input type="number" value="{{dailyKarmaRemaining}}" disabled />
-        <div class="divider">/</div>
-        <input type="number" value="{{dailyKarmaMax}}" disabled />
+  <div class="karma-section">
+    <div class="karma-values">
+      <div class="karma-current">
+        <label>Available Karma</label>
+        <input type="number" value="{{availableKarma}}" disabled />
       </div>
-    </div>
-    {{/if}}
-  </div>
-  
-  <div class="karma-buttons">
-    <button type="button" class="view-karma-history tab-style-button">
-      <i class="fas fa-history"></i> View Karma History
-    </button>
-    {{#if dailyKarmaEnabled}}
-      {{#if isGM}}
-      <button type="button" class="reset-daily-karma-button tab-style-button danger-button">
-        <i class="fas fa-redo"></i> Reset Daily Karma
-      </button>
+
+      <div class="karma-pool">
+        <label>Team Pool</label>
+        <input type="number" value="{{teamKarmaPool}}" disabled title="Shared team karma pool - donate via Team Tracker" />
+      </div>
+
+      <!-- Daily Karma Display -->
+      {{#if dailyKarmaEnabled}}
+      <div class="karma-daily">
+        <label>Daily Karma</label>
+        <div class="stacked-values">
+          <input type="number" value="{{dailyKarmaRemaining}}" disabled />
+          <div class="divider">/</div>
+          <input type="number" value="{{dailyKarmaMax}}" disabled />
+        </div>
+      </div>
       {{/if}}
-    {{/if}}
+    </div>
+    
+    <div class="karma-buttons">
+      <button type="button" class="view-karma-history tab-style-button">
+        <i class="fas fa-history"></i> View Karma History
+      </button>
+      <button type="button" class="open-team-tracker tab-style-button">
+        <i class="fas fa-users"></i> Team Tracker
+      </button>
+      {{#if dailyKarmaEnabled}}
+        {{#if isGM}}
+        <button type="button" class="reset-daily-karma-button tab-style-button danger-button">
+          <i class="fas fa-redo"></i> Reset Daily Karma
+        </button>
+        {{/if}}
+      {{/if}}
+    </div>
   </div>
-</div>
 </form>
