@@ -87,7 +87,7 @@ export class KarmaSheet extends DocumentSheet {
     const totalSpentLifetime = context.totalSpent;
     const advancementFund = context.system.karma.advancement || 0;
     
-    context.currentKarma = Math.max(0, totalEarned - totalSpentLifetime - advancementFund - context.teamKarmaPool);
+    context.currentKarma = Math.max(0, totalEarned - totalSpentLifetime - advancementFund);
     
     return context;
   }

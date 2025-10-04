@@ -169,6 +169,7 @@ export class FaseripActorSheet extends ActorSheet {
     console.log("Prepared effects:", context.effects);
 
     context.editable = this.isEditable;
+    context.isBiographyOpen = this._isBiographyOpen;
 
     // karma - FIX: Define karma variable first
     const karma = context.system.karma || {};
@@ -195,7 +196,7 @@ export class FaseripActorSheet extends ActorSheet {
       }
     }
 
-    context.availableKarma = Math.max(0, lifetime - spent - advancement - context.teamKarmaPool);
+    context.availableKarma = Math.max(0, lifetime - spent - advancement);
     return context;
   }
 
