@@ -4447,12 +4447,17 @@ async function processMultipleAttackSequence(actor, power, options) {
     console.log("Multiple attack FEAT auto-succeeds (3+ ranks above intensity).");
   } else {
     // Roll your existing Fighting FEAT function; treat color result against neededColor
-    const featResult = await game.msh.CombatHandler.rollMultipleAttackFeat(actorDoc, attackCount, { intensity: intensityName });
+    const featResult = await game.msh.CombatHandler.rollMultipleAttackFeat(actorDoc, attackCount, { 
+        intensity: intensityName,
+        effectiveFightingRank: attackerFight,
+        effectiveFightingValue: CONFIG.FASERIP?.rankValues?.[attackerFight] || 0
+    });
+
     if (featResult?.cancelled) {
       ui.notifications.info("Multiple attack cancelled");
       return [];
     }
-    featColor = String(featResult?.color ?? (featResult?.success ? "green" : "white")).toLowerCase();
+    featColor = String(featResult?.resultColor ?? "white").toLowerCase();
     featSucceeded = colorOK(featColor, neededColor);
   }
 

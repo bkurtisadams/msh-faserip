@@ -549,10 +549,12 @@ export class CombatHandler {
      * @param {Number} attackCount - Number of attacks (2 or 3)
      * @returns {Object} - {success: boolean, intensity: string, roll: Roll}
      */
-    static async rollMultipleAttackFeat(actor, attackCount) {
+    static async rollMultipleAttackFeat(actor, attackCount, options = {}) {
         const intensity = attackCount === 2 ? "Remarkable" : "Amazing";
-        const fightingRank = actor.system.abilities.fighting.rank;
-        const fightingValue = actor.system.abilities.fighting.value;
+        
+        // Use the effective/power-modified rank if provided, otherwise fall back to base rank
+        const fightingRank = options.effectiveFightingRank || actor.system.abilities.fighting.rank;
+        const fightingValue = options.effectiveFightingValue || actor.system.abilities.fighting.value;
         
         // Get available Karma
         const availableKarma = actor.system.attributes.karma.value || 0;
@@ -595,10 +597,16 @@ export class CombatHandler {
                             await roll.evaluate();
                             
                             const totalRoll = Math.min(100, roll.total + karmaSpent);
+                            // DEBUG LINES:
+                            console.log(`🎯 MULTIPLE ATTACK DEBUG:`);
+                            console.log(`   attackCount: ${attackCount}`);
+                            console.log(`   intensity: ${intensity}`);
+                            console.log(`   fightingRank: ${fightingRank}`);
+                            console.log(`   totalRoll: ${totalRoll}`);
                             const resultColor = game.msh.rollUniversalTable(fightingRank, totalRoll);
                             
                             // Determine success based on intensity requirement
-                            let success = false;
+                            /* let success = false;
                             switch (intensity) {
                                 case "Remarkable":
                                     success = ["green", "yellow", "red"].includes(resultColor.toLowerCase());
@@ -606,7 +614,7 @@ export class CombatHandler {
                                 case "Amazing":
                                     success = ["yellow", "red"].includes(resultColor.toLowerCase());
                                     break;
-                            }
+                            } */
                             
                             // Deduct karma if spent
                             if (karmaSpent > 0) {
@@ -647,14 +655,14 @@ export class CombatHandler {
                                             <div>Roll: ${roll.total} + Karma: ${karmaSpent} = ${totalRoll}</div>
                                         </div>
                                         <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
-                                            background-color: ${success ? '#4CAF50' : '#F44336'}; color: white;">
-                                            ${success ? "SUCCESS" : "FAILURE"} (${resultColor.toUpperCase()})
+                                            background-color: #4A90E2; color: white;">
+                                            RESULT: ${resultColor.toUpperCase()}
                                         </div>
                                     </div>
                                 `
                             });
                             
-                            resolve({ success, intensity, roll, totalRoll, resultColor });
+                            resolve({ intensity, roll, totalRoll, resultColor });
                         }
                     },
                     cancel: {
