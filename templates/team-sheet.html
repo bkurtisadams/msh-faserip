@@ -134,16 +134,36 @@
       </div>
       
       <div class="awards-list">
-        {{#each karmaAwards as |award|}}
-        <div class="award-entry">
-          <div class="award-date">{{award.date}}</div>
-          <div class="award-amount">{{award.totalAmount}} Karma ({{award.amountPerHero}} each)</div>
-          <div class="award-reason">{{award.reason}}</div>
-          <div class="award-description">{{award.description}}</div>
-        </div>
-        {{else}}
-        <div class="empty-message">No team karma awards recorded yet.</div>
-        {{/each}}
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Total Karma</th>
+              <th>Per Hero</th>
+              <th>Team Size</th>
+              <th>Award Type</th>
+              <th>Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            {{#if karmaAwards.length}}
+              {{#each karmaAwards as |award i|}}
+              <tr>
+                <td class="award-date">{{award.date}}</td>
+                <td class="award-amount">{{award.totalAmount}}</td>
+                <td class="award-amount">{{award.amountPerHero}}</td>
+                <td>{{award.teamSize}}</td>
+                <td class="award-reason">{{award.reason}}</td>
+                <td class="award-description">{{award.description}}</td>
+              </tr>
+              {{/each}}
+            {{else}}
+              <tr>
+                <td colspan="6" class="empty-message">No team karma awards recorded yet.</td>
+              </tr>
+            {{/if}}
+          </tbody>
+        </table>
       </div>
     </div>
   </section>

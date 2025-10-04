@@ -1,13 +1,15 @@
 .team-tracker {
-  background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
-  color: #ecf0f1;
-  border-radius: 8px;
+  background: #f5f5f0;
+  color: #333;
+  border: 2px solid #8b0000;
+  border-radius: 4px;
   overflow: hidden;
+  font-family: Arial, sans-serif;
 
   .tracker-tabs {
     display: flex;
-    background: rgba(0, 0, 0, 0.2);
-    border-bottom: 2px solid #34495e;
+    background: #8b0000;
+    border-bottom: 2px solid #660000;
 
     .tab-button {
       flex: 1;
@@ -16,13 +18,18 @@
       cursor: pointer;
       border: none;
       background: transparent;
-      color: #bdc3c7;
+      color: #ffcccc;
       text-decoration: none;
-      transition: all 0.3s ease;
+      transition: all 0.2s ease;
       display: flex;
       flex-direction: column;
       align-items: center;
       gap: 4px;
+      border-right: 1px solid #660000;
+
+      &:last-child {
+        border-right: none;
+      }
 
       i {
         font-size: 1.2em;
@@ -34,13 +41,13 @@
       }
 
       &:hover {
-        background: rgba(255, 255, 255, 0.1);
-        color: #ecf0f1;
+        background: #a00000;
+        color: white;
       }
 
       &.active {
-        background: #3498db;
-        color: white;
+        background: #f5f5f0;
+        color: #8b0000;
       }
     }
   }
@@ -49,6 +56,7 @@
     padding: 16px;
     height: calc(100% - 60px);
     overflow-y: auto;
+    background: white;
   }
 
   .tab-panel {
@@ -65,11 +73,13 @@
     align-items: center;
     margin-bottom: 16px;
     padding-bottom: 8px;
-    border-bottom: 1px solid #34495e;
+    border-bottom: 2px solid #8b0000;
 
     h3 {
       margin: 0;
-      color: #3498db;
+      color: #8b0000;
+      font-size: 1.3em;
+      font-weight: bold;
     }
 
     .team-stats {
@@ -79,20 +89,27 @@
 
       .pool-total {
         font-weight: bold;
-        color: #f39c12;
+        color: #333;
+        font-size: 1.1em;
       }
 
       .distribute-karma {
-        background: #27ae60;
+        background: #8b0000;
         color: white;
-        border: none;
-        padding: 6px 12px;
-        border-radius: 4px;
+        border: 1px solid #660000;
+        padding: 8px 14px;
+        border-radius: 3px;
         cursor: pointer;
-        font-size: 0.9em;
+        font-size: 0.95em;
+        font-weight: bold;
+        transition: background 0.2s;
+
+        i {
+          margin-right: 4px;
+        }
 
         &:hover {
-          background: #229954;
+          background: #a00000;
         }
       }
     }
@@ -100,11 +117,11 @@
 
   .member-card {
     display: flex;
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 8px;
+    background: #f9f9f9;
+    border-radius: 4px;
     padding: 12px;
     margin-bottom: 12px;
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    border: 1px solid #ddd;
 
     .member-portrait {
       display: flex;
@@ -116,13 +133,14 @@
       .hero-portrait {
         width: 60px;
         height: 60px;
-        border-radius: 50%;
-        border: 2px solid #3498db;
+        border-radius: 4px;
+        border: 2px solid #8b0000;
         cursor: pointer;
         transition: transform 0.2s ease;
 
         &:hover {
           transform: scale(1.05);
+          border-color: #a00000;
         }
       }
 
@@ -131,7 +149,7 @@
         font-weight: bold;
         text-align: center;
         margin-top: 6px;
-        color: #3498db;
+        color: #8b0000;
       }
     }
 
@@ -150,22 +168,26 @@
           flex-direction: column;
           align-items: center;
           min-width: 40px;
+          background: white;
+          padding: 4px;
+          border-radius: 3px;
+          border: 1px solid #ddd;
 
           label {
-            font-size: 0.8em;
-            color: #95a5a6;
+            font-size: 0.75em;
+            color: #8b0000;
             font-weight: bold;
           }
 
           .rank {
             font-size: 0.7em;
-            color: #f39c12;
+            color: #666;
           }
 
           .value {
-            font-size: 0.9em;
+            font-size: 0.95em;
             font-weight: bold;
-            color: #ecf0f1;
+            color: #333;
           }
         }
 
@@ -174,15 +196,21 @@
           align-items: center;
           gap: 4px;
           margin-left: 12px;
+          padding: 4px 8px;
+          background: white;
+          border: 1px solid #ddd;
+          border-radius: 3px;
 
           label {
             font-size: 0.8em;
-            color: #95a5a6;
+            color: #666;
+            font-weight: bold;
           }
 
           span {
             font-size: 0.9em;
             font-weight: bold;
+            color: #333;
           }
         }
       }
@@ -195,15 +223,21 @@
           display: flex;
           align-items: center;
           gap: 4px;
+          padding: 4px 8px;
+          background: white;
+          border: 1px solid #ddd;
+          border-radius: 3px;
 
           label {
             font-size: 0.8em;
-            color: #95a5a6;
+            color: #666;
+            font-weight: bold;
           }
 
           span {
             font-size: 0.85em;
             font-weight: bold;
+            color: #333;
           }
         }
       }
@@ -215,24 +249,32 @@
       gap: 6px;
 
       button {
-        background: rgba(255, 255, 255, 0.1);
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        color: #ecf0f1;
+        background: #f5f5f0;
+        border: 1px solid #c0c0c0;
+        color: #333;
         padding: 6px;
-        border-radius: 4px;
+        border-radius: 3px;
         cursor: pointer;
         width: 32px;
         height: 32px;
         display: flex;
         align-items: center;
         justify-content: center;
+        transition: all 0.2s;
 
         &:hover {
-          background: rgba(255, 255, 255, 0.2);
+          background: #e5e5e0;
+          border-color: #a0a0a0;
         }
 
-        &.remove-hero-from-team:hover {
-          background: #e74c3c;
+        &.remove-hero-from-team {
+          color: #8b0000;
+          
+          &:hover {
+            background: #8b0000;
+            color: white;
+            border-color: #660000;
+          }
         }
       }
     }
@@ -241,11 +283,13 @@
   .available-heroes {
     margin-top: 20px;
     padding-top: 16px;
-    border-top: 1px solid #34495e;
+    border-top: 2px solid #8b0000;
 
     h4 {
-      color: #3498db;
+      color: #8b0000;
       margin-bottom: 12px;
+      font-size: 1.1em;
+      font-weight: bold;
     }
 
     .hero-add-list {
@@ -256,27 +300,31 @@
       .hero-add-item {
         display: flex;
         align-items: center;
-        background: rgba(255, 255, 255, 0.05);
+        background: #f9f9f9;
         padding: 6px;
-        border-radius: 6px;
+        border-radius: 4px;
+        border: 1px solid #ddd;
         gap: 8px;
 
         img {
           width: 24px;
           height: 24px;
-          border-radius: 50%;
+          border-radius: 3px;
+          border: 1px solid #8b0000;
         }
 
         span {
           font-size: 0.9em;
+          color: #333;
+          font-weight: 500;
         }
 
         button {
-          background: #27ae60;
+          background: #8b0000;
           border: none;
           color: white;
           padding: 4px;
-          border-radius: 50%;
+          border-radius: 3px;
           cursor: pointer;
           width: 24px;
           height: 24px;
@@ -285,183 +333,116 @@
           justify-content: center;
 
           &:hover {
-            background: #229954;
+            background: #a00000;
           }
         }
       }
     }
   }
 
-  .awards-header, .logs-header {
+  .awards-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
     margin-bottom: 16px;
     padding-bottom: 8px;
-    border-bottom: 1px solid #34495e;
+    border-bottom: 2px solid #8b0000;
 
     h3 {
       margin: 0;
-      color: #3498db;
+      color: #8b0000;
+      font-size: 1.3em;
+      font-weight: bold;
     }
 
-    button {
-      background: #95a5a6;
-      color: white;
-      border: none;
-      padding: 6px 12px;
-      border-radius: 4px;
+    .clear-awards {
+      background: #f5f5f0;
+      color: #8b0000;
+      border: 1px solid #c0c0c0;
+      padding: 8px 14px;
+      border-radius: 3px;
       cursor: pointer;
-      font-size: 0.9em;
+      font-size: 0.95em;
+      font-weight: bold;
+      transition: all 0.2s;
+
+      i {
+        margin-right: 4px;
+      }
 
       &:hover {
-        background: #7f8c8d;
-      }
-    }
-
-    .log-actions {
-      display: flex;
-      gap: 8px;
-
-      .add-defeated-villain {
-        background: #27ae60;
-
-        &:hover {
-          background: #229954;
-        }
-      }
-
-      .clear-logs {
-        background: #e74c3c;
-
-        &:hover {
-          background: #c0392b;
-        }
+        background: #8b0000;
+        color: white;
+        border-color: #660000;
       }
     }
   }
 
   .awards-list {
-    .award-entry {
-      background: rgba(255, 255, 255, 0.05);
-      border-radius: 6px;
-      padding: 12px;
-      margin-bottom: 8px;
-      border-left: 4px solid #f39c12;
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
 
-      .award-date {
-        font-size: 0.8em;
-        color: #95a5a6;
-        margin-bottom: 4px;
-      }
-
-      .award-member {
-        font-weight: bold;
-        color: #3498db;
-        margin-bottom: 4px;
-      }
-
-      .award-amount {
-        font-size: 1.1em;
-        font-weight: bold;
-        color: #27ae60;
-        margin-bottom: 4px;
-      }
-
-      .award-reason {
-        font-size: 0.9em;
-        color: #e67e22;
-        margin-bottom: 4px;
-      }
-
-      .award-description {
-        font-size: 0.85em;
-        color: #bdc3c7;
-        font-style: italic;
-      }
-    }
-
-    .empty-message {
-      text-align: center;
-      color: #95a5a6;
-      font-style: italic;
-      padding: 20px;
-    }
-  }
-
-  .logs-list {
-    .log-entry {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      background: rgba(255, 255, 255, 0.05);
-      border-radius: 6px;
-      padding: 12px;
-      margin-bottom: 8px;
-      border-left: 4px solid #e74c3c;
-
-      .villain-info {
-        flex: 1;
-
-        h4 {
-          margin: 0 0 6px 0;
-          color: #e74c3c;
-          font-size: 1.1em;
-        }
-
-        .villain-details {
-          display: flex;
-          gap: 12px;
-          margin-bottom: 6px;
-
-          .power-level {
-            background: #8e44ad;
-            color: white;
-            padding: 2px 8px;
-            border-radius: 12px;
-            font-size: 0.8em;
-            font-weight: bold;
-          }
-
-          .date {
-            color: #95a5a6;
-            font-size: 0.85em;
-          }
-        }
-
-        .notes {
-          font-size: 0.85em;
-          color: #bdc3c7;
-          font-style: italic;
-          margin: 6px 0 0 0;
-        }
-      }
-
-      .remove-villain {
-        background: #e74c3c;
-        border: none;
+      thead {
+        background: #8b0000;
         color: white;
-        padding: 6px;
-        border-radius: 50%;
-        cursor: pointer;
-        width: 28px;
-        height: 28px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        flex-shrink: 0;
 
-        &:hover {
-          background: #c0392b;
+        th {
+          padding: 10px;
+          text-align: left;
+          font-weight: bold;
+          border: 1px solid #660000;
+          font-size: 0.95em;
+        }
+      }
+
+      tbody {
+        tr {
+          border-bottom: 1px solid #ddd;
+
+          &:hover {
+            background: #f9f9f9;
+          }
+
+          td {
+            padding: 10px;
+            border: 1px solid #ddd;
+            font-size: 0.9em;
+          }
+
+          .award-date {
+            color: #666;
+            white-space: nowrap;
+          }
+
+          .award-amount {
+            font-weight: bold;
+            color: #8b0000;
+            white-space: nowrap;
+          }
+
+          .award-reason {
+            color: #333;
+            font-weight: 500;
+          }
+
+          .award-description {
+            color: #555;
+            font-style: italic;
+          }
         }
       }
     }
 
     .empty-message {
       text-align: center;
-      color: #95a5a6;
+      color: #999;
       font-style: italic;
-      padding: 20px;
+      padding: 40px 20px;
+      background: #f9f9f9;
+      border-radius: 4px;
+      border: 1px dashed #ddd;
     }
   }
 }
