@@ -18,8 +18,6 @@
       <div class="members-header">
         <h3>Team Members</h3>
         <div class="team-stats">
-          <span class="pool-total">Shared Pool: {{teamPoolTotal}} Karma</span>
-          <button type="button" class="use-pool-karma"><i class="fas fa-hand-sparkles"></i> Use Pool</button>
           <button type="button" class="distribute-karma"><i class="fas fa-gift"></i> Award Karma</button>
         </div>
       </div>
@@ -89,18 +87,11 @@
                 <label>Popularity:</label>
                 <span>{{member.popularity}}</span>
               </div>
-              <div class="stat-small">
-                <label>Pool:</label>
-                <span>{{member.poolContribution}}</span>
-              </div>
             </div>
           </div>
           
           <div class="member-actions">
-            <button type="button" class="donate-to-pool" data-hero-id="{{member.id}}" title="Donate to Pool">
-              <i class="fas fa-hand-holding-heart"></i>
-            </button>
-            <button type="button" class="hero-settings" data-hero-id="{{member.id}}" title="View Contributions">
+            <button type="button" class="hero-settings" data-hero-id="{{member.id}}" title="Settings">
               <i class="fas fa-cog"></i>
             </button>
             <button type="button" class="remove-hero-from-team" data-hero-id="{{member.id}}" title="Remove from Team">
