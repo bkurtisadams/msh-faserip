@@ -9,10 +9,6 @@
       <i class="fas fa-trophy"></i>
       <span>Awards</span>
     </a>
-    <a class="tab-button" data-tab="logs">
-      <i class="fas fa-scroll"></i>
-      <span>Logs</span>
-    </a>
   </nav>
 
   <!-- Tab Content -->
@@ -134,51 +130,19 @@
     <div class="tab-panel" data-tab="awards">
       <div class="awards-header">
         <h3>Team Karma Awards</h3>
-        <button type="button" class="clear-awards"><i class="fas fa-broom"></i> Clear Display</button>
+        <button type="button" class="clear-awards"><i class="fas fa-broom"></i> Clear History</button>
       </div>
       
       <div class="awards-list">
         {{#each karmaAwards as |award|}}
         <div class="award-entry">
           <div class="award-date">{{award.date}}</div>
-          <div class="award-member">{{award.member}}</div>
-          <div class="award-amount">+{{award.amount}} Karma</div>
+          <div class="award-amount">{{award.totalAmount}} Karma ({{award.amountPerHero}} each)</div>
           <div class="award-reason">{{award.reason}}</div>
           <div class="award-description">{{award.description}}</div>
         </div>
         {{else}}
         <div class="empty-message">No team karma awards recorded yet.</div>
-        {{/each}}
-      </div>
-    </div>
-
-    <!-- Logs Tab -->
-    <div class="tab-panel" data-tab="logs">
-      <div class="logs-header">
-        <h3>Defeated Villains</h3>
-        <div class="log-actions">
-          <button type="button" class="add-defeated-villain"><i class="fas fa-plus"></i> Add Villain</button>
-          <button type="button" class="clear-logs"><i class="fas fa-trash"></i> Clear Logs</button>
-        </div>
-      </div>
-      
-      <div class="logs-list">
-        {{#each defeatedVillains as |villain|}}
-        <div class="log-entry">
-          <div class="villain-info">
-            <h4>{{villain.name}}</h4>
-            <div class="villain-details">
-              <span class="power-level">{{villain.powerLevel}}</span>
-              <span class="date">{{villain.dateDefeated}}</span>
-            </div>
-            {{#if villain.notes}}<p class="notes">{{villain.notes}}</p>{{/if}}
-          </div>
-          <button type="button" class="remove-villain" data-villain-id="{{villain.id}}">
-            <i class="fas fa-times"></i>
-          </button>
-        </div>
-        {{else}}
-        <div class="empty-message">No defeated villains recorded yet.</div>
         {{/each}}
       </div>
     </div>

@@ -73,10 +73,7 @@ export class TeamSheet extends Application {
     }));
 
     // Get team karma awards history
-    context.karmaAwards = this._getTeamKarmaAwards();
-    
-    // Get defeated villains log
-    context.defeatedVillains = game.settings.get("msh-faserip", "defeatedVillains") || [];
+    context.karmaAwards = game.settings.get("msh-faserip", "teamKarmaAwards") || [];
     
     // Get karma multiplier setting
     context.karmaMultiplier = game.settings.get("msh-faserip", "karmaMultiplier") || 1;
@@ -85,32 +82,6 @@ export class TeamSheet extends Application {
     context.teamPoolTotal = context.teamMembers.reduce((total, member) => total + member.poolContribution, 0);
     
     return context;
-  }
-
-  _getTeamKarmaAwards() {
-    // Get karma awards from team members' history that were team-wide
-    const teamMembers = game.settings.get("msh-faserip", "teamMembers") || [];
-    const awards = [];
-    
-    teamMembers.forEach(memberId => {
-      const hero = game.actors.get(memberId);
-      if (hero && hero.system.karma?.history) {
-        hero.system.karma.history.forEach(event => {
-          if (event.description && event.description.includes("Team") && event.amount > 0) {
-            awards.push({
-              date: event.realDate,
-              member: hero.name,
-              amount: event.amount,
-              reason: event.type,
-              description: event.description
-            });
-          }
-        });
-      }
-    });
-    
-    // Sort by date descending (most recent first)
-    return awards.sort((a, b) => new Date(b.date) - new Date(a.date));
   }
 
   activateListeners(html) {
@@ -137,11 +108,6 @@ export class TeamSheet extends Application {
     // Karma awards
     html.find('.distribute-karma').click(ev => this._onDistributeKarma(ev));
     html.find('.clear-awards').click(ev => this._onClearAwards(ev));
-    
-    // Villain logs
-    html.find('.add-defeated-villain').click(ev => this._onAddDefeatedVillain(ev));
-    html.find('.remove-villain').click(ev => this._onRemoveVillain(ev));
-    html.find('.clear-logs').click(ev => this._onClearLogs(ev));
 
     // Hero portraits - click to open sheet
     html.find('.hero-portrait').click(ev => {
@@ -149,7 +115,7 @@ export class TeamSheet extends Application {
         const hero = game.actors.get(heroId);
         if (hero) hero.sheet.render(true);
     });
-}
+  }
 
   async _onAddHeroToTeam(event) {
     const heroId = event.currentTarget.dataset.heroId;
@@ -295,100 +261,32 @@ export class TeamSheet extends Application {
       });
     }
     
+    // Log team award for display in Awards tab
+    const teamAwards = game.settings.get("msh-faserip", "teamKarmaAwards") || [];
+    teamAwards.push({
+      date: new Date().toLocaleDateString(),
+      totalAmount: totalKarma,
+      amountPerHero: karmaPerHero,
+      teamSize: heroes.length,
+      reason: awardType,
+      description: description || "Team karma award",
+      multiplier: multiplier
+    });
+    await game.settings.set("msh-faserip", "teamKarmaAwards", teamAwards);
+    
     ui.notifications.info(`Distributed ${totalKarma} karma split among ${heroes.length} team members (${karmaPerHero} each)`);
     this.render();
   }
 
   async _onClearAwards(event) {
     const confirmed = await Dialog.confirm({
-      title: "Clear Team Awards",
-      content: "This will clear the awards display but not affect individual karma histories. Continue?"
+      title: "Clear Team Awards History",
+      content: "This will clear the team awards display but not affect individual karma histories. Continue?"
     });
     
     if (confirmed) {
-      // This is just a display function, actual clearing would need to modify individual histories
-      ui.notifications.info("Awards display refreshed");
-      this.render();
-    }
-  }
-
-  _onAddDefeatedVillain(event) {
-    new Dialog({
-      title: "Add Defeated Villain",
-      content: `
-        <form>
-          <div class="form-group">
-            <label>Villain Name:</label>
-            <input type="text" name="villainName" />
-          </div>
-          <div class="form-group">
-            <label>Power Level:</label>
-            <select name="powerLevel">
-              <option value="Remarkable">Remarkable (+40 Karma)</option>
-              <option value="Incredible">Incredible (+50 Karma)</option>
-              <option value="Amazing">Amazing (+75 Karma)</option>
-              <option value="Monstrous">Monstrous (+100 Karma)</option>
-              <option value="Unearthly">Unearthly (+150 Karma)</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>Date Defeated:</label>
-            <input type="text" name="dateDefeated" value="${new Date().toLocaleDateString()}" />
-          </div>
-          <div class="form-group">
-            <label>Notes:</label>
-            <textarea name="notes"></textarea>
-          </div>
-        </form>
-      `,
-      buttons: {
-        add: {
-          icon: '<i class="fas fa-check"></i>',
-          label: "Add",
-          callback: async (html) => {
-            const villainData = {
-              name: html.find('[name="villainName"]').val(),
-              powerLevel: html.find('[name="powerLevel"]').val(),
-              dateDefeated: html.find('[name="dateDefeated"]').val(),
-              notes: html.find('[name="notes"]').val(),
-              id: foundry.utils.randomID()
-            };
-            
-            const defeatedVillains = game.settings.get("msh-faserip", "defeatedVillains") || [];
-            defeatedVillains.push(villainData);
-            await game.settings.set("msh-faserip", "defeatedVillains", defeatedVillains);
-            
-            this.render();
-          }
-        },
-        cancel: {
-          icon: '<i class="fas fa-times"></i>',
-          label: "Cancel"
-        }
-      }
-    }).render(true);
-  }
-
-  async _onRemoveVillain(event) {
-    const villainId = event.currentTarget.dataset.villainId;
-    const defeatedVillains = game.settings.get("msh-faserip", "defeatedVillains") || [];
-    const index = defeatedVillains.findIndex(v => v.id === villainId);
-    
-    if (index > -1) {
-      defeatedVillains.splice(index, 1);
-      await game.settings.set("msh-faserip", "defeatedVillains", defeatedVillains);
-      this.render();
-    }
-  }
-
-  async _onClearLogs(event) {
-    const confirmed = await Dialog.confirm({
-      title: "Clear Villain Logs",
-      content: "This will permanently delete all defeated villain records. Continue?"
-    });
-    
-    if (confirmed) {
-      await game.settings.set("msh-faserip", "defeatedVillains", []);
+      await game.settings.set("msh-faserip", "teamKarmaAwards", []);
+      ui.notifications.info("Team awards history cleared");
       this.render();
     }
   }

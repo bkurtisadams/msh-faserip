@@ -116,7 +116,7 @@ Hooks.once("init", async () => {
   });
 
   // <-- NEW/MODIFIED SECTION START -->
-  // Register system settings - THIS IS THE MISSING PART
+  // Register system settings
   game.settings.register('msh-faserip', 'dailyKarmaEnabled', {
     name: "Enable Daily Karma",
     hint: "If enabled, characters gain temporary Karma equal to their Reason+Intuition+Psyche at the start of each session, used before their lifetime Karma pool.",
@@ -129,32 +129,30 @@ Hooks.once("init", async () => {
   console.log("FASERIP DEBUG: dailyKarmaEnabled setting registered."); // <-- DEBUG CONSOLE LOG
   // <-- NEW/MODIFIED SECTION END -->
   
-  game.settings.register('msh-faserip', 'teamMembers', {
-    name: "Team Members",
-    hint: "List of hero IDs that are part of the team",
-    scope: "world",
-    config: false,
-    type: Array,
-    default: []
-  });
+  game.settings.register("msh-faserip", "teamMembers", {
+      name: "Team Members",
+      scope: "world",
+      config: false,
+      type: Array,
+      default: []
+    });
 
-  game.settings.register('msh-faserip', 'defeatedVillains', {
-    name: "Defeated Villains", 
-    hint: "List of villains defeated by the team",
-    scope: "world",
-    config: false,
-    type: Array,
-    default: []
-  });
+    game.settings.register("msh-faserip", "karmaMultiplier", {
+      name: "Karma Multiplier",
+      scope: "world",
+      config: false,
+      type: Number,
+      default: 1
+    });
 
-  game.settings.register('msh-faserip', 'karmaMultiplier', {
-    name: "Karma Multiplier",
-    hint: "Multiplier for karma awards",
-    scope: "world",
-    config: false,
-    type: Number,
-    default: 1
-  });
+    // Add this new one:
+    game.settings.register("msh-faserip", "teamKarmaAwards", {
+      name: "Team Karma Awards History",
+      scope: "world",
+      config: false,
+      type: Array,
+      default: []
+    });
 
   console.log("FASERIP DEBUG: Team settings registered.");
 
