@@ -3648,81 +3648,211 @@ _rollVehicleControl(vehicle) {
 }
 
   async _rollStandaloneStunt(stunt, stuntIndex) {
+    console.log("=== POWER STUNT DEBUG START ===");
+    console.log("Stunt:", stunt.name);
+    console.log("Times Used:", stunt.timesUsed);
+    console.log("Rank:", stunt.rank);
+    console.log("Value:", stunt.value);
+    
     const rank = stunt.rank || "Typical";
     const rankValue = stunt.value || 6;
     
-    // Determine required FEAT color
-    const nextAttempt = stunt.timesUsed + 1;
-    let requiredColor = "red";
-    if (nextAttempt >= 4 && nextAttempt < 10) requiredColor = "green";
-    else if (nextAttempt >= 1 && nextAttempt <= 3) requiredColor = "yellow";
+    // Check if stunt is mastered (10+ uses) - no FEAT or Karma needed
+    if (stunt.timesUsed >= 10) {
+      console.log("Stunt is MASTERED (10+ uses) - auto success");
+      ui.notifications.info(`${stunt.name} is mastered! No FEAT or Karma required.`);
+      
+      const chatHtml = `
+        <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
+          <div style="padding: 5px 10px; border-bottom: 1px solid #c0c0c0; font-size: 1.1em; color: #8b0000;">
+            <strong>${this.actor.name} - ${stunt.name} (Power Stunt)</strong>
+          </div>
+          <div style="padding: 5px 10px; font-size: 0.9em;">
+            <div>Rank: ${rank} (${rankValue})</div>
+            <div>Status: MASTERED (10+ uses)</div>
+          </div>
+          <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
+            background-color: #4CAF50 !important; color: white;">
+            AUTOMATIC SUCCESS
+          </div>
+        </div>
+      `;
+      
+      await ChatMessage.create({
+        speaker: ChatMessage.getSpeaker({ actor: this.actor }),
+        content: chatHtml
+      });
+      return;
+    }
     
-    // Prompt for Karma bonus
+    // Check if actor has at least 100 karma available
+    const availableKarma = this.actor.availableKarma || 0;
+    console.log("Available Karma:", availableKarma);
+    
+    if (availableKarma < 100) {
+      console.log("INSUFFICIENT KARMA - Cannot perform stunt");
+      ui.notifications.error(`Insufficient Karma! ${stunt.name} requires 100 Karma. You have ${availableKarma} available.`);
+      
+      const chatHtml = `
+        <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
+          <div style="padding: 5px 10px; border-bottom: 1px solid #c0c0c0; font-size: 1.1em; color: #8b0000;">
+            <strong>${this.actor.name} - ${stunt.name} (Power Stunt)</strong>
+          </div>
+          <div style="padding: 5px 10px; font-size: 0.9em;">
+            <div>Required Karma: 100</div>
+            <div>Available Karma: ${availableKarma}</div>
+          </div>
+          <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
+            background-color: #F44336 !important; color: white;">
+            INSUFFICIENT KARMA
+          </div>
+        </div>
+      `;
+      
+      await ChatMessage.create({
+        speaker: ChatMessage.getSpeaker({ actor: this.actor }),
+        content: chatHtml
+      });
+      return;
+    }
+    
+    // Determine required FEAT color based on current times used
+    let requiredColor;
+    if (stunt.timesUsed === 0) {
+      requiredColor = "red";
+      console.log("Times used = 0: Required FEAT = RED");
+    } else if (stunt.timesUsed <= 3) {
+      requiredColor = "yellow";
+      console.log("Times used 1-3: Required FEAT = YELLOW");
+    } else {
+      requiredColor = "green";
+      console.log("Times used 4-9: Required FEAT = GREEN");
+    }
+    
+    console.log("Required FEAT Color:", requiredColor);
+    
+    // Calculate maximum additional karma they can spend
+    const maxAdditionalKarma = availableKarma - 100;
+    console.log("Max additional karma available:", maxAdditionalKarma);
+    
+    // Prompt for optional Karma bonus
     const karmaInput = await Dialog.prompt({
-      title: "Add Karma to Roll?",
-      label: "Optional Karma to add to roll:",
+      title: "Add Karma Bonus to Roll?",
+      label: "Optional Karma bonus (in addition to 100 Karma base cost):",
       callback: html => parseInt(html.find("input").val() || "0"),
-      content: `<input type="number" min="0" value="0" style="width:100%"/>`
+      content: `
+        <p>Base cost: <strong>100 Karma</strong></p>
+        <p>Available for bonus: <strong>${maxAdditionalKarma} Karma</strong></p>
+        <p>Required FEAT: <strong style="color:${requiredColor}">${requiredColor.toUpperCase()}</strong></p>
+        <label>Additional Karma bonus to roll (max ${maxAdditionalKarma}):</label>
+        <input type="number" min="0" max="${maxAdditionalKarma}" value="0" style="width:100%"/>
+      `
     });
     
-    const karmaBonus = Number.isNaN(karmaInput) ? 0 : karmaInput;
+    const karmaBonus = Math.min(maxAdditionalKarma, Number.isNaN(karmaInput) ? 0 : karmaInput);
+    console.log("Karma bonus:", karmaBonus);
     
     // Roll 1d100
     const roll = new Roll("1d100");
     await roll.evaluate();
-    const total = roll.total + karmaBonus;
+    console.log("Roll result:", roll.total);
     
-    // Determine FEAT result color
-    const resultColor = this._getFeatColor(rankValue, total);
-    const success = (
-      (requiredColor === "green" && ["green", "yellow", "red"].includes(resultColor)) ||
-      (requiredColor === "yellow" && ["yellow", "red"].includes(resultColor)) ||
-      (requiredColor === "red" && resultColor === "red")
-    );
+    // Calculate total with karma bonus
+    const totalRoll = Math.min(100, roll.total + karmaBonus);
+    console.log("Total roll (with karma):", totalRoll);
     
-    // Increment usage count if successful and not yet mastered
-    if (success && stunt.timesUsed < 10) {
+    // Use the universal table to determine FEAT result color
+    const resultColor = game.msh.rollUniversalTable(rank, totalRoll);
+    console.log("Result color from universal table:", resultColor);
+    console.log("Result color (lowercase):", resultColor.toLowerCase());
+    
+    // Check if the result meets the requirement
+    const resultColorLower = resultColor.toLowerCase();
+    console.log("Checking success with:");
+    console.log("  Required:", requiredColor);
+    console.log("  Got:", resultColorLower);
+    
+    let success = false;
+    if (requiredColor === "green") {
+      success = ["green", "yellow", "red"].includes(resultColorLower);
+      console.log("  Green check: needs green/yellow/red, got", resultColorLower, "=", success);
+    } else if (requiredColor === "yellow") {
+      success = ["yellow", "red"].includes(resultColorLower);
+      console.log("  Yellow check: needs yellow/red, got", resultColorLower, "=", success);
+    } else if (requiredColor === "red") {
+      success = resultColorLower === "red";
+      console.log("  Red check: needs red, got", resultColorLower, "=", success);
+    }
+    
+    console.log("FINAL SUCCESS VALUE:", success);
+    
+    // Increment usage count if successful
+    if (success) {
+      console.log("Success! Incrementing usage count from", stunt.timesUsed, "to", stunt.timesUsed + 1);
       const stunts = foundry.utils.deepClone(this.actor.system.stunts || []);
       stunts[stuntIndex].timesUsed++;
       await this.actor.update({ "system.stunts": stunts });
+    } else {
+      console.log("Failed! Usage count stays at", stunt.timesUsed);
     }
     
-    // Log Karma spend
+    // Log Karma spending to history
     const karmaSheet = await import('./karma.js').then(m => new m.KarmaSheet(this.actor));
+    
+    // Base 100 Karma cost
     await karmaSheet._addKarmaEvent({
       realDate: new Date().toLocaleDateString(),
       gameDate: "",
       amount: -100,
       type: "Power Stunt",
-      description: `Attempted stunt "${stunt.name}"`
+      description: `Attempted stunt "${stunt.name}" (${requiredColor} FEAT required)`
     });
     
+    // Additional karma bonus
     if (karmaBonus > 0) {
       await karmaSheet._addKarmaEvent({
         realDate: new Date().toLocaleDateString(),
         gameDate: "",
         amount: -karmaBonus,
-        type: "Karma Bonus",
-        description: `Added ${karmaBonus} Karma to Power Stunt roll for "${stunt.name}"`
+        type: "Die Roll",
+        description: `Karma bonus for "${stunt.name}" power stunt`
       });
     }
     
-    // Display result in chat
-    const chatHtml = `
-      <strong>${this.actor.name}</strong> attempts <em>${stunt.name}</em><br>
-      Rank: <strong>${rank}</strong> (${rankValue})<br>
-      Required FEAT: <strong style="color:${requiredColor}">${requiredColor.toUpperCase()}</strong><br>
-      Roll: <strong>${roll.total}</strong> + Karma: <strong>${karmaBonus}</strong> → <strong>${total}</strong><br>
-      Result: <strong style="color:${resultColor}">${resultColor.toUpperCase()}</strong><br>
-      Karma Spent: <strong>${100 + karmaBonus}</strong><br>
-      <strong>${success ? "✅ Success!" : "❌ Failure!"}</strong>
+    // Determine result text
+    const resultText = success ? "STUNT SUCCEEDED" : "STUNT FAILED";
+    
+    // Build chat content - matching power roll format exactly
+    let content = `
+      <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
+        <div style="padding: 5px 10px; border-bottom: 1px solid #c0c0c0; font-size: 1.1em; color: #8b0000;">
+          <strong>${this.actor.name} - ${stunt.name} (Power Stunt)</strong>
+        </div>
+        <div style="padding: 5px 10px; font-size: 0.9em;">
+          <div>Base Rank: ${rank} (${rankValue})</div>
+          <div>Times Used: ${stunt.timesUsed} → Required FEAT: ${requiredColor.toUpperCase()}</div>
+          <div>Base Karma Cost: 100</div>
+          ${karmaBonus > 0 ? `<div>Additional Karma Spent: ${karmaBonus}</div>` : ''}
+          <div>Roll: ${roll.total}${karmaBonus > 0 ? ` + Karma: ${karmaBonus}` : ''} = ${totalRoll}</div>
+          ${success ? `<div>Usage count increased to ${stunt.timesUsed + 1}</div>` : ''}
+        </div>
+        <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
+          background-color: ${resultColorLower === 'white' ? '#f8f8f8 !important' :
+            resultColorLower === 'green' ? '#4CAF50 !important' :
+              resultColorLower === 'yellow' ? '#FFC107 !important' :
+                '#F44336 !important'};
+          color: ${resultColorLower === 'white' || resultColorLower === 'yellow' ? '#333' : 'white'};">
+          ${resultText} (${resultColor.toUpperCase()})
+        </div>
+      </div>
     `;
     
-    await roll.toMessage({
+    await ChatMessage.create({
       speaker: ChatMessage.getSpeaker({ actor: this.actor }),
-      flavor: chatHtml,
-      rollMode: game.settings.get("core", "rollMode")
+      content: content
     });
+    
+    console.log("=== POWER STUNT DEBUG END ===");
   }
 
   _getFeatColor(rankValue, roll) {
