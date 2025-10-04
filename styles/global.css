@@ -1777,11 +1777,11 @@
 
 /* Add specific background colors */
 .karma-sheet .karma-summary div:nth-child(4) {
-  background-color: #e8f5e9; /* Light green background for Advancement Fund */
+  background-color: #e3f2fd; /* Light blue background for Team Pool */
 }
 
 .karma-sheet .karma-summary div:nth-child(5) {
-  background-color: #e3f2fd; /* Light blue background for Karma Pool */
+  background-color: #e0e0e0; /* Grey background for Daily Karma */
 }
 
 .karma-sheet .summary-item label {
