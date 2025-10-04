@@ -207,6 +207,8 @@ export class TeamSheet extends Application {
   }
 
   _onDistributeKarma(event) {
+    const currentMultiplier = game.settings.get("msh-faserip", "karmaMultiplier") || 1;
+    
     new Dialog({
       title: "Distribute Team Karma Award",
       content: `
@@ -231,8 +233,8 @@ export class TeamSheet extends Application {
             <textarea name="description" placeholder="Describe the heroic act..."></textarea>
           </div>
           <div class="form-group">
-            <label>Apply Multiplier (${game.settings.get("msh-faserip", "karmaMultiplier") || 1}x):</label>
-            <input type="checkbox" name="useMultiplier" checked />
+            <label>Karma Multiplier (1-100):</label>
+            <input type="number" name="karmaMultiplier" value="${currentMultiplier}" min="1" max="100" />
           </div>
         </form>
       `,
@@ -244,9 +246,12 @@ export class TeamSheet extends Application {
             const karmaAmount = Number(html.find('[name="karmaAmount"]').val());
             const awardType = html.find('[name="awardType"]').val();
             const description = html.find('[name="description"]').val();
-            const useMultiplier = html.find('[name="useMultiplier"]').prop('checked');
+            const multiplier = Number(html.find('[name="karmaMultiplier"]').val());
             
-            await this._distributeKarma(karmaAmount, awardType, description, useMultiplier);
+            // Save the multiplier setting for next time
+            await game.settings.set("msh-faserip", "karmaMultiplier", multiplier);
+            
+            await this._distributeKarma(karmaAmount, awardType, description, multiplier);
           }
         },
         cancel: {
@@ -257,25 +262,32 @@ export class TeamSheet extends Application {
     }).render(true);
   }
 
-  async _distributeKarma(karmaAmount, awardType, description, useMultiplier) {
+  async _distributeKarma(karmaAmount, awardType, description, multiplier) {
     const teamMembers = game.settings.get("msh-faserip", "teamMembers") || [];
     const heroes = game.actors.filter(a => teamMembers.includes(a.id));
-    const multiplier = useMultiplier ? (game.settings.get("msh-faserip", "karmaMultiplier") || 1) : 1;
-    const finalAmount = karmaAmount * multiplier;
+    
+    if (heroes.length === 0) {
+      ui.notifications.warn("No team members to distribute karma to");
+      return;
+    }
+    
+    // Calculate total karma pool and split among team members
+    const totalKarma = karmaAmount * multiplier;
+    const karmaPerHero = Math.floor(totalKarma / heroes.length);
     
     for (const hero of heroes) {
       const karmaEvent = {
         realDate: new Date().toLocaleDateString(),
         gameDate: "",
-        amount: finalAmount,
+        amount: karmaPerHero,
         type: awardType,
-        description: description || `Team karma award${multiplier > 1 ? ` (${multiplier}x multiplier)` : ''}`
+        description: description || `Team karma award (${karmaPerHero} of ${totalKarma} total${multiplier > 1 ? `, ${multiplier}x multiplier` : ''})`
       };
       
       const history = foundry.utils.deepClone(hero.system.karma?.history || []);
       history.push(karmaEvent);
       
-      const newLifetime = (hero.system.karma.lifetime || 0) + finalAmount;
+      const newLifetime = (hero.system.karma.lifetime || 0) + karmaPerHero;
       
       await hero.update({
         "system.karma.history": history,
@@ -283,7 +295,7 @@ export class TeamSheet extends Application {
       });
     }
     
-    ui.notifications.info(`Distributed ${finalAmount} karma to ${heroes.length} team members`);
+    ui.notifications.info(`Distributed ${totalKarma} karma split among ${heroes.length} team members (${karmaPerHero} each)`);
     this.render();
   }
 
