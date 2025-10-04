@@ -992,8 +992,8 @@ export class KarmaSheet extends DocumentSheet {
       const amount = Number(event.amount) || 0;
       if (amount > 0) {
         totalEarned += amount;
-      } else if (amount < 0) {
-        // All negative entries are lifetime spending
+      } else if (amount < 0 && event.type !== "Daily Roll") {
+        // Only count non-daily roll spending toward lifetime spent
         totalSpentLifetime += Math.abs(amount);
       }
     });

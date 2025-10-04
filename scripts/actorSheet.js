@@ -190,6 +190,7 @@ export class FaseripActorSheet extends ActorSheet {
       }
     }
 
+    context.availableKarma = Math.max(0, lifetime - spent - advancement - pool);
     return context;
   }
 

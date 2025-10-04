@@ -87,9 +87,7 @@ export class FaseripActor extends Actor {
     if (dailyKarmaEnabled) {
       const dailyRemaining = Math.max(0, system.karma.dailyKarmaMax - (system.karma.dailyKarmaUsed || 0));
       displayKarmaValue = dailyRemaining;
-      if (dailyRemaining <= 0) {
-        displayKarmaValue = availableLifetimeKarma;
-      }
+      // Remove the if statement that switches to lifetime karma
     } else {
       displayKarmaValue = availableLifetimeKarma;
     }
@@ -184,7 +182,7 @@ export class FaseripActor extends Actor {
     let totalSpent = 0;
     history.forEach(event => {
       // Only count negative amounts (spending), and ignore daily roll entries completely
-      if (event.amount < 0) {
+      if (event.amount < 0 && event.type !== "Daily Roll") {  // <-- ADD THIS CHECK
         totalSpent += Math.abs(event.amount);
       }
     });
