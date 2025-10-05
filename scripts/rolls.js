@@ -3539,7 +3539,34 @@ export async function openUniversalTableDialog(actor) {
           return;
         }
 
-        console.log("🎯 Creating macro for action:", action);
+        //console.log("🎯 Creating macro for action:", action);
+        console.log("🎯 Dragging action:", action);
+
+        // Map action codes to names
+        const actionNames = {
+          BA: "Blunt Attack", EA: "Edged Attack", Sh: "Shooting",
+          TE: "Thrown Edged", TB: "Thrown Blunt", En: "Energy Attack",
+          Fo: "Force Attack", Gp: "Grapple", Gb: "Grab", Es: "Escape",
+          Ch: "Charge", Ki: "Kill", St: "Stun", Sl: "Slam", Do: "Dodge",
+          Ev: "Evade", Bl: "Block", Ca: "Catch"
+        };
+
+        const iconMap = {
+          BA: "blunt", EA: "edged", Sh: "shooting", TE: "thrown", TB: "thrown_blunt",
+          En: "energy", Fo: "force", Gp: "grapple", Gb: "grab", Es: "escape",
+          Ch: "charge", Ki: "kill", St: "stun", Sl: "slam", Do: "dodge",
+          Ev: "evade", Bl: "block", Ca: "catch"
+        };
+
+        // Set custom drag data that hotbarDrop will handle
+        ev.dataTransfer.setData("text/plain", JSON.stringify({
+          type: "UniversalAction",
+          actionCode: action,
+          actionName: actionNames[action] || action,
+          actorId: actor.id,
+          actorName: actor.name,
+          iconName: iconMap[action] || "dice-target"
+        }));
 
         // Copy EXACTLY what the click handler does - don't open a new dialog
         const command = `// Universal Action Macro - same pattern as power macros

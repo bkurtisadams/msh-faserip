@@ -483,13 +483,18 @@ Hooks.on('hotbarDrop', (bar, data, slot) => {
   
   if (data.type === "Item" && data.actorId) {
     createFaseripItemMacro(data, slot);
-    return false; // Prevent default handling
+    return false;
   }
   else if (data.type === "UniversalTable" && data.actorId) {
     createUniversalTableMacro(data, slot);
-    return false; // Prevent default handling
+    return false;
   }
-  return true; // Allow default handling for other drop types
+  else if (data.type === "UniversalAction" && data.actionCode) {
+    createUniversalActionMacro(data, slot);
+    return false;
+  }
+  
+  return true;
 });
 
 // Define the function to create a macro
@@ -580,6 +585,40 @@ async function createUniversalTableMacro(data, slot) {
   }
   
   // Assign to hotbar slot
+  game.user.assignHotbarMacro(macro, slot);
+  return true;
+}
+
+async function createUniversalActionMacro(data, slot) {
+  const { actionCode, actionName, actorId, actorName, iconName } = data;
+  
+  const command = `// Universal Action Macro
+const actor = game.user.character || canvas.tokens.controlled[0]?.actor || game.actors.get("${actorId}");
+if (!actor) {
+  return ui.notifications.warn("Select a token or assign a character first.");
+}
+
+const savedCS = actor.getFlag("msh-faserip", "cs_${actionCode}") || 0;
+const savedKarma = actor.getFlag("msh-faserip", "karma_${actionCode}") || 0;
+
+// Call the same function that generates multi-target options in the dialog
+game.msh.rollUniversalAction("${actionCode}", actor.id, savedCS, savedKarma);`;
+
+  const macroName = `${actionName} (${actorName})`;
+  let macro = game.macros.find(m => m.name === macroName && m.command === command);
+  
+  if (!macro) {
+    const img = `systems/msh-faserip/assets/icons/actions/${iconName}.png`;
+    
+    macro = await Macro.create({
+      name: macroName,
+      type: "script",
+      command: command,
+      img: img,
+      flags: {"faserip.universalActionMacro": true}
+    });
+  }
+  
   game.user.assignHotbarMacro(macro, slot);
   return true;
 }
