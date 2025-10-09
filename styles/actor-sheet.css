@@ -269,24 +269,30 @@
 }
 
 /* Color coding for different action types */
-.action-btn[data-action*="attack"] .action-abbr,
+/* Orange attacks - Blunt Attack, Throwing Blunt, Force, Charging */
+.action-btn[data-action="blunt-attack"] .action-abbr,
+.action-btn[data-action="throwing-blunt"] .action-abbr,
+.action-btn[data-action="force"] .action-abbr,
+.action-btn[data-action="charging"] .action-abbr {
+  color: #cc6600;
+}
+
+/* Red attacks - Edged Attack, Shooting, Throwing Edged, Energy */
+.action-btn[data-action="edged-attack"] .action-abbr,
 .action-btn[data-action="shooting"] .action-abbr,
-.action-btn[data-action*="throwing"] .action-abbr,
-.action-btn[data-action="energy"] .action-abbr,
-.action-btn[data-action="force"] .action-abbr {
+.action-btn[data-action="throwing-edged"] .action-abbr,
+.action-btn[data-action="energy"] .action-abbr {
   color: #8b0000;
 }
 
+/* Blue - Grappling actions */
 .action-btn[data-action="grappling"] .action-abbr,
 .action-btn[data-action="grabbing"] .action-abbr,
 .action-btn[data-action="escaping"] .action-abbr {
   color: #0066cc;
 }
 
-.action-btn[data-action="charging"] .action-abbr {
-  color: #cc6600;
-}
-
+/* Green - Defensive actions */
 .action-btn[data-action="dodging"] .action-abbr,
 .action-btn[data-action="evading"] .action-abbr,
 .action-btn[data-action="blocking"] .action-abbr,
@@ -294,6 +300,7 @@
   color: #009900;
 }
 
+/* Purple - Effect checks */
 .action-btn[data-action="stun"] .action-abbr,
 .action-btn[data-action="slam"] .action-abbr,
 .action-btn[data-action="kill"] .action-abbr {
@@ -312,6 +319,7 @@
     grid-template-columns: repeat(3, 1fr);
   }
 }
+
 /* Universal Table Tab Styling */
 .universal-rank-table {
   padding: 8px;
