@@ -649,6 +649,7 @@
         <a class="item" data-tab="headquarters" data-tooltip="HQ"><i class="fas fa-home"></i></a>
         <a class="item" data-tab="vehicles" data-tooltip="Vehicles"><i class="fas fa-car"></i></a>
         <a class="item" data-tab="stunts" data-tooltip="Stunts"><i class="fas fa-star"></i></a>
+        <a class="item" data-tab="actions" data-tooltip="Actions"><i class="fas fa-fist-raised"></i></a>
         <a class="item" data-tab="effects" data-tooltip="Effects"><i class="fas fa-magic"></i></a>
       </nav>
 
@@ -1035,7 +1036,118 @@
         <p class="no-stunts">No power stunts created yet.</p>
         {{/unless}}
       </div>
+      <!-- Actions Tab -->
+      <div class="tab" data-tab="actions">
+        <div class="actions-tab-header">
+          <h2>Combat Actions</h2>
+          <p>Click an action to make a FEAT roll using the Universal Table</p>
+        </div>
 
+        <!-- Row 1: Attack Actions -->
+        <div class="action-row">
+          <h3>Attack Actions</h3>
+          <div class="action-buttons">
+            <button type="button" class="action-btn" data-action="blunt-attack" data-ability="fighting" title="Blunt Attack using Fighting ability">
+              <span class="action-abbr">BA</span>
+              <span class="action-name">Blunt<br>Attack</span>
+              <span class="action-ability">Fighting</span>
+            </button>
+            <button type="button" class="action-btn" data-action="edged-attack" data-ability="fighting" title="Edged Attack using Fighting ability">
+              <span class="action-abbr">EA</span>
+              <span class="action-name">Edged<br>Attack</span>
+              <span class="action-ability">Fighting</span>
+            </button>
+            <button type="button" class="action-btn" data-action="shooting" data-ability="agility" title="Shooting using Agility ability">
+              <span class="action-abbr">Sh</span>
+              <span class="action-name">Shooting</span>
+              <span class="action-ability">Agility</span>
+            </button>
+            <button type="button" class="action-btn" data-action="throwing-edged" data-ability="agility" title="Throwing Edged using Agility ability">
+              <span class="action-abbr">TE</span>
+              <span class="action-name">Throwing<br>Edged</span>
+              <span class="action-ability">Agility</span>
+            </button>
+            <button type="button" class="action-btn" data-action="throwing-blunt" data-ability="agility" title="Throwing Blunt using Agility ability">
+              <span class="action-abbr">TB</span>
+              <span class="action-name">Throwing<br>Blunt</span>
+              <span class="action-ability">Agility</span>
+            </button>
+            <button type="button" class="action-btn" data-action="energy" data-ability="agility" title="Energy Attack using Agility ability">
+              <span class="action-abbr">En</span>
+              <span class="action-name">Energy</span>
+              <span class="action-ability">Agility</span>
+            </button>
+            <button type="button" class="action-btn" data-action="force" data-ability="agility" title="Force Attack using Agility ability">
+              <span class="action-abbr">Fo</span>
+              <span class="action-name">Force</span>
+              <span class="action-ability">Agility</span>
+            </button>
+            <button type="button" class="action-btn" data-action="grappling" data-ability="strength" title="Grappling using Strength ability">
+              <span class="action-abbr">Gp</span>
+              <span class="action-name">Grappling</span>
+              <span class="action-ability">Strength</span>
+            </button>
+            <button type="button" class="action-btn" data-action="grabbing" data-ability="strength" title="Grabbing using Strength ability">
+              <span class="action-abbr">Gb</span>
+              <span class="action-name">Grabbing</span>
+              <span class="action-ability">Strength</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Row 2: Defensive & Special Actions -->
+        <div class="action-row">
+          <h3>Defensive & Special Actions</h3>
+          <div class="action-buttons">
+            <button type="button" class="action-btn" data-action="escaping" data-ability="strength" title="Escaping using Strength ability">
+              <span class="action-abbr">Es</span>
+              <span class="action-name">Escaping</span>
+              <span class="action-ability">Strength</span>
+            </button>
+            <button type="button" class="action-btn" data-action="charging" data-ability="endurance" title="Charging using Endurance ability">
+              <span class="action-abbr">Ch</span>
+              <span class="action-name">Charging</span>
+              <span class="action-ability">Endurance</span>
+            </button>
+            <button type="button" class="action-btn" data-action="dodging" data-ability="agility" title="Dodging using Agility ability">
+              <span class="action-abbr">Do</span>
+              <span class="action-name">Dodging</span>
+              <span class="action-ability">Agility</span>
+            </button>
+            <button type="button" class="action-btn" data-action="evading" data-ability="fighting" title="Evading using Fighting ability">
+              <span class="action-abbr">Ev</span>
+              <span class="action-name">Evading</span>
+              <span class="action-ability">Fighting</span>
+            </button>
+            <button type="button" class="action-btn" data-action="blocking" data-ability="strength" title="Blocking using Strength ability">
+              <span class="action-abbr">Bl</span>
+              <span class="action-name">Blocking</span>
+              <span class="action-ability">Strength</span>
+            </button>
+            <button type="button" class="action-btn" data-action="catching" data-ability="agility" title="Catching using Agility ability">
+              <span class="action-abbr">Ca</span>
+              <span class="action-name">Catching</span>
+              <span class="action-ability">Agility</span>
+            </button>
+            <button type="button" class="action-btn" data-action="stun" data-ability="endurance" title="Stun Check using Endurance ability">
+              <span class="action-abbr">St</span>
+              <span class="action-name">Stun</span>
+              <span class="action-ability">Endurance</span>
+            </button>
+            <button type="button" class="action-btn" data-action="slam" data-ability="endurance" title="Slam Check using Endurance ability">
+              <span class="action-abbr">Sl</span>
+              <span class="action-name">Slam</span>
+              <span class="action-ability">Endurance</span>
+            </button>
+            <button type="button" class="action-btn" data-action="kill" data-ability="endurance" title="Kill Check using Endurance ability">
+              <span class="action-abbr">Kl</span>
+              <span class="action-name">Kill</span>
+              <span class="action-ability">Endurance</span>
+            </button>
+          </div>
+        </div>
+      </div>
+      
       <!-- Effects Tab -->
       <div class="tab" data-tab="effects">
         <div class="tab-controls">

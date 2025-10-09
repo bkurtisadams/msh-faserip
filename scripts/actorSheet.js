@@ -2833,7 +2833,14 @@ html.find('.headquarters-row').each((i, row) => {
       this.render(false);
     });
 
-    
+    // Action buttons in Actions tab
+    html.find('.action-btn').click(async ev => {
+      const button = ev.currentTarget;
+      const actionType = button.dataset.action;
+      const abilityName = button.dataset.ability;
+      
+      await this._rollAction(actionType, abilityName);
+    });
 
     // This serves as a fallback to ensure all draggable items can create macros
     new foundry.applications.ux.DragDrop.implementation({
@@ -3873,6 +3880,508 @@ _rollVehicleControl(vehicle) {
     if (roll >= 66) return rankValue >= 36 ? "red" : "yellow";
     if (roll >= 36) return rankValue >= 16 ? "yellow" : "green";
     return "green";
+  }
+
+  async _rollAction(actionType, abilityName) {
+    const actor = this.actor;
+    const ability = actor.system.abilities[abilityName];
+    
+    if (!ability) {
+      ui.notifications.error(`Ability ${abilityName} not found`);
+      return;
+    }
+
+    const abilityRank = ability.rank;
+    const abilityValue = ability.value;
+    const abilityFullName = abilityName.charAt(0).toUpperCase() + abilityName.slice(1);
+    
+    // Get action display name
+    const actionNames = {
+      'blunt-attack': 'Blunt Attack',
+      'edged-attack': 'Edged Attack',
+      'shooting': 'Shooting',
+      'throwing-edged': 'Throwing Edged',
+      'throwing-blunt': 'Throwing Blunt',
+      'energy': 'Energy Attack',
+      'force': 'Force Attack',
+      'grappling': 'Grappling',
+      'grabbing': 'Grabbing',
+      'escaping': 'Escaping Hold',
+      'charging': 'Charging',
+      'dodging': 'Dodging',
+      'evading': 'Evading',
+      'blocking': 'Blocking',
+      'catching': 'Catching',
+      'stun': 'Stun Check',
+      'slam': 'Slam Check',
+      'kill': 'Kill Check'
+    };
+    
+    // Define effects for each action type and color (corrected from Universal Table)
+    const actionEffects = {
+      'blunt-attack': {
+        white: 'Miss',
+        green: 'Hit',
+        yellow: 'Slam',
+        red: 'Stun'
+      },
+      'edged-attack': {
+        white: 'Miss',
+        green: 'Hit',
+        yellow: 'Stun',
+        red: 'Kill'
+      },
+      'shooting': {
+        white: 'Miss',
+        green: 'Hit',
+        yellow: 'Bullseye',
+        red: 'Kill'
+      },
+      'throwing-edged': {
+        white: 'Miss',
+        green: 'Hit',
+        yellow: 'Stun',
+        red: 'Kill'
+      },
+      'throwing-blunt': {
+        white: 'Miss',
+        green: 'Hit',
+        yellow: 'Hit',
+        red: 'Stun'
+      },
+      'energy': {
+        white: 'Miss',
+        green: 'Hit',
+        yellow: 'Bullseye',
+        red: 'Kill'
+      },
+      'force': {
+        white: 'Miss',
+        green: 'Hit',
+        yellow: 'Bullseye',
+        red: 'Stun'
+      },
+      'grappling': {
+        white: 'Miss',
+        green: 'Miss',
+        yellow: 'Partial',
+        red: 'Hold'
+      },
+      'grabbing': {
+        white: 'Miss',
+        green: 'Take',
+        yellow: 'Grab',
+        red: 'Break'
+      },
+      'escaping': {
+        white: 'Miss',
+        green: 'Escape',
+        yellow: 'Escape',
+        red: 'Reverse'
+      },
+      'charging': {
+        white: 'Miss',
+        green: 'Hit',
+        yellow: 'Slam',
+        red: 'Stun'
+      },
+      'dodging': {
+        white: 'None',
+        green: '-2 CS',
+        yellow: '-4 CS',
+        red: '-6 CS'
+      },
+      'evading': {
+        white: 'Auto-hit',
+        green: 'Evasion',
+        yellow: 'Evasion +1CS',
+        red: 'Evasion +2CS'
+      },
+      'blocking': {
+        white: '-6 CS',
+        green: '-4 CS',
+        yellow: '-2 CS',
+        red: '+1 CS'
+      },
+      'catching': {
+        white: 'Autohit',
+        green: 'Miss',
+        yellow: 'Damage',
+        red: 'Catch'
+      },
+      'stun': {
+        white: '1-10 rounds',
+        green: '1 round',
+        yellow: 'No effect',
+        red: 'No effect'
+      },
+      'slam': {
+        white: 'Grand Slam',
+        green: '1 area',
+        yellow: 'Stagger',
+        red: 'No Slam'
+      },
+      'kill': {
+        white: 'Endurance Loss',
+        green: 'E/S',
+        yellow: 'No effect',
+        red: 'No effect'
+      }
+    };
+    
+    const actionName = actionNames[actionType] || actionType;
+    const effects = actionEffects[actionType] || { white: 'White', green: 'Green', yellow: 'Yellow', red: 'Red' };
+    
+    // Create dialog for roll options
+    const dialogContent = `
+      <div style="margin-bottom: 10px;">
+        <label style="display: inline-block; width: 120px;">Action:</label>
+        <strong>${actionName}</strong>
+      </div>
+      <div style="margin-bottom: 10px;">
+        <label style="display: inline-block; width: 120px;">Ability:</label>
+        <input type="text" value="${abilityFullName}" style="width: 100px;" readonly>
+      </div>
+      <div style="margin-bottom: 10px;">
+        <label style="display: inline-block; width: 120px;">Rank:</label>
+        <input type="text" value="${abilityRank}" style="width: 100px;" readonly>
+        <span style="margin-left: 5px;">(${abilityValue})</span>
+      </div>
+      <div style="margin-bottom: 10px;">
+        <label style="display: inline-block; width: 120px;">Column Shift:</label>
+        <input type="number" id="shift" name="shift" value="0" style="width: 50px;">
+        <span style="color: #666; font-size: 0.9em;">(+ right, - left)</span>
+      </div>
+      <div style="margin-bottom: 10px;">
+        <label style="display: inline-block; width: 120px;">Karma Points:</label>
+        <input type="number" id="karma" name="karma" value="0" min="0" style="width: 50px;">
+      </div>
+      <div>
+        <label>
+          <input type="checkbox" id="skip-dice" name="skipDice"> 
+          Skip dice animation
+        </label>
+      </div>
+    `;
+    
+    new Dialog({
+      title: `${actionName}: ${actor.name}`,
+      content: dialogContent,
+      buttons: {
+        roll: {
+          label: "Roll",
+          callback: async (html) => {
+            const columnShift = parseInt(html.find('[name="shift"]').val()) || 0;
+            const karma = parseInt(html.find('[name="karma"]').val()) || 0;
+            const skipDice = html.find('[name="skipDice"]').is(':checked');
+            
+            // Apply column shifts
+            let effectiveRank = abilityRank;
+            if (columnShift !== 0) {
+              const ranks = [
+                "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent",
+                "Remarkable", "Incredible", "Amazing", "Monstrous", "Unearthly",
+                "Shift-X", "Shift-Y", "Shift-Z", "Class 1000", "Class 3000", "Class 5000", "Beyond"
+              ];
+              const index = ranks.indexOf(abilityRank);
+              if (index !== -1) {
+                const newIndex = Math.min(Math.max(index + columnShift, 0), ranks.length - 1);
+                effectiveRank = ranks[newIndex];
+              }
+            }
+            
+            // Create the roll
+            const roll = new Roll("1d100");
+            await roll.evaluate();
+            
+            // Display dice if not skipped
+            if (!skipDice) {
+              await roll.toMessage({
+                speaker: ChatMessage.getSpeaker({ actor }),
+                flavor: `${actor.name} performs ${actionName}`,
+                rollMode: game.settings.get("core", "rollMode")
+              });
+            }
+            
+            // Apply karma
+            let cappedTotal = roll.total;
+
+            const dailyKarmaEnabled = game.settings.get("msh-faserip", "dailyKarmaEnabled");
+            let dailyKarmaUsedAmount = 0;
+            let lifetimeKarmaUsedAmount = 0;
+
+            if (karma > 0) {
+              if (dailyKarmaEnabled) {
+                const dailyRemaining = this.actor.system.karma.dailyKarmaMax - (this.actor.system.karma.dailyKarmaUsed || 0);
+                if (dailyRemaining > 0) {
+                  dailyKarmaUsedAmount = Math.min(karma, dailyRemaining);
+                  cappedTotal = Math.min(100, roll.total + dailyKarmaUsedAmount);
+                  
+                  await game.msh.runAsGM({
+                    operation: 'update',
+                    targetActorUuid: this.actor.uuid,
+                    args: [{ "system.karma.dailyKarmaUsed": (this.actor.system.karma.dailyKarmaUsed || 0) + dailyKarmaUsedAmount }]
+                  });
+                  
+                  const remainingNeeded = karma - dailyKarmaUsedAmount;
+                  if (remainingNeeded > 0) {
+                    lifetimeKarmaUsedAmount = remainingNeeded;
+                    cappedTotal = Math.min(100, cappedTotal + lifetimeKarmaUsedAmount);
+                  }
+                } else {
+                  lifetimeKarmaUsedAmount = karma;
+                  cappedTotal = Math.min(100, roll.total + lifetimeKarmaUsedAmount);
+                }
+              } else {
+                lifetimeKarmaUsedAmount = karma;
+                cappedTotal = Math.min(100, roll.total + lifetimeKarmaUsedAmount);
+              }
+
+              if (lifetimeKarmaUsedAmount > 0) {
+                const historyEntry = {
+                  realDate: new Date().toLocaleDateString(),
+                  gameDate: "",
+                  amount: -lifetimeKarmaUsedAmount,
+                  type: "Die Roll",
+                  description: `Spent lifetime karma on ${actionName}`
+                };
+                
+                const currentHistory = foundry.utils.deepClone(this.actor.system.karma?.history || []);
+                currentHistory.push(historyEntry);
+                
+                await game.msh.runAsGM({
+                  operation: 'update',
+                  targetActorUuid: this.actor.uuid,
+                  args: [{ "system.karma.history": currentHistory }]
+                });
+              }
+            }
+
+            const historyUpdates = [];
+            if (dailyKarmaUsedAmount > 0) {
+              historyUpdates.push({
+                realDate: new Date().toLocaleDateString(),
+                gameDate: "",
+                amount: -dailyKarmaUsedAmount,
+                type: "Daily Roll",
+                description: `Spent daily karma on ${actionName}`
+              });
+            }
+            if (lifetimeKarmaUsedAmount > 0) {
+              historyUpdates.push({
+                realDate: new Date().toLocaleDateString(),
+                gameDate: "",
+                amount: -lifetimeKarmaUsedAmount,
+                type: "Die Roll",
+                description: `Spent lifetime karma on ${actionName}`
+              });
+            }
+
+            if (historyUpdates.length > 0) {
+              const currentHistory = foundry.utils.deepClone(actor.system.karma?.history || []);
+              const newHistory = currentHistory.concat(historyUpdates);
+              
+              await game.msh.runAsGM({
+                operation: 'update',
+                targetActorUuid: actor.uuid,
+                args: [{ "system.karma.history": newHistory }]
+              });
+            }
+
+            const totalKarmaUsed = dailyKarmaUsedAmount + lifetimeKarmaUsedAmount;
+            
+            // Get result color
+            const resultColor = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
+            const resultColorLower = resultColor.toLowerCase();
+            
+            // Get the specific effect for this action and color
+            const effectResult = effects[resultColorLower] || resultColor;
+            
+            // Create chat message with all possible results and highlight the actual result
+            const content = `
+              <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
+                <div style="padding: 5px 10px; border-bottom: 1px solid #c0c0c0; font-size: 1.1em; color: #8b0000;">
+                  <strong>${actor.name} - ${actionName}</strong>
+                </div>
+                <div style="padding: 5px 10px; font-size: 0.9em;">
+                  <div>Ability: ${abilityFullName}</div>
+                  <div>Base Rank: ${abilityRank} (${abilityValue})</div>
+                  ${columnShift !== 0 ? `<div>Column Shift: ${columnShift} → ${effectiveRank}</div>` : ''}
+                  <div>Roll: ${roll.total}${totalKarmaUsed > 0 ? ` + Karma: ${totalKarmaUsed}` : ''} = ${cappedTotal}</div>
+                </div>
+                
+                <!-- Possible Results Table with Hover Text -->
+                <div style="padding: 5px 10px; margin: 5px 0; background-color: #fff; border: 1px solid #ddd;">
+                  <div style="font-weight: bold; margin-bottom: 5px; color: #333;">Possible Results (hover for details):</div>
+                  <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 3px; font-size: 0.85em;">
+                    <div style="padding: 4px; background-color: ${resultColorLower === 'white' ? '#333' : '#f0f0f0'}; 
+                      color: ${resultColorLower === 'white' ? '#fff' : '#666'}; 
+                      border: ${resultColorLower === 'white' ? '2px solid #000' : '1px solid #ccc'}; 
+                      font-weight: ${resultColorLower === 'white' ? 'bold' : 'normal'}; text-align: center; cursor: help;"
+                      title="${this._getResultHoverText(actionType, 'white')}">
+                      White: ${effects.white}
+                    </div>
+                    <div style="padding: 4px; background-color: ${resultColorLower === 'green' ? '#4CAF50' : '#f0f0f0'}; 
+                      color: ${resultColorLower === 'green' ? '#fff' : '#666'}; 
+                      border: ${resultColorLower === 'green' ? '2px solid #2e7d32' : '1px solid #ccc'}; 
+                      font-weight: ${resultColorLower === 'green' ? 'bold' : 'normal'}; text-align: center; cursor: help;"
+                      title="${this._getResultHoverText(actionType, 'green')}">
+                      Green: ${effects.green}
+                    </div>
+                    <div style="padding: 4px; background-color: ${resultColorLower === 'yellow' ? '#FFC107' : '#f0f0f0'}; 
+                      color: ${resultColorLower === 'yellow' ? '#333' : '#666'}; 
+                      border: ${resultColorLower === 'yellow' ? '2px solid #f57c00' : '1px solid #ccc'}; 
+                      font-weight: ${resultColorLower === 'yellow' ? 'bold' : 'normal'}; text-align: center; cursor: help;"
+                      title="${this._getResultHoverText(actionType, 'yellow')}">
+                      Yellow: ${effects.yellow}
+                    </div>
+                    <div style="padding: 4px; background-color: ${resultColorLower === 'red' ? '#F44336' : '#f0f0f0'}; 
+                      color: ${resultColorLower === 'red' ? '#fff' : '#666'}; 
+                      border: ${resultColorLower === 'red' ? '2px solid #c62828' : '1px solid #ccc'}; 
+                      font-weight: ${resultColorLower === 'red' ? 'bold' : 'normal'}; text-align: center; cursor: help;"
+                      title="${this._getResultHoverText(actionType, 'red')}">
+                      Red: ${effects.red}
+                    </div>
+                  </div>
+                </div>
+                
+                <!-- Actual Result -->
+                <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
+                  background-color: ${resultColorLower === 'white' ? '#f8f8f8' :
+                    resultColorLower === 'green' ? '#4CAF50' :
+                      resultColorLower === 'yellow' ? '#FFC107' :
+                        '#F44336'}; 
+                  color: ${resultColorLower === 'white' || resultColorLower === 'yellow' ? '#333' : 'white'};">
+                  RESULT: ${resultColor.toUpperCase()} - ${effectResult.toUpperCase()}
+                </div>
+              </div>
+            `;
+            
+            await ChatMessage.create({
+              speaker: ChatMessage.getSpeaker({ actor }),
+              content
+            });
+          }
+        },
+        cancel: { label: "Cancel" }
+      },
+      default: "roll"
+    }).render(true);
+  }
+
+  _getResultHoverText(actionType, color) {
+    const hoverTexts = {
+      'blunt-attack': {
+        white: 'Miss - No damage inflicted',
+        green: 'Hit - Inflict Strength rank damage',
+        yellow: 'Slam - Inflict damage and may Slam opponent',
+        red: 'Stun - Inflict damage and may Stun opponent'
+      },
+      'edged-attack': {
+        white: 'Miss - No damage inflicted',
+        green: 'Hit - Inflict weapon damage',
+        yellow: 'Stun - Inflict damage and may Stun opponent',
+        red: 'Kill - Inflict damage and may Kill opponent'
+      },
+      'shooting': {
+        white: 'Miss - No damage, may hit another target',
+        green: 'Hit - Inflict weapon damage',
+        yellow: 'Bullseye - Hit specific target area',
+        red: 'Kill - Inflict damage and may Kill opponent'
+      },
+      'throwing-edged': {
+        white: 'Miss - No damage, may hit another target',
+        green: 'Hit - Inflict weapon damage',
+        yellow: 'Stun - Inflict damage and may Stun opponent',
+        red: 'Kill - Inflict damage and may Kill opponent'
+      },
+      'throwing-blunt': {
+        white: 'Miss - No damage',
+        green: 'Hit - Inflict Strength or material damage',
+        yellow: 'Hit - Inflict Strength or material damage',
+        red: 'Stun - Inflict damage and may Stun opponent'
+      },
+      'energy': {
+        white: 'Miss - No damage inflicted',
+        green: 'Hit - Inflict power rank damage',
+        yellow: 'Bullseye - Hit specific target area',
+        red: 'Kill - Inflict damage and may Kill opponent'
+      },
+      'force': {
+        white: 'Miss - No damage inflicted',
+        green: 'Hit - Inflict power rank damage',
+        yellow: 'Bullseye - Hit specific target area',
+        red: 'Stun - Inflict damage and may Stun opponent'
+      },
+      'grappling': {
+        white: 'Miss - Failed to hold opponent, no other actions',
+        green: 'Miss - Failed to hold opponent, no other actions',
+        yellow: 'Partial Hold - Grabbed limb, target acts at -2CS',
+        red: 'Hold - Target fully restrained, can inflict Strength damage'
+      },
+      'grabbing': {
+        white: 'Miss - Item not taken, may be knocked loose',
+        green: 'Take - Gained possession if Strength ≥ target',
+        yellow: 'Grab - Gained possession regardless of Strength',
+        red: 'Break - Item taken or potentially damaged/activated'
+      },
+      'escaping': {
+        white: 'Miss - Still held, no other actions this turn',
+        green: 'Escape - Free of hold, may move half speed',
+        yellow: 'Escape - Free of hold, may move half speed',
+        red: 'Reverse - Free and may counter-grapple or act at -2CS'
+      },
+      'charging': {
+        white: 'Miss - No damage, continue moving half speed',
+        green: 'Hit - Inflict Endurance + speed damage',
+        yellow: 'Slam - Inflict damage and may Slam opponent',
+        red: 'Stun - Inflict damage and may Stun opponent'
+      },
+      'dodging': {
+        white: 'None - No reduction to incoming attacks',
+        green: '-2 CS - Reduce attacker column shift by 2',
+        yellow: '-4 CS - Reduce attacker column shift by 4',
+        red: '-6 CS - Reduce attacker column shift by 6'
+      },
+      'evading': {
+        white: 'Auto-hit - Opponent automatically scores green result',
+        green: 'Evasion - Dodge successful, no damage taken',
+        yellow: 'Evasion +1CS - Dodge and gain +1CS next attack',
+        red: 'Evasion +2CS - Dodge and gain +2CS next attack'
+      },
+      'blocking': {
+        white: '-6 CS - Body Armor reduced by 6 column shifts',
+        green: '-4 CS - Body Armor reduced by 4 column shifts',
+        yellow: '-2 CS - Body Armor reduced by 2 column shifts',
+        red: '+1 CS - Body Armor increased by 1 column shift'
+      },
+      'catching': {
+        white: 'Autohit - Object hits you instead (auto green)',
+        green: 'Miss - Failed to catch, attack gets +1CS',
+        yellow: 'Damage - Caught but may damage object/person',
+        red: 'Catch - Successfully caught with no damage'
+      },
+      'stun': {
+        white: '1-10 rounds - Knocked out for 1-10 rounds',
+        green: '1 round - Knocked down, no action next round',
+        yellow: 'No effect - Character not stunned',
+        red: 'No effect - Character not stunned'
+      },
+      'slam': {
+        white: 'Grand Slam - Knocked away at attacker Strength speed',
+        green: '1 area - Knocked back one area',
+        yellow: 'Stagger - Knocked back a step, no longer adjacent',
+        red: 'No Slam - Not affected by slam'
+      },
+      'kill': {
+        white: 'Endurance Loss - Dying, lose 1 rank/turn',
+        green: 'E/S - Endurance Loss only if Edged/Shooting attack',
+        yellow: 'No effect - Character survives, takes damage only',
+        red: 'No effect - Character survives, takes damage only'
+      }
+    };
+    
+    return hoverTexts[actionType]?.[color] || `${color} result for ${actionType}`;
   }
   
   // other methods

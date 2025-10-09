@@ -201,3 +201,138 @@
 .sheet-tabs-navigation .item:hover::after {
   opacity: 1;
 }
+
+/* Actions Tab Styling */
+.actions-tab-header {
+  text-align: center;
+  padding: 10px;
+  background-color: #f5f5f0;
+  border-bottom: 2px solid #8b0000;
+  margin-bottom: 20px;
+}
+
+.actions-tab-header h2 {
+  margin: 0 0 5px 0;
+  color: #8b0000;
+}
+
+.actions-tab-header p {
+  margin: 0;
+  font-size: 0.9em;
+  color: #666;
+}
+
+.action-row {
+  margin-bottom: 20px;
+  padding: 10px;
+  background-color: #f9f9f9;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+}
+
+.action-row h3 {
+  margin: 0 0 10px 0;
+  padding-bottom: 5px;
+  border-bottom: 1px solid #ccc;
+  color: #8b0000;
+  font-size: 1em;
+}
+
+.action-buttons {
+  display: grid;
+  grid-template-columns: repeat(9, 1fr);
+  gap: 2px;
+  background-color: #666;
+  border: 2px solid #666;
+}
+
+.action-btn {
+  padding: 8px 4px;
+  background-color: #ffffff;
+  color: #000;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  font-weight: normal;
+  font-size: 0.75em;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  min-height: 70px;
+  position: relative;
+}
+
+.action-btn:hover {
+  background-color: #e8e8e8;
+}
+
+.action-btn:active {
+  background-color: #d0d0d0;
+}
+
+.action-btn .action-abbr {
+  font-weight: bold;
+  font-size: 1.3em;
+  margin-bottom: 2px;
+  color: #000;
+}
+
+.action-btn .action-name {
+  font-size: 0.8em;
+  line-height: 1.1;
+  margin-bottom: 3px;
+  color: #333;
+}
+
+.action-btn .action-ability {
+  font-size: 0.75em;
+  color: #666;
+  font-style: italic;
+}
+
+/* Color coding for different action types */
+.action-btn[data-action*="attack"] .action-abbr,
+.action-btn[data-action="shooting"] .action-abbr,
+.action-btn[data-action*="throwing"] .action-abbr,
+.action-btn[data-action="energy"] .action-abbr,
+.action-btn[data-action="force"] .action-abbr {
+  color: #8b0000;
+}
+
+.action-btn[data-action="grappling"] .action-abbr,
+.action-btn[data-action="grabbing"] .action-abbr,
+.action-btn[data-action="escaping"] .action-abbr {
+  color: #0066cc;
+}
+
+.action-btn[data-action="charging"] .action-abbr {
+  color: #cc6600;
+}
+
+.action-btn[data-action="dodging"] .action-abbr,
+.action-btn[data-action="evading"] .action-abbr,
+.action-btn[data-action="blocking"] .action-abbr,
+.action-btn[data-action="catching"] .action-abbr {
+  color: #009900;
+}
+
+.action-btn[data-action="stun"] .action-abbr,
+.action-btn[data-action="slam"] .action-abbr,
+.action-btn[data-action="kill"] .action-abbr {
+  color: #990099;
+}
+
+/* Responsive adjustments */
+@media (max-width: 900px) {
+  .action-buttons {
+    grid-template-columns: repeat(5, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .action-buttons {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
