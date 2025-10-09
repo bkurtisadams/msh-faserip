@@ -2842,6 +2842,26 @@ html.find('.headquarters-row').each((i, row) => {
       await this._rollAction(actionType, abilityName);
     });
 
+    // Universal Table cell click - highlight the cell
+    html.find('.rank-cell').click(ev => {
+      // Remove previous highlights
+      html.find('.rank-cell').removeClass('highlighted');
+      
+      // Highlight clicked cell
+      $(ev.currentTarget).addClass('highlighted');
+      
+      // Get the roll range and rank
+      const row = $(ev.currentTarget).closest('tr');
+      const rollLabel = row.data('roll-label');
+      const cellIndex = $(ev.currentTarget).index();
+      const headerRow = html.find('.universal-rank-table thead tr').eq(0);
+      const rankAbbr = headerRow.find('th').eq(cellIndex).text().trim();
+      const color = $(ev.currentTarget).data('color');
+      
+      // Optional: Show a notification
+      ui.notifications.info(`Roll ${rollLabel} on ${rankAbbr} = ${color.toUpperCase()}`);
+    });
+    
     // This serves as a fallback to ensure all draggable items can create macros
     new foundry.applications.ux.DragDrop.implementation({
       dragSelector: ".power-row, .talent-item, .contact-item, .equipment-row, .vehicle-draggable, .headquarters-draggable",

@@ -230,7 +230,7 @@
   cursor: pointer;
   transition: background-color 0.2s ease;
   font-weight: normal;
-  font-size: 0.7em;
+  font-size: 0.9em;
   text-align: center;
   display: flex;
   flex-direction: column;
@@ -310,5 +310,95 @@
 @media (max-width: 600px) {
   .action-buttons {
     grid-template-columns: repeat(3, 1fr);
+  }
+}
+/* Universal Table Tab Styling */
+.universal-rank-table {
+  padding: 8px;
+  overflow-x: auto;
+  border: none;
+}
+
+.universal-rank-table table {
+  width: 100%;
+  border-collapse: collapse;
+  background-color: #fff;
+  border: 2px solid #333;
+  font-size: 0.75em;
+}
+
+.universal-rank-table thead th {
+  background-color: #e0e0e0;
+  border: 1px solid #666;
+  padding: 4px 2px;
+  text-align: center;
+  font-weight: bold;
+  font-size: 0.85em;
+  line-height: 1.1;
+}
+
+.universal-rank-table thead .header-top th {
+  font-size: 1em;
+  font-weight: bold;
+  padding: 6px 2px;
+}
+
+.universal-rank-table tbody th {
+  background-color: #f0f0f0;
+  border: 1px solid #666;
+  padding: 4px 6px;
+  text-align: center;
+  font-weight: bold;
+  min-width: 40px;
+}
+
+.universal-rank-table .rank-cell {
+  border: 1px solid #999;
+  padding: 0;
+  height: 20px;
+  min-width: 30px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.universal-rank-table .rank-cell:hover {
+  opacity: 0.8;
+  transform: scale(1.05);
+  box-shadow: 0 0 5px rgba(0,0,0,0.3);
+}
+
+.universal-rank-table .rank-cell.white {
+  background-color: #ffffff;
+}
+
+.universal-rank-table .rank-cell.green {
+  background-color: #00c000;
+}
+
+.universal-rank-table .rank-cell.yellow {
+  background-color: #ffff00;
+}
+
+.universal-rank-table .rank-cell.red {
+  background-color: #cc0000;
+}
+
+.universal-rank-table .rank-cell.highlighted {
+  outline: 3px solid #000;
+  outline-offset: -3px;
+  box-shadow: 0 0 10px rgba(0,0,0,0.5);
+  z-index: 10;
+  position: relative;
+}
+
+/* Responsive adjustments */
+@media (max-width: 900px) {
+  .universal-rank-table {
+    font-size: 0.7em;
+  }
+  
+  .universal-rank-table .rank-cell {
+    min-width: 20px;
+    height: 15px;
   }
 }

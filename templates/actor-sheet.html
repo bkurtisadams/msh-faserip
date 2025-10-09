@@ -650,6 +650,8 @@
         <a class="item" data-tab="vehicles" data-tooltip="Vehicles"><i class="fas fa-car"></i></a>
         <a class="item" data-tab="stunts" data-tooltip="Stunts"><i class="fas fa-star"></i></a>
         <a class="item" data-tab="actions" data-tooltip="Actions"><i class="fas fa-fist-raised"></i></a>
+        <!-- universal table tab, after the actions tab -->
+        <a class="item" data-tab="universal-table" data-tooltip="Universal Table"><i class="fas fa-table"></i></a>
         <a class="item" data-tab="effects" data-tooltip="Effects"><i class="fas fa-magic"></i></a>
       </nav>
 
@@ -1139,6 +1141,606 @@
               <span class="action-ability">Endurance</span>
             </button>
           </div>
+        </div>
+      </div>
+
+      <!-- Universal Table Tab -->
+      <div class="tab" data-tab="universal-table">
+        <div class="universal-rank-table">
+          <table>
+            <thead>
+              <tr class="header-top">
+                <th style="color: #000; text-shadow: none;">&nbsp;</th>
+                <th style="color: #000; text-shadow: none;">0</th>
+                <th style="color: #000; text-shadow: none;">Fe</th>
+                <th style="color: #000; text-shadow: none;">Pr</th>
+                <th style="color: #000; text-shadow: none;">Ty</th>
+                <th style="color: #000; text-shadow: none;">Gd</th>
+                <th style="color: #000; text-shadow: none;">Ex</th>
+                <th style="color: #000; text-shadow: none;">Rm</th>
+                <th style="color: #000; text-shadow: none;">In</th>
+                <th style="color: #000; text-shadow: none;">Am</th>
+                <th style="color: #000; text-shadow: none;">Mn</th>
+                <th style="color: #000; text-shadow: none;">Un</th>
+                <th style="color: #000; text-shadow: none;">X</th>
+                <th style="color: #000; text-shadow: none;">Y</th>
+                <th style="color: #000; text-shadow: none;">Z</th>
+                <th style="color: #000; text-shadow: none;">1000</th>
+                <th style="color: #000; text-shadow: none;">3000</th>
+                <th style="color: #000; text-shadow: none;">5000</th>
+                <th style="color: #000; text-shadow: none;">B</th>
+              </tr>
+              <tr>
+                <th></th>
+                <th>Shift</th>
+                <th>Feeble</th>
+                <th>Poor</th>
+                <th>Typical</th>
+                <th>Good</th>
+                <th>Excellent</th>
+                <th>Remarkable</th>
+                <th>Incredible</th>
+                <th>Amazing</th>
+                <th>Monstrous</th>
+                <th>Unearthly</th>
+                <th>Shift</th>
+                <th>Shift</th>
+                <th>Shift</th>
+                <th>Class</th>
+                <th>Class</th>
+                <th>Class</th>
+                <th>Beyond</th>
+              </tr>
+              <tr>
+                <th></th>
+                <th>0</th>
+                <th>2</th>
+                <th>4</th>
+                <th>6</th>
+                <th>10</th>
+                <th>20</th>
+                <th>30</th>
+                <th>40</th>
+                <th>50</th>
+                <th>75</th>
+                <th>100</th>
+                <th>150</th>
+                <th>200</th>
+                <th>500</th>
+                <th>1000</th>
+                <th>3000</th>
+                <th>5000</th>
+                <th>∞</th>
+              </tr>
+              <tr>
+                <th></th>
+                <th>0</th>
+                <th>1-2</th>
+                <th>3-4</th>
+                <th>5-7</th>
+                <th>8-15</th>
+                <th>16-25</th>
+                <th>26-36</th>
+                <th>37-45</th>
+                <th>46-62</th>
+                <th>63-87</th>
+                <th>88-125</th>
+                <th>126-175</th>
+                <th>176-350</th>
+                <th>351+</th>
+                <th>1000</th>
+                <th>3000</th>
+                <th>5000</th>
+                <th>-</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr data-roll-label="01">
+                <th>01</th>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+              </tr>
+              <tr data-roll-label="02-03">
+                <th>02-03</th>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+              </tr>
+              <tr data-roll-label="04-06">
+                <th>04-06</th>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+              </tr>
+              <tr data-roll-label="07-10">
+                <th>07-10</th>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+              </tr>
+              <tr data-roll-label="11-15">
+                <th>11-15</th>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+              </tr>
+              <tr data-roll-label="16-20">
+                <th>16-20</th>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+              </tr>
+              <tr data-roll-label="21-25">
+                <th>21-25</th>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+              </tr>
+              <tr data-roll-label="26-30">
+                <th>26-30</th>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+              </tr>
+              <tr data-roll-label="31-35">
+                <th>31-35</th>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+              </tr>
+              <tr data-roll-label="36-40">
+                <th>36-40</th>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+              </tr>
+              <tr data-roll-label="41-45">
+                <th>41-45</th>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+              </tr>
+              <tr data-roll-label="46-50">
+                <th>46-50</th>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+              </tr>
+              <tr data-roll-label="51-55">
+                <th>51-55</th>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+              </tr>
+              <tr data-roll-label="56-60">
+                <th>56-60</th>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+              </tr>
+              <tr data-roll-label="61-65">
+                <th>61-65</th>
+                <td class="white rank-cell" data-color="white"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="red rank-cell" data-color="red"></td>
+              </tr>
+              <tr data-roll-label="66-70">
+                <th>66-70</th>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="red rank-cell" data-color="red"></td>
+                <td class="red rank-cell" data-color="red"></td>
+              </tr>
+              <tr data-roll-label="71-75">
+                <th>71-75</th>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="red rank-cell" data-color="red"></td>
+                <td class="red rank-cell" data-color="red"></td>
+                <td class="red rank-cell" data-color="red"></td>
+              </tr>
+              <tr data-roll-label="76-80">
+                <th>76-80</th>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="red rank-cell" data-color="red"></td>
+                <td class="red rank-cell" data-color="red"></td>
+                <td class="red rank-cell" data-color="red"></td>
+                <td class="red rank-cell" data-color="red"></td>
+                <td class="red rank-cell" data-color="red"></td>
+              </tr>
+              <tr data-roll-label="81-85">
+                <th>81-85</th>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="red rank-cell" data-color="red"></td>
+                <td class="red rank-cell" data-color="red"></td>
+                <td class="red rank-cell" data-color="red"></td>
+                <td class="red rank-cell" data-color="red"></td>
+                <td class="red rank-cell" data-color="red"></td>
+                <td class="red rank-cell" data-color="red"></td>
+                <td class="red rank-cell" data-color="red"></td>
+              </tr>
+              <tr data-roll-label="86-90">
+                <th>86-90</th>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="red rank-cell" data-color="red"></td>
+                <td class="red rank-cell" data-color="red"></td>
+                <td class="red rank-cell" data-color="red"></td>
+                <td class="red rank-cell" data-color="red"></td>
+                <td class="red rank-cell" data-color="red"></td>
+                <td class="red rank-cell" data-color="red"></td>
+                <td class="red rank-cell" data-color="red"></td>
+                <td class="red rank-cell" data-color="red"></td>
+                <td class="red rank-cell" data-color="red"></td>
+              </tr>
+              <tr data-roll-label="91-94">
+                <th>91-94</th>
+                <td class="green rank-cell" data-color="green"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="red rank-cell" data-color="red"></td>
+                <td class="red rank-cell" data-color="red"></td>
+                <td class="red rank-cell" data-color="red"></td>
+                <td class="red rank-cell" data-color="red"></td>
+                <td class="red rank-cell" data-color="red"></td>
+                <td class="red rank-cell" data-color="red"></td>
+                <td class="red rank-cell" data-color="red"></td>
+                <td class="red rank-cell" data-color="red"></td>
+                <td class="red rank-cell" data-color="red"></td>
+                <td class="red rank-cell" data-color="red"></td>
+                <td class="red rank-cell" data-color="red"></td>
+              </tr>
+              <tr data-roll-label="95-97">
+                <th>95-97</th>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="red rank-cell" data-color="red"></td>
+                <td class="red rank-cell" data-color="red"></td>
+                <td class="red rank-cell" data-color="red"></td>
+                <td class="red rank-cell" data-color="red"></td>
+                <td class="red rank-cell" data-color="red"></td>
+                <td class="red rank-cell" data-color="red"></td>
+                <td class="red rank-cell" data-color="red"></td>
+                <td class="red rank-cell" data-color="red"></td>
+                <td class="red rank-cell" data-color="red"></td>
+                <td class="red rank-cell" data-color="red"></td>
+                <td class="red rank-cell" data-color="red"></td>
+                <td class="red rank-cell" data-color="red"></td>
+                <td class="red rank-cell" data-color="red"></td>
+              </tr>
+              <tr data-roll-label="98-99">
+                <th>98-99</th>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="yellow rank-cell" data-color="yellow"></td>
+                <td class="red rank-cell" data-color="red"></td>
+                <td class="red rank-cell" data-color="red"></td>
+                <td class="red rank-cell" data-color="red"></td>
+                <td class="red rank-cell" data-color="red"></td>
+                <td class="red rank-cell" data-color="red"></td>
+                <td class="red rank-cell" data-color="red"></td>
+                <td class="red rank-cell" data-color="red"></td>
+                <td class="red rank-cell" data-color="red"></td>
+                <td class="red rank-cell" data-color="red"></td>
+                <td class="red rank-cell" data-color="red"></td>
+                <td class="red rank-cell" data-color="red"></td>
+                <td class="red rank-cell" data-color="red"></td>
+                <td class="red rank-cell" data-color="red"></td>
+                <td class="red rank-cell" data-color="red"></td>
+                <td class="red rank-cell" data-color="red"></td>
+              </tr>
+              <tr data-roll-label="100">
+                <th>100</th>
+                <td class="red rank-cell" data-color="red"></td>
+                <td class="red rank-cell" data-color="red"></td>
+                <td class="red rank-cell" data-color="red"></td>
+                <td class="red rank-cell" data-color="red"></td>
+                <td class="red rank-cell" data-color="red"></td>
+                <td class="red rank-cell" data-color="red"></td>
+                <td class="red rank-cell" data-color="red"></td>
+                <td class="red rank-cell" data-color="red"></td>
+                <td class="red rank-cell" data-color="red"></td>
+                <td class="red rank-cell" data-color="red"></td>
+                <td class="red rank-cell" data-color="red"></td>
+                <td class="red rank-cell" data-color="red"></td>
+                <td class="red rank-cell" data-color="red"></td>
+                <td class="red rank-cell" data-color="red"></td>
+                <td class="red rank-cell" data-color="red"></td>
+                <td class="red rank-cell" data-color="red"></td>
+                <td class="red rank-cell" data-color="red"></td>
+                <td class="red rank-cell" data-color="red"></td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
 
