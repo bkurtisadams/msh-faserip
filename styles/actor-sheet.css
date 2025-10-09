@@ -202,40 +202,16 @@
   opacity: 1;
 }
 
-/* Actions Tab Styling */
-.actions-tab-header {
-  text-align: center;
-  padding: 10px;
-  background-color: #f5f5f0;
-  border-bottom: 2px solid #8b0000;
-  margin-bottom: 20px;
-}
-
-.actions-tab-header h2 {
-  margin: 0 0 5px 0;
-  color: #8b0000;
-}
-
-.actions-tab-header p {
-  margin: 0;
-  font-size: 0.9em;
-  color: #666;
-}
-
+/* Actions Tab Styling - Compact Version */
 .action-row {
-  margin-bottom: 20px;
-  padding: 10px;
-  background-color: #f9f9f9;
-  border: 1px solid #ddd;
-  border-radius: 5px;
+  margin-bottom: 8px;
+  padding: 0;
+  background-color: transparent;
+  border: none;
 }
 
-.action-row h3 {
-  margin: 0 0 10px 0;
-  padding-bottom: 5px;
-  border-bottom: 1px solid #ccc;
-  color: #8b0000;
-  font-size: 1em;
+.action-row:first-child {
+  margin-top: 10px;
 }
 
 .action-buttons {
@@ -247,20 +223,20 @@
 }
 
 .action-btn {
-  padding: 8px 4px;
+  padding: 4px 2px;
   background-color: #ffffff;
   color: #000;
   border: none;
   cursor: pointer;
   transition: background-color 0.2s ease;
   font-weight: normal;
-  font-size: 0.75em;
+  font-size: 0.7em;
   text-align: center;
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  min-height: 70px;
+  min-height: 50px;
   position: relative;
 }
 
@@ -274,20 +250,20 @@
 
 .action-btn .action-abbr {
   font-weight: bold;
-  font-size: 1.3em;
-  margin-bottom: 2px;
+  font-size: 1.4em;
+  margin-bottom: 1px;
   color: #000;
 }
 
 .action-btn .action-name {
-  font-size: 0.8em;
-  line-height: 1.1;
-  margin-bottom: 3px;
+  font-size: 0.75em;
+  line-height: 1;
+  margin-bottom: 2px;
   color: #333;
 }
 
 .action-btn .action-ability {
-  font-size: 0.75em;
+  font-size: 0.7em;
   color: #666;
   font-style: italic;
 }
