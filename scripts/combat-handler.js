@@ -2208,7 +2208,7 @@ export class CombatHandler {
                                 const effectData = {
                                 name: `Grand Slam (Knockback ${slamDistance} areas)`,
                                 label: `Grand Slam (Knockback ${slamDistance} areas)`,
-                                icon: "systems/msh-faserip/assets/icons/slam.svg",
+                                icon: "icons/svg/falling.svg",
                                 origin: attacker?.uuid ?? null,
                                 disabled: false,
                                 flags: {
@@ -2481,7 +2481,7 @@ export class CombatHandler {
                 label: `Stunned (${rounds} rnds)`,
 
                 // nice to have an icon; use any path in your system
-                icon: "systems/msh-faserip/assets/icons/stunned.svg",
+                icon: "icons/svg/daze.svg",
 
                 origin: (typeof sourceName === "string" ? null : sourceName?.uuid) ?? null,
                 disabled: false,
