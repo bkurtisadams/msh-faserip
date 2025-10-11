@@ -2313,10 +2313,17 @@ html.find('.headquarters-row').each((i, row) => {
       const abilityRank = ability.rank;
       const abilityValue = ability.value;
       
+      // Check if this is a Strength FEAT
+      const isStrength = abilityName === 'strength';
+      
       // Get saved settings if they exist
       const savedColumnShift = this.actor.getFlag("msh-faserip", `last${abilityFullName}ColumnShift`) || 0;
       const savedIntensity = this.actor.getFlag("msh-faserip", `last${abilityFullName}Intensity`) || "None";
       const skipDiceRoll = this.actor.getFlag("msh-faserip", `last${abilityFullName}SkipDiceRoll`) || false;
+      const savedFeatType = this.actor.getFlag("msh-faserip", `last${abilityFullName}FeatType`) || "standard";
+      const savedWeightIntensity = this.actor.getFlag("msh-faserip", `last${abilityFullName}WeightIntensity`) || "Remarkable";
+      const savedMaterial = this.actor.getFlag("msh-faserip", `last${abilityFullName}Material`) || "Steel";
+      const savedThickness = this.actor.getFlag("msh-faserip", `last${abilityFullName}Thickness`) || "2-12";
       
       // Define all available ranks for intensity dropdown
       const allRanks = [
@@ -2325,18 +2332,126 @@ html.find('.headquarters-row').each((i, row) => {
         "Shift-X", "Shift-Y", "Shift-Z", "Class 1000", "Class 3000", "Class 5000", "Beyond"
       ];
       
+      // Weight to intensity mapping
+      const weightIntensities = [
+        { rank: "Feeble", display: "Feeble (Up to 50 lbs)" },
+        { rank: "Poor", display: "Poor (Up to 100 lbs)" },
+        { rank: "Typical", display: "Typical (Up to 200 lbs)" },
+        { rank: "Good", display: "Good (Up to 400 lbs)" },
+        { rank: "Excellent", display: "Excellent (Up to 800 lbs)" },
+        { rank: "Remarkable", display: "Remarkable (Up to 2000 lbs / 1 ton)" },
+        { rank: "Incredible", display: "Incredible (Up to 10 tons)" },
+        { rank: "Amazing", display: "Amazing (Up to 50 tons)" },
+        { rank: "Monstrous", display: "Monstrous (Up to 80 tons)" },
+        { rank: "Unearthly", display: "Unearthly (Up to 100 tons)" },
+        { rank: "Shift-X", display: "Shift-X (Up to 250 tons)" },
+        { rank: "Shift-Y", display: "Shift-Y (Up to 500 tons)" },
+        { rank: "Shift-Z", display: "Shift-Z (Up to 1000 tons)" }
+      ];
+      
+      // Material strength data
+      const materials = {
+        "Cloth": "Feeble",
+        "Glass": "Feeble",
+        "Brush": "Feeble",
+        "Paper": "Feeble",
+        "Normal Plastics": "Poor",
+        "Crystal": "Poor",
+        "Wood": "Poor",
+        "Rubber": "Typical",
+        "Gold": "Typical",
+        "Brass": "Typical",
+        "Copper": "Typical",
+        "Ice": "Typical",
+        "Adobe": "Typical",
+        "Computer Chips": "Typical",
+        "Brick": "Good",
+        "Aluminum": "Good",
+        "Light Machinery": "Good",
+        "Asphalt": "Good",
+        "High Strength Plastics": "Good",
+        "Concrete": "Excellent",
+        "Beta Cloth": "Excellent",
+        "Iron": "Excellent",
+        "Bullet-proof Glass": "Excellent",
+        "Reinforced Concrete": "Remarkable",
+        "Steel": "Remarkable",
+        "Solid Stone": "Incredible",
+        "Vibranium": "Incredible",
+        "Volcanic Rock": "Incredible",
+        "Osmium Steel": "Amazing",
+        "Granite": "Amazing",
+        "Gemstones": "Amazing",
+        "Diamond": "Monstrous",
+        "Super-heavy Alloys": "Monstrous",
+        "Adamantium Steel": "Unearthly",
+        "Mystical/Enchanted": "Unearthly"
+      };
+      
       // Create options HTML for intensity dropdown
       const intensityOptionsHTML = allRanks.map(rank => 
         `<option value="${rank}" ${rank === savedIntensity ? 'selected' : ''}>${rank}</option>`
       ).join('');
       
-      // Create dialog for roll options
+      // Create options for weight intensity dropdown
+      const weightIntensityOptionsHTML = weightIntensities.map(item =>
+        `<option value="${item.rank}" ${item.rank === savedWeightIntensity ? 'selected' : ''}>${item.display}</option>`
+      ).join('');
+      
+      // Create options for material dropdown
+      const materialOptionsHTML = Object.keys(materials).sort().map(material =>
+        `<option value="${material}" ${material === savedMaterial ? 'selected' : ''}>${material}</option>`
+      ).join('');
+      
+      // Build the dialog content
       let dialogContent = `
         <div style="margin-bottom: 10px;">
-          <label style="display: inline-block; width: 120px;">Ability Rank:</label>
-          <input type="text" id="ability-rank" name="abilityRank" value="${abilityRank}" style="width: 100px;" readonly>
+          <label style="display: inline-block; width: 100px;">Ability Rank:</label>
+          <input type="text" id="ability-rank" name="abilityRank" value="${abilityRank}" style="width: 120px;" readonly>
           <span style="margin-left: 5px;">(${abilityValue})</span>
-        </div>
+        </div>`;
+      
+      // Add FEAT Type selection for Strength
+      if (isStrength) {
+        dialogContent += `
+          <div style="margin-bottom: 10px;">
+            <label style="display: inline-block; width: 100px;">FEAT Type:</label>
+            <label><input type="radio" name="featType" value="standard" ${savedFeatType === 'standard' ? 'checked' : ''}> Standard</label>
+            <label style="margin-left: 10px;"><input type="radio" name="featType" value="lifting" ${savedFeatType === 'lifting' ? 'checked' : ''}> Lifting</label>
+            <label style="margin-left: 10px;"><input type="radio" name="featType" value="breaking" ${savedFeatType === 'breaking' ? 'checked' : ''}> Breaking</label>
+          </div>
+          
+          <div id="lifting-section" style="display: none; padding: 8px; background-color: #f0f0f0; border-radius: 3px; margin-bottom: 10px;">
+            <div style="font-weight: bold; margin-bottom: 5px; text-align: center;">─── Lifting Weight ───</div>
+            <div style="margin-bottom: 5px;">
+              <label style="display: inline-block; width: 50px;">Weight:</label>
+              <select id="weight-intensity" name="weightIntensity" style="width: 300px;">
+                ${weightIntensityOptionsHTML}
+              </select>
+            </div>
+          </div>
+          
+          <div id="breaking-section" style="display: none; padding: 8px; background-color: #f0f0f0; border-radius: 3px; margin-bottom: 10px;">
+            <div style="font-weight: bold; margin-bottom: 5px; text-align: center;">─── Breaking Material ───</div>
+            <div style="margin-bottom: 5px;">
+              <label style="display: inline-block; width: 60px;">Material:</label>
+              <select id="material-select" name="material" style="width: 150px;">
+                ${materialOptionsHTML}
+              </select>
+              <span id="base-material-strength" style="margin-left: 5px; font-size: 0.9em;"></span>
+            </div>
+            <div style="margin-bottom: 5px;">
+              <label style="display: inline-block; width: 60px;">Thickness:</label>
+              <label><input type="radio" name="thickness" value="<2" ${savedThickness === '<2' ? 'checked' : ''}> &lt;2"</label>
+              <label style="margin-left: 8px;"><input type="radio" name="thickness" value="2-12" ${savedThickness === '2-12' ? 'checked' : ''}> 2-12"</label>
+              <label style="margin-left: 8px;"><input type="radio" name="thickness" value="1-2ft" ${savedThickness === '1-2ft' ? 'checked' : ''}> 1-2'</label>
+              <label style="margin-left: 8px;"><input type="radio" name="thickness" value=">2ft" ${savedThickness === '>2ft' ? 'checked' : ''}> &gt;2'</label>
+              <span id="effective-material-strength" style="margin-left: 10px; font-weight: bold;"></span>
+            </div>
+          </div>`;
+      }
+      
+      dialogContent += `
         <div style="margin-bottom: 10px;">
           <label style="display: inline-block; width: 120px;">Intensity:</label>
           <select id="intensity" name="intensity" style="width: 120px;">
@@ -2382,11 +2497,31 @@ html.find('.headquarters-row').each((i, row) => {
               const saveSettings = html.find('[name="saveSettings"]').is(':checked');
               const skipDice = html.find('[name="skipDice"]').is(':checked');
               
+              // Get Strength-specific settings if applicable
+              let featType = 'standard';
+              let weightIntensity = '';
+              let material = '';
+              let thickness = '';
+              
+              if (isStrength) {
+                featType = html.find('[name="featType"]:checked').val();
+                weightIntensity = html.find('[name="weightIntensity"]').val();
+                material = html.find('[name="material"]').val();
+                thickness = html.find('[name="thickness"]:checked').val();
+              }
+              
               // Save settings if requested
               if (saveSettings) {
                 await this.actor.setFlag("msh-faserip", `last${abilityFullName}ColumnShift`, columnShift);
                 await this.actor.setFlag("msh-faserip", `last${abilityFullName}Intensity`, intensity);
                 await this.actor.setFlag("msh-faserip", `last${abilityFullName}SkipDiceRoll`, skipDice);
+                
+                if (isStrength) {
+                  await this.actor.setFlag("msh-faserip", `last${abilityFullName}FeatType`, featType);
+                  await this.actor.setFlag("msh-faserip", `last${abilityFullName}WeightIntensity`, weightIntensity);
+                  await this.actor.setFlag("msh-faserip", `last${abilityFullName}Material`, material);
+                  await this.actor.setFlag("msh-faserip", `last${abilityFullName}Thickness`, thickness);
+                }
               }
               
               // Apply column shifts to get effective rank
@@ -2423,6 +2558,20 @@ html.find('.headquarters-row').each((i, row) => {
                 return;
               }
               
+              // Build additional context for strength feats
+              let strengthContext = '';
+              if (isStrength && featType !== 'standard') {
+                if (featType === 'lifting') {
+                  const weightDisplay = weightIntensities.find(w => w.rank === weightIntensity)?.display || weightIntensity;
+                  strengthContext = `<div>Lifting: ${weightDisplay}</div>`;
+                } else if (featType === 'breaking') {
+                  const thicknessDisplay = thickness === '<2' ? '< 2"' : 
+                                          thickness === '2-12' ? '2-12"' : 
+                                          thickness === '1-2ft' ? '1-2 feet' : '> 2 feet';
+                  strengthContext = `<div>Breaking: ${material} (${thicknessDisplay})</div>`;
+                }
+              }
+              
               // Handle automatic FEAT
               if (isAutomatic) {
                 const content = `
@@ -2433,6 +2582,7 @@ html.find('.headquarters-row').each((i, row) => {
                     <div style="padding: 5px 10px; font-size: 0.9em;">
                       <div>Base Rank: ${abilityRank} (${abilityValue})</div>
                       ${columnShift !== 0 ? `<div>Column Shift: ${columnShift} → ${effectiveRank}</div>` : ''}
+                      ${strengthContext}
                       <div>Intensity: ${intensity}</div>
                       <div>Ability rank is 3+ ranks higher than intensity</div>
                     </div>
@@ -2577,6 +2727,7 @@ html.find('.headquarters-row').each((i, row) => {
                   <div style="padding: 5px 10px; font-size: 0.9em;">
                     <div>Base Rank: ${abilityRank} (${abilityValue})</div>
                     ${columnShift !== 0 ? `<div>Column Shift: ${columnShift} → ${effectiveRank}</div>` : ''}
+                    ${strengthContext}
                     ${intensity !== "None" ? `<div>Intensity: ${intensity} (Required: ${featRequirement})</div>` : ''}
                     <div>Roll: ${roll.total} + Karma: ${totalKarmaUsed} = ${cappedTotal}</div>
                   </div>
@@ -2607,48 +2758,190 @@ html.find('.headquarters-row').each((i, row) => {
         },
         default: "roll",
         render: html => {
-          // Function to update FEAT requirement display
-          const updateFeatRequirement = () => {
-            const intensity = html.find('#intensity').val();
-            const columnShift = parseInt(html.find('#shift').val()) || 0;
-            const reqText = html.find('#required-feat-text');
+          if (!isStrength) {
+            // Original functionality for non-Strength abilities
+            // Function to update FEAT requirement display
+            const updateFeatRequirement = () => {
+              const intensity = html.find('#intensity').val();
+              const columnShift = parseInt(html.find('#shift').val()) || 0;
+              const reqText = html.find('#required-feat-text');
+              
+              if (intensity === "None") {
+                reqText.text("Any Color").css('color', '#333');
+                return;
+              }
+              
+              // Apply column shifts to get effective rank
+              let effectiveRank = abilityRank;
+              if (columnShift !== 0) {
+                const ranks = [
+                  "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent",
+                  "Remarkable", "Incredible", "Amazing", "Monstrous", "Unearthly",
+                  "Shift-X", "Shift-Y", "Shift-Z", "Class 1000", "Class 3000", "Class 5000", "Beyond"
+                ];
+                const index = ranks.indexOf(abilityRank);
+                if (index !== -1) {
+                  const newIndex = Math.min(Math.max(index + columnShift, 0), ranks.length - 1);
+                  effectiveRank = ranks[newIndex];
+                }
+              }
+              
+              const { requirement, impossible, automatic } = this._determineFeatRequirement(effectiveRank, intensity);
+              
+              if (impossible) {
+                reqText.text("IMPOSSIBLE").css('color', '#F44336');
+              } else if (automatic) {
+                reqText.text("AUTOMATIC").css('color', '#4CAF50');
+              } else {
+                // Color code the requirement based on FEAT color
+                let color = '#333'; // default color
+                if (requirement === 'Green') {
+                  color = '#4CAF50'; // green
+                } else if (requirement === 'Yellow') {
+                  color = '#FFC107'; // yellow/amber
+                } else if (requirement === 'Red') {
+                  color = '#F44336'; // red
+                }
+                reqText.text(requirement).css('color', color);
+              }
+            };
             
-            if (intensity === "None") {
-              reqText.text("Any Color").css('color', '#333');
-              return;
-            }
+            // Update on intensity or column shift change
+            html.find('#intensity, #shift').on('change', updateFeatRequirement);
             
-            // Apply column shifts to get effective rank
-            let effectiveRank = abilityRank;
-            if (columnShift !== 0) {
+            // Initial update
+            updateFeatRequirement();
+          } else {
+            // Enhanced functionality for Strength
+            
+            // Get reference to the dialog element for resizing
+            const dialogElement = html.closest('.dialog');
+            
+            // Function to show/hide sections based on FEAT type
+            const updateFeatTypeDisplay = () => {
+              const featType = html.find('[name="featType"]:checked').val();
+              const liftingSection = html.find('#lifting-section');
+              const breakingSection = html.find('#breaking-section');
+              const intensitySelect = html.find('#intensity');
+              
+              if (featType === 'lifting') {
+                liftingSection.show();
+                breakingSection.hide();
+                intensitySelect.prop('disabled', true);
+                updateWeightIntensity();
+              } else if (featType === 'breaking') {
+                liftingSection.hide();
+                breakingSection.show();
+                intensitySelect.prop('disabled', true);
+                updateMaterialStrength();
+              } else {
+                liftingSection.hide();
+                breakingSection.hide();
+                intensitySelect.prop('disabled', false);
+              }
+              
+              updateFeatRequirement();
+              
+              // Force dialog to recalculate height
+              if (dialogElement.length > 0) {
+                dialogElement[0].style.height = 'auto';
+              }
+            };
+            
+            // Function to update weight intensity and set main intensity
+            const updateWeightIntensity = () => {
+              const weightIntensity = html.find('#weight-intensity').val();
+              html.find('#intensity').val(weightIntensity);
+              updateFeatRequirement();
+            };
+            
+            // Function to update material strength based on selection and thickness
+            const updateMaterialStrength = () => {
+              const material = html.find('#material-select').val();
+              const thickness = html.find('[name="thickness"]:checked').val();
+              const baseStrength = materials[material];
+              
+              html.find('#base-material-strength').text(`(${baseStrength})`);
+              
+              // Calculate effective strength based on thickness
               const ranks = [
                 "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent",
                 "Remarkable", "Incredible", "Amazing", "Monstrous", "Unearthly",
                 "Shift-X", "Shift-Y", "Shift-Z", "Class 1000", "Class 3000", "Class 5000", "Beyond"
               ];
-              const index = ranks.indexOf(abilityRank);
+              
+              let shift = 0;
+              if (thickness === '<2') shift = -1;
+              else if (thickness === '2-12') shift = 0;
+              else if (thickness === '1-2ft') shift = 1;
+              else if (thickness === '>2ft') shift = 2;
+              
+              const index = ranks.indexOf(baseStrength);
               if (index !== -1) {
-                const newIndex = Math.min(Math.max(index + columnShift, 0), ranks.length - 1);
-                effectiveRank = ranks[newIndex];
+                const newIndex = Math.min(Math.max(index + shift, 0), ranks.length - 1);
+                const effectiveStrength = ranks[newIndex];
+                html.find('#effective-material-strength').text(`→ ${effectiveStrength}`);
+                html.find('#intensity').val(effectiveStrength);
+                updateFeatRequirement();
               }
-            }
+            };
             
-            const { requirement, impossible, automatic } = this._determineFeatRequirement(effectiveRank, intensity);
+            // Function to update FEAT requirement display
+            const updateFeatRequirement = () => {
+              const intensity = html.find('#intensity').val();
+              const columnShift = parseInt(html.find('#shift').val()) || 0;
+              const reqText = html.find('#required-feat-text');
+              
+              if (intensity === "None") {
+                reqText.text("Any Color").css('color', '#333');
+                return;
+              }
+              
+              // Apply column shifts to get effective rank
+              let effectiveRank = abilityRank;
+              if (columnShift !== 0) {
+                const ranks = [
+                  "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent",
+                  "Remarkable", "Incredible", "Amazing", "Monstrous", "Unearthly",
+                  "Shift-X", "Shift-Y", "Shift-Z", "Class 1000", "Class 3000", "Class 5000", "Beyond"
+                ];
+                const index = ranks.indexOf(abilityRank);
+                if (index !== -1) {
+                  const newIndex = Math.min(Math.max(index + columnShift, 0), ranks.length - 1);
+                  effectiveRank = ranks[newIndex];
+                }
+              }
+              
+              const { requirement, impossible, automatic } = this._determineFeatRequirement(effectiveRank, intensity);
+              
+              if (impossible) {
+                reqText.text("IMPOSSIBLE").css('color', '#F44336');
+              } else if (automatic) {
+                reqText.text("AUTOMATIC").css('color', '#4CAF50');
+              } else {
+                // Color code the requirement based on FEAT color
+                let color = '#333'; // default color
+                if (requirement === 'Green') {
+                  color = '#4CAF50'; // green
+                } else if (requirement === 'Yellow') {
+                  color = '#FFC107'; // yellow/amber
+                } else if (requirement === 'Red') {
+                  color = '#F44336'; // red
+                }
+                reqText.text(requirement).css('color', color);
+              }
+            };
             
-            if (impossible) {
-              reqText.text("IMPOSSIBLE").css('color', '#F44336');
-            } else if (automatic) {
-              reqText.text("AUTOMATIC").css('color', '#4CAF50');
-            } else {
-              reqText.text(requirement).css('color', '#333');
-            }
-          };
-          
-          // Update on intensity or column shift change
-          html.find('#intensity, #shift').on('change', updateFeatRequirement);
-          
-          // Initial update
-          updateFeatRequirement();
+            // Event listeners for Strength-specific functionality
+            html.find('[name="featType"]').on('change', updateFeatTypeDisplay);
+            html.find('#weight-intensity').on('change', updateWeightIntensity);
+            html.find('#material-select').on('change', updateMaterialStrength);
+            html.find('[name="thickness"]').on('change', updateMaterialStrength);
+            html.find('#intensity, #shift').on('change', updateFeatRequirement);
+            
+            // Initial display update
+            updateFeatTypeDisplay();
+          }
         }
       }).render(true);
     });
