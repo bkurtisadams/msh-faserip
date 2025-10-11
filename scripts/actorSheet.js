@@ -4256,19 +4256,19 @@ _rollVehicleControl(vehicle) {
   const actionName = actionNames[actionType] || actionType;
   const effects = actionEffects[actionType] || { white: 'White', green: 'Green', yellow: 'Yellow', red: 'Red' };
   const isBluntAttack = actionType === 'blunt-attack';
+  const isEdgedAttack = actionType === 'edged-attack';
 
-  // Strength (for bare hands dmg)
+  // Strength (for bare hands/natural weapons dmg)
   const strengthAbility = actor.system.abilities.strength;
   const strengthRank = strengthAbility?.rank || "Typical";
   const strengthValue = strengthAbility?.value || 6;
 
-  // House rule toggle (global setting)
-  //const nextRankMinRule = game.settings.get("msh-faserip", "bluntNextRankMinRule") === true;
-  const nextRankMinRule = getBluntNextRankMinRule();
-
-  // Save/restore user prefs
-  const savedSource = await actor.getFlag("msh-faserip", "lastBluntSource") || "hands"; // "hands" | "weapon"
-  const savedItemId = await actor.getFlag("msh-faserip", "lastBluntItemId") || "";
+  // Save/restore user prefs for both attack types
+  const savedSource = await actor.getFlag("msh-faserip", 
+    isBluntAttack ? "lastBluntSource" : isEdgedAttack ? "lastEdgedSource" : null) || 
+    (isBluntAttack ? "hands" : isEdgedAttack ? "natural" : null);
+  const savedItemId = await actor.getFlag("msh-faserip", 
+    isBluntAttack ? "lastBluntItemId" : isEdgedAttack ? "lastEdgedItemId" : null) || "";
   const savedPullPunch = await actor.getFlag("msh-faserip", "lastPullPunch") || false;
 
   // Ranks array
@@ -4278,7 +4278,6 @@ _rollVehicleControl(vehicle) {
     "Shift-X", "Shift-Y", "Shift-Z", "Class 1000", "Class 3000", "Class 5000", "Beyond"
   ];
 
-
   // Helpers
   const isBluntCapable = (it) => {
     const s = it.system || {};
@@ -4286,7 +4285,13 @@ _rollVehicleControl(vehicle) {
     return (s.damageType === "BA") || (s.attackType === "blunt") || tagHit;
   };
 
-  // Helper to get minimum value for a rank (used for weapon material > strength calculation)
+  const isEdgedCapable = (it) => {
+    const s = it.system || {};
+    const tagHit = Array.isArray(s.tags) && (s.tags.includes("EA") || s.tags.includes("edged"));
+    return (s.damageType === "EA") || (s.attackType === "edged") || tagHit;
+  };
+
+  // Helper to get minimum value for a rank
   const getRankMinValue = (rankName) => {
     return game.msh.getRankValue(rankName) || 0;
   };
@@ -4300,8 +4305,6 @@ _rollVehicleControl(vehicle) {
       return { damage: strVal, note: 'Using Strength value' };
     }
 
-    // Official FASERIP Rule: If weapon material > user strength, 
-    // upgrade to minimum value of next rank
     if (matIdx > strIdx) {
       const nextIdx = Math.min(strIdx + 1, allRanks.length - 1);
       const nextRank = allRanks[nextIdx];
@@ -4312,7 +4315,6 @@ _rollVehicleControl(vehicle) {
       };
     }
 
-    // If weapon material <= user strength, use min(STR value, MAT value)
     const strValCap = game.msh.getRankValue(strRank);
     const matVal = game.msh.getRankValue(matRank);
     const dmg = Math.min(strValCap, matVal);
@@ -4322,12 +4324,38 @@ _rollVehicleControl(vehicle) {
     };
   };
 
-  // Build inventory list (blunt-capable)
-  const bluntItems = isBluntAttack
+  // Edged damage calculation following official FASERIP rules
+  const getDamageForEdged = (strRank, strVal, matRank, weaponBaseDmg) => {
+    const strIdx = allRanks.indexOf(strRank);
+    const matIdx = allRanks.indexOf(matRank);
+    
+    if (strIdx === -1 || matIdx === -1) {
+      return { 
+        damage: weaponBaseDmg || strVal, 
+        note: weaponBaseDmg ? `Using weapon base damage (${weaponBaseDmg})` : 'Using Strength value' 
+      };
+    }
+
+    // Edge attack: damage = min(Strength, weapon material), but never less than weapon base
+    const strValCap = game.msh.getRankValue(strRank);
+    const matVal = game.msh.getRankValue(matRank);
+    const calculatedDmg = Math.min(strValCap, matVal);
+    const finalDmg = Math.max(calculatedDmg, weaponBaseDmg || 0);
+    
+    return { 
+      damage: finalDmg, 
+      note: `Damage = max(min(STR ${strValCap}, MAT ${matVal}), weapon base ${weaponBaseDmg || 0})` 
+    };
+  };
+
+  // Build inventory list (attack-type-capable)
+  const attackItems = isBluntAttack 
     ? actor.items.filter(i => isBluntCapable(i))
+    : isEdgedAttack
+    ? actor.items.filter(i => isEdgedCapable(i))
     : [];
 
-  const itemOptionsHTML = bluntItems.map(i =>
+  const itemOptionsHTML = attackItems.map(i =>
     `<option value="${i.id}" ${i.id === savedItemId ? 'selected' : ''}>${i.name}</option>`
   ).join('');
 
@@ -4384,7 +4412,49 @@ _rollVehicleControl(vehicle) {
     `;
   }
 
+  if (isEdgedAttack) {
+    // Get saved settings
+    const savedNaturalRank = await actor.getFlag("msh-faserip", "lastNaturalWeaponRank") || "Good";
+    const savedNaturalDamage = await actor.getFlag("msh-faserip", "lastNaturalWeaponDamage") || game.msh.getRankValue(savedNaturalRank);
+    
+    dialogContent += `
+      <div style="margin: 10px 0 6px;">
+        <label style="display:inline-block; width:120px;">Source:</label>
+        <label><input type="radio" name="edgedSource" value="natural" ${savedSource === 'natural' ? 'checked' : ''}> Natural Weapon</label>
+        <label style="margin-left:10px;"><input type="radio" name="edgedSource" value="weapon" ${savedSource === 'weapon' ? 'checked' : ''}> Edged Weapon</label>
+      </div>
+
+      <div id="natural-row" style="display:none; margin-bottom:8px;">
+        <div style="margin-bottom:6px;">
+          <label style="display:inline-block; width:120px;">Rank:</label>
+          <select id="natural-rank" name="naturalRank" style="width:170px;">
+            ${allRanks.map(r => `<option value="${r}" ${r === savedNaturalRank ? 'selected' : ''}>${r}</option>`).join('')}
+          </select>
+        </div>
+        <div style="margin-bottom:6px;">
+          <label style="display:inline-block; width:120px;">Damage:</label>
+          <input type="number" id="natural-damage" name="naturalDamage" value="${savedNaturalDamage}" style="width:80px;">
+        </div>
+      </div>
+
+      <div id="weapon-row" style="display:none; margin-bottom:8px;">
+        <label style="display:inline-block; width:120px;">Item:</label>
+        <select id="weapon-item" name="weaponItem" style="min-width:220px;">
+          ${itemOptionsHTML || `<option value="">(No edged weapons found)</option>`}
+        </select>
+      </div>
+
+      <div id="damage-preview" style="margin-top:8px; padding:6px; background:#fff3e0; border:1px solid #FF9800; border-radius:3px; font-size:0.9em;">
+        <strong>Damage:</strong> <span id="dmg-val">-</span>
+        <span id="dmg-note" style="margin-left:6px; color:#555;"></span>
+      </div>
+    `;
+  }
+
   dialogContent += `
+    <div style="margin-top:8px;">
+      <label><input type="checkbox" id="remember-settings" name="rememberSettings" checked> Remember these settings</label>
+    </div>
     <div style="margin-top:8px;">
       <label><input type="checkbox" id="skip-dice" name="skipDice"> Skip dice animation</label>
     </div>
@@ -4412,16 +4482,14 @@ _rollVehicleControl(vehicle) {
             }
           }
 
-          // Blunt context
+          // Attack context
           let source = "none";
           let weaponName = "";
           let weaponMat = "";
-          let damageValue = abilityValue; // default fall-through
-          let showBreakHint = false;
+          let damageValue = abilityValue;
 
           if (isBluntAttack) {
             source = html.find('[name="bluntSource"]:checked').val() || "hands";
-            // persist
             await actor.setFlag("msh-faserip", "lastPullPunch", pulled);
 
             if (source === "hands") {
@@ -4432,29 +4500,65 @@ _rollVehicleControl(vehicle) {
               const itemId = html.find('[name="weaponItem"]').val();
               await actor.setFlag("msh-faserip", "lastBluntItemId", itemId);
 
-              const item = bluntItems.find(i => i.id === itemId) || null;
+              const item = attackItems.find(i => i.id === itemId) || null;
               if (item) {
                 weaponName = item.name;
                 weaponMat = getItemMaterialRank(item);
                 const { damage, note } = getDamageForBlunt(strengthRank, strengthValue, weaponMat);
                 damageValue = damage;
-
-                // If target armor > weapon material, a break check "may" apply; we only hint here.
-                showBreakHint = true;
-
-                // stash for later display
                 html.data('weaponNote', note);
               } else {
-                // No item found; default to Excellent material
                 weaponName = "(Object)";
                 weaponMat = "Excellent";
                 const { damage, note } = getDamageForBlunt(strengthRank, strengthValue, weaponMat);
                 damageValue = damage;
-                showBreakHint = true;
                 html.data('weaponNote', note);
               }
             }
-          }
+          } else if (isEdgedAttack) {
+              source = html.find('[name="edgedSource"]:checked').val() || "natural";
+              const rememberSettings = html.find('[name="rememberSettings"]').is(':checked');
+              
+              if (rememberSettings) {
+                await actor.setFlag("msh-faserip", "lastPullPunch", pulled);
+                await actor.setFlag("msh-faserip", "lastEdgedSource", source);
+              }
+
+              if (source === "natural") {
+                const naturalRank = html.find('[name="naturalRank"]').val();
+                const naturalDamage = parseInt(html.find('[name="naturalDamage"]').val()) || 0;
+                
+                if (rememberSettings) {
+                  await actor.setFlag("msh-faserip", "lastNaturalWeaponRank", naturalRank);
+                  await actor.setFlag("msh-faserip", "lastNaturalWeaponDamage", naturalDamage);
+                }
+                
+                weaponName = "Natural Weapon";
+                weaponMat = naturalRank;
+                damageValue = naturalDamage;
+                html.data('weaponNote', `${naturalRank} rank natural weapon`);
+              } else {
+                const itemId = html.find('[name="weaponItem"]').val();
+                
+                if (rememberSettings) {
+                  await actor.setFlag("msh-faserip", "lastEdgedItemId", itemId);
+                }
+
+                const item = attackItems.find(i => i.id === itemId);
+                if (item) {
+                  weaponName = item.name;
+                  weaponMat = getItemMaterialRank(item);
+                  const weaponBaseDmg = item.system?.damage || 0;
+                  const { damage, note } = getDamageForEdged(strengthRank, strengthValue, weaponMat, weaponBaseDmg);
+                  damageValue = damage;
+                  html.data('weaponNote', note);
+                } else {
+                  weaponName = "(Edged Weapon)";
+                  weaponMat = "Excellent";
+                  damageValue = strengthValue;
+                }
+              }
+            }
 
           // Roll
           const roll = new Roll("1d100");
@@ -4468,7 +4572,7 @@ _rollVehicleControl(vehicle) {
             });
           }
 
-          // Karma (unchanged behavior)
+          // Karma handling (same as before)
           let cappedTotal = roll.total;
 
           const dailyKarmaEnabled = game.settings.get("msh-faserip", "dailyKarmaEnabled");
@@ -4561,7 +4665,7 @@ _rollVehicleControl(vehicle) {
             }
           }
 
-          // Theme colors for result grid (same style logic you use)
+          // Theme colors for result grid
           const isWhite = resultColorLower === 'white';
           const isGreen = resultColorLower === 'green';
           const isYellow = resultColorLower === 'yellow';
@@ -4582,9 +4686,9 @@ _rollVehicleControl(vehicle) {
           const resultBG = isWhite ? '#f8f8f8' : isGreen ? '#4CAF50' : isYellow ? '#FFC107' : '#F44336';
           const resultFG = (isWhite || isYellow) ? '#333' : '#fff';
 
-          // Weapon/bare hands line for the card
+          // Weapon/natural weapon line for the card
           let weaponContext = '';
-          if (isBluntAttack && source === 'weapon') {
+          if ((isBluntAttack || isEdgedAttack) && source === 'weapon') {
             const note = html.data('weaponNote') || '';
             weaponContext = `
               <div>Weapon: ${weaponName} (${weaponMat}) — Damage: ${damageValue}</div>
@@ -4592,87 +4696,58 @@ _rollVehicleControl(vehicle) {
             `;
           } else if (isBluntAttack && source === 'hands') {
             weaponContext = `<div>Attack: Bare Hands — Damage: ${strengthValue}</div>`;
+          } else if (isEdgedAttack && source === 'natural') {
+            weaponContext = `<div>Attack: Claws/Teeth — Damage: ${strengthValue}</div>`;
           }
 
-          // Build actions row safely (no nested template strings)
+          // Build actions row - CORRECTED VERSION
           let actionsHtml = `
-            <div style="
-              display:flex;gap:6px;justify-content:center;flex-wrap:wrap;
-              padding:8px 10px;margin:6px 10px 10px;
-              border:1px solid #c0c0c0;background:#fafafa;border-radius:4px;
-            ">
-              <a
-                data-action="apply-damage"
-                aria-disabled="true"
-                onclick="return false;"
-                title="Placeholder: apply damage manually to the target(s)."
-                style="display:inline-block;font-size:12px;line-height:1.1;padding:2px 6px;
-                      border:1px solid #bbb;border-radius:3px;background:#f7f7f7;color:#333;
-                      text-decoration:none;white-space:nowrap;cursor:not-allowed;opacity:.55;filter:grayscale(.3);"
-              >Apply Damage</a>
-          `;
+            <div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;padding:8px 10px;margin:6px 10px 10px;border:1px solid #c0c0c0;background:#fafafa;border-radius:4px;">
+              <a class="action-button" data-action="apply-damage" aria-disabled="true" title="Placeholder: apply damage manually to the target(s)." style="display:inline-block;font-size:12px;line-height:1.1;padding:2px 6px;border:1px solid #bbb;border-radius:3px;background:#f7f7f7;color:#333;text-decoration:none;white-space:nowrap;cursor:not-allowed;opacity:.55;filter:grayscale(.3);">
+                Apply Damage
+              </a>`;
 
-          if (isYellow) {
+          if (isYellow && isBluntAttack) {
             actionsHtml += `
-              <a
-                data-action="resolve-slam"
-                aria-disabled="true"
-                onclick="return false;"
-                title="Placeholder: resolve SLAM manually (use Universal Table & movement as needed)."
-                style="display:inline-block;font-size:12px;line-height:1.1;padding:2px 6px;
-                      border:1px solid #bbb;border-radius:3px;background:#f7f7f7;color:#333;
-                      text-decoration:none;white-space:nowrap;cursor:not-allowed;opacity:.55;filter:grayscale(.3);"
-              >Resolve Slam</a>
-            `;
+              <a class="action-button" data-action="resolve-slam" aria-disabled="true" title="Placeholder: resolve SLAM manually (use Universal Table & movement as needed)." style="display:inline-block;font-size:12px;line-height:1.1;padding:2px 6px;border:1px solid #bbb;border-radius:3px;background:#f7f7f7;color:#333;text-decoration:none;white-space:nowrap;cursor:not-allowed;opacity:.55;filter:grayscale(.3);">
+                Resolve Slam
+              </a>`;
           }
 
-          if (isRed) {
+          if ((isRed && isBluntAttack) || (isYellow && isEdgedAttack) || (isRed && isEdgedAttack)) {
             actionsHtml += `
-              <a
-                data-action="resolve-stun"
-                aria-disabled="true"
-                onclick="return false;"
-                title="Placeholder: resolve STUN manually (apply duration/effects by table)."
-                style="display:inline-block;font-size:12px;line-height:1.1;padding:2px 6px;
-                      border:1px solid #bbb;border-radius:3px;background:#f7f7f7;color:#333;
-                      text-decoration:none;white-space:nowrap;cursor:not-allowed;opacity:.55;filter:grayscale(.3);"
-              >Resolve Stun</a>
-            `;
+              <a class="action-button" data-action="resolve-stun" aria-disabled="true" title="Placeholder: resolve STUN manually (apply duration/effects by table)." style="display:inline-block;font-size:12px;line-height:1.1;padding:2px 6px;border:1px solid #bbb;border-radius:3px;background:#f7f7f7;color:#333;text-decoration:none;white-space:nowrap;cursor:not-allowed;opacity:.55;filter:grayscale(.3);">
+                Resolve Stun
+              </a>`;
+          }
+
+          if (isRed && isEdgedAttack) {
+            actionsHtml += `
+              <a class="action-button" data-action="resolve-kill" aria-disabled="true" title="Placeholder: resolve KILL manually (apply endurance loss or death)." style="display:inline-block;font-size:12px;line-height:1.1;padding:2px 6px;border:1px solid #bbb;border-radius:3px;background:#f7f7f7;color:#333;text-decoration:none;white-space:nowrap;cursor:not-allowed;opacity:.55;filter:grayscale(.3);">
+                Resolve Kill
+              </a>`;
           }
 
           if (pulled) {
             actionsHtml += `
-              <a
-                data-action="pull-options"
-                aria-disabled="true"
-                onclick="return false;"
-                title="Placeholder: adjust for pulled punch manually (lower damage or downgrade color)."
-                style="display:inline-block;font-size:12px;line-height:1.1;padding:2px 6px;
-                      border:1px solid #bbb;border-radius:3px;background:#f7f7f7;color:#333;
-                      text-decoration:none;white-space:nowrap;cursor:not-allowed;opacity:.55;filter:grayscale(.3);"
-              >Pull Options</a>
-            `;
+              <a class="action-button" data-action="pull-options" aria-disabled="true" title="Placeholder: adjust for pulled punch manually (lower damage or downgrade color)." style="display:inline-block;font-size:12px;line-height:1.1;padding:2px 6px;border:1px solid #bbb;border-radius:3px;background:#f7f7f7;color:#333;text-decoration:none;white-space:nowrap;cursor:not-allowed;opacity:.55;filter:grayscale(.3);">
+                Pull Options
+              </a>`;
           }
 
-          if (isBluntAttack && source === 'weapon') {
+          if ((isBluntAttack || isEdgedAttack) && source === 'weapon') {
             actionsHtml += `
-              <a
-                data-action="breaking-feat"
-                data-weapon-mat="${weaponMat}"
-                data-actor-uuid="${actor.uuid}"
-                title="Roll a Breaking FEAT: compare weapon material vs target armor/material (or wielder STR)."
-                style="display:inline-block;font-size:12px;line-height:1.1;padding:2px 6px;
-                      border:1px solid #bbb;border-radius:3px;background:#ffffff;color:#333;
-                      text-decoration:none;white-space:nowrap;cursor:pointer;"
-              >Breaking FEAT</a>
-            `;
+              <a class="action-button" data-action="breaking-feat" data-weapon-mat="${weaponMat}" data-actor-uuid="${actor.uuid}" title="Roll a Breaking FEAT: compare weapon material vs target armor/material (or wielder STR)." style="display:inline-block;font-size:12px;line-height:1.1;padding:2px 6px;border:1px solid #bbb;border-radius:3px;background:#ffffff;color:#333;text-decoration:none;white-space:nowrap;cursor:pointer;">
+                Breaking FEAT
+              </a>`;
           }
 
-          actionsHtml += `</div>`;
+          actionsHtml += `
+            </div>`;
 
           // Optional hint below the box
           let actionsHintHtml = '';
-          if (isBluntAttack && source === 'weapon') {
+          if ((isBluntAttack || isEdgedAttack) && source === 'weapon') {
             actionsHintHtml = `
               <div style="padding:0 10px 8px;font-size:.8em;color:#666;">
                 Note: If weapon Material &lt; target Armor/Material, a Breaking FEAT may apply.
@@ -4680,7 +4755,7 @@ _rollVehicleControl(vehicle) {
             `;
           }
 
-          // Build chat content (keeps your current style)
+          // Build chat content
           const content = `
             <div style="background-color:#f5f5f0; border:1px solid #c0c0c0; border-radius:3px; margin-bottom:5px;">
               <div style="padding:5px 10px; border-bottom:1px solid #c0c0c0; font-size:1.1em; color:#8b0000;">
@@ -4717,7 +4792,8 @@ _rollVehicleControl(vehicle) {
               ${bodyArmorDisplay}
               ${actionsHtml}
               ${actionsHintHtml}
-              `;
+            </div>
+          `;
 
           await ChatMessage.create({
             speaker: ChatMessage.getSpeaker({ actor }),
@@ -4729,31 +4805,57 @@ _rollVehicleControl(vehicle) {
     },
     default: "roll",
     render: (html) => {
-      if (!isBluntAttack) return;
+      if (!isBluntAttack && !isEdgedAttack) return;
 
       const $dialog = html.closest('.dialog');
 
       const updateWeaponVisibility = () => {
-        const src = html.find('[name="bluntSource"]:checked').val() || "hands";
-        const $weaponRow = html.find('#weapon-row');
-        const $dmgVal = html.find('#dmg-val');
-        const $dmgNote = html.find('#dmg-note');
+        if (isBluntAttack) {
+          const src = html.find('[name="bluntSource"]:checked').val() || "hands";
+          const $weaponRow = html.find('#weapon-row');
+          const $dmgVal = html.find('#dmg-val');
+          const $dmgNote = html.find('#dmg-note');
 
-        if (src === "weapon") {
-          $weaponRow.show();
+          if (src === "weapon") {
+            $weaponRow.show();
+            const itemId = html.find('#weapon-item').val();
+            const item = attackItems.find(i => i.id === itemId) || null;  // Changed from bluntItems
+            const mat = item ? getItemMaterialRank(item) : "Excellent";
+            const { damage, note } = getDamageForBlunt(strengthRank, strengthValue, mat);
+            $dmgVal.text(damage);
+            $dmgNote.text(`Weapon: ${item ? item.name : '(Object)'} (${mat}) — ${note}`);
+          } else {
+            $weaponRow.hide();
+            $dmgVal.text(strengthValue);
+            $dmgNote.text(`(Bare Hands = Strength value)`);
+          }
+        } else if (isEdgedAttack) {
+          const src = html.find('[name="edgedSource"]:checked').val() || "natural";
+          const $naturalRow = html.find('#natural-row');
+          const $weaponRow = html.find('#weapon-row');
+          const $dmgVal = html.find('#dmg-val');
+          const $dmgNote = html.find('#dmg-note');
 
-          // Compute preview from selected item
-          const itemId = html.find('#weapon-item').val();
-          const item = bluntItems.find(i => i.id === itemId) || null;
-          const mat = item ? getItemMaterialRank(item) : "Excellent";
-          const { damage, note } = getDamageForBlunt(strengthRank, strengthValue, mat);
-
-          $dmgVal.text(damage);
-          $dmgNote.text(`Weapon: ${item ? item.name : '(Object)'} (${mat}) — ${note}`);
-        } else {
-          $weaponRow.hide();
-          $dmgVal.text(strengthValue);
-          $dmgNote.text(`(Bare Hands = Strength value)`);
+          if (src === "natural") {
+            $naturalRow.show();
+            $weaponRow.hide();
+            const rank = html.find('#natural-rank').val();
+            const damage = parseInt(html.find('#natural-damage').val()) || 0;
+            $dmgVal.text(damage);
+            $dmgNote.text(`Natural weapon (${rank})`);
+          } else {
+            $naturalRow.hide();
+            $weaponRow.show();
+            const itemId = html.find('#weapon-item').val();
+            const item = attackItems.find(i => i.id === itemId);
+            if (item) {
+              const mat = getItemMaterialRank(item);
+              const weaponBaseDmg = item.system?.damage || 0;
+              const { damage, note } = getDamageForEdged(strengthRank, strengthValue, mat, weaponBaseDmg);
+              $dmgVal.text(damage);
+              $dmgNote.text(`${item.name} (${mat}) — ${note}`);
+            }
+          }
         }
 
         if ($dialog.length) $dialog[0].style.height = 'auto';
@@ -4761,24 +4863,46 @@ _rollVehicleControl(vehicle) {
 
       const updateDamageFromItem = () => {
         const itemId = html.find('#weapon-item').val();
-        const item = bluntItems.find(i => i.id === itemId) || null;
+        const item = attackItems.find(i => i.id === itemId) || null;
         const mat = item ? getItemMaterialRank(item) : "Excellent";
-        const { damage, note } = getDamageForBlunt(strengthRank, strengthValue, mat);
-
-        html.find('#dmg-val').text(damage);
-        html.find('#dmg-note').text(`Weapon: ${item ? item.name : '(Object)'} (${mat}) — ${note}`);
+        
+        if (isBluntAttack) {
+          const { damage, note } = getDamageForBlunt(strengthRank, strengthValue, mat);
+          html.find('#dmg-val').text(damage);
+          html.find('#dmg-note').text(`Weapon: ${item ? item.name : '(Object)'} (${mat}) — ${note}`);
+        } else if (isEdgedAttack) {
+          const weaponBaseDmg = item?.system?.damage || 0;
+          const { damage, note } = getDamageForEdged(strengthRank, strengthValue, mat, weaponBaseDmg);
+          html.find('#dmg-val').text(damage);
+          html.find('#dmg-note').text(`Weapon: ${item ? item.name : '(Edged Weapon)'} (${mat}) — ${note}`);
+        }
+        
         if ($dialog.length) $dialog[0].style.height = 'auto';
+      };
+
+      const updateNaturalDamage = () => {
+        const rank = html.find('#natural-rank').val();
+        const standardDamage = game.msh.getRankValue(rank);
+        html.find('#natural-damage').val(standardDamage);
+        updateWeaponVisibility();
       };
 
       // Initial visibility & preview
       updateWeaponVisibility();
 
       // Listeners
-      html.find('[name="bluntSource"]').on('change', updateWeaponVisibility);
-      html.find('#weapon-item').on('change', updateDamageFromItem);
+      if (isBluntAttack) {
+        html.find('[name="bluntSource"]').on('change', updateWeaponVisibility);
+        html.find('#weapon-item').on('change', updateDamageFromItem);
+      } else if (isEdgedAttack) {
+        html.find('[name="edgedSource"]').on('change', updateWeaponVisibility);
+        html.find('#natural-rank').on('change', updateNaturalDamage);
+        html.find('#natural-damage').on('input', updateWeaponVisibility);
+        html.find('#weapon-item').on('change', updateDamageFromItem);
+      }
     }
-  }).render(true);
-}
+    }).render(true);
+  }  // <-- Close _rollAction method
 
   _getResultHoverText(actionType, color) {
     const hoverTexts = {
