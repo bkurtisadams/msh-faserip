@@ -4,6 +4,96 @@
 const SOCKET_NAME = "msh-faserip";
 let socket = null;
 
+// ── Settings helpers ─────────────────────────────────────────
+export function getBluntNextRankMinRule() {
+  try { return game.settings.get("msh-faserip", "bluntNextRankMinRule") === true; }
+  catch { return false; } // fallback for older worlds/missing setting
+}
+
+export function getItemMaterialRank(it) {
+  const s = it?.system ?? {};
+  console.groupCollapsed(`FASERIP DEBUG:getItemMaterialRank → ${it?.name ?? '(no name)'}`);
+  console.debug('raw item', it);
+  console.debug('system block', s);
+
+  // Add materialStrength and common variants to the probe list
+  let raw =
+    s.materialRank ??          // "Good"
+    s.materialStrength ??      // <-- your Club uses this ("Good")
+    s.material?.rank ??        // nested
+    s.material?.name ??
+    s.material ??              // plain string or number
+    s.materialRankName ??
+    s.matStrength ??           // extra aliases just in case
+    s.mat ??                   // …
+    null;
+
+  console.debug('raw material field(s) →', raw);
+
+  if (raw == null) {
+    console.debug('no material found → fallback "Excellent"');
+    console.groupEnd();
+    return "Excellent";
+  }
+
+  if (typeof raw === "number") {
+    const byNumber = numberToRank(raw);
+    console.debug('number material →', raw, '→', byNumber ?? '(no map)');
+    console.groupEnd();
+    return byNumber ?? "Excellent";
+  }
+
+  let text = String(raw).trim();
+  console.debug('normalized text →', text);
+
+  const numMatch = text.match(/(\d{1,4})/);
+  if (numMatch) {
+    const n = parseInt(numMatch[1], 10);
+    const byNumber = numberToRank(n);
+    console.debug('embedded number →', n, '→', byNumber ?? '(no map)');
+    if (byNumber) { console.groupEnd(); return byNumber; }
+  }
+
+  const RANKS = [
+    "Shift-0","Feeble","Poor","Typical","Good","Excellent",
+    "Remarkable","Incredible","Amazing","Monstrous","Unearthly",
+    "Shift-X","Shift-Y","Shift-Z","Class 1000","Class 3000","Class 5000","Beyond"
+  ];
+  const asFull = RANKS.find(r => r.toLowerCase() === text.toLowerCase());
+  if (asFull) { console.debug('full rank match →', asFull); console.groupEnd(); return asFull; }
+
+  const ABBR = {
+    sh0:"Shift-0","sh-0":"Shift-0",fb:"Feeble",fe:"Feeble",pr:"Poor",ty:"Typical",
+    gd:"Good",ex:"Excellent",rm:"Remarkable",rk:"Remarkable",in:"Incredible",
+    am:"Amazing",mn:"Monstrous",mon:"Monstrous",un:"Unearthly",une:"Unearthly",
+    shx:"Shift-X","sh-x":"Shift-X",shy:"Shift-Y","sh-y":"Shift-Y",
+    shz:"Shift-Z","sh-z":"Shift-Z",cl1000:"Class 1000","cl-1000":"Class 1000",
+    cl3000:"Class 3000","cl-3000":"Class 3000",cl5000:"Class 5000","cl-5000":"Class 5000",
+    beyond:"Beyond"
+  };
+  const key = text.toLowerCase().replace(/[ _().:]/g, "");
+  const abbr = ABBR[key];
+  if (abbr) { console.debug('abbr match →', key, '→', abbr); console.groupEnd(); return abbr; }
+
+  const title = text.charAt(0).toUpperCase() + text.slice(1).toLowerCase();
+  if (RANKS.includes(title)) { console.debug('title-case fallback →', title); console.groupEnd(); return title; }
+
+  console.debug('no match → fallback "Excellent"');
+  console.groupEnd();
+  return "Excellent";
+
+  function numberToRank(n) {
+    try {
+      if (game?.msh?.getRankName) {
+        const name = game.msh.getRankName(n);
+        if (typeof name === "string" && name.length) return name;
+      }
+    } catch (e) { console.debug('getRankName threw:', e); }
+    const MAP = {0:"Shift-0",2:"Feeble",4:"Poor",6:"Typical",10:"Good",20:"Excellent",30:"Remarkable",40:"Incredible",50:"Amazing",75:"Monstrous",100:"Unearthly",150:"Shift-X",200:"Shift-Y",500:"Shift-Z",1000:"Class 1000",3000:"Class 3000",5000:"Class 5000"};
+    return MAP[n] ?? null;
+  }
+}
+
 /**
  * Legacy entrypoint: run arbitrary GM op via { operation, ... }.
  * If caller is GM, run locally; else dispatch over socketlib.

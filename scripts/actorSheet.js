@@ -1,4 +1,6 @@
+// actorSheet.js
 import { prepareActiveEffectCategories, onManageActiveEffect } from "../helpers/effects.mjs";
+import { getItemMaterialRank, getBluntNextRankMinRule } from "./gm-utils.js";
 
 function getPopularityRankWithRange(value, context) {
   const rank = context._getPopularityRank(value);
@@ -4196,278 +4198,295 @@ _rollVehicleControl(vehicle) {
   }
 
   async _rollAction(actionType, abilityName) {
-    const actor = this.actor;
-    const ability = actor.system.abilities[abilityName];
-    
-    if (!ability) {
-      ui.notifications.error(`Ability ${abilityName} not found`);
-      return;
+  const actor = this.actor;
+  const ability = actor.system.abilities[abilityName];
+
+  if (!ability) {
+    ui.notifications.error(`Ability ${abilityName} not found`);
+    return;
+  }
+
+  const abilityRank = ability.rank;
+  const abilityValue = ability.value;
+  const abilityFullName = abilityName.charAt(0).toUpperCase() + abilityName.slice(1);
+
+  // Action labels and effects (unchanged)
+  const actionNames = {
+    'blunt-attack': 'Blunt Attack',
+    'edged-attack': 'Edged Attack',
+    'shooting': 'Shooting',
+    'throwing-edged': 'Throwing Edged',
+    'throwing-blunt': 'Throwing Blunt',
+    'energy': 'Energy Attack',
+    'force': 'Force Attack',
+    'grappling': 'Grappling',
+    'grabbing': 'Grabbing',
+    'escaping': 'Escaping Hold',
+    'charging': 'Charging',
+    'dodging': 'Dodging',
+    'evading': 'Evading',
+    'blocking': 'Blocking',
+    'catching': 'Catching',
+    'stun': 'Stun Check',
+    'slam': 'Slam Check',
+    'kill': 'Kill Check'
+  };
+
+  const actionEffects = {
+    'blunt-attack': { white: 'Miss', green: 'Hit', yellow: 'Slam', red: 'Stun' },
+    'edged-attack': { white: 'Miss', green: 'Hit', yellow: 'Stun', red: 'Kill' },
+    'shooting': { white: 'Miss', green: 'Hit', yellow: 'Bullseye', red: 'Kill' },
+    'throwing-edged': { white: 'Miss', green: 'Hit', yellow: 'Stun', red: 'Kill' },
+    'throwing-blunt': { white: 'Miss', green: 'Hit', yellow: 'Hit', red: 'Stun' },
+    'energy': { white: 'Miss', green: 'Hit', yellow: 'Bullseye', red: 'Kill' },
+    'force': { white: 'Miss', green: 'Hit', yellow: 'Bullseye', red: 'Stun' },
+    'grappling': { white: 'Miss', green: 'Miss', yellow: 'Partial', red: 'Hold' },
+    'grabbing': { white: 'Miss', green: 'Take', yellow: 'Grab', red: 'Break' },
+    'escaping': { white: 'Miss', green: 'Escape', yellow: 'Escape', red: 'Reverse' },
+    'charging': { white: 'Miss', green: 'Hit', yellow: 'Slam', red: 'Stun' },
+    'dodging': { white: 'None', green: '-2 CS', yellow: '-4 CS', red: '-6 CS' },
+    'evading': { white: 'Auto-hit', green: 'Evasion', yellow: 'Evasion +1CS', red: 'Evasion +2CS' },
+    'blocking': { white: '-6 CS', green: '-4 CS', yellow: '-2 CS', red: '+1 CS' },
+    'catching': { white: 'Autohit', green: 'Miss', yellow: 'Damage', red: 'Catch' },
+    'stun': { white: '1-10 rounds', green: '1 round', yellow: 'No effect', red: 'No effect' },
+    'slam': { white: 'Grand Slam', green: '1 area', yellow: 'Stagger', red: 'No Slam' },
+    'kill': { white: 'Endurance Loss', green: 'E/S', yellow: 'No effect', red: 'No effect' }
+  };
+
+  const actionName = actionNames[actionType] || actionType;
+  const effects = actionEffects[actionType] || { white: 'White', green: 'Green', yellow: 'Yellow', red: 'Red' };
+  const isBluntAttack = actionType === 'blunt-attack';
+
+  // Strength (for bare hands dmg)
+  const strengthAbility = actor.system.abilities.strength;
+  const strengthRank = strengthAbility?.rank || "Typical";
+  const strengthValue = strengthAbility?.value || 6;
+
+  // House rule toggle (global setting)
+  //const nextRankMinRule = game.settings.get("msh-faserip", "bluntNextRankMinRule") === true;
+  const nextRankMinRule = getBluntNextRankMinRule();
+
+  // Save/restore user prefs
+  const savedSource = await actor.getFlag("msh-faserip", "lastBluntSource") || "hands"; // "hands" | "weapon"
+  const savedItemId = await actor.getFlag("msh-faserip", "lastBluntItemId") || "";
+  const savedPullPunch = await actor.getFlag("msh-faserip", "lastPullPunch") || false;
+
+  // Ranks array
+  const allRanks = [
+    "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent",
+    "Remarkable", "Incredible", "Amazing", "Monstrous", "Unearthly",
+    "Shift-X", "Shift-Y", "Shift-Z", "Class 1000", "Class 3000", "Class 5000", "Beyond"
+  ];
+
+
+  // Helpers
+  const isBluntCapable = (it) => {
+    const s = it.system || {};
+    const tagHit = Array.isArray(s.tags) && (s.tags.includes("BA") || s.tags.includes("blunt"));
+    return (s.damageType === "BA") || (s.attackType === "blunt") || tagHit;
+  };
+
+  // use getItemMaterialRank(item) wherever needed; do NOT redefine it here
+
+  const getDamageForBlunt = (strRank, strVal, matRank) => {
+    const strIdx = allRanks.indexOf(strRank);
+    const matIdx = allRanks.indexOf(matRank);
+    if (strIdx === -1 || matIdx === -1) return { damage: strVal, note: 'Using Strength value' };
+
+    // House rule path
+    if (nextRankMinRule && matIdx > strIdx) {
+      const nextIdx = Math.min(strIdx + 1, allRanks.length - 1);
+      const nextRank = allRanks[nextIdx];
+      const dmg = game.msh.getRankMinValue(nextRank);
+      return { damage: dmg, note: `House Rule: ${matRank} > ${strRank} → min of next rank (${nextRank})` };
     }
 
-    const abilityRank = ability.rank;
-    const abilityValue = ability.value;
-    const abilityFullName = abilityName.charAt(0).toUpperCase() + abilityName.slice(1);
-    
-    // Get action display name
-    const actionNames = {
-      'blunt-attack': 'Blunt Attack',
-      'edged-attack': 'Edged Attack',
-      'shooting': 'Shooting',
-      'throwing-edged': 'Throwing Edged',
-      'throwing-blunt': 'Throwing Blunt',
-      'energy': 'Energy Attack',
-      'force': 'Force Attack',
-      'grappling': 'Grappling',
-      'grabbing': 'Grabbing',
-      'escaping': 'Escaping Hold',
-      'charging': 'Charging',
-      'dodging': 'Dodging',
-      'evading': 'Evading',
-      'blocking': 'Blocking',
-      'catching': 'Catching',
-      'stun': 'Stun Check',
-      'slam': 'Slam Check',
-      'kill': 'Kill Check'
-    };
-    
-    // Define effects for each action type and color (corrected from Universal Table)
-    const actionEffects = {
-      'blunt-attack': {
-        white: 'Miss',
-        green: 'Hit',
-        yellow: 'Slam',
-        red: 'Stun'
-      },
-      'edged-attack': {
-        white: 'Miss',
-        green: 'Hit',
-        yellow: 'Stun',
-        red: 'Kill'
-      },
-      'shooting': {
-        white: 'Miss',
-        green: 'Hit',
-        yellow: 'Bullseye',
-        red: 'Kill'
-      },
-      'throwing-edged': {
-        white: 'Miss',
-        green: 'Hit',
-        yellow: 'Stun',
-        red: 'Kill'
-      },
-      'throwing-blunt': {
-        white: 'Miss',
-        green: 'Hit',
-        yellow: 'Hit',
-        red: 'Stun'
-      },
-      'energy': {
-        white: 'Miss',
-        green: 'Hit',
-        yellow: 'Bullseye',
-        red: 'Kill'
-      },
-      'force': {
-        white: 'Miss',
-        green: 'Hit',
-        yellow: 'Bullseye',
-        red: 'Stun'
-      },
-      'grappling': {
-        white: 'Miss',
-        green: 'Miss',
-        yellow: 'Partial',
-        red: 'Hold'
-      },
-      'grabbing': {
-        white: 'Miss',
-        green: 'Take',
-        yellow: 'Grab',
-        red: 'Break'
-      },
-      'escaping': {
-        white: 'Miss',
-        green: 'Escape',
-        yellow: 'Escape',
-        red: 'Reverse'
-      },
-      'charging': {
-        white: 'Miss',
-        green: 'Hit',
-        yellow: 'Slam',
-        red: 'Stun'
-      },
-      'dodging': {
-        white: 'None',
-        green: '-2 CS',
-        yellow: '-4 CS',
-        red: '-6 CS'
-      },
-      'evading': {
-        white: 'Auto-hit',
-        green: 'Evasion',
-        yellow: 'Evasion +1CS',
-        red: 'Evasion +2CS'
-      },
-      'blocking': {
-        white: '-6 CS',
-        green: '-4 CS',
-        yellow: '-2 CS',
-        red: '+1 CS'
-      },
-      'catching': {
-        white: 'Autohit',
-        green: 'Miss',
-        yellow: 'Damage',
-        red: 'Catch'
-      },
-      'stun': {
-        white: '1-10 rounds',
-        green: '1 round',
-        yellow: 'No effect',
-        red: 'No effect'
-      },
-      'slam': {
-        white: 'Grand Slam',
-        green: '1 area',
-        yellow: 'Stagger',
-        red: 'No Slam'
-      },
-      'kill': {
-        white: 'Endurance Loss',
-        green: 'E/S',
-        yellow: 'No effect',
-        red: 'No effect'
-      }
-    };
-    
-    const actionName = actionNames[actionType] || actionType;
-    const effects = actionEffects[actionType] || { white: 'White', green: 'Green', yellow: 'Yellow', red: 'Red' };
-    
-    // Create dialog for roll options
-    const dialogContent = `
-      <div style="margin-bottom: 10px;">
-        <label style="display: inline-block; width: 120px;">Action:</label>
-        <strong>${actionName}</strong>
+    // RAW min(STR, MAT)
+    const strValCap = game.msh.getRankValue(strRank);
+    const matVal = game.msh.getRankValue(matRank);
+    const dmg = Math.min(strValCap, matVal);
+    return { damage: dmg, note: `Damage = min(STR ${strValCap}, MAT ${matVal})` };
+  };
+
+  // Build inventory list (blunt-capable)
+  const bluntItems = isBluntAttack
+    ? actor.items.filter(i => isBluntCapable(i))
+    : [];
+
+  const itemOptionsHTML = bluntItems.map(i =>
+    `<option value="${i.id}" ${i.id === savedItemId ? 'selected' : ''}>${i.name}</option>`
+  ).join('');
+
+  // Dialog HTML (compact)
+  let dialogContent = `
+    <div style="margin-bottom: 8px;">
+      <label style="display:inline-block; width:120px;">Action:</label>
+      <strong>${actionName}</strong>
+    </div>
+    <div style="margin-bottom: 8px;">
+      <label style="display:inline-block; width:120px;">Ability:</label>
+      <input type="text" value="${abilityFullName}" style="width:120px;" readonly>
+    </div>
+    <div style="margin-bottom: 8px;">
+      <label style="display:inline-block; width:120px;">Rank:</label>
+      <input type="text" value="${abilityRank}" style="width:120px;" readonly>
+      <span style="margin-left:6px;">(${abilityValue})</span>
+    </div>
+    <div style="margin-bottom: 8px;">
+      <label style="display:inline-block; width:120px;">Column Shift:</label>
+      <input type="number" id="shift" name="shift" value="0" style="width:52px;">
+      <span style="color:#666; font-size:0.9em;">(+ right, - left)</span>
+    </div>
+    <div style="margin-bottom: 8px;">
+      <label style="display:inline-block; width:120px;">Karma Points:</label>
+      <input type="number" id="karma" name="karma" value="0" min="0" style="width:52px;">
+    </div>
+    <div style="margin-bottom: 8px;">
+      <label style="display:inline-block; width:120px;">Pull Punch:</label>
+      <input type="checkbox" id="pull-punch" name="pullPunch" ${savedPullPunch ? 'checked' : ''}>
+      <span style="color:#666; font-size:0.85em;">(lower dmg and/or color)</span>
+    </div>
+  `;
+
+  if (isBluntAttack) {
+    dialogContent += `
+      <div style="margin: 10px 0 6px;">
+        <label style="display:inline-block; width:120px;">Source:</label>
+        <label><input type="radio" name="bluntSource" value="hands" ${savedSource === 'hands' ? 'checked' : ''}> Bare Hands</label>
+        <label style="margin-left:10px;"><input type="radio" name="bluntSource" value="weapon" ${savedSource === 'weapon' ? 'checked' : ''}> Weapon/Object</label>
       </div>
-      <div style="margin-bottom: 10px;">
-        <label style="display: inline-block; width: 120px;">Ability:</label>
-        <input type="text" value="${abilityFullName}" style="width: 100px;" readonly>
+
+      <div id="weapon-row" style="display:none; margin-bottom:8px;">
+        <label style="display:inline-block; width:120px;">Item:</label>
+        <select id="weapon-item" name="weaponItem" style="min-width:220px;">
+          ${itemOptionsHTML || `<option value="">(No blunt-capable items found)</option>`}
+        </select>
       </div>
-      <div style="margin-bottom: 10px;">
-        <label style="display: inline-block; width: 120px;">Rank:</label>
-        <input type="text" value="${abilityRank}" style="width: 100px;" readonly>
-        <span style="margin-left: 5px;">(${abilityValue})</span>
-      </div>
-      <div style="margin-bottom: 10px;">
-        <label style="display: inline-block; width: 120px;">Column Shift:</label>
-        <input type="number" id="shift" name="shift" value="0" style="width: 50px;">
-        <span style="color: #666; font-size: 0.9em;">(+ right, - left)</span>
-      </div>
-      <div style="margin-bottom: 10px;">
-        <label style="display: inline-block; width: 120px;">Karma Points:</label>
-        <input type="number" id="karma" name="karma" value="0" min="0" style="width: 50px;">
-      </div>
-      <div>
-        <label>
-          <input type="checkbox" id="skip-dice" name="skipDice"> 
-          Skip dice animation
-        </label>
+
+      <div id="damage-preview" style="margin-top:8px; padding:6px; background:#e3f2fd; border:1px solid #2196F3; border-radius:3px; font-size:0.9em;">
+        <strong>Damage:</strong> <span id="dmg-val">${strengthValue}</span>
+        <span id="dmg-note" style="margin-left:6px; color:#555;">(Bare Hands = Strength value)</span>
+        <div style="font-size:0.8em; color:#666; margin-top:2px;">House Rule: ${nextRankMinRule ? 'ON' : 'OFF'}</div>
       </div>
     `;
-    
-    new Dialog({
-      title: `${actionName}: ${actor.name}`,
-      content: dialogContent,
-      buttons: {
-        roll: {
-          label: "Roll",
-          callback: async (html) => {
-            const columnShift = parseInt(html.find('[name="shift"]').val()) || 0;
-            const karma = parseInt(html.find('[name="karma"]').val()) || 0;
-            const skipDice = html.find('[name="skipDice"]').is(':checked');
-            
-            // Apply column shifts
-            let effectiveRank = abilityRank;
-            if (columnShift !== 0) {
-              const ranks = [
-                "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent",
-                "Remarkable", "Incredible", "Amazing", "Monstrous", "Unearthly",
-                "Shift-X", "Shift-Y", "Shift-Z", "Class 1000", "Class 3000", "Class 5000", "Beyond"
-              ];
-              const index = ranks.indexOf(abilityRank);
-              if (index !== -1) {
-                const newIndex = Math.min(Math.max(index + columnShift, 0), ranks.length - 1);
-                effectiveRank = ranks[newIndex];
+  }
+
+  dialogContent += `
+    <div style="margin-top:8px;">
+      <label><input type="checkbox" id="skip-dice" name="skipDice"> Skip dice animation</label>
+    </div>
+  `;
+
+  new Dialog({
+    title: `${actionName}: ${actor.name}`,
+    content: dialogContent,
+    buttons: {
+      roll: {
+        label: "Roll",
+        callback: async (html) => {
+          const columnShift = parseInt(html.find('[name="shift"]').val()) || 0;
+          const karma = parseInt(html.find('[name="karma"]').val()) || 0;
+          const skipDice = html.find('[name="skipDice"]').is(':checked');
+          const pulled = html.find('[name="pullPunch"]').is(':checked');
+
+          // Apply column shifts
+          let effectiveRank = abilityRank;
+          if (columnShift !== 0) {
+            const index = allRanks.indexOf(abilityRank);
+            if (index !== -1) {
+              const newIndex = Math.min(Math.max(index + columnShift, 0), allRanks.length - 1);
+              effectiveRank = allRanks[newIndex];
+            }
+          }
+
+          // Blunt context
+          let source = "none";
+          let weaponName = "";
+          let weaponMat = "";
+          let damageValue = abilityValue; // default fall-through
+          let showBreakHint = false;
+
+          if (isBluntAttack) {
+            source = html.find('[name="bluntSource"]:checked').val() || "hands";
+            // persist
+            await actor.setFlag("msh-faserip", "lastPullPunch", pulled);
+
+            if (source === "hands") {
+              await actor.setFlag("msh-faserip", "lastBluntSource", "hands");
+              damageValue = strengthValue;
+            } else {
+              await actor.setFlag("msh-faserip", "lastBluntSource", "weapon");
+              const itemId = html.find('[name="weaponItem"]').val();
+              await actor.setFlag("msh-faserip", "lastBluntItemId", itemId);
+
+              const item = bluntItems.find(i => i.id === itemId) || null;
+              if (item) {
+                weaponName = item.name;
+                weaponMat = getItemMaterialRank(item);
+                const { damage, note } = getDamageForBlunt(strengthRank, strengthValue, weaponMat);
+                damageValue = damage;
+
+                // If target armor > weapon material, a break check "may" apply; we only hint here.
+                showBreakHint = true;
+
+                // stash for later display
+                html.data('weaponNote', note);
+              } else {
+                // No item found; default to Excellent material
+                weaponName = "(Object)";
+                weaponMat = "Excellent";
+                const { damage, note } = getDamageForBlunt(strengthRank, strengthValue, weaponMat);
+                damageValue = damage;
+                showBreakHint = true;
+                html.data('weaponNote', note);
               }
             }
-            
-            // Create the roll
-            const roll = new Roll("1d100");
-            await roll.evaluate();
-            
-            // Display dice if not skipped
-            if (!skipDice) {
-              await roll.toMessage({
-                speaker: ChatMessage.getSpeaker({ actor }),
-                flavor: `${actor.name} performs ${actionName}`,
-                rollMode: game.settings.get("core", "rollMode")
-              });
-            }
-            
-            // Apply karma
-            let cappedTotal = roll.total;
+          }
 
-            const dailyKarmaEnabled = game.settings.get("msh-faserip", "dailyKarmaEnabled");
-            let dailyKarmaUsedAmount = 0;
-            let lifetimeKarmaUsedAmount = 0;
+          // Roll
+          const roll = new Roll("1d100");
+          await roll.evaluate();
 
-            if (karma > 0) {
-              if (dailyKarmaEnabled) {
-                const dailyRemaining = this.actor.system.karma.dailyKarmaMax - (this.actor.system.karma.dailyKarmaUsed || 0);
-                if (dailyRemaining > 0) {
-                  dailyKarmaUsedAmount = Math.min(karma, dailyRemaining);
-                  cappedTotal = Math.min(100, roll.total + dailyKarmaUsedAmount);
-                  
-                  await game.msh.runAsGM({
-                    operation: 'update',
-                    targetActorUuid: this.actor.uuid,
-                    args: [{ "system.karma.dailyKarmaUsed": (this.actor.system.karma.dailyKarmaUsed || 0) + dailyKarmaUsedAmount }]
-                  });
-                  
-                  const remainingNeeded = karma - dailyKarmaUsedAmount;
-                  if (remainingNeeded > 0) {
-                    lifetimeKarmaUsedAmount = remainingNeeded;
-                    cappedTotal = Math.min(100, cappedTotal + lifetimeKarmaUsedAmount);
-                  }
-                } else {
-                  lifetimeKarmaUsedAmount = karma;
-                  cappedTotal = Math.min(100, roll.total + lifetimeKarmaUsedAmount);
+          if (!skipDice) {
+            await roll.toMessage({
+              speaker: ChatMessage.getSpeaker({ actor }),
+              flavor: `${actor.name} performs ${actionName}`,
+              rollMode: game.settings.get("core", "rollMode")
+            });
+          }
+
+          // Karma (unchanged behavior)
+          let cappedTotal = roll.total;
+
+          const dailyKarmaEnabled = game.settings.get("msh-faserip", "dailyKarmaEnabled");
+          let dailyKarmaUsedAmount = 0;
+          let lifetimeKarmaUsedAmount = 0;
+
+          if (karma > 0) {
+            if (dailyKarmaEnabled) {
+              const dailyRemaining = actor.system.karma.dailyKarmaMax - (actor.system.karma.dailyKarmaUsed || 0);
+              if (dailyRemaining > 0) {
+                dailyKarmaUsedAmount = Math.min(karma, dailyRemaining);
+                cappedTotal = Math.min(100, roll.total + dailyKarmaUsedAmount);
+
+                await game.msh.runAsGM({
+                  operation: 'update',
+                  targetActorUuid: actor.uuid,
+                  args: [{ "system.karma.dailyKarmaUsed": (actor.system.karma.dailyKarmaUsed || 0) + dailyKarmaUsedAmount }]
+                });
+
+                const remainingNeeded = karma - dailyKarmaUsedAmount;
+                if (remainingNeeded > 0) {
+                  lifetimeKarmaUsedAmount = remainingNeeded;
+                  cappedTotal = Math.min(100, cappedTotal + lifetimeKarmaUsedAmount);
                 }
               } else {
                 lifetimeKarmaUsedAmount = karma;
                 cappedTotal = Math.min(100, roll.total + lifetimeKarmaUsedAmount);
               }
-
-              if (lifetimeKarmaUsedAmount > 0) {
-                const historyEntry = {
-                  realDate: new Date().toLocaleDateString(),
-                  gameDate: "",
-                  amount: -lifetimeKarmaUsedAmount,
-                  type: "Die Roll",
-                  description: `Spent lifetime karma on ${actionName}`
-                };
-                
-                const currentHistory = foundry.utils.deepClone(this.actor.system.karma?.history || []);
-                currentHistory.push(historyEntry);
-                
-                await game.msh.runAsGM({
-                  operation: 'update',
-                  targetActorUuid: this.actor.uuid,
-                  args: [{ "system.karma.history": currentHistory }]
-                });
-              }
+            } else {
+              lifetimeKarmaUsedAmount = karma;
+              cappedTotal = Math.min(100, roll.total + lifetimeKarmaUsedAmount);
             }
 
             const historyUpdates = [];
@@ -4489,134 +4508,190 @@ _rollVehicleControl(vehicle) {
                 description: `Spent lifetime karma on ${actionName}`
               });
             }
-
             if (historyUpdates.length > 0) {
               const currentHistory = foundry.utils.deepClone(actor.system.karma?.history || []);
               const newHistory = currentHistory.concat(historyUpdates);
-              
               await game.msh.runAsGM({
                 operation: 'update',
                 targetActorUuid: actor.uuid,
                 args: [{ "system.karma.history": newHistory }]
               });
             }
-
-            const totalKarmaUsed = dailyKarmaUsedAmount + lifetimeKarmaUsedAmount;
-            
-            // Get result color
-            const resultColor = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
-            const resultColorLower = resultColor.toLowerCase();
-            
-            // Get the specific effect for this action and color
-            const effectResult = effects[resultColorLower] || resultColor;
-            
-            // Calculate Body Armor for blocking actions
-            let bodyArmorDisplay = '';
-            if (actionType === 'blocking') {
-              const ranks = [
-                "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent",
-                "Remarkable", "Incredible", "Amazing", "Monstrous", "Unearthly",
-                "Shift-X", "Shift-Y", "Shift-Z", "Class 1000", "Class 3000", "Class 5000", "Beyond"
-              ];
-              
-              // Determine column shift based on result color
-              let blockShift = 0;
-              if (resultColorLower === 'white') blockShift = -6;
-              else if (resultColorLower === 'green') blockShift = -4;
-              else if (resultColorLower === 'yellow') blockShift = -2;
-              else if (resultColorLower === 'red') blockShift = 1;
-              
-              // Apply shift to Strength rank
-              const strengthIndex = ranks.indexOf(abilityRank);
-              if (strengthIndex !== -1) {
-                const armorIndex = Math.min(Math.max(strengthIndex + blockShift, 0), ranks.length - 1);
-                const armorRank = ranks[armorIndex];
-                
-                // Get the armor value from the universal table
-                const armorAbility = { rank: armorRank };
-                const armorValue = game.msh.getRankValue(armorRank);
-                
-                bodyArmorDisplay = `
-                  <div style="padding: 5px 10px; font-size: 1em; text-align: center; background-color: #e8f5e9; border: 1px solid #4CAF50; border-radius: 3px; margin: 5px;">
-                    <strong>Body Armor Granted: ${armorRank} (${armorValue})</strong>
-                  </div>
-                `;
-              }
-            }
-            
-            // Create chat message with all possible results and highlight the actual result
-            const content = `
-              <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
-                <div style="padding: 5px 10px; border-bottom: 1px solid #c0c0c0; font-size: 1.1em; color: #8b0000;">
-                  <strong>${actor.name} - ${actionName}</strong>
-                </div>
-                <div style="padding: 5px 10px; font-size: 0.9em;">
-                  <div>Ability: ${abilityFullName}</div>
-                  <div>Base Rank: ${abilityRank} (${abilityValue})</div>
-                  ${columnShift !== 0 ? `<div>Column Shift: ${columnShift} → ${effectiveRank}</div>` : ''}
-                  <div>Roll: ${roll.total}${totalKarmaUsed > 0 ? ` + Karma: ${totalKarmaUsed}` : ''} = ${cappedTotal}</div>
-                </div>
-                
-                <!-- Possible Results Table with Hover Text -->
-                <div style="padding: 5px 10px; margin: 5px 0; background-color: #fff; border: 1px solid #ddd;">
-                  <div style="font-weight: bold; margin-bottom: 5px; color: #333;">Possible Results (hover for details):</div>
-                  <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 3px; font-size: 0.85em;">
-                    <div style="padding: 4px; background-color: ${resultColorLower === 'white' ? '#333' : '#f0f0f0'}; 
-                      color: ${resultColorLower === 'white' ? '#fff' : '#666'}; 
-                      border: ${resultColorLower === 'white' ? '2px solid #000' : '1px solid #ccc'}; 
-                      font-weight: ${resultColorLower === 'white' ? 'bold' : 'normal'}; text-align: center; cursor: help;"
-                      title="${this._getResultHoverText(actionType, 'white')}">
-                      White: ${effects.white}
-                    </div>
-                    <div style="padding: 4px; background-color: ${resultColorLower === 'green' ? '#4CAF50' : '#f0f0f0'}; 
-                      color: ${resultColorLower === 'green' ? '#fff' : '#666'}; 
-                      border: ${resultColorLower === 'green' ? '2px solid #2e7d32' : '1px solid #ccc'}; 
-                      font-weight: ${resultColorLower === 'green' ? 'bold' : 'normal'}; text-align: center; cursor: help;"
-                      title="${this._getResultHoverText(actionType, 'green')}">
-                      Green: ${effects.green}
-                    </div>
-                    <div style="padding: 4px; background-color: ${resultColorLower === 'yellow' ? '#FFC107' : '#f0f0f0'}; 
-                      color: ${resultColorLower === 'yellow' ? '#333' : '#666'}; 
-                      border: ${resultColorLower === 'yellow' ? '2px solid #f57c00' : '1px solid #ccc'}; 
-                      font-weight: ${resultColorLower === 'yellow' ? 'bold' : 'normal'}; text-align: center; cursor: help;"
-                      title="${this._getResultHoverText(actionType, 'yellow')}">
-                      Yellow: ${effects.yellow}
-                    </div>
-                    <div style="padding: 4px; background-color: ${resultColorLower === 'red' ? '#F44336' : '#f0f0f0'}; 
-                      color: ${resultColorLower === 'red' ? '#fff' : '#666'}; 
-                      border: ${resultColorLower === 'red' ? '2px solid #c62828' : '1px solid #ccc'}; 
-                      font-weight: ${resultColorLower === 'red' ? 'bold' : 'normal'}; text-align: center; cursor: help;"
-                      title="${this._getResultHoverText(actionType, 'red')}">
-                      Red: ${effects.red}
-                    </div>
-                  </div>
-                </div>
-                
-                <!-- Actual Result -->
-                <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
-                  background-color: ${resultColorLower === 'white' ? '#f8f8f8' :
-                    resultColorLower === 'green' ? '#4CAF50' :
-                      resultColorLower === 'yellow' ? '#FFC107' :
-                        '#F44336'}; 
-                  color: ${resultColorLower === 'white' || resultColorLower === 'yellow' ? '#333' : 'white'};">
-                  RESULT: ${resultColor.toUpperCase()} - ${effectResult.toUpperCase()}
-                </div>
-                
-                ${bodyArmorDisplay}
-              </div>
-            `;
-            
-            await ChatMessage.create({
-              speaker: ChatMessage.getSpeaker({ actor }),
-              content
-            });
           }
-        },
-        cancel: { label: "Cancel" }
+
+          const totalKarmaUsed = dailyKarmaUsedAmount + lifetimeKarmaUsedAmount;
+
+          // Result color & effect
+          const resultColor = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
+          const resultColorLower = (resultColor || "").toLowerCase();
+          const effectResult = effects[resultColorLower] || resultColor;
+
+          // Body Armor for blocking (same logic)
+          let bodyArmorDisplay = '';
+          if (actionType === 'blocking') {
+            let blockShift = 0;
+            if (resultColorLower === 'white') blockShift = -6;
+            else if (resultColorLower === 'green') blockShift = -4;
+            else if (resultColorLower === 'yellow') blockShift = -2;
+            else if (resultColorLower === 'red') blockShift = 1;
+
+            const strengthIndex = allRanks.indexOf(abilityRank);
+            if (strengthIndex !== -1) {
+              const armorIndex = Math.min(Math.max(strengthIndex + blockShift, 0), allRanks.length - 1);
+              const armorRank = allRanks[armorIndex];
+              const armorValue = game.msh.getRankValue(armorRank);
+              bodyArmorDisplay = `
+                <div style="padding: 5px 10px; font-size: 1em; text-align: center; background-color: #e8f5e9; border: 1px solid #4CAF50; border-radius: 3px; margin: 5px;">
+                  <strong>Body Armor Granted: ${armorRank} (${armorValue})</strong>
+                </div>
+              `;
+            }
+          }
+
+          // Theme colors for result grid (same style logic you use)
+          const isWhite = resultColorLower === 'white';
+          const isGreen = resultColorLower === 'green';
+          const isYellow = resultColorLower === 'yellow';
+          const isRed = resultColorLower === 'red';
+
+          const cell = (active, baseBG, activeBG, baseFG, activeFG, baseBDR, activeBDR, bold) => ({
+            bg: active ? activeBG : baseBG,
+            fg: active ? activeFG : baseFG,
+            bdr: active ? activeBDR : baseBDR,
+            b: active ? bold : 'normal'
+          });
+
+          const whiteCell = cell(isWhite, '#f0f0f0', '#333', '#666', '#fff', '1px solid #ccc', '2px solid #000', 'bold');
+          const greenCell = cell(isGreen, '#f0f0f0', '#4CAF50', '#666', '#fff', '1px solid #ccc', '2px solid #2e7d32', 'bold');
+          const yellowCell = cell(isYellow, '#f0f0f0', '#FFC107', '#666', '#333', '1px solid #ccc', '2px solid #f57c00', 'bold');
+          const redCell = cell(isRed, '#f0f0f0', '#F44336', '#666', '#fff', '1px solid #ccc', '2px solid #c62828', 'bold');
+
+          const resultBG = isWhite ? '#f8f8f8' : isGreen ? '#4CAF50' : isYellow ? '#FFC107' : '#F44336';
+          const resultFG = (isWhite || isYellow) ? '#333' : '#fff';
+
+          // Weapon/bare hands line for the card
+          let weaponContext = '';
+          if (isBluntAttack && source === 'weapon') {
+            const note = html.data('weaponNote') || '';
+            weaponContext = `
+              <div>Weapon: ${weaponName} (${weaponMat}) — Damage: ${damageValue}</div>
+              ${note ? `<div style="font-size:0.85em; color:#666;">${note}</div>` : ``}
+            `;
+          } else if (isBluntAttack && source === 'hands') {
+            weaponContext = `<div>Attack: Bare Hands — Damage: ${strengthValue}</div>`;
+          }
+
+          // Build chat content (keeps your current style)
+          const content = `
+            <div style="background-color:#f5f5f0; border:1px solid #c0c0c0; border-radius:3px; margin-bottom:5px;">
+              <div style="padding:5px 10px; border-bottom:1px solid #c0c0c0; font-size:1.1em; color:#8b0000;">
+                <strong>${actor.name} - ${actionName}</strong>
+              </div>
+
+              <div style="padding:5px 10px; font-size:0.9em;">
+                <div>Ability: ${abilityFullName}</div>
+                <div>Base Rank: ${abilityRank} (${abilityValue})</div>
+                ${columnShift !== 0 ? `<div>Column Shift: ${columnShift} → ${effectiveRank}</div>` : ``}
+                ${weaponContext}
+                <div>Roll: ${roll.total}${totalKarmaUsed > 0 ? ` + Karma: ${totalKarmaUsed}` : ''} = ${cappedTotal}</div>
+                ${pulled ? `<div style="color:#FF9800;">⚠ Pull Punch selected (apply cap or downgrade color)</div>` : ``}
+              </div>
+
+              <div style="padding:5px 10px; margin:5px 0; background-color:#fff; border:1px solid #ddd;">
+                <div style="font-weight:bold; margin-bottom:5px; color:#333;">Possible Results:</div>
+                <div style="display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:3px; font-size:0.85em;">
+                  <div style="padding:4px; background-color:${whiteCell.bg}; color:${whiteCell.fg}; border:${whiteCell.bdr}; font-weight:${whiteCell.b}; text-align:center;"
+                       title="${this._getResultHoverText(actionType, 'white')}">White: ${effects.white}</div>
+                  <div style="padding:4px; background-color:${greenCell.bg}; color:${greenCell.fg}; border:${greenCell.bdr}; font-weight:${greenCell.b}; text-align:center;"
+                       title="${this._getResultHoverText(actionType, 'green')}">Green: ${effects.green}</div>
+                  <div style="padding:4px; background-color:${yellowCell.bg}; color:${yellowCell.fg}; border:${yellowCell.bdr}; font-weight:${yellowCell.b}; text-align:center;"
+                       title="${this._getResultHoverText(actionType, 'yellow')}">Yellow: ${effects.yellow}</div>
+                  <div style="padding:4px; background-color:${redCell.bg}; color:${redCell.fg}; border:${redCell.bdr}; font-weight:${redCell.b}; text-align:center;"
+                       title="${this._getResultHoverText(actionType, 'red')}">Red: ${effects.red}</div>
+                </div>
+              </div>
+
+              <div style="text-align:center; padding:8px; margin:5px; font-weight:bold; font-size:1.1em; border-radius:3px; background-color:${resultBG}; color:${resultFG};">
+                RESULT: ${resultColor.toUpperCase()} — ${String(effectResult).toUpperCase()}
+              </div>
+
+              ${bodyArmorDisplay}
+
+              <div style="display:flex; gap:6px; justify-content:center; padding:5px 10px 10px;">
+                <a data-action="apply-damage" style="padding:4px 8px; border:1px solid #bbb; border-radius:3px; background:#fafafa; text-decoration:none; color:#333;">Apply Damage</a>
+                ${isYellow ? `<a data-action="resolve-slam" style="padding:4px 8px; border:1px solid #bbb; border-radius:3px; background:#fafafa; text-decoration:none; color:#333;">Resolve Slam</a>` : ``}
+                ${isRed ? `<a data-action="resolve-stun" style="padding:4px 8px; border:1px solid #bbb; border-radius:3px; background:#fafafa; text-decoration:none; color:#333;">Resolve Stun</a>` : ``}
+                ${pulled ? `<a data-action="pull-options" style="padding:4px 8px; border:1px solid #ffc107; border-radius:3px; background:#fff8e1; text-decoration:none; color:#8a6d00;">Pull Options</a>` : ``}
+              </div>
+
+              ${isBluntAttack && source === 'weapon' ? `
+                <div style="padding:0 10px 8px; font-size:0.8em; color:#666;">
+                  Note: If weapon Material &lt; target Armor/Material, a Breaking FEAT may apply.
+                </div>` : ``}
+            </div>
+          `;
+
+          await ChatMessage.create({
+            speaker: ChatMessage.getSpeaker({ actor }),
+            content
+          });
+        }
       },
-      default: "roll"
-    }).render(true);
-  }
+      cancel: { label: "Cancel" }
+    },
+    default: "roll",
+    render: (html) => {
+      if (!isBluntAttack) return;
+
+      const $dialog = html.closest('.dialog');
+
+      const updateWeaponVisibility = () => {
+        const src = html.find('[name="bluntSource"]:checked').val() || "hands";
+        const $weaponRow = html.find('#weapon-row');
+        const $dmgVal = html.find('#dmg-val');
+        const $dmgNote = html.find('#dmg-note');
+
+        if (src === "weapon") {
+          $weaponRow.show();
+
+          // Compute preview from selected item
+          const itemId = html.find('#weapon-item').val();
+          const item = bluntItems.find(i => i.id === itemId) || null;
+          const mat = item ? getItemMaterialRank(item) : "Excellent";
+          const { damage, note } = getDamageForBlunt(strengthRank, strengthValue, mat);
+
+          $dmgVal.text(damage);
+          $dmgNote.text(`Weapon: ${item ? item.name : '(Object)'} (${mat}) — ${note}`);
+        } else {
+          $weaponRow.hide();
+          $dmgVal.text(strengthValue);
+          $dmgNote.text(`(Bare Hands = Strength value)`);
+        }
+
+        if ($dialog.length) $dialog[0].style.height = 'auto';
+      };
+
+      const updateDamageFromItem = () => {
+        const itemId = html.find('#weapon-item').val();
+        const item = bluntItems.find(i => i.id === itemId) || null;
+        const mat = item ? getItemMaterialRank(item) : "Excellent";
+        const { damage, note } = getDamageForBlunt(strengthRank, strengthValue, mat);
+
+        html.find('#dmg-val').text(damage);
+        html.find('#dmg-note').text(`Weapon: ${item ? item.name : '(Object)'} (${mat}) — ${note}`);
+        if ($dialog.length) $dialog[0].style.height = 'auto';
+      };
+
+      // Initial visibility & preview
+      updateWeaponVisibility();
+
+      // Listeners
+      html.find('[name="bluntSource"]').on('change', updateWeaponVisibility);
+      html.find('#weapon-item').on('change', updateDamageFromItem);
+    }
+  }).render(true);
+}
+
 
   _getResultHoverText(actionType, color) {
     const hoverTexts = {

@@ -129,6 +129,16 @@ Hooks.once("init", async () => {
   console.log("FASERIP DEBUG: dailyKarmaEnabled setting registered."); // <-- DEBUG CONSOLE LOG
   // <-- NEW/MODIFIED SECTION END -->
 
+  // new toggle (used by _rollAction for Blunt damage calc)
+  game.settings.register("msh-faserip", "bluntNextRankMinRule", {
+    name: "Blunt: Use Next-Rank Minimum when Material > Strength",
+    hint: "If ON: when weapon/object Material rank exceeds the attacker’s Strength rank, damage = minimum of the next higher rank. If OFF: RAW min(STR, MAT).",
+    scope: "world",
+    config: true,
+    type: Boolean,
+    default: false
+  });
+
   game.settings.register("msh-faserip", "teamKarmaPoolTotal", {
     name: "Team Karma Pool Total",
     scope: "world",
