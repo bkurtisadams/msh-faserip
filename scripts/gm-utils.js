@@ -5,9 +5,9 @@ const SOCKET_NAME = "msh-faserip";
 let socket = null;
 
 // ── Settings helpers ─────────────────────────────────────────
+// Always use official FASERIP blunt weapon rules
 export function getBluntNextRankMinRule() {
-  try { return game.settings.get("msh-faserip", "bluntNextRankMinRule") === true; }
-  catch { return false; } // fallback for older worlds/missing setting
+  return true; // Always use the official rule: material > strength upgrades to next rank min
 }
 
 export function getItemMaterialRank(it) {

@@ -4286,26 +4286,40 @@ _rollVehicleControl(vehicle) {
     return (s.damageType === "BA") || (s.attackType === "blunt") || tagHit;
   };
 
-  // use getItemMaterialRank(item) wherever needed; do NOT redefine it here
+  // Helper to get minimum value for a rank (used for weapon material > strength calculation)
+  const getRankMinValue = (rankName) => {
+    return game.msh.getRankValue(rankName) || 0;
+  };
 
+  // Blunt damage calculation following official FASERIP rules
   const getDamageForBlunt = (strRank, strVal, matRank) => {
     const strIdx = allRanks.indexOf(strRank);
     const matIdx = allRanks.indexOf(matRank);
-    if (strIdx === -1 || matIdx === -1) return { damage: strVal, note: 'Using Strength value' };
-
-    // House rule path
-    if (nextRankMinRule && matIdx > strIdx) {
-      const nextIdx = Math.min(strIdx + 1, allRanks.length - 1);
-      const nextRank = allRanks[nextIdx];
-      const dmg = game.msh.getRankMinValue(nextRank);
-      return { damage: dmg, note: `House Rule: ${matRank} > ${strRank} → min of next rank (${nextRank})` };
+    
+    if (strIdx === -1 || matIdx === -1) {
+      return { damage: strVal, note: 'Using Strength value' };
     }
 
-    // RAW min(STR, MAT)
+    // Official FASERIP Rule: If weapon material > user strength, 
+    // upgrade to minimum value of next rank
+    if (matIdx > strIdx) {
+      const nextIdx = Math.min(strIdx + 1, allRanks.length - 1);
+      const nextRank = allRanks[nextIdx];
+      const dmg = getRankMinValue(nextRank);
+      return { 
+        damage: dmg, 
+        note: `${matRank} weapon > ${strRank} → min of ${nextRank} rank (${dmg})` 
+      };
+    }
+
+    // If weapon material <= user strength, use min(STR value, MAT value)
     const strValCap = game.msh.getRankValue(strRank);
     const matVal = game.msh.getRankValue(matRank);
     const dmg = Math.min(strValCap, matVal);
-    return { damage: dmg, note: `Damage = min(STR ${strValCap}, MAT ${matVal})` };
+    return { 
+      damage: dmg, 
+      note: `Damage = min(STR ${strValCap}, MAT ${matVal})` 
+    };
   };
 
   // Build inventory list (blunt-capable)
@@ -4366,7 +4380,6 @@ _rollVehicleControl(vehicle) {
       <div id="damage-preview" style="margin-top:8px; padding:6px; background:#e3f2fd; border:1px solid #2196F3; border-radius:3px; font-size:0.9em;">
         <strong>Damage:</strong> <span id="dmg-val">${strengthValue}</span>
         <span id="dmg-note" style="margin-left:6px; color:#555;">(Bare Hands = Strength value)</span>
-        <div style="font-size:0.8em; color:#666; margin-top:2px;">House Rule: ${nextRankMinRule ? 'ON' : 'OFF'}</div>
       </div>
     `;
   }
@@ -4581,6 +4594,92 @@ _rollVehicleControl(vehicle) {
             weaponContext = `<div>Attack: Bare Hands — Damage: ${strengthValue}</div>`;
           }
 
+          // Build actions row safely (no nested template strings)
+          let actionsHtml = `
+            <div style="
+              display:flex;gap:6px;justify-content:center;flex-wrap:wrap;
+              padding:8px 10px;margin:6px 10px 10px;
+              border:1px solid #c0c0c0;background:#fafafa;border-radius:4px;
+            ">
+              <a
+                data-action="apply-damage"
+                aria-disabled="true"
+                onclick="return false;"
+                title="Placeholder: apply damage manually to the target(s)."
+                style="display:inline-block;font-size:12px;line-height:1.1;padding:2px 6px;
+                      border:1px solid #bbb;border-radius:3px;background:#f7f7f7;color:#333;
+                      text-decoration:none;white-space:nowrap;cursor:not-allowed;opacity:.55;filter:grayscale(.3);"
+              >Apply Damage</a>
+          `;
+
+          if (isYellow) {
+            actionsHtml += `
+              <a
+                data-action="resolve-slam"
+                aria-disabled="true"
+                onclick="return false;"
+                title="Placeholder: resolve SLAM manually (use Universal Table & movement as needed)."
+                style="display:inline-block;font-size:12px;line-height:1.1;padding:2px 6px;
+                      border:1px solid #bbb;border-radius:3px;background:#f7f7f7;color:#333;
+                      text-decoration:none;white-space:nowrap;cursor:not-allowed;opacity:.55;filter:grayscale(.3);"
+              >Resolve Slam</a>
+            `;
+          }
+
+          if (isRed) {
+            actionsHtml += `
+              <a
+                data-action="resolve-stun"
+                aria-disabled="true"
+                onclick="return false;"
+                title="Placeholder: resolve STUN manually (apply duration/effects by table)."
+                style="display:inline-block;font-size:12px;line-height:1.1;padding:2px 6px;
+                      border:1px solid #bbb;border-radius:3px;background:#f7f7f7;color:#333;
+                      text-decoration:none;white-space:nowrap;cursor:not-allowed;opacity:.55;filter:grayscale(.3);"
+              >Resolve Stun</a>
+            `;
+          }
+
+          if (pulled) {
+            actionsHtml += `
+              <a
+                data-action="pull-options"
+                aria-disabled="true"
+                onclick="return false;"
+                title="Placeholder: adjust for pulled punch manually (lower damage or downgrade color)."
+                style="display:inline-block;font-size:12px;line-height:1.1;padding:2px 6px;
+                      border:1px solid #bbb;border-radius:3px;background:#f7f7f7;color:#333;
+                      text-decoration:none;white-space:nowrap;cursor:not-allowed;opacity:.55;filter:grayscale(.3);"
+              >Pull Options</a>
+            `;
+          }
+
+          if (isBluntAttack && source === 'weapon') {
+            actionsHtml += `
+              <a
+                data-action="breaking-feat"
+                data-weapon-mat="${weaponMat}"
+                data-actor-uuid="${actor.uuid}"
+                title="Roll a Breaking FEAT: compare weapon material vs target armor/material (or wielder STR)."
+                style="display:inline-block;font-size:12px;line-height:1.1;padding:2px 6px;
+                      border:1px solid #bbb;border-radius:3px;background:#ffffff;color:#333;
+                      text-decoration:none;white-space:nowrap;cursor:pointer;"
+              >Breaking FEAT</a>
+            `;
+          }
+
+          actionsHtml += `</div>`;
+
+          // Optional hint below the box
+          let actionsHintHtml = '';
+          if (isBluntAttack && source === 'weapon') {
+            actionsHintHtml = `
+              <div style="padding:0 10px 8px;font-size:.8em;color:#666;">
+                Note: If weapon Material &lt; target Armor/Material, a Breaking FEAT may apply.
+              </div>
+            `;
+          }
+
           // Build chat content (keeps your current style)
           const content = `
             <div style="background-color:#f5f5f0; border:1px solid #c0c0c0; border-radius:3px; margin-bottom:5px;">
@@ -4616,20 +4715,9 @@ _rollVehicleControl(vehicle) {
               </div>
 
               ${bodyArmorDisplay}
-
-              <div style="display:flex; gap:6px; justify-content:center; padding:5px 10px 10px;">
-                <a data-action="apply-damage" style="padding:4px 8px; border:1px solid #bbb; border-radius:3px; background:#fafafa; text-decoration:none; color:#333;">Apply Damage</a>
-                ${isYellow ? `<a data-action="resolve-slam" style="padding:4px 8px; border:1px solid #bbb; border-radius:3px; background:#fafafa; text-decoration:none; color:#333;">Resolve Slam</a>` : ``}
-                ${isRed ? `<a data-action="resolve-stun" style="padding:4px 8px; border:1px solid #bbb; border-radius:3px; background:#fafafa; text-decoration:none; color:#333;">Resolve Stun</a>` : ``}
-                ${pulled ? `<a data-action="pull-options" style="padding:4px 8px; border:1px solid #ffc107; border-radius:3px; background:#fff8e1; text-decoration:none; color:#8a6d00;">Pull Options</a>` : ``}
-              </div>
-
-              ${isBluntAttack && source === 'weapon' ? `
-                <div style="padding:0 10px 8px; font-size:0.8em; color:#666;">
-                  Note: If weapon Material &lt; target Armor/Material, a Breaking FEAT may apply.
-                </div>` : ``}
-            </div>
-          `;
+              ${actionsHtml}
+              ${actionsHintHtml}
+              `;
 
           await ChatMessage.create({
             speaker: ChatMessage.getSpeaker({ actor }),
@@ -4691,7 +4779,6 @@ _rollVehicleControl(vehicle) {
     }
   }).render(true);
 }
-
 
   _getResultHoverText(actionType, color) {
     const hoverTexts = {

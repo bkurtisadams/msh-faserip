@@ -12,6 +12,7 @@ import { rollUniversalAction } from './rolls.js';
 import { FaseripInitiative } from './faserip-initiative.js';
 import { CombatHandler } from './combat-handler.js';
 import { initializeSlamHandlers } from './charge-damage.js';
+import { openBreakingFeatDialog } from './breaking-feat.js';
 
 Hooks.once("init", async () => {
   console.log("FASERIP DEBUG: init hook is running!"); // <-- DEBUG CONSOLE LOG
@@ -128,16 +129,6 @@ Hooks.once("init", async () => {
 
   console.log("FASERIP DEBUG: dailyKarmaEnabled setting registered."); // <-- DEBUG CONSOLE LOG
   // <-- NEW/MODIFIED SECTION END -->
-
-  // new toggle (used by _rollAction for Blunt damage calc)
-  game.settings.register("msh-faserip", "bluntNextRankMinRule", {
-    name: "Blunt: Use Next-Rank Minimum when Material > Strength",
-    hint: "If ON: when weapon/object Material rank exceeds the attacker’s Strength rank, damage = minimum of the next higher rank. If OFF: RAW min(STR, MAT).",
-    scope: "world",
-    config: true,
-    type: Boolean,
-    default: false
-  });
 
   game.settings.register("msh-faserip", "teamKarmaPoolTotal", {
     name: "Team Karma Pool Total",
@@ -483,9 +474,27 @@ Hooks.once("ready", () => {
     game.settings.set("core", "prototypeTokenOverrides", fixedOverrides);
   }
 
+  // ↓↓↓ Add this near the end of the same ready block ↓↓↓
+  if (!game.msh) game.msh = {};
+  if (!game.msh.breakingFeatHookRegistered) {
+    game.msh.breakingFeatHookRegistered = true;
+
+    Hooks.on('renderChatMessage', (message, html) => {
+      html.on('click', '[data-action="breaking-feat"]', async (ev) => {
+        ev.preventDefault();
+        const btn = ev.currentTarget;
+        const weaponMat = btn.dataset.weaponMat || "Excellent";
+        const actorUuid = btn.dataset.actorUuid;
+        const actor = actorUuid ? await fromUuid(actorUuid) : null;
+
+        // Call the helper you placed in a shared module
+        openBreakingFeatDialog({ weaponMatRank: weaponMat, actor });
+      });
+    });
+  }
+
   /* Optional hotkey block remains commented-out */
 });
-;
 
 // Add the hotbarDrop hook at module level (like in the older file)
 Hooks.on('hotbarDrop', (bar, data, slot) => {
