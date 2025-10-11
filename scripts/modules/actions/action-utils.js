@@ -118,36 +118,41 @@ export async function rollWithKarmaAndHistory(actor, actionLabel, requestedKarma
   let cappedTotal = raw;
   let dailyUsed = 0;
   let lifetimeUsed = 0;
-  const k = Math.max(0, Number(requestedKarma || 0));
 
-  if (k > 0) {
+  // NEW: only consider what’s needed to hit 100 (and what was requested)
+  const want = Math.max(0, Number(requestedKarma || 0));
+  const needTo100 = Math.max(0, 100 - raw);
+  const maxSpend = Math.min(want, needTo100);
+
+  if (maxSpend > 0) {
     const dailyEnabled = game.settings.get("msh-faserip", "dailyKarmaEnabled");
     if (dailyEnabled) {
-      const dailyRemaining = actor.system.karma.dailyKarmaMax - (actor.system.karma.dailyKarmaUsed || 0);
-      if (dailyRemaining > 0) {
-        dailyUsed = Math.min(k, dailyRemaining);
-        cappedTotal = Math.min(100, raw + dailyUsed);
+      const dailyRemaining = Math.max(0, (actor.system.karma.dailyKarmaMax || 0) - (actor.system.karma.dailyKarmaUsed || 0));
 
+      // Spend daily first, but no more than needed
+      dailyUsed = Math.min(maxSpend, dailyRemaining);
+      const stillNeed = maxSpend - dailyUsed;
+
+      // Only if still needed, use lifetime
+      lifetimeUsed = Math.max(0, stillNeed);
+
+      // Persist daily usage if any
+      if (dailyUsed > 0) {
         await game.msh.runAsGM({
           operation: 'update',
           targetActorUuid: actor.uuid,
           args: [{ "system.karma.dailyKarmaUsed": (actor.system.karma.dailyKarmaUsed || 0) + dailyUsed }]
         });
-
-        const leftover = k - dailyUsed;
-        if (leftover > 0) {
-          lifetimeUsed = leftover;
-          cappedTotal = Math.min(100, cappedTotal + lifetimeUsed);
-        }
-      } else {
-        lifetimeUsed = k;
-        cappedTotal = Math.min(100, raw + lifetimeUsed);
       }
+
+      cappedTotal = Math.min(100, raw + dailyUsed + lifetimeUsed);
     } else {
-      lifetimeUsed = k;
+      // No daily pool: all from lifetime, still only up to what's needed
+      lifetimeUsed = maxSpend;
       cappedTotal = Math.min(100, raw + lifetimeUsed);
     }
 
+    // History (only record what we actually spent)
     const history = [];
     if (dailyUsed > 0) history.push({
       realDate: new Date().toLocaleDateString(),
@@ -175,6 +180,7 @@ export async function rollWithKarmaAndHistory(actor, actionLabel, requestedKarma
 
   return { roll, cappedTotal, totalKarmaUsed: dailyUsed + lifetimeUsed };
 }
+
 
 // Build the 4-cell result grid
 // Result grid + actions + banner
@@ -271,4 +277,27 @@ export function computeBluntDamage(strRank, strVal, matRank, RANKS_LOCAL=RANKS) 
   }
   const dmg = Math.min(getVal(strRank), getVal(matRank));
   return { damage: dmg, note: `Damage = min(STR ${getVal(strRank)}, MAT ${getVal(matRank)})` };
+}
+
+// Edged-capable item filter (damageType/attackType tags or "edged"/EA)
+export const isEdgedCapable = (it) => {
+  const s = it.system || {};
+  const tagHit = Array.isArray(s.tags) && (s.tags.includes("EA") || s.tags.includes("edged"));
+  return (s.damageType === "EA") || (s.attackType === "edged") || tagHit;
+};
+
+// Edged damage: min(STR, MAT) but never less than weapon base damage.
+// natural weapon case: pass weaponBase = 0, matRank = selected natural rank.
+export function computeEdgedDamage(strRank, strVal, matRank, weaponBase = 0, RANKS_LOCAL = RANKS) {
+  const getVal = (r)=> game.msh.getRankValue(r) || 0;
+  const sIdx = RANKS_LOCAL.indexOf(strRank);
+  const mIdx = RANKS_LOCAL.indexOf(matRank);
+  if (sIdx < 0 || mIdx < 0) {
+    return { damage: Math.max(strVal, weaponBase), note: weaponBase ? `Using base ${weaponBase}` : "Using Strength value" };
+  }
+  const strCap = getVal(strRank);
+  const matVal = getVal(matRank);
+  const calc   = Math.min(strCap, matVal);
+  const final  = Math.max(calc, weaponBase);
+  return { damage: final, note: `Damage = max(min(STR ${strCap}, MAT ${matVal}), base ${weaponBase || 0})` };
 }
