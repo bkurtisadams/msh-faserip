@@ -4510,6 +4510,40 @@ _rollVehicleControl(vehicle) {
             // Get the specific effect for this action and color
             const effectResult = effects[resultColorLower] || resultColor;
             
+            // Calculate Body Armor for blocking actions
+            let bodyArmorDisplay = '';
+            if (actionType === 'blocking') {
+              const ranks = [
+                "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent",
+                "Remarkable", "Incredible", "Amazing", "Monstrous", "Unearthly",
+                "Shift-X", "Shift-Y", "Shift-Z", "Class 1000", "Class 3000", "Class 5000", "Beyond"
+              ];
+              
+              // Determine column shift based on result color
+              let blockShift = 0;
+              if (resultColorLower === 'white') blockShift = -6;
+              else if (resultColorLower === 'green') blockShift = -4;
+              else if (resultColorLower === 'yellow') blockShift = -2;
+              else if (resultColorLower === 'red') blockShift = 1;
+              
+              // Apply shift to Strength rank
+              const strengthIndex = ranks.indexOf(abilityRank);
+              if (strengthIndex !== -1) {
+                const armorIndex = Math.min(Math.max(strengthIndex + blockShift, 0), ranks.length - 1);
+                const armorRank = ranks[armorIndex];
+                
+                // Get the armor value from the universal table
+                const armorAbility = { rank: armorRank };
+                const armorValue = game.msh.getRankValue(armorRank);
+                
+                bodyArmorDisplay = `
+                  <div style="padding: 5px 10px; font-size: 1em; text-align: center; background-color: #e8f5e9; border: 1px solid #4CAF50; border-radius: 3px; margin: 5px;">
+                    <strong>Body Armor Granted: ${armorRank} (${armorValue})</strong>
+                  </div>
+                `;
+              }
+            }
+            
             // Create chat message with all possible results and highlight the actual result
             const content = `
               <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
@@ -4567,6 +4601,8 @@ _rollVehicleControl(vehicle) {
                   color: ${resultColorLower === 'white' || resultColorLower === 'yellow' ? '#333' : 'white'};">
                   RESULT: ${resultColor.toUpperCase()} - ${effectResult.toUpperCase()}
                 </div>
+                
+                ${bodyArmorDisplay}
               </div>
             `;
             
@@ -4645,16 +4681,16 @@ _rollVehicleControl(vehicle) {
         red: 'Reverse - Free and may counter-grapple or act at -2CS'
       },
       'charging': {
-        white: 'Miss - No damage, continue moving half speed',
-        green: 'Hit - Inflict Endurance + speed damage',
-        yellow: 'Slam - Inflict damage and may Slam opponent',
-        red: 'Stun - Inflict damage and may Stun opponent'
+        white: 'Miss - No damage, continue moving half speed in straight line\nRequirements: Move 1+ areas, +1CS per area (max +3CS)\nAgility FEAT needed to change direction after miss',
+        green: 'Hit - Damage = Endurance/Body Armor (higher) + 2pts per area moved\nRequirements: Move 1+ areas, +1CS per area (max +3CS)\nBody Armor may reflect damage to attacker',
+        yellow: 'Slam - Damage as Hit result, plus may Slam opponent\nDamage = Endurance/Body Armor (higher) + 2pts per area\nBody Armor may reflect damage to attacker',
+        red: 'Stun - Damage as Hit result, plus may Stun opponent\nDamage = Endurance/Body Armor (higher) + 2pts per area\nBody Armor may reflect damage to attacker'
       },
       'dodging': {
-        white: 'None - No reduction to incoming attacks',
-        green: '-2 CS - Reduce attacker column shift by 2',
-        yellow: '-4 CS - Reduce attacker column shift by 4',
-        red: '-6 CS - Reduce attacker column shift by 6'
+        white: 'None - No reduction to incoming attacks. Dodging: -2CS to FEAT rolls, 1/2 move, only 1 other action',
+        green: '-2 CS - Reduce attacker CS by 2. Dodging: -2CS to FEAT rolls, 1/2 move, only 1 other action',
+        yellow: '-4 CS - Reduce attacker CS by 4. Dodging: -2CS to FEAT rolls, 1/2 move, only 1 other action',
+        red: '-6 CS - Reduce attacker CS by 6. Dodging: -2CS to FEAT rolls, 1/2 move, only 1 other action'
       },
       'evading': {
         white: 'Auto-hit - Opponent automatically scores green result',
@@ -4663,10 +4699,10 @@ _rollVehicleControl(vehicle) {
         red: 'Evasion +2CS - Dodge and gain +2CS next attack'
       },
       'blocking': {
-        white: '-6 CS - Body Armor reduced by 6 column shifts',
-        green: '-4 CS - Body Armor reduced by 4 column shifts',
-        yellow: '-2 CS - Body Armor reduced by 2 column shifts',
-        red: '+1 CS - Body Armor increased by 1 column shift'
+        white: '-6 CS - Strength shifted down 6 columns as Body Armor',
+        green: '-4 CS - Strength shifted down 4 columns as Body Armor',
+        yellow: '-2 CS - Strength shifted down 2 columns as Body Armor',
+        red: '+1 CS - Strength shifted up 1 column as Body Armor'
       },
       'catching': {
         white: 'Autohit - Object hits you instead (auto green)',
