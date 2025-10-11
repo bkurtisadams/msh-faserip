@@ -1,7 +1,458 @@
+// scripts/modules/actions/defense-action.js
 import { BaseAction } from "./base-action.js";
+import {
+  RANKS,
+  shiftRank,
+  getAbilityInfo,
+  effectsFor,
+  labelFor,
+  rollWithKarmaAndHistory,
+  buildResultGrid,
+  bannerColors
+} from "./action-utils.js";
+
+/**
+ * Handles: "dodging" | "evading" | "blocking" | "catching"
+ * Expect dispatcher to pass { actionType, abilityName, opts }
+ */
 export class DefenseAction extends BaseAction {
+  constructor(a, b, c) {
+    const inferAbilityFor = (t) => ({
+      dodging:  'agility',
+      evading:  'fighting',
+      blocking: 'strength',
+      catching: 'agility'
+    }[t] || 'fighting');
+
+    // Case 1: new DefenseAction({ actor, actionType, abilityName, opts })
+    if (a && typeof a === "object" && a !== null && "actor" in a) {
+      const cfg         = a || {};
+      const actionType  = cfg.actionType || cfg.opts?.actionType || "dodging";
+      const abilityName = cfg.abilityName || cfg.opts?.abilityName || inferAbilityFor(actionType);
+      const opts        = cfg.opts || {};
+      super({ actor: cfg.actor, abilityName, opts });   // <-- pass object
+      this.actionType  = actionType;
+      this.abilityName = abilityName;
+      return;
+    }
+
+    // Case 2: new DefenseAction(actor, { actionType, abilityName, opts })
+    if (a && typeof b === "object" && b !== null) {
+      const actor       = a;
+      const actionType  = b.actionType || b.opts?.actionType || "dodging";
+      const abilityName = b.abilityName || b.opts?.abilityName || inferAbilityFor(actionType);
+      const opts        = b.opts || {};
+      super({ actor, abilityName, opts });              // <-- pass object
+      this.actionType  = actionType;
+      this.abilityName = abilityName;
+      return;
+    }
+
+    // Case 3 (legacy): new DefenseAction(actor, abilityName, opts)
+    const actor       = a;
+    const abilityName = (typeof b === "string" && b) ? b : inferAbilityFor(c?.actionType || "dodging");
+    const opts        = c || {};
+    const actionType  = opts.actionType || "dodging";
+    super({ actor, abilityName, opts });                // <-- pass object
+    this.actionType  = actionType;
+    this.abilityName = abilityName;
+  }
+  
   async execute() {
-    // TODO: dodging/evading/blocking/catching tables & body-armor shift calc
-    return super.execute();
+    console.debug("DefenseAction:", {
+        type: this.actionType,
+        ability: this.abilityName,
+        actor: this.actor?.name
+        });
+
+    const actor = this.actor;
+    const actionType = this.actionType;
+    const actionName = labelFor(actionType);
+    const effects = effectsFor(actionType);
+    const ability = getAbilityInfo(actor, this.abilityName);
+
+    // Per-action extra inputs
+    const extra = this._buildExtraInputs(actionType);
+
+    // ------- Dialog -------
+    const dialogHtml = `
+      <div style="margin-bottom:8px;"><label style="display:inline-block;width:120px;">Action:</label><strong>${actionName}</strong></div>
+      <div style="margin-bottom:8px;"><label style="display:inline-block;width:120px;">Ability:</label>
+        <input type="text" value="${ability.name}" style="width:160px;" readonly></div>
+      <div style="margin-bottom:8px;"><label style="display:inline-block;width:120px;">Rank:</label>
+        <input type="text" value="${ability.rank}" style="width:120px;" readonly>
+        <span style="margin-left:6px;">(${ability.value})</span></div>
+
+      <div style="margin-bottom:8px;"><label style="display:inline-block;width:120px;">Column Shift:</label>
+        <input type="number" name="shift" value="${Number(this.opts.shift ?? 0)}" style="width:60px;">
+        <span style="color:#666;font-size:.9em;">(+ right, - left)</span></div>
+
+      <div style="margin-bottom:8px;"><label style="display:inline-block;width:120px;">Karma Points:</label>
+        <input type="number" name="karma" value="${Number(this.opts.karma ?? 0)}" min="0" style="width:60px;">
+        <span style="color:#666;font-size:.85em;">(spend only up to 100)</span></div>
+
+      ${extra.html}
+
+      <div style="margin-top:8px;">
+        <label><input type="checkbox" name="skipDice" ${this.opts.skipDice ? "checked" : ""}> Skip dice animation</label>
+      </div>
+
+      ${this._actionNotes(actionType)}
+    `;
+
+    const choice = await new Promise((resolve) => {
+      new Dialog({
+        title: `${actionName}: ${actor.name}`,
+        content: dialogHtml,
+        buttons: {
+          roll: {
+            label: "Roll",
+            callback: (html) => resolve(this._readDialog(actionType, html))
+          },
+          cancel: { label: "Cancel", callback: () => resolve(null) }
+        },
+        default: "roll",
+        render: (html) => extra.onRender?.(html)
+      }).render(true);
+    });
+    if (!choice) return;
+
+    // Effective rank
+    const effectiveRank = shiftRank(ability.rank, choice.shift);
+
+    // Roll
+    const roll = await (new Roll("1d100")).evaluate();
+    if (!choice.skipDice) {
+      await roll.toMessage({
+        speaker: ChatMessage.getSpeaker({ actor }),
+        flavor: `${actor.name} performs ${actionName}`,
+        rollMode: game.settings.get("core", "rollMode")
+      });
+    }
+
+    // Karma (only up to 100)
+    const { cappedTotal, totalKarmaUsed } =
+      await rollWithKarmaAndHistory(actor, actionName, choice.karma, roll);
+
+    // Result & effect text
+    const color = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
+    const colorLower = String(color || "").toLowerCase();
+    const effectResult = effects[colorLower] || color;
+
+    // Build grid & banner
+    const grid = buildResultGrid(actionType, colorLower, effects, (globalThis._getResultHoverText||this._getResultHoverText));
+    const { bg, fg } = bannerColors(colorLower);
+
+    // Compute special outcome blocks per action
+    const specialHtml = await this._specialOutcomeHtml({ actionType, ability, colorLower, choice });
+
+    // Action chips (light placeholders)
+    const actionsHtml = this._actionsBox({ actionType, colorLower });
+
+    // Final card
+    const cardHtml = `
+      <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
+        <div style="padding:5px 10px;border-bottom:1px solid #c0c0c0;font-size:1.1em;color:#0d47a1;">
+          <strong>${actor.name} - ${actionName}</strong>
+        </div>
+        <div style="padding:5px 10px;font-size:.9em;">
+          <div>Ability: ${ability.name}</div>
+          <div>Base Rank: ${ability.rank} (${ability.value})${choice.shift ? ` — Shift ${choice.shift} → ${effectiveRank}` : ""}</div>
+          ${this._contextLine(actionType, choice)}
+          <div>Roll: ${roll.total}${totalKarmaUsed ? ` + Karma: ${totalKarmaUsed}` : ""} = ${cappedTotal}</div>
+        </div>
+        ${grid}
+        <div style="text-align:center;padding:8px;margin:5px;font-weight:bold;font-size:1.1em;border-radius:3px;background:${bg};color:${fg};">
+          RESULT: ${String(color).toUpperCase()} — ${String(effectResult).toUpperCase()}
+        </div>
+        ${specialHtml}
+        ${actionsHtml}
+      </div>
+    `;
+
+    await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor }), content: cardHtml });
+  }
+
+  // ------- Per-action UI bits -------
+
+  _buildExtraInputs(actionType) {
+    if (actionType === "evading") {
+      return {
+        html: `
+          <div style="margin-top:8px;padding:6px;border:1px solid #ddd;background:#fafafa;border-radius:3px;">
+            <div style="font-weight:bold;margin-bottom:6px;">Evade Settings</div>
+            <div style="margin-bottom:6px;">
+              <label style="display:inline-block;width:160px;">Opponent (name or note):</label>
+              <input type="text" name="evadeTarget" style="width:220px;" placeholder="Who you’re evading">
+            </div>
+          </div>
+        `
+      };
+    }
+    if (actionType === "catching") {
+      return {
+        html: `
+          <div style="margin-top:8px;padding:6px;border:1px solid #ddd;background:#fafafa;border-radius:3px;">
+            <div style="font-weight:bold;margin-bottom:6px;">Catching Settings</div>
+            <div style="margin-bottom:6px;">
+              <label style="display:inline-block;width:160px;">Scenario:</label>
+              <select name="catchScenario" style="width:220px;">
+                <option value="falling">Falling object / ally</option>
+                <option value="shooting-bullet">Shooting: bullet (needs Unearthly Agility)</option>
+                <option value="shooting-arrow">Shooting: arrow (needs Amazing Agility)</option>
+                <option value="throwing-other">Thrown projectile (needs Remarkable Agility)</option>
+              </select>
+            </div>
+            <div style="margin-bottom:6px;">
+              <label><input type="checkbox" name="catchVsYou"> Object/attack is directed at you (–3CS to catch)</label>
+            </div>
+          </div>
+        `
+      };
+    }
+    // dodging / blocking: no extras needed
+    return { html: "" };
+  }
+
+  _readDialog(actionType, html) {
+    const shift   = Number(html.find('[name="shift"]').val() || 0);
+    const karma   = Number(html.find('[name="karma"]').val() || 0);
+    const skipDice= !!html.find('[name="skipDice"]').is(':checked');
+
+    if (actionType === "evading") {
+      return { shift, karma, skipDice, evadeTarget: String(html.find('[name="evadeTarget"]').val() || "") };
+    }
+    if (actionType === "catching") {
+      return {
+        shift, karma, skipDice,
+        catchScenario: String(html.find('[name="catchScenario"]').val() || "falling"),
+        catchVsYou: !!html.find('[name="catchVsYou"]').is(':checked')
+      };
+    }
+    return { shift, karma, skipDice };
+  }
+
+  _actionNotes(actionType) {
+    if (actionType === "dodging") {
+      return `
+        <div style="margin-top:10px;color:#555;font-size:.85em;">
+          <div>• Dodging is Agility. Reduces <em>attacker’s</em> CS on attacks you’re aware of this phase.</div>
+          <div>• While Dodging: half move; no Charge; only one other action; your FEATs this turn are at <strong>-2CS</strong>.</div>
+          <div>• Typically used vs ranged/charging; no effect vs adjacent Slugfest/Wrestling.</div>
+        </div>`;
+    }
+    if (actionType === "evading") {
+      return `
+        <div style="margin-top:10px;color:#555;font-size:.85em;">
+          <div>• Evading is Fighting vs a single adjacent attacker. You make no attack this round.</div>
+          <div>• Results: Auto-Hit; Evasion; Evasion +1CS; Evasion +2CS (next round attack bonus vs that attacker).</div>
+        </div>`;
+    }
+    if (actionType === "blocking") {
+      return `
+        <div style="margin-top:10px;color:#555;font-size:.85em;">
+          <div>• Blocking uses Strength as temporary Body Armor vs physical (Grappling, Slugfest, Edged/Blunt Throwing, Force, Wrestling). No effect vs Shooting/Energy; not Charging.</div>
+          <div>• You take no other action; can shield allies behind you. Normal Armor stacks (not Force Fields).</div>
+        </div>`;
+    }
+    if (actionType === "catching") {
+      return `
+        <div style="margin-top:10px;color:#555;font-size:.85em;">
+          <div>• Catching is Agility vs one item. Results: Auto-hit; Miss (+1CS to attacker if it was an attack); Damage (you might harm what you caught); Catch (clean).</div>
+          <div>• –3CS to catch items specifically directed at you.</div>
+          <div>• Min Agility: Unearthly (bullets), Amazing (arrows), Remarkable (other thrown). Any Agility for falling.</div>
+        </div>`;
+    }
+    return "";
+  }
+
+  _contextLine(actionType, choice) {
+    if (actionType === "evading") {
+      return `<div>Targeting: ${choice.evadeTarget ? choice.evadeTarget : "(single adjacent attacker)"} </div>`;
+    }
+    if (actionType === "catching") {
+      const map = {
+        "falling": "Falling object/ally",
+        "shooting-bullet": "Shooting (bullet)",
+        "shooting-arrow": "Shooting (arrow)",
+        "throwing-other": "Thrown projectile"
+      };
+      return `<div>Catching: ${map[choice.catchScenario] || "Object"}${choice.catchVsYou ? " — vs you (–3CS)" : ""}</div>`;
+    }
+    return "";
+  }
+
+  // ------- Outcome engines per action -------
+
+  async _specialOutcomeHtml({ actionType, ability, colorLower, choice }) {
+    if (actionType === "blocking") {
+      // Body Armor shift: White -6, Green -4, Yellow -2, Red +1 (from source text)
+      let blockShift = 0;
+      if (colorLower === 'white') blockShift = -6;
+      else if (colorLower === 'green') blockShift = -4;
+      else if (colorLower === 'yellow') blockShift = -2;
+      else if (colorLower === 'red') blockShift = 1;
+
+      const idx = RANKS.indexOf(ability.rank);
+      if (idx !== -1) {
+        const armorIndex = Math.min(Math.max(idx + blockShift, 0), RANKS.length - 1);
+        const armorRank = RANKS[armorIndex];
+        const armorValue = game.msh.getRankValue(armorRank);
+
+        // Set a lightweight temp flag (manual application)
+        await this._setTempFlag("blocking", { armorRank, armorValue });
+
+        return `
+          <div style="padding:6px 10px;margin:6px 10px;background:#e8f5e9;border:1px solid #4CAF50;border-radius:3px;text-align:center;">
+            <strong>Body Armor Granted: ${armorRank} (${armorValue})</strong>
+            <div style="font-size:.85em;color:#2e7d32;">Applies vs physical (not Shooting/Energy; not Charging). Use manually for next incoming attack.</div>
+          </div>
+        `;
+      }
+    }
+
+    if (actionType === "dodging") {
+      // Attacker CS penalty: White None, Green -2, Yellow -4, Red -6
+      const penalty = (colorLower === 'green') ? -2
+                    : (colorLower === 'yellow') ? -4
+                    : (colorLower === 'red') ? -6 : 0;
+
+      await this._setTempFlag("dodging", {
+        attackerPenaltyCS: penalty,
+        selfPenaltyCS: -2, // your FEATs at -2CS this turn
+        notes: "Half move; no Charge; only one other action; affects attacks you’re aware of this phase."
+      });
+
+      return `
+        <div style="padding:6px 10px;margin:6px 10px;background:#e3f2fd;border:1px solid #1976d2;border-radius:3px;">
+          <div><strong>Dodging Effect:</strong> Attacker suffers ${penalty ? `${penalty} CS` : "no"} penalty on attacks you’re aware of this phase.</div>
+          <div style="font-size:.85em;color:#0d47a1;">Your own FEATs this turn: -2CS. Half move; no Charge; only one other action.</div>
+        </div>
+      `;
+    }
+
+    if (actionType === "evading") {
+      // White: Auto-Hit; Green: Evasion; Yellow: Evasion +1; Red: Evasion +2 (for NEXT round vs that attacker)
+      let nextRoundBonus = 0;
+      let note = "";
+      if (colorLower === 'white') {
+        note = "Auto-Hit: opponent’s result counts as at least Green (Slugfest will always hit).";
+      } else if (colorLower === 'green') {
+        note = "Evasion: you avoid that attacker’s blow (no damage).";
+      } else if (colorLower === 'yellow') {
+        nextRoundBonus = 1;
+        note = "Evasion +1CS: avoid this blow; next round, your first attack vs that attacker gets +1CS.";
+      } else if (colorLower === 'red') {
+        nextRoundBonus = 2;
+        note = "Evasion +2CS: avoid this blow; next round, your first attack vs that attacker gets +2CS.";
+      }
+
+      // Store a small temp flag so you can apply the next-round bonus manually
+      await this._setTempFlag("evading", {
+        target: choice.evadeTarget || "(adjacent attacker)",
+        nextRoundAttackBonusCS: nextRoundBonus,
+        note
+      });
+
+      return `
+        <div style="padding:6px 10px;margin:6px 10px;background:#fffde7;border:1px solid #fbc02d;border-radius:3px;">
+          <div><strong>Evasion Result:</strong> ${note}</div>
+          ${nextRoundBonus ? `<div style="font-size:.85em;color:#f57f17;">Remember: next round, first attack vs ${choice.evadeTarget || "that attacker"}: +${nextRoundBonus}CS.</div>` : ""}
+        </div>
+      `;
+    }
+
+    if (actionType === "catching") {
+      // Catching outcomes and prerequisites
+      const prereqHtml = this._catchingPrereqHtml(ability, choice);
+      let hint = "";
+      if (colorLower === 'white') {
+        hint = "Auto-hit: the object/attack hits you (treat falling as a Charge at fall speed; shooting/throwing auto-hit at least Green).";
+      } else if (colorLower === 'green') {
+        hint = "Miss: you fail to catch it. If it was an attack on you, attacker gains +1CS to hit.";
+      } else if (colorLower === 'yellow') {
+        hint = "Damage: you catch it, but you might damage the caught object/ally (resolve as damage vs that target).";
+      } else if (colorLower === 'red') {
+        hint = "Catch: clean catch with no ill effects.";
+      }
+
+      // –3CS if the object/attack is directed at you (we present in context; actual FEAT rank shift is up to table ops)
+      await this._setTempFlag("catching", {
+        scenario: choice.catchScenario,
+        vsYou: !!choice.catchVsYou,
+        note: hint
+      });
+
+      return `
+        ${prereqHtml}
+        <div style="padding:6px 10px;margin:6px 10px;background:#f1f8e9;border:1px solid #7cb342;border-radius:3px;">
+          <div><strong>Catching Result:</strong> ${hint}</div>
+          ${choice.catchVsYou ? `<div style="font-size:.85em;color:#558b2f;">This catch was vs you: apply an additional -3CS to the catching attempt.</div>` : ""}
+        </div>
+      `;
+    }
+
+    return "";
+  }
+
+  _catchingPrereqHtml(ability, choice) {
+    // Show min-Agility prerequisites for shooting/throwing; falling has no min.
+    const agiRankIndex = RANKS.indexOf(ability.rank);
+    const need = (rank) => RANKS.indexOf(rank);
+
+    const checks = [];
+    if (choice.catchScenario === "shooting-bullet") {
+      checks.push({ label: "Bullet", min: "Unearthly" });
+    } else if (choice.catchScenario === "shooting-arrow") {
+      checks.push({ label: "Arrow", min: "Amazing" });
+    } else if (choice.catchScenario === "throwing-other") {
+      checks.push({ label: "Thrown projectile", min: "Remarkable" });
+    }
+
+    if (!checks.length) return ""; // Falling object
+
+    const rows = checks.map(c => {
+      const ok = agiRankIndex >= need(c.min);
+      return `<div>• ${c.label}: requires at least <strong>${c.min}</strong> Agility — ${ok ? `<span style="color:#2e7d32;">OK</span>` : `<span style="color:#c62828;">Not Met</span>`}</div>`;
+    }).join("");
+
+    return `
+      <div style="padding:6px 10px;margin:6px 10px;background:#fff3e0;border:1px solid #ffb300;border-radius:3px;">
+        <div style="font-weight:bold;margin-bottom:4px;">Catching Prerequisites</div>
+        <div>Current Agility: <strong>${ability.rank}</strong></div>
+        ${rows}
+      </div>
+    `;
+  }
+
+  _actionsBox({ actionType, colorLower }) {
+    const chip = (label, title, enabled) => {
+      const base = "display:inline-block;font-size:12px;line-height:1.1;padding:2px 6px;border:1px solid #bbb;border-radius:3px;text-decoration:none;white-space:nowrap;";
+      const style = enabled
+        ? `${base}background:#fff;color:#333;cursor:pointer;`
+        : `${base}background:#f7f7f7;color:#333;cursor:not-allowed;opacity:.55;filter:grayscale(.3);`;
+      const key = label.toLowerCase().replace(/\s+/g,'-');
+      return `<a class="faserip-chip" data-action="${key}" ${enabled? "" : 'aria-disabled="true"'} title="${title}" style="${style}">${label}</a>`;
+    };
+
+    // Enable “Use Armor” only when blocking result wasn’t White
+    const useArmor = (actionType === "blocking" && colorLower !== "white");
+
+    return `
+      <div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;padding:8px 10px;margin:6px 10px 10px;border:1px solid #c0c0c0;background:#fafafa;border-radius:4px;">
+        ${chip("Apply Effect","Placeholder: apply this defense outcome manually.", true)}
+        ${useArmor ? chip("Use Armor","Placeholder: apply temporary Body Armor vs next attack.", true) : ""}
+      </div>
+    `;
+  }
+
+  async _setTempFlag(kind, data) {
+    try {
+      const current = await this.actor.getFlag("msh-faserip", "defenseTemp") || {};
+      current[kind] = data;
+      await this.actor.setFlag("msh-faserip", "defenseTemp", current);
+    } catch (e) {
+      console.warn("DefenseAction: could not set temp flag", e);
+    }
   }
 }

@@ -26,11 +26,14 @@ const registry = {
   "kill":           CheckAction
 };
 
+// scripts/modules/actions/action-dispatcher.js
 export class ActionDispatcher {
   static async roll(actionType, { actor, abilityName, opts = {} } = {}) {
+    console.debug("ActionDispatcher.roll()", { actionType, abilityName, opts }); // <— add this
     const Handler = registry[actionType];
     if (!Handler) throw new Error(`Unknown actionType: ${actionType}`);
     const handler = new Handler({ actor, actionType, abilityName, opts });
     return await handler.execute();
   }
 }
+

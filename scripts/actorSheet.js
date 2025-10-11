@@ -4205,6 +4205,7 @@ async _rollAction(actionType, abilityName) {
       actor,
       abilityName,
       opts: {
+        actionType,
         shift: 0,
         karma: 0,
         pulled: false,
