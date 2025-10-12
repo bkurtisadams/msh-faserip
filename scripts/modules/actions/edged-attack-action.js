@@ -9,7 +9,8 @@ import {
   labelFor,
   rollWithKarmaAndHistory,
   buildResultGrid,
-  bannerColors
+  bannerColors,
+  getTargetingContext
 } from "./action-utils.js";
 import { getItemMaterialRank } from "../../gm-utils.js";
 
@@ -295,12 +296,17 @@ export class EdgedAttackAction extends AttackAction {
           `;
         })()
       : `<div>Attack: Claws/Teeth — Damage: ${choice.damage} (${choice.natRank})</div>`;
+    
+    const targetingContext = getTargetingContext(actor, actionName);
 
     // final chat card
     const cardHtml = `
       <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
         <div style="padding:5px 10px;border-bottom:1px solid #c0c0c0;font-size:1.1em;color:#8b0000;">
           <strong>${actor.name} - ${actionName}</strong>
+        </div>
+        <div style="padding:5px 10px;border-bottom:1px solid #e0e0e0;font-size:.9em;">
+          ${targetingContext}
         </div>
         <div style="padding:5px 10px;font-size:.9em;">
           <div>Ability: ${ability.name}</div>

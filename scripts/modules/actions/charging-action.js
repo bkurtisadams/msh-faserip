@@ -10,7 +10,8 @@ import {
   getAbilityInfo,
   rollWithKarmaAndHistory,
   buildActionsBox,
-  getResultHoverText
+  getResultHoverText,
+  getTargetingContext
 } from "./action-utils.js";
 
 /**
@@ -270,10 +271,16 @@ export class ChargingAction extends BaseAction {
       <div>Roll: ${roll.total}${totalKarmaUsed ? ` + Karma: ${totalKarmaUsed}` : ""} = ${cappedTotal}</div>
     `;
 
+    // targeting info
+    const targetingContext = getTargetingContext(actor, actionName);
+
     const cardHtml = `
       <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
         <div style="padding:5px 10px;border-bottom:1px solid #c0c0c0;font-size:1.1em;color:#8b0000;">
           <strong>${actor.name} - ${actionName}</strong>
+        </div>
+        <div style="padding:5px 10px;border-bottom:1px solid #e0e0e0;font-size:.9em;">
+          ${targetingContext}
         </div>
         <div style="padding:5px 10px;font-size:.9em;">${contextHtml}</div>
         ${grid}
