@@ -30,7 +30,7 @@ export const ACTION_EFFECTS = {
   'force':          { white:'Miss', green:'Hit', yellow:'Bullseye',red:'Stun' },
   'grappling':      { white:'Miss', green:'Miss',yellow:'Partial', red:'Hold' },
   'grabbing':       { white:'Miss', green:'Take',yellow:'Grab',    red:'Break' },
-  'escaping':       { white:'Miss', green:'Escape',yellow:'Escape',red:'Reverse' },
+  'escaping':       { white:'Miss', green:'Miss',yellow:'Escape',red:'Reverse' },
   'charging':       { white:'Miss', green:'Hit', yellow:'Slam',    red:'Stun' },
   'dodging':        { white:'None', green:'-2 CS',yellow:'-4 CS',  red:'-6 CS' },
   'evading':        { white:'Auto-hit', green:'Evasion', yellow:'Evasion +1CS', red:'Evasion +2CS' },

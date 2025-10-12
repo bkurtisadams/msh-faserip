@@ -10,6 +10,9 @@ import { ThrowingBluntAction } from "./throwing-blunt-action.js";
 import { EnergyAction } from "./energy-action.js";
 import { ForceAction } from "./force-action.js";
 import { ChargingAction } from "./charging-action.js";
+import { GrapplingAction } from "./grappling-action.js";
+import { GrabbingAction } from "./grabbing-action.js";
+import { EscapingAction } from "./escaping-action.js";
 
 const registry = {
   "blunt-attack":   BluntAttackAction,
@@ -23,9 +26,9 @@ const registry = {
   "evading":        DefenseAction,
   "blocking":       DefenseAction,
   "catching":       DefenseAction,
-  "grappling":      ManeuverAction,
-  "grabbing":       ManeuverAction,
-  "escaping":       ManeuverAction,
+  "grappling":      GrapplingAction,
+  "grabbing":       GrabbingAction,
+  "escaping":       EscapingAction,
   "charging":       ChargingAction,
   "stun":           CheckAction,
   "slam":           CheckAction,
