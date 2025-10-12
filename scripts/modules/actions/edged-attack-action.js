@@ -52,7 +52,6 @@ export class EdgedAttackAction extends AttackAction {
     const savedItemId = await actor.getFlag("msh-faserip","lastEdgedItemId") || "";
     const savedNatRank = await actor.getFlag("msh-faserip","lastNaturalWeaponRank") || "Good";
     const savedNatDmg  = await actor.getFlag("msh-faserip","lastNaturalWeaponDamage") || game.msh.getRankValue(savedNatRank);
-    const savedPull    = await actor.getFlag("msh-faserip","lastPullPunch") || false;
 
     const itemOptions = attackItems.map(i =>
       `<option value="${i.id}" ${i.id===savedItemId?'selected':''}>${i.name}</option>`
@@ -71,10 +70,6 @@ export class EdgedAttackAction extends AttackAction {
 
       <div style="margin-bottom:8px;"><label style="display:inline-block;width:120px;">Karma Points:</label>
         <input type="number" name="karma" value="${Number(this.opts.karma ?? 0)}" min="0" style="width:52px;"></div>
-
-      <div style="margin-bottom:8px;"><label style="display:inline-block;width:120px;">Pull Punch:</label>
-        <input type="checkbox" name="pulled" ${savedPull?'checked':''}>
-        <span style="color:#666;font-size:.85em;">(lower dmg and/or color)</span></div>
 
       <div style="margin:10px 0 6px;">
         <label style="display:inline-block;width:120px;">Source:</label>
@@ -128,7 +123,7 @@ export class EdgedAttackAction extends AttackAction {
               const natDmg  = Number($('[name="natDmg"]').val() || game.msh.getRankValue(natRank));
               const shift   = Number($('[name="shift"]').val() || 0);
               const karma   = Number($('[name="karma"]').val() || 0);
-              const pulled  = !!$('[name="pulled"]').is(':checked');
+              
               const remember= !!$('[name="remember"]').is(':checked');
               const skipDice= !!$('[name="skipDice"]').is(':checked');
 
@@ -149,10 +144,7 @@ export class EdgedAttackAction extends AttackAction {
                 html.data('weaponNote', note);
               }
 
-              if (pulled) damage = Math.max(1, Math.floor(damage * 0.5)); // simple pull
-
               if (remember) {
-                await actor.setFlag("msh-faserip","lastPullPunch", pulled);
                 await actor.setFlag("msh-faserip","lastEdgedSource", src);
                 if (src === "weapon") {
                   await actor.setFlag("msh-faserip","lastEdgedItemId", itemId);
@@ -162,7 +154,7 @@ export class EdgedAttackAction extends AttackAction {
                 }
               }
 
-              resolve({ src, itemId, natRank, natDmg, shift, karma, pulled, skipDice, weaponMat, weaponName, damage, html });
+              resolve({ src, itemId, natRank, natDmg, shift, karma, skipDice, weaponMat, weaponName, damage, html });
             }
           },
           cancel: { label: "Cancel", callback: ()=> resolve(null) }
@@ -268,8 +260,6 @@ export class EdgedAttackAction extends AttackAction {
       `data-check="kill" data-attack-form="edged" data-dmg="${choice.damage}" data-attacker-uuid="${actor.uuid}"`
     ));
 
-    if (choice.pulled) parts.push(chip("Pull Options","Placeholder: adjust for pulled punch (lower damage/downgrade color).", false));
-
     if (choice.src === "weapon") {
       parts.push(chip(
         "Breaking FEAT",
@@ -296,6 +286,13 @@ export class EdgedAttackAction extends AttackAction {
           `;
         })()
       : `<div>Attack: Claws/Teeth — Damage: ${choice.damage} (${choice.natRank})</div>`;
+
+    // WARNING NOTE:
+    const edgedWarning = `
+      <div style="margin:6px 10px;padding:6px;background:#fff3e0;border:1px solid #ff9800;border-radius:3px;font-size:0.85em;">
+        <strong>⚠ Edged Attack Rules:</strong> Damage cannot be reduced in effect. Minimum damage is always the weapon's listed damage.
+      </div>
+    `;
     
     const targetingContext = getTargetingContext(actor, actionName);
 
@@ -313,8 +310,8 @@ export class EdgedAttackAction extends AttackAction {
           <div>Base Rank: ${ability.rank} (${ability.value})${choice.shift ? ` — Shift ${choice.shift} → ${effectiveRank}` : ""}</div>
           ${weaponContext}
           <div>Roll: ${roll.total}${totalKarmaUsed ? ` + Karma: ${totalKarmaUsed}` : ""} = ${cappedTotal}</div>
-          ${choice.pulled ? `<div style="color:#FF9800;">⚠ Pull Punch selected (apply cap or downgrade color)</div>` : ``}
         </div>
+        ${edgedWarning}  <!-- new -->
         ${grid}
         <div style="text-align:center;padding:8px;margin:5px;font-weight:bold;font-size:1.1em;border-radius:3px;background:${bg};color:${fg};">
           RESULT: ${String(color).toUpperCase()} — ${String(effectResult).toUpperCase()}
