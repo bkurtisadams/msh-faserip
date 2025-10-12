@@ -28,19 +28,29 @@ export class CheckAction extends BaseAction {
     const actor       = this.actor;
     const actionType  = this.actionType; // "stun" | "slam" | "kill"
     const actionName  = labelFor(actionType);
-    const effects     = effectsFor(actionType); // you already defined these in action-utils (stun/slam/kill maps)
+    const effects     = effectsFor(actionType);
 
     // Pull the attacker's Strength rank (used for Slam context)
-    const attackerStr = getAbilityInfo(actor, "strength"); // { name, rank, value }
+    const attackerStr = getAbilityInfo(actor, "strength");
+
+    // Extract prefill data from opts (passed from chat hook)
+    const prefill = this.opts.prefill || {};
+    const prefilledTargetName = prefill.targetName || "";
+    const prefilledTargetEndRank = prefill.targetEndRank || "Good";
+    const prefilledDmgThrough = prefill.dmgThrough || 0;
+    const prefilledAttackForm = prefill.attackForm || "blunt";
 
     // --- Dialog: gather target info & context ---
-    const targetRanks = RANKS.map(r => `<option value="${r}">${r}</option>`).join("");
+    const targetRanks = RANKS.map(r => `<option value="${r}" ${r===prefilledTargetEndRank?'selected':''}>${r}</option>`).join("");
+    const attackFormOptions = ["blunt","edged","shooting","throwing","energy","force","charging","wrestling"]
+      .map(f => `<option value="${f}" ${f===prefilledAttackForm?'selected':''}>${f.charAt(0).toUpperCase() + f.slice(1)}</option>`).join("");
+    
     const dialogHtml = `
       <div style="margin-bottom:8px;"><label style="display:inline-block;width:130px;">Check:</label><strong>${actionName}</strong></div>
 
       <div style="margin-bottom:8px;">
         <label style="display:inline-block;width:130px;">Target (label):</label>
-        <input type="text" name="targetName" style="width:220px;" placeholder="e.g., Doctor Doom">
+        <input type="text" name="targetName" style="width:220px;" placeholder="e.g., Doctor Doom" value="${prefilledTargetName}">
       </div>
 
       <div style="margin-bottom:8px;">
@@ -58,7 +68,7 @@ export class CheckAction extends BaseAction {
         <div style="font-weight:bold;margin-bottom:6px;">Damage Gate</div>
         <div style="margin-bottom:6px;">
           <label style="display:inline-block;width:130px;">Damage that penetrated:</label>
-          <input type="number" name="dmgThrough" value="0" min="0" style="width:80px;">
+          <input type="number" name="dmgThrough" value="${prefilledDmgThrough}" min="0" style="width:80px;">
           <span style="color:#666;font-size:.9em;">(after Armor/Fields/Resistances)</span>
         </div>
         <div>
@@ -77,16 +87,7 @@ export class CheckAction extends BaseAction {
 
       <div style="margin-bottom:8px;">
         <label style="display:inline-block;width:130px;">Attack Form:</label>
-        <select name="attackForm" style="width:220px;">
-          <option value="blunt">Blunt (Slugfest)</option>
-          <option value="edged">Edged (Slugfest)</option>
-          <option value="shooting">Shooting</option>
-          <option value="throwing">Throwing</option>
-          <option value="energy">Energy</option>
-          <option value="force">Force</option>
-          <option value="charging">Charging</option>
-          <option value="wrestling">Wrestling</option>
-        </select>
+        <select name="attackForm" style="width:220px;">${attackFormOptions}</select>
         <span style="color:#666;font-size:.85em;">(Kill: E/S applies to Edged or Shooting only)</span>
       </div>
 
@@ -101,6 +102,8 @@ export class CheckAction extends BaseAction {
       <div style="margin-top:10px;">
         <label><input type="checkbox" name="skipDice"> Skip dice animation</label>
       </div>
+      
+      ${prefilledTargetName ? `<div style="margin-top:8px;padding:4px;background:#e8f5e9;border:1px solid #4CAF50;border-radius:3px;font-size:.85em;color:#2e7d32;">✓ Auto-populated from targeted token</div>` : ""}
     `;
 
     const choice = await new Promise((resolve) => {
@@ -137,7 +140,7 @@ export class CheckAction extends BaseAction {
     // --- Target FEAT rank after column shifts ---
     const effectiveEndRank = shiftRank(choice.targetEndRank, choice.shift);
 
-    // --- Roll d100 (target’s FEAT); cap with "spend up to 100" locally (no history unless you choose to use the actor) ---
+    // --- Roll d100 (target's FEAT); cap with "spend up to 100" locally (no history unless you choose to use the actor) ---
     const roll = await (new Roll("1d100")).evaluate();
     if (!choice.skipDice) {
       await roll.toMessage({
@@ -150,7 +153,7 @@ export class CheckAction extends BaseAction {
     const karmaSpend = Math.min(Math.max(0, choice.karma || 0), needTo100);
     const cappedTotal = Math.min(100, roll.total + karmaSpend);
 
-    // --- Determine color/result on target’s Endurance ---
+    // --- Determine color/result on target's Endurance ---
     const color = game.msh.rollUniversalTable(effectiveEndRank, cappedTotal);
     const colorLower = String(color||"").toLowerCase();
     const baseEffect = effects[colorLower] || color;
@@ -210,20 +213,74 @@ export class CheckAction extends BaseAction {
   _extraExplanationHtml({ actionType, choice, attackerStr, colorLower, effectiveEndRank, finalEffect, effectsSuppressed }) {
     // Slam: show movement/dir rules; Stun: durations; Kill: E/S clarification
     if (actionType === "slam") {
-      const lines = {
-        white: "No Slam — target still takes damage.",
-        green: "Stagger — no longer adjacent; may act next round.",
-        yellow: "1 Area — attacker chooses direction if damage penetrated; defender chooses if not.",
-        red: "Grand Slam — travel ≈ attacker Strength ground speed (e.g., Unearthly ≈ 10 areas)."
+      // Map Universal Table colors to Slam effects per the rules
+      const slamEffects = {
+        white: {
+          name: "Grand Slam",
+          desc: `Target is knocked away with speed equal to attacker's Strength as ground speed. With ${attackerStr.rank} Strength (${attackerStr.value}), this translates to approximately ${this._strengthToAreas(attackerStr.value)} areas of travel.`,
+          direction: choice.dmgThrough > 0 ? "Attacker chooses direction (any compass direction, straight up, or straight down)." : "Defender chooses direction."
+        },
+        green: {
+          name: "1 Area",
+          desc: "Target is knocked one area away (ranged or area movement).",
+          direction: choice.dmgThrough > 0 ? "Attacker chooses direction (any compass direction, straight up, or straight down)." : "Defender chooses direction (likely avoiding teammates, buildings, and obstacles)."
+        },
+        yellow: {
+          name: "Stagger",
+          desc: "Target is knocked back a step or two, perhaps to one knee, but is fully capable of combat next round. Target is no longer adjacent to attacker.",
+          direction: "No forced movement beyond stepping back. Target may suffer situational damage (e.g., staggering off a cliff edge)."
+        },
+        red: {
+          name: "No Slam",
+          desc: "Target is not affected by the Slam. Target still takes damage as normal.",
+          direction: "No movement."
+        }
       };
+
+      const effect = slamEffects[colorLower] || slamEffects.red;
+      
+      // Show collision button for Grand Slam and 1 Area
+      const showCollisionButton = (colorLower === 'white' || colorLower === 'green') && !effectsSuppressed;
+
       return `
         <div style="padding:6px 10px;margin:6px 10px;background:#fffde7;border:1px solid #f9a825;border-radius:3px;">
-          <div style="font-weight:bold;">Slam Details</div>
-          <div>${lines[colorLower] || ""}</div>
-          <div style="color:#555;font-size:.85em;margin-top:4px;">
-            Colliding with walls/objects deals impact as per charging vs obstacle; direction per rules above.
+          <div style="font-weight:bold;margin-bottom:6px;">Slam Result: ${effect.name}</div>
+          
+          <div style="margin-bottom:6px;">
+            <strong>Effect:</strong> ${effect.desc}
           </div>
-          ${effectsSuppressed ? `<div style="margin-top:6px;color:#b71c1c;"><strong>Note:</strong> No damage penetrated → Slam effects do not apply.</div>` : ""}
+          
+          <div style="margin-bottom:6px;">
+            <strong>Direction:</strong> ${effect.direction}
+          </div>
+          
+          ${showCollisionButton ? `
+            <div style="margin-top:8px;padding:4px;background:#ffebee;border:1px solid #ef5350;border-radius:3px;">
+              <strong>⚠ Collision Damage:</strong> If the target slams into a building, wall, or other obstruction, they take damage as if making a Charging attack against that object. Buildings and obstructions affect movement speed as per normal movement rules.
+            </div>
+            
+            <div style="margin-top:8px;text-align:center;">
+              <a class="faserip-chip" 
+                data-action="calculate-collision"
+                data-target-name="${choice.targetName}"
+                data-target-endurance="${choice.targetEndRank}"
+                data-slam-distance="${colorLower === 'white' ? this._strengthToAreas(attackerStr.value) : 1}"
+                title="Calculate damage if target collides with an obstacle"
+                style="display:inline-block;font-size:12px;line-height:1.1;padding:4px 10px;border:1px solid #ef5350;border-radius:3px;background:#fff;color:#d32f2f;text-decoration:none;cursor:pointer;font-weight:bold;">
+                🧮 Calculate Collision Damage
+              </a>
+            </div>
+          ` : ''}
+          
+          ${effectsSuppressed ? `
+            <div style="margin-top:8px;padding:4px;background:#ffcdd2;border:1px solid #b71c1c;border-radius:3px;color:#b71c1c;">
+              <strong>Note:</strong> No damage penetrated defenses → Slam effects do not apply (per rules: "For any one of these three results to be effective on a target, the attacker must inflict some damage on the target").
+            </div>
+          ` : ''}
+          
+          <div style="margin-top:8px;font-size:.85em;color:#666;">
+            <strong>Attacker Context:</strong> ${this.actor.name} (Strength: ${attackerStr.rank} = ${attackerStr.value})
+          </div>
         </div>
       `;
     }
@@ -231,7 +288,7 @@ export class CheckAction extends BaseAction {
     if (actionType === "stun") {
       const lines = {
         white: "1–10 rounds Stunned — roll 1d10; no actions.",
-        green: "1 round Stunned — no action next round (can “play possum”).",
+        green: "1 round Stunned — no action next round (can \"play possum\").",
         yellow: "No effect.",
         red: "No effect."
       };
@@ -267,4 +324,15 @@ export class CheckAction extends BaseAction {
 
     return "";
   }
+
+  // Helper method to estimate areas from Strength value
+  _strengthToAreas(strValue) {
+    // Rough approximation: ground speed in areas based on Strength rank value
+    // Using the example: Unearthly (100) ≈ 10 areas
+    if (strValue >= 100) return Math.floor(strValue / 10);
+    if (strValue >= 50) return Math.floor(strValue / 8);
+    if (strValue >= 20) return Math.floor(strValue / 5);
+    return Math.max(1, Math.floor(strValue / 4));
+  }
+
 }

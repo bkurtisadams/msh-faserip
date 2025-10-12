@@ -212,27 +212,44 @@ export function buildResultGrid(actionType, activeColorLower, effects, hoverFn) 
 }
 
 // Action buttons box (placeholder chips + optional Breaking FEAT)
-export function buildActionsBox({ showSlam=false, showStun=false, pulled=false, breakingFeat=null, actorUuid }) {
-  const chip = (label, title, enabled) => {
+// In action-utils.js, update buildActionsBox signature:
+export function buildActionsBox({ showSlam=false, showStun=false, pulled=false, breakingFeat=null, actorUuid, damage=0 }) {
+  const chip = (label, title, enabled, dataAttrs="") => {
     const base = "display:inline-block;font-size:12px;line-height:1.1;padding:2px 6px;border:1px solid #bbb;border-radius:3px;text-decoration:none;white-space:nowrap;";
     const style = enabled
       ? `${base}background:#fff;color:#333;cursor:pointer;`
       : `${base}background:#f7f7f7;color:#333;cursor:not-allowed;opacity:.55;filter:grayscale(.3);`;
     const key = label.toLowerCase().replace(/\s+/g,'-');
-    return `<a class="faserip-chip" data-action="${key}" ${enabled? "" : 'aria-disabled="true"'} title="${title}" style="${style}">${label}</a>`;
+    return `<a class="faserip-chip" data-action="${key}" ${dataAttrs} ${enabled? "" : 'aria-disabled="true"'} title="${title}" style="${style}">${label}</a>`;
   };
 
   const parts = [
     chip("Apply Damage","Placeholder: apply damage manually to the target(s).", false)
   ];
-  if (showSlam) parts.push(chip("Resolve Slam","Placeholder: resolve SLAM manually.", true));
-  if (showStun) parts.push(chip("Resolve Stun","Placeholder: resolve STUN manually.", true));
-  if (pulled)   parts.push(chip("Pull Options","Placeholder: adjust for pulled punch.", false));
+  
+  if (showSlam) parts.push(chip(
+    "Resolve Slam",
+    "Open Slam Check dialog",
+    true,
+    `data-check="slam" data-attack-form="blunt" data-dmg="${damage}" data-attacker-uuid="${actorUuid}"`
+  ));
+  
+  if (showStun) parts.push(chip(
+    "Resolve Stun",
+    "Open Stun Check dialog",
+    true,
+    `data-check="stun" data-attack-form="blunt" data-dmg="${damage}" data-attacker-uuid="${actorUuid}"`
+  ));
+  
+  if (pulled) parts.push(chip("Pull Options","Placeholder: adjust for pulled punch.", false));
+  
   if (breakingFeat) {
-    parts.push(`<a class="faserip-chip" data-action="breaking-feat" data-weapon-mat="${breakingFeat.weaponMat}"
-                 data-actor-uuid="${actorUuid}"
-                 title="Roll a Breaking FEAT: compare weapon material vs target armor/material (or wielder STR)."
-                 style="display:inline-block;font-size:12px;line-height:1.1;padding:2px 6px;border:1px solid #bbb;border-radius:3px;background:#ffffff;color:#333;text-decoration:none;white-space:nowrap;cursor:pointer;">Breaking FEAT</a>`);
+    parts.push(chip(
+      "Breaking FEAT",
+      "Roll a Breaking FEAT: compare weapon material vs target armor/material (or wielder STR).",
+      true,
+      `data-action="breaking-feat" data-weapon-mat="${breakingFeat.weaponMat}" data-actor-uuid="${actorUuid}"`
+    ));
   }
 
   return `

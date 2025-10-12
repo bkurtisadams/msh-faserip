@@ -13,6 +13,7 @@ import { FaseripInitiative } from './faserip-initiative.js';
 import { CombatHandler } from './combat-handler.js';
 import { initializeSlamHandlers } from './charge-damage.js';
 import { installActionChatHandlers } from "./modules/actions/chat-hooks.js";
+import { openCollisionDamageDialog } from './modules/actions/collision-damage.js';
 
 
 Hooks.once("init", async () => {
@@ -305,6 +306,9 @@ Hooks.once("init", async () => {
 
   // Add the CombatHandler to the namespace
   game.msh.CombatHandler = CombatHandler;
+
+  // Add the collision damage dialog
+  game.msh.openCollisionDamageDialog = openCollisionDamageDialog;
 
   // Initialize faserip initiative
   FaseripInitiative.init();
