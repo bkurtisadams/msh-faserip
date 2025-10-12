@@ -12,7 +12,8 @@ import { rollUniversalAction } from './rolls.js';
 import { FaseripInitiative } from './faserip-initiative.js';
 import { CombatHandler } from './combat-handler.js';
 import { initializeSlamHandlers } from './charge-damage.js';
-import { openBreakingFeatDialog } from './breaking-feat.js';
+import { installActionChatHandlers } from "./modules/actions/chat-hooks.js";
+
 
 Hooks.once("init", async () => {
   console.log("FASERIP DEBUG: init hook is running!"); // <-- DEBUG CONSOLE LOG
@@ -441,59 +442,52 @@ Hooks.on("preCreateActor", (document, data, options, userId) => {
 });
 
 // CONSOLIDATED READY HOOK - All ready logic in one place
-Hooks.once("ready", () => {
-  // SocketLib + GM handlers (idempotent; gm-utils handles internal checks)
-  console.log("🔄 Registering SocketLib and GM handlers (ready hook)...");
-  GMUtils.registerSocket(); // exposes game.msh.socket and game.msh.runAsGM
+Hooks.once("ready", async () => {
+  game.msh ??= {};
 
-  // Initialize slam collision handlers
-  initializeSlamHandlers?.();
-  console.log("MSH FASERIP | Slam collision handlers initialized");
-
-  // Fix prototype token overrides to allow manual disposition changes
-  const currentOverrides = game.settings.get("core", "prototypeTokenOverrides") ?? {};
-
-  // Check if disposition overrides exist and remove them
-  if (currentOverrides.hero?.disposition !== undefined ||
-      currentOverrides.villain?.disposition !== undefined ||
-      currentOverrides.npc?.disposition !== undefined) {
-
-    console.log("FASERIP: Removing automatic disposition overrides to allow manual control");
-
-    const fixedOverrides = {
-      base: currentOverrides.base ?? {},
-      hero: { ...(currentOverrides.hero ?? {}) },
-      villain: { ...(currentOverrides.villain ?? {}) },
-      npc: { ...(currentOverrides.npc ?? {}) }
-    };
-
-    delete fixedOverrides.hero.disposition;
-    delete fixedOverrides.villain.disposition;
-    delete fixedOverrides.npc.disposition;
-
-    game.settings.set("core", "prototypeTokenOverrides", fixedOverrides);
+  // SocketLib + GM handlers
+  try {
+    GMUtils.registerSocket();
+    console.log("MSH FASERIP | Socket/GM registered");
+  } catch (e) {
+    console.warn("MSH FASERIP | Socket/GM registration failed:", e);
   }
 
-  // ↓↓↓ Add this near the end of the same ready block ↓↓↓
-  if (!game.msh) game.msh = {};
-  if (!game.msh.breakingFeatHookRegistered) {
-    game.msh.breakingFeatHookRegistered = true;
-
-    Hooks.on('renderChatMessage', (message, html) => {
-      html.on('click', '[data-action="breaking-feat"]', async (ev) => {
-        ev.preventDefault();
-        const btn = ev.currentTarget;
-        const weaponMat = btn.dataset.weaponMat || "Excellent";
-        const actorUuid = btn.dataset.actorUuid;
-        const actor = actorUuid ? await fromUuid(actorUuid) : null;
-
-        // Call the helper you placed in a shared module
-        openBreakingFeatDialog({ weaponMatRank: weaponMat, actor });
-      });
-    });
+  // Slam collision handlers (optional, safe)
+  try {
+    initializeSlamHandlers?.();
+    console.log("MSH FASERIP | Slam handlers ready");
+  } catch (e) {
+    console.warn("MSH FASERIP | Slam handler init failed:", e);
   }
 
-  /* Optional hotkey block remains commented-out */
+  // Fix prototype token overrides (only if needed)
+  try {
+    const o = game.settings.get("core", "prototypeTokenOverrides") ?? {};
+    const needsFix = o.hero?.disposition !== undefined || o.villain?.disposition !== undefined || o.npc?.disposition !== undefined;
+    if (needsFix) {
+      const fixed = {
+        base: o.base ?? {},
+        hero: { ...(o.hero ?? {}) },
+        villain: { ...(o.villain ?? {}) },
+        npc: { ...(o.npc ?? {}) }
+      };
+      delete fixed.hero.disposition;
+      delete fixed.villain.disposition;
+      delete fixed.npc.disposition;
+      await game.settings.set("core", "prototypeTokenOverrides", fixed);
+      console.log("MSH FASERIP | Cleared disposition overrides");
+    }
+  } catch (e) {
+    console.warn("MSH FASERIP | Could not adjust prototypeTokenOverrides:", e);
+  }
+
+  // Chat hooks (checks + breaking FEAT)
+  try {
+    installActionChatHandlers();
+  } catch (e) {
+    console.warn("MSH FASERIP | Failed to install chat hooks:", e);
+  }
 });
 
 // Add the hotbarDrop hook at module level (like in the older file)

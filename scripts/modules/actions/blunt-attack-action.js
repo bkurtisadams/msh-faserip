@@ -168,6 +168,24 @@ export class BluntAttackAction extends AttackAction {
       actorUuid: actor.uuid
     });
 
+    // right after `const actions = buildActionsBox({...});`
+    const makeCheckChip = (label, check, attackForm, dmg, actorUuid) => {
+    const base = "display:inline-block;font-size:12px;line-height:1.1;padding:2px 6px;border:1px solid #bbb;border-radius:3px;text-decoration:none;white-space:nowrap;";
+    const style = `${base}background:#fff;color:#333;cursor:pointer;`;
+    return `<a class="faserip-chip" data-check="${check}" data-attack-form="${attackForm}"
+                data-dmg="${dmg || 0}" data-attacker-uuid="${actorUuid}" style="${style}">${label}</a>`;
+    };
+
+    // Build the extra chips you want on Blunt
+    const extraChips = [
+    makeCheckChip("Open Stun Check", "stun", "blunt", choice.damage, actor.uuid),
+    makeCheckChip("Open Slam Check", "slam", "blunt", choice.damage, actor.uuid),
+    ].join("\n");
+
+    // Inject them just before the actions' closing </div>
+    const actionsWithChecks = actions.replace(/<\/div>\s*$/, `${extraChips}\n</div>`);
+
+
     // weapon/bare line
     const weaponContext = (choice.src === "weapon")
       ? (() => {
@@ -196,7 +214,7 @@ export class BluntAttackAction extends AttackAction {
         <div style="text-align:center;padding:8px;margin:5px;font-weight:bold;font-size:1.1em;border-radius:3px;background:${bg};color:${fg};">
           RESULT: ${String(color).toUpperCase()} — ${String(effectResult).toUpperCase()}
         </div>
-        ${actions}
+        ${actionsWithChecks}
       </div>
     `;
 
