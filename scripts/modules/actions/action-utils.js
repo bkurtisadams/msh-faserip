@@ -213,36 +213,56 @@ export function buildResultGrid(actionType, activeColorLower, effects, hoverFn) 
 
 // Action buttons box (placeholder chips + optional Breaking FEAT)
 // In action-utils.js, update buildActionsBox signature:
-export function buildActionsBox({ showSlam=false, showStun=false, pulled=false, breakingFeat=null, actorUuid, damage=0 }) {
-  const chip = (label, title, enabled, dataAttrs="") => {
+export function buildActionsBox({
+  showSlam = false,
+  showStun = false,
+  showKill = false,            // NEW: for edged / kill-capable actions
+  pulled = false,
+  breakingFeat = null,
+  actorUuid,
+  damage = 0,
+  attackForm = "blunt"         // NEW: "blunt" | "edged" | "shooting" | etc.
+}) {
+  const chip = (label, title, enabled, dataAttrs = "") => {
     const base = "display:inline-block;font-size:12px;line-height:1.1;padding:2px 6px;border:1px solid #bbb;border-radius:3px;text-decoration:none;white-space:nowrap;";
     const style = enabled
       ? `${base}background:#fff;color:#333;cursor:pointer;`
       : `${base}background:#f7f7f7;color:#333;cursor:not-allowed;opacity:.55;filter:grayscale(.3);`;
-    const key = label.toLowerCase().replace(/\s+/g,'-');
-    return `<a class="faserip-chip" data-action="${key}" ${dataAttrs} ${enabled? "" : 'aria-disabled="true"'} title="${title}" style="${style}">${label}</a>`;
+    const key = label.toLowerCase().replace(/\s+/g, "-");
+    return `<a class="faserip-chip" data-action="${key}" ${dataAttrs} ${enabled ? "" : 'aria-disabled="true"'} title="${title}" style="${style}">${label}</a>`;
   };
 
   const parts = [
-    chip("Apply Damage","Placeholder: apply damage manually to the target(s).", false)
+    chip("Apply Damage", "Placeholder: apply damage manually to the target(s).", false)
   ];
-  
+
   if (showSlam) parts.push(chip(
     "Resolve Slam",
-    "Open Slam Check dialog",
+    "Open Slam dialog",
     true,
-    `data-check="slam" data-attack-form="blunt" data-dmg="${damage}" data-attacker-uuid="${actorUuid}"`
+    `data-check="slam" data-attack-form="${attackForm}" data-dmg="${damage}" data-attacker-uuid="${actorUuid}"`
   ));
-  
+
   if (showStun) parts.push(chip(
     "Resolve Stun",
-    "Open Stun Check dialog",
+    "Open Stun dialog",
     true,
-    `data-check="stun" data-attack-form="blunt" data-dmg="${damage}" data-attacker-uuid="${actorUuid}"`
+    `data-check="stun" data-attack-form="${attackForm}" data-dmg="${damage}" data-attacker-uuid="${actorUuid}"`
   ));
-  
-  if (pulled) parts.push(chip("Pull Options","Placeholder: adjust for pulled punch.", false));
-  
+
+  if (showKill) parts.push(chip(
+    "Resolve Kill",
+    "Open Kill dialog",
+    true,
+    `data-check="kill" data-attack-form="${attackForm}" data-dmg="${damage}" data-attacker-uuid="${actorUuid}"`
+  ));
+
+  if (pulled) parts.push(chip(
+    "Pull Options",
+    "Placeholder: adjust for pulled punch.",
+    false
+  ));
+
   if (breakingFeat) {
     parts.push(chip(
       "Breaking FEAT",

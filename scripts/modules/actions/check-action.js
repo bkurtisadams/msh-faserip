@@ -213,11 +213,13 @@ export class CheckAction extends BaseAction {
       rawStunDuration
     });
 
+    const shortAction = String(actionName).replace(/\s*check$/i, "");
+
     // --- Final chat card ---
     const cardHtml = `
       <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
         <div style="padding:5px 10px;border-bottom:1px solid #c0c0c0;font-size:1.1em;color:#4e342e;">
-          <strong>${actor.name} - ${actionName} Check vs ${choice.targetName}</strong>
+          <strong>${actor.name} - ${shortAction} Check vs ${choice.targetName}</strong>
         </div>
 
         <div style="padding:5px 10px;font-size:.9em;">
