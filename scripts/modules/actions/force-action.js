@@ -1,5 +1,7 @@
 // scripts/modules/actions/force-action.js
 import { RangedAttackAction } from "./ranged-attack-action.js";
+import { attachAutoFillRange } from "./action-utils.js";
+
 import {
   getAbilityInfo,
   labelFor,
@@ -176,6 +178,10 @@ export class ForceAction extends RangedAttackAction {
               const usePowerToHit = !!$('#usePowerToHit').is(':checked');
               const range = Number($('[name="range"]').val() || 1);
               const throughObstacle = !!$('[name="throughObstacle"]').is(':checked');
+  
+              const targetMovement = String($('[name="targetMovement"]').val() || "0");
+              const movementModifier = targetMovement === "0-charging" ? 0 : Number(targetMovement);
+              
               const remember = !!$('[name="remember"]').is(':checked');
               const skipDice = !!$('[name="skipDice"]').is(':checked');
 
@@ -190,18 +196,27 @@ export class ForceAction extends RangedAttackAction {
                 await actor.setFlag("msh-faserip", "lastForceUsePowerToHit", usePowerToHit);
               }
 
-              // Range & obstacle modifiers via powerRank path
+                // Range & obstacle modifiers via powerRank path
               const { totalShift, impossible, rangeModifier, obstacleModifier } =
                 this._applyRangeModifiers(shift, range, throughObstacle, null, powerRank, null);
+                
+              // ⬇️ ADD THIS LINE
+              const finalShift = totalShift + movementModifier;
+              
               if (impossible) {
-                ui.notifications.error(`Target is beyond force range (rank: ${powerRank}).`);
+                ui.notifications.error(`Target is beyond energy range (rank: ${powerRank}).`);
                 return resolve(null);
               }
 
               resolve({
                 powerName, powerDamage, powerRank, powerId, prettyRange,
                 karma, range, throughObstacle, skipDice, usePowerToHit,
-                totalShift, rangeModifier, obstacleModifier
+                totalShift: finalShift, // ⬅️ CHANGE THIS
+                rangeModifier, 
+                obstacleModifier,
+                // ⬇️ ADD THESE TWO LINES
+                targetMovement,
+                movementModifier
               });
             },
           },
@@ -212,22 +227,22 @@ export class ForceAction extends RangedAttackAction {
           const $adhoc = html.find("#adhoc-toggle");
 
           const updatePreviewFromSelection = () => {
-            if ($adhoc.is(":checked")) {
+              if ($adhoc.is(":checked")) {
               const r = String(html.find('[name="adhocRank"]').val() || "Remarkable");
               this._setupRangePreview(html, { powerRank: r });
-            } else {
+              } else {
               const wid = String(html.find('[name="power"]').val() || "");
               const s = forceItems.find((i) => i.id === wid)?.system || {};
               const r = String(s.rank ?? s.powerRank ?? "Remarkable");
               this._setupRangePreview(html, { powerRank: r });
-            }
+              }
           };
 
           const applyToggle = () => {
-            const on = $adhoc.is(":checked");
-            html.find(".adhoc-fields").css("display", on ? "" : "none");
-            html.find(".carried-fields").css("display", on ? "none" : "");
-            updatePreviewFromSelection();
+              const on = $adhoc.is(":checked");
+              html.find(".adhoc-fields").css("display", on ? "" : "none");
+              html.find(".carried-fields").css("display", on ? "none" : "");
+              updatePreviewFromSelection();
           };
 
           $adhoc.on("change", applyToggle);
@@ -235,7 +250,13 @@ export class ForceAction extends RangedAttackAction {
           html.find('[name="power"]').on("change", updatePreviewFromSelection);
 
           applyToggle(); // initial
-        },
+
+          // ⬇️ Attach auto-fill so [name="range"] updates from token→target distance
+          this._disposeAutoFill = attachAutoFillRange(html, actor, updatePreviewFromSelection);
+          },
+          close: () => {
+          if (this._disposeAutoFill) this._disposeAutoFill();
+          },
       }).render(true);
     });
 
@@ -277,9 +298,10 @@ export class ForceAction extends RangedAttackAction {
       attackForm: "force",
     });
 
-    const rangeText = (choice.prettyRange && choice.prettyRange.trim())
-      ? choice.prettyRange
-      : `${choice.range} area${choice.range > 1 ? "s" : ""}${choice.rangeModifier ? ` (${choice.rangeModifier}CS)` : ""}${choice.throughObstacle ? `, obstacle (-2CS)` : ""}`;
+    const rangeText = choice.prettyRange || 
+      `${choice.range} area${choice.range > 1 ? "s" : ""}` +
+      `${choice.rangeModifier ? ` (${choice.rangeModifier}CS)` : ""}` +
+      `${choice.throughObstacle ? `, obstacle (-2CS)` : ""}`;
 
     const toHitLine = choice.usePowerToHit
       ? `To-Hit Rank: ${choice.powerRank} (Power)`

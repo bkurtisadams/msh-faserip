@@ -1,5 +1,7 @@
 // scripts/modules/actions/shooting-action.js
 import { RangedAttackAction } from "./ranged-attack-action.js";
+import { attachAutoFillRange } from "./action-utils.js";
+
 import {
   RANKS,
   shiftRank,
@@ -110,6 +112,8 @@ export class ShootingAction extends RangedAttackAction {
               const karma = Number($('[name="karma"]').val() || 0);
               const range = Number($('[name="range"]').val() || 1);
               const throughObstacle = !!$('[name="throughObstacle"]').is(':checked');
+              const targetMovement = String($('[name="targetMovement"]').val() || "0");
+              const movementModifier = targetMovement === "0-charging" ? 0 : Number(targetMovement);
               const remember = !!$('[name="remember"]').is(':checked');
               const skipDice = !!$('[name="skipDice"]').is(':checked');
 
@@ -119,6 +123,8 @@ export class ShootingAction extends RangedAttackAction {
               // Check if shot is possible
               const { totalShift, impossible, rangeModifier, obstacleModifier } = 
                 this._applyRangeModifiers(shift, range, throughObstacle, weaponRange);
+
+              const finalShift = totalShift + movementModifier; // Add movement modifier
 
               if (impossible) {
                 ui.notifications.error(`Target is beyond weapon range (${weaponRange} areas)!`);
@@ -140,9 +146,11 @@ export class ShootingAction extends RangedAttackAction {
                 range, 
                 throughObstacle, 
                 skipDice,
-                totalShift,
+                totalShift: finalShift,
                 rangeModifier,
-                obstacleModifier
+                obstacleModifier,
+                targetMovement,
+                movementModifier
               });
             }
           },
@@ -150,21 +158,34 @@ export class ShootingAction extends RangedAttackAction {
         },
         default: "roll",
         render: (html) => {
-          // Setup range preview updates
-          this._setupRangePreview(html, { weaponMaxRange: initialRange });
+            // Setup range preview updates
+            this._setupRangePreview(html, { weaponMaxRange: initialRange });
 
-          // Update range preview when weapon changes
-          html.find('[name="weapon"]').on('change', () => {
-            const weaponId = html.find('[name="weapon"]').val();
-            const weapon = shootingWeapons.find(i => i.id === weaponId);
-            const newRange = weapon?.system?.range || 15;
-            
-            html.find('#range-preview').prevAll('div').find('span').last()
-              .text(`Max: ${newRange} areas`);
-            
-            this._setupRangePreview(html, { weaponMaxRange: newRange });
-          });
-        }
+            // Update range preview when weapon changes
+            html.find('[name="weapon"]').on('change', () => {
+                const weaponId = html.find('[name="weapon"]').val();
+                const weapon = shootingWeapons.find(i => i.id === weaponId);
+                const newRange = weapon?.system?.range || 15;
+                
+                // Update the max range hint text in the UI
+                html.find('[name="range"]').siblings('span').text(`Max: ${newRange} areas`);
+                
+                // Refresh the range preview with new weapon range
+                this._setupRangePreview(html, { weaponMaxRange: newRange });
+            });
+
+            // Attach auto-fill to update range from token-to-target distance
+            this._disposeAutoFill = attachAutoFillRange(html, actor, () => {
+                const weaponId = html.find('[name="weapon"]').val();
+                const weapon = shootingWeapons.find(i => i.id === weaponId);
+                const currentRange = weapon?.system?.range || 15;
+                this._setupRangePreview(html, { weaponMaxRange: currentRange });
+            });
+            },
+            close: () => {
+            // Clean up the auto-fill event listeners
+            if (this._disposeAutoFill) this._disposeAutoFill();
+            }
       }).render(true);
     });
 

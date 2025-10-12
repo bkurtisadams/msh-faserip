@@ -1,4 +1,5 @@
 import { RangedAttackAction } from "./ranged-attack-action.js";
+import { attachAutoFillRange } from "./action-utils.js";
 import {
   getAbilityInfo,
   labelFor,
@@ -142,6 +143,10 @@ export class ThrowingEdgedAction extends RangedAttackAction {
               const karma = Number($('[name="karma"]').val() || 0);
               const range = Number($('[name="range"]').val() || 1);
               const throughObstacle = !!$('[name="throughObstacle"]').is(':checked');
+
+              const targetMovement = String($('[name="targetMovement"]').val() || "0");
+              const movementModifier = targetMovement === "0-charging" ? 0 : Number(targetMovement);
+
               const remember = !!$('[name="remember"]').is(':checked');
               const skipDice = !!$('[name="skipDice"]').is(':checked');
 
@@ -156,6 +161,7 @@ export class ThrowingEdgedAction extends RangedAttackAction {
 
               const { totalShift, impossible, rangeModifier, obstacleModifier } =
                 this._applyRangeModifiers(shift, range, throughObstacle, null, null, strRank);
+
               if (impossible) {
                 ui.notifications.error(`Target is beyond throwing range (${this._getThrowingRangeInAreas(strRank)} areas).`);
                 return resolve(null);
@@ -169,9 +175,11 @@ export class ThrowingEdgedAction extends RangedAttackAction {
                 range,
                 throughObstacle,
                 skipDice,
-                totalShift,
+                totalShift: finalShift,
                 rangeModifier,
-                obstacleModifier
+                obstacleModifier,
+                targetMovement,
+                movementModifier
               });
             }
           },
@@ -179,16 +187,25 @@ export class ThrowingEdgedAction extends RangedAttackAction {
         },
         default: "roll",
         render: (html) => {
+          // existing toggle+preview code…
           const $adhoc = html.find("#adhoc-toggle");
           const applyToggle = () => {
             const on = $adhoc.is(":checked");
             html.find(".adhoc-fields").css("display", on ? "" : "none");
             html.find(".carried-fields").css("display", on ? "none" : "");
+            this._setupRangePreview(html, { strengthRank: strRank });
           };
           $adhoc.on("change", applyToggle);
           applyToggle();
 
-          this._setupRangePreview(html, { strengthRank: strRank });
+          // attach auto-fill; keep disposer to unhook later
+          this._disposeAutoFill = attachAutoFillRange(html, actor, () => {
+            this._setupRangePreview(html, { strengthRank: strRank });
+          });
+        },
+        close: (html) => {
+          // clean up hooks
+          if (this._disposeAutoFill) this._disposeAutoFill();
         }
       }).render(true);
     });

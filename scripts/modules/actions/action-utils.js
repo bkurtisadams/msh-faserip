@@ -338,3 +338,93 @@ export function computeEdgedDamage(strRank, strVal, matRank, weaponBase = 0, RAN
   const final  = Math.max(calc, weaponBase);
   return { damage: final, note: `Damage = max(min(STR ${strCap}, MAT ${matVal}), base ${weaponBase || 0})` };
 }
+
+export function getUnitsPerArea() {
+  const unit = String(canvas?.scene?.grid?.units || "").toLowerCase();
+
+  // If the scene is already in Areas, DO NOT convert; 1 scene unit == 1 Area
+  if (unit === "area" || unit === "areas") return 1;
+
+  // Otherwise, allow GM override if set
+  const val = game.settings?.get?.("msh-faserip", "unitsPerArea");
+  if (Number.isFinite(val) && val > 0) return Number(val);
+
+  // Fallback by common units
+  switch (unit) {
+    case "ft":
+    case "feet":   return 132; // 44 yards
+    case "m":
+    case "meter":
+    case "meters": return 40;  // ~36.6 m
+    case "yd":
+    case "yard":
+    case "yards":  return 44;  // exactly 44 yards
+    default:       return 132;
+  }
+}
+
+/** Measure scene distance between two points in SCENE UNITS (ft/m/areas), V12+ compatible. */
+function measureSceneDistance(p0, p1) {
+  if (canvas?.grid?.measurePath) {
+    const res = canvas.grid.measurePath([p0, p1], { gridSpaces: false });
+    if (typeof res === "number") return res;
+    if (res && typeof res.distance === "number") return res.distance;
+    if (Array.isArray(res) && res[0] && typeof res[0].distance === "number") return res[0].distance;
+    return 0;
+  }
+  if (canvas?.grid?.measureDistance) {
+    const n = canvas.grid.measureDistance(p0, p1);
+    return typeof n === "number" ? n : 0;
+  }
+  return 0;
+}
+
+export function measureAreasBetweenTokens(src, dst) {
+  if (!src || !dst) return 0;
+  const dist = measureSceneDistance(src.center, dst.center);
+  const unitsPerArea = getUnitsPerArea();
+  const areas = unitsPerArea === 1 ? dist : (dist / unitsPerArea);
+  // keep minimum 1 only if you want to force ranged min; otherwise allow 0.x
+  return Math.max(1, Math.round(areas));
+}
+
+/**
+ * Auto-fill the [name="range"] input in a Dialog with measured Areas from the actor’s token to the first target.
+ * Returns a disposer to unhook listeners when the dialog closes.
+ */
+export function attachAutoFillRange(html, actor, onAfterFill) {
+  const $range = html.find('[name="range"]');
+  if (!$range.length) return () => {};
+
+  const fill = () => {
+    try {
+      const targets = Array.from(game.user?.targets ?? []);
+      if (!targets.length) return;
+      const dst = targets[0];
+
+      const src = canvas.tokens?.controlled?.[0]
+        || canvas.tokens?.placeables?.find(t => t.actor?.id === actor.id);
+      if (!src || !dst) return;
+
+      const areas = measureAreasBetweenTokens(src, dst);
+      $range.val(String(areas)).trigger("input");
+      if (typeof onAfterFill === "function") onAfterFill();
+    } catch (e) {
+      console.warn("attachAutoFillRange: fill failed", e);
+    }
+  };
+
+  fill();
+
+  const onTarget = () => fill();
+  const onMove   = () => fill();
+
+  Hooks.on("targetToken", onTarget);
+  Hooks.on("updateToken", onMove);
+
+  return () => {
+    Hooks.off("targetToken", onTarget);
+    Hooks.off("updateToken", onMove);
+  };
+}
+

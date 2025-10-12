@@ -143,6 +143,15 @@ Hooks.once("init", async () => {
     }
   });
 
+  game.settings.register("msh-faserip", "unitsPerArea", {
+    name: "Distance per Area",
+    hint: "How many scene distance units equal 1 Area. Examples: 132 for feet, ~40 for meters, 1 if your scene units are Areas.",
+    scope: "world",
+    config: true,
+    type: Number,
+    default: 132
+  });
+
   console.log("FASERIP DEBUG: dailyKarmaEnabled setting registered."); // <-- DEBUG CONSOLE LOG
   // <-- NEW/MODIFIED SECTION END -->
 

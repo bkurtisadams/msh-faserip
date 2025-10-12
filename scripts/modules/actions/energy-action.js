@@ -1,5 +1,7 @@
 // scripts/modules/actions/energy-action.js
 import { RangedAttackAction } from "./ranged-attack-action.js";
+import { attachAutoFillRange } from "./action-utils.js";
+
 import {
   getAbilityInfo,
   labelFor,
@@ -176,6 +178,10 @@ export class EnergyAction extends RangedAttackAction {
 
               const range = Number($('[name="range"]').val() || 1);
               const throughObstacle = !!$('[name="throughObstacle"]').is(':checked');
+  
+              const targetMovement = String($('[name="targetMovement"]').val() || "0");
+              const movementModifier = targetMovement === "0-charging" ? 0 : Number(targetMovement);
+              
               const remember = !!$('[name="remember"]').is(':checked');
               const skipDice = !!$('[name="skipDice"]').is(':checked');
 
@@ -193,6 +199,10 @@ export class EnergyAction extends RangedAttackAction {
               // Range & obstacle modifiers via powerRank path
               const { totalShift, impossible, rangeModifier, obstacleModifier } =
                 this._applyRangeModifiers(shift, range, throughObstacle, null, powerRank, null);
+                
+              // ⬇️ ADD THIS LINE
+              const finalShift = totalShift + movementModifier;
+              
               if (impossible) {
                 ui.notifications.error(`Target is beyond energy range (rank: ${powerRank}).`);
                 return resolve(null);
@@ -201,7 +211,12 @@ export class EnergyAction extends RangedAttackAction {
               resolve({
                 powerName, powerDamage, powerRank, powerId, prettyRange,
                 karma, range, throughObstacle, skipDice, usePowerToHit,
-                totalShift, rangeModifier, obstacleModifier
+                totalShift: finalShift, // ⬅️ CHANGE THIS
+                rangeModifier, 
+                obstacleModifier,
+                // ⬇️ ADD THESE TWO LINES
+                targetMovement,
+                movementModifier
               });
             },
           },
@@ -235,7 +250,11 @@ export class EnergyAction extends RangedAttackAction {
           html.find('[name="power"]').on("change", updatePreviewFromSelection);
 
           applyToggle(); // initial
+          this._disposeAutoFill = attachAutoFillRange(html, actor, updatePreviewFromSelection);
         },
+        close: () => {
+          if (this._disposeAutoFill) this._disposeAutoFill();
+        }
       }).render(true);
     });
 
