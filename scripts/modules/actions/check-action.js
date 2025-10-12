@@ -136,6 +136,7 @@ export class CheckAction extends BaseAction {
 
     // --- Damage gate: effects only if dmg > 0 (or borderline toggle) ---
     const effectGateOpen = (choice.dmgThrough > 0) || !!choice.borderline;
+    const effectsSuppressed = !effectGateOpen;  // <-- MOVE THIS UP HERE
 
     // --- Target FEAT rank after column shifts ---
     const effectiveEndRank = shiftRank(choice.targetEndRank, choice.shift);
@@ -158,6 +159,28 @@ export class CheckAction extends BaseAction {
     const colorLower = String(color||"").toLowerCase();
     const baseEffect = effects[colorLower] || color;
 
+    // --- Special handling for Stun White result: auto-roll 1d10 for duration ---
+    // In check-action.js, around line 150-200, replace the stun duration section with:
+
+    // --- Special handling for Stun White result: auto-roll 1d10 for duration ---
+    let stunDuration = null;
+    let rawStunDuration = null;
+    if (actionType === "stun" && colorLower === "white" && !effectsSuppressed) {
+      const durationRoll = await (new Roll("1d10")).evaluate();
+      rawStunDuration = durationRoll.total;
+      
+      // Apply house rule cap
+      const maxStunDuration = game.settings.get('msh-faserip', 'maxStunDuration') || 10;
+      stunDuration = Math.min(rawStunDuration, maxStunDuration);
+      
+      // Show the d10 roll in chat
+      await durationRoll.toMessage({
+        speaker: ChatMessage.getSpeaker({ actor }),
+        flavor: `${choice.targetName} Stun Duration (1d10)${rawStunDuration > stunDuration ? ` - Capped at ${maxStunDuration}` : ''}`,
+        rollMode: game.settings.get("core", "rollMode")
+      });
+    }
+
     // --- Apply special Kill "E/S" rule ---
     let finalEffect = baseEffect;
     if (actionType === "kill" && baseEffect) {
@@ -169,7 +192,6 @@ export class CheckAction extends BaseAction {
     }
 
     // --- If no damage penetrated (and not borderline), effects are negated ---
-    const effectsSuppressed = !effectGateOpen;
     if (effectsSuppressed) {
       finalEffect = "No effect (no damage penetrated)";
     }
@@ -180,7 +202,15 @@ export class CheckAction extends BaseAction {
 
     // --- Extra explanatory block per check type ---
     const extraHtml = this._extraExplanationHtml({
-      actionType, choice, attackerStr, colorLower, effectiveEndRank, finalEffect, effectsSuppressed
+      actionType, 
+      choice, 
+      attackerStr, 
+      colorLower, 
+      effectiveEndRank, 
+      finalEffect, 
+      effectsSuppressed, 
+      stunDuration,
+      rawStunDuration
     });
 
     // --- Final chat card ---
@@ -210,7 +240,7 @@ export class CheckAction extends BaseAction {
     await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor }), content: cardHtml });
   }
 
-  _extraExplanationHtml({ actionType, choice, attackerStr, colorLower, effectiveEndRank, finalEffect, effectsSuppressed }) {
+  _extraExplanationHtml({ actionType, choice, attackerStr, colorLower, effectiveEndRank, finalEffect, effectsSuppressed, stunDuration = null, rawStunDuration = null }) {
     // Slam: show movement/dir rules; Stun: durations; Kill: E/S clarification
     if (actionType === "slam") {
       // Map Universal Table colors to Slam effects per the rules
@@ -287,15 +317,25 @@ export class CheckAction extends BaseAction {
 
     if (actionType === "stun") {
       const lines = {
-        white: "1–10 rounds Stunned — roll 1d10; no actions.",
+        white: stunDuration 
+          ? `<strong>${stunDuration} rounds Stunned</strong> — Target can take no actions for ${stunDuration} round${stunDuration > 1 ? 's' : ''}.`
+          : "1–10 rounds Stunned — roll 1d10; no actions.",
         green: "1 round Stunned — no action next round (can \"play possum\").",
         yellow: "No effect.",
         red: "No effect."
       };
+      
       return `
         <div style="padding:6px 10px;margin:6px 10px;background:#e3f2fd;border:1px solid #1e88e5;border-radius:3px;">
-          <div style="font-weight:bold;">Stun Details</div>
+          <div style="font-weight:bold;margin-bottom:4px;">Stun Details</div>
           <div>${lines[colorLower] || ""}</div>
+          ${stunDuration && colorLower === 'white' ? `
+            <div style="margin-top:8px;padding:6px;background:#fff9c4;border:1px solid #fbc02d;border-radius:3px;">
+              <strong>🎲 Duration Roll: ${stunDuration} round${stunDuration > 1 ? 's' : ''}</strong>
+              ${rawStunDuration && rawStunDuration > stunDuration ? `<div style="font-size:0.85em;color:#f57c00;margin-top:2px;">(Rolled ${rawStunDuration}, capped by house rule at ${stunDuration})</div>` : ''}
+              <div style="font-size:0.85em;color:#666;margin-top:4px;">Target is knocked out and can take no actions.</div>
+            </div>
+          ` : ''}
           ${effectsSuppressed ? `<div style="margin-top:6px;color:#b71c1c;"><strong>Note:</strong> No damage penetrated → Stun does not apply.</div>` : ""}
         </div>
       `;

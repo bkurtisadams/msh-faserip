@@ -129,6 +129,20 @@ Hooks.once("init", async () => {
     default: false, // Default value
   });
 
+  game.settings.register('msh-faserip', 'maxStunDuration', {
+    name: "Maximum Stun Duration",
+    hint: "House rule: Cap the maximum rounds a character can be stunned (White result on Stun check rolls 1d10). Set to 10 for RAW, or lower (e.g., 3-5) to keep combats moving.",
+    scope: "world",
+    config: true,
+    type: Number,
+    default: 10,
+    range: {
+      min: 1,
+      max: 10,
+      step: 1
+    }
+  });
+
   console.log("FASERIP DEBUG: dailyKarmaEnabled setting registered."); // <-- DEBUG CONSOLE LOG
   // <-- NEW/MODIFIED SECTION END -->
 

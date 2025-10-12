@@ -237,30 +237,50 @@ export class EdgedAttackAction extends AttackAction {
     const { bg, fg } = bannerColors(colorLower);
 
     // actions: edged shows STUN (yellow/red) and KILL (red)
-    const chip = (label, title, enabled) => {
+    const chip = (label, title, enabled, dataAttrs="") => {
       const base = "display:inline-block;font-size:12px;line-height:1.1;padding:2px 6px;border:1px solid #bbb;border-radius:3px;text-decoration:none;white-space:nowrap;";
       const style = enabled
         ? `${base}background:#fff;color:#333;cursor:pointer;`
         : `${base}background:#f7f7f7;color:#333;cursor:not-allowed;opacity:.55;filter:grayscale(.3);`;
       const key = label.toLowerCase().replace(/\s+/g,'-');
-      return `<a class="faserip-chip" data-action="${key}" ${enabled? "" : 'aria-disabled="true"'} title="${title}" style="${style}">${label}</a>`;
+      return `<a class="faserip-chip" data-action="${key}" ${dataAttrs} ${enabled? "" : 'aria-disabled="true"'} title="${title}" style="${style}">${label}</a>`;
     };
+
+    const parts = [
+      chip("Apply Damage","Placeholder: apply damage manually to the target(s).", false)
+    ];
+
     const enableStun = (colorLower === 'yellow' || colorLower === 'red');
     const enableKill = (colorLower === 'red');
 
-    const breakingFeatHtml = (choice.src === "weapon")
-      ? `<a class="faserip-chip" data-action="breaking-feat" data-weapon-mat="${choice.weaponMat}" data-actor-uuid="${actor.uuid}"
-           title="Roll a Breaking FEAT: compare weapon material vs target armor/material (or wielder STR)."
-           style="display:inline-block;font-size:12px;line-height:1.1;padding:2px 6px;border:1px solid #bbb;border-radius:3px;background:#ffffff;color:#333;text-decoration:none;white-space:nowrap;cursor:pointer;">Breaking FEAT</a>`
-      : "";
+    if (enableStun) parts.push(chip(
+      "Resolve Stun",
+      "Open Stun Check dialog",
+      true,
+      `data-check="stun" data-attack-form="edged" data-dmg="${choice.damage}" data-attacker-uuid="${actor.uuid}"`
+    ));
+
+    if (enableKill) parts.push(chip(
+      "Resolve Kill",
+      "Open Kill Check dialog",
+      true,
+      `data-check="kill" data-attack-form="edged" data-dmg="${choice.damage}" data-attacker-uuid="${actor.uuid}"`
+    ));
+
+    if (choice.pulled) parts.push(chip("Pull Options","Placeholder: adjust for pulled punch (lower damage/downgrade color).", false));
+
+    if (choice.src === "weapon") {
+      parts.push(chip(
+        "Breaking FEAT",
+        "Roll a Breaking FEAT: compare weapon material vs target armor/material (or wielder STR).",
+        true,
+        `data-action="breaking-feat" data-weapon-mat="${choice.weaponMat}" data-actor-uuid="${actor.uuid}"`
+      ));
+    }
 
     const actionsHtml = `
       <div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;padding:8px 10px;margin:6px 10px 10px;border:1px solid #c0c0c0;background:#fafafa;border-radius:4px;">
-        ${chip("Apply Damage","Placeholder: apply damage manually to the target(s).", false)}
-        ${chip("Resolve Stun","Placeholder: resolve STUN manually (apply duration/effects).", enableStun)}
-        ${chip("Resolve Kill","Placeholder: resolve KILL manually (apply endurance/death rules).", enableKill)}
-        ${choice.pulled ? chip("Pull Options","Placeholder: adjust for pulled punch (lower damage/downgrade color).", false) : ""}
-        ${breakingFeatHtml}
+        ${parts.join("\n")}
       </div>
       ${choice.src === "weapon" ? `<div style="padding:0 10px 8px;font-size:.8em;color:#666;">Note: If weapon Material &lt; target Armor/Material, a Breaking FEAT may apply.</div>` : "" }
     `;
