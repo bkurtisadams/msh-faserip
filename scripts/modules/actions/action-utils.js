@@ -542,3 +542,27 @@ export function getResultHoverText(actionType, color) {
   
   return hoverTexts[actionType]?.[color] || `${color} result for ${actionType}`;
 }
+
+/**
+ * Get targeting context string for chat cards
+ * @param {Actor} actor - The acting character
+ * @param {string} actionLabel - The action being performed (e.g., "Blunt Attack")
+ * @returns {string} HTML string describing the targeting context
+ */
+export function getTargetingContext(actor, actionLabel) {
+  const targets = Array.from(game.user?.targets ?? []);
+  const actorName = actor?.name || "Unknown";
+  
+  if (targets.length === 0) {
+    return `<div style="font-style:italic;color:#666;">${actorName} attacks <span style="color:#d32f2f;">(no target selected)</span></div>`;
+  }
+  
+  if (targets.length === 1) {
+    const targetName = targets[0].name || "Unknown";
+    return `<div>${actorName} attacks <strong>${targetName}</strong></div>`;
+  }
+  
+  // Multiple targets
+  const targetNames = targets.map(t => t.name || "Unknown").join(", ");
+  return `<div>${actorName} attacks <strong>${targetNames}</strong> <span style="color:#666;">(${targets.length} targets)</span></div>`;
+}

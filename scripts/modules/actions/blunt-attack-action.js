@@ -4,7 +4,8 @@ import {
   RANKS, shiftRank, getAbilityInfo, getStrengthInfo,
   effectsFor, labelFor,
   isBluntCapable, computeBluntDamage,
-  rollWithKarmaAndHistory, buildResultGrid, buildActionsBox, bannerColors
+  rollWithKarmaAndHistory, buildResultGrid, buildActionsBox, bannerColors,
+  getTargetingContext
 } from "./action-utils.js";
 import { getItemMaterialRank } from "../../gm-utils.js";
 
@@ -169,24 +170,6 @@ export class BluntAttackAction extends AttackAction {
       damage: choice.damage
     });
 
-    // right after `const actions = buildActionsBox({...});`
-    /* const makeCheckChip = (label, check, attackForm, dmg, actorUuid) => {
-    const base = "display:inline-block;font-size:12px;line-height:1.1;padding:2px 6px;border:1px solid #bbb;border-radius:3px;text-decoration:none;white-space:nowrap;";
-    const style = `${base}background:#fff;color:#333;cursor:pointer;`;
-    return `<a class="faserip-chip" data-check="${check}" data-attack-form="${attackForm}"
-                data-dmg="${dmg || 0}" data-attacker-uuid="${actorUuid}" style="${style}">${label}</a>`;
-    };
-
-    // Build the extra chips you want on Blunt
-    const extraChips = [
-    makeCheckChip("Open Stun Check", "stun", "blunt", choice.damage, actor.uuid),
-    makeCheckChip("Open Slam Check", "slam", "blunt", choice.damage, actor.uuid),
-    ].join("\n");
-
-    // Inject them just before the actions' closing </div>
-    const actionsWithChecks = actions.replace(/<\/div>\s*$/, `${extraChips}\n</div>`);
-
- */
     // weapon/bare line
     const weaponContext = (choice.src === "weapon")
       ? (() => {
@@ -198,11 +181,17 @@ export class BluntAttackAction extends AttackAction {
         })()
       : `<div>Attack: Bare Hands — Damage: ${strength.value}</div>`;
 
+    // Then in the execute() method, before building cardHtml:
+    const targetingContext = getTargetingContext(actor, actionName);
+
     // final chat card
     const cardHtml = `
       <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
         <div style="padding:5px 10px;border-bottom:1px solid #c0c0c0;font-size:1.1em;color:#8b0000;">
           <strong>${actor.name} - ${actionName}</strong>
+        </div>
+        <div style="padding:5px 10px;border-bottom:1px solid #e0e0e0;font-size:.9em;">
+          ${targetingContext}
         </div>
         <div style="padding:5px 10px;font-size:.9em;">
           <div>Ability: ${ability.name}</div>
