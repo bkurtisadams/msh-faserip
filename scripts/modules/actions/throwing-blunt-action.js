@@ -1,12 +1,13 @@
 // scripts/modules/actions/throwing-blunt-action.js
 import { RangedAttackAction } from "./ranged-attack-action.js";
 import {
-  shiftRank,
   getAbilityInfo,
-  effectsFor,
   labelFor,
+  effectsFor,
+  shiftRank,
   rollWithKarmaAndHistory,
   buildResultGrid,
+  buildActionsBox,
   bannerColors
 } from "./action-utils.js";
 
@@ -23,14 +24,18 @@ export class ThrowingBluntAction extends RangedAttackAction {
       const s = i.system || {};
       const tags = (s.tags || []).map(t => String(t).toLowerCase());
       const isThrown = s.weaponType === "thrown" || tags.includes("thrown");
-      const isBlunt  = s.damageType === "BA" || s.attackType === "blunt" || tags.includes("blunt") || tags.includes("ba");
+      const isBlunt  =
+        s.damageType === "BA" ||
+        s.attackType === "blunt" ||
+        tags.includes("blunt") ||
+        tags.includes("ba");
       return isThrown && isBlunt;
     });
 
     // Strength-based throwing range
     const strRank = actor?.system?.abilities?.strength?.rank || "Typical";
 
-    // Restore prefs
+    // Restore flags
     const savedItemId    = await actor.getFlag("msh-faserip", "lastThrowBluntItemId") || "";
     const savedRange     = await actor.getFlag("msh-faserip", "lastThrowBluntRange") || 1;
     const savedObstacle  = await actor.getFlag("msh-faserip", "lastThrowBluntObstacle") || false;
@@ -38,9 +43,9 @@ export class ThrowingBluntAction extends RangedAttackAction {
     const savedAdHocName = await actor.getFlag("msh-faserip", "lastThrowBluntAdHocName") || "Rock";
     const savedAdHocDmg  = Number(await actor.getFlag("msh-faserip", "lastThrowBluntAdHocDamage") || 6);
 
-    const itemOptions = thrownBlunt.map(i =>
-      `<option value="${i.id}" ${i.id === savedItemId ? "selected" : ""}>${i.name}</option>`
-    ).join("");
+    const itemOptions = thrownBlunt
+      .map(i => `<option value="${i.id}" ${i.id === savedItemId ? "selected" : ""}>${i.name}</option>`)
+      .join("");
 
     // Dialog
     const dialogHtml = `
@@ -100,11 +105,6 @@ export class ThrowingBluntAction extends RangedAttackAction {
       })}
 
       <div style="margin-top:8px;">
-        <input type="checkbox" id="throughObstacle" name="throughObstacle" ${savedObstacle ? "checked" : ""}>
-        <label for="throughObstacle">Through obstacle (-2CS)</label>
-      </div>
-
-      <div style="margin-top:8px;">
         <input type="checkbox" id="remember" name="remember" checked>
         <label for="remember">Remember settings</label>
         <input type="checkbox" id="skipDice" name="skipDice" style="margin-left:12px;">
@@ -123,7 +123,6 @@ export class ThrowingBluntAction extends RangedAttackAction {
               const $ = (sel) => html.find(sel);
               const useAdHoc = !!$('#adhoc-toggle').is(':checked');
 
-              // Gather weapon info
               let weaponName, weaponDamage, weaponId = null;
               if (useAdHoc) {
                 weaponName = String($('[name="adhocName"]').val() || "Improvised Blunt");
@@ -151,7 +150,6 @@ export class ThrowingBluntAction extends RangedAttackAction {
               const remember = !!$('[name="remember"]').is(':checked');
               const skipDice = !!$('[name="skipDice"]').is(':checked');
 
-              // Save flags
               if (remember) {
                 await actor.setFlag("msh-faserip", "lastThrowBluntAdHoc", useAdHoc);
                 await actor.setFlag("msh-faserip", "lastThrowBluntAdHocName", weaponName);
@@ -161,7 +159,7 @@ export class ThrowingBluntAction extends RangedAttackAction {
                 await actor.setFlag("msh-faserip", "lastThrowBluntObstacle", throughObstacle);
               }
 
-              // Apply Strength-path range & obstacle modifiers
+              // Strength-path range & obstacle modifiers
               const { totalShift, impossible, rangeModifier, obstacleModifier } =
                 this._applyRangeModifiers(shift, range, throughObstacle, null, null, strRank);
               if (impossible) {
@@ -200,42 +198,54 @@ export class ThrowingBluntAction extends RangedAttackAction {
     const effectiveRank = shiftRank(ability.rank, choice.totalShift);
     const roll = await (new Roll("1d100")).evaluate();
     if (!choice.skipDice) {
-      await roll.toMessage({ speaker: ChatMessage.getSpeaker({ actor }), flavor: `${actor.name} performs ${actionName}` });
+      await roll.toMessage({
+        speaker: ChatMessage.getSpeaker({ actor }),
+        flavor: `${actor.name} performs ${actionName}`
+      });
     }
     const { cappedTotal, totalKarmaUsed } =
       await rollWithKarmaAndHistory(actor, actionName, choice.karma, roll);
     const color = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
-    const colorKey = String(color).toLowerCase();
 
-    // Result card
-    const grid = buildResultGrid(actionType, colorKey, effects, this._getResultHoverText);
-    const { bg, fg } = bannerColors(colorKey);
+    // Standardized card (same as Throwing Edged/Blunt Attack style)
+    const colorLower = String(color || "").toLowerCase();
+    const effectResult = effects[colorLower] || color;
 
-    // Chips: Throwing Blunt (per your ACTION_EFFECTS: yellow=Hit, red=Stun)
-    const chips = [];
-    chips.push(`<a class="faserip-chip" style="pointer-events:none;opacity:.6;" title="Placeholder: apply damage manually.">Apply Damage</a>`);
-    if (colorKey === "red") {
-      chips.push(`<a class="faserip-chip" data-action="resolve-stun" data-check="stun" data-attack-form="blunt" data-dmg="${choice.weaponDamage}" data-attacker-uuid="${actor.uuid}" title="Open Stun Check dialog">Resolve Stun</a>`);
-    }
+    const grid = buildResultGrid(actionType, colorLower, effects, (globalThis._getResultHoverText || this._getResultHoverText));
+    const { bg, fg } = bannerColors(colorLower);
 
-    const html = `
+    // Throwing Blunt: Red = Stun (no Kill/Slam by default)
+    const actions = buildActionsBox({
+      showStun: colorLower === "red",
+      showKill: false,
+      showSlam: false,
+      actorUuid: actor.uuid,
+      damage: choice.weaponDamage,
+      attackForm: "blunt"
+    });
+
+    const contextHtml = `
+      <div>Ability: ${ability.name}</div>
+      <div>Base Rank: ${ability.rank} (${ability.value})${this.opts?.shift ? ` — Shift ${this.opts.shift} → ${effectiveRank}` : ""}</div>
+      <div>Weapon: ${choice.weaponName} — Damage: ${choice.weaponDamage}</div>
+      <div>Distance: ${choice.range} area${choice.range > 1 ? "s" : ""} ${choice.rangeModifier ? `(${choice.rangeModifier}CS)` : ""}${choice.throughObstacle ? `, obstacle (-2CS)` : ""}</div>
+      <div>Roll: ${roll.total}${totalKarmaUsed ? ` + Karma: ${totalKarmaUsed}` : ""} = ${cappedTotal}</div>
+    `;
+
+    const cardHtml = `
       <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
-        <div style="padding:5px 10px;border-bottom:1px solid #c0c0c0;"><strong>${actor.name} — ${actionName}</strong></div>
-        <div style="padding:6px 10px;font-size:.9em;">
-          <div>Weapon: ${choice.weaponName} (Damage: ${choice.weaponDamage})</div>
-          <div>Distance: ${choice.range} area${choice.range>1?'s':''} ${choice.rangeModifier?`(${choice.rangeModifier}CS)`:''}${choice.throughObstacle?`, obstacle (-2CS)`:''}</div>
-          <div>Total Shift: ${choice.totalShift}</div>
-          <div>Roll: ${roll.total}${totalKarmaUsed ? ` + Karma: ${totalKarmaUsed}` : ""} = ${cappedTotal}</div>
+        <div style="padding:5px 10px;border-bottom:1px solid #c0c0c0;font-size:1.1em;color:#8b0000;">
+          <strong>${actor.name} - ${actionName}</strong>
         </div>
+        <div style="padding:5px 10px;font-size:.9em;">${contextHtml}</div>
         ${grid}
-        <div style="text-align:center;padding:8px;margin:5px;font-weight:bold;border-radius:3px;background:${bg};color:${fg};">
-          RESULT: ${String(color).toUpperCase()}
+        <div style="text-align:center;padding:8px;margin:5px;font-weight:bold;font-size:1.1em;border-radius:3px;background:${bg};color:${fg};">
+          RESULT: ${String(color).toUpperCase()} — ${String(effectResult).toUpperCase()}
         </div>
-        <div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;padding:8px 10px;margin:6px 10px 10px;border:1px solid #c0c0c0;background:#fafafa;border-radius:4px;">
-          ${chips.join("")}
-        </div>
+        ${actions}
       </div>
     `;
-    await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor }), content: html });
+
+    await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor }), content: cardHtml });
   }
 }

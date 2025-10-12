@@ -104,11 +104,6 @@ export class ThrowingEdgedAction extends RangedAttackAction {
       })}
 
       <div style="margin-top:8px;">
-        <input type="checkbox" id="throughObstacle" name="throughObstacle" ${savedObstacle ? "checked" : ""}>
-        <label for="throughObstacle">Through obstacle (-2CS)</label>
-      </div>
-
-      <div style="margin-top:8px;">
         <input type="checkbox" id="remember" name="remember" checked>
         <label for="remember">Remember settings</label>
         <input type="checkbox" id="skipDice" name="skipDice" style="margin-left:12px;">
