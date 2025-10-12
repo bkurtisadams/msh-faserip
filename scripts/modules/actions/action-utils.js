@@ -184,7 +184,7 @@ export async function rollWithKarmaAndHistory(actor, actionLabel, requestedKarma
 
 // Build the 4-cell result grid
 // Result grid + actions + banner
-export function buildResultGrid(actionType, activeColorLower, effects, hoverFn) {
+export function buildResultGrid(actionType, activeColorLower, effects, hoverFn = getResultHoverText) {
   const cell = (active, baseBG, activeBG, baseFG, activeFG, baseBDR, activeBDR, bold) => ({
     bg: active ? activeBG : baseBG,
     fg: active ? activeFG : baseFG,
@@ -428,3 +428,117 @@ export function attachAutoFillRange(html, actor, onAfterFill) {
   };
 }
 
+export function getResultHoverText(actionType, color) {
+  const hoverTexts = {
+    'blunt-attack': {
+      white: 'Miss - No damage inflicted',
+      green: 'Hit - Inflict Strength rank damage',
+      yellow: 'Slam - Inflict damage and may Slam opponent',
+      red: 'Stun - Inflict damage and may Stun opponent'
+    },
+    'edged-attack': {
+      white: 'Miss - No damage inflicted',
+      green: 'Hit - Inflict weapon damage',
+      yellow: 'Stun - Inflict damage and may Stun opponent',
+      red: 'Kill - Inflict damage and may Kill opponent'
+    },
+    'shooting': {
+      white: 'Miss - No damage, may hit another target',
+      green: 'Hit - Inflict weapon damage',
+      yellow: 'Bullseye - Hit specific target area',
+      red: 'Kill - Inflict damage and may Kill opponent'
+    },
+    'throwing-edged': {
+      white: 'Miss - No damage, may hit another target',
+      green: 'Hit - Inflict weapon damage',
+      yellow: 'Stun - Inflict damage and may Stun opponent',
+      red: 'Kill - Inflict damage and may Kill opponent'
+    },
+    'throwing-blunt': {
+      white: 'Miss - No damage',
+      green: 'Hit - Inflict Strength or material damage',
+      yellow: 'Hit - Inflict Strength or material damage',
+      red: 'Stun - Inflict damage and may Stun opponent'
+    },
+    'energy': {
+      white: 'Miss - No damage inflicted',
+      green: 'Hit - Inflict power rank damage',
+      yellow: 'Bullseye - Hit specific target area',
+      red: 'Kill - Inflict damage and may Kill opponent'
+    },
+    'force': {
+      white: 'Miss - No damage inflicted',
+      green: 'Hit - Inflict power rank damage',
+      yellow: 'Bullseye - Hit specific target area',
+      red: 'Stun - Inflict damage and may Stun opponent'
+    },
+    'grappling': {
+      white: 'Miss - Failed to hold opponent, no other actions',
+      green: 'Miss - Failed to hold opponent, no other actions',
+      yellow: 'Partial Hold - Grabbed limb, target acts at -2CS',
+      red: 'Hold - Target fully restrained, can inflict Strength damage'
+    },
+    'grabbing': {
+      white: 'Miss - Item not taken, may be knocked loose',
+      green: 'Take - Gained possession if Strength ≥ target',
+      yellow: 'Grab - Gained possession regardless of Strength',
+      red: 'Break - Item taken or potentially damaged/activated'
+    },
+    'escaping': {
+      white: 'Miss - Still held, no other actions this turn',
+      green: 'Escape - Free of hold, may move half speed',
+      yellow: 'Escape - Free of hold, may move half speed',
+      red: 'Reverse - Free and may counter-grapple or act at -2CS'
+    },
+    'charging': {
+      white: 'Miss - No damage, continue moving half speed in straight line\nRequirements: Move 1+ areas, +1CS per area (max +3CS)\nAgility FEAT needed to change direction after miss',
+      green: 'Hit - Damage = Endurance/Body Armor (higher) + 2pts per area moved\nRequirements: Move 1+ areas, +1CS per area (max +3CS)\nBody Armor may reflect damage to attacker',
+      yellow: 'Slam - Damage as Hit result, plus may Slam opponent\nDamage = Endurance/Body Armor (higher) + 2pts per area\nBody Armor may reflect damage to attacker',
+      red: 'Stun - Damage as Hit result, plus may Stun opponent\nDamage = Endurance/Body Armor (higher) + 2pts per area\nBody Armor may reflect damage to attacker'
+    },
+    'dodging': {
+      white: 'None - No reduction to incoming attacks. Dodging: -2CS to FEAT rolls, 1/2 move, only 1 other action',
+      green: '-2 CS - Reduce attacker CS by 2. Dodging: -2CS to FEAT rolls, 1/2 move, only 1 other action',
+      yellow: '-4 CS - Reduce attacker CS by 4. Dodging: -2CS to FEAT rolls, 1/2 move, only 1 other action',
+      red: '-6 CS - Reduce attacker CS by 6. Dodging: -2CS to FEAT rolls, 1/2 move, only 1 other action'
+    },
+    'evading': {
+      white: 'Auto-hit - Opponent automatically scores green result',
+      green: 'Evasion - Dodge successful, no damage taken',
+      yellow: 'Evasion +1CS - Dodge and gain +1CS next attack',
+      red: 'Evasion +2CS - Dodge and gain +2CS next attack'
+    },
+    'blocking': {
+      white: '-6 CS - Strength shifted down 6 columns as Body Armor',
+      green: '-4 CS - Strength shifted down 4 columns as Body Armor',
+      yellow: '-2 CS - Strength shifted down 2 columns as Body Armor',
+      red: '+1 CS - Strength shifted up 1 column as Body Armor'
+    },
+    'catching': {
+      white: 'Autohit - Object hits you instead (auto green)',
+      green: 'Miss - Failed to catch, attack gets +1CS',
+      yellow: 'Damage - Caught but may damage object/person',
+      red: 'Catch - Successfully caught with no damage'
+    },
+    'stun': {
+      white: '1-10 rounds - Knocked out for 1-10 rounds',
+      green: '1 round - Knocked down, no action next round',
+      yellow: 'No effect - Character not stunned',
+      red: 'No effect - Character not stunned'
+    },
+    'slam': {
+      white: 'Grand Slam - Knocked away at attacker Strength speed',
+      green: '1 area - Knocked back one area',
+      yellow: 'Stagger - Knocked back a step, no longer adjacent',
+      red: 'No Slam - Not affected by slam'
+    },
+    'kill': {
+      white: 'Endurance Loss - Dying, lose 1 rank/turn',
+      green: 'E/S - Endurance Loss only if Edged/Shooting attack',
+      yellow: 'No effect - Character survives, takes damage only',
+      red: 'No effect - Character survives, takes damage only'
+    }
+  };
+  
+  return hoverTexts[actionType]?.[color] || `${color} result for ${actionType}`;
+}
