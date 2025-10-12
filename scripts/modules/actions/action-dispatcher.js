@@ -8,6 +8,7 @@ import { ShootingAction } from "./shooting-action.js";
 import { ThrowingEdgedAction } from "./throwing-edged-action.js";
 import { ThrowingBluntAction } from "./throwing-blunt-action.js";
 import { EnergyAction } from "./energy-action.js";
+import { ForceAction } from "./force-action.js";
 
 const registry = {
   "blunt-attack":   BluntAttackAction,
@@ -16,7 +17,7 @@ const registry = {
   "throwing-edged": ThrowingEdgedAction,
   "throwing-blunt": ThrowingBluntAction,
   "energy":         EnergyAction,
-  "force":          RangedAttackAction,
+  "force":          ForceAction,
   "dodging":        DefenseAction,
   "evading":        DefenseAction,
   "blocking":       DefenseAction,
