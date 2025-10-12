@@ -2353,7 +2353,7 @@ html.find('.headquarters-row').each((i, row) => {
       ];
       
       // Material strength data
-      const materials = {
+      /* const materials = {
         "Cloth": "Feeble",
         "Glass": "Feeble",
         "Brush": "Feeble",
@@ -2389,7 +2389,38 @@ html.find('.headquarters-row').each((i, row) => {
         "Super-heavy Alloys": "Monstrous",
         "Adamantium Steel": "Unearthly",
         "Mystical/Enchanted": "Unearthly"
+      }; */
+
+      // Material strength data - organized by rank
+      const materialsByRank = {
+        "Feeble": ["Cloth", "Glass", "Brush", "Paper"],
+        "Poor": ["Normal Plastics", "Crystal", "Wood"],
+        "Typical": ["Rubber", "Gold", "Brass", "Copper", "Ice", "Adobe", "Computer Chips"],
+        "Good": ["Brick", "Aluminum", "Light Machinery", "Asphalt", "High Strength Plastics"],
+        "Excellent": ["Concrete", "Beta Cloth", "Iron", "Bullet-proof Glass"],
+        "Remarkable": ["Reinforced Concrete", "Steel"],
+        "Incredible": ["Solid Stone", "Vibranium", "Volcanic Rock"],
+        "Amazing": ["Osmium Steel", "Granite", "Gemstones"],
+        "Monstrous": ["Diamond", "Super-heavy Alloys"],
+        "Unearthly": ["Adamantium Steel", "Mystical/Enchanted"],
+        "Class 1000-5000": ["Cap's Shield", "Thor's Hammer", "Virtually Indestructible"]
       };
+
+      // Flatten into lookup table for getting rank from material
+      const materials = {};
+      for (const [rank, mats] of Object.entries(materialsByRank)) {
+        for (const mat of mats) {
+          materials[mat] = rank === "Class 1000-5000" ? "Unearthly" : rank; // Cap at Unearthly for game purposes
+        }
+      }
+
+      // Create grouped options HTML for material dropdown
+      const materialOptionsHTML = Object.entries(materialsByRank).map(([rank, mats]) => {
+        const options = mats.map(material => 
+          `<option value="${material}" ${material === savedMaterial ? 'selected' : ''}>${material}</option>`
+        ).join('');
+        return `<optgroup label="${rank}">${options}</optgroup>`;
+      }).join('');
       
       // Create options HTML for intensity dropdown
       const intensityOptionsHTML = allRanks.map(rank => 
@@ -2399,11 +2430,6 @@ html.find('.headquarters-row').each((i, row) => {
       // Create options for weight intensity dropdown
       const weightIntensityOptionsHTML = weightIntensities.map(item =>
         `<option value="${item.rank}" ${item.rank === savedWeightIntensity ? 'selected' : ''}>${item.display}</option>`
-      ).join('');
-      
-      // Create options for material dropdown
-      const materialOptionsHTML = Object.keys(materials).sort().map(material =>
-        `<option value="${material}" ${material === savedMaterial ? 'selected' : ''}>${material}</option>`
       ).join('');
       
       // Build the dialog content
@@ -2438,7 +2464,7 @@ html.find('.headquarters-row').each((i, row) => {
             <div style="font-weight: bold; margin-bottom: 5px; text-align: center;">─── Breaking Material ───</div>
             <div style="margin-bottom: 5px;">
               <label style="display: inline-block; width: 60px;">Material:</label>
-              <select id="material-select" name="material" style="width: 150px;">
+              <select id="material-select" name="material" style="width: 200px;">
                 ${materialOptionsHTML}
               </select>
               <span id="base-material-strength" style="margin-left: 5px; font-size: 0.9em;"></span>
@@ -2826,21 +2852,26 @@ html.find('.headquarters-row').each((i, row) => {
               const liftingSection = html.find('#lifting-section');
               const breakingSection = html.find('#breaking-section');
               const intensitySelect = html.find('#intensity');
+              const intensityRow = intensitySelect.closest('div'); // Get the parent div
               
               if (featType === 'lifting') {
                 liftingSection.show();
                 breakingSection.hide();
-                intensitySelect.prop('disabled', true);
+                intensityRow.hide();
                 updateWeightIntensity();
               } else if (featType === 'breaking') {
                 liftingSection.hide();
                 breakingSection.show();
-                intensitySelect.prop('disabled', true);
+                intensityRow.hide();
                 updateMaterialStrength();
               } else {
                 liftingSection.hide();
                 breakingSection.hide();
+                intensityRow.show();
                 intensitySelect.prop('disabled', false);
+                // Reset to saved intensity when switching back to standard
+                intensitySelect.val(savedIntensity);
+                updateFeatRequirement();
               }
               
               updateFeatRequirement();
