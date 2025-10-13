@@ -246,7 +246,7 @@ BLUNT DAMAGE RULES:
     // card pieces (shared)
     const grid = buildResultGrid(actionType, colorLower, effects, (globalThis._getResultHoverText||this._getResultHoverText));
     const { bg, fg } = bannerColors(colorLower);
-    const breakingFeat = choice.src === "weapon" ? { weaponMat: choice.weaponMat } : null;
+    const breakingFeat = (choice.src === "weapon" || choice.src === "object") ? { weaponMat: choice.weaponMat } : null;
     const isHit = colorLower !== 'white';
     const actions = buildActionsBox({
       showSlam: colorLower==='yellow',
