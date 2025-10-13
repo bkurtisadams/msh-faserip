@@ -49,73 +49,79 @@ export class GrabbingAction extends AttackAction {
     // Effective rank after CS
     const effectiveRank = shiftRank(strength.rank, choice.shift);
 
+    // Decide comparator once (target STR or item material if fixed) for both legend and outcome
+    const cmpRank = this._chooseComparatorRank(choice); // may be null/undefined
+    const mustDowngradeGreen = cmpRank ? !this._rankGTE(strength.rank, cmpRank) : false;
+
     // Roll + optional karma cap (uses your standard helper)
     const roll = await (new Roll("1d100")).evaluate();
     if (!choice.skipDice) {
-      await roll.toMessage({
+        await roll.toMessage({
         speaker: ChatMessage.getSpeaker({ actor }),
         flavor: `${actor.name} attempts to Grab ${choice.itemLabel} from ${choice.targetName}`,
         rollMode: game.settings.get("core", "rollMode")
-      });
+        });
     }
     const { cappedTotal, totalKarmaUsed } =
-      await rollWithKarmaAndHistory(actor, actionName, choice.karma, roll);
+        await rollWithKarmaAndHistory(actor, actionName, choice.karma, roll);
 
     // Universal Table result color
     const color = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
     let colorLower = String(color || "").toLowerCase();
+    let effectResult = effects[colorLower] || colorLower;
 
-    // Resolve rules effect from config map
-    // (white:'Miss', green:'Take', yellow:'Grab', red:'Break')
-    let effectResult = effects[colorLower] || color;
-
-    // "Take" requires: Attacker STR ≥ comparator (target STR OR item material if glued/clamped)
-    // If not, treat as Miss.
-    if (effectResult && String(effectResult).toLowerCase() === "take") {
-      const cmpRank = this._chooseComparatorRank(choice); // itemMaterial if provided, else targetStrength
-      const ok = this._rankGTE(strength.rank, cmpRank);
-      if (!ok) {
-        effectResult = "Miss"; // per rule: "If not, consider as a miss."
-        colorLower = "white";  // display as a Miss block visually
-      }
+    // Enforce Take rule: Attacker STR ≥ comparator, else Treat as Miss (visual White)
+    let takeDowngraded = false;
+    if (String(effectResult).toLowerCase() === "take" && mustDowngradeGreen) {
+        effectResult = "Miss";
+        colorLower = "white";
+        takeDowngraded = true;
     }
 
-    // Visuals: result grid & banner
-    const grid = buildResultGrid(actionType, colorLower, effects);
-    const { bg, fg } = bannerColors(colorLower);
+    // Adjust legend and build grid so it always matches the matchup (not the roll)
+    const legendEffects = mustDowngradeGreen ? { ...effects, green: "Miss" } : effects;
+    const grid = buildResultGrid(actionType, colorLower, legendEffects);
 
+    // Optional: explain why the legend shows Green → Miss
+    const noteHtml = takeDowngraded
+    ? `<div style="font-size:.85em;color:#666;margin-top:4px;">
+        Note: Green downgraded to <strong>Miss</strong> (Attacker STR &lt; comparator).
+        </div>`
+    : "";
+
+    const { bg, fg } = bannerColors(colorLower);
     // Targeting context line (consistent with BluntAttackAction)
     const targetingContext = getTargetingContext(actor, actionName);
 
     // Build the small details section
     const compNote = this._composeComparatorLine(choice);
     const detailsHtml = `
-      <div>Attacker STR: ${strength.rank} (${strength.value})${choice.shift ? ` — Shift ${choice.shift} → ${effectiveRank}` : ""}</div>
-      ${choice.targetStrength ? `<div>Target STR: ${choice.targetStrength}</div>` : ``}
-      ${choice.itemMaterial ? `<div>Item Material: ${choice.itemMaterial}</div>` : ``}
-      ${compNote ? `<div style="font-size:.85em;color:#666;">Comparator for "Take": ${compNote}</div>` : ``}
-      <div>Roll: ${roll.total}${totalKarmaUsed ? ` + Karma: ${totalKarmaUsed}` : ""} = ${cappedTotal}</div>
+    <div>Attacker STR: ${strength.rank} (${strength.value})${choice.shift ? ` — Shift ${choice.shift} → ${effectiveRank}` : ""}</div>
+    ${choice.targetStrength ? `<div>Target STR: ${choice.targetStrength}</div>` : ``}
+    ${choice.itemMaterial ? `<div>Item Material: ${choice.itemMaterial}</div>` : ``}
+    ${compNote ? `<div style="font-size:.85em;color:#666;">Comparator for "Take": ${compNote}</div>` : ``}
+    <div>Roll: ${roll.total}${totalKarmaUsed ? ` + Karma: ${totalKarmaUsed}` : ""} = ${cappedTotal}</div>
     `;
 
-    // For RED (Break), show a “Breaking FEAT” button, but do not auto-run it.
-    // This mirrors BluntAttackAction's pattern using buildActionsBox() and a breakingFeat payload.
-    const breakingFeat = (String(effectResult).toLowerCase() === "break")
-      ? { weaponMat: choice.itemMaterial || "Excellent" } // reuse param name so existing chat-hook code can open breaking-feat dialog
-      : null;
+    // For RED (Break), show a "Grabbing Break Check" button
+    const grabbingBreak = (String(effectResult).toLowerCase() === "break")
+    ? { 
+        itemMaterial: choice.itemMaterial || "Excellent",
+        itemName: choice.itemLabel || "Item"
+        }
+    : null;
 
     const actions = buildActionsBox({
-      // No Stun/Slam here—Grabbing normally doesn’t inflict damage
-      breakingFeat,                 // ← enables the “Breaking FEAT” button (handled by chat-hooks)
-      actorUuid: actor.uuid
-    }); // Pattern consistent with BluntAttackAction:contentReference[oaicite:2]{index=2}
-
+    grabbingBreak,  // ← NEW: use grabbing break instead of breaking feat
+    actorUuid: actor.uuid
+    });
     // Effect blocks for the four results (text-only; no auto-ops)
     const effectBlock = this._effectBlock(String(effectResult).toLowerCase(), strength, choice);
 
     // Final chat card
     const cardHtml = `
       <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
-        <div style="padding:5px 10px;border-bottom:1px solid #c0c0c0;font-size:1.1em;color:#4e342e;">
+        <div style="padding:5px 10px;border-bottom:1px solid #c0c0c0;font-size:1.1em;color:#8b0000;">
           <strong>${actor.name} — ${actionName}</strong>
         </div>
         <div style="padding:5px 10px;border-bottom:1px solid #e0e0e0;font-size:.9em;">
@@ -126,7 +132,10 @@ export class GrabbingAction extends AttackAction {
         <div style="padding:5px 10px;font-size:.9em;">
           ${detailsHtml}
         </div>
+
         ${grid}
+        ${noteHtml}
+        
         <div style="text-align:center;padding:8px;margin:5px;font-weight:bold;font-size:1.05em;border-radius:3px;background:${bg};color:${fg};">
           RESULT: ${String(color).toUpperCase()} — ${String(effectResult).toUpperCase()}
         </div>
@@ -153,8 +162,21 @@ export class GrabbingAction extends AttackAction {
       prefillTargetStr = t.actor?.system?.abilities?.strength?.rank || "";
     }
 
+    // Load persisted settings
+    const savedShift = await actor.getFlag("msh-faserip", "lastGrabbingShift") ?? 0;
+    const savedKarma = await actor.getFlag("msh-faserip", "lastGrabbingKarma") ?? 0;
+
     const html = `
-      <div style="margin-bottom:8px;"><label style="display:inline-block;width:130px;">Action:</label><strong>${this.actionName}</strong></div>
+      <div style="margin-bottom:8px;">
+        <label style="display:inline-block;width:130px;">Action:</label>
+        <strong>${this.actionName}</strong>
+      </div>
+
+      <div style="margin-bottom:8px;">
+        <label style="display:inline-block;width:130px;">Your Strength:</label>
+        <input type="text" value="${strength.rank}" style="width:160px;" readonly>
+        <span style="margin-left:6px;">(${strength.value})</span>
+      </div>
 
       <div style="margin-bottom:8px;">
         <label style="display:inline-block;width:130px;">Target:</label>
@@ -165,7 +187,7 @@ export class GrabbingAction extends AttackAction {
         <label style="display:inline-block;width:130px;">Target STR:</label>
         <input type="text" name="targetStrength" style="width:160px;" value="${prefillTargetStr}" placeholder="e.g., Excellent">
         <div style="margin-left:130px;font-size:.85em;color:#666;">
-          Used for GREEN “Take”: possession only if your STR ≥ comparator (target STR, or item material if glued/clamped).
+          Used for GREEN "Take": possession only if your STR ≥ comparator (target STR, or item material if glued/clamped).
         </div>
       </div>
 
@@ -184,16 +206,20 @@ export class GrabbingAction extends AttackAction {
 
       <div style="margin-bottom:8px;">
         <label style="display:inline-block;width:130px;">Column Shift:</label>
-        <input type="number" name="shift" value="${Number(this.opts.shift ?? 0)}" style="width:60px;">
+        <input type="number" name="shift" value="${Number(savedShift)}" style="width:60px;">
         <span style="color:#666;font-size:.9em;">(+ easier, - harder)</span>
       </div>
 
       <div style="margin-bottom:8px;">
         <label style="display:inline-block;width:130px;">Karma:</label>
-        <input type="number" name="karma" value="${Number(this.opts.karma ?? 0)}" min="0" style="width:60px;">
+        <input type="number" name="karma" value="${Number(savedKarma)}" min="0" style="width:60px;">
       </div>
 
-      <div style="margin-top:10px;">
+      <div style="margin-top:6px;">
+        <label><input type="checkbox" name="remember" checked> Remember these settings</label>
+      </div>
+
+      <div style="margin-top:8px;">
         <label><input type="checkbox" name="skipDice"> Skip dice animation</label>
       </div>
 
@@ -210,22 +236,31 @@ export class GrabbingAction extends AttackAction {
 
     return new Promise((resolve) => {
       new Dialog({
-        title: `Grabbing: ${actor.name}`,
+        title: `${this.actionName}: ${actor.name}`,
         content: html,
         buttons: {
           roll: {
             label: "Roll",
-            callback: (h) => {
+            callback: async (h) => {
               const $ = (s) => h.find(s);
-              resolve({
+              const result = {
                 targetName: String($('[name="targetName"]').val() || "Target"),
                 targetStrength: String($('[name="targetStrength"]').val() || ""),
                 itemLabel: String($('[name="itemLabel"]').val() || "Item"),
                 itemMaterial: String($('[name="itemMaterial"]').val() || ""),
                 shift: Number($('[name="shift"]').val() || 0),
                 karma: Number($('[name="karma"]').val() || 0),
+                remember: !!$('[name="remember"]').is(':checked'),
                 skipDice: !!$('[name="skipDice"]').is(':checked')
-              });
+              };
+
+              // Persist settings if requested
+              if (result.remember) {
+                await actor.setFlag("msh-faserip", "lastGrabbingShift", result.shift);
+                await actor.setFlag("msh-faserip", "lastGrabbingKarma", result.karma);
+              }
+
+              resolve(result);
             }
           },
           cancel: { label: "Cancel", callback: () => resolve(null) }
@@ -256,7 +291,7 @@ export class GrabbingAction extends AttackAction {
     return ai >= bi;
   }
 
-    _composeComparatorLine(choice) {
+  _composeComparatorLine(choice) {
     const mat = String(choice.itemMaterial || "").trim();
     const tStr = String(choice.targetStrength || "").trim();
 
@@ -288,15 +323,15 @@ export class GrabbingAction extends AttackAction {
         </div>`;
     }
     if (effectLower === "break") {
-      return `
-        <div style="padding:6px 10px;margin:6px 10px;background:#e8f5e9;border:1px solid #66bb6a;border-radius:3px;">
-          <div style="font-weight:bold;color:#2e7d32;">Break</div>
-          <div style="font-size:.9em;">
-            Item seized. Use the <strong>Breaking FEAT</strong> button below to roll vs item material.
-            (This opens your standard Breaking FEAT dialog — consistent with blunt attacks.) 
-          </div>
-        </div>`;
-    }
+    return `
+      <div style="padding:6px 10px;margin:6px 10px;background:#e8f5e9;border:1px solid #66bb6a;border-radius:3px;">
+        <div style="font-weight:bold;color:#2e7d32;">Break</div>
+        <div style="font-size:.9em;">
+          Item seized. Use the <strong>Grabbing Break Check</strong> button below to roll your Strength vs the item's material 
+          to see if it breaks, is damaged, or activates.
+        </div>
+      </div>`;
+  }
     return "";
   }
 }

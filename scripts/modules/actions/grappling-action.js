@@ -1,8 +1,15 @@
 // scripts/modules/actions/grappling-action.js
 import { AttackAction } from "./attack-action.js";
 import {
-  getStrengthInfo, shiftRank, rollWithKarmaAndHistory,
-  buildResultGrid, bannerColors, labelFor, effectsFor
+  getStrengthInfo, 
+  shiftRank, 
+  rollWithKarmaAndHistory,
+  buildResultGrid, 
+  buildActionsBox,
+  bannerColors, 
+  labelFor, 
+  effectsFor,
+  getTargetingContext
 } from "./action-utils.js";
 
 export class GrapplingAction extends AttackAction {
@@ -15,6 +22,7 @@ export class GrapplingAction extends AttackAction {
 
   async execute() {
     const actor = this.actor;
+    const actionName = this.label;
     const strength = getStrengthInfo(actor);
 
     // Load persisted defaults
@@ -41,20 +49,42 @@ export class GrapplingAction extends AttackAction {
       });
     }
 
-    const actionLabel = this.label || "Grappling";
     const { cappedTotal, totalKarmaUsed } =
-        await rollWithKarmaAndHistory(actor, actionLabel, choice.karma, roll);
+        await rollWithKarmaAndHistory(actor, actionName, choice.karma, roll);
 
     const color = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
-
     const colorLower = String(color || "").toLowerCase();
     const effect = this.effects[colorLower] || "Miss";
 
     const grid = buildResultGrid(this.actionType, colorLower, this.effects);
     const { bg, fg } = bannerColors(colorLower);
+    const targetingContext = getTargetingContext(actor, actionName);
+
+    // Show escape button for Partial Hold and Hold results
+    const showEscape = (colorLower === "yellow" || colorLower === "red");
+    const actions = buildActionsBox({
+      showEscape: showEscape,
+      targetUuid: choice.targetUuid,
+      targetName: choice.targetName,
+      targetStrength: choice.targetStrength,
+      actorUuid: actor.uuid
+    });
 
     const cardHtml = this._buildChatCard({
-      actor, choice, strength, effectiveRank, roll, totalKarmaUsed, cappedTotal, color, effect, grid, bg, fg
+      actor, 
+      choice, 
+      strength, 
+      effectiveRank, 
+      roll, 
+      totalKarmaUsed, 
+      cappedTotal, 
+      color, 
+      effect, 
+      grid, 
+      bg, 
+      fg,
+      targetingContext,
+      actions
     });
 
     await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor }), content: cardHtml });
@@ -66,13 +96,27 @@ export class GrapplingAction extends AttackAction {
     // auto-fill target from current single targeted token
     let prefillTargetName = "";
     let prefillTargetStr  = "";
+    let prefillTargetUuid = "";
     const targets = Array.from(game.user?.targets ?? []);
     if (targets.length === 1) {
-      prefillTargetName = targets[0].name || "";
-      prefillTargetStr  = targets[0].actor?.system?.abilities?.strength?.rank || "";
+        const tok = targets[0];
+        prefillTargetName = tok?.name || "";
+        prefillTargetStr  = tok?.actor?.system?.abilities?.strength?.rank || "";
+        prefillTargetUuid = tok?.actor?.uuid || "";
     }
 
     const dialogHtml = `
+      <div style="margin-bottom:8px;">
+        <label style="display:inline-block;width:130px;">Action:</label>
+        <strong>${this.label}</strong>
+      </div>
+
+      <div style="margin-bottom:8px;">
+        <label style="display:inline-block;width:130px;">Your Strength:</label>
+        <input type="text" value="${strength.rank}" style="width:160px;" readonly>
+        <span style="margin-left:6px;">(${strength.value})</span>
+      </div>
+
       <div style="margin-bottom:8px;">
         <label style="display:inline-block;width:130px;">Target:</label>
         <input type="text" name="targetName" style="width:220px;" placeholder="e.g., Doctor Doom" value="${prefillTargetName}">
@@ -115,7 +159,7 @@ export class GrapplingAction extends AttackAction {
 
     return new Promise((resolve) => {
       new Dialog({
-        title: `Grappling: ${actor.name}`,
+        title: `${this.label}: ${actor.name}`,
         content: dialogHtml,
         buttons: {
           roll: {
@@ -125,6 +169,7 @@ export class GrapplingAction extends AttackAction {
               resolve({
                 targetName:     String($('[name="targetName"]').val() || "Target"),
                 targetStrength: String($('[name="targetStrength"]').val() || ""),
+                targetUuid:     prefillTargetUuid,
                 shift:          Number($('[name="shift"]').val() || 0),
                 karma:          Number($('[name="karma"]').val() || 0),
                 remember:       !!$('[name="remember"]').is(':checked'),
@@ -139,9 +184,7 @@ export class GrapplingAction extends AttackAction {
     });
   }
 
-  _buildChatCard({ actor, choice, strength, effectiveRank, roll, totalKarmaUsed, cappedTotal, color, effect, grid, bg, fg }) {
-    const effectLower = String(effect).toLowerCase();
-
+  _buildChatCard({ actor, choice, strength, effectiveRank, roll, totalKarmaUsed, cappedTotal, color, effect, grid, bg, fg, targetingContext, actions }) {
     const partialMovement =
       choice.targetStrength
         ? this._compareRanks(strength.rank, choice.targetStrength) >= 0
@@ -175,16 +218,21 @@ export class GrapplingAction extends AttackAction {
         </div>`
     };
 
+    const effectLower = String(effect).toLowerCase();
+
     return `
       <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
-        <div style="padding:5px 10px;border-bottom:1px solid #c0c0c0;font-size:1.1em;color:#4e342e;">
-          <strong>${actor.name} — Grappling vs ${choice.targetName}</strong>
+        <div style="padding:5px 10px;border-bottom:1px solid #c0c0c0;font-size:1.1em;color:#8b0000;">
+          <strong>${actor.name} — Grappling</strong>
+        </div>
+
+        <div style="padding:5px 10px;border-bottom:1px solid #e0e0e0;font-size:.9em;">
+          ${targetingContext}
         </div>
 
         <div style="padding:5px 10px;font-size:.9em;">
           <div>Strength: ${strength.rank} (${strength.value})${(choice.shift ? ` — Shift ${choice.shift} → ${effectiveRank}` : '')}</div>
           ${choice.targetStrength ? `<div>Target STR: ${choice.targetStrength}</div>` : ``}
-          
           <div>Roll: ${roll.total}${totalKarmaUsed ? ` + Karma: ${totalKarmaUsed}` : ``} = ${cappedTotal}</div>
         </div>
 
@@ -195,6 +243,7 @@ export class GrapplingAction extends AttackAction {
         </div>
 
         ${blocks[effectLower] || ""}
+        ${actions}
       </div>
     `;
   }

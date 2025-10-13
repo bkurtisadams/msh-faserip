@@ -1,6 +1,17 @@
 // scripts/modules/actions/escaping-action.js
 import { AttackAction } from "./attack-action.js";
-import { getStrengthInfo, shiftRank, buildResultGrid, bannerColors, labelFor, effectsFor } from "./action-utils.js";
+import { 
+  getStrengthInfo, 
+  shiftRank, 
+  rollWithKarmaAndHistory,
+  buildResultGrid, 
+  buildActionsBox,
+  bannerColors, 
+  labelFor, 
+  effectsFor,
+  getTargetingContext
+} from "./action-utils.js";
+
 export class EscapingAction extends AttackAction {
   constructor(args) {
     super(args);
@@ -11,11 +22,13 @@ export class EscapingAction extends AttackAction {
 
   async execute() {
     const actor = this.actor;
+    const actionName = this.label;
     const strength = getStrengthInfo(actor);
-    const choice = await this._showDialog(actor);
+    
+    const choice = await this._showDialog(actor, strength);
     if (!choice) return;
 
-    // Escaping is rolled on the character’s Strength (per your Wrestling section “resolved on Strength”)
+    // Escaping is rolled on the character's Strength
     const effectiveRank = shiftRank(strength.rank, choice.shift);
 
     const roll = await (new Roll("1d100")).evaluate();
@@ -27,9 +40,8 @@ export class EscapingAction extends AttackAction {
       });
     }
 
-    const needTo100 = Math.max(0, 100 - roll.total);
-    const karmaSpent = Math.min(Math.max(0, choice.karma || 0), needTo100);
-    const cappedTotal = Math.min(100, roll.total + karmaSpent);
+    const { cappedTotal, totalKarmaUsed } =
+      await rollWithKarmaAndHistory(actor, actionName, choice.karma, roll);
 
     const color = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
     const colorLower = String(color || "").toLowerCase();
@@ -37,86 +49,137 @@ export class EscapingAction extends AttackAction {
 
     const grid = buildResultGrid(this.actionType, colorLower, this.effects);
     const { bg, fg } = bannerColors(colorLower);
+    const targetingContext = getTargetingContext(actor, actionName);
+
+    // No special action buttons needed for escaping
+    const actions = buildActionsBox({
+      actorUuid: actor.uuid
+    });
 
     const cardHtml = `
       <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
-        <div style="padding:5px 10px;border-bottom:1px solid #c0c0c0;font-size:1.1em;color:#4e342e;">
-          <strong>${actor.name} — Escaping a Hold</strong>
+        <div style="padding:5px 10px;border-bottom:1px solid #c0c0c0;font-size:1.1em;color:#8b0000;">
+          <strong>${actor.name} — ${actionName}</strong>
+        </div>
+        
+        <div style="padding:5px 10px;border-bottom:1px solid #e0e0e0;font-size:.9em;">
+          ${targetingContext}
+          <div>Opponent: ${choice.opponentName}</div>
         </div>
 
         <div style="padding:5px 10px;font-size:.9em;">
-          <div>FEAT Rank: ${choice.selfEndOrStr}${choice.shift ? ` — Shift ${choice.shift} → ${effectiveRank}` : ""}</div>
-          ${choice.opponentName ? `<div>Opponent: ${choice.opponentName}</div>` : ``}
-          <div>Roll: ${roll.total}${karmaSpent ? ` + Karma ${karmaSpent}` : ``} = ${cappedTotal}</div>
+          <div>Strength: ${strength.rank} (${strength.value})${choice.shift ? ` — Shift ${choice.shift} → ${effectiveRank}` : ""}</div>
+          ${choice.opponentStr ? `<div>Opponent STR: ${choice.opponentStr}</div>` : ``}
+          <div>Roll: ${roll.total}${totalKarmaUsed ? ` + Karma: ${totalKarmaUsed}` : ``} = ${cappedTotal}</div>
         </div>
 
         ${grid}
 
-        <div style="text-align:center;padding:8px;margin:5px;font-weight:bold;border-radius:3px;background:${bg};color:${fg};">
+        <div style="text-align:center;padding:8px;margin:5px;font-weight:bold;font-size:1.05em;border-radius:3px;background:${bg};color:${fg};">
           RESULT: ${String(color).toUpperCase()} — ${String(effect).toUpperCase()}
         </div>
 
         ${this._effectBlock(effect)}
+        ${actions}
       </div>
     `;
 
     await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor }), content: cardHtml });
 
-    return { roll, color, effectiveRank, cappedTotal, karmaSpent };
+    return { roll, color, effectiveRank, cappedTotal, totalKarmaUsed };
   }
 
-  async _showDialog(actor) {
+  async _showDialog(actor, strength) {
     // Auto-fill opponent from target if any
     let prefillOpp = "";
-    const t = Array.from(game.user?.targets ?? []);
-    if (t.length === 1) prefillOpp = t[0].name || "";
+    let prefillOppStr = "";
+    const targets = Array.from(game.user?.targets ?? []);
+    if (targets.length === 1) {
+      prefillOpp = targets[0].name || "";
+      prefillOppStr = targets[0].actor?.system?.abilities?.strength?.rank || "";
+    }
+
+    // Load persisted settings
+    const savedShift = await actor.getFlag("msh-faserip", "lastEscapeShift") ?? 0;
+    const savedKarma = await actor.getFlag("msh-faserip", "lastEscapeKarma") ?? 0;
 
     const dialogHtml = `
       <div style="margin-bottom:8px;">
-        <label style="display:inline-block;width:130px;">Opponent (label):</label>
-        <input type="text" name="opponentName" style="width:220px;" value="${prefillOpp}">
-        </div>
+        <label style="display:inline-block;width:130px;">Action:</label>
+        <strong>${this.label}</strong>
+      </div>
 
-        <div style="margin-bottom:8px;">
+      <div style="margin-bottom:8px;">
+        <label style="display:inline-block;width:130px;">Your Strength:</label>
+        <input type="text" value="${strength.rank}" style="width:160px;" readonly>
+        <span style="margin-left:6px;">(${strength.value})</span>
+      </div>
+
+      <div style="margin-bottom:8px;">
+        <label style="display:inline-block;width:130px;">Opponent:</label>
+        <input type="text" name="opponentName" style="width:220px;" value="${prefillOpp}" placeholder="Who is holding you?">
+      </div>
+
+      <div style="margin-bottom:8px;">
+        <label style="display:inline-block;width:130px;">Opponent STR:</label>
+        <input type="text" name="opponentStr" style="width:160px;" value="${prefillOppStr}" placeholder="e.g., Excellent">
+        <div style="margin-left:130px;font-size:.85em;color:#666;">Optional: for reference only</div>
+      </div>
+
+      <div style="margin-bottom:8px;">
         <label style="display:inline-block;width:130px;">Column Shift:</label>
-        <input type="number" name="shift" value="${Number(this.opts.shift ?? 0)}" style="width:60px;">
-        </div>
+        <input type="number" name="shift" value="${Number(savedShift)}" style="width:60px;">
+        <span style="color:#666;font-size:.9em;">(+ easier, - harder)</span>
+      </div>
 
-        <div style="margin-bottom:8px;">
+      <div style="margin-bottom:8px;">
         <label style="display:inline-block;width:130px;">Karma:</label>
-        <input type="number" name="karma" value="${Number(this.opts.karma ?? 0)}" min="0" style="width:60px;">
-        </div>
+        <input type="number" name="karma" value="${Number(savedKarma)}" min="0" style="width:60px;">
+      </div>
 
-        <div style="margin-top:10px;">
+      <div style="margin-top:6px;">
+        <label><input type="checkbox" name="remember" checked> Remember these settings</label>
+      </div>
+
+      <div style="margin-top:8px;">
         <label><input type="checkbox" name="skipDice"> Skip dice animation</label>
-        </div>
+      </div>
 
-        <div style="margin-top:12px;padding:8px;background:#f5f5f5;border:1px solid #ddd;border-radius:3px;">
+      <div style="margin-top:12px;padding:8px;background:#f5f5f5;border:1px solid #ddd;border-radius:3px;">
         <div style="font-weight:bold;margin-bottom:4px;">Escaping Results</div>
         <div style="font-size:.85em;color:#555;">
-            <strong>Miss (White/Green):</strong> Still held; no other actions.<br>
-            <strong>Escape (Yellow):</strong> Free; may move up to half speed; no other actions.<br>
-            <strong>Reverse (Red):</strong> Free; move ½, Grapple attacker, or take another action at -2 CS.
+          <strong>Miss (White/Green):</strong> Still held; no other actions.<br>
+          <strong>Escape (Yellow):</strong> Free; may move up to half speed; no other actions.<br>
+          <strong>Reverse (Red):</strong> Free; move ½, Grapple attacker, or take another action at -2 CS.
         </div>
-        </div>
+      </div>
     `;
 
     return new Promise((resolve) => {
       new Dialog({
-        title: `Escaping Hold: ${actor.name}`,
+        title: `${this.label}: ${actor.name}`,
         content: dialogHtml,
         buttons: {
           roll: {
             label: "Roll",
-            callback: (html) => {
+            callback: async (html) => {
               const $ = (s) => html.find(s);
-              resolve({
+              const result = {
                 opponentName: String($('[name="opponentName"]').val() || "Opponent"),
-                selfEndOrStr: String($('[name="selfRank"]').val() || "Good"),
+                opponentStr: String($('[name="opponentStr"]').val() || ""),
                 shift: Number($('[name="shift"]').val() || 0),
                 karma: Number($('[name="karma"]').val() || 0),
+                remember: !!$('[name="remember"]').is(':checked'),
                 skipDice: !!$('[name="skipDice"]').is(':checked')
-              });
+              };
+              
+              // Persist settings if requested
+              if (result.remember) {
+                await actor.setFlag("msh-faserip", "lastEscapeShift", result.shift);
+                await actor.setFlag("msh-faserip", "lastEscapeKarma", result.karma);
+              }
+              
+              resolve(result);
             }
           },
           cancel: { label: "Cancel", callback: () => resolve(null) }
@@ -146,7 +209,7 @@ export class EscapingAction extends AttackAction {
       return `
         <div style="padding:6px 10px;margin:6px 10px;background:#e8f5e9;border:1px solid #66bb6a;border-radius:3px;">
           <div style="font-weight:bold;color:#2e7d32;">Reverse</div>
-          <div style="font-size:.9em;">You’re free and may either: move up to ½ distance; attempt to Grapple the former attacker; or perform any other action at -2 CS.</div>
+          <div style="font-size:.9em;">You're free and may either: move up to ½ distance; attempt to Grapple the former attacker; or perform any other action at -2 CS.</div>
         </div>`;
     }
     return "";

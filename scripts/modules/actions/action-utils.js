@@ -212,16 +212,21 @@ export function buildResultGrid(actionType, activeColorLower, effects, hoverFn =
 }
 
 // Action buttons box (placeholder chips + optional Breaking FEAT)
-// In action-utils.js, update buildActionsBox signature:
 export function buildActionsBox({
   showSlam = false,
   showStun = false,
-  showKill = false,            // NEW: for edged / kill-capable actions
+  showKill = false,
+  showEscape = false,     // NEW: for grappling holds
   pulled = false,
   breakingFeat = null,
+  grabbingBreak = null,
   actorUuid,
   damage = 0,
-  attackForm = "blunt"         // NEW: "blunt" | "edged" | "shooting" | etc.
+  attackForm = "blunt",
+  // NEW: escape-specific data
+  targetUuid = "",
+  targetName = "",
+  targetStrength = ""
 }) {
   const chip = (label, title, enabled, dataAttrs = "") => {
     const base = "display:inline-block;font-size:12px;line-height:1.1;padding:2px 6px;border:1px solid #bbb;border-radius:3px;text-decoration:none;white-space:nowrap;";
@@ -257,6 +262,13 @@ export function buildActionsBox({
     `data-check="kill" data-attack-form="${attackForm}" data-dmg="${damage}" data-attacker-uuid="${actorUuid}"`
   ));
 
+  if (showEscape) parts.push(chip(
+    "Attempt Escape",
+    "Have the held character attempt to escape (STR FEAT; Yellow/Red succeeds)",
+    true,
+    `data-check="escape" data-defender-uuid="${targetUuid}" data-defender-name="${targetName}" data-defender-rank="${targetStrength}"`
+  ));
+
   if (pulled) parts.push(chip(
     "Pull Options",
     "Placeholder: adjust for pulled punch.",
@@ -269,6 +281,16 @@ export function buildActionsBox({
       "Roll a Breaking FEAT: compare weapon material vs target armor/material (or wielder STR).",
       true,
       `data-action="breaking-feat" data-weapon-mat="${breakingFeat.weaponMat}" data-actor-uuid="${actorUuid}"`
+    ));
+  }
+
+  if (grabbingBreak) {
+    // Use a label whose key becomes "grabbing-break" and DO NOT add a second data-action attribute.
+    parts.push(chip(
+      "Grabbing Break",
+      "Roll to see if the grabbed item breaks, is damaged, or activates (STR vs Item Material).",
+      true,
+      `data-item-material="${grabbingBreak.itemMaterial}" data-item-name="${grabbingBreak.itemName}" data-actor-uuid="${actorUuid}"`
     ));
   }
 
