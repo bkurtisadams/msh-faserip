@@ -299,13 +299,13 @@ export function buildActionsBox({
   // Escape chip
   if (showEscape) {
     const targetBits = [
-      targetUuid ? `data-target-uuid="${targetUuid}"` : "",
-      targetName ? `data-target-name="${targetName}"` : "",
-      targetStrength ? `data-target-str="${targetStrength}"` : ""
+      targetUuid ? `data-defender-uuid="${targetUuid}"` : "",
+      targetName ? `data-defender-name="${targetName}"` : "",
+      targetStrength ? `data-defender-rank="${targetStrength}"` : ""
     ].join(" ");
     parts.push(
       chip(
-        "Resolve Escape",
+        "Attempt Escape",
         "Open Escape check dialog",
         true,
         `data-check="escape" data-attack-form="${attackForm}" data-attacker-uuid="${actorUuid}" ${targetBits} ${prefillAttr}`
