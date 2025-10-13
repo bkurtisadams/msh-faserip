@@ -123,10 +123,16 @@ export function installActionChatHandlers() {
       const btn = ev.currentTarget;
       
       const targetName = btn.dataset.targetName || "Target";
+      const targetUuid = btn.dataset.targetUuid || "";
       const targetEndurance = btn.dataset.targetEndurance || "Good";
       const slamDistance = Number(btn.dataset.slamDistance || 1);
 
-      openCollisionDamageDialog({ targetName, targetEndurance, slamDistance });
+      openCollisionDamageDialog({ 
+        targetName, 
+        targetUuid,
+        targetEndurance, 
+        slamDistance 
+      });
     });
 
     // 5) Apply Damage button

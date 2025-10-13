@@ -230,7 +230,7 @@ export function buildActionsBox({
 }) {
   // Small helper to render a chip
   const chip = (label, title, enabled, dataAttrs = "") => {
-    const base = "display:inline-block;font-size:12px;line-height:1.1;padding:2px 6px;border:1px solid #bbb;border-radius:3px;text-decoration:none;white-space:nowrap;";
+    const base = "display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;font-size:13px;line-height:1.2;padding:4px 10px;border:1px solid #bbb;border-radius:4px;text-decoration:none;white-space:nowrap;";
     const style = enabled
       ? `${base}background:#fff;color:#333;cursor:pointer;`
       : `${base}background:#f7f7f7;color:#333;cursor:not-allowed;opacity:.55;filter:grayscale(.3);`;
@@ -260,54 +260,43 @@ export function buildActionsBox({
     );
   }
 
-  // Slam chip — only if requested by caller (caller decides color/penetration gating)
+  // Slam chip — only if requested by caller
   if (showSlam) {
     parts.push(
-      `<a class="faserip-chip"
-          data-check="slam"
-          data-attack-form="${attackForm}"
-          data-dmg="${dmgPen}"
-          data-attacker-uuid="${actorUuid}"
-          ${pulled ? 'data-pulled="true"' : ""}
-          ${prefillAttr}
-          title="Open Slam dialog using penetrating damage">
-          Resolve Slam
-       </a>`
+      chip(
+        "Resolve Slam",
+        "Open Slam dialog using penetrating damage",
+        true,
+        `data-check="slam" data-attack-form="${attackForm}" data-dmg="${dmgPen}" data-attacker-uuid="${actorUuid}" ${pulled ? 'data-pulled="true"' : ""} ${prefillAttr}`
+      )
     );
   }
 
   // Stun chip
   if (showStun) {
     parts.push(
-      `<a class="faserip-chip"
-          data-check="stun"
-          data-attack-form="${attackForm}"
-          data-dmg="${dmgPen}"
-          data-attacker-uuid="${actorUuid}"
-          ${pulled ? 'data-pulled="true"' : ""}
-          ${prefillAttr}
-          title="Open Stun dialog using penetrating damage">
-          Resolve Stun
-       </a>`
+      chip(
+        "Resolve Stun",
+        "Open Stun dialog using penetrating damage",
+        true,
+        `data-check="stun" data-attack-form="${attackForm}" data-dmg="${dmgPen}" data-attacker-uuid="${actorUuid}" ${pulled ? 'data-pulled="true"' : ""} ${prefillAttr}`
+      )
     );
   }
 
-  // Kill chip (if your ruleset uses the same intensity as penetration, reuse dmgPen)
+  // Kill chip
   if (showKill) {
     parts.push(
-      `<a class="faserip-chip"
-          data-check="kill"
-          data-attack-form="${attackForm}"
-          data-dmg="${dmgPen}"
-          data-attacker-uuid="${actorUuid}"
-          ${prefillAttr}
-          title="Open Kill check dialog">
-          Resolve Kill
-       </a>`
+      chip(
+        "Resolve Kill",
+        "Open Kill check dialog",
+        true,
+        `data-check="kill" data-attack-form="${attackForm}" data-dmg="${dmgPen}" data-attacker-uuid="${actorUuid}" ${prefillAttr}`
+      )
     );
   }
 
-  // Escape chip (grapples etc.). Include target context if provided.
+  // Escape chip
   if (showEscape) {
     const targetBits = [
       targetUuid ? `data-target-uuid="${targetUuid}"` : "",
@@ -315,19 +304,16 @@ export function buildActionsBox({
       targetStrength ? `data-target-str="${targetStrength}"` : ""
     ].join(" ");
     parts.push(
-      `<a class="faserip-chip"
-          data-check="escape"
-          data-attack-form="${attackForm}"
-          data-attacker-uuid="${actorUuid}"
-          ${targetBits}
-          ${prefillAttr}
-          title="Open Escape check dialog">
-          Resolve Escape
-       </a>`
+      chip(
+        "Resolve Escape",
+        "Open Escape check dialog",
+        true,
+        `data-check="escape" data-attack-form="${attackForm}" data-attacker-uuid="${actorUuid}" ${targetBits} ${prefillAttr}`
+      )
     );
   }
 
-  // Optional utility chips you were already exposing
+  // Optional utility chips
   if (breakingFeat) {
     parts.push(
       chip(
@@ -352,10 +338,9 @@ export function buildActionsBox({
 
   // Render container or nothing
   return parts.length
-    ? `<div class="actions-row" style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;">${parts.join("")}</div>`
+    ? `<div class="actions-row" style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;padding:6px 0 10px;margin:6px 0 2px;">${parts.join("")}</div>`
     : "";
 }
-
 
 export function bannerColors(colorLower) {
   const bg = colorLower==='white' ? '#f8f8f8'

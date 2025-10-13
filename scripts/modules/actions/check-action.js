@@ -303,6 +303,7 @@ export class CheckAction extends BaseAction {
               <a class="faserip-chip" 
                 data-action="calculate-collision"
                 data-target-name="${choice.targetName}"
+                data-target-uuid="${choice.targetUuid || ""}"
                 data-target-endurance="${choice.targetEndRank}"
                 data-slam-distance="${colorLower === 'white' ? this._strengthToAreas(attackerStr.rank) : 1}"
                 title="Calculate damage if target collides with an obstacle"

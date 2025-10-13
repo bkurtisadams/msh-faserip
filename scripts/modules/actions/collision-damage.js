@@ -1,12 +1,56 @@
 // scripts/modules/actions/collision-damage.js
 import { applyDamageToActorUuid } from "./action-utils.js";
 
-export function openCollisionDamageDialog({ targetName = "Target", targetEndurance = "Good", slamDistance = 1 }) {
+export function openCollisionDamageDialog({ 
+  targetName = "Target", 
+  targetUuid = "",
+  targetEndurance = "Good", 
+  slamDistance = 1 
+}) {
   const RANKS = [
     "Shift-0","Feeble","Poor","Typical","Good","Excellent",
     "Remarkable","Incredible","Amazing","Monstrous","Unearthly",
     "Shift-X","Shift-Y","Shift-Z","Class 1000","Class 3000","Class 5000","Beyond"
   ];
+
+  // Auto-populate from target actor if UUID provided
+  let autoPopulatedEnd = targetEndurance;
+  let autoPopulatedArmor = "Shift-0";
+  let autoPopulated = false;
+
+  if (targetUuid) {
+    try {
+      const resolved = fromUuidSync ? fromUuidSync(targetUuid) : null;
+      const targetActor = resolved?.documentName === "Actor" ? resolved
+                        : (resolved?.documentName === "Token" ? resolved.actor : null);
+      
+      if (targetActor) {
+        autoPopulated = true;
+        
+        // Get Endurance
+        const endRank = targetActor.system?.abilities?.endurance?.rank;
+        if (endRank) {
+          autoPopulatedEnd = endRank;
+        }
+        
+        // Get Body Armor from power
+        const bodyArmorPower = targetActor.items.find(i => 
+          i.type === "power" && 
+          (i.name.toLowerCase().includes("body armor") || 
+           i.name.toLowerCase().includes("body armour"))
+        );
+        
+        if (bodyArmorPower) {
+          const baRank = bodyArmorPower.system?.rank || "Shift-0";
+          autoPopulatedArmor = baRank;
+        }
+        
+        console.log(`FASERIP | Auto-populated collision data: ${targetName} (END: ${autoPopulatedEnd}, BA: ${autoPopulatedArmor})`);
+      }
+    } catch (e) {
+      console.warn("FASERIP | Failed to auto-populate collision data:", e);
+    }
+  }
 
   // Material strength examples for each rank
   const MATERIAL_EXAMPLES = {
@@ -25,10 +69,15 @@ export function openCollisionDamageDialog({ targetName = "Target", targetEnduran
     "Class 5000": "Virtually indestructible (Cap's shield, Thor's hammer)"
   };
 
-  // Plain rank options with values (for Body Armor)
-  const rankOptions = RANKS.map(r => {
+  // Plain rank options with values (for Body Armor and Endurance)
+  const enduranceOptions = RANKS.map(r => {
     const val = game.msh.getRankValue(r);
-    return `<option value="${r}" ${r===targetEndurance?'selected':''}>${r} (${val})</option>`;
+    return `<option value="${r}" ${r===autoPopulatedEnd?'selected':''}>${r} (${val})</option>`;
+  }).join('');
+  
+  const armorOptions = RANKS.map(r => {
+    const val = game.msh.getRankValue(r);
+    return `<option value="${r}" ${r===autoPopulatedArmor?'selected':''}>${r} (${val})</option>`;
   }).join('');
   
   // Material strength options with examples (for obstacles)
@@ -47,6 +96,12 @@ export function openCollisionDamageDialog({ targetName = "Target", targetEnduran
           Damage is calculated as a Charging attack.
         </div>
 
+        ${autoPopulated ? `
+          <div style="margin-bottom:12px;padding:6px;background:#e8f5e9;border:1px solid #4CAF50;border-radius:3px;font-size:0.9em;color:#2e7d32;">
+            ✓ Auto-populated from ${targetName}
+          </div>
+        ` : ''}
+
         <div style="margin-bottom:8px;">
           <label style="display:inline-block;width:160px;font-weight:bold;">Slammed Character:</label>
         </div>
@@ -58,12 +113,12 @@ export function openCollisionDamageDialog({ targetName = "Target", targetEnduran
         
         <div style="margin-bottom:6px;margin-left:20px;">
           <label style="display:inline-block;width:140px;">Endurance:</label>
-          <select name="target-endurance" style="width:200px;">${rankOptions}</select>
+          <select name="target-endurance" style="width:200px;">${enduranceOptions}</select>
         </div>
         
         <div style="margin-bottom:6px;margin-left:20px;">
           <label style="display:inline-block;width:140px;">Body Armor:</label>
-          <select name="target-armor" style="width:200px;">${rankOptions}</select>
+          <select name="target-armor" style="width:200px;">${armorOptions}</select>
         </div>
 
         <div style="margin:16px 0 8px 0;">
@@ -83,7 +138,7 @@ export function openCollisionDamageDialog({ targetName = "Target", targetEnduran
             <div style="margin-bottom:6px;font-weight:bold;color:#555;">Character</div>
             <div style="margin-bottom:6px;">
               <label style="display:block;margin-bottom:4px;">Body Armor Rank:</label>
-              <select name="obstacle-armor-rank" style="width:100%;">${rankOptions}</select>
+              <select name="obstacle-armor-rank" style="width:100%;">${armorOptions}</select>
             </div>
             <div style="margin-bottom:6px;">
               <label style="display:block;margin-bottom:4px;">Body Armor Value:</label>
@@ -99,7 +154,7 @@ export function openCollisionDamageDialog({ targetName = "Target", targetEnduran
             <li>Base damage = max(Endurance or Body Armor, whichever is higher)</li>
             <li>Speed damage = 2 × areas traveled (${2 * slamDistance} in this case)</li>
             <li>Total damage = Base + Speed</li>
-            <li><strong>The absorbed portion rebounds to the attacker; the attacker’s Body Armor may soak</li>
+            <li><strong>The absorbed portion rebounds to the attacker; the attacker's Body Armor may soak</strong></li>
             <li><strong>Otherwise:</strong> The defender/object takes the remainder after its BA/Material</li>
           </ul>
         </div>
@@ -135,7 +190,8 @@ export function openCollisionDamageDialog({ targetName = "Target", targetEnduran
             obstacleType,
             obstacleDefense,
             obstacleDefenseValue,
-            areasMovedThrough: slamDistance
+            areasMovedThrough: slamDistance,
+            selfActorUuid: targetUuid  // Pass the UUID so we can apply damage
           });
           
           // Post result to chat
@@ -279,38 +335,38 @@ async function postCollisionResult(result) {
   // Action chips
   const chips = [];
 
-  // Self damage chip if UUID provided and there is damage to apply
-  if (result.selfActorUuid && result.damageToTarget > 0) {
+  // Apply damage to slammed character (the primary damage)
+  if (result.damageToTarget > 0) {
     chips.push(
       `<a class="faserip-chip"
-          data-action="apply-self-damage"
-          data-actor-uuid="${result.selfActorUuid}"
+          data-action="apply-damage"
           data-damage="${result.damageToTarget}"
-          title="Apply collision damage to the slammed character"
+          data-attacker-uuid="${result.selfActorUuid || ""}"
+          title="Apply collision damage to ${result.targetName}"
           style="display:inline-block;font-size:12px;line-height:1.1;padding:2px 6px;border:1px solid #bbb;border-radius:3px;text-decoration:none;white-space:nowrap;background:#fff;color:#333;cursor:pointer;">
-          Apply Self Damage
-       </a>`
+          Apply Damage (${result.targetName})
+      </a>`
     );
   }
 
-  // Defender damage chip when the obstacle is a character and we have its UUID
+  // Apply damage to obstacle if it's a character
   if (result.defenderActorUuid && result.obstacleType === "character" && result.damageToObstacle > 0) {
     chips.push(
       `<a class="faserip-chip"
-          data-action="apply-dmg-to-uuid"
-          data-actor-uuid="${result.defenderActorUuid}"
+          data-action="apply-damage"
           data-damage="${result.damageToObstacle}"
+          data-attacker-uuid="${result.defenderActorUuid}"
           title="Apply collision damage to defender"
           style="display:inline-block;font-size:12px;line-height:1.1;padding:2px 6px;border:1px solid #bbb;border-radius:3px;text-decoration:none;white-space:nowrap;background:#fff;color:#333;cursor:pointer;">
-          Apply Damage To Defender
-       </a>`
+          Apply Damage (Defender)
+      </a>`
     );
   }
 
   const actionsBox = chips.length
     ? `<div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;padding:8px 10px;margin:6px 10px 10px;border:1px solid #c0c0c0;background:#fafafa;border-radius:4px;">
-         ${chips.join("")}
-       </div>`
+        ${chips.join("")}
+      </div>`
     : "";
 
   const content = `
