@@ -5,7 +5,8 @@ import {
   effectsFor, labelFor,
   isBluntCapable, computeBluntDamage,
   rollWithKarmaAndHistory, buildResultGrid, buildActionsBox, bannerColors,
-  getTargetingContext
+  getTargetingContext,
+  applyDamageToTargets  // ADD THIS IMPORT
 } from "./action-utils.js";
 import { getItemMaterialRank } from "../../gm-utils.js";
 
@@ -161,13 +162,15 @@ export class BluntAttackAction extends AttackAction {
     const grid = buildResultGrid(actionType, colorLower, effects, (globalThis._getResultHoverText||this._getResultHoverText));
     const { bg, fg } = bannerColors(colorLower);
     const breakingFeat = choice.src === "weapon" ? { weaponMat: choice.weaponMat } : null;
+    const isHit = colorLower !== 'white';
     const actions = buildActionsBox({
       showSlam: colorLower==='yellow',
       showStun: colorLower==='red',
       pulled: choice.pulled,
       breakingFeat,
       actorUuid: actor.uuid,
-      damage: choice.damage
+      damage: isHit ? choice.damage : 0,  // Only pass damage if it's a hit
+      attackForm: "blunt"
     });
 
     // weapon/bare line
@@ -181,7 +184,6 @@ export class BluntAttackAction extends AttackAction {
         })()
       : `<div>Attack: Bare Hands — Damage: ${strength.value}</div>`;
 
-    // Then in the execute() method, before building cardHtml:
     const targetingContext = getTargetingContext(actor, actionName);
 
     // final chat card

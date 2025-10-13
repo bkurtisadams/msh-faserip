@@ -10,7 +10,8 @@ import {
   rollWithKarmaAndHistory,
   buildResultGrid,
   bannerColors,
-  getTargetingContext
+  getTargetingContext,
+  applyDamageToTargets  // ADD THIS IMPORT
 } from "./action-utils.js";
 import { getItemMaterialRank } from "../../gm-utils.js";
 
@@ -239,9 +240,18 @@ export class EdgedAttackAction extends AttackAction {
       return `<a class="faserip-chip" data-action="${key}" ${dataAttrs} ${enabled? "" : 'aria-disabled="true"'} title="${title}" style="${style}">${label}</a>`;
     };
 
-    const parts = [
-      chip("Apply Damage","Placeholder: apply damage manually to the target(s).", false)
-    ];
+    const parts = [];
+
+    // Only show Apply Damage on hits (not white)
+    const isHit = colorLower !== 'white';
+    if (isHit && choice.damage > 0) {
+      parts.push(chip(
+        "Apply Damage",
+        "Apply damage to targeted/selected token(s)", 
+        true, 
+        `data-damage="${choice.damage}" data-attacker-uuid="${actor.uuid}"`
+      ));
+    }
 
     const enableStun = (colorLower === 'yellow' || colorLower === 'red');
     const enableKill = (colorLower === 'red');
@@ -311,7 +321,7 @@ export class EdgedAttackAction extends AttackAction {
           ${weaponContext}
           <div>Roll: ${roll.total}${totalKarmaUsed ? ` + Karma: ${totalKarmaUsed}` : ""} = ${cappedTotal}</div>
         </div>
-        ${edgedWarning}  <!-- new -->
+        ${edgedWarning}
         ${grid}
         <div style="text-align:center;padding:8px;margin:5px;font-weight:bold;font-size:1.1em;border-radius:3px;background:${bg};color:${fg};">
           RESULT: ${String(color).toUpperCase()} — ${String(effectResult).toUpperCase()}
@@ -321,5 +331,6 @@ export class EdgedAttackAction extends AttackAction {
     `;
 
     await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor }), content: cardHtml });
+
   }
 }

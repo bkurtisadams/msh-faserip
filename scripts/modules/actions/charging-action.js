@@ -11,7 +11,7 @@ import {
   rollWithKarmaAndHistory,
   buildActionsBox,
   getResultHoverText,
-  getTargetingContext
+  getTargetingContext,
 } from "./action-utils.js";
 
 /**

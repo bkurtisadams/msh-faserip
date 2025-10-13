@@ -216,7 +216,7 @@ export function buildActionsBox({
   showSlam = false,
   showStun = false,
   showKill = false,
-  showEscape = false,     // NEW: for grappling holds
+  showEscape = false,
   pulled = false,
   breakingFeat = null,
   grabbingBreak = null,
@@ -237,9 +237,17 @@ export function buildActionsBox({
     return `<a class="faserip-chip" data-action="${key}" ${dataAttrs} ${enabled ? "" : 'aria-disabled="true"'} title="${title}" style="${style}">${label}</a>`;
   };
 
-  const parts = [
-    chip("Apply Damage", "Placeholder: apply damage manually to the target(s).", false)
-  ];
+  const parts = [];
+  
+  // Add Apply Damage button if damage > 0
+  if (damage > 0) {
+    parts.push(chip(
+      "Apply Damage",
+      "Apply damage to targeted/selected token(s)",
+      true,
+      `data-damage="${damage}" data-attacker-uuid="${actorUuid}"`
+    ));
+  }
 
   if (showSlam) parts.push(chip(
     "Resolve Slam",
@@ -589,4 +597,200 @@ export function getTargetingContext(actor, actionLabel) {
   return `<div>Targets: <strong>${targetNames}</strong> <span style="color:#666;">(${targets.length} targets)</span></div>`;
 }
 
+/**
+ * Apply damage to targeted or controlled tokens with Body Armor calculation
+ * @param {number} damage - Base damage amount
+ * @param {Object} options - Additional options
+ *   - attackerUuid: UUID of the attacker (optional)
+ *   - damageType: Type of damage for resistance checks (optional)
+ *   - showNotification: Whether to show UI notifications (default: true)
+ *   - updateButton: Button element to update with "Applied" state (optional)
+ * @returns {Array} - Array of results for each target: { target, damageDealt, absorbed, newHealth }
+ */
+export async function applyDamageToTargets(damage, options = {}) {
+  const {
+    attackerUuid = null,
+    damageType = "Physical-Blunt",
+    showNotification = true,
+    updateButton = null
+  } = options;
 
+  if (damage <= 0) {
+    if (showNotification) ui.notifications.warn("No damage to apply.");
+    return [];
+  }
+
+  // Check for targeted tokens first, then fall back to controlled tokens (for GM)
+  let targets = Array.from(game.user.targets);
+  
+  if (targets.length === 0) {
+    // If no targets, check for controlled tokens (GM workflow)
+    targets = canvas.tokens?.controlled || [];
+    
+    if (targets.length === 0) {
+      if (showNotification) {
+        ui.notifications.warn("No targets selected. Please target or select at least one token.");
+      }
+      return [];
+    }
+    
+    console.log(`FASERIP | Using ${targets.length} controlled token(s) as targets (GM mode)`);
+  }
+
+  const results = [];
+
+  // Apply damage to each target
+  for (const target of targets) {
+    const targetActor = target.actor;
+    if (!targetActor) {
+      console.warn(`FASERIP | Target token has no actor:`, target.name);
+      continue;
+    }
+
+    // Get target's Body Armor (check both equipment and powers)
+    let bodyArmorValue = 0;
+    
+    // Check armor equipment
+    const armorItems = targetActor.items.filter(i => 
+      i.type === "equipment" && 
+      i.system.category === "armor" && 
+      i.system.protection
+    );
+    
+    if (armorItems.length > 0) {
+      const bestArmor = armorItems.reduce((best, current) => {
+        let bestValue = 0;
+        let currentValue = 0;
+        
+        if (typeof best.system.protection === 'number') {
+          bestValue = best.system.protection;
+        } else {
+          bestValue = CONFIG.FASERIP?.rankValues?.[best.system.protection] || 0;
+        }
+        
+        if (typeof current.system.protection === 'number') {
+          currentValue = current.system.protection;
+        } else {
+          currentValue = CONFIG.FASERIP?.rankValues?.[current.system.protection] || 0;
+        }
+        
+        return currentValue > bestValue ? current : best;
+      });
+      
+      if (typeof bestArmor.system.protection === 'number') {
+        bodyArmorValue = bestArmor.system.protection;
+      } else {
+        bodyArmorValue = CONFIG.FASERIP?.rankValues?.[bestArmor.system.protection] || 0;
+      }
+    }
+
+    // Check Body Armor powers
+    const bodyArmorPower = targetActor.items.find(i => 
+      i.type === "power" && 
+      (i.name.toLowerCase().includes("body armor") || 
+       i.name.toLowerCase().includes("body armour") ||
+       i.name.toLowerCase().includes("armor") ||
+       i.system.type?.toLowerCase().includes("body armor"))
+    );
+    
+    if (bodyArmorPower) {
+      let powerValue = 0;
+      if (typeof bodyArmorPower.system.value === 'number') {
+        powerValue = bodyArmorPower.system.value;
+      } else {
+        powerValue = CONFIG.FASERIP?.rankValues?.[bodyArmorPower.system.rank] || 0;
+      }
+      
+      if (powerValue > bodyArmorValue) {
+        bodyArmorValue = powerValue;
+      }
+    }
+
+    // Calculate damage after armor
+    const damageAfterArmor = Math.max(0, damage - bodyArmorValue);
+    
+    // Get current health
+    const currentHealth = targetActor.system.attributes.health.value;
+    const newHealth = Math.max(0, currentHealth - damageAfterArmor);
+
+    // Track result
+    const result = {
+      target: target.name,
+      targetActor: targetActor,
+      damageDealt: damageAfterArmor,
+      absorbed: bodyArmorValue,
+      currentHealth: currentHealth,
+      newHealth: newHealth
+    };
+
+    if (damageAfterArmor > 0) {
+      // Apply damage using the same method as combat-handler
+      const isToken = target.document?.documentName === "Token" || target.documentName === "Token";
+      const targetTokenData = isToken ? (target.document || target) : null;
+      const isUnlinkedToken = isToken && targetTokenData && !targetTokenData.actorLink;
+
+      const update = { "system.attributes.health.value": newHealth };
+
+      try {
+        if (isUnlinkedToken && (game.user.isGM || targetActor.isOwner)) {
+          await target.document.update(update);
+        } else if (game.user.isGM || targetActor.isOwner) {
+          await targetActor.update(update);
+        } else if (game.msh?.runAsGM) {
+          await game.msh.runAsGM({
+            operation: 'update',
+            targetActorUuid: targetActor.uuid,
+            args: [update]
+          });
+        } else {
+          if (showNotification) {
+            ui.notifications.warn("Couldn't update Health: no GM helper available.");
+          }
+          result.error = "No GM helper available";
+          results.push(result);
+          continue;
+        }
+
+        // Create feedback message
+        if (showNotification) {
+          const armorNote = bodyArmorValue > 0 
+            ? ` (${damage} damage - ${bodyArmorValue} Body Armor)` 
+            : "";
+          
+          ui.notifications.info(
+            `${target.name} took ${damageAfterArmor} damage${armorNote}. Health: ${currentHealth} → ${newHealth}`
+          );
+        }
+        
+        result.success = true;
+      } catch (err) {
+        console.error("FASERIP | Failed to apply damage:", err);
+        if (showNotification) {
+          ui.notifications.error(`Failed to apply damage to ${target.name}`);
+        }
+        result.error = err.message;
+        result.success = false;
+      }
+    } else {
+      // All damage absorbed
+      if (showNotification) {
+        ui.notifications.info(
+          `${target.name}'s Body Armor (${bodyArmorValue}) absorbed all ${damage} damage!`
+        );
+      }
+      result.success = true;
+      result.fullyAbsorbed = true;
+    }
+
+    results.push(result);
+  }
+
+  // Update button if provided
+  if (updateButton) {
+    updateButton.style.opacity = "0.5";
+    updateButton.style.pointerEvents = "none";
+    updateButton.textContent = "✓ Damage Applied";
+  }
+
+  return results;
+}

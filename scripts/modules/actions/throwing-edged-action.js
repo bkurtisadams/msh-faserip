@@ -233,18 +233,21 @@ export class ThrowingEdgedAction extends RangedAttackAction {
     const grid = buildResultGrid(actionType, colorLower, effects, (globalThis._getResultHoverText || this._getResultHoverText));
     const { bg, fg } = bannerColors(colorLower);
 
+    const isHit = colorLower !== 'white';
     const actions = buildActionsBox({
       showStun: colorLower === "yellow",
       showKill: colorLower === "red",
       actorUuid: actor.uuid,
-      damage: choice.weaponDamage
+      damage: isHit ? choice.weaponDamage : 0,  // Only pass damage if it's a hit
+      attackForm: "edged"  // ADD THIS - was missing
     });
 
     const contextHtml = `
       <div>Ability: ${ability.name}</div>
-      <div>Base Rank: ${ability.rank} (${ability.value})${this.opts?.shift ? ` — Shift ${this.opts.shift} → ${effectiveRank}` : ""}</div>
+      <div>Base Rank: ${ability.rank} (${ability.value})</div>
       <div>Weapon: ${choice.weaponName} — Damage: ${choice.weaponDamage}</div>
-      <div>Distance: ${choice.range} area${choice.range > 1 ? "s" : ""} ${choice.rangeModifier ? `(${choice.rangeModifier}CS)` : ""}${choice.throughObstacle ? `, obstacle (-2CS)` : ""}</div>
+      <div>Distance: ${choice.range} area${choice.range > 1 ? "s" : ""} ${choice.rangeModifier ? `(${choice.rangeModifier}CS)` : ""}${choice.throughObstacle ? `, obstacle (-2CS)` : ""}${choice.movementModifier ? `, target movement (${choice.movementModifier > 0 ? '+' : ''}${choice.movementModifier}CS)` : ""}</div>
+      ${choice.totalShift !== 0 ? `<div>Effective Rank: ${effectiveRank} (${choice.totalShift > 0 ? '+' : ''}${choice.totalShift}CS total)</div>` : ""}
       <div>Roll: ${roll.total}${totalKarmaUsed ? ` + Karma: ${totalKarmaUsed}` : ""} = ${cappedTotal}</div>
     `;
 

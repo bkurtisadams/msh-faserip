@@ -288,12 +288,13 @@ export class EnergyAction extends RangedAttackAction {
 
     // Derive which chips to show from the configured effect text for this color
     const effText = String(effectResult || "").toLowerCase();
+    const isHit = colorLower !== 'white';
     const actions = buildActionsBox({
       showSlam: /slam/.test(effText),
       showStun: /stun/.test(effText),
       showKill: /kill/.test(effText),
       actorUuid: actor.uuid,
-      damage: choice.powerDamage,
+      damage: isHit ? choice.powerDamage : 0,  // Only pass damage if it's a hit
       attackForm: "energy",
     });
 

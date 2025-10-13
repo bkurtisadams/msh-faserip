@@ -227,9 +227,18 @@ export class ShootingAction extends RangedAttackAction {
       return `<a class="faserip-chip" data-action="${key}" ${dataAttrs} ${enabled ? "" : 'aria-disabled="true"'} title="${title}" style="${style}">${label}</a>`;
     };
 
-    const parts = [
-      chip("Apply Damage", "Placeholder: apply damage manually to the target(s).", false)
-    ];
+    const parts = [];
+
+    // Only show Apply Damage on hits (not white)
+    const isHit = colorLower !== 'white';
+    if (isHit && choice.weaponDamage > 0) {
+      parts.push(chip(
+        "Apply Damage",
+        "Apply damage to targeted/selected token(s)",
+        true,
+        `data-damage="${choice.weaponDamage}" data-attacker-uuid="${actor.uuid}"`
+      ));
+    }
 
     // Bullseye: text input for specific target
     if (colorLower === 'yellow') {
@@ -254,14 +263,6 @@ export class ShootingAction extends RangedAttackAction {
     `;
 
     // Range context
-    const rangeContext = `
-      <div>Weapon: ${choice.weapon.name} (Range: ${choice.weaponRange} areas, Damage: ${choice.weaponDamage})</div>
-      <div>Distance: ${choice.range} area${choice.range > 1 ? 's' : ''} 
-        ${choice.rangeModifier ? `(${choice.rangeModifier}CS)` : ''}
-        ${choice.throughObstacle ? ` — Through obstacle (-2CS)` : ''}
-      </div>
-    `;
-
     const targetingContext = getTargetingContext(actor, actionName);
 
     // final chat card
@@ -275,9 +276,10 @@ export class ShootingAction extends RangedAttackAction {
         </div>
         <div style="padding:5px 10px;font-size:.9em;">
           <div>Ability: ${ability.name}</div>
-          <div>Base Rank: ${ability.rank} (${ability.value})${choice.shift ? ` — Base Shift ${choice.shift}` : ""}</div>
-          ${rangeContext}
-          <div>Effective Rank: ${effectiveRank} (after all modifiers)</div>
+          <div>Base Rank: ${ability.rank} (${ability.value})</div>
+          <div>Weapon: ${choice.weapon.name} (Range: ${choice.weaponRange} areas, Damage: ${choice.weaponDamage})</div>
+          <div>Distance: ${choice.range} area${choice.range > 1 ? 's' : ''} ${choice.rangeModifier ? `(${choice.rangeModifier}CS)` : ''}${choice.throughObstacle ? `, obstacle (-2CS)` : ""}${choice.movementModifier ? `, target movement (${choice.movementModifier > 0 ? '+' : ''}${choice.movementModifier}CS)` : ""}</div>
+          ${choice.totalShift !== 0 ? `<div>Effective Rank: ${effectiveRank} (${choice.totalShift > 0 ? '+' : ''}${choice.totalShift}CS total)</div>` : ""}
           <div>Roll: ${roll.total}${totalKarmaUsed ? ` + Karma: ${totalKarmaUsed}` : ""} = ${cappedTotal}</div>
         </div>
         ${grid}

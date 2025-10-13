@@ -8,7 +8,8 @@ import {
   rollWithKarmaAndHistory, 
   buildResultGrid, 
   bannerColors, 
-  effectsFor 
+  effectsFor,
+  applyDamageToTargets
 } from "./action-utils.js";
 
 export function installActionChatHandlers() {
@@ -127,9 +128,23 @@ export function installActionChatHandlers() {
       openCollisionDamageDialog({ targetName, targetEndurance, slamDistance });
     });
 
+    // 5) Apply Damage button
+    html.on("click", '[data-action="apply-damage"]', async (ev) => {
+      ev.preventDefault();
+      const btn = ev.currentTarget;
+      const damage = Number(btn.dataset.damage || 0);
+      const attackerUuid = btn.dataset.attackerUuid;
+      
+      await applyDamageToTargets(damage, {
+        attackerUuid,
+        showNotification: true,
+        updateButton: btn
+      });
+    });
+
   }); // End of single combined Hooks.on
 
-  console.log("MSH FASERIP | Chat hooks installed (checks + breaking FEAT + grabbing break + collision damage + escape)");
+  console.log("MSH FASERIP | Chat hooks installed (checks + breaking FEAT + grabbing break + collision damage + escape + apply damage)");
 }
 
 /**

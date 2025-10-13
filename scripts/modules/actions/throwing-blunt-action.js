@@ -245,20 +245,22 @@ export class ThrowingBluntAction extends RangedAttackAction {
     const { bg, fg } = bannerColors(colorLower);
 
     // Throwing Blunt: Red = Stun (no Kill/Slam by default)
+    const isHit = colorLower !== 'white';
     const actions = buildActionsBox({
       showStun: colorLower === "red",
       showKill: false,
       showSlam: false,
       actorUuid: actor.uuid,
-      damage: choice.weaponDamage,
+      damage: isHit ? choice.weaponDamage : 0,  // Only pass damage if it's a hit
       attackForm: "blunt"
     });
 
     const contextHtml = `
       <div>Ability: ${ability.name}</div>
-      <div>Base Rank: ${ability.rank} (${ability.value})${this.opts?.shift ? ` — Shift ${this.opts.shift} → ${effectiveRank}` : ""}</div>
+      <div>Base Rank: ${ability.rank} (${ability.value})</div>
       <div>Weapon: ${choice.weaponName} — Damage: ${choice.weaponDamage}</div>
-      <div>Distance: ${choice.range} area${choice.range > 1 ? "s" : ""} ${choice.rangeModifier ? `(${choice.rangeModifier}CS)` : ""}${choice.throughObstacle ? `, obstacle (-2CS)` : ""}</div>
+      <div>Distance: ${choice.range} area${choice.range > 1 ? "s" : ""} ${choice.rangeModifier ? `(${choice.rangeModifier}CS)` : ""}${choice.throughObstacle ? `, obstacle (-2CS)` : ""}${choice.movementModifier ? `, target movement (${choice.movementModifier > 0 ? '+' : ''}${choice.movementModifier}CS)` : ""}</div>
+      ${choice.totalShift !== 0 ? `<div>Effective Rank: ${effectiveRank} (${choice.totalShift > 0 ? '+' : ''}${choice.totalShift}CS total)</div>` : ""}
       <div>Roll: ${roll.total}${totalKarmaUsed ? ` + Karma: ${totalKarmaUsed}` : ""} = ${cappedTotal}</div>
     `;
 
