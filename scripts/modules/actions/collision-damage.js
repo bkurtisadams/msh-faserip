@@ -47,7 +47,7 @@ export function openCollisionDamageDialog({ targetName = "Target", targetEnduran
         </div>
 
         <div style="margin-bottom:8px;">
-          <label style="display:inline-block;width:160px;font-weight:bold;">Target (slammed character):</label>
+          <label style="display:inline-block;width:160px;font-weight:bold;">Slammed Character:</label>
         </div>
         
         <div style="margin-bottom:6px;margin-left:20px;">
@@ -66,30 +66,30 @@ export function openCollisionDamageDialog({ targetName = "Target", targetEnduran
         </div>
 
         <div style="margin:16px 0 8px 0;">
-          <label style="display:inline-block;width:160px;font-weight:bold;">Obstacle:</label>
+          <label style="display:inline-block;width:160px;font-weight:bold;">Obstacle Type:</label>
+          <label><input type="radio" name="obstacle-type" value="object" checked> Inanimate Object</label>
+          <label style="margin-left:10px;"><input type="radio" name="obstacle-type" value="character"> Character</label>
         </div>
         
-        <div style="margin-bottom:6px;margin-left:20px;">
-          <label style="display:inline-block;width:140px;">Type:</label>
-          <label><input type="radio" name="obstacle-type" value="character" checked> Character</label>
-          <label style="margin-left:10px;"><input type="radio" name="obstacle-type" value="object"> Inanimate Object</label>
-        </div>
-        
-        <div id="obstacle-character-row" style="margin-left:20px;">
-          <div style="margin-bottom:6px;">
-            <label style="display:inline-block;width:140px;">Body Armor Rank:</label>
-            <select name="obstacle-armor-rank" style="width:200px;">${rankOptions}</select>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-left:20px;">
+          <div id="obstacle-object-panel" style="padding:8px;border:1px solid #ddd;border-radius:3px;background:#fafafa;">
+            <div style="margin-bottom:6px;font-weight:bold;color:#555;">Inanimate Object</div>
+            <label style="display:block;margin-bottom:4px;">Material Strength:</label>
+            <select name="obstacle-material" style="width:100%;">${materialOptions}</select>
           </div>
-          <div style="margin-bottom:6px;">
-            <label style="display:inline-block;width:140px;">Body Armor Value:</label>
-            <input type="number" name="obstacle-armor-value" value="10" min="0" style="width:100px;">
-            <span style="font-size:0.85em;color:#666;margin-left:6px;">Edit if non-standard armor</span>
+          
+          <div id="obstacle-character-panel" style="padding:8px;border:1px solid #ddd;border-radius:3px;background:#fafafa;display:none;">
+            <div style="margin-bottom:6px;font-weight:bold;color:#555;">Character</div>
+            <div style="margin-bottom:6px;">
+              <label style="display:block;margin-bottom:4px;">Body Armor Rank:</label>
+              <select name="obstacle-armor-rank" style="width:100%;">${rankOptions}</select>
+            </div>
+            <div style="margin-bottom:6px;">
+              <label style="display:block;margin-bottom:4px;">Body Armor Value:</label>
+              <input type="number" name="obstacle-armor-value" value="10" min="0" style="width:100px;">
+              <div style="font-size:0.85em;color:#666;margin-top:2px;">Edit if non-standard</div>
+            </div>
           </div>
-        </div>
-        
-        <div id="obstacle-object-row" style="display:none;margin-bottom:6px;margin-left:20px;">
-          <label style="display:inline-block;width:140px;">Material Strength:</label>
-          <select name="obstacle-material" style="width:500px;">${materialOptions}</select>
         </div>
 
         <div style="margin-top:16px;padding:8px;background:#fff3e0;border:1px solid #ff9800;border-radius:3px;font-size:0.9em;">
@@ -97,8 +97,9 @@ export function openCollisionDamageDialog({ targetName = "Target", targetEnduran
           <ul style="margin:6px 0 0 0;padding-left:20px;">
             <li>Base damage = max(Endurance, Body Armor)</li>
             <li>Speed damage = 2 × areas traveled (${2 * slamDistance} in this case)</li>
-            <li>If defender's armor > damage: rebound to attacker</li>
-            <li>If attacker's armor > rebound: no damage to either</li>
+            <li>Total damage = Base + Speed</li>
+            <li><strong>If obstacle BA > total damage:</strong> damage rebounds to attacker (minus attacker's BA)</li>
+            <li><strong>Otherwise:</strong> attacker takes no damage; obstacle takes (total - obstacle BA)</li>
           </ul>
         </div>
       </div>
@@ -143,8 +144,8 @@ export function openCollisionDamageDialog({ targetName = "Target", targetEnduran
       cancel: { label: "Cancel" }
     },
     render: (html) => {
-      const $charRow = html.find('#obstacle-character-row');
-      const $objRow = html.find('#obstacle-object-row');
+      const $objectPanel = html.find('#obstacle-object-panel');
+      const $charPanel = html.find('#obstacle-character-panel');
       const $armorValue = html.find('[name="obstacle-armor-value"]');
       const $armorRank = html.find('[name="obstacle-armor-rank"]');
       
@@ -159,14 +160,15 @@ export function openCollisionDamageDialog({ targetName = "Target", targetEnduran
       const initialRank = $armorRank.val();
       $armorValue.val(game.msh.getRankValue(initialRank));
       
+      // Toggle panels based on radio selection
       html.find('[name="obstacle-type"]').on('change', () => {
         const type = html.find('[name="obstacle-type"]:checked').val();
-        if (type === 'character') {
-          $charRow.show();
-          $objRow.hide();
+        if (type === 'object') {
+          $objectPanel.show();
+          $charPanel.hide();
         } else {
-          $charRow.hide();
-          $objRow.show();
+          $objectPanel.hide();
+          $charPanel.show();
         }
       });
     }
@@ -180,56 +182,65 @@ function calculateCollisionDamage({ targetName, targetEndurance, targetArmor, ob
   
   const targetEndVal = getVal(targetEndurance);
   const targetArmorVal = getVal(targetArmor);
-  
-  // Use provided value if available, otherwise look it up
   const obstacleDefenseVal = obstacleDefenseValue !== undefined ? obstacleDefenseValue : getVal(obstacleDefense);
   
-  // Base damage = max(Endurance, Body Armor)
+  // Base damage = max(Endurance, Body Armor) of the slammed character
   const baseDamage = Math.max(targetEndVal, targetArmorVal);
   
   // Speed damage = 2 × areas
   const speedDamage = 2 * areasMovedThrough;
   
-  // Total damage before armor
+  // Total damage
   const totalDamage = baseDamage + speedDamage;
   
-  // Check if defender's armor rebounds damage
-  let damageToTarget = totalDamage;
+  // Charging rebound rule: rebound ONLY if obstacle BA STRICTLY GREATER than total damage
+  let damageToTarget = 0;
   let damageToObstacle = 0;
-  let reboundDamage = 0;
-  let finalDamageToTarget = totalDamage;
+  let rebounded = false;
+  let explanation = "";
   
   if (obstacleDefenseVal > totalDamage) {
-    // Damage is rebounded
-    reboundDamage = totalDamage;
+    // Rebound: ALL damage reflects back to attacker
+    rebounded = true;
+    const reboundAmount = totalDamage;
+    
+    // Attacker's BA absorbs what it can
+    damageToTarget = Math.max(0, reboundAmount - targetArmorVal);
     damageToObstacle = 0;
     
-    // Check if target's armor absorbs rebound
-    if (targetArmorVal >= reboundDamage) {
-      finalDamageToTarget = 0;
-    } else {
-      finalDamageToTarget = reboundDamage - targetArmorVal;
+    explanation = `Obstacle BA/Material (${obstacleDefenseVal}) > total damage (${totalDamage}) → all damage rebounds. `;
+    if (targetArmorVal > 0) {
+      explanation += `${targetName}'s BA (${targetArmorVal}) absorbs some. `;
     }
+    explanation += `${targetName} takes ${damageToTarget} damage. Obstacle takes no damage.`;
+    
   } else {
-    // Obstacle takes some damage, target continues
-    damageToObstacle = totalDamage - obstacleDefenseVal;
-    finalDamageToTarget = 0; // Target doesn't take damage if obstacle yields
+    // No rebound: obstacle takes damage (reduced by its BA/material), attacker takes nothing
+    rebounded = false;
+    damageToTarget = 0;
+    damageToObstacle = Math.max(0, totalDamage - obstacleDefenseVal);
+    
+    explanation = `Total damage (${totalDamage}) ≥ obstacle BA/Material (${obstacleDefenseVal}) → no rebound. `;
+    explanation += `${targetName} takes no damage. Obstacle takes ${damageToObstacle} damage.`;
   }
   
   return {
     targetName,
     targetEndurance,
+    targetEndVal,
     targetArmor,
+    targetArmorVal,
     obstacleType,
     obstacleDefense,
+    obstacleDefenseVal,
     areasMovedThrough,
     baseDamage,
     speedDamage,
     totalDamage,
-    obstacleDefenseVal,
-    reboundDamage,
-    finalDamageToTarget,
-    damageToObstacle
+    rebounded,
+    damageToTarget,
+    damageToObstacle,
+    explanation
   };
 }
 
@@ -241,33 +252,46 @@ async function postCollisionResult(result) {
       </div>
       
       <div style="padding:5px 10px;font-size:0.9em;">
-        <div style="margin-bottom:8px;"><strong>Target:</strong> ${result.targetName} (END: ${result.targetEndurance}, Armor: ${result.targetArmor})</div>
-        <div style="margin-bottom:8px;"><strong>Obstacle:</strong> ${result.obstacleType === 'character' ? 'Character' : 'Object'} (Defense: ${result.obstacleDefense} = ${result.obstacleDefenseVal})</div>
-        <div style="margin-bottom:8px;"><strong>Distance Slammed:</strong> ${result.areasMovedThrough} area${result.areasMovedThrough > 1 ? 's' : ''}</div>
+        <div style="margin-bottom:8px;">
+          <strong>Slammed Character:</strong> ${result.targetName}<br>
+          Endurance: ${result.targetEndurance} (${result.targetEndVal}), Body Armor: ${result.targetArmor} (${result.targetArmorVal})
+        </div>
+        
+        <div style="margin-bottom:8px;">
+          <strong>Obstacle:</strong> ${result.obstacleType === 'character' ? 'Character' : 'Object'}<br>
+          ${result.obstacleType === 'character' ? 'Body Armor' : 'Material Strength'}: ${result.obstacleDefense} (${result.obstacleDefenseVal})
+        </div>
+        
+        <div style="margin-bottom:8px;">
+          <strong>Distance:</strong> ${result.areasMovedThrough} area${result.areasMovedThrough > 1 ? 's' : ''}
+        </div>
         
         <hr style="margin:8px 0;">
         
-        <div><strong>Base Damage:</strong> ${result.baseDamage} (max of Endurance ${game.msh.getRankValue(result.targetEndurance)}, Armor ${game.msh.getRankValue(result.targetArmor)})</div>
-        <div><strong>Speed Damage:</strong> ${result.speedDamage} (2 × ${result.areasMovedThrough} areas)</div>
-        <div><strong>Total Damage:</strong> ${result.totalDamage}</div>
-        <div><strong>Obstacle Defense:</strong> ${result.obstacleDefenseVal}</div>
+        <div style="margin-bottom:4px;"><strong>Damage Calculation:</strong></div>
+        <div style="margin-left:12px;margin-bottom:4px;">Base: ${result.baseDamage} (max of END/BA)</div>
+        <div style="margin-left:12px;margin-bottom:4px;">Speed: +${result.speedDamage} (2 × ${result.areasMovedThrough} areas)</div>
+        <div style="margin-left:12px;font-weight:bold;">Total: ${result.totalDamage} points</div>
         
         <hr style="margin:8px 0;">
         
-        ${result.reboundDamage > 0 ? `
-          <div style="color:#d32f2f;font-weight:bold;margin-bottom:6px;">
-            ⚠ Obstacle defense (${result.obstacleDefenseVal}) > damage (${result.totalDamage}) → Rebound!
-          </div>
-          <div><strong>Rebound Damage:</strong> ${result.reboundDamage}</div>
-          <div><strong>Target Armor Absorbs:</strong> ${game.msh.getRankValue(result.targetArmor)}</div>
-          <div style="background:#ffebee;padding:6px;margin-top:6px;border:1px solid #ef5350;border-radius:3px;">
-            <strong>💥 ${result.targetName} takes ${result.finalDamageToTarget} damage</strong>
+        <div style="padding:8px;background:#fff9c4;border:1px solid #f57c00;border-radius:3px;margin-bottom:8px;">
+          ${result.explanation}
+        </div>
+        
+        ${result.rebounded ? `
+          <div style="background:#ffebee;padding:8px;border:1px solid #ef5350;border-radius:3px;text-align:center;font-weight:bold;">
+            💥 ${result.targetName} takes ${result.damageToTarget} damage (rebounded)
           </div>
         ` : `
-          <div style="background:#e8f5e9;padding:6px;margin-top:6px;border:1px solid #4CAF50;border-radius:3px;">
-            <strong>✓ Obstacle yields — ${result.targetName} takes no damage</strong>
-            ${result.damageToObstacle > 0 ? `<div>Obstacle takes ${result.damageToObstacle} damage</div>` : ''}
+          <div style="background:#e8f5e9;padding:8px;border:1px solid #4CAF50;border-radius:3px;text-align:center;font-weight:bold;">
+            ✓ ${result.targetName} takes no damage
           </div>
+          ${result.damageToObstacle > 0 ? `
+            <div style="margin-top:8px;padding:6px;background:#e3f2fd;border:1px solid #2196F3;border-radius:3px;">
+              Obstacle takes ${result.damageToObstacle} damage
+            </div>
+          ` : ''}
         `}
       </div>
     </div>
