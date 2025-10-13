@@ -249,7 +249,7 @@ export class CheckAction extends BaseAction {
       const slamEffects = {
         white: {
           name: "Grand Slam",
-          desc: `Target is knocked away with speed equal to attacker's Strength as ground speed. With ${attackerStr.rank} Strength (${attackerStr.value}), this translates to approximately ${this._strengthToAreas(attackerStr.value)} areas of travel.`,
+          desc: `Target is knocked away with speed equal to attacker's Strength as ground speed. With ${attackerStr.rank} Strength (${attackerStr.value}), this translates to approximately ${this._strengthToAreas(attackerStr.rank)} areas of travel.`,
           direction: choice.dmgThrough > 0 ? "Attacker chooses direction (any compass direction, straight up, or straight down)." : "Defender chooses direction."
         },
         green: {
@@ -296,7 +296,7 @@ export class CheckAction extends BaseAction {
                 data-action="calculate-collision"
                 data-target-name="${choice.targetName}"
                 data-target-endurance="${choice.targetEndRank}"
-                data-slam-distance="${colorLower === 'white' ? this._strengthToAreas(attackerStr.value) : 1}"
+                data-slam-distance="${colorLower === 'white' ? this._strengthToAreas(attackerStr.rank) : 1}"
                 title="Calculate damage if target collides with an obstacle"
                 style="display:inline-block;font-size:12px;line-height:1.1;padding:4px 10px;border:1px solid #ef5350;border-radius:3px;background:#fff;color:#d32f2f;text-decoration:none;cursor:pointer;font-weight:bold;">
                 🧮 Calculate Collision Damage
@@ -368,13 +368,29 @@ export class CheckAction extends BaseAction {
   }
 
   // Helper method to estimate areas from Strength value
-  _strengthToAreas(strValue) {
-    // Rough approximation: ground speed in areas based on Strength rank value
-    // Using the example: Unearthly (100) ≈ 10 areas
-    if (strValue >= 100) return Math.floor(strValue / 10);
-    if (strValue >= 50) return Math.floor(strValue / 8);
-    if (strValue >= 20) return Math.floor(strValue / 5);
-    return Math.max(1, Math.floor(strValue / 4));
+  _strengthToAreas(strRank) {
+    // Official FASERIP land speed (areas per round) based on Strength rank name
+    const speedByRank = {
+      "Shift-0": 1,
+      "Feeble": 1,
+      "Poor": 2,
+      "Typical": 3,
+      "Good": 4,
+      "Excellent": 5,
+      "Remarkable": 6,
+      "Incredible": 7,
+      "Amazing": 8,
+      "Monstrous": 9,
+      "Unearthly": 10,
+      "Shift-X": 12,
+      "Shift-Y": 14,
+      "Shift-Z": 16,
+      "Class 1000": 32,
+      "Class 3000": 50,
+      "Class 5000": 100
+    };
+    
+    return speedByRank[strRank] || 1;
   }
 
 }
