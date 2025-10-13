@@ -127,7 +127,7 @@ export class GrabbingAction extends AttackAction {
         <div style="padding:5px 10px;border-bottom:1px solid #e0e0e0;font-size:.9em;">
           ${targetingContext}
           <div>Item: ${choice.itemLabel}</div>
-          <div>Target: ${choice.targetName}</div>
+        <!--  <div>Target: ${choice.targetName}</div>  -->
         </div>
         <div style="padding:5px 10px;font-size:.9em;">
           ${detailsHtml}
