@@ -647,6 +647,20 @@ export async function applyDamageToTargets(damage, options = {}) {
       continue;
     }
 
+    // ADD THIS DEBUG LOGGING HERE:
+  const isToken = target.document?.documentName === "Token" || target.documentName === "Token";
+  const targetTokenData = isToken ? (target.document || target) : null;
+  const isUnlinkedToken = isToken && targetTokenData && !targetTokenData.actorLink;
+  
+  console.log("FASERIP | Apply Damage Debug:", {
+    targetName: target.name,
+    isToken,
+    isUnlinkedToken,
+    isGM: game.user.isGM,
+    isOwner: targetActor.isOwner,
+    updatePath: isUnlinkedToken ? "token.document" : "actor"
+  });
+
     // Get target's Body Armor (check both equipment and powers)
     let bodyArmorValue = 0;
     
@@ -724,17 +738,10 @@ export async function applyDamageToTargets(damage, options = {}) {
     };
 
     if (damageAfterArmor > 0) {
-      // Apply damage using the same method as combat-handler
-      const isToken = target.document?.documentName === "Token" || target.documentName === "Token";
-      const targetTokenData = isToken ? (target.document || target) : null;
-      const isUnlinkedToken = isToken && targetTokenData && !targetTokenData.actorLink;
-
       const update = { "system.attributes.health.value": newHealth };
 
       try {
-        if (isUnlinkedToken && (game.user.isGM || targetActor.isOwner)) {
-          await target.document.update(update);
-        } else if (game.user.isGM || targetActor.isOwner) {
+        if (game.user.isGM || targetActor.isOwner) {
           await targetActor.update(update);
         } else if (game.msh?.runAsGM) {
           await game.msh.runAsGM({
