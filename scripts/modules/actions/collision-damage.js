@@ -1,4 +1,5 @@
 // scripts/modules/actions/collision-damage.js
+import { applyDamageToActorUuid } from "./action-utils.js";
 
 export function openCollisionDamageDialog({ targetName = "Target", targetEndurance = "Good", slamDistance = 1 }) {
   const RANKS = [
@@ -95,11 +96,11 @@ export function openCollisionDamageDialog({ targetName = "Target", targetEnduran
         <div style="margin-top:16px;padding:8px;background:#fff3e0;border:1px solid #ff9800;border-radius:3px;font-size:0.9em;">
           <strong>Charging Damage Rules:</strong>
           <ul style="margin:6px 0 0 0;padding-left:20px;">
-            <li>Base damage = max(Endurance, Body Armor)</li>
+            <li>Base damage = max(Endurance or Body Armor, whichever is higher)</li>
             <li>Speed damage = 2 × areas traveled (${2 * slamDistance} in this case)</li>
             <li>Total damage = Base + Speed</li>
-            <li><strong>If obstacle BA > total damage:</strong> damage rebounds to attacker (minus attacker's BA)</li>
-            <li><strong>Otherwise:</strong> attacker takes no damage; obstacle takes (total - obstacle BA)</li>
+            <li><strong>The absorbed portion rebounds to the attacker; the attacker’s Body Armor may soak</li>
+            <li><strong>Otherwise:</strong> The defender/object takes the remainder after its BA/Material</li>
           </ul>
         </div>
       </div>
@@ -177,53 +178,47 @@ export function openCollisionDamageDialog({ targetName = "Target", targetEnduran
   dlg.render(true);
 }
 
-function calculateCollisionDamage({ targetName, targetEndurance, targetArmor, obstacleType, obstacleDefense, obstacleDefenseValue, areasMovedThrough }) {
+function calculateCollisionDamage({
+  targetName,
+  targetEndurance,
+  targetArmor,
+  obstacleType,
+  obstacleDefense,
+  obstacleDefenseValue,
+  areasMovedThrough,
+  selfActorUuid = "",          // optional: the slammed character / attacker
+  defenderActorUuid = ""       // optional: the defender if obstacleType is "character"
+}) {
   const getVal = (rank) => game.msh.getRankValue(rank) || 0;
-  
+
   const targetEndVal = getVal(targetEndurance);
   const targetArmorVal = getVal(targetArmor);
   const obstacleDefenseVal = obstacleDefenseValue !== undefined ? obstacleDefenseValue : getVal(obstacleDefense);
-  
+
   // Base damage = max(Endurance, Body Armor) of the slammed character
   const baseDamage = Math.max(targetEndVal, targetArmorVal);
-  
+
   // Speed damage = 2 × areas
   const speedDamage = 2 * areasMovedThrough;
-  
+
   // Total damage
   const totalDamage = baseDamage + speedDamage;
-  
-  // Charging rebound rule: rebound ONLY if obstacle BA STRICTLY GREATER than total damage
-  let damageToTarget = 0;
-  let damageToObstacle = 0;
-  let rebounded = false;
+
+  // Absorbed-portion rebound (always)
+  const absorbedByObstacle = Math.min(obstacleDefenseVal, totalDamage);
+  const damageToObstacle = totalDamage - absorbedByObstacle;
+
+  const reboundAmount = absorbedByObstacle;
+  const damageToTarget = Math.max(0, reboundAmount - targetArmorVal);
+
+  const rebounded = reboundAmount > 0;
+
   let explanation = "";
-  
-  if (obstacleDefenseVal > totalDamage) {
-    // Rebound: ALL damage reflects back to attacker
-    rebounded = true;
-    const reboundAmount = totalDamage;
-    
-    // Attacker's BA absorbs what it can
-    damageToTarget = Math.max(0, reboundAmount - targetArmorVal);
-    damageToObstacle = 0;
-    
-    explanation = `Obstacle BA/Material (${obstacleDefenseVal}) > total damage (${totalDamage}) → all damage rebounds. `;
-    if (targetArmorVal > 0) {
-      explanation += `${targetName}'s BA (${targetArmorVal}) absorbs some. `;
-    }
-    explanation += `${targetName} takes ${damageToTarget} damage. Obstacle takes no damage.`;
-    
-  } else {
-    // No rebound: obstacle takes damage (reduced by its BA/material), attacker takes nothing
-    rebounded = false;
-    damageToTarget = 0;
-    damageToObstacle = Math.max(0, totalDamage - obstacleDefenseVal);
-    
-    explanation = `Total damage (${totalDamage}) ≥ obstacle BA/Material (${obstacleDefenseVal}) → no rebound. `;
-    explanation += `${targetName} takes no damage. Obstacle takes ${damageToObstacle} damage.`;
-  }
-  
+  explanation += `Total ${totalDamage} = ${baseDamage} base + ${speedDamage} speed. `;
+  explanation += `${rebounded ? `Obstacle absorbs ${absorbedByObstacle} and returns it.` : `Obstacle absorbs ${absorbedByObstacle}.`} `;
+  explanation += `${targetName} ${damageToTarget > 0 ? `takes ${damageToTarget} after own BA ${targetArmorVal}. ` : `takes no damage after own BA ${targetArmorVal}. `}`;
+  explanation += `${obstacleType === 'character' ? 'Defender' : 'Object'} takes ${damageToObstacle}.`;
+
   return {
     targetName,
     targetEndurance,
@@ -240,62 +235,137 @@ function calculateCollisionDamage({ targetName, targetEndurance, targetArmor, ob
     rebounded,
     damageToTarget,
     damageToObstacle,
-    explanation
+    explanation,
+    selfActorUuid,
+    defenderActorUuid
   };
 }
 
 async function postCollisionResult(result) {
+  const targetLine = `${result.targetName} — Endurance ${result.targetEndurance} (${result.targetEndVal}), Body Armor ${result.targetArmor} (${result.targetArmorVal})`;
+  const obstacleLabel = result.obstacleType === "character" ? "Body Armor" : "Material Strength";
+  const obstacleLine = `${result.obstacleType === "character" ? "Character" : "Object"} — ${obstacleLabel} ${result.obstacleDefense} (${result.obstacleDefenseVal})`;
+
+  const outcomeBlocks = [];
+
+  if (result.damageToTarget > 0) {
+    outcomeBlocks.push(
+      `<div style="background:#ffebee;padding:8px;border:1px solid #ef5350;border-radius:3px;text-align:center;font-weight:bold;">
+         ${result.targetName} takes ${result.damageToTarget} damage from collision
+       </div>`
+    );
+  } else {
+    outcomeBlocks.push(
+      `<div style="background:#e8f5e9;padding:8px;border:1px solid #4CAF50;border-radius:3px;text-align:center;font-weight:bold;">
+         ${result.targetName} takes no damage
+       </div>`
+    );
+  }
+
+  if (result.damageToObstacle > 0) {
+    outcomeBlocks.push(
+      `<div style="margin-top:8px;padding:6px;background:#e3f2fd;border:1px solid #2196F3;border-radius:3px;">
+         ${result.obstacleType === "character" ? "Defender" : "Object"} takes ${result.damageToObstacle} damage
+       </div>`
+    );
+  } else {
+    outcomeBlocks.push(
+      `<div style="margin-top:8px;padding:6px;background:#fafafa;border:1px solid #ddd;border-radius:3px;">
+         ${result.obstacleType === "character" ? "Defender" : "Object"} takes no damage
+       </div>`
+    );
+  }
+
+  // Action chips
+  const chips = [];
+
+  // Self damage chip if UUID provided and there is damage to apply
+  if (result.selfActorUuid && result.damageToTarget > 0) {
+    chips.push(
+      `<a class="faserip-chip"
+          data-action="apply-self-damage"
+          data-actor-uuid="${result.selfActorUuid}"
+          data-damage="${result.damageToTarget}"
+          title="Apply collision damage to the slammed character"
+          style="display:inline-block;font-size:12px;line-height:1.1;padding:2px 6px;border:1px solid #bbb;border-radius:3px;text-decoration:none;white-space:nowrap;background:#fff;color:#333;cursor:pointer;">
+          Apply Self Damage
+       </a>`
+    );
+  }
+
+  // Defender damage chip when the obstacle is a character and we have its UUID
+  if (result.defenderActorUuid && result.obstacleType === "character" && result.damageToObstacle > 0) {
+    chips.push(
+      `<a class="faserip-chip"
+          data-action="apply-dmg-to-uuid"
+          data-actor-uuid="${result.defenderActorUuid}"
+          data-damage="${result.damageToObstacle}"
+          title="Apply collision damage to defender"
+          style="display:inline-block;font-size:12px;line-height:1.1;padding:2px 6px;border:1px solid #bbb;border-radius:3px;text-decoration:none;white-space:nowrap;background:#fff;color:#333;cursor:pointer;">
+          Apply Damage To Defender
+       </a>`
+    );
+  }
+
+  const actionsBox = chips.length
+    ? `<div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;padding:8px 10px;margin:6px 10px 10px;border:1px solid #c0c0c0;background:#fafafa;border-radius:4px;">
+         ${chips.join("")}
+       </div>`
+    : "";
+
   const content = `
     <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
       <div style="padding:5px 10px;border-bottom:1px solid #c0c0c0;font-size:1.1em;color:#d32f2f;">
         <strong>Collision Damage — ${result.targetName}</strong>
       </div>
-      
+
       <div style="padding:5px 10px;font-size:0.9em;">
-        <div style="margin-bottom:8px;">
-          <strong>Slammed Character:</strong> ${result.targetName}<br>
-          Endurance: ${result.targetEndurance} (${result.targetEndVal}), Body Armor: ${result.targetArmor} (${result.targetArmorVal})
-        </div>
-        
-        <div style="margin-bottom:8px;">
-          <strong>Obstacle:</strong> ${result.obstacleType === 'character' ? 'Character' : 'Object'}<br>
-          ${result.obstacleType === 'character' ? 'Body Armor' : 'Material Strength'}: ${result.obstacleDefense} (${result.obstacleDefenseVal})
-        </div>
-        
-        <div style="margin-bottom:8px;">
-          <strong>Distance:</strong> ${result.areasMovedThrough} area${result.areasMovedThrough > 1 ? 's' : ''}
-        </div>
-        
+        <div style="margin-bottom:8px;"><strong>Slammed Character:</strong> ${targetLine}</div>
+        <div style="margin-bottom:8px;"><strong>Obstacle:</strong> ${obstacleLine}</div>
+        <div style="margin-bottom:8px;"><strong>Distance:</strong> ${result.areasMovedThrough} area${result.areasMovedThrough > 1 ? "s" : ""}</div>
+
         <hr style="margin:8px 0;">
-        
+
         <div style="margin-bottom:4px;"><strong>Damage Calculation:</strong></div>
-        <div style="margin-left:12px;margin-bottom:4px;">Base: ${result.baseDamage} (max of END/BA)</div>
-        <div style="margin-left:12px;margin-bottom:4px;">Speed: +${result.speedDamage} (2 × ${result.areasMovedThrough} areas)</div>
-        <div style="margin-left:12px;font-weight:bold;">Total: ${result.totalDamage} points</div>
-        
+        <div style="margin-left:12px;margin-bottom:4px;">Base equals ${result.baseDamage}</div>
+        <div style="margin-left:12px;margin-bottom:4px;">Speed equals ${result.speedDamage}</div>
+        <div style="margin-left:12px;font-weight:bold;">Total equals ${result.totalDamage}</div>
+
         <hr style="margin:8px 0;">
-        
+
         <div style="padding:8px;background:#fff9c4;border:1px solid #f57c00;border-radius:3px;margin-bottom:8px;">
           ${result.explanation}
         </div>
-        
-        ${result.rebounded ? `
-          <div style="background:#ffebee;padding:8px;border:1px solid #ef5350;border-radius:3px;text-align:center;font-weight:bold;">
-            💥 ${result.targetName} takes ${result.damageToTarget} damage (rebounded)
-          </div>
-        ` : `
-          <div style="background:#e8f5e9;padding:8px;border:1px solid #4CAF50;border-radius:3px;text-align:center;font-weight:bold;">
-            ✓ ${result.targetName} takes no damage
-          </div>
-          ${result.damageToObstacle > 0 ? `
-            <div style="margin-top:8px;padding:6px;background:#e3f2fd;border:1px solid #2196F3;border-radius:3px;">
-              Obstacle takes ${result.damageToObstacle} damage
-            </div>
-          ` : ''}
-        `}
+
+        ${outcomeBlocks.join("")}
+        ${actionsBox}
       </div>
     </div>
   `;
-  
+
   await ChatMessage.create({ content });
 }
+
+if (!globalThis.mshCollisionHandlersBound) {
+  Hooks.on("renderChatMessageHTML", (message, element) => {
+  const html = $(element);
+
+    html.on("click", 'a.faserip-chip[data-action="apply-self-damage"]', async (ev) => {
+      ev.preventDefault();
+      const btn = ev.currentTarget;
+      const dmg = Number(btn.getAttribute("data-damage") || 0);
+      const uuid = btn.getAttribute("data-actor-uuid") || "";
+      await applyDamageToActorUuid(dmg, uuid, { updateButton: btn });
+    });
+
+    html.on("click", 'a.faserip-chip[data-action="apply-dmg-to-uuid"]', async (ev) => {
+      ev.preventDefault();
+      const btn = ev.currentTarget;
+      const dmg = Number(btn.getAttribute("data-damage") || 0);
+      const uuid = btn.getAttribute("data-actor-uuid") || "";
+      await applyDamageToActorUuid(dmg, uuid, { updateButton: btn });
+    });
+  });
+  globalThis.mshCollisionHandlersBound = true;
+}
+

@@ -221,13 +221,14 @@ export function buildActionsBox({
   breakingFeat = null,
   grabbingBreak = null,
   actorUuid,
-  damage = 0,
+  damage = 0,                 // pass penetrating damage for checks
   attackForm = "blunt",
-  // NEW: escape-specific data
+  prefillData = null,         // may contain { dmgThrough, attackForm, ownerActor, ... }
   targetUuid = "",
   targetName = "",
   targetStrength = ""
 }) {
+  // Small helper to render a chip
   const chip = (label, title, enabled, dataAttrs = "") => {
     const base = "display:inline-block;font-size:12px;line-height:1.1;padding:2px 6px;border:1px solid #bbb;border-radius:3px;text-decoration:none;white-space:nowrap;";
     const style = enabled
@@ -238,77 +239,123 @@ export function buildActionsBox({
   };
 
   const parts = [];
-  
-  // Add Apply Damage button if damage > 0
-  if (damage > 0) {
-    parts.push(chip(
-      "Apply Damage",
-      "Apply damage to targeted/selected token(s)",
-      true,
-      `data-damage="${damage}" data-attacker-uuid="${actorUuid}"`
-    ));
+
+  // Derive the penetrating damage value that the hook expects (dataset.dmg)
+  // Prefer prefillData.dmgThrough, fall back to the provided damage param.
+  const dmgPen = Number((prefillData && prefillData.dmgThrough) ?? damage ?? 0);
+
+  // Optional JSON prefill for backward compatibility with older handlers
+  const prefillJson = prefillData ? JSON.stringify(prefillData) : null;
+  const prefillAttr = prefillJson ? `data-prefill='${prefillJson.replace(/'/g, "&apos;")}'` : "";
+
+  // Apply Damage chip (to apply damage to selected/targeted token[s])
+  if (dmgPen > 0) {
+    parts.push(
+      chip(
+        "Apply Damage",
+        "Apply damage to targeted or selected token(s)",
+        true,
+        `data-action="apply-damage" data-damage="${dmgPen}" data-attacker-uuid="${actorUuid}"`
+      )
+    );
   }
 
-  if (showSlam) parts.push(chip(
-    "Resolve Slam",
-    "Open Slam dialog",
-    true,
-    `data-check="slam" data-attack-form="${attackForm}" data-dmg="${damage}" data-attacker-uuid="${actorUuid}"`
-  ));
+  // Slam chip — only if requested by caller (caller decides color/penetration gating)
+  if (showSlam) {
+    parts.push(
+      `<a class="faserip-chip"
+          data-check="slam"
+          data-attack-form="${attackForm}"
+          data-dmg="${dmgPen}"
+          data-attacker-uuid="${actorUuid}"
+          ${pulled ? 'data-pulled="true"' : ""}
+          ${prefillAttr}
+          title="Open Slam dialog using penetrating damage">
+          Resolve Slam
+       </a>`
+    );
+  }
 
-  if (showStun) parts.push(chip(
-    "Resolve Stun",
-    "Open Stun dialog",
-    true,
-    `data-check="stun" data-attack-form="${attackForm}" data-dmg="${damage}" data-attacker-uuid="${actorUuid}"`
-  ));
+  // Stun chip
+  if (showStun) {
+    parts.push(
+      `<a class="faserip-chip"
+          data-check="stun"
+          data-attack-form="${attackForm}"
+          data-dmg="${dmgPen}"
+          data-attacker-uuid="${actorUuid}"
+          ${pulled ? 'data-pulled="true"' : ""}
+          ${prefillAttr}
+          title="Open Stun dialog using penetrating damage">
+          Resolve Stun
+       </a>`
+    );
+  }
 
-  if (showKill) parts.push(chip(
-    "Resolve Kill",
-    "Open Kill dialog",
-    true,
-    `data-check="kill" data-attack-form="${attackForm}" data-dmg="${damage}" data-attacker-uuid="${actorUuid}"`
-  ));
+  // Kill chip (if your ruleset uses the same intensity as penetration, reuse dmgPen)
+  if (showKill) {
+    parts.push(
+      `<a class="faserip-chip"
+          data-check="kill"
+          data-attack-form="${attackForm}"
+          data-dmg="${dmgPen}"
+          data-attacker-uuid="${actorUuid}"
+          ${prefillAttr}
+          title="Open Kill check dialog">
+          Resolve Kill
+       </a>`
+    );
+  }
 
-  if (showEscape) parts.push(chip(
-    "Attempt Escape",
-    "Have the held character attempt to escape (STR FEAT; Yellow/Red succeeds)",
-    true,
-    `data-check="escape" data-defender-uuid="${targetUuid}" data-defender-name="${targetName}" data-defender-rank="${targetStrength}"`
-  ));
+  // Escape chip (grapples etc.). Include target context if provided.
+  if (showEscape) {
+    const targetBits = [
+      targetUuid ? `data-target-uuid="${targetUuid}"` : "",
+      targetName ? `data-target-name="${targetName}"` : "",
+      targetStrength ? `data-target-str="${targetStrength}"` : ""
+    ].join(" ");
+    parts.push(
+      `<a class="faserip-chip"
+          data-check="escape"
+          data-attack-form="${attackForm}"
+          data-attacker-uuid="${actorUuid}"
+          ${targetBits}
+          ${prefillAttr}
+          title="Open Escape check dialog">
+          Resolve Escape
+       </a>`
+    );
+  }
 
-  if (pulled) parts.push(chip(
-    "Pull Options",
-    "Placeholder: adjust for pulled punch.",
-    false
-  ));
-
+  // Optional utility chips you were already exposing
   if (breakingFeat) {
-    parts.push(chip(
-      "Breaking FEAT",
-      "Roll a Breaking FEAT: compare weapon material vs target armor/material (or wielder STR).",
-      true,
-      `data-action="breaking-feat" data-weapon-mat="${breakingFeat.weaponMat}" data-actor-uuid="${actorUuid}"`
-    ));
+    parts.push(
+      chip(
+        "Breaking FEAT",
+        "Attempt a Breaking FEAT against intensity",
+        true,
+        `data-action="breaking-feat" ${prefillAttr}`
+      )
+    );
   }
 
   if (grabbingBreak) {
-    // Use a label whose key becomes "grabbing-break" and DO NOT add a second data-action attribute.
-    parts.push(chip(
-      "Grabbing Break",
-      "Roll to see if the grabbed item breaks, is damaged, or activates (STR vs Item Material).",
-      true,
-      `data-item-material="${grabbingBreak.itemMaterial}" data-item-name="${grabbingBreak.itemName}" data-actor-uuid="${actorUuid}"`
-    ));
+    parts.push(
+      chip(
+        "Break Grab",
+        "Attempt to break a grab or hold",
+        true,
+        `data-action="grab-break" ${prefillAttr}`
+      )
+    );
   }
 
-  return `
-    <div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;padding:8px 10px;margin:6px 10px 10px;border:1px solid #c0c0c0;background:#fafafa;border-radius:4px;">
-      ${parts.join("\n")}
-    </div>
-    ${breakingFeat ? `<div style="padding:0 10px 8px;font-size:.8em;color:#666;">Note: If weapon Material &lt; target Armor/Material, a Breaking FEAT may apply.</div>` : "" }
-  `;
+  // Render container or nothing
+  return parts.length
+    ? `<div class="actions-row" style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;">${parts.join("")}</div>`
+    : "";
 }
+
 
 export function bannerColors(colorLower) {
   const bg = colorLower==='white' ? '#f8f8f8'
@@ -800,4 +847,64 @@ export async function applyDamageToTargets(damage, options = {}) {
   }
 
   return results;
+}
+
+export async function applyDamageToActorUuid(damage, actorUuid, options = {}) {
+  const { showNotification = true, updateButton = null } = options;
+  try {
+    const resolved = await fromUuid(actorUuid);
+    if (!resolved) {
+      ui.notifications.warn("Could not find actor for self damage.");
+      return { success: false, error: "Actor not found" };
+    }
+
+    const actor = resolved.documentName === "Actor"
+      ? resolved
+      : (resolved.documentName === "Token" ? resolved.actor : null);
+
+    if (!actor) {
+      ui.notifications.warn("Could not resolve actor for self damage.");
+      return { success: false, error: "Bad UUID" };
+    }
+
+    const amt = Math.max(0, Number(damage || 0));
+    if (amt === 0) {
+      if (showNotification) ui.notifications.warn("No damage to apply.");
+      return { success: false, error: "Zero damage" };
+    }
+
+    const current = actor.system?.attributes?.health?.value ?? 0;
+    const newVal  = Math.max(0, current - amt);
+
+    const update = { "system.attributes.health.value": newVal };
+
+    if (game.user.isGM || actor.isOwner) {
+      await actor.update(update);
+    } else if (game.msh?.runAsGM) {
+      await game.msh.runAsGM({
+        operation: "update",
+        targetActorUuid: actor.uuid,
+        args: [update]
+      });
+    } else {
+      if (showNotification) ui.notifications.warn("No permission to update health.");
+      return { success: false, error: "No permission" };
+    }
+
+    if (showNotification) {
+      ui.notifications.info(`${actor.name} took ${amt} collision damage. Health: ${current} to ${newVal}`);
+    }
+
+    if (updateButton) {
+      updateButton.style.opacity = "0.5";
+      updateButton.style.pointerEvents = "none";
+      updateButton.textContent = "Damage Applied";
+    }
+
+    return { success: true, actor: actor.name, amount: amt, newHealth: newVal };
+  } catch (err) {
+    console.error("applyDamageToActorUuid failed:", err);
+    if (showNotification) ui.notifications.error("Failed to apply collision damage.");
+    return { success: false, error: err?.message || String(err) };
+  }
 }

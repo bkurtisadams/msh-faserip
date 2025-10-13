@@ -19,7 +19,8 @@ export function installActionChatHandlers() {
   game.msh.chatHooksInstalled = true;
 
   // SINGLE combined hook for all chat interactions
-  Hooks.on("renderChatMessage", (message, html) => {
+  Hooks.on("renderChatMessageHTML", (message, element) => {
+    const html = $(element);
     
     // 1) Stun/Slam/Kill/Escape chips
     html.on("click", "a.faserip-chip[data-check]", async (ev) => {

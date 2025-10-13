@@ -141,14 +141,16 @@ export class ChargingAction extends BaseAction {
     </div>
 
     <div style="margin-bottom:12px;padding:8px;background:#fff3e0;border:1px solid #ff9800;border-radius:3px;">
-      <div style="font-weight:bold;margin-bottom:4px;">Movement & Modifiers</div>
+      <div style="font-weight:bold;margin-bottom:4px;">Movement and Modifiers</div>
       <div style="margin-bottom:6px;">
         <label style="display:inline-block;width:140px;">Areas moved:</label>
         <input type="number" name="areas" value="${savedAreas}" min="1" max="20" style="width:60px;">
-        <span id="charge-bonus" style="margin-left:6px;font-weight:bold;color:#2e7d32;">+1 CS</span>
+        <span id="charge-bonus" style="margin-left:6px;font-weight:bold;color:#2e7d32;">
+          CS bonus: ${Math.min(3, savedAreas)}
+        </span>
       </div>
       <div style="font-size:0.85em;color:#666;">
-        Must move at least 1 area. +1CS per area moved (max +3CS at 3+ areas)
+        Must move at least one area. Gain one CS per area moved (cap three at three or more areas).
       </div>
     </div>
 
@@ -210,7 +212,7 @@ export class ChargingAction extends BaseAction {
     </div>
 
     <div style="font-size:0.85em;color:#666;margin-bottom:8px;">
-      Rebound only if target BA/Material strictly greater than total damage
+      Absorbed portion rebounds to the attacker; your Body Armor may soak it.
     </div>
 
     <div style="margin-top:8px;">
@@ -304,52 +306,60 @@ export class ChargingAction extends BaseAction {
         };
 
         const updatePreview = () => {
-          const areas = Math.max(1, Number(html.find('[name="areas"]').val() || 1));
-          const movementBonus = Math.min(3, areas);
-          
-          // Update charge bonus display
-          html.find('#charge-bonus').text(`+${movementBonus} CS`);
+        const areas = Math.max(1, Number(html.find('[name="areas"]').val() || 1));
+        const movementBonus = Math.min(3, areas);
 
-          // Calculate potential damage
-          const baseRankValue = Math.max(endurance.value, bodyArmorValue);
-          const speedDamage = areas * 2;
-          const totalDamage = baseRankValue + speedDamage;
-          
-          const targetType = html.find('[name="target-type"]:checked').val();
+        // UI: avoid + and - symbols in labels
+        html.find('#charge-bonus').text(`CS bonus: ${movementBonus}`);
 
-          if (targetType === 'character') {
-            // Character target preview
-            const targetBA = Number(html.find('[name="targetBodyArmorValue"]').val() || 0);
-            const $charCalc = html.find('#char-damage-calc');
-            const $charWarning = html.find('#char-rebound-warning');
+        // Numbers for the attacker
+        const baseRankValue = Math.max(endurance.value, bodyArmorValue);
+        const speedDamage = areas * 2;
+        const totalDamage = baseRankValue + speedDamage;
 
-            if (targetBA > totalDamage) {
-              const reboundToYou = Math.max(0, totalDamage - bodyArmorValue);
-              $charCalc.html(`${totalDamage} total (${baseRankValue} base + ${speedDamage} speed)<br>→ Rebounds! You take ${reboundToYou} dmg`);
-              $charWarning.show();
-            } else {
-              const targetTakes = Math.max(0, totalDamage - targetBA);
-              $charCalc.html(`${totalDamage} total (${baseRankValue} base + ${speedDamage} speed)<br>→ Target takes ${targetTakes} dmg`);
-              $charWarning.hide();
-            }
-          } else {
-            // Object target preview
-            const objectMat = html.find('[name="objectMaterial"]').val();
-            const objectMatValue = game.msh.getRankValue(objectMat) || 20;
-            const $objCalc = html.find('#obj-damage-calc');
-            const $objWarning = html.find('#obj-rebound-warning');
+        const type = String(html.find('[name="target-type"]:checked').val() || "character");
 
-            if (objectMatValue > totalDamage) {
-              const reboundToYou = Math.max(0, totalDamage - bodyArmorValue);
-              $objCalc.html(`${totalDamage} total (${baseRankValue} base + ${speedDamage} speed)<br>→ Rebounds! You take ${reboundToYou} dmg, object takes 0`);
-              $objWarning.show();
-            } else {
-              const objectTakes = Math.max(0, totalDamage - objectMatValue);
-              $objCalc.html(`${totalDamage} total (${baseRankValue} base + ${speedDamage} speed)<br>→ You take 0 dmg, object takes ${objectTakes} dmg`);
-              $objWarning.hide();
-            }
-          }
-        };
+        if (type === 'character') {
+          // Character target preview
+          const targetBA = Number(html.find('[name="targetBodyArmorValue"]').val() || 0);
+          const absorbed = Math.min(targetBA, totalDamage);
+          const targetTakes = totalDamage - absorbed;
+          const reboundRaw = absorbed;
+          const reboundFinal = Math.max(0, reboundRaw - bodyArmorValue);
+
+          const $calc = html.find('#char-damage-calc');
+          const $warn = html.find('#char-rebound-warning');
+
+          $calc.html(
+            `${totalDamage} total (${baseRankValue} base, ${speedDamage} speed)<br>` +
+            `→ Target absorbs ${absorbed}, takes ${targetTakes}.<br>` +
+            `→ Rebound ${reboundRaw} to you; after your BA ${bodyArmorValue}, you take ${reboundFinal}.`
+          );
+
+          if (reboundFinal > 0) $warn.show(); else $warn.hide();
+
+        } else {
+          // Object (material) target preview
+          const objectMat = String(html.find('[name="objectMaterial"]').val() || "Excellent");
+          const objectMatValue = game.msh.getRankValue(objectMat) || 20;
+
+          const absorbed = Math.min(objectMatValue, totalDamage);
+          const objectTakes = totalDamage - absorbed;
+          const reboundRaw = absorbed;
+          const reboundFinal = Math.max(0, reboundRaw - bodyArmorValue);
+
+          const $calc = html.find('#obj-damage-calc');
+          const $warn = html.find('#obj-rebound-warning');
+
+          $calc.html(
+            `${totalDamage} total (${baseRankValue} base, ${speedDamage} speed)<br>` +
+            `→ Object absorbs ${absorbed}, takes ${objectTakes}.<br>` +
+            `→ Rebound ${reboundRaw} to you; after your BA ${bodyArmorValue}, you take ${reboundFinal}.`
+          );
+
+          if (reboundFinal > 0) $warn.show(); else $warn.hide();
+        }
+      };
 
         html.find('[name="areas"]').on('input', updatePreview);
         html.find('[name="target-type"]').on('change', togglePanels);
@@ -396,35 +406,80 @@ export class ChargingAction extends BaseAction {
   const colorLower = String(color || "").toLowerCase();
   const effectResult = effects[colorLower] || color;
 
-  // Calculate damage
+  // define once, above this block (right after you have colorLower)
+  const targetLabel = (choice.targetType === "character")
+    ? ((typeof targetName !== "undefined" && targetName) ? targetName : "Target")
+    : (choice.objectDesc ? choice.objectDesc : "Object");
+
+  // Calculate damage numbers for this attempt
   const baseRankValue = Math.max(endurance.value, bodyArmorValue);
   const speedDamage = choice.areas * 2;
   const totalDamage = baseRankValue + speedDamage;
 
-  // Check for damage reflection (ONLY if target BA STRICTLY GREATER than total damage)
+  // Outputs used by the chat card
   let damageToTarget = 0;
   let damageToAttacker = 0;
   let reflectionNote = "";
-  const targetLabel = choice.targetType === "character" 
-    ? (targetName || "Target") 
-    : (choice.objectDesc || "Object");
+  let penetratingDamage = 0;
 
-  if (choice.targetBAvalue > totalDamage) {
-    // Rebound: ALL damage reflects back
-    damageToTarget = 0;
-    const reboundAmount = totalDamage;
+  if (colorLower !== "white") {
+    const absorbedByDefense = Math.min(choice.targetBAvalue, totalDamage);
+    const reboundAmount = absorbedByDefense;
+
+    damageToTarget = Math.max(0, totalDamage - absorbedByDefense);
     damageToAttacker = Math.max(0, reboundAmount - bodyArmorValue);
-    
-    const defenseType = choice.targetType === "character" ? "BA" : "Material Strength";
-    reflectionNote = `<div style="padding:6px;margin:6px 10px;background:#ffebee;border:1px solid #f44336;border-radius:3px;">
-      <strong>⚠️ Damage Reflected!</strong> ${targetLabel}'s ${defenseType} (${choice.targetBAvalue}) > your damage (${totalDamage}) → all ${reboundAmount} damage rebounds.
-      ${bodyArmorValue > 0 ? ` Your BA (${bodyArmorValue}) absorbs some.` : ''}
-      <strong> You take ${damageToAttacker} damage!</strong> ${targetLabel} takes no damage.
-    </div>`;
+    penetratingDamage = damageToTarget;
+
+    if (reboundAmount > 0) {
+      const defenseType = choice.targetType === "character" ? "BA" : "Material Strength";
+      reflectionNote = `
+        <div style="padding:6px;margin:6px 10px;background:#ffebee;border:1px solid #f44336;border-radius:3px;">
+          <strong>Rebound:</strong> ${targetLabel}'s ${defenseType} absorbed ${absorbedByDefense} and returns it to you.
+          Your BA (${bodyArmorValue}) soaks what it can.
+          <strong> You take ${damageToAttacker} damage.</strong>
+        </div>
+      `;
+      if (damageToAttacker > 0) {
+        reflectionNote += `
+          <div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;padding:8px 10px;margin:6px 10px 10px;border:1px solid #c0c0c0;background:#fafafa;border-radius:4px;">
+            <a class="faserip-chip"
+              data-action="apply-self-damage"
+              data-actor-uuid="${actor.uuid}"
+              data-damage="${damageToAttacker}"
+              title="Apply collision damage to attacker"
+              style="display:inline-block;font-size:12px;line-height:1.1;padding:2px 6px;border:1px solid #bbb;border-radius:3px;text-decoration:none;white-space:nowrap;background:#fff;color:#333;cursor:pointer;">
+              Apply Self Damage
+            </a>
+          </div>
+        `;
+      }
+    }
+
+    console.debug("Charging Resolve (contact)", {
+      attacker: actor?.name,
+      target: targetLabel,
+      areas: choice.areas,
+      baseRankValue,
+      speedDamage,
+      totalDamage,
+      targetDefense: choice.targetBAvalue,
+      absorbedByDefense,
+      reboundAmount,
+      damageToTarget,       // penetration (drives Slam/Stun)
+      attackerBA: bodyArmorValue,
+      damageToAttacker,
+      penetratingDamage
+    });
   } else {
-    // No rebound
-    damageToTarget = Math.max(0, totalDamage - choice.targetBAvalue);
-    damageToAttacker = 0;
+    penetratingDamage = 0;
+    console.debug("Charging Resolve (miss)", {
+      attacker: actor?.name,
+      target: targetLabel,
+      areas: choice.areas,
+      baseRankValue,
+      speedDamage,
+      totalDamage
+    });
   }
 
   // Build result grid and banner
@@ -433,11 +488,19 @@ export class ChargingAction extends BaseAction {
 
   // Action chips
   const actions = buildActionsBox({
-    showSlam: colorLower === "yellow" && choice.targetType === "character",
+    showSlam: colorLower === "yellow" && choice.targetType === "character" && damageToTarget > 0,
     showStun: colorLower === "red" && choice.targetType === "character",
     actorUuid: actor.uuid,
     damage: damageToTarget,
-    attackForm: "charging"
+    attackForm: "charging",
+    // Add prefill data for Slam/Stun checks
+    prefillData: {
+      dmgThrough: penetratingDamage,
+      attackForm: "charging",
+      ownerActor: actor.name,
+      ownerActorUuid: actor.uuid,
+      targetName: targetName || "Target"
+    }
   });
 
   // Special miss handling

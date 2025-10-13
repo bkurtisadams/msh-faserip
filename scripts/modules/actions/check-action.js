@@ -246,6 +246,14 @@ export class CheckAction extends BaseAction {
     // Slam: show movement/dir rules; Stun: durations; Kill: E/S clarification
     if (actionType === "slam") {
       // Map Universal Table colors to Slam effects per the rules
+      // If no penetration (and not borderline), don't render any Slam effect block
+      if (effectsSuppressed) {
+        return `
+          <div style="padding:6px 10px;margin:6px 10px;background:#ffcdd2;border:1px solid #b71c1c;border-radius:3px;color:#b71c1c;">
+            <strong>Note:</strong> No damage penetrated defenses — Slam effects do not apply.
+          </div>
+        `;
+      }
       const slamEffects = {
         white: {
           name: "Grand Slam",
