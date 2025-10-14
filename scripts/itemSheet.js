@@ -166,7 +166,29 @@ export class FaseripItemSheet extends ItemSheet {
       // Single update with all changes, no re-render
       await this.item.update(updates, { render: false });
     });
-    
+
+    // Toggle combat properties section
+    html.find('.toggle-combat-section').click(ev => {
+      const button = $(ev.currentTarget);
+      const section = button.next('.combat-properties');
+      const icon = button.find('.toggle-icon');
+      
+      section.slideToggle(200);
+      icon.toggleClass('fa-chevron-down fa-chevron-up');
+    });
+
+    // Auto-expand combat section if combat data exists
+    if (this.item.type === "power") {
+      const hasAttackType = this.item.system.attackType;
+      const hasBodyArmor = this.item.system.isBodyArmor;
+      const hasResistance = this.item.system.isResistance;
+      
+      if (hasAttackType || hasBodyArmor || hasResistance) {
+        html.find('.combat-properties').show();
+        html.find('.toggle-icon').removeClass('fa-chevron-down').addClass('fa-chevron-up');
+      }
+    }
+
     // Update power type options when category changes
     html.find('#power-category').change(ev => {
       const category = ev.currentTarget.value;

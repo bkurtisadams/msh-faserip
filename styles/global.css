@@ -2563,3 +2563,20 @@
   overflow-y: auto;
   overflow-x: hidden;
 }
+
+/* Combat properties toggle button */
+.toggle-combat-section {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: background-color 0.2s;
+}
+
+.toggle-combat-section:hover {
+  background-color: #e0e0e0 !important;
+}
+
+.toggle-combat-section .toggle-icon {
+  transition: transform 0.2s;
+  font-size: 12px;
+}
