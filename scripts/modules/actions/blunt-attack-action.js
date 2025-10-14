@@ -264,6 +264,10 @@ BLUNT DAMAGE RULES:
       }
     }
 
+    const targets = Array.from(game.user?.targets ?? []);
+    const rawDamage = choice.damage ?? strength.value;
+    const afterArmor = penetratingDamage;
+
     const actions = buildActionsBox({
       showSlam: colorLower==='yellow' && penetratingDamage > 0,
       showStun: colorLower==='red' && penetratingDamage > 0,
@@ -276,13 +280,23 @@ BLUNT DAMAGE RULES:
       bypassArmor: false  // <-- Let applyDamageToTargets handle armor
     });
 
-    // weapon/bare line
-    const weaponContext = (choice.src === "weapon" || choice.src === "object")
-      ? `
-        <div>Weapon: ${choice.weaponName || "(Object)"} (${choice.weaponMat || "Excellent"}) — Damage: ${choice.damage}</div>
-        ${choice.note ? `<div style="font-size:.85em;color:#666;">${choice.note}</div>` : ``}
-      `
-      : `<div>Attack: Bare Hands — Damage: ${strength.value}</div>`;
+    // damage line
+    const damageBlock = `
+      <div style="margin:6px 10px;padding:6px;border:1px solid #ccc;border-radius:3px;background:#fff;">
+        <div><b>Damage (raw):</b> ${rawDamage}${choice.note ? ` <span style="color:#666;">— ${choice.note}</span>` : ``}</div>
+        ${isHit ? `
+          <div><b>After Armor${targets.length===1 ? ` (${targets[0].name})` : ``}:</b> ${afterArmor}</div>
+        ` : ``}
+        ${(choice.src === "weapon" || choice.src === "object") ? `
+          <div style="font-size:.9em;color:#555;">
+            Source: ${choice.weaponName || "(Object)"} (${choice.weaponMat || "Excellent"})
+          </div>
+        ` : `
+          <div style="font-size:.9em;color:#555;">Source: Bare Hands</div>
+        `}
+      </div>
+    `;
+
 
     const targetingContext = getTargetingContext(actor, actionName);
 
@@ -298,10 +312,10 @@ BLUNT DAMAGE RULES:
         <div style="padding:5px 10px;font-size:.9em;">
           <div>Ability: ${ability.name}</div>
           <div>Base Rank: ${ability.rank} (${ability.value})${choice.shift ? ` — Shift ${choice.shift} → ${effectiveRank}` : ""}</div>
-          ${weaponContext}
           <div>Roll: ${roll.total}${totalKarmaUsed ? ` + Karma: ${totalKarmaUsed}` : ""} = ${cappedTotal}</div>
           ${choice.pulled ? `<div style="color:#FF9800;">⚠ Pull Punch selected (apply cap or downgrade color)</div>` : ``}
         </div>
+        ${damageBlock}
         ${grid}
         <div style="text-align:center;padding:8px;margin:5px;font-weight:bold;font-size:1.1em;border-radius:3px;background:${bg};color:${fg};">
           RESULT: ${String(color).toUpperCase()} — ${String(effectResult).toUpperCase()}
@@ -310,6 +324,21 @@ BLUNT DAMAGE RULES:
       </div>
     `;
 
-    await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor }), content: cardHtml });
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor }),
+      content: cardHtml,
+      flags: {
+        "msh-faserip": {
+          actionId: actionType,
+          damageType: "physical-blunt",
+          rawDamage,
+          afterArmor,
+          resultColor: colorLower,
+          cappedTotal,
+          targets: targets.map(t => t.document?.uuid ?? t.actor?.uuid ?? t.id)
+        }
+      }
+    });
+
   }
 }

@@ -159,6 +159,42 @@ export function installActionChatHandlers() {
   console.log("MSH FASERIP | Chat hooks installed (checks + breaking FEAT + grabbing break + collision damage + escape + apply damage)");
 }
 
+export async function postAttackChatCard({
+  actor, actionId, label, ability, roll, resultColor,
+  baseDamage = 0, bonusDamage = 0, finalDamage = null,
+  targets = [], notes = ""
+}) {
+  const dmg = finalDamage ?? (baseDamage + bonusDamage);
+  const tNames = targets?.length ? targets.map(t => t.name).join(", ") : "—";
+  const colorName = (resultColor||"").toUpperCase();
+
+  const content = `
+  <div class="faserip-chat-card" data-action="${actionId}">
+    <div class="faserip-header"><b>${label}</b> — ${ability.toUpperCase()}</div>
+    <div class="faserip-row"><b>Roll:</b> ${roll.total ?? roll} &nbsp; <b>Result:</b> ${colorName}</div>
+    <div class="faserip-row"><b>Targets:</b> ${tNames}</div>
+    <div class="faserip-row"><b>Damage:</b> ${dmg}</div>
+    ${notes ? `<div class="faserip-notes">${notes}</div>` : ""}
+    <div class="faserip-actions" style="margin-top:6px; display:flex; gap:6px; flex-wrap:wrap;">
+      <a class="faserip-chip" data-action="apply-damage">Apply Damage</a>
+      ${/YELLOW|RED/.test(colorName) ? `<a class="faserip-chip" data-action="resolve-stun-slam">Resolve Stun/Slam</a>` : ""}
+    </div>
+  </div>`;
+
+  return ChatMessage.create({
+    user: game.user.id,
+    speaker: ChatMessage.getSpeaker({ actor }),
+    content,
+    type: CONST.CHAT_MESSAGE_TYPES.OTHER,
+    flags: {
+      "msh-faserip": {
+        actionId, ability, roll: roll?.total ?? roll, resultColor: colorName,
+        baseDamage, bonusDamage, finalDamage: dmg, targets: targets.map(t=>t.id)
+      }
+    }
+  });
+}
+
 /**
  * Handle "Attempt Escape" button clicks from Grappling hold results
  */
