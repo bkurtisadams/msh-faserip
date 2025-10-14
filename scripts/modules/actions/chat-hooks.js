@@ -64,6 +64,7 @@ export function installActionChatHandlers() {
         if (targetActor) {
           prefill.targetName = targetToken.name;
           prefill.targetEndRank = targetActor.system?.abilities?.endurance?.rank || "Good";
+          prefill.targetUuid = targetActor.uuid;
           
           console.log(`FASERIP | Auto-populated target: ${prefill.targetName} (Endurance: ${prefill.targetEndRank})`);
         }
