@@ -69,6 +69,7 @@ export class ChargingAction extends BaseAction {
   let targetBArank = "Shift-0";
   let targetBAvalue = 0;
   let targetName = "";
+  let targetUuid = "";
   let autoPopulated = false;
   
   const targets = game.user.targets;
@@ -513,7 +514,8 @@ export class ChargingAction extends BaseAction {
       attackForm: "charging",
       ownerActor: actor.name,
       ownerActorUuid: actor.uuid,
-      targetName: targetName || "Target"
+      targetName: targetName || "Target",
+      targetUuid: targetUuid || ""
     }
   });
 

@@ -1,5 +1,5 @@
 // scripts/modules/actions/collision-damage.js
-import { applyDamageToActorUuid } from "./action-utils.js";
+import { applyDamageToActorUuid, debugLog } from "./action-utils.js";
 
 export function openCollisionDamageDialog({ 
   targetName = "Target", 
@@ -37,7 +37,7 @@ export function openCollisionDamageDialog({
         const bodyArmorPower = targetActor.items.find(i => 
           i.type === "power" && 
           (i.name.toLowerCase().includes("body armor") || 
-           i.name.toLowerCase().includes("body armour"))
+          i.name.toLowerCase().includes("body armour"))
         );
         
         if (bodyArmorPower) {
@@ -46,6 +46,15 @@ export function openCollisionDamageDialog({
         }
         
         console.log(`FASERIP | Auto-populated collision data: ${targetName} (END: ${autoPopulatedEnd}, BA: ${autoPopulatedArmor})`);
+        
+        debugLog("Collision: Auto-populate details", {
+          actorName: targetActor.name,
+          enduranceRank: autoPopulatedEnd,
+          bodyArmorRank: autoPopulatedArmor,
+          allPowers: targetActor.items.filter(i => i.type === "power").map(p => p.name),
+          bodyArmorPowerFound: !!bodyArmorPower,
+          bodyArmorPowerName: bodyArmorPower?.name
+        });
       }
     } catch (e) {
       console.warn("FASERIP | Failed to auto-populate collision data:", e);

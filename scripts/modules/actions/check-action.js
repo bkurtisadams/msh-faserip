@@ -37,6 +37,7 @@ export class CheckAction extends BaseAction {
     const prefill = this.opts.prefill || {};
     const prefilledTargetName = prefill.targetName || "";
     const prefilledTargetEndRank = prefill.targetEndRank || "Good";
+    const prefilledTargetUuid = prefill.targetUuid || "";
     const prefilledDmgThrough = prefill.dmgThrough || 0;
     const prefilledAttackForm = prefill.attackForm || "blunt";
 
@@ -118,6 +119,7 @@ export class CheckAction extends BaseAction {
               resolve({
                 targetName: String($('[name="targetName"]').val() || "Target"),
                 targetEndRank: String($('[name="targetEndRank"]').val() || "Good"),
+                targetUuid: prefilledTargetUuid || "",
                 shift: Number($('[name="shift"]').val() || 0),
                 dmgThrough: Number($('[name="dmgThrough"]').val() || 0),
                 borderline: !!$('[name="borderline"]').is(':checked'),
