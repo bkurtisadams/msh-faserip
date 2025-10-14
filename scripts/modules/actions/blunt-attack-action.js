@@ -5,8 +5,7 @@ import {
   effectsFor, labelFor,
   isBluntCapable, computeBluntDamage,
   rollWithKarmaAndHistory, buildResultGrid, buildActionsBox, bannerColors,
-  getTargetingContext,
-  applyDamageToTargets  // ADD THIS IMPORT
+  getTargetingContext, getBodyArmorValues, applyDamageToTargets  // ADD THIS IMPORT
 } from "./action-utils.js";
 import { getItemMaterialRank } from "../../gm-utils.js";
 
@@ -271,9 +270,10 @@ BLUNT DAMAGE RULES:
       pulled: choice.pulled,
       breakingFeat,
       actorUuid: actor.uuid,
-      damage: penetratingDamage,
+      damage: choice.damage,  // <-- Pass RAW damage, not penetrating
       attackForm: "blunt",
-      damageType: "physical-blunt"
+      damageType: "physical-blunt",
+      bypassArmor: false  // <-- Let applyDamageToTargets handle armor
     });
 
     // weapon/bare line

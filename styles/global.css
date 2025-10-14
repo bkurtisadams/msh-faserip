@@ -2620,7 +2620,7 @@
   color: #ffffff;
   padding: 4px 10px;
   display: grid;
-  grid-template-columns: minmax(200px, 2fr) minmax(250px, 3fr) auto;
+  grid-template-columns: minmax(200px, 2fr) minmax(200px, 2fr) auto;
   align-items: center;
   gap: 10px;
   font-family: "Signika", sans-serif;
@@ -2712,6 +2712,7 @@
   display: none;
 }
 
+/* Effect Row - With Duration (Temporary Effects) */
 .effect-row {
   display: grid;
   grid-template-columns: 40px minmax(150px, 2fr) minmax(100px, 1.5fr) minmax(80px, 1fr) minmax(90px, 100px);
@@ -2723,6 +2724,11 @@
   transition: background 0.15s;
   list-style: none;
   min-height: 32px;
+}
+
+/* Effect Row - Without Duration (Passive/Inactive Effects) */
+.effect-row.no-duration {
+  grid-template-columns: 40px minmax(150px, 3fr) minmax(100px, 2fr) minmax(90px, 100px);
 }
 
 .effect-row:hover {
@@ -2777,9 +2783,8 @@
   min-width: 0;
 }
 
-/* Effect Duration/Modifier */
-.effect-duration,
-.effect-modifier {
+/* Effect Duration */
+.effect-duration {
   font-size: 12px;
   color: #000000;
   text-align: center;
@@ -2788,17 +2793,6 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   min-width: 0;
-}
-
-/* CS Modifier Colors */
-.modifier-positive {
-  color: #006600;
-  font-weight: bold;
-}
-
-.modifier-negative {
-  color: #cc0000;
-  font-weight: bold;
 }
 
 /* Effect Controls */
@@ -2854,7 +2848,7 @@
 /* Responsive adjustments for smaller screens */
 @media (max-width: 768px) {
   .effect-header {
-    grid-template-columns: minmax(150px, 1fr) minmax(200px, 2fr) auto;
+    grid-template-columns: minmax(150px, 1fr) minmax(150px, 1.5fr) auto;
     font-size: 12px;
   }
   
@@ -2872,6 +2866,10 @@
     font-size: 11px;
   }
   
+  .effect-row.no-duration {
+    grid-template-columns: 32px minmax(100px, 3fr) minmax(80px, 1.5fr) 80px;
+  }
+  
   .effect-icon {
     width: 28px;
     height: 28px;
@@ -2887,8 +2885,7 @@
   }
   
   .effect-source,
-  .effect-duration,
-  .effect-modifier {
+  .effect-duration {
     font-size: 11px;
   }
 }
