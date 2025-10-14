@@ -313,38 +313,18 @@
     </div>
 
     <div class="form-row special-flags">
-      <div class="form-group third">
+      <div class="form-group half">
         <label>
           <input type="checkbox" name="system.isLimited" {{checked system.isLimited}} />
-          Limited Power
+          Has Limitations
         </label>
       </div>
-      <div class="form-group third">
+      <div class="form-group half">
         <label>
           <input type="checkbox" name="system.isActive" {{checked system.isActive}} />
-          Active Power
+          Requires Activation
         </label>
       </div>
-      <div class="form-group third">
-        <label>
-          <input type="checkbox" name="system.isStarred" {{checked system.isStarred}} />
-          Starred Power (*)
-        </label>
-        <div class="hint">Counts as two powers</div>
-      </div>
-    </div>
-
-    <div class="form-group third">
-      <label>
-        <input type="checkbox" name="flags.msh-faserip.isBonusPower" {{checked (getFlag item "msh-faserip" "isBonusPower")}} />
-        Bonus Power
-      </label>
-    </div>
-    <div class="form-group third">
-      <label>
-        <input type="checkbox" name="flags.msh-faserip.isStuntPower" {{checked (getFlag item "msh-faserip" "isStuntPower")}} />
-        Stunt Power
-      </label>
     </div>
 
     <div class="form-group">
@@ -371,80 +351,9 @@
       </div>
     </div>
 
-    <div class="bonus-powers">
-      <h3>Bonus Powers</h3>
-      <div class="bonus-power-list">
-        {{#each system.bonusPowers as |power i|}}
-        <div class="bonus-power-entry">
-          <input type="text" name="system.bonusPowers.{{i}}.name" value="{{power.name}}" placeholder="Bonus Power Name"/>
-          <select name="system.bonusPowers.{{i}}.rank">
-            <option value="Shift-0" {{#if (eq power.rank "Shift-0")}}selected{{/if}}>Shift-0</option>
-            <option value="Feeble" {{#if (eq power.rank "Feeble")}}selected{{/if}}>Feeble</option>
-            <option value="Poor" {{#if (eq power.rank "Poor")}}selected{{/if}}>Poor</option>
-            <option value="Typical" {{#if (eq power.rank "Typical")}}selected{{/if}}>Typical</option>
-            <option value="Good" {{#if (eq power.rank "Good")}}selected{{/if}}>Good</option>
-            <option value="Excellent" {{#if (eq power.rank "Excellent")}}selected{{/if}}>Excellent</option>
-            <option value="Remarkable" {{#if (eq power.rank "Remarkable")}}selected{{/if}}>Remarkable</option>
-            <option value="Incredible" {{#if (eq power.rank "Incredible")}}selected{{/if}}>Incredible</option>
-            <option value="Amazing" {{#if (eq power.rank "Amazing")}}selected{{/if}}>Amazing</option>
-            <option value="Monstrous" {{#if (eq power.rank "Monstrous")}}selected{{/if}}>Monstrous</option>
-            <option value="Unearthly" {{#if (eq power.rank "Unearthly")}}selected{{/if}}>Unearthly</option>
-          </select>
-          <button type="button" class="delete-bonus-power" data-index="{{i}}"><i class="fas fa-trash"></i></button>
-        </div>
-        {{/each}}
-      </div>
-      <button type="button" class="add-bonus-power">+ Add Bonus Power</button>
-    </div>
-
     <div class="form-group description-field">
       <label>Description:</label>
       <textarea name="system.description" rows="5" class="power-description">{{system.description}}</textarea>
-    </div>
-
-    <div class="form-group">
-      <label>
-        <input type="checkbox" name="flags.msh-faserip.hasStunts" {{checked (getFlag item "msh-faserip" "hasStunts")}} />
-        Has Power Stunts
-      </label>
-    </div>
-    
-    <div class="stunts">
-      <h3>Power Stunts</h3>
-      <p class="stunt-info">Power Stunts allow creative use of powers. Difficulty decreases with practice.</p>
-      <div class="stunt-list">
-        {{#each system.stunts as |stunt i|}}
-        <div class="stunt-entry">
-          <div class="stunt-header">
-            <input type="text" name="system.stunts.{{i}}.name" value="{{stunt.name}}" placeholder="Stunt Name"/>
-            <div class="stunt-attempts">
-              <label>Times Used:</label>
-              <input type="number" name="system.stunts.{{i}}.timesUsed" value="{{stunt.timesUsed}}" min="0" class="stunt-count" />
-              <span class="stunt-difficulty">
-                {{#if (lt stunt.timesUsed 1)}}
-                <span class="difficulty red">Red FEAT (100 Karma)</span>
-                {{else if (lt stunt.timesUsed 4)}}
-                <span class="difficulty yellow">Yellow FEAT (100 Karma)</span>
-                {{else if (lt stunt.timesUsed 10)}}
-                <span class="difficulty green">Green FEAT (100 Karma)</span>
-                {{else}}
-                <span class="difficulty mastered">Mastered (No Karma Cost)</span>
-                {{/if}}
-              </span>
-            </div>
-          </div>
-          <textarea name="system.stunts.{{i}}.description">{{stunt.description}}</textarea>
-          <div class="stunt-controls">
-            <!-- <button type="button" class="increment-stunt" data-index="{{i}}"><i class="fas fa-plus"></i> Use</button> -->
-            <!-- <button type="button" class="roll-stunt" data-index="{{i}}"><i class="fas fa-dice-d20"></i> Roll</button> -->
-            <button type="button" class="roll-stunt" data-index="{{@index}}">🎲 Roll Power Stunt</button>
- 
-            <button type="button" class="delete-stunt" data-index="{{i}}"><i class="fas fa-trash"></i></button>
-          </div>
-        </div>
-        {{/each}}
-      </div>
-      <button type="button" class="add-stunt">+ Add Power Stunt</button>
     </div>
   </section>
 </form>

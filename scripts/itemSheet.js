@@ -115,13 +115,14 @@ export class FaseripItemSheet extends ItemSheet {
   activateListeners(html) {
     super.activateListeners(html);
 
+    // Handle magic checkbox toggle
     if (this.item.type === "power") {
       html.find("#is-magic-checkbox").change(ev => {
         const isChecked = ev.currentTarget.checked;
         this.item.update({ "system.isMagic": isChecked });
       });
     }
-  
+
     // Update power type options when category changes
     html.find('#power-category').change(ev => {
       const category = ev.currentTarget.value;
@@ -139,14 +140,13 @@ export class FaseripItemSheet extends ItemSheet {
       const currentRange = this.item.system.range;
       const customRangeInput = html.find('.custom-range-input');
       
-      if (currentRange === "Custom") {
+      if (currentRange === "custom") {
         customRangeInput.show();
       } else {
         customRangeInput.hide();
       }
       
       // Handle range dropdown changes
-      // Range dropdown listener
       html.find('select[name="system.range"]').change(ev => {
         const selectedRange = ev.currentTarget.value;
         const customRangeInput = html.find('.custom-range-input');
@@ -160,7 +160,7 @@ export class FaseripItemSheet extends ItemSheet {
       
         if (selectedRange === "rank") {
           calculatedRangeField.show();
-          const rank = html.find('select[name="system.rank"]').val(); // Use dropdown value, not this.item.system
+          const rank = html.find('select[name="system.rank"]').val();
           const rangeText = this._getRangeByRank(rank);
           html.find('#calculated-range-display').val(rangeText);
           this.item.update({ "system.calculatedRange": rangeText });
@@ -183,344 +183,152 @@ export class FaseripItemSheet extends ItemSheet {
       // When Rank dropdown changes, update calculated range if using "By Rank"
       html.find('select[name="system.rank"]').change(ev => {
         const newRank = ev.currentTarget.value;
-        const selectedRange = html.find('select[name="system.range"]').val(); // Get current dropdown value
+        const selectedRange = html.find('select[name="system.range"]').val();
         if (selectedRange === "rank") {
           const rangeText = this._getRangeByRank(newRank);
           html.find('#calculated-range-display').val(rangeText);
           this.item.update({ "system.calculatedRange": rangeText });
         }
       });
-      
-      // Add to the activateListeners method in itemSheet.js
-      // Handle power stunts
-      html.find('.add-stunt').click(ev => {
-        const stunts = this.item.system.stunts || [];
-        stunts.push({ 
-          name: "New Stunt", 
-          description: "", 
-          timesUsed: 0 
-        });
-        this.item.update({ "system.stunts": stunts });
-      });
 
-      html.find('.increment-stunt').click(ev => {
-        const index = ev.currentTarget.dataset.index;
-        const stunts = duplicate(this.item.system.stunts || []);
-        if (stunts[index]) {
-          stunts[index].timesUsed = (stunts[index].timesUsed || 0) + 1;
-          this.item.update({ "system.stunts": stunts });
-        }
-      });
-
-      html.find('.delete-stunt').click(ev => {
-        const index = parseInt(ev.currentTarget.dataset.index);
+      // Handle duration dropdown changes
+      html.find('select[name="system.duration"]').change(ev => {
+        const selectedDuration = ev.currentTarget.value;
+        const customDurationInput = html.find('.custom-duration-input');
         
-        // Make sure stunts exists and is an array
-        let stunts = duplicate(this.item.system.stunts);
-        if (!Array.isArray(stunts)) {
-          stunts = [];
-          console.warn("Stunts was not an array, creating empty array");
-        }
-        
-        // Log for debugging
-        console.log("Before delete:", stunts, "index:", index);
-        
-        // Remove the stunt at the specified index
-        if (stunts.length > index) {
-          stunts.splice(index, 1);
-          console.log("After delete:", stunts);
-          
-          // Update the item
-          this.item.update({ "system.stunts": stunts });
+        if (selectedDuration === "custom") {
+          customDurationInput.show();
         } else {
-          console.error("Invalid stunt index:", index, "length:", stunts.length);
+          customDurationInput.hide();
         }
       });
 
-      // Handle Power Stunt roll button
-      html.find('.roll-stunt').click(async ev => {
-        const index = parseInt(ev.currentTarget.dataset.index);
-        const stunts = this.item.system.stunts || [];
-        const stunt = stunts[index];
-        const actor = this.item.parent;
-      
-        if (!stunt || !actor) return;
-      
-        // Mastered stunt = no Karma cost
-        if (stunt.timesUsed >= 10) {
-          ui.notifications.info(`Mastered stunt "${stunt.name}" — no Karma required.`);
-          await this._rollStunt(actor, this.item, stunt);
-          return;
-        }
-      
-        // Confirm Karma cost
-        const confirmed = await Dialog.confirm({
-          title: "Attempt Power Stunt",
-          content: `This attempt costs <strong>100 Karma</strong>. Proceed?`
-        });
-        if (!confirmed) return;
-      
-        const currentKarma = actor.system.attributes.karma.value;
-        if (currentKarma < 100) {
-          ui.notifications.error(`${actor.name} doesn't have enough Karma.`);
-          return;
-        }
-      
-        // Call the actual stunt logic (handles all logging, rolling, and output)
-        await this._rollStunt(actor, this.item, stunt);
-      });
-
+      // Initialize duration input visibility on load
+      const currentDuration = html.find('select[name="system.duration"]').val();
+      const customDurationInput = html.find('.custom-duration-input');
+      if (currentDuration === "custom") {
+        customDurationInput.show();
+      } else {
+        customDurationInput.hide();
+      }
     }
 
-    // For talent sheets - handle specialty dropdown
-if (this.item.type === "talent") {
-  // Define talent specialties by category
-  const talentSpecialties = {
-    "Weapon Skill": ["Guns", "Thrown Weapons", "Bows", "Blunt Weapons", "Sharp Weapons", 
-                     "Oriental Weapons", "Marksman", "Weapons Master", "Weapons Specialist"],
-    "Fighting Skill": ["Martial Arts A", "Martial Arts B", "Martial Arts C", "Martial Arts D", 
-                       "Martial Arts E", "Wrestling", "Thrown Objects", "Acrobatics", "Tumbling"],
-    "Professional Skill": ["Medicine", "Law", "Law Enforcement", "Pilot", "Military", 
-                          "Business/Finance", "Journalism", "Engineering", "Criminology", 
-                          "Psychiatry", "Detective/Espionage"],
-    "Scientific Skill": ["Chemistry", "Biology", "Geology", "Genetics", "Archaeology", 
-                         "Physics", "Computers", "Electronics"],
-    "Mystic/Mental Skill": ["Trance", "Mesmerism and Hypnosis", "Sleight of Hand", 
-                           "Resist Domination", "Occult Lore", "Mystic Background"],
-    "Other": ["Artist", "Languages", "First Aid", "Repair/Tinkering", "Trivia", 
-              "Performer", "Animal Training", "Heir to Fortune", "Student", "Leadership"]
-  };
+    // Handle talent specialty dropdown (for talent sheets)
+    if (this.item.type === "talent") {
+      // Define talent specialties by category
+      const talentSpecialties = {
+        "Weapon Skill": ["Guns", "Thrown Weapons", "Bows", "Blunt Weapons", "Sharp Weapons", 
+                        "Oriental Weapons", "Marksman", "Weapons Master", "Weapons Specialist"],
+        "Fighting Skill": ["Martial Arts A", "Martial Arts B", "Martial Arts C", "Martial Arts D", 
+                          "Martial Arts E", "Wrestling", "Thrown Objects", "Acrobatics", "Tumbling"],
+        "Professional Skill": ["Medicine", "Law", "Law Enforcement", "Pilot", "Military", 
+                              "Business/Finance", "Journalism", "Engineering", "Criminology", 
+                              "Psychiatry", "Detective/Espionage"],
+        "Scientific Skill": ["Chemistry", "Biology", "Geology", "Genetics", "Archaeology", 
+                            "Physics", "Computers", "Electronics"],
+        "Mystic/Mental Skill": ["Trance", "Mesmerism and Hypnosis", "Sleight of Hand", 
+                              "Resist Domination", "Occult Lore", "Mystic Background"],
+        "Other": ["Artist", "Languages", "First Aid", "Repair/Tinkering", "Trivia", 
+                  "Performer", "Animal Training", "Heir to Fortune", "Student", "Leadership"]
+      };
 
-    // Function to update specialty dropdown based on selected category
-    const updateSpecialtyDropdown = () => {
-      const category = html.find('#talent-category').val();
-      const specialtySelect = html.find('#talent-specialty');
-      specialtySelect.empty(); // Clear existing options
-      
-      // Add default option
-      specialtySelect.append($('<option></option>').val('').text('--Select Specialty--'));
-      
-      // If a category is selected, add its specialties
-      if (category && talentSpecialties[category]) {
-        talentSpecialties[category].forEach(specialty => {
-          const option = $('<option></option>').val(specialty).text(specialty);
-          // Select this option if it matches the current specialty
-          if (specialty === this.item.system.specialty) {
-            option.attr('selected', 'selected');
-          }
-          specialtySelect.append(option);
-        });
-      }
-    };
+      // Function to update specialty dropdown based on selected category
+      const updateSpecialtyDropdown = () => {
+        const category = html.find('#talent-category').val();
+        const specialtySelect = html.find('#talent-specialty');
+        specialtySelect.empty();
+        
+        // Add default option
+        specialtySelect.append($('<option></option>').val('').text('--Select Specialty--'));
+        
+        // If a category is selected, add its specialties
+        if (category && talentSpecialties[category]) {
+          talentSpecialties[category].forEach(specialty => {
+            const option = $('<option></option>').val(specialty).text(specialty);
+            // Select this option if it matches the current specialty
+            if (specialty === this.item.system.specialty) {
+              option.attr('selected', 'selected');
+            }
+            specialtySelect.append(option);
+          });
+        }
+      };
 
-    // Update specialty dropdown when category changes
-    html.find('#talent-category').change(updateSpecialtyDropdown);
-    
-    // Initially populate the dropdown
-    updateSpecialtyDropdown();
-  }
+      // Update specialty dropdown when category changes
+      html.find('#talent-category').change(updateSpecialtyDropdown);
+      
+      // Initially populate the dropdown
+      updateSpecialtyDropdown();
+    }
 
     // Show/hide offensive fields
-  html.find('#is-offensive').change(ev => {
-    const checked = ev.currentTarget.checked;
-    html.find('#offensive-fields').toggle(checked);
-  });
-
-  // Show/hide body armor fields
-  html.find('#is-body-armor').change(ev => {
-    const checked = ev.currentTarget.checked;
-    html.find('#body-armor-fields').toggle(checked);
-  });
-
-  // Show/hide resistance fields
-  html.find('#is-resistance').change(ev => {
-    const checked = ev.currentTarget.checked;
-    html.find('#resistance-fields').toggle(checked);
-  });
-
-  // Show/hide magic fields
-  html.find('#is-magic-checkbox').change(ev => {
-    const checked = ev.currentTarget.checked;
-    html.find('#magic-fields').toggle(checked);
-  });
-
-  // Auto-calculate energy armor
-  html.find('#armor-physical').change(ev => {
-    const physical = parseInt(ev.currentTarget.value) || 0;
-    const energyField = html.find('#armor-energy');
-    if (energyField.val() == 0 || energyField.val() == '') {
-      energyField.val(Math.max(0, physical - 20));
-    }
-  });
-
-  // Update resistance value label
-  html.find('input[name="system.resistanceEffect"]').change(ev => {
-    const effect = ev.currentTarget.value;
-    const label = html.find('#resistance-value-label');
-    const group = html.find('#resistance-value-group');
-    
-    if (effect === 'columnShift') {
-      label.text('CS Bonus:');
-      group.show();
-    } else if (effect === 'damageReduction') {
-      label.text('Damage Reduction:');
-      group.show();
-    } else {
-      group.hide();
-    }
-  });
-
-  // Delete button
-  html.find('.delete-power').click(async () => {
-    const confirmed = await Dialog.confirm({
-      title: "Delete Power",
-      content: `<p>Are you sure you want to delete ${this.item.name}?</p>`
+    html.find('#is-offensive').change(ev => {
+      const checked = ev.currentTarget.checked;
+      html.find('#offensive-fields').toggle(checked);
     });
-    if (confirmed) {
-      await this.item.delete();
-      this.close();
-    }
-  });
 
-  // Test power button (placeholder)
-  html.find('.test-power').click(() => {
-    ui.notifications.info("Test Power functionality coming soon!");
-  });
-
-  // Show/hide body armor fields
-html.find('#is-body-armor').change(ev => {
-  const checked = ev.currentTarget.checked;
-  html.find('.armor-details').toggle(checked);
-});
-
-  // Show/hide resistance fields
-  html.find('#is-resistance').change(ev => {
-    const checked = ev.currentTarget.checked;
-    html.find('.resistance-details').toggle(checked);
-  });
-
-  // Auto-calculate energy armor from physical
-  html.find('#armor-physical').change(ev => {
-    const physical = parseInt(ev.currentTarget.value) || 0;
-    const energyField = html.find('#armor-energy');
-    if (!energyField.val() || energyField.val() == 0) {
-      energyField.val(Math.max(0, physical - 20));
-    }
-  });
-
-  // Update resistance value label based on effect type
-  html.find('[name="system.resistanceEffect"]').change(ev => {
-    const effect = ev.currentTarget.value;
-    const label = html.find('#resistance-value-label');
-    const group = html.find('.resistance-value-group');
-    
-    if (effect === 'columnShift') {
-      label.text('CS Bonus:');
-      group.show();
-    } else if (effect === 'damageReduction') {
-      label.text('Damage Reduction:');
-      group.show();
-    } else if (effect === 'immunity') {
-      group.hide();
-    }
-  });
-
-  // end of activeListeners
-  }
-
-  async _rollStunt(actor, power, stunt) {
-    const rank = power.system.rank || "Typical";
-    const rankValue = CONFIG.FASERIP.rankValues[rank] ?? 6;
-  
-    // Determine required FEAT color for the next attempt
-    const nextAttempt = stunt.timesUsed + 1;
-    let requiredColor = "red";
-    if (nextAttempt >= 4 && nextAttempt < 10) requiredColor = "green";
-    else if (nextAttempt >= 1 && nextAttempt <= 3) requiredColor = "yellow";
-  
-    // Prompt for Karma bonus
-    const karmaInput = await Dialog.prompt({
-      title: "Add Karma to Roll?",
-      label: "Optional Karma to add to roll:",
-      callback: html => parseInt(html.find("input").val() || "0"),
-      content: `<input type="number" min="0" value="0" style="width:100%"/>`
+    // Show/hide body armor fields
+    html.find('#is-body-armor').change(ev => {
+      const checked = ev.currentTarget.checked;
+      html.find('.armor-details').toggle(checked);
     });
-  
-    const karmaBonus = Number.isNaN(karmaInput) ? 0 : karmaInput;
-  
-    // Roll 1d100
-    const roll = new Roll("1d100");
-    await roll.evaluate();
-    const total = roll.total + karmaBonus;
-  
-    // Determine FEAT result color
-    const resultColor = this._getFeatColor(rankValue, total);
-    const success = (
-      (requiredColor === "green" && ["green", "yellow", "red"].includes(resultColor)) ||
-      (requiredColor === "yellow" && ["yellow", "red"].includes(resultColor)) ||
-      (requiredColor === "red" && resultColor === "red")
-    );
-  
-    // Increment usage count if successful and not yet mastered
-    if (success && stunt.timesUsed < 10) {
-      let stunts = Array.isArray(power.system.stunts)
-        ? foundry.utils.deepClone(power.system.stunts)
-        : Object.values(foundry.utils.deepClone(power.system.stunts || {}));
-  
-      const idx = stunts.findIndex(s => s.name === stunt.name);
-      if (idx !== -1) {
-        stunts[idx].timesUsed++;
-        await power.update({ "system.stunts": stunts });
+
+    // Show/hide resistance fields
+    html.find('#is-resistance').change(ev => {
+      const checked = ev.currentTarget.checked;
+      html.find('.resistance-details').toggle(checked);
+    });
+
+    // Show/hide magic fields
+    html.find('#is-magic-checkbox').change(ev => {
+      const checked = ev.currentTarget.checked;
+      html.find('#magic-fields').toggle(checked);
+    });
+
+    // Auto-calculate energy armor
+    html.find('#armor-physical').change(ev => {
+      const physical = parseInt(ev.currentTarget.value) || 0;
+      const energyField = html.find('#armor-energy');
+      if (energyField.val() === 0 || energyField.val() === '') {
+        energyField.val(Math.max(0, physical - 20));
       }
-    }
-  
-    // Log Karma spend (100 base + bonus if applicable)
-    const karmaSheet = new KarmaSheet(actor);
-    await karmaSheet._addKarmaEvent({
-      realDate: new Date().toLocaleDateString(),
-      gameDate: "",
-      amount: -100,
-      type: "Power Stunt",
-      description: `Attempted stunt "${stunt.name}" from ${power.name}`
     });
-  
-    if (karmaBonus > 0) {
-      await karmaSheet._addKarmaEvent({
-        realDate: new Date().toLocaleDateString(),
-        gameDate: "",
-        amount: -karmaBonus,
-        type: "Karma Bonus",
-        description: `Added ${karmaBonus} Karma to Power Stunt roll for "${stunt.name}"`
+
+    // Update resistance value label
+    html.find('[name="system.resistanceEffect"]').change(ev => {
+      const effect = ev.currentTarget.value;
+      const label = html.find('#resistance-value-label');
+      const group = html.find('.resistance-value-group');
+      
+      if (effect === 'columnShift') {
+        label.text('CS Bonus:');
+        group.show();
+      } else if (effect === 'damageReduction') {
+        label.text('Damage Reduction:');
+        group.show();
+      } else if (effect === 'immunity') {
+        group.hide();
+      }
+    });
+
+    // Delete button
+    html.find('.delete-power').click(async () => {
+      const confirmed = await Dialog.confirm({
+        title: "Delete Power",
+        content: `<p>Are you sure you want to delete ${this.item.name}?</p>`
       });
-    }
-  
-    // Display result in chat
-    const chatHtml = `
-      <strong>${actor.name}</strong> attempts <em>${stunt.name}</em> from <strong>${power.name}</strong><br>
-      Power Rank: <strong>${rank}</strong> (${rankValue})<br>
-      Required FEAT: <strong style="color:${requiredColor}">${requiredColor.toUpperCase()}</strong><br>
-      Roll: <strong>${roll.total}</strong> + Karma: <strong>${karmaBonus}</strong> → <strong>${total}</strong><br>
-      Result: <strong style="color:${resultColor}">${resultColor.toUpperCase()}</strong><br>
-      Karma Spent: <strong>${100 + karmaBonus}</strong><br>
-      <strong>${success ? "✅ Success!" : "❌ Failure!"}</strong>
-    `;
-  
-    await roll.toMessage({
-      speaker: ChatMessage.getSpeaker({ actor }),
-      flavor: chatHtml,
-      rollMode: game.settings.get("core", "rollMode"),
-      rolls: [roll] // ✅ new format for Foundry v12+
+      if (confirmed) {
+        await this.item.delete();
+        this.close();
+      }
+    });
+
+    // Test power button (placeholder)
+    html.find('.test-power').click(() => {
+      ui.notifications.info("Test Power functionality coming soon!");
     });
   }
-  
-  
-  _getFeatColor(rankValue, roll) {
-    if (roll >= 91) return "red";
-    if (roll >= 66) return rankValue >= 36 ? "red" : "yellow";
-    if (roll >= 36) return rankValue >= 16 ? "yellow" : "green";
-    return "green";
-  }
-  
+
   /**
  * Update power type options based on selected category
  */
