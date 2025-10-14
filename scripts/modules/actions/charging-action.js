@@ -12,6 +12,7 @@ import {
   buildActionsBox,
   getResultHoverText,
   getTargetingContext,
+  debugLog
 } from "./action-utils.js";
 
 /**
@@ -324,7 +325,7 @@ export class ChargingAction extends BaseAction {
           const targetBA = Number(html.find('[name="targetBodyArmorValue"]').val() || 0);
           const absorbed = Math.min(targetBA, totalDamage);
           const targetTakes = totalDamage - absorbed;
-          const reboundRaw = absorbed;
+          const reboundRaw = (targetBA > totalDamage) ? absorbed : 0;  // only rebound if BA > damage
           const reboundFinal = Math.max(0, reboundRaw - bodyArmorValue);
 
           const $calc = html.find('#char-damage-calc');
@@ -345,7 +346,7 @@ export class ChargingAction extends BaseAction {
 
           const absorbed = Math.min(objectMatValue, totalDamage);
           const objectTakes = totalDamage - absorbed;
-          const reboundRaw = absorbed;
+            const reboundRaw = (objectMatValue > totalDamage) ? absorbed : 0;  // only rebound if Material > damage
           const reboundFinal = Math.max(0, reboundRaw - bodyArmorValue);
 
           const $calc = html.find('#obj-damage-calc');
@@ -389,6 +390,18 @@ export class ChargingAction extends BaseAction {
     console.log("FASERIP | Charging: Effective rank capped at Shift-Z per rules");
   }
 
+  debugLog("Charging: Dialog choices", {
+    areas: choice.areas,
+    shift: choice.shift,
+    karma: choice.karma,
+    totalShift: choice.totalShift,
+    movementBonus: choice.movementBonus,
+    targetType: choice.targetType,
+    targetBArank: choice.targetBArank,
+    targetBAvalue: choice.targetBAvalue,
+    effectiveRank: effectiveRank
+  });
+
   // Roll
   const roll = await new Roll("1d100").evaluate();
   if (!choice.skipDice) {
@@ -424,7 +437,7 @@ export class ChargingAction extends BaseAction {
 
   if (colorLower !== "white") {
     const absorbedByDefense = Math.min(choice.targetBAvalue, totalDamage);
-    const reboundAmount = absorbedByDefense;
+    const reboundAmount = (choice.targetBAvalue > totalDamage) ? absorbedByDefense : 0;
 
     damageToTarget = Math.max(0, totalDamage - absorbedByDefense);
     damageToAttacker = Math.max(0, reboundAmount - bodyArmorValue);
@@ -434,7 +447,7 @@ export class ChargingAction extends BaseAction {
       const defenseType = choice.targetType === "character" ? "BA" : "Material Strength";
       reflectionNote = `
         <div style="padding:6px;margin:6px 10px;background:#ffebee;border:1px solid #f44336;border-radius:3px;">
-          <strong>Rebound:</strong> ${targetLabel}'s ${defenseType} absorbed ${absorbedByDefense} and returns it to you.
+          <strong>Rebound:</strong> ${targetLabel}'s ${defenseType} (${choice.targetBAvalue}) exceeded your damage (${totalDamage}) and returns ${absorbedByDefense} to you.
           Your BA (${bodyArmorValue}) soaks what it can.
           <strong> You take ${damageToAttacker} damage.</strong>
         </div>
@@ -455,7 +468,7 @@ export class ChargingAction extends BaseAction {
       }
     }
 
-    console.debug("Charging Resolve (contact)", {
+    debugLog("Charging Resolve (contact)", {
       attacker: actor?.name,
       target: targetLabel,
       areas: choice.areas,
@@ -465,14 +478,14 @@ export class ChargingAction extends BaseAction {
       targetDefense: choice.targetBAvalue,
       absorbedByDefense,
       reboundAmount,
-      damageToTarget,       // penetration (drives Slam/Stun)
+      damageToTarget,
       attackerBA: bodyArmorValue,
       damageToAttacker,
       penetratingDamage
     });
   } else {
     penetratingDamage = 0;
-    console.debug("Charging Resolve (miss)", {
+    debugLog("Charging Resolve (miss)", {
       attacker: actor?.name,
       target: targetLabel,
       areas: choice.areas,
@@ -493,6 +506,7 @@ export class ChargingAction extends BaseAction {
     actorUuid: actor.uuid,
     damage: damageToTarget,
     attackForm: "charging",
+    bypassArmor: true,
     // Add prefill data for Slam/Stun checks
     prefillData: {
       dmgThrough: penetratingDamage,

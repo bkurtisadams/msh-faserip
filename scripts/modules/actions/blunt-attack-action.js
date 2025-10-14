@@ -248,13 +248,43 @@ BLUNT DAMAGE RULES:
     const { bg, fg } = bannerColors(colorLower);
     const breakingFeat = (choice.src === "weapon" || choice.src === "object") ? { weaponMat: choice.weaponMat } : null;
     const isHit = colorLower !== 'white';
+
+    // Calculate penetrating damage by checking targeted token's Body Armor
+    let penetratingDamage = 0;
+    if (isHit && choice.damage > 0) {
+      const targets = Array.from(game.user?.targets ?? []);
+      if (targets.length === 1) {
+        const targetActor = targets[0].actor;
+        if (targetActor) {
+          // Get target's Body Armor
+          let bodyArmorValue = 0;
+          
+          // Check Body Armor power
+          const bodyArmorPower = targetActor.items.find(i => 
+            i.type === "power" && 
+            (i.name.toLowerCase().includes("body armor") || 
+            i.name.toLowerCase().includes("body armour"))
+          );
+          
+          if (bodyArmorPower) {
+            bodyArmorValue = bodyArmorPower.system?.value || 0;
+          }
+          
+          penetratingDamage = Math.max(0, choice.damage - bodyArmorValue);
+        }
+      } else {
+        // Multiple or no targets - can't auto-calculate, use full damage as estimate
+        penetratingDamage = choice.damage;
+      }
+    }
+
     const actions = buildActionsBox({
-      showSlam: colorLower==='yellow',
-      showStun: colorLower==='red',
+      showSlam: colorLower==='yellow' && penetratingDamage > 0,
+      showStun: colorLower==='red' && penetratingDamage > 0,
       pulled: choice.pulled,
       breakingFeat,
       actorUuid: actor.uuid,
-      damage: isHit ? choice.damage : 0,  // Only pass damage if it's a hit
+      damage: penetratingDamage,
       attackForm: "blunt"
     });
 

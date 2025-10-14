@@ -6,6 +6,12 @@ export const RANKS = [
   "Shift-X","Shift-Y","Shift-Z","Class 1000","Class 3000","Class 5000","Beyond"
 ];
 
+export function debugLog(...args) {
+  if (game.settings.get("msh-faserip", "debugMode")) {
+    console.log("FASERIP DEBUG |", ...args);
+  }
+}
+
 export function shiftRank(rankName, delta) {
   const i = RANKS.indexOf(rankName);
   if (i < 0) return rankName;
@@ -226,7 +232,8 @@ export function buildActionsBox({
   prefillData = null,         // may contain { dmgThrough, attackForm, ownerActor, ... }
   targetUuid = "",
   targetName = "",
-  targetStrength = ""
+  targetStrength = "",
+  bypassArmor = false
 }) {
   // Small helper to render a chip
   const chip = (label, title, enabled, dataAttrs = "") => {
@@ -255,7 +262,7 @@ export function buildActionsBox({
         "Apply Damage",
         "Apply damage to targeted or selected token(s)",
         true,
-        `data-action="apply-damage" data-damage="${dmgPen}" data-attacker-uuid="${actorUuid}"`
+        `data-action="apply-damage" data-damage="${dmgPen}" data-attacker-uuid="${actorUuid}" data-bypass-armor="${bypassArmor}"`
       )
     );
   }
@@ -644,8 +651,15 @@ export async function applyDamageToTargets(damage, options = {}) {
     attackerUuid = null,
     damageType = "Physical-Blunt",
     showNotification = true,
-    updateButton = null
+    updateButton = null,
+    bypassArmor = false
   } = options;
+
+  debugLog("applyDamageToTargets called", {
+    damage: damage,
+    bypassArmor: bypassArmor,
+    attackerUuid: attackerUuid
+  });
 
   if (damage <= 0) {
     if (showNotification) ui.notifications.warn("No damage to apply.");
@@ -693,9 +707,11 @@ export async function applyDamageToTargets(damage, options = {}) {
     updatePath: isUnlinkedToken ? "token.document" : "actor"
   });
 
-    // Get target's Body Armor (check both equipment and powers)
-    let bodyArmorValue = 0;
-    
+  // Get target's Body Armor (check both equipment and powers)
+  let bodyArmorValue = 0;
+
+  // ✅ ONLY calculate armor if not bypassed
+  if (!bypassArmor) {
     // Check armor equipment
     const armorItems = targetActor.items.filter(i => 
       i.type === "equipment" && 
@@ -734,9 +750,9 @@ export async function applyDamageToTargets(damage, options = {}) {
     const bodyArmorPower = targetActor.items.find(i => 
       i.type === "power" && 
       (i.name.toLowerCase().includes("body armor") || 
-       i.name.toLowerCase().includes("body armour") ||
-       i.name.toLowerCase().includes("armor") ||
-       i.system.type?.toLowerCase().includes("body armor"))
+      i.name.toLowerCase().includes("body armour") ||
+      i.name.toLowerCase().includes("armor") ||
+      i.system.type?.toLowerCase().includes("body armor"))
     );
     
     if (bodyArmorPower) {
@@ -751,9 +767,18 @@ export async function applyDamageToTargets(damage, options = {}) {
         bodyArmorValue = powerValue;
       }
     }
+  } // close the if (!bypassArmor) block
 
     // Calculate damage after armor
-    const damageAfterArmor = Math.max(0, damage - bodyArmorValue);
+    const damageAfterArmor = bypassArmor ? damage : Math.max(0, damage - bodyArmorValue);
+
+    debugLog("applyDamageToTargets: Armor calculation", {
+      targetName: target.name,
+      incomingDamage: damage,
+      bodyArmorValue: bodyArmorValue,
+      bypassArmor: bypassArmor,
+      damageAfterArmor: damageAfterArmor
+    });
     
     // Get current health
     const currentHealth = targetActor.system.attributes.health.value;

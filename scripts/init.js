@@ -120,6 +120,15 @@ Hooks.once("init", async () => {
 
   // <-- NEW/MODIFIED SECTION START -->
   // Register system settings
+  game.settings.register("msh-faserip", "debugMode", {
+    name: "Debug Mode",
+    hint: "Enable detailed console logging for troubleshooting",
+    scope: "client",
+    config: true,
+    type: Boolean,
+    default: false
+  });
+  
   game.settings.register('msh-faserip', 'dailyKarmaEnabled', {
     name: "Enable Daily Karma",
     hint: "If enabled, characters gain temporary Karma equal to their Reason+Intuition+Psyche at the start of each session, used before their lifetime Karma pool.",
