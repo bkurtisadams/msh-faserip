@@ -124,12 +124,36 @@ export class TeamSheet extends Application {
 
   async _onRemoveHeroFromTeam(event) {
     const heroId = event.currentTarget.dataset.heroId;
+    const hero = game.actors.get(heroId);
+    
+    const confirmed = await Dialog.confirm({
+      title: "Remove from Team",
+      content: `
+        <p>Remove <strong>${hero.name}</strong> from the team?</p>
+        <p style="color: #666; font-size: 0.9em;">
+          This will also reset their karma pool contribution to 0.
+        </p>
+      `
+    });
+    
+    if (!confirmed) return;
+    
     const teamMembers = game.settings.get("msh-faserip", "teamMembers") || [];
     const index = teamMembers.indexOf(heroId);
     
     if (index > -1) {
+      // Remove from team list
       teamMembers.splice(index, 1);
       await game.settings.set("msh-faserip", "teamMembers", teamMembers);
+      
+      // Reset their pool contribution
+      if (hero) {
+        await hero.update({
+          "system.karma.poolContribution": 0
+        });
+      }
+      
+      ui.notifications.info(`${hero.name} removed from team and pool contribution reset.`);
       this.render();
     }
   }

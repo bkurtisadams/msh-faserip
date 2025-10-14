@@ -2051,143 +2051,165 @@
   color: #2e7d32;
 }
 
-/* Karma Pool Sheet Styles */
+/* Karma Pool Sheet Improvements */
 .karma-pool-sheet {
-  font-family: Arial, sans-serif;
-  background: #f5f5f5;
-  color: #222;
-  padding: 12px;
-  overflow-y: auto;
-}
-
-.karma-pool-sheet h2 {
-  color: #8b0000;
-  margin: 0 0 15px 0;
-  border-bottom: 1px solid #ccc;
-  padding-bottom: 5px;
-}
-
-.karma-pool-sheet .karma-summary {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 10px;
-  margin-bottom: 15px;
-}
-
-.karma-pool-sheet .summary-item {
-  text-align: center;
-  padding: 8px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  background: #f0f0f0;
-}
-
-.karma-pool-sheet .summary-item.karma-pool-summary {
-  background-color: #e3f2fd;
-}
-
-.karma-pool-sheet .summary-item label {
-  font-weight: bold;
-  color: #1565c0;
-  display: block;
-  font-size: 0.9em;
-  margin-bottom: 3px;
-}
-
-.karma-pool-sheet .summary-item .value {
-  font-size: 1.3em;
-  font-weight: bold;
-}
-
-.karma-pool-sheet .karma-pool-section {
-  border: 1px solid #ddd;
-  border-radius: 4px;
   padding: 10px;
-  background-color: #f0f7ff;
 }
 
-.karma-pool-sheet .pool-controls {
-  margin-bottom: 12px;
-}
-
-.karma-pool-sheet .pool-controls input {
-  width: 100%;
-  padding: 6px;
+.pool-summary {
+  background: #f5f5f0;
+  padding: 15px;
+  border-radius: 5px;
+  margin-bottom: 15px;
   border: 1px solid #ccc;
-  border-radius: 3px;
 }
 
-.karma-pool-sheet .pool-buttons {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.karma-pool-sheet .pool-buttons button {
-  flex: 1;
-  background-color: #8b0000;
-  color: white;
-  border: none;
-  border-radius: 3px;
-  padding: 8px;
-  cursor: pointer;
-}
-
-.karma-pool-sheet .pool-members {
-  margin-top: 12px;
-  border-top: 1px solid #ddd;
-  padding-top: 12px;
-}
-
-.karma-pool-sheet .pool-members h4 {
-  margin: 0 0 8px 0;
-  font-size: 1em;
-  color: #1565c0;
-}
-
-.karma-pool-sheet .pool-members select {
-  width: calc(100% - 40px);
-  display: inline-block;
-  padding: 5px;
-  border: 1px solid #ccc;
-  border-radius: 3px;
-}
-
-.karma-pool-sheet .add-to-pool {
-  display: inline-block;
-  width: 34px;
-  padding: 5px 0;
-  background-color: #8b0000;
-  color: white;
-  border: none;
-  border-radius: 3px;
-  cursor: pointer;
-}
-
-.karma-pool-sheet .members-list {
-  list-style: none;
-  padding: 0;
-  margin: 10px 0 0 0;
-}
-
-.karma-pool-sheet .members-list li {
+.pool-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 5px 8px;
-  background-color: #f5f5f5;
-  border: 1px solid #ddd;
-  margin-bottom: 5px;
-  border-radius: 3px;
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #8b0000;
 }
 
-.karma-pool-sheet .remove-from-pool {
-  color: #c62828;
+.pool-header h2 {
+  margin: 0;
+  color: #8b0000;
+}
+
+.pool-total {
+  text-align: center;
+}
+
+.pool-total label {
+  display: block;
+  font-size: 0.9em;
+  color: #666;
+  margin-bottom: 5px;
+}
+
+.pool-total .value {
+  font-size: 2em;
+  font-weight: bold;
+  color: #2196F3;
+}
+
+.current-actor-info {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.current-actor-info .info-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.current-actor-info .value {
+  font-weight: bold;
+  color: #2196F3;
+}
+
+.pool-actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 15px;
+  flex-wrap: wrap;
+}
+
+.pool-actions button {
+  flex: 1;
+  min-width: 140px;
+}
+
+.team-members-section {
+  margin-bottom: 15px;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.section-header h3 {
+  margin: 0;
+  color: #8b0000;
+}
+
+.team-members-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.team-members-table th {
+  background: #8b0000;
+  color: white;
+  padding: 8px;
+  text-align: left;
+}
+
+.team-members-table td {
+  padding: 8px;
+  border-bottom: 1px solid #ddd;
+}
+
+.member-row.current-actor {
+  background: #e3f2fd;
+}
+
+.current-badge {
+  color: #2196F3;
+  font-weight: bold;
+  font-size: 0.85em;
+}
+
+.member-actions {
+  text-align: center;
+}
+
+.member-actions a {
+  margin: 0 5px;
   cursor: pointer;
 }
 
-.karma-pool-sheet .remove-from-pool:hover {
-  color: #b71c1c;
+.member-actions a.danger:hover {
+  color: #f44336;
+}
+
+.pool-management {
+  margin-top: 20px;
+  padding-top: 15px;
+  border-top: 2px solid #ccc;
+}
+
+.pool-management h3 {
+  color: #8b0000;
+  margin-bottom: 10px;
+}
+
+.gm-controls {
+  display: flex;
+  gap: 10px;
+}
+
+.danger-button {
+  background: #f44336;
+  color: white;
+}
+
+.danger-button:hover {
+  background: #d32f2f;
+}
+
+.empty-message {
+  text-align: center;
+  color: #666;
+  font-style: italic;
+  padding: 20px !important;
 }
 
 /* Talent Sheet Styling */

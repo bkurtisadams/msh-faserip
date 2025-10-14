@@ -17,36 +17,48 @@ export class KarmaPoolSheet extends DocumentSheet {
 
   getData() {
     const context = super.getData();
-    const actorData = this.object.toObject(false);
+    
+    // Force fresh actor data by re-fetching from game.actors
+    const freshActor = game.actors.get(this.object.id);
+    const actorData = freshActor.toObject(false);
     
     context.system = actorData.system;
-    context.actorName = this.object.name;
+    context.actorName = freshActor.name;
+    context.isGM = game.user.isGM;
     
     // Get shared team pool
     context.teamKarmaPool = game.settings.get("msh-faserip", "teamKarmaPoolTotal") || 0;
     
-    // Get team members from settings
+    // Get team members - FORCE FRESH DATA
     const teamMemberIds = game.settings.get("msh-faserip", "teamMembers") || [];
-    context.poolMembers = game.actors.filter(a => teamMemberIds.includes(a.id)).map(a => ({
-      id: a.id,
-      name: a.name,
-      karma: a.system.attributes?.karma?.value || 0,
-      poolContribution: a.system.karma?.poolContribution || 0
-    }));
+    context.poolMembers = teamMemberIds.map(id => {
+      const member = game.actors.get(id); // Force fresh fetch
+      if (!member) return null;
+      
+      return {
+        id: member.id,
+        name: member.name,
+        karma: member.system.attributes?.karma?.value || 0,
+        poolContribution: member.system.karma?.poolContribution || 0
+      };
+    }).filter(m => m !== null); // Remove any null entries
     
-    // Calculate current actor's available karma
+    // Calculate current actor's available karma using fresh data
     context.currentKarma = this._getCurrentKarma();
     
     return context;
   }
 
   _getCurrentKarma() {
+    // Force fresh actor data
+    const freshActor = game.actors.get(this.object.id);
+    
     // Calculate lifetime karma minus spent (excluding daily rolls) minus advancement
-    const totalEarned = this.object.system.karma.lifetime || 0;
+    const totalEarned = freshActor.system.karma?.lifetime || 0;
     let totalSpentLifetime = 0;
     
-    if (this.object.system.karma.history && Array.isArray(this.object.system.karma.history)) {
-      this.object.system.karma.history.forEach(event => {
+    if (freshActor.system.karma?.history && Array.isArray(freshActor.system.karma.history)) {
+      freshActor.system.karma.history.forEach(event => {
         // Only count non-daily roll spending toward lifetime spent
         if (event.amount < 0 && event.type !== "Daily Roll") {
           totalSpentLifetime += Math.abs(event.amount);
@@ -54,7 +66,7 @@ export class KarmaPoolSheet extends DocumentSheet {
       });
     }
     
-    const advancementFund = this.object.system.karma.advancement || 0;
+    const advancementFund = freshActor.system.karma?.advancement || 0;
     
     return Math.max(0, totalEarned - totalSpentLifetime - advancementFund);
   }
@@ -67,6 +79,10 @@ export class KarmaPoolSheet extends DocumentSheet {
     html.find('.add-to-pool').click(ev => this._onAddToPool(ev));
     html.find('.remove-from-pool').click(ev => this._onRemoveFromPool(ev));
     html.find('.delete-pool').click(ev => this._onDeletePool(ev));
+    html.find('.withdraw-from-pool').click(ev => this._onWithdrawFromPool(ev));
+    html.find('.gm-adjust-pool').click(ev => this._onGMAdjustPool(ev));
+    html.find('.gm-edit-contribution').click(ev => this._onGMEditContribution(ev));
+    html.find('.reset-all-contributions').click(ev => this._onResetAllContributions(ev));
   }
 
   _onContributeToPool(event) {
@@ -266,7 +282,12 @@ export class KarmaPoolSheet extends DocumentSheet {
     
     new Dialog({
       title: "Remove from Team Pool",
-      content: `<p>Remove ${member.name} from the team karma pool?</p>`,
+      content: `
+        <p>Remove <strong>${member.name}</strong> from the team karma pool?</p>
+        <p style="color: #666; font-size: 0.9em;">
+          This will reset their pool contribution to 0.
+        </p>
+      `,
       buttons: {
         remove: {
           icon: '<i class="fas fa-user-minus"></i>',
@@ -278,8 +299,14 @@ export class KarmaPoolSheet extends DocumentSheet {
             if (index > -1) {
               teamMemberIds.splice(index, 1);
               await game.settings.set("msh-faserip", "teamMembers", teamMemberIds);
+              
+              // Reset pool contribution
+              await member.update({
+                "system.karma.poolContribution": 0
+              });
+              
               ui.notifications.info(`${member.name} removed from team pool.`);
-              this.render();
+              this.render(true); // Force full refresh
             }
           }
         },
@@ -299,51 +326,309 @@ export class KarmaPoolSheet extends DocumentSheet {
     const teamMemberIds = game.settings.get("msh-faserip", "teamMembers") || [];
     const teamMembers = game.actors.filter(a => teamMemberIds.includes(a.id));
     
-    if (currentPool === 0) {
-      ui.notifications.warn("Pool is already empty.");
-      return;
-    }
-    
-    const refundPerMember = Math.floor(currentPool / teamMembers.length);
+    const refundPerMember = teamMembers.length > 0 ? Math.floor(currentPool / teamMembers.length) : 0;
     
     const confirmed = await Dialog.confirm({
       title: "Delete Karma Pool",
       content: `
-        <p>Delete the team karma pool and refund karma to members?</p>
+        <p>Delete the team karma pool and clean up all member data?</p>
         <p><strong>Pool Total:</strong> ${currentPool} karma</p>
         <p><strong>Team Members:</strong> ${teamMembers.length}</p>
-        <p><strong>Refund Per Member:</strong> ${refundPerMember} karma</p>
-        <p style="color: #8b0000; margin-top: 10px;">This will reset the pool to 0 and return karma to all team members equally.</p>
+        ${currentPool > 0 ? `<p><strong>Refund Per Member:</strong> ${refundPerMember} karma</p>` : ''}
+        <p style="color: #8b0000; margin-top: 10px;">This will reset the pool to 0, clear all contribution tracking, and optionally refund karma.</p>
       `
     });
     
     if (confirmed) {
-      // Refund karma to each team member
+      // Update all members
+      const updates = [];
+      
       for (const member of teamMembers) {
-        const karmaEvent = {
-          realDate: new Date().toLocaleDateString(),
-          gameDate: "",
-          amount: refundPerMember,
-          type: "Pool Refund",
-          description: `Team karma pool dissolved - equal share refunded`
+        const updateData = {
+          "system.karma.poolContribution": 0
         };
         
-        const history = foundry.utils.deepClone(member.system.karma?.history || []);
-        history.push(karmaEvent);
+        if (currentPool > 0 && refundPerMember > 0) {
+          const karmaEvent = {
+            realDate: new Date().toLocaleDateString(),
+            gameDate: "",
+            amount: refundPerMember,
+            type: "Pool Refund",
+            description: `Team karma pool dissolved - equal share refunded`
+          };
+          
+          const history = foundry.utils.deepClone(member.system.karma?.history || []);
+          history.push(karmaEvent);
+          updateData["system.karma.history"] = history;
+        }
         
-        const newCurrent = (member.system.attributes.karma.value || 0) + refundPerMember;
-        
-        await member.update({
-          "system.karma.history": history,
-          "system.attributes.karma.value": newCurrent
-        });
+        updates.push(member.update(updateData));
       }
+      
+      // Wait for all updates to complete
+      await Promise.all(updates);
       
       // Reset pool to 0
       await game.settings.set("msh-faserip", "teamKarmaPoolTotal", 0);
       
-      ui.notifications.info(`Team karma pool dissolved. ${refundPerMember} karma refunded to each of ${teamMembers.length} members.`);
-      this.render();
+      // Small delay to ensure data propagates
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      ui.notifications.info(`Team karma pool dissolved. ${currentPool > 0 ? `${refundPerMember} karma refunded to each of ${teamMembers.length} members.` : 'All contribution data cleared.'}`);
+      
+      // Force full re-render
+      this.render(true);
     }
   }
-}
+
+  // NEW: Individual withdrawal method
+  _onWithdrawFromPool(event) {
+    event.preventDefault();
+    
+    const currentPool = game.settings.get("msh-faserip", "teamKarmaPoolTotal") || 0;
+    const teamMemberIds = game.settings.get("msh-faserip", "teamMembers") || [];
+    const numberOfMembers = teamMemberIds.length;
+    
+    if (currentPool === 0) {
+      ui.notifications.warn("Pool is empty - nothing to withdraw.");
+      return;
+    }
+    
+    if (numberOfMembers === 0) {
+      ui.notifications.warn("No team members in pool.");
+      return;
+    }
+    
+    const equalShare = Math.floor(currentPool / numberOfMembers);
+    
+    new Dialog({
+      title: "Withdraw from Team Pool",
+      content: `
+        <div style="margin-bottom: 15px;">
+          <p><strong>${this.object.name}</strong> will withdraw from the team karma pool.</p>
+          <div style="background: #f5f5f0; padding: 10px; border-radius: 3px; margin: 10px 0;">
+            <div><strong>Current Pool:</strong> ${currentPool} karma</div>
+            <div><strong>Team Members:</strong> ${numberOfMembers}</div>
+            <div><strong>Your Equal Share:</strong> ${equalShare} karma</div>
+          </div>
+          <p style="color: #666; font-size: 0.9em;">
+            Per FASERIP rules, you receive an equal share (${currentPool} ÷ ${numberOfMembers}) regardless of original contribution.
+          </p>
+        </div>
+        <div class="form-group">
+          <label>
+            <input type="checkbox" name="leaveTeam" checked />
+            Remove me from team pool members
+          </label>
+        </div>
+      `,
+      buttons: {
+        withdraw: {
+          icon: '<i class="fas fa-hand-holding-usd"></i>',
+          label: "Withdraw",
+          callback: async (html) => {
+            const leaveTeam = html.find('[name="leaveTeam"]').is(':checked');
+            
+            // Add karma to actor's history
+            const karmaEvent = {
+              realDate: new Date().toLocaleDateString(),
+              gameDate: "",
+              amount: equalShare,
+              type: "Pool Withdrawal",
+              description: `Withdrew equal share from team karma pool`
+            };
+            
+            const history = foundry.utils.deepClone(this.object.system.karma?.history || []);
+            history.push(karmaEvent);
+            
+            // Reset pool contribution
+            await this.object.update({
+              "system.karma.history": history,
+              "system.karma.poolContribution": 0
+            });
+            
+            // Reduce pool
+            await game.settings.set("msh-faserip", "teamKarmaPoolTotal", currentPool - equalShare);
+            
+            // Optionally remove from team
+            if (leaveTeam) {
+              const index = teamMemberIds.indexOf(this.object.id);
+              if (index > -1) {
+                teamMemberIds.splice(index, 1);
+                await game.settings.set("msh-faserip", "teamMembers", teamMemberIds);
+              }
+            }
+            
+            ui.notifications.info(`${this.object.name} withdrew ${equalShare} karma from the team pool!`);
+            this.render();
+          }
+        },
+        cancel: {
+          icon: '<i class="fas fa-times"></i>',
+          label: "Cancel"
+        }
+      },
+      default: "withdraw"
+    }).render(true);
+  }
+
+// NEW: GM adjust pool total
+  _onGMAdjustPool(event) {
+    event.preventDefault();
+    
+    if (!game.user.isGM) return;
+    
+    const currentPool = game.settings.get("msh-faserip", "teamKarmaPoolTotal") || 0;
+    
+    new Dialog({
+      title: "GM: Adjust Team Karma Pool",
+      content: `
+        <form>
+          <div class="form-group">
+            <label>Current Pool Total:</label>
+            <input type="number" value="${currentPool}" disabled />
+          </div>
+          <div class="form-group">
+            <label>New Pool Total:</label>
+            <input type="number" name="newTotal" value="${currentPool}" min="0" />
+          </div>
+          <div class="form-group">
+            <label>Reason (optional):</label>
+            <input type="text" name="reason" placeholder="e.g., GM award, correction..." />
+          </div>
+        </form>
+      `,
+      buttons: {
+        adjust: {
+          icon: '<i class="fas fa-check"></i>',
+          label: "Set Pool",
+          callback: async (html) => {
+            const newTotal = Number(html.find('[name="newTotal"]').val());
+            const reason = html.find('[name="reason"]').val();
+            
+            if (newTotal < 0) {
+              ui.notifications.error("Pool total cannot be negative.");
+              return;
+            }
+            
+            await game.settings.set("msh-faserip", "teamKarmaPoolTotal", newTotal);
+            
+            const message = reason ? `: ${reason}` : '';
+            ui.notifications.info(`Team karma pool adjusted to ${newTotal}${message}`);
+            this.render();
+          }
+        },
+        cancel: {
+          icon: '<i class="fas fa-times"></i>',
+          label: "Cancel"
+        }
+      },
+      default: "adjust"
+    }).render(true);
+  }
+
+// NEW: GM edit individual contribution
+  _onGMEditContribution(event) {
+    event.preventDefault();
+    
+    if (!game.user.isGM) return;
+    
+    const memberId = event.currentTarget.dataset.id;
+    const memberName = event.currentTarget.dataset.name;
+    const member = game.actors.get(memberId);
+    
+    if (!member) return;
+    
+    const currentContribution = member.system.karma?.poolContribution || 0;
+    
+    new Dialog({
+      title: `GM: Edit ${memberName}'s Contribution`,
+      content: `
+        <form>
+          <div class="form-group">
+            <label>Current Pool Contribution:</label>
+            <input type="number" value="${currentContribution}" disabled />
+          </div>
+          <div class="form-group">
+            <label>New Pool Contribution:</label>
+            <input type="number" name="newContribution" value="${currentContribution}" min="0" />
+          </div>
+          <p style="color: #666; font-size: 0.9em; margin-top: 8px;">
+            Note: This only changes the tracked contribution amount, not the actual pool total or personal karma.
+          </p>
+        </form>
+      `,
+      buttons: {
+        save: {
+          icon: '<i class="fas fa-save"></i>',
+          label: "Save",
+          callback: async (html) => {
+            const newContribution = Number(html.find('[name="newContribution"]').val());
+            
+            if (newContribution < 0) {
+              ui.notifications.error("Contribution cannot be negative.");
+              return;
+            }
+            
+            await member.update({
+              "system.karma.poolContribution": newContribution
+            });
+            
+            ui.notifications.info(`${memberName}'s pool contribution updated to ${newContribution}`);
+            this.render();
+          }
+        },
+        cancel: {
+          icon: '<i class="fas fa-times"></i>',
+          label: "Cancel"
+        }
+      },
+      default: "save"
+    }).render(true);
+  }
+
+  _onResetAllContributions(event) {
+    event.preventDefault();
+    
+    if (!game.user.isGM) return;
+    
+    const teamMemberIds = game.settings.get("msh-faserip", "teamMembers") || [];
+    const teamMembers = game.actors.filter(a => teamMemberIds.includes(a.id));
+    
+    new Dialog({
+      title: "Reset All Contribution Tracking",
+      content: `
+        <p>Reset all pool contribution values to 0 for all ${teamMembers.length} team members?</p>
+        <p style="color: #666; font-size: 0.9em;">This will not affect the pool total or personal karma, only the tracked contribution amounts.</p>
+      `,
+      buttons: {
+        reset: {
+          icon: '<i class="fas fa-eraser"></i>',
+          label: "Reset All",
+          callback: async () => {
+            // Update all members and wait for completion
+            const updates = teamMembers.map(member => 
+              member.update({ "system.karma.poolContribution": 0 })
+            );
+            
+            await Promise.all(updates);
+            
+            // Small delay to ensure data propagates
+            await new Promise(resolve => setTimeout(resolve, 100));
+            
+            ui.notifications.info("All contribution tracking reset to 0.");
+            
+            // Force a full re-render with fresh data
+            this.render(true);
+          }
+        },
+        cancel: {
+          icon: '<i class="fas fa-times"></i>',
+          label: "Cancel"
+        }
+      },
+      default: "cancel"
+    }).render(true);
+  }
+  
+} // end of class KarmaPoolSheet
