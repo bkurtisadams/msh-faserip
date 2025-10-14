@@ -98,38 +98,62 @@
     },
     "power": {
       "templates": ["base", "ranked"],
+      
+      "category": "",
       "type": "",
       "subtype": "",
-      "category": "",
+      
       "range": "",
       "customRange": "",
+      "calculatedRange": "",
       "area": "",
       "duration": "",
       "customDuration": "",
+      
       "limitations": "",
       "isLimited": false,
+      "limitRankMax": "",
+      "limitationColumnShift": 0,
+      
       "isActive": true,
       "isStarred": false,
       "source": "natural",
       "grantedByEquipment": false,
-      "limitRankMax": "",
-      "limitationColumnShift": 0,
-      "bonusPowers": [],
-      "stunts": [],
+      
       "attackType": "",
       "damageType": "",
-      "mentalEffect": "",
-      "karmaCost": 0,
-      "karmaLoss": 0,
+      "primaryEffect": "damage",
+      "damage": 0,
+      
+      "isBodyArmor": false,
+      "bodyArmorType": "both",
       "armorPhysical": 0,
       "armorEnergy": 0,
-      "recoveryRate": "",
+      
+      "isResistance": false,
+      "resistanceType": "",
+      "resistanceEffect": "columnShift",
+      "resistanceValue": 2,
+      
+      "mentalEffect": "",
+      "effectNotes": "",
+      "targetResistsWith": "",
+      
+      "karmaCost": 0,
+      "karmaLoss": 0,
+      
+      "continuingDamage": false,
+      "continuingDamageRounds": 3,
+      
+      "controlStrength": "",
+      "controlQuantity": "",
+      
       "speed": "",
       "areasPerRound": 1,
       "teleportAccuracy": "",
-      "controlStrength": "",
-      "controlQuantity": "",
-      "calculatedRange": "",
+      
+      "recoveryRate": "",
+      
       "isMagic": false,
       "magic": {
         "energyType": "",
@@ -139,7 +163,10 @@
         "targetResistsWith": "",
         "backlashNotes": "",
         "castCost": 0
-      }
+      },
+      
+      "bonusPowers": [],
+      "stunts": []
     },
     "talent": {
       "templates": ["base"],

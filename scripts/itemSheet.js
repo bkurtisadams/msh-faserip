@@ -6,7 +6,7 @@ export class FaseripItemSheet extends ItemSheet {
     return foundry.utils.mergeObject(super.defaultOptions, {
       classes: ["faserip", "sheet", "item"],
       width: 500,
-      height: "auto",
+      height: 600,
       tabs: [{ navSelector: ".sheet-tabs", contentSelector: ".sheet-body", initial: "description" }],
       resizable: true
     });
@@ -34,49 +34,83 @@ export class FaseripItemSheet extends ItemSheet {
   }
 
   // In itemSheet.js - revised getData() function
-getData() {
-  // Get base data
-  const context = super.getData();
-  context.item = this.item;
-  context.system = this.item.system;
-  
-  // Add custom CSS class based on document type
-  const classes = ["faserip", "sheet", "item", this.item.type];
-  context.cssClass = classes.join(" ");
+  getData() {
+    const context = super.getData();
+    context.item = this.item;
+    context.system = this.item.system;
+    
+    const classes = ["faserip", "sheet", "item", this.item.type];
+    context.cssClass = classes.join(" ");
 
-  // If this is a power and marked as magic, include options
-  if (this.item.type === "power") {
-    context.isMagic = context.system.isMagic;
-    context.magic = context.system.magic || {};
-    context.energyTypes = ["personal", "universal", "dimensional"];
-    context.abilities = ["fighting", "agility", "strength", "endurance", "reason", "intuition", "psyche"];
-  }
-  
-  // Add specific data for power items
-  if (this.item.type === "power") {
-    // Add power-specific dropdown options
-    context.powerTypes = [
-      "Resistances", "Movement", "Matter Control", "Energy Control", 
-      "Body Control", "Mental", "Sensory", "Self-Alteration", "Other"
-    ];
-    
-    // Range options - direct options for dropdown
-    context.rangeOptions = [
-      "1 area", "2 areas", "4 areas", "6 areas", "8 areas", 
-      "10 areas", "20 areas", "40 areas", "60 areas", "80 areas", 
-      "160 areas", "400 areas", "Line of Sight"
-    ];
-    
-    context.durationOptions = [
-      "Instant", "Concentration", "Maintenance", "Permanent"
-    ];
-    
-    // Make sure to log data for debugging
-    console.log("Power sheet data:", context);
+    if (this.item.type === "power") {
+      context.isMagic = context.system.isMagic;
+      context.magic = context.system.magic || {};
+      context.energyTypes = ["personal", "universal", "dimensional"];
+      context.abilities = ["fighting", "agility", "strength", "endurance", "reason", "intuition", "psyche"];
+      
+      // Add dropdown options from CONFIG
+      context.damageTypes = CONFIG.FASERIP.damageTypes;
+      context.resistanceTypes = CONFIG.FASERIP.resistanceTypes;
+      context.attackTypes = CONFIG.FASERIP.attackTypes;
+      context.primaryEffects = CONFIG.FASERIP.primaryEffects;
+      context.bodyArmorTypes = CONFIG.FASERIP.bodyArmorTypes;
+      context.resistanceEffects = CONFIG.FASERIP.resistanceEffects;
+      
+      context.powerTypes = [
+        "Resistances", "Movement", "Matter Control", "Energy Control", 
+        "Body Control", "Mental", "Sensory", "Self-Alteration", "Other"
+      ];
+      
+      context.rangeOptions = [
+        "1 area", "2 areas", "4 areas", "6 areas", "8 areas", 
+        "10 areas", "20 areas", "40 areas", "60 areas", "80 areas", 
+        "160 areas", "400 areas", "Line of Sight"
+      ];
+      
+      context.durationOptions = [
+        "Instant", "Concentration", "Maintenance", "Permanent"
+      ];
+      
+      // Auto-detect which action buttons will find this power
+      context.detectedActions = this._detectActionButtons(context.system);
+      
+      console.log("Power sheet data:", context);
+    }
+
+    return context;
   }
 
-  return context;
-}
+  _detectActionButtons(system) {
+    const detected = [];
+    const cat = String(system.category || "").toLowerCase();
+    const typ = String(system.type || "").toLowerCase();
+    
+    // Energy detection
+    if (cat.includes("energy") || cat.includes("distanceattacks")) {
+      if (/energy|light|electric|plasma|beam|blast|fire|ice|sound|darkforce|radiation/.test(typ)) {
+        detected.push("Energy Attack");
+      }
+    }
+    
+    // Force detection
+    if (cat.includes("distanceattacks") || /force|telekinesis|kinetic/.test(cat)) {
+      if (/force|telekinesis|kinetic|pressure|concussion|shockwave|ram/.test(typ)) {
+        detected.push("Force Attack");
+      }
+    }
+    
+    // Mental detection
+    if (cat.includes("mental") || /telepathy|emotion|mind/.test(typ)) {
+      detected.push("Mental Attack");
+    }
+    
+    // Edged detection
+    if (/claws|edged|slashing/.test(typ) || system.attackType === "melee-edged") {
+      detected.push("Edged Attack");
+    }
+    
+    return detected;
+  }
 
   activateListeners(html) {
     super.activateListeners(html);
@@ -285,6 +319,111 @@ if (this.item.type === "talent") {
     // Initially populate the dropdown
     updateSpecialtyDropdown();
   }
+
+    // Show/hide offensive fields
+  html.find('#is-offensive').change(ev => {
+    const checked = ev.currentTarget.checked;
+    html.find('#offensive-fields').toggle(checked);
+  });
+
+  // Show/hide body armor fields
+  html.find('#is-body-armor').change(ev => {
+    const checked = ev.currentTarget.checked;
+    html.find('#body-armor-fields').toggle(checked);
+  });
+
+  // Show/hide resistance fields
+  html.find('#is-resistance').change(ev => {
+    const checked = ev.currentTarget.checked;
+    html.find('#resistance-fields').toggle(checked);
+  });
+
+  // Show/hide magic fields
+  html.find('#is-magic-checkbox').change(ev => {
+    const checked = ev.currentTarget.checked;
+    html.find('#magic-fields').toggle(checked);
+  });
+
+  // Auto-calculate energy armor
+  html.find('#armor-physical').change(ev => {
+    const physical = parseInt(ev.currentTarget.value) || 0;
+    const energyField = html.find('#armor-energy');
+    if (energyField.val() == 0 || energyField.val() == '') {
+      energyField.val(Math.max(0, physical - 20));
+    }
+  });
+
+  // Update resistance value label
+  html.find('input[name="system.resistanceEffect"]').change(ev => {
+    const effect = ev.currentTarget.value;
+    const label = html.find('#resistance-value-label');
+    const group = html.find('#resistance-value-group');
+    
+    if (effect === 'columnShift') {
+      label.text('CS Bonus:');
+      group.show();
+    } else if (effect === 'damageReduction') {
+      label.text('Damage Reduction:');
+      group.show();
+    } else {
+      group.hide();
+    }
+  });
+
+  // Delete button
+  html.find('.delete-power').click(async () => {
+    const confirmed = await Dialog.confirm({
+      title: "Delete Power",
+      content: `<p>Are you sure you want to delete ${this.item.name}?</p>`
+    });
+    if (confirmed) {
+      await this.item.delete();
+      this.close();
+    }
+  });
+
+  // Test power button (placeholder)
+  html.find('.test-power').click(() => {
+    ui.notifications.info("Test Power functionality coming soon!");
+  });
+
+  // Show/hide body armor fields
+html.find('#is-body-armor').change(ev => {
+  const checked = ev.currentTarget.checked;
+  html.find('.armor-details').toggle(checked);
+});
+
+  // Show/hide resistance fields
+  html.find('#is-resistance').change(ev => {
+    const checked = ev.currentTarget.checked;
+    html.find('.resistance-details').toggle(checked);
+  });
+
+  // Auto-calculate energy armor from physical
+  html.find('#armor-physical').change(ev => {
+    const physical = parseInt(ev.currentTarget.value) || 0;
+    const energyField = html.find('#armor-energy');
+    if (!energyField.val() || energyField.val() == 0) {
+      energyField.val(Math.max(0, physical - 20));
+    }
+  });
+
+  // Update resistance value label based on effect type
+  html.find('[name="system.resistanceEffect"]').change(ev => {
+    const effect = ev.currentTarget.value;
+    const label = html.find('#resistance-value-label');
+    const group = html.find('.resistance-value-group');
+    
+    if (effect === 'columnShift') {
+      label.text('CS Bonus:');
+      group.show();
+    } else if (effect === 'damageReduction') {
+      label.text('Damage Reduction:');
+      group.show();
+    } else if (effect === 'immunity') {
+      group.hide();
+    }
+  });
 
   // end of activeListeners
   }

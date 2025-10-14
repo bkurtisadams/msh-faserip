@@ -149,11 +149,13 @@ export class EnergyAction extends RangedAttackAction {
               const useAdHoc = !!$("#adhoc-toggle").is(":checked");
 
               let powerName = "", powerDamage = 0, powerRank = "Remarkable", powerId = null, prettyRange = "";
+              let powerDamageType = "energy-generic"; // Default damage type
 
               if (useAdHoc) {
                 powerName = String($('[name="adhocName"]').val() || "Energy Blast");
                 powerDamage = Number($('[name="adhocDamage"]').val() || 0);
                 powerRank = String($('[name="adhocRank"]').val() || "Remarkable");
+                powerDamageType = "energy-generic"; // Ad-hoc uses generic energy
                 if (!Number.isFinite(powerDamage) || powerDamage < 0) {
                   ui.notifications.error("Enter a valid non-negative damage value for the ad-hoc energy.");
                   return resolve(null);
@@ -171,6 +173,7 @@ export class EnergyAction extends RangedAttackAction {
                 powerDamage = Number(s.damage ?? s.value ?? 0);
                 powerRank = String(s.rank ?? s.powerRank ?? "Remarkable");
                 prettyRange = String(s.calculatedRange || "");
+                powerDamageType = item.system.damageType || "energy-generic"; // Get from power or default
               }
 
               const shift = Number($('[name="shift"]').val() || 0);
@@ -217,7 +220,8 @@ export class EnergyAction extends RangedAttackAction {
                 obstacleModifier,
                 // ⬇️ ADD THESE TWO LINES
                 targetMovement,
-                movementModifier
+                movementModifier,
+                powerDamageType
               });
             },
           },
@@ -294,8 +298,9 @@ export class EnergyAction extends RangedAttackAction {
       showStun: /stun/.test(effText),
       showKill: /kill/.test(effText),
       actorUuid: actor.uuid,
-      damage: isHit ? choice.powerDamage : 0,  // Only pass damage if it's a hit
+      damage: isHit ? choice.powerDamage : 0,
       attackForm: "energy",
+      damageType: choice.powerDamageType || "energy-generic"
     });
 
     const rangeText = choice.prettyRange || `${choice.range} area${choice.range > 1 ? "s" : ""}${choice.rangeModifier ? ` (${choice.rangeModifier}CS)` : ""}${choice.throughObstacle ? `, obstacle (-2CS)` : ""}`;

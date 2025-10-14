@@ -710,63 +710,53 @@ export async function applyDamageToTargets(damage, options = {}) {
   // Get target's Body Armor (check both equipment and powers)
   let bodyArmorValue = 0;
 
-  // ✅ ONLY calculate armor if not bypassed
+  // ONLY calculate armor if not bypassed
   if (!bypassArmor) {
-    // Check armor equipment
-    const armorItems = targetActor.items.filter(i => 
-      i.type === "equipment" && 
-      i.system.category === "armor" && 
-      i.system.protection
-    );
+    // Use new helper function to get armor values with energy vs physical distinction
+    const armorData = getBodyArmorValues(targetActor, damageType);
+    bodyArmorValue = armorData.applicable;
     
-    if (armorItems.length > 0) {
-      const bestArmor = armorItems.reduce((best, current) => {
-        let bestValue = 0;
-        let currentValue = 0;
-        
-        if (typeof best.system.protection === 'number') {
-          bestValue = best.system.protection;
-        } else {
-          bestValue = CONFIG.FASERIP?.rankValues?.[best.system.protection] || 0;
+    debugLog("Armor calculation", {
+      targetName: target.name,
+      damageType: damageType,
+      isEnergyDamage: armorData.isEnergyDamage,
+      physicalArmor: armorData.physical,
+      energyArmor: armorData.energy,
+      applicableArmor: bodyArmorValue
+    });
+    
+    // Check for resistances
+    const resistance = getResistanceModifiers(targetActor, damageType);
+    
+    // Check immunity first - if immune, skip damage entirely
+    if (resistance.hasImmunity) {
+      const attackRank = damage; // You could pass actual attack rank if available
+      if (checkImmunity(targetActor, damageType, attackRank)) {
+        if (showNotification) {
+          ui.notifications.info(
+            `${target.name} is IMMUNE to ${damageType} damage!`
+          );
         }
-        
-        if (typeof current.system.protection === 'number') {
-          currentValue = current.system.protection;
-        } else {
-          currentValue = CONFIG.FASERIP?.rankValues?.[current.system.protection] || 0;
-        }
-        
-        return currentValue > bestValue ? current : best;
+        result.immune = true;
+        result.success = true;
+        result.damageDealt = 0;
+        result.absorbed = damage;
+        results.push(result);
+        continue; // Skip to next target
+      }
+    }
+    
+    // Apply resistance damage reduction (stacks with armor)
+    if (resistance.damageReduction > 0) {
+      bodyArmorValue += resistance.damageReduction;
+      debugLog("Resistance applied", {
+        targetName: target.name,
+        resistanceDR: resistance.damageReduction,
+        totalProtection: bodyArmorValue
       });
-      
-      if (typeof bestArmor.system.protection === 'number') {
-        bodyArmorValue = bestArmor.system.protection;
-      } else {
-        bodyArmorValue = CONFIG.FASERIP?.rankValues?.[bestArmor.system.protection] || 0;
-      }
     }
-
-    // Check Body Armor powers
-    const bodyArmorPower = targetActor.items.find(i => 
-      i.type === "power" && 
-      (i.name.toLowerCase().includes("body armor") || 
-      i.name.toLowerCase().includes("body armour") ||
-      i.name.toLowerCase().includes("armor") ||
-      i.system.type?.toLowerCase().includes("body armor"))
-    );
     
-    if (bodyArmorPower) {
-      let powerValue = 0;
-      if (typeof bodyArmorPower.system.value === 'number') {
-        powerValue = bodyArmorPower.system.value;
-      } else {
-        powerValue = CONFIG.FASERIP?.rankValues?.[bodyArmorPower.system.rank] || 0;
-      }
-      
-      if (powerValue > bodyArmorValue) {
-        bodyArmorValue = powerValue;
-      }
-    }
+    // Note: CS bonus from resistance affects to-hit rolls (applied in action classes, not here)
   } // close the if (!bypassArmor) block
 
     // Calculate damage after armor
@@ -917,4 +907,184 @@ export async function applyDamageToActorUuid(damage, actorUuid, options = {}) {
     if (showNotification) ui.notifications.error("Failed to apply collision damage.");
     return { success: false, error: err?.message || String(err) };
   }
+}
+
+// Add to action-utils.js
+
+/**
+ * Get Body Armor values for a target actor
+ * Supports both new explicit flags and legacy name-matching
+ * @param {Actor} targetActor - The actor being hit
+ * @param {string} damageType - Type of damage (e.g., "energy-fire", "physical-blunt")
+ * @returns {Object} { physical, energy, applicable }
+ */
+export function getBodyArmorValues(targetActor, damageType = "physical-blunt") {
+  let physicalArmor = 0;
+  let energyArmor = 0;
+
+  // Check equipment armor
+  const armorItems = targetActor.items.filter(i => 
+    i.type === "equipment" && 
+    i.system.category === "armor" && 
+    i.system.protection
+  );
+  
+  if (armorItems.length > 0) {
+    const bestArmor = armorItems.reduce((best, current) => {
+      const bestVal = typeof best.system.protection === 'number' 
+        ? best.system.protection 
+        : (CONFIG.FASERIP?.rankValues?.[best.system.protection] || 0);
+      const currVal = typeof current.system.protection === 'number'
+        ? current.system.protection
+        : (CONFIG.FASERIP?.rankValues?.[current.system.protection] || 0);
+      return currVal > bestVal ? current : best;
+    });
+    
+    const armorValue = typeof bestArmor.system.protection === 'number'
+      ? bestArmor.system.protection
+      : (CONFIG.FASERIP?.rankValues?.[bestArmor.system.protection] || 0);
+    
+    physicalArmor = armorValue;
+    energyArmor = Math.max(0, armorValue - 20); // FASERIP rule: energy armor = physical - 20
+  }
+
+  // Check Body Armor powers with NEW explicit flag support
+  const bodyArmorPowers = targetActor.items.filter(i => {
+    if (i.type !== "power") return false;
+    
+    // NEW WAY: Check explicit isBodyArmor flag
+    if (i.system.isBodyArmor === true) return true;
+    
+    // LEGACY FALLBACK: Name matching for backward compatibility
+    const name = i.name.toLowerCase();
+    return name.includes("body armor") || 
+           name.includes("body armour") || 
+           i.system.type?.toLowerCase().includes("body armor");
+  });
+
+  bodyArmorPowers.forEach(power => {
+    const type = power.system.bodyArmorType || "both";
+    
+    // NEW: Use explicit armorPhysical/armorEnergy fields if available
+    let physVal = power.system.armorPhysical;
+    let energyVal = power.system.armorEnergy;
+    
+    // FALLBACK: Use value or rank if new fields not set
+    if (physVal === undefined || physVal === 0) {
+      physVal = typeof power.system.value === 'number'
+        ? power.system.value
+        : (CONFIG.FASERIP?.rankValues?.[power.system.rank] || 0);
+    }
+    
+    if (energyVal === undefined || energyVal === 0) {
+      // FASERIP rule: energy = physical - 20 if not explicitly set
+      energyVal = Math.max(0, physVal - 20);
+    }
+    
+    // Apply based on armor type
+    if (type === "physical" || type === "both") {
+      physicalArmor = Math.max(physicalArmor, physVal);
+    }
+    if (type === "energy" || type === "both") {
+      energyArmor = Math.max(energyArmor, energyVal);
+    }
+  });
+
+  // Determine which armor applies based on damage type
+  const isEnergy = CONFIG.FASERIP?.isEnergyDamage?.(damageType) ?? 
+                   (damageType && damageType.includes("energy"));
+  const applicable = isEnergy ? energyArmor : physicalArmor;
+
+  return {
+    physical: physicalArmor,
+    energy: energyArmor,
+    applicable: applicable,
+    isEnergyDamage: isEnergy
+  };
+}
+
+/**
+ * Get resistance modifiers for a target actor
+ * @param {Actor} targetActor - The actor being hit
+ * @param {string} damageType - Type of damage (e.g., "energy-fire", "physical-blunt")
+ * @returns {Object} { csBonus, damageReduction, hasImmunity, resistancePowers }
+ */
+export function getResistanceModifiers(targetActor, damageType = "physical-blunt") {
+  // Extract base resistance type (e.g., "fire" from "energy-fire")
+  let baseType = damageType;
+  if (damageType?.includes("-")) {
+    baseType = damageType.split("-")[1];
+  }
+  
+  // Find relevant resistance powers
+  const resistances = targetActor.items.filter(i => {
+    if (i.type !== "power") return false;
+    
+    // NEW WAY: Check explicit isResistance flag and match type
+    if (i.system.isResistance === true) {
+      return i.system.resistanceType === baseType;
+    }
+    
+    // LEGACY FALLBACK: Category-based detection
+    const cat = String(i.system.category || "").toLowerCase();
+    if (cat === "resistances") {
+      const typ = String(i.system.type || "").toLowerCase();
+      return typ.includes(baseType);
+    }
+    
+    return false;
+  });
+
+  let totalCSBonus = 0;
+  let totalDamageReduction = 0;
+  let hasImmunity = false;
+
+  resistances.forEach(res => {
+    const effect = res.system.resistanceEffect || "columnShift";
+    
+    if (effect === "immunity") {
+      hasImmunity = true;
+    } else if (effect === "columnShift") {
+      totalCSBonus += res.system.resistanceValue || 2;
+    } else if (effect === "damageReduction") {
+      totalDamageReduction += res.system.resistanceValue || 0;
+    }
+  });
+
+  return {
+    csBonus: totalCSBonus,
+    damageReduction: totalDamageReduction,
+    hasImmunity: hasImmunity,
+    resistancePowers: resistances,
+    damageType: damageType,
+    baseType: baseType
+  };
+}
+
+/**
+ * Check if target is immune to damage type based on resistance powers
+ * @param {Actor} targetActor - The actor being hit
+ * @param {string} damageType - Type of damage
+ * @param {number} attackRank - Rank value of the attack
+ * @returns {boolean} True if immune
+ */
+export function checkImmunity(targetActor, damageType, attackRank) {
+  const resistance = getResistanceModifiers(targetActor, damageType);
+  
+  if (!resistance.hasImmunity) return false;
+  
+  // Check if any immunity power has rank >= attack rank
+  for (const resPower of resistance.resistancePowers) {
+    if (resPower.system.resistanceEffect === "immunity") {
+      const resRank = typeof resPower.system.value === 'number'
+        ? resPower.system.value
+        : (CONFIG.FASERIP?.rankValues?.[resPower.system.rank] || 0);
+      
+      if (resRank >= attackRank) {
+        return true; // Immune!
+      }
+    }
+  }
+  
+  return false;
 }

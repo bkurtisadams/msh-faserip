@@ -170,6 +170,7 @@ BLUNT DAMAGE RULES:
             }
 
             resolve({ src, itemId, objectName, objectRank, objectValue, shift, karma, skipDice, weaponMat, weaponName, damage, note });
+            const attackDamageType = "physical-blunt";
           }
         },
           cancel: { label: "Cancel", callback: ()=> resolve(null) }
@@ -256,24 +257,10 @@ BLUNT DAMAGE RULES:
       if (targets.length === 1) {
         const targetActor = targets[0].actor;
         if (targetActor) {
-          // Get target's Body Armor
-          let bodyArmorValue = 0;
-          
-          // Check Body Armor power
-          const bodyArmorPower = targetActor.items.find(i => 
-            i.type === "power" && 
-            (i.name.toLowerCase().includes("body armor") || 
-            i.name.toLowerCase().includes("body armour"))
-          );
-          
-          if (bodyArmorPower) {
-            bodyArmorValue = bodyArmorPower.system?.value || 0;
-          }
-          
-          penetratingDamage = Math.max(0, choice.damage - bodyArmorValue);
+          const armorData = getBodyArmorValues(targetActor, "physical-blunt");
+          penetratingDamage = Math.max(0, choice.damage - armorData.applicable);
         }
       } else {
-        // Multiple or no targets - can't auto-calculate, use full damage as estimate
         penetratingDamage = choice.damage;
       }
     }
@@ -285,7 +272,8 @@ BLUNT DAMAGE RULES:
       breakingFeat,
       actorUuid: actor.uuid,
       damage: penetratingDamage,
-      attackForm: "blunt"
+      attackForm: "blunt",
+      damageType: "physical-blunt"
     });
 
     // weapon/bare line

@@ -249,7 +249,7 @@ export class EdgedAttackAction extends AttackAction {
         "Apply Damage",
         "Apply damage to targeted/selected token(s)", 
         true, 
-        `data-damage="${choice.damage}" data-attacker-uuid="${actor.uuid}"`
+        `data-damage="${choice.damage}" data-attacker-uuid="${actor.uuid}" data-damage-type="physical-edged"`
       ));
     }
 
@@ -260,14 +260,14 @@ export class EdgedAttackAction extends AttackAction {
       "Resolve Stun",
       "Open Stun Check dialog",
       true,
-      `data-check="stun" data-attack-form="edged" data-dmg="${choice.damage}" data-attacker-uuid="${actor.uuid}"`
+      `data-check="stun" data-attack-form="edged" data-damage-type="physical-edged" data-dmg="${choice.damage}" data-attacker-uuid="${actor.uuid}"`
     ));
 
     if (enableKill) parts.push(chip(
       "Resolve Kill",
-      "Open Kill Check dialog",
+      "Open Kill check dialog",
       true,
-      `data-check="kill" data-attack-form="edged" data-dmg="${choice.damage}" data-attacker-uuid="${actor.uuid}"`
+      `data-check="kill" data-attack-form="edged" data-damage-type="physical-edged" data-dmg="${choice.damage}" data-attacker-uuid="${actor.uuid}"`
     ));
 
     if (choice.src === "weapon") {

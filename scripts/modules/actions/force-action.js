@@ -150,6 +150,7 @@ export class ForceAction extends RangedAttackAction {
               const useAdHoc = !!$("#adhoc-toggle").is(":checked");
 
               let powerName = "", powerDamage = 0, powerRank = "Remarkable", powerId = null, prettyRange = "";
+              let powerDamageType = "energy-force"; // Force uses different default
 
               if (useAdHoc) {
                 powerName = String($('[name="adhocName"]').val() || "Force Blast");
@@ -172,6 +173,7 @@ export class ForceAction extends RangedAttackAction {
                 powerDamage = Number(s.damage ?? s.value ?? 0);
                 powerRank = String(s.rank ?? s.powerRank ?? "Remarkable");
                 prettyRange = String(s.calculatedRange || "");
+                powerDamageType = item.system.damageType || "energy-force";
               }
 
               const shift = Number($('[name="shift"]').val() || 0);

@@ -128,7 +128,7 @@ Hooks.once("init", async () => {
     type: Boolean,
     default: false
   });
-  
+
   game.settings.register('msh-faserip', 'dailyKarmaEnabled', {
     name: "Enable Daily Karma",
     hint: "If enabled, characters gain temporary Karma equal to their Reason+Intuition+Psyche at the start of each session, used before their lifetime Karma pool.",
@@ -242,6 +242,118 @@ Hooks.once("init", async () => {
     "Class1000": 1000,
     "Class3000": 3000,
     "Class5000": 5000
+  };
+
+  // Add after the rankValues definition in init.js
+
+  CONFIG.FASERIP.damageTypes = {
+    // Physical
+    "physical-blunt": "Physical: Blunt",
+    "physical-edged": "Physical: Edged",
+    
+    // Energy - these need to bypass physical armor
+    "energy-force": "Energy: Force",
+    "energy-generic": "Energy: Generic",
+    "energy-fire": "Energy: Fire/Heat",
+    "energy-cold": "Energy: Cold/Ice",
+    "energy-electricity": "Energy: Electricity",
+    "energy-sound": "Energy: Sound/Sonic",
+    "energy-light": "Energy: Light",
+    "energy-radiation": "Energy: Radiation",
+    "energy-darkforce": "Energy: Darkforce",
+    
+    // Special
+    "corrosive": "Corrosive/Acid",
+    "mental": "Mental/Psionic",
+    "nullification": "Nullification",
+    
+    // Touch Attacks
+    "touch-energy": "Touch: Energy",
+    "touch-paralyzing": "Touch: Paralyzing",
+    "touch-rotting": "Touch: Rotting (organic)",
+    "touch-corrosive": "Touch: Corrosive (inorganic)",
+    "touch-healthdrain": "Touch: Health Drain",
+    "touch-blinding": "Touch: Blinding"
+  };
+
+  CONFIG.FASERIP.resistanceTypes = {
+    "fire": "Fire/Heat",
+    "cold": "Cold/Ice",
+    "electricity": "Electricity",
+    "radiation": "Radiation",
+    "toxins": "Toxins/Poison",
+    "corrosives": "Corrosives/Acid",
+    "emotion": "Emotion Attacks",
+    "mental": "Mental Attacks",
+    "magic": "Magical Attacks",
+    "disease": "Disease"
+  };
+
+  CONFIG.FASERIP.attackTypes = {
+    "ranged-energy": "Ranged: Energy Blast",
+    "ranged-force": "Ranged: Force Blast",
+    "ranged-projectile": "Ranged: Projectile",
+    "ranged-thrown": "Ranged: Thrown Weapon",
+    "melee-blunt": "Melee: Blunt Attack",
+    "melee-edged": "Melee: Edged Attack",
+    "touch": "Touch Attack",
+    "mental": "Mental Attack",
+    "grapple": "Grappling",
+    "charging": "Charging Attack"
+  };
+
+  CONFIG.FASERIP.primaryEffects = {
+    "damage": "Deals Damage",
+    "stun": "Stunning Effect",
+    "nullification": "Power Nullification",
+    "control-mind": "Mind Control",
+    "control-emotion": "Emotion Control",
+    "control-animal": "Animal Control",
+    "control-plant": "Plant Control",
+    "healing": "Healing",
+    "support": "Support/Buff",
+    "transformation": "Transformation",
+    "detection": "Detection/Sensing",
+    "teleportation": "Teleportation",
+    "illusion": "Illusion/Image",
+    "force-field": "Force Field"
+  };
+
+  CONFIG.FASERIP.bodyArmorTypes = {
+    "physical": "Physical Only",
+    "energy": "Energy Only",
+    "both": "Both Physical & Energy"
+  };
+
+  CONFIG.FASERIP.resistanceEffects = {
+    "columnShift": "Column Shift Bonus",
+    "damageReduction": "Damage Reduction",
+    "immunity": "Immunity (if rank exceeds attack)"
+  };
+
+  // Helper function to check if damage type is energy-based
+  CONFIG.FASERIP.isEnergyDamage = function(damageType) {
+    return damageType && (
+      damageType.startsWith("energy-") || 
+      damageType === "mental" ||
+      damageType === "touch-energy"
+    );
+  };
+
+  // Helper function to check if damage type is physical
+  CONFIG.FASERIP.isPhysicalDamage = function(damageType) {
+    return damageType && damageType.startsWith("physical-");
+  };
+
+  // Helper function to get appropriate armor value
+  CONFIG.FASERIP.getApplicableArmor = function(armorPhysical, armorEnergy, damageType) {
+    if (this.isEnergyDamage(damageType)) {
+      return armorEnergy || 0;
+    } else if (this.isPhysicalDamage(damageType)) {
+      return armorPhysical || 0;
+    }
+    // For special damage types, use physical as default
+    return armorPhysical || 0;
   };
 
   await loadTemplates([
