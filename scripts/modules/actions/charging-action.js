@@ -125,107 +125,100 @@ export class ChargingAction extends BaseAction {
 
   // Build dialog
   const dialogHtml = `
-    <div style="margin-bottom:8px;"><strong>${actionName}</strong></div>
+  <div style="margin-bottom:8px;">
+    <span style="display:inline-block;width:60px;"><strong>Action:</strong></span>
+    <span>${actionName}</span>
+  </div>
 
-    <div style="margin-bottom:8px;">
-      <span style="display:inline-block;width:140px;">Endurance:</span>
-      <span style="margin-left:6px;">${endurance.rank} (${endurance.value})</span>
+  <div style="margin-bottom:8px;">
+    <span style="display:inline-block;width:60px;"><strong>Target:</strong></span>
+    <span>${targetName || "(no target selected)"}</span>
+  </div>
+
+  <div style="margin-bottom:8px;">
+    <strong>END:</strong> ${endurance.rank} (${endurance.value}) | 
+    <strong>BA:</strong> ${bodyArmorRank} (${bodyArmorValue}) | 
+    <strong>Agility:</strong> ${agility.rank} (${agility.value})
+  </div>
+
+  <div style="margin-bottom:12px;padding:6px;background:#fff3e0;border:1px solid #ff9800;border-radius:3px;">
+    <div style="margin-bottom:4px;">
+      <label style="display:inline-block;width:80px;" title="Areas moved">Movement:</label>
+      <input type="number" name="areas" value="${savedAreas}" min="1" max="20" style="width:60px;">
+      <span id="charge-bonus" style="margin-left:6px;font-weight:bold;color:#2e7d32;" title="Column Shift bonus from movement">
+        CS: ${Math.min(3, savedAreas)}
+      </span>
     </div>
-
-    <div style="margin-bottom:8px;">
-      <span style="display:inline-block;width:140px;">Body Armor:</span>
-      <span style="margin-left:6px;">${bodyArmorRank} (${bodyArmorValue})</span>
-    </div>
-
-    <div style="margin-bottom:8px;">
-      <span style="display:inline-block;width:140px;">Agility (for miss):</span>
-      <span style="margin-left:6px;">${agility.rank} (${agility.value})</span>
-    </div>
-
-    <div style="margin-bottom:12px;padding:8px;background:#fff3e0;border:1px solid #ff9800;border-radius:3px;">
-      <div style="font-weight:bold;margin-bottom:4px;">Movement and Modifiers</div>
-      <div style="margin-bottom:6px;">
-        <label style="display:inline-block;width:140px;">Areas moved:</label>
-        <input type="number" name="areas" value="${savedAreas}" min="1" max="20" style="width:60px;">
-        <span id="charge-bonus" style="margin-left:6px;font-weight:bold;color:#2e7d32;">
-          CS bonus: ${Math.min(3, savedAreas)}
-        </span>
-      </div>
-      <div style="font-size:0.85em;color:#666;">
-        Must move at least one area. Gain one CS per area moved (cap three at three or more areas).
-      </div>
-    </div>
-
-    <div style="margin-bottom:8px;">
-      <span style="display:inline-block;width:140px;">Base Column Shift:</span>
+    <div style="margin-bottom:4px;">
+      <label style="display:inline-block;width:80px;" title="Base Column Shift modifier">Base CS:</label>
       <input type="number" name="shift" value="${Number(this.opts.shift ?? 0)}" style="width:60px;">
-    </div>
-
-    <div style="margin-bottom:8px;">
-      <span style="display:inline-block;width:140px;">Karma Points:</span>
+      <label style="display:inline-block;width:80px;margin-left:40px;" title="Karma points to spend">Karma:</label>
       <input type="number" name="karma" value="${Number(this.opts.karma ?? 0)}" min="0" style="width:60px;">
     </div>
-
-    <div style="margin-bottom:8px;">
-      <label style="font-weight:bold;">Target Type:</label>
-      <label style="margin-left:10px;"><input type="radio" name="target-type" value="character" ${defaultTargetType === 'character' ? 'checked' : ''}> Character</label>
-      <label style="margin-left:10px;"><input type="radio" name="target-type" value="object" ${defaultTargetType === 'object' ? 'checked' : ''}> Inanimate Object</label>
+    <div style="font-size:0.8em;color:#777;">
+      Must move at least one area. Gain one CS per area moved (cap three at three or more areas).
     </div>
+  </div>
 
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
-      <div id="character-target-panel" style="padding:8px;border:1px solid #2196F3;border-radius:3px;background:#e3f2fd;">
-        <div style="font-weight:bold;margin-bottom:6px;color:#1565c0;">Character Target</div>
-        ${targetName ? `<div style="margin-bottom:6px;color:#2e7d32;font-weight:bold;">Target: ${targetName}</div>` : ''}
-        <div style="margin-bottom:6px;">
-          <label style="display:block;margin-bottom:2px;">Body Armor Rank:</label>
-          <select name="targetBodyArmorRank" style="width:100%;">${rankOptions}</select>
-        </div>
-        <div style="margin-bottom:6px;">
-          <label style="display:block;margin-bottom:2px;">Body Armor Value:</label>
-          <input type="number" name="targetBodyArmorValue" value="${savedTargetBAValue}" min="0" style="width:80px;">
-        </div>
-        <div id="char-damage-preview" style="margin-top:8px;padding:6px;background:#fff;border:1px solid #2196F3;border-radius:3px;font-size:0.9em;">
-          <strong>Damage Preview:</strong><br>
-          <span id="char-damage-calc">Calculating...</span>
-        </div>
-        <div id="char-rebound-warning" style="margin-top:4px;padding:4px;display:none;background:#ffebee;border:1px solid #f44336;border-radius:3px;font-size:0.85em;color:#d32f2f;font-weight:bold;">
-          ⚠ Target BA > damage → rebounds!
-        </div>
+  <div style="margin-bottom:8px;">
+    <label style="font-weight:bold;">Target Type:</label>
+    <label style="margin-left:10px;"><input type="radio" name="target-type" value="character" ${defaultTargetType === 'character' ? 'checked' : ''}> Character</label>
+    <label style="margin-left:10px;"><input type="radio" name="target-type" value="object" ${defaultTargetType === 'object' ? 'checked' : ''}> Inanimate Object</label>
+  </div>
+
+  <div style="margin-bottom:12px;">
+    <div id="character-target-panel" style="padding:6px;border:1px solid #2196F3;border-radius:3px;background:#e3f2fd;font-size:0.9em;">
+      <div style="font-weight:bold;margin-bottom:6px;color:#1565c0;">Character Target</div>
+      <div style="margin-bottom:6px;">
+        <label style="display:inline-block;width:140px;">Body Armor Rank:</label>
+        <select name="targetBodyArmorRank" style="width:200px;">${rankOptions}</select>
       </div>
-
-      <div id="object-target-panel" style="padding:8px;border:1px solid #ff9800;border-radius:3px;background:#fff3e0;display:none;">
-        <div style="font-weight:bold;margin-bottom:6px;color:#e65100;">Inanimate Object</div>
-        <div style="margin-bottom:6px;">
-          <label style="display:block;margin-bottom:2px;">Description:</label>
-          <input type="text" name="objectDescription" value="${savedObjectDesc}" placeholder="e.g., Brick wall, Steel door" style="width:100%;">
-        </div>
-        <div style="margin-bottom:6px;">
-          <label style="display:block;margin-bottom:2px;">Material Strength:</label>
-          <select name="objectMaterial" style="width:100%;">${materialOptions}</select>
-        </div>
-        <div id="obj-damage-preview" style="margin-top:8px;padding:6px;background:#fff;border:1px solid #ff9800;border-radius:3px;font-size:0.9em;">
-          <strong>Damage Preview:</strong><br>
-          <span id="obj-damage-calc">Calculating...</span>
-        </div>
-        <div id="obj-rebound-warning" style="margin-top:4px;padding:4px;display:none;background:#ffebee;border:1px solid #f44336;border-radius:3px;font-size:0.85em;color:#d32f2f;font-weight:bold;">
-          ⚠ Material > damage → rebounds!
-        </div>
+      <div style="margin-bottom:6px;">
+        <label style="display:inline-block;width:140px;">Body Armor Value:</label>
+        <input type="number" name="targetBodyArmorValue" value="${savedTargetBAValue}" min="0" style="width:100px;">
+      </div>
+      <div id="char-damage-preview" style="margin-top:4px;padding:4px;background:#fff;border:1px solid #2196F3;border-radius:3px;font-size:0.85em;">
+        <strong>Damage Preview:</strong><br>
+        <span id="char-damage-calc">Calculating...</span>
+      </div>
+      <div id="char-rebound-warning" style="margin-top:4px;padding:4px;display:none;background:#ffebee;border:1px solid #f44336;border-radius:3px;font-size:0.85em;color:#d32f2f;font-weight:bold;">
+        ⚠ Target BA > damage → rebounds!
       </div>
     </div>
 
-    <div style="font-size:0.85em;color:#666;margin-bottom:8px;">
-      Absorbed portion rebounds to the attacker; your Body Armor may soak it.
+    <div id="object-target-panel" style="padding:6px;border:1px solid #ff9800;border-radius:3px;background:#fff3e0;display:none;font-size:0.9em;">
+      <div style="font-weight:bold;margin-bottom:6px;color:#e65100;">Inanimate Object</div>
+      <div style="margin-bottom:6px;">
+        <label style="display:inline-block;width:140px;">Description:</label>
+        <input type="text" name="objectDescription" value="${savedObjectDesc}" placeholder="e.g., Brick wall, Steel door" style="width:calc(100% - 145px);">
+      </div>
+      <div style="margin-bottom:6px;">
+        <label style="display:inline-block;width:140px;">Material Strength:</label>
+        <select name="objectMaterial" style="width:200px;">${materialOptions}</select>
+      </div>
+      <div id="obj-damage-preview" style="margin-top:4px;padding:4px;background:#fff;border:1px solid #ff9800;border-radius:3px;font-size:0.85em;">
+        <strong>Damage Preview:</strong><br>
+        <span id="obj-damage-calc">Calculating...</span>
+      </div>
+      <div id="obj-rebound-warning" style="margin-top:4px;padding:4px;display:none;background:#ffebee;border:1px solid #f44336;border-radius:3px;font-size:0.85em;color:#d32f2f;font-weight:bold;">
+        ⚠ Material > damage → rebounds!
+      </div>
     </div>
+  </div>
 
-    <div style="margin-top:8px;">
-      <input type="checkbox" id="remember" name="remember" checked>
-      <label for="remember">Remember settings</label>
-      <input type="checkbox" id="skipDice" name="skipDice" style="margin-left:12px;">
-      <label for="skipDice">Skip dice animation</label>
-    </div>
-    
-    ${autoPopulated ? `<div style="margin-top:8px;padding:4px;background:#e8f5e9;border:1px solid #4CAF50;border-radius:3px;font-size:.85em;color:#2e7d32;">✓ Auto-populated from targeted token</div>` : ""}
-  `;
+  <div style="font-size:0.8em;color:#777;margin-bottom:8px;">
+    Absorbed portion rebounds to the attacker; your Body Armor may soak it.
+  </div>
+
+  <div style="margin-top:8px;">
+    <input type="checkbox" id="remember" name="remember" checked>
+    <label for="remember">Remember settings</label>
+    <input type="checkbox" id="skipDice" name="skipDice" style="margin-left:12px;">
+    <label for="skipDice">Skip dice animation</label>
+  </div>
+  
+  ${autoPopulated ? `<div style="margin-top:8px;padding:4px;background:#e8f5e9;border:1px solid #4CAF50;border-radius:3px;font-size:.85em;color:#2e7d32;">✓ Auto-populated from targeted token</div>` : ""}
+`;
 
   const choice = await new Promise(resolve => {
     new Dialog({
