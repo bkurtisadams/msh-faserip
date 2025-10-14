@@ -50,6 +50,7 @@ export class EnergyAction extends RangedAttackAction {
     const savedUsePowerToHit = await actor.getFlag("msh-faserip", "lastEnergyUsePowerToHit");
     const defaultUsePowerToHit = (savedUsePowerToHit === undefined || savedUsePowerToHit === null) ? true : !!savedUsePowerToHit;
 
+    const savedShift = await actor.getFlag("msh-faserip", "lastEnergyShift") || 0;
 
     const itemOptions = energyItems
       .map((i) => `<option value="${i.id}" ${i.id === savedItemId ? "selected" : ""}>${i.name}</option>`)
@@ -67,7 +68,7 @@ export class EnergyAction extends RangedAttackAction {
 
       <div style="margin-bottom:8px;">
         <span style="display:inline-block;width:110px;">Column Shift:</span>
-        <input type="number" name="shift" value="${Number(this.opts.shift ?? 0)}" style="width:60px;">
+        <input type="number" name="shift" value="${Number(savedShift)}" style="width:60px;">
       </div>
 
       <div style="margin-bottom:8px;">
@@ -170,7 +171,7 @@ export class EnergyAction extends RangedAttackAction {
                 powerId = wid;
                 const s = item.system || {};
                 powerName = item.name;
-                powerDamage = Number(s.damage ?? s.value ?? 0);
+                powerDamage = Number(s.damage && s.damage > 0 ? s.damage : s.value) || 0;
                 powerRank = String(s.rank ?? s.powerRank ?? "Remarkable");
                 prettyRange = String(s.calculatedRange || "");
                 powerDamageType = item.system.damageType || "energy-generic"; // Get from power or default
@@ -198,13 +199,13 @@ export class EnergyAction extends RangedAttackAction {
                 await actor.setFlag("msh-faserip", "lastEnergyItemId", powerId || "");
                 await actor.setFlag("msh-faserip", "lastEnergyRange", range);
                 await actor.setFlag("msh-faserip", "lastEnergyObstacle", throughObstacle);
+                await actor.setFlag("msh-faserip", "lastEnergyShift", shift);
               }
 
               // Range & obstacle modifiers via powerRank path
               const { totalShift, impossible, rangeModifier, obstacleModifier } =
                 this._applyRangeModifiers(shift, range, throughObstacle, null, powerRank, null);
                 
-              // ⬇️ ADD THIS LINE
               const finalShift = totalShift + movementModifier;
               
               if (impossible) {
@@ -215,10 +216,9 @@ export class EnergyAction extends RangedAttackAction {
               resolve({
                 powerName, powerDamage, powerRank, powerId, prettyRange,
                 karma, range, throughObstacle, skipDice, usePowerToHit,
-                totalShift: finalShift, // ⬅️ CHANGE THIS
+                totalShift: finalShift,
                 rangeModifier, 
                 obstacleModifier,
-                // ⬇️ ADD THESE TWO LINES
                 targetMovement,
                 movementModifier,
                 powerDamageType
@@ -293,10 +293,22 @@ export class EnergyAction extends RangedAttackAction {
     // Derive which chips to show from the configured effect text for this color
     const effText = String(effectResult || "").toLowerCase();
     const isHit = colorLower !== 'white';
+    // Debug
+    console.log("FASERIP | Energy Action Debug:", {
+      isHit,
+      colorLower,
+      powerDamage: choice.powerDamage,
+      damagePassedToBox: isHit ? choice.powerDamage : 0,
+      effText,
+      actorName: actor.name,
+      powerName: choice.powerName,
+      usePowerToHit: choice.usePowerToHit
+    });
     const actions = buildActionsBox({
       showSlam: /slam/.test(effText),
       showStun: /stun/.test(effText),
       showKill: /kill/.test(effText),
+      showApplyDamage: isHit && choice.powerDamage > 0,
       actorUuid: actor.uuid,
       damage: isHit ? choice.powerDamage : 0,
       attackForm: "energy",

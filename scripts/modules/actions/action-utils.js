@@ -229,6 +229,7 @@ export function buildActionsBox({
   actorUuid,
   damage = 0,                 // pass penetrating damage for checks
   attackForm = "blunt",
+  damageType = "physical-blunt",
   prefillData = null,         // may contain { dmgThrough, attackForm, ownerActor, ... }
   targetUuid = "",
   targetName = "",
@@ -262,7 +263,7 @@ export function buildActionsBox({
         "Apply Damage",
         "Apply damage to targeted or selected token(s)",
         true,
-        `data-action="apply-damage" data-damage="${dmgPen}" data-attacker-uuid="${actorUuid}" data-bypass-armor="${bypassArmor}"`
+        `data-action="apply-damage" data-damage="${dmgPen}" data-attacker-uuid="${actorUuid}" data-bypass-armor="${bypassArmor}" data-damage-type="${damageType || 'physical-blunt'}"`
       )
     );
   }
@@ -919,6 +920,11 @@ export async function applyDamageToActorUuid(damage, actorUuid, options = {}) {
  * @returns {Object} { physical, energy, applicable }
  */
 export function getBodyArmorValues(targetActor, damageType = "physical-blunt") {
+  console.log("FASERIP DEBUG | getBodyArmorValues called:", {
+    targetName: targetActor.name,
+    damageType: damageType
+  });
+
   let physicalArmor = 0;
   let energyArmor = 0;
 
@@ -994,6 +1000,15 @@ export function getBodyArmorValues(targetActor, damageType = "physical-blunt") {
   const isEnergy = CONFIG.FASERIP?.isEnergyDamage?.(damageType) ?? 
                    (damageType && damageType.includes("energy"));
   const applicable = isEnergy ? energyArmor : physicalArmor;
+
+  console.log("FASERIP DEBUG | getBodyArmorValues result:", {
+    targetName: targetActor.name,
+    damageType,
+    physicalArmor,
+    energyArmor,
+    isEnergy,
+    applicable
+  });
 
   return {
     physical: physicalArmor,

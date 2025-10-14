@@ -142,13 +142,15 @@ export function installActionChatHandlers() {
       const btn = ev.currentTarget;
       const damage = Number(btn.dataset.damage || 0);
       const attackerUuid = btn.dataset.attackerUuid;
-      const bypassArmor = btn.dataset.bypassArmor === "true";  // new
+      const bypassArmor = btn.dataset.bypassArmor === "true";
+      const damageType = btn.dataset.damageType || "physical-blunt";  // ADD THIS LINE
       
       await applyDamageToTargets(damage, {
         attackerUuid,
+        damageType: damageType,  // ADD THIS LINE
         showNotification: true,
         updateButton: btn,
-        bypassArmor: bypassArmor  // new
+        bypassArmor: bypassArmor
       });
     });
 
