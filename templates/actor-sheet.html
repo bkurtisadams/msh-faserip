@@ -1773,40 +1773,93 @@
       </div>
 
       <!-- Effects Tab -->
-      <div class="tab" data-tab="effects">
-        <div class="tab-controls">
-          <a class="effect-control" data-action="create" data-effect-type="temporary">
-            <i class="fas fa-plus"></i> Add Effect
-          </a>
-        </div>
-
+      <div class="tab effects-tab" data-tab="effects">
+        
         {{#each effects as |section|}}
-        <div class="effect-category">
-          <h3>{{section.label}}</h3>
-          <ol class="effects-list">
-            {{#each section.effects as |effect|}}
-            <li class="effect" data-effect-id="{{effect.id}}" data-parent-id="{{effect.parent.id}}">
-              <div class="effect-name">
-                <img src="{{effect.img}}" width="24" height="24" /> {{effect.name}}
-              </div>
-              <div class="effect-controls">
-                <a class="effect-control" data-action="edit"><i class="fas fa-edit"></i></a>
-                <a class="effect-control" data-action="toggle"><i class="fas fa-sync"></i></a>
-                <a class="effect-control" data-action="delete"><i class="fas fa-trash"></i></a>
-              </div>
+        <div class="effect-section" data-section-type="{{section.type}}">
+          <!-- Category Header with Column Labels and Add Button -->
+          <div class="effect-header" data-section="{{section.type}}">
+            <div class="header-left">
+              <i class="fas fa-chevron-down collapse-icon"></i>
+              <span class="section-title">{{section.label}} Effects</span>
+            </div>
+            <div class="header-columns">
+              <span class="col-source">Source</span>
+              {{#if (eq section.type "temporary")}}
+                <span class="col-duration">Duration</span>
+              {{else}}
+                <span class="col-modifier">CS Modifier</span>
+              {{/if}}
+            </div>
+            <li data-effect-type="{{section.type}}" style="list-style: none; margin: 0;">
+              <a class="effect-control btn-add" data-action="create">
+                <i class="fas fa-plus"></i> Add
+              </a>
             </li>
-            {{/each}}
+          </div>
+
+          <!-- Effects List -->
+          <ol class="effects-list">
+            {{#if section.effects.length}}
+              {{#each section.effects as |effect|}}
+                <li class="effect-row" data-effect-id="{{effect.id}}" data-parent-id="{{effect.parent.id}}">
+                  <div class="effect-icon">
+                    <img src="{{effect.icon}}" alt="{{effect.name}}" />
+                  </div>
+                  <div class="effect-name">
+                    {{effect.name}}
+                  </div>
+                  <div class="effect-source">
+                    {{#if effect.origin}}
+                      {{effect.origin}}
+                    {{else}}
+                      —
+                    {{/if}}
+                  </div>
+                  {{#if (eq ../section.type "temporary")}}
+                    <div class="effect-duration">
+                      {{#if effect.duration.rounds}}
+                        {{effect.duration.rounds}} Rounds
+                      {{else if effect.duration.seconds}}
+                        {{effect.duration.seconds}}s
+                      {{else if effect.duration.turns}}
+                        {{effect.duration.turns}} Turns
+                      {{else}}
+                        Unlimited
+                      {{/if}}
+                    </div>
+                  {{else}}
+                    <div class="effect-modifier">
+                      {{#if effect.csModifier}}
+                        <span class="{{#if (gt effect.csModifier 0)}}modifier-positive{{else}}modifier-negative{{/if}}">
+                          {{#if (gt effect.csModifier 0)}}+{{/if}}{{effect.csModifier}} CS
+                        </span>
+                      {{else}}
+                        —
+                      {{/if}}
+                    </div>
+                  {{/if}}
+                  <div class="effect-controls">
+                    <a class="effect-control" data-action="toggle" title="{{#if effect.disabled}}Enable{{else}}Disable{{/if}} Effect">
+                      <i class="fas fa-{{#if effect.disabled}}eye-slash{{else}}eye{{/if}}"></i>
+                    </a>
+                    <a class="effect-control" data-action="edit" title="Edit Effect">
+                      <i class="fas fa-edit"></i>
+                    </a>
+                    <a class="effect-control" data-action="delete" title="Delete Effect">
+                      <i class="fas fa-trash"></i>
+                    </a>
+                  </div>
+                </li>
+              {{/each}}
+            {{else}}
+              <li class="no-effects">No {{section.label}} effects</li>
+            {{/if}}
           </ol>
         </div>
         {{/each}}
-
-        {{#if effects.temporary}}
-          {{#unless effects.temporary.effects.length}}
-          <p class="no-effects">No active effects.</p>
-          {{/unless}}
-        {{/if}}
+        
       </div>
-
     
       <!-- END OF TAB CONTAINER -->
     </div>

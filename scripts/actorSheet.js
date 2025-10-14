@@ -249,13 +249,26 @@ export class FaseripActorSheet extends ActorSheet {
     console.log("Resistances type:", typeof this.actor.system.resistances);
     console.log("Is array:", Array.isArray(this.actor.system.resistances));
 
-    html.on("click", ".effect-control", (ev) => {
-      const row = ev.currentTarget.closest("li");
-      const document =
-        row?.dataset.parentId === this.actor.id
-          ? this.actor
-          : this.actor.items.get(row?.dataset.parentId);
-      onManageActiveEffect(ev, document);
+    // Collapsible effect sections
+    html.find('.effect-header').click((event) => {
+      // Don't collapse if clicking the add button
+      if ($(event.target).closest('.btn-add').length) return;
+      
+      const header = $(event.currentTarget);
+      const section = header.closest('.effect-section');
+      section.toggleClass('collapsed');
+    });
+    
+    // Existing effect management
+    html.find('.effect-control').click(ev => {
+      if ($(ev.currentTarget).data('action') === 'create') {
+        onManageActiveEffect(ev, this.actor);
+      } else {
+        const li = $(ev.currentTarget).closest('.effect-row');
+        if (li.length) {
+          onManageActiveEffect(ev, this.actor);
+        }
+      }
     });
 
     // universal roll trigger listener

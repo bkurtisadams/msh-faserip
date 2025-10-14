@@ -33,31 +33,39 @@
   font-size: 0.85rem;
   color: #e6e6e6;
 }
+/* ==== Team Pool: light blue info box ==== */
 .team-tracker .pool-display {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  display: flex; align-items: center; gap: 10px;
+  background: #e3f2fd;            /* light blue */
+  border: 1px solid #90caf9;       /* blue border */
+  color: #0d47a1;                  /* deep blue text */
+  padding: 6px 10px;
+  border-radius: 6px;
 }
 .team-tracker .pool-display label {
-  font-size: 0.85rem;
-  color: #e6e6e6;
+  color: inherit; font-weight: 600; font-size: 12px;
 }
 .team-tracker .pool-value {
-  min-width: 60px;
+  color: inherit;
+  background: #ffffff;
+  border: 1px solid #bbdefb;
+  border-radius: 4px;
+  padding: 2px 8px;
+  min-width: 64px;
   text-align: center;
   font-weight: 700;
-  font-size: 1.2rem;
-  color: #ffd700;
+  font-size: 14px;
+  line-height: 1.2;
 }
 .team-tracker .open-pool-manager {
+  background: #bbdefb;
+  border: 1px solid #90caf9;
+  color: #0d47a1;
   padding: 4px 8px;
-  border-radius: 3px;
-  border: 1px solid rgba(255,255,255,0.35);
-  background: rgba(255,255,255,0.18);
-  color: #fff;
-  cursor: pointer;
+  border-radius: 4px;
 }
-.team-tracker .open-pool-manager:hover { background: rgba(255,255,255,0.28); }
+.team-tracker .open-pool-manager:hover { background: #a6d4fa; }
+
 
 /* Tabs */
 .team-tracker .sheet-tabs {
@@ -363,3 +371,43 @@
 .team-tracker .sheet-body { 
   overflow: auto; 
 }
+
+/* ==== Team Members: 8-column layout (Health & Resources removed) ==== */
+.team-tracker .team-members-table { table-layout: fixed; }
+.team-tracker .team-members-table thead th {
+  padding: 4px 6px; line-height: 1.1; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.team-tracker .team-members-table tbody td {
+  padding: 3px 6px; line-height: 1.1; font-size: 12px; vertical-align: middle;
+}
+
+/* Column widths (8 cols) */
+.team-tracker .team-members-table th:nth-child(1),
+.team-tracker .team-members-table td:nth-child(1) { width: 40px; text-align: center; } /* Portrait */
+.team-tracker .team-members-table th:nth-child(2),
+.team-tracker .team-members-table td:nth-child(2) { width: 150px; }                      /* Hero name (fixed) */
+.team-tracker .team-members-table th:nth-child(3),
+.team-tracker .team-members-table td:nth-child(3) { width: 12%; text-align: center; }    /* Display Karma */
+.team-tracker .team-members-table th:nth-child(4),
+.team-tracker .team-members-table td:nth-child(4) { width: 12%; text-align: center; }    /* Lifetime */
+.team-tracker .team-members-table th:nth-child(5),
+.team-tracker .team-members-table td:nth-child(5) { width: 12%; text-align: center; }    /* Available */
+.team-tracker .team-members-table th:nth-child(6),
+.team-tracker .team-members-table td:nth-child(6) { width: 12%; text-align: center; }    /* Pool Share */
+.team-tracker .team-members-table th:nth-child(7),
+.team-tracker .team-members-table td:nth-child(7) { width: 8%;  text-align: center; }    /* Pop */
+.team-tracker .team-members-table th:nth-child(8),
+.team-tracker .team-members-table td:nth-child(8) { width: 6%;  text-align: center; }    /* Actions */
+
+/* Portrait + name cell styles */
+.team-tracker .hero-portrait { width: 28px; height: 28px; border-radius: 3px; border: none; object-fit: cover; }
+.team-tracker .member-name { min-width: 0; }
+.team-tracker .member-name .hero-name {
+  display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; color: #333;
+}
+
+/* Actions tighter */
+.team-tracker .actions-cell a { padding: 0; }
+
+/* Optional hover */
+.team-tracker .member-row:hover { background: #fafafa; }

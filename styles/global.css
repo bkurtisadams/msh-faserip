@@ -2602,3 +2602,293 @@
   transition: transform 0.2s;
   font-size: 12px;
 }
+
+/* Effects Tab Styling */
+.effects-tab {
+  padding: 0;
+}
+
+.effect-section {
+  margin-bottom: 2px;
+  border: 1px solid #7a7971;
+  overflow: hidden;
+}
+
+/* Category Header - One Row with Everything */
+.effect-header {
+  background: linear-gradient(to bottom, #8B0000 0%, #660000 100%);
+  color: #ffffff;
+  padding: 4px 10px;
+  display: grid;
+  grid-template-columns: minmax(200px, 2fr) minmax(250px, 3fr) auto;
+  align-items: center;
+  gap: 10px;
+  font-family: "Signika", sans-serif;
+  cursor: pointer;
+  user-select: none;
+}
+
+.effect-header:hover {
+  background: linear-gradient(to bottom, #9B0000 0%, #760000 100%);
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.collapse-icon {
+  font-size: 10px;
+  transition: transform 0.2s;
+  flex-shrink: 0;
+}
+
+.effect-section.collapsed .collapse-icon {
+  transform: rotate(-90deg);
+}
+
+.section-title {
+  font-size: 14px;
+  font-weight: bold;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.header-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: bold;
+  text-align: center;
+  min-width: 0;
+}
+
+.header-columns span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Add Button in Header */
+.effect-header .btn-add {
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: #ffffff;
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-size: 12px;
+  font-weight: normal;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.effect-header .btn-add:hover {
+  background: rgba(255, 255, 255, 0.25);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.effect-header .btn-add i {
+  font-size: 10px;
+}
+
+/* Effects List */
+.effects-list {
+  background: #ffffff;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  transition: max-height 0.3s ease-out;
+}
+
+.effect-section.collapsed .effects-list {
+  display: none;
+}
+
+.effect-row {
+  display: grid;
+  grid-template-columns: 40px minmax(150px, 2fr) minmax(100px, 1.5fr) minmax(80px, 1fr) minmax(90px, 100px);
+  align-items: center;
+  padding: 2px 10px;
+  gap: 10px;
+  border-bottom: 1px solid #d4d4d4;
+  background: #ffffff;
+  transition: background 0.15s;
+  list-style: none;
+  min-height: 32px;
+}
+
+.effect-row:hover {
+  background: #f5f5f5;
+}
+
+.effect-row:last-child {
+  border-bottom: none;
+}
+
+/* Effect Icon */
+.effect-icon {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #e8e8e8;
+  border: 1px solid #999;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.effect-icon img {
+  width: 28px;
+  height: 28px;
+  object-fit: cover;
+  border-radius: 2px;
+}
+
+/* Effect Name */
+.effect-name {
+  font-weight: bold;
+  font-size: 13px;
+  color: #000000;
+  font-family: "Signika", sans-serif;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+/* Effect Source */
+.effect-source {
+  font-size: 12px;
+  color: #000000;
+  text-align: center;
+  font-family: "Signika", sans-serif;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+/* Effect Duration/Modifier */
+.effect-duration,
+.effect-modifier {
+  font-size: 12px;
+  color: #000000;
+  text-align: center;
+  font-family: "Signika", sans-serif;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+/* CS Modifier Colors */
+.modifier-positive {
+  color: #006600;
+  font-weight: bold;
+}
+
+.modifier-negative {
+  color: #cc0000;
+  font-weight: bold;
+}
+
+/* Effect Controls */
+.effect-controls {
+  display: flex;
+  gap: 4px;
+  justify-content: center;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.effect-row .effect-control {
+  cursor: pointer;
+  color: #666;
+  text-decoration: none;
+  transition: all 0.15s;
+  padding: 2px;
+  flex-shrink: 0;
+}
+
+.effect-row .effect-control:hover {
+  color: #000;
+  transform: scale(1.15);
+}
+
+.effect-row .effect-control i {
+  font-size: 14px;
+}
+
+/* Delete button red on hover */
+.effect-control[data-action="delete"]:hover {
+  color: #cc0000;
+}
+
+/* Toggle button styling */
+.effect-control[data-action="toggle"]:hover {
+  color: #8B0000;
+}
+
+/* No Effects Message */
+.no-effects {
+  padding: 12px;
+  text-align: center;
+  color: #999;
+  font-style: italic;
+  font-size: 12px;
+  background: #ffffff;
+  list-style: none;
+  font-family: "Signika", sans-serif;
+  min-height: 32px;
+}
+
+/* Responsive adjustments for smaller screens */
+@media (max-width: 768px) {
+  .effect-header {
+    grid-template-columns: minmax(150px, 1fr) minmax(200px, 2fr) auto;
+    font-size: 12px;
+  }
+  
+  .section-title {
+    font-size: 12px;
+  }
+  
+  .header-columns {
+    font-size: 11px;
+  }
+  
+  .effect-row {
+    grid-template-columns: 32px minmax(100px, 2fr) minmax(80px, 1fr) minmax(70px, 1fr) 80px;
+    gap: 6px;
+    font-size: 11px;
+  }
+  
+  .effect-icon {
+    width: 28px;
+    height: 28px;
+  }
+  
+  .effect-icon img {
+    width: 24px;
+    height: 24px;
+  }
+  
+  .effect-name {
+    font-size: 12px;
+  }
+  
+  .effect-source,
+  .effect-duration,
+  .effect-modifier {
+    font-size: 11px;
+  }
+}
