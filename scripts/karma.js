@@ -1033,5 +1033,4 @@ export class KarmaSheet extends DocumentSheet {
     
     this.render();
   }
-
-}
+  } // end of class KarmaSheet

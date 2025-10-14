@@ -3,6 +3,7 @@ import { prepareActiveEffectCategories, onManageActiveEffect } from "../helpers/
 import { getItemMaterialRank, getBluntNextRankMinRule } from "./gm-utils.js";
 import { ActionDispatcher } from "./modules/actions/action-dispatcher.js";
 
+
 function getPopularityRankWithRange(value, context) {
   const rank = context._getPopularityRank(value);
   const ranges = {
@@ -1536,36 +1537,24 @@ export class FaseripActorSheet extends ActorSheet {
                 }
               }
 
-              const historyUpdates = [];
-              if (dailyKarmaUsedAmount > 0) {
-                historyUpdates.push({
-                  realDate: new Date().toLocaleDateString(),
-                  gameDate: "",
-                  amount: -dailyKarmaUsedAmount,
-                  type: "Daily Roll",
-                  description: `Spent daily karma on ${item.name} (Contact)`
-                });
-              }
+              // Only add lifetime karma spending to history (daily is tracked by counter only)
               if (lifetimeKarmaUsedAmount > 0) {
-                historyUpdates.push({
+                const historyEntry = {
                   realDate: new Date().toLocaleDateString(),
                   gameDate: "",
                   amount: -lifetimeKarmaUsedAmount,
                   type: "Die Roll",
                   description: `Spent lifetime karma on ${item.name} (Contact)`
-                });
-              }
-
-              if (historyUpdates.length > 0) {
+                };
+                
                 const currentHistory = foundry.utils.deepClone(actor.system.karma?.history || []);
-                const newHistory = currentHistory.concat(historyUpdates);
+                currentHistory.push(historyEntry);
                 
                 await game.msh.runAsGM({
                   operation: 'update',
                   targetActorUuid: actor.uuid,
-                  args: [{ "system.karma.history": newHistory }]
+                  args: [{ "system.karma.history": currentHistory }]
                 });
-                // No need to call _updateCurrentKarma here, prepareData handles it on sheet re-render
               }
               // <-- NEW/MODIFIED SECTION END -->
 
@@ -2706,37 +2695,6 @@ html.find('.headquarters-row').each((i, row) => {
                 }
               }
 
-              const historyUpdates = [];
-              if (dailyKarmaUsedAmount > 0) {
-                historyUpdates.push({
-                  realDate: new Date().toLocaleDateString(),
-                  gameDate: "",
-                  amount: -dailyKarmaUsedAmount,
-                  type: "Daily Roll",
-                  description: `Spent daily karma on ${abilityFullName} FEAT roll`
-                });
-              }
-              if (lifetimeKarmaUsedAmount > 0) {
-                historyUpdates.push({
-                  realDate: new Date().toLocaleDateString(),
-                  gameDate: "",
-                  amount: -lifetimeKarmaUsedAmount,
-                  type: "Die Roll",
-                  description: `Spent lifetime karma on ${abilityFullName} FEAT roll`
-                });
-              }
-
-              if (historyUpdates.length > 0) {
-                const currentHistory = foundry.utils.deepClone(this.actor.system.karma?.history || []);
-                const newHistory = currentHistory.concat(historyUpdates);
-                
-                await game.msh.runAsGM({
-                  operation: 'update',
-                  targetActorUuid: this.actor.uuid,
-                  args: [{ "system.karma.history": newHistory }]
-                });
-              }
-
               const totalKarmaUsed = dailyKarmaUsedAmount + lifetimeKarmaUsedAmount;
 
               const resultColor = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
@@ -3030,9 +2988,11 @@ html.find('.headquarters-row').each((i, row) => {
                 return;
               }
               
+              // add Power Stunt
               const stunts = foundry.utils.deepClone(this.actor.system.stunts || []);
               stunts.push({
                 name: name,
+                parentPower: null, // ← Add this - will populate from power sheet
                 rank: html.find('[name="rank"]').val(),
                 value: parseInt(html.find('[name="value"]').val()) || 6,
                 description: html.find('[name="description"]').val() || "",
@@ -3055,13 +3015,108 @@ html.find('.headquarters-row').each((i, row) => {
 
     // Stunts Tab - Roll stunt
     html.find('.roll-stunt-tab').click(async ev => {
+      ev.preventDefault();
+      
       const stuntIndex = parseInt(ev.currentTarget.dataset.stuntIndex);
-      const stunts = this.actor.system.stunts || [];
-      const stunt = stunts[stuntIndex];
+      const stunt = this.actor.system.stunts[stuntIndex];
       
-      if (!stunt) return ui.notifications.error("Stunt not found");
+      if (!stunt) {
+        return ui.notifications.warn("Stunt not found!");
+      }
       
-      await this._rollStandaloneStunt(stunt, stuntIndex);
+      // Determine required FEAT color
+      const times = stunt.timesUsed || 0;
+      let requiredColor = "Any Color";
+      let mastered = false;
+      
+      if (times < 1) {
+        requiredColor = "Red FEAT";
+      } else if (times < 4) {
+        requiredColor = "Yellow FEAT";
+      } else if (times < 10) {
+        requiredColor = "Green FEAT";
+      } else {
+        requiredColor = "Mastered";
+        mastered = true;
+      }
+      
+      // Get LIFETIME karma (not daily karma) - Power stunts always use lifetime karma
+      const lifetimeKarma = this.actor.availableKarma || this.actor.system.karma?.availableLifetime || 0;
+      
+      console.log(`Power Stunt Check - Available Lifetime Karma: ${lifetimeKarma}, Mastered: ${mastered}`);
+      
+      // Check and spend karma if needed
+      let karmaSpent = 0;
+      if (!mastered) {
+        if (lifetimeKarma >= 100) {
+          // Spend the karma
+          karmaSpent = 100;
+          
+          // Add to karma history (this will automatically recalculate available karma)
+          const history = foundry.utils.deepClone(this.actor.system.karma?.history || []);
+          history.push({
+            realDate: new Date().toLocaleDateString(),
+            gameDate: "",
+            amount: -100,
+            type: "Power Stunt",
+            description: `Power Stunt: ${stunt.name}`
+          });
+          
+          await this.actor.update({
+            "system.karma.history": history
+          });
+          
+          // The actor's prepareData will recalculate availableLifetime and display values
+        } else {
+          ui.notifications.warn(`Need 100 Lifetime Karma for this stunt. You have ${lifetimeKarma} available.`);
+          return; // Don't proceed with the roll if insufficient karma
+        }
+      }
+      
+      // Create a fake power item for rolling
+      const fakePower = {
+        name: stunt.name,
+        system: {
+          rank: stunt.rank,
+          value: stunt.value
+        }
+      };
+      
+      // Roll the power
+      await game.msh.rollPower(this.actor, fakePower);
+      
+      // Show stunt info in chat
+      const content = `
+        <div class="msh-stunt-info">
+          <h3>Power Stunt: ${stunt.name}</h3>
+          ${stunt.parentPower ? `<p><em>Stunt of: ${stunt.parentPower}</em></p>` : ''}
+          <p><strong>Required:</strong> ${requiredColor}</p>
+          <p><strong>Times Used:</strong> ${times}/10</p>
+          ${karmaSpent > 0 ? `<p><strong>Lifetime Karma Spent:</strong> ${karmaSpent}</p>` : ''}
+          ${mastered ? '<p style="color: green;"><strong>MASTERED - No Karma Cost</strong></p>' : ''}
+        </div>
+      `;
+      
+      await ChatMessage.create({
+        user: game.user.id,
+        speaker: ChatMessage.getSpeaker({ actor: this.actor }),
+        content: content
+      });
+      
+      // Ask if they want to increase practice counter
+      if (!mastered && times < 10) {
+        const increase = await Dialog.confirm({
+          title: "Increase Practice?",
+          content: `<p>Did the stunt succeed (met the ${requiredColor} requirement)?</p><p>Click Yes to increase practice counter.</p>`
+        });
+        
+        if (increase) {
+          await this.actor.update({
+            [`system.stunts.${stuntIndex}.timesUsed`]: times + 1
+          });
+          ui.notifications.info(`Practice increased to ${times + 1}/10`);
+        }
+      }
     });
 
     // Stunts Tab - Edit stunt
@@ -3091,6 +3146,11 @@ html.find('.headquarters-row').each((i, row) => {
               <input type="text" name="name" value="${stunt.name}" style="width: 100%;" />
             </div>
             <div class="form-group">
+              <label>Parent Power (optional):</label>
+              <input type="text" name="parentPower" value="${stunt.parentPower || ''}" 
+                    placeholder="e.g., Teleportation" style="width: 100%;" />
+              <small style="color: #666;">Links this stunt to a specific power</small>
+            </div>
               <label>Rank:</label>
               <select name="rank" style="width: 150px;">
                 ${rankOptions}
@@ -3123,6 +3183,7 @@ html.find('.headquarters-row').each((i, row) => {
             callback: async html => {
               stunts[stuntIndex] = {
                 name: html.find('[name="name"]').val(),
+                parentPower: html.find('[name="parentPower"]').val() || null,
                 rank: html.find('[name="rank"]').val(),
                 value: parseInt(html.find('[name="value"]').val()) || 6,
                 description: html.find('[name="description"]').val(),
@@ -3230,6 +3291,51 @@ html.find('.headquarters-row').each((i, row) => {
         // This is important if `saveGeneratedData` is called on the manager, but the main sheet re-renders.
         this._charCreationManager.loadGeneratedData(); // Re-load and render on sheet re-open/re-render
     }
+
+    // Show stunt description in chat
+    html.find('.show-stunt-description').click(async (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+
+      const stuntIndex = Number(ev.currentTarget.dataset.stuntIndex);
+      const actor = this.actor;
+      const stunt = actor?.system?.stunts?.[stuntIndex];
+      if (!stunt) return ui.notifications.warn("Stunt not found!");
+
+      // Difficulty badge
+      const difficultyClass =
+        stunt.timesUsed < 1  ? "difficulty-red"      :
+        stunt.timesUsed < 4  ? "difficulty-yellow"   :
+        stunt.timesUsed < 10 ? "difficulty-green"    :
+                              "difficulty-mastered";
+
+      const difficultyText =
+        stunt.timesUsed < 1  ? "Red FEAT"    :
+        stunt.timesUsed < 4  ? "Yellow FEAT" :
+        stunt.timesUsed < 10 ? "Green FEAT"  : "Mastered";
+
+      const chatContent = `
+        <div class="msh-stunt-card">
+          <h3 class="stunt-title">${stunt.name}</h3>
+          ${stunt.parentPower ? `<div class="stunt-parent-power"><em>Power Stunt of: ${stunt.parentPower}</em></div>` : ""}
+          <div class="stunt-stats">
+            <span><strong>Rank:</strong> ${stunt.rank} (${stunt.value})</span>
+            <span><strong>Difficulty:</strong> <span class="difficulty-badge ${difficultyClass}">${difficultyText}</span></span>
+            <span><strong>Times Used:</strong> ${stunt.timesUsed}</span>
+          </div>
+          ${stunt.description
+            ? `<div class="stunt-description-content"><strong>Description:</strong><br/>${stunt.description}</div>`
+            : `<div class="stunt-description-content"><em>No description provided.</em></div>`}
+        </div>
+      `;
+
+      await ChatMessage.create({
+        user: game.user.id,
+        speaker: ChatMessage.getSpeaker({ actor }),
+        content: chatContent
+      });
+    });
+
 
     // Continue with other listeners...
   }
@@ -3630,35 +3736,24 @@ html.find('.headquarters-row').each((i, row) => {
                 lifetimeKarmaLoss = loss;
               }
 
-              const historyUpdates = [];
-              if (dailyKarmaLoss > 0) {
-                historyUpdates.push({
-                  realDate: new Date().toLocaleDateString(),
-                  gameDate: "",
-                  amount: -dailyKarmaLoss,
-                  type: "Daily Roll",
-                  description: `Lost daily karma from negative popularity`
-                });
-              }
+              // Only add lifetime karma loss to history (daily is tracked by counter only)
               if (lifetimeKarmaLoss > 0) {
-                historyUpdates.push({
+                const historyEntry = {
                   realDate: new Date().toLocaleDateString(),
                   gameDate: "",
                   amount: -lifetimeKarmaLoss,
                   type: "Karma Loss",
                   description: `Lost lifetime karma from negative popularity`
-                });
-              }
-
-              if (historyUpdates.length > 0) {
+                };
+                
                 const currentHistory = foundry.utils.deepClone(this.actor.system.karma?.history || []);
-                const newHistory = currentHistory.concat(historyUpdates);
+                currentHistory.push(historyEntry);
                 
                 game.msh.runAsGM({
                   operation: 'update',
                   targetActorUuid: this.actor.uuid,
                   args: [{ 
-                    "system.karma.history": newHistory,
+                    "system.karma.history": currentHistory,
                     "system.karma.dailyKarmaUsed": (this.actor.system.karma.dailyKarmaUsed || 0) + dailyKarmaLoss
                   }]
                 });
@@ -3855,34 +3950,26 @@ _rollVehicleControl(vehicle) {
             }
           }
 
-          const historyUpdates = [];
-          if (dailyKarmaUsedAmount > 0) {
-            historyUpdates.push({
+          // Only add lifetime karma loss to history (daily is tracked by counter only)
+          if (lifetimeKarmaLoss > 0) {
+            const historyEntry = {
               realDate: new Date().toLocaleDateString(),
               gameDate: "",
-              amount: -dailyKarmaUsedAmount,
-              type: "Daily Roll",
-              description: `Spent daily karma on Vehicle Control for ${vehicle.name}`
-            });
-          }
-          if (lifetimeKarmaUsedAmount > 0) {
-            historyUpdates.push({
-              realDate: new Date().toLocaleDateString(),
-              gameDate: "",
-              amount: -lifetimeKarmaUsedAmount,
+              amount: -lifetimeKarmaLoss,
               type: "Die Roll",
               description: `Spent lifetime karma on Vehicle Control for ${vehicle.name}`
-            });
-          }
-
-          if (historyUpdates.length > 0) {
-            const currentHistory = foundry.utils.deepClone(actor.system.karma?.history || []);
-            const newHistory = currentHistory.concat(historyUpdates);
+            };
             
-            await game.msh.runAsGM({
+            const currentHistory = foundry.utils.deepClone(this.actor.system.karma?.history || []);
+            currentHistory.push(historyEntry);
+            
+            game.msh.runAsGM({
               operation: 'update',
-              targetActorUuid: actor.uuid,
-              args: [{ "system.karma.history": newHistory }]
+              targetActorUuid: this.actor.uuid,
+              args: [{ 
+                "system.karma.history": currentHistory,
+                "system.karma.dailyKarmaUsed": (this.actor.system.karma.dailyKarmaUsed || 0) + dailyKarmaLoss
+              }]
             });
             // No need to call _updateCurrentKarma here, prepareData handles it on sheet re-render
           }

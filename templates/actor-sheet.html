@@ -983,28 +983,53 @@
         <table class="stunts-table">
           <thead>
             <tr>
+              <th class="roll-column">Roll</th>
               <th>Stunt Name</th>
+              <th>Parent Power</th>
               <th>Rank</th>
               <th>Value</th>
               <th>Difficulty</th>
               <th>Times Used</th>
-              <th>Description</th>
               <th>Actions</th>
             </tr>
           </thead>
           <tbody>
             {{#each system.stunts as |stunt stuntIndex|}}
             <tr class="stunt-row" data-stunt-index="{{stuntIndex}}">
-              <td class="stunt-name">
+              <!-- Roll Button Column -->
+              <td class="stunt-roll-cell">
                 <a class="stunt-roll-link roll-stunt-tab" 
                   data-stunt-index="{{stuntIndex}}"
                   title="Roll stunt">
                   <i class="fas fa-dice-d20"></i>
                 </a>
-                {{stunt.name}}
               </td>
+              
+              <!-- Clickable Stunt Name -->
+              <td class="stunt-name">
+                <a class="stunt-name-link show-stunt-description" 
+                  data-stunt-index="{{stuntIndex}}"
+                  title="Show description in chat">
+                  {{stunt.name}}
+                </a>
+              </td>
+              
+              <!-- Parent Power -->
+              <td class="stunt-parent">
+                {{#if stunt.parentPower}}
+                  <span style="font-style: italic; color: #666;">{{stunt.parentPower}}</span>
+                {{else}}
+                  <span style="color: #999;">—</span>
+                {{/if}}
+              </td>
+              
+              <!-- Rank -->
               <td class="stunt-rank">{{stunt.rank}}</td>
+              
+              <!-- Value -->
               <td class="stunt-value">{{stunt.value}}</td>
+              
+              <!-- Difficulty -->
               <td class="stunt-difficulty">
                 <span class="difficulty-badge 
                   {{#if (lt stunt.timesUsed 1)}}difficulty-red
@@ -1017,8 +1042,11 @@
                   {{else}}Mastered{{/if}}
                 </span>
               </td>
+              
+              <!-- Times Used -->
               <td class="stunt-uses">{{stunt.timesUsed}}</td>
-              <td class="stunt-description-cell">{{stunt.description}}</td>
+              
+              <!-- Actions (Edit/Delete) -->
               <td class="stunt-controls">
                 <a class="item-control edit-stunt-tab" title="Edit" 
                   data-stunt-index="{{stuntIndex}}">

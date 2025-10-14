@@ -374,5 +374,16 @@
       <label>Description:</label>
       <textarea name="system.description" rows="5" class="power-description">{{system.description}}</textarea>
     </div>
+
+    <!-- ADD NEW SECTION -->
+    <div class="form-group" style="margin-top: 10px;">
+      <button type="button" class="create-stunt-from-power" style="width: 100%; padding: 8px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
+        <i class="fas fa-plus"></i> Create Power Stunt for {{item.name}}
+      </button>
+      <small style="display: block; margin-top: 4px; color: #666; font-style: italic;">
+        Creates a new stunt in the actor's Stunts tab based on this power
+      </small>
+    </div>
+
   </section>
 </form>
