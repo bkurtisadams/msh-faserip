@@ -123,7 +123,9 @@
       <div class="form-row">
         <div class="form-group half">
           <label>Damage Value:</label>
-          <input type="number" name="system.damage" value="{{system.damage}}" placeholder="Usually = rank value" />
+          <input type="number" name="system.damage" value="{{system.damage}}" 
+                placeholder="Leave blank to use {{system.value}}" />
+          <small class="hint">For attacks - usually equals Power rank value. Leave blank for auto.</small>
         </div>
         
         <div class="form-group half">
@@ -220,52 +222,65 @@
     <!-- MAGIC SPELLS SECTION -->
     {{#if system.isMagic}}
     <div class="form-group">
-      <label>Spell Energy Type</label>
-      <select name="system.magic.energyType">
-        {{#each energyTypes}}
-          <option value="{{this}}" {{#if (eq ../system.magic.energyType this)}}selected{{/if}}>{{this}}</option>
-        {{/each}}
+      <label>Spell Energy Type <span style="color:red;">*</span></label>
+      <select name="system.magic.energyType" required>
+        <option value="">-- Select Energy Type --</option>
+        <option value="personal">Personal (1 HP/turn, self/willing only, no ceremony)</option>
+        <option value="universal">Universal (target resists, ceremony required, backlash risk)</option>
+        <option value="dimensional">Dimensional (needs Contact entity, ceremony required)</option>
       </select>
     </div>
 
-    <div class="form-group">
-      <label>Source Entity</label>
-      <input type="text" name="system.magic.sourceEntity" value="{{system.magic.sourceEntity}}" />
+    <!-- Source Entity - only for Dimensional -->
+    <div class="form-group source-entity-group" style="display: none;">
+      <label>Source Entity <span style="color:red;">*</span></label>
+      <input type="text" name="system.magic.sourceEntity" 
+            placeholder="Must be a Contact (e.g., Agamotto, Cytorrak)" />
+      <small class="hint">This entity must be listed in your Contacts</small>
     </div>
 
+    <!-- Backlash - only for Universal -->
+    <div class="form-group backlash-group" style="display: none;">
+      <label>Backlash on Failure</label>
+      <textarea name="system.magic.backlashNotes" 
+                placeholder="Default: Caster's Psyche -1 rank for 1-10 turns if target resists">{{system.magic.backlashNotes}}</textarea>
+    </div>
+
+    <!-- Ceremony - auto-checked for Universal/Dimensional -->
     <div class="form-group">
-      <label>Uses Ceremony?</label>
-      <input type="checkbox" name="system.magic.usesCeremony" {{checked system.magic.usesCeremony}} />
+      <label>
+        <input type="checkbox" name="system.magic.usesCeremony" {{checked system.magic.usesCeremony}} />
+        Requires Ceremony (gestures/chants)
+      </label>
+      <small class="hint">Universal and Dimensional energies require ceremony</small>
+    </div>
+
+    <!-- Cast Cost - mainly for Personal -->
+    <div class="form-group">
+      <label>Cast Cost (Health)</label>
+      <input type="number" name="system.magic.castCost" value="{{system.magic.castCost}}" />
+      <small class="hint">Personal energy: 1 Health per turn active</small>
     </div>
 
     <div class="form-group">
       <label>Casting Ability</label>
       <select name="system.magic.successAbility">
-        {{#each abilities}}
-          <option value="{{this}}" {{#if (eq ../system.magic.successAbility this)}}selected{{/if}}>{{this}}</option>
-        {{/each}}
+        <option value="psyche" selected>Psyche (standard for magic)</option>
+        <option value="reason">Reason</option>
+        <option value="intuition">Intuition</option>
       </select>
     </div>
 
     <div class="form-group">
       <label>Target Resists With</label>
       <select name="system.magic.targetResistsWith">
-        <option value="">None</option>
-        {{#each abilities}}
-          <option value="{{this}}" {{#if (eq ../system.magic.targetResistsWith this)}}selected{{/if}}>{{this}}</option>
-        {{/each}}
+        <option value="">None (Personal energy - willing targets only)</option>
+        <option value="psyche" selected>Psyche (Universal energy default)</option>
+        <option value="reason">Reason</option>
+        <option value="intuition">Intuition</option>
       </select>
     </div>
 
-    <div class="form-group">
-      <label>Backlash on Failure</label>
-      <textarea name="system.magic.backlashNotes">{{system.magic.backlashNotes}}</textarea>
-    </div>
-
-    <div class="form-group">
-      <label>Cast Cost (Health)</label>
-      <input type="number" name="system.magic.castCost" value="{{system.magic.castCost}}" />
-    </div>
     {{/if}}
 
     <!-- Checkbox to enable/disable Magic -->

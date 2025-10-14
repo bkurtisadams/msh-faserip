@@ -2546,13 +2546,20 @@
   margin-top: 6px;
 }
 
-/* Make power sheet body scrollable */
-.power-sheet .sheet-body {
-  overflow-y: auto;
-  max-height: calc(100% - 80px); /* Account for header */
-  padding: 10px;
+/* ADD THESE LINES to fix power sheet scrolling in dialog */
+.dialog .power-sheet {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  max-height: 80vh;
 }
 
-.power-sheet .sheet-header {
-  flex-shrink: 0; /* Keep header visible */
+.dialog .power-sheet .sheet-header {
+  flex-shrink: 0;
+}
+
+.dialog .power-sheet .sheet-body {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
 }

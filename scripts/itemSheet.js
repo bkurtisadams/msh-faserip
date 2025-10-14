@@ -123,6 +123,50 @@ export class FaseripItemSheet extends ItemSheet {
       });
     }
 
+    // Handle magic energy type dropdown - MERGED VERSION (replaces both handlers)
+    html.find('select[name="system.magic.energyType"]').change(async ev => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      
+      const value = ev.currentTarget.value;
+      
+      // Prepare updates object
+      const updates = { "system.magic.energyType": value };
+      
+      // Auto-fill ceremony checkbox based on energy type
+      const ceremonyCheckbox = html.find('input[name="system.magic.usesCeremony"]');
+      const shouldUseCeremony = (value === 'universal' || value === 'dimensional');
+      
+      if (ceremonyCheckbox.prop('checked') !== shouldUseCeremony) {
+        ceremonyCheckbox.prop('checked', shouldUseCeremony);
+        updates["system.magic.usesCeremony"] = shouldUseCeremony;
+      }
+      
+      // Auto-fill cast cost for Personal energy
+      const castCostInput = html.find('input[name="system.magic.castCost"]');
+      if (value === 'personal') {
+        if (!castCostInput.val() || castCostInput.val() === '0') {
+          castCostInput.val(1);
+          updates["system.magic.castCost"] = 1;
+        }
+        castCostInput.attr('placeholder', '1 Health per turn');
+      } else {
+        castCostInput.attr('placeholder', 'None');
+        // Don't clear existing value, just change placeholder
+      }
+      
+      // Show/hide Source Entity for Dimensional
+      const sourceEntityGroup = html.find('.source-entity-group');
+      sourceEntityGroup.toggle(value === 'dimensional');
+      
+      // Show/hide Backlash for Universal
+      const backlashGroup = html.find('.backlash-group');
+      backlashGroup.toggle(value === 'universal');
+      
+      // Single update with all changes, no re-render
+      await this.item.update(updates, { render: false });
+    });
+    
     // Update power type options when category changes
     html.find('#power-category').change(ev => {
       const category = ev.currentTarget.value;
