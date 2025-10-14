@@ -500,6 +500,10 @@ Hooks.once("init", async () => {
   };
       
   // Register Handlebars helpers
+  Handlebars.registerHelper('div', function(a, b) {
+    return Math.floor(a / b);
+  });
+  
   Handlebars.registerHelper('getFlag', function(object, scope, flag) {
     return object.getFlag(scope, flag);
   });

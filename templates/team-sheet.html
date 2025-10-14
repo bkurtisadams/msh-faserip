@@ -1,119 +1,125 @@
-<form class="team-tracker" autocomplete="off">
-  <!-- Top Tab Navigation -->
-  <nav class="tracker-tabs">
-    <a class="tab-button active" data-tab="members">
-      <i class="fas fa-users"></i>
-      <span>Members</span>
+<form class="team-tracker compact" autocomplete="off">
+  <!-- Header with Team Pool Info -->
+  <div class="team-header">
+    <div class="header-left">
+      <h2>Team Tracker</h2>
+      <div class="team-size">{{teamMembers.length}} Members</div>
+    </div>
+    <div class="header-right">
+      <div class="pool-display">
+        <label>Team Karma Pool</label>
+        <div class="pool-value">{{teamKarmaPool}}</div>
+        <button type="button" class="open-pool-manager" title="Manage Pool">
+          <i class="fas fa-cog"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab Navigation -->
+  <nav class="sheet-tabs">
+    <a class="tab-button active" data-tab="overview">
+      <i class="fas fa-users"></i> Team Overview
     </a>
     <a class="tab-button" data-tab="awards">
-      <i class="fas fa-trophy"></i>
-      <span>Awards</span>
+      <i class="fas fa-trophy"></i> Awards History
     </a>
   </nav>
 
   <!-- Tab Content -->
-  <section class="tab-content">
-    <!-- Members Tab -->
-    <div class="tab-panel active" data-tab="members">
-      <div class="members-header">
-        <h3>Team Members</h3>
-        <div class="team-stats">
-          <button type="button" class="distribute-karma"><i class="fas fa-gift"></i> Award Karma</button>
-        </div>
+  <section class="sheet-body">
+    <!-- Overview Tab -->
+    <div class="tab-panel active" data-tab="overview">
+      <!-- GM Award Buttons -->
+      {{#if isGM}}
+      <div class="gm-controls">
+        <button type="button" class="award-team-karma">
+          <i class="fas fa-trophy"></i> Award Team Karma
+        </button>
+        <button type="button" class="award-individual-karma">
+          <i class="fas fa-user-plus"></i> Award Individual Karma
+        </button>
       </div>
-      
-      <div class="members-list">
-        {{#each teamMembers as |member|}}
-        <div class="member-card">
-          <div class="member-portrait" data-hero-id="{{member.id}}">
-            <img src="{{member.img}}" alt="{{member.name}}" class="hero-portrait" data-hero-id="{{member.id}}" />
-            <div class="member-name">{{member.name}}</div>
-          </div>
-          
-          <div class="member-stats">
-            <div class="faserip-row">
-              <div class="stat">
-                <label>F</label>
-                <span class="rank">{{abbreviateRank member.fightingRank}}</span>
-                <span class="value">{{member.fighting}}</span>
-              </div>
-              <div class="stat">
-                <label>A</label>
-                <span class="rank">{{abbreviateRank member.agilityRank}}</span>
-                <span class="value">{{member.agility}}</span>
-              </div>
-              <div class="stat">
-                <label>S</label>
-                <span class="rank">{{abbreviateRank member.strengthRank}}</span>
-                <span class="value">{{member.strength}}</span>
-              </div>
-              <div class="stat">
-                <label>E</label>
-                <span class="rank">{{abbreviateRank member.enduranceRank}}</span>
-                <span class="value">{{member.endurance}}</span>
-              </div>
-            </div>
-            <div class="faserip-row">
-              <div class="stat">
-                <label>R</label>
-                <span class="rank">{{abbreviateRank member.reasonRank}}</span>
-                <span class="value">{{member.reason}}</span>
-              </div>
-              <div class="stat">
-                <label>I</label>
-                <span class="rank">{{abbreviateRank member.intuitionRank}}</span>
-                <span class="value">{{member.intuition}}</span>
-              </div>
-              <div class="stat">
-                <label>P</label>
-                <span class="rank">{{abbreviateRank member.psycheRank}}</span>
-                <span class="value">{{member.psyche}}</span>
-              </div>
-              <div class="derived-stat">
-                <label>Health:</label>
-                <span>{{member.health}}/{{member.healthMax}}</span>
-              </div>
-            </div>
-            <div class="secondary-stats">
-              <div class="stat-small">
-                <label>Karma:</label>
-                <span>{{member.karma}}</span>
-              </div>
-              <div class="stat-small">
-                <label>Resources:</label>
-                <span>{{abbreviateRank member.resources}}</span>
-              </div>
-              <div class="stat-small">
-                <label>Popularity:</label>
-                <span>{{member.popularity}}</span>
-              </div>
-            </div>
-          </div>
-          
-          <div class="member-actions">
-            <button type="button" class="hero-settings" data-hero-id="{{member.id}}" title="Settings">
-              <i class="fas fa-cog"></i>
-            </button>
-            <button type="button" class="remove-hero-from-team" data-hero-id="{{member.id}}" title="Remove from Team">
-              <i class="fas fa-user-minus"></i>
-            </button>
-          </div>
-        </div>
-        {{/each}}
+      {{/if}}
+
+      <!-- Team Members List -->
+      <div class="team-members-section">
+        <h3>Active Team Members</h3>
+
+        {{#if teamMembers.length}}
+        <table class="team-members-table">
+          <thead>
+            <tr>
+              <th class="col-por" title="Portrait"></th>
+              <th>Hero</th>
+              <th>Health</th>
+              <th>Display Karma</th>
+              <th>Lifetime</th>
+              <th>Available</th>
+              <th>Pool Share</th>
+              <th>Resources</th>
+              <th>Pop</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {{#each teamMembers as |member|}}
+            <tr class="member-row">
+              <!-- Portrait column -->
+              <td class="col-por">
+                <img src="{{member.img}}" class="hero-portrait" data-hero-id="{{member.id}}" title="Click to open sheet" />
+              </td>
+
+              <!-- Name column -->
+              <td class="member-name">
+                <span class="hero-name">{{member.name}}</span>
+              </td>
+
+              <!-- Stats -->
+              <td class="stat-cell">
+                <span class="{{#if (lt member.health (div member.healthMax 2))}}health-low{{/if}}">
+                  {{member.health}}/{{member.healthMax}}
+                </span>
+              </td>
+              <td class="stat-cell">{{member.karma}}</td>
+              <td class="stat-cell">{{member.lifetimeKarma}}</td>
+              <td class="stat-cell karma-available">{{member.availableKarma}}</td>
+              <td class="stat-cell">{{member.poolContribution}}</td>
+              <td class="stat-cell">{{member.resources}}</td>
+              <td class="stat-cell">{{member.popularity}}</td>
+
+              <!-- Actions -->
+              <td class="actions-cell">
+                {{#if ../isGM}}
+                <a class="remove-hero-from-team" data-hero-id="{{member.id}}" title="Remove from Team">
+                  <i class="fas fa-user-minus"></i>
+                </a>
+                {{/if}}
+              </td>
+            </tr>
+            {{/each}}
+          </tbody>
+        </table>
+        {{else}}
+        <p class="no-members">No team members yet. Add heroes below.</p>
+        {{/if}}
       </div>
 
-      <!-- Available Heroes to Add -->
+      <!-- Available Heroes -->
       {{#if availableHeroes.length}}
-      <div class="available-heroes">
-        <h4>Available Heroes</h4>
-        <div class="hero-add-list">
+      <div class="available-heroes-section">
+        <h3>Available Heroes</h3>
+        <div class="hero-grid">
           {{#each availableHeroes as |hero|}}
-          <div class="hero-add-item">
+          <div class="hero-card">
             <img src="{{hero.img}}" alt="{{hero.name}}" />
-            <span>{{hero.name}}</span>
+            <div class="hero-card-name">{{hero.name}}</div>
+            {{#if ../isGM}}
             <button type="button" class="add-hero-to-team" data-hero-id="{{hero.id}}">
-              <i class="fas fa-plus"></i>
+              <i class="fas fa-plus"></i> Add
             </button>
+            {{/if}}
           </div>
           {{/each}}
         </div>
@@ -121,40 +127,46 @@
       {{/if}}
     </div>
 
-    <!-- Awards Tab -->
+    <!-- Awards History Tab -->
     <div class="tab-panel" data-tab="awards">
       <div class="awards-header">
-        <h3>Team Karma Awards</h3>
-        <button type="button" class="clear-awards"><i class="fas fa-broom"></i> Clear History</button>
+        <h3>Team Karma Awards History</h3>
+        {{#if isGM}}
+        <button type="button" class="clear-awards-history">
+          <i class="fas fa-broom"></i> Clear History
+        </button>
+        {{/if}}
       </div>
       
-      <div class="awards-list">
-        <table>
+      <div class="awards-table-container">
+        <table class="awards-table">
           <thead>
             <tr>
               <th>Date</th>
               <th>Total Karma</th>
-              <th>Per Hero</th>
+              <th>Destination</th>
               <th>Team Size</th>
               <th>Award Type</th>
               <th>Description</th>
+              <th>Multiplier</th>
             </tr>
           </thead>
           <tbody>
-            {{#if karmaAwards.length}}
-              {{#each karmaAwards as |award i|}}
+            {{#if teamAwards.length}}
+              {{#each teamAwards as |award|}}
               <tr>
-                <td class="award-date">{{award.date}}</td>
-                <td class="award-amount">{{award.totalAmount}}</td>
-                <td class="award-amount">{{award.amountPerHero}}</td>
+                <td>{{award.date}}</td>
+                <td class="karma-amount">{{award.totalAmount}}</td>
+                <td class="destination">{{award.destination}}</td>
                 <td>{{award.teamSize}}</td>
-                <td class="award-reason">{{award.reason}}</td>
-                <td class="award-description">{{award.description}}</td>
+                <td>{{award.reason}}</td>
+                <td class="description">{{award.description}}</td>
+                <td>{{#if (gt award.multiplier 1)}}×{{award.multiplier}}{{else}}—{{/if}}</td>
               </tr>
               {{/each}}
             {{else}}
               <tr>
-                <td colspan="6" class="empty-message">No team karma awards recorded yet.</td>
+                <td colspan="7" class="empty-message">No team awards recorded yet.</td>
               </tr>
             {{/if}}
           </tbody>
