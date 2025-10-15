@@ -246,7 +246,7 @@ BLUNT DAMAGE RULES:
     // card pieces (shared)
     const grid = buildResultGrid(actionType, colorLower, effects, (globalThis._getResultHoverText||this._getResultHoverText));
     const { bg, fg } = bannerColors(colorLower);
-    const breakingFeat = (choice.src === "weapon" || choice.src === "object") ? { weaponMat: choice.weaponMat } : null;
+
     const isHit = colorLower !== 'white';
 
     // Calculate penetrating damage by checking targeted token's Body Armor
@@ -258,27 +258,39 @@ BLUNT DAMAGE RULES:
         if (targetActor) {
           const armorData = getBodyArmorValues(targetActor, "physical-blunt");
           penetratingDamage = Math.max(0, choice.damage - armorData.applicable);
+        } else {
+          // No actor found for target, use raw damage
+          penetratingDamage = choice.damage;
         }
       } else {
+        // Multiple targets or no targets, use raw damage
         penetratingDamage = choice.damage;
       }
     }
+
+    // NOW calculate breakingFeat (after penetratingDamage is known)
+    const breakingFeat = (colorLower !== "white" && penetratingDamage > 0 && (choice.src === "weapon" || choice.src === "object"))
+      ? { weaponMat: choice.weaponMat }
+      : null;
 
     const targets = Array.from(game.user?.targets ?? []);
     const rawDamage = choice.damage ?? strength.value;
     const afterArmor = penetratingDamage;
 
-    const actions = buildActionsBox({
-      showSlam: colorLower==='yellow' && penetratingDamage > 0,
-      showStun: colorLower==='red' && penetratingDamage > 0,
-      pulled: choice.pulled,
-      breakingFeat,
-      actorUuid: actor.uuid,
-      damage: choice.damage,  // <-- Pass RAW damage, not penetrating
-      attackForm: "blunt",
-      damageType: "physical-blunt",
-      bypassArmor: false  // <-- Let applyDamageToTargets handle armor
-    });
+    const actions = (isHit && penetratingDamage > 0)
+      ? buildActionsBox({
+          showSlam: colorLower === "yellow" && penetratingDamage > 0,
+          showStun: colorLower === "red" && penetratingDamage > 0,
+          pulled: choice.pulled,
+          breakingFeat,
+          actorUuid: actor.uuid,
+          damage: penetratingDamage,      // pass penetrating, not raw
+          attackForm: "blunt",
+          damageType: "physical-blunt",
+          bypassArmor: false
+        })
+      : "";
+
 
     // damage line
     const damageBlock = `
