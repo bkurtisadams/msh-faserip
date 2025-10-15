@@ -11,7 +11,8 @@ import {
   buildResultGrid,
   buildActionsBox,
   bannerColors,
-  getTargetingContext
+  getTargetingContext,
+  getBodyArmorValues
 } from "./action-utils.js";
 
 export class ThrowingBluntAction extends RangedAttackAction {
@@ -244,16 +245,50 @@ export class ThrowingBluntAction extends RangedAttackAction {
     const grid = buildResultGrid(actionType, colorLower, effects, (globalThis._getResultHoverText || this._getResultHoverText));
     const { bg, fg } = bannerColors(colorLower);
 
-    // Throwing Blunt: Red = Stun (no Kill/Slam by default)
+    // Calculate penetrating damage by checking targeted token's Body Armor
     const isHit = colorLower !== 'white';
+    let penetratingDamage = 0;
+    if (isHit && choice.weaponDamage > 0) {
+      const targets = Array.from(game.user?.targets ?? []);
+      if (targets.length === 1) {
+        const targetActor = targets[0].actor;
+        if (targetActor) {
+          const armorData = getBodyArmorValues(targetActor, "physical-blunt");
+          penetratingDamage = Math.max(0, choice.weaponDamage - armorData.applicable);
+        }
+      } else {
+        penetratingDamage = choice.weaponDamage;
+      }
+    }
+
+    const targets = Array.from(game.user?.targets ?? []);
+    const rawDamage = choice.weaponDamage;
+    const afterArmor = penetratingDamage;
+
+    // Throwing Blunt: Red = Stun (no Kill/Slam by default)
     const actions = buildActionsBox({
-      showStun: colorLower === "red",
+      showStun: colorLower === "red" && penetratingDamage > 0,
       showKill: false,
       showSlam: false,
       actorUuid: actor.uuid,
       damage: isHit ? choice.weaponDamage : 0,  // Only pass damage if it's a hit
-      attackForm: "blunt"
+      attackForm: "blunt",
+      damageType: "physical-blunt",
+      bypassArmor: false
     });
+
+    // Damage block
+    const damageBlock = `
+      <div style="margin:6px 10px;padding:6px;border:1px solid #ccc;border-radius:3px;background:#fff;">
+        <div><b>Damage (raw):</b> ${rawDamage}</div>
+        ${isHit ? `
+          <div><b>After Armor${targets.length===1 ? ` (${targets[0].name})` : ``}:</b> ${afterArmor}</div>
+        ` : ``}
+        <div style="font-size:.9em;color:#555;">
+          Weapon: ${choice.weaponName}
+        </div>
+      </div>
+    `;
 
     const contextHtml = `
       <div>Ability: ${ability.name}</div>
@@ -276,6 +311,7 @@ export class ThrowingBluntAction extends RangedAttackAction {
           ${targetingContext}
         </div>
         <div style="padding:5px 10px;font-size:.9em;">${contextHtml}</div>
+        ${damageBlock}
         ${grid}
         <div style="text-align:center;padding:8px;margin:5px;font-weight:bold;font-size:1.1em;border-radius:3px;background:${bg};color:${fg};">
           RESULT: ${String(color).toUpperCase()} — ${String(effectResult).toUpperCase()}
