@@ -14,6 +14,9 @@ import {
   applyDamageToTargets  // ADD THIS IMPORT
 } from "./action-utils.js";
 import { getItemMaterialRank } from "../../gm-utils.js";
+import { makeDamageBlock, computeAfterArmor, buildDamageFlags } from "./damage-ui.js";
+import { getBodyArmorValues } from "./action-utils.js";
+
 
 export class EdgedAttackAction extends AttackAction {
   async execute() {
@@ -226,6 +229,42 @@ export class EdgedAttackAction extends AttackAction {
     const colorLower = String(color||"").toLowerCase();
     const effectResult = effects[colorLower] || color;
 
+    const isHit = colorLower !== "white";
+
+    // Edged damage type (prefer weapon’s damageType if present)
+    const dmgType =
+      (choice.src === "weapon"
+        ? (actor.items.get(choice.itemId)?.system?.damageType)
+        : null) || "physical-edged";
+
+    // Your choice.damage is already computed earlier in the dialog callback
+    const rawDamage = isHit ? Number(choice.damage || 0) : 0;
+
+    // Compute after-armor and target metadata
+    const { afterArmor, targetName, multiTargetCount, targetsArray } = computeAfterArmor({
+      isHit,
+      rawDamage,
+      damageType: dmgType,
+      targets: game.user?.targets,
+      getArmorFn: (actor, dt) => getBodyArmorValues(actor, dt)
+    });
+
+    // Build standardized damage block
+    const sourceLabel = (choice.src === "weapon")
+      ? `Weapon: ${choice.weaponName || "(Edged Weapon)"} (${choice.weaponMat || "Excellent"})`
+      : `Natural Weapon (${choice.natRank})`;
+
+    const damageBlock = makeDamageBlock({
+      isHit,
+      rawDamage,
+      afterArmor,
+      note: (choice.html?.data('weaponNote') || ""),
+      sourceLabel,
+      targetName,
+      multiTargetCount
+    });
+
+
     // shared pieces
     const grid = buildResultGrid(actionType, colorLower, effects, (globalThis._getResultHoverText||this._getResultHoverText));
     const { bg, fg } = bannerColors(colorLower);
@@ -243,13 +282,12 @@ export class EdgedAttackAction extends AttackAction {
     const parts = [];
 
     // Only show Apply Damage on hits (not white)
-    const isHit = colorLower !== 'white';
     if (isHit && choice.damage > 0) {
       parts.push(chip(
         "Apply Damage",
         "Apply damage to targeted/selected token(s)", 
         true, 
-        `data-damage="${choice.damage}" data-attacker-uuid="${actor.uuid}" data-damage-type="physical-edged"`
+        `data-damage="${rawDamage}" data-attacker-uuid="${actor.uuid}" data-damage-type="physical-edged"`
       ));
     }
 
@@ -260,14 +298,14 @@ export class EdgedAttackAction extends AttackAction {
       "Resolve Stun",
       "Open Stun Check dialog",
       true,
-      `data-check="stun" data-attack-form="edged" data-damage-type="physical-edged" data-dmg="${choice.damage}" data-attacker-uuid="${actor.uuid}"`
+      `data-check="stun" data-attack-form="edged" data-damage-type="physical-edged" data-dmg="${rawDamage}"" data-attacker-uuid="${actor.uuid}"`
     ));
 
     if (enableKill) parts.push(chip(
       "Resolve Kill",
       "Open Kill check dialog",
       true,
-      `data-check="kill" data-attack-form="edged" data-damage-type="physical-edged" data-dmg="${choice.damage}" data-attacker-uuid="${actor.uuid}"`
+      `data-check="kill" data-attack-form="edged" data-damage-type="physical-edged" data-dmg="${rawDamage}"" data-attacker-uuid="${actor.uuid}"`
     ));
 
     if (choice.src === "weapon") {
@@ -318,9 +356,10 @@ export class EdgedAttackAction extends AttackAction {
         <div style="padding:5px 10px;font-size:.9em;">
           <div>Ability: ${ability.name}</div>
           <div>Base Rank: ${ability.rank} (${ability.value})${choice.shift ? ` — Shift ${choice.shift} → ${effectiveRank}` : ""}</div>
-          ${weaponContext}
+          
           <div>Roll: ${roll.total}${totalKarmaUsed ? ` + Karma: ${totalKarmaUsed}` : ""} = ${cappedTotal}</div>
         </div>
+        ${damageBlock}
         ${edgedWarning}
         ${grid}
         <div style="text-align:center;padding:8px;margin:5px;font-weight:bold;font-size:1.1em;border-radius:3px;background:${bg};color:${fg};">
@@ -330,7 +369,19 @@ export class EdgedAttackAction extends AttackAction {
       </div>
     `;
 
-    await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor }), content: cardHtml });
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor }),
+      content: cardHtml,
+      flags: buildDamageFlags({
+        actionId: actionType,
+        damageType: dmgType,
+        rawDamage,
+        afterArmor,
+        resultColor: colorLower,
+        cappedTotal,
+        targets: targetsArray
+      })
+    });
 
   }
 }

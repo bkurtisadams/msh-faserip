@@ -1,6 +1,7 @@
 // scripts/modules/actions/energy-action.js
 import { RangedAttackAction } from "./ranged-attack-action.js";
 import { attachAutoFillRange } from "./action-utils.js";
+import { getBodyArmorValues } from "./action-utils.js";
 
 import {
   getAbilityInfo,
@@ -314,6 +315,31 @@ export class EnergyAction extends RangedAttackAction {
       attackForm: "energy",
       damageType: choice.powerDamageType || "energy-generic"
     });
+    // Damage numbers for display + flags
+    const targets = Array.from(game.user?.targets ?? []);
+    const rawDamage = isHit ? (Number(choice.powerDamage) || 0) : 0;
+
+    let afterArmor = rawDamage;
+    if (isHit && rawDamage > 0 && targets.length === 1) {
+      const targetActor = targets[0]?.actor;
+      if (targetActor) {
+        const armorData = getBodyArmorValues(targetActor, choice.powerDamageType || "energy-generic");
+        afterArmor = Math.max(0, rawDamage - (armorData?.applicable ?? 0));
+      }
+    }
+
+    // Build a standardized damage block (inline HTML)
+    const sourceLabel = `Power: ${choice.powerName} (${choice.powerRank})`;
+    const damageBlock = `
+      <div style="margin:6px 10px;padding:6px;border:1px solid #ccc;border-radius:3px;background:#fff;">
+        <div><b>Damage (raw):</b> ${rawDamage}</div>
+        ${isHit ? (targets.length === 1
+          ? `<div><b>After Armor (${targets[0].name}):</b> ${afterArmor}</div>`
+          : `<div><b>After Armor (varies):</b> Resolve per target</div>`) : ``}
+        <div style="font-size:.9em;color:#555;">${sourceLabel}</div>
+      </div>
+    `;
+
 
     const rangeText = choice.prettyRange || `${choice.range} area${choice.range > 1 ? "s" : ""}${choice.rangeModifier ? ` (${choice.rangeModifier}CS)` : ""}${choice.throughObstacle ? `, obstacle (-2CS)` : ""}`;
 
@@ -342,6 +368,7 @@ export class EnergyAction extends RangedAttackAction {
           ${targetingContext}
         </div>
         <div style="padding:5px 10px;font-size:.9em;">${contextHtml}</div>
+        ${damageBlock}
         ${grid}
         <div style="text-align:center;padding:8px;margin:5px;font-weight:bold;font-size:1.1em;border-radius:3px;background:${bg};color:${fg};">
           RESULT: ${String(color).toUpperCase()} — ${String(effectResult).toUpperCase()}
@@ -350,6 +377,21 @@ export class EnergyAction extends RangedAttackAction {
       </div>
     `;
 
-    await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor }), content: cardHtml });
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor }),
+      content: cardHtml,
+      flags: {
+        "msh-faserip": {
+          actionId: actionType,
+          damageType: choice.powerDamageType || "energy-generic",
+          rawDamage,
+          afterArmor,
+          resultColor: colorLower,
+          cappedTotal,
+          targets: targets.map(t => t.document?.uuid ?? t.actor?.uuid ?? t.id)
+        }
+      }
+    });
+
   }
 }

@@ -1,6 +1,8 @@
 // scripts/modules/actions/shooting-action.js
 import { RangedAttackAction } from "./ranged-attack-action.js";
 import { attachAutoFillRange } from "./action-utils.js";
+import { getBodyArmorValues } from "./action-utils.js";
+import { makeDamageBlock, computeAfterArmor, buildDamageFlags } from "./damage-ui.js";
 
 import {
   RANKS,
@@ -214,8 +216,42 @@ export class ShootingAction extends RangedAttackAction {
     const effectResult = effects[colorLower] || color;
 
     // Build grid & banner
-    const grid = buildResultGrid(actionType, colorLower, effects, (globalThis._getResultHoverText || this._getResultHoverText));
+    const grid = buildResultGrid(
+      actionType,
+      colorLower,
+      effects,
+      (globalThis._getResultHoverText || this._getResultHoverText)
+    );
     const { bg, fg } = bannerColors(colorLower);
+
+    // Hit state (define BEFORE using it anywhere)
+    const isHit = colorLower !== "white";
+
+    // Damage type from weapon if available; fallback to shooting physical
+    const dmgType = choice.weapon?.system?.damageType || "physical-shooting";
+
+    // Raw damage (only matters on a hit)
+    const rawDamage = isHit ? Number(choice.weaponDamage || 0) : 0;
+
+    // Compute after-armor using the shared helper
+    const { afterArmor, targetName, multiTargetCount, targetsArray } = computeAfterArmor({
+      isHit,
+      rawDamage,
+      damageType: dmgType,
+      targets: game.user?.targets,
+      getArmorFn: (actor, dt) => getBodyArmorValues(actor, dt)
+    });
+
+    // Standardized damage block
+    const sourceLabel = `Weapon: ${choice.weapon.name} (Range ${choice.weaponRange}, Damage ${choice.weaponDamage})`;
+    const damageBlock = makeDamageBlock({
+      isHit,
+      rawDamage,
+      afterArmor,
+      sourceLabel,
+      targetName,
+      multiTargetCount
+    });
 
     // Action chips
     const chip = (label, title, enabled, dataAttrs = "") => {
@@ -230,28 +266,27 @@ export class ShootingAction extends RangedAttackAction {
     const parts = [];
 
     // Only show Apply Damage on hits (not white)
-    const isHit = colorLower !== 'white';
-    if (isHit && choice.weaponDamage > 0) {
+    if (isHit && rawDamage > 0) {
       parts.push(chip(
         "Apply Damage",
         "Apply damage to targeted/selected token(s)",
         true,
-        `data-damage="${choice.weaponDamage}" data-attacker-uuid="${actor.uuid}"`
+        `data-damage="${rawDamage}" data-attacker-uuid="${actor.uuid}"`
       ));
     }
 
-    // Bullseye: text input for specific target
-    if (colorLower === 'yellow') {
+    // Bullseye details (yellow)
+    if (colorLower === "yellow") {
       parts.push(chip("Bullseye Details", "Describe what specific part was targeted.", false));
     }
 
-    // Kill check
-    if (colorLower === 'red') {
+    // Kill check (red)
+    if (colorLower === "red") {
       parts.push(chip(
         "Resolve Kill",
         "Open Kill Check dialog",
         true,
-        `data-check="kill" data-attack-form="shooting" data-dmg="${choice.weaponDamage}" data-attacker-uuid="${actor.uuid}"`
+        `data-check="kill" data-attack-form="shooting" data-dmg="${rawDamage}" data-attacker-uuid="${actor.uuid}"`
       ));
     }
 
@@ -262,10 +297,10 @@ export class ShootingAction extends RangedAttackAction {
       <div style="padding:0 10px 8px;font-size:.8em;color:#d32f2f;">⚠ Shooting attacks cannot be reduced in effect or damage.</div>
     `;
 
-    // Range context
+    // Range/targeting context
     const targetingContext = getTargetingContext(actor, actionName);
 
-    // final chat card
+    // Final chat card
     const cardHtml = `
       <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
         <div style="padding:5px 10px;border-bottom:1px solid #c0c0c0;font-size:1.1em;color:#8b0000;">
@@ -282,6 +317,7 @@ export class ShootingAction extends RangedAttackAction {
           ${choice.totalShift !== 0 ? `<div>Effective Rank: ${effectiveRank} (${choice.totalShift > 0 ? '+' : ''}${choice.totalShift}CS total)</div>` : ""}
           <div>Roll: ${roll.total}${totalKarmaUsed ? ` + Karma: ${totalKarmaUsed}` : ""} = ${cappedTotal}</div>
         </div>
+        ${damageBlock}
         ${grid}
         <div style="text-align:center;padding:8px;margin:5px;font-weight:bold;font-size:1.1em;border-radius:3px;background:${bg};color:${fg};">
           RESULT: ${String(color).toUpperCase()} — ${String(effectResult).toUpperCase()}
@@ -290,6 +326,21 @@ export class ShootingAction extends RangedAttackAction {
       </div>
     `;
 
-    await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor }), content: cardHtml });
+    // Create chat with standardized flags
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor }),
+      content: cardHtml,
+      flags: buildDamageFlags({
+        actionId: actionType,
+        damageType: dmgType,
+        rawDamage,
+        afterArmor,
+        resultColor: colorLower,
+        cappedTotal,
+        targets: targetsArray
+      })
+    });
+
+
   }
 }

@@ -1,6 +1,10 @@
 // scripts/modules/actions/force-action.js
 import { RangedAttackAction } from "./ranged-attack-action.js";
 import { attachAutoFillRange } from "./action-utils.js";
+// NEW
+import { makeDamageBlock, computeAfterArmor, buildDamageFlags } from "./damage-ui.js";
+import { getBodyArmorValues } from "./action-utils.js";
+
 
 import {
   getAbilityInfo,
@@ -302,6 +306,32 @@ export class ForceAction extends RangedAttackAction {
       attackForm: "force",
     });
 
+    // --- Damage numbers for display + flags ---
+    const rawDamage = isHit ? Number(choice.powerDamage || 0) : 0;
+
+    // Prefer item damageType if a carried power was chosen; else default to force energy
+    const dmgType =
+      (choice.powerId
+        ? (forceItems.find(i => i.id === choice.powerId)?.system?.damageType)
+        : null) || "energy-force";
+
+    const { afterArmor, targetName, multiTargetCount, targetsArray } = computeAfterArmor({
+      isHit,
+      rawDamage,
+      damageType: dmgType,
+      targets: game.user?.targets,
+      getArmorFn: (actor, dt) => getBodyArmorValues(actor, dt)
+    });
+
+    const damageBlock = makeDamageBlock({
+      isHit,
+      rawDamage,
+      afterArmor,
+      sourceLabel: `Power: ${choice.powerName} (${choice.powerRank})`,
+      targetName,
+      multiTargetCount
+    });
+
     const rangeText = choice.prettyRange || 
       `${choice.range} area${choice.range > 1 ? "s" : ""}` +
       `${choice.rangeModifier ? ` (${choice.rangeModifier}CS)` : ""}` +
@@ -330,6 +360,7 @@ export class ForceAction extends RangedAttackAction {
           ${targetingContext}
         </div>
         <div style="padding:5px 10px;font-size:.9em;">${contextHtml}</div>
+        ${damageBlock}
         ${grid}
         <div style="text-align:center;padding:8px;margin:5px;font-weight:bold;font-size:1.1em;border-radius:3px;background:${bg};color:${fg};">
           RESULT: ${String(color).toUpperCase()} — ${String(effectResult).toUpperCase()}
@@ -338,6 +369,18 @@ export class ForceAction extends RangedAttackAction {
       </div>
     `;
 
-    await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor }), content: cardHtml });
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor }),
+      content: cardHtml,
+      flags: buildDamageFlags({
+        actionId: actionType,
+        damageType: dmgType,
+        rawDamage,
+        afterArmor,
+        resultColor: colorLower,
+        cappedTotal,
+        targets: targetsArray
+      })
+    });
   }
 }
