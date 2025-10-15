@@ -181,6 +181,14 @@ export class CheckAction extends BaseAction {
         flavor: `${choice.targetName} Stun Duration (1d10)${rawStunDuration > stunDuration ? ` - Capped at ${maxStunDuration}` : ''}`,
         rollMode: game.settings.get("core", "rollMode")
       });
+
+      // CREATE STUNNED EFFECT
+      await this._createStunnedEffect(choice.targetUuid, choice.targetName, stunDuration);
+    }
+
+    // Handle Green result (1 round stun) - ADD THIS BLOCK
+    if (actionType === "stun" && colorLower === "green" && !effectsSuppressed) {
+      await this._createStunnedEffect(choice.targetUuid, choice.targetName, 1);
     }
 
     // --- Apply special Kill "E/S" rule ---
@@ -404,4 +412,47 @@ export class CheckAction extends BaseAction {
     return speedByRank[strRank] || 1;
   }
 
-}
+  /**
+   * Create a Stunned effect on the target
+   */
+  async _createStunnedEffect(targetUuid, targetName, duration) {
+    if (!targetUuid) {
+      console.warn("No target UUID provided for Stunned effect");
+      return;
+    }
+
+    try {
+      const resolved = await fromUuid(targetUuid);
+      const targetActor = resolved?.documentName === "Actor" 
+        ? resolved 
+        : (resolved?.documentName === "Token" ? resolved.actor : null);
+
+      if (!targetActor) {
+        console.warn(`Could not resolve actor for Stunned effect: ${targetName}`);
+        return;
+      }
+
+      const effectData = {
+        name: `Stunned (${duration} round${duration > 1 ? 's' : ''})`,
+        icon: "icons/svg/daze.svg",
+        origin: targetActor.uuid,
+        disabled: false,
+        duration: {
+          rounds: duration,
+          startRound: game.combat?.round || 0
+        },
+        flags: {
+          "msh-faserip": {
+            isStunned: true,
+            fromStunCheck: true
+          }
+        }
+      };
+
+      await targetActor.createEmbeddedDocuments('ActiveEffect', [effectData]);
+      ui.notifications.info(`Stunned effect created for ${targetName} (${duration} round${duration > 1 ? 's' : ''}).`);
+    } catch (err) {
+      console.error("Failed to create Stunned effect:", err);
+    }
+  }
+} // end of class CheckAction
