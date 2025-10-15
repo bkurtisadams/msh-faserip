@@ -26,13 +26,14 @@ export class BluntAttackAction extends AttackAction {
     const savedObjectName = await actor.getFlag("msh-faserip","lastBluntObjectName") || "";
     const savedObjectRank = await actor.getFlag("msh-faserip","lastBluntObjectRank") || "Excellent";
     const savedObjectValue = await actor.getFlag("msh-faserip","lastBluntObjectValue") || 20;
+    const savedPulledDamage = await actor.getFlag("msh-faserip","lastBluntPulledDamage") || 0;
+    const savedResultCap = await actor.getFlag("msh-faserip","lastBluntResultCap") || "none";
 
     const itemOptions = attackItems.map(i =>
       `<option value="${i.id}" ${i.id===savedItemId?'selected':''}>${i.name}</option>`
     ).join("");
 
     // dialog HTML
-    // In blunt-attack-action.js, replace the dialogHtml section with:
     const dialogHtml = `
       <div style="margin-bottom:6px;">
         <div style="display:grid;grid-template-columns:65px 1fr;gap:3px 8px;font-size:.9em;line-height:1.3;">
@@ -55,6 +56,25 @@ export class BluntAttackAction extends AttackAction {
         </div>
       </div>
 
+      <div style="margin:6px 0;padding:6px;background:#fff3e0;border:1px solid #ff9800;border-radius:3px;">
+        <div style="font-weight:600;margin-bottom:6px;color:#e65100;">Pull Punch (Optional)</div>
+        <div style="margin-bottom:4px;">
+          <label style="display:inline-block;width:90px;font-size:.9em;">Damage Cap:</label>
+          <input type="number" name="pulledDamage" value="${savedPulledDamage || strength.value}" min="0" max="${strength.value}" style="width:60px;padding:2px;">
+          <span style="color:#666;font-size:.8em;margin-left:4px;" id="dmg-cap-note">(max: ${strength.value})</span>
+        </div>
+        <div style="margin-bottom:4px;">
+          <label style="display:inline-block;width:90px;font-size:.9em;">Result Cap:</label>
+          <select name="resultCap" style="width:140px;padding:2px;">
+            <option value="none" ${savedResultCap==='none'?'selected':''}>No Limit</option>
+            <option value="yellow" ${savedResultCap==='yellow'?'selected':''}>Cap at Yellow</option>
+            <option value="green" ${savedResultCap==='green'?'selected':''}>Cap at Green</option>
+            
+          </select>
+        </div>
+        <div style="font-size:.85em;color:#666;font-style:italic;">Reduces effectiveness (subdue vs kill)</div>
+      </div>
+
       <div style="margin:6px 0;padding:6px;background:#f5f5f5;border:1px solid #ccc;border-radius:3px;">
         <div style="margin-bottom:4px;font-size:.9em;">
           <label style="font-weight:600;margin-right:8px;">Source:</label>
@@ -63,23 +83,23 @@ export class BluntAttackAction extends AttackAction {
           <label style="margin-left:8px;"><input type="radio" name="src" value="object" ${savedSource==='object'?'checked':''}> Object</label>
           <span style="display:inline-block;width:14px;height:14px;line-height:14px;text-align:center;border-radius:50%;background:#2196F3;color:#fff;font-size:10px;font-weight:bold;cursor:help;margin-left:4px;" title="Common improvised weapons:
 
-Wooden items (chair, bat): Typical (6)
-Metal pipe, crowbar: Good (10)
-Concrete chunk: Good (10)
-Brick: Typical (6)
-Trash can lid: Poor (4)
-Bottle/glass: Feeble (2)
-Rock (small): Poor (4)
-Rock (large): Typical (6)
-Car door: Excellent (20)
-Lamp post: Remarkable (30)
-Mailbox: Good (10)
-Dumpster: Incredible (40)
+  Wooden items (chair, bat): Typical (6)
+  Metal pipe, crowbar: Good (10)
+  Concrete chunk: Good (10)
+  Brick: Typical (6)
+  Trash can lid: Poor (4)
+  Bottle/glass: Feeble (2)
+  Rock (small): Poor (4)
+  Rock (large): Typical (6)
+  Car door: Excellent (20)
+  Lamp post: Remarkable (30)
+  Mailbox: Good (10)
+  Dumpster: Incredible (40)
 
-BLUNT DAMAGE RULES:
-- Bare hands = Strength value
-- Weapon material ≤ Strength: damage = min(Strength, Material)
-- Weapon material > Strength: damage = next rank up from Strength">?</span>
+  BLUNT DAMAGE RULES:
+  - Bare hands = Strength value
+  - Weapon material ≤ Strength: damage = min(Strength, Material)
+  - Weapon material > Strength: damage = next rank up from Strength">?</span>
         </div>
 
         <div id="weapon-row" style="display:none;font-size:.9em;padding-left:8px;">
@@ -114,7 +134,6 @@ BLUNT DAMAGE RULES:
 
       <div id="preview" style="margin:6px 0;padding:5px;background:#e3f2fd;border:1px solid #2196F3;border-radius:3px;font-size:.85em;">
         <div><strong>Damage:</strong> <span id="dmg-val">${strength.value}</span> <span id="dmg-note" style="color:#555;">(Bare Hands = Strength)</span></div>
-        <div style="margin-top:2px;font-size:.9em;color:#666;font-style:italic;">Pull Punch reduces damage/color</div>
       </div>
 
       <div style="margin-top:6px;padding-top:5px;border-top:1px solid #ddd;display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:.9em;">
@@ -139,6 +158,8 @@ BLUNT DAMAGE RULES:
             const objectValue = Number($('[name="objectValue"]').val() || 20);
             const shift = Number($('[name="shift"]').val() || 0);
             const karma = Number($('[name="karma"]').val() || 0);
+            const pulledDamage = Number($('[name="pulledDamage"]').val() || 0);
+            const resultCap = String($('[name="resultCap"]').val() || "none");
             const remember = !!$('[name="remember"]').is(':checked');
             const skipDice = !!$('[name="skipDice"]').is(':checked');
 
@@ -159,6 +180,8 @@ BLUNT DAMAGE RULES:
 
             if (remember) {
               await actor.setFlag("msh-faserip","lastBluntSource", src);
+              await actor.setFlag("msh-faserip","lastBluntPulledDamage", pulledDamage);
+              await actor.setFlag("msh-faserip","lastBluntResultCap", resultCap);
               if (src==="weapon") {
                 await actor.setFlag("msh-faserip","lastBluntItemId", itemId);
               } else if (src==="object") {
@@ -168,8 +191,7 @@ BLUNT DAMAGE RULES:
               }
             }
 
-            resolve({ src, itemId, objectName, objectRank, objectValue, shift, karma, skipDice, weaponMat, weaponName, damage, note });
-            const attackDamageType = "physical-blunt";
+            resolve({ src, itemId, objectName, objectRank, objectValue, shift, karma, pulledDamage, resultCap, skipDice, weaponMat, weaponName, damage, note });
           }
         },
           cancel: { label: "Cancel", callback: ()=> resolve(null) }
@@ -183,10 +205,14 @@ BLUNT DAMAGE RULES:
             const $objectRow = html.find('#object-row');
             const $val = html.find('#dmg-val');
             const $note= html.find('#dmg-note');
+            const $pulledDamage = html.find('[name="pulledDamage"]');
+            const $dmgCapNote = html.find('#dmg-cap-note');
 
             // Hide both rows first
             $weaponRow.hide();
             $objectRow.hide();
+
+            let maxDamage = strength.value;
 
             if (src === "weapon") {
               $weaponRow.show();
@@ -194,12 +220,14 @@ BLUNT DAMAGE RULES:
               const item = attackItems.find(i=>i.id===itemId) || null;
               const mat = item ? getItemMaterialRank(item) : "Excellent";
               const res = computeBluntDamage(strength.rank, strength.value, mat, RANKS);
+              maxDamage = res.damage;
               $val.text(res.damage);
               $note.text(`Weapon: ${item ? item.name : "(Object)"} (${mat}) — ${res.note}`);
             } else if (src === "object") {
               $objectRow.show();
               const mat = String(html.find('[name="objectRank"]').val() || "Excellent");
               const res = computeBluntDamage(strength.rank, strength.value, mat, RANKS);
+              maxDamage = res.damage;
               $val.text(res.damage);
               const objName = html.find('[name="objectName"]').val() || "Object";
               $note.text(`Object: ${objName} (${mat}) — ${res.note}`);
@@ -207,6 +235,14 @@ BLUNT DAMAGE RULES:
               $val.text(strength.value);
               $note.text(`(Bare Hands = Strength value)`);
             }
+
+            // Update pull punch damage cap max
+            $pulledDamage.attr('max', maxDamage);
+            if (Number($pulledDamage.val()) > maxDamage) {
+              $pulledDamage.val(maxDamage);
+            }
+            $dmgCapNote.text(`(max: ${maxDamage})`);
+
             if ($dialog.length) $dialog[0].style.height = 'auto';
           };
           
@@ -239,8 +275,20 @@ BLUNT DAMAGE RULES:
       await rollWithKarmaAndHistory(actor, actionName, choice.karma, roll);
 
     // resolve color/effects
-    const color = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
-    const colorLower = String(color||"").toLowerCase();
+    let color = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
+    let colorLower = String(color||"").toLowerCase();
+    
+    // Apply result cap if set
+    const colorOrder = ['white', 'green', 'yellow', 'red'];
+    if (choice.resultCap !== 'none') {
+      const capIndex = colorOrder.indexOf(choice.resultCap);
+      const currentIndex = colorOrder.indexOf(colorLower);
+      if (currentIndex > capIndex) {
+        colorLower = choice.resultCap;
+        color = colorLower.charAt(0).toUpperCase() + colorLower.slice(1);
+      }
+    }
+    
     const effectResult = effects[colorLower] || color;
 
     // card pieces (shared)
@@ -268,6 +316,11 @@ BLUNT DAMAGE RULES:
       }
     }
 
+    // Apply damage cap from pull punch
+    if (choice.pulledDamage > 0 && choice.pulledDamage < penetratingDamage) {
+      penetratingDamage = choice.pulledDamage;
+    }
+
     // NOW calculate breakingFeat (after penetratingDamage is known)
     const breakingFeat = (colorLower !== "white" && penetratingDamage > 0 && (choice.src === "weapon" || choice.src === "object"))
       ? { weaponMat: choice.weaponMat }
@@ -281,7 +334,7 @@ BLUNT DAMAGE RULES:
       ? buildActionsBox({
           showSlam: colorLower === "yellow" && penetratingDamage > 0,
           showStun: colorLower === "red" && penetratingDamage > 0,
-          pulled: choice.pulled,
+          pulled: choice.resultCap !== 'none' || (choice.pulledDamage > 0 && choice.pulledDamage < choice.damage),
           breakingFeat,
           actorUuid: actor.uuid,
           damage: penetratingDamage,      // pass penetrating, not raw
@@ -291,6 +344,14 @@ BLUNT DAMAGE RULES:
         })
       : "";
 
+    // Build pull punch indicator
+    let pullPunchNote = "";
+    if (choice.pulledDamage > 0 && choice.pulledDamage < rawDamage) {
+      pullPunchNote += `<div style="color:#ff6f00;">⚠ Damage pulled: ${rawDamage} → ${choice.pulledDamage}</div>`;
+    }
+    if (choice.resultCap !== 'none') {
+      pullPunchNote += `<div style="color:#ff6f00;">⚠ Result capped at ${choice.resultCap.toUpperCase()}</div>`;
+    }
 
     // damage line
     const damageBlock = `
@@ -306,6 +367,7 @@ BLUNT DAMAGE RULES:
         ` : `
           <div style="font-size:.9em;color:#555;">Source: Bare Hands</div>
         `}
+        ${pullPunchNote}
       </div>
     `;
 
@@ -325,7 +387,6 @@ BLUNT DAMAGE RULES:
           <div>Ability: ${ability.name}</div>
           <div>Base Rank: ${ability.rank} (${ability.value})${choice.shift ? ` — Shift ${choice.shift} → ${effectiveRank}` : ""}</div>
           <div>Roll: ${roll.total}${totalKarmaUsed ? ` + Karma: ${totalKarmaUsed}` : ""} = ${cappedTotal}</div>
-          ${choice.pulled ? `<div style="color:#FF9800;">⚠ Pull Punch selected (apply cap or downgrade color)</div>` : ``}
         </div>
         ${damageBlock}
         ${grid}
@@ -351,6 +412,5 @@ BLUNT DAMAGE RULES:
         }
       }
     });
-
   }
-}
+} // end of class BlundAttackAction
