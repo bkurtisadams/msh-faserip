@@ -818,6 +818,12 @@ export async function applyDamageToTargets(damage, options = {}) {
         }
         
         result.success = true;
+
+        // Check if just hit 0 health
+        if (newHealth === 0 && currentHealth > 0) {
+          // Just hit 0 - post death save prompt
+          await postDeathSavePrompt(targetActor);
+        }
       } catch (err) {
         console.error("FASERIP | Failed to apply damage:", err);
         if (showNotification) {
@@ -1102,4 +1108,36 @@ export function checkImmunity(targetActor, damageType, attackRank) {
   }
   
   return false;
+}
+
+/**
+ * Post a chat card prompting for a death save when a character hits 0 Health
+ */
+export async function postDeathSavePrompt(actor) {
+  const content = `
+    <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
+      <div style="padding:5px 10px;border-bottom:1px solid #c0c0c0;font-size:1.1em;color:#8b0000;">
+        <strong>${actor.name} - Health Collapsed</strong>
+      </div>
+      
+      <div style="padding:5px 10px;font-size:.9em;">
+        <div style="color:#c62828;font-weight:bold;">Health: 0</div>
+        <div style="margin-top:4px;">Character is unconscious and must roll an Endurance FEAT vs the Kill column to determine if they are dying.</div>
+      </div>
+
+      <div style="text-align:center;padding:8px;margin:8px 10px;">
+        <a class="faserip-chip" 
+           data-action="death-save"
+           data-actor-uuid="${actor.uuid}"
+           style="display:inline-block;font-size:13px;font-weight:bold;padding:6px 14px;border:1px solid #c62828;border-radius:3px;background:#fff;color:#c62828;text-decoration:none;cursor:pointer;">
+          Roll Death Save
+        </a>
+      </div>
+    </div>
+  `;
+
+  await ChatMessage.create({
+    speaker: ChatMessage.getSpeaker({ actor }),
+    content: content
+  });
 }

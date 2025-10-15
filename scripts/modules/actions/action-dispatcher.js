@@ -13,6 +13,7 @@ import { ChargingAction } from "./charging-action.js";
 import { GrapplingAction } from "./grappling-action.js";
 import { GrabbingAction } from "./grabbing-action.js";
 import { EscapingAction } from "./escaping-action.js";
+import { DeathSaveAction } from "./death-save-action.js";
 
 const registry = {
   "blunt-attack":   BluntAttackAction,
@@ -32,14 +33,17 @@ const registry = {
   "charging":       ChargingAction,
   "stun":           CheckAction,
   "slam":           CheckAction,
-  "kill":           CheckAction
+  "kill":           CheckAction,
+  "death-save":     DeathSaveAction
 };
 
 // scripts/modules/actions/action-dispatcher.js
 export class ActionDispatcher {
   static async roll(actionType, { actor, abilityName, opts = {} } = {}) {
     console.debug("ActionDispatcher.roll()", { actionType, abilityName, opts });
+    
     const Handler = registry[actionType];
+
     if (!Handler) throw new Error(`Unknown actionType: ${actionType}`);
     const handler = new Handler({ actor, actionType, abilityName, opts });
     return await handler.execute();

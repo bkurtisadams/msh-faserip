@@ -154,6 +154,28 @@ export function installActionChatHandlers() {
       });
     });
 
+    // 6) Death Save button
+    html.on("click", '[data-action="death-save"]', async (ev) => {
+      ev.preventDefault();
+      const btn = ev.currentTarget;
+      const actorUuid = btn.dataset.actorUuid;
+
+      let actor = null;
+      try {
+        if (actorUuid) {
+          const doc = await fromUuid(actorUuid);
+          actor = doc?.actor ?? doc ?? null;
+        }
+      } catch (_) {}
+
+      if (!actor) {
+        ui.notifications.warn("Could not find actor for death save.");
+        return;
+      }
+
+      await ActionDispatcher.roll("death-save", { actor });
+    });
+
   }); // End of single combined Hooks.on
 
   console.log("MSH FASERIP | Chat hooks installed (checks + breaking FEAT + grabbing break + collision damage + escape + apply damage)");
