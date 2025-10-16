@@ -14,6 +14,7 @@ import { CombatHandler } from './combat-handler.js';
 import { initializeSlamHandlers } from './charge-damage.js';
 import { installActionChatHandlers } from "./modules/actions/chat-hooks.js";
 import { openCollisionDamageDialog } from './modules/actions/collision-damage.js';
+import { FaseripActionHUD } from './action-hud.js';
 
 
 Hooks.once("init", async () => {
@@ -56,6 +57,25 @@ Hooks.once("init", async () => {
   game.msh.FaseripActorSheet = FaseripActorSheet;
 
   CONFIG.FASERIP = CONFIG.FASERIP || {};
+
+  // Register Action HUD keybinding
+  game.keybindings.register("msh-faserip", "openActionHUD", {
+    name: "Open Action HUD",
+    hint: "Opens the Action HUD for quick access to combat actions",
+    category: "FASERIP",
+    editable: [{ key: "KeyH", modifiers: ["Control"] }],  // Ctrl+H
+    onDown: () => {
+      if (ui.faseripHUD?.rendered) {
+        ui.faseripHUD.bringToTop();
+      } else {
+        ui.faseripHUD = new FaseripActionHUD();
+        ui.faseripHUD.render(true);
+      }
+      return true;
+    },
+    restricted: false,
+    precedence: CONST.KEYBINDING_PRECEDENCE.NORMAL
+  });
 
   // keyboard control to open Universal Table dialog
   game.keybindings.register("msh-faserip", "openUniversalTable", {
@@ -465,6 +485,7 @@ Hooks.once("init", async () => {
     return powers;
   };
 
+  // GAME NAMESPACE REGISTER
   game.msh.rollUniversalAction = rollUniversalAction;
   // Add the rollUniversalTable function to the namespace
   game.msh.rollUniversalTable = rollUniversalTable;
@@ -480,6 +501,15 @@ Hooks.once("init", async () => {
 
   // Add the CombatHandler to the namespace
   game.msh.CombatHandler = CombatHandler;
+
+  // Add the CombatHandler to the namespace
+  game.msh.CombatHandler = CombatHandler;
+
+  // Add the Action HUD to the namespace
+  game.msh.FaseripActionHUD = FaseripActionHUD;  // <-- ADD THIS LINE
+
+  // Add the collision damage dialog
+  game.msh.openCollisionDamageDialog = openCollisionDamageDialog;
 
   // Add the collision damage dialog
   game.msh.openCollisionDamageDialog = openCollisionDamageDialog;

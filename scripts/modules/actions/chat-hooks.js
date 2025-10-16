@@ -241,10 +241,250 @@ export function installActionChatHandlers() {
       }
     });
 
+    // 8) Apply Defense Effect (dodging/evading/blocking/catching)
+    html.on("click", '[data-action="apply-effect"]', async (ev) => {
+      ev.preventDefault();
+      const btn = ev.currentTarget;
+      const $msg = $(btn).closest(".message");
+      const msg = game.messages.get($msg.data("messageId"));
+      
+      // Get actor from message speaker
+      let actor = null;
+      try {
+        if (msg.speaker?.actor) {
+          actor = game.actors.get(msg.speaker.actor);
+        }
+      } catch (_) {}
+      
+      if (!actor) {
+        ui.notifications.warn("Could not find actor for this defense action.");
+        return;
+      }
+      
+      // Read temp flags
+      const defenseTemp = await actor.getFlag("msh-faserip", "defenseTemp") || {};
+      
+      // Determine which defense action this was and create appropriate effect
+      let effectCreated = false;
+      
+      if (defenseTemp.dodging) {
+        await createDodgingEffect(actor, defenseTemp.dodging);
+        effectCreated = true;
+      } else if (defenseTemp.evading) {
+        await createEvadingEffect(actor, defenseTemp.evading);
+        effectCreated = true;
+      } else if (defenseTemp.blocking) {
+        await createBlockingEffect(actor, defenseTemp.blocking);
+        effectCreated = true;
+      } else if (defenseTemp.catching) {
+        await createCatchingEffect(actor, defenseTemp.catching);
+        effectCreated = true;
+      }
+      
+      if (!effectCreated) {
+        ui.notifications.warn("No defense data found for this action.");
+        return;
+      }
+      
+      // Update button
+      btn.style.opacity = "0.5";
+      btn.style.pointerEvents = "none";
+      btn.textContent = "✓ Effect Applied";
+      
+      ui.notifications.info(`Defense effect applied to ${actor.name}`);
+    });
+
+    // 9) Use Blocking Armor (separate button for blocking)
+    html.on("click", '[data-action="use-armor"]', async (ev) => {
+      ev.preventDefault();
+      const btn = ev.currentTarget;
+      const $msg = $(btn).closest(".message");
+      const msg = game.messages.get($msg.data("messageId"));
+      
+      let actor = null;
+      try {
+        if (msg.speaker?.actor) {
+          actor = game.actors.get(msg.speaker.actor);
+        }
+      } catch (_) {}
+      
+      if (!actor) {
+        ui.notifications.warn("Could not find actor for blocking armor.");
+        return;
+      }
+      
+      const defenseTemp = await actor.getFlag("msh-faserip", "defenseTemp") || {};
+      
+      if (!defenseTemp.blocking) {
+        ui.notifications.warn("No blocking data found.");
+        return;
+      }
+      
+      await createBlockingEffect(actor, defenseTemp.blocking);
+      
+      btn.style.opacity = "0.5";
+      btn.style.pointerEvents = "none";
+      btn.textContent = "✓ Armor Applied";
+      
+      ui.notifications.info(`Blocking armor applied to ${actor.name}`);
+    });
 
   }); // End of single combined Hooks.on
 
   console.log("MSH FASERIP | Chat hooks installed (checks + breaking FEAT + grabbing break + collision damage + escape + apply damage)");
+}
+
+/**
+ * Helper functions to create defense-related ActiveEffects
+ */
+
+/**
+ * Create a Dodging effect
+ */
+async function createDodgingEffect(actor, data) {
+  const { attackerPenaltyCS, selfPenaltyCS, notes } = data;
+  
+  // Remove any existing dodging effects first
+  const existingDodge = actor.effects.find(e => e.flags?.["msh-faserip"]?.isDodging);
+  if (existingDodge) await existingDodge.delete();
+  
+  const penaltyText = attackerPenaltyCS !== 0 
+    ? `${attackerPenaltyCS}CS to attackers` 
+    : "no penalty";
+  
+  const effectData = {
+    name: `Dodging (${penaltyText})`,
+    icon: "icons/svg/windmill.svg",
+    origin: actor.uuid,
+    disabled: false,
+    duration: {
+      rounds: 1,
+      startRound: game.combat?.round || 0
+    },
+    flags: {
+      "msh-faserip": {
+        isDodging: true,
+        attackerPenaltyCS: attackerPenaltyCS,
+        selfPenaltyCS: selfPenaltyCS,
+        notes: notes
+      }
+    },
+    changes: [
+      // This is a visual/reminder effect; actual CS penalties handled manually
+      // Could add system-specific change rules here if your system supports them
+    ]
+  };
+  
+  await actor.createEmbeddedDocuments('ActiveEffect', [effectData]);
+}
+
+/**
+ * Create an Evading effect
+ */
+async function createEvadingEffect(actor, data) {
+  const { target, nextRoundAttackBonusCS, note } = data;
+  
+  // Remove any existing evading effects first
+  const existingEvade = actor.effects.find(e => e.flags?.["msh-faserip"]?.isEvading);
+  if (existingEvade) await existingEvade.delete();
+  
+  const bonusText = nextRoundAttackBonusCS > 0 
+    ? `+${nextRoundAttackBonusCS}CS next attack` 
+    : "no bonus";
+  
+  const effectData = {
+    name: `Evaded ${target} (${bonusText})`,
+    icon: "icons/svg/combat.svg",
+    origin: actor.uuid,
+    disabled: false,
+    duration: {
+      rounds: 1,
+      startRound: game.combat?.round || 0
+    },
+    flags: {
+      "msh-faserip": {
+        isEvading: true,
+        evadedTarget: target,
+        nextRoundAttackBonusCS: nextRoundAttackBonusCS,
+        notes: note
+      }
+    }
+  };
+  
+  await actor.createEmbeddedDocuments('ActiveEffect', [effectData]);
+}
+
+/**
+ * Create a Blocking effect
+ */
+async function createBlockingEffect(actor, data) {
+  const { armorRank, armorValue } = data;
+  
+  // Remove any existing blocking effects first
+  const existingBlock = actor.effects.find(e => e.flags?.["msh-faserip"]?.isBlocking);
+  if (existingBlock) await existingBlock.delete();
+  
+  const effectData = {
+    name: `Blocking (${armorRank} Body Armor)`,
+    icon: "icons/svg/shield.svg",
+    origin: actor.uuid,
+    disabled: false,
+    duration: {
+      rounds: 1,
+      startRound: game.combat?.round || 0
+    },
+    flags: {
+      "msh-faserip": {
+        isBlocking: true,
+        armorRank: armorRank,
+        armorValue: armorValue,
+        notes: "Applies vs physical (not Shooting/Energy; not Charging). Stacks with normal armor, not Force Fields."
+      }
+    }
+  };
+  
+  await actor.createEmbeddedDocuments('ActiveEffect', [effectData]);
+}
+
+/**
+ * Create a Catching effect (mainly a reminder/note)
+ */
+async function createCatchingEffect(actor, data) {
+  const { scenario, vsYou, note } = data;
+  
+  // Remove any existing catching effects first
+  const existingCatch = actor.effects.find(e => e.flags?.["msh-faserip"]?.isCatching);
+  if (existingCatch) await existingCatch.delete();
+  
+  const scenarioMap = {
+    "falling": "Caught Falling Object",
+    "shooting-bullet": "Caught Bullet",
+    "shooting-arrow": "Caught Arrow",
+    "throwing-other": "Caught Projectile"
+  };
+  
+  const effectName = scenarioMap[scenario] || "Catching Result";
+  
+  const effectData = {
+    name: effectName,
+    icon: "icons/svg/target.svg",
+    origin: actor.uuid,
+    disabled: false,
+    duration: {
+      rounds: 1,
+      startRound: game.combat?.round || 0
+    },
+    flags: {
+      "msh-faserip": {
+        isCatching: true,
+        scenario: scenario,
+        vsYou: vsYou,
+        notes: note
+      }
+    }
+  };
+  
+  await actor.createEmbeddedDocuments('ActiveEffect', [effectData]);
 }
 
 export async function postAttackChatCard({

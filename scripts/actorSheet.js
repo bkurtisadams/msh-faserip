@@ -3234,7 +3234,7 @@ html.find('.headquarters-row').each((i, row) => {
       this.render(false);
     });
 
-    // Action buttons in Actions tab
+    // Actions Tab -- buttons in Actions tab
     html.find('.action-btn').click(async ev => {
       const button = ev.currentTarget;
       const actionType = button.dataset.action;
