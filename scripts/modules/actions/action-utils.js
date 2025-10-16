@@ -1,4 +1,5 @@
 import { ACTION_LABELS, ACTION_EFFECTS } from "./action-config.js";
+import { applyNullifiedEffect, isAuraMaintained } from "./nullify.js";
 
 export const RANKS = [
   "Shift-0","Feeble","Poor","Typical","Good","Excellent",
@@ -223,14 +224,17 @@ export function buildActionsBox({
   showStun = false,
   showKill = false,
   showEscape = false,
+  // NEW:
+  showNullifySave = false,       // ← add this
+  nullifyIntensityRank = "",     // ← and this (e.g., "Remarkable")
   pulled = false,
   breakingFeat = null,
   grabbingBreak = null,
   actorUuid,
-  damage = 0,                 // pass penetrating damage for checks
+  damage = 0,
   attackForm = "blunt",
   damageType = "physical-blunt",
-  prefillData = null,         // may contain { dmgThrough, attackForm, ownerActor, ... }
+  prefillData = null,
   targetUuid = "",
   targetName = "",
   targetStrength = "",
@@ -340,6 +344,23 @@ export function buildActionsBox({
         "Attempt to break a grab or hold",
         true,
         `data-action="grab-break" ${prefillAttr}`
+      )
+    );
+  }
+
+    // Nullify: force Endurance save (single target)
+  if (showNullifySave) {
+    const targetBits = [
+      targetUuid ? `data-target-uuid="${targetUuid}"` : "",
+      targetName ? `data-target-name="${targetName}"` : ""
+    ].join(" ");
+    const intensityAttr = nullifyIntensityRank ? `data-intensity-rank="${nullifyIntensityRank}"` : "";
+    parts.push(
+      chip(
+        "Force Nullify Save",
+        "Target makes an Endurance FEAT vs power intensity",
+        true,
+        `data-action="force-save-nullify" data-attacker-uuid="${actorUuid}" ${targetBits} ${intensityAttr}`
       )
     );
   }
@@ -1109,6 +1130,17 @@ export function checkImmunity(targetActor, damageType, attackRank) {
   
   return false;
 }
+
+/**
+ * Apply the Nullified status to a single target via your effects system.
+ * Duration: RAW 1–10 rounds unless the attacker is maintaining a Nullify aura.
+ */
+export async function applyNullifyToTarget(targetActor, attacker, { originUuid = null, rounds = null } = {}) {
+  if (!targetActor) return;
+  const maintained = isAuraMaintained(attacker);
+  await applyNullifiedEffect(targetActor, { maintained, originUuid, rounds });
+}
+
 
 /**
  * Post a chat card prompting for a death save when a character hits 0 Health

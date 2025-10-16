@@ -125,6 +125,79 @@
           </div>
         </div>
 
+        <!-- SAVING THROW (inside .combat-properties) -->
+        <div class="form-group" style="margin-top:10px; padding-top:10px; border-top:1px dashed #8b0000;">
+          <label>
+            <input type="checkbox" name="system.requiresSave" {{checked system.requiresSave}}>
+            Requires Saving Throw
+          </label>
+        </div>
+
+        <div class="form-row" {{#unless system.requiresSave}}style="display:none"{{/unless}}>
+          <div class="form-group half">
+            <label>Save Ability:</label>
+            <select name="system.save.ability">
+              <option value="endurance" {{#if (eq system.save.ability "endurance")}}selected{{/if}}>Endurance</option>
+              <option value="psyche" {{#if (eq system.save.ability "psyche")}}selected{{/if}}>Psyche</option>
+              <option value="intuition" {{#if (eq system.save.ability "intuition")}}selected{{/if}}>Intuition</option>
+              <option value="reason" {{#if (eq system.save.ability "reason")}}selected{{/if}}>Reason</option>
+              <option value="fighting" {{#if (eq system.save.ability "fighting")}}selected{{/if}}>Fighting</option>
+              <option value="agility" {{#if (eq system.save.ability "agility")}}selected{{/if}}>Agility</option>
+              <option value="strength" {{#if (eq system.save.ability "strength")}}selected{{/if}}>Strength</option>
+            </select>
+          </div>
+          <div class="form-group half">
+            <label>Intensity:</label>
+            <select name="system.save.intensity" id="save-intensity">
+              <option value="power-rank" {{#if (eq system.save.intensity "power-rank")}}selected{{/if}}>This power’s rank</option>
+              <option value="fixed-rank" {{#if (eq system.save.intensity "fixed-rank")}}selected{{/if}}>Fixed rank…</option>
+              <option value="none" {{#if (eq system.save.intensity "none")}}selected{{/if}}>None</option>
+            </select>
+            <input type="text" name="system.save.fixedRank" value="{{system.save.fixedRank}}" placeholder="e.g., Remarkable"
+                  {{#unless (eq system.save.intensity "fixed-rank")}}style="display:none"{{/unless}}>
+          </div>
+        </div>
+
+        <div class="form-row" {{#unless system.requiresSave}}style="display:none"{{/unless}}>
+          <div class="form-group half">
+            <label>Ignore Damage Gate:</label>
+            <input type="checkbox" name="system.save.ignoreDamageGate" {{checked system.save.ignoreDamageGate}}>
+          </div>
+          <div class="form-group half">
+            <label>Color Mapping (fail/partial/success):</label>
+            <div style="display:flex; gap:6px; flex-wrap:wrap;">
+              <input type="text" name="system.save.mapping.white"  value="{{system.save.mapping.white}}"  placeholder="white → fail"  style="width:110px;">
+              <input type="text" name="system.save.mapping.green"  value="{{system.save.mapping.green}}"  placeholder="green → fail"  style="width:110px;">
+              <input type="text" name="system.save.mapping.yellow" value="{{system.save.mapping.yellow}}" placeholder="yellow → partial" style="width:120px;">
+              <input type="text" name="system.save.mapping.red"    value="{{system.save.mapping.red}}"    placeholder="red → success" style="width:120px;">
+            </div>
+          </div>
+        </div>
+
+        <div class="form-row" {{#unless system.requiresSave}}style="display:none"{{/unless}}>
+          <div class="form-group half">
+            <label>On Fail:</label>
+            <select name="system.save.onFail.effect">
+              <option value="nullified" {{#if (eq system.save.onFail.effect "nullified")}}selected{{/if}}>Nullified</option>
+              <option value="stunned" {{#if (eq system.save.onFail.effect "stunned")}}selected{{/if}}>Stunned</option>
+              <option value="custom" {{#if (eq system.save.onFail.effect "custom")}}selected{{/if}}>Custom</option>
+            </select>
+            <select name="system.save.onFail.duration" style="margin-left:6px;">
+              <option value="rank" {{#if (eq system.save.onFail.duration "rank")}}selected{{/if}}>For power rank (rounds)</option>
+              <option value="rounds" {{#if (eq system.save.onFail.duration "rounds")}}selected{{/if}}>Fixed rounds…</option>
+              <option value="scene" {{#if (eq system.save.onFail.duration "scene")}}selected{{/if}}>Scene</option>
+              <option value="custom" {{#if (eq system.save.onFail.duration "custom")}}selected{{/if}}>Custom</option>
+            </select>
+            <input type="number" name="system.save.onFail.rounds" value="{{system.save.onFail.rounds}}" min="0" placeholder="Rounds"
+                  {{#unless (eq system.save.onFail.duration "rounds")}}style="display:none"{{/unless}}>
+          </div>
+          <div class="form-group half">
+            <label>Notes:</label>
+            <input type="text" name="system.save.onFail.notes" value="{{system.save.onFail.notes}}" placeholder="What exactly happens?" />
+          </div>
+        </div>
+
+
         <div class="form-row">
           <div class="form-group half">
             <label>Damage Value:</label>

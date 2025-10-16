@@ -17,7 +17,8 @@ export const ACTION_LABELS = {
   'catching': 'Catching',
   'stun': 'Stun Check',
   'slam': 'Slam Check',
-  'kill': 'Kill Check'
+  'kill': 'Kill Check',
+  "save-nullify": "Saving Throw (Nullification)"
 };
 
 export const ACTION_EFFECTS = {
@@ -38,5 +39,6 @@ export const ACTION_EFFECTS = {
   'catching':       { white:'Autohit', green:'Miss', yellow:'Damage', red:'Catch' },
   'stun':           { white:'1-10 rounds', green:'1 round', yellow:'No effect', red:'No effect' },
   'slam':           { white:'Grand Slam',  green:'1 area', yellow:'Stagger',    red:'No Slam' },
-  'kill':           { white:'Endurance Loss', green:'E/S', yellow:'No effect',  red:'No effect' }
+  'kill':           { white:'Endurance Loss', green:'E/S', yellow:'No effect',  red:'No effect' },
+  "save-nullify":   { white:  "Fail — powers nullified", green:  "Fail — powers nullified", yellow: "Partial — reduced/suppressed", red: "Success — no effect"}
 };

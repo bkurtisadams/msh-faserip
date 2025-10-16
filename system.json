@@ -23,6 +23,11 @@
     ],
     "esmodules": [
         "scripts/init.js",
+        "scripts/modules/actions/nullify.js",
+        "scripts/modules/actions/check-action.js",
+        "scripts/modules/actions/energy-action.js",
+        "scripts/chat-hooks.js",
+        "scripts/action-dispatcher.js",
         "scripts/actor.js",
         "scripts/item.js",
         "scripts/actorSheet.js",

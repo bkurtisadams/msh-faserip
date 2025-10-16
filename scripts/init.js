@@ -17,6 +17,36 @@ import { openCollisionDamageDialog } from './modules/actions/collision-damage.js
 
 
 Hooks.once("init", async () => {
+  // ---- Canonical flag scope + shim ----------------------------------------
+  // System-scoped flags go under your real system id.
+  globalThis.MSH_FLAG_SCOPE = game.system?.id || "msh-faserip";
+
+  // Guard so we don't wrap twice if code reloads
+  if (!ActiveEffect.prototype._mshFlagShimApplied) {
+    const _origGetFlag = ActiveEffect.prototype.getFlag;
+
+    ActiveEffect.prototype.getFlag = function (scope, key) {
+      if (scope === "msh") {
+        // Helpful breadcrumb to find the caller that still passes "msh"
+        console.warn(
+          `[Flag scope fix] getFlag('msh','${key}') on effect "${this?.name ?? "(no-name)"}". Redirecting to "${MSH_FLAG_SCOPE}".`
+        );
+        // Optional: show stack once to locate the offender in your code/bundle
+        // Remove/comment this if it gets too chatty:
+        console.trace();
+
+        scope = MSH_FLAG_SCOPE;
+      }
+      return _origGetFlag.call(this, scope, key);
+    };
+
+    // mark as applied so we don't double-wrap
+    Object.defineProperty(ActiveEffect.prototype, "_mshFlagShimApplied", {
+      value: true, configurable: false, enumerable: false, writable: false
+    });
+  }
+  // --------------------------------------------------------------------------
+
   console.log("FASERIP DEBUG: init hook is running!"); // <-- DEBUG CONSOLE LOG
   console.log("Marvel Super Heroes (FASERIP) system initializing...");
 
@@ -505,6 +535,12 @@ Hooks.once("init", async () => {
   });
   
   Handlebars.registerHelper('getFlag', function(object, scope, flag) {
+    return object.getFlag(scope, flag);
+  });
+
+  // Use system scope automatically: {{getSysFlag object "status.nullified"}}
+  Handlebars.registerHelper('getSysFlag', function(object, flag) {
+    const scope = globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faserip";
     return object.getFlag(scope, flag);
   });
 

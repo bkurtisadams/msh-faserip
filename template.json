@@ -124,6 +124,34 @@
       "damageType": "",
       "primaryEffect": "damage",
       "damage": 0,
+
+      "requiresSave": false,
+      "save": {
+        "ability": "endurance",          
+        "intensity": "power-rank",       
+        "fixedRank": "",                 
+        "ignoreDamageGate": true,        
+        "mapping": {                     
+          "white":  "fail",
+          "green":  "fail",
+          "yellow": "partial",
+          "red":    "success"
+        },
+        "onFail": {
+          "effect": "nullified",         
+          "duration": "rank",            
+          "rounds": 0,                   
+          "notes": "Target’s powers are suppressed while effect lasts."
+        },
+        "onPartial": {
+          "effect": "reduced",
+          "notes": "Reduced effect or disadvantage at GM’s option."
+        },
+        "onSuccess": {
+          "effect": "none",
+          "notes": ""
+        }
+      },
       
       "isBodyArmor": false,
       "bodyArmorType": "both",

@@ -9,6 +9,8 @@ import {
   bannerColors,
   getAbilityInfo,
 } from "./action-utils.js";
+import * as Nullify from "./nullify.js";
+
 
 /**
  * CheckAction covers: "stun" | "slam" | "kill"
@@ -136,9 +138,14 @@ export class CheckAction extends BaseAction {
     });
     if (!choice) return;
 
-    // --- Damage gate: effects only if dmg > 0 (or borderline toggle) ---
+    // --- Damage gate: effects only if dmg > 0 (or borderline toggle) unless caller overrides ---
     const effectGateOpen = (choice.dmgThrough > 0) || !!choice.borderline;
-    const effectsSuppressed = !effectGateOpen;  // <-- MOVE THIS UP HERE
+
+    // NEW: let the caller bypass this via opts.ignoreDamageGate (used by Force Save)
+    const ignoreGate = !!(this.opts?.ignoreDamageGate);
+
+    // If not open and no override, suppress effects
+    const effectsSuppressed = !effectGateOpen && !ignoreGate;
 
     // --- Target FEAT rank after column shifts ---
     const effectiveEndRank = shiftRank(choice.targetEndRank, choice.shift);
@@ -160,6 +167,46 @@ export class CheckAction extends BaseAction {
     const color = game.msh.rollUniversalTable(effectiveEndRank, cappedTotal);
     const colorLower = String(color||"").toLowerCase();
     const baseEffect = effects[colorLower] || color;
+
+    // --- Nullify: resolve & apply (single-target) ---
+    const isSaveNullify =
+      (this?.actionId === "save-nullify") ||
+      (this?.type === "save-nullify") ||
+      (this?.opts?.actionId === "save-nullify") ||
+      (typeof actionType !== "undefined" && actionType === "save-nullify");
+
+    if (isSaveNullify && !effectsSuppressed) {
+      // resolve target actor (prefer explicit UUID; else current user target)
+      let targetActor = null;
+      try {
+        if (choice?.targetUuid) {
+          const doc = await fromUuid(choice.targetUuid);
+          targetActor = doc?.actor ?? doc ?? null;
+        }
+      } catch (_) {}
+      if (!targetActor && game.user?.targets?.size === 1) {
+        targetActor = game.user.targets.first()?.actor ?? null;
+      }
+
+      if (targetActor) {
+        const attacker = this?.actor ?? actor ?? null;
+        // use the unshifted Endurance rank for the threshold comparison
+        const endRank = choice?.targetEndRank || "Typical";
+
+        // pick intensity rank (attacker’s power rank): prefer explicit values if your chat hook passes them
+        let intensityRank = endRank; // default = equal → Yellow required
+        if (this?.opts?.powerRankName) intensityRank = this.opts.powerRankName;
+        if (this?.opts?.intensity === "fixed-rank" && this?.opts?.fixedRank) intensityRank = this.opts.fixedRank;
+
+        await Nullify.resolveAndApply(attacker, targetActor, {
+          endRank,
+          intensityRank,
+          rolledColor: colorLower,           // what your UT just returned
+          originUuid: this?.opts?.originUuid ?? null
+        });
+      }
+    }
+
 
     // --- Special handling for Stun White result: auto-roll 1d10 for duration ---
     // In check-action.js, around line 150-200, replace the stun duration section with:

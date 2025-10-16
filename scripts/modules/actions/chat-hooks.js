@@ -12,6 +12,8 @@ import {
   applyDamageToTargets
 } from "./action-utils.js";
 
+import { startAura, stopAura, isAuraMaintained } from "./nullify.js";
+
 export function installActionChatHandlers() {
   // idempotent guard
   game.msh ??= {};
@@ -154,27 +156,91 @@ export function installActionChatHandlers() {
       });
     });
 
-    // 6) Death Save button
-    html.on("click", '[data-action="death-save"]', async (ev) => {
+    // 6) Force Save (Nullification / RAW: Endurance vs Power Rank)
+    html.on("click", '[data-action="force-save"], [data-action="force-save-nullify"]', async (ev) => {
       ev.preventDefault();
       const btn = ev.currentTarget;
-      const actorUuid = btn.dataset.actorUuid;
+      const $msg = $(btn).closest(".message");
+      const msg = game.messages.get($msg.data("messageId"));
+      const f = msg?.flags?.["msh-faserip"] || {};
+      if (!f.requiresSave) return;
+
+      const ability    = f.saveAbility   || "endurance";
+      const intensity  = f.saveIntensity || "power-rank"; // "power-rank" | "fixed-rank" | "none"
+      const fixedRank  = f.saveFixedRank || "";
+      const ignoreGate = (f.saveIgnoreGate !== false);
+
+      // Attacker (for labels/origin)
+      let ownerActor = null;
+      try {
+        if (f.attackerUuid) {
+          const doc = await fromUuid(f.attackerUuid);
+          ownerActor = doc?.actor ?? doc ?? null;
+        }
+      } catch (_) {}
+      ownerActor = ownerActor ?? game.actors?.get(msg.speaker?.actor) ?? game.user?.character ?? null;
+
+      // Prefill every currently targeted token (area handling — RAW affects all within range; we use selection)
+      const targets = Array.from(game.user?.targets ?? []);
+      const prefill = {};
+      if (targets.length === 1) {
+        const t = targets[0];
+        prefill.targetName    = t.name;
+        prefill.targetUuid    = t.actor?.uuid ?? "";
+        prefill.targetEndRank = t.actor?.system?.abilities?.[ability]?.rank || "Good";
+        prefill.dmgThrough    = 0;      // saves don't require penetrating damage
+        prefill.attackForm    = "energy";
+      }
+
+      await ActionDispatcher.roll("save-nullify", {
+        actor: ownerActor,
+        abilityName: ability,
+        opts: {
+          prefill,
+          ignoreDamageGate: ignoreGate,  // key: saves apply even if no dmg penetrates
+          intensity,
+          fixedRank
+        }
+      });
+
+      // NOTE: Your CheckAction handles the actual FEAT + result. Make sure "save-nullify"
+      // has labels/effects configured in action-config (fail => nullified).
+    });
+
+    // While active, nullifier cannot use other inborn powers (guarded in energy-action.js)
+    // 7) Toggle Nullify Aura (maintain while in range)
+    html.on("click", '[data-action="toggle-nullify-aura"]', async (ev) => {
+      ev.preventDefault();
+      const btn = ev.currentTarget;
+      const $msg = $(btn).closest(".message");
+      const msg = game.messages.get($msg.data("messageId"));
+      const f = msg?.flags?.["msh-faserip"] || {};
 
       let actor = null;
       try {
-        if (actorUuid) {
-          const doc = await fromUuid(actorUuid);
+        if (f.attackerUuid) {
+          const doc = await fromUuid(f.attackerUuid);
           actor = doc?.actor ?? doc ?? null;
         }
       } catch (_) {}
+      actor = actor ?? game.actors?.get(msg.speaker?.actor) ?? game.user?.character ?? null;
+      if (!actor) return;
 
-      if (!actor) {
-        ui.notifications.warn("Could not find actor for death save.");
-        return;
+      // Use helpers from nullify.js
+      try {
+        if (isAuraMaintained(actor)) {
+          await stopAura(actor);
+          ui.notifications.info(`${actor.name} stops maintaining Nullification.`);
+        } else {
+          await startAura(actor, f.nullify?.powerItemUuid ?? null);
+          ui.notifications.info(`${actor.name} is now maintaining Nullification (while in range).`);
+        }
+      } catch (e) {
+        console.warn("Nullify aura toggle failed:", e);
+        ui.notifications.error("Failed to toggle Nullify aura (see console).");
       }
-
-      await ActionDispatcher.roll("death-save", { actor });
     });
+
 
   }); // End of single combined Hooks.on
 
@@ -199,7 +265,19 @@ export async function postAttackChatCard({
     ${notes ? `<div class="faserip-notes">${notes}</div>` : ""}
     <div class="faserip-actions" style="margin-top:6px; display:flex; gap:6px; flex-wrap:wrap;">
       <a class="faserip-chip" data-action="apply-damage">Apply Damage</a>
+
+      {{!-- NEW: Force Save chip (only show if the item/power says it requires a save) --}}
+      ${(() => {
+        try {
+          // Pull the item (power) that created this card, if you’re already packing uuid in flags.
+          // If you aren’t sending item flags yet, you can hide under a condition you control.
+          const needsSave = !!(game.messages?.get?.(undefined)?.flags?.["msh-faserip"]?.requiresSave);
+          return needsSave ? `<a class="faserip-chip" data-action="force-save">Force Save</a>` : "";
+        } catch { return ""; }
+      })()}
+
       ${/YELLOW|RED/.test(colorName) ? `<a class="faserip-chip" data-action="resolve-stun-slam">Resolve Stun/Slam</a>` : ""}
+
     </div>
   </div>`;
 

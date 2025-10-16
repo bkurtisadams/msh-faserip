@@ -11,12 +11,12 @@ import {
   buildResultGrid,
   bannerColors,
   getTargetingContext,
-  applyDamageToTargets  // ADD THIS IMPORT
+  applyDamageToTargets,
+  postDeathSavePrompt
 } from "./action-utils.js";
 import { getItemMaterialRank } from "../../gm-utils.js";
 import { makeDamageBlock, computeAfterArmor, buildDamageFlags } from "./damage-ui.js";
 import { getBodyArmorValues } from "./action-utils.js";
-
 
 export class EdgedAttackAction extends AttackAction {
   async execute() {
@@ -231,7 +231,7 @@ export class EdgedAttackAction extends AttackAction {
 
     const isHit = colorLower !== "white";
 
-    // Edged damage type (prefer weapon’s damageType if present)
+    // Edged damage type (prefer weapon's damageType if present)
     const dmgType =
       (choice.src === "weapon"
         ? (actor.items.get(choice.itemId)?.system?.damageType)
@@ -264,10 +264,12 @@ export class EdgedAttackAction extends AttackAction {
       multiTargetCount
     });
 
-
     // shared pieces
     const grid = buildResultGrid(actionType, colorLower, effects, (globalThis._getResultHoverText||this._getResultHoverText));
     const { bg, fg } = bannerColors(colorLower);
+
+    // Calculate penetrating damage for action chips
+    let penetratingDamage = afterArmor;
 
     // actions: edged shows STUN (yellow/red) and KILL (red)
     const chip = (label, title, enabled, dataAttrs="") => {
@@ -281,31 +283,31 @@ export class EdgedAttackAction extends AttackAction {
 
     const parts = [];
 
-    // Only show Apply Damage on hits (not white)
-    if (isHit && choice.damage > 0) {
+    // Only show Apply Damage on hits - pass raw damage, let handler calculate armor
+    if (isHit && rawDamage > 0) {
       parts.push(chip(
         "Apply Damage",
         "Apply damage to targeted/selected token(s)", 
         true, 
-        `data-damage="${rawDamage}" data-attacker-uuid="${actor.uuid}" data-damage-type="physical-edged"`
+        `data-damage="${rawDamage}" data-attacker-uuid="${actor.uuid}" data-damage-type="${dmgType}" data-bypass-armor="false"`
       ));
     }
 
-    const enableStun = (colorLower === 'yellow' || colorLower === 'red');
-    const enableKill = (colorLower === 'red');
+    const enableStun = (colorLower === 'yellow' || colorLower === 'red') && penetratingDamage > 0;
+    const enableKill = (colorLower === 'red') && penetratingDamage > 0;
 
     if (enableStun) parts.push(chip(
       "Resolve Stun",
       "Open Stun Check dialog",
       true,
-      `data-check="stun" data-attack-form="edged" data-damage-type="physical-edged" data-dmg="${rawDamage}"" data-attacker-uuid="${actor.uuid}"`
+      `data-check="stun" data-attack-form="edged" data-damage-type="${dmgType}" data-dmg="${penetratingDamage}" data-attacker-uuid="${actor.uuid}"`
     ));
 
     if (enableKill) parts.push(chip(
       "Resolve Kill",
       "Open Kill check dialog",
       true,
-      `data-check="kill" data-attack-form="edged" data-damage-type="physical-edged" data-dmg="${rawDamage}"" data-attacker-uuid="${actor.uuid}"`
+      `data-check="kill" data-attack-form="edged" data-damage-type="${dmgType}" data-dmg="${penetratingDamage}" data-attacker-uuid="${actor.uuid}"`
     ));
 
     if (choice.src === "weapon") {
@@ -382,6 +384,5 @@ export class EdgedAttackAction extends AttackAction {
         targets: targetsArray
       })
     });
-
   }
 }

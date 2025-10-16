@@ -19,6 +19,9 @@ import {
   RANKS  // ADD THIS IMPORT for effect creation
 } from "./action-utils.js";
 
+import { startAura, stopAura, isAuraMaintained } from "./nullify.js";
+
+
 export class EnergyAction extends RangedAttackAction {
   async execute() {
     const actor = this.actor;
@@ -270,6 +273,26 @@ export class EnergyAction extends RangedAttackAction {
 
     if (!choice) return;
 
+    // --- Nullify RAW guard: while maintaining aura, user cannot use other inborn powers
+    try {
+      const maintaining = isAuraMaintained(actor);
+      if (maintaining && !choice.useAdHoc && choice.powerId) {
+        const thisItem = energyItems.find(i => i.id === choice.powerId);
+        const isNullifyPower =
+          (thisItem?.system?.damageType === 'nullification') ||
+          (thisItem?.system?.primaryEffect === 'nullification') ||
+          /nullif/i.test(thisItem?.name ?? '');
+        const isInborn = (thisItem?.system?.source === 'natural'); // tech/magic unaffected
+        if (!isNullifyPower && isInborn) {
+          ui.notifications.warn(`${actor.name} is maintaining Nullification and cannot use other inborn powers right now.`);
+          return; // abort this action
+        }
+      }
+    } catch (e) {
+      console.warn('Nullify aura guard check failed:', e);
+    }
+
+
     // === Resolve roll ===
     // Rank → roll → karma → color
     const toHitRankName = choice.usePowerToHit ? choice.powerRank : ability.rank;
@@ -291,21 +314,12 @@ export class EnergyAction extends RangedAttackAction {
     const colorLower = String(color || "").toLowerCase();
     const effectResult = effects[colorLower] || color;
 
-    // === Handle automatic Stun effect creation on Yellow result ===
+    // Hit state
     const isHit = colorLower !== 'white';
     const targets = Array.from(game.user?.targets ?? []);
-    
-    // Auto-create Stunned effect on Yellow (Bullseye) result
-    if (colorLower === 'yellow' && isHit && targets.length === 1) {
-      const targetActor = targets[0]?.actor;
-      if (targetActor) {
-        await this._createStunnedEffect(
-          targetActor.uuid, 
-          targetActor.name, 
-          1  // Bullseye stuns for 1 round
-        );
-      }
-    }
+    // Primary target (if exactly one is selected) + power rank for Nullify intensity
+    const primaryTarget = targets.length === 1 ? targets[0] : null;
+    const attackerPowerRankName = choice.powerRank;
 
     // === Build standardized chat card (same as Throwing-Edged style) ===
     const grid = buildResultGrid(actionType, colorLower, effects, (globalThis._getResultHoverText || this._getResultHoverText));
@@ -347,12 +361,64 @@ export class EnergyAction extends RangedAttackAction {
       showSlam: false, // Energy attacks don't typically slam
       showStun: /stun|bullseye/.test(effText) && penetratingDamage > 0,
       showKill: /kill/.test(effText) && penetratingDamage > 0,
+      showNullifySave: true,
+      nullifyIntensityRank: attackerPowerRankName, // e.g., "Remarkable"
       actorUuid: actor.uuid,
+      targetUuid: primaryTarget?.actor?.uuid || "",
       damage: penetratingDamage,
       attackForm: "energy",
       damageType: choice.powerDamageType,
       bypassArmor: false
     });
+
+    // --- Nullification save + aura chips (per RAW: Endurance vs Power Rank, tech/magic unaffected)
+    const usedItem = choice.powerId ? energyItems.find(i => i.id === choice.powerId) : null;
+
+    let saveChipHtml = "";
+    let auraChipHtml = "";
+    let saveFlags = null;
+
+    if (!choice.useAdHoc && choice.powerId) {
+      const s = usedItem?.system ?? {};
+      const isNullifyPower =
+        (s.damageType === 'nullification') ||
+        (s.primaryEffect === 'nullification') ||
+        /nullif/i.test(usedItem?.name ?? '');
+
+      if (isNullifyPower) {
+        // Defaults to RAW: Endurance FEAT vs Attacker Power Rank; effect for rank rounds if not maintained
+        const ability    = (s.save?.ability)    || "endurance";
+        const intensity  = (s.save?.intensity)  || "power-rank";
+        const fixedRank  = (s.save?.fixedRank)  || "";
+        const ignoreGate = (s.save?.ignoreDamageGate !== false); // saves should ignore damage gate
+
+        saveChipHtml = `
+          <div style="text-align:center;margin-top:6px;">
+            <a class="faserip-chip" data-action="force-save">Force Save (Targets)</a>
+          </div>
+        `;
+
+        // Aura toggle (maintain while in range)
+        const isMaintaining = isAuraMaintained(actor);
+        auraChipHtml = `
+          <div style="text-align:center;margin-top:6px;">
+            <a class="faserip-chip" data-action="toggle-nullify-aura">
+              ${isMaintaining ? 'Stop Nullify Aura' : 'Start Nullify Aura'}
+            </a>
+          </div>
+        `;
+
+        saveFlags = {
+          requiresSave: true,
+          saveAbility: ability,           // Endurance by default
+          saveIntensity: intensity,       // Power rank intensity
+          saveFixedRank: fixedRank,
+          saveIgnoreGate: ignoreGate,
+          attackerUuid: actor?.uuid || "",
+          nullify: { powerItemUuid: usedItem?.uuid ?? null } // helpful for provenance
+        };
+      }
+    }
 
     // Damage numbers for display + flags
     const rawDamage = isHit ? (Number(choice.powerDamage) || 0) : 0;
@@ -410,6 +476,9 @@ export class EnergyAction extends RangedAttackAction {
         <div style="text-align:center;padding:8px;margin:5px;font-weight:bold;font-size:1.1em;border-radius:3px;background:${bg};color:${fg};">
           RESULT: ${String(color).toUpperCase()} — ${String(effectResult).toUpperCase()}
         </div>
+        
+        ${auraChipHtml}
+        ${saveChipHtml}
         ${actions}
       </div>
     `;
@@ -425,53 +494,11 @@ export class EnergyAction extends RangedAttackAction {
           afterArmor,
           resultColor: colorLower,
           cappedTotal,
-          targets: targets.map(t => t.document?.uuid ?? t.actor?.uuid ?? t.id)
+          targets: targets.map(t => t.document?.uuid ?? t.actor?.uuid ?? t.id), 
+          ...(saveFlags || {})
+
         }
       }
     });
-  }
-
-  /**
-   * Create a Stunned effect on the target (same as check-action.js)
-   */
-  async _createStunnedEffect(targetUuid, targetName, duration) {
-    if (!targetUuid) {
-      console.warn("No target UUID provided for Stunned effect");
-      return;
-    }
-
-    try {
-      const resolved = await fromUuid(targetUuid);
-      const targetActor = resolved?.documentName === "Actor" 
-        ? resolved 
-        : (resolved?.documentName === "Token" ? resolved.actor : null);
-
-      if (!targetActor) {
-        console.warn(`Could not resolve actor for Stunned effect: ${targetName}`);
-        return;
-      }
-
-      const effectData = {
-        name: `Stunned (${duration} round${duration > 1 ? 's' : ''})`,
-        icon: "icons/svg/daze.svg",
-        origin: targetActor.uuid,
-        disabled: false,
-        duration: {
-          rounds: duration,
-          startRound: game.combat?.round || 0
-        },
-        flags: {
-          "msh-faserip": {
-            isStunned: true,
-            fromEnergyAttack: true
-          }
-        }
-      };
-
-      await targetActor.createEmbeddedDocuments('ActiveEffect', [effectData]);
-      ui.notifications.info(`Stunned effect created for ${targetName} (${duration} round${duration > 1 ? 's' : ''}).`);
-    } catch (err) {
-      console.error("Failed to create Stunned effect:", err);
-    }
   }
 }

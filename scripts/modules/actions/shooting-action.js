@@ -1,11 +1,14 @@
 // scripts/modules/actions/shooting-action.js
 import { RangedAttackAction } from "./ranged-attack-action.js";
-import { attachAutoFillRange } from "./action-utils.js";
-import { getBodyArmorValues } from "./action-utils.js";
+import { 
+  attachAutoFillRange,
+  getBodyArmorValues,
+  postDeathSavePrompt,
+  RANKS
+} from "./action-utils.js";
 import { makeDamageBlock, computeAfterArmor, buildDamageFlags } from "./damage-ui.js";
 
 import {
-  RANKS,
   shiftRank,
   getAbilityInfo,
   effectsFor,
@@ -242,6 +245,9 @@ export class ShootingAction extends RangedAttackAction {
       getArmorFn: (actor, dt) => getBodyArmorValues(actor, dt)
     });
 
+    // Calculate penetrating damage for action chips
+    let penetratingDamage = afterArmor;
+
     // Standardized damage block
     const sourceLabel = `Weapon: ${choice.weapon.name} (Range ${choice.weaponRange}, Damage ${choice.weaponDamage})`;
     const damageBlock = makeDamageBlock({
@@ -265,13 +271,13 @@ export class ShootingAction extends RangedAttackAction {
 
     const parts = [];
 
-    // Only show Apply Damage on hits (not white)
+    // Only show Apply Damage on hits - pass raw damage, let handler calculate armor
     if (isHit && rawDamage > 0) {
       parts.push(chip(
         "Apply Damage",
         "Apply damage to targeted/selected token(s)",
         true,
-        `data-damage="${rawDamage}" data-attacker-uuid="${actor.uuid}"`
+        `data-damage="${rawDamage}" data-attacker-uuid="${actor.uuid}" data-damage-type="${dmgType}" data-bypass-armor="false"`
       ));
     }
 
@@ -280,13 +286,13 @@ export class ShootingAction extends RangedAttackAction {
       parts.push(chip("Bullseye Details", "Describe what specific part was targeted.", false));
     }
 
-    // Kill check (red)
-    if (colorLower === "red") {
+    // Kill check (red) - only if damage penetrates
+    if (colorLower === "red" && penetratingDamage > 0) {
       parts.push(chip(
         "Resolve Kill",
         "Open Kill Check dialog",
         true,
-        `data-check="kill" data-attack-form="shooting" data-dmg="${rawDamage}" data-attacker-uuid="${actor.uuid}"`
+        `data-check="kill" data-attack-form="shooting" data-damage-type="${dmgType}" data-dmg="${penetratingDamage}" data-attacker-uuid="${actor.uuid}"`
       ));
     }
 
@@ -340,7 +346,5 @@ export class ShootingAction extends RangedAttackAction {
         targets: targetsArray
       })
     });
-
-
   }
 }
