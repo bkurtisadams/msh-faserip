@@ -361,7 +361,7 @@ export class EnergyAction extends RangedAttackAction {
       showSlam: false, // Energy attacks don't typically slam
       showStun: /stun|bullseye/.test(effText) && penetratingDamage > 0,
       showKill: /kill/.test(effText) && penetratingDamage > 0,
-      showNullifySave: true,
+      showNullifySave: false,
       nullifyIntensityRank: attackerPowerRankName, // e.g., "Remarkable"
       actorUuid: actor.uuid,
       targetUuid: primaryTarget?.actor?.uuid || "",
@@ -378,7 +378,7 @@ export class EnergyAction extends RangedAttackAction {
     let auraChipHtml = "";
     let saveFlags = null;
 
-    if (!choice.useAdHoc && choice.powerId) {
+    if (!choice.useAdHoc && choice.powerId && isHit) {  // ← ADD && isHit
       const s = usedItem?.system ?? {};
       const isNullifyPower =
         (s.damageType === 'nullification') ||
