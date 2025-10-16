@@ -1,7 +1,10 @@
 // scripts/modules/actions/energy-action.js
 import { RangedAttackAction } from "./ranged-attack-action.js";
-import { attachAutoFillRange } from "./action-utils.js";
-import { getBodyArmorValues } from "./action-utils.js";
+import { 
+  attachAutoFillRange,
+  getBodyArmorValues,
+  postDeathSavePrompt  // ADD THIS IMPORT
+} from "./action-utils.js";
 
 import {
   getAbilityInfo,
@@ -12,7 +15,8 @@ import {
   buildResultGrid,
   buildActionsBox,
   bannerColors,
-  getTargetingContext
+  getTargetingContext,
+  RANKS  // ADD THIS IMPORT for effect creation
 } from "./action-utils.js";
 
 export class EnergyAction extends RangedAttackAction {
@@ -104,7 +108,7 @@ export class EnergyAction extends RangedAttackAction {
           <div>
             <span style="display:inline-block;width:110px;">Power Rank (range):</span>
             <input type="text" name="adhocRank" value="${savedAdHocRank}" style="width:120px;">
-            <span style="font-size:0.85em;color:#666;margin-left:6px;">e.g., “Remarkable”</span>
+            <span style="font-size:0.85em;color:#666;margin-left:6px;">e.g., "Remarkable"</span>
           </div>
         </div>
 
@@ -287,13 +291,29 @@ export class EnergyAction extends RangedAttackAction {
     const colorLower = String(color || "").toLowerCase();
     const effectResult = effects[colorLower] || color;
 
+    // === Handle automatic Stun effect creation on Yellow result ===
+    const isHit = colorLower !== 'white';
+    const targets = Array.from(game.user?.targets ?? []);
+    
+    // Auto-create Stunned effect on Yellow (Bullseye) result
+    if (colorLower === 'yellow' && isHit && targets.length === 1) {
+      const targetActor = targets[0]?.actor;
+      if (targetActor) {
+        await this._createStunnedEffect(
+          targetActor.uuid, 
+          targetActor.name, 
+          1  // Bullseye stuns for 1 round
+        );
+      }
+    }
+
     // === Build standardized chat card (same as Throwing-Edged style) ===
     const grid = buildResultGrid(actionType, colorLower, effects, (globalThis._getResultHoverText || this._getResultHoverText));
     const { bg, fg } = bannerColors(colorLower);
 
     // Derive which chips to show from the configured effect text for this color
     const effText = String(effectResult || "").toLowerCase();
-    const isHit = colorLower !== 'white';
+    
     // Debug
     console.log("FASERIP | Energy Action Debug:", {
       isHit,
@@ -303,27 +323,45 @@ export class EnergyAction extends RangedAttackAction {
       effText,
       actorName: actor.name,
       powerName: choice.powerName,
-      usePowerToHit: choice.usePowerToHit
+      usePowerToHit: choice.usePowerToHit,
+      damageType: choice.powerDamageType
     });
+
+    // Calculate penetrating damage
+    let penetratingDamage = 0;
+    if (isHit && choice.powerDamage > 0) {
+      if (targets.length === 1) {
+        const targetActor = targets[0].actor;
+        if (targetActor) {
+          const armorData = getBodyArmorValues(targetActor, choice.powerDamageType);
+          penetratingDamage = Math.max(0, choice.powerDamage - armorData.applicable);
+        } else {
+          penetratingDamage = choice.powerDamage;
+        }
+      } else {
+        penetratingDamage = choice.powerDamage;
+      }
+    }
+
     const actions = buildActionsBox({
-      showSlam: /slam/.test(effText),
-      showStun: /stun/.test(effText),
-      showKill: /kill/.test(effText),
-      showApplyDamage: isHit && choice.powerDamage > 0,
+      showSlam: false, // Energy attacks don't typically slam
+      showStun: /stun|bullseye/.test(effText) && penetratingDamage > 0,
+      showKill: /kill/.test(effText) && penetratingDamage > 0,
       actorUuid: actor.uuid,
-      damage: isHit ? choice.powerDamage : 0,
+      damage: penetratingDamage,
       attackForm: "energy",
-      damageType: choice.powerDamageType || "energy-generic"
+      damageType: choice.powerDamageType,
+      bypassArmor: false
     });
+
     // Damage numbers for display + flags
-    const targets = Array.from(game.user?.targets ?? []);
     const rawDamage = isHit ? (Number(choice.powerDamage) || 0) : 0;
 
     let afterArmor = rawDamage;
     if (isHit && rawDamage > 0 && targets.length === 1) {
       const targetActor = targets[0]?.actor;
       if (targetActor) {
-        const armorData = getBodyArmorValues(targetActor, choice.powerDamageType || "energy-generic");
+        const armorData = getBodyArmorValues(targetActor, choice.powerDamageType);
         afterArmor = Math.max(0, rawDamage - (armorData?.applicable ?? 0));
       }
     }
@@ -340,7 +378,6 @@ export class EnergyAction extends RangedAttackAction {
       </div>
     `;
 
-
     const rangeText = choice.prettyRange || `${choice.range} area${choice.range > 1 ? "s" : ""}${choice.rangeModifier ? ` (${choice.rangeModifier}CS)` : ""}${choice.throughObstacle ? `, obstacle (-2CS)` : ""}`;
 
     // Build a clear to-hit line first
@@ -350,7 +387,7 @@ export class EnergyAction extends RangedAttackAction {
 
     // Context block (same order/style as your other cards)
     const contextHtml = `
-      <div>${toHitLine}${this.opts?.shift ? ` — Shift ${this.opts.shift} → ${effectiveRank}` : ""}</div>
+      <div>${toHitLine}${choice.totalShift ? ` — Shift ${choice.totalShift} → ${effectiveRank}` : ""}</div>
       <div>Power: ${choice.powerName} — Damage: ${choice.powerDamage} — Rank: ${choice.powerRank}</div>
       <div>Distance: ${rangeText}</div>
       <div>Roll: ${roll.total}${totalKarmaUsed ? ` + Karma: ${totalKarmaUsed}` : ""} = ${cappedTotal}</div>
@@ -383,7 +420,7 @@ export class EnergyAction extends RangedAttackAction {
       flags: {
         "msh-faserip": {
           actionId: actionType,
-          damageType: choice.powerDamageType || "energy-generic",
+          damageType: choice.powerDamageType,
           rawDamage,
           afterArmor,
           resultColor: colorLower,
@@ -392,6 +429,49 @@ export class EnergyAction extends RangedAttackAction {
         }
       }
     });
+  }
 
+  /**
+   * Create a Stunned effect on the target (same as check-action.js)
+   */
+  async _createStunnedEffect(targetUuid, targetName, duration) {
+    if (!targetUuid) {
+      console.warn("No target UUID provided for Stunned effect");
+      return;
+    }
+
+    try {
+      const resolved = await fromUuid(targetUuid);
+      const targetActor = resolved?.documentName === "Actor" 
+        ? resolved 
+        : (resolved?.documentName === "Token" ? resolved.actor : null);
+
+      if (!targetActor) {
+        console.warn(`Could not resolve actor for Stunned effect: ${targetName}`);
+        return;
+      }
+
+      const effectData = {
+        name: `Stunned (${duration} round${duration > 1 ? 's' : ''})`,
+        icon: "icons/svg/daze.svg",
+        origin: targetActor.uuid,
+        disabled: false,
+        duration: {
+          rounds: duration,
+          startRound: game.combat?.round || 0
+        },
+        flags: {
+          "msh-faserip": {
+            isStunned: true,
+            fromEnergyAttack: true
+          }
+        }
+      };
+
+      await targetActor.createEmbeddedDocuments('ActiveEffect', [effectData]);
+      ui.notifications.info(`Stunned effect created for ${targetName} (${duration} round${duration > 1 ? 's' : ''}).`);
+    } catch (err) {
+      console.error("Failed to create Stunned effect:", err);
+    }
   }
 }
