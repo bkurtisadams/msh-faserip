@@ -20,7 +20,7 @@ import {
 } from "./action-utils.js";
 
 import { startAura, stopAura, isAuraMaintained } from "./nullify.js";
-
+import { buildDamageFlags } from "./damage-ui.js";
 
 export class EnergyAction extends RangedAttackAction {
   async execute() {
@@ -487,16 +487,27 @@ export class EnergyAction extends RangedAttackAction {
       speaker: ChatMessage.getSpeaker({ actor }),
       content: cardHtml,
       flags: {
-        "msh-faserip": {
+        ...buildDamageFlags({
           actionId: actionType,
           damageType: choice.powerDamageType,
           rawDamage,
           afterArmor,
           resultColor: colorLower,
           cappedTotal,
-          targets: targets.map(t => t.document?.uuid ?? t.actor?.uuid ?? t.id), 
+          targets: targets
+        }),
+        // Merge in save flags for Nullification if present
+        "msh-faserip": {
+          ...buildDamageFlags({
+            actionId: actionType,
+            damageType: choice.powerDamageType,
+            rawDamage,
+            afterArmor,
+            resultColor: colorLower,
+            cappedTotal,
+            targets: targets
+          })["msh-faserip"],
           ...(saveFlags || {})
-
         }
       }
     });

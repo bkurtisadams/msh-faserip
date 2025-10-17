@@ -19,8 +19,8 @@ export function onManageActiveEffect(event, owner) {
           }),
           icon: 'icons/svg/aura.svg',
           origin: owner.uuid,
-          'duration.rounds':
-            li.dataset.effectType === 'temporary' ? 1 : undefined,
+          'duration.seconds':
+            li.dataset.effectType === 'temporary' ? 6 : undefined,
           disabled: li.dataset.effectType === 'inactive',
         },
       ]);
@@ -58,20 +58,35 @@ export function prepareActiveEffectCategories(effects) {
 }
 
 // Factory used by damage/0-HP code to mark an actor as "Dying"
-export function buildDyingEffect(actor, { rounds = undefined } = {}) {
-  return {
+export function buildDyingEffect(actor, { rounds } = {}) {
+  const scope = (globalThis.MSH_FLAG_SCOPE || "msh-faserip");
+
+  // Base effect data
+  const data = {
     name: "Dying",
     icon: "icons/svg/skull.svg",
-    origin: actor.uuid,
-    "duration.rounds": rounds,
+    origin: actor?.uuid,
     changes: [],
     flags: {
-      [globalThis.MSH_FLAG_SCOPE || "msh-faserip"]: {
+      [scope]: {
         dying: true,
         stabilizedRounds: 0,
         reFeatOnSlip: false
       }
     }
   };
+
+  // If a number of "rounds" was passed, convert to seconds (FASERIP: 1 turn = 6s)
+  if (Number.isFinite(rounds)) {
+    const te = game.modules.get('calendar-time-tracker')?.api?.timeEngine;
+    const secPerTurn = (te && typeof te.convertToSeconds === 'function')
+      ? te.convertToSeconds(1, 'turn')
+      : 6;
+    const seconds = Math.max(0, Math.floor(rounds * secPerTurn));
+    data.duration = { seconds };
+  }
+
+  return data;
 }
+
 

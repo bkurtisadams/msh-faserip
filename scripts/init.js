@@ -68,6 +68,101 @@ Hooks.once("init", async () => {
     default: false
   });
 
+  // Convert "duration.rounds" -> seconds (based on preset turn length: FASERIP: turn = 6s).
+  Hooks.on("preCreateActiveEffect", function (effect, data, options, userId) {
+    try {
+      // Ensure payload objects exist
+      if (!data) data = {};
+      if (!data.duration) data.duration = {};
+
+      // 1) Gather duration from payload and from the effect's source
+      var incomingHasSeconds = (data.duration.seconds !== undefined && data.duration.seconds !== null);
+      var incomingHasRounds  = (data.duration.rounds  !== undefined && data.duration.rounds  !== null);
+
+      var src = (effect && typeof effect.toObject === "function") ? effect.toObject() : {};
+      var srcDuration = (src && src.duration) ? src.duration : {};
+      var sourceHasRounds = (srcDuration.rounds !== undefined && srcDuration.rounds !== null);
+
+      // Prefer payload rounds; if missing, fall back to source rounds
+      var rounds = null;
+      if (incomingHasRounds) {
+        rounds = Number(data.duration.rounds);
+      } else if (!incomingHasSeconds && sourceHasRounds) {
+        rounds = Number(srcDuration.rounds);
+      }
+
+      // Nothing to do if:
+      //  - no rounds anywhere, or
+      //  - seconds already specified
+      if (rounds === null || isNaN(rounds) || incomingHasSeconds) return;
+
+      // 2) Determine seconds per turn from CTT preset (fallback to 6)
+      var ctt = game.modules.get("calendar-time-tracker");
+      var te  = (ctt && ctt.api) ? ctt.api.timeEngine : null;
+
+      var secPerTurn = 6;
+      if (te && typeof te.convertToSeconds === "function") {
+        try {
+          var v = Number(te.convertToSeconds(1, "turn"));
+          if (!isNaN(v) && v > 0) secPerTurn = v;
+        } catch (e1) { /* ignore */ }
+      }
+
+      // 3) Convert and sanitize
+      var safeRounds = Math.max(0, Math.floor(isNaN(rounds) ? 0 : rounds));
+      var seconds    = Math.max(0, Math.floor(safeRounds * secPerTurn));
+
+      // 4) Prefer worldTime-based startTime when timing in seconds
+      var startTime = (game.time && typeof game.time.worldTime === "number")
+        ? game.time.worldTime
+        : (srcDuration.startTime !== undefined ? srcDuration.startTime : undefined);
+
+      // 5) Update the document source (reliable in preCreate)
+      //    Also remove rounds/startRound/startTurn from the source
+      var newSrc = effect.toObject ? effect.toObject() : {};
+      if (!newSrc) newSrc = {};
+      if (!newSrc.duration) newSrc.duration = {};
+      newSrc.duration.seconds    = seconds;
+      newSrc.duration.startTime  = startTime;
+      newSrc.duration.rounds     = undefined;
+      newSrc.duration.startRound = undefined;
+      newSrc.duration.startTurn  = undefined;
+
+      if (!newSrc.flags) newSrc.flags = {};
+      if (!newSrc.flags["msh-faserip"]) newSrc.flags["msh-faserip"] = {};
+      newSrc.flags["msh-faserip"].unitLabel       = "turn";
+      newSrc.flags["msh-faserip"].unitLabelPlural = "turns";
+
+      if (typeof effect.updateSource === "function") {
+        effect.updateSource(newSrc);
+      }
+
+      // 6) Reflect the same in the incoming payload (some code reads `data`)
+      data.duration.seconds = seconds;
+      if (data.duration.rounds !== undefined)     delete data.duration.rounds;
+      if (data.duration.startRound !== undefined) delete data.duration.startRound;
+      if (data.duration.startTurn !== undefined)  delete data.duration.startTurn;
+
+      if (!data.flags) data.flags = {};
+      if (!data.flags["msh-faserip"]) data.flags["msh-faserip"] = {};
+      data.flags["msh-faserip"].unitLabel       = "turn";
+      data.flags["msh-faserip"].unitLabelPlural = "turns";
+
+      // 7) Debug log (if you have the setting)
+      try {
+        if (game.settings && typeof game.settings.get === "function" &&
+            game.settings.get("msh-faserip", "debugMode")) {
+          var nm = (data && data.name) ? data.name : (effect && effect.name ? effect.name : "(unnamed)");
+          console.log("[FASERIP] preCreateActiveEffect:",
+            safeRounds, "round(s) ->", seconds + "s", "(turn=" + secPerTurn + "s)", nm);
+        }
+      } catch (e2) { /* ignore */ }
+
+    } catch (err) {
+      console.warn("FASERIP preCreateActiveEffect conversion failed:", err);
+    }
+  });
+;
 
   // Register Action HUD keybinding
   game.keybindings.register("msh-faserip", "openActionHUD", {
@@ -804,15 +899,26 @@ Hooks.on("updateCombat", async (combat, changed, diff, userId) => {
     }
 
     // Drop Endurance by one printed rank
-    const curName  = game.msh.getEnduranceRankName(actor);
-    const nextName = game.msh.nextLowerRankName(curName);
-    
-    console.log(`📉 FASERIP | ${actor.name} Endurance: ${curName} → ${nextName}`);
+      const curName  = game.msh.getEnduranceRankName(actor);
+      const nextName = game.msh.nextLowerRankName(curName);
 
-    // Update the actor's printed rank
+    // Calculate the numeric value for the new rank - ADD THIS BEFORE THE TRY BLOCK
+    const nextValue = game.msh.getRankValue(nextName) || 0;
+
+    if (game.settings.get("msh-faserip", "debugMode")) {
+      console.log(`📉 FASERIP | ${actor.name} Endurance: ${curName} → ${nextName} (${nextValue})`);
+    }
+
+    // Update the actor's printed rank AND value
     try {
-      await actor.update({"system.abilities.endurance.rank": nextName});
-      console.log(`✅ FASERIP | Updated ${actor.name}'s Endurance rank to ${nextName}`);
+      await actor.update({
+        "system.abilities.endurance.rank": nextName,
+        "system.abilities.endurance.value": nextValue
+      });
+      
+      if (game.settings.get("msh-faserip", "debugMode")) {
+        console.log(`✅ FASERIP | Updated ${actor.name}'s Endurance to ${nextName} (${nextValue})`);
+      }
     } catch (err) {
       console.error(`❌ FASERIP | Failed to update ${actor.name}'s Endurance:`, err);
     }
@@ -823,7 +929,7 @@ Hooks.on("updateCombat", async (combat, changed, diff, userId) => {
     
     try {
       await dyingEffect.update({
-        name: `Dying (${originalRank} → ${nextName}, ${turnsElapsed} rounds)`,
+        name: `Dying (${originalRank} → ${nextName}, ${turnsElapsed} turns)`,
         [`flags.${scope}.currentTempRank`]: nextName,
         [`flags.${scope}.turnsElapsed`]: turnsElapsed
       });

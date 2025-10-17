@@ -460,46 +460,74 @@ export class CheckAction extends BaseAction {
   }
 
   /**
-   * Create a Stunned effect on the target
-   */
-  async _createStunnedEffect(targetUuid, targetName, duration) {
-    if (!targetUuid) {
-      console.warn("No target UUID provided for Stunned effect");
+ * Create a Stunned effect on the target
+ */
+async _createStunnedEffect(targetUuid, targetName, duration) {
+  if (!targetUuid) {
+    console.warn("No target UUID provided for Stunned effect");
+    return;
+  }
+
+  try {
+    const resolved = await fromUuid(targetUuid);
+    const targetActor = resolved?.documentName === "Actor"
+      ? resolved
+      : (resolved?.documentName === "Token" ? resolved.actor : null);
+
+    if (!targetActor) {
+      console.warn(`Could not resolve actor for Stunned effect: ${targetName}`);
       return;
     }
 
-    try {
-      const resolved = await fromUuid(targetUuid);
-      const targetActor = resolved?.documentName === "Actor" 
-        ? resolved 
-        : (resolved?.documentName === "Token" ? resolved.actor : null);
+    // --- Convert "rounds" (your HUD input) to preset-aware seconds ---
+    const turnsInput = Math.max(0, Number(duration) || 0);
+    const te = game.modules.get("calendar-time-tracker")?.api?.timeEngine;
+    const secPerTurn = (te && typeof te.convertToSeconds === "function")
+      ? te.convertToSeconds(1, "turn")
+      : 6; // safe fallback for FASERIP
+    const secondsTotal = Math.floor(turnsInput * secPerTurn);
 
-      if (!targetActor) {
-        console.warn(`Could not resolve actor for Stunned effect: ${targetName}`);
-        return;
-      }
+    // Use the CANONICAL flag scope
+    const scope = globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faserip";
 
-      const effectData = {
-        name: `Stunned (${duration} round${duration > 1 ? 's' : ''})`,
-        icon: "icons/svg/daze.svg",
-        origin: targetActor.uuid,
-        disabled: false,
-        duration: {
-          rounds: duration,
-          startRound: game.combat?.round || 0
-        },
-        flags: {
-          "msh-faserip": {
-            isStunned: true,
-            fromStunCheck: true
-          }
+    const effectData = {
+      name: `Stunned (${turnsInput} turn${turnsInput === 1 ? "" : "s"})`,
+      icon: "icons/svg/daze.svg",
+      origin: targetActor.uuid,
+      disabled: false,
+      duration: {
+        seconds: secondsTotal,
+        startTime: game.time?.worldTime ?? undefined
+      },
+      flags: {
+        [scope]: {
+          isStunned: true,
+          fromStunCheck: true,
+          unitLabel: "turn",           // ← CRITICAL: Set these flags!
+          unitLabelPlural: "turns"     // ← CRITICAL: Set these flags!
         }
-      };
+      }
+    };
 
-      await targetActor.createEmbeddedDocuments('ActiveEffect', [effectData]);
-      ui.notifications.info(`Stunned effect created for ${targetName} (${duration} round${duration > 1 ? 's' : ''}).`);
-    } catch (err) {
-      console.error("Failed to create Stunned effect:", err);
+    if (game.settings?.get?.("msh-faserip", "debugMode")) {
+      console.log("[FASERIP _createStunnedEffect]", {
+        targetName,
+        turnsInput,
+        secondsTotal,
+        effectData
+      });
     }
+
+    const [created] = await targetActor.createEmbeddedDocuments("ActiveEffect", [effectData]);
+
+    ui.notifications.info(
+      `Stunned effect created for ${targetName} (${turnsInput} turn${turnsInput === 1 ? "" : "s"} = ${secondsTotal}s).`
+    );
+
+    return created;
+  } catch (err) {
+    console.error("Failed to create Stunned effect:", err);
   }
+}
+
 } // end of class CheckAction
