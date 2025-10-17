@@ -753,55 +753,144 @@ Hooks.once("ready", async () => {
 });
 
 // Each turn, decrement Endurance one printed rank for actors who are Dying (RAW)
-  Hooks.on("updateCombat", async (combat, changed, diff, userId) => {
-    // Only act when the turn actually changes
-    if (!("turn" in changed || "round" in changed)) return;
+// Each turn, decrement Endurance one printed rank for actors who are Dying (RAW)
+// Each turn, decrement Endurance one printed rank for actors who are Dying (RAW)
+Hooks.on("updateCombat", async (combat, changed, diff, userId) => {
+  console.log("🔄 FASERIP | updateCombat hook fired", { changed, round: combat.round, turn: combat.turn });
+  
+  // Only act when the turn actually changes
+  if (!("turn" in changed || "round" in changed)) {
+    console.log("⏭️ FASERIP | Skipping - no turn/round change");
+    return;
+  }
 
-    const c = combat.combatant;
-    if (!c?.actor) return;
-    const actor = c.actor;
+  const scope = globalThis.MSH_FLAG_SCOPE || "msh-faserip";
+  console.log("🔍 FASERIP | Checking all combatants for Dying effects...");
+
+  // Check ALL combatants for dying effects, not just the current one
+  let dyingCount = 0;
+  for (const combatant of combat.combatants) {
+    const actor = combatant.actor;
+    if (!actor) {
+      console.log("⚠️ FASERIP | Combatant has no actor:", combatant.name);
+      continue;
+    }
 
     // Identify "Dying" state via either status effect or flags
-    const scope = globalThis.MSH_FLAG_SCOPE || "msh-faserip";
     const dyingEffect = actor.effects.find(e =>
       e.getFlag(scope, "dying") || e.statuses?.has?.("dying")
     );
-    if (!dyingEffect) return;
+    
+    if (!dyingEffect) continue;
+    
+    dyingCount++;
+    console.log(`💀 FASERIP | Found Dying effect on ${actor.name}`, {
+      effectName: dyingEffect.name,
+      effectId: dyingEffect.id,
+      flags: dyingEffect.flags[scope]
+    });
 
     // Pause 1 round if stabilized
     const stabilizedRounds = dyingEffect.getFlag(scope, "stabilizedRounds") || 0;
     if (stabilizedRounds > 0) {
+      console.log(`⏸️ FASERIP | ${actor.name} is stabilized for ${stabilizedRounds} more rounds`);
       await dyingEffect.setFlag(scope, "stabilizedRounds", stabilizedRounds - 1);
-      return;
+      continue;
     }
 
     // Drop Endurance by one printed rank
     const curName  = game.msh.getEnduranceRankName(actor);
     const nextName = game.msh.nextLowerRankName(curName);
+    
+    console.log(`📉 FASERIP | ${actor.name} Endurance: ${curName} → ${nextName}`);
 
-    // Update the actor's printed rank (keep your own schema here)
-    await actor.update({"system.abilities.endurance.rank": nextName});
+    // Update the actor's printed rank
+    try {
+      await actor.update({"system.abilities.endurance.rank": nextName});
+      console.log(`✅ FASERIP | Updated ${actor.name}'s Endurance rank to ${nextName}`);
+    } catch (err) {
+      console.error(`❌ FASERIP | Failed to update ${actor.name}'s Endurance:`, err);
+    }
+
+    // Update the effect's label and tracking flags
+    const turnsElapsed = (dyingEffect.getFlag(scope, "turnsElapsed") || 0) + 1;
+    const originalRank = dyingEffect.getFlag(scope, "originalEndRank") || curName;
+    
+    try {
+      await dyingEffect.update({
+        name: `Dying (${originalRank} → ${nextName}, ${turnsElapsed} rounds)`,
+        [`flags.${scope}.currentTempRank`]: nextName,
+        [`flags.${scope}.turnsElapsed`]: turnsElapsed
+      });
+      console.log(`✅ FASERIP | Updated Dying effect label for ${actor.name}`);
+    } catch (err) {
+      console.error(`❌ FASERIP | Failed to update Dying effect:`, err);
+    }
+
+    // Post message about Endurance loss
+    ChatMessage.create({
+      content: `<div style="background:#ffebee;border:1px solid #ef5350;padding:8px;border-radius:3px;">
+        <strong>${actor.name}</strong> is dying and loses 1 Endurance rank: ${curName} → ${nextName}
+      </div>`
+    });
 
     // If we slipped below Shift-0 → death
-    if (nextName === "Shift-0") {
-      // Next slip (below Shift-0) kills the character per RAW; enforce here by
-      // checking if we were ALREADY Shift-0 before this tick:
-      if (curName === "Shift-0") {
-        await actor.update({"system.details.isDead": true});
-        await dyingEffect.delete();
-        ChatMessage.create({content: `<b>${actor.name}</b> has died.`});
-        return;
-      }
+    if (curName === "Shift-0" && nextName === "Shift-0") {
+      console.log(`💀 FASERIP | ${actor.name} has died`);
+      await actor.update({"system.details.isDead": true});
+      await dyingEffect.delete();
+      ChatMessage.create({content: `<b>${actor.name}</b> has died.`});
+      continue;
     }
 
-    // Handle the special 200-Karma “re-FEAT on slip”
+    // Handle the special 200-Karma "re-FEAT on slip"
     const reFeat = dyingEffect.getFlag(scope, "reFeatOnSlip");
     if (reFeat) {
+      console.log(`🎲 FASERIP | ${actor.name} gets re-FEAT on slip`);
       await dyingEffect.setFlag(scope, "reFeatOnSlip", false);
-      // Fire your existing Endurance FEAT dialog here
       game.msh?.openUniversalTableDialog?.(actor, { mode: "death-save" });
     }
-  });
+  }
+  
+  if (dyingCount === 0) {
+    console.log("✨ FASERIP | No dying combatants found");
+  } else {
+    console.log(`📊 FASERIP | Processed ${dyingCount} dying combatant(s)`);
+  }
+});
+
+// When a stun from a death save expires, restore Health to Endurance rank value
+Hooks.on("deleteActiveEffect", async (effect, options, userId) => {
+  const scope = globalThis.MSH_FLAG_SCOPE || "msh-faserip";
+  
+  // Check if this was a stun from a death save
+  const fromDeathSave = effect.getFlag(scope, "fromDeathSave");
+  const isStunned = effect.getFlag(scope, "isStunned");
+  
+  if (fromDeathSave && isStunned) {
+    const actor = effect.parent;
+    if (!actor) return;
+    
+    // Only restore health if they're still at 0 (not if they were healed already)
+    const currentHealth = actor.system?.attributes?.health?.value || 0;
+    if (currentHealth > 0) {
+      console.log(`FASERIP | ${actor.name} already has health, skipping recovery`);
+      return;
+    }
+    
+    // Character wakes up with Health = Endurance rank value
+    const enduranceValue = actor.system?.abilities?.endurance?.value || 10;
+    
+    console.log(`FASERIP | ${actor.name} waking up, restoring ${enduranceValue} Health`);
+    await actor.update({"system.attributes.health.value": enduranceValue});
+    
+    ChatMessage.create({
+      content: `<div style="background:#e8f5e9;border:1px solid #4CAF50;padding:8px;border-radius:3px;">
+        <strong>${actor.name}</strong> regains consciousness with ${enduranceValue} Health (Endurance rank value).
+      </div>`
+    });
+  }
+});
 
 // Add the hotbarDrop hook at module level (like in the older file)
 Hooks.on('hotbarDrop', (bar, data, slot) => {
