@@ -58,6 +58,17 @@ Hooks.once("init", async () => {
 
   CONFIG.FASERIP = CONFIG.FASERIP || {};
 
+  // Four-Color: no death save at 0 Health, unless a 'Kill' action type used.
+  game.settings.register('msh-faserip', 'fourColorRule', {
+    name: "Four-Color Rule (Non-lethal 0 Health)",
+    hint: "If enabled, characters who hit 0 Health do NOT make a death save unless the triggering attack produced a Kill result (or the GM marks the hazard as lethal).",
+    scope: "world",
+    config: true,
+    type: Boolean,
+    default: false
+  });
+
+
   // Register Action HUD keybinding
   game.keybindings.register("msh-faserip", "openActionHUD", {
     name: "Open Action HUD",
@@ -265,6 +276,13 @@ Hooks.once("init", async () => {
     }
   );
 
+  CONFIG.statusEffects.push({
+    id: "dying",
+    label: "Dying",
+    icon: "icons/svg/skull.svg",
+    flags: { "msh-faserip": { dying: true } }
+  });
+
   CONFIG.FASERIP.rankValues = {
     "Shift-0": 0, 
     "Feeble": 2, 
@@ -294,7 +312,33 @@ Hooks.once("init", async () => {
     "Class5000": 5000
   };
 
-  // Add after the rankValues definition in init.js
+  // Build an ordered rank ladder from your values
+  const _rankEntries = Object.entries(CONFIG.FASERIP.rankValues)
+    .filter(([n,v]) => typeof v === "number")
+    .sort((a,b) => a[1] - b[1]); // ascending by value
+
+  const RANK_ORDER = _rankEntries.map(([name]) => name);
+
+  // Return the next lower printed rank name, clamped at "Shift-0"
+  game.msh.nextLowerRankName = function(name) {
+    const i = RANK_ORDER.indexOf(name);
+    if (i <= 0) return "Shift-0";
+    return RANK_ORDER[i - 1];
+  };
+
+  // Convenience to get current printed rank name from an actor's Endurance
+  game.msh.getEnduranceRankName = function(actor) {
+    const r = actor.system?.abilities?.endurance?.rank ?? actor.system?.abilities?.endurance?.value;
+    // tolerate either printed rank name or numeric; resolve to printed name
+    if (typeof r === "string") return r;
+    // if numeric, snap to the closest printed name by value
+    let best = "Shift-0", bestDiff = Infinity;
+    for (const [name, val] of _rankEntries) {
+      const d = Math.abs((r ?? 0) - val);
+      if (d < bestDiff) { best = name; bestDiff = d; }
+    }
+    return best;
+  };
 
   CONFIG.FASERIP.damageTypes = {
     // Physical
@@ -707,6 +751,57 @@ Hooks.once("ready", async () => {
     console.warn("MSH FASERIP | Failed to install chat hooks:", e);
   }
 });
+
+// Each turn, decrement Endurance one printed rank for actors who are Dying (RAW)
+  Hooks.on("updateCombat", async (combat, changed, diff, userId) => {
+    // Only act when the turn actually changes
+    if (!("turn" in changed || "round" in changed)) return;
+
+    const c = combat.combatant;
+    if (!c?.actor) return;
+    const actor = c.actor;
+
+    // Identify "Dying" state via either status effect or flags
+    const scope = globalThis.MSH_FLAG_SCOPE || "msh-faserip";
+    const dyingEffect = actor.effects.find(e =>
+      e.getFlag(scope, "dying") || e.statuses?.has?.("dying")
+    );
+    if (!dyingEffect) return;
+
+    // Pause 1 round if stabilized
+    const stabilizedRounds = dyingEffect.getFlag(scope, "stabilizedRounds") || 0;
+    if (stabilizedRounds > 0) {
+      await dyingEffect.setFlag(scope, "stabilizedRounds", stabilizedRounds - 1);
+      return;
+    }
+
+    // Drop Endurance by one printed rank
+    const curName  = game.msh.getEnduranceRankName(actor);
+    const nextName = game.msh.nextLowerRankName(curName);
+
+    // Update the actor's printed rank (keep your own schema here)
+    await actor.update({"system.abilities.endurance.rank": nextName});
+
+    // If we slipped below Shift-0 → death
+    if (nextName === "Shift-0") {
+      // Next slip (below Shift-0) kills the character per RAW; enforce here by
+      // checking if we were ALREADY Shift-0 before this tick:
+      if (curName === "Shift-0") {
+        await actor.update({"system.details.isDead": true});
+        await dyingEffect.delete();
+        ChatMessage.create({content: `<b>${actor.name}</b> has died.`});
+        return;
+      }
+    }
+
+    // Handle the special 200-Karma “re-FEAT on slip”
+    const reFeat = dyingEffect.getFlag(scope, "reFeatOnSlip");
+    if (reFeat) {
+      await dyingEffect.setFlag(scope, "reFeatOnSlip", false);
+      // Fire your existing Endurance FEAT dialog here
+      game.msh?.openUniversalTableDialog?.(actor, { mode: "death-save" });
+    }
+  });
 
 // Add the hotbarDrop hook at module level (like in the older file)
 Hooks.on('hotbarDrop', (bar, data, slot) => {

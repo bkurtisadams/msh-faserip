@@ -8,6 +8,7 @@ import {
   getTargetingContext, getBodyArmorValues, applyDamageToTargets  // ADD THIS IMPORT
 } from "./action-utils.js";
 import { getItemMaterialRank } from "../../gm-utils.js";
+import { makeDamageBlock, computeAfterArmor, buildDamageFlags } from "./damage-ui.js";
 
 export class BluntAttackAction extends AttackAction {
   async execute() {
@@ -330,6 +331,8 @@ export class BluntAttackAction extends AttackAction {
     const rawDamage = choice.damage ?? strength.value;
     const afterArmor = penetratingDamage;
 
+    const dmgType = "physical-blunt"; // Blunt attacks are always physical-blunt damage
+
     const actions = (isHit && penetratingDamage > 0)
       ? buildActionsBox({
           showSlam: colorLower === "yellow" && penetratingDamage > 0,
@@ -400,17 +403,15 @@ export class BluntAttackAction extends AttackAction {
     await ChatMessage.create({
       speaker: ChatMessage.getSpeaker({ actor }),
       content: cardHtml,
-      flags: {
-        "msh-faserip": {
-          actionId: actionType,
-          damageType: "physical-blunt",
-          rawDamage,
-          afterArmor,
-          resultColor: colorLower,
-          cappedTotal,
-          targets: targets.map(t => t.document?.uuid ?? t.actor?.uuid ?? t.id)
-        }
-      }
+      flags: buildDamageFlags({
+        actionId: actionType,
+        damageType: dmgType,
+        rawDamage,
+        afterArmor,
+        resultColor: colorLower,
+        cappedTotal,
+        targets: targets  // Note: buildDamageFlags expects the targets array, not the mapped uuids
+      })
     });
   }
 } // end of class BlundAttackAction

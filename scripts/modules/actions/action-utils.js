@@ -841,9 +841,32 @@ export async function applyDamageToTargets(damage, options = {}) {
         result.success = true;
 
         // Check if just hit 0 health
+        // modify the 0-health check:
         if (newHealth === 0 && currentHealth > 0) {
-          // Just hit 0 - post death save prompt
-          await postDeathSavePrompt(targetActor);
+          // Check four-color rule
+          const fourColorRule = game.settings.get('msh-faserip', 'fourColorRule');
+          
+          if (fourColorRule) {
+            // In four-color mode, only do death save if this was a Kill result
+            const wasKillResult = options.wasKillResult || false;
+            
+            if (wasKillResult) {
+              await postDeathSavePrompt(targetActor);
+            } else {
+              // Just stunned/unconscious, no death save needed
+              ChatMessage.create({
+                content: `<div style="background:#e3f2fd;border:1px solid #2196F3;padding:8px;border-radius:3px;">
+                  <strong>${targetActor.name}</strong> has been knocked unconscious (0 Health).
+                  <div style="font-size:0.9em;color:#666;margin-top:4px;">
+                    Four-Color Rule: No death save required (attack was not lethal).
+                  </div>
+                </div>`
+              });
+            }
+          } else {
+            // Standard rules: always death save at 0 health
+            await postDeathSavePrompt(targetActor);
+          }
         }
       } catch (err) {
         console.error("FASERIP | Failed to apply damage:", err);

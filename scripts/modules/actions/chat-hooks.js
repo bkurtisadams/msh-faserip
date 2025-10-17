@@ -145,11 +145,13 @@ export function installActionChatHandlers() {
       const damage = Number(btn.dataset.damage || 0);
       const attackerUuid = btn.dataset.attackerUuid;
       const bypassArmor = btn.dataset.bypassArmor === "true";
-      const damageType = btn.dataset.damageType || "physical-blunt";  // ADD THIS LINE
+      const damageType = btn.dataset.damageType || "physical-blunt";
+      const wasKillResult = btn.dataset.isKill === "true";
       
       await applyDamageToTargets(damage, {
         attackerUuid,
-        damageType: damageType,  // ADD THIS LINE
+        damageType: damageType,
+        wasKillResult: wasKillResult,
         showNotification: true,
         updateButton: btn,
         bypassArmor: bypassArmor
@@ -327,6 +329,30 @@ export function installActionChatHandlers() {
       btn.textContent = "✓ Armor Applied";
       
       ui.notifications.info(`Blocking armor applied to ${actor.name}`);
+    });
+
+    // 10) Death Save
+    html.on("click", '[data-action="death-save"]', async (ev) => {
+      ev.preventDefault();
+      const btn = ev.currentTarget;
+      const actorUuid = btn.dataset.actorUuid;
+      
+      try {
+        const resolved = await fromUuid(actorUuid);
+        const actor = resolved?.documentName === "Actor" 
+          ? resolved 
+          : (resolved?.documentName === "Token" ? resolved.actor : null);
+        
+        if (!actor) {
+          ui.notifications.warn("Could not find actor for death save.");
+          return;
+        }
+        
+        await ActionDispatcher.roll("death-save", { actor });
+      } catch (err) {
+        console.error("Death save handler failed:", err);
+        ui.notifications.error("Failed to open death save dialog.");
+      }
     });
 
   }); // End of single combined Hooks.on
