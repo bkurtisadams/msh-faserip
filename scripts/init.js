@@ -15,7 +15,7 @@ import { initializeSlamHandlers } from './charge-damage.js';
 import { installActionChatHandlers } from "./modules/actions/chat-hooks.js";
 import { openCollisionDamageDialog } from './modules/actions/collision-damage.js';
 import { FaseripActionHUD } from './action-hud.js';
-
+import { debugLog } from './modules/actions/action-utils.js';
 
 Hooks.once("init", async () => {
   // ---- Canonical flag scope + shim ----------------------------------------
@@ -280,7 +280,14 @@ Hooks.once("init", async () => {
     id: "dying",
     label: "Dying",
     icon: "icons/svg/skull.svg",
-    flags: { "msh-faserip": { dying: true } }
+    flags: { "msh-faserip": { isDying: true } }  // ← Changed to isDying
+  });
+
+  CONFIG.statusEffects.push({
+    id: "dead",
+    label: "Dead",
+    icon: "icons/svg/skull.svg",
+    flags: { "msh-faserip": { isDead: true } }  // ← Also use isDead for consistency
   });
 
   CONFIG.FASERIP.rankValues = {
@@ -753,8 +760,6 @@ Hooks.once("ready", async () => {
 });
 
 // Each turn, decrement Endurance one printed rank for actors who are Dying (RAW)
-// Each turn, decrement Endurance one printed rank for actors who are Dying (RAW)
-// Each turn, decrement Endurance one printed rank for actors who are Dying (RAW)
 Hooks.on("updateCombat", async (combat, changed, diff, userId) => {
   console.log("🔄 FASERIP | updateCombat hook fired", { changed, round: combat.round, turn: combat.turn });
   
@@ -778,7 +783,7 @@ Hooks.on("updateCombat", async (combat, changed, diff, userId) => {
 
     // Identify "Dying" state via either status effect or flags
     const dyingEffect = actor.effects.find(e =>
-      e.getFlag(scope, "dying") || e.statuses?.has?.("dying")
+      e.getFlag(scope, "isDying") || e.statuses?.has?.("dying")
     );
     
     if (!dyingEffect) continue;
@@ -834,13 +839,52 @@ Hooks.on("updateCombat", async (combat, changed, diff, userId) => {
       </div>`
     });
 
-    // If we slipped below Shift-0 → death
-    if (curName === "Shift-0" && nextName === "Shift-0") {
-      console.log(`💀 FASERIP | ${actor.name} has died`);
-      await actor.update({"system.details.isDead": true});
-      await dyingEffect.delete();
-      ChatMessage.create({content: `<b>${actor.name}</b> has died.`});
-      continue;
+    // Check if they've hit Shift-0 (dying) or gone below (death)
+    if (nextName === "Shift-0") {
+      if (curName === "Shift-0") {
+        // Already at Shift-0 and trying to go lower = death
+        console.log(`💀 FASERIP | ${actor.name} has died (below Shift-0)`);
+        await actor.update({"system.details.isDead": true});
+        await dyingEffect.delete();
+
+         // Apply dead status to all tokens of this actor
+        for (const token of actor.getActiveTokens()) {
+          await token.toggleEffect({
+            id: "dead",
+            label: "Dead",
+            icon: "icons/svg/skull.svg"
+          }, { active: true, overlay: true });
+        }
+        
+        ChatMessage.create({
+          content: `<div style="background:#ffebee;border:1px solid #b71c1c;padding:8px;border-radius:3px;color:#b71c1c;">
+            <strong>💀 ${actor.name} has died.</strong>
+          </div>`
+        });
+        continue;
+      } else {
+        // Just reached Shift-0 this round
+        // DEBUG: Log the exact values being compared (if debug mode enabled)
+        if (game.settings.get("msh-faserip", "debugMode")) {
+          console.log(`🔍 FASERIP | Death check for ${actor.name}:`, {
+            curName,
+            nextName,
+            curNameType: typeof curName,
+            nextNameType: typeof nextName,
+            curNameTrimmed: curName?.trim(),
+            nextNameTrimmed: nextName?.trim(),
+            areEqual: curName === nextName,
+            bothShift0: curName === "Shift-0" && nextName === "Shift-0"
+          });
+        }
+        console.log(`⚠️ FASERIP | ${actor.name} has reached Shift-0 Endurance (will die next round if not stabilized)`);
+        ChatMessage.create({
+          content: `<div style="background:#fff3e0;border:1px solid #ff9800;padding:8px;border-radius:3px;color:#e65100;">
+            <strong>⚠️ ${actor.name} has reached Shift-0 Endurance!</strong>
+            <div style="font-size:0.9em;margin-top:4px;">Will die next round unless stabilized.</div>
+          </div>`
+        });
+      }
     }
 
     // Handle the special 200-Karma "re-FEAT on slip"
