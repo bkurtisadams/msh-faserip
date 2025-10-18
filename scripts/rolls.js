@@ -358,6 +358,22 @@ export class FaseripRolls {
       ui.notifications.error("Actor or power not found");
       return;
     }
+    
+    // Handle stunt data if present
+    const stunt = options.stunt;
+    const stuntIndex = options.stuntIndex;
+    const isStunt = !!stunt;
+    
+    // Use stunt's rank/value if this is a stunt roll, otherwise use power's
+    const rank = isStunt ? stunt.rank : power.system.rank;
+    const value = isStunt ? stunt.value : power.system.value;
+    const displayName = isStunt ? `${stunt.name} (Stunt)` : power.name;
+    
+    // Check if stunt is mastered (used successfully 3+ times)
+    const isMastered = isStunt && stunt.timesUsed >= 3;
+    
+    console.log(`Power ${isStunt ? 'Stunt' : ''} Check - Available Lifetime Karma: ${actor.system.karma.lifetime}, Mastered: ${isMastered}`);
+    
 
     // Define action types and results based on color
     const ACTIONS = {

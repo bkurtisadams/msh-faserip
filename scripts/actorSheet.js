@@ -2,6 +2,7 @@
 import { prepareActiveEffectCategories, onManageActiveEffect } from "../helpers/effects.mjs";
 import { getItemMaterialRank, getBluntNextRankMinRule } from "./gm-utils.js";
 import { ActionDispatcher } from "./modules/actions/action-dispatcher.js";
+import { StuntRoller } from './stunts.js';
 
 
 function getPopularityRankWithRange(value, context) {
@@ -3026,110 +3027,13 @@ html.find('.headquarters-row').each((i, row) => {
       }).render(true);
     });
 
-    // Stunts Tab - Roll stunt
+    // Stunts Tab
+    // Roll Power Stunt
     html.find('.roll-stunt-tab').click(async ev => {
       ev.preventDefault();
-      
-      const stuntIndex = parseInt(ev.currentTarget.dataset.stuntIndex);
-      const stunt = this.actor.system.stunts[stuntIndex];
-      
-      if (!stunt) {
-        return ui.notifications.warn("Stunt not found!");
-      }
-      
-      // Determine required FEAT color
-      const times = stunt.timesUsed || 0;
-      let requiredColor = "Any Color";
-      let mastered = false;
-      
-      if (times < 1) {
-        requiredColor = "Red FEAT";
-      } else if (times < 4) {
-        requiredColor = "Yellow FEAT";
-      } else if (times < 10) {
-        requiredColor = "Green FEAT";
-      } else {
-        requiredColor = "Mastered";
-        mastered = true;
-      }
-      
-      // Get LIFETIME karma (not daily karma) - Power stunts always use lifetime karma
-      const lifetimeKarma = this.actor.availableKarma || this.actor.system.karma?.availableLifetime || 0;
-      
-      console.log(`Power Stunt Check - Available Lifetime Karma: ${lifetimeKarma}, Mastered: ${mastered}`);
-      
-      // Check and spend karma if needed
-      let karmaSpent = 0;
-      if (!mastered) {
-        if (lifetimeKarma >= 100) {
-          // Spend the karma
-          karmaSpent = 100;
-          
-          // Add to karma history (this will automatically recalculate available karma)
-          const history = foundry.utils.deepClone(this.actor.system.karma?.history || []);
-          history.push({
-            realDate: new Date().toLocaleDateString(),
-            gameDate: "",
-            amount: -100,
-            type: "Power Stunt",
-            description: `Power Stunt: ${stunt.name}`
-          });
-          
-          await this.actor.update({
-            "system.karma.history": history
-          });
-          
-          // The actor's prepareData will recalculate availableLifetime and display values
-        } else {
-          ui.notifications.warn(`Need 100 Lifetime Karma for this stunt. You have ${lifetimeKarma} available.`);
-          return; // Don't proceed with the roll if insufficient karma
-        }
-      }
-      
-      // Create a fake power item for rolling
-      const fakePower = {
-        name: stunt.name,
-        system: {
-          rank: stunt.rank,
-          value: stunt.value
-        }
-      };
-      
-      // Roll the power
-      await game.msh.rollPower(this.actor, fakePower);
-      
-      // Show stunt info in chat
-      const content = `
-        <div class="msh-stunt-info">
-          <h3>Power Stunt: ${stunt.name}</h3>
-          ${stunt.parentPower ? `<p><em>Stunt of: ${stunt.parentPower}</em></p>` : ''}
-          <p><strong>Required:</strong> ${requiredColor}</p>
-          <p><strong>Times Used:</strong> ${times}/10</p>
-          ${karmaSpent > 0 ? `<p><strong>Lifetime Karma Spent:</strong> ${karmaSpent}</p>` : ''}
-          ${mastered ? '<p style="color: green;"><strong>MASTERED - No Karma Cost</strong></p>' : ''}
-        </div>
-      `;
-      
-      await ChatMessage.create({
-        user: game.user.id,
-        speaker: ChatMessage.getSpeaker({ actor: this.actor }),
-        content: content
-      });
-      
-      // Ask if they want to increase practice counter
-      if (!mastered && times < 10) {
-        const increase = await Dialog.confirm({
-          title: "Increase Practice?",
-          content: `<p>Did the stunt succeed (met the ${requiredColor} requirement)?</p><p>Click Yes to increase practice counter.</p>`
-        });
-        
-        if (increase) {
-          await this.actor.update({
-            [`system.stunts.${stuntIndex}.timesUsed`]: times + 1
-          });
-          ui.notifications.info(`Practice increased to ${times + 1}/10`);
-        }
-      }
+      const stuntIndex = parseInt($(ev.currentTarget).data('stunt-index'));
+      const roller = new StuntRoller(this.actor);
+      await roller.rollStunt(stuntIndex);
     });
 
     // Stunts Tab - Edit stunt
@@ -3306,46 +3210,64 @@ html.find('.headquarters-row').each((i, row) => {
     }
 
     // Show stunt description in chat
-    html.find('.show-stunt-description').click(async (ev) => {
+    html.find('.show-stunt-description').click(async ev => {
       ev.preventDefault();
-      ev.stopPropagation();
-
-      const stuntIndex = Number(ev.currentTarget.dataset.stuntIndex);
-      const actor = this.actor;
-      const stunt = actor?.system?.stunts?.[stuntIndex];
-      if (!stunt) return ui.notifications.warn("Stunt not found!");
-
-      // Difficulty badge
-      const difficultyClass =
-        stunt.timesUsed < 1  ? "difficulty-red"      :
-        stunt.timesUsed < 4  ? "difficulty-yellow"   :
-        stunt.timesUsed < 10 ? "difficulty-green"    :
-                              "difficulty-mastered";
-
-      const difficultyText =
-        stunt.timesUsed < 1  ? "Red FEAT"    :
-        stunt.timesUsed < 4  ? "Yellow FEAT" :
-        stunt.timesUsed < 10 ? "Green FEAT"  : "Mastered";
-
-      const chatContent = `
-        <div class="msh-stunt-card">
-          <h3 class="stunt-title">${stunt.name}</h3>
-          ${stunt.parentPower ? `<div class="stunt-parent-power"><em>Power Stunt of: ${stunt.parentPower}</em></div>` : ""}
-          <div class="stunt-stats">
-            <span><strong>Rank:</strong> ${stunt.rank} (${stunt.value})</span>
-            <span><strong>Difficulty:</strong> <span class="difficulty-badge ${difficultyClass}">${difficultyText}</span></span>
-            <span><strong>Times Used:</strong> ${stunt.timesUsed}</span>
+      const stuntIndex = parseInt($(ev.currentTarget).data('stunt-index'));
+      const stunt = this.actor.system.stunts[stuntIndex];
+      
+      if (!stunt) return;
+      
+      // Determine difficulty color
+      let difficultyColor, difficultyText;
+      if (stunt.timesUsed === 0) {
+        difficultyColor = '#F44336';
+        difficultyText = 'Red FEAT';
+      } else if (stunt.timesUsed <= 3) {
+        difficultyColor = '#FFC107';
+        difficultyText = 'Yellow FEAT';
+      } else if (stunt.timesUsed < 10) {
+        difficultyColor = '#4CAF50';
+        difficultyText = 'Green FEAT';
+      } else {
+        difficultyColor = '#2196F3';
+        difficultyText = 'Mastered';
+      }
+      
+      const cardHtml = `
+        <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
+          <div style="padding:5px 10px;border-bottom:1px solid #c0c0c0;font-size:1.1em;color:#8b0000;">
+            <strong>${this.actor.name} — Power Stunt</strong>
           </div>
-          ${stunt.description
-            ? `<div class="stunt-description-content"><strong>Description:</strong><br/>${stunt.description}</div>`
-            : `<div class="stunt-description-content"><em>No description provided.</em></div>`}
+          
+          <div style="padding:5px 10px;border-bottom:1px solid #e0e0e0;font-size:.9em;">
+            <div><strong>Stunt:</strong> ${stunt.name}</div>
+            ${stunt.parentPower ? `<div><strong>Parent Power:</strong> ${stunt.parentPower}</div>` : ''}
+          </div>
+
+          <div style="padding:5px 10px;font-size:.9em;">
+            <div>Rank: ${stunt.rank} (${stunt.value})</div>
+            <div>Difficulty: <span style="color:${difficultyColor};font-weight:bold;">${difficultyText}</span></div>
+            <div>Times Used: ${stunt.timesUsed}</div>
+            ${stunt.timesUsed < 10 ? `<div style="color:#666;font-size:.85em;">${10 - stunt.timesUsed} more success${10 - stunt.timesUsed === 1 ? '' : 'es'} until mastered</div>` : ''}
+          </div>
+
+          ${stunt.description ? `
+            <div style="padding:6px 10px;margin:6px 10px;background:#e3f2fd;border:1px solid #2196F3;border-radius:3px;">
+              <div style="font-weight:bold;color:#0d47a1;">Description</div>
+              <div style="font-size:.9em;">${stunt.description}</div>
+            </div>
+          ` : `
+            <div style="padding:6px 10px;margin:6px 10px;background:#f5f5f5;border:1px solid #ccc;border-radius:3px;">
+              <div style="font-size:.9em;color:#666;font-style:italic;">No description provided</div>
+            </div>
+          `}
         </div>
       `;
-
+      
       await ChatMessage.create({
         user: game.user.id,
-        speaker: ChatMessage.getSpeaker({ actor }),
-        content: chatContent
+        speaker: ChatMessage.getSpeaker({ actor: this.actor }),
+        content: cardHtml
       });
     });
 

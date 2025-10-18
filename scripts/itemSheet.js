@@ -455,7 +455,13 @@ export class FaseripItemSheet extends ItemSheet {
                 return;
               }
               
-              const stunts = foundry.utils.deepClone(actor.system.stunts || []);
+              let existingStunts = actor.system.stunts || [];
+              // Convert to array if it's an object
+              if (!Array.isArray(existingStunts)) {
+                existingStunts = Object.values(existingStunts).filter(s => s); // Filter out any null/undefined
+              }
+              const stunts = foundry.utils.deepClone(existingStunts);
+              
               stunts.push({
                 name: name,
                 parentPower: power.name, // ← Link to parent power
