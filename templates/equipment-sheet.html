@@ -112,16 +112,16 @@
         </div>
   
         <div class="form-group">
-          <label>Ammunition Type:</label>
-          <select name="system.ammoType">
-            <option value="Standard" {{#if (eq system.ammoType "Standard")}}selected{{/if}}>Standard</option>
-            <option value="Mercy" {{#if (eq system.ammoType "Mercy")}}selected{{/if}}>Mercy Shot</option>
-            <option value="AP" {{#if (eq system.ammoType "AP")}}selected{{/if}}>Armor Piercing (AP)</option>
-            <option value="Rubber" {{#if (eq system.ammoType "Rubber")}}selected{{/if}}>Rubber Shot</option>
-            <option value="Explosive" {{#if (eq system.ammoType "Explosive")}}selected{{/if}}>Explosive Shot</option>
-            <option value="Canister" {{#if (eq system.ammoType "Canister")}}selected{{/if}}>Canister Shot</option>
-            <option value="Heat-Seeker" {{#if (eq system.ammoType "Heat-Seeker")}}selected{{/if}}>Heat-Seeker</option>
-            <option value="Power Pack" {{#if (eq system.ammoType "Power Pack")}}selected{{/if}}>Power Pack</option>
+          <label>Default Weapon Variant <span style="font-size:0.9em; color:#666;">(can be changed during roll)</span>:</label>
+          <select name="system.variantType">
+            <option value="standard" {{#if (eq system.variantType "standard")}}selected{{/if}}>Standard</option>
+            <option value="ap" {{#if (eq system.variantType "ap")}}selected{{/if}}>Armor Piercing</option>
+            <option value="mercy" {{#if (eq system.variantType "mercy")}}selected{{/if}}>Mercy/Non-Lethal</option>
+            <option value="rubber" {{#if (eq system.variantType "rubber")}}selected{{/if}}>Blunted/Rubber</option>
+            <option value="explosive" {{#if (eq system.variantType "explosive")}}selected{{/if}}>Explosive/Enhanced</option>
+            <option value="canister" {{#if (eq system.variantType "canister")}}selected{{/if}}>Canister Shot</option>
+            <option value="heatSeeker" {{#if (eq system.variantType "heatSeeker")}}selected{{/if}}>Heat-Seeker</option>
+            <option value="powerPack" {{#if (eq system.variantType "powerPack")}}selected{{/if}}>Power Pack</option>
           </select>
         </div>
 
@@ -180,6 +180,92 @@
           <div class="form-group half">
             <label>Duration:</label>
             <input type="text" name="system.continuingDamageRounds" value="{{system.continuingDamageRounds}}" placeholder="e.g., 5 or 1d10" />
+          </div>
+        </div>
+
+        <!-- Attack Modes Section -->
+        <div class="specialized-section">
+          <div class="section-header collapsible" data-section="attack-modes">
+            <h3>Attack Modes <span style="font-size:0.8em; color:#666;">(for multi-mode weapons)</span></h3>
+            <i class="fas fa-chevron-down"></i>
+          </div>
+          <div class="attack-modes-section section-content" style="display: none;">
+            <p class="hint">Define multiple ways to attack with this weapon (e.g., Spear: Thrust/Shaft Strike)</p>
+            
+            <button type="button" class="add-attack-mode" style="margin-bottom:8px;">
+              <i class="fas fa-plus"></i> Add Attack Mode
+            </button>
+            
+            <div class="attack-modes-list">
+              {{#each system.attackModes as |mode i|}}
+              <div class="attack-mode" style="border:1px solid #ccc; padding:8px; margin-bottom:8px; border-radius:4px; background:#fafafa;">
+                <!-- Mode Name Row -->
+                <div class="form-group" style="margin-bottom:8px;">
+                  <label style="display:block; margin-bottom:4px; font-weight:bold;">Mode Name:</label>
+                  <div style="display:grid; grid-template-columns: 1fr auto; gap:8px; align-items:center;">
+                    <input type="text" name="system.attackModes.{{i}}.name" 
+                          value="{{mode.name}}" placeholder="Mode Name (e.g., Thrust)"/>
+                    <button type="button" class="remove-attack-mode" data-index="{{i}}" 
+                            title="Delete Mode"
+                            style="background:#dc3545; color:white; border:none; padding:8px 12px; border-radius:3px; cursor:pointer; min-width:80px;">
+                      <i class="fas fa-trash"></i>
+                    </button>
+                  </div>
+                </div>
+                
+                <div class="form-row">
+                  <div class="form-group half">
+                    <label>Action Type:</label>
+                    <select name="system.attackModes.{{i}}.actionType">
+                      <option value="blunt-attack" {{#if (eq mode.actionType "blunt-attack")}}selected{{/if}}>Blunt Attack (BA)</option>
+                      <option value="edged-attack" {{#if (eq mode.actionType "edged-attack")}}selected{{/if}}>Edged Attack (EA)</option>
+                      <option value="shooting" {{#if (eq mode.actionType "shooting")}}selected{{/if}}>Shooting (Sh)</option>
+                      <option value="throwing-edged" {{#if (eq mode.actionType "throwing-edged")}}selected{{/if}}>Throwing Edged (TE)</option>
+                      <option value="throwing-blunt" {{#if (eq mode.actionType "throwing-blunt")}}selected{{/if}}>Throwing Blunt (TB)</option>
+                      <option value="energy" {{#if (eq mode.actionType "energy")}}selected{{/if}}>Energy (En)</option>
+                      <option value="force" {{#if (eq mode.actionType "force")}}selected{{/if}}>Force (Fo)</option>
+                      <option value="grappling" {{#if (eq mode.actionType "grappling")}}selected{{/if}}>Grappling (Gp)</option>
+                    </select>
+                  </div>
+                  
+                  <div class="form-group half">
+                    <label>Damage Type:</label>
+                    <select name="system.attackModes.{{i}}.damageType">
+                      <option value="BA" {{#if (eq mode.damageType "BA")}}selected{{/if}}>BA (Blunt)</option>
+                      <option value="EA" {{#if (eq mode.damageType "EA")}}selected{{/if}}>EA (Edged)</option>
+                      <option value="S" {{#if (eq mode.damageType "S")}}selected{{/if}}>S (Shooting)</option>
+                      <option value="E" {{#if (eq mode.damageType "E")}}selected{{/if}}>E (Energy)</option>
+                      <option value="F" {{#if (eq mode.damageType "F")}}selected{{/if}}>F (Force)</option>
+                      <option value="TE" {{#if (eq mode.damageType "TE")}}selected{{/if}}>TE (Throwing Edged)</option>
+                      <option value="TB" {{#if (eq mode.damageType "TB")}}selected{{/if}}>TB (Throwing Blunt)</option>
+                    </select>
+                  </div>
+                </div>
+                
+                <div class="form-row">
+                  <div class="form-group half">
+                    <label>Damage:</label>
+                    <input type="number" name="system.attackModes.{{i}}.damage" 
+                          value="{{mode.damage}}" placeholder="10"/>
+                  </div>
+                  <div class="form-group half">
+                    <label>Ability:</label>
+                    <select name="system.attackModes.{{i}}.ability">
+                      <option value="fighting" {{#if (eq mode.ability "fighting")}}selected{{/if}}>Fighting</option>
+                      <option value="agility" {{#if (eq mode.ability "agility")}}selected{{/if}}>Agility</option>
+                      <option value="strength" {{#if (eq mode.ability "strength")}}selected{{/if}}>Strength</option>
+                    </select>
+                  </div>
+                </div>
+                
+                <div class="form-group">
+                  <label>Description:</label>
+                  <input type="text" name="system.attackModes.{{i}}.description" 
+                        value="{{mode.description}}" placeholder="e.g., Thrust with the spearhead"/>
+                </div>
+              </div>
+              {{/each}}
+            </div>
           </div>
         </div>
 
@@ -348,12 +434,12 @@
         <!-- Special Ammunition -->
         <div class="specialized-section">
           <div class="section-header collapsible" data-section="ammo-fields">
-            <h3>Special Ammunition</h3>
-            <i class="fas fa-chevron-down"></i>
-          </div>
-          <div class="ammo-fields section-content" style="display: none;">
-            <div class="form-group">
-              <label>Available Ammunition Types:</label>
+              <h3>Available Weapon Variants</h3>
+              <i class="fas fa-chevron-down"></i>
+            </div>
+            <div class="ammo-fields section-content" style="display: none;">
+              <div class="form-group">
+                <label>Check which variants this weapon can use (unchecked = all available):</label>
               <div class="ammo-types-grid">
                 <div class="ammo-type-item">
                   <input type="checkbox" name="system.specialAmmo.mercy" {{checked system.specialAmmo.mercy}}/>

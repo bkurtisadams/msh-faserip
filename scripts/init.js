@@ -58,6 +58,22 @@ Hooks.once("init", async () => {
 
   CONFIG.FASERIP = CONFIG.FASERIP || {};
 
+  game.settings.register("msh-faserip", "combatMode", {
+    name: "Combat Mode",
+    hint: "Choose between Classic (automated) and Refactor (manual control).",
+    scope: "world",
+    config: true,
+    type: String,
+    choices: { classic: "Classic (Automated)", refactor: "Refactor (Manual)" },
+    default: "classic"
+  });
+
+  // Helper: resolve mode (per-actor flag > world)
+  game.msh.getCombatModeFor = function(actor) {
+    const actorPref = actor?.getFlag?.("msh-faserip", "combatModeOverride");
+    return actorPref || game.settings.get("msh-faserip", "combatMode") || "classic";
+  };
+
   // Four-Color: no death save at 0 Health, unless a 'Kill' action type used.
   game.settings.register('msh-faserip', 'fourColorRule', {
     name: "Four-Color Rule (Non-lethal 0 Health)",

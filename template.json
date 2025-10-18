@@ -226,8 +226,27 @@
       "rate": "1",
       "shots": "",
       "shotsRemaining": "",
-      "ammoType": "Standard",
-      "specialAmmo": [],
+      "variantType": "standard",
+      "specialAmmo": {
+        "mercy": false,
+        "ap": false,
+        "rubber": false,
+        "explosive": false,
+        "canister": false,
+        "heatSeeker": false
+      },
+
+      "attackModes": [
+        {
+          "name": "Thrust",
+          "actionType": "edged-attack",
+          "damageType": "EA",
+          "damage": 10,
+          "ability": "fighting",
+          "description": "",
+          "allowedVariants": ["standard", "ap"]
+        }
+      ],
 
       "burstScatter": "none",
       "stunIntensity": "",
