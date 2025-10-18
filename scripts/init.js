@@ -852,6 +852,15 @@ Hooks.once("ready", async () => {
   } catch (e) {
     console.warn("MSH FASERIP | Failed to install chat hooks:", e);
   }
+
+  // Auto-open Action HUD
+  try {
+    ui.faseripHUD = new FaseripActionHUD();
+    ui.faseripHUD.render(true);
+    console.log("MSH FASERIP | Action HUD auto-opened");
+  } catch (e) {
+    console.warn("MSH FASERIP | Failed to auto-open Action HUD:", e);
+  }
 });
 
 // Each turn, decrement Endurance one printed rank for actors who are Dying (RAW)

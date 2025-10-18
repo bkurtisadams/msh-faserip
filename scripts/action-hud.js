@@ -48,11 +48,17 @@ function applyLayout(actions, order) {
 }
 
 export class FaseripActionHUD extends Application {
-  static get defaultOptions() {
+    static get defaultOptions() {
+    const savedPos = game.user?.getFlag("msh-faserip", "faserip-action-hud.position") || {};
+    
     return foundry.utils.mergeObject(super.defaultOptions, {
+      id: "faserip-action-hud",
       classes:["faserip-action-hud","faserip-action-hud--responsive"],
       popOut:true, resizable:true, minimizable:true,
-      width: 262, height: 210,
+      width: savedPos.width || 262,
+      height: savedPos.height || 210,
+      left: savedPos.left || 100,
+      top: savedPos.top || 100,
       title:"Action HUD", template:null
     });
   }
@@ -63,6 +69,27 @@ export class FaseripActionHUD extends Application {
     this.editMode = false;
     this.actions = applyLayout(ACTIONS, loadLayout());
     this.gridEl = null;
+  }
+
+  async setPosition(options = {}) {
+    const position = await super.setPosition(options);
+    
+    // Save the position after any change
+    if (this.options.id) {
+      await this.savePosition();
+    }
+    
+    return position;
+  }
+
+  async savePosition() {
+    const position = this.position;
+    await game.user.setFlag("msh-faserip", `${this.options.id}.position`, {
+      width: position.width,
+      height: position.height,
+      left: position.left,
+      top: position.top
+    });
   }
 
   get actor(){ return canvas.tokens?.controlled[0]?.actor || null; }
