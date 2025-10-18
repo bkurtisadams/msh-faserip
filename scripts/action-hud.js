@@ -117,16 +117,19 @@ export class FaseripActionHUD extends Application {
         gap:3px; flex:1; align-content:start;
       }
       .hud-btn{
-        padding:4px 2px; font-size:10px; font-weight:600; line-height:1.1;
+        padding:clamp(4px, 1.2vw, 5px) clamp(2px, 0.6vw, 3px);
+        font-size:clamp(10px, 2.5vw, 13px);
+        font-weight:600; line-height:1.1;
         border:1px solid rgba(0,0,0,0.3); border-radius:3px; cursor:pointer; text-align:center;
         white-space:nowrap; overflow:hidden; text-overflow:ellipsis; text-shadow:0 1px 2px rgba(0,0,0,0.4);
-        transition: all .12s ease; box-shadow:0 1px 3px rgba(0,0,0,0.2); min-height:32px;
+        transition: all .12s ease; box-shadow:0 1px 3px rgba(0,0,0,0.2); 
+        min-height:clamp(32px, 8vw, 42px);
         display:flex; flex-direction:column; justify-content:center; align-items:center; gap:1px;
       }
       .hud-btn:hover{ filter:brightness(1.5); transform:translateY(-2px); box-shadow:0 4px 8px rgba(0,0,0,0.4); }
       .hud-btn:active{ transform:translateY(0); box-shadow:0 1px 2px rgba(0,0,0,0.2); }
-      .btn-label{ font-size:11px; font-weight:bold; letter-spacing:.3px; }
-      .btn-name{ font-size:8px; font-weight:500; opacity:.9; }
+      .btn-label{ font-size:clamp(11px, 2.8vw, 14px); font-weight:bold; letter-spacing:.3px; }
+      .btn-name{ font-size:clamp(8px, 2vw, 10px); font-weight:500; opacity:.9; }
 
       .editing .hud-btn{ cursor:move; }
       .hud-btn.dragging{ opacity:.6; transform:scale(0.98); }
