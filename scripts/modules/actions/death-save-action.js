@@ -117,12 +117,21 @@ export class DeathSaveAction extends BaseAction {
 
     // Determine if dying or just stunned
     const isDying = (colorLower === 'white' || colorLower === 'green');
-    
+
+    console.log("=== Death Save Result ===");
+    console.log("Color:", colorLower);
+    console.log("Is Dying:", isDying);
+    console.log("Unconscious Duration:", unconsciousDuration);
+
     // Create appropriate effect
     if (isDying) {
+      console.log("Calling _createDyingEffect...");
       await this._createDyingEffect(actor, endurance, unconsciousDuration);
+      console.log("_createDyingEffect complete");
     } else {
+      console.log("Calling _createStunnedEffect...");
       await this._createStunnedEffect(actor, unconsciousDuration);
+      console.log("_createStunnedEffect complete");
     }
 
     // Build chat card
@@ -190,30 +199,36 @@ export class DeathSaveAction extends BaseAction {
   }
 
   async _createDyingEffect(actor, endurance, unconsciousDuration) {
-    const effectData = {
-        name: `Dying (${endurance.rank} → ?)`,
-        icon: "icons/svg/skull.svg",
-        origin: actor.uuid,
-        disabled: false,
-        duration: {
-        rounds: 999, // Long duration until manually removed
-        startRound: game.combat?.round || 0
-        },
-        flags: {
-        "msh-faserip": {
-            isDying: true,
-            originalEndRank: endurance.rank,
-            originalEndValue: endurance.value,
-            currentTempRank: endurance.rank,
-            turnsElapsed: 0,
-            unconsciousDuration: unconsciousDuration
-        }
-        }
-    };
-
-    await actor.createEmbeddedDocuments('ActiveEffect', [effectData]);
-    ui.notifications.info(`Dying effect created for ${actor.name}. Edit effect to track progression.`);
+  const secondsPerTurn = 6;
+  
+  // Calculate turns until death
+  // They die when they go BELOW Shift 0, so it's their current rank index + 1
+  const currentRankIndex = RANKS.indexOf(endurance.rank);
+  const turnsUntilDeath = currentRankIndex + 1; // +1 for the turn that takes them BELOW Shift 0
+  
+  const dyingEffect = {
+    name: `Dying (${endurance.rank} → Dead in ${turnsUntilDeath} turns)`,
+    icon: "icons/svg/skull.svg",
+    origin: actor.uuid,
+    disabled: false,
+    duration: {
+      seconds: turnsUntilDeath * secondsPerTurn,
+      startTime: game.time?.worldTime || 0
+    },
+    flags: {
+      "msh-faserip": {
+        isDying: true,
+        originalEndRank: endurance.rank,
+        originalEndValue: endurance.value,
+        unitLabel: "turn",
+        unitLabelPlural: "turns"
+      }
     }
+  };
+
+  await actor.createEmbeddedDocuments('ActiveEffect', [dyingEffect]);
+  ui.notifications.warn(`${actor.name} is DYING! Loses 1 Endurance rank per turn. Dead in ${turnsUntilDeath} turns!`);
+}
 
   async _createStunnedEffect(actor, duration) {
     const effectData = {
