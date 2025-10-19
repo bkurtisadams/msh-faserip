@@ -690,21 +690,16 @@ export async function applyDamageToTargets(damage, options = {}) {
 
   // Check for targeted tokens first, then fall back to controlled tokens (for GM)
   let targets = Array.from(game.user.targets);
-  
+    
   if (targets.length === 0) {
-    // If no targets, check for controlled tokens (GM workflow)
-    targets = canvas.tokens?.controlled || [];
-    
-    if (targets.length === 0) {
-      if (showNotification) {
-        ui.notifications.warn("No targets selected. Please target or select at least one token.");
-      }
-      return [];
+    // Allow the roll to happen, but skip damage application
+    if (showNotification) {
+      ui.notifications.info("No targets selected. Roll made but no damage applied.");
     }
-    
-    console.log(`FASERIP | Using ${targets.length} controlled token(s) as targets (GM mode)`);
+    return []; // Return empty array - damage won't be applied
   }
 
+  console.log(`FASERIP | Using ${targets.length} targeted token(s)`);
   const results = [];
 
   // Apply damage to each target
