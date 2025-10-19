@@ -1380,24 +1380,95 @@ async function createUniversalTableMacro(data, slot) {
   return true;
 }
 
+// Generate colored action button icon matching HUD appearance
+function generateActionIcon(actionCode, label, bgColor, fgColor) {
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = 128;
+    canvas.height = 128;
+    const ctx = canvas.getContext('2d');
+    
+    // Background
+    ctx.fillStyle = bgColor;
+    ctx.fillRect(8, 8, 112, 112);
+    
+    // Border
+    ctx.strokeStyle = 'rgba(0,0,0,0.4)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(8, 8, 112, 112);
+    
+    // Label text
+    ctx.fillStyle = fgColor;
+    ctx.font = 'bold 48px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(label, 64, 64);
+    
+    return canvas.toDataURL('image/png');
+  } catch (err) {
+    console.warn("Icon generation failed:", err);
+    return "icons/svg/combat.svg"; // Fallback
+  }
+}
+
 async function createUniversalActionMacro(data, slot) {
-  const { actionCode, actionName, actorId, actorName } = data;
+  const { actionCode, actionName, actorId, actorName, iconName } = data;
   
-  const command = `const actor = game.user.character || canvas.tokens.controlled[0]?.actor || game.actors.get("${actorId}");
-if (!actor) return ui.notifications.warn("Select a token first.");
-game.msh.rollUniversalAction("${actionCode}", actor.id, 0, 0);`;
+  const command = `// Universal Action Macro
+const actor = game.user.character || canvas.tokens.controlled[0]?.actor || game.actors.get("${actorId}");
+if (!actor) {
+  return ui.notifications.warn("Select a token or assign a character first.");
+}
+
+const savedCS = actor.getFlag("msh-faserip", "cs_${actionCode}") || 0;
+const savedKarma = actor.getFlag("msh-faserip", "karma_${actionCode}") || 0;
+
+game.msh.rollUniversalAction("${actionCode}", actor.id, savedCS, savedKarma);`;
 
   const macroName = `${actionName} (${actorName})`;
-  let macro = game.macros.find(m => m.name === macroName);
+  let macro = game.macros.find(m => m.name === macroName && m.command === command);
   
   if (!macro) {
+    // Define action colors here
+    const ACTIONS = [
+      { id:"blunt-attack",   label:"BA",  color:"#FF6B00", textColor:"#FFF" },
+      { id:"edged-attack",   label:"EA",  color:"#DC143C", textColor:"#FFF" },
+      { id:"shooting",       label:"Sh",  color:"#8B0000", textColor:"#FFF" },
+      { id:"throwing-edged", label:"TE",  color:"#DC143C", textColor:"#FFF" },
+      { id:"throwing-blunt", label:"TB",  color:"#FF8C00", textColor:"#000" },
+      { id:"energy",         label:"En",  color:"#8B0000", textColor:"#FFF" },
+      { id:"force",          label:"Fo",  color:"#FF6B00", textColor:"#FFF" },
+      { id:"grappling",      label:"Gp",  color:"#1E90FF", textColor:"#FFF" },
+      { id:"grabbing",       label:"Gb",  color:"#4169E1", textColor:"#FFF" },
+      { id:"escaping",       label:"Es",  color:"#4682B4", textColor:"#FFF" },
+      { id:"charging",       label:"Ch",  color:"#FF8C00", textColor:"#000" },
+      { id:"dodging",        label:"Do",  color:"#32CD32", textColor:"#000" },
+      { id:"evading",        label:"Ev",  color:"#228B22", textColor:"#FFF" },
+      { id:"blocking",       label:"Bl",  color:"#228B22", textColor:"#FFF" },
+      { id:"catching",       label:"Ca",  color:"#32CD32", textColor:"#000" },
+      { id:"stun",           label:"St",  color:"#9932CC", textColor:"#FFF" },
+      { id:"slam",           label:"Sl",  color:"#9932CC", textColor:"#FFF" },
+      { id:"kill",           label:"Kl",  color:"#8B008B", textColor:"#FFF" }
+    ];
+    
+    const actionDef = ACTIONS.find(a => a.id === actionCode);
+    console.log("🎨 About to generate icon for:", actionCode, actionDef);
+    
+    const img = actionDef 
+      ? generateActionIcon(actionCode, actionDef.label, actionDef.color, actionDef.textColor)
+      : "icons/svg/combat.svg";
+    
+    console.log("🎨 Generated img:", img?.substring(0, 50));
+    
     macro = await Macro.create({
       name: macroName,
       type: "script",
       command: command,
-      img: "icons/svg/combat.svg"
+      img: img,
+      flags: {"faserip.universalActionMacro": true}
     });
   }
   
   game.user.assignHotbarMacro(macro, slot);
+  return true;
 }
