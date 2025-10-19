@@ -877,6 +877,43 @@ Hooks.once("ready", async () => {
   } catch (e) {
     console.warn("MSH FASERIP | Failed to auto-open Action HUD:", e);
   }
+
+});
+
+// Capture old health value before update
+Hooks.on('preUpdateActor', (actor, updateData, options, userId) => {
+  const newHealth = updateData.system?.attributes?.health?.value;
+  if (newHealth === undefined) return;
+  
+  const oldHealth = actor.system.attributes.health.value;
+  
+  options.healthChange = {
+    old: oldHealth,
+    new: newHealth
+  };
+});
+
+// Process damage and start timers
+Hooks.on('updateActor', async (actor, updateData, options, userId) => {
+  if (!options.healthChange) return;
+  
+  const { old: oldHealth, new: newHealth } = options.healthChange;
+  
+  // Only process damage
+  if (newHealth >= oldHealth) return;
+  
+  console.log("FASERIP | DAMAGE DETECTED", {
+    actor: actor.name,
+    damage: oldHealth - newHealth
+  });
+  
+  const manager = game.msh?.faseripIntegration?.recoveryManager;
+  if (!manager) {
+    console.error("FASERIP | No recovery manager found!");
+    return;
+  }
+  
+  await manager.handleDamage(actor, oldHealth, newHealth);
 });
 
 // Each turn, decrement Endurance one printed rank for actors who are Dying (RAW)
@@ -1031,6 +1068,61 @@ Hooks.on("updateCombat", async (combat, changed, diff, userId) => {
     console.log("✨ FASERIP | No dying combatants found");
   } else {
     console.log(`📊 FASERIP | Processed ${dyingCount} dying combatant(s)`);
+  }
+
+  // Check for Recovery/Healing timers
+  
+  for (const combatant of combat.combatants) {
+    const actor = combatant.actor;
+    if (!actor) continue;
+    
+    // Check Recovery timers
+    const recoveryEffect = actor.effects.find(e => 
+      e.flags?.[scope]?.recoveryTimer && 
+      e.flags?.[scope]?.fallbackMode === "combat"
+    );
+    
+    if (recoveryEffect) {
+      const turnsRemaining = recoveryEffect.getFlag(scope, "turnsRemaining") || 0;
+      const newRemaining = turnsRemaining - 1;
+      
+      if (newRemaining <= 0) {
+        // Recovery complete
+        const flags = recoveryEffect.flags[scope];
+        const manager = game.msh?.faseripIntegration?.recoveryManager;
+        if (manager) {
+          await manager.completeRecovery(actor, flags);
+          await actor.deleteEmbeddedDocuments("ActiveEffect", [recoveryEffect.id]);
+        }
+      } else {
+        await recoveryEffect.setFlag(scope, "turnsRemaining", newRemaining);
+        await recoveryEffect.update({ name: `Recovery Timer (${newRemaining} turns)` });
+      }
+    }
+    
+    // Check Healing timers
+    const healingEffect = actor.effects.find(e => 
+      e.flags?.[scope]?.healingTimer && 
+      e.flags?.[scope]?.fallbackMode === "combat"
+    );
+    
+    if (healingEffect) {
+      const turnsRemaining = healingEffect.getFlag(scope, "turnsRemaining") || 0;
+      const newRemaining = turnsRemaining - 1;
+      
+      if (newRemaining <= 0) {
+        // Healing complete
+        const flags = healingEffect.flags[scope];
+        const manager = game.msh?.faseripIntegration?.recoveryManager;
+        if (manager) {
+          await manager.completeHealing(actor, flags);
+          await actor.deleteEmbeddedDocuments("ActiveEffect", [healingEffect.id]);
+        }
+      } else {
+        await healingEffect.setFlag(scope, "turnsRemaining", newRemaining);
+        await healingEffect.update({ name: `${healingEffect.name.split('(')[0].trim()} (${newRemaining} turns)` });
+      }
+    }
   }
 });
 
