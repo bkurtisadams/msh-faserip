@@ -3147,12 +3147,33 @@ html.find('.headquarters-row').each((i, row) => {
       
       // Check if CTRL key is held
       if (ev.ctrlKey) {
-        // Just show info, don't roll
         await this._showActionInfo(actionType);
       } else {
-        // Normal click: roll the action
         await this._rollAction(actionType, abilityName);
       }
+    });
+
+    // NEW: Make action buttons draggable to hotbar
+    html.find('.action-btn').each((i, btn) => {
+      btn.setAttribute('draggable', true);
+      
+      btn.addEventListener('dragstart', ev => {
+        const actionCode = btn.dataset.action;
+        const actionAbility = btn.dataset.ability;
+        const actionName = btn.querySelector('.action-name')?.textContent?.replace(/<br>/g, ' ') || actionCode;
+        
+        const dragData = {
+          type: "UniversalAction",
+          actionCode: actionCode,
+          actionName: actionName,
+          actorId: this.actor.id,
+          actorName: this.actor.name,
+          iconName: actionCode
+        };
+        
+        ev.dataTransfer.setData("text/plain", JSON.stringify(dragData));
+        console.log("📤 Character Sheet drag:", dragData);
+      });
     });
 
     // Universal Table cell click - highlight the cell

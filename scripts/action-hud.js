@@ -119,7 +119,7 @@ export class FaseripActionHUD extends Application {
     if (!root || !grid) return;
 
     root.classList.toggle("editing", this.editMode);
-    [...grid.querySelectorAll(".hud-btn")].forEach(b => { b.draggable = this.editMode; });
+    //[...grid.querySelectorAll(".hud-btn")].forEach(b => { b.draggable = this.editMode; });
 
     if (!this.editMode) {
       saveLayoutFromDOM(grid);
@@ -168,122 +168,169 @@ export class FaseripActionHUD extends Application {
   }
 
   async _render(...args){
-    await super._render(...args);
-    const root = this.element[0];
-    root.style.opacity = `${this.opacity}`;
-    this._updateTitle();
+  await super._render(...args);
+  const root = this.element[0];
+  root.style.opacity = `${this.opacity}`;
+  this._updateTitle();
 
-    const grid = root.querySelector(".hud-grid");
-    this.gridEl = grid;
+  const grid = root.querySelector(".hud-grid");
+  this.gridEl = grid;
 
-    const makeBtn = a => {
-      const el = document.createElement("button");
-      el.type="button";
-      el.className="hud-btn";
-      el.dataset.action=a.id;
-      el.dataset.ability=a.ability;
-      el.title = `${a.full} (${a.ability})`;
-      el.style.backgroundColor = a.color;
-      el.style.color = a.textColor;
-      el.innerHTML = `<span class="btn-label">${a.label}</span><span class="btn-name">${a.full.split(" ")[0]}</span>`;
-      return el;
-    };
-    grid.replaceChildren(...this.actions.map(makeBtn));
+  const makeBtn = a => {
+  const el = document.createElement("button");
+  el.type="button";
+  el.className="hud-btn";
+  el.dataset.action=a.id;
+  el.dataset.ability=a.ability;
+  el.title = `${a.full} (${a.ability})`;
+  el.style.backgroundColor = a.color;
+  el.style.color = a.textColor;
+  el.innerHTML = `<span class="btn-label">${a.label}</span><span class="btn-name">${a.full.split(" ")[0]}</span>`;
+  el.setAttribute('draggable', 'true'); // ← ADD THIS LINE
+  return el;
+};
+  
+  grid.replaceChildren(...this.actions.map(makeBtn));
+  root.classList.toggle("editing", this.editMode);
 
-    [...grid.querySelectorAll(".hud-btn")].forEach(b => { b.draggable = this.editMode; });
-    root.classList.toggle("editing", this.editMode);
-
-    let dragSrc = null;
-    grid.addEventListener("dragstart", (ev) => {
-      if (!this.editMode) return;
-      const btn = ev.target.closest(".hud-btn"); if (!btn) return;
+  let dragSrc = null;
+  
+  // ATTACH DRAGSTART DIRECTLY TO EACH BUTTON
+  grid.addEventListener("dragstart", (ev) => {
+    const btn = ev.target.closest(".hud-btn");
+    if (!btn) return;
+    
+    if (this.editMode) {
+      // EDIT MODE: Reorder buttons
       dragSrc = btn;
       btn.classList.add("dragging");
       ev.dataTransfer.effectAllowed = "move";
-    });
-    grid.addEventListener("dragend", () => {
-      const d = grid.querySelector(".dragging"); if (d) d.classList.remove("dragging");
-      [...grid.children].forEach(c => c.classList.remove("drop-indicator"));
-    });
-    grid.addEventListener("dragover", (ev) => {
-      if (!this.editMode) return;
-      ev.preventDefault();
-      const over = ev.target.closest(".hud-btn");
-      if (!over || over === dragSrc) return;
-      over.classList.add("drop-indicator");
-    });
-    grid.addEventListener("dragleave", (ev) => {
-      const over = ev.target.closest(".hud-btn");
-      if (over) over.classList.remove("drop-indicator");
-    });
-    grid.addEventListener("drop", (ev) => {
-      if (!this.editMode) return;
-      ev.preventDefault();
-      const target = ev.target.closest(".hud-btn");
-      if (!target || target === dragSrc) return;
-      target.classList.remove("drop-indicator");
-      const rect = target.getBoundingClientRect();
-      const before = (ev.clientY - rect.top) < rect.height / 2;
-      grid.insertBefore(dragSrc, before ? target : target.nextSibling);
-    });
-
-    grid.addEventListener("click", async (ev) => {
-      if (this.editMode) return;
-      const btn = ev.target.closest(".hud-btn"); if (!btn) return;
+    } else {
+      // NORMAL MODE: Drag to hotbar (same pattern as character sheet)
       const actor = this.actor;
-      if (!actor) return ui.notifications.warn("Select a token first.");
-      const actionType = btn.dataset.action;
-      const abilityName = btn.dataset.ability;
-      const sheet = actor.sheet;
-      if (sheet && typeof sheet._rollAction === "function") {
-        try { await sheet._rollAction(actionType, abilityName); }
-        catch(e){ console.error("[HUD] _rollAction error:", e); ui.notifications.error(e.message ?? "Roll failed."); }
-      } else {
-        ui.notifications.error("Open the actor sheet at least once so its methods are available.");
+      if (!actor) {
+        ui.notifications.warn("Select a token first");
+        ev.preventDefault();
+        return;
       }
-    });
+      
+      const actionCode = btn.dataset.action;
+      const actionName = btn.querySelector('.btn-name')?.textContent || btn.title;
+      
+      const dragData = {
+        type: "UniversalAction",
+        actionCode: actionCode,
+        actionName: actionName,
+        actorId: actor.id,
+        actorName: actor.name,
+        iconName: actionCode
+      };
+      
+      ev.dataTransfer.setData("text/plain", JSON.stringify(dragData));
+      console.log("📤 HUD drag:", dragData);
+    }
+  });
 
-    root.addEventListener("keydown", (ev) => {
-      if (ev.key?.toLowerCase() === "e" && !ev.shiftKey && !ev.ctrlKey && !ev.altKey) {
-        ev.preventDefault(); this.setEditMode(!this.editMode);
+  grid.addEventListener("dragend", () => {
+    const d = grid.querySelector(".dragging");
+    if (d) d.classList.remove("dragging");
+    [...grid.children].forEach(c => c.classList.remove("drop-indicator"));
+  });
+  
+  grid.addEventListener("dragover", (ev) => {
+    if (!this.editMode) return;
+    ev.preventDefault();
+    const over = ev.target.closest(".hud-btn");
+    if (!over || over === dragSrc) return;
+    over.classList.add("drop-indicator");
+  });
+  
+  grid.addEventListener("dragleave", (ev) => {
+    const over = ev.target.closest(".hud-btn");
+    if (over) over.classList.remove("drop-indicator");
+  });
+  
+  grid.addEventListener("drop", (ev) => {
+    if (!this.editMode) return;
+    ev.preventDefault();
+    const target = ev.target.closest(".hud-btn");
+    if (!target || target === dragSrc) return;
+    target.classList.remove("drop-indicator");
+    const rect = target.getBoundingClientRect();
+    const before = (ev.clientY - rect.top) < rect.height / 2;
+    grid.insertBefore(dragSrc, before ? target : target.nextSibling);
+  });
+
+  grid.addEventListener("click", async (ev) => {
+    if (this.editMode) return;
+    const btn = ev.target.closest(".hud-btn");
+    if (!btn) return;
+    const actor = this.actor;
+    if (!actor) return ui.notifications.warn("Select a token first.");
+    const actionType = btn.dataset.action;
+    const abilityName = btn.dataset.ability;
+    const sheet = actor.sheet;
+    if (sheet && typeof sheet._rollAction === "function") {
+      try {
+        await sheet._rollAction(actionType, abilityName);
+      } catch(e) {
+        console.error("[HUD] _rollAction error:", e);
+        ui.notifications.error(e.message ?? "Roll failed.");
       }
-      if (ev.key?.toLowerCase() === "r" && ev.shiftKey) {
-        ev.preventDefault(); this._confirmReset(this.gridEl, this.setEditMode.bind(this));
-      }
-    });
+    } else {
+      ui.notifications.error("Open the actor sheet at least once so its methods are available.");
+    }
+  });
 
-    root.tabIndex = -1;
-    root.focus();
+  root.addEventListener("keydown", (ev) => {
+    if (ev.key?.toLowerCase() === "e" && !ev.shiftKey && !ev.ctrlKey && !ev.altKey) {
+      ev.preventDefault();
+      this.setEditMode(!this.editMode);
+    }
+    if (ev.key?.toLowerCase() === "r" && ev.shiftKey) {
+      ev.preventDefault();
+      this._confirmReset(this.gridEl, this.setEditMode.bind(this));
+    }
+  });
 
-    this.element.find(".window-title").off("dblclick.faserip").on("dblclick.faserip", () => this.setEditMode(!this.editMode));
-  }
+  root.tabIndex = -1;
+  root.focus();
 
-  _confirmReset(grid, setEditMode){
-    Dialog.confirm({
-      title: "Reset HUD Layout",
-      content: "<p>Reset to the default button order?</p>",
-      yes: () => {
-        localStorage.removeItem(STORAGE_KEY);
-        this.actions = [...ACTIONS];
-        const makeBtn = a => {
-          const el = document.createElement("button");
-          el.type="button"; el.className="hud-btn";
-          el.dataset.action=a.id; el.dataset.ability=a.ability;
-          el.title = `${a.full} (${a.ability})`;
-          el.style.backgroundColor = a.color; el.style.color = a.textColor;
-          el.innerHTML = `<span class="btn-label">${a.label}</span><span class="btn-name">${a.full.split(" ")[0]}</span>`;
-          return el;
-        };
-        grid.replaceChildren(...this.actions.map(makeBtn));
-        setEditMode(false);
-        ui.notifications?.info("Layout reset.");
-      }
-    });
-  }
+  this.element.find(".window-title").off("dblclick.faserip").on("dblclick.faserip", () => this.setEditMode(!this.editMode));
+}
 
-  _updateTitle(){
-    const actorName = this.actor?.name ?? "No Actor Selected";
-    const t = this.element.find(".window-title");
-    if (t.length) t.text(`Action HUD - ${actorName}`);
-  }
+_confirmReset(grid, setEditMode){
+  Dialog.confirm({
+    title: "Reset HUD Layout",
+    content: "<p>Reset to the default button order?</p>",
+    yes: () => {
+      localStorage.removeItem(STORAGE_KEY);
+      this.actions = [...ACTIONS];
+      
+      const makeBtn = a => {
+        const el = document.createElement("button");
+        el.type="button";
+        el.className="hud-btn";
+        el.dataset.action=a.id;
+        el.dataset.ability=a.ability;
+        el.title = `${a.full} (${a.ability})`;
+        el.style.backgroundColor = a.color;
+        el.style.color = a.textColor;
+        el.innerHTML = `<span class="btn-label">${a.label}</span><span class="btn-name">${a.full.split(" ")[0]}</span>`;
+        el.setAttribute('draggable', 'true'); // ← ADD THIS LINE HERE TOO
+        return el;
+      };
+      
+      grid.replaceChildren(...this.actions.map(makeBtn));
+      setEditMode(false);
+      ui.notifications?.info("Layout reset.");
+    }
+  });
+}
+
+_updateTitle(){
+  const actorName = this.actor?.name ?? "No Actor Selected";
+  const t = this.element.find(".window-title");
+  if (t.length) t.text(`Action HUD - ${actorName}`);
+}
 }

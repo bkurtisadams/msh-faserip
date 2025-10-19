@@ -1269,19 +1269,19 @@ Hooks.on("deleteActiveEffect", async (effect, options, userId) => {
 });
 
 // Add the hotbarDrop hook at module level (like in the older file)
-Hooks.on('hotbarDrop', (bar, data, slot) => {
+Hooks.on('hotbarDrop', async (bar, data, slot) => {
   console.log("📦 hotbarDrop received:", data);
   
   if (data.type === "Item" && data.actorId) {
-    createFaseripItemMacro(data, slot);
+    await createFaseripItemMacro(data, slot);
     return false;
   }
   else if (data.type === "UniversalTable" && data.actorId) {
-    createUniversalTableMacro(data, slot);
+    await createUniversalTableMacro(data, slot);
     return false;
   }
   else if (data.type === "UniversalAction" && data.actionCode) {
-    createUniversalActionMacro(data, slot);
+    await createUniversalActionMacro(data, slot);
     return false;
   }
   
@@ -1381,35 +1381,23 @@ async function createUniversalTableMacro(data, slot) {
 }
 
 async function createUniversalActionMacro(data, slot) {
-  const { actionCode, actionName, actorId, actorName, iconName } = data;
+  const { actionCode, actionName, actorId, actorName } = data;
   
-  const command = `// Universal Action Macro
-const actor = game.user.character || canvas.tokens.controlled[0]?.actor || game.actors.get("${actorId}");
-if (!actor) {
-  return ui.notifications.warn("Select a token or assign a character first.");
-}
-
-const savedCS = actor.getFlag("msh-faserip", "cs_${actionCode}") || 0;
-const savedKarma = actor.getFlag("msh-faserip", "karma_${actionCode}") || 0;
-
-// Call the same function that generates multi-target options in the dialog
-game.msh.rollUniversalAction("${actionCode}", actor.id, savedCS, savedKarma);`;
+  const command = `const actor = game.user.character || canvas.tokens.controlled[0]?.actor || game.actors.get("${actorId}");
+if (!actor) return ui.notifications.warn("Select a token first.");
+game.msh.rollUniversalAction("${actionCode}", actor.id, 0, 0);`;
 
   const macroName = `${actionName} (${actorName})`;
-  let macro = game.macros.find(m => m.name === macroName && m.command === command);
+  let macro = game.macros.find(m => m.name === macroName);
   
   if (!macro) {
-    const img = `systems/msh-faserip/assets/icons/actions/${iconName}.png`;
-    
     macro = await Macro.create({
       name: macroName,
       type: "script",
       command: command,
-      img: img,
-      flags: {"faserip.universalActionMacro": true}
+      img: "icons/svg/combat.svg"
     });
   }
   
   game.user.assignHotbarMacro(macro, slot);
-  return true;
 }
