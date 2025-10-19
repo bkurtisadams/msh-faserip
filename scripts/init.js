@@ -1104,13 +1104,26 @@ Hooks.on("updateCombat", async (combat, changed, diff, userId) => {
         await actor.update({"system.details.isDead": true});
         await dyingEffect.delete();
 
-         // Apply dead status to all tokens of this actor
-        for (const token of actor.getActiveTokens()) {
-          await token.toggleEffect({
-            id: "dead",
-            label: "Dead",
-            icon: "icons/svg/skull.svg"
-          }, { active: true, overlay: true });
+        // Only affect the specific token if this is a token actor (unlinked)
+        if (actor.isToken) {
+          // This is an unlinked token - only affect this specific token
+          const token = actor.token?.object || combatant.token?.object;
+          if (token) {
+            await token.toggleEffect({
+              id: "dead",
+              label: "Dead",
+              icon: "icons/svg/skull.svg"
+            }, { active: true, overlay: true });
+          }
+        } else {
+          // This is a linked actor - affect all its tokens
+          for (const token of actor.getActiveTokens()) {
+            await token.toggleEffect({
+              id: "dead",
+              label: "Dead",
+              icon: "icons/svg/skull.svg"
+            }, { active: true, overlay: true });
+          }
         }
         
         ChatMessage.create({
