@@ -37,6 +37,24 @@ export class CheckAction extends BaseAction {
 
     // Extract prefill data from opts (passed from chat hook)
     const prefill = this.opts.prefill || {};
+    
+    // ADD THIS PERMISSION CHECK HERE (right after prefill is declared)
+    // If there's a targeted NPC, only GM can roll checks
+    if (prefill.targetUuid && !game.user.isGM) {
+      try {
+        const resolved = await fromUuid(prefill.targetUuid);
+        const targetActor = resolved?.actor || resolved;
+        
+        if (targetActor && !targetActor.isOwner) {
+          ui.notifications.warn("Only the GM can roll Stun/Slam/Kill checks for NPCs");
+          return;
+        }
+      } catch (err) {
+        console.warn("Could not resolve target for permission check:", err);
+      }
+    }
+    // END OF PERMISSION CHECK
+    
     const prefilledTargetName = prefill.targetName || "";
     const prefilledTargetEndRank = prefill.targetEndRank || "Good";
     const prefilledTargetUuid = prefill.targetUuid || "";
