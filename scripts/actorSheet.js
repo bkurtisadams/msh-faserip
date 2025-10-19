@@ -2,6 +2,7 @@
 import { prepareActiveEffectCategories, onManageActiveEffect } from "../helpers/effects.mjs";
 import { getItemMaterialRank, getBluntNextRankMinRule } from "./gm-utils.js";
 import { ActionDispatcher } from "./modules/actions/action-dispatcher.js";
+import { ACTION_INFO } from "./modules/actions/action-config.js";
 import { StuntRoller } from './stunts.js';
 
 
@@ -3144,7 +3145,14 @@ html.find('.headquarters-row').each((i, row) => {
       const actionType = button.dataset.action;
       const abilityName = button.dataset.ability;
       
-      await this._rollAction(actionType, abilityName);
+      // Check if CTRL key is held
+      if (ev.ctrlKey) {
+        // Just show info, don't roll
+        await this._showActionInfo(actionType);
+      } else {
+        // Normal click: roll the action
+        await this._rollAction(actionType, abilityName);
+      }
     });
 
     // Universal Table cell click - highlight the cell
@@ -4253,8 +4261,17 @@ _rollVehicleControl(vehicle) {
 
 async _rollAction(actionType, abilityName) {
   const actor = this.actor;
+  
+  // Get action information
+  const actionInfo = ACTION_INFO[actionType];
+  if (!actionInfo) {
+    ui.notifications.warn(`No information found for action: ${actionType}`);
+    return;
+  }
+  
   try {
-    await ActionDispatcher.roll(actionType, {
+    // Perform the roll
+    const rollResult = await ActionDispatcher.roll(actionType, {
       actor,
       abilityName,
       opts: {
@@ -4263,15 +4280,56 @@ async _rollAction(actionType, abilityName) {
         karma: 0,
         pulled: false,
         source: "hands"
-        // Later: pass dialog choices here
       }
     });
+    
+    // Create chat card with action info
+    await this._showActionInfo(actionInfo, actor, rollResult);
+    
   } catch (err) {
     console.error(err);
     ui.notifications.error(err.message ?? "Action failed.");
   }
 }
 
+  async _showActionInfo(actionType) {
+    const actionInfo = ACTION_INFO[actionType];
+    
+    if (!actionInfo) {
+      ui.notifications.warn(`No information found for action: ${actionType}`);
+      return;
+    }
+    
+    // Create simple info card
+    const content = `
+      <div class="marvel-action-info">
+        <h3 style="margin-top:0; border-bottom: 2px solid #444; padding-bottom: 8px;">
+          <strong>${actionInfo.name}</strong>
+          <span style="color: #666; font-size: 0.9em;">(${actionInfo.ability})</span>
+        </h3>
+        
+        <p style="font-style: italic; color: #555;">
+          ${actionInfo.description}
+        </p>
+        
+        <p style="margin: 8px 0;">
+          <strong>Possible Results:</strong> ${actionInfo.effects.join(', ')}
+        </p>
+        
+        <div style="background: #f5f5f5; padding: 8px; border-radius: 4px; margin-top: 8px;">
+          <strong>Details:</strong><br>
+          ${actionInfo.details}
+        </div>
+      </div>
+    `;
+    
+    await ChatMessage.create({
+      user: game.user.id,
+      speaker: ChatMessage.getSpeaker({ actor: this.actor }),
+      content,
+      type: CONST.CHAT_MESSAGE_TYPES.OTHER
+    });
+  }
 
   _getResultHoverText(actionType, color) {
     const hoverTexts = {
