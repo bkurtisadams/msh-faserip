@@ -902,18 +902,107 @@ Hooks.on('updateActor', async (actor, updateData, options, userId) => {
   // Only process damage
   if (newHealth >= oldHealth) return;
   
+  // Prevent duplicate calls within same tick
+  const damageKey = `damage-${actor.id}-${oldHealth}-${newHealth}`;
+  if (game.msh._processingDamage === damageKey) {
+    console.log("FASERIP | Skipping duplicate damage processing");
+    return;
+  }
+  game.msh._processingDamage = damageKey;
+  
   console.log("FASERIP | DAMAGE DETECTED", {
     actor: actor.name,
     damage: oldHealth - newHealth
   });
   
-  const manager = game.msh?.faseripIntegration?.recoveryManager;
-  if (!manager) {
-    console.error("FASERIP | No recovery manager found!");
-    return;
+  try {
+    const manager = game.msh?.faseripIntegration?.recoveryManager;
+    if (!manager) {
+      console.error("FASERIP | No recovery manager found!");
+      return;
+    }
+    
+    await manager.handleDamage(actor, oldHealth, newHealth);
+  } finally {
+    // Clear flag after a brief delay
+    setTimeout(() => {
+      if (game.msh._processingDamage === damageKey) {
+        delete game.msh._processingDamage;
+      }
+    }, 100);
   }
-  
-  await manager.handleDamage(actor, oldHealth, newHealth);
+});
+
+// Handle medical care toggle button in chat
+Hooks.on('renderChatMessage', (message, html) => {
+  html.find('.toggle-medical-care').click(async (event) => {
+    const button = event.currentTarget;
+    const actorId = button.dataset.actorId;
+    
+    const actor = game.actors.get(actorId);
+    if (!actor) {
+      ui.notifications.warn("Actor not found");
+      return;
+    }
+    
+    const scope = "msh-faserip";
+    const currentCare = actor.getFlag(scope, "medicalCare") || false;
+    const newCare = !currentCare;
+    
+    // Toggle the flag
+    await actor.setFlag(scope, "medicalCare", newCare);
+    
+    // Find active Healing effect
+    const healingEffect = actor.effects.find(e => e.flags?.[scope]?.healingTimer);
+    
+    if (healingEffect) {
+      const baseEndurance = healingEffect.flags[scope].baseEndurance || 
+                           actor.system.abilities?.endurance?.value || 10;
+      const newHealAmount = newCare ? baseEndurance * 2 : baseEndurance;
+      const newName = newCare ? "Healing (Medical Care)" : "Healing";
+      
+      // Update the effect
+      await healingEffect.update({
+        name: newName,
+        [`flags.${scope}.healAmount`]: newHealAmount,
+        [`flags.${scope}.medicalCare`]: newCare
+      });
+      
+      // Update the CTT tracker effect if it exists
+      const manager = game.msh?.faseripIntegration;
+      if (manager?.timeTracker) {
+        const trackerEffects = manager.timeTracker.effectsManager.getEffects();
+        const trackerEffect = trackerEffects.find(e => 
+          e.originalEffectId === healingEffect.id && 
+          e.actorId === actor.id
+        );
+        
+        if (trackerEffect) {
+          trackerEffect.notes = `Healing ${newHealAmount} HP (${newCare ? 'with' : 'without'} medical care)`;
+        }
+      }
+      
+      ui.notifications.info(`Medical care ${newCare ? 'enabled' : 'disabled'} for ${actor.name}`);
+      
+      ChatMessage.create({
+        content: `<div style="background:#e8f5e9;border:2px solid #4caf50;border-radius:5px;padding:10px;text-align:center;">
+          <p style="color:#2e7d32;margin:0;">
+            <i class="fas fa-hospital"></i> <strong>${actor.name}</strong><br>
+            Medical Care: <strong>${newCare ? 'ON' : 'OFF'}</strong><br>
+            Healing Rate: <strong>${newHealAmount} HP/hour</strong>
+          </p>
+        </div>`,
+        speaker: ChatMessage.getSpeaker({ actor })
+      });
+      
+      // Disable the button to prevent spam
+      $(button).prop('disabled', true)
+               .css('opacity', '0.6')
+               .html('<i class="fas fa-check"></i> Updated!');
+    } else {
+      ui.notifications.warn("No active Healing timer found");
+    }
+  });
 });
 
 // Each turn, decrement Endurance one printed rank for actors who are Dying (RAW)
