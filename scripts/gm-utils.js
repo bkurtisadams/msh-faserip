@@ -115,6 +115,7 @@ export async function executeAsGM(action, payload) {
       case "adjustTargetHealth": return await adjustTargetHealth(payload);
       case "createActorEffect":  return await createActorEffect(payload);
       case "createEmbeddedDocsOnActor": return await createEmbeddedDocsOnActor(payload);
+      case "manageRecoveryEffect": return await manageRecoveryEffect(payload);
       default: throw new Error(`Unknown GM action: ${action}`);
     }
   }
@@ -143,6 +144,7 @@ export function registerSocket() {
     socket.register("adjustTargetHealth", adjustTargetHealth);
     socket.register("createActorEffect", createActorEffect);
     socket.register("createEmbeddedDocsOnActor", createEmbeddedDocsOnActor);
+    socket.register("manageRecoveryEffect", manageRecoveryEffect);
 
     // Expose on game.msh for other modules/files
     game.msh = game.msh || {};
@@ -300,4 +302,25 @@ async function applyCombatHandlerDamage({
     originalRollResult
   });
   return true;
+}
+
+async function manageRecoveryEffect({ actorUuid, action, effectData = null, effectId = null }) {
+  const actor = await getActorFromUuid(actorUuid);
+  if (!actor) throw new Error(`manageRecoveryEffect: actor not found: ${actorUuid}`);
+  
+  if (action === "create") {
+    if (!effectData) throw new Error("manageRecoveryEffect: effectData required for create action");
+    return await actor.createEmbeddedDocuments("ActiveEffect", [effectData]);
+  } 
+  else if (action === "delete") {
+    if (!effectId) throw new Error("manageRecoveryEffect: effectId required for delete action");
+    const effect = actor.effects.get(effectId);
+    if (effect) {
+      return await effect.delete();
+    }
+    return null;
+  }
+  else {
+    throw new Error(`manageRecoveryEffect: unknown action: ${action}`);
+  }
 }

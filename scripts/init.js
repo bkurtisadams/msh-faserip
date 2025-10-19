@@ -902,6 +902,13 @@ Hooks.on('updateActor', async (actor, updateData, options, userId) => {
   // Only process damage
   if (newHealth >= oldHealth) return;
   
+  // CRITICAL: Only process if we own the actor OR we're the GM
+  // This prevents both player and GM from processing the same damage
+  if (!game.user.isGM && !actor.isOwner) {
+    console.log("FASERIP | Skipping - not owner and not GM");
+    return;
+  }
+  
   // Prevent duplicate calls within same tick
   const damageKey = `damage-${actor.id}-${oldHealth}-${newHealth}`;
   if (game.msh._processingDamage === damageKey) {
