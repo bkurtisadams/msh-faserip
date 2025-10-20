@@ -401,6 +401,27 @@ Hooks.once("init", async () => {
     flags: { "msh-faserip": { isDead: true } }  // ← Also use isDead for consistency
   });
 
+  CONFIG.statusEffects.push(
+    {
+      id: "dodging",
+      label: "Dodging",
+      icon: "icons/svg/windmill.svg",
+      flags: { "msh-faserip": { isDodging: true } }
+    },
+    {
+      id: "evading", 
+      label: "Evading",
+      icon: "icons/svg/combat.svg",
+      flags: { "msh-faserip": { isEvading: true } }
+    },
+    {
+      id: "blocking",
+      label: "Blocking",
+      icon: "icons/svg/shield.svg",
+      flags: { "msh-faserip": { isBlocking: true } }
+    }
+  );
+
   CONFIG.FASERIP.rankValues = {
     "Shift-0": 0, 
     "Feeble": 2, 

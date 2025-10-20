@@ -146,6 +146,9 @@ export class DefenseAction extends BaseAction {
     // Compute special outcome blocks per action
     const specialHtml = await this._specialOutcomeHtml({ actionType, ability, colorLower, choice });
 
+    // CREATE THE EFFECT AUTOMATICALLY (NEW!)
+    await this._createDefenseEffect({ actionType, ability, colorLower, choice });
+
     // Action chips (light placeholders)
     const actionsHtml = this._actionsBox({ actionType, colorLower });
 
@@ -395,6 +398,137 @@ export class DefenseAction extends BaseAction {
     return "";
   }
 
+  // Add this method to the DefenseAction class in defense-action.js
+  // Place it after the _specialOutcomeHtml method
+
+  /**
+   * Create an ActiveEffect for defense actions that shows on the token
+   */
+  async _createDefenseEffect({ actionType, ability, colorLower, choice }) {
+    if (actionType === "blocking") {
+      let blockShift = 0;
+      if (colorLower === 'white') blockShift = -6;
+      else if (colorLower === 'green') blockShift = -4;
+      else if (colorLower === 'yellow') blockShift = -2;
+      else if (colorLower === 'red') blockShift = 1;
+
+      const idx = RANKS.indexOf(ability.rank);
+      if (idx !== -1) {
+        const armorIndex = Math.min(Math.max(idx + blockShift, 0), RANKS.length - 1);
+        const armorRank = RANKS[armorIndex];
+        const armorValue = game.msh.getRankValue(armorRank);
+
+        // Remove existing blocking effect
+        const existingBlock = this.actor.effects.find(e => 
+          e.flags?.["msh-faserip"]?.isBlocking
+        );
+        if (existingBlock) await existingBlock.delete();
+
+        // Create new blocking effect
+        const effectData = {
+          name: `Blocking (${armorRank} Armor)`,
+          icon: "icons/svg/shield.svg",
+          origin: this.actor.uuid,
+          disabled: false,
+          duration: {
+            rounds: 1,
+            startRound: game.combat?.round || 0,
+            startTurn: game.combat?.turn || 0
+          },
+          flags: {
+            "msh-faserip": {
+              isBlocking: true,
+              armorRank: armorRank,
+              armorValue: armorValue,
+              notes: "Strength as Body Armor vs physical attacks (not Shooting/Energy/Charging)"
+            }
+          }
+        };
+
+        await this.actor.createEmbeddedDocuments('ActiveEffect', [effectData]);
+      }
+    }
+
+    if (actionType === "dodging") {
+      const penalty = (colorLower === 'green') ? -2
+                    : (colorLower === 'yellow') ? -4
+                    : (colorLower === 'red') ? -6 : 0;
+
+      // Remove existing dodging effect
+      const existingDodge = this.actor.effects.find(e => 
+        e.flags?.["msh-faserip"]?.isDodging
+      );
+      if (existingDodge) await existingDodge.delete();
+
+      // Create new dodging effect
+      const penaltyText = penalty !== 0 ? `${penalty}CS penalty to attackers` : "no penalty";
+      
+      const effectData = {
+        name: `Dodging (${penaltyText})`,
+        icon: "icons/svg/windmill.svg",
+        origin: this.actor.uuid,
+        disabled: false,
+        duration: {
+          rounds: 1,
+          startRound: game.combat?.round || 0,
+          startTurn: game.combat?.turn || 0
+        },
+        flags: {
+          "msh-faserip": {
+            isDodging: true,
+            attackerPenaltyCS: penalty,
+            selfPenaltyCS: -2,
+            notes: "Attackers suffer CS penalty; your FEATs at -2CS; half move only"
+          }
+        }
+      };
+
+      await this.actor.createEmbeddedDocuments('ActiveEffect', [effectData]);
+    }
+
+    if (actionType === "evading") {
+      let nextRoundBonus = 0;
+      if (colorLower === 'yellow') nextRoundBonus = 1;
+      else if (colorLower === 'red') nextRoundBonus = 2;
+
+      // Remove existing evading effect
+      const existingEvade = this.actor.effects.find(e => 
+        e.flags?.["msh-faserip"]?.isEvading
+      );
+      if (existingEvade) await existingEvade.delete();
+
+      // Create new evading effect
+      const bonusText = nextRoundBonus > 0 
+        ? `+${nextRoundBonus}CS next attack` 
+        : "no bonus";
+      
+      const effectData = {
+        name: `Evaded (${bonusText})`,
+        icon: "icons/svg/combat.svg",
+        origin: this.actor.uuid,
+        disabled: false,
+        duration: {
+          rounds: colorLower === 'white' ? 0 : 1, // Auto-hit lasts 0 rounds
+          startRound: game.combat?.round || 0,
+          startTurn: game.combat?.turn || 0
+        },
+        flags: {
+          "msh-faserip": {
+            isEvading: true,
+            evadedTarget: choice.evadeTarget || "adjacent attacker",
+            nextRoundAttackBonusCS: nextRoundBonus,
+            autoHit: colorLower === 'white',
+            notes: colorLower === 'white' 
+              ? "Opponent auto-hits (at least Green result)"
+              : `Evaded successfully${nextRoundBonus ? `; +${nextRoundBonus}CS to next attack vs that target` : ""}`
+          }
+        }
+      };
+
+      await this.actor.createEmbeddedDocuments('ActiveEffect', [effectData]);
+    }
+  }
+
   _catchingPrereqHtml(ability, choice) {
     // Show min-Agility prerequisites for shooting/throwing; falling has no min.
     const agiRankIndex = RANKS.indexOf(ability.rank);
@@ -425,7 +559,7 @@ export class DefenseAction extends BaseAction {
     `;
   }
 
-  _actionsBox({ actionType, colorLower }) {
+    _actionsBox({ actionType, colorLower }) {
     const chip = (label, title, enabled) => {
       const base = "display:inline-block;font-size:12px;line-height:1.1;padding:2px 6px;border:1px solid #bbb;border-radius:3px;text-decoration:none;white-space:nowrap;";
       const style = enabled
@@ -434,14 +568,17 @@ export class DefenseAction extends BaseAction {
       const key = label.toLowerCase().replace(/\s+/g,'-');
       return `<a class="faserip-chip" data-action="${key}" ${enabled? "" : 'aria-disabled="true"'} title="${title}" style="${style}">${label}</a>`;
     };
-
+    
     // Enable “Use Armor” only when blocking result wasn’t White
     const useArmor = (actionType === "blocking" && colorLower !== "white");
 
     return `
       <div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;padding:8px 10px;margin:6px 10px 10px;border:1px solid #c0c0c0;background:#fafafa;border-radius:4px;">
-        ${chip("Apply Effect","Placeholder: apply this defense outcome manually.", true)}
-        ${useArmor ? chip("Use Armor","Placeholder: apply temporary Body Armor vs next attack.", true) : ""}
+        <div style="font-size:0.85em;color:#2e7d32;font-weight:bold;width:100%;text-align:center;margin-bottom:4px;">
+          ✓ Effect Applied to Token
+        </div>
+        ${chip("Reapply Effect","Manually reapply this defense effect if needed", true)}
+        ${useArmor ? chip("Use Armor","Apply temporary Body Armor vs next attack", true) : ""}
       </div>
     `;
   }
