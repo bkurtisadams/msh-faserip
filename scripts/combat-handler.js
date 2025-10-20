@@ -737,11 +737,22 @@ export class CombatHandler {
             volume = 1.0; // Make lightning louder
         } else {
             console.log("No weapon or damage type match found");
-            // Generic hit/miss sounds as fallback
-            if (isHit) {
-                soundPath = "systems/msh-faserip/assets/sfx/generic-hit.wav";
+            
+            // Check for energy damage type or source
+            const energyTypes = ['energy', 'electric', 'electricity', 'lightning', 'plasma'];
+            const hasEnergyDamage = energyTypes.some(type => lowerDamageType.includes(type));
+            const hasEnergySource = energyTypes.some(type => lowerSourceName.includes(type));
+            
+            if (hasEnergyDamage || hasEnergySource) {
+                console.log("Energy type detected - using electric-impact");
+                soundPath = isHit ? "systems/msh-faserip/assets/sfx/electric-impact.mp3" : "systems/msh-faserip/assets/sfx/near-miss-swing-whoosh-5.wav";
             } else {
-                soundPath = "systems/msh-faserip/assets/sfx/generic-miss.wav";
+                // Generic hit/miss sounds as final fallback
+                if (isHit) {
+                    soundPath = "systems/msh-faserip/assets/sfx/punch.wav";
+                } else {
+                    soundPath = "systems/msh-faserip/assets/sfx/near-miss-swing-whoosh-5.wav";
+                }
             }
         }
         

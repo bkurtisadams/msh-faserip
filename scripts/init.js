@@ -1414,7 +1414,38 @@ function generateActionIcon(actionCode, label, bgColor, fgColor) {
 async function createUniversalActionMacro(data, slot) {
   const { actionCode, actionName, actorId, actorName, iconName } = data;
   
-  const command = `// Universal Action Macro
+  // CHECK THE SETTING!
+  const actor = game.actors.get(actorId);
+  const mode = game.msh.getCombatModeFor(actor);
+  
+  // Define ability mapping
+  const abilityMap = {
+    "blunt-attack": "fighting", "edged-attack": "fighting", "shooting": "agility",
+    "throwing-edged": "agility", "throwing-blunt": "agility", "energy": "agility",
+    "force": "agility", "grappling": "strength", "grabbing": "strength",
+    "escaping": "strength", "charging": "endurance", "dodging": "agility",
+    "evading": "fighting", "blocking": "strength", "catching": "agility",
+    "stun": "endurance", "slam": "endurance", "kill": "endurance"
+  };
+  
+  const abilityName = abilityMap[actionCode] || "fighting";
+  
+  // CREATE DIFFERENT MACRO BASED ON SETTING
+  const command = (mode === "refactor") 
+    ? `// Universal Action Macro (Refactor/New System)
+const actor = game.user.character || canvas.tokens.controlled[0]?.actor || game.actors.get("${actorId}");
+if (!actor) {
+  return ui.notifications.warn("Select a token or assign a character first.");
+}
+
+const sheet = actor.sheet;
+if (!sheet || typeof sheet._rollAction !== "function") {
+  return ui.notifications.error("Actor sheet must be opened at least once.");
+}
+
+// Call NEW power-aware system
+await sheet._rollAction("${actionCode}", "${abilityName}");`
+    : `// Universal Action Macro (Classic/Old System)
 const actor = game.user.character || canvas.tokens.controlled[0]?.actor || game.actors.get("${actorId}");
 if (!actor) {
   return ui.notifications.warn("Select a token or assign a character first.");
@@ -1429,36 +1460,31 @@ game.msh.rollUniversalAction("${actionCode}", actor.id, savedCS, savedKarma);`;
   let macro = game.macros.find(m => m.name === macroName && m.command === command);
   
   if (!macro) {
-    // Define action colors here
     const ACTIONS = [
-      { id:"blunt-attack",   label:"BA",  color:"#FF6B00", textColor:"#FFF" },
-      { id:"edged-attack",   label:"EA",  color:"#DC143C", textColor:"#FFF" },
-      { id:"shooting",       label:"Sh",  color:"#8B0000", textColor:"#FFF" },
-      { id:"throwing-edged", label:"TE",  color:"#DC143C", textColor:"#FFF" },
-      { id:"throwing-blunt", label:"TB",  color:"#FF8C00", textColor:"#000" },
-      { id:"energy",         label:"En",  color:"#8B0000", textColor:"#FFF" },
-      { id:"force",          label:"Fo",  color:"#FF6B00", textColor:"#FFF" },
-      { id:"grappling",      label:"Gp",  color:"#1E90FF", textColor:"#FFF" },
-      { id:"grabbing",       label:"Gb",  color:"#4169E1", textColor:"#FFF" },
-      { id:"escaping",       label:"Es",  color:"#4682B4", textColor:"#FFF" },
-      { id:"charging",       label:"Ch",  color:"#FF8C00", textColor:"#000" },
-      { id:"dodging",        label:"Do",  color:"#32CD32", textColor:"#000" },
-      { id:"evading",        label:"Ev",  color:"#228B22", textColor:"#FFF" },
-      { id:"blocking",       label:"Bl",  color:"#228B22", textColor:"#FFF" },
-      { id:"catching",       label:"Ca",  color:"#32CD32", textColor:"#000" },
-      { id:"stun",           label:"St",  color:"#9932CC", textColor:"#FFF" },
-      { id:"slam",           label:"Sl",  color:"#9932CC", textColor:"#FFF" },
-      { id:"kill",           label:"Kl",  color:"#8B008B", textColor:"#FFF" }
+      { id:"blunt-attack", label:"BA", color:"#FF6B00", textColor:"#FFF" },
+      { id:"edged-attack", label:"EA", color:"#DC143C", textColor:"#FFF" },
+      { id:"shooting", label:"Sh", color:"#8B0000", textColor:"#FFF" },
+      { id:"throwing-edged", label:"TE", color:"#DC143C", textColor:"#FFF" },
+      { id:"throwing-blunt", label:"TB", color:"#FF8C00", textColor:"#000" },
+      { id:"energy", label:"En", color:"#8B0000", textColor:"#FFF" },
+      { id:"force", label:"Fo", color:"#FF6B00", textColor:"#FFF" },
+      { id:"grappling", label:"Gp", color:"#1E90FF", textColor:"#FFF" },
+      { id:"grabbing", label:"Gb", color:"#4169E1", textColor:"#FFF" },
+      { id:"escaping", label:"Es", color:"#4682B4", textColor:"#FFF" },
+      { id:"charging", label:"Ch", color:"#FF8C00", textColor:"#000" },
+      { id:"dodging", label:"Do", color:"#32CD32", textColor:"#000" },
+      { id:"evading", label:"Ev", color:"#228B22", textColor:"#FFF" },
+      { id:"blocking", label:"Bl", color:"#228B22", textColor:"#FFF" },
+      { id:"catching", label:"Ca", color:"#32CD32", textColor:"#000" },
+      { id:"stun", label:"St", color:"#9932CC", textColor:"#FFF" },
+      { id:"slam", label:"Sl", color:"#9932CC", textColor:"#FFF" },
+      { id:"kill", label:"Kl", color:"#8B008B", textColor:"#FFF" }
     ];
     
     const actionDef = ACTIONS.find(a => a.id === actionCode);
-    console.log("🎨 About to generate icon for:", actionCode, actionDef);
-    
     const img = actionDef 
       ? generateActionIcon(actionCode, actionDef.label, actionDef.color, actionDef.textColor)
       : "icons/svg/combat.svg";
-    
-    console.log("🎨 Generated img:", img?.substring(0, 50));
     
     macro = await Macro.create({
       name: macroName,
