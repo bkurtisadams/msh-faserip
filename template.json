@@ -194,7 +194,24 @@
       },
       
       "bonusPowers": [],
-      "stunts": []
+      "stunts": [],
+      
+      "healingType": "",
+      "healingMaxPerDay": 0,
+      "absorptionType": "",
+      "absorptionConvertsToHealth": true,
+      "forceFieldCoverage": 0,
+      "forceFieldPersonal": false,
+      "telekinesiStrength": "",
+      "extraBodyParts": [],
+      "clawMaterialStrength": "",
+      "lifeSupport": false,
+      "lifeSupportTurns": 0,
+      "regenerationType": "",
+      "regenerationRate": "",
+      "extraAttacks": false,
+      "specialMechanics": ""
+
     },
     "talent": {
       "templates": ["base"],

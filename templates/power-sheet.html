@@ -5,135 +5,236 @@
   </header>
 
   <section class="sheet-body">
-    <div class="form-group">
-      <label>Rank:</label>
-      <select name="system.rank">
-        <option value="Shift-0" {{#if (eq system.rank "Shift-0")}}selected{{/if}}>Shift-0</option>
-        <option value="Feeble" {{#if (eq system.rank "Feeble")}}selected{{/if}}>Feeble</option>
-        <option value="Poor" {{#if (eq system.rank "Poor")}}selected{{/if}}>Poor</option>
-        <option value="Typical" {{#if (eq system.rank "Typical")}}selected{{/if}}>Typical</option>
-        <option value="Good" {{#if (eq system.rank "Good")}}selected{{/if}}>Good</option>
-        <option value="Excellent" {{#if (eq system.rank "Excellent")}}selected{{/if}}>Excellent</option>
-        <option value="Remarkable" {{#if (eq system.rank "Remarkable")}}selected{{/if}}>Remarkable</option>
-        <option value="Incredible" {{#if (eq system.rank "Incredible")}}selected{{/if}}>Incredible</option>
-        <option value="Amazing" {{#if (eq system.rank "Amazing")}}selected{{/if}}>Amazing</option>
-        <option value="Monstrous" {{#if (eq system.rank "Monstrous")}}selected{{/if}}>Monstrous</option>
-        <option value="Unearthly" {{#if (eq system.rank "Unearthly")}}selected{{/if}}>Unearthly</option>
-        <option value="Shift-X" {{#if (eq system.rank "Shift-X")}}selected{{/if}}>Shift-X</option>
-        <option value="Shift-Y" {{#if (eq system.rank "Shift-Y")}}selected{{/if}}>Shift-Y</option>
-        <option value="Shift-Z" {{#if (eq system.rank "Shift-Z")}}selected{{/if}}>Shift-Z</option>
-        <option value="Class 1000" {{#if (eq system.rank "Class 1000")}}selected{{/if}}>Class 1000</option>
-        <option value="Class 3000" {{#if (eq system.rank "Class 3000")}}selected{{/if}}>Class 3000</option>
-        <option value="Class 5000" {{#if (eq system.rank "Class 5000")}}selected{{/if}}>Class 5000</option>
-        <option value="Beyond" {{#if (eq system.rank "Beyond")}}selected{{/if}}>Beyond</option>
-      </select>
-      <input type="number" name="system.value" value="{{system.value}}" />
-    </div>
+    <!-- TAB NAVIGATION -->
+    <nav class="sheet-tabs tabs" data-group="primary">
+      <a class="item" data-tab="basics">Basics</a>
+      <a class="item" data-tab="combat">Combat</a>
+      <a class="item" data-tab="special">Special Abilities</a>
+      {{#if system.isMagic}}
+      <a class="item" data-tab="magic">Magic</a>
+      {{/if}}
+      <a class="item" data-tab="range">Range & Limits</a>
+    </nav>
 
-    <div class="form-row">
-      <div class="form-group half">
-        <label>Category:</label>
-        <select name="system.category" id="power-category">
-          <option value="" {{#if (eq system.category "")}}selected{{/if}}>-- Select Category --</option>
-          <option value="resistances" {{#if (eq system.category "resistances")}}selected{{/if}}>Resistances</option>
-          <option value="senses" {{#if (eq system.category "senses")}}selected{{/if}}>Senses</option>
-          <option value="movement" {{#if (eq system.category "movement")}}selected{{/if}}>Movement</option>
-          <option value="matterControl" {{#if (eq system.category "matterControl")}}selected{{/if}}>Matter Control</option>
-          <option value="energyControl" {{#if (eq system.category "energyControl")}}selected{{/if}}>Energy Control</option>
-          <option value="bodyControl" {{#if (eq system.category "bodyControl")}}selected{{/if}}>Body Control</option>
-          <option value="distanceAttacks" {{#if (eq system.category "distanceAttacks")}}selected{{/if}}>Distance Attacks</option>
-          <option value="mentalPowers" {{#if (eq system.category "mentalPowers")}}selected{{/if}}>Mental Powers</option>
-          <option value="bodyAlterationsOffensive" {{#if (eq system.category "bodyAlterationsOffensive")}}selected{{/if}}>Body Alterations/Offensive</option>
-          <option value="bodyAlterationsDefensive" {{#if (eq system.category "bodyAlterationsDefensive")}}selected{{/if}}>Body Alterations/Defensive</option>
+    <!-- TAB 1: BASICS -->
+    <div class="tab" data-group="primary" data-tab="basics">
+      <div class="form-group">
+        <label>Rank:</label>
+        <select name="system.rank">
+          <option value="Shift-0" {{#if (eq system.rank "Shift-0")}}selected{{/if}}>Shift-0</option>
+          <option value="Feeble" {{#if (eq system.rank "Feeble")}}selected{{/if}}>Feeble</option>
+          <option value="Poor" {{#if (eq system.rank "Poor")}}selected{{/if}}>Poor</option>
+          <option value="Typical" {{#if (eq system.rank "Typical")}}selected{{/if}}>Typical</option>
+          <option value="Good" {{#if (eq system.rank "Good")}}selected{{/if}}>Good</option>
+          <option value="Excellent" {{#if (eq system.rank "Excellent")}}selected{{/if}}>Excellent</option>
+          <option value="Remarkable" {{#if (eq system.rank "Remarkable")}}selected{{/if}}>Remarkable</option>
+          <option value="Incredible" {{#if (eq system.rank "Incredible")}}selected{{/if}}>Incredible</option>
+          <option value="Amazing" {{#if (eq system.rank "Amazing")}}selected{{/if}}>Amazing</option>
+          <option value="Monstrous" {{#if (eq system.rank "Monstrous")}}selected{{/if}}>Monstrous</option>
+          <option value="Unearthly" {{#if (eq system.rank "Unearthly")}}selected{{/if}}>Unearthly</option>
+          <option value="Shift-X" {{#if (eq system.rank "Shift-X")}}selected{{/if}}>Shift-X</option>
+          <option value="Shift-Y" {{#if (eq system.rank "Shift-Y")}}selected{{/if}}>Shift-Y</option>
+          <option value="Shift-Z" {{#if (eq system.rank "Shift-Z")}}selected{{/if}}>Shift-Z</option>
+          <option value="Class 1000" {{#if (eq system.rank "Class 1000")}}selected{{/if}}>Class 1000</option>
+          <option value="Class 3000" {{#if (eq system.rank "Class 3000")}}selected{{/if}}>Class 3000</option>
+          <option value="Class 5000" {{#if (eq system.rank "Class 5000")}}selected{{/if}}>Class 5000</option>
+          <option value="Beyond" {{#if (eq system.rank "Beyond")}}selected{{/if}}>Beyond</option>
         </select>
+        <input type="number" name="system.value" value="{{system.value}}" />
       </div>
-      
-      <div class="form-group half">
-        <label>Type:</label>
-        <select name="system.type" id="power-type">
-          <option value="" {{#if (eq system.type "")}}selected{{/if}}>-- Select Type --</option>
-        </select>
-      </div>
-    </div>
 
-    <div class="form-group">
-      <label>Subtype:</label>
-      <input type="text" name="system.subtype" value="{{system.subtype}}" />
-    </div>
-
-    <div id="special-attributes" class="special-attributes">
-      <!-- Dynamically filled by JS -->
-    </div>
-
-    <!-- COMBAT PROPERTIES SECTION (COLLAPSIBLE) -->
-    <div class="combat-properties-container">
-      <button type="button" class="toggle-combat-section" style="width:100%; padding:8px; margin:10px 0; background:#f0f0f0; border:1px solid #8b0000; cursor:pointer; text-align:left; font-weight:bold; border-radius:4px;">
-        <i class="fas fa-chevron-down toggle-icon"></i> Combat Properties (optional)
-      </button>
-      
-      <div class="combat-properties" style="display:none; margin:15px 0; padding:12px; border:2px solid #8b0000; border-radius:4px; background:#fafafa;">
-        <h3 style="margin:0 0 10px 0; color:#8b0000; border-bottom:1px solid #8b0000; padding-bottom:4px;">Combat Properties</h3>
+      <div class="form-row">
+        <div class="form-group half">
+          <label>Category:</label>
+          <select name="system.category" id="power-category">
+            <option value="">-- Select Category --</option>
+            <option value="resistances" {{#if (eq system.category "resistances")}}selected{{/if}}>Resistances</option>
+            <option value="senses" {{#if (eq system.category "senses")}}selected{{/if}}>Senses</option>
+            <option value="movement" {{#if (eq system.category "movement")}}selected{{/if}}>Movement</option>
+            <option value="matterControl" {{#if (eq system.category "matterControl")}}selected{{/if}}>Matter Control</option>
+            <option value="energyControl" {{#if (eq system.category "energyControl")}}selected{{/if}}>Energy Control</option>
+            <option value="bodyControl" {{#if (eq system.category "bodyControl")}}selected{{/if}}>Body Control</option>
+            <option value="distanceAttacks" {{#if (eq system.category "distanceAttacks")}}selected{{/if}}>Distance Attacks</option>
+            <option value="mentalPowers" {{#if (eq system.category "mentalPowers")}}selected{{/if}}>Mental Powers</option>
+            <option value="bodyAlterationsOffensive" {{#if (eq system.category "bodyAlterationsOffensive")}}selected{{/if}}>Body Alterations/Offensive</option>
+            <option value="bodyAlterationsDefensive" {{#if (eq system.category "bodyAlterationsDefensive")}}selected{{/if}}>Body Alterations/Defensive</option>
+          </select>
+        </div>
         
+        <div class="form-group half">
+          <label>Type:</label>
+          <select name="system.type" id="power-type">
+            <option value="">-- Select Type --</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Subtype:</label>
+        <input type="text" name="system.subtype" value="{{system.subtype}}" />
+      </div>
+
+      <div class="form-group">
+        <label>Power Source:</label>
+        <select name="system.source">
+          <option value="natural" {{#if (eq system.source "natural")}}selected{{/if}}>Natural/Inborn</option>
+          <option value="equipment" {{#if (eq system.source "equipment")}}selected{{/if}}>Equipment</option>
+          <option value="mystical" {{#if (eq system.source "mystical")}}selected{{/if}}>Mystical</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>
+          <input type="checkbox" id="is-magic-checkbox" name="system.isMagic" {{checked system.isMagic}} />
+          Is this Power a Spell?
+        </label>
+      </div>
+
+      <div class="form-group">
+        <label>Description:</label>
+        <textarea name="system.description" rows="10" class="power-description">{{system.description}}</textarea>
+      </div>
+
+      <div class="form-group">
+        <label>Special Mechanics (rules text):</label>
+        <textarea name="system.specialMechanics" rows="6" placeholder="Additional rules for this power not covered by fields above...">{{system.specialMechanics}}</textarea>
+        <small>For powers with unique mechanics (continuing damage degradation, specific FEAT requirements, etc.)</small>
+      </div>
+
+      <div id="special-attributes" class="special-attributes">
+        <!-- Dynamically filled by JS -->
+      </div>
+    </div>
+
+    <!-- TAB 2: COMBAT -->
+    <div class="tab" data-group="primary" data-tab="combat">
+      <div class="form-row">
+        <div class="form-group half">
+          <label>Attack Type:</label>
+          <select name="system.attackType">
+            <option value="">-- Not an Attack --</option>
+            <option value="ranged-energy" {{#if (eq system.attackType "ranged-energy")}}selected{{/if}}>Ranged: Energy Blast</option>
+            <option value="ranged-force" {{#if (eq system.attackType "ranged-force")}}selected{{/if}}>Ranged: Force Blast</option>
+            <option value="ranged-projectile" {{#if (eq system.attackType "ranged-projectile")}}selected{{/if}}>Ranged: Projectile</option>
+            <option value="ranged-thrown" {{#if (eq system.attackType "ranged-thrown")}}selected{{/if}}>Ranged: Thrown</option>
+            <option value="melee-blunt" {{#if (eq system.attackType "melee-blunt")}}selected{{/if}}>Melee: Blunt</option>
+            <option value="melee-edged" {{#if (eq system.attackType "melee-edged")}}selected{{/if}}>Melee: Edged</option>
+            <option value="touch" {{#if (eq system.attackType "touch")}}selected{{/if}}>Touch Attack</option>
+            <option value="mental" {{#if (eq system.attackType "mental")}}selected{{/if}}>Mental Attack</option>
+          </select>
+        </div>
+        
+        <div class="form-group half">
+          <label>Damage Type:</label>
+          <select name="system.damageType">
+            <option value="">-- None --</option>
+            <optgroup label="Physical">
+              <option value="physical-blunt" {{#if (eq system.damageType "physical-blunt")}}selected{{/if}}>Physical: Blunt</option>
+              <option value="physical-edged" {{#if (eq system.damageType "physical-edged")}}selected{{/if}}>Physical: Edged</option>
+            </optgroup>
+            <optgroup label="Energy">
+              <option value="energy-force" {{#if (eq system.damageType "energy-force")}}selected{{/if}}>Energy: Force</option>
+              <option value="energy-generic" {{#if (eq system.damageType "energy-generic")}}selected{{/if}}>Energy: Generic</option>
+              <option value="energy-fire" {{#if (eq system.damageType "energy-fire")}}selected{{/if}}>Energy: Fire/Heat</option>
+              <option value="energy-cold" {{#if (eq system.damageType "energy-cold")}}selected{{/if}}>Energy: Cold/Ice</option>
+              <option value="energy-electricity" {{#if (eq system.damageType "energy-electricity")}}selected{{/if}}>Energy: Electricity</option>
+              <option value="energy-sound" {{#if (eq system.damageType "energy-sound")}}selected{{/if}}>Energy: Sound/Sonic</option>
+              <option value="energy-light" {{#if (eq system.damageType "energy-light")}}selected{{/if}}>Energy: Light</option>
+              <option value="energy-radiation" {{#if (eq system.damageType "energy-radiation")}}selected{{/if}}>Energy: Radiation</option>
+              <option value="energy-darkforce" {{#if (eq system.damageType "energy-darkforce")}}selected{{/if}}>Energy: Darkforce</option>
+            </optgroup>
+            <optgroup label="Special">
+              <option value="corrosive" {{#if (eq system.damageType "corrosive")}}selected{{/if}}>Corrosive/Acid</option>
+              <option value="mental" {{#if (eq system.damageType "mental")}}selected{{/if}}>Mental/Psionic</option>
+              <option value="nullification" {{#if (eq system.damageType "nullification")}}selected{{/if}}>Nullification</option>
+            </optgroup>
+            <optgroup label="Touch Attacks">
+              <option value="touch-energy" {{#if (eq system.damageType "touch-energy")}}selected{{/if}}>Touch: Energy</option>
+              <option value="touch-paralyzing" {{#if (eq system.damageType "touch-paralyzing")}}selected{{/if}}>Touch: Paralyzing</option>
+              <option value="touch-rotting" {{#if (eq system.damageType "touch-rotting")}}selected{{/if}}>Touch: Rotting (organic)</option>
+              <option value="touch-corrosive" {{#if (eq system.damageType "touch-corrosive")}}selected{{/if}}>Touch: Corrosive (inorganic)</option>
+              <option value="touch-healthdrain" {{#if (eq system.damageType "touch-healthdrain")}}selected{{/if}}>Touch: Health Drain</option>
+            </optgroup>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group half">
+          <label>Damage Value:</label>
+          <input type="number" name="system.damage" value="{{system.damage}}" placeholder="Leave 0 to use rank value ({{system.value}})" />
+          <small>Default: Uses rank value. Override only if power deals different damage.</small>
+        </div>
+        
+        <div class="form-group half">
+          <label>Primary Effect:</label>
+          <select name="system.primaryEffect">
+            <option value="damage" {{#if (eq system.primaryEffect "damage")}}selected{{/if}}>Deals Damage</option>
+            <option value="stun" {{#if (eq system.primaryEffect "stun")}}selected{{/if}}>Stunning Effect</option>
+            <option value="nullification" {{#if (eq system.primaryEffect "nullification")}}selected{{/if}}>Power Nullification</option>
+            <option value="control-mind" {{#if (eq system.primaryEffect "control-mind")}}selected{{/if}}>Mind Control</option>
+            <option value="control-emotion" {{#if (eq system.primaryEffect "control-emotion")}}selected{{/if}}>Emotion Control</option>
+            <option value="healing" {{#if (eq system.primaryEffect "healing")}}selected{{/if}}>Healing</option>
+            <option value="absorption" {{#if (eq system.primaryEffect "absorption")}}selected{{/if}}>Absorption (Defensive)</option>
+            <option value="support" {{#if (eq system.primaryEffect "support")}}selected{{/if}}>Support/Buff</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- COMBAT SPECIALS -->
+      <div class="form-row">
+        <div class="form-group half">
+          <label>Claw Material Strength:</label>
+          <select name="system.clawMaterialStrength">
+            <option value="">Not claws</option>
+            <option value="Typical" {{#if (eq system.clawMaterialStrength "Typical")}}selected{{/if}}>Typical</option>
+            <option value="Good" {{#if (eq system.clawMaterialStrength "Good")}}selected{{/if}}>Good</option>
+            <option value="Excellent" {{#if (eq system.clawMaterialStrength "Excellent")}}selected{{/if}}>Excellent</option>
+            <option value="Remarkable" {{#if (eq system.clawMaterialStrength "Remarkable")}}selected{{/if}}>Remarkable</option>
+            <option value="Incredible" {{#if (eq system.clawMaterialStrength "Incredible")}}selected{{/if}}>Incredible</option>
+            <option value="Amazing" {{#if (eq system.clawMaterialStrength "Amazing")}}selected{{/if}}>Amazing</option>
+            <option value="Monstrous" {{#if (eq system.clawMaterialStrength "Monstrous")}}selected{{/if}}>Monstrous</option>
+            <option value="Unearthly" {{#if (eq system.clawMaterialStrength "Unearthly")}}selected{{/if}}>Unearthly</option>
+          </select>
+          <small>For breaking objects (separate from damage vs living)</small>
+        </div>
+        
+        <div class="form-group half">
+          <label>Telekinesis Strength:</label>
+          <select name="system.telekinesiStrength">
+            <option value="">Not telekinesis</option>
+            <option value="Feeble" {{#if (eq system.telekinesiStrength "Feeble")}}selected{{/if}}>Feeble</option>
+            <option value="Poor" {{#if (eq system.telekinesiStrength "Poor")}}selected{{/if}}>Poor</option>
+            <option value="Typical" {{#if (eq system.telekinesiStrength "Typical")}}selected{{/if}}>Typical</option>
+            <option value="Good" {{#if (eq system.telekinesiStrength "Good")}}selected{{/if}}>Good</option>
+            <option value="Excellent" {{#if (eq system.telekinesiStrength "Excellent")}}selected{{/if}}>Excellent</option>
+            <option value="Remarkable" {{#if (eq system.telekinesiStrength "Remarkable")}}selected{{/if}}>Remarkable</option>
+            <option value="Incredible" {{#if (eq system.telekinesiStrength "Incredible")}}selected{{/if}}>Incredible</option>
+            <option value="Amazing" {{#if (eq system.telekinesiStrength "Amazing")}}selected{{/if}}>Amazing</option>
+            <option value="Monstrous" {{#if (eq system.telekinesiStrength "Monstrous")}}selected{{/if}}>Monstrous</option>
+            <option value="Unearthly" {{#if (eq system.telekinesiStrength "Unearthly")}}selected{{/if}}>Unearthly</option>
+          </select>
+          <small>Acts as Strength for lifting/throwing</small>
+        </div>
+      </div>
+
+      <div class="form-group half">
+        <label>Force Field Coverage (areas):</label>
+        <input type="number" name="system.forceFieldCoverage" value="{{system.forceFieldCoverage}}" min="0" placeholder="0 = not force field" />
+        <small>Tens digit of rank (70 = 7 areas). -1 rank per area beyond first.</small>
+      </div>
+
+      <!-- SAVING THROW -->
+      <div class="form-group" style="margin-top:15px;padding-top:15px;border-top:2px solid #ddd;">
+        <label>
+          <input type="checkbox" name="system.requiresSave" {{checked system.requiresSave}} id="requires-save">
+          Requires Saving Throw
+        </label>
+      </div>
+
+      {{#if system.requiresSave}}
+      <div class="save-section">
         <div class="form-row">
-          <div class="form-group half">
-            <label>Attack Type:</label>
-            <select name="system.attackType">
-              <option value="">-- Not an Attack --</option>
-              <option value="ranged-energy" {{#if (eq system.attackType "ranged-energy")}}selected{{/if}}>Ranged: Energy Blast</option>
-              <option value="ranged-force" {{#if (eq system.attackType "ranged-force")}}selected{{/if}}>Ranged: Force Blast</option>
-              <option value="ranged-projectile" {{#if (eq system.attackType "ranged-projectile")}}selected{{/if}}>Ranged: Projectile</option>
-              <option value="ranged-thrown" {{#if (eq system.attackType "ranged-thrown")}}selected{{/if}}>Ranged: Thrown</option>
-              <option value="melee-blunt" {{#if (eq system.attackType "melee-blunt")}}selected{{/if}}>Melee: Blunt</option>
-              <option value="melee-edged" {{#if (eq system.attackType "melee-edged")}}selected{{/if}}>Melee: Edged</option>
-              <option value="touch" {{#if (eq system.attackType "touch")}}selected{{/if}}>Touch Attack</option>
-              <option value="mental" {{#if (eq system.attackType "mental")}}selected{{/if}}>Mental Attack</option>
-            </select>
-          </div>
-          
-          <div class="form-group half">
-            <label>Damage Type:</label>
-            <select name="system.damageType">
-              <option value="">-- None --</option>
-              <optgroup label="Physical">
-                <option value="physical-blunt" {{#if (eq system.damageType "physical-blunt")}}selected{{/if}}>Physical: Blunt</option>
-                <option value="physical-edged" {{#if (eq system.damageType "physical-edged")}}selected{{/if}}>Physical: Edged</option>
-              </optgroup>
-              <optgroup label="Energy">
-                <option value="energy-force" {{#if (eq system.damageType "energy-force")}}selected{{/if}}>Energy: Force</option>
-                <option value="energy-generic" {{#if (eq system.damageType "energy-generic")}}selected{{/if}}>Energy: Generic</option>
-                <option value="energy-fire" {{#if (eq system.damageType "energy-fire")}}selected{{/if}}>Energy: Fire/Heat</option>
-                <option value="energy-cold" {{#if (eq system.damageType "energy-cold")}}selected{{/if}}>Energy: Cold/Ice</option>
-                <option value="energy-electricity" {{#if (eq system.damageType "energy-electricity")}}selected{{/if}}>Energy: Electricity</option>
-                <option value="energy-sound" {{#if (eq system.damageType "energy-sound")}}selected{{/if}}>Energy: Sound/Sonic</option>
-                <option value="energy-light" {{#if (eq system.damageType "energy-light")}}selected{{/if}}>Energy: Light</option>
-                <option value="energy-radiation" {{#if (eq system.damageType "energy-radiation")}}selected{{/if}}>Energy: Radiation</option>
-                <option value="energy-darkforce" {{#if (eq system.damageType "energy-darkforce")}}selected{{/if}}>Energy: Darkforce</option>
-              </optgroup>
-              <optgroup label="Special">
-                <option value="corrosive" {{#if (eq system.damageType "corrosive")}}selected{{/if}}>Corrosive/Acid</option>
-                <option value="mental" {{#if (eq system.damageType "mental")}}selected{{/if}}>Mental/Psionic</option>
-                <option value="nullification" {{#if (eq system.damageType "nullification")}}selected{{/if}}>Nullification</option>
-              </optgroup>
-              <optgroup label="Touch Attacks">
-                <option value="touch-energy" {{#if (eq system.damageType "touch-energy")}}selected{{/if}}>Touch: Energy</option>
-                <option value="touch-paralyzing" {{#if (eq system.damageType "touch-paralyzing")}}selected{{/if}}>Touch: Paralyzing</option>
-                <option value="touch-rotting" {{#if (eq system.damageType "touch-rotting")}}selected{{/if}}>Touch: Rotting (organic)</option>
-                <option value="touch-corrosive" {{#if (eq system.damageType "touch-corrosive")}}selected{{/if}}>Touch: Corrosive (inorganic)</option>
-                <option value="touch-healthdrain" {{#if (eq system.damageType "touch-healthdrain")}}selected{{/if}}>Touch: Health Drain</option>
-              </optgroup>
-            </select>
-          </div>
-        </div>
-
-        <!-- SAVING THROW (inside .combat-properties) -->
-        <div class="form-group" style="margin-top:10px; padding-top:10px; border-top:1px dashed #8b0000;">
-          <label>
-            <input type="checkbox" name="system.requiresSave" {{checked system.requiresSave}}>
-            Requires Saving Throw
-          </label>
-        </div>
-
-        <div class="form-row" {{#unless system.requiresSave}}style="display:none"{{/unless}}>
           <div class="form-group half">
             <label>Save Ability:</label>
             <select name="system.save.ability">
@@ -149,314 +250,375 @@
           <div class="form-group half">
             <label>Intensity:</label>
             <select name="system.save.intensity" id="save-intensity">
-              <option value="power-rank" {{#if (eq system.save.intensity "power-rank")}}selected{{/if}}>This power’s rank</option>
+              <option value="power-rank" {{#if (eq system.save.intensity "power-rank")}}selected{{/if}}>This power's rank</option>
               <option value="fixed-rank" {{#if (eq system.save.intensity "fixed-rank")}}selected{{/if}}>Fixed rank…</option>
               <option value="none" {{#if (eq system.save.intensity "none")}}selected{{/if}}>None</option>
             </select>
-            <input type="text" name="system.save.fixedRank" value="{{system.save.fixedRank}}" placeholder="e.g., Remarkable"
-                  {{#unless (eq system.save.intensity "fixed-rank")}}style="display:none"{{/unless}}>
+            {{#if (eq system.save.intensity "fixed-rank")}}
+            <input type="text" name="system.save.fixedRank" value="{{system.save.fixedRank}}" placeholder="e.g., Remarkable">
+            {{/if}}
           </div>
         </div>
-
-        <div class="form-row" {{#unless system.requiresSave}}style="display:none"{{/unless}}>
-          <div class="form-group half">
-            <label>Ignore Damage Gate:</label>
-            <input type="checkbox" name="system.save.ignoreDamageGate" {{checked system.save.ignoreDamageGate}}>
-          </div>
-          <div class="form-group half">
-            <label>Color Mapping (fail/partial/success):</label>
-            <div style="display:flex; gap:6px; flex-wrap:wrap;">
-              <input type="text" name="system.save.mapping.white"  value="{{system.save.mapping.white}}"  placeholder="white → fail"  style="width:110px;">
-              <input type="text" name="system.save.mapping.green"  value="{{system.save.mapping.green}}"  placeholder="green → fail"  style="width:110px;">
-              <input type="text" name="system.save.mapping.yellow" value="{{system.save.mapping.yellow}}" placeholder="yellow → partial" style="width:120px;">
-              <input type="text" name="system.save.mapping.red"    value="{{system.save.mapping.red}}"    placeholder="red → success" style="width:120px;">
-            </div>
-          </div>
-        </div>
-
-        <div class="form-row" {{#unless system.requiresSave}}style="display:none"{{/unless}}>
-          <div class="form-group half">
-            <label>On Fail:</label>
-            <select name="system.save.onFail.effect">
-              <option value="nullified" {{#if (eq system.save.onFail.effect "nullified")}}selected{{/if}}>Nullified</option>
-              <option value="stunned" {{#if (eq system.save.onFail.effect "stunned")}}selected{{/if}}>Stunned</option>
-              <option value="custom" {{#if (eq system.save.onFail.effect "custom")}}selected{{/if}}>Custom</option>
-            </select>
-            <select name="system.save.onFail.duration" style="margin-left:6px;">
-              <option value="rank" {{#if (eq system.save.onFail.duration "rank")}}selected{{/if}}>For power rank (rounds)</option>
-              <option value="rounds" {{#if (eq system.save.onFail.duration "rounds")}}selected{{/if}}>Fixed rounds…</option>
-              <option value="scene" {{#if (eq system.save.onFail.duration "scene")}}selected{{/if}}>Scene</option>
-              <option value="custom" {{#if (eq system.save.onFail.duration "custom")}}selected{{/if}}>Custom</option>
-            </select>
-            <input type="number" name="system.save.onFail.rounds" value="{{system.save.onFail.rounds}}" min="0" placeholder="Rounds"
-                  {{#unless (eq system.save.onFail.duration "rounds")}}style="display:none"{{/unless}}>
-          </div>
-          <div class="form-group half">
-            <label>Notes:</label>
-            <input type="text" name="system.save.onFail.notes" value="{{system.save.onFail.notes}}" placeholder="What exactly happens?" />
-          </div>
-        </div>
-
 
         <div class="form-row">
           <div class="form-group half">
-            <label>Damage Value:</label>
-            <input type="number" name="system.damage" value="{{system.damage}}" placeholder="Usually = rank value" />
+            <label>
+              <input type="checkbox" name="system.save.ignoreDamageGate" {{checked system.save.ignoreDamageGate}}>
+              Ignore Damage Gate
+            </label>
           </div>
-          
-          <div class="form-group half">
-            <label>Primary Effect:</label>
-            <select name="system.primaryEffect">
-              <option value="damage" {{#if (eq system.primaryEffect "damage")}}selected{{/if}}>Deals Damage</option>
-              <option value="stun" {{#if (eq system.primaryEffect "stun")}}selected{{/if}}>Stunning Effect</option>
-              <option value="nullification" {{#if (eq system.primaryEffect "nullification")}}selected{{/if}}>Power Nullification</option>
-              <option value="control-mind" {{#if (eq system.primaryEffect "control-mind")}}selected{{/if}}>Mind Control</option>
-              <option value="control-emotion" {{#if (eq system.primaryEffect "control-emotion")}}selected{{/if}}>Emotion Control</option>
-              <option value="healing" {{#if (eq system.primaryEffect "healing")}}selected{{/if}}>Healing</option>
-              <option value="support" {{#if (eq system.primaryEffect "support")}}selected{{/if}}>Support/Buff</option>
+        </div>
+
+        <div class="form-group">
+          <label>On Fail:</label>
+          <select name="system.save.onFail.effect">
+            <option value="nullified" {{#if (eq system.save.onFail.effect "nullified")}}selected{{/if}}>Nullified</option>
+            <option value="stunned" {{#if (eq system.save.onFail.effect "stunned")}}selected{{/if}}>Stunned</option>
+            <option value="custom" {{#if (eq system.save.onFail.effect "custom")}}selected{{/if}}>Custom</option>
+          </select>
+          <select name="system.save.onFail.duration" style="margin-left:6px;">
+            <option value="rank" {{#if (eq system.save.onFail.duration "rank")}}selected{{/if}}>For power rank (rounds)</option>
+            <option value="rounds" {{#if (eq system.save.onFail.duration "rounds")}}selected{{/if}}>Fixed rounds…</option>
+            <option value="scene" {{#if (eq system.save.onFail.duration "scene")}}selected{{/if}}>Scene</option>
+            <option value="custom" {{#if (eq system.save.onFail.duration "custom")}}selected{{/if}}>Custom</option>
+          </select>
+          {{#if (eq system.save.onFail.duration "rounds")}}
+          <input type="number" name="system.save.onFail.rounds" value="{{system.save.onFail.rounds}}" min="0" placeholder="Rounds">
+          {{/if}}
+          <input type="text" name="system.save.onFail.notes" value="{{system.save.onFail.notes}}" placeholder="What exactly happens?" style="width:100%;margin-top:4px;" />
+        </div>
+      </div>
+      {{/if}}
+
+      <!-- BODY ARMOR & RESISTANCE -->
+      <div class="form-row" style="margin-top:15px;padding-top:15px;border-top:2px solid #ddd;">
+        <div class="form-group half">
+          <label>
+            <input type="checkbox" name="system.isBodyArmor" {{checked system.isBodyArmor}} id="is-body-armor" />
+            Body Armor
+          </label>
+          {{#if system.isBodyArmor}}
+          <div class="armor-details" style="margin-top:6px;">
+            <label>Armor Type:</label>
+            <select name="system.bodyArmorType">
+              <option value="both" {{#if (eq system.bodyArmorType "both")}}selected{{/if}}>Both Physical & Energy</option>
+              <option value="physical" {{#if (eq system.bodyArmorType "physical")}}selected{{/if}}>Physical Only</option>
+              <option value="energy" {{#if (eq system.bodyArmorType "energy")}}selected{{/if}}>Energy Only</option>
             </select>
-          </div>
-        </div>
-
-        <div class="form-row defensive-properties">
-          <div class="form-group half">
-            <label>
-              <input type="checkbox" name="system.isBodyArmor" {{checked system.isBodyArmor}} id="is-body-armor" />
-              Body Armor
-            </label>
-            <div class="armor-details" {{#unless system.isBodyArmor}}style="display: none;"{{/unless}}>
-              <label>Armor Type:</label>
-              <select name="system.bodyArmorType">
-                <option value="both" {{#if (eq system.bodyArmorType "both")}}selected{{/if}}>Both Physical & Energy</option>
-                <option value="physical" {{#if (eq system.bodyArmorType "physical")}}selected{{/if}}>Physical Only</option>
-                <option value="energy" {{#if (eq system.bodyArmorType "energy")}}selected{{/if}}>Energy Only</option>
-              </select>
-              <div class="form-row">
-                <div class="form-group half">
-                  <label>Physical:</label>
-                  <input type="number" name="system.armorPhysical" value="{{system.armorPhysical}}" id="armor-physical" />
-                </div>
-                <div class="form-group half">
-                  <label>Energy:</label>
-                  <input type="number" name="system.armorEnergy" value="{{system.armorEnergy}}" id="armor-energy" />
-                  <small>(Auto = Physical - 20)</small>
-                </div>
+            <div class="form-row">
+              <div class="form-group half">
+                <label>Physical:</label>
+                <input type="number" name="system.armorPhysical" value="{{system.armorPhysical}}" />
+              </div>
+              <div class="form-group half">
+                <label>Energy:</label>
+                <input type="number" name="system.armorEnergy" value="{{system.armorEnergy}}" />
+                <small>(Auto = Physical - 20)</small>
               </div>
             </div>
           </div>
-
-          <div class="form-group half">
-            <label>
-              <input type="checkbox" name="system.isResistance" {{checked system.isResistance}} id="is-resistance" />
-              Resistance
-            </label>
-            <div class="resistance-details" {{#unless system.isResistance}}style="display: none;"{{/unless}}>
-              <label>Against:</label>
-              <select name="system.resistanceType">
-                <option value="">-- Select Type --</option>
-                <option value="fire" {{#if (eq system.resistanceType "fire")}}selected{{/if}}>Fire/Heat</option>
-                <option value="cold" {{#if (eq system.resistanceType "cold")}}selected{{/if}}>Cold/Ice</option>
-                <option value="electricity" {{#if (eq system.resistanceType "electricity")}}selected{{/if}}>Electricity</option>
-                <option value="radiation" {{#if (eq system.resistanceType "radiation")}}selected{{/if}}>Radiation</option>
-                <option value="toxins" {{#if (eq system.resistanceType "toxins")}}selected{{/if}}>Toxins/Poison</option>
-                <option value="corrosives" {{#if (eq system.resistanceType "corrosives")}}selected{{/if}}>Corrosives/Acid</option>
-                <option value="emotion" {{#if (eq system.resistanceType "emotion")}}selected{{/if}}>Emotion Attacks</option>
-                <option value="mental" {{#if (eq system.resistanceType "mental")}}selected{{/if}}>Mental Attacks</option>
-                <option value="magic" {{#if (eq system.resistanceType "magic")}}selected{{/if}}>Magical Attacks</option>
-                <option value="disease" {{#if (eq system.resistanceType "disease")}}selected{{/if}}>Disease</option>
-              </select>
-              <label>Effect:</label>
-              <select name="system.resistanceEffect">
-                <option value="columnShift" {{#if (eq system.resistanceEffect "columnShift")}}selected{{/if}}>Column Shift Bonus</option>
-                <option value="damageReduction" {{#if (eq system.resistanceEffect "damageReduction")}}selected{{/if}}>Damage Reduction</option>
-                <option value="immunity" {{#if (eq system.resistanceEffect "immunity")}}selected{{/if}}>Immunity (if rank >= attack)</option>
-              </select>
-              <div class="resistance-value-group">
-                <label id="resistance-value-label">Value:</label>
-                <input type="number" name="system.resistanceValue" value="{{system.resistanceValue}}" placeholder="2" />
-              </div>
-            </div>
-          </div>
+          {{/if}}
         </div>
 
-        {{#if detectedActions}}
-        <div class="combat-detection-info">
-          <strong>INFO:</strong> Will appear in: {{#each detectedActions}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}
+        <div class="form-group half">
+          <label>
+            <input type="checkbox" name="system.isResistance" {{checked system.isResistance}} id="is-resistance" />
+            Resistance
+          </label>
+          {{#if system.isResistance}}
+          <div class="resistance-details" style="margin-top:6px;">
+            <label>Against:</label>
+            <select name="system.resistanceType">
+              <option value="">-- Select Type --</option>
+              <option value="fire" {{#if (eq system.resistanceType "fire")}}selected{{/if}}>Fire/Heat</option>
+              <option value="cold" {{#if (eq system.resistanceType "cold")}}selected{{/if}}>Cold/Ice</option>
+              <option value="electricity" {{#if (eq system.resistanceType "electricity")}}selected{{/if}}>Electricity</option>
+              <option value="radiation" {{#if (eq system.resistanceType "radiation")}}selected{{/if}}>Radiation</option>
+              <option value="toxins" {{#if (eq system.resistanceType "toxins")}}selected{{/if}}>Toxins/Poison</option>
+              <option value="corrosives" {{#if (eq system.resistanceType "corrosives")}}selected{{/if}}>Corrosives/Acid</option>
+              <option value="emotion" {{#if (eq system.resistanceType "emotion")}}selected{{/if}}>Emotion Attacks</option>
+              <option value="mental" {{#if (eq system.resistanceType "mental")}}selected{{/if}}>Mental Attacks</option>
+              <option value="magic" {{#if (eq system.resistanceType "magic")}}selected{{/if}}>Magical Attacks</option>
+              <option value="disease" {{#if (eq system.resistanceType "disease")}}selected{{/if}}>Disease</option>
+            </select>
+            <label>Effect:</label>
+            <select name="system.resistanceEffect">
+              <option value="columnShift" {{#if (eq system.resistanceEffect "columnShift")}}selected{{/if}}>Column Shift Bonus</option>
+              <option value="damageReduction" {{#if (eq system.resistanceEffect "damageReduction")}}selected{{/if}}>Damage Reduction</option>
+              <option value="immunity" {{#if (eq system.resistanceEffect "immunity")}}selected{{/if}}>Immunity (if rank >= attack)</option>
+            </select>
+            <label>Value:</label>
+            <input type="number" name="system.resistanceValue" value="{{system.resistanceValue}}" placeholder="2" />
+          </div>
+          {{/if}}
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 3: SPECIAL ABILITIES -->
+    <div class="tab" data-group="primary" data-tab="special">
+      <!-- FLAGS -->
+      <div class="form-row">
+        <div class="form-group third">
+          <label>
+            <input type="checkbox" name="system.lifeSupport" {{checked system.lifeSupport}} id="is-life-support" />
+            Life Support
+          </label>
+        </div>
+        <div class="form-group third">
+          <label>
+            <input type="checkbox" name="system.extraAttacks" {{checked system.extraAttacks}} />
+            Extra Attacks
+          </label>
+        </div>
+        <div class="form-group third">
+          <label>
+            <input type="checkbox" name="system.forceFieldPersonal" {{checked system.forceFieldPersonal}} />
+            Personal Force Field
+          </label>
+        </div>
+      </div>
+
+      {{#if system.lifeSupport}}
+      <div class="form-group">
+        <label>Survive Hostile Environment (turns):</label>
+        <input type="number" name="system.lifeSupportTurns" value="{{system.lifeSupportTurns}}" placeholder="Use rank value" />
+        <small>How many turns survive in space/underwater/lava before Endurance FEATs</small>
+      </div>
+      {{/if}}
+
+      <div class="form-group">
+        <label>Extra Body Parts:</label>
+        <input type="text" name="system.extraBodyParts" value="{{system.extraBodyParts}}" placeholder="wings, tail, extra-arms" />
+        <small>Comma-separated. May grant bonus powers.</small>
+      </div>
+
+      <!-- HEALING -->
+      <h4 style="margin:15px 0 8px;padding-top:15px;border-top:2px solid #ddd;">Healing & Recovery</h4>
+      
+      <div class="form-row">
+        <div class="form-group half">
+          <label>Healing Type:</label>
+          <select name="system.healingType" id="healing-type">
+            <option value="">Not a healing power</option>
+            <option value="self" {{#if (eq system.healingType "self")}}selected{{/if}}>Self Only</option>
+            <option value="others" {{#if (eq system.healingType "others")}}selected{{/if}}>Others Only</option>
+            <option value="both" {{#if (eq system.healingType "both")}}selected{{/if}}>Self & Others</option>
+          </select>
+        </div>
+        
+        {{#if system.healingType}}
+        <div class="form-group half">
+          <label>Max Health Per Day (per target):</label>
+          <input type="number" name="system.healingMaxPerDay" value="{{system.healingMaxPerDay}}" placeholder="Use rank value" />
+          <small>Endurance FEAT required; failure costs Karma</small>
+        </div>
+        {{/if}}
+      </div>
+
+      <!-- REGENERATION -->
+      <div class="form-row">
+        <div class="form-group half">
+          <label>Regeneration Type:</label>
+          <select name="system.regenerationType" id="regen-type">
+            <option value="">None</option>
+            <option value="standard" {{#if (eq system.regenerationType "standard")}}selected{{/if}}>Standard Regeneration</option>
+            <option value="solar" {{#if (eq system.regenerationType "solar")}}selected{{/if}}>Solar Regeneration</option>
+          </select>
+        </div>
+        
+        {{#if system.regenerationType}}
+        <div class="form-group half">
+          <label>Recovery Rate:</label>
+          <select name="system.regenerationRate">
+            <option value="10-turns" {{#if (eq system.regenerationRate "10-turns")}}selected{{/if}}>Endurance rank per 10 turns</option>
+            <option value="10-minutes" {{#if (eq system.regenerationType "solar")}}selected{{/if}}>Power rank per 10 min (solar)</option>
+          </select>
+        </div>
+        {{/if}}
+      </div>
+
+      <!-- ABSORPTION -->
+      <div class="form-group">
+        <label>Absorption Type:</label>
+        <select name="system.absorptionType" id="absorption-type">
+          <option value="">Not an absorption power</option>
+          <option value="fire" {{#if (eq system.absorptionType "fire")}}selected{{/if}}>Fire/Heat</option>
+          <option value="cold" {{#if (eq system.absorptionType "cold")}}selected{{/if}}>Cold</option>
+          <option value="electricity" {{#if (eq system.absorptionType "electricity")}}selected{{/if}}>Electricity</option>
+          <option value="sound" {{#if (eq system.absorptionType "sound")}}selected{{/if}}>Sound/Sonic</option>
+          <option value="kinetic" {{#if (eq system.absorptionType "kinetic")}}selected{{/if}}>Kinetic (physical)</option>
+          <option value="energy" {{#if (eq system.absorptionType "energy")}}selected{{/if}}>Energy (generic)</option>
+        </select>
+        {{#if system.absorptionType}}
+        <div style="margin-top:6px;">
+          <small>Absorbs up to Power rank; heals, then temp Health. Dissipates after 10 rounds.</small>
+          <label style="display:block;margin-top:4px;">
+            <input type="checkbox" name="system.absorptionConvertsToHealth" {{checked system.absorptionConvertsToHealth}} />
+            Converts absorbed damage to temporary Health
+          </label>
         </div>
         {{/if}}
       </div>
     </div>
 
-    <div class="form-group">
-      <label>Power Source:</label>
-      <select name="system.source">
-        <option value="natural" {{#if (eq system.source "natural")}}selected{{/if}}>Natural/Inborn</option>
-        <option value="equipment" {{#if (eq system.source "equipment")}}selected{{/if}}>Equipment</option>
-        <option value="mystical" {{#if (eq system.source "mystical")}}selected{{/if}}>Mystical</option>
-      </select>
-    </div>
-
-    <!-- MAGIC SPELLS SECTION -->
+    <!-- TAB 4: MAGIC (conditional) -->
     {{#if system.isMagic}}
-    <div class="form-group">
-      <label>Spell Energy Type <span style="color:red;">*</span></label>
-      <select name="system.magic.energyType" required>
-        <option value="">-- Select Energy Type --</option>
-        <option value="personal">Personal (1 HP/turn, self/willing only, no ceremony)</option>
-        <option value="universal">Universal (target resists, ceremony required, backlash risk)</option>
-        <option value="dimensional">Dimensional (needs Contact entity, ceremony required)</option>
-      </select>
-    </div>
-
-    <!-- Source Entity - only for Dimensional -->
-    <div class="form-group source-entity-group" style="display: none;">
-      <label>Source Entity <span style="color:red;">*</span></label>
-      <input type="text" name="system.magic.sourceEntity" 
-            placeholder="Must be a Contact (e.g., Agamotto, Cytorrak)" />
-      <small class="hint">This entity must be listed in your Contacts</small>
-    </div>
-
-    <!-- Backlash - only for Universal -->
-    <div class="form-group backlash-group" style="display: none;">
-      <label>Backlash on Failure</label>
-      <textarea name="system.magic.backlashNotes" 
-                placeholder="Default: Caster's Psyche -1 rank for 1-10 turns if target resists">{{system.magic.backlashNotes}}</textarea>
-    </div>
-
-    <!-- Ceremony - auto-checked for Universal/Dimensional -->
-    <div class="form-group">
-      <label>
-        <input type="checkbox" name="system.magic.usesCeremony" {{checked system.magic.usesCeremony}} />
-        Requires Ceremony (gestures/chants)
-      </label>
-      <small class="hint">Universal and Dimensional energies require ceremony</small>
-    </div>
-
-    <!-- Cast Cost - mainly for Personal -->
-    <div class="form-group">
-      <label>Cast Cost (Health)</label>
-      <input type="number" name="system.magic.castCost" value="{{system.magic.castCost}}" />
-      <small class="hint">Personal energy: 1 Health per turn active</small>
-    </div>
-
-    <div class="form-group">
-      <label>Casting Ability</label>
-      <select name="system.magic.successAbility">
-        <option value="psyche" selected>Psyche (standard for magic)</option>
-        <option value="reason">Reason</option>
-        <option value="intuition">Intuition</option>
-      </select>
-    </div>
-
-    <div class="form-group">
-      <label>Target Resists With</label>
-      <select name="system.magic.targetResistsWith">
-        <option value="">None (Personal energy - willing targets only)</option>
-        <option value="psyche" selected>Psyche (Universal energy default)</option>
-        <option value="reason">Reason</option>
-        <option value="intuition">Intuition</option>
-      </select>
-    </div>
-
-    {{/if}}
-
-    <!-- Checkbox to enable/disable Magic -->
-    <div class="form-group">
-    <label><input type="checkbox" id="is-magic-checkbox" name="system.isMagic" {{checked system.isMagic}} /> Is this Power a Spell?</label>
-    </div>
-
-    <div class="form-group">
-      <label>Range:</label>
-      <select name="system.range" id="range-type">
-        <option value="touch" {{#if (eq system.range "touch")}}selected{{/if}}>Touch Only</option>
-        <option value="rank" {{#if (eq system.range "rank")}}selected{{/if}}>By Rank</option>
-        <option value="custom" {{#if (eq system.range "custom")}}selected{{/if}}>Custom</option>
-        {{#each rangeOptions}}
-        <option value="{{this}}" {{#if (eq ../system.range this)}}selected{{/if}}>{{this}}</option>
-        {{/each}}
-      </select>
-      <input type="text" name="system.customRange" value="{{system.customRange}}" 
-             placeholder="Custom range" class="custom-range-input" 
-             {{#unless (eq system.range "custom")}}style="display: none;"{{/unless}}>
-    </div>
-    
-    <div class="form-group calculated-range" 
-         {{#unless (eq system.range "rank")}}style="display: none;"{{/unless}}>
-      <label>Calculated Range:</label>
-      <input type="text" id="calculated-range-display" value="{{calculatedRange}}" readonly />
-    </div>
-
-    <div class="form-group">
-      <label>Duration:</label>
-      <select name="system.duration" id="duration-type">
-        {{#each durationOptions}}
-          <option value="{{this}}" {{#if (eq ../system.duration this)}}selected{{/if}}>{{this}}</option>
-        {{/each}}
-      </select>
-      
-      <input type="text" name="system.customDuration" value="{{system.customDuration}}" 
-             placeholder="e.g., 1-10 rounds" class="custom-duration-input"
-             {{#unless (eq system.duration "custom")}}style="display: none;"{{/unless}}>
-    </div>
-
-    <div class="form-group">
-      <label>Area:</label>
-      <input type="text" name="system.area" value="{{system.area}}" />
-    </div>
-
-    <div class="form-row special-flags">
-      <div class="form-group half">
-        <label>
-          <input type="checkbox" name="system.isLimited" {{checked system.isLimited}} />
-          Has Limitations
-        </label>
-      </div>
-      <div class="form-group half">
-        <label>
-          <input type="checkbox" name="system.isActive" {{checked system.isActive}} />
-          Requires Activation
-        </label>
-      </div>
-    </div>
-
-    <div class="form-group">
-      <label>Limitations/Drawbacks:</label>
-      <textarea name="system.limitations">{{system.limitations}}</textarea>
-    </div>
-    
-    <div class="form-row limitation-rank-mod" {{#unless system.isLimited}}style="display: none;"{{/unless}}>
-      <div class="form-group half">
-        <label>Limited To Maximum:</label>
-        <select name="system.limitRankMax">
-          <option value="" {{#if (eq system.limitRankMax "")}}selected{{/if}}>No Limit</option>
-          <option value="Excellent" {{#if (eq system.limitRankMax "Excellent")}}selected{{/if}}>Excellent</option>
-          <option value="Remarkable" {{#if (eq system.limitRankMax "Remarkable")}}selected{{/if}}>Remarkable</option>
-          <option value="Incredible" {{#if (eq system.limitRankMax "Incredible")}}selected{{/if}}>Incredible</option>
-          <option value="Amazing" {{#if (eq system.limitRankMax "Amazing")}}selected{{/if}}>Amazing</option>
-          <option value="Monstrous" {{#if (eq system.limitRankMax "Monstrous")}}selected{{/if}}>Monstrous</option>
-          <option value="Unearthly" {{#if (eq system.limitRankMax "Unearthly")}}selected{{/if}}>Unearthly</option>
+    <div class="tab" data-group="primary" data-tab="magic">
+      <div class="form-group">
+        <label>Spell Energy Type <span style="color:red;">*</span></label>
+        <select name="system.magic.energyType" required>
+          <option value="">-- Select Energy Type --</option>
+          <option value="personal">Personal (1 HP/turn, self/willing only)</option>
+          <option value="universal">Universal (target resists, ceremony, backlash)</option>
+          <option value="dimensional">Dimensional (needs Contact, ceremony)</option>
         </select>
       </div>
-      <div class="form-group half">
-        <label>Column Shift:</label>
-        <input type="number" name="system.limitationColumnShift" value="{{system.limitationColumnShift}}" placeholder="0" />
+
+      {{#if (eq system.magic.energyType "dimensional")}}
+      <div class="form-group">
+        <label>Source Entity <span style="color:red;">*</span></label>
+        <input type="text" name="system.magic.sourceEntity" value="{{system.magic.sourceEntity}}" placeholder="e.g., Agamotto, Cytorrak" />
+        <small>Must be listed in your Contacts</small>
+      </div>
+      {{/if}}
+
+      {{#if (eq system.magic.energyType "universal")}}
+      <div class="form-group">
+        <label>Backlash on Failure:</label>
+        <textarea name="system.magic.backlashNotes" rows="4" placeholder="Default: Caster's Psyche -1 rank for 1-10 turns if target resists">{{system.magic.backlashNotes}}</textarea>
+      </div>
+      {{/if}}
+
+      <div class="form-group">
+        <label>
+          <input type="checkbox" name="system.magic.usesCeremony" {{checked system.magic.usesCeremony}} />
+          Requires Ceremony (gestures/chants)
+        </label>
+        <small>Universal and Dimensional require ceremony</small>
+      </div>
+
+      <div class="form-group">
+        <label>Cast Cost (Health):</label>
+        <input type="number" name="system.magic.castCost" value="{{system.magic.castCost}}" />
+        <small>Personal: 1 Health per turn active</small>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group half">
+          <label>Casting Ability:</label>
+          <select name="system.magic.successAbility">
+            <option value="psyche" selected>Psyche</option>
+            <option value="reason">Reason</option>
+            <option value="intuition">Intuition</option>
+          </select>
+        </div>
+
+        <div class="form-group half">
+          <label>Target Resists With:</label>
+          <select name="system.magic.targetResistsWith">
+            <option value="">None (Personal - willing only)</option>
+            <option value="psyche" selected>Psyche (Universal default)</option>
+            <option value="reason">Reason</option>
+            <option value="intuition">Intuition</option>
+          </select>
+        </div>
       </div>
     </div>
+    {{/if}}
 
-    <div class="form-group description-field">
-      <label>Description:</label>
-      <textarea name="system.description" rows="5" class="power-description">{{system.description}}</textarea>
+    <!-- TAB 5: RANGE & LIMITS -->
+    <div class="tab" data-group="primary" data-tab="range">
+      <div class="form-group">
+        <label>Range:</label>
+        <select name="system.range" id="range-type">
+          <option value="touch" {{#if (eq system.range "touch")}}selected{{/if}}>Touch Only</option>
+          <option value="rank" {{#if (eq system.range "rank")}}selected{{/if}}>By Rank</option>
+          <option value="custom" {{#if (eq system.range "custom")}}selected{{/if}}>Custom</option>
+        </select>
+        {{#if (eq system.range "custom")}}
+        <input type="text" name="system.customRange" value="{{system.customRange}}" placeholder="Custom range" style="width:100%;margin-top:4px;" />
+        {{/if}}
+      </div>
+      
+      {{#if (eq system.range "rank")}}
+      <div class="form-group">
+        <label>Calculated Range:</label>
+        <input type="text" id="calculated-range-display" value="{{calculatedRange}}" readonly />
+      </div>
+      {{/if}}
+
+      <div class="form-group">
+        <label>Duration:</label>
+        <select name="system.duration" id="duration-type">
+          <option value="Instant">Instant</option>
+          <option value="1 round">1 round</option>
+          <option value="Concentration">Concentration</option>
+          <option value="Power rank">Power rank (rounds)</option>
+          <option value="Permanent">Permanent</option>
+          <option value="custom" {{#if (eq system.duration "custom")}}selected{{/if}}>Custom</option>
+        </select>
+        {{#if (eq system.duration "custom")}}
+        <input type="text" name="system.customDuration" value="{{system.customDuration}}" placeholder="e.g., 1-10 rounds" style="width:100%;margin-top:4px;" />
+        {{/if}}
+      </div>
+
+      <div class="form-group">
+        <label>Area:</label>
+        <input type="text" name="system.area" value="{{system.area}}" placeholder="e.g., 1 area, 3 areas, line of sight" />
+      </div>
+
+      <div class="form-row">
+        <div class="form-group half">
+          <label>
+            <input type="checkbox" name="system.isLimited" {{checked system.isLimited}} id="is-limited" />
+            Has Limitations
+          </label>
+        </div>
+        <div class="form-group half">
+          <label>
+            <input type="checkbox" name="system.isActive" {{checked system.isActive}} />
+            Requires Activation
+          </label>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Limitations/Drawbacks:</label>
+        <textarea name="system.limitations" rows="8">{{system.limitations}}</textarea>
+        <small>Describe any conditions, weaknesses, or restrictions on this power</small>
+      </div>
+      
+      {{#if system.isLimited}}
+      <div class="form-row">
+        <div class="form-group half">
+          <label>Limited To Maximum:</label>
+          <select name="system.limitRankMax">
+            <option value="">No Limit</option>
+            <option value="Excellent" {{#if (eq system.limitRankMax "Excellent")}}selected{{/if}}>Excellent</option>
+            <option value="Remarkable" {{#if (eq system.limitRankMax "Remarkable")}}selected{{/if}}>Remarkable</option>
+            <option value="Incredible" {{#if (eq system.limitRankMax "Incredible")}}selected{{/if}}>Incredible</option>
+            <option value="Amazing" {{#if (eq system.limitRankMax "Amazing")}}selected{{/if}}>Amazing</option>
+            <option value="Monstrous" {{#if (eq system.limitRankMax "Monstrous")}}selected{{/if}}>Monstrous</option>
+            <option value="Unearthly" {{#if (eq system.limitRankMax "Unearthly")}}selected{{/if}}>Unearthly</option>
+          </select>
+        </div>
+        <div class="form-group half">
+          <label>Column Shift Penalty:</label>
+          <input type="number" name="system.limitationColumnShift" value="{{system.limitationColumnShift}}" placeholder="0" />
+        </div>
+      </div>
+      {{/if}}
     </div>
 
-    <!-- ADD NEW SECTION -->
-    <div class="form-group" style="margin-top: 10px;">
-      <button type="button" class="create-stunt-from-power" style="width: 100%; padding: 8px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
+    <!-- STUNT BUTTON (always visible at bottom) -->
+    <div class="form-group" style="margin-top:20px;padding-top:20px;border-top:2px solid #ddd;">
+      <button type="button" class="create-stunt-from-power" style="width:100%;padding:8px;background:#4CAF50;color:white;border:none;border-radius:4px;cursor:pointer;font-weight:bold;">
         <i class="fas fa-plus"></i> Create Power Stunt for {{item.name}}
       </button>
-      <small style="display: block; margin-top: 4px; color: #666; font-style: italic;">
-        Creates a new stunt in the actor's Stunts tab based on this power
+      <small style="display:block;margin-top:4px;color:#666;font-style:italic;">
+        Creates a new stunt in the actor's Stunts tab
       </small>
     </div>
-
   </section>
 </form>

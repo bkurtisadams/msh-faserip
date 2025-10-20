@@ -1064,6 +1064,56 @@ export function getBodyArmorValues(targetActor, damageType = "physical-blunt") {
 }
 
 /**
+ * Apply damage immediately using the classic mitigation pipeline.
+ * Wraps CombatHandler.processAttack so both classic and refactor paths share one soak/HP codepath.
+ *
+ * @param {Object} opts
+ * @param {Actor}  opts.sourceActor
+ * @param {TokenDocument[]|Token[]} opts.targets
+ * @param {number} opts.baseDamage            Raw damage before soak
+ * @param {string} opts.damageType            e.g., "energy-generic", "physical-blunt", etc.
+ * @param {string} [opts.sourceLabel]         For chat summaries
+ * @param {boolean}[opts.forceKilling=false]  If you need to mark as killing attack
+ * @returns {Promise<Array>}                  Per-target summaries: { targetId, name, absorbed, net, hpBefore, hpAfter }
+ */
+export async function applyDamageNow({ sourceActor, targets, baseDamage, damageType, sourceLabel = "Attack", forceKilling = false }) {
+  const CombatHandler = (await import("../../combat-handler.js")).default || (await import("../../combat-handler.js"));
+  const results = [];
+
+  for (const t of targets) {
+    // Normalize to TokenDocument → Actor
+    const td = t?.document ? t.document : t;
+    const targetActor = td?.actor || t?.actor;
+    if (!targetActor) continue;
+
+    // Prepare the minimal classic payload; adapt if your processAttack signature differs
+    const payload = {
+      baseDamage,
+      damageType,
+      sourceLabel,
+      forceKilling,
+      // Hints that this call wants HP application and full soak
+      directApply: true
+    };
+
+    // Classic pipeline does soak + HP change + detailed breakdown
+    const summary = await CombatHandler.processAttack(sourceActor, targetActor, payload);
+
+    // Normalize a small summary object the refactor can consume
+    results.push({
+      targetId: targetActor.id,
+      name: targetActor.name,
+      absorbed: summary?.damageAbsorbed ?? 0,
+      net: summary?.netDamage ?? Math.max(0, baseDamage - (summary?.damageAbsorbed ?? 0)),
+      hpBefore: summary?.hpBefore ?? targetActor.system?.attributes?.health?.value,
+      hpAfter: summary?.hpAfter ?? (targetActor.system?.attributes?.health?.value)
+    });
+  }
+
+  return results;
+}
+
+/**
  * Get resistance modifiers for a target actor
  * @param {Actor} targetActor - The actor being hit
  * @param {string} damageType - Type of damage (e.g., "energy-fire", "physical-blunt")

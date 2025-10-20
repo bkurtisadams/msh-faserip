@@ -113,6 +113,38 @@ export class FaseripItemSheet extends ItemSheet {
   activateListeners(html) {
     super.activateListeners(html);
 
+   // ============ TAB HANDLING ============
+    // Manual tab switching (compatible with all Foundry versions)
+    html.find('.sheet-tabs .item').click(ev => {
+      ev.preventDefault();
+      const tab = ev.currentTarget.dataset.tab;
+      
+      // Update tab nav
+      html.find('.sheet-tabs .item').removeClass('active');
+      ev.currentTarget.classList.add('active');
+      
+      // Update tab content
+      html.find('.tab').removeClass('active');
+      html.find(`.tab[data-tab="${tab}"]`).addClass('active');
+    });
+
+    // Activate first tab on initial render
+    html.find('.sheet-tabs .item:first').addClass('active');
+    html.find('.tab:first').addClass('active');
+
+    // ============ CONDITIONAL FIELD VISIBILITY ============
+    // These trigger re-renders so {{#if}} conditions in template update
+
+    html.find('#is-life-support, #healing-type, #regen-type, #absorption-type, #is-body-armor, #is-resistance, #requires-save, #is-limited, #save-intensity, #range-type, #duration-type').change(ev => {
+      this.render(true);
+    });
+
+    // Magic checkbox needs to save data THEN re-render
+    html.find('#is-magic-checkbox').change(async (ev) => {
+      await this.item.update({'system.isMagic': ev.target.checked});
+      this.render(true);
+    });
+
     // Handle magic checkbox toggle
     if (this.item.type === "power") {
       html.find("#is-magic-checkbox").change(ev => {

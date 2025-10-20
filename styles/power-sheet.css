@@ -1,0 +1,121 @@
+/* SHEET SIZE CONSTRAINTS */
+.power-sheet.sheet {
+  width: 600px;
+  height: 700px;
+}
+
+.power-sheet .window-content {
+  padding: 5px;
+}
+
+.power-sheet .sheet-body {
+  overflow-y: auto;
+  height: calc(100% - 100px); /* Account for header */
+}
+
+/* TAB NAVIGATION - COMPACT */
+.power-sheet .sheet-tabs {
+  flex: 0 0 30px;
+  border-bottom: 2px solid #8b0000;
+  margin: 5px 0 10px;
+  display: flex;
+  gap: 0;
+}
+
+.power-sheet .sheet-tabs .item {
+  line-height: 28px;
+  padding: 0 10px;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  font-weight: 600;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.power-sheet .sheet-tabs .item.active {
+  border-bottom-color: #8b0000;
+  color: #8b0000;
+}
+
+.power-sheet .sheet-tabs .item:hover {
+  background: rgba(139, 0, 0, 0.05);
+}
+
+/* TAB CONTENT - COMPACT */
+.power-sheet .tab {
+  display: none;
+  padding: 0;
+}
+
+.power-sheet .tab.active {
+  display: block;
+}
+
+/* FORM GROUPS - MATCH ORIGINAL SIZING */
+.power-sheet .form-group {
+  margin-bottom: 8px;
+}
+
+.power-sheet .form-row {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.power-sheet .form-group.half {
+  flex: 1;
+}
+
+.power-sheet .form-group.third {
+  flex: 1;
+}
+
+.power-sheet label {
+  font-weight: bold;
+  font-size: 12px;
+  display: block;
+  margin-bottom: 2px;
+}
+
+.power-sheet input[type="text"],
+.power-sheet input[type="number"],
+.power-sheet select,
+.power-sheet textarea {
+  width: 100%;
+  box-sizing: border-box;
+  font-size: 12px;
+}
+
+.power-sheet small {
+  font-size: 10px;
+  color: #666;
+  font-style: italic;
+  display: block;
+  margin-top: 2px;
+}
+
+/* BIGGER TEXT AREAS */
+.power-sheet textarea.power-description {
+  min-height: 180px;
+  resize: vertical;
+}
+
+.power-sheet textarea[name="system.limitations"] {
+  min-height: 120px;
+  resize: vertical;
+}
+
+.power-sheet textarea[name="system.specialMechanics"] {
+  min-height: 100px;
+  resize: vertical;
+}
+
+/* SECTION HEADERS */
+.power-sheet h4 {
+  color: #8b0000;
+  font-weight: bold;
+  font-size: 14px;
+  margin: 10px 0 6px;
+  padding-bottom: 3px;
+  border-bottom: 1px solid #ddd;
+}
