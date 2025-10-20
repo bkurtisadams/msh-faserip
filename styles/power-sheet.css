@@ -119,3 +119,118 @@
   padding-bottom: 3px;
   border-bottom: 1px solid #ddd;
 }
+
+/* Advanced collapsible section */
+.power-sheet .advanced-section.collapsed { 
+  display: none; 
+}
+
+.power-sheet h4.advanced-toggle { 
+  cursor: pointer;
+  user-select: none;
+  padding: 8px 12px;
+  background: #f5f5f5;
+  border: 1px solid #ddd;
+  border-radius: 3px;
+  margin: 15px 0 0 0;
+  position: relative;
+}
+
+.power-sheet h4.advanced-toggle:hover {
+  background: #e8e8e8;
+}
+
+.power-sheet h4.advanced-toggle::before {
+  content: "▼ ";
+  display: inline-block;
+  transition: transform 0.2s;
+  margin-right: 6px;
+}
+
+.power-sheet h4.advanced-toggle.collapsed::before {
+  transform: rotate(-90deg);
+}
+
+.power-sheet .advanced-section {
+  border: 1px solid #ddd;
+  border-top: none;
+  padding: 12px;
+  background: #fafafa;
+  border-radius: 0 0 3px 3px;
+}
+
+/* Description textarea improvements */
+.power-sheet textarea.power-description {
+  min-height: 180px;
+  resize: vertical;
+  font-family: inherit;
+  font-size: 0.9em;
+  line-height: 1.5;
+  padding: 8px;
+}
+
+.power-sheet textarea[name="system.specialMechanics"] {
+  min-height: 120px;
+  resize: vertical;
+  font-family: "Courier New", monospace;
+  font-size: 0.85em;
+  line-height: 1.4;
+  padding: 8px;
+  background: #f8f8f8;
+}
+
+.power-sheet textarea[name="system.limitations"] {
+  min-height: 150px;
+  resize: vertical;
+  font-family: inherit;
+  font-size: 0.9em;
+  line-height: 1.5;
+  padding: 8px;
+}
+
+/* All textareas in power sheet */
+.power-sheet textarea {
+  width: 100%;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+}
+
+.power-sheet textarea:focus {
+  outline: none;
+  border-color: #4CAF50;
+  box-shadow: 0 0 3px rgba(76, 175, 80, 0.3);
+}
+
+/* Stunt button styling */
+.power-sheet .stunt-button-group {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 2px solid #ddd;
+}
+
+.power-sheet button.create-stunt-from-power {
+  padding: 6px 12px;
+  background: #f5f5f5;
+  color: #333;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 0.9em;
+  font-weight: normal;
+  transition: all 0.2s;
+}
+
+.power-sheet button.create-stunt-from-power:hover {
+  background: #e8e8e8;
+  border-color: #999;
+}
+
+.power-sheet button.create-stunt-from-power:active {
+  background: #ddd;
+  transform: translateY(1px);
+}
+
+.power-sheet button.create-stunt-from-power i {
+  margin-right: 4px;
+  color: #666;
+}

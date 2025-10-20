@@ -6,7 +6,9 @@ export class FaseripItemSheet extends ItemSheet {
       width: 500,
       height: 600,
       tabs: [{ navSelector: ".sheet-tabs", contentSelector: ".sheet-body", initial: "description" }],
-      resizable: true
+      resizable: true,
+      width: 640, // a bit wider to avoid label wrap
+      submitOnChange: true
     });
   }
 
@@ -33,45 +35,60 @@ export class FaseripItemSheet extends ItemSheet {
 
   // In itemSheet.js - revised getData() function
   getData() {
+    // Keep this sync and side-effect free
     const context = super.getData();
-    context.item = this.item;
+
+    // Preserve what your template expects
+    context.item   = this.item;
     context.system = this.item.system;
-    
+
     const classes = ["faserip", "sheet", "item", this.item.type];
     context.cssClass = classes.join(" ");
 
     if (this.item.type === "power") {
-      context.isMagic = context.system.isMagic;
-      context.magic = context.system.magic || {};
+      // Keep the magic context (even if the tab is always visible now)
+      context.isMagic = context.system?.isMagic ?? false;
+      context.magic   = context.system?.magic   ?? {};
+
+      // Your original option arrays
       context.energyTypes = ["personal", "universal", "dimensional"];
-      context.abilities = ["fighting", "agility", "strength", "endurance", "reason", "intuition", "psyche"];
-      
-      // Add dropdown options from CONFIG
-      context.damageTypes = CONFIG.FASERIP.damageTypes;
-      context.resistanceTypes = CONFIG.FASERIP.resistanceTypes;
-      context.attackTypes = CONFIG.FASERIP.attackTypes;
-      context.primaryEffects = CONFIG.FASERIP.primaryEffects;
-      context.bodyArmorTypes = CONFIG.FASERIP.bodyArmorTypes;
-      context.resistanceEffects = CONFIG.FASERIP.resistanceEffects;
-      
+      context.abilities   = ["fighting", "agility", "strength", "endurance", "reason", "intuition", "psyche"];
+
+      // Defensive guards so a missing CONFIG block doesn't grey the sheet
+      const FCFG = (globalThis.CONFIG && CONFIG.FASERIP) ? CONFIG.FASERIP : {};
+      context.damageTypes       = FCFG.damageTypes        ?? {};
+      context.resistanceTypes   = FCFG.resistanceTypes    ?? {};
+      context.attackTypes       = FCFG.attackTypes        ?? {};
+      context.primaryEffects    = FCFG.primaryEffects     ?? {};
+      context.bodyArmorTypes    = FCFG.bodyArmorTypes     ?? {};
+      context.resistanceEffects = FCFG.resistanceEffects  ?? {};
+
       context.powerTypes = [
-        "Resistances", "Movement", "Matter Control", "Energy Control", 
+        "Resistances", "Movement", "Matter Control", "Energy Control",
         "Body Control", "Mental", "Sensory", "Self-Alteration", "Other"
       ];
-      
+
       context.rangeOptions = [
-        "1 area", "2 areas", "4 areas", "6 areas", "8 areas", 
-        "10 areas", "20 areas", "40 areas", "60 areas", "80 areas", 
+        "1 area", "2 areas", "4 areas", "6 areas", "8 areas",
+        "10 areas", "20 areas", "40 areas", "60 areas", "80 areas",
         "160 areas", "400 areas", "Line of Sight"
       ];
-      
+
       context.durationOptions = [
         "Instant", "Concentration", "Maintenance", "Permanent"
       ];
-      
-      // Auto-detect which action buttons will find this power
-      context.detectedActions = this._detectActionButtons(context.system);
-      
+
+      // Auto-detect which action buttons will find this power (your original)
+      context.detectedActions = this._detectActionButtons?.(context.system) ?? [];
+
+      // ----- NEW: provide a safe calculatedRange string when range === "rank"
+      if (context.system?.range === "rank") {
+        // If you have a proper range engine, call it here instead.
+        const rankValue = Number(context.system?.value ?? 0);
+        context.calculatedRange = rankValue ? `${rankValue} areas (by rank)` : "";
+      }
+
+      // Helpful logging (kept from your original)
       console.log("Power sheet data:", context);
     }
 
@@ -113,6 +130,21 @@ export class FaseripItemSheet extends ItemSheet {
   activateListeners(html) {
     super.activateListeners(html);
 
+    // One-time migration: telekinesiStrength -> telekinesisStrength
+    try {
+      if (this.item?.type === "power") {
+        const sys = this.item.system || {};
+        if (sys.telekinesiStrength && !sys.telekinesisStrength) {
+          this.item.update({
+            "system.telekinesisStrength": sys.telekinesiStrength,
+            "system.telekinesiStrength": null
+          }, { diff: false });
+        }
+      }
+    } catch (e) {
+      console.warn("FASERIP | telekinesis migration skipped:", e);
+    }
+
    // ============ TAB HANDLING ============
     // Manual tab switching (compatible with all Foundry versions)
     html.find('.sheet-tabs .item').click(ev => {
@@ -132,26 +164,71 @@ export class FaseripItemSheet extends ItemSheet {
     html.find('.sheet-tabs .item:first').addClass('active');
     html.find('.tab:first').addClass('active');
 
+    // --- HEALING ---
+    html.find('#healing-type').change(async ev => {
+      const value = ev.currentTarget.value || "";
+      await this.item.update({ "system.healingType": value }, { render: false });
+      this.render(true); // re-test {{#if system.healingType}}
+    });
+
+    html.find('input[name="system.healingMaxPerDay"]').change(async ev => {
+      const num = Number(ev.currentTarget.value ?? 0) || 0;
+      await this.item.update({ "system.healingMaxPerDay": num }, { render: false });
+    });
+
+    // --- REGENERATION ---
+    html.find('#regen-type').change(async ev => {
+      const value = ev.currentTarget.value || "";
+      // If switching to solar, provide a sensible default for the rate
+      const patch = { "system.regenerationType": value };
+      if (value === "solar" && !this.item.system?.regenerationRate) {
+        patch["system.regenerationRate"] = "10-minutes";
+      }
+      await this.item.update(patch, { render: false });
+      this.render(true); // re-test {{#if system.regenerationType}}
+    });
+
+    html.find('select[name="system.regenerationRate"]').change(async ev => {
+      const value = ev.currentTarget.value || "";
+      await this.item.update({ "system.regenerationRate": value }, { render: false });
+    });
+
+    // --- ABSORPTION (same pattern so its {{#if}} toggles immediately) ---
+    html.find('#absorption-type').change(async ev => {
+      const value = ev.currentTarget.value || "";
+      await this.item.update({ "system.absorptionType": value }, { render: false });
+      this.render(true); // re-test {{#if system.absorptionType}}
+    });
+
+    html.find('input[name="system.absorptionConvertsToHealth"]').change(async ev => {
+      await this.item.update({ "system.absorptionConvertsToHealth": ev.currentTarget.checked }, { render: false });
+    });
+
+    // If Source set to 'mystical', prefill energyType (if empty) and switch to Magic tab
+    html.find('select[name="system.source"]').change(async ev => {
+      if (ev.currentTarget.value === 'mystical') {
+        const current = this.item.system?.magic?.energyType || "";
+        if (!current) await this.item.update({ "system.magic.energyType": "universal" });
+        html.find('.sheet-tabs .item[data-tab="magic"]').trigger('click');
+      }
+    });
+
+    // ============ ADVANCED SECTION TOGGLE ============
+    html.find('h4.advanced-toggle').click(ev => {
+      const target = ev.currentTarget;
+      const collapseId = target.dataset.collapse;
+      const section = html.find(`#${collapseId}`);
+      
+      target.classList.toggle('collapsed');
+      section.toggleClass('collapsed');
+    });
+
     // ============ CONDITIONAL FIELD VISIBILITY ============
     // These trigger re-renders so {{#if}} conditions in template update
 
     html.find('#is-life-support, #healing-type, #regen-type, #absorption-type, #is-body-armor, #is-resistance, #requires-save, #is-limited, #save-intensity, #range-type, #duration-type').change(ev => {
       this.render(true);
     });
-
-    // Magic checkbox needs to save data THEN re-render
-    html.find('#is-magic-checkbox').change(async (ev) => {
-      await this.item.update({'system.isMagic': ev.target.checked});
-      this.render(true);
-    });
-
-    // Handle magic checkbox toggle
-    if (this.item.type === "power") {
-      html.find("#is-magic-checkbox").change(ev => {
-        const isChecked = ev.currentTarget.checked;
-        this.item.update({ "system.isMagic": isChecked });
-      });
-    }
 
     // Handle magic energy type dropdown - MERGED VERSION (replaces both handlers)
     html.find('select[name="system.magic.energyType"]').change(async ev => {

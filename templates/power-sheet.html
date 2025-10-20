@@ -10,9 +10,8 @@
       <a class="item" data-tab="basics">Basics</a>
       <a class="item" data-tab="combat">Combat</a>
       <a class="item" data-tab="special">Special Abilities</a>
-      {{#if system.isMagic}}
       <a class="item" data-tab="magic">Magic</a>
-      {{/if}}
+
       <a class="item" data-tab="range">Range & Limits</a>
     </nav>
 
@@ -84,13 +83,6 @@
       </div>
 
       <div class="form-group">
-        <label>
-          <input type="checkbox" id="is-magic-checkbox" name="system.isMagic" {{checked system.isMagic}} />
-          Is this Power a Spell?
-        </label>
-      </div>
-
-      <div class="form-group">
         <label>Description:</label>
         <textarea name="system.description" rows="10" class="power-description">{{system.description}}</textarea>
       </div>
@@ -102,29 +94,33 @@
       </div>
 
       <div id="special-attributes" class="special-attributes">
-        <!-- Dynamically filled by JS -->
-      </div>
-    </div>
+          <!-- Dynamically filled by JS -->
+        </div>
 
-    <!-- TAB 2: COMBAT -->
+        <!-- STUNT BUTTON -->
+        <div class="form-group stunt-button-group">
+          <button type="button" class="create-stunt-from-power">
+            <i class="fas fa-plus"></i> Create Power Stunt
+          </button>
+          <small style="display:block;margin-top:4px;color:#666;font-style:italic;">
+            Creates a new stunt in the actor's Stunts tab
+          </small>
+        </div>
+      </div>
+
+      <!-- TAB 2: COMBAT -->
     <div class="tab" data-group="primary" data-tab="combat">
+
+
+      <!-- DAMAGE BLOCK - Better organized -->
       <div class="form-row">
-        <div class="form-group half">
-          <label>Attack Type:</label>
-          <select name="system.attackType">
-            <option value="">-- Not an Attack --</option>
-            <option value="ranged-energy" {{#if (eq system.attackType "ranged-energy")}}selected{{/if}}>Ranged: Energy Blast</option>
-            <option value="ranged-force" {{#if (eq system.attackType "ranged-force")}}selected{{/if}}>Ranged: Force Blast</option>
-            <option value="ranged-projectile" {{#if (eq system.attackType "ranged-projectile")}}selected{{/if}}>Ranged: Projectile</option>
-            <option value="ranged-thrown" {{#if (eq system.attackType "ranged-thrown")}}selected{{/if}}>Ranged: Thrown</option>
-            <option value="melee-blunt" {{#if (eq system.attackType "melee-blunt")}}selected{{/if}}>Melee: Blunt</option>
-            <option value="melee-edged" {{#if (eq system.attackType "melee-edged")}}selected{{/if}}>Melee: Edged</option>
-            <option value="touch" {{#if (eq system.attackType "touch")}}selected{{/if}}>Touch Attack</option>
-            <option value="mental" {{#if (eq system.attackType "mental")}}selected{{/if}}>Mental Attack</option>
-          </select>
+        <div class="form-group third">
+          <label>Damage Value:</label>
+          <input type="number" name="system.damage" value="{{system.damage}}" placeholder="0 = use rank" />
+          <small>Leave 0 to use rank value ({{system.value}}). Override only if different.</small>
         </div>
         
-        <div class="form-group half">
+        <div class="form-group third">
           <label>Damage Type:</label>
           <select name="system.damageType">
             <option value="">-- None --</option>
@@ -157,16 +153,8 @@
             </optgroup>
           </select>
         </div>
-      </div>
-
-      <div class="form-row">
-        <div class="form-group half">
-          <label>Damage Value:</label>
-          <input type="number" name="system.damage" value="{{system.damage}}" placeholder="Leave 0 to use rank value ({{system.value}})" />
-          <small>Default: Uses rank value. Override only if power deals different damage.</small>
-        </div>
         
-        <div class="form-group half">
+        <div class="form-group third">
           <label>Primary Effect:</label>
           <select name="system.primaryEffect">
             <option value="damage" {{#if (eq system.primaryEffect "damage")}}selected{{/if}}>Deals Damage</option>
@@ -201,7 +189,7 @@
         
         <div class="form-group half">
           <label>Telekinesis Strength:</label>
-          <select name="system.telekinesiStrength">
+          <select name="system.telekinesisStrength">
             <option value="">Not telekinesis</option>
             <option value="Feeble" {{#if (eq system.telekinesiStrength "Feeble")}}selected{{/if}}>Feeble</option>
             <option value="Poor" {{#if (eq system.telekinesiStrength "Poor")}}selected{{/if}}>Poor</option>
@@ -432,7 +420,10 @@
           <label>Recovery Rate:</label>
           <select name="system.regenerationRate">
             <option value="10-turns" {{#if (eq system.regenerationRate "10-turns")}}selected{{/if}}>Endurance rank per 10 turns</option>
-            <option value="10-minutes" {{#if (eq system.regenerationType "solar")}}selected{{/if}}>Power rank per 10 min (solar)</option>
+            <option value="10-minutes" {{#if (eq system.regenerationRate "10-minutes")}}selected{{/if}}>
+              Power rank per 10 min (solar)
+            </option>
+
           </select>
         </div>
         {{/if}}
@@ -462,12 +453,12 @@
       </div>
     </div>
 
-    <!-- TAB 4: MAGIC (conditional) -->
-    {{#if system.isMagic}}
+    <!-- TAB 4: MAGIC (always visible) -->
     <div class="tab" data-group="primary" data-tab="magic">
       <div class="form-group">
         <label>Spell Energy Type <span style="color:red;">*</span></label>
-        <select name="system.magic.energyType" required>
+        <select name="system.magic.energyType">
+
           <option value="">-- Select Energy Type --</option>
           <option value="personal">Personal (1 HP/turn, self/willing only)</option>
           <option value="universal">Universal (target resists, ceremony, backlash)</option>
@@ -525,7 +516,7 @@
         </div>
       </div>
     </div>
-    {{/if}}
+    
 
     <!-- TAB 5: RANGE & LIMITS -->
     <div class="tab" data-group="primary" data-tab="range">
@@ -611,14 +602,45 @@
       {{/if}}
     </div>
 
-    <!-- STUNT BUTTON (always visible at bottom) -->
-    <div class="form-group" style="margin-top:20px;padding-top:20px;border-top:2px solid #ddd;">
-      <button type="button" class="create-stunt-from-power" style="width:100%;padding:8px;background:#4CAF50;color:white;border:none;border-radius:4px;cursor:pointer;font-weight:bold;">
-        <i class="fas fa-plus"></i> Create Power Stunt for {{item.name}}
-      </button>
-      <small style="display:block;margin-top:4px;color:#666;font-style:italic;">
-        Creates a new stunt in the actor's Stunts tab
-      </small>
+    <!-- ADVANCED OPTIONS -->
+    <h4 class="advanced-toggle collapsed" data-collapse="adv-power">Advanced Options</h4>
+    <div id="adv-power" class="advanced-section collapsed">
+      <div class="form-row">
+        <div class="form-group half">
+          <label>Karma Cost to Use:</label>
+          <input type="number" name="system.karmaCost" value="{{system.karmaCost}}" min="0" placeholder="0" />
+          <small>Karma required each time this power is used</small>
+        </div>
+        
+        <div class="form-group half">
+          <label>Karma Loss on Failure:</label>
+          <input type="number" name="system.karmaLoss" value="{{system.karmaLoss}}" min="0" placeholder="0" />
+          <small>Karma lost if power use fails</small>
+        </div>
+      </div>
+      
+      <div class="form-group">
+        <label>
+          <input type="checkbox" name="system.continuingDamage" {{checked system.continuingDamage}} />
+          Continuing Damage
+        </label>
+        {{#if system.continuingDamage}}
+        <div style="margin-top: 6px;">
+          <label>Duration (rounds):</label>
+          <input type="number" name="system.continuingDamageRounds" value="{{system.continuingDamageRounds}}" min="1" placeholder="3" />
+          <small>Damage continues for this many rounds, dropping -1CS per round</small>
+        </div>
+        {{/if}}
+      </div>
+      
+      <div class="form-group">
+        <label>
+          <input type="checkbox" name="system.grantedByEquipment" {{checked system.grantedByEquipment}} />
+          Granted by Equipment
+        </label>
+        <small>This power comes from a device/equipment rather than natural ability</small>
+      </div>
     </div>
+
   </section>
 </form>
