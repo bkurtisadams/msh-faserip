@@ -602,45 +602,45 @@
       {{/if}}
     </div>
 
-    <!-- ADVANCED OPTIONS -->
-    <h4 class="advanced-toggle collapsed" data-collapse="adv-power">Advanced Options</h4>
-    <div id="adv-power" class="advanced-section collapsed">
-      <div class="form-row">
-        <div class="form-group half">
-          <label>Karma Cost to Use:</label>
-          <input type="number" name="system.karmaCost" value="{{system.karmaCost}}" min="0" placeholder="0" />
-          <small>Karma required each time this power is used</small>
+    <details class="advanced" style="margin-top:8px">
+      <summary><h4>Advanced Options</h4></summary>
+      <div class="inside">
+        <div class="form-row">
+          <div class="form-group half">
+            <label>Karma Cost to Use:</label>
+            <input type="number" name="system.karmaCost" value="{{system.karmaCost}}" min="0" placeholder="0" />
+            <small>Karma required each time this power is used</small>
+          </div>
+          <div class="form-group half">
+            <label>Karma Loss on Failure:</label>
+            <input type="number" name="system.karmaLoss" value="{{system.karmaLoss}}" min="0" placeholder="0" />
+            <small>Karma lost if power use fails</small>
+          </div>
         </div>
-        
-        <div class="form-group half">
-          <label>Karma Loss on Failure:</label>
-          <input type="number" name="system.karmaLoss" value="{{system.karmaLoss}}" min="0" placeholder="0" />
-          <small>Karma lost if power use fails</small>
+
+        <div class="form-group">
+          <label>
+            <input type="checkbox" name="system.continuingDamage" {{checked system.continuingDamage}} />
+            Continuing Damage
+          </label>
+          {{#if system.continuingDamage}}
+          <div style="margin-top:6px;">
+            <label>Duration (rounds):</label>
+            <input type="number" name="system.continuingDamageRounds" value="{{system.continuingDamageRounds}}" min="1" placeholder="3" />
+            <small>Damage continues for this many rounds, dropping -1CS per round</small>
+          </div>
+          {{/if}}
+        </div>
+
+        <div class="form-group">
+          <label>
+            <input type="checkbox" name="system.grantedByEquipment" {{checked system.grantedByEquipment}} />
+            Granted by Equipment
+          </label>
+          <small>This power comes from a device/equipment rather than natural ability</small>
         </div>
       </div>
-      
-      <div class="form-group">
-        <label>
-          <input type="checkbox" name="system.continuingDamage" {{checked system.continuingDamage}} />
-          Continuing Damage
-        </label>
-        {{#if system.continuingDamage}}
-        <div style="margin-top: 6px;">
-          <label>Duration (rounds):</label>
-          <input type="number" name="system.continuingDamageRounds" value="{{system.continuingDamageRounds}}" min="1" placeholder="3" />
-          <small>Damage continues for this many rounds, dropping -1CS per round</small>
-        </div>
-        {{/if}}
-      </div>
-      
-      <div class="form-group">
-        <label>
-          <input type="checkbox" name="system.grantedByEquipment" {{checked system.grantedByEquipment}} />
-          Granted by Equipment
-        </label>
-        <small>This power comes from a device/equipment rather than natural ability</small>
-      </div>
-    </div>
+    </details>
 
   </section>
 </form>

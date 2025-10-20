@@ -234,3 +234,69 @@
   margin-right: 4px;
   color: #666;
 }
+
+/* basic two-column grid without heavy styling */
+.power-sheet .form-row { display: flex; gap: 12px; }
+.power-sheet .form-group.half { flex: 1 1 0; }
+.power-sheet .form-group.third { flex: 1 1 0; min-width: 170px; }
+
+.power-sheet textarea { width: 100%; box-sizing: border-box; resize: vertical; }
+.power-sheet .power-description { min-height: 140px; }
+
+.power-sheet .sheet-header img.profile-img { border-radius: 8px; }
+
+/* === ALIGNMENT FIXES (append-only) ===================================== */
+
+/* 1) Normalize control heights & padding so selects and inputs align */
+.power-sheet input[type="text"],
+.power-sheet input[type="number"],
+.power-sheet select {
+  height: 28px;                 /* uniform control height */
+  padding: 2px 6px;             /* same internal padding */
+  line-height: 24px;            /* centers text vertically */
+}
+
+/* 2) Remove number-input spinners (they throw off alignment on Chrome) */
+.power-sheet input[type="number"]::-webkit-outer-spin-button,
+.power-sheet input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+/* .power-sheet input[type="number"] { -moz-appearance: textfield; } */
+
+/* 3) Align fields along the bottom within each row */
+.power-sheet .form-row {
+  display: flex;
+  gap: 12px;                    /* consolidate to one value */
+  align-items: flex-end;        /* bottoms line up cleanly */
+}
+
+/* 4) Make halves/thirds truly equal width */
+.power-sheet .form-group.half  { flex: 1 1 0; }
+.power-sheet .form-group.third { flex: 1 1 0; min-width: 170px; }
+
+/* 5) Labels stay compact so they don't push controls off baseline */
+.power-sheet label {
+  margin-bottom: 2px;
+  line-height: 1.2;
+}
+
+/* 6) Textareas fill width and don’t shift other elements */
+.power-sheet textarea {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+}
+
+/* 7) Make the small description under inputs not change the row height */
+.power-sheet small {
+  line-height: 1.2;
+}
+
+/* (Optional) Slightly round inputs for a smoother look */
+.power-sheet input[type="text"],
+.power-sheet input[type="number"],
+.power-sheet select,
+.power-sheet textarea {
+  border-radius: 3px;
+}
