@@ -142,19 +142,28 @@ export function installActionChatHandlers() {
     html.on("click", '[data-action="apply-damage"]', async (ev) => {
       ev.preventDefault();
       const btn = ev.currentTarget;
-      const damage = Number(btn.dataset.damage || 0);
-      const attackerUuid = btn.dataset.attackerUuid;
-      const bypassArmor = btn.dataset.bypassArmor === "true";
-      const damageType = btn.dataset.damageType || "physical-blunt";
+
+      const damage        = Number(btn.dataset.damage || 0);
+      const attackerUuid  = btn.dataset.attackerUuid;
+      const bypassArmor   = btn.dataset.bypassArmor === "true";
+      const damageType    = (btn.dataset.damageType || "physical-blunt").toLowerCase();
+      const attackForm    = (btn.dataset.attackForm || "blunt").toLowerCase();
+      const armorPiercing = Number(btn.dataset.armorPiercing || 0) || 0;
+      const armorPiercingCS = Number(btn.dataset.armorPiercingCs || 0) || 0;  // ✅ NEW
+      const apMode        = btn.dataset.apMode || "value";                     // ✅ NEW
       const wasKillResult = btn.dataset.isKill === "true";
-      
+
       await applyDamageToTargets(damage, {
         attackerUuid,
-        damageType: damageType,
-        wasKillResult: wasKillResult,
+        damageType,
+        attackForm,
+        armorPiercing,
+        armorPiercingCS,    // ✅ NEW
+        apMode,             // ✅ NEW
+        wasKillResult,
         showNotification: true,
         updateButton: btn,
-        bypassArmor: bypassArmor
+        bypassArmor
       });
     });
 

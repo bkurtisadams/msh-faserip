@@ -224,9 +224,8 @@ export function buildActionsBox({
   showStun = false,
   showKill = false,
   showEscape = false,
-  // NEW:
-  showNullifySave = false,       // ← add this
-  nullifyIntensityRank = "",     // ← and this (e.g., "Remarkable")
+  showNullifySave = false,
+  nullifyIntensityRank = "",
   pulled = false,
   breakingFeat = null,
   grabbingBreak = null,
@@ -234,12 +233,16 @@ export function buildActionsBox({
   damage = 0,
   attackForm = "blunt",
   damageType = "physical-blunt",
+  armorPiercing = 0,
+  armorPiercingCS = 0,        // ✅ NEW
+  apMode = "value",           // ✅ NEW
   prefillData = null,
   targetUuid = "",
   targetName = "",
   targetStrength = "",
   bypassArmor = false
 }) {
+
   // Small helper to render a chip
   const chip = (label, title, enabled, dataAttrs = "") => {
     const base = "display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;font-size:13px;line-height:1.2;padding:4px 10px;border:1px solid #bbb;border-radius:4px;text-decoration:none;white-space:nowrap;";
@@ -267,7 +270,15 @@ export function buildActionsBox({
         "Apply Damage",
         "Apply damage to targeted or selected token(s)",
         true,
-        `data-action="apply-damage" data-damage="${dmgPen}" data-attacker-uuid="${actorUuid}" data-bypass-armor="${bypassArmor}" data-damage-type="${damageType || 'physical-blunt'}"`
+        `data-action="apply-damage"
+        data-damage="${dmgPen}"
+        data-attacker-uuid="${actorUuid}"
+        data-bypass-armor="${bypassArmor}"
+        data-damage-type="${damageType || 'physical-blunt'}"
+        data-attack-form="${attackForm || 'blunt'}"
+        data-armor-piercing="${Number(armorPiercing || 0)}"
+        data-armor-piercing-cs="${Number(armorPiercingCS || 0)}"
+        data-ap-mode="${apMode}"`
       )
     );
   }
@@ -291,7 +302,12 @@ export function buildActionsBox({
         "Resolve Stun",
         "Open Stun dialog using penetrating damage",
         true,
-        `data-check="stun" data-attack-form="${attackForm}" data-dmg="${dmgPen}" data-attacker-uuid="${actorUuid}" ${pulled ? 'data-pulled="true"' : ""} ${prefillAttr}`
+        `data-check="stun"
+        data-attack-form="${attackForm}"
+        data-damage-type="${damageType}"
+        data-dmg="${dmgPen}"
+        data-attacker-uuid="${actorUuid}"
+        ${pulled ? 'data-pulled="true"' : ""} ${prefillAttr}`
       )
     );
   }
@@ -303,7 +319,12 @@ export function buildActionsBox({
         "Resolve Kill",
         "Open Kill check dialog",
         true,
-        `data-check="kill" data-attack-form="${attackForm}" data-dmg="${dmgPen}" data-attacker-uuid="${actorUuid}" ${prefillAttr}`
+        `data-check="kill"
+        data-attack-form="${attackForm}"
+        data-damage-type="${damageType}"
+        data-dmg="${dmgPen}"
+        data-attacker-uuid="${actorUuid}"
+        ${prefillAttr}`
       )
     );
   }
@@ -677,6 +698,12 @@ export async function applyDamageToTargets(damage, options = {}) {
     bypassArmor = false
   } = options;
 
+  // NEW: normalize extra fields (back-compat safe)
+  const attackForm    = String(options.attackForm || "blunt").toLowerCase();
+  const armorPiercing = Number(options.armorPiercing || 0) || 0;
+  const dmgTypeLower  = String(damageType || "physical-blunt").toLowerCase();
+
+
   debugLog("applyDamageToTargets called", {
     damage: damage,
     bypassArmor: bypassArmor,
@@ -724,57 +751,90 @@ export async function applyDamageToTargets(damage, options = {}) {
     updatePath: isUnlinkedToken ? "token.document" : "actor"
   });
 
-  // Get target's Body Armor (check both equipment and powers)
-  let bodyArmorValue = 0;
+    // Get target's Body Armor (check both equipment and powers)
+    let bodyArmorValue = 0;
 
-  // ONLY calculate armor if not bypassed
+    // ONLY calculate armor if not bypassed
+    // ONLY calculate armor if not bypassed
   if (!bypassArmor) {
-    // Use new helper function to get armor values with energy vs physical distinction
-    const armorData = getBodyArmorValues(targetActor, damageType);
-    bodyArmorValue = armorData.applicable;
-    
-    debugLog("Armor calculation", {
-      targetName: target.name,
-      damageType: damageType,
-      isEnergyDamage: armorData.isEnergyDamage,
-      physicalArmor: armorData.physical,
-      energyArmor: armorData.energy,
-      applicableArmor: bodyArmorValue
-    });
-    
-    // Check for resistances
-    const resistance = getResistanceModifiers(targetActor, damageType);
-    
-    // Check immunity first - if immune, skip damage entirely
-    if (resistance.hasImmunity) {
-      const attackRank = damage; // You could pass actual attack rank if available
-      if (checkImmunity(targetActor, damageType, attackRank)) {
-        if (showNotification) {
-          ui.notifications.info(
-            `${target.name} is IMMUNE to ${damageType} damage!`
-          );
+    const armorData = getBodyArmorValues(targetActor, dmgTypeLower) || {};
+    let physArmor   = Number(armorData.physical || 0);
+    let enerArmor   = Number(armorData.energy   || 0);
+    const isEnergy  = (armorData.isEnergy ?? armorData.isEnergyDamage) === true;
+    const physRank  = armorData.physicalRank || "";
+    const enerRank  = armorData.energyRank || "";
+    const isForce   = armorData.isForceField === true;
+
+    // NEW: Extract AP mode and CS value
+    const apMode = String(options.apMode || "value").toLowerCase();
+    const apCS   = Number(options.armorPiercingCS || 0) || 0;
+
+    // Apply Armor Piercing (ONLY if not a force field)
+    if (!isForce) {
+      if (apMode === "cs" && apCS > 0) {
+        // Use classic working AP logic
+        const armorToReduce = isEnergy ? enerArmor : physArmor;
+        
+        if (armorToReduce > 0) {
+          const rankEntries = Object.entries(CONFIG.FASERIP.rankValues).sort((a, b) => a[1] - b[1]);
+          
+          let currentRankIndex = -1;
+          for (let i = 0; i < rankEntries.length; i++) {
+            if (rankEntries[i][1] === armorToReduce) {
+              currentRankIndex = i;
+              break;
+            }
+          }
+          
+          if (currentRankIndex >= 0) {
+            const oldRankName = rankEntries[currentRankIndex][0];
+            const newRankIndex = Math.max(0, currentRankIndex - apCS);  // Reduce by AP CS
+            const newArmorValue = rankEntries[newRankIndex][1];
+            const newRankName = rankEntries[newRankIndex][0];
+            
+            if (isEnergy) {
+              enerArmor = newArmorValue;
+            } else {
+              physArmor = newArmorValue;
+            }
+            
+            debugLog("AP (CS mode) applied", {
+              originalRank: oldRankName,
+              originalValue: armorToReduce,
+              apCS: apCS,
+              newRank: newRankName,
+              newArmorValue: newArmorValue
+            });
+          }
         }
-        result.immune = true;
-        result.success = true;
-        result.damageDealt = 0;
-        result.absorbed = damage;
-        results.push(result);
-        continue; // Skip to next target
+      } else if (armorPiercing > 0) {
+        // Legacy numeric AP
+        if (isEnergy) {
+          enerArmor = Math.max(0, enerArmor - armorPiercing);
+        } else {
+          physArmor = Math.max(0, physArmor - armorPiercing);
+        }
       }
     }
+
+    bodyArmorValue = isEnergy ? enerArmor : physArmor;
+
+    debugLog("Armor calculation", {
+      targetName: target.name,
+      damageType: dmgTypeLower,
+      isEnergyDamage: isEnergy,
+      isForceField: isForce,
+      apMode: apMode,
+      apCS: apCS,
+      armorPiercingNumeric: armorPiercing,
+      physicalArmor_afterAP: physArmor,
+      energyArmor_afterAP: enerArmor,
+      applicableArmor_afterAP: bodyArmorValue
+    });
+
+    // Check for resistances (existing code continues...)
     
-    // Apply resistance damage reduction (stacks with armor)
-    if (resistance.damageReduction > 0) {
-      bodyArmorValue += resistance.damageReduction;
-      debugLog("Resistance applied", {
-        targetName: target.name,
-        resistanceDR: resistance.damageReduction,
-        totalProtection: bodyArmorValue
-      });
-    }
-    
-    // Note: CS bonus from resistance affects to-hit rolls (applied in action classes, not here)
-  } // close the if (!bypassArmor) block
+    } // close the if (!bypassArmor) block
 
     // Calculate damage after armor
     const damageAfterArmor = bypassArmor ? damage : Math.max(0, damage - bodyArmorValue);
@@ -965,6 +1025,8 @@ export async function applyDamageToActorUuid(damage, actorUuid, options = {}) {
  * @returns {Object} { physical, energy, applicable }
  */
 export function getBodyArmorValues(targetActor, damageType = "physical-blunt") {
+  const dmgTypeLower = String(damageType || "physical-blunt").toLowerCase();
+  
   console.log("FASERIP DEBUG | getBodyArmorValues called:", {
     targetName: targetActor.name,
     damageType: damageType
@@ -972,6 +1034,9 @@ export function getBodyArmorValues(targetActor, damageType = "physical-blunt") {
 
   let physicalArmor = 0;
   let energyArmor = 0;
+  let physicalRank = "";
+  let energyRank = "";
+  let isForceField = false;
 
   // Check equipment armor
   const armorItems = targetActor.items.filter(i => 
@@ -991,22 +1056,28 @@ export function getBodyArmorValues(targetActor, damageType = "physical-blunt") {
       return currVal > bestVal ? current : best;
     });
     
+    // Store rank label if available
+    if (typeof bestArmor.system.protection === 'string') {
+      physicalRank = bestArmor.system.protection;
+      energyRank = bestArmor.system.protection;
+    }
+    
     const armorValue = typeof bestArmor.system.protection === 'number'
       ? bestArmor.system.protection
       : (CONFIG.FASERIP?.rankValues?.[bestArmor.system.protection] || 0);
     
     physicalArmor = armorValue;
-    energyArmor = Math.max(0, armorValue - 20); // FASERIP rule: energy armor = physical - 20
+    energyArmor = Math.max(0, armorValue - 20);
+    
+    // Check for force field flag
+    isForceField = bestArmor.system.isForceField === true;
   }
 
-  // Check Body Armor powers with NEW explicit flag support
+  // Check Body Armor powers
   const bodyArmorPowers = targetActor.items.filter(i => {
     if (i.type !== "power") return false;
-    
-    // NEW WAY: Check explicit isBodyArmor flag
     if (i.system.isBodyArmor === true) return true;
     
-    // LEGACY FALLBACK: Name matching for backward compatibility
     const name = i.name.toLowerCase();
     return name.includes("body armor") || 
            name.includes("body armour") || 
@@ -1016,23 +1087,38 @@ export function getBodyArmorValues(targetActor, damageType = "physical-blunt") {
   bodyArmorPowers.forEach(power => {
     const type = power.system.bodyArmorType || "both";
     
-    // NEW: Use explicit armorPhysical/armorEnergy fields if available
+    // Check if this power is a force field
+    if (power.system.isForceField === true) {
+      isForceField = true;
+    }
+    
     let physVal = power.system.armorPhysical;
     let energyVal = power.system.armorEnergy;
     
-    // FALLBACK: Use value or rank if new fields not set
     if (physVal === undefined || physVal === 0) {
       physVal = typeof power.system.value === 'number'
         ? power.system.value
         : (CONFIG.FASERIP?.rankValues?.[power.system.rank] || 0);
+      
+      // Store rank if available
+      if (power.system.rank && !physicalRank) {
+        physicalRank = power.system.rank;
+      }
     }
     
     if (energyVal === undefined || energyVal === 0) {
-      // FASERIP rule: energy = physical - 20 if not explicitly set
       energyVal = Math.max(0, physVal - 20);
+      
+      if (power.system.rank && !energyRank) {
+        const rankIdx = RANKS.indexOf(power.system.rank);
+        if (rankIdx >= 0) {
+          // Energy rank is typically 2 CS lower than physical
+          const energyRankIdx = Math.max(0, rankIdx - 2);
+          energyRank = RANKS[energyRankIdx];
+        }
+      }
     }
     
-    // Apply based on armor type
     if (type === "physical" || type === "both") {
       physicalArmor = Math.max(physicalArmor, physVal);
     }
@@ -1041,9 +1127,8 @@ export function getBodyArmorValues(targetActor, damageType = "physical-blunt") {
     }
   });
 
-  // Determine which armor applies based on damage type
-  const isEnergy = CONFIG.FASERIP?.isEnergyDamage?.(damageType) ?? 
-                   (damageType && damageType.includes("energy"));
+  const isEnergy = CONFIG.FASERIP?.isEnergyDamage?.(dmgTypeLower) ?? 
+                   (dmgTypeLower && dmgTypeLower.includes("energy"));
   const applicable = isEnergy ? energyArmor : physicalArmor;
 
   console.log("FASERIP DEBUG | getBodyArmorValues result:", {
@@ -1051,16 +1136,32 @@ export function getBodyArmorValues(targetActor, damageType = "physical-blunt") {
     damageType,
     physicalArmor,
     energyArmor,
+    physicalRank,
+    energyRank,
+    isForceField,
     isEnergy,
     applicable
   });
 
-  return {
-    physical: physicalArmor,
-    energy: energyArmor,
-    applicable: applicable,
-    isEnergyDamage: isEnergy
-  };
+  // If ranks are missing, reverse-lookup from numeric values
+/* if (!physicalRank && physicalArmor > 0) {
+  physicalRank = game.msh.getClosestRank(physicalArmor) || "";
+}
+if (!energyRank && energyArmor > 0) {
+  energyRank = game.msh.getClosestRank(energyArmor) || "";
+}
+ */
+
+return {
+  physical: physicalArmor,
+  energy: energyArmor,
+  physicalRank: physicalRank,
+  energyRank: energyRank,
+  applicable: applicable,
+  isEnergyDamage: isEnergy,
+  isForceField: isForceField
+};
+
 }
 
 /**
@@ -1120,10 +1221,11 @@ export async function applyDamageNow({ sourceActor, targets, baseDamage, damageT
  * @returns {Object} { csBonus, damageReduction, hasImmunity, resistancePowers }
  */
 export function getResistanceModifiers(targetActor, damageType = "physical-blunt") {
+  const dmgTypeLower = String(damageType || "physical-blunt").toLowerCase();
   // Extract base resistance type (e.g., "fire" from "energy-fire")
-  let baseType = damageType;
-  if (damageType?.includes("-")) {
-    baseType = damageType.split("-")[1];
+  let baseType = dmgTypeLower;  // ✅ Use normalized version
+  if (dmgTypeLower?.includes("-")) {  // ✅ Use normalized version
+    baseType = dmgTypeLower.split("-")[1];  // ✅ Use normalized version
   }
   
   // Find relevant resistance powers
@@ -1241,3 +1343,4 @@ export async function postDeathSavePrompt(actor) {
     content: content
   });
 }
+

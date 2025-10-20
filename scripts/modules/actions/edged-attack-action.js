@@ -49,6 +49,19 @@ export class EdgedAttackAction extends AttackAction {
       return { damage: finalDmg, note: `Damage = max(min(STR ${strCap}, MAT ${matVal}), base ${weaponBase||0})` };
     };
 
+    // Normalize Armor Piercing across possible fields and shapes
+    const getArmorPiercing = (it) => {
+      const s = it?.system || {};
+      const props = s.properties || {};
+      // Prefer numeric; fall back to boolean (1) if present in props
+      const ap =
+        s.armorPiercing ??
+        s.penetration ??
+        s.ap ??
+        (props.armorPiercing === true ? 1 : 0);
+      return Number(ap) || 0;
+    };
+
     const attackItems = actor.items.filter(isEdgedCapable);
 
     // restore flags
@@ -95,8 +108,14 @@ export class EdgedAttackAction extends AttackAction {
       </div>
 
       <div id="weapon-row" style="display:none;margin-bottom:8px;">
-        <label style="display:inline-block;width:120px;">Item:</label>
-        <select name="item" style="min-width:220px;">${itemOptions || `<option value="">(No edged weapons found)</option>`}</select>
+        <div style="margin-bottom:6px;">
+          <label style="display:inline-block;width:120px;">Item:</label>
+          <select name="item" style="min-width:220px;">${itemOptions || `<option value="">(No edged weapons found)</option>`}</select>
+        </div>
+        <div style="margin-bottom:6px;">
+          <label style="display:inline-block;width:120px;">Armor Piercing:</label>
+          <input type="text" name="apDisplay" value="0" style="width:80px;" readonly>
+        </div>
       </div>
 
       <div id="preview" style="margin-top:8px;padding:6px;background:#fff3e0;border:1px solid #FF9800;border-radius:3px;font-size:.9em;">
@@ -131,7 +150,7 @@ export class EdgedAttackAction extends AttackAction {
               const remember= !!$('[name="remember"]').is(':checked');
               const skipDice= !!$('[name="skipDice"]').is(':checked');
 
-              let weaponMat="", weaponName="", damage=natDmg, note="";
+              let weaponMat="", weaponName="", damage=natDmg, note="", ap=0, apCS=0, apMode="value";
               if (src === "natural") {
                 weaponMat = natRank;
                 weaponName = "Natural Weapon";
@@ -139,14 +158,17 @@ export class EdgedAttackAction extends AttackAction {
                 note = `${natRank} rank natural weapon`;
                 html.data('weaponNote', note);
               } else {
-                const item = attackItems.find(i=>i.id===itemId) || null;
-                weaponMat = item ? getItemMaterialRank(item) : "Excellent";
-                weaponName= item ? item.name : "(Edged Weapon)";
-                const base = Number(item?.system?.damage || 0);
-                const res = computeEdgedDamage(strength.rank, strength.value, weaponMat, base);
-                damage = res.damage; note = res.note;
-                html.data('weaponNote', note);
-              }
+                  const item = attackItems.find(i=>i.id===itemId) || null;
+                  weaponMat = item ? getItemMaterialRank(item) : "Excellent";
+                  weaponName= item ? item.name : "(Edged Weapon)";
+                  const base = Number(item?.system?.damage || 0);
+                  ap = item ? getArmorPiercing(item) : 0;
+                  apCS = item ? (Number(item.system.armorPiercingCS || 0) || 0) : 0;      // ✅ ADD
+                  apMode = item ? (item.system.apMode || "value") : "value";              // ✅ ADD
+                  const res = computeEdgedDamage(strength.rank, strength.value, weaponMat, base);
+                  damage = res.damage; note = res.note;
+                  html.data('weaponNote', note);
+                }
 
               if (remember) {
                 await actor.setFlag("msh-faserip","lastEdgedSource", src);
@@ -158,7 +180,8 @@ export class EdgedAttackAction extends AttackAction {
                 }
               }
 
-              resolve({ src, itemId, natRank, natDmg, shift, karma, skipDice, weaponMat, weaponName, damage, html });
+              resolve({ src, itemId, natRank, natDmg, shift, karma, skipDice, weaponMat, weaponName, damage, ap, apCS, apMode, html });
+
             }
           },
           cancel: { label: "Cancel", callback: ()=> resolve(null) }
@@ -187,8 +210,10 @@ export class EdgedAttackAction extends AttackAction {
               const mat = item ? getItemMaterialRank(item) : "Excellent";
               const base = Number(item?.system?.damage || 0);
               const res = computeEdgedDamage(strength.rank, strength.value, mat, base);
+              const ap  = item ? getArmorPiercing(item) : 0;
               $val.text(res.damage);
               $note.text(`${item ? item.name : "(Edged Weapon)"} (${mat}) — ${res.note}`);
+              html.find('[name="apDisplay"]').val(String(ap));
             }
             if ($dialog.length) $dialog[0].style.height = 'auto';
           };
@@ -241,12 +266,66 @@ export class EdgedAttackAction extends AttackAction {
     const rawDamage = isHit ? Number(choice.damage || 0) : 0;
 
     // Compute after-armor and target metadata
+    const apValue = Number(choice.ap || 0) || 0;
+    const apCSValue = Number(choice.apCS || 0) || 0;        // ✅ ADD
+    const apModeValue = choice.apMode || "value";          // ✅ ADD
+
     const { afterArmor, targetName, multiTargetCount, targetsArray } = computeAfterArmor({
       isHit,
       rawDamage,
       damageType: dmgType,
       targets: game.user?.targets,
-      getArmorFn: (actor, dt) => getBodyArmorValues(actor, dt)
+      getArmorFn: (tActor, dt) => {
+        const vals = getBodyArmorValues(tActor, dt) || {};
+
+        // ✅ ADD THIS DEBUG LOG:
+        console.log("DEBUG armor vals:", {
+          physicalRank: vals.physicalRank,
+          energyRank: vals.energyRank,
+          physicalArmor: vals.physical || vals.physicalArmor,
+          energyArmor: vals.energy || vals.energyArmor,
+          apCSValue,
+          apModeValue,
+          isForce: vals.isForceField
+        });
+        
+        // Don't apply AP to force fields
+        const isForce = vals.isForceField === true;
+        
+        if (!isForce) {
+          // Handle CS-based AP
+          if (apModeValue === "cs" && apCSValue > 0) {
+            const relevantRank = vals.isEnergyDamage ? vals.energyRank : vals.physicalRank;
+            if (relevantRank) {
+              const loweredRank = shiftRank(relevantRank, -apCSValue);
+              const newValue = game.msh.getRankValue(loweredRank) || 0;
+              if (vals.isEnergyDamage) {
+                vals.energy = newValue;
+                vals.energyArmor = newValue;
+              } else {
+                vals.physical = newValue;
+                vals.physicalArmor = newValue;
+              }
+              vals._apApplied = `${apCSValue} CS`;
+            }
+          } 
+          // Handle numeric AP (legacy)
+          else if (apValue > 0) {
+            if (vals.isEnergyDamage) {
+              vals.energyArmor = Math.max(0, Number(vals.energyArmor || 0) - apValue);
+              vals.energy = vals.energyArmor;
+            } else {
+              vals.physicalArmor = Math.max(0, Number(vals.physicalArmor || 0) - apValue);
+              vals.physical = vals.physicalArmor;
+            }
+            vals._apApplied = apValue;
+          }
+        } else {
+          vals._apApplied = "Force Field (AP blocked)";
+        }
+        
+        return vals;
+      }
     });
 
     // Build standardized damage block
@@ -289,7 +368,14 @@ export class EdgedAttackAction extends AttackAction {
         "Apply Damage",
         "Apply damage to targeted/selected token(s)", 
         true, 
-        `data-damage="${rawDamage}" data-attacker-uuid="${actor.uuid}" data-damage-type="${dmgType}" data-bypass-armor="false"`
+        `data-damage="${rawDamage}" 
+        data-attacker-uuid="${actor.uuid}" 
+        data-damage-type="${dmgType}" 
+        data-attack-form="edged"
+        data-bypass-armor="false"
+        data-armor-piercing="${Number(choice.ap || 0)}"
+        data-armor-piercing-cs="${Number(choice.apCS || 0)}"
+        data-ap-mode="${choice.apMode || 'value'}"`
       ));
     }
 
@@ -330,8 +416,9 @@ export class EdgedAttackAction extends AttackAction {
     const weaponContext = (choice.src === "weapon")
       ? (() => {
           const note = choice.html.data('weaponNote') || "";
+          const apText = Number(choice.ap || 0) > 0 ? ` — AP: ${Number(choice.ap)}` : "";
           return `
-            <div>Weapon: ${choice.weaponName || "(Edged Weapon)"} (${choice.weaponMat || "Excellent"}) — Damage: ${choice.damage}</div>
+            <div>Weapon: ${choice.weaponName || "(Edged Weapon)"} (${choice.weaponMat || "Excellent"}) — Damage: ${choice.damage}${apText}</div>
             ${note ? `<div style="font-size:.85em;color:#666;">${note}</div>` : ``}
           `;
         })()
@@ -375,14 +462,16 @@ export class EdgedAttackAction extends AttackAction {
       speaker: ChatMessage.getSpeaker({ actor }),
       content: cardHtml,
       flags: buildDamageFlags({
-        actionId: actionType,
-        damageType: dmgType,
-        rawDamage,
-        afterArmor,
-        resultColor: colorLower,
-        cappedTotal,
-        targets: targetsArray
-      })
+      actionId: actionType,
+      damageType: dmgType,
+      rawDamage,
+      afterArmor,
+      resultColor: colorLower,
+      cappedTotal,
+      targets: targetsArray,
+      armorPiercing: apValue
+    })
+
     });
   }
 }

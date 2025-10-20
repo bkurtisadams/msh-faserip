@@ -19,19 +19,58 @@ export class ThrowingEdgedAction extends RangedAttackAction {
     const actionName = labelFor(actionType);
     const effects = effectsFor(actionType);
     const ability = getAbilityInfo(actor, this.abilityName || "agility");
+    // --- AP helper (numeric preferred; boolean fallback) ---
+    const getArmorPiercing = (item) => {
+      const s = item?.system ?? {};
+      const props = s.properties ?? {};
+      const ap =
+        s.armorPiercing ??
+        s.penetration ??
+        s.ap ??
+        (props.armorPiercing === true ? 1 : 0);
+      return Number(ap) || 0;
+    };
 
     // Candidate weapons: thrown + edged
+    // Build the Throwing-Edged weapon list (back-compat + multi-mode support)
     const thrownEdged = actor.items.filter(i => {
-      const s = i.system || {};
-      const tags = (s.tags || []).map(t => String(t).toLowerCase());
-      const isThrown = s.weaponType === "thrown" || tags.includes("thrown");
+      if (i.type !== "weapon") return false;
+
+      const s = i.system ?? {};
+      const tags = (s.tags ?? []).map(t => String(t).toLowerCase());
+      const forms = Array.isArray(s.attackForms) ? s.attackForms.map(f => String(f).toLowerCase()) : [];
+      const props = s.properties ?? {};
+
+      const weaponType  = String(s.weaponType ?? "").toLowerCase();
+      const category    = String(s.category ?? "").toLowerCase();
+      const damageType  = String(s.damageType ?? "").toLowerCase();
+      const attackType  = String(s.attackType ?? "").toLowerCase();
+
+      // Ways to consider a weapon "throwable"
+      const isThrowable =
+        props.throwable === true ||             // new sheet prop
+        weaponType === "thrown" ||              // your original field
+        category === "throwing" ||              // some items use category
+        tags.includes("thrown") ||              // your original tags
+        forms.includes("throwing") ||           // attackForms support
+        forms.includes("throwing-edged");       // explicit composite form
+
+      // Ways to consider a weapon "edged"
       const isEdged =
-        s.damageType === "EA" ||
-        s.attackType === "edged" ||
+        // your original representations
+        damageType === "ea" ||
+        attackType === "edged" ||
         tags.includes("edged") ||
-        tags.includes("ea");
-      return isThrown && isEdged;
+        tags.includes("ea") ||
+        // additional spellings seen across items/sheets
+        damageType === "edged" ||
+        damageType === "physical-edged" ||
+        forms.includes("edged") ||
+        forms.includes("throwing-edged");
+
+      return isThrowable && isEdged;
     });
+
 
     // Strength-based range
     const strRank = actor?.system?.abilities?.strength?.rank || "Typical";
@@ -72,7 +111,7 @@ export class ThrowingEdgedAction extends RangedAttackAction {
         <legend style="padding:0 6px;font-weight:bold;">Weapon Source</legend>
 
         <div style="margin:4px 0;">
-          <input type="checkbox" id="adhoc-toggle" name="adhoc" ${savedAdHoc || (!thrownEdged.length) ? "checked" : ""}>
+          <input type="checkbox" id="adhoc-toggle" name="adhoc" ${(savedAdHoc === true || thrownEdged.length === 0) ? "checked" : ""}>
           <label for="adhoc-toggle">Use weapon of opportunity (ad-hoc)</label>
         </div>
 
@@ -90,11 +129,18 @@ export class ThrowingEdgedAction extends RangedAttackAction {
         </div>
 
         <div class="carried-fields" style="margin-top:8px;${savedAdHoc || (!thrownEdged.length) ? "display:none" : ""}">
-          <span style="display:inline-block;width:110px;">Weapon:</span>
-          <select name="weapon" style="min-width:220px">
-            ${itemOptions || '<option value="">(none in inventory)</option>'}
-          </select>
+          <div style="margin-bottom:6px;">
+            <span style="display:inline-block;width:110px;">Weapon:</span>
+            <select name="weapon" style="min-width:220px">
+              ${itemOptions || '<option value="">(none in inventory)</option>'}
+            </select>
+          </div>
+          <div>
+            <span style="display:inline-block;width:110px;">Armor Piercing:</span>
+            <input type="text" name="apDisplay" value="0" style="width:80px;" readonly>
+          </div>
         </div>
+
       </fieldset>
 
       ${this._buildRangeInputs({
@@ -138,6 +184,9 @@ export class ThrowingEdgedAction extends RangedAttackAction {
                 weaponId = wid;
                 weaponName = weapon.name;
                 weaponDamage = Number(weapon.system?.damage || 0);
+                // NEW: capture AP + damageType for mitigation
+                var weaponAP = getArmorPiercing(weapon);
+                var weaponDamageType = String(weapon.system?.damageType || "physical-edged").toLowerCase();
               }
 
               const shift = Number($('[name="shift"]').val() || 0);
@@ -183,22 +232,44 @@ export class ThrowingEdgedAction extends RangedAttackAction {
                 rangeModifier,
                 obstacleModifier,
                 targetMovement,
-                movementModifier
+                movementModifier,
+                armorPiercing: (typeof weaponAP !== "undefined" ? weaponAP : 0),
+                damageType: (typeof weaponDamageType !== "undefined" ? weaponDamageType : "physical-edged")
               });
+
             }
           },
           cancel: { label: "Cancel", callback: () => resolve(null) }
         },
         default: "roll",
         render: (html) => {
-          // existing toggle+preview code…
           const $adhoc = html.find("#adhoc-toggle");
+          const $weapon = html.find('[name="weapon"]');
           const applyToggle = () => {
             const on = $adhoc.is(":checked");
             html.find(".adhoc-fields").css("display", on ? "" : "none");
             html.find(".carried-fields").css("display", on ? "none" : "");
             this._setupRangePreview(html, { strengthRank: strRank });
+
+            // If switching OFF ad-hoc and a weapon exists, update AP display
+            if (!on) {
+              const wid = String($weapon.val() || "");
+              const weapon = thrownEdged.find(i => i.id === wid);
+              const ap = weapon ? getArmorPiercing(weapon) : 0;
+              html.find('[name="apDisplay"]').val(String(ap));
+            }
           };
+
+          // If user selects a carried weapon, auto-turn OFF ad-hoc and sync AP
+          $weapon.on("change", () => {
+            if ($adhoc.is(":checked")) $adhoc.prop("checked", false);
+            const wid = String($weapon.val() || "");
+            const weapon = thrownEdged.find(i => i.id === wid);
+            const ap = weapon ? getArmorPiercing(weapon) : 0;
+            html.find('[name="apDisplay"]').val(String(ap));
+            applyToggle();
+          });
+
           $adhoc.on("change", applyToggle);
           applyToggle();
 
@@ -238,14 +309,17 @@ export class ThrowingEdgedAction extends RangedAttackAction {
       showStun: colorLower === "yellow",
       showKill: colorLower === "red",
       actorUuid: actor.uuid,
-      damage: isHit ? choice.weaponDamage : 0,  // Only pass damage if it's a hit
-      attackForm: "edged"  // ADD THIS - was missing
+      damage: isHit ? choice.weaponDamage : 0,
+      attackForm: "edged",
+      damageType: (choice.damageType || "physical-edged"),
+      armorPiercing: Number(choice.armorPiercing || 0)
     });
 
     const contextHtml = `
       <div>Ability: ${ability.name}</div>
       <div>Base Rank: ${ability.rank} (${ability.value})</div>
-      <div>Weapon: ${choice.weaponName} — Damage: ${choice.weaponDamage}</div>
+        <div>Weapon: ${choice.weaponName} — Damage: ${choice.weaponDamage}${Number(choice.armorPiercing||0) ? ` — AP: ${Number(choice.armorPiercing)}` : ""}</div>
+
       <div>Distance: ${choice.range} area${choice.range > 1 ? "s" : ""} ${choice.rangeModifier ? `(${choice.rangeModifier}CS)` : ""}${choice.throughObstacle ? `, obstacle (-2CS)` : ""}${choice.movementModifier ? `, target movement (${choice.movementModifier > 0 ? '+' : ''}${choice.movementModifier}CS)` : ""}</div>
       ${choice.totalShift !== 0 ? `<div>Effective Rank: ${effectiveRank} (${choice.totalShift > 0 ? '+' : ''}${choice.totalShift}CS total)</div>` : ""}
       <div>Roll: ${roll.total}${totalKarmaUsed ? ` + Karma: ${totalKarmaUsed}` : ""} = ${cappedTotal}</div>
