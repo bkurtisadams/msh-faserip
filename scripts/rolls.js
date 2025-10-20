@@ -2143,6 +2143,12 @@ export class FaseripRolls {
     const savedColumnShift = equipment.getFlag("msh-faserip", "lastColumnShift") || 0;
     const skipDiceRoll = equipment.getFlag("msh-faserip", "skipDiceRoll") || false;
 
+    // ADD THIS: Check if we should use saved settings for quick roll
+    const hasSavedSettings = savedActionType !== "" || savedColumnShift !== 0;
+    const shouldUseQuickRoll = options.useDirectRoll || 
+                              game.keyboard.isModifierActive(foundry.helpers.interaction.KeyboardManager.MODIFIER_KEYS.CONTROL) ||
+                              (hasSavedSettings && options.useSavedSettings);
+
     // Get equipment information
     const category = equipment.system.category || "gear";
 
@@ -2239,7 +2245,7 @@ export class FaseripRolls {
 
       // If this is a macro or direct call with options provided
       // Check if CTRL is pressed or if this is a direct roll call
-      if (options.useDirectRoll || game.keyboard.isModifierActive(foundry.helpers.interaction.KeyboardManager.MODIFIER_KEYS.CONTROL)) {
+      if (shouldUseQuickRoll) {
         console.log("=== ROLL EQUIPMENT DEBUG ===");
         console.log("Received options:", options);
         console.log("Ammo type from options:", options.ammoType);
@@ -2693,6 +2699,11 @@ export class FaseripRolls {
         return { roll, resultColor, effect };
       }
 
+      // Use saved settings or defaults for dialog
+      const dialogActionType = savedActionType || defaultAction;
+      const dialogColumnShift = savedColumnShift || 0;
+      const dialogSkipDice = skipDiceRoll || false;
+      
       // Otherwise show dialog for interactive roll
       // Create dialog for roll options with multi-target support
       let dialogContent = `
@@ -2701,13 +2712,13 @@ export class FaseripRolls {
             <label style="display: inline-block; width: 120px;">Action Type:</label>
             <select id="action" name="action" style="width: 180px;">
               ${Object.keys(ACTIONS).map(action =>
-          `<option value="${action}" ${action === defaultAction ? 'selected' : ''}>${action}</option>`
+          `<option value="${action}" ${action === dialogActionType ? 'selected' : ''}>${action}</option>`
         ).join('')}
             </select>
           </div>
           <div style="margin-bottom: 10px;">
             <label style="display: inline-block; width: 120px;">Column Shift:</label>
-            <input type="number" id="shift" name="shift" value="0" style="width: 50px;">
+            <input type="number" id="shift" name="shift" value="${dialogColumnShift}" style="width: 50px;">
             <span style="color: #666; font-size: 0.9em;">(+ right, - left)</span>
           </div>
 
@@ -2750,7 +2761,7 @@ export class FaseripRolls {
           </div>
           <div>
             <label>
-              <input type="checkbox" id="skip-dice" name="skipDice"> 
+              <input type="checkbox" id="skip-dice" name="skipDice" ${dialogSkipDice ? 'checked' : ''}> 
               Skip dice animation
             </label>
           <div style="margin-top: 10px;">
