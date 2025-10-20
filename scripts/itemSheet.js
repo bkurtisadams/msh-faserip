@@ -5,7 +5,7 @@ export class FaseripItemSheet extends ItemSheet {
       classes: ["faserip", "sheet", "item"],
       width: 500,
       height: 600,
-      tabs: [{ navSelector: ".sheet-tabs", contentSelector: ".sheet-body", initial: "description" }],
+      tabs: [{ navSelector: ".sheet-tabs", contentSelector: ".sheet-body", initial: "basics" }],
       resizable: true,
       width: 640, // a bit wider to avoid label wrap
       submitOnChange: true
@@ -127,23 +127,24 @@ export class FaseripItemSheet extends ItemSheet {
     return detected;
   }
 
-  activateListeners(html) {
+  async activateListeners(html) {
     super.activateListeners(html);
 
     // One-time migration: telekinesiStrength -> telekinesisStrength
     try {
       if (this.item?.type === "power") {
-        const sys = this.item.system || {};
-        if (sys.telekinesiStrength && !sys.telekinesisStrength) {
-          this.item.update({
+        const sys = this.item.system ?? {};
+        if (sys.telekinesiStrength !== undefined && sys.telekinesisStrength === undefined) {
+          await this.item.update({
             "system.telekinesisStrength": sys.telekinesiStrength,
-            "system.telekinesiStrength": null
-          }, { diff: false });
+            "-=system.telekinesiStrength": null    // <-- correctly unset old key
+          });
         }
       }
     } catch (e) {
       console.warn("FASERIP | telekinesis migration skipped:", e);
     }
+
 
    // ============ TAB HANDLING ============
     // Manual tab switching (compatible with all Foundry versions)
@@ -160,9 +161,16 @@ export class FaseripItemSheet extends ItemSheet {
       html.find(`.tab[data-tab="${tab}"]`).addClass('active');
     });
 
-    // Activate first tab on initial render
-    html.find('.sheet-tabs .item:first').addClass('active');
-    html.find('.tab:first').addClass('active');
+    // Respect existing active state; if none, default to the first
+    if (!html.find('.sheet-tabs .item.active').length) {
+      html.find('.sheet-tabs .item:first').addClass('active');
+    }
+    if (!html.find('.tab.active').length) {  // ← Fixed: proper if statement
+      html.find('.tab:first').addClass('active');
+    }
+    const activeTab = html.find('.sheet-tabs .item.active').data('tab') 
+                    ?? html.find('.sheet-tabs .item:first').data('tab');
+    html.find(`.tab[data-tab="${activeTab}"]`).addClass('active');
 
     // --- HEALING ---
     html.find('#healing-type').change(async ev => {
@@ -226,53 +234,58 @@ export class FaseripItemSheet extends ItemSheet {
     // ============ CONDITIONAL FIELD VISIBILITY ============
     // These trigger re-renders so {{#if}} conditions in template update
 
-    html.find('#is-life-support, #healing-type, #regen-type, #absorption-type, #is-body-armor, #is-resistance, #requires-save, #is-limited, #save-intensity, #range-type, #duration-type').change(ev => {
+    html.find('#is-life-support, #healing-type, #regen-type, #absorption-type, #is-limited, #save-intensity').change(ev => {
       this.render(true);
     });
 
+
     // Handle magic energy type dropdown - MERGED VERSION (replaces both handlers)
-    html.find('select[name="system.magic.energyType"]').change(async ev => {
-      ev.preventDefault();
-      ev.stopPropagation();
-      
-      const value = ev.currentTarget.value;
-      
-      // Prepare updates object
+    html.find('select[name="system.magic.energyType"]').on('change', async ev => {
+      const value  = ev.currentTarget.value;
+      const magic  = this.item.system?.magic ?? {};
       const updates = { "system.magic.energyType": value };
-      
-      // Auto-fill ceremony checkbox based on energy type
-      const ceremonyCheckbox = html.find('input[name="system.magic.usesCeremony"]');
-      const shouldUseCeremony = (value === 'universal' || value === 'dimensional');
-      
-      if (ceremonyCheckbox.prop('checked') !== shouldUseCeremony) {
-        ceremonyCheckbox.prop('checked', shouldUseCeremony);
-        updates["system.magic.usesCeremony"] = shouldUseCeremony;
-      }
-      
-      // Auto-fill cast cost for Personal energy
-      const castCostInput = html.find('input[name="system.magic.castCost"]');
-      if (value === 'personal') {
-        if (!castCostInput.val() || castCostInput.val() === '0') {
-          castCostInput.val(1);
-          updates["system.magic.castCost"] = 1;
+
+      // Ceremony only for Dimensional (Universal = chant OR gesture)
+      updates["system.magic.usesCeremony"] = (value === 'dimensional');
+
+      // Set chant/gesture defaults ONLY if both are currently undefined
+      const untouched = (magic.chant === undefined) && (magic.gesture === undefined);
+
+      if (untouched) {
+        if (value === 'personal') {
+          updates["system.magic.chant"]   = false;
+          updates["system.magic.gesture"] = false;
+        } else if (value === 'universal') {
+          updates["system.magic.chant"]   = true;   // default to chant
+          updates["system.magic.gesture"] = false;
+        } else if (value === 'dimensional') {
+          updates["system.magic.chant"]   = true;
+          updates["system.magic.gesture"] = true;
         }
-        castCostInput.attr('placeholder', '1 Health per turn');
-      } else {
-        castCostInput.attr('placeholder', 'None');
-        // Don't clear existing value, just change placeholder
       }
-      
-      // Show/hide Source Entity for Dimensional
-      const sourceEntityGroup = html.find('.source-entity-group');
-      sourceEntityGroup.toggle(value === 'dimensional');
-      
-      // Show/hide Backlash for Universal
-      const backlashGroup = html.find('.backlash-group');
-      backlashGroup.toggle(value === 'universal');
-      
-      // Single update with all changes, no re-render
-      await this.item.update(updates, { render: false });
+
+      // Sensible resist defaults per type
+      if (value === 'personal') {
+        updates["system.magic.targetResistsWith"] = "";
+      } else if (value === 'universal') {
+        updates["system.magic.targetResistsWith"] = "psyche";
+      }
+      // dimensional: leave as-is (depends on emulated effect)
+
+      // Personal default cost (1 HP/turn) if not already set
+      if (value === 'personal' && !magic.castCost) {
+        updates["system.magic.castCost"] = 1;
+      }
+
+      await this.item.update(updates);
+
+      // Optional: avatar quality-of-life (skip scary notes on dimensional)
+      const isAvatar = this.actor?.getFlag?.('msh-faserip', 'isAvatar') === true;
+      if (value === 'dimensional' && isAvatar) {
+        await this.item.update({ "system.magic.backlashNotes": "" }, { render: false });
+      }
     });
+
 
     // Toggle combat properties section
     html.find('.toggle-combat-section').click(ev => {
@@ -282,6 +295,25 @@ export class FaseripItemSheet extends ItemSheet {
       
       section.slideToggle(200);
       icon.toggleClass('fa-chevron-down fa-chevron-up');
+    });
+
+    // --- COMBAT TAB CHECKBOXES ---
+    html.find('#requires-save').change(async ev => {
+      const checked = ev.currentTarget.checked;
+      await this.item.update({ "system.requiresSave": checked }, { render: false });
+      this.render(true);
+    });
+
+    html.find('#is-body-armor').change(async ev => {
+      const checked = ev.currentTarget.checked;
+      await this.item.update({ "system.isBodyArmor": checked }, { render: false });
+      this.render(true);
+    });
+
+    html.find('#is-resistance').change(async ev => {
+      const checked = ev.currentTarget.checked;
+      await this.item.update({ "system.isResistance": checked }, { render: false });
+      this.render(true);
     });
 
     // Auto-expand combat section if combat data exists
@@ -434,54 +466,10 @@ export class FaseripItemSheet extends ItemSheet {
       updateSpecialtyDropdown();
     }
 
-    // Show/hide offensive fields
-    html.find('#is-offensive').change(ev => {
-      const checked = ev.currentTarget.checked;
-      html.find('#offensive-fields').toggle(checked);
-    });
-
     // Show/hide body armor fields
     html.find('#is-body-armor').change(ev => {
       const checked = ev.currentTarget.checked;
       html.find('.armor-details').toggle(checked);
-    });
-
-    // Show/hide resistance fields
-    html.find('#is-resistance').change(ev => {
-      const checked = ev.currentTarget.checked;
-      html.find('.resistance-details').toggle(checked);
-    });
-
-    // Show/hide magic fields
-    html.find('#is-magic-checkbox').change(ev => {
-      const checked = ev.currentTarget.checked;
-      html.find('#magic-fields').toggle(checked);
-    });
-
-    // Auto-calculate energy armor
-    html.find('#armor-physical').change(ev => {
-      const physical = parseInt(ev.currentTarget.value) || 0;
-      const energyField = html.find('#armor-energy');
-      if (energyField.val() === 0 || energyField.val() === '') {
-        energyField.val(Math.max(0, physical - 20));
-      }
-    });
-
-    // Update resistance value label
-    html.find('[name="system.resistanceEffect"]').change(ev => {
-      const effect = ev.currentTarget.value;
-      const label = html.find('#resistance-value-label');
-      const group = html.find('.resistance-value-group');
-      
-      if (effect === 'columnShift') {
-        label.text('CS Bonus:');
-        group.show();
-      } else if (effect === 'damageReduction') {
-        label.text('Damage Reduction:');
-        group.show();
-      } else if (effect === 'immunity') {
-        group.hide();
-      }
     });
 
     // Delete button

@@ -789,6 +789,17 @@ Hooks.once("init", async () => {
     makeDefault: true 
   });
 
+  Handlebars.registerHelper('array', function() {
+    // arguments includes the Handlebars options object at the end
+    return Array.prototype.slice.call(arguments, 0, -1);
+  });
+
+  // {{capitalize "word"}} -> "Word"
+  Handlebars.registerHelper('capitalize', function(str) {
+    if (typeof str !== 'string') return '';
+    return str.charAt(0).toUpperCase() + str.slice(1);
+  });
+  
   // end of hooks.once
 });
 

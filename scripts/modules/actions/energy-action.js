@@ -34,15 +34,16 @@ export class EnergyAction extends RangedAttackAction {
     const energyItems = actor.items.filter((i) => {
       if (i.type !== "power") return false;
       const s = i.system || {};
+      
+      // NEW: Explicit flag (if you add one)
+      if (s.isEnergyAttack === true) return true;
+      
+      // EXISTING: Category/type detection
       const cat = String(s.category || "").toLowerCase();
       const typ = String(s.type || "").toLowerCase();
-
-      // Primary buckets: ranged / energy-style powers
       const catIsEnergy = cat === "energycontrol" || cat === "distanceattacks";
-
-      // Safety net: if category is missing/migrated, detect by type keywords
       const typeLooksEnergy = /energy|light|electric|plasma|beam|blast|fire|ice|sound|darkforce|radiation/.test(typ);
-
+      
       return catIsEnergy || typeLooksEnergy;
     });
 
