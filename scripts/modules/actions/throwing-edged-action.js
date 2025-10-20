@@ -34,9 +34,21 @@ export class ThrowingEdgedAction extends RangedAttackAction {
     // Candidate weapons: thrown + edged
     // Build the Throwing-Edged weapon list (back-compat + multi-mode support)
     const thrownEdged = actor.items.filter(i => {
-      if (i.type !== "weapon") return false;
+      if (i.type !== "equipment" || i.system?.category !== "weapon") return false;
 
       const s = i.system ?? {};
+      
+      // ✅ NEW: Check if weapon has a throwing-edged attack mode
+      if (s.attackModes) {
+        const modes = Object.values(s.attackModes);
+        const hasThrowingEdged = modes.some(m => 
+          m.actionType === "throwing-edged" || 
+          (m.damageType === "TE" && m.name?.toLowerCase().includes("throw"))
+        );
+        if (hasThrowingEdged) return true;
+      }
+      
+      // EXISTING LOGIC BELOW (keep all of this):
       const tags = (s.tags ?? []).map(t => String(t).toLowerCase());
       const forms = Array.isArray(s.attackForms) ? s.attackForms.map(f => String(f).toLowerCase()) : [];
       const props = s.properties ?? {};
@@ -48,21 +60,19 @@ export class ThrowingEdgedAction extends RangedAttackAction {
 
       // Ways to consider a weapon "throwable"
       const isThrowable =
-        props.throwable === true ||             // new sheet prop
-        weaponType === "thrown" ||              // your original field
-        category === "throwing" ||              // some items use category
-        tags.includes("thrown") ||              // your original tags
-        forms.includes("throwing") ||           // attackForms support
-        forms.includes("throwing-edged");       // explicit composite form
+        props.throwable === true ||
+        weaponType === "thrown" ||
+        category === "throwing" ||
+        tags.includes("thrown") ||
+        forms.includes("throwing") ||
+        forms.includes("throwing-edged");
 
       // Ways to consider a weapon "edged"
       const isEdged =
-        // your original representations
         damageType === "ea" ||
         attackType === "edged" ||
         tags.includes("edged") ||
         tags.includes("ea") ||
-        // additional spellings seen across items/sheets
         damageType === "edged" ||
         damageType === "physical-edged" ||
         forms.includes("edged") ||
@@ -170,7 +180,11 @@ export class ThrowingEdgedAction extends RangedAttackAction {
               const $ = (sel) => html.find(sel);
               const useAdHoc = !!$('#adhoc-toggle').is(':checked');
 
+              // ✅ DECLARE THESE AT THE TOP:
               let weaponName, weaponDamage, weaponId = null;
+              let weaponAP = 0, weaponAPCS = 0, weaponAPMode = "value";  // ✅ ADD THIS LINE
+              let weaponDamageType = "physical-edged";                    // ✅ ADD THIS LINE
+              
               if (useAdHoc) {
                 weaponName = String($('[name="adhocName"]').val() || "Improvised Edged");
                 weaponDamage = Number($('[name="adhocDamage"]').val() || 0);
@@ -181,12 +195,28 @@ export class ThrowingEdgedAction extends RangedAttackAction {
                   ui.notifications.error("Select a carried thrown-edged weapon or use ad-hoc.");
                   return resolve(null);
                 }
+                // DEBUG BLOCK:
+                console.log("=== THROWING WEAPON SELECTED ===");
+                console.log("Weapon:", weapon.name);
+                console.log("Attack modes:", weapon.system.attackModes);
+                console.log("Root damage:", weapon.system.damage);
+                console.log("Root AP CS:", weapon.system.armorPiercingCS);
+                console.log("Root AP mode:", weapon.system.apMode);
+                
+                // Find the throwing-edged mode
+                const throwMode = Object.values(weapon.system.attackModes || {})
+                  .find(m => m.actionType === "throwing-edged");
+                console.log("Throwing mode found:", throwMode);
+                console.log("================================");
+                
                 weaponId = wid;
                 weaponName = weapon.name;
                 weaponDamage = Number(weapon.system?.damage || 0);
-                // NEW: capture AP + damageType for mitigation
-                var weaponAP = getArmorPiercing(weapon);
-                var weaponDamageType = String(weapon.system?.damageType || "physical-edged").toLowerCase();
+
+                weaponAP = getArmorPiercing(weapon);
+                weaponAPCS = Number(weapon.system?.armorPiercingCS || 0) || 0;
+                weaponAPMode = weapon.system?.apMode || "value";
+                weaponDamageType = String(weapon.system?.damageType || "physical-edged").toLowerCase();
               }
 
               const shift = Number($('[name="shift"]').val() || 0);
@@ -234,9 +264,10 @@ export class ThrowingEdgedAction extends RangedAttackAction {
                 targetMovement,
                 movementModifier,
                 armorPiercing: (typeof weaponAP !== "undefined" ? weaponAP : 0),
+                armorPiercingCS: (typeof weaponAPCS !== "undefined" ? weaponAPCS : 0),    // ✅ ADD
+                apMode: (typeof weaponAPMode !== "undefined" ? weaponAPMode : "value"),   // ✅ ADD
                 damageType: (typeof weaponDamageType !== "undefined" ? weaponDamageType : "physical-edged")
               });
-
             }
           },
           cancel: { label: "Cancel", callback: () => resolve(null) }
@@ -312,7 +343,9 @@ export class ThrowingEdgedAction extends RangedAttackAction {
       damage: isHit ? choice.weaponDamage : 0,
       attackForm: "edged",
       damageType: (choice.damageType || "physical-edged"),
-      armorPiercing: Number(choice.armorPiercing || 0)
+      armorPiercing: Number(choice.armorPiercing || 0),
+      armorPiercingCS: Number(choice.armorPiercingCS || 0),   // ✅ ADD
+      apMode: choice.apMode || "value"                         // ✅ ADD
     });
 
     const contextHtml = `
