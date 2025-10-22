@@ -2889,3 +2889,213 @@
     font-size: 11px;
   }
 }
+
+/* ====== OUTER FORM ====== */
+/* Let the window scroll */
+.window-content { overflow: auto !important; }
+
+/* Form should NOT create its own scrollbar */
+form.faserip-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px 8px;
+  min-height: 0;
+  height: auto;          /* natural height */
+  overflow: visible;     /* no inner scroll */
+}
+
+/* Body should NOT scroll on its own */
+form.faserip-sheet > .sheet-body {
+  flex: 0 0 auto;
+  min-height: 0;
+  overflow: visible;
+}
+
+/* Sometimes themes set .window-content to scroll as well */
+.window-content { overflow: hidden; }   /* optional, only if you see a double scroll */
+
+
+/* ====== TOP HEADER (keeps your exact HTML) ====== */
+form.faserip-sheet .sheet-header.marvel-header {
+  display: grid;
+  grid-template-columns: 72px 1fr auto;  /* portrait | MARVEL text block | player name */
+  align-items: center;                    /* vertical centering */
+  column-gap: 12px;
+  padding: 6px 8px;                       /* tighter container padding */
+  line-height: 1.1;
+  min-height: 0;                          /* prevent any inherited min-height */
+}
+
+/* Portrait smaller, cannot dictate height of the row */
+/* Keep the container a fixed square and center the image inside it */
+form.faserip-sheet .sheet-header.marvel-header .portrait-container {
+  width: 72px;
+  height: 72px;
+  display: grid;
+  place-items: center;
+  background: #fff;                          /* letterbox background */
+  border: 1px solid rgba(0,0,0,.25);
+  border-radius: 4px;
+  box-sizing: border-box;
+}
+
+/* Let the image fit inside the square without cropping */
+form.faserip-sheet .sheet-header.marvel-header .portrait-container .portrait {
+  width: 100% !important;
+  height: 100% !important;      /* was auto */
+  object-fit: contain !important; 
+  max-width: none !important;    /* let width/height control the box */
+  max-height: none !important;
+  display: block;
+  border: 0;
+  border-radius: 3px;
+}
+
+/* Giant text block: same words, just no default margins and tight line-height */
+form.faserip-sheet .sheet-header.marvel-header .header-title { margin: 0; }
+form.faserip-sheet .sheet-header.marvel-header .header-title .marvel-logo-text {
+  margin: 0;
+  line-height: 1.0;     /* critical to avoid ballooning */
+}
+form.faserip-sheet .sheet-header.marvel-header .header-title .super-heroes-text {
+  margin: 0;
+  line-height: 1.0;
+}
+form.faserip-sheet .sheet-header.marvel-header .header-title .character-sheet-text {
+  margin: 2px 0 0 0;    /* tiny nudge between the rows */
+  line-height: 1.05;    /* <br> stays; line spacing is tight */
+}
+
+/* Right side: Player Name — do not let it set the row height */
+form.faserip-sheet .sheet-header.marvel-header .character-info .player-name-container label {
+  margin: 0 0 2px 0;
+  line-height: 1.1;
+  font-size: 12.5px;
+}
+form.faserip-sheet .sheet-header.marvel-header .character-info .player-name-container input[type="text"] {
+  height: 26px;         /* slim control so header rows can shrink */
+  padding: 2px 6px;
+  font-size: 12.5px;
+  line-height: 1.1;
+}
+
+/* ====== IDENTITY SECTION (same layout, just tighter) ====== */
+form.faserip-sheet .identity-section {
+  padding: 8px 10px;
+  min-height: 0;
+  display: grid;      /* new */
+  row-gap: 6px;       /* new: vertical spacing between rows */
+}
+
+/* two-column and three-column rows, now compact */
+form.faserip-sheet .identity-section .hero-info-row {
+  margin: 0;          /* was 4px 0; */
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 12px;
+  row-gap: 6px;
+}
+
+form.faserip-sheet .identity-section .hero-info-row.three-columns {
+  grid-template-columns: 1fr 1fr 1fr;
+  column-gap: 12px;
+  row-gap: 6px;
+}
+
+/* Labels and inputs slimmer but unchanged in structure */
+form.faserip-sheet .identity-section label {
+  font-size: 12.5px;
+  line-height: 1.1;
+  margin: 0 0 2px 0;
+}
+
+form.faserip-sheet .identity-section input[type="text"],
+form.faserip-sheet .identity-section input[type="number"],
+form.faserip-sheet .identity-section select {
+  height: 24px;
+  padding: 2px 6px;
+  font-size: 12.5px;
+  line-height: 1.1;
+}
+
+/* “Hero's Identity” radio row — stays inline, just tighter */
+form.faserip-sheet .identity-section .identity-label-row { margin-bottom: 2px; }
+form.faserip-sheet .identity-section .identity-type-inline {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+}
+form.faserip-sheet .identity-section .radio-label {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+}
+form.faserip-sheet .identity-section input[type="radio"] {
+  margin: 0;
+  transform: scale(0.95);          /* subtle size trim (optional) */
+}
+
+/* ===== Compact, from-scratch header ===== */
+.msh-compact-header{
+  display:grid;
+  grid-template-columns:72px 1fr auto;      /* portrait | logo | player */
+  align-items:center;
+  column-gap:12px;
+  padding:6px 8px;
+  border:1px solid #7a0b0b;                 /* your red box style */
+  border-radius:3px;
+  background:#fff;
+  line-height:1.1;
+}
+
+.msh-portrait img{
+  width:100%;height:100%;object-fit:contain;border-radius:4px;display:block;
+  border:1px solid rgba(0,0,0,.25);
+}
+
+.msh-logo{ margin:0; }
+.msh-logo .msh-marvel{ font-weight:900;font-size:28px;line-height:1.0;margin:0; }
+.msh-logo .msh-super{  font-weight:700;font-size:12px;line-height:1.0;margin:0; }
+.msh-logo .msh-chartext{ font-weight:700;font-size:13px;line-height:1.05;margin:2px 0 0 0; }
+
+.msh-player label{ display:block;font-size:12.5px;line-height:1.1;margin:0 0 2px 0; }
+.msh-player input{ height:26px;padding:2px 6px;font-size:12.5px;line-height:1.1; box-sizing:border-box; }
+
+/* ===== Identity section (same fields/order, just tight) ===== */
+.msh-identity{
+  border:1px solid #7a0b0b;border-radius:3px;background:#fff;
+  padding:8px 10px; display:grid; row-gap:6px; line-height:1.1;
+}
+
+/* rows: 2-col by default, 3-col when .msh-3 */
+.msh-identity .msh-row{ display:grid; grid-template-columns:1fr 1fr; column-gap:12px; row-gap:6px; }
+.msh-identity .msh-row.msh-3{ grid-template-columns:1fr 1fr 1fr; }
+.msh-identity .msh-field{ min-width:0; } /* allow shrink */
+
+.msh-identity label{ display:block;font-size:12.5px;margin:0 0 2px 0; }
+.msh-identity input[type="text"],
+.msh-identity input[type="number"],
+.msh-identity select{
+  width:100%;height:24px;padding:2px 6px;font-size:12.5px;line-height:1.1;box-sizing:border-box;
+}
+
+/* radios inline, compact */
+.msh-inline{ display:flex; align-items:center; gap:8px; }
+.msh-radios{ display:inline-flex; align-items:center; gap:8px; }
+.msh-radio{ display:inline-flex; align-items:center; gap:4px; }
+.msh-identity input[type="radio"]{ margin:0; transform:scale(.95); }
+
+/* biography button sized like inputs */
+.msh-biography{ display:flex; align-items:end; }
+.msh-biography .biography-toggle{
+  height:26px; line-height:24px; padding:2px 8px; box-sizing:border-box;
+}
+
+/* biography details grid */
+.msh-bio{ display:grid; row-gap:8px; margin-top:6px; }
+.msh-biorow{ display:grid; grid-template-columns:1fr 1fr; column-gap:12px; row-gap:6px; }
+.msh-biofield label{ display:block;font-size:12.5px;margin:0 0 2px 0; }
+.msh-biofield input, .msh-biofield textarea{ width:100%; box-sizing:border-box; font-size:12.5px; }
+.msh-biofield textarea{ padding:6px; }
+.msh-biofield.msh-full{ grid-column:1 / -1; }
