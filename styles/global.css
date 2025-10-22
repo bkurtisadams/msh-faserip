@@ -3099,3 +3099,434 @@ form.faserip-sheet .identity-section input[type="radio"] {
 .msh-biofield input, .msh-biofield textarea{ width:100%; box-sizing:border-box; font-size:12.5px; }
 .msh-biofield textarea{ padding:6px; }
 .msh-biofield.msh-full{ grid-column:1 / -1; }
+
+/* ========================================
+   ABILITIES & MOVEMENT SECTION - MATCHED HEADERS
+   ======================================== */
+
+:root {
+  --mred: #8b0000;  /* Dark red */
+  --cell-grey: #efefef;
+  --line-grey: #d7d7d7;
+  --text-light: #fff;
+}
+
+/* ===== Abilities: Two-Column Layout ===== */
+form.faserip-sheet .abilities-section {
+  display: grid;
+  grid-template-columns: minmax(0, var(--colP, 1fr)) minmax(0, var(--colS, 1fr));
+  gap: 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--mred);
+  border-radius: 3px;
+  background: #fff;
+  align-items: stretch;
+  box-sizing: border-box;
+}
+
+/* When initial columns are hidden, rebalance widths */
+form.faserip-sheet .abilities-section.initial-hidden {
+  --colP: 0.78fr;
+  --colS: 1.22fr;
+}
+
+form.faserip-sheet .abilities-section .abilities-container {
+  align-self: stretch;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  box-sizing: border-box;
+  margin: 0 !important;  /* must match secondary container */
+}
+
+@media (max-width: 780px) {
+  form.faserip-sheet .abilities-section {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ===== Primary Abilities (Table) ===== */
+form.faserip-sheet .primary-abilities .abilities-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: auto;
+  font-size: 12.5px;
+  line-height: 1.1;
+  margin: 0 !important;  /* match 2ndary */
+  display: block;         /* match 2ndary */
+}
+
+/* Ensure thead and tbody also have no gap */
+form.faserip-sheet .primary-abilities .abilities-table thead,
+form.faserip-sheet .primary-abilities .abilities-table tbody {
+  display: table;
+  width: 100%;
+  table-layout: auto;
+}
+
+form.faserip-sheet .primary-abilities .abilities-table th,
+form.faserip-sheet .primary-abilities .abilities-table td {
+  padding: 4px 6px;
+  vertical-align: middle;
+  box-sizing: border-box;
+}
+
+/* ===== Primary Abilities (Table) ===== */
+form.faserip-sheet .primary-abilities .abilities-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: auto;
+  font-size: 12.5px;
+  line-height: 1.1;
+  margin: 0 !important;
+}
+
+form.faserip-sheet .primary-abilities .abilities-table th,
+form.faserip-sheet .primary-abilities .abilities-table td {
+  padding: 4px 6px;
+  vertical-align: middle;
+  box-sizing: border-box;
+}
+
+/* PRIMARY HEADER - MATCH SECONDARY EXACTLY */
+form.faserip-sheet .primary-abilities .abilities-table thead th {
+  text-align: center;
+  background: #8b0000 !important;
+  color: #fff !important;
+  height: 38px !important;
+  min-height: 38px !important;
+  max-height: 38px !important;
+  padding: 6px !important;          /* CHANGED: reduced from 8px */
+  border-bottom: 1px solid rgba(0, 0, 0, 0.25);
+  white-space: nowrap;
+  font-size: 12px !important;       /* CHANGED: reduced from 13px */
+  font-weight: 600;
+  line-height: 1.1 !important;      /* CHANGED: reduced from 1.2 */
+  vertical-align: middle;
+  box-sizing: border-box;
+}
+
+/* Icon column - wider to show icon fully */
+form.faserip-sheet .primary-abilities .abilities-table thead th:first-child,
+form.faserip-sheet .primary-abilities .abilities-table tbody td:first-child {
+  width: 40px !important;           /* CHANGED: increased from 28px */
+  min-width: 40px !important;
+  padding: 4px !important;
+}
+
+form.faserip-sheet .primary-abilities .abilities-table td,
+form.faserip-sheet .primary-abilities .abilities-table th {
+  border-right: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+form.faserip-sheet .primary-abilities .abilities-table td:last-child,
+form.faserip-sheet .primary-abilities .abilities-table th:last-child {
+  border-right: 0;
+}
+
+form.faserip-sheet .primary-abilities .abilities-table td.ability-key {
+  width: 1%;
+  white-space: nowrap;
+  text-align: center;
+  font-weight: 700;
+}
+
+form.faserip-sheet .primary-abilities .abilities-table input,
+form.faserip-sheet .primary-abilities .abilities-table select {
+  height: 24px;
+  padding: 2px 6px;
+  font-size: 12.5px;
+  line-height: 1.1;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+/* === Hide Initial Roll & Initial Rank columns === */
+form.faserip-sheet .primary-abilities .abilities-table.initial-hidden th:nth-child(2),
+form.faserip-sheet .primary-abilities .abilities-table.initial-hidden td:nth-child(2),
+form.faserip-sheet .primary-abilities .abilities-table.initial-hidden th:nth-child(3),
+form.faserip-sheet .primary-abilities .abilities-table.initial-hidden td:nth-child(3) {
+  display: none !important;
+}
+
+/* When hidden, switch to fixed layout to prevent expansion */
+form.faserip-sheet .primary-abilities .abilities-table.initial-hidden {
+  table-layout: fixed;
+  width: 100%;
+}
+
+form.faserip-sheet .primary-abilities .abilities-table.initial-hidden th,
+form.faserip-sheet .primary-abilities .abilities-table.initial-hidden td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Column widths when hidden: icon | Current Rank | Current # */
+form.faserip-sheet .primary-abilities .abilities-table.initial-hidden thead th:nth-child(1),
+form.faserip-sheet .primary-abilities .abilities-table.initial-hidden tbody td:nth-child(1) {
+  width: 40px !important;           /* CHANGED: increased from 28px */
+  min-width: 40px !important;
+}
+
+form.faserip-sheet .primary-abilities .abilities-table.initial-hidden thead th:nth-child(4),
+form.faserip-sheet .primary-abilities .abilities-table.initial-hidden tbody td:nth-child(4) {
+  width: auto;
+}
+
+form.faserip-sheet .primary-abilities .abilities-table.initial-hidden thead th:nth-child(5),
+form.faserip-sheet .primary-abilities .abilities-table.initial-hidden tbody td:nth-child(5) {
+  width: 64px;
+}
+
+/* SECONDARY HEADER - MATCH PRIMARY EXACTLY */
+form.faserip-sheet .secondary-abilities .sec-head {
+  background: #8b0000 !important;
+  color: #fff !important;
+  text-align: center;
+  height: 38px !important;
+  min-height: 38px !important;
+  max-height: 38px !important;
+  padding: 6px !important;          /* CHANGED: reduced from 8px */
+  line-height: 1.1 !important;      /* CHANGED: reduced from 1.2 */
+  font-size: 12px !important;       /* CHANGED: reduced from 13px */
+  font-weight: 600;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.25);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  box-sizing: border-box;
+  vertical-align: middle;
+}
+
+form.faserip-sheet .secondary-abilities .sec-head > button {
+  background: transparent;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  padding: 0;
+  cursor: pointer;
+  line-height: 1.1;
+}
+
+form.faserip-sheet .secondary-abilities .sec-head small {
+  display: block;
+  font-size: 9px;
+  font-weight: 400;
+  color: #ffd;
+  line-height: 1.1;
+  margin-top: 2px;
+}
+
+form.faserip-sheet .secondary-abilities .sec-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.2fr 1fr;
+  column-gap: 0;
+  row-gap: 0;
+  width: 100%;
+  min-width: 0;
+}
+
+@media (max-width: 1100px) {
+  form.faserip-sheet .secondary-abilities .sec-grid {
+    grid-template-columns: 1fr 1fr 1.25fr 1fr;
+  }
+}
+
+form.faserip-sheet .secondary-abilities .sec-col {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  border-right: 1px solid var(--line-grey);
+}
+
+form.faserip-sheet .secondary-abilities .sec-col:last-child {
+  border-right: 0;
+}
+
+/* SECONDARY HEADER - EXACT MATCH TO PRIMARY */
+form.faserip-sheet .secondary-abilities .sec-head {
+  background: #8b0000 !important;  /* Force exact red match */
+  color: #fff !important;
+  text-align: center;
+  height: 38px;
+  min-height: 38px;
+  max-height: 38px;
+  padding: 8px 6px;
+  line-height: 1.2;
+  font-size: 13px;
+  font-weight: 600;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.25);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  box-sizing: border-box;
+  vertical-align: middle;
+}
+
+form.faserip-sheet .secondary-abilities .sec-head > button {
+  background: transparent;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  padding: 0;
+  cursor: pointer;
+  line-height: 1.2;
+}
+
+form.faserip-sheet .secondary-abilities .sec-head small {
+  display: block;
+  font-size: 9px;
+  font-weight: 400;
+  color: #ffd;
+  line-height: 1.1;
+  margin-top: 2px;
+}
+
+/* Column Bodies */
+form.faserip-sheet .secondary-abilities .sec-body {
+  padding: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  box-sizing: border-box;
+}
+
+/* Inputs - Base styling */
+form.faserip-sheet .secondary-abilities input[type="number"],
+form.faserip-sheet .secondary-abilities input[type="text"],
+form.faserip-sheet .secondary-abilities select {
+  height: 26px;
+  padding: 2px 6px;
+  font-size: 12.5px;
+  line-height: 1.2;
+  background: var(--cell-grey);
+  border: 1px solid #ccc;
+  border-radius: 2px;
+  box-sizing: border-box;
+  text-align: center;
+  appearance: textfield;
+  -moz-appearance: textfield;
+  -webkit-appearance: none;
+}
+
+form.faserip-sheet .secondary-abilities input[type="number"]::-webkit-outer-spin-button,
+form.faserip-sheet .secondary-abilities input[type="number"]::-webkit-inner-spin-button {
+  appearance: none;
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* Health & Karma: [value] / [max] */
+form.faserip-sheet .secondary-abilities .stacked-values {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+}
+
+form.faserip-sheet .secondary-abilities .stacked-values input[type="number"] {
+  width: 50px;
+  min-width: 50px;
+  flex-shrink: 0;
+}
+
+form.faserip-sheet .secondary-abilities .stacked-values .divider {
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1;
+  flex-shrink: 0;
+  color: #666;
+}
+
+/* Resources: dropdown above, number below */
+form.faserip-sheet .secondary-abilities .resources-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+  width: 100%;
+}
+
+form.faserip-sheet .secondary-abilities .resources-row select {
+  width: 100%;
+  max-width: 140px;
+  text-align: left;
+  padding-left: 6px;
+}
+
+form.faserip-sheet .secondary-abilities .resources-row input[type="number"] {
+  width: 60px;
+  min-width: 60px;
+}
+
+/* Popularity: [hero] / [secret] (if exists) */
+form.faserip-sheet .secondary-abilities .popularity-values {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+}
+
+form.faserip-sheet .secondary-abilities .popularity-values input[type="number"] {
+  width: 50px;
+  min-width: 50px;
+  flex-shrink: 0;
+}
+
+form.faserip-sheet .secondary-abilities .popularity-values .divider {
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1;
+  flex-shrink: 0;
+  color: #666;
+}
+
+/* ===== Movement Panel ===== */
+form.faserip-sheet .movement-panel {
+  grid-column: 1 / -1;
+  border: 1px solid var(--mred);
+  border-radius: 3px;
+  background: #fff;
+  padding: 8px 10px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px 12px;
+}
+
+form.faserip-sheet .movement-panel label {
+  display: block;
+  font-size: 12.5px;
+  line-height: 1.1;
+  margin: 0 0 4px 0;
+  font-weight: 600;
+}
+
+form.faserip-sheet .movement-panel input[type="number"] {
+  height: 26px;
+  padding: 2px 6px;
+  font-size: 12.5px;
+  line-height: 1.2;
+  background: var(--cell-grey);
+  border: 1px solid #ccc;
+  border-radius: 2px;
+  box-sizing: border-box;
+  text-align: center;
+  width: 100%;
+  appearance: textfield;
+  -moz-appearance: textfield;
+  -webkit-appearance: none;
+}

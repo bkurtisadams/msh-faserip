@@ -111,9 +111,10 @@
           <thead>
             <tr>
               <th>
-                <a class="universal-roll-trigger" title="Universal Table FEAT Roll">
+                <a class="universal-roll-trigger" title="Universal Table FEAT Roll&#10;CTRL+Click: Toggle Initial Columns">
                   <img src="systems/msh-faserip/assets/universal-table-icon.png" width="16" height="16" />
                 </a>
+              </th>
               </th>
               <th class="narrow-column initial toggle-header" 
                   title="Hold CTRL + click to hide/show initial columns">Initial<br>Roll</th>
@@ -461,148 +462,112 @@
 
       <!-- Secondary Abilities Container -->
       <div class="abilities-container secondary-abilities">
-        <table class="attributes-table">
-          <thead>
-            <tr>
-              <th>Health</th>
-              <th>Karma</th>
-              <th>
-                <button type="button" class="resources-header-button"
-                        title="Click to roll Resources. Hold CTRL for info."
-                        style="cursor: pointer;">
-                  Resources
-                </button>
-              </th>
-              
-              <th><button type="button" class="popularity-header-button"
-                  title="Popularity & Contacts Information">Popularity</button></th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td class="health-column">
-                <div class="stacked-values">
-                  <input type="number" name="system.attributes.health.value"
-                    value="{{system.attributes.health.value}}" />
-                  <div class="divider">/</div>
-                  <input type="number" name="system.attributes.health.max" value="{{system.attributes.health.max}}"
-                    disabled />
-                </div>
-              </td>
-              <td class="karma-column">
-                <div class="stacked-values">
-                  <input type="number" name="system.attributes.karma.value" value="{{system.attributes.karma.value}}" />
-                  <div class="divider">/</div>
-                  <input type="number" name="system.attributes.karma.max" value="{{system.attributes.karma.max}}"
-                    disabled />
-                </div>
-              </td>
-              <td class="resources-column">
-
-                <select name="system.attributes.resources.rank">
-                  <option value="Shift-0" {{#if (eq system.attributes.resources.rank "Shift-0" )}}selected{{/if}}>
-                    Shift-0</option>
-                  <option value="Feeble" {{#if (eq system.attributes.resources.rank "Feeble" )}}selected{{/if}}>Feeble
-                  </option>
-                  <option value="Poor" {{#if (eq system.attributes.resources.rank "Poor" )}}selected{{/if}}>Poor
-                  </option>
-                  <option value="Typical" {{#if (eq system.attributes.resources.rank "Typical" )}}selected{{/if}}>
-                    Typical</option>
-                  <option value="Good" {{#if (eq system.attributes.resources.rank "Good" )}}selected{{/if}}>Good
-                  </option>
-                  <option value="Excellent" {{#if (eq system.attributes.resources.rank "Excellent" )}}selected{{/if}}>
-                    Excellent</option>
-                  <option value="Remarkable" {{#if (eq system.attributes.resources.rank "Remarkable" )}}selected{{/if}}>
-                    Remarkable</option>
-                  <option value="Incredible" {{#if (eq system.attributes.resources.rank "Incredible" )}}selected{{/if}}>
-                    Incredible</option>
-                  <option value="Amazing" {{#if (eq system.attributes.resources.rank "Amazing" )}}selected{{/if}}>
-                    Amazing</option>
-                  <option value="Monstrous" {{#if (eq system.attributes.resources.rank "Monstrous" )}}selected{{/if}}>
-                    Monstrous</option>
-                  <option value="Unearthly" {{#if (eq system.attributes.resources.rank "Unearthly" )}}selected{{/if}}>
-                    Unearthly</option>
-                </select>
-                <input type="number" name="system.attributes.resources.value"
-                  value="{{system.attributes.resources.value}}" />
-              </td>
-              <td class="popularity-column">
-                <div class="stacked-values popularity-values" style="margin-top: 0;">
-                  <input type="number"
-                         name="system.attributes.popularity.hero.value"
-                         value="{{system.attributes.popularity.hero.value}}"
-                         title="Hero Identity Popularity" />
-              
-                  {{#if (eq system.identityType "secret")}}
-                    <div class="divider">/</div>
-                    <input type="number"
-                           name="system.attributes.popularity.secretId.value"
-                           value="{{system.attributes.popularity.secretId.value}}"
-                           title="Secret Identity Popularity" />
-                  {{/if}}
-                </div>
-              </td>
-              
-            </tr>
-          </tbody>
-        </table>
-
-        <!-- Movement Row - Now in its own section -->
-        <div class="movement-section">
-          <div class="movement-item">
-            <label>Run</label>
-            <input type="number" name="system.movement.run" value="{{system.movement.run}}" />
-          </div>
-          <div class="movement-item">
-            <label>Swim</label>
-            <input type="number" name="system.movement.swim" value="{{system.movement.swim}}" />
-          </div>
-          <div class="movement-item">
-            <label>Fly</label>
-            <input type="number" name="system.movement.fly" value="{{system.movement.fly}}" />
-          </div>
-          <div class="movement-item">
-            <label>Teleport</label>
-            <input type="number" name="system.movement.teleport" value="{{system.movement.teleport}}" />
-          </div>
-        </div>
-
-        <!-- Resistances section -->
-        <div class="resistances">
-          <table class="resistances-table">
-            <thead>
-              <tr>
-                <th class="resistance-name-col">
-                  <button type="button" class="add-resistance">Resistance +</button>
-                </th>
-                <th class="resistance-rank-col">Rank</th>
-                <th class="resistance-value-col">Value</th>
-                <th class="resistance-actions-col">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {{#each system.resistances as |resistance i|}}
-              <tr class="resistance-row" data-index="{{i}}">
-                <td class="resistance-name">{{resistance.type}}</td>
-                <td class="resistance-rank">{{resistance.rank}}</td>
-                <td class="resistance-value">{{resistance.value}}</td>
-                <td class="resistance-controls">
-                  <a class="resistance-info" title="Information" data-index="{{i}}"><i
-                      class="fas fa-info-circle"></i></a>
-                  <a class="resistance-edit" title="Edit" data-index="{{i}}"><i class="fas fa-edit"></i></a>
-                  <a class="delete-resistance" title="Delete" data-index="{{i}}"><i class="fas fa-trash"></i></a>
-                </td>
-              </tr>
-              {{/each}}
-            </tbody>
-          </table>
-
-          <!-- {{#unless system.resistances.length}}
-          <p class="no-resistances">No resistances added yet.</p>
-          {{/unless}} -->
+  <div class="sec-grid">
+    <!-- HEALTH -->
+    <div class="sec-col health">
+      <div class="sec-head">
+        <span>Health</span>
+        <small>F + A + S + E</small>
+      </div>
+      <div class="sec-body">
+        <div class="stacked-values">
+          <input type="number" name="system.attributes.health.value" value="{{system.attributes.health.value}}" />
+          <div class="divider">/</div>
+          <input type="number" name="system.attributes.health.max" value="{{system.attributes.health.max}}" disabled />
         </div>
       </div>
     </div>
+
+    <!-- KARMA -->
+    <div class="sec-col karma">
+      <div class="sec-head">
+        <span>Karma</span>
+        <small>R + I + P</small>
+      </div>
+      <div class="sec-body">
+        <div class="stacked-values">
+          <input type="number" name="system.attributes.karma.value" value="{{system.attributes.karma.value}}" />
+          <div class="divider">/</div>
+          <input type="number" name="system.attributes.karma.max" value="{{system.attributes.karma.max}}" disabled />
+        </div>
+      </div>
+    </div>
+
+    <!-- RESOURCES -->
+    <div class="sec-col resources">
+      <div class="sec-head">
+        <button type="button"
+                class="resources-header-button"
+                title="Click to roll Resources. Hold CTRL for info.">Resources</button>
+      </div>
+      <div class="sec-body resources-row">
+        <select name="system.attributes.resources.rank">
+          <option value="Shift-0" {{#if (eq system.attributes.resources.rank "Shift-0")}}selected{{/if}}>Shift-0</option>
+          <option value="Feeble"   {{#if (eq system.attributes.resources.rank "Feeble")}}selected{{/if}}>Feeble</option>
+          <option value="Poor"     {{#if (eq system.attributes.resources.rank "Poor")}}selected{{/if}}>Poor</option>
+          <option value="Typical"  {{#if (eq system.attributes.resources.rank "Typical")}}selected{{/if}}>Typical</option>
+          <option value="Good"     {{#if (eq system.attributes.resources.rank "Good")}}selected{{/if}}>Good</option>
+          <option value="Excellent"{{#if (eq system.attributes.resources.rank "Excellent")}}selected{{/if}}>Excellent</option>
+          <option value="Remarkable"{{#if (eq system.attributes.resources.rank "Remarkable")}}selected{{/if}}>Remarkable</option>
+          <option value="Incredible"{{#if (eq system.attributes.resources.rank "Incredible")}}selected{{/if}}>Incredible</option>
+          <option value="Amazing"  {{#if (eq system.attributes.resources.rank "Amazing")}}selected{{/if}}>Amazing</option>
+          <option value="Monstrous"{{#if (eq system.attributes.resources.rank "Monstrous")}}selected{{/if}}>Monstrous</option>
+          <option value="Unearthly"{{#if (eq system.attributes.resources.rank "Unearthly")}}selected{{/if}}>Unearthly</option>
+        </select>
+        <input type="number" name="system.attributes.resources.value" value="{{system.attributes.resources.value}}" />
+      </div>
+    </div>
+
+    <!-- POPULARITY -->
+    <div class="sec-col popularity">
+      <div class="sec-head">
+        <button type="button"
+                class="popularity-header-button"
+                title="Popularity & Contacts Information">Popularity</button>
+      </div>
+      <div class="sec-body">
+        <div class="stacked-values popularity-values">
+          <input type="number"
+                 name="system.attributes.popularity.hero.value"
+                 value="{{system.attributes.popularity.hero.value}}"
+                 title="Hero Identity Popularity" />
+          {{#if (eq system.identityType "secret")}}
+            <div class="divider">/</div>
+            <input type="number"
+                   name="system.attributes.popularity.secretId.value"
+                   value="{{system.attributes.popularity.secretId.value}}"
+                   title="Secret Identity Popularity" />
+          {{/if}}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+ <!-- end of ability section -->
+
+      <!-- ADD: movement as its own panel spanning both columns -->
+      <div class="movement-panel">
+        <div class="movement-item">
+          <label>Run</label>
+          <input type="number" name="system.movement.run" value="{{system.movement.run}}" />
+        </div>
+        <div class="movement-item">
+          <label>Swim</label>
+          <input type="number" name="system.movement.swim" value="{{system.movement.swim}}" />
+        </div>
+        <div class="movement-item">
+          <label>Fly</label>
+          <input type="number" name="system.movement.fly" value="{{system.movement.fly}}" />
+        </div>
+        <div class="movement-item">
+          <label>Teleport</label>
+          <input type="number" name="system.movement.teleport" value="{{system.movement.teleport}}" />
+        </div>
+      </div>
+    </div>
+    </div>
+
+  
 
     <!-- Main tab container with explicit positioning -->
     <div class="sheet-tabs">

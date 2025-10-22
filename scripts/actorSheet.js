@@ -239,6 +239,62 @@ export class FaseripActorSheet extends ActorSheet {
   activateListeners(html) {
     super.activateListeners(html);
 
+    // Auto-populate Resources value when rank changes
+    html.find('select[name="system.attributes.resources.rank"]').change((event) => {
+      const selectedRank = $(event.currentTarget).val();
+      
+      const rankList = [
+        { name: "Shift-0", min: 0 },
+        { name: "Feeble", min: 1 },
+        { name: "Poor", min: 3 },
+        { name: "Typical", min: 5 },
+        { name: "Good", min: 8 },
+        { name: "Excellent", min: 16 },
+        { name: "Remarkable", min: 26 },
+        { name: "Incredible", min: 36 },
+        { name: "Amazing", min: 46 },
+        { name: "Monstrous", min: 63 },
+        { name: "Unearthly", min: 88 }
+      ];
+      
+      const rank = rankList.find(r => r.name === selectedRank);
+      if (rank) {
+        html.find('input[name="system.attributes.resources.value"]').val(rank.min);
+        this.actor.update({ "system.attributes.resources.value": rank.min });
+      }
+    });
+
+    // Hide initial roll/rank columns functionality
+    const $table = html.find('.primary-abilities .abilities-table');
+    const $section = html.find('.abilities-section');
+
+    // Ctrl+click either "Initial" header (keep this existing functionality)
+    html.find('.primary-abilities .abilities-table thead th.initial.toggle-header').on('click', ev => {
+      if (!ev.ctrlKey) return;
+      $table.toggleClass('initial-hidden');
+      $section.toggleClass('initial-hidden');
+    });
+
+    // Add toggle functionality to universal table icon
+    html.find('.universal-roll-trigger').on('click', (event) => {
+      if (event.ctrlKey || event.metaKey) {
+        // CTRL+Click: Toggle initial columns
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation(); // Stop ALL other handlers
+        
+        $table.toggleClass('initial-hidden');
+        $section.toggleClass('initial-hidden');
+        
+        // Optional: save preference
+        const isHidden = $table.hasClass('initial-hidden');
+        this.actor.setFlag('msh-faserip', 'hideInitialColumns', isHidden);
+        
+        return false; // Extra safety to stop propagation
+      }
+      // Normal click: Let the default behavior happen
+    });
+
     html.find('.open-team-tracker').click(ev => {
       import('./teamSheet.js').then(module => {
         const sheet = new module.TeamSheet();
