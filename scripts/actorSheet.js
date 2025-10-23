@@ -226,7 +226,7 @@ export class FaseripActorSheet extends ActorSheet {
     
     if (item) {
       event.dataTransfer.setData("text/plain", JSON.stringify({
-        type: "Item",
+        type: "FaseripItem",  // Changed from "Item"
         actorId: this.actor.id,
         itemId: item.id,
         uuid: item.uuid,
@@ -779,7 +779,7 @@ export class FaseripActorSheet extends ActorSheet {
         } else {
           // Hotbar macro drag
           dragData = {
-            type: "Item",
+            type: "FaseripItem",
             actorId: this.actor.id,
             itemId: item.id,
             uuid: item.uuid,
@@ -3271,7 +3271,7 @@ html.find('.headquarters-row').each((i, row) => {
               
               // Use the format from the older file for creating macros
               event.dataTransfer.setData("text/plain", JSON.stringify({
-                  type: "Item",
+                  type: "FaseripItem",
                   actorId: this.actor.id,
                   itemId: item.id,
                   uuid: item.uuid,

@@ -1301,19 +1301,25 @@ Hooks.on("deleteActiveEffect", async (effect, options, userId) => {
 });
 
 // Add the hotbarDrop hook at module level (like in the older file)
-Hooks.on('hotbarDrop', async (bar, data, slot) => {
+Hooks.on('hotbarDrop', (bar, data, slot) => {  // Remove async
   console.log("📦 hotbarDrop received:", data);
   
-  if (data.type === "Item" && data.actorId) {
-    await createFaseripItemMacro(data, slot);
-    return false;
+  if (data.type === "FaseripItem" && data.actorId) {  // Changed from "Item"
+    createFaseripItemMacro(data, slot).catch(err => {
+      console.error("Error creating FASERIP macro:", err);
+    });
+    return false; // Returns immediately
   }
   else if (data.type === "UniversalTable" && data.actorId) {
-    await createUniversalTableMacro(data, slot);
+    createUniversalTableMacro(data, slot).catch(err => {
+      console.error("Error creating UniversalTable macro:", err);
+    });
     return false;
   }
   else if (data.type === "UniversalAction" && data.actionCode) {
-    await createUniversalActionMacro(data, slot);
+    createUniversalActionMacro(data, slot).catch(err => {
+      console.error("Error creating UniversalAction macro:", err);
+    });
     return false;
   }
   
@@ -1322,63 +1328,73 @@ Hooks.on('hotbarDrop', async (bar, data, slot) => {
 
 // Define the function to create a macro
 async function createFaseripItemMacro(data, slot) {
-  // Try to get the item from UUID first
-  let item;
-  if (data.uuid) {
-    try {
-      item = await fromUuid(data.uuid);
-    } catch (error) {
-      console.error("Error retrieving item from UUID:", error);
-    }
+  const { actorId, itemId } = data;
+  
+  // Get actor and item for macro creation
+  const actor = game.actors.get(actorId);
+  if (!actor) {
+    ui.notifications.warn("Actor not found");
+    return false;
   }
   
-  // If UUID approach fails, fall back to the old method
+  const item = actor.items.get(itemId);
   if (!item) {
-    const actor = game.actors.get(data.actorId);
-    if (!actor) return ui.notifications.warn("Actor not found");
-    
-    item = actor.items.get(data.itemId);
-    if (!item) return ui.notifications.warn("Item not found");
+    ui.notifications.warn("Item not found on actor");
+    return false;
   }
   
-  // Get the parent actor (works for both regular and token actors)
-  const parent = item.parent;
-  console.log(`Creating macro for ${item.name} (${parent.name})`);
+  console.log(`Creating macro for ${item.name} (${actor.name})`);
   
-  // Create a command that uses UUID for token actors, or falls back to actorId/itemId for compatibility
-  const command = `// Try UUID method first
-  const item = await fromUuid("${data.uuid}");
-  if (item) {
-    // Determine which roll function to use based on item type
-    switch (item.type) {
-      case "power": game.msh.rollPower(item.parent, item, {useDirectRoll: false}); break;
-      case "talent": game.msh.rollTalent(item.parent, item); break;
-      case "contact": game.msh.rollContact(item.parent, item); break;
-      case "equipment": game.msh.rollEquipment(item.parent, item); break;
-      case "vehicle": game.msh.rollVehicleControl(item.parent, item); break;
-      default: ui.notifications.warn(\`Cannot roll item of type: \${item.type}\`);
-    }
-  } else {
-    // Fall back to original method
-    game.msh.rollItemMacro("${data.actorId}", "${data.itemId}");
-  }`;
+  // Create command that retrieves actor/item at execution time (like action HUD does)
+  const command = `// ${item.name} Macro
+const actor = game.user.character || canvas.tokens.controlled[0]?.actor || game.actors.get("${actorId}");
+if (!actor) {
+  return ui.notifications.warn("Select a token or assign a character first.");
+}
+
+const item = actor.items.get("${itemId}");
+if (!item) {
+  return ui.notifications.error("Item not found on actor.");
+}
+
+// Roll based on item type
+switch (item.type) {
+  case "power":
+    game.msh.rollPower(actor, item, {useDirectRoll: false});
+    break;
+  case "talent":
+    game.msh.rollTalent(actor, item);
+    break;
+  case "equipment":
+    game.msh.rollEquipment(actor, item);
+    break;
+  default:
+    ui.notifications.warn(\`Cannot roll item type: \${item.type}\`);
+}`;
   
-  // Create the macro
-  const macroName = `${item.name} (${parent.name})`;
-  let macro = game.macros.find(m => m.name === macroName && m.command === command);
+  const macroName = `${item.name} (${actor.name})`;
+  
+  // Check if macro already exists
+  let macro = game.macros.find(m => 
+    m.name === macroName && 
+    m.flags?.["faserip.itemMacro"]
+  );
   
   if (!macro) {
     macro = await Macro.create({
       name: macroName,
       type: "script",
-      img: item.img || "icons/svg/dice-target.svg",
+      img: item.img || "icons/svg/item-bag.svg",
       command: command,
       flags: {"faserip.itemMacro": true}
     });
   }
   
-  // Assign to hotbar slot
-  game.user.assignHotbarMacro(macro, slot);
+  if (macro) {
+    game.user.assignHotbarMacro(macro, slot);
+    ui.notifications.info(`Created macro: ${macroName}`);
+  }
+  
   return true;
 }
 
