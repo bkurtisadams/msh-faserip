@@ -7,7 +7,6 @@ import {
   RANKS
 } from "./action-utils.js";
 import { makeDamageBlock, computeAfterArmor, buildDamageFlags } from "./damage-ui.js";
-
 import {
   shiftRank,
   getAbilityInfo,
@@ -18,6 +17,7 @@ import {
   bannerColors,
   getTargetingContext
 } from "./action-utils.js";
+import { canEffectsApply } from "../../rules/effects-gate.js";
 
 export class ShootingAction extends RangedAttackAction {
   async execute() {
@@ -287,7 +287,7 @@ export class ShootingAction extends RangedAttackAction {
     }
 
     // Kill check (red) - only if damage penetrates
-    if (colorLower === "red" && penetratingDamage > 0) {
+    if (colorLower === "red" && canEffectsApply(penetratingDamage)) {
       parts.push(chip(
         "Resolve Kill",
         "Open Kill Check dialog",

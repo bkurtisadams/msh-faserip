@@ -9,6 +9,7 @@ import {
 } from "./action-utils.js";
 import { getItemMaterialRank } from "../../gm-utils.js";
 import { makeDamageBlock, computeAfterArmor, buildDamageFlags } from "./damage-ui.js";
+import { canEffectsApply } from "../../rules/effects-gate.js";
 
 export class BluntAttackAction extends AttackAction {
   async execute() {
@@ -333,14 +334,14 @@ export class BluntAttackAction extends AttackAction {
 
     const dmgType = "physical-blunt"; // Blunt attacks are always physical-blunt damage
 
-    const actions = (isHit && penetratingDamage > 0)
+    const actions = (isHit && canEffectsApply(penetratingDamage))
       ? buildActionsBox({
-          showSlam: colorLower === "yellow" && penetratingDamage > 0,
-          showStun: colorLower === "red" && penetratingDamage > 0,
+          showSlam: colorLower === "yellow" && canEffectsApply(penetratingDamage),
+          showStun: colorLower === "red" && canEffectsApply(penetratingDamage),
           pulled: choice.resultCap !== 'none' || (choice.pulledDamage > 0 && choice.pulledDamage < choice.damage),
           breakingFeat,
           actorUuid: actor.uuid,
-          damage: penetratingDamage,      // pass penetrating, not raw
+          damage: penetratingDamage,
           attackForm: "blunt",
           damageType: "physical-blunt",
           bypassArmor: false

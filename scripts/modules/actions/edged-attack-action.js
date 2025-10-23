@@ -17,6 +17,7 @@ import {
 import { getItemMaterialRank } from "../../gm-utils.js";
 import { makeDamageBlock, computeAfterArmor, buildDamageFlags } from "./damage-ui.js";
 import { getBodyArmorValues } from "./action-utils.js";
+import { canEffectsApply } from "../../rules/effects-gate.js";
 
 export class EdgedAttackAction extends AttackAction {
   async execute() {
@@ -379,8 +380,8 @@ export class EdgedAttackAction extends AttackAction {
       ));
     }
 
-    const enableStun = (colorLower === 'yellow' || colorLower === 'red') && penetratingDamage > 0;
-    const enableKill = (colorLower === 'red') && penetratingDamage > 0;
+    const enableStun = (colorLower === 'yellow' || colorLower === 'red') && canEffectsApply(penetratingDamage);
+    const enableKill = (colorLower === 'red') && canEffectsApply(penetratingDamage);
 
     if (enableStun) parts.push(chip(
       "Resolve Stun",
