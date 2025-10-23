@@ -97,17 +97,36 @@ export function getKillContextFromAttackForm(attackForm) {
   }
   
   let context;
+  
+  // Edged attacks
   if (formLower === "edged" || formLower === "edgedmelee" || formLower === "edgedattack") {
     context = KILL_CONTEXTS.EDGED_MELEE;
-  } else if (formLower === "shooting" || formLower === "rangedattack") {
+  } 
+  // Shooting attacks
+  else if (formLower === "shooting" || formLower === "rangedattack" || formLower === "firearm") {
     context = KILL_CONTEXTS.SHOOTING;
-  } else if (formLower === "edgedthrowing" || formLower === "throwingedged") {
+  } 
+  // Edged throwing
+  else if (formLower === "edgedthrowing" || formLower === "throwingedged") {
     context = KILL_CONTEXTS.EDGED_THROWING;
-  } else if (formLower === "energy" || formLower === "energyattack") {
+  } 
+  // Energy attacks
+  else if (formLower === "energy" || formLower === "energyattack") {
     context = KILL_CONTEXTS.ENERGY;
-  } else {
-    console.warn(`[KILL RESOLVER] Unknown attack form for Kill context: ${attackForm}, defaulting to EDGED_THROWING`);
-    context = KILL_CONTEXTS.EDGED_THROWING;
+  }
+  // Non-lethal attack forms (shouldn't normally trigger Kill, but handle gracefully)
+  else if (formLower === "blunt" || formLower === "bluntattack" || 
+           formLower === "force" || formLower === "forceattack" ||
+           formLower === "charging") {
+    if (debug) {
+      console.log('[KILL RESOLVER] Non-lethal attack form, treating as zero_health context');
+    }
+    context = KILL_CONTEXTS.ZERO_HEALTH;
+  }
+  // Unknown
+  else {
+    console.warn(`[KILL RESOLVER] Unknown attack form: ${attackForm}, defaulting to zero_health`);
+    context = KILL_CONTEXTS.ZERO_HEALTH;
   }
   
   if (debug) {
