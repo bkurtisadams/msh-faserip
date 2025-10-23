@@ -3,7 +3,9 @@ import { RangedAttackAction } from "./ranged-attack-action.js";
 import { 
   attachAutoFillRange,
   getBodyArmorValues,
-  postDeathSavePrompt  // ADD THIS IMPORT
+  postDeathSavePrompt,
+  buildMultiAttackSection,
+  setupMultiAttackHandlers
 } from "./action-utils.js";
 
 import {
@@ -60,6 +62,7 @@ export class EnergyAction extends RangedAttackAction {
     const defaultUsePowerToHit = (savedUsePowerToHit === undefined || savedUsePowerToHit === null) ? true : !!savedUsePowerToHit;
 
     const savedShift = await actor.getFlag("msh-faserip", "lastEnergyShift") || 0;
+    const savedMultiAdjacent = await actor.getFlag("msh-faserip", "lastEnergyMultiAdjacent") || false;
 
     const itemOptions = energyItems
       .map((i) => `<option value="${i.id}" ${i.id === savedItemId ? "selected" : ""}>${i.name}</option>`)
@@ -127,6 +130,8 @@ export class EnergyAction extends RangedAttackAction {
         </div>
       </fieldset>
 
+      ${buildMultiAttackSection("energy", game.user.targets.size, false, 2, savedMultiAdjacent)}
+      
       ${this._buildRangeInputs({
         defaultRange: savedRange,
         showObstacle: true,
@@ -199,9 +204,15 @@ export class EnergyAction extends RangedAttackAction {
               const remember = !!$('[name="remember"]').is(':checked');
               const skipDice = !!$('[name="skipDice"]').is(':checked');
 
+              const multiAdjacent = !!$('[name="multiAdjacent"]').is(':checked');
+
               if (remember) {
                 await actor.setFlag("msh-faserip", "lastEnergyAdHoc", useAdHoc);
                 await actor.setFlag("msh-faserip", "lastEnergyUsePowerToHit", usePowerToHit);
+
+                await actor.setFlag("msh-faserip", "lastEnergyShift", shift);
+                await actor.setFlag("msh-faserip", "lastEnergyMultiAdjacent", multiAdjacent);
+
                 await actor.setFlag("msh-faserip", "lastEnergyAdHocName", powerName);
                 await actor.setFlag("msh-faserip", "lastEnergyAdHocDamage", powerDamage);
                 await actor.setFlag("msh-faserip", "lastEnergyAdHocRank", powerRank);
@@ -224,13 +235,15 @@ export class EnergyAction extends RangedAttackAction {
 
               resolve({
                 powerName, powerDamage, powerRank, powerId, prettyRange,
-                karma, range, throughObstacle, skipDice, usePowerToHit,
+                useAdHoc,
+                shift, karma, range, throughObstacle, skipDice, usePowerToHit, html,
                 totalShift: finalShift,
-                rangeModifier, 
+                rangeModifier,
                 obstacleModifier,
                 targetMovement,
                 movementModifier,
-                powerDamageType
+                powerDamageType,
+                multiAdjacent
               });
             },
           },
@@ -264,6 +277,8 @@ export class EnergyAction extends RangedAttackAction {
           html.find('[name="power"]').on("change", updatePreviewFromSelection);
 
           applyToggle(); // initial
+          // multi adjacent targets, FEAT roll at -4 CS, if success all targets hit
+          setupMultiAttackHandlers(html);
           this._disposeAutoFill = attachAutoFillRange(html, actor, updatePreviewFromSelection);
         },
         close: () => {
@@ -273,6 +288,12 @@ export class EnergyAction extends RangedAttackAction {
     });
 
     if (!choice) return;
+
+    // Handle multiple adjacent targets (single roll @-4 CS)
+    if (choice.multiAdjacent) {
+      choice.totalShift = (choice.totalShift || 0) - 4;
+      ui.notifications.info(`Attacking ${game.user.targets.size} adjacent targets at -4CS!`);
+    }
 
     // --- Nullify RAW guard: while maintaining aura, user cannot use other inborn powers
     try {
@@ -512,5 +533,11 @@ export class EnergyAction extends RangedAttackAction {
         }
       }
     });
+
+    // Play combat SFX
+    const sourceName = choice.powerName || "Energy Blast";
+    if (game.msh?.CombatHandler?.playCombatSFX) {
+      await game.msh.CombatHandler.playCombatSFX(choice.powerDamageType, sourceName, colorLower);
+    }
   }
 }

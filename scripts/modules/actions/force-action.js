@@ -1,7 +1,10 @@
 // scripts/modules/actions/force-action.js
 import { RangedAttackAction } from "./ranged-attack-action.js";
-import { attachAutoFillRange } from "./action-utils.js";
-// NEW
+import { 
+  attachAutoFillRange,
+  buildMultiAttackSection,
+  setupMultiAttackHandlers
+} from "./action-utils.js";
 import { makeDamageBlock, computeAfterArmor, buildDamageFlags } from "./damage-ui.js";
 import { getBodyArmorValues } from "./action-utils.js";
 
@@ -57,6 +60,9 @@ export class ForceAction extends RangedAttackAction {
     const savedUsePowerToHit = await actor.getFlag("msh-faserip", "lastForceUsePowerToHit");
     const defaultUsePowerToHit = (savedUsePowerToHit === undefined || savedUsePowerToHit === null) ? true : !!savedUsePowerToHit;
 
+    const savedShift = await actor.getFlag("msh-faserip", "lastForceShift") || 0;
+    const savedMultiAdjacent = await actor.getFlag("msh-faserip", "lastForceMultiAdjacent") || false;
+
     const itemOptions = forceItems
       .map((i) => `<option value="${i.id}" ${i.id === savedItemId ? "selected" : ""}>${i.name}</option>`)
       .join("");
@@ -73,7 +79,7 @@ export class ForceAction extends RangedAttackAction {
 
       <div style="margin-bottom:8px;">
         <span style="display:inline-block;width:110px;">Column Shift:</span>
-        <input type="number" name="shift" value="${Number(this.opts.shift ?? 0)}" style="width:60px;">
+        <input type="number" name="shift" value="${savedShift}" style="width:60px;">
       </div>
 
       <div style="margin-bottom:8px;">
@@ -121,6 +127,8 @@ export class ForceAction extends RangedAttackAction {
           </div>
         </div>
       </fieldset>
+
+      ${buildMultiAttackSection("force", game.user.targets.size, false, 2, savedMultiAdjacent)}
 
       ${this._buildRangeInputs({
         defaultRange: savedRange,
@@ -192,6 +200,8 @@ export class ForceAction extends RangedAttackAction {
               const remember = !!$('[name="remember"]').is(':checked');
               const skipDice = !!$('[name="skipDice"]').is(':checked');
 
+              const multiAdjacent = !!$('[name="multiAdjacent"]').is(':checked');
+
               if (remember) {
                 await actor.setFlag("msh-faserip", "lastForceAdHoc", useAdHoc);
                 await actor.setFlag("msh-faserip", "lastForceAdHocName", powerName);
@@ -201,13 +211,15 @@ export class ForceAction extends RangedAttackAction {
                 await actor.setFlag("msh-faserip", "lastForceRange", range);
                 await actor.setFlag("msh-faserip", "lastForceObstacle", throughObstacle);
                 await actor.setFlag("msh-faserip", "lastForceUsePowerToHit", usePowerToHit);
+
+                await actor.setFlag("msh-faserip", "lastForceShift", shift);
+                await actor.setFlag("msh-faserip", "lastForceMultiAdjacent", multiAdjacent);
               }
 
                 // Range & obstacle modifiers via powerRank path
               const { totalShift, impossible, rangeModifier, obstacleModifier } =
                 this._applyRangeModifiers(shift, range, throughObstacle, null, powerRank, null);
                 
-              // ⬇️ ADD THIS LINE
               const finalShift = totalShift + movementModifier;
               
               if (impossible) {
@@ -218,12 +230,12 @@ export class ForceAction extends RangedAttackAction {
               resolve({
                 powerName, powerDamage, powerRank, powerId, prettyRange,
                 karma, range, throughObstacle, skipDice, usePowerToHit,
-                totalShift: finalShift, // ⬅️ CHANGE THIS
+                totalShift: finalShift,
                 rangeModifier, 
                 obstacleModifier,
-                // ⬇️ ADD THESE TWO LINES
                 targetMovement,
-                movementModifier
+                movementModifier,
+                multiAdjacent
               });
             },
           },
@@ -258,6 +270,8 @@ export class ForceAction extends RangedAttackAction {
 
           applyToggle(); // initial
 
+          setupMultiAttackHandlers(html);
+
           // ⬇️ Attach auto-fill so [name="range"] updates from token→target distance
           this._disposeAutoFill = attachAutoFillRange(html, actor, updatePreviewFromSelection);
           },
@@ -268,6 +282,12 @@ export class ForceAction extends RangedAttackAction {
     });
 
     if (!choice) return;
+
+    // Handle multiple adjacent targets (single roll @-4 CS)
+    if (choice.multiAdjacent) {
+      choice.totalShift = (choice.totalShift || 0) - 4;
+      ui.notifications.info(`Attacking ${game.user.targets.size} adjacent targets at -4CS!`);
+    }
 
     // === To-hit column rank selection ===
     const toHitRankName = choice.usePowerToHit ? choice.powerRank : ability.rank;
@@ -382,5 +402,11 @@ export class ForceAction extends RangedAttackAction {
         targets: targetsArray
       })
     });
+
+    // Play combat SFX
+    const sourceName = choice.powerName || "Force Blast";
+    if (game.msh?.CombatHandler?.playCombatSFX) {
+      await game.msh.CombatHandler.playCombatSFX(dmgType, sourceName, colorLower);
+    }
   }
 }
