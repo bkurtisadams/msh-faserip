@@ -1,5 +1,6 @@
 import { ACTION_LABELS, ACTION_EFFECTS } from "./action-config.js";
 import { applyNullifiedEffect, isAuraMaintained } from "./nullify.js";
+import { calculateMitigation } from "../../rules/mitigation.js";
 
 export const RANKS = [
   "Shift-0","Feeble","Poor","Typical","Good","Excellent",
@@ -752,100 +753,18 @@ export async function applyDamageToTargets(damage, options = {}) {
   });
 
     // Get target's Body Armor (check both equipment and powers)
-    let bodyArmorValue = 0;
-
-    // ONLY calculate armor if not bypassed
-    // ONLY calculate armor if not bypassed
-  if (!bypassArmor) {
-    const armorData = getBodyArmorValues(targetActor, dmgTypeLower) || {};
-    let physArmor   = Number(armorData.physical || 0);
-    let enerArmor   = Number(armorData.energy   || 0);
-    const isEnergy  = (armorData.isEnergy ?? armorData.isEnergyDamage) === true;
-    const physRank  = armorData.physicalRank || "";
-    const enerRank  = armorData.energyRank || "";
-    const isForce   = armorData.isForceField === true;
-
-    // NEW: Extract AP mode and CS value
-    const apMode = String(options.apMode || "value").toLowerCase();
-    const apCS   = Number(options.armorPiercingCS || 0) || 0;
-
-    // Apply Armor Piercing (ONLY if not a force field)
-    if (!isForce) {
-      if (apMode === "cs" && apCS > 0) {
-        // Use classic working AP logic
-        const armorToReduce = isEnergy ? enerArmor : physArmor;
-        
-        if (armorToReduce > 0) {
-          const rankEntries = Object.entries(CONFIG.FASERIP.rankValues).sort((a, b) => a[1] - b[1]);
-          
-          let currentRankIndex = -1;
-          for (let i = 0; i < rankEntries.length; i++) {
-            if (rankEntries[i][1] === armorToReduce) {
-              currentRankIndex = i;
-              break;
-            }
-          }
-          
-          if (currentRankIndex >= 0) {
-            const oldRankName = rankEntries[currentRankIndex][0];
-            const newRankIndex = Math.max(0, currentRankIndex - apCS);  // Reduce by AP CS
-            const newArmorValue = rankEntries[newRankIndex][1];
-            const newRankName = rankEntries[newRankIndex][0];
-            
-            if (isEnergy) {
-              enerArmor = newArmorValue;
-            } else {
-              physArmor = newArmorValue;
-            }
-            
-            debugLog("AP (CS mode) applied", {
-              originalRank: oldRankName,
-              originalValue: armorToReduce,
-              apCS: apCS,
-              newRank: newRankName,
-              newArmorValue: newArmorValue
-            });
-          }
-        }
-      } else if (armorPiercing > 0) {
-        // Legacy numeric AP
-        if (isEnergy) {
-          enerArmor = Math.max(0, enerArmor - armorPiercing);
-        } else {
-          physArmor = Math.max(0, physArmor - armorPiercing);
-        }
-      }
-    }
-
-    bodyArmorValue = isEnergy ? enerArmor : physArmor;
-
-    debugLog("Armor calculation", {
-      targetName: target.name,
+    // Calculate mitigation using centralized logic
+    const mitigationResult = calculateMitigation(damage, targetActor, {
       damageType: dmgTypeLower,
-      isEnergyDamage: isEnergy,
-      isForceField: isForce,
-      apMode: apMode,
-      apCS: apCS,
-      armorPiercingNumeric: armorPiercing,
-      physicalArmor_afterAP: physArmor,
-      energyArmor_afterAP: enerArmor,
-      applicableArmor_afterAP: bodyArmorValue
-    });
-
-    // Check for resistances (existing code continues...)
-    
-    } // close the if (!bypassArmor) block
-
-    // Calculate damage after armor
-    const damageAfterArmor = bypassArmor ? damage : Math.max(0, damage - bodyArmorValue);
-
-    debugLog("applyDamageToTargets: Armor calculation", {
-      targetName: target.name,
-      incomingDamage: damage,
-      bodyArmorValue: bodyArmorValue,
+      attackForm: attackForm,
       bypassArmor: bypassArmor,
-      damageAfterArmor: damageAfterArmor
+      armorPiercing: armorPiercing,
+      armorPiercingCS: options.armorPiercingCS || 0,
+      apMode: options.apMode || "value"
     });
+    
+    const damageAfterArmor = mitigationResult.netDamage;
+    const bodyArmorValue = mitigationResult.absorbed;
     
     // Get current health
     const currentHealth = targetActor.system.attributes.health.value;
