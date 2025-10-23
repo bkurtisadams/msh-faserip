@@ -11,6 +11,7 @@ import {
 } from "./action-utils.js";
 import * as Nullify from "./nullify.js";
 import { resolveKillFeat, getKillContextFromAttackForm } from "../../rules/kill-resolver.js";
+import { canEffectsApply } from "../../rules/effects-gate.js";
 
 
 /**
@@ -61,6 +62,7 @@ export class CheckAction extends BaseAction {
     const prefilledTargetUuid = prefill.targetUuid || "";
     const prefilledDmgThrough = prefill.dmgThrough || 0;
     const prefilledAttackForm = prefill.attackForm || "blunt";
+    const prefilledBorderline = prefill.borderline || false;
 
     // --- Dialog: gather target info & context ---
     const targetRanks = RANKS.map(r => `<option value="${r}" ${r===prefilledTargetEndRank?'selected':''}>${r}</option>`).join("");
@@ -94,7 +96,7 @@ export class CheckAction extends BaseAction {
           <span style="color:#666;font-size:.9em;">(after Armor/Fields/Resistances)</span>
         </div>
         <div>
-          <label><input type="checkbox" name="borderline"> Apply borderline allowance (tie still affects)</label>
+          <label><input type="checkbox" name="borderline" ${prefilledBorderline ? 'checked' : ''}> Apply borderline allowance (tie still affects)</label>
         </div>
         <div style="color:#666;font-size:.85em;margin-top:4px;">
           Effects only apply if some damage penetrates; in borderline ties, they still apply.
@@ -158,13 +160,10 @@ export class CheckAction extends BaseAction {
     if (!choice) return;
 
     // --- Damage gate: effects only if dmg > 0 (or borderline toggle) unless caller overrides ---
-    const effectGateOpen = (choice.dmgThrough > 0) || !!choice.borderline;
-
-    // NEW: let the caller bypass this via opts.ignoreDamageGate (used by Force Save)
-    const ignoreGate = !!(this.opts?.ignoreDamageGate);
-
-    // If not open and no override, suppress effects
-    const effectsSuppressed = !effectGateOpen && !ignoreGate;
+    const effectsSuppressed = !canEffectsApply(choice.dmgThrough, {
+      borderline: choice.borderline,
+      ignoreDamageGate: this.opts?.ignoreDamageGate
+    });
 
     // --- Target FEAT rank after column shifts ---
     const effectiveEndRank = shiftRank(choice.targetEndRank, choice.shift);
