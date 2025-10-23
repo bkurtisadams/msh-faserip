@@ -4,7 +4,9 @@ import {
   attachAutoFillRange,
   getBodyArmorValues,
   postDeathSavePrompt,
-  RANKS
+  RANKS,
+  buildMultiAttackSection,
+  setupMultiAttackHandlers
 } from "./action-utils.js";
 import { makeDamageBlock, computeAfterArmor, buildDamageFlags } from "./damage-ui.js";
 import {
@@ -41,6 +43,9 @@ export class ShootingAction extends RangedAttackAction {
     const savedItemId = await actor.getFlag("msh-faserip", "lastShootingItemId") || "";
     const savedRange = await actor.getFlag("msh-faserip", "lastShootingRange") || 1;
     const savedObstacle = await actor.getFlag("msh-faserip", "lastShootingObstacle") || false;
+    const savedShift = await actor.getFlag("msh-faserip", "lastShootingShift") || 0;
+    const savedMultiAttacks = await actor.getFlag("msh-faserip", "lastShootingMultiAttacks") || false;
+    const savedAttackCount = await actor.getFlag("msh-faserip", "lastShootingAttackCount") || 2;
 
     const itemOptions = shootingWeapons.map(i =>
       `<option value="${i.id}" ${i.id === savedItemId ? 'selected' : ''}>${i.name}</option>`
@@ -63,7 +68,7 @@ export class ShootingAction extends RangedAttackAction {
         <span style="margin-left:6px;">(${ability.value})</span></div>
 
       <div style="margin-bottom:8px;"><label style="display:inline-block;width:120px;">Column Shift:</label>
-        <input type="number" name="shift" value="${Number(this.opts.shift ?? 0)}" style="width:52px;">
+        <input type="number" name="shift" value="${savedShift}" style="width:52px;">
         <span style="color:#666;font-size:.9em;">(+ right, - left)</span></div>
 
       <div style="margin-bottom:8px;"><label style="display:inline-block;width:120px;">Karma Points:</label>
@@ -79,6 +84,8 @@ export class ShootingAction extends RangedAttackAction {
         showObstacle: true, 
         weaponMaxRange: initialRange 
       })}
+
+      ${buildMultiAttackSection("shooting", game.user.targets.size, savedMultiAttacks, savedAttackCount, false)}
 
       <div style="margin-top:10px;padding:6px;background:#fff3e0;border:1px solid #ff9800;border-radius:3px;font-size:0.85em;">
         <strong>⚠ Shooting Attack Rules:</strong>
@@ -123,6 +130,13 @@ export class ShootingAction extends RangedAttackAction {
               const remember = !!$('[name="remember"]').is(':checked');
               const skipDice = !!$('[name="skipDice"]').is(':checked');
 
+              const multiAttacks = !!$('[name="multiAttacks"]').is(':checked');
+              const attackCount = parseInt($('[name="attackCount"]:checked').val() || 2);
+
+              await actor.setFlag("msh-faserip", "lastShootingShift", shift);
+              await actor.setFlag("msh-faserip", "lastShootingMultiAttacks", multiAttacks);
+              await actor.setFlag("msh-faserip", "lastShootingAttackCount", attackCount);
+
               const weaponRange = weapon.system?.range || 15;
               const weaponDamage = weapon.system?.damage || 0;
 
@@ -156,7 +170,9 @@ export class ShootingAction extends RangedAttackAction {
                 rangeModifier,
                 obstacleModifier,
                 targetMovement,
-                movementModifier
+                movementModifier,
+                multiAttacks,
+                attackCount
               });
             }
           },
@@ -187,16 +203,71 @@ export class ShootingAction extends RangedAttackAction {
                 const currentRange = weapon?.system?.range || 15;
                 this._setupRangePreview(html, { weaponMaxRange: currentRange });
             });
+
+             setupMultiAttackHandlers(html);
             },
             close: () => {
-            // Clean up the auto-fill event listeners
-            if (this._disposeAutoFill) this._disposeAutoFill();
-            }
+             
+              // Clean up the auto-fill event listeners
+              if (this._disposeAutoFill) this._disposeAutoFill();
+              }
       }).render(true);
     });
 
     if (!choice) return;
 
+    // Handle multi-attacks (2 or 3 attacks, must make FEAT; all attacks @-1 CS)
+    let actualAttackCount = 1;
+    if (choice.multiAttacks) {
+      const fightingAbility = getAbilityInfo(actor, "fighting");
+      const intensity = choice.attackCount === 2 ? "Remarkable" : "Amazing";
+      
+      // Calculate effective Fighting rank with column shift
+      const effectiveFightingRank = shiftRank(fightingAbility.rank, choice.shift || 0);
+      
+      const featResult = await this._rollFightingFeat(
+        actor, 
+        { ...fightingAbility, rank: effectiveFightingRank }, 
+        intensity, 
+        choice.attackCount
+      );
+      if (featResult.cancelled) return;
+      
+      if (!featResult.success) {
+        // Failed FEAT: 1 attack at -3CS
+        choice.totalShift = (choice.totalShift || 0) - 3;
+        actualAttackCount = 1;
+      } else {
+        // Success: Multiple attacks at -1CS each
+        choice.totalShift = (choice.totalShift || 0) - 1;
+        actualAttackCount = choice.attackCount;
+      }
+    }
+
+    // Execute attack(s)
+for (let i = 1; i <= actualAttackCount; i++) {
+  if (i > 1) {
+    // Small delay between attacks for visual clarity
+    await new Promise(resolve => setTimeout(resolve, 500));
+  }
+  const actionLabel = actualAttackCount > 1 ? `${actionName} (${i}/${actualAttackCount})` : actionName;
+  await this._executeSingleAttack(choice, actionLabel, ability, effects, actionType);
+}
+
+// Multi-attack completion message
+if (actualAttackCount > 1) {
+  await ChatMessage.create({
+    speaker: ChatMessage.getSpeaker({ actor }),
+    content: `<div style="background:#e8f5e9;border:1px solid #4caf50;border-radius:3px;padding:8px;margin:5px 0;">
+      <div style="color:#2e7d32;font-weight:bold;margin-bottom:5px;">Multiple Attack Sequence Complete</div>
+      <div style="font-size:0.9em;">${actor.name} completed ${actualAttackCount} attacks.</div>
+    </div>`
+  });
+}
+  } // <-- CLOSE execute()
+
+  async _executeSingleAttack(choice, actionLabel, ability, effects, actionType) {
+    const actor = this.actor;
     // Effective rank after all modifiers
     const effectiveRank = shiftRank(ability.rank, choice.totalShift);
 
@@ -205,13 +276,13 @@ export class ShootingAction extends RangedAttackAction {
     if (!choice.skipDice) {
       await roll.toMessage({
         speaker: ChatMessage.getSpeaker({ actor }),
-        flavor: `${actor.name} performs ${actionName}`,
+        flavor: `${actor.name} performs ${actionLabel}`,
         rollMode: game.settings.get("core", "rollMode")
       });
     }
 
     const { cappedTotal, totalKarmaUsed } =
-      await rollWithKarmaAndHistory(actor, actionName, choice.karma, roll);
+      await rollWithKarmaAndHistory(actor, actionLabel, choice.karma, roll);
 
     // Resolve color/effects
     const color = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
@@ -304,13 +375,13 @@ export class ShootingAction extends RangedAttackAction {
     `;
 
     // Range/targeting context
-    const targetingContext = getTargetingContext(actor, actionName);
+    const targetingContext = getTargetingContext(actor, actionLabel);
 
     // Final chat card
     const cardHtml = `
       <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
         <div style="padding:5px 10px;border-bottom:1px solid #c0c0c0;font-size:1.1em;color:#8b0000;">
-          <strong>${actor.name} - ${actionName}</strong>
+          <strong>${actor.name} - ${actionLabel}</strong>
         </div>
         <div style="padding:5px 10px;border-bottom:1px solid #e0e0e0;font-size:.9em;">
           ${targetingContext}
@@ -346,5 +417,11 @@ export class ShootingAction extends RangedAttackAction {
         targets: targetsArray
       })
     });
+
+    // Play combat SFX
+    const sourceName = choice.weapon.name || "Firearm";
+    if (game.msh?.CombatHandler?.playCombatSFX) {
+      await game.msh.CombatHandler.playCombatSFX(dmgType, sourceName, colorLower);
+    }
   }
 }
