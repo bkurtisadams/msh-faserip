@@ -6,6 +6,7 @@ import {
     processChargeAttack,
     initializeSlamHandlers  // Add this
 } from './charge-damage.js';
+import { calculateMitigation, getMitigationSummary } from "./rules/mitigation.js";
 
 // location: systems/msh-faserip/scripts/combat-handler.js
 const ACTION_RESULT_LABELS = {
@@ -193,127 +194,34 @@ export class CombatHandler {
         console.log("Rubber Shot: Slam effects disabled");
     }
 
-    // 3. Calculate Net Damage
-    let netDamage = modifiedBaseDamage;
-    let damageAbsorbed = 0;
-    let defenseUsed = "None";
-    let defenseDetails = [];
-
-    // Check if it's an energy attack (affects body armor)
-    const isEnergyAttack = damageType.toLowerCase().includes("energy");
+    // 3. Calculate Net Damage using centralized mitigation
+    const mitigationResult = calculateMitigation(modifiedBaseDamage, targetActor, {
+        damageType: damageType,
+        attackForm: options.attackForm || "blunt",
+        bypassArmor: options.bypassArmor || false,
+        armorPiercing: options.armorPiercing || 0,
+        armorPiercingCS: options.armorPiercingCS || 0,
+        apMode: options.apMode || "value"
+    });
     
-    // Apply Body Armor first (if applicable)
-    let effectiveBodyArmor = defenseData.bodyArmorValue;
-    if (isEnergyAttack && effectiveBodyArmor > 0) {
-        effectiveBodyArmor = Math.max(0, effectiveBodyArmor - 20);
-        console.log(`Energy attack: Body Armor reduced from ${defenseData.bodyArmorValue} to ${effectiveBodyArmor}`);
-    }
+    const netDamage = mitigationResult.netDamage;
+    const damageAbsorbed = mitigationResult.absorbed;
     
-    if (effectiveBodyArmor > 0) {
-        const armorAbsorbed = Math.min(netDamage, effectiveBodyArmor);
-        netDamage -= armorAbsorbed;
-        damageAbsorbed += armorAbsorbed;
-        if (armorAbsorbed > 0) {
-            defenseDetails.push(`Body Armor absorbed ${armorAbsorbed} damage`);
-            defenseUsed = defenseUsed === "None" ? "Body Armor" : defenseUsed + " + Body Armor";
+    // For backwards compatibility, preserve old variable names
+    const defenseUsed = mitigationResult.layers.length > 0 
+        ? mitigationResult.layers.map(l => l.type).join(" + ")
+        : "None";
+    const defenseDetails = mitigationResult.layers.map(layer => {
+        if (layer.immune) {
+            return `${layer.type}: IMMUNE (${layer.reason})`;
         }
-    }
+        return `${layer.type} absorbed ${layer.absorbed} damage`;
+    });
 
-    // Apply Force Field (if applicable)
-    let effectiveForceField = defenseData.forceFieldValue;
-    if (!isEnergyAttack && effectiveForceField > 0) {
-        effectiveForceField = Math.max(0, effectiveForceField - 10);
-        console.log(`Physical attack: Force Field reduced from ${defenseData.forceFieldValue} to ${effectiveForceField}`);
-    }
-    
-    if (effectiveForceField > 0 && netDamage > 0) {
-        const ffAbsorbed = Math.min(netDamage, effectiveForceField);
-        netDamage -= ffAbsorbed;
-        damageAbsorbed += ffAbsorbed;
-        if (ffAbsorbed > 0) {
-            defenseDetails.push(`Force Field absorbed ${ffAbsorbed} damage`);
-            defenseUsed = defenseUsed === "None" ? "Force Field" : defenseUsed + " + Force Field";
-        }
-    }
-
-    // Apply Resistance (automatic damage reduction per FASERIP rules)
-    if (defenseData.resistanceValue > 0 && netDamage > 0) {
-        if (isResistanceApplicable(damageType, defenseData.resistanceType)) {
-            console.log(`Target has ${defenseData.resistanceType} resistance at rank value ${defenseData.resistanceValue}`);
-            
-            // Resistance automatically reduces damage by its rank value
-            const resistanceReduction = Math.min(netDamage, defenseData.resistanceValue);
-            netDamage -= resistanceReduction;
-            damageAbsorbed += resistanceReduction;
-            
-            if (resistanceReduction > 0) {
-                defenseDetails.push(`${defenseData.resistanceType} Resistance absorbed ${resistanceReduction} damage`);
-                defenseUsed = defenseUsed === "None" ? `${defenseData.resistanceType} Resistance` : defenseUsed + ` + ${defenseData.resistanceType} Resistance`;
-            }
-            
-            // Check if attack intensity is below resistance rank (immunity to weak attacks)
-            const attackIntensity = modifiedBaseDamage;
-            if (attackIntensity < defenseData.resistanceValue) {
-                console.log(`Attack intensity (${attackIntensity}) is below resistance rank (${defenseData.resistanceValue}) - NO EFFECT`);
-                netDamage = 0;
-                defenseDetails.push(`Attack too weak to affect ${defenseData.resistanceType} Resistance - NO EFFECT`);
-            }
-            
-            console.log(`Resistance reduced damage by ${resistanceReduction}, remaining damage: ${netDamage}`);
-        } else {
-            console.log(`Resistance ${defenseData.resistanceType} does not apply to ${damageType} damage`);
-        }
-    }
-
-    netDamage = Math.max(0, netDamage);
-    // 3b. Apply passive armor from equipment-granted powers
-    const allPowers = game.msh.getActorPowers(targetActor);
-    console.log("All powers (including equipment-granted):", allPowers);
-
-    const matchingArmor = allPowers.filter(p => p.isPassiveArmor &&
-    (!p.damageType || p.damageType === damageType));
-    console.log(`Matching passive armor powers for damageType "${damageType}":`, matchingArmor);
-
-    if (matchingArmor.length > 0 && netDamage > 0) {
-    // Use the highest-value passive armor that matches
-    const armorPower = matchingArmor.reduce((best, curr) =>
-        (curr.value ?? 0) > (best.value ?? 0) ? curr : best, { value: 0 });
-
-    console.log("Selected armor power:", armorPower);
-
-    const armorAbsorbed = Math.min(netDamage, armorPower.value ?? 0);
-    console.log(`Passive armor will absorb ${armorAbsorbed} from net damage ${netDamage}`);
-
-    netDamage -= armorAbsorbed;
-    damageAbsorbed += armorAbsorbed;
-
-    defenseDetails.push(`Passive Armor (${armorPower.name || "Unnamed"}) absorbed ${armorAbsorbed} damage`);
-    defenseUsed = defenseUsed === "None" ? "Passive Armor" : `${defenseUsed} + Passive Armor`;
-
-    console.log(`New netDamage after passive armor: ${netDamage}`);
-    console.log(`Total damageAbsorbed so far: ${damageAbsorbed}`);
-    } else {
-    console.log("No applicable passive armor found or netDamage already 0");
-    }
-
-
-    console.log(`Damage calculation: ${modifiedBaseDamage} modified base - ${damageAbsorbed} absorbed = ${netDamage} net damage`);
-
-    // Calculate health values and determine if target will reach zero health
+    // Calculate health changes
     const currentHealth = targetActor.system.attributes.health.value;
     const newHealth = Math.max(0, currentHealth - netDamage);
-    const willReachZeroHealth = newHealth <= 0;
-
-    console.log(`Current health: ${currentHealth}, net damage: ${netDamage}, new health: ${newHealth}, will reach zero: ${willReachZeroHealth}`);
-
-    // 🎵 ADD SFX HERE - RIGHT AFTER DAMAGE CALCULATION
-    await this.playCombatSFX(damageType, sourceName, originalRollResult, {
-        ...options,
-        netDamage: netDamage,
-        damageAbsorbed: damageAbsorbed,
-        attackerActor: attackerActor,
-        targetActor: targetActor
-    });
+    const willReachZeroHealth = (newHealth === 0 && currentHealth > 0);
 
     // 4. Apply Net Damage to Target Health
     const isToken = target.document?.documentName === "Token" || target.documentName === "Token";
@@ -354,6 +262,7 @@ export class CombatHandler {
 
 
     // 5. Create chat message
+    // defenseSummar is defined earlier on line 209
     let defenseSummary = defenseDetails.length > 0 ? defenseDetails.join("; ") : "No defenses applied";
 
     let chatContent = `

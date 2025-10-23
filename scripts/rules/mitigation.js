@@ -242,8 +242,18 @@ function applyArmorPiercingCS(armorValue, csReduction) {
   const rankEntries = Object.entries(CONFIG.FASERIP.rankValues)
     .sort((a, b) => a[1] - b[1]);
   
-  const currentIndex = rankEntries.findIndex(([_, val]) => val === armorValue);
-  if (currentIndex < 0) return armorValue;
+  // Find the closest rank at or above the armor value
+  let currentIndex = rankEntries.findIndex(([_, val]) => val >= armorValue);
+  
+  // If armor is higher than all ranks, use the highest rank
+  if (currentIndex < 0) {
+    currentIndex = rankEntries.length - 1;
+  }
+  
+  // If armor is between ranks, find the next lower rank
+  if (currentIndex > 0 && rankEntries[currentIndex][1] > armorValue) {
+    currentIndex--;
+  }
   
   const newIndex = Math.max(0, currentIndex - csReduction);
   return rankEntries[newIndex][1];
