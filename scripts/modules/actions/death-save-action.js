@@ -8,6 +8,7 @@ import {
   bannerColors,
   getAbilityInfo,
 } from "./action-utils.js";
+import { resolveKillFeat, KILL_CONTEXTS } from "../../rules/kill-resolver.js";
 
 export class DeathSaveAction extends BaseAction {
   constructor(a) {
@@ -50,8 +51,8 @@ export class DeathSaveAction extends BaseAction {
     <div style="margin-top:12px;padding:8px;background:#fff3e0;border:1px solid #ff9800;border-radius:3px;font-size:0.9em;">
         <strong>Possible Results:</strong>
         <ul style="margin:6px 0 0 20px;padding:0;">
-        <li><strong>White/Green (Endurance Loss):</strong> Character is dying, loses 1 rank per turn</li>
-        <li><strong>Yellow/Red (No Effect):</strong> Character is stunned 1-10 rounds, can wake up</li>
+        <li><strong>White (Endurance Loss):</strong> Character is dying, loses 1 rank per turn</li>
+        <li><strong>Green/Yellow/Red (No Effect):</strong> Character is stunned 1-10 rounds, can wake up</li>
         </ul>
     </div>
 
@@ -115,11 +116,13 @@ export class DeathSaveAction extends BaseAction {
       rollMode: game.settings.get("core", "rollMode")
     });
 
-    // Determine if dying or just stunned
-    const isDying = (colorLower === 'white' || colorLower === 'green');
+    // *** FIXED: Use centralized Kill resolver with ZERO_HEALTH context ***
+    const killResult = resolveKillFeat(colorLower, KILL_CONTEXTS.ZERO_HEALTH);
+    const isDying = (killResult.outcome === "EnduranceLoss");
 
     console.log("=== Death Save Result ===");
     console.log("Color:", colorLower);
+    console.log("Kill Result:", killResult);
     console.log("Is Dying:", isDying);
     console.log("Unconscious Duration:", unconsciousDuration);
 
@@ -185,7 +188,7 @@ export class DeathSaveAction extends BaseAction {
         ${grid}
 
         <div style="text-align:center;padding:8px;margin:5px;font-weight:bold;font-size:1.1em;border-radius:3px;background:${bg};color:${fg};">
-          RESULT: ${String(color).toUpperCase()} — ${String(baseEffect).toUpperCase()}
+          RESULT: ${String(color).toUpperCase()} — ${String(killResult.label).toUpperCase()}
         </div>
 
         ${rulesBlock}
