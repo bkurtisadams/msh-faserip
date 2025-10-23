@@ -1,4 +1,5 @@
 // scripts/action-hud.js
+import { ActionDispatcher } from "./modules/actions/action-dispatcher.js";
 
 const ACTIONS = [
   { id:"blunt-attack",   label:"BA",  full:"Blunt Attack",   ability:"fighting",  color:"#FF6B00", textColor:"#FFF" },
@@ -267,18 +268,23 @@ export class FaseripActionHUD extends Application {
     if (!btn) return;
     const actor = this.actor;
     if (!actor) return ui.notifications.warn("Select a token first.");
+    
     const actionType = btn.dataset.action;
     const abilityName = btn.dataset.ability;
-    const sheet = actor.sheet;
-    if (sheet && typeof sheet._rollAction === "function") {
-      try {
-        await sheet._rollAction(actionType, abilityName);
-      } catch(e) {
-        console.error("[HUD] _rollAction error:", e);
-        ui.notifications.error(e.message ?? "Roll failed.");
+    
+    // Call ActionDispatcher which will show the action's full dialog
+    try {
+      await ActionDispatcher.roll(actionType, {
+        actor,
+        abilityName,
+        opts: {} // Empty opts = action will show its dialog
+      });
+    } catch(e) {
+      console.error("[HUD] Action error:", e);
+      // Don't show error if user cancelled dialog
+      if (e.message && e.message !== "cancelled") {
+        ui.notifications.error(e.message);
       }
-    } else {
-      ui.notifications.error("Open the actor sheet at least once so its methods are available.");
     }
   });
 
@@ -333,4 +339,94 @@ _updateTitle(){
   const t = this.element.find(".window-title");
   if (t.length) t.text(`Action HUD - ${actorName}`);
 }
+
+} // end of class FaseripActionHUD
+
+// Add these functions to action-hud.js (before the class definition or at the end)
+
+async function showMultiAttackDialog(actionType, actor) {
+  const supportsMultipleAttacks = ["blunt-attack", "edged-attack", "shooting"].includes(actionType);
+  const supportsAdjacent = ["blunt-attack", "escaping", "energy", "force"].includes(actionType);
+  
+  // Build dialog content
+  let content = `<div style="margin: 10px 0;">
+    <p>Select attack mode:</p>
+    <div style="margin: 15px 0;">
+      <label style="display: block; margin: 8px 0;">
+        <input type="radio" name="attack-mode" value="single" checked> 
+        <strong>Single Attack</strong> (normal)
+      </label>`;
+  
+  if (supportsAdjacent) {
+    const targetCount = game.user.targets.size;
+    content += `
+      <label style="display: block; margin: 8px 0;">
+        <input type="radio" name="attack-mode" value="adjacent"> 
+        <strong>Multiple Adjacent Targets</strong> (${targetCount} targets, single roll at -4CS)
+      </label>`;
+  }
+  
+  if (supportsMultipleAttacks) {
+    content += `
+      <label style="display: block; margin: 8px 0;">
+        <input type="radio" name="attack-mode" value="multi-2"> 
+        <strong>2 Attacks</strong> (Requires Remarkable Fighting FEAT, -1CS each)
+      </label>
+      <label style="display: block; margin: 8px 0;">
+        <input type="radio" name="attack-mode" value="multi-3"> 
+        <strong>3 Attacks</strong> (Requires Amazing Fighting FEAT, -1CS each)
+      </label>`;
+  }
+  
+  content += `</div></div>`;
+  
+  return new Promise((resolve) => {
+    new Dialog({
+      title: "Attack Options",
+      content: content,
+      buttons: {
+        ok: {
+          icon: '<i class="fas fa-check"></i>',
+          label: "Execute",
+          callback: (html) => {
+            const mode = html.find('input[name="attack-mode"]:checked').val();
+            resolve(mode);
+          }
+        },
+        cancel: {
+          icon: '<i class="fas fa-times"></i>',
+          label: "Cancel",
+          callback: () => resolve(null)
+        }
+      },
+      default: "ok"
+    }).render(true);
+  });
+}
+
+async function executeActionWithOptions(actor, actionType, abilityName, choice) {
+  const sheet = actor.sheet;
+  if (!sheet || typeof sheet._rollAction !== "function") {
+    return ui.notifications.error("Open the actor sheet at least once.");
+  }
+  
+  // Parse the choice
+  if (choice === "single") {
+    // Normal single attack
+    await sheet._rollAction(actionType, abilityName);
+  } 
+  else if (choice === "adjacent") {
+    // Multiple adjacent - pass flag to _rollAction
+    await sheet._rollAction(actionType, abilityName, {
+      multiAdjacent: true
+    });
+  }
+  else if (choice.startsWith("multi-")) {
+    // Multiple attacks (2 or 3)
+    const attackCount = parseInt(choice.split("-")[1]);
+    await sheet._rollAction(actionType, abilityName, {
+      multiAttacks: true,
+      attackCount: attackCount
+    });
+  }
 }

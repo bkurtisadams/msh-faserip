@@ -2,6 +2,95 @@ import { ACTION_LABELS, ACTION_EFFECTS } from "./action-config.js";
 import { applyNullifiedEffect, isAuraMaintained } from "./nullify.js";
 import { calculateMitigation } from "../../rules/mitigation.js";
 
+// Add near the top after other exports
+
+export function buildMultiAttackSection(actionType, targetCount) {
+  const supportsMultipleAttacks = ["blunt-attack", "edged-attack", "shooting"].includes(actionType);
+  const supportsAdjacent = ["blunt-attack", "escaping", "energy", "force"].includes(actionType);
+  
+  // Show section if either option is available
+  const showAdjacentOption = supportsAdjacent && targetCount > 1;
+  const showMultipleAttacksOption = supportsMultipleAttacks;
+  
+  if (!showAdjacentOption && !showMultipleAttacksOption) {
+    return '';
+  }
+  
+  let html = '<div style="margin:6px 0;padding:6px;background:#e8f5e9;border:1px solid #4caf50;border-radius:3px;">';
+  html += '<div style="font-weight:600;margin-bottom:6px;color:#2e7d32;">Multiple Target Options</div>';
+  
+  if (showAdjacentOption) {
+    html += `
+      <div style="margin-bottom:4px;">
+        <label style="display:flex;align-items:center;">
+          <input type="checkbox" id="multi-adjacent" name="multiAdjacent" style="margin-right:8px;">
+          <span style="font-size:.9em;">Multiple Adjacent Targets (${targetCount} targets, single roll at -4CS)</span>
+        </label>
+      </div>`;
+  }
+  
+  if (showMultipleAttacksOption) {
+    html += `
+      <div style="margin-bottom:4px;">
+        <label style="display:flex;align-items:center;">
+          <input type="checkbox" id="multi-attacks" name="multiAttacks" style="margin-right:8px;">
+          <span style="font-size:.9em;">Multiple Attacks (requires Fighting FEAT, -1CS each)</span>
+        </label>
+      </div>
+      <div id="multi-attacks-options" style="margin-left:24px;display:none;">
+        <label style="display:block;margin:4px 0;font-size:.85em;">
+          <input type="radio" name="attackCount" value="2" checked> 
+          2 attacks (Remarkable FEAT)
+        </label>
+        <label style="display:block;margin:4px 0;font-size:.85em;">
+          <input type="radio" name="attackCount" value="3"> 
+          3 attacks (Amazing FEAT)
+        </label>
+      </div>`;
+  }
+  
+  html += '</div>';
+  return html;
+}
+
+export function setupMultiAttackHandlers(html) {
+  const multiAdjacentCheckbox = html.find('#multi-adjacent');
+  const multiAttacksCheckbox = html.find('#multi-attacks');
+  const multiAttacksOptions = html.find('#multi-attacks-options');
+  
+  // Set up handlers independently
+  if (multiAttacksCheckbox.length) {
+    multiAttacksCheckbox.on('change', function() {
+      if (this.checked) {
+        if (multiAdjacentCheckbox.length) {
+          multiAdjacentCheckbox.prop('disabled', true).prop('checked', false);
+        }
+        multiAttacksOptions.show();
+      } else {
+        multiAttacksOptions.hide();
+        if (multiAdjacentCheckbox.length) {
+          multiAdjacentCheckbox.prop('disabled', false);
+        }
+      }
+    });
+  }
+  
+  if (multiAdjacentCheckbox.length) {
+    multiAdjacentCheckbox.on('change', function() {
+      if (this.checked) {
+        if (multiAttacksCheckbox.length) {
+          multiAttacksCheckbox.prop('disabled', true).prop('checked', false);
+        }
+        multiAttacksOptions.hide();
+      } else {
+        if (multiAttacksCheckbox.length) {
+          multiAttacksCheckbox.prop('disabled', false);
+        }
+      }
+    });
+  }
+}
+
 export const RANKS = [
   "Shift-0","Feeble","Poor","Typical","Good","Excellent",
   "Remarkable","Incredible","Amazing","Monstrous","Unearthly",

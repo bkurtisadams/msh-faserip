@@ -5,7 +5,8 @@ import {
   effectsFor, labelFor,
   isBluntCapable, computeBluntDamage,
   rollWithKarmaAndHistory, buildResultGrid, buildActionsBox, bannerColors,
-  getTargetingContext, getBodyArmorValues, applyDamageToTargets  // ADD THIS IMPORT
+  getTargetingContext, getBodyArmorValues, applyDamageToTargets,
+  buildMultiAttackSection, setupMultiAttackHandlers // ADD THIS IMPORT
 } from "./action-utils.js";
 import { getItemMaterialRank } from "../../gm-utils.js";
 import { makeDamageBlock, computeAfterArmor, buildDamageFlags } from "./damage-ui.js";
@@ -23,13 +24,13 @@ export class BluntAttackAction extends AttackAction {
     const attackItems = actor.items.filter(isBluntCapable);
 
     // restore flags
-    const savedSource = await actor.getFlag("msh-faserip","lastBluntSource") || "hands";
-    const savedItemId = await actor.getFlag("msh-faserip","lastBluntItemId") || "";
-    const savedObjectName = await actor.getFlag("msh-faserip","lastBluntObjectName") || "";
-    const savedObjectRank = await actor.getFlag("msh-faserip","lastBluntObjectRank") || "Excellent";
-    const savedObjectValue = await actor.getFlag("msh-faserip","lastBluntObjectValue") || 20;
-    const savedPulledDamage = await actor.getFlag("msh-faserip","lastBluntPulledDamage") || 0;
-    const savedResultCap = await actor.getFlag("msh-faserip","lastBluntResultCap") || "none";
+    const savedSource = (await actor.getFlag("msh-faserip","lastBluntSource")) || "hands";
+    const savedItemId = (await actor.getFlag("msh-faserip","lastBluntItemId")) || "";
+    const savedObjectName = (await actor.getFlag("msh-faserip","lastBluntObjectName")) || "";
+    const savedObjectRank = (await actor.getFlag("msh-faserip","lastBluntObjectRank")) || "Excellent";
+    const savedObjectValue = (await actor.getFlag("msh-faserip","lastBluntObjectValue")) || 20;
+    const savedPulledDamage = (await actor.getFlag("msh-faserip","lastBluntPulledDamage")) || 0;
+    const savedResultCap = (await actor.getFlag("msh-faserip","lastBluntResultCap")) || "none";
 
     const itemOptions = attackItems.map(i =>
       `<option value="${i.id}" ${i.id===savedItemId?'selected':''}>${i.name}</option>`
@@ -60,6 +61,7 @@ export class BluntAttackAction extends AttackAction {
 
       <div style="margin:6px 0;padding:6px;background:#fff3e0;border:1px solid #ff9800;border-radius:3px;">
         <div style="font-weight:600;margin-bottom:6px;color:#e65100;">Pull Punch (Optional)</div>
+        
         <div style="margin-bottom:4px;">
           <label style="display:inline-block;width:90px;font-size:.9em;">Damage Cap:</label>
           <input type="number" name="pulledDamage" value="${savedPulledDamage || strength.value}" min="0" max="${strength.value}" style="width:60px;padding:2px;">
@@ -71,11 +73,12 @@ export class BluntAttackAction extends AttackAction {
             <option value="none" ${savedResultCap==='none'?'selected':''}>No Limit</option>
             <option value="yellow" ${savedResultCap==='yellow'?'selected':''}>Cap at Yellow</option>
             <option value="green" ${savedResultCap==='green'?'selected':''}>Cap at Green</option>
-            
           </select>
         </div>
         <div style="font-size:.85em;color:#666;font-style:italic;">Reduces effectiveness (subdue vs kill)</div>
       </div>
+
+      ${buildMultiAttackSection("blunt-attack", game.user.targets.size)}
 
       <div style="margin:6px 0;padding:6px;background:#f5f5f5;border:1px solid #ccc;border-radius:3px;">
         <div style="margin-bottom:4px;font-size:.9em;">
@@ -110,28 +113,28 @@ export class BluntAttackAction extends AttackAction {
         </div>
 
         <div id="object-row" style="display:none;font-size:.9em;padding-left:8px;">
-        <div style="display:grid;grid-template-columns:50px 1fr;gap:3px;align-items:center;">
-          <label>Name:</label>
-          <input type="text" name="objectName" value="${savedObjectName}" placeholder="rock, pipe..." style="width:100%;padding:2px;">
-          
-          <label>Material:</label>
-          <div style="display:flex;gap:4px;align-items:center;">
-            <select name="objectRank" style="width:110px;padding:2px;">
-              <option value="Feeble" ${savedObjectRank==='Feeble'?'selected':''}>Feeble</option>
-              <option value="Poor" ${savedObjectRank==='Poor'?'selected':''}>Poor</option>
-              <option value="Typical" ${savedObjectRank==='Typical'?'selected':''}>Typical</option>
-              <option value="Good" ${savedObjectRank==='Good'?'selected':''}>Good</option>
-              <option value="Excellent" ${savedObjectRank==='Excellent'?'selected':''}>Excellent</option>
-              <option value="Remarkable" ${savedObjectRank==='Remarkable'?'selected':''}>Remarkable</option>
-              <option value="Incredible" ${savedObjectRank==='Incredible'?'selected':''}>Incredible</option>
-              <option value="Amazing" ${savedObjectRank==='Amazing'?'selected':''}>Amazing</option>
-              <option value="Monstrous" ${savedObjectRank==='Monstrous'?'selected':''}>Monstrous</option>
-              <option value="Unearthly" ${savedObjectRank==='Unearthly'?'selected':''}>Unearthly</option>
-            </select>
-            <input type="number" name="objectValue" value="${savedObjectValue}" style="width:45px;padding:2px;">
+          <div style="display:grid;grid-template-columns:50px 1fr;gap:3px;align-items:center;">
+            <label>Name:</label>
+            <input type="text" name="objectName" value="${savedObjectName}" placeholder="rock, pipe..." style="width:100%;padding:2px;">
+            
+            <label>Material:</label>
+            <div style="display:flex;gap:4px;align-items:center;">
+              <select name="objectRank" style="width:110px;padding:2px;">
+                <option value="Feeble" ${savedObjectRank==='Feeble'?'selected':''}>Feeble</option>
+                <option value="Poor" ${savedObjectRank==='Poor'?'selected':''}>Poor</option>
+                <option value="Typical" ${savedObjectRank==='Typical'?'selected':''}>Typical</option>
+                <option value="Good" ${savedObjectRank==='Good'?'selected':''}>Good</option>
+                <option value="Excellent" ${savedObjectRank==='Excellent'?'selected':''}>Excellent</option>
+                <option value="Remarkable" ${savedObjectRank==='Remarkable'?'selected':''}>Remarkable</option>
+                <option value="Incredible" ${savedObjectRank==='Incredible'?'selected':''}>Incredible</option>
+                <option value="Amazing" ${savedObjectRank==='Amazing'?'selected':''}>Amazing</option>
+                <option value="Monstrous" ${savedObjectRank==='Monstrous'?'selected':''}>Monstrous</option>
+                <option value="Unearthly" ${savedObjectRank==='Unearthly'?'selected':''}>Unearthly</option>
+              </select>
+              <input type="number" name="objectValue" value="${savedObjectValue}" style="width:45px;padding:2px;">
+            </div>
           </div>
         </div>
-      </div>
       </div>
 
       <div id="preview" style="margin:6px 0;padding:5px;background:#e3f2fd;border:1px solid #2196F3;border-radius:3px;font-size:.85em;">
@@ -144,71 +147,78 @@ export class BluntAttackAction extends AttackAction {
       </div>
     `;
 
-    const choice = await new Promise((resolve)=>{
+    const choice = await new Promise((resolve) => {
       new Dialog({
         title: `${actionName}: ${actor.name}`,
         content: dialogHtml,
         buttons: {
           roll: {
-          label: "Roll",
-          callback: async (html)=>{
-            const $ = (sel)=> html.find(sel);
-            const src   = $('[name="src"]:checked').val() || "hands";
-            const itemId= String($('[name="item"]').val() || "");
-            const objectName = String($('[name="objectName"]').val() || "");
-            const objectRank = String($('[name="objectRank"]').val() || "Excellent");
-            const objectValue = Number($('[name="objectValue"]').val() || 20);
-            const shift = Number($('[name="shift"]').val() || 0);
-            const karma = Number($('[name="karma"]').val() || 0);
-            const pulledDamage = Number($('[name="pulledDamage"]').val() || 0);
-            const resultCap = String($('[name="resultCap"]').val() || "none");
-            const remember = !!$('[name="remember"]').is(':checked');
-            const skipDice = !!$('[name="skipDice"]').is(':checked');
+            label: "Roll",
+            callback: async (html) => {
+              const $ = (sel) => html.find(sel);
+              const src    = $('[name="src"]:checked').val() || "hands";
+              const itemId = String($('[name="item"]').val() || "");
+              const objectName  = String($('[name="objectName"]').val() || "");
+              const objectRank  = String($('[name="objectRank"]').val() || "Excellent");
+              const objectValue = Number($('[name="objectValue"]').val() || 20);
+              const shift  = Number($('[name="shift"]').val() || 0);
+              const karma  = Number($('[name="karma"]').val() || 0);
+              const pulledDamage = Number($('[name="pulledDamage"]').val() || 0);
+              const resultCap    = String($('[name="resultCap"]').val() || "none");
+              const remember = !!$('[name="remember"]').is(':checked');
+              const skipDice = !!$('[name="skipDice"]').is(':checked');
 
-            // compute damage
-            let weaponMat="", weaponName="", damage=strength.value, note="";
-            if (src === "weapon") {
-              const item = attackItems.find(i=>i.id===itemId) || null;
-              weaponMat = item ? getItemMaterialRank(item) : "Excellent";
-              weaponName= item ? item.name : "(Object)";
-              const res = computeBluntDamage(strength.rank, strength.value, weaponMat, RANKS);
-              damage = res.damage; note = res.note;
-            } else if (src === "object") {
-              weaponMat = objectRank;
-              weaponName = objectName || "Object";
-              const res = computeBluntDamage(strength.rank, strength.value, weaponMat, RANKS);
-              damage = res.damage; note = res.note;
-            }
-
-            if (remember) {
-              await actor.setFlag("msh-faserip","lastBluntSource", src);
-              await actor.setFlag("msh-faserip","lastBluntPulledDamage", pulledDamage);
-              await actor.setFlag("msh-faserip","lastBluntResultCap", resultCap);
-              if (src==="weapon") {
-                await actor.setFlag("msh-faserip","lastBluntItemId", itemId);
-              } else if (src==="object") {
-                await actor.setFlag("msh-faserip","lastBluntObjectName", objectName);
-                await actor.setFlag("msh-faserip","lastBluntObjectRank", objectRank);
-                await actor.setFlag("msh-faserip","lastBluntObjectValue", objectValue);
+              // compute damage
+              let weaponMat = "", weaponName = "", damage = strength.value, note = "";
+              if (src === "weapon") {
+                const item = attackItems.find(i => i.id === itemId) || null;
+                weaponMat  = item ? getItemMaterialRank(item) : "Excellent";
+                weaponName = item ? item.name : "(Object)";
+                const res = computeBluntDamage(strength.rank, strength.value, weaponMat, RANKS);
+                damage = res.damage; note = res.note;
+              } else if (src === "object") {
+                weaponMat  = objectRank;
+                weaponName = objectName || "Object";
+                const res = computeBluntDamage(strength.rank, strength.value, weaponMat, RANKS);
+                damage = res.damage; note = res.note;
               }
-            }
 
-            resolve({ src, itemId, objectName, objectRank, objectValue, shift, karma, pulledDamage, resultCap, skipDice, weaponMat, weaponName, damage, note });
-          }
-        },
-          cancel: { label: "Cancel", callback: ()=> resolve(null) }
+              if (remember) {
+                await actor.setFlag("msh-faserip","lastBluntSource", src);
+                await actor.setFlag("msh-faserip","lastBluntPulledDamage", pulledDamage);
+                await actor.setFlag("msh-faserip","lastBluntResultCap", resultCap);
+                if (src === "weapon") {
+                  await actor.setFlag("msh-faserip","lastBluntItemId", itemId);
+                } else if (src === "object") {
+                  await actor.setFlag("msh-faserip","lastBluntObjectName", objectName);
+                  await actor.setFlag("msh-faserip","lastBluntObjectRank", objectRank);
+                  await actor.setFlag("msh-faserip","lastBluntObjectValue", objectValue);
+                }
+              }
+
+              resolve({
+                src, itemId, objectName, objectRank, objectValue, shift, karma,
+                pulledDamage, resultCap, skipDice, weaponMat, weaponName, damage, note,
+                // new code
+                multiAttacks: !!$('[name="multiAttacks"]').is(':checked'),
+                attackCount: parseInt($('[name="attackCount"]:checked').val() || 2),
+                multiAdjacent: !!$('[name="multiAdjacent"]').is(':checked')
+              });
+            }
+          },
+          cancel: { label: "Cancel", callback: () => resolve(null) }
         },
         default: "roll",
-        render: (html)=>{
+        render: (html) => {
           const $dialog = html.closest('.dialog');
-          const update = ()=>{
+          const update = () => {
             const src = html.find('[name="src"]:checked').val() || "hands";
             const $weaponRow = html.find('#weapon-row');
             const $objectRow = html.find('#object-row');
-            const $val = html.find('#dmg-val');
-            const $note= html.find('#dmg-note');
+            const $val  = html.find('#dmg-val');
+            const $note = html.find('#dmg-note');
             const $pulledDamage = html.find('[name="pulledDamage"]');
-            const $dmgCapNote = html.find('#dmg-cap-note');
+            const $dmgCapNote   = html.find('#dmg-cap-note');
 
             // Hide both rows first
             $weaponRow.hide();
@@ -219,9 +229,9 @@ export class BluntAttackAction extends AttackAction {
             if (src === "weapon") {
               $weaponRow.show();
               const itemId = String(html.find('[name="item"]').val() || "");
-              const item = attackItems.find(i=>i.id===itemId) || null;
-              const mat = item ? getItemMaterialRank(item) : "Excellent";
-              const res = computeBluntDamage(strength.rank, strength.value, mat, RANKS);
+              const item = attackItems.find(i => i.id === itemId) || null;
+              const mat  = item ? getItemMaterialRank(item) : "Excellent";
+              const res  = computeBluntDamage(strength.rank, strength.value, mat, RANKS);
               maxDamage = res.damage;
               $val.text(res.damage);
               $note.text(`Weapon: ${item ? item.name : "(Object)"} (${mat}) — ${res.note}`);
@@ -258,10 +268,75 @@ export class BluntAttackAction extends AttackAction {
             update();
           });
           html.find('[name="objectName"]').on('input', update);
+          // multi attack
+          setupMultiAttackHandlers(html);
         }
       }).render(true);
     });
-    if (!choice) return; // cancelled
+    
+    if (!choice) return;
+
+    // Handle multi-attacks
+    let actualAttackCount = 1;
+    if (choice.multiAttacks) {
+      const fightingAbility = getAbilityInfo(actor, "fighting");
+      const intensity = choice.attackCount === 2 ? "Remarkable" : "Amazing";
+      
+      // Calculate effective Fighting rank with column shift
+      const effectiveFightingRank = shiftRank(fightingAbility.rank, choice.shift || 0);
+      
+      const featResult = await this._rollFightingFeat(
+        actor, 
+        { ...fightingAbility, rank: effectiveFightingRank }, 
+        intensity, 
+        choice.attackCount
+      );
+      if (featResult.cancelled) return;
+      
+      if (!featResult.success) {
+        // Failed FEAT: 1 attack at -3CS
+        choice.shift = (choice.shift || 0) - 3;
+        actualAttackCount = 1;
+      } else {
+        // Success: Multiple attacks at -1CS each
+        choice.shift = (choice.shift || 0) - 1;
+        actualAttackCount = choice.attackCount;
+      }
+    }
+
+    // Execute attack(s)
+    for (let i = 1; i <= actualAttackCount; i++) {
+      if (i > 1) {
+        // Small delay between attacks for visual clarity
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+      
+      const attackLabel = actualAttackCount > 1 ? ` (Attack ${i}/${actualAttackCount})` : '';
+      await this._executeSingleAttack(choice, actionName + attackLabel);
+    }
+
+    // Summary if multiple attacks
+    if (actualAttackCount > 1) {
+      await ChatMessage.create({
+        speaker: ChatMessage.getSpeaker({ actor }),
+        content: `
+          <div style="background:#e8f5e9;border:1px solid #4caf50;border-radius:3px;padding:8px;margin:5px 0;">
+            <div style="color:#2e7d32;font-weight:bold;margin-bottom:5px;">Multiple Attack Sequence Complete</div>
+            <div style="font-size:0.9em;">
+              ${actor.name} completed ${actualAttackCount} attacks at -1CS each.
+            </div>
+          </div>
+        `
+      });
+    }
+  } // <-- CLOSE execute()
+
+  async _executeSingleAttack(choice, actionLabel) {
+    const actor = this.actor;
+    const actionType = "blunt-attack";
+    const ability = getAbilityInfo(actor, this.abilityName);
+    const strength = getStrengthInfo(actor);
+    const effects = effectsFor(actionType);
 
     // effective rank + roll/karma
     const effectiveRank = shiftRank(ability.rank, choice.shift);
@@ -269,16 +344,16 @@ export class BluntAttackAction extends AttackAction {
     if (!choice.skipDice) {
       await roll.toMessage({
         speaker: ChatMessage.getSpeaker({ actor }),
-        flavor: `${actor.name} performs ${actionName}`,
+        flavor: `${actor.name} performs ${actionLabel}`,
         rollMode: game.settings.get("core", "rollMode")
       });
     }
     const { cappedTotal, totalKarmaUsed } =
-      await rollWithKarmaAndHistory(actor, actionName, choice.karma, roll);
+      await rollWithKarmaAndHistory(actor, actionLabel, choice.karma, roll);
 
     // resolve color/effects
     let color = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
-    let colorLower = String(color||"").toLowerCase();
+    let colorLower = String(color || "").toLowerCase();
     
     // Apply result cap if set
     const colorOrder = ['white', 'green', 'yellow', 'red'];
@@ -294,7 +369,7 @@ export class BluntAttackAction extends AttackAction {
     const effectResult = effects[colorLower] || color;
 
     // card pieces (shared)
-    const grid = buildResultGrid(actionType, colorLower, effects, (globalThis._getResultHoverText||this._getResultHoverText));
+    const grid = buildResultGrid(actionType, colorLower, effects, (globalThis._getResultHoverText || this._getResultHoverText));
     const { bg, fg } = bannerColors(colorLower);
 
     const isHit = colorLower !== 'white';
@@ -309,11 +384,9 @@ export class BluntAttackAction extends AttackAction {
           const armorData = getBodyArmorValues(targetActor, "physical-blunt");
           penetratingDamage = Math.max(0, choice.damage - armorData.applicable);
         } else {
-          // No actor found for target, use raw damage
           penetratingDamage = choice.damage;
         }
       } else {
-        // Multiple targets or no targets, use raw damage
         penetratingDamage = choice.damage;
       }
     }
@@ -332,7 +405,7 @@ export class BluntAttackAction extends AttackAction {
     const rawDamage = choice.damage ?? strength.value;
     const afterArmor = penetratingDamage;
 
-    const dmgType = "physical-blunt"; // Blunt attacks are always physical-blunt damage
+    const dmgType = "physical-blunt";
 
     const actions = (isHit && canEffectsApply(penetratingDamage))
       ? buildActionsBox({
@@ -375,14 +448,13 @@ export class BluntAttackAction extends AttackAction {
       </div>
     `;
 
-
-    const targetingContext = getTargetingContext(actor, actionName);
+    const targetingContext = getTargetingContext(actor, actionLabel);
 
     // final chat card
     const cardHtml = `
       <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
         <div style="padding:5px 10px;border-bottom:1px solid #c0c0c0;font-size:1.1em;color:#8b0000;">
-          <strong>${actor.name} - ${actionName}</strong>
+          <strong>${actor.name} - ${actionLabel}</strong>
         </div>
         <div style="padding:5px 10px;border-bottom:1px solid #e0e0e0;font-size:.9em;">
           ${targetingContext}
@@ -411,8 +483,8 @@ export class BluntAttackAction extends AttackAction {
         afterArmor,
         resultColor: colorLower,
         cappedTotal,
-        targets: targets  // Note: buildDamageFlags expects the targets array, not the mapped uuids
+        targets: targets
       })
     });
-  }
-} // end of class BlundAttackAction
+  } // <-- CLOSE _executeSingleAttack()
+} // <-- CLOSE class
