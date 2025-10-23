@@ -685,9 +685,6 @@ Hooks.once("init", async () => {
   // Add the CombatHandler to the namespace
   game.msh.CombatHandler = CombatHandler;
 
-  // Add the CombatHandler to the namespace
-  game.msh.CombatHandler = CombatHandler;
-
   // Add the Action HUD to the namespace
   game.msh.FaseripActionHUD = FaseripActionHUD;  // <-- ADD THIS LINE
 

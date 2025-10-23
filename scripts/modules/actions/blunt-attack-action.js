@@ -32,6 +32,12 @@ export class BluntAttackAction extends AttackAction {
     const savedPulledDamage = (await actor.getFlag("msh-faserip","lastBluntPulledDamage")) || 0;
     const savedResultCap = (await actor.getFlag("msh-faserip","lastBluntResultCap")) || "none";
 
+    const savedMultiAttacks = await actor.getFlag("msh-faserip","lastBluntMultiAttacks") || false;
+    const savedAttackCount = await actor.getFlag("msh-faserip","lastBluntAttackCount") || 2;
+    const savedMultiAdjacent = await actor.getFlag("msh-faserip","lastBluntMultiAdjacent") || false;
+    const savedColumnShift  = await actor.getFlag("msh-faserip","lastBluntShift") || 0;
+    //const savedKarma = await actor.getFlag("msh-faserip","lastBluntKarma") || 0;
+
     const itemOptions = attackItems.map(i =>
       `<option value="${i.id}" ${i.id===savedItemId?'selected':''}>${i.name}</option>`
     ).join("");
@@ -50,7 +56,7 @@ export class BluntAttackAction extends AttackAction {
       <div style="margin:6px 0;padding:6px 0;border-top:1px solid #ddd;">
         <div style="margin-bottom:4px;">
           <label style="display:inline-block;width:90px;font-size:.9em;">Column Shift:</label>
-          <input type="number" name="shift" value="${Number(this.opts.shift ?? 0)}" style="width:45px;padding:2px;">
+          <input type="number" name="shift" value="${savedColumnShift }" style="width:45px;padding:2px;">
           <span style="color:#666;font-size:.8em;margin-left:4px;">(+/−)</span>
         </div>
         <div style="margin-bottom:4px;">
@@ -78,7 +84,7 @@ export class BluntAttackAction extends AttackAction {
         <div style="font-size:.85em;color:#666;font-style:italic;">Reduces effectiveness (subdue vs kill)</div>
       </div>
 
-      ${buildMultiAttackSection("blunt-attack", game.user.targets.size)}
+      ${buildMultiAttackSection("blunt-attack", game.user.targets.size, savedMultiAttacks, savedAttackCount, savedMultiAdjacent)}
 
       <div style="margin:6px 0;padding:6px;background:#f5f5f5;border:1px solid #ccc;border-radius:3px;">
         <div style="margin-bottom:4px;font-size:.9em;">
@@ -187,8 +193,16 @@ export class BluntAttackAction extends AttackAction {
                 await actor.setFlag("msh-faserip","lastBluntSource", src);
                 await actor.setFlag("msh-faserip","lastBluntPulledDamage", pulledDamage);
                 await actor.setFlag("msh-faserip","lastBluntResultCap", resultCap);
+
+                await actor.setFlag("msh-faserip","lastBluntShift", shift);
+                await actor.setFlag("msh-faserip","lastBluntKarma", karma);
+                await actor.setFlag("msh-faserip","lastBluntMultiAttacks", !!$('[name="multiAttacks"]').is(':checked'));
+                await actor.setFlag("msh-faserip","lastBluntAttackCount", parseInt($('[name="attackCount"]:checked').val() || 2));
+                await actor.setFlag("msh-faserip","lastBluntMultiAdjacent", !!$('[name="multiAdjacent"]').is(':checked'));
+
                 if (src === "weapon") {
                   await actor.setFlag("msh-faserip","lastBluntItemId", itemId);
+                  await actor.setFlag("msh-faserip","lastBluntColumnShift", savedColumnShift);
                 } else if (src === "object") {
                   await actor.setFlag("msh-faserip","lastBluntObjectName", objectName);
                   await actor.setFlag("msh-faserip","lastBluntObjectRank", objectRank);
@@ -276,7 +290,13 @@ export class BluntAttackAction extends AttackAction {
     
     if (!choice) return;
 
-    // Handle multi-attacks
+    // Handle multiple adjacent targets (single roll @-4 CS)
+    if (choice.multiAdjacent) {
+      choice.shift = (choice.shift || 0) - 4;
+      ui.notifications.info(`Attacking ${game.user.targets.size} adjacent targets at -4CS!`);
+    }
+
+    // Handle multi-attacks (2 or 3 attacks, must make FEAT; all attacks @-1 CS)
     let actualAttackCount = 1;
     if (choice.multiAttacks) {
       const fightingAbility = getAbilityInfo(actor, "fighting");
@@ -486,5 +506,22 @@ export class BluntAttackAction extends AttackAction {
         targets: targets
       })
     });
+
+  // Play combat SFX
+  const sourceName = choice.weaponName || "Bare Hands";
+    if (game.msh?.CombatHandler?.playCombatSFX) {
+      // Special case: Blunt attacks on multiple adjacent targets play sound per target (comic book slugfest!)
+      if (choice.multiAdjacent && actionType === "blunt-attack") {
+        const targetCount = game.user?.targets?.size || 1;
+        for (let i = 0; i < targetCount; i++) {
+          if (i > 0) await new Promise(resolve => setTimeout(resolve, 150)); // Quick delay between punches
+          await game.msh.CombatHandler.playCombatSFX(dmgType, sourceName, colorLower);
+        }
+      } else {
+        // Normal: one sound
+        await game.msh.CombatHandler.playCombatSFX(dmgType, sourceName, colorLower);
+      }
+    }
+
   } // <-- CLOSE _executeSingleAttack()
 } // <-- CLOSE class

@@ -4,52 +4,58 @@ import { calculateMitigation } from "../../rules/mitigation.js";
 
 // Add near the top after other exports
 
-export function buildMultiAttackSection(actionType, targetCount) {
+// action-utils.js
+export function buildMultiAttackSection(actionType, targetCount, opts = {}) {
   const supportsMultipleAttacks = ["blunt-attack", "edged-attack", "shooting"].includes(actionType);
   const supportsAdjacent = ["blunt-attack", "escaping", "energy", "force"].includes(actionType);
-  
+
+  // saved UI state (with defaults)
+  const {
+    savedMultiAdjacent = false,
+    savedMultiAttacks = false,
+    savedAttackCount = 2
+  } = opts;
+
   // Show section if either option is available
   const showAdjacentOption = supportsAdjacent && targetCount > 1;
   const showMultipleAttacksOption = supportsMultipleAttacks;
-  
-  if (!showAdjacentOption && !showMultipleAttacksOption) {
-    return '';
-  }
-  
+
+  if (!showAdjacentOption && !showMultipleAttacksOption) return "";
+
   let html = '<div style="margin:6px 0;padding:6px;background:#e8f5e9;border:1px solid #4caf50;border-radius:3px;">';
   html += '<div style="font-weight:600;margin-bottom:6px;color:#2e7d32;">Multiple Target Options</div>';
-  
+
   if (showAdjacentOption) {
     html += `
       <div style="margin-bottom:4px;">
         <label style="display:flex;align-items:center;">
-          <input type="checkbox" id="multi-adjacent" name="multiAdjacent" style="margin-right:8px;">
+          <input type="checkbox" id="multi-adjacent" name="multiAdjacent" ${savedMultiAdjacent ? "checked" : ""} style="margin-right:8px;">
           <span style="font-size:.9em;">Multiple Adjacent Targets (${targetCount} targets, single roll at -4CS)</span>
         </label>
       </div>`;
   }
-  
+
   if (showMultipleAttacksOption) {
     html += `
       <div style="margin-bottom:4px;">
         <label style="display:flex;align-items:center;">
-          <input type="checkbox" id="multi-attacks" name="multiAttacks" style="margin-right:8px;">
+          <input type="checkbox" id="multi-attacks" name="multiAttacks" ${savedMultiAttacks ? "checked" : ""} style="margin-right:8px;">
           <span style="font-size:.9em;">Multiple Attacks (requires Fighting FEAT, -1CS each)</span>
         </label>
       </div>
-      <div id="multi-attacks-options" style="margin-left:24px;display:none;">
+      <div id="multi-attacks-options" style="margin-left:24px;display:${savedMultiAttacks ? "block" : "none"};">
         <label style="display:block;margin:4px 0;font-size:.85em;">
-          <input type="radio" name="attackCount" value="2" checked> 
+          <input type="radio" name="attackCount" value="2" ${savedAttackCount === 2 ? "checked" : ""}>
           2 attacks (Remarkable FEAT)
         </label>
         <label style="display:block;margin:4px 0;font-size:.85em;">
-          <input type="radio" name="attackCount" value="3"> 
+          <input type="radio" name="attackCount" value="3" ${savedAttackCount === 3 ? "checked" : ""}>
           3 attacks (Amazing FEAT)
         </label>
       </div>`;
   }
-  
-  html += '</div>';
+
+  html += "</div>";
   return html;
 }
 
