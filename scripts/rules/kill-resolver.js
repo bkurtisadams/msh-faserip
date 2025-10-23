@@ -1,17 +1,5 @@
 // scripts/rules/kill-resolver.js
 
-/**
- * Centralized Kill FEAT resolution logic
- * Handles context-dependent interpretation of Kill column results
- * 
- * Kill Column Interpretation varies by attack context:
- * - Edged Melee: W=EnduranceLoss, G(E/S)=EnduranceLoss, Y=NoEffect, R=NoEffect
- * - Shooting: W=EnduranceLoss, G(E/S)=EnduranceLoss, Y=NoEffect, R=NoEffect  
- * - Edged Throwing: W=EnduranceLoss, G(E/S)=NoEffect, Y=NoEffect, R=NoEffect
- * - Energy: W=EnduranceLoss, G(E/S)=NoEffect, Y=NoEffect, R=NoEffect
- * - Zero Health Save: W=EnduranceLoss, G/Y/R=NoEffect (no attack context)
- */
-
 export const KILL_CONTEXTS = {
   EDGED_MELEE: "edged_melee",
   SHOOTING: "shooting",
@@ -25,67 +13,69 @@ export const KILL_OUTCOMES = {
   NO_EFFECT: "NoEffect"
 };
 
-/**
- * Resolve a Kill FEAT result based on color and attack context
- * @param {string} color - The Universal Table result color ('white', 'green', 'yellow', 'red')
- * @param {string} context - The attack context (use KILL_CONTEXTS constants)
- * @returns {Object} - { outcome: "EnduranceLoss" | "NoEffect", label: "Endurance Loss" | "No Effect" }
- */
 export function resolveKillFeat(color, context) {
+  const debug = game.settings?.get('msh-faserip', 'debugMode') || false;
   const colorLower = String(color || "").toLowerCase();
   
-  // White always means Endurance Loss regardless of context
+  if (debug) {
+    console.log('[KILL RESOLVER] resolveKillFeat called', { color: colorLower, context });
+  }
+  
   if (colorLower === "white") {
-    return {
+    const result = {
       outcome: KILL_OUTCOMES.ENDURANCE_LOSS,
       label: "Endurance Loss",
       description: "Target begins dying - loses 1 Endurance rank per turn"
     };
+    if (debug) console.log('[KILL RESOLVER] White result:', result);
+    return result;
   }
   
-  // Green (E/S) - context dependent
   if (colorLower === "green") {
+    let result;
     switch (context) {
       case KILL_CONTEXTS.EDGED_MELEE:
       case KILL_CONTEXTS.SHOOTING:
-        // These attack forms cause Endurance Loss on green
-        return {
+        result = {
           outcome: KILL_OUTCOMES.ENDURANCE_LOSS,
           label: "Endurance Loss (E/S)",
           description: "Target begins dying - loses 1 Endurance rank per turn"
         };
+        break;
         
       case KILL_CONTEXTS.EDGED_THROWING:
       case KILL_CONTEXTS.ENERGY:
       case KILL_CONTEXTS.ZERO_HEALTH:
-        // These contexts treat green as No Effect
-        return {
+        result = {
           outcome: KILL_OUTCOMES.NO_EFFECT,
           label: "No Effect",
           description: "Target is stunned but not dying"
         };
+        break;
         
       default:
-        console.warn(`Unknown Kill context: ${context}, treating green as No Effect`);
-        return {
+        console.warn(`[KILL RESOLVER] Unknown Kill context: ${context}, treating green as No Effect`);
+        result = {
           outcome: KILL_OUTCOMES.NO_EFFECT,
           label: "No Effect",
           description: "Target is stunned but not dying"
         };
     }
+    if (debug) console.log('[KILL RESOLVER] Green result:', result);
+    return result;
   }
   
-  // Yellow and Red always mean No Effect
   if (colorLower === "yellow" || colorLower === "red") {
-    return {
+    const result = {
       outcome: KILL_OUTCOMES.NO_EFFECT,
       label: "No Effect",
       description: "Target is stunned but not dying"
     };
+    if (debug) console.log('[KILL RESOLVER] Yellow/Red result:', result);
+    return result;
   }
   
-  // Fallback for unexpected colors
-  console.error(`Unexpected Kill column color: ${color}`);
+  console.error(`[KILL RESOLVER] Unexpected Kill column color: ${color}`);
   return {
     outcome: KILL_OUTCOMES.NO_EFFECT,
     label: "No Effect",
@@ -93,39 +83,36 @@ export function resolveKillFeat(color, context) {
   };
 }
 
-/**
- * Helper to check if a Kill result causes death/dying
- * @param {string} color - The Universal Table result color
- * @param {string} context - The attack context
- * @returns {boolean} - True if the result causes Endurance Loss (dying)
- */
 export function isKillResultLethal(color, context) {
   const result = resolveKillFeat(color, context);
   return result.outcome === KILL_OUTCOMES.ENDURANCE_LOSS;
 }
 
-/**
- * Get attack context from attack form/type
- * @param {string} attackForm - The attack form ("edged", "shooting", "throwing-edged", "energy", etc.)
- * @returns {string} - The appropriate KILL_CONTEXT constant
- */
 export function getKillContextFromAttackForm(attackForm) {
+  const debug = game.settings?.get('msh-faserip', 'debugMode') || false;
   const formLower = String(attackForm || "").toLowerCase().replace(/[_\s-]/g, "");
   
-  if (formLower === "edged" || formLower === "edgedmelee" || formLower === "edgedattack") {
-    return KILL_CONTEXTS.EDGED_MELEE;
-  }
-  if (formLower === "shooting" || formLower === "rangedattack") {
-    return KILL_CONTEXTS.SHOOTING;
-  }
-  if (formLower === "edgedthrowing" || formLower === "throwingedged") {
-    return KILL_CONTEXTS.EDGED_THROWING;
-  }
-  if (formLower === "energy" || formLower === "energyattack") {
-    return KILL_CONTEXTS.ENERGY;
+  if (debug) {
+    console.log('[KILL RESOLVER] getKillContextFromAttackForm', { attackForm, normalized: formLower });
   }
   
-  // Default to a safe fallback (treat as edged throwing - most restrictive)
-  console.warn(`Unknown attack form for Kill context: ${attackForm}, defaulting to EDGED_THROWING`);
-  return KILL_CONTEXTS.EDGED_THROWING;
+  let context;
+  if (formLower === "edged" || formLower === "edgedmelee" || formLower === "edgedattack") {
+    context = KILL_CONTEXTS.EDGED_MELEE;
+  } else if (formLower === "shooting" || formLower === "rangedattack") {
+    context = KILL_CONTEXTS.SHOOTING;
+  } else if (formLower === "edgedthrowing" || formLower === "throwingedged") {
+    context = KILL_CONTEXTS.EDGED_THROWING;
+  } else if (formLower === "energy" || formLower === "energyattack") {
+    context = KILL_CONTEXTS.ENERGY;
+  } else {
+    console.warn(`[KILL RESOLVER] Unknown attack form for Kill context: ${attackForm}, defaulting to EDGED_THROWING`);
+    context = KILL_CONTEXTS.EDGED_THROWING;
+  }
+  
+  if (debug) {
+    console.log('[KILL RESOLVER] Resolved context:', context);
+  }
+  
+  return context;
 }

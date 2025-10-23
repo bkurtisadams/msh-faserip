@@ -10,6 +10,7 @@ import {
   getAbilityInfo,
 } from "./action-utils.js";
 import * as Nullify from "./nullify.js";
+import { resolveKillFeat, getKillContextFromAttackForm } from "../../rules/kill-resolver.js";
 
 
 /**
@@ -251,19 +252,27 @@ export class CheckAction extends BaseAction {
       await this._createStunnedEffect(choice.targetUuid, choice.targetName, stunDuration);
     }
 
-    // Handle Green result (1 round stun) - ADD THIS BLOCK
+    // Handle Green result (1 round stun)
     if (actionType === "stun" && colorLower === "green" && !effectsSuppressed) {
       await this._createStunnedEffect(choice.targetUuid, choice.targetName, 1);
     }
 
     // --- Apply special Kill "E/S" rule ---
     let finalEffect = baseEffect;
-    if (actionType === "kill" && baseEffect) {
-      // E/S only applies if attack form is Edged or Shooting; otherwise treat as No Effect
-      if (String(baseEffect).toUpperCase() === "E/S") {
-        const isEdgedOrShooting = (choice.attackForm === "edged" || choice.attackForm === "shooting");
-        finalEffect = isEdgedOrShooting ? "Endurance Loss (E/S)" : "No effect";
-      }
+
+    // Around where you call the resolver
+    const debug = game.settings?.get('msh-faserip', 'debugMode') || false;
+
+    if (debug) {
+      console.log('[CHECK ACTION] Kill check', { actionType, attackForm: choice.attackForm, color: colorLower });
+    }
+
+    const killContext = getKillContextFromAttackForm(choice.attackForm);
+    const killResult = resolveKillFeat(colorLower, killContext);
+    finalEffect = killResult.label;
+
+    if (debug) {
+      console.log('[CHECK ACTION] Kill resolved', { killContext, killResult, finalEffect });
     }
 
     // --- If no damage penetrated (and not borderline), effects are negated ---
