@@ -4,6 +4,15 @@ compendiums/
 *.db
 *.db
 
+# Temporary files
+dir.txt
+dir.bat
+create-zip.bat
+
+# Backup files
+*.backup
+msh-faserip-backup.zip
+
 # Ignore local module/system settings
 module.json~
 system.json~
