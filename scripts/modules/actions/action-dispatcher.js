@@ -66,7 +66,18 @@ export class ActionDispatcher {
 
     if (!Handler) throw new Error(`Unknown actionType: ${actionType}`);
     const handler = new Handler({ actor, actionType, abilityName, opts });
-    return await handler.execute();
+    // Anchor: mode gate
+    const mode = game.msh?.getCombatModeFor?.(actor) ?? "semi";
+
+    if (mode === "auto") {
+      return await handler.execute({ mode: "auto", autoApply: true, showConfirm: false });
+    }
+    if (mode === "semi") {
+      // If you have a preview dialog, open/prepare it inside execute based on showConfirm
+      return await handler.execute({ mode: "semi", autoApply: false, showConfirm: true });
+    }
+    // Manual
+    return await handler.execute({ mode: "manual", autoApply: false, showConfirm: false });
   }
 }
 

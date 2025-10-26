@@ -47,8 +47,18 @@ Hooks.once("init", async () => {
     });
   }
   // --------------------------------------------------------------------------
+  
+  // Register the debugMode setting FIRST
+  game.settings.register("msh-faserip", "debugMode", {
+    name: "Debug Mode",
+    hint: "Enable debug logging for MSH FASERIP system",
+    scope: "world",     // or "client" if it should be per-user
+    config: true,       // shows in settings menu
+    type: Boolean,
+    default: false
+  });
 
-  console.log("FASERIP DEBUG: init hook is running!"); // <-- DEBUG CONSOLE LOG
+  debugLog("init hook is running!");
   console.log("Marvel Super Heroes (FASERIP) system initializing...");
 
   // Initialize the game.msh namespace early
@@ -64,14 +74,19 @@ Hooks.once("init", async () => {
     scope: "world",
     config: true,
     type: String,
-    choices: { classic: "Classic (Automated)", refactor: "Refactor (Manual)" },
-    default: "classic"
+    choices: {
+    classic:  "Classic (Automated)",
+    manual:   "Manual",
+    semi:     "Semi-auto (Preview/Confirm)",
+    auto:     "Full auto"
+  },
+  default: "semi"
   });
 
   // Helper: resolve mode (per-actor flag > world)
   game.msh.getCombatModeFor = function(actor) {
     const actorPref = actor?.getFlag?.("msh-faserip", "combatModeOverride");
-    return actorPref || game.settings.get("msh-faserip", "combatMode") || "classic";
+    return actorPref || game.settings.get("msh-faserip", "combatMode") || "semi";
   };
 
   // Four-Color: no death save at 0 Health, unless a 'Kill' action type used.
@@ -292,14 +307,7 @@ Hooks.once("init", async () => {
 
   // <-- NEW/MODIFIED SECTION START -->
   // Register system settings
-  game.settings.register("msh-faserip", "debugMode", {
-    name: "Debug Mode",
-    hint: "Enable detailed console logging for troubleshooting",
-    scope: "client",
-    config: true,
-    type: Boolean,
-    default: false
-  });
+
 
   game.settings.register('msh-faserip', 'dailyKarmaEnabled', {
     name: "Enable Daily Karma",
@@ -369,7 +377,7 @@ Hooks.once("init", async () => {
       default: []
     });
 
-  console.log("FASERIP DEBUG: Team settings registered.");
+    debugLog("FASERIP DEBUG: Team settings registered.");
 
   // Register custom grappling effects so they show token HUD icons and work with ActiveEffect.statuses
   CONFIG.statusEffects.push(
@@ -684,6 +692,11 @@ Hooks.once("init", async () => {
 
   // Add the CombatHandler to the namespace
   game.msh.CombatHandler = CombatHandler;
+  // Anchor: expose legacy handler only in classic mode
+  if (game.msh?.getCombatModeFor?.() !== "classic") {
+    // Do not expose CombatHandler in refactor modes
+    delete game.msh.CombatHandler;
+  }
 
   // Add the Action HUD to the namespace
   game.msh.FaseripActionHUD = FaseripActionHUD;  // <-- ADD THIS LINE

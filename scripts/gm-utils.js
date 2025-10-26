@@ -1,5 +1,7 @@
 // gm-utils.js
 // v13-safe socketlib wiring for "msh-faserip"
+import { applyDamageToTargets } from "./modules/actions/action-utils.js";
+import { debugLog } from "./modules/actions/action-utils.js";
 
 const SOCKET_NAME = "msh-faserip";
 let socket = null;
@@ -172,17 +174,13 @@ async function runGMCommand(data = {}) {
         newHealth: data.newHealth
       });
 
-    case "applyCombatHandlerDamage":
-      return await applyCombatHandlerDamage({
-        attackerUuid: data.attackerUuid,
+    // New refactor route
+    case "applyRulesDamage":
+      return await applyRulesDamage({
         targetActorUuid: data.targetActorUuid,
         baseDamage: data.baseDamage,
         damageType: data.damageType,
-        sourceName: data.sourceName,
-        canBeStun: data.canBeStun,
-        canBeSlam: data.canBeSlam,
-        canBeKill: data.canBeKill,
-        originalRollResult: data.originalRollResult
+        attackerUuid: data.attackerUuid ?? null
       });
 
     case "deleteActiveEffects":
@@ -281,28 +279,19 @@ async function updateActor({ targetActorUuid, updateData }) {
   return true;
 }
 
-async function applyCombatHandlerDamage({
-  attackerUuid, targetActorUuid, baseDamage, damageType, sourceName,
-  canBeStun, canBeSlam, canBeKill, originalRollResult
-}) {
-  const attacker = await getActorFromUuid(attackerUuid);
-  const targetActor = await getActorFromUuid(targetActorUuid);
-  if (!attacker || !targetActor) return false;
-
-  // Call your system’s combat handler directly on the GM
-  await game.msh.CombatHandler.processAttack({
-    attacker,
-    target: targetActor,
-    baseDamage,
-    damageType,
-    sourceName,
-    canBeStun,
-    canBeSlam,
-    canBeKill,
-    originalRollResult
+async function applyRulesDamage({ targetActorUuid, baseDamage, damageType, attackerUuid }) {
+  const actor = await fromUuid(targetActorUuid).then(doc => doc?.actor ?? doc);
+  if (!actor) return false;
+  debugLog("gm-utils → applyRulesDamage", { actor: actor.name, baseDamage, damageType, attackerUuid });
+  // Use selection if GM clicked from a message; otherwise direct-apply to target actor only
+  const targets = game.user?.targets?.size ? Array.from(game.user.targets) : [actor.getActiveTokens()?.at(0)?.document ?? actor];
+  await applyDamageToTargets(baseDamage, {
+    attackerUuid,
+    damageType: damageType || "physical-blunt"
   });
   return true;
 }
+
 
 async function manageRecoveryEffect({ actorUuid, action, effectData = null, effectId = null }) {
   const actor = await getActorFromUuid(actorUuid);

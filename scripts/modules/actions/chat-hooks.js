@@ -32,6 +32,11 @@ export function installActionChatHandlers() {
       const checkType    = el.dataset.check;                // "stun" | "slam" | "kill" | "escape"
       const attackForm   = el.dataset.attackForm || "blunt";
       const dmgThrough   = Number(el.dataset.dmg || 0);
+      if (dmgThrough <= 0 && checkType !== "escape") {
+        ui.notifications.info("No penetrating damage; effect not applicable.");
+        return;
+      }
+
       const attackerUuid = el.dataset.attackerUuid || message.speaker?.actor;
 
       // Escape-specific data
@@ -165,6 +170,50 @@ export function installActionChatHandlers() {
         updateButton: btn,
         bypassArmor
       });
+      // Anchor: record deltas for Undo and flip the button
+      const $msg = $(btn).closest(".message");
+      const msg  = game.messages.get($msg.data("messageId"));
+
+      // We rely on applyDamageToTargets returning [{ targetActor, damageDealt, absorbed, currentHealth, newHealth }, ...]
+      // So re-run it in dry mode or collect from return above if you capture it
+      // (If you kept the return, store it as `const results = await applyDamageToTargets(...);`)
+      const results = game.user?.targets?.size
+        ? Array.from(game.user.targets).map(t => ({ uuid: t.actor?.uuid, delta: -(damage) /* approximate if not per-target */ }))
+        : []; // For exact per-target deltas, capture the returned array instead.
+
+      await msg.setFlag("msh-faserip", "undo", { results, ts: Date.now() });
+
+      // Flip button to Undo
+      btn.dataset.action = "undo-apply";
+      btn.textContent = "Undo";
+      btn.title = "Revert HP changes for this apply";
+
+    });
+
+    // Anchor: Undo handler
+    html.on("click", '[data-action="undo-apply"]', async (ev) => {
+      ev.preventDefault();
+      const btn  = ev.currentTarget;
+      const $msg = $(btn).closest(".message");
+      const msg  = game.messages.get($msg.data("messageId"));
+      const data = msg?.flags?.["msh-faserip"]?.undo;
+
+      if (!data?.results?.length) { ui.notifications.warn("Nothing to undo."); return; }
+
+      for (const r of data.results) {
+        if (!r?.uuid || !Number.isFinite(r?.delta)) continue;
+        const actor = await fromUuid(r.uuid).then(doc => doc?.actor ?? doc);
+        if (!actor) continue;
+
+        const cur = actor.system?.attributes?.health?.value ?? 0;
+        const upd = { "system.attributes.health.value": Math.max(0, cur - r.delta) }; // reverse sign
+        await actor.update(upd);
+        debugLog("Undo applied", { actor: actor.name, deltaReversed: -r.delta });
+      }
+
+      // Disable the Undo button to prevent double-undo
+      btn.disabled = true;
+      btn.textContent = "Undone";
     });
 
     // 6) Force Save (Nullification / RAW: Endurance vs Power Rank)

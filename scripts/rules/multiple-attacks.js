@@ -1,5 +1,55 @@
 // scripts/rules/multiple-attacks.js
-import { FaseripRolls } from "../rolls.js";
+import { rollWithKarmaAndHistory } from "../modules/actions/action-utils.js";
+import { rollUniversalTable } from "../universalTable.js";
+import { debugLog } from "../modules/actions/action-utils.js";
+
+// Anchor: local helper replaces classic rollPower calls
+async function rollSingleAttackRefactor({ actor, power, options = {} }) {
+  // Rank selection policy:
+  // - Prefer explicit override from options (rankOverride or rank)
+  // - Then the power's own rank if present
+  // - Fallback to "Good" to avoid hard crashes (caller should pass rank in practice)
+  const rankUsed =
+    options.rankOverride ??
+    options.rank ??
+    power?.system?.rank?.label ??
+    power?.system?.rank ??
+    "Good";
+
+  // Column shift: prefer explicit option; otherwise 0
+  const csApplied = Number(options.columnShift ?? options.cs ?? 0);
+
+  // Do a karma-aware roll; caller typically provides useDirectRoll and other flags in options
+  const r = await rollWithKarmaAndHistory(actor, { useDirectRoll: true, ...options });
+
+  // Map result to UT color
+  const color = rollUniversalTable(rankUsed, r.total, csApplied);
+
+  debugLog("multiple-attacks → single roll", {
+    actor: actor?.name,
+    power: power?.name,
+    rankUsed,
+    csApplied,
+    total: r.total,
+    color
+  });
+
+  // Normalize the shape: return what your callers expect from the legacy path,
+  // minimally including total/color and the inputs used to derive them.
+  return {
+    total: r.total,
+    color,
+    rankUsed,
+    csApplied,
+    roll: r,
+    context: {
+      multiAttacks: !!options.multiAttacks,
+      attackCount: Number(options.attackCount ?? 1),
+      attackIndex: Number(options.attackIndex ?? 1)
+    }
+  };
+}
+
 
 /**
  * Processes a sequence of multiple attacks after a Fighting FEAT check.
@@ -27,12 +77,14 @@ export async function processMultipleAttackSequence(actor, power, options) {
   const isShooting = at.includes("shoot") || at.includes("(sh)");
   if (!isSlugfest && !isShooting && attackCount > 1) {
     ui.notifications.warn("Multiple attacks apply only to Slugfest and Shooting. Performing a single attack.");
-    return [await FaseripRolls.rollPower(actor, power, { useDirectRoll: true, ...options, multiAttacks: false, attackCount: 1 })];
+      return [await rollSingleAttackRefactor({ actor, power, options: { ...options, multiAttacks: false, attackCount: 1 } })];
+
   }
 
   // If only one attack, just roll normally
   if (attackCount === 1) {
-    return [await FaseripRolls.rollPower(actor, power, { useDirectRoll: true, ...options, multiAttacks: false, attackCount: 1 })];
+      return [await rollSingleAttackRefactor({ actor, power, options: { ...options, multiAttacks: false, attackCount: 1 } })];
+
   }
 
   // ===== CAPTURE TARGETS BEFORE FEAT ROLL =====
@@ -153,32 +205,40 @@ export async function processMultipleAttackSequence(actor, power, options) {
       multiAttacks: false,
       attackCount: 1
     };
-    return [await FaseripRolls.rollPower(actor, power, { useDirectRoll: true, ...modifiedOptions })];
+    return [await rollSingleAttackRefactor({ actor, power, options: { ...modifiedOptions, useDirectRoll: true } })];
   }
 
   // Success → perform N attacks at −1CS each against selected targets
-  console.log(`Multiple attack FEAT ${featColor.toUpperCase()} — proceeding with ${attackCount} attacks at −1CS each.`);
+  debugLog(`Multiple attack FEAT ${String(featColor).toUpperCase()} — proceeding with ${attackCount} attacks at −1CS each.`);
   const results = [];
-  
+
   for (let i = 1; i <= attackCount; i++) {
     const currentTarget = targets[i - 1];
-    console.log(`Making attack ${i} of ${attackCount} against ${currentTarget.name}`);
-    
+    debugLog("Multiple attack executing", { i, attackCount, target: currentTarget?.name });
+
     // Temporarily clear and set single target for this attack
     game.user.targets.forEach(t => t.setTarget(false, { user: game.user, releaseOthers: false }));
-    currentTarget.setTarget(true, { user: game.user, releaseOthers: true });
-    
+    currentTarget?.setTarget?.(true, { user: game.user, releaseOthers: true });
+
     const attackOptions = {
       ...options,
       columnShift: (options.columnShift ?? 0) - 1,
       multiAttacks: false, // prevent recursion
-      attackCount: 1
+      attackCount: 1,
+      attackIndex: i
     };
-    const attackResult = await FaseripRolls.rollPower(actor, power, { useDirectRoll: true, ...attackOptions });
+
+    const attackResult = await rollSingleAttackRefactor({
+      actor,
+      power,
+      options: { ...attackOptions, useDirectRoll: true }
+    });
+
     results.push(attackResult);
-    
+
     if (i < attackCount) await new Promise(r => setTimeout(r, 800));
   }
+
 
   // Restore original target selection
   game.user.targets.forEach(t => t.setTarget(false, { user: game.user, releaseOthers: false }));

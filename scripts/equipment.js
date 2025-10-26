@@ -1,5 +1,6 @@
 // equipment.js
-import { CombatHandler } from './combat-handler.js';
+import { applyDamageToTargets } from "./modules/actions/action-utils.js";
+import { debugLog } from "./modules/actions/action-utils.js";
 
 // Power Rank Range Table (based on "Faserip Combat 02.txt")
 const POWER_RANGE_VALUES = {
@@ -783,21 +784,17 @@ export class FaseripEquipmentSheet extends ItemSheet {
               }
 
               // Update the CombatHandler.processAttack call
-              await CombatHandler.processAttack({
-                attacker: actor,
-                target: target,
-                baseDamage: finalDamage,
+              // Refactor path: soak + HP apply through rules/service
+              debugLog("equipment → apply via rules", { actor: actor?.name, target: target?.name, dmg: finalDamage, type: normalizedDamageType });
+              await applyDamageToTargets(finalDamage, {
+                attackerUuid: actor?.uuid ?? null,
                 damageType: normalizedDamageType,
-                sourceName: item.name,
-                canBeStun,
-                canBeSlam,
-                canBeKill,
-                originalRollResult: colorResult.toLowerCase()
-              }, { 
-                variantType: selectedVariant,
-                specialEffects: specialEffects,
-                skipDefenseDialog: false 
+                // set these if applicable from the item
+                bypassArmor: !!item?.system?.bypassArmor,
+                armorPiercing: Number(item?.system?.armorPiercing ?? 0),
+                apMode: item?.system?.apMode ?? "value"
               });
+
             } else {
               ui.notifications.info("No target selected. Damage not applied.");
             }

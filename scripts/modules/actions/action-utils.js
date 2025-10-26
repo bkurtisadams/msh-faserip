@@ -1191,42 +1191,101 @@ return {
  * @param {boolean}[opts.forceKilling=false]  If you need to mark as killing attack
  * @returns {Promise<Array>}                  Per-target summaries: { targetId, name, absorbed, net, hpBefore, hpAfter }
  */
-export async function applyDamageNow({ sourceActor, targets, baseDamage, damageType, sourceLabel = "Attack", forceKilling = false }) {
-  const CombatHandler = (await import("../../combat-handler.js")).default || (await import("../../combat-handler.js"));
-  const results = [];
+export async function applyDamageNow({
+  sourceActor,
+  targets = [],
+  baseDamage = 0,
+  damageType = "physical-blunt",
+  sourceLabel = "Attack",
+  forceKilling = false,
+  wasKillResult = false,      // if the triggering roll was a Kill result
+  attackForm = "blunt",
+  bypassArmor = false,
+  armorPiercing = 0,
+  armorPiercingCS = 0,
+  apMode = "value",
+  showNotification = true
+}) {
+  try {
+    const results = [];
+    const dmgTypeLower = String(damageType || "physical-blunt").toLowerCase();
+    const apVal = Number(armorPiercing || 0) || 0;
+    const apCS  = Number(armorPiercingCS || 0) || 0;
 
-  for (const t of targets) {
-    // Normalize to TokenDocument → Actor
-    const td = t?.document ? t.document : t;
-    const targetActor = td?.actor || t?.actor;
-    if (!targetActor) continue;
+    for (const t of (targets || [])) {
+      // Normalize Token/TokenDocument → Actor
+      const td = t?.document ? t.document : t;
+      const targetActor = td?.actor || t?.actor;
+      if (!targetActor) continue;
 
-    // Prepare the minimal classic payload; adapt if your processAttack signature differs
-    const payload = {
-      baseDamage,
-      damageType,
-      sourceLabel,
-      forceKilling,
-      // Hints that this call wants HP application and full soak
-      directApply: true
-    };
+      // Mitigation (centralized rules)
+      const m = calculateMitigation(baseDamage, targetActor, {
+        damageType: dmgTypeLower,
+        attackForm: String(attackForm || "blunt").toLowerCase(),
+        bypassArmor: !!bypassArmor,
+        armorPiercing: apVal,
+        armorPiercingCS: apCS,
+        apMode
+      });
 
-    // Classic pipeline does soak + HP change + detailed breakdown
-    const summary = await CombatHandler.processAttack(sourceActor, targetActor, payload);
+      const net      = Math.max(0, m?.netDamage || 0);
+      const absorbed = Math.max(0, m?.absorbed   || 0);
+      const hpBefore = targetActor.system?.attributes?.health?.value ?? 0;
+      const hpAfter  = Math.max(0, hpBefore - net);
 
-    // Normalize a small summary object the refactor can consume
-    results.push({
-      targetId: targetActor.id,
-      name: targetActor.name,
-      absorbed: summary?.damageAbsorbed ?? 0,
-      net: summary?.netDamage ?? Math.max(0, baseDamage - (summary?.damageAbsorbed ?? 0)),
-      hpBefore: summary?.hpBefore ?? targetActor.system?.attributes?.health?.value,
-      hpAfter: summary?.hpAfter ?? (targetActor.system?.attributes?.health?.value)
-    });
+      if (net > 0) {
+        const update = { "system.attributes.health.value": hpAfter };
+
+        if (game.user.isGM || targetActor.isOwner) {
+          await targetActor.update(update);
+        } else if (game.msh?.runAsGM) {
+          await game.msh.runAsGM({ operation: "update", targetActorUuid: targetActor.uuid, args: [update] });
+        } else {
+          if (showNotification) ui.notifications.warn("Couldn't update Health: no GM helper available.");
+        }
+
+        // 0-Health rule (supports Four-Color toggle)
+        if (hpAfter === 0 && hpBefore > 0) {
+          const fourColor = game.settings.get("msh-faserip", "fourColorRule");
+          const lethal = wasKillResult || forceKilling;
+          if (!fourColor || lethal) {
+            await postDeathSavePrompt(targetActor);
+          } else {
+            await ChatMessage.create({
+              content: `<div style="background:#e3f2fd;border:1px solid #2196F3;padding:8px;border-radius:3px;">
+                <strong>${targetActor.name}</strong> is unconscious (0 Health).
+                <div style="font-size:0.9em;color:#666;margin-top:4px;">Four-Color Rule: No death save (non-lethal).</div>
+              </div>`
+            });
+          }
+        }
+
+        if (showNotification) {
+          const armorNote = absorbed > 0 ? ` (${baseDamage} - ${absorbed} Body Armor)` : "";
+          ui.notifications.info(`${targetActor.name} took ${net} damage${armorNote}. Health: ${hpBefore} → ${hpAfter}`);
+        }
+      } else if (showNotification) {
+        ui.notifications.info(`${targetActor.name}'s Body Armor (${absorbed}) absorbed all ${baseDamage} damage.`);
+      }
+
+      results.push({
+        targetId: targetActor.id,
+        name: targetActor.name,
+        absorbed,
+        net,
+        hpBefore,
+        hpAfter
+      });
+    }
+
+    debugLog("applyDamageNow (refactor path)", { count: results.length, sourceLabel, damageType: dmgTypeLower });
+    return results;
+  } catch (err) {
+    console.error("applyDamageNow error:", err);
+    return [];
   }
-
-  return results;
 }
+
 
 /**
  * Get resistance modifiers for a target actor
