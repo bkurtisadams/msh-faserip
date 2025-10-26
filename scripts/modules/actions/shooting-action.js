@@ -20,6 +20,8 @@ import {
   getTargetingContext
 } from "./action-utils.js";
 import { canEffectsApply } from "../../rules/effects-gate.js";
+import { debugLog } from "./action-utils.js";
+import { playCombatSFX } from "./audio-utils.js";
 
 export class ShootingAction extends RangedAttackAction {
   async execute() {
@@ -316,6 +318,76 @@ if (actualAttackCount > 1) {
       getArmorFn: (actor, dt) => getBodyArmorValues(actor, dt)
     });
 
+    // ——— Semi-auto preview (only when requested by dispatcher) ———
+    if (this?.opts?.showConfirm && this?.opts?.autoApply === false) {
+      const tgtList = targetsArray?.length
+        ? `<ul style="margin:6px 0 0 18px;">${targetsArray.map(t => `<li>${t?.name ?? "Target"}</li>`).join("")}</ul>`
+        : "<div style='margin-top:4px;color:#666;'>No targets selected.</div>";
+
+      const previewHtml = `
+        <div style="font-family:var(--font-primary);line-height:1.3;">
+          <div style="font-weight:600;margin-bottom:6px;">${actor.name} — ${actionLabel}</div>
+          <div style="display:grid;grid-template-columns:140px 1fr;gap:6px;">
+            <div style="color:#666;">Roll total</div><div>${roll.total}</div>
+            <div style="color:#666;">Result color</div><div style="text-transform:capitalize;">${colorLower}</div>
+            <div style="color:#666;">Raw damage</div><div>${rawDamage}</div>
+            <div style="color:#666;">After armor</div><div>${afterArmor}${multiTargetCount > 1 ? " (varies)" : ""}</div>
+            <div style="color:#666;">Targets</div>
+            <div>${targetName || (multiTargetCount ? `${multiTargetCount} targets` : "—")}${tgtList}</div>
+          </div>
+          <div style="margin-top:8px;color:#666;font-size:.9em;">
+            Confirm to post the action card and proceed. You can still click “Apply damage” from the chat card.
+          </div>
+        </div>
+      `;
+
+      const content = await renderTemplate("templates/hud/dialog.html", {
+        title: `${actor.name} — ${actionLabel}`,
+        body: previewHtml,     // many of your templates accept body/content
+        content: previewHtml
+      });
+
+      const confirmed = await Dialog.confirm({
+        title: "Preview — Shooting",
+        content,
+        yes: () => true,
+        no: () => false,
+        defaultYes: true,
+        classes: ["msh-dialog", "compact", "faserip-dialog"],
+        width: 420
+      });
+
+      debugLog("Shooting preview", {
+        confirmed, rollTotal: roll.total, color: colorLower, rawDamage, afterArmor,
+        targets: targetsArray?.map(t => t?.name)
+      });
+
+      if (!confirmed) return; // cancel this single attack cleanly
+
+      // Fire SFX after confirm
+      await game.msh.playCombatSFX?.(
+        (this?.opts?.damageType || "shooting"),
+        (this?.item?.name || "weapon"),
+        (String(colorLower || "")).toLowerCase(),
+        {
+          item: this?.item,            // lets SFX read item.system.sfx and notes
+          actionType: "shooting",      // enables per-mode SFX (attackModes[].sfx)
+          ammoType:
+            // prefer an explicit variant if you use it
+            (this?.item?.system?.variantType && this.item.system.variantType !== "standard")
+              ? this.item.system.variantType
+              // otherwise derive from specialAmmo flags
+              : (this?.item?.system?.specialAmmo?.explosive ? "explosive"
+                : this?.item?.system?.specialAmmo?.ap        ? "ap"
+                : this?.item?.system?.specialAmmo?.rubber    ? "rubber"
+                : this?.item?.system?.specialAmmo?.canister  ? "canister"
+                : this?.item?.system?.specialAmmo?.heatSeeker? "heatSeeker"
+                : undefined)
+        }
+      );
+    }
+    // ——— End preview gate ———
+
     // Calculate penetrating damage for action chips
     let penetratingDamage = afterArmor;
 
@@ -420,8 +492,8 @@ if (actualAttackCount > 1) {
 
     // Play combat SFX
     const sourceName = choice.weapon.name || "Firearm";
-    if (game.msh?.CombatHandler?.playCombatSFX) {
-      await game.msh.CombatHandler.playCombatSFX(dmgType, sourceName, colorLower);
+    if (game.msh?.playCombatSFX) {
+      await game.msh.playCombatSFX(dmgType, sourceName, colorLower);
     }
   }
 }

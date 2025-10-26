@@ -509,17 +509,15 @@ export class BluntAttackAction extends AttackAction {
 
   // Play combat SFX
   const sourceName = choice.weaponName || "Bare Hands";
-    if (game.msh?.CombatHandler?.playCombatSFX) {
-      // Special case: Blunt attacks on multiple adjacent targets play sound per target (comic book slugfest!)
-      if (choice.multiAdjacent && actionType === "blunt-attack") {
-        const targetCount = game.user?.targets?.size || 1;
+    if (game.msh?.playCombatSFX) {
+      if (targetCount > 1 && MULTIPLE_PUNCH_SFX) {
+        // Rapid-fire punches
         for (let i = 0; i < targetCount; i++) {
-          if (i > 0) await new Promise(resolve => setTimeout(resolve, 150)); // Quick delay between punches
-          await game.msh.CombatHandler.playCombatSFX(dmgType, sourceName, colorLower);
+          if (i > 0) await new Promise(resolve => setTimeout(resolve, 150));
+          await game.msh.playCombatSFX(dmgType, sourceName, colorLower);
         }
       } else {
-        // Normal: one sound
-        await game.msh.CombatHandler.playCombatSFX(dmgType, sourceName, colorLower);
+        await game.msh.playCombatSFX(dmgType, sourceName, colorLower);
       }
     }
 

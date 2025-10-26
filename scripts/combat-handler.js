@@ -585,7 +585,11 @@ export class CombatHandler {
         });
     }
 
-    static async playCombatSFX(damageType, sourceName, rollResult, options = {}) {
+    playCombatSFX(opts = {}) {
+        try { game.msh?.playCombatSFX?.(opts); } catch (_e) {}
+        }
+
+    /* static async playCombatSFX(damageType, sourceName, rollResult, options = {}) {
         console.log("=== playCombatSFX Debug Start ===");
         console.log("Input parameters:");
         console.log("  damageType:", damageType);
@@ -705,7 +709,7 @@ export class CombatHandler {
         }
         
         console.log("=== playCombatSFX Debug End ===");
-    }
+    } */
 
     static async soundFileExists(path) {
         try {

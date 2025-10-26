@@ -1269,12 +1269,13 @@ export async function applyDamageNow({
       }
 
       results.push({
-        targetId: targetActor.id,
-        name: targetActor.name,
-        absorbed,
-        net,
+        actorUuid: targetActor?.uuid ?? null,     // works for base actors or token actors
+        tokenUuid: targetToken?.document?.uuid ?? targetToken?.uuid ?? null, // if you have token
+        name: targetActor?.name ?? "Target",
         hpBefore,
-        hpAfter
+        hpAfter,
+        absorbed,
+        net
       });
     }
 

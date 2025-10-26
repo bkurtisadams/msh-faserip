@@ -16,6 +16,8 @@ import { installActionChatHandlers } from "./modules/actions/chat-hooks.js";
 import { openCollisionDamageDialog } from './modules/actions/collision-damage.js';
 import { FaseripActionHUD } from './action-hud.js';
 import { debugLog } from './modules/actions/action-utils.js';
+import { playCombatSFX } from "./modules/actions/audio-utils.js";
+
 
 Hooks.once("init", async () => {
   // ---- Canonical flag scope + shim ----------------------------------------
@@ -58,11 +60,21 @@ Hooks.once("init", async () => {
     default: false
   });
 
+  game.settings.register("msh-faserip", "sfxBasePath", {
+    name: "SFX Base Path",
+    hint: "Folder with SFX files (e.g., systems/msh-faserip/assets/sfx).",
+    scope: "world",
+    config: true,
+    type: String,
+    default: "systems/msh-faserip/assets/sfx"
+  });
+
   debugLog("init hook is running!");
   console.log("Marvel Super Heroes (FASERIP) system initializing...");
 
   // Initialize the game.msh namespace early
   game.msh = game.msh || {};
+  game.msh.playCombatSFX = playCombatSFX;
 
   game.msh.FaseripActorSheet = FaseripActorSheet;
 

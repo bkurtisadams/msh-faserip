@@ -1,7 +1,6 @@
 // gm-utils.js
 // v13-safe socketlib wiring for "msh-faserip"
-import { applyDamageToTargets } from "./modules/actions/action-utils.js";
-import { debugLog } from "./modules/actions/action-utils.js";
+import { applyDamageToTargets, debugLog } from "./modules/actions/action-utils.js";
 
 const SOCKET_NAME = "msh-faserip";
 let socket = null;
@@ -118,6 +117,11 @@ export async function executeAsGM(action, payload) {
       case "createActorEffect":  return await createActorEffect(payload);
       case "createEmbeddedDocsOnActor": return await createEmbeddedDocsOnActor(payload);
       case "manageRecoveryEffect": return await manageRecoveryEffect(payload);
+      case "applyRulesDamage":      return await applyRulesDamage(payload);
+      case "updateActor":           return await updateActor(payload);
+      case "deleteActiveEffects":   return await deleteActiveEffects(payload);
+      case "deleteEmbeddedDocsOnActor": return await deleteEmbeddedDocsOnActor(payload);
+
       default: throw new Error(`Unknown GM action: ${action}`);
     }
   }
@@ -147,6 +151,8 @@ export function registerSocket() {
     socket.register("createActorEffect", createActorEffect);
     socket.register("createEmbeddedDocsOnActor", createEmbeddedDocsOnActor);
     socket.register("manageRecoveryEffect", manageRecoveryEffect);
+    socket.register("applyRulesDamage", applyRulesDamage);
+
 
     // Expose on game.msh for other modules/files
     game.msh = game.msh || {};
@@ -180,6 +186,14 @@ async function runGMCommand(data = {}) {
         targetActorUuid: data.targetActorUuid,
         baseDamage: data.baseDamage,
         damageType: data.damageType,
+        attackerUuid: data.attackerUuid ?? null
+      });
+
+    case "applyCombatHandlerDamage":
+      return await applyRulesDamage({
+        targetActorUuid: data.targetActorUuid ?? data.targetUuid ?? data.uuid ?? null,
+        baseDamage: Number(data.baseDamage ?? data.damage ?? 0),
+        damageType: data.damageType ?? "physical-blunt",
         attackerUuid: data.attackerUuid ?? null
       });
 
@@ -280,7 +294,8 @@ async function updateActor({ targetActorUuid, updateData }) {
 }
 
 async function applyRulesDamage({ targetActorUuid, baseDamage, damageType, attackerUuid }) {
-  const actor = await fromUuid(targetActorUuid).then(doc => doc?.actor ?? doc);
+  const actor = await getActorFromUuid(targetActorUuid);
+
   if (!actor) return false;
   debugLog("gm-utils → applyRulesDamage", { actor: actor.name, baseDamage, damageType, attackerUuid });
   // Use selection if GM clicked from a message; otherwise direct-apply to target actor only

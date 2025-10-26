@@ -14,6 +14,21 @@ import { GrapplingAction } from "./grappling-action.js";
 import { GrabbingAction } from "./grabbing-action.js";
 import { EscapingAction } from "./escaping-action.js";
 import { DeathSaveAction } from "./death-save-action.js";
+import { debugLog } from "./action-utils.js";
+
+// Anchor: mode resolver (safe even if settings not registered yet)
+function resolveCombatMode(actor) {
+  try {
+    // Prefer actor override if you already expose it via game.msh.getCombatModeFor
+    const v =
+      (game.msh?.getCombatModeFor?.(actor)) ??
+      (game.settings?.get?.("msh-faserip", "combatMode")) ??
+      "semi";
+    return String(v || "semi");
+  } catch (_e) {
+    return "semi";
+  }
+}
 
 const registry = {
   "blunt-attack":   BluntAttackAction,
@@ -41,7 +56,7 @@ const registry = {
 // scripts/modules/actions/action-dispatcher.js
 export class ActionDispatcher {
   static async roll(actionType, { actor, abilityName, opts = {} } = {}) {
-    console.debug("ActionDispatcher.roll()", { actionType, abilityName, opts });
+    debugLog("ActionDispatcher.roll()", { actionType, abilityName, opts });
 
     // --- Central guard: if actor is Nullified, they cannot use inborn super-human powers (RAW)
     // We block only power-channel actions here (energy/force). Martial/ranged/etc. still allowed.
@@ -54,8 +69,7 @@ export class ActionDispatcher {
       }
 
       // Light hint for aura maintenance: handlers can read this if they want stricter behavior.
-      const SCOPE2 = game.system?.id || 'msh-faserip';
-      const auraNullifyActive = actor.effects?.some(e => e.getFlag?.(SCOPE2, 'aura.nullify.active') === true);
+      const auraNullifyActive = actor.effects?.some(e => e.getFlag?.(SCOPE, 'aura.nullify.active') === true);
       if (auraNullifyActive) {
         // Pass through a hint so action handlers can decide whether to allow/deny:
         opts = { ...(opts ?? {}), nullifyAuraActive: true };
@@ -66,18 +80,27 @@ export class ActionDispatcher {
 
     if (!Handler) throw new Error(`Unknown actionType: ${actionType}`);
     const handler = new Handler({ actor, actionType, abilityName, opts });
-    // Anchor: mode gate
-    const mode = game.msh?.getCombatModeFor?.(actor) ?? "semi";
+    
+    // Anchor: mode gate — merge flags into handler.opts so actions can read this.opts.showConfirm/autoApply
+    const mode = resolveCombatMode(actor);
+    debugLog("ActionDispatcher mode", { actor: actor?.name, mode });
 
-    if (mode === "auto") {
-      return await handler.execute({ mode: "auto", autoApply: true, showConfirm: false });
+    let modeFlags = {};
+    if (mode === "auto" || mode === "classic") {
+      modeFlags = { mode: "auto", autoApply: true, showConfirm: false };
+    } else if (mode === "semi") {
+      modeFlags = { mode: "semi", autoApply: false, showConfirm: true };
+    } else {
+      modeFlags = { mode: "manual", autoApply: false, showConfirm: false };
     }
-    if (mode === "semi") {
-      // If you have a preview dialog, open/prepare it inside execute based on showConfirm
-      return await handler.execute({ mode: "semi", autoApply: false, showConfirm: true });
-    }
-    // Manual
-    return await handler.execute({ mode: "manual", autoApply: false, showConfirm: false });
+
+    // Merge into the handler’s own options so action code can read this.opts
+    handler.opts = { ...(handler.opts ?? {}), ...modeFlags };
+    debugLog("ActionDispatcher merged mode flags", handler.opts);
+
+    // Call without passing flags; actions consume this.opts.*
+    return await handler.execute();
+
   }
 }
 

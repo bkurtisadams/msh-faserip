@@ -243,6 +243,12 @@
       "rate": "1",
       "shots": "",
       "shotsRemaining": "",
+      "sfx": {
+        "hit": "",
+        "miss": "",
+        "critical": ""
+      },
+      "reloadSfx": "",
       "variantType": "standard",
       "specialAmmo": {
         "mercy": false,
@@ -261,7 +267,8 @@
           "damage": 10,
           "ability": "fighting",
           "description": "",
-          "allowedVariants": ["standard", "ap"]
+          "allowedVariants": ["standard", "ap"],
+          "sfx": { "hit": "", "miss": "", "critical": "" }
         }
       ],
 

@@ -544,8 +544,8 @@ export class EdgedAttackAction extends AttackAction {
     });
     // Play combat SFX
     const sourceName = choice.weaponName || "Natural Weapon";
-    if (game.msh?.CombatHandler?.playCombatSFX) {
-      await game.msh.CombatHandler.playCombatSFX(dmgType, sourceName, colorLower);
+    if (game.msh?.playCombatSFX) {
+      await game.msh.playCombatSFX(dmgType, sourceName, colorLower);
     }
   }
 }

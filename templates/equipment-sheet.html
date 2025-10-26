@@ -83,6 +83,7 @@
           <p class="notes">Use weaponPowerRank for attack rolls instead of an ability like Agility.</p>
         </div>
   
+        <!-- Damage Type: shooting, energy, edged, etc. -->
         <div class="form-group">
           <label>Damage Type:</label>
           <select name="system.damageType">
@@ -99,6 +100,40 @@
             <option value="Stun" {{#if (eq system.damageType "Stun")}}selected{{/if}}>Stunning (Stun)</option>
           </select>
         </div>
+        
+        <!-- SFX -->
+        <div class="form-group">
+          <label>SFX (Hit)</label>
+          <div class="form-fields">
+            <input type="text" name="system.sfx.hit" value="{{system.sfx.hit}}" placeholder="systems/msh-faserip/assets/sfx/gunshot.wav"/>
+            {{filePicker type="audio" target="system.sfx.hit"}}
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>SFX (Miss)</label>
+          <div class="form-fields">
+            <input type="text" name="system.sfx.miss" value="{{system.sfx.miss}}" placeholder="systems/msh-faserip/assets/sfx/gunshot-miss.wav"/>
+            {{filePicker type="audio" target="system.sfx.miss"}}
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>SFX (Critical)</label>
+          <div class="form-fields">
+            <input type="text" name="system.sfx.critical" value="{{system.sfx.critical}}" placeholder="(optional) .../gunshot-critical.wav"/>
+            {{filePicker type="audio" target="system.sfx.critical"}}
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>SFX (Reload)</label>
+          <div class="form-fields">
+            <input type="text" name="system.reloadSfx" value="{{system.reloadSfx}}" placeholder="(optional) .../reload.wav"/>
+            {{filePicker type="audio" target="system.reloadSfx"}}
+          </div>
+        </div>
+
   
         <div class="form-row">
           <div class="form-group half">

@@ -9,9 +9,9 @@ import {
   buildResultGrid, 
   bannerColors, 
   effectsFor,
-  applyDamageToTargets
+  applyDamageToTargets,
+  debugLog
 } from "./action-utils.js";
-
 import { startAura, stopAura, isAuraMaintained } from "./nullify.js";
 
 export function installActionChatHandlers() {
@@ -147,73 +147,148 @@ export function installActionChatHandlers() {
     html.on("click", '[data-action="apply-damage"]', async (ev) => {
       ev.preventDefault();
       const btn = ev.currentTarget;
+      btn.disabled = true;
 
-      const damage        = Number(btn.dataset.damage || 0);
-      const attackerUuid  = btn.dataset.attackerUuid;
-      const bypassArmor   = btn.dataset.bypassArmor === "true";
-      const damageType    = (btn.dataset.damageType || "physical-blunt").toLowerCase();
-      const attackForm    = (btn.dataset.attackForm || "blunt").toLowerCase();
-      const armorPiercing = Number(btn.dataset.armorPiercing || 0) || 0;
-      const armorPiercingCS = Number(btn.dataset.armorPiercingCs || 0) || 0;  // ✅ NEW
-      const apMode        = btn.dataset.apMode || "value";                     // ✅ NEW
-      const wasKillResult = btn.dataset.isKill === "true";
+      try {
+        // 1) Read inputs from the button/card
+        const damage          = Number(btn.dataset.damage || 0);
+        const attackerUuid    = btn.dataset.attackerUuid || null;
+        const bypassArmor     = btn.dataset.bypassArmor === "true";
+        const damageType      = (btn.dataset.damageType || "physical-blunt").toLowerCase();
+        const attackForm      = (btn.dataset.attackForm || "blunt").toLowerCase();
+        const armorPiercing   = Number(btn.dataset.armorPiercing || 0) || 0;
+        const armorPiercingCS = Number(btn.dataset.armorPiercingCs || 0) || 0; // note the 'Cs' in dataset
+        const apMode          = btn.dataset.apMode || "value";
+        const wasKillResult   = btn.dataset.isKill === "true";
 
-      await applyDamageToTargets(damage, {
-        attackerUuid,
-        damageType,
-        attackForm,
-        armorPiercing,
-        armorPiercingCS,    // ✅ NEW
-        apMode,             // ✅ NEW
-        wasKillResult,
-        showNotification: true,
-        updateButton: btn,
-        bypassArmor
-      });
-      // Anchor: record deltas for Undo and flip the button
-      const $msg = $(btn).closest(".message");
-      const msg  = game.messages.get($msg.data("messageId"));
+        // 2) Apply via rules and CAPTURE RETURNED RESULTS (one entry per target)
+        const results = await applyDamageToTargets(damage, {
+          attackerUuid,
+          damageType,
+          attackForm,
+          armorPiercing,
+          armorPiercingCS,
+          apMode,
+          wasKillResult,
+          showNotification: true,
+          bypassArmor
+        }) ?? [];
 
-      // We rely on applyDamageToTargets returning [{ targetActor, damageDealt, absorbed, currentHealth, newHealth }, ...]
-      // So re-run it in dry mode or collect from return above if you capture it
-      // (If you kept the return, store it as `const results = await applyDamageToTargets(...);`)
-      const results = game.user?.targets?.size
-        ? Array.from(game.user.targets).map(t => ({ uuid: t.actor?.uuid, delta: -(damage) /* approximate if not per-target */ }))
-        : []; // For exact per-target deltas, capture the returned array instead.
+        debugLog("Chat Apply results", results);
 
-      await msg.setFlag("msh-faserip", "undo", { results, ts: Date.now() });
+        // 3) Persist undo info on the *correct* chat message
+        const $msgEl = $(btn).closest("li.chat-message, .message, .chat-card, .message-content");
+        const messageId =
+          $msgEl.attr("data-message-id") ||
+          $msgEl.data("messageId") ||
+          $msgEl.closest("li.chat-message").attr("data-message-id");
 
-      // Flip button to Undo
-      btn.dataset.action = "undo-apply";
-      btn.textContent = "Undo";
-      btn.title = "Revert HP changes for this apply";
+        const msg   = messageId ? game.messages.get(messageId) : null;
+        const SCOPE = game.system?.id || "msh-faserip";
 
+        if (!msg) {
+          console.warn("Undo flag: could not resolve ChatMessage from element; skipping flag write.");
+        } else {
+          await msg.setFlag(SCOPE, "undo", {
+            ts: Date.now(),
+            results: (results || []).map(r => ({
+              actorUuid: r.actorUuid ?? r.targetActorUuid ?? r.targetUuid ?? null,
+              tokenUuid: r.tokenUuid ?? null,
+              hpBefore:  Number(r.hpBefore  ?? r.currentHealth ?? 0),
+              hpAfter:   Number(r.hpAfter   ?? r.newHealth    ?? 0)
+            }))
+          });
+        }
+
+        // 4) Flip button into Undo state
+        btn.dataset.action = "undo-apply";
+        btn.textContent    = "Undo";
+        btn.title          = "Revert these HP changes";
+        btn.disabled       = false;
+
+      } catch (err) {
+        console.error("Apply Damage error:", err);
+        ui.notifications?.error?.("Apply failed — see console for details.");
+        btn.disabled = false;
+      }
     });
 
-    // Anchor: Undo handler
-    html.on("click", '[data-action="undo-apply"]', async (ev) => {
+    // Anchor: Undo handler (robust)
+    html.on("click", "[data-action='undo-apply']", async (ev) => {
       ev.preventDefault();
-      const btn  = ev.currentTarget;
-      const $msg = $(btn).closest(".message");
-      const msg  = game.messages.get($msg.data("messageId"));
-      const data = msg?.flags?.["msh-faserip"]?.undo;
-
-      if (!data?.results?.length) { ui.notifications.warn("Nothing to undo."); return; }
-
-      for (const r of data.results) {
-        if (!r?.uuid || !Number.isFinite(r?.delta)) continue;
-        const actor = await fromUuid(r.uuid).then(doc => doc?.actor ?? doc);
-        if (!actor) continue;
-
-        const cur = actor.system?.attributes?.health?.value ?? 0;
-        const upd = { "system.attributes.health.value": Math.max(0, cur - r.delta) }; // reverse sign
-        await actor.update(upd);
-        debugLog("Undo applied", { actor: actor.name, deltaReversed: -r.delta });
-      }
-
-      // Disable the Undo button to prevent double-undo
+      const btn = ev.currentTarget;
       btn.disabled = true;
-      btn.textContent = "Undone";
+
+      try {
+        // Resolve the originating ChatMessage (same robust lookup used in Apply)
+        const $msgEl = $(btn).closest("li.chat-message, .message, .chat-card, .message-content");
+        const messageId =
+          $msgEl.attr("data-message-id") ||
+          $msgEl.data("messageId") ||
+          $msgEl.closest("li.chat-message").attr("data-message-id");
+
+        const msg   = messageId ? game.messages.get(messageId) : null;
+        const SCOPE = game.system?.id || "msh-faserip";
+        const data  = msg?.flags?.[SCOPE]?.undo;
+
+        if (!msg || !data?.results?.length) {
+          ui.notifications?.warn?.("Nothing to undo for this message.");
+          btn.disabled = false;
+          return;
+        }
+
+        // Health path helper (supports old/new schemas)
+        const healthPath = (actor) =>
+          (actor?.system?.attributes?.health?.value !== undefined)
+            ? "system.attributes.health.value"
+            : "system.health.value";
+
+        for (const r of data.results) {
+          const uuid = r.actorUuid || r.tokenUuid;
+          if (!uuid) continue;
+
+          // Resolve Actor or TokenDocument
+          const doc   = await fromUuid(uuid);
+          const actor = doc?.actor ?? doc;
+          if (!actor) continue;
+
+          const cur  = Number(actor?.system?.attributes?.health?.value ?? actor?.system?.health?.value ?? 0);
+          const prev = Number(r.hpBefore ?? cur);
+          const update = { [healthPath(actor)]: Math.max(0, prev) };
+
+          // Try local update; fall back to GM bridge
+          if (game.user.isGM || actor.isOwner) {
+            await actor.update(update);
+          } else if (game.msh?.socket?.executeAsGM) {
+            // MODERN API (preferred)
+            await game.msh.socket.executeAsGM("updateActor", {
+              targetActorUuid: actor.uuid,
+              updateData: update
+            });
+          } else if (game.msh?.runAsGM) {
+            // LEGACY API (fallback)
+            await game.msh.runAsGM({
+              operation: "update",          // ← FIXED: was "updateActor"
+              targetActorUuid: actor.uuid,
+              args: [update]                // ← FIXED: was "data: update"
+            });
+          } else {
+            ui.notifications?.warn?.(`Cannot undo for ${actor.name}: insufficient permission.`);
+          }
+
+          debugLog("Undo applied", { actor: actor.name, from: cur, to: prev });
+        }
+
+        // Lock the button after success
+        btn.textContent = "Undone";
+        btn.title       = "Already undone";
+        btn.disabled    = true;
+
+      } catch (err) {
+        console.error("Undo error:", err);
+        ui.notifications?.error?.("Undo failed — see console for details.");
+        btn.disabled = false;
+      }
     });
 
     // 6) Force Save (Nullification / RAW: Endurance vs Power Rank)
