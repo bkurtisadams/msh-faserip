@@ -364,27 +364,23 @@ if (actualAttackCount > 1) {
 
       if (!confirmed) return; // cancel this single attack cleanly
 
-      // Fire SFX after confirm
-      await game.msh.playCombatSFX?.(
-        (this?.opts?.damageType || "shooting"),
-        (this?.item?.name || "weapon"),
-        (String(colorLower || "")).toLowerCase(),
-        {
-          item: this?.item,            // lets SFX read item.system.sfx and notes
-          actionType: "shooting",      // enables per-mode SFX (attackModes[].sfx)
-          ammoType:
-            // prefer an explicit variant if you use it
-            (this?.item?.system?.variantType && this.item.system.variantType !== "standard")
-              ? this.item.system.variantType
-              // otherwise derive from specialAmmo flags
-              : (this?.item?.system?.specialAmmo?.explosive ? "explosive"
-                : this?.item?.system?.specialAmmo?.ap        ? "ap"
-                : this?.item?.system?.specialAmmo?.rubber    ? "rubber"
-                : this?.item?.system?.specialAmmo?.canister  ? "canister"
-                : this?.item?.system?.specialAmmo?.heatSeeker? "heatSeeker"
-                : undefined)
-        }
-      );
+      // Fire SFX after confirm (refactor mode only)
+      if (game.msh?.getCombatModeFor?.() !== "classic") {
+        await game.msh.playCombatSFX?.(
+          (this?.opts?.damageType || "shooting"),
+          (this?.item?.name || "weapon"),
+          (String(colorLower || "")).toLowerCase(),
+          {
+            item: this?.item,
+            actionType: "shooting",
+            ammoType:
+              (this?.item?.system?.variantType && this.item.system.variantType !== "standard")
+                ? this.item.system.variantType
+                : (this?.item?.system?.specialAmmo?.explosive ? "explosive"
+                : "standard")
+          }
+        );
+      }
     }
     // ——— End preview gate ———
 
@@ -490,9 +486,9 @@ if (actualAttackCount > 1) {
       })
     });
 
-    // Play combat SFX
+    // Play combat SFX (classic mode only)
     const sourceName = choice.weapon.name || "Firearm";
-    if (game.msh?.playCombatSFX) {
+    if (game.msh?.getCombatModeFor?.() === "classic" && game.msh?.playCombatSFX) {
       await game.msh.playCombatSFX(dmgType, sourceName, colorLower);
     }
   }
