@@ -1103,7 +1103,7 @@ export class FaseripActorSheet extends ActorSheet {
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Roll power button
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    html.find('.power-roll').click(ev => {
+    html.find('.power-roll').click(async ev => {
       const li = $(ev.currentTarget).closest(".power-row");
       const itemId = li.data("itemId");
       const item = this.actor.items.get(itemId);
@@ -1113,8 +1113,20 @@ export class FaseripActorSheet extends ActorSheet {
         return;
       }
 
-      // Use the same roll function as macros (which has range penalties)
-      return game.msh.rollPower(this.actor, item);
+      // Import ActionDispatcher at top of file
+      const { ActionDispatcher } = await import("./modules/actions/action-dispatcher.js");
+      
+      // Determine action type based on power type
+      const actionType = item.system.attackType === "force" ? "force" : "energy";
+      
+      return ActionDispatcher.roll(actionType, {
+        actor: this.actor,
+        abilityName: "agility", // Powers use Agility
+        opts: { 
+          itemId: item.id,
+          item: item // Pass the item for power-specific data
+        }
+      });
     });
 
     ///////////////////////////////////////////////////////////////////////////////////////////
@@ -1237,8 +1249,18 @@ export class FaseripActorSheet extends ActorSheet {
 
       if (!item) return;
 
-      // Call the centralized talent roll function
+      // Talents might need special handling or use check-action
+      // For now, route through the old system OR create a TalentAction class
+      
+      // Option A: Keep using old system for talents (if they're special)
       await game.msh.rollTalent(actor, item);
+      
+      // Option B: Create new talent handler (future work)
+      // const { ActionDispatcher } = await import("./modules/actions/action-dispatcher.js");
+      // await ActionDispatcher.roll("talent", { 
+      //   actor: this.actor, 
+      //   opts: { item }
+      // });
     });
 
     ////////////////////////////////////////////////////////////////////////////////////////
@@ -1895,14 +1917,38 @@ export class FaseripActorSheet extends ActorSheet {
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Roll equipment button
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    html.find('.equipment-roll').click(ev => {
+    html.find('.equipment-roll').click(async ev => {
       const li = $(ev.currentTarget).closest(".equipment-row");
       const itemId = li.data("itemId");
       const item = this.actor.items.get(itemId);
-    
-      if (item) {
-        item.rollItem();
+
+      if (!item) return;
+
+      const { ActionDispatcher } = await import("./modules/actions/action-dispatcher.js");
+      
+      // Determine action type based on equipment category
+      let actionType;
+      const category = item.system.category?.toLowerCase();
+      
+      if (category === "melee" || category === "melee weapon") {
+        actionType = item.system.attackForm === "edged" ? "edged-attack" : "blunt-attack";
+      } else if (category === "weapon" || category === "ranged weapon") {
+        actionType = "shooting";
+      } else if (category === "thrown") {
+        actionType = item.system.attackForm === "edged" ? "throwing-edged" : "throwing-blunt";
+      } else {
+        // Unknown equipment type - use old system
+        return item.rollItem();
       }
+      
+      return ActionDispatcher.roll(actionType, {
+        actor: this.actor,
+        abilityName: actionType.includes("shooting") || actionType.includes("throwing") ? "agility" : "fighting",
+        opts: { 
+          itemId: item.id,
+          item: item
+        }
+      });
     });
 
     // Reload weapon
