@@ -867,6 +867,11 @@ export async function applyDamageToTargets(damage, options = {}) {
 
     // Track result
     const result = {
+      // UNDO FIX: Added UUID fields
+      actorUuid: targetActor.uuid,
+      tokenUuid: target.document?.uuid,
+      hpBefore: currentHealth,
+      hpAfter: newHealth,
       target: target.name,
       targetActor: targetActor,
       damageDealt: damageAfterArmor,
@@ -1417,4 +1422,3 @@ export async function postDeathSavePrompt(actor) {
     content: content
   });
 }
-

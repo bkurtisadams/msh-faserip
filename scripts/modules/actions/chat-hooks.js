@@ -21,8 +21,23 @@ export function installActionChatHandlers() {
   game.msh.chatHooksInstalled = true;
 
   // SINGLE combined hook for all chat interactions
-  Hooks.on("renderChatMessageHTML", (message, element) => {
+  Hooks.on("renderChatMessage", (message, element) => {
     const html = $(element);
+    
+    // Check if this message has an undo flag
+    const SCOPE = game.system?.id || "msh-faserip";
+    const undoData = message.flags?.[SCOPE]?.undo;
+    
+    if (undoData?.results?.length) {
+      // This message has been applied - transform button
+      const applyBtn = html.find('[data-action="apply-damage"]');
+      if (applyBtn.length) {
+        applyBtn.attr('data-action', 'undo-apply');
+        applyBtn.text('Undo');
+        applyBtn.attr('title', 'Revert these HP changes');
+        applyBtn.prop('disabled', false);
+      }
+    }
     
     // 1) Stun/Slam/Kill/Escape chips
     html.on("click", "a.faserip-chip[data-check]", async (ev) => {
