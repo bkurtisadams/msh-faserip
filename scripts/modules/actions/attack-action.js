@@ -8,6 +8,15 @@ export class AttackAction extends BaseAction {
     this.pulled = false;
   }
 
+  // attack-action.js (base class)
+  getTargetCount() {
+    const t = this.targets;
+    if (Array.isArray(t)) return t.length;
+    if (t && typeof t.size === "number") return t.size; // Set/Map (e.g., User.targets)
+    // last resort: live selection
+    return Number(game?.user?.targets?.size ?? 1);
+  }
+
   _computeEffectiveRank(baseRank, columnShift=0) {
     return shiftRank(baseRank, columnShift);
   }

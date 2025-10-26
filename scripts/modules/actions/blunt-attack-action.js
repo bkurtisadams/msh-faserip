@@ -11,6 +11,9 @@ import {
 import { getItemMaterialRank } from "../../gm-utils.js";
 import { makeDamageBlock, computeAfterArmor, buildDamageFlags } from "./damage-ui.js";
 import { canEffectsApply } from "../../rules/effects-gate.js";
+import { buildColorOutcome } from "../dice/color-results.js";
+import { applyColumnShifts } from "../dice/column-shifts.js";
+
 
 export class BluntAttackAction extends AttackAction {
   async execute() {
@@ -352,6 +355,7 @@ export class BluntAttackAction extends AttackAction {
   } // <-- CLOSE execute()
 
   async _executeSingleAttack(choice, actionLabel) {
+    const targetCount = this.getTargetCount();
     const actor = this.actor;
     const actionType = "blunt-attack";
     const ability = getAbilityInfo(actor, this.abilityName);
@@ -359,7 +363,7 @@ export class BluntAttackAction extends AttackAction {
     const effects = effectsFor(actionType);
 
     // effective rank + roll/karma
-    const effectiveRank = shiftRank(ability.rank, choice.shift);
+    const { name: effectiveRank } = applyColumnShifts(ability.rank, choice.shift);
     const roll = await (new Roll("1d100")).evaluate();
     if (!choice.skipDice) {
       await roll.toMessage({
@@ -374,6 +378,9 @@ export class BluntAttackAction extends AttackAction {
     // resolve color/effects
     let color = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
     let colorLower = String(color || "").toLowerCase();
+
+    const outcome = buildColorOutcome(color, "BA"); // "BA" = Blunt Attack
+    // outcome.damageShiftCS, outcome.slamCandidate, outcome.stunCandidate
     
     // Apply result cap if set
     const colorOrder = ['white', 'green', 'yellow', 'red'];

@@ -4,6 +4,23 @@ import { CombatHandler } from './combat-handler.js';
 import { runAsGM } from './gm-utils.js';
 import { calculateChargeDamage, getBodyArmorValue, processChargeAttack } from './charge-damage.js';
 import { processMultipleAttackSequence } from "./rules/multiple-attacks.js";
+import { rollD100AndApplyKarma } from "./modules/dice/dice-roller.js";
+import { 
+  rankRows, 
+  actionTypes, 
+  ACTION_ABILITY_MAP, 
+  ACTION_RESULT_LABELS, 
+  POWER_RANGE_VALUES,
+  resultRows,
+  RANKS,
+  RANKS_EXTENDED,
+  rankIndex,
+  getRankIndex,
+  getRollLabelFromValue,
+  maxDefenderFightingRankName,
+  requiredColorForAttackCount,
+  colorMeetsRequirement
+} from "./modules/dice/universal-table.js";
 
 // ============================================
 // HELPER FUNCTIONS (OUTSIDE THE CLASS)
@@ -239,112 +256,6 @@ function addMultiTargetEventHandlers(html) {
 }
 
 // ============================================
-// CONSTANTS AND DATA (OUTSIDE THE CLASS)  
-// ============================================
-const actionTypes = [
-  { code: "BA", label: "Blunt Attacks" },
-  { code: "EA", label: "Edged Attacks" },
-  { code: "Sh", label: "Shooting Attacks" },
-  { code: "TE", label: "Throwing Edged" },
-  { code: "TB", label: "Throwing Blunt" },
-  { code: "En", label: "Energy" },
-  { code: "Fo", label: "Force" },
-  { code: "Gp", label: "Grappling" },
-  { code: "Gb", label: "Grabbing" },
-  { code: "Es", label: "Escaping" },
-  { code: "Ch", label: "Charging" },
-  { code: "Do", label: "Dodging" },
-  { code: "Ev", label: "Evading" },
-  { code: "Bl", label: "Blocking" },
-  { code: "Ca", label: "Catching" },
-  { code: "St", label: "Stun?" },
-  { code: "Sl", label: "Slam?" },
-  { code: "Ki", label: "Kill?" }
-];
-
-const ACTION_ABILITY_MAP = {
-  BA: "fighting",
-  EA: "fighting",
-  Sh: "agility",
-  TE: "agility",
-  TB: "agility",
-  En: "agility",
-  Fo: "agility",
-  Gp: "strength",
-  Gb: "strength",
-  Es: "strength",
-  Ch: "endurance",
-  Do: "agility",
-  Ev: "fighting",
-  Bl: "strength",
-  Ca: "agility",
-  St: "endurance",
-  Sl: "endurance",
-  Ki: "endurance"
-};
-
-const ACTION_RESULT_LABELS = {
-  BA: { white: "Miss", green: "Hit", yellow: "Slam", red: "Stun" },
-  EA: { white: "Miss", green: "Hit", yellow: "Stun", red: "Kill" },
-  Sh: { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Kill" },
-  TE: { white: "Miss", green: "Hit", yellow: "Stun", red: "Kill" },
-  TB: { white: "Miss", green: "Hit", yellow: "Hit", red: "Stun" },
-  En: { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Kill" },
-  Fo: { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Stun" },
-  Gp: { white: "Miss", green: "Miss", yellow: "Partial", red: "Hold" },
-  Gb: { white: "Miss", green: "Take", yellow: "Grab", red: "Break" },
-  Es: { white: "Miss", green: "Miss", yellow: "Escape", red: "Reverse" },
-  Ch: { white: "None", green: "Slam", yellow: "Slam", red: "Stun" },
-  Do: { white: "Autohit", green: "-2 CS", yellow: "-4 CS", red: "-6 CS" },
-  Ev: { white: "Autohit", green: "Evasion", yellow: "+1 CS", red: "+2 CS" },
-  Bl: { white: "Autohit", green: "+4 CS", yellow: "+2 CS", red: "+1 CS" },
-  Ca: { white: "Miss", green: "Catch", yellow: "Catch", red: "No" },
-  St: { white: "1–10", green: "1", yellow: "Damage", red: "No" },
-  Sl: { white: "Gr. Slam", green: "1 area", yellow: "Stagger", red: "No" },
-  Ki: { white: "End. Loss", green: "E/S", yellow: "No", red: "No" }
-};
-                            // 0      Feeble  Poor   Typical  Good    Ex      Rm      In      Am       Mn    Un      Sh X     Sh Y    Sh Z    1000   3000     5000   Beyond
-export const rankRows = [
-  { label: "01", colors:    ["white","white","white","white","white","white","white","white","white","white","white","white","white","white","white","white","white","white"] },
-  { label: "02–03", colors: ["white","white","white","white","white","white","white","white","white","white","white","white","white","green","green","green","green","green"] },
-  { label: "04–06", colors: ["white","white","white","white","white","white","white","white","white","white","white","white","white","green","green","green","green","green"] },
-  { label: "07–10", colors: ["white","white","white","white","white","white","white","white","white","white","white","white","green","green","green","green","green","green"] },
-  { label: "11–15", colors: ["white","white","white","white","white","white","white","white","white","white","white","green","green","green","green","green","green","green"] },
-  { label: "16–20", colors: ["white","white","white","white","white","white","white","white","white","white","green","green","green","green","green","green","green","green"] },
-  { label: "21–25", colors: ["white","white","white","white","white","white","white","white","white","green","green","green","green","green","green","green","green","yellow"] },
-  { label: "26–30", colors: ["white","white","white","white","white","white","white","white","green","green","green","green","green","green","green","green","yellow","yellow"] },
-  { label: "31–35", colors: ["white","white","white","white","white","white","white","green","green","green","green","green","green","green","green","yellow","yellow","yellow"] },
-  { label: "36–40", colors: ["white","white","white","white","white","white","green","green","green","green","green","green","green","yellow","yellow","yellow","yellow","yellow"] },
-  { label: "41–45", colors: ["white","white","white","white","white","green","green","green","green","green","green","yellow","yellow","yellow","yellow","yellow","yellow","yellow"] },
-  { label: "46–50", colors: ["white","white","white","white","green","green","green","green","green","green","yellow","yellow","yellow","yellow","yellow","yellow","yellow","yellow"] },
-  { label: "51–55", colors: ["white","white","white","green","green","green","green","green","green","yellow","yellow","yellow","yellow","yellow","yellow","yellow","yellow","yellow"] },
-  { label: "56–60", colors: ["white","white","green","green","green","green","green","green","yellow","yellow","yellow","yellow","yellow","yellow","yellow","yellow","yellow","yellow"] },
-  { label: "61–65", colors: ["white","green","green","green","green","green","green","yellow","yellow","yellow","yellow","yellow","yellow","yellow","yellow","yellow","yellow"   ,"red"] },
-  { label: "66–70", colors: ["green","green","green","green","green","green","yellow","yellow","yellow","yellow","yellow","yellow","yellow","yellow","yellow","yellow"   ,"red"  ,"red"] },
-  { label: "71–75", colors: ["green","green","green","green","green","yellow","yellow","yellow","yellow","yellow","yellow","yellow","yellow","yellow","yellow"  ,"red"   ,"red"  ,"red"] },
-  { label: "76–80", colors: ["green","green","green","green","yellow","yellow","yellow","yellow","yellow","yellow","yellow","yellow"  ,"red"  ,"red"   ,"red"   ,"red"   ,"red"  ,"red"] },
-  { label: "81–85", colors: ["green","green","green","yellow","yellow","yellow","yellow","yellow","yellow" ,"yellow","yellow","red"   ,"red"  ,"red"   ,"red"   ,"red"   ,"red"  ,"red"] },
-  { label: "86–90", colors: ["green","green","yellow","yellow","yellow","yellow","yellow","yellow","yellow","red"   ,"red"   ,"red"   ,"red"  ,"red"   ,"red"   ,"red"   ,"red"  ,"red"] },
-  { label: "91–94", colors: ["green","yellow","yellow","yellow","yellow","yellow","yellow","red"  ,"red"   ,"red"   ,"red"   ,"red"   ,"red"  ,"red"   ,"red"   ,"red"   ,"red"  ,"red"] },
-  { label: "95–97", colors: ["yellow","yellow","yellow","yellow","yellow","red"  ,"red"  ,"red"   ,"red"   ,"red"   ,"red"   ,"red"   ,"red"  ,"red"   ,"red"   ,"red"   ,"red"  ,"red"] },
-  { label: "98–99", colors: ["yellow","yellow","yellow","red"   ,"red"   ,"red"  ,"red"  ,"red"   ,"red"   ,"red"   ,"red"   ,"red"   ,"red"  ,"red"   ,"red"   ,"red"   ,"red"  ,"red"] },
-  { label: "100", colors:   ["red"   ,"red"   ,"red"   ,"red"   ,"red"   ,"red"  ,"red"  ,"red"   ,"red"   ,"red"   ,"red"   ,"red"  ,"red"   ,"red"   ,"red"   ,"red"  ,"red"] }
-];
-
-// Power Rank Range Table (based on "Faserip Combat 02.txt")
-const POWER_RANGE_VALUES = {
-  "Shift-0": 0, "Feeble": 0, "Poor": 1, "Typical": 2, "Good": 4,
-  "Excellent": 6, "Remarkable": 8, "Incredible": 10, "Amazing": 20,
-  "Monstrous": 40, "Unearthly": 60, "Shift X": 80, "Shift Y": 160,
-  "Shift Z": 400,
-  // Converted miles to areas (1 mile = 1760 yards/areas)
-  "Class 1000": 176000,   // 100 miles
-  "Class 3000": 17600000, // 10,000 miles
-  "Class 5000": 1760000000, // 1,000,000 miles
-  "Beyond": Infinity      // Unlimited
-};
-
-// ============================================
 // MAIN CLASS DEFINITION
 // ============================================
 export class FaseripRolls {
@@ -483,94 +394,17 @@ export class FaseripRolls {
       const damageRankName = damageRankResult?.rank;
       const damageRankValue = damageRankResult?.value;
 
-      // Create the roll
-      const roll = new Roll("1d100");
+      // Roll d100 and apply karma using the dice-roller module
+      const rollResult = await rollD100AndApplyKarma(actor, {
+        karma: karma,
+        sourceName: power.name,
+        skipDiceDisplay: skipDice,
+        flavorText: `${actor.name} uses ${power.name}`
+      });
 
-      // Evaluate the roll
-      await roll.evaluate();
-
-      // Display the dice roll with flavor text if not skipped
-      if (!skipDice) {
-        await roll.toMessage({
-          speaker: ChatMessage.getSpeaker({ actor: actor }),
-          flavor: `${actor.name} uses ${power.name}`,
-          rollMode: game.settings.get("core", "rollMode")
-        });
-      }
-
-      // Calculate the result
-      let cappedTotal = roll.total;
-      let karmaUsed = 0;
-
-// <-- NEW/MODIFIED SECTION START -->
-      const dailyKarmaEnabled = game.settings.get("msh-faserip", "dailyKarmaEnabled");
-      let dailyKarmaUsedAmount = 0;
-      let lifetimeKarmaUsedAmount = 0;
-
-      if (karma > 0) {
-        if (dailyKarmaEnabled && actor.system.karma.dailyKarmaUsed < actor.system.karma.dailyKarmaMax) {
-          const dailyKarmaRemaining = actor.system.karma.dailyKarmaMax - actor.system.karma.dailyKarmaUsed;
-          const karmaFromDaily = Math.min(karma, dailyKarmaRemaining);
-          
-          dailyKarmaUsedAmount = karmaFromDaily;
-          karmaUsed += karmaFromDaily;
-
-          await runAsGM({
-            operation: 'update',
-            targetActorUuid: actor.uuid,
-            args: [{ "system.karma.dailyKarmaUsed": actor.system.karma.dailyKarmaUsed + dailyKarmaUsedAmount }]
-          });
-
-          const remainingKarmaToSpend = karma - karmaFromDaily;
-          if (remainingKarmaToSpend > 0) {
-            cappedTotal = Math.min(100, roll.total + remainingKarmaToSpend);
-            lifetimeKarmaUsedAmount = cappedTotal - roll.total;
-            karmaUsed += lifetimeKarmaUsedAmount;
-          } else {
-            cappedTotal = Math.min(100, roll.total + karmaFromDaily);
-          }
-        } else {
-          cappedTotal = Math.min(100, roll.total + karma);
-          lifetimeKarmaUsedAmount = cappedTotal - roll.total;
-          karmaUsed = cappedTotal - roll.total; // Corrected to only add to karmaUsed if lifetime karma used
-        }
-      } else {
-        cappedTotal = roll.total;
-      }
-
-      const historyUpdates = [];
-      if (dailyKarmaUsedAmount > 0) {
-        historyUpdates.push({
-          realDate: new Date().toLocaleDateString(),
-          gameDate: "",
-          amount: -dailyKarmaUsedAmount,
-          type: "Daily Roll",
-          description: `Spent daily karma on ${power.name}`
-        });
-      }
-      if (lifetimeKarmaUsedAmount > 0) {
-        historyUpdates.push({
-          realDate: new Date().toLocaleDateString(),
-          gameDate: "",
-          amount: -lifetimeKarmaUsedAmount,
-          type: "Die Roll",
-          description: `Spent lifetime karma on ${power.name}`
-        });
-      }
-
-      if (historyUpdates.length > 0) {
-        const currentHistory = foundry.utils.deepClone(actor.system.karma?.history || []);
-        const newHistory = currentHistory.concat(historyUpdates);
-        
-        await runAsGM({
-          operation: 'update',
-          targetActorUuid: actor.uuid,
-          args: [{ "system.karma.history": newHistory }]
-        });
-        await FaseripRolls._updateCurrentKarma(actor); // Update displayed karma
-      }
-      
-      // <-- NEW/MODIFIED SECTION END -->
+      const roll = rollResult.roll;
+      const cappedTotal = rollResult.cappedTotal;
+      const karmaUsed = rollResult.karmaUsed;
 
       // DEBUG: Log the universal table call
       console.log("🎲 DEBUG: About to call rollUniversalTable");
@@ -1182,93 +1016,17 @@ export class FaseripRolls {
       const damageRankName = damageRankResult?.rank;
       const damageRankValue = damageRankResult?.value;
 
-      // Create the roll
-      const roll = new Roll("1d100");
+      // Roll d100 and apply karma using the dice-roller module
+      const rollResult = await rollD100AndApplyKarma(actor, {
+        karma: karma,
+        sourceName: `${talent.name} (Talent)`,
+        skipDiceDisplay: skipDice,
+        flavorText: `${actor.name} uses ${talent.name}`
+      });
 
-      // Evaluate the roll
-      await roll.evaluate();
-
-      // Display the dice roll with flavor text if not skipped
-      if (!skipDice) {
-        await roll.toMessage({
-          speaker: ChatMessage.getSpeaker({ actor: actor }),
-          flavor: `${actor.name} uses ${talent.name}`,
-          rollMode: game.settings.get("core", "rollMode")
-        });
-      }
-
-      // Calculate the result
-      let cappedTotal = roll.total;
-      let karmaUsed = 0;
-
-// <-- NEW/MODIFIED SECTION START -->
-      const dailyKarmaEnabled = game.settings.get("msh-faserip", "dailyKarmaEnabled");
-      let dailyKarmaUsedAmount = 0;
-      let lifetimeKarmaUsedAmount = 0;
-
-      if (karma > 0) {
-        if (dailyKarmaEnabled && actor.system.karma.dailyKarmaUsed < actor.system.karma.dailyKarmaMax) {
-          const dailyKarmaRemaining = actor.system.karma.dailyKarmaMax - actor.system.karma.dailyKarmaUsed;
-          const karmaFromDaily = Math.min(karma, dailyKarmaRemaining);
-          
-          dailyKarmaUsedAmount = karmaFromDaily;
-          karmaUsed += karmaFromDaily;
-
-          await runAsGM({
-            operation: 'update',
-            targetActorUuid: actor.uuid,
-            args: [{ "system.karma.dailyKarmaUsed": actor.system.karma.dailyKarmaUsed + dailyKarmaUsedAmount }]
-          });
-
-          const remainingKarmaToSpend = karma - karmaFromDaily;
-          if (remainingKarmaToSpend > 0) {
-            cappedTotal = Math.min(100, roll.total + remainingKarmaToSpend);
-            lifetimeKarmaUsedAmount = cappedTotal - roll.total;
-            karmaUsed += lifetimeKarmaUsedAmount;
-          } else {
-            cappedTotal = Math.min(100, roll.total + karmaFromDaily);
-          }
-        } else {
-          cappedTotal = Math.min(100, roll.total + karma);
-          lifetimeKarmaUsedAmount = cappedTotal - roll.total;
-          karmaUsed = lifetimeKarmaUsedAmount;
-        }
-      } else {
-        cappedTotal = roll.total;
-      }
-
-      const historyUpdates = [];
-      if (dailyKarmaUsedAmount > 0) {
-        historyUpdates.push({
-          realDate: new Date().toLocaleDateString(),
-          gameDate: "",
-          amount: -dailyKarmaUsedAmount,
-          type: "Daily Roll",
-          description: `Spent daily karma on ${talent.name} (Talent)`
-        });
-      }
-      if (lifetimeKarmaUsedAmount > 0) {
-        historyUpdates.push({
-          realDate: new Date().toLocaleDateString(),
-          gameDate: "",
-          amount: -lifetimeKarmaUsedAmount,
-          type: "Die Roll",
-          description: `Spent lifetime karma on ${talent.name} (Talent)`
-        });
-      }
-
-      if (historyUpdates.length > 0) {
-        const currentHistory = foundry.utils.deepClone(actor.system.karma?.history || []);
-        const newHistory = currentHistory.concat(historyUpdates);
-        
-        await runAsGM({
-          operation: 'update',
-          targetActorUuid: actor.uuid,
-          args: [{ "system.karma.history": newHistory }]
-        });
-        await FaseripRolls._updateCurrentKarma(actor); // Update displayed karma
-      }
-      // <-- NEW/MODIFIED SECTION END -->
+      const roll = rollResult.roll;
+      const cappedTotal = rollResult.cappedTotal;
+      const karmaUsed = rollResult.karmaUsed;
 
       const resultColor = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
 
@@ -1778,93 +1536,17 @@ export class FaseripRolls {
         }
       }
 
-      // Create the roll
-      const roll = new Roll("1d100");
+      // Roll d100 and apply karma using the dice-roller module
+      const rollResult = await rollD100AndApplyKarma(actor, {
+        karma: karma,
+        sourceName: `${contact.name} (Contact)`,
+        skipDiceDisplay: skipDice,
+        flavorText: `${actor.name} contacts ${contact.name}`
+      });
 
-      // Evaluate the roll
-      await roll.evaluate();
-
-      // Display the dice roll with flavor text if not skipped
-      if (!skipDice) {
-        await roll.toMessage({
-          speaker: ChatMessage.getSpeaker({ actor: actor }),
-          flavor: `${actor.name} contacts ${contact.name}`,
-          rollMode: game.settings.get("core", "rollMode")
-        });
-      }
-
-      // Calculate the result
-      let cappedTotal = roll.total;
-      let karmaUsed = 0;
-
-// <-- NEW/MODIFIED SECTION START -->
-      const dailyKarmaEnabled = game.settings.get("msh-faserip", "dailyKarmaEnabled");
-      let dailyKarmaUsedAmount = 0;
-      let lifetimeKarmaUsedAmount = 0;
-
-      if (karma > 0) {
-        if (dailyKarmaEnabled && actor.system.karma.dailyKarmaUsed < actor.system.karma.dailyKarmaMax) {
-          const dailyKarmaRemaining = actor.system.karma.dailyKarmaMax - actor.system.karma.dailyKarmaUsed;
-          const karmaFromDaily = Math.min(karma, dailyKarmaRemaining);
-          
-          dailyKarmaUsedAmount = karmaFromDaily;
-          karmaUsed += karmaFromDaily;
-
-          await runAsGM({
-            operation: 'update',
-            targetActorUuid: actor.uuid,
-            args: [{ "system.karma.dailyKarmaUsed": actor.system.karma.dailyKarmaUsed + dailyKarmaUsedAmount }]
-          });
-
-          const remainingKarmaToSpend = karma - karmaFromDaily;
-          if (remainingKarmaToSpend > 0) {
-            cappedTotal = Math.min(100, roll.total + remainingKarmaToSpend);
-            lifetimeKarmaUsedAmount = cappedTotal - roll.total;
-            karmaUsed += lifetimeKarmaUsedAmount;
-          } else {
-            cappedTotal = Math.min(100, roll.total + karmaFromDaily);
-          }
-        } else {
-          cappedTotal = Math.min(100, roll.total + karma);
-          lifetimeKarmaUsedAmount = cappedTotal - roll.total;
-          karmaUsed = lifetimeKarmaUsedAmount;
-        }
-      } else {
-        cappedTotal = roll.total;
-      }
-
-      const historyUpdates = [];
-      if (dailyKarmaUsedAmount > 0) {
-        historyUpdates.push({
-          realDate: new Date().toLocaleDateString(),
-          gameDate: "",
-          amount: -dailyKarmaUsedAmount,
-          type: "Daily Roll",
-          description: `Spent daily karma on ${contact.name} (Contact)`
-        });
-      }
-      if (lifetimeKarmaUsedAmount > 0) {
-        historyUpdates.push({
-          realDate: new Date().toLocaleDateString(),
-          gameDate: "",
-          amount: -lifetimeKarmaUsedAmount,
-          type: "Die Roll",
-          description: `Spent lifetime karma on ${contact.name} (Contact)`
-        });
-      }
-
-      if (historyUpdates.length > 0) {
-        const currentHistory = foundry.utils.deepClone(actor.system.karma?.history || []);
-        const newHistory = currentHistory.concat(historyUpdates);
-        
-        await runAsGM({
-          operation: 'update',
-          targetActorUuid: actor.uuid,
-          args: [{ "system.karma.history": newHistory }]
-        });
-        await FaseripRolls._updateCurrentKarma(actor); // Update displayed karma
-      }
-      // <-- NEW/MODIFIED SECTION END -->
+      const roll = rollResult.roll;
+      const cappedTotal = rollResult.cappedTotal;
+      const karmaUsed = rollResult.karmaUsed;
 
       const resultColor = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
 
@@ -2311,91 +1993,17 @@ export class FaseripRolls {
           }
         }
 
-        // Create the roll and evaluate it
-        const roll = new Roll("1d100");
-        await roll.evaluate();
+        // Roll d100 and apply karma using the dice-roller module
+        const rollResult = await rollD100AndApplyKarma(actor, {
+          karma: karma,
+          sourceName: `${equipment.name} (Equipment)`,
+          skipDiceDisplay: skipDice,
+          flavorText: `${actor.name} equipment ${equipment.name}`
+        });
 
-        // Display the dice roll with flavor text if not skipped
-        if (!skipDice) {
-          await roll.toMessage({
-            speaker: ChatMessage.getSpeaker({ actor: actor }),
-            flavor: `${actor.name} equipment ${equipment.name}`,
-            rollMode: game.settings.get("core", "rollMode")
-          });
-        }
-
-        // Calculate the result
-        let cappedTotal = roll.total;
-        let karmaUsed = 0;
-
-        // <-- NEW/MODIFIED SECTION START (same karma handling as rollPower) -->
-        const dailyKarmaEnabled = game.settings.get("msh-faserip", "dailyKarmaEnabled");
-        let dailyKarmaUsedAmount = 0;
-        let lifetimeKarmaUsedAmount = 0;
-
-        if (karma > 0) {
-          if (dailyKarmaEnabled && actor.system.karma.dailyKarmaUsed < actor.system.karma.dailyKarmaMax) {
-            const dailyKarmaRemaining = actor.system.karma.dailyKarmaMax - actor.system.karma.dailyKarmaUsed;
-            const karmaFromDaily = Math.min(karma, dailyKarmaRemaining);
-            
-            dailyKarmaUsedAmount = karmaFromDaily;
-            karmaUsed += karmaFromDaily;
-
-            await runAsGM({
-              operation: 'update',
-              targetActorUuid: actor.uuid,
-              args: [{ "system.karma.dailyKarmaUsed": actor.system.karma.dailyKarmaUsed + dailyKarmaUsedAmount }]
-            });
-
-            const remainingKarmaToSpend = karma - karmaFromDaily;
-            if (remainingKarmaToSpend > 0) {
-              cappedTotal = Math.min(100, roll.total + remainingKarmaToSpend);
-              lifetimeKarmaUsedAmount = cappedTotal - roll.total;
-              karmaUsed += lifetimeKarmaUsedAmount;
-            } else {
-              cappedTotal = Math.min(100, roll.total + karmaFromDaily);
-            }
-          } else {
-            cappedTotal = Math.min(100, roll.total + karma);
-            lifetimeKarmaUsedAmount = cappedTotal - roll.total;
-            karmaUsed = lifetimeKarmaUsedAmount;
-          }
-        } else {
-          cappedTotal = roll.total;
-        }
-
-        const historyUpdates = [];
-        if (dailyKarmaUsedAmount > 0) {
-          historyUpdates.push({
-            realDate: new Date().toLocaleDateString(),
-            gameDate: "",
-            amount: -dailyKarmaUsedAmount,
-            type: "Daily Roll",
-            description: `Spent daily karma on ${equipment.name} (Equipment)`
-          });
-        }
-        if (lifetimeKarmaUsedAmount > 0) {
-          historyUpdates.push({
-            realDate: new Date().toLocaleDateString(),
-            gameDate: "",
-            amount: -lifetimeKarmaUsedAmount,
-            type: "Die Roll",
-            description: `Spent lifetime karma on ${equipment.name} (Equipment)`
-          });
-        }
-
-        if (historyUpdates.length > 0) {
-          const currentHistory = foundry.utils.deepClone(actor.system.karma?.history || []);
-          const newHistory = currentHistory.concat(historyUpdates);
-          
-          await runAsGM({
-            operation: 'update',
-            targetActorUuid: actor.uuid,
-            args: [{ "system.karma.history": newHistory }]
-          });
-          await FaseripRolls._updateCurrentKarma(actor); // Update displayed karma
-        }
-        // <-- NEW/MODIFIED SECTION END -->
+        const roll = rollResult.roll;
+        const cappedTotal = rollResult.cappedTotal;
+        const karmaUsed = rollResult.karmaUsed;
 
         // ✅ Now use cappedTotal instead of totalRoll
         const resultColor = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
@@ -3349,86 +2957,8 @@ function highlightResultCell(rankName, rollValue) {
 }
 
 
-function getRankIndex(rankName) {
-  const ranks = [
-    "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent", "Remarkable", "Incredible",
-    "Amazing", "Monstrous", "Unearthly", "Shift X", "Shift Y", "Shift Z",
-    "Class 1000", "Class 3000", "Class 5000", "Beyond"
-  ];
-  return ranks.indexOf(rankName);
-}
 
-function getRollLabelFromValue(value) {
-  if (value === 1) return "01";
-  if (value <= 3) return "02–03";
-  if (value <= 6) return "04–06";
-  if (value <= 10) return "07–10";
-  if (value <= 15) return "11–15";
-  if (value <= 20) return "16–20";
-  if (value <= 25) return "21–25";
-  if (value <= 30) return "26–30";
-  if (value <= 35) return "31–35";
-  if (value <= 40) return "36–40";
-  if (value <= 45) return "41–45";
-  if (value <= 50) return "46–50";
-  if (value <= 55) return "51–55";
-  if (value <= 60) return "56–60";
-  if (value <= 65) return "61–65";
-  if (value <= 70) return "66–70";
-  if (value <= 75) return "71–75";
-  if (value <= 80) return "76–80";
-  if (value <= 85) return "81–85";
-  if (value <= 90) return "86–90";
-  if (value <= 94) return "91–94";
-  if (value <= 97) return "95–97";
-  if (value <= 99) return "98–99";
-  return "100";
-}
-
-
-const resultRows = [
-  {
-    result: "white",
-    cells: [
-      { value: "Miss", span: 5 }, { value: "Miss", span: 2 }, { value: "Miss", span: 1 },
-      { value: "Miss", span: 1 }, { value: "Miss", span: 1 }, { value: "None", span: 1 },
-      { value: "Autohit", span: 1 }, { value: "-6 CS", span: 1 }, { value: "Autohit", span: 1 },
-      { value: "Miss", span: 1 }, { value: "1–10", span: 1 }, { value: "Gr. Slam", span: 1 },
-      { value: "En. Loss", span: 1 }
-    ]
-  },
-  {
-    result: "green",
-    cells: [
-      { value: "Hit", span: 5 }, { value: "Hit", span: 2 }, { value: "Hit", span: 1 },
-      { value: "Hit", span: 1 }, { value: "Hit", span: 1 }, { value: "-2 CS", span: 1 },
-      { value: "Evasion", span: 1 }, { value: "+4 CS", span: 1 }, { value: "Catch", span: 1 },
-      { value: "1", span: 1 }, { value: "1 area", span: 1 }, { value: "E/S", span: 1 }
-    ]
-  },
-  {
-    result: "yellow",
-    cells: [
-      { value: "Slam", span: 1 }, { value: "Stun", span: 1 }, { value: "Bullseye", span: 1 },
-      { value: "Stun", span: 1 }, { value: "Bullseye", span: 1 }, { value: "Bullseye", span: 1 },
-      { value: "Partial", span: 1 }, { value: "Grab", span: 1 }, { value: "Escape", span: 1 },
-      { value: "Slam", span: 1 }, { value: "-4 CS", span: 1 }, { value: "+1 CS", span: 1 },
-      { value: "+2 CS", span: 1 }, { value: "Catch", span: 1 }, { value: "Damage", span: 1 },
-      { value: "Stagger", span: 1 }, { value: "No", span: 1 }
-    ]
-  },
-  {
-    result: "red",
-    cells: [
-      { value: "Stun", span: 1 }, { value: "Kill", span: 1 }, { value: "Kill", span: 1 },
-      { value: "Kill", span: 1 }, { value: "Stun", span: 1 }, { value: "Kill", span: 1 },
-      { value: "Hold", span: 1 }, { value: "Break", span: 1 }, { value: "Reverse", span: 1 },
-      { value: "Stun", span: 1 }, { value: "-6 CS", span: 1 }, { value: "+2 CS", span: 1 },
-      { value: "+1 CS", span: 1 }, { value: "No", span: 1 }, { value: "No", span: 1 },
-      { value: "No", span: 1 }
-    ]
-  }
-];
+// getRankIndex, getRollLabelFromValue, and resultRows are now imported from modules/dice/universal-table.js
 
 // ============================================
 // EXPORTED FUNCTIONS (OUTSIDE THE CLASS)
@@ -4057,81 +3587,17 @@ export async function rollUniversalAction(actionCode, actorId, columnShift = nul
     console.log(`Applied ${totalColumnShift} column shifts to ${ability.rank}, now ${finalRank}`);
   }
 
-  // Create and evaluate the roll
-  const roll = new Roll("1d100");
-  await roll.evaluate();
+  // Roll d100 and apply karma using the dice-roller module
+  const rollResult = await rollD100AndApplyKarma(actor, {
+    karma: karma,
+    sourceName: `${actionCode} roll`,
+    skipDiceDisplay: false,  // Always show dice for universal actions
+    flavorText: label
+  });
 
-  // Process karma
-  let cappedTotal = roll.total;
-  let karmaUsed = 0;
-
-  // <-- KARMA PROCESSING SECTION (same as before) -->
-  const dailyKarmaEnabled = game.settings.get("msh-faserip", "dailyKarmaEnabled");
-  let dailyKarmaUsedAmount = 0;
-  let lifetimeKarmaUsedAmount = 0;
-  
-  if (karma > 0) {
-    if (dailyKarmaEnabled && actor.system.karma.dailyKarmaUsed < actor.system.karma.dailyKarmaMax) {
-      const dailyKarmaRemaining = actor.system.karma.dailyKarmaMax - actor.system.karma.dailyKarmaUsed;
-      const karmaFromDaily = Math.min(karma, dailyKarmaRemaining);
-      
-      dailyKarmaUsedAmount = karmaFromDaily;
-      karmaUsed += karmaFromDaily;
-
-      await runAsGM({
-        operation: 'update',
-        targetActorUuid: actor.uuid,
-        args: [{ "system.karma.dailyKarmaUsed": actor.system.karma.dailyKarmaUsed + dailyKarmaUsedAmount }]
-      });
-
-      const remainingKarmaToSpend = karma - karmaFromDaily;
-      if (remainingKarmaToSpend > 0) {
-        cappedTotal = Math.min(100, roll.total + remainingKarmaToSpend);
-        lifetimeKarmaUsedAmount = cappedTotal - roll.total;
-        karmaUsed += lifetimeKarmaUsedAmount;
-      } else {
-        cappedTotal = Math.min(100, roll.total + karmaFromDaily);
-      }
-    } else {
-      cappedTotal = Math.min(100, roll.total + karma);
-      lifetimeKarmaUsedAmount = cappedTotal - roll.total;
-      karmaUsed = lifetimeKarmaUsedAmount;
-    }
-  }
-
-  // Update karma history
-  const historyUpdates = [];
-  if (dailyKarmaUsedAmount > 0) {
-    historyUpdates.push({
-      realDate: new Date().toLocaleDateString(),
-      gameDate: "",
-      amount: -dailyKarmaUsedAmount,
-      type: "Daily Roll",
-      description: `Spent daily karma on ${actionCode} roll`
-    });
-  }
-  if (lifetimeKarmaUsedAmount > 0) {
-    historyUpdates.push({
-      realDate: new Date().toLocaleDateString(),
-      gameDate: "",
-      amount: -lifetimeKarmaUsedAmount,
-      type: "Die Roll",
-      description: `Spent lifetime karma on ${actionCode} roll`
-    });
-  }
-
-  if (historyUpdates.length > 0) {
-    const currentHistory = foundry.utils.deepClone(actor.system.karma?.history || []);
-    const newHistory = currentHistory.concat(historyUpdates);
-    
-    await runAsGM({
-      operation: 'update',
-      targetActorUuid: actor.uuid,
-      args: [{ "system.karma.history": newHistory }]
-    });
-
-    await FaseripRolls._updateCurrentKarma(actor);
-  }
+  const roll = rollResult.roll;
+  const cappedTotal = rollResult.cappedTotal;
+  const karmaUsed = rollResult.karmaUsed;
 
   // NOW determine result color using the FINAL rank and capped total
   let color, resultText;
@@ -4362,42 +3828,7 @@ async function processUniversalActionTarget(actor, target, actionCode, resultCol
   }
 }
 
-// Rank order used by the Universal Table (low → high).
-const RANKS = [
-  "Feeble","Poor","Typical","Good","Excellent","Remarkable",
-  "Incredible","Amazing","Monstrous","Unearthly","Shift-X","Shift-Y","Shift-Z","Class 1000","Class 3000","Class 5000"
-];
-
-function rankIndex(rankName) {
-  const i = RANKS.findIndex(r => r.toLowerCase() === String(rankName).toLowerCase());
-  return i >= 0 ? i : 0;
-}
-
-/** Highest Fighting rank among selected targets (intensity) */
-function maxDefenderFightingRankName(targets=[]) {
-  let bestIdx = -1, bestName = "Feeble";
-  for (const t of targets) {
-    const a = t?.actor ?? t;
-    const rn = a?.system?.abilities?.fighting?.rank ?? a?.system?.fighting?.rank ?? "Feeble";
-    const idx = rankIndex(rn);
-    if (idx > bestIdx) { bestIdx = idx; bestName = rn; }
-  }
-  return bestName;
-}
-
-/** Color needed for N attacks (core A/MSH: 2=Yellow, 3=Red) */
-function requiredColorForAttackCount(n) {
-  if (n >= 3) return "red";
-  if (n === 2) return "yellow";
-  return "green"; // 1 attack doesn't need the multi-attack FEAT
-}
-
-/** Does rolled color meet the requirement? red > yellow > green */
-function colorMeetsRequirement(rolled, needed) {
-  const order = { white:0, green:1, yellow:2, red:3, auto:4 };
-  return (order[rolled] ?? 0) >= (order[needed] ?? 0);
-}
-
+// RANKS, rankIndex, maxDefenderFightingRankName, requiredColorForAttackCount, and colorMeetsRequirement are now imported from modules/dice/universal-table.js
 
 /**
  * Process multiple attacks with Fighting FEAT and CS penalties
