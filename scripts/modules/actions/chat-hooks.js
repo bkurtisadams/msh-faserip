@@ -22,13 +22,31 @@ export function installActionChatHandlers() {
   game.msh.chatHooksInstalled = true;
 
   // SINGLE combined hook for all chat interactions
-  Hooks.on("renderChatMessage", (message, element) => {
-    const html = $(element);
-    
-    // Check if this message has an undo flag
+  Hooks.on("renderChatMessage", async (message, element) => {
+    const html  = $(element);
     const SCOPE = game.system?.id || "msh-faserip";
+
+    // --- NEW: Full-Auto damage application (idempotent)
+    try {
+      const flags      = message?.flags?.[SCOPE] ?? {};
+      const shouldAuto = flags?.autoApply === true;
+      const already    = flags?.autoApplied === true;
+      const results    = flags?.results;
+
+      if (shouldAuto && !already && Array.isArray(results) && results.length) {
+        debugLog("Auto-applying damage", { msgId: message.id, targets: results.length });
+        await applyDamageToTargets(results, { messageId: message.id });
+        await message.setFlag(SCOPE, "autoApplied", true); // guard against re-renders
+      }
+    } catch (err) {
+      console.error("Auto-apply failed:", err);
+    }
+
+    // --- existing code below stays as-is ---
+
+    // Check if this message has an undo flag
     const undoData = message.flags?.[SCOPE]?.undo;
-    
+
     if (undoData?.results?.length) {
       // This message has been applied - transform button
       const applyBtn = html.find('[data-action="apply-damage"]');
@@ -39,7 +57,7 @@ export function installActionChatHandlers() {
         applyBtn.prop('disabled', false);
       }
     }
-    
+
     // 1) Stun/Slam/Kill/Escape chips
     html.on("click", "a.faserip-chip[data-check]", async (ev) => {
       ev.preventDefault();

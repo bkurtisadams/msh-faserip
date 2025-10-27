@@ -1,26 +1,26 @@
 // scripts/modules/actions/shooting-action.js
 import { RangedAttackAction } from "./ranged-attack-action.js";
 import { 
+  applyDamageToTargets,
   attachAutoFillRange,
+  bannerColors,
+  buildActionsBox,
+  buildMultiAttackSection,
+  buildResultGrid,
+  debugLog,
+  effectsFor,
+  getAbilityInfo,
   getBodyArmorValues,
+  getTargetingContext,
+  labelFor,
   postDeathSavePrompt,
   RANKS,
-  buildMultiAttackSection,
-  setupMultiAttackHandlers
+  rollWithKarmaAndHistory,
+  setupMultiAttackHandlers,
+  shiftRank
 } from "./action-utils.js";
 import { makeDamageBlock, computeAfterArmor, buildDamageFlags } from "./damage-ui.js";
-import {
-  shiftRank,
-  getAbilityInfo,
-  effectsFor,
-  labelFor,
-  rollWithKarmaAndHistory,
-  buildResultGrid,
-  bannerColors,
-  getTargetingContext
-} from "./action-utils.js";
 import { canEffectsApply } from "../../rules/effects-gate.js";
-import { debugLog } from "./action-utils.js";
 import { playCombatSFX } from "./audio-utils.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
 
@@ -412,7 +412,8 @@ if (actualAttackCount > 1) {
     const parts = [];
 
     // Only show Apply Damage on hits - pass raw damage, let handler calculate armor
-    if (isHit && rawDamage > 0) {
+    // Skip button in auto mode since damage applies automatically
+    if (isHit && rawDamage > 0 && !this.opts?.autoApply) {
       parts.push(chip(
         "Apply Damage",
         "Apply damage to targeted/selected token(s)",
@@ -487,9 +488,31 @@ if (actualAttackCount > 1) {
       })
     });
 
-    // Play combat SFX (classic mode only)
+    // === AUTO-APPLY DAMAGE IN FULL AUTO MODE ===
+    if (this.opts?.autoApply && isHit && rawDamage > 0) {
+      debugLog("Auto-applying damage in full auto mode", {
+        damage: rawDamage,
+        afterArmor,
+        targets: targetsArray?.length || 0
+      });
+      
+      await applyDamageToTargets(rawDamage, {
+        attackerUuid: actor.uuid,
+        damageType: dmgType,
+        showNotification: true,
+        bypassArmor: false,
+        attackForm: "shooting",
+        armorPiercing: 0
+      });
+    }
+    // === END AUTO-APPLY ===
+
+    // Play combat SFX (if not already played after preview)
     const sourceName = choice.weapon.name || "Firearm";
-    if (game.msh?.getCombatModeFor?.() === "classic" && game.msh?.playCombatSFX) {
+    // In semi-auto with confirmation, SFX already played at line 370
+    // In all other cases (auto/full/classic), play SFX now
+    const alreadyPlayed = (this.opts?.showConfirm && this.opts?.autoApply === false);
+    if (game.msh?.playCombatSFX && !alreadyPlayed) {
       await game.msh.playCombatSFX(dmgType, sourceName, colorLower);
     }
   }

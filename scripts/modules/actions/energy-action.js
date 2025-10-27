@@ -1,24 +1,23 @@
 // scripts/modules/actions/energy-action.js
 import { RangedAttackAction } from "./ranged-attack-action.js";
 import { 
+  applyDamageToTargets,
   attachAutoFillRange,
-  getBodyArmorValues,
-  postDeathSavePrompt,
-  buildMultiAttackSection,
-  setupMultiAttackHandlers
-} from "./action-utils.js";
-
-import {
-  getAbilityInfo,
-  labelFor,
-  effectsFor,
-  shiftRank,
-  rollWithKarmaAndHistory,
-  buildResultGrid,
-  buildActionsBox,
   bannerColors,
+  buildActionsBox,
+  buildMultiAttackSection,
+  buildResultGrid,
+  debugLog,
+  effectsFor,
+  getAbilityInfo,
+  getBodyArmorValues,
   getTargetingContext,
-  RANKS  // ADD THIS IMPORT for effect creation
+  labelFor,
+  postDeathSavePrompt,
+  RANKS,
+  rollWithKarmaAndHistory,
+  setupMultiAttackHandlers,
+  shiftRank
 } from "./action-utils.js";
 
 import { isAuraMaintained } from "./nullify.js";
@@ -391,7 +390,8 @@ export class EnergyAction extends RangedAttackAction {
       damage: penetratingDamage,
       attackForm: "energy",
       damageType: choice.powerDamageType,
-      bypassArmor: false
+      bypassArmor: false,
+      autoApply: this.opts?.autoApply  // is Auto Mode on?
     });
 
     // --- Nullification save + aura chips (per RAW: Endurance vs Power Rank, tech/magic unaffected)
@@ -534,6 +534,25 @@ export class EnergyAction extends RangedAttackAction {
         }
       }
     });
+
+    // === AUTO-APPLY DAMAGE IN FULL AUTO MODE ===
+    if (this.opts?.autoApply && isHit && rawDamage > 0) {
+      debugLog("Auto-applying damage in full auto mode", {
+        damage: rawDamage,
+        afterArmor,
+        targets: targets?.length || 0
+      });
+      
+      await applyDamageToTargets(rawDamage, {
+        attackerUuid: actor.uuid,
+        damageType: choice.powerDamageType,
+        showNotification: true,
+        bypassArmor: false,
+        attackForm: "energy",
+        armorPiercing: 0
+      });
+    }
+    // === END AUTO-APPLY ===
 
     // Play combat SFX
     const sourceName = choice.powerName || "Energy Blast";

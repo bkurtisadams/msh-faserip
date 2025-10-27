@@ -1,25 +1,25 @@
 // scripts/modules/actions/force-action.js
 import { RangedAttackAction } from "./ranged-attack-action.js";
 import { 
+  applyDamageToTargets,
   attachAutoFillRange,
+  bannerColors,
+  buildActionsBox,
   buildMultiAttackSection,
-  setupMultiAttackHandlers
+  buildResultGrid,
+  debugLog,
+  effectsFor,
+  getAbilityInfo,
+  getBodyArmorValues,
+  getTargetingContext,
+  labelFor,
+  postDeathSavePrompt,
+  RANKS,
+  rollWithKarmaAndHistory,
+  setupMultiAttackHandlers,
+  shiftRank
 } from "./action-utils.js";
 import { makeDamageBlock, computeAfterArmor, buildDamageFlags } from "./damage-ui.js";
-import { getBodyArmorValues } from "./action-utils.js";
-
-
-import {
-  getAbilityInfo,
-  labelFor,
-  effectsFor,
-  shiftRank,
-  rollWithKarmaAndHistory,
-  buildResultGrid,
-  buildActionsBox,
-  bannerColors,
-  getTargetingContext
-} from "./action-utils.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
 
 export class ForceAction extends RangedAttackAction {
@@ -325,6 +325,7 @@ export class ForceAction extends RangedAttackAction {
       actorUuid: actor.uuid,
       damage: isHit ? choice.powerDamage : 0,  // Only pass damage if it's a hit
       attackForm: "force",
+      autoApply: this.opts?.autoApply  // is Auto Mode on?
     });
 
     // --- Damage numbers for display + flags ---
@@ -403,6 +404,25 @@ export class ForceAction extends RangedAttackAction {
         targets: targetsArray
       })
     });
+
+    // === AUTO-APPLY DAMAGE IN FULL AUTO MODE ===
+    if (this.opts?.autoApply && isHit && rawDamage > 0) {
+      debugLog("Auto-applying damage in full auto mode", {
+        damage: rawDamage,
+        afterArmor,
+        targets: targetsArray?.length || 0
+      });
+      
+      await applyDamageToTargets(rawDamage, {
+        attackerUuid: actor.uuid,
+        damageType: dmgType,
+        showNotification: true,
+        bypassArmor: false,
+        attackForm: "force",
+        armorPiercing: 0
+      });
+    }
+    // === END AUTO-APPLY ===
 
     // Play combat SFX
     const sourceName = choice.powerName || "Force Blast";

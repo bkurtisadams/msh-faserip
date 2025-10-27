@@ -336,12 +336,13 @@ export function buildActionsBox({
   attackForm = "blunt",
   damageType = "physical-blunt",
   armorPiercing = 0,
-  armorPiercingCS = 0,        // ✅ NEW
-  apMode = "value",           // ✅ NEW
+  armorPiercingCS = 0,
+  apMode = "value",        
   prefillData = null,
   targetUuid = "",
   targetName = "",
   targetStrength = "",
+  autoApply = false,  // full auto mode
   bypassArmor = false
 }) {
 
@@ -366,7 +367,8 @@ export function buildActionsBox({
   const prefillAttr = prefillJson ? `data-prefill='${prefillJson.replace(/'/g, "&apos;")}'` : "";
 
   // Apply Damage chip (to apply damage to selected/targeted token[s])
-  if (dmgPen > 0) {
+  // Skip button in auto mode since damage applies automatically
+  if (dmgPen > 0 && !autoApply) {  // check auto mode
     parts.push(
       chip(
         "Apply Damage",

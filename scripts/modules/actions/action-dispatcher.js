@@ -172,10 +172,10 @@ export class ActionDispatcher {
 
     const handler = new Handler({ actor, actionType: type, abilityName: resolvedAbility, opts });
 
-    // Mode flags
+    // Mode flags - preserve original mode value
     let modeFlags = {};
     if (mode === "auto" || mode === "classic" || mode === "full") {
-      modeFlags = { mode: "auto", autoApply: true, showConfirm: false };
+      modeFlags = { mode: mode, autoApply: true, showConfirm: false };  // Keep original!
     } else if (mode === "semi") {
       modeFlags = { mode: "semi", autoApply: false, showConfirm: true };
     }
