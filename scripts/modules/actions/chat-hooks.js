@@ -13,6 +13,7 @@ import {
   debugLog
 } from "./action-utils.js";
 import { startAura, stopAura, isAuraMaintained } from "./nullify.js";
+import { rollUniversalTable } from "../dice/universal-table.js";
 
 export function installActionChatHandlers() {
   // idempotent guard

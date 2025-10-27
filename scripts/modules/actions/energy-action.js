@@ -23,6 +23,7 @@ import {
 
 import { startAura, stopAura, isAuraMaintained } from "./nullify.js";
 import { buildDamageFlags } from "./damage-ui.js";
+import { rollUniversalTable } from "../dice/universal-table.js";
 
 export class EnergyAction extends RangedAttackAction {
   async execute() {

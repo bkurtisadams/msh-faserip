@@ -1,5 +1,6 @@
 // breaking-feat.js
 
+import { rollUniversalTable } from "../dice/universal-table.js";
 export function openBreakingFeatDialog({ weaponMatRank = "Excellent", actor = null }) {
   const RANKS = [
     "Shift-0","Feeble","Poor","Typical","Good","Excellent",

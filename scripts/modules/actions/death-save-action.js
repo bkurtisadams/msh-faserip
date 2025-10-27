@@ -9,6 +9,7 @@ import {
   getAbilityInfo,
 } from "./action-utils.js";
 import { resolveKillFeat, KILL_CONTEXTS } from "../../rules/kill-resolver.js";
+import { rollUniversalTable } from "../dice/universal-table.js";
 
 export class DeathSaveAction extends BaseAction {
   constructor(a) {

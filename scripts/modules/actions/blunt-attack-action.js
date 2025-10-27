@@ -13,6 +13,7 @@ import { makeDamageBlock, computeAfterArmor, buildDamageFlags } from "./damage-u
 import { canEffectsApply } from "../../rules/effects-gate.js";
 import { buildColorOutcome } from "../dice/color-results.js";
 import { applyColumnShifts } from "../dice/column-shifts.js";
+import { rollUniversalTable } from "../dice/universal-table.js";
 
 
 export class BluntAttackAction extends AttackAction {

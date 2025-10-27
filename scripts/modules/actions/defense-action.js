@@ -10,6 +10,7 @@ import {
   buildResultGrid,
   bannerColors
 } from "./action-utils.js";
+import { rollUniversalTable } from "../dice/universal-table.js";
 
 /**
  * Handles: "dodging" | "evading" | "blocking" | "catching"

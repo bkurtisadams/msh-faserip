@@ -6,7 +6,8 @@ import { FaseripActorSheet } from './actorSheet.js';
 import { FaseripItemSheet } from './itemSheet.js';
 import { FaseripEquipmentSheet } from './equipment.js';
 import { FaseripRolls } from './rolls.js';
-import { rollUniversalTable } from './universalTable.js';  // Import your function
+//import { rollUniversalTable } from './universalTable.js';  // deprecated
+import { rollUniversalTable } from './modules/dice/universal-table.js';
 import { openUniversalTableDialog } from './rolls.js';
 import { rollUniversalAction } from './rolls.js';
 import { FaseripInitiative } from './faserip-initiative.js';

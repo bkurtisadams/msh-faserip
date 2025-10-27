@@ -1,6 +1,7 @@
 // scripts/rules/multiple-attacks.js
 import { rollWithKarmaAndHistory } from "../modules/actions/action-utils.js";
-import { rollUniversalTable } from "../universalTable.js";
+//import { rollUniversalTable } from "../universalTable.js";  // deprecated
+import { rollUniversalTable } from "../modules/dice/universal-table.js";
 import { debugLog } from "../modules/actions/action-utils.js";
 
 // Anchor: local helper replaces classic rollPower calls

@@ -21,6 +21,7 @@ import {
   requiredColorForAttackCount,
   colorMeetsRequirement
 } from "./modules/dice/universal-table.js";
+import { rollUniversalTable } from "./modules/dice/universal-table.js";
 
 // ============================================
 // HELPER FUNCTIONS (OUTSIDE THE CLASS)

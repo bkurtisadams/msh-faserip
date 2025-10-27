@@ -1,6 +1,7 @@
 // equipment.js
 import { applyDamageToTargets } from "./modules/actions/action-utils.js";
 import { debugLog } from "./modules/actions/action-utils.js";
+import { rollUniversalTable } from "./modules/dice/universal-table.js";
 
 // Power Rank Range Table (based on "Faserip Combat 02.txt")
 const POWER_RANGE_VALUES = {

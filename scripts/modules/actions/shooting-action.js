@@ -22,6 +22,7 @@ import {
 import { canEffectsApply } from "../../rules/effects-gate.js";
 import { debugLog } from "./action-utils.js";
 import { playCombatSFX } from "./audio-utils.js";
+import { rollUniversalTable } from "../dice/universal-table.js";
 
 export class ShootingAction extends RangedAttackAction {
   async execute() {

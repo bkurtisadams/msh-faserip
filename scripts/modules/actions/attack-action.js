@@ -1,5 +1,6 @@
 import { BaseAction } from "./base-action.js";
 import { RANKS, getStrengthInfo, shiftRank, getAbilityInfo } from "./action-utils.js";
+import { rollUniversalTable } from "../dice/universal-table.js";
 
 export class AttackAction extends BaseAction {
   constructor(args) {

@@ -20,6 +20,7 @@ import {
   bannerColors,
   getTargetingContext
 } from "./action-utils.js";
+import { rollUniversalTable } from "../dice/universal-table.js";
 
 export class ForceAction extends RangedAttackAction {
   async execute() {

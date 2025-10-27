@@ -1,6 +1,7 @@
 import { ACTION_LABELS, ACTION_EFFECTS } from "./action-config.js";
 import { applyNullifiedEffect, isAuraMaintained } from "./nullify.js";
 import { calculateMitigation } from "../../rules/mitigation.js";
+import { rollUniversalTable } from "../dice/universal-table.js";
 
 // Add near the top after other exports
 

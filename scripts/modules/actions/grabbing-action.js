@@ -12,6 +12,7 @@ import {
   bannerColors,
   getTargetingContext
 } from "./action-utils.js";
+import { rollUniversalTable } from "../dice/universal-table.js";
 
 /**
  * Grabbing (Wrestling) — STR vs UT → Miss / Take / Grab / Break

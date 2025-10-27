@@ -14,6 +14,7 @@ import {
   getTargetingContext,
   debugLog
 } from "./action-utils.js";
+import { rollUniversalTable } from "../dice/universal-table.js";
 
 /**
  * ChargingAction - Endurance-based attack combining movement and combat

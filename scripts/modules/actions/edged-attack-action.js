@@ -21,6 +21,7 @@ import { getItemMaterialRank } from "../../gm-utils.js";
 import { makeDamageBlock, computeAfterArmor, buildDamageFlags } from "./damage-ui.js";
 import { getBodyArmorValues } from "./action-utils.js";
 import { canEffectsApply } from "../../rules/effects-gate.js";
+import { rollUniversalTable } from "../dice/universal-table.js";
 
 export class EdgedAttackAction extends AttackAction {
   async execute() {

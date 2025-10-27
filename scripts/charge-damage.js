@@ -1,4 +1,5 @@
-import { rollUniversalTable } from './universalTable.js';
+//import { rollUniversalTable } from './universalTable.js';     // deprecated
+import { rollUniversalTable } from './modules/dice/universal-table.js';
 import { 
   resolveSlamFeat, 
   resolveStunFeat, 

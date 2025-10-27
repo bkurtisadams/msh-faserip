@@ -14,6 +14,7 @@ import {
   getTargetingContext,
   getBodyArmorValues
 } from "./action-utils.js";
+import { rollUniversalTable } from "../dice/universal-table.js";
 
 export class ThrowingBluntAction extends RangedAttackAction {
   async execute() {

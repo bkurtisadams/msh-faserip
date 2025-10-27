@@ -11,6 +11,7 @@ import {
   effectsFor,
   getTargetingContext
 } from "./action-utils.js";
+import { rollUniversalTable } from "../dice/universal-table.js";
 
 export class GrapplingAction extends AttackAction {
   constructor(args) {

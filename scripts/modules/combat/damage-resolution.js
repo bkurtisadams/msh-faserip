@@ -10,6 +10,7 @@
  * @param {number} strengthValue - Attacker's Strength rank value
  * @returns {number} - Distance in areas
  */
+import { rollUniversalTable } from "../dice/universal-table.js";
 export function getGrandSlamDistance(strengthValue) {
   // Convert strength value to areas for knockback
   if (strengthValue >= 100) return 10; // Unearthly and above

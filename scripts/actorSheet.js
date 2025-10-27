@@ -4,6 +4,7 @@ import { getItemMaterialRank, getBluntNextRankMinRule } from "./gm-utils.js";
 import { ActionDispatcher } from "./modules/actions/action-dispatcher.js";
 import { ACTION_INFO } from "./modules/actions/action-config.js";
 import { StuntRoller } from './stunts.js';
+import { rollUniversalTable } from "./modules/dice/universal-table.js";
 
 
 function getPopularityRankWithRange(value, context) {

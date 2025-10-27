@@ -1,5 +1,6 @@
 // scripts/modules/stunts.js
 
+import { rollUniversalTable } from "./modules/dice/universal-table.js";
 export class StuntRoller {
   constructor(actor) {
     this.actor = actor;

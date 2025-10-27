@@ -12,6 +12,7 @@ import {
 import * as Nullify from "./nullify.js";
 import { resolveKillFeat, getKillContextFromAttackForm } from "../../rules/kill-resolver.js";
 import { canEffectsApply } from "../../rules/effects-gate.js";
+import { rollUniversalTable } from "../dice/universal-table.js";
 
 
 /**

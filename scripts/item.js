@@ -1,5 +1,6 @@
 // item.js
 import { FaseripEquipmentSheet } from "./equipment.js";
+import { rollUniversalTable } from "./modules/dice/universal-table.js";
 
 export class FaseripItem extends Item {
   prepareData() {

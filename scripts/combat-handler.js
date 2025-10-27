@@ -7,6 +7,7 @@ import {
 } from './charge-damage.js';
 import { calculateMitigation, getMitigationSummary } from "./rules/mitigation.js";
 import { getGrandSlamDistance } from './modules/combat/damage-resolution.js';
+import { rollUniversalTable } from "./modules/dice/universal-table.js";
 
 // location: systems/msh-faserip/scripts/combat-handler.js
 const ACTION_RESULT_LABELS = {

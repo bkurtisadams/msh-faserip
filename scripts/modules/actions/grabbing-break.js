@@ -10,6 +10,7 @@
  * - White result: Item is damaged, broken, or goes off
  * - Any color (Green/Yellow/Red): Item intact - may use it or move up to half speed
  */
+import { rollUniversalTable } from "../dice/universal-table.js";
 export function openGrabbingBreakDialog({ itemMaterial = "Excellent", itemName = "Item", actor = null }) {
   // Close any existing instance (same id)
   const existing = Object.values(ui.windows).find(w => w.id === "grabbing-break-dialog");
