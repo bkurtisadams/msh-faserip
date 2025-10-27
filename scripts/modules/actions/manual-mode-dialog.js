@@ -20,12 +20,21 @@ export class ManualModeDialog {
         ev.stopImmediatePropagation();
 
         const $btn = $(ev.currentTarget);
-        const $content = $btn.next(".manual-action-content");
+        // FIX: Use siblings() instead of next() to handle whitespace text nodes
+        const $content = $btn.siblings(".manual-action-content").first();
         const expanded = $content.is(":visible");
+        const $icon = $btn.find(".toggle-icon");
 
         // stop(true,true) kills queued animations so rapid clicks don't stack
         $content.stop(true, true).slideToggle(120);
         $btn.attr("aria-expanded", String(!expanded));
+        
+        // Toggle icon between chevron-down and chevron-up
+        if (!expanded) {
+          $icon.removeClass("fa-chevron-down").addClass("fa-chevron-up");
+        } else {
+          $icon.removeClass("fa-chevron-up").addClass("fa-chevron-down");
+        }
       });
   }
 
@@ -179,6 +188,7 @@ export class ManualModeDialog {
     };
     
     const actionCode = actionCodeMap[actionType] || "BA";
+    //const actionCode = actionCodeMap[actionType] || "BA" || "EA" || "Sh" || "TE" || "TB" || "En" || "Fo" || "Gp" || "Gb" || "Es" || "Ch" || "Do" || "Ev" || "Bl" || "Ca";
     const effectResult = ACTION_RESULT_LABELS[actionCode]?.[colorLower] || colorLower;
 
     // Build result grid
@@ -201,8 +211,9 @@ export class ManualModeDialog {
         </div>
 
         <div style="padding:6px 10px;background:#f9f9f9;border-top:1px solid #e0e0e0;">
-          <div class="manual-action-toggle" style="cursor:pointer;font-weight:600;font-size:0.9em;color:#555;user-select:none;">
-            📖 Action Rules (click to expand)
+          <div class="manual-action-toggle" style="cursor:pointer;font-weight:600;font-size:0.9em;color:#555;user-select:none;display:flex;align-items:center;gap:6px;">
+            <i class="fas fa-chevron-down toggle-icon" style="font-size:0.8em;"></i>
+            <span>Action Rules</span>
           </div>
           <div class="manual-action-content" style="display:none;margin-top:6px;font-size:0.85em;line-height:1.4;color:#444;">
             ${this._getActionDescription(actionType)}
@@ -283,35 +294,166 @@ export class ManualModeDialog {
    */
   static _getActionDescription(actionType) {
     const descriptions = {
-      "blunt-attack": `<strong>Blunt Attack:</strong> Hand-to-hand combat with bare hands, fists, or blunt weapons. Uses Fighting ability. May score Hit, Slam, or Stun results. Damage equals Strength rank number (or weapon's material strength minimum). Hero may choose to pull punches or inflict lesser results.`,
-      
-      "edged-attack": `<strong>Edged Attack:</strong> Combat with claws, teeth, knives, or swords. Uses Fighting ability. May score Hit, Stun, or Kill results. Always inflicts minimum weapon damage. Damage cannot be reduced. Character inflicts damage equal to Strength or weapon material strength (whichever is less).`,
-      
-      "shooting": `<strong>Shooting Attack:</strong> Projectile weapons (guns, bows, etc.). Uses Agility ability. May score Miss, Hit, Bullseye, or Kill results. Effect and damage cannot be reduced. Range determined by weapon. Passing through cover suffers -2CS penalty.`,
-      
-      "throwing-edged": `<strong>Throwing (Edged):</strong> Throwing edged weapons like knives or axes. Uses Agility ability. May score Miss, Hit, Bullseye, or Stun results. Range based on Strength. Damage equals weapon or Strength (whichever is less).`,
-      
-      "throwing-blunt": `<strong>Throwing (Blunt):</strong> Throwing blunt objects. Uses Agility ability. May score Miss, Hit, Bullseye, or Stun results. Range based on Strength. Damage equals Strength rank number.`,
-      
-      "energy": `<strong>Energy Attack:</strong> Energy blasts, lightning, fire beams. Uses power rank or Agility. May score Miss, Hit, Bullseye, or Kill results. Energy beams inflict damage on intervening structures first, then pass through with reduced strength.`,
-      
-      "force": `<strong>Force Attack:</strong> Concussive energy, telekinetic blasts. Uses power rank or Agility. May score Miss, Hit, Bullseye, or Stun results. Similar to energy but more physical impact.`,
-      
-      "grappling": `<strong>Grappling:</strong> Wrestling holds and pins. Uses Strength ability. May score Miss, Partial Grab (Yellow = -2CS to target), or Hold (Red = target can only escape). Held targets cannot take other actions.`,
-      
-      "grabbing": `<strong>Grabbing:</strong> Attempt to grab and hold opponent. Uses Strength ability. Success means opponent is held. Target may attempt to escape on their turn.`,
-      
-      "escaping": `<strong>Escaping:</strong> Breaking free from grapple or grab. Uses Strength ability. Red result = Break & Reverse (you escape AND may immediately grab opponent).`,
-      
-      "charging": `<strong>Charging:</strong> Running attack for extra damage. Uses Endurance ability. Damage = Strength + speed rank. May result in Slam. Both attacker and target take damage if hit. Attacker must move at least 1 area.`,
-      
-      "dodging": `<strong>Dodging:</strong> Defensive move to avoid ranged attacks. Uses Agility ability. Success gives -2CS to attacker's roll or +1CS if exceptional. Character can take no other actions this round.`,
-      
-      "evading": `<strong>Evading:</strong> Defensive move to avoid melee attacks. Uses Fighting ability. Success gives -4CS to attacker's roll or +2CS if exceptional. Character can take no other actions this round.`,
-      
-      "blocking": `<strong>Blocking:</strong> Using Strength to resist physical attacks. Uses Strength as temporary Body Armor against one attack. Roll determines CS modifier to Strength for armor value (-6CS to +1CS). Cannot block energy or shooting attacks.`,
-      
-      "catching": `<strong>Catching:</strong> Attempting to catch thrown/falling objects. Uses Agility ability. Results: Auto-hit (object hits you), Miss (+1CS for attacker), Damage (caught but may damage it), or Catch (clean catch). -3CS if object targeted at you. Minimum Agility: Unearthly for bullets, Amazing for arrows, Remarkable for other projectiles.`
+      "blunt-attack": `
+        <strong>Blunt Attack (Fighting):</strong>
+        <ul>
+          <li><em>Results:</em> Miss, Hit, <u>Slam</u>, <u>Stun</u>.</li>
+          <li><em>Damage:</em> Attacker’s <b>Strength rank number</b>. Bare hands/gauntlets use STR.</li>
+          <li><em>Blunt weapons:</em> Up to the item’s <b>Material Strength</b>. If item MS &gt; user STR, damage becomes the <b>minimum of the next rank</b> (e.g., Feeble→Typical min).</li>
+          <li><em>Options:</em> May voluntarily <b>pull punches</b>—reduce damage or even lower the color (e.g., Red→Yellow).</li>
+          <li><em>Slam:</em> Deal STR damage; target makes Endurance FEAT for Slam effects.</li>
+          <li><em>Stun:</em> Deal STR damage; target makes Endurance FEAT for Stun effects.</li>
+        </ul>
+      `,
+
+      "edged-attack": `
+        <strong>Edged Attack (Fighting):</strong>
+        <ul>
+          <li><em>Results:</em> Hit, <u>Stun</u>, <u>Kill</u>.</li>
+          <li><em>Damage:</em> At least the weapon’s listed damage; may instead use <b>min(STR, weapon MS)</b>.</li>
+          <li><em>Options:</em> May <b>not</b> reduce <em>effect</em> color (no Red→Yellow swap). Damage can’t be softened below weapon minimum.</li>
+          <li><em>Stun:</em> Deal damage; target makes Endurance FEAT for Stun.</li>
+          <li><em>Kill:</em> Deal damage; target checks Kill column (see Kill rules).</li>
+        </ul>
+      `,
+
+      "shooting": `
+        <strong>Shooting Attack (Agility):</strong>
+        <ul>
+          <li><em>Results:</em> Miss, Hit, <u>Bullseye</u>, <u>Kill</u>.</li>
+          <li><em>Damage:</em> As weapon lists (some cause effects like Mercy Bullets instead of damage).</li>
+          <li><em>Bullseye:</em> Precision hit (e.g., disarm); Judge adjudicates special part hits; should not be fatal.</li>
+          <li><em>Miss:</em> Projectile may continue; Judge may roll to hit something else along the path.</li>
+          <li><em>Options:</em> May <b>not</b> reduce damage or effect color.</li>
+          <li><em>Range:</em> -1CS to hit per area traveled for weapons.</li>
+        </ul>
+      `,
+
+      "edged-throwing": `
+        <strong>Edged Throwing (Agility):</strong>
+        <ul>
+          <li><em>Results:</em> Miss, Hit, <u>Stun</u>, <u>Kill</u>.</li>
+          <li><em>Damage:</em> As the thrown edged weapon lists.</li>
+          <li><em>Options:</em> <b>May not</b> reduce <em>effect</em> color; may choose to deal <b>less damage</b>.</li>
+          <li><em>Miss:</em> As Shooting—may strike something else along the path.</li>
+          <li><em>Stun/Kill:</em> Deal damage; then resolve the appropriate Endurance FEAT (Stun or Kill).</li>
+        </ul>
+      `,
+
+      "blunt-throwing": `
+        <strong>Blunt Throwing (Agility):</strong>
+        <ul>
+          <li><em>Results:</em> Miss, Hit, <u>Bullseye</u>, <u>Stun</u>.</li>
+          <li><em>Damage:</em> <b>min(Thrower STR, Item MS)</b>.</li>
+          <li><em>Options:</em> May reduce <b>effect</b> color and/or <b>damage</b>.</li>
+          <li><em>Bullseye:</em> Precision placement (Judge adjudicates).</li>
+          <li><em>Stun:</em> Deal damage; target makes Endurance FEAT for Stun.</li>
+        </ul>
+      `,
+
+      "energy": `
+        <strong>Energy Attack (Agility):</strong>
+        <ul>
+          <li><em>Results:</em> Miss, Hit, <u>Bullseye</u>, <u>Kill</u>.</li>
+          <li><em>Damage:</em> Capped at the power/weapon’s <b>maximum</b>.</li>
+          <li><em>Options:</em> May reduce <b>damage</b>, but <b>not effect</b> color.</li>
+          <li><em>Bullseye:</em> Target a specific part as per Judge.</li>
+          <li><em>Range:</em> Powers can exceed normal range at <b>-1CS per extra area</b> (can’t go below Shift 0).</li>
+        </ul>
+      `,
+
+      "force": `
+        <strong>Force (Concussive) Attack (Agility):</strong>
+        <ul>
+          <li><em>Results:</em> Miss, Hit, <u>Bullseye</u>, <u>Stun</u>.</li>
+          <li><em>Damage:</em> Based on power/weapon description.</li>
+          <li><em>Options:</em> May choose <b>less damage</b>; may <b>not</b> reduce effect color.</li>
+          <li><em>Stun:</em> Deal damage; target makes Endurance FEAT for Stun.</li>
+        </ul>
+      `,
+
+      "grappling": `
+        <strong>Grappling (Strength):</strong>
+        <ul>
+          <li><em>Results:</em> Miss, <u>Partial Hold</u>, <u>Hold</u>.</li>
+          <li><em>Partial Hold:</em> You seize a limb/part; target suffers <b>-2CS</b> to actions and <b>cannot move</b> if your STR ≥ target’s STR. No damage.</li>
+          <li><em>Hold:</em> Target fully restrained; you may perform <b>one additional action</b> and deal up to <b>STR damage</b> (Body Armor applies).</li>
+        </ul>
+      `,
+
+      "grabbing": `
+        <strong>Grabbing (Strength):</strong>
+        <ul>
+          <li><em>Results:</em> Miss, <u>Take</u>, <u>Grab</u>, <u>Break</u>. Generally no damage.</li>
+          <li><em>Take:</em> You get the item if your STR ≥ target STR (or item MS); otherwise counts as Miss.</li>
+          <li><em>Grab:</em> You get the item regardless of target’s STR.</li>
+          <li><em>Break:</em> You succeed; then roll vs item <b>Material Strength</b>:
+            <ul>
+              <li><em>Color (G/Y/R):</em> You may use the item or move up to <b>half speed</b> with it.</li>
+              <li><em>White:</em> Item breaks/misfires/goes off (Judge adjudicates).</li>
+            </ul>
+          </li>
+        </ul>
+      `,
+
+      "escaping": `
+        <strong>Escaping (Strength):</strong>
+        <ul>
+          <li><em>Results:</em> Miss (still held), <u>Escape</u>, <u>Reverse</u>.</li>
+          <li><em>Escape:</em> Free from hold; may move up to <b>half speed</b> (no other actions).</li>
+          <li><em>Reverse:</em> Free and may <b>move half</b>, attempt to <b>Grapple</b> former attacker, or take another action at <b>-2CS</b>.</li>
+        </ul>
+      `,
+
+      "charging": `
+        <strong>Charging (Endurance):</strong>
+        <ul>
+          <li><em>Move:</em> Must move ≥1 area; may move full speed and still attack.</li>
+          <li><em>To Hit:</em> <b>+1CS per area moved</b> (max +3CS). Resolve on Charging column.</li>
+          <li><em>Results:</em> Miss (continue straight <b>½ speed</b>), Hit, <u>Slam</u>, <u>Stun</u>.</li>
+          <li><em>Damage (Hit):</em> Up to <b>max(Endurance, Body Armor)</b> + <b>2</b> per area moved.</li>
+          <li><em>Rebound:</em> If defender’s Body Armor &gt; your inflicted damage, the <b>excess rebounds</b> onto you (your BA can absorb).</li>
+          <li><em>Objects:</em> Walls count as Body Armor equal to Material Strength for collisions.</li>
+        </ul>
+      `,
+
+      "dodging": `
+        <strong>Dodging (Agility):</strong>
+        <ul>
+          <li><em>When:</em> Declare at start of round; you may move <b>½ speed</b>, no charge, and take at most <b>one</b> other action.</li>
+          <li><em>Effect:</em> Roll Agility; apply <b>-2/-4/-6CS</b> to attacks you’re aware of (this round).</li>
+          <li><em>Limits:</em> No effect vs Slugfest/Wrestling; can’t dodge surprise/blindsides.</li>
+          <li><em>Cost:</em> Your own FEATs this round suffer <b>-2CS</b>.</li>
+        </ul>
+      `,
+
+      "evading": `
+        <strong>Evading (Fighting):</strong>
+        <ul>
+          <li><em>Use:</em> Against a single <b>adjacent</b> attacker (Slugfest/Wrestling).</li>
+          <li><em>Action:</em> You make no attacks this round; roll on Evasion column.</li>
+          <li><em>Results:</em> <b>Auto-Hit</b> (their attack is at least Green), <b>Evasion</b> (no damage), <b>Evasion +1CS/+2CS</b> (you avoid and gain +1/+2CS to your first attack vs that foe next round).</li>
+        </ul>
+      `,
+
+      "blocking": `
+        <strong>Blocking (Strength):</strong>
+        <ul>
+          <li><em>Use:</em> Mitigate <b>physical</b> attacks (Slugfest, Grapple damage, Edged/Blunt Throwing, Force, Wrestling). Not vs <b>Energy</b> or <b>Shooting</b>.</li>
+          <li><em>Action:</em> No other action; you may shield allies behind you. Normal Body Armor still applies (Force Fields don’t add to Block).</li>
+          <li><em>Effect:</em> Roll Strength; treat a result of <b>-6/-4/-2/+1CS</b> as the <b>effective Body Armor</b> derived from your STR versus that single attack.</li>
+        </ul>
+      `,
+
+      "catching": `
+        <strong>Catching (Agility):</strong>
+        <ul>
+          <li><em>Targets:</em> One falling/thrown object (or ally) at a time.</li>
+          <li><em>Results:</em> <b>Auto-Hit</b> (it hits you), <b>Miss</b> (attack continues at +1CS vs you), <b>Damage</b> (you catch but may damage it), <b>Catch</b> (clean catch).</li>
+          <li><em>Vs aimed attacks:</em> You suffer <b>-3CS</b> to Catch.</li>
+          <li><em>Agility mins:</em> <b>Unearthly</b> to catch bullets; <b>Amazing</b> for arrows; <b>Remarkable</b> for other projectiles; any Agility for falling bodies/objects.</li>
+        </ul>
+      `
     };
     
     return descriptions[actionType] || "Combat action using appropriate ability vs Universal Table.";

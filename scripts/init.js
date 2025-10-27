@@ -976,10 +976,16 @@ Hooks.once("ready", async () => {
   }
 
   // Manual mode chat listeners
-  Hooks.once("ready", () => {
-    try { ManualModeDialog.setupChatListeners(); }
+  if (game?.ready) {
+    try { ManualModeDialog.setupChatListeners(); } 
     catch (e) { console.warn("Manual toggle setup failed:", e); }
-  });
+  } else {
+    Hooks.on("ready", () => {
+      try { ManualModeDialog.setupChatListeners(); }
+      catch (e) { console.warn("Manual toggle setup failed:", e); }
+    });
+  }
+
 
   // Auto-open Action HUD
   try {
