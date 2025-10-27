@@ -1430,3 +1430,85 @@ export async function postDeathSavePrompt(actor) {
     content: content
   });
 }
+
+// === [PREVIEW CONFIRM HELPERS] =============================================
+//
+// Centralized helpers for the optional post-roll "Preview → Confirm" gate.
+// Used by actions in Semi-Auto / Manual when opts.showConfirm && !opts.autoApply
+//
+// Usage in an action file (after computing roll/color/damage, before posting):
+//   import { shouldConfirm, buildPreviewHtml, confirmPreview } from "./action-utils.js";
+//   if (shouldConfirm(this?.opts)) {
+//     const html = buildPreviewHtml({ actorName, actionName, rollTotal, resultColor, column, colShift, baseDamage, finalDamage, extras: [...] });
+//     const ok = await confirmPreview({ title: "Preview — <Action Name>", contentHtml: html });
+//     if (!ok) return;
+//   }
+
+export function shouldConfirm(opts) {
+  return Boolean(opts && opts.showConfirm === true && opts.autoApply === false);
+}
+
+/**
+ * Build a compact preview grid.
+ * @param {Object} p
+ * @param {string} p.actorName
+ * @param {string} p.actionName
+ * @param {number|string} p.rollTotal
+ * @param {string} p.resultColor   // "white"|"green"|"yellow"|"red"
+ * @param {string} p.column        // e.g., "Remarkable" (or a number/index string)
+ * @param {string} p.colShift      // e.g., "+1 CS", "-2 CS", "0 CS"
+ * @param {number|string} p.baseDamage
+ * @param {number|string} p.finalDamage
+ * @param {Array<{label:string,value:string|number}>} p.extras
+ */
+export function buildPreviewHtml({
+  actorName,
+  actionName,
+  rollTotal,
+  resultColor,
+  column,
+  colShift,
+  baseDamage,
+  finalDamage,
+  extras = []
+} = {}) {
+  const rows = [
+    { label: "Roll total",   value: rollTotal ?? "—" },
+    { label: "Result color", value: (resultColor ?? "—").toString() },
+    { label: "Column",       value: column ?? "—" },
+    { label: "CS",           value: colShift ?? "—" },
+    { label: "Raw damage",   value: baseDamage ?? "—" },
+    { label: "After armor",  value: finalDamage ?? "—" },
+    ...extras
+  ];
+
+  const grid = rows.map(r => `
+    <div style="color:#666;">${r.label}</div>
+    <div>${r.value}</div>
+  `).join("");
+
+  return `
+    <div style="font-family:var(--font-primary);line-height:1.3;">
+      <div style="font-weight:600;margin-bottom:6px;">${actorName ?? ""} — ${actionName ?? ""}</div>
+      <div style="display:grid;grid-template-columns:140px 1fr;gap:6px;">${grid}</div>
+      <div style="margin-top:8px;color:#666;font-size:.9em;">Confirm to post the action card.</div>
+    </div>
+  `;
+}
+
+/**
+ * Show a standard confirm dialog. Returns true if confirmed.
+ * @param {Object} p
+ * @param {string} p.title
+ * @param {string} p.contentHtml
+ * @returns {Promise<boolean>}
+ */
+export async function confirmPreview({ title = "Preview", contentHtml }) {
+  return await Dialog.confirm({
+    title,
+    content: contentHtml,
+    yes: () => true,
+    no: () => false,
+    defaultYes: true
+  });
+}

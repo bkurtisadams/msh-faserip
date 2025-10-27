@@ -1568,18 +1568,24 @@ async function createUniversalActionMacro(data, slot) {
   // CREATE DIFFERENT MACRO BASED ON SETTING
   const command = (mode === "refactor") 
     ? `// Universal Action Macro (Refactor/New System)
-const actor = game.user.character || canvas.tokens.controlled[0]?.actor || game.actors.get("${actorId}");
-if (!actor) {
-  return ui.notifications.warn("Select a token or assign a character first.");
-}
+  const actor = game.user.character || canvas.tokens.controlled[0]?.actor || game.actors.get("${actorId}");
+  if (!actor) {
+    return ui.notifications.warn("Select a token or assign a character first.");
+  }
 
-const sheet = actor.sheet;
-if (!sheet || typeof sheet._rollAction !== "function") {
-  return ui.notifications.error("Actor sheet must be opened at least once.");
-}
+  // Use ActionDispatcher (respects actor's combat mode setting)
+  const { ActionDispatcher } = await import("./scripts/modules/actions/action-dispatcher.js");
+  const savedCS = actor.getFlag("msh-faserip", "cs_${actionCode}") || 0;
+  const savedKarma = actor.getFlag("msh-faserip", "karma_${actionCode}") || 0;
 
-// Call NEW power-aware system
-await sheet._rollAction("${actionCode}", "${abilityName}");`
+  await ActionDispatcher.roll("${actionCode}", {
+    actor: actor,
+    abilityName: "${abilityName}",
+    opts: {
+      shift: savedCS,
+      karma: savedKarma
+    }
+  });`
     : `// Universal Action Macro (Classic/Old System)
 const actor = game.user.character || canvas.tokens.controlled[0]?.actor || game.actors.get("${actorId}");
 if (!actor) {

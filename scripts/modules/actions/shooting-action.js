@@ -19,6 +19,8 @@ import {
   setupMultiAttackHandlers,
   shiftRank
 } from "./action-utils.js";
+import { shouldConfirm, buildPreviewHtml } from "./action-utils.js";
+
 import { makeDamageBlock, computeAfterArmor, buildDamageFlags } from "./damage-ui.js";
 import { canEffectsApply } from "../../rules/effects-gate.js";
 import { playCombatSFX } from "./audio-utils.js";
@@ -319,33 +321,34 @@ if (actualAttackCount > 1) {
       getArmorFn: (actor, dt) => getBodyArmorValues(actor, dt)
     });
 
-    // ——— Semi-auto preview (only when requested by dispatcher) ———
-    if (this?.opts?.showConfirm && this?.opts?.autoApply === false) {
+    // --- Unified Semi-Auto/Manual confirm gate (using shared helpers) ---
+    if (shouldConfirm(this?.opts)) {
+      // Keep your UL list for targets (preserves original look)
       const tgtList = targetsArray?.length
         ? `<ul style="margin:6px 0 0 18px;">${targetsArray.map(t => `<li>${t?.name ?? "Target"}</li>`).join("")}</ul>`
         : "<div style='margin-top:4px;color:#666;'>No targets selected.</div>";
 
-      const previewHtml = `
-        <div style="font-family:var(--font-primary);line-height:1.3;">
-          <div style="font-weight:600;margin-bottom:6px;">${actor.name} — ${actionLabel}</div>
-          <div style="display:grid;grid-template-columns:140px 1fr;gap:6px;">
-            <div style="color:#666;">Roll total</div><div>${roll.total}</div>
-            <div style="color:#666;">Result color</div><div style="text-transform:capitalize;">${colorLower}</div>
-            <div style="color:#666;">Raw damage</div><div>${rawDamage}</div>
-            <div style="color:#666;">After armor</div><div>${afterArmor}${multiTargetCount > 1 ? " (varies)" : ""}</div>
-            <div style="color:#666;">Targets</div>
-            <div>${targetName || (multiTargetCount ? `${multiTargetCount} targets` : "—")}${tgtList}</div>
-          </div>
-          <div style="margin-top:8px;color:#666;font-size:.9em;">
-            Confirm to post the action card and proceed. You can still click “Apply damage” from the chat card.
-          </div>
-        </div>
-      `;
+      // Build the compact preview grid via shared helper
+      const innerHtml = buildPreviewHtml({
+        actorName: actor?.name,
+        actionName: actionLabel,                  // your existing label
+        rollTotal:  roll?.total,
+        resultColor: (colorLower || "—"),
+        column:     (typeof columnLabel !== "undefined" ? columnLabel : "—"),
+        colShift:   (typeof csLabel !== "undefined" ? csLabel : "0 CS"),
+        baseDamage: (typeof rawDamage !== "undefined" ? rawDamage : "—"),
+        finalDamage:(typeof afterArmor !== "undefined" ? afterArmor : "—"),
+        extras: [
+          { label: "Range",   value: (typeof rangeBand !== "undefined" && rangeBand) ? rangeBand : "—" },
+          { label: "Targets", value: `${targetName || (multiTargetCount ? `${multiTargetCount} targets` : "—")}${tgtList}` }
+        ]
+      });
 
+      // Use your HUD wrapper template so styling stays identical
       const content = await renderTemplate("templates/hud/dialog.html", {
         title: `${actor.name} — ${actionLabel}`,
-        body: previewHtml,     // many of your templates accept body/content
-        content: previewHtml
+        body: innerHtml,
+        content: innerHtml
       });
 
       const confirmed = await Dialog.confirm({
@@ -359,13 +362,13 @@ if (actualAttackCount > 1) {
       });
 
       debugLog("Shooting preview", {
-        confirmed, rollTotal: roll.total, color: colorLower, rawDamage, afterArmor,
+        confirmed, rollTotal: roll?.total, color: colorLower, rawDamage, afterArmor,
         targets: targetsArray?.map(t => t?.name)
       });
 
-      if (!confirmed) return; // cancel this single attack cleanly
+      if (!confirmed) return; // abort this single attack
 
-      // Fire SFX after confirm (refactor mode only)
+      // Fire SFX after confirm (unchanged)
       if (game.msh?.getCombatModeFor?.() !== "classic") {
         await game.msh.playCombatSFX?.(
           (this?.opts?.damageType || "shooting"),
@@ -377,13 +380,13 @@ if (actualAttackCount > 1) {
             ammoType:
               (this?.item?.system?.variantType && this.item.system.variantType !== "standard")
                 ? this.item.system.variantType
-                : (this?.item?.system?.specialAmmo?.explosive ? "explosive"
-                : "standard")
+                : (this?.item?.system?.specialAmmo?.explosive ? "explosive" : "standard")
           }
         );
       }
     }
-    // ——— End preview gate ———
+    // --- End confirm gate ---
+
 
     // Calculate penetrating damage for action chips
     let penetratingDamage = afterArmor;
