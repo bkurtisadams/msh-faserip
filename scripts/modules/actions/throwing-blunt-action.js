@@ -12,7 +12,8 @@ import {
   buildActionsBox,
   bannerColors,
   getTargetingContext,
-  getBodyArmorValues
+  getBodyArmorValues,
+  applyDamageToTargets
 } from "./action-utils.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
 
@@ -275,7 +276,8 @@ export class ThrowingBluntAction extends RangedAttackAction {
       damage: isHit ? choice.weaponDamage : 0,  // Only pass damage if it's a hit
       attackForm: "blunt",
       damageType: "physical-blunt",
-      bypassArmor: false
+      bypassArmor: false,
+      autoApply: !!this.opts?.autoApply
     });
 
     // Damage block
@@ -322,5 +324,18 @@ export class ThrowingBluntAction extends RangedAttackAction {
     `;
 
     await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor }), content: cardHtml });
+
+    // === AUTO-APPLY DAMAGE IN FULL AUTO MODE ===
+    if (this.opts?.autoApply && isHit && rawDamage > 0) {
+      await applyDamageToTargets(rawDamage, {
+        attackerUuid: actor.uuid,
+        damageType: "physical-blunt",
+        attackForm: "blunt",
+        showNotification: true,
+        bypassArmor: false
+      });
+    }
+    // === END AUTO-APPLY ===
+
   }
 }

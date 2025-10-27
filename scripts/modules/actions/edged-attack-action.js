@@ -543,6 +543,28 @@ export class EdgedAttackAction extends AttackAction {
     })
 
     });
+
+    // === AUTO-APPLY DAMAGE IN FULL AUTO MODE ===
+    if (this.opts?.autoApply && isHit && rawDamage > 0) {
+      debugLog("Auto-applying damage in full auto mode", {
+        damage: rawDamage,
+        afterArmor,
+        targets: (Array.from(game.user?.targets ?? [])).length || 0
+      });
+
+      await applyDamageToTargets(rawDamage, {
+        attackerUuid: actor.uuid,
+        damageType: dmgType,        // "physical-edged" or weapon’s damageType if set
+        showNotification: true,
+        bypassArmor: false,
+        attackForm: "edged",
+        armorPiercing: Number(choice.ap || 0) || 0,
+        armorPiercingCS: Number(choice.apCS || 0) || 0,
+        apMode: "value"
+      });
+    }
+    // === END AUTO-APPLY ===
+
     // Play combat SFX
     const sourceName = choice.weaponName || "Natural Weapon";
     if (game.msh?.playCombatSFX) {

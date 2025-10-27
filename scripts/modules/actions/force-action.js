@@ -419,7 +419,9 @@ export class ForceAction extends RangedAttackAction {
         showNotification: true,
         bypassArmor: false,
         attackForm: "force",
-        armorPiercing: 0
+        armorPiercing: 0,
+        apMode: "value",
+        wasKillResult: colorLower === "red"
       });
     }
     // === END AUTO-APPLY ===

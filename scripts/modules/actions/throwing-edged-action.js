@@ -9,7 +9,8 @@ import {
   buildResultGrid,
   buildActionsBox,
   bannerColors,
-  getTargetingContext
+  getTargetingContext,
+  applyDamageToTargets
 } from "./action-utils.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
 
@@ -345,8 +346,9 @@ export class ThrowingEdgedAction extends RangedAttackAction {
       attackForm: "edged",
       damageType: (choice.damageType || "physical-edged"),
       armorPiercing: Number(choice.armorPiercing || 0),
-      armorPiercingCS: Number(choice.armorPiercingCS || 0),   // ✅ ADD
-      apMode: choice.apMode || "value"                         // ✅ ADD
+      armorPiercingCS: Number(choice.armorPiercingCS || 0),
+      apMode: choice.apMode || "value",
+      autoApply: !!this.opts?.autoApply
     });
 
     const contextHtml = `
@@ -380,5 +382,21 @@ export class ThrowingEdgedAction extends RangedAttackAction {
     `;
 
     await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor }), content: cardHtml });
+
+    // === AUTO-APPLY DAMAGE IN FULL AUTO MODE ===
+    if (this.opts?.autoApply && isHit && Number(choice.weaponDamage) > 0) {
+      await applyDamageToTargets(Number(choice.weaponDamage), {
+        attackerUuid: actor.uuid,
+        damageType: (choice.damageType || "physical-edged"),
+        attackForm: "edged",
+        showNotification: true,
+        bypassArmor: false,
+        armorPiercing: Number(choice.armorPiercing || 0),
+        armorPiercingCS: Number(choice.armorPiercingCS || 0),
+        apMode: choice.apMode || "value",
+        wasKillResult: colorLower === "red"
+      });
+    }
+    // === END AUTO-APPLY ===
   }
 }

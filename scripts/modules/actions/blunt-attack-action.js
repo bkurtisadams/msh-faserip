@@ -515,6 +515,25 @@ export class BluntAttackAction extends AttackAction {
       })
     });
 
+  // === AUTO-APPLY DAMAGE IN FULL AUTO MODE ===
+  if (this.opts?.autoApply && isHit && rawDamage > 0) {
+    debugLog("Auto-applying damage in full auto mode", {
+      damage: rawDamage,
+      afterArmor,
+      targets: (Array.from(game.user?.targets ?? [])).length || 0
+    });
+
+    await applyDamageToTargets(rawDamage, {
+      attackerUuid: actor.uuid,
+      damageType: dmgType,        // "physical-blunt"
+      showNotification: true,
+      bypassArmor: false,
+      attackForm: "blunt",
+      armorPiercing: 0
+    });
+  }
+  // === END AUTO-APPLY ===
+
   // Play combat SFX
   const sourceName = choice.weaponName || "Bare Hands";
     if (game.msh?.playCombatSFX) {

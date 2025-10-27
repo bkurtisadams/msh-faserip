@@ -498,14 +498,17 @@ if (actualAttackCount > 1) {
         afterArmor,
         targets: targetsArray?.length || 0
       });
-      
+
       await applyDamageToTargets(rawDamage, {
         attackerUuid: actor.uuid,
-        damageType: dmgType,
+        damageType: choice.weapon?.system?.damageType || "physical-shooting",
         showNotification: true,
         bypassArmor: false,
         attackForm: "shooting",
-        armorPiercing: 0
+        armorPiercing: Number(choice.ap || 0) || 0,
+        armorPiercingCS: Number(choice.apCS || 0) || 0,
+        apMode: "value",
+        wasKillResult: colorLower === "red"
       });
     }
     // === END AUTO-APPLY ===

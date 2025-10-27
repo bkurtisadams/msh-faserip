@@ -549,7 +549,9 @@ export class EnergyAction extends RangedAttackAction {
         showNotification: true,
         bypassArmor: false,
         attackForm: "energy",
-        armorPiercing: 0
+        armorPiercing: 0,
+        apMode: "value",
+        wasKillResult: colorLower === "red"
       });
     }
     // === END AUTO-APPLY ===
