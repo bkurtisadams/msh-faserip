@@ -1,3 +1,4 @@
+// scripts/modules/actions/action-dispatcher.js
 import { BluntAttackAction }   from "./blunt-attack-action.js";
 import { EdgedAttackAction }   from "./edged-attack-action.js";
 import { RangedAttackAction }  from "./ranged-attack-action.js";
@@ -14,21 +15,50 @@ import { GrapplingAction } from "./grappling-action.js";
 import { GrabbingAction } from "./grabbing-action.js";
 import { EscapingAction } from "./escaping-action.js";
 import { DeathSaveAction } from "./death-save-action.js";
+import { ManualModeDialog } from "./manual-mode-dialog.js";
 import { debugLog } from "./action-utils.js";
 
 // Anchor: mode resolver (safe even if settings not registered yet)
 function resolveCombatMode(actor) {
   try {
-    // Prefer actor override if you already expose it via game.msh.getCombatModeFor
-    const v =
-      (game.msh?.getCombatModeFor?.(actor)) ??
-      (game.settings?.get?.("msh-faserip", "combatMode")) ??
-      "semi";
-    return String(v || "semi");
+    // Priority: actor setting > global setting > fallback
+    const actorMode = actor?.system?.combatMode;
+    if (actorMode) return String(actorMode);
+    
+    // Check global setting
+    const globalMode = game.settings?.get?.("msh-faserip", "defaultCombatMode");
+    if (globalMode) return String(globalMode);
+    
+    // Fallback
+    return "semi";
   } catch (_e) {
     return "semi";
   }
 }
+
+// Map action types to their required abilities
+const ACTION_ABILITIES = {
+  "blunt-attack": "fighting",
+  "edged-attack": "fighting",
+  "shooting": "agility",
+  "throwing-edged": "agility",
+  "throwing-blunt": "agility",
+  "energy": "agility", // Will be specified in opts
+  "force": "agility",  // Will be specified in opts
+  "dodging": "agility",
+  "evading": "fighting",
+  "blocking": "strength",
+  "catching": "agility",
+  "grappling": "strength",
+  "grabbing": "strength",
+  "escaping": "strength",
+  "charging": "endurance",
+  "stun": "endurance",
+  "slam": "endurance",
+  "kill": "endurance",
+  "save-nullify": "endurance",
+  "death-save": "endurance"
+};
 
 const registry = {
   "blunt-attack":   BluntAttackAction,
@@ -53,13 +83,11 @@ const registry = {
   "death-save":     DeathSaveAction
 };
 
-// scripts/modules/actions/action-dispatcher.js
 export class ActionDispatcher {
   static async roll(actionType, { actor, abilityName, opts = {} } = {}) {
     debugLog("ActionDispatcher.roll()", { actionType, abilityName, opts });
 
     // --- Central guard: if actor is Nullified, they cannot use inborn super-human powers (RAW)
-    // We block only power-channel actions here (energy/force). Martial/ranged/etc. still allowed.
     if (actor) {
       const SCOPE = game.system?.id || 'msh-faserip';
       const isNullified = actor.effects?.some(e => e.getFlag?.(SCOPE, 'status.nullified') === true);
@@ -68,39 +96,44 @@ export class ActionDispatcher {
         return;
       }
 
-      // Light hint for aura maintenance: handlers can read this if they want stricter behavior.
       const auraNullifyActive = actor.effects?.some(e => e.getFlag?.(SCOPE, 'aura.nullify.active') === true);
       if (auraNullifyActive) {
-        // Pass through a hint so action handlers can decide whether to allow/deny:
         opts = { ...(opts ?? {}), nullifyAuraActive: true };
       }
     }
     
-    const Handler = registry[actionType];
-
-    if (!Handler) throw new Error(`Unknown actionType: ${actionType}`);
-    const handler = new Handler({ actor, actionType, abilityName, opts });
-    
-    // Anchor: mode gate — merge flags into handler.opts so actions can read this.opts.showConfirm/autoApply
+    // Check combat mode
     const mode = resolveCombatMode(actor);
     debugLog("ActionDispatcher mode", { actor: actor?.name, mode });
 
+    // MANUAL MODE INTERCEPT
+    if (mode === "manual") {
+      debugLog("Manual mode detected - showing simple dialog");
+      
+      // Determine which ability to use
+      const ability = abilityName || opts.abilityName || ACTION_ABILITIES[actionType] || "fighting";
+      
+      // Show manual mode dialog and return
+      return await ManualModeDialog.show(actor, ability, actionType, opts);
+    }
+
+    // Otherwise, proceed with full action handler
+    const Handler = registry[actionType];
+    if (!Handler) throw new Error(`Unknown actionType: ${actionType}`);
+    
+    const handler = new Handler({ actor, actionType, abilityName, opts });
+    
+    // Set mode flags for semi/full auto
     let modeFlags = {};
-    if (mode === "auto" || mode === "classic") {
+    if (mode === "auto" || mode === "classic" || mode === "full") {
       modeFlags = { mode: "auto", autoApply: true, showConfirm: false };
     } else if (mode === "semi") {
       modeFlags = { mode: "semi", autoApply: false, showConfirm: true };
-    } else {
-      modeFlags = { mode: "manual", autoApply: false, showConfirm: false };
     }
 
-    // Merge into the handler’s own options so action code can read this.opts
     handler.opts = { ...(handler.opts ?? {}), ...modeFlags };
     debugLog("ActionDispatcher merged mode flags", handler.opts);
 
-    // Call without passing flags; actions consume this.opts.*
     return await handler.execute();
-
   }
 }
-

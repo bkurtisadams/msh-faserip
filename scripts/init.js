@@ -17,6 +17,8 @@ import { openCollisionDamageDialog } from './modules/actions/collision-damage.js
 import { FaseripActionHUD } from './action-hud.js';
 import { debugLog } from './modules/actions/action-utils.js';
 import { playCombatSFX } from "./modules/actions/audio-utils.js";
+import { ActionDispatcher } from './modules/actions/action-dispatcher.js';
+import { ManualModeDialog } from './modules/actions/manual-mode-dialog.js';
 
 
 Hooks.once("init", async () => {
@@ -67,6 +69,22 @@ Hooks.once("init", async () => {
     config: true,
     type: String,
     default: "systems/msh-faserip/assets/sfx"
+  });
+
+  // Register default combat mode setting
+  game.settings.register("msh-faserip", "defaultCombatMode", {
+    name: "Default Combat Mode",
+    hint: "Default combat mode for new characters. Manual = simple FEAT rolls, Semi-Auto = dialogs with confirmation, Full-Auto = automatic application.",
+    scope: "world",
+    config: true,
+    type: String,
+    choices: {
+      "manual": "Manual (Simple FEAT Rolls)",
+      "semi": "Semi-Auto (Dialogs with Confirmation)",
+      "full": "Full-Auto (Automatic Application)"
+    },
+    default: "semi",
+    requiresReload: false
   });
 
   debugLog("init hook is running!");
@@ -689,7 +707,41 @@ Hooks.once("init", async () => {
   };
 
   // GAME NAMESPACE REGISTER
-  game.msh.rollUniversalAction = rollUniversalAction;
+  // Compatibility shim: redirect old rollUniversalAction calls to new ActionDispatcher
+  game.msh.rollUniversalAction = async function(actionCode, actorId, columnShift = null, karma = null, options = {}) {
+    const actor = game.actors.get(actorId);
+    if (!actor) {
+      ui.notifications.error("Actor not found!");
+      return;
+    }
+    
+    // Map old action codes to new action types
+    const actionTypeMap = {
+      "BA": "blunt-attack",
+      "EA": "edged-attack", 
+      "Sh": "shooting",
+      "TE": "throwing-edged",
+      "TB": "throwing-blunt",
+      "En": "energy",
+      "Fo": "force",
+      "Do": "dodging",
+      "Ev": "evading",
+      "Bl": "blocking",
+      "Ca": "catching",
+      "Gp": "grappling",
+      "Gb": "grabbing",
+      "Es": "escaping",
+      "Ch": "charging"
+    };
+    
+    const actionType = actionTypeMap[actionCode] || actionCode;
+    
+    // Call new dispatcher
+    return await ActionDispatcher.roll(actionType, {
+      actor,
+      opts: { karma, ...options }
+    });
+  };
   // Add the rollUniversalTable function to the namespace
   game.msh.rollUniversalTable = rollUniversalTable;
 
@@ -922,6 +974,12 @@ Hooks.once("ready", async () => {
   } catch (e) {
     console.warn("MSH FASERIP | Failed to install chat hooks:", e);
   }
+
+  // Manual mode chat listeners
+  Hooks.once("ready", () => {
+    try { ManualModeDialog.setupChatListeners(); }
+    catch (e) { console.warn("Manual toggle setup failed:", e); }
+  });
 
   // Auto-open Action HUD
   try {
