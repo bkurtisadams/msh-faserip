@@ -105,7 +105,12 @@ export const RANKS = [
 ];
 
 export function debugLog(...args) {
-  if (game.settings.get("msh-faserip", "debugMode")) {
+  try {
+    if (game.settings.get("msh-faserip", "debugMode")) {
+      console.log("FASERIP DEBUG |", ...args);
+    }
+  } catch (_) {
+    // settings may not exist yet during early boot
     console.log("FASERIP DEBUG |", ...args);
   }
 }

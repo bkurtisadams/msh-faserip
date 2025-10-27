@@ -34,6 +34,50 @@ function resolveCombatMode(actor) {
   }
 }
 
+// Canonical codes (from your actionCodeMap)
+const CANONICAL_CODES = {
+  "blunt-attack":   "BA",
+  "edged-attack":   "EA",
+  "shooting":       "Sh",
+  "throwing-edged": "TE",
+  "throwing-blunt": "TB",
+  "energy":         "En",
+  "force":          "Fo",
+  "grappling":      "Gp",
+  "grabbing":       "Gb",
+  "escaping":       "Es",
+  "charging":       "Ch",
+  "dodging":        "Do",
+  "evading":        "Ev",
+  "blocking":       "Bl",
+  "catching":       "Ca",
+  "stun":           "St",
+  "slam":           "Sl",
+  "kill":           "Ki"
+};
+
+// Build a robust alias map that matches either code or long name, any case
+const ACTION_ALIASES = (() => {
+  const map = {};
+  for (const [type, code] of Object.entries(CANONICAL_CODES)) {
+    // long name variants
+    map[type] = type;
+    map[type.toLowerCase()] = type;
+    map[type.toUpperCase()] = type;
+
+    // code variants (exact, lower, upper)
+    map[code] = type;                 // e.g., "Sh"
+    map[code.toLowerCase()] = type;   // e.g., "sh"
+    map[code.toUpperCase()] = type;   // e.g., "SH"
+  }
+  return map;
+})();
+
+function normalizeActionType(input) {
+  const key = String(input ?? "").trim();
+  return ACTION_ALIASES[key] ?? ACTION_ALIASES[key.toLowerCase()] ?? ACTION_ALIASES[key.toUpperCase()] ?? key;
+}
+
 // Map action types to their required abilities
 const ACTION_ABILITIES = {
   "blunt-attack": "fighting",
@@ -85,43 +129,50 @@ export class ActionDispatcher {
   static async roll(actionType, { actor, abilityName, opts = {} } = {}) {
     debugLog("ActionDispatcher.roll()", { actionType, abilityName, opts });
 
-    // --- Central guard: if actor is Nullified, they cannot use inborn super-human powers (RAW)
+    // Normalize mixed-case codes like "Sh"/"sh"/"SH" or pass-through long names
+    const type = normalizeActionType(actionType);
+
+    // Nullify checks
     if (actor) {
-      const SCOPE = game.system?.id || 'msh-faserip';
-      const isNullified = actor.effects?.some(e => e.getFlag?.(SCOPE, 'status.nullified') === true);
-      if (isNullified && (actionType === 'energy' || actionType === 'force')) {
-        ui.notifications?.warn?.(`${actor.name}'s inborn powers are nullified and cannot be used right now.`);
+      const SCOPE = game.system?.id || "msh-faserip";
+      const isNullified =
+        actor.effects?.some(e => e.getFlag?.(SCOPE, "status.nullified") === true) ?? false;
+
+      if (isNullified && (type === "energy" || type === "force")) {
+        ui.notifications?.warn?.(
+          `${actor.name}'s inborn powers are nullified and cannot be used right now.`
+        );
         return;
       }
 
-      const auraNullifyActive = actor.effects?.some(e => e.getFlag?.(SCOPE, 'aura.nullify.active') === true);
+      const auraNullifyActive =
+        actor.effects?.some(e => e.getFlag?.(SCOPE, "aura.nullify.active") === true) ?? false;
       if (auraNullifyActive) {
         opts = { ...(opts ?? {}), nullifyAuraActive: true };
       }
     }
-    
-    // Check combat mode
-    const mode = resolveCombatMode(actor);
+
+    // Mode (allow macro override)
+    const mode = opts?.mode ?? resolveCombatMode(actor);
     debugLog("ActionDispatcher mode", { actor: actor?.name, mode });
 
-    // MANUAL MODE INTERCEPT
+    // Resolve ability for BOTH manual and auto paths
+    const resolvedAbility =
+      abilityName || opts?.abilityName || ACTION_ABILITIES[type] || "fighting";
+
+    // Manual intercept
     if (mode === "manual") {
       debugLog("Manual mode detected - showing simple dialog");
-      
-      // Determine which ability to use
-      const ability = abilityName || opts.abilityName || ACTION_ABILITIES[actionType] || "fighting";
-      
-      // Show manual mode dialog and return
-      return await ManualModeDialog.show(actor, ability, actionType, opts);
+      return await ManualModeDialog.show(actor, resolvedAbility, type, opts);
     }
 
-    // Otherwise, proceed with full action handler
-    const Handler = registry[actionType];
-    if (!Handler) throw new Error(`Unknown actionType: ${actionType}`);
-    
-    const handler = new Handler({ actor, actionType, abilityName, opts });
-    
-    // Set mode flags for semi/full auto
+    // Auto/semi handler path
+    const Handler = registry[type];
+    if (!Handler) throw new Error(`Unknown actionType: ${type}`);
+
+    const handler = new Handler({ actor, actionType: type, abilityName: resolvedAbility, opts });
+
+    // Mode flags
     let modeFlags = {};
     if (mode === "auto" || mode === "classic" || mode === "full") {
       modeFlags = { mode: "auto", autoApply: true, showConfirm: false };
