@@ -207,28 +207,53 @@ export class FaseripActionHUD extends Application {
       btn.classList.add("dragging");
       ev.dataTransfer.effectAllowed = "move";
     } else {
-      // NORMAL MODE: Drag to hotbar (same pattern as character sheet)
+      // NORMAL MODE: Drag to hotbar — emit a Macro payload (refactor-first)
       const actor = this.actor;
       if (!actor) {
         ui.notifications.warn("Select a token first");
         ev.preventDefault();
         return;
       }
-      
-      const actionCode = btn.dataset.action;
-      const actionName = btn.querySelector('.btn-name')?.textContent || btn.title;
-      
-      const dragData = {
-        type: "UniversalAction",
-        actionCode: actionCode,
-        actionName: actionName,
-        actorId: actor.id,
-        actorName: actor.name,
-        iconName: actionCode
+
+      const actionType  = btn.dataset.action;    // e.g., "shooting"
+      const abilityName = btn.dataset.ability;   // e.g., "agility"
+      const macroName   = `FASERIP: ${btn.querySelector('.btn-name')?.textContent || btn.title}`;
+
+      // Refactor-first macro with legacy fallback
+      const command = `// FASERIP Action Macro (Refactor-first with legacy fallback)
+    (async () => {
+      const actor = canvas.tokens.controlled[0]?.actor ?? game.user.character;
+      if (!actor) return ui.notifications.warn("Select a token or assign a character first.");
+
+      // Default to Semi-Auto UX; change to {showConfirm:false, autoApply:true} for Full Auto
+      const opts = { showConfirm: true, autoApply: false };
+
+      if (game.msh?.actions?.dispatch) {
+        // Refactor path
+        await game.msh.actions.dispatch("${actionType}", {
+          actorUuid: actor.uuid,
+          abilityName: "${abilityName}",
+          opts
+        });
+      } else if (game.msh?.rollUniversalAction) {
+        // Legacy/classic fallback
+        const savedCS    = actor.getFlag("msh-faserip", "cs_${actionType}")    || 0;
+        const savedKarma = actor.getFlag("msh-faserip", "karma_${actionType}") || 0;
+        await game.msh.rollUniversalAction("${actionType}", actor.id, savedCS, savedKarma);
+      } else {
+        ui.notifications.error("No action dispatcher found (refactor or classic).");
+      }
+    })();`;
+
+      const payload = {
+        type: "Macro",
+        name: macroName,
+        img: "icons/svg/d20-black.svg", // pick any icon you prefer
+        command
       };
-      
-      ev.dataTransfer.setData("text/plain", JSON.stringify(dragData));
-      console.log("📤 HUD drag:", dragData);
+
+      ev.dataTransfer.setData("text/plain", JSON.stringify(payload));
+      console.log("📤 HUD drag → Macro:", payload);
     }
   });
 
