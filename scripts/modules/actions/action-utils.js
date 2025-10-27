@@ -2,100 +2,60 @@ import { ACTION_LABELS, ACTION_EFFECTS } from "./action-config.js";
 import { applyNullifiedEffect, isAuraMaintained } from "./nullify.js";
 import { calculateMitigation } from "../../rules/mitigation.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
+import { resolveCombatMode } from "./action-dispatcher.js";
 
-// Add near the top after other exports
 
-// action-utils.js
-export function buildMultiAttackSection(actionType, targetCount, opts = {}) {
-  const supportsMultipleAttacks = ["blunt-attack", "edged-attack", "shooting"].includes(actionType);
-  const supportsAdjacent = ["blunt-attack", "escaping", "energy", "force"].includes(actionType);
+/** Build the Manual / Semi / Full mode selector strip */
+export function buildModeSelector({ mode = "semi", disabled = false, disabledReason = "" } = {}) {
+  const mk = (val, label) => {
+    const active = mode === val;
+    const base = "display:inline-block;padding:4px 8px;border:1px solid #bbb;border-radius:4px;margin-left:6px;cursor:pointer;font-size:12px;";
+    const on   = `${base}background:#fff;color:#111;font-weight:600;`;
+    const off  = `${base}background:#f7f7f7;color:#444;opacity:.9;`;
+    const dis  = disabled ? "pointer-events:none;opacity:.5;filter:grayscale(.4);" : "";
+    return `<a class="faserip-mode" data-mode="${val}" title="${disabled ? disabledReason : ""}" style="${active ? on : off}${dis}">${label}</a>`;
+  };
 
-  // saved UI state (with defaults)
-  const {
-    savedMultiAdjacent = false,
-    savedMultiAttacks = false,
-    savedAttackCount = 2
-  } = opts;
-
-  // Show section if either option is available
-  const showAdjacentOption = supportsAdjacent && targetCount > 1;
-  const showMultipleAttacksOption = supportsMultipleAttacks;
-
-  if (!showAdjacentOption && !showMultipleAttacksOption) return "";
-
-  let html = '<div style="margin:6px 0;padding:6px;background:#e8f5e9;border:1px solid #4caf50;border-radius:3px;">';
-  html += '<div style="font-weight:600;margin-bottom:6px;color:#2e7d32;">Multiple Target Options</div>';
-
-  if (showAdjacentOption) {
-    html += `
-      <div style="margin-bottom:4px;">
-        <label style="display:flex;align-items:center;">
-          <input type="checkbox" id="multi-adjacent" name="multiAdjacent" ${savedMultiAdjacent ? "checked" : ""} style="margin-right:8px;">
-          <span style="font-size:.9em;">Multiple Adjacent Targets (${targetCount} targets, single roll at -4CS)</span>
-        </label>
-      </div>`;
-  }
-
-  if (showMultipleAttacksOption) {
-    html += `
-      <div style="margin-bottom:4px;">
-        <label style="display:flex;align-items:center;">
-          <input type="checkbox" id="multi-attacks" name="multiAttacks" ${savedMultiAttacks ? "checked" : ""} style="margin-right:8px;">
-          <span style="font-size:.9em;">Multiple Attacks (requires Fighting FEAT, -1CS each)</span>
-        </label>
-      </div>
-      <div id="multi-attacks-options" style="margin-left:24px;display:${savedMultiAttacks ? "block" : "none"};">
-        <label style="display:block;margin:4px 0;font-size:.85em;">
-          <input type="radio" name="attackCount" value="2" ${savedAttackCount === 2 ? "checked" : ""}>
-          2 attacks (Remarkable FEAT)
-        </label>
-        <label style="display:block;margin:4px 0;font-size:.85em;">
-          <input type="radio" name="attackCount" value="3" ${savedAttackCount === 3 ? "checked" : ""}>
-          3 attacks (Amazing FEAT)
-        </label>
-      </div>`;
-  }
-
-  html += "</div>";
-  return html;
+  return `
+    <div class="faserip-mode-row" style="display:flex;align-items:center;justify-content:flex-end;gap:6px;margin:4px 0 6px;">
+      <span style="font-size:12px;color:#666;margin-right:6px;">Mode:</span>
+      ${mk("manual","Manual")}
+      ${mk("semi","Semi")}
+      ${mk("full","Full")}
+      ${disabled ? `<span style="font-size:11px;color:#a33;margin-left:8px;">${disabledReason}</span>` : ""}
+    </div>`;
 }
 
-export function setupMultiAttackHandlers(html) {
-  const multiAdjacentCheckbox = html.find('#multi-adjacent');
-  const multiAttacksCheckbox = html.find('#multi-attacks');
-  const multiAttacksOptions = html.find('#multi-attacks-options');
-  
-  // Set up handlers independently
-  if (multiAttacksCheckbox.length) {
-    multiAttacksCheckbox.on('change', function() {
-      if (this.checked) {
-        if (multiAdjacentCheckbox.length) {
-          multiAdjacentCheckbox.prop('disabled', true).prop('checked', false);
-        }
-        multiAttacksOptions.show();
-      } else {
-        multiAttacksOptions.hide();
-        if (multiAdjacentCheckbox.length) {
-          multiAdjacentCheckbox.prop('disabled', false);
-        }
-      }
-    });
-  }
-  
-  if (multiAdjacentCheckbox.length) {
-    multiAdjacentCheckbox.on('change', function() {
-      if (this.checked) {
-        if (multiAttacksCheckbox.length) {
-          multiAttacksCheckbox.prop('disabled', true).prop('checked', false);
-        }
-        multiAttacksOptions.hide();
-      } else {
-        if (multiAttacksCheckbox.length) {
-          multiAttacksCheckbox.prop('disabled', false);
-        }
-      }
-    });
-  }
+/** Attach click handlers; updates opts.mode and derived flags, calls onChange(mode) */
+export function attachModeSelectorHandlers($html, opts = {}, onChange) {
+  const $buttons = $html.find(".faserip-mode-row .faserip-mode");
+  if (!$buttons.length) return;
+
+  const applyFlags = (modeVal) => {
+    const mode = String(modeVal || "semi");
+    const derived = (mode === "full")
+      ? { autoApply: true, showConfirm: false }
+      : (mode === "semi")
+        ? { autoApply: false, showConfirm: true }
+        : { autoApply: false, showConfirm: false };
+    if (opts) {
+      opts.mode = mode;
+      opts.autoApply = derived.autoApply;
+      opts.showConfirm = derived.showConfirm;
+    }
+    if (typeof onChange === "function") onChange(mode, derived);
+  };
+
+  $buttons.on("click", (ev) => {
+    const $btn = $(ev.currentTarget);
+    const mode = $btn.data("mode");
+    $buttons.css("background", "#f7f7f7").css("color", "#444").css("font-weight", "400");
+    $btn.css("background","#fff").css("color","#111").css("font-weight","600");
+    applyFlags(mode);
+  });
+
+  // Initialize flags once on attach
+  applyFlags(opts?.mode || "semi");
 }
 
 export const RANKS = [

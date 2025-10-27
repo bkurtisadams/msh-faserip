@@ -17,7 +17,7 @@ import { ManualModeDialog } from "./manual-mode-dialog.js";
 import { debugLog } from "./action-utils.js";
 
 // Anchor: mode resolver (safe even if settings not registered yet)
-function resolveCombatMode(actor) {
+export function resolveCombatMode(actor) {
   try {
     // Priority: actor setting > global setting > fallback
     const actorMode = actor?.system?.combatMode;
