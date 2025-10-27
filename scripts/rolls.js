@@ -22,6 +22,7 @@ import {
   colorMeetsRequirement
 } from "./modules/dice/universal-table.js";
 import { rollUniversalTable } from "./modules/dice/universal-table.js";
+import { applyColumnShifts } from "./modules/dice/column-shifts.js";
 
 // ============================================
 // HELPER FUNCTIONS (OUTSIDE THE CLASS)
@@ -288,25 +289,25 @@ export class FaseripRolls {
     console.log(`Power ${isStunt ? 'Stunt' : ''} Check - Available Lifetime Karma: ${actor.system.karma.lifetime}, Mastered: ${isMastered}`);
     
 
-    // Define action types and results based on color
-    const ACTIONS = {
-      "Blunt Attack (BA)": { white: "Miss", green: "Hit", yellow: "Slam", red: "Stun" },
-      "Edged Attack (EA)": { white: "Miss", green: "Hit", yellow: "Stun", red: "Kill" },
-      "Shooting Attack (Sh)": { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Kill" },
-      "Throwing Edged (TE)": { white: "Miss", green: "Hit", yellow: "Stun", red: "Kill" },
-      "Throwing Blunt (TB)": { white: "Miss", green: "Hit", yellow: "Hit", red: "Stun" },
-      "Energy (En)": { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Kill" },
-      "Force (Fo)": { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Stun" },
-      "Grappling (GP)": { white: "Miss", green: "Miss", yellow: "Partial", red: "Hold" },
-      "Grabbing (Gb)": { white: "Miss", green: "Take", yellow: "Grab", red: "Break" },
-      "Escaping (ES)": { white: "Miss", green: "Miss", yellow: "Escape", red: "Reverse" },
-      "Mental Attack": { white: "Failure", green: "Success", yellow: "Special Effect", red: "Maximum Effect" },
-      "General Power Use": { white: "Failure", green: "Success", yellow: "Special Effect", red: "Maximum Effect" }
+    // Helper to get action results from ACTION_RESULT_LABELS (imported from universal-table.js)
+    // Maps display names to action codes and provides fallbacks for custom power types
+    const getActionResults = (actionType) => {
+      // Extract action code from display name (e.g., "Blunt Attack (BA)" -> "BA")
+      const codeMatch = actionType.match(/\(([A-Z][a-z]?)\)/);
+      if (codeMatch) {
+        const code = codeMatch[1];
+        return ACTION_RESULT_LABELS[code];
+      }
+      // Fallbacks for non-standard action types
+      if (actionType === "Mental Attack" || actionType === "General Power Use") {
+        return { white: "Failure", green: "Success", yellow: "Special Effect", red: "Maximum Effect" };
+      }
+      return null;
     };
     
     // Get saved power settings or use defaults
     const savedActionType = power.getFlag("msh-faserip", "lastActionType");
-    const validActionType = Object.keys(ACTIONS).includes(savedActionType) ? savedActionType : "General Power Use";
+    const validActionType = savedActionType && getActionResults(savedActionType) ? savedActionType : "General Power Use";
     const savedColumnShift = power.getFlag("msh-faserip", "lastColumnShift") || 0;
     const savedDamageCS = power.getFlag("msh-faserip", "lastDamageCS") || 0; // Add this line
     const savedDamageType = power.getFlag("msh-faserip", "lastDamageType") || "Energy-Energy"; // Add this line
@@ -376,18 +377,10 @@ export class FaseripRolls {
 
       // Apply column shifts to get effective rank
       let effectiveRank = powerRank;
-      if (totalColumnShift !== 0) { // Use totalColumnShift here
-        const ranks = [
-          "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent",
-          "Remarkable", "Incredible", "Amazing", "Monstrous", "Unearthly",
-          "Shift-X", "Shift-Y", "Shift-Z", "Class 1000", "Class 3000", "Class 5000", "Beyond"
-        ];
-        const index = ranks.indexOf(powerRank);
-        if (index !== -1) {
-          const newIndex = Math.min(Math.max(index + totalColumnShift, 0), ranks.length - 1); // Use totalColumnShift here
-          effectiveRank = ranks[newIndex];
-          console.log(`Applied ${totalColumnShift} column shifts to ${powerRank}, now ${effectiveRank}`);
-        }
+      if (totalColumnShift !== 0) {
+        const shifted = applyColumnShifts(powerRank, totalColumnShift);
+        effectiveRank = shifted.name;
+        console.log(`Applied ${totalColumnShift} column shifts to ${powerRank}, now ${effectiveRank}`);
       }
 
       // Calculate damage rank based on damage CS
@@ -425,8 +418,8 @@ export class FaseripRolls {
 
       // Get the result text based on action type and color
       let resultText = "";
-      if (ACTIONS[actionType]) {
-        resultText = ACTIONS[actionType][resultColor.toLowerCase()];
+      if (getActionResults(actionType)) {
+        resultText = getActionResults(actionType)[resultColor.toLowerCase()];
       } else {
         resultText = resultColor.toUpperCase();
       }
@@ -999,17 +992,9 @@ export class FaseripRolls {
       // Apply column shifts to get effective rank
       let effectiveRank = abilityRank;
       if (totalColumnShift !== 0) {
-        const ranks = [
-          "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent",
-          "Remarkable", "Incredible", "Amazing", "Monstrous", "Unearthly",
-          "Shift-X", "Shift-Y", "Shift-Z", "Class 1000", "Class 3000", "Class 5000", "Beyond"
-        ];
-        const index = ranks.indexOf(abilityRank);
-        if (index !== -1) {
-          const newIndex = Math.min(Math.max(index + totalColumnShift, 0), ranks.length - 1);
-          effectiveRank = ranks[newIndex];
-          console.log(`Applied ${totalColumnShift} column shifts to ${abilityRank}, now ${effectiveRank}`);
-        }
+        const shifted = applyColumnShifts(abilityRank, totalColumnShift);
+        effectiveRank = shifted.name;
+        console.log(`Applied ${totalColumnShift} column shifts to ${abilityRank}, now ${effectiveRank}`);
       }
 
       // Calculate damage rank based on damage CS
@@ -1063,8 +1048,8 @@ export class FaseripRolls {
 
       // Get the result text - if action type doesn't have specific results, use color names
       let resultText = "";
-      if (ACTIONS[actionType]) {
-        resultText = ACTIONS[actionType][resultColor.toLowerCase()];
+      if (getActionResults(actionType)) {
+        resultText = getActionResults(actionType)[resultColor.toLowerCase()];
       } else {
         resultText = resultColor.toUpperCase();
       }
@@ -1511,30 +1496,17 @@ export class FaseripRolls {
       // Apply column shifts to get effective rank
       let effectiveRank = heroPopularityRank;
       if (columnShift !== 0) {
-        const ranks = [
-          "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent",
-          "Remarkable", "Incredible", "Amazing", "Monstrous", "Unearthly"
-        ];
-        const index = ranks.indexOf(effectiveRank);
-        if (index !== -1) {
-          const newIndex = Math.min(Math.max(index + columnShift, 0), ranks.length - 1);
-          effectiveRank = ranks[newIndex];
-          console.log(`Applied ${columnShift} column shifts to ${heroPopularityRank}, now ${effectiveRank}`);
-        }
+        const shifted = applyColumnShifts(effectiveRank, columnShift);
+        effectiveRank = shifted.name;
+        console.log(`Applied ${columnShift} column shifts to ${heroPopularityRank}, now ${effectiveRank}`);
       }
 
       // Apply mutant penalty if applicable
       if (isMutant) {
         // Apply a -1CS to reflect mutant penalty
-        const ranks = [
-          "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent",
-          "Remarkable", "Incredible", "Amazing", "Monstrous", "Unearthly"
-        ];
-        const index = ranks.indexOf(effectiveRank);
-        if (index > 0) { // Don't go below Shift-0
-          effectiveRank = ranks[index - 1];
-          console.log(`Applied -1CS mutant penalty, now ${effectiveRank}`);
-        }
+        const shifted = applyColumnShifts(effectiveRank, -1);
+        effectiveRank = shifted.name;
+        console.log(`Applied -1CS mutant penalty, now ${effectiveRank}`);
       }
 
       // Roll d100 and apply karma using the dice-roller module
@@ -1983,15 +1955,8 @@ export class FaseripRolls {
         // Apply column shifts if needed
         let effectiveRank = abilityRank;
         if (totalShift !== 0) {
-          const ranks = [
-            "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent",
-            "Remarkable", "Incredible", "Amazing", "Monstrous", "Unearthly"
-          ];
-          const index = ranks.indexOf(abilityRank);
-          if (index !== -1) {
-            const newIndex = Math.min(Math.max(index + totalShift, 0), ranks.length - 1); // Use totalShift here
-            effectiveRank = ranks[newIndex];
-          }
+          const shifted = applyColumnShifts(abilityRank, totalShift);
+          effectiveRank = shifted.name;
         }
 
         // Roll d100 and apply karma using the dice-roller module
