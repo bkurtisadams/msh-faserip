@@ -21,7 +21,7 @@ import {
   RANKS  // ADD THIS IMPORT for effect creation
 } from "./action-utils.js";
 
-import { startAura, stopAura, isAuraMaintained } from "./nullify.js";
+import { isAuraMaintained } from "./nullify.js";
 import { buildDamageFlags } from "./damage-ui.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
 

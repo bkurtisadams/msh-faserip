@@ -1,9 +1,7 @@
 // scripts/modules/actions/action-dispatcher.js
 import { BluntAttackAction }   from "./blunt-attack-action.js";
 import { EdgedAttackAction }   from "./edged-attack-action.js";
-import { RangedAttackAction }  from "./ranged-attack-action.js";
 import { DefenseAction }       from "./defense-action.js";
-import { ManeuverAction }      from "./maneuver-action.js";
 import { CheckAction }         from "./check-action.js";
 import { ShootingAction } from "./shooting-action.js";
 import { ThrowingEdgedAction } from "./throwing-edged-action.js";
