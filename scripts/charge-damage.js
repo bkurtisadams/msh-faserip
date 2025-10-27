@@ -1,54 +1,11 @@
-import { rollUniversalTable } from './universalTable.js'; // Ensure this exists
+import { rollUniversalTable } from './universalTable.js';
+import { 
+  resolveSlamFeat, 
+  resolveStunFeat, 
+  getGrandSlamDistance 
+} from './modules/combat/damage-resolution.js';
 
-/**
- * Resolve slam effect based on FASERIP rules
- * Target rolls Endurance FEAT on Universal Table to determine slam outcome
- * @param {Object} targetData - Object containing endurance info
- * @param {number} attackerStrength - Attacker's strength value (for Grand Slam distance)
- * @returns {Object} - Slam resolution results
- */
-function resolveSlamEffect(targetData, attackerStrength = 0) {
-    const enduranceRank = targetData.enduranceRank || "Typical";
-    const enduranceValue = targetData.enduranceValue || 6;
-
-    const roll = Math.ceil(Math.random() * 100);
-    const colorResult = rollUniversalTable(enduranceRank, roll); // returns 'white', 'green', etc.
-
-    let effect;
-    let knockbackDistance = 0;
-    let description = "";
-
-    switch (colorResult.toLowerCase()) {
-        case 'white':
-            effect = 'No Slam';
-            description = 'Target is not affected by the slam. Takes damage as for a normal hit.';
-            break;
-        case 'green':
-            effect = 'Stagger';
-            description = 'Target is knocked back a step or two, no longer adjacent to attacker.';
-            break;
-        case 'yellow':
-            effect = '1 Area';
-            knockbackDistance = 1;
-            description = 'Target is knocked 1 area away.';
-            break;
-        case 'red':
-            effect = 'Grand Slam';
-            knockbackDistance = getGrandSlamDistance(attackerStrength);
-            description = `Target is knocked away ${knockbackDistance} areas (attacker's strength as ground speed).`;
-            break;
-    }
-
-    console.log(`🎲 Slam Endurance FEAT roll: ${roll} → ${colorResult.toUpperCase()} → ${effect}`);
-    
-    return {
-        effect,
-        roll,
-        colorResult,
-        knockbackDistance,
-        description
-    };
-}
+// resolveSlamEffect moved to modules/combat/damage-resolution.js
 
 /**
  * Calculate charge damage based on FASERIP rules
@@ -167,7 +124,7 @@ export function calculateChargeDamage(options) {
             enduranceValue: defenderEndurance
         };
         
-        const slamResult = resolveSlamEffect(targetData, attackerStrength);
+        const slamResult = resolveSlamFeat({targetEnduranceRank: targetData.enduranceRank, targetEnduranceValue: targetData.enduranceValue, attackerStrength, penetratingDamage: results.damageToDefender});
         results.slamEffect = slamResult.effect;
         results.knockbackDistance = slamResult.knockbackDistance;
         
@@ -183,7 +140,7 @@ export function calculateChargeDamage(options) {
         };
         
         // Resolve stun effect
-        const stunResult = resolveStunEffect(targetData);
+        const stunResult = resolveStunFeat({targetEnduranceRank: targetData.enduranceRank, targetEnduranceValue: targetData.enduranceValue, penetratingDamage: results.damageToDefender});
         results.stunEffect = stunResult.effect;
         results.stunDuration = stunResult.stunDuration;
         
@@ -191,7 +148,7 @@ export function calculateChargeDamage(options) {
         results.description += ` Stun: ${stunResult.description}`;
         
         // Stun results can also include slam effects
-        const slamResult = resolveSlamEffect(targetData, attackerStrength);
+        const slamResult = resolveSlamFeat({targetEnduranceRank: targetData.enduranceRank, targetEnduranceValue: targetData.enduranceValue, attackerStrength, penetratingDamage: results.damageToDefender});
         results.slamEffect = slamResult.effect;
         results.knockbackDistance = slamResult.knockbackDistance;
         
@@ -217,52 +174,7 @@ export function calculateChargeDamage(options) {
     return results;
 }
 
-/**
- * Resolve stun effect based on FASERIP rules
- * Target rolls Endurance FEAT on Universal Table to determine stun outcome
- * @param {Object} targetData - Object containing endurance info
- * @returns {Object} - Stun resolution results
- */
-function resolveStunEffect(targetData) {
-    const enduranceRank = targetData.enduranceRank || "Typical";
-    const enduranceValue = targetData.enduranceValue || 6;
-
-    const roll = Math.ceil(Math.random() * 100);
-    const colorResult = game.faserip?.getResultColor(enduranceRank, roll) || 'white';
-
-    let effect;
-    let stunDuration = 0;
-    let description = "";
-
-    switch (colorResult.toLowerCase()) {
-        case 'white':
-            effect = '1-10 rounds';
-            stunDuration = Math.ceil(Math.random() * 10); // Roll 1d10
-            description = `Knocked out for ${stunDuration} rounds. May take no actions.`;
-            break;
-        case 'green':
-            effect = '1 round';
-            stunDuration = 1;
-            description = 'Knocked down for 1 round. May take no action next round.';
-            break;
-        case 'yellow':
-        case 'red':
-            effect = 'No effect';
-            stunDuration = 0;
-            description = 'Not affected by the stun result.';
-            break;
-    }
-
-    console.log(`🎲 Stun Endurance FEAT roll: ${roll} → ${colorResult.toUpperCase()} → ${effect}`);
-    
-    return {
-        effect,
-        roll,
-        colorResult,
-        stunDuration,
-        description
-    };
-}
+// resolveStunEffect moved to modules/combat/damage-resolution.js
 
 /**
  * Calculate damage when a character is slammed into an inanimate object
@@ -306,71 +218,8 @@ export function calculateSlamDamage(options) {
     return damageResults;
 }
 
-/**
- * Get slam distance based on attacker's strength rank (for Grand Slam)
- * @param {Number} strengthValue - Attacker's strength value
- * @returns {Number} - Distance in areas
- */
-export function getGrandSlamDistance(strengthValue) {
-    // Convert strength value to areas for knockback
-    // FASERIP rule: knocked away with speed equal to strength as ground speed
-    if (strengthValue >= 100) return 10; // Unearthly and above
-    if (strengthValue >= 75) return 9;   // Monstrous
-    if (strengthValue >= 50) return 8;   // Amazing
-    if (strengthValue >= 40) return 7;   // Incredible
-    if (strengthValue >= 30) return 6;   // Remarkable
-    if (strengthValue >= 20) return 5;   // Excellent
-    if (strengthValue >= 10) return 4;   // Good
-    if (strengthValue >= 6) return 3;    // Typical
-    if (strengthValue >= 4) return 2;    // Poor
-    if (strengthValue >= 2) return 1;    // Feeble
-    return 0; // Shift-0
-}
-
-/**
- * Resolve slam endurance feat for a target (for interactive use)
- * @param {Actor} target - Target actor making the endurance feat
- * @param {number} attackerStrength - Attacker's strength for grand slam distance
- * @returns {Object} - Slam resolution results
- */
-async function resolveSlamEnduranceFeat(target, attackerStrength = 0) {
-    const enduranceRank = target.system.abilities?.endurance?.rank || "Typical";
-    const enduranceValue = target.system.abilities?.endurance?.value || 6;
-
-    // Roll 1d100
-    const roll = new Roll("1d100").roll({async: false});
-    await roll.toMessage({flavor: `Slam Endurance FEAT for ${target.name} (${enduranceRank})`});
-
-    // Interpret the result using your Universal Table logic
-    const color = game.faserip?.getResultColor(enduranceRank, roll.total);  
-
-    let outcome = "No Slam";
-    let knockbackDistance = 0;
-
-    switch (color) {
-        case "white":
-            outcome = "No Slam";
-            break;
-        case "green":
-            outcome = "Stagger";
-            break;
-        case "yellow":
-            outcome = "1 Area";
-            knockbackDistance = 1;
-            break;
-        case "red":
-            outcome = "Grand Slam";
-            knockbackDistance = getGrandSlamDistance(attackerStrength);
-            break;
-    }
-
-    return {
-        outcome,
-        knockbackDistance,
-        color,
-        roll: roll.total
-    };
-}
+// getGrandSlamDistance and resolveSlamEnduranceFeat moved to modules/combat/damage-resolution.js
+// Use resolveSlamFeatWithRoll() for async interactive version
 
 // Rest of the code remains the same...
 export async function processChargeAttack(attackData) {
@@ -567,10 +416,13 @@ export function initializeSlamHandlers() {
             
             // Resolve the slam effect based on the roll
             const color = game.faserip?.getResultColor(enduranceRank, rollValue) || 'white';
-            const slamResult = resolveSlamEffect({
-                enduranceRank: enduranceRank,
-                enduranceValue: targetActor.system.abilities?.endurance?.value || 6
-            }, attackerStrength);
+            const slamResult = resolveSlamFeat({
+                targetEnduranceRank: enduranceRank,
+                targetEnduranceValue: targetActor.system.abilities?.endurance?.value || 6,
+                attackerStrength: attackerStrength,
+                penetratingDamage: 1,
+                roll: rollValue
+            });
             
             // Show the slam result
             await ChatMessage.create({
@@ -627,19 +479,19 @@ export function initializeSlamHandlers() {
                     </div>
                 `
             });
-            
-            // Resolve the stun effect based on the roll
-            const color = game.faserip?.getResultColor(enduranceRank, rollValue) || 'white';
-            const stunResult = resolveStunEffect({
-                enduranceRank: enduranceRank,
-                enduranceValue: targetActor.system.abilities?.endurance?.value || 6
+            const stunResult = resolveStunFeat({
+                targetEnduranceRank: enduranceRank,
+                targetEnduranceValue: targetActor.system.abilities?.endurance?.value || 6,
+                penetratingDamage: 1,
+                roll: rollValue
             });
-            
-            // Also check for slam effect (stun can include slam)
-            const slamResult = resolveSlamEffect({
-                enduranceRank: enduranceRank,
-                enduranceValue: targetActor.system.abilities?.endurance?.value || 6
-            }, attackerStrength);
+            const slamResult   = resolveSlamFeat({
+                targetEnduranceRank: enduranceRank,
+                targetEnduranceValue: targetActor.system.abilities?.endurance?.value || 6,
+                attackerStrength: attackerStrength,
+                penetratingDamage: 1,
+                roll: rollValue
+            });
             
             // Show the stun result
             let stunContent = `

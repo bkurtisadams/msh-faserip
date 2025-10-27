@@ -2,11 +2,11 @@
 import { 
     calculateChargeDamage, 
     calculateSlamDamage, 
-    getGrandSlamDistance,
     processChargeAttack,
     initializeSlamHandlers  // Add this
 } from './charge-damage.js';
 import { calculateMitigation, getMitigationSummary } from "./rules/mitigation.js";
+import { getGrandSlamDistance } from './modules/combat/damage-resolution.js';
 
 // location: systems/msh-faserip/scripts/combat-handler.js
 const ACTION_RESULT_LABELS = {

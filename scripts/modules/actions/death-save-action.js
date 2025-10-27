@@ -52,7 +52,8 @@ export class DeathSaveAction extends BaseAction {
         <strong>Possible Results:</strong>
         <ul style="margin:6px 0 0 20px;padding:0;">
         <li><strong>White (Endurance Loss):</strong> Character is dying, loses 1 rank per turn</li>
-        <li><strong>Green/Yellow/Red (No Effect):</strong> Character is stunned 1-10 rounds, can wake up</li>
+        <li><strong>Green (E/S):</strong> Dying if Edged/Shooting attack, otherwise stunned</li>
+        <li><strong>Yellow/Red (No Effect):</strong> Character is stunned 1-10 rounds, can wake up</li>
         </ul>
     </div>
 
