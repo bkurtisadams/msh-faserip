@@ -15,6 +15,7 @@ import {
   postDeathSavePrompt,
   buildMultiAttackSection,
   setupMultiAttackHandlers,
+  debugLog,
   buildActionsBox
 } from "./action-utils.js";
 import { getItemMaterialRank } from "../../gm-utils.js";
@@ -552,16 +553,23 @@ export class EdgedAttackAction extends AttackAction {
         targets: (Array.from(game.user?.targets ?? [])).length || 0
       });
 
-      await applyDamageToTargets(rawDamage, {
-        attackerUuid: actor.uuid,
-        damageType: dmgType,        // "physical-edged" or weapon’s damageType if set
-        showNotification: true,
-        bypassArmor: false,
-        attackForm: "edged",
-        armorPiercing: Number(choice.ap || 0) || 0,
-        armorPiercingCS: Number(choice.apCS || 0) || 0,
-        apMode: "value"
-      });
+      /* Auto-apply in full-auto mode for Edged. */
+      if (this.opts?.autoApply && isHit && rawDamage > 0) {
+        await applyDamageToTargets(rawDamage, {
+          attackerUuid: actor.uuid,
+          damageType: (choice?.damageType || dmgType || "physical-edged"),
+          attackForm: "edged",
+          showNotification: true,
+          bypassArmor: false,
+          armorPiercing: Number(choice?.armorPiercing || choice?.ap || 0),
+          armorPiercingCS: Number(choice?.armorPiercingCS || choice?.apCS || 0),
+          apMode: (choice?.apMode || "value"),
+          wasKillResult: (colorLower === "red")
+        });
+        if (typeof debugLog === "function") {
+          debugLog("Edged auto-apply complete", { rawDamage, damageType: (choice?.damageType || dmgType || "physical-edged") });
+        }
+      }
     }
     // === END AUTO-APPLY ===
 
