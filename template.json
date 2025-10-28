@@ -68,7 +68,7 @@
     },
     "hero": {
       "templates": ["base", "abilities", "derived", "movement", "progress"],
-      "combatMode": "semi",
+      "characterType": "player",
       "powerOrigin": "altered human",
       "isMutant": false,
       "resistances": [],
@@ -76,6 +76,7 @@
     },
     "villain": {
       "templates": ["base", "abilities", "derived", "movement", "progress"],
+      "characterType": "npc-villain",
       "powerOrigin": "altered human",
       "isMutant": false,
       "resistances": [],
@@ -83,6 +84,7 @@
     },
     "npc": {
       "templates": ["base", "abilities", "derived", "movement", "progress"],
+      "characterType": "civilian",
       "resistances": []
     }
   },
