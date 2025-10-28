@@ -7,7 +7,7 @@ import {
   rollWithKarmaAndHistory, buildResultGrid, buildActionsBox, bannerColors,
   getTargetingContext, getBodyArmorValues, applyDamageToTargets,
   buildMultiAttackSection, setupMultiAttackHandlers,
-  buildModeSelector, attachModeSelectorHandlers, debugLog
+  buildModeSelector, attachModeSelectorHandlers, debugLog, setupModeSelector
 } from "./action-utils.js";
 import { getItemMaterialRank } from "../../gm-utils.js";
 import { makeDamageBlock, computeAfterArmor, buildDamageFlags } from "./damage-ui.js";
@@ -50,7 +50,7 @@ export class BluntAttackAction extends AttackAction {
 
     // dialog HTML
     const dialogHtml = `
-      ${buildModeSelector({ mode: this.opts?.mode || "semi" })}
+      ${buildModeSelector({ mode: "semi" })}
 
       <div style="margin-bottom:6px;">
         <div style="display:grid;grid-template-columns:65px 1fr;gap:3px 8px;font-size:.9em;line-height:1.3;">
@@ -171,32 +171,36 @@ export class BluntAttackAction extends AttackAction {
             callback: async (html) => {
               const $ = (sel) => html.find(sel);
               const src    = $('[name="src"]:checked').val() || "hands";
-              const itemId = String($('[name="item"]').val() || "");
-              const objectName  = String($('[name="objectName"]').val() || "");
-              const objectRank  = String($('[name="objectRank"]').val() || "Excellent");
-              const objectValue = Number($('[name="objectValue"]').val() || 20);
-              const shift  = Number($('[name="shift"]').val() || 0);
-              const karma  = Number($('[name="karma"]').val() || 0);
-              const pulledDamage = Number($('[name="pulledDamage"]').val() || 0);
-              const resultCap    = String($('[name="resultCap"]').val() || "none");
-              const remember = !!$('[name="remember"]').is(':checked');
-              const skipDice = !!$('[name="skipDice"]').is(':checked');
+              const itemId = $('[name="item"]').val() || "";
+              const objectName  = $('[name="objectName"]').val() || "";
+              const objectRank  = $('[name="objectRank"]').val() || "Excellent";
+              const objectValue = parseInt($('[name="objectValue"]').val() || 20);
+              const shift       = parseInt($('[name="shift"]').val() || 0);
+              const karma       = parseInt($('[name="karma"]').val() || 0);
+              const pulledDamage= parseInt($('[name="pulledDamage"]').val() || 0);
+              const resultCap   = $('[name="resultCap"]').val() || "none";
+              const skipDice    = !!$('[name="skipDice"]').is(':checked');
 
-              // compute damage
-              let weaponMat = "", weaponName = "", damage = strength.value, note = "";
+              let weaponMat="", weaponName="", damage=strength.value, note="";
               if (src === "weapon") {
-                const item = attackItems.find(i => i.id === itemId) || null;
-                weaponMat  = item ? getItemMaterialRank(item) : "Excellent";
-                weaponName = item ? item.name : "(Object)";
+                const item = attackItems.find(i => i.id === itemId);
+                weaponMat = item ? getItemMaterialRank(item) : "Excellent";
+                weaponName = item ? item.name : "";
                 const res = computeBluntDamage(strength.rank, strength.value, weaponMat, RANKS);
-                damage = res.damage; note = res.note;
+                damage = res.damage;
+                note = res.note;
               } else if (src === "object") {
-                weaponMat  = objectRank;
+                weaponMat = objectRank;
                 weaponName = objectName || "Object";
                 const res = computeBluntDamage(strength.rank, strength.value, weaponMat, RANKS);
-                damage = res.damage; note = res.note;
+                damage = res.damage;
+                note = res.note;
+              } else {
+                damage = strength.value;
+                note = "Bare Hands = Strength";
               }
 
+              const remember = !!$('[name="remember"]').is(':checked');
               if (remember) {
                 await actor.setFlag("msh-faserip","lastBluntSource", src);
                 await actor.setFlag("msh-faserip","lastBluntPulledDamage", pulledDamage);
@@ -231,12 +235,11 @@ export class BluntAttackAction extends AttackAction {
           cancel: { label: "Cancel", callback: () => resolve(null) }
         },
         default: "roll",
-        render: (html) => {
+        render: async (html) => {
           const $dialog = html.closest('.dialog');
-           // Initialize mode selector
-          attachModeSelectorHandlers(html, this.opts || {}, (mode, derived) => {
-            console.log('Mode changed to:', mode, derived);
-          });
+          
+          // Setup mode selector with centralized persistence
+          await setupModeSelector(actor, html, this.opts || {}, "lastBluntMode");
 
           const update = () => {
             const src = html.find('[name="src"]:checked').val() || "hands";
@@ -324,238 +327,51 @@ export class BluntAttackAction extends AttackAction {
         intensity, 
         choice.attackCount
       );
-      if (featResult.cancelled) return;
       
-      if (!featResult.success) {
-        // Failed FEAT: 1 attack at -3CS
-        choice.shift = (choice.shift || 0) - 3;
-        actualAttackCount = 1;
-      } else {
-        // Success: Multiple attacks at -1CS each
-        choice.shift = (choice.shift || 0) - 1;
+      if (featResult.success) {
         actualAttackCount = choice.attackCount;
-      }
-    }
-
-    // Execute attack(s)
-    for (let i = 1; i <= actualAttackCount; i++) {
-      if (i > 1) {
-        // Small delay between attacks for visual clarity
-        await new Promise(resolve => setTimeout(resolve, 500));
-      }
-      
-      const attackLabel = actualAttackCount > 1 ? ` (Attack ${i}/${actualAttackCount})` : '';
-      await this._executeSingleAttack(choice, actionName + attackLabel);
-    }
-
-    // Summary if multiple attacks
-    if (actualAttackCount > 1) {
-      await ChatMessage.create({
-        speaker: ChatMessage.getSpeaker({ actor }),
-        content: `
-          <div style="background:#e8f5e9;border:1px solid #4caf50;border-radius:3px;padding:8px;margin:5px 0;">
-            <div style="color:#2e7d32;font-weight:bold;margin-bottom:5px;">Multiple Attack Sequence Complete</div>
-            <div style="font-size:0.9em;">
-              ${actor.name} completed ${actualAttackCount} attacks at -1CS each.
-            </div>
-          </div>
-        `
-      });
-    }
-  } // <-- CLOSE execute()
-
-  async _executeSingleAttack(choice, actionLabel) {
-    const targetCount = this.getTargetCount();
-    const actor = this.actor;
-    const actionType = "blunt-attack";
-    const ability = getAbilityInfo(actor, this.abilityName);
-    const strength = getStrengthInfo(actor);
-    const effects = effectsFor(actionType);
-
-    // effective rank + roll/karma
-    const { name: effectiveRank } = applyColumnShifts(ability.rank, choice.shift);
-    const roll = await (new Roll("1d100")).evaluate();
-    if (!choice.skipDice) {
-      await roll.toMessage({
-        speaker: ChatMessage.getSpeaker({ actor }),
-        flavor: `${actor.name} performs ${actionLabel}`,
-        rollMode: game.settings.get("core", "rollMode")
-      });
-    }
-    const { cappedTotal, totalKarmaUsed } =
-      await rollWithKarmaAndHistory(actor, actionLabel, choice.karma, roll);
-
-    // resolve color/effects
-    let color = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
-    let colorLower = String(color || "").toLowerCase();
-
-    const outcome = buildColorOutcome(color, "BA"); // "BA" = Blunt Attack
-    // outcome.damageShiftCS, outcome.slamCandidate, outcome.stunCandidate
-    
-    // Apply result cap if set
-    const colorOrder = ['white', 'green', 'yellow', 'red'];
-    if (choice.resultCap !== 'none') {
-      const capIndex = colorOrder.indexOf(choice.resultCap);
-      const currentIndex = colorOrder.indexOf(colorLower);
-      if (currentIndex > capIndex) {
-        colorLower = choice.resultCap;
-        color = colorLower.charAt(0).toUpperCase() + colorLower.slice(1);
-      }
-    }
-    
-    const effectResult = effects[colorLower] || color;
-
-    // card pieces (shared)
-    const grid = buildResultGrid(actionType, colorLower, effects, (globalThis._getResultHoverText || this._getResultHoverText));
-    const { bg, fg } = bannerColors(colorLower);
-
-    const isHit = colorLower !== 'white';
-
-    // Calculate penetrating damage by checking targeted token's Body Armor
-    let penetratingDamage = 0;
-    if (isHit && choice.damage > 0) {
-      const targets = Array.from(game.user?.targets ?? []);
-      if (targets.length === 1) {
-        const targetActor = targets[0].actor;
-        if (targetActor) {
-          const armorData = getBodyArmorValues(targetActor, "physical-blunt");
-          penetratingDamage = Math.max(0, choice.damage - armorData.applicable);
-        } else {
-          penetratingDamage = choice.damage;
-        }
+        choice.shift = (choice.shift || 0) - 1; // Apply -1 CS for multi-attacks
+        ui.notifications.info(`Multi-attack successful! Making ${actualAttackCount} attacks at -1CS!`);
       } else {
-        penetratingDamage = choice.damage;
+        ui.notifications.warn(`Multi-attack FEAT failed! Only making 1 attack.`);
+        actualAttackCount = 1;
       }
     }
 
-    // Apply damage cap from pull punch
-    if (choice.pulledDamage > 0 && choice.pulledDamage < penetratingDamage) {
-      penetratingDamage = choice.pulledDamage;
-    }
+    // Execute attacks
+    const targetCount = game.user.targets.size || 1;
 
-    // NOW calculate breakingFeat (after penetratingDamage is known)
-    const breakingFeat = (colorLower !== "white" && penetratingDamage > 0 && (choice.src === "weapon" || choice.src === "object"))
-      ? { weaponMat: choice.weaponMat }
-      : null;
-
-    const targets = Array.from(game.user?.targets ?? []);
-    const rawDamage = choice.damage ?? strength.value;
-    const afterArmor = penetratingDamage;
-
-    const dmgType = "physical-blunt";
-
-    const actions = (isHit && canEffectsApply(penetratingDamage))
-      ? buildActionsBox({
-          showSlam: colorLower === "yellow" && canEffectsApply(penetratingDamage),
-          showStun: colorLower === "red" && canEffectsApply(penetratingDamage),
-          pulled: choice.resultCap !== 'none' || (choice.pulledDamage > 0 && choice.pulledDamage < choice.damage),
-          breakingFeat,
-          actorUuid: actor.uuid,
-          damage: penetratingDamage,
-          attackForm: "blunt",
-          damageType: "physical-blunt",
-          bypassArmor: false
-        })
-      : "";
-
-    // Build pull punch indicator
-    let pullPunchNote = "";
-    if (choice.pulledDamage > 0 && choice.pulledDamage < rawDamage) {
-      pullPunchNote += `<div style="color:#ff6f00;">⚠ Damage pulled: ${rawDamage} → ${choice.pulledDamage}</div>`;
-    }
-    if (choice.resultCap !== 'none') {
-      pullPunchNote += `<div style="color:#ff6f00;">⚠ Result capped at ${choice.resultCap.toUpperCase()}</div>`;
-    }
-
-    // damage line
-    const damageBlock = `
-      <div style="margin:6px 10px;padding:6px;border:1px solid #ccc;border-radius:3px;background:#fff;">
-        <div><b>Damage (raw):</b> ${rawDamage}${choice.note ? ` <span style="color:#666;">— ${choice.note}</span>` : ``}</div>
-        ${isHit ? `
-          <div><b>After Armor${targets.length===1 ? ` (${targets[0].name})` : ``}:</b> ${afterArmor}</div>
-        ` : ``}
-        ${(choice.src === "weapon" || choice.src === "object") ? `
-          <div style="font-size:.9em;color:#555;">
-            Source: ${choice.weaponName || "(Object)"} (${choice.weaponMat || "Excellent"})
-          </div>
-        ` : `
-          <div style="font-size:.9em;color:#555;">Source: Bare Hands</div>
-        `}
-        ${pullPunchNote}
-      </div>
-    `;
-
-    const targetingContext = getTargetingContext(actor, actionLabel);
-
-    // final chat card
-    const cardHtml = `
-      <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
-        <div style="padding:5px 10px;border-bottom:1px solid #c0c0c0;font-size:1.1em;color:#8b0000;">
-          <strong>${actor.name} - ${actionLabel}</strong>
-        </div>
-        <div style="padding:5px 10px;border-bottom:1px solid #e0e0e0;font-size:.9em;">
-          ${targetingContext}
-        </div>
-        <div style="padding:5px 10px;font-size:.9em;">
-          <div>Ability: ${ability.name}</div>
-          <div>Base Rank: ${ability.rank} (${ability.value})${choice.shift ? ` — Shift ${choice.shift} → ${effectiveRank}` : ""}</div>
-          <div>Roll: ${roll.total}${totalKarmaUsed ? ` + Karma: ${totalKarmaUsed}` : ""} = ${cappedTotal}</div>
-        </div>
-        ${damageBlock}
-        ${grid}
-        <div style="text-align:center;padding:8px;margin:5px;font-weight:bold;font-size:1.1em;border-radius:3px;background:${bg};color:${fg};">
-          RESULT: ${String(color).toUpperCase()} — ${String(effectResult).toUpperCase()}
-        </div>
-        ${actions}
-      </div>
-    `;
-
-    await ChatMessage.create({
-      speaker: ChatMessage.getSpeaker({ actor }),
-      content: cardHtml,
-      flags: buildDamageFlags({
-        actionId: actionType,
-        damageType: dmgType,
-        rawDamage,
-        afterArmor,
-        resultColor: colorLower,
-        cappedTotal,
-        targets: targets
-      })
-    });
-
-  // === AUTO-APPLY DAMAGE IN FULL AUTO MODE ===
-  if (this.opts?.autoApply && isHit && rawDamage > 0) {
-    debugLog("Auto-applying damage in full auto mode", {
-      damage: rawDamage,
-      afterArmor,
-      targets: (Array.from(game.user?.targets ?? [])).length || 0
-    });
-
-    await applyDamageToTargets(rawDamage, {
-      attackerUuid: actor.uuid,
-      damageType: dmgType,        // "physical-blunt"
-      showNotification: true,
-      bypassArmor: false,
+    if (choice.multiAdjacent && targetCount > 1) {
+      // Single roll for all adjacent targets
+      await this._executeSingleAttack({
+      choice, actor, ability,
+      actionType, actionName, effects,
+      damageType: "physical-blunt",
+      rawDamage: choice.damage,
+      damageNote: choice.note,
+      sourceName: choice.weaponName || "Bare Hands",
       attackForm: "blunt",
-      armorPiercing: 0
+      breakingFeat: (choice.src === "weapon" || choice.src === "object") ? { weaponMat: choice.weaponMat } : null,
+      targetCount
     });
-  }
-  // === END AUTO-APPLY ===
-
-  // Play combat SFX
-  const sourceName = choice.weaponName || "Bare Hands";
-    if (game.msh?.playCombatSFX) {
-      if (targetCount > 1 && MULTIPLE_PUNCH_SFX) {
-        // Rapid-fire punches
-        for (let i = 0; i < targetCount; i++) {
-          if (i > 0) await new Promise(resolve => setTimeout(resolve, 150));
-          await game.msh.playCombatSFX(dmgType, sourceName, colorLower);
+    } else {
+      // Execute each attack separately
+      for (let i = 0; i < actualAttackCount; i++) {
+        if (i > 0 && MULTIPLE_PUNCH_SFX) {
+          await new Promise(resolve => setTimeout(resolve, 300));
         }
-      } else {
-        await game.msh.playCombatSFX(dmgType, sourceName, colorLower);
+        await this._executeSingleAttack({
+      choice, actor, ability,
+      actionType, actionName, effects,
+      damageType: "physical-blunt",
+      rawDamage: choice.damage,
+      damageNote: choice.note,
+      sourceName: choice.weaponName || "Bare Hands",
+      attackForm: "blunt",
+      breakingFeat: (choice.src === "weapon" || choice.src === "object") ? { weaponMat: choice.weaponMat } : null,
+      targetCount: 1
+    });
       }
     }
-
-  } // <-- CLOSE _executeSingleAttack()
-} // <-- CLOSE class
+  }
+}

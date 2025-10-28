@@ -4,6 +4,42 @@ import { calculateMitigation } from "../../rules/mitigation.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
 import { resolveCombatMode } from "./action-dispatcher.js";
 
+/**
+ * Setup complete mode selector with persistence
+ * @param {Actor} actor - The actor to save/load mode from
+ * @param {jQuery} $html - The dialog HTML
+ * @param {Object} opts - Options object to update
+ * @param {string} flagName - Flag name to save mode (e.g., "lastBluntMode")
+ * @returns {string} Current mode value
+ */
+export async function setupModeSelector(actor, $html, opts = {}, flagName = "lastActionMode") {
+  // Load saved mode
+  const savedMode = (await actor.getFlag("msh-faserip", flagName)) || "semi";
+  
+  // Initialize opts
+  opts.mode = savedMode;
+  const derived = (savedMode === "full")
+    ? { autoApply: true, showConfirm: false }
+    : (savedMode === "semi")
+      ? { autoApply: false, showConfirm: true }
+      : { autoApply: false, showConfirm: false };
+  Object.assign(opts, derived);
+  
+  // Update visual state to match saved mode
+  const $buttons = $html.find(".faserip-mode-row .faserip-mode");
+  $buttons.css({"background": "#f7f7f7", "color": "#444", "font-weight": "400", "border-color": "#bbb"});
+  const $activeBtn = $buttons.filter(`[data-mode="${savedMode}"]`);
+  $activeBtn.css({"background":"#2196F3", "color":"#fff", "font-weight":"600", "border-color":"#1976D2"});
+  
+  // Attach handlers with auto-save
+  attachModeSelectorHandlers($html, opts, async (mode, derived) => {
+    await actor.setFlag("msh-faserip", flagName, mode);
+    debugLog(`Mode changed to ${mode} and saved to ${flagName}`);
+  });
+  
+  return savedMode;
+}
+
 
 /** Build the Manual / Semi / Full mode selector strip */
 export function buildModeSelector({ mode = "semi", disabled = false, disabledReason = "" } = {}) {
@@ -54,8 +90,8 @@ export function attachModeSelectorHandlers($html, opts = {}, onChange) {
     applyFlags(mode);
   });
 
-  // Initialize flags once on attach
-  applyFlags(opts?.mode || "semi");
+  // REMOVE THIS LINE - it's causing double initialization:
+  // applyFlags(opts?.mode || "semi");
 }
 
 export const RANKS = [
@@ -1483,22 +1519,33 @@ export async function confirmPreview({ title = "Preview", contentHtml }) {
  * @returns {string} HTML for the multi-attack section
  */
 export function buildMultiAttackSection(actionType, targetCount, multiAttacks = false, attackCount = 2, multiAdjacent = false) {
-  const isMelee = ["blunt-attack", "edged-attack"].includes(actionType);
+  const canUseAdjacent = ["blunt-attack", "energy", "force"].includes(actionType);
   
   return `
     <div style="margin:6px 0;padding:6px;background:#e8f5e9;border:1px solid #4caf50;border-radius:3px;">
-      <div style="font-weight:600;margin-bottom:6px;color:#2e7d32;">Multiple Attacks</div>
+      <div style="font-weight:600;margin-bottom:6px;color:#2e7d32;">Multiple Targets/Attacks</div>
       
-      <div style="margin-bottom:4px;">
+      ${canUseAdjacent ? `
+        <div style="margin-bottom:6px;">
+          <label style="font-size:.9em;">
+            <input type="checkbox" name="multiAdjacent" ${multiAdjacent ? 'checked' : ''}>
+            Attack all adjacent targets (-4 CS, single roll)
+          </label>
+          <div style="font-size:.8em;color:#555;font-style:italic;margin-left:20px;">
+            One attack roll affects all adjacent enemies
+          </div>
+        </div>
+      ` : ''}
+      
+      <div style="margin-bottom:4px;${canUseAdjacent ? 'border-top:1px solid #c8e6c9;padding-top:6px;' : ''}">
         <label style="font-size:.9em;">
           <input type="checkbox" name="multiAttacks" ${multiAttacks ? 'checked' : ''}>
-          Enable Multi-Attacks (-1 CS per attack)
+          Multiple attacks: 2 or 3 separate attacks (-1 CS each)
         </label>
       </div>
       
       <div id="multi-attack-options" style="display:${multiAttacks ? 'block' : 'none'};margin-left:20px;padding:4px 0;">
         <div style="margin-bottom:4px;">
-          <label style="font-size:.9em;display:block;margin-bottom:2px;">Number of Attacks:</label>
           <label style="font-size:.85em;margin-right:12px;">
             <input type="radio" name="attackCount" value="2" ${attackCount === 2 ? 'checked' : ''}>
             2 attacks (Remarkable FEAT)
@@ -1508,17 +1555,13 @@ export function buildMultiAttackSection(actionType, targetCount, multiAttacks = 
             3 attacks (Amazing FEAT)
           </label>
         </div>
-        ${isMelee ? `
-          <div style="margin-top:4px;">
-            <label style="font-size:.85em;">
-              <input type="checkbox" name="multiAdjacent" ${multiAdjacent ? 'checked' : ''}>
-              Attack multiple adjacent targets (-4 CS, single roll)
-            </label>
-          </div>
-        ` : ''}
-        <div style="font-size:.8em;color:#555;font-style:italic;margin-top:4px;">
-          Must succeed at Fighting FEAT to perform multiple attacks
+        <div style="font-size:.8em;color:#555;font-style:italic;">
+          Requires Fighting FEAT. If failed: 1 attack at -3CS
         </div>
+      </div>
+      
+      <div style="font-size:.75em;color:#d32f2f;font-style:italic;margin-top:6px;">
+        ⚠ Cannot use both options together
       </div>
     </div>
   `;
@@ -1530,13 +1573,28 @@ export function buildMultiAttackSection(actionType, targetCount, multiAttacks = 
  */
 export function setupMultiAttackHandlers(html) {
   const $multiAttacks = html.find('[name="multiAttacks"]');
+  const $multiAdjacent = html.find('[name="multiAdjacent"]');
   const $multiOptions = html.find('#multi-attack-options');
   
+  // Toggle multi-attack options visibility
   if ($multiAttacks.length && $multiOptions.length) {
     $multiAttacks.on('change', function() {
       if ($(this).is(':checked')) {
         $multiOptions.slideDown(200);
+        // Uncheck adjacent if multi-attacks is checked
+        if ($multiAdjacent.length) $multiAdjacent.prop('checked', false);
       } else {
+        $multiOptions.slideUp(200);
+      }
+    });
+  }
+  
+  // Make adjacent mutually exclusive with multi-attacks
+  if ($multiAdjacent.length && $multiAttacks.length) {
+    $multiAdjacent.on('change', function() {
+      if ($(this).is(':checked')) {
+        // Uncheck multi-attacks if adjacent is checked
+        $multiAttacks.prop('checked', false);
         $multiOptions.slideUp(200);
       }
     });

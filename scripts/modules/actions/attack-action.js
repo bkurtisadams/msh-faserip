@@ -1,6 +1,13 @@
 import { BaseAction } from "./base-action.js";
-import { RANKS, getStrengthInfo, shiftRank, getAbilityInfo } from "./action-utils.js";
+import { 
+  RANKS, getStrengthInfo, shiftRank, getAbilityInfo,
+  rollWithKarmaAndHistory, buildResultGrid, buildActionsBox, bannerColors,
+  getTargetingContext, getBodyArmorValues, applyDamageToTargets,
+  debugLog
+} from "./action-utils.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
+import { buildDamageFlags } from "./damage-ui.js";
+import { canEffectsApply } from "../../rules/effects-gate.js";
 
 export class AttackAction extends BaseAction {
   constructor(args) {
@@ -31,7 +38,6 @@ export class AttackAction extends BaseAction {
 
   _getStrength() { return getStrengthInfo(this.actor); }
 
-  // Add to attack-action.js (base class)
   async _rollFightingFeat(actor, fightingAbility, intensity, attackCount) {
     const availableKarma = actor.system.karma.value || 0;
     
@@ -39,6 +45,59 @@ export class AttackAction extends BaseAction {
     const intensityIndex = RANKS.indexOf(intensity);
     const fightingIndex = RANKS.indexOf(fightingAbility.rank);
     
+    // In Full Auto mode, skip dialog and roll automatically with 0 karma
+    if (this.opts?.autoApply === true) {
+      const roll = await (new Roll("1d100")).evaluate();
+      const totalRoll = roll.total;
+      
+      const resultColor = game.msh.rollUniversalTable(fightingAbility.rank, totalRoll);
+      const colorLower = resultColor.toLowerCase();
+      
+      // Determine success based on FEAT intensity comparison rules
+      let success = false;
+      if (fightingIndex > intensityIndex) {
+        success = ["green", "yellow", "red"].includes(colorLower);
+      } else if (fightingIndex === intensityIndex) {
+        success = ["yellow", "red"].includes(colorLower);
+      } else {
+        success = colorLower === "red";
+      }
+      
+      // Show result in chat (auto-rolled)
+      await roll.toMessage({
+        speaker: ChatMessage.getSpeaker({ actor }),
+        flavor: `Multiple Attack FEAT: ${intensity} (Auto-rolled)`,
+      });
+      
+      const bgColor = success ? "#e8f5e9" : "#ffebee";
+      const borderColor = success ? "#4caf50" : "#f44336";
+      const textColor = success ? "#2e7d32" : "#d32f2f";
+      
+      await ChatMessage.create({
+        speaker: ChatMessage.getSpeaker({ actor }),
+        content: `
+          <div style="background:${bgColor}; border:1px solid ${borderColor}; border-radius:3px; padding:8px; margin:5px 0;">
+            <div style="color:${textColor}; font-weight:bold; margin-bottom:5px;">
+              Multiple Attack FEAT - ${success ? "SUCCESS" : "FAILED"} (Full Auto)
+            </div>
+            <div style="font-size:0.9em;">
+              <div>Fighting: ${fightingAbility.rank} vs Intensity: ${intensity}</div>
+              <div>Roll: ${roll.total}</div>
+              <div>Result: <strong>${resultColor.toUpperCase()}</strong></div>
+              <div style="margin-top:5px; font-style:italic;">
+                ${success 
+                  ? `${attackCount} attacks at -1CS each` 
+                  : `FEAT failed: Only 1 attack at -3CS`}
+              </div>
+            </div>
+          </div>
+        `
+      });
+      
+      return { success, intensity, roll, totalRoll, resultColor, cancelled: false };
+    }
+    
+    // Manual/Semi mode: show dialog
     // Determine required color based on FEAT rules
     let requiredColor;
     if (fightingIndex > intensityIndex) {
@@ -165,5 +224,201 @@ export class AttackAction extends BaseAction {
         default: "roll"
       }).render(true);
     });
+  }
+
+  /**
+   * Unified attack execution for all attack types
+   * @param {Object} config - Attack configuration
+   * @param {Object} config.choice - User choices from dialog
+   * @param {Actor} config.actor - The attacking actor
+   * @param {Object} config.ability - Ability info {name, rank, value}
+   * @param {string} config.actionType - Action type identifier (e.g., "blunt-attack")
+   * @param {string} config.actionName - Display name for action
+   * @param {Object} config.effects - Effect mappings for colors
+   * @param {string} config.damageType - Damage type (e.g., "physical-blunt")
+   * @param {number} config.rawDamage - Base damage value
+   * @param {string} config.damageNote - Description of damage source
+   * @param {string} config.sourceName - Name of weapon/source
+   * @param {string} config.attackForm - Attack form for effects ("blunt", "edged", "shooting")
+   * @param {Object} config.breakingFeat - Optional breaking feat data
+   * @param {number} config.targetCount - Number of targets (for display)
+   */
+  async _executeSingleAttack(config) {
+    const {
+      choice,
+      actor,
+      ability,
+      actionType,
+      actionName,
+      effects,
+      damageType,
+      rawDamage,
+      damageNote,
+      sourceName,
+      attackForm,
+      breakingFeat = null,
+      targetCount = 1
+    } = config;
+
+    const actionLabel = `${actionName}${targetCount > 1 ? ` (${targetCount} targets)` : ''}`;
+
+    // Apply column shift
+    let effectiveRank = ability.rank;
+    if (choice.shift) effectiveRank = shiftRank(effectiveRank, choice.shift);
+
+    // Roll + karma
+    const { roll, cappedTotal, totalKarmaUsed } = await rollWithKarmaAndHistory(
+      actor,
+      actionLabel,
+      choice.karma || 0,
+      choice.skipDice ? null : undefined
+    );
+
+    // Resolve color
+    let color = rollUniversalTable(effectiveRank, cappedTotal);
+    const colorLower = String(color || "white").toLowerCase();
+
+    // Apply result cap if pulling punch
+    if (choice.resultCap && choice.resultCap !== 'none') {
+      const capOrder = ['white', 'green', 'yellow', 'red'];
+      const currentIndex = capOrder.indexOf(colorLower);
+      const capIndex = capOrder.indexOf(choice.resultCap);
+      if (currentIndex > capIndex) {
+        color = choice.resultCap;
+      }
+    }
+
+    const effectResult = effects[colorLower] || color;
+    const grid = buildResultGrid(actionType, colorLower, effects, (globalThis._getResultHoverText || this._getResultHoverText));
+    const { bg, fg } = bannerColors(colorLower);
+    const isHit = colorLower !== 'white';
+
+    // Create a chat card for each target
+    const targets = Array.from(game.user?.targets ?? []);
+    const targetList = targets.length > 0 ? targets : [null]; // null for untargeted attacks
+
+    for (const target of targetList) {
+      const targetActor = target?.actor;
+      const targetName = target?.name || "Unknown Target";
+
+      // Calculate armor and penetrating damage for this specific target
+      let penetratingDamage = 0;
+      if (isHit && rawDamage > 0) {
+        if (targetActor) {
+          const armorData = getBodyArmorValues(targetActor, damageType);
+          penetratingDamage = Math.max(0, rawDamage - armorData.applicable);
+        } else {
+          penetratingDamage = rawDamage;
+        }
+      }
+
+      // Apply damage cap from pull punch
+      if (choice.pulledDamage > 0 && choice.pulledDamage < penetratingDamage) {
+        penetratingDamage = choice.pulledDamage;
+      }
+
+      const afterArmor = penetratingDamage;
+
+      // Calculate breaking feat for this attack
+      const currentBreakingFeat = (colorLower !== "white" && penetratingDamage > 0 && breakingFeat)
+        ? breakingFeat
+        : null;
+
+      // Build actions box for this target
+      const actions = (isHit && canEffectsApply(penetratingDamage) && targetActor)
+        ? buildActionsBox({
+            showSlam: colorLower === "yellow" && canEffectsApply(penetratingDamage),
+            showStun: colorLower === "red" && canEffectsApply(penetratingDamage),
+            pulled: choice.resultCap !== 'none' || (choice.pulledDamage > 0 && choice.pulledDamage < rawDamage),
+            breakingFeat: currentBreakingFeat,
+            actorUuid: actor.uuid,
+            targetUuid: target?.actor?.uuid,
+            damage: penetratingDamage,
+            attackForm: attackForm,
+            damageType: damageType,
+            bypassArmor: choice.bypassArmor || false
+          })
+        : "";
+
+      // Build pull punch indicator
+      let pullPunchNote = "";
+      if (choice.pulledDamage > 0 && choice.pulledDamage < rawDamage) {
+        pullPunchNote += `<div style="color:#ff6f00;">⚠ Damage pulled: ${rawDamage} → ${choice.pulledDamage}</div>`;
+      }
+      if (choice.resultCap && choice.resultCap !== 'none') {
+        pullPunchNote += `<div style="color:#ff6f00;">⚠ Result capped at ${choice.resultCap.toUpperCase()}</div>`;
+      }
+
+      // Damage block for this target
+      const damageBlock = `
+        <div style="margin:6px 10px;padding:6px;border:1px solid #ccc;border-radius:3px;background:#fff;">
+          <div><b>Damage (raw):</b> ${rawDamage}${damageNote ? ` <span style="color:#666;">— ${damageNote}</span>` : ``}</div>
+          ${isHit ? `
+            <div><b>After Armor${targetActor ? ` (${targetName})` : ``}:</b> ${afterArmor}</div>
+          ` : ``}
+          <div style="font-size:.9em;color:#555;">Source: ${sourceName}</div>
+          ${pullPunchNote}
+        </div>
+      `;
+
+      // Final chat card for this target
+      const cardHtml = `
+        <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
+          <div style="padding:5px 10px;border-bottom:1px solid #c0c0c0;font-size:1.1em;color:#8b0000;">
+            <strong>${actor.name} - ${actionLabel}</strong>
+            ${targetActor ? `<br><span style="font-size:.85em;color:#555;">→ ${targetName}</span>` : ''}
+          </div>
+          <div style="padding:5px 10px;font-size:.9em;">
+            <div>Ability: ${ability.name}</div>
+            <div>Base Rank: ${ability.rank} (${ability.value})${choice.shift ? ` — Shift ${choice.shift} → ${effectiveRank}` : ""}</div>
+            <div>Roll: ${roll.total}${totalKarmaUsed ? ` + Karma: ${totalKarmaUsed}` : ""} = ${cappedTotal}</div>
+          </div>
+          ${damageBlock}
+          ${grid}
+          <div style="text-align:center;padding:8px;margin:5px;font-weight:bold;font-size:1.1em;border-radius:3px;background:${bg};color:${fg};">
+            RESULT: ${String(color).toUpperCase()} — ${String(effectResult).toUpperCase()}
+          </div>
+          ${actions}
+        </div>
+      `;
+
+      await ChatMessage.create({
+        speaker: ChatMessage.getSpeaker({ actor }),
+        content: cardHtml,
+        flags: buildDamageFlags({
+          actionId: actionType,
+          damageType: damageType,
+          rawDamage,
+          afterArmor,
+          resultColor: colorLower,
+          cappedTotal,
+          targets: target ? [target] : []
+        })
+      });
+
+      // Auto-apply damage for this target
+      if (this.opts?.autoApply && isHit && rawDamage > 0 && targetActor) {
+        debugLog("Auto-applying damage in full auto mode", {
+          damage: rawDamage,
+          afterArmor,
+          target: targetName
+        });
+
+        await applyDamageToTargets(rawDamage, {
+          attackerUuid: actor.uuid,
+          damageType: damageType,
+          showNotification: false,
+          bypassArmor: choice.bypassArmor || false,
+          attackForm: attackForm,
+          armorPiercing: choice.armorPiercing || 0,
+          specificTarget: target
+        });
+      }
+    }
+
+    // Play combat SFX once after all cards
+    if (game.msh?.playCombatSFX && isHit) {
+      await game.msh.playCombatSFX(damageType, sourceName, colorLower);
+    }
   }
 }
