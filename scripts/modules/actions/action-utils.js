@@ -4,6 +4,72 @@ import { calculateMitigation } from "../../rules/mitigation.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
 import { resolveCombatMode } from "./action-dispatcher.js";
 
+/** Action capability map — what rules permit by default */
+export const ACTION_CAPS = {
+  "blunt-attack":   { multi:true,  reduceDamage:true,  lowerEffect:true  },  // Slugfest
+  "edged-attack":   { multi:true,  reduceDamage:false, lowerEffect:false },  // Slugfest (cannot pull/lower by default)
+  "shooting":       { multi:true,  reduceDamage:false, lowerEffect:false },  // Shooting (trick shots are separate)
+  "throwing-blunt": { multi:false, reduceDamage:true,  lowerEffect:false },
+  "throwing-edged": { multi:false, reduceDamage:false, lowerEffect:false },
+  "energy":         { multi:false, reduceDamage:true,  lowerEffect:true  },
+  "force":          { multi:false, reduceDamage:true,  lowerEffect:true  },
+  "grappling":      { multi:false, reduceDamage:true,  lowerEffect:true  },
+  "grabbing":       { multi:false, reduceDamage:false, lowerEffect:false },   // treated separately from Grappling
+  "escaping":       { multi:false, reduceDamage:false, lowerEffect:false },
+  "charging":       { multi:false, reduceDamage:false, lowerEffect:true  },
+  "dodging":        { multi:false, reduceDamage:false, lowerEffect:false },
+  "evading":        { multi:false, reduceDamage:false, lowerEffect:false },
+  "blocking":       { multi:false, reduceDamage:false, lowerEffect:false },
+  "catching":       { multi:false, reduceDamage:false, lowerEffect:false },
+  // effect-only “actions” (usually part of results flow, not standalone actions)
+  "stun":           { multi:false, reduceDamage:false, lowerEffect:false },
+  "slam":           { multi:false, reduceDamage:false, lowerEffect:false },
+  "kill":           { multi:false, reduceDamage:false, lowerEffect:false },
+};
+
+/** Get merged capabilities for an action; allows per-item/power overrides */
+export function getActionCapabilities(actionType, { actor=null, item=null, power=null } = {}) {
+  const base = ACTION_CAPS[actionType] || { multi:false, reduceDamage:false, lowerEffect:false };
+  const caps = { ...base };
+
+  // Example extension points:
+  // - Power stunt flag to allow multi for specific powers
+  if (power?.flags?.msh?.multiAttackStunt === true) caps.multi = true;
+
+  // - Some items might allow pulling or special “up to” wording
+  if (item?.flags?.msh?.allowsReduceDamage === true) caps.reduceDamage = true;
+  if (item?.flags?.msh?.allowsLowerEffect === true)  caps.lowerEffect  = true;
+
+  return caps;
+}
+
+/** Apply capabilities to the current dialog UI (non-destructive: hide/disable only) */
+export function applyCapabilitiesToDialog(html, actionType, ctx = {}) {
+  const caps = getActionCapabilities(actionType, ctx);
+  const $root = $(html);
+  const $pull  = $root.find("#msh-section-pull, .msh-pull-section");   // prefer an explicit id/class; fallback ok
+  const $multi = $root.find("#msh-section-multi, .msh-multi-section");
+
+  // Pull section sub-controls
+  const $pulledDamageRow = $pull.find('[name="pulledDamage"]').closest("div");
+  const $resultCapRow    = $pull.find('[name="resultCap"]').closest("div");
+
+  if (!caps.reduceDamage) $pulledDamageRow.hide();
+  if (!caps.lowerEffect)  $resultCapRow.hide();
+  if (!caps.reduceDamage && !caps.lowerEffect) $pull.hide();
+
+  if (!caps.multi) $multi.hide();
+
+  // For consistency, make sure downstream reads don’t crash if hidden:
+  // If a row is hidden and input missing, we default to safe values:
+  if (!$pull.length) {
+    $root.data("msh-no-pull", true);
+  }
+  if (!$multi.length) {
+    $root.data("msh-no-multi", true);
+  }
+}
+
 /**
  * Play a visual effect from attacker to target(s) using Sequencer
  * @param {string} effectPath - JB2A file path (e.g., "jb2a.energy_beam.normal.blue.01")

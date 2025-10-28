@@ -167,71 +167,100 @@ export class BluntAttackAction extends AttackAction {
         content: dialogHtml,
         buttons: {
           roll: {
-            label: "Roll",
-            callback: async (html) => {
-              const $ = (sel) => html.find(sel);
-              const src    = $('[name="src"]:checked').val() || "hands";
-              const itemId = $('[name="item"]').val() || "";
-              const objectName  = $('[name="objectName"]').val() || "";
-              const objectRank  = $('[name="objectRank"]').val() || "Excellent";
-              const objectValue = parseInt($('[name="objectValue"]').val() || 20);
-              const shift       = parseInt($('[name="shift"]').val() || 0);
-              const karma       = parseInt($('[name="karma"]').val() || 0);
-              const pulledDamage= parseInt($('[name="pulledDamage"]').val() || 0);
-              const resultCap   = $('[name="resultCap"]').val() || "none";
-              const skipDice    = !!$('[name="skipDice"]').is(':checked');
+          label: "Roll",
+          callback: async (html) => {
+            // ===== dialog-scoped query helpers =====
+            const $content = $(html).find(".dialog-content").first();
+            const $dlg = (sel) => html.find(sel); // only searches within this dialog
 
-              let weaponMat="", weaponName="", damage=strength.value, note="";
-              if (src === "weapon") {
-                const item = attackItems.find(i => i.id === itemId);
-                weaponMat = item ? getItemMaterialRank(item) : "Excellent";
-                weaponName = item ? item.name : "";
-                const res = computeBluntDamage(strength.rank, strength.value, weaponMat, RANKS);
-                damage = res.damage;
-                note = res.note;
-              } else if (src === "object") {
-                weaponMat = objectRank;
-                weaponName = objectName || "Object";
-                const res = computeBluntDamage(strength.rank, strength.value, weaponMat, RANKS);
-                damage = res.damage;
-                note = res.note;
-              } else {
-                damage = strength.value;
-                note = "Bare Hands = Strength";
+            // ===== read Remember/Skip checkboxes (prefer new IDs, fall back to legacy [name=...] if present) =====
+            const rememberSettings = $content.find("#msh-remember-settings").length
+              ? $content.find("#msh-remember-settings").prop("checked")
+              : !!$dlg('[name="remember"]').is(':checked');
+
+            const skipDice = $content.find("#msh-skip-dice").length
+              ? $content.find("#msh-skip-dice").prop("checked")
+              : !!$dlg('[name="skipDice"]').is(':checked');
+
+            // ===== persist collapsible open states if remembering =====
+            try {
+              if (rememberSettings) {
+                localStorage.setItem("msh.ba.remember", "1");
+                localStorage.setItem("msh.ba.skipDice", skipDice ? "1" : "0");
+
+                const pullOpen  = $content.find(".frp-col-h:contains('Pull Punch')")
+                                          .closest(".frp-collapsible").attr("data-open") === "1";
+                const multiOpen = $content.find(".frp-col-h:contains('Multiple')")
+                                          .closest(".frp-collapsible").attr("data-open") === "1";
+                localStorage.setItem("msh.ba.pull.open",  pullOpen  ? "1" : "0");
+                localStorage.setItem("msh.ba.multi.open", multiOpen ? "1" : "0");
               }
-
-              const remember = !!$('[name="remember"]').is(':checked');
-              if (remember) {
-                await actor.setFlag("msh-faserip","lastBluntSource", src);
-                await actor.setFlag("msh-faserip","lastBluntPulledDamage", pulledDamage);
-                await actor.setFlag("msh-faserip","lastBluntResultCap", resultCap);
-
-                await actor.setFlag("msh-faserip","lastBluntShift", shift);
-                await actor.setFlag("msh-faserip","lastBluntKarma", karma);
-                await actor.setFlag("msh-faserip","lastBluntMultiAttacks", !!$('[name="multiAttacks"]').is(':checked'));
-                await actor.setFlag("msh-faserip","lastBluntAttackCount", parseInt($('[name="attackCount"]:checked').val() || 2));
-                await actor.setFlag("msh-faserip","lastBluntMultiAdjacent", !!$('[name="multiAdjacent"]').is(':checked'));
-
-                if (src === "weapon") {
-                  await actor.setFlag("msh-faserip","lastBluntItemId", itemId);
-                  await actor.setFlag("msh-faserip","lastBluntColumnShift", savedColumnShift);
-                } else if (src === "object") {
-                  await actor.setFlag("msh-faserip","lastBluntObjectName", objectName);
-                  await actor.setFlag("msh-faserip","lastBluntObjectRank", objectRank);
-                  await actor.setFlag("msh-faserip","lastBluntObjectValue", objectValue);
-                }
-              }
-
-              resolve({
-                src, itemId, objectName, objectRank, objectValue, shift, karma,
-                pulledDamage, resultCap, skipDice, weaponMat, weaponName, damage, note,
-                // new code
-                multiAttacks: !!$('[name="multiAttacks"]').is(':checked'),
-                attackCount: parseInt($('[name="attackCount"]:checked').val() || 2),
-                multiAdjacent: !!$('[name="multiAdjacent"]').is(':checked')
-              });
+            } catch (e) {
+              // ignore localStorage issues
             }
-          },
+
+            // ===== gather form values =====
+            const src          = $dlg('[name="src"]:checked').val() || "hands";
+            const itemId       = $dlg('[name="item"]').val() || "";
+            const objectName   = $dlg('[name="objectName"]').val() || "";
+            const objectRank   = $dlg('[name="objectRank"]').val() || "Excellent";
+            const objectValue  = parseInt($dlg('[name="objectValue"]').val() || 20);
+            const shift        = parseInt($dlg('[name="shift"]').val() || 0);
+            const karma        = parseInt($dlg('[name="karma"]').val() || 0);
+            const pulledDamage = parseInt($dlg('[name="pulledDamage"]').val() || 0);
+            const resultCap    = $dlg('[name="resultCap"]').val() || "none";
+
+            const multiAttacks  = !!$dlg('[name="multiAttacks"]').is(':checked');
+            const attackCount   = parseInt($dlg('[name="attackCount"]:checked').val() || 2);
+            const multiAdjacent = !!$dlg('[name="multiAdjacent"]').is(':checked');
+
+            // ===== compute damage and notes =====
+            let weaponMat = "", weaponName = "", damage = strength.value, note = "";
+            if (src === "weapon") {
+              const item = attackItems.find(i => i.id === itemId);
+              weaponMat  = item ? getItemMaterialRank(item) : "Excellent";
+              weaponName = item ? item.name : "";
+              const res  = computeBluntDamage(strength.rank, strength.value, weaponMat, RANKS);
+              damage = res.damage; note = res.note;
+            } else if (src === "object") {
+              weaponMat  = objectRank;
+              weaponName = objectName || "Object";
+              const res  = computeBluntDamage(strength.rank, strength.value, weaponMat, RANKS);
+              damage = res.damage; note = res.note;
+            } else {
+              damage = strength.value;
+              note   = "Bare Hands = Strength";
+            }
+
+            // ===== remember per-actor prefs (actor flags) =====
+            if (rememberSettings) {
+              await actor.setFlag("msh-faserip", "lastBluntSource", src);
+              await actor.setFlag("msh-faserip", "lastBluntPulledDamage", pulledDamage);
+              await actor.setFlag("msh-faserip", "lastBluntResultCap", resultCap);
+              await actor.setFlag("msh-faserip", "lastBluntShift", shift);
+              await actor.setFlag("msh-faserip", "lastBluntKarma", karma);
+              await actor.setFlag("msh-faserip", "lastBluntMultiAttacks", multiAttacks);
+              await actor.setFlag("msh-faserip", "lastBluntAttackCount", attackCount);
+              await actor.setFlag("msh-faserip", "lastBluntMultiAdjacent", multiAdjacent);
+
+              if (src === "weapon") {
+                await actor.setFlag("msh-faserip", "lastBluntItemId", itemId);
+                await actor.setFlag("msh-faserip", "lastBluntColumnShift", shift); // use current shift, not undefined savedColumnShift
+              } else if (src === "object") {
+                await actor.setFlag("msh-faserip", "lastBluntObjectName", objectName);
+                await actor.setFlag("msh-faserip", "lastBluntObjectRank", objectRank);
+                await actor.setFlag("msh-faserip", "lastBluntObjectValue", objectValue);
+              }
+            }
+
+            // ===== return all values to the caller =====
+            resolve({
+              src, itemId, objectName, objectRank, objectValue, shift, karma,
+              pulledDamage, resultCap, skipDice, weaponMat, weaponName, damage, note,
+              multiAttacks, attackCount, multiAdjacent
+            });
+          }
+        },
           cancel: { label: "Cancel", callback: () => resolve(null) }
         },
         default: "roll",
@@ -300,17 +329,74 @@ export class BluntAttackAction extends AttackAction {
           html.find('[name="objectName"]').on('input', update);
           // multi attack
           setupMultiAttackHandlers(html);
+          applyCapabilitiesToDialog(html, "blunt-attack", { actor });
 
-          /** ---- Collapsible wrappers for Pull Punch and Multiple Targets/Attacks (Blunt only) ---- */
+            /** -----------------------------------------------------------
+           *  Blunt-only UI additions:
+           *  - Bottom controls: Remember settings, Skip dice animation
+           *  - Collapsible state persistence (Pull Punch, Multiple Attacks)
+           *  ----------------------------------------------------------- */
           (() => {
-            // Minimal helper that wraps an existing section in a clickable header
-            const makeCollapsible = (container, title, tone = "neutral") => {
+            const $root = $(html);
+            const $content = $root.find(".dialog-content").first();
+
+            // --- Local storage keys (user-local, no game.settings registration needed)
+            const LS = {
+              REMEMBER: "msh.ba.remember",
+              SKIP:     "msh.ba.skipDice",
+              PULL:     "msh.ba.pull.open",
+              MULTI:    "msh.ba.multi.open"
+            };
+
+            const getLS = (k, d=null) => {
+              try { const v = localStorage.getItem(k); return v === null ? d : v; } catch { return d; }
+            };
+            const setLS = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
+
+            // --- Bottom controls (only install once)
+            if (!$content.find("#msh-bottom-controls").length) {
+              const $controls = $(`
+                <div id="msh-bottom-controls" style="margin-top:10px; padding-top:8px; border-top:1px solid #ccc; display:flex; align-items:center; gap:16px;">
+                  <label style="display:flex; align-items:center; gap:6px; font-size:12px;">
+                    <input type="checkbox" id="msh-remember-settings">
+                    <span>Remember settings</span>
+                  </label>
+                  <label style="display:flex; align-items:center; gap:6px; font-size:12px;">
+                    <input type="checkbox" id="msh-skip-dice">
+                    <span>Skip dice animation</span>
+                  </label>
+                </div>
+              `);
+              $content.append($controls);
+
+              // Initialize remembered values
+              const remembered = getLS(LS.REMEMBER, "0") === "1";
+              $controls.find("#msh-remember-settings").prop("checked", remembered);
+              $controls.find("#msh-skip-dice").prop("checked", getLS(LS.SKIP, "0") === "1");
+
+              // Keep skip value up to date if user toggles
+              $controls.on("change", "#msh-skip-dice", function() {
+                if ($controls.find("#msh-remember-settings").prop("checked")) {
+                  setLS(LS.SKIP, this.checked ? "1" : "0");
+                }
+              });
+              // Persist remember checkbox itself
+              $controls.on("change", "#msh-remember-settings", function() {
+                setLS(LS.REMEMBER, this.checked ? "1" : "0");
+              });
+            }
+
+            // --- Collapsible helpers (updated to support persistence)
+            const remembered = getLS(LS.REMEMBER, "0") === "1";
+            const persistIf = (key, val) => { if (remembered) setLS(key, val); };
+
+            const makeCollapsible = (container, title, tone, lsKey) => {
               if (!container || !container.length) return;
 
               const toneColors = (t) => {
-                if (t === "green")  return { bg: "#c8e6c9", border: "#4caf50", text: "#2e7d32" }; // matches your multi-attack box vibe
-                if (t === "orange") return { bg: "#ffe0b2", border: "#ff9800", text: "#e65100" }; // matches your pull-punch box vibe
-                return { bg: "#eee",    border: "#bbb",   text: "#333" };
+                if (t === "green")  return { bg: "#c8e6c9", border: "#4caf50", text: "#2e7d32" };
+                if (t === "orange") return { bg: "#ffe0b2", border: "#ff9800", text: "#e65100" };
+                return { bg: "#eee", border: "#bbb", text: "#333" };
               };
               const { bg, border, text } = toneColors(tone);
 
@@ -323,49 +409,52 @@ export class BluntAttackAction extends AttackAction {
                 </div>`);
               const $body  = $(`<div class="frp-col-body" style="display:none;"></div>`);
 
-              // Insert wrapper before the section and move section inside the body
+              // Insert and move section
               container.before($wrap);
               $wrap.append($hdr).append($body);
               $body.append(container);
 
-              // Toggle handler
+              // Restore initial open state if remembered
+              const shouldOpen = remembered && getLS(lsKey, "0") === "1";
+              if (shouldOpen) {
+                $wrap.attr("data-open", "1");
+                $body.show();
+                $hdr.find(".frp-caret").text("▾");
+              }
+
+              // Toggle handler + persistence
               $hdr.on("click", (ev) => {
                 ev.preventDefault();
                 const open = $wrap.attr("data-open") === "1";
                 $body.stop(true, true).slideToggle(150);
-                $wrap.attr("data-open", open ? "0" : "1");
-                $hdr.find(".frp-caret").text(open ? "▸" : "▾");
+                const nowOpen = !open;
+                $wrap.attr("data-open", nowOpen ? "1" : "0");
+                $hdr.find(".frp-caret").text(nowOpen ? "▾" : "▸");
+                persistIf(lsKey, nowOpen ? "1" : "0");
               });
             };
 
-            // 1) Pull Punch section — find the orange box that contains the "Pull Punch (Optional)" title
-            // We locate the specific block by its title text and wrap the whole section.
+            // Locate the two existing sections and wrap them
             const $pullBlock = (function() {
-              // Get the first DIV whose text includes the title, then take the closest colored box around it.
-              const $titleDiv = $(html).find("div").filter(function() {
-                return $(this).text().trim().includes("Pull Punch (Optional)");
+              const $titleDiv = $content.find("div").filter(function() {
+                return $(this).text().trim().includes("Pull Punch");
               }).first();
-              if (!$titleDiv.length) return $(); // not found
-              // The original orange container is the nearest ancestor with inline background styling
+              if (!$titleDiv.length) return $();
               const $container = $titleDiv.closest("div[style*='#fff3e0'], div[style*='ff9800']");
               return $container.length ? $container : $titleDiv.closest("div");
             })();
-            makeCollapsible($pullBlock, "Pull Punch (Optional)", "orange");
+            makeCollapsible($pullBlock, "Pull Punch (Optional)", "orange", LS.PULL);
 
-            // 2) Multiple Targets/Attacks section — find the green box with that header text and wrap it.
             const $multiBlock = (function() {
-              const $titleDiv = $(html).find("div").filter(function() {
-                return $(this).text().includes("Multiple Targets/Attacks");
+              const $titleDiv = $content.find("div").filter(function() {
+                return $(this).text().includes("Multiple Targets");
               }).first();
               if (!$titleDiv.length) return $();
-              // The multi section’s top-level green container is the nearest ancestor box
               const $container = $titleDiv.closest("div[style*='#e8f5e9'], div[style*='4caf50']");
               return $container.length ? $container : $titleDiv.closest("div");
             })();
-            makeCollapsible($multiBlock, "Multiple Targets / Attacks", "green");
+            makeCollapsible($multiBlock, "Multiple Targets / Attacks", "green", LS.MULTI);
           })();
-          /** ---- END Collapsible wrappers for Pull Punch and Multiple Targets/Attacks (Blunt only) ---- */
-
         }
       }).render(true);
     });

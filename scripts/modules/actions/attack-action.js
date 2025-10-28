@@ -125,6 +125,17 @@ export class AttackAction extends BaseAction {
           <span style="margin-left: 8px; font-size: 0.9em; color: #666;">
             (Available: ${availableKarma})
           </span>
+
+          <div style="margin-top: 10px;">
+          <label style="display: block; margin-bottom: 5px;">Column Shift (CS):</label>
+          <input type="number" id="multi-feat-cs" value="0" min="-10" max="10" step="1"
+                style="width: 60px; padding: 4px; text-align:center; border:1px solid #bbb; border-radius:4px;">
+          <span style="margin-left: 8px; font-size: 0.9em; color: #666;">
+            (from talents / powers / equipment)
+          </span>
+
+        </div>
+
         </div>
       </div>
     `;
@@ -148,15 +159,19 @@ export class AttackAction extends BaseAction {
               const totalRoll = Math.min(100, roll.total + karmaSpent);
               
               // Get result color
-              const resultColor = game.msh.rollUniversalTable(fightingAbility.rank, totalRoll);
+              const cs = parseInt(html.find('#multi-feat-cs').val()) || 0;
+              const effRank = shiftRank(fightingAbility.rank, cs);
+              const effFightingIndex = RANKS.indexOf(effRank);
+
+              const resultColor = game.msh.rollUniversalTable(effRank, totalRoll);
               const colorLower = resultColor.toLowerCase();
               
               // Determine success based on FEAT intensity comparison rules
               let success = false;
-              if (fightingIndex > intensityIndex) {
+              if (effFightingIndex > intensityIndex) {
                 // Fighting > Intensity: Green or better succeeds
                 success = ["green", "yellow", "red"].includes(colorLower);
-              } else if (fightingIndex === intensityIndex) {
+              } else if (effFightingIndex === intensityIndex) {
                 // Fighting = Intensity: Yellow or better succeeds
                 success = ["yellow", "red"].includes(colorLower);
               } else {
