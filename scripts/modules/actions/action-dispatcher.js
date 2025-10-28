@@ -129,10 +129,8 @@ export class ActionDispatcher {
   static async roll(actionType, { actor, abilityName, opts = {} } = {}) {
     debugLog("ActionDispatcher.roll()", { actionType, abilityName, opts });
 
-    // Normalize mixed-case codes like "Sh"/"sh"/"SH" or pass-through long names
     const type = normalizeActionType(actionType);
 
-    // Nullify checks
     if (actor) {
       const SCOPE = game.system?.id || "msh-faserip";
       const isNullified =
@@ -152,33 +150,31 @@ export class ActionDispatcher {
       }
     }
 
-    // Mode (allow macro override)
     const mode = opts?.mode ?? resolveCombatMode(actor);
     debugLog("ActionDispatcher mode", { actor: actor?.name, mode });
 
-    // Resolve ability for BOTH manual and auto paths
     const resolvedAbility =
       abilityName || opts?.abilityName || ACTION_ABILITIES[type] || "fighting";
 
-    // Manual intercept
-    if (mode === "manual") {
-      debugLog("Manual mode detected - showing simple dialog");
-      return await ManualModeDialog.show(actor, resolvedAbility, type, opts);
-    }
-
-    // Auto/semi handler path
     const Handler = registry[type];
     if (!Handler) throw new Error(`Unknown actionType: ${type}`);
 
-    const handler = new Handler({ actor, actionType: type, abilityName: resolvedAbility, opts });
-
-    // Mode flags - preserve original mode value
-    let modeFlags = {};
+    // Always carry the chosen mode through
+    let modeFlags = { mode };
     if (mode === "auto" || mode === "classic" || mode === "full") {
-      modeFlags = { mode: mode, autoApply: true, showConfirm: false };  // Keep original!
+      modeFlags = { mode, autoApply: true, showConfirm: false };
     } else if (mode === "semi") {
       modeFlags = { mode: "semi", autoApply: false, showConfirm: true };
+    } else {
+      modeFlags = { mode: "manual", autoApply: false, showConfirm: false };
     }
+
+    const handler = new Handler({
+      actor,
+      actionType: type,
+      abilityName: resolvedAbility,
+      opts
+    });
 
     handler.opts = { ...(handler.opts ?? {}), ...modeFlags };
     debugLog("ActionDispatcher merged mode flags", handler.opts);

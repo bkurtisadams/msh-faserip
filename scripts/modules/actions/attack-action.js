@@ -245,19 +245,9 @@ export class AttackAction extends BaseAction {
    */
   async _executeSingleAttack(config) {
     const {
-      choice,
-      actor,
-      ability,
-      actionType,
-      actionName,
-      effects,
-      damageType,
-      rawDamage,
-      damageNote,
-      sourceName,
-      attackForm,
-      breakingFeat = null,
-      targetCount = 1
+      choice, actor, ability, actionType, actionName, effects,
+      damageType, rawDamage, damageNote, sourceName, attackForm,
+      breakingFeat = null, targetCount = 1
     } = config;
 
     const actionLabel = `${actionName}${targetCount > 1 ? ` (${targetCount} targets)` : ''}`;
@@ -268,13 +258,14 @@ export class AttackAction extends BaseAction {
 
     // Roll + karma
     const { roll, cappedTotal, totalKarmaUsed } = await rollWithKarmaAndHistory(
-      actor,
-      actionLabel,
-      choice.karma || 0,
-      choice.skipDice ? null : undefined
+      actor, actionLabel, choice.karma || 0, choice.skipDice ? null : undefined
     );
 
-    // Resolve color
+    // Check if manual mode -- return if true
+    const isManualMode = this.opts?.mode === "manual";
+    
+    // Continue with normal resolution for Semi/Full modes...
+    // Resolve color (always, even in manual mode)
     let color = rollUniversalTable(effectiveRank, cappedTotal);
     const colorLower = String(color || "white").toLowerCase();
 
@@ -324,8 +315,8 @@ export class AttackAction extends BaseAction {
         ? breakingFeat
         : null;
 
-      // Build actions box for this target
-      const actions = (isHit && canEffectsApply(penetratingDamage) && targetActor)
+      // Build actions box ONLY if not manual mode
+      const actions = (!isManualMode && isHit && canEffectsApply(penetratingDamage) && targetActor)
         ? buildActionsBox({
             showSlam: colorLower === "yellow" && canEffectsApply(penetratingDamage),
             showStun: colorLower === "red" && canEffectsApply(penetratingDamage),
@@ -361,6 +352,13 @@ export class AttackAction extends BaseAction {
         </div>
       `;
 
+      // Add manual mode notice if applicable
+      const manualModeNotice = isManualMode ? `
+        <div style="padding:6px;margin:5px;background:#fff3e0;border:1px solid #ff9800;border-radius:3px;text-align:center;font-style:italic;color:#e65100;">
+          ⚠ Manual Mode: GM adjudicates damage and effects
+        </div>
+      ` : "";
+
       // Final chat card for this target
       const cardHtml = `
         <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
@@ -379,6 +377,7 @@ export class AttackAction extends BaseAction {
             RESULT: ${String(color).toUpperCase()} — ${String(effectResult).toUpperCase()}
           </div>
           ${actions}
+          ${manualModeNotice}
         </div>
       `;
 
@@ -396,8 +395,8 @@ export class AttackAction extends BaseAction {
         })
       });
 
-      // Auto-apply damage for this target
-      if (this.opts?.autoApply && isHit && rawDamage > 0 && targetActor) {
+      // Auto-apply damage for this target ONLY if not manual mode
+      if (!isManualMode && this.opts?.autoApply && isHit && rawDamage > 0 && targetActor) {
         debugLog("Auto-applying damage in full auto mode", {
           damage: rawDamage,
           afterArmor,
@@ -416,7 +415,7 @@ export class AttackAction extends BaseAction {
       }
     }
 
-    // Play combat SFX once after all cards
+    // Play combat SFX once after all cards (still plays in manual mode)
     if (game.msh?.playCombatSFX && isHit) {
       await game.msh.playCombatSFX(damageType, sourceName, colorLower);
     }

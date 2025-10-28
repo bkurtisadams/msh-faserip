@@ -1545,23 +1545,35 @@ export function buildMultiAttackSection(actionType, targetCount, multiAttacks = 
       </div>
       
       <div id="multi-attack-options" style="display:${multiAttacks ? 'block' : 'none'};margin-left:20px;padding:4px 0;">
-        <div style="margin-bottom:4px;">
-          <label style="font-size:.85em;margin-right:12px;">
-            <input type="radio" name="attackCount" value="2" ${attackCount === 2 ? 'checked' : ''}>
-            2 attacks (Remarkable FEAT)
-          </label>
-          <label style="font-size:.85em;">
-            <input type="radio" name="attackCount" value="3" ${attackCount === 3 ? 'checked' : ''}>
-            3 attacks (Amazing FEAT)
-          </label>
-        </div>
-        <div style="font-size:.8em;color:#555;font-style:italic;">
-          Requires Fighting FEAT. If failed: 1 attack at -3CS
+      <div style="margin-bottom:4px;">
+        <label style="font-size:.9em;display:block;margin-bottom:2px;">Number of Attacks:</label>
+        <label style="font-size:.85em;margin-right:12px;">
+          <input type="radio" name="attackCount" value="2" ${attackCount === 2 ? 'checked' : ''}>
+          2 attacks (Remarkable FEAT)
+        </label>
+        <label style="font-size:.85em;">
+          <input type="radio" name="attackCount" value="3" ${attackCount === 3 ? 'checked' : ''}>
+          3 attacks (Amazing FEAT)
+        </label>
+      </div>
+      
+      <!-- ADD THIS SECTION -->
+      <div style="margin-top:6px;border-top:1px solid #c8e6c9;padding-top:4px;">
+        <span class="multi-attack-info-toggle" style="font-size:.8em;color:#2e7d32;cursor:pointer;user-select:none;">
+          ℹ️ How are attacks distributed? <span style="font-size:.7em;">(click)</span>
+        </span>
+        <div class="multi-attack-info" style="display:none;margin-top:4px;padding:6px;background:#f1f8e9;border-radius:3px;font-size:.75em;color:#555;">
+          <div style="font-weight:600;margin-bottom:3px;">Attack Distribution:</div>
+          <div>• 1 target: All attacks hit that target</div>
+          <div>• Multiple targets: Attacks distributed round-robin</div>
+          <div style="margin-top:3px;font-style:italic;">
+            Examples: 3 attacks/2 targets = 2+1 hits, 3 attacks/3 targets = 1+1+1 hits
+          </div>
         </div>
       </div>
       
-      <div style="font-size:.75em;color:#d32f2f;font-style:italic;margin-top:6px;">
-        ⚠ Cannot use both options together
+      <div style="font-size:.8em;color:#555;font-style:italic;margin-top:4px;">
+        Requires Fighting FEAT. If failed: 1 attack at -3CS
       </div>
     </div>
   `;
@@ -1581,7 +1593,6 @@ export function setupMultiAttackHandlers(html) {
     $multiAttacks.on('change', function() {
       if ($(this).is(':checked')) {
         $multiOptions.slideDown(200);
-        // Uncheck adjacent if multi-attacks is checked
         if ($multiAdjacent.length) $multiAdjacent.prop('checked', false);
       } else {
         $multiOptions.slideUp(200);
@@ -1593,10 +1604,15 @@ export function setupMultiAttackHandlers(html) {
   if ($multiAdjacent.length && $multiAttacks.length) {
     $multiAdjacent.on('change', function() {
       if ($(this).is(':checked')) {
-        // Uncheck multi-attacks if adjacent is checked
         $multiAttacks.prop('checked', false);
         $multiOptions.slideUp(200);
       }
     });
   }
+  
+  // Toggle info section
+  html.find('.multi-attack-info-toggle').on('click', function(e) {
+    e.preventDefault();
+    html.find('.multi-attack-info').slideToggle(200);
+  });
 }

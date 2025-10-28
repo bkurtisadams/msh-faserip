@@ -329,12 +329,15 @@ export class BluntAttackAction extends AttackAction {
       );
       
       if (featResult.success) {
+        // Success: Make 2 or 3 attacks, each at -1CS
         actualAttackCount = choice.attackCount;
-        choice.shift = (choice.shift || 0) - 1; // Apply -1 CS for multi-attacks
-        ui.notifications.info(`Multi-attack successful! Making ${actualAttackCount} attacks at -1CS!`);
+        choice.shift = (choice.shift || 0) - 1;
+        ui.notifications.info(`Multi-attack successful! Making ${actualAttackCount} attacks at -1CS each!`);
       } else {
-        ui.notifications.warn(`Multi-attack FEAT failed! Only making 1 attack.`);
+        // Failed: Only 1 attack at -3CS
         actualAttackCount = 1;
+        choice.shift = (choice.shift || 0) - 3;
+        ui.notifications.warn(`Multi-attack FEAT failed! Only making 1 attack at -3CS.`);
       }
     }
 
@@ -344,33 +347,33 @@ export class BluntAttackAction extends AttackAction {
     if (choice.multiAdjacent && targetCount > 1) {
       // Single roll for all adjacent targets
       await this._executeSingleAttack({
-      choice, actor, ability,
-      actionType, actionName, effects,
-      damageType: "physical-blunt",
-      rawDamage: choice.damage,
-      damageNote: choice.note,
-      sourceName: choice.weaponName || "Bare Hands",
-      attackForm: "blunt",
-      breakingFeat: (choice.src === "weapon" || choice.src === "object") ? { weaponMat: choice.weaponMat } : null,
-      targetCount
-    });
+        choice, actor, ability,
+        actionType, actionName, effects,
+        damageType: "physical-blunt",
+        rawDamage: choice.damage,
+        damageNote: choice.note,
+        sourceName: choice.weaponName || "Bare Hands",
+        attackForm: "blunt",
+        breakingFeat: (choice.src === "weapon" || choice.src === "object") ? { weaponMat: choice.weaponMat } : null,
+        targetCount
+      });
     } else {
       // Execute each attack separately
       for (let i = 0; i < actualAttackCount; i++) {
-        if (i > 0 && MULTIPLE_PUNCH_SFX) {
+        if (i > 0) {
           await new Promise(resolve => setTimeout(resolve, 300));
         }
         await this._executeSingleAttack({
-      choice, actor, ability,
-      actionType, actionName, effects,
-      damageType: "physical-blunt",
-      rawDamage: choice.damage,
-      damageNote: choice.note,
-      sourceName: choice.weaponName || "Bare Hands",
-      attackForm: "blunt",
-      breakingFeat: (choice.src === "weapon" || choice.src === "object") ? { weaponMat: choice.weaponMat } : null,
-      targetCount: 1
-    });
+          choice, actor, ability,
+          actionType, actionName, effects,
+          damageType: "physical-blunt",
+          rawDamage: choice.damage,
+          damageNote: choice.note,
+          sourceName: choice.weaponName || "Bare Hands",
+          attackForm: "blunt",
+          breakingFeat: (choice.src === "weapon" || choice.src === "object") ? { weaponMat: choice.weaponMat } : null,
+          targetCount: 1
+        });
       }
     }
   }
