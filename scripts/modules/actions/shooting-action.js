@@ -6,6 +6,7 @@ import {
   bannerColors,
   buildActionsBox,
   buildMultiAttackSection,
+  buildModeSelector,
   buildResultGrid,
   debugLog,
   effectsFor,
@@ -16,6 +17,7 @@ import {
   postDeathSavePrompt,
   RANKS,
   rollWithKarmaAndHistory,
+  setupModeSelector,
   setupMultiAttackHandlers,
   shiftRank
 } from "./action-utils.js";
@@ -66,7 +68,9 @@ export class ShootingAction extends RangedAttackAction {
     const initialRange = initialWeapon?.system?.range || 15;
 
     // Dialog HTML
-    const dialogHtml = `
+   const dialogHtml = `
+      ${buildModeSelector({ mode: "semi" })}
+
       <div style="margin-bottom:8px;"><label style="display:inline-block;width:120px;">Action:</label><strong>${actionName}</strong></div>
       <div style="margin-bottom:8px;"><label style="display:inline-block;width:120px;">Ability:</label><input type="text" value="${ability.name}" style="width:140px;" readonly></div>
       <div style="margin-bottom:8px;"><label style="display:inline-block;width:120px;">Rank:</label><input type="text" value="${ability.rank}" style="width:120px;" readonly>
@@ -184,42 +188,59 @@ export class ShootingAction extends RangedAttackAction {
           cancel: { label: "Cancel", callback: () => resolve(null) }
         },
         default: "roll",
-        render: (html) => {
-            // Setup range preview updates
-            this._setupRangePreview(html, { weaponMaxRange: initialRange });
+        render: async (html) => {
+          this.opts = this.opts || {};  // Ensure opts exists
+          await setupModeSelector(actor, html, this.opts || {}, "lastShootingMode");
 
-            // Update range preview when weapon changes
-            html.find('[name="weapon"]').on('change', () => {
-                const weaponId = html.find('[name="weapon"]').val();
-                const weapon = shootingWeapons.find(i => i.id === weaponId);
-                const newRange = weapon?.system?.range || 15;
-                
-                // Update the max range hint text in the UI
-                html.find('[name="range"]').siblings('span').text(`Max: ${newRange} areas`);
-                
-                // Refresh the range preview with new weapon range
-                this._setupRangePreview(html, { weaponMaxRange: newRange });
-            });
+          // Setup range preview updates
+          this._setupRangePreview(html, { weaponMaxRange: initialRange });
 
-            // Attach auto-fill to update range from token-to-target distance
-            this._disposeAutoFill = attachAutoFillRange(html, actor, () => {
-                const weaponId = html.find('[name="weapon"]').val();
-                const weapon = shootingWeapons.find(i => i.id === weaponId);
-                const currentRange = weapon?.system?.range || 15;
-                this._setupRangePreview(html, { weaponMaxRange: currentRange });
-            });
+          // Update range preview when weapon changes
+          html.find('[name="weapon"]').on('change', () => {
+              const weaponId = html.find('[name="weapon"]').val();
+              const weapon = shootingWeapons.find(i => i.id === weaponId);
+              const newRange = weapon?.system?.range || 15;
+              
+              // Update the max range hint text in the UI
+              html.find('[name="range"]').siblings('span').text(`Max: ${newRange} areas`);
+              
+              // Refresh the range preview with new weapon range
+              this._setupRangePreview(html, { weaponMaxRange: newRange });
+          });
 
-             setupMultiAttackHandlers(html);
-            },
-            close: () => {
-             
-              // Clean up the auto-fill event listeners
-              if (this._disposeAutoFill) this._disposeAutoFill();
-              }
+          // Attach auto-fill to update range from token-to-target distance
+          this._disposeAutoFill = attachAutoFillRange(html, actor, () => {
+              const weaponId = html.find('[name="weapon"]').val();
+              const weapon = shootingWeapons.find(i => i.id === weaponId);
+              const currentRange = weapon?.system?.range || 15;
+              this._setupRangePreview(html, { weaponMaxRange: currentRange });
+          });
+
+            setupMultiAttackHandlers(html);
+          },
+          close: () => {
+            
+            // Clean up the auto-fill event listeners
+            if (this._disposeAutoFill) this._disposeAutoFill();
+            }
       }).render(true);
     });
 
     if (!choice) return;
+
+    // Reload mode from flags (user may have changed it in dialog)
+    this.opts.mode = await actor.getFlag("msh-faserip", "lastShootingMode") || "semi";
+    const mode = this.opts.mode;
+    if (mode === "manual") {
+      this.opts.autoApply = false;
+      this.opts.showConfirm = false;
+    } else if (mode === "semi") {
+      this.opts.autoApply = false;
+      this.opts.showConfirm = true;
+    } else {
+      this.opts.autoApply = true;
+      this.opts.showConfirm = false;
+    }
 
     // Handle multi-attacks (2 or 3 attacks, must make FEAT; all attacks @-1 CS)
     let actualAttackCount = 1;

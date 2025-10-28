@@ -15,6 +15,8 @@ import {
   postDeathSavePrompt,
   buildMultiAttackSection,
   setupMultiAttackHandlers,
+  buildModeSelector,
+  setupModeSelector,
   debugLog,
   buildActionsBox
 } from "./action-utils.js";
@@ -86,6 +88,8 @@ export class EdgedAttackAction extends AttackAction {
 
     // dialog HTML
     const dialogHtml = `
+      ${buildModeSelector({ mode: "semi" })}
+
       <div style="margin-bottom:8px;"><label style="display:inline-block;width:120px;">Action:</label><strong>${actionName}</strong></div>
       <div style="margin-bottom:8px;"><label style="display:inline-block;width:120px;">Ability:</label><input type="text" value="${ability.name}" style="width:140px;" readonly></div>
       <div style="margin-bottom:8px;"><label style="display:inline-block;width:120px;">Rank:</label><input type="text" value="${ability.rank}" style="width:120px;" readonly>
@@ -204,7 +208,7 @@ export class EdgedAttackAction extends AttackAction {
           cancel: { label: "Cancel", callback: ()=> resolve(null) }
         },
         default: "roll",
-        render: (html)=>{
+        render: async (html) => {
           const $dialog = html.closest('.dialog');
 
           const updatePreview = ()=>{
@@ -247,13 +251,29 @@ export class EdgedAttackAction extends AttackAction {
           html.find('[name="src"]').on('change', updatePreview);
           html.find('[name="item"]').on('change', updatePreview);
           html.find('[name="natRank"]').on('change', syncNatDamage);
-          html.find('[name="natDmg"]').on('input', updatePreview);
+
+         html.find('[name="natDmg"]').on('input', updatePreview);
+          await setupModeSelector(actor, html, this.opts || {}, "lastEdgedMode");
           setupMultiAttackHandlers(html);
         }
       }).render(true);
     });
     
-    if (!choice) return; // cancelled
+    if (!choice) return;
+
+    // Reload mode from flags (user may have changed it in dialog)
+    this.opts.mode = await actor.getFlag("msh-faserip", "lastEdgedMode") || "semi";
+    const mode = this.opts.mode;
+    if (mode === "manual") {
+      this.opts.autoApply = false;
+      this.opts.showConfirm = false;
+    } else if (mode === "semi") {
+      this.opts.autoApply = false;
+      this.opts.showConfirm = true;
+    } else {
+      this.opts.autoApply = true;
+      this.opts.showConfirm = false;
+    }
 
     // Handle multi-attacks (2 or 3 attacks, must make FEAT; all attacks @-1 CS)
     let actualAttackCount = 1;

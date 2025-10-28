@@ -1,9 +1,11 @@
 import { RangedAttackAction } from "./ranged-attack-action.js";
 import { attachAutoFillRange } from "./action-utils.js";
 import {
+  buildModeSelector,
   getAbilityInfo,
   labelFor,
   effectsFor,
+  setupModeSelector,
   shiftRank,
   rollWithKarmaAndHistory,
   buildResultGrid,
@@ -100,7 +102,9 @@ export class ThrowingEdgedAction extends RangedAttackAction {
       .join("");
 
     // Dialog HTML
-    const dialogHtml = `
+   const dialogHtml = `
+      ${buildModeSelector({ mode: "semi" })}
+
       <div style="margin-bottom:8px;"><strong>${actionName}</strong></div>
 
       <div style="margin-bottom:8px;">
@@ -182,7 +186,7 @@ export class ThrowingEdgedAction extends RangedAttackAction {
               const $ = (sel) => html.find(sel);
               const useAdHoc = !!$('#adhoc-toggle').is(':checked');
 
-              // ✅ DECLARE THESE AT THE TOP:
+              // DECLARE THESE AT THE TOP:
               let weaponName, weaponDamage, weaponId = null;
               let weaponAP = 0, weaponAPCS = 0, weaponAPMode = "value";  // ✅ ADD THIS LINE
               let weaponDamageType = "physical-edged";                    // ✅ ADD THIS LINE
@@ -275,7 +279,10 @@ export class ThrowingEdgedAction extends RangedAttackAction {
           cancel: { label: "Cancel", callback: () => resolve(null) }
         },
         default: "roll",
-        render: (html) => {
+        render: async (html) => {
+          this.opts = this.opts || {};  // Ensure opts exists
+          await setupModeSelector(actor, html, this.opts, "lastEdgedMode");
+
           const $adhoc = html.find("#adhoc-toggle");
           const $weapon = html.find('[name="weapon"]');
           const applyToggle = () => {
@@ -319,6 +326,21 @@ export class ThrowingEdgedAction extends RangedAttackAction {
     });
 
     if (!choice) return;
+
+    // Reload mode from flags (user may have changed it in dialog)
+    this.opts.mode = await actor.getFlag("msh-faserip", "lastEdgedMode") || "semi";
+    const mode = this.opts.mode;
+    if (mode === "manual") {
+      this.opts.autoApply = false;
+      this.opts.showConfirm = false;
+    } else if (mode === "semi") {
+      this.opts.autoApply = false;
+      this.opts.showConfirm = true;
+    } else {
+      this.opts.autoApply = true;
+      this.opts.showConfirm = false;
+    }
+
 
     const effectiveRank = shiftRank(ability.rank, choice.totalShift);
     const roll = await (new Roll("1d100")).evaluate();
