@@ -11,16 +11,17 @@
     <div class="msh-chartext">Character<br>Information<br>Sheet</div>
   </div>
 
-  <div class="msh-player">
-    <label>Combat Mode</label>
-    <select name="system.combatMode" style="height:26px;padding:2px 6px;font-size:12.5px;">
-      <option value="manual" {{#if (eq system.combatMode "manual")}}selected{{/if}}>Manual</option>
-      <option value="semi" {{#if (eq system.combatMode "semi")}}selected{{/if}}>Semi-Auto</option>
-      <option value="full" {{#if (eq system.combatMode "full")}}selected{{/if}}>Full-Auto</option>
-    </select>
-    
-    <label style="margin-top:6px;">Player Name</label>
+    <div class="msh-player">
+    <label>Character Name</label>
     <input type="text" name="system.player" value="{{system.player}}" />
+    
+    <label style="margin-top:6px;">Character Type</label>
+    <select name="system.characterType" style="height:26px;padding:2px 6px;font-size:12.5px;">
+      <option value="player" {{#if (eq system.characterType "player")}}selected{{/if}}>Player</option>
+      <option value="npc-hero" {{#if (eq system.characterType "npc-hero")}}selected{{/if}}>NPC Hero</option>
+      <option value="npc-villain" {{#if (eq system.characterType "npc-villain")}}selected{{/if}}>NPC Villain</option>
+      <option value="civilian" {{#if (eq system.characterType "civilian")}}selected{{/if}}>Civilian</option>
+    </select>
   </div>
 </div>
 
