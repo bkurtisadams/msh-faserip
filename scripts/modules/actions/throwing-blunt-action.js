@@ -13,7 +13,9 @@ import {
   bannerColors,
   getTargetingContext,
   getBodyArmorValues,
-  applyDamageToTargets
+  applyDamageToTargets,
+  buildModeSelector,
+  setupModeSelector 
 } from "./action-utils.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
 
@@ -55,6 +57,8 @@ export class ThrowingBluntAction extends RangedAttackAction {
 
     // Dialog
     const dialogHtml = `
+      ${buildModeSelector({ mode: "semi" })}
+      
       <div style="margin-bottom:8px;"><strong>${actionName}</strong></div>
 
       <div style="margin-bottom:8px;">
@@ -214,8 +218,9 @@ export class ThrowingBluntAction extends RangedAttackAction {
             updatePreviewFromSelection();
           };
 
-          $adhoc.on('change', applyToggle);
+         $adhoc.on('change', applyToggle);
           applyToggle();
+          setupModeSelector(actor, html, this.opts || {}, "lastThrowBluntMode");
           this._disposeAutoFill = attachAutoFillRange(html, actor, updatePreviewFromSelection);
         },
         close: () => {

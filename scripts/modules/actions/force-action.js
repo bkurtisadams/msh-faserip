@@ -7,6 +7,7 @@ import {
   buildActionsBox,
   buildMultiAttackSection,
   buildResultGrid,
+  buildModeSelector,
   debugLog,
   effectsFor,
   getAbilityInfo,
@@ -16,6 +17,7 @@ import {
   postDeathSavePrompt,
   RANKS,
   rollWithKarmaAndHistory,
+  setupModeSelector,
   setupMultiAttackHandlers,
   shiftRank
 } from "./action-utils.js";
@@ -70,6 +72,8 @@ export class ForceAction extends RangedAttackAction {
 
     // === Dialog ===
     const dialogHtml = `
+      ${buildModeSelector({ mode: "semi" })}
+      
       <div style="margin-bottom:8px;"><strong>${actionName}</strong></div>
 
       <div style="margin-bottom:8px;">
@@ -243,8 +247,9 @@ export class ForceAction extends RangedAttackAction {
           cancel: { label: "Cancel", callback: () => resolve(null) },
         },
         default: "roll",
-        render: (html) => {
-          const $adhoc = html.find("#adhoc-toggle");
+        render: async (html) => {
+          await setupModeSelector(actor, html, this.opts || {}, "lastForceMode");
+          const $adhoc = html.find('#adhoc-toggle');
 
           const updatePreviewFromSelection = () => {
               if ($adhoc.is(":checked")) {
