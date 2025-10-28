@@ -5,6 +5,83 @@ import { rollUniversalTable } from "../dice/universal-table.js";
 import { resolveCombatMode } from "./action-dispatcher.js";
 
 /**
+ * Play a visual effect from attacker to target(s) using Sequencer
+ * @param {string} effectPath - JB2A file path (e.g., "jb2a.energy_beam.normal.blue.01")
+ * @param {Token} sourceToken - Attacking token
+ * @param {Token[]} targetTokens - Array of target tokens
+ * @param {Object} options - Additional options (color, scale, duration, etc.)
+ */
+export async function playAttackEffect(effectPath, sourceToken, targetTokens = [], options = {}) {
+  // Check if Sequencer is available
+  if (!game.modules.get("sequencer")?.active) return;
+  
+  const targets = targetTokens.length ? targetTokens : Array.from(game.user.targets);
+  if (!sourceToken || !targets.length) return;
+
+  try {
+    const sequence = new Sequence();
+    
+    for (const target of targets) {
+      sequence.effect()
+        .file(effectPath)
+        .atLocation(sourceToken)
+        .stretchTo(target)
+        .duration(options.duration || 1000)
+        .scale(options.scale || 1.0)
+        .opacity(options.opacity || 1.0)
+        .waitUntilFinished(options.wait ? -500 : 0);
+    }
+    
+    await sequence.play();
+  } catch (err) {
+    console.warn("Sequencer effect failed:", err);
+  }
+}
+
+/**
+ * Play an impact/explosion effect at target location(s)
+ */
+export async function playImpactEffect(effectPath, targetTokens = [], options = {}) {
+  if (!game.modules.get("sequencer")?.active) return;
+  
+  const targets = targetTokens.length ? targetTokens : Array.from(game.user.targets);
+  if (!targets.length) return;
+
+  try {
+    const sequence = new Sequence();
+    
+    for (const target of targets) {
+      sequence.effect()
+        .file(effectPath)
+        .atLocation(target)
+        .scale(options.scale || 1.0)
+        .opacity(options.opacity || 1.0);
+    }
+    
+    await sequence.play();
+  } catch (err) {
+    console.warn("Sequencer impact effect failed:", err);
+  }
+}
+
+/**
+ * Get JB2A effect path based on attack type and color
+ */
+export function getAttackEffectPath(attackType, color = "blue", variant = "01") {
+  const effectMap = {
+    "energy": `jb2a.energy_beam.normal.${color}.${variant}`,
+    "force": `jb2a.impact.010.${color}`,
+    "lightning": `jb2a.chain_lightning.primary.${color}.${variant}`,
+    "fire": `jb2a.fire_bolt.${color}`,
+    "ice": `jb2a.ice_spikes.radial.${variant}`,
+    "laser": `jb2a.laser_blast.${color}`,
+    "magic": `jb2a.magic_missile.${color}`
+  };
+  
+  return effectMap[attackType] || effectMap["energy"];
+}
+
+/**
  * Setup complete mode selector with persistence
  * @param {Actor} actor - The actor to save/load mode from
  * @param {jQuery} $html - The dialog HTML

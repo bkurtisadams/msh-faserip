@@ -19,7 +19,10 @@ import {
   rollWithKarmaAndHistory,
   setupModeSelector,
   setupMultiAttackHandlers,
-  shiftRank
+  shiftRank,
+  playAttackEffect,
+  playImpactEffect,
+  getAttackEffectPath
 } from "./action-utils.js";
 import { makeDamageBlock, computeAfterArmor, buildDamageFlags } from "./damage-ui.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
@@ -312,10 +315,42 @@ export class ForceAction extends RangedAttackAction {
     const { cappedTotal, totalKarmaUsed } =
       await rollWithKarmaAndHistory(actor, actionName, choice.karma, roll);
 
+    // Standardized card
     const color = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
     const colorLower = String(color || "").toLowerCase();
     const effectResult = effects[colorLower] || color;
 
+    // === VISUAL EFFECTS ===
+    const sourceToken = actor.getActiveTokens()[0];
+    if (sourceToken && !choice.skipDice) {
+      let effectPath;
+      
+      if (!choice.useAdHoc && choice.powerItem) {
+        // Use power's configured effect
+        const effectAnim = choice.powerItem.system?.effectAnimation || "";
+        const effectColor = choice.powerItem.system?.effectColor || "blue";
+        const effectVariant = choice.powerItem.system?.effectVariant || "01";
+        
+        if (effectAnim) {
+          effectPath = effectAnim; // Custom path from item
+        } else {
+          effectPath = getAttackEffectPath("energy", effectColor, effectVariant);
+        }
+      } else {
+        // Default energy effect
+        effectPath = getAttackEffectPath("energy", "blue", "01");
+      }
+      
+      await playAttackEffect(effectPath, sourceToken);
+      
+      // Add impact effect on hit
+      if (colorLower !== "white") {
+        await playImpactEffect("jb2a.impact.010.blue", Array.from(game.user.targets));
+      }
+    }
+    // === END VISUAL EFFECTS ===
+
+    // Then continue with chat message...
     // === Standardized chat card ===
     const grid = buildResultGrid(actionType, colorLower, effects, (globalThis._getResultHoverText || this._getResultHoverText));
     const { bg, fg } = bannerColors(colorLower);

@@ -101,6 +101,9 @@
     },
     "power": {
       "templates": ["base", "ranked"],
+      "effectAnimation": "",
+      "effectColor": "blue",
+      "effectVariant": "01",
       
       "category": "",
       "type": "",

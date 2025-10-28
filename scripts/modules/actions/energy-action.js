@@ -19,7 +19,10 @@ import {
   rollWithKarmaAndHistory,
   setupModeSelector,
   setupMultiAttackHandlers,
-  shiftRank
+  shiftRank,
+  playAttackEffect,
+  playImpactEffect,
+  getAttackEffectPath
 } from "./action-utils.js";
 
 import { isAuraMaintained } from "./nullify.js";
@@ -316,9 +319,8 @@ export class EnergyAction extends RangedAttackAction {
         }
       }
     } catch (e) {
-      console.warn('Nullify aura guard check failed:', e);
+          console.warn('Nullify aura guard check failed:', e);
     }
-
 
     // === Resolve roll ===
     // Rank → roll → karma → color
@@ -338,8 +340,38 @@ export class EnergyAction extends RangedAttackAction {
       await rollWithKarmaAndHistory(actor, actionName, choice.karma, roll);
 
     const color = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
-    const colorLower = String(color || "").toLowerCase();
+    const colorLower = String(color || "").toLowerCase();  // DECLARE IT HERE
     const effectResult = effects[colorLower] || color;
+
+    // === VISUAL EFFECTS ===
+    const sourceToken = actor.getActiveTokens()[0];
+    if (sourceToken && !choice.skipDice) {
+      let effectPath;
+      
+      if (!choice.useAdHoc && choice.powerItem) {
+        // Use power's configured effect
+        const effectAnim = choice.powerItem.system?.effectAnimation || "";
+        const effectColor = choice.powerItem.system?.effectColor || "blue";
+        const effectVariant = choice.powerItem.system?.effectVariant || "01";
+        
+        if (effectAnim) {
+          effectPath = effectAnim; // Custom path from item
+        } else {
+          effectPath = getAttackEffectPath("energy", effectColor, effectVariant);
+        }
+      } else {
+        // Default energy effect
+        effectPath = getAttackEffectPath("energy", "blue", "01");
+      }
+      
+      await playAttackEffect(effectPath, sourceToken);
+      
+      // Add impact effect on hit
+      if (colorLower !== "white") {
+        await playImpactEffect("jb2a.impact.010.blue", Array.from(game.user.targets));
+      }
+    }
+    // === END VISUAL EFFECTS ===
 
     // Hit state
     const isHit = colorLower !== 'white';
