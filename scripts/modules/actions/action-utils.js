@@ -10,7 +10,7 @@ export function buildModeSelector({ mode = "semi", disabled = false, disabledRea
   const mk = (val, label) => {
     const active = mode === val;
     const base = "display:inline-block;padding:4px 8px;border:1px solid #bbb;border-radius:4px;margin-left:6px;cursor:pointer;font-size:12px;";
-    const on   = `${base}background:#fff;color:#111;font-weight:600;`;
+    const on   = `${base}background:#2196F3;color:#fff;font-weight:600;border-color:#1976D2;`;  // Changed to blue
     const off  = `${base}background:#f7f7f7;color:#444;opacity:.9;`;
     const dis  = disabled ? "pointer-events:none;opacity:.5;filter:grayscale(.4);" : "";
     return `<a class="faserip-mode" data-mode="${val}" title="${disabled ? disabledReason : ""}" style="${active ? on : off}${dis}">${label}</a>`;
@@ -49,8 +49,8 @@ export function attachModeSelectorHandlers($html, opts = {}, onChange) {
   $buttons.on("click", (ev) => {
     const $btn = $(ev.currentTarget);
     const mode = $btn.data("mode");
-    $buttons.css("background", "#f7f7f7").css("color", "#444").css("font-weight", "400");
-    $btn.css("background","#fff").css("color","#111").css("font-weight","600");
+    $buttons.css({"background": "#f7f7f7", "color": "#444", "font-weight": "400", "border-color": "#bbb"});
+    $btn.css({"background":"#2196F3", "color":"#fff", "font-weight":"600", "border-color":"#1976D2"});
     applyFlags(mode);
   });
 
@@ -1471,4 +1471,74 @@ export async function confirmPreview({ title = "Preview", contentHtml }) {
     no: () => false,
     defaultYes: true
   });
+}
+
+/**
+ * Build HTML for the multi-attack section
+ * @param {string} actionType - Type of action (e.g., "blunt-attack", "energy", "shooting")
+ * @param {number} targetCount - Number of targets selected
+ * @param {boolean} multiAttacks - Whether multi-attacks is enabled
+ * @param {number} attackCount - Number of attacks (2 or 3)
+ * @param {boolean} multiAdjacent - Whether attacking multiple adjacent targets
+ * @returns {string} HTML for the multi-attack section
+ */
+export function buildMultiAttackSection(actionType, targetCount, multiAttacks = false, attackCount = 2, multiAdjacent = false) {
+  const isMelee = ["blunt-attack", "edged-attack"].includes(actionType);
+  
+  return `
+    <div style="margin:6px 0;padding:6px;background:#e8f5e9;border:1px solid #4caf50;border-radius:3px;">
+      <div style="font-weight:600;margin-bottom:6px;color:#2e7d32;">Multiple Attacks</div>
+      
+      <div style="margin-bottom:4px;">
+        <label style="font-size:.9em;">
+          <input type="checkbox" name="multiAttacks" ${multiAttacks ? 'checked' : ''}>
+          Enable Multi-Attacks (-1 CS per attack)
+        </label>
+      </div>
+      
+      <div id="multi-attack-options" style="display:${multiAttacks ? 'block' : 'none'};margin-left:20px;padding:4px 0;">
+        <div style="margin-bottom:4px;">
+          <label style="font-size:.9em;display:block;margin-bottom:2px;">Number of Attacks:</label>
+          <label style="font-size:.85em;margin-right:12px;">
+            <input type="radio" name="attackCount" value="2" ${attackCount === 2 ? 'checked' : ''}>
+            2 attacks (Remarkable FEAT)
+          </label>
+          <label style="font-size:.85em;">
+            <input type="radio" name="attackCount" value="3" ${attackCount === 3 ? 'checked' : ''}>
+            3 attacks (Amazing FEAT)
+          </label>
+        </div>
+        ${isMelee ? `
+          <div style="margin-top:4px;">
+            <label style="font-size:.85em;">
+              <input type="checkbox" name="multiAdjacent" ${multiAdjacent ? 'checked' : ''}>
+              Attack multiple adjacent targets (-4 CS, single roll)
+            </label>
+          </div>
+        ` : ''}
+        <div style="font-size:.8em;color:#555;font-style:italic;margin-top:4px;">
+          Must succeed at Fighting FEAT to perform multiple attacks
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+/**
+ * Setup event handlers for multi-attack checkboxes
+ * @param {jQuery} html - The jQuery-wrapped HTML element
+ */
+export function setupMultiAttackHandlers(html) {
+  const $multiAttacks = html.find('[name="multiAttacks"]');
+  const $multiOptions = html.find('#multi-attack-options');
+  
+  if ($multiAttacks.length && $multiOptions.length) {
+    $multiAttacks.on('change', function() {
+      if ($(this).is(':checked')) {
+        $multiOptions.slideDown(200);
+      } else {
+        $multiOptions.slideUp(200);
+      }
+    });
+  }
 }

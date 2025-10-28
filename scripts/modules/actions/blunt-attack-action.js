@@ -6,7 +6,8 @@ import {
   isBluntCapable, computeBluntDamage,
   rollWithKarmaAndHistory, buildResultGrid, buildActionsBox, bannerColors,
   getTargetingContext, getBodyArmorValues, applyDamageToTargets,
-  buildMultiAttackSection, setupMultiAttackHandlers // ADD THIS IMPORT
+  buildMultiAttackSection, setupMultiAttackHandlers,
+  buildModeSelector, attachModeSelectorHandlers, debugLog
 } from "./action-utils.js";
 import { getItemMaterialRank } from "../../gm-utils.js";
 import { makeDamageBlock, computeAfterArmor, buildDamageFlags } from "./damage-ui.js";
@@ -14,6 +15,7 @@ import { canEffectsApply } from "../../rules/effects-gate.js";
 import { buildColorOutcome } from "../dice/color-results.js";
 import { applyColumnShifts } from "../dice/column-shifts.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
+import { resolveCombatMode } from "./action-dispatcher.js";
 
 
 export class BluntAttackAction extends AttackAction {
@@ -48,6 +50,8 @@ export class BluntAttackAction extends AttackAction {
 
     // dialog HTML
     const dialogHtml = `
+      ${buildModeSelector({ mode: this.opts?.mode || "semi" })}
+
       <div style="margin-bottom:6px;">
         <div style="display:grid;grid-template-columns:65px 1fr;gap:3px 8px;font-size:.9em;line-height:1.3;">
           <span style="font-weight:600;">Action:</span><span style="font-weight:600;">${actionName}</span>
@@ -229,6 +233,11 @@ export class BluntAttackAction extends AttackAction {
         default: "roll",
         render: (html) => {
           const $dialog = html.closest('.dialog');
+           // Initialize mode selector
+          attachModeSelectorHandlers(html, this.opts || {}, (mode, derived) => {
+            console.log('Mode changed to:', mode, derived);
+          });
+
           const update = () => {
             const src = html.find('[name="src"]:checked').val() || "hands";
             const $weaponRow = html.find('#weapon-row');
