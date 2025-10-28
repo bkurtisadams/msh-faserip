@@ -300,6 +300,72 @@ export class BluntAttackAction extends AttackAction {
           html.find('[name="objectName"]').on('input', update);
           // multi attack
           setupMultiAttackHandlers(html);
+
+          /** ---- Collapsible wrappers for Pull Punch and Multiple Targets/Attacks (Blunt only) ---- */
+          (() => {
+            // Minimal helper that wraps an existing section in a clickable header
+            const makeCollapsible = (container, title, tone = "neutral") => {
+              if (!container || !container.length) return;
+
+              const toneColors = (t) => {
+                if (t === "green")  return { bg: "#c8e6c9", border: "#4caf50", text: "#2e7d32" }; // matches your multi-attack box vibe
+                if (t === "orange") return { bg: "#ffe0b2", border: "#ff9800", text: "#e65100" }; // matches your pull-punch box vibe
+                return { bg: "#eee",    border: "#bbb",   text: "#333" };
+              };
+              const { bg, border, text } = toneColors(tone);
+
+              const $wrap  = $(`<div class="frp-collapsible" data-open="0"></div>`);
+              const $hdr   = $(`
+                <div class="frp-col-h"
+                    style="cursor:pointer;user-select:none;background:${bg};border:1px solid ${border};
+                            border-radius:3px;padding:6px;font-weight:600;color:${text};margin:6px 0;">
+                  <span class="frp-caret" style="display:inline-block;width:1em;">▸</span>${title}
+                </div>`);
+              const $body  = $(`<div class="frp-col-body" style="display:none;"></div>`);
+
+              // Insert wrapper before the section and move section inside the body
+              container.before($wrap);
+              $wrap.append($hdr).append($body);
+              $body.append(container);
+
+              // Toggle handler
+              $hdr.on("click", (ev) => {
+                ev.preventDefault();
+                const open = $wrap.attr("data-open") === "1";
+                $body.stop(true, true).slideToggle(150);
+                $wrap.attr("data-open", open ? "0" : "1");
+                $hdr.find(".frp-caret").text(open ? "▸" : "▾");
+              });
+            };
+
+            // 1) Pull Punch section — find the orange box that contains the "Pull Punch (Optional)" title
+            // We locate the specific block by its title text and wrap the whole section.
+            const $pullBlock = (function() {
+              // Get the first DIV whose text includes the title, then take the closest colored box around it.
+              const $titleDiv = $(html).find("div").filter(function() {
+                return $(this).text().trim().includes("Pull Punch (Optional)");
+              }).first();
+              if (!$titleDiv.length) return $(); // not found
+              // The original orange container is the nearest ancestor with inline background styling
+              const $container = $titleDiv.closest("div[style*='#fff3e0'], div[style*='ff9800']");
+              return $container.length ? $container : $titleDiv.closest("div");
+            })();
+            makeCollapsible($pullBlock, "Pull Punch (Optional)", "orange");
+
+            // 2) Multiple Targets/Attacks section — find the green box with that header text and wrap it.
+            const $multiBlock = (function() {
+              const $titleDiv = $(html).find("div").filter(function() {
+                return $(this).text().includes("Multiple Targets/Attacks");
+              }).first();
+              if (!$titleDiv.length) return $();
+              // The multi section’s top-level green container is the nearest ancestor box
+              const $container = $titleDiv.closest("div[style*='#e8f5e9'], div[style*='4caf50']");
+              return $container.length ? $container : $titleDiv.closest("div");
+            })();
+            makeCollapsible($multiBlock, "Multiple Targets / Attacks", "green");
+          })();
+          /** ---- END Collapsible wrappers for Pull Punch and Multiple Targets/Attacks (Blunt only) ---- */
+
         }
       }).render(true);
     });
