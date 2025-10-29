@@ -25,6 +25,14 @@ export class AttackAction extends BaseAction {
     return Number(game?.user?.targets?.size ?? 1);
   }
 
+  /** First selected token, honoring an override if present */
+  _selectPrimaryTarget() {
+    const arr = Array.isArray(this?.targets)
+      ? this.targets
+      : Array.from(game?.user?.targets ?? []);
+    return arr[0] ?? null;
+  }
+
   _computeEffectiveRank(baseRank, columnShift=0) {
     return shiftRank(baseRank, columnShift);
   }
@@ -39,18 +47,52 @@ export class AttackAction extends BaseAction {
   _getStrength() { return getStrengthInfo(this.actor); }
 
   async _rollFightingFeat(actor, fightingAbility, intensity, attackCount) {
+    // RAW: Auto when Ability ≥ Intensity + 4 ranks (diff >= 4)
+    // Optional “Impossible”: when Intensity ≥ Ability + 2 ranks (diff <= -2)
+    const AUTO_DIFF = 4;
+
+    // Toggle this to enable (RAW optional). If disabled, nothing is “impossible”;
+    // the required color rule applies (e.g., Red-only).
+    const USE_IMPOSSIBLE = true;
+    const IMPOSSIBLE_DIFF = -2;
+
     const availableKarma = actor.system.karma.value || 0;
     
     // Get intensity rank value for comparison
     const intensityIndex = RANKS.indexOf(intensity);
-    const fightingIndex = RANKS.indexOf(fightingAbility.rank);
+    const fightingIndex  = RANKS.indexOf(fightingAbility.rank);
+    const diff = fightingIndex - intensityIndex;
+
+    if (diff >= AUTO_DIFF) {
+      return { success: true, intensity, roll: null, totalRoll: null, resultColor: "AUTO", cancelled: false, auto: true };
+    }
+    if (USE_IMPOSSIBLE && diff <= IMPOSSIBLE_DIFF) {
+      return { success: false, intensity, roll: null, totalRoll: null, resultColor: "IMPOSSIBLE", cancelled: false, auto: false };
+    }
+
+    if (diff <= IMPOSSIBLE_DIFF) {
+      // Impossible under standard rules (no roll)
+      return {
+        success: false,
+        intensity,
+        roll: null,
+        totalRoll: null,
+        resultColor: "IMPOSSIBLE",  // sentinel for UI/logging
+        cancelled: false,
+        auto: false
+      };
+    }
+
+    // otherwise fall through to the normal roll path
+
     
     // In Full Auto mode, skip dialog and roll automatically with 0 karma
     if (this.opts?.autoApply === true) {
       const roll = await (new Roll("1d100")).evaluate();
       const totalRoll = roll.total;
       
-      const resultColor = game.msh.rollUniversalTable(fightingAbility.rank, totalRoll);
+      const effFeatRank = shiftRank(fightingAbility.rank, this.opts?.featCs ?? 0);
+      const resultColor = game.msh.rollUniversalTable(effFeatRank, totalRoll);
       const colorLower = resultColor.toLowerCase();
       
       // Determine success based on FEAT intensity comparison rules
@@ -98,14 +140,15 @@ export class AttackAction extends BaseAction {
     }
     
     // Manual/Semi mode: show dialog
-    // Determine required color based on FEAT rules
+    // Determine required color based on FEAT rules (with auto/impossible)
     let requiredColor;
-    if (fightingIndex > intensityIndex) {
-      requiredColor = "Green or better";
-    } else if (fightingIndex === intensityIndex) {
-      requiredColor = "Yellow or better";
-    } else {
-      requiredColor = "Red only";
+    {
+      const d = fightingIndex - intensityIndex;
+      if (d >= AUTO_DIFF)                         requiredColor = "Automatic (no roll)";
+      else if (USE_IMPOSSIBLE && d <= IMPOSSIBLE_DIFF) requiredColor = "Impossible (fails)";
+      else if (d > 0)                             requiredColor = "Green or better";
+      else if (d === 0)                           requiredColor = "Yellow or better";
+      else                                        requiredColor = "Red only";
     }
     
     const dialogContent = `
@@ -162,6 +205,32 @@ export class AttackAction extends BaseAction {
               const cs = parseInt(html.find('#multi-feat-cs').val()) || 0;
               const effRank = shiftRank(fightingAbility.rank, cs);
               const effFightingIndex = RANKS.indexOf(effRank);
+
+              // Re-check auto/impossible with CS applied
+              {
+                const d2 = effFightingIndex - intensityIndex;
+                if (d2 >= AUTO_DIFF) {
+                  await ChatMessage.create({
+                    speaker: ChatMessage.getSpeaker({ actor }),
+                    content: `<div style="background:#e8f5e9;border:1px solid #4caf50;border-radius:3px;padding:8px;margin:5px 0;">
+                      <div style="color:#2e7d32;font-weight:bold;margin-bottom:5px;">Multiple Attack FEAT - AUTOMATIC SUCCESS</div>
+                      <div style="font-size:.9em;">Fighting (eff.): ${effRank} vs Intensity: ${intensity} — no roll required</div>
+                    </div>`
+                  });
+                  return resolve({ success: true, intensity, roll: null, totalRoll: null, resultColor: "AUTO", cancelled: false, auto: true });
+                }
+                if (USE_IMPOSSIBLE && d2 <= IMPOSSIBLE_DIFF) {
+                  await ChatMessage.create({
+                    speaker: ChatMessage.getSpeaker({ actor }),
+                    content: `<div style="background:#ffebee;border:1px solid #f44336;border-radius:3px;padding:8px;margin:5px 0;">
+                      <div style="color:#d32f2f;font-weight:bold;margin-bottom:5px;">Multiple Attack FEAT - IMPOSSIBLE</div>
+                      <div style="font-size:.9em;">Fighting (eff.): ${effRank} vs Intensity: ${intensity}</div>
+                      <div style="font-size:.9em;margin-top:4px;">Proceed with a single attack at -3CS.</div>
+                    </div>`
+                  });
+                  return resolve({ success: false, intensity, roll: null, totalRoll: null, resultColor: "IMPOSSIBLE", cancelled: false, auto: false });
+                }
+              }
 
               const resultColor = game.msh.rollUniversalTable(effRank, totalRoll);
               const colorLower = resultColor.toLowerCase();
@@ -262,7 +331,8 @@ export class AttackAction extends BaseAction {
     const {
       choice, actor, ability, actionType, actionName, effects,
       damageType, rawDamage, damageNote, sourceName, attackForm,
-      breakingFeat = null, targetCount = 1
+      breakingFeat = null, targetCount = 1,
+      overrideTargets = null
     } = config;
 
     const actionLabel = `${actionName}${targetCount > 1 ? ` (${targetCount} targets)` : ''}`;
@@ -300,8 +370,17 @@ export class AttackAction extends BaseAction {
     const isHit = colorLower !== 'white';
 
     // Create a chat card for each target
-    const targets = Array.from(game.user?.targets ?? []);
-    const targetList = targets.length > 0 ? targets : [null]; // null for untargeted attacks
+    let targetList;
+    if (choice?.specificTarget) {
+      // Single specific target (for multi-attack distribution)
+      targetList = [choice.specificTarget];
+    } else {
+      // All currently selected targets
+      const selected = Array.from(game.user?.targets ?? []);
+      targetList = selected.length > 0 ? selected : [null]; // null for untargeted attacks
+    }
+
+    debugLog("FASERIP | _executeSingleAttack targetList:", targetList?.map(t => t?.name ?? "untargeted"));
 
     for (const target of targetList) {
       const targetActor = target?.actor;

@@ -263,38 +263,43 @@ export class ShootingAction extends RangedAttackAction {
       
       if (!featResult.success) {
         // Failed FEAT: 1 attack at -3CS
+        choice.shift = (choice.shift || 0) - 3;
         choice.totalShift = (choice.totalShift || 0) - 3;
         actualAttackCount = 1;
       } else {
         // Success: Multiple attacks at -1CS each
+        choice.shift = (choice.shift || 0) - 1;
         choice.totalShift = (choice.totalShift || 0) - 1;
         actualAttackCount = choice.attackCount;
       }
     }
 
     // Execute attack(s)
-for (let i = 1; i <= actualAttackCount; i++) {
-  if (i > 1) {
-    // Small delay between attacks for visual clarity
-    await new Promise(resolve => setTimeout(resolve, 500));
-  }
-  const actionLabel = actualAttackCount > 1 ? `${actionName} (${i}/${actualAttackCount})` : actionName;
-  await this._executeSingleAttack({
-      choice,
-      actor: this.actor,
-      ability,
-      actionType,
-      actionName: actionLabel,
-      effects,
-      damageType: choice.weapon?.system?.damageType || "physical-ranged",
-      rawDamage: choice.weaponDamage || 0,
-      damageNote: "",
-      sourceName: choice.weapon?.name || "Weapon",
-      attackForm: "shooting",
-      breakingFeat: null,
-      targetCount: 1
-    });
-}
+    const targets = Array.from(game.user?.targets ?? []);
+    for (let i = 1; i <= actualAttackCount; i++) {
+      if (i > 1) await new Promise(resolve => setTimeout(resolve, 500));
+      
+      const actionLabel = actualAttackCount > 1 ? `${actionName} (${i}/${actualAttackCount})` : actionName;
+      
+      // For failed FEAT (actualAttackCount=1), only attack first target
+      const targetForThisAttack = actualAttackCount === 1 ? targets[0] : targets[(i-1) % targets.length];
+      
+      await this._executeSingleAttack({
+        choice: { ...choice, specificTarget: targetForThisAttack },  // Force specific target
+        actor: this.actor,
+        ability,
+        actionType,
+        actionName: actionLabel,
+        effects,
+        damageType: choice.weapon?.system?.damageType || "physical-ranged",
+        rawDamage: choice.weaponDamage || 0,
+        damageNote: "",
+        sourceName: choice.weapon?.name || "Weapon",
+        attackForm: "shooting",
+        breakingFeat: null,
+        targetCount: 1
+      });
+    }
 
 // Multi-attack completion message
 if (actualAttackCount > 1) {

@@ -7,7 +7,8 @@ import {
   rollWithKarmaAndHistory, buildResultGrid, buildActionsBox, bannerColors,
   getTargetingContext, getBodyArmorValues, applyDamageToTargets,
   buildMultiAttackSection, setupMultiAttackHandlers,
-  buildModeSelector, attachModeSelectorHandlers, debugLog, setupModeSelector
+  buildModeSelector, attachModeSelectorHandlers, debugLog, setupModeSelector,
+  applyCapabilitiesToDialog
 } from "./action-utils.js";
 import { getItemMaterialRank } from "../../gm-utils.js";
 import { makeDamageBlock, computeAfterArmor, buildDamageFlags } from "./damage-ui.js";
@@ -483,7 +484,18 @@ export class BluntAttackAction extends AttackAction {
         choice.attackCount
       );
       
-      if (featResult.success) {
+      // (A) FEAT status banner so users see what happened
+      await ChatMessage.create({
+        speaker: ChatMessage.getSpeaker({ actor }),
+        content: `<div style="background:#eef6ff;border:1px solid #90caf9;border-radius:3px;padding:6px;margin:4px 0;">
+          <b>Multi-Attack FEAT:</b> ${intensity} — ${
+            featResult?.success ? "SUCCESS" : "FAIL"
+          } ${featResult?.auto ? "(Automatic)" : ""}</div>`
+      });
+
+      const featSuccess    = !!(featResult?.auto || featResult?.resultColor === "AUTO" || featResult?.success);
+      const featImpossible =  !!(featResult?.resultColor === "IMPOSSIBLE");
+      if (featSuccess && !featImpossible) {
         // Success: Make 2 or 3 attacks, each at -1CS
         actualAttackCount = choice.attackCount;
         choice.shift = (choice.shift || 0) - 1;
@@ -513,13 +525,21 @@ export class BluntAttackAction extends AttackAction {
         targetCount
       });
     } else {
-      // Execute each attack separately
-      for (let i = 0; i < actualAttackCount; i++) {
-        if (i > 0) {
-          await new Promise(resolve => setTimeout(resolve, 300));
-        }
+      // Build ordered target list once (at call time)
+      const selected = Array.from(game.user?.targets ?? []);
+      const count = Math.max(1, actualAttackCount);
+
+      for (let i = 0; i < count; i++) {
+        if (i > 0) await new Promise(r => setTimeout(r, 300));
+
+        // On FEAT failure (count === 1), hit FIRST target only; on success, round-robin
+        const tgt = (count === 1)
+          ? (selected[0] ?? null)
+          : (selected.length ? selected[i % selected.length] : null);
+
         await this._executeSingleAttack({
-          choice, actor, ability,
+          choice: { ...choice, specificTarget: tgt },
+          actor, ability,
           actionType, actionName, effects,
           damageType: "physical-blunt",
           rawDamage: choice.damage,
@@ -531,5 +551,6 @@ export class BluntAttackAction extends AttackAction {
         });
       }
     }
+
   }
 }

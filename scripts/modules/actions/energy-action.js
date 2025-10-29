@@ -375,145 +375,29 @@ export class EnergyAction extends RangedAttackAction {
     }
     // === END VISUAL EFFECTS ===
 
-    // Hit state
+    // Hit state — per-target cards (Multiple Attack Adjacent keeps the single roll & penalty)
     const isHit = colorLower !== 'white';
-    const targets = Array.from(game.user?.targets ?? []);
-    // Primary target (if exactly one is selected) + power rank for Nullify intensity
-    const primaryTarget = targets.length === 1 ? targets[0] : null;
-    const attackerPowerRankName = choice.powerRank;
 
-    // === Build standardized chat card (same as Throwing-Edged style) ===
+    // Use exactly the tokens the user targeted (no auto-adding)
+    let targets = Array.from(game.user?.targets ?? []);
+    const targetList = targets.length ? targets : [null];
+
+    // Build shared chrome once
     const grid = buildResultGrid(actionType, colorLower, effects, (globalThis._getResultHoverText || this._getResultHoverText));
     const { bg, fg } = bannerColors(colorLower);
 
-    // Derive which chips to show from the configured effect text for this color
-    const effText = String(effectResult || "").toLowerCase();
-    
-    // Debug
-    console.log("FASERIP | Energy Action Debug:", {
-      isHit,
-      colorLower,
-      powerDamage: choice.powerDamage,
-      damagePassedToBox: isHit ? choice.powerDamage : 0,
-      effText,
-      actorName: actor.name,
-      powerName: choice.powerName,
-      usePowerToHit: choice.usePowerToHit,
-      damageType: choice.powerDamageType
-    });
+    // Shared context (same for all targets because the roll/result is shared)
+    const rangeText =
+      choice.prettyRange ||
+      `${choice.range} area${choice.range > 1 ? "s" : ""}` +
+      `${choice.rangeModifier ? ` (${choice.rangeModifier}CS)` : ""}` +
+      `${choice.throughObstacle ? `, obstacle (-2CS)` : ""}`;
 
-    // Calculate penetrating damage
-    let penetratingDamage = 0;
-    if (isHit && choice.powerDamage > 0) {
-      if (targets.length === 1) {
-        const targetActor = targets[0].actor;
-        if (targetActor) {
-          const armorData = getBodyArmorValues(targetActor, choice.powerDamageType);
-          penetratingDamage = Math.max(0, choice.powerDamage - armorData.applicable);
-        } else {
-          penetratingDamage = choice.powerDamage;
-        }
-      } else {
-        penetratingDamage = choice.powerDamage;
-      }
-    }
+    const toHitLine =
+      choice.usePowerToHit
+        ? `To-Hit Rank: ${choice.powerRank} (Power)`
+        : `To-Hit Rank: ${ability.rank} (${ability.value}) — Ability: ${ability.name}`;
 
-    const actions = buildActionsBox({
-      showSlam: false, // Energy attacks don't typically slam
-      showStun: /stun|bullseye/.test(effText) && penetratingDamage > 0,
-      showKill: /kill/.test(effText) && penetratingDamage > 0,
-      showNullifySave: false,
-      nullifyIntensityRank: attackerPowerRankName, // e.g., "Remarkable"
-      actorUuid: actor.uuid,
-      targetUuid: primaryTarget?.actor?.uuid || "",
-      damage: penetratingDamage,
-      attackForm: "energy",
-      damageType: choice.powerDamageType,
-      bypassArmor: false,
-      autoApply: this.opts?.autoApply  // is Auto Mode on?
-    });
-
-    // --- Nullification save + aura chips (per RAW: Endurance vs Power Rank, tech/magic unaffected)
-    const usedItem = choice.powerId ? energyItems.find(i => i.id === choice.powerId) : null;
-
-    let saveChipHtml = "";
-    let auraChipHtml = "";
-    let saveFlags = null;
-
-    if (!choice.useAdHoc && choice.powerId && isHit) {  // ← ADD && isHit
-      const s = usedItem?.system ?? {};
-      const isNullifyPower =
-        (s.damageType === 'nullification') ||
-        (s.primaryEffect === 'nullification') ||
-        /nullif/i.test(usedItem?.name ?? '');
-
-      if (isNullifyPower) {
-        // Defaults to RAW: Endurance FEAT vs Attacker Power Rank; effect for rank rounds if not maintained
-        const ability    = (s.save?.ability)    || "endurance";
-        const intensity  = (s.save?.intensity)  || "power-rank";
-        const fixedRank  = (s.save?.fixedRank)  || "";
-        const ignoreGate = (s.save?.ignoreDamageGate !== false); // saves should ignore damage gate
-
-        saveChipHtml = `
-          <div style="text-align:center;margin-top:6px;">
-            <a class="faserip-chip" data-action="force-save">Force Save (Targets)</a>
-          </div>
-        `;
-
-        // Aura toggle (maintain while in range)
-        const isMaintaining = isAuraMaintained(actor);
-        auraChipHtml = `
-          <div style="text-align:center;margin-top:6px;">
-            <a class="faserip-chip" data-action="toggle-nullify-aura">
-              ${isMaintaining ? 'Stop Nullify Aura' : 'Start Nullify Aura'}
-            </a>
-          </div>
-        `;
-
-        saveFlags = {
-          requiresSave: true,
-          saveAbility: ability,           // Endurance by default
-          saveIntensity: intensity,       // Power rank intensity
-          saveFixedRank: fixedRank,
-          saveIgnoreGate: ignoreGate,
-          attackerUuid: actor?.uuid || "",
-          nullify: { powerItemUuid: usedItem?.uuid ?? null } // helpful for provenance
-        };
-      }
-    }
-
-    // Damage numbers for display + flags
-    const rawDamage = isHit ? (Number(choice.powerDamage) || 0) : 0;
-
-    let afterArmor = rawDamage;
-    if (isHit && rawDamage > 0 && targets.length === 1) {
-      const targetActor = targets[0]?.actor;
-      if (targetActor) {
-        const armorData = getBodyArmorValues(targetActor, choice.powerDamageType);
-        afterArmor = Math.max(0, rawDamage - (armorData?.applicable ?? 0));
-      }
-    }
-
-    // Build a standardized damage block (inline HTML)
-    const sourceLabel = `Power: ${choice.powerName} (${choice.powerRank})`;
-    const damageBlock = `
-      <div style="margin:6px 10px;padding:6px;border:1px solid #ccc;border-radius:3px;background:#fff;">
-        <div><b>Damage (raw):</b> ${rawDamage}</div>
-        ${isHit ? (targets.length === 1
-          ? `<div><b>After Armor (${targets[0].name}):</b> ${afterArmor}</div>`
-          : `<div><b>After Armor (varies):</b> Resolve per target</div>`) : ``}
-        <div style="font-size:.9em;color:#555;">${sourceLabel}</div>
-      </div>
-    `;
-
-    const rangeText = choice.prettyRange || `${choice.range} area${choice.range > 1 ? "s" : ""}${choice.rangeModifier ? ` (${choice.rangeModifier}CS)` : ""}${choice.throughObstacle ? `, obstacle (-2CS)` : ""}`;
-
-    // Build a clear to-hit line first
-    const toHitLine = choice.usePowerToHit
-      ? `To-Hit Rank: ${choice.powerRank} (Power)`
-      : `To-Hit Rank: ${ability.rank} (${ability.value}) — Ability: ${ability.name}`;
-
-    // Context block (same order/style as your other cards)
     const contextHtml = `
       <div>${toHitLine}${choice.totalShift ? ` — Shift ${choice.totalShift} → ${effectiveRank}` : ""}</div>
       <div>Power: ${choice.powerName} — Damage: ${choice.powerDamage} — Rank: ${choice.powerRank}</div>
@@ -522,79 +406,104 @@ export class EnergyAction extends RangedAttackAction {
     `;
 
     const targetingContext = getTargetingContext(actor, actionName);
+    const effText = String(effectResult || "").toLowerCase();
+    const isManualMode = this?.opts?.mode === "manual";
 
-    // final chat card
-    const cardHtml = `
-      <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
-        <div style="padding:5px 10px;border-bottom:1px solid #c0c0c0;font-size:1.1em;color:#8b0000;">
-          <strong>${actor.name} - ${actionName}</strong>
-        </div>
-        <div style="padding:5px 10px;border-bottom:1px solid #e0e0e0;font-size:.9em;">
-          ${targetingContext}
-        </div>
-        <div style="padding:5px 10px;font-size:.9em;">${contextHtml}</div>
-        ${damageBlock}
-        ${grid}
-        <div style="text-align:center;padding:8px;margin:5px;font-weight:bold;font-size:1.1em;border-radius:3px;background:${bg};color:${fg};">
-          RESULT: ${String(color).toUpperCase()} — ${String(effectResult).toUpperCase()}
-        </div>
-        
-        ${auraChipHtml}
-        ${saveChipHtml}
-        ${actions}
-      </div>
-    `;
+    // One message per target
+    for (const target of targetList) {
+      const targetActor = target?.actor;
+      const targetName  = target?.name || "Unknown Target";
 
-    await ChatMessage.create({
-      speaker: ChatMessage.getSpeaker({ actor }),
-      content: cardHtml,
-      flags: {
-        ...buildDamageFlags({
-          actionId: actionType,
-          damageType: choice.powerDamageType,
-          rawDamage,
-          afterArmor,
-          resultColor: colorLower,
-          cappedTotal,
-          targets: targets
-        }),
-        // Merge in save flags for Nullification if present
-        "msh-faserip": {
-          ...buildDamageFlags({
-            actionId: actionType,
-            damageType: choice.powerDamageType,
-            rawDamage,
-            afterArmor,
-            resultColor: colorLower,
-            cappedTotal,
-            targets: targets
-          })["msh-faserip"],
-          ...(saveFlags || {})
-        }
+      const rawDamage = isHit ? (Number(choice.powerDamage) || 0) : 0;
+
+      let afterArmor = rawDamage;
+      if (isHit && rawDamage > 0 && targetActor) {
+        const armorData = getBodyArmorValues(targetActor, choice.powerDamageType);
+        afterArmor = Math.max(0, rawDamage - (armorData?.applicable ?? 0));
       }
-    });
 
-    // === AUTO-APPLY DAMAGE IN FULL AUTO MODE ===
-    if (this.opts?.autoApply && isHit && rawDamage > 0) {
-      debugLog("Auto-applying damage in full auto mode", {
-        damage: rawDamage,
-        afterArmor,
-        targets: targets?.length || 0
-      });
-      
-      await applyDamageToTargets(rawDamage, {
-        attackerUuid: actor.uuid,
+      // Per-target actions (skip in manual mode)
+      const actions = (!isManualMode && isHit && afterArmor > 0 && targetActor)
+        ? buildActionsBox({
+            showSlam: false,                                  // Energy doesn’t slam by default
+            showStun: /stun|bullseye/.test(effText),
+            showKill: /kill/.test(effText),
+            actorUuid: actor.uuid,
+            targetUuid: targetActor?.uuid,
+            damage: afterArmor,
+            attackForm: "energy",
+            damageType: choice.powerDamageType,
+            bypassArmor: false,
+            autoApply: this.opts?.autoApply
+          })
+        : "";
+
+      // Per-target damage summary
+      const sourceLabel = `Power: ${choice.powerName} (${choice.powerRank})`;
+      const damageBlock = `
+        <div style="margin:6px 10px;padding:6px;border:1px solid #ccc;border-radius:3px;background:#fff;">
+          <div><b>Damage (raw):</b> ${rawDamage}</div>
+          ${isHit ? `<div><b>After Armor${targetActor ? ` (${targetName})` : ``}:</b> ${afterArmor}</div>` : ``}
+          <div style="font-size:.9em;color:#555;">${sourceLabel}</div>
+        </div>
+      `;
+
+      const cardHtml = `
+        <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
+          <div style="padding:5px 10px;border-bottom:1px solid #c0c0c0;font-size:1.1em;color:#8b0000;">
+            <strong>${actor.name} - ${actionName}</strong>
+            ${targetActor ? `<br><span style="font-size:.85em;color:#555;">→ ${targetName}</span>` : ``}
+          </div>
+          <div style="padding:5px 10px;border-bottom:1px solid #e0e0e0;font-size:.9em;">
+            ${targetingContext}
+          </div>
+          <div style="padding:5px 10px;font-size:.9em;">${contextHtml}</div>
+          ${damageBlock}
+          ${grid}
+          <div style="text-align:center;padding:8px;margin:5px;font-weight:bold;font-size:1.1em;border-radius:3px;background:${bg};color:${fg};">
+            RESULT: ${String(color).toUpperCase()} — ${String(effectResult).toUpperCase()}
+          </div>
+          ${actions}
+        </div>
+      `;
+
+      // Flags per target (no auto-apply trigger in flags to avoid loops)
+      const msgFlags = buildDamageFlags({
+        actionId: actionType,
         damageType: choice.powerDamageType,
-        showNotification: true,
-        bypassArmor: false,
-        attackForm: "energy",
-        armorPiercing: 0,
-        apMode: "value",
-        wasKillResult: colorLower === "red"
+        rawDamage,
+        afterArmor,
+        resultColor: colorLower,
+        cappedTotal,
+        targets: target ? [target] : []
       });
-    }
-    // === END AUTO-APPLY ===
+      if (msgFlags && msgFlags["msh-faserip"]) {
+        delete msgFlags["msh-faserip"].autoApply;
+        delete msgFlags["msh-faserip"].results;
+        msgFlags["msh-faserip"].origin = "energy-per-target";
+      }
 
+      await ChatMessage.create({
+        speaker: ChatMessage.getSpeaker({ actor }),
+        content: cardHtml,
+        flags: msgFlags
+      });
+
+      // Explicit per-target apply in Full Auto
+      if (!isManualMode && this.opts?.autoApply && isHit && rawDamage > 0 && targetActor) {
+        await applyDamageToTargets(rawDamage, {
+          attackerUuid: actor.uuid,
+          damageType: choice.powerDamageType,
+          showNotification: true,
+          bypassArmor: false,
+          attackForm: "energy",
+          armorPiercing: 0,
+          apMode: "value",
+          wasKillResult: colorLower === "red",
+          specificTarget: target
+        });
+      }
+    }
     // Play combat SFX
     const sourceName = choice.powerName || "Energy Blast";
     if (game.msh?.playCombatSFX) {

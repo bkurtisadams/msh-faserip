@@ -11,8 +11,9 @@ export const ACTION_CAPS = {
   "shooting":       { multi:true,  reduceDamage:false, lowerEffect:false },  // Shooting (trick shots are separate)
   "throwing-blunt": { multi:false, reduceDamage:true,  lowerEffect:false },
   "throwing-edged": { multi:false, reduceDamage:false, lowerEffect:false },
-  "energy":         { multi:false, reduceDamage:true,  lowerEffect:true  },
-  "force":          { multi:false, reduceDamage:true,  lowerEffect:true  },
+  "energy": { multi:false, reduceDamage:true, lowerEffect:true, adjacentOnly:true },
+  "force":  { multi:false, reduceDamage:true, lowerEffect:true, adjacentOnly:true },
+
   "grappling":      { multi:false, reduceDamage:true,  lowerEffect:true  },
   "grabbing":       { multi:false, reduceDamage:false, lowerEffect:false },   // treated separately from Grappling
   "escaping":       { multi:false, reduceDamage:false, lowerEffect:false },
@@ -58,7 +59,20 @@ export function applyCapabilitiesToDialog(html, actionType, ctx = {}) {
   if (!caps.lowerEffect)  $resultCapRow.hide();
   if (!caps.reduceDamage && !caps.lowerEffect) $pull.hide();
 
-  if (!caps.multi) $multi.hide();
+  if (!caps.multi) {
+    // Hide only the 2/3 controls
+    const $ma   = $root.find('[name="multiAttacks"]');
+    const $mopt = $root.find('#multi-attack-options');
+    if ($ma.length)   $ma.closest("div").hide().find("input,select").prop("disabled", true);
+    if ($mopt.length) $mopt.hide().find("input,select").prop("disabled", true);
+
+    // If we are NOT adjacentOnly, also hide the adjacent checkbox and wrapper
+    if (!caps.adjacentOnly) {
+      const $adj = $root.find('[name="multiAdjacent"]');
+      if ($adj.length) $adj.closest("div").hide().find("input,select").prop("disabled", true);
+      if ($multi.length) $multi.hide();
+    }
+  }
 
   // For consistency, make sure downstream reads don’t crash if hidden:
   // If a row is hidden and input missing, we default to safe values:

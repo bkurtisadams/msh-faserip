@@ -353,57 +353,29 @@ export class ForceAction extends RangedAttackAction {
     // === END VISUAL EFFECTS ===
 
     // Then continue with chat message...
-    // === Standardized chat card ===
+    // === Standardized per-target cards ===
     const grid = buildResultGrid(actionType, colorLower, effects, (globalThis._getResultHoverText || this._getResultHoverText));
     const { bg, fg } = bannerColors(colorLower);
-
-    // Derive which chips to show from the configured effect text for this color
     const effText = String(effectResult || "").toLowerCase();
     const isHit = colorLower !== 'white';
-    const actions = buildActionsBox({
-      showSlam: /slam/.test(effText),
-      showStun: /stun/.test(effText),
-      showKill: /kill/.test(effText),
-      actorUuid: actor.uuid,
-      damage: isHit ? choice.powerDamage : 0,  // Only pass damage if it's a hit
-      attackForm: "force",
-      autoApply: this.opts?.autoApply  // is Auto Mode on?
-    });
 
-    // --- Damage numbers for display + flags ---
-    const rawDamage = isHit ? Number(choice.powerDamage || 0) : 0;
-
-    // Prefer item damageType if a carried power was chosen; else default to force energy
+    // Derive damage type once
     const dmgType =
       (choice.powerId
         ? (forceItems.find(i => i.id === choice.powerId)?.system?.damageType)
         : null) || "energy-force";
 
-    const { afterArmor, targetName, multiTargetCount, targetsArray } = computeAfterArmor({
-      isHit,
-      rawDamage,
-      damageType: dmgType,
-      targets: game.user?.targets,
-      getArmorFn: (actor, dt) => getBodyArmorValues(actor, dt)
-    });
-
-    const damageBlock = makeDamageBlock({
-      isHit,
-      rawDamage,
-      afterArmor,
-      sourceLabel: `Power: ${choice.powerName} (${choice.powerRank})`,
-      targetName,
-      multiTargetCount
-    });
-
-    const rangeText = choice.prettyRange || 
+    // Shared context (same roll/result for all targets)
+    const rangeText =
+      choice.prettyRange ||
       `${choice.range} area${choice.range > 1 ? "s" : ""}` +
       `${choice.rangeModifier ? ` (${choice.rangeModifier}CS)` : ""}` +
       `${choice.throughObstacle ? `, obstacle (-2CS)` : ""}`;
 
-    const toHitLine = choice.usePowerToHit
-      ? `To-Hit Rank: ${choice.powerRank} (Power)`
-      : `To-Hit Rank: ${ability.rank} (${ability.value}) — Ability: ${ability.name}`;
+    const toHitLine =
+      choice.usePowerToHit
+        ? `To-Hit Rank: ${choice.powerRank} (Power)`
+        : `To-Hit Rank: ${ability.rank} (${ability.value}) — Ability: ${ability.name}`;
 
     const contextHtml = `
       <div>${toHitLine}${this.opts?.shift ? ` — Shift ${this.opts.shift} → ${effectiveRank}` : ""}</div>
@@ -413,60 +385,103 @@ export class ForceAction extends RangedAttackAction {
     `;
 
     const targetingContext = getTargetingContext(actor, actionName);
+    const isManualMode = this?.opts?.mode === "manual";
+    const rawDamage = isHit ? Number(choice.powerDamage || 0) : 0;
 
-    // final chat card
-    const cardHtml = `
-      <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
-        <div style="padding:5px 10px;border-bottom:1px solid #c0c0c0;font-size:1.1em;color:#8b0000;">
-          <strong>${actor.name} - ${actionName}</strong>
-        </div>
-        <div style="padding:5px 10px;border-bottom:1px solid #e0e0e0;font-size:.9em;">
-          ${targetingContext}
-        </div>
-        <div style="padding:5px 10px;font-size:.9em;">${contextHtml}</div>
-        ${damageBlock}
-        ${grid}
-        <div style="text-align:center;padding:8px;margin:5px;font-weight:bold;font-size:1.1em;border-radius:3px;background:${bg};color:${fg};">
-          RESULT: ${String(color).toUpperCase()} — ${String(effectResult).toUpperCase()}
-        </div>
-        ${actions}
-      </div>
-    `;
+    // Only the tokens the user targeted
+    let targets = Array.from(game.user?.targets ?? []);
+    const targetList = targets.length ? targets : [null];
 
-    await ChatMessage.create({
-      speaker: ChatMessage.getSpeaker({ actor }),
-      content: cardHtml,
-      flags: buildDamageFlags({
+    for (const target of targetList) {
+      const tActor = target?.actor;
+      const tName  = target?.name || "Unknown Target";
+
+      let afterArmor = rawDamage;
+      if (isHit && rawDamage > 0 && tActor) {
+        const armorData = getBodyArmorValues(tActor, dmgType);
+        afterArmor = Math.max(0, rawDamage - (armorData?.applicable ?? 0));
+      }
+
+      const actions = (!isManualMode && isHit && afterArmor > 0 && tActor)
+        ? buildActionsBox({
+            showSlam: /slam/.test(effText),
+            showStun: /stun/.test(effText),
+            showKill: /kill/.test(effText),
+            actorUuid: actor.uuid,
+            targetUuid: tActor?.uuid,
+            damage: afterArmor,
+            attackForm: "force",
+            damageType: dmgType,
+            autoApply: this.opts?.autoApply
+          })
+        : "";
+
+      const damageBlock = `
+        <div style="margin:6px 10px;padding:6px;border:1px solid #ccc;border-radius:3px;background:#fff;">
+          <div><b>Damage (raw):</b> ${rawDamage}</div>
+          ${isHit ? `<div><b>After Armor${tActor ? ` (${tName})` : ``}:</b> ${afterArmor}</div>` : ``}
+          <div style="font-size:.9em;color:#555;">Power: ${choice.powerName} (${choice.powerRank})</div>
+        </div>
+      `;
+
+      const cardHtml = `
+        <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
+          <div style="padding:5px 10px;border-bottom:1px solid #c0c0c0;font-size:1.1em;color:#8b0000;">
+            <strong>${actor.name} - ${actionName}</strong>
+            ${tActor ? `<br><span style="font-size:.85em;color:#555;">→ ${tName}</span>` : ``}
+          </div>
+          <div style="padding:5px 10px;border-bottom:1px solid #e0e0e0;font-size:.9em;">
+            ${targetingContext}
+          </div>
+          <div style="padding:5px 10px;font-size:.9em;">${contextHtml}</div>
+          ${damageBlock}
+          ${grid}
+          <div style="text-align:center;padding:8px;margin:5px;font-weight:bold;font-size:1.1em;border-radius:3px;background:${bg};color:${fg};">
+            RESULT: ${String(color).toUpperCase()} — ${String(effectResult).toUpperCase()}
+          </div>
+          ${actions}
+        </div>
+      `;
+
+      // Flags per target (no auto-apply trigger to avoid loops)
+      const msgFlags = buildDamageFlags({
         actionId: actionType,
         damageType: dmgType,
         rawDamage,
         afterArmor,
         resultColor: colorLower,
         cappedTotal,
-        targets: targetsArray
-      })
-    });
+        targets: target ? [target] : []
+      });
+      if (msgFlags && msgFlags["msh-faserip"]) {
+        delete msgFlags["msh-faserip"].autoApply;
+        delete msgFlags["msh-faserip"].results;
+        msgFlags["msh-faserip"].origin = "force-per-target";
+      }
 
-    // === AUTO-APPLY DAMAGE IN FULL AUTO MODE ===
-    if (this.opts?.autoApply && isHit && rawDamage > 0) {
-      debugLog("Auto-applying damage in full auto mode", {
-        damage: rawDamage,
-        afterArmor,
-        targets: targetsArray?.length || 0
+      await ChatMessage.create({
+        speaker: ChatMessage.getSpeaker({ actor }),
+        content: cardHtml,
+        flags: msgFlags
       });
-      
-      await applyDamageToTargets(rawDamage, {
-        attackerUuid: actor.uuid,
-        damageType: dmgType,
-        showNotification: true,
-        bypassArmor: false,
-        attackForm: "force",
-        armorPiercing: 0,
-        apMode: "value",
-        wasKillResult: colorLower === "red"
-      });
+
+      // Explicit per-target apply in Full Auto
+      if (!isManualMode && this.opts?.autoApply && isHit && rawDamage > 0 && tActor) {
+        await applyDamageToTargets(rawDamage, {
+          attackerUuid: actor.uuid,
+          damageType: dmgType,
+          showNotification: true,
+          bypassArmor: false,
+          attackForm: "force",
+          armorPiercing: 0,
+          apMode: "value",
+          wasKillResult: colorLower === "red",
+          specificTarget: target
+        });
+      }
     }
     // === END AUTO-APPLY ===
+
 
     // Play combat SFX
     const sourceName = choice.powerName || "Force Blast";
