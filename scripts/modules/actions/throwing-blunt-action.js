@@ -15,7 +15,8 @@ import {
   getBodyArmorValues,
   applyDamageToTargets,
   buildModeSelector,
-  setupModeSelector 
+  setupModeSelector,
+  applyCapabilitiesToDialog
 } from "./action-utils.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
 
@@ -221,6 +222,7 @@ export class ThrowingBluntAction extends RangedAttackAction {
          $adhoc.on('change', applyToggle);
           applyToggle();
           setupModeSelector(actor, html, this.opts || {}, "lastThrowBluntMode");
+          applyCapabilitiesToDialog(html, "throwing-blunt", { actor });  // new
           this._disposeAutoFill = attachAutoFillRange(html, actor, updatePreviewFromSelection);
         },
         close: () => {

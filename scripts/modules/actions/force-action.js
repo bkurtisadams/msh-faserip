@@ -19,6 +19,7 @@ import {
   rollWithKarmaAndHistory,
   setupModeSelector,
   setupMultiAttackHandlers,
+  applyCapabilitiesToDialog,
   shiftRank,
   playAttackEffect,
   playImpactEffect,
@@ -280,6 +281,7 @@ export class ForceAction extends RangedAttackAction {
           applyToggle(); // initial
 
           setupMultiAttackHandlers(html);
+          applyCapabilitiesToDialog(html, "force", { actor });  // new
 
           // ⬇️ Attach auto-fill so [name="range"] updates from token→target distance
           this._disposeAutoFill = attachAutoFillRange(html, actor, updatePreviewFromSelection);

@@ -19,6 +19,7 @@ import {
   rollWithKarmaAndHistory,
   setupModeSelector,
   setupMultiAttackHandlers,
+  applyCapabilitiesToDialog,
   shiftRank
 } from "./action-utils.js";
 import { shouldConfirm, buildPreviewHtml } from "./action-utils.js";
@@ -217,6 +218,7 @@ export class ShootingAction extends RangedAttackAction {
           });
 
             setupMultiAttackHandlers(html);
+            applyCapabilitiesToDialog(html, "shooting", { actor });  // new
           },
           close: () => {
             

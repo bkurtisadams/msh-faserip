@@ -9,7 +9,8 @@ import {
   bannerColors, 
   labelFor, 
   effectsFor,
-  getTargetingContext
+  getTargetingContext,
+  applyCapabilitiesToDialog
 } from "./action-utils.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
 
@@ -180,7 +181,10 @@ export class GrapplingAction extends AttackAction {
           },
           cancel: { label: "Cancel", callback: () => resolve(null) }
         },
-        default: "roll"
+        default: "roll",
+        render: (html) => {
+          applyCapabilitiesToDialog(html, "grappling", { actor });
+        }
       }).render(true);
     });
   }

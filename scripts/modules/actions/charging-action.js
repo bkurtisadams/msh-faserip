@@ -12,7 +12,8 @@ import {
   buildActionsBox,
   getResultHoverText,
   getTargetingContext,
-  debugLog
+  debugLog,
+  applyCapabilitiesToDialog
 } from "./action-utils.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
 
@@ -368,6 +369,7 @@ export class ChargingAction extends BaseAction {
 
         togglePanels(); // Initial setup
         updatePreview(); // Initial preview
+        applyCapabilitiesToDialog(html, "charging", { actor });  // new
       }
     }).render(true);
   });

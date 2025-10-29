@@ -15,6 +15,7 @@ import {
   postDeathSavePrompt,
   buildMultiAttackSection,
   setupMultiAttackHandlers,
+  applyCapabilitiesToDialog,
   buildModeSelector,
   setupModeSelector,
   debugLog,
@@ -255,6 +256,7 @@ export class EdgedAttackAction extends AttackAction {
          html.find('[name="natDmg"]').on('input', updatePreview);
           await setupModeSelector(actor, html, this.opts || {}, "lastEdgedMode");
           setupMultiAttackHandlers(html);
+          applyCapabilitiesToDialog(html, "edged-attack", { actor });  // new
         }
       }).render(true);
     });

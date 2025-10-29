@@ -19,6 +19,7 @@ import {
   rollWithKarmaAndHistory,
   setupModeSelector,
   setupMultiAttackHandlers,
+  applyCapabilitiesToDialog,
   shiftRank,
   playAttackEffect,
   playImpactEffect,
@@ -287,6 +288,7 @@ export class EnergyAction extends RangedAttackAction {
           applyToggle(); // initial
           // multi adjacent targets, FEAT roll at -4 CS, if success all targets hit
           setupMultiAttackHandlers(html);
+          applyCapabilitiesToDialog(html, "energy", { actor });  // new
           this._disposeAutoFill = attachAutoFillRange(html, actor, updatePreviewFromSelection);
         },
         close: () => {
