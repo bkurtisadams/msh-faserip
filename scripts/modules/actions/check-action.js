@@ -13,6 +13,8 @@ import * as Nullify from "./nullify.js";
 import { resolveKillFeat, getKillContextFromAttackForm } from "../../rules/kill-resolver.js";
 import { canEffectsApply } from "../../rules/effects-gate.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
+import { resolveSlamFeat } from "../combat/damage-resolution.js";
+import * as Effects from "../effects/effect-engine.js";
 
 
 /**
@@ -257,6 +259,16 @@ export class CheckAction extends BaseAction {
       await this._createStunnedEffect(choice.targetUuid, choice.targetName, 1);
     }
 
+        // Apply Slam AE using the color we just rolled (no extra roll)
+    if (actionType === "slam" && !effectsSuppressed) {
+      await this._createSlamEffect(this.actor, {
+        targetUuid:  choice.targetUuid || prefilledTargetUuid,
+        targetEndRank: choice.targetEndRank,
+        dmgThrough: choice.dmgThrough
+      }, colorLower);
+    }
+
+
     // --- Apply special Kill "E/S" rule ---
     let finalEffect = baseEffect;
 
@@ -270,6 +282,26 @@ export class CheckAction extends BaseAction {
     const killContext = getKillContextFromAttackForm(choice.attackForm);
     const killResult = resolveKillFeat(colorLower, killContext);
     finalEffect = killResult.label;
+
+        // If Kill result = Endurance Loss and not suppressed, apply DYING
+    if (!effectsSuppressed && String(killResult?.label || "").toLowerCase().includes("endurance loss")) {
+      let targetActor = null;
+      try {
+        if (choice?.targetUuid) {
+          const doc = await fromUuid(choice.targetUuid);
+          targetActor = doc?.actor ?? doc ?? null;
+        }
+      } catch (_) {}
+      if (!targetActor && game.user?.targets?.size === 1) {
+        targetActor = game.user.targets.first()?.actor ?? null;
+      }
+      if (targetActor) {
+        await Effects.applyDying(targetActor, {
+          enduranceValue: targetActor.system?.abilities?.endurance?.value ?? 10
+        });
+        ui.notifications.warn(`${targetActor.name} is DYING (Endurance steps down each round unless stabilized).`);
+      }
+    }
 
     if (debug) {
       console.log('[CHECK ACTION] Kill resolved', { killContext, killResult, finalEffect });
@@ -545,16 +577,73 @@ async _createStunnedEffect(targetUuid, targetName, duration) {
       });
     }
 
-    const [created] = await targetActor.createEmbeddedDocuments("ActiveEffect", [effectData]);
-
+    const created = await Effects.applyStun(targetActor, { rounds: turnsInput, originUuid: targetActor.uuid });
     ui.notifications.info(
-      `Stunned effect created for ${targetName} (${turnsInput} turn${turnsInput === 1 ? "" : "s"} = ${secondsTotal}s).`
-    );
+      `Stunned effect created for ${targetName} (${turnsInput} turn${turnsInput === 1 ? "" : "s"}).
+    `);
 
     return created;
   } catch (err) {
     console.error("Failed to create Stunned effect:", err);
   }
 }
+
+  // Create a Slam effect based on the already-rolled Universal Table color
+  async _createSlamEffect(ownerActor, prefill = {}, colorLower = "red") {
+    // Resolve target from prefill (supports token or actor UUID)
+    const targetUuid  = prefill?.targetUuid;
+    const targetDoc   = targetUuid ? await fromUuid(targetUuid) : null; // TokenDocument or Actor
+    const targetActor = targetDoc?.actor ?? targetDoc ?? null;
+
+    if (!targetActor) {
+      ui.notifications.warn("No target selected for Slam check.");
+      return null;
+    }
+
+    // If no penetration (and not borderline), caller should have gated this already.
+    const dmgThrough = Number(prefill?.dmgThrough ?? 0) || 0;
+    if (dmgThrough <= 0) {
+      ui.notifications.info("No penetrating damage; Slam does not apply.");
+      return null;
+    }
+
+    // Attacker Strength → estimate areas for Grand Slam
+    const strRank  = ownerActor?.system?.abilities?.strength?.rank  || "Typical";
+    const strValue = ownerActor?.system?.abilities?.strength?.value || 6;
+
+    // Map color → slam kind/flags (no extra roll; use the color we already rolled)
+    let kind = "No Slam";
+    let knockbackAreas = 0;
+    let prone = false;
+    let stagger = false;
+
+    switch (String(colorLower)) {
+      case "white":
+        kind = "Grand Slam";
+        knockbackAreas = this._strengthToAreas(strRank); // estimate by Strength rank
+        prone = true;
+        break;
+      case "green":
+        kind = "1 area";
+        knockbackAreas = 1;
+        prone = true;
+        break;
+      case "yellow":
+        kind = "Stagger";
+        stagger = true;
+        break;
+      case "red":
+      default:
+        kind = "No Slam";
+        break;
+    }
+
+    await Effects.applySlam(targetActor, { kind, knockbackAreas, prone, stagger });
+    ui.notifications.info(
+      `${targetActor.name}: ${kind}${knockbackAreas ? ` (${knockbackAreas} area${knockbackAreas>1?"s":""})` : ""}`
+    );
+
+    return { kind, knockbackAreas, prone, stagger, strRank, strValue };
+  }
 
 } // end of class CheckAction

@@ -20,6 +20,7 @@ import { debugLog } from './modules/actions/action-utils.js';
 import { playCombatSFX } from "./modules/actions/audio-utils.js";
 import { ActionDispatcher } from './modules/actions/action-dispatcher.js';
 import { ManualModeDialog } from './modules/actions/manual-mode-dialog.js';
+import * as Effects from "./modules/effects/effect-engine.js";
 
 
 Hooks.once("init", async () => {
@@ -130,8 +131,31 @@ Hooks.once("init", async () => {
     default: false
   });
 
+  function shouldConvertToSecondsByPolicy() {
+    const policy = game.settings?.get?.("msh-faserip", "effects.durationPolicy") || "rounds-in-combat";
+    if (policy === "seconds-only") return true;
+    if (game.combat && (policy === "rounds-in-combat" || policy === "auto")) return false;
+    return true; // out of combat → convert
+  }
+
   // Convert "duration.rounds" -> seconds (based on preset turn length: FASERIP: turn = 6s).
   Hooks.on("preCreateActiveEffect", function (effect, data, options, userId) {
+    // KEEP ROUNDS DURING COMBAT — do not convert to seconds while combat is active.
+    if (game.combat && data?.duration?.rounds) {
+      console.debug("[FASERIP] preCreateActiveEffect: SKIP conversion (combat active)");
+      return;
+    }
+
+    // Back-compat for sheets/modules: ensure BOTH fields exist.
+    if (data?.img  && !data?.icon) data.icon = data.img;
+    if (data?.icon && !data?.img)  data.img  = data.icon;
+
+    // Core doesn't have impact.svg; remap to a safe built-in.
+    if (data?.img === "icons/svg/impact.svg" || data?.icon === "icons/svg/impact.svg") {
+      data.img = data.icon = "icons/svg/target.svg";
+    }
+
+
     try {
       // Ensure payload objects exist
       if (!data) data = {};
@@ -224,7 +248,50 @@ Hooks.once("init", async () => {
       console.warn("FASERIP preCreateActiveEffect conversion failed:", err);
     }
   });
-;
+
+  // Delete round-based effects when they hit 0 remaining (safety net for custom flows)
+  Hooks.on("updateCombat", async (combat, changes) => {
+    if (!("round" in changes) && !("turn" in changes)) return;    // only when advancing
+    if (!combat?.active) return;
+
+    const curRound = combat.round ?? 1;
+
+    for (const c of combat.combatants) {
+      const a = c?.actor; if (!a) continue;
+
+      for (const ef of a.effects) {
+        const d = ef.duration ?? {};
+        if (!Number.isFinite(d.rounds)) continue;                 // only timed-by-rounds
+
+        // Respect only this combat's lifecycle if startRound was stamped during this combat.
+        // (If you stamp a "combat id" flag yourself elsewhere, check it here.)
+        const startR = d.startRound ?? curRound;
+        const elapsed = Math.max(0, curRound - startR);
+        const remaining = Math.ceil((d.rounds ?? 0) - elapsed);
+
+        if (remaining <= 0 && !ef.disabled) {
+          try { await ef.delete(); } catch (e) { console.warn("AE auto-expire failed", e); }
+        }
+      }
+    }
+  });
+
+  Hooks.on("updateCombat", async (combat, changes) => {
+    if (!("round" in changes) && !("turn" in changes)) return;
+    const a = combat?.combatant?.actor; if (!a) return;
+    for (const ef of a.effects) {
+      try { await FX.renameEffectWithRemaining(ef); } catch {}
+    }
+  });
+
+
+  Hooks.on("preUpdateActiveEffect", function (effect, changes, options, userId) {
+    if (changes?.img  && !changes?.icon) changes.icon = changes.img;
+    if (changes?.icon && !changes?.img)  changes.img  = changes.icon;
+    if (changes?.img === "icons/svg/impact.svg" || changes?.icon === "icons/svg/impact.svg") {
+      changes.img = changes.icon = "icons/svg/target.svg";
+    }
+  });
 
   // Register Action HUD keybinding
   game.keybindings.register("msh-faserip", "openActionHUD", {
@@ -406,6 +473,32 @@ Hooks.once("init", async () => {
       config: false,
       type: Array,
       default: []
+    });
+
+    game.settings.register("msh-faserip", "turnSeconds", {
+      name: "Turn Length (seconds)",
+      hint: "Used when Calendar Time Tracker is not present.",
+      scope: "world", config: true, type: Number, default: 6
+    });
+
+    game.settings.register("msh-faserip", "effects.durationPolicy", {
+      name: "Effects Duration Policy",
+      hint: "Auto = rounds in combat, seconds out of combat. Rounds-in-combat keeps round timing while combat is active.",
+      scope: "world", config: true, type: String,
+      choices: {
+        "auto": "Auto (rounds in combat, seconds out of combat)",
+        "rounds-in-combat": "Prefer rounds during combat",
+        "seconds-only": "Always convert to seconds"
+      },
+      default: "rounds-in-combat"
+    });
+
+    game.settings.register("msh-faserip", "ctt.syncMode", {
+      name: "CTT Sync Mode",
+      hint: "Advance Calendar Time Tracker when combat advances.",
+      scope: "world", config: true, type: String,
+      choices: { "off":"Off", "turn":"Per Turn", "round":"Per Round" },
+      default: "off"
     });
 
     debugLog("FASERIP DEBUG: Team settings registered.");
@@ -1139,6 +1232,29 @@ Hooks.on("updateCombat", async (combat, changed, diff, userId) => {
   if (!("turn" in changed || "round" in changed)) {
     console.log("⏭️ FASERIP | Skipping - no turn/round change");
     return;
+  }
+
+  // Optional CTT sync
+  const syncMode = game.settings.get("msh-faserip", "ctt.syncMode");
+  try {
+    if (syncMode === "turn" && ("turn" in changed || "round" in changed)) {
+      Effects.advanceCTTByTurns(1);
+    } else if (syncMode === "round" && ("round" in changed)) {
+      // Estimate turns per round: number of combatants (fallback 1)
+      const turns = Math.max(1, combat.turns?.length ?? combat.combatants.size ?? 1);
+      Effects.advanceCTTByTurns(turns);
+    }
+  } catch (_) { /* no-op */ }
+
+  // Refresh labels for round-based effects on all combatants
+  for (const c of combat.combatants) {
+    const a = c.actor;
+    if (!a) continue;
+    for (const eff of a.effects) {
+      if (eff?.duration?.rounds) {
+        await Effects.renameEffectWithRemaining(eff);
+      }
+    }
   }
 
   const scope = globalThis.MSH_FLAG_SCOPE || "msh-faserip";

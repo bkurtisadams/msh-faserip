@@ -14,6 +14,7 @@ import {
 } from "./action-utils.js";
 import { startAura, stopAura, isAuraMaintained } from "./nullify.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
+import * as Effects from "../effects/effect-engine.js";
 
 export function installActionChatHandlers() {
   // idempotent guard
@@ -576,109 +577,27 @@ async function createDodgingEffect(actor, data) {
  */
 async function createEvadingEffect(actor, data) {
   const { target, nextRoundAttackBonusCS, note } = data;
-  
-  // Remove any existing evading effects first
-  const existingEvade = actor.effects.find(e => e.flags?.["msh-faserip"]?.isEvading);
-  if (existingEvade) await existingEvade.delete();
-  
-  const bonusText = nextRoundAttackBonusCS > 0 
-    ? `+${nextRoundAttackBonusCS}CS next attack` 
-    : "no bonus";
-  
-  const effectData = {
-    name: `Evaded ${target} (${bonusText})`,
-    icon: "icons/svg/combat.svg",
-    origin: actor.uuid,
-    disabled: false,
-    duration: {
-      rounds: 1,
-      startRound: game.combat?.round || 0
-    },
-    flags: {
-      "msh-faserip": {
-        isEvading: true,
-        evadedTarget: target,
-        nextRoundAttackBonusCS: nextRoundAttackBonusCS,
-        notes: note
-      }
-    }
-  };
-  
-  await actor.createEmbeddedDocuments('ActiveEffect', [effectData]);
+  await Effects.applyEvade(actor, { target, nextRoundAttackBonusCS, note });
 }
+
 
 /**
  * Create a Blocking effect
  */
 async function createBlockingEffect(actor, data) {
   const { armorRank, armorValue } = data;
-  
-  // Remove any existing blocking effects first
-  const existingBlock = actor.effects.find(e => e.flags?.["msh-faserip"]?.isBlocking);
-  if (existingBlock) await existingBlock.delete();
-  
-  const effectData = {
-    name: `Blocking (${armorRank} Body Armor)`,
-    icon: "icons/svg/shield.svg",
-    origin: actor.uuid,
-    disabled: false,
-    duration: {
-      rounds: 1,
-      startRound: game.combat?.round || 0
-    },
-    flags: {
-      "msh-faserip": {
-        isBlocking: true,
-        armorRank: armorRank,
-        armorValue: armorValue,
-        notes: "Applies vs physical (not Shooting/Energy; not Charging). Stacks with normal armor, not Force Fields."
-      }
-    }
-  };
-  
-  await actor.createEmbeddedDocuments('ActiveEffect', [effectData]);
+  await Effects.applyBlock(actor, { armorRank, armorValue });
 }
+
 
 /**
  * Create a Catching effect (mainly a reminder/note)
  */
 async function createCatchingEffect(actor, data) {
   const { scenario, vsYou, note } = data;
-  
-  // Remove any existing catching effects first
-  const existingCatch = actor.effects.find(e => e.flags?.["msh-faserip"]?.isCatching);
-  if (existingCatch) await existingCatch.delete();
-  
-  const scenarioMap = {
-    "falling": "Caught Falling Object",
-    "shooting-bullet": "Caught Bullet",
-    "shooting-arrow": "Caught Arrow",
-    "throwing-other": "Caught Projectile"
-  };
-  
-  const effectName = scenarioMap[scenario] || "Catching Result";
-  
-  const effectData = {
-    name: effectName,
-    icon: "icons/svg/target.svg",
-    origin: actor.uuid,
-    disabled: false,
-    duration: {
-      rounds: 1,
-      startRound: game.combat?.round || 0
-    },
-    flags: {
-      "msh-faserip": {
-        isCatching: true,
-        scenario: scenario,
-        vsYou: vsYou,
-        notes: note
-      }
-    }
-  };
-  
-  await actor.createEmbeddedDocuments('ActiveEffect', [effectData]);
+  await Effects.applyCatch(actor, { scenario, vsYou, note });
 }
+
 
 export async function postAttackChatCard({
   actor, actionId, label, ability, roll, resultColor,
