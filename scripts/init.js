@@ -493,6 +493,16 @@ Hooks.once("init", async () => {
       default: "rounds-in-combat"
     });
 
+    // Suppress auto Recovery/Healing timers (and their chat cards) when damage is taken
+    game.settings.register("msh-faserip", "effects.autoDamageTimers", {
+      name: "Auto Recovery/Healing Timers on Damage",
+      hint: "If OFF, taking damage will not auto-create Recovery/Healing timers or post timer chat cards. You can still create timers manually.",
+      scope: "world",
+      config: true,
+      type: Boolean,
+      default: false
+    });
+
     game.settings.register("msh-faserip", "ctt.syncMode", {
       name: "CTT Sync Mode",
       hint: "Advance Calendar Time Tracker when combat advances.",
@@ -1113,6 +1123,25 @@ Hooks.on('updateActor', async (actor, updateData, options, userId) => {
   
   // Only process damage
   if (newHealth >= oldHealth) return;
+
+  // Respect setting: skip auto Recovery/Healing timers (prevents chat card spam)
+  if (!game.settings.get("msh-faserip", "effects.autoDamageTimers")) {
+    if (game.settings.get("msh-faserip", "debugMode")) {
+      console.log("FASERIP | Auto damage timers disabled; skipping handleDamage");
+    }
+    return;
+  }
+
+  // Optional: throttle repeated damage timer creation per actor (1.5s)
+  const now = Date.now();
+  game.msh._lastDamageTimerAt ??= {};
+  if ((now - (game.msh._lastDamageTimerAt[actor.id] || 0)) < 1500) {
+    if (game.settings.get("msh-faserip", "debugMode")) {
+      console.log("FASERIP | Throttled damage timer for", actor.name);
+    }
+    return;
+  }
+  game.msh._lastDamageTimerAt[actor.id] = now;
   
   // CRITICAL: Only process if we own the actor OR we're the GM
   // This prevents both player and GM from processing the same damage
@@ -1202,27 +1231,17 @@ Hooks.on('renderChatMessage', (message, html) => {
       }
       
       ui.notifications.info(`Medical care ${newCare ? 'enabled' : 'disabled'} for ${actor.name}`);
-      
-      ChatMessage.create({
-        content: `<div style="background:#e8f5e9;border:2px solid #4caf50;border-radius:5px;padding:10px;text-align:center;">
-          <p style="color:#2e7d32;margin:0;">
-            <i class="fas fa-hospital"></i> <strong>${actor.name}</strong><br>
-            Medical Care: <strong>${newCare ? 'ON' : 'OFF'}</strong><br>
-            Healing Rate: <strong>${newHealAmount} HP/hour</strong>
-          </p>
-        </div>`,
-        speaker: ChatMessage.getSpeaker({ actor })
+      // (Quiet mode) — no chat card spam on toggle
+            
+            // Disable the button to prevent spam
+            $(button).prop('disabled', true)
+                    .css('opacity', '0.6')
+                    .html('<i class="fas fa-check"></i> Updated!');
+          } else {
+            ui.notifications.warn("No active Healing timer found");
+          }
+        });
       });
-      
-      // Disable the button to prevent spam
-      $(button).prop('disabled', true)
-               .css('opacity', '0.6')
-               .html('<i class="fas fa-check"></i> Updated!');
-    } else {
-      ui.notifications.warn("No active Healing timer found");
-    }
-  });
-});
 
 // Each turn, decrement Endurance one printed rank for actors who are Dying (RAW)
 Hooks.on("updateCombat", async (combat, changed, diff, userId) => {
