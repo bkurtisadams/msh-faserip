@@ -159,6 +159,26 @@ export class CombatHandler {
     console.log(`Process Attack: Using target: ${targetActor.name}`);
     console.log("Process Attack options:", options);
 
+    // --- Normalize frequently used inputs ---
+    const dtLower   = String(damageType || "").toLowerCase();
+    const rollColor = String(originalRollResult ?? options.utColor ?? "white").toLowerCase();
+
+    // Derive/normalize attackForm from damageType unless explicitly provided
+    const derivedAttackForm = (() => {
+    if (options?.attackForm) return String(options.attackForm).toLowerCase();
+    if (dtLower.includes("throwing-edged")) return "throwing-edged";
+    if (dtLower.includes("throwing-blunt")) return "throwing-blunt";
+    if (dtLower.includes("shooting"))       return "shooting";
+    if (dtLower.includes("edged"))          return "edged";
+    if (dtLower.includes("blunt"))          return "blunt";
+    if (dtLower.includes("energy"))         return "energy";
+    if (dtLower.includes("force"))          return "force";
+    if (dtLower.includes("grabbing"))       return "grabbing";
+    if (dtLower.includes("grappling"))      return "grappling";
+    return "blunt";
+    })();
+    options.attackForm = derivedAttackForm; // ensure mitigation uses the right form
+
     // Handle multiple attack penalties
     if (options.multipleAttackPenalty) {
         console.log(`Applying multiple attack penalty: ${options.multipleAttackPenalty}CS`);
@@ -198,7 +218,8 @@ export class CombatHandler {
     // 3. Calculate Net Damage using centralized mitigation
     const mitigationResult = calculateMitigation(modifiedBaseDamage, targetActor, {
         damageType: damageType,
-        attackForm: options.attackForm || "blunt",
+        attackForm: options.attackForm, // already normalized above
+
         bypassArmor: options.bypassArmor || false,
         armorPiercing: options.armorPiercing || 0,
         armorPiercingCS: options.armorPiercingCS || 0,
@@ -288,71 +309,74 @@ export class CombatHandler {
         chatContent += `<p><strong>Mercy Shot:</strong> Remarkable intensity knockout drug applied!</p>`;
     }
 
-    if (options.ammoType === "rubber" && originalRollResult.toLowerCase() === "yellow" && canBeSlam) {
+    if (options.ammoType === "rubber" && rollColor === "yellow" && canBeSlam) {
         chatContent += `<p><strong>Rubber Shot:</strong> Slam result ignored (rubber ammunition).</p>`;
     }
 
     // 7. Handle Secondary Effects - USE modifiedCanBeSlam instead of canBeSlam
     let secondaryEffectResult = "";
         if (netDamage > 0 && !willReachZeroHealth) { // BUT ONLY if target won't reach 0 Health
-            if (damageType.toLowerCase().includes("blunt")) {
-                if (originalRollResult.toLowerCase() === "yellow" && modifiedCanBeSlam) {
+            if (dtLower.includes("blunt")) {
+                if (rollColor === "yellow" && modifiedCanBeSlam) {
                     secondaryEffectResult = await this.rollSecondaryFeat(target, "Slam", sourceName, damageType, attacker);
                     chatContent += `<p><strong>Slam Check:</strong> ${secondaryEffectResult}</p>`;
-                } else if (originalRollResult.toLowerCase() === "red" && canBeStun) {
+                } else if (rollColor === "red" && canBeStun) {
                     secondaryEffectResult = await this.rollSecondaryFeat(target, "Stun", sourceName, damageType, attacker);
                     chatContent += `<p><strong>Stun Check:</strong> ${secondaryEffectResult}</p>`;
                 }
-            } else if (damageType.toLowerCase().includes("edged")) {
-                // Edged attack effects
-                if (originalRollResult.toLowerCase() === "yellow" && canBeStun) {
+            } else if (dtLower.includes("edged")) {
+                if (rollColor === "yellow" && canBeStun) {
                     secondaryEffectResult = await this.rollSecondaryFeat(target, "Stun", sourceName, damageType, attacker);
                     chatContent += `<p><strong>Stun Check:</strong> ${secondaryEffectResult}</p>`;
-                } else if (originalRollResult.toLowerCase() === "red" && canBeKill) {
+                } else if (rollColor === "red" && canBeKill) {
                     secondaryEffectResult = await this.rollSecondaryFeat(target, "Kill", sourceName, damageType, attacker);
                     chatContent += `<p><strong>Kill Check:</strong> ${secondaryEffectResult}</p>`;
                 }
-            } else if (damageType.toLowerCase().includes("energy")) {
-                // Energy attack effects
-                if (originalRollResult.toLowerCase() === "yellow" && canBeStun) {
+            } else if (dtLower.includes("energy")) {
+                if (rollColor === "yellow" && canBeStun) {
                     secondaryEffectResult = await this.rollSecondaryFeat(target, "Stun", sourceName, damageType, attacker);
                     chatContent += `<p><strong>Stun Check:</strong> ${secondaryEffectResult}</p>`;
-                } else if (originalRollResult.toLowerCase() === "red" && canBeKill) {
+                } else if (rollColor === "red" && canBeKill) {
                     secondaryEffectResult = await this.rollSecondaryFeat(target, "Kill", sourceName, damageType, attacker);
                     chatContent += `<p><strong>Kill Check:</strong> ${secondaryEffectResult}</p>`;
                 }
-            } else if (damageType.toLowerCase().includes("force")) {
-                // Force attack effects
-                if (originalRollResult.toLowerCase() === "yellow" && canBeStun) {
+            } else if (dtLower.includes("force")) {
+                if (rollColor === "yellow" && canBeStun) {
                     secondaryEffectResult = await this.rollSecondaryFeat(target, "Stun", sourceName, damageType, attacker);
                     chatContent += `<p><strong>Stun Check:</strong> ${secondaryEffectResult}</p>`;
-                } else if (originalRollResult.toLowerCase() === "red" && canBeStun) {
+                } else if (rollColor === "red" && canBeStun) {
                     secondaryEffectResult = await this.rollSecondaryFeat(target, "Stun", sourceName, damageType, attacker);
                     chatContent += `<p><strong>Stun Check:</strong> ${secondaryEffectResult}</p>`;
                 }
-            } else if (damageType.toLowerCase().includes("shooting")) {
-                // Shooting attack effects
-                if (originalRollResult.toLowerCase() === "yellow" && canBeSlam) {
+            } else if (dtLower.includes("shooting")) {
+                if (rollColor === "yellow" && canBeSlam) {
                     secondaryEffectResult = await this.rollSecondaryFeat(target, "Slam", sourceName, damageType, attacker);
                     chatContent += `<p><strong>Bullseye/Slam Check:</strong> ${secondaryEffectResult}</p>`;
-                } else if (originalRollResult.toLowerCase() === "red" && canBeKill) {
+                } else if (rollColor === "red" && canBeKill) {
                     secondaryEffectResult = await this.rollSecondaryFeat(target, "Kill", sourceName, damageType, attacker);
                     chatContent += `<p><strong>Kill Check:</strong> ${secondaryEffectResult}</p>`;
                 }
             }
         } else if (netDamage > 0 && willReachZeroHealth) {
             chatContent += `<p>Target reduced to 0 Health - unconsciousness supersedes other effects.</p>`;
-        } else if ((canBeStun && (originalRollResult.toLowerCase() === "yellow" || originalRollResult.toLowerCase() === "red")) ||
-                    (canBeSlam && originalRollResult.toLowerCase() === "yellow") ||
-                    (canBeKill && originalRollResult.toLowerCase() === "red")) {
+        } else if ((canBeStun && (rollColor === "yellow" || rollColor === "red")) ||
+           (canBeSlam && rollColor === "yellow") ||
+           (canBeKill && rollColor === "red")) {
+
             chatContent += `<p>No damage inflicted; secondary effects (Stun/Slam/Kill) are negated.</p>`;
         }
 
-        await ChatMessage.create({
-            speaker: ChatMessage.getSpeaker({actor: attacker}),
+        const msgCreate = await ChatMessage.create({
+            speaker: ChatMessage.getSpeaker({ actor: attacker }),
             content: chatContent
-            // You might want to whisper this to GM and target or make it public
-        });
+            });
+
+            try {
+            const SCOPE = game.system?.id || "msh-faserip";
+            await msgCreate.setFlag(SCOPE, "autoChecksRun", true); // tell chat-hooks to skip auto-clicks
+            } catch (e) {
+            console.warn("Could not set autoChecksRun flag:", e);
+            }
 
         // 6. Check for Unconsciousness / Death if Health is 0
         if (newHealth <= 0) {
@@ -1852,7 +1876,7 @@ export class CombatHandler {
 
                     // Create the roll first
                     const roll = new Roll("1d100");
-                    await roll.evaluate({ async: true });
+                    await roll.evaluate(); // v13+ async API (or: roll.evaluateSync() for sync)
 
                     // Then use the results
                     const totalRoll = Math.min(100, (roll.total ?? 0) + karmaSpent);
@@ -2103,7 +2127,7 @@ export class CombatHandler {
                     else if (featType === "Stun") {
                     if (featResultText === "1–10" || featResultText === "1-10") {
                         // Roll stun duration for 1-10 rounds
-                        const stunRoll = await (new Roll("1d10")).evaluate({ async: true });
+                        const stunRoll = await (new Roll("1d10")).evaluate();
                         stunDuration = stunRoll.total;
                         ui.notifications.info(`${target.name} is Stunned for ${stunDuration} rounds!`);
 

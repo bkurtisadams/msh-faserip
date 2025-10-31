@@ -418,687 +418,204 @@ export class FaseripEquipmentSheet extends ItemSheet {
   }
 
   // Method to handle equipment rolls
-  async rollEquipment() {
+  // --- helpers used by equipment rolling ---
+  _parseDamage(value) {
+    if (typeof value === "number") return value;
+    const s = String(value ?? "").trim();
+    const m = s.match(/\((\d+)\)/); // e.g., "RM (30)"
+    if (m) return Number(m[1]);
+    const n = Number(s);
+    return Number.isFinite(n) ? n : 0;
+  }
+
+  _normalizeDamageType(t) {
+    const map = {
+      "S":"physical-shooting",
+      "BA":"physical-blunt",
+      "EA":"physical-edged",
+      "TB":"physical-throwing-blunt",
+      "TE":"physical-throwing-edged",
+      "E":"energy",
+      "F":"force",
+      "GP":"grappling",
+      "Gb":"grabbing"
+    };
+    const norm = map[t] || String(t || "").toLowerCase();
+    return norm;
+  }
+
+async rollEquipment() {
     const item = this.object;
     const actor = item.actor;
-
     if (!actor) return ui.notifications.error("No actor linked to item!");
 
-    // Get equipment details
-    const category = item.system.category || "gear";
-
-    switch (category) {
-      case "weapon":
-        return this._rollWeapon(item, actor);
-
-      case "power-item":
-        return this._rollPowerItem(item, actor);
-
-      case "custom":
-        return this._rollCustomAbility(item, actor);
-
-      default:
-        return ui.notifications.warn("This equipment type cannot be rolled!");
-    }
+    const type = item.system?.type || "weapon";
+    if (type === "weapon") return this._rollWeapon(item, actor);
+    if (type === "power")  return this._rollPowerItem(item, actor);
+    if (type === "custom") return this._rollCustomAbility(item, actor);
+    return ui.notifications.warn("This equipment type cannot be rolled!");
   }
+
 
   // Roll a weapon attack
   async _rollWeapon(item, actor) {
-    // Check if weapon has attack modes
-    const hasAttackModes = item.system.attackModes?.length > 0;
-    
-    if (hasAttackModes) {
-      // Show mode selection dialog first
-      return this._selectAndRollWeaponMode(item, actor);
-    }
-
-    // Get weapon details
-    const weaponType = item.system.weaponType || "";
-    let ability = "strength";
-
-    // Determine which ability to use based on weapon type
-    if (weaponType === "shooting" || weaponType === "energy") {
-      ability = "agility";
-    } else if (weaponType === "thrown") {
-      ability = "agility";
-    }
-
-    // Get ability rank and damage type - or use weapon power rank if treating as power
-    let abilityRank, abilityValue;
-    if (item.system.treatAsPower && item.system.weaponPowerRank) {
-      abilityRank = item.system.weaponPowerRank;
-      abilityValue = CONFIG.FASERIP?.rankValues?.[abilityRank] || 6;
-    } else {
-      abilityRank = actor.system.abilities[ability].rank || "Typical";
-      abilityValue = actor.system.abilities[ability].value || 6;
-    }
-    const damageType = item.system.damageType || "S";
-    const damage = item.system.damage || "0";
-
-    // Build variant options based on what's available for this weapon
-    const specialAmmo = item.system.specialAmmo || {};
-    const availableVariants = [];
-
-    // Always include standard
-    availableVariants.push({ value: "standard", label: "Standard" });
-
-    // Add checked variants
-    if (specialAmmo.ap) availableVariants.push({ value: "ap", label: "Armor Piercing" });
-    if (specialAmmo.mercy) availableVariants.push({ value: "mercy", label: "Mercy/Non-Lethal" });
-    if (specialAmmo.rubber) availableVariants.push({ value: "rubber", label: "Blunted/Rubber" });
-    if (specialAmmo.explosive) availableVariants.push({ value: "explosive", label: "Explosive/Enhanced" });
-    if (specialAmmo.canister) availableVariants.push({ value: "canister", label: "Canister Shot" });
-    if (specialAmmo.heatSeeker) availableVariants.push({ value: "heatSeeker", label: "Heat-Seeker" });
-
-    // If no special ammo is checked, show all options (backwards compatibility)
-    if (!specialAmmo.ap && !specialAmmo.mercy && !specialAmmo.rubber && 
-        !specialAmmo.explosive && !specialAmmo.canister && !specialAmmo.heatSeeker) {
-      availableVariants.push(
-        { value: "ap", label: "Armor Piercing" },
-        { value: "mercy", label: "Mercy/Non-Lethal" },
-        { value: "rubber", label: "Blunted/Rubber" },
-        { value: "explosive", label: "Explosive/Enhanced" },
-        { value: "canister", label: "Canister Shot" },
-        { value: "heatSeeker", label: "Heat-Seeker" }
-      );
-    }
-
-    const variantOptions = availableVariants.map(v => 
-      `<option value="${v.value}">${v.label}</option>`
-    ).join('');
-
-    // Define action types from the Universal Table
-    const ACTIONS = {
-      "Blunt Attack (BA)": { ability: "fighting", results: { white: "Miss", green: "Hit", yellow: "Slam", red: "Stun" } },
-      "Edged Attack (EA)": { ability: "fighting", results: { white: "Miss", green: "Hit", yellow: "Stun", red: "Kill" } },
-      "Shooting Attack (Sh)": { ability: "agility", results: { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Kill" } },
-      "Throwing Edged (TE)": { ability: "agility", results: { white: "Miss", green: "Hit", yellow: "Stun", red: "Kill" } },
-      "Throwing Blunt (TB)": { ability: "agility", results: { white: "Miss", green: "Hit", yellow: "Hit", red: "Stun" } },
-      "Energy (En)": { ability: "agility", results: { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Kill" } },
-      "Force (Fo)": { ability: "agility", results: { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Stun" } },
-      "Grappling (Gp)": { ability: "strength", results: { white: "Miss", green: "Miss", yellow: "Partial", red: "Hold" } },
-      "Grabbing (Gb)": { ability: "strength", results: { white: "Miss", green: "Take", yellow: "Grab", red: "Break" } },
-      "Escaping (Es)": { ability: "strength", results: { white: "Miss", green: "Miss", yellow: "Escape", red: "Reverse" } },
-      "Stunning Attack": { ability: "agility", results: { white: "No Effect", green: "Partial Effect", yellow: "Stun", red: "Knockout" } }
+    // Route to mode picker if defined; otherwise use base
+    const hasModes = Array.isArray(item.system?.modes) && item.system.modes.length;
+    if (hasModes) return this._selectAndRollWeaponMode(item, actor);
+    // Synthesize a base "mode" from item fields
+    const baseMode = {
+      name: "Standard",
+      ability: item.system.ability || "fighting",
+      damage: item.system.damage || 0,
+      damageType: item.system.damageType || "S",
+      rangeRank: item.system.rangeRank || (actor.system?.abilities?.agility?.rank ?? "Typical"),
+      heatSeeking: !!item.system?.heatSeeking,
+      multiAttacks: Number(item.system?.multiAttacks || 1) || 1
     };
-
-    // Determine default action based on weapon type
-    let defaultAction = "Shooting Attack (Sh)";
-    if (weaponType === "melee" && damageType === "BA") {
-      defaultAction = "Blunt Attack (BA)";
-    } else if (weaponType === "melee" && damageType === "EA") {
-      defaultAction = "Edged Attack (EA)";
-    } else if (weaponType === "thrown" && damageType === "BA") {
-      defaultAction = "Throwing Blunt (TB)";
-    } else if (weaponType === "thrown" && damageType === "EA") {
-      defaultAction = "Throwing Edged (TE)";
-    } else if (weaponType === "energy" || damageType === "E") {
-      defaultAction = "Energy (En)";
-    } else if (weaponType === "force" || damageType === "F") {
-      defaultAction = "Force (Fo)";
-    } else if (weaponType === "grappling" || damageType === "GP") {
-      defaultAction = "Grappling (GP)";
-    } else if (weaponType === "grabbing" || damageType === "Gb") {
-      defaultAction = "Grabbing (Gb)";
-    } else if (item.system.stunIntensity && item.system.stunIntensity !== "") {
-      defaultAction = "Stunning Attack";
-    }
-
-    let dialogContent = `
-    <div style="background: #f0e8d8; padding: 10px; border-radius: 5px;">
-      <div style="margin-bottom: 10px;">
-        <label style="display: inline-block; width: 120px;">Weapon:</label>
-        <input type="text" value="${item.name}" readonly style="width: 180px;">
-      </div>
-      <div style="margin-bottom: 10px;">
-        <label style="display: inline-block; width: 120px;">Weapon Variant:</label>
-        <select name="variantType" style="width: 180px;">
-          ${variantOptions}
-        </select>
-      </div>
-      <div style="margin-bottom: 10px;">
-        <label style="display: inline-block; width: 120px;">Action Type:</label>
-        <select id="action" name="action" style="width: 180px;">
-          ${Object.keys(ACTIONS).map(action =>
-            `<option value="${action}" ${action === defaultAction ? 'selected' : ''}>${action}</option>`
-          ).join('')}
-        </select>
-      </div>
-      <div style="margin-bottom: 10px;">
-        <label style="display: inline-block; width: 120px;">Target Distance:</label>
-        <input type="number" id="distance" name="distance" value="1" min="1" style="width: 50px;"> areas
-      </div>
-      <div style="margin-bottom: 10px;">
-        <label style="display: inline-block; width: 120px;">Column Shift:</label>
-        <input type="number" id="shift" name="shift" value="0" style="width: 50px;">
-        <span style="color: #666; font-size: 0.9em;">(+ right, - left)</span>
-      </div>
-      <div>
-        <label style="display: inline-block; width: 120px;">Karma Points:</label>
-        <input type="number" id="karma" name="karma" value="0" min="0" style="width: 50px;">
-      </div>
-    </div>`;
-
-    new Dialog({
-      title: `Weapon Attack: ${item.name}`,
-      content: dialogContent,
-      buttons: {
-        roll: {
-          label: "Roll",
-          callback: async (html) => {
-          const actionName = html.find('[name="action"]').val();
-          const action = ACTIONS[actionName];
-          const distance = parseInt(html.find('[name="distance"]').val()) || 1;
-          const shift = parseInt(html.find('[name="shift"]').val()) || 0;
-          const karma = parseInt(html.find('[name="karma"]').val()) || 0;
-          
-          // Get variant type from dialog
-          const selectedVariant = html.find('[name="variantType"]').val() || "standard";
-          
-          // Handle variant effects
-          let finalDamage = parseInt(damage) || 0;
-          let specialEffects = {};
-
-          switch(selectedVariant) {
-            case "mercy":
-              finalDamage = 0;
-              specialEffects.mercyShot = true;
-              break;
-            case "ap":
-              specialEffects.armorPiercing = true;
-              break;
-            case "explosive":
-              finalDamage = finalDamage * 2;
-              break;
-            case "rubber":
-              specialEffects.noSlam = true;
-              break;
-            case "canister":
-              specialEffects.canister = true;
-              break;
-            case "heatSeeker":
-              specialEffects.heatSeeking = true;
-              break;
-          }
-
-          // Calculate range penalty for shooting weapons
-          let totalShift = shift;
-          if (weaponType === "shooting" && distance > 1) {
-            totalShift -= (distance - 1);
-          }
-
-          // Apply column shifts if needed
-          let effectiveRank = abilityRank;
-          if (totalShift !== 0) {
-            const ranks = [
-              "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent",
-              "Remarkable", "Incredible", "Amazing", "Monstrous", "Unearthly"
-            ];
-            const index = ranks.indexOf(abilityRank);
-            if (index !== -1) {
-              const newIndex = Math.min(Math.max(index + totalShift, 0), ranks.length - 1);
-              effectiveRank = ranks[newIndex];
-            }
-          }
-
-          try {
-            // Create the roll
-            const roll = new Roll("1d100");
-            await roll.evaluate();
-
-            // Calculate final roll with karma
-            let cappedTotal = roll.total;
-            let karmaUsed = 0;
-
-            if (karma > 0) {
-              cappedTotal = Math.min(100, roll.total + karma);
-              karmaUsed = cappedTotal - roll.total;
-            }
-
-            if (karmaUsed > 0) {
-              const history = foundry.utils.deepClone(actor.system.karma?.history || []);
-              const newEvent = {
-                realDate: new Date().toLocaleDateString(),
-                gameDate: "",
-                amount: -karmaUsed,
-                type: "Die Roll",
-                description: `Spent on ${item.name} (Equipment)`
-              };
-              history.push(newEvent);
-              await actor.update({ "system.karma.history": history });
-            }
-
-            // Get result color from universal table
-            const colorResult = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
-
-            // Get the specific result based on action type and color
-            const effect = action.results[colorResult.toLowerCase()];
-
-            // Get additional weapon properties
-            const legality = item.system.legality || "legal";
-            const burstScatter = item.system.burstScatter || "none";
-            const stunIntensity = item.system.stunIntensity || "";
-            const continuingDamage = item.system.continuingDamage || "";
-            const continuingRounds = item.system.continuingDamageRounds || "";
-            const requiresTwoOperators = item.system.requiresTwoOperators || false;
-
-            // Add to chat message content
-            let additionalInfo = "";
-            if (stunIntensity) {
-              additionalInfo += `<div>Stun/Gas Intensity: ${stunIntensity} (Endurance FEAT to resist)</div>`;
-              if (actionName === "Stunning Attack") {
-                additionalInfo += `<div>Effect: Knockout for 1d10 rounds on failed FEAT</div>`;
-              }
-            }
-            if (continuingDamage && continuingRounds) {
-              additionalInfo += `<div>Continuing Damage: ${continuingDamage} for ${continuingRounds}</div>`;
-            }
-            if (burstScatter !== "none") {
-              additionalInfo += `<div>${burstScatter === "burst" ? "Burst Attack (affects up to 3 adjacent targets)" : "Scatter Attack (affects all in target area)"}</div>`;
-            }
-            if (requiresTwoOperators) {
-              additionalInfo += `<div>Requires Two Operators</div>`;
-            }
-            if (legality !== "legal") {
-              const legalText = {
-                "restricted": "Restricted",
-                "military": "Military Only",
-                "illegal": "Illegal"
-              }[legality] || legality;
-              additionalInfo += `<div>Legality: ${legalText}</div>`;
-            }
-            
-            // Create the formatted chat message with proper colors
-            await ChatMessage.create({
-              speaker: ChatMessage.getSpeaker({ actor }),
-              roll: roll,
-              content: `
-                <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
-                  <div style="padding: 5px 10px; border-bottom: 1px solid #c0c0c0; font-size: 1.1em; color: #8b0000;">
-                    <strong>${actor.name} - ${item.name} (${actionName})</strong>
-                  </div>
-                  <div style="padding: 5px 10px; font-size: 0.9em;">
-                    <div>Base Rank: ${abilityRank} (${abilityValue})</div>
-                    <div>Column Shift: ${totalShift !== 0 ? `${totalShift > 0 ? '+' : ''}${totalShift}CS → ${effectiveRank}` : `0 → ${effectiveRank}`}</div>
-                    <div>Roll: ${roll.total} + Karma: ${karmaUsed} = ${cappedTotal}</div>
-                    <div>Damage: ${finalDamage} (${damageType})</div>
-                    ${selectedVariant !== "standard" ? `<div>Variant: ${selectedVariant.toUpperCase()}</div>` : ''}
-                    ${additionalInfo}
-                  </div>
-                  <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px;
-                    background-color: ${
-                      colorResult.toLowerCase() === 'white' ? '#f8f8f8' :
-                      colorResult.toLowerCase() === 'green' ? '#4CAF50' :
-                      colorResult.toLowerCase() === 'yellow' ? '#FFC107' :
-                      '#F44336'
-                    };
-                    color: ${
-                      colorResult.toLowerCase() === 'white' || colorResult.toLowerCase() === 'yellow' ? '#333' : 'white'
-                    };">
-                    ${effect} (${colorResult.toUpperCase()})
-                  </div>
-                </div>
-              `
-            });
-
-            // Automatically apply damage to the targeted token (if any)
-            const target = Array.from(game.user.targets)[0]?.actor;
-
-            if (target) {
-              const canBeStun = effect?.toLowerCase().includes("stun") || actionName.toLowerCase().includes("stunning");
-              const canBeSlam = effect?.toLowerCase().includes("slam");
-              const canBeKill = effect?.toLowerCase().includes("kill");
-
-              // damage type normalization
-              let normalizedDamageType;
-              switch (damageType.toUpperCase()) {
-                case "S":
-                case "SH":
-                case "BA":
-                  normalizedDamageType = "Physical-Blunt";
-                  break;
-                case "EA":
-                  normalizedDamageType = "Physical-Edged";
-                  break;
-                case "TE":
-                  normalizedDamageType = "Physical-Edged";
-                  break;
-                case "TB":
-                  normalizedDamageType = "Physical-Blunt";
-                  break;
-                case "E":
-                case "EN":
-                  normalizedDamageType = "Energy-Energy";
-                  break;
-                case "F":
-                case "FO":
-                  normalizedDamageType = "Force";
-                  break;
-                case "GP":
-                  normalizedDamageType = "Physical-Grapple";
-                  break;
-                case "GB":
-                  normalizedDamageType = "Physical-Grab";
-                  break;
-                default:
-                  normalizedDamageType = "Physical-Blunt";
-              }
-
-              // Update the CombatHandler.processAttack call
-              // Refactor path: soak + HP apply through rules/service
-              debugLog("equipment → apply via rules", { actor: actor?.name, target: target?.name, dmg: finalDamage, type: normalizedDamageType });
-              await applyDamageToTargets(finalDamage, {
-                attackerUuid: actor?.uuid ?? null,
-                damageType: normalizedDamageType,
-                // set these if applicable from the item
-                bypassArmor: !!item?.system?.bypassArmor,
-                armorPiercing: Number(item?.system?.armorPiercing ?? 0),
-                apMode: item?.system?.apMode ?? "value"
-              });
-
-            } else {
-              ui.notifications.info("No target selected. Damage not applied.");
-            }
-
-            // Update shots remaining if it's a weapon
-            if (item.system.category === "weapon" && item.system.shots) {
-              let shotsRemaining = item.system.shotsRemaining;
-              if (shotsRemaining === undefined || shotsRemaining === "") {
-                shotsRemaining = item.system.shots;
-              }
-
-              shotsRemaining = Math.max(0, parseInt(shotsRemaining) - 1);
-              await item.update({ "system.shotsRemaining": shotsRemaining });
-
-              if (shotsRemaining === 0) {
-                ui.notifications.warn(`${item.name} needs to be reloaded!`);
-              }
-            }
-
-          } catch (error) {
-            console.error("Error rolling dice:", error);
-            ui.notifications.error("Error when rolling dice. See console for details.");
-          }
-        }
-        },
-        cancel: { label: "Cancel" }
-      },
-      default: "roll"
-    }).render(true);
+    return this._rollWeaponWithMode(item, actor, baseMode);
   }
 
   async _selectAndRollWeaponMode(item, actor) {
-    const modes = item.system.attackModes;
-    
-    // Build mode selection HTML
-    const modeOptions = modes.map((mode, i) => 
-      `<option value="${i}">${mode.name} (${mode.actionType.toUpperCase()}, ${mode.damage} damage)</option>`
-    ).join('');
-    
-    new Dialog({
-      title: `${item.name} - Select Attack Mode`,
-      content: `
-        <div style="margin-bottom:10px;">
-          <label>Attack Mode:</label>
-          <select id="attack-mode-select" style="width:100%;">
-            ${modeOptions}
-          </select>
-        </div>
-      `,
-      buttons: {
-        roll: {
-          label: "Continue",
-          callback: async (html) => {
-            const modeIndex = parseInt(html.find('#attack-mode-select').val());
-            const selectedMode = modes[modeIndex];
-            await this._rollWeaponWithMode(item, actor, selectedMode);
-          }
+    const modes = item.system?.modes || [];
+    const options = modes.map(m => `<option value="${m.name}">${m.name}</option>`).join("");
+    return new Promise((resolve) => {
+      new Dialog({
+        title: `${item.name}: Select Mode`,
+        content: `<div style="margin-top:6px;">
+          <label style="display:inline-block;width:120px;">Mode:</label>
+          <select name="mode">${options}</select>
+        </div>`,
+        buttons: {
+          roll: {
+            label: "Continue",
+            callback: html => {
+              const sel = html.find('[name="mode"]').val();
+              const mode = modes.find(m => m.name === sel) || modes[0];
+              resolve(this._rollWeaponWithMode(item, actor, mode));
+            }
+          },
+          cancel: { label: "Cancel", callback: () => resolve(null) }
         },
-        cancel: { label: "Cancel" }
-      },
-      default: "roll"
-    }).render(true);
+        default: "roll"
+      }).render(true);
+    });
   }
+
 
   async _rollWeaponWithMode(item, actor, mode) {
-  // Use the mode's properties instead of base weapon properties
-  const abilityName = mode.ability || "fighting";
-  const abilityRank = actor.system.abilities[abilityName].rank || "Typical";
-  const abilityValue = actor.system.abilities[abilityName].value || 6;
-  const damageType = mode.damageType;
-  const damage = mode.damage;
-  
-  // Map actionType to ACTIONS structure
-  const ACTION_MAP = {
-    "blunt-attack": { results: { white: "Miss", green: "Hit", yellow: "Slam", red: "Stun" } },
-    "edged-attack": { results: { white: "Miss", green: "Hit", yellow: "Stun", red: "Kill" } },
-    "shooting": { results: { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Kill" } },
-    "throwing-edged": { results: { white: "Miss", green: "Hit", yellow: "Stun", red: "Kill" } },
-    "throwing-blunt": { results: { white: "Miss", green: "Hit", yellow: "Hit", red: "Stun" } },
-    "energy": { results: { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Kill" } },
-    "force": { results: { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Stun" } },
-    "grappling": { results: { white: "Miss", green: "Miss", yellow: "Partial", red: "Hold" } }
-  };
-  
-  const action = ACTION_MAP[mode.actionType];
-  
-  // Build variant options based on what's available for this weapon
-  const specialAmmo = item.system.specialAmmo || {};
-  const availableVariants = [];
+    const ranks = [
+      "Shift-0","Feeble","Poor","Typical","Good","Excellent","Remarkable",
+      "Incredible","Amazing","Monstrous","Unearthly","Shift X","Shift Y","Shift Z",
+      "Class 1000","Class 3000","Class 5000","Beyond"
+    ];
 
-  availableVariants.push({ value: "standard", label: "Standard" });
+    // Build roll dialog
+    const rangeRank = mode.rangeRank || item.system?.rangeRank || actor.system?.abilities?.agility?.rank || "Typical";
+    const content = `
+      <div style="min-width:420px">
+        <div style="margin-bottom:8px;">
+          <label style="display:inline-block;width:140px;">Target Distance:</label>
+          <input type="number" name="distance" value="1" min="1" style="width:70px;"> areas
+        </div>
+        <div style="margin-bottom:8px;">
+          <label style="display:inline-block;width:140px;">Column Shift:</label>
+          <input type="number" name="shift" value="0" style="width:70px;">
+          <span style="color:#666;font-size:.9em;">(+ right, − left)</span>
+        </div>
+        <div style="margin-bottom:8px;">
+          <label style="display:inline-block;width:140px;">Karma Points:</label>
+          <input type="number" name="karma" value="0" min="0" style="width:70px;">
+        </div>
+        <div style="margin-top:10px;color:#555;">Range Rank: <b>${rangeRank}</b></div>
+      </div>`;
 
-  if (specialAmmo.ap) availableVariants.push({ value: "ap", label: "Armor Piercing" });
-  if (specialAmmo.mercy) availableVariants.push({ value: "mercy", label: "Mercy/Non-Lethal" });
-  if (specialAmmo.rubber) availableVariants.push({ value: "rubber", label: "Blunted/Rubber" });
-  if (specialAmmo.explosive) availableVariants.push({ value: "explosive", label: "Explosive/Enhanced" });
-  if (specialAmmo.canister) availableVariants.push({ value: "canister", label: "Canister Shot" });
-  if (specialAmmo.heatSeeker) availableVariants.push({ value: "heatSeeker", label: "Heat-Seeker" });
+    return new Promise(resolve => {
+      new Dialog({
+        title: `${item.name} — ${mode.name}`,
+        content,
+        buttons: {
+          roll: {
+            label: "Roll",
+            callback: async (html) => {
+              const $ = sel => html.find(sel);
+              const distance = Math.max(1, Number($('[name="distance"]').val() || 1));
+              const shift    = Number($('[name="shift"]').val() || 0);
+              const karma    = Math.max(0, Number($('[name="karma"]').val() || 0));
 
-  if (!specialAmmo.ap && !specialAmmo.mercy && !specialAmmo.rubber && 
-      !specialAmmo.explosive && !specialAmmo.canister && !specialAmmo.heatSeeker) {
-    availableVariants.push(
-      { value: "ap", label: "Armor Piercing" },
-      { value: "mercy", label: "Mercy/Non-Lethal" },
-      { value: "rubber", label: "Blunted/Rubber" },
-      { value: "explosive", label: "Explosive/Enhanced" },
-      { value: "canister", label: "Canister Shot" },
-      { value: "heatSeeker", label: "Heat-Seeker" }
-    );
+              // Compute effective rank with range
+              const rangeAreas = (globalThis.CONFIG?.FASERIP?.rankValues?.[rangeRank] ?? 0) * 2; // fallback approx
+              let rangePenaltyCS = 0;
+              if (!mode.heatSeeking) {
+                // simple bracket logic: each multiple of rangeAreas beyond first gives -1CS
+                if (rangeAreas > 0) {
+                  const bracket = Math.ceil(distance / Math.max(1, rangeAreas));
+                  rangePenaltyCS = Math.max(0, bracket - 1);
+                }
+              }
+
+              // Base ability
+              const abilityKey = (mode.ability || "fighting").toLowerCase();
+              const abilityRank = actor.system?.abilities?.[abilityKey]?.rank || "Typical";
+              const abilityIndex = Math.max(0, ranks.indexOf(abilityRank));
+              let effectiveIndex = abilityIndex - rangePenaltyCS + shift;
+              effectiveIndex = Math.max(0, Math.min(ranks.length - 1, effectiveIndex));
+              const effectiveRank = ranks[effectiveIndex];
+
+              // Roll with optional Karma
+              const r = await (new Roll("1d100")).evaluate({ async: true });
+              let total = r.total;
+              let karmaUsed = 0;
+              if (karma > 0) {
+                const cap = Math.min(100, total + karma);
+                karmaUsed = cap - total;
+                total = cap;
+              }
+              if (karmaUsed > 0) {
+                const history = foundry.utils.deepClone(actor.system.karma?.history || []);
+                history.push({ realDate: new Date().toLocaleDateString(), gameDate: "", amount: -karmaUsed, type: "Die Roll", description: `Spent on ${item.name} - ${mode.name}` });
+                await actor.update({ "system.karma.history": history });
+              }
+
+              // Determine color & effect
+              const color = rollUniversalTable(effectiveRank, Math.min(100, total))?.toLowerCase() || "white";
+
+              // Prepare attack payload
+              const target = game.user.targets.first()?.document ?? null;
+              const baseDamage = this._parseDamage(mode.damage ?? item.system.damage ?? 0);
+              const damageType = this._normalizeDamageType(mode.damageType || item.system.damageType || "S");
+
+              // Multiple attacks (max 3)
+              const attacks = Math.max(1, Math.min(3, Number(mode.multiAttacks || item.system.multiAttacks || 1)));
+              const { CombatHandler } = await import(`/systems/${game.system.id}/scripts/combat-handler.js`);
+
+              for (let i = 1; i <= attacks; i++) {
+                const sourceName = attacks > 1 ? `${item.name} (${mode.name}) [${i}/${attacks}]` : `${item.name} (${mode.name})`;
+                await CombatHandler.processAttack({
+                  attacker: actor,
+                  target,
+                  baseDamage,
+                  damageType,
+                  sourceName,
+                  canBeStun: (color === "red" && damageType.includes("blunt")) || (color === "yellow" && damageType.includes("edged")),
+                  canBeSlam: (color === "yellow" && damageType.includes("blunt")),
+                  canBeKill: (color === "red" && damageType.includes("edged")),
+                  originalRollResult: color
+                }, {
+                  variantType: null,
+                  specialEffects: { heatSeeking: !!mode.heatSeeking },
+                  precomputedRangePenalty: mode.heatSeeking ? 0 : rangePenaltyCS
+                });
+              }
+
+              resolve();
+            }
+          },
+          cancel: { label: "Cancel", callback: () => resolve(null) }
+        },
+        default: "roll"
+      }).render(true);
+    });
   }
-
-  const variantOptions = availableVariants.map(v => 
-    `<option value="${v.value}">${v.label}</option>`
-  ).join('');
-  
-  // Now show the standard roll dialog with range, shift, karma
-  let dialogContent = `
-    <div style="background: #f0e8d8; padding: 10px; border-radius: 5px;">
-      <div style="margin-bottom: 10px;">
-        <label style="display: inline-block; width: 120px;">Weapon:</label>
-        <input type="text" value="${item.name} (${mode.name})" readonly style="width: 180px;">
-      </div>
-      <div style="margin-bottom: 10px;">
-        <label style="display: inline-block; width: 120px;">Action:</label>
-        <input type="text" value="${mode.actionType}" readonly style="width: 180px;">
-      </div>
-      <div style="margin-bottom: 10px;">
-        <label style="display: inline-block; width: 120px;">Weapon Variant:</label>
-        <select name="variantType" style="width: 180px;">
-          ${variantOptions}
-        </select>
-      </div>
-      <div style="margin-bottom: 10px;">
-        <label style="display: inline-block; width: 120px;">Target Distance:</label>
-        <input type="number" id="distance" name="distance" value="1" min="1" style="width: 50px;"> areas
-      </div>
-      <div style="margin-bottom: 10px;">
-        <label style="display: inline-block; width: 120px;">Column Shift:</label>
-        <input type="number" id="shift" name="shift" value="0" style="width: 50px;">
-        <span style="color: #666; font-size: 0.9em;">(+ right, - left)</span>
-      </div>
-      <div>
-        <label style="display: inline-block; width: 120px;">Karma Points:</label>
-        <input type="number" id="karma" name="karma" value="0" min="0" style="width: 50px;">
-      </div>
-    </div>`;
-
-  new Dialog({
-    title: `${mode.actionType}: ${item.name} (${mode.name})`,
-    content: dialogContent,
-    buttons: {
-      roll: {
-        label: "Roll",
-        callback: async (html) => {
-          const distance = parseInt(html.find('[name="distance"]').val()) || 1;
-          const shift = parseInt(html.find('[name="shift"]').val()) || 0;
-          const karma = parseInt(html.find('[name="karma"]').val()) || 0;
-          
-          // Get variant type from dialog
-          const selectedVariant = html.find('[name="variantType"]').val() || "standard";
-          
-          // Handle variant effects
-          let finalDamage = damage;
-          let specialEffects = {};
-
-          switch(selectedVariant) {
-            case "mercy":
-              finalDamage = 0;
-              specialEffects.mercyShot = true;
-              break;
-            case "ap":
-              specialEffects.armorPiercing = true;
-              break;
-            case "explosive":
-              finalDamage = damage * 2;
-              break;
-            case "rubber":
-              specialEffects.noSlam = true;
-              break;
-            case "canister":
-              specialEffects.canister = true;
-              break;
-            case "heatSeeker":
-              specialEffects.heatSeeking = true;
-              break;
-          }
-          
-          // Calculate range penalty if shooting/throwing
-          let totalShift = shift;
-          if (["shooting", "throwing-edged", "throwing-blunt"].includes(mode.actionType) && distance > 1) {
-            totalShift -= (distance - 1);
-          }
-
-          // Apply column shifts
-          let effectiveRank = abilityRank;
-          if (totalShift !== 0) {
-            const ranks = [
-              "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent",
-              "Remarkable", "Incredible", "Amazing", "Monstrous", "Unearthly"
-            ];
-            const index = ranks.indexOf(abilityRank);
-            if (index !== -1) {
-              const newIndex = Math.min(Math.max(index + totalShift, 0), ranks.length - 1);
-              effectiveRank = ranks[newIndex];
-            }
-          }
-
-          // Roll
-          const roll = new Roll("1d100");
-          await roll.evaluate();
-
-          let cappedTotal = roll.total;
-          let karmaUsed = 0;
-          if (karma > 0) {
-            cappedTotal = Math.min(100, roll.total + karma);
-            karmaUsed = cappedTotal - roll.total;
-          }
-
-          if (karmaUsed > 0) {
-            const history = foundry.utils.deepClone(actor.system.karma?.history || []);
-            history.push({
-              realDate: new Date().toLocaleDateString(),
-              gameDate: "",
-              amount: -karmaUsed,
-              type: "Die Roll",
-              description: `Spent on ${item.name} - ${mode.name}`
-            });
-            await actor.update({ "system.karma.history": history });
-          }
-
-          // Get result
-          const colorResult = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
-          const effect = action.results[colorResult.toLowerCase()];
-
-          // Chat message
-          await ChatMessage.create({
-            speaker: ChatMessage.getSpeaker({ actor }),
-            roll: roll,
-            content: `
-              <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
-                <div style="padding: 5px 10px; border-bottom: 1px solid #c0c0c0; font-size: 1.1em; color: #8b0000;">
-                  <strong>${actor.name} - ${item.name} (${mode.name})</strong>
-                </div>
-                <div style="padding: 5px 10px; font-size: 0.9em;">
-                  <div>Attack Mode: ${mode.actionType}</div>
-                  <div>Base ${abilityName.charAt(0).toUpperCase() + abilityName.slice(1)}: ${abilityRank} (${abilityValue})</div>
-                  <div>Column Shift: ${totalShift !== 0 ? `${totalShift > 0 ? '+' : ''}${totalShift}CS → ${effectiveRank}` : `0 → ${effectiveRank}`}</div>
-                  <div>Roll: ${roll.total} + Karma: ${karmaUsed} = ${cappedTotal}</div>
-                  <div>Damage: ${finalDamage} (${damageType})</div>
-                  ${selectedVariant !== "standard" ? `<div>Variant: ${selectedVariant.toUpperCase()}</div>` : ''}
-                </div>
-                <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px;
-                  background-color: ${
-                    colorResult.toLowerCase() === 'white' ? '#f8f8f8' :
-                    colorResult.toLowerCase() === 'green' ? '#4CAF50' :
-                    colorResult.toLowerCase() === 'yellow' ? '#FFC107' : '#F44336'
-                  };
-                  color: ${colorResult.toLowerCase() === 'white' || colorResult.toLowerCase() === 'yellow' ? '#333' : 'white'};">
-                  ${effect} (${colorResult.toUpperCase()})
-                </div>
-              </div>
-            `
-          });
-
-          // Apply damage to target if selected
-          const target = Array.from(game.user.targets)[0]?.actor;
-          if (target && CombatHandler) {
-            // Normalize damage type for CombatHandler
-            let normalizedDamageType;
-            switch (damageType.toUpperCase()) {
-              case "BA": normalizedDamageType = "Physical-Blunt"; break;
-              case "EA": normalizedDamageType = "Physical-Edged"; break;
-              case "S": normalizedDamageType = "Physical-Blunt"; break;
-              case "E": normalizedDamageType = "Energy-Energy"; break;
-              case "F": normalizedDamageType = "Force"; break;
-              case "TE": normalizedDamageType = "Physical-Edged"; break;
-              case "TB": normalizedDamageType = "Physical-Blunt"; break;
-              default: normalizedDamageType = "Physical-Blunt";
-            }
-
-            await CombatHandler.processAttack({
-              attacker: actor,
-              target: target,
-              baseDamage: finalDamage,
-              damageType: normalizedDamageType,
-              sourceName: `${item.name} (${mode.name})`,
-              canBeStun: effect?.toLowerCase().includes("stun"),
-              canBeSlam: effect?.toLowerCase().includes("slam"),
-              canBeKill: effect?.toLowerCase().includes("kill"),
-              originalRollResult: colorResult.toLowerCase()
-            }, { 
-              variantType: selectedVariant,
-              specialEffects: specialEffects,
-              skipDefenseDialog: false 
-            });
-          }
-        }
-      },
-      cancel: { label: "Cancel" }
-    },
-    default: "roll"
-  }).render(true);
-}
 
   // Roll a power-based item
   async _rollPowerItem(item, actor) {

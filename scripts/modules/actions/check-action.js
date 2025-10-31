@@ -66,7 +66,9 @@ export class CheckAction extends BaseAction {
       const effectiveEndRank = shift ? shiftRank(targetEndRank, shift) : targetEndRank;
 
       // Roll percent
-      const roll = await (new Roll("1d100")).evaluate({ async: true });
+      //const roll = await (new Roll("1d100")).evaluate({ async: true });
+      const roll = new Roll("1d100");
+        await roll.evaluate(); // v13+ async API (or: roll.evaluateSync() for sync)
       if (!this.opts?.skipDice) {
         await roll.toMessage({
           speaker: ChatMessage.getSpeaker({ actor }),

@@ -240,6 +240,12 @@ export function installActionChatHandlers() {
         ui.notifications.warn("Multiple tokens targeted. Please select only one target for this check.");
       }
 
+      const SCOPE = game.system?.id || "msh-faserip";
+      const already =
+        message.getFlag(SCOPE, "autoChecksRun") ||
+        message.getFlag(SCOPE, "autoApplied"); // if you use this elsewhere
+      if (already) return; // Full Auto already resolved saves/effects
+
       console.debug("FASERIP chip click ->", { checkType, attackForm, dmgThrough, ownerActor: ownerActor?.name, prefill });
 
       await ActionDispatcher.roll(checkType, {
