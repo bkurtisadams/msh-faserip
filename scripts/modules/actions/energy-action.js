@@ -1,5 +1,7 @@
 // scripts/modules/actions/energy-action.js
 import { RangedAttackAction } from "./ranged-attack-action.js";
+import { resolveCombatMode } from "./action-dispatcher.js";
+
 import { 
   applyDamageToTargets,
   attachAutoFillRange,
@@ -434,7 +436,11 @@ export class EnergyAction extends RangedAttackAction {
             attackForm: "energy",
             damageType: choice.powerDamageType,
             bypassArmor: false,
-            autoApply: this.opts?.autoApply
+            autoApply: this.opts?.autoApply,
+            
+            autoSave: (typeof resolveCombatMode === "function" && targetActor)
+              ? (resolveCombatMode(targetActor) === "full")
+              : false,
           })
         : "";
 

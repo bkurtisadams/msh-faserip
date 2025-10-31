@@ -54,7 +54,9 @@ export class EscapingAction extends AttackAction {
 
     // No special action buttons needed for escaping
     const actions = buildActionsBox({
-      actorUuid: actor.uuid
+      actorUuid: actor.uuid,
+      autoApply: !!this.opts?.autoApply,
+
     });
 
     const cardHtml = `

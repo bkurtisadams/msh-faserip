@@ -5,810 +5,404 @@ import {
   shiftRank,
   labelFor,
   effectsFor,
-  buildResultGrid,
   bannerColors,
   getAbilityInfo,
 } from "./action-utils.js";
-import * as Nullify from "./nullify.js";
 import { resolveKillFeat, getKillContextFromAttackForm } from "../../rules/kill-resolver.js";
 import { canEffectsApply } from "../../rules/effects-gate.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
-import { resolveSlamFeat } from "../combat/damage-resolution.js";
 import * as Effects from "../effects/effect-engine.js";
+import * as Nullify from "./nullify.js";
 
+const SCOPE = () => (globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faserip");
 
-/**
- * CheckAction covers: "stun" | "slam" | "kill"
- * Dispatcher must call: new CheckAction({ actor, actionType, opts })
- */
+/** Small util */
+function rankIndex(r) {
+  return Math.max(0, RANKS.findIndex(x => x.toLowerCase() === String(r||"").toLowerCase()));
+}
+
 export class CheckAction extends BaseAction {
-  constructor(a) {
-    // Expect a single config object: { actor, actionType, abilityName?, opts? }
-    // abilityName is unused (checks are rolled on TARGET Endurance), but accepted for symmetry
-    if (!a || typeof a !== "object") throw new Error("CheckAction requires a config object.");
-    const { actor, actionType, abilityName = "endurance", opts = {} } = a;
-    super({ actor, abilityName, opts });
-    this.actionType = actionType;
+  constructor(actor, actionType, opts = {}) {
+    super(actor, actionType, opts);
+  }
+
+  /** Build a simple select */
+  _rankOptions(selected) {
+    return RANKS.map(r => `<option value="${r}" ${String(r).toLowerCase()===String(selected).toLowerCase()?"selected":""}>${r}</option>`).join("");
   }
 
   async execute() {
     const actor       = this.actor;
-    const actionType  = this.actionType; // "stun" | "slam" | "kill"
+    const actionType  = String(this.actionType || "").toLowerCase(); // "stun" | "slam" | "kill" | "save-nullify"
     const actionName  = labelFor(actionType);
-    const effects     = effectsFor(actionType);
-
-    // Pull the attacker's Strength rank (used for Slam context)
+    const mapping     = effectsFor(actionType) || {};
     const attackerStr = getAbilityInfo(actor, "strength");
 
-    // Extract prefill data from opts (passed from chat hook)
-    const prefill = this.opts.prefill || {};
+    // Prefill from opts (e.g., auto path or chat hook)
+    const prefill     = this.opts?.prefill || {};
 
-    // --- AUTO MODE FAST-PATH: skip dialog & roll immediately when Full Auto ---
+    // TDZ-safe flag computed early
+    let isSaveNullify = false;
+
+    // ------------------------------
+    // FULL AUTO FAST-PATH
+    // ------------------------------
     if (this?.opts?.autoApply === true) {
-      // Build a synthetic "choice" as the dialog would have returned
-      let targetName     = prefill.targetName || "";
-      let targetEndRank  = prefill.targetEndRank || "Good";
-      let targetUuid     = prefill.targetUuid || "";
-      let dmgThrough     = Number(prefill.dmgThrough ?? 0);
-      let attackForm     = prefill.attackForm || (this.opts?.attackForm || "blunt");
+      // Compute variant id once
+      const actionId = String(
+        this?.actionId || this?.type || this?.opts?.actionId || this?.opts?.checkType || this?.actionType || ""
+      ).toLowerCase();
+      isSaveNullify = (actionId === "save-nullify" || actionId === "nullify-save" || actionId === "force-save-nullify");
 
-      // If no explicit target, use a single targeted token (if exactly one)
-      if (!targetUuid && game.user?.targets?.size === 1) {
-        const t = game.user.targets.first();
-        targetUuid    = t?.actor?.uuid ?? t?.document?.uuid ?? "";
-        targetName    = t?.name ?? "Target";
-        targetEndRank = t?.actor?.system?.abilities?.endurance?.rank || targetEndRank;
-        // If dmgThrough wasn't prefilled, fall back to 0 (borderline toggle is handled below)
-        if (!Number.isFinite(dmgThrough)) dmgThrough = 0;
+      // Build choice (synthetic dialog result)
+      const targetName    = prefill.targetName     || "Target";
+      const targetEndRank = prefill.targetEndRank  || "Good";
+      const shift         = Number(prefill.shift ?? 0) || 0;
+      const dmgThrough    = Number(prefill.dmgThrough ?? 0) || 0;
+      const borderline    = !!prefill.borderline;
+      const attackForm    = String(prefill.attackForm || this?.opts?.attackForm || "blunt").toLowerCase();
+      const defenderUuid  = prefill.targetUuid || prefill.defenderUuid || "";
+
+      const effectiveEndRank = shift ? shiftRank(targetEndRank, shift) : targetEndRank;
+
+      // Roll percent
+      const roll = await (new Roll("1d100")).evaluate({ async: true });
+      if (!this.opts?.skipDice) {
+        await roll.toMessage({
+          speaker: ChatMessage.getSpeaker({ actor }),
+          flavor: `${actionName}: ${targetName} (${effectiveEndRank})`,
+          rollMode: game.settings.get("core", "rollMode")
+        });
+      }
+      const capped = Math.min(100, roll.total);
+      const color = (typeof rollUniversalTable === "function")
+        ? rollUniversalTable(effectiveEndRank, capped)
+        : (game?.msh?.rollUniversalTable?.(effectiveEndRank, capped) ?? "white");
+      const colorLower = String(color || "white").toLowerCase();
+
+      // Determine base effect label
+      let baseEffect = mapping[colorLower] || color;
+      if (actionType === "kill") {
+        const ctx = getKillContextFromAttackForm(attackForm);
+        baseEffect = resolveKillFeat(colorLower, ctx);
       }
 
-      // If still no target context, fall back to the dialog path
-      if (targetUuid || targetName) {
-        const choice = {
-          targetName,
-          targetEndRank,
-          targetUuid,
-          shift: Number(this.opts?.featCs ?? 0),
-          dmgThrough,
-          borderline: !!this.opts?.borderline,
-          karma: 0,
-          attackForm,
-          // Skip dice animation by default for auto path; change to false if you prefer animations
-          skipDice: true
-        };
-
-        // ---- Below mirrors the normal post-dialog resolution path ----
-        const effectsSuppressed = !canEffectsApply(choice.dmgThrough, {
-          borderline: choice.borderline,
-          ignoreDamageGate: this.opts?.ignoreDamageGate
-        });
-
-        const effectiveEndRank = shiftRank(choice.targetEndRank, choice.shift);
-
-        // Roll & (optionally) show the roll
-        const roll = await (new Roll("1d100")).evaluate();
-        if (!choice.skipDice) {
-          await roll.toMessage({
-            speaker: ChatMessage.getSpeaker({ actor: this.actor }),
-            flavor: `${choice.targetName} rolls Endurance vs ${labelFor(this.actionType)}`,
-            rollMode: game.settings.get("core", "rollMode")
+      // Damage-gate: do NOT gate Nullify
+      const effectsSuppressed = isSaveNullify
+        ? false
+        : !canEffectsApply(dmgThrough, {
+            borderline,
+            ignoreDamageGate: this.opts?.ignoreDamageGate
           });
+
+      // Apply effects according to type
+      // STUN
+      let stunDuration = null;
+      let rawDuration  = null;
+      if (actionType === "stun" && !effectsSuppressed) {
+        if (colorLower === "white") {
+          const d = await (new Roll("1d10")).evaluate({ async: true });
+          rawDuration = d.total;
+          const maxDur = game.settings?.get?.("msh-faserip","maxStunDuration") || 10;
+          stunDuration = Math.min(rawDuration, maxDur);
+          await d.toMessage({
+            speaker: ChatMessage.getSpeaker({ actor }),
+            flavor: `${targetName} Stun Duration (1d10)${rawDuration>stunDuration?` - capped ${maxDur}`:""}`
+          });
+          await this._createStunnedEffect(defenderUuid, targetName, stunDuration);
+        } else if (colorLower === "green") {
+          await this._createStunnedEffect(defenderUuid, targetName, 1);
         }
-        const needTo100  = Math.max(0, 100 - roll.total);
-        const karmaSpend = 0; // auto path defaults to 0 karma
-        const cappedTotal = Math.min(100, roll.total + karmaSpend);
+      }
 
-        const color = game.msh.rollUniversalTable(effectiveEndRank, cappedTotal);
-        const colorLower = String(color||"").toLowerCase();
+      // SLAM (single-resolution; use rolled color)
+      if (actionType === "slam" && !effectsSuppressed) {
+        await this._createSlamEffect(actor, { targetUuid: defenderUuid, dmgThrough, targetEndRank }, colorLower);
+      }
 
-        // Determine effect label, with Kill using kill-resolver
-        let finalEffect = effects[colorLower] || color;
-        if (this.actionType === "kill") {
-          const killContext = getKillContextFromAttackForm(choice.attackForm);
-          const killResult  = resolveKillFeat(colorLower, killContext);
-          finalEffect = killResult.label;
-
-          // Apply DYING on Endurance Loss if not suppressed
-          if (!effectsSuppressed && String(killResult?.label || "").toLowerCase().includes("endurance loss")) {
-            let targetActor = null;
-            try {
-              if (choice?.targetUuid) {
-                const doc = await fromUuid(choice.targetUuid);
-                targetActor = doc?.actor ?? doc ?? null;
-              }
-            } catch (_) {}
-            if (!targetActor && game.user?.targets?.size === 1) {
-              targetActor = game.user.targets.first()?.actor ?? null;
-            }
-            if (targetActor) {
-              await Effects.applyDyingEffect(targetActor);
-            }
-          }
-        }
-
-        // Nullify: on save failure apply effect
-        const isSaveNullify =
-          (this?.actionId === "save-nullify") ||
-          (this?.type === "save-nullify") ||
-          (this?.opts?.actionId === "save-nullify") ||
-          (typeof this.actionType !== "undefined" && this.actionType === "save-nullify");
-
-        if (isSaveNullify && !effectsSuppressed) {
-          let targetActor = null;
-          try {
-            if (choice?.targetUuid) {
-              const doc = await fromUuid(choice.targetUuid);
-              targetActor = doc?.actor ?? doc ?? null;
-            }
-          } catch (_){}
-          if (!targetActor && game.user?.targets?.size === 1) {
-            targetActor = game.user.targets.first()?.actor ?? null;
-          }
+      // KILL (Endurance Loss → DYING)
+      if (actionType === "kill" && !effectsSuppressed) {
+        const hasEndLoss = String(baseEffect || "").toLowerCase().includes("endurance");
+        if (hasEndLoss) {
+          const targetActor = await this._resolveTokenActor(defenderUuid);
           if (targetActor) {
-            const attacker = this?.actor ?? null;
-            const endRank  = choice?.targetEndRank || "Typical";
-            let intensityRank = endRank;
-            if (this?.opts?.powerRankName) intensityRank = this.opts.powerRankName;
-            if (this?.opts?.intensity === "fixed-rank" && this?.opts?.fixedRank) intensityRank = this.opts.fixedRank;
-
-            await Nullify.resolveAndApply(attacker, targetActor, {
-              endRank,
-              intensityRank,
-              rolledColor: colorLower,
-              originUuid: this?.opts?.originUuid ?? null
+            await Effects.applyDying(targetActor, {
+              enduranceValue: targetActor.system?.abilities?.endurance?.value ?? 10
             });
+            ui.notifications.warn(`${targetActor.name} is DYING (Endurance steps down each round unless stabilized).`);
           }
-        }
 
-        // Stun extra (white result): roll 1d10 for duration
-        let stunDuration = null, rawStunDuration = null;
-        if (this.actionType === "stun" && colorLower === "white" && !effectsSuppressed) {
-          const durationRoll = await (new Roll("1d10")).evaluate();
-          rawStunDuration = durationRoll.total;
-          const maxStunDuration = game.settings.get('msh-faserip', 'maxStunDuration') || 10;
-          stunDuration = Math.min(rawStunDuration, maxStunDuration);
         }
+      }
 
-        // Build explanatory block & final chat card
-        const extraHtml = this._extraExplanationHtml({
-          actionType: this.actionType,
-          choice,
-          attackerStr,
-          colorLower,
-          effectiveEndRank,
-          finalEffect,
-          effectsSuppressed,
-          stunDuration,
-          rawStunDuration
+      // NULLIFY (NEVER damage-gated)
+      if (isSaveNullify) {
+      // Prefer the targeted Token's synthetic actor (handles unlinked tokens)
+      const saveActor = await this._resolveTokenActor(defenderUuid || (this.opts?.prefill?.targetUuid || ""));
+      if (saveActor) {
+        const endRank     = targetEndRank;
+        let intensityRank = endRank;
+        if (this?.opts?.powerRankName) intensityRank = this.opts.powerRankName;
+        if (this?.opts?.intensity === "fixed-rank" && this?.opts?.fixedRank) intensityRank = this.opts.fixedRank;
+
+        await Nullify.resolveAndApply(actor, saveActor, {
+          endRank,
+          intensityRank,
+          rolledColor: colorLower,
+          originUuid: this?.opts?.originUuid ?? null
         });
+      }
+    }
 
-        const shortAction = String(labelFor(this.actionType)).replace(/\s*check$/i, "");
-        const cardHtml = `
-          <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
-            <div style="padding:5px 10px;border-bottom:1px solid #c0c0c0;font-size:1.1em;color:#4e342e;">
-              <strong>${this.actor.name} - ${shortAction} Check vs ${choice.targetName}</strong>
-            </div>
-            <div style="padding:5px 10px;font-size:.9em;">
-              <div>Target Endurance: ${choice.targetEndRank}${choice.shift ? ` — Shift ${choice.shift} → ${effectiveEndRank}` : ""}</div>
-              <div>Attack Form: ${choice.attackForm}${this.actionType==="slam" ? ` — Attacker STR: ${attackerStr.rank} (${attackerStr.value})` : ""}</div>
-              <div>Damage Penetrated: ${choice.dmgThrough}${choice.borderline ? " (borderline allowed)" : ""}</div>
-              <div>Roll: ${roll.total}${karmaSpend ? ` + Karma ${karmaSpend} = ${cappedTotal}` : ""}</div>
-              <div style="margin-top:6px;padding:6px;border-radius:3px;background:${bannerColors(colorLower).bg};color:${bannerColors(colorLower).fg};">
-                RESULT: ${String(color).toUpperCase()} — ${String(finalEffect).toUpperCase()}
-              </div>
-              ${extraHtml}
-            </div>
+      // Build and post a light-weight chat card
+      const banner = bannerColors[colorLower] || { bg:"#eee", fg:"#333", bd:"#ccc" };
+      const effectText = (actionType === "kill") ? (baseEffect || color) : (mapping[colorLower] || color);
+      const extraHtml  = this._extraExplanationHtml({
+        actionType, attackerStr, colorLower, finalEffect: effectText, effectsSuppressed,
+        stunDuration, rawStunDuration: rawDuration
+      });
+
+      const content = `
+        <div style="border:1px solid ${banner.bd};border-radius:3px;overflow:hidden;">
+          <div style="padding:6px 10px;background:${banner.bg};color:${banner.fg};border-bottom:1px solid ${banner.bd};">
+            <b>${actor.name}</b> — ${labelFor(actionType)} vs <b>${targetName}</b>
           </div>
-        `;
-
-        await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor: this.actor }), content: cardHtml });
-        return; // ← IMPORTANT: stop here; skip dialog path entirely
-      }
-    }
-    // --- END AUTO MODE FAST-PATH ---
-
-    
-    // ADD THIS PERMISSION CHECK HERE (right after prefill is declared)
-    // If there's a targeted NPC, only GM can roll checks
-    if (prefill.targetUuid && !game.user.isGM) {
-      try {
-        const resolved = await fromUuid(prefill.targetUuid);
-        const targetActor = resolved?.actor || resolved;
-        
-        if (targetActor && !targetActor.isOwner) {
-          ui.notifications.warn("Only the GM can roll Stun/Slam/Kill checks for NPCs");
-          return;
-        }
-      } catch (err) {
-        console.warn("Could not resolve target for permission check:", err);
-      }
-    }
-    // END OF PERMISSION CHECK
-    
-    const prefilledTargetName = prefill.targetName || "";
-    const prefilledTargetEndRank = prefill.targetEndRank || "Good";
-    const prefilledTargetUuid = prefill.targetUuid || "";
-    const prefilledDmgThrough = prefill.dmgThrough || 0;
-    const prefilledAttackForm = prefill.attackForm || "blunt";
-    const prefilledBorderline = prefill.borderline || false;
-
-    // --- Dialog: gather target info & context ---
-    const targetRanks = RANKS.map(r => `<option value="${r}" ${r===prefilledTargetEndRank?'selected':''}>${r}</option>`).join("");
-    const attackFormOptions = ["blunt","edged","shooting","throwing","energy","force","charging","wrestling"]
-      .map(f => `<option value="${f}" ${f===prefilledAttackForm?'selected':''}>${f.charAt(0).toUpperCase() + f.slice(1)}</option>`).join("");
-    
-    const dialogHtml = `
-      <div style="margin-bottom:8px;"><label style="display:inline-block;width:130px;">Check:</label><strong>${actionName}</strong></div>
-
-      <div style="margin-bottom:8px;">
-        <label style="display:inline-block;width:130px;">Target (label):</label>
-        <input type="text" name="targetName" style="width:220px;" placeholder="e.g., Doctor Doom" value="${prefilledTargetName}">
-      </div>
-
-      <div style="margin-bottom:8px;">
-        <label style="display:inline-block;width:130px;">Target Endurance:</label>
-        <select name="targetEndRank" style="width:180px;">${targetRanks}</select>
-      </div>
-
-      <div style="margin-bottom:8px;">
-        <label style="display:inline-block;width:130px;">Column Shift (on target):</label>
-        <input type="number" name="shift" value="0" style="width:60px;">
-        <span style="color:#666;font-size:.9em;">(+ easier, - harder for target)</span>
-      </div>
-
-      <div style="margin-bottom:10px;padding:6px;border:1px solid #ddd;background:#fafafa;border-radius:3px;">
-        <div style="font-weight:bold;margin-bottom:6px;">Damage Gate</div>
-        <div style="margin-bottom:6px;">
-          <label style="display:inline-block;width:130px;">Damage that penetrated:</label>
-          <input type="number" name="dmgThrough" value="${prefilledDmgThrough}" min="0" style="width:80px;">
-          <span style="color:#666;font-size:.9em;">(after Armor/Fields/Resistances)</span>
+          <div style="padding:8px 10px;font-size:.95em;">
+            <div><b>Result:</b> <span style="text-transform:capitalize">${colorLower}</span> — ${effectText}</div>
+            ${effectsSuppressed ? `<div style="margin-top:6px;color:#b71c1c;">No damage penetrated → effect suppressed.</div>` : ""}
+            ${extraHtml || ""}
+          </div>
         </div>
-        <div>
-          <label><input type="checkbox" name="borderline" ${prefilledBorderline ? 'checked' : ''}> Apply borderline allowance (tie still affects)</label>
+      `;
+      await ChatMessage.create({
+        speaker: ChatMessage.getSpeaker({ actor }),
+        content,
+        flags: { [SCOPE()]: { autoChecksDone: true } }
+      });
+      return;
+    } // end auto fast-path
+
+    // ------------------------------
+    // MANUAL / SEMI: show a compact dialog
+    // ------------------------------
+    const targetRanks = this._rankOptions(prefill.targetEndRank || "Good");
+    const preDmg = Number(prefill.dmgThrough ?? 0) || 0;
+    const html = `
+      <div class="frp-dialog" style="min-width:410px;">
+        <div style="margin-bottom:8px;">
+          <label style="display:inline-block;width:140px;">Target Name:</label>
+          <input type="text" name="targetName" value="${prefill.targetName||"Target"}" style="width:220px;">
         </div>
-        <div style="color:#666;font-size:.85em;margin-top:4px;">
-          Effects only apply if some damage penetrates; in borderline ties, they still apply.
+        <div style="margin-bottom:8px;">
+          <label style="display:inline-block;width:140px;">Target Endurance:</label>
+          <select name="targetEndRank" style="width:220px;">${targetRanks}</select>
+        </div>
+        <div style="margin-bottom:8px;">
+          <label style="display:inline-block;width:140px;">Column Shift (on target):</label>
+          <input type="number" name="shift" value="${Number(prefill.shift??0)||0}" style="width:70px;">
+        </div>
+        <div style="margin-bottom:8px;">
+          <label style="display:inline-block;width:140px;">Damage penetrated:</label>
+          <input type="number" name="dmgThrough" value="${preDmg}" min="0" style="width:90px;">
+        </div>
+        <div style="margin-bottom:8px;">
+          <label><input type="checkbox" name="borderline" ${prefill.borderline ? "checked" : ""}> Borderline (tie still affects)</label>
         </div>
       </div>
-
-      <div style="margin-bottom:8px;">
-        <label style="display:inline-block;width:130px;">Karma (target spend):</label>
-        <input type="number" name="karma" value="0" min="0" style="width:60px;">
-        <span style="color:#666;font-size:.85em;">(only up to 100 total; history not recorded unless you roll as this actor)</span>
-      </div>
-
-      <div style="margin-bottom:8px;">
-        <label style="display:inline-block;width:130px;">Attack Form:</label>
-        <select name="attackForm" style="width:220px;">${attackFormOptions}</select>
-        <span style="color:#666;font-size:.85em;">(Kill: E/S applies to Edged or Shooting only)</span>
-      </div>
-
-      ${actionType === "slam" ? `
-        <div style="margin:8px 0 0;padding:6px;border:1px dashed #bbb;border-radius:3px;background:#fff;">
-          <div style="font-weight:bold;">Slam context</div>
-          <div>Attacker Strength: <strong>${attackerStr.rank}</strong> (${attackerStr.value})</div>
-          <div style="color:#666;font-size:.85em;">Grand Slam travel ≈ attacker's Strength as ground speed (e.g., Unearthly ≈ 10 areas).</div>
-        </div>
-      ` : ``}
-
-      <div style="margin-top:10px;">
-        <label><input type="checkbox" name="skipDice"> Skip dice animation</label>
-      </div>
-      
-      ${prefilledTargetName ? `<div style="margin-top:8px;padding:4px;background:#e8f5e9;border:1px solid #4CAF50;border-radius:3px;font-size:.85em;color:#2e7d32;">✓ Auto-populated from targeted token</div>` : ""}
     `;
 
     const choice = await new Promise((resolve) => {
       new Dialog({
-        title: `${actionName} Check`,
-        content: dialogHtml,
+        title: `${labelFor(actionType)}: ${actor.name}`,
+        content: html,
         buttons: {
           roll: {
             label: "Roll",
             callback: (html) => {
-              const $ = (sel)=> html.find(sel);
+              const $ = (s) => html.find(s);
               resolve({
                 targetName: String($('[name="targetName"]').val() || "Target"),
                 targetEndRank: String($('[name="targetEndRank"]').val() || "Good"),
-                targetUuid: prefilledTargetUuid || "",
                 shift: Number($('[name="shift"]').val() || 0),
                 dmgThrough: Number($('[name="dmgThrough"]').val() || 0),
                 borderline: !!$('[name="borderline"]').is(':checked'),
-                karma: Number($('[name="karma"]').val() || 0),
-                attackForm: String($('[name="attackForm"]').val() || "blunt"),
-                skipDice: !!$('[name="skipDice"]').is(':checked'),
               });
             }
           },
-          cancel: { label: "Cancel", callback: ()=> resolve(null) }
+          cancel: { label: "Cancel", callback: () => resolve(null) }
         },
         default: "roll"
       }).render(true);
     });
     if (!choice) return;
 
-    // --- Damage gate: effects only if dmg > 0 (or borderline toggle) unless caller overrides ---
+    const effectiveEndRank = choice.shift ? shiftRank(choice.targetEndRank, choice.shift) : choice.targetEndRank;
+    const roll = await (new Roll("1d100")).evaluate({ async: true });
+    await roll.toMessage({
+      speaker: ChatMessage.getSpeaker({ actor }),
+      flavor: `${actionName}: ${choice.targetName} (${effectiveEndRank})`
+    });
+    const color = (typeof rollUniversalTable === "function")
+      ? rollUniversalTable(effectiveEndRank, Math.min(100, roll.total))
+      : (game?.msh?.rollUniversalTable?.(effectiveEndRank, Math.min(100, roll.total)) ?? "white");
+    const colorLower = String(color || "white").toLowerCase();
+
+    let finalEffect = mapping[colorLower] || color;
+    if (actionType === "kill") {
+      const ctx = getKillContextFromAttackForm(String(this?.opts?.attackForm || "blunt"));
+      finalEffect = resolveKillFeat(colorLower, ctx);
+    }
+
     const effectsSuppressed = !canEffectsApply(choice.dmgThrough, {
       borderline: choice.borderline,
       ignoreDamageGate: this.opts?.ignoreDamageGate
     });
 
-    // --- Target FEAT rank after column shifts ---
-    const effectiveEndRank = shiftRank(choice.targetEndRank, choice.shift);
-
-    // --- Roll d100 (target's FEAT); cap with "spend up to 100" locally (no history unless you choose to use the actor) ---
-    const roll = await (new Roll("1d100")).evaluate();
-    if (!choice.skipDice) {
-      await roll.toMessage({
-        speaker: ChatMessage.getSpeaker({ actor }),
-        flavor: `${choice.targetName} rolls Endurance vs ${actionName}`,
-        rollMode: game.settings.get("core", "rollMode")
-      });
-    }
-    const needTo100 = Math.max(0, 100 - roll.total);
-    const karmaSpend = Math.min(Math.max(0, choice.karma || 0), needTo100);
-    const cappedTotal = Math.min(100, roll.total + karmaSpend);
-
-    // --- Determine color/result on target's Endurance ---
-    const color = game.msh.rollUniversalTable(effectiveEndRank, cappedTotal);
-    const colorLower = String(color||"").toLowerCase();
-    const baseEffect = effects[colorLower] || color;
-
-    // --- Nullify: resolve & apply (single-target) ---
-    const isSaveNullify =
-      (this?.actionId === "save-nullify") ||
-      (this?.type === "save-nullify") ||
-      (this?.opts?.actionId === "save-nullify") ||
-      (typeof actionType !== "undefined" && actionType === "save-nullify");
-
-    if (isSaveNullify && !effectsSuppressed) {
-      // resolve target actor (prefer explicit UUID; else current user target)
-      let targetActor = null;
-      try {
-        if (choice?.targetUuid) {
-          const doc = await fromUuid(choice.targetUuid);
-          targetActor = doc?.actor ?? doc ?? null;
-        }
-      } catch (_) {}
-      if (!targetActor && game.user?.targets?.size === 1) {
-        targetActor = game.user.targets.first()?.actor ?? null;
-      }
-
-      if (targetActor) {
-        const attacker = this?.actor ?? actor ?? null;
-        // use the unshifted Endurance rank for the threshold comparison
-        const endRank = choice?.targetEndRank || "Typical";
-
-        // pick intensity rank (attacker’s power rank): prefer explicit values if your chat hook passes them
-        let intensityRank = endRank; // default = equal → Yellow required
-        if (this?.opts?.powerRankName) intensityRank = this.opts.powerRankName;
-        if (this?.opts?.intensity === "fixed-rank" && this?.opts?.fixedRank) intensityRank = this.opts.fixedRank;
-
-        await Nullify.resolveAndApply(attacker, targetActor, {
-          endRank,
-          intensityRank,
-          rolledColor: colorLower,           // what your UT just returned
-          originUuid: this?.opts?.originUuid ?? null
-        });
+    // Minimal effect application in manual mode (same as auto)
+    if (actionType === "stun" && !effectsSuppressed) {
+      if (colorLower === "white") {
+        const d = await (new Roll("1d10")).evaluate({ async: true });
+        const maxDur = game.settings?.get?.("msh-faserip","maxStunDuration") || 10;
+        const dur = Math.min(d.total, maxDur);
+        await d.toMessage({ speaker: ChatMessage.getSpeaker({ actor }), flavor: `${choice.targetName} Stun Duration (1d10)` });
+        await this._createStunnedEffect(this.opts?.prefill?.targetUuid || "", choice.targetName, dur);
+      } else if (colorLower === "green") {
+        await this._createStunnedEffect(this.opts?.prefill?.targetUuid || "", choice.targetName, 1);
       }
     }
 
-
-    // --- Special handling for Stun White result: auto-roll 1d10 for duration ---
-    // In check-action.js, around line 150-200, replace the stun duration section with:
-
-    // --- Special handling for Stun White result: auto-roll 1d10 for duration ---
-    let stunDuration = null;
-    let rawStunDuration = null;
-    if (actionType === "stun" && colorLower === "white" && !effectsSuppressed) {
-      const durationRoll = await (new Roll("1d10")).evaluate();
-      rawStunDuration = durationRoll.total;
-      
-      // Apply house rule cap
-      const maxStunDuration = game.settings.get('msh-faserip', 'maxStunDuration') || 10;
-      stunDuration = Math.min(rawStunDuration, maxStunDuration);
-      
-      // Show the d10 roll in chat
-      await durationRoll.toMessage({
-        speaker: ChatMessage.getSpeaker({ actor }),
-        flavor: `${choice.targetName} Stun Duration (1d10)${rawStunDuration > stunDuration ? ` - Capped at ${maxStunDuration}` : ''}`,
-        rollMode: game.settings.get("core", "rollMode")
-      });
-
-      // CREATE STUNNED EFFECT
-      await this._createStunnedEffect(choice.targetUuid, choice.targetName, stunDuration);
-    }
-
-    // Handle Green result (1 round stun)
-    if (actionType === "stun" && colorLower === "green" && !effectsSuppressed) {
-      await this._createStunnedEffect(choice.targetUuid, choice.targetName, 1);
-    }
-
-        // Apply Slam AE using the color we just rolled (no extra roll)
     if (actionType === "slam" && !effectsSuppressed) {
-      await this._createSlamEffect(this.actor, {
-        targetUuid:  choice.targetUuid || prefilledTargetUuid,
-        targetEndRank: choice.targetEndRank,
-        dmgThrough: choice.dmgThrough
-      }, colorLower);
+      await this._createSlamEffect(actor, { targetUuid: this.opts?.prefill?.targetUuid || "", dmgThrough: choice.dmgThrough }, colorLower);
     }
 
-
-    // --- Apply special Kill "E/S" rule ---
-    let finalEffect = baseEffect;
-
-    // Around where you call the resolver
-    const debug = game.settings?.get('msh-faserip', 'debugMode') || false;
-
-    if (debug) {
-      console.log('[CHECK ACTION] Kill check', { actionType, attackForm: choice.attackForm, color: colorLower });
-    }
-
-    const killContext = getKillContextFromAttackForm(choice.attackForm);
-    const killResult = resolveKillFeat(colorLower, killContext);
-    finalEffect = killResult.label;
-
-        // If Kill result = Endurance Loss and not suppressed, apply DYING
-    if (!effectsSuppressed && String(killResult?.label || "").toLowerCase().includes("endurance loss")) {
-      let targetActor = null;
-      try {
-        if (choice?.targetUuid) {
-          const doc = await fromUuid(choice.targetUuid);
-          targetActor = doc?.actor ?? doc ?? null;
+    if (actionType === "kill" && !effectsSuppressed) {
+      const hasEndLoss = String(finalEffect || "").toLowerCase().includes("endurance");
+      if (hasEndLoss) {
+        const targetActor = await this._resolveTokenActor(this.opts?.prefill?.targetUuid || "");
+        if (targetActor) {
+          await Effects.applyDying(targetActor, {
+            enduranceValue: targetActor.system?.abilities?.endurance?.value ?? 10
+          });
+          ui.notifications.warn(`${targetActor.name} is DYING (Endurance steps down each round unless stabilized).`);
         }
-      } catch (_) {}
-      if (!targetActor && game.user?.targets?.size === 1) {
-        targetActor = game.user.targets.first()?.actor ?? null;
-      }
-      if (targetActor) {
-        await Effects.applyDying(targetActor, {
-          enduranceValue: targetActor.system?.abilities?.endurance?.value ?? 10
-        });
-        ui.notifications.warn(`${targetActor.name} is DYING (Endurance steps down each round unless stabilized).`);
+
       }
     }
 
-    if (debug) {
-      console.log('[CHECK ACTION] Kill resolved', { killContext, killResult, finalEffect });
-    }
-
-    // --- If no damage penetrated (and not borderline), effects are negated ---
-    if (effectsSuppressed) {
-      finalEffect = "No effect (no damage penetrated)";
-    }
-
-    // --- Build visual grid/banners using your helper maps ---
-    const grid = buildResultGrid(actionType, colorLower, effects, (globalThis._getResultHoverText||this._getResultHoverText));
-    const { bg, fg } = bannerColors(colorLower);
-
-    // --- Extra explanatory block per check type ---
-    const extraHtml = this._extraExplanationHtml({
-      actionType, 
-      choice, 
-      attackerStr, 
-      colorLower, 
-      effectiveEndRank, 
-      finalEffect, 
-      effectsSuppressed, 
-      stunDuration,
-      rawStunDuration
+    const banner = bannerColors[colorLower] || { bg:"#eee", fg:"#333", bd:"#ccc" };
+    const extraHtml  = this._extraExplanationHtml({
+      actionType, attackerStr, colorLower, finalEffect, effectsSuppressed
     });
-
-    const shortAction = String(actionName).replace(/\s*check$/i, "");
-
-    // --- Final chat card ---
-    const cardHtml = `
-      <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
-        <div style="padding:5px 10px;border-bottom:1px solid #c0c0c0;font-size:1.1em;color:#4e342e;">
-          <strong>${actor.name} - ${shortAction} Check vs ${choice.targetName}</strong>
+    const content = `
+      <div style="border:1px solid ${banner.bd};border-radius:3px;overflow:hidden;">
+        <div style="padding:6px 10px;background:${banner.bg};color:${banner.fg};border-bottom:1px solid ${banner.bd};">
+          <b>${actor.name}</b> — ${labelFor(actionType)} vs <b>${choice.targetName}</b>
         </div>
-
-        <div style="padding:5px 10px;font-size:.9em;">
-          <div>Target Endurance: ${choice.targetEndRank}${choice.shift ? ` — Shift ${choice.shift} → ${effectiveEndRank}` : ""}</div>
-          <div>Attack Form: ${choice.attackForm}${actionType==="slam" ? ` — Attacker STR: ${attackerStr.rank} (${attackerStr.value})` : ""}</div>
-          <div>Damage Penetrated: ${choice.dmgThrough}${choice.borderline ? " (borderline allowed)" : ""}</div>
-          <div>Roll: ${roll.total}${karmaSpend ? ` + Karma: ${karmaSpend}` : ""} = ${cappedTotal}</div>
+        <div style="padding:8px 10px;font-size:.95em;">
+          <div><b>Result:</b> <span style="text-transform:capitalize">${colorLower}</span> — ${finalEffect}</div>
+          ${effectsSuppressed ? `<div style="margin-top:6px;color:#b71c1c;">No damage penetrated → effect suppressed.</div>` : ""}
+          ${extraHtml || ""}
         </div>
-
-        ${grid}
-
-        <div style="text-align:center;padding:8px;margin:5px;font-weight:bold;font-size:1.1em;border-radius:3px;background:${bg};color:${fg};">
-          RESULT: ${String(color).toUpperCase()} — ${String(finalEffect).toUpperCase()}
-        </div>
-
-        ${extraHtml}
       </div>
     `;
-
-    await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor }), content: cardHtml });
+    await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor }), content });
   }
 
-  _extraExplanationHtml({ actionType, choice, attackerStr, colorLower, effectiveEndRank, finalEffect, effectsSuppressed, stunDuration = null, rawStunDuration = null }) {
-    // Slam: show movement/dir rules; Stun: durations; Kill: E/S clarification
-    if (actionType === "slam") {
-      // Map Universal Table colors to Slam effects per the rules
-      // If no penetration (and not borderline), don't render any Slam effect block
-      if (effectsSuppressed) {
-        return `
-          <div style="padding:6px 10px;margin:6px 10px;background:#ffcdd2;border:1px solid #b71c1c;border-radius:3px;color:#b71c1c;">
-            <strong>Note:</strong> No damage penetrated defenses — Slam effects do not apply.
-          </div>
-        `;
-      }
-      const slamEffects = {
-        white: {
-          name: "Grand Slam",
-          desc: `Target is knocked away with speed equal to attacker's Strength as ground speed. With ${attackerStr.rank} Strength (${attackerStr.value}), this translates to approximately ${this._strengthToAreas(attackerStr.rank)} areas of travel.`,
-          direction: choice.dmgThrough > 0 ? "Attacker chooses direction (any compass direction, straight up, or straight down)." : "Defender chooses direction."
-        },
-        green: {
-          name: "1 Area",
-          desc: "Target is knocked one area away (ranged or area movement).",
-          direction: choice.dmgThrough > 0 ? "Attacker chooses direction (any compass direction, straight up, or straight down)." : "Defender chooses direction (likely avoiding teammates, buildings, and obstacles)."
-        },
-        yellow: {
-          name: "Stagger",
-          desc: "Target is knocked back a step or two, perhaps to one knee, but is fully capable of combat next round. Target is no longer adjacent to attacker.",
-          direction: "No forced movement beyond stepping back. Target may suffer situational damage (e.g., staggering off a cliff edge)."
-        },
-        red: {
-          name: "No Slam",
-          desc: "Target is not affected by the Slam. Target still takes damage as normal.",
-          direction: "No movement."
-        }
-      };
+    /** Prefer a Token's synthetic actor (unlinked tokens) over the base Actor */
+  async _resolveTokenActor(targetUuid) {
+    let doc = null;
+    try { if (targetUuid) doc = await fromUuid(targetUuid); } catch {}
 
-      const effect = slamEffects[colorLower] || slamEffects.red;
-      
-      // Show collision button for Grand Slam and 1 Area
-      const showCollisionButton = (colorLower === 'white' || colorLower === 'green') && !effectsSuppressed;
-
-      return `
-        <div style="padding:6px 10px;margin:6px 10px;background:#fffde7;border:1px solid #f9a825;border-radius:3px;">
-          <div style="font-weight:bold;margin-bottom:6px;">Slam Result: ${effect.name}</div>
-          
-          <div style="margin-bottom:6px;">
-            <strong>Effect:</strong> ${effect.desc}
-          </div>
-          
-          <div style="margin-bottom:6px;">
-            <strong>Direction:</strong> ${effect.direction}
-          </div>
-          
-          ${showCollisionButton ? `
-            <div style="margin-top:8px;padding:4px;background:#ffebee;border:1px solid #ef5350;border-radius:3px;">
-              <strong>⚠ Collision Damage:</strong> If the target slams into a building, wall, or other obstruction, they take damage as if making a Charging attack against that object. Buildings and obstructions affect movement speed as per normal movement rules.
-            </div>
-            
-            <div style="margin-top:8px;text-align:center;">
-              <a class="faserip-chip" 
-                data-action="calculate-collision"
-                data-target-name="${choice.targetName}"
-                data-target-uuid="${choice.targetUuid || ""}"
-                data-target-endurance="${choice.targetEndRank}"
-                data-slam-distance="${colorLower === 'white' ? this._strengthToAreas(attackerStr.rank) : 1}"
-                title="Calculate damage if target collides with an obstacle"
-                style="display:inline-block;font-size:12px;line-height:1.1;padding:4px 10px;border:1px solid #ef5350;border-radius:3px;background:#fff;color:#d32f2f;text-decoration:none;cursor:pointer;font-weight:bold;">
-                🧮 Calculate Collision Damage
-              </a>
-            </div>
-          ` : ''}
-          
-          ${effectsSuppressed ? `
-            <div style="margin-top:8px;padding:4px;background:#ffcdd2;border:1px solid #b71c1c;border-radius:3px;color:#b71c1c;">
-              <strong>Note:</strong> No damage penetrated defenses → Slam effects do not apply (per rules: "For any one of these three results to be effective on a target, the attacker must inflict some damage on the target").
-            </div>
-          ` : ''}
-          
-          <div style="margin-top:8px;font-size:.85em;color:#666;">
-            <strong>Attacker Context:</strong> ${this.actor.name} (Strength: ${attackerStr.rank} = ${attackerStr.value})
-          </div>
-        </div>
-      `;
+    // If UUID is a TokenDocument → use its synthetic actor
+    if (doc?.documentName === "Token") {
+      return doc.actor ?? null;
     }
 
+    // If UUID is an Actor → try to find the currently targeted token for that Actor
+    if (doc?.documentName === "Actor") {
+      const sel = game.user?.targets?.first?.();
+      if (sel?.actor && sel.actor.id === doc.id) return sel.actor;
+
+      // Fallback: if exactly one scene token references this Actor, use its synthetic actor
+      const matches = canvas.tokens?.placeables?.filter(t => t?.actor && t.actor.id === doc.id) ?? [];
+      if (matches.length === 1) return matches[0].actor;
+
+      // Last resort: return the base Actor (linked tokens case)
+      return doc;
+    }
+
+    // No UUID or unknown doc — if exactly one target is selected, use that
+    if (game.user?.targets?.size === 1) {
+      return game.user.targets.first()?.actor ?? null;
+    }
+    return null;
+  }
+
+  // ---------- helpers ----------
+
+  async _createStunnedEffect(targetUuid, targetName, rounds=1) {
+    const targetActor = await this._resolveTokenActor(targetUuid);
+    if (!targetActor) return;
+    await Effects.applyStun(targetActor, { rounds });
+    ui.notifications.info(`${targetName || targetActor.name}: Stunned for ${rounds} round${rounds>1?"s":""}.`);
+  }
+
+  _strengthToAreas(rankName) {
+    // Rough mapping; tweak as desired
+    const idx = rankIndex(rankName);
+    if (idx <= rankIndex("Typical"))    return 1;
+    if (idx <= rankIndex("Excellent"))  return 2;
+    if (idx <= rankIndex("Remarkable")) return 3;
+    if (idx <= rankIndex("Incredible")) return 4;
+    if (idx <= rankIndex("Amazing"))    return 5;
+    return 6;
+  }
+
+  async _createSlamEffect(ownerActor, { targetUuid="", dmgThrough=0 }={}, colorLower="white") {
+    const targetActor = await this._resolveTokenActor(targetUuid);
+    if (!targetActor) return;
+
+    let kind = "No Slam", knockbackAreas = 0, prone = false, stagger = false;
+    switch (colorLower) {
+      case "white":
+        kind = "Grand Slam"; knockbackAreas = this._strengthToAreas(getAbilityInfo(ownerActor,"strength").rank); prone = true; break;
+      case "green":
+        kind = "1 area"; knockbackAreas = 1; prone = true; break;
+      case "yellow":
+        kind = "Stagger"; stagger = true; break;
+      default: break;
+    }
+    await Effects.applySlam(targetActor, { kind, knockbackAreas, prone, stagger });
+    ui.notifications.info(`${targetActor.name}: ${kind}${knockbackAreas?` (${knockbackAreas} area${knockbackAreas>1?"s":""})`:""}`);
+  }
+
+  _extraExplanationHtml({ actionType, attackerStr, colorLower, finalEffect, effectsSuppressed, stunDuration=null, rawStunDuration=null }) {
     if (actionType === "stun") {
       const lines = {
-        white: stunDuration 
-          ? `<strong>${stunDuration} rounds Stunned</strong> — Target can take no actions for ${stunDuration} round${stunDuration > 1 ? 's' : ''}.`
-          : "1–10 rounds Stunned — roll 1d10; no actions.",
-        green: "1 round Stunned — no action next round (can \"play possum\").",
+        white: stunDuration ? `1–10 rounds Stunned — rolled ${stunDuration} rounds.` : "1–10 rounds Stunned — roll 1d10; no actions.",
+        green: "1 round Stunned — no actions next round (can “play possum”).",
         yellow: "No effect.",
         red: "No effect."
       };
-      
-      return `
-        <div style="padding:6px 10px;margin:6px 10px;background:#e3f2fd;border:1px solid #1e88e5;border-radius:3px;">
-          <div style="font-weight:bold;margin-bottom:4px;">Stun Details</div>
-          <div>${lines[colorLower] || ""}</div>
-          ${stunDuration && colorLower === 'white' ? `
-            <div style="margin-top:8px;padding:6px;background:#fff9c4;border:1px solid #fbc02d;border-radius:3px;">
-              <strong>🎲 Duration Roll: ${stunDuration} round${stunDuration > 1 ? 's' : ''}</strong>
-              ${rawStunDuration && rawStunDuration > stunDuration ? `<div style="font-size:0.85em;color:#f57c00;margin-top:2px;">(Rolled ${rawStunDuration}, capped by house rule at ${stunDuration})</div>` : ''}
-              <div style="font-size:0.85em;color:#666;margin-top:4px;">Target is knocked out and can take no actions.</div>
-            </div>
-          ` : ''}
-          ${effectsSuppressed ? `<div style="margin-top:6px;color:#b71c1c;"><strong>Note:</strong> No damage penetrated → Stun does not apply.</div>` : ""}
-        </div>
-      `;
+      return `<div style="margin-top:8px;color:#444;">${lines[colorLower]||""}</div>`;
     }
-
+    if (actionType === "slam") {
+      if (effectsSuppressed) {
+        return `<div style="margin-top:8px;color:#b71c1c;">No damage penetrated — Slam does not apply.</div>`;
+      }
+      const strRank = attackerStr?.rank || "Typical";
+      const areas   = this._strengthToAreas(strRank);
+      const notes = {
+        white: `Grand Slam — knocked away up to ~${areas} areas; prone.`,
+        green: `Knockback 1 area; prone.`,
+        yellow:`Stagger; half-move next round.`,
+        red:  `No effect.`
+      };
+      return `<div style="margin-top:8px;color:#444;">${notes[colorLower]||""}</div>`;
+    }
     if (actionType === "kill") {
-      const lines = {
-        white: "Endurance Loss — target loses 1 Endurance rank and is dying; loses 1 rank per turn until stabilized.",
-        green: "E/S — Endurance Loss only if attack form is Edged (Slugfest) or Shooting; otherwise No Effect.",
-        yellow: "No effect.",
-        red: "No effect."
-      };
-      const esNote = (String(finalEffect).toLowerCase().includes("endurance loss"))
-        ? `<div style="color:#b71c1c;margin-top:6px;">Karma note: A hero who kills loses all Karma.</div>`
-        : "";
-
-      return `
-        <div style="padding:6px 10px;margin:6px 10px;background:#f1f8e9;border:1px solid #7cb342;border-radius:3px;">
-          <div style="font-weight:bold;">Kill Details</div>
-          <div>${lines[colorLower] || ""}</div>
-          ${effectsSuppressed ? `<div style="margin-top:6px;color:#b71c1c;"><strong>Note:</strong> No damage penetrated → Kill does not apply.</div>` : ""}
-          ${esNote}
-        </div>
-      `;
+      return `<div style="margin-top:8px;color:#444;">${String(finalEffect||"").replace(/E\/S/,"Edged/Shooting")}</div>`;
     }
-
     return "";
   }
-
-  // Helper method to estimate areas from Strength value
-  _strengthToAreas(strRank) {
-    // Official FASERIP land speed (areas per round) based on Strength rank name
-    const speedByRank = {
-      "Shift-0": 1,
-      "Feeble": 1,
-      "Poor": 2,
-      "Typical": 3,
-      "Good": 4,
-      "Excellent": 5,
-      "Remarkable": 6,
-      "Incredible": 7,
-      "Amazing": 8,
-      "Monstrous": 9,
-      "Unearthly": 10,
-      "Shift-X": 12,
-      "Shift-Y": 14,
-      "Shift-Z": 16,
-      "Class 1000": 32,
-      "Class 3000": 50,
-      "Class 5000": 100
-    };
-    
-    return speedByRank[strRank] || 1;
-  }
-
-  /**
- * Create a Stunned effect on the target
- */
-async _createStunnedEffect(targetUuid, targetName, duration) {
-  if (!targetUuid) {
-    console.warn("No target UUID provided for Stunned effect");
-    return;
-  }
-
-  try {
-    const resolved = await fromUuid(targetUuid);
-    const targetActor = resolved?.documentName === "Actor"
-      ? resolved
-      : (resolved?.documentName === "Token" ? resolved.actor : null);
-
-    if (!targetActor) {
-      console.warn(`Could not resolve actor for Stunned effect: ${targetName}`);
-      return;
-    }
-
-    // --- Convert "rounds" (your HUD input) to preset-aware seconds ---
-    const turnsInput = Math.max(0, Number(duration) || 0);
-    const te = game.modules.get("calendar-time-tracker")?.api?.timeEngine;
-    const secPerTurn = (te && typeof te.convertToSeconds === "function")
-      ? te.convertToSeconds(1, "turn")
-      : 6; // safe fallback for FASERIP
-    const secondsTotal = Math.floor(turnsInput * secPerTurn);
-
-    // Use the CANONICAL flag scope
-    const scope = globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faserip";
-
-    const effectData = {
-      name: `Stunned (${turnsInput} turn${turnsInput === 1 ? "" : "s"})`,
-      icon: "icons/svg/daze.svg",
-      origin: targetActor.uuid,
-      disabled: false,
-      duration: {
-        seconds: secondsTotal,
-        startTime: game.time?.worldTime ?? undefined
-      },
-      flags: {
-        [scope]: {
-          isStunned: true,
-          fromStunCheck: true,
-          unitLabel: "turn",           // ← CRITICAL: Set these flags!
-          unitLabelPlural: "turns"     // ← CRITICAL: Set these flags!
-        }
-      }
-    };
-
-    if (game.settings?.get?.("msh-faserip", "debugMode")) {
-      console.log("[FASERIP _createStunnedEffect]", {
-        targetName,
-        turnsInput,
-        secondsTotal,
-        effectData
-      });
-    }
-
-    const created = await Effects.applyStun(targetActor, { rounds: turnsInput, originUuid: targetActor.uuid });
-    ui.notifications.info(
-      `Stunned effect created for ${targetName} (${turnsInput} turn${turnsInput === 1 ? "" : "s"}).
-    `);
-
-    return created;
-  } catch (err) {
-    console.error("Failed to create Stunned effect:", err);
-  }
-}
-
-  // Create a Slam effect based on the already-rolled Universal Table color
-  async _createSlamEffect(ownerActor, prefill = {}, colorLower = "red") {
-    // Resolve target from prefill (supports token or actor UUID)
-    const targetUuid  = prefill?.targetUuid;
-    const targetDoc   = targetUuid ? await fromUuid(targetUuid) : null; // TokenDocument or Actor
-    const targetActor = targetDoc?.actor ?? targetDoc ?? null;
-
-    if (!targetActor) {
-      ui.notifications.warn("No target selected for Slam check.");
-      return null;
-    }
-
-    // If no penetration (and not borderline), caller should have gated this already.
-    const dmgThrough = Number(prefill?.dmgThrough ?? 0) || 0;
-    if (dmgThrough <= 0) {
-      ui.notifications.info("No penetrating damage; Slam does not apply.");
-      return null;
-    }
-
-    // Attacker Strength → estimate areas for Grand Slam
-    const strRank  = ownerActor?.system?.abilities?.strength?.rank  || "Typical";
-    const strValue = ownerActor?.system?.abilities?.strength?.value || 6;
-
-    // Map color → slam kind/flags (no extra roll; use the color we already rolled)
-    let kind = "No Slam";
-    let knockbackAreas = 0;
-    let prone = false;
-    let stagger = false;
-
-    switch (String(colorLower)) {
-      case "white":
-        kind = "Grand Slam";
-        knockbackAreas = this._strengthToAreas(strRank); // estimate by Strength rank
-        prone = true;
-        break;
-      case "green":
-        kind = "1 area";
-        knockbackAreas = 1;
-        prone = true;
-        break;
-      case "yellow":
-        kind = "Stagger";
-        stagger = true;
-        break;
-      case "red":
-      default:
-        kind = "No Slam";
-        break;
-    }
-
-    await Effects.applySlam(targetActor, { kind, knockbackAreas, prone, stagger });
-    ui.notifications.info(
-      `${targetActor.name}: ${kind}${knockbackAreas ? ` (${knockbackAreas} area${knockbackAreas>1?"s":""})` : ""}`
-    );
-
-    return { kind, knockbackAreas, prone, stagger, strRank, strValue };
-  }
-
-} // end of class CheckAction
+} // end class

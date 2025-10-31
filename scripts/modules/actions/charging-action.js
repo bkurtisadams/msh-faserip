@@ -502,6 +502,8 @@ export class ChargingAction extends BaseAction {
     damage: damageToTarget,
     attackForm: "charging",
     bypassArmor: true,
+    autoApply: !!this.opts?.autoApply,
+
     // Add prefill data for Slam/Stun checks
     prefillData: {
       dmgThrough: penetratingDamage,

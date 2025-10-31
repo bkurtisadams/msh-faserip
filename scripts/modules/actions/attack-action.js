@@ -1,4 +1,6 @@
 import { BaseAction } from "./base-action.js";
+import { resolveCombatMode } from "./action-dispatcher.js";
+
 import { 
   RANKS, getStrengthInfo, shiftRank, getAbilityInfo,
   rollWithKarmaAndHistory, buildResultGrid, buildActionsBox, bannerColors,
@@ -421,7 +423,12 @@ export class AttackAction extends BaseAction {
             damage: penetratingDamage,
             attackForm: attackForm,
             damageType: damageType,
-            bypassArmor: choice.bypassArmor || false
+            bypassArmor: choice.bypassArmor || false,
+            autoApply: !!this.opts?.autoApply,
+
+            autoSave: (typeof resolveCombatMode === "function" && targetActor)
+              ? (resolveCombatMode(targetActor) === "full")
+              : false,
           })
         : "";
 

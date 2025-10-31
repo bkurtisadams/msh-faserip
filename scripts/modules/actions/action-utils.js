@@ -4,6 +4,7 @@ import { calculateMitigation } from "../../rules/mitigation.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
 import { resolveCombatMode } from "./action-dispatcher.js";
 
+
 /** Action capability map — what rules permit by default */
 export const ACTION_CAPS = {
   "blunt-attack":   { multi:true,  reduceDamage:true,  lowerEffect:true  },  // Slugfest
@@ -495,7 +496,8 @@ export function buildActionsBox({
   targetUuid = "",
   targetName = "",
   targetStrength = "",
-  autoApply = false,  // full auto mode
+  autoApply = false,  // attacker-side auto apply (damage)
+  autoSave  = false,  // defender-side auto save (disable save chips)
   bypassArmor = false
 }) {
 
@@ -504,7 +506,7 @@ export function buildActionsBox({
     const base = "display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;font-size:13px;line-height:1.2;padding:4px 10px;border:1px solid #bbb;border-radius:4px;text-decoration:none;white-space:nowrap;";
     const style = enabled
       ? `${base}background:#fff;color:#333;cursor:pointer;`
-      : `${base}background:#f7f7f7;color:#333;cursor:not-allowed;opacity:.55;filter:grayscale(.3);`;
+        : `${base}background:#f7f7f7;color:#333;cursor:not-allowed;opacity:.55;filter:grayscale(.3);pointer-events:none;`;
     const key = label.toLowerCase().replace(/\s+/g, "-");
     return `<a class="faserip-chip" data-action="${key}" ${dataAttrs} ${enabled ? "" : 'aria-disabled="true"'} title="${title}" style="${style}">${label}</a>`;
   };
@@ -546,7 +548,8 @@ export function buildActionsBox({
       chip(
         "Resolve Slam",
         "Open Slam dialog using penetrating damage",
-        true,
+        //true,
+        !autoApply,
         `data-check="slam" data-attack-form="${attackForm}" data-dmg="${dmgPen}" data-attacker-uuid="${actorUuid}" ${pulled ? 'data-pulled="true"' : ""} ${prefillAttr}`
       )
     );
@@ -558,7 +561,8 @@ export function buildActionsBox({
       chip(
         "Resolve Stun",
         "Open Stun dialog using penetrating damage",
-        true,
+        //true,
+        !autoApply,
         `data-check="stun"
         data-attack-form="${attackForm}"
         data-damage-type="${damageType}"
@@ -575,7 +579,8 @@ export function buildActionsBox({
       chip(
         "Resolve Kill",
         "Open Kill check dialog",
-        true,
+        //true,
+        !autoApply,
         `data-check="kill"
         data-attack-form="${attackForm}"
         data-damage-type="${damageType}"
@@ -637,7 +642,8 @@ export function buildActionsBox({
       chip(
         "Force Nullify Save",
         "Target makes an Endurance FEAT vs power intensity",
-        true,
+        //true,
+        !autoApply,
         `data-action="force-save-nullify" data-attacker-uuid="${actorUuid}" ${targetBits} ${intensityAttr}`
       )
     );
@@ -1556,6 +1562,9 @@ export async function applyNullifyToTarget(targetActor, attacker, { originUuid =
  * Post a chat card prompting for a death save when a character hits 0 Health
  */
 export async function postDeathSavePrompt(actor) {
+  const isFull = resolveCombatMode(actor) === "full";
+  const deathDisabledStyle = isFull ? "pointer-events:none;opacity:.55;filter:grayscale(.4);cursor:not-allowed;" : "";
+
   const content = `
     <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
       <div style="padding:5px 10px;border-bottom:1px solid #c0c0c0;font-size:1.1em;color:#8b0000;">
@@ -1571,7 +1580,7 @@ export async function postDeathSavePrompt(actor) {
         <a class="faserip-chip" 
            data-action="death-save"
            data-actor-uuid="${actor.uuid}"
-           style="display:inline-block;font-size:13px;font-weight:bold;padding:6px 14px;border:1px solid #c62828;border-radius:3px;background:#fff;color:#c62828;text-decoration:none;cursor:pointer;">
+           style="display:inline-block;font-size:13px;font-weight:600; ... ;cursor:pointer; ${deathDisabledStyle}">
           Roll Death Save
         </a>
       </div>

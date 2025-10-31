@@ -69,7 +69,9 @@ export class GrapplingAction extends AttackAction {
       targetUuid: choice.targetUuid,
       targetName: choice.targetName,
       targetStrength: choice.targetStrength,
-      actorUuid: actor.uuid
+      actorUuid: actor.uuid,
+      autoApply: !!this.opts?.autoApply,
+
     });
 
     const cardHtml = this._buildChatCard({

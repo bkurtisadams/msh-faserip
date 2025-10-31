@@ -114,7 +114,9 @@ export class GrabbingAction extends AttackAction {
 
     const actions = buildActionsBox({
     grabbingBreak,  // ← NEW: use grabbing break instead of breaking feat
-    actorUuid: actor.uuid
+    actorUuid: actor.uuid,
+    autoApply: !!this.opts?.autoApply,
+
     });
     // Effect blocks for the four results (text-only; no auto-ops)
     const effectBlock = this._effectBlock(String(effectResult).toLowerCase(), strength, choice);

@@ -1,5 +1,7 @@
 // scripts/modules/actions/force-action.js
 import { RangedAttackAction } from "./ranged-attack-action.js";
+import { resolveCombatMode } from "./action-dispatcher.js";
+
 import { 
   applyDamageToTargets,
   attachAutoFillRange,
@@ -412,7 +414,11 @@ export class ForceAction extends RangedAttackAction {
             damage: afterArmor,
             attackForm: "force",
             damageType: dmgType,
-            autoApply: this.opts?.autoApply
+            autoApply: this.opts?.autoApply,
+
+            autoSave: (typeof resolveCombatMode === "function" && tActor)
+              ? (resolveCombatMode(tActor) === "full")
+              : false,
           })
         : "";
 

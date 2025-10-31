@@ -1,5 +1,7 @@
 import { RangedAttackAction } from "./ranged-attack-action.js";
 import { attachAutoFillRange } from "./action-utils.js";
+import { resolveCombatMode } from "./action-dispatcher.js";
+
 import {
   buildModeSelector,
   getAbilityInfo,
@@ -370,7 +372,12 @@ export class ThrowingEdgedAction extends RangedAttackAction {
       armorPiercing: Number(choice.armorPiercing || 0),
       armorPiercingCS: Number(choice.armorPiercingCS || 0),
       apMode: choice.apMode || "value",
-      autoApply: !!this.opts?.autoApply
+      autoApply: !!this.opts?.autoApply,
+
+      // ← 3D goes here:
+      autoSave: (game.user?.targets?.size === 1 && typeof resolveCombatMode === "function")
+        ? (resolveCombatMode(game.user.targets.first()?.actor) === "full")
+        : false,
     });
 
     const contextHtml = `

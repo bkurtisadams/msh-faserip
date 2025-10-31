@@ -67,11 +67,35 @@ export function installActionChatHandlers() {
           const deathBtns = html.find('[data-action="death-save"]');
 
           // Per-chip auto run (Stun/Slam/Kill). Chips from attacks include per-target prefill.
+          // Auto-run Stun/Slam/Kill per defender in Full mode
           for (const el of chips.toArray()) {
-            const checkType  = el.dataset.check;             // "stun"|"slam"|"kill"|"escape"
-            if (checkType === "escape") continue;            // escape isn't a save; leave manual
+            const checkType  = el.dataset.check;                // "stun"|"slam"|"kill"|"escape"
+            if (checkType === "escape") continue;               // not a save
+
             const attackForm = el.dataset.attackForm || "blunt";
 
+            // Resolve defender (preferred in this order)
+            let saveActor = null;
+            const saveUuid = el.dataset.targetUuid
+                          || el.dataset.defenderUuid
+                          || (el.dataset.prefill ? (JSON.parse(el.dataset.prefill.replaceAll("&apos;","'")).targetUuid || "") : "")
+                          || "";
+
+            if (saveUuid) {
+              try {
+                const doc = await fromUuid(saveUuid);
+                saveActor = doc?.actor ?? doc ?? null;
+              } catch (_){}
+            }
+            if (!saveActor && game.user?.targets?.size === 1) {
+              saveActor = game.user.targets.first()?.actor ?? null;
+            }
+            if (!saveActor) continue;
+
+            // Only auto-run if the DEFENDER is in Full mode
+            if (resolveCombatMode(saveActor) !== "full") continue;
+
+            // Build prefill if present
             let prefill = {};
             try {
               if (el.dataset.prefill) {
@@ -79,32 +103,49 @@ export function installActionChatHandlers() {
               }
             } catch (_){}
 
-            // If no explicit target in prefill, use single targeted token (if any)
-            if (!prefill.targetUuid && game.user?.targets?.size === 1) {
-              const t = game.user.targets.first();
-              prefill.targetUuid    = t?.actor?.uuid ?? t?.document?.uuid ?? "";
-              prefill.targetName    = t?.name ?? "Target";
-              prefill.targetEndRank = t?.actor?.system?.abilities?.endurance?.rank || "Good";
-              prefill.dmgThrough    = Number(el.dataset.dmg || 0);
+            // Ensure dmgThrough is available (slam/stun gates use it)
+            if (prefill && typeof prefill.dmgThrough === "undefined") {
+              prefill.dmgThrough = Number(el.dataset.dmg || 0);
+            }
+            if (!prefill.targetUuid && saveActor?.uuid) {
+              prefill.targetUuid = saveActor.uuid;
+              prefill.targetName = saveActor.name || "Target";
+              prefill.targetEndRank = saveActor?.system?.abilities?.endurance?.rank || "Good";
             }
 
             await ActionDispatcher.roll(checkType, {
-              actor: ownerActor,
-              opts: { attackForm, prefill }
+              actor: saveActor,
+              opts: { attackForm, prefill, autoApply: true }
             });
           }
+
 
           // Nullify / Force Save auto-run if the message indicates a save is required
           const f = message?.flags?.[SCOPE] ?? {};
           if (forceBtns.length && f?.requiresSave) {
-            await ActionDispatcher.roll("save-nullify", {
-              actor: ownerActor,
-              opts: {
-                ability:   f.saveAbility   || "endurance",
-                intensity: f.saveIntensity || "power-rank", // or "fixed-rank"
-                fixedRank: f.saveFixedRank || ""
-              }
-            });
+            // Prefer the flagged defender, else first selected target
+            let saveActor = null;
+            const defUuid = f?.defenderUuid || f?.targetUuid || "";
+            if (defUuid) {
+              try {
+                const doc = await fromUuid(defUuid);
+                saveActor = doc?.actor ?? doc ?? null;
+              } catch (_){}
+            }
+            if (!saveActor && game.user?.targets?.size === 1) {
+              saveActor = game.user.targets.first()?.actor ?? null;
+            }
+            if (saveActor && resolveCombatMode(saveActor) === "full") {
+              await ActionDispatcher.roll("save-nullify", {
+                actor: saveActor,
+                opts: {
+                  ability:   f.saveAbility   || "endurance",
+                  intensity: f.saveIntensity || "power-rank",
+                  fixedRank: f.saveFixedRank || "",
+                  autoApply: true
+                }
+              });
+            }
           }
 
           // Death Save auto-run
@@ -139,8 +180,15 @@ export function installActionChatHandlers() {
 
     // 1) Stun/Slam/Kill/Escape chips
     html.on("click", "a.faserip-chip[data-check]", async (ev) => {
+        // Respect disabled state
+        const el = ev.currentTarget;
+        if (el.getAttribute?.("aria-disabled") === "true" || el.dataset.autoDisabled === "1") {
+          ev.preventDefault();
+          return;
+        }
+
       ev.preventDefault();
-      const el = ev.currentTarget;
+      //const el = ev.currentTarget;
 
       const checkType    = el.dataset.check;                // "stun" | "slam" | "kill" | "escape"
       const attackForm   = el.dataset.attackForm || "blunt";
@@ -406,6 +454,13 @@ export function installActionChatHandlers() {
 
     // 6) Force Save (Nullification / RAW: Endurance vs Power Rank)
     html.on("click", '[data-action="force-save"], [data-action="force-save-nullify"]', async (ev) => {
+      // Respect disabled state
+      const el = ev.currentTarget;
+      if (el.getAttribute?.("aria-disabled") === "true" || el.dataset.autoDisabled === "1") {
+        ev.preventDefault();
+        return;
+      }
+
       ev.preventDefault();
       const btn = ev.currentTarget;
       const $msg = $(btn).closest(".message");
@@ -579,6 +634,13 @@ export function installActionChatHandlers() {
 
     // 10) Death Save
     html.on("click", '[data-action="death-save"]', async (ev) => {
+      // Respect disabled state
+      const el = ev.currentTarget;
+      if (el.getAttribute?.("aria-disabled") === "true" || el.dataset.autoDisabled === "1") {
+        ev.preventDefault();
+        return;
+      }
+
       ev.preventDefault();
       const btn = ev.currentTarget;
       const actorUuid = btn.dataset.actorUuid;
