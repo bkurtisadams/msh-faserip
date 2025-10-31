@@ -23,6 +23,46 @@ export class DeathSaveAction extends BaseAction {
     const endurance = getAbilityInfo(actor, "endurance");
     const effects = effectsFor("kill"); // Reuse Kill column effects
 
+    // --- AUTO MODE FAST-PATH: Full Auto skips dialog & rolls immediately ---
+    if (this?.opts?.autoApply === true) {
+      const actor = this.actor;
+      const endurance = {
+        rank: actor.system?.abilities?.endurance?.rank || "Good",
+        value: actor.system?.abilities?.endurance?.value || 8
+      };
+      const effectiveRank = shiftRank(endurance.rank, Number(this.opts?.featCs ?? 0));
+
+      const roll = await (new Roll("1d100")).evaluate();
+      // Auto path: skip dice animation; set toMessage() if you want a visible roll line
+      const needTo100  = Math.max(0, 100 - roll.total);
+      const cappedTotal = Math.min(100, roll.total); // no karma in auto path
+
+      const color = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
+      const survives = String(color).toLowerCase() !== "white";  // white = fails death save per your rules text
+
+      const resultHtml = `
+        <div style="background:#fafafa;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
+          <div style="padding:5px 10px;border-bottom:1px solid #c0c0c0;font-size:1.1em;color:#4e342e;">
+            <strong>${actor.name} — Death Save</strong>
+          </div>
+          <div style="padding:8px 10px;font-size:.95em;">
+            <div>Endurance: ${endurance.rank}${this.opts?.featCs ? ` — Shift ${this.opts.featCs} → ${effectiveRank}` : ""}</div>
+            <div>Roll: ${roll.total}</div>
+            <div style="margin-top:6px;padding:6px;border-radius:3px;background:${bannerColors(survives ? 'green' : 'red').bg};color:${bannerColors(survives ? 'green' : 'red').fg};">
+              RESULT: ${survives ? "SURVIVES" : "FAILS"}
+            </div>
+          </div>
+        </div>
+      `;
+      await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor }), content: resultHtml });
+
+      if (!survives) {
+        await Effects.applyDyingEffect(actor);
+      }
+      return; // ← skip dialog path
+    }
+    // --- END AUTO MODE FAST-PATH ---
+
     // Simple dialog - just endurance and shift
     const dialogHtml = `
     <div style="margin-bottom:12px;padding:8px;background:#ffebee;border:1px solid #ef5350;border-radius:3px;">

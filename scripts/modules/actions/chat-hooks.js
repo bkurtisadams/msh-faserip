@@ -1,5 +1,7 @@
 // scripts/modules/actions/chat-hooks.js
 import { ActionDispatcher } from "./action-dispatcher.js";
+import { resolveCombatMode } from "./action-dispatcher.js";
+
 import { openBreakingFeatDialog } from "./breaking-feat.js";
 import { openGrabbingBreakDialog } from "./grabbing-break.js";
 import { openCollisionDamageDialog } from "./collision-damage.js";
@@ -42,6 +44,82 @@ export function installActionChatHandlers() {
     } catch (err) {
       console.error("Auto-apply failed:", err);
     }
+
+    // --- NEW: Full-Auto auto-rolling of saves (Stun/Slam/Kill/Nullify/Death) ---
+    try {
+      const alreadyChecks = message?.flags?.[SCOPE]?.autoChecksDone === true;
+      if (!alreadyChecks) {
+        // Derive an "owner" actor (attacker or speaker)
+        let ownerActor = null;
+        try {
+          const attackerUuid = message?.flags?.[SCOPE]?.attackerUuid || message?.speaker?.actor;
+          if (attackerUuid) {
+            const doc = await fromUuid(attackerUuid);
+            ownerActor = doc?.actor ?? doc ?? null;
+          }
+        } catch (_){}
+        ownerActor = ownerActor ?? game.actors?.get(message.speaker?.actor) ?? game.user?.character ?? null;
+
+        const mode = resolveCombatMode(ownerActor);
+        if (mode === "full") {
+          const chips     = html.find('a.faserip-chip[data-check]');
+          const forceBtns = html.find('[data-action="force-save"], [data-action="force-save-nullify"]');
+          const deathBtns = html.find('[data-action="death-save"]');
+
+          // Per-chip auto run (Stun/Slam/Kill). Chips from attacks include per-target prefill.
+          for (const el of chips.toArray()) {
+            const checkType  = el.dataset.check;             // "stun"|"slam"|"kill"|"escape"
+            if (checkType === "escape") continue;            // escape isn't a save; leave manual
+            const attackForm = el.dataset.attackForm || "blunt";
+
+            let prefill = {};
+            try {
+              if (el.dataset.prefill) {
+                prefill = JSON.parse(el.dataset.prefill.replaceAll("&apos;","'"));
+              }
+            } catch (_){}
+
+            // If no explicit target in prefill, use single targeted token (if any)
+            if (!prefill.targetUuid && game.user?.targets?.size === 1) {
+              const t = game.user.targets.first();
+              prefill.targetUuid    = t?.actor?.uuid ?? t?.document?.uuid ?? "";
+              prefill.targetName    = t?.name ?? "Target";
+              prefill.targetEndRank = t?.actor?.system?.abilities?.endurance?.rank || "Good";
+              prefill.dmgThrough    = Number(el.dataset.dmg || 0);
+            }
+
+            await ActionDispatcher.roll(checkType, {
+              actor: ownerActor,
+              opts: { attackForm, prefill }
+            });
+          }
+
+          // Nullify / Force Save auto-run if the message indicates a save is required
+          const f = message?.flags?.[SCOPE] ?? {};
+          if (forceBtns.length && f?.requiresSave) {
+            await ActionDispatcher.roll("save-nullify", {
+              actor: ownerActor,
+              opts: {
+                ability:   f.saveAbility   || "endurance",
+                intensity: f.saveIntensity || "power-rank", // or "fixed-rank"
+                fixedRank: f.saveFixedRank || ""
+              }
+            });
+          }
+
+          // Death Save auto-run
+          if (deathBtns.length) {
+            await ActionDispatcher.roll("death-save", { actor: ownerActor });
+          }
+
+          await message.setFlag(SCOPE, "autoChecksDone", true); // idempotent guard
+        }
+      }
+    } catch (err) {
+      console.error("Auto-save rolling failed:", err);
+    }
+    // --- END auto-rolling saves ---
+
 
     // --- existing code below stays as-is ---
 

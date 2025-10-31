@@ -42,6 +42,171 @@ export class CheckAction extends BaseAction {
 
     // Extract prefill data from opts (passed from chat hook)
     const prefill = this.opts.prefill || {};
+
+    // --- AUTO MODE FAST-PATH: skip dialog & roll immediately when Full Auto ---
+    if (this?.opts?.autoApply === true) {
+      // Build a synthetic "choice" as the dialog would have returned
+      let targetName     = prefill.targetName || "";
+      let targetEndRank  = prefill.targetEndRank || "Good";
+      let targetUuid     = prefill.targetUuid || "";
+      let dmgThrough     = Number(prefill.dmgThrough ?? 0);
+      let attackForm     = prefill.attackForm || (this.opts?.attackForm || "blunt");
+
+      // If no explicit target, use a single targeted token (if exactly one)
+      if (!targetUuid && game.user?.targets?.size === 1) {
+        const t = game.user.targets.first();
+        targetUuid    = t?.actor?.uuid ?? t?.document?.uuid ?? "";
+        targetName    = t?.name ?? "Target";
+        targetEndRank = t?.actor?.system?.abilities?.endurance?.rank || targetEndRank;
+        // If dmgThrough wasn't prefilled, fall back to 0 (borderline toggle is handled below)
+        if (!Number.isFinite(dmgThrough)) dmgThrough = 0;
+      }
+
+      // If still no target context, fall back to the dialog path
+      if (targetUuid || targetName) {
+        const choice = {
+          targetName,
+          targetEndRank,
+          targetUuid,
+          shift: Number(this.opts?.featCs ?? 0),
+          dmgThrough,
+          borderline: !!this.opts?.borderline,
+          karma: 0,
+          attackForm,
+          // Skip dice animation by default for auto path; change to false if you prefer animations
+          skipDice: true
+        };
+
+        // ---- Below mirrors the normal post-dialog resolution path ----
+        const effectsSuppressed = !canEffectsApply(choice.dmgThrough, {
+          borderline: choice.borderline,
+          ignoreDamageGate: this.opts?.ignoreDamageGate
+        });
+
+        const effectiveEndRank = shiftRank(choice.targetEndRank, choice.shift);
+
+        // Roll & (optionally) show the roll
+        const roll = await (new Roll("1d100")).evaluate();
+        if (!choice.skipDice) {
+          await roll.toMessage({
+            speaker: ChatMessage.getSpeaker({ actor: this.actor }),
+            flavor: `${choice.targetName} rolls Endurance vs ${labelFor(this.actionType)}`,
+            rollMode: game.settings.get("core", "rollMode")
+          });
+        }
+        const needTo100  = Math.max(0, 100 - roll.total);
+        const karmaSpend = 0; // auto path defaults to 0 karma
+        const cappedTotal = Math.min(100, roll.total + karmaSpend);
+
+        const color = game.msh.rollUniversalTable(effectiveEndRank, cappedTotal);
+        const colorLower = String(color||"").toLowerCase();
+
+        // Determine effect label, with Kill using kill-resolver
+        let finalEffect = effects[colorLower] || color;
+        if (this.actionType === "kill") {
+          const killContext = getKillContextFromAttackForm(choice.attackForm);
+          const killResult  = resolveKillFeat(colorLower, killContext);
+          finalEffect = killResult.label;
+
+          // Apply DYING on Endurance Loss if not suppressed
+          if (!effectsSuppressed && String(killResult?.label || "").toLowerCase().includes("endurance loss")) {
+            let targetActor = null;
+            try {
+              if (choice?.targetUuid) {
+                const doc = await fromUuid(choice.targetUuid);
+                targetActor = doc?.actor ?? doc ?? null;
+              }
+            } catch (_) {}
+            if (!targetActor && game.user?.targets?.size === 1) {
+              targetActor = game.user.targets.first()?.actor ?? null;
+            }
+            if (targetActor) {
+              await Effects.applyDyingEffect(targetActor);
+            }
+          }
+        }
+
+        // Nullify: on save failure apply effect
+        const isSaveNullify =
+          (this?.actionId === "save-nullify") ||
+          (this?.type === "save-nullify") ||
+          (this?.opts?.actionId === "save-nullify") ||
+          (typeof this.actionType !== "undefined" && this.actionType === "save-nullify");
+
+        if (isSaveNullify && !effectsSuppressed) {
+          let targetActor = null;
+          try {
+            if (choice?.targetUuid) {
+              const doc = await fromUuid(choice.targetUuid);
+              targetActor = doc?.actor ?? doc ?? null;
+            }
+          } catch (_){}
+          if (!targetActor && game.user?.targets?.size === 1) {
+            targetActor = game.user.targets.first()?.actor ?? null;
+          }
+          if (targetActor) {
+            const attacker = this?.actor ?? null;
+            const endRank  = choice?.targetEndRank || "Typical";
+            let intensityRank = endRank;
+            if (this?.opts?.powerRankName) intensityRank = this.opts.powerRankName;
+            if (this?.opts?.intensity === "fixed-rank" && this?.opts?.fixedRank) intensityRank = this.opts.fixedRank;
+
+            await Nullify.resolveAndApply(attacker, targetActor, {
+              endRank,
+              intensityRank,
+              rolledColor: colorLower,
+              originUuid: this?.opts?.originUuid ?? null
+            });
+          }
+        }
+
+        // Stun extra (white result): roll 1d10 for duration
+        let stunDuration = null, rawStunDuration = null;
+        if (this.actionType === "stun" && colorLower === "white" && !effectsSuppressed) {
+          const durationRoll = await (new Roll("1d10")).evaluate();
+          rawStunDuration = durationRoll.total;
+          const maxStunDuration = game.settings.get('msh-faserip', 'maxStunDuration') || 10;
+          stunDuration = Math.min(rawStunDuration, maxStunDuration);
+        }
+
+        // Build explanatory block & final chat card
+        const extraHtml = this._extraExplanationHtml({
+          actionType: this.actionType,
+          choice,
+          attackerStr,
+          colorLower,
+          effectiveEndRank,
+          finalEffect,
+          effectsSuppressed,
+          stunDuration,
+          rawStunDuration
+        });
+
+        const shortAction = String(labelFor(this.actionType)).replace(/\s*check$/i, "");
+        const cardHtml = `
+          <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
+            <div style="padding:5px 10px;border-bottom:1px solid #c0c0c0;font-size:1.1em;color:#4e342e;">
+              <strong>${this.actor.name} - ${shortAction} Check vs ${choice.targetName}</strong>
+            </div>
+            <div style="padding:5px 10px;font-size:.9em;">
+              <div>Target Endurance: ${choice.targetEndRank}${choice.shift ? ` — Shift ${choice.shift} → ${effectiveEndRank}` : ""}</div>
+              <div>Attack Form: ${choice.attackForm}${this.actionType==="slam" ? ` — Attacker STR: ${attackerStr.rank} (${attackerStr.value})` : ""}</div>
+              <div>Damage Penetrated: ${choice.dmgThrough}${choice.borderline ? " (borderline allowed)" : ""}</div>
+              <div>Roll: ${roll.total}${karmaSpend ? ` + Karma ${karmaSpend} = ${cappedTotal}` : ""}</div>
+              <div style="margin-top:6px;padding:6px;border-radius:3px;background:${bannerColors(colorLower).bg};color:${bannerColors(colorLower).fg};">
+                RESULT: ${String(color).toUpperCase()} — ${String(finalEffect).toUpperCase()}
+              </div>
+              ${extraHtml}
+            </div>
+          </div>
+        `;
+
+        await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor: this.actor }), content: cardHtml });
+        return; // ← IMPORTANT: stop here; skip dialog path entirely
+      }
+    }
+    // --- END AUTO MODE FAST-PATH ---
+
     
     // ADD THIS PERMISSION CHECK HERE (right after prefill is declared)
     // If there's a targeted NPC, only GM can roll checks
