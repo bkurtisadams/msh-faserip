@@ -194,7 +194,7 @@ export async function resolveSlamFeatWithRoll(target, attackerStrength = 0) {
 
   // Create and roll a Foundry Roll object
   const roll = new Roll("1d100");
-  await roll.evaluate({async: true});
+  await roll.evaluate();
   await roll.toMessage({
     flavor: `Slam Endurance FEAT: ${target.name} (${enduranceRank})`
   });

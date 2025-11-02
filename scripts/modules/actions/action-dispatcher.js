@@ -53,7 +53,11 @@ const CANONICAL_CODES = {
   "catching":       "Ca",
   "stun":           "St",
   "slam":           "Sl",
-  "kill":           "Ki"
+  "kill":           "Ki",
+  "death": "death-save",
+  "deathsave": "death-save",
+  "death-save": "death-save"
+
 };
 
 // Build a robust alias map that matches either code or long name, any case

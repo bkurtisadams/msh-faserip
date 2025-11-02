@@ -614,350 +614,6 @@ export class CombatHandler {
         try { game.msh?.playCombatSFX?.(opts); } catch (_e) {}
         }
 
-    /* static async playCombatSFX(damageType, sourceName, rollResult, options = {}) {
-        console.log("=== playCombatSFX Debug Start ===");
-        console.log("Input parameters:");
-        console.log("  damageType:", damageType);
-        console.log("  sourceName:", sourceName);
-        console.log("  rollResult:", rollResult);
-        console.log("  options:", options);
-        
-        let soundPath = null;
-        let volume = 0.8; // default volume
-        
-        // Determine if this was a hit or miss
-        const isHit = rollResult.toLowerCase() !== "white";
-        const isMiss = rollResult.toLowerCase() === "white";
-        
-        console.log("Hit/Miss status:", isHit ? "HIT" : "MISS");
-        
-        // Determine sound based on damage type and source
-        const lowerDamageType = damageType.toLowerCase();
-        const lowerSourceName = sourceName.toLowerCase();
-        
-        console.log("Converted to lowercase:");
-        console.log("  lowerDamageType:", lowerDamageType);
-        console.log("  lowerSourceName:", lowerSourceName);
-        
-        // Weapon-specific sounds (check most specific first)
-        if (lowerSourceName.includes("sub-machine gun") || lowerSourceName.includes("submachine gun")) {
-            console.log("Match found: sub-machine gun");
-            soundPath = isHit ? "systems/msh-faserip/assets/sfx/submachine-gun.wav" : "systems/msh-faserip/assets/sfx/submachine-gun-miss.wav";
-        } else if (lowerSourceName.includes("machine gun")) {
-            console.log("Match found: machine gun");
-            soundPath = isHit ? "systems/msh-faserip/assets/sfx/machine-gun.wav" : "systems/msh-faserip/assets/sfx/machine-gun-miss.wav";
-        } else if (lowerSourceName.includes("rifle")) {
-            console.log("Match found: rifle");
-            soundPath = isHit ? "systems/msh-faserip/assets/sfx/rifle.wav" : "systems/msh-faserip/assets/sfx/rifle-miss.wav";
-        } else if (lowerSourceName.includes("shotgun")) {
-            console.log("Match found: shotgun");
-            soundPath = isHit ? "systems/msh-faserip/assets/sfx/shotgun.wav" : "systems/msh-faserip/assets/sfx/shotgun-miss.wav";
-        } else if (lowerSourceName.includes("pistol") || lowerSourceName.includes("gun")) {
-            console.log("Match found: pistol/gun");
-            soundPath = isHit ? "systems/msh-faserip/assets/sfx/gunshot.wav" : "systems/msh-faserip/assets/sfx/gunshot-miss.wav";
-        }
-        // Damage type sounds (fallback)
-        else if (lowerDamageType.includes("shooting")) {
-            console.log("Match found: shooting damage type");
-            soundPath = isHit ? "systems/msh-faserip/assets/sfx/gunshot.wav" : "systems/msh-faserip/assets/sfx/gunshot-miss.wav";
-        } else if (lowerDamageType.includes("blunt")) {
-            console.log("Match found: blunt damage type");
-            soundPath = isHit ? "systems/msh-faserip/assets/sfx/punch.wav" : "systems/msh-faserip/assets/sfx/punch-miss.wav";
-        } else if (lowerDamageType.includes("edged")) {
-            console.log("Match found: edged damage type");
-            soundPath = isHit ? "systems/msh-faserip/assets/sfx/blade.wav" : "systems/msh-faserip/assets/sfx/blade-miss.wav";
-        } else if (lowerDamageType.includes("energy-fire")) {
-            console.log("Match found: energy-fire damage type");
-            soundPath = isHit ? "systems/msh-faserip/assets/sfx/fire-blast.wav" : "systems/msh-faserip/assets/sfx/fire-blast-miss.wav";
-        } else if (lowerDamageType.includes("energy-energy")) {
-            console.log("Match found: energy-energy damage type");
-            soundPath = isHit ? "systems/msh-faserip/assets/sfx/lightning_bolt.wav" : "systems/msh-faserip/assets/sfx/lightning_bolt-miss.wav";
-            volume = 1.0; // Make lightning louder
-        } else {
-            console.log("No weapon or damage type match found");
-            
-            // Check for energy damage type or source
-            const energyTypes = ['energy', 'electric', 'electricity', 'lightning', 'plasma'];
-            const hasEnergyDamage = energyTypes.some(type => lowerDamageType.includes(type));
-            const hasEnergySource = energyTypes.some(type => lowerSourceName.includes(type));
-            
-            if (hasEnergyDamage || hasEnergySource) {
-                console.log("Energy type detected - using electric-impact");
-                soundPath = isHit ? "systems/msh-faserip/assets/sfx/electric-impact.mp3" : "systems/msh-faserip/assets/sfx/near-miss-swing-whoosh-5.wav";
-            } else {
-                // Generic hit/miss sounds as final fallback
-                if (isHit) {
-                    soundPath = "systems/msh-faserip/assets/sfx/punch.wav";
-                } else {
-                    soundPath = "systems/msh-faserip/assets/sfx/near-miss-swing-whoosh-5.wav";
-                }
-            }
-        }
-        
-        console.log("Initial soundPath:", soundPath);
-        
-        // Play different sounds for critical results (only for hits)
-        if (rollResult.toLowerCase() === "red" && soundPath && isHit) {
-            console.log("Red result detected, checking for critical version");
-            const criticalPath = soundPath.replace(".wav", "-critical.wav").replace(".ogg", "-critical.ogg");
-            console.log("Critical path would be:", criticalPath);
-            
-            if (await this.soundFileExists(criticalPath)) {
-                console.log("Critical version exists, using it");
-                soundPath = criticalPath;
-                volume = Math.min(volume * 1.2, 1.0); // Boost volume for critical hits
-            } else {
-                console.log("Critical version does not exist, keeping original");
-            }
-        }
-        
-        // Handle special ammunition (only for hits)
-        if (options.ammoType === "explosive" && isHit) {
-            console.log("Explosive ammo detected, overriding sound");
-            soundPath = "systems/msh-faserip/sounds/explosion.wav";
-            volume = 1.0;
-        }
-        
-        console.log("Final soundPath:", soundPath);
-        console.log("Final volume:", volume);
-        
-        if (soundPath) {
-            console.log("Attempting to play sound:", soundPath, "at volume:", volume);
-            try {
-                await foundry.audio.AudioHelper.play({ src: soundPath, volume: volume, autoplay: true }, true);
-                console.log("Sound play command executed successfully");
-            } catch (error) {
-                console.error("Error playing sound:", error);
-            }
-        } else {
-            console.log("No sound to play - soundPath is null");
-        }
-        
-        console.log("=== playCombatSFX Debug End ===");
-    } */
-
-    static async soundFileExists(path) {
-        try {
-            const response = await fetch(path, { method: 'HEAD' });
-            return response.ok;
-        } catch {
-            return false;
-        }
-    }
-
-    /**
-     * Rolls a resistance FEAT against incoming damage
-     * @param {Object} target - The target with resistance
-     * @param {String} resistanceType - Type of resistance (e.g., "physical", "fire")
-     * @param {Number} resistanceValue - Rank value of the resistance
-     * @param {Number} damageIntensity - The intensity to resist against
-     * @param {String} sourceName - Name of the attack source
-     * @returns {Object} { success: boolean, resultText: string }
-     */
-    /* static async rollResistanceFeat(target, resistanceType, resistanceValue, damageIntensity, sourceName) {
-        const targetActor = target.actor || target;
-        
-        console.log("Rolling resistance FEAT for:", targetActor.name);
-        console.log("Resistance type:", resistanceType, "Value:", resistanceValue);
-        console.log("Damage intensity:", damageIntensity);
-        
-        // Find the resistance rank name from the value
-        let resistanceRank = "Typical";
-        for (const [rankName, rankValue] of Object.entries(CONFIG.FASERIP.rankValues)) {
-            if (rankValue === resistanceValue) {
-                resistanceRank = rankName;
-                break;
-            }
-        }
-        
-        // Special handling for specific resistance types
-        let featRank = resistanceRank;
-        let featValue = resistanceValue;
-        
-        // Toxin, Emotion, Mental, and Disease resistances have minimum ranks
-        const resistanceTypeLower = resistanceType.toLowerCase();
-        
-        if (resistanceTypeLower.includes("toxin")) {
-            // Toxin resistance is minimum Endurance +1CS
-            const enduranceValue = targetActor.system.abilities.endurance.value || 0;
-            if (resistanceValue < enduranceValue) {
-                featValue = enduranceValue + 10; // Approximate +1CS
-                // Find the new rank
-                for (const [rankName, rankValue] of Object.entries(CONFIG.FASERIP.rankValues)) {
-                    if (rankValue >= featValue) {
-                        featRank = rankName;
-                        break;
-                    }
-                }
-            }
-        } else if (resistanceTypeLower.includes("emotion")) {
-            // Emotion resistance is minimum Intuition +1CS
-            const intuitionValue = targetActor.system.abilities.intuition.value || 0;
-            if (resistanceValue < intuitionValue) {
-                featValue = intuitionValue + 10;
-                for (const [rankName, rankValue] of Object.entries(CONFIG.FASERIP.rankValues)) {
-                    if (rankValue >= featValue) {
-                        featRank = rankName;
-                        break;
-                    }
-                }
-            }
-        } else if (resistanceTypeLower.includes("mental") && !resistanceTypeLower.includes("magical")) {
-            // Mental resistance is minimum Psyche +1CS
-            const psycheValue = targetActor.system.abilities.psyche.value || 0;
-            if (resistanceValue < psycheValue) {
-                featValue = psycheValue + 10;
-                for (const [rankName, rankValue] of Object.entries(CONFIG.FASERIP.rankValues)) {
-                    if (rankValue >= featValue) {
-                        featRank = rankName;
-                        break;
-                    }
-                }
-            }
-        } else if (resistanceTypeLower.includes("disease")) {
-            // Disease resistance is minimum Endurance +1CS
-            const enduranceValue = targetActor.system.abilities.endurance.value || 0;
-            if (resistanceValue < enduranceValue) {
-                featValue = enduranceValue + 10;
-                for (const [rankName, rankValue] of Object.entries(CONFIG.FASERIP.rankValues)) {
-                    if (rankValue >= featValue) {
-                        featRank = rankName;
-                        break;
-                    }
-                }
-            }
-        }
-        
-        // Get available Karma
-        const availableKarma = targetActor.system.attributes.karma.value || 0;
-        
-        // Create dialog content
-        const dialogContent = `
-            <div style="text-align: center;">
-                <h2>${targetActor.name} - ${resistanceType.charAt(0).toUpperCase() + resistanceType.slice(1)} Resistance FEAT</h2>
-                <p>Attack from <strong>${sourceName}</strong> requires a resistance FEAT roll.</p>
-                <div style="margin: 10px 0;">
-                    <p>Resistance Rank: <strong>${featRank}</strong> (${featValue})</p>
-                    <p>Damage Intensity: <strong>${damageIntensity}</strong></p>
-                    <hr style="margin: 10px 0;">
-                    <p style="font-size: 0.9em; color: #666;">
-                        ${resistanceTypeLower.includes("toxin") ? "Using Toxin Resistance instead of Endurance" : ""}
-                        ${resistanceTypeLower.includes("emotion") ? "Using Emotion Resistance instead of Intuition" : ""}
-                        ${resistanceTypeLower.includes("mental") && !resistanceTypeLower.includes("magical") ? "Using Mental Resistance instead of Psyche" : ""}
-                        ${resistanceTypeLower.includes("disease") ? "Using Disease Resistance instead of Endurance" : ""}
-                    </p>
-                    <div>
-                        <label>Spend Karma Points:</label>
-                        <input type="number" id="karma-points" min="0" max="${availableKarma}" value="0" style="width: 60px;">
-                        <span style="margin-left: 5px; font-size: 0.9em; color: #666;">(Available: ${availableKarma})</span>
-                    </div>
-                </div>
-            </div>
-        `;
-        
-        // Show dialog to target player (or GM if NPC)
-        return new Promise((resolve) => {
-            const isPlayerOwned = targetActor.hasPlayerOwner;
-            
-            new Dialog({
-                title: `${resistanceType.charAt(0).toUpperCase() + resistanceType.slice(1)} Resistance FEAT`,
-                content: dialogContent,
-                buttons: {
-                    roll: {
-                        icon: '<i class="fas fa-dice-d20"></i>',
-                        label: "Roll Resistance",
-                        callback: async (html) => {
-                            const karmaSpent = Math.min(
-                                parseInt(html.find('#karma-points').val()) || 0,
-                                availableKarma
-                            );
-                            
-                            const roll = new Roll("1d100");
-                            await roll.evaluate();
-                            
-                            const totalRoll = Math.min(100, roll.total + karmaSpent);
-                            const colorResult = game.msh.rollUniversalTable(featRank, totalRoll);
-                            
-                            // Determine success based on color result
-                            // Generally, Green or better means success
-                            let success = false;
-                            if (["green", "yellow", "red"].includes(colorResult.toLowerCase())) {
-                                success = true;
-                            }
-                            
-                            // Handle karma spending
-                            if (karmaSpent > 0) {
-                                await game.msh.runAsGM({
-                                    operation: "update",
-                                    targetActorUuid: targetActor.uuid,
-                                    args: [{ "system.attributes.karma.value": availableKarma - karmaSpent }]
-                                });
-                            }
-                            
-                            // Create result text
-                            const resultText = success ? 
-                                "Success - All damage negated!" : 
-                                `Failed - Resistance provides ${featValue} armor value`;
-                            
-                            // Special handling for specific resistance types
-                            let specialEffect = "";
-                            if (success) {
-                                if (resistanceTypeLower.includes("fire") || resistanceTypeLower.includes("heat")) {
-                                    specialEffect = `<div style="color: #ff6600;">🔥 Fire/Heat of less than ${featRank} rank has no effect!</div>`;
-                                } else if (resistanceTypeLower.includes("cold")) {
-                                    specialEffect = `<div style="color: #4da6ff;">❄️ Cold/Ice of less than ${featRank} rank has no effect!</div>`;
-                                } else if (resistanceTypeLower.includes("electricity")) {
-                                    specialEffect = `<div style="color: #ffff00;">⚡ Electricity of less than ${featRank} rank has no effect!</div>`;
-                                } else if (resistanceTypeLower.includes("radiation")) {
-                                    specialEffect = `<div style="color: #00ff00;">☢️ Radiation of less than ${featRank} rank has no effect!</div>`;
-                                }
-                            }
-                            
-                            // Create chat message
-                            await ChatMessage.create({
-                                speaker: ChatMessage.getSpeaker({ actor: targetActor }),
-                                content: `
-                                    <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
-                                        <div style="padding: 5px 10px; border-bottom: 1px solid #c0c0c0; font-size: 1.1em; color: #8b0000;">
-                                            <strong>${targetActor.name} - ${resistanceType} Resistance FEAT</strong>
-                                        </div>
-                                        <div style="padding: 5px 10px; font-size: 0.9em;">
-                                            <div>Resistance Rank: ${featRank} (${featValue})</div>
-                                            <div>Roll: ${roll.total} + Karma: ${karmaSpent} = ${totalRoll}</div>
-                                            ${specialEffect}
-                                        </div>
-                                        <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
-                                            background-color: ${success ? '#4CAF50' : '#F44336'}; 
-                                            color: white;">
-                                            ${resultText}
-                                        </div>
-                                    </div>
-                                `
-                            });
-                            
-                            resolve({ success, resultText });
-                        }
-                    },
-                    cancel: {
-                        icon: '<i class="fas fa-times"></i>',
-                        label: "No Resistance",
-                        callback: () => {
-                            resolve({ success: false, resultText: "No resistance attempted" });
-                        }
-                    }
-                },
-                default: "roll",
-                render: (html) => {
-                    if (!isPlayerOwned) {
-                        setTimeout(() => {
-                            html.find('button[data-button="roll"]').trigger('click');
-                        }, 5000);
-                    }
-                }
-            }).render(true);
-        });
-    } */
-
     /**
      * Check if a resistance replaces an ability for FEAT rolls
      * @param {Actor} actor - The actor with potential resistance
@@ -1263,7 +919,7 @@ export class CombatHandler {
                                                 });
                                                 
                                                 // Calculate actual damage done for button feedback
-                                                const healthAfter = target.system.attributes.health.value;
+                                                const healthAfter = targetActor.system.attributes.health.value;
                                                 const damageDealt = Math.max(0, healthBefore - healthAfter);
                                                 
                                                 // Temporarily change button text to show damage was applied
@@ -1831,11 +1487,26 @@ export class CombatHandler {
      * @returns {String} Text result of the FEAT.
      */
     static async rollSecondaryFeat(target, featType, sourceName, attackType = "unknown", attacker = null) {
+        const targetActor = target?.actor ?? target ?? null;
+        const attackerActor = attacker?.actor ?? attacker ?? null;
+        if (!targetActor?.system?.abilities?.endurance) {
+            console.warn("rollSecondaryFeat: target lacks END or is not an Actor", { target });
+            return "No valid target";
+        }
+
+        if (!targetActor?.system?.abilities?.endurance) {
+            console.warn("[rollSecondaryFeat] No valid targetActor or END on target:", { targetActor });
+            return "No valid target";
+            }
+
         // Get the endurance rank for the save
-        const enduranceRank = target.system.abilities.endurance.rank;
+        const enduranceRank =
+            targetActor?.system?.abilities?.endurance?.rank ??
+            targetActor?.system?.abilities?.endurance?.value ??
+            "Typical";
 
         // Get available Karma
-        const availableKarma = target.system.attributes.karma.value || 0;
+        const availableKarma = targetActor.system.attributes.karma.value || 0;
 
         // Create dialog content
         const dialogContent = `
@@ -1900,7 +1571,7 @@ export class CombatHandler {
                     });
 
                     // Create a new karma history entry
-                    const history = foundry.utils.deepClone(target.system.karma?.history || []);
+                    const history = foundry.utils.deepClone(targetActor.system.karma?.history || []);
                     const newEvent = {
                         realDate: new Date().toLocaleDateString(),
                         gameDate: game.time?.worldTime ? game.time.worldTime.toString() : "",
@@ -1925,7 +1596,7 @@ export class CombatHandler {
                     // =========================
                     if (featType === "Kill") {
                         if (featResultText === "End. Loss") {
-                            const currentEnduranceRank = target.system.abilities.endurance.rank;
+                            const currentEnduranceRank = targetActor.system.abilities.endurance.rank;
                             
                             // Get proper next lower rank
                             const ranks = [
@@ -2017,7 +1688,7 @@ export class CombatHandler {
                                                 attackType.toLowerCase() === "sh";
                             
                             if (edgedOrShooting) {
-                                const currentEnduranceRank = target.system.abilities.endurance.rank;
+                                const currentEnduranceRank = targetActor.system.abilities.endurance.rank;
                                 
                                 // Get proper next lower rank
                                 const ranks = [
@@ -2662,7 +2333,7 @@ export class CombatHandler {
         await this.applyDyingEffect(target);
         
         // Immediately lose the FIRST Endurance rank
-        const currentRank = target.system.abilities.endurance.rank;
+        const currentRank = targetActor.system.abilities.endurance.rank;
         const ranks = Object.keys(CONFIG.FASERIP.rankValues);
         const currentRankIndex = ranks.indexOf(currentRank);
         
@@ -2733,7 +2404,7 @@ export class CombatHandler {
         }
 
         // Track original endurance for recovery calculation
-        const currentRank = target.system.abilities.endurance.rank;
+        const currentRank = targetActor.system.abilities.endurance.rank;
         const originalEndurance = target.getFlag(scope, "originalEndurance");
         if (!originalEndurance) {
             await target.setFlag(scope, "originalEndurance", currentRank);

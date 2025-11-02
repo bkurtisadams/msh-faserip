@@ -121,38 +121,54 @@ function getFlagPath(effect, path) {
   return path.split(".").reduce((acc, k) => (acc && acc[k] !== undefined ? acc[k] : undefined), flags);
 }
 
-/** Core creator */
-export async function applyEffect(actor, {
-  name,
-  img = null,
-  icon = "icons/svg/aura.svg",
-  flags = {},
-  rounds = null,
-  seconds = null,
-  originUuid = null,
-  disabled = false,
-  changes = []
-} = {}) {
-  if (!actor) throw new Error("applyEffect: actor required");
+/** Core creator (v13-safe, no deprecated 'icon', handles unlinked tokens) */
+export async function applyEffect(target, effectData = {}, opts = {}) {
+  // Normalize actor (works for linked/unlinked tokens or raw Actor)
+  const actor = target?.actor ?? target;
+  if (!actor) {
+    console.error("[effect-engine] applyEffect: no valid actor/target", { target, effectData, opts });
+    return null;
+  }
 
-  const duration = computeDuration({ rounds, seconds });
-    // Normalize art: prefer explicit img, else icon, then keep both for back-compat
-    const finalImg = img || icon || "icons/svg/aura.svg";
+  // Prefer img; fall back to icon; never set both (prevents deprecation warnings)
+  const img = effectData?.img ?? effectData?.icon ?? "icons/svg/aura.svg";
 
-    const data = {
-        name,
-        img: finalImg,
-        icon: finalImg,                  // ← keep legacy field so old templates still render
-        origin: originUuid ?? actor.uuid,
-        disabled,
-        duration,
-        changes,
-        flags: { [SCOPE()]: flags }
-    };
+  // Pull out duration hints; compute a proper duration block if needed
+  const {
+    rounds = null,
+    seconds = null,
+    duration: providedDuration = null,
+    icon,          // deprecated; drop it
+    originUuid,    // allow both originUuid and origin
+    origin,
+    ...rest
+  } = effectData;
 
-  const [created] = await actor.createEmbeddedDocuments("ActiveEffect", [data]);
-  if (created?.id) await renameEffectWithRemaining(created);
-  return created;
+  const duration = providedDuration || computeDuration({ rounds, seconds });
+  const payload = {
+    ...rest,
+    img,
+    duration,
+    origin: origin ?? originUuid ?? actor.uuid,
+    flags: {
+      ...(rest?.flags || {}),
+      [SCOPE()]: {
+        ...(rest?.flags?.[SCOPE()] || {})
+      }
+    }
+  };
+
+  try {
+    // Create on the actor (lets Foundry handle parent linkage & hooks)
+    const createdArr = await actor.createEmbeddedDocuments("ActiveEffect", [payload]);
+    const created = Array.isArray(createdArr) ? createdArr[0] : createdArr;
+    if (created?.id) await renameEffectWithRemaining(created);
+    return created;
+  } catch (err) {
+    console.error("[effect-engine] applyEffect failed:", err, { payload });
+    ui.notifications?.error?.("Failed to apply effect (see console).");
+    return null;
+  }
 }
 
 /* ===== Specific wrappers for common combat effects ===== */
@@ -160,7 +176,7 @@ export async function applyEffect(actor, {
 export async function applyStun(actor, { rounds = 1, originUuid = null } = {}) {
   return applyEffect(actor, {
     name: "Stunned",
-    icon: "icons/svg/daze.svg",
+    img: "icons/svg/daze.svg",
     rounds,
     originUuid,
     flags: { status: { isStunned: true }, meta: { unitLabel: "turn", unitLabelPlural: "turns" } }
@@ -170,7 +186,7 @@ export async function applyStun(actor, { rounds = 1, originUuid = null } = {}) {
 export async function applyEvade(actor, { target = "", nextRoundAttackBonusCS = 0, note = "" } = {}) {
   return applyEffect(actor, {
     name: target ? `Evaded ${target}` : "Evaded",
-    icon: "icons/svg/combat.svg",
+    img: "icons/svg/combat.svg",
     rounds: 1,
     flags: {
       status: { isEvading: true },
@@ -184,7 +200,7 @@ export async function applyEvade(actor, { target = "", nextRoundAttackBonusCS = 
 export async function applyBlock(actor, { armorRank = "Good", armorValue = 10, note = "" } = {}) {
   return applyEffect(actor, {
     name: `Blocking (${armorRank})`,
-    icon: "icons/svg/shield.svg",
+    img: "icons/svg/shield.svg",
     rounds: 1,
     flags: {
       status: { isBlocking: true },
@@ -204,7 +220,7 @@ export async function applyCatch(actor, { scenario = "generic", vsYou = "", note
   };
   return applyEffect(actor, {
     name: scenarioMap[scenario] || "Caught Object",
-    icon: "icons/svg/net.svg",
+    img: "icons/svg/net.svg",
     rounds: 1,
     flags: { status: { isCatching: true }, scenario, vsYou, notes: note }
   });
@@ -224,7 +240,7 @@ export async function applySlam(actor, { kind = "No Slam", knockbackAreas = 0, p
 export async function applyDying(actor, { enduranceValue = null } = {}) {
   return applyEffect(actor, {
     name: "Dying",
-    icon: "icons/svg/skull.svg",
+    img: "icons/svg/skull.svg",
     flags: {
       status: { isDying: true },
       enduranceBase: Number.isFinite(enduranceValue) ? enduranceValue : (actor.system?.abilities?.endurance?.value ?? 10),

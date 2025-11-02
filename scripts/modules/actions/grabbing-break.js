@@ -91,7 +91,7 @@ export function openGrabbingBreakDialog({ itemMaterial = "Excellent", itemName =
           const effectiveRank = shiftRank(wielderStr, shift);
 
           // Roll
-          const roll = await (new Roll("1d100")).evaluate({ async: true });
+          const roll = await (new Roll("1d100")).evaluate();
           await roll.toMessage({
             speaker: ChatMessage.getSpeaker({ actor }),
             flavor: `${actor?.name ?? 'Character'} — Grabbing Break Check`,

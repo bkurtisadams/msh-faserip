@@ -246,7 +246,7 @@ async _rollPower() {
           }
           
           // Roll dice and add karma
-          const roll = await new Roll("1d100").evaluate({async: true});
+          const roll = await (new Roll("1d100")).evaluate();
           const finalRoll = Math.min(100, roll.total + karma);
           
           // Get result color

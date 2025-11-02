@@ -66,9 +66,8 @@ export class CheckAction extends BaseAction {
       const effectiveEndRank = shift ? shiftRank(targetEndRank, shift) : targetEndRank;
 
       // Roll percent
-      //const roll = await (new Roll("1d100")).evaluate({ async: true });
       const roll = new Roll("1d100");
-        await roll.evaluate(); // v13+ async API (or: roll.evaluateSync() for sync)
+      roll.evaluate(); // v13+: do not pass {async:true}
       if (!this.opts?.skipDice) {
         await roll.toMessage({
           speaker: ChatMessage.getSpeaker({ actor }),
@@ -103,7 +102,8 @@ export class CheckAction extends BaseAction {
       let rawDuration  = null;
       if (actionType === "stun" && !effectsSuppressed) {
         if (colorLower === "white") {
-          const d = await (new Roll("1d10")).evaluate({ async: true });
+          const d = new Roll("1d10");
+          d.evaluate();
           rawDuration = d.total;
           const maxDur = game.settings?.get?.("msh-faserip","maxStunDuration") || 10;
           stunDuration = Math.min(rawDuration, maxDur);
@@ -133,28 +133,27 @@ export class CheckAction extends BaseAction {
             });
             ui.notifications.warn(`${targetActor.name} is DYING (Endurance steps down each round unless stabilized).`);
           }
-
         }
       }
 
       // NULLIFY (NEVER damage-gated)
       if (isSaveNullify) {
-      // Prefer the targeted Token's synthetic actor (handles unlinked tokens)
-      const saveActor = await this._resolveTokenActor(defenderUuid || (this.opts?.prefill?.targetUuid || ""));
-      if (saveActor) {
-        const endRank     = targetEndRank;
-        let intensityRank = endRank;
-        if (this?.opts?.powerRankName) intensityRank = this.opts.powerRankName;
-        if (this?.opts?.intensity === "fixed-rank" && this?.opts?.fixedRank) intensityRank = this.opts.fixedRank;
+        // Prefer the targeted Token's synthetic actor (handles unlinked tokens)
+        const saveActor = await this._resolveTokenActor(defenderUuid || (this.opts?.prefill?.targetUuid || ""));
+        if (saveActor) {
+          const endRank     = targetEndRank;
+          let intensityRank = endRank;
+          if (this?.opts?.powerRankName) intensityRank = this.opts.powerRankName;
+          if (this?.opts?.intensity === "fixed-rank" && this?.opts?.fixedRank) intensityRank = this.opts.fixedRank;
 
-        await Nullify.resolveAndApply(actor, saveActor, {
-          endRank,
-          intensityRank,
-          rolledColor: colorLower,
-          originUuid: this?.opts?.originUuid ?? null
-        });
+          await Nullify.resolveAndApply(actor, saveActor, {
+            endRank,
+            intensityRank,
+            rolledColor: colorLower,
+            originUuid: this?.opts?.originUuid ?? null
+          });
+        }
       }
-    }
 
       // Build and post a light-weight chat card
       const banner = bannerColors[colorLower] || { bg:"#eee", fg:"#333", bd:"#ccc" };
@@ -239,7 +238,8 @@ export class CheckAction extends BaseAction {
     if (!choice) return;
 
     const effectiveEndRank = choice.shift ? shiftRank(choice.targetEndRank, choice.shift) : choice.targetEndRank;
-    const roll = await (new Roll("1d100")).evaluate({ async: true });
+    const roll = new Roll("1d100");
+    roll.evaluate();
     await roll.toMessage({
       speaker: ChatMessage.getSpeaker({ actor }),
       flavor: `${actionName}: ${choice.targetName} (${effectiveEndRank})`
@@ -263,7 +263,8 @@ export class CheckAction extends BaseAction {
     // Minimal effect application in manual mode (same as auto)
     if (actionType === "stun" && !effectsSuppressed) {
       if (colorLower === "white") {
-        const d = await (new Roll("1d10")).evaluate({ async: true });
+        const d = new Roll("1d10");
+        d.evaluate();
         const maxDur = game.settings?.get?.("msh-faserip","maxStunDuration") || 10;
         const dur = Math.min(d.total, maxDur);
         await d.toMessage({ speaker: ChatMessage.getSpeaker({ actor }), flavor: `${choice.targetName} Stun Duration (1d10)` });
@@ -287,7 +288,6 @@ export class CheckAction extends BaseAction {
           });
           ui.notifications.warn(`${targetActor.name} is DYING (Endurance steps down each round unless stabilized).`);
         }
-
       }
     }
 
@@ -310,7 +310,7 @@ export class CheckAction extends BaseAction {
     await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor }), content });
   }
 
-    /** Prefer a Token's synthetic actor (unlinked tokens) over the base Actor */
+  /** Prefer a Token's synthetic actor (unlinked tokens) over the base Actor */
   async _resolveTokenActor(targetUuid) {
     let doc = null;
     try { if (targetUuid) doc = await fromUuid(targetUuid); } catch {}
@@ -364,16 +364,19 @@ export class CheckAction extends BaseAction {
     const targetActor = await this._resolveTokenActor(targetUuid);
     if (!targetActor) return;
 
+    // Canonical mapping: Green=Stagger, Yellow=1 area (prone), Red=Grand Slam (STR-based areas, prone)
     let kind = "No Slam", knockbackAreas = 0, prone = false, stagger = false;
     switch (colorLower) {
-      case "white":
-        kind = "Grand Slam"; knockbackAreas = this._strengthToAreas(getAbilityInfo(ownerActor,"strength").rank); prone = true; break;
       case "green":
-        kind = "1 area"; knockbackAreas = 1; prone = true; break;
-      case "yellow":
         kind = "Stagger"; stagger = true; break;
-      default: break;
+      case "yellow":
+        kind = "1 area"; knockbackAreas = 1; prone = true; break;
+      case "red":
+        kind = "Grand Slam"; knockbackAreas = this._strengthToAreas(getAbilityInfo(ownerActor,"strength").rank); prone = true; break;
+      default:
+        kind = "No Slam"; break;
     }
+    // You can keep dmgThrough for future rules; not used in this base effect
     await Effects.applySlam(targetActor, { kind, knockbackAreas, prone, stagger });
     ui.notifications.info(`${targetActor.name}: ${kind}${knockbackAreas?` (${knockbackAreas} area${knockbackAreas>1?"s":""})`:""}`);
   }
@@ -395,10 +398,10 @@ export class CheckAction extends BaseAction {
       const strRank = attackerStr?.rank || "Typical";
       const areas   = this._strengthToAreas(strRank);
       const notes = {
-        white: `Grand Slam — knocked away up to ~${areas} areas; prone.`,
-        green: `Knockback 1 area; prone.`,
-        yellow:`Stagger; half-move next round.`,
-        red:  `No effect.`
+        white: `No effect.`,
+        green: `Stagger; half-move next round.`,
+        yellow:`Knockback 1 area; prone.`,
+        red:  `Grand Slam — knocked away up to ~${areas} areas; prone.`
       };
       return `<div style="margin-top:8px;color:#444;">${notes[colorLower]||""}</div>`;
     }
