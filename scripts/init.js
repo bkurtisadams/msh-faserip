@@ -1549,76 +1549,69 @@ Hooks.on('hotbarDrop', (bar, data, slot) => {  // Remove async
 });
 
 // Define the function to create a macro
+// Define the function to create a macro (supports token/unlinked + actor sheets)
 async function createFaseripItemMacro(data, slot) {
-  const { actorId, itemId } = data;
-  
-  // Get actor and item for macro creation
-  const actor = game.actors.get(actorId);
-  if (!actor) {
-    ui.notifications.warn("Actor not found");
-    return false;
+  // Resolve via UUID first (covers Scene.Token.Actor.Item for unlinked tokens)
+  let item = null, actor = null;
+
+  if (data?.uuid) {
+    try {
+      const doc = await fromUuid(data.uuid);
+      if (doc?.documentName === "Item") {
+        item = doc;
+        actor = doc.parent ?? null;
+      } else if (doc?.documentName === "Token") {
+        actor = doc.actor ?? null;
+        if (actor && data.itemId) item = actor.items.get(data.itemId) ?? null;
+      }
+    } catch (e) {
+      console.warn("fromUuid failed for hotbarDrop:", data.uuid, e);
+    }
   }
-  
-  const item = actor.items.get(itemId);
+
+  // Fallback to actorId/itemId (dragged from Actor directory sheet)
   if (!item) {
-    ui.notifications.warn("Item not found on actor");
-    return false;
+    actor = actor ?? (data.actorId ? game.actors.get(data.actorId) : null);
+    if (!actor) return ui.notifications.warn("Actor not found");
+    item = data.itemId ? actor.items.get(data.itemId) : null;
   }
-  
-  console.log(`Creating macro for ${item.name} (${actor.name})`);
-  
-  // Create command that retrieves actor/item at execution time (like action HUD does)
+  if (!item) return ui.notifications.warn("Item not found on actor");
+  if (!actor) actor = item.parent ?? null;
+
+  console.log(`Creating macro for ${item.name} (${actor?.name ?? "Unknown"})`);
+
+  // Build a UUID-based macro so it also works later from the hotbar
   const command = `// ${item.name} Macro
-const actor = game.user.character || canvas.tokens.controlled[0]?.actor || game.actors.get("${actorId}");
-if (!actor) {
-  return ui.notifications.warn("Select a token or assign a character first.");
-}
+(async () => {
+  const item = await fromUuid("${item.uuid}");
+  if (!item) return ui.notifications.error("Missing item: ${item.name}");
+  const actor = item.parent;
+  if (!actor) return ui.notifications.error("No parent actor for item: ${item.name}");
 
-const item = actor.items.get("${itemId}");
-if (!item) {
-  return ui.notifications.error("Item not found on actor.");
-}
+  switch (item.type) {
+    case "power":     game.msh.rollPower(actor, item, { useDirectRoll: false }); break;
+    case "talent":    game.msh.rollTalent(actor, item); break;
+    case "equipment": game.msh.rollEquipment(actor, item); break;
+    default:          ui.notifications.warn(\`Cannot roll item type: \${item.type}\`);
+  }
+})();`;
 
-// Roll based on item type
-switch (item.type) {
-  case "power":
-    game.msh.rollPower(actor, item, {useDirectRoll: false});
-    break;
-  case "talent":
-    game.msh.rollTalent(actor, item);
-    break;
-  case "equipment":
-    game.msh.rollEquipment(actor, item);
-    break;
-  default:
-    ui.notifications.warn(\`Cannot roll item type: \${item.type}\`);
-}`;
-  
-  const macroName = `${item.name} (${actor.name})`;
-  
-  // Check if macro already exists
-  let macro = game.macros.find(m => 
-    m.name === macroName && 
-    m.flags?.["faserip.itemMacro"]
-  );
-  
+  const macroName = `${item.name} (${actor?.name ?? "Actor"})`;
+  let macro = game.macros.find(m => m.name === macroName && m.flags?.["faserip.itemMacro"]);
   if (!macro) {
     macro = await Macro.create({
       name: macroName,
       type: "script",
       img: item.img || "icons/svg/item-bag.svg",
-      command: command,
-      flags: {"faserip.itemMacro": true}
+      command,
+      flags: { "faserip.itemMacro": true }
     });
   }
-  
-  if (macro) {
-    game.user.assignHotbarMacro(macro, slot);
-    ui.notifications.info(`Created macro: ${macroName}`);
-  }
-  
+  await game.user.assignHotbarMacro(macro, slot);
+  ui.notifications.info(`Created macro: ${macroName}`);
   return true;
 }
+
 
 // Define the function to create a Universal Table macro
 async function createUniversalTableMacro(data, slot) {
@@ -1701,36 +1694,26 @@ async function createUniversalActionMacro(data, slot) {
   const abilityName = abilityMap[actionCode] || "fighting";
   
   // CREATE DIFFERENT MACRO BASED ON SETTING
-  const command = (mode === "refactor") 
-    ? `// Universal Action Macro (Refactor/New System)
-  const actor = game.user.character || canvas.tokens.controlled[0]?.actor || game.actors.get("${actorId}");
-  if (!actor) {
-    return ui.notifications.warn("Select a token or assign a character first.");
-  }
+  const command = `// Universal Action Macro
+    (async () => {
+      const actor = game.user.character || canvas.tokens.controlled[0]?.actor || game.actors.get("${actorId}");
+      if (!actor) return ui.notifications.warn("Select a token or assign a character first.");
 
-  // Use ActionDispatcher (respects actor's combat mode setting)
-  const { ActionDispatcher } = await import("./scripts/modules/actions/action-dispatcher.js");
-  const savedCS = actor.getFlag("msh-faserip", "cs_${actionCode}") || 0;
-  const savedKarma = actor.getFlag("msh-faserip", "karma_${actionCode}") || 0;
+      const savedCS = await actor.getFlag("msh-faserip", "cs_${actionCode}") || 0;
+      const savedKarma = await actor.getFlag("msh-faserip", "karma_${actionCode}") || 0;
 
-  await ActionDispatcher.roll("${actionCode}", {
-    actor: actor,
-    abilityName: "${abilityName}",
-    opts: {
-      shift: savedCS,
-      karma: savedKarma
-    }
-  });`
-    : `// Universal Action Macro (Classic/Old System)
-const actor = game.user.character || canvas.tokens.controlled[0]?.actor || game.actors.get("${actorId}");
-if (!actor) {
-  return ui.notifications.warn("Select a token or assign a character first.");
-}
-
-const savedCS = actor.getFlag("msh-faserip", "cs_${actionCode}") || 0;
-const savedKarma = actor.getFlag("msh-faserip", "karma_${actionCode}") || 0;
-
-game.msh.rollUniversalAction("${actionCode}", actor.id, savedCS, savedKarma);`;
+      if (game.msh?.actions?.roll) {
+        await game.msh.actions.roll("${actionCode}", {
+          actor,
+          abilityName: "${abilityName}",
+          opts: { shift: savedCS, karma: savedKarma }
+        });
+      } else if (game.msh?.rollUniversalAction) {
+        game.msh.rollUniversalAction("${actionCode}", actor.id, savedCS, savedKarma);
+      } else {
+        ui.notifications.error("No action entrypoint found.");
+      }
+    })();`;
 
   const macroName = `${actionName} (${actorName})`;
   let macro = game.macros.find(m => m.name === macroName && m.command === command);

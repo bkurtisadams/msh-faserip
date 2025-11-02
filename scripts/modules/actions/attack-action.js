@@ -10,6 +10,9 @@ import {
 import { rollUniversalTable } from "../dice/universal-table.js";
 import { buildDamageFlags } from "./damage-ui.js";
 import { canEffectsApply } from "../../rules/effects-gate.js";
+import { ACTION_LABELS } from "./action-config.js";
+import { ACTION_EFFECTS } from "./action-config.js";
+
 
 export class AttackAction extends BaseAction {
   constructor(args) {
@@ -389,15 +392,18 @@ export class AttackAction extends BaseAction {
       const targetName = target?.name || "Unknown Target";
 
       // Calculate armor and penetrating damage for this specific target
-      let penetratingDamage = 0;
-      if (isHit && rawDamage > 0) {
-        if (targetActor) {
-          const armorData = getBodyArmorValues(targetActor, damageType);
-          penetratingDamage = Math.max(0, rawDamage - armorData.applicable);
-        } else {
-          penetratingDamage = rawDamage;
-        }
-      }
+     let penetratingDamage = 0;
+     if (isHit && rawDamage > 0) {
+       if (targetActor) {
+         const armorData = getBodyArmorValues(targetActor, damageType);
+         // Ensure numbers whether rawDamage arrived as "20" or 20
+         const rd = Number(rawDamage) || 0;
+         const ap = Number(armorData?.applicable) || 0;
+         penetratingDamage = Math.max(0, rd - ap);
+       } else {
+         penetratingDamage = Number(rawDamage) || 0;
+         }
+       }
 
       // Apply damage cap from pull punch
       if (choice.pulledDamage > 0 && choice.pulledDamage < penetratingDamage) {
@@ -412,25 +418,90 @@ export class AttackAction extends BaseAction {
         : null;
 
       // Build actions box ONLY if not manual mode
+      // Follow-ups must match the Universal Table per action type.
+      //  • Blunt/Charging:  Yellow→Slam, Red→Stun
+      //  • Edged/Throwing-Edged: Yellow→Stun, Red→Kill (Kill handled elsewhere)
+      //  • Shooting/Energy: Yellow→Bullseye (no Slam/Stun), Red→Kill
+      //  • Force:           Yellow→Bullseye (no Slam),   Red→Stun
+      //  • Throwing-Blunt:  Yellow→Hit (no follow-up),   Red→Stun
+      let showSlam = false;
+      let showStun = false;
+      let showKill = false;
+
+      switch (String(actionType)) {
+        case "blunt-attack":
+        case "charging":
+          showSlam = (colorLower === "yellow");
+          showStun = (colorLower === "red");
+          break;
+
+        case "edged-attack":
+        case "throwing-edged":
+          showStun = (colorLower === "yellow");
+          showKill = (colorLower === "red");    // ← NEW
+          // Red = Kill (resolved via Kill flow/UI elsewhere); no Slam.
+          break;
+
+        case "shooting":
+        case "energy":
+          // Yellow = Bullseye → no Slam/Stun check; Red = Kill (handled elsewhere)
+          showKill = (colorLower === "red");    // ← NEW
+          break;
+
+        case "force":
+          // Yellow = Bullseye → no Slam; Red = Stun
+          showStun = (colorLower === "red");
+          break;
+
+        case "throwing-blunt":
+          // Yellow = Hit; Red = Stun
+          showStun = (colorLower === "red");
+          break;
+
+        default:
+          // No generic follow-ups
+          break;
+      }
+
       const actions = (!isManualMode && isHit && canEffectsApply(penetratingDamage) && targetActor)
         ? buildActionsBox({
-            showSlam: colorLower === "yellow" && canEffectsApply(penetratingDamage),
-            showStun: colorLower === "red" && canEffectsApply(penetratingDamage),
+            showSlam,
+            showStun,
+            showKill, // ← NEW
             pulled: choice.resultCap !== 'none' || (choice.pulledDamage > 0 && choice.pulledDamage < rawDamage),
             breakingFeat: currentBreakingFeat,
             actorUuid: actor.uuid,
-            targetUuid: target?.actor?.uuid,
-            damage: penetratingDamage,
-            attackForm: attackForm,
-            damageType: damageType,
+            targetUuid: target?.document?.uuid ?? target?.actor?.uuid,
+            damage: Number(penetratingDamage) || 0,
+            prefill: { dmgThrough: Number(penetratingDamage) || 0 },
+            attackForm,
+            damageType,
             bypassArmor: choice.bypassArmor || false,
             autoApply: !!this.opts?.autoApply,
-
             autoSave: (typeof resolveCombatMode === "function" && targetActor)
               ? (resolveCombatMode(targetActor) === "full")
               : false,
           })
         : "";
+
+      // Auto-run Kill in full-auto mode
+      if (!isManualMode && this.opts?.autoApply && autoSave && showKill && targetActor) {
+        const { ActionDispatcher } = await import("./action-dispatcher.js");
+        await ActionDispatcher.roll("kill", {
+          actor,
+          opts: {
+            autoApply: true,
+            showConfirm: false,
+            attackForm,
+            prefill: {
+              targetUuid: target?.document?.uuid ?? target?.actor?.uuid,
+              dmgThrough: Number(penetratingDamage) || 0,
+              targetName: target?.name,
+              targetEndRank: targetActor?.system?.abilities?.endurance?.rank || "Good"
+            }
+          }
+        });
+      }  
 
       // Build pull punch indicator
       let pullPunchNote = "";
