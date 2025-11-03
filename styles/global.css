@@ -1922,6 +1922,30 @@
   color: #8b0000;
 }
 
+/* Sort toggle styles */
+.karma-sheet .sort-header {
+  width: 30px;
+  text-align: center;
+  padding: 2px;
+}
+
+.karma-sheet .sort-toggle {
+  cursor: pointer;
+  color: #FFF;
+  text-decoration: none;
+  display: inline-block;
+  padding: 2px;
+}
+
+.karma-sheet .sort-toggle:hover {
+  color: #007bff;
+}
+
+.karma-sheet .sort-column {
+  width: 30px;
+  text-align: center;
+}
+
 /* Event type styles */
 .karma-sheet .karma-entry.karma-gain {
   background-color: #e8f5e9;
