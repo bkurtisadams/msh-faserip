@@ -249,6 +249,12 @@
       "rate": "1",
       "shots": "",
       "shotsRemaining": "",
+
+      "noRangePenalty": false,
+      "oneHandedUse": "normal",
+      "throwable": false,
+      "entangling": false,
+
       "sfx": {
         "hit": "",
         "miss": "",

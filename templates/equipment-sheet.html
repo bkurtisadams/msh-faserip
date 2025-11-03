@@ -145,7 +145,42 @@
             <input type="text" name="system.shots" value="{{system.shots}}" />
           </div>
         </div>
-  
+
+        <div class="form-row">
+          <div class="form-group half">
+            <label>One-Handed Use:</label>
+            <select name="system.oneHandedUse">
+              <option value="normal" {{#if (eq system.oneHandedUse "normal")}}selected{{/if}}>Can Use One-Handed</option>
+              <option value="-1cs" {{#if (eq system.oneHandedUse "-1cs")}}selected{{/if}}>One-Handed at -1CS</option>
+              <option value="-2cs" {{#if (eq system.oneHandedUse "-2cs")}}selected{{/if}}>One-Handed at -2CS</option>
+              <option value="two-handed-only" {{#if (eq system.oneHandedUse "two-handed-only")}}selected{{/if}}>Requires Two Hands</option>
+            </select>
+          </div>
+          <div class="form-group half">
+            <label>Precision Weapon:</label>
+            <input type="checkbox" name="system.noRangePenalty" {{checked system.noRangePenalty}}/>
+            <span style="font-size:0.85em; color:#666;">No range penalty</span>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group half">
+            <label>Throwable (Melee):</label>
+            <input type="checkbox" name="system.throwable" {{checked system.throwable}}/>
+            <span style="font-size:0.85em; color:#666;">Can be thrown</span>
+          </div>
+          <div class="form-group half">
+            <label>Entangling:</label>
+            <input type="checkbox" name="system.entangling" {{checked system.entangling}}/>
+            <span style="font-size:0.85em; color:#666;">Net, bola, webbing</span>
+          </div>
+        </div>
+
+        <div class="form-group" style="background:#fff3e0; border:1px solid #ff9800; border-radius:3px; padding:8px; margin-top:8px; font-size:0.85em;">
+          <strong>⚠ Entangling Weapons:</strong> Target must make Agility FEAT vs weapon's Material Strength. 
+          On failure, target is enmeshed and can escape via Strength FEAT (break) or Agility (slip).
+        </div>
+        
         <div class="form-group">
           <label>Default Weapon Variant <span style="font-size:0.9em; color:#666;">(can be changed during roll)</span>:</label>
           <select name="system.variantType">
