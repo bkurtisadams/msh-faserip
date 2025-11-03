@@ -55,6 +55,11 @@
             <th>Event Type</th>
             <th>Description</th>
             <th>Actions</th>
+            <th class="sort-header">
+              <a class="sort-toggle" title="{{sortToggle.tooltip}}">
+                <i class="fas {{sortToggle.icon}}"></i>
+              </a>
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -72,11 +77,12 @@
                   <a class="edit-karma" data-index="{{i}}"><i class="fas fa-edit"></i></a>
                   <a class="delete-karma" data-index="{{i}}"><i class="fas fa-trash"></i></a>
                 </td>
+                <td class="sort-column"></td>
               </tr>
             {{/each}}
           {{else}}
             <tr>
-              <td colspan="6" class="empty-message">No karma history recorded yet.</td>
+              <td colspan="7" class="empty-message">No karma history recorded yet.</td>
             </tr>
           {{/if}}
         </tbody>

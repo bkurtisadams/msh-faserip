@@ -186,6 +186,30 @@ export class CombatHandler {
         // Since processAttack doesn't do the rolling, just the damage processing
     }
 
+    // 0. Check if weapon is entangling
+    const weapon = attackerActor.items.find(i => i.name === sourceName);
+    if (weapon?.system?.entangling && resultColor.toLowerCase() !== "white") {
+    // Hit succeeded, now check entanglement
+    const { processEntanglingHit } = await import("./modules/actions/entangling-action.js");
+    
+    const entangleResult = await processEntanglingHit({
+        attacker: attackerActor,
+        target: targetActor,
+        weapon: weapon,
+        weaponMaterialStrength: weapon.system.materialStrength || "Typical"
+    });
+
+    if (entangleResult.entangled) {
+        // Entangled! No damage (just the entanglement effect)
+        return { entangled: true };
+    } else {
+        // Target avoided entanglement, no damage either
+        return { entangled: false, avoided: true };
+    }
+    }
+
+    // Continue with normal damage processing if not entangling weapon
+
     // 1. Get Defenses from Target
     let defenseData = await this.getTargetDefenses(target, damageType, baseDamage, options);
 

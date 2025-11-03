@@ -919,6 +919,18 @@ Hooks.once("init", async () => {
         return ui.notifications.warn(`Cannot roll item of type: ${item.type}`);
     }
   };
+
+  // entangle - new!
+  game.msh.attemptEscapeEntanglement = async function(actorId) {
+    const actor = game.actors.get(actorId);
+    if (!actor) {
+      ui.notifications.error("Actor not found");
+      return;
+    }
+
+    const { attemptEscapeEntanglement } = await import("./modules/actions/entangling-action.js");
+    await attemptEscapeEntanglement(actor);
+  };
       
   // Register Handlebars helpers
   Handlebars.registerHelper('div', function(a, b) {

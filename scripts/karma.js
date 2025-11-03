@@ -1,5 +1,8 @@
 // karma.js with modifications
 export class KarmaSheet extends DocumentSheet {
+  // Track current sort order (true = newest first, false = oldest first)
+  sortNewestFirst = true;
+
   static get defaultOptions() {
     return foundry.utils.mergeObject(super.defaultOptions, {
       classes: ["faserip", "sheet", "karma"],
@@ -57,12 +60,20 @@ export class KarmaSheet extends DocumentSheet {
     context.dailyKarmaUsed = context.system.karma.dailyKarmaUsed || 0;
     context.dailyKarmaRemaining = Math.max(0, context.dailyKarmaMax - context.dailyKarmaUsed);
     
-    // Sort history by date descending (newest to oldest)
+    // Sort history by date (newest first or oldest first based on user preference)
     context.system.karma.history.sort((a, b) => {
       const dateA = new Date(a.realDate || 0);
       const dateB = new Date(b.realDate || 0);
-      return dateB - dateA;
+      return this.sortNewestFirst ? dateB - dateA : dateA - dateB;
     });
+    
+    // Add sort toggle data for template
+    context.sortToggle = {
+      icon: this.sortNewestFirst ? 'fa-arrow-down' : 'fa-arrow-up',
+      tooltip: this.sortNewestFirst ? 
+        'Currently showing newest first. Click to show oldest first.' :
+        'Currently showing oldest first. Click to show newest first.'
+    };
     
     // Add CSS classes based on event type
     context.system.karma.history.forEach(event => {
@@ -143,6 +154,9 @@ export class KarmaSheet extends DocumentSheet {
     
     // Export button
     html.find('.export-karma').click(ev => this._onExportKarma(ev));
+    
+    // Sort toggle button
+    html.find('.sort-toggle').click(ev => this._onSortToggle(ev));
     
     // Toggle history button
     html.find('.toggle-history').click(ev => {
@@ -857,15 +871,25 @@ export class KarmaSheet extends DocumentSheet {
     setTimeout(() => URL.revokeObjectURL(url), 100);
   }
 
+  _onSortToggle(event) {
+    event.preventDefault();
+    
+    // Toggle the sort order
+    this.sortNewestFirst = !this.sortNewestFirst;
+    
+    // Re-render the sheet to apply the new sort order
+    this.render();
+  }
+
   _onEditKarma(index) {
     // Get a copy of the history array
     const history = foundry.utils.deepClone(this.object.system.karma?.history || []);
     
-    // Sort the history array the same way it's displayed (newest to oldest)
+    // Sort the history array the same way it's displayed (based on current sort preference)
     history.sort((a, b) => {
       const dateA = new Date(a.realDate || 0);
       const dateB = new Date(b.realDate || 0);
-      return dateB - dateA; // Changed to match new display order
+      return this.sortNewestFirst ? dateB - dateA : dateA - dateB;
     });
     
     // Now access the correct entry based on the sorted index
@@ -950,11 +974,11 @@ export class KarmaSheet extends DocumentSheet {
     // Get a copy of the history array
     const history = foundry.utils.deepClone(this.object.system.karma?.history || []);
     
-    // Sort the history array the same way it's displayed (newest to oldest)
+    // Sort the history array the same way it's displayed (based on current sort preference)
     history.sort((a, b) => {
       const dateA = new Date(a.realDate || 0);
       const dateB = new Date(b.realDate || 0);
-      return dateB - dateA; // Changed to match new display order
+      return this.sortNewestFirst ? dateB - dateA : dateA - dateB;
     });
     
     if (index < 0 || index >= history.length) return;
