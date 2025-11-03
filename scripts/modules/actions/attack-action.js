@@ -463,11 +463,16 @@ export class AttackAction extends BaseAction {
           break;
       }
 
+      // Calculate autoSave before using it
+      const autoSave = (typeof resolveCombatMode === "function" && targetActor)
+        ? (resolveCombatMode(targetActor) === "full")
+        : false;
+
       const actions = (!isManualMode && isHit && canEffectsApply(penetratingDamage) && targetActor)
         ? buildActionsBox({
             showSlam,
             showStun,
-            showKill, // ← NEW
+            showKill,
             pulled: choice.resultCap !== 'none' || (choice.pulledDamage > 0 && choice.pulledDamage < rawDamage),
             breakingFeat: currentBreakingFeat,
             actorUuid: actor.uuid,
@@ -478,9 +483,7 @@ export class AttackAction extends BaseAction {
             damageType,
             bypassArmor: choice.bypassArmor || false,
             autoApply: !!this.opts?.autoApply,
-            autoSave: (typeof resolveCombatMode === "function" && targetActor)
-              ? (resolveCombatMode(targetActor) === "full")
-              : false,
+            autoSave,
           })
         : "";
 

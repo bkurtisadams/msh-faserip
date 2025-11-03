@@ -1817,10 +1817,15 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 26px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  min-height: 32px;
+  /* white-space: nowrap; */
+  white-space: normal;
+  padding: 6px 8px;          /* Increase padding to contain text */
+  box-sizing: border-box;     /* Include padding in button size */
+  line-height: 1.2;          /* Better spacing for wrapped lines */
+  text-align: center;        /* Keep text centered */
+  /* overflow: hidden; */
+  /* text-overflow: ellipsis; */
 }
 
 .karma-sheet .karma-controls button:hover {
