@@ -3,11 +3,10 @@ export class FaseripItemSheet extends ItemSheet {
   static get defaultOptions() {
     return foundry.utils.mergeObject(super.defaultOptions, {
       classes: ["faserip", "sheet", "item"],
-      width: 500,
+      width: 640, // a bit wider to avoid label wrap
       height: 600,
       tabs: [{ navSelector: ".sheet-tabs", contentSelector: ".sheet-body", initial: "basics" }],
       resizable: true,
-      width: 640, // a bit wider to avoid label wrap
       submitOnChange: true
     });
   }

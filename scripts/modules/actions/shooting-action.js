@@ -59,10 +59,40 @@ export class ShootingAction extends RangedAttackAction {
       `<option value="${i.id}" ${i.id === savedItemId ? 'selected' : ''}>${i.name}</option>`
     ).join("");
 
+    // If no shooting weapons, try to detect a non-shooting source item and reroute
     if (!itemOptions) {
+      const src = this?.opts?.sourceItem || this?.opts?.equipment || null;
+
+      if (src?.type === "equipment" && src.system?.category === "weapon") {
+        const w  = String(src.system.weaponType || "").toLowerCase();
+        const dt = String(src.system.damageType || "").toUpperCase();
+
+        // Minimal mapping that mirrors your action names/codes
+        const fallbackAction =
+          w === "thrown" ? (dt.startsWith("E") ? "Throwing Edged (TE)" : "Throwing Blunt (TB)") :
+          w === "melee"  ? (dt.startsWith("E") ? "Edged Attack (EA)"   : "Blunt Attack (BA)") :
+          null;
+
+        if (fallbackAction) {
+          const roller = (globalThis.FaseripRolls?.rollEquipment ?? game.msh?.rollEquipment);
+          if (typeof roller === "function") {
+            return roller(actor, src, {
+              useDirectRoll: true,
+              actionType:    fallbackAction,
+              columnShift:   Number(this?.opts?.shift ?? 0),
+              karma:         Number(this?.opts?.karma ?? 0),
+              skipDice:      !!this?.opts?.skipDice,
+              suppressWarnings: true
+            });
+          }
+        }
+      }
+
+      // Only warn if we truly have no weapon to act with and no source item fallback
       ui.notifications.warn(`${actor.name} has no shooting weapons.`);
       return;
     }
+
 
     // Get initial weapon for range display
     const initialWeapon = shootingWeapons.find(i => i.id === savedItemId) || shootingWeapons[0];

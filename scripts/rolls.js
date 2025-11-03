@@ -591,23 +591,6 @@ export class FaseripRolls {
 
       return { roll, resultColor, resultText };
     } else {
-      // First call - show dialog to select options
-      // Define action types from the Universal Table
-      /* const ACTIONS = {
-        "Blunt Attack (BA)": { ability: "fighting", results: { white: "Miss", green: "Hit", yellow: "Slam", red: "Stun" } },
-        "Edged Attack (EA)": { ability: "fighting", results: { white: "Miss", green: "Hit", yellow: "Stun", red: "Kill" } },
-        "Shooting Attack (Sh)": { ability: "agility", results: { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Kill" } },
-        "Throwing Edged (TE)": { ability: "agility", results: { white: "Miss", green: "Hit", yellow: "Stun", red: "Kill" } },
-        "Throwing Blunt (TB)": { ability: "agility", results: { white: "Miss", green: "Hit", yellow: "Hit", red: "Stun" } },
-        "Energy (En)": { ability: "agility", results: { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Kill" } },
-        "Force (Fo)": { ability: "agility", results: { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Stun" } },
-        "Grappling (GP)": { ability: "strength", results: { white: "Miss", green: "Miss", yellow: "Partial", red: "Hold" } },
-        "Grabbing (Gb)": { ability: "strength", results: { white: "Miss", green: "Take", yellow: "Grab", red: "Break" } },
-        "Escaping (ES)": { ability: "strength", results: { white: "Miss", green: "Miss", yellow: "Escape", red: "Reverse" } },
-        "Mental Attack": { ability: "psyche", results: { white: "Failure", green: "Success", yellow: "Special Effect", red: "Maximum Effect" } },
-        "General Power Use": { ability: "none", results: { white: "Failure", green: "Success", yellow: "Special Effect", red: "Maximum Effect" } }
-      }; */
-
       // Determine the default damage type based on power type
       let defaultDamageType = "Energy-Energy";
       if (power.system.type) {
@@ -1844,11 +1827,15 @@ export class FaseripRolls {
     if (category === "weapon") {
       // Roll for weapon attack
       const rank = equipment.system.materialStrength || "Typical";
-      const damage = equipment.system.damage || "-";
-      const damageType = equipment.system.damageType || "Blunt";
-      const range = equipment.system.range || "None";
-      // Get the weapon type from the equipment
-      const weaponType = equipment.system.weaponType || "";
+      const damage = equipment.system.damage ?? "-";
+
+      // Normalize damageType & weaponType for consistent matching
+      const damageTypeRaw = equipment.system.damageType ?? "Blunt";
+      const damageType = String(damageTypeRaw).toUpperCase(); // e.g., "EA", "BA", "E", "F", "GP", "GB", etc.
+
+      const range = equipment.system.range ?? "";
+      const weaponTypeRaw = equipment.system.weaponType ?? "";
+      const weaponType = String(weaponTypeRaw).toLowerCase(); // "melee", "thrown", "shooting", etc.
 
       // Check ammunition at the very beginning for weapons
       if (equipment.system.shots) {
@@ -1884,6 +1871,15 @@ export class FaseripRolls {
         defaultAction = "Stunning Attack";
       }
 
+      // --- SAFEGUARD: never leave melee/thrown edged/blunt as Shooting by default ---
+      if (defaultAction === "Shooting Attack (Sh)") {
+        if (weaponType === "melee") {
+          defaultAction = damageType.startsWith("E") ? "Edged Attack (EA)" : "Blunt Attack (BA)";
+        } else if (weaponType === "thrown" || /\(thrown\)/i.test(equipment.name)) {
+          defaultAction = damageType.startsWith("E") ? "Throwing Edged (TE)" : "Throwing Blunt (TB)";
+        }
+      }
+
       // Define action types from the Universal Table
       const ACTIONS = {
         "Blunt Attack (BA)": { ability: "fighting", results: { white: "Miss", green: "Hit", yellow: "Slam", red: "Stun" }},
@@ -1898,6 +1894,28 @@ export class FaseripRolls {
         "Escaping (Es)": { ability: "strength", results: { white: "Miss", green: "Miss", yellow: "Escape", red: "Reverse" }},
         "Stunning Attack": { ability: "agility", results: { white: "No Effect", green: "Partial Effect", yellow: "Stun", red: "Knockout" }}
       };
+
+      // --- normalize damage-type once, reuse everywhere ---
+      function normalizeDamageTypeForCombat(actionName, weaponType) {
+        const name = String(actionName || "").toLowerCase();
+        const wtyp = String(weaponType || "").toLowerCase();
+
+        // Prefer the chosen action's name over raw item fields
+        if (name.includes("throwing")) {
+          return name.includes("edged") ? "Physical-Edged" : "Physical-Blunt";
+        }
+        if (name.includes("shooting")) return "Physical-Shooting";
+        if (name.includes("blunt"))    return "Physical-Blunt";
+        if (name.includes("edged"))    return "Physical-Edged";
+        if (name.includes("energy"))   return "Energy-Energy";
+        if (name.includes("force"))    return "Force";
+
+        // Last-ditch fallback: if item is explicitly marked shooting
+        if (wtyp === "shooting" || wtyp === "ranged") return "Physical-Shooting";
+
+        // Safe default (don’t silently treat unknowns as shooting)
+        return "Physical-Blunt";
+      }
 
       // If this is a macro or direct call with options provided
       // Check if CTRL is pressed or if this is a direct roll call
@@ -1918,7 +1936,13 @@ export class FaseripRolls {
         const skipDice = options.skipDice ?? skipDiceRoll;
 
         // NOW calculate range data using the defined shift value
-        const rangeData = calculateRangeInfo(actor, equipment, game.user.targets.first());
+        // Use range only for ranged/throwing (anything that isn't pure melee slugfest)
+        const useRange = !(weaponType === "melee" && (
+          /edged/i.test(savedActionType || defaultAction) || /blunt/i.test(savedActionType || defaultAction)
+        ));
+        const rangeData = useRange
+          ? calculateRangeInfo(actor, equipment, game.user.targets.first())
+          : { penalty: 0, outOfRange: false, maxRange: null, distance: null, info: "" };
 
         // Check if out of range first
         if (rangeData.outOfRange) {
@@ -2102,57 +2126,41 @@ export class FaseripRolls {
 
               // DAMAGE TYPE NORMALIZATION HERE
               // Normalize damage types for combat handler
-              let normalizedDamageType;
               const weaponType = equipment.system.weaponType || "";
               const rawDamageType = equipment.system.damageType || "";
 
-              // Normalize damage types for shooting weapons
-              if (weaponType === "shooting" || actionName.includes("Shooting")) {
-                normalizedDamageType = "Physical-Shooting";
-              } else if (actionName.includes("Blunt")) {
-                normalizedDamageType = "Physical-Blunt";
-              } else if (actionName.includes("Edged")) {
-                normalizedDamageType = "Physical-Edged";
-              } else if (actionName.includes("Energy")) {
-                normalizedDamageType = "Energy-Energy";
-              } else if (actionName.includes("Force")) {
-                normalizedDamageType = "Force";
-              } else {
-                // Default based on weapon type
-                normalizedDamageType = "Physical-Shooting"; // Most weapons are shooting
-              }
-
-              console.log(`Weapon damage type: "${rawDamageType}" → "${normalizedDamageType}"`);
+              // DAMAGE TYPE NORMALIZATION (DRY)
+              const normalizedDamageType = normalizeDamageTypeForCombat(actionName, equipment.system.weaponType || "");
+              console.log(`Weapon damage type: "${equipment.system.damageType || ""}" → "${normalizedDamageType}"`);
 
               const actionNameLower = actionName.toLowerCase();
               const effectLower = effect?.toLowerCase() || "";
 
-              // Apply FASERIP rules: only certain attack types can kill
-              const canBeKill = (actionNameLower.includes("edged") || 
-                                actionNameLower.includes("shooting") || 
-                                actionNameLower.includes("energy")) && 
+              // Apply FASERIP rules: only certain attack types can kill/slam/stun
+              const canBeKill = (actionNameLower.includes("edged") ||
+                                actionNameLower.includes("shooting") ||
+                                actionNameLower.includes("energy")) &&
                                 effectLower.includes("kill");
 
-              const canBeSlam = (actionNameLower.includes("blunt") || 
-                                actionNameLower.includes("shooting")) && 
+              const canBeSlam = (actionNameLower.includes("blunt") ||
+                                actionNameLower.includes("shooting")) &&
                                 effectLower.includes("slam");
 
               const canBeStun = effectLower.includes("stun") || actionNameLower.includes("stunning");
-              
+
               await CombatHandler.processAttack({
                 attacker: actor,
                 target: target.actor,
                 baseDamage: baseDamage,
-                damageType: normalizedDamageType, // Use the normalized type
+                damageType: normalizedDamageType,
                 sourceName: equipment.name,
-                canBeStun: canBeStun,
-                canBeSlam: canBeSlam,
-                canBeKill: canBeKill,
+                canBeStun, canBeSlam, canBeKill,
                 originalRollResult: resultColor.toLowerCase()
               }, {
-                ammoType: currentAmmoType, // Use the determined ammo type instead of options.ammoType
+                ammoType: currentAmmoType,
                 skipDefenseDialog: false
               });
+
             }
           }
         } else if (options.multiAttacks) {
@@ -2176,45 +2184,29 @@ export class FaseripRolls {
 
             // DAMAGE TYPE NORMALIZATION HERE
             // Normalize damage types for combat handler
-            let normalizedDamageType;
             const weaponType = equipment.system.weaponType || "";
             const rawDamageType = equipment.system.damageType || "";
 
             // Normalize damage types for shooting weapons
-            if (weaponType === "shooting" || actionName.includes("Shooting")) {
-              normalizedDamageType = "Physical-Shooting";
-            } else if (actionName.includes("Blunt")) {
-              normalizedDamageType = "Physical-Blunt";
-            } else if (actionName.includes("Edged")) {
-              normalizedDamageType = "Physical-Edged";
-            } else if (actionName.includes("Energy")) {
-              normalizedDamageType = "Energy-Energy";
-            } else if (actionName.includes("Force")) {
-              normalizedDamageType = "Force";
-            } else {
-              // Default based on weapon type
-              normalizedDamageType = "Physical-Shooting"; // Most weapons are shooting
-            }
-
-            console.log(`Weapon damage type: "${rawDamageType}" → "${normalizedDamageType}"`);
-
+            // DAMAGE TYPE NORMALIZATION (DRY)
+            const normalizedDamageType = normalizeDamageTypeForCombat(actionName, equipment.system.weaponType || "");
+            console.log(`Weapon damage type: "${equipment.system.damageType || ""}" → "${normalizedDamageType}"`);
             // END OF DAMAGE TYPE NORMALIZATION ↑
 
             const actionNameLower = actionName.toLowerCase();
             const effectLower = effect?.toLowerCase() || "";
 
-            // Apply FASERIP rules: only certain attack types can kill
-            const canBeKill = (actionNameLower.includes("edged") || 
-                              actionNameLower.includes("shooting") || 
-                              actionNameLower.includes("energy")) && 
+            // Apply FASERIP rules: only certain attack types can kill/slam/stun
+            const canBeKill = (actionNameLower.includes("edged") ||
+                              actionNameLower.includes("shooting") ||
+                              actionNameLower.includes("energy")) &&
                               effectLower.includes("kill");
 
-            const canBeSlam = (actionNameLower.includes("blunt") || 
-                              actionNameLower.includes("shooting")) && 
+            const canBeSlam = (actionNameLower.includes("blunt") ||
+                              actionNameLower.includes("shooting")) &&
                               effectLower.includes("slam");
 
             const canBeStun = effectLower.includes("stun") || actionNameLower.includes("stunning");
-
 
             // Around line 2580 in rollEquipment function
             if (effectLower === "miss") {
@@ -4638,3 +4630,5 @@ async function processDodgeResult(actor, color, finalValue, label) {
 
   ui.notifications.info(`${actor.name} is now dodging with ${csPenalty} effect. GM should enforce restrictions.`);
 }
+
+globalThis.FaseripRolls = globalThis.FaseripRolls ?? FaseripRolls;

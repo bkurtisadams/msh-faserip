@@ -1930,18 +1930,37 @@ export class FaseripActorSheet extends ActorSheet {
       // Determine action type based on equipment category
       let actionType;
       const category = item.system.category?.toLowerCase();
-      
-      if (category === "melee" || category === "melee weapon") {
+      const weaponType = item.system.weaponType?.toLowerCase();
+      const damageType = item.system.damageType?.toUpperCase();
+
+      if (category === "weapon") {
+        // Check weaponType to determine the correct action
+        if (weaponType === "shooting" || weaponType === "firearm") {
+          actionType = "shooting";
+        } else if (weaponType === "melee") {
+          // Use damageType to determine if edged or blunt
+          actionType = (damageType === "EA") ? "edged-attack" : "blunt-attack";
+        } else if (weaponType === "thrown") {
+          // Use damageType to determine if edged or blunt
+          actionType = (damageType === "TE") ? "throwing-edged" : "throwing-blunt";
+        } else {
+          // Fallback: try to infer from damageType
+          if (damageType === "S") actionType = "shooting";
+          else if (damageType === "EA") actionType = "edged-attack";
+          else if (damageType === "BA") actionType = "blunt-attack";
+          else if (damageType === "TE") actionType = "throwing-edged";
+          else if (damageType === "TB") actionType = "throwing-blunt";
+          else actionType = "shooting"; // ultimate fallback
+        }
+      } else if (category === "melee" || category === "melee weapon") {
         actionType = item.system.attackForm === "edged" ? "edged-attack" : "blunt-attack";
-      } else if (category === "weapon" || category === "ranged weapon") {
-        actionType = "shooting";
       } else if (category === "thrown") {
         actionType = item.system.attackForm === "edged" ? "throwing-edged" : "throwing-blunt";
       } else {
         // Unknown equipment type - use old system
         return item.rollItem();
       }
-      
+            
       return ActionDispatcher.roll(actionType, {
         actor: this.actor,
         abilityName: actionType.includes("shooting") || actionType.includes("throwing") ? "agility" : "fighting",

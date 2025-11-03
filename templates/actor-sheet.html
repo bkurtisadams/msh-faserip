@@ -734,7 +734,10 @@
                 title="{{item.system.category}} - {{item.system.description}}">
                 <td class="equipment-name">
                   {{#if (or (eq item.system.category "weapon") (eq item.system.category "power-item") (eq item.system.category "custom"))}}
-                  <a class="item-control equipment-roll" title="Roll"><i class="fas fa-dice-d20"></i></a>
+                  <a class="item-control equipment-roll"
+                    data-item-id="{{item._id}}"
+                    title="Roll"><i class="fas fa-dice-d20"></i></a>
+
                   {{/if}}
                   <img src="{{item.img}}" class="equipment-icon equipment-info" width="24" height="24" title="Click for info. Shift+drag to reorder." />
                   <span class="equipment-name-text">{{item.name}}</span>

@@ -390,7 +390,7 @@ export class FaseripEquipmentSheet extends ItemSheet {
       await this.object.update({ "system.attackModes": modes });
     });
 
-    /* html.find('.remove-attack-mode').click(async ev => {
+    html.find('.remove-attack-mode').click(async ev => {
       ev.preventDefault();
       const index = parseInt(ev.currentTarget.dataset.index);
       
@@ -406,7 +406,7 @@ export class FaseripEquipmentSheet extends ItemSheet {
       
       await this.object.update({ "system.attackModes": modes });
       this.render(true);
-    }); */
+    });
 
     // Save attack mode changes on field change (without re-render)
     
