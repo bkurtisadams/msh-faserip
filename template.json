@@ -1,6 +1,6 @@
 {
   "Actor": {
-    "types": ["hero", "villain", "npc"],
+    "types": ["hero", "villain", "npc", "vehicle"],
     "templates": {
       "base": {
         "identity": "",
@@ -86,6 +86,27 @@
       "templates": ["base", "abilities", "derived", "movement", "progress"],
       "characterType": "civilian",
       "resistances": []
+    },
+    "vehicle": {
+      "templates": ["base"],
+      "type": "Road",
+      "cost": "Typical",
+      "control": "Typical",
+      "speed": "Typical",
+      "body": "Typical",
+      "protection": "Typical",
+      "compartmented": false,
+      "features": "",
+      "description": "",
+      "driver": "",
+      "passengers": "",
+      "bodyHP": 20,
+      "bodyHPMax": 20,
+      "bodyCSLoss": 0,
+      "speedCSLoss": 0,
+      "controlCSLoss": 0,
+      "damageLog": [],
+      "resources": { "body": { "value": 20, "max": 20 } }
     }
   },
   "Item": {
@@ -327,13 +348,17 @@
       "description": "",
 
       "driver": "",
-      "passengers": [],
+      "passengers": "",
+
       "bodyHP": 20,
       "bodyHPMax": 20,
       "bodyCSLoss": 0,
       "speedCSLoss": 0,
       "controlCSLoss": 0,
-      "damageLog": []
+      "damageLog": [],
+
+      "resources": { "body": { "value": 20, "max": 20 }
+  }
     },
     "headquarters": {
       "templates": ["base"],

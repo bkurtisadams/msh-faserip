@@ -21,6 +21,10 @@ import { playCombatSFX } from "./modules/actions/audio-utils.js";
 import { ActionDispatcher } from './modules/actions/action-dispatcher.js';
 import { ManualModeDialog } from './modules/actions/manual-mode-dialog.js';
 import * as Effects from "./modules/effects/effect-engine.js";
+//import { MSHVehicleActor } from "./modules/actors/vehicle-actor.js";
+//import { MSHVehicleActorSheet } from "./modules/sheets/vehicle-actor-sheet.js";
+import { MSHVehicleActorSheet } from "./vehicle-actor-sheet.js";
+
 
 
 Hooks.once("init", async () => {
@@ -129,6 +133,12 @@ Hooks.once("init", async () => {
     config: true,
     type: Boolean,
     default: false
+  });
+
+  Actors.registerSheet("msh-faserip", MSHVehicleActorSheet, {
+    types: ["vehicle"],
+    makeDefault: true,
+    label: "Vehicle Sheet"
   });
 
   function shouldConvertToSecondsByPolicy() {
@@ -987,7 +997,10 @@ Hooks.once("init", async () => {
   Actors.unregisterSheet("core", ActorSheet);
   Items.unregisterSheet("core", ItemSheet);
 
-  Actors.registerSheet("msh-faserip", FaseripActorSheet, { makeDefault: true });
+  Actors.registerSheet("msh-faserip", FaseripActorSheet, {
+    types: ["hero", "villain", "npc"],
+    makeDefault: true
+  });
   
   // Make sure to register vehicle items with FaseripItemSheet
   Items.registerSheet("msh-faserip", FaseripItemSheet, { 
@@ -1016,32 +1029,43 @@ Hooks.once("init", async () => {
 
 Hooks.on("preCreateActor", (document, data, options, userId) => {
   console.log("FASERIP: preCreateActor - Type:", document.type);
-  console.log("FASERIP: preCreateActor - Data before fix:", data.prototypeToken);
-  
-  // Initialize prototypeToken if it doesn't exist
-  if (!data.prototypeToken) {
-    data.prototypeToken = {};
-  }
-  
-  // Force the correct disposition based on actor type
+  console.log("FASERIP: preCreateActor - Data before fix:", data?.prototypeToken);
+
+  // Ensure prototypeToken object exists
+  data.prototypeToken ??= {};
+  const pt = data.prototypeToken;
+
+  // --- Disposition defaults by actor type ---
   switch (document.type) {
     case "hero":
-      data.prototypeToken.disposition = CONST.TOKEN_DISPOSITIONS.FRIENDLY; // 1
+      pt.disposition = CONST.TOKEN_DISPOSITIONS.FRIENDLY; // 1
       console.log("FASERIP: Forcing hero disposition to FRIENDLY (1)");
       break;
     case "villain":
-      data.prototypeToken.disposition = CONST.TOKEN_DISPOSITIONS.HOSTILE; // -1
+      pt.disposition = CONST.TOKEN_DISPOSITIONS.HOSTILE; // -1
       console.log("FASERIP: Forcing villain disposition to HOSTILE (-1)");
+      break;
+    case "vehicle":
+      // If a value was already provided (e.g., via import), keep it; else default to NEUTRAL.
+      pt.disposition ??= CONST.TOKEN_DISPOSITIONS.NEUTRAL; // 0
+      console.log("FASERIP: Defaulting vehicle disposition to NEUTRAL (0)");
+      // --- Vehicle-specific token defaults (only if not already set) ---
+      pt.lockRotation ??= true;              // vehicles usually don't rotate freely
+      pt.width ??= 2;                        // tweak to your grid scale
+      pt.height ??= 2;
+      pt.bar1 ??= {};
+      pt.bar1.attribute ??= "system.resources.body"; // Body HP bar
       break;
     case "npc":
     default:
-      data.prototypeToken.disposition = CONST.TOKEN_DISPOSITIONS.NEUTRAL; // 0
+      pt.disposition = CONST.TOKEN_DISPOSITIONS.NEUTRAL; // 0
       console.log("FASERIP: Forcing NPC disposition to NEUTRAL (0)");
       break;
   }
-  
+
   console.log("FASERIP: preCreateActor - Data after fix:", data.prototypeToken);
 });
+
 
 // CONSOLIDATED READY HOOK - All ready logic in one place
 Hooks.once("ready", async () => {

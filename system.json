@@ -33,6 +33,8 @@
         "scripts/actorSheet.js",
         "scripts/itemSheet.js",
 
+        "scripts/vehicle-actor-sheet.js",
+
         "scripts/macros.js",
         "scripts/gm-utils.js",
         "scripts/rolls.js",
@@ -98,7 +100,8 @@
         "Actor": {
             "hero": {},
             "villain": {},
-            "npc": {}
+            "npc": {},
+            "vehicle": {}
         },
         "Item": {
             "power": {},

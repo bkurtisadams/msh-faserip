@@ -148,6 +148,14 @@ export class FaseripActor extends Actor {
         defaultDisposition = CONST.TOKEN_DISPOSITIONS.HOSTILE; // -1
         break;
       case "npc":
+      case "vehicle":
+        defaultDisposition = CONST.TOKEN_DISPOSITIONS.NEUTRAL; // 0
+        // Optional safety: set token bar mapping if not present (helps existing worlds)
+        if (!this.prototypeToken?.bar1?.attribute) {
+          this.prototypeToken.updateSource({ bar1: { attribute: "system.resources.body" } });
+        }
+        break;
+
       default:
         defaultDisposition = CONST.TOKEN_DISPOSITIONS.NEUTRAL; // 0
         break;
@@ -158,6 +166,27 @@ export class FaseripActor extends Actor {
       console.log(`FASERIP: Correcting disposition for ${this.type} "${this.name}" from ${this.prototypeToken.disposition} to ${defaultDisposition}`);
       this.prototypeToken.updateSource({ disposition: defaultDisposition });
     }
+  }
+
+  prepareDerivedData() {
+    super.prepareDerivedData();
+    if (this.type === "vehicle") {
+      const s = this.system ?? {};
+      s.resources ??= {};
+      const val = Number.isFinite(s.bodyHP)    ? Number(s.bodyHP)    : 0;
+      const max = Number.isFinite(s.bodyHPMax) ? Number(s.bodyHPMax) : 0;
+      s.resources.body = { value: val, max };
+    }
+  }
+
+  async applyVehicleDamage(amount = 0) {
+    if (this.type !== "vehicle") return this;
+    const s = this.system ?? {};
+    const next = Math.max(0, (Number(s.bodyHP) || 0) - Math.max(0, Number(amount) || 0));
+    return this.update({
+      "system.bodyHP": next,
+      "system.resources.body.value": next
+    });
   }
 
   // Getter for available lifetime karma (for bottom left display)
