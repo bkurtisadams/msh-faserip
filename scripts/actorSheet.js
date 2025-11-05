@@ -3880,30 +3880,44 @@ _getPopularityRank(value) {
 _rollVehicleControl(vehicle) {
   const actor = this.actor;
   const agility = actor.system.abilities.agility?.value ?? 6;
+  // --- Rank ladder + values (min thresholds) ---
   const rankTable = [
     "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent",
     "Remarkable", "Incredible", "Amazing", "Monstrous", "Unearthly",
     "Shift-X", "Shift-Y", "Shift-Z", "Class 1000", "Class 3000", "Class 5000", "Beyond"
   ];
-  const rankValues = Object.fromEntries(rankTable.map((r, i) => [r, [0, 2, 4, 6, 10, 20, 30, 40, 50, 75, 100, 150, 200, 500, 1000, 3000, 5000, 10000][i]]));
-  const colorStyles = {
-    white: '#f8f8f8', green: '#4CAF50', yellow: '#FFC107', red: '#F44336'
+  const rankMinValues = [0, 2, 4, 6, 10, 20, 30, 40, 50, 75, 100, 150, 200, 500, 1000, 3000, 5000, 10000];
+  const rankValues = Object.fromEntries(rankTable.map((r, i) => [r, rankMinValues[i]]));
+
+  const getRankFromValue = (val) => {
+    for (let i = rankTable.length - 1; i >= 0; i--) {
+      if (rankValues[rankTable[i]] <= val) return rankTable[i];
+    }
+    return rankTable[0];
   };
-  const textColor = (c) => ["white", "yellow"].includes(c) ? "#333" : "white";
 
+  // Compare RAW values to find limiting factor
   const controlRank = vehicle.system.control || "Typical";
-  const controlCSLoss = vehicle.system.controlCSLoss || 0;
-  const rawControlValue = rankValues[controlRank] ?? 6;
-  const controlValue = Math.max(0, rawControlValue - (controlCSLoss * 2));
+  const controlIndex = Math.max(0, rankTable.indexOf(controlRank));
+  const driverAgiRank = getRankFromValue(agility);
+  const driverAgiIndex = rankTable.indexOf(driverAgiRank);
 
-  // Figure out adjusted control rank after CS loss
-  const adjustedControlRank = Object.entries(rankValues).find(([_, v]) => v === controlValue)?.[0] || "Unknown";
+  // If Control < Agility: vehicle limits (apply CS losses)
+  // If Control >= Agility: driver limits (NO CS losses)
+  const controlCSLoss = Number(vehicle.system.controlCSLoss || 0);
+  const isControlLimiting = (controlIndex < driverAgiIndex); // Only if STRICTLY less
 
-  const usedValue = Math.min(agility, controlValue);
-  const baseUsedRank = Object.entries(rankValues).find(([_, v]) => v === usedValue)?.[0] || "Typical";
-  const baseRankIndex = rankTable.indexOf(baseUsedRank);
+  const baseRankIndex = isControlLimiting 
+    ? Math.max(0, controlIndex - controlCSLoss)  // Apply CS losses when vehicle limits
+    : Math.min(driverAgiIndex, controlIndex);     // Use lower of the two when driver limits
 
-  // 🧱 Prevent control roll if vehicle is destroyed
+  const baseUsedRank = rankTable[baseRankIndex];
+  const adjustedControlRank = rankTable[Math.max(0, controlIndex - controlCSLoss)];
+  
+  // Numeric value for the base-used rank (some cards/logic expect this)
+  const usedValue = rankValues[baseUsedRank];
+
+  // Prevent control roll if vehicle is destroyed
   const bodyRank = vehicle.system.body || "Typical";
   const maxHP = rankValues[bodyRank] ?? 6;
   const currentHP = vehicle.system.bodyHP ?? maxHP;
@@ -3914,13 +3928,46 @@ _rollVehicleControl(vehicle) {
     // UI popup
     ui.notifications.error(`${vehicle.name} is destroyed and cannot be operated.`);
 
-    // Chat card
+    // Chat card with matching styling
     ChatMessage.create({
       speaker: ChatMessage.getSpeaker({ actor }),
       content: `
-        <div style="border:1px solid #aaa; padding:10px; background:#fbeaea; border-radius:5px;">
-          <h3>Vehicle Control Attempt</h3>
-          <p>${message}</p>
+        <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
+          <div style="padding:5px 10px;border-bottom:1px solid #c0c0c0;font-size:1.1em;color:#0d47a1;">
+            <strong>${actor.name} - Vehicle Control FEAT</strong>
+          </div>
+          <div style="padding:5px 10px;font-size:.9em;">
+            <div>Vehicle: ${vehicle.name}</div>
+            <div>Driver Agility: ${driverAgiRank} (${agility})</div>
+            <div>Control Rank: ${controlRank}${isControlLimiting && controlCSLoss > 0 ? ` — ${controlCSLoss} CS Lost → ${adjustedControlRank}` : ""}</div>
+            <div>Used Rank: ${baseUsedRank}${cs !== 0 ? ` — Shift ${cs >= 0 ? '+' : ''}${cs} → ${shiftedRank}` : ""}</div>
+            <div>Roll: ${controlRoll.total}${totalKarmaUsed ? ` + Karma: ${totalKarmaUsed}` : ""} = ${cappedTotal}</div>
+            ${stunt ? `<div>Stunt: ${stuntName || "(unnamed)"}${stuntFailure ? " — <span style='color:#c62828;'>FAILED</span>" : ""}</div>` : ""}
+          </div>
+          
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;padding:8px 10px;font-size:.85em;text-align:center;">
+            <div style="padding:4px;background:#f5f5f5;border:1px solid #ddd;border-radius:2px;">
+              <div style="font-weight:600;color:#666;">White:</div>
+              <div style="color:#c62828;">Crash</div>
+            </div>
+            <div style="padding:4px;background:#e8f5e9;border:1px solid #a5d6a7;border-radius:2px;">
+              <div style="font-weight:600;color:#2e7d32;">Green:</div>
+              <div>Maintained</div>
+            </div>
+            <div style="padding:4px;background:#fffde7;border:1px solid #fff176;border-radius:2px;">
+              <div style="font-weight:600;color:#f57f17;">Yellow:</div>
+              <div>Maintained</div>
+            </div>
+            <div style="padding:4px;background:#ffebee;border:1px solid #ef9a9a;border-radius:2px;">
+              <div style="font-weight:600;color:#c62828;">Red:</div>
+              <div>Maintained</div>
+            </div>
+          </div>
+
+          <div style="text-align:center;padding:8px;margin:5px;font-weight:bold;font-size:1.1em;border-radius:3px;background:${mainBg};color:${mainTx};">
+            RESULT: ${featColor.toUpperCase()} — ${stuntFailure ? `STUNT FAILED` : (isCrash ? "OUT OF CONTROL" : "CONTROL MAINTAINED")}
+          </div>
+          ${crashDetails}
         </div>
       `
     });
@@ -3931,21 +3978,58 @@ _rollVehicleControl(vehicle) {
   new Dialog({
     title: `Vehicle Control FEAT: ${vehicle.name}`,
     content: `
-      <p><strong>${actor.name}</strong> is attempting to control <em>${vehicle.name}</em>.</p>
-      <p>Used Rank: <b>${baseUsedRank}</b> (${usedValue})</p>
-      <div><label>Column Shifts (CS):</label><input id="cs" type="number" value="0"></div>
-      <div><label>Karma Spent:</label><input id="karma" type="number" value="0"></div>
-      <div><label>Attempting Stunt?</label> <input type="checkbox" id="stunt-check"> <input id="stunt-name" type="text" placeholder="e.g., Bootleg Turn" style="width: 60%; margin-left: 8px;"></div>
-      <div><label>Crash Object:</label>
-        <select id="crash-object">
-          ${rankTable.slice(0, 10).map(r => `<option value="${r}" ${r === "Excellent" ? "selected" : ""}>${r}</option>`).join('')}
-        </select>
+      <div style="margin-bottom:8px;">
+        <label style="display:inline-block;width:120px;">Vehicle:</label>
+        <strong>${vehicle.name}</strong>
       </div>
-      <div><label>Passengers Buckled In?</label>
-        <select id="buckled">
-          <option value="yes">Yes (Blunt)</option>
-          <option value="no">No (Edged)</option>
-        </select>
+      <div style="margin-bottom:8px;">
+        <label style="display:inline-block;width:120px;">Driver:</label>
+        <strong>${actor.name}</strong>
+      </div>
+      <div style="margin-bottom:8px;">
+        <label style="display:inline-block;width:120px;">Used Rank:</label>
+        <input type="text" value="${baseUsedRank}" style="width:120px;" readonly>
+        <span style="margin-left:6px;">(${usedValue})</span>
+      </div>
+
+      <div style="margin-bottom:8px;">
+        <label style="display:inline-block;width:120px;">Column Shift:</label>
+        <input id="cs" type="number" value="0" style="width:60px;">
+        <span style="color:#666;font-size:.9em;">(+ right, - left)</span>
+      </div>
+
+      <div style="margin-bottom:8px;">
+        <label style="display:inline-block;width:120px;">Karma Points:</label>
+        <input id="karma" type="number" value="0" min="0" style="width:60px;">
+        <span style="color:#666;font-size:.85em;">(spend only up to 100)</span>
+      </div>
+
+      <div style="margin-top:8px;padding:6px;border:1px solid #ddd;background:#fafafa;border-radius:3px;">
+        <div style="font-weight:bold;margin-bottom:6px;">Stunt Settings</div>
+        <div style="margin-bottom:6px;">
+          <label><input type="checkbox" id="stunt-check"> Attempting Stunt?</label>
+        </div>
+        <div style="margin-bottom:6px;">
+          <label style="display:inline-block;width:100px;">Stunt Name:</label>
+          <input id="stunt-name" type="text" placeholder="e.g., Bootleg Turn" style="width:200px;">
+        </div>
+      </div>
+
+      <div style="margin-top:8px;padding:6px;border:1px solid #ddd;background:#fafafa;border-radius:3px;">
+        <div style="font-weight:bold;margin-bottom:6px;">Crash Settings</div>
+        <div style="margin-bottom:6px;">
+          <label style="display:inline-block;width:120px;">Crash Object:</label>
+          <select id="crash-object">
+            ${rankTable.slice(0, 10).map(r => `<option value="${r}" ${r === "Excellent" ? "selected" : ""}>${r}</option>`).join('')}
+          </select>
+        </div>
+        <div style="margin-bottom:6px;">
+          <label style="display:inline-block;width:120px;">Passengers:</label>
+          <select id="buckled">
+            <option value="yes">Buckled In (Blunt)</option>
+            <option value="no">Not Buckled (Edged)</option>
+          </select>
+        </div>
       </div>
     `,
     buttons: {
@@ -3970,64 +4054,49 @@ _rollVehicleControl(vehicle) {
             flavor: `${actor.name} makes a Vehicle Control FEAT${stunt ? ` to perform a stunt: ${stuntName}` : ""}`
           });
 
-          let cappedTotal = controlRoll.total; // <-- NEW LINE
-          let karmaUsed = 0; // <-- NEW LINE
+          // Karma handling (daily first, then lifetime), building on your settings & history
+          let cappedTotal = controlRoll.total;
+          let karmaUsed = 0;
 
-          // <-- NEW/MODIFIED SECTION START -->
           const dailyKarmaEnabled = game.settings.get("msh-faserip", "dailyKarmaEnabled");
           let dailyKarmaUsedAmount = 0;
           let lifetimeKarmaUsedAmount = 0;
 
-          // Replace the complex daily karma logic with this simpler version:
           if (karma > 0) {
-            /* const dailyKarmaEnabled = game.settings.get("msh-faserip", "dailyKarmaEnabled");
-            let dailyKarmaUsedAmount = 0;
-            let lifetimeKarmaUsedAmount = 0; */
-
             if (dailyKarmaEnabled) {
               const dailyRemaining = this.actor.system.karma.dailyKarmaMax - (this.actor.system.karma.dailyKarmaUsed || 0);
               if (dailyRemaining > 0) {
-                // Use daily karma first (no history entry needed)
                 dailyKarmaUsedAmount = Math.min(karma, dailyRemaining);
                 cappedTotal = Math.min(100, controlRoll.total + dailyKarmaUsedAmount);
-                
-                // Update daily usage immediately
                 await game.msh.runAsGM({
                   operation: 'update',
                   targetActorUuid: this.actor.uuid,
                   args: [{ "system.karma.dailyKarmaUsed": (this.actor.system.karma.dailyKarmaUsed || 0) + dailyKarmaUsedAmount }]
                 });
-                
-                // If we need more karma than daily provides, use lifetime
                 const remainingNeeded = karma - dailyKarmaUsedAmount;
                 if (remainingNeeded > 0) {
                   lifetimeKarmaUsedAmount = remainingNeeded;
                   cappedTotal = Math.min(100, cappedTotal + lifetimeKarmaUsedAmount);
                 }
               } else {
-                // No daily karma left, use lifetime
                 lifetimeKarmaUsedAmount = karma;
                 cappedTotal = Math.min(100, controlRoll.total + lifetimeKarmaUsedAmount);
               }
             } else {
-              // Daily karma disabled, use lifetime
               lifetimeKarmaUsedAmount = karma;
               cappedTotal = Math.min(100, controlRoll.total + lifetimeKarmaUsedAmount);
             }
 
-            // Only create history entry for lifetime karma spending
             if (lifetimeKarmaUsedAmount > 0) {
               const historyEntry = {
                 realDate: new Date().toLocaleDateString(),
                 gameDate: "",
                 amount: -lifetimeKarmaUsedAmount,
                 type: "Die Roll",
-                description: `Spent lifetime karma on [ability/power/etc] roll`
+                description: `Spent lifetime karma on Vehicle Control for ${vehicle.name}`
               };
-              
               const currentHistory = foundry.utils.deepClone(this.actor.system.karma?.history || []);
               currentHistory.push(historyEntry);
-              
               await game.msh.runAsGM({
                 operation: 'update',
                 targetActorUuid: this.actor.uuid,
@@ -4035,34 +4104,21 @@ _rollVehicleControl(vehicle) {
               });
             }
           }
-
-          // Only add lifetime karma loss to history (daily is tracked by counter only)
-          if (lifetimeKarmaLoss > 0) {
-            const historyEntry = {
-              realDate: new Date().toLocaleDateString(),
-              gameDate: "",
-              amount: -lifetimeKarmaLoss,
-              type: "Die Roll",
-              description: `Spent lifetime karma on Vehicle Control for ${vehicle.name}`
-            };
-            
-            const currentHistory = foundry.utils.deepClone(this.actor.system.karma?.history || []);
-            currentHistory.push(historyEntry);
-            
-            game.msh.runAsGM({
-              operation: 'update',
-              targetActorUuid: this.actor.uuid,
-              args: [{ 
-                "system.karma.history": currentHistory,
-                "system.karma.dailyKarmaUsed": (this.actor.system.karma.dailyKarmaUsed || 0) + dailyKarmaLoss
-              }]
-            });
-            // No need to call _updateCurrentKarma here, prepareData handles it on sheet re-render
-          }
-          // <-- NEW/MODIFIED SECTION END -->
-
           const totalKarmaUsed = dailyKarmaUsedAmount + lifetimeKarmaUsedAmount;
 
+          // ---- Defense-style banner helpers (safe local fallbacks) ----
+          const colorStyles = (globalThis.colorStyles)
+            || (game?.msh?.ui?.colorStyles)
+            || { white:"#f5f5f5", green:"#e8f5e9", yellow:"#fffde7", red:"#ffebee" };
+
+          const textColor = (globalThis.textColor)
+            || (game?.msh?.ui?.textColor)
+            || (c => {
+                const m = { white:"#333", green:"#1b5e20", yellow:"#5d4037", red:"#b71c1c" };
+                return m[String(c).toLowerCase()] || "#333";
+              });
+
+          // FEAT color using your thresholds and the karma-capped total
           const getFEATColor = (rank, total) => {
             const [g, y, r] = {
               "Shift-0": [0, 36, 66], "Feeble": [6, 26, 56], "Poor": [16, 36, 66],
@@ -4078,107 +4134,166 @@ _rollVehicleControl(vehicle) {
             return "red";
           };
 
-          const featColor = getFEATColor(shiftedRank, cappedTotal).toLowerCase(); // <-- MODIFIED: Use cappedTotal
-          const isCrash = featColor === "white";
-          const stuntFailure = stunt && isCrash;
-          let crashDetails = "";
+          const featColor = getFEATColor(shiftedRank, cappedTotal).toLowerCase();
+          const isCrash = (featColor === "white");
+          const stuntFailure = (stunt && isCrash);
 
+          // Crash sequence
+          let crashDetails = "";
           if (isCrash) {
             const speedRank = vehicle.system.speed || "Typical";
-            const bodyRank = vehicle.system.body || "Typical";
+            const bodyRank  = vehicle.system.body  || "Typical";
+
+            // CRITICAL FIX: Crash FEAT uses LOWER of Speed or Body (per rules page 53)
+            // "as if the vehicle had a 'strength' equal to its Speed or Body, whichever is lower"
             const vehicleStrengthRank = rankValues[speedRank] <= rankValues[bodyRank] ? speedRank : bodyRank;
+
             const crashRoll = new Roll("1d100"); await crashRoll.evaluate();
             const crashColor = getFEATColor(vehicleStrengthRank, crashRoll.total).toLowerCase();
-            const brokeThrough = crashColor === "red";
-            const baseDamageRank = brokeThrough ? crashObjRank : speedRank;
-            const baseDamage = rankValues[baseDamageRank];
-            const protectionRank = vehicle.system.protection || "Typical";
-            const protection = rankValues[protectionRank];
-            const netDamage = Math.max(0, baseDamage - protection);
+            const brokeThrough = (crashColor === "red");
 
-            const bodyValue = rankValues[bodyRank];
+            // Base damage = material strength OR Speed, whichever is HIGHER (per rules page 53)
+            const baseDamageRank = brokeThrough ? crashObjRank : speedRank;
+            const baseDamage     = rankValues[baseDamageRank];
+
+            const protectionRank = vehicle.system.protection || "Typical";
+            const protection     = rankValues[protectionRank];
+            const netDamage      = Math.max(0, baseDamage - protection);
+
+            // Post-crash FEAT vs Body to determine CS losses
+            const bodyValue   = rankValues[bodyRank];
             const damageLevel = baseDamage > bodyValue ? "greater" : baseDamage === bodyValue ? "equal" : "less";
-            const damageRoll = new Roll("1d100"); await damageRoll.evaluate();
+            const damageRoll  = new Roll("1d100"); await damageRoll.evaluate();
             const damageColor = getFEATColor(bodyRank, damageRoll.total).toLowerCase();
+
             let outcome = "";
             if (damageLevel === "greater") {
-              outcome = damageColor === "red" ? "Body -1CS" : damageColor === "yellow" ? "Speed -1CS, Control FEAT required" : damageColor === "green" ? "Control -1CS, Control FEAT required" : "All -1CS, Vehicle out of control!";
+              outcome = damageColor === "red"    ? "Body -1CS"
+                    : damageColor === "yellow" ? "Speed -1CS, Control FEAT required"
+                    : damageColor === "green"  ? "Control -1CS, Control FEAT required"
+                                                : "All -1CS, Vehicle out of control!";
             } else if (damageLevel === "equal") {
-              outcome = damageColor === "red" ? "No damage to vehicle" : damageColor === "yellow" ? "Body -1CS" : damageColor === "green" ? "Speed -1CS, Control FEAT required" : "Control -1CS, Control FEAT required";
+              outcome = damageColor === "red"    ? "No damage to vehicle"
+                    : damageColor === "yellow" ? "Body -1CS"
+                    : damageColor === "green"  ? "Speed -1CS, Control FEAT required"
+                                                : "Control -1CS, Control FEAT required";
             } else {
-              outcome = ["red", "yellow"].includes(damageColor) ? "No effect" : damageColor === "green" ? "Body -1CS, Control FEAT required" : "Control -1CS, damage to passengers, Control FEAT required";
+              outcome = ["red", "yellow"].includes(damageColor) ? "No effect"
+                    : damageColor === "green"  ? "Body -1CS, Control FEAT required"
+                                                : "Control -1CS, damage to passengers, Control FEAT required";
             }
 
-            // Apply damage effects to the vehicle's system
-            let updateData = {};
+            // Apply effects to vehicle
+            const updateData = {};
+
             if (damageLevel === "greater") {
-              if (damageColor === "red") updateData["system.bodyCSLoss"] = (vehicle.system.bodyCSLoss || 0) + 1;
-              if (damageColor === "yellow") updateData["system.speedCSLoss"] = (vehicle.system.speedCSLoss || 0) + 1;
-              if (damageColor === "green") updateData["system.controlCSLoss"] = (vehicle.system.controlCSLoss || 0) + 1;
+              if (damageColor === "red")    updateData["system.bodyCSLoss"]    = (vehicle.system.bodyCSLoss    || 0) + 1;
+              if (damageColor === "yellow") updateData["system.speedCSLoss"]   = (vehicle.system.speedCSLoss   || 0) + 1;
+              if (damageColor === "green")  updateData["system.controlCSLoss"] = (vehicle.system.controlCSLoss || 0) + 1;
               if (damageColor === "white") {
-                updateData["system.bodyCSLoss"] = (vehicle.system.bodyCSLoss || 0) + 1;
-                updateData["system.speedCSLoss"] = (vehicle.system.speedCSLoss || 0) + 1;
+                updateData["system.bodyCSLoss"]    = (vehicle.system.bodyCSLoss    || 0) + 1;
+                updateData["system.speedCSLoss"]   = (vehicle.system.speedCSLoss   || 0) + 1;
                 updateData["system.controlCSLoss"] = (vehicle.system.controlCSLoss || 0) + 1;
               }
             } else if (damageLevel === "equal") {
-              if (damageColor === "yellow") updateData["system.bodyCSLoss"] = (vehicle.system.bodyCSLoss || 0) + 1;
-              if (damageColor === "green") updateData["system.speedCSLoss"] = (vehicle.system.speedCSLoss || 0) + 1;
-              if (damageColor === "white") updateData["system.controlCSLoss"] = (vehicle.system.controlCSLoss || 0) + 1;
+              if (damageColor === "yellow") updateData["system.bodyCSLoss"]    = (vehicle.system.bodyCSLoss    || 0) + 1;
+              if (damageColor === "green")  updateData["system.speedCSLoss"]   = (vehicle.system.speedCSLoss   || 0) + 1;
+              if (damageColor === "white")  updateData["system.controlCSLoss"] = (vehicle.system.controlCSLoss || 0) + 1;
             } else {
-              if (damageColor === "green") updateData["system.bodyCSLoss"] = (vehicle.system.bodyCSLoss || 0) + 1;
-              if (damageColor === "white") {
-                updateData["system.controlCSLoss"] = (vehicle.system.controlCSLoss || 0) + 1;
-              }
+              if (damageColor === "green")  updateData["system.bodyCSLoss"]    = (vehicle.system.bodyCSLoss    || 0) + 1;
+              if (damageColor === "white")  updateData["system.controlCSLoss"] = (vehicle.system.controlCSLoss || 0) + 1;
             }
 
-            // Apply net passenger damage to vehicle HP
-            // Calculate max HP from body rank (reuse bodyRank from earlier)
-            const maxHP = rankValues[bodyRank] ?? 6;
+            // HP tracking from Body rank min value
+            const maxHP     = rankValues[bodyRank] ?? 6;
             const currentHP = vehicle.system.bodyHP ?? maxHP;
-
-            // Apply net passenger damage to vehicle HP
             updateData["system.bodyHP"] = Math.max(0, currentHP - netDamage);
-
-            // Commit the changes
             await vehicle.update(updateData);
 
-            // Add a destruction warning if HP hits zero
             if (updateData["system.bodyHP"] === 0) {
-              outcome += " Vehicle destroyed!";
+              outcome += " <strong style='color:#c62828;'>Vehicle destroyed!</strong>";
             }
 
+            // Use defense-style color helpers
+            const bannerBg1 = colorStyles?.[crashColor] || "#eee";
+            const bannerTx1 = (typeof textColor === "function") ? textColor(crashColor) : "#333";
+            const bannerBg2 = colorStyles?.[damageColor] || "#eee";
+            const bannerTx2 = (typeof textColor === "function") ? textColor(damageColor) : "#333";
+
             crashDetails = `
-              <hr>
-              <div><strong>Crash Result:</strong></div>
-              <div>Crash Roll: ${crashRoll.total}</div>
-              <div style="text-align:center;padding:6px;margin:5px 0;font-weight:bold;font-size:1em;border-radius:3px;
-                background-color:${colorStyles[crashColor]};color:${textColor(crashColor)};">
-                Crash FEAT: ${crashColor.toUpperCase()}
+              <div style="padding:8px 10px;margin:0;background:#fff;border-top:1px solid #ddd;font-size:.9em;">
+                <div style="font-weight:bold;margin-bottom:6px;color:#d32f2f;">Crash Outcome</div>
+                <div>Vehicle Crash Strength: ${vehicleStrengthRank} (lower of Speed/Body)</div>
+                <div>Crash Roll: ${crashRoll.total}</div>
+                <div style="margin:8px 0;">
+                  <div style="text-align:center;padding:8px;font-weight:bold;font-size:1em;border-radius:3px;background-color:${bannerBg1};color:${bannerTx1};">
+                    CRASH FEAT: ${crashColor.toUpperCase()}
+                  </div>
+                </div>
+                <div>${brokeThrough ? "✓ Vehicle broke through obstacle" : "✗ Vehicle stopped by obstacle"}</div>
+                <div>Base Damage: ${baseDamageRank} (${baseDamage})</div>
+                <div>After Protection: ${netDamage}</div>
+                <div style="margin-top:8px;padding-top:8px;border-top:1px solid #eee;">
+                  <div>Post-Crash Roll: ${damageRoll.total}</div>
+                  <div style="margin:6px 0;">
+                    <div style="text-align:center;padding:8px;font-weight:bold;font-size:1em;border-radius:3px;background-color:${bannerBg2};color:${bannerTx2};">
+                      POST-CRASH: ${damageColor.toUpperCase()}
+                    </div>
+                  </div>
+                  <div><strong>${stuntFailure ? `Stunt caused crash!` : outcome}</strong></div>
+                </div>
               </div>
-              <div>${brokeThrough ? "Vehicle broke through!" : "Vehicle stopped."}</div>
-              <div>Damage Rank: ${baseDamageRank} → ${baseDamage} - ${protection} = ${netDamage}</div>
-              <div>Post-Crash FEAT Roll: ${damageRoll.total}</div>
-              <div style="text-align:center;padding:6px;margin:5px 0;font-weight:bold;font-size:1em;border-radius:3px;
-                background-color:${colorStyles[damageColor]};color:${textColor(damageColor)};">
-                Post-Crash Result: ${damageColor.toUpperCase()}
-              </div>
-              <div><strong>${stuntFailure ? `STUNT FAILED – ${stuntName} failed and crashed!` : outcome}</strong></div>`;
+            `;
           }
+
+          // Defense-style result banner for the main FEAT
+          const mainBg = colorStyles?.[featColor] || "#eee";
+          const mainTx = (typeof textColor === "function") ? textColor(featColor) : "#333";
 
           ChatMessage.create({
             speaker: ChatMessage.getSpeaker({ actor }),
             content: `
-              <div style="border:1px solid gray;padding:10px;background:#f5f5f5">
-                <h3>${actor.name} - Vehicle Control FEAT</h3>
-                <p>Control Rank: ${controlRank}${controlCSLoss > 0 ? ` -${controlCSLoss}CS → ${adjustedControlRank}` : ""}</p>
-                <p>Used Rank: ${baseUsedRank} → ${shiftedRank}</p>
-                <p>Roll: ${controlRoll.total} + Karma ${totalKarmaUsed} = ${cappedTotal}</p> <!-- MODIFIED: use karmaUsed -->
-                <div style="text-align:center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px;
-                  background-color: ${colorStyles[featColor]}; color: ${textColor(featColor)};">
-                  ${stuntFailure ? `STUNT FAILED – ${stuntName || "Unnamed stunt"}` : (isCrash ? "OUT OF CONTROL!" : "CONTROL MAINTAINED")} (${featColor.toUpperCase()})
+              <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
+                <div style="padding:5px 10px;border-bottom:1px solid #c0c0c0;font-size:1.1em;color:#a52a2a;">
+                  <strong>${actor.name} - Vehicle Control FEAT</strong>
+                </div>
+                <div style="padding:5px 10px;font-size:.9em;">
+                  <div>Vehicle: ${vehicle.name}</div>
+                  <div>Driver Agility: ${driverAgiRank} (${agility})</div>
+                  <div>Control Rank: ${controlRank}${isControlLimiting && controlCSLoss > 0 ? ` — ${controlCSLoss} CS Lost → ${adjustedControlRank}` : ""}</div>
+                  <div>Used Rank: ${baseUsedRank}${cs !== 0 ? ` — Shift ${cs >= 0 ? '+' : ''}${cs} → ${shiftedRank}` : ""}</div>
+                  <div>Roll: ${controlRoll.total}${totalKarmaUsed ? ` + Karma: ${totalKarmaUsed}` : ""} = ${cappedTotal}</div>
+                  ${stunt ? `<div style="margin-top:4px;"><strong>Stunt:</strong> ${stuntName || "(unnamed)"}</div>` : ""}
+                </div>
+
+                <div style="padding:8px 10px;border-top:1px solid #ddd;">
+                  <div style="font-weight:bold;margin-bottom:6px;">Possible Results:</div>
+                  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;font-size:.85em;text-align:center;">
+                    <div style="padding:6px 4px;background:${featColor === 'white' ? '#333' : '#e0e0e0'};color:${featColor === 'white' ? '#fff' : '#666'};border-radius:2px;font-weight:600;" title="Vehicle crashes and goes out of control. Damage to passengers and vehicle.">
+                      <div>White:</div>
+                      <div>Crash</div>
+                    </div>
+                    <div style="padding:6px 4px;background:${featColor === 'green' ? '#4caf50' : '#e0e0e0'};color:${featColor === 'green' ? '#fff' : '#666'};border-radius:2px;font-weight:600;" title="Control maintained successfully.">
+                      <div>Green:</div>
+                      <div>Control</div>
+                    </div>
+                    <div style="padding:6px 4px;background:${featColor === 'yellow' ? '#fbc02d' : '#e0e0e0'};color:${featColor === 'yellow' ? '#333' : '#666'};border-radius:2px;font-weight:600;" title="Control maintained successfully.">
+                      <div>Yellow:</div>
+                      <div>Control</div>
+                    </div>
+                    <div style="padding:6px 4px;background:${featColor === 'red' ? '#d32f2f' : '#e0e0e0'};color:${featColor === 'red' ? '#fff' : '#666'};border-radius:2px;font-weight:600;" title="Control maintained successfully.">
+                      <div>Red:</div>
+                      <div>Control</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div style="text-align:center;padding:10px;margin:8px 0;font-weight:bold;font-size:1.1em;text-transform:uppercase;border-radius:3px;background:${mainBg};color:${mainTx};">
+                  ${stuntFailure ? `STUNT FAILED — ${stuntName || "UNNAMED STUNT"}` : `RESULT: ${featColor.toUpperCase()} — ${isCrash ? "OUT OF CONTROL" : "CONTROL MAINTAINED"}`}
                 </div>
                 ${crashDetails}
-              </div>`
+              </div>
+            `
           });
         }
       },
