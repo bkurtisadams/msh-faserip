@@ -3896,23 +3896,28 @@ _rollVehicleControl(vehicle) {
     return rankTable[0];
   };
 
-  // Compare RAW values to find limiting factor
+ // Compare RAW values to find limiting factor
   const controlRank = vehicle.system.control || "Typical";
+  const controlCSLoss = Number(vehicle.system.controlCSLoss || 0);
   const controlIndex = Math.max(0, rankTable.indexOf(controlRank));
+
+  // Driver Agility rank from numeric Agility score
   const driverAgiRank = getRankFromValue(agility);
   const driverAgiIndex = rankTable.indexOf(driverAgiRank);
 
+  // Only apply CS losses if vehicle Control is STRICTLY LESS than driver Agility
+  const isControlLimiting = (controlIndex < driverAgiIndex);
+
   // If Control < Agility: vehicle limits (apply CS losses)
   // If Control >= Agility: driver limits (NO CS losses)
-  const controlCSLoss = Number(vehicle.system.controlCSLoss || 0);
-  const isControlLimiting = (controlIndex < driverAgiIndex); // Only if STRICTLY less
+  const adjustedControlIndex = isControlLimiting 
+    ? Math.max(0, controlIndex - controlCSLoss)
+    : controlIndex;
+  const adjustedControlRank = rankTable[adjustedControlIndex];
 
-  const baseRankIndex = isControlLimiting 
-    ? Math.max(0, controlIndex - controlCSLoss)  // Apply CS losses when vehicle limits
-    : Math.min(driverAgiIndex, controlIndex);     // Use lower of the two when driver limits
-
+  // Used FEAT rank = LOWER of driver agility vs adjusted vehicle control
+  const baseRankIndex = Math.min(driverAgiIndex, adjustedControlIndex);
   const baseUsedRank = rankTable[baseRankIndex];
-  const adjustedControlRank = rankTable[Math.max(0, controlIndex - controlCSLoss)];
   
   // Numeric value for the base-used rank (some cards/logic expect this)
   const usedValue = rankValues[baseUsedRank];
@@ -3944,7 +3949,7 @@ _rollVehicleControl(vehicle) {
             <div>Roll: ${controlRoll.total}${totalKarmaUsed ? ` + Karma: ${totalKarmaUsed}` : ""} = ${cappedTotal}</div>
             ${stunt ? `<div>Stunt: ${stuntName || "(unnamed)"}${stuntFailure ? " — <span style='color:#c62828;'>FAILED</span>" : ""}</div>` : ""}
           </div>
-          
+           
           <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;padding:8px 10px;font-size:.85em;text-align:center;">
             <div style="padding:4px;background:#f5f5f5;border:1px solid #ddd;border-radius:2px;">
               <div style="font-weight:600;color:#666;">White:</div>
@@ -3999,6 +4004,14 @@ _rollVehicleControl(vehicle) {
       </div>
 
       <div style="margin-bottom:8px;">
+        <label style="display:inline-block;width:120px;">Current Speed:</label>
+        <select id="current-speed">
+          ${rankTable.slice(0, 10).map(r => `<option value="${r}" ${r === (vehicle.system.speed || "Typical") ? "selected" : ""}>${r}</option>`).join('')}
+        </select>
+        <span style="color:#666;font-size:.85em;">(speed at moment of FEAT)</span>
+      </div>
+
+      <div style="margin-bottom:8px;">
         <label style="display:inline-block;width:120px;">Karma Points:</label>
         <input id="karma" type="number" value="0" min="0" style="width:60px;">
         <span style="color:#666;font-size:.85em;">(spend only up to 100)</span>
@@ -4037,6 +4050,7 @@ _rollVehicleControl(vehicle) {
         label: "Roll",
         callback: async html => {
           const cs = parseInt(html.find("#cs").val()) || 0;
+          const currentSpeed = html.find("#current-speed").val();
           const karma = parseInt(html.find("#karma").val()) || 0;
           const crashObjRank = html.find("#crash-object").val();
           const buckled = html.find("#buckled").val();
@@ -4141,12 +4155,15 @@ _rollVehicleControl(vehicle) {
           // Crash sequence
           let crashDetails = "";
           if (isCrash) {
-            const speedRank = vehicle.system.speed || "Typical";
+            // need current speed for crash sequence:
+            const speedRank = currentSpeed || vehicle.system.speed || "Typical";
             const bodyRank  = vehicle.system.body  || "Typical";
 
             // CRITICAL FIX: Crash FEAT uses LOWER of Speed or Body (per rules page 53)
             // "as if the vehicle had a 'strength' equal to its Speed or Body, whichever is lower"
-            const vehicleStrengthRank = rankValues[speedRank] <= rankValues[bodyRank] ? speedRank : bodyRank;
+            const vehicleStrengthRank = rankValues[speedRank] <= rankValues[bodyRank]
+              ? speedRank
+              : bodyRank;
 
             const crashRoll = new Roll("1d100"); await crashRoll.evaluate();
             const crashColor = getFEATColor(vehicleStrengthRank, crashRoll.total).toLowerCase();

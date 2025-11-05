@@ -6,20 +6,14 @@
     </h2>
   </div>
 
-  <!-- Tab Navigation -->
-  <nav class="sheet-tabs tabs">
-    <a class="item" data-tab="info">Vehicle Info</a>
-    <a class="item" data-tab="crew">Crew & Condition</a>
-  </nav>
-
   <div class="dialog-body sheet-body">
-    <!-- Tab 1: Vehicle Info -->
-    <div class="tab" data-tab="info">
+    
+    <!-- CORE INFO ROW -->
+    <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:8px;margin-bottom:12px;">
       <div class="form-group">
         <label>Name</label>
         <input type="text" name="name" value="{{item.name}}" placeholder="Vehicle Name">
       </div>
-
       <div class="form-group">
         <label>Type</label>
         {{#select system.type}}
@@ -30,9 +24,8 @@
           </select>
         {{/select}}
       </div>
-
       <div class="form-group">
-        <label>Cost</label>
+        <label>Cost (Resources)</label>
         {{#select system.cost}}
           <select name="system.cost">
             {{#each allRanks}}
@@ -41,112 +34,270 @@
           </select>
         {{/select}}
       </div>
-
-      <div class="form-group">
-        <label>Control</label>
-        {{#select system.control}}
-          <select name="system.control">
-            {{#each allRanks}}
-              <option value="{{this}}">{{this}}</option>
-            {{/each}}
-          </select>
-        {{/select}}
-      </div>
-
-      <div class="form-group">
-        <label>Speed</label>
-        {{#select system.speed}}
-          <select name="system.speed">
-            {{#each allRanks}}
-              <option value="{{this}}">{{this}}</option>
-            {{/each}}
-          </select>
-        {{/select}}
-      </div>
-
-      <div class="form-group">
-        <label>Body</label>
-        {{#select system.body}}
-          <select name="system.body">
-            {{#each allRanks}}
-              <option value="{{this}}">{{this}}</option>
-            {{/each}}
-          </select>
-        {{/select}}
-      </div>
-
-      <div class="form-group">
-        <label>Protection</label>
-        {{#select system.protection}}
-          <select name="system.protection">
-            {{#each allRanks}}
-              <option value="{{this}}">{{this}}</option>
-            {{/each}}
-          </select>
-        {{/select}}
-      </div>
-
-      <div class="form-group">
-        <label>Compartmented</label>
-        <input type="checkbox" name="system.compartmented" {{#if system.compartmented}}checked{{/if}}>
-      </div>
-
-      <div class="form-group">
-        <label>Special Features</label>
-        <textarea name="system.features">{{system.features}}</textarea>
-      </div>
-
-      <div class="form-group">
-        <label>Description</label>
-        <textarea name="system.description">{{system.description}}</textarea>
-      </div>
     </div>
 
-    <!-- Tab 2: Crew & Condition -->
-    <div class="tab" data-tab="crew">
-      <div class="form-group">
-        <label>Driver (name or UUID)</label>
-        <input type="text" name="system.driver" value="{{system.driver}}" placeholder="e.g., Tess Winters">
+    <!-- CORE STATS SECTION -->
+    <fieldset style="margin-bottom:12px;padding:8px;border:1px solid #999;border-radius:3px;">
+      <legend style="font-weight:bold;padding:0 6px;">Core Stats (Ranks)</legend>
+      
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:8px;">
+        <div class="form-group">
+          <label>Control</label>
+          {{#select system.control}}
+            <select name="system.control">
+              {{#each allRanks}}
+                <option value="{{this}}">{{this}}</option>
+              {{/each}}
+            </select>
+          {{/select}}
+        </div>
+        <div class="form-group">
+          <label>Speed</label>
+          {{#select system.speed}}
+            <select name="system.speed">
+              {{#each allRanks}}
+                <option value="{{this}}">{{this}}</option>
+              {{/each}}
+            </select>
+          {{/select}}
+        </div>
+        <div class="form-group">
+          <label>Body</label>
+          {{#select system.body}}
+            <select name="system.body">
+              {{#each allRanks}}
+                <option value="{{this}}">{{this}}</option>
+              {{/each}}
+            </select>
+          {{/select}}
+        </div>
+        <div class="form-group">
+          <label>Protection</label>
+          {{#select system.protection}}
+            <select name="system.protection">
+              {{#each allRanks}}
+                <option value="{{this}}">{{this}}</option>
+              {{/each}}
+            </select>
+          {{/select}}
+        </div>
+        <div class="form-group" style="display:flex;align-items:center;gap:6px;">
+          <label>Compartmented</label>
+          <input type="checkbox" name="system.compartmented" {{#if system.compartmented}}checked{{/if}}>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:8px;">
+        <div class="form-group">
+          <label>Body HP</label>
+          <div style="display:flex;gap:4px;align-items:center;">
+            <input type="number" name="system.bodyHP" value="{{system.bodyHP}}" style="width:60px;">
+            <span>/</span>
+            <input type="number" name="system.bodyHPMax" value="{{system.bodyHPMax}}" style="width:60px;">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Body CS Loss</label>
+          <input type="number" name="system.bodyCSLoss" value="{{system.bodyCSLoss}}" style="width:50px;">
+        </div>
+        <div class="form-group">
+          <label>Speed CS Loss</label>
+          <input type="number" name="system.speedCSLoss" value="{{system.speedCSLoss}}" style="width:50px;">
+        </div>
+        <div class="form-group">
+          <label>Control CS Loss</label>
+          <input type="number" name="system.controlCSLoss" value="{{system.controlCSLoss}}" style="width:50px;">
+        </div>
+      </div>
+    </fieldset>
+
+    <!-- CREW & CAPACITY SECTION -->
+    <fieldset style="margin-bottom:12px;padding:8px;border:1px solid #999;border-radius:3px;">
+      <legend style="font-weight:bold;padding:0 6px;">Crew & Capacity</legend>
+      
+      <div style="display:grid;grid-template-columns:1fr 2fr 1fr 1fr;gap:8px;margin-bottom:8px;">
+        <div class="form-group">
+          <label>Driver</label>
+          <input type="text" name="system.driver" value="{{system.driver}}" placeholder="Name or UUID">
+        </div>
+        <div class="form-group">
+          <label>Passengers</label>
+          <input type="text" name="system.passengers" value="{{system.passengers}}" placeholder="Comma-separated names">
+        </div>
+        <div class="form-group">
+          <label>Seats</label>
+          <input type="number" name="system.seats" value="{{system.seats}}" placeholder="incl. driver" style="width:60px;">
+        </div>
+        <div class="form-group">
+          <label>Cargo</label>
+          <input type="text" name="system.cargo" value="{{system.cargo}}" placeholder="wt / volume">
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">
+        <div class="form-group">
+          <label>Fuel/Power</label>
+          <input type="text" name="system.fuel" value="{{system.fuel}}" placeholder="Type">
+        </div>
+        <div class="form-group">
+          <label>Range</label>
+          <input type="text" name="system.range" value="{{system.range}}" placeholder="Distance">
+        </div>
+        <div class="form-group">
+          <label>Size/Weight</label>
+          <input type="text" name="system.size" value="{{system.size}}" placeholder="Dimensions">
+        </div>
+        <div class="form-group">
+          <label>Notes</label>
+          <input type="text" name="system.notes" value="{{system.notes}}">
+        </div>
       </div>
 
       <div class="form-group">
-        <label>Passengers (comma-separated)</label>
-        <input type="text" name="system.passengers" value="{{system.passengers}}" placeholder="e.g., Counter-Strike, Stormbringer">
+        <label>Special Features (ECM, Sensors, Autopilot, Flight Gear, Amphibious, etc.)</label>
+        <textarea name="system.features" rows="2">{{system.features}}</textarea>
+      </div>
+    </fieldset>
+
+    <!-- MOVEMENT & CHASE DATA SECTION -->
+    <fieldset style="margin-bottom:12px;padding:8px;border:1px solid #999;border-radius:3px;">
+      <legend style="font-weight:bold;padding:0 6px;">Movement & Chase Data</legend>
+      
+      <div style="display:grid;grid-template-columns:auto 1fr 1fr 1fr;gap:4px 8px;align-items:center;font-size:.9em;">
+        <div style="font-weight:600;padding:4px;">Mode</div>
+        <div style="font-weight:600;padding:4px;">Top Speed</div>
+        <div style="font-weight:600;padding:4px;">Accel / Braking</div>
+        <div style="font-weight:600;padding:4px;">Turn / Handling</div>
+
+        <div style="padding:4px;">LAND (areas/round):</div>
+        <input type="text" name="system.movement.land.speed" value="{{system.movement.land.speed}}" placeholder="Speed rank">
+        <input type="text" name="system.movement.land.accel" value="{{system.movement.land.accel}}" placeholder="Accel / Brake">
+        <input type="text" name="system.movement.land.turn" value="{{system.movement.land.turn}}" placeholder="Turn radius">
+
+        <div style="padding:4px;">AIR (areas/round):</div>
+        <input type="text" name="system.movement.air.speed" value="{{system.movement.air.speed}}" placeholder="Speed rank">
+        <input type="text" name="system.movement.air.accel" value="{{system.movement.air.accel}}" placeholder="Accel / Brake">
+        <input type="text" name="system.movement.air.stall" value="{{system.movement.air.stall}}" placeholder="Stall / Climb">
+
+        <div style="padding:4px;">WATER (areas/round):</div>
+        <input type="text" name="system.movement.water.speed" value="{{system.movement.water.speed}}" placeholder="Speed rank">
+        <input type="text" name="system.movement.water.accel" value="{{system.movement.water.accel}}" placeholder="Accel / Brake">
+        <input type="text" name="system.movement.water.sea" value="{{system.movement.water.sea}}" placeholder="Sea state mod">
+
+        <div style="padding:4px;">SPACE (areas/round):</div>
+        <input type="text" name="system.movement.space.speed" value="{{system.movement.space.speed}}" placeholder="Speed rank">
+        <input type="text" name="system.movement.space.accel" value="{{system.movement.space.accel}}" placeholder="Accel / Brake">
+        <input type="text" name="system.movement.space.vacuum" value="{{system.movement.space.vacuum}}" placeholder="Vacuum/Heat mods">
       </div>
 
-      <hr>
+      <div style="margin-top:8px;padding-top:8px;border-top:1px solid #ddd;">
+        <label style="font-weight:600;margin-bottom:4px;display:block;">Chase Tracker:</label>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;font-size:.9em;">
+          <input type="text" name="system.chase.lead" value="{{system.chase.lead}}" placeholder="Lead (areas)">
+          <input type="text" name="system.chase.terrain" value="{{system.chase.terrain}}" placeholder="Terrain">
+          <input type="text" name="system.chase.weather" value="{{system.chase.weather}}" placeholder="Weather">
+          <input type="text" name="system.chase.maneuver" value="{{system.chase.maneuver}}" placeholder="Maneuver">
+        </div>
+      </div>
+    </fieldset>
+
+    <!-- WEAPONS SECTION (Optional) -->
+    <fieldset style="margin-bottom:12px;padding:8px;border:1px solid #999;border-radius:3px;">
+      <legend style="font-weight:bold;padding:0 6px;">Weapons (Optional)</legend>
+      
+      <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:.85em;">
+          <thead>
+            <tr style="background:#f0f0f0;border-bottom:2px solid #999;">
+              <th style="padding:4px;text-align:center;width:30px;">#</th>
+              <th style="padding:4px;text-align:left;">Name</th>
+              <th style="padding:4px;text-align:left;">Type</th>
+              <th style="padding:4px;text-align:left;">Dmg / Effect</th>
+              <th style="padding:4px;text-align:center;width:40px;">ROF</th>
+              <th style="padding:4px;text-align:left;">Range (A/S/L)</th>
+              <th style="padding:4px;text-align:center;width:50px;">Ammo</th>
+              <th style="padding:4px;text-align:left;">To-Hit Mod</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="border-bottom:1px solid #ddd;">
+              <td style="padding:4px;text-align:center;">1</td>
+              <td style="padding:4px;"><input type="text" name="system.weapons.0.name" value="{{system.weapons.0.name}}" placeholder="Weapon name"></td>
+              <td style="padding:4px;"><input type="text" name="system.weapons.0.type" value="{{system.weapons.0.type}}" placeholder="Energy/Ballistic"></td>
+              <td style="padding:4px;"><input type="text" name="system.weapons.0.damage" value="{{system.weapons.0.damage}}" placeholder="Rank or effect"></td>
+              <td style="padding:4px;"><input type="text" name="system.weapons.0.rof" value="{{system.weapons.0.rof}}" style="width:40px;"></td>
+              <td style="padding:4px;"><input type="text" name="system.weapons.0.range" value="{{system.weapons.0.range}}" placeholder="3/7/20"></td>
+              <td style="padding:4px;"><input type="text" name="system.weapons.0.ammo" value="{{system.weapons.0.ammo}}" style="width:50px;"></td>
+              <td style="padding:4px;"><input type="text" name="system.weapons.0.modifier" value="{{system.weapons.0.modifier}}" placeholder="+2CS"></td>
+            </tr>
+            <tr style="border-bottom:1px solid #ddd;">
+              <td style="padding:4px;text-align:center;">2</td>
+              <td style="padding:4px;"><input type="text" name="system.weapons.1.name" value="{{system.weapons.1.name}}" placeholder="Weapon name"></td>
+              <td style="padding:4px;"><input type="text" name="system.weapons.1.type" value="{{system.weapons.1.type}}" placeholder="Energy/Ballistic"></td>
+              <td style="padding:4px;"><input type="text" name="system.weapons.1.damage" value="{{system.weapons.1.damage}}" placeholder="Rank or effect"></td>
+              <td style="padding:4px;"><input type="text" name="system.weapons.1.rof" value="{{system.weapons.1.rof}}" style="width:40px;"></td>
+              <td style="padding:4px;"><input type="text" name="system.weapons.1.range" value="{{system.weapons.1.range}}" placeholder="3/7/20"></td>
+              <td style="padding:4px;"><input type="text" name="system.weapons.1.ammo" value="{{system.weapons.1.ammo}}" style="width:50px;"></td>
+              <td style="padding:4px;"><input type="text" name="system.weapons.1.modifier" value="{{system.weapons.1.modifier}}" placeholder="+2CS"></td>
+            </tr>
+            <tr>
+              <td style="padding:4px;text-align:center;">3</td>
+              <td style="padding:4px;"><input type="text" name="system.weapons.2.name" value="{{system.weapons.2.name}}" placeholder="Weapon name"></td>
+              <td style="padding:4px;"><input type="text" name="system.weapons.2.type" value="{{system.weapons.2.type}}" placeholder="Energy/Ballistic"></td>
+              <td style="padding:4px;"><input type="text" name="system.weapons.2.damage" value="{{system.weapons.2.damage}}" placeholder="Rank or effect"></td>
+              <td style="padding:4px;"><input type="text" name="system.weapons.2.rof" value="{{system.weapons.2.rof}}" style="width:40px;"></td>
+              <td style="padding:4px;"><input type="text" name="system.weapons.2.range" value="{{system.weapons.2.range}}" placeholder="3/7/20"></td>
+              <td style="padding:4px;"><input type="text" name="system.weapons.2.ammo" value="{{system.weapons.2.ammo}}" style="width:50px;"></td>
+              <td style="padding:4px;"><input type="text" name="system.weapons.2.modifier" value="{{system.weapons.2.modifier}}" placeholder="+2CS"></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="form-group" style="margin-top:8px;">
+        <label>Weapon Notes</label>
+        <textarea name="system.weaponNotes" rows="2">{{system.weaponNotes}}</textarea>
+      </div>
+    </fieldset>
+
+    <!-- DAMAGE & CONDITION / LOG SECTION -->
+    <fieldset style="margin-bottom:12px;padding:8px;border:1px solid #999;border-radius:3px;">
+      <legend style="font-weight:bold;padding:0 6px;">Damage & Condition / Log</legend>
+      
+      <div style="padding:6px;background:#fff3e0;border:1px solid #ff9800;border-radius:3px;margin-bottom:8px;font-size:.9em;">
+        <div style="font-weight:600;margin-bottom:4px;">Collision/Ramming Notes:</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:4px;">
+          <div>Speed @ impact: <input type="text" name="system.collision.speed" value="{{system.collision.speed}}" placeholder="areas/round" style="width:80px;"></div>
+          <div>FEATs Used: Control vs Terrain / Endurance</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <div>Target Body/Material: <input type="text" name="system.collision.target" value="{{system.collision.target}}" placeholder="Rank" style="width:100px;"></div>
+          <div>Damage Applied To: Protection → Body → CS</div>
+        </div>
+      </div>
+
+      <div style="padding:6px;background:#e3f2fd;border:1px solid #2196f3;border-radius:3px;margin-bottom:8px;font-size:.85em;">
+        <div style="font-weight:600;margin-bottom:4px;">Effects by Thresholds:</div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;">
+          <label><input type="checkbox" name="system.effects.cosmetic"> 75% HP: Cosmetic</label>
+          <label><input type="checkbox" name="system.effects.control"> 50%: -1 CS Control</label>
+          <label><input type="checkbox" name="system.effects.speed"> 25%: -1 CS Speed</label>
+          <label><input type="checkbox" name="system.effects.disabled"> 0%: Disabled</label>
+        </div>
+      </div>
 
       <div class="form-group">
-        <label>Current Body HP</label>
-        <input type="number" name="system.bodyHP" value="{{system.bodyHP}}"> /
-        <input type="number" name="system.bodyHPMax" value="{{system.bodyHPMax}}">
+        <label>Damage Log (latest first)</label>
+        <textarea name="system.damageLog" rows="4" placeholder="Log damage events, repairs, etc.">{{system.damageLog}}</textarea>
       </div>
+    </fieldset>
 
-      <div class="form-group">
-        <label>Body CS Loss</label>
-        <input type="number" name="system.bodyCSLoss" value="{{system.bodyCSLoss}}">
-      </div>
-
-      <div class="form-group">
-        <label>Speed CS Loss</label>
-        <input type="number" name="system.speedCSLoss" value="{{system.speedCSLoss}}">
-      </div>
-
-      <div class="form-group">
-        <label>Control CS Loss</label>
-        <input type="number" name="system.controlCSLoss" value="{{system.controlCSLoss}}">
-      </div>
-
-      <hr>
-
-      <div class="form-group">
-        <label>Damage Log</label>
-        <textarea name="system.damageLog">
-{{#each system.damageLog}}{{this}}
-{{/each}}
-        </textarea>
-      </div>
+    <!-- DESCRIPTION -->
+    <div class="form-group">
+      <label>Description</label>
+      <textarea name="system.description" rows="3">{{system.description}}</textarea>
     </div>
+
   </div>
 
   <div class="dialog-footer">
