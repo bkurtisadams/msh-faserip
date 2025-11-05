@@ -1,7 +1,9 @@
 <form class="faserip-dialog vehicle-dialog">
   <div class="dialog-header">
-    <!-- <h2><img src="{{item.img}}" width="32" height="32"> {{#if item._id}}Edit{{else}}New{{/if}} Vehicle</h2> -->
-    <h2><img class="profile-img" src="{{item.img}}" data-edit="img" width="32" height="32" title="Click to edit image"> {{#if item._id}}Edit{{else}}New{{/if}} Vehicle</h2>
+    <h2>
+      <img class="profile-img" src="{{item.img}}" data-edit="img" width="32" height="32" title="Click to edit image">
+      {{#if item.id}}Edit{{else}}New{{/if}} Vehicle
+    </h2>
   </div>
 
   <!-- Tab Navigation -->
@@ -17,68 +19,83 @@
         <label>Name</label>
         <input type="text" name="name" value="{{item.name}}" placeholder="Vehicle Name">
       </div>
+
       <div class="form-group">
         <label>Type</label>
-        <select name="system.type">
-          <option value="Road" {{#if (eq system.type "Road")}}selected{{/if}}>Road</option>
-          <option value="Off-Road" {{#if (eq system.type "Off-Road")}}selected{{/if}}>Off-Road</option>
-          <option value="Railed" {{#if (eq system.type "Railed")}}selected{{/if}}>Railed</option>
-          <option value="GEV" {{#if (eq system.type "GEV")}}selected{{/if}}>GEV</option>
-          <option value="Air" {{#if (eq system.type "Air")}}selected{{/if}}>Air</option>
-          <option value="Space" {{#if (eq system.type "Space")}}selected{{/if}}>Space</option>
-          <option value="Water" {{#if (eq system.type "Water")}}selected{{/if}}>Water</option>
-          <option value="Sub" {{#if (eq system.type "Sub")}}selected{{/if}}>Sub</option>
-        </select>
+        {{#select system.type}}
+          <select name="system.type">
+            {{#each vehicleTypes}}
+              <option value="{{this}}">{{this}}</option>
+            {{/each}}
+          </select>
+        {{/select}}
       </div>
+
       <div class="form-group">
         <label>Cost</label>
-        <select name="system.cost">
-          {{#each allRanks}}
-          <option value="{{this}}" {{#if (eq ../system.cost this)}}selected{{/if}}>{{this}}</option>
-          {{/each}}
-        </select>
+        {{#select system.cost}}
+          <select name="system.cost">
+            {{#each allRanks}}
+              <option value="{{this}}">{{this}}</option>
+            {{/each}}
+          </select>
+        {{/select}}
       </div>
+
       <div class="form-group">
         <label>Control</label>
-        <select name="system.control">
-          {{#each allRanks}}
-          <option value="{{this}}" {{#if (eq ../system.control this)}}selected{{/if}}>{{this}}</option>
-          {{/each}}
-        </select>
+        {{#select system.control}}
+          <select name="system.control">
+            {{#each allRanks}}
+              <option value="{{this}}">{{this}}</option>
+            {{/each}}
+          </select>
+        {{/select}}
       </div>
+
       <div class="form-group">
         <label>Speed</label>
-        <select name="system.speed">
-          {{#each allRanks}}
-            <option value="{{this}}" {{#if (eq this ../system.speed)}}selected{{/if}}>{{this}}</option>
-          {{/each}}
-        </select>
-        
+        {{#select system.speed}}
+          <select name="system.speed">
+            {{#each allRanks}}
+              <option value="{{this}}">{{this}}</option>
+            {{/each}}
+          </select>
+        {{/select}}
       </div>
+
       <div class="form-group">
         <label>Body</label>
-        <select name="system.body">
-          {{#each allRanks}}
-          <option value="{{this}}" {{#if (eq ../system.body this)}}selected{{/if}}>{{this}}</option>
-          {{/each}}
-        </select>
+        {{#select system.body}}
+          <select name="system.body">
+            {{#each allRanks}}
+              <option value="{{this}}">{{this}}</option>
+            {{/each}}
+          </select>
+        {{/select}}
       </div>
+
       <div class="form-group">
         <label>Protection</label>
-        <select name="system.protection">
-          {{#each allRanks}}
-          <option value="{{this}}" {{#if (eq ../system.protection this)}}selected{{/if}}>{{this}}</option>
-          {{/each}}
-        </select>
+        {{#select system.protection}}
+          <select name="system.protection">
+            {{#each allRanks}}
+              <option value="{{this}}">{{this}}</option>
+            {{/each}}
+          </select>
+        {{/select}}
       </div>
+
       <div class="form-group">
         <label>Compartmented</label>
         <input type="checkbox" name="system.compartmented" {{#if system.compartmented}}checked{{/if}}>
       </div>
+
       <div class="form-group">
         <label>Special Features</label>
         <textarea name="system.features">{{system.features}}</textarea>
       </div>
+
       <div class="form-group">
         <label>Description</label>
         <textarea name="system.description">{{system.description}}</textarea>
@@ -91,40 +108,50 @@
         <label>Driver (name or UUID)</label>
         <input type="text" name="system.driver" value="{{system.driver}}" placeholder="e.g., Tess Winters">
       </div>
+
       <div class="form-group">
         <label>Passengers (comma-separated)</label>
         <input type="text" name="system.passengers" value="{{system.passengers}}" placeholder="e.g., Counter-Strike, Stormbringer">
       </div>
+
       <hr>
+
       <div class="form-group">
         <label>Current Body HP</label>
-        <input type="number" name="system.bodyHP" value="{{system.bodyHP}}" /> / 
-        <!-- <input type="number" value="{{lookup ../rankValues ../system.body}}" readonly /> -->
-        <input type="number" name="system.bodyHPMax" value="{{system.bodyHPMax}}" />
+        <input type="number" name="system.bodyHP" value="{{system.bodyHP}}"> /
+        <input type="number" name="system.bodyHPMax" value="{{system.bodyHPMax}}">
       </div>
-      
+
       <div class="form-group">
         <label>Body CS Loss</label>
-        <input type="number" name="system.bodyCSLoss" value="{{system.bodyCSLoss}}" />
+        <input type="number" name="system.bodyCSLoss" value="{{system.bodyCSLoss}}">
       </div>
+
       <div class="form-group">
         <label>Speed CS Loss</label>
-        <input type="number" name="system.speedCSLoss" value="{{system.speedCSLoss}}" />
+        <input type="number" name="system.speedCSLoss" value="{{system.speedCSLoss}}">
       </div>
+
       <div class="form-group">
         <label>Control CS Loss</label>
-        <input type="number" name="system.controlCSLoss" value="{{system.controlCSLoss}}" />
+        <input type="number" name="system.controlCSLoss" value="{{system.controlCSLoss}}">
       </div>
+
       <hr>
+
       <div class="form-group">
         <label>Damage Log</label>
-        <textarea name="system.damageLog">{{#each system.damageLog}}{{this}}\n{{/each}}</textarea>
+        <textarea name="system.damageLog">
+{{#each system.damageLog}}{{this}}
+{{/each}}
+        </textarea>
       </div>
     </div>
   </div>
 
   <div class="dialog-footer">
     <button type="button" class="cancel-button">Cancel</button>
-    <button type="submit" class="submit-button">{{#if item._id}}Update{{else}}Create{{/if}} Vehicle</button>
+    <button type="button" class="create-vehicle-actor">Create Vehicle Actor</button>
+    <button type="submit" class="submit-button">{{#if item.id}}Update{{else}}Create{{/if}} Vehicle</button>
   </div>
 </form>

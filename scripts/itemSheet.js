@@ -78,7 +78,9 @@ export class FaseripItemSheet extends ItemSheet {
       ];
 
       // Auto-detect which action buttons will find this power (your original)
-      context.detectedActions = this._detectActionButtons?.(context.system) ?? [];
+      context.detectedActions = typeof this._detectActionButtons === "function"
+        ? this._detectActionButtons(context.system)
+        : [];
 
       // ----- NEW: provide a safe calculatedRange string when range === "rank"
       if (context.system?.range === "rank") {
@@ -90,6 +92,15 @@ export class FaseripItemSheet extends ItemSheet {
       // Helpful logging (kept from your original)
       console.log("Power sheet data:", context);
     }
+
+    // ANCHOR: vehicle-item-sheet-getData
+      if (this.item?.type === "vehicle") {
+        context.allRanks = context.allRanks || [
+          "Feeble","Poor","Typical","Good","Excellent","Remarkable","Incredible","Amazing","Monstrous",
+          "Unearthly","Shift-X","Shift-Y","Shift-Z","Class 1000","Class 3000","Class 5000"
+        ];
+        context.vehicleTypes = ["Road","Off-Road","Railed","GEV","Air","Space","Water","Submersible"];
+      }
 
     return context;
   }
@@ -136,7 +147,7 @@ export class FaseripItemSheet extends ItemSheet {
         if (sys.telekinesiStrength !== undefined && sys.telekinesisStrength === undefined) {
           await this.item.update({
             "system.telekinesisStrength": sys.telekinesiStrength,
-            "-=system.telekinesiStrength": null    // <-- correctly unset old key
+            "system.-=telekinesiStrength": null
           });
         }
       }
@@ -592,6 +603,25 @@ export class FaseripItemSheet extends ItemSheet {
         }
       }).render(true);
     });
+
+    // ANCHOR: vehicle-item-create-actor
+    if (this.item?.type === "vehicle") {
+      html.find(".create-vehicle-actor").on("click", async () => {
+        const sys = foundry.utils.duplicate(this.item.system ?? {});
+        const actor = await Actor.create({
+          name: this.item.name,
+          type: "vehicle",
+          img: this.item.img,
+          system: sys,
+          prototypeToken: {
+            bar1: { attribute: "system.resources.body" },
+            lockRotation: true,
+            disposition: CONST.TOKEN_DISPOSITIONS.NEUTRAL
+          }
+        });
+        ui.notifications?.info(`Created Vehicle Actor: ${actor.name}`);
+      });
+    }
   
   } // end of activeListeners
 

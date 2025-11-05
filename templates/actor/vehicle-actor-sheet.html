@@ -16,15 +16,9 @@
       <div class="form-group">
         <label>Type</label>
         <select name="system.type">
-          <option value="Road"  {{#if (eq system.type "Road")}}selected{{/if}}>Road</option>
-          <option value="Off-Road"  {{#if (eq system.type "Off-Road")}}selected{{/if}}>Off-Road</option>
-          <option value="Railed"  {{#if (eq system.type "Railed")}}selected{{/if}}>Railed</option>
-          <option value="GEV"  {{#if (eq system.type "GEV")}}selected{{/if}}>GEV</option>
-          <option value="Air"   {{#if (eq system.type "Air")}}selected{{/if}}>Air</option>
-          <option value="Space" {{#if (eq system.type "Space")}}selected{{/if}}>Space</option>
-          <option value="Water"   {{#if (eq system.type "Water")}}selected{{/if}}>Water</option>
-          <option value="Sub"   {{#if (eq system.type "Sub")}}selected{{/if}}>Sub</option>
-          
+          {{#each vehicleTypes}}
+            <option value="{{this}}" {{#if (eq ../system.type this)}}selected{{/if}}>{{this}}</option>
+          {{/each}}
         </select>
       </div>
 
