@@ -473,7 +473,8 @@ export class ForceAction extends RangedAttackAction {
 
       // Explicit per-target apply in Full Auto
       if (!isManualMode && this.opts?.autoApply && isHit && rawDamage > 0 && tActor) {
-        await applyDamageToTargets(rawDamage, {
+        await applyDamageToTargets({
+          damage: rawDamage,
           attackerUuid: actor.uuid,
           damageType: dmgType,
           showNotification: true,
@@ -481,10 +482,11 @@ export class ForceAction extends RangedAttackAction {
           attackForm: "force",
           armorPiercing: 0,
           apMode: "value",
-          wasKillResult: colorLower === "red",
+          wasKillResult: (colorLower === "red"),
           specificTarget: target
         });
       }
+
     }
     // === END AUTO-APPLY ===
 

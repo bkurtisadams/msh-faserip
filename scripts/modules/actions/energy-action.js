@@ -497,7 +497,8 @@ export class EnergyAction extends RangedAttackAction {
 
       // Explicit per-target apply in Full Auto
       if (!isManualMode && this.opts?.autoApply && isHit && rawDamage > 0 && targetActor) {
-        await applyDamageToTargets(rawDamage, {
+        await applyDamageToTargets({
+          damage: rawDamage,
           attackerUuid: actor.uuid,
           damageType: choice.powerDamageType,
           showNotification: true,
@@ -505,15 +506,16 @@ export class EnergyAction extends RangedAttackAction {
           attackForm: "energy",
           armorPiercing: 0,
           apMode: "value",
-          wasKillResult: colorLower === "red",
+          wasKillResult: (colorLower === "red"),
           specificTarget: target
         });
       }
-    }
+
+    } // end for loop for target processing
     // Play combat SFX
     const sourceName = choice.powerName || "Energy Blast";
     if (game.msh?.playCombatSFX) {
       await game.msh.playCombatSFX(choice.powerDamageType, sourceName, colorLower);
     }
-  }
+  } // end execute()
 }

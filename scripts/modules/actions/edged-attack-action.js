@@ -338,6 +338,23 @@ export class EdgedAttackAction extends AttackAction {
           <div style="font-size:0.9em;">${actor.name} completed ${actualAttackCount} attacks.</div>
         </div>`
       });
+
+      // Full Auto: immediately apply damage to the specific target
+      if (this?.opts?.mode !== "manual" && this?.opts?.autoApply && isHit && afterArmor > 0 && target) {
+        await applyDamageToTargets({
+          damage: afterArmor,
+          attackerUuid: actor.uuid,
+          damageType,             // e.g. "physical-edged" for this action
+          attackForm,             // e.g. "edged"
+          showNotification: true,
+          bypassArmor: false,
+          armorPiercing: (choice?.ap ?? 0),
+          apMode: (choice?.apMode ?? "value"),
+          wasKillResult: (colorLower === "red"),
+          specificTarget: target  // the TokenDocument/Token from this per-target branch
+        });
+      }
+
     }
   } // <-- CLOSE async execute()
 }
