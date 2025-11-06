@@ -300,7 +300,8 @@ async function applyRulesDamage({ targetActorUuid, baseDamage, damageType, attac
   debugLog("gm-utils → applyRulesDamage", { actor: actor.name, baseDamage, damageType, attackerUuid });
   // Use selection if GM clicked from a message; otherwise direct-apply to target actor only
   const targets = game.user?.targets?.size ? Array.from(game.user.targets) : [actor.getActiveTokens()?.at(0)?.document ?? actor];
-  await applyDamageToTargets(baseDamage, {
+  await applyDamageToTargets({
+    damage: baseDamage,
     attackerUuid,
     damageType: damageType || "physical-blunt"
   });

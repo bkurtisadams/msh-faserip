@@ -67,7 +67,7 @@ export class CheckAction extends BaseAction {
 
       // Roll percent
       const roll = new Roll("1d100");
-      roll.evaluate(); // v13+: do not pass {async:true}
+      await roll.evaluate(); // v13+: do not pass {async:true}
       if (!this.opts?.skipDice) {
         await roll.toMessage({
           speaker: ChatMessage.getSpeaker({ actor }),
@@ -103,7 +103,7 @@ export class CheckAction extends BaseAction {
       if (actionType === "stun" && !effectsSuppressed) {
         if (colorLower === "white") {
           const d = new Roll("1d10");
-          d.evaluate();
+          await d.evaluate();
           rawDuration = d.total;
           const maxDur = game.settings?.get?.("msh-faserip","maxStunDuration") || 10;
           stunDuration = Math.min(rawDuration, maxDur);
@@ -239,7 +239,7 @@ export class CheckAction extends BaseAction {
 
     const effectiveEndRank = choice.shift ? shiftRank(choice.targetEndRank, choice.shift) : choice.targetEndRank;
     const roll = new Roll("1d100");
-    roll.evaluate();
+    await roll.evaluate();
     await roll.toMessage({
       speaker: ChatMessage.getSpeaker({ actor }),
       flavor: `${actionName}: ${choice.targetName} (${effectiveEndRank})`
@@ -264,7 +264,7 @@ export class CheckAction extends BaseAction {
     if (actionType === "stun" && !effectsSuppressed) {
       if (colorLower === "white") {
         const d = new Roll("1d10");
-        d.evaluate();
+        await d.evaluate();
         const maxDur = game.settings?.get?.("msh-faserip","maxStunDuration") || 10;
         const dur = Math.min(d.total, maxDur);
         await d.toMessage({ speaker: ChatMessage.getSpeaker({ actor }), flavor: `${choice.targetName} Stun Duration (1d10)` });

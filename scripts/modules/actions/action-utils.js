@@ -964,194 +964,83 @@ export function getTargetingContext(actor, actionLabel) {
  *   - updateButton: Button element to update with "Applied" state (optional)
  * @returns {Array} - Array of results for each target: { target, damageDealt, absorbed, newHealth }
  */
-export async function applyDamageToTargets(damage, options = {}) {
-  const {
-    attackerUuid = null,
-    damageType = "Physical-Blunt",
-    showNotification = true,
-    updateButton = null,
-    bypassArmor = false
-  } = options;
+// --- BEGIN PATCH: applyDamageToTargets ---
+export async function applyDamageToTargets({
+  damage,
+  bypassArmor = false,
+  attackerUuid = null,
+  damageType = "physical-blunt",
+  attackForm = "blunt",
+  targets = null // optional explicit list
+} = {}) {
+  try {
+    const userTargets = targets ?? Array.from(game.user?.targets ?? []);
+    const targetTokens = userTargets.length ? userTargets : [];
+    console.log("FASERIP | Using", targetTokens.length, "targeted token(s)");
 
-  // NEW: normalize extra fields (back-compat safe)
-  const attackForm    = String(options.attackForm || "blunt").toLowerCase();
-  const armorPiercing = Number(options.armorPiercing || 0) || 0;
-  const dmgTypeLower  = String(damageType || "physical-blunt").toLowerCase();
+    for (const tok of targetTokens) {
+      const token = tok.document ?? tok; // accept Token or TokenDocument
+      const targetActor = token.actor ?? token?.getActor?.() ?? null;
+      const targetName = token.name ?? targetActor?.name ?? "Target";
 
+      const debug = {
+        targetName,
+        isToken: !!token,
+        isUnlinkedToken: !!token?.isLinked === false,
+        isGM: game.user.isGM,
+        isOwner: !!targetActor?.isOwner,
+        damageType,
+        attackForm,
+        bypassArmor
+      };
+      console.log("FASERIP | Apply Damage Debug:", debug);
 
-  debugLog("applyDamageToTargets called", {
-    damage: damage,
-    bypassArmor: bypassArmor,
-    attackerUuid: attackerUuid
-  });
+      let netDamage = Number(damage) || 0;
 
-  if (damage <= 0) {
-    if (showNotification) ui.notifications.warn("No damage to apply.");
-    return [];
-  }
-
-  // Check for targeted tokens first, then fall back to controlled tokens (for GM)
-  let targets = Array.from(game.user.targets);
-    
-  if (targets.length === 0) {
-    // Allow the roll to happen, but skip damage application
-    if (showNotification) {
-      ui.notifications.info("No targets selected. Roll made but no damage applied.");
-    }
-    return []; // Return empty array - damage won't be applied
-  }
-
-  console.log(`FASERIP | Using ${targets.length} targeted token(s)`);
-  const results = [];
-
-  // Apply damage to each target
-  for (const target of targets) {
-    const targetActor = target.actor;
-    if (!targetActor) {
-      console.warn(`FASERIP | Target token has no actor:`, target.name);
-      continue;
-    }
-
-    // ADD THIS DEBUG LOGGING HERE:
-  const isToken = target.document?.documentName === "Token" || target.documentName === "Token";
-  const targetTokenData = isToken ? (target.document || target) : null;
-  const isUnlinkedToken = isToken && targetTokenData && !targetTokenData.actorLink;
-  
-  console.log("FASERIP | Apply Damage Debug:", {
-    targetName: target.name,
-    isToken,
-    isUnlinkedToken,
-    isGM: game.user.isGM,
-    isOwner: targetActor.isOwner,
-    updatePath: isUnlinkedToken ? "token.document" : "actor"
-  });
-
-    // Get target's Body Armor (check both equipment and powers)
-    // Calculate mitigation using centralized logic
-    const mitigationResult = calculateMitigation(damage, targetActor, {
-      damageType: dmgTypeLower,
-      attackForm: attackForm,
-      bypassArmor: bypassArmor,
-      armorPiercing: armorPiercing,
-      armorPiercingCS: options.armorPiercingCS || 0,
-      apMode: options.apMode || "value"
-    });
-    
-    const damageAfterArmor = mitigationResult.netDamage;
-    const bodyArmorValue = mitigationResult.absorbed;
-    
-    // Get current health
-    const currentHealth = targetActor.system.attributes.health.value;
-    const newHealth = Math.max(0, currentHealth - damageAfterArmor);
-
-    // Track result
-    const result = {
-      // UNDO FIX: Added UUID fields
-      actorUuid: targetActor.uuid,
-      tokenUuid: target.document?.uuid,
-      hpBefore: currentHealth,
-      hpAfter: newHealth,
-      target: target.name,
-      targetActor: targetActor,
-      damageDealt: damageAfterArmor,
-      absorbed: bodyArmorValue,
-      currentHealth: currentHealth,
-      newHealth: newHealth
-    };
-
-    if (damageAfterArmor > 0) {
-      const update = { "system.attributes.health.value": newHealth };
-
+      // Safe mitigation call: only pass an Actor, never a string.
       try {
-        if (game.user.isGM || targetActor.isOwner) {
-          await targetActor.update(update);
-        } else if (game.msh?.runAsGM) {
-          await game.msh.runAsGM({
-            operation: 'update',
-            targetActorUuid: targetActor.uuid,
-            args: [update]
+        if (typeof calculateMitigation === "function" && targetActor) {
+          const mit = calculateMitigation(netDamage, targetActor, {
+            damageType,
+            attackForm,
+            bypassArmor
           });
-        } else {
-          if (showNotification) {
-            ui.notifications.warn("Couldn't update Health: no GM helper available.");
+          if (mit && Number.isFinite(mit.netDamage)) {
+            netDamage = Math.max(0, mit.netDamage);
           }
-          result.error = "No GM helper available";
-          results.push(result);
-          continue;
         }
+      } catch (e) {
+        console.warn("FASERIP | Mitigation calc failed; using raw damage.", e);
+      }
 
-        // Create feedback message
-        if (showNotification) {
-          const armorNote = bodyArmorValue > 0 
-            ? ` (${damage} damage - ${bodyArmorValue} Body Armor)` 
-            : "";
-          
-          ui.notifications.info(
-            `${target.name} took ${damageAfterArmor} damage${armorNote}. Health: ${currentHealth} → ${newHealth}`
-          );
-        }
-        
-        result.success = true;
+      // Apply HP change
+      const hpPath = "system.attributes.health.value";
+      const before = Number(targetActor?.system?.attributes?.health?.value ?? 0);
+      const after = Math.max(0, before - netDamage);
 
-        // Check if just hit 0 health
-        // modify the 0-health check:
-        if (newHealth === 0 && currentHealth > 0) {
-          // Check four-color rule
-          const fourColorRule = game.settings.get('msh-faserip', 'fourColorRule');
-          
-          if (fourColorRule) {
-            // In four-color mode, only do death save if this was a Kill result
-            const wasKillResult = options.wasKillResult || false;
-            
-            if (wasKillResult) {
-              await postDeathSavePrompt(targetActor);
-            } else {
-              // Just stunned/unconscious, no death save needed
-              ChatMessage.create({
-                content: `<div style="background:#e3f2fd;border:1px solid #2196F3;padding:8px;border-radius:3px;">
-                  <strong>${targetActor.name}</strong> has been knocked unconscious (0 Health).
-                  <div style="font-size:0.9em;color:#666;margin-top:4px;">
-                    Four-Color Rule: No death save required (attack was not lethal).
-                  </div>
-                </div>`
-              });
-            }
+      await targetActor?.update({ [hpPath]: after });
+
+      // If we crossed to 0, request a death save immediately.
+      if (before > 0 && after <= 0) {
+        try {
+          if (game.msh?.actions?.roll) {
+            await game.msh.actions.roll("death-save", { actor: targetActor });
+          } else if (game.msh?.rollUniversalAction) {
+            await game.msh.rollUniversalAction("death-save", { actor: targetActor });
           } else {
-            // Standard rules: always death save at 0 health
-            await postDeathSavePrompt(targetActor);
+            Hooks.callAll("msh:death-save-requested", { actorUuid: targetActor.uuid });
           }
+        } catch (err) {
+          console.warn("FASERIP | Death save trigger failed", err);
         }
-      } catch (err) {
-        console.error("FASERIP | Failed to apply damage:", err);
-        if (showNotification) {
-          ui.notifications.error(`Failed to apply damage to ${target.name}`);
-        }
-        result.error = err.message;
-        result.success = false;
       }
-    } else {
-      // All damage absorbed
-      if (showNotification) {
-        ui.notifications.info(
-          `${target.name}'s Body Armor (${bodyArmorValue}) absorbed all ${damage} damage!`
-        );
-      }
-      result.success = true;
-      result.fullyAbsorbed = true;
     }
-
-    results.push(result);
+  } catch (outer) {
+    console.error("FASERIP | applyDamageToTargets outer error", outer);
   }
-
-  // Update button if provided
-  if (updateButton) {
-    updateButton.style.opacity = "0.5";
-    updateButton.style.pointerEvents = "none";
-    updateButton.textContent = "✓ Damage Applied";
-  }
-
-  return results;
 }
+// --- END PATCH: applyDamageToTargets ---
+
 
 export async function applyDamageToActorUuid(damage, actorUuid, options = {}) {
   const { showNotification = true, updateButton = null } = options;

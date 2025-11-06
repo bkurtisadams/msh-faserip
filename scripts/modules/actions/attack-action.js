@@ -578,7 +578,8 @@ export class AttackAction extends BaseAction {
           target: targetName
         });
 
-        await applyDamageToTargets(rawDamage, {
+        await applyDamageToTargets({
+          damage: rawDamage,
           attackerUuid: actor.uuid,
           damageType: damageType,
           showNotification: false,

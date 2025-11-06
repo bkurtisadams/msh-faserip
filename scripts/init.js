@@ -859,6 +859,13 @@ Hooks.once("init", async () => {
   // Add the rollUniversalTable function to the namespace
   game.msh.rollUniversalTable = rollUniversalTable;
 
+  // Back-compat / public wrapper so code can call game.msh.actions.roll()
+  // (internally delegates to the new ActionDispatcher)
+  game.msh.actions ??= {};
+  game.msh.actions.roll = async function (actionType, { actor, abilityName, opts = {} } = {}) {
+    return await ActionDispatcher.roll(actionType, { actor, abilityName, opts });
+  };
+
    // Add the open dialog function safely inside the hook
    game.msh.openUniversalTableDialog = openUniversalTableDialog;
   

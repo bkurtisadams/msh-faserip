@@ -329,7 +329,8 @@ export function installActionChatHandlers() {
         const wasKillResult   = btn.dataset.isKill === "true";
 
         // 2) Apply via rules and CAPTURE RETURNED RESULTS (one entry per target)
-        const results = await applyDamageToTargets(damage, {
+        const results = await applyDamageToTargets({
+          damage: damage,
           attackerUuid,
           damageType,
           attackForm,

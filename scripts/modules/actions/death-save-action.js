@@ -34,12 +34,19 @@ export class DeathSaveAction extends BaseAction {
       const effectiveRank = shiftRank(endurance.rank, Number(this.opts?.featCs ?? 0));
 
       const roll = await (new Roll("1d100")).evaluate();
-      // Auto path: skip dice animation; set toMessage() if you want a visible roll line
-      const needTo100  = Math.max(0, 100 - roll.total);
-      const cappedTotal = Math.min(100, roll.total); // no karma in auto path
+      const cappedTotal = Math.min(100, roll.total);
 
       const color = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
-      const survives = String(color).toLowerCase() !== "white";  // white = fails death save per your rules text
+      const colorLower = String(color).toLowerCase();
+      
+      // Roll unconscious duration
+      const durationRoll = await (new Roll("1d10")).evaluate();
+      const maxStunDuration = game.settings.get('msh-faserip', 'maxStunDuration') || 10;
+      const unconsciousDuration = Math.min(durationRoll.total, maxStunDuration);
+
+      // Use Kill resolver to determine outcome
+      const killResult = resolveKillFeat(colorLower, KILL_CONTEXTS.ZERO_HEALTH);
+      const isDying = (killResult.outcome === "EnduranceLoss");
 
       const resultHtml = `
         <div style="background:#fafafa;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
@@ -49,17 +56,22 @@ export class DeathSaveAction extends BaseAction {
           <div style="padding:8px 10px;font-size:.95em;">
             <div>Endurance: ${endurance.rank}${this.opts?.featCs ? ` — Shift ${this.opts.featCs} → ${effectiveRank}` : ""}</div>
             <div>Roll: ${roll.total}</div>
-            <div style="margin-top:6px;padding:6px;border-radius:3px;background:${bannerColors(survives ? 'green' : 'red').bg};color:${bannerColors(survives ? 'green' : 'red').fg};">
-              RESULT: ${survives ? "SURVIVES" : "FAILS"}
+            <div>Unconscious: ${unconsciousDuration} rounds</div>
+            <div style="margin-top:6px;padding:6px;border-radius:3px;background:${bannerColors(isDying ? 'red' : 'green').bg};color:${bannerColors(isDying ? 'red' : 'green').fg};">
+              RESULT: ${isDying ? "DYING" : "STUNNED"}
             </div>
           </div>
         </div>
       `;
       await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor }), content: resultHtml });
 
-      if (!survives) {
-        await applyDying(actor);
+      // Create appropriate effect
+      if (isDying) {
+        await this._createDyingEffect(actor, endurance, unconsciousDuration);
+      } else {
+        await this._createStunnedEffect(actor, unconsciousDuration);
       }
+      
       return; // ← skip dialog path
     }
     // --- END AUTO MODE FAST-PATH ---
@@ -169,6 +181,30 @@ export class DeathSaveAction extends BaseAction {
     console.log("Is Dying:", isDying);
     console.log("Unconscious Duration:", unconsciousDuration);
 
+    // --- Death Save on 0 Health (always, any source) ---
+    try {
+      const targetToken = targets?.[0] ?? targetT ?? null; // use your local variable(s)
+      const targetActor = targetToken?.actor ?? null;
+      if (targetActor) {
+        const hp = Number(
+          getProperty(targetActor, "system.derived.attributes.health.value") ??
+          getProperty(targetActor, "system.health?.value") ??
+          0
+        );
+        if (hp <= 0) {
+          // Death Save runs as an action on the defender
+          const ds = new game.msh.actions.ActionDispatcher(targetActor);
+          await ds.roll("death-save", {
+            source: attacker,         // attribute the source for logging
+            autoApply: true,          // skip dialog if you prefer
+            showConfirm: false
+          });
+        }
+      }
+    } catch (err) {
+      console.error("FASERIP | post-damage Death Save check failed:", err);
+    }
+
     // Create appropriate effect
     if (isDying) {
       console.log("Calling _createDyingEffect...");
@@ -244,122 +280,111 @@ export class DeathSaveAction extends BaseAction {
     });
   }
 
+  /** Create the DYING effect: loses 1 Endurance rank per turn (6 seconds) */
   async _createDyingEffect(actor, endurance, _unconsciousDuration) {
     const scope = globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faserip";
 
-    // Prevent duplicate Dying on token/prototype
-    const existing = actor.effects.find(e =>
-      e.getFlag(scope, "isDying") === true || e.getFlag(scope, "dyingTimer") === true
-    );
-    if (existing) {
-      console.log(`FASERIP | Dying already on ${actor.name}, skipping duplicate.`);
-      return;
-    }
+    // Remove any existing dying timers to avoid duplicates
+    try {
+      const existing = actor.effects.filter(e => e.flags?.[scope]?.dyingTimer);
+      if (existing.length) {
+        await actor.deleteEmbeddedDocuments("ActiveEffect", existing.map(e => e.id));
+      }
+    } catch (_) {}
 
-    const secondsPerTurn = 6;
-    const currentRankIndex = RANKS.indexOf(endurance.rank);
-    const turnsUntilDeath = Math.max(1, currentRankIndex + 1); // includes final tick below Shift-0
+    const usesCTT = game.modules.get("calendar-time-tracker")?.active === true;
 
-    const dyingEffect = {
-      name: `Dying (${endurance.rank} → Dead in ${turnsUntilDeath} turns)`,
-      img: "icons/svg/skull.svg",             // use img to avoid deprecated icon getter
+    const effectData = {
+      name: "Dying",
+      img: "icons/svg/skull.svg",         // IMPORTANT: use img, never read effect.icon anywhere
       origin: actor.uuid,
-      disabled: false,
-      duration: {
-        seconds: turnsUntilDeath * secondsPerTurn,
-        startTime: game.time?.worldTime ?? 0
-      },
       flags: {
         [scope]: {
+          dyingTimer: true,
           isDying: true,
-          dyingTimer: true,                   // <<< IMPORTANT: lets CTT expiration tick the track
-          originalEndRank: endurance.rank,
-          originalEndValue: endurance.value,
           unitLabel: "turn",
           unitLabelPlural: "turns"
         }
-      }
-    };
-
-    await actor.createEmbeddedDocuments("ActiveEffect", [dyingEffect]);
-    ui.notifications.warn(`${actor.name} is DYING! Loses 1 Endurance rank per turn. Dead in ${turnsUntilDeath} turns!`);
-  }
-
-  async _createStunnedEffect(actor, duration) {
-    const scope = globalThis.MSH_FLAG_SCOPE || "msh-faserip";
-
-    // Prevent duplicate Stunned on token/prototype
-    const existingStunned = actor.effects.find(e => e.getFlag(scope, "isStunned") === true);
-    if (existingStunned) {
-      console.log(`FASERIP | Stunned already on ${actor.name}, skipping duplicate.`);
-      return;
-    }
-
-    const effectData = {
-      name: `Stunned (${duration} rounds)`,
-      img: "icons/svg/daze.svg",            // use img to avoid deprecated icon getter
-      origin: actor.uuid,
-      disabled: false,
-      duration: {
-        rounds: duration,
-        startRound: game.combat?.round || 0
       },
-      flags: {
-        [scope]: {
-          isStunned: true,
-          fromDeathSave: true
-        }
-      }
+      changes: [
+        { key: "system.status.dying", mode: CONST.ACTIVE_EFFECT_MODES.OVERRIDE, value: true }
+      ],
+      statuses: ["dying"],
+      duration: usesCTT
+        ? { seconds: 6, startTime: game.time.worldTime }                         // 1 turn
+        : { rounds: 1, startRound: game.combat?.round || 0, startTurn: game.combat?.turn || 0 }
     };
 
     await actor.createEmbeddedDocuments("ActiveEffect", [effectData]);
-    ui.notifications.info(`Stunned effect created for ${actor.name} (${duration} rounds).`);
-  }
 
-
-  async _createStunnedEffect(actor, duration) {
-    const scope = globalThis.MSH_FLAG_SCOPE || "msh-faserip";
-    
-    // === BUG FIX: Check for existing effect to prevent duplication on token/prototype ===
-    const existingStunned = actor.effects.find(e => 
-        e.getFlag(scope, "isStunned") === true
-    );
-    if (existingStunned) {
-        console.log(`FASERIP | Stunned effect already exists on ${actor.name}, skipping duplicate creation.`);
-        return; // <-- Exit if it already exists
-    }
-    // ===================================================================================
-    const effectData = {
-        name: `Stunned (${duration} rounds)`,
-        icon: "icons/svg/daze.svg",
-        origin: actor.uuid,
-        disabled: false,
-        duration: {
-        rounds: duration,
-        startRound: game.combat?.round || 0
-        },
-        flags: {
-        "msh-faserip": {
-            isStunned: true,
-            fromDeathSave: true
+    // Also create Unconscious effect - character is unconscious while dying
+    const unconsciousData = {
+      name: `Unconscious (${_unconsciousDuration} rounds)`,
+      img: "icons/svg/unconscious.svg",
+      origin: actor.uuid,
+      flags: {
+        [scope]: {
+          unitLabel: "turn",
+          unitLabelPlural: "turns"
         }
-        }
+      },
+      statuses: ["unconscious"],
+      duration: usesCTT
+        ? { seconds: Math.max(1, Number(_unconsciousDuration)) * 6, startTime: game.time.worldTime }
+        : { rounds: Math.max(1, Number(_unconsciousDuration)), startRound: game.combat?.round || 0, startTurn: game.combat?.turn || 0 }
     };
 
-    await actor.createEmbeddedDocuments('ActiveEffect', [effectData]);
-    ui.notifications.info(`Stunned effect created for ${actor.name} (${duration} rounds).`);
-    }
+    await actor.createEmbeddedDocuments("ActiveEffect", [unconsciousData]);
 
-  _buildEnduranceLadder(startRank) {
-    const idx = RANKS.indexOf(startRank);
-    if (idx === -1) return "Unknown → Dead";
-    
-    const ladder = [];
-    for (let i = idx; i >= 0; i--) {
-      ladder.push(RANKS[i]);
-    }
-    ladder.push("DEAD");
-    
-    return ladder.join(" → ");
+    // (Optional) If you want the “unconscious N rounds” status during dying, create a separate AE here.
+    // Not required for the CTT tick-loop; the chat card already shows the duration rolled.
   }
+
+  /** Create an UNCONSCIOUS effect for non-dying outcomes (N rounds) */
+  async _createStunnedEffect(actor, unconsciousRounds = 1) {
+    const scope = globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faserip";
+    const usesCTT = game.modules.get("calendar-time-tracker")?.active === true;
+
+    // Clean up any old unconscious effects we own (optional, but tidy)
+    try {
+      const existing = actor.effects.filter(e => e.statuses?.has?.("unconscious"));
+      if (existing.length) {
+        await actor.deleteEmbeddedDocuments("ActiveEffect", existing.map(e => e.id));
+      }
+    } catch (_) {}
+
+    const effectData = {
+      name: `Unconscious (${unconsciousRounds} rounds)`,
+      img: "icons/svg/unconscious.svg",
+      origin: actor.uuid,
+      flags: {
+        [scope]: {
+          unitLabel: "turn",
+          unitLabelPlural: "turns"
+        }
+      },
+      statuses: ["unconscious"],
+      duration: usesCTT
+        ? { seconds: Math.max(1, Number(unconsciousRounds)) * 6, startTime: game.time.worldTime }
+        : { rounds: Math.max(1, Number(unconsciousRounds)), startRound: game.combat?.round || 0, startTurn: game.combat?.turn || 0 }
+    };
+
+    await actor.createEmbeddedDocuments("ActiveEffect", [effectData]);
+    ui.notifications.info(`Stunned effect created for ${actor.name} (${unconsciousRounds} rounds).`);
+  }
+
+  /** Build a simple endurance "ladder" preview for the chat card */
+  _buildEnduranceLadder(startRank = "Typical") {
+    const order = [
+      "Shift-0","Feeble","Poor","Typical","Good","Excellent","Remarkable",
+      "Incredible","Amazing","Monstrous","Unearthly","Shift X","Shift Y","Shift Z",
+      "Class 1000","Class 3000","Class 5000","Beyond"
+    ];
+    const i = order.indexOf(startRank);
+    if (i < 0) return `${startRank} → (unknown)`;
+    // Show a short tail down to Shift-0 for readability
+    const tail = order.slice(Math.max(0, i - 3), i + 1).concat("… → Shift-0");
+    return tail.join(" → ");
+  }
+
 }
