@@ -44,7 +44,6 @@ export function computeDuration({ rounds = null, seconds = null } = {}) {
       return {
         rounds,
         startRound: game.combat?.round ?? 0,
-        startTurn: game.combat?.turn ?? 0
       };
     }
 

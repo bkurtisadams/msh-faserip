@@ -12,6 +12,7 @@ import { buildDamageFlags } from "./damage-ui.js";
 import { canEffectsApply } from "../../rules/effects-gate.js";
 import { ACTION_LABELS } from "./action-config.js";
 import { ACTION_EFFECTS } from "./action-config.js";
+import { SCOPE, getFlagScope } from "./flags.js";
 
 
 export class AttackAction extends BaseAction {
@@ -507,23 +508,24 @@ export class AttackAction extends BaseAction {
       }
 
       // Auto-run Slam in full-auto mode
-if (!isManualMode && this.opts?.autoApply && autoSave && showSlam && targetActor) {
-  const { ActionDispatcher } = await import("./action-dispatcher.js");
-  await ActionDispatcher.roll("slam", {
-    actor,
-    opts: {
-      autoApply: true,
-      showConfirm: false,
-      attackForm,
-      prefill: {
-        targetUuid: target?.document?.uuid ?? target?.actor?.uuid,
-        dmgThrough: Number(penetratingDamage) || 0,
-        targetName: target?.name,
-        targetEndRank: targetActor?.system?.abilities?.endurance?.rank || "Good"
+      if (!isManualMode && this.opts?.autoApply && autoSave && showSlam && targetActor) {
+        const { ActionDispatcher } = await import("./action-dispatcher.js");
+        await ActionDispatcher.roll("slam", {
+          actor,
+          opts: {
+            autoApply: true,
+            showConfirm: false,
+            attackForm,
+            prefill: {
+              targetUuid: target?.document?.uuid ?? target?.actor?.uuid,
+              dmgThrough: Number(penetratingDamage) || 0,
+              targetName: target?.name,
+              targetEndRank: targetActor?.system?.abilities?.endurance?.rank || "Good"
+            }
+          }
+        });
       }
-    }
-  });
-}
+      
       // Auto-run Stun in full-auto mode
       if (!isManualMode && this.opts?.autoApply && autoSave && showStun && targetActor) {
         const { ActionDispatcher } = await import("./action-dispatcher.js");
@@ -593,18 +595,26 @@ if (!isManualMode && this.opts?.autoApply && autoSave && showSlam && targetActor
         </div>
       `;
 
+      const damageFlags = buildDamageFlags({
+        actionId: actionType,
+        damageType: damageType,
+        rawDamage,
+        afterArmor,
+        resultColor: colorLower,
+        cappedTotal,
+        targets: target ? [target] : []
+      });
+
       await ChatMessage.create({
         speaker: ChatMessage.getSpeaker({ actor }),
         content: cardHtml,
-        flags: buildDamageFlags({
-          actionId: actionType,
-          damageType: damageType,
-          rawDamage,
-          afterArmor,
-          resultColor: colorLower,
-          cappedTotal,
-          targets: target ? [target] : []
-        })
+        flags: {
+          ...damageFlags,
+          [SCOPE]: {
+            ...(damageFlags?.[SCOPE] || {}),
+            autoChecksDone: true
+          }
+        }
       });
 
       // Auto-apply damage for this target ONLY if not manual mode
