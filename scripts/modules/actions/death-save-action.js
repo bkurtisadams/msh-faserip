@@ -244,39 +244,91 @@ export class DeathSaveAction extends BaseAction {
     });
   }
 
-  async _createDyingEffect(actor, endurance, unconsciousDuration) {
-  const secondsPerTurn = 6;
-  
-  // Calculate turns until death
-  // They die when they go BELOW Shift 0, so it's their current rank index + 1
-  const currentRankIndex = RANKS.indexOf(endurance.rank);
-  const turnsUntilDeath = currentRankIndex + 1; // +1 for the turn that takes them BELOW Shift 0
-  
-  const dyingEffect = {
-    name: `Dying (${endurance.rank} → Dead in ${turnsUntilDeath} turns)`,
-    icon: "icons/svg/skull.svg",
-    origin: actor.uuid,
-    disabled: false,
-    duration: {
-      seconds: turnsUntilDeath * secondsPerTurn,
-      startTime: game.time?.worldTime || 0
-    },
-    flags: {
-      "msh-faserip": {
-        isDying: true,
-        originalEndRank: endurance.rank,
-        originalEndValue: endurance.value,
-        unitLabel: "turn",
-        unitLabelPlural: "turns"
-      }
-    }
-  };
+  async _createDyingEffect(actor, endurance, _unconsciousDuration) {
+    const scope = globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faserip";
 
-  await actor.createEmbeddedDocuments('ActiveEffect', [dyingEffect]);
-  ui.notifications.warn(`${actor.name} is DYING! Loses 1 Endurance rank per turn. Dead in ${turnsUntilDeath} turns!`);
-}
+    // Prevent duplicate Dying on token/prototype
+    const existing = actor.effects.find(e =>
+      e.getFlag(scope, "isDying") === true || e.getFlag(scope, "dyingTimer") === true
+    );
+    if (existing) {
+      console.log(`FASERIP | Dying already on ${actor.name}, skipping duplicate.`);
+      return;
+    }
+
+    const secondsPerTurn = 6;
+    const currentRankIndex = RANKS.indexOf(endurance.rank);
+    const turnsUntilDeath = Math.max(1, currentRankIndex + 1); // includes final tick below Shift-0
+
+    const dyingEffect = {
+      name: `Dying (${endurance.rank} → Dead in ${turnsUntilDeath} turns)`,
+      img: "icons/svg/skull.svg",             // use img to avoid deprecated icon getter
+      origin: actor.uuid,
+      disabled: false,
+      duration: {
+        seconds: turnsUntilDeath * secondsPerTurn,
+        startTime: game.time?.worldTime ?? 0
+      },
+      flags: {
+        [scope]: {
+          isDying: true,
+          dyingTimer: true,                   // <<< IMPORTANT: lets CTT expiration tick the track
+          originalEndRank: endurance.rank,
+          originalEndValue: endurance.value,
+          unitLabel: "turn",
+          unitLabelPlural: "turns"
+        }
+      }
+    };
+
+    await actor.createEmbeddedDocuments("ActiveEffect", [dyingEffect]);
+    ui.notifications.warn(`${actor.name} is DYING! Loses 1 Endurance rank per turn. Dead in ${turnsUntilDeath} turns!`);
+  }
 
   async _createStunnedEffect(actor, duration) {
+    const scope = globalThis.MSH_FLAG_SCOPE || "msh-faserip";
+
+    // Prevent duplicate Stunned on token/prototype
+    const existingStunned = actor.effects.find(e => e.getFlag(scope, "isStunned") === true);
+    if (existingStunned) {
+      console.log(`FASERIP | Stunned already on ${actor.name}, skipping duplicate.`);
+      return;
+    }
+
+    const effectData = {
+      name: `Stunned (${duration} rounds)`,
+      img: "icons/svg/daze.svg",            // use img to avoid deprecated icon getter
+      origin: actor.uuid,
+      disabled: false,
+      duration: {
+        rounds: duration,
+        startRound: game.combat?.round || 0
+      },
+      flags: {
+        [scope]: {
+          isStunned: true,
+          fromDeathSave: true
+        }
+      }
+    };
+
+    await actor.createEmbeddedDocuments("ActiveEffect", [effectData]);
+    ui.notifications.info(`Stunned effect created for ${actor.name} (${duration} rounds).`);
+  }
+
+
+  async _createStunnedEffect(actor, duration) {
+    const scope = globalThis.MSH_FLAG_SCOPE || "msh-faserip";
+    
+    // === BUG FIX: Check for existing effect to prevent duplication on token/prototype ===
+    const existingStunned = actor.effects.find(e => 
+        e.getFlag(scope, "isStunned") === true
+    );
+    if (existingStunned) {
+        console.log(`FASERIP | Stunned effect already exists on ${actor.name}, skipping duplicate creation.`);
+        return; // <-- Exit if it already exists
+    }
+    // ===================================================================================
     const effectData = {
         name: `Stunned (${duration} rounds)`,
         icon: "icons/svg/daze.svg",

@@ -4,6 +4,19 @@ import { calculateMitigation } from "../../rules/mitigation.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
 import { resolveCombatMode } from "./action-dispatcher.js";
 
+// Given a Token or Actor, return the correct Actor document for Active Effects
+export function actorForEffects(target) {
+  if (!target) return null;
+  // TokenDocument or Token
+  if (target.document?.documentName === "Token" || target.documentName === "Token") return target.actor;
+  // placeables return { actor }
+  if (target.actor) return target.actor;
+  // already an Actor
+  return target;
+}
+// usage:
+//const aeParent = actorForEffects(target);
+//await aeParent.createEmbeddedDocuments("ActiveEffect", [effectData]);
 
 /** Action capability map — what rules permit by default */
 export const ACTION_CAPS = {
@@ -548,8 +561,8 @@ export function buildActionsBox({
       chip(
         "Resolve Slam",
         "Open Slam dialog using penetrating damage",
-        //true,
-        !autoApply,
+        true,
+        
         `data-check="slam" data-attack-form="${attackForm}" data-dmg="${dmgPen}" data-attacker-uuid="${actorUuid}" ${pulled ? 'data-pulled="true"' : ""} ${prefillAttr}`
       )
     );
@@ -561,8 +574,7 @@ export function buildActionsBox({
       chip(
         "Resolve Stun",
         "Open Stun dialog using penetrating damage",
-        //true,
-        !autoApply,
+        true,
         `data-check="stun"
         data-attack-form="${attackForm}"
         data-damage-type="${damageType}"
@@ -579,8 +591,8 @@ export function buildActionsBox({
       chip(
         "Resolve Kill",
         "Open Kill check dialog",
-        //true,
-        !autoApply,
+        true,
+        
         `data-check="kill"
         data-attack-form="${attackForm}"
         data-damage-type="${damageType}"
