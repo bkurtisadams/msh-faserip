@@ -469,7 +469,7 @@ export class AttackAction extends BaseAction {
         ? (resolveCombatMode(targetActor) === "full")
         : false;
 
-      const actions = (!isManualMode && isHit && canEffectsApply(penetratingDamage) && targetActor)
+      const actions = (!isManualMode && !this.opts?.autoApply && isHit && canEffectsApply(penetratingDamage) && targetActor)
         ? buildActionsBox({
             showSlam,
             showStun,

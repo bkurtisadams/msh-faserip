@@ -286,13 +286,13 @@ Hooks.once("init", async () => {
     }
   });
 
-  Hooks.on("updateCombat", async (combat, changes) => {
+  /* Hooks.on("updateCombat", async (combat, changes) => {
     if (!("round" in changes) && !("turn" in changes)) return;
     const a = combat?.combatant?.actor; if (!a) return;
     for (const ef of a.effects) {
       try { await FX.renameEffectWithRemaining(ef); } catch {}
     }
-  });
+  }); */
 
 
   Hooks.on("preUpdateActiveEffect", function (effect, changes, options, userId) {
