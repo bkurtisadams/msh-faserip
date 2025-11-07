@@ -787,6 +787,26 @@ export function initRestSystem() {
     // Check if actor is still at 0 HP
     const currentHealth = actor.system?.attributes?.health?.value ?? 0;
     if (currentHealth > 0) return; // Already conscious
+
+        // Check if actor is dead
+    if (actor.system?.details?.isDead) {
+      if (game.settings.get(getFlagScope(), "debugMode")) {
+        console.log(`FASERIP | ${actor.name} is dead - skipping consciousness attempt`);
+      }
+      return;
+    }
+    
+    // Check if still dying
+    const hasDyingEffect = actor.effects.find(e => 
+      e.getFlag(getFlagScope(), "isDying") || e.statuses?.has?.("dying")
+    );
+    
+    if (hasDyingEffect) {
+      if (game.settings.get(getFlagScope(), "debugMode")) {
+        console.log(`FASERIP | ${actor.name} is still dying - skipping consciousness attempt`);
+      }
+      return;
+    }
     
     // Check if this was from a death save (not from consciousness attempt)
     const fromDeathSave = effect.getFlag(getFlagScope(), "fromDeathSave");

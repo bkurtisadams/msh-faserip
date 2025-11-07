@@ -24,6 +24,9 @@ export class DeathSaveAction extends BaseAction {
     const endurance = getAbilityInfo(actor, "endurance");
     const effects = effectsFor("kill"); // Reuse Kill column effects
 
+    // Add clear debug statement at the start
+    console.log(`🎲 DEATH SAVE | ${actor.name} rolling Endurance FEAT (${endurance.rank} rank) vs Kill table`);
+
     // --- AUTO MODE FAST-PATH: Full Auto skips dialog & rolls immediately ---
     if (this?.opts?.autoApply === true) {
       const actor = this.actor;
@@ -47,6 +50,9 @@ export class DeathSaveAction extends BaseAction {
       // Use Kill resolver to determine outcome
       const killResult = resolveKillFeat(colorLower, KILL_CONTEXTS.ZERO_HEALTH);
       const isDying = (killResult.outcome === "EnduranceLoss");
+
+      // Add clear result statement
+      console.log(`💀 DEATH SAVE | ${actor.name} result: ${color.toUpperCase()} - ${killResult.label} (${killResult.description})`);
 
       const resultHtml = `
         <div style="background:#fafafa;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">

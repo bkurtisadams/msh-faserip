@@ -1547,7 +1547,13 @@ Hooks.on("updateCombat", async (combat, changed, diff, userId) => {
       if (curName === "Shift-0") {
         // Already at Shift-0 and trying to go lower = death
         console.log(`💀 FASERIP | ${actor.name} has died (below Shift-0)`);
-        await actor.update({"system.details.isDead": true});
+        
+        // For linked actors, set isDead flag on base actor
+        // For unlinked tokens, skip this to avoid affecting other tokens sharing the same base actor
+        if (!actor.isToken || actor.prototypeToken?.actorLink) {
+          await actor.update({"system.details.isDead": true});
+        }
+        
         await dyingEffect.delete();
 
         // Remove any Unconscious effects from dead character
