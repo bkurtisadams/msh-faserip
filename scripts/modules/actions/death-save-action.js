@@ -323,6 +323,8 @@ export class DeathSaveAction extends BaseAction {
       origin: actor.uuid,
       flags: {
         [scope]: {
+          isStunned: true,           // if this exists already
+          fromDeathSave: true,        // ADD THIS
           unitLabel: "turn",
           unitLabelPlural: "turns"
         }

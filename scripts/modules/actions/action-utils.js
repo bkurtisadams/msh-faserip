@@ -3,6 +3,7 @@ import { applyNullifiedEffect, isAuraMaintained } from "./nullify.js";
 import { calculateMitigation } from "../../rules/mitigation.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
 import { resolveCombatMode } from "./action-dispatcher.js";
+import { recordDamage } from "../rest-system.js";
 
 // Given a Token or Actor, return the correct Actor document for Active Effects
 export function actorForEffects(target) {
@@ -1050,6 +1051,12 @@ export async function applyDamageToTargets({
         { [hpPath]: after },
         { healthChange: { old: before, new: after } }
       );
+
+      // Record damage timestamp for rest system
+      if (before > after) {
+        await recordDamage(targetActor);
+      }
+      
     }
   } catch (outer) {
     console.error("FASERIP | applyDamageToTargets outer error", outer);
