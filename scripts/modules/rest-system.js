@@ -315,6 +315,17 @@ export class RestSystem {
       return { success: false, message: msg };
     }
 
+    // Check if still has Dying effect
+    const hasDyingEffect = actor.effects.find(e => 
+      e.getFlag(SCOPE, "isDying") || e.statuses?.has?.("dying")
+    );
+
+    if (hasDyingEffect) {
+      const msg = `${actor.name} is still dying. Cannot attempt consciousness while dying.`;
+      ui.notifications.warn(msg);
+      return { success: false, message: msg };
+    }
+
     // Roll Endurance FEAT vs Kill column
     const enduranceRank = actor.system?.abilities?.endurance?.rank || "Typical";
     
@@ -458,6 +469,10 @@ export class RestSystem {
       return { success: false, message: msg };
     }
 
+    // Get original Endurance rank from Dying effect
+    const originalEndurance = dyingEffect.getFlag(SCOPE, "originalEndurance");
+    const currentEndurance = actor.system.abilities.endurance.rank;
+
     // Remove Dying effect
     await actor.deleteEmbeddedDocuments("ActiveEffect", [dyingEffect.id]);
     
@@ -469,10 +484,10 @@ export class RestSystem {
       await actor.deleteEmbeddedDocuments("ActiveEffect", [unconsciousFromDeathSave.id]);
     }
     
-    // Create new Unconscious effect for 1-10 hours
+    // Unconscious for 1-10 hours
     const hours = Math.floor(Math.random() * 10) + 1;
     
-    const effectData = {
+    const unconsciousEffect = {
       name: `Unconscious (${hours} hours)`,
       icon: "icons/svg/unconscious.svg",
       origin: actor.uuid,
@@ -488,9 +503,35 @@ export class RestSystem {
       }
     };
     
-    await actor.createEmbeddedDocuments("ActiveEffect", [effectData]);
+    await actor.createEmbeddedDocuments("ActiveEffect", [unconsciousEffect]);
     
-    const message = `${actor.name} stabilized! Unconscious for ${hours} hours.`;
+    // Create Impaired Endurance effect if Endurance was reduced
+    if (originalEndurance && currentEndurance < originalEndurance) {
+      const impairedEffect = {
+        name: `Impaired Endurance (${currentEndurance} of ${originalEndurance})`,
+        icon: "icons/svg/downgrade.svg",
+        origin: actor.uuid,
+        flags: {
+          [SCOPE]: {
+            isImpairedEndurance: true,
+            originalEndurance: originalEndurance,
+            currentEndurance: currentEndurance,
+            lastHealed: Date.now()
+          }
+        },
+        changes: [
+          {
+            key: "system.columnShift",
+            mode: CONST.ACTIVE_EFFECT_MODES.ADD,
+            value: "-2"
+          }
+        ]
+      };
+      
+      await actor.createEmbeddedDocuments("ActiveEffect", [impairedEffect]);
+    }
+    
+    const message = `${actor.name} stabilized! Unconscious for ${hours} hours. Endurance impaired (${currentEndurance} of ${originalEndurance}).`;
     
     await ChatMessage.create({
       content: `<div style="background:#e8f5e9;border:2px solid #4CAF50;padding:10px;border-radius:5px;">
@@ -498,6 +539,7 @@ export class RestSystem {
           <i class="fas fa-medkit"></i> ${actor.name} Stabilized!
         </div>
         <div>Dying halted - unconscious for ${hours} hours</div>
+        <div>Endurance impaired: ${currentEndurance} of ${originalEndurance} (-2CS penalty)</div>
       </div>`,
       speaker: ChatMessage.getSpeaker({ actor })
     });
@@ -505,6 +547,139 @@ export class RestSystem {
     ui.notifications.info(message);
     
     return { success: true, message };
+  }
+
+  /**
+   * Heal one rank of impaired Endurance
+   * Rules: 1 rank/week normal, 1 rank/day with medical care
+   * @param {Actor} actor - The actor to heal
+   * @param {boolean} medicalCare - Whether under medical care (daily vs weekly healing)
+   * @returns {Promise<Object>} {success: boolean, message: string, rankRestored: string|null}
+   */
+  static async healImpairedEndurance(actor, medicalCare = false) {
+    if (!actor) {
+      return { success: false, message: "No actor provided" };
+    }
+
+    // Find Impaired Endurance effect
+    const impairedEffect = actor.effects.find(e => 
+      e.getFlag(SCOPE, "isImpairedEndurance")
+    );
+    
+    if (!impairedEffect) {
+      return { success: false, message: `${actor.name} does not have impaired Endurance` };
+    }
+
+    const originalEndurance = impairedEffect.getFlag(SCOPE, "originalEndurance");
+    const currentEndurance = actor.system.abilities.endurance.rank;
+    const lastHealed = impairedEffect.getFlag(SCOPE, "lastHealed") || 0;
+    
+    // Check if enough time has passed
+    const now = Date.now();
+    const dayInMs = 24 * 60 * 60 * 1000;
+    const weekInMs = 7 * dayInMs;
+    const requiredTime = medicalCare ? dayInMs : weekInMs;
+    const timeSinceHealing = now - lastHealed;
+    
+    if (timeSinceHealing < requiredTime) {
+      const timeRemaining = requiredTime - timeSinceHealing;
+      const hoursRemaining = Math.ceil(timeRemaining / (60 * 60 * 1000));
+      return { 
+        success: false, 
+        message: `${actor.name} needs ${hoursRemaining} more hours before healing another Endurance rank` 
+      };
+    }
+
+    // Get rank names for display
+    const rankNames = [
+      "Shift 0", "Feeble", "Poor", "Typical", "Good", "Excellent", 
+      "Remarkable", "Incredible", "Amazing", "Monstrous", "Unearthly"
+    ];
+    
+    const currentRankIndex = rankNames.indexOf(currentEndurance);
+    const originalRankIndex = rankNames.indexOf(originalEndurance);
+    
+    if (currentRankIndex === -1 || originalRankIndex === -1) {
+      return { success: false, message: "Invalid Endurance rank data" };
+    }
+
+    // Calculate new Endurance rank (increase by 1 step)
+    const newRankIndex = Math.min(currentRankIndex + 1, originalRankIndex);
+    
+    if (newRankIndex === currentRankIndex) {
+      return { success: false, message: `${actor.name}'s Endurance is already at maximum (${originalEndurance})` };
+    }
+
+    const newRank = rankNames[newRankIndex];
+
+    // Update actor's Endurance rank
+    await actor.update({
+      "system.abilities.endurance.rank": newRank
+    });
+
+    // Check if fully healed
+    if (newRankIndex >= originalRankIndex) {
+      // Remove Impaired Endurance effect
+      await actor.deleteEmbeddedDocuments("ActiveEffect", [impairedEffect.id]);
+      
+      const message = `${actor.name}'s Endurance fully restored to ${originalEndurance}!`;
+      
+      await ChatMessage.create({
+        content: `<div style="background:#e8f5e9;border:2px solid #4CAF50;padding:10px;border-radius:5px;">
+          <div style="font-size:1.2em;font-weight:bold;color:#2e7d32;">
+            <i class="fas fa-heart"></i> ${actor.name} Fully Recovered!
+          </div>
+          <div>Endurance restored to ${originalEndurance} - no more penalties!</div>
+        </div>`,
+        speaker: ChatMessage.getSpeaker({ actor })
+      });
+      
+      ui.notifications.info(message);
+      
+      if (game.settings.get(SCOPE, "debugMode")) {
+        console.log("FASERIP | Endurance fully restored:", {
+          actor: actor.name,
+          from: currentEndurance,
+          to: newRank
+        });
+      }
+      
+      return { success: true, message, rankRestored: newRank };
+    } else {
+      // Update effect to reflect new rank and reset timer
+      await impairedEffect.update({
+        name: `Impaired Endurance (${newRank} of ${originalEndurance})`,
+        "flags.msh.currentEndurance": newRank,
+        "flags.msh.lastHealed": now
+      });
+      
+      const careNote = medicalCare ? " (with medical care)" : "";
+      const message = `${actor.name} healed 1 Endurance rank${careNote}: ${currentEndurance} → ${newRank}`;
+      
+      await ChatMessage.create({
+        content: `<div style="background:#fff3e0;border:2px solid #FF9800;padding:10px;border-radius:5px;">
+          <div style="font-size:1.2em;font-weight:bold;color:#e65100;">
+            <i class="fas fa-heart-pulse"></i> Endurance Healing
+          </div>
+          <div>${actor.name}: ${newRank} of ${originalEndurance}${careNote}</div>
+          <div style="margin-top:6px;color:#555;">-2CS penalty continues until fully healed</div>
+        </div>`,
+        speaker: ChatMessage.getSpeaker({ actor })
+      });
+      
+      ui.notifications.info(message);
+      
+      if (game.settings.get(SCOPE, "debugMode")) {
+        console.log("FASERIP | Endurance rank healed:", {
+          actor: actor.name,
+          from: currentEndurance,
+          to: newRank,
+          remaining: originalRankIndex - newRankIndex
+        });
+      }
+      
+      return { success: true, message, rankRestored: newRank };
+    }
   }
 }
 
@@ -529,6 +704,9 @@ export function initRestSystem() {
   game.msh = game.msh || {};
   game.msh.rest = RestSystem;
   game.msh.recordDamage = recordDamage;
+  
+  // Expose convenience functions for common operations
+  game.msh.healEndurance = (actor, medicalCare = false) => RestSystem.healImpairedEndurance(actor, medicalCare);
   
   console.log("FASERIP | Rest system initialized");
   
