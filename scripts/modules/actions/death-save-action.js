@@ -65,11 +65,12 @@ export class DeathSaveAction extends BaseAction {
       `;
       await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor }), content: resultHtml });
 
-      // Create appropriate effect
+      // Always create unconscious effect when at 0 HP
+      await this._createStunnedEffect(actor, unconsciousDuration);
+
+      // If dying, ALSO create dying effect
       if (isDying) {
         await this._createDyingEffect(actor, endurance, unconsciousDuration);
-      } else {
-        await this._createStunnedEffect(actor, unconsciousDuration);
       }
       
       return; // ← skip dialog path
@@ -181,29 +182,7 @@ export class DeathSaveAction extends BaseAction {
     console.log("Is Dying:", isDying);
     console.log("Unconscious Duration:", unconsciousDuration);
 
-    // --- Death Save on 0 Health (always, any source) ---
-    try {
-      const targetToken = targets?.[0] ?? targetT ?? null; // use your local variable(s)
-      const targetActor = targetToken?.actor ?? null;
-      if (targetActor) {
-        const hp = Number(
-          getProperty(targetActor, "system.derived.attributes.health.value") ??
-          getProperty(targetActor, "system.health?.value") ??
-          0
-        );
-        if (hp <= 0) {
-          // Death Save runs as an action on the defender
-          const ds = new game.msh.actions.ActionDispatcher(targetActor);
-          await ds.roll("death-save", {
-            source: attacker,         // attribute the source for logging
-            autoApply: true,          // skip dialog if you prefer
-            showConfirm: false
-          });
-        }
-      }
-    } catch (err) {
-      console.error("FASERIP | post-damage Death Save check failed:", err);
-    }
+    // --- Death Save on 0 Health (always, any source) --- covered in init.js
 
     // Create appropriate effect
     if (isDying) {
@@ -312,36 +291,18 @@ export class DeathSaveAction extends BaseAction {
       statuses: ["dying"],
       duration: usesCTT
         ? { seconds: 6, startTime: game.time.worldTime }                         // 1 turn
-        : { rounds: 1, startRound: game.combat?.round || 0, startTurn: game.combat?.turn || 0 }
+        : { rounds: 1, startRound: game.combat?.round }
     };
 
     await actor.createEmbeddedDocuments("ActiveEffect", [effectData]);
 
-    // Also create Unconscious effect - character is unconscious while dying
-    const unconsciousData = {
-      name: `Unconscious (${_unconsciousDuration} rounds)`,
-      img: "icons/svg/unconscious.svg",
-      origin: actor.uuid,
-      flags: {
-        [scope]: {
-          unitLabel: "turn",
-          unitLabelPlural: "turns"
-        }
-      },
-      statuses: ["unconscious"],
-      duration: usesCTT
-        ? { seconds: Math.max(1, Number(_unconsciousDuration)) * 6, startTime: game.time.worldTime }
-        : { rounds: Math.max(1, Number(_unconsciousDuration)), startRound: game.combat?.round || 0, startTurn: game.combat?.turn || 0 }
-    };
-
-    await actor.createEmbeddedDocuments("ActiveEffect", [unconsciousData]);
-
-    // (Optional) If you want the “unconscious N rounds” status during dying, create a separate AE here.
     // Not required for the CTT tick-loop; the chat card already shows the duration rolled.
   }
 
   /** Create an UNCONSCIOUS effect for non-dying outcomes (N rounds) */
   async _createStunnedEffect(actor, unconsciousRounds = 1) {
+    //console.log("DEBUG: _createStunnedEffect called", {actor: actor.name, rounds: unconsciousRounds});
+    
     const scope = globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faserip";
     const usesCTT = game.modules.get("calendar-time-tracker")?.active === true;
 
@@ -349,9 +310,12 @@ export class DeathSaveAction extends BaseAction {
     try {
       const existing = actor.effects.filter(e => e.statuses?.has?.("unconscious"));
       if (existing.length) {
+        console.log("DEBUG: Deleting existing unconscious effects", existing.length);
         await actor.deleteEmbeddedDocuments("ActiveEffect", existing.map(e => e.id));
       }
-    } catch (_) {}
+    } catch (err) {
+      console.error("DEBUG: Error deleting existing effects", err);
+    }
 
     const effectData = {
       name: `Unconscious (${unconsciousRounds} rounds)`,
@@ -366,10 +330,18 @@ export class DeathSaveAction extends BaseAction {
       statuses: ["unconscious"],
       duration: usesCTT
         ? { seconds: Math.max(1, Number(unconsciousRounds)) * 6, startTime: game.time.worldTime }
-        : { rounds: Math.max(1, Number(unconsciousRounds)), startRound: game.combat?.round || 0, startTurn: game.combat?.turn || 0 }
+        : { rounds: Math.max(1, Number(unconsciousRounds)), startRound: game.combat?.round || 0 }
     };
 
-    await actor.createEmbeddedDocuments("ActiveEffect", [effectData]);
+    //console.log("DEBUG: About to create effect", effectData);
+    
+    try {
+      const created = await actor.createEmbeddedDocuments("ActiveEffect", [effectData]);
+      //console.log("DEBUG: Effect created successfully", created);
+    } catch (err) {
+      console.error("DEBUG: Effect creation failed", err);
+    }
+    
     ui.notifications.info(`Stunned effect created for ${actor.name} (${unconsciousRounds} rounds).`);
   }
 

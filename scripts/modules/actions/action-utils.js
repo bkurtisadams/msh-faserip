@@ -971,7 +971,7 @@ export async function applyDamageToTargets({
   attackerUuid = null,
   damageType = "physical-blunt",
   attackForm = "blunt",
-  targets = null // optional explicit list
+  targets = null
 } = {}) {
   try {
     const userTargets = targets ?? Array.from(game.user?.targets ?? []);
@@ -979,7 +979,7 @@ export async function applyDamageToTargets({
     console.log("FASERIP | Using", targetTokens.length, "targeted token(s)");
 
     for (const tok of targetTokens) {
-      const token = tok.document ?? tok; // accept Token or TokenDocument
+      const token = tok.document ?? tok;
       const targetActor = token.actor ?? token?.getActor?.() ?? null;
       const targetName = token.name ?? targetActor?.name ?? "Target";
 
@@ -997,7 +997,6 @@ export async function applyDamageToTargets({
 
       let netDamage = Number(damage) || 0;
 
-      // Safe mitigation call: only pass an Actor, never a string.
       try {
         if (typeof calculateMitigation === "function" && targetActor) {
           const mit = calculateMitigation(netDamage, targetActor, {
@@ -1018,22 +1017,39 @@ export async function applyDamageToTargets({
       const before = Number(targetActor?.system?.attributes?.health?.value ?? 0);
       const after = Math.max(0, before - netDamage);
 
-      await targetActor?.update({ [hpPath]: after });
-
-      // If we crossed to 0, request a death save immediately.
-      if (before > 0 && after <= 0) {
-        try {
-          if (game.msh?.actions?.roll) {
-            await game.msh.actions.roll("death-save", { actor: targetActor });
-          } else if (game.msh?.rollUniversalAction) {
-            await game.msh.rollUniversalAction("death-save", { actor: targetActor });
-          } else {
-            Hooks.callAll("msh:death-save-requested", { actorUuid: targetActor.uuid });
-          }
-        } catch (err) {
-          console.warn("FASERIP | Death save trigger failed", err);
+      // ===== HANDLE DAMAGE TO 0 HP TARGET =====
+      if (before === 0 && netDamage > 0) {
+        console.log("⚠️ FASERIP | Hit on unconscious target:", targetActor.name, "- triggering death save");
+        
+        // resolveCombatMode is already imported at top of file
+        const mode = resolveCombatMode(targetActor) || "manual";
+        
+        if (mode === "full") {
+          console.log("FASERIP DEBUG | Full auto - triggering death save for unconscious target");
+          const { ActionDispatcher } = await import("./action-dispatcher.js");
+          await ActionDispatcher.roll("death-save", { 
+            actor: targetActor,
+            opts: { autoApply: true, showConfirm: false }
+          });
+        } else {
+          // Manual mode - show button
+          ChatMessage.create({
+            content: `<div style="background:#ffebee;border:1px solid #ef5350;padding:8px;border-radius:3px;">
+              <strong>${targetActor.name}</strong> was hit while unconscious!
+              <button class="death-save-button" data-actor-id="${targetActor.id}">Roll Death Save</button>
+            </div>`
+          });
         }
+          
+        // Still update (or not - health stays at 0), but death save already handled
+        continue; // Skip to next target
       }
+      // ===== END DAMAGE TO 0 HP HANDLING =====
+
+      await targetActor?.update(
+        { [hpPath]: after },
+        { healthChange: { old: before, new: after } }
+      );
     }
   } catch (outer) {
     console.error("FASERIP | applyDamageToTargets outer error", outer);
@@ -1464,7 +1480,12 @@ export async function applyNullifyToTarget(targetActor, attacker, { originUuid =
  */
 export async function postDeathSavePrompt(actor) {
   const isFull = resolveCombatMode(actor) === "full";
-  const deathDisabledStyle = isFull ? "pointer-events:none;opacity:.55;filter:grayscale(.4);cursor:not-allowed;" : "";
+  
+  // In full auto mode, don't post the prompt - death save runs automatically
+  if (isFull) {
+    console.log("FASERIP | Skipping death save prompt in full auto mode");
+    return;
+  }
 
   const content = `
     <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
@@ -1481,7 +1502,7 @@ export async function postDeathSavePrompt(actor) {
         <a class="faserip-chip" 
            data-action="death-save"
            data-actor-uuid="${actor.uuid}"
-           style="display:inline-block;font-size:13px;font-weight:600; ... ;cursor:pointer; ${deathDisabledStyle}">
+           style="display:inline-block;font-size:13px;font-weight:600; ... ;cursor:pointer;">
           Roll Death Save
         </a>
       </div>

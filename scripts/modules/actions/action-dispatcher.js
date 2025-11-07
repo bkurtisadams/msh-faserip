@@ -19,17 +19,19 @@ import { debugLog } from "./action-utils.js";
 // Anchor: mode resolver (safe even if settings not registered yet)
 export function resolveCombatMode(actor) {
   try {
-    // Priority: actor setting > global setting > fallback
-    const actorMode = actor?.system?.combatMode;
-    if (actorMode) return String(actorMode);
+    // REMOVED: actor-level combat mode (no longer in UI)
+    // Priority: global setting > fallback
     
     // Check global setting
     const globalMode = game.settings?.get?.("msh-faserip", "defaultCombatMode");
+    console.log("FASERIP DEBUG | resolveCombatMode - globalMode:", globalMode);
     if (globalMode) return String(globalMode);
     
     // Fallback
+    console.log("FASERIP DEBUG | resolveCombatMode - using fallback: semi");
     return "semi";
   } catch (_e) {
+    console.log("FASERIP DEBUG | resolveCombatMode - error, using fallback: semi");
     return "semi";
   }
 }
