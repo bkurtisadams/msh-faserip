@@ -510,8 +510,14 @@ export class AttackAction extends BaseAction {
       // Auto-run Slam in full-auto mode
       if (!isManualMode && this.opts?.autoApply && autoSave && showSlam && targetActor) {
         const { ActionDispatcher } = await import("./action-dispatcher.js");
+        console.log("BEFORE SLAM CALL", {
+          targetActor,
+          targetActorName: targetActor?.name,
+          targetActorId: targetActor?.id
+        });
         await ActionDispatcher.roll("slam", {
-          actor,
+          actor: targetActor,  // ← TARGET makes the save, not attacker!
+          abilityName: "endurance",     // ← Slam uses Endurance FEAT
           opts: {
             autoApply: true,
             showConfirm: false,
@@ -529,8 +535,14 @@ export class AttackAction extends BaseAction {
       // Auto-run Stun in full-auto mode
       if (!isManualMode && this.opts?.autoApply && autoSave && showStun && targetActor) {
         const { ActionDispatcher } = await import("./action-dispatcher.js");
+        console.log("BEFORE STUN CALL", {
+          targetActor,
+          targetActorName: targetActor?.name,
+          targetActorId: targetActor?.id
+        });
         await ActionDispatcher.roll("stun", {
-          actor,
+          actor: targetActor,  // ← TARGET makes the save, not attacker!
+          abilityName: "endurance",     // ← Slam uses Endurance FEAT
           opts: {
             autoApply: true,
             showConfirm: false,

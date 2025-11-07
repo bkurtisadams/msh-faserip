@@ -22,8 +22,8 @@ function rankIndex(r) {
 }
 
 export class CheckAction extends BaseAction {
-  constructor(actor, actionType, opts = {}) {
-    super(actor, actionType, opts);
+  constructor({ actor, actionType, abilityName, opts = {} }) {
+    super({ actor, actionType, abilityName, opts });
   }
 
   /** Build a simple select */
@@ -32,11 +32,19 @@ export class CheckAction extends BaseAction {
   }
 
   async execute() {
+    console.log("CheckAction.execute() START", {
+      thisActor: this.actor,
+      thisActorName: this.actor?.name,
+      thisAbilityName: this.abilityName,
+      opts: this.opts
+    });
+    
     const actor       = this.actor;
     const actionType  = String(this.actionType || "").toLowerCase(); // "stun" | "slam" | "kill" | "save-nullify"
     const actionName  = labelFor(actionType);
     const mapping     = effectsFor(actionType) || {};
-    const attackerStr = getAbilityInfo(actor, "strength");
+    //const attackerStr = getAbilityInfo(actor, "strength");
+    const targetAbility = getAbilityInfo(actor, this.abilityName || "endurance");
 
     // Prefill from opts (e.g., auto path or chat hook)
     const prefill     = this.opts?.prefill || {};
@@ -159,7 +167,7 @@ export class CheckAction extends BaseAction {
       const banner = bannerColors[colorLower] || { bg:"#eee", fg:"#333", bd:"#ccc" };
       const effectText = (actionType === "kill") ? (baseEffect || color) : (mapping[colorLower] || color);
       const extraHtml  = this._extraExplanationHtml({
-        actionType, attackerStr, colorLower, finalEffect: effectText, effectsSuppressed,
+        actionType, targetAbility, colorLower, finalEffect: effectText, effectsSuppressed,
         stunDuration, rawStunDuration: rawDuration
       });
 
@@ -293,7 +301,7 @@ export class CheckAction extends BaseAction {
 
     const banner = bannerColors[colorLower] || { bg:"#eee", fg:"#333", bd:"#ccc" };
     const extraHtml  = this._extraExplanationHtml({
-      actionType, attackerStr, colorLower, finalEffect, effectsSuppressed
+      actionType, targetAbility, colorLower, finalEffect, effectsSuppressed
     });
     const content = `
       <div style="border:1px solid ${banner.bd};border-radius:3px;overflow:hidden;">
@@ -381,7 +389,7 @@ export class CheckAction extends BaseAction {
     ui.notifications.info(`${targetActor.name}: ${kind}${knockbackAreas?` (${knockbackAreas} area${knockbackAreas>1?"s":""})`:""}`);
   }
 
-  _extraExplanationHtml({ actionType, attackerStr, colorLower, finalEffect, effectsSuppressed, stunDuration=null, rawStunDuration=null }) {
+  _extraExplanationHtml({ actionType, targetAbility, colorLower, finalEffect, effectsSuppressed, stunDuration=null, rawStunDuration=null }) {
     if (actionType === "stun") {
       const lines = {
         white: stunDuration ? `1–10 rounds Stunned — rolled ${stunDuration} rounds.` : "1–10 rounds Stunned — roll 1d10; no actions.",
@@ -395,7 +403,7 @@ export class CheckAction extends BaseAction {
       if (effectsSuppressed) {
         return `<div style="margin-top:8px;color:#b71c1c;">No damage penetrated — Slam does not apply.</div>`;
       }
-      const strRank = attackerStr?.rank || "Typical";
+      const strRank = targetAbility?.rank || "Typical";
       const areas   = this._strengthToAreas(strRank);
       const notes = {
         white: `No effect.`,

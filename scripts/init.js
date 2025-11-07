@@ -1292,20 +1292,12 @@ Hooks.on('updateActor', async (actor, updateData, options, userId) => {
       console.log("FASERIP | At 0 HP - death save will handle effects");
       
    } else {
-      // === GAME RULE: Above 0 HP - start recovery/healing ===
-      console.log("FASERIP | Above 0 HP - starting recovery/healing timers");
-      
-      // Try CTT integration first, fallback to combat-based timers
-      const manager = game.msh?.faseripIntegration?.recoveryManager;
-      if (manager && game.modules.get('calendar-time-tracker')?.active) {
-        console.log("FASERIP | Using CTT for timer tracking");
-        await manager.startRecoveryTimer(actor, currentHealth, maxHealth, enduranceValue);
-        await manager.startHealingTimer(actor, currentHealth, maxHealth, enduranceValue);
-      } else {
-        console.log("FASERIP | Using fallback combat-based timers");
-        await game.msh.fallbackTimers.startRecoveryTimer(actor, currentHealth, maxHealth, enduranceValue);
-        await game.msh.fallbackTimers.startHealingTimer(actor, currentHealth, maxHealth, enduranceValue);
-      }
+     // === GAME RULE: Above 0 HP - record damage for rest system ===
+      console.log("FASERIP | Above 0 HP - recording damage for rest eligibility");
+
+      // Flag-based rest system (rest-system.js) handles recovery/healing
+      const { recordDamage } = await import("./modules/rest-system.js");
+      await recordDamage(actor);
     }
     
   } finally {

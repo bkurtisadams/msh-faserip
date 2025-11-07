@@ -133,7 +133,7 @@ const registry = {
 
 export class ActionDispatcher {
   static async roll(actionType, { actor, abilityName, opts = {} } = {}) {
-    debugLog("ActionDispatcher.roll()", { actionType, abilityName, opts });
+    debugLog("ActionDispatcher.roll()", { actionType, actor, abilityName, opts });
 
     const type = normalizeActionType(actionType);
 
