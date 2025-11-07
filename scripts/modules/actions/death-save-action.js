@@ -260,7 +260,9 @@ export class DeathSaveAction extends BaseAction {
   }
 
   /** Create the DYING effect: loses 1 Endurance rank per turn (6 seconds) */
-  async _createDyingEffect(actor, endurance, _unconsciousDuration) {
+  // In death-save-action.js, find the _createDyingEffect function and update it:
+
+async _createDyingEffect(actor, endurance, _unconsciousDuration) {
     const scope = globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faserip";
 
     // Remove any existing dying timers to avoid duplicates
@@ -275,12 +277,13 @@ export class DeathSaveAction extends BaseAction {
 
     const effectData = {
       name: "Dying",
-      img: "icons/svg/skull.svg",         // IMPORTANT: use img, never read effect.icon anywhere
+      img: "icons/svg/skull.svg",
       origin: actor.uuid,
       flags: {
         [scope]: {
           dyingTimer: true,
           isDying: true,
+          originalEndurance: endurance.rank,  // ← ADD THIS LINE
           unitLabel: "turn",
           unitLabelPlural: "turns"
         }
@@ -290,13 +293,11 @@ export class DeathSaveAction extends BaseAction {
       ],
       statuses: ["dying"],
       duration: usesCTT
-        ? { seconds: 6, startTime: game.time.worldTime }                         // 1 turn
+        ? { seconds: 6, startTime: game.time.worldTime }
         : { rounds: 1, startRound: game.combat?.round }
     };
 
     await actor.createEmbeddedDocuments("ActiveEffect", [effectData]);
-
-    // Not required for the CTT tick-loop; the chat card already shows the duration rolled.
   }
 
   /** Create an UNCONSCIOUS effect for non-dying outcomes (N rounds) */

@@ -551,6 +551,13 @@ Hooks.once("init", async () => {
   });
 
   CONFIG.statusEffects.push({
+    id: "impaired-endurance",
+    label: "Impaired Endurance",
+    icon: "icons/svg/blood.svg",
+    flags: { "msh-faserip": { isImpairedEndurance: true } }
+  });
+
+  CONFIG.statusEffects.push({
     id: "dead",
     label: "Dead",
     icon: "icons/svg/skull.svg",
@@ -1451,12 +1458,61 @@ Hooks.on("updateCombat", async (combat, changed, diff, userId) => {
       console.log(`📉 FASERIP | ${actor.name} Endurance: ${curName} → ${nextName} (${nextValue})`);
     }
 
+    // line moved - right after the nextValue calculation and BEFORE the try block:
+    const originalRank = dyingEffect.getFlag(scope, "originalEndurance") || curName;
+
     // Update the actor's printed rank AND value
     try {
       await actor.update({
         "system.abilities.endurance.rank": nextName,
         "system.abilities.endurance.value": nextValue
       });
+
+      // Create Impaired Endurance effect
+      const scope = globalThis.MSH_FLAG_SCOPE || "msh-faserip";
+      let impairedEffect = actor.effects.find(e => e.getFlag(scope, "isImpairedEndurance"));
+
+      if (!impairedEffect) {
+        // First rank loss - create the effect
+        const hasMedicalCare = actor.getFlag(scope, "medicalCare") ?? false;
+        const daysUntilHealing = hasMedicalCare ? 1 : 7;
+        
+        await actor.createEmbeddedDocuments("ActiveEffect", [{
+          name: `Impaired Endurance (${nextName} of ${originalRank})`,
+          icon: "icons/svg/blood.svg",
+          origin: actor.uuid,
+          statuses: ["impaired-endurance"],
+          flags: {
+            [scope]: {
+              isImpairedEndurance: true,
+              originalEndurance: originalRank,
+              currentEndurance: nextName,
+              lastHealed: Date.now(),
+              medicalCare: hasMedicalCare
+            },
+            core: { statusId: "impaired-endurance" }
+          },
+          duration: {
+            rounds: daysUntilHealing * 600 * 24,
+            startRound: game.combat?.round || 0
+          },
+          changes: [{
+            key: "system.columnShift",
+            mode: CONST.ACTIVE_EFFECT_MODES.ADD,
+            value: "-2"
+          }]
+        }]);
+        
+        console.log(`✅ FASERIP | Created Impaired Endurance effect for ${actor.name}`);
+      } else {
+        // Update existing effect with new rank
+        await impairedEffect.update({
+          name: `Impaired Endurance (${nextName} of ${originalRank})`,
+          [`flags.${scope}.currentEndurance`]: nextName
+        });
+        
+        console.log(`✅ FASERIP | Updated Impaired Endurance effect for ${actor.name}`);
+      }
       
       if (game.settings.get("msh-faserip", "debugMode")) {
         console.log(`✅ FASERIP | Updated ${actor.name}'s Endurance to ${nextName} (${nextValue})`);
@@ -1467,8 +1523,7 @@ Hooks.on("updateCombat", async (combat, changed, diff, userId) => {
 
     // Update the effect's label and tracking flags
     const turnsElapsed = (dyingEffect.getFlag(scope, "turnsElapsed") || 0) + 1;
-    const originalRank = dyingEffect.getFlag(scope, "originalEndRank") || curName;
-    
+        
     try {
       await dyingEffect.update({
         name: `Dying (${originalRank} → ${nextName}, ${turnsElapsed} turns)`,

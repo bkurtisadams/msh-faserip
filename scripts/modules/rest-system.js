@@ -289,7 +289,7 @@ export class RestSystem {
    * @param {Actor} actor - The actor attempting to wake
    * @returns {Promise<Object>} {success: boolean, message: string, rolled: number, color: string}
    */
-  static async attemptRegainConsciousness(actor) {
+static async attemptRegainConsciousness(actor) {
     if (!actor) {
       return { success: false, message: "No actor provided" };
     }
@@ -345,8 +345,8 @@ export class RestSystem {
 
     const colorLower = color.toLowerCase();
     
-    // Success on Yellow or Red
-    const success = (colorLower === "yellow" || colorLower === "red");
+    // Success on Green or better (Green/Yellow/Red)
+    const success = (colorLower !== "white");
     
     if (success) {
       // Wake up with Health = Endurance rank value
@@ -384,6 +384,26 @@ export class RestSystem {
           roll,
           color,
           health: enduranceValue
+        });
+      }
+
+      // Remove Dying effect if present (they're awake, no longer dying)
+      const dyingEffect = actor.effects.find(e => 
+        e.getFlag(SCOPE, "isDying") || e.statuses?.has?.("dying")
+      );
+      if (dyingEffect) {
+        await actor.deleteEmbeddedDocuments("ActiveEffect", [dyingEffect.id]);
+        
+        if (game.settings.get(SCOPE, "debugMode")) {
+          console.log(`FASERIP | Removed Dying effect from ${actor.name} (regained consciousness)`);
+        }
+      }
+      
+      // Update Impaired Endurance timestamp
+      const impairedEffect = actor.effects.find(e => e.getFlag(SCOPE, "isImpairedEndurance"));
+      if (impairedEffect) {
+        await impairedEffect.update({
+          [`flags.${SCOPE}.lastHealed`]: Date.now()
         });
       }
 
@@ -505,30 +525,65 @@ export class RestSystem {
     
     await actor.createEmbeddedDocuments("ActiveEffect", [unconsciousEffect]);
     
-    // Create Impaired Endurance effect if Endurance was reduced
-    if (originalEndurance && currentEndurance < originalEndurance) {
-      const impairedEffect = {
-        name: `Impaired Endurance (${currentEndurance} of ${originalEndurance})`,
-        icon: "icons/svg/downgrade.svg",
-        origin: actor.uuid,
-        flags: {
-          [SCOPE]: {
-            isImpairedEndurance: true,
-            originalEndurance: originalEndurance,
-            currentEndurance: currentEndurance,
-            lastHealed: Date.now()
-          }
-        },
-        changes: [
-          {
+    // Create or update Impaired Endurance effect if Endurance was reduced
+    let impairedEffect = actor.effects.find(e => e.getFlag(SCOPE, "isImpairedEndurance"));
+
+    if (impairedEffect) {
+      // Effect already exists from dying - update it with stabilization timestamp
+      await impairedEffect.update({
+        [`flags.${SCOPE}.lastHealed`]: Date.now(),
+        [`flags.${SCOPE}.medicalCare`]: actor.getFlag(SCOPE, "medicalCare") ?? false
+      });
+      
+      if (game.settings.get(SCOPE, "debugMode")) {
+        console.log(`✅ FASERIP | Updated existing Impaired Endurance effect for ${actor.name}`);
+      }
+    } else if (originalEndurance && currentEndurance !== originalEndurance) {
+      // Effect doesn't exist yet (edge case - stabilized before losing a rank)
+      const rankNames = [
+        "Shift 0", "Feeble", "Poor", "Typical", "Good", "Excellent", 
+        "Remarkable", "Incredible", "Amazing", "Monstrous", "Unearthly"
+      ];
+      
+      const currentIndex = rankNames.indexOf(currentEndurance);
+      const originalIndex = rankNames.indexOf(originalEndurance);
+      
+      if (currentIndex >= 0 && originalIndex >= 0 && currentIndex < originalIndex) {
+        const hasMedicalCare = actor.getFlag(SCOPE, "medicalCare") ?? false;
+        const daysUntilHealing = hasMedicalCare ? 1 : 7;
+        
+        const impairedEffectData = {
+          name: `Impaired Endurance (${currentEndurance} of ${originalEndurance})`,
+          icon: "icons/svg/blood.svg",
+          origin: actor.uuid,
+          statuses: ["impaired-endurance"],
+          flags: {
+            [SCOPE]: {
+              isImpairedEndurance: true,
+              originalEndurance: originalEndurance,
+              currentEndurance: currentEndurance,
+              lastHealed: Date.now(),
+              medicalCare: hasMedicalCare
+            },
+            core: { statusId: "impaired-endurance" }
+          },
+          duration: {
+            rounds: daysUntilHealing * 600 * 24,
+            startRound: game.combat?.round || 0
+          },
+          changes: [{
             key: "system.columnShift",
             mode: CONST.ACTIVE_EFFECT_MODES.ADD,
             value: "-2"
-          }
-        ]
-      };
-      
-      await actor.createEmbeddedDocuments("ActiveEffect", [impairedEffect]);
+          }]
+        };
+        
+        await actor.createEmbeddedDocuments("ActiveEffect", [impairedEffectData]);
+        
+        if (game.settings.get(SCOPE, "debugMode")) {
+          console.log(`✅ FASERIP | Created Impaired Endurance effect for ${actor.name}`);
+        }
+      }
     }
     
     const message = `${actor.name} stabilized! Unconscious for ${hours} hours. Endurance impaired (${currentEndurance} of ${originalEndurance}).`;
@@ -647,10 +702,15 @@ export class RestSystem {
       return { success: true, message, rankRestored: newRank };
     } else {
       // Update effect to reflect new rank and reset timer
+      const daysUntilNextHealing = medicalCare ? 1 : 7;
+      
       await impairedEffect.update({
         name: `Impaired Endurance (${newRank} of ${originalEndurance})`,
         "flags.msh.currentEndurance": newRank,
-        "flags.msh.lastHealed": now
+        "flags.msh.lastHealed": now,
+        "flags.msh.medicalCare": medicalCare,
+        "duration.rounds": daysUntilNextHealing * 600 * 24,
+        "duration.startRound": game.combat?.round || 0
       });
       
       const careNote = medicalCare ? " (with medical care)" : "";
