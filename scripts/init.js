@@ -420,6 +420,52 @@ Hooks.once("init", async () => {
   // <-- NEW/MODIFIED SECTION START -->
   // Register system settings
 
+  // Time Tracking Settings
+  game.settings.register("msh-faserip", "campaignStartDate", {
+    name: "Campaign Start Date",
+    hint: "The starting date/time for the campaign",
+    scope: "world",
+    config: false,
+    type: String,
+    default: "1976-01-01T00:00:00"
+  });
+
+  game.settings.register("msh-faserip", "elapsedSeconds", {
+    name: "Elapsed Seconds",
+    hint: "Total seconds elapsed since campaign start",
+    scope: "world",
+    config: false,
+    type: Number,
+    default: 0
+  });
+
+  game.settings.register("msh-faserip", "combatSyncEnabled", {
+    name: "Combat Sync Enabled",
+    hint: "Auto-sync time with combat tracker",
+    scope: "world",
+    config: false,
+    type: Boolean,
+    default: true
+  });
+
+  // Combat Logs Settings
+  game.settings.register("msh-faserip", "combatLogs", {
+    name: "Combat Logs",
+    hint: "Array of combat log entries",
+    scope: "world",
+    config: false,
+    type: Array,
+    default: []
+  });
+
+  game.settings.register("msh-faserip", "autoLogCombat", {
+    name: "Auto-Log Combat",
+    hint: "Automatically create log entries when combat ends",
+    scope: "world",
+    config: false,
+    type: Boolean,
+    default: false
+  });
 
   game.settings.register('msh-faserip', 'dailyKarmaEnabled', {
     name: "Enable Daily Karma",
@@ -1405,6 +1451,37 @@ Hooks.on("updateCombat", async (combat, changed, diff, userId) => {
         } catch (e) {
           console.warn("Failed to rename effect:", e);
         }
+      }
+    }
+  }
+
+  // FASERIP Time Tracker sync
+  if (game.user.isGM) {
+    const syncEnabled = game.settings.get("msh-faserip", "combatSyncEnabled");
+    if (syncEnabled && ("turn" in changed || "round" in changed)) {
+      let secondsChange = 0;
+      
+      if ("turn" in changed) {
+        const oldTurn = combat.previous?.turn ?? 0;
+        const newTurn = combat.turn;
+        const turnDiff = newTurn - oldTurn;
+        secondsChange = turnDiff * 6;
+      } else if ("round" in changed && !("turn" in changed)) {
+        const oldRound = combat.previous?.round ?? 0;
+        const newRound = combat.round;
+        const roundDiff = newRound - oldRound;
+        const turnsPerRound = combat.turns?.length || 1;
+        secondsChange = roundDiff * turnsPerRound * 6;
+      }
+      
+      if (secondsChange !== 0) {
+        const currentElapsed = game.settings.get("msh-faserip", "elapsedSeconds") || 0;
+        const newElapsed = Math.max(0, currentElapsed + secondsChange);
+        await game.settings.set("msh-faserip", "elapsedSeconds", newElapsed);
+        console.log(`🕐 FASERIP | Time tracker synced: ${secondsChange > 0 ? '+' : ''}${secondsChange} seconds`);
+        
+        // Trigger hook to update any open team sheets
+        Hooks.callAll("msh-faserip.timeUpdated", newElapsed);
       }
     }
   }

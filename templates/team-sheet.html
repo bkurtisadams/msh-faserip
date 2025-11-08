@@ -19,12 +19,41 @@
   <!-- Tab Navigation -->
   <nav class="sheet-tabs">
     <a class="tab-button active" data-tab="overview">
-      <i class="fas fa-users"></i> Team Overview
+      <i class="fas fa-users"></i> Team
+    </a>
+    <a class="tab-button" data-tab="combat">
+      <i class="fas fa-fist-raised"></i> Combat
+    </a>
+    <a class="tab-button" data-tab="karma">
+      <i class="fas fa-star"></i> Karma
     </a>
     <a class="tab-button" data-tab="awards">
-      <i class="fas fa-trophy"></i> Awards History
+      <i class="fas fa-trophy"></i> Awards
+    </a>
+    <a class="tab-button" data-tab="logs">
+      <i class="fas fa-book"></i> Logs
     </a>
   </nav>
+
+  <!-- Time Controls (Always Visible) -->
+  <div class="time-controls">
+    <div class="time-buttons">
+      <span style="font-weight:600;">Time:</span>
+      <button type="button" class="time-adjust-btn" data-unit="turn" title="Adjust by Turns (6 sec)">Turn</button>
+      <button type="button" class="time-adjust-btn" data-unit="minute" title="Adjust by Minutes (60 sec)">Minute</button>
+      <button type="button" class="time-adjust-btn" data-unit="hour" title="Adjust by Hours (3600 sec)">Hour</button>
+      <button type="button" class="time-adjust-btn" data-unit="day" title="Adjust by Days (86400 sec)">Day</button>
+      <button type="button" class="time-adjust-btn" data-unit="custom" title="Adjust by Custom Seconds">Custom</button>
+      <button type="button" class="time-settings-btn" title="Time Settings"><i class="fas fa-cog"></i></button>
+    </div>
+    <div class="time-display">
+      <span class="current-time">{{currentDateTime}}</span>
+      <label class="sync-checkbox">
+        <input type="checkbox" class="combat-sync-toggle" {{#if combatSyncEnabled}}checked{{/if}}>
+        Sync Combat
+      </label>
+    </div>
+  </div>
 
   <!-- Tab Content -->
   <section class="sheet-body">
@@ -172,5 +201,57 @@
         </table>
       </div>
     </div>
+
+    <!-- Logs Tab -->
+    <div class="tab-panel" data-tab="logs">
+      <div class="logs-header">
+        <h3>Combat Log</h3>
+        {{#if isGM}}
+        <div class="logs-controls">
+          <button type="button" class="add-log-entry">
+            <i class="fas fa-plus"></i> Add Entry
+          </button>
+          <button type="button" class="clear-all-logs">
+            <i class="fas fa-broom"></i> Clear All
+          </button>
+        </div>
+        {{/if}}
+      </div>
+      
+      <div class="logs-list-container">
+        {{#if combatLogs.length}}
+        <div class="logs-list">
+          {{#each combatLogs as |log|}}
+          <div class="log-entry" data-log-id="{{log.id}}">
+            <div class="log-timestamp">{{log.timestamp}}</div>
+            <div class="log-text">{{log.text}}</div>
+            {{#if ../isGM}}
+            <div class="log-actions">
+              <button type="button" class="edit-log-btn" data-log-id="{{log.id}}" title="Edit">
+                <i class="fas fa-edit"></i>
+              </button>
+              <button type="button" class="delete-log-btn" data-log-id="{{log.id}}" title="Delete">
+                <i class="fas fa-trash"></i>
+              </button>
+            </div>
+            {{/if}}
+          </div>
+          {{/each}}
+        </div>
+        {{else}}
+        <p class="no-logs">No combat logs recorded yet.</p>
+        {{/if}}
+      </div>
+      
+      {{#if isGM}}
+      <div class="auto-log-setting">
+        <label>
+          <input type="checkbox" class="auto-log-toggle" {{#if autoLogCombat}}checked{{/if}}>
+          Auto-log combat victories
+        </label>
+      </div>
+      {{/if}}
+    </div>
+    
   </section>
 </form>

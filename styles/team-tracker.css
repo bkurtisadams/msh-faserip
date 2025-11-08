@@ -411,3 +411,71 @@
 
 /* Optional hover */
 .team-tracker .member-row:hover { background: #fafafa; }
+
+/* Time Controls */
+.time-controls {
+  padding: 8px 12px;
+  background: #f5f5f0;
+  border-bottom: 1px solid #c0c0c0;
+}
+
+.time-buttons {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+  flex-wrap: nowrap; /* Prevent wrapping */
+}
+
+.time-buttons span {
+  margin-right: 4px;
+  white-space: nowrap;
+}
+
+.time-adjust-btn,
+.time-settings-btn {
+  padding: 4px 10px;
+  background: white;
+  border: 1px solid #c0c0c0;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 0.85em;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+
+.time-adjust-btn:hover,
+.time-settings-btn:hover {
+  background: #e5e5e0;
+  border-color: #a0a0a0;
+}
+
+.time-settings-btn {
+  padding: 4px 8px;
+  margin-left: auto; /* Push to right side */
+}
+
+.time-display {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.9em;
+}
+
+.current-time {
+  font-weight: 600;
+  color: #333;
+}
+
+.sync-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.9em;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.sync-checkbox input[type="checkbox"] {
+  cursor: pointer;
+}

@@ -1,5 +1,16 @@
 // teamSheet.js - REFACTORED
 export class TeamSheet extends Application {
+  constructor(options = {}) {
+    super(options);
+    
+    // Listen for time updates
+    this._timeUpdateHook = Hooks.on("msh-faserip.timeUpdated", () => {
+      if (this.rendered) {
+        this.render(false); // Re-render without changing position/size
+      }
+    });
+  }
+
   static get defaultOptions() {
     return foundry.utils.mergeObject(super.defaultOptions, {
       classes: ["faserip", "sheet", "team-tracker"],
@@ -16,6 +27,14 @@ export class TeamSheet extends Application {
         }
       ]
     });
+  }
+
+  async close(options) {
+    // Clean up hook listener
+    if (this._timeUpdateHook) {
+      Hooks.off("msh-faserip.timeUpdated", this._timeUpdateHook);
+    }
+    return super.close(options);
   }
 
   getData() {
@@ -68,6 +87,14 @@ export class TeamSheet extends Application {
     
     // Team awards history
     context.teamAwards = game.settings.get("msh-faserip", "teamKarmaAwards") || [];
+
+    // Time tracking
+    context.currentDateTime = this._formatDateTime();
+    context.combatSyncEnabled = game.settings.get("msh-faserip", "combatSyncEnabled") ?? true;
+    
+    // Combat logs
+    context.combatLogs = game.settings.get("msh-faserip", "combatLogs") || [];
+    context.autoLogCombat = game.settings.get("msh-faserip", "autoLogCombat") ?? false;
     
     // Settings
     context.karmaMultiplier = game.settings.get("msh-faserip", "karmaMultiplier") || 1;
@@ -136,6 +163,25 @@ export class TeamSheet extends Application {
         }
       });
     });
+
+    // Time tracking controls
+    html.find('.time-adjust-btn').click(ev => this._onTimeAdjust(ev));
+    html.find('.time-settings-btn').click(ev => this._onTimeSettings(ev));
+    html.find('.combat-sync-toggle').change(async (ev) => {
+      await game.settings.set("msh-faserip", "combatSyncEnabled", ev.target.checked);
+      ui.notifications.info(`Combat sync ${ev.target.checked ? 'enabled' : 'disabled'}`);
+    });
+    
+    // Combat logs controls
+    html.find('.add-log-entry').click(ev => this._onAddLogEntry(ev));
+    html.find('.edit-log-btn').click(ev => this._onEditLogEntry(ev));
+    html.find('.delete-log-btn').click(ev => this._onDeleteLogEntry(ev));
+    html.find('.clear-all-logs').click(ev => this._onClearAllLogs(ev));
+    html.find('.auto-log-toggle').change(async (ev) => {
+      await game.settings.set("msh-faserip", "autoLogCombat", ev.target.checked);
+      ui.notifications.info(`Auto-log ${ev.target.checked ? 'enabled' : 'disabled'}`);
+    });
+
   }
 
   async _onAddHeroToTeam(event) {
@@ -712,4 +758,286 @@ export class TeamSheet extends Application {
     }
   }
 
-}
+  // ========== TIME TRACKING METHODS ==========
+  
+  _formatDateTime() {
+    const startDate = game.settings.get("msh-faserip", "campaignStartDate") || "1976-01-01T00:00:00";
+    const elapsedSeconds = game.settings.get("msh-faserip", "elapsedSeconds") || 0;
+    
+    const start = new Date(startDate);
+    const current = new Date(start.getTime() + (elapsedSeconds * 1000));
+    
+    const options = { 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: true
+    };
+    
+    return current.toLocaleString('en-US', options);
+  }
+  
+  async _onTimeAdjust(event) {
+    const unit = event.currentTarget.dataset.unit;
+    
+    const unitLabels = {
+      turn: { label: "Turns", seconds: 6 },
+      minute: { label: "Minutes", seconds: 60 },
+      hour: { label: "Hours", seconds: 3600 },
+      day: { label: "Days", seconds: 86400 },
+      custom: { label: "Seconds", seconds: 1 }
+    };
+    
+    const config = unitLabels[unit];
+    
+    const content = `
+      <div style="display:grid;gap:8px;">
+        <label>Enter ${config.label}:</label>
+        <input type="number" id="time-adjust-input" value="0" style="width:100%;padding:4px;">
+        <div style="font-size:0.9em;color:#666;">
+          ${unit === 'custom' ? 'Enter seconds directly' : `(${config.seconds} seconds each)`}<br>
+          Positive = forward, Negative = backward
+        </div>
+      </div>
+    `;
+    
+    new Dialog({
+      title: `Adjust Time by ${config.label}`,
+      content,
+      buttons: {
+        apply: {
+          label: "Apply",
+          callback: async (html) => {
+            const value = parseInt(html.find('#time-adjust-input').val()) || 0;
+            if (value !== 0) {
+              await this._adjustTime(value * config.seconds);
+            }
+          }
+        },
+        cancel: {
+          label: "Cancel"
+        }
+      },
+      default: "apply",
+      render: (html) => {
+        html.find('#time-adjust-input').focus().select();
+      }
+    }).render(true);
+  }
+  
+  async _adjustTime(seconds) {
+    const current = game.settings.get("msh-faserip", "elapsedSeconds") || 0;
+    const newTime = Math.max(0, current + seconds);
+    await game.settings.set("msh-faserip", "elapsedSeconds", newTime);
+    
+    const direction = seconds > 0 ? "forward" : "backward";
+    const absSeconds = Math.abs(seconds);
+    ui.notifications.info(`Time adjusted ${direction} by ${absSeconds} seconds`);
+    
+    this.render(true);
+  }
+  
+  async _onTimeSettings(event) {
+    const currentStart = game.settings.get("msh-faserip", "campaignStartDate") || "1976-01-01T00:00:00";
+    const startDate = new Date(currentStart);
+    
+    const content = `
+      <div style="display:grid;gap:12px;">
+        <div>
+          <label style="font-weight:600;">Campaign Start Date:</label>
+          <input type="datetime-local" id="start-date" value="${startDate.toISOString().slice(0, 16)}" style="width:100%;padding:4px;">
+        </div>
+        
+        <div style="border-top:1px solid #ccc;padding-top:12px;">
+          <label style="font-weight:600;">Current Game Time:</label>
+          <input type="datetime-local" id="current-date" value="${new Date(startDate.getTime() + (game.settings.get("msh-faserip", "elapsedSeconds") || 0) * 1000).toISOString().slice(0, 16)}" style="width:100%;padding:4px;">
+          <div style="font-size:0.85em;color:#666;margin-top:4px;">Set current time manually</div>
+        </div>
+        
+        <div style="border-top:1px solid #ccc;padding-top:12px;">
+          <button type="button" id="reset-time-btn" style="width:100%;padding:6px;background:#d32f2f;color:white;border:none;border-radius:3px;cursor:pointer;">
+            Reset to Campaign Start
+          </button>
+        </div>
+      </div>
+    `;
+    
+    const dialog = new Dialog({
+      title: "Time Settings",
+      content,
+      buttons: {
+        save: {
+          label: "Save",
+          callback: async (html) => {
+            const newStart = html.find('#start-date').val();
+            const newCurrent = html.find('#current-date').val();
+            
+            if (newStart) {
+              await game.settings.set("msh-faserip", "campaignStartDate", new Date(newStart).toISOString());
+            }
+            
+            if (newCurrent && newStart) {
+              const startTime = new Date(newStart).getTime();
+              const currentTime = new Date(newCurrent).getTime();
+              const elapsed = Math.max(0, Math.floor((currentTime - startTime) / 1000));
+              await game.settings.set("msh-faserip", "elapsedSeconds", elapsed);
+            }
+            
+            ui.notifications.info("Time settings saved");
+            this.render(true);
+          }
+        },
+        cancel: {
+          label: "Cancel"
+        }
+      },
+      default: "save",
+      render: (html) => {
+        html.find('#reset-time-btn').click(async () => {
+          const confirmed = await Dialog.confirm({
+            title: "Reset Time",
+            content: "<p>Reset game time to campaign start?</p>"
+          });
+          
+          if (confirmed) {
+            await game.settings.set("msh-faserip", "elapsedSeconds", 0);
+            ui.notifications.info("Time reset to campaign start");
+            dialog.close();
+            this.render(true);
+          }
+        });
+      }
+    }).render(true);
+  }
+  
+  // ========== COMBAT LOG METHODS ==========
+  
+  async _onAddLogEntry(event) {
+    const content = `
+      <div style="display:grid;gap:8px;">
+        <label>Log Entry:</label>
+        <textarea id="log-text" rows="3" style="width:100%;padding:4px;" placeholder="Defeated 5 Maggia Thugs..."></textarea>
+        <div style="font-size:0.9em;color:#666;">
+          Timestamp will be set to current game time
+        </div>
+      </div>
+    `;
+    
+    new Dialog({
+      title: "Add Combat Log Entry",
+      content,
+      buttons: {
+        add: {
+          label: "Add",
+          callback: async (html) => {
+            const text = html.find('#log-text').val().trim();
+            if (text) {
+              await this._addLogEntry(text);
+            }
+          }
+        },
+        cancel: {
+          label: "Cancel"
+        }
+      },
+      default: "add",
+      render: (html) => {
+        html.find('#log-text').focus();
+      }
+    }).render(true);
+  }
+  
+  async _addLogEntry(text, timestamp = null) {
+    const logs = game.settings.get("msh-faserip", "combatLogs") || [];
+    
+    const newLog = {
+      id: foundry.utils.randomID(),
+      timestamp: timestamp || this._formatDateTime(),
+      text: text
+    };
+    
+    logs.unshift(newLog); // Add to beginning
+    await game.settings.set("msh-faserip", "combatLogs", logs);
+    
+    ui.notifications.info("Log entry added");
+    this.render(true);
+  }
+  
+  async _onEditLogEntry(event) {
+    const logId = event.currentTarget.dataset.logId;
+    const logs = game.settings.get("msh-faserip", "combatLogs") || [];
+    const log = logs.find(l => l.id === logId);
+    
+    if (!log) return;
+    
+    const content = `
+      <div style="display:grid;gap:8px;">
+        <label>Log Entry:</label>
+        <textarea id="log-text" rows="3" style="width:100%;padding:4px;">${log.text}</textarea>
+      </div>
+    `;
+    
+    new Dialog({
+      title: "Edit Combat Log Entry",
+      content,
+      buttons: {
+        save: {
+          label: "Save",
+          callback: async (html) => {
+            const text = html.find('#log-text').val().trim();
+            if (text) {
+              log.text = text;
+              await game.settings.set("msh-faserip", "combatLogs", logs);
+              ui.notifications.info("Log entry updated");
+              this.render(true);
+            }
+          }
+        },
+        cancel: {
+          label: "Cancel"
+        }
+      },
+      default: "save",
+      render: (html) => {
+        html.find('#log-text').focus().select();
+      }
+    }).render(true);
+  }
+  
+  async _onDeleteLogEntry(event) {
+    const logId = event.currentTarget.dataset.logId;
+    const logs = game.settings.get("msh-faserip", "combatLogs") || [];
+    const log = logs.find(l => l.id === logId);
+    
+    if (!log) return;
+    
+    const confirmed = await Dialog.confirm({
+      title: "Delete Log Entry",
+      content: `<p>Delete this log entry?</p><p style="font-style:italic;color:#666;">${log.text}</p>`
+    });
+    
+    if (confirmed) {
+      const filtered = logs.filter(l => l.id !== logId);
+      await game.settings.set("msh-faserip", "combatLogs", filtered);
+      ui.notifications.info("Log entry deleted");
+      this.render(true);
+    }
+  }
+  
+  async _onClearAllLogs(event) {
+    const confirmed = await Dialog.confirm({
+      title: "Clear All Logs",
+      content: "<p>Delete all combat log entries?</p><p style='color:#d32f2f;'>This cannot be undone.</p>"
+    });
+    
+    if (confirmed) {
+      await game.settings.set("msh-faserip", "combatLogs", []);
+      ui.notifications.info("All logs cleared");
+      this.render(true);
+    }
+  }
+
+} // end of class TeamSheet
