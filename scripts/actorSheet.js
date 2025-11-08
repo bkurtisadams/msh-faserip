@@ -1071,37 +1071,36 @@ export class FaseripActorSheet extends ActorSheet {
     });
 
     // Power info button
-    html.find('.power-info').click(ev => {
+    html.find('.power-info').click(async ev => {
       const li = $(ev.currentTarget).closest(".power-row");
       const itemId = li.data("itemId");
       const item = this.actor.items.get(itemId);
 
       if (!item) return;
 
-      // Create a dialog to show power information
-      let content = `
-        <h2>${item.name}</h2>
-        <div class="power-details">
-          <p><strong>Rank:</strong> ${item.system.rank} (${item.system.value})</p>
-          <p><strong>Type:</strong> ${item.system.type || 'None'}</p>
-          <p><strong>Range:</strong> ${item.system.range || 'None'}</p>
-          <p><strong>Active:</strong> ${item.system.isActive ? 'Yes' : 'No'}</p>
+      // Create a compact chat card to show power information
+      const content = `
+        <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
+          <div style="padding:5px 10px;border-bottom:1px solid #c0c0c0;font-size:1.1em;color:#0d47a1;">
+            <strong>${item.name}</strong>
+          </div>
+          <div style="padding:5px 10px;font-size:.9em;">
+            <div><strong>Rank:</strong> ${item.system.rank} (${item.system.value})</div>
+            <div><strong>Type:</strong> ${item.system.type || 'None'}</div>
+            <div><strong>Range:</strong> ${item.system.range || 'None'}</div>
+            <div><strong>Active:</strong> ${item.system.isActive ? 'Yes' : 'No'}</div>
+            ${item.system.description ? `<div style="margin-top:8px;padding-top:8px;border-top:1px solid #ddd;">${item.system.description}</div>` : ''}
+          </div>
         </div>
-        <div class="description">${item.system.description || 'No description available.'}</div>
       `;
 
-      new Dialog({
-        title: "Power Information",
+      await ChatMessage.create({
+        speaker: ChatMessage.getSpeaker({ actor: this.actor }),
         content: content,
-        buttons: {
-          close: {
-            label: "Close"
-          }
-        },
-        width: 400
-      }).render(true);
+        type: CONST.CHAT_MESSAGE_TYPES.OTHER
+      });
     });
-
+    
     // Edit power button - more specific selector
     html.find('.powers-table .item-edit').click(ev => {
       const li = $(ev.currentTarget).closest(".power-row");
