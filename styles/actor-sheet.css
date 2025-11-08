@@ -410,3 +410,63 @@
     height: 15px;
   }
 }
+
+.sheet-lock-toggle {
+  background: #f5f5f0;
+  border: 1px solid #c0c0c0;
+  border-radius: 3px;
+  cursor: pointer;
+  padding: 3px 6px;
+  height: 26px;
+  min-width: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  font-size: 12px;
+  color: #666;
+}
+
+.sheet-lock-toggle:hover {
+  background: #e5e5e0;
+  border-color: #a0a0a0;
+  color: #333;
+}
+
+.sheet-lock-toggle.locked {
+  background: #8b0000;
+  border-color: #660000;
+  color: #fff;
+}
+
+.sheet-lock-toggle.locked:hover {
+  background: #a00000;
+  border-color: #770000;
+}
+
+.faserip-sheet.sheet-locked input:not([type="checkbox"]):not([type="radio"]),
+.faserip-sheet.sheet-locked select,
+.faserip-sheet.sheet-locked textarea {
+  background-color: #f5f5f5;
+  color: #999;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.faserip-sheet.sheet-locked button:not(.sheet-lock-toggle) {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.faserip-sheet.sheet-locked input[type="checkbox"],
+.faserip-sheet.sheet-locked input[type="radio"] {
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.faserip-sheet.sheet-locked .sheet-lock-toggle {
+  opacity: 1;
+  cursor: pointer;
+  pointer-events: all;
+}

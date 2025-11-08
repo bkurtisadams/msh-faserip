@@ -207,6 +207,33 @@ export class FaseripActorSheet extends ActorSheet {
     return context;
   }
 
+  async _toggleSheetLock(html) {
+    const currentLock = this.actor.getFlag('msh-faserip', 'sheetLocked') || false;
+    const newLock = !currentLock;
+    
+    await this.actor.setFlag('msh-faserip', 'sheetLocked', newLock);
+    
+    const form = html.closest('.faserip-sheet');
+    if (newLock) {
+      form.addClass('sheet-locked');
+    } else {
+      form.removeClass('sheet-locked');
+    }
+    
+    const lockButton = html.find('.sheet-lock-toggle');
+    const lockIcon = lockButton.find('i');
+    
+    if (newLock) {
+      lockButton.addClass('locked');
+      lockButton.attr('title', 'Unlock Sheet');
+      lockIcon.removeClass('fa-lock-open').addClass('fa-lock');
+    } else {
+      lockButton.removeClass('locked');
+      lockButton.attr('title', 'Lock Sheet');
+      lockIcon.removeClass('fa-lock').addClass('fa-lock-open');
+    }
+  }
+
   /** @override */
   _updateObject(event, formData) {
     // Expand the form data
@@ -239,6 +266,18 @@ export class FaseripActorSheet extends ActorSheet {
   // In actorSheet.js, add to the activateListeners function
   activateListeners(html) {
     super.activateListeners(html);
+
+    // Sheet lock toggle
+    html.find('.sheet-lock-toggle').click(async (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      await this._toggleSheetLock(html);
+    });
+
+    const isLocked = this.actor.getFlag('msh-faserip', 'sheetLocked') || false;
+    if (isLocked) {
+      html.closest('.faserip-sheet').addClass('sheet-locked');
+    }
 
     // Auto-populate Resources value when rank changes
     html.find('select[name="system.attributes.resources.rank"]').change((event) => {

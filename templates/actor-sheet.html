@@ -16,12 +16,18 @@
     <input type="text" name="system.player" value="{{system.player}}" />
     
     <label style="margin-top:6px;">Character Type</label>
-    <select name="system.characterType" style="height:26px;padding:2px 6px;font-size:12.5px;">
-      <option value="player" {{#if (eq system.characterType "player")}}selected{{/if}}>Player</option>
-      <option value="npc-hero" {{#if (eq system.characterType "npc-hero")}}selected{{/if}}>NPC Hero</option>
-      <option value="npc-villain" {{#if (eq system.characterType "npc-villain")}}selected{{/if}}>NPC Villain</option>
-      <option value="civilian" {{#if (eq system.characterType "civilian")}}selected{{/if}}>Civilian</option>
-    </select>
+    <div style="display: flex; align-items: flex-end; gap: 6px;">
+      <select name="system.characterType" style="height:26px;padding:2px 6px;font-size:12.5px;flex:1;">
+        <option value="player" {{#if (eq system.characterType "player")}}selected{{/if}}>Player</option>
+        <option value="npc-hero" {{#if (eq system.characterType "npc-hero")}}selected{{/if}}>NPC Hero</option>
+        <option value="npc-villain" {{#if (eq system.characterType "npc-villain")}}selected{{/if}}>NPC Villain</option>
+        <option value="civilian" {{#if (eq system.characterType "civilian")}}selected{{/if}}>Civilian</option>
+      </select>
+      <button type="button" class="sheet-lock-toggle {{#if flags.msh-faserip.sheetLocked}}locked{{/if}}" 
+              title="{{#if flags.msh-faserip.sheetLocked}}Unlock Sheet{{else}}Lock Sheet{{/if}}">
+        <i class="fas {{#if flags.msh-faserip.sheetLocked}}fa-lock{{else}}fa-lock-open{{/if}}"></i>
+      </button>
+    </div>
   </div>
 </div>
 
