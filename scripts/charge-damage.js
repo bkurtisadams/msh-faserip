@@ -84,36 +84,43 @@ export function calculateChargeDamage(options) {
     results.speedDamage = 2 * areasMovedThrough;
     results.totalDamage = results.baseDamage + results.speedDamage;
 
-    console.log(`💥 Base damage: ${results.baseDamage} (max of Endurance ${attackerEndurance} and Body Armor ${attackerBodyArmor})`);
-    console.log(`⚡ Speed damage: ${results.speedDamage} (2 × ${areasMovedThrough} areas)`);
-    console.log(`🎯 Total damage: ${results.totalDamage}`);
+    console.log(`[IMPACT] Base damage: ${results.baseDamage} (max of Endurance ${attackerEndurance} and Body Armor ${attackerBodyArmor})`);
+    console.log(`[SPEED] Speed damage: ${results.speedDamage} (2 × ${areasMovedThrough} areas)`);
+    console.log(`[TARGET] Total damage: ${results.totalDamage}`);
 
     // Determine effective defender armor
     const effectiveDefenderArmor = isInanimateObject ? objectMaterialStrength : defenderBodyArmor;
 
     // Apply FASERIP rebound rules
     if (effectiveDefenderArmor > results.totalDamage) {
-        // Rebound occurs - armor completely stops the attack
+        // REBOUND - Wall is stronger than impact force
         results.reboundDamage = results.totalDamage;
-        results.damageToDefender = 0;
+        results.damageToDefender = 0; // Wall takes no damage
         
+        // All impact damage rebounds to character
         if (attackerBodyArmor >= results.reboundDamage) {
             results.damageToAttacker = 0;
-            console.log(`🛡️ All damage rebounded (${results.reboundDamage}) but attacker's armor (${attackerBodyArmor}) absorbs it`);
+            console.log(`[ARMOR] All damage rebounded (${results.reboundDamage}) but attacker's armor (${attackerBodyArmor}) absorbs it`);
         } else {
             results.damageToAttacker = results.reboundDamage - attackerBodyArmor;
-            console.log(`🛡️ Rebound damage: ${results.reboundDamage} - ${attackerBodyArmor} attacker armor = ${results.damageToAttacker}`);
+            console.log(`[ARMOR] Rebound damage: ${results.reboundDamage} - ${attackerBodyArmor} attacker armor = ${results.damageToAttacker}`);
         }
         
-        results.description = `${isInanimateObject ? 'Object' : 'Defender'} armor (${effectiveDefenderArmor}) > damage (${results.totalDamage}) - damage rebounded.`;
-    } else {
-        // Normal damage resolution - no rebound
-        const damageAbsorbed = Math.min(results.totalDamage, effectiveDefenderArmor);
-        results.damageToDefender = results.totalDamage - damageAbsorbed;
-        results.damageToAttacker = 0;
+        results.description = `${isInanimateObject ? 'Wall' : 'Defender'} (${effectiveDefenderArmor}) > impact (${results.totalDamage}) - full rebound!`;
         
-        console.log(`✅ Normal hit: ${results.totalDamage} damage - ${damageAbsorbed} absorbed = ${results.damageToDefender} to defender`);
-        results.description = `${results.totalDamage} damage - ${damageAbsorbed} absorbed = ${results.damageToDefender} damage dealt.`;
+    } else {
+        // BREAK THROUGH - Character breaks through wall
+        const damageAbsorbed = Math.min(results.totalDamage, effectiveDefenderArmor);
+        results.damageToDefender = results.totalDamage - damageAbsorbed; // Wall is destroyed
+        
+        // MSH Rule: "Charging through a [X] strength wall will inflict [X] points of damage on the attacker"
+        // Wall hits character back with its material strength value
+        const damageFromWall = effectiveDefenderArmor;
+        const damageAfterArmor = Math.max(0, damageFromWall - attackerBodyArmor);
+        results.damageToAttacker = damageAfterArmor;
+        
+        console.log(`[OK] Break through: Wall strength ${damageFromWall} - ${attackerBodyArmor} character armor = ${damageAfterArmor} to character`);
+        results.description = `Breaks through! Wall (${effectiveDefenderArmor}) inflicts ${damageFromWall} damage, ${attackerBodyArmor} absorbed by armor = ${damageAfterArmor} damage taken.`;
     }
 
     // Handle Slam effects (only if damage was dealt to defender)
@@ -542,73 +549,134 @@ export function initializeSlamHandlers() {
             const slamDistance = parseInt(this.dataset.distance);
             const slamSpeed = parseInt(this.dataset.speed);
             const attackerStrength = parseInt(this.dataset.attackerStrength);
-
-            console.log("DEBUG: UUID from button:", targetUuid);  // new
+            
+            console.log("DEBUG: UUID from button:", targetUuid);
             
             const targetDoc = await fromUuid(targetUuid);
-            const targetActor = targetDoc?.actor ?? targetDoc;  // ← FIX: Get .actor if it's a token
-
-            console.log("DEBUG: Resolved actor:", targetActor, targetActor?.name);  // new
-
+            const targetActor = targetDoc?.actor ?? targetDoc;
+            
+            console.log("DEBUG: Resolved actor:", targetActor, targetActor?.name);
+            
             if (!targetActor) {
                 ui.notifications.error("Target actor not found!");
                 return;
             }
             
-            // Directly prompt for material strength with a simple dropdown
+            // Material strength options (corrected per MSH material table)
             const materialOptions = [
-                { value: 2, label: "Feeble (Cardboard, Glass)" },
-                { value: 4, label: "Poor (Wood, Plastic)" },
-                { value: 6, label: "Typical (Brick Wall)" },
-                { value: 10, label: "Good (Stone Wall)" },
-                { value: 20, label: "Excellent (Steel Wall)" },
-                { value: 30, label: "Remarkable (Reinforced Steel)" },
-                { value: 40, label: "Incredible (Super-Strong Material)" },
-                { value: 50, label: "Amazing (Nearly Indestructible)" },
-                { value: 75, label: "Monstrous (Extremely Durable)" },
-                { value: 100, label: "Unearthly (Virtually Indestructible)" }
+                { value: 2, label: "Feeble (Cloth, glass, brush, paper)" },
+                { value: 4, label: "Poor (Plastics, crystal, wood)" },
+                { value: 6, label: "Typical (Rubber, soft metals, ice, adobe)" },
+                { value: 10, label: "Good (Brick, aluminum, light machinery, asphalt)" },
+                { value: 20, label: "Excellent (Concrete, Beta cloth, iron, bullet-proof glass)" },
+                { value: 30, label: "Remarkable (Reinforced concrete, steel)" },
+                { value: 40, label: "Incredible (Solid stone, Vibranium, volcanic rock)" },
+                { value: 50, label: "Amazing (Osmium steel, granite, gemstones)" },
+                { value: 75, label: "Monstrous (Diamond, super-heavy alloys)" },
+                { value: 100, label: "Unearthly (Adamantium steel, mystical elements)" },
+                { value: 1000, label: "Class 1000 (Legendary artifacts - Cap's shield)" },
+                { value: 3000, label: "Class 3000 (Nearly indestructible artifacts)" },
+                { value: 5000, label: "Class 5000 (Thor's hammer, ultimate artifacts)" }
             ];
             
-            // Create simple select dialog without the full Dialog class
-            const selectHtml = materialOptions.map(opt => 
-                `<option value="${opt.value}" ${opt.value === 6 ? 'selected' : ''}>${opt.label}</option>`
-            ).join('');
-            
-            const materialStrength = await new Promise((resolve) => {
+            // Create collision dialog
+            const collisionData = await new Promise((resolve) => {
                 new Dialog({
-                    title: "Select Obstacle Material",
+                    title: "Slam Collision Damage",
                     content: `
-                        <div style="text-align: center; padding: 10px;">
-                            <p><strong>${targetActor.name}</strong> hits an obstacle!</p>
-                            <select id="obstacle-material" style="width: 100%; padding: 5px;">
-                                ${selectHtml}
-                            </select>
+                        <div style="padding: 10px;">
+                            <p><strong>${targetActor.name}</strong> is slammed ${slamDistance} area${slamDistance > 1 ? 's' : ''}!</p>
+                            
+                            <div style="margin: 15px 0;">
+                                <label style="display: block; margin-bottom: 5px;"><strong>Distance to obstacle (areas):</strong></label>
+                                <input type="number" id="distance-to-obstacle" min="0.5" max="${slamDistance}" step="0.5" value="${slamDistance}" 
+                                    style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
+                                <small style="color: #666;">How many areas before hitting the obstacle? (Max: ${slamDistance})</small>
+                            </div>
+                            
+                            <div style="margin: 15px 0;">
+                                <label style="display: block; margin-bottom: 5px;"><strong>Obstacle material:</strong></label>
+                                <select id="obstacle-material" style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
+                                    ${materialOptions.map(opt => 
+                                        `<option value="${opt.value}" ${opt.value === 10 ? 'selected' : ''}>${opt.label}</option>`
+                                    ).join('')}
+                                </select>
+                            </div>
                         </div>
                     `,
                     buttons: {
-                        ok: {
-                            label: "Calculate Damage",
-                            callback: (html) => resolve(parseInt(html.find('#obstacle-material').val()))
+                        calculate: {
+                            icon: '<i class="fas fa-calculator"></i>',
+                            label: "Calculate Collision",
+                            callback: (html) => {
+                                const distanceToObstacle = parseFloat(html.find('#distance-to-obstacle').val());
+                                const materialStrength = parseInt(html.find('#obstacle-material').val());
+                                resolve({ distanceToObstacle, materialStrength });
+                            }
                         },
                         cancel: {
-                            label: "No Collision",
+                            icon: '<i class="fas fa-times"></i>',
+                            label: "Cancel",
                             callback: () => resolve(null)
                         }
                     },
-                    default: "ok"
+                    default: "calculate"
                 }).render(true);
             });
             
-            if (materialStrength === null) return; // User cancelled
+            if (collisionData === null) return; // User cancelled
             
-            // Calculate slam damage using the existing function
+            const { distanceToObstacle, materialStrength } = collisionData;
+            
+            // Get character stats
+            const characterEndurance = targetActor.system.abilities.endurance.value || 0;
+            const characterBodyArmor = getBodyArmorValue(targetActor);
+            
+            // Calculate slam damage using distance to obstacle (not full slam distance)
             const slamResults = calculateSlamDamage({
-                characterEndurance: targetActor.system.abilities.endurance.value || 0,
-                characterBodyArmor: getBodyArmorValue(targetActor),
+                characterEndurance,
+                characterBodyArmor,
                 objectMaterialStrength: materialStrength,
-                slamSpeed: slamSpeed,
-                attackerStrength: attackerStrength
+                slamSpeed: distanceToObstacle,  // Use actual distance traveled
+                attackerStrength
             });
+            
+            // Determine break-through and remaining movement
+            let areasLost = 0;
+            let breaksThrough = false;
+            let remainingMovement = 0;
+            let breakThroughText = "";
+            
+            if (materialStrength <= 4) {
+                // Poor or less
+                areasLost = 1;
+                breaksThrough = true;
+                breakThroughText = "Breaks through! Loses 1 area of movement.";
+            } else if (materialStrength <= 20) {
+                // Up to Excellent
+                areasLost = 2;
+                breaksThrough = true;
+                breakThroughText = "Breaks through! Loses 2 areas of movement.";
+            } else if (materialStrength <= 40) {
+                // Up to Incredible
+                areasLost = 3;
+                breaksThrough = true;
+                breakThroughText = "Breaks through! Loses 3 areas of movement.";
+            } else {
+                // Greater than Incredible
+                areasLost = 0;
+                breaksThrough = false;
+                breakThroughText = "Cannot break through! Movement stops.";
+            }
+            
+            if (breaksThrough) {
+                remainingMovement = slamDistance - distanceToObstacle - areasLost;
+                if (remainingMovement > 0) {
+                    breakThroughText += ` <strong>${remainingMovement} area${remainingMovement > 1 ? 's' : ''} of movement remaining!</strong>`;
+                } else {
+                    breakThroughText += " Movement exhausted.";
+                }
+            }
             
             // Create detailed damage report
             await ChatMessage.create({
@@ -616,17 +684,22 @@ export function initializeSlamHandlers() {
                 content: `
                     <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
                         <div style="padding: 5px 10px; border-bottom: 1px solid #c0c0c0; font-size: 1.1em; color: #8b0000;">
-                            <strong>Slam Collision: ${targetActor.name} hits obstacle</strong>
+                            <strong>${targetActor.name} - Slam Collision</strong>
                         </div>
                         <div style="padding: 5px 10px; font-size: 0.9em;">
-                            <div><strong>Slam Speed:</strong> ${slamSpeed} areas/round</div>
+                            <div><strong>Total Slam Distance:</strong> ${slamDistance} areas</div>
+                            <div><strong>Distance to Obstacle:</strong> ${distanceToObstacle} areas</div>
                             <div><strong>Material Strength:</strong> ${materialStrength}</div>
-                            <div><strong>Character Endurance:</strong> ${targetActor.system.abilities.endurance.value || 0}</div>
-                            <div><strong>Damage Calculation:</strong> ${slamResults.description}</div>
+                            <div><strong>Character Endurance:</strong> ${characterEndurance}</div>
+                            <div><strong>Character Body Armor:</strong> ${characterBodyArmor}</div>
+                            <div style="margin-top: 8px;"><strong>Impact Force:</strong> ${slamResults.totalDamage} (${characterEndurance} base + ${distanceToObstacle * 2} speed)</div>
                             ${slamResults.damageToCharacter > 0 ? 
-                                `<div style="color: #cc0000;"><strong>Damage to ${targetActor.name}:</strong> ${slamResults.damageToCharacter}</div>` : 
-                                '<div style="color: #28a745;"><strong>No damage taken</strong></div>'
+                                `<div style="color: #cc0000; font-weight: bold; margin-top: 5px;">Damage to ${targetActor.name}: ${slamResults.damageToCharacter}</div>` : 
+                                '<div style="color: #28a745; font-weight: bold; margin-top: 5px;">No damage taken</div>'
                             }
+                            <div style="margin-top: 8px; padding: 5px; background-color: #fff3cd; border-radius: 3px;">
+                                ${breakThroughText}
+                            </div>
                         </div>
                     </div>
                 `
@@ -637,17 +710,13 @@ export function initializeSlamHandlers() {
                 const currentHealth = targetActor.system.attributes.health.value;
                 const newHealth = Math.max(0, currentHealth - slamResults.damageToCharacter);
                 
-                await game.msh.runAsGM({
-                    operation: 'adjustTargetHealth',
-                    targetActorUuid: targetActor.uuid,
-                    newHealth: newHealth
-                });
+                await targetActor.update({ "system.attributes.health.value": newHealth });
                 
                 ui.notifications.info(`${targetActor.name} takes ${slamResults.damageToCharacter} collision damage!`);
             }
             
             // Disable the button to prevent multiple calculations
-            $(this).prop('disabled', true).text('Damage Calculated');
+            $(this).prop('disabled', true).text('Collision Calculated');
         });
     });
 }

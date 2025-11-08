@@ -549,7 +549,7 @@ export class CheckAction extends BaseAction {
                     data-distance="${knockbackDistance}"
                     data-speed="${knockbackDistance}"
                     data-attacker-strength="${attackerStrength}"
-                    style="background:#dc3545;color:white;border:none;padding:5px 10px;border-radius:3px;cursor:pointer;">
+                    style="background:#DB747E;color:white;border-radius:3px;padding:5px 10px;border-radius:3px;cursor:pointer;">
               Calculate Collision Damage
             </button>
           </div>
@@ -574,7 +574,7 @@ export class CheckAction extends BaseAction {
                     data-distance="1"
                     data-speed="1"
                     data-attacker-strength="${attackerStrength}"
-                    style="background:#dc3545;color:white;border:none;padding:5px 10px;border-radius:3px;cursor:pointer;">
+                    style="background:#DB747E;color:white;border-radius:3px;padding:5px 10px;border-radius:3px;cursor:pointer;">
               Calculate Collision Damage
             </button>
           </div>
