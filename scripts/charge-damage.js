@@ -3,6 +3,8 @@ import {
   resolveStunFeat, 
   getGrandSlamDistance 
 } from './modules/combat/damage-resolution.js';
+// At the top of charge-damage.js with other imports
+import { ActionDispatcher } from "./modules/actions/action-dispatcher.js";
 
 // resolveSlamEffect moved to modules/combat/damage-resolution.js
 
@@ -550,19 +552,15 @@ export function initializeSlamHandlers() {
             const slamSpeed = parseInt(this.dataset.speed);
             const attackerStrength = parseInt(this.dataset.attackerStrength);
             
-            console.log("DEBUG: UUID from button:", targetUuid);
-            
             const targetDoc = await fromUuid(targetUuid);
             const targetActor = targetDoc?.actor ?? targetDoc;
-            
-            console.log("DEBUG: Resolved actor:", targetActor, targetActor?.name);
             
             if (!targetActor) {
                 ui.notifications.error("Target actor not found!");
                 return;
             }
             
-            // Material strength options (corrected per MSH material table)
+            // Material strength options
             const materialOptions = [
                 { value: 2, label: "Feeble (Cloth, glass, brush, paper)" },
                 { value: 4, label: "Poor (Plastics, crystal, wood)" },
@@ -581,26 +579,46 @@ export function initializeSlamHandlers() {
             
             // Create collision dialog
             const collisionData = await new Promise((resolve) => {
-                new Dialog({
+                const dialog = new Dialog({
                     title: "Slam Collision Damage",
                     content: `
                         <div style="padding: 10px;">
                             <p><strong>${targetActor.name}</strong> is slammed ${slamDistance} area${slamDistance > 1 ? 's' : ''}!</p>
                             
                             <div style="margin: 15px 0;">
-                                <label style="display: block; margin-bottom: 5px;"><strong>Distance to obstacle (areas):</strong></label>
+                                <label style="display: block; margin-bottom: 5px;"><strong>Distance to impact (areas):</strong></label>
                                 <input type="number" id="distance-to-obstacle" min="0.5" max="${slamDistance}" step="0.5" value="${slamDistance}" 
                                     style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
                                 <small style="color: #666;">How many areas before hitting the obstacle? (Max: ${slamDistance})</small>
                             </div>
                             
                             <div style="margin: 15px 0;">
-                                <label style="display: block; margin-bottom: 5px;"><strong>Obstacle material:</strong></label>
+                                <label style="display: block; margin-bottom: 8px;"><strong>Obstacle Type:</strong></label>
+                                <div style="margin-left: 10px;">
+                                    <label style="display: block; margin-bottom: 5px; cursor: pointer;">
+                                        <input type="radio" name="obstacle-type" value="object" checked style="margin-right: 5px;">
+                                        Inanimate Object (wall, building, etc.)
+                                    </label>
+                                    <label style="display: block; cursor: pointer;">
+                                        <input type="radio" name="obstacle-type" value="character" style="margin-right: 5px;">
+                                        Character (use targeted token)
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <div id="object-options" style="margin: 15px 0;">
+                                <label style="display: block; margin-bottom: 5px;"><strong>Material Strength:</strong></label>
                                 <select id="obstacle-material" style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
                                     ${materialOptions.map(opt => 
                                         `<option value="${opt.value}" ${opt.value === 10 ? 'selected' : ''}>${opt.label}</option>`
                                     ).join('')}
                                 </select>
+                            </div>
+                            
+                            <div id="character-options" style="margin: 15px 0; display: none; padding: 10px; background-color: #e8f4f8; border-radius: 3px;">
+                                <small style="color: #666;">
+                                    <strong>Note:</strong> Make sure you have targeted the character token on the canvas before clicking Calculate.
+                                </small>
                             </div>
                         </div>
                     `,
@@ -610,8 +628,9 @@ export function initializeSlamHandlers() {
                             label: "Calculate Collision",
                             callback: (html) => {
                                 const distanceToObstacle = parseFloat(html.find('#distance-to-obstacle').val());
+                                const obstacleType = html.find('input[name="obstacle-type"]:checked').val();
                                 const materialStrength = parseInt(html.find('#obstacle-material').val());
-                                resolve({ distanceToObstacle, materialStrength });
+                                resolve({ distanceToObstacle, obstacleType, materialStrength });
                             }
                         },
                         cancel: {
@@ -620,103 +639,173 @@ export function initializeSlamHandlers() {
                             callback: () => resolve(null)
                         }
                     },
-                    default: "calculate"
+                    default: "calculate",
+                    render: (html) => {
+                        // Toggle between object and character options
+                        html.find('input[name="obstacle-type"]').on('change', function() {
+                            const type = $(this).val();
+                            if (type === "character") {
+                                html.find('#object-options').hide();
+                                html.find('#character-options').show();
+                            } else {
+                                html.find('#object-options').show();
+                                html.find('#character-options').hide();
+                            }
+                        });
+                    }
                 }).render(true);
             });
             
             if (collisionData === null) return; // User cancelled
             
-            const { distanceToObstacle, materialStrength } = collisionData;
+            const { distanceToObstacle, obstacleType, materialStrength } = collisionData;
             
-            // Get character stats
-            const characterEndurance = targetActor.system.abilities.endurance.value || 0;
-            const characterBodyArmor = getBodyArmorValue(targetActor);
-            
-            // Calculate slam damage using distance to obstacle (not full slam distance)
-            const slamResults = calculateSlamDamage({
-                characterEndurance,
-                characterBodyArmor,
-                objectMaterialStrength: materialStrength,
-                slamSpeed: distanceToObstacle,  // Use actual distance traveled
-                attackerStrength
-            });
-            
-            // Determine break-through and remaining movement
-            let areasLost = 0;
-            let breaksThrough = false;
-            let remainingMovement = 0;
-            let breakThroughText = "";
-            
-            if (materialStrength <= 4) {
-                // Poor or less
-                areasLost = 1;
-                breaksThrough = true;
-                breakThroughText = "Breaks through! Loses 1 area of movement.";
-            } else if (materialStrength <= 20) {
-                // Up to Excellent
-                areasLost = 2;
-                breaksThrough = true;
-                breakThroughText = "Breaks through! Loses 2 areas of movement.";
-            } else if (materialStrength <= 40) {
-                // Up to Incredible
-                areasLost = 3;
-                breaksThrough = true;
-                breakThroughText = "Breaks through! Loses 3 areas of movement.";
-            } else {
-                // Greater than Incredible
-                areasLost = 0;
-                breaksThrough = false;
-                breakThroughText = "Cannot break through! Movement stops.";
-            }
-            
-            if (breaksThrough) {
-                remainingMovement = slamDistance - distanceToObstacle - areasLost;
-                if (remainingMovement > 0) {
-                    breakThroughText += ` <strong>${remainingMovement} area${remainingMovement > 1 ? 's' : ''} of movement remaining!</strong>`;
-                } else {
-                    breakThroughText += " Movement exhausted.";
+            // BRANCH: Character vs Object collision
+            if (obstacleType === "character") {
+                // CHARACTER-TO-CHARACTER COLLISION
+                // Get currently targeted token
+                const targets = Array.from(game.user.targets);
+                
+                if (targets.length === 0) {
+                    ui.notifications.error("No character targeted! Please target a token on the canvas.");
+                    return;
                 }
-            }
-            
-            // Create detailed damage report
-            await ChatMessage.create({
-                speaker: ChatMessage.getSpeaker({ alias: "Collision Damage" }),
-                content: `
-                    <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
-                        <div style="padding: 5px 10px; border-bottom: 1px solid #c0c0c0; font-size: 1.1em; color: #8b0000;">
-                            <strong>${targetActor.name} - Slam Collision</strong>
-                        </div>
-                        <div style="padding: 5px 10px; font-size: 0.9em;">
-                            <div><strong>Total Slam Distance:</strong> ${slamDistance} areas</div>
-                            <div><strong>Distance to Obstacle:</strong> ${distanceToObstacle} areas</div>
-                            <div><strong>Material Strength:</strong> ${materialStrength}</div>
-                            <div><strong>Character Endurance:</strong> ${characterEndurance}</div>
-                            <div><strong>Character Body Armor:</strong> ${characterBodyArmor}</div>
-                            <div style="margin-top: 8px;"><strong>Impact Force:</strong> ${slamResults.totalDamage} (${characterEndurance} base + ${distanceToObstacle * 2} speed)</div>
-                            ${slamResults.damageToCharacter > 0 ? 
-                                `<div style="color: #cc0000; font-weight: bold; margin-top: 5px;">Damage to ${targetActor.name}: ${slamResults.damageToCharacter}</div>` : 
-                                '<div style="color: #28a745; font-weight: bold; margin-top: 5px;">No damage taken</div>'
-                            }
-                            <div style="margin-top: 8px; padding: 5px; background-color: #fff3cd; border-radius: 3px;">
-                                ${breakThroughText}
+                
+                const secondaryToken = targets[0];
+                const secondaryActor = secondaryToken.actor;
+                
+                if (!secondaryActor) {
+                    ui.notifications.error("Targeted token has no actor!");
+                    return;
+                }
+                
+                // Don't allow slamming into yourself
+                if (secondaryActor.uuid === targetActor.uuid) {
+                    ui.notifications.error("Cannot slam into yourself!");
+                    return;
+                }
+                
+                // Create flavor text message
+                await ChatMessage.create({
+                    speaker: ChatMessage.getSpeaker({ alias: "Slam Collision" }),
+                    content: `
+                        <div style="background-color: #8b0000; color: white; padding: 10px; border-radius: 5px; margin: 5px 0;">
+                            <div style="font-size: 1.2em; font-weight: bold; text-align: center; margin-bottom: 8px;">
+                                💥 CHARACTER COLLISION! 💥
+                            </div>
+                            <div style="padding: 5px; font-size: 0.9em;">
+                                <div><strong>${targetActor.name}</strong> is slammed into <strong>${secondaryActor.name}</strong>!</div>
+                                <div style="margin: 5px 0;">Distance traveled: ${distanceToObstacle} areas</div>
+                                <div style="margin-top: 8px;">Resolving as Charging attack...</div>
                             </div>
                         </div>
-                    </div>
-                `
-            });
-            
-            // Apply damage if any
-            if (slamResults.damageToCharacter > 0) {
-                const currentHealth = targetActor.system.attributes.health.value;
-                const newHealth = Math.max(0, currentHealth - slamResults.damageToCharacter);
+                    `
+                });
                 
-                await targetActor.update({ "system.attributes.health.value": newHealth });
+                // Resolve as Charging attack: slammed character "charges" the secondary target
+                await ActionDispatcher.roll("charging", {
+                    actor: targetActor,  // Slammed character becomes "attacker"
+                    abilityName: "fighting",
+                    opts: {
+                        autoApply: true,
+                        showConfirm: false,
+                        prefill: {
+                            targetUuid: secondaryToken.document.uuid,
+                            areasMovedThrough: distanceToObstacle
+                        }
+                    }
+                });
                 
-                ui.notifications.info(`${targetActor.name} takes ${slamResults.damageToCharacter} collision damage!`);
+                ui.notifications.info(`${targetActor.name} charging attack on ${secondaryActor.name} resolved!`);
+                
+            } else {
+                // OBJECT COLLISION (existing code)
+                const characterEndurance = targetActor.system.abilities.endurance.value || 0;
+                const characterBodyArmor = getBodyArmorValue(targetActor);
+                
+                // Calculate slam damage using distance to obstacle
+                const slamResults = calculateSlamDamage({
+                    characterEndurance,
+                    characterBodyArmor,
+                    objectMaterialStrength: materialStrength,
+                    slamSpeed: distanceToObstacle,
+                    attackerStrength
+                });
+                
+                // Determine break-through and remaining movement
+                let areasLost = 0;
+                let breaksThrough = false;
+                let remainingMovement = 0;
+                let breakThroughText = "";
+                
+                if (materialStrength <= 4) {
+                    areasLost = 1;
+                    breaksThrough = true;
+                    breakThroughText = "Breaks through! Loses 1 area of movement.";
+                } else if (materialStrength <= 20) {
+                    areasLost = 2;
+                    breaksThrough = true;
+                    breakThroughText = "Breaks through! Loses 2 areas of movement.";
+                } else if (materialStrength <= 40) {
+                    areasLost = 3;
+                    breaksThrough = true;
+                    breakThroughText = "Breaks through! Loses 3 areas of movement.";
+                } else {
+                    areasLost = 0;
+                    breaksThrough = false;
+                    breakThroughText = "Cannot break through! Movement stops.";
+                }
+                
+                if (breaksThrough) {
+                    remainingMovement = slamDistance - distanceToObstacle - areasLost;
+                    if (remainingMovement > 0) {
+                        breakThroughText += ` <strong>${remainingMovement} area${remainingMovement > 1 ? 's' : ''} of movement remaining!</strong>`;
+                    } else {
+                        breakThroughText += " Movement exhausted.";
+                    }
+                }
+                
+                // Create detailed damage report
+                await ChatMessage.create({
+                    speaker: ChatMessage.getSpeaker({ alias: "Collision Damage" }),
+                    content: `
+                        <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
+                            <div style="padding: 5px 10px; border-bottom: 1px solid #c0c0c0; font-size: 1.1em; color: #8b0000;">
+                                <strong>${targetActor.name} - Slam Collision</strong>
+                            </div>
+                            <div style="padding: 5px 10px; font-size: 0.9em;">
+                                <div><strong>Total Slam Distance:</strong> ${slamDistance} areas</div>
+                                <div><strong>Distance to Obstacle:</strong> ${distanceToObstacle} areas</div>
+                                <div><strong>Material Strength:</strong> ${materialStrength}</div>
+                                <div><strong>Character Endurance:</strong> ${characterEndurance}</div>
+                                <div><strong>Character Body Armor:</strong> ${characterBodyArmor}</div>
+                                <div style="margin-top: 8px;"><strong>Impact Force:</strong> ${slamResults.totalDamage} (${characterEndurance} base + ${Math.round(distanceToObstacle * 2)} speed)</div>
+                                ${slamResults.damageToCharacter > 0 ? 
+                                    `<div style="color: #cc0000; font-weight: bold; margin-top: 5px;">Damage to ${targetActor.name}: ${slamResults.damageToCharacter}</div>` : 
+                                    '<div style="color: #28a745; font-weight: bold; margin-top: 5px;">No damage taken</div>'
+                                }
+                                <div style="margin-top: 8px; padding: 5px; background-color: #fff3cd; border-radius: 3px;">
+                                    ${breakThroughText}
+                                </div>
+                            </div>
+                        </div>
+                    `
+                });
+                
+                // Apply damage if any
+                if (slamResults.damageToCharacter > 0) {
+                    const currentHealth = targetActor.system.attributes.health.value;
+                    const newHealth = Math.max(0, currentHealth - slamResults.damageToCharacter);
+                    
+                    await targetActor.update({ "system.attributes.health.value": newHealth });
+                    
+                    ui.notifications.info(`${targetActor.name} takes ${slamResults.damageToCharacter} collision damage!`);
+                }
             }
             
             // Disable the button to prevent multiple calculations
             $(this).prop('disabled', true).text('Collision Calculated');
-        });
-    });
+            
+        }); // end of html.find('.calculate-slam-collision').on('click', async function() {
+    }); // end of Hooks.on("renderChatMessage", (app, html, data) => {
 }
