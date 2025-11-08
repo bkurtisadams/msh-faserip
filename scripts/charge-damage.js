@@ -542,8 +542,14 @@ export function initializeSlamHandlers() {
             const slamDistance = parseInt(this.dataset.distance);
             const slamSpeed = parseInt(this.dataset.speed);
             const attackerStrength = parseInt(this.dataset.attackerStrength);
+
+            console.log("DEBUG: UUID from button:", targetUuid);  // new
             
-            const targetActor = await fromUuid(targetUuid);
+            const targetDoc = await fromUuid(targetUuid);
+            const targetActor = targetDoc?.actor ?? targetDoc;  // ← FIX: Get .actor if it's a token
+
+            console.log("DEBUG: Resolved actor:", targetActor, targetActor?.name);  // new
+
             if (!targetActor) {
                 ui.notifications.error("Target actor not found!");
                 return;

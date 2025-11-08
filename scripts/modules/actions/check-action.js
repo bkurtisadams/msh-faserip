@@ -13,6 +13,7 @@ import { canEffectsApply } from "../../rules/effects-gate.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
 import * as Effects from "../effects/effect-engine.js";
 import * as Nullify from "./nullify.js";
+import { resolveSlamFeat, getGrandSlamDistance } from "../combat/damage-resolution.js";
 
 const SCOPE = () => (globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faserip");
 
@@ -38,7 +39,7 @@ export class CheckAction extends BaseAction {
       thisAbilityName: this.abilityName,
       opts: this.opts
     });
-    
+
     const actor       = this.actor;
     const actionType  = String(this.actionType || "").toLowerCase(); // "stun" | "slam" | "kill" | "save-nullify"
     const actionName  = labelFor(actionType);
@@ -110,6 +111,7 @@ export class CheckAction extends BaseAction {
       let rawDuration  = null;
       if (actionType === "stun" && !effectsSuppressed) {
         if (colorLower === "white") {
+          // White = 1-10 rounds (roll 1d10)
           const d = new Roll("1d10");
           await d.evaluate();
           rawDuration = d.total;
@@ -121,13 +123,60 @@ export class CheckAction extends BaseAction {
           });
           await this._createStunnedEffect(defenderUuid, targetName, stunDuration);
         } else if (colorLower === "green") {
+          // Green = 1 round
           await this._createStunnedEffect(defenderUuid, targetName, 1);
         }
+        // Yellow/Red = No effect (no stun applied)
       }
 
-      // SLAM (single-resolution; use rolled color)
+      // SLAM - CORRECTED LOGIC (White = worst, Red = best for defender)
       if (actionType === "slam" && !effectsSuppressed) {
-        await this._createSlamEffect(actor, { targetUuid: defenderUuid, dmgThrough, targetEndRank }, colorLower);
+        const attackerStrength = prefill.attackerStrength || 30;
+        const attackerStrengthRank = prefill.attackerStrengthRank || "Remarkable";
+        const attackerName = prefill.attackerName || "Attacker";
+        
+        // Map color to slam effect (CORRECTED - White is worst for defender)
+        let slamEffect = "";
+        let knockbackDistance = 0;
+        
+        switch (colorLower) {
+          case "white":
+            slamEffect = "Grand Slam";
+            knockbackDistance = getGrandSlamDistance(attackerStrength);
+            break;
+          case "green":
+            slamEffect = "1 Area";
+            knockbackDistance = 1;
+            break;
+          case "yellow":
+            slamEffect = "Stagger";
+            break;
+          case "red":
+            slamEffect = "No Slam";
+            break;
+        }
+        
+        // Create detailed chat message based on effect
+        await this._createSlamChatMessage({
+          targetName,
+          targetUuid: defenderUuid,
+          slamEffect,
+          knockbackDistance,
+          attackerStrength,
+          attackerStrengthRank,
+          attackerName,
+          colorLower
+        });
+        
+        // Create the Active Effect
+        if (slamEffect !== "No Slam") {
+          await this._createSlamEffect(actor, {
+            targetUuid: defenderUuid,
+            slamEffect,
+            knockbackDistance,
+            attackerStrength
+          });
+        }
       }
 
       // KILL (Endurance Loss → DYING)
@@ -368,25 +417,70 @@ export class CheckAction extends BaseAction {
     return 6;
   }
 
-  async _createSlamEffect(ownerActor, { targetUuid="", dmgThrough=0 }={}, colorLower="white") {
+  async _createSlamEffect(actor, options) {
+    const { targetUuid, slamEffect, knockbackDistance, attackerStrength } = options;
     const targetActor = await this._resolveTokenActor(targetUuid);
     if (!targetActor) return;
-
-    // Canonical mapping: Green=Stagger, Yellow=1 area (prone), Red=Grand Slam (STR-based areas, prone)
-    let kind = "No Slam", knockbackAreas = 0, prone = false, stagger = false;
-    switch (colorLower) {
-      case "green":
-        kind = "Stagger"; stagger = true; break;
-      case "yellow":
-        kind = "1 area"; knockbackAreas = 1; prone = true; break;
-      case "red":
-        kind = "Grand Slam"; knockbackAreas = this._strengthToAreas(getAbilityInfo(ownerActor,"strength").rank); prone = true; break;
-      default:
-        kind = "No Slam"; break;
+    
+    const SCOPE = globalThis.MSH_FLAG_SCOPE || "msh-faserip";
+    let effectData = null;
+    
+    if (slamEffect === "Grand Slam") {
+      effectData = {
+        name: `Grand Slam (Knockback ${knockbackDistance} areas)`,
+        icon: "icons/svg/falling.svg",
+        origin: this.actor?.uuid ?? null,
+        flags: {
+          [SCOPE]: {
+            effectType: "grandSlam",
+            slamSpeed: knockbackDistance,
+            attackerStrength
+          }
+        },
+        changes: [
+          { key: "system.status.prone", mode: CONST.ACTIVE_EFFECT_MODES.OVERRIDE, value: true }
+        ],
+        duration: {
+          rounds: 2,
+          startRound: game.combat?.round ?? 0
+        },
+        statuses: ["prone"]
+      };
+    } else if (slamEffect === "1 Area") {
+      effectData = {
+        name: "Slammed (1 Area)",
+        icon: "icons/svg/falling.svg",
+        origin: this.actor?.uuid ?? null,
+        flags: {
+          [SCOPE]: { slammed: true, distance: 1 }
+        },
+        changes: [
+          { key: "system.status.prone", mode: CONST.ACTIVE_EFFECT_MODES.OVERRIDE, value: true }
+        ],
+        duration: {
+          rounds: 1,
+          startRound: game.combat?.round ?? 0
+        },
+        statuses: ["prone"]
+      };
+    } else if (slamEffect === "Stagger") {
+      effectData = {
+        name: "Staggered",
+        icon: "icons/svg/stoned.svg",
+        flags: {
+          [SCOPE]: { staggered: true }
+        },
+        duration: {
+          rounds: 1,
+          startRound: game.combat?.round ?? 0
+        },
+        statuses: ["staggered"]
+      };
     }
-    // You can keep dmgThrough for future rules; not used in this base effect
-    await Effects.applySlam(targetActor, { kind, knockbackAreas, prone, stagger });
-    ui.notifications.info(`${targetActor.name}: ${kind}${knockbackAreas?` (${knockbackAreas} area${knockbackAreas>1?"s":""})`:""}`);
+    
+    if (effectData) {
+      await targetActor.createEmbeddedDocuments("ActiveEffect", [effectData]);
+    }
   }
 
   _extraExplanationHtml({ actionType, targetAbility, colorLower, finalEffect, effectsSuppressed, stunDuration=null, rawStunDuration=null }) {
@@ -417,5 +511,108 @@ export class CheckAction extends BaseAction {
       return `<div style="margin-top:8px;color:#444;">${String(finalEffect||"").replace(/E\/S/,"Edged/Shooting")}</div>`;
     }
     return "";
+  }
+
+  async _createSlamChatMessage(options) {
+    const {
+      targetName,
+      targetUuid,
+      slamEffect,
+      knockbackDistance,
+      attackerStrength,
+      attackerStrengthRank,
+      attackerName,
+      colorLower
+    } = options;
+    
+    let content = "";
+    
+    if (slamEffect === "Grand Slam") {
+      content = `
+        <div style="background-color:#8B0000;color:white;padding:10px;border-radius:5px;margin:5px 0;">
+          <div style="font-size:1.2em;font-weight:bold;text-align:center;margin-bottom:8px;">💥 GRAND SLAM! 💥</div>
+          <div style="padding:5px;font-size:0.9em;">
+            <div><strong>${targetName}</strong> is launched away with tremendous force!</div>
+            <div style="margin:5px 0;"><strong>Mechanical Effects:</strong></div>
+            <div>• Attacker Strength: ${attackerStrengthRank} (${attackerStrength})</div>
+            <div>• Knockback Distance: ${knockbackDistance} areas</div>
+            <div>• Launch Speed: ${knockbackDistance} areas/round</div>
+            <div>• Direction: ${attackerName} chooses (if damage dealt)</div>
+            <div style="margin-top:8px;"><strong>Collision Damage:</strong></div>
+            <div>• If target hits obstacle: charging damage applies</div>
+            <div>• Buildings reduce knockback per movement rules</div>
+            <div>• Target takes slam damage if hitting walls/objects</div>
+          </div>
+          <div style="margin-top:10px;text-align:center;">
+            <button class="calculate-slam-collision"
+                    data-target="${targetUuid}"
+                    data-distance="${knockbackDistance}"
+                    data-speed="${knockbackDistance}"
+                    data-attacker-strength="${attackerStrength}"
+                    style="background:#dc3545;color:white;border:none;padding:5px 10px;border-radius:3px;cursor:pointer;">
+              Calculate Collision Damage
+            </button>
+          </div>
+        </div>
+      `;
+    } else if (slamEffect === "1 Area") {
+      content = `
+        <div style="background-color:#DC3545;color:white;padding:10px;border-radius:5px;margin:5px 0;">
+          <div style="font-size:1.2em;font-weight:bold;text-align:center;margin-bottom:8px;">💢 SLAMMED - 1 AREA 💢</div>
+          <div style="padding:5px;font-size:0.9em;">
+            <div><strong>${targetName}</strong> is knocked back 1 area!</div>
+            <div style="margin:5px 0;"><strong>Mechanical Effects:</strong></div>
+            <div>• Knocked 1 area away from attacker</div>
+            <div>• May hit obstacles during knockback</div>
+            <div>• Takes damage if slammed into walls/objects</div>
+            <div>• ${attackerName} chooses direction (if damage dealt)</div>
+            <div>• Target chooses direction (if no damage dealt)</div>
+          </div>
+          <div style="margin-top:10px;text-align:center;">
+            <button class="calculate-slam-collision"
+                    data-target="${targetUuid}"
+                    data-distance="1"
+                    data-speed="1"
+                    data-attacker-strength="${attackerStrength}"
+                    style="background:#dc3545;color:white;border:none;padding:5px 10px;border-radius:3px;cursor:pointer;">
+              Calculate Collision Damage
+            </button>
+          </div>
+        </div>
+      `;
+    } else if (slamEffect === "Stagger") {
+      content = `
+        <div style="background-color:#FFC107;color:black;padding:10px;border-radius:5px;margin:5px 0;">
+          <div style="font-size:1.2em;font-weight:bold;text-align:center;margin-bottom:8px;">😵‍💫 STAGGERED 😵‍💫</div>
+          <div style="padding:5px;font-size:0.9em;">
+            <div><strong>${targetName}</strong> staggers from the impact!</div>
+            <div style="margin:5px 0;"><strong>Mechanical Effects:</strong></div>
+            <div>• Knocked back a step or two</div>
+            <div>• No longer adjacent to attacker</div>
+            <div>• Fully capable of combat next round</div>
+            <div>• No movement penalty or damage</div>
+            <div>• May fall off cliffs if near edges</div>
+          </div>
+        </div>
+      `;
+    } else { // No Slam
+      content = `
+        <div style="background-color:#28A745;color:white;padding:10px;border-radius:5px;margin:5px 0;">
+          <div style="font-size:1.1em;font-weight:bold;text-align:center;margin-bottom:5px;">🛡️ SLAM RESISTED 🛡️</div>
+          <div style="padding:5px;font-size:0.9em;">
+            <div><strong>${targetName}</strong> plants their feet and resists!</div>
+            <div style="margin:5px 0;"><strong>Effect:</strong></div>
+            <div>• No knockback effect</div>
+            <div>• Remains in current position</div>
+            <div>• Still adjacent to attacker</div>
+          </div>
+        </div>
+      `;
+    }
+    
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ alias: "Slam Effect" }),
+      content
+    });
   }
 } // end class

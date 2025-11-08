@@ -76,22 +76,22 @@ export function resolveSlamFeat(options) {
 
   switch (colorResult.toLowerCase()) {
     case 'white':
-      effect = 'No Slam';
-      description = 'Target is not affected by the slam. Takes damage as for a normal hit.';
+      effect = 'Grand Slam';
+      knockbackDistance = getGrandSlamDistance(attackerStrength);
+      description = `Target is knocked away ${knockbackDistance} areas (attacker's strength as ground speed).`;
       break;
     case 'green':
-      effect = 'Stagger';
-      description = 'Target is knocked back a step or two, no longer adjacent to attacker.';
-      break;
-    case 'yellow':
       effect = '1 Area';
       knockbackDistance = 1;
       description = 'Target is knocked 1 area away.';
       break;
+    case 'yellow':
+      effect = 'Stagger';
+      description = 'Target is knocked back a step or two, no longer adjacent to attacker.';
+      break;
     case 'red':
-      effect = 'Grand Slam';
-      knockbackDistance = getGrandSlamDistance(attackerStrength);
-      description = `Target is knocked away ${knockbackDistance} areas (attacker's strength as ground speed).`;
+      effect = 'No Slam';
+      description = 'Target is not affected by the slam. Takes damage as for a normal hit.';
       break;
   }
 

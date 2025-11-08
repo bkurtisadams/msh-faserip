@@ -1399,8 +1399,12 @@ Hooks.on("updateCombat", async (combat, changed, diff, userId) => {
     const a = c.actor;
     if (!a) continue;
     for (const eff of a.effects) {
-      if (eff?.duration?.rounds) {
-        await Effects.renameEffectWithRemaining(eff);
+      if (eff?.duration?.rounds && eff?.id) {  // ← ADD: && eff?.id
+        try {
+          await Effects.renameEffectWithRemaining(eff);
+        } catch (e) {
+          console.warn("Failed to rename effect:", e);
+        }
       }
     }
   }

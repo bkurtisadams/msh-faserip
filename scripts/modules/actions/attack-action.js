@@ -523,6 +523,10 @@ export class AttackAction extends BaseAction {
             showConfirm: false,
             attackForm,
             prefill: {
+              attackerUuid: actor.uuid,
+              attackerName: actor.name,
+              attackerStrength: actor.system?.abilities?.strength?.value || 30,
+              attackerStrengthRank: actor.system?.abilities?.strength?.rank || "Remarkable",
               targetUuid: target?.document?.uuid ?? target?.actor?.uuid,
               dmgThrough: Number(penetratingDamage) || 0,
               targetName: target?.name,
