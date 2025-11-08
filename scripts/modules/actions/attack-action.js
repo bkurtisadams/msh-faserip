@@ -649,7 +649,7 @@ export class AttackAction extends BaseAction {
           bypassArmor: choice.bypassArmor || false,
           attackForm: attackForm,
           armorPiercing: choice.armorPiercing || 0,
-          specificTarget: target
+          targets: [target]  // Changed from specificTarget to targets array
         });
       }
     }

@@ -1616,8 +1616,13 @@ export async function confirmPreview({ title = "Preview", contentHtml }) {
 export function buildMultiAttackSection(actionType, targetCount, multiAttacks = false, attackCount = 2, multiAdjacent = false) {
   const canUseAdjacent = ["blunt-attack", "energy", "force"].includes(actionType);
   
+  // Determine background color based on what's active
+  let bgColor = '#e8f5e9'; // Default green
+  if (multiAdjacent) bgColor = '#ffe0b2'; // Light orange for adjacent
+  else if (multiAttacks) bgColor = '#fff3cd'; // Light yellow for multi-attacks
+  
   return `
-    <div style="margin:6px 0;padding:6px;background:#e8f5e9;border:1px solid #4caf50;border-radius:3px;">
+    <div class="multi-attack-section" style="margin:6px 0;padding:6px;background:${bgColor};border:1px solid #4caf50;border-radius:3px;transition:background 0.3s ease;">
       <div style="font-weight:600;margin-bottom:6px;color:#2e7d32;">Multiple Targets/Attacks</div>
       
       ${canUseAdjacent ? `
@@ -1652,7 +1657,6 @@ export function buildMultiAttackSection(actionType, targetCount, multiAttacks = 
         </label>
       </div>
       
-      <!-- ADD THIS SECTION -->
       <div style="margin-top:6px;border-top:1px solid #c8e6c9;padding-top:4px;">
         <span class="multi-attack-info-toggle" style="font-size:.8em;color:#2e7d32;cursor:pointer;user-select:none;">
           ℹ️ How are attacks distributed? <span style="font-size:.7em;">(click)</span>
@@ -1682,30 +1686,34 @@ export function setupMultiAttackHandlers(html) {
   const $multiAttacks = html.find('[name="multiAttacks"]');
   const $multiAdjacent = html.find('[name="multiAdjacent"]');
   const $multiOptions = html.find('#multi-attack-options');
-  
-  // Toggle multi-attack options visibility
+  const $section = html.find('.multi-attack-section');
+
+  // Toggle multi-attack options visibility and background color
   if ($multiAttacks.length && $multiOptions.length) {
     $multiAttacks.on('change', function() {
-      if ($(this).is(':checked')) {
-        $multiOptions.slideDown(200);
-        if ($multiAdjacent.length) $multiAdjacent.prop('checked', false);
-      } else {
-        $multiOptions.slideUp(200);
+      const isChecked = $(this).is(':checked');
+      $multiOptions.toggle(isChecked);
+      // Only change background if adjacent isn't checked
+      if (!$multiAdjacent.is(':checked')) {
+        $section.css('background', isChecked ? '#fff3cd' : '#e8f5e9');
       }
     });
   }
-  
+
   // Make adjacent mutually exclusive with multi-attacks
   if ($multiAdjacent.length && $multiAttacks.length) {
     $multiAdjacent.on('change', function() {
-      if ($(this).is(':checked')) {
+      const isChecked = $(this).is(':checked');
+      if (isChecked) {
         $multiAttacks.prop('checked', false);
-        $multiOptions.slideUp(200);
+        $multiOptions.hide();
+        $section.css('background', '#ffe0b2'); // Light orange
+      } else {
+        $section.css('background', '#e8f5e9'); // Back to green
       }
     });
   }
-  
-  // Toggle info section
+
   html.find('.multi-attack-info-toggle').on('click', function(e) {
     e.preventDefault();
     html.find('.multi-attack-info').slideToggle(200);

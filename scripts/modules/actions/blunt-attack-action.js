@@ -75,6 +75,7 @@ export class BluntAttackAction extends AttackAction {
       </div>
 
       <div style="margin:6px 0;padding:6px;background:#fff3e0;border:1px solid #ff9800;border-radius:3px;">
+        <div class="pull-punch-section" style="margin:6px 0;padding:6px;background:${savedPulledDamage < strength.value || savedResultCap !== 'none' ? '#ffebee' : '#fff3e0'};border:1px solid #ff9800;border-radius:3px;transition:background 0.3s ease;">
         <div style="font-weight:600;margin-bottom:6px;color:#e65100;">Pull Punch (Optional)</div>
         
         <div style="margin-bottom:4px;">
@@ -330,6 +331,24 @@ export class BluntAttackAction extends AttackAction {
           html.find('[name="objectName"]').on('input', update);
           // multi attack
           setupMultiAttackHandlers(html);
+
+          // Pull punch background color update
+          const updatePullPunchColor = () => {
+            const $section = html.find('.pull-punch-section');
+            const $pulledDamage = html.find('[name="pulledDamage"]');
+            const $resultCap = html.find('[name="resultCap"]');
+            
+            const maxDamage = Number($pulledDamage.attr('max'));
+            const currentDamage = Number($pulledDamage.val());
+            const resultCapValue = $resultCap.val();
+            
+            const isPulling = currentDamage < maxDamage || resultCapValue !== 'none';
+            $section.css('background', isPulling ? '#ffebee' : '#fff3e0'); // Pink when active, orange when inactive
+          };
+          
+          html.find('[name="pulledDamage"]').on('input change', updatePullPunchColor);
+          html.find('[name="resultCap"]').on('change', updatePullPunchColor);
+          
           applyCapabilitiesToDialog(html, "blunt-attack", { actor });
 
             /** -----------------------------------------------------------
