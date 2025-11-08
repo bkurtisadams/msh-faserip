@@ -5,6 +5,9 @@ const SCOPE = () => (globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faseri
 
 /** Safe handle to CTT time engine (if installed & active) */
 function getCTT() {
+  const cttSyncMode = game.settings.get("msh-faserip", "ctt.syncMode");
+  if (cttSyncMode === "off") return null; // Setting is off, don't use CTT
+  
   const mod = game.modules.get("calendar-time-tracker");
   return mod?.active ? (mod.api?.timeEngine ?? null) : null;
 }

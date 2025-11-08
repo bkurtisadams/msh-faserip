@@ -266,20 +266,16 @@ export class DeathSaveAction extends BaseAction {
   }
 
   /** Create the DYING effect: loses 1 Endurance rank per turn (6 seconds) */
-  // In death-save-action.js, find the _createDyingEffect function and update it:
-
-async _createDyingEffect(actor, endurance, _unconsciousDuration) {
+  async _createDyingEffect(actor, endurance, _unconsciousDuration) {
     const scope = globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faserip";
 
-    // Remove any existing dying timers to avoid duplicates
+    // Remove any existing dying effects to avoid duplicates
     try {
-      const existing = actor.effects.filter(e => e.flags?.[scope]?.dyingTimer);
+      const existing = actor.effects.filter(e => e.flags?.[scope]?.isDying);
       if (existing.length) {
         await actor.deleteEmbeddedDocuments("ActiveEffect", existing.map(e => e.id));
       }
     } catch (_) {}
-
-    const usesCTT = game.modules.get("calendar-time-tracker")?.active === true;
 
     const effectData = {
       name: "Dying",
@@ -287,9 +283,10 @@ async _createDyingEffect(actor, endurance, _unconsciousDuration) {
       origin: actor.uuid,
       flags: {
         [scope]: {
-          dyingTimer: true,
           isDying: true,
-          originalEndurance: endurance.rank,  // ← ADD THIS LINE
+          originalEndurance: endurance.rank,
+          currentTempRank: endurance.rank,
+          turnsElapsed: 0,
           unitLabel: "turn",
           unitLabelPlural: "turns"
         }
@@ -297,10 +294,8 @@ async _createDyingEffect(actor, endurance, _unconsciousDuration) {
       changes: [
         { key: "system.status.dying", mode: CONST.ACTIVE_EFFECT_MODES.OVERRIDE, value: true }
       ],
-      statuses: ["dying"],
-      duration: usesCTT
-        ? { seconds: 6, startTime: game.time.worldTime }
-        : { rounds: 1, startRound: game.combat?.round }
+      statuses: ["dying"]
+      // NO DURATION - persists until manually removed
     };
 
     await actor.createEmbeddedDocuments("ActiveEffect", [effectData]);
@@ -308,20 +303,20 @@ async _createDyingEffect(actor, endurance, _unconsciousDuration) {
 
   /** Create an UNCONSCIOUS effect for non-dying outcomes (N rounds) */
   async _createStunnedEffect(actor, unconsciousRounds = 1) {
-    //console.log("DEBUG: _createStunnedEffect called", {actor: actor.name, rounds: unconsciousRounds});
-    
     const scope = globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faserip";
-    const usesCTT = game.modules.get("calendar-time-tracker")?.active === true;
+    
+    // Check the SETTING, not just if module exists
+    const cttSyncMode = game.settings.get("msh-faserip", "ctt.syncMode");
+    const usesCTT = (cttSyncMode !== "off" && game.modules.get("calendar-time-tracker")?.active === true);
 
-    // Clean up any old unconscious effects we own (optional, but tidy)
+    // Clean up any old unconscious effects
     try {
       const existing = actor.effects.filter(e => e.statuses?.has?.("unconscious"));
       if (existing.length) {
-        console.log("DEBUG: Deleting existing unconscious effects", existing.length);
         await actor.deleteEmbeddedDocuments("ActiveEffect", existing.map(e => e.id));
       }
     } catch (err) {
-      console.error("DEBUG: Error deleting existing effects", err);
+      console.error("Error deleting existing effects", err);
     }
 
     const effectData = {
@@ -330,8 +325,8 @@ async _createDyingEffect(actor, endurance, _unconsciousDuration) {
       origin: actor.uuid,
       flags: {
         [scope]: {
-          isStunned: true,           // if this exists already
-          fromDeathSave: true,        // ADD THIS
+          isStunned: true,
+          fromDeathSave: true,
           unitLabel: "turn",
           unitLabelPlural: "turns"
         }
@@ -341,15 +336,8 @@ async _createDyingEffect(actor, endurance, _unconsciousDuration) {
         ? { seconds: Math.max(1, Number(unconsciousRounds)) * 6, startTime: game.time.worldTime }
         : { rounds: Math.max(1, Number(unconsciousRounds)), startRound: game.combat?.round || 0 }
     };
-
-    //console.log("DEBUG: About to create effect", effectData);
     
-    try {
-      const created = await actor.createEmbeddedDocuments("ActiveEffect", [effectData]);
-      //console.log("DEBUG: Effect created successfully", created);
-    } catch (err) {
-      console.error("DEBUG: Effect creation failed", err);
-    }
+    await actor.createEmbeddedDocuments("ActiveEffect", [effectData]);
     
     ui.notifications.info(`Stunned effect created for ${actor.name} (${unconsciousRounds} rounds).`);
   }

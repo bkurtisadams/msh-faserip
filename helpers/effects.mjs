@@ -76,14 +76,23 @@ export function buildDyingEffect(actor, { rounds } = {}) {
     }
   };
 
-  // If a number of "rounds" was passed, convert to seconds (FASERIP: 1 turn = 6s)
+  // If a number of "rounds" was passed, convert to seconds only if CTT sync is enabled
   if (Number.isFinite(rounds)) {
-    const te = game.modules.get('calendar-time-tracker')?.api?.timeEngine;
-    const secPerTurn = (te && typeof te.convertToSeconds === 'function')
-      ? te.convertToSeconds(1, 'turn')
-      : 6;
-    const seconds = Math.max(0, Math.floor(rounds * secPerTurn));
-    data.duration = { seconds };
+    const cttSyncMode = game.settings.get("msh-faserip", "ctt.syncMode");
+    const useCTT = (cttSyncMode !== "off" && game.modules.get("calendar-time-tracker")?.active === true);
+    
+    if (useCTT) {
+      // CTT sync enabled: convert to seconds
+      const te = game.modules.get('calendar-time-tracker')?.api?.timeEngine;
+      const secPerTurn = (te && typeof te.convertToSeconds === 'function')
+        ? te.convertToSeconds(1, 'turn')
+        : 6;
+      const seconds = Math.max(0, Math.floor(rounds * secPerTurn));
+      data.duration = { seconds, startTime: game.time.worldTime };
+    } else {
+      // CTT sync disabled: keep as rounds
+      data.duration = { rounds, startRound: game.combat?.round || 0 };
+    }
   }
 
   return data;

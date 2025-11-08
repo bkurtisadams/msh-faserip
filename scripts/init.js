@@ -102,11 +102,34 @@ Hooks.once("init", async () => {
 
   // Initialize the game.msh namespace early
   game.msh = game.msh || {};
+
   game.msh.playCombatSFX = playCombatSFX;
 
   game.msh.FaseripActorSheet = FaseripActorSheet;
 
   CONFIG.FASERIP = CONFIG.FASERIP || {};
+
+  game.msh.getCampaignDateTime = function() {
+    const startDate = new Date(game.settings.get("msh-faserip", "campaignStartDate"));
+    const startWorldTime = game.settings.get("msh-faserip", "campaignStartWorldTime");
+    const currentWorldTime = game.time.worldTime;
+    
+    const elapsedSeconds = Math.floor((currentWorldTime - startWorldTime) / 1000);
+    const currentDate = new Date(startDate.getTime() + (elapsedSeconds * 1000));
+    
+    return {
+      date: currentDate,
+      formatted: currentDate.toLocaleString("en-US", {
+        year: "numeric",
+        month: "long", 
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit"
+      }),
+      elapsedSeconds
+    };
+  };
 
   game.settings.register("msh-faserip", "combatMode", {
     name: "Combat Mode",
@@ -423,16 +446,16 @@ Hooks.once("init", async () => {
   // Time Tracking Settings
   game.settings.register("msh-faserip", "campaignStartDate", {
     name: "Campaign Start Date",
-    hint: "The starting date/time for the campaign",
+    hint: "The starting date/time for the campaign (e.g., 1976-01-01T00:00:00)",
     scope: "world",
     config: false,
     type: String,
     default: "1976-01-01T00:00:00"
   });
 
-  game.settings.register("msh-faserip", "elapsedSeconds", {
-    name: "Elapsed Seconds",
-    hint: "Total seconds elapsed since campaign start",
+  game.settings.register("msh-faserip", "campaignStartWorldTime", {
+    name: "Campaign Start World Time",
+    hint: "The Foundry worldTime when campaign began",
     scope: "world",
     config: false,
     type: Number,
@@ -441,17 +464,16 @@ Hooks.once("init", async () => {
 
   game.settings.register("msh-faserip", "combatSyncEnabled", {
     name: "Combat Sync Enabled",
-    hint: "Auto-sync time with combat tracker",
+    hint: "Auto-advance campaign time with combat tracker",
     scope: "world",
     config: false,
     type: Boolean,
     default: true
   });
 
-  // Combat Logs Settings
+  // Combat Logs Settings (unchanged)
   game.settings.register("msh-faserip", "combatLogs", {
     name: "Combat Logs",
-    hint: "Array of combat log entries",
     scope: "world",
     config: false,
     type: Array,
@@ -460,7 +482,6 @@ Hooks.once("init", async () => {
 
   game.settings.register("msh-faserip", "autoLogCombat", {
     name: "Auto-Log Combat",
-    hint: "Automatically create log entries when combat ends",
     scope: "world",
     config: false,
     type: Boolean,
@@ -1220,8 +1241,14 @@ Hooks.on('preUpdateActor', (actor, updateData, options, userId) => {
 
 // Process damage and start timers
 Hooks.on('updateActor', async (actor, updateData, options, userId) => {
-  // ===== ADD THIS CHECK FIRST =====
-  // Check for flagged damage to 0 HP target
+  if (!options.healthChange) return;
+  
+  const { old: oldHealth, new: newHealth } = options.healthChange;
+  
+  // Process damage OR if at/below 0 HP (for repeated attacks on unconscious characters)
+  if (newHealth >= oldHealth && newHealth > 0) return;
+
+  // ===== CHECK FOR FLAGGED DAMAGE TO 0 HP TARGET =====
   const pendingDamage = game.msh._pendingDamageToZeroHP?.[actor.id];
   if (pendingDamage && (Date.now() - pendingDamage.timestamp) < 1000) {
     console.log("FASERIP | Detected damage to 0 HP target - forcing death save");
@@ -1247,22 +1274,6 @@ Hooks.on('updateActor', async (actor, updateData, options, userId) => {
       });
     }
     return; // Exit early - don't process as normal damage
-  }
-  // ===== END NEW CHECK =====
-  
-  if (!options.healthChange) return;
-  
-  const { old: oldHealth, new: newHealth } = options.healthChange;
-  
-  // Process damage OR if at/below 0 HP (for repeated attacks on unconscious characters)
-  if (newHealth >= oldHealth && newHealth > 0) return;
-
-  // Respect setting: skip auto Recovery/Healing timers
-  if (!game.settings.get("msh-faserip", "effects.autoDamageTimers")) {
-    if (game.settings.get("msh-faserip", "debugMode")) {
-      console.log("FASERIP | Auto damage timers disabled");
-    }
-    return;
   }
 
   // Throttle repeated damage timer creation per actor (1.5s)
@@ -1299,17 +1310,12 @@ Hooks.on('updateActor', async (actor, updateData, options, userId) => {
   
   try {
     const currentHealth = Number(newHealth ?? 0);
-    const maxHealth = Number(actor.system?.attributes?.health?.max ?? 0);
-    const enduranceValue = Number(actor.system?.abilities?.endurance?.value ?? 10);
 
     // === GAME RULE: Check if at/below 0 HP ===
     if (currentHealth <= 0) {
       console.log(`⚠️ FASERIP | ${actor.name} is at ${currentHealth} HP - triggering death save`);
-      
-      console.log(`⚠️ FASERIP | ${actor.name} is at ${currentHealth} HP - triggering death save`);
 
       // Auto-trigger death save in full mode
-      //const mode = game.msh?.resolveCombatMode?.(actor) || "manual";
       const mode = resolveCombatMode(actor) || "manual";
       console.log("FASERIP DEBUG | Combat mode resolved to:", mode);
 
@@ -1337,8 +1343,8 @@ Hooks.on('updateActor', async (actor, updateData, options, userId) => {
       // Death save handles unconsciousness/dying effects
       console.log("FASERIP | At 0 HP - death save will handle effects");
       
-   } else {
-     // === GAME RULE: Above 0 HP - record damage for rest system ===
+    } else {
+      // === GAME RULE: Above 0 HP - record damage for rest system ===
       console.log("FASERIP | Above 0 HP - recording damage for rest eligibility");
 
       // Flag-based rest system (rest-system.js) handles recovery/healing
@@ -1456,7 +1462,7 @@ Hooks.on("updateCombat", async (combat, changed, diff, userId) => {
   }
 
   // FASERIP Time Tracker sync
-  if (game.user.isGM) {
+  /* if (game.user.isGM) {
     const syncEnabled = game.settings.get("msh-faserip", "combatSyncEnabled");
     if (syncEnabled && ("turn" in changed || "round" in changed)) {
       let secondsChange = 0;
@@ -1484,7 +1490,22 @@ Hooks.on("updateCombat", async (combat, changed, diff, userId) => {
         Hooks.callAll("msh-faserip.timeUpdated", newElapsed);
       }
     }
-  }
+  } */
+
+  // FASERIP Combat Sync - Use combatRound hook (fires once per round)
+  Hooks.on("combatRound", async (combat, updateData, updateOptions) => {
+    if (!game.user.isGM) return;
+    
+    const syncEnabled = game.settings.get("msh-faserip", "combatSyncEnabled");
+    if (!syncEnabled) return;
+    
+    // Advance Foundry world time by 6 seconds (1 FASERIP turn)
+    await game.time.advance(6);
+    console.log("🕐 FASERIP | Combat advanced time by 6 seconds");
+    
+    // Trigger hook to update team sheet display
+    Hooks.callAll("msh-faserip.timeUpdated");
+  });
 
   const scope = globalThis.MSH_FLAG_SCOPE || "msh-faserip";
   console.log("🔍 FASERIP | Checking all combatants for Dying effects...");

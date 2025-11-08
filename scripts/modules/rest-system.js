@@ -514,11 +514,12 @@ static async attemptRegainConsciousness(actor) {
       flags: {
         [SCOPE]: {
           isStunned: true,
-          fromStabilization: true
+          fromDeathSave: true,      // ← Changed from fromStabilization
+          fromStabilization: true   // ← Keep this too for tracking
         }
       },
       duration: {
-        rounds: hours * 600, // 600 rounds per hour
+        rounds: hours * 600,
         startRound: game.combat?.round || 0
       }
     };
