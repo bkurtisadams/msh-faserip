@@ -1031,8 +1031,15 @@ export class FaseripRolls {
 
       // Get the result text - if action type doesn't have specific results, use color names
       let resultText = "";
-      if (getActionResults(actionType)) {
+      /* if (getActionResults(actionType)) {
         resultText = getActionResults(actionType)[resultColor.toLowerCase()];
+      } else {
+        resultText = resultColor.toUpperCase();
+      } */
+      // Get the result text - if action type doesn't have specific results, use color names
+      
+      if (ACTIONS[actionType]) {
+        resultText = ACTIONS[actionType][resultColor.toLowerCase()];
       } else {
         resultText = resultColor.toUpperCase();
       }
