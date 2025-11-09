@@ -208,6 +208,8 @@ export class CheckAction extends BaseAction {
           const customEffectName = this?.opts?.effectName;
           const customFailMessage = this?.opts?.failMessage;
           const powerName = this?.opts?.powerName || "Mental Power";
+          const saveAbility = this.abilityName || "psyche";
+          const saveAbilityUpper = saveAbility.toUpperCase();
 
           if (customEffectName && colorLower === "white") {
             // Custom mental power effect (e.g., Psionic Attack → Unconscious)
@@ -220,33 +222,44 @@ export class CheckAction extends BaseAction {
             });
             
             // Create custom effect
-            const cttSyncMode = game.settings.get("msh-faserip", "ctt.syncMode");
-            const cttActive   = (cttSyncMode !== "off" && game.modules.get("calendar-time-tracker")?.active === true);
-            const te          = game.modules.get("calendar-time-tracker")?.api?.timeEngine;
-            const secPerTurn  = (te && typeof te.convertToSeconds === "function") ? te.convertToSeconds(1, "turn") : 6;
-
-            const effectDuration = cttActive
-              ? { seconds: Math.max(0, duration * secPerTurn), startTime: game.time.worldTime }
-              : { rounds: duration, startRound: game.combat?.round || 0 };
-
-            await saveActor.createEmbeddedDocuments("ActiveEffect", [{
+            await Effects.applyEffect(saveActor, {
               name: customEffectName,
-              icon: "icons/svg/unconscious.svg",
-              duration: effectDuration,
+              img: "icons/svg/unconscious.svg",
+              rounds: duration,
+              originUuid: actor.uuid,
               flags: {
                 "msh-faserip": {
                   type: "mental-power",
                   powerName: powerName,
                   sourceUuid: actor.uuid
+                },
+                meta: {
+                  unitLabel: "round",
+                  unitLabelPlural: "rounds"
                 }
               }
-            }]);
+            });
             
             // Chat message
-            await ChatMessage.create({
-              speaker: ChatMessage.getSpeaker({ actor }),
-              content: `<p><strong>${targetName}</strong> is ${customFailMessage} (${duration} rounds)</p>`
-            });
+            // Chat message with color-coded result
+        const { bg, fg } = bannerColors("white");
+        await ChatMessage.create({
+          speaker: ChatMessage.getSpeaker({ actor: saveActor }),
+          content: `
+            <div style="border:1px solid #d32f2f;border-radius:4px;background:#fff;">
+              <div style="padding:8px 10px;border-bottom:1px solid #ffcdd2;">
+                <div style="color:#c62828;font-weight:700;">${targetName} — ${saveAbilityUpper} FEAT Failed</div>
+              </div>
+              <div style="padding:8px 10px;">
+                <div><strong>Roll:</strong> WHITE (failed)</div>
+                <div><strong>Result:</strong> ${customFailMessage} for ${duration} rounds</div>
+              </div>
+              <div style="text-align:center;padding:8px;margin:6px;background:${bg};color:${fg};font-weight:700;border-radius:4px;">
+                ${customEffectName.toUpperCase()} (${duration} ROUNDS)
+              </div>
+            </div>
+          `
+        });
           } else if (customEffectName) {
             // Custom power but save succeeded - no effect
             await ChatMessage.create({
