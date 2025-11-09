@@ -121,6 +121,7 @@ export class FaseripActorSheet extends ActorSheet {
     const actorData = this.actor.toObject(false);
 
     context.system = actorData.system;
+    context.flags = this.actor.flags;
 
     // Get items sorted by type for display in the template
     context.powers = this.actor.items.filter(item => item.type === "power") || [];
@@ -341,6 +342,92 @@ export class FaseripActorSheet extends ActorSheet {
         sheet.render(true);
       });
     });
+    // Recovery & Rest Button Handlers
+    html.find('.recovery-btn').click(async (event) => {
+      event.preventDefault();
+      const button = $(event.currentTarget);
+      const action = button.data('action');
+      
+      // Check if rest system is available
+      if (!game.msh?.rest) {
+        ui.notifications.error("Rest system not initialized!");
+        return;
+      }
+      
+      switch(action) {
+        case 'recovery':
+          await game.msh.rest.attemptRecovery(this.actor);
+          break;
+          
+        case 'healing':
+          await game.msh.rest.attemptHealing(this.actor);
+          break;
+          
+        case 'medical-care':
+          const currentCare = this.actor.getFlag('msh-faserip', 'medicalCare') || false;
+          await game.msh.rest.setMedicalCare(this.actor, !currentCare);
+          this.render(false);
+          break;
+          
+        case 'wake-up':
+          await game.msh.rest.attemptRegainConsciousness(this.actor);
+          break;
+          
+        case 'stabilize':
+          // Check if dying
+          const scope = "msh-faserip";
+          const dyingEffect = this.actor.effects.find(e => 
+            e.getFlag(scope, "isDying") || e.statuses?.has?.("dying")
+          );
+          
+          if (!dyingEffect) {
+            ui.notifications.warn(`${this.actor.name} is not dying`);
+            return;
+          }
+          
+          // Show stabilization options dialog
+          new Dialog({
+            title: `Stabilize ${this.actor.name}`,
+            content: `
+              <div style="padding:8px;">
+                <p><strong>${this.actor.name}</strong> is dying!</p>
+                <p>Choose stabilization method:</p>
+              </div>
+            `,
+            buttons: {
+              karma50: {
+                label: "50 Karma (1 round pause)",
+                callback: async () => {
+                  await dyingEffect.setFlag(scope, "stabilizedRounds", 1);
+                  ChatMessage.create({
+                    content: `<p style="color:#ff9800;"><strong>${this.actor.name}</strong> stabilized for 1 round (50 Karma spent)!</p>`
+                  });
+                  ui.notifications.info(`${this.actor.name} stabilized for 1 round`);
+                }
+              },
+              karma200: {
+                label: "200 Karma + FEAT",
+                callback: async () => {
+                  ui.notifications.info("Roll Endurance FEAT manually - success = stabilized");
+                }
+              },
+              aid: {
+                label: "Aid/First Aid (permanent)",
+                callback: async () => {
+                  await game.msh.rest.stabilizeDying(this.actor);
+                }
+              },
+              cancel: {
+                label: "Cancel",
+                callback: () => {}
+              }
+            },
+            default: "aid"
+          }).render(true);
+          break;
+      }
+    });
+
 
     // Debug resistances data structure
     console.log("Actor resistances on sheet load:", this.actor.system.resistances);

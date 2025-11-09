@@ -532,7 +532,7 @@
       </div>
     </div>
 
-    <!-- POPULARITY -->
+<!-- POPULARITY -->
     <div class="sec-col popularity">
       <div class="sec-head">
         <button type="button"
@@ -555,8 +555,39 @@
         </div>
       </div>
     </div>
-  </div>
-</div>
+  </div> <!-- closes sec-grid -->
+  
+      <!-- Recovery & Rest Section -->
+      <div class="recovery-rest-section">
+        <div class="recovery-header">
+          <span>RECOVERY & REST</span>
+        </div>
+        <div class="recovery-buttons">
+          <div class="recovery-row">
+            <button type="button" class="recovery-btn" data-action="recovery" title="Attempt Recovery (10 rounds)&#10;Regain Health equal to Endurance rank">
+              <i class="fas fa-clock"></i> Recovery (10 rnd)
+            </button>
+            <button type="button" class="recovery-btn" data-action="healing" title="Attempt Healing (1 hour)&#10;Regain Health equal to Endurance rank">
+              <i class="fas fa-heart"></i> Healing (1 hr)
+            </button>
+            <button type="button" class="recovery-btn medical-toggle {{#if flags.msh-faserip.medicalCare}}active{{/if}}" 
+                    data-action="medical-care" 
+                    title="Toggle Medical Care&#10;Doubles healing rate when active">
+              <i class="fas fa-hospital"></i> Medical: {{#if flags.msh-faserip.medicalCare}}ON{{else}}OFF{{/if}}
+            </button>
+          </div>
+          <div class="recovery-row">
+            <button type="button" class="recovery-btn crisis-btn" data-action="wake-up" title="Attempt to Regain Consciousness&#10;Only available at 0 HP">
+              <i class="fas fa-eye"></i> Wake Up (0 HP)
+            </button>
+            <button type="button" class="recovery-btn crisis-btn" data-action="stabilize" title="Stabilize Dying Character&#10;Only available when dying">
+              <i class="fas fa-medkit"></i> Stabilize Dying
+            </button>
+          </div>
+        </div>
+      </div>
+
+</div> <!-- closes secondary-abilities -->
  <!-- end of ability section -->
 
       <!-- ADD: movement as its own panel spanning both columns -->
