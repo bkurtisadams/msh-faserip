@@ -502,7 +502,7 @@ export function installActionChatHandlers() {
         prefill.targetUuid    = t.actor?.uuid ?? "";
         prefill.targetEndRank = t.actor?.system?.abilities?.[ability]?.rank || "Good";
         prefill.dmgThrough    = 0;      // saves don't require penetrating damage
-        prefill.attackForm    = "energy";
+        prefill.attackForm    = "mental";
       }
 
       await ActionDispatcher.roll("save-nullify", {

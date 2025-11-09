@@ -1,6 +1,8 @@
 // scripts/modules/actions/nullify.js
 // Foundry v13 helpers for the Nullification power (ES module)
 
+import { applyEffect } from "../effects/effect-engine.js";
+
 export const RANKS = [
   "Shift-0","Feeble","Poor","Typical","Good","Excellent","Remarkable","Incredible","Amazing",
   "Monstrous","Unearthly","Shift-X","Shift-Y","Shift-Z","Class 1000","Class 3000","Class 5000","Beyond"
@@ -41,20 +43,30 @@ export function meetsThreshold(rolledColor, requiredColor) {
 }
 
 export async function applyNullifiedEffect(targetActor, { maintained=false, originUuid=null, rounds=null } = {}) {
-  const f = {}; f[scope()] = { status: { nullified: true } };
-  let duration = {};
-  if (!maintained) {
-    const roll = await (new Roll("1d10")).evaluate();
-    const rollTotal = roll?.total ?? 10;
-    const r = (rounds ?? rollTotal) ?? 10; // TS-friendly—no ?? mixed with ||
-    duration = { rounds: r, startRound: game.combat?.round ?? 0, startTime: game.time.worldTime };
+  // Use effect-engine for proper duration handling
+  if (maintained) {
+    // Maintained aura = no duration (infinite until concentration broken)
+    const f = {}; f[scope()] = { status: { nullified: true } };
+    return applyEffect(targetActor, {
+      name: "Nullified (Maintained)",
+      img: "icons/svg/silenced.svg",
+      originUuid,
+      flags: f
+    });
   }
-  const effect = {
-    name: "Nullified", icon: "icons/svg/silenced.svg",
-    origin: originUuid, disabled: false, duration, flags: f
-  };
-  await targetActor.createEmbeddedDocuments("ActiveEffect", [effect]);
-  return effect;
+  
+  // Temporary nullification = roll 1d10 for rounds
+  const roll = await (new Roll("1d10")).evaluate();
+  const r = rounds ?? roll.total ?? 10;
+  
+  const f = {}; f[scope()] = { status: { nullified: true } };
+  return applyEffect(targetActor, {
+    name: "Nullified",
+    img: "icons/svg/silenced.svg",
+    rounds: r,  // Let effect-engine handle conversion to proper duration
+    originUuid,
+    flags: f
+  });
 }
 
 /** Resolve save & apply effect on failure for a single target. */

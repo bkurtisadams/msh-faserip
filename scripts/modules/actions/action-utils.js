@@ -523,11 +523,9 @@ export function buildActionsBox({
       ? `${base}background:#fff;color:#333;cursor:pointer;`
         : `${base}background:#f7f7f7;color:#333;cursor:not-allowed;opacity:.55;filter:grayscale(.3);pointer-events:none;`;
     const key = label.toLowerCase().replace(/\s+/g, "-");
-// If caller already supplied a data-action, don't add the default.
-const hasActionAttr = /\bdata-action\s*=/.test(dataAttrs);
-const actionAttr = hasActionAttr ? "" : `data-action="${key}"`;
-return `<a class="faserip-chip" ${actionAttr} ${dataAttrs} ${enabled ? "" : 'aria-disabled="true"'} title="${title}" style="${style}">${label}</a>`;
-
+    const hasActionAttr = /\bdata-action\s*=/.test(dataAttrs);
+    const actionAttr = hasActionAttr ? "" : `data-action="${key}"`;
+    return `<a class="faserip-chip" ${actionAttr} ${dataAttrs} ${enabled ? "" : 'aria-disabled="true"'} title="${title}" style="${style}">${label}</a>`;
   };
 
   const parts = [];

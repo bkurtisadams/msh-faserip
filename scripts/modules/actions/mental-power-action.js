@@ -164,14 +164,18 @@ export class MentalPowerAction extends BaseAction {
     const actionsHtml = buildActionsBox({
       showNullifySave: requiresSave,
       nullifyIntensityRank: powerRank,
-      saveAbility: saveAbility,  // NEW: Pass the save ability (psyche for mental powers)
+      saveAbility: saveAbility,
       actorUuid: actor.uuid,
       targetUuid: target.document?.uuid || target.actor?.uuid,
       targetName: targetName,
-      autoApply: false, // Mental powers don't apply damage
-      autoSave: isFinalAuto, // Hide save button in full auto
+      autoApply: false,
+      autoSave: isFinalAuto,     // Hide button in full auto
       attackForm: "mental"
-    });
+      });
+
+      // Render nothing in full-auto (prevents disabled/hidden chip from confusing hooks)
+      const renderedActionsHtml = actionsHtml;  // Always show, but button will be disabled
+
     console.log("Mental Power Action - Action buttons HTML length:", actionsHtml.length);
     console.log("Mental Power Action - Action buttons HTML:", actionsHtml);
 
@@ -218,7 +222,7 @@ const cardHtml = `
 
     <!-- Action chips (Force Save, etc.) -->
     <div style="padding:8px 10px 10px 10px;">
-      ${actionsHtml}
+      ${renderedActionsHtml}
     </div>
   </div>
 `;
@@ -227,23 +231,55 @@ const cardHtml = `
 
     // Build message flags for auto-save
     console.log("Mental Power Action - Building message flags...");
+    const nameLc = (powerName || "").toLowerCase();
+    let effectName   = item.system?.save?.onFail?.effectName || null;
+    let failMessage  = item.system?.save?.onFail?.message     || null;
+    let abilityLabel = saveAbility;
+    let intensity    = item.system?.save?.intensity || "power-rank";
+    let fixedRank    = item.system?.save?.fixedRank || powerRank;
+
+    // Sensible defaults per common mental powers
+    if (!effectName) {
+      if (nameLc.includes("psionic attack")) {
+        effectName   = "Unconscious";
+        failMessage  = "is knocked unconscious";
+        abilityLabel = "psyche";
+      } else if (nameLc.includes("mind control") || nameLc.includes("possession")) {
+        effectName   = "Controlled";
+        failMessage  = "falls under psychic control";
+        abilityLabel = "psyche";
+      } else if (nameLc.includes("emotion control")) {
+        effectName   = "Emotion Controlled";
+        failMessage  = "is overwhelmed by emotion";
+        abilityLabel = "intuition";
+      } else if (nameLc.includes("mental probe")) {
+        effectName   = "Mentally Fatigued";
+        failMessage  = "suffers mental strain";
+        abilityLabel = "psyche";
+      } else if (nameLc.includes("nullif")) {
+        effectName   = "Nullified";
+        failMessage  = "has powers nullified";
+      }
+    }
+
+    const defenderUuid = target.document?.uuid || target.actor?.uuid;
+
     const msgFlags = {
       "msh-faserip": {
         actionId: "mental-power",
-        powerName: powerName,
-        powerRank: powerRank,
-        powerValue: powerValue,
-        requiresSave: requiresSave,
-        saveAbility: saveAbility,
-        saveIntensity: saveIntensity,
-        saveFixedRank: saveFixedRank,
-        effectName: item.system.save?.onFail?.effectName || null,
-        failMessage: item.system.save?.onFail?.message || null,
-        powerName: powerName,
-        targetUuid: target.document?.uuid || target.actor?.uuid,
-        defenderUuid: target.document?.uuid || target.actor?.uuid,
+        powerName,
+        powerRank,
+        powerValue,
+        requiresSave: requiresSave === true,
+        attackerUuid: actor.uuid,
+        targetUuid: defenderUuid,
+        defenderUuid,
+        saveAbility: abilityLabel,
+        saveIntensity: intensity,
+        saveFixedRank: fixedRank,
+        effectName,
+        failMessage,
         itemId: item.id,
-        // Include save configuration from power
         saveConfig: item.system.save || {}
       }
     };

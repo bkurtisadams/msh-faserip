@@ -220,10 +220,19 @@ export class CheckAction extends BaseAction {
             });
             
             // Create custom effect
+            const cttSyncMode = game.settings.get("msh-faserip", "ctt.syncMode");
+            const cttActive   = (cttSyncMode !== "off" && game.modules.get("calendar-time-tracker")?.active === true);
+            const te          = game.modules.get("calendar-time-tracker")?.api?.timeEngine;
+            const secPerTurn  = (te && typeof te.convertToSeconds === "function") ? te.convertToSeconds(1, "turn") : 6;
+
+            const effectDuration = cttActive
+              ? { seconds: Math.max(0, duration * secPerTurn), startTime: game.time.worldTime }
+              : { rounds: duration, startRound: game.combat?.round || 0 };
+
             await saveActor.createEmbeddedDocuments("ActiveEffect", [{
               name: customEffectName,
               icon: "icons/svg/unconscious.svg",
-              duration: { rounds: duration },
+              duration: effectDuration,
               flags: {
                 "msh-faserip": {
                   type: "mental-power",
