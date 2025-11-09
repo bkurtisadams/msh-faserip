@@ -1100,7 +1100,7 @@ export class FaseripActorSheet extends ActorSheet {
         type: CONST.CHAT_MESSAGE_TYPES.OTHER
       });
     });
-    
+
     // Edit power button - more specific selector
     html.find('.powers-table .item-edit').click(ev => {
       const li = $(ev.currentTarget).closest(".power-row");
@@ -1152,10 +1152,25 @@ export class FaseripActorSheet extends ActorSheet {
         return;
       }
 
-      // Import ActionDispatcher at top of file
+      // Import ActionDispatcher
       const { ActionDispatcher } = await import("./modules/actions/action-dispatcher.js");
       
-      // Determine action type based on power type
+      // Route based on power category
+      const category = item.system.category || "";
+      const requiresSave = item.system.requiresSave;
+      
+      // Mental powers skip to-hit and go straight to saves
+      if (category === "mentalPowers" || requiresSave) {
+        return ActionDispatcher.roll("mental-power", {
+          actor: this.actor,
+          opts: { 
+            itemId: item.id,
+            item: item
+          }
+        });
+      }
+      
+      // Distance attacks use energy/force actions
       const actionType = item.system.attackType === "force" ? "force" : "energy";
       
       return ActionDispatcher.roll(actionType, {
@@ -1163,7 +1178,7 @@ export class FaseripActorSheet extends ActorSheet {
         abilityName: "agility", // Powers use Agility
         opts: { 
           itemId: item.id,
-          item: item // Pass the item for power-specific data
+          item: item
         }
       });
     });

@@ -15,6 +15,7 @@ import { EscapingAction } from "./escaping-action.js";
 import { DeathSaveAction } from "./death-save-action.js";
 import { ManualModeDialog } from "./manual-mode-dialog.js";
 import { debugLog } from "./action-utils.js";
+import { MentalPowerAction } from "./mental-power-action.js";
 
 // Anchor: mode resolver (safe even if settings not registered yet)
 export function resolveCombatMode(actor) {
@@ -128,7 +129,8 @@ const registry = {
   "slam":           CheckAction,
   "kill":           CheckAction,
   "save-nullify":   CheckAction,
-  "death-save":     DeathSaveAction
+  "death-save":     DeathSaveAction,
+  "mental-power":   MentalPowerAction
 };
 
 export class ActionDispatcher {

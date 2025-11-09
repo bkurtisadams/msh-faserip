@@ -194,6 +194,7 @@ export class CheckAction extends BaseAction {
       }
 
       // NULLIFY (NEVER damage-gated)
+      // NULLIFY / MENTAL POWER SAVE (NEVER damage-gated)
       if (isSaveNullify) {
         // Prefer the targeted Token's synthetic actor (handles unlinked tokens)
         const saveActor = await this._resolveTokenActor(defenderUuid || (this.opts?.prefill?.targetUuid || ""));
@@ -203,12 +204,55 @@ export class CheckAction extends BaseAction {
           if (this?.opts?.powerRankName) intensityRank = this.opts.powerRankName;
           if (this?.opts?.intensity === "fixed-rank" && this?.opts?.fixedRank) intensityRank = this.opts.fixedRank;
 
-          await Nullify.resolveAndApply(actor, saveActor, {
-            endRank,
-            intensityRank,
-            rolledColor: colorLower,
-            originUuid: this?.opts?.originUuid ?? null
-          });
+          // Check if this is a custom mental power (not nullification)
+          const customEffectName = this?.opts?.effectName;
+          const customFailMessage = this?.opts?.failMessage;
+          const powerName = this?.opts?.powerName || "Mental Power";
+
+          if (customEffectName && colorLower === "white") {
+            // Custom mental power effect (e.g., Psionic Attack → Unconscious)
+            const d = new Roll("1d10");
+            await d.evaluate();
+            const duration = d.total;
+            await d.toMessage({
+              speaker: ChatMessage.getSpeaker({ actor }),
+              flavor: `${targetName} ${customEffectName} Duration (1d10)`
+            });
+            
+            // Create custom effect
+            await saveActor.createEmbeddedDocuments("ActiveEffect", [{
+              name: customEffectName,
+              icon: "icons/svg/unconscious.svg",
+              duration: { rounds: duration },
+              flags: {
+                "msh-faserip": {
+                  type: "mental-power",
+                  powerName: powerName,
+                  sourceUuid: actor.uuid
+                }
+              }
+            }]);
+            
+            // Chat message
+            await ChatMessage.create({
+              speaker: ChatMessage.getSpeaker({ actor }),
+              content: `<p><strong>${targetName}</strong> is ${customFailMessage} (${duration} rounds)</p>`
+            });
+          } else if (customEffectName) {
+            // Custom power but save succeeded - no effect
+            await ChatMessage.create({
+              speaker: ChatMessage.getSpeaker({ actor }),
+              content: `<p><strong>${targetName}</strong> resisted ${powerName}!</p>`
+            });
+          } else {
+            // Standard Nullification
+            await Nullify.resolveAndApply(actor, saveActor, {
+              endRank,
+              intensityRank,
+              rolledColor: colorLower,
+              originUuid: this?.opts?.originUuid ?? null
+            });
+          }
         }
       }
 

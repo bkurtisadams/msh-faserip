@@ -138,11 +138,14 @@ export function installActionChatHandlers() {
             if (saveActor && resolveCombatMode(saveActor) === "full") {
               await ActionDispatcher.roll("save-nullify", {
                 actor: saveActor,
+                abilityName: f.saveAbility || "endurance",
                 opts: {
-                  ability:   f.saveAbility   || "endurance",
                   intensity: f.saveIntensity || "power-rank",
                   fixedRank: f.saveFixedRank || "",
-                  autoApply: true
+                  autoApply: true,
+                  effectName: f.effectName,
+                  failMessage: f.failMessage,
+                  powerName: f.powerName
                 }
               });
             }
@@ -475,7 +478,7 @@ export function installActionChatHandlers() {
       const f = msg?.flags?.["msh-faserip"] || {};
       if (!f.requiresSave) return;
 
-      const ability    = f.saveAbility   || "endurance";
+      const ability    = btn.dataset.saveAbility || f.saveAbility || "endurance";
       const intensity  = f.saveIntensity || "power-rank"; // "power-rank" | "fixed-rank" | "none"
       const fixedRank  = f.saveFixedRank || "";
       const ignoreGate = (f.saveIgnoreGate !== false);
@@ -507,9 +510,12 @@ export function installActionChatHandlers() {
         abilityName: ability,
         opts: {
           prefill,
-          ignoreDamageGate: ignoreGate,  // key: saves apply even if no dmg penetrates
+          ignoreDamageGate: ignoreGate,
           intensity,
-          fixedRank
+          fixedRank,
+          effectName: f.effectName,
+          failMessage: f.failMessage,
+          powerName: f.powerName
         }
       });
 

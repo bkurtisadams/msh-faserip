@@ -496,6 +496,7 @@ export function buildActionsBox({
   showEscape = false,
   showNullifySave = false,
   nullifyIntensityRank = "",
+  saveAbility = "endurance",  // NEW: which ability to save against (endurance, psyche, etc.)
   pulled = false,
   breakingFeat = null,
   grabbingBreak = null,
@@ -522,7 +523,11 @@ export function buildActionsBox({
       ? `${base}background:#fff;color:#333;cursor:pointer;`
         : `${base}background:#f7f7f7;color:#333;cursor:not-allowed;opacity:.55;filter:grayscale(.3);pointer-events:none;`;
     const key = label.toLowerCase().replace(/\s+/g, "-");
-    return `<a class="faserip-chip" data-action="${key}" ${dataAttrs} ${enabled ? "" : 'aria-disabled="true"'} title="${title}" style="${style}">${label}</a>`;
+// If caller already supplied a data-action, don't add the default.
+const hasActionAttr = /\bdata-action\s*=/.test(dataAttrs);
+const actionAttr = hasActionAttr ? "" : `data-action="${key}"`;
+return `<a class="faserip-chip" ${actionAttr} ${dataAttrs} ${enabled ? "" : 'aria-disabled="true"'} title="${title}" style="${style}">${label}</a>`;
+
   };
 
   const parts = [];
@@ -644,20 +649,22 @@ export function buildActionsBox({
     );
   }
 
-    // Nullify: force Endurance save (single target)
+    // Nullify/Mental Power: force save (single target)
   if (showNullifySave) {
     const targetBits = [
       targetUuid ? `data-target-uuid="${targetUuid}"` : "",
       targetName ? `data-target-name="${targetName}"` : ""
     ].join(" ");
     const intensityAttr = nullifyIntensityRank ? `data-intensity-rank="${nullifyIntensityRank}"` : "";
+    const saveAttr = saveAbility ? `data-save-ability="${saveAbility}"` : "";
+    const saveAbilityUpper = saveAbility.toUpperCase();
     parts.push(
       chip(
-        "Force Nullify Save",
-        "Target makes an Endurance FEAT vs power intensity",
+        "Force Save",
+        `Target makes a ${saveAbilityUpper} FEAT vs power intensity`,
         //true,
-        !autoApply,
-        `data-action="force-save-nullify" data-attacker-uuid="${actorUuid}" ${targetBits} ${intensityAttr}`
+        !autoSave,
+        `data-action="force-save-nullify" data-attacker-uuid="${actorUuid}" ${targetBits} ${intensityAttr} ${saveAttr}`
       )
     );
   }
