@@ -467,3 +467,23 @@
   cursor: pointer;
   pointer-events: all;
 }
+
+/* Initial Columns Toggle Button */
+.initial-columns-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 4px;
+  color: #f8f4c5;
+  transition: color 0.2s;
+}
+
+.initial-columns-toggle:hover {
+  color: #333;
+}
+
+.initial-columns-toggle i {
+  pointer-events: none; /* Prevent icon from capturing clicks */
+  font-size: 14px;
+}

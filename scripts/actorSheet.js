@@ -204,6 +204,9 @@ export class FaseripActorSheet extends ActorSheet {
       }
     }
 
+    // Apply initial columns visibility preference
+    context.hideInitialColumns = this.actor.getFlag('msh-faserip', 'hideInitialColumns') || false;
+
     context.availableKarma = Math.max(0, lifetime - spent - advancement);
     return context;
   }
@@ -309,6 +312,13 @@ export class FaseripActorSheet extends ActorSheet {
     const $table = html.find('.primary-abilities .abilities-table');
     const $section = html.find('.abilities-section');
 
+    // Apply saved initial columns visibility state
+    const hideInitialColumns = this.actor.getFlag('msh-faserip', 'hideInitialColumns');
+    if (hideInitialColumns) {
+      $table.addClass('initial-hidden');
+      $section.addClass('initial-hidden');
+    }
+
     // Ctrl+click either "Initial" header (keep this existing functionality)
     html.find('.primary-abilities .abilities-table thead th.initial.toggle-header').on('click', ev => {
       if (!ev.ctrlKey) return;
@@ -316,24 +326,46 @@ export class FaseripActorSheet extends ActorSheet {
       $section.toggleClass('initial-hidden');
     });
 
-    // Add toggle functionality to universal table icon
-    html.find('.universal-roll-trigger').on('click', (event) => {
+    // Click the icon to toggle initial columns visibility
+    // Click the icon to toggle initial columns visibility
+html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (event) => {
+  console.log('=== INITIAL COLUMNS TOGGLE CLICKED ===');
+  console.log('Event:', event);
+  console.log('Target:', event.target);
+  console.log('CurrentTarget:', event.currentTarget);
+  
+  event.preventDefault();
+  event.stopPropagation();
+  event.stopImmediatePropagation();
+  
+  const wasHidden = $table.hasClass('initial-hidden');
+  console.log('Before toggle - Table has initial-hidden:', wasHidden);
+  console.log('Before toggle - Section has initial-hidden:', $section.hasClass('initial-hidden'));
+  
+  $table.toggleClass('initial-hidden');
+  $section.toggleClass('initial-hidden');
+  
+  const nowHidden = $table.hasClass('initial-hidden');
+  console.log('After toggle - Table has initial-hidden:', nowHidden);
+  console.log('After toggle - Section has initial-hidden:', $section.hasClass('initial-hidden'));
+  
+  // Save preference
+  this.actor.setFlag('msh-faserip', 'hideInitialColumns', nowHidden);
+  console.log('Flag saved:', nowHidden);
+  console.log('=== END TOGGLE ===\n');
+  
+  return false;
+});
+
+    // Universal Table tab - CTRL+click opens legacy dialog
+    html.find('a[data-tab="universal-table"]').on('click', (event) => {
       if (event.ctrlKey || event.metaKey) {
-        // CTRL+Click: Toggle initial columns
         event.preventDefault();
         event.stopPropagation();
-        event.stopImmediatePropagation(); // Stop ALL other handlers
-        
-        $table.toggleClass('initial-hidden');
-        $section.toggleClass('initial-hidden');
-        
-        // Optional: save preference
-        const isHidden = $table.hasClass('initial-hidden');
-        this.actor.setFlag('msh-faserip', 'hideInitialColumns', isHidden);
-        
-        return false; // Extra safety to stop propagation
+        game.msh.openUniversalTableDialog?.(this.actor);
+        return false;
       }
-      // Normal click: Let the default behavior happen
+      // Normal click: let Foundry handle tab switching
     });
 
     html.find('.open-team-tracker').click(ev => {
@@ -457,10 +489,10 @@ export class FaseripActorSheet extends ActorSheet {
     });
 
     // universal roll trigger listener
-    html.find('.universal-roll-trigger').click(ev => {
+    /* html.find('.universal-roll-trigger').click(ev => {
       ev.preventDefault();
       game.msh.openUniversalTableDialog?.(this.actor);
-    });
+    }); */
 
     // Make the universal roll trigger draggable for macros
     html.find('.universal-roll-trigger').each((i, el) => {
