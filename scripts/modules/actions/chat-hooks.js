@@ -49,6 +49,9 @@ export function installActionChatHandlers() {
     try {
       const alreadyChecks = message?.flags?.[SCOPE]?.autoChecksDone === true;
       if (!alreadyChecks) {
+        // Set flag immediately to prevent race condition (multiple renderChatMessage events)
+        await message.setFlag(SCOPE, "autoChecksDone", true);
+
         // Derive an "owner" actor (attacker or speaker)
         let ownerActor = null;
         try {
@@ -155,8 +158,6 @@ export function installActionChatHandlers() {
           if (deathBtns.length) {
             await ActionDispatcher.roll("death-save", { actor: ownerActor });
           }
-
-          await message.setFlag(SCOPE, "autoChecksDone", true); // idempotent guard
         }
       }
     } catch (err) {

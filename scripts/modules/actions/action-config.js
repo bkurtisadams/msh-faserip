@@ -42,7 +42,7 @@ export const ACTION_EFFECTS = {
   'stun':           { white:'1-10 rounds', green:'1 round', yellow:'No effect', red:'No effect' },
   'slam':           { white:'Grand Slam',  green:'1 area', yellow:'Stagger',    red:'No Slam' },
   'kill':           { white:'Endurance Loss', green:'E/S', yellow:'No effect',  red:'No effect' },
-  "save-nullify":   { white:  "Fail — powers nullified", green:  "Fail — powers nullified", yellow: "Partial — reduced/suppressed", red: "Success — no effect"}
+  "save-nullify":   { white:  "Fail — affected", green:  "Success — resisted", yellow: "Success — resisted", red: "Success — resisted"}
 };
 
 // config/action-info.js

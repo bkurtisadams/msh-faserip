@@ -260,12 +260,31 @@ export class CheckAction extends BaseAction {
             </div>
           `
         });
+            return; // Mental power effect applied, don't create standard card
           } else if (customEffectName) {
-            // Custom power but save succeeded - no effect
+            // Custom power but save succeeded - create proper result card
+            const effectText = mapping[colorLower] || `${colorLower} - Success`;
+            const { bg, fg } = bannerColors(colorLower);
+            
             await ChatMessage.create({
-              speaker: ChatMessage.getSpeaker({ actor }),
-              content: `<p><strong>${targetName}</strong> resisted ${powerName}!</p>`
+              speaker: ChatMessage.getSpeaker({ actor: saveActor }),
+              content: `
+                <div style="border:1px solid #4caf50;border-radius:4px;background:#fff;">
+                  <div style="padding:8px 10px;border-bottom:1px solid #81c784;">
+                    <div style="color:#2e7d32;font-weight:700;">${targetName} — ${saveAbilityUpper} FEAT</div>
+                  </div>
+                  <div style="padding:8px 10px;">
+                    <div><strong>Power:</strong> ${powerName}</div>
+                    <div><strong>Roll:</strong> ${colorLower.toUpperCase()}</div>
+                    <div><strong>Result:</strong> ${effectText}</div>
+                  </div>
+                  <div style="text-align:center;padding:8px;margin:6px;background:${bg};color:${fg};font-weight:700;border-radius:4px;">
+                    ${targetName.toUpperCase()} RESISTED!
+                  </div>
+                </div>
+              `
             });
+            return; // Mental power resisted, don't create standard card
           } else {
             // Standard Nullification
             await Nullify.resolveAndApply(actor, saveActor, {
@@ -274,6 +293,7 @@ export class CheckAction extends BaseAction {
               rolledColor: colorLower,
               originUuid: this?.opts?.originUuid ?? null
             });
+            return; // Nullify creates its own chat card, don't create standard card
           }
         }
       }
