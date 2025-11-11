@@ -3658,3 +3658,24 @@ form.faserip-sheet .recovery-btn:disabled:hover {
   border-color: #c0c0c0;
   box-shadow: none;
 }
+/* stack header + mini icon only for these two columns */
+.sec-col.resources .sec-head,
+.sec-col.popularity .sec-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+/* micro roll button */
+.mini-roll{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:18px;height:18px;padding:0;line-height:1;
+  border:1px solid var(--color-border,#b9b9b9);
+  border-radius:9999px;background:var(--color-bg,#f7f7f7);
+  cursor:pointer;
+}
+.mini-roll i{font-size:12px}
+.mini-roll:hover{filter:brightness(0.95)}
+.mini-roll:focus-visible{outline:2px solid var(--color-accent,#b30000);outline-offset:1px}
+

@@ -2586,6 +2586,24 @@ html.find('.headquarters-row').each((i, row) => {
         default: "roll"
       }).render(true);
     });
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    // Mini roll under RESOURCES: instant roll (ignore Ctrl/info)
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    html.on('click', '.resources-mini-roll', (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      this._onResourceRoll();
+    });
+
+    // Mini roll under POPULARITY: open the same dialog as the header
+    html.on('click', '.popularity-mini-roll', (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      // just trigger the existing header click so it builds the dialog
+      const col = $(ev.currentTarget).closest('.sec-col.popularity');
+      col.find('.popularity-header-button').trigger('click');
+    });
         
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Ability FEAT roll buttons
