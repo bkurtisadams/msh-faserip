@@ -26,6 +26,12 @@ import * as Effects from "./modules/effects/effect-engine.js";
 import { MSHVehicleActorSheet } from "./vehicle-actor-sheet.js";
 import { resolveCombatMode } from "./modules/actions/action-dispatcher.js";
 import { initRestSystem } from "./modules/rest-system.js";
+import { ACTIONS } from '../helpers/action-constants.js';
+
+// Helper to resolve ACTIONS from CONFIG (for macro compatibility)
+function getActions() {
+  return CONFIG?.MSHF?.ACTIONS || globalThis?.ACTIONS || {};
+}
 
 // Create global instance
 game.msh = game.msh || {};
@@ -108,6 +114,10 @@ Hooks.once("init", async () => {
   game.msh.FaseripActorSheet = FaseripActorSheet;
 
   CONFIG.FASERIP = CONFIG.FASERIP || {};
+
+  // Make ACTIONS available to macros via CONFIG
+  CONFIG.MSHF = CONFIG.MSHF || {};
+  CONFIG.MSHF.ACTIONS = ACTIONS;
 
   game.msh.getCampaignDateTime = function() {
     const startDate = new Date(game.settings.get("msh-faserip", "campaignStartDate"));
@@ -1850,7 +1860,32 @@ async function createFaseripItemMacro(data, slot) {
   if (!actor) return ui.notifications.error("No parent actor for item: ${item.name}");
 
   switch (item.type) {
-    case "power":     game.msh.rollPower(actor, item, { useDirectRoll: false }); break;
+    case "power": 
+      // Use ActionDispatcher for mental powers, old rollPower for others
+
+      // Normalize to new schema; keep legacy fallback just in case
+      const saveAbility = item.system?.save?.ability ?? item.system?.saveAbility ?? null;
+      const damageType  = item.system?.damageType ?? null;
+      const category    = item.system?.category ?? null;
+
+      const isMental =
+        (saveAbility === "psyche" || saveAbility === "intuition") ||
+        (damageType === "mental") ||
+        (category === "mental");
+
+      if (isMental) {
+        // ✅ Use the exposed wrapper so macros can reach the dispatcher
+        await game.msh.actions.roll("mental-power", {
+          actor,
+          abilityName: undefined,
+          opts: { itemId: item.id, item }
+        });
+      } else {
+        // Legacy path for non-mental powers (as you had)
+        game.msh.rollPower(actor, item, { useDirectRoll: false });
+      }
+
+      break;
     case "talent":    game.msh.rollTalent(actor, item); break;
     case "equipment": game.msh.rollEquipment(actor, item); break;
     default:          ui.notifications.warn(\`Cannot roll item type: \${item.type}\`);

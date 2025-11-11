@@ -25,8 +25,8 @@ export function installActionChatHandlers() {
   game.msh.chatHooksInstalled = true;
 
   // SINGLE combined hook for all chat interactions
-  Hooks.on("renderChatMessage", async (message, element) => {
-    const html  = $(element);
+  Hooks.on("renderChatMessageHTML", async (message, htmlEl /* HTMLElement */, data) => {
+    const html  = $(htmlEl);
     const SCOPE = game.system?.id || "msh-faserip";
 
     // --- NEW: Full-Auto damage application (idempotent)
@@ -44,6 +44,12 @@ export function installActionChatHandlers() {
     } catch (err) {
       console.error("Auto-apply failed:", err);
     }
+
+    // Bail if already auto-processed (prevents double-fire on rerender/notify)
+    const alreadyHandled = await message.getFlag(SCOPE, "autoSaveHandled");
+    if (alreadyHandled) return;
+
+    let firedAnyCheck = false; // <— track if we actually ran something
 
     // --- NEW: Full-Auto auto-rolling of saves (Stun/Slam/Kill/Nullify/Death) ---
     try {
@@ -116,10 +122,13 @@ export function installActionChatHandlers() {
               prefill.targetEndRank = saveActor?.system?.abilities?.endurance?.rank || "Good";
             }
 
-            await ActionDispatcher.roll(checkType, {
+            // inside chips loop when roll: used
+            await game.msh.actions.roll(checkType, {
               actor: saveActor,
               opts: { attackForm, prefill, autoApply: true }
             });
+            firedAnyCheck = true;
+
           }
 
 
@@ -139,7 +148,7 @@ export function installActionChatHandlers() {
               saveActor = game.user.targets.first()?.actor ?? null;
             }
             if (saveActor && resolveCombatMode(saveActor) === "full") {
-              await ActionDispatcher.roll("save-nullify", {
+              await game.msh.actions.roll("save-nullify", {
                 actor: saveActor,
                 abilityName: f.saveAbility || "endurance",
                 opts: {
@@ -151,12 +160,18 @@ export function installActionChatHandlers() {
                   powerName: f.powerName
                 }
               });
+              firedAnyCheck = true;
             }
           }
 
           // Death Save auto-run
           if (deathBtns.length) {
-            await ActionDispatcher.roll("death-save", { actor: ownerActor });
+            await game.msh.actions.roll("death-save", { actor: ownerActor });
+            firedAnyCheck = true;
+          }
+          // ✅ mark handled only if we actually ran something
+          if (firedAnyCheck) {
+            await message.setFlag(SCOPE, "autoSaveHandled", true);
           }
         }
       }
@@ -164,9 +179,6 @@ export function installActionChatHandlers() {
       console.error("Auto-save rolling failed:", err);
     }
     // --- END auto-rolling saves ---
-
-
-    // --- existing code below stays as-is ---
 
     // Check if this message has an undo flag
     const undoData = message.flags?.[SCOPE]?.undo;

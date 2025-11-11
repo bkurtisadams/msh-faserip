@@ -1,0 +1,20 @@
+export const ACTIONS = [
+  { id:"blunt-attack",   label:"BA",  full:"Blunt Attack",   ability:"fighting",  color:"#FF6B00", textColor:"#FFF" },
+  { id:"edged-attack",   label:"EA",  full:"Edged Attack",   ability:"fighting",  color:"#DC143C", textColor:"#FFF" },
+  { id:"shooting",       label:"Sh",  full:"Shooting",       ability:"agility",   color:"#8B0000", textColor:"#FFF" },
+  { id:"throwing-edged", label:"TE",  full:"Throwing Edged", ability:"agility",   color:"#DC143C", textColor:"#FFF" },
+  { id:"throwing-blunt", label:"TB",  full:"Throwing Blunt", ability:"agility",   color:"#FF8C00", textColor:"#000" },
+  { id:"energy",         label:"En",  full:"Energy",         ability:"agility",   color:"#8B0000", textColor:"#FFF" },
+  { id:"force",          label:"Fo",  full:"Force",          ability:"agility",   color:"#FF6B00", textColor:"#FFF" },
+  { id:"grappling",      label:"Gp",  full:"Grappling",      ability:"strength",  color:"#1E90FF", textColor:"#FFF" },
+  { id:"grabbing",       label:"Gb",  full:"Grabbing",       ability:"strength",  color:"#4169E1", textColor:"#FFF" },
+  { id:"escaping",       label:"Es",  full:"Escaping",       ability:"strength",  color:"#4682B4", textColor:"#FFF" },
+  { id:"charging",       label:"Ch",  full:"Charging",       ability:"endurance", color:"#FF8C00", textColor:"#000" },
+  { id:"dodging",        label:"Do",  full:"Dodging",        ability:"agility",   color:"#32CD32", textColor:"#000" },
+  { id:"evading",        label:"Ev",  full:"Evading",        ability:"fighting",  color:"#228B22", textColor:"#FFF" },
+  { id:"blocking",       label:"Bl",  full:"Blocking",       ability:"strength",  color:"#228B22", textColor:"#FFF" },
+  { id:"catching",       label:"Ca",  full:"Catching",       ability:"agility",   color:"#32CD32", textColor:"#000" },
+  { id:"stun",           label:"St",  full:"Stun",           ability:"endurance", color:"#9932CC", textColor:"#FFF" },
+  { id:"slam",           label:"Sl",  full:"Slam",           ability:"endurance", color:"#9932CC", textColor:"#FFF" },
+  { id:"kill",           label:"Kl",  full:"Kill",           ability:"endurance", color:"#8B008B", textColor:"#FFF" }
+];

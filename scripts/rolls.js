@@ -23,7 +23,7 @@ import {
 } from "./modules/dice/universal-table.js";
 import { rollUniversalTable } from "./modules/dice/universal-table.js";
 import { applyColumnShifts } from "./modules/dice/column-shifts.js";
-
+import { ACTIONS } from '../helpers/action-constants.js';
 // ============================================
 // HELPER FUNCTIONS (OUTSIDE THE CLASS)
 // ============================================
@@ -1005,7 +1005,7 @@ export class FaseripRolls {
         "None";
 
       // Define action types and results based on color
-      const ACTIONS = {
+      /* const ACTIONS = {
         // Combat results
         "Blunt Attack (BA)": { white: "Miss", green: "Hit", yellow: "Slam", red: "Stun" },
         "Edged Attack (EA)": { white: "Miss", green: "Hit", yellow: "Stun", red: "Kill" },
@@ -1027,7 +1027,7 @@ export class FaseripRolls {
         "Mental Power": { white: "No Effect", green: "Minor Effect", yellow: "Moderate Effect", red: "Major Effect" },
         "Mystical Knowledge": { white: "No Insight", green: "Minor Insight", yellow: "Significant Insight", red: "Complete Insight" },
         "Skill Use": { white: "Failure", green: "Basic Success", yellow: "Good Success", red: "Excellent Success" }
-      };
+      }; */
 
       // Get the result text - if action type doesn't have specific results, use color names
       let resultText = "";
@@ -1038,6 +1038,7 @@ export class FaseripRolls {
       } */
       // Get the result text - if action type doesn't have specific results, use color names
       
+      const ACTIONS = getActions();
       if (ACTIONS[actionType]) {
         resultText = ACTIONS[actionType][resultColor.toLowerCase()];
       } else {
@@ -1937,6 +1938,7 @@ export class FaseripRolls {
         }
 
         const actionName = options.actionType || savedActionType || defaultAction;
+        const ACTIONS = getActions();
         const action = ACTIONS[actionName];
         const shift = parseInt(options.columnShift) || savedColumnShift || 0; // Define shift FIRST
         const karma = parseInt(options.karma) || 0;
