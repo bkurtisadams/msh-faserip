@@ -493,8 +493,15 @@ export class ForceAction extends RangedAttackAction {
 
     // Play combat SFX
     const sourceName = choice.powerName || "Force Blast";
-    if (game.msh?.playCombatSFX) {
-      await game.msh.playCombatSFX(dmgType, sourceName, colorLower);
-    }
+    const srcItem = actor.items.get?.(choice.powerId) || null;
+      if (game.msh?.playCombatSFX) {
+        await game.msh.playCombatSFX({
+          item: srcItem,                  // ← enables per-power SFX if present
+          actionType: "force",
+          damageType: choice.powerDamageType,
+          rollResult: colorLower,
+          isHit
+        });
+      }
   }
 }

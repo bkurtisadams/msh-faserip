@@ -514,8 +514,15 @@ export class EnergyAction extends RangedAttackAction {
     } // end for loop for target processing
     // Play combat SFX
     const sourceName = choice.powerName || "Energy Blast";
-    if (game.msh?.playCombatSFX) {
-      await game.msh.playCombatSFX(choice.powerDamageType, sourceName, colorLower);
-    }
+    const srcItem = actor.items.get?.(choice.powerId) || null;
+      if (game.msh?.playCombatSFX) {
+        await game.msh.playCombatSFX({
+          item: srcItem,                  // ← enables per-power SFX if present
+          actionType: "energy",
+          damageType: choice.powerDamageType,
+          rollResult: colorLower,
+          isHit
+        });
+      }
   } // end execute()
 }

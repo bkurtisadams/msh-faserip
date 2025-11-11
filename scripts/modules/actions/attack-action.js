@@ -655,8 +655,14 @@ export class AttackAction extends BaseAction {
     }
 
     // Play combat SFX once after all cards (still plays in manual mode)
-    if (game.msh?.playCombatSFX && isHit) {
-      await game.msh.playCombatSFX(damageType, sourceName, colorLower);
+    if (game.msh?.playCombatSFX) {
+      await game.msh.playCombatSFX({
+        item: choice.weapon,            // ← gives access to item.system.sfx.*
+        actionType,                     // "shooting"
+        damageType,                     // keep as a fallback
+        rollResult: colorLower,         // "white"/"green"/"yellow"/"red"
+        isHit                           // true/false
+      });
     }
   }
 }

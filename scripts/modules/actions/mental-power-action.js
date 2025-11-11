@@ -297,7 +297,14 @@ const cardHtml = `
     console.log("Mental Power Action - Checking for SFX...");
     if (game.msh?.playCombatSFX) {
       console.log("Mental Power Action - Playing SFX...");
-      await game.msh.playCombatSFX("mental", powerName, "purple");
+        const srcItem = this?.opts?.item || actor.items.get?.(this?.opts?.itemId) || null;
+        await game.msh.playCombatSFX({
+          item: srcItem,
+          actionType: "mental-power",
+          damageType: "mental",
+          rollResult: "purple", // or map color to result if available
+          isHit: true           // or derive based on new logic
+        });
       console.log("Mental Power Action - SFX played");
     } else {
       console.log("Mental Power Action - No SFX system available");
