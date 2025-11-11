@@ -3679,3 +3679,10 @@ form.faserip-sheet .recovery-btn:disabled:hover {
 .mini-roll:hover{filter:brightness(0.95)}
 .mini-roll:focus-visible{outline:2px solid var(--color-accent,#b30000);outline-offset:1px}
 
+/* Resources: pin contents to the top, don't let the body grow */
+form.faserip-sheet .secondary-abilities .sec-col.resources > .sec-body.resources-row {
+  flex: 0 0 auto;            /* stop growing; height = content */
+  align-items: flex-start;   /* top (cross-axis) */
+  justify-content: flex-start; /* left (main axis) */
+  padding-top: 4;            /* keep it tight; !important if needed */
+}
