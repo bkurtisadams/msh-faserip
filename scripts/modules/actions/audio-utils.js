@@ -1,28 +1,99 @@
 // systems/msh-faserip/scripts/modules/actions/audio-utils.js
+// Modernized SFX utilities with verbose debug logging.
 
-// Optional existence check. We keep it simple and tolerant.
-async function soundFileExists(path) {
+/* ---------------------------------- Core handles ---------------------------------- */
+
+const FilePickerImpl = foundry?.applications?.apps?.FilePicker?.implementation ?? FilePicker;
+const AudioHelperNS  = foundry?.audio?.AudioHelper ?? AudioHelper;
+
+/* ---------------------------------- Utilities ---------------------------------- */
+
+function SYS_ID() {
+  return game.system?.id || "msh-faserip";
+}
+
+function BASE_PATH() {
+  const base = game.settings?.get?.(SYS_ID(), "sfxBasePath");
+  return base || `systems/${SYS_ID()}/assets/sfx`;
+}
+
+function isDebug() {
+  try { return !!game.settings?.get?.(SYS_ID(), "debugMode"); }
+  catch { return false; }
+}
+
+function dlog(...args) {
+  if (!isDebug()) return;
+  // prefix to make filtering super easy
+  console.log("[SFX]", ...args);
+}
+
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = (Math.random() * (i + 1)) | 0;
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+/* -------------------------- Existence cache & folder cache -------------------------- */
+
+const _dirCache  = new Map();   // dir -> Set(fileNames)
+const _fileCache = new Map();   // fullPath -> boolean
+
+async function soundFileExists(fullPath) {
+  if (_fileCache.has(fullPath)) {
+    dlog("exists: cache-hit", { path: fullPath, ok: _fileCache.get(fullPath) });
+    return _fileCache.get(fullPath);
+  }
+
+  const lastSlash = fullPath.lastIndexOf("/");
+  const dir  = fullPath.slice(0, lastSlash);
+  const file = fullPath.slice(lastSlash + 1);
+
   try {
-    const dir = path.slice(0, path.lastIndexOf("/"));
-    const file = path.slice(path.lastIndexOf("/") + 1);
-    const res = await FilePicker.browse("data", dir);
-    return Array.isArray(res.files) && res.files.some(f => f.endsWith(`/${file}`) || f === path);
-  } catch (_e) { return false; }
+    let files = _dirCache.get(dir);
+    if (!files) {
+      dlog("exists: browsing dir", { dir });
+      const res = await FilePickerImpl.browse("data", dir);
+      files = new Set((res.files || []).map(f => f.split("/").pop()));
+      _dirCache.set(dir, files);
+      dlog("exists: dir cached", { dir, count: files.size });
+    }
+    const ok = files.has(file);
+    _fileCache.set(fullPath, ok);
+    dlog("exists: resolved", { path: fullPath, ok });
+    return ok;
+  } catch (e) {
+    _fileCache.set(fullPath, false);
+    dlog("exists: error", { path: fullPath, error: String(e) });
+    return false;
+  }
 }
 
-function basePath() {
-  const SYS = game.system?.id || "msh-faserip";
-  const base = game.settings?.get?.(SYS, "sfxBasePath");
-  return base || `systems/${SYS}/assets/sfx`;
+async function pickFirstExisting(files) {
+  const candidates = shuffle([...files]);
+  dlog("pick: candidates", { base: BASE_PATH(), n: candidates.length, list: candidates });
+  for (const f of candidates) {
+    const full = `${BASE_PATH()}/${f}`;
+    if (await soundFileExists(full)) {
+      dlog("pick: chosen", { full });
+      return full;
+    }
+  }
+  dlog("pick: none-found");
+  return null;
 }
+
+/* ------------------------- Item-configured SFX (per-mode aware) ------------------------- */
 
 function pickFromItemSfx(item, { actionType, isHit, rollResult }) {
   if (!item) return null;
-  const sfx = item.system?.sfx || {};
+
+  const sfx  = item.system?.sfx || {};
   const crit = String(rollResult || "").toLowerCase() === "red";
 
-  // Per-mode override (if present on the matching attack mode)
-  const mode = (item.system?.attackModes || []).find(m => m?.actionType === actionType);
+  const mode    = (item.system?.attackModes || []).find(m => m?.actionType === actionType);
   const modeSfx = mode?.sfx || {};
 
   // Priority: mode.critical → item.critical → mode.hit/miss → item.hit/miss
@@ -30,7 +101,6 @@ function pickFromItemSfx(item, { actionType, isHit, rollResult }) {
   if (isHit && (modeSfx.hit || sfx.hit))         return modeSfx.hit || sfx.hit;
   if (!isHit && (modeSfx.miss || sfx.miss))      return modeSfx.miss || sfx.miss;
 
-  // Single-base style (if you eventually store sfx.base)
   if (sfx.base) {
     if (crit)   return sfx.base.replace(/\.(wav|ogg|mp3)$/i, "-critical.$1");
     if (isHit)  return sfx.base;
@@ -39,116 +109,77 @@ function pickFromItemSfx(item, { actionType, isHit, rollResult }) {
   return null;
 }
 
-/**
- * Back-compat signature:
- *   playCombatSFX(damageType, sourceName, rollResult, options?)
- * New signature (object):
- *   playCombatSFX({ item, kind, rof, volume, damageType, sourceName, rollResult, isHit, isMiss, ammoType })
- */
+/* ---------------------------------- Classifier ---------------------------------- */
+
+function classifyWeapon({ item, sourceName, damageType }) {
+  const typeStr = String(item?.system?.damageType ?? damageType ?? "").toLowerCase();
+  const name    = String(item?.name ?? sourceName ?? "").toLowerCase();
+  const notes   = String(item?.system?.notes ?? "").toLowerCase();
+  const burstScatter = String(item?.system?.burstScatter ?? "none").toLowerCase();
+
+  if (typeStr.includes("mental") || /psychic|telepathy|psionic/.test(name + " " + notes)) {
+    return { cat: "psychic", bursty: false, detail: {} };
+  }
+
+  const isSMG     = /\b(sub-?machine|smg|thompson|tommy|uzi|mp[-\s]?5|mp[-\s]?40|mac[-\s]?1?0|mac[-\s]?11|machine\s?pistol)\b/i.test(name);
+  const isMG      = /\b(machine\s?gun|lmg|hmg|m60|m249|m134|minigun)\b/i.test(name);
+  const isShotgun = /shotgun|riot\s*gun/.test(name) || /scatter/.test(notes);
+  const isRifle   = (/\brifle\b|carbine|sniper/.test(name)) && !/laser/.test(name);
+  const isPistol  = /\bpistol\b|handgun|revolver|sidearm/.test(name);
+  const isBow     = /\b(bow|crossbow)\b/.test(name);
+  const hasBursts = burstScatter !== "none" || /burst/.test(notes) || isSMG || isMG;
+
+  const isEnergy = /energy|laser|plasma/.test(typeStr);
+  const isForce  = /force|concussion/.test(typeStr);
+
+  if (isEnergy)   return { cat: "energy",     bursty: false, detail: { hasBursts } };
+  if (isForce)    return { cat: "force",      bursty: false, detail: { hasBursts } };
+  if (isBow)      return { cat: "bow",        bursty: false, detail: { hasBursts } };
+  if (isMG)       return { cat: "mg",         bursty: true,  detail: { hasBursts } };
+  if (isSMG)      return { cat: "smg",        bursty: true,  detail: { hasBursts } };
+  if (isShotgun)  return { cat: "shotgun",    bursty: true,  detail: { hasBursts } };
+  if (isRifle)    return { cat: hasBursts ? "auto-rifle" : "rifle", bursty: hasBursts, detail: { hasBursts } };
+  if (isPistol)   return { cat: "pistol",     bursty: false, detail: { hasBursts } };
+
+  if (String(damageType || "").toLowerCase().includes("shooting")) {
+    return { cat: hasBursts ? "burst-gun" : "pistol", bursty: hasBursts, detail: { hasBursts } };
+  }
+
+  return { cat: "blunt", bursty: false, detail: { hasBursts } };
+}
+
+/* ---------------------------------- Public API ---------------------------------- */
+
 export async function playCombatSFX(...args) {
-  // ---- Helpers (scoped to this function) -----------------------------------
-  function sysId() {
-    return game.system?.id || "msh-faserip";
-  }
-  function basePath() {
-    const base = game.settings?.get?.(sysId(), "sfxBasePath");
-    return base || `systems/${sysId()}/assets/sfx`;
-  }
-  async function soundFileExists(path) {
-    try {
-      const dir  = path.slice(0, path.lastIndexOf("/"));
-      const file = path.slice(path.lastIndexOf("/") + 1);
-      const res  = await FilePicker.browse("data", dir);
-      return Array.isArray(res.files) && res.files.some(f => f.endsWith(`/${file}`) || f === path);
-    } catch {
-      return false;
-    }
-  }
-  function dlog(...m) {
-    try {
-      if (game.settings?.get?.(sysId(), "debugMode")) console.log("SFX|", ...m);
-    } catch {}
-  }
-  function pickFromItemSfx(item, { actionType, isHit, rollResult }) {
-    if (!item) return null;
-    const sfx = item.system?.sfx || {};
-    // Per-mode override (if attackModes[].sfx is present)
-    const mode = (item.system?.attackModes || []).find(m => m?.actionType === actionType);
-    const modeSfx = mode?.sfx || {};
-    const crit = String(rollResult || "").toLowerCase() === "red";
-
-    // Priority: mode.critical → item.critical → mode.hit/miss → item.hit/miss
-    if (crit && (modeSfx.critical || sfx.critical)) return modeSfx.critical || sfx.critical;
-    if (isHit && (modeSfx.hit || sfx.hit))         return modeSfx.hit || sfx.hit;
-    if (!isHit && (modeSfx.miss || sfx.miss))      return modeSfx.miss || sfx.miss;
-
-    // Single-base style (if ever used)
-    if (sfx.base) {
-      if (crit)   return sfx.base.replace(/\.(wav|ogg|mp3)$/i, "-critical.$1");
-      if (isHit)  return sfx.base;
-      return sfx.base.replace(/\.(wav|ogg|mp3)$/i, "-miss.$1");
-    }
-    return null;
-  }
-  async function pickFirstExisting(files) {
-    for (const f of files) {
-      const full = `${basePath()}/${f}`;
-      if (await soundFileExists(full)) return full;
-    }
-    return null;
-  }
-  function classifyWeapon({ item, sourceName, damageType }) {
-    const name = String(item?.name ?? sourceName ?? "").toLowerCase();
-    const notes = String(item?.system?.notes ?? "").toLowerCase();
-    const typeStr = String(item?.system?.damageType ?? damageType ?? "").toLowerCase();
-    const burstScatter = String(item?.system?.burstScatter ?? "none").toLowerCase();
-
-    const isSMG     = /\b(sub-?machine|smg|thompson|tommy|uzi|mp[-\s]?5|mp[-\s]?40|mac[-\s]?1?0|mac[-\s]?11|machine\s?pistol)\b/i.test(name);
-    const isMG      = /\b(machine\s?gun|lmg|hmg|m60|m249|m134|minigun)\b/i.test(name);
-    const isShotgun = /shotgun|riot\s*gun/.test(name) || /scatter/.test(notes);
-    const isRifle   = /\brifle\b|carbine|sniper/.test(name) && !/laser/.test(name);
-    const isPistol  = /\bpistol\b|handgun|revolver|sidearm/.test(name);
-    const isBow     = /\b(bow|crossbow)\b/.test(name);
-
-    const hasBursts = burstScatter !== "none" || /burst/.test(notes) || isSMG || isMG;
-
-    // Column type hints (E/F/S) from rules
-    const isEnergy = /energy|laser|plasma/.test(typeStr);
-    const isForce  = /force|concussion/.test(typeStr);
-
-    // Category keys for mapping table below
-    if (isEnergy) return { cat: "energy", bursty: false, detail: { isSMG, isMG, isShotgun, isRifle, isPistol, isBow, hasBursts } };
-    if (isForce)  return { cat: "force",  bursty: false, detail: { isSMG, isMG, isShotgun, isRifle, isPistol, isBow, hasBursts } };
-    if (isBow)    return { cat: "bow",    bursty: false, detail: { isSMG, isMG, isShotgun, isRifle, isPistol, isBow, hasBursts } };
-
-    if (isMG)      return { cat: "mg",          bursty: true,  detail: { isSMG, isMG, isShotgun, isRifle, isPistol, isBow, hasBursts } };
-    if (isSMG)     return { cat: "smg",         bursty: true,  detail: { isSMG, isMG, isShotgun, isRifle, isPistol, isBow, hasBursts } };
-    if (isShotgun) return { cat: "shotgun",     bursty: true,  detail: { isSMG, isMG, isShotgun, isRifle, isPistol, isBow, hasBursts } };
-    if (isRifle)   return { cat: hasBursts ? "auto-rifle" : "rifle", bursty: hasBursts, detail: { isSMG, isMG, isShotgun, isRifle, isPistol, isBow, hasBursts } };
-    if (isPistol)  return { cat: "pistol",      bursty: false, detail: { isSMG, isMG, isShotgun, isRifle, isPistol, isBow, hasBursts } };
-
-    // Generic shooting fallback
-    if (String(damageType || "").toLowerCase().includes("shooting"))
-      return { cat: hasBursts ? "burst-gun" : "pistol", bursty: hasBursts, detail: { isSMG, isMG, isShotgun, isRifle, isPistol, isBow, hasBursts } };
-
-    // Default to blunt-ish if unknown
-    return { cat: "blunt", bursty: false, detail: { isSMG, isMG, isShotgun, isRifle, isPistol, isBow, hasBursts } };
-  }
-
-  // ---- Main body ------------------------------------------------------------
   try {
     // Normalize call signatures
     let opts = {};
     if (typeof args[0] === "string") {
-      // Legacy: (damageType, sourceName, rollResult, options)
       const [damageType, sourceName, rollResult, options = {}] = args;
       opts = { damageType, sourceName, rollResult, ...options };
+      dlog("input: legacy", { damageType, sourceName, rollResult, options });
     } else {
-      // New: single options object
       opts = args[0] || {};
+      dlog("input: object", { ...opts, item: opts.item ? `[Item:${opts.item?.name}]` : null });
     }
 
-    const SYS = sysId();
+    // Settings
+    const enabled = game.settings?.get?.(SYS_ID(), "sfxEnabled");
+    if (enabled === false) { dlog("skip: sfx disabled"); return; }
+
+    let volume = Number(
+      opts.volume ?? game.settings?.get?.(SYS_ID(), "sfxVolume") ?? 0.8
+    );
+    if (!Number.isFinite(volume)) volume = 0.8;
+    volume = Math.max(0, Math.min(volume, 1));
+
+    // Rate limit
+    const now = Date.now();
+    const key = "msh-last-sfx-at";
+    game.msh ??= {};
+    if (game.msh[key] && (now - game.msh[key]) < 35) { dlog("skip: rate-limit"); return; }
+    game.msh[key] = now;
+
     const lowerDamageType = String(opts.damageType ?? opts.kind ?? "").toLowerCase();
     const lowerSourceName = String(opts.sourceName ?? opts.item?.name ?? "").toLowerCase();
     const rollResult      = String(opts.rollResult ?? "").toLowerCase();
@@ -156,99 +187,128 @@ export async function playCombatSFX(...args) {
     const isMiss          = opts.isMiss ?? (rollResult === "white");
     const actionType      = opts.actionType ?? null;
 
-    let volume    = Number(opts.volume ?? 0.8) || 0.8;
-    let soundPath = null;
+    dlog("normalized", {
+      basePath: BASE_PATH(),
+      damageType: lowerDamageType,
+      name: lowerSourceName,
+      rollResult,
+      isHit,
+      actionType,
+      volume
+    });
 
-    // 1) If the item specifies SFX explicitly, use that first
-    const itemChosen = pickFromItemSfx(opts.item ?? null, { actionType, isHit, rollResult });
-    if (itemChosen) {
-      dlog("item SFX", { src: itemChosen, isHit, rollResult, name: lowerSourceName });
-      await AudioHelper.play({ src: itemChosen, volume, autoplay: true, loop: false }, true);
-      return;
+    // 1) Item-configured SFX
+    const forcePsychic = lowerDamageType === "mental";
+    if (!forcePsychic) {
+      const itemChosen = pickFromItemSfx(opts.item ?? null, { actionType, isHit, rollResult });
+      if (itemChosen) {
+        dlog("play: item-sfx", { src: itemChosen });
+        await AudioHelperNS.play({ src: itemChosen, volume, autoplay: true, loop: false }, true);
+        return;
+      }
+    } else {
+      dlog("force: psychic via damageType");
     }
 
-    // 2) Heuristic mapping (rules-aware, no ROF dependence)
+    // 2) Classify & table
     const { cat, bursty, detail } = classifyWeapon({
       item: opts.item ?? null,
       sourceName: lowerSourceName,
       damageType: lowerDamageType
     });
+    dlog("classify", { cat, bursty, detail });
 
-    dlog("classify", { cat, bursty, detail, damageType: lowerDamageType, name: lowerSourceName, rollResult });
-
-    // Candidate filenames by category
     const HIT = {
+      "psychic":    ["psychic.mp3", "telepathy.wav", "mind-blast.wav"],
       "mg":         ["mg-burst.ogg", "machine-gun.wav", "submachine-gun.wav", "gunshot.wav"],
       "smg":        ["submachine-gun.wav", "machine-gun.wav", "gunshot.wav"],
-      "auto-rifle": ["assault-rifle-burst.wav", "machine-gun.wav", "submachine-gun.wav", "rifle.wav"],
-      "burst-gun":  ["machine-gun.wav", "submachine-gun.wav", "gunshot.wav"],
+      "auto-rifle": ["assault-rifle.mp3", "rifle.wav"],
+      "burst-gun":  ["machine-pistol.mp3", "submachine-gun.wav", "gunshot.wav"],
       "rifle":      ["rifle.wav"],
       "shotgun":    ["shotgun.wav"],
       "pistol":     ["gunshot.wav"],
       "bow":        ["bow-string.wav", "gunshot.wav"],
-      "energy":     ["fire-blast.wav", "lightning_bolt.wav"],
+      "energy":     ["lightning-bolt.mp3", "fire-blast.wav"],
       "force":      ["concussion.wav", "thump.ogg", "near-miss-swing-whoosh-5.wav"],
       "blunt":      ["punch.wav"],
-      "edged":      ["blade.wav"]
-    };
-    const MISS = {
-      "mg":         ["mg-burst-miss.ogg", "machine-gun-miss.wav", "submachine-gun-miss.wav", "gunshot-miss.wav", "near-miss-swing-whoosh-5.wav"],
-      "smg":        ["submachine-gun-miss.wav", "machine-gun-miss.wav", "gunshot-miss.wav", "near-miss-swing-whoosh-5.wav"],
-      "auto-rifle": ["submachine-gun-miss.wav", "machine-gun-miss.wav", "rifle-miss.wav", "near-miss-swing-whoosh-5.wav"],
-      "burst-gun":  ["submachine-gun-miss.wav", "machine-gun-miss.wav", "gunshot-miss.wav", "near-miss-swing-whoosh-5.wav"],
-      "rifle":      ["rifle-miss.wav", "near-miss-swing-whoosh-5.wav"],
-      "shotgun":    ["shotgun-miss.wav", "near-miss-swing-whoosh-5.wav"],
-      "pistol":     ["gunshot-miss.wav", "near-miss-swing-whoosh-5.wav"],
-      "bow":        ["near-miss-swing-whoosh-5.wav"],
-      "energy":     ["fire-blast-miss.wav", "near-miss-swing-whoosh-5.wav"],
-      "force":      ["near-miss-swing-whoosh-5.wav"],
-      "blunt":      ["punch-miss.wav", "near-miss-swing-whoosh-5.wav"],
-      "edged":      ["blade-miss.wav", "near-miss-swing-whoosh-5.wav"]
+      "edged":      ["sword-slice.mp3"]
     };
 
+    const MISS = {
+      "psychic":   ["whoosh-end.mp3"],
+      "mg":         ["mg-ricochets.mp3"],
+      "smg":        ["mg-ricochets.mp3"],
+      "auto-rifle": ["mg-ricochets.mp3"],
+      "burst-gun":  ["mg-ricochets.mp3"],
+      "rifle":      ["ricochet-shot.mp3"],
+      "shotgun":    ["shotgun-miss.wav", "near-miss-swing-whoosh-5.wav"],
+      "pistol":     ["ricochet-shot.mp3"],
+      "bow":        ["near-miss-swing-whoosh-5.wav"],
+      "energy":     ["whoosh-cinematic.mp3"],
+      "force":      ["whoosh-cinematic.mp3"],
+      "blunt":      ["whoosh-simple.mp3"],
+      "edged":      ["whoosh-simple.mp3"]
+    };
+
+    let soundPath = null;
     if (cat) {
       soundPath = isHit
-        ? (await pickFirstExisting(HIT[cat] || []))  || `${basePath()}/gunshot.wav`
-        : (await pickFirstExisting(MISS[cat] || [])) || `${basePath()}/near-miss-swing-whoosh-5.wav`;
+        ? (await pickFirstExisting(HIT[cat] || []))  || `${BASE_PATH()}/gunshot.wav`
+        : (await pickFirstExisting(MISS[cat] || [])) || `${BASE_PATH()}/near-miss-swing-whoosh-5.wav`;
+      dlog("pick: by-cat", { cat, isHit, soundPath });
     }
 
-    // 3) Damage-type fallback if still nothing chosen
+    // 3) Damage-type fallback
     if (!soundPath) {
       if (lowerDamageType.includes("edged")) {
-        soundPath = isHit ? `${basePath()}/blade.wav` : `${basePath()}/blade-miss.wav`;
+        soundPath = isHit ? `${BASE_PATH()}/blade.wav` : `${BASE_PATH()}/blade-miss.wav`;
       } else if (lowerDamageType.includes("blunt")) {
-        soundPath = isHit ? `${basePath()}/punch.wav` : `${basePath()}/punch-miss.wav`;
+        soundPath = isHit ? `${BASE_PATH()}/punch.wav` : `${BASE_PATH()}/punch-miss.wav`;
       } else if (lowerDamageType.includes("energy")) {
-        soundPath = isHit ? `${basePath()}/fire-blast.wav` : `${basePath()}/fire-blast-miss.wav`;
+        soundPath = isHit ? `${BASE_PATH()}/fire-blast.wav` : `${BASE_PATH()}/fire-blast-miss.wav`;
       } else if (lowerDamageType.includes("force")) {
-        soundPath = `${basePath()}/near-miss-swing-whoosh-5.wav`;
+        soundPath = `${BASE_PATH()}/near-miss-swing-whoosh-5.wav`;
+      } else if (lowerDamageType.includes("mental")) {
+        soundPath = isHit ? `${BASE_PATH()}/psychic.wav` : `${BASE_PATH()}/psychic-whoosh.wav`;
       } else {
-        soundPath = isHit ? `${basePath()}/gunshot.wav` : `${basePath()}/gunshot-miss.wav`;
+        soundPath = isHit ? `${BASE_PATH()}/gunshot.wav` : `${BASE_PATH()}/gunshot-miss.wav`;
       }
+      dlog("fallback: by-damageType", { lowerDamageType, isHit, soundPath });
     }
 
-    // 4) Critical (red) variant for hits: try -critical.*
+    // 4) Critical variant
     if (isHit && rollResult === "red" && soundPath) {
-      const criticalPath = soundPath.replace(".wav", "-critical.wav").replace(".ogg", "-critical.ogg").replace(".mp3", "-critical.mp3");
+      const criticalPath = soundPath.replace(/\.(wav|ogg|mp3)$/i, "-critical.$1");
       if (await soundFileExists(criticalPath)) {
+        dlog("critical: variant-found", { criticalPath });
         soundPath = criticalPath;
         volume = Math.min(volume * 1.2, 1.0);
+      } else {
+        dlog("critical: no-variant");
       }
     }
 
-    // 5) Special ammo override (hits only)
+    // 5) Special ammo override
     if (opts.ammoType === "explosive" && isHit) {
-      soundPath = `systems/${SYS}/sounds/explosion.wav`;
-      volume = 1.0;
+      const exp = `systems/${SYS_ID()}/sounds/explosion.wav`;
+      if (await soundFileExists(exp)) {
+        dlog("ammo: explosive override", { exp });
+        soundPath = exp;
+        volume = 1.0;
+      } else {
+        dlog("ammo: explosive override missing", { exp });
+      }
     }
 
     // 6) Play
     if (soundPath) {
       dlog("play", { soundPath, volume });
-      await AudioHelper.play({ src: soundPath, volume, autoplay: true, loop: false }, true);
+      await AudioHelperNS.play({ src: soundPath, volume, autoplay: true, loop: false }, true);
+    } else {
+      dlog("skip: no soundPath resolved");
     }
-  } catch {
-    // no-op
+  } catch (e) {
+    dlog("error: playCombatSFX crashed", { error: String(e) });
+    // swallow errors to avoid impacting action flow
   }
 }
-

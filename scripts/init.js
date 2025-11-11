@@ -87,6 +87,25 @@ Hooks.once("init", async () => {
     default: "systems/msh-faserip/assets/sfx"
   });
 
+  game.settings.register("msh-faserip", "sfxEnabled", {
+    name: "Enable SFX",
+    hint: "Allow the system to play sound effects for attacks and effects.",
+    scope: "client",     // per-user is nicer for volume/mute
+    config: true,
+    type: Boolean,
+    default: true
+  });
+
+  game.settings.register("msh-faserip", "sfxVolume", {
+    name: "SFX Volume",
+    hint: "Volume for system SFX (0.0–1.0).",
+    scope: "client",
+    config: true,
+    type: Number,
+    range: { min: 0, max: 1, step: 0.05 },
+    default: 0.8
+  });
+
   // Register default combat mode setting
   game.settings.register("msh-faserip", "defaultCombatMode", {
     name: "Default Combat Mode",
