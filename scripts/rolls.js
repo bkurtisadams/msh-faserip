@@ -1925,355 +1925,103 @@ export class FaseripRolls {
         return "Physical-Blunt";
       }
 
+      const invokedFromMacro = options?.useDirectRoll === true || options?.source === "macro";
+      const globalMode = (game.msh?.resolveCombatMode?.(actor)) || game.settings.get("msh-faserip", "defaultCombatMode") || "semi";
+
+      // Example policy: macro OR Full-Auto → quick-roll; holding SHIFT can disable it if desired.
+      const shouldUseQuickRoll = invokedFromMacro || globalMode === "full";
+
       // If this is a macro or direct call with options provided
       // Check if CTRL is pressed or if this is a direct roll call
       if (shouldUseQuickRoll) {
+      if (!game.msh?.actions?.roll) {
+        console.warn("[ROLLS] Dispatcher missing; falling back to legacy dialog.");
+      } else {
         console.log("=== ROLL EQUIPMENT DEBUG ===");
         console.log("Received options:", options);
-        console.log("Ammo type from options:", options.ammoType);
+        console.log("Ammo type from options:", options?.ammoType);
         console.log("============================");
-        // Optional notification that CTRL quick roll is being used
+
         if (game.keyboard.isModifierActive(foundry.helpers.interaction.KeyboardManager.MODIFIER_KEYS.CONTROL)) {
           ui.notifications.info("Quick roll with saved settings (CTRL pressed)");
         }
 
-        const actionName = options.actionType || savedActionType || defaultAction;
-        const ACTIONS = getActions();
-        const action = ACTIONS[actionName];
-        const shift = parseInt(options.columnShift) || savedColumnShift || 0; // Define shift FIRST
-        const karma = parseInt(options.karma) || 0;
-        const skipDice = options.skipDice ?? skipDiceRoll;
+        const actionName  = (options.actionType || savedActionType || defaultAction || "").toString();
+        const actionLower = actionName.toLowerCase();
 
-        // NOW calculate range data using the defined shift value
-        // Use range only for ranged/throwing (anything that isn't pure melee slugfest)
-        const useRange = !(weaponType === "melee" && (
-          /edged/i.test(savedActionType || defaultAction) || /blunt/i.test(savedActionType || defaultAction)
-        ));
-        const rangeData = useRange
-          ? calculateRangeInfo(actor, equipment, game.user.targets.first())
-          : { penalty: 0, outOfRange: false, maxRange: null, distance: null, info: "" };
+        const weaponType  = String(equipment.system?.weaponType || "").toLowerCase();
+        const isMelee     = (weaponType === "melee");
+        const mode        = (game.msh?.resolveCombatMode?.(actor)) || "full";
 
-        // Check if out of range first
-        if (rangeData.outOfRange) {
-          await ChatMessage.create({
-            speaker: ChatMessage.getSpeaker({ actor }),
-            content: `
-              <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px;">
-                <div style="padding: 5px 10px; color: #cc0000; font-weight: bold; font-size: 1.1em;">
-                  ${equipment.name} - OUT OF RANGE
-                </div>
-                <div style="padding: 5px 10px;">
-                  Target is ${rangeData.distance} areas away, but ${equipment.name} has maximum range of ${rangeData.maxRange} areas.
-                </div>
-              </div>
-            `
+        const currentAmmoType = isMelee ? "standard" : (options?.ammoType || equipment.system?.ammoType || "standard");
+        if (!isMelee) console.log(`Weapon ${equipment.name} loaded with: ${currentAmmoType} ammunition`);
+
+        const isThrowFlag = !!equipment.system?.throwable;
+        const isThrowing  = isThrowFlag || /(^|[\s-])(throw|throwing)([\s-]|$)/.test(actionLower);
+        const isShooting  = !isMelee && /(shooting|energy|blast|ray|beam|gun|bow|crossbow)/.test(actionLower);
+
+        // --- SHOOTING ---
+        if (isShooting) {
+          await game.msh.actions.roll("shooting", {
+            actor,
+            abilityName: "agility",
+            opts: {
+              itemId: equipment.id,
+              item: equipment,
+              ammoType: currentAmmoType,
+              mode,
+              autoApply: true,
+              showConfirm: false
+            }
           });
-          return { outOfRange: true };
+          return; // prevent legacy dialog
         }
 
-        // Apply range penalty to column shift and multi-target penalties
-        let totalShift = shift - rangeData.penalty; // Now shift is defined
+        // --- THROWING ---
+        if (isThrowing) {
+          const dmgStr   = `${String(equipment.system?.damageType || "")} ${equipment.name}`.toLowerCase();
+          const throwKey = /(edg|edge|slash|cut|stab|spear|dagger|knife)/.test(dmgStr)
+            ? "throwing-edged"
+            : "throwing-blunt";
 
-        // Apply -4CS penalty for multiple adjacent targets
-        if (options.multiAdjacent) {
-          totalShift -= 4;
-          console.log("Applied -4CS penalty for multiple adjacent targets");
+          await game.msh.actions.roll(throwKey, {
+            actor,
+            abilityName: "agility",
+            opts: {
+              itemId: equipment.id,
+              item: equipment,
+              ammoType: "standard",
+              mode,
+              autoApply: true,
+              showConfirm: false
+            }
+          });
+          return; // prevent legacy dialog
         }
 
-        // Get the ability to use (fighting or agility)
-        const abilityKey = action.ability || "fighting";
-        const abilityRank = actor.system.abilities[abilityKey].rank || "Typical";
-        const abilityValue = actor.system.abilities[abilityKey].value || 10;
+        // --- MELEE (default) ---
+        const dmgTypeStr = `${String(equipment.system?.damageType || "")} ${equipment.name}`.toLowerCase();
+        const meleeKey   = /(edg|edge|slash|cut|stab|sword|spear|axe|dagger|knife)/.test(dmgTypeStr)
+          ? "edged-attack"
+          : "blunt-attack";
 
-        // Apply column shifts if needed
-        let effectiveRank = abilityRank;
-        if (totalShift !== 0) {
-          const shifted = applyColumnShifts(abilityRank, totalShift);
-          effectiveRank = shifted.name;
-        }
-
-        // Roll d100 and apply karma using the dice-roller module
-        const rollResult = await rollD100AndApplyKarma(actor, {
-          karma: karma,
-          sourceName: `${equipment.name} (Equipment)`,
-          skipDiceDisplay: skipDice,
-          flavorText: `${actor.name} equipment ${equipment.name}`
+        await game.msh.actions.roll(meleeKey, {
+          actor,
+          abilityName: "fighting",
+          opts: {
+            itemId: equipment.id,
+            item: equipment,
+            ammoType: "standard",
+            mode,
+            autoApply: true,
+            showConfirm: false
+          }
         });
-
-        const roll = rollResult.roll;
-        const cappedTotal = rollResult.cappedTotal;
-        const karmaUsed = rollResult.karmaUsed;
-
-        // ✅ Now use cappedTotal instead of totalRoll
-        const resultColor = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
-        const effect = action.results[resultColor.toLowerCase()];
-
-        // Get grenade properties if applicable
-        let additionalInfo = "";
-        const isGrenade = equipment.name.toLowerCase().includes("grenade") ||
-          equipment.system.weaponType === "grenade";
-        if (isGrenade && equipment.system.grenadeType) {
-          additionalInfo += `<div><strong>Grenade Type:</strong> ${equipment.system.grenadeType}</div>`;
-          if (equipment.system.grenadeRadius) {
-            additionalInfo += `<div><strong>Blast Radius:</strong> ${equipment.system.grenadeRadius} areas</div>`;
-          }
-          if (equipment.system.grenadeIntensity) {
-            additionalInfo += `<div><strong>Intensity:</strong> ${equipment.system.grenadeIntensity}</div>`;
-          }
-          if (equipment.system.grenadeDamage) {
-            additionalInfo += `<div><strong>Damage:</strong> ${equipment.system.grenadeDamage} ${equipment.system.grenadeDamageType ? `(${equipment.system.grenadeDamageType})` : ''}</div>`;
-          }
-        }
-
-        const isMissileLauncher = equipment.name.toLowerCase().includes("missile") ||
-          equipment.system.weaponType === "missile";
-        if (isMissileLauncher && equipment.system.missileType) { // Corrected check to isMissileLauncher
-          additionalInfo += `<div><strong>Missile Type:</strong> ${equipment.system.missileType}</div>`;
-          if (equipment.system.guidanceSystem) {
-            additionalInfo += `<div><strong>Guidance:</strong> ${equipment.system.guidanceSystem}</div>`;
-          }
-          if (equipment.system.payloadType) {
-            additionalInfo += `<div><strong>Payload:</strong> ${equipment.system.payloadType}</div>`;
-          }
-          if (equipment.system.missileDamage) {
-            additionalInfo += `<div><strong>Damage:</strong> ${equipment.system.missileDamage} ${equipment.system.missileDamageType ? `(${equipment.system.missileDamageType})` : ''}</div>`;
-            if (equipment.system.missileSecondaryDamage) {
-              additionalInfo += `<div><strong>Secondary Damage:</strong> ${equipment.system.missileSecondaryDamage} to adjacent areas</div>`;
-            }
-          }
-        }
-
-        // Special ammo effects
-        if (equipment.system.ammoType !== "Standard") {
-          let ammoEffect = "";
-          switch (equipment.system.ammoType) {
-            case "Mercy":
-              ammoEffect = "Target must make Endurance FEAT vs Remarkable drug or be knocked out for 1-10 rounds";
-              break;
-            case "AP":
-              ammoEffect = "Reduces target Body Armor by 2 CS";
-              break;
-            case "Rubber":
-              ammoEffect = "Inflicts Slugfest damage instead of Shooting damage";
-              break;
-            case "Explosive":
-              ammoEffect = "Double normal damage";
-              break;
-            case "Heat-Seeker":
-              ammoEffect = "Seeks hottest source, no penalty for range";
-              break;
-          }
-          if (ammoEffect) {
-            additionalInfo += `<div><strong>Ammo Effect:</strong> ${ammoEffect}</div>`;
-          }
-        }
-
-        const baseDamage = isNaN(Number(equipment.system.damage)) ? 0 : Number(equipment.system.damage);
-
-        // Create a single enhanced message that includes the roll and all information
-        const messageContent = `
-          <div>
-            <h3 style="color: #8B0000; margin: 0 0 5px 0; font-size: 1.1em;">${actor.name} - ${equipment.name} (${actionName})</h3>
-            <div style="margin-bottom: 5px; font-size: 0.9em;">
-              <div>Attack Ability: ${abilityKey} → ${abilityRank} (${abilityValue})</div>
-              <div>Base Damage: ${baseDamage} (${equipment.system.damage})</div>
-              ${rangeData.info}
-              <div>Column Shift: ${totalShift !== 0 ? `${totalShift > 0 ? "+" : ""}${totalShift} → ${effectiveRank}` : "None"}</div>
-
-              <div>Roll: ${roll.total} + Karma: ${karmaUsed} = ${cappedTotal}</div>
-
-              ${equipment.system.ammoType ? `<div>Ammo Type: ${equipment.system.ammoType}</div>` : ''}
-              ${additionalInfo}
-            </div>
-            <div style="
-              background-color: ${resultColor.toLowerCase() === 'white' ? '#FFFFFF' :
-            resultColor.toLowerCase() === 'green' ? '#4CAF50' :
-              resultColor.toLowerCase() === 'yellow' ? '#FFC107' :
-                '#F44336'
-          }; 
-              color: ${resultColor.toLowerCase() === 'white' ? '#000000' :
-            resultColor.toLowerCase() === 'yellow' ? '#000000' : '#FFFFFF'
-          };
-              padding: 8px;
-              text-align: center;
-              font-weight: bold;
-              font-size: 1.1em;
-              border-radius: 3px;
-              border: ${resultColor.toLowerCase() === 'white' ? '1px solid #CCCCCC' : 'none'};
-            ">
-              ${effect} (${resultColor.toUpperCase()})
-            </div>
-          </div>
-          `;
-
-        // Display the enhanced message with the roll
-        await ChatMessage.create({
-          speaker: ChatMessage.getSpeaker({ actor }),
-          content: messageContent,
-          roll: roll
-        });
-
-        // MULTI-TARGET COMBAT HANDLER INTEGRATION
-        // Check if we have target(s) to apply damage to
-        if (options.multiAdjacent && game.user.targets.size > 1) {
-          // Multiple adjacent targets - single roll with -4CS, applied to all
-          const targets = Array.from(game.user.targets);
-          console.log(`Processing multiple adjacent targets: ${targets.map(t => t.name).join(', ')}`);
-          
-          for (const target of targets) {
-            if (resultColor.toLowerCase() !== "white") {
-              let baseDamage;
-              const rawDamage = equipment.system.damage;
-
-              if (typeof rawDamage === "number") {
-                baseDamage = rawDamage;
-              } else if (!isNaN(rawDamage)) {
-                baseDamage = parseInt(rawDamage);
-              } else {
-                baseDamage = CONFIG.FASERIP.rankValues[rawDamage] || 0;
-              }
-
-              // DAMAGE TYPE NORMALIZATION HERE
-              // Normalize damage types for combat handler
-              const weaponType = equipment.system.weaponType || "";
-              const rawDamageType = equipment.system.damageType || "";
-
-              // DAMAGE TYPE NORMALIZATION (DRY)
-              const normalizedDamageType = normalizeDamageTypeForCombat(actionName, equipment.system.weaponType || "");
-              console.log(`Weapon damage type: "${equipment.system.damageType || ""}" → "${normalizedDamageType}"`);
-
-              const actionNameLower = actionName.toLowerCase();
-              const effectLower = effect?.toLowerCase() || "";
-
-              // Apply FASERIP rules: only certain attack types can kill/slam/stun
-              const canBeKill = (actionNameLower.includes("edged") ||
-                                actionNameLower.includes("shooting") ||
-                                actionNameLower.includes("energy")) &&
-                                effectLower.includes("kill");
-
-              const canBeSlam = (actionNameLower.includes("blunt") ||
-                                actionNameLower.includes("shooting")) &&
-                                effectLower.includes("slam");
-
-              const canBeStun = effectLower.includes("stun") || actionNameLower.includes("stunning");
-
-              await CombatHandler.processAttack({
-                attacker: actor,
-                target: target.actor,
-                baseDamage: baseDamage,
-                damageType: normalizedDamageType,
-                sourceName: equipment.name,
-                canBeStun, canBeSlam, canBeKill,
-                originalRollResult: resultColor.toLowerCase()
-              }, {
-                ammoType: currentAmmoType,
-                skipDefenseDialog: false
-              });
-
-            }
-          }
-        } else if (options.multiAttacks) {
-          // Handle multiple attacks (this will be more complex)
-          console.log("Multiple attacks not yet implemented for equipment");
-          ui.notifications.info("Multiple attacks feature not yet implemented for equipment.");
-        } else {
-          // Single target (existing code)
-          const target = game.user.targets.first()?.actor;
-          if (target) {
-            let baseDamage;
-            const rawDamage = equipment.system.damage;
-
-            if (typeof rawDamage === "number") {
-              baseDamage = rawDamage;
-            } else if (!isNaN(rawDamage)) {
-              baseDamage = parseInt(rawDamage);
-            } else {
-              baseDamage = CONFIG.FASERIP.rankValues[rawDamage] || 0;
-            }
-
-            // DAMAGE TYPE NORMALIZATION HERE
-            // Normalize damage types for combat handler
-            const weaponType = equipment.system.weaponType || "";
-            const rawDamageType = equipment.system.damageType || "";
-
-            // Normalize damage types for shooting weapons
-            // DAMAGE TYPE NORMALIZATION (DRY)
-            const normalizedDamageType = normalizeDamageTypeForCombat(actionName, equipment.system.weaponType || "");
-            console.log(`Weapon damage type: "${equipment.system.damageType || ""}" → "${normalizedDamageType}"`);
-            // END OF DAMAGE TYPE NORMALIZATION ↑
-
-            const actionNameLower = actionName.toLowerCase();
-            const effectLower = effect?.toLowerCase() || "";
-
-            // Apply FASERIP rules: only certain attack types can kill/slam/stun
-            const canBeKill = (actionNameLower.includes("edged") ||
-                              actionNameLower.includes("shooting") ||
-                              actionNameLower.includes("energy")) &&
-                              effectLower.includes("kill");
-
-            const canBeSlam = (actionNameLower.includes("blunt") ||
-                              actionNameLower.includes("shooting")) &&
-                              effectLower.includes("slam");
-
-            const canBeStun = effectLower.includes("stun") || actionNameLower.includes("stunning");
-
-            // Around line 2580 in rollEquipment function
-            if (effectLower === "miss") {
-              console.log("🛑 No damage — attack result is Miss.");
-            } else {
-              // Add debugging for ammo type
-              console.log("Equipment roll options:", options); // Debug line
-              console.log("Ammo type being passed:", options.ammoType || "standard"); // Debug line
-              
-              await CombatHandler.processAttack({
-                attacker: actor,
-                target: target,
-                baseDamage: baseDamage,
-                damageType: normalizedDamageType, // Use the normalized type
-                sourceName: equipment.name,
-                canBeStun: effectLower.includes("stun") || actionName.toLowerCase().includes("stunning"),
-                canBeSlam: effectLower.includes("slam"),
-                canBeKill: effectLower.includes("kill"),
-                originalRollResult: resultColor.toLowerCase()
-              }, {
-                ammoType: currentAmmoType, // Use the determined ammo type instead of options.ammoType
-                skipDefenseDialog: false
-              });
-            }
-          } else if (resultColor.toLowerCase() !== "white" && !target) {
-            ui.notifications.info("No target selected. Damage not applied.");
-          }
-        }
-
-        // After the roll is complete and the chat message is created, update ammunition:
-        if (category === "weapon" && equipment.system.shots) {
-          const currentShots = equipment.system.shotsRemaining !== undefined ?
-            parseInt(equipment.system.shotsRemaining) : 0;
-
-          if (currentShots > 0) {
-            // Decrement ammunition
-            const newShots = currentShots - 1;
-            console.log(`${equipment.name}: Reducing ammo from ${currentShots} to ${newShots}`);
-
-            try {
-              // Method 1: Direct item update
-              await equipment.update({ "system.shotsRemaining": newShots });
-
-              // Method 2: Actor embedded document update (as a backup)
-              await actor.updateEmbeddedDocuments("Item", [{
-                _id: equipment.id,
-                "system.shotsRemaining": newShots
-              }]);
-
-              console.log("Ammunition updated successfully");
-            } catch (error) {
-              console.error("Failed to update ammunition:", error);
-            }
-          }
-        }
-
-        return { roll, resultColor, effect };
+        return; // prevent legacy dialog
       }
+    }
+    // (falls through to legacy dialog if dispatcher missing)
+
 
       // Use saved settings or defaults for dialog
       const dialogActionType = savedActionType || defaultAction;

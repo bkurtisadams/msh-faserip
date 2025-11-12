@@ -87,20 +87,38 @@ async function pickFirstExisting(files) {
 
 /* ------------------------- Item-configured SFX (per-mode aware) ------------------------- */
 
-function pickFromItemSfx(item, { actionType, isHit, rollResult }) {
-  if (!item) return null;
+function normalizeSfxShape(sfx) {
+  // Accept string or object; normalize to {hit, miss, critical, base}
+  if (!sfx) return {};
+  if (typeof sfx === "string") return { hit: sfx };
+  if (typeof sfx === "object") return sfx;
+  return {};
+}
 
-  const sfx  = item.system?.sfx || {};
+function getArrayish(val) {
+  // Turn common shapes (array, object map, nullish, bogus) into an array safely
+  if (Array.isArray(val)) return val;
+  if (val && typeof val === "object") return Object.values(val);
+  return [];
+}
+
+function pickFromItemSfx(item, { actionType, isHit, rollResult }) {
+  if (!item || typeof item !== "object") return null;
+
+  const sfx = normalizeSfxShape(item.system?.sfx);
+  const modes = getArrayish(item.system?.attackModes);
   const crit = String(rollResult || "").toLowerCase() === "red";
 
-  const mode    = (item.system?.attackModes || []).find(m => m?.actionType === actionType);
-  const modeSfx = mode?.sfx || {};
+  // Per-mode override if the matching mode has its own sfx block
+  const mode = modes.find(m => (m?.actionType || "").toLowerCase() === String(actionType || "").toLowerCase());
+  const modeSfx = normalizeSfxShape(mode?.sfx);
 
   // Priority: mode.critical → item.critical → mode.hit/miss → item.hit/miss
   if (crit && (modeSfx.critical || sfx.critical)) return modeSfx.critical || sfx.critical;
   if (isHit && (modeSfx.hit || sfx.hit))         return modeSfx.hit || sfx.hit;
   if (!isHit && (modeSfx.miss || sfx.miss))      return modeSfx.miss || sfx.miss;
 
+  // Single-base style fallback
   if (sfx.base) {
     if (crit)   return sfx.base.replace(/\.(wav|ogg|mp3)$/i, "-critical.$1");
     if (isHit)  return sfx.base;
@@ -111,16 +129,30 @@ function pickFromItemSfx(item, { actionType, isHit, rollResult }) {
 
 /* ---------------------------------- Classifier ---------------------------------- */
 
-function classifyWeapon({ item, sourceName, damageType }) {
+// Accept actionType so we can detect e.g. "edged-attack" / "blunt-attack"
+function classifyWeapon({ item, sourceName, damageType, actionType }) {
   const typeStr = String(item?.system?.damageType ?? damageType ?? "").toLowerCase();
+  const actStr  = String(actionType ?? "").toLowerCase();
   const name    = String(item?.name ?? sourceName ?? "").toLowerCase();
   const notes   = String(item?.system?.notes ?? "").toLowerCase();
   const burstScatter = String(item?.system?.burstScatter ?? "none").toLowerCase();
 
+  // Psychic first
   if (typeStr.includes("mental") || /psychic|telepathy|psionic/.test(name + " " + notes)) {
     return { cat: "psychic", bursty: false, detail: {} };
   }
 
+  // --- New: explicit edged & blunt detection ---
+  if (typeStr.includes("edged") || actStr.includes("edged") ||
+      /\b(sword|sabre|saber|rapier|katana|knife|dagger|dirk|axe|ax|hatchet|machete|spear|halberd|glaive|scythe|bayonet)\b/.test(name)) {
+    return { cat: "edged", bursty: false, detail: {} };
+  }
+  if (typeStr.includes("blunt") || actStr.includes("blunt") ||
+      /\b(club|mace|hammer|maul|staff|baton|bat|cudgel|flail|morningstar)\b/.test(name)) {
+    return { cat: "blunt", bursty: false, detail: {} };
+  }
+
+  // Firearms & bows
   const isSMG     = /\b(sub-?machine|smg|thompson|tommy|uzi|mp[-\s]?5|mp[-\s]?40|mac[-\s]?1?0|mac[-\s]?11|machine\s?pistol)\b/i.test(name);
   const isMG      = /\b(machine\s?gun|lmg|hmg|m60|m249|m134|minigun)\b/i.test(name);
   const isShotgun = /shotgun|riot\s*gun/.test(name) || /scatter/.test(notes);
@@ -145,8 +177,10 @@ function classifyWeapon({ item, sourceName, damageType }) {
     return { cat: hasBursts ? "burst-gun" : "pistol", bursty: hasBursts, detail: { hasBursts } };
   }
 
+  // Final fallback
   return { cat: "blunt", bursty: false, detail: { hasBursts } };
 }
+
 
 /* ---------------------------------- Public API ---------------------------------- */
 
@@ -214,8 +248,10 @@ export async function playCombatSFX(...args) {
     const { cat, bursty, detail } = classifyWeapon({
       item: opts.item ?? null,
       sourceName: lowerSourceName,
-      damageType: lowerDamageType
+      damageType: lowerDamageType,
+      actionType: actionType            // <— ensure this is forwarded
     });
+
     dlog("classify", { cat, bursty, detail });
 
     const HIT = {

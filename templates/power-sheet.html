@@ -533,6 +533,68 @@
         <small>Leave blank for auto-selection based on power type. <a href="#" class="jb2a-help" title="Click for common JB2A paths">(?)</a></small>
       </div>
 
+      {{!-- Advanced → SFX (Equipment-style, functional file pickers) --}}
+
+      <div class="form-group">
+        <label>SFX (Hit)</label>
+        <div class="form-fields">
+          <input type="text"
+                name="system.sfx.hit"
+                value="{{system.sfx.hit}}"
+                data-dtype="String"
+                data-edit="system.sfx.hit"
+                placeholder="systems/msh-faserip/assets/sfx/gunshot.mp3" />
+          <button type="button"
+                  class="file-picker"
+                  data-type="audio"
+                  data-target="system.sfx.hit"
+                  data-current="{{system.sfx.hit}}"
+                  title="{{localize 'FILE.Browse'}}">
+            <i class="fas fa-file-import"></i>
+          </button>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>SFX (Miss)</label>
+        <div class="form-fields">
+          <input type="text"
+                name="system.sfx.miss"
+                value="{{system.sfx.miss}}"
+                data-dtype="String"
+                data-edit="system.sfx.miss"
+                placeholder="systems/msh-faserip/assets/sfx/gunshot-miss.mp3" />
+          <button type="button"
+                  class="file-picker"
+                  data-type="audio"
+                  data-target="system.sfx.miss"
+                  data-current="{{system.sfx.miss}}"
+                  title="{{localize 'FILE.Browse'}}">
+            <i class="fas fa-file-import"></i>
+          </button>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>SFX (Critical)</label>
+        <div class="form-fields">
+          <input type="text"
+                name="system.sfx.critical"
+                value="{{system.sfx.critical}}"
+                data-dtype="String"
+                data-edit="system.sfx.critical"
+                placeholder="(optional) .../gunshot-critical.mp3" />
+          <button type="button"
+                  class="file-picker"
+                  data-type="audio"
+                  data-target="system.sfx.critical"
+                  data-current="{{system.sfx.critical}}"
+                  title="{{localize 'FILE.Browse'}}">
+            <i class="fas fa-file-import"></i>
+          </button>
+        </div>
+      </div>
+
       <!-- Karma Costs -->
       <div class="form-row">
         <div class="form-group half">

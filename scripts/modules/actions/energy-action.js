@@ -512,17 +512,28 @@ export class EnergyAction extends RangedAttackAction {
       }
 
     } // end for loop for target processing
-    // Play combat SFX
-    const sourceName = choice.powerName || "Energy Blast";
-    const srcItem = actor.items.get?.(choice.powerId) || null;
+
+    // Play combat SFX (Energy)
+    try {
+      const sourceName   = choice?.powerName || "Energy Blast";
+      const srcItem      = this?.opts?.item || actor.items.get?.(choice?.powerId) || null;
+      const damageType   = choice?.powerDamageType || srcItem?.system?.damageType || "energy";
+      const rollResult   = String(colorLower ?? "").toLowerCase();   // e.g. "white" | "green" | "yellow" | "red"
+      const isHitResult  = typeof isHit === "boolean" ? isHit : rollResult !== "white";
+
       if (game.msh?.playCombatSFX) {
         await game.msh.playCombatSFX({
-          item: srcItem,                  // ← enables per-power SFX if present
-          actionType: "energy",
-          damageType: choice.powerDamageType,
-          rollResult: colorLower,
-          isHit
+          item: srcItem,                 // enables per-power SFX (system.sfx.* or attackModes[].sfx)
+          actionType: "energy",          // lets the SFX picker use mode-specific overrides
+          damageType,                    // e.g. "energy-electricity" or generic "energy"
+          rollResult,                    // normalized
+          isHit: isHitResult,
+          sourceName                     // optional, for heuristic fallback naming
         });
       }
+    } catch (e) {
+      console.warn("EnergyAction SFX error:", e);
+    }
+
   } // end execute()
 }

@@ -412,6 +412,18 @@ export class ThrowingEdgedAction extends RangedAttackAction {
 
     await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor }), content: cardHtml });
 
+    // --- SFX ---
+    if (game.msh?.playCombatSFX) {
+      const srcItem = choice.weaponId ? actor.items.get(choice.weaponId) : null;
+      await game.msh.playCombatSFX({
+        item: srcItem,
+        actionType: "throwing-edged",
+        damageType: (choice.damageType || "physical-edged"),
+        rollResult: colorLower,
+        isHit
+      });
+    }
+
     // === AUTO-APPLY DAMAGE IN FULL AUTO MODE ===
     if (this.opts?.autoApply && isHit && Number(choice.weaponDamage) > 0) {
       await applyDamageToTargets(Number(choice.weaponDamage), {

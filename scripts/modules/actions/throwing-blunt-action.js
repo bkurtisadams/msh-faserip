@@ -338,6 +338,18 @@ export class ThrowingBluntAction extends RangedAttackAction {
 
     await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor }), content: cardHtml });
 
+    // --- SFX ---
+    if (game.msh?.playCombatSFX) {
+      const srcItem = choice.weaponId ? actor.items.get(choice.weaponId) : null;
+      await game.msh.playCombatSFX({
+        item: srcItem,                    // enables per-item SFX if present
+        actionType: "throwing-blunt",
+        damageType: "physical-blunt",
+        rollResult: colorLower,           // "white" | "green" | "yellow" | "red"
+        isHit                              // boolean from your result
+      });
+    }
+
     // === AUTO-APPLY DAMAGE IN FULL AUTO MODE ===
     if (this.opts?.autoApply && isHit && rawDamage > 0) {
       await applyDamageToTargets(rawDamage, {

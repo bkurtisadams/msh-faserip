@@ -299,11 +299,11 @@ const cardHtml = `
       console.log("Mental Power Action - Playing SFX...");
         const srcItem = this?.opts?.item || actor.items.get?.(this?.opts?.itemId) || null;
         await game.msh.playCombatSFX({
-          item: srcItem,
+          item: this?.opts?.item || actor.items.get?.(this?.opts?.itemId) || null,
           actionType: "mental-power",
           damageType: "mental",
-          rollResult: "purple", // or map color to result if available
-          isHit: true           // or derive based on new logic
+          rollResult: resultColor?.toLowerCase?.() ?? "",
+          isHit: (resultColor ?? "").toLowerCase() !== "white"
         });
       console.log("Mental Power Action - SFX played");
     } else {

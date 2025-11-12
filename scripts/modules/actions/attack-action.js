@@ -656,13 +656,36 @@ export class AttackAction extends BaseAction {
 
     // Play combat SFX once after all cards (still plays in manual mode)
     if (game.msh?.playCombatSFX) {
+      // Before
+      // const weapon = choice?.weapon ?? null;
+      // After
+      const weapon =
+        this?.opts?.item
+        || choice?.weapon
+        || (choice?.weaponId ? this.actor.items.get(choice.weaponId) : null)
+        || null;
+
+      const sourceName = weapon?.name ?? "Attack";
+      const dmgType =
+        damageType
+        || weapon?.system?.damageType
+        || (actionType === "edged"   ? "physical-edged"
+          : actionType === "blunt"  ? "physical-blunt"
+          : actionType === "energy" ? "energy"
+          : actionType); // final fallback
+
+      const rollResult = String(colorLower ?? "").toLowerCase();
+      const hit        = typeof isHit === "boolean" ? isHit : rollResult !== "white";
+
       await game.msh.playCombatSFX({
-        item: choice.weapon,            // ← gives access to item.system.sfx.*
-        actionType,                     // "shooting"
-        damageType,                     // keep as a fallback
-        rollResult: colorLower,         // "white"/"green"/"yellow"/"red"
-        isHit                           // true/false
+        item: weapon,
+        actionType,          // e.g. "shooting"
+        damageType: dmgType, // robust fallback chain
+        rollResult,          // "white"|"green"|"yellow"|"red"
+        isHit: hit,
+        sourceName
       });
     }
+
   }
 }
