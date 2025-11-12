@@ -286,11 +286,8 @@ export class ThrowingBluntAction extends RangedAttackAction {
       damageType: "physical-blunt",
       bypassArmor: false,
       autoApply: !!this.opts?.autoApply,
-
-      // ← 3D goes here:
-      autoSave: (game.user?.targets?.size === 1 && typeof resolveCombatMode === "function")
-        ? (resolveCombatMode(game.user.targets.first()?.actor) === "full")
-        : false,
+      // IMPORTANT: let the action flow handle auto-saves; the card should NOT auto-save.
+      autoSave: false,
     });
 
     // Damage block

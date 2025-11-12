@@ -17,16 +17,21 @@ import { installActionChatHandlers } from "./modules/actions/chat-hooks.js";
 import { openCollisionDamageDialog } from './modules/actions/collision-damage.js';
 import { FaseripActionHUD } from './action-hud.js';
 import { debugLog } from './modules/actions/action-utils.js';
-import { playCombatSFX } from "./modules/actions/audio-utils.js";
 import { ActionDispatcher } from './modules/actions/action-dispatcher.js';
 import { ManualModeDialog } from './modules/actions/manual-mode-dialog.js';
 import * as Effects from "./modules/effects/effect-engine.js";
-//import { MSHVehicleActor } from "./modules/actors/vehicle-actor.js";
-//import { MSHVehicleActorSheet } from "./modules/sheets/vehicle-actor-sheet.js";
 import { MSHVehicleActorSheet } from "./vehicle-actor-sheet.js";
 import { resolveCombatMode } from "./modules/actions/action-dispatcher.js";
 import { initRestSystem } from "./modules/rest-system.js";
 import { ACTIONS } from '../helpers/action-constants.js';
+import { playCombatSFX, classifyWeapon } from "./modules/actions/audio-utils.js";
+
+Hooks.once("init", () => {
+  game.msh ??= {};
+  game.msh.playCombatSFX ??= playCombatSFX;
+  game.msh._classifyWeapon ??= classifyWeapon;
+});
+
 
 // Helper to resolve ACTIONS from CONFIG (for macro compatibility)
 function getActions() {

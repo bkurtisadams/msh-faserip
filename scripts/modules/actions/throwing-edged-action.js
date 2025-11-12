@@ -372,12 +372,9 @@ export class ThrowingEdgedAction extends RangedAttackAction {
       armorPiercing: Number(choice.armorPiercing || 0),
       armorPiercingCS: Number(choice.armorPiercingCS || 0),
       apMode: choice.apMode || "value",
-      autoApply: !!this.opts?.autoApply,
-
-      // ← 3D goes here:
-      autoSave: (game.user?.targets?.size === 1 && typeof resolveCombatMode === "function")
-        ? (resolveCombatMode(game.user.targets.first()?.actor) === "full")
-        : false,
+      //autoApply: !!this.opts?.autoApply,
+      // IMPORTANT: let the action flow handle auto-saves; the card should NOT auto-save.
+      autoSave: false,
     });
 
     const contextHtml = `

@@ -130,7 +130,7 @@ function pickFromItemSfx(item, { actionType, isHit, rollResult }) {
 /* ---------------------------------- Classifier ---------------------------------- */
 
 // Accept actionType so we can detect e.g. "edged-attack" / "blunt-attack"
-function classifyWeapon({ item, sourceName, damageType, actionType }) {
+export function classifyWeapon({ item, sourceName, damageType, actionType }) {
   const typeStr = String(item?.system?.damageType ?? damageType ?? "").toLowerCase();
   const actStr  = String(actionType ?? "").toLowerCase();
   const name    = String(item?.name ?? sourceName ?? "").toLowerCase();
