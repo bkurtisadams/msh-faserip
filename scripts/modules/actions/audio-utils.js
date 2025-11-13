@@ -262,7 +262,7 @@ export async function playCombatSFX(...args) {
       "burst-gun":  ["machine-pistol.mp3", "submachine-gun.wav", "gunshot.wav"],
       "rifle":      ["rifle.wav"],
       "shotgun":    ["shotgun.wav"],
-      "pistol":     ["gunshot.wav"],
+      "pistol":     ["gunshot.mp3"],
       "bow":        ["bow-string.wav", "gunshot.wav"],
       "energy":     ["lightning-bolt.mp3", "fire-blast.wav"],
       "force":      ["concussion.wav", "thump.ogg", "near-miss-swing-whoosh-5.wav"],

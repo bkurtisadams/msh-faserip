@@ -458,59 +458,68 @@ export class FaseripRolls {
 
       // COMBAT HANDLER INTEGRATION
       // Check if we have target(s) to apply damage to
+      // --- AUTO-APPLY DAMAGE HANDLING ---
+
       if (options.multiAdjacent && game.user.targets.size > 1) {
         // Multiple adjacent targets - single roll with -4CS, applied to all
         const targets = Array.from(game.user.targets);
-        console.log(`Processing multiple adjacent targets: ${targets.map(t => t.name).join(', ')}`);
-        
-        for (const target of targets) {
-          if (resultColor.toLowerCase() !== "white") {
-            let finalDamageType = damageType;
-            if (!finalDamageType) {
-              if (actionType.includes("Blunt")) {
-                finalDamageType = "Physical-Blunt";
-              } else if (actionType.includes("Edged")) {
-                finalDamageType = "Physical-Edged";
-              } else if (actionType.includes("Force")) {
+        console.log(`Processing multiple adjacent targets: ${targets.map(t => t.name).join(", ")}`);
+
+        for (const targetToken of targets) {
+          if (resultColor.toLowerCase() === "white") continue;
+
+          // Determine final damage type
+          let finalDamageType = damageType;
+          if (!finalDamageType) {
+            if (actionType.includes("Blunt")) {
+              finalDamageType = "Physical-Blunt";
+            } else if (actionType.includes("Edged")) {
+              finalDamageType = "Physical-Edged";
+            } else if (actionType.includes("Force")) {
+              finalDamageType = "Force";
+            } else if (actionType.includes("Mental")) {
+              finalDamageType = "Mental";
+            } else if (power.system.type) {
+              const powerTypeStr = String(power.system.type).toLowerCase();
+              if (powerTypeStr.includes("force")) {
                 finalDamageType = "Force";
-              } else if (actionType.includes("Mental")) {
+              } else if (powerTypeStr.includes("mental") || powerTypeStr.includes("psi")) {
                 finalDamageType = "Mental";
-              } else if (power.system.type) {
-                const powerTypeStr = power.system.type.toLowerCase();
-                if (powerTypeStr.includes("force")) {
-                  finalDamageType = "Force";
-                } else if (powerTypeStr.includes("mental") || powerTypeStr.includes("psi")) {
-                  finalDamageType = "Mental";
-                } else if (powerTypeStr.includes("phys")) {
-                  finalDamageType = "Physical-Blunt";
-                } else {
-                  finalDamageType = "Energy-Energy";
-                }
+              } else if (powerTypeStr.includes("phys")) {
+                finalDamageType = "Physical-Blunt";
+              } else {
+                finalDamageType = "Energy-Energy";
               }
             }
-            
-            const canBeStun = actionType.includes("Blunt") || 
-                            actionType.includes("Force") || 
-                            resultText.toLowerCase().includes("stun");
-            
-            const canBeSlam = actionType.includes("Blunt") || 
-                            resultText.toLowerCase().includes("slam");
-            
-            const canBeKill = actionType.includes("Edged") || 
-                    actionType.includes("Energy") || 
-                    actionType.includes("Shooting");
-            
-            //const baseDamage = damageCS && damageRankValue ? damageRankValue : powerValue;
-            let baseDamage;
-            if (actionType.includes("Blunt")) {
-              baseDamage = actor.system.abilities.strength.value || 0;
-            } else {
-              baseDamage = damageCS && damageRankValue ? damageRankValue : powerValue;
-            }
-            
-            await game.msh.CombatHandler.processAttack({
+          }
+
+          const canBeStun =
+            actionType.includes("Blunt") ||
+            actionType.includes("Force") ||
+            resultText.toLowerCase().includes("stun");
+
+          const canBeSlam =
+            actionType.includes("Blunt") ||
+            resultText.toLowerCase().includes("slam");
+
+          const canBeKill =
+            actionType.includes("Edged") ||
+            actionType.includes("Energy") ||
+            actionType.includes("Shooting");
+
+          // Blunt uses Strength; otherwise use power rank / damageCS
+          let baseDamage;
+          if (actionType.includes("Blunt")) {
+            baseDamage = (actor.system.abilities.strength.value || 0);
+          } else {
+            baseDamage = (damageCS && damageRankValue) ? damageRankValue : powerValue;
+          }
+
+          const combatHandler = game.msh && game.msh.CombatHandler;
+          if (combatHandler && typeof combatHandler.processAttack === "function") {
+            await combatHandler.processAttack({
               attacker: actor,
-              target: target.actor,
+              target: targetToken.actor,
               baseDamage: baseDamage,
               damageType: finalDamageType,
               sourceName: power.name,
@@ -519,15 +528,23 @@ export class FaseripRolls {
               canBeKill,
               originalRollResult: resultColor.toLowerCase()
             });
+          } else {
+            console.log(
+              "FASERIP | CombatHandler.processAttack unavailable; " +
+              "skipping auto-apply damage for multi-adjacent power attack."
+            );
           }
         }
+
       } else if (options.multiAttacks) {
         // Handle multiple attacks (this will be more complex)
         console.log("Multiple attacks not yet implemented");
         ui.notifications.info("Multiple attacks feature not yet implemented.");
+
       } else {
         // Single target (existing code)
-        const target = game.user.targets.first()?.actor;
+        const firstTarget = game.user.targets.first();
+        const target = firstTarget ? firstTarget.actor : null;
 
         if (target && resultColor.toLowerCase() !== "white") {
           let finalDamageType = damageType;
@@ -541,7 +558,7 @@ export class FaseripRolls {
             } else if (actionType.includes("Mental")) {
               finalDamageType = "Mental";
             } else if (power.system.type) {
-              const powerTypeStr = power.system.type.toLowerCase();
+              const powerTypeStr = String(power.system.type).toLowerCase();
               if (powerTypeStr.includes("force")) {
                 finalDamageType = "Force";
               } else if (powerTypeStr.includes("mental") || powerTypeStr.includes("psi")) {
@@ -553,37 +570,49 @@ export class FaseripRolls {
               }
             }
           }
-          
-          const canBeStun = actionType.includes("Blunt") || 
-                          actionType.includes("Force") || 
-                          resultText.toLowerCase().includes("stun");
-          
-          const canBeSlam = actionType.includes("Blunt") || 
-                          resultText.toLowerCase().includes("slam");
-          
-          const canBeKill = actionType.includes("Edged") || 
-                  actionType.includes("Energy") || 
-                  actionType.includes("Shooting");
-          
-          // FIX: Blunt attacks use Strength for damage, not power value
+
+          const canBeStun =
+            actionType.includes("Blunt") ||
+            actionType.includes("Force") ||
+            resultText.toLowerCase().includes("stun");
+
+          const canBeSlam =
+            actionType.includes("Blunt") ||
+            resultText.toLowerCase().includes("slam");
+
+          const canBeKill =
+            actionType.includes("Edged") ||
+            actionType.includes("Energy") ||
+            actionType.includes("Shooting");
+
+          // Blunt uses Strength; otherwise use power rank / damageCS
           let baseDamage;
           if (actionType.includes("Blunt")) {
-            baseDamage = actor.system.abilities.strength.value || 0;
+            baseDamage = (actor.system.abilities.strength.value || 0);
           } else {
-            baseDamage = damageCS && damageRankValue ? damageRankValue : powerValue;
+            baseDamage = (damageCS && damageRankValue) ? damageRankValue : powerValue;
           }
-          
-          await game.msh.CombatHandler.processAttack({
-            attacker: actor,
-            target: target,
-            baseDamage: baseDamage,
-            damageType: finalDamageType,
-            sourceName: power.name,
-            canBeStun,
-            canBeSlam,
-            canBeKill,
-            originalRollResult: resultColor.toLowerCase()
-          });
+
+          const combatHandler = game.msh && game.msh.CombatHandler;
+          if (combatHandler && typeof combatHandler.processAttack === "function") {
+            await combatHandler.processAttack({
+              attacker: actor,
+              target: target,
+              baseDamage: baseDamage,
+              damageType: finalDamageType,
+              sourceName: power.name,
+              canBeStun,
+              canBeSlam,
+              canBeKill,
+              originalRollResult: resultColor.toLowerCase()
+            });
+          } else {
+            console.log(
+              "FASERIP | CombatHandler.processAttack unavailable; " +
+              "skipping auto-apply damage for power attack."
+            );
+          }
+
         } else if (resultColor.toLowerCase() !== "white" && !target) {
           ui.notifications.info("No target selected. Damage not applied.");
         }
@@ -1123,11 +1152,23 @@ export class FaseripRolls {
               const canBeKill = actionType.includes("Edged") || actionType.includes("Energy") || actionType.includes("Shooting");
               const baseDamage = damageCS && damageRankValue ? damageRankValue : abilityValue;
               
-              await game.msh.CombatHandler.processAttack({
-                attacker: actor, target: targetActor, baseDamage,
-                damageType: finalDamageType, sourceName: talent.name,
-                canBeStun, canBeSlam, canBeKill, originalRollResult: resultColor.toLowerCase()
-              });
+              const combatHandler = game.msh?.CombatHandler;
+              if (combatHandler?.processAttack) {
+                await combatHandler.processAttack({
+                  attacker: actor,
+                  target: targetActor,
+                  baseDamage,
+                  damageType: finalDamageType,
+                  sourceName: talent.name,
+                  canBeStun,
+                  canBeSlam,
+                  canBeKill,
+                  originalRollResult: resultColor.toLowerCase()
+                });
+              } else {
+                console.log("FASERIP | CombatHandler.processAttack unavailable; skipping auto-apply damage for multi-target talent attack.");
+              }
+
             }
           }
         } else {
@@ -1135,10 +1176,19 @@ export class FaseripRolls {
           if (target) {
             if (wrestlingActions.includes(actionType)) {
               const actionCode = actionType.match(/\(([^)]+)\)/)?.[1]?.toLowerCase();
-              await game.msh.CombatHandler.processWrestlingAction({
-                attacker: actor, target, actionType: actionCode,
-                resultColor: resultColor.toLowerCase(), sourceName: talent.name
-              });
+              const combatHandler = game.msh?.CombatHandler;
+              if (combatHandler?.processWrestlingAction) {
+                await combatHandler.processWrestlingAction({
+                  attacker: actor,
+                  target,
+                  actionType: actionCode,
+                  resultColor: resultColor.toLowerCase(),
+                  sourceName: talent.name
+                });
+              } else {
+                console.log("FASERIP | CombatHandler.processWrestlingAction unavailable; skipping auto-apply wrestling for talent.");
+              }
+
             } else {
               let finalDamageType = damageType;
               if (!finalDamageType) {
@@ -1163,11 +1213,23 @@ export class FaseripRolls {
               const canBeKill = actionType.includes("Edged") || actionType.includes("Energy") || actionType.includes("Shooting");
               const baseDamage = damageCS && damageRankValue ? damageRankValue : abilityValue;
               
-              await game.msh.CombatHandler.processAttack({
-                attacker: actor, target, baseDamage,
-                damageType: finalDamageType, sourceName: talent.name,
-                canBeStun, canBeSlam, canBeKill, originalRollResult: resultColor.toLowerCase()
-              });
+                            const combatHandler = game.msh?.CombatHandler;
+              if (combatHandler?.processAttack) {
+                await combatHandler.processAttack({
+                  attacker: actor,
+                  target,
+                  baseDamage,
+                  damageType: finalDamageType,
+                  sourceName: talent.name,
+                  canBeStun,
+                  canBeSlam,
+                  canBeKill,
+                  originalRollResult: resultColor.toLowerCase()
+                });
+              } else {
+                console.log("FASERIP | CombatHandler.processAttack unavailable; skipping auto-apply damage for talent attack.");
+              }
+
             }
           } else {
             ui.notifications.info("No target selected. Effect not applied.");
@@ -3508,19 +3570,24 @@ async function processUniversalActionTarget(actor, target, actionCode, resultCol
   console.log(`🎯 DEBUG: Final damage being used: ${finalBaseDamage} ${options.customDamage ? '(custom)' : '(calculated)'}`);
 
   // Check if this is a wrestling action
-  if (["Gp", "Gb", "Es"].includes(actionCode)) {
-    try {
-      await game.msh.CombatHandler.processWrestlingAction({
-        attacker: actor,
-        target,
-        actionType: actionCode,
-        resultColor: resultColor.toLowerCase(),
-        sourceName: sourceName
-      });
-    } catch (error) {
-      console.error("Error processing wrestling action:", error);
-      ui.notifications.error("Failed to process wrestling action");
-    }
+    if (["Gp", "Gb", "Es"].includes(actionCode)) {
+      try {
+        const combatHandler = game.msh?.CombatHandler;
+        if (combatHandler?.processWrestlingAction) {
+          await combatHandler.processWrestlingAction({
+            attacker: actor,
+            target,
+            actionType: actionCode,
+            resultColor,
+            sourceName
+          });
+        } else {
+          console.log("FASERIP | CombatHandler.processWrestlingAction unavailable; skipping auto-apply wrestling in shared helper.");
+        }
+      } catch (error) {
+        console.error("Error processing wrestling action:", error);
+        ui.notifications.error("Failed to process wrestling action");
+      }
   } else {
     // Regular damage processing for non-wrestling actions
     try {

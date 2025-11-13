@@ -341,6 +341,73 @@ export class AttackAction extends BaseAction {
       overrideTargets = null
     } = config;
 
+    // ANCHOR: early-weapon-resolve
+    // Resolve weapon early so we can gate empty-mag attacks
+    let weapon =
+      this?.opts?.item
+      || choice?.weapon
+      || (choice?.weaponId ? this.actor.items.get(choice.weaponId) : null)
+      || null;
+
+    // Stop immediately if out of ammo (shooting only). Also play a 'click' SFX.
+    if (weapon?.system && String(actionType).toLowerCase() === "shooting") {
+      const toNum = (v) => {
+        if (v == null || v === "") return NaN;
+        if (typeof v === "number") return v;
+        if (typeof v === "string") {
+          const m = v.match(/-?\d+(\.\d+)?/);
+          return m ? Number(m[0]) : NaN;
+        }
+        return NaN;
+      };
+
+      // pull current ammo from any supported field
+      const cur =
+        (weapon.system.ammo && (toNum(weapon.system.ammo.current) ?? toNum(weapon.system.ammo.value))) ??
+        toNum(weapon.system.shotsRemaining) ??
+        toNum(weapon.system.shots);
+
+      if (!Number.isFinite(cur) || cur <= 0) {
+        // Play a 'dry fire' click. Use your own SFX filename here if different.
+        const CLICK_SFX = "systems/msh-faserip/assets/sfx/weapon-empty.mp3";
+
+        try {
+          const AH = foundry?.audio?.AudioHelper ?? globalThis.AudioHelper; // fallback for older
+          if (AH?.play) {
+            await AH.play({ src: CLICK_SFX, volume: 0.8, autoplay: true, loop: false }, true);
+          } else if (game.msh?.playCombatSFX) {
+            await game.msh.playCombatSFX({
+              item: weapon,
+              actionType: "dry",
+              damageType: "none",
+              rollResult: "white",
+              isHit: false,
+              sourceName: weapon?.name ?? "Weapon (empty)",
+              sfxOverride: CLICK_SFX // only if your SFX layer supports it
+            });
+          }
+
+        } catch (e) {
+          console.warn("FASERIP | Could not play empty click SFX:", e);
+        }
+
+        ui.notifications?.warn(`${weapon?.name ?? "Weapon"}: out of ammo`);
+
+        // (Optional) small chat card so players see the click in the log
+        await ChatMessage.create({
+          speaker: ChatMessage.getSpeaker({ actor }),
+          content: `
+            <div style="background:#fff;border:1px solid #bbb;border-radius:3px;padding:6px 8px;">
+              <b>${actor.name}</b> pulls the trigger — <i>click!</i> <span style="color:#888">(empty)</span>
+            </div>
+          `
+        });
+
+        return; // abort this attack before any rolls/effects
+      }
+    }
+    // ANCHOR: early-weapon-resolve
+
     const actionLabel = `${actionName}${targetCount > 1 ? ` (${targetCount} targets)` : ''}`;
 
     // Apply column shift
@@ -484,15 +551,21 @@ export class AttackAction extends BaseAction {
             damageType,
             bypassArmor: choice.bypassArmor || false,
             autoApply: !!this.opts?.autoApply,
-            autoSave,
+            autoSave: false,  // prevent chat button duplicates
           })
         : "";
 
       // Auto-run Kill in full-auto mode
       if (!isManualMode && this.opts?.autoApply && autoSave && showKill && targetActor) {
         const { ActionDispatcher } = await import("./action-dispatcher.js");
+        console.log("BEFORE KILL CALL", {
+          targetActor,
+          targetActorName: targetActor?.name,
+          targetActorId: targetActor?.id
+        });
         await ActionDispatcher.roll("kill", {
-          actor,
+          actor: targetActor,  // ✅ defender makes the save
+          abilityName: "endurance",  // ✅ specify the ability
           opts: {
             autoApply: true,
             showConfirm: false,
@@ -656,9 +729,6 @@ export class AttackAction extends BaseAction {
 
     // Play combat SFX once after all cards (still plays in manual mode)
     if (game.msh?.playCombatSFX) {
-      // Before
-      // const weapon = choice?.weapon ?? null;
-      // After
       const weapon =
         this?.opts?.item
         || choice?.weapon
@@ -666,6 +736,7 @@ export class AttackAction extends BaseAction {
         || null;
 
       const sourceName = weapon?.name ?? "Attack";
+
       const dmgType =
         damageType
         || weapon?.system?.damageType
@@ -677,15 +748,76 @@ export class AttackAction extends BaseAction {
       const rollResult = String(colorLower ?? "").toLowerCase();
       const hit        = typeof isHit === "boolean" ? isHit : rollResult !== "white";
 
-      await game.msh.playCombatSFX({
-        item: weapon,
-        actionType,          // e.g. "shooting"
-        damageType: dmgType, // robust fallback chain
-        rollResult,          // "white"|"green"|"yellow"|"red"
-        isHit: hit,
-        sourceName
-      });
-    }
+        await game.msh.playCombatSFX({
+          item: weapon,
+          actionType,
+          damageType: dmgType,
+          rollResult,
+          isHit: hit,
+          sourceName
+        });
 
+        // --- Spend ammo for firearms (string/number tolerant; supports current template.json) ---
+        try {
+          if (String(actionType).toLowerCase() === "shooting" && weapon?.system) {
+            const sys = weapon.system;
+
+            // Parse first numeric in a value (works for "20", "", null, "Burst (3)", etc.)
+            const toNum = (v, dflt = NaN) => {
+              if (v == null || v === "") return dflt;
+              if (typeof v === "number" && Number.isFinite(v)) return v;
+              if (typeof v === "string") {
+                const m = v.match(/-?\d+(\.\d+)?/);
+                return m ? Number(m[0]) : dflt;
+              }
+              return dflt;
+            };
+
+            // Decide rounds to spend: prefer HUD/sender opts, then item hints, else 1
+            // Choose the first finite, positive number; default to 1 if none.
+            const candidates = [
+              this?.opts?.roundsFired,
+              this?.opts?.shotsToSpend,
+              sys?.roundsFired, sys?.burst, sys?.burstSize, sys?.rateOfFire, sys?.rate
+            ];
+            const first = candidates.map(v => toNum(v)).find(n => Number.isFinite(n) && n > 0);
+            const rounds = Number.isFinite(first) ? Math.max(1, Math.trunc(first)) : 1;
+
+            // (optional debug)
+            if (!Number.isFinite(first)) {
+              console.warn("FASERIP | Ammo spend: no finite rounds found; defaulting to 1", { candidates });
+            }
+
+            // Helper to update any ammo-like field (string or number), return true if updated
+            const tryUpdate = async (path) => {
+              const cur = foundry.utils.getProperty(weapon, path);
+              const curNum = toNum(cur);
+              if (!Number.isFinite(curNum)) return false;
+              const next = Math.max(0, curNum - rounds);
+              await weapon.update({ [path]: next }); // Foundry will coerce as needed
+              console.log("FASERIP | Ammo spend", { weapon: weapon.name, path, cur, curNum, rounds, next });
+              return true;
+            };
+
+            // First match wins (order chosen to fit your template.json)
+            const updated =
+              (sys.ammo && (await tryUpdate("system.ammo.current") || await tryUpdate("system.ammo.value"))) ||
+              (await tryUpdate("system.shotsRemaining")) ||
+              (await tryUpdate("system.shots")) ||
+              (sys.uses && await tryUpdate("system.uses.value")) ||
+              (await tryUpdate("system.clip")) ||
+              (await tryUpdate("system.magazine"));
+
+            if (!updated) {
+              console.warn("FASERIP | No numeric ammo field found on weapon", weapon.name, { sys });
+            } else if (rounds > 1) {
+              ui.notifications?.info?.(`${weapon.name}: fired ${rounds} rounds`);
+            }
+          }
+        } catch (e) {
+          console.warn("FASERIP | Ammo spend failed:", e);
+        }
+
+    }
   }
 }

@@ -300,7 +300,9 @@ export class CheckAction extends BaseAction {
 
       // Build and post a light-weight chat card
       const banner = bannerColors[colorLower] || { bg:"#eee", fg:"#333", bd:"#ccc" };
-      const effectText = (actionType === "kill") ? (baseEffect || color) : (mapping[colorLower] || color);
+      const effectText = (actionType === "kill")
+        ? (baseEffect?.label || color)
+        : (mapping[colorLower] || color);
       const extraHtml  = this._extraExplanationHtml({
         actionType, targetAbility, colorLower, finalEffect: effectText, effectsSuppressed,
         stunDuration, rawStunDuration: rawDuration
@@ -422,7 +424,8 @@ export class CheckAction extends BaseAction {
     }
 
     if (actionType === "kill" && !effectsSuppressed) {
-      const hasEndLoss = String(finalEffect || "").toLowerCase().includes("endurance");
+      const _txt = (typeof finalEffect === "string" ? finalEffect : finalEffect?.label) || "";
+      const hasEndLoss = _txt.toLowerCase().includes("endurance");
       if (hasEndLoss) {
         const targetActor = await this._resolveTokenActor(this.opts?.prefill?.targetUuid || "");
         if (targetActor) {
@@ -444,7 +447,7 @@ export class CheckAction extends BaseAction {
           <b>${actor.name}</b> — ${labelFor(actionType)} vs <b>${choice.targetName}</b>
         </div>
         <div style="padding:8px 10px;font-size:.95em;">
-          <div><b>Result:</b> <span style="text-transform:capitalize">${colorLower}</span> — ${finalEffect}</div>
+          <div><b>Result:</b> <span style="text-transform:capitalize">${colorLower}</span> — ${(actionType === "kill") ? (finalEffect?.label ?? "No Effect") : finalEffect}</div>
           ${effectsSuppressed ? `<div style="margin-top:6px;color:#b71c1c;">No damage penetrated → effect suppressed.</div>` : ""}
           ${extraHtml || ""}
         </div>

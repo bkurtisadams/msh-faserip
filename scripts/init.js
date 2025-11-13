@@ -1877,60 +1877,76 @@ async function createFaseripItemMacro(data, slot) {
 
   // Build a UUID-based macro so it also works later from the hotbar
   const command = `// ${item.name} Macro
-(async () => {
-  const item = await fromUuid("${item.uuid}");
-  if (!item) return ui.notifications.error("Missing item: ${item.name}");
-  const actor = item.parent;
-  if (!actor) return ui.notifications.error("No parent actor for item: ${item.name}");
+    (async () => {
+      const item = await fromUuid("${item.uuid}");
+      if (!item) return ui.notifications.error("Missing item: ${item.name}");
+      const actor = item.parent;
+      if (!actor) return ui.notifications.error("No parent actor for item: ${item.name}");
 
-  switch (item.type) {
-    case "power": 
-      // Use ActionDispatcher for mental powers, old rollPower for others
+      const system = item.system || {};
 
-      // Normalize to new schema; keep legacy fallback just in case
-      const saveAbility = item.system?.save?.ability ?? item.system?.saveAbility ?? null;
-      const damageType  = item.system?.damageType ?? null;
-      const category    = item.system?.category ?? null;
+      switch (item.type) {
+        case "power": {
+          const category     = system.category || "";
+          const requiresSave = !!system.requiresSave;
+          const saveAbility  = (system.save && system.save.ability) || system.saveAbility || null;
+          const damageType   = system.damageType || null;
 
-      const isMental =
-        (saveAbility === "psyche" || saveAbility === "intuition") ||
-        (damageType === "mental") ||
-        (category === "mental");
+          const isMental =
+            category === "mentalPowers" ||
+            requiresSave ||
+            saveAbility === "psyche" ||
+            saveAbility === "intuition" ||
+            damageType === "mental";
 
-      if (isMental) {
-        // ✅ Use the exposed wrapper so macros can reach the dispatcher
-        await game.msh.actions.roll("mental-power", {
-          actor,
-          abilityName: undefined,
-          opts: { itemId: item.id, item }
-        });
-      } else {
-        // Legacy path for non-mental powers (as you had)
-        game.msh.rollPower(actor, item, { useDirectRoll: false });
+          if (isMental) {
+            // Mental / save-based powers: skip to-hit, go straight to saves
+            await game.msh.actions.roll("mental-power", {
+              actor,
+              abilityName: undefined,
+              opts: { itemId: item.id, item }
+            });
+          } else {
+            // Regular attack powers: route to energy/force actions like the sheet
+            const actionType = system.attackType === "force" ? "force" : "energy";
+
+            await game.msh.actions.roll(actionType, {
+              actor,
+              abilityName: "agility",   // Powers use Agility to hit
+              opts: { itemId: item.id, item }
+            });
+          }
+          break;
+        }
+
+        case "talent":
+          game.msh.rollTalent(actor, item);
+          break;
+
+        case "equipment":
+          game.msh.rollEquipment(actor, item);
+          break;
+
+        default:
+          ui.notifications.warn("Cannot roll item type: " + item.type);
       }
+    })();`;
 
-      break;
-    case "talent":    game.msh.rollTalent(actor, item); break;
-    case "equipment": game.msh.rollEquipment(actor, item); break;
-    default:          ui.notifications.warn(\`Cannot roll item type: \${item.type}\`);
+    const macroName = `${item.name} (${actor?.name ?? "Actor"})`;
+    let macro = game.macros.find(m => m.name === macroName && m.flags?.["faserip.itemMacro"]);
+    if (!macro) {
+      macro = await Macro.create({
+        name: macroName,
+        type: "script",
+        img: item.img || "icons/svg/item-bag.svg",
+        command,
+        flags: { "faserip.itemMacro": true }
+      });
+    }
+    await game.user.assignHotbarMacro(macro, slot);
+    ui.notifications.info(`Created macro: ${macroName}`);
+    return true;
   }
-})();`;
-
-  const macroName = `${item.name} (${actor?.name ?? "Actor"})`;
-  let macro = game.macros.find(m => m.name === macroName && m.flags?.["faserip.itemMacro"]);
-  if (!macro) {
-    macro = await Macro.create({
-      name: macroName,
-      type: "script",
-      img: item.img || "icons/svg/item-bag.svg",
-      command,
-      flags: { "faserip.itemMacro": true }
-    });
-  }
-  await game.user.assignHotbarMacro(macro, slot);
-  ui.notifications.info(`Created macro: ${macroName}`);
-  return true;
-}
 
 
 // Define the function to create a Universal Table macro
