@@ -5,8 +5,7 @@ import {
 } from './modules/combat/damage-resolution.js';
 // At the top of charge-damage.js with other imports
 import { ActionDispatcher } from "./modules/actions/action-dispatcher.js";
-
-// resolveSlamEffect moved to modules/combat/damage-resolution.js
+import { applyDamageToTargets } from "./modules/actions/action-utils.js";
 
 /**
  * Calculate charge damage based on FASERIP rules
@@ -793,14 +792,47 @@ export function initializeSlamHandlers() {
                 });
                 
                 // Apply damage if any
-                if (slamResults.damageToCharacter > 0) {
-                    const currentHealth = targetActor.system.attributes.health.value;
-                    const newHealth = Math.max(0, currentHealth - slamResults.damageToCharacter);
-                    
-                    await targetActor.update({ "system.attributes.health.value": newHealth });
-                    
-                    ui.notifications.info(`${targetActor.name} takes ${slamResults.damageToCharacter} collision damage!`);
+                if (slamResults.damageToCharacter > 0 && targetActor) {
+                console.log(
+                    "[COLLISION] Applying",
+                    slamResults.damageToCharacter,
+                    "collision damage to",
+                    targetActor.name
+                );
+
+                try {
+                    // Find an active token for the target actor on the current scene
+                    const targetToken = targetActor.getActiveTokens()?.[0] ?? null;
+                    const targetTokenOrDoc = targetToken?.document ?? targetToken;
+
+                    if (!targetTokenOrDoc) {
+                    console.warn(
+                        "[COLLISION] No active token found for collision target",
+                        targetActor.name
+                    );
+                    } else {
+                    await applyDamageToTargets({
+                        damage: slamResults.damageToCharacter,
+                        damageType: "physical-blunt",
+                        attackForm: "blunt",
+                        // Pass an explicit token/doc so the GM-safe path can run
+                        targets: [targetTokenOrDoc]
+                    });
+
+                    ui.notifications.info(
+                       ui.notifications.info(
+                        `${targetActor.name} is slammed into the wall for ${slamResults.damageToCharacter} collision impact (before armor).`
+                        );
+                    );
+                    }
+                } catch (err) {
+                    console.error("[COLLISION] Failed to apply collision damage", err);
+                    ui.notifications.error(
+                    `Failed to apply collision damage to ${targetActor.name}. Check console for details.`
+                    );
                 }
+                }
+
             }
             
             // Disable the button to prevent multiple calculations
