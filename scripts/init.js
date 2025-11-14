@@ -1275,81 +1275,93 @@ Hooks.on('preUpdateActor', (actor, updateData, options, userId) => {
 
 // Process damage and start timers
 Hooks.on('updateActor', async (actor, updateData, options, userId) => {
-  if (!options.healthChange) return;
-  
-  const { old: oldHealth, new: newHealth } = options.healthChange;
-  
-  // Process damage OR if at/below 0 HP (for repeated attacks on unconscious characters)
-  if (newHealth >= oldHealth && newHealth > 0) return;
-
-  // ===== CHECK FOR FLAGGED DAMAGE TO 0 HP TARGET =====
-  const pendingDamage = game.msh._pendingDamageToZeroHP?.[actor.id];
-  if (pendingDamage && (Date.now() - pendingDamage.timestamp) < 1000) {
-    console.log("FASERIP | Detected damage to 0 HP target - forcing death save");
-    delete game.msh._pendingDamageToZeroHP[actor.id];
-    
-    const mode = resolveCombatMode(actor) || "manual";
-    console.log("FASERIP DEBUG | Combat mode for 0HP repeat hit:", mode);
-    
-    if (mode === "full") {
-      console.log("FASERIP DEBUG | Full auto mode - triggering death save for unconscious target");
-      const { ActionDispatcher } = await import("./modules/actions/action-dispatcher.js");
-      await ActionDispatcher.roll("death-save", { 
-        actor,
-        opts: { autoApply: true, showConfirm: false }
-      });
-      console.log("FASERIP DEBUG | Death save complete for repeat hit");
-    } else {
-      ChatMessage.create({
-        content: `<div style="background:#ffebee;border:1px solid #ef5350;padding:8px;border-radius:3px;">
-          <strong>${actor.name}</strong> was hit while unconscious!
-          <button class="death-save-button" data-actor-id="${actor.id}">Roll Death Save</button>
-        </div>`
-      });
-    }
-    return; // Exit early - don't process as normal damage
-  }
-
-  // Throttle repeated damage timer creation per actor (1.5s)
-  const now = Date.now();
-  game.msh._lastDamageTimerAt ??= {};
-  if ((now - (game.msh._lastDamageTimerAt[actor.id] || 0)) < 1500) {
-    if (game.settings.get("msh-faserip", "debugMode")) {
-      console.log("FASERIP | Throttled damage timer for", actor.name);
-    }
-    return;
-  }
-  game.msh._lastDamageTimerAt[actor.id] = now;
-  
-  // CRITICAL: Only process if we own the actor OR we're the GM
-  if (!game.user.isGM && !actor.isOwner) {
-    console.log("FASERIP | Skipping - not owner and not GM");
-    return;
-  }
-  
-  // Prevent duplicate calls within same tick
-  const damageKey = `damage-${actor.id}-${oldHealth}-${newHealth}`;
-  if (game.msh._processingDamage === damageKey) {
-    console.log("FASERIP | Skipping duplicate damage processing");
-    return;
-  }
-  game.msh._processingDamage = damageKey;
-  
-  console.log("FASERIP | DAMAGE DETECTED", {
-    actor: actor.name,
-    oldHealth,
-    newHealth,
-    damage: oldHealth - newHealth
-  });
-  
   try {
+    // --- GM-ONLY GUARD -----------------------------------------
+    // Only the GM should run damage/effect logic.
+    // Players will trigger the HP change, but the GM client is
+    // the authority that actually handles death saves and rest timers.
+    if (!game.user.isGM) {
+      if (game.settings.get("msh-faserip", "debugMode")) {
+        console.log("FASERIP | Skipping damage hook on non-GM client", {
+          actor: actor.name,
+          user: game.user.name
+        });
+      }
+      return;
+    }
+    // -----------------------------------------------------------
+
+    if (!options?.healthChange) return;
+
+    const { old: oldHealth, new: newHealth } = options.healthChange;
+
+    // Ignore healing or non-damage changes (including 0->0)
+    // Note: if we want repeats on 0 HP, that’s handled below via pending flag.
+    if (newHealth >= oldHealth && newHealth > 0) return;
+
+    // ===== SPECIAL: FLAGGED DAMAGE TO 0 HP TARGET =====
+    // This is your "they were already at 0 HP, then got hit again" logic.
+    const pendingDamage = game.msh._pendingDamageToZeroHP?.[actor.id];
+    if (pendingDamage && (Date.now() - pendingDamage.timestamp) < 1000) {
+      console.log("FASERIP | Detected damage to 0 HP target - forcing death save");
+      delete game.msh._pendingDamageToZeroHP[actor.id];
+
+      const mode = resolveCombatMode(actor) || "manual";
+      console.log("FASERIP DEBUG | Combat mode for 0HP repeat hit:", mode);
+
+      if (mode === "full") {
+        console.log("FASERIP DEBUG | Full auto mode - triggering death save for unconscious target");
+        const { ActionDispatcher } = await import("./modules/actions/action-dispatcher.js");
+        await ActionDispatcher.roll("death-save", {
+          actor,
+          opts: { autoApply: true, showConfirm: false }
+        });
+        console.log("FASERIP DEBUG | Death save complete for repeat hit");
+      } else {
+        await ChatMessage.create({
+          content: `<div style="background:#ffebee;border:1px solid #ef5350;padding:8px;border-radius:3px;">
+            <strong>${actor.name}</strong> was hit while unconscious!
+            <button class="death-save-button" data-actor-id="${actor.id}">Roll Death Save</button>
+          </div>`
+        });
+      }
+      return; // Exit early - don't process as normal damage
+    }
+
+    // ===== THROTTLE DAMAGE TIMER CREATION (1.5s per actor) =====
+    const now = Date.now();
+    game.msh._lastDamageTimerAt ??= {};
+    const lastAt = game.msh._lastDamageTimerAt[actor.id] || 0;
+
+    if ((now - lastAt) < 1500) {
+      if (game.settings.get("msh-faserip", "debugMode")) {
+        console.log("FASERIP | Throttled damage timer for", actor.name);
+      }
+      return;
+    }
+    game.msh._lastDamageTimerAt[actor.id] = now;
+
+    // ===== DEDUPE WITHIN SAME TICK =====
+    const damageKey = `damage-${actor.id}-${oldHealth}-${newHealth}`;
+    if (game.msh._processingDamage === damageKey) {
+      console.log("FASERIP | Skipping duplicate damage processing");
+      return;
+    }
+    game.msh._processingDamage = damageKey;
+
+    console.log("FASERIP | DAMAGE DETECTED", {
+      actor: actor.name,
+      oldHealth,
+      newHealth,
+      damage: oldHealth - newHealth
+    });
+
     const currentHealth = Number(newHealth ?? 0);
 
     // === GAME RULE: Check if at/below 0 HP ===
     if (currentHealth <= 0) {
       console.log(`⚠️ FASERIP | ${actor.name} is at ${currentHealth} HP - triggering death save`);
 
-      // Auto-trigger death save in full mode
       const mode = resolveCombatMode(actor) || "manual";
       console.log("FASERIP DEBUG | Combat mode resolved to:", mode);
 
@@ -1357,42 +1369,43 @@ Hooks.on('updateActor', async (actor, updateData, options, userId) => {
         console.log("FASERIP DEBUG | Full auto mode - about to import ActionDispatcher");
         const { ActionDispatcher } = await import("./modules/actions/action-dispatcher.js");
         console.log("FASERIP DEBUG | ActionDispatcher imported, calling roll...");
-        await ActionDispatcher.roll("death-save", { 
+        await ActionDispatcher.roll("death-save", {
           actor,
           opts: { autoApply: true, showConfirm: false }
         });
         console.log("FASERIP DEBUG | Death save complete");
       } else {
         console.log("FASERIP DEBUG | Manual/semi mode - showing button");
-        // Manual/semi mode: show button
-        ChatMessage.create({
+        await ChatMessage.create({
           content: `<div style="background:#ffebee;border:1px solid #ef5350;padding:8px;border-radius:3px;">
             <strong>${actor.name}</strong> is at 0 HP!
             <button class="death-save-button" data-actor-id="${actor.id}">Roll Death Save</button>
           </div>`
         });
       }
-      
-      // DO NOT start recovery/healing timers at 0 HP
-      // Death save handles unconsciousness/dying effects
+
       console.log("FASERIP | At 0 HP - death save will handle effects");
-      
     } else {
-      // === GAME RULE: Above 0 HP - record damage for rest system ===
+      // === Above 0 HP: record damage for rest system ===
       console.log("FASERIP | Above 0 HP - recording damage for rest eligibility");
 
-      // Flag-based rest system (rest-system.js) handles recovery/healing
       const { recordDamage } = await import("./modules/rest-system.js");
       await recordDamage(actor);
     }
-    
+
+  } catch (err) {
+    console.error("FASERIP | Error in updateActor damage hook:", err);
   } finally {
-    // Clear flag after a brief delay
-    setTimeout(() => {
-      if (game.msh._processingDamage === damageKey) {
-        delete game.msh._processingDamage;
-      }
-    }, 100);
+    // Clear dedupe flag after a brief delay
+    // (using the last damageKey in scope)
+    if (game.msh?._processingDamage) {
+      const keyToClear = game.msh._processingDamage;
+      setTimeout(() => {
+        if (game.msh._processingDamage === keyToClear) {
+          delete game.msh._processingDamage;
+        }
+      }, 100);
+    }
   }
 });
 

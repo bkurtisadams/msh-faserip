@@ -47,6 +47,14 @@ async function soundFileExists(fullPath) {
     return _fileCache.get(fullPath);
   }
 
+  // Non-GM users can't browse directories in Foundry v13
+  // Skip file checking for players - just assume files exist
+  if (!game.user?.isGM) {
+    dlog("exists: skipping check (non-GM user)");
+    _fileCache.set(fullPath, true);
+    return true;
+  }
+
   const lastSlash = fullPath.lastIndexOf("/");
   const dir  = fullPath.slice(0, lastSlash);
   const file = fullPath.slice(lastSlash + 1);

@@ -24,6 +24,22 @@ export function installActionChatHandlers() {
   if (game.msh.chatHooksInstalled) return;
   game.msh.chatHooksInstalled = true;
 
+  // Helper to safely set flags only if user has permission
+  async function safeSetFlag(message, scope, key, value) {
+    try {
+      // Check if user can modify this message
+      if (!message.isOwner && !game.user.isGM) {
+        debugLog(`Skipping flag set (no permission): ${key}`, { msgId: message.id, user: game.user.name });
+        return false;
+      }
+      await message.setFlag(scope, key, value);
+      return true;
+    } catch (err) {
+      console.warn(`Failed to set flag ${key} on message ${message.id}:`, err.message);
+      return false;
+    }
+  }
+
   // SINGLE combined hook for all chat interactions
   Hooks.on("renderChatMessageHTML", async (message, htmlEl /* HTMLElement */, data) => {
     const html  = $(htmlEl);
@@ -39,7 +55,7 @@ export function installActionChatHandlers() {
       if (shouldAuto && !already && Array.isArray(results) && results.length) {
         debugLog("Auto-applying damage", { msgId: message.id, targets: results.length });
         await applyDamageToTargets(results, { messageId: message.id });
-        await message.setFlag(SCOPE, "autoApplied", true); // guard against re-renders
+        await safeSetFlag(message, SCOPE, "autoApplied", true); // guard against re-renders
       }
     } catch (err) {
       console.error("Auto-apply failed:", err);
@@ -49,6 +65,17 @@ export function installActionChatHandlers() {
     const alreadyHandled = await message.getFlag(SCOPE, "autoSaveHandled");
     if (alreadyHandled) return;
 
+      // Only GM or message owner should run auto-save logic that sets flags / rolls extra saves
+      if (!game.user.isGM && !message.isOwner) {
+        if (game.settings.get("msh-faserip", "debugMode")) {
+          console.log("FASERIP | Auto-save skipping for non-owner non-GM", {
+            msgId: message.id,
+            user: game.user.name
+          });
+        }
+        return;
+      }
+
     let firedAnyCheck = false; // <— track if we actually ran something
 
     // --- NEW: Full-Auto auto-rolling of saves (Stun/Slam/Kill/Nullify/Death) ---
@@ -56,7 +83,7 @@ export function installActionChatHandlers() {
       const alreadyChecks = message?.flags?.[SCOPE]?.autoChecksDone === true;
       if (!alreadyChecks) {
         // Set flag immediately to prevent race condition (multiple renderChatMessage events)
-        await message.setFlag(SCOPE, "autoChecksDone", true);
+        await safeSetFlag(message, SCOPE, "autoChecksDone", true);
 
         // Derive an "owner" actor (attacker or speaker)
         let ownerActor = null;
@@ -171,7 +198,7 @@ export function installActionChatHandlers() {
           }
           // ✅ mark handled only if we actually ran something
           if (firedAnyCheck) {
-            await message.setFlag(SCOPE, "autoSaveHandled", true);
+            await safeSetFlag(message, SCOPE, "autoSaveHandled", true);
           }
         }
       }

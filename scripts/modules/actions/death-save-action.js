@@ -267,39 +267,55 @@ export class DeathSaveAction extends BaseAction {
 
   /** Create the DYING effect: loses 1 Endurance rank per turn (6 seconds) */
   async _createDyingEffect(actor, endurance, _unconsciousDuration) {
-    const scope = globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faserip";
+      const scope = globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faserip";
 
-    // Remove any existing dying effects to avoid duplicates
-    try {
-      const existing = actor.effects.filter(e => e.flags?.[scope]?.isDying);
-      if (existing.length) {
-        await actor.deleteEmbeddedDocuments("ActiveEffect", existing.map(e => e.id));
-      }
-    } catch (_) {}
-
-    const effectData = {
-      name: "Dying",
-      img: "icons/svg/skull.svg",
-      origin: actor.uuid,
-      flags: {
-        [scope]: {
-          isDying: true,
-          originalEndurance: endurance.rank,
-          currentTempRank: endurance.rank,
-          turnsElapsed: 0,
-          unitLabel: "turn",
-          unitLabelPlural: "turns"
+      // Remove any existing dying effects to avoid duplicates
+      try {
+        const existing = actor.effects.filter(e => e.flags?.[scope]?.isDying);
+        if (existing.length) {
+          if (game.user.isGM || actor.isOwner) {
+            await actor.deleteEmbeddedDocuments("ActiveEffect", existing.map(e => e.id));
+          } else {
+            const { runAsGM } = await import("../../gm-utils.js");
+            await runAsGM({
+              operation: "deleteEmbeddedDocuments",
+              targetActorUuid: actor.uuid,
+              args: ["ActiveEffect", existing.map(e => e.id)]
+            });
+          }
         }
-      },
-      changes: [
-        { key: "system.status.dying", mode: CONST.ACTIVE_EFFECT_MODES.OVERRIDE, value: true }
-      ],
-      statuses: ["dying"]
-      // NO DURATION - persists until manually removed
-    };
+      } catch (_) {}
 
-    await actor.createEmbeddedDocuments("ActiveEffect", [effectData]);
-  }
+      const effectData = {
+        name: "Dying",
+        img: "icons/svg/skull.svg",
+        origin: actor.uuid,
+        disabled: false,
+        flags: {
+          [scope]: {
+            isDying: true,
+            zeroHealth: true
+          }
+        },
+        changes: [
+          { key: "system.status.dying", mode: CONST.ACTIVE_EFFECT_MODES.OVERRIDE, value: true }
+        ],
+        statuses: ["dying"]
+        // NO DURATION - persists until manually removed
+      };
+
+      if (game.user.isGM || actor.isOwner) {
+        await actor.createEmbeddedDocuments("ActiveEffect", [effectData]);
+      } else {
+        const { runAsGM } = await import("../../gm-utils.js");
+        await runAsGM({
+          operation: "createEmbeddedDocuments",
+          targetActorUuid: actor.uuid,
+          args: ["ActiveEffect", [effectData]]
+        });
+      }
+    }
+
 
   /** Create an UNCONSCIOUS effect for non-dying outcomes (N rounds) */
   async _createStunnedEffect(actor, unconsciousRounds = 1) {
@@ -313,7 +329,16 @@ export class DeathSaveAction extends BaseAction {
     try {
       const existing = actor.effects.filter(e => e.statuses?.has?.("unconscious"));
       if (existing.length) {
-        await actor.deleteEmbeddedDocuments("ActiveEffect", existing.map(e => e.id));
+        if (game.user.isGM || actor.isOwner) {
+          await actor.deleteEmbeddedDocuments("ActiveEffect", existing.map(e => e.id));
+        } else {
+          const { runAsGM } = await import("../../gm-utils.js");
+          await runAsGM({
+            operation: "deleteEmbeddedDocuments",
+            targetActorUuid: actor.uuid,
+            args: ["ActiveEffect", existing.map(e => e.id)]
+          });
+        }
       }
     } catch (err) {
       console.error("Error deleting existing effects", err);
@@ -321,26 +346,39 @@ export class DeathSaveAction extends BaseAction {
 
     const effectData = {
       name: `Unconscious (${unconsciousRounds} rounds)`,
-      img: "icons/svg/unconscious.svg",
+      img: "icons/svg/sleep.svg",
       origin: actor.uuid,
+      disabled: false,
       flags: {
         [scope]: {
-          isStunned: true,
-          fromDeathSave: true,
-          unitLabel: "turn",
-          unitLabelPlural: "turns"
+          isUnconscious: true,
+          zeroHealth: true,
+          durationRounds: Number(unconsciousRounds)
         }
       },
+      changes: [
+        { key: "system.status.unconscious", mode: CONST.ACTIVE_EFFECT_MODES.OVERRIDE, value: true }
+      ],
       statuses: ["unconscious"],
       duration: usesCTT
         ? { seconds: Math.max(1, Number(unconsciousRounds)) * 6, startTime: game.time.worldTime }
         : { rounds: Math.max(1, Number(unconsciousRounds)), startRound: game.combat?.round || 0 }
     };
     
-    await actor.createEmbeddedDocuments("ActiveEffect", [effectData]);
+    if (game.user.isGM || actor.isOwner) {
+      await actor.createEmbeddedDocuments("ActiveEffect", [effectData]);
+    } else {
+      const { runAsGM } = await import("../../gm-utils.js");
+      await runAsGM({
+        operation: "createEmbeddedDocuments",
+        targetActorUuid: actor.uuid,
+        args: ["ActiveEffect", [effectData]]
+      });
+    }
     
     ui.notifications.info(`Stunned effect created for ${actor.name} (${unconsciousRounds} rounds).`);
   }
+
 
   /** Build a simple endurance "ladder" preview for the chat card */
   _buildEnduranceLadder(startRank = "Typical") {

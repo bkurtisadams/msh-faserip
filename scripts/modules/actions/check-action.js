@@ -175,7 +175,7 @@ export class CheckAction extends BaseAction {
             slamEffect,
             knockbackDistance,
             attackerStrength
-          });
+          }, this.opts);
         }
       }
 
@@ -420,7 +420,37 @@ export class CheckAction extends BaseAction {
     }
 
     if (actionType === "slam" && !effectsSuppressed) {
-      await this._createSlamEffect(actor, { targetUuid: this.opts?.prefill?.targetUuid || "", dmgThrough: choice.dmgThrough }, colorLower);
+      // Manual path - map color to slam effect (same logic as auto path)
+      const prefill = this.opts?.prefill || {};
+      const attackerStrength = prefill.attackerStrength || 30;
+      let slamEffect = "";
+      let knockbackDistance = 0;
+      
+      switch (colorLower) {
+        case "white":
+          slamEffect = "Grand Slam";
+          knockbackDistance = getGrandSlamDistance(attackerStrength);
+          break;
+        case "green":
+          slamEffect = "1 Area";
+          knockbackDistance = 1;
+          break;
+        case "yellow":
+          slamEffect = "Stagger";
+          break;
+        case "red":
+          slamEffect = "No Slam";
+          break;
+      }
+      
+      if (slamEffect !== "No Slam") {
+        await this._createSlamEffect(actor, {
+          targetUuid: prefill.targetUuid || "",
+          slamEffect,
+          knockbackDistance,
+          attackerStrength
+        }, this.opts);
+      }
     }
 
     if (actionType === "kill" && !effectsSuppressed) {
@@ -491,7 +521,7 @@ export class CheckAction extends BaseAction {
   async _createStunnedEffect(targetUuid, targetName, rounds=1) {
     const targetActor = await this._resolveTokenActor(targetUuid);
     if (!targetActor) return;
-    await Effects.applyStun(targetActor, { rounds });
+    await Effects.applyStun(targetActor, { rounds }, this.opts || {});
     ui.notifications.info(`${targetName || targetActor.name}: Stunned for ${rounds} round${rounds>1?"s":""}.`);
   }
 
@@ -506,18 +536,18 @@ export class CheckAction extends BaseAction {
     return 6;
   }
 
-  async _createSlamEffect(actor, options) {
+  async _createSlamEffect(actor, options, opts = {}) {
     const { targetUuid, slamEffect, knockbackDistance, attackerStrength } = options;
     const targetActor = await this._resolveTokenActor(targetUuid);
     if (!targetActor) return;
     
     const SCOPE = globalThis.MSH_FLAG_SCOPE || "msh-faserip";
-    let effectData = null;
     
     if (slamEffect === "Grand Slam") {
-      effectData = {
+      await Effects.applyEffect(targetActor, {
         name: `Grand Slam (Knockback ${knockbackDistance} areas)`,
-        icon: "icons/svg/falling.svg",
+        img: "icons/svg/falling.svg",
+        rounds: 2,
         origin: this.actor?.uuid ?? null,
         flags: {
           [SCOPE]: {
@@ -529,16 +559,13 @@ export class CheckAction extends BaseAction {
         changes: [
           { key: "system.status.prone", mode: CONST.ACTIVE_EFFECT_MODES.OVERRIDE, value: true }
         ],
-        duration: {
-          rounds: 2,
-          startRound: game.combat?.round ?? 0
-        },
         statuses: ["prone"]
-      };
+      }, opts);
     } else if (slamEffect === "1 Area") {
-      effectData = {
+      await Effects.applyEffect(targetActor, {
         name: "Slammed (1 Area)",
-        icon: "icons/svg/falling.svg",
+        img: "icons/svg/falling.svg",
+        rounds: 1,
         origin: this.actor?.uuid ?? null,
         flags: {
           [SCOPE]: { slammed: true, distance: 1 }
@@ -546,29 +573,18 @@ export class CheckAction extends BaseAction {
         changes: [
           { key: "system.status.prone", mode: CONST.ACTIVE_EFFECT_MODES.OVERRIDE, value: true }
         ],
-        duration: {
-          rounds: 1,
-          startRound: game.combat?.round ?? 0
-        },
         statuses: ["prone"]
-      };
+      }, opts);
     } else if (slamEffect === "Stagger") {
-      effectData = {
+      await Effects.applyEffect(targetActor, {
         name: "Staggered",
-        icon: "icons/svg/stoned.svg",
+        img: "icons/svg/stoned.svg",
+        rounds: 1,
         flags: {
           [SCOPE]: { staggered: true }
         },
-        duration: {
-          rounds: 1,
-          startRound: game.combat?.round ?? 0
-        },
         statuses: ["staggered"]
-      };
-    }
-    
-    if (effectData) {
-      await targetActor.createEmbeddedDocuments("ActiveEffect", [effectData]);
+      }, opts);
     }
   }
 

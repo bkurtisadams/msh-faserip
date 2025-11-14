@@ -1051,17 +1051,49 @@ export async function applyDamageToTargets({
         continue; // Skip to next target
       }
       // ===== END DAMAGE TO 0 HP HANDLING =====
+      const canDirectUpdate = game.user.isGM || targetActor?.isOwner;
 
-      await targetActor?.update(
-        { [hpPath]: after },
-        { healthChange: { old: before, new: after } }
-      );
+      if (canDirectUpdate) {
+        // GM or actor owner: update directly
+        await targetActor?.update(
+          { [hpPath]: after },
+          { healthChange: { old: before, new: after } }
+        );
 
-      // Record damage timestamp for rest system
-      if (before > after) {
-        await recordDamage(targetActor);
+        // Record damage timestamp for rest system
+        if (before > after) {
+          await recordDamage(targetActor);
+        }
+      } else if (targetActor) {
+        // Non-owner player hitting a non-owned token: delegate to GM
+        try {
+          if (game.msh?.runAsGM) {
+            await game.msh.runAsGM({
+              operation: "update",
+              targetActorUuid: targetActor.uuid,
+              // gm-utils/updateActor uses args[0] as updateData
+              args: [{ [hpPath]: after }]
+            });
+          } else if (game.msh?.socket?.executeAsGM) {
+            // Fallback: call through SocketLib directly if that’s how you configured it
+            await game.msh.socket.executeAsGM("runGMCommand", {
+              operation: "update",
+              targetActorUuid: targetActor.uuid,
+              args: [{ [hpPath]: after }]
+            });
+          } else {
+            console.warn("FASERIP | No GM helper available for applyDamageToTargets");
+          }
+        } catch (err) {
+          console.error("FASERIP | applyDamageToTargets GM update failed", err, {
+            targetActorUuid: targetActor.uuid,
+            hpPath,
+            before,
+            after
+          });
+          ui.notifications?.warn?.("Could not apply damage via GM helper. See console.");
+        }
       }
-      
     }
   } catch (outer) {
     console.error("FASERIP | applyDamageToTargets outer error", outer);

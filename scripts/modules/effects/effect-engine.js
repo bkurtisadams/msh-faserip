@@ -160,29 +160,100 @@ export async function applyEffect(target, effectData = {}, opts = {}) {
     }
   };
 
+  // Permission check: can the current user create effects on this actor?
+  // For unlinked tokens (ActorDelta), we must check the parent token's ownership
+  let canCreate = game.user.isGM;
+  
+  if (!canCreate) {
+    // Try multiple ways to detect and handle unlinked tokens/ActorDeltas
+    
+    // Method 1: Check if actor has .token property with isLinked = false
+    if (actor.token?.isLinked === false) {
+      const tokenDoc = actor.token;
+      canCreate = tokenDoc.isOwner;
+    }
+    // Method 2: Check if actor has a parent TokenDocument (ActorDelta pattern)
+    else if (actor.parent && actor.parent.documentName === "Token") {
+      canCreate = actor.parent.isOwner;
+    }
+    // Method 3: Check if this is a synthetic actor (has isToken property)
+    else if (actor.isToken === true) {
+      // Try to find the token this synthetic actor belongs to
+      const token = canvas.tokens?.placeables?.find(t => t.actor === actor);
+      if (token?.document) {
+        canCreate = token.document.isOwner;
+      } else {
+        // Can't find token, check actor ownership as fallback
+        canCreate = actor.isOwner;
+      }
+    }
+    // Method 4: Regular linked actor or base actor
+    else {
+      canCreate = actor.isOwner;
+    }
+  }
+  
+  // If user lacks permission, use GM socket to create the effect
+  if (!canCreate) {
+    try {
+      // Import the GM utils module
+      const { executeAsGM } = await import("../../gm-utils.js");
+      
+      // Have the GM create the effect via socket
+      const created = await executeAsGM("createActorEffect", {
+        targetActorUuid: actor.uuid,
+        effectData: payload
+      });
+      
+      // Rename with remaining time if successful
+      if (created?.[0]?.id) {
+        const effect = actor.effects.get(created[0].id);
+        if (effect) await renameEffectWithRemaining(effect);
+      }
+      
+      return Array.isArray(created) ? created[0] : created;
+    } catch (err) {
+      console.error("[effect-engine] Failed to create effect via GM socket:", err, {
+        actorName: actor.name,
+        effectName: payload.name,
+        user: game.user.name
+      });
+      // In auto-apply mode, fail silently
+      if (!opts.autoApply) {
+        ui.notifications?.error?.(`Failed to apply "${payload.name}" - GM socket error`);
+      }
+      return null;
+    }
+  }
+
+  // User has permission - create directly
   try {
-    // Create on the actor (lets Foundry handle parent linkage & hooks)
     const createdArr = await actor.createEmbeddedDocuments("ActiveEffect", [payload]);
     const created = Array.isArray(createdArr) ? createdArr[0] : createdArr;
     if (created?.id) await renameEffectWithRemaining(created);
     return created;
   } catch (err) {
-    console.error("[effect-engine] applyEffect failed:", err, { payload });
-    ui.notifications?.error?.("Failed to apply effect (see console).");
+    console.error("[effect-engine] applyEffect failed:", err, { 
+      payload,
+      actorName: actor.name
+    });
+    if (!opts.autoApply) {
+      ui.notifications?.error?.("Failed to apply effect (see console).");
+    }
     return null;
   }
 }
 
 /* ===== Specific wrappers for common combat effects ===== */
 
-export async function applyStun(actor, { rounds = 1, originUuid = null } = {}) {
+export async function applyStun(actor, { rounds = 1, originUuid = null } = {}, opts = {}) {
   return applyEffect(actor, {
     name: "Stunned",
     img: "icons/svg/daze.svg",
     rounds,
     originUuid,
     flags: { status: { isStunned: true }, meta: { unitLabel: "turn", unitLabelPlural: "turns" } }
-  });
+  }, opts);
 }
 
 export async function applyEvade(actor, { target = "", nextRoundAttackBonusCS = 0, note = "" } = {}) {
@@ -229,13 +300,13 @@ export async function applyCatch(actor, { scenario = "generic", vsYou = "", note
 }
 
 /** Apply Slam note/prone/stagger. Optionally drive token displacement elsewhere. */
-export async function applySlam(actor, { kind = "No Slam", knockbackAreas = 0, prone = false, stagger = false } = {}) {
+export async function applySlam(actor, { kind = "No Slam", knockbackAreas = 0, prone = false, stagger = false } = {}, opts = {}) {
   return applyEffect(actor, {
     name: `Slam (${kind})`,
     img: "icons/svg/target.svg",
     rounds: (stagger || prone) ? 1 : 0, // stagger/prone last one round; pure note lasts 0 (timeless)
     flags: { status: { isSlammed: true }, kind, knockbackAreas, prone, stagger }
-  });
+  }, opts);
 }
 
 /** Create/refresh Dying state (no timer; update handled by updateCombat) */
