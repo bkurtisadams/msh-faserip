@@ -162,10 +162,10 @@ export class FaseripActor extends Actor {
     }
     
     // Force set the disposition if it's wrong
-    if (this.prototypeToken.disposition !== defaultDisposition) {
+    /* if (this.prototypeToken.disposition !== defaultDisposition) {
       console.log(`FASERIP: Correcting disposition for ${this.type} "${this.name}" from ${this.prototypeToken.disposition} to ${defaultDisposition}`);
       this.prototypeToken.updateSource({ disposition: defaultDisposition });
-    }
+    } */
   }
 
   prepareDerivedData() {
