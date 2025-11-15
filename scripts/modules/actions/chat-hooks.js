@@ -65,25 +65,35 @@ export function installActionChatHandlers() {
     const alreadyHandled = await message.getFlag(SCOPE, "autoSaveHandled");
     if (alreadyHandled) return;
 
-      // Only GM or message owner should run auto-save logic that sets flags / rolls extra saves
-      if (!game.user.isGM && !message.isOwner) {
-        if (game.settings.get("msh-faserip", "debugMode")) {
-          console.log("FASERIP | Auto-save skipping for non-owner non-GM", {
-            msgId: message.id,
-            user: game.user.name
-          });
-        }
-        return;
+    // Only a user who can edit this message should drive auto-save logic.
+    // safeSetFlag will enforce this too, but this keeps the logs cleaner.
+    const canDriveAutoSaves = message.isOwner || game.user.isGM;
+    if (!canDriveAutoSaves) {
+      if (game.settings.get("msh-faserip", "debugMode")) {
+        console.log("FASERIP | Auto-save skipping (no message ownership)", {
+          msgId: message.id,
+          user: game.user.name
+        });
       }
+      return;
+    }
 
     let firedAnyCheck = false; // <— track if we actually ran something
 
-    // --- NEW: Full-Auto auto-rolling of saves (Stun/Slam/Kill/Nullify/Death) ---
+   // --- NEW: Full-Auto auto-rolling of saves (Stun/Slam/Kill/Nullify/Death) ---
     try {
       const alreadyChecks = message?.flags?.[SCOPE]?.autoChecksDone === true;
       if (!alreadyChecks) {
-        // Set flag immediately to prevent race condition (multiple renderChatMessage events)
-        await safeSetFlag(message, SCOPE, "autoChecksDone", true);
+        const didSet = await safeSetFlag(message, SCOPE, "autoChecksDone", true);
+        if (!didSet) {
+          if (game.settings.get("msh-faserip", "debugMode")) {
+            console.log("FASERIP | autoChecksDone not set - skipping auto-saves", {
+              msgId: message.id,
+              user: game.user.name
+            });
+          }
+          return;
+        }
 
         // Derive an "owner" actor (attacker or speaker)
         let ownerActor = null;
@@ -101,6 +111,9 @@ export function installActionChatHandlers() {
           const chips     = html.find('a.faserip-chip[data-check]');
           const forceBtns = html.find('[data-action="force-save"], [data-action="force-save-nullify"]');
           const deathBtns = html.find('[data-action="death-save"]');
+
+          // Track which (checkType, defender) pairs we've already auto-run for this message
+          const autoSaveDefenderKeys = new Set();
 
           // Per-chip auto run (Stun/Slam/Kill). Chips from attacks include per-target prefill.
           // Auto-run Stun/Slam/Kill per defender in Full mode
@@ -127,6 +140,30 @@ export function installActionChatHandlers() {
               saveActor = game.user.targets.first()?.actor ?? null;
             }
             if (!saveActor) continue;
+
+            // Only auto-run on a client that can control this defender
+            const canControlDefender = saveActor?.isOwner || game.user.isGM;
+            if (!canControlDefender) {
+              if (game.settings.get("msh-faserip", "debugMode")) {
+                console.log("FASERIP | Auto-save skipping for defender I don't own", {
+                  msgId: message.id,
+                  user: game.user.name,
+                  defender: saveActor.name
+                });
+              }
+              continue;
+            }
+
+            // De-duplicate: one save per defender per check type per message
+            const defUuid = saveActor.uuid || saveActor.id || saveActor.name;
+            const key = `${checkType}:${defUuid}`;
+            if (autoSaveDefenderKeys.has(key)) {
+              if (game.settings.get("msh-faserip", "debugMode")) {
+                console.log("FASERIP | Skipping duplicate auto-save", { key, defender: saveActor.name });
+              }
+              continue;
+            }
+            autoSaveDefenderKeys.add(key);
 
             // Only auto-run if the DEFENDER is in Full mode
             if (resolveCombatMode(saveActor) !== "full") continue;
@@ -192,11 +229,12 @@ export function installActionChatHandlers() {
           }
 
           // Death Save auto-run
-          if (deathBtns.length) {
+          /* if (deathBtns.length) {
             await game.msh.actions.roll("death-save", { actor: ownerActor });
             firedAnyCheck = true;
-          }
-          // ✅ mark handled only if we actually ran something
+          } */
+          
+          // mark handled only if we actually ran something
           if (firedAnyCheck) {
             await safeSetFlag(message, SCOPE, "autoSaveHandled", true);
           }

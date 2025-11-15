@@ -819,11 +819,9 @@ export function initializeSlamHandlers() {
                         targets: [targetTokenOrDoc]
                     });
 
-                    ui.notifications.info(
                        ui.notifications.info(
                         `${targetActor.name} is slammed into the wall for ${slamResults.damageToCharacter} collision impact (before armor).`
                         );
-                    );
                     }
                 } catch (err) {
                     console.error("[COLLISION] Failed to apply collision damage", err);

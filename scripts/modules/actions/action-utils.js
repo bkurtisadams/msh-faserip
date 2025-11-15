@@ -2,8 +2,23 @@ import { ACTION_LABELS, ACTION_EFFECTS } from "./action-config.js";
 import { applyNullifiedEffect, isAuraMaintained } from "./nullify.js";
 import { calculateMitigation } from "../../rules/mitigation.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
-import { resolveCombatMode } from "./action-dispatcher.js";
+// NOTE: do NOT import resolveCombatMode here – that creates a circular dependency
 import { recordDamage } from "../rest-system.js";
+
+// Local helper to read the global combat mode without importing action-dispatcher
+function resolveCombatModeSafe(actor) {
+  try {
+    const globalMode = game.settings?.get?.("msh-faserip", "defaultCombatMode");
+    if (globalMode) return String(globalMode);
+    // Fallback if setting not found
+    console.log("FASERIP DEBUG | resolveCombatModeSafe - using fallback: semi");
+    return "semi";
+  } catch (e) {
+    console.log("FASERIP DEBUG | resolveCombatModeSafe error, fallback: semi", e);
+    return "semi";
+  }
+}
+
 
 // Given a Token or Actor, return the correct Actor document for Active Effects
 export function actorForEffects(target) {
@@ -1028,7 +1043,7 @@ export async function applyDamageToTargets({
         console.log("⚠️ FASERIP | Hit on unconscious target:", targetActor.name, "- triggering death save");
         
         // resolveCombatMode is already imported at top of file
-        const mode = resolveCombatMode(targetActor) || "manual";
+        const mode = resolveCombatModeSafe(targetActor) || "manual";
         
         if (mode === "full") {
           console.log("FASERIP DEBUG | Full auto - triggering death save for unconscious target");
@@ -1523,7 +1538,7 @@ export async function applyNullifyToTarget(targetActor, attacker, { originUuid =
  * Post a chat card prompting for a death save when a character hits 0 Health
  */
 export async function postDeathSavePrompt(actor) {
-  const isFull = resolveCombatMode(actor) === "full";
+  const isFull = resolveCombatModeSafe(actor) === "full";
   
   // In full auto mode, don't post the prompt - death save runs automatically
   if (isFull) {

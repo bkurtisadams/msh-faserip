@@ -308,10 +308,15 @@ export class CheckAction extends BaseAction {
         stunDuration, rawStunDuration: rawDuration
       });
 
+      const headerActorName  = actor?.name || targetName || "Actor";
+      const headerTargetName = (targetName && targetName !== headerActorName) ? targetName : "";
+
       const content = `
         <div style="border:1px solid ${banner.bd};border-radius:3px;overflow:hidden;">
           <div style="padding:6px 10px;background:${banner.bg};color:${banner.fg};border-bottom:1px solid ${banner.bd};">
-            <b>${actor.name}</b> — ${labelFor(actionType)} vs <b>${targetName}</b>
+            <b>${headerActorName}</b> — ${labelFor(actionType)}${
+              headerTargetName ? ` vs <b>${headerTargetName}</b>` : ``
+            }
           </div>
           <div style="padding:8px 10px;font-size:.95em;">
             <div><b>Result:</b> <span style="text-transform:capitalize">${colorLower}</span> — ${effectText}</div>

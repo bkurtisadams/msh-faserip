@@ -536,7 +536,7 @@ export class AttackAction extends BaseAction {
         ? (resolveCombatMode(targetActor) === "full")
         : false;
 
-      const actions = (!isManualMode && !this.opts?.autoApply && isHit && canEffectsApply(penetratingDamage) && targetActor)
+      const actions = (!isManualMode && isHit && canEffectsApply(penetratingDamage) && targetActor)
         ? buildActionsBox({
             showSlam,
             showStun,
@@ -554,85 +554,6 @@ export class AttackAction extends BaseAction {
             autoSave: false,  // prevent chat button duplicates
           })
         : "";
-
-      // Auto-run Kill in full-auto mode
-      if (!isManualMode && this.opts?.autoApply && autoSave && showKill && targetActor) {
-        const { ActionDispatcher } = await import("./action-dispatcher.js");
-        console.log("BEFORE KILL CALL", {
-          targetActor,
-          targetActorName: targetActor?.name,
-          targetActorId: targetActor?.id
-        });
-        await ActionDispatcher.roll("kill", {
-          actor: targetActor,  // ✅ defender makes the save
-          abilityName: "endurance",  // ✅ specify the ability
-          opts: {
-            autoApply: true,
-            showConfirm: false,
-            attackForm,
-            prefill: {
-              targetUuid: target?.document?.uuid ?? target?.actor?.uuid,
-              dmgThrough: Number(penetratingDamage) || 0,
-              targetName: target?.name,
-              targetEndRank: targetActor?.system?.abilities?.endurance?.rank || "Good"
-            }
-          }
-        });
-      }
-
-      // Auto-run Slam in full-auto mode
-      if (!isManualMode && this.opts?.autoApply && autoSave && showSlam && targetActor) {
-        const { ActionDispatcher } = await import("./action-dispatcher.js");
-        console.log("BEFORE SLAM CALL", {
-          targetActor,
-          targetActorName: targetActor?.name,
-          targetActorId: targetActor?.id
-        });
-        await ActionDispatcher.roll("slam", {
-          actor: targetActor,  // ← TARGET makes the save, not attacker!
-          abilityName: "endurance",     // ← Slam uses Endurance FEAT
-          opts: {
-            autoApply: true,
-            showConfirm: false,
-            attackForm,
-            prefill: {
-              attackerUuid: actor.uuid,
-              attackerName: actor.name,
-              attackerStrength: actor.system?.abilities?.strength?.value || 30,
-              attackerStrengthRank: actor.system?.abilities?.strength?.rank || "Remarkable",
-              targetUuid: target?.document?.uuid ?? target?.actor?.uuid,
-              dmgThrough: Number(penetratingDamage) || 0,
-              targetName: target?.name,
-              targetEndRank: targetActor?.system?.abilities?.endurance?.rank || "Good"
-            }
-          }
-        });
-      }
-      
-      // Auto-run Stun in full-auto mode
-      if (!isManualMode && this.opts?.autoApply && autoSave && showStun && targetActor) {
-        const { ActionDispatcher } = await import("./action-dispatcher.js");
-        console.log("BEFORE STUN CALL", {
-          targetActor,
-          targetActorName: targetActor?.name,
-          targetActorId: targetActor?.id
-        });
-        await ActionDispatcher.roll("stun", {
-          actor: targetActor,  // ← TARGET makes the save, not attacker!
-          abilityName: "endurance",     // ← Slam uses Endurance FEAT
-          opts: {
-            autoApply: true,
-            showConfirm: false,
-            attackForm,
-            prefill: {
-              targetUuid: target?.document?.uuid ?? target?.actor?.uuid,
-              dmgThrough: Number(penetratingDamage) || 0,
-              targetName: target?.name,
-              targetEndRank: targetActor?.system?.abilities?.endurance?.rank || "Good"
-            }
-          }
-        });
-      }
 
       // Build pull punch indicator
       let pullPunchNote = "";
@@ -697,13 +618,7 @@ export class AttackAction extends BaseAction {
       await ChatMessage.create({
         speaker: ChatMessage.getSpeaker({ actor }),
         content: cardHtml,
-        flags: {
-          ...damageFlags,
-          [SCOPE]: {
-            ...(damageFlags?.[SCOPE] || {}),
-            autoChecksDone: true
-          }
-        }
+        flags: damageFlags
       });
 
       // Auto-apply damage for this target ONLY if not manual mode

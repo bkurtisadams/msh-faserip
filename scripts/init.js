@@ -26,26 +26,34 @@ import { initRestSystem } from "./modules/rest-system.js";
 import { ACTIONS } from '../helpers/action-constants.js';
 import { playCombatSFX, classifyWeapon } from "./modules/actions/audio-utils.js";
 
-Hooks.once("init", () => {
-  game.msh ??= {};
-  game.msh.playCombatSFX ??= playCombatSFX;
-  game.msh._classifyWeapon ??= classifyWeapon;
-});
-
-
 // Helper to resolve ACTIONS from CONFIG (for macro compatibility)
 function getActions() {
   return CONFIG?.MSHF?.ACTIONS || globalThis?.ACTIONS || {};
 }
 
-// Create global instance
-game.msh = game.msh || {};
-//game.msh.fallbackTimers = new FallbackTimerManager();
+// FASERIP Combat Sync - Use combatRound hook (fires once per round)
+Hooks.on("combatRound", async (combat, updateData, updateOptions, userId) => {
+  // 🔒 GM-only – only the GM advances world time
+  if (!game.user.isGM) return;
+  
+  const syncEnabled = game.settings.get("msh-faserip", "combatSyncEnabled");
+  if (!syncEnabled) return;
+  
+  // Advance Foundry world time by 6 seconds (1 FASERIP turn)
+  await game.time.advance(6);
+  console.log("🕐 FASERIP | Combat advanced time by 6 seconds");
+  
+  // Trigger hook to update team sheet display
+  Hooks.callAll("msh-faserip.timeUpdated");
+});
 
 Hooks.once("init", async () => {
-  // ---- Canonical flag scope + shim ----------------------------------------
-  // System-scoped flags go under your real system id.
+  // --- Global flag scope & namespace ---
   globalThis.MSH_FLAG_SCOPE = game.system?.id || "msh-faserip";
+
+  game.msh = game.msh || {};
+  game.msh.playCombatSFX = playCombatSFX;
+  game.msh._classifyWeapon = classifyWeapon;
 
   // Guard so we don't wrap twice if code reloads
   if (!ActiveEffect.prototype._mshFlagShimApplied) {
@@ -322,6 +330,17 @@ Hooks.once("init", async () => {
 
   // Delete round-based effects when they hit 0 remaining (safety net for custom flows)
   Hooks.on("updateCombat", async (combat, changes) => {
+    // Only GM should handle timed-effect auto-expiry
+    if (!game.user.isGM) {
+      if (game.settings.get("msh-faserip", "debugMode")) {
+        console.log("FASERIP | Skipping timed-effect auto-expire on non-GM client", {
+          user: game.user.name,
+          combatId: combat?.id
+        });
+      }
+      return;
+    }
+
     if (!("round" in changes) && !("turn" in changes)) return;    // only when advancing
     if (!combat?.active) return;
 
@@ -334,10 +353,8 @@ Hooks.once("init", async () => {
         const d = ef.duration ?? {};
         if (!Number.isFinite(d.rounds)) continue;                 // only timed-by-rounds
 
-        // Respect only this combat's lifecycle if startRound was stamped during this combat.
-        // (If you stamp a "combat id" flag yourself elsewhere, check it here.)
-        const startR = d.startRound ?? curRound;
-        const elapsed = Math.max(0, curRound - startR);
+        const startR   = d.startRound ?? curRound;
+        const elapsed  = Math.max(0, curRound - startR);
         const remaining = Math.ceil((d.rounds ?? 0) - elapsed);
 
         if (remaining <= 0 && !ef.disabled) {
@@ -346,6 +363,7 @@ Hooks.once("init", async () => {
       }
     }
   });
+
 
   /* Hooks.on("updateCombat", async (combat, changes) => {
     if (!("round" in changes) && !("turn" in changes)) return;
@@ -1278,8 +1296,6 @@ Hooks.on('updateActor', async (actor, updateData, options, userId) => {
   try {
     // --- GM-ONLY GUARD -----------------------------------------
     // Only the GM should run damage/effect logic.
-    // Players will trigger the HP change, but the GM client is
-    // the authority that actually handles death saves and rest timers.
     if (!game.user.isGM) {
       if (game.settings.get("msh-faserip", "debugMode")) {
         console.log("FASERIP | Skipping damage hook on non-GM client", {
@@ -1291,17 +1307,44 @@ Hooks.on('updateActor', async (actor, updateData, options, userId) => {
     }
     // -----------------------------------------------------------
 
-    if (!options?.healthChange) return;
+    // We prefer explicit healthChange when present (local updates),
+    // but remote clients (like the GM when a player caused the change)
+    // usually won't see options.healthChange at all.
+    let oldHealth, newHealth;
 
-    const { old: oldHealth, new: newHealth } = options.healthChange;
+    if (options?.healthChange) {
+      ({ old: oldHealth, new: newHealth } = options.healthChange);
+    } else {
+      // Derive from actor + updateData for remote/replicated updates
+      const path = "system.attributes.health.value";
+
+      // If this update didn't touch Health at all, bail out
+      const incoming = foundry.utils.getProperty(updateData, path);
+      if (incoming === undefined) return;
+
+      oldHealth = Number(foundry.utils.getProperty(actor, path) ?? 0);
+      newHealth = Number(incoming ?? 0);
+
+      if (game.settings.get("msh-faserip", "debugMode")) {
+        console.log("FASERIP | Derived healthChange for remote update", {
+          actor: actor.name,
+          user: game.user.name,
+          oldHealth,
+          newHealth
+        });
+      }
+    }
 
     // Ignore healing or non-damage changes (including 0->0)
-    // Note: if we want repeats on 0 HP, that’s handled below via pending flag.
     if (newHealth >= oldHealth && newHealth > 0) return;
 
+
+
+    // DEAD LEGACY CODE START
     // ===== SPECIAL: FLAGGED DAMAGE TO 0 HP TARGET =====
     // This is your "they were already at 0 HP, then got hit again" logic.
-    const pendingDamage = game.msh._pendingDamageToZeroHP?.[actor.id];
+
+/*     const pendingDamage = game.msh._pendingDamageToZeroHP?.[actor.id];
     if (pendingDamage && (Date.now() - pendingDamage.timestamp) < 1000) {
       console.log("FASERIP | Detected damage to 0 HP target - forcing death save");
       delete game.msh._pendingDamageToZeroHP[actor.id];
@@ -1327,6 +1370,8 @@ Hooks.on('updateActor', async (actor, updateData, options, userId) => {
       }
       return; // Exit early - don't process as normal damage
     }
+ */
+    // DEAD LEGACY CODE END
 
     // ===== THROTTLE DAMAGE TIMER CREATION (1.5s per actor) =====
     const now = Date.now();
@@ -1473,6 +1518,9 @@ Hooks.on('renderChatMessage', (message, html) => {
 
 // Each turn, decrement Endurance one printed rank for actors who are Dying (RAW)
 Hooks.on("updateCombat", async (combat, changed, diff, userId) => {
+  // 🔒 GM-only – players don't mutate actors/effects here
+  if (!game.user.isGM) return;
+
   console.log("🔄 FASERIP | updateCombat hook fired", { changed, round: combat.round, turn: combat.turn });
   
   // Only act when the turn actually changes
@@ -1538,21 +1586,6 @@ Hooks.on("updateCombat", async (combat, changed, diff, userId) => {
       }
     }
   } */
-
-  // FASERIP Combat Sync - Use combatRound hook (fires once per round)
-  Hooks.on("combatRound", async (combat, updateData, updateOptions) => {
-    if (!game.user.isGM) return;
-    
-    const syncEnabled = game.settings.get("msh-faserip", "combatSyncEnabled");
-    if (!syncEnabled) return;
-    
-    // Advance Foundry world time by 6 seconds (1 FASERIP turn)
-    await game.time.advance(6);
-    console.log("🕐 FASERIP | Combat advanced time by 6 seconds");
-    
-    // Trigger hook to update team sheet display
-    Hooks.callAll("msh-faserip.timeUpdated");
-  });
 
   const scope = globalThis.MSH_FLAG_SCOPE || "msh-faserip";
   console.log("🔍 FASERIP | Checking all combatants for Dying effects...");
