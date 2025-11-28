@@ -106,8 +106,8 @@ export class FaseripActorSheet extends ActorSheet {
     return foundry.utils.mergeObject(super.defaultOptions, {
       classes: ["faserip-sheet", "sheet", "actor"],
       template: "systems/msh-faserip/templates/actor-sheet.html",
-      width: 650,
-      height: 700,
+      width: 700,
+      height: 800,
       tabs: [{ navSelector: ".sheet-tabs-navigation", contentSelector: ".sheet-tab-content", initial: "powers" },
         { navSelector: ".sheet-tabs-navigation", contentSelector: ".sheet-tab-content", tab: "create-character", label: "Creator" }],
       submitOnChange: true,
@@ -862,7 +862,7 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
       // Re-render the sheet
       this.render(false);
     });
-    
+
     // Handle form changes in biography section
     html.find('.biography-details input, .biography-details textarea').change(ev => {
       const formData = this._getSubmitData();

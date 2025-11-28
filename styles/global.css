@@ -2521,13 +2521,13 @@
 }
 
 /* Fix the space distribution in universal table dialog */
-.dialog .dialog-buttons {
+.universal-table-dialog .dialog-buttons {
     flex-grow: 0 !important;
     flex-shrink: 0 !important;
     height: auto !important;
 }
 
-.dialog .dialog-content {
+.universal-table-dialog .dialog-content {
     flex-grow: 1 !important;
     height: 100% !important;
     display: flex !important;
@@ -2921,7 +2921,8 @@
 
 /* ====== OUTER FORM ====== */
 /* Let the window scroll */
-.window-content { overflow: auto !important; }
+/* scope to FASERIP sheets only */
+.faserip-sheet .window-content { overflow: auto !important; }
 
 /* Form should NOT create its own scrollbar */
 form.faserip-sheet {
@@ -2942,8 +2943,7 @@ form.faserip-sheet > .sheet-body {
 }
 
 /* Sometimes themes set .window-content to scroll as well */
-.window-content { overflow: hidden; }   /* optional, only if you see a double scroll */
-
+/* .window-content { overflow: hidden; } */   /* optional, only if you see a double scroll */
 
 /* ====== TOP HEADER (keeps your exact HTML) ====== */
 form.faserip-sheet .sheet-header.marvel-header {
@@ -3128,6 +3128,17 @@ form.faserip-sheet .identity-section input[type="radio"] {
 .msh-biofield input, .msh-biofield textarea{ width:100%; box-sizing:border-box; font-size:12.5px; }
 .msh-biofield textarea{ padding:6px; }
 .msh-biofield.msh-full{ grid-column:1 / -1; }
+
+/* Larger history box with scrollbar in the FASERIP sheet */
+.faserip-sheet .msh-biofield.msh-full .editor {
+  height: 260px;           /* overall size of the History area */
+}
+
+.faserip-sheet .msh-biofield.msh-full .editor .editor-content {
+  height: 100%;            /* fill the box */
+  overflow-y: auto;        /* vertical scrollbar when text overflows */
+  padding-right: 4px;      /* a little room next to the scrollbar */
+}
 
 /* ========================================
    ABILITIES & MOVEMENT SECTION - MATCHED HEADERS

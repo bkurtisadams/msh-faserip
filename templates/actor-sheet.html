@@ -109,8 +109,10 @@
       <div class="msh-biofield"><label>Eye Color</label><input type="text" name="system.eyeColor" value="{{system.eyeColor}}" /></div>
       <div class="msh-biofield"><label>Hair Color</label><input type="text" name="system.hairColor" value="{{system.hairColor}}" /></div>
     </div>
-    <div class="msh-biorow">
-      <div class="msh-biofield msh-full"><label>History</label><textarea name="system.history" rows="4">{{system.history}}</textarea></div>
+    <div class="msh-biofield msh-full">
+      <label>History</label>
+      <div class="history-preview">{{{system.history}}}</div>
+      <button type="button" class="history-edit-btn"><i class="fas fa-edit"></i> Edit History</button>
     </div>
   </div>
   {{/if}}
