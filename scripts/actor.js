@@ -242,27 +242,43 @@ export class FaseripActor extends Actor {
       "Class 3000": { areas: 50, mph: 750 },
       "Class 5000": { areas: 100, mph: 1500 }
     },
-    // Leaping by Strength rank: { horizontal areas, vertical floors up, safe fall floors }
+    // Air speed by rank: { areas/round, mph, groundAreas (for low altitude) }
+    airSpeed: {
+      "Feeble": { areas: 2, mph: 30, groundAreas: 1 },
+      "Poor": { areas: 4, mph: 60, groundAreas: 2 },
+      "Typical": { areas: 6, mph: 90, groundAreas: 3 },
+      "Good": { areas: 8, mph: 120, groundAreas: 4 },
+      "Excellent": { areas: 10, mph: 150, groundAreas: 5 },
+      "Remarkable": { areas: 15, mph: 225, groundAreas: 6 },
+      "Incredible": { areas: 20, mph: 300, groundAreas: 7 },
+      "Amazing": { areas: 25, mph: 375, groundAreas: 8 },
+      "Monstrous": { areas: 30, mph: 450, groundAreas: 9 },
+      "Unearthly": { areas: 40, mph: 600, groundAreas: 10 },
+      "Shift-X": { areas: 50, mph: 750, groundAreas: 12 },
+      "Shift-Y": { areas: 100, mph: 1500, groundAreas: 14 },
+      "Shift-Z": { areas: 200, mph: 3750, groundAreas: 16 }
+    },
+    // Leaping by Strength rank: feet and fractional areas/floors (1 area = 132', 1 floor = 15')
     leaping: {
-      "Feeble": { horizontal: 0, vertical: 0, safeFall: 1 },
-      "Poor": { horizontal: 0, vertical: 0, safeFall: 1 },
-      "Typical": { horizontal: 0, vertical: 1, safeFall: 1 },
-      "Good": { horizontal: 1, vertical: 1, safeFall: 1 },
-      "Excellent": { horizontal: 1, vertical: 1, safeFall: 2 },
-      "Remarkable": { horizontal: 2, vertical: 1, safeFall: 2 },
-      "Incredible": { horizontal: 3, vertical: 2, safeFall: 3 },
-      "Amazing": { horizontal: 4, vertical: 2, safeFall: 3 },
-      "Monstrous": { horizontal: 5, vertical: 3, safeFall: 5 },
-      "Unearthly": { horizontal: 6, vertical: 3, safeFall: 6 },
-      "Shift-X": { horizontal: 8, vertical: 4, safeFall: 8 },
-      "Shift X": { horizontal: 8, vertical: 4, safeFall: 8 },
-      "Shift-Y": { horizontal: 10, vertical: 5, safeFall: 10 },
-      "Shift Y": { horizontal: 10, vertical: 5, safeFall: 10 },
-      "Shift-Z": { horizontal: 15, vertical: 8, safeFall: 15 },
-      "Shift Z": { horizontal: 15, vertical: 8, safeFall: 15 },
-      "Class 1000": { horizontal: 30, vertical: 15, safeFall: 30 },
-      "Class 3000": { horizontal: 50, vertical: 25, safeFall: 50 },
-      "Class 5000": { horizontal: 100, vertical: 50, safeFall: 100 }
+      "Feeble": { upFeet: 2, acrossFeet: 2, downFeet: 3, upFloors: 0.1, acrossAreas: 0, downFloors: 0.2 },
+      "Poor": { upFeet: 4, acrossFeet: 4, downFeet: 8, upFloors: 0.3, acrossAreas: 0, downFloors: 0.5 },
+      "Typical": { upFeet: 6, acrossFeet: 6, downFeet: 9, upFloors: 0.4, acrossAreas: 0, downFloors: 0.6 },
+      "Good": { upFeet: 10, acrossFeet: 10, downFeet: 15, upFloors: 0.7, acrossAreas: 0.1, downFloors: 1 },
+      "Excellent": { upFeet: 20, acrossFeet: 20, downFeet: 30, upFloors: 1.3, acrossAreas: 0.2, downFloors: 2 },
+      "Remarkable": { upFeet: 30, acrossFeet: 30, downFeet: 45, upFloors: 2, acrossAreas: 0.2, downFloors: 3 },
+      "Incredible": { upFeet: 40, acrossFeet: 40, downFeet: 60, upFloors: 2.7, acrossAreas: 0.3, downFloors: 4 },
+      "Amazing": { upFeet: 50, acrossFeet: 50, downFeet: 75, upFloors: 3.3, acrossAreas: 0.4, downFloors: 5 },
+      "Monstrous": { upFeet: 75, acrossFeet: 75, downFeet: 105, upFloors: 5, acrossAreas: 0.6, downFloors: 7 },
+      "Unearthly": { upFeet: 100, acrossFeet: 100, downFeet: 150, upFloors: 6.7, acrossAreas: 0.8, downFloors: 10 },
+      "Shift-X": { upFeet: 150, acrossFeet: 150, downFeet: 225, upFloors: 10, acrossAreas: 1.1, downFloors: 15 },
+      "Shift X": { upFeet: 150, acrossFeet: 150, downFeet: 225, upFloors: 10, acrossAreas: 1.1, downFloors: 15 },
+      "Shift-Y": { upFeet: 200, acrossFeet: 200, downFeet: 300, upFloors: 13.3, acrossAreas: 1.5, downFloors: 20 },
+      "Shift Y": { upFeet: 200, acrossFeet: 200, downFeet: 300, upFloors: 13.3, acrossAreas: 1.5, downFloors: 20 },
+      "Shift-Z": { upFeet: 500, acrossFeet: 500, downFeet: 750, upFloors: 33.3, acrossAreas: 3.8, downFloors: 50 },
+      "Shift Z": { upFeet: 500, acrossFeet: 500, downFeet: 750, upFloors: 33.3, acrossAreas: 3.8, downFloors: 50 },
+      "Class 1000": { upFeet: 1000, acrossFeet: 1000, downFeet: 1500, upFloors: 66.7, acrossAreas: 7.6, downFloors: 100 },
+      "Class 3000": { upFeet: 3000, acrossFeet: 3000, downFeet: 4500, upFloors: 200, acrossAreas: 22.7, downFloors: 300 },
+      "Class 5000": { upFeet: 5000, acrossFeet: 5000, downFeet: 7500, upFloors: 333.3, acrossAreas: 37.9, downFloors: 500 }
     },
     // Rank numbers for exhaustion calculations
     rankNumbers: {
@@ -273,6 +289,23 @@ export class FaseripActor extends Actor {
       "Class 1000": 1000, "Class 3000": 3000, "Class 5000": 5000
     }
   };
+
+  // Lookup flight rank and ground speed from air areas/turn
+  static getFlightInfo(airAreas) {
+    for (const [rank, data] of Object.entries(FaseripActor.MOVEMENT_DATA.airSpeed)) {
+      if (data.areas === airAreas) {
+        return { rank, ...data };
+      }
+    }
+    // If no exact match, find closest
+    let closest = { rank: "Typical", areas: 6, mph: 90, groundAreas: 3 };
+    for (const [rank, data] of Object.entries(FaseripActor.MOVEMENT_DATA.airSpeed)) {
+      if (data.areas <= airAreas && data.areas > closest.areas) {
+        closest = { rank, ...data };
+      }
+    }
+    return closest;
+  }
 
   // Calculate suggested movement (areas/turn) based on Endurance rank
   get suggestedMovement() {
@@ -287,7 +320,7 @@ export class FaseripActor extends Actor {
   // Get leaping data based on Strength rank
   get leapingData() {
     const strengthRank = this.system.abilities?.strength?.rank || "Typical";
-    return FaseripActor.MOVEMENT_DATA.leaping[strengthRank] || { horizontal: 0, vertical: 1, safeFall: 1 };
+    return FaseripActor.MOVEMENT_DATA.leaping[strengthRank] || { upFeet: 6, acrossFeet: 6, downFeet: 9, upFloors: 0.4, acrossAreas: 0, downFloors: 0.6 };
   }
 
   // Get exhaustion threshold (turns before first FEAT check)

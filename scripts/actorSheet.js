@@ -4931,15 +4931,19 @@ async _rollAction(actionType, abilityName) {
   async _sendMovementToChat() {
     const info = this.actor.movementInfo;
     const movement = this.actor.system.movement || {};
+    const FaseripActor = CONFIG.Actor.documentClass;
     
     const runAreas = movement.run || this.actor.suggestedMovement;
     const swimAreas = movement.swim || 1;
     const flyAreas = movement.fly || 0;
     const teleportAreas = movement.teleport || 0;
-    const leapAreas = movement.leap || info.leap.horizontal;
+    const leapAreas = movement.leap || info.leap.acrossAreas;
     
-    // Calculate fly mph from air speed table or approximate
-    const flyMph = flyAreas > 0 ? flyAreas * 15 : 0;
+    // Get flight info from air speed table
+    const flightInfo = flyAreas > 0 ? FaseripActor.getFlightInfo(flyAreas) : null;
+    const flyMph = flightInfo ? flightInfo.mph : 0;
+    const lowAltitudeMax = flightInfo ? flightInfo.groundAreas : 0;
+    const flightRank = flightInfo ? flightInfo.rank : "";
     
     const cardHtml = `
       <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
@@ -4948,18 +4952,18 @@ async _rollAction(actionType, abilityName) {
         </div>
         <div style="padding:5px 10px;font-size:.9em;">
           <div><strong>Run:</strong> ${runAreas} areas/turn (${runAreas * 15} mph)</div>
-          <div><strong>Leap:</strong> ${leapAreas} areas horizontal</div>
+          <div><strong>Leap:</strong> ${leapAreas} areas across</div>
           <div><strong>Swim:</strong> ${swimAreas} areas/turn (${swimAreas * 15} mph)</div>
-          ${flyAreas > 0 ? `<div><strong>Fly:</strong> ${flyAreas} areas/turn (${flyMph} mph)</div>` : ''}
+          ${flyAreas > 0 ? `<div><strong>Fly:</strong> ${flyAreas} areas/turn (${flyMph} mph) — ${flightRank}</div>` : ''}
           ${teleportAreas > 0 ? `<div><strong>Teleport:</strong> ${teleportAreas} areas (instantaneous)</div>` : ''}
         </div>
         
         <details style="padding:5px 10px;border-top:1px solid #ddd;">
           <summary style="cursor:pointer;font-weight:bold;color:#333;">Leaping (Strength: ${info.strengthRank})</summary>
           <div style="padding:5px 0 0 10px;font-size:.85em;">
-            <div>Horizontal: ${leapAreas} areas</div>
-            <div>Vertical: ${info.leap.vertical} floors up</div>
-            <div>Safe Fall: ${info.leap.safeFall} floors</div>
+            <div>Across: ${info.leap.acrossFeet}' (${info.leap.acrossAreas} areas)</div>
+            <div>Up: ${info.leap.upFeet}' (${info.leap.upFloors} floors)</div>
+            <div>Down: ${info.leap.downFeet}' (${info.leap.downFloors} floors)</div>
           </div>
         </details>
         
@@ -4977,10 +4981,11 @@ async _rollAction(actionType, abilityName) {
         
         ${flyAreas > 0 ? `
         <details style="padding:5px 10px;border-top:1px solid #ddd;">
-          <summary style="cursor:pointer;font-weight:bold;color:#333;">Flight Rules</summary>
+          <summary style="cursor:pointer;font-weight:bold;color:#333;">Flight Rules (${flightRank})</summary>
           <div style="padding:5px 0 0 10px;font-size:.85em;">
             <div>Acceleration: ${info.acceleration} areas/turn</div>
-            <div>Low altitude max: ${runAreas} areas/turn</div>
+            <div>Low altitude/enclosed max: ${lowAltitudeMax} areas/turn</div>
+            <div>Exceeding ${lowAltitudeMax} areas requires Agility FEAT</div>
             <div>90° turn costs 1 area</div>
             <div>>90° turn requires Agility FEAT</div>
             <div>Landing at >3 areas/turn requires Agility FEAT</div>
