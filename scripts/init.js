@@ -384,13 +384,13 @@ Hooks.once("init", async () => {
 
   // Register Action HUD keybinding
   game.keybindings.register("msh-faserip", "openActionHUD", {
-    name: "Open Action HUD",
-    hint: "Opens the Action HUD for quick access to combat actions",
+    name: "Toggle Action HUD",
+    hint: "Toggles the Action HUD for quick access to combat actions",
     category: "FASERIP",
-    editable: [{ key: "KeyH", modifiers: ["Control"] }],  // Ctrl+H
+    editable: [{ key: "KeyA", modifiers: ["Control"] }],  // Ctrl+A
     onDown: () => {
       if (ui.faseripHUD?.rendered) {
-        ui.faseripHUD.bringToTop();
+        ui.faseripHUD.close();
       } else {
         ui.faseripHUD = new FaseripActionHUD();
         ui.faseripHUD.render(true);
