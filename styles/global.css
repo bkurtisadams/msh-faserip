@@ -3545,7 +3545,7 @@ form.faserip-sheet .movement-panel {
   background: #fff;
   padding: 8px 10px;
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 8px 12px;
 }
 
@@ -3571,6 +3571,21 @@ form.faserip-sheet .movement-panel input[type="number"] {
   appearance: textfield;
   -moz-appearance: textfield;
   -webkit-appearance: none;
+}
+
+form.faserip-sheet .movement-panel .movement-chat-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 26px;
+  background: #8b0000;
+  color: #fff;
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+form.faserip-sheet .movement-panel .movement-chat-btn:hover {
+  background: #a00000;
 }
 
 /* ===== Recovery & Rest Section ===== */

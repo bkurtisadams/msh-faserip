@@ -211,23 +211,112 @@ export class FaseripActor extends Actor {
     let totalSpent = 0;
     history.forEach(event => {
       // Only count negative amounts (spending), and ignore daily roll entries completely
-      if (event.amount < 0 && event.type !== "Daily Roll") {  // <-- ADD THIS CHECK
+      if (event.amount < 0 && event.type !== "Daily Roll") {
         totalSpent += Math.abs(event.amount);
       }
     });
     return totalSpent;
   }
 
+  // Movement data tables
+  static MOVEMENT_DATA = {
+    // Land/Water speed by rank: { areas/round, mph }
+    landSpeed: {
+      "Feeble": { areas: 1, mph: 15 },
+      "Poor": { areas: 2, mph: 30 },
+      "Typical": { areas: 3, mph: 45 },
+      "Good": { areas: 4, mph: 60 },
+      "Excellent": { areas: 5, mph: 75 },
+      "Remarkable": { areas: 6, mph: 90 },
+      "Incredible": { areas: 7, mph: 105 },
+      "Amazing": { areas: 8, mph: 120 },
+      "Monstrous": { areas: 9, mph: 135 },
+      "Unearthly": { areas: 10, mph: 150 },
+      "Shift-X": { areas: 12, mph: 180 },
+      "Shift X": { areas: 12, mph: 180 },
+      "Shift-Y": { areas: 14, mph: 210 },
+      "Shift Y": { areas: 14, mph: 210 },
+      "Shift-Z": { areas: 16, mph: 240 },
+      "Shift Z": { areas: 16, mph: 240 },
+      "Class 1000": { areas: 32, mph: 480 },
+      "Class 3000": { areas: 50, mph: 750 },
+      "Class 5000": { areas: 100, mph: 1500 }
+    },
+    // Leaping by Strength rank: { horizontal areas, vertical floors up, safe fall floors }
+    leaping: {
+      "Feeble": { horizontal: 0, vertical: 0, safeFall: 1 },
+      "Poor": { horizontal: 0, vertical: 0, safeFall: 1 },
+      "Typical": { horizontal: 0, vertical: 1, safeFall: 1 },
+      "Good": { horizontal: 1, vertical: 1, safeFall: 1 },
+      "Excellent": { horizontal: 1, vertical: 1, safeFall: 2 },
+      "Remarkable": { horizontal: 2, vertical: 1, safeFall: 2 },
+      "Incredible": { horizontal: 3, vertical: 2, safeFall: 3 },
+      "Amazing": { horizontal: 4, vertical: 2, safeFall: 3 },
+      "Monstrous": { horizontal: 5, vertical: 3, safeFall: 5 },
+      "Unearthly": { horizontal: 6, vertical: 3, safeFall: 6 },
+      "Shift-X": { horizontal: 8, vertical: 4, safeFall: 8 },
+      "Shift X": { horizontal: 8, vertical: 4, safeFall: 8 },
+      "Shift-Y": { horizontal: 10, vertical: 5, safeFall: 10 },
+      "Shift Y": { horizontal: 10, vertical: 5, safeFall: 10 },
+      "Shift-Z": { horizontal: 15, vertical: 8, safeFall: 15 },
+      "Shift Z": { horizontal: 15, vertical: 8, safeFall: 15 },
+      "Class 1000": { horizontal: 30, vertical: 15, safeFall: 30 },
+      "Class 3000": { horizontal: 50, vertical: 25, safeFall: 50 },
+      "Class 5000": { horizontal: 100, vertical: 50, safeFall: 100 }
+    },
+    // Rank numbers for exhaustion calculations
+    rankNumbers: {
+      "Feeble": 2, "Poor": 4, "Typical": 6, "Good": 10, "Excellent": 20,
+      "Remarkable": 30, "Incredible": 40, "Amazing": 50, "Monstrous": 75,
+      "Unearthly": 100, "Shift-X": 150, "Shift X": 150, "Shift-Y": 200, 
+      "Shift Y": 200, "Shift-Z": 500, "Shift Z": 500,
+      "Class 1000": 1000, "Class 3000": 3000, "Class 5000": 5000
+    }
+  };
+
   // Calculate suggested movement (areas/turn) based on Endurance rank
   get suggestedMovement() {
     const enduranceRank = this.system.abilities?.endurance?.rank || "Typical";
-    
-    // Feeble = 1 area, Poor-Excellent = 2 areas, Remarkable+ = 3 areas
     const oneAreaRanks = ["Feeble"];
     const twoAreaRanks = ["Poor", "Typical", "Good", "Excellent"];
-    
     if (oneAreaRanks.includes(enduranceRank)) return 1;
     if (twoAreaRanks.includes(enduranceRank)) return 2;
-    return 3; // Remarkable and higher
+    return 3;
+  }
+
+  // Get leaping data based on Strength rank
+  get leapingData() {
+    const strengthRank = this.system.abilities?.strength?.rank || "Typical";
+    return FaseripActor.MOVEMENT_DATA.leaping[strengthRank] || { horizontal: 0, vertical: 1, safeFall: 1 };
+  }
+
+  // Get exhaustion threshold (turns before first FEAT check)
+  get exhaustionThreshold() {
+    const enduranceRank = this.system.abilities?.endurance?.rank || "Typical";
+    return FaseripActor.MOVEMENT_DATA.rankNumbers[enduranceRank] || 6;
+  }
+
+  // Get comprehensive movement info for chat card
+  get movementInfo() {
+    const endRank = this.system.abilities?.endurance?.rank || "Typical";
+    const strRank = this.system.abilities?.strength?.rank || "Typical";
+    const movement = this.system.movement || {};
+    
+    const runAreas = movement.run || this.suggestedMovement;
+    const swimAreas = movement.swim || 1;
+    const flyAreas = movement.fly || 0;
+    
+    return {
+      run: { areas: runAreas, mph: runAreas * 15 },
+      swim: { areas: swimAreas, mph: swimAreas * 15 },
+      fly: { areas: flyAreas, mph: flyAreas * 15 },
+      leap: this.leapingData,
+      exhaustion: {
+        threshold: this.exhaustionThreshold,
+        enduranceRank: endRank
+      },
+      acceleration: this.suggestedMovement,
+      strengthRank: strRank
+    };
   }
 }

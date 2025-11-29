@@ -44,10 +44,11 @@
       },
       "movement": {
         "movement": {
-          "run": 1,
-          "swim": 1,
+          "run": null,
+          "swim": null,
           "fly": 0,
           "teleport": 0,
+          "leap": null,
           "other": []
         }
       },

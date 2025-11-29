@@ -619,19 +619,36 @@
         <div class="movement-item">
           <label>Run</label>
           <input type="number" name="system.movement.run" value="{{system.movement.run}}" 
-                 placeholder="{{suggestedMovement}}" title="Base: {{suggestedMovement}} areas/turn (from Endurance)" />
+                 placeholder="{{suggestedMovement}}" 
+                 title="Base: {{suggestedMovement}} areas/turn (from Endurance)&#10;Speed: {{movementInfo.run.mph}} mph&#10;&#10;Actions while moving: half speed&#10;Turning >90°: half speed" />
+        </div>
+        <div class="movement-item">
+          <label>Leap</label>
+          <input type="number" name="system.movement.leap" value="{{system.movement.leap}}" 
+                 placeholder="{{leapingData.horizontal}}"
+                 title="Horizontal: {{leapingData.horizontal}} areas&#10;Vertical: {{leapingData.vertical}} floors up&#10;Safe Fall: {{leapingData.safeFall}} floors&#10;(Based on Strength rank)" />
         </div>
         <div class="movement-item">
           <label>Swim</label>
-          <input type="number" name="system.movement.swim" value="{{system.movement.swim}}" />
+          <input type="number" name="system.movement.swim" value="{{system.movement.swim}}" 
+                 placeholder="1"
+                 title="Default: 1 area/turn without powers&#10;Max: 9 areas/turn (Monstrous)&#10;&#10;Drowning: Hold breath for Endurance rank # of rounds" />
         </div>
         <div class="movement-item">
           <label>Fly</label>
-          <input type="number" name="system.movement.fly" value="{{system.movement.fly}}" />
+          <input type="number" name="system.movement.fly" value="{{system.movement.fly}}" 
+                 placeholder="0"
+                 title="Acceleration: {{suggestedMovement}} areas/turn&#10;Low altitude max: ground speed&#10;90° turn costs 1 area&#10;>90° turn requires Agility FEAT" />
         </div>
         <div class="movement-item">
           <label>Teleport</label>
-          <input type="number" name="system.movement.teleport" value="{{system.movement.teleport}}" />
+          <input type="number" name="system.movement.teleport" value="{{system.movement.teleport}}" 
+                 placeholder="0"
+                 title="Instantaneous - no speed&#10;Multiple teleports: Endurance FEAT&#10;Carrying others: Power Stunt required" />
+        </div>
+        <div class="movement-item movement-info-btn">
+          <label>&nbsp;</label>
+          <a class="movement-chat-btn" title="Send movement info to chat"><i class="fas fa-comment-dots"></i></a>
         </div>
       </div>
     </div>
@@ -650,7 +667,7 @@
         <a class="item" data-tab="headquarters" data-tooltip="HQ"><i class="fas fa-home"></i></a>
         <a class="item" data-tab="vehicles" data-tooltip="Vehicles"><i class="fas fa-car"></i></a>
         <a class="item" data-tab="stunts" data-tooltip="Stunts"><i class="fas fa-star"></i></a>
-        <a class="item" data-tab="actions" data-tooltip="Actions&#10;CTRL+A: Toggle Action HUD"><i class="fas fa-fist-raised"></i></a>
+        <a class="item" data-tab="actions" data-tooltip="Actions"><i class="fas fa-fist-raised"></i></a>
         <!-- universal table tab, after the actions tab -->
         <a class="item" data-tab="universal-table" data-tooltip="Universal Table&#10;CTRL+Click: Legacy Dialog&#10;SHIFT+Click: Popout Table"><i class="fas fa-table"></i></a>
         <a class="item" data-tab="effects" data-tooltip="Effects"><i class="fas fa-magic"></i></a>

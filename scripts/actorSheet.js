@@ -207,8 +207,10 @@ export class FaseripActorSheet extends ActorSheet {
     // Apply initial columns visibility preference
     context.hideInitialColumns = this.actor.getFlag('msh-faserip', 'hideInitialColumns') || false;
 
-    // Add suggested movement based on Endurance
+    // Movement data for template
     context.suggestedMovement = this.actor.suggestedMovement;
+    context.leapingData = this.actor.leapingData;
+    context.movementInfo = this.actor.movementInfo;
 
     context.availableKarma = Math.max(0, lifetime - spent - advancement);
     return context;
@@ -285,6 +287,12 @@ export class FaseripActorSheet extends ActorSheet {
     if (isLocked) {
       html.closest('.faserip-sheet').addClass('sheet-locked');
     }
+
+    // Movement info chat button
+    html.find('.movement-chat-btn').on('click', (event) => {
+      event.preventDefault();
+      this._sendMovementToChat();
+    });
 
     // Auto-populate Resources value when rank changes
     html.find('select[name="system.attributes.resources.rank"]').change((event) => {
@@ -4920,6 +4928,84 @@ async _rollAction(actionType, abilityName) {
     return hoverTexts[actionType]?.[color] || `${color} result for ${actionType}`;
   }
 
+  async _sendMovementToChat() {
+    const info = this.actor.movementInfo;
+    const movement = this.actor.system.movement || {};
+    
+    const runAreas = movement.run || this.actor.suggestedMovement;
+    const swimAreas = movement.swim || 1;
+    const flyAreas = movement.fly || 0;
+    const teleportAreas = movement.teleport || 0;
+    const leapAreas = movement.leap || info.leap.horizontal;
+    
+    // Calculate fly mph from air speed table or approximate
+    const flyMph = flyAreas > 0 ? flyAreas * 15 : 0;
+    
+    const cardHtml = `
+      <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
+        <div style="padding:5px 10px;border-bottom:1px solid #c0c0c0;font-size:1.1em;color:#0d47a1;">
+          <strong>${this.actor.name} - Movement Reference</strong>
+        </div>
+        <div style="padding:5px 10px;font-size:.9em;">
+          <div><strong>Run:</strong> ${runAreas} areas/turn (${runAreas * 15} mph)</div>
+          <div><strong>Leap:</strong> ${leapAreas} areas horizontal</div>
+          <div><strong>Swim:</strong> ${swimAreas} areas/turn (${swimAreas * 15} mph)</div>
+          ${flyAreas > 0 ? `<div><strong>Fly:</strong> ${flyAreas} areas/turn (${flyMph} mph)</div>` : ''}
+          ${teleportAreas > 0 ? `<div><strong>Teleport:</strong> ${teleportAreas} areas (instantaneous)</div>` : ''}
+        </div>
+        
+        <details style="padding:5px 10px;border-top:1px solid #ddd;">
+          <summary style="cursor:pointer;font-weight:bold;color:#333;">Leaping (Strength: ${info.strengthRank})</summary>
+          <div style="padding:5px 0 0 10px;font-size:.85em;">
+            <div>Horizontal: ${leapAreas} areas</div>
+            <div>Vertical: ${info.leap.vertical} floors up</div>
+            <div>Safe Fall: ${info.leap.safeFall} floors</div>
+          </div>
+        </details>
+        
+        <details style="padding:5px 10px;border-top:1px solid #ddd;">
+          <summary style="cursor:pointer;font-weight:bold;color:#333;">Exhaustion (Endurance: ${info.exhaustion.enduranceRank})</summary>
+          <div style="padding:5px 0 0 10px;font-size:.85em;">
+            <div>Full speed for <strong>${info.exhaustion.threshold} turns</strong> before first check</div>
+            <div>Green FEAT after ${info.exhaustion.threshold} turns</div>
+            <div>Yellow FEAT after ${info.exhaustion.threshold * 2} turns</div>
+            <div>Red FEAT after ${info.exhaustion.threshold * 3} turns</div>
+            <div>Mandatory rest after ${info.exhaustion.threshold * 4} turns</div>
+            <div><em>No check needed if moving 2 ranks slower</em></div>
+          </div>
+        </details>
+        
+        ${flyAreas > 0 ? `
+        <details style="padding:5px 10px;border-top:1px solid #ddd;">
+          <summary style="cursor:pointer;font-weight:bold;color:#333;">Flight Rules</summary>
+          <div style="padding:5px 0 0 10px;font-size:.85em;">
+            <div>Acceleration: ${info.acceleration} areas/turn</div>
+            <div>Low altitude max: ${runAreas} areas/turn</div>
+            <div>90° turn costs 1 area</div>
+            <div>>90° turn requires Agility FEAT</div>
+            <div>Landing at >3 areas/turn requires Agility FEAT</div>
+          </div>
+        </details>
+        ` : ''}
+        
+        <details style="padding:5px 10px;border-top:1px solid #ddd;">
+          <summary style="cursor:pointer;font-weight:bold;color:#333;">Other Movement Rules</summary>
+          <div style="padding:5px 0 0 10px;font-size:.85em;">
+            <div>Actions while moving: <strong>half speed</strong></div>
+            <div>Turning >90°: <strong>half speed</strong></div>
+            <div>Through doorway: +½ area</div>
+            <div>Breaking through wall: -1 to -3 areas (by material)</div>
+          </div>
+        </details>
+      </div>
+    `;
+    
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor: this.actor }),
+      content: cardHtml
+    });
+  }
+
   _openUniversalTablePopout(rollData = null) {
     // Use existing instance or create new one
     if (!this._universalTablePopout) {
@@ -4933,21 +5019,6 @@ async _rollAction(actionType, abilityName) {
 }
 
 class UniversalTablePopout extends Application {
-  // Rank order matching the table columns (0-indexed)
-  static RANK_ORDER = [
-    "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent", "Remarkable", "Incredible",
-    "Amazing", "Monstrous", "Unearthly", "Shift-X", "Shift-Y", "Shift-Z",
-    "Class 1000", "Class 3000", "Class 5000", "Beyond"
-  ];
-
-  // Alternate rank names mapping
-  static RANK_ALIASES = {
-    "Shift X": "Shift-X",
-    "Shift Y": "Shift-Y", 
-    "Shift Z": "Shift-Z",
-    "Shift 0": "Shift-0"
-  };
-
   static get defaultOptions() {
     return foundry.utils.mergeObject(super.defaultOptions, {
       id: "universal-table-popout",
@@ -4963,7 +5034,6 @@ class UniversalTablePopout extends Application {
   constructor(options = {}) {
     super(options);
     this.rollData = null;
-    this._hookId = null;
   }
 
   setRollData(data) {
@@ -4974,75 +5044,19 @@ class UniversalTablePopout extends Application {
     return { rollData: this.rollData };
   }
 
-  render(force = false, options = {}) {
-    // Register hook when rendering
-    if (!this._hookId) {
-      this._hookId = Hooks.on('msh-faserip.universalTableRoll', (data) => {
-        this._onUniversalTableRoll(data);
-      });
-    }
-    return super.render(force, options);
-  }
-
-  close(options = {}) {
-    // Unregister hook when closing
-    if (this._hookId) {
-      Hooks.off('msh-faserip.universalTableRoll', this._hookId);
-      this._hookId = null;
-    }
-    return super.close(options);
-  }
-
-  _onUniversalTableRoll({ rank, roll, color }) {
-    if (!this.rendered) return;
-    
-    // Normalize rank name
-    let normalizedRank = UniversalTablePopout.RANK_ALIASES[rank] || rank;
-    const rankIndex = UniversalTablePopout.RANK_ORDER.indexOf(normalizedRank);
-    
-    if (rankIndex === -1) {
-      console.warn(`UniversalTablePopout: Unknown rank "${rank}"`);
-      return;
-    }
-
-    const html = this.element;
-    
-    // Clear previous highlights
-    html.find('.rank-cell').removeClass('highlighted');
-    
-    // Find and highlight the cell
-    const rows = html.find('tbody tr');
-    rows.each((i, row) => {
-      const $row = $(row);
-      const label = $row.find('th').first().text().trim();
-      
-      let match = false;
-      if (label.includes('-')) {
-        const [min, max] = label.split('-').map(n => parseInt(n));
-        match = roll >= min && roll <= max;
-      } else {
-        match = roll === parseInt(label);
-      }
-      
-      if (match) {
-        const cell = $row.find('td').eq(rankIndex);
-        cell.addClass('highlighted');
-      }
-    });
-  }
-
   activateListeners(html) {
     super.activateListeners(html);
     
-    // Handle initial rollData if provided
     if (this.rollData) {
       const { roll, rankIndex, color } = this.rollData;
       
+      // Find the row matching the roll
       const rows = html.find('tbody tr');
       rows.each((i, row) => {
         const $row = $(row);
         const label = $row.find('th').first().text().trim();
         
+        // Parse roll ranges like "02-03", "04-06", or single "01", "100"
         let match = false;
         if (label.includes('-')) {
           const [min, max] = label.split('-').map(n => parseInt(n));
@@ -5052,6 +5066,7 @@ class UniversalTablePopout extends Application {
         }
         
         if (match && rankIndex >= 0) {
+          // Highlight the cell at rankIndex (add 1 to skip the th)
           const cell = $row.find('td').eq(rankIndex);
           cell.addClass('highlighted');
         }
