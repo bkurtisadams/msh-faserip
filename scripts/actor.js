@@ -217,4 +217,17 @@ export class FaseripActor extends Actor {
     });
     return totalSpent;
   }
+
+  // Calculate suggested movement (areas/turn) based on Endurance rank
+  get suggestedMovement() {
+    const enduranceRank = this.system.abilities?.endurance?.rank || "Typical";
+    
+    // Feeble = 1 area, Poor-Excellent = 2 areas, Remarkable+ = 3 areas
+    const oneAreaRanks = ["Feeble"];
+    const twoAreaRanks = ["Poor", "Typical", "Good", "Excellent"];
+    
+    if (oneAreaRanks.includes(enduranceRank)) return 1;
+    if (twoAreaRanks.includes(enduranceRank)) return 2;
+    return 3; // Remarkable and higher
+  }
 }

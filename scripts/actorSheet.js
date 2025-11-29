@@ -207,6 +207,9 @@ export class FaseripActorSheet extends ActorSheet {
     // Apply initial columns visibility preference
     context.hideInitialColumns = this.actor.getFlag('msh-faserip', 'hideInitialColumns') || false;
 
+    // Add suggested movement based on Endurance
+    context.suggestedMovement = this.actor.suggestedMovement;
+
     context.availableKarma = Math.max(0, lifetime - spent - advancement);
     return context;
   }
