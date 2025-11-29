@@ -4970,12 +4970,15 @@ async _rollAction(actionType, abilityName) {
         <details style="padding:5px 10px;border-top:1px solid #ddd;">
           <summary style="cursor:pointer;font-weight:bold;color:#333;">Exhaustion (Endurance: ${info.exhaustion.enduranceRank})</summary>
           <div style="padding:5px 0 0 10px;font-size:.85em;">
-            <div>Full speed for <strong>${info.exhaustion.threshold} turns</strong> before first check</div>
-            <div>Green FEAT after ${info.exhaustion.threshold} turns</div>
-            <div>Yellow FEAT after ${info.exhaustion.threshold * 2} turns</div>
-            <div>Red FEAT after ${info.exhaustion.threshold * 3} turns</div>
-            <div>Mandatory rest after ${info.exhaustion.threshold * 4} turns</div>
-            <div><em>No check needed if moving 2 ranks slower</em></div>
+            ${["Unearthly", "Shift-X", "Shift X", "Shift-Y", "Shift Y", "Shift-Z", "Shift Z", "Class 1000", "Class 3000", "Class 5000"].includes(info.exhaustion.enduranceRank) ? 
+              `<div><strong>IMMUNE</strong> - Unearthly+ Endurance exempt from exhaustion</div>` :
+              `<div>After <strong>${info.exhaustion.threshold} turns</strong>: Green Endurance FEAT or rest 1-10 turns</div>
+              <div>After <strong>${info.exhaustion.threshold * 2} turns</strong>: Yellow FEAT or rest 2-20 turns</div>
+              <div>After <strong>${info.exhaustion.threshold * 3} turns</strong>: Red FEAT or rest 3-30 turns</div>
+              <div>After <strong>${info.exhaustion.threshold * 4} turns</strong>: Mandatory rest 3-30 turns</div>
+              <div style="margin-top:5px;"><em>Moving 2 ranks slower: no exhaustion check needed</em></div>
+              <div><em>Devices, vehicles, robots: exempt from exhaustion</em></div>`
+            }
           </div>
         </details>
         
