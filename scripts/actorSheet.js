@@ -357,12 +357,18 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
   return false;
 });
 
-    // Universal Table tab - CTRL+click opens legacy dialog
+    // Universal Table tab - CTRL+click opens legacy dialog, SHIFT+click opens popout
     html.find('a[data-tab="universal-table"]').on('click', (event) => {
       if (event.ctrlKey || event.metaKey) {
         event.preventDefault();
         event.stopPropagation();
         game.msh.openUniversalTableDialog?.(this.actor);
+        return false;
+      }
+      if (event.shiftKey) {
+        event.preventDefault();
+        event.stopPropagation();
+        this._openUniversalTablePopout();
         return false;
       }
       // Normal click: let Foundry handle tab switching
@@ -4910,6 +4916,32 @@ async _rollAction(actionType, abilityName) {
     
     return hoverTexts[actionType]?.[color] || `${color} result for ${actionType}`;
   }
+
+  _openUniversalTablePopout() {
+    // Use existing instance or create new one
+    if (!this._universalTablePopout) {
+      this._universalTablePopout = new UniversalTablePopout();
+    }
+    this._universalTablePopout.render(true);
+  }
   
   // other methods
+}
+
+class UniversalTablePopout extends Application {
+  static get defaultOptions() {
+    return foundry.utils.mergeObject(super.defaultOptions, {
+      id: "universal-table-popout",
+      title: "Universal Table",
+      template: "systems/msh-faserip/templates/universal-table-popout.html",
+      width: 750,
+      height: 500,
+      resizable: true,
+      popOut: true
+    });
+  }
+
+  getData() {
+    return {};
+  }
 }
