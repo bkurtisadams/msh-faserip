@@ -3135,7 +3135,9 @@ form.faserip-sheet .identity-section input[type="radio"] {
 }
 
 .faserip-sheet .msh-biofield.msh-full .editor .editor-content {
-  height: 100%;            /* fill the box */
+  /* height: 100%; */            /* fill the box */
+  min-height: 220px;
+  max-height: 320px;
   overflow-y: auto;        /* vertical scrollbar when text overflows */
   padding-right: 4px;      /* a little room next to the scrollbar */
 }

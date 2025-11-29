@@ -864,10 +864,10 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
     });
 
     // Handle form changes in biography section
-    html.find('.biography-details input, .biography-details textarea').change(ev => {
+/*     html.find('.biography-details input, .biography-details textarea').change(ev => {
       const formData = this._getSubmitData();
       this.actor.update(formData);
-    });
+    }); */
 
     // Karma History button
     html.find('.view-karma-history').click(ev => {

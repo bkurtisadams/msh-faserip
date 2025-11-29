@@ -109,11 +109,18 @@
       <div class="msh-biofield"><label>Eye Color</label><input type="text" name="system.eyeColor" value="{{system.eyeColor}}" /></div>
       <div class="msh-biofield"><label>Hair Color</label><input type="text" name="system.hairColor" value="{{system.hairColor}}" /></div>
     </div>
-    <div class="msh-biofield msh-full">
+    <div class="msh-biofield msh-full biography-details">
       <label>History</label>
-      <div class="history-preview">{{{system.history}}}</div>
-      <button type="button" class="history-edit-btn"><i class="fas fa-edit"></i> Edit History</button>
+      {{editor system.history
+              target="system.history"
+              button=true
+              owner=owner
+              editable=editable
+              collaborate=false
+              documents=true
+              relativeTo=actor}}
     </div>
+
   </div>
   {{/if}}
 </div>
