@@ -4944,6 +4944,9 @@ async _rollAction(actionType, abilityName) {
     const flyMph = flightInfo ? flightInfo.mph : 0;
     const lowAltitudeMax = flightInfo ? flightInfo.groundAreas : 0;
     const flightRank = flightInfo ? flightInfo.rank : "";
+    // Get cruising speeds (2 ranks lower - no exhaustion checks)
+    const cruisingFlight = flyAreas > 0 ? FaseripActor.getCruisingFlight(flyAreas) : null;
+    const cruisingRun = runAreas > this.actor.suggestedMovement ? FaseripActor.getCruisingLand(runAreas) : null;
     
     const cardHtml = `
       <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
@@ -4951,10 +4954,10 @@ async _rollAction(actionType, abilityName) {
           <strong>${this.actor.name} - Movement Reference</strong>
         </div>
         <div style="padding:5px 10px;font-size:.9em;">
-          <div><strong>Run:</strong> ${runAreas} areas/turn (${runAreas * 15} mph)</div>
+          <div><strong>Run:</strong> ${runAreas} areas/turn (${runAreas * 15} mph)${cruisingRun ? ` <em>(cruise: ${cruisingRun.areas})</em>` : ''}</div>
           <div><strong>Leap:</strong> ${leapAreas} areas across</div>
           <div><strong>Swim:</strong> ${swimAreas} areas/turn (${swimAreas * 15} mph)</div>
-          ${flyAreas > 0 ? `<div><strong>Fly:</strong> ${flyAreas} areas/turn (${flyMph} mph) — ${flightRank}</div>` : ''}
+          ${flyAreas > 0 ? `<div><strong>Fly:</strong> ${flyAreas} areas/turn (${flyMph} mph) — ${flightRank}${cruisingFlight ? ` <em>(cruise: ${cruisingFlight.areas})</em>` : ''}</div>` : ''}
           ${teleportAreas > 0 ? `<div><strong>Teleport:</strong> ${teleportAreas} areas (instantaneous)</div>` : ''}
         </div>
         
@@ -4989,6 +4992,7 @@ async _rollAction(actionType, abilityName) {
         <details style="padding:5px 10px;border-top:1px solid #ddd;">
           <summary style="cursor:pointer;font-weight:bold;color:#333;">Flight Rules (${flightRank})</summary>
           <div style="padding:5px 0 0 10px;font-size:.85em;">
+            ${cruisingFlight ? `<div><strong>Cruising:</strong> ${cruisingFlight.areas} areas/turn (${cruisingFlight.mph} mph) - no exhaustion</div>` : ''}
             <div>Acceleration: ${info.acceleration} areas/turn</div>
             <div>Low altitude/enclosed max: ${lowAltitudeMax} areas/turn</div>
             <div>Exceeding ${lowAltitudeMax} areas requires Agility FEAT</div>

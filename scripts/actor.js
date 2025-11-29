@@ -290,6 +290,45 @@ export class FaseripActor extends Actor {
     }
   };
 
+  // Rank order for calculating "2 ranks lower" cruising speed
+  static RANK_ORDER = [
+    "Feeble", "Poor", "Typical", "Good", "Excellent", "Remarkable", "Incredible",
+    "Amazing", "Monstrous", "Unearthly", "Shift-X", "Shift-Y", "Shift-Z",
+    "Class 1000", "Class 3000", "Class 5000"
+  ];
+
+  // Get rank N levels lower (for cruising speed calculation)
+  static getRankLower(rank, levels = 2) {
+    const normalizedRank = rank.replace("Shift X", "Shift-X").replace("Shift Y", "Shift-Y").replace("Shift Z", "Shift-Z");
+    const index = FaseripActor.RANK_ORDER.indexOf(normalizedRank);
+    if (index === -1) return "Feeble";
+    const newIndex = Math.max(0, index - levels);
+    return FaseripActor.RANK_ORDER[newIndex];
+  }
+
+  // Get cruising speed (2 ranks lower) for flight - no exhaustion checks
+  static getCruisingFlight(flightAreas) {
+    const flightInfo = FaseripActor.getFlightInfo(flightAreas);
+    if (!flightInfo) return null;
+    const cruisingRank = FaseripActor.getRankLower(flightInfo.rank, 2);
+    const cruisingData = FaseripActor.MOVEMENT_DATA.airSpeed[cruisingRank];
+    return cruisingData ? { rank: cruisingRank, ...cruisingData } : null;
+  }
+
+  // Get cruising speed (2 ranks lower) for land speed - no exhaustion checks
+  static getCruisingLand(landAreas) {
+    let currentRank = "Typical";
+    for (const [rank, data] of Object.entries(FaseripActor.MOVEMENT_DATA.landSpeed)) {
+      if (data.areas === landAreas) {
+        currentRank = rank;
+        break;
+      }
+    }
+    const cruisingRank = FaseripActor.getRankLower(currentRank, 2);
+    const cruisingData = FaseripActor.MOVEMENT_DATA.landSpeed[cruisingRank];
+    return cruisingData ? { rank: cruisingRank, ...cruisingData } : null;
+  }
+  
   // Lookup flight rank and ground speed from air areas/turn
   static getFlightInfo(airAreas) {
     for (const [rank, data] of Object.entries(FaseripActor.MOVEMENT_DATA.airSpeed)) {
