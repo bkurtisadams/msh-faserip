@@ -4964,6 +4964,9 @@ async _rollAction(actionType, abilityName) {
             <div>Across: ${info.leap.acrossFeet}' (${info.leap.acrossAreas} areas)</div>
             <div>Up: ${info.leap.upFeet}' (${info.leap.upFloors} floors)</div>
             <div>Down: ${info.leap.downFeet}' (${info.leap.downFloors} floors)</div>
+            <div style="margin-top:5px;"><em>Half distance: automatic</em></div>
+            <div><em>Full distance: Green Strength FEAT</em></div>
+            <div><em>x2 distance: Red Strength FEAT</em></div>
           </div>
         </details>
         
