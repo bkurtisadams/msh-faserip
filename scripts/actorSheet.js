@@ -4930,6 +4930,21 @@ async _rollAction(actionType, abilityName) {
 }
 
 class UniversalTablePopout extends Application {
+  // Rank order matching the table columns (0-indexed)
+  static RANK_ORDER = [
+    "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent", "Remarkable", "Incredible",
+    "Amazing", "Monstrous", "Unearthly", "Shift-X", "Shift-Y", "Shift-Z",
+    "Class 1000", "Class 3000", "Class 5000", "Beyond"
+  ];
+
+  // Alternate rank names mapping
+  static RANK_ALIASES = {
+    "Shift X": "Shift-X",
+    "Shift Y": "Shift-Y", 
+    "Shift Z": "Shift-Z",
+    "Shift 0": "Shift-0"
+  };
+
   static get defaultOptions() {
     return foundry.utils.mergeObject(super.defaultOptions, {
       id: "universal-table-popout",
@@ -4945,6 +4960,7 @@ class UniversalTablePopout extends Application {
   constructor(options = {}) {
     super(options);
     this.rollData = null;
+    this._hookId = null;
   }
 
   setRollData(data) {
@@ -4955,19 +4971,75 @@ class UniversalTablePopout extends Application {
     return { rollData: this.rollData };
   }
 
+  render(force = false, options = {}) {
+    // Register hook when rendering
+    if (!this._hookId) {
+      this._hookId = Hooks.on('msh-faserip.universalTableRoll', (data) => {
+        this._onUniversalTableRoll(data);
+      });
+    }
+    return super.render(force, options);
+  }
+
+  close(options = {}) {
+    // Unregister hook when closing
+    if (this._hookId) {
+      Hooks.off('msh-faserip.universalTableRoll', this._hookId);
+      this._hookId = null;
+    }
+    return super.close(options);
+  }
+
+  _onUniversalTableRoll({ rank, roll, color }) {
+    if (!this.rendered) return;
+    
+    // Normalize rank name
+    let normalizedRank = UniversalTablePopout.RANK_ALIASES[rank] || rank;
+    const rankIndex = UniversalTablePopout.RANK_ORDER.indexOf(normalizedRank);
+    
+    if (rankIndex === -1) {
+      console.warn(`UniversalTablePopout: Unknown rank "${rank}"`);
+      return;
+    }
+
+    const html = this.element;
+    
+    // Clear previous highlights
+    html.find('.rank-cell').removeClass('highlighted');
+    
+    // Find and highlight the cell
+    const rows = html.find('tbody tr');
+    rows.each((i, row) => {
+      const $row = $(row);
+      const label = $row.find('th').first().text().trim();
+      
+      let match = false;
+      if (label.includes('-')) {
+        const [min, max] = label.split('-').map(n => parseInt(n));
+        match = roll >= min && roll <= max;
+      } else {
+        match = roll === parseInt(label);
+      }
+      
+      if (match) {
+        const cell = $row.find('td').eq(rankIndex);
+        cell.addClass('highlighted');
+      }
+    });
+  }
+
   activateListeners(html) {
     super.activateListeners(html);
     
+    // Handle initial rollData if provided
     if (this.rollData) {
       const { roll, rankIndex, color } = this.rollData;
       
-      // Find the row matching the roll
       const rows = html.find('tbody tr');
       rows.each((i, row) => {
         const $row = $(row);
         const label = $row.find('th').first().text().trim();
         
-        // Parse roll ranges like "02-03", "04-06", or single "01", "100"
         let match = false;
         if (label.includes('-')) {
           const [min, max] = label.split('-').map(n => parseInt(n));
@@ -4977,7 +5049,6 @@ class UniversalTablePopout extends Application {
         }
         
         if (match && rankIndex >= 0) {
-          // Highlight the cell at rankIndex (add 1 to skip the th)
           const cell = $row.find('td').eq(rankIndex);
           cell.addClass('highlighted');
         }

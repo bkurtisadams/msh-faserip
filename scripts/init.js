@@ -986,8 +986,16 @@ Hooks.once("init", async () => {
       opts: { karma, ...options }
     });
   };
-  // Add the rollUniversalTable function to the namespace
-  game.msh.rollUniversalTable = rollUniversalTable;
+  
+  // Wrap rollUniversalTable to emit a hook for popout highlighting
+  game.msh.rollUniversalTable = function(rank, roll) {
+    const color = rollUniversalTable(rank, roll);
+    
+    // Emit hook for any listeners (e.g., UniversalTablePopout)
+    Hooks.callAll('msh-faserip.universalTableRoll', { rank, roll, color });
+    
+    return color;
+  };
 
   // Back-compat / public wrapper so code can call game.msh.actions.roll()
   // (internally delegates to the new ActionDispatcher)
