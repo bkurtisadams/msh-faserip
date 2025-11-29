@@ -4917,11 +4917,12 @@ async _rollAction(actionType, abilityName) {
     return hoverTexts[actionType]?.[color] || `${color} result for ${actionType}`;
   }
 
-  _openUniversalTablePopout() {
+  _openUniversalTablePopout(rollData = null) {
     // Use existing instance or create new one
     if (!this._universalTablePopout) {
       this._universalTablePopout = new UniversalTablePopout();
     }
+    this._universalTablePopout.setRollData(rollData);
     this._universalTablePopout.render(true);
   }
   
@@ -4941,7 +4942,52 @@ class UniversalTablePopout extends Application {
     });
   }
 
+  constructor(options = {}) {
+    super(options);
+    this.rollData = null;
+  }
+
+  setRollData(data) {
+    this.rollData = data;
+  }
+
   getData() {
-    return {};
+    return { rollData: this.rollData };
+  }
+
+  activateListeners(html) {
+    super.activateListeners(html);
+    
+    if (this.rollData) {
+      const { roll, rankIndex, color } = this.rollData;
+      
+      // Find the row matching the roll
+      const rows = html.find('tbody tr');
+      rows.each((i, row) => {
+        const $row = $(row);
+        const label = $row.find('th').first().text().trim();
+        
+        // Parse roll ranges like "02-03", "04-06", or single "01", "100"
+        let match = false;
+        if (label.includes('-')) {
+          const [min, max] = label.split('-').map(n => parseInt(n));
+          match = roll >= min && roll <= max;
+        } else {
+          match = roll === parseInt(label);
+        }
+        
+        if (match && rankIndex >= 0) {
+          // Highlight the cell at rankIndex (add 1 to skip the th)
+          const cell = $row.find('td').eq(rankIndex);
+          cell.addClass('highlighted');
+        }
+      });
+    }
+    
+    // Cell click highlighting
+    html.find('.rank-cell').click(ev => {
+      html.find('.rank-cell').removeClass('highlighted');
+      $(ev.currentTarget).addClass('highlighted');
+    });
   }
 }
