@@ -384,13 +384,13 @@ Hooks.once("init", async () => {
 
   // Register Action HUD keybinding
   game.keybindings.register("msh-faserip", "openActionHUD", {
-    name: "Toggle Action HUD",
-    hint: "Toggles the Action HUD for quick access to combat actions",
+    name: "Open Action HUD",
+    hint: "Opens the Action HUD for quick access to combat actions",
     category: "FASERIP",
-    editable: [{ key: "KeyA", modifiers: ["Control"] }],  // Ctrl+A
+    editable: [{ key: "KeyH", modifiers: ["Control"] }],  // Ctrl+H
     onDown: () => {
       if (ui.faseripHUD?.rendered) {
-        ui.faseripHUD.close();
+        ui.faseripHUD.bringToTop();
       } else {
         ui.faseripHUD = new FaseripActionHUD();
         ui.faseripHUD.render(true);
@@ -986,14 +986,16 @@ Hooks.once("init", async () => {
       opts: { karma, ...options }
     });
   };
-  
-  // Wrap rollUniversalTable to emit a hook for popout highlighting
+  // Add the rollUniversalTable function to the namespace, wrapped to emit hook
+  const originalRollUniversalTable = rollUniversalTable;
   game.msh.rollUniversalTable = function(rank, roll) {
-    const color = rollUniversalTable(rank, roll);
-    
-    // Emit hook for any listeners (e.g., UniversalTablePopout)
-    Hooks.callAll('msh-faserip.universalTableRoll', { rank, roll, color });
-    
+    const color = originalRollUniversalTable(rank, roll);
+    // Emit hook for universal table popout to catch
+    Hooks.call('msh-faserip.universalTableRoll', {
+      rank: rank,
+      roll: roll,
+      color: color
+    });
     return color;
   };
 

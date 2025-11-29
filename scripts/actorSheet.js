@@ -5027,6 +5027,21 @@ async _rollAction(actionType, abilityName) {
 }
 
 class UniversalTablePopout extends Application {
+  // Rank order matching the table columns (0-indexed)
+  static RANK_ORDER = [
+    "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent", "Remarkable", "Incredible",
+    "Amazing", "Monstrous", "Unearthly", "Shift-X", "Shift-Y", "Shift-Z",
+    "Class 1000", "Class 3000", "Class 5000", "Beyond"
+  ];
+
+  // Alternate rank names mapping
+  static RANK_ALIASES = {
+    "Shift X": "Shift-X",
+    "Shift Y": "Shift-Y",
+    "Shift Z": "Shift-Z",
+    "Shift 0": "Shift-0"
+  };
+
   static get defaultOptions() {
     return foundry.utils.mergeObject(super.defaultOptions, {
       id: "universal-table-popout",
@@ -5042,6 +5057,7 @@ class UniversalTablePopout extends Application {
   constructor(options = {}) {
     super(options);
     this.rollData = null;
+    this._hookId = null;
   }
 
   setRollData(data) {
@@ -5050,6 +5066,64 @@ class UniversalTablePopout extends Application {
 
   getData() {
     return { rollData: this.rollData };
+  }
+
+  render(force = false, options = {}) {
+    // Register hook to listen for universal table rolls
+    if (!this._hookId) {
+      this._hookId = Hooks.on('msh-faserip.universalTableRoll', (data) => {
+        this._onUniversalTableRoll(data);
+      });
+    }
+    return super.render(force, options);
+  }
+
+  async close(options = {}) {
+    // Unregister hook when window closes
+    if (this._hookId) {
+      Hooks.off('msh-faserip.universalTableRoll', this._hookId);
+      this._hookId = null;
+    }
+    return super.close(options);
+  }
+
+  _onUniversalTableRoll(data) {
+    if (!this.rendered) return;
+    
+    const { rank, roll, color } = data;
+    const html = this.element;
+    
+    // Normalize rank name
+    let normalizedRank = UniversalTablePopout.RANK_ALIASES[rank] || rank;
+    
+    // Find column index for this rank
+    const colIndex = UniversalTablePopout.RANK_ORDER.indexOf(normalizedRank);
+    if (colIndex === -1) return;
+    
+    // Clear previous highlights
+    html.find('.rank-cell').removeClass('roll-highlight');
+    
+    // Find the row matching the roll
+    const rows = html.find('tbody tr');
+    rows.each((i, row) => {
+      const $row = $(row);
+      const label = $row.find('th').first().text().trim();
+      
+      // Parse roll ranges like "02-03", "04-06", or single "01", "100"
+      let match = false;
+      if (label.includes('–') || label.includes('-')) {
+        const [min, max] = label.split(/[–-]/).map(n => parseInt(n));
+        match = roll >= min && roll <= max;
+      } else {
+        match = roll === parseInt(label);
+      }
+      
+      if (match) {
+        // Highlight the cell at colIndex
+        const cell = $row.find('td').eq(colIndex);
+        cell.addClass('roll-highlight');
+      }
+    });
   }
 
   activateListeners(html) {

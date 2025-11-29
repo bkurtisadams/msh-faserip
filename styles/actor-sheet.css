@@ -399,6 +399,20 @@
   position: relative;
 }
 
+.universal-rank-table .rank-cell.roll-highlight {
+  outline: 4px solid #0048ff;
+  outline-offset: -4px;
+  box-shadow: 0 0 15px rgba(183, 0, 255, 0.8);
+  z-index: 10;
+  position: relative;
+  animation: pulse-highlight 1s ease-in-out 2;
+}
+
+@keyframes pulse-highlight {
+  0%, 100% { outline-color: #00bfff; box-shadow: 0 0 15px rgba(255,204,0,0.8); }
+  50% { outline-color: #0048ff; box-shadow: 0 0 20px rgba(255,153,0,1); }
+}
+
 /* Responsive adjustments */
 @media (max-width: 900px) {
   .universal-rank-table {
