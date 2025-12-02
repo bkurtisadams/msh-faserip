@@ -1,0 +1,657 @@
+/* chargen.css - Character Generation Tab Styles */
+
+.chargen-tab {
+  padding: 10px;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.chargen-container {
+  max-width: 100%;
+}
+
+.chargen-header {
+  text-align: center;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #8b0000;
+}
+
+.chargen-header h2 {
+  color: #333;
+  margin: 0;
+  font-size: 1.0em;           /* match sheet header size */
+  font-weight: bold;
+}
+
+.chargen-header h2 i {
+  margin-right: 8px;
+}
+
+.chargen-subtitle {
+  color: #666;
+  font-style: italic;
+  margin: 3px 0 0 0;
+  font-size: 0.9em;
+}
+
+.chargen-content {
+  min-height: 300px;
+}
+
+.chargen-intro {
+  text-align: center;
+  padding: 12px;
+  background: #f5f5f0;
+  border: 1px solid #c0c0c0;
+  border-radius: 3px;
+}
+
+.chargen-intro h3 {
+  color: #8b0000;
+  margin: 0 0 8px 0;
+  font-size: 1em;
+}
+
+.chargen-intro p {
+  color: #555;
+  margin: 6px 0;
+  font-size: 0.9em;
+}
+
+.chargen-intro-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin: 12px 0 8px 0;
+  flex-wrap: wrap;
+}
+
+.chargen-intro-buttons button {
+  padding: 8px 14px;
+  font-size: 0.9em;
+  border-radius: 3px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.chargen-intro-buttons .chargen-start {
+  background: #f5f5f0;
+  color: #333;
+  border: 1px solid #c0c0c0;
+}
+
+.chargen-intro-buttons .chargen-start:hover {
+  background: #e5e5e0;
+}
+
+.chargen-intro-buttons .chargen-quick-random {
+  background: #8b0000;
+  color: white;
+  border: 1px solid #660000;
+}
+
+.chargen-intro-buttons .chargen-quick-random:hover {
+  background: #a00000;
+}
+
+.chargen-hint {
+  font-size: 0.8em;
+  color: #888;
+  font-style: italic;
+  margin: 8px 0 0 0 !important;
+}
+
+.chargen-start,
+.chargen-reset {
+  background: #e5e5e0;
+  color: #222;
+  border: 1px solid #999;
+  padding: 4px 10px;
+  font-size: 0.9em;
+  cursor: pointer;
+  border-radius: 3px;
+  margin-top: 8px;
+  text-transform: uppercase;
+  font-weight: bold;
+}
+
+.chargen-start:hover,
+.chargen-reset:hover {
+  background: #f0f0ec;
+}
+
+.chargen-reset {
+  background: linear-gradient(to bottom, #d9534f, #c9302c);
+  border-color: #ac2925;
+}
+
+.chargen-reset:hover {
+  background: linear-gradient(to bottom, #e96460, #d94440);
+}
+
+/* Step styling */
+.chargen-step {
+  padding: 10px;
+}
+
+.chargen-step h3 {
+  color: #333;
+  border-bottom: 1px solid #c0c0c0;
+  padding-bottom: 4px;
+  font-size: 0.95em;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.chargen-step h4 {
+  color: #444;
+  margin: 15px 0 10px 0;
+}
+
+.chargen-controls {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin: 15px 0;
+  flex-wrap: wrap;
+}
+
+.chargen-controls button {
+  background: linear-gradient(to bottom, #5cb85c, #449d44);
+  color: white;
+  border: 1px solid #398439;
+  padding: 8px 16px;
+  cursor: pointer;
+  border-radius: 3px;
+}
+
+.chargen-controls button:hover {
+  background: linear-gradient(to bottom, #6cc86c, #54ad54);
+}
+
+.chargen-controls button:disabled {
+  background: #ccc;
+  border-color: #aaa;
+  cursor: not-allowed;
+}
+
+.chargen-controls select {
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  min-width: 180px;
+}
+
+.chargen-result {
+  background: #f9f9f9;
+  border: 1px solid #ddd;
+  padding: 15px;
+  border-radius: 4px;
+  margin: 15px 0;
+}
+
+.chargen-result strong {
+  color: #8b0000;
+}
+
+.origin-info {
+  color: #666;
+  font-style: italic;
+  margin-top: 8px;
+  font-size: 0.9em;
+}
+
+/* Abilities table */
+.chargen-abilities-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 15px 0;
+}
+
+.chargen-abilities-table th,
+.chargen-abilities-table td {
+  border: 1px solid #ddd;
+  padding: 8px;
+  text-align: center;
+}
+
+.chargen-abilities-table th {
+  background: #8b0000;
+  color: white;
+}
+
+.chargen-abilities-table tr:nth-child(even) {
+  background: #f9f9f9;
+}
+
+.chargen-abilities-table button {
+  background: #5cb85c;
+  color: white;
+  border: none;
+  padding: 4px 10px;
+  cursor: pointer;
+  border-radius: 3px;
+  font-size: 0.9em;
+}
+
+.chargen-abilities-table button:hover {
+  background: #449d44;
+}
+
+/* Secondary abilities */
+.chargen-secondary-results,
+.chargen-specials-results {
+  background: #f5f5f5;
+  border: 1px solid #ddd;
+  padding: 15px;
+  border-radius: 4px;
+}
+
+.secondary-item,
+.special-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid #eee;
+}
+
+.secondary-item:last-child,
+.special-item:last-child {
+  border-bottom: none;
+}
+
+.secondary-item label,
+.special-item label {
+  font-weight: bold;
+  color: #444;
+}
+
+/* Categories display */
+.chargen-categories {
+  background: #fff;
+  border: 1px solid #ddd;
+  padding: 15px;
+  margin-top: 15px;
+  border-radius: 4px;
+}
+
+.chargen-categories h5 {
+  color: #8b0000;
+  margin: 10px 0 5px 0;
+}
+
+.chargen-categories ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.chargen-categories li {
+  margin: 5px 0;
+}
+
+/* Power/Talent selection */
+.chargen-power-category,
+.chargen-talent-category {
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  margin: 10px 0;
+  overflow: hidden;
+}
+
+.chargen-power-category h4,
+.chargen-talent-category h4 {
+  background: #f5f5f0;
+  color: #222;
+  margin: 0;
+  padding: 4px 6px;
+  border-bottom: 1px solid #ccc;
+  font-size: 0.9em;
+}
+
+.chargen-power-category.chosen h4,
+.chargen-talent-category.chosen h4 {
+  background: #e0efe0;
+  font-weight: bold;
+}
+
+
+.power-list,
+.talent-list,
+.contact-types {
+  padding: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.power-list button,
+.talent-list button,
+.contact-types button {
+  background: #f5f5f5;
+  border: 1px solid #ddd;
+  padding: 6px 12px;
+  cursor: pointer;
+  border-radius: 3px;
+  font-size: 0.85em;
+  transition: all 0.2s;
+}
+
+.power-list button:hover,
+.talent-list button:hover,
+.contact-types button:hover {
+  background: #e0e0e0;
+  border-color: #bbb;
+}
+
+.power-list button[data-star="true"],
+.talent-list button[data-star="true"] {
+  border-color: #f0ad4e;
+  background: #fcf8e3;
+}
+
+.power-list button[data-star="true"]:hover,
+.talent-list button[data-star="true"]:hover {
+  background: #f7ecb5;
+}
+
+.chosen-power,
+.chosen-talent {
+  padding: 10px;
+  color: #3c763d;
+  background: #dff0d8;
+}
+
+.chosen-contacts {
+  margin-top: 15px;
+  padding: 10px;
+  background: #f9f9f9;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.chosen-contacts h4 {
+  margin: 0 0 10px 0;
+  color: #444;
+}
+
+.chosen-contacts ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+/* Navigation */
+.chargen-nav {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 20px;
+  padding-top: 15px;
+  border-top: 1px solid #ddd;
+}
+
+.chargen-nav button {
+  background: #e5e5e0;
+  color: #222;
+  border: 1px solid #999;
+  padding: 4px 10px;
+  cursor: pointer;
+  border-radius: 3px;
+  font-size: 0.9em;
+  text-transform: uppercase;
+}
+
+.chargen-nav button:hover {
+  background: linear-gradient(to bottom, #5a9fe9, #4580cd);
+}
+
+.chargen-prev {
+  background: #dddddd !important;
+  border-color: #999 !important;
+}
+
+.chargen-prev:hover {
+  background: linear-gradient(to bottom, #888, #666) !important;
+}
+
+.chargen-apply-btn {
+  background: #e0f2df !important;
+  border-color: #5a8c5a !important;
+  font-weight: bold;
+}
+
+.chargen-apply-btn:hover {
+  background: linear-gradient(to bottom, #6cc86c, #54ad54) !important;
+}
+
+.chargen-reset-container {
+  text-align: center;
+  margin-top: 20px;
+}
+
+/* Summary (scoped to the summary step) */
+.chargen-step.chargen-summary-step .summary-card {
+  background: #f9f9f9;
+  border: 1px solid #ddd;
+  padding: 15px;
+  margin: 10px 0;
+  border-radius: 4px;
+}
+
+.chargen-step.chargen-summary-step .summary-card h4 {
+  margin: 0 0 10px 0;
+  color: #8b0000;
+}
+
+/* Summary tables */
+.chargen-step.chargen-summary-step .summary-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 2px;
+}
+
+.chargen-step.chargen-summary-step .summary-table th,
+.chargen-step.chargen-summary-step .summary-table td {
+  border: 1px solid #ddd;
+  padding: 8px;
+  text-align: center;
+}
+
+.chargen-step.chargen-summary-step .summary-table th {
+  background: #8b0000;
+  color: white;
+  font-size: 1.2em;
+}
+
+.chargen-step.chargen-summary-step .summary-table td {
+  padding: 1px 2px;
+  font-size: 0.85em;
+}
+
+/* Legacy summary-grid (if you still use it anywhere) */
+.chargen-step.chargen-summary-step .summary-grid div {
+  padding: 5px;
+}
+
+/* If you have a .chargen-summary wrapper */
+.chargen-step.chargen-summary-step .chargen-summary ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.chargen-step.chargen-summary-step .chargen-summary li {
+  margin: 5px 0;
+}
+
+/* Log (within summary step) */
+.chargen-step.chargen-summary-step .chargen-log {
+  margin-top: 20px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.chargen-step.chargen-summary-step .chargen-log h4 {
+  background: #f5f5f5;
+  margin: 0;
+  padding: 10px;
+  border-bottom: 1px solid #ddd;
+  position: sticky;
+  top: 0;
+}
+
+.chargen-step.chargen-summary-step .log-entries {
+  padding: 10px;
+  font-family: monospace;
+  font-size: 0.85em;
+}
+
+.chargen-step.chargen-summary-step .log-entry {
+  padding: 3px 0;
+  border-bottom: 1px dotted #eee;
+}
+
+.chargen-step.chargen-summary-step .log-entry:last-child {
+  border-bottom: none;
+}
+
+/* Summary layout */
+.chargen-step.chargen-summary-step .chargen-summary-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1.25fr);
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.chargen-step.chargen-summary-step .summary-card {
+  background: #f8f8f4;
+  border: 1px solid #c0c0c0;
+  border-radius: 3px;
+  padding: 6px 8px;
+  font-size: 0.9em;
+}
+
+.chargen-step.chargen-summary-step .summary-card h4 {
+  margin: 2px 0 4px 0;
+  font-size: 0.9em;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  border-bottom: 1px solid #d0d0d0;
+}
+
+.chargen-step.chargen-summary-step .summary-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 2px;
+}
+
+.chargen-step.chargen-summary-step .summary-label {
+  font-weight: bold;
+  color: #333;
+}
+
+.chargen-step.chargen-summary-step .summary-value {
+  color: #222;
+}
+
+.chargen-step.chargen-summary-step .summary-ability-label {
+  width: 40%;
+}
+
+.chargen-step.chargen-summary-step .summary-ability-rank {
+  width: 30%;
+}
+
+.chargen-step.chargen-summary-step .summary-ability-value {
+  width: 30%;
+  text-align: right;
+}
+
+/* Lists in summary cards */
+.chargen-step.chargen-summary-step .summary-list {
+  list-style: none;
+  padding-left: 0;
+  margin: 0 0 4px 0;
+  font-size: 0.85em;
+}
+
+.chargen-step.chargen-summary-step .summary-list li {
+  display: flex;
+  justify-content: space-between;
+  border-bottom: 1px dotted #d8d8d8;
+  padding: 1px 0;
+}
+
+.chargen-step.chargen-summary-step .summary-main {
+  flex: 1 1 auto;
+}
+
+.chargen-step.chargen-summary-step .summary-sub {
+  flex: 0 0 auto;
+  margin-left: 4px;
+  color: #666;
+}
+
+.chargen-step.chargen-summary-step .summary-rank {
+  flex: 0 0 auto;
+  margin-left: 6px;
+  font-family: monospace;
+}
+
+/* Text summary box */
+.chargen-step.chargen-summary-step .chargen-result {
+  margin-top: 8px;
+}
+
+.chargen-step.chargen-summary-step .chargen-summary-text {
+  box-sizing: border-box;
+}
+
+/* History panel */
+.chargen-step.chargen-summary-step .chargen-history {
+  margin-top: 8px;
+  max-height: 120px;
+  overflow-y: auto;
+  background: #f5f5f0;
+  border: 1px solid #c0c0c0;
+  border-radius: 3px;
+  padding: 4px 6px;
+  font-size: 0.8em;
+}
+
+.chargen-step.chargen-summary-step .chargen-history-title {
+  font-weight: bold;
+  margin-bottom: 4px;
+}
+
+.chargen-step.chargen-summary-step .chargen-history ul {
+  list-style: none;
+  padding-left: 0;
+  margin: 0;
+}
+
+.chargen-step.chargen-summary-step .chargen-history li {
+  border-bottom: 1px dotted #d0d0d0;
+  padding: 2px 0;
+}
+
+.chargen-step.chargen-summary-step .chargen-history-meta {
+  color: #555;
+}
+
+/* Re-roll button */
+.chargen-reroll-btn {
+  background: #f5f5f0 !important;
+  color: #333 !important;
+  border: 1px solid #c0c0c0 !important;
+}
+
+.chargen-reroll-btn:hover {
+  background: #e5e5e0 !important;
+}
+
+.chargen-reroll-btn i {
+  margin-right: 4px;
+}

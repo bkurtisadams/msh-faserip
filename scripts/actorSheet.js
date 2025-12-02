@@ -5,6 +5,7 @@ import { ActionDispatcher } from "./modules/actions/action-dispatcher.js";
 import { ACTION_INFO } from "./modules/actions/action-config.js";
 import { StuntRoller } from './stunts.js';
 import { rollUniversalTable } from "./modules/dice/universal-table.js";
+import { ChargenUIManager } from './chargen.js';
 
 
 function getPopularityRankWithRange(value, context) {
@@ -275,6 +276,9 @@ export class FaseripActorSheet extends ActorSheet {
   // In actorSheet.js, add to the activateListeners function
   activateListeners(html) {
     super.activateListeners(html);
+
+    // Initialize Character Generation Tab
+    this._initChargenTab(html);
 
     // Sheet lock toggle
     html.find('.sheet-lock-toggle').click(async (event) => {
@@ -5029,6 +5033,25 @@ async _rollAction(actionType, abilityName) {
     }
     this._universalTablePopout.setRollData(rollData);
     this._universalTablePopout.render(true);
+  }
+
+  // Character Generation Tab Initialization
+  _initChargenTab(html) {
+    const chargenTab = html.find('.chargen-tab');
+    if (!chargenTab.length) return;
+
+    // Initialize the ChargenUIManager if not already done
+    if (!this._chargenManager) {
+      this._chargenManager = new ChargenUIManager(this, html);
+      this._chargenManager.bindEvents();
+    } else {
+      // Update the html reference for re-renders
+      this._chargenManager.html = html;
+      // Re-check if we need to bind events (for fresh html)
+      if (!this._chargenManager._boundEvents) {
+        this._chargenManager.bindEvents();
+      }
+    }
   }
   
   // other methods

@@ -50,7 +50,8 @@
         "styles/item-sheet.css",
         "styles/karma-dialog.css",
         "styles/faserip-initiative.css",
-        "styles/team-tracker.css"
+        "styles/team-tracker.css",
+        "styles/chargen.css"
     ],
     "packs": [
         {
