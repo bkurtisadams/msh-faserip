@@ -21,6 +21,15 @@ export const RANKS = [
   { name: "Class 5000", min: 5000, standard: 5000 }
 ];
 
+// Origin table
+const ORIGIN_TABLE = [
+  { roll: [1, 30], origin: "Altered Human" },
+  { roll: [31, 60], origin: "Mutant" },
+  { roll: [61, 90], origin: "Hi-Tech" },
+  { roll: [91, 95], origin: "Robot" },
+  { roll: [96, 100], origin: "Alien" }
+];
+
 // Column 1: Altered Humans, Mutants
 const COLUMN_1 = [
   { roll: [1, 5], rank: "Feeble" },
@@ -31,6 +40,15 @@ const COLUMN_1 = [
   { roll: [61, 80], rank: "Remarkable" },
   { roll: [81, 96], rank: "Incredible" },
   { roll: [97, 100], rank: "Amazing" }
+];
+
+// Column 2: Normal Folks (not used for heroes but shown for reference)
+const COLUMN_2 = [
+  { roll: [1, 5], rank: "Feeble" },
+  { roll: [6, 25], rank: "Poor" },
+  { roll: [26, 75], rank: "Typical" },
+  { roll: [76, 95], rank: "Good" },
+  { roll: [96, 100], rank: "Excellent" }
 ];
 
 // Column 3: High Technology
@@ -360,6 +378,108 @@ export const CONTACT_TYPES = [
   "Religion", "Occult Lore", "Mythology"
 ];
 
+// Origin modifiers data for comparison table and tracker
+const ORIGIN_MODIFIERS = {
+  "Altered Human": {
+    column: 1,
+    abilityBonus: "+1 rank (pick any)",
+    powers: "—",
+    resources: "Typical +mod",
+    popularity: 10,
+    contacts: "—",
+    talents: "—",
+    special: "—",
+    trackerItems: [
+      { text: "Use Column 1", step: 2 },
+      { text: "+1 rank to any ability", step: 2 }
+    ],
+    warnings: []
+  },
+  "Mutant": {
+    column: 1,
+    abilityBonus: "Endurance +1",
+    powers: "+1 power",
+    resources: "Typical +mod -1",
+    popularity: 0,
+    contacts: "—",
+    talents: "—",
+    special: "Mutant detection; Powers mostly inborn",
+    trackerItems: [
+      { text: "Use Column 1", step: 2 },
+      { text: "Endurance +1 rank", step: 2 },
+      { text: "Resources -1 rank", step: 3 },
+      { text: "Popularity = 0", step: 3 },
+      { text: "+1 Power", step: 5 }
+    ],
+    warnings: [
+      "Slow Pop changes",
+      "Mutant detection",
+      "Powers mostly inborn"
+    ]
+  },
+  "Hi-Tech": {
+    column: 3,
+    abilityBonus: "Reason +2",
+    powers: "—",
+    resources: "Good +mod",
+    popularity: 10,
+    contacts: "1 required",
+    talents: "1 sci/prof required",
+    special: "Battlesuit option with Body Armor",
+    trackerItems: [
+      { text: "Use Column 3", step: 2 },
+      { text: "Reason +2 ranks", step: 2 },
+      { text: "Resources = Good", step: 3 },
+      { text: "1 Contact required", step: 7 },
+      { text: "1 Sci/Prof Talent req.", step: 6 }
+    ],
+    warnings: [
+      "Powers via equipment",
+      "Battlesuit option (if Body Armor)"
+    ]
+  },
+  "Robot": {
+    column: 4,
+    abilityBonus: "—",
+    powers: "—",
+    resources: "Typical +mod",
+    popularity: 0,
+    contacts: "—",
+    talents: "—",
+    special: "Heals normally; No karma loss on death",
+    trackerItems: [
+      { text: "Use Column 4", step: 2 },
+      { text: "Popularity = 0", step: 3 }
+    ],
+    warnings: [],
+    benefits: [
+      "Can heal normally",
+      "No karma loss on death",
+      "Can be reactivated"
+    ]
+  },
+  "Alien": {
+    column: 5,
+    abilityBonus: "—",
+    powers: "-1 power (min 2)",
+    resources: "Poor +mod",
+    popularity: 10,
+    contacts: "1 max",
+    talents: "—",
+    special: "Declare power source; Outcast if no race contact",
+    trackerItems: [
+      { text: "Use Column 5", step: 2 },
+      { text: "Resources = Poor", step: 3 },
+      { text: "-1 Power (min 2)", step: 5 },
+      { text: "1 Contact max", step: 7 }
+    ],
+    warnings: [
+      "Declare power source",
+      "Outcast if no race Contact"
+    ]
+  }
+};
+
 function roll100() {
   return Math.floor(Math.random() * 100) + 1;
 }
@@ -375,7 +495,7 @@ function rollOnTable(table, rollValue = null) {
 }
 
 function getRankData(rankName) {
-  return RANKS.find(r => r.name === rankName) || RANKS[3]; // Default Typical
+  return RANKS.find(r => r.name === rankName) || RANKS[3];
 }
 
 function shiftRank(rankName, shifts) {
@@ -385,21 +505,38 @@ function shiftRank(rankName, shifts) {
   return RANKS[newIdx].name;
 }
 
+function getColumnForOrigin(origin) {
+  switch (origin) {
+    case "Altered Human":
+    case "Mutant":
+      return { num: 1, data: COLUMN_1 };
+    case "Hi-Tech":
+      return { num: 3, data: COLUMN_3 };
+    case "Robot":
+      return { num: 4, data: COLUMN_4 };
+    case "Alien":
+      return { num: 5, data: COLUMN_5 };
+    default:
+      return { num: 1, data: COLUMN_1 };
+  }
+}
+
 export class CharacterGenerator {
   constructor(actor) {
     this.actor = actor;
     this.state = {
       step: 0,
       origin: null,
+      originRoll: null,
       abilities: {},
       health: 0,
       karma: 0,
-      resources: { rank: "Typical", value: 6 },
+      resources: { rank: "Typical", value: 6, roll: null },
       popularity: { hero: 10, secretId: 0 },
       hasSecretId: false,
-      powersData: { initial: 0, max: 0, categories: [], chosen: [] },
-      talentsData: { initial: 0, max: 0, categories: [], chosen: [] },
-      contactsData: { initial: 0, max: 0, chosen: [] },
+      powersData: { initial: 0, max: 0, roll: null, categories: [], chosen: [] },
+      talentsData: { initial: 0, max: 0, roll: null, categories: [], chosen: [] },
+      contactsData: { initial: 0, max: 0, roll: null, chosen: [] },
       alteredBonusUsed: false,
       log: []
     };
@@ -413,62 +550,38 @@ export class CharacterGenerator {
     this.state = {
       step: 0,
       origin: null,
+      originRoll: null,
       abilities: {},
       health: 0,
       karma: 0,
-      resources: { rank: "Typical", value: 6 },
+      resources: { rank: "Typical", value: 6, roll: null },
       popularity: { hero: 10, secretId: 0 },
       hasSecretId: false,
-      powersData: { initial: 0, max: 0, categories: [], chosen: [] },
-      talentsData: { initial: 0, max: 0, categories: [], chosen: [] },
-      contactsData: { initial: 0, max: 0, chosen: [] },
+      powersData: { initial: 0, max: 0, roll: null, categories: [], chosen: [] },
+      talentsData: { initial: 0, max: 0, roll: null, categories: [], chosen: [] },
+      contactsData: { initial: 0, max: 0, roll: null, chosen: [] },
       alteredBonusUsed: false,
       log: []
     };
   }
 
-  // Step 1: Roll or choose origin
   rollOrigin() {
-    const roll = roll100();
-    let origin;
-    if (roll <= 30) origin = "Altered Human";
-    else if (roll <= 60) origin = "Mutant";
-    else if (roll <= 90) origin = "Hi-Tech";
-    else if (roll <= 95) origin = "Robot";
-    else origin = "Alien";
-    
-    this.state.origin = origin;
-    this.log(`Origin Roll: ${roll} → ${origin}`);
-    return { roll, origin };
+    const { roll, result } = rollOnTable(ORIGIN_TABLE);
+    this.state.origin = result.origin;
+    this.state.originRoll = roll;
+    this.log(`Origin Roll: ${roll} → ${result.origin}`);
+    return { roll, origin: result.origin };
   }
 
   setOrigin(origin) {
     this.state.origin = origin;
+    this.state.originRoll = null;
     this.log(`Origin chosen: ${origin}`);
   }
 
-  // Step 2: Generate primary abilities
   rollPrimaryAbilities() {
     const origin = this.state.origin;
-    let column;
-    
-    switch (origin) {
-      case "Altered Human":
-      case "Mutant":
-        column = COLUMN_1;
-        break;
-      case "Hi-Tech":
-        column = COLUMN_3;
-        break;
-      case "Robot":
-        column = COLUMN_4;
-        break;
-      case "Alien":
-        column = COLUMN_5;
-        break;
-      default:
-        column = COLUMN_1;
-    }
+    const { data: column } = getColumnForOrigin(origin);
 
     const abilities = ["fighting", "agility", "strength", "endurance", "reason", "intuition", "psyche"];
     const results = {};
@@ -486,9 +599,7 @@ export class CharacterGenerator {
       this.log(`${ability.charAt(0).toUpperCase() + ability.slice(1)}: Roll ${roll} → ${result.rank} (${rankData.min})`);
     }
 
-    // Apply origin modifiers
     this.applyOriginModifiers(results);
-    
     this.state.abilities = results;
     return results;
   }
@@ -498,37 +609,33 @@ export class CharacterGenerator {
 
     switch (origin) {
       case "Altered Human":
-        // May raise any single primary ability by one rank (handled in UI)
         this.log("Altered Human: May raise one primary ability by 1 rank");
         break;
 
       case "Mutant":
-        // Endurance raised by one rank
         abilities.endurance.rank = shiftRank(abilities.endurance.rank, 1);
         abilities.endurance.value = getRankData(abilities.endurance.rank).min;
+        abilities.endurance.modified = true;
         this.log(`Mutant: Endurance raised to ${abilities.endurance.rank}`);
         break;
 
       case "Hi-Tech":
-        // Reason raised by two ranks
         abilities.reason.rank = shiftRank(abilities.reason.rank, 2);
         abilities.reason.value = getRankData(abilities.reason.rank).min;
+        abilities.reason.modified = true;
         this.log(`Hi-Tech: Reason raised to ${abilities.reason.rank}`);
         break;
 
       case "Robot":
-        // No automatic modifications
         this.log("Robot: No automatic ability modifications");
         break;
 
       case "Alien":
-        // No automatic modifications
         this.log("Alien: No automatic ability modifications");
         break;
     }
   }
 
-  // Allow Altered Human to raise one ability
   raiseAbility(abilityKey) {
     if (this.state.origin !== "Altered Human") return false;
     if (this.state.alteredBonusUsed) {
@@ -540,24 +647,21 @@ export class CharacterGenerator {
 
     ability.rank = shiftRank(ability.rank, 1);
     ability.value = getRankData(ability.rank).min;
+    ability.modified = true;
     this.state.alteredBonusUsed = true;
     this.log(`Altered Human bonus: ${abilityKey} raised to ${ability.rank}`);
     return true;
   }
 
-  // Step 3: Generate secondary abilities
   generateSecondaryAbilities() {
     const a = this.state.abilities;
-    
-    // Health = F + A + S + E
+
     this.state.health = a.fighting.value + a.agility.value + a.strength.value + a.endurance.value;
     this.log(`Health: ${a.fighting.value} + ${a.agility.value} + ${a.strength.value} + ${a.endurance.value} = ${this.state.health}`);
-    
-    // Karma = R + I + P
+
     this.state.karma = a.reason.value + a.intuition.value + a.psyche.value;
     this.log(`Initial Karma: ${a.reason.value} + ${a.intuition.value} + ${a.psyche.value} = ${this.state.karma}`);
-    
-    // Resources
+
     let resourceRank = "Typical";
     if (this.state.origin === "Alien") {
       resourceRank = "Poor";
@@ -566,341 +670,288 @@ export class CharacterGenerator {
       resourceRank = "Good";
       this.log("Hi-Tech: Resources set to Good");
     }
-    
-    // Roll modifier
+
     const { roll, result } = rollOnTable(ABILITY_MODIFIER);
     const modifiedRank = shiftRank(resourceRank, result.mod);
+    this.state.resources.roll = roll;
     this.log(`Resources: ${resourceRank} + modifier roll ${roll} (${result.mod >= 0 ? '+' : ''}${result.mod}) = ${modifiedRank}`);
-    
-    // Mutant reduction
+
     let finalResourceRank = modifiedRank;
     if (this.state.origin === "Mutant") {
       finalResourceRank = shiftRank(modifiedRank, -1);
       this.log(`Mutant: Resources reduced to ${finalResourceRank}`);
     }
-    
+
     this.state.resources = {
       rank: finalResourceRank,
-      value: getRankData(finalResourceRank).min
+      value: getRankData(finalResourceRank).min,
+      roll: roll
     };
-    
-    // Popularity
+
     let basePop = 10;
     if (this.state.origin === "Mutant" || this.state.origin === "Robot") {
       basePop = 0;
       this.log(`${this.state.origin}: Starting Popularity is 0`);
     }
-    
+
     this.state.popularity = { hero: basePop, secretId: basePop };
   }
 
   setSecretId(hasSecret) {
-    this.state.hasSecretId = hasSecret;
-    if (hasSecret) {
+    if (this.state.hasSecretId === hasSecret) return;
+    
+    if (hasSecret && !this.state.hasSecretId) {
       this.state.popularity.hero -= 5;
-      this.log("Secret Identity: Popularity reduced by 5");
+      this.state.popularity.secretId -= 5;
+      this.log("Secret ID: Popularity reduced by 5");
+    } else if (!hasSecret && this.state.hasSecretId) {
+      this.state.popularity.hero += 5;
+      this.state.popularity.secretId += 5;
+      this.log("Secret ID removed: Popularity restored");
     }
+    this.state.hasSecretId = hasSecret;
   }
 
-  // Step 4: Generate special abilities counts
   rollSpecialAbilityCounts() {
-  // Powers
-  const powersRoll = rollOnTable(POWERS_TABLE);
-  let powersInitial = powersRoll.result.initial;
-  let powersMax = powersRoll.result.max;
+    const { roll: pRoll, result: pResult } = rollOnTable(POWERS_TABLE);
+    let powerInitial = pResult.initial;
+    let powerMax = pResult.max;
 
-  if (this.state.origin === "Mutant") {
-    powersInitial = Math.min(powersInitial + 1, 5);
-    this.log(`Mutant: +1 Power (now ${powersInitial})`);
+    if (this.state.origin === "Mutant") {
+      powerInitial = Math.min(powerInitial + 1, powerMax);
+      this.log(`Mutant: +1 Power (${pResult.initial} → ${powerInitial})`);
+    }
+    if (this.state.origin === "Alien") {
+      powerInitial = Math.max(2, powerInitial - 1);
+      this.log(`Alien: -1 Power (${pResult.initial} → ${powerInitial})`);
+    }
+
+    this.state.powersData = {
+      initial: powerInitial,
+      max: powerMax,
+      roll: pRoll,
+      categories: [],
+      chosen: []
+    };
+    this.log(`Powers: Roll ${pRoll} → ${powerInitial} initial, ${powerMax} max`);
+
+    const { roll: tRoll, result: tResult } = rollOnTable(TALENTS_TABLE);
+    this.state.talentsData = {
+      initial: tResult.initial,
+      max: tResult.max,
+      roll: tRoll,
+      categories: [],
+      chosen: []
+    };
+    this.log(`Talents: Roll ${tRoll} → ${tResult.initial} initial, ${tResult.max} max`);
+
+    const { roll: cRoll, result: cResult } = rollOnTable(CONTACTS_TABLE);
+    let contactInitial = cResult.initial;
+    let contactMax = cResult.max;
+
+    if (this.state.origin === "Hi-Tech" && contactInitial < 1) {
+      contactInitial = 1;
+      this.log("Hi-Tech: Must have at least 1 Contact");
+    }
+    if (this.state.origin === "Alien") {
+      contactInitial = Math.min(contactInitial, 1);
+      contactMax = 1;
+      this.log("Alien: Maximum 1 Contact");
+    }
+
+    this.state.contactsData = {
+      initial: contactInitial,
+      max: contactMax,
+      roll: cRoll,
+      chosen: []
+    };
+    this.log(`Contacts: Roll ${cRoll} → ${contactInitial} initial, ${contactMax} max`);
   }
-  if (this.state.origin === "Alien") {
-    powersInitial = Math.max(powersInitial - 1, 2);
-    this.log(`Alien: -1 Power (now ${powersInitial})`);
-  }
 
-  this.state.powersData = {
-    initial: powersInitial,
-    max: powersMax,
-    categories: [],
-    chosen: [],
-    rollResult: powersRoll.roll
-  };
-  this.log(`Powers: Roll ${powersRoll.roll} → ${powersInitial} initial, ${powersMax} max`);
-
-  // Talents
-  const talentsRoll = rollOnTable(TALENTS_TABLE);
-  this.state.talentsData = { 
-    initial: talentsRoll.result.initial, 
-    max: talentsRoll.result.max,
-    categories: [],
-    chosen: [],
-    rollResult: talentsRoll.roll
-  };
-  this.log(`Talents: Roll ${talentsRoll.roll} → ${talentsRoll.result.initial} initial, ${talentsRoll.result.max} max`);
-
-  // Contacts
-  const contactsRoll = rollOnTable(CONTACTS_TABLE);
-  let contactsInitial = contactsRoll.result.initial;
-
-  if (this.state.origin === "Hi-Tech") {
-    contactsInitial = Math.max(contactsInitial, 1);
-    this.log("Hi-Tech: Must have at least 1 Contact (support organization)");
-  }
-  if (this.state.origin === "Alien") {
-    contactsInitial = 1;
-    this.log("Alien: Starts with exactly 1 initial Contact (usually home race)");
-  }
-
-  this.state.contactsData = { 
-    initial: contactsInitial, 
-    max: contactsRoll.result.max,
-    chosen: [],
-    rollResult: contactsRoll.roll
-  };
-  this.log(`Contacts: Roll ${contactsRoll.roll} → ${contactsInitial} initial, ${contactsRoll.result.max} max`);
-}
-
-
-  // Roll power categories
   rollPowerCategories() {
+    const count = this.state.powersData.initial;
     const categories = [];
-    for (let i = 0; i < this.state.powersData.initial; i++) {
+    for (let i = 0; i < count; i++) {
       const { roll, result } = rollOnTable(POWER_CATEGORIES);
-      categories.push({ roll, category: result.category });
-      this.log(`Power ${i + 1} Category: Roll ${roll} → ${result.category}`);
+      categories.push({ index: i, roll, category: result.category, bonus: false });
+      this.log(`Power Category ${i + 1}: Roll ${roll} → ${result.category}`);
     }
     this.state.powersData.categories = categories;
-    return categories;
   }
 
-  // Roll talent categories  
   rollTalentCategories() {
+    const count = this.state.talentsData.initial;
     const categories = [];
-    for (let i = 0; i < this.state.talentsData.initial; i++) {
+    for (let i = 0; i < count; i++) {
       const { roll, result } = rollOnTable(TALENT_CATEGORIES);
-      categories.push({ roll, category: result.category });
-      this.log(`Talent ${i + 1} Category: Roll ${roll} → ${result.category}`);
+      categories.push({ index: i, roll, category: result.category });
+      this.log(`Talent Category ${i + 1}: Roll ${roll} → ${result.category}`);
     }
     this.state.talentsData.categories = categories;
-    return categories;
   }
 
-  // Roll power rank
-  rollPowerRank() {
-    const { roll, result } = rollOnTable(COLUMN_4);
-    const rankData = getRankData(result.rank);
-    return { roll, rank: result.rank, value: rankData.min };
-  }
-
-  // Choose a power from a category
-  choosePower(category, powerName, { silent = false } = {}) {
+  choosePower(category, powerName, categoryIndex = null) {
     const powerList = POWER_LISTS[category];
-    if (!powerList) return null;
-
-    // Prevent exact duplicate powers by name
-    if (this.state.powersData.chosen.some(p => p.name === powerName)) {
-      const msg = `Duplicate power "${powerName}" ignored (powers should be unique).`;
-      this.log(msg);
-      if (!silent && typeof ui !== "undefined" && ui.notifications) {
-        ui.notifications.warn(msg);
-      }
-      return null;
-    }
+    if (!powerList) return false;
 
     const power = powerList.find(p => p.name === powerName);
-    if (!power) return null;
+    if (!power) return false;
 
-    // Enforce star-powers counting as 2 slots vs max
-    const slotCost = power.star ? 2 : 1;
-    const usedSlots = this.state.powersData.chosen.reduce(
-      (sum, p) => sum + (p.star ? 2 : 1),
-      0
-    );
-    const maxSlots = this.state.powersData.max ?? this.state.powersData.initial ?? 0;
-
-    if (maxSlots && usedSlots + slotCost > maxSlots) {
-      const msg = `Cannot add "${powerName}" – it would exceed the maximum number of starting powers.`;
-      this.log(msg);
-      if (!silent && typeof ui !== "undefined" && ui.notifications) {
-        ui.notifications.warn(msg);
-      }
-      return null;
+    // Check if this power is already chosen
+    if (this.state.powersData.chosen.some(p => p.name === powerName)) {
+      this.log(`Cannot choose ${powerName}: already chosen`);
+      return false;
     }
 
-    const rankInfo = this.rollPowerRank();
-    const chosenPower = {
-      name: power.name,
+    // Check if this category slot is already filled
+    if (categoryIndex !== null && this.state.powersData.chosen.some(p => p.categoryIndex === categoryIndex)) {
+      this.log(`Cannot choose ${powerName}: category slot already filled`);
+      return false;
+    }
+
+    if (power.star) {
+      const slotsUsed = this.state.powersData.chosen.reduce((acc, p) => acc + (p.star ? 2 : 1), 0);
+      if (slotsUsed + 2 > this.state.powersData.initial) {
+        this.log(`Cannot choose ${powerName}: requires 2 slots`);
+        return false;
+      }
+    }
+
+    const { roll, result } = rollOnTable(COLUMN_4);
+    const rankData = getRankData(result.rank);
+
+    this.state.powersData.chosen.push({
+      name: powerName,
       category,
-      rank: rankInfo.rank,
-      value: rankInfo.value,
+      categoryIndex,
       star: power.star,
-      rankRoll: rankInfo.roll
-    };
+      rank: result.rank,
+      value: rankData.min,
+      roll
+    });
 
-    this.state.powersData.chosen.push(chosenPower);
-    this.log(`Power chosen: ${power.name} at ${rankInfo.rank} (${rankInfo.value}) - Roll ${rankInfo.roll}`);
-
-    return chosenPower;
+    this.log(`Chose Power: ${powerName} (${category}) - ${result.rank} (${rankData.min})`);
+    return true;
   }
 
-  // Helper for random selection without duplicates
   autoPickPower(category) {
-    const powerList = POWER_LISTS[category] || [];
-    if (!powerList.length) return null;
+    const powerList = POWER_LISTS[category];
+    if (!powerList) return false;
 
-    // Try up to N times to find a legal, non-duplicate power
-    for (let i = 0; i < powerList.length; i++) {
-      const candidate = powerList[Math.floor(Math.random() * powerList.length)];
-      const result = this.choosePower(category, candidate.name, { silent: true });
-      if (result) return result;
-    }
+    const chosenNames = this.state.powersData.chosen.map(p => p.name);
+    const available = powerList.filter(p => !p.star && !chosenNames.includes(p.name));
+    if (available.length === 0) return false;
 
-    // No legal power found
-    return null;
+    const power = available[Math.floor(Math.random() * available.length)];
+    return this.choosePower(category, power.name);
   }
 
-  // Choose a talent
-  chooseTalent(category, talentName, { silent = false } = {}) {
+  chooseTalent(category, talentName, categoryIndex = null) {
     const talentList = TALENT_LISTS[category];
-    if (!talentList) return null;
-
-    // No duplicate talents by name
-    if (this.state.talentsData.chosen.some(t => t.name === talentName)) {
-      const msg = `Duplicate talent "${talentName}" ignored (talents should be unique).`;
-      this.log(msg);
-      if (!silent && typeof ui !== "undefined" && ui.notifications) {
-        ui.notifications.warn(msg);
-      }
-      return null;
-    }
+    if (!talentList) return false;
 
     const talent = talentList.find(t => t.name === talentName);
-    if (!talent) return null;
+    if (!talent) return false;
 
-    const chosenTalent = {
-      name: talent.name,
+    // Check if this talent is already chosen
+    if (this.state.talentsData.chosen.some(t => t.name === talentName)) {
+      this.log(`Cannot choose ${talentName}: already chosen`);
+      return false;
+    }
+
+    // Check if this category slot is already filled
+    if (categoryIndex !== null && this.state.talentsData.chosen.some(t => t.categoryIndex === categoryIndex)) {
+      this.log(`Cannot choose ${talentName}: category slot already filled`);
+      return false;
+    }
+
+    if (talent.star) {
+      const slotsUsed = this.state.talentsData.chosen.reduce((acc, t) => acc + (t.star ? 2 : 1), 0);
+      if (slotsUsed + 2 > this.state.talentsData.initial) {
+        this.log(`Cannot choose ${talentName}: requires 2 slots`);
+        return false;
+      }
+    }
+
+    this.state.talentsData.chosen.push({
+      name: talentName,
       category,
+      categoryIndex,
       star: talent.star
-    };
+    });
 
-    this.state.talentsData.chosen.push(chosenTalent);
-    this.log(`Talent chosen: ${talent.name} (${category})`);
-
-    return chosenTalent;
+    this.log(`Chose Talent: ${talentName} (${category})`);
+    return true;
   }
 
-  // Helper for random selection without duplicates
   autoPickTalent(category) {
-    const talentList = TALENT_LISTS[category] || [];
-    if (!talentList.length) return null;
+    const talentList = TALENT_LISTS[category];
+    if (!talentList) return false;
 
-    for (let i = 0; i < talentList.length; i++) {
-      const candidate = talentList[Math.floor(Math.random() * talentList.length)];
-      const result = this.chooseTalent(category, candidate.name, { silent: true });
-      if (result) return result;
+    const chosenNames = this.state.talentsData.chosen.map(t => t.name);
+    const available = talentList.filter(t => !t.star && !chosenNames.includes(t.name));
+    if (available.length === 0) return false;
+
+    const talent = available[Math.floor(Math.random() * available.length)];
+    return this.chooseTalent(category, talent.name);
+  }
+
+  chooseContact(type, name = null) {
+    if (this.state.contactsData.chosen.length >= this.state.contactsData.initial) {
+      return false;
     }
 
-    return null;
+    // Check if this contact type is already chosen
+    if (this.state.contactsData.chosen.some(c => c.type === type)) {
+      this.log(`Cannot choose ${type}: already have a contact of this type`);
+      return false;
+    }
+
+    this.state.contactsData.chosen.push({
+      type,
+      name: name || type
+    });
+
+    this.log(`Chose Contact: ${name || type} (${type})`);
+    return true;
   }
 
-
-  // Choose a contact
-  chooseContact(contactType, name = "") {
-    const contact = {
-      type: contactType,
-      name: name || contactType
-    };
-    
-    this.state.contactsData.chosen.push(contact);
-    this.log(`Contact chosen: ${contact.name} (${contactType})`);
-    
-    return contact;
-  }
-
-  // Generate a complete random character in one shot
   generateFullRandom() {
-    this.log("=== FULL RANDOM GENERATION ===");
-    
-    // Step 1: Origin
     this.rollOrigin();
-    
-    // Step 2: Primary Abilities
     this.rollPrimaryAbilities();
-    
-    // For Altered Human, randomly pick one ability to raise
-    if (this.state.origin === "Altered Human") {
-      const abilities = ["fighting", "agility", "strength", "endurance", "reason", "intuition", "psyche"];
-      const randomAbility = abilities[Math.floor(Math.random() * abilities.length)];
-      this.raiseAbility(randomAbility);
-      this.log(`Altered Human: Randomly raised ${randomAbility}`);
-    }
-    
-    // Step 3: Secondary Abilities
     this.generateSecondaryAbilities();
-    
-    // Randomly decide secret ID (50% chance)
-    const hasSecret = Math.random() < 0.5;
-    if (hasSecret) {
-      this.setSecretId(true);
-    }
-    
-    // Step 4: Roll special ability counts
     this.rollSpecialAbilityCounts();
-    
-    // Step 5: Roll and choose powers
     this.rollPowerCategories();
-    const powerCats = this.state.powersData.categories;
-    for (const cat of powerCats) {
-      if (this.state.powersData.chosen.length >= this.state.powersData.initial) break;
+    this.rollTalentCategories();
+
+    for (const cat of this.state.powersData.categories) {
       this.autoPickPower(cat.category);
     }
-    
-    // Step 6: Roll and choose talents
-    this.rollTalentCategories();
-    const talentCats = this.state.talentsData.categories;
-    for (const cat of talentCats) {
-      if (this.state.talentsData.chosen.length >= this.state.talentsData.initial) break;
+
+    for (const cat of this.state.talentsData.categories) {
       this.autoPickTalent(cat.category);
     }
-    
-    // Step 7: Choose random contacts
-    const numContacts = this.state.contactsData.initial;
-    for (let i = 0; i < numContacts; i++) {
-      const randomType = CONTACT_TYPES[Math.floor(Math.random() * CONTACT_TYPES.length)];
-      this.chooseContact(randomType);
+
+    const contactCount = this.state.contactsData.initial;
+    for (let i = 0; i < contactCount; i++) {
+      const type = CONTACT_TYPES[Math.floor(Math.random() * CONTACT_TYPES.length)];
+      this.chooseContact(type);
     }
-    
-    this.log("=== GENERATION COMPLETE ===");
-    return this.state;
   }
 
-  // Apply to actor
   async applyToActor() {
-  if (!this.generator) return;
+    if (!this.actor) return;
 
-  // Build history entry before we reset anything
-  const shortLabel = this.generator.buildShortLabel
-    ? this.generator.buildShortLabel()
-    : "Unnamed hero";
-  const timestamp = new Date().toLocaleTimeString();
+    const updates = this.buildActorUpdates();
+    if (updates) {
+      await this.actor.update(updates);
+    }
 
-  this.history.unshift({
-    timestamp,
-    label: shortLabel
-  });
-
-  await this.generator.applyToActor();
-
-  if (typeof ui !== "undefined" && ui.notifications) {
-    ui.notifications.info("Random character applied to sheet.");
+    const itemData = this.buildItemData();
+    if (itemData && itemData.length > 0) {
+      await this.actor.createEmbeddedDocuments("Item", itemData);
+    }
   }
-
-  // If you want to leave the hero displayed, comment the next two lines out
-  this.generator = null;
-  this.currentStep = 0;
-  this.updateDisplay();
-}
-
 
   getState() {
     return this.state;
@@ -912,19 +963,11 @@ export class CharacterGenerator {
 
   buildTextSummary() {
     const s = this.state;
-    if (!s) return "";
+    if (!s || !s.abilities) return "";
 
-    const primary = s.primaryAbilities || {};
-    const secondary = s.secondary || {};
-    const origin = s.origin || {};
-
-    const line = (label, v) => `${label}: ${v ?? "-"}`;
-
-    const primaryLines = Object.entries(primary)
-      .map(([key, data]) => {
-        const label = key.toUpperCase();
-        return `${label} ${data.rank} (${data.value})`;
-      })
+    const a = s.abilities;
+    const primaryLines = Object.entries(a)
+      .map(([key, data]) => `${key.toUpperCase()} ${data.rank} (${data.value})`)
       .join(" | ");
 
     const powerLines = (s.powersData?.chosen || [])
@@ -940,16 +983,16 @@ export class CharacterGenerator {
       .join("\n");
 
     return [
-      `Hero Origin: ${origin.type || "-"}`,
+      `Hero Origin: ${s.origin || "-"}`,
       "",
       "Primary Abilities:",
       primaryLines,
       "",
       "Secondary:",
-      line("Health", secondary.health),
-      line("Karma", secondary.karma),
-      line("Resources", `${secondary.resourcesRank} (${secondary.resourcesValue})`),
-      line("Popularity", `${secondary.popularityRank} (${secondary.popularityValue})`),
+      `Health: ${s.health}`,
+      `Karma: ${s.karma}`,
+      `Resources: ${s.resources.rank} (${s.resources.value})`,
+      `Popularity: ${s.popularity.hero}`,
       "",
       "Powers:",
       powerLines || "• None",
@@ -964,70 +1007,66 @@ export class CharacterGenerator {
 
   buildShortLabel() {
     const s = this.state || {};
-    const origin = s.origin || {};
-    const primary = s.primaryAbilities || {};
+    const a = s.abilities || {};
 
-    const f = primary.fighting?.rank || "-";
-    const a = primary.agility?.rank || "-";
-    const e = primary.endurance?.rank || "-";
+    const f = a.fighting?.rank?.substring(0, 2) || "-";
+    const ag = a.agility?.rank?.substring(0, 2) || "-";
+    const e = a.endurance?.rank?.substring(0, 2) || "-";
 
     const powers = (s.powersData?.chosen || []);
     const topPowers = powers.slice(0, 2).map(p => p.name).join(", ");
-    const powerPart = topPowers ? `Powers: ${topPowers}` : "Powers: none";
+    const powerPart = topPowers ? topPowers : "none";
 
-    return `${origin.type || "Unknown origin"} F/A/E ${f}/${a}/${e} — ${powerPart}`;
+    return `${s.origin || "Unknown"} F/A/E ${f}/${ag}/${e} — ${powerPart}`;
   }
 
-  // Build the update object for applying to actor
   buildActorUpdates() {
     const s = this.state;
     if (!s || !s.abilities) return null;
 
     const a = s.abilities;
-    
+
     return {
       "system.origin": s.origin || "",
       "system.powerOrigin": s.origin?.toLowerCase().replace("-", " ") || "altered human",
       "system.isMutant": s.origin === "Mutant",
       "system.identityType": s.hasSecretId ? "secret" : "public",
-      
-      // Primary abilities
+
       "system.abilities.fighting.value": a.fighting.value,
       "system.abilities.fighting.rank": a.fighting.rank,
       "system.abilities.fighting.initialRoll": a.fighting.initialRoll || "",
       "system.abilities.fighting.initialRank": a.fighting.initialRank || "",
-      
+
       "system.abilities.agility.value": a.agility.value,
       "system.abilities.agility.rank": a.agility.rank,
       "system.abilities.agility.initialRoll": a.agility.initialRoll || "",
       "system.abilities.agility.initialRank": a.agility.initialRank || "",
-      
+
       "system.abilities.strength.value": a.strength.value,
       "system.abilities.strength.rank": a.strength.rank,
       "system.abilities.strength.initialRoll": a.strength.initialRoll || "",
       "system.abilities.strength.initialRank": a.strength.initialRank || "",
-      
+
       "system.abilities.endurance.value": a.endurance.value,
       "system.abilities.endurance.rank": a.endurance.rank,
       "system.abilities.endurance.initialRoll": a.endurance.initialRoll || "",
       "system.abilities.endurance.initialRank": a.endurance.initialRank || "",
-      
+
       "system.abilities.reason.value": a.reason.value,
       "system.abilities.reason.rank": a.reason.rank,
       "system.abilities.reason.initialRoll": a.reason.initialRoll || "",
       "system.abilities.reason.initialRank": a.reason.initialRank || "",
-      
+
       "system.abilities.intuition.value": a.intuition.value,
       "system.abilities.intuition.rank": a.intuition.rank,
       "system.abilities.intuition.initialRoll": a.intuition.initialRoll || "",
       "system.abilities.intuition.initialRank": a.intuition.initialRank || "",
-      
+
       "system.abilities.psyche.value": a.psyche.value,
       "system.abilities.psyche.rank": a.psyche.rank,
       "system.abilities.psyche.initialRoll": a.psyche.initialRoll || "",
       "system.abilities.psyche.initialRank": a.psyche.initialRank || "",
-      
-      // Secondary abilities
+
       "system.attributes.health.value": s.health,
       "system.attributes.health.max": s.health,
       "system.attributes.karma.value": s.karma,
@@ -1039,12 +1078,10 @@ export class CharacterGenerator {
     };
   }
 
-  // Build item data for powers, talents, contacts
   buildItemData() {
     const s = this.state;
     const items = [];
 
-    // Powers
     for (const p of (s.powersData?.chosen || [])) {
       items.push({
         name: p.name,
@@ -1059,7 +1096,6 @@ export class CharacterGenerator {
       });
     }
 
-    // Talents
     for (const t of (s.talentsData?.chosen || [])) {
       items.push({
         name: t.name,
@@ -1071,7 +1107,6 @@ export class CharacterGenerator {
       });
     }
 
-    // Contacts
     for (const c of (s.contactsData?.chosen || [])) {
       items.push({
         name: c.name || c.type,
@@ -1086,7 +1121,6 @@ export class CharacterGenerator {
 
     return items;
   }
-
 }
 
 // UI Manager for the character creation tab
@@ -1097,10 +1131,7 @@ export class ChargenUIManager {
     this.actor = sheet.actor;
     this.generator = null;
     this.currentStep = 0;
-    this.randomPowers = false;
-    this.randomTalents = false;
     this._boundEvents = false;
-    // New: per-session concept history
     this.history = [];
 
     this.bindEvents(html);
@@ -1113,17 +1144,14 @@ export class ChargenUIManager {
   }
 
   bindEvents() {
-    // Only bind once - use event delegation
     if (this._boundEvents) return;
     this._boundEvents = true;
-    
+
     const container = this.html.find('.chargen-container');
     if (!container.length) return;
 
-    // Use event delegation for all dynamic content
     container.on('click', '.chargen-start', () => this.startGeneration());
     container.on('click', '.chargen-quick-random', () => this.quickRandomCharacter());
-    container.on('click', '.chargen-reroll', () => this.quickRandomCharacter());
     container.on('click', '.chargen-reset', () => this.reset());
     container.on('click', '.chargen-roll-origin', () => this.rollOrigin());
     container.on('change', '.chargen-origin-select', ev => this.selectOrigin(ev.target.value));
@@ -1139,71 +1167,42 @@ export class ChargenUIManager {
     container.on('click', '.chargen-choose-power', ev => {
       const category = ev.currentTarget.dataset.category;
       const power = ev.currentTarget.dataset.power;
-      this.choosePower(category, power);
+      const index = parseInt(ev.currentTarget.dataset.index, 10);
+      this.choosePower(category, power, index);
     });
     container.on('click', '.chargen-choose-talent', ev => {
       const category = ev.currentTarget.dataset.category;
       const talent = ev.currentTarget.dataset.talent;
-      this.chooseTalent(category, talent);
+      const index = parseInt(ev.currentTarget.dataset.index, 10);
+      this.chooseTalent(category, talent, index);
     });
     container.on('click', '.chargen-choose-contact', ev => {
       const type = ev.currentTarget.dataset.type;
       this.chooseContact(type);
     });
-
-    // Toggle random / manual mode for powers
-    container.on('change', '.chargen-powers-mode', ev => {
-      this.randomPowers = ev.currentTarget.value === "random";
-      this.updateDisplay();
-    });
-
-    // Randomly roll all remaining powers
-    container.on('click', '.chargen-roll-powers', () => {
-      this.rollAllPowersRandomly();
-    });
-
-    // Toggle random / manual mode for talents
-    container.on('change', '.chargen-talents-mode', ev => {
-      this.randomTalents = ev.currentTarget.value === "random";
-      this.updateDisplay();
-    });
-
-    // Randomly roll all remaining talents
-    container.on('click', '.chargen-roll-talents', () => {
-      this.rollAllTalentsRandomly();
-    });
-
-    container.on('click', '.chargen-soft-reset', () => this.softReset());
-
+    container.on('click', '.chargen-roll-powers', () => this.rollAllPowersRandomly());
+    container.on('click', '.chargen-roll-talents', () => this.rollAllTalentsRandomly());
     container.on('click', '.chargen-next', () => this.nextStep());
     container.on('click', '.chargen-prev', () => this.prevStep());
     container.on('click', '.chargen-apply', () => this.applyToActor());
-  }
-
-  softReset() {
-    if (!this.generator) return;
-    // Use the existing generator reset logic, but do NOT touch this.history
-    this.generator.reset();
-    this.currentStep = 0;
-    this.updateDisplay();
-
-    if (typeof ui !== "undefined" && ui.notifications) {
-      ui.notifications.info("New hero started. Previous concepts kept in history.");
-    }
+    container.on('click', '.chargen-reroll', () => this.quickRandomCharacter());
+    container.on('click', '.chargen-discard', () => this.reset());
   }
 
   startGeneration() {
+    if (typeof game !== "undefined" && !game.user.isGM) return;
     this.generator = new CharacterGenerator(this.actor);
     this.currentStep = 1;
     this.renderStep(1);
   }
 
   quickRandomCharacter() {
+    if (typeof game !== "undefined" && !game.user.isGM) return;
     this.generator = new CharacterGenerator(this.actor);
     this.generator.generateFullRandom();
-    this.currentStep = 8; // Jump to summary
+    this.currentStep = 8;
     this.renderStep(8);
-    
+
     if (typeof ui !== "undefined" && ui.notifications) {
       ui.notifications.info(`Random ${this.generator.state.origin} generated!`);
     }
@@ -1216,7 +1215,7 @@ export class ChargenUIManager {
   }
 
   rollOrigin() {
-    const result = this.generator.rollOrigin();
+    this.generator.rollOrigin();
     this.updateDisplay();
   }
 
@@ -1259,47 +1258,59 @@ export class ChargenUIManager {
     this.updateDisplay();
   }
 
-  choosePower(category, power) {
-    this.generator.choosePower(category, power);
+  choosePower(category, power, index) {
+    this.generator.choosePower(category, power, index);
     this.updateDisplay();
   }
 
-  chooseTalent(category, talent) {
-    this.generator.chooseTalent(category, talent);
+  chooseTalent(category, talent, index) {
+    this.generator.chooseTalent(category, talent, index);
     this.updateDisplay();
   }
 
   rollAllPowersRandomly() {
-    if (!this.generator || !this.generator.state?.powersData) return;
+    if (!this.generator?.state?.powersData) return;
     const data = this.generator.state.powersData;
-    const categories = data.categories || [];
     const needed = data.initial || 0;
 
-    // Fill any categories that don't have a chosen power yet,
-    // up to the allowed number of starting powers.
-    for (const entry of categories) {
+    for (const entry of data.categories) {
       if (data.chosen.length >= needed) break;
-      const alreadyChosen = data.chosen.some(p => p.category === entry.category);
+      const alreadyChosen = data.chosen.some(p => p.categoryIndex === entry.index);
       if (alreadyChosen) continue;
-      this.generator.autoPickPower(entry.category);
+      
+      const powerList = POWER_LISTS[entry.category];
+      if (!powerList) continue;
+      
+      const chosenNames = data.chosen.map(p => p.name);
+      const available = powerList.filter(p => !p.star && !chosenNames.includes(p.name));
+      if (available.length === 0) continue;
+      
+      const power = available[Math.floor(Math.random() * available.length)];
+      this.generator.choosePower(entry.category, power.name, entry.index);
     }
-
     this.updateDisplay();
   }
 
   rollAllTalentsRandomly() {
-    if (!this.generator || !this.generator.state?.talentsData) return;
+    if (!this.generator?.state?.talentsData) return;
     const data = this.generator.state.talentsData;
-    const categories = data.categories || [];
     const needed = data.initial || 0;
 
-    for (const entry of categories) {
+    for (const entry of data.categories) {
       if (data.chosen.length >= needed) break;
-      const alreadyChosen = data.chosen.some(t => t.category === entry.category);
+      const alreadyChosen = data.chosen.some(t => t.categoryIndex === entry.index);
       if (alreadyChosen) continue;
-      this.generator.autoPickTalent(entry.category);
+      
+      const talentList = TALENT_LISTS[entry.category];
+      if (!talentList) continue;
+      
+      const chosenNames = data.chosen.map(t => t.name);
+      const available = talentList.filter(t => !t.star && !chosenNames.includes(t.name));
+      if (available.length === 0) continue;
+      
+      const talent = available[Math.floor(Math.random() * available.length)];
+      this.generator.chooseTalent(entry.category, talent.name, entry.index);
     }
-
     this.updateDisplay();
   }
 
@@ -1321,38 +1332,19 @@ export class ChargenUIManager {
   }
 
   async applyToActor() {
-    if (!this.generator || !this.generator.state) return;
+    if (typeof game !== "undefined" && !game.user.isGM) return;
+    if (!this.generator?.state) return;
 
-    const updates = this.generator.buildActorUpdates();
-    if (!updates) return;
-
-    // Build history entry before we reset anything
-    const shortLabel = this.generator.buildShortLabel
-      ? this.generator.buildShortLabel()
-      : "Unnamed hero";
+    const shortLabel = this.generator.buildShortLabel();
     const timestamp = new Date().toLocaleTimeString();
+    this.history.unshift({ timestamp, label: shortLabel });
 
-    this.history.unshift({
-      timestamp,
-      label: shortLabel
-    });
+    await this.generator.applyToActor();
 
-    // Update actor attributes
-    await this.actor.update(updates);
-
-    // Create items (powers, talents, contacts)
-    const itemData = this.generator.buildItemData();
-    if (itemData && itemData.length > 0) {
-      await this.actor.createEmbeddedDocuments("Item", itemData);
-    }
-
-    // Optionally notify
     if (typeof ui !== "undefined" && ui.notifications) {
-      ui.notifications.info("Random character applied to sheet.");
+      ui.notifications.info("Character applied to sheet.");
     }
 
-    // After applying, you can either leave the hero on screen,
-    // or auto-soft-reset to encourage the next concept.
     this.generator.reset();
     this.currentStep = 0;
     this.updateDisplay();
@@ -1365,51 +1357,208 @@ export class ChargenUIManager {
   renderStep(step) {
     const container = this.html.find('.chargen-content');
     const state = this.generator?.getState();
-    const log = this.generator?.getLog() || [];
+
+    // GM-only check
+    if (typeof game !== "undefined" && !game.user.isGM) {
+      container.html(`
+        <div class="chargen-intro">
+          <h3>Random Character Generator</h3>
+          <p style="color: #856404;">This feature is available to the Game Master only.</p>
+          <p style="font-size: 0.85em; color: #666;">Contact your GM if you need a randomly generated character.</p>
+        </div>
+      `);
+      return;
+    }
 
     let content = '';
 
-    switch (step) {
-      case 0:
-        content = this.renderIntro();
-        break;
-      case 1:
-        content = this.renderOriginStep(state);
-        break;
-      case 2:
-        content = this.renderAbilitiesStep(state);
-        break;
-      case 3:
-        content = this.renderSecondaryStep(state);
-        break;
-      case 4:
-        content = this.renderSpecialsStep(state);
-        break;
-      case 5:
-        content = this.renderPowersStep(state);
-        break;
-      case 6:
-        content = this.renderTalentsStep(state);
-        break;
-      case 7:
-        content = this.renderContactsStep(state);
-        break;
-      case 8:
-        content = this.renderSummaryStep(state);
-        break;
+    if (step === 0) {
+      content = this.renderIntro();
+    } else {
+      content = `
+        <div class="chargen-body">
+          ${this.renderChronicle(state, step)}
+          <div class="chargen-main">
+            ${this.renderStepContent(step, state)}
+          </div>
+        </div>
+      `;
     }
 
-    // Add log display
-    const logHtml = log.length ? `
-      <div class="chargen-log">
-        <h4>Generation Log</h4>
-        <div class="log-entries">
-          ${log.map(l => `<div class="log-entry">${l}</div>`).join('')}
-        </div>
-      </div>
-    ` : '';
+    container.html(content);
+  }
 
-    container.html(content + logHtml);
+  renderChronicle(state, currentStep) {
+    const steps = [
+      { num: 1, name: "Origin", key: "origin" },
+      { num: 2, name: "Primary Abilities", key: "abilities" },
+      { num: 3, name: "Secondary", key: "secondary" },
+      { num: 4, name: "Specials Count", key: "specials" },
+      { num: 5, name: "Powers", key: "powers" },
+      { num: 6, name: "Talents", key: "talents" },
+      { num: 7, name: "Contacts", key: "contacts" },
+      { num: 8, name: "Summary", key: "summary" }
+    ];
+
+    const isComplete = currentStep === 8;
+    const chronicleClass = isComplete ? "chargen-chronicle complete" : "chargen-chronicle";
+    const titleClass = isComplete ? "chronicle-title complete" : "chronicle-title";
+    const titleText = isComplete ? "✓ Generation Complete" : "Generation Chronicle";
+
+    let html = `<div class="${chronicleClass}">`;
+    html += `<div class="${titleClass}">${titleText}</div>`;
+
+    if (state?.origin) {
+      html += this.renderOriginTracker(state, currentStep);
+    }
+
+    for (const step of steps) {
+      const isActive = step.num === currentStep;
+      const isCompleted = step.num < currentStep;
+      let stepClass = "chronicle-step";
+      if (isActive) stepClass += " active";
+      if (isCompleted) stepClass += " completed";
+
+      html += `<div class="${stepClass}">`;
+      html += `<div class="chronicle-step-header">${step.num}. ${step.name}</div>`;
+      html += `<div class="chronicle-step-result">${this.getChronicleResult(state, step.key, isCompleted, isActive)}</div>`;
+      html += `</div>`;
+    }
+
+    html += `</div>`;
+    return html;
+  }
+
+  getChronicleResult(state, key, isCompleted, isActive) {
+    if (!state) return "Awaiting...";
+
+    switch (key) {
+      case "origin":
+        if (state.origin) {
+          const rollText = state.originRoll ? ` (Roll: ${state.originRoll})` : "";
+          return `<strong>${state.origin}</strong>${rollText}`;
+        }
+        return isActive ? "Select an origin..." : "Awaiting...";
+
+      case "abilities":
+        if (state.abilities && Object.keys(state.abilities).length > 0) {
+          const a = state.abilities;
+          return `F: <strong>${a.fighting?.rank?.substring(0, 2) || "-"}</strong> ` +
+                 `A: <strong>${a.agility?.rank?.substring(0, 2) || "-"}</strong> ` +
+                 `S: <strong>${a.strength?.rank?.substring(0, 2) || "-"}</strong><br>` +
+                 `E: <strong>${a.endurance?.rank?.substring(0, 2) || "-"}</strong> ` +
+                 `R: <strong>${a.reason?.rank?.substring(0, 2) || "-"}</strong> ` +
+                 `I: <strong>${a.intuition?.rank?.substring(0, 2) || "-"}</strong> ` +
+                 `P: <strong>${a.psyche?.rank?.substring(0, 2) || "-"}</strong>`;
+        }
+        return isActive ? "Rolling..." : "Awaiting...";
+
+      case "secondary":
+        if (state.health > 0) {
+          return `Health: <strong>${state.health}</strong><br>` +
+                 `Karma: <strong>${state.karma}</strong><br>` +
+                 `Resources: <strong>${state.resources?.rank?.substring(0, 2) || "-"}</strong><br>` +
+                 `Popularity: <strong>${state.popularity?.hero}</strong>`;
+        }
+        return isActive ? "Calculating..." : "Awaiting...";
+
+      case "specials":
+        if (state.powersData?.roll) {
+          return `Powers: <strong>${state.powersData.initial}</strong><br>` +
+                 `Talents: <strong>${state.talentsData.initial}</strong><br>` +
+                 `Contacts: <strong>${state.contactsData.initial}</strong>`;
+        }
+        return isActive ? "Rolling..." : "Awaiting...";
+
+      case "powers":
+        const powers = state.powersData?.chosen || [];
+        if (powers.length > 0) {
+          return powers.map(p => `• ${p.name} (${p.rank?.substring(0, 2)})`).join("<br>");
+        }
+        if (state.powersData?.initial > 0) {
+          return isActive ? `Choosing... (${powers.length}/${state.powersData.initial})` : "Awaiting...";
+        }
+        return "Awaiting...";
+
+      case "talents":
+        const talents = state.talentsData?.chosen || [];
+        if (talents.length > 0) {
+          return talents.map(t => `• ${t.name}`).join("<br>");
+        }
+        if (state.talentsData?.initial > 0) {
+          return isActive ? `Choosing... (${talents.length}/${state.talentsData.initial})` : "Awaiting...";
+        }
+        return "Awaiting...";
+
+      case "contacts":
+        const contacts = state.contactsData?.chosen || [];
+        if (contacts.length > 0) {
+          return contacts.map(c => `• ${c.name}`).join("<br>");
+        }
+        if (state.contactsData?.initial > 0) {
+          return isActive ? `Choosing... (${contacts.length}/${state.contactsData.initial})` : "Awaiting...";
+        }
+        return "Awaiting...";
+
+      case "summary":
+        return isActive ? "Review & Save" : "Awaiting...";
+
+      default:
+        return "Awaiting...";
+    }
+  }
+
+  renderOriginTracker(state, currentStep) {
+    const origin = state.origin;
+    const mods = ORIGIN_MODIFIERS[origin];
+    if (!mods) return "";
+
+    const trackerClass = currentStep === 8 ? "origin-tracker complete" : `origin-tracker ${origin.toLowerCase().replace("-", "").replace(" ", "")}`;
+
+    let html = `<div class="${trackerClass}">`;
+    html += `<div class="origin-tracker-header">${origin}${currentStep === 8 ? " ✓" : ""}</div>`;
+    html += `<div class="origin-tracker-body">`;
+
+    for (const item of mods.trackerItems) {
+      const isDone = currentStep > item.step;
+      const isActive = currentStep === item.step;
+      let itemClass = "tracker-item";
+      if (isDone) itemClass += " done";
+      else if (isActive) itemClass += " active";
+      else itemClass += " pending";
+
+      const check = isDone ? "✓" : "○";
+      html += `<div class="${itemClass}"><span class="tracker-check">${check}</span><span class="tracker-text">${item.text}</span></div>`;
+    }
+
+    if (mods.warnings?.length > 0 || mods.benefits?.length > 0) {
+      html += `<div class="tracker-divider"></div>`;
+
+      for (const warning of (mods.warnings || [])) {
+        html += `<div class="tracker-item warning"><span class="tracker-icon">⚠</span><span class="tracker-text">${warning}</span></div>`;
+      }
+
+      for (const benefit of (mods.benefits || [])) {
+        html += `<div class="tracker-item benefit"><span class="tracker-icon">✚</span><span class="tracker-text">${benefit}</span></div>`;
+      }
+    }
+
+    html += `</div></div>`;
+    return html;
+  }
+
+  renderStepContent(step, state) {
+    switch (step) {
+      case 1: return this.renderOriginStep(state);
+      case 2: return this.renderAbilitiesStep(state);
+      case 3: return this.renderSecondaryStep(state);
+      case 4: return this.renderSpecialsStep(state);
+      case 5: return this.renderPowersStep(state);
+      case 6: return this.renderTalentsStep(state);
+      case 7: return this.renderContactsStep(state);
+      case 8: return this.renderSummaryStep(state);
+      default: return "";
+    }
   }
 
   renderIntro() {
@@ -1417,566 +1566,691 @@ export class ChargenUIManager {
       <div class="chargen-intro">
         <h3>Random Character Generator</h3>
         <p>Generate characters using MSH Advanced Set rules.</p>
-        <div class="chargen-intro-buttons">
-          <button type="button" class="chargen-start">
+        <div class="intro-buttons">
+          <button type="button" class="btn-step-by-step chargen-start">
             <i class="fas fa-shoe-prints"></i> Step-by-Step
           </button>
-          <button type="button" class="chargen-quick-random">
+          <button type="button" class="btn-quick-random chargen-quick-random">
             <i class="fas fa-dice"></i> Quick Random
           </button>
         </div>
-        <p class="chargen-hint">Quick Random for instant NPCs and villains</p>
+        <p class="intro-hint">Quick Random for instant NPCs and villains</p>
       </div>
     `;
   }
 
   renderOriginStep(state) {
     const origins = ["Altered Human", "Mutant", "Hi-Tech", "Robot", "Alien"];
-    return `
-      <div class="chargen-step">
-        <h3>Step 1: Origin</h3>
-        <p>Roll or choose your character's origin.</p>
-        
-        <div class="chargen-controls">
-          <button type="button" class="chargen-roll-origin">Roll Origin (d100)</button>
-          <span>or</span>
-          <select class="chargen-origin-select">
-            <option value="">-- Choose Origin --</option>
-            ${origins.map(o => `<option value="${o}" ${state?.origin === o ? 'selected' : ''}>${o}</option>`).join('')}
-          </select>
-        </div>
-        
-        ${state?.origin ? `
-          <div class="chargen-result">
-            <strong>Origin:</strong> ${state.origin}
-            <div class="origin-info">${this.getOriginInfo(state.origin)}</div>
-          </div>
-        ` : ''}
-        
-        <div class="chargen-nav">
-          ${state?.origin ? '<button type="button" class="chargen-next">Next: Primary Abilities →</button>' : ''}
-        </div>
-      </div>
-    `;
-  }
+    const selectedOrigin = state?.origin;
 
-  getOriginInfo(origin) {
-    const info = {
-      "Altered Human": "May raise one primary ability by 1 rank after rolling.",
-      "Mutant": "+1 Power, Endurance +1 rank, Resources -1 rank, Popularity starts at 0.",
-      "Hi-Tech": "Reason +2 ranks, Resources Good, must have 1+ Contact, requires scientific/professional Talent.",
-      "Robot": "Popularity starts at 0. May heal normally. No Karma loss for being killed/deactivated.",
-      "Alien": "-1 Power (min 2), Resources Poor, max 1 initial Contact."
-    };
-    return info[origin] || "";
+    let html = `
+      <div class="step-header">
+        <div class="step-number">1</div>
+        <div class="step-title">Choose Origin</div>
+      </div>
+      <p class="step-description">Review the origin comparison, then roll or pick your character's origin.</p>
+    `;
+
+    // Origin Comparison Table
+    html += `
+      <table class="rules-table" style="font-size: 0.75em; margin-bottom: 15px;">
+        <caption>Origin Comparison — Review Before Choosing</caption>
+        <thead>
+          <tr>
+            <th style="text-align: left; width: 120px;">Modifier</th>
+            <th>Altered Human</th>
+            <th>Mutant</th>
+            <th>Hi-Tech</th>
+            <th>Robot</th>
+            <th>Alien</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="text-align: left; font-weight: bold;">Roll Range</td>
+            <td>01-30</td>
+            <td>31-60</td>
+            <td>61-90</td>
+            <td>91-95</td>
+            <td>96-00</td>
+          </tr>
+          <tr>
+            <td style="text-align: left; font-weight: bold;">Ability Column</td>
+            <td>1</td>
+            <td>1</td>
+            <td>3</td>
+            <td>4</td>
+            <td>5</td>
+          </tr>
+          <tr>
+            <td style="text-align: left; font-weight: bold;">Ability Bonus</td>
+            <td class="positive">+1 rank (any)</td>
+            <td class="positive">Endurance +1</td>
+            <td class="positive">Reason +2</td>
+            <td>—</td>
+            <td>—</td>
+          </tr>
+          <tr>
+            <td style="text-align: left; font-weight: bold;">Powers</td>
+            <td>—</td>
+            <td class="positive">+1 power</td>
+            <td>—</td>
+            <td>—</td>
+            <td class="negative">-1 (min 2)</td>
+          </tr>
+          <tr>
+            <td style="text-align: left; font-weight: bold;">Resources</td>
+            <td>Typical +mod</td>
+            <td class="negative">Typical -1</td>
+            <td class="positive">Good +mod</td>
+            <td>Typical +mod</td>
+            <td class="negative">Poor +mod</td>
+          </tr>
+          <tr>
+            <td style="text-align: left; font-weight: bold;">Popularity</td>
+            <td>10</td>
+            <td class="negative">0</td>
+            <td>10</td>
+            <td class="negative">0</td>
+            <td>10</td>
+          </tr>
+          <tr>
+            <td style="text-align: left; font-weight: bold;">Contacts</td>
+            <td>—</td>
+            <td>—</td>
+            <td class="warning">1 required</td>
+            <td>—</td>
+            <td class="negative">1 max</td>
+          </tr>
+          <tr>
+            <td style="text-align: left; font-weight: bold;">Talents</td>
+            <td>—</td>
+            <td>—</td>
+            <td class="warning">1 sci/prof req</td>
+            <td>—</td>
+            <td>—</td>
+          </tr>
+        </tbody>
+      </table>
+    `;
+
+    // Roll table + controls
+    html += `<div class="step-content">`;
+    html += `<div class="step-table-side">`;
+    html += `
+      <table class="rules-table">
+        <caption>Origin Roll Table</caption>
+        <thead>
+          <tr>
+            <th>Dice Roll</th>
+            <th>Origin</th>
+          </tr>
+        </thead>
+        <tbody>
+    `;
+
+    for (const o of ORIGIN_TABLE) {
+      const isSelected = selectedOrigin === o.origin;
+      const rollRange = `${String(o.roll[0]).padStart(2, '0')}-${String(o.roll[1]).padStart(2, '0')}`;
+      html += `<tr class="${isSelected ? 'selected' : ''}">`;
+      html += `<td>${rollRange}</td>`;
+      html += `<td>${o.origin}</td>`;
+      html += `</tr>`;
+    }
+
+    html += `</tbody></table>`;
+
+    // Show benefits if origin selected
+    if (selectedOrigin) {
+      const mods = ORIGIN_MODIFIERS[selectedOrigin];
+      if (mods) {
+        html += `<div class="origin-benefits">`;
+        html += `<div class="origin-benefits-title">${selectedOrigin} Benefits & Restrictions</div>`;
+        html += `<ul>`;
+        for (const item of mods.trackerItems) {
+          html += `<li class="benefit-positive">${item.text}</li>`;
+        }
+        for (const warning of (mods.warnings || [])) {
+          html += `<li class="benefit-neutral">⚠ ${warning}</li>`;
+        }
+        for (const benefit of (mods.benefits || [])) {
+          html += `<li class="benefit-positive">✚ ${benefit}</li>`;
+        }
+        html += `</ul></div>`;
+      }
+    }
+
+    html += `</div>`; // end step-table-side
+
+    // Controls
+    html += `<div class="step-controls-side">`;
+    html += `<div class="controls-title">Roll or Pick</div>`;
+    html += `<button type="button" class="roll-button chargen-roll-origin" ${selectedOrigin ? 'disabled' : ''}>🎲 Roll d100</button>`;
+    if (state?.originRoll) {
+      html += `<div class="roll-result">${state.originRoll}</div>`;
+    } else {
+      html += `<div class="roll-result"></div>`;
+    }
+    html += `<div class="or-divider">— or —</div>`;
+    html += `<select class="pick-select chargen-origin-select" ${selectedOrigin ? 'disabled' : ''}>`;
+    html += `<option value="">— Pick Origin —</option>`;
+    for (const o of origins) {
+      html += `<option value="${o}" ${selectedOrigin === o ? 'selected' : ''}>${o}</option>`;
+    }
+    html += `</select>`;
+    html += `</div>`; // end step-controls-side
+    html += `</div>`; // end step-content
+
+    // Navigation
+    html += `<div class="step-nav">`;
+    html += `<button type="button" class="nav-btn nav-prev chargen-reset">← Start Over</button>`;
+    html += `<button type="button" class="nav-btn nav-next chargen-next" ${!selectedOrigin ? 'disabled' : ''}>Next: Primary Abilities →</button>`;
+    html += `</div>`;
+
+    return html;
   }
 
   renderAbilitiesStep(state) {
-    const abilities = ["fighting", "agility", "strength", "endurance", "reason", "intuition", "psyche"];
+    const origin = state?.origin || "Altered Human";
+    const { num: colNum } = getColumnForOrigin(origin);
     const hasAbilities = state?.abilities && Object.keys(state.abilities).length > 0;
-    const isAlteredHuman = state?.origin === "Altered Human";
-    
-    return `
-      <div class="chargen-step">
-        <h3>Step 2: Primary Abilities</h3>
-        <p>Roll your FASERIP abilities based on your origin.</p>
-        
-        <div class="chargen-controls">
-          <button type="button" class="chargen-roll-abilities" ${hasAbilities ? 'disabled' : ''}>
-            Roll All Abilities
-          </button>
-        </div>
-        
-        ${hasAbilities ? `
-          <table class="chargen-abilities-table">
-            <thead>
-              <tr>
-                <th>Ability</th>
-                <th>Roll</th>
-                <th>Rank</th>
-                <th>Value</th>
-                ${isAlteredHuman ? '<th>Raise</th>' : ''}
-              </tr>
-            </thead>
-            <tbody>
-              ${abilities.map(a => `
-                <tr>
-                  <td>${a.charAt(0).toUpperCase() + a.slice(1)}</td>
-                  <td>${state.abilities[a].initialRoll}</td>
-                  <td>${state.abilities[a].rank}</td>
-                  <td>${state.abilities[a].value}</td>
-                  ${isAlteredHuman ? `
-                    <td>
-                      <button type="button" class="chargen-raise-ability" data-ability="${a}">+1</button>
-                    </td>
-                  ` : ''}
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-        ` : ''}
-        
-        <div class="chargen-nav">
-          <button type="button" class="chargen-prev">← Previous</button>
-          ${hasAbilities ? '<button type="button" class="chargen-next">Next: Secondary Abilities →</button>' : ''}
-        </div>
+    const isAlteredHuman = origin === "Altered Human";
+    const bonusUsed = state?.alteredBonusUsed;
+
+    let html = `
+      <div class="step-header">
+        <div class="step-number">2</div>
+        <div class="step-title">Primary Abilities</div>
       </div>
+      <p class="step-description">
+        <strong>${origin}</strong> uses <strong>Column ${colNum}</strong> for ability rolls.
+        ${origin === "Mutant" ? "Endurance will be raised by 1 rank after rolling." : ""}
+        ${origin === "Hi-Tech" ? "Reason will be raised by 2 ranks after rolling." : ""}
+        ${isAlteredHuman ? "You may raise one ability by 1 rank after rolling." : ""}
+      </p>
     `;
+
+    // Random Ranks Table
+    html += `
+      <table class="rules-table" style="font-size: 0.8em;">
+        <caption>Random Ranks Table</caption>
+        <thead>
+          <tr>
+            <th>Rank</th>
+            <th>Initial Value</th>
+            <th class="${colNum === 1 ? 'active-column' : ''}">Col 1<br><small>Altered/Mutant</small></th>
+            <th>Col 2<br><small>Normal</small></th>
+            <th class="${colNum === 3 ? 'active-column' : ''}">Col 3<br><small>Hi-Tech</small></th>
+            <th class="${colNum === 4 ? 'active-column' : ''}">Col 4<br><small>Robot</small></th>
+            <th class="${colNum === 5 ? 'active-column' : ''}">Col 5<br><small>Alien</small></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Feeble</td><td>1</td><td class="${colNum === 1 ? 'active-column' : ''}">01-05</td><td>01-05</td><td class="${colNum === 3 ? 'active-column' : ''}">01-05</td><td class="${colNum === 4 ? 'active-column' : ''}">01-05</td><td class="${colNum === 5 ? 'active-column' : ''}">01-10</td></tr>
+          <tr><td>Poor</td><td>3</td><td class="${colNum === 1 ? 'active-column' : ''}">06-10</td><td>06-25</td><td class="${colNum === 3 ? 'active-column' : ''}">06-10</td><td class="${colNum === 4 ? 'active-column' : ''}">06-10</td><td class="${colNum === 5 ? 'active-column' : ''}">11-20</td></tr>
+          <tr><td>Typical</td><td>5</td><td class="${colNum === 1 ? 'active-column' : ''}">11-20</td><td>26-75</td><td class="${colNum === 3 ? 'active-column' : ''}">11-40</td><td class="${colNum === 4 ? 'active-column' : ''}">11-15</td><td class="${colNum === 5 ? 'active-column' : ''}">21-30</td></tr>
+          <tr><td>Good</td><td>8</td><td class="${colNum === 1 ? 'active-column' : ''}">21-40</td><td>76-95</td><td class="${colNum === 3 ? 'active-column' : ''}">41-80</td><td class="${colNum === 4 ? 'active-column' : ''}">16-40</td><td class="${colNum === 5 ? 'active-column' : ''}">31-40</td></tr>
+          <tr><td>Excellent</td><td>16</td><td class="${colNum === 1 ? 'active-column' : ''}">41-60</td><td>96-00</td><td class="${colNum === 3 ? 'active-column' : ''}">81-95</td><td class="${colNum === 4 ? 'active-column' : ''}">41-50</td><td class="${colNum === 5 ? 'active-column' : ''}">41-60</td></tr>
+          <tr><td>Remarkable</td><td>26</td><td class="${colNum === 1 ? 'active-column' : ''}">61-80</td><td>—</td><td class="${colNum === 3 ? 'active-column' : ''}">96-00</td><td class="${colNum === 4 ? 'active-column' : ''}">51-70</td><td class="${colNum === 5 ? 'active-column' : ''}">61-70</td></tr>
+          <tr><td>Incredible</td><td>36</td><td class="${colNum === 1 ? 'active-column' : ''}">81-96</td><td>—</td><td class="${colNum === 3 ? 'active-column' : ''}">—</td><td class="${colNum === 4 ? 'active-column' : ''}">71-90</td><td class="${colNum === 5 ? 'active-column' : ''}">71-80</td></tr>
+          <tr><td>Amazing</td><td>46</td><td class="${colNum === 1 ? 'active-column' : ''}">97-00</td><td>—</td><td class="${colNum === 3 ? 'active-column' : ''}">—</td><td class="${colNum === 4 ? 'active-column' : ''}">91-98</td><td class="${colNum === 5 ? 'active-column' : ''}">81-95</td></tr>
+          <tr><td>Monstrous</td><td>63</td><td class="${colNum === 1 ? 'active-column' : ''}">—</td><td>—</td><td class="${colNum === 3 ? 'active-column' : ''}">—</td><td class="${colNum === 4 ? 'active-column' : ''}">99-00</td><td class="${colNum === 5 ? 'active-column' : ''}">96-00</td></tr>
+        </tbody>
+      </table>
+    `;
+
+    if (!hasAbilities) {
+      html += `<div style="text-align: center; margin: 20px 0;">`;
+      html += `<button type="button" class="roll-button chargen-roll-abilities" style="width: auto; padding: 12px 30px;">🎲 Roll All Abilities</button>`;
+      html += `</div>`;
+    } else {
+      // Results table
+      const abilities = ["fighting", "agility", "strength", "endurance", "reason", "intuition", "psyche"];
+      html += `
+        <table class="abilities-results">
+          <thead>
+            <tr>
+              <th>Ability</th>
+              <th>Roll</th>
+              <th>Initial Rank</th>
+              <th>Final Rank</th>
+              <th>Value</th>
+              ${isAlteredHuman && !bonusUsed ? '<th>Raise</th>' : ''}
+            </tr>
+          </thead>
+          <tbody>
+      `;
+
+      for (const ab of abilities) {
+        const a = state.abilities[ab];
+        const modified = a.modified || false;
+        const label = ab.charAt(0).toUpperCase() + ab.slice(1);
+        html += `<tr class="${modified ? 'modified' : ''}">`;
+        html += `<td class="ability-name">${label}</td>`;
+        html += `<td>${a.roll}</td>`;
+        html += `<td>${a.initialRank}</td>`;
+        html += `<td>${modified ? `<strong>${a.rank}</strong> (+)` : a.rank}</td>`;
+        html += `<td>${a.value}</td>`;
+        if (isAlteredHuman && !bonusUsed) {
+          html += `<td><button type="button" class="raise-btn chargen-raise-ability" data-ability="${ab}">+1</button></td>`;
+        }
+        html += `</tr>`;
+      }
+
+      html += `</tbody></table>`;
+
+      if (isAlteredHuman && !bonusUsed) {
+        html += `<p style="color: #856404; font-style: italic; margin-top: 10px;">Altered Human: Click +1 to raise one ability by 1 rank.</p>`;
+      }
+    }
+
+    // Navigation
+    const canProceed = hasAbilities && (origin !== "Altered Human" || bonusUsed);
+    html += `<div class="step-nav">`;
+    html += `<button type="button" class="nav-btn nav-prev chargen-prev">← Back</button>`;
+    html += `<button type="button" class="nav-btn nav-next chargen-next" ${!canProceed ? 'disabled' : ''}>Next: Secondary Abilities →</button>`;
+    html += `</div>`;
+
+    return html;
   }
 
   renderSecondaryStep(state) {
     const hasSecondary = state?.health > 0;
-    
-    return `
-      <div class="chargen-step">
-        <h3>Step 3: Secondary Abilities</h3>
-        <p>Calculate Health, Karma, Resources, and Popularity.</p>
-        
-        <div class="chargen-controls">
-          <button type="button" class="chargen-generate-secondary" ${hasSecondary ? 'disabled' : ''}>
-            Generate Secondary Abilities
-          </button>
-        </div>
-        
-        ${hasSecondary ? `
-          <div class="chargen-secondary-results">
-            <div class="secondary-item">
-              <label>Health (F+A+S+E):</label>
-              <span>${state.health}</span>
-            </div>
-            <div class="secondary-item">
-              <label>Initial Karma (R+I+P):</label>
-              <span>${state.karma}</span>
-            </div>
-            <div class="secondary-item">
-              <label>Resources:</label>
-              <span>${state.resources.rank} (${state.resources.value})</span>
-            </div>
-            <div class="secondary-item">
-              <label>Popularity:</label>
-              <span>${state.popularity.hero}</span>
-            </div>
-            <div class="secondary-item">
-              <label>
-                <input type="checkbox" class="chargen-secret-id" ${state.hasSecretId ? 'checked' : ''} />
-                Secret Identity (-5 Popularity)
-              </label>
-            </div>
-          </div>
-        ` : ''}
-        
-        <div class="chargen-nav">
-          <button type="button" class="chargen-prev">← Previous</button>
-          ${hasSecondary ? '<button type="button" class="chargen-next">Next: Special Abilities →</button>' : ''}
-        </div>
+
+    let html = `
+      <div class="step-header">
+        <div class="step-number">3</div>
+        <div class="step-title">Secondary Abilities</div>
       </div>
+      <p class="step-description">Calculate Health, Karma, Resources, and Popularity based on your abilities and origin.</p>
     `;
+
+    if (!hasSecondary) {
+      html += `<div style="text-align: center; margin: 20px 0;">`;
+      html += `<button type="button" class="roll-button chargen-generate-secondary" style="width: auto; padding: 12px 30px;">📊 Calculate Secondary Abilities</button>`;
+      html += `</div>`;
+    } else {
+      const a = state.abilities;
+      html += `
+        <div class="secondary-results">
+          <div class="secondary-row">
+            <span class="secondary-label">Health</span>
+            <span class="secondary-value">${state.health}</span>
+          </div>
+          <div class="secondary-note">F(${a.fighting.value}) + A(${a.agility.value}) + S(${a.strength.value}) + E(${a.endurance.value})</div>
+          
+          <div class="secondary-row">
+            <span class="secondary-label">Karma</span>
+            <span class="secondary-value">${state.karma}</span>
+          </div>
+          <div class="secondary-note">R(${a.reason.value}) + I(${a.intuition.value}) + P(${a.psyche.value})</div>
+          
+          <div class="secondary-row">
+            <span class="secondary-label">Resources</span>
+            <span class="secondary-value">${state.resources.rank} (${state.resources.value})</span>
+          </div>
+          <div class="secondary-note">Modifier roll: ${state.resources.roll}</div>
+          
+          <div class="secondary-row">
+            <span class="secondary-label">Popularity</span>
+            <span class="secondary-value">${state.popularity.hero}</span>
+          </div>
+        </div>
+
+        <div class="secret-id-option">
+          <label>
+            <input type="checkbox" class="chargen-secret-id" ${state.hasSecretId ? 'checked' : ''}>
+            Character has a Secret Identity
+          </label>
+          <div class="secret-id-note">Secret ID reduces starting Popularity by 5</div>
+        </div>
+      `;
+    }
+
+    html += `<div class="step-nav">`;
+    html += `<button type="button" class="nav-btn nav-prev chargen-prev">← Back</button>`;
+    html += `<button type="button" class="nav-btn nav-next chargen-next" ${!hasSecondary ? 'disabled' : ''}>Next: Special Abilities Count →</button>`;
+    html += `</div>`;
+
+    return html;
   }
 
   renderSpecialsStep(state) {
-    const hasSpecials = state?.powersData?.initial > 0;
-    
-    return `
-      <div class="chargen-step">
-        <h3>Step 4: Special Abilities Count</h3>
-        <p>Determine how many Powers, Talents, and Contacts you start with.</p>
-        
-        <div class="chargen-controls">
-          <button type="button" class="chargen-roll-specials" ${hasSpecials ? 'disabled' : ''}>
-            Roll Special Ability Counts
-          </button>
-        </div>
-        
-        ${hasSpecials ? `
-          <div class="chargen-specials-results">
-            <div class="special-item">
-              <label>Powers:</label>
-              <span>${state.powersData.initial} initial / ${state.powersData.max} max</span>
-            </div>
-            <div class="special-item">
-              <label>Talents:</label>
-              <span>${state.talentsData.initial} initial / ${state.talentsData.max} max</span>
-            </div>
-            <div class="special-item">
-              <label>Contacts:</label>
-              <span>${state.contactsData.initial} initial / ${state.contactsData.max} max</span>
-            </div>
-          </div>
-          
-          <h4>Roll Power & Talent Categories</h4>
-          <button type="button" class="chargen-roll-categories" ${state.powersData.categories?.length ? 'disabled' : ''}>
-            Roll Categories
-          </button>
-          
-          ${state.powersData.categories?.length ? `
-            <div class="chargen-categories">
-              <h5>Power Categories:</h5>
-              <ul>
-                ${state.powersData.categories.map((c, i) => `<li>Power ${i + 1}: ${c.category} (Roll: ${c.roll})</li>`).join('')}
-              </ul>
-              <h5>Talent Categories:</h5>
-              <ul>
-                ${state.talentsData.categories.map((c, i) => `<li>Talent ${i + 1}: ${c.category} (Roll: ${c.roll})</li>`).join('')}
-              </ul>
-            </div>
-          ` : ''}
-        ` : ''}
-        
-        <div class="chargen-nav">
-          <button type="button" class="chargen-prev">← Previous</button>
-          ${state?.powersData?.categories?.length ? '<button type="button" class="chargen-next">Next: Choose Powers →</button>' : ''}
-        </div>
+    const hasSpecials = state?.powersData?.roll;
+
+    let html = `
+      <div class="step-header">
+        <div class="step-number">4</div>
+        <div class="step-title">Powers, Talents & Contacts Count</div>
       </div>
+      <p class="step-description">Roll to determine how many Powers, Talents, and Contacts your character starts with.</p>
     `;
+
+    // Show the tables
+    html += `<div style="display: flex; gap: 15px; flex-wrap: wrap;">`;
+
+    // Powers Table
+    html += `
+      <table class="rules-table" style="font-size: 0.85em; flex: 1; min-width: 150px;">
+        <caption>Powers</caption>
+        <thead><tr><th>Roll</th><th>Initial/Max</th></tr></thead>
+        <tbody>
+          <tr ${state?.powersData?.roll >= 1 && state?.powersData?.roll <= 20 ? 'class="selected"' : ''}><td>01-20</td><td>2/4</td></tr>
+          <tr ${state?.powersData?.roll >= 21 && state?.powersData?.roll <= 60 ? 'class="selected"' : ''}><td>21-60</td><td>3/4</td></tr>
+          <tr ${state?.powersData?.roll >= 61 && state?.powersData?.roll <= 90 ? 'class="selected"' : ''}><td>61-90</td><td>4/4</td></tr>
+          <tr ${state?.powersData?.roll >= 91 ? 'class="selected"' : ''}><td>91-00</td><td>5/5</td></tr>
+        </tbody>
+      </table>
+    `;
+
+    // Talents Table
+    html += `
+      <table class="rules-table" style="font-size: 0.85em; flex: 1; min-width: 150px;">
+        <caption>Talents</caption>
+        <thead><tr><th>Roll</th><th>Initial/Max</th></tr></thead>
+        <tbody>
+          <tr ${state?.talentsData?.roll >= 1 && state?.talentsData?.roll <= 20 ? 'class="selected"' : ''}><td>01-20</td><td>1/6</td></tr>
+          <tr ${state?.talentsData?.roll >= 21 && state?.talentsData?.roll <= 60 ? 'class="selected"' : ''}><td>21-60</td><td>2/5</td></tr>
+          <tr ${state?.talentsData?.roll >= 61 && state?.talentsData?.roll <= 90 ? 'class="selected"' : ''}><td>61-90</td><td>3/4</td></tr>
+          <tr ${state?.talentsData?.roll >= 91 ? 'class="selected"' : ''}><td>91-00</td><td>4/4</td></tr>
+        </tbody>
+      </table>
+    `;
+
+    // Contacts Table
+    html += `
+      <table class="rules-table" style="font-size: 0.85em; flex: 1; min-width: 150px;">
+        <caption>Contacts</caption>
+        <thead><tr><th>Roll</th><th>Initial/Max</th></tr></thead>
+        <tbody>
+          <tr ${state?.contactsData?.roll >= 1 && state?.contactsData?.roll <= 20 ? 'class="selected"' : ''}><td>01-20</td><td>0/4</td></tr>
+          <tr ${state?.contactsData?.roll >= 21 && state?.contactsData?.roll <= 60 ? 'class="selected"' : ''}><td>21-60</td><td>1/4</td></tr>
+          <tr ${state?.contactsData?.roll >= 61 && state?.contactsData?.roll <= 90 ? 'class="selected"' : ''}><td>61-90</td><td>2/4</td></tr>
+          <tr ${state?.contactsData?.roll >= 91 ? 'class="selected"' : ''}><td>91-00</td><td>3/4</td></tr>
+        </tbody>
+      </table>
+    `;
+
+    html += `</div>`;
+
+    if (!hasSpecials) {
+      html += `<div style="text-align: center; margin: 20px 0;">`;
+      html += `<button type="button" class="roll-button chargen-roll-specials" style="width: auto; padding: 12px 30px;">🎲 Roll All Counts</button>`;
+      html += `</div>`;
+    } else {
+      html += `
+        <div class="specials-counts">
+          <div class="specials-row">
+            <span class="specials-label">Powers</span>
+            <span class="specials-value">${state.powersData.initial} initial / ${state.powersData.max} max</span>
+          </div>
+          <div class="specials-row">
+            <span class="specials-label">Talents</span>
+            <span class="specials-value">${state.talentsData.initial} initial / ${state.talentsData.max} max</span>
+          </div>
+          <div class="specials-row">
+            <span class="specials-label">Contacts</span>
+            <span class="specials-value">${state.contactsData.initial} initial / ${state.contactsData.max} max</span>
+          </div>
+        </div>
+      `;
+
+      if (state.origin === "Mutant") {
+        html += `<p style="color: #28a745; font-style: italic;">Mutant: +1 Power applied</p>`;
+      }
+      if (state.origin === "Alien") {
+        html += `<p style="color: #dc3545; font-style: italic;">Alien: -1 Power applied (minimum 2)</p>`;
+      }
+    }
+
+    html += `<div class="step-nav">`;
+    html += `<button type="button" class="nav-btn nav-prev chargen-prev">← Back</button>`;
+    html += `<button type="button" class="nav-btn nav-next chargen-next" ${!hasSpecials ? 'disabled' : ''}>Next: Choose Powers →</button>`;
+    html += `</div>`;
+
+    return html;
   }
 
   renderPowersStep(state) {
-    const categories = state?.powersData?.categories || [];
+    const hasCategories = state?.powersData?.categories?.length > 0;
     const chosen = state?.powersData?.chosen || [];
     const needed = state?.powersData?.initial || 0;
+    const categories = state?.powersData?.categories || [];
+    const chosenPowerNames = chosen.map(p => p.name);
 
-    const remaining = Math.max(0, needed - (chosen.length || 0));
-    
-    return `
-      <div class="chargen-step">
-        <h3>Step 5: Choose Powers</h3>
-        <p>Select ${needed} powers from your rolled categories. (${chosen.length}/${needed} chosen)</p>
-
-        <!-- MODE TOGGLE: manual vs random -->
-        <div class="chargen-mode-row">
-          <label>
-            <input type="radio"
-                  name="chargen-powers-mode"
-                  class="chargen-powers-mode"
-                  value="manual"
-                  ${this.randomPowers ? "" : "checked"}>
-            Roll categories, then <b>pick powers</b> (RAW)
-          </label>
-          <label>
-            <input type="radio"
-                  name="chargen-powers-mode"
-                  class="chargen-powers-mode"
-                  value="random"
-                  ${this.randomPowers ? "checked" : ""}>
-            Roll categories and <b>randomize powers</b>
-          </label>
-        </div>
-        
-        ${categories.map((cat, idx) => {
-          const alreadyChosen = chosen.find(c => c.category === cat.category);
-          if (alreadyChosen) {
-            return `
-              <div class="chargen-power-category chosen">
-                <h4>${cat.category}</h4>
-                <div class="chosen-power">✓ ${alreadyChosen.name} (${alreadyChosen.rank} ${alreadyChosen.value})</div>
-              </div>
-            `;
-          }
-          
-          const powers = POWER_LISTS[cat.category] || [];
-          return `
-            <div class="chargen-power-category">
-              <h4>${cat.category}</h4>
-              <div class="power-list">
-                ${powers.map(p => `
-                  <button type="button" class="chargen-choose-power" 
-                          data-category="${cat.category}" 
-                          data-power="${p.name}"
-                          ${p.star ? 'data-star="true"' : ''}>
-                    ${p.name}${p.star ? ' ★' : ''}
-                  </button>
-                `).join('')}
-              </div>
-            </div>
-          `;
-        }).join('')}
-
-        <!-- RANDOM ROLL REMAINING BUTTON -->
-        ${this.randomPowers && remaining > 0 ? `
-          <div class="chargen-controls">
-            <button type="button" class="chargen-roll-powers">
-              Roll remaining powers (${remaining})
-            </button>
-          </div>
-        ` : ``}
-        
-        <div class="chargen-nav">
-          <button type="button" class="chargen-prev">← Previous</button>
-          ${chosen.length >= needed ? '<button type="button" class="chargen-next">Next: Choose Talents →</button>' : ''}
-        </div>
+    let html = `
+      <div class="step-header">
+        <div class="step-number">5</div>
+        <div class="step-title">Choose Powers</div>
       </div>
+      <p class="step-description">${needed} powers to choose. Roll categories, then pick one power from each.</p>
     `;
+
+    // Power Categories Table
+    html += `
+      <table class="rules-table" style="font-size: 0.8em; margin-bottom: 12px;">
+        <caption>Power Categories Table</caption>
+        <thead><tr><th>Dice Roll</th><th>Category</th></tr></thead>
+        <tbody>
+    `;
+    for (const cat of POWER_CATEGORIES) {
+      const isSelected = categories.some(c => c.category === cat.category);
+      html += `<tr class="${isSelected ? 'selected' : ''}"><td>${String(cat.roll[0]).padStart(2, '0')}-${String(cat.roll[1]).padStart(2, '0')}</td><td>${cat.category}</td></tr>`;
+    }
+    html += `</tbody></table>`;
+
+    if (!hasCategories) {
+      html += `<div style="text-align: center; margin: 20px 0;">`;
+      html += `<button type="button" class="roll-button chargen-roll-categories" style="width: auto; padding: 12px 30px;">🎲 Roll Power Categories</button>`;
+      html += `</div>`;
+    } else {
+      // Show rolled categories
+      html += `<div class="rolled-categories">Your Categories: `;
+      for (const cat of categories) {
+        html += `<span class="cat-tag${cat.bonus ? ' bonus' : ''}">${cat.category} (${cat.roll})</span>`;
+      }
+      html += `</div>`;
+
+      // Category selection boxes
+      for (const catEntry of categories) {
+        const catName = catEntry.category;
+        const catIndex = catEntry.index;
+        const powerList = POWER_LISTS[catName] || [];
+        const chosenPower = chosen.find(p => p.categoryIndex === catIndex);
+        const isChosen = !!chosenPower;
+
+        html += `<div class="power-category${isChosen ? ' chosen' : ''}">`;
+        html += `<div class="category-header"><span>${catName}</span><span class="roll-info">Roll: ${catEntry.roll}</span></div>`;
+
+        if (!isChosen) {
+          html += `<div class="power-list">`;
+          for (const power of powerList) {
+            const alreadyChosen = chosenPowerNames.includes(power.name);
+            const disabledAttr = alreadyChosen ? 'disabled' : '';
+            const chosenClass = alreadyChosen ? ' chosen' : '';
+            html += `<button type="button" class="power-btn${power.star ? ' starred' : ''}${chosenClass} chargen-choose-power" data-category="${catName}" data-power="${power.name}" data-index="${catIndex}" ${disabledAttr}>${power.name}${power.star ? ' ★' : ''}${alreadyChosen ? ' ✓' : ''}</button>`;
+          }
+          html += `</div>`;
+          html += `<div class="pending-display">Select a power from this category...</div>`;
+        } else {
+          html += `<div class="chosen-display"><strong>Chosen:</strong> ${chosenPower.name} — <strong>${chosenPower.rank} (${chosenPower.value})</strong></div>`;
+        }
+
+        html += `</div>`;
+      }
+
+      // Random fill button
+      const remaining = needed - chosen.length;
+      if (remaining > 0) {
+        html += `<div style="text-align: center; margin: 15px 0;">`;
+        html += `<button type="button" class="roll-button chargen-roll-powers" style="width: auto; padding: 10px 20px;">🎲 Random Fill Remaining (${remaining})</button>`;
+        html += `</div>`;
+      }
+    }
+
+    const canProceed = chosen.length >= needed;
+    html += `<div class="step-nav">`;
+    html += `<button type="button" class="nav-btn nav-prev chargen-prev">← Back</button>`;
+    html += `<button type="button" class="nav-btn nav-next chargen-next" ${!canProceed ? 'disabled' : ''}>Next: Choose Talents →</button>`;
+    html += `</div>`;
+
+    return html;
   }
 
   renderTalentsStep(state) {
-    const categories = state?.talentsData?.categories || [];
+    const hasCategories = state?.talentsData?.categories?.length > 0;
     const chosen = state?.talentsData?.chosen || [];
     const needed = state?.talentsData?.initial || 0;
+    const categories = state?.talentsData?.categories || [];
+    const isHiTech = state?.origin === "Hi-Tech";
+    const chosenTalentNames = chosen.map(t => t.name);
 
-    const remaining = Math.max(0, needed - (chosen.length || 0));
-    
-    return `
-      <div class="chargen-step">
-        <h3>Step 6: Choose Talents</h3>
-        <p>Select ${needed} talents from your rolled categories. (${chosen.length}/${needed} chosen)</p>
-
-        <!-- MODE TOGGLE: manual vs random -->
-        <div class="chargen-mode-row">
-          <label>
-            <input type="radio"
-                  name="chargen-talents-mode"
-                  class="chargen-talents-mode"
-                  value="manual"
-                  ${this.randomTalents ? "" : "checked"}>
-            Roll categories, then <b>pick talents</b> (RAW)
-          </label>
-          <label>
-            <input type="radio"
-                  name="chargen-talents-mode"
-                  class="chargen-talents-mode"
-                  value="random"
-                  ${this.randomTalents ? "checked" : ""}>
-            Roll categories and <b>randomize talents</b>
-          </label>
-        </div>
-        
-        ${categories.map((cat, idx) => {
-          const alreadyChosen = chosen.find(c => c.category === cat.category);
-          if (alreadyChosen) {
-            return `
-              <div class="chargen-talent-category chosen">
-                <h4>${cat.category}</h4>
-                <div class="chosen-talent">✓ ${alreadyChosen.name}</div>
-              </div>
-            `;
-          }
-          
-          const talents = TALENT_LISTS[cat.category] || [];
-          return `
-            <div class="chargen-talent-category">
-              <h4>${cat.category}</h4>
-              <div class="talent-list">
-                ${talents.map(t => `
-                  <button type="button" class="chargen-choose-talent" 
-                          data-category="${cat.category}" 
-                          data-talent="${t.name}"
-                          ${t.star ? 'data-star="true"' : ''}>
-                    ${t.name}${t.star ? ' ★' : ''}
-                  </button>
-                `).join('')}
-              </div>
-            </div>
-          `;
-        }).join('')}
-
-        <!-- RANDOM ROLL REMAINING BUTTON -->
-        ${this.randomTalents && remaining > 0 ? `
-          <div class="chargen-controls">
-            <button type="button" class="chargen-roll-talents">
-              Roll remaining talents (${remaining})
-            </button>
-          </div>
-        ` : ``}
-        
-        <div class="chargen-nav">
-          <button type="button" class="chargen-prev">← Previous</button>
-          ${chosen.length >= needed ? '<button type="button" class="chargen-next">Next: Choose Contacts →</button>' : ''}
-        </div>
+    let html = `
+      <div class="step-header">
+        <div class="step-number">6</div>
+        <div class="step-title">Choose Talents</div>
       </div>
+      <p class="step-description">${needed} talents to choose.${isHiTech ? ' <strong>Hi-Tech requires at least 1 Scientific or Professional talent.</strong>' : ''}</p>
     `;
+
+    // Talent Categories Table
+    html += `
+      <table class="rules-table" style="font-size: 0.8em; margin-bottom: 12px;">
+        <caption>Talent Categories Table</caption>
+        <thead><tr><th>Dice Roll</th><th>Category</th></tr></thead>
+        <tbody>
+    `;
+    for (const cat of TALENT_CATEGORIES) {
+      const isSelected = categories.some(c => c.category === cat.category);
+      html += `<tr class="${isSelected ? 'selected' : ''}"><td>${String(cat.roll[0]).padStart(2, '0')}-${String(cat.roll[1]).padStart(2, '0')}</td><td>${cat.category}</td></tr>`;
+    }
+    html += `</tbody></table>`;
+
+    if (!hasCategories) {
+      html += `<p style="color: #666; font-style: italic;">Categories were rolled in the previous step.</p>`;
+    }
+
+    // Show rolled categories
+    if (categories.length > 0) {
+      html += `<div class="rolled-categories">Your Categories: `;
+      for (const cat of categories) {
+        html += `<span class="cat-tag">${cat.category} (${cat.roll})</span>`;
+      }
+      html += `</div>`;
+    }
+
+    // Category selection boxes
+    for (const catEntry of categories) {
+      const catName = catEntry.category;
+      const catIndex = catEntry.index;
+      const talentList = TALENT_LISTS[catName] || [];
+      const chosenTalent = chosen.find(t => t.categoryIndex === catIndex);
+      const isChosen = !!chosenTalent;
+
+      html += `<div class="talent-category${isChosen ? ' chosen' : ''}">`;
+      html += `<div class="category-header"><span>${catName}</span><span class="roll-info">Roll: ${catEntry.roll}</span></div>`;
+
+      if (!isChosen) {
+        html += `<div class="talent-list">`;
+        for (const talent of talentList) {
+          const alreadyChosen = chosenTalentNames.includes(talent.name);
+          const disabledAttr = alreadyChosen ? 'disabled' : '';
+          const chosenClass = alreadyChosen ? ' chosen' : '';
+          html += `<button type="button" class="talent-btn${talent.star ? ' starred' : ''}${chosenClass} chargen-choose-talent" data-category="${catName}" data-talent="${talent.name}" data-index="${catIndex}" ${disabledAttr}>${talent.name}${talent.star ? ' ★' : ''}${alreadyChosen ? ' ✓' : ''}</button>`;
+        }
+        html += `</div>`;
+        html += `<div class="pending-display">Select a talent from this category...</div>`;
+      } else {
+        html += `<div class="chosen-display"><strong>Chosen:</strong> ${chosenTalent.name}</div>`;
+      }
+
+      html += `</div>`;
+    }
+
+    // Random fill button
+    const remaining = needed - chosen.length;
+    if (remaining > 0 && categories.length > 0) {
+      html += `<div style="text-align: center; margin: 15px 0;">`;
+      html += `<button type="button" class="roll-button chargen-roll-talents" style="width: auto; padding: 10px 20px;">🎲 Random Fill Remaining (${remaining})</button>`;
+      html += `</div>`;
+    }
+
+    const canProceed = chosen.length >= needed;
+    html += `<div class="step-nav">`;
+    html += `<button type="button" class="nav-btn nav-prev chargen-prev">← Back</button>`;
+    html += `<button type="button" class="nav-btn nav-next chargen-next" ${!canProceed ? 'disabled' : ''}>Next: Choose Contacts →</button>`;
+    html += `</div>`;
+
+    return html;
   }
 
   renderContactsStep(state) {
     const chosen = state?.contactsData?.chosen || [];
     const needed = state?.contactsData?.initial || 0;
-    
-    return `
-      <div class="chargen-step">
-        <h3>Step 7: Choose Contacts</h3>
-        <p>Select ${needed} contacts. (${chosen.length}/${needed} chosen)</p>
-        
-        ${chosen.length < needed ? `
-          <div class="contact-types">
-            ${CONTACT_TYPES.map(type => `
-              <button type="button" class="chargen-choose-contact" data-type="${type}">
-                ${type}
-              </button>
-            `).join('')}
-          </div>
-        ` : ''}
-        
-        ${chosen.length ? `
-          <div class="chosen-contacts">
-            <h4>Chosen Contacts:</h4>
-            <ul>
-              ${chosen.map(c => `<li>${c.name} (${c.type})</li>`).join('')}
-            </ul>
-          </div>
-        ` : ''}
-        
-        <div class="chargen-nav">
-          <button type="button" class="chargen-prev">← Previous</button>
-          ${chosen.length >= needed ? '<button type="button" class="chargen-next">Next: Summary →</button>' : ''}
-        </div>
+    const isHiTech = state?.origin === "Hi-Tech";
+    const isAlien = state?.origin === "Alien";
+
+    let html = `
+      <div class="step-header">
+        <div class="step-number">7</div>
+        <div class="step-title">Choose Contacts</div>
       </div>
+      <p class="step-description">
+        ${needed} contacts to choose.
+        ${isHiTech ? ' <strong>Hi-Tech: First contact should be your support organization.</strong>' : ''}
+        ${isAlien ? ' <strong>Alien: Contact should be your home race (or you are an outcast).</strong>' : ''}
+      </p>
     `;
+
+    if (chosen.length < needed) {
+      html += `<div class="contact-types">`;
+      for (const type of CONTACT_TYPES) {
+        const alreadyChosen = chosen.some(c => c.type === type);
+        html += `<button type="button" class="contact-btn${alreadyChosen ? ' chosen' : ''} chargen-choose-contact" data-type="${type}" ${alreadyChosen ? 'disabled' : ''}>${type}</button>`;
+      }
+      html += `</div>`;
+    }
+
+    if (chosen.length > 0) {
+      html += `<div class="chosen-contacts"><h4>Chosen Contacts:</h4><ul>`;
+      for (const c of chosen) {
+        html += `<li>${c.name} (${c.type})</li>`;
+      }
+      html += `</ul></div>`;
+    }
+
+    const canProceed = chosen.length >= needed;
+    html += `<div class="step-nav">`;
+    html += `<button type="button" class="nav-btn nav-prev chargen-prev">← Back</button>`;
+    html += `<button type="button" class="nav-btn nav-next chargen-next" ${!canProceed ? 'disabled' : ''}>Next: Summary →</button>`;
+    html += `</div>`;
+
+    return html;
   }
 
   renderSummaryStep(state) {
-  const g = this.generator;
-  if (!g || !state) {
-    return `
-      <div class="chargen-step chargen-summary-step">
-        <h3>Step 8: Summary & Apply to Sheet</h3>
-        <p>No character has been generated yet.</p>
-        <div class="chargen-nav">
-          <button type="button" class="chargen-prev">Back</button>
-        </div>
+    if (!state) {
+      return `<div class="step-header"><div class="step-number">8</div><div class="step-title">Summary</div></div><p>No character generated.</p>`;
+    }
+
+    let html = `
+      <div class="step-header">
+        <div class="step-number">✓</div>
+        <div class="step-title">Character Complete</div>
+      </div>
+
+      <div class="summary-complete">
+        <h3>Generation Complete!</h3>
+        <p>Review your character in the chronicle, then save or start over.</p>
+      </div>
+
+      <div class="summary-actions">
+        <button type="button" class="btn-save chargen-apply">💾 Save to Character Sheet</button>
+        <button type="button" class="btn-reroll chargen-reroll">🎲 Re-Roll Everything</button>
+        <button type="button" class="btn-discard chargen-discard">🗑️ Discard</button>
       </div>
     `;
+
+    return html;
   }
-
-  const primary = state.abilities || {};
-  const origin  = state.origin || { type: "-" };
-
-  const secondary = {
-    health: state.health,
-    karma: state.karma,
-    resourcesRank: state.resources?.rank,
-    resourcesValue: state.resources?.value,
-    popularityRank: "Heroic",
-    popularityValue: state.popularity?.hero
-  };
-
-  const powers   = state.powersData?.chosen   || [];
-  const talents  = state.talentsData?.chosen  || [];
-  const contacts = state.contactsData?.chosen || [];
-
-  const textSummary = g.buildTextSummary ? g.buildTextSummary(state) : "";
-
-  return `
-    <div class="chargen-step chargen-summary-step">
-      <h3>Step 8: Summary & Apply to Sheet</h3>
-
-      <div class="chargen-summary-grid">
-        <section class="summary-card summary-primary">
-          <h4>Identity & Origin</h4>
-          <div class="summary-row">
-            <span class="summary-label">Origin:</span>
-            <span class="summary-value">${origin.type || "-"}</span>
-          </div>
-          <div class="summary-row">
-            <span class="summary-label">Secret ID?</span>
-            <span class="summary-value">${state.secretId ? "Yes" : "No"}</span>
-          </div>
-
-          <h4>Primary Abilities</h4>
-          <table class="summary-table">
-            <tbody>
-              ${["fighting","agility","strength","endurance","reason","intuition","psyche"].map(k => {
-                const a = primary[k] || {};
-                const label = k.charAt(0).toUpperCase() + k.slice(1);
-                return `
-                  <tr>
-                    <td class="summary-ability-label">${label}</td>
-                    <td class="summary-ability-rank">${a.rank || "-"}</td>
-                    <td class="summary-ability-value">${a.value ?? ""}</td>
-                  </tr>
-                `;
-              }).join("")}
-            </tbody>
-          </table>
-
-          <h4>Secondary</h4>
-          <table class="summary-table">
-            <tbody>
-              <tr>
-                <td>Health</td>
-                <td>${secondary.health ?? "-"}</td>
-              </tr>
-              <tr>
-                <td>Karma</td>
-                <td>${secondary.karma ?? "-"}</td>
-              </tr>
-              <tr>
-                <td>Resources</td>
-                <td>${secondary.resourcesRank || "-"} (${secondary.resourcesValue ?? ""})</td>
-              </tr>
-              <tr>
-                <td>Popularity</td>
-                <td>${secondary.popularityRank || "-"} (${secondary.popularityValue ?? ""})</td>
-              </tr>
-            </tbody>
-          </table>
-        </section>
-
-        <section class="summary-card summary-specials">
-          <h4>Powers</h4>
-          <ul class="summary-list">
-            ${powers.length ? powers.map(p => `
-              <li>
-                <span class="summary-main">${p.name}</span>
-                <span class="summary-sub">(${p.category})</span>
-                <span class="summary-rank">${p.rank} (${p.value})</span>
-              </li>
-            `).join("") : `<li>None</li>`}
-          </ul>
-
-          <h4>Talents</h4>
-          <ul class="summary-list">
-            ${talents.length ? talents.map(t => `
-              <li>
-                <span class="summary-main">${t.name}</span>
-                <span class="summary-sub">(${t.category})</span>
-              </li>
-            `).join("") : `<li>None</li>`}
-          </ul>
-
-          <h4>Contacts</h4>
-          <ul class="summary-list">
-            ${contacts.length ? contacts.map(c => `
-              <li>
-                <span class="summary-main">${c.name || c.type || "Contact"}</span>
-                ${c.type ? `<span class="summary-sub">(${c.type})</span>` : ""}
-              </li>
-            `).join("") : `<li>None</li>`}
-          </ul>
-        </section>
-      </div>
-
-      ${textSummary ? `
-        <div class="chargen-result">
-          <label>Full text summary (for copy/paste or notes):</label>
-          <textarea class="chargen-summary-text" readonly rows="10"
-                    style="width: 100%; font-family: monospace; font-size: 0.85em;">
-${textSummary}
-          </textarea>
-        </div>
-      ` : ""}
-
-      ${this.history?.length ? `
-        <div class="chargen-history">
-          <div class="chargen-history-title">Earlier concepts (this session):</div>
-          <ul>
-            ${this.history.map(h => `
-              <li><span class="chargen-history-meta">${h.timestamp}</span> — ${h.label}</li>
-            `).join("")}
-          </ul>
-        </div>
-      ` : ""}
-
-      <div class="chargen-nav">
-        <button type="button" class="chargen-prev">Back</button>
-        <button type="button" class="chargen-reroll chargen-reroll-btn">
-          <i class="fas fa-dice"></i> Re-roll
-        </button>
-        <button type="button" class="chargen-apply chargen-apply-btn">
-          <i class="fas fa-download"></i> Apply to Sheet
-        </button>
-      </div>
-    </div>
-  `;
-}
-
-
 }
