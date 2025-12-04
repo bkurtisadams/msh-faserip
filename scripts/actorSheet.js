@@ -101,7 +101,10 @@ export class FaseripActorSheet extends ActorSheet {
   
   // Add a property for the character creation manager
   _charCreationManager = null; // NEW PROPERTY
-  
+
+    // Track the in-sheet Universal Table hook
+  _universalTableHookId = null;
+
   /** @override */
   static get defaultOptions() {
     return foundry.utils.mergeObject(super.defaultOptions, {
@@ -272,6 +275,16 @@ export class FaseripActorSheet extends ActorSheet {
       }));
     }
   }
+  
+  // This is separate from the async close method on UniversalTablePopout at the bottom of the file; don’t touch that one.
+  async close(options = {}) {
+    // Unregister the in-sheet Universal Table hook when the sheet closes
+    if (this._universalTableHookId) {
+      Hooks.off('msh-faserip.universalTableRoll', this._universalTableHookId);
+      this._universalTableHookId = null;
+    }
+    return super.close(options);
+  }
 
   // In actorSheet.js, add to the activateListeners function
   activateListeners(html) {
@@ -388,6 +401,14 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
       }
       // Normal click: let Foundry handle tab switching
     });
+
+    // Listen for universal table rolls so the in-sheet tab also highlights results
+    if (!this._universalTableHookId) {
+      this._onSheetUniversalTableRoll; // keep method bound to this instance
+      this._universalTableHookId = Hooks.on('msh-faserip.universalTableRoll', (data) => {
+        this._onSheetUniversalTableRoll(data);
+      });
+    }
 
     html.find('.open-team-tracker').click(ev => {
       import('./teamSheet.js').then(module => {
@@ -5054,6 +5075,58 @@ async _rollAction(actionType, abilityName) {
     }
   }
   
+    /**
+   * Handle universal table rolls for the in-sheet Universal Table tab.
+   * Mirrors the behavior of UniversalTablePopout._onUniversalTableRoll,
+   * but targets the actor sheet's table.
+   */
+  _onSheetUniversalTableRoll(data) {
+    // Only proceed if the sheet is actually rendered
+    if (!this.rendered) return;
+
+    const { rank, roll } = data;
+    const html = this.element;
+    if (!html || !html.length) return;
+
+    // Normalize rank name using the same mapping as the popout
+    let normalizedRank = UniversalTablePopout.RANK_ALIASES[rank] || rank;
+
+    // Find column index for this rank
+    const colIndex = UniversalTablePopout.RANK_ORDER.indexOf(normalizedRank);
+    if (colIndex === -1) return;
+
+    // Clear previous highlights inside the sheet
+    html.find('.rank-cell').removeClass('roll-highlight');
+
+    // Find the row matching the roll
+    const rows = html.find('tbody tr');
+    rows.each((i, row) => {
+      const $row = $(row);
+      const label = $row.find('th').first().text().trim();
+      if (!label) return;
+
+      // Parse roll ranges like "02-03", "04-06", or single "01", "100"
+      let match = false;
+      if (label.includes('–') || label.includes('-')) {
+        const [min, max] = label.split(/[–-]/).map(n => parseInt(n));
+        if (!Number.isNaN(min) && !Number.isNaN(max)) {
+          match = roll >= min && roll <= max;
+        }
+      } else {
+        const numericLabel = parseInt(label);
+        if (!Number.isNaN(numericLabel)) {
+          match = roll === numericLabel;
+        }
+      }
+
+      if (match) {
+        // Highlight the cell at colIndex within this row
+        const cell = $row.find('td').eq(colIndex);
+        cell.addClass('roll-highlight');
+      }
+    });
+  }
+
   // other methods
 }
 
