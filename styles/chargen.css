@@ -966,6 +966,52 @@
   padding-left: 20px;
 }
 
+/* Normal Folks Checkbox */
+.normal-folks-option {
+  margin-bottom: 10px;
+  padding: 6px;
+  background: #f5f5f0;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+.normal-folks-option label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: 0.8em;
+  font-weight: bold;
+}
+
+.normal-folks-option input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+}
+
+.normal-folks-note {
+  font-size: 0.7em;
+  color: #666;
+  margin-top: 3px;
+  padding-left: 20px;
+  font-style: italic;
+}
+
+/* No Powers Notice (for Normal folks) */
+.no-powers-notice {
+  background: #f8f9fa;
+  border: 2px dashed #ccc;
+  border-radius: 6px;
+  padding: 20px;
+  text-align: center;
+  margin: 20px 0;
+  color: #555;
+}
+
+.no-powers-notice p {
+  margin: 8px 0;
+}
+
 /* Comparison table cell alignment */
 .rules-table td[style*="text-align: left"] {
   text-align: left !important;

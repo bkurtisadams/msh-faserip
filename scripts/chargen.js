@@ -382,6 +382,25 @@ export const CONTACT_TYPES = [
 
 // Origin modifiers data for comparison table and tracker
 const ORIGIN_MODIFIERS = {
+  "Normal": {
+    column: 2,
+    abilityBonus: "—",
+    powers: "0 (none)",
+    resources: "Typical +mod",
+    popularity: 0,
+    contacts: "—",
+    talents: "—",
+    special: "No powers; for NPCs and supporting cast",
+    trackerItems: [
+      { text: "Use Column 2", step: 2 },
+      { text: "No Powers", step: 5 }
+    ],
+    warnings: [],
+    benefits: [
+      "Normal talents/contacts",
+      "Good for NPCs"
+    ]
+  },
   "Altered Human": {
     column: 1,
     abilityBonus: "+1 rank (pick any)",
@@ -514,6 +533,8 @@ function shiftRank(rankName, shifts) {
 
 function getColumnForOrigin(origin) {
   switch (origin) {
+    case "Normal":
+      return { num: 2, data: COLUMN_2 };
     case "Altered Human":
     case "Mutant":
       return { num: 1, data: COLUMN_1 };
@@ -696,7 +717,7 @@ export class CharacterGenerator {
     };
 
     let basePop = 10;
-    if (this.state.origin === "Mutant" || this.state.origin === "Robot") {
+    if (this.state.origin === "Mutant" || this.state.origin === "Robot" || this.state.origin === "Normal") {
       basePop = 0;
       this.log(`${this.state.origin}: Starting Popularity is 0`);
     }
@@ -724,11 +745,15 @@ export class CharacterGenerator {
     let powerInitial = pResult.initial;
     let powerMax = pResult.max;
 
-    if (this.state.origin === "Mutant") {
+    // Normal folks get no powers
+    if (this.state.origin === "Normal") {
+      powerInitial = 0;
+      powerMax = 0;
+      this.log("Normal: No powers available");
+    } else if (this.state.origin === "Mutant") {
       powerInitial = Math.min(powerInitial + 1, powerMax);
       this.log(`Mutant: +1 Power (${pResult.initial} → ${powerInitial})`);
-    }
-    if (this.state.origin === "Alien") {
+    } else if (this.state.origin === "Alien") {
       powerInitial = Math.max(2, powerInitial - 1);
       this.log(`Alien: -1 Power (${pResult.initial} → ${powerInitial})`);
     }
@@ -736,11 +761,11 @@ export class CharacterGenerator {
     this.state.powersData = {
       initial: powerInitial,
       max: powerMax,
-      roll: pRoll,
+      roll: this.state.origin === "Normal" ? "N/A" : pRoll,
       categories: [],
       chosen: []
     };
-    this.log(`Powers: Roll ${pRoll} → ${powerInitial} initial, ${powerMax} max`);
+    this.log(`Powers: ${this.state.origin === "Normal" ? "None (Normal)" : `Roll ${pRoll} → ${powerInitial} initial, ${powerMax} max`}`);
 
     const { roll: tRoll, result: tResult } = rollOnTable(TALENTS_TABLE);
     this.state.talentsData = {
@@ -1341,6 +1366,7 @@ export class ChargenUIManager {
     container.on('click', '.chargen-reset', () => this.reset());
     container.on('click', '.chargen-roll-origin', () => this.rollOrigin());
     container.on('change', '.chargen-origin-select', ev => this.selectOrigin(ev.target.value));
+    container.on('change', '.chargen-normal-folks', ev => this.toggleNormalFolks(ev.target.checked));
     container.on('click', '.chargen-roll-abilities', () => this.rollAbilities());
     container.on('click', '.chargen-raise-ability', ev => {
       const ability = ev.currentTarget.dataset.ability;
@@ -1350,6 +1376,7 @@ export class ChargenUIManager {
     container.on('change', '.chargen-secret-id', ev => this.setSecretId(ev.target.checked));
     container.on('click', '.chargen-roll-specials', () => this.rollSpecials());
     container.on('click', '.chargen-roll-categories', () => this.rollCategories());
+    container.on('click', '.chargen-roll-talent-categories', () => this.rollTalentCategoriesOnly());
     container.on('click', '.chargen-choose-power', ev => {
       const category = ev.currentTarget.dataset.category;
       const power = ev.currentTarget.dataset.power;
@@ -1425,6 +1452,16 @@ export class ChargenUIManager {
     }
   }
 
+  toggleNormalFolks(isNormal) {
+    if (isNormal) {
+      this.generator.setOrigin("Normal");
+    } else if (this.generator.state.origin === "Normal") {
+      this.generator.state.origin = null;
+      this.generator.state.originRoll = null;
+    }
+    this.updateDisplay();
+  }
+
   rollAbilities() {
     this.generator.rollPrimaryAbilities();
     this.updateDisplay();
@@ -1453,6 +1490,11 @@ export class ChargenUIManager {
 
   rollCategories() {
     this.generator.rollPowerCategories();
+    this.generator.rollTalentCategories();
+    this.updateDisplay();
+  }
+
+  rollTalentCategoriesOnly() {
     this.generator.rollTalentCategories();
     this.updateDisplay();
   }
@@ -1949,6 +1991,14 @@ export class ChargenUIManager {
 
     // Controls
     html += `<div class="step-controls-side">`;
+    
+    // Normal Folks checkbox
+    const isNormal = selectedOrigin === "Normal";
+    html += `<div class="normal-folks-option">`;
+    html += `<label><input type="checkbox" class="chargen-normal-folks" ${isNormal ? 'checked' : ''} ${selectedOrigin && !isNormal ? 'disabled' : ''}> Normal Folks</label>`;
+    html += `<div class="normal-folks-note">No powers, Column 2</div>`;
+    html += `</div>`;
+    
     html += `<div class="controls-title">Roll or Pick</div>`;
     html += `<button type="button" class="roll-button chargen-roll-origin" ${selectedOrigin ? 'disabled' : ''}>🎲 Roll d100</button>`;
     if (state?.originRoll) {
@@ -2004,22 +2054,22 @@ export class ChargenUIManager {
             <th>Rank</th>
             <th>Initial Value</th>
             <th class="${colNum === 1 ? 'active-column' : ''}">Col 1<br><small>Altered/Mutant</small></th>
-            <th>Col 2<br><small>Normal</small></th>
+            <th class="${colNum === 2 ? 'active-column' : ''}">Col 2<br><small>Normal</small></th>
             <th class="${colNum === 3 ? 'active-column' : ''}">Col 3<br><small>Hi-Tech</small></th>
             <th class="${colNum === 4 ? 'active-column' : ''}">Col 4<br><small>Robot</small></th>
             <th class="${colNum === 5 ? 'active-column' : ''}">Col 5<br><small>Alien</small></th>
           </tr>
         </thead>
         <tbody>
-          <tr><td>Feeble</td><td>1</td><td class="${colNum === 1 ? 'active-column' : ''}">01-05</td><td>01-05</td><td class="${colNum === 3 ? 'active-column' : ''}">01-05</td><td class="${colNum === 4 ? 'active-column' : ''}">01-05</td><td class="${colNum === 5 ? 'active-column' : ''}">01-10</td></tr>
-          <tr><td>Poor</td><td>3</td><td class="${colNum === 1 ? 'active-column' : ''}">06-10</td><td>06-25</td><td class="${colNum === 3 ? 'active-column' : ''}">06-10</td><td class="${colNum === 4 ? 'active-column' : ''}">06-10</td><td class="${colNum === 5 ? 'active-column' : ''}">11-20</td></tr>
-          <tr><td>Typical</td><td>5</td><td class="${colNum === 1 ? 'active-column' : ''}">11-20</td><td>26-75</td><td class="${colNum === 3 ? 'active-column' : ''}">11-40</td><td class="${colNum === 4 ? 'active-column' : ''}">11-15</td><td class="${colNum === 5 ? 'active-column' : ''}">21-30</td></tr>
-          <tr><td>Good</td><td>8</td><td class="${colNum === 1 ? 'active-column' : ''}">21-40</td><td>76-95</td><td class="${colNum === 3 ? 'active-column' : ''}">41-80</td><td class="${colNum === 4 ? 'active-column' : ''}">16-40</td><td class="${colNum === 5 ? 'active-column' : ''}">31-40</td></tr>
-          <tr><td>Excellent</td><td>16</td><td class="${colNum === 1 ? 'active-column' : ''}">41-60</td><td>96-00</td><td class="${colNum === 3 ? 'active-column' : ''}">81-95</td><td class="${colNum === 4 ? 'active-column' : ''}">41-50</td><td class="${colNum === 5 ? 'active-column' : ''}">41-60</td></tr>
-          <tr><td>Remarkable</td><td>26</td><td class="${colNum === 1 ? 'active-column' : ''}">61-80</td><td>—</td><td class="${colNum === 3 ? 'active-column' : ''}">96-00</td><td class="${colNum === 4 ? 'active-column' : ''}">51-70</td><td class="${colNum === 5 ? 'active-column' : ''}">61-70</td></tr>
-          <tr><td>Incredible</td><td>36</td><td class="${colNum === 1 ? 'active-column' : ''}">81-96</td><td>—</td><td class="${colNum === 3 ? 'active-column' : ''}">—</td><td class="${colNum === 4 ? 'active-column' : ''}">71-90</td><td class="${colNum === 5 ? 'active-column' : ''}">71-80</td></tr>
-          <tr><td>Amazing</td><td>46</td><td class="${colNum === 1 ? 'active-column' : ''}">97-00</td><td>—</td><td class="${colNum === 3 ? 'active-column' : ''}">—</td><td class="${colNum === 4 ? 'active-column' : ''}">91-98</td><td class="${colNum === 5 ? 'active-column' : ''}">81-95</td></tr>
-          <tr><td>Monstrous</td><td>63</td><td class="${colNum === 1 ? 'active-column' : ''}">—</td><td>—</td><td class="${colNum === 3 ? 'active-column' : ''}">—</td><td class="${colNum === 4 ? 'active-column' : ''}">99-00</td><td class="${colNum === 5 ? 'active-column' : ''}">96-00</td></tr>
+          <tr><td>Feeble</td><td>1</td><td class="${colNum === 1 ? 'active-column' : ''}">01-05</td><td class="${colNum === 2 ? 'active-column' : ''}">01-05</td><td class="${colNum === 3 ? 'active-column' : ''}">01-05</td><td class="${colNum === 4 ? 'active-column' : ''}">01-05</td><td class="${colNum === 5 ? 'active-column' : ''}">01-10</td></tr>
+          <tr><td>Poor</td><td>3</td><td class="${colNum === 1 ? 'active-column' : ''}">06-10</td><td class="${colNum === 2 ? 'active-column' : ''}">06-25</td><td class="${colNum === 3 ? 'active-column' : ''}">06-10</td><td class="${colNum === 4 ? 'active-column' : ''}">06-10</td><td class="${colNum === 5 ? 'active-column' : ''}">11-20</td></tr>
+          <tr><td>Typical</td><td>5</td><td class="${colNum === 1 ? 'active-column' : ''}">11-20</td><td class="${colNum === 2 ? 'active-column' : ''}">26-75</td><td class="${colNum === 3 ? 'active-column' : ''}">11-40</td><td class="${colNum === 4 ? 'active-column' : ''}">11-15</td><td class="${colNum === 5 ? 'active-column' : ''}">21-30</td></tr>
+          <tr><td>Good</td><td>8</td><td class="${colNum === 1 ? 'active-column' : ''}">21-40</td><td class="${colNum === 2 ? 'active-column' : ''}">76-95</td><td class="${colNum === 3 ? 'active-column' : ''}">41-80</td><td class="${colNum === 4 ? 'active-column' : ''}">16-40</td><td class="${colNum === 5 ? 'active-column' : ''}">31-40</td></tr>
+          <tr><td>Excellent</td><td>16</td><td class="${colNum === 1 ? 'active-column' : ''}">41-60</td><td class="${colNum === 2 ? 'active-column' : ''}">96-00</td><td class="${colNum === 3 ? 'active-column' : ''}">81-95</td><td class="${colNum === 4 ? 'active-column' : ''}">41-50</td><td class="${colNum === 5 ? 'active-column' : ''}">41-60</td></tr>
+          <tr><td>Remarkable</td><td>26</td><td class="${colNum === 1 ? 'active-column' : ''}">61-80</td><td class="${colNum === 2 ? 'active-column' : ''}">—</td><td class="${colNum === 3 ? 'active-column' : ''}">96-00</td><td class="${colNum === 4 ? 'active-column' : ''}">51-70</td><td class="${colNum === 5 ? 'active-column' : ''}">61-70</td></tr>
+          <tr><td>Incredible</td><td>36</td><td class="${colNum === 1 ? 'active-column' : ''}">81-96</td><td class="${colNum === 2 ? 'active-column' : ''}">—</td><td class="${colNum === 3 ? 'active-column' : ''}">—</td><td class="${colNum === 4 ? 'active-column' : ''}">71-90</td><td class="${colNum === 5 ? 'active-column' : ''}">71-80</td></tr>
+          <tr><td>Amazing</td><td>46</td><td class="${colNum === 1 ? 'active-column' : ''}">97-00</td><td class="${colNum === 2 ? 'active-column' : ''}">—</td><td class="${colNum === 3 ? 'active-column' : ''}">—</td><td class="${colNum === 4 ? 'active-column' : ''}">91-98</td><td class="${colNum === 5 ? 'active-column' : ''}">81-95</td></tr>
+          <tr><td>Monstrous</td><td>63</td><td class="${colNum === 1 ? 'active-column' : ''}">—</td><td class="${colNum === 2 ? 'active-column' : ''}">—</td><td class="${colNum === 3 ? 'active-column' : ''}">—</td><td class="${colNum === 4 ? 'active-column' : ''}">99-00</td><td class="${colNum === 5 ? 'active-column' : ''}">96-00</td></tr>
         </tbody>
       </table>
     `;
@@ -2220,6 +2270,9 @@ export class ChargenUIManager {
         </div>
       `;
 
+      if (state.origin === "Normal") {
+        html += `<p style="color: #666; font-style: italic;">Normal: No powers available</p>`;
+      }
       if (state.origin === "Mutant") {
         html += `<p style="color: #28a745; font-style: italic;">Mutant: +1 Power applied</p>`;
       }
@@ -2230,7 +2283,7 @@ export class ChargenUIManager {
 
     html += `<div class="step-nav">`;
     html += `<button type="button" class="nav-btn nav-prev chargen-prev">← Back</button>`;
-    html += `<button type="button" class="nav-btn nav-next chargen-next" ${!hasSpecials ? 'disabled' : ''}>Next: Choose Powers →</button>`;
+    html += `<button type="button" class="nav-btn nav-next chargen-next" ${!hasSpecials ? 'disabled' : ''}>${state?.origin === "Normal" ? 'Next: Choose Talents →' : 'Next: Choose Powers →'}</button>`;
     html += `</div>`;
 
     return html;
@@ -2251,7 +2304,42 @@ export class ChargenUIManager {
         <div class="step-number">5</div>
         <div class="step-title">Choose Powers</div>
       </div>
-      <p class="step-description">${needed} power slots to fill. Starred (★) powers use 2 slots. Slots used: ${slotsUsed}/${needed}</p>
+    `;
+
+    // Normal folks get no powers
+    if (needed === 0) {
+      // Auto-roll talent categories if not already done
+      if (!state?.talentsData?.categories?.length && state?.talentsData?.initial > 0) {
+        html += `
+          <div class="no-powers-notice">
+            <p><strong>Normal Folks</strong> do not receive any powers.</p>
+            <p style="color: #666; font-size: 0.9em;">Roll your Talent categories to continue.</p>
+            <div style="margin-top: 15px;">
+              <button type="button" class="roll-button chargen-roll-talent-categories" style="width: auto; padding: 10px 20px;">🎲 Roll Talent Categories</button>
+            </div>
+          </div>
+        `;
+        html += `<div class="step-nav">`;
+        html += `<button type="button" class="nav-btn nav-prev chargen-prev">← Back</button>`;
+        html += `<button type="button" class="nav-btn nav-next chargen-next" disabled>Next: Choose Talents →</button>`;
+        html += `</div>`;
+        return html;
+      }
+      
+      html += `
+        <div class="no-powers-notice">
+          <p><strong>Normal Folks</strong> do not receive any powers.</p>
+          <p style="color: #666; font-size: 0.9em;">Proceed to Talents to continue character generation.</p>
+        </div>
+      `;
+      html += `<div class="step-nav">`;
+      html += `<button type="button" class="nav-btn nav-prev chargen-prev">← Back</button>`;
+      html += `<button type="button" class="nav-btn nav-next chargen-next">Next: Choose Talents →</button>`;
+      html += `</div>`;
+      return html;
+    }
+
+    html += `<p class="step-description">${needed} power slots to fill. Starred (★) powers use 2 slots. Slots used: ${slotsUsed}/${needed}</p>
     `;
 
     // Pending bonus power prompt
@@ -2404,8 +2492,11 @@ export class ChargenUIManager {
     }
     html += `</tbody></table>`;
 
-    if (!hasCategories) {
-      html += `<p style="color: #666; font-style: italic;">Categories were rolled in the previous step.</p>`;
+    // If no categories rolled yet, show button to roll them
+    if (!hasCategories && needed > 0) {
+      html += `<div style="text-align: center; margin: 20px 0;">`;
+      html += `<button type="button" class="roll-button chargen-roll-talent-categories" style="width: auto; padding: 12px 30px;">🎲 Roll Talent Categories</button>`;
+      html += `</div>`;
     }
 
     // Show rolled categories
@@ -2476,7 +2567,7 @@ export class ChargenUIManager {
       html += `</div>`;
     }
 
-    const canProceed = slotsUsed >= needed;
+    const canProceed = slotsUsed >= needed && (needed === 0 || hasCategories);
     html += `<div class="step-nav">`;
     html += `<button type="button" class="nav-btn nav-prev chargen-prev">← Back</button>`;
     html += `<button type="button" class="nav-btn nav-next chargen-next" ${!canProceed ? 'disabled' : ''}>Next: Choose Contacts →</button>`;
