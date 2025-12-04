@@ -628,6 +628,17 @@
   cursor: not-allowed;
 }
 
+.power-btn.no-slots, .talent-btn.no-slots {
+  background: #f0f0f0;
+  border-color: #aaa;
+  color: #888;
+  text-decoration: line-through;
+}
+
+.power-btn.no-slots:hover, .talent-btn.no-slots:hover {
+  background: #f0f0f0;
+}
+
 .chosen-display {
   padding: 5px 8px;
   background: #d4edda;
@@ -958,4 +969,185 @@
 /* Comparison table cell alignment */
 .rules-table td[style*="text-align: left"] {
   text-align: left !important;
+}
+
+/* Bonus Power Prompt */
+.bonus-power-prompt {
+  background: linear-gradient(to bottom, #fff8e1, #ffecb3);
+  border: 2px solid #ffc107;
+  border-radius: 6px;
+  padding: 12px;
+  margin: 12px 0;
+  text-align: center;
+}
+
+.bonus-header {
+  font-size: 1.1em;
+  font-weight: bold;
+  color: #8b6914;
+  margin-bottom: 8px;
+}
+
+.bonus-desc {
+  font-size: 0.85em;
+  color: #555;
+  margin: 8px 0;
+  font-style: italic;
+}
+
+.bonus-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 10px;
+}
+
+.btn-accept, .btn-decline {
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-weight: bold;
+  cursor: pointer;
+  border: 2px solid;
+}
+
+.btn-accept {
+  background: linear-gradient(to bottom, #28a745, #1e7e34);
+  color: #fff;
+  border-color: #155724;
+}
+
+.btn-accept:hover {
+  background: linear-gradient(to bottom, #34ce57, #28a745);
+}
+
+.btn-decline {
+  background: linear-gradient(to bottom, #6c757d, #5a6268);
+  color: #fff;
+  border-color: #495057;
+}
+
+.btn-decline:hover {
+  background: linear-gradient(to bottom, #7d868e, #6c757d);
+}
+
+/* Power/Talent button indicators */
+.power-btn.has-bonus::after,
+.talent-btn.grants-contact::after {
+  content: '';
+}
+
+.power-btn.needs-limit {
+  border-left: 3px solid #dc3545;
+}
+
+.bonus-category {
+  background: linear-gradient(to bottom, #fff8e1, #fff);
+  border-color: #ffc107;
+}
+
+/* Tags for chosen items */
+.bonus-tag, .limit-tag, .modifier-tag, .contact-tag, .resource-tag {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 0.75em;
+  margin-left: 6px;
+  font-weight: normal;
+}
+
+.bonus-tag {
+  background: #fff3cd;
+  color: #856404;
+  border: 1px solid #ffc107;
+}
+
+.limit-tag {
+  background: #f8d7da;
+  color: #721c24;
+  border: 1px solid #dc3545;
+}
+
+.modifier-tag {
+  background: #d4edda;
+  color: #155724;
+  border: 1px solid #28a745;
+}
+
+.contact-tag {
+  background: #cce5ff;
+  color: #004085;
+  border: 1px solid #007bff;
+}
+
+.resource-tag {
+  background: #e2e3e5;
+  color: #383d41;
+  border: 1px solid #6c757d;
+}
+
+/* Power/Talent descriptions */
+.power-desc, .talent-desc {
+  font-size: 0.8em;
+  color: #555;
+  padding: 6px 8px;
+  background: #f8f9fa;
+  border-radius: 4px;
+  margin-top: 6px;
+  line-height: 1.4;
+}
+
+.power-stunts {
+  font-size: 0.75em;
+  color: #666;
+  padding: 4px 8px;
+  margin-top: 4px;
+  font-style: italic;
+}
+
+/* Granted contacts notice */
+.granted-contacts-notice {
+  background: #e7f3ff;
+  border: 1px solid #b6d4fe;
+  border-radius: 4px;
+  padding: 8px 12px;
+  margin: 10px 0;
+  font-size: 0.85em;
+  color: #084298;
+}
+
+/* Contact entries */
+.contact-entry {
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 8px;
+  margin: 6px 0;
+}
+
+.contact-name {
+  font-size: 0.9em;
+}
+
+.contact-specialty {
+  font-size: 0.8em;
+  color: #555;
+  margin-top: 4px;
+}
+
+.contact-notes {
+  font-size: 0.75em;
+  color: #856404;
+  background: #fff3cd;
+  padding: 4px 6px;
+  border-radius: 3px;
+  margin-top: 4px;
+}
+
+.chosen-contacts {
+  margin-top: 12px;
+}
+
+.chosen-contacts h4 {
+  margin-bottom: 8px;
+  font-size: 0.9em;
 }

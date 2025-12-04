@@ -1,6 +1,8 @@
 // chargen.js - Marvel Super Heroes Random Character Generation
 // Based on the Advanced Set rules
 
+import { POWER_DATA, TALENT_DATA, CONTACT_DATA } from './chargen-data.js';
+
 export const RANKS = [
   { name: "Shift-0", min: 0, standard: 0 },
   { name: "Feeble", min: 1, standard: 2 },
@@ -498,6 +500,11 @@ function getRankData(rankName) {
   return RANKS.find(r => r.name === rankName) || RANKS[3];
 }
 
+// Calculate slots used by chosen powers/talents (starred = 2 slots, normal = 1)
+function calcSlotsUsed(chosen) {
+  return (chosen || []).reduce((acc, item) => acc + (item.star ? 2 : 1), 0);
+}
+
 function shiftRank(rankName, shifts) {
   const idx = RANKS.findIndex(r => r.name === rankName);
   if (idx === -1) return rankName;
@@ -797,6 +804,9 @@ export class CharacterGenerator {
     const power = powerList.find(p => p.name === powerName);
     if (!power) return false;
 
+    // Get detailed power data
+    const powerInfo = POWER_DATA[powerName] || {};
+
     // Check if this power is already chosen
     if (this.state.powersData.chosen.some(p => p.name === powerName)) {
       this.log(`Cannot choose ${powerName}: already chosen`);
@@ -818,20 +828,120 @@ export class CharacterGenerator {
     }
 
     const { roll, result } = rollOnTable(COLUMN_4);
-    const rankData = getRankData(result.rank);
+    let rankName = result.rank;
+    let rankData = getRankData(rankName);
 
-    this.state.powersData.chosen.push({
+    // Apply minRank restrictions
+    if (powerInfo.minRank) {
+      const minRankName = this.resolveMinRank(powerInfo.minRank);
+      const minRankIdx = RANKS.findIndex(r => r.name === minRankName);
+      const currentIdx = RANKS.findIndex(r => r.name === rankName);
+      if (currentIdx < minRankIdx) {
+        rankName = minRankName;
+        rankData = getRankData(rankName);
+        this.log(`${powerName}: Raised to minimum ${rankName}`);
+      }
+    }
+
+    // Store full power data
+    const chosenPower = {
       name: powerName,
       category,
       categoryIndex,
       star: power.star,
-      rank: result.rank,
+      rank: rankName,
       value: rankData.min,
-      roll
+      roll,
+      description: powerInfo.description || "",
+      stunts: powerInfo.stunts || [],
+      bonusPower: powerInfo.bonusPower || null,
+      limitationRequired: powerInfo.limitationRequired || false,
+      notes: powerInfo.notes || ""
+    };
+
+    this.state.powersData.chosen.push(chosenPower);
+    this.log(`Chose Power: ${powerName} (${category}) - ${rankName} (${rankData.min})`);
+
+    // Handle bonus power
+    if (powerInfo.bonusPower && !this.state.powersData.chosen.some(p => p.name === powerInfo.bonusPower)) {
+      this.log(`${powerName} grants Bonus Power: ${powerInfo.bonusPower}`);
+      this.state.powersData.pendingBonus = {
+        powerName: powerInfo.bonusPower,
+        fromPower: powerName
+      };
+    }
+
+    // Warn about required limitations
+    if (powerInfo.limitationRequired) {
+      this.log(`⚠️ ${powerName} REQUIRES a limitation!`);
+    }
+
+    return true;
+  }
+
+  // Resolve minRank that references abilities like "Endurance+1"
+  resolveMinRank(minRankStr) {
+    if (!minRankStr.includes("+")) return minRankStr;
+    
+    const match = minRankStr.match(/^(\w+)\+(\d+)$/);
+    if (!match) return "Feeble";
+    
+    const abilityName = match[1].toLowerCase();
+    const shift = parseInt(match[2]);
+    const ability = this.state.abilities[abilityName];
+    if (!ability) return "Feeble";
+    
+    return shiftRank(ability.rank, shift);
+  }
+
+  acceptBonusPower() {
+    const pending = this.state.powersData.pendingBonus;
+    if (!pending) return false;
+
+    // Find the bonus power's category
+    let bonusCategory = null;
+    for (const [cat, powers] of Object.entries(POWER_LISTS)) {
+      if (powers.some(p => p.name === pending.powerName)) {
+        bonusCategory = cat;
+        break;
+      }
+    }
+
+    if (!bonusCategory) {
+      this.log(`Could not find category for bonus power: ${pending.powerName}`);
+      this.state.powersData.pendingBonus = null;
+      return false;
+    }
+
+    // Add a bonus category slot
+    const bonusIndex = this.state.powersData.categories.length;
+    this.state.powersData.categories.push({
+      index: bonusIndex,
+      roll: "Bonus",
+      category: bonusCategory,
+      bonus: true
     });
 
-    this.log(`Chose Power: ${powerName} (${category}) - ${result.rank} (${rankData.min})`);
-    return true;
+    // Choose the bonus power
+    const result = this.choosePower(bonusCategory, pending.powerName, bonusIndex);
+    if (result) {
+      // Mark it as bonus in the chosen array
+      const chosenBonus = this.state.powersData.chosen.find(p => p.name === pending.powerName);
+      if (chosenBonus) {
+        chosenBonus.isBonus = true;
+        chosenBonus.bonusFrom = pending.fromPower;
+      }
+    }
+
+    this.state.powersData.pendingBonus = null;
+    return result;
+  }
+
+  declineBonusPower() {
+    if (this.state.powersData.pendingBonus) {
+      this.log(`Declined bonus power: ${this.state.powersData.pendingBonus.powerName}`);
+      this.state.powersData.pendingBonus = null;
+    }
   }
 
   autoPickPower(category) {
@@ -853,6 +963,9 @@ export class CharacterGenerator {
     const talent = talentList.find(t => t.name === talentName);
     if (!talent) return false;
 
+    // Get detailed talent data
+    const talentInfo = TALENT_DATA[talentName] || {};
+
     // Check if this talent is already chosen
     if (this.state.talentsData.chosen.some(t => t.name === talentName)) {
       this.log(`Cannot choose ${talentName}: already chosen`);
@@ -873,14 +986,39 @@ export class CharacterGenerator {
       }
     }
 
+    // Store full talent data
     this.state.talentsData.chosen.push({
       name: talentName,
       category,
       categoryIndex,
-      star: talent.star
+      star: talent.star,
+      effect: talentInfo.effect || "",
+      ability: talentInfo.ability || null,
+      modifier: talentInfo.modifier || 0,
+      notes: talentInfo.notes || "",
+      grantsContact: talentInfo.grantsContact || null
     });
 
     this.log(`Chose Talent: ${talentName} (${category})`);
+
+    // Handle granted contacts
+    if (talentInfo.grantsContact) {
+      const contactTypes = talentInfo.grantsContact.split(/,\s*| x\d+/);
+      for (const contactType of contactTypes) {
+        const cleanType = contactType.trim();
+        if (cleanType && !this.state.talentsData.grantedContacts) {
+          this.state.talentsData.grantedContacts = [];
+        }
+        if (cleanType) {
+          this.state.talentsData.grantedContacts.push({
+            type: cleanType,
+            fromTalent: talentName
+          });
+          this.log(`${talentName} grants Contact: ${cleanType}`);
+        }
+      }
+    }
+
     return true;
   }
 
@@ -907,12 +1045,25 @@ export class CharacterGenerator {
       return false;
     }
 
+    // Get detailed contact data
+    const contactInfo = CONTACT_DATA[type] || {};
+
     this.state.contactsData.chosen.push({
       type,
-      name: name || type
+      name: name || type,
+      contactType: contactInfo.type || "Professional",
+      resourceRank: contactInfo.resourceRank || "Typical",
+      specialty: contactInfo.specialty || "",
+      notes: contactInfo.notes || ""
     });
 
     this.log(`Chose Contact: ${name || type} (${type})`);
+    if (contactInfo.specialty) {
+      this.log(`  → Specialty: ${contactInfo.specialty}`);
+    }
+    if (contactInfo.resourceRank) {
+      this.log(`  → Resources: ${contactInfo.resourceRank}`);
+    }
     return true;
   }
 
@@ -1091,7 +1242,12 @@ export class CharacterGenerator {
           value: p.value,
           category: p.category,
           isStarred: p.star || false,
-          description: `Generated power from ${p.category} category.`
+          isBonus: p.isBonus || false,
+          bonusFrom: p.bonusFrom || "",
+          description: p.description || `Generated power from ${p.category} category.`,
+          stunts: (p.stunts || []).join("\n"),
+          limitationRequired: p.limitationRequired || false,
+          notes: p.notes || ""
         }
       });
     }
@@ -1102,19 +1258,49 @@ export class CharacterGenerator {
         type: "talent",
         system: {
           type: t.category,
-          description: `Generated talent from ${t.category} category.`
+          effect: t.effect || "",
+          ability: t.ability || "",
+          modifier: t.modifier || 0,
+          description: t.effect || `Generated talent from ${t.category} category.`,
+          notes: t.notes || ""
         }
       });
     }
 
+    // Add contacts from contactsData.chosen
     for (const c of (s.contactsData?.chosen || [])) {
       items.push({
         name: c.name || c.type,
         type: "contact",
         system: {
           type: c.type,
+          contactType: c.contactType || "Professional",
+          resourceRank: c.resourceRank || "Typical",
+          specialty: c.specialty || "",
           disposition: "Friendly",
-          description: "Generated contact."
+          description: c.specialty || "Generated contact.",
+          notes: c.notes || ""
+        }
+      });
+    }
+
+    // Add contacts granted by talents
+    for (const gc of (s.talentsData?.grantedContacts || [])) {
+      // Skip if already have this contact type
+      if (items.some(i => i.type === "contact" && i.system.type === gc.type)) continue;
+      
+      const contactInfo = CONTACT_DATA[gc.type] || {};
+      items.push({
+        name: gc.type,
+        type: "contact",
+        system: {
+          type: gc.type,
+          contactType: contactInfo.type || "Professional",
+          resourceRank: contactInfo.resourceRank || "Typical",
+          specialty: contactInfo.specialty || "",
+          disposition: "Friendly",
+          description: `Granted by ${gc.fromTalent} talent.`,
+          notes: contactInfo.notes || ""
         }
       });
     }
@@ -1182,11 +1368,24 @@ export class ChargenUIManager {
     });
     container.on('click', '.chargen-roll-powers', () => this.rollAllPowersRandomly());
     container.on('click', '.chargen-roll-talents', () => this.rollAllTalentsRandomly());
+    container.on('click', '.chargen-accept-bonus', () => this.acceptBonusPower());
+    container.on('click', '.chargen-decline-bonus', () => this.declineBonusPower());
     container.on('click', '.chargen-next', () => this.nextStep());
     container.on('click', '.chargen-prev', () => this.prevStep());
     container.on('click', '.chargen-apply', () => this.applyToActor());
     container.on('click', '.chargen-reroll', () => this.quickRandomCharacter());
     container.on('click', '.chargen-discard', () => this.reset());
+  }
+
+  acceptBonusPower() {
+    if (this.generator.acceptBonusPower()) {
+      this.updateDisplay();
+    }
+  }
+
+  declineBonusPower() {
+    this.generator.declineBonusPower();
+    this.updateDisplay();
   }
 
   startGeneration() {
@@ -1274,7 +1473,8 @@ export class ChargenUIManager {
     const needed = data.initial || 0;
 
     for (const entry of data.categories) {
-      if (data.chosen.length >= needed) break;
+      const slotsUsed = calcSlotsUsed(data.chosen);
+      if (slotsUsed >= needed) break;
       const alreadyChosen = data.chosen.some(p => p.categoryIndex === entry.index);
       if (alreadyChosen) continue;
       
@@ -1282,10 +1482,19 @@ export class ChargenUIManager {
       if (!powerList) continue;
       
       const chosenNames = data.chosen.map(p => p.name);
-      const available = powerList.filter(p => !p.star && !chosenNames.includes(p.name));
-      if (available.length === 0) continue;
+      const slotsRemaining = needed - slotsUsed;
+      // Filter out starred powers if not enough slots, and already chosen powers
+      const available = powerList.filter(p => {
+        if (chosenNames.includes(p.name)) return false;
+        if (p.star && slotsRemaining < 2) return false;
+        return true;
+      });
+      // Prefer non-starred to avoid using extra slots
+      const nonStarred = available.filter(p => !p.star);
+      const pickFrom = nonStarred.length > 0 ? nonStarred : available;
+      if (pickFrom.length === 0) continue;
       
-      const power = available[Math.floor(Math.random() * available.length)];
+      const power = pickFrom[Math.floor(Math.random() * pickFrom.length)];
       this.generator.choosePower(entry.category, power.name, entry.index);
     }
     this.updateDisplay();
@@ -1297,7 +1506,8 @@ export class ChargenUIManager {
     const needed = data.initial || 0;
 
     for (const entry of data.categories) {
-      if (data.chosen.length >= needed) break;
+      const slotsUsed = calcSlotsUsed(data.chosen);
+      if (slotsUsed >= needed) break;
       const alreadyChosen = data.chosen.some(t => t.categoryIndex === entry.index);
       if (alreadyChosen) continue;
       
@@ -1305,10 +1515,19 @@ export class ChargenUIManager {
       if (!talentList) continue;
       
       const chosenNames = data.chosen.map(t => t.name);
-      const available = talentList.filter(t => !t.star && !chosenNames.includes(t.name));
-      if (available.length === 0) continue;
+      const slotsRemaining = needed - slotsUsed;
+      // Filter out starred talents if not enough slots, and already chosen talents
+      const available = talentList.filter(t => {
+        if (chosenNames.includes(t.name)) return false;
+        if (t.star && slotsRemaining < 2) return false;
+        return true;
+      });
+      // Prefer non-starred to avoid using extra slots
+      const nonStarred = available.filter(t => !t.star);
+      const pickFrom = nonStarred.length > 0 ? nonStarred : available;
+      if (pickFrom.length === 0) continue;
       
-      const talent = available[Math.floor(Math.random() * available.length)];
+      const talent = pickFrom[Math.floor(Math.random() * pickFrom.length)];
       this.generator.chooseTalent(entry.category, talent.name, entry.index);
     }
     this.updateDisplay();
@@ -1473,20 +1692,26 @@ export class ChargenUIManager {
       case "powers":
         const powers = state.powersData?.chosen || [];
         if (powers.length > 0) {
-          return powers.map(p => `• ${p.name} (${p.rank?.substring(0, 2)})`).join("<br>");
+          const powerSlots = calcSlotsUsed(powers);
+          return powers.map(p => `• ${p.name}${p.star ? ' ★' : ''} (${p.rank?.substring(0, 2)})`).join("<br>") + 
+                 `<br><em>Slots: ${powerSlots}/${state.powersData.initial}</em>`;
         }
         if (state.powersData?.initial > 0) {
-          return isActive ? `Choosing... (${powers.length}/${state.powersData.initial})` : "Awaiting...";
+          const currentSlots = calcSlotsUsed(powers);
+          return isActive ? `Choosing... (${currentSlots}/${state.powersData.initial} slots)` : "Awaiting...";
         }
         return "Awaiting...";
 
       case "talents":
         const talents = state.talentsData?.chosen || [];
         if (talents.length > 0) {
-          return talents.map(t => `• ${t.name}`).join("<br>");
+          const talentSlots = calcSlotsUsed(talents);
+          return talents.map(t => `• ${t.name}${t.star ? ' ★' : ''}`).join("<br>") +
+                 `<br><em>Slots: ${talentSlots}/${state.talentsData.initial}</em>`;
         }
         if (state.talentsData?.initial > 0) {
-          return isActive ? `Choosing... (${talents.length}/${state.talentsData.initial})` : "Awaiting...";
+          const currentSlots = calcSlotsUsed(talents);
+          return isActive ? `Choosing... (${currentSlots}/${state.talentsData.initial} slots)` : "Awaiting...";
         }
         return "Awaiting...";
 
@@ -2017,14 +2242,33 @@ export class ChargenUIManager {
     const needed = state?.powersData?.initial || 0;
     const categories = state?.powersData?.categories || [];
     const chosenPowerNames = chosen.map(p => p.name);
+    const pendingBonus = state?.powersData?.pendingBonus;
+    const slotsUsed = calcSlotsUsed(chosen);
+    const slotsRemaining = needed - slotsUsed;
 
     let html = `
       <div class="step-header">
         <div class="step-number">5</div>
         <div class="step-title">Choose Powers</div>
       </div>
-      <p class="step-description">${needed} powers to choose. Roll categories, then pick one power from each.</p>
+      <p class="step-description">${needed} power slots to fill. Starred (★) powers use 2 slots. Slots used: ${slotsUsed}/${needed}</p>
     `;
+
+    // Pending bonus power prompt
+    if (pendingBonus) {
+      const bonusInfo = POWER_DATA[pendingBonus.powerName] || {};
+      html += `
+        <div class="bonus-power-prompt">
+          <div class="bonus-header">🎁 Bonus Power Available!</div>
+          <p><strong>${pendingBonus.fromPower}</strong> grants <strong>${pendingBonus.powerName}</strong> as a bonus power.</p>
+          ${bonusInfo.description ? `<p class="bonus-desc">${bonusInfo.description}</p>` : ''}
+          <div class="bonus-actions">
+            <button type="button" class="btn-accept chargen-accept-bonus">✓ Accept Bonus Power</button>
+            <button type="button" class="btn-decline chargen-decline-bonus">✗ Decline</button>
+          </div>
+        </div>
+      `;
+    }
 
     // Power Categories Table
     html += `
@@ -2059,36 +2303,59 @@ export class ChargenUIManager {
         const chosenPower = chosen.find(p => p.categoryIndex === catIndex);
         const isChosen = !!chosenPower;
 
-        html += `<div class="power-category${isChosen ? ' chosen' : ''}">`;
-        html += `<div class="category-header"><span>${catName}</span><span class="roll-info">Roll: ${catEntry.roll}</span></div>`;
+        html += `<div class="power-category${isChosen ? ' chosen' : ''}${catEntry.bonus ? ' bonus-category' : ''}">`;
+        html += `<div class="category-header"><span>${catName}${catEntry.bonus ? ' (Bonus)' : ''}</span><span class="roll-info">Roll: ${catEntry.roll}</span></div>`;
 
         if (!isChosen) {
           html += `<div class="power-list">`;
           for (const power of powerList) {
             const alreadyChosen = chosenPowerNames.includes(power.name);
-            const disabledAttr = alreadyChosen ? 'disabled' : '';
+            // Disable starred powers if not enough slots remaining (need 2 for starred)
+            const notEnoughSlots = power.star && slotsRemaining < 2;
+            const isDisabled = alreadyChosen || notEnoughSlots;
+            const disabledAttr = isDisabled ? 'disabled' : '';
             const chosenClass = alreadyChosen ? ' chosen' : '';
-            html += `<button type="button" class="power-btn${power.star ? ' starred' : ''}${chosenClass} chargen-choose-power" data-category="${catName}" data-power="${power.name}" data-index="${catIndex}" ${disabledAttr}>${power.name}${power.star ? ' ★' : ''}${alreadyChosen ? ' ✓' : ''}</button>`;
+            const noSlotsClass = notEnoughSlots ? ' no-slots' : '';
+            const powerInfo = POWER_DATA[power.name] || {};
+            
+            // Build tooltip
+            let tooltip = power.name;
+            if (power.star) tooltip += `\n(Uses 2 power slots)`;
+            if (notEnoughSlots) tooltip += `\n⛔ Not enough slots remaining`;
+            if (powerInfo.description) tooltip += `\n${powerInfo.description}`;
+            if (powerInfo.bonusPower) tooltip += `\n★ Bonus: ${powerInfo.bonusPower}`;
+            if (powerInfo.limitationRequired) tooltip += `\n⚠ Requires Limitation`;
+            if (powerInfo.minRank) tooltip += `\nMin Rank: ${powerInfo.minRank}`;
+            
+            html += `<button type="button" class="power-btn${power.star ? ' starred' : ''}${chosenClass}${noSlotsClass}${powerInfo.bonusPower ? ' has-bonus' : ''}${powerInfo.limitationRequired ? ' needs-limit' : ''} chargen-choose-power" data-category="${catName}" data-power="${power.name}" data-index="${catIndex}" title="${tooltip.replace(/"/g, '&quot;')}" ${disabledAttr}>${power.name}${power.star ? ' ★' : ''}${powerInfo.bonusPower ? ' 🎁' : ''}${powerInfo.limitationRequired ? ' ⚠' : ''}${alreadyChosen ? ' ✓' : ''}</button>`;
           }
           html += `</div>`;
           html += `<div class="pending-display">Select a power from this category...</div>`;
         } else {
-          html += `<div class="chosen-display"><strong>Chosen:</strong> ${chosenPower.name} — <strong>${chosenPower.rank} (${chosenPower.value})</strong></div>`;
+          let chosenDisplay = `<strong>Chosen:</strong> ${chosenPower.name} — <strong>${chosenPower.rank} (${chosenPower.value})</strong>`;
+          if (chosenPower.isBonus) chosenDisplay += ` <span class="bonus-tag">Bonus from ${chosenPower.bonusFrom}</span>`;
+          if (chosenPower.limitationRequired) chosenDisplay += ` <span class="limit-tag">⚠ Needs Limitation</span>`;
+          html += `<div class="chosen-display">${chosenDisplay}</div>`;
+          if (chosenPower.description) {
+            html += `<div class="power-desc">${chosenPower.description}</div>`;
+          }
+          if (chosenPower.stunts && chosenPower.stunts.length > 0) {
+            html += `<div class="power-stunts"><strong>Available Stunts:</strong> ${chosenPower.stunts.slice(0, 3).join('; ')}${chosenPower.stunts.length > 3 ? '...' : ''}</div>`;
+          }
         }
 
         html += `</div>`;
       }
 
-      // Random fill button
-      const remaining = needed - chosen.length;
-      if (remaining > 0) {
+      // Random fill button - show remaining slots, not powers
+      if (slotsRemaining > 0 && !pendingBonus) {
         html += `<div style="text-align: center; margin: 15px 0;">`;
-        html += `<button type="button" class="roll-button chargen-roll-powers" style="width: auto; padding: 10px 20px;">🎲 Random Fill Remaining (${remaining})</button>`;
+        html += `<button type="button" class="roll-button chargen-roll-powers" style="width: auto; padding: 10px 20px;">🎲 Random Fill Remaining (${slotsRemaining} slots)</button>`;
         html += `</div>`;
       }
     }
 
-    const canProceed = chosen.length >= needed;
+    const canProceed = slotsUsed >= needed && !pendingBonus;
     html += `<div class="step-nav">`;
     html += `<button type="button" class="nav-btn nav-prev chargen-prev">← Back</button>`;
     html += `<button type="button" class="nav-btn nav-next chargen-next" ${!canProceed ? 'disabled' : ''}>Next: Choose Talents →</button>`;
@@ -2104,14 +2371,25 @@ export class ChargenUIManager {
     const categories = state?.talentsData?.categories || [];
     const isHiTech = state?.origin === "Hi-Tech";
     const chosenTalentNames = chosen.map(t => t.name);
+    const grantedContacts = state?.talentsData?.grantedContacts || [];
+    const slotsUsed = calcSlotsUsed(chosen);
+    const slotsRemaining = needed - slotsUsed;
 
     let html = `
       <div class="step-header">
         <div class="step-number">6</div>
         <div class="step-title">Choose Talents</div>
       </div>
-      <p class="step-description">${needed} talents to choose.${isHiTech ? ' <strong>Hi-Tech requires at least 1 Scientific or Professional talent.</strong>' : ''}</p>
+      <p class="step-description">${needed} talent slots to fill. Starred (★) talents use 2 slots. Slots used: ${slotsUsed}/${needed}${isHiTech ? ' <strong>Hi-Tech requires at least 1 Scientific or Professional talent.</strong>' : ''}</p>
     `;
+
+    // Show granted contacts from talents
+    if (grantedContacts.length > 0) {
+      html += `<div class="granted-contacts-notice">`;
+      html += `<strong>📇 Contacts Granted by Talents:</strong> `;
+      html += grantedContacts.map(gc => `${gc.type} (from ${gc.fromTalent})`).join(', ');
+      html += `</div>`;
+    }
 
     // Talent Categories Table
     html += `
@@ -2154,28 +2432,51 @@ export class ChargenUIManager {
         html += `<div class="talent-list">`;
         for (const talent of talentList) {
           const alreadyChosen = chosenTalentNames.includes(talent.name);
-          const disabledAttr = alreadyChosen ? 'disabled' : '';
+          // Disable starred talents if not enough slots remaining (need 2 for starred)
+          const notEnoughSlots = talent.star && slotsRemaining < 2;
+          const isDisabled = alreadyChosen || notEnoughSlots;
+          const disabledAttr = isDisabled ? 'disabled' : '';
           const chosenClass = alreadyChosen ? ' chosen' : '';
-          html += `<button type="button" class="talent-btn${talent.star ? ' starred' : ''}${chosenClass} chargen-choose-talent" data-category="${catName}" data-talent="${talent.name}" data-index="${catIndex}" ${disabledAttr}>${talent.name}${talent.star ? ' ★' : ''}${alreadyChosen ? ' ✓' : ''}</button>`;
+          const noSlotsClass = notEnoughSlots ? ' no-slots' : '';
+          const talentInfo = TALENT_DATA[talent.name] || {};
+          
+          // Build tooltip
+          let tooltip = talent.name;
+          if (talent.star) tooltip += `\n(Uses 2 talent slots)`;
+          if (notEnoughSlots) tooltip += `\n⛔ Not enough slots remaining`;
+          if (talentInfo.effect) tooltip += `\n${talentInfo.effect}`;
+          if (talentInfo.ability && talentInfo.modifier) tooltip += `\n+${talentInfo.modifier}CS ${talentInfo.ability}`;
+          if (talentInfo.grantsContact) tooltip += `\n📇 Grants: ${talentInfo.grantsContact}`;
+          
+          html += `<button type="button" class="talent-btn${talent.star ? ' starred' : ''}${chosenClass}${noSlotsClass}${talentInfo.grantsContact ? ' grants-contact' : ''} chargen-choose-talent" data-category="${catName}" data-talent="${talent.name}" data-index="${catIndex}" title="${tooltip.replace(/"/g, '&quot;')}" ${disabledAttr}>${talent.name}${talent.star ? ' ★' : ''}${talentInfo.grantsContact ? ' 📇' : ''}${alreadyChosen ? ' ✓' : ''}</button>`;
         }
         html += `</div>`;
         html += `<div class="pending-display">Select a talent from this category...</div>`;
       } else {
-        html += `<div class="chosen-display"><strong>Chosen:</strong> ${chosenTalent.name}</div>`;
+        let chosenDisplay = `<strong>Chosen:</strong> ${chosenTalent.name}`;
+        if (chosenTalent.ability && chosenTalent.modifier) {
+          chosenDisplay += ` <span class="modifier-tag">+${chosenTalent.modifier}CS ${chosenTalent.ability}</span>`;
+        }
+        if (chosenTalent.grantsContact) {
+          chosenDisplay += ` <span class="contact-tag">📇 ${chosenTalent.grantsContact}</span>`;
+        }
+        html += `<div class="chosen-display">${chosenDisplay}</div>`;
+        if (chosenTalent.effect) {
+          html += `<div class="talent-desc">${chosenTalent.effect}</div>`;
+        }
       }
 
       html += `</div>`;
     }
 
-    // Random fill button
-    const remaining = needed - chosen.length;
-    if (remaining > 0 && categories.length > 0) {
+    // Random fill button - show remaining slots, not talents
+    if (slotsRemaining > 0 && categories.length > 0) {
       html += `<div style="text-align: center; margin: 15px 0;">`;
-      html += `<button type="button" class="roll-button chargen-roll-talents" style="width: auto; padding: 10px 20px;">🎲 Random Fill Remaining (${remaining})</button>`;
+      html += `<button type="button" class="roll-button chargen-roll-talents" style="width: auto; padding: 10px 20px;">🎲 Random Fill Remaining (${slotsRemaining} slots)</button>`;
       html += `</div>`;
     }
 
-    const canProceed = chosen.length >= needed;
+    const canProceed = slotsUsed >= needed;
     html += `<div class="step-nav">`;
     html += `<button type="button" class="nav-btn nav-prev chargen-prev">← Back</button>`;
     html += `<button type="button" class="nav-btn nav-next chargen-next" ${!canProceed ? 'disabled' : ''}>Next: Choose Contacts →</button>`;
@@ -2189,6 +2490,7 @@ export class ChargenUIManager {
     const needed = state?.contactsData?.initial || 0;
     const isHiTech = state?.origin === "Hi-Tech";
     const isAlien = state?.origin === "Alien";
+    const grantedContacts = state?.talentsData?.grantedContacts || [];
 
     let html = `
       <div class="step-header">
@@ -2202,21 +2504,43 @@ export class ChargenUIManager {
       </p>
     `;
 
+    // Show contacts already granted by talents
+    if (grantedContacts.length > 0) {
+      html += `<div class="granted-contacts-notice">`;
+      html += `<strong>📇 Already Granted by Talents:</strong> `;
+      html += grantedContacts.map(gc => `${gc.type} (from ${gc.fromTalent})`).join(', ');
+      html += `</div>`;
+    }
+
     if (chosen.length < needed) {
       html += `<div class="contact-types">`;
       for (const type of CONTACT_TYPES) {
         const alreadyChosen = chosen.some(c => c.type === type);
-        html += `<button type="button" class="contact-btn${alreadyChosen ? ' chosen' : ''} chargen-choose-contact" data-type="${type}" ${alreadyChosen ? 'disabled' : ''}>${type}</button>`;
+        const contactInfo = CONTACT_DATA[type] || {};
+        
+        // Build tooltip
+        let tooltip = type;
+        if (contactInfo.resourceRank) tooltip += `\nResources: ${contactInfo.resourceRank}`;
+        if (contactInfo.specialty) tooltip += `\n${contactInfo.specialty}`;
+        if (contactInfo.notes) tooltip += `\n⚠ ${contactInfo.notes}`;
+        
+        html += `<button type="button" class="contact-btn${alreadyChosen ? ' chosen' : ''} chargen-choose-contact" data-type="${type}" title="${tooltip.replace(/"/g, '&quot;')}" ${alreadyChosen ? 'disabled' : ''}>${type}</button>`;
       }
       html += `</div>`;
     }
 
     if (chosen.length > 0) {
-      html += `<div class="chosen-contacts"><h4>Chosen Contacts:</h4><ul>`;
+      html += `<div class="chosen-contacts"><h4>Chosen Contacts:</h4>`;
       for (const c of chosen) {
-        html += `<li>${c.name} (${c.type})</li>`;
+        html += `<div class="contact-entry">`;
+        html += `<div class="contact-name"><strong>${c.name}</strong> (${c.type})`;
+        if (c.resourceRank) html += ` <span class="resource-tag">Resources: ${c.resourceRank}</span>`;
+        html += `</div>`;
+        if (c.specialty) html += `<div class="contact-specialty">${c.specialty}</div>`;
+        if (c.notes) html += `<div class="contact-notes">⚠ ${c.notes}</div>`;
+        html += `</div>`;
       }
-      html += `</ul></div>`;
+      html += `</div>`;
     }
 
     const canProceed = chosen.length >= needed;
