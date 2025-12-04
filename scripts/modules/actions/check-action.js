@@ -7,10 +7,11 @@ import {
   effectsFor,
   bannerColors,
   getAbilityInfo,
+  universalColor
 } from "./action-utils.js";
 import { resolveKillFeat, getKillContextFromAttackForm } from "../../rules/kill-resolver.js";
 import { canEffectsApply } from "../../rules/effects-gate.js";
-import { rollUniversalTable } from "../dice/universal-table.js";
+//import { rollUniversalTable } from "../dice/universal-table.js";
 import * as Effects from "../effects/effect-engine.js";
 import * as Nullify from "./nullify.js";
 import { resolveSlamFeat, getGrandSlamDistance } from "../combat/damage-resolution.js";
@@ -84,11 +85,14 @@ export class CheckAction extends BaseAction {
           rollMode: game.settings.get("core", "rollMode")
         });
       }
-      const capped = Math.min(100, roll.total);
+/*       const capped = Math.min(100, roll.total);
       const color = (typeof rollUniversalTable === "function")
         ? rollUniversalTable(effectiveEndRank, capped)
         : (game?.msh?.rollUniversalTable?.(effectiveEndRank, capped) ?? "white");
-      const colorLower = String(color || "white").toLowerCase();
+      const colorLower = String(color || "white").toLowerCase(); */
+
+      const capped = Math.min(100, roll.total);
+      const colorLower = String(universalColor(effectiveEndRank, capped) || "white").toLowerCase();
 
       // Determine base effect label
       let baseEffect = mapping[colorLower] || color;

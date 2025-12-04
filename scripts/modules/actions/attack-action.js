@@ -5,9 +5,9 @@ import {
   RANKS, getStrengthInfo, shiftRank, getAbilityInfo,
   rollWithKarmaAndHistory, buildResultGrid, buildActionsBox, bannerColors,
   getTargetingContext, getBodyArmorValues, applyDamageToTargets,
-  debugLog
+  debugLog, universalColor
 } from "./action-utils.js";
-import { rollUniversalTable } from "../dice/universal-table.js";
+//import { rollUniversalTable } from "../dice/universal-table.js";
 import { buildDamageFlags } from "./damage-ui.js";
 import { canEffectsApply } from "../../rules/effects-gate.js";
 import { ACTION_LABELS } from "./action-config.js";
@@ -238,8 +238,11 @@ export class AttackAction extends BaseAction {
                 }
               }
 
-              const resultColor = game.msh.rollUniversalTable(effRank, totalRoll);
-              const colorLower = resultColor.toLowerCase();
+              //const resultColor = game.msh.rollUniversalTable(effRank, totalRoll);
+              //const colorLower = resultColor.toLowerCase();
+              // Resolve color (always, even in manual mode)
+              let color = universalColor(effectiveRank, cappedTotal);
+              const colorLower = String(color || "white").toLowerCase();
               
               // Determine success based on FEAT intensity comparison rules
               let success = false;
@@ -424,7 +427,10 @@ export class AttackAction extends BaseAction {
     
     // Continue with normal resolution for Semi/Full modes...
     // Resolve color (always, even in manual mode)
-    let color = rollUniversalTable(effectiveRank, cappedTotal);
+    //let color = rollUniversalTable(effectiveRank, cappedTotal);
+    //const colorLower = String(color || "white").toLowerCase();
+    // Resolve color (always, even in manual mode)
+    let color = universalColor(effectiveRank, cappedTotal);
     const colorLower = String(color || "white").toLowerCase();
 
     // Apply result cap if pulling punch
