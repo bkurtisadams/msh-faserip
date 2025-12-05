@@ -28,11 +28,22 @@ export class BluntAttackAction extends AttackAction {
 
     const ability = getAbilityInfo(actor, this.abilityName);
     const strength = getStrengthInfo(actor);
-    const attackItems = actor.items.filter(isBluntCapable);
+    let attackItems = actor.items.filter(isBluntCapable);
 
-    // restore flags
+    // If a specific item was passed via opts, ensure it's in the list and pre-selected
+    const passedItemId = this.opts?.itemId || this.opts?.item?.id || null;
+    const passedItem = passedItemId ? actor.items.get(passedItemId) : null;
+    
+    if (passedItem && passedItem.type === "equipment") {
+      // Add to list if not already present
+      if (!attackItems.find(i => i.id === passedItem.id)) {
+        attackItems = [passedItem, ...attackItems];
+      }
+    }
+
+    // restore flags (but override with passed item if present)
     const savedSource = (await actor.getFlag("msh-faserip","lastBluntSource")) || "hands";
-    const savedItemId = (await actor.getFlag("msh-faserip","lastBluntItemId")) || "";
+    const savedItemId = passedItemId || (await actor.getFlag("msh-faserip","lastBluntItemId")) || "";
     const savedObjectName = (await actor.getFlag("msh-faserip","lastBluntObjectName")) || "";
     const savedObjectRank = (await actor.getFlag("msh-faserip","lastBluntObjectRank")) || "Excellent";
     const savedObjectValue = (await actor.getFlag("msh-faserip","lastBluntObjectValue")) || 20;

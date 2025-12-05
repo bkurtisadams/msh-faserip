@@ -30,26 +30,44 @@ export class ThrowingBluntAction extends RangedAttackAction {
     const ability = getAbilityInfo(actor, this.abilityName || "agility");
 
     // Candidate weapons: thrown + blunt
-    const thrownBlunt = actor.items.filter(i => {
+    let thrownBlunt = actor.items.filter(i => {
       const s = i.system || {};
       const tags = (s.tags || []).map(t => String(t).toLowerCase());
+      const damageType = String(s.damageType || "").toUpperCase();
+      const attackType = String(s.attackType || "").toLowerCase();
+      
       const isThrown = s.weaponType === "thrown" || tags.includes("thrown");
       const isBlunt  =
-        s.damageType === "BA" ||
-        s.attackType === "blunt" ||
+        damageType === "BA" ||
+        damageType === "TB" ||
+        attackType === "blunt" ||
+        attackType === "throwing-blunt" ||
         tags.includes("blunt") ||
-        tags.includes("ba");
+        tags.includes("ba") ||
+        tags.includes("tb");
       return isThrown && isBlunt;
     });
+
+    // If a specific item was passed via opts, ensure it's in the list and pre-selected
+    const passedItemId = this.opts?.itemId || this.opts?.item?.id || null;
+    const passedItem = passedItemId ? actor.items.get(passedItemId) : null;
+    
+    if (passedItem && passedItem.type === "equipment") {
+      // Add to list if not already present
+      if (!thrownBlunt.find(i => i.id === passedItem.id)) {
+        thrownBlunt = [passedItem, ...thrownBlunt];
+      }
+    }
 
     // Strength-based throwing range
     const strRank = actor?.system?.abilities?.strength?.rank || "Typical";
 
-    // Restore flags
-    const savedItemId    = await actor.getFlag("msh-faserip", "lastThrowBluntItemId") || "";
+    // Restore flags (but override with passed item if present)
+    const savedItemId    = passedItemId || await actor.getFlag("msh-faserip", "lastThrowBluntItemId") || "";
     const savedRange     = await actor.getFlag("msh-faserip", "lastThrowBluntRange") || 1;
     const savedObstacle  = await actor.getFlag("msh-faserip", "lastThrowBluntObstacle") || false;
-    const savedAdHoc     = await actor.getFlag("msh-faserip", "lastThrowBluntAdHoc") || (!thrownBlunt.length);
+    // If a specific item was passed, don't use ad-hoc mode
+    const savedAdHoc     = passedItem ? false : (await actor.getFlag("msh-faserip", "lastThrowBluntAdHoc") || (!thrownBlunt.length));
     const savedAdHocName = await actor.getFlag("msh-faserip", "lastThrowBluntAdHocName") || "Rock";
     const savedAdHocDmg  = Number(await actor.getFlag("msh-faserip", "lastThrowBluntAdHocDamage") || 6);
 

@@ -39,12 +39,12 @@ export class ThrowingEdgedAction extends RangedAttackAction {
 
     // Candidate weapons: thrown + edged
     // Build the Throwing-Edged weapon list (back-compat + multi-mode support)
-    const thrownEdged = actor.items.filter(i => {
+    let thrownEdged = actor.items.filter(i => {
       if (i.type !== "equipment" || i.system?.category !== "weapon") return false;
 
       const s = i.system ?? {};
       
-      // ✅ NEW: Check if weapon has a throwing-edged attack mode
+      // Check if weapon has a throwing-edged attack mode
       if (s.attackModes) {
         const modes = Object.values(s.attackModes);
         const hasThrowingEdged = modes.some(m => 
@@ -76,9 +76,12 @@ export class ThrowingEdgedAction extends RangedAttackAction {
       // Ways to consider a weapon "edged"
       const isEdged =
         damageType === "ea" ||
+        damageType === "te" ||
         attackType === "edged" ||
+        attackType === "throwing-edged" ||
         tags.includes("edged") ||
         tags.includes("ea") ||
+        tags.includes("te") ||
         damageType === "edged" ||
         damageType === "physical-edged" ||
         forms.includes("edged") ||
@@ -87,15 +90,26 @@ export class ThrowingEdgedAction extends RangedAttackAction {
       return isThrowable && isEdged;
     });
 
+    // If a specific item was passed via opts, ensure it's in the list and pre-selected
+    const passedItemId = this.opts?.itemId || this.opts?.item?.id || null;
+    const passedItem = passedItemId ? actor.items.get(passedItemId) : null;
+    
+    if (passedItem && passedItem.type === "equipment") {
+      // Add to list if not already present
+      if (!thrownEdged.find(i => i.id === passedItem.id)) {
+        thrownEdged = [passedItem, ...thrownEdged];
+      }
+    }
 
     // Strength-based range
     const strRank = actor?.system?.abilities?.strength?.rank || "Typical";
 
-    // Restore previous flags
-    const savedItemId = await actor.getFlag("msh-faserip", "lastThrowEdgedItemId") || "";
+    // Restore previous flags (but override with passed item if present)
+    const savedItemId = passedItemId || await actor.getFlag("msh-faserip", "lastThrowEdgedItemId") || "";
     const savedRange = await actor.getFlag("msh-faserip", "lastThrowEdgedRange") || 1;
     const savedObstacle = await actor.getFlag("msh-faserip", "lastThrowEdgedObstacle") || false;
-    const savedAdHoc = await actor.getFlag("msh-faserip", "lastThrowEdgedAdHoc") || false;
+    // If a specific item was passed, don't use ad-hoc mode
+    const savedAdHoc = passedItem ? false : (await actor.getFlag("msh-faserip", "lastThrowEdgedAdHoc") || false);
     const savedAdHocNm = await actor.getFlag("msh-faserip", "lastThrowEdgedAdHocName") || "Broken Bottle";
     const savedAdHocDmg = Number(await actor.getFlag("msh-faserip", "lastThrowEdgedAdHocDamage") || 10);
 

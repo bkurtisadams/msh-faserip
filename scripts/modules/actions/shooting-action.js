@@ -41,14 +41,27 @@ export class ShootingAction extends RangedAttackAction {
     // Filter for shooting weapons (guns, rifles, etc.)
     const isShootingWeapon = (it) => {
       const s = it.system || {};
+      const damageType = String(s.damageType || "").toUpperCase();
       return (s.weaponType === "shooting" || s.weaponType === "firearm" || 
+              damageType === "S" ||
               Array.isArray(s.tags) && s.tags.includes("shooting"));
     };
 
-    const shootingWeapons = actor.items.filter(isShootingWeapon);
+    let shootingWeapons = actor.items.filter(isShootingWeapon);
 
-    // Restore flags
-    const savedItemId = await actor.getFlag("msh-faserip", "lastShootingItemId") || "";
+    // If a specific item was passed via opts, ensure it's in the list and pre-selected
+    const passedItemId = this.opts?.itemId || this.opts?.item?.id || null;
+    const passedItem = passedItemId ? actor.items.get(passedItemId) : null;
+    
+    if (passedItem && passedItem.type === "equipment") {
+      // Add to list if not already present
+      if (!shootingWeapons.find(i => i.id === passedItem.id)) {
+        shootingWeapons = [passedItem, ...shootingWeapons];
+      }
+    }
+
+    // Restore flags (but override with passed item if present)
+    const savedItemId = passedItemId || await actor.getFlag("msh-faserip", "lastShootingItemId") || "";
     const savedRange = await actor.getFlag("msh-faserip", "lastShootingRange") || 1;
     const savedObstacle = await actor.getFlag("msh-faserip", "lastShootingObstacle") || false;
     const savedShift = await actor.getFlag("msh-faserip", "lastShootingShift") || 0;

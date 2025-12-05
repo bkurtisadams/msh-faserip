@@ -71,11 +71,23 @@ export class EdgedAttackAction extends AttackAction {
       return Number(ap) || 0;
     };
 
-    const attackItems = actor.items.filter(isEdgedCapable);
+    const attackItems_base = actor.items.filter(isEdgedCapable);
+    
+    // If a specific item was passed via opts, ensure it's in the list and pre-selected
+    const passedItemId = this.opts?.itemId || this.opts?.item?.id || null;
+    const passedItem = passedItemId ? actor.items.get(passedItemId) : null;
+    
+    let attackItems = attackItems_base;
+    if (passedItem && passedItem.type === "equipment") {
+      // Add to list if not already present
+      if (!attackItems.find(i => i.id === passedItem.id)) {
+        attackItems = [passedItem, ...attackItems];
+      }
+    }
 
-    // restore flags
-    const savedSource = await actor.getFlag("msh-faserip","lastEdgedSource") || "natural";
-    const savedItemId = await actor.getFlag("msh-faserip","lastEdgedItemId") || "";
+    // restore flags (but override with passed item if present)
+    const savedSource = passedItem ? "weapon" : await actor.getFlag("msh-faserip","lastEdgedSource") || "natural";
+    const savedItemId = passedItemId || await actor.getFlag("msh-faserip","lastEdgedItemId") || "";
     const savedNatRank = await actor.getFlag("msh-faserip","lastNaturalWeaponRank") || "Good";
     const savedNatDmg  = await actor.getFlag("msh-faserip","lastNaturalWeaponDamage") || game.msh.getRankValue(savedNatRank);
 
