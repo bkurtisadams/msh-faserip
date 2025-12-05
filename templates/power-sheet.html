@@ -4,6 +4,32 @@
     <h1><input name="name" type="text" value="{{item.name}}" placeholder="Power Name"/></h1>
   </header>
 
+  <!-- STAT STRIP - Always Visible -->
+  <div class="stat-strip">
+    <div class="stat-group">
+      <label>Rank</label>
+      <select name="system.rank">
+        {{#each (array "Shift-0" "Feeble" "Poor" "Typical" "Good" "Excellent" "Remarkable" "Incredible" "Amazing" "Monstrous" "Unearthly" "Shift-X" "Shift-Y" "Shift-Z" "Class 1000" "Class 3000" "Class 5000" "Beyond") as |r|}}
+          <option value="{{r}}" {{#if (eq ../system.rank r)}}selected{{/if}}>{{r}}</option>
+        {{/each}}
+      </select>
+    </div>
+    <div class="stat-group narrow">
+      <label>Value</label>
+      <input type="number" name="system.value" value="{{system.value}}" data-dtype="Number" />
+    </div>
+    <div class="stat-group narrow">
+      <label>Karma Cost</label>
+      <input type="number" name="system.karmaCost" value="{{system.karmaCost}}" placeholder="0" min="0" />
+    </div>
+    <div class="stat-group checkbox-group">
+      <label class="inline-check">
+        <input type="checkbox" name="system.isStarred" {{checked system.isStarred}} data-dtype="Boolean">
+        <i class="fas fa-star"></i>
+      </label>
+    </div>
+  </div>
+
   <section class="sheet-body">
     <!-- TAB NAVIGATION -->
     <nav class="sheet-tabs tabs" data-group="primary">
@@ -16,34 +42,26 @@
 
     <!-- TAB 1: BASICS -->
     <div class="tab" data-group="primary" data-tab="basics">
-      <!-- Rank -->
-      <div class="form-group">
-        <label>Rank:</label>
-        <select name="system.rank" style="width:140px;">
-          {{#each (array "Shift-0" "Feeble" "Poor" "Typical" "Good" "Excellent" "Remarkable" "Incredible" "Amazing" "Monstrous" "Unearthly" "Shift-X" "Shift-Y" "Shift-Z" "Class 1000" "Class 3000" "Class 5000" "Beyond") as |r|}}
-            <option value="{{r}}" {{#if (eq ../system.rank r)}}selected{{/if}}>{{r}}</option>
-          {{/each}}
-        </select>
-        <input type="number" name="system.value" value="{{system.value}}" data-dtype="Number" style="width:60px;" />
-      </div>
 
     <!-- Range + Duration -->
       <div class="form-row">
         <div class="form-group half">
           <label>Range:</label>
-          <div style="display:flex;gap:6px;">
-            <select name="system.range" id="range-type" style="flex:1;">
-              <option value="">None</option>
-              <option value="touch"  {{#if (eq system.range "touch")}}selected{{/if}}>Touch</option>
-              <option value="lineOfSight" {{#if (eq system.range "lineOfSight")}}selected{{/if}}>Line of Sight</option>
-              <option value="areas"  {{#if (eq system.range "areas")}}selected{{/if}}>Areas (fixed)</option>
-              <option value="rank"   {{#if (eq system.range "rank")}}selected{{/if}}>By Rank</option>
-              <option value="custom" {{#if (eq system.range "custom")}}selected{{/if}}>Custom…</option>
-            </select>
-            <input id="range-display" type="text" value="{{system.calculatedRange}}" readonly style="flex:1;background:#f0f0f0;">
+          <select name="system.range" id="range-type">
+            <option value="">None</option>
+            <option value="touch"  {{#if (eq system.range "touch")}}selected{{/if}}>Touch</option>
+            <option value="lineOfSight" {{#if (eq system.range "lineOfSight")}}selected{{/if}}>Line of Sight</option>
+            <option value="areas"  {{#if (eq system.range "areas")}}selected{{/if}}>Areas (fixed)</option>
+            <option value="rank"   {{#if (eq system.range "rank")}}selected{{/if}}>By Rank</option>
+            <option value="custom" {{#if (eq system.range "custom")}}selected{{/if}}>Custom…</option>
+          </select>
+          <!-- Calculated range display (shown when "By Rank") -->
+          <div class="calculated-range" style="display:none;margin-top:6px;">
+            <input id="calculated-range-display" type="text" value="{{system.calculatedRange}}" readonly class="calc-range-field" placeholder="Calculated from rank...">
           </div>
+          <!-- Custom range input (shown when "Custom") -->
           <div class="custom-range-input" style="display:none;margin-top:6px;">
-            <input type="text" name="system.customRange" value="{{system.customRange}}" placeholder="e.g., 10 areas or 500m" style="width:100%;">
+            <input type="text" name="system.customRange" value="{{system.customRange}}" placeholder="e.g., 10 areas or 500m">
           </div>
         </div>
 
@@ -110,10 +128,6 @@
             <input type="checkbox" name="system.isActive" {{checked system.isActive}} data-dtype="Boolean">
             Must be activated (not passive)
           </label>
-          <label>
-            <input type="checkbox" name="system.isStarred" {{checked system.isStarred}} data-dtype="Boolean">
-            Star for quick access
-          </label>
         </div>
       </div>
 
@@ -141,15 +155,15 @@
       </div>
 
       <!-- Description -->
-      <div class="form-group">
+      <div class="form-group description-group">
         <label>Description:</label>
-        <textarea name="system.description" rows="4" class="power-description">{{system.description}}</textarea>
+        <textarea name="system.description" rows="8" class="power-description">{{system.description}}</textarea>
       </div>
 
       <!-- Special Mechanics -->
       <div class="form-group">
         <label>Special Mechanics (rules text):</label>
-        <textarea name="system.specialMechanics" rows="3" placeholder="Additional rules for this power...">{{system.specialMechanics}}</textarea>
+        <textarea name="system.specialMechanics" rows="5" class="special-mechanics" placeholder="Additional rules for this power...">{{system.specialMechanics}}</textarea>
         <small>For powers with unique mechanics (continuing damage, special FEATs, etc.)</small>
       </div>
     </div> <!-- /tab: basics -->

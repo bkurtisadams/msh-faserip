@@ -49,6 +49,10 @@ export class FaseripItemSheet extends ItemSheet {
       context.isMagic = context.system?.isMagic ?? false;
       context.magic   = context.system?.magic   ?? {};
 
+      // Normalize legacy attackType values (ranged-force -> force, ranged-energy -> energy)
+      const rawAttackType = context.system?.attackType || "";
+      context.normalizedAttackType = rawAttackType.replace(/^ranged-/, "");
+
       // Your original option arrays
       context.energyTypes = ["personal", "universal", "dimensional"];
       context.abilities   = ["fighting", "agility", "strength", "endurance", "reason", "intuition", "psyche"];
@@ -351,6 +355,25 @@ export class FaseripItemSheet extends ItemSheet {
     }
     
     if (this.item.type === "power") {
+      // Normalize and set attack type dropdown (handle legacy values)
+      const rawAttackType = this.item.system.attackType || "";
+      const legacyMap = {
+        "ranged-energy": "energy",
+        "ranged-force": "force",
+        "ranged-projectile": "shooting",
+        "ranged-thrown": "throwing-blunt",
+        "melee-blunt": "blunt-attack",
+        "melee-edged": "edged-attack",
+        "touch": "energy",
+        "grapple": "grappling",
+        "charging": "charging"
+      };
+      const normalizedType = legacyMap[rawAttackType] || rawAttackType;
+      const attackTypeSelect = html.find('#attack-type');
+      if (attackTypeSelect.length && normalizedType) {
+        attackTypeSelect.val(normalizedType);
+      }
+
       // Initially show/hide custom range field based on current selection
       const currentRange = this.item.system.range;
       const customRangeInput = html.find('.custom-range-input');
@@ -411,7 +434,7 @@ export class FaseripItemSheet extends ItemSheet {
         const selectedDuration = ev.currentTarget.value;
         const customDurationInput = html.find('.custom-duration-input');
         
-        if (selectedDuration === "custom") {
+        if (selectedDuration === "custom" || selectedDuration === "rounds") {
           customDurationInput.show();
         } else {
           customDurationInput.hide();
@@ -421,7 +444,7 @@ export class FaseripItemSheet extends ItemSheet {
       // Initialize duration input visibility on load
       const currentDuration = html.find('select[name="system.duration"]').val();
       const customDurationInput = html.find('.custom-duration-input');
-      if (currentDuration === "custom") {
+      if (currentDuration === "custom" || currentDuration === "rounds") {
         customDurationInput.show();
       } else {
         customDurationInput.hide();

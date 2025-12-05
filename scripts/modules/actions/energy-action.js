@@ -41,7 +41,7 @@ export class EnergyAction extends RangedAttackAction {
     const ability = getAbilityInfo(actor, this.abilityName || "agility");
 
     // === Candidate powers (schema-aware based on itemSheet.js) ===
-    const energyItems = actor.items.filter((i) => {
+    let energyItems = actor.items.filter((i) => {
       if (i.type !== "power") return false;
       const s = i.system || {};
       
@@ -52,16 +52,28 @@ export class EnergyAction extends RangedAttackAction {
       const cat = String(s.category || "").toLowerCase();
       const typ = String(s.type || "").toLowerCase();
       const catIsEnergy = cat === "energycontrol" || cat === "distanceattacks";
-      const typeLooksEnergy = /energy|light|electric|plasma|beam|blast|fire|ice|sound|darkforce|radiation/.test(typ);
+      const typeLooksEnergy = /energy|light|electric|plasma|beam|blast|fire|ice|cold|sound|darkforce|radiation|heat/.test(typ);
       
       return catIsEnergy || typeLooksEnergy;
     });
 
-    // === Restore prefs ===
-    const savedItemId    = await actor.getFlag("msh-faserip", "lastEnergyItemId") || "";
+    // If a specific item was passed via opts, ensure it's in the list and pre-selected
+    const passedItemId = this.opts?.itemId || this.opts?.item?.id || null;
+    const passedItem = passedItemId ? actor.items.get(passedItemId) : null;
+    
+    if (passedItem && passedItem.type === "power") {
+      // Add to list if not already present
+      if (!energyItems.find(i => i.id === passedItem.id)) {
+        energyItems = [passedItem, ...energyItems];
+      }
+    }
+
+    // === Restore prefs (but override with passed item if present) ===
+    const savedItemId    = passedItemId || await actor.getFlag("msh-faserip", "lastEnergyItemId") || "";
     const savedRange     = await actor.getFlag("msh-faserip", "lastEnergyRange") || 1;
     const savedObstacle  = await actor.getFlag("msh-faserip", "lastEnergyObstacle") || false;
-    const savedAdHoc     = await actor.getFlag("msh-faserip", "lastEnergyAdHoc") || (!energyItems.length);
+    // If a specific item was passed, don't use ad-hoc mode
+    const savedAdHoc     = passedItem ? false : (await actor.getFlag("msh-faserip", "lastEnergyAdHoc") || (!energyItems.length));
     const savedAdHocName = await actor.getFlag("msh-faserip", "lastEnergyAdHocName") || "Energy Blast";
     const savedAdHocDmg  = Number(await actor.getFlag("msh-faserip", "lastEnergyAdHocDamage") || 20);
     const savedAdHocRank = await actor.getFlag("msh-faserip", "lastEnergyAdHocRank") || "Remarkable";

@@ -1316,12 +1316,232 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
       // Import ActionDispatcher
       const { ActionDispatcher } = await import("./modules/actions/action-dispatcher.js");
       
-      // Route based on power category
+      // Route based on power category and type
       const category = item.system.category || "";
+      const powerType = (item.system.type || "").toLowerCase();
       const requiresSave = item.system.requiresSave;
+      const catLower = category.toLowerCase();
       
-      // Mental powers skip to-hit and go straight to saves
-      if (category === "mentalPowers" || requiresSave) {
+      // Determine attack type - explicit setting or auto-detect
+      let actionType = item.system.attackType;
+      
+      // Normalize legacy values to current action types
+      if (actionType) {
+        const legacyMap = {
+          "ranged-energy": "energy",
+          "ranged-force": "force",
+          "ranged-projectile": "shooting",
+          "ranged-thrown": "throwing-blunt",
+          "melee-blunt": "blunt-attack",
+          "melee-edged": "edged-attack",
+          "touch": "energy",
+          "grapple": "grappling",
+          "charging": "charging"
+        };
+        actionType = legacyMap[actionType] || actionType;
+      }
+      
+      // If no explicit type, auto-detect from power name/category
+      if (!actionType || actionType === "") {
+        // Specific power type mappings based on UE rulebook
+        const powerTypeLower = powerType.toLowerCase();
+        
+        // FORCE attacks (Force column - Slam/Stun results)
+        // Air, Water, Earth control; Sound; Stunning Missile; Telekinesis; Magnetic; Gravity; Weather winds
+        const forceTypes = [
+          "air control", "water control", "earth control",
+          "sound generation", "stunning missile",
+          "telekinesis", "magnetic manipulation", "gravity manipulation",
+          "force field generation", "weather control"
+        ];
+        
+        // ENERGY attacks (Energy column - Stun/Kill results)
+        // Fire, Light, Electrical, Energy Touch, Darkforce, Energy Generation
+        const energyTypes = [
+          "fire control", "fire generation", "energy generation",
+          "electrical manipulation", "light manipulation",
+          "energy touch", "darkforce manipulation", "darkforce generation",
+          "shocking touch", "corrosive touch", "rotting touch",
+          "health-drain touch", "paralyzing touch", "blinding touch"
+        ];
+        
+        // THROWING BLUNT attacks
+        const throwingBluntTypes = ["ice generation"];
+        
+        // THROWING EDGED attacks  
+        const throwingEdgedTypes = ["slashing missile"];
+        
+        // SHOOTING attacks
+        const shootingTypes = ["projectile missile"];
+        
+        // EDGED ATTACK (Fighting-based melee)
+        const edgedAttackTypes = ["claws"];
+        
+        // GRAPPLING attacks
+        const grapplingTypes = ["ensnaring missile"];
+        
+        // MENTAL attacks (Psyche FEAT, no to-hit)
+        const mentalTypes = [
+          "psionic attack", "mind control", "emotion control",
+          "possession", "transferral", "mental probe",
+          "telepathy", "image generation"
+        ];
+        
+        // NON-ATTACK powers - don't open attack dialogs
+        const nonAttackCategories = ["resistances", "senses", "movement"];
+        const nonAttackTypes = [
+          // Resistances
+          "resistance to fire", "resistance to cold", "resistance to electricity",
+          "resistance to radiation", "resistance to toxins", "resistance to corrosives",
+          "resistance to emotion", "resistance to mental", "resistance to magical",
+          "resistance to disease", "invulnerability",
+          // Senses
+          "protected senses", "enhanced senses", "infravision", "cosmic awareness",
+          "combat sense", "computer links", "emotion detection", "energy detection",
+          "magic detection", "magnetic detection", "mutant detection", "psionic detection",
+          "astral detection", "tracking",
+          // Movement
+          "flight", "gliding", "leaping", "wall-crawling", "lightning speed",
+          "teleportation", "levitation", "swimming", "climbing", "digging",
+          "dimensional travel",
+          // Body Controls (self-affecting)
+          "growth", "shrinking", "density manipulation", "phasing", "invisibility",
+          "plasticity", "elongation", "shape-shifting", "imitation",
+          "body transformation", "animal transformation", "blending", "alter ego",
+          // Body Alterations/Defensive
+          "body armor", "water breathing", "absorption", "regeneration",
+          "solar regeneration", "recovery", "life support", "pheromones",
+          "damage transfer", "healing", "immortality"
+        ];
+        
+        // Check for non-attack powers first
+        if (nonAttackCategories.includes(catLower)) {
+          ui.notifications.info(`${item.name} is not typically used as an attack power.`);
+          return;
+        }
+        
+        // Check specific non-attack types
+        for (const nat of nonAttackTypes) {
+          if (powerTypeLower.includes(nat)) {
+            ui.notifications.info(`${item.name} is not typically used as an attack power.`);
+            return;
+          }
+        }
+        
+        // Check specific attack type mappings
+        for (const ft of forceTypes) {
+          if (powerTypeLower.includes(ft)) {
+            actionType = "force";
+            break;
+          }
+        }
+        
+        if (!actionType) {
+          for (const et of energyTypes) {
+            if (powerTypeLower.includes(et)) {
+              actionType = "energy";
+              break;
+            }
+          }
+        }
+        
+        if (!actionType) {
+          for (const tbt of throwingBluntTypes) {
+            if (powerTypeLower.includes(tbt)) {
+              actionType = "throwing-blunt";
+              break;
+            }
+          }
+        }
+        
+        if (!actionType) {
+          for (const tet of throwingEdgedTypes) {
+            if (powerTypeLower.includes(tet)) {
+              actionType = "throwing-edged";
+              break;
+            }
+          }
+        }
+        
+        if (!actionType) {
+          for (const st of shootingTypes) {
+            if (powerTypeLower.includes(st)) {
+              actionType = "shooting";
+              break;
+            }
+          }
+        }
+        
+        if (!actionType) {
+          for (const eat of edgedAttackTypes) {
+            if (powerTypeLower.includes(eat)) {
+              actionType = "edged-attack";
+              break;
+            }
+          }
+        }
+        
+        if (!actionType) {
+          for (const gt of grapplingTypes) {
+            if (powerTypeLower.includes(gt)) {
+              actionType = "grappling";
+              break;
+            }
+          }
+        }
+        
+        if (!actionType) {
+          for (const mt of mentalTypes) {
+            if (powerTypeLower.includes(mt)) {
+              actionType = "mental";
+              break;
+            }
+          }
+        }
+        
+        // Category-based fallbacks if no specific type matched
+        if (!actionType) {
+          if (catLower === "mentalpowers" || requiresSave) {
+            actionType = "mental";
+          } else if (catLower === "mattercontrol") {
+            // Matter Control defaults to Force (physical manipulation)
+            actionType = "force";
+          } else if (catLower === "energycontrol") {
+            // Energy Control defaults to Energy
+            actionType = "energy";
+          } else if (catLower === "distanceattacks") {
+            // Distance Attacks - check for specific patterns
+            if (/fire|energy|electric|light|dark|corrosive/i.test(powerTypeLower)) {
+              actionType = "energy";
+            } else if (/sound|stun|force/i.test(powerTypeLower)) {
+              actionType = "force";
+            } else if (/ice|throw/i.test(powerTypeLower)) {
+              actionType = "throwing-blunt";
+            } else if (/slash|edge/i.test(powerTypeLower)) {
+              actionType = "throwing-edged";
+            } else if (/projectile|missile|shoot/i.test(powerTypeLower)) {
+              actionType = "shooting";
+            } else if (/ensnar|grappl|web/i.test(powerTypeLower)) {
+              actionType = "grappling";
+            } else {
+              actionType = "energy"; // Default for distance attacks
+            }
+          } else if (catLower === "bodyalterationsoffensive") {
+            // Offensive body alterations - mostly touch-based energy
+            if (/claw/i.test(powerTypeLower)) {
+              actionType = "edged-attack";
+            } else {
+              actionType = "energy"; // Touch attacks are energy
+            }
+          } else {
+            // Unknown category - default to energy
+            actionType = "energy";
+          }
+        }
+      }
+      
+      // Route to appropriate action
+      if (actionType === "mental") {
         return ActionDispatcher.roll("mental-power", {
           actor: this.actor,
           opts: { 
@@ -1331,12 +1551,46 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
         });
       }
       
-      // Distance attacks use energy/force actions
-      const actionType = item.system.attackType === "force" ? "force" : "energy";
+      // Fighting-based attacks
+      if (actionType === "edged-attack" || actionType === "blunt-attack") {
+        return ActionDispatcher.roll(actionType, {
+          actor: this.actor,
+          abilityName: "fighting",
+          opts: { 
+            itemId: item.id,
+            item: item
+          }
+        });
+      }
       
+      // Strength-based attacks
+      if (actionType === "grappling") {
+        return ActionDispatcher.roll(actionType, {
+          actor: this.actor,
+          abilityName: "strength",
+          opts: { 
+            itemId: item.id,
+            item: item
+          }
+        });
+      }
+      
+      // Endurance-based attacks
+      if (actionType === "charging") {
+        return ActionDispatcher.roll(actionType, {
+          actor: this.actor,
+          abilityName: "endurance",
+          opts: { 
+            itemId: item.id,
+            item: item
+          }
+        });
+      }
+      
+      // Agility-based ranged attacks (force, energy, throwing, shooting)
       return ActionDispatcher.roll(actionType, {
         actor: this.actor,
-        abilityName: "agility", // Powers use Agility
+        abilityName: "agility",
         opts: { 
           itemId: item.id,
           item: item

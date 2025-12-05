@@ -41,7 +41,7 @@ export class ForceAction extends RangedAttackAction {
     const ability = getAbilityInfo(actor, this.abilityName || "agility");
 
     // === Candidate powers (schema-aware based on itemSheet.js) ===
-    const forceItems = actor.items.filter((i) => {
+    let forceItems = actor.items.filter((i) => {
       if (i.type !== "power") return false;
       const s = i.system || {};
       const cat = String(s.category || "").toLowerCase();
@@ -50,19 +50,32 @@ export class ForceAction extends RangedAttackAction {
       // Likely categories/types for "force" style ranged attacks
       const catLooksForce =
         cat === "distanceattacks" ||
+        cat === "mattercontrol" ||
         /force|telekinesis|kinetic|concussion|shockwave/.test(cat);
 
       const typeLooksForce =
-        /force|telekinesis|kinetic|pressure|concussion|shockwave|ram/.test(typ);
+        /force|telekinesis|kinetic|pressure|concussion|shockwave|ram|air|wind|earth|water|magnetic|gravity/.test(typ);
 
       return catLooksForce || typeLooksForce;
     });
 
-    // === Restore prefs ===
-    const savedItemId    = await actor.getFlag("msh-faserip", "lastForceItemId") || "";
+    // If a specific item was passed via opts, ensure it's in the list and pre-selected
+    const passedItemId = this.opts?.itemId || this.opts?.item?.id || null;
+    const passedItem = passedItemId ? actor.items.get(passedItemId) : null;
+    
+    if (passedItem && passedItem.type === "power") {
+      // Add to list if not already present
+      if (!forceItems.find(i => i.id === passedItem.id)) {
+        forceItems = [passedItem, ...forceItems];
+      }
+    }
+
+    // === Restore prefs (but override with passed item if present) ===
+    const savedItemId    = passedItemId || await actor.getFlag("msh-faserip", "lastForceItemId") || "";
     const savedRange     = await actor.getFlag("msh-faserip", "lastForceRange") || 1;
     const savedObstacle  = await actor.getFlag("msh-faserip", "lastForceObstacle") || false;
-    const savedAdHoc     = await actor.getFlag("msh-faserip", "lastForceAdHoc") || (!forceItems.length);
+    // If a specific item was passed, don't use ad-hoc mode
+    const savedAdHoc     = passedItem ? false : (await actor.getFlag("msh-faserip", "lastForceAdHoc") || (!forceItems.length));
     const savedAdHocName = await actor.getFlag("msh-faserip", "lastForceAdHocName") || "Force Blast";
     const savedAdHocDmg  = Number(await actor.getFlag("msh-faserip", "lastForceAdHocDamage") || 15);
     const savedAdHocRank = await actor.getFlag("msh-faserip", "lastForceAdHocRank") || "Remarkable";
