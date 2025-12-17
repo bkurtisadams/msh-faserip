@@ -114,6 +114,8 @@ export class ChargingAction extends BaseAction {
   const savedTargetBAValue = autoPopulated ? targetBAvalue : (await actor.getFlag("msh-faserip", "lastChargingTargetBAValue") || 0);
   const savedObjectMaterial = await actor.getFlag("msh-faserip", "lastChargingObjectMaterial") || "Excellent";
   const savedObjectDesc = await actor.getFlag("msh-faserip", "lastChargingObjectDesc") || "";
+  const savedRemember = await actor.getFlag("msh-faserip", "lastChargingRemember") ?? true;
+  const savedSkipDice = await actor.getFlag("msh-faserip", "lastChargingSkipDice") ?? false;
 
   // If auto-populated a character, override saved target type
   const defaultTargetType = autoPopulated ? "character" : savedTargetType;
@@ -215,8 +217,8 @@ export class ChargingAction extends BaseAction {
     </div>
 
     <div style="margin-top:6px;padding-top:5px;border-top:1px solid #ddd;display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:.9em;">
-      <label><input type="checkbox" name="remember" checked> Remember settings</label>
-      <label><input type="checkbox" name="skipDice"> Skip dice animation</label>
+      <label><input type="checkbox" name="remember" ${savedRemember ? 'checked' : ''}> Remember settings</label>
+      <label><input type="checkbox" name="skipDice" ${savedSkipDice ? 'checked' : ''}> Skip dice animation</label>
     </div>
     
     ${autoPopulated ? `<div style="margin-top:8px;padding:4px;background:#e8f5e9;border:1px solid #4CAF50;border-radius:3px;font-size:.85em;color:#2e7d32;">✓ Auto-populated from targeted token</div>` : ""}
@@ -252,6 +254,10 @@ export class ChargingAction extends BaseAction {
               targetBArank = objectMaterial;
               targetBAvalue = game.msh.getRankValue(objectMaterial) || 20;
             }
+
+            // Always save remember/skipDice preferences
+            await actor.setFlag("msh-faserip", "lastChargingRemember", remember);
+            await actor.setFlag("msh-faserip", "lastChargingSkipDice", skipDice);
 
             if (remember) {
               await actor.setFlag("msh-faserip", "lastChargingAreas", areas);

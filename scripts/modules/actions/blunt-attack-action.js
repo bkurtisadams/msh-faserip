@@ -199,10 +199,11 @@ export class BluntAttackAction extends AttackAction {
 
             // ===== persist collapsible open states if remembering =====
             try {
-              if (rememberSettings) {
-                localStorage.setItem("msh.ba.remember", "1");
-                localStorage.setItem("msh.ba.skipDice", skipDice ? "1" : "0");
+              // Always persist remember and skipDice settings
+              localStorage.setItem("msh.ba.remember", rememberSettings ? "1" : "0");
+              localStorage.setItem("msh.ba.skipDice", skipDice ? "1" : "0");
 
+              if (rememberSettings) {
                 const pullOpen  = $content.find(".frp-col-h:contains('Pull Punch')")
                                           .closest(".frp-collapsible").attr("data-open") === "1";
                 const multiOpen = $content.find(".frp-col-h:contains('Multiple')")
@@ -404,16 +405,14 @@ export class BluntAttackAction extends AttackAction {
               `);
               $content.append($controls);
 
-              // Initialize remembered values
-              const remembered = getLS(LS.REMEMBER, "0") === "1";
+              // Initialize remembered values (default to "1" to match HTML default of checked)
+              const remembered = getLS(LS.REMEMBER, "1") === "1";
               $controls.find("#msh-remember-settings").prop("checked", remembered);
               $controls.find("#msh-skip-dice").prop("checked", getLS(LS.SKIP, "0") === "1");
 
-              // Keep skip value up to date if user toggles
+              // Keep skip value up to date if user toggles - always persist regardless of remember setting
               $controls.on("change", "#msh-skip-dice", function() {
-                if ($controls.find("#msh-remember-settings").prop("checked")) {
-                  setLS(LS.SKIP, this.checked ? "1" : "0");
-                }
+                setLS(LS.SKIP, this.checked ? "1" : "0");
               });
               // Persist remember checkbox itself
               $controls.on("change", "#msh-remember-settings", function() {
@@ -422,7 +421,7 @@ export class BluntAttackAction extends AttackAction {
             }
 
             // --- Collapsible helpers (updated to support persistence)
-            const remembered = getLS(LS.REMEMBER, "0") === "1";
+            const remembered = getLS(LS.REMEMBER, "1") === "1";
             const persistIf = (key, val) => { if (remembered) setLS(key, val); };
 
             const makeCollapsible = (container, title, tone, lsKey) => {

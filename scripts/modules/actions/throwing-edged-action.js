@@ -117,6 +117,8 @@ export class ThrowingEdgedAction extends RangedAttackAction {
     const savedAdHoc = passedItem ? false : (await actor.getFlag("msh-faserip", "lastThrowEdgedAdHoc") || false);
     const savedAdHocNm = await actor.getFlag("msh-faserip", "lastThrowEdgedAdHocName") || "Broken Bottle";
     const savedAdHocDmg = Number(await actor.getFlag("msh-faserip", "lastThrowEdgedAdHocDamage") || 10);
+    const savedRemember = await actor.getFlag("msh-faserip", "lastThrowEdgedRemember") ?? true;
+    const savedSkipDice = await actor.getFlag("msh-faserip", "lastThrowEdgedSkipDice") ?? false;
 
     const itemOptions = thrownEdged
       .map(i => `<option value="${i.id}" ${i.id === savedItemId ? "selected" : ""}>${i.name}</option>`)
@@ -186,9 +188,9 @@ export class ThrowingEdgedAction extends RangedAttackAction {
       })}
 
       <div style="margin-top:8px;">
-        <input type="checkbox" id="remember" name="remember" checked>
+        <input type="checkbox" id="remember" name="remember" ${savedRemember ? 'checked' : ''}>
         <label for="remember">Remember settings</label>
-        <input type="checkbox" id="skipDice" name="skipDice" style="margin-left:12px;">
+        <input type="checkbox" id="skipDice" name="skipDice" ${savedSkipDice ? 'checked' : ''}> style="margin-left:12px;">
         <label for="skipDice">Skip dice animation</label>
       </div>
     `;
@@ -254,6 +256,10 @@ export class ThrowingEdgedAction extends RangedAttackAction {
 
               const remember = !!$('[name="remember"]').is(':checked');
               const skipDice = !!$('[name="skipDice"]').is(':checked');
+
+              // Always save remember/skipDice preferences
+              await actor.setFlag("msh-faserip", "lastThrowEdgedRemember", remember);
+              await actor.setFlag("msh-faserip", "lastThrowEdgedSkipDice", skipDice);
 
               if (remember) {
                 await actor.setFlag("msh-faserip", "lastThrowEdgedAdHoc", useAdHoc);

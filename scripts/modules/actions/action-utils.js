@@ -1753,3 +1753,81 @@ export function setupMultiAttackHandlers(html) {
     html.find('.multi-attack-info').slideToggle(200);
   });
 }
+
+// ============================================
+// REMEMBER SETTINGS UTILITIES
+// ============================================
+
+/**
+ * Get a localStorage value with fallback
+ */
+export function getLocalStorage(key, defaultValue = null) {
+  try {
+    const value = localStorage.getItem(key);
+    return value === null ? defaultValue : value;
+  } catch {
+    return defaultValue;
+  }
+}
+
+/**
+ * Set a localStorage value safely
+ */
+export function setLocalStorage(key, value) {
+  try {
+    localStorage.setItem(key, value);
+  } catch {}
+}
+
+/**
+ * Generate HTML for remember/skip-dice controls
+ * @param {string} prefix - localStorage key prefix (e.g., "msh.ba" for blunt attack)
+ * @returns {string} HTML string
+ */
+export function generateRememberControlsHTML(prefix) {
+  const rememberKey = `${prefix}.remember`;
+  const skipKey = `${prefix}.skipDice`;
+  const remembered = getLocalStorage(rememberKey, "1") === "1";
+  const skipDice = getLocalStorage(skipKey, "0") === "1";
+  
+  return `
+    <div style="margin-top:6px;padding-top:5px;border-top:1px solid #ddd;display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:.9em;">
+      <label><input type="checkbox" name="remember" ${remembered ? 'checked' : ''}> Remember settings</label>
+      <label><input type="checkbox" name="skipDice" ${skipDice ? 'checked' : ''}> Skip dice animation</label>
+    </div>
+  `;
+}
+
+/**
+ * Setup handlers for remember/skip-dice controls and persist state
+ * @param {jQuery} html - Dialog HTML
+ * @param {string} prefix - localStorage key prefix
+ */
+export function setupRememberControlHandlers(html, prefix) {
+  const rememberKey = `${prefix}.remember`;
+  const skipKey = `${prefix}.skipDice`;
+  
+  // Persist remember checkbox changes immediately
+  html.find('[name="remember"]').on('change', function() {
+    setLocalStorage(rememberKey, this.checked ? "1" : "0");
+  });
+  
+  // Persist skip dice changes only if remember is checked
+  html.find('[name="skipDice"]').on('change', function() {
+    if (html.find('[name="remember"]').is(':checked')) {
+      setLocalStorage(skipKey, this.checked ? "1" : "0");
+    }
+  });
+}
+
+/**
+ * Extract remember/skip values from dialog
+ * @param {jQuery} html - Dialog HTML
+ * @returns {{remember: boolean, skipDice: boolean}}
+ */
+export function extractRememberSettings(html) {
+  return {
+    remember: html.find('[name="remember"]').is(':checked'),
+    skipDice: html.find('[name="skipDice"]').is(':checked')
+  };
+}

@@ -99,6 +99,8 @@ export class EdgedAttackAction extends AttackAction {
     const savedShift = await actor.getFlag("msh-faserip","lastEdgedShift") || 0;
     const savedMultiAttacks = await actor.getFlag("msh-faserip","lastEdgedMultiAttacks") || false;
     const savedAttackCount = await actor.getFlag("msh-faserip","lastEdgedAttackCount") || 2;
+    const savedRemember = await actor.getFlag("msh-faserip","lastEdgedRemember") ?? true;
+    const savedSkipDice = await actor.getFlag("msh-faserip","lastEdgedSkipDice") ?? false;
 
     const itemOptions = attackItems.map(i =>
       `<option value="${i.id}" ${i.id===savedItemId?'selected':''}>${i.name}</option>`
@@ -156,10 +158,10 @@ export class EdgedAttackAction extends AttackAction {
       </div>
 
       <div style="margin-top:8px;">
-        <label><input type="checkbox" name="remember" checked> Remember these settings</label>
+        <label><input type="checkbox" name="remember" ${savedRemember ? 'checked' : ''}> Remember these settings</label>
       </div>
       <div style="margin-top:8px;">
-        <label><input type="checkbox" name="skipDice"> Skip dice animation</label>
+        <label><input type="checkbox" name="skipDice" ${savedSkipDice ? 'checked' : ''}> Skip dice animation</label>
       </div>
     `;
 
@@ -204,6 +206,10 @@ export class EdgedAttackAction extends AttackAction {
                   damage = res.damage; note = res.note;
                   html.data('weaponNote', note);
                 }
+
+              // Always save remember/skipDice preferences
+              await actor.setFlag("msh-faserip","lastEdgedRemember", remember);
+              await actor.setFlag("msh-faserip","lastEdgedSkipDice", skipDice);
 
               if (remember) {
                 await actor.setFlag("msh-faserip","lastEdgedSource", src);

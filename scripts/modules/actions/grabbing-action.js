@@ -169,6 +169,8 @@ export class GrabbingAction extends AttackAction {
     // Load persisted settings
     const savedShift = await actor.getFlag("msh-faserip", "lastGrabbingShift") ?? 0;
     const savedKarmaFlag = await actor.getFlag("msh-faserip", "lastGrabbingKarma") ?? 0;
+    const savedRemember = await actor.getFlag("msh-faserip", "lastGrabbingRemember") ?? true;
+    const savedSkipDice = await actor.getFlag("msh-faserip", "lastGrabbingSkipDice") ?? false;
     const savedSpendKarma = (savedKarmaFlag === true) || (Number(savedKarmaFlag) > 0);
 
     const html = `
@@ -216,11 +218,11 @@ export class GrabbingAction extends AttackAction {
       </div>
       ${generateKarmaControlsHTML(actor, savedSpendKarma)}
       <div style="margin-top:6px;">
-        <label><input type="checkbox" name="remember" checked> Remember these settings</label>
+        <label><input type="checkbox" name="remember" ${savedRemember ? 'checked' : ''}> Remember these settings</label>
       </div>
 
       <div style="margin-top:8px;">
-        <label><input type="checkbox" name="skipDice"> Skip dice animation</label>
+        <label><input type="checkbox" name="skipDice" ${savedSkipDice ? 'checked' : ''}> Skip dice animation</label>
       </div>
 
       <div style="margin-top:12px;padding:8px;background:#f5f5f5;border:1px solid #ddd;border-radius:3px;">
@@ -254,6 +256,10 @@ export class GrabbingAction extends AttackAction {
                 remember: !!$('[name="remember"]').is(':checked'),
                 skipDice: !!$('[name="skipDice"]').is(':checked')
               };
+
+              // Always save remember/skipDice preferences
+              await actor.setFlag("msh-faserip", "lastGrabbingRemember", result.remember);
+              await actor.setFlag("msh-faserip", "lastGrabbingSkipDice", result.skipDice);
 
               // Persist settings if requested
               if (result.remember) {

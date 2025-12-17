@@ -312,6 +312,7 @@ export class FaseripRolls {
     const savedDamageCS = power.getFlag("msh-faserip", "lastDamageCS") || 0; // Add this line
     const savedDamageType = power.getFlag("msh-faserip", "lastDamageType") || "Energy-Energy"; // Add this line
     const skipDiceRoll = power.getFlag("msh-faserip", "skipDiceRoll") || false;
+    const savedRememberSettings = power.getFlag("msh-faserip", "rememberSettings") ?? true;
 
     // --- INITIAL DISTANCE FOR DIALOG ---
     let initialDistance = 0;
@@ -738,7 +739,7 @@ export class FaseripRolls {
         </div>
         <div style="margin-top: 10px;">
           <label>
-            <input type="checkbox" id="save-settings" name="saveSettings" checked> 
+            <input type="checkbox" id="save-settings" name="saveSettings" ${savedRememberSettings ? 'checked' : ''}> 
             Remember these settings for future rolls
           </label>
         </div>
@@ -824,13 +825,16 @@ export class FaseripRolls {
                 return;
               }
 
-              // Save settings if requested
+              // Always save skipDice and remember settings preferences
+              await power.setFlag("msh-faserip", "skipDiceRoll", skipDice);
+              await power.setFlag("msh-faserip", "rememberSettings", saveSettings);
+              
+              // Save other settings if requested
               if (saveSettings) {
                 await power.setFlag("msh-faserip", "lastActionType", actionType);
                 await power.setFlag("msh-faserip", "lastColumnShift", columnShift);
                 await power.setFlag("msh-faserip", "lastDamageCS", damageCS);
                 await power.setFlag("msh-faserip", "lastDamageType", damageType);
-                await power.setFlag("msh-faserip", "skipDiceRoll", skipDice);
               }
 
               // Handle multiple attacks first (requires Fighting FEAT)
@@ -972,6 +976,7 @@ export class FaseripRolls {
     const savedDamageCS = talent.getFlag("msh-faserip", "lastDamageCS") || 0;
     const savedDamageType = talent.getFlag("msh-faserip", "lastDamageType") || "Physical-Blunt";
     const skipDiceRoll = talent.getFlag("msh-faserip", "skipDiceRoll") || false;
+    const savedRememberSettings = talent.getFlag("msh-faserip", "rememberSettings") ?? true;
 
     // If this is a direct roll (called after dialog or with options)
     // Check if CTRL is pressed or if this is a direct roll call
@@ -1402,7 +1407,7 @@ export class FaseripRolls {
           </div>
           <div style="margin-top: 10px;">
             <label>
-              <input type="checkbox" id="save-settings" name="saveSettings" checked> 
+              <input type="checkbox" id="save-settings" name="saveSettings" ${savedRememberSettings ? 'checked' : ''}> 
               Remember these settings for future rolls
             </label>
           </div>
@@ -1433,13 +1438,16 @@ export class FaseripRolls {
               if (multiAttacks && !isValidMultipleAttack(actionCode)) return ui.notifications.warn("This action cannot be used for multiple attacks.");
               if (multiAdjacent && multiAttacks) return ui.notifications.warn("Cannot use both multi-target options at once.");
 
-              // Save settings if requested
+              // Always save skipDice and remember settings preferences
+              await talent.setFlag("msh-faserip", "skipDiceRoll", skipDice);
+              await talent.setFlag("msh-faserip", "rememberSettings", saveSettings);
+              
+              // Save other settings if requested
               if (saveSettings) {
                 await talent.setFlag("msh-faserip", "lastActionType", actionType);
                 await talent.setFlag("msh-faserip", "lastExtraShift", extraShift);
                 await talent.setFlag("msh-faserip", "lastDamageCS", damageCS);
                 await talent.setFlag("msh-faserip", "lastDamageType", damageType);
-                await talent.setFlag("msh-faserip", "skipDiceRoll", skipDice);
               }
 
               if (multiAttacks) {
@@ -1523,6 +1531,7 @@ export class FaseripRolls {
     const savedActionType = contact.getFlag("msh-faserip", "lastActionType") || "Availability";
     const savedColumnShift = contact.getFlag("msh-faserip", "lastColumnShift") || 0;
     const skipDiceRoll = contact.getFlag("msh-faserip", "skipDiceRoll") || false;
+    const savedRememberSettings = contact.getFlag("msh-faserip", "rememberSettings") ?? true;
 
     // If this is a direct roll (called after dialog or with options)
     // Check if CTRL is pressed or if this is a direct roll call
@@ -1789,7 +1798,7 @@ export class FaseripRolls {
         </div>
         <div style="margin-top: 10px;">
           <label>
-            <input type="checkbox" id="save-settings" name="saveSettings" checked> 
+            <input type="checkbox" id="save-settings" name="saveSettings" ${savedRememberSettings ? 'checked' : ''}> 
             Remember these settings for future rolls
           </label>
         </div>
@@ -1807,11 +1816,14 @@ export class FaseripRolls {
               const skipDice = html.find('[name="skipDice"]').is(':checked');
               const saveSettings = html.find('[name="saveSettings"]').is(':checked');
 
-              // Save settings if requested
+              // Always save skipDice and remember settings preferences
+              await contact.setFlag("msh-faserip", "skipDiceRoll", skipDice);
+              await contact.setFlag("msh-faserip", "rememberSettings", saveSettings);
+              
+              // Save other settings if requested
               if (saveSettings) {
                 await contact.setFlag("msh-faserip", "lastActionType", actionType);
                 await contact.setFlag("msh-faserip", "lastColumnShift", columnShift);
-                await contact.setFlag("msh-faserip", "skipDiceRoll", skipDice);
               }
 
               // Call this method again but with the gathered options
@@ -1866,6 +1878,7 @@ export class FaseripRolls {
     const savedActionType = equipment.getFlag("msh-faserip", "lastActionType") || "";
     const savedColumnShift = equipment.getFlag("msh-faserip", "lastColumnShift") || 0;
     const skipDiceRoll = equipment.getFlag("msh-faserip", "skipDiceRoll") || false;
+    const savedRememberSettings = equipment.getFlag("msh-faserip", "rememberSettings") ?? true;
 
     // ADD THIS: Check if we should use saved settings for quick roll
     const hasSavedSettings = savedActionType !== "" || savedColumnShift !== 0;
@@ -2104,6 +2117,7 @@ export class FaseripRolls {
       const dialogActionType = savedActionType || defaultAction;
       const dialogColumnShift = savedColumnShift || 0;
       const dialogSkipDice = skipDiceRoll || false;
+      const dialogRememberSettings = savedRememberSettings;
       
       // Otherwise show dialog for interactive roll
       // Create dialog for roll options with multi-target support
@@ -2164,7 +2178,7 @@ export class FaseripRolls {
             </label>
           <div style="margin-top: 10px;">
           <label>
-            <input type="checkbox" id="save-settings" name="saveSettings" checked> 
+            <input type="checkbox" id="save-settings" name="saveSettings" ${dialogRememberSettings ? 'checked' : ''}> 
             Remember these settings for future rolls
           </label>
         </div>
@@ -2252,11 +2266,14 @@ export class FaseripRolls {
                 return;
               }
 
-              // Save settings if requested
+              // Always save skipDice and remember settings preferences
+              await equipment.setFlag("msh-faserip", "skipDiceRoll", skipDice);
+              await equipment.setFlag("msh-faserip", "rememberSettings", saveSettings);
+              
+              // Save other settings if requested
               if (saveSettings) {
                 await equipment.setFlag("msh-faserip", "lastActionType", actionName);
                 await equipment.setFlag("msh-faserip", "lastColumnShift", shift);
-                await equipment.setFlag("msh-faserip", "skipDiceRoll", skipDice);
               }
 
               // Handle multiple attacks first (requires Fighting FEAT)

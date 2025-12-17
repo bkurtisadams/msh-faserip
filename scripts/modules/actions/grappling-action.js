@@ -31,10 +31,16 @@ export class GrapplingAction extends AttackAction {
     // Load persisted defaults
     const savedShift = await actor.getFlag("msh-faserip", "lastGrappleShift") ?? 0;
     const savedKarmaFlag = await actor.getFlag("msh-faserip", "lastGrappleKarma") ?? 0;
+    const savedRemember = await actor.getFlag("msh-faserip", "lastGrappleRemember") ?? true;
+    const savedSkipDice = await actor.getFlag("msh-faserip", "lastGrappleSkipDice") ?? false;
     const savedSpendKarma = (savedKarmaFlag === true) || (Number(savedKarmaFlag) > 0);
 
     const choice = await this._showGrapplingDialog(actor, strength, { savedShift, savedSpendKarma });
     if (!choice) return;
+
+    // Always save remember/skipDice preferences
+    await actor.setFlag("msh-faserip", "lastGrappleRemember", choice.remember);
+    await actor.setFlag("msh-faserip", "lastGrappleSkipDice", choice.skipDice);
 
     // Persist settings if requested
     if (choice.remember) {
@@ -141,11 +147,11 @@ export class GrapplingAction extends AttackAction {
       </div>
       ${generateKarmaControlsHTML(actor, savedSpendKarma)}
       <div style="margin-top:6px;">
-        <label><input type="checkbox" name="remember" checked> Remember these settings</label>
+        <label><input type="checkbox" name="remember" ${savedRemember ? 'checked' : ''}> Remember these settings</label>
       </div>
 
       <div style="margin-top:8px;">
-        <label><input type="checkbox" name="skipDice"> Skip dice animation</label>
+        <label><input type="checkbox" name="skipDice" ${savedSkipDice ? 'checked' : ''}> Skip dice animation</label>
       </div>
 
       <div style="margin-top:12px;padding:8px;background:#f5f5f5;border:1px solid #ddd;border-radius:3px;">

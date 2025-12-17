@@ -883,6 +883,8 @@ export async function handleEscapeAttempt({ defenderUuid, defenderName, defender
   const savedShift = await defender.getFlag("msh-faserip", "lastEscapeShift") ?? 0;
   const savedKarmaFlag = await defender.getFlag("msh-faserip", "lastEscapeKarma") ?? 0;
   const savedSpendKarma = (savedKarmaFlag === true) || (Number(savedKarmaFlag) > 0);
+  const savedRemember = await defender.getFlag("msh-faserip", "lastEscapeRemember") ?? true;
+  const savedSkipDice = await defender.getFlag("msh-faserip", "lastEscapeSkipDice") ?? false;
 
   const dialogHtml = `
     <div style="line-height:1.4;">
@@ -906,10 +908,10 @@ export async function handleEscapeAttempt({ defenderUuid, defenderName, defender
       </div>
       ${generateKarmaControlsHTML(defender, savedSpendKarma)}
       <div style="margin-top:6px;">
-        <label><input type="checkbox" name="remember" checked> Remember these settings</label>
+        <label><input type="checkbox" name="remember" ${savedRemember ? 'checked' : ''}> Remember these settings</label>
       </div>
       <div style="margin-top:8px;">
-        <label><input type="checkbox" name="skipDice"> Skip dice animation</label>
+        <label><input type="checkbox" name="skipDice" ${savedSkipDice ? 'checked' : ''}> Skip dice animation</label>
       </div>
       <div style="margin-top:12px;padding:8px;background:#f5f5f5;border:1px solid #ddd;border-radius:3px;">
         <div style="font-weight:bold;margin-bottom:4px;">Escape Results</div>
@@ -934,6 +936,10 @@ export async function handleEscapeAttempt({ defenderUuid, defenderName, defender
           const { spendKarma } = extractKarmaFromDialog(html);
           const remember = !!$('[name="remember"]').is(':checked');
           const skipDice = !!$('[name="skipDice"]').is(':checked');
+
+          // Always save remember/skipDice preferences
+          await defender.setFlag("msh-faserip", "lastEscapeRemember", remember);
+          await defender.setFlag("msh-faserip", "lastEscapeSkipDice", skipDice);
 
           if (remember) {
             await defender.setFlag("msh-faserip", "lastEscapeShift", shift);
