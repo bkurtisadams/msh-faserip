@@ -90,17 +90,29 @@ export class EdgedAttackAction extends AttackAction {
       }
     }
 
-    // restore flags (but override with passed item if present)
-    const savedSource = passedItem ? "weapon" : await actor.getFlag("msh-faserip","lastEdgedSource") || "natural";
-    const savedItemId = passedItemId || await actor.getFlag("msh-faserip","lastEdgedItemId") || "";
-    const savedNatRank = await actor.getFlag("msh-faserip","lastNaturalWeaponRank") || "Good";
-    const savedNatDmg  = await actor.getFlag("msh-faserip","lastNaturalWeaponDamage") || game.msh.getRankValue(savedNatRank);
+    // --- INITIALIZATION & DEFAULTS ---
+    // 1. Check LocalStorage for "Remember Settings" preference
+    const lsRememberKey = "msh.ea.remember";
+    const lsSkipKey = "msh.ea.skipDice";
+    const shouldRemember = localStorage.getItem(lsRememberKey) === "1";
+    const savedSkipDice = localStorage.getItem(lsSkipKey) === "1";
 
-    const savedShift = await actor.getFlag("msh-faserip","lastEdgedShift") || 0;
-    const savedMultiAttacks = await actor.getFlag("msh-faserip","lastEdgedMultiAttacks") || false;
-    const savedAttackCount = await actor.getFlag("msh-faserip","lastEdgedAttackCount") || 2;
-    const savedRemember = (await actor.getFlag("msh-faserip", "rememberSettings")) ?? (await actor.getFlag("msh-faserip", "lastEdgedRemember")) ?? true;
-    const savedSkipDice = (await actor.getFlag("msh-faserip", "skipDiceRoll")) ?? (await actor.getFlag("msh-faserip", "lastEdgedSkipDice")) ?? false;
+    // 2. Determine Defaults vs Saved Flags
+    // Default Source is "weapon" (per rules/request) unless item passed overrides it
+    const defaultSource = passedItem ? "weapon" : "weapon"; 
+
+    const savedSource = shouldRemember 
+      ? (passedItem ? "weapon" : (await actor.getFlag("msh-faserip","lastEdgedSource") || defaultSource))
+      : defaultSource;
+
+    const savedItemId = passedItemId || (shouldRemember ? (await actor.getFlag("msh-faserip","lastEdgedItemId")) : "") || "";
+    
+    const savedNatRank = shouldRemember ? (await actor.getFlag("msh-faserip","lastNaturalWeaponRank") || "Good") : "Good";
+    const savedNatDmg  = shouldRemember ? (await actor.getFlag("msh-faserip","lastNaturalWeaponDamage") || game.msh.getRankValue(savedNatRank)) : game.msh.getRankValue("Good");
+
+    const savedShift = shouldRemember ? (await actor.getFlag("msh-faserip","lastEdgedShift") || 0) : 0;
+    const savedMultiAttacks = shouldRemember ? (await actor.getFlag("msh-faserip","lastEdgedMultiAttacks") || false) : false;
+    const savedAttackCount = shouldRemember ? (await actor.getFlag("msh-faserip","lastEdgedAttackCount") || 2) : 2;
 
     const itemOptions = attackItems.map(i =>
       `<option value="${i.id}" ${i.id===savedItemId?'selected':''}>${i.name}</option>`
@@ -152,16 +164,17 @@ export class EdgedAttackAction extends AttackAction {
       </div>
 
       ${buildMultiAttackSection("edged-attack", game.user.targets.size, savedMultiAttacks, savedAttackCount, false)}
+      
       <div id="preview" style="margin-top:8px;padding:6px;background:#fff3e0;border:1px solid #FF9800;border-radius:3px;font-size:.9em;">
         <strong>Damage:</strong> <span id="dmg-val">-</span>
         <span id="dmg-note" style="margin-left:6px;color:#555;"></span>
       </div>
 
-      <div style="margin-top:8px;">
-        <label><input type="checkbox" name="remember" ${savedRemember ? 'checked' : ''}> Remember these settings</label>
+      <div id="msh-bottom-controls" style="margin-top:8px;">
+        <label><input type="checkbox" id="msh-remember-settings" name="remember" ${shouldRemember ? 'checked' : ''}> Remember these settings</label>
       </div>
       <div style="margin-top:8px;">
-        <label><input type="checkbox" name="skipDice" ${savedSkipDice ? 'checked' : ''}> Skip dice animation</label>
+        <label><input type="checkbox" id="msh-skip-dice" name="skipDice" ${savedSkipDice ? 'checked' : ''}> Skip dice animation</label>
       </div>
     `;
 
@@ -174,6 +187,15 @@ export class EdgedAttackAction extends AttackAction {
             label: "Roll",
             callback: async (html)=>{
               const $ = (sel)=> html.find(sel);
+              
+              // Read checkboxes from updated IDs
+              const remember = $("#msh-remember-settings").is(':checked');
+              const skipDice = $("#msh-skip-dice").is(':checked');
+
+              // Persist LS settings immediately
+              localStorage.setItem(lsRememberKey, remember ? "1" : "0");
+              localStorage.setItem(lsSkipKey, skipDice ? "1" : "0");
+
               const src     = $('[name="src"]:checked').val() || "natural";
               const itemId  = String($('[name="item"]').val() || "");
               const natRank = String($('[name="natRank"]').val() || savedNatRank);
@@ -182,8 +204,6 @@ export class EdgedAttackAction extends AttackAction {
               const { spendKarma, karmaToSpend } = extractKarmaFromDialog(html);
               const karma   = karmaToSpend;
               
-              const remember = $(`[name="rememberSettings"]`).length ? !!$(`[name="rememberSettings"]`).is(':checked') : !!$(`[name="remember"]`).is(':checked');
-              const skipDice = $(`[name="skipDiceRoll"]`).length ? !!$(`[name="skipDiceRoll"]`).is(':checked') : !!$(`[name="skipDice"]`).is(':checked');
               const multiAttacks = !!$('[name="multiAttacks"]').is(':checked');
               const attackCount = parseInt($('[name="attackCount"]:checked').val() || 2);
 
@@ -195,23 +215,29 @@ export class EdgedAttackAction extends AttackAction {
                 note = `${natRank} rank natural weapon`;
                 html.data('weaponNote', note);
               } else {
+                  // FIX: If no item selected (e.g. empty list), default damage to 0
                   const item = attackItems.find(i=>i.id===itemId) || null;
-                  weaponMat = item ? getItemMaterialRank(item) : "Excellent";
-                  weaponName= item ? item.name : "(Edged Weapon)";
-                  const base = Number(item?.system?.damage || 0);
-                  ap = item ? getArmorPiercing(item) : 0;
-                  apCS = item ? (Number(item.system.armorPiercingCS || 0) || 0) : 0;      // ✅ ADD
-                  apMode = item ? (item.system.apMode || "value") : "value";              // ✅ ADD
-                  const res = computeEdgedDamage(strength.rank, strength.value, weaponMat, base);
-                  damage = res.damage; note = res.note;
+                  if (!item) {
+                    weaponMat = "Feeble";
+                    weaponName = "(No weapon)";
+                    damage = 0;
+                    note = "No edged weapon selected";
+                    ap = 0;
+                  } else {
+                    weaponMat = getItemMaterialRank(item);
+                    weaponName= item.name;
+                    const base = Number(item.system?.damage || 0);
+                    ap = getArmorPiercing(item);
+                    apCS = (Number(item.system.armorPiercingCS || 0) || 0);
+                    apMode = (item.system.apMode || "value");
+                    const res = computeEdgedDamage(strength.rank, strength.value, weaponMat, base);
+                    damage = res.damage; 
+                    note = res.note;
+                  }
                   html.data('weaponNote', note);
                 }
 
-              // Always save remember/skipDice preferences
-              await actor.setFlag("msh-faserip", "rememberSettings", remember);
-              await actor.setFlag("msh-faserip", "lastEdgedRemember", remember);
-              await actor.setFlag("msh-faserip", "skipDiceRoll", skipDice);
-              await actor.setFlag("msh-faserip", "lastEdgedSkipDice", skipDice);
+              // Only save flags if Remember is checked
               if (remember) {
                 await actor.setFlag("msh-faserip","lastEdgedSource", src);
                 await actor.setFlag("msh-faserip","lastEdgedShift", shift);
@@ -237,6 +263,14 @@ export class EdgedAttackAction extends AttackAction {
           setupKarmaControlHandlers(html);
           const $dialog = html.closest('.dialog');
 
+          // Initialize bottom controls event listeners
+          html.find("#msh-remember-settings").on("change", function() {
+              localStorage.setItem(lsRememberKey, this.checked ? "1" : "0");
+          });
+          html.find("#msh-skip-dice").on("change", function() {
+              localStorage.setItem(lsSkipKey, this.checked ? "1" : "0");
+          });
+
           const updatePreview = ()=>{
             const src = html.find('[name="src"]:checked').val() || "natural";
             const $nat = html.find('#natural-row');
@@ -254,13 +288,21 @@ export class EdgedAttackAction extends AttackAction {
               $nat.hide(); $wep.show();
               const itemId = String(html.find('[name="item"]').val() || "");
               const item = attackItems.find(i=>i.id===itemId) || null;
-              const mat = item ? getItemMaterialRank(item) : "Excellent";
-              const base = Number(item?.system?.damage || 0);
-              const res = computeEdgedDamage(strength.rank, strength.value, mat, base);
-              const ap  = item ? getArmorPiercing(item) : 0;
-              $val.text(res.damage);
-              $note.text(`${item ? item.name : "(Edged Weapon)"} (${mat}) — ${res.note}`);
-              html.find('[name="apDisplay"]').val(String(ap));
+              
+              // FIX: Handle no item selected
+              if (!item) {
+                $val.text("0");
+                $note.text("(No weapon selected)");
+                html.find('[name="apDisplay"]').val("0");
+              } else {
+                const mat = getItemMaterialRank(item);
+                const base = Number(item.system?.damage || 0);
+                const res = computeEdgedDamage(strength.rank, strength.value, mat, base);
+                const ap  = getArmorPiercing(item);
+                $val.text(res.damage);
+                $note.text(`${item.name} (${mat}) — ${res.note}`);
+                html.find('[name="apDisplay"]').val(String(ap));
+              }
             }
             if ($dialog.length) $dialog[0].style.height = 'auto';
           };
@@ -281,7 +323,7 @@ export class EdgedAttackAction extends AttackAction {
          html.find('[name="natDmg"]').on('input', updatePreview);
           await setupModeSelector(actor, html, this.opts || {}, "lastEdgedMode");
           setupMultiAttackHandlers(html);
-          applyCapabilitiesToDialog(html, "edged-attack", { actor });  // new
+          applyCapabilitiesToDialog(html, "edged-attack", { actor });
         }
       }).render(true);
     });
@@ -331,27 +373,36 @@ export class EdgedAttackAction extends AttackAction {
     }
 
     // Execute attack(s)
-    for (let i = 1; i <= actualAttackCount; i++) {
-      if (i > 1) {
-        // Small delay between attacks for visual clarity
+    const targets = Array.from(game.user?.targets ?? []);
+    // Distribute hits round-robin across selected targets
+    for (let i = 0; i < actualAttackCount; i++) {
+      if (i > 0) {
         await new Promise(resolve => setTimeout(resolve, 500));
       }
-      const actionLabel = actualAttackCount > 1 ? `${actionName} (${i}/${actualAttackCount})` : actionName;
+
+      // If FEAT failed (actual=1), hit first target. 
+      // If FEAT success, distribute 1st attack to 1st target, 2nd to 2nd, 3rd to 3rd (or loop back)
+      const targetForThisAttack = actualAttackCount === 1 
+        ? targets[0] 
+        : targets.length ? targets[i % targets.length] : null;
+
+      const actionLabel = actualAttackCount > 1 ? `${actionName} (${i+1}/${actualAttackCount})` : actionName;
+      
       await this._executeSingleAttack({
-      choice,
-      actor: this.actor,
-      ability,
-      actionType,
-      actionName: actionLabel,
-      effects,
-      damageType: "physical-edged",
-      rawDamage: choice.damage,
-      damageNote: choice.note || "",
-      sourceName: choice.weaponName || "Natural Weapon",
-      attackForm: "edged",
-      breakingFeat: { weaponMat: choice.weaponMat },
-      targetCount: 1
-    });
+        choice: { ...choice, specificTarget: targetForThisAttack }, // Force specific target
+        actor: this.actor,
+        ability,
+        actionType,
+        actionName: actionLabel,
+        effects,
+        damageType: "physical-edged",
+        rawDamage: choice.damage,
+        damageNote: choice.note || "",
+        sourceName: choice.weaponName || "Natural Weapon",
+        attackForm: "edged",
+        breakingFeat: { weaponMat: choice.weaponMat },
+        targetCount: 1
+      });
     }
 
     // Multi-attack completion message
@@ -363,23 +414,6 @@ export class EdgedAttackAction extends AttackAction {
           <div style="font-size:0.9em;">${actor.name} completed ${actualAttackCount} attacks.</div>
         </div>`
       });
-
-      // Full Auto: immediately apply damage to the specific target
-      if (this?.opts?.mode !== "manual" && this?.opts?.autoApply && isHit && afterArmor > 0 && target) {
-        await applyDamageToTargets({
-          damage: afterArmor,
-          attackerUuid: actor.uuid,
-          damageType,             // e.g. "physical-edged" for this action
-          attackForm,             // e.g. "edged"
-          showNotification: true,
-          bypassArmor: false,
-          armorPiercing: (choice?.ap ?? 0),
-          apMode: (choice?.apMode ?? "value"),
-          wasKillResult: (colorLower === "red"),
-          specificTarget: target  // the TokenDocument/Token from this per-target branch
-        });
-      }
-
     }
-  } // <-- CLOSE async execute()
+  } 
 }

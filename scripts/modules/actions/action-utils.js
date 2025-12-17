@@ -1,5 +1,3 @@
-//--- START OF FILE action-utils.js ---
-
 import { ACTION_LABELS, ACTION_EFFECTS } from "./action-config.js";
 import { applyNullifiedEffect, isAuraMaintained } from "./nullify.js";
 import { calculateMitigation } from "../../rules/mitigation.js";
@@ -1746,7 +1744,7 @@ export function buildMultiAttackSection(actionType, targetCount, multiAttacks = 
         Requires Fighting FEAT. If failed: 1 attack at -3CS
       </div>
     </div>
-  `;
+  </div>`;
 }
 
 /**
