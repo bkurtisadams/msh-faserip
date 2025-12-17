@@ -169,8 +169,8 @@ export class GrabbingAction extends AttackAction {
     // Load persisted settings
     const savedShift = await actor.getFlag("msh-faserip", "lastGrabbingShift") ?? 0;
     const savedKarmaFlag = await actor.getFlag("msh-faserip", "lastGrabbingKarma") ?? 0;
-    const savedRemember = await actor.getFlag("msh-faserip", "lastGrabbingRemember") ?? true;
-    const savedSkipDice = await actor.getFlag("msh-faserip", "lastGrabbingSkipDice") ?? false;
+    const savedRemember = (await actor.getFlag("msh-faserip", "rememberSettings")) ?? (await actor.getFlag("msh-faserip", "lastGrabbingRemember")) ?? true;
+    const savedSkipDice = (await actor.getFlag("msh-faserip", "skipDiceRoll")) ?? (await actor.getFlag("msh-faserip", "lastGrabbingSkipDice")) ?? false;
     const savedSpendKarma = (savedKarmaFlag === true) || (Number(savedKarmaFlag) > 0);
 
     const html = `

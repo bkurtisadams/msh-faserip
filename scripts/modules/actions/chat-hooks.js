@@ -934,8 +934,8 @@ export async function handleEscapeAttempt({ defenderUuid, defenderName, defender
           const $ = (s) => html.find(s);
           const shift = Number($('[name="shift"]').val() || 0);
           const { spendKarma } = extractKarmaFromDialog(html);
-          const remember = !!$('[name="remember"]').is(':checked');
-          const skipDice = !!$('[name="skipDice"]').is(':checked');
+          const remember = $(`[name="rememberSettings"]`).length ? !!$(`[name="rememberSettings"]`).is(':checked') : !!$(`[name="remember"]`).is(':checked');
+          const skipDice = $(`[name="skipDiceRoll"]`).length ? !!$(`[name="skipDiceRoll"]`).is(':checked') : !!$(`[name="skipDice"]`).is(':checked');
 
           // Always save remember/skipDice preferences
           await defender.setFlag("msh-faserip", "lastEscapeRemember", remember);

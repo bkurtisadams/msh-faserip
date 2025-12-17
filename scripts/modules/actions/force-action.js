@@ -89,8 +89,8 @@ export class ForceAction extends RangedAttackAction {
 
     const savedShift = await actor.getFlag("msh-faserip", "lastForceShift") || 0;
     const savedMultiAdjacent = await actor.getFlag("msh-faserip", "lastForceMultiAdjacent") || false;
-    const savedRemember = await actor.getFlag("msh-faserip", "lastForceRemember") ?? true;
-    const savedSkipDice = await actor.getFlag("msh-faserip", "lastForceSkipDice") ?? false;
+    const savedRemember = (await actor.getFlag("msh-faserip", "rememberSettings")) ?? (await actor.getFlag("msh-faserip", "lastForceRemember")) ?? true;
+    const savedSkipDice = (await actor.getFlag("msh-faserip", "skipDiceRoll")) ?? (await actor.getFlag("msh-faserip", "lastForceSkipDice")) ?? false;
 
     const itemOptions = forceItems
       .map((i) => `<option value="${i.id}" ${i.id === savedItemId ? "selected" : ""}>${i.name}</option>`)
@@ -171,10 +171,10 @@ export class ForceAction extends RangedAttackAction {
       })}
 
       <div style="margin-top:8px;">
-        <input type="checkbox" id="remember" name="remember" ${savedRemember ? 'checked' : ''}>
-        <label for="remember">Remember settings</label>
-        <input type="checkbox" id="skipDice" name="skipDice" style="margin-left:12px;" ${savedSkipDice ? 'checked' : ''}>
-        <label for="skipDice">Skip dice animation</label>
+        <input type="checkbox" id="rememberSettings" name="rememberSettings" ${savedRemember ? 'checked' : ''}>
+        <label for="rememberSettings">Remember settings</label>
+        <input type="checkbox" id="skipDiceRoll" name="skipDiceRoll" style="margin-left:12px;" ${savedSkipDice ? 'checked' : ''}>
+        <label for="skipDiceRoll">Skip dice animation</label>
       </div>
     `;
 
@@ -226,15 +226,16 @@ export class ForceAction extends RangedAttackAction {
               const targetMovement = String($('[name="targetMovement"]').val() || "0");
               const movementModifier = targetMovement === "0-charging" ? 0 : Number(targetMovement);
               
-              const remember = !!$('[name="remember"]').is(':checked');
-              const skipDice = !!$('[name="skipDice"]').is(':checked');
+              const remember = $(`[name="rememberSettings"]`).length ? !!$(`[name="rememberSettings"]`).is(':checked') : !!$(`[name="remember"]`).is(':checked');
+              const skipDice = $(`[name="skipDiceRoll"]`).length ? !!$(`[name="skipDiceRoll"]`).is(':checked') : !!$(`[name="skipDice"]`).is(':checked');
 
               const multiAdjacent = !!$('[name="multiAdjacent"]').is(':checked');
 
               // Always save remember/skipDice preferences
+              await actor.setFlag("msh-faserip", "rememberSettings", remember);
               await actor.setFlag("msh-faserip", "lastForceRemember", remember);
+              await actor.setFlag("msh-faserip", "skipDiceRoll", skipDice);
               await actor.setFlag("msh-faserip", "lastForceSkipDice", skipDice);
-
               if (remember) {
                 await actor.setFlag("msh-faserip", "lastForceAdHoc", useAdHoc);
                 await actor.setFlag("msh-faserip", "lastForceAdHocName", powerName);

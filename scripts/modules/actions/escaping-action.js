@@ -106,8 +106,8 @@ export class EscapingAction extends AttackAction {
     // Load persisted settings
     const savedShift = await actor.getFlag("msh-faserip", "lastEscapeShift") ?? 0;
     const savedKarmaFlag = await actor.getFlag("msh-faserip", "lastEscapeKarma") ?? 0;
-    const savedRemember = await actor.getFlag("msh-faserip", "lastEscapeRemember") ?? true;
-    const savedSkipDice = await actor.getFlag("msh-faserip", "lastEscapeSkipDice") ?? false;
+    const savedRemember = (await actor.getFlag("msh-faserip", "rememberSettings")) ?? (await actor.getFlag("msh-faserip", "lastEscapeRemember")) ?? true;
+    const savedSkipDice = (await actor.getFlag("msh-faserip", "skipDiceRoll")) ?? (await actor.getFlag("msh-faserip", "lastEscapeSkipDice")) ?? false;
     const savedSpendKarma = (savedKarmaFlag === true) || (Number(savedKarmaFlag) > 0);
 
     const dialogHtml = `

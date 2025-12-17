@@ -1,3 +1,5 @@
+//--- START OF FILE blunt-attack-action.js ---
+
 // scripts/modules/actions/blunt-attack-action.js
 import { AttackAction } from "./attack-action.js";
 import { 
@@ -46,20 +48,40 @@ export class BluntAttackAction extends AttackAction {
       }
     }
 
-    // restore flags (but override with passed item if present)
-    const savedSource = (await actor.getFlag("msh-faserip","lastBluntSource")) || "hands";
-    const savedItemId = passedItemId || (await actor.getFlag("msh-faserip","lastBluntItemId")) || "";
-    const savedObjectName = (await actor.getFlag("msh-faserip","lastBluntObjectName")) || "";
-    const savedObjectRank = (await actor.getFlag("msh-faserip","lastBluntObjectRank")) || "Excellent";
-    const savedObjectValue = (await actor.getFlag("msh-faserip","lastBluntObjectValue")) || 20;
-    const savedPulledDamage = (await actor.getFlag("msh-faserip","lastBluntPulledDamage")) || 0;
-    const savedResultCap = (await actor.getFlag("msh-faserip","lastBluntResultCap")) || "none";
+    // --- INITIALIZATION & DEFAULTS ---
+    // 1. Check if we should remember settings from LocalStorage
+    const lsRememberKey = "msh.ba.remember";
+    const lsSkipKey = "msh.ba.skipDice";
+    
+    // Default to false if not set, or read value "1"/"0"
+    const storedRemember = localStorage.getItem(lsRememberKey);
+    const shouldRemember = storedRemember === "1"; 
 
-    const savedMultiAttacks = await actor.getFlag("msh-faserip","lastBluntMultiAttacks") || false;
-    const savedAttackCount = await actor.getFlag("msh-faserip","lastBluntAttackCount") || 2;
-    const savedMultiAdjacent = await actor.getFlag("msh-faserip","lastBluntMultiAdjacent") || false;
-    const savedColumnShift  = await actor.getFlag("msh-faserip","lastBluntShift") || 0;
-    //const savedKarma = await actor.getFlag("msh-faserip","lastBluntKarma") || 0;
+    // 2. Load settings (Flag vs Default)
+    // If remembering, load from actor flags. If not, force defaults.
+    // Exception: passedItemId always overrides source default.
+    const defaultSource = passedItemId ? "weapon" : "hands";
+    
+    const savedSource = shouldRemember 
+      ? ((await actor.getFlag("msh-faserip","lastBluntSource")) || defaultSource)
+      : defaultSource;
+
+    const savedItemId = passedItemId || (shouldRemember ? (await actor.getFlag("msh-faserip","lastBluntItemId")) : "") || "";
+    
+    const savedObjectName = shouldRemember ? ((await actor.getFlag("msh-faserip","lastBluntObjectName")) || "") : "";
+    const savedObjectRank = shouldRemember ? ((await actor.getFlag("msh-faserip","lastBluntObjectRank")) || "Excellent") : "Excellent";
+    const savedObjectValue = shouldRemember ? ((await actor.getFlag("msh-faserip","lastBluntObjectValue")) || 20) : 20;
+    
+    const savedPulledDamage = shouldRemember ? ((await actor.getFlag("msh-faserip","lastBluntPulledDamage")) || 0) : 0;
+    const savedResultCap = shouldRemember ? ((await actor.getFlag("msh-faserip","lastBluntResultCap")) || "none") : "none";
+
+    const savedMultiAttacks = shouldRemember ? (await actor.getFlag("msh-faserip","lastBluntMultiAttacks") || false) : false;
+    const savedAttackCount = shouldRemember ? (await actor.getFlag("msh-faserip","lastBluntAttackCount") || 2) : 2;
+    const savedMultiAdjacent = shouldRemember ? (await actor.getFlag("msh-faserip","lastBluntMultiAdjacent") || false) : false;
+    const savedColumnShift  = shouldRemember ? (await actor.getFlag("msh-faserip","lastBluntShift") || 0) : 0;
+    
+    // Skip Dice is a client setting, mostly UI based, stored in LS
+    const savedSkipDice = localStorage.getItem(lsSkipKey) === "1";
 
     const itemOptions = attackItems.map(i =>
       `<option value="${i.id}" ${i.id===savedItemId?'selected':''}>${i.name}</option>`
@@ -133,7 +155,7 @@ export class BluntAttackAction extends AttackAction {
   BLUNT DAMAGE RULES:
   - Bare hands = Strength value
   - Weapon material ≤ Strength: damage = min(Strength, Material)
-  - Weapon material > Strength: damage = next rank up from Strength">?</span>
+  - Weapon material > Strength: damage = lowest value of next rank from Strength">?</span>
         </div>
 
         <div id="weapon-row" style="display:none;font-size:.9em;padding-left:8px;">
@@ -170,9 +192,9 @@ export class BluntAttackAction extends AttackAction {
         <div><strong>Damage:</strong> <span id="dmg-val">${strength.value}</span> <span id="dmg-note" style="color:#555;">(Bare Hands = Strength)</span></div>
       </div>
 
-      <div style="margin-top:6px;padding-top:5px;border-top:1px solid #ddd;display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:.9em;">
-        <label><input type="checkbox" name="remember" checked> Remember settings</label>
-        <label><input type="checkbox" name="skipDice"> Skip dice animation</label>
+      <div id="msh-bottom-controls" style="margin-top:6px;padding-top:5px;border-top:1px solid #ddd;display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:.9em;">
+        <label><input type="checkbox" id="msh-remember-settings" name="remember" ${shouldRemember ? 'checked' : ''}> Remember settings</label>
+        <label><input type="checkbox" id="msh-skip-dice" name="skipDice" ${savedSkipDice ? 'checked' : ''}> Skip dice animation</label>
       </div>
     `;
 
@@ -188,7 +210,7 @@ export class BluntAttackAction extends AttackAction {
             const $content = $(html).find(".dialog-content").first();
             const $dlg = (sel) => html.find(sel); // only searches within this dialog
 
-            // ===== read Remember/Skip checkboxes (prefer new IDs, fall back to legacy [name=...] if present) =====
+            // ===== read Remember/Skip checkboxes =====
             const rememberSettings = $content.find("#msh-remember-settings").length
               ? $content.find("#msh-remember-settings").prop("checked")
               : !!$dlg('[name="remember"]').is(':checked');
@@ -197,11 +219,14 @@ export class BluntAttackAction extends AttackAction {
               ? $content.find("#msh-skip-dice").prop("checked")
               : !!$dlg('[name="skipDice"]').is(':checked');
 
-            // ===== persist collapsible open states if remembering =====
+            // ===== persist settings logic =====
             try {
-              // Always persist remember and skipDice settings
-              localStorage.setItem("msh.ba.remember", rememberSettings ? "1" : "0");
-              localStorage.setItem("msh.ba.skipDice", skipDice ? "1" : "0");
+              // Always save 'remember' preference to localStorage
+              localStorage.setItem(lsRememberKey, rememberSettings ? "1" : "0");
+              
+              // Only save 'skipDice' if we are actually remembering settings
+              // Or should skipDice be global? Usually it's nice to persist it.
+              localStorage.setItem(lsSkipKey, skipDice ? "1" : "0");
 
               if (rememberSettings) {
                 const pullOpen  = $content.find(".frp-col-h:contains('Pull Punch')")
@@ -250,6 +275,7 @@ export class BluntAttackAction extends AttackAction {
             }
 
             // ===== remember per-actor prefs (actor flags) =====
+            // Only update flags if 'Remember Settings' is checked
             if (rememberSettings) {
               await actor.setFlag("msh-faserip", "lastBluntSource", src);
               await actor.setFlag("msh-faserip", "lastBluntPulledDamage", pulledDamage);
@@ -262,7 +288,7 @@ export class BluntAttackAction extends AttackAction {
 
               if (src === "weapon") {
                 await actor.setFlag("msh-faserip", "lastBluntItemId", itemId);
-                await actor.setFlag("msh-faserip", "lastBluntColumnShift", shift); // use current shift, not undefined savedColumnShift
+                await actor.setFlag("msh-faserip", "lastBluntColumnShift", shift); 
               } else if (src === "object") {
                 await actor.setFlag("msh-faserip", "lastBluntObjectName", objectName);
                 await actor.setFlag("msh-faserip", "lastBluntObjectRank", objectRank);
@@ -378,8 +404,8 @@ export class BluntAttackAction extends AttackAction {
 
             // --- Local storage keys (user-local, no game.settings registration needed)
             const LS = {
-              REMEMBER: "msh.ba.remember",
-              SKIP:     "msh.ba.skipDice",
+              REMEMBER: lsRememberKey,
+              SKIP:     lsSkipKey,
               PULL:     "msh.ba.pull.open",
               MULTI:    "msh.ba.multi.open"
             };
@@ -389,40 +415,28 @@ export class BluntAttackAction extends AttackAction {
             };
             const setLS = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
 
-            // --- Bottom controls (only install once)
-            if (!$content.find("#msh-bottom-controls").length) {
-              const $controls = $(`
-                <div id="msh-bottom-controls" style="margin-top:10px; padding-top:8px; border-top:1px solid #ccc; display:flex; align-items:center; gap:16px;">
-                  <label style="display:flex; align-items:center; gap:6px; font-size:12px;">
-                    <input type="checkbox" id="msh-remember-settings">
-                    <span>Remember settings</span>
-                  </label>
-                  <label style="display:flex; align-items:center; gap:6px; font-size:12px;">
-                    <input type="checkbox" id="msh-skip-dice">
-                    <span>Skip dice animation</span>
-                  </label>
-                </div>
-              `);
-              $content.append($controls);
-
-              // Initialize remembered values (default to "1" to match HTML default of checked)
-              const remembered = getLS(LS.REMEMBER, "1") === "1";
-              $controls.find("#msh-remember-settings").prop("checked", remembered);
-              $controls.find("#msh-skip-dice").prop("checked", getLS(LS.SKIP, "0") === "1");
-
-              // Keep skip value up to date if user toggles - always persist regardless of remember setting
+            // --- Initialize bottom controls (already set in HTML value, but adding listeners)
+            const $controls = $content.find("#msh-bottom-controls");
+            if ($controls.length) {
+              // Persist changes immediately when toggled
               $controls.on("change", "#msh-skip-dice", function() {
                 setLS(LS.SKIP, this.checked ? "1" : "0");
               });
-              // Persist remember checkbox itself
               $controls.on("change", "#msh-remember-settings", function() {
                 setLS(LS.REMEMBER, this.checked ? "1" : "0");
               });
             }
 
             // --- Collapsible helpers (updated to support persistence)
-            const remembered = getLS(LS.REMEMBER, "1") === "1";
-            const persistIf = (key, val) => { if (remembered) setLS(key, val); };
+            // Use current checkbox state (source of truth)
+            const isRememberChecked = $controls.find("#msh-remember-settings").prop("checked");
+            
+            const persistIf = (key, val) => { 
+                // re-check checkbox in case user toggled it
+                if ($controls.find("#msh-remember-settings").prop("checked")) {
+                    setLS(key, val); 
+                }
+            };
 
             const makeCollapsible = (container, title, tone, lsKey) => {
               if (!container || !container.length) return;
@@ -449,7 +463,8 @@ export class BluntAttackAction extends AttackAction {
               $body.append(container);
 
               // Restore initial open state if remembered
-              const shouldOpen = remembered && getLS(lsKey, "0") === "1";
+              // We use the initial calculation of shouldRemember passed in
+              const shouldOpen = shouldRemember && getLS(lsKey, "0") === "1";
               if (shouldOpen) {
                 $wrap.attr("data-open", "1");
                 $body.show();

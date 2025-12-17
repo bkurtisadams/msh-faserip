@@ -1304,6 +1304,9 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
     // Roll power button
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     html.find('.power-roll').click(async ev => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      ev.stopImmediatePropagation();
       const li = $(ev.currentTarget).closest(".power-row");
       const itemId = li.data("itemId");
       const item = this.actor.items.get(itemId);

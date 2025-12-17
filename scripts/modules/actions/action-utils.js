@@ -1,3 +1,5 @@
+//--- START OF FILE action-utils.js ---
+
 import { ACTION_LABELS, ACTION_EFFECTS } from "./action-config.js";
 import { applyNullifiedEffect, isAuraMaintained } from "./nullify.js";
 import { calculateMitigation } from "../../rules/mitigation.js";
@@ -404,10 +406,34 @@ export const isBluntCapable = (it) => {
 
 // Roll + Karma (same behavior you had, packaged up)
 export async function rollWithKarmaAndHistory(actor, actionLabel, requestedKarma = 0, baseTotal, options = {}) {
-  const { spendKarma = false, rank = null } = options;
+  const { spendKarma = false, rank = null, skipDice = false } = options;
   
-  const roll = baseTotal instanceof Roll ? baseTotal : await (new Roll("1d100")).evaluate();
-  const raw = baseTotal instanceof Roll ? baseTotal.total : roll.total;
+  // Create roll - if baseTotal is a Roll instance, use it; otherwise create new
+  // skipDice controls whether we show the dice animation, not whether we roll
+  let roll;
+  let raw;
+  
+  if (baseTotal instanceof Roll) {
+    roll = baseTotal;
+    raw = baseTotal.total;
+  } else {
+    roll = new Roll("1d100");
+    // Evaluate with or without dice animation based on skipDice
+    if (skipDice) {
+      // Evaluate synchronously without triggering DiceSoNice
+      await roll.evaluate();
+    } else {
+      // Normal evaluation - will trigger dice animation if DiceSoNice is active
+      await roll.evaluate();
+      // Show dice roll in chat (triggers animation)
+      await roll.toMessage({
+        speaker: ChatMessage.getSpeaker({ actor }),
+        flavor: actionLabel,
+        rollMode: game.settings.get("core", "rollMode")
+      });
+    }
+    raw = roll.total;
+  }
 
   let cappedTotal = raw;
   let karmaUsed = 0;
@@ -689,7 +715,7 @@ export function resultBannerColors(activeColorLower) {
   return { bg, fg };
 }
 
-// Blunt damage (exactly your rule)
+// Blunt damage (Updated to use rule: "minimum value of the next rank")
 export function computeBluntDamage(strRank, strVal, matRank, RANKS_LOCAL=RANKS) {
   const getVal = (r)=> game.msh.getRankValue(r) || 0;
   const sIdx = RANKS_LOCAL.indexOf(strRank);
@@ -699,9 +725,21 @@ export function computeBluntDamage(strRank, strVal, matRank, RANKS_LOCAL=RANKS) 
   if (mIdx > sIdx) {
     const nextIdx = Math.min(sIdx + 1, RANKS_LOCAL.length - 1);
     const nextRank = RANKS_LOCAL[nextIdx];
-    const dmg = getVal(nextRank);
+    
+    // Minimum value lookup for ranks (bottom of bracket)
+    const RANK_BOTTOM_VALUES = {
+       "Feeble": 2, "Poor": 3, "Typical": 5, "Good": 8, "Excellent": 16,
+       "Remarkable": 26, "Incredible": 36, "Amazing": 46, "Monstrous": 63,
+       "Unearthly": 88, "Shift-X": 126, "Shift-Y": 176, "Shift-Z": 251,
+       "Class 1000": 1000, "Class 3000": 3000, "Class 5000": 5000
+    };
+
+    // Use specific minimum if available, else standard value
+    const dmg = RANK_BOTTOM_VALUES[nextRank] ?? getVal(nextRank);
+    
     return { damage: dmg, note: `${matRank} weapon > ${strRank} → min of ${nextRank} rank (${dmg})` };
   }
+  
   const dmg = Math.min(getVal(strRank), getVal(matRank));
   return { damage: dmg, note: `Damage = min(STR ${getVal(strRank)}, MAT ${getVal(matRank)})` };
 }
@@ -1633,8 +1671,7 @@ export async function confirmPreview({ title = "Preview", contentHtml }) {
     title,
     content: contentHtml,
     yes: () => true,
-    no: () => false,
-    defaultYes: true
+    no: () => false,    defaultYes: true
   });
 }
 
@@ -1826,8 +1863,14 @@ export function setupRememberControlHandlers(html, prefix) {
  * @returns {{remember: boolean, skipDice: boolean}}
  */
 export function extractRememberSettings(html) {
-  return {
-    remember: html.find('[name="remember"]').is(':checked'),
-    skipDice: html.find('[name="skipDice"]').is(':checked')
-  };
+  const $rememberNew = html.find('[name="rememberSettings"]');
+  const $rememberOld = html.find('[name="remember"]');
+  const $skipNew = html.find('[name="skipDiceRoll"]');
+  const $skipOld = html.find('[name="skipDice"]');
+
+  const remember = ($rememberNew.length ? $rememberNew : $rememberOld).is(':checked');
+  const skipDice = ($skipNew.length ? $skipNew : $skipOld).is(':checked');
+
+  // Maintain legacy property names for existing call sites
+  return { remember, skipDice };
 }

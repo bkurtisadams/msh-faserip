@@ -72,8 +72,8 @@ export class ShootingAction extends RangedAttackAction {
     const savedShift = await actor.getFlag("msh-faserip", "lastShootingShift") || 0;
     const savedMultiAttacks = await actor.getFlag("msh-faserip", "lastShootingMultiAttacks") || false;
     const savedAttackCount = await actor.getFlag("msh-faserip", "lastShootingAttackCount") || 2;
-    const savedRemember = await actor.getFlag("msh-faserip", "lastShootingRemember") ?? true;
-    const savedSkipDice = await actor.getFlag("msh-faserip", "lastShootingSkipDice") ?? false;
+    const savedRemember = (await actor.getFlag("msh-faserip", "rememberSettings")) ?? (await actor.getFlag("msh-faserip", "lastShootingRemember")) ?? true;
+    const savedSkipDice = (await actor.getFlag("msh-faserip", "skipDiceRoll")) ?? (await actor.getFlag("msh-faserip", "lastShootingSkipDice")) ?? false;
 
     const itemOptions = shootingWeapons.map(i =>
       `<option value="${i.id}" ${i.id === savedItemId ? 'selected' : ''}>${i.name}</option>`
@@ -187,8 +187,8 @@ export class ShootingAction extends RangedAttackAction {
               const throughObstacle = !!$('[name="throughObstacle"]').is(':checked');
               const targetMovement = String($('[name="targetMovement"]').val() || "0");
               const movementModifier = targetMovement === "0-charging" ? 0 : Number(targetMovement);
-              const remember = !!$('[name="remember"]').is(':checked');
-              const skipDice = !!$('[name="skipDice"]').is(':checked');
+              const remember = $(`[name="rememberSettings"]`).length ? !!$(`[name="rememberSettings"]`).is(':checked') : !!$(`[name="remember"]`).is(':checked');
+              const skipDice = $(`[name="skipDiceRoll"]`).length ? !!$(`[name="skipDiceRoll"]`).is(':checked') : !!$(`[name="skipDice"]`).is(':checked');
 
               const multiAttacks = !!$('[name="multiAttacks"]').is(':checked');
               const attackCount = parseInt($('[name="attackCount"]:checked').val() || 2);
@@ -198,9 +198,10 @@ export class ShootingAction extends RangedAttackAction {
               await actor.setFlag("msh-faserip", "lastShootingAttackCount", attackCount);
 
               // Always save remember/skipDice preferences
+              await actor.setFlag("msh-faserip", "rememberSettings", remember);
               await actor.setFlag("msh-faserip", "lastShootingRemember", remember);
+              await actor.setFlag("msh-faserip", "skipDiceRoll", skipDice);
               await actor.setFlag("msh-faserip", "lastShootingSkipDice", skipDice);
-
               const weaponRange = weapon.system?.range || 15;
               const weaponDamage = weapon.system?.damage || 0;
 

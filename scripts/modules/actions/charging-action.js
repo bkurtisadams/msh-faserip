@@ -114,8 +114,8 @@ export class ChargingAction extends BaseAction {
   const savedTargetBAValue = autoPopulated ? targetBAvalue : (await actor.getFlag("msh-faserip", "lastChargingTargetBAValue") || 0);
   const savedObjectMaterial = await actor.getFlag("msh-faserip", "lastChargingObjectMaterial") || "Excellent";
   const savedObjectDesc = await actor.getFlag("msh-faserip", "lastChargingObjectDesc") || "";
-  const savedRemember = await actor.getFlag("msh-faserip", "lastChargingRemember") ?? true;
-  const savedSkipDice = await actor.getFlag("msh-faserip", "lastChargingSkipDice") ?? false;
+  const savedRemember = (await actor.getFlag("msh-faserip", "rememberSettings")) ?? (await actor.getFlag("msh-faserip", "lastChargingRemember")) ?? true;
+  const savedSkipDice = (await actor.getFlag("msh-faserip", "skipDiceRoll")) ?? (await actor.getFlag("msh-faserip", "lastChargingSkipDice")) ?? false;
 
   // If auto-populated a character, override saved target type
   const defaultTargetType = autoPopulated ? "character" : savedTargetType;
@@ -238,8 +238,8 @@ export class ChargingAction extends BaseAction {
             const { spendKarma, karmaToSpend } = extractKarmaFromDialog(html);
             const karma = karmaToSpend;
             const targetType = String($('[name="target-type"]:checked').val() || "character");
-            const skipDice = !!$('[name="skipDice"]').is(':checked');
-            const remember = !!$('[name="remember"]').is(':checked');
+            const skipDice = $(`[name="skipDiceRoll"]`).length ? !!$(`[name="skipDiceRoll"]`).is(':checked') : !!$(`[name="skipDice"]`).is(':checked');
+            const remember = $(`[name="rememberSettings"]`).length ? !!$(`[name="rememberSettings"]`).is(':checked') : !!$(`[name="remember"]`).is(':checked');
 
             let targetBArank, targetBAvalue, objectMaterial, objectDesc;
 
@@ -256,10 +256,11 @@ export class ChargingAction extends BaseAction {
             }
 
             // Always save remember/skipDice preferences
-            await actor.setFlag("msh-faserip", "lastChargingRemember", remember);
-            await actor.setFlag("msh-faserip", "lastChargingSkipDice", skipDice);
-
-            if (remember) {
+            await actor.setFlag("msh-faserip", "rememberSettings", remember);
+              await actor.setFlag("msh-faserip", "lastChargingRemember", remember);
+              await actor.setFlag("msh-faserip", "skipDiceRoll", skipDice);
+              await actor.setFlag("msh-faserip", "lastChargingSkipDice", skipDice);
+              if (remember) {
               await actor.setFlag("msh-faserip", "lastChargingAreas", areas);
               await actor.setFlag("msh-faserip", "lastChargingTargetType", targetType);
               if (targetType === "character") {

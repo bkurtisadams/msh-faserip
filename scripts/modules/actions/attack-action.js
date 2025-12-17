@@ -418,8 +418,8 @@ export class AttackAction extends BaseAction {
 
     // Roll + karma (two-phase system: spendKarma flag triggers decision dialog after roll)
     const { roll, cappedTotal, totalKarmaUsed } = await rollWithKarmaAndHistory(
-      actor, actionLabel, choice.karma || 0, choice.skipDice ? null : undefined,
-      { spendKarma: choice.spendKarma, rank: effectiveRank }
+      actor, actionLabel, choice.karma || 0, null,
+      { spendKarma: choice.spendKarma, rank: effectiveRank, skipDice: choice.skipDice }
     );
 
     // Check if manual mode -- return if true

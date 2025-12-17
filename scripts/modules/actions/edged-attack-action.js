@@ -99,8 +99,8 @@ export class EdgedAttackAction extends AttackAction {
     const savedShift = await actor.getFlag("msh-faserip","lastEdgedShift") || 0;
     const savedMultiAttacks = await actor.getFlag("msh-faserip","lastEdgedMultiAttacks") || false;
     const savedAttackCount = await actor.getFlag("msh-faserip","lastEdgedAttackCount") || 2;
-    const savedRemember = await actor.getFlag("msh-faserip","lastEdgedRemember") ?? true;
-    const savedSkipDice = await actor.getFlag("msh-faserip","lastEdgedSkipDice") ?? false;
+    const savedRemember = (await actor.getFlag("msh-faserip", "rememberSettings")) ?? (await actor.getFlag("msh-faserip", "lastEdgedRemember")) ?? true;
+    const savedSkipDice = (await actor.getFlag("msh-faserip", "skipDiceRoll")) ?? (await actor.getFlag("msh-faserip", "lastEdgedSkipDice")) ?? false;
 
     const itemOptions = attackItems.map(i =>
       `<option value="${i.id}" ${i.id===savedItemId?'selected':''}>${i.name}</option>`
@@ -182,8 +182,8 @@ export class EdgedAttackAction extends AttackAction {
               const { spendKarma, karmaToSpend } = extractKarmaFromDialog(html);
               const karma   = karmaToSpend;
               
-              const remember= !!$('[name="remember"]').is(':checked');
-              const skipDice= !!$('[name="skipDice"]').is(':checked');
+              const remember = $(`[name="rememberSettings"]`).length ? !!$(`[name="rememberSettings"]`).is(':checked') : !!$(`[name="remember"]`).is(':checked');
+              const skipDice = $(`[name="skipDiceRoll"]`).length ? !!$(`[name="skipDiceRoll"]`).is(':checked') : !!$(`[name="skipDice"]`).is(':checked');
               const multiAttacks = !!$('[name="multiAttacks"]').is(':checked');
               const attackCount = parseInt($('[name="attackCount"]:checked').val() || 2);
 
@@ -208,9 +208,10 @@ export class EdgedAttackAction extends AttackAction {
                 }
 
               // Always save remember/skipDice preferences
-              await actor.setFlag("msh-faserip","lastEdgedRemember", remember);
-              await actor.setFlag("msh-faserip","lastEdgedSkipDice", skipDice);
-
+              await actor.setFlag("msh-faserip", "rememberSettings", remember);
+              await actor.setFlag("msh-faserip", "lastEdgedRemember", remember);
+              await actor.setFlag("msh-faserip", "skipDiceRoll", skipDice);
+              await actor.setFlag("msh-faserip", "lastEdgedSkipDice", skipDice);
               if (remember) {
                 await actor.setFlag("msh-faserip","lastEdgedSource", src);
                 await actor.setFlag("msh-faserip","lastEdgedShift", shift);

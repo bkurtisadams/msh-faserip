@@ -31,8 +31,8 @@ export class GrapplingAction extends AttackAction {
     // Load persisted defaults
     const savedShift = await actor.getFlag("msh-faserip", "lastGrappleShift") ?? 0;
     const savedKarmaFlag = await actor.getFlag("msh-faserip", "lastGrappleKarma") ?? 0;
-    const savedRemember = await actor.getFlag("msh-faserip", "lastGrappleRemember") ?? true;
-    const savedSkipDice = await actor.getFlag("msh-faserip", "lastGrappleSkipDice") ?? false;
+    const savedRemember = (await actor.getFlag("msh-faserip", "rememberSettings")) ?? (await actor.getFlag("msh-faserip", "lastGrappleRemember")) ?? true;
+    const savedSkipDice = (await actor.getFlag("msh-faserip", "skipDiceRoll")) ?? (await actor.getFlag("msh-faserip", "lastGrappleSkipDice")) ?? false;
     const savedSpendKarma = (savedKarmaFlag === true) || (Number(savedKarmaFlag) > 0);
 
     const choice = await this._showGrapplingDialog(actor, strength, { savedShift, savedSpendKarma });
