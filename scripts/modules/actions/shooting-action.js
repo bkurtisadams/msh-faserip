@@ -1,6 +1,11 @@
 // scripts/modules/actions/shooting-action.js
 import { RangedAttackAction } from "./ranged-attack-action.js";
 import { 
+  generateKarmaControlsHTML, 
+  setupKarmaControlHandlers, 
+  extractKarmaFromDialog 
+} from "../dice/dice-roller.js";
+import { 
   applyDamageToTargets,
   attachAutoFillRange,
   bannerColors,
@@ -124,8 +129,7 @@ export class ShootingAction extends RangedAttackAction {
         <input type="number" name="shift" value="${savedShift}" style="width:52px;">
         <span style="color:#666;font-size:.9em;">(+ right, - left)</span></div>
 
-      <div style="margin-bottom:8px;"><label style="display:inline-block;width:120px;">Karma Points:</label>
-        <input type="number" name="karma" value="${Number(this.opts.karma ?? 0)}" min="0" style="width:52px;"></div>
+      ${generateKarmaControlsHTML(actor, 0)}
 
       <div style="margin-bottom:8px;">
         <label style="display:inline-block;width:120px;">Weapon:</label>
@@ -175,7 +179,8 @@ export class ShootingAction extends RangedAttackAction {
               }
 
               const shift = Number($('[name="shift"]').val() || 0);
-              const karma = Number($('[name="karma"]').val() || 0);
+              const { spendKarma, karmaToSpend } = extractKarmaFromDialog(html);
+              const karma = karmaToSpend;
               const range = Number($('[name="range"]').val() || 1);
               const throughObstacle = !!$('[name="throughObstacle"]').is(':checked');
               const targetMovement = String($('[name="targetMovement"]').val() || "0");
@@ -215,7 +220,8 @@ export class ShootingAction extends RangedAttackAction {
                 weaponDamage, 
                 weaponRange, 
                 shift, 
-                karma, 
+                karma,
+                spendKarma,
                 range, 
                 throughObstacle, 
                 skipDice,
@@ -233,6 +239,7 @@ export class ShootingAction extends RangedAttackAction {
         },
         default: "roll",
         render: async (html) => {
+          setupKarmaControlHandlers(html);
           this.opts = this.opts || {};  // Ensure opts exists
           await setupModeSelector(actor, html, this.opts || {}, "lastShootingMode");
 

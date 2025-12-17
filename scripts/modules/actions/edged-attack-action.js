@@ -1,5 +1,10 @@
 // scripts/modules/actions/edged-attack-action.js
 import { AttackAction } from "./attack-action.js";
+import { 
+  generateKarmaControlsHTML, 
+  setupKarmaControlHandlers, 
+  extractKarmaFromDialog 
+} from "../dice/dice-roller.js";
 import {
   RANKS,
   shiftRank,
@@ -112,8 +117,7 @@ export class EdgedAttackAction extends AttackAction {
         <input type="number" name="shift" value="${savedShift}" style="width:52px;">
         <span style="color:#666;font-size:.9em;">(+ right, - left)</span></div>
 
-      <div style="margin-bottom:8px;"><label style="display:inline-block;width:120px;">Karma Points:</label>
-        <input type="number" name="karma" value="${Number(this.opts.karma ?? 0)}" min="0" style="width:52px;"></div>
+      ${generateKarmaControlsHTML(actor, 0)}
 
       <div style="margin:10px 0 6px;">
         <label style="display:inline-block;width:120px;">Source:</label>
@@ -173,7 +177,8 @@ export class EdgedAttackAction extends AttackAction {
               const natRank = String($('[name="natRank"]').val() || savedNatRank);
               const natDmg  = Number($('[name="natDmg"]').val() || game.msh.getRankValue(natRank));
               const shift   = Number($('[name="shift"]').val() || 0);
-              const karma   = Number($('[name="karma"]').val() || 0);
+              const { spendKarma, karmaToSpend } = extractKarmaFromDialog(html);
+              const karma   = karmaToSpend;
               
               const remember= !!$('[name="remember"]').is(':checked');
               const skipDice= !!$('[name="skipDice"]').is(':checked');
@@ -214,7 +219,7 @@ export class EdgedAttackAction extends AttackAction {
                 }
               }
 
-              resolve({ src, itemId, natRank, natDmg, shift, karma, skipDice, weaponMat, weaponName, damage, ap, apCS, apMode, html, multiAttacks, attackCount });
+              resolve({ src, itemId, natRank, natDmg, shift, karma, spendKarma, skipDice, weaponMat, weaponName, damage, ap, apCS, apMode, html, multiAttacks, attackCount });
 
             }
           },
@@ -222,6 +227,7 @@ export class EdgedAttackAction extends AttackAction {
         },
         default: "roll",
         render: async (html) => {
+          setupKarmaControlHandlers(html);
           const $dialog = html.closest('.dialog');
 
           const updatePreview = ()=>{

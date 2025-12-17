@@ -1,6 +1,11 @@
 import { RangedAttackAction } from "./ranged-attack-action.js";
 import { attachAutoFillRange } from "./action-utils.js";
-import { resolveCombatMode } from "./action-dispatcher.js";
+// NOTE: resolveCombatMode imported dynamically if needed
+import { 
+  generateKarmaControlsHTML, 
+  setupKarmaControlHandlers, 
+  extractKarmaFromDialog 
+} from "../dice/dice-roller.js";
 
 import {
   buildModeSelector,
@@ -134,10 +139,7 @@ export class ThrowingEdgedAction extends RangedAttackAction {
         <input type="number" name="shift" value="${Number(this.opts.shift ?? 0)}" style="width:60px;">
       </div>
 
-      <div style="margin-bottom:8px;">
-        <span style="display:inline-block;width:110px;">Karma Points:</span>
-        <input type="number" name="karma" value="${Number(this.opts.karma ?? 0)}" min="0" style="width:60px;">
-      </div>
+      ${generateKarmaControlsHTML(actor, 0)}
 
       <fieldset style="margin:10px 0;padding:8px;border:1px solid #ddd;border-radius:4px;background:#fafafa;">
         <legend style="padding:0 6px;font-weight:bold;">Weapon Source</legend>
@@ -242,7 +244,8 @@ export class ThrowingEdgedAction extends RangedAttackAction {
               }
 
               const shift = Number($('[name="shift"]').val() || 0);
-              const karma = Number($('[name="karma"]').val() || 0);
+              const { spendKarma, karmaToSpend } = extractKarmaFromDialog(html);
+              const karma = karmaToSpend;
               const range = Number($('[name="range"]').val() || 1);
               const throughObstacle = !!$('[name="throughObstacle"]').is(':checked');
 
@@ -277,6 +280,7 @@ export class ThrowingEdgedAction extends RangedAttackAction {
                 weaponDamage,
                 weaponId,
                 karma,
+                spendKarma,
                 range,
                 throughObstacle,
                 skipDice,
@@ -296,6 +300,7 @@ export class ThrowingEdgedAction extends RangedAttackAction {
         },
         default: "roll",
         render: async (html) => {
+          setupKarmaControlHandlers(html);
           this.opts = this.opts || {};  // Ensure opts exists
           await setupModeSelector(actor, html, this.opts, "lastEdgedMode");
 
@@ -367,7 +372,7 @@ export class ThrowingEdgedAction extends RangedAttackAction {
       });
     }
 
-    const { cappedTotal, totalKarmaUsed } = await rollWithKarmaAndHistory(actor, actionName, choice.karma, roll);
+    const { cappedTotal, totalKarmaUsed } = await rollWithKarmaAndHistory(actor, actionName, choice.karma, roll, { spendKarma: choice.spendKarma, rank: effectiveRank });
     const color = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
     const colorLower = String(color || "").toLowerCase();
     const effectResult = effects[colorLower] || color;

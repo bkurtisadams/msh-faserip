@@ -317,33 +317,35 @@ export function rankNameAt(index) {
 export function rollUniversalTable(rank, roll) {
   console.log("🎲 rollUniversalTable called with rank:", rank, "roll:", roll);
   
+  // Thresholds: [lastWhite, lastGreen, lastYellow]
+  // roll <= lastWhite = white, roll <= lastGreen = green, roll <= lastYellow = yellow, else red
   const tableRanks = {
-    "Shift-0": [66, 95, 100],
-    "Feeble": [61, 91, 100],
-    "Poor": [56, 86, 100],
-    "Typical": [51, 81, 98],
-    "Good": [46, 75, 98],
-    "Excellent": [41, 71, 95],
-    "Remarkable": [36, 66, 95],
-    "Incredible": [31, 61, 91],
-    "Amazing": [26, 56, 91],
-    "Monstrous": [21, 51, 86],
-    "Unearthly": [16, 46, 86],
-    "Shift X": [11, 41, 81],
-    "Shift Y": [7, 41, 81],
-    "Shift Z": [4, 36, 75],
-    "Class 1000": [2, 36, 75],
-    "Class 3000": [2, 31, 71],
-    "Class 5000": [2, 26, 66],
-    "Beyond": [2, 21, 61],
+    "Shift-0": [65, 94, 99],
+    "Feeble": [60, 90, 99],
+    "Poor": [55, 85, 99],
+    "Typical": [50, 80, 97],
+    "Good": [45, 75, 97],
+    "Excellent": [40, 70, 94],
+    "Remarkable": [35, 65, 94],
+    "Incredible": [30, 60, 90],
+    "Amazing": [25, 55, 90],
+    "Monstrous": [20, 50, 85],
+    "Unearthly": [15, 45, 85],
+    "Shift X": [10, 40, 80],
+    "Shift Y": [6, 40, 80],
+    "Shift Z": [3, 35, 75],
+    "Class 1000": [1, 35, 75],
+    "Class 3000": [1, 30, 70],
+    "Class 5000": [1, 25, 65],
+    "Beyond": [1, 20, 60],
     
-    // Add backward compatibility for old formats
-    "Shift-X": [11, 41, 81],
-    "Shift-Y": [7, 41, 81],
-    "Shift-Z": [4, 36, 75],
-    "1000": [2, 36, 75],
-    "3000": [2, 31, 71],
-    "5000": [2, 26, 66]
+    // Backward compatibility
+    "Shift-X": [10, 40, 80],
+    "Shift-Y": [6, 40, 80],
+    "Shift-Z": [3, 35, 75],
+    "1000": [1, 35, 75],
+    "3000": [1, 30, 70],
+    "5000": [1, 25, 65]
   };
 
   // Normalize the rank name

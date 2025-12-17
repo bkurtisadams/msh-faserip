@@ -1,5 +1,10 @@
 // scripts/modules/actions/entangling-action.js
 import { rollUniversalTable } from "../dice/universal-table.js";
+import { 
+  generateKarmaControlsHTML, 
+  setupKarmaControlHandlers, 
+  extractKarmaFromDialog 
+} from "../dice/dice-roller.js";
 
 /**
  * Handle entangling weapon mechanics
@@ -227,10 +232,7 @@ export async function attemptEscapeEntanglement(actor) {
           <input type="number" name="shift" value="0" style="width:60px;">
         </div>
 
-        <div style="margin-bottom:6px;">
-          <label style="display:inline-block; width:180px;">Karma Points:</label>
-          <input type="number" name="karma" value="0" min="0" style="width:60px;">
-        </div>
+        ${generateKarmaControlsHTML(actor, 0)}
 
         <div style="font-size:0.85em; color:#555; margin-top:10px; padding:8px; background:#fff3e0; border:1px solid #ff9800; border-radius:3px;">
           <strong>Escape Rule:</strong> Roll Strength FEAT vs Material Strength. 
@@ -243,7 +245,7 @@ export async function attemptEscapeEntanglement(actor) {
         label: "Attempt Escape",
         callback: async (html) => {
           const shift = parseInt(html.find('[name="shift"]').val()) || 0;
-          const karma = parseInt(html.find('[name="karma"]').val()) || 0;
+          const { spendKarma } = extractKarmaFromDialog(html);
 
           // Apply column shifts
           let effectiveStrength = actorStrength;
@@ -253,23 +255,21 @@ export async function attemptEscapeEntanglement(actor) {
             effectiveStrength = RANKS[newIndex];
           }
 
-          // Roll d100 with karma
+          // Roll d100
           const roll = new Roll("1d100");
           await roll.evaluate();
-          const cappedTotal = Math.min(100, roll.total + karma);
-          const karmaUsed = cappedTotal - roll.total;
-
-          // Update karma if used
-          if (karmaUsed > 0) {
-            const history = foundry.utils.deepClone(actor.system.karma?.history || []);
-            history.push({
-              realDate: new Date().toLocaleDateString(),
-              gameDate: "",
-              amount: -karmaUsed,
-              type: "Escape Entanglement",
-              description: `Escaping ${weaponName}`
-            });
-            await actor.update({ "system.karma.history": history });
+          
+          let cappedTotal = roll.total;
+          let karmaUsed = 0;
+          
+          // If karma was declared, show decision dialog
+          if (spendKarma) {
+            const { showKarmaDecisionDialog } = await import("../dice/dice-roller.js");
+            const initialColor = rollUniversalTable(effectiveStrength, roll.total);
+            const result = await showKarmaDecisionDialog(actor, roll.total, effectiveStrength, `Escape ${weaponName}`, initialColor);
+            cappedTotal = result.finalResult;
+            karmaUsed = result.karmaSpent;
+            // Karma already deducted in showKarmaDecisionDialog
           }
 
           // Check result
@@ -315,7 +315,8 @@ export async function attemptEscapeEntanglement(actor) {
       },
       cancel: { label: "Cancel" }
     },
-    default: "roll"
+    default: "roll",
+    render: (html) => setupKarmaControlHandlers(html)
   });
 
   dlg.render(true);

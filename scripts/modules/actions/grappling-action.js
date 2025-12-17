@@ -12,6 +12,7 @@ import {
   getTargetingContext,
   applyCapabilitiesToDialog
 } from "./action-utils.js";
+import { generateKarmaControlsHTML, setupKarmaControlHandlers, extractKarmaFromDialog } from "../dice/dice-roller.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
 
 export class GrapplingAction extends AttackAction {
@@ -29,15 +30,16 @@ export class GrapplingAction extends AttackAction {
 
     // Load persisted defaults
     const savedShift = await actor.getFlag("msh-faserip", "lastGrappleShift") ?? 0;
-    const savedKarma = await actor.getFlag("msh-faserip", "lastGrappleKarma") ?? 0;
+    const savedKarmaFlag = await actor.getFlag("msh-faserip", "lastGrappleKarma") ?? 0;
+    const savedSpendKarma = (savedKarmaFlag === true) || (Number(savedKarmaFlag) > 0);
 
-    const choice = await this._showGrapplingDialog(actor, strength, { savedShift, savedKarma });
+    const choice = await this._showGrapplingDialog(actor, strength, { savedShift, savedSpendKarma });
     if (!choice) return;
 
     // Persist settings if requested
     if (choice.remember) {
       await actor.setFlag("msh-faserip", "lastGrappleShift", choice.shift);
-      await actor.setFlag("msh-faserip", "lastGrappleKarma", choice.karma);
+      await actor.setFlag("msh-faserip", "lastGrappleKarma", choice.spendKarma ? 1 : 0);
     }
 
     const effectiveRank = shiftRank(strength.rank, choice.shift);
@@ -52,7 +54,7 @@ export class GrapplingAction extends AttackAction {
     }
 
     const { cappedTotal, totalKarmaUsed } =
-        await rollWithKarmaAndHistory(actor, actionName, choice.karma, roll);
+        await rollWithKarmaAndHistory(actor, actionName, 0, roll, { spendKarma: choice.spendKarma, rank: effectiveRank });
 
     const color = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
     const colorLower = String(color || "").toLowerCase();
@@ -96,7 +98,7 @@ export class GrapplingAction extends AttackAction {
     return { roll, color, effectiveRank, cappedTotal, totalKarmaUsed };
   }
 
-  async _showGrapplingDialog(actor, strength, { savedShift = 0, savedKarma = 0 } = {}) {
+  async _showGrapplingDialog(actor, strength, { savedShift = 0, savedSpendKarma = false } = {}) {
     // auto-fill target from current single targeted token
     let prefillTargetName = "";
     let prefillTargetStr  = "";
@@ -137,12 +139,7 @@ export class GrapplingAction extends AttackAction {
         <input type="number" name="shift" value="${Number(savedShift)}" style="width:60px;">
         <span style="color:#666;font-size:.9em;">(+ easier, - harder)</span>
       </div>
-
-      <div style="margin-bottom:8px;">
-        <label style="display:inline-block;width:130px;">Karma:</label>
-        <input type="number" name="karma" value="${Number(savedKarma)}" min="0" style="width:60px;">
-      </div>
-
+      ${generateKarmaControlsHTML(actor, savedSpendKarma)}
       <div style="margin-top:6px;">
         <label><input type="checkbox" name="remember" checked> Remember these settings</label>
       </div>
@@ -170,12 +167,13 @@ export class GrapplingAction extends AttackAction {
             label: "Roll",
             callback: (html) => {
               const $ = (s) => html.find(s);
+              const { spendKarma } = extractKarmaFromDialog(html);
               resolve({
                 targetName:     String($('[name="targetName"]').val() || "Target"),
                 targetStrength: String($('[name="targetStrength"]').val() || ""),
                 targetUuid:     prefillTargetUuid,
                 shift:          Number($('[name="shift"]').val() || 0),
-                karma:          Number($('[name="karma"]').val() || 0),
+                spendKarma,
                 remember:       !!$('[name="remember"]').is(':checked'),
                 skipDice:       !!$('[name="skipDice"]').is(':checked')
               });
@@ -185,6 +183,7 @@ export class GrapplingAction extends AttackAction {
         },
         default: "roll",
         render: (html) => {
+          setupKarmaControlHandlers(html);
           applyCapabilitiesToDialog(html, "grappling", { actor });
         }
       }).render(true);

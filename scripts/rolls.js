@@ -4,7 +4,7 @@ import { CombatHandler } from './combat-handler.js';
 import { runAsGM } from './gm-utils.js';
 import { calculateChargeDamage, getBodyArmorValue, processChargeAttack } from './charge-damage.js';
 import { processMultipleAttackSequence } from "./rules/multiple-attacks.js";
-import { rollD100AndApplyKarma } from "./modules/dice/dice-roller.js";
+import { rollD100AndApplyKarma, generateKarmaControlsHTML, setupKarmaControlHandlers, extractKarmaFromDialog, getMinimumKarmaCommitment, grantDailyKarma } from "./modules/dice/dice-roller.js";
 import { 
   rankRows, 
   actionTypes, 
@@ -729,10 +729,7 @@ export class FaseripRolls {
             <option value="Mental" ${isSelected("Mental") ? "selected" : ""}>Mental</option>
           </select>
         </div>
-        <div style="margin-bottom: 10px;">
-          <label style="display: inline-block; width: 120px;">Karma Points:</label>
-          <input type="number" id="karma" name="karma" value="0" min="0" style="width: 50px;">
-        </div>
+        ${generateKarmaControlsHTML(actor, 0)}
         <div>
           <label>
             <input type="checkbox" id="skip-dice" name="skipDice" ${skipDiceRoll ? 'checked' : ''}> 
@@ -759,7 +756,7 @@ export class FaseripRolls {
               const columnShift = parseInt(html.find('[name="shift"]').val()) || 0;
               const damageCS = parseInt(html.find('[name="damageCs"]').val()) || 0;
               const damageType = html.find('[name="damageType"]').val();
-              const karma = parseInt(html.find('[name="karma"]').val()) || 0;
+              const { spendKarma, karmaToSpend } = extractKarmaFromDialog(html);
               const skipDice = html.find('[name="skipDice"]').is(':checked');
               const saveSettings = html.find('[name="saveSettings"]').is(':checked');
               
@@ -843,7 +840,7 @@ export class FaseripRolls {
                   columnShift,
                   damageCS,
                   damageType,
-                  karma,
+                  karma: karmaToSpend,
                   skipDice,
                   attackCount
                 });
@@ -856,7 +853,7 @@ export class FaseripRolls {
                 columnShift: columnShift,
                 damageCS: damageCS,
                 damageType: damageType,
-                karma: karma,
+                karma: karmaToSpend,
                 skipDice: skipDice,
                 multiAdjacent: multiAdjacent,
                 multiAttacks: multiAttacks,
@@ -868,6 +865,9 @@ export class FaseripRolls {
         },
         default: "roll",
         render: (html) => {
+          // Setup karma control handlers
+          setupKarmaControlHandlers(html);
+          
           // Get references to the multiple target elements
           const actionSelect = html.find('#action');
           const multiAdjacentCheckbox = html.find('#multi-adjacent');
@@ -985,7 +985,7 @@ export class FaseripRolls {
       const extraShift = options.extraShift ?? savedExtraShift;
       const damageCS = options.damageCS ?? savedDamageCS;
       const damageType = options.damageType || savedDamageType;
-      const karma = options.karma || 0;
+      const spendKarma = options.spendKarma || false;
       const skipDice = options.skipDice ?? skipDiceRoll;
 
       // Total column shift is talent bonus plus any extra shifts
@@ -1016,7 +1016,8 @@ export class FaseripRolls {
 
       // Roll d100 and apply karma using the dice-roller module
       const rollResult = await rollD100AndApplyKarma(actor, {
-        karma: karma,
+        spendKarma,
+        rank: effectiveRank,
         sourceName: `${talent.name} (Talent)`,
         skipDiceDisplay: skipDice,
         flavorText: `${actor.name} uses ${talent.name}`
@@ -1033,9 +1034,12 @@ export class FaseripRolls {
         abilityModified.charAt(0).toUpperCase() + abilityModified.slice(1) :
         "None";
 
-      // Define action types and results based on color
-      /* const ACTIONS = {
-        // Combat results
+      // Action result labels for talents - maps action type to color results
+      // Only includes actual Universal Table actions plus simple Ability FEAT
+      const TALENT_ACTION_RESULTS = {
+        // Non-combat Ability FEAT - success depends on intensity comparison (GM interprets)
+        "Ability FEAT": { white: "Failure", green: "Success", yellow: "Success", red: "Success" },
+        // Combat results (from Universal Table)
         "Blunt Attack (BA)": { white: "Miss", green: "Hit", yellow: "Slam", red: "Stun" },
         "Edged Attack (EA)": { white: "Miss", green: "Hit", yellow: "Stun", red: "Kill" },
         "Shooting Attack (Sh)": { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Kill" },
@@ -1046,64 +1050,78 @@ export class FaseripRolls {
         "Grappling (GP)": { white: "Miss", green: "Miss", yellow: "Partial", red: "Hold" },
         "Grabbing (Gb)": { white: "Miss", green: "Take", yellow: "Grab", red: "Break" },
         "Escaping (ES)": { white: "Miss", green: "Miss", yellow: "Escape", red: "Reverse" },
+        "Charging (Ch)": { white: "Miss", green: "Hit", yellow: "Slam", red: "Stun" },
+        "Dodging (Do)": { white: "Autohit", green: "-2CS", yellow: "-4CS", red: "-6CS" },
+        "Evading (Ev)": { white: "Autohit", green: "Evasion", yellow: "+1CS", red: "+2CS" },
+        "Blocking (Bl)": { white: "-6CS", green: "-4CS", yellow: "-2CS", red: "+1CS" },
+        "Catching (Ca)": { white: "Autohit", green: "Miss", yellow: "Damage", red: "Catch" }
+      };
 
-        // Non-combat results
-        "Knowledge Check": { white: "No Knowledge", green: "Basic Knowledge", yellow: "Good Knowledge", red: "Expert Knowledge" },
-        "Practical Application": { white: "Failure", green: "Basic Success", yellow: "Good Success", red: "Excellent Success" },
-        "Analysis": { white: "Failed Analysis", green: "Basic Analysis", yellow: "Detailed Analysis", red: "Complete Analysis" },
-        "Research": { white: "No Results", green: "Basic Results", yellow: "Good Results", red: "Breakthrough" },
-        "Technical Application": { white: "Failure", green: "Works Minimally", yellow: "Works Well", red: "Works Perfectly" },
-        "Mental Power": { white: "No Effect", green: "Minor Effect", yellow: "Moderate Effect", red: "Major Effect" },
-        "Mystical Knowledge": { white: "No Insight", green: "Minor Insight", yellow: "Significant Insight", red: "Complete Insight" },
-        "Skill Use": { white: "Failure", green: "Basic Success", yellow: "Good Success", red: "Excellent Success" }
-      }; */
+      // Get the result labels for this action type
+      // Fall back to Ability FEAT for unknown types (e.g., old saved settings)
+      const effects = TALENT_ACTION_RESULTS[actionType] || TALENT_ACTION_RESULTS["Ability FEAT"];
+      const resultText = effects[resultColor.toLowerCase()] || resultColor.toUpperCase();
 
-      // Get the result text - if action type doesn't have specific results, use color names
-      let resultText = "";
-      /* if (getActionResults(actionType)) {
-        resultText = getActionResults(actionType)[resultColor.toLowerCase()];
-      } else {
-        resultText = resultColor.toUpperCase();
-      } */
-      // Get the result text - if action type doesn't have specific results, use color names
-      
-      const ACTIONS = getActions();
-      if (ACTIONS[actionType]) {
-        resultText = ACTIONS[actionType][resultColor.toLowerCase()];
-      } else {
-        resultText = resultColor.toUpperCase();
-      }
+      // Build the visual result grid (same as combat actions)
+      const buildTalentResultGrid = (activeColor, effectLabels) => {
+        const isW = activeColor === 'white', isG = activeColor === 'green',
+              isY = activeColor === 'yellow', isR = activeColor === 'red';
+        const cell = (active, baseBG, activeBG, baseFG, activeFG, baseBDR, activeBDR) => ({
+          bg: active ? activeBG : baseBG,
+          fg: active ? activeFG : baseFG,
+          bdr: active ? activeBDR : baseBDR,
+          bold: active ? 'bold' : 'normal'
+        });
+        const wCell = cell(isW, '#f0f0f0', '#333', '#666', '#fff', '1px solid #ccc', '2px solid #000');
+        const gCell = cell(isG, '#f0f0f0', '#4CAF50', '#666', '#fff', '1px solid #ccc', '2px solid #2e7d32');
+        const yCell = cell(isY, '#f0f0f0', '#FFC107', '#666', '#333', '1px solid #ccc', '2px solid #f57c00');
+        const rCell = cell(isR, '#f0f0f0', '#F44336', '#666', '#fff', '1px solid #ccc', '2px solid #c62828');
+        return `
+          <div style="padding:5px 10px; margin:5px 0; background-color:#fff; border:1px solid #ddd;">
+            <div style="font-weight:bold; margin-bottom:5px; color:#333;">Universal Table Results:</div>
+            <div style="display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:3px; font-size:0.85em;">
+              <div style="padding:4px;background:${wCell.bg};color:${wCell.fg};border:${wCell.bdr};font-weight:${wCell.bold};text-align:center;">White: ${effectLabels.white}</div>
+              <div style="padding:4px;background:${gCell.bg};color:${gCell.fg};border:${gCell.bdr};font-weight:${gCell.bold};text-align:center;">Green: ${effectLabels.green}</div>
+              <div style="padding:4px;background:${yCell.bg};color:${yCell.fg};border:${yCell.bdr};font-weight:${yCell.bold};text-align:center;">Yellow: ${effectLabels.yellow}</div>
+              <div style="padding:4px;background:${rCell.bg};color:${rCell.fg};border:${rCell.bdr};font-weight:${rCell.bold};text-align:center;">Red: ${effectLabels.red}</div>
+            </div>
+          </div>`;
+      };
 
-      // Create chat message styled to match screenshot
+      // Get banner colors for the result
+      const getBannerColors = (color) => {
+        switch(color.toLowerCase()) {
+          case 'white': return { bg: '#f8f8f8', fg: '#333' };
+          case 'green': return { bg: '#4CAF50', fg: '#fff' };
+          case 'yellow': return { bg: '#FFC107', fg: '#333' };
+          case 'red': return { bg: '#F44336', fg: '#fff' };
+          default: return { bg: '#f8f8f8', fg: '#333' };
+        }
+      };
+      const banner = getBannerColors(resultColor);
+
+      // Build the result grid HTML
+      const resultGrid = buildTalentResultGrid(resultColor.toLowerCase(), effects);
+
+      // Create chat message with visual grid like combat actions
       let content = `
         <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
           <div style="padding: 5px 10px; border-bottom: 1px solid #c0c0c0; font-size: 1.1em; color: #8b0000;">
-            <strong>${actor.name} - ${abilityName} Roll (${actionType})</strong>
+            <strong>${actor.name} - ${talent.name}</strong>
+            <div style="font-size: 0.85em; color: #666;">${actionType}</div>
           </div>
           <div style="padding: 5px 10px; font-size: 0.9em;">
-            <div>Base Rank: ${abilityRank} (${abilityValue})</div>
-            <div>Column Shift: ${totalColumnShift} → ${effectiveRank}</div>
+            <div><strong>Ability:</strong> ${abilityName} - ${abilityRank} (${abilityValue})</div>
+            <div><strong>Talent Bonus:</strong> +${talentBonus}CS${extraShift ? ` | Extra Shift: ${extraShift > 0 ? '+' : ''}${extraShift}CS` : ''}</div>
+            <div><strong>Effective Rank:</strong> ${effectiveRank}</div>
             ${damageCS !== 0 && damageRankName
-              ? `<div>Damage Column Shift: ${damageCS > 0 ? "+" : ""}${damageCS}CS → <strong>${damageRankName} (${damageRankValue})</strong></div>`
+              ? `<div><strong>Damage Rank:</strong> ${damageRankName} (${damageRankValue})</div>`
               : ""}
-            <div>Roll: ${roll.total} + Karma: ${karmaUsed} = ${cappedTotal}</div>
+            <div><strong>Roll:</strong> ${roll.total}${karmaUsed > 0 ? ` + Karma ${karmaUsed}` : ''} = <strong>${cappedTotal}</strong></div>
           </div>
-          <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; background-color: ${
-            resultText.toLowerCase().includes('partial') ? '#FFC107' :
-            resultText.toLowerCase().includes('hold') ? '#F44336' :
-            resultText.toLowerCase().includes('escape') ? '#FFC107' :
-            resultText.toLowerCase().includes('reverse') ? '#F44336' :
-            resultColor.toLowerCase() === 'white' ? '#f8f8f8' :
-            resultColor.toLowerCase() === 'green' ? '#4CAF50' :
-            resultColor.toLowerCase() === 'yellow' ? '#FFC107' :
-            '#F44336'
-          }; color: ${
-            resultText.toLowerCase().includes('partial') || 
-            resultText.toLowerCase().includes('escape') ||
-            resultColor.toLowerCase() === 'white' || 
-            resultColor.toLowerCase() === 'yellow' ? '#333' : 'white'
-          };">
-            ${resultText} (${resultColor.toUpperCase()})
+          ${resultGrid}
+          <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; background-color: ${banner.bg}; color: ${banner.fg};">
+            RESULT: ${resultColor.toUpperCase()} — ${resultText}
           </div>
         </div>
         `;
@@ -1247,9 +1265,9 @@ export class FaseripRolls {
       const talentType = talent.system.type || "";
       const talentSpecialty = talent.system.specialty || "";
 
-      // Assign appropriate action types based on talent type
-      // Define all action options from the Universal Table
+      // Define action options - only actual Universal Table actions plus Ability FEAT for non-combat
       actionOptions = [
+        { value: "Ability FEAT", label: "Ability FEAT (non-combat)" },
         { value: "Blunt Attack (BA)", label: "Blunt Attack (BA)" },
         { value: "Edged Attack (EA)", label: "Edged Attack (EA)" },
         { value: "Shooting Attack (Sh)", label: "Shooting Attack (Sh)" },
@@ -1264,18 +1282,7 @@ export class FaseripRolls {
         { value: "Dodging (Do)", label: "Dodging (Do)" },
         { value: "Evading (Ev)", label: "Evading (Ev)" },
         { value: "Blocking (Bl)", label: "Blocking (Bl)" },
-        { value: "Catching (Ca)", label: "Catching (Ca)" },
-        { value: "Stun Check (St)", label: "Stun Check (St)" },
-        { value: "Slam Check (Sl)", label: "Slam Check (Sl)" },
-        { value: "Kill Check (Ki)", label: "Kill Check (Ki)" },
-        { value: "Knowledge Check", label: "Knowledge Check" },
-        { value: "Practical Application", label: "Practical Application" },
-        { value: "Analysis", label: "Analysis" },
-        { value: "Research", label: "Research" },
-        { value: "Technical Application", label: "Technical Application" },
-        { value: "Mental Power", label: "Mental Power" },
-        { value: "Mystical Knowledge", label: "Mystical Knowledge" },
-        { value: "Skill Use", label: "Skill Use" }
+        { value: "Catching (Ca)", label: "Catching (Ca)" }
       ];
 
       // Suggest a default based on talent type
@@ -1285,21 +1292,26 @@ export class FaseripRolls {
           suggestedDefault = "Blunt Attack (BA)";
         } else if (talentSpecialty === "Sharp Weapons" || talentSpecialty === "Edged Weapons") {
           suggestedDefault = "Edged Attack (EA)";
-        } else if (talentSpecialty === "Thrown Weapons" || talentSpecialty === "Bows") {
+        } else if (talentSpecialty === "Thrown Weapons") {
+          suggestedDefault = "Throwing Blunt (TB)";
+        } else if (talentSpecialty === "Bows" || talentSpecialty === "Guns" || talentSpecialty === "Marksman") {
           suggestedDefault = "Shooting Attack (Sh)";
         } else {
           suggestedDefault = "Blunt Attack (BA)";
         }
       } else if (talentType === "Fighting Skill") {
-        suggestedDefault = "Grappling (GP)";
-      } else if (talentType === "Professional Skill") {
-        suggestedDefault = "Knowledge Check";
-      } else if (talentType === "Scientific Skill") {
-        suggestedDefault = "Analysis";
-      } else if (talentType === "Mystic/Mental Skill") {
-        suggestedDefault = "Mental Power";
+        if (talentSpecialty === "Wrestling" || talentSpecialty === "Martial Arts C") {
+          suggestedDefault = "Grappling (GP)";
+        } else if (talentSpecialty === "Acrobatics") {
+          suggestedDefault = "Dodging (Do)";
+        } else if (talentSpecialty === "Thrown Objects") {
+          suggestedDefault = "Throwing Blunt (TB)";
+        } else {
+          suggestedDefault = "Blunt Attack (BA)";
+        }
       } else {
-        suggestedDefault = "Skill Use";
+        // Professional, Scientific, Mystic/Mental, Other - use simple Ability FEAT
+        suggestedDefault = "Ability FEAT";
       }
 
       // Use saved action type or suggested default
@@ -1336,28 +1348,16 @@ export class FaseripRolls {
       `;
 
       // Create dialog for roll options
-      // Debug the action code extraction
-      console.log("🎯 actionOptions[0]:", actionOptions[0]);
-      const firstActionCode = actionOptions[0].value.match(/\(([^)]+)\)/)?.[1] || "";
-      console.log("🎯 firstActionCode:", firstActionCode);
-
-      // If we still can't extract it, try a fallback
-      let actionCodeToUse = firstActionCode;
-      if (!actionCodeToUse && actionOptions[0].value.includes("Blunt Attack")) {
-        actionCodeToUse = "BA";
-      } else if (!actionCodeToUse && actionOptions[0].value.includes("Edged Attack")) {
-        actionCodeToUse = "EA";
-      } else if (!actionCodeToUse && actionOptions[0].value.includes("Grappling")) {
-        actionCodeToUse = "Gp";
-      }
-
-      console.log("🎯 actionCodeToUse:", actionCodeToUse);
-      const multiTargetOptionsHTML = generateMultiTargetOptionsHTML(actionCodeToUse);
-      console.log("🎯 multiTargetOptionsHTML:", multiTargetOptionsHTML);
+      // Get action code from the default action type
+      const defaultActionCode = defaultActionType.match(/\(([^)]+)\)/)?.[1] || "";
+      const isAbilityFeat = defaultActionType === "Ability FEAT";
+      
+      // Only generate multi-target options for combat actions
+      const multiTargetOptionsHTML = isAbilityFeat ? "" : generateMultiTargetOptionsHTML(defaultActionCode);
 
       // Create dialog for roll options
       let dialogContent = `
-        <div id="multi-target-container">${multiTargetOptionsHTML}</div>
+        <div id="multi-target-container" ${isAbilityFeat ? 'style="display:none;"' : ''}>${multiTargetOptionsHTML}</div>
         <div style="background: #f0e8d8; padding: 10px; border-radius: 5px;">
           <div style="margin-bottom: 10px;">
             <label style="display: inline-block; width: 120px;">Action Type:</label>
@@ -1379,21 +1379,21 @@ export class FaseripRolls {
             <input type="number" id="shift" name="shift" value="${savedExtraShift}" style="width: 50px;">
             <span style="color: #666; font-size: 0.9em;">(additional +/- CS)</span>
           </div>
-          <div style="margin-bottom: 10px;">
-            <label style="display: inline-block; width: 120px;">Damage CS:</label>
-            <input type="number" id="damage-cs" name="damageCs" value="${savedDamageCS}" style="width: 50px;">
-            <span style="color: #666; font-size: 0.9em;">(modifies damage rank)</span>
+          <div id="combat-options-container" ${isAbilityFeat ? 'style="display:none;"' : ''}>
+            <div style="margin-bottom: 10px;">
+              <label style="display: inline-block; width: 120px;">Damage CS:</label>
+              <input type="number" id="damage-cs" name="damageCs" value="${savedDamageCS}" style="width: 50px;">
+              <span style="color: #666; font-size: 0.9em;">(modifies damage rank)</span>
+            </div>
+            <div style="margin-bottom: 10px;">
+              <label style="display: inline-block; width: 120px;">Damage Type:</label>
+              <select id="damage-type" name="damageType" style="width: 180px;">
+                ${damageOptionsHTML}
+              </select>
+            </div>
           </div>
-          <div style="margin-bottom: 10px;">
-            <label style="display: inline-block; width: 120px;">Damage Type:</label>
-            <select id="damage-type" name="damageType" style="width: 180px;">
-              ${damageOptionsHTML}
-            </select>
           </div>
-          <div style="margin-bottom: 10px;">
-            <label style="display: inline-block; width: 120px;">Karma Points:</label>
-            <input type="number" id="karma" name="karma" value="0" min="0" style="width: 50px;">
-          </div>
+          ${generateKarmaControlsHTML(actor, 0)}
           <div style="margin-bottom: 10px;">
             <label>
               <input type="checkbox" id="skip-dice" name="skipDice" ${skipDiceRoll ? 'checked' : ''}> 
@@ -1420,7 +1420,8 @@ export class FaseripRolls {
               const extraShift = parseInt(html.find('[name="shift"]').val()) || 0;
               const damageCS = parseInt(html.find('[name="damageCs"]').val()) || 0;
               const damageType = html.find('[name="damageType"]').val();
-              const karma = parseInt(html.find('[name="karma"]').val()) || 0;
+              const { spendKarma, karmaToSpend } = extractKarmaFromDialog(html);
+              if (game.settings.get("msh-faserip", "debugMode")) console.log("FASERIP DEBUG | TALENT KARMA - Dialog extracted:", { spendKarma, karmaToSpend });
               const skipDice = html.find('[name="skipDice"]').is(':checked');
               const saveSettings = html.find('[name="saveSettings"]').is(':checked');
               const multiAdjacent = html.find('[name="multiAdjacent"]').is(':checked');
@@ -1443,13 +1444,13 @@ export class FaseripRolls {
 
               if (multiAttacks) {
                 return await processMultipleTalentAttackSequence(actor, talent, {
-                  actionType, extraShift, damageCS, damageType, karma, skipDice, attackCount
+                  actionType, extraShift, damageCS, damageType, spendKarma, skipDice, attackCount
                 });
               }
 
               return FaseripRolls.rollTalent(actor, talent, {
                 useDirectRoll: true,
-                actionType, extraShift, damageCS, damageType, karma, skipDice, multiAdjacent
+                actionType, extraShift, damageCS, damageType, spendKarma, skipDice, multiAdjacent
               });
             }
           },
@@ -1457,14 +1458,27 @@ export class FaseripRolls {
         },
         default: "roll",
         render: (html) => {
+          // Setup karma control handlers
+          setupKarmaControlHandlers(html);
+          
           const actionSelect = html.find('#action-type');
           const multiContainer = html.find('#multi-target-container');
+          const combatOptions = html.find('#combat-options-container');
 
           function updateMultiOptions() {
             const selectedAction = actionSelect.val();
             const actionCode = selectedAction.match(/\(([^)]+)\)/)?.[1] || "";
-            const newOptionsHTML = generateMultiTargetOptionsHTML(actionCode);
-            multiContainer.html(newOptionsHTML);
+            
+            // Hide multi-target and combat options for non-combat actions
+            if (selectedAction === "Ability FEAT") {
+              multiContainer.hide();
+              combatOptions.hide();
+            } else {
+              multiContainer.show();
+              combatOptions.show();
+              const newOptionsHTML = generateMultiTargetOptionsHTML(actionCode);
+              multiContainer.html(newOptionsHTML);
+            }
             
             const multiAdjacentCheckbox = multiContainer.find('#multi-adjacent');
             const multiAttacksCheckbox = multiContainer.find('#multi-attacks');
@@ -1762,9 +1776,10 @@ export class FaseripRolls {
           <input type="number" id="shift" name="shift" value="${savedColumnShift}" style="width: 50px;">
           <span style="color: #666; font-size: 0.9em;">(+ right, - left)</span>
         </div>
-        <div style="margin-bottom: 10px;">
-          <label style="display: inline-block; width: 120px;">Karma Points:</label>
-          <input type="number" id="karma" name="karma" value="0" min="0" style="width: 50px;">
+        <div style="margin-bottom: 10px; padding: 5px; background: #f5f0e0; border: 1px solid #c9b98a; border-radius: 3px;">
+          <span style="color: #8b0000; font-size: 0.85em; font-style: italic;">
+            ⚠️ Popularity FEATs cannot be modified by Karma (per rules)
+          </span>
         </div>
         <div style="margin-bottom: 10px;">
           <label>
@@ -1789,7 +1804,6 @@ export class FaseripRolls {
             callback: async (html) => {
               const actionType = html.find('[name="actionType"]').val();
               const columnShift = parseInt(html.find('[name="shift"]').val()) || 0;
-              const karma = parseInt(html.find('[name="karma"]').val()) || 0;
               const skipDice = html.find('[name="skipDice"]').is(':checked');
               const saveSettings = html.find('[name="saveSettings"]').is(':checked');
 
@@ -1801,11 +1815,12 @@ export class FaseripRolls {
               }
 
               // Call this method again but with the gathered options
+              // Note: karma is not allowed on Popularity FEATs per the rules
               return FaseripRolls.rollContact(actor, contact, {
                 useDirectRoll: true,
                 actionType: actionType,
                 columnShift: columnShift,
-                karma: karma,
+                karma: 0,
                 skipDice: skipDice
               });
             }
@@ -2141,10 +2156,7 @@ export class FaseripRolls {
             </div>
           </div>
           
-          <div style="margin-bottom: 10px;">
-            <label style="display: inline-block; width: 120px;">Karma Points:</label>
-            <input type="number" id="karma" name="karma" value="0" min="0" style="width: 50px;">
-          </div>
+          ${generateKarmaControlsHTML(actor, 0)}
           <div>
             <label>
               <input type="checkbox" id="skip-dice" name="skipDice" ${dialogSkipDice ? 'checked' : ''}> 
@@ -2168,7 +2180,7 @@ export class FaseripRolls {
             callback: async (html) => {
               const actionName = html.find('[name="action"]').val();
               const shift = parseInt(html.find('[name="shift"]').val()) || 0;
-              const karma = parseInt(html.find('[name="karma"]').val()) || 0;
+              const { spendKarma, karmaToSpend } = extractKarmaFromDialog(html);
               const skipDice = html.find('[name="skipDice"]').is(':checked');
               const saveSettings = html.find('[name="saveSettings"]').is(':checked');
               
@@ -2184,7 +2196,7 @@ export class FaseripRolls {
               console.log("attackCount:", attackCount);
               console.log("Selected targets:", Array.from(game.user.targets).map(t => t.name));
               console.log("All form values:", {
-                actionName, shift, karma, skipDice, saveSettings
+                actionName, shift, karma: karmaToSpend, skipDice, saveSettings
               });
               console.log("===================");
 
@@ -2252,7 +2264,7 @@ export class FaseripRolls {
                 return await processMultipleAttackSequence(actor, equipment, {
                   actionType: actionName,
                   columnShift: shift,
-                  karma: karma,
+                  karma: karmaToSpend,
                   skipDice: skipDice,
                   attackCount: attackCount,
                   ammoType: currentAmmoType
@@ -2264,7 +2276,7 @@ export class FaseripRolls {
                 useDirectRoll: true,
                 actionType: actionName,
                 columnShift: shift,
-                karma: karma,
+                karma: karmaToSpend,
                 skipDice: skipDice,
                 ammoType: currentAmmoType,
                 multiAdjacent: multiAdjacent,
@@ -2277,6 +2289,9 @@ export class FaseripRolls {
         },
         default: "roll",
         render: (html) => {
+          // Setup karma control handlers
+          setupKarmaControlHandlers(html);
+          
           // Get references to the multiple target elements
           const actionSelect = html.find('#action');
           const multiAdjacentCheckbox = html.find('#multi-adjacent');

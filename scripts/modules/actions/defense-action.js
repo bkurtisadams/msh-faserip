@@ -1,5 +1,10 @@
 // scripts/modules/actions/defense-action.js
 import { BaseAction } from "./base-action.js";
+import { 
+  generateKarmaControlsHTML, 
+  setupKarmaControlHandlers, 
+  extractKarmaFromDialog 
+} from "../dice/dice-roller.js";
 import {
   RANKS,
   shiftRank,
@@ -88,9 +93,7 @@ export class DefenseAction extends BaseAction {
         <input type="number" name="shift" value="${Number(this.opts.shift ?? 0)}" style="width:60px;">
         <span style="color:#666;font-size:.9em;">(+ right, - left)</span></div>
 
-      <div style="margin-bottom:8px;"><label style="display:inline-block;width:120px;">Karma Points:</label>
-        <input type="number" name="karma" value="${Number(this.opts.karma ?? 0)}" min="0" style="width:60px;">
-        <span style="color:#666;font-size:.85em;">(spend only up to 100)</span></div>
+      ${generateKarmaControlsHTML(actor, 0)}
 
       ${extra.html}
 
@@ -113,7 +116,10 @@ export class DefenseAction extends BaseAction {
           cancel: { label: "Cancel", callback: () => resolve(null) }
         },
         default: "roll",
-        render: (html) => extra.onRender?.(html)
+        render: (html) => {
+          setupKarmaControlHandlers(html);
+          extra.onRender?.(html);
+        }
       }).render(true);
     });
     if (!choice) return;
@@ -133,7 +139,7 @@ export class DefenseAction extends BaseAction {
 
     // Karma (only up to 100)
     const { cappedTotal, totalKarmaUsed } =
-      await rollWithKarmaAndHistory(actor, actionName, choice.karma, roll);
+      await rollWithKarmaAndHistory(actor, actionName, choice.karma, roll, { spendKarma: choice.spendKarma, rank: effectiveRank });
 
     // Result & effect text
     const color = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
@@ -220,20 +226,21 @@ export class DefenseAction extends BaseAction {
 
   _readDialog(actionType, html) {
     const shift   = Number(html.find('[name="shift"]').val() || 0);
-    const karma   = Number(html.find('[name="karma"]').val() || 0);
+    const { spendKarma, karmaToSpend } = extractKarmaFromDialog(html);
+    const karma   = karmaToSpend;
     const skipDice= !!html.find('[name="skipDice"]').is(':checked');
 
     if (actionType === "evading") {
-      return { shift, karma, skipDice, evadeTarget: String(html.find('[name="evadeTarget"]').val() || "") };
+      return { shift, karma, spendKarma, skipDice, evadeTarget: String(html.find('[name="evadeTarget"]').val() || "") };
     }
     if (actionType === "catching") {
       return {
-        shift, karma, skipDice,
+        shift, karma, spendKarma, skipDice,
         catchScenario: String(html.find('[name="catchScenario"]').val() || "falling"),
         catchVsYou: !!html.find('[name="catchVsYou"]').is(':checked')
       };
     }
-    return { shift, karma, skipDice };
+    return { shift, karma, spendKarma, skipDice };
   }
 
   _actionNotes(actionType) {

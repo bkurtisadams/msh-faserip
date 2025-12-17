@@ -16,6 +16,7 @@ import {
 } from "./action-utils.js";
 import { startAura, stopAura, isAuraMaintained } from "./nullify.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
+import { generateKarmaControlsHTML, setupKarmaControlHandlers, extractKarmaFromDialog } from "../dice/dice-roller.js";
 import * as Effects from "../effects/effect-engine.js";
 
 export function installActionChatHandlers() {
@@ -848,19 +849,7 @@ export async function postAttackChatCard({
     ${notes ? `<div class="faserip-notes">${notes}</div>` : ""}
     <div class="faserip-actions" style="margin-top:6px; display:flex; gap:6px; flex-wrap:wrap;">
       <a class="faserip-chip" data-action="apply-damage">Apply Damage</a>
-
-      {{!-- NEW: Force Save chip (only show if the item/power says it requires a save) --}}
-      ${(() => {
-        try {
-          // Pull the item (power) that created this card, if you’re already packing uuid in flags.
-          // If you aren’t sending item flags yet, you can hide under a condition you control.
-          const needsSave = !!(game.messages?.get?.(undefined)?.flags?.["msh-faserip"]?.requiresSave);
-          return needsSave ? `<a class="faserip-chip" data-action="force-save">Force Save</a>` : "";
-        } catch { return ""; }
-      })()}
-
       ${/YELLOW|RED/.test(colorName) ? `<a class="faserip-chip" data-action="resolve-stun-slam">Resolve Stun/Slam</a>` : ""}
-
     </div>
   </div>`;
 
@@ -870,18 +859,12 @@ export async function postAttackChatCard({
     content,
     type: CONST.CHAT_MESSAGE_TYPES.OTHER,
     flags: {
-      "msh-faserip": {
-        actionId, ability, roll: roll?.total ?? roll, resultColor: colorName,
-        baseDamage, bonusDamage, finalDamage: dmg, targets: targets.map(t=>t.id)
-      }
+      "msh-faserip": { baseDamage, bonusDamage, finalDamage: dmg, targets: targets.map(t => t.id) }
     }
   });
 }
 
-/**
- * Handle "Attempt Escape" button clicks from Grappling hold results
- */
-async function handleEscapeCheck({ defenderUuid, defenderName, defenderRank }) {
+export async function handleEscapeAttempt({ defenderUuid, defenderName, defenderRank }) {
   if (!defenderUuid) {
     ui.notifications.warn("No defender UUID provided for escape attempt.");
     return;
@@ -893,53 +876,41 @@ async function handleEscapeCheck({ defenderUuid, defenderName, defenderRank }) {
     return;
   }
 
-  // Get defender's strength
   const defenderStrength = defender.system?.abilities?.strength?.rank || defenderRank || "Typical";
   const defenderStrengthValue = defender.system?.abilities?.strength?.value || game.msh.getRankValue(defenderStrength) || 6;
   const actualDefenderName = defenderName || defender.name || "Target";
 
-  // Load persisted settings
   const savedShift = await defender.getFlag("msh-faserip", "lastEscapeShift") ?? 0;
-  const savedKarma = await defender.getFlag("msh-faserip", "lastEscapeKarma") ?? 0;
+  const savedKarmaFlag = await defender.getFlag("msh-faserip", "lastEscapeKarma") ?? 0;
+  const savedSpendKarma = (savedKarmaFlag === true) || (Number(savedKarmaFlag) > 0);
 
-  // Build escape dialog
   const dialogHtml = `
     <div style="line-height:1.4;">
       <div style="margin-bottom:8px;">
         <label style="display:inline-block;width:130px;">Action:</label>
         <strong>Escaping</strong>
       </div>
-
       <div style="margin-bottom:8px;">
         <label style="display:inline-block;width:130px;">Character:</label>
         <strong>${actualDefenderName}</strong>
       </div>
-
       <div style="margin-bottom:8px;">
         <label style="display:inline-block;width:130px;">Strength:</label>
         <input type="text" value="${defenderStrength}" style="width:160px;" readonly>
         <span style="margin-left:6px;">(${defenderStrengthValue})</span>
       </div>
-
       <div style="margin-bottom:8px;">
         <label style="display:inline-block;width:130px;">Column Shift:</label>
         <input type="number" name="shift" value="${Number(savedShift)}" style="width:60px;">
         <span style="color:#666;font-size:.9em;">(+ easier, - harder)</span>
       </div>
-
-      <div style="margin-bottom:8px;">
-        <label style="display:inline-block;width:130px;">Karma:</label>
-        <input type="number" name="karma" value="${Number(savedKarma)}" min="0" style="width:60px;">
-      </div>
-
+      ${generateKarmaControlsHTML(defender, savedSpendKarma)}
       <div style="margin-top:6px;">
         <label><input type="checkbox" name="remember" checked> Remember these settings</label>
       </div>
-
       <div style="margin-top:8px;">
         <label><input type="checkbox" name="skipDice"> Skip dice animation</label>
       </div>
-
       <div style="margin-top:12px;padding:8px;background:#f5f5f5;border:1px solid #ddd;border-radius:3px;">
         <div style="font-weight:bold;margin-bottom:4px;">Escape Results</div>
         <div style="font-size:.85em;color:#555;">
@@ -960,20 +931,18 @@ async function handleEscapeCheck({ defenderUuid, defenderName, defenderRank }) {
         callback: async (html) => {
           const $ = (s) => html.find(s);
           const shift = Number($('[name="shift"]').val() || 0);
-          const karma = Number($('[name="karma"]').val() || 0);
+          const { spendKarma } = extractKarmaFromDialog(html);
           const remember = !!$('[name="remember"]').is(':checked');
           const skipDice = !!$('[name="skipDice"]').is(':checked');
 
-          // Persist settings if requested
           if (remember) {
             await defender.setFlag("msh-faserip", "lastEscapeShift", shift);
-            await defender.setFlag("msh-faserip", "lastEscapeKarma", karma);
+            await defender.setFlag("msh-faserip", "lastEscapeKarma", spendKarma ? 1 : 0);
           }
 
           const effectiveRank = shiftRank(defenderStrength, shift);
-
-          // Roll
           const roll = await (new Roll("1d100")).evaluate();
+          
           if (!skipDice) {
             await roll.toMessage({
               speaker: ChatMessage.getSpeaker({ actor: defender }),
@@ -983,56 +952,45 @@ async function handleEscapeCheck({ defenderUuid, defenderName, defenderRank }) {
           }
 
           const { cappedTotal, totalKarmaUsed } = 
-            await rollWithKarmaAndHistory(defender, "Escaping", karma, roll);
+            await rollWithKarmaAndHistory(defender, "Escaping", 0, roll, { spendKarma, rank: effectiveRank });
 
-          // Get result
           const color = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
           const colorLower = String(color || "").toLowerCase();
           const effects = effectsFor("escaping");
           const effect = effects[colorLower] || "Miss";
-
           const grid = buildResultGrid("escaping", colorLower, effects);
           const { bg, fg } = bannerColors(colorLower);
 
-          // Effect blocks
           const effectBlocks = {
-            miss: `
-              <div style="padding:6px 10px;margin:6px 10px;background:#ffebee;border:1px solid #ef5350;border-radius:3px;">
-                <div style="font-weight:bold;color:#c62828;">Miss</div>
-                <div style="font-size:.9em;">Still held this turn; no other actions.</div>
-              </div>`,
-            escape: `
-              <div style="padding:6px 10px;margin:6px 10px;background:#e3f2fd;border:1px solid #2196F3;border-radius:3px;">
-                <div style="font-weight:bold;color:#0d47a1;">Escape</div>
-                <div style="font-size:.9em;">Free of hold; may move up to half speed (no other actions).</div>
-              </div>`,
-            reverse: `
-              <div style="padding:6px 10px;margin:6px 10px;background:#e8f5e9;border:1px solid #66bb6a;border-radius:3px;">
-                <div style="font-weight:bold;color:#2e7d32;">Reverse</div>
-                <div style="font-size:.9em;">Free; may move ½, Grapple attacker, or take another action at -2 CS.</div>
-              </div>`
+            miss: `<div style="padding:6px 10px;margin:6px 10px;background:#ffebee;border:1px solid #ef5350;border-radius:3px;">
+              <div style="font-weight:bold;color:#c62828;">Miss</div>
+              <div style="font-size:.9em;">Still held this turn; no other actions.</div>
+            </div>`,
+            escape: `<div style="padding:6px 10px;margin:6px 10px;background:#e3f2fd;border:1px solid #2196F3;border-radius:3px;">
+              <div style="font-weight:bold;color:#0d47a1;">Escape</div>
+              <div style="font-size:.9em;">Free of hold; may move up to half speed (no other actions).</div>
+            </div>`,
+            reverse: `<div style="padding:6px 10px;margin:6px 10px;background:#e8f5e9;border:1px solid #66bb6a;border-radius:3px;">
+              <div style="font-weight:bold;color:#2e7d32;">Reverse</div>
+              <div style="font-size:.9em;">Free; may move ½, Grapple attacker, or take another action at -2 CS.</div>
+            </div>`
           };
 
           const effectBlock = effectBlocks[effect.toLowerCase()] || "";
 
-          // Create result card
           const cardHtml = `
             <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
               <div style="padding:5px 10px;border-bottom:1px solid #c0c0c0;font-size:1.1em;color:#8b0000;">
                 <strong>${actualDefenderName} — Escape Attempt</strong>
               </div>
-
               <div style="padding:5px 10px;font-size:.9em;">
                 <div>Strength: ${defenderStrength} (${defenderStrengthValue})${shift ? ` — Shift ${shift} → ${effectiveRank}` : ""}</div>
                 <div>Roll: ${roll.total}${totalKarmaUsed ? ` + Karma: ${totalKarmaUsed}` : ``} = ${cappedTotal}</div>
               </div>
-
               ${grid}
-
               <div style="text-align:center;padding:8px;margin:5px;font-weight:bold;font-size:1.05em;border-radius:3px;background:${bg};color:${fg};">
                 RESULT: ${String(color).toUpperCase()} — ${String(effect).toUpperCase()}
               </div>
-
               ${effectBlock}
             </div>
           `;
@@ -1045,6 +1003,7 @@ async function handleEscapeCheck({ defenderUuid, defenderName, defenderRank }) {
       },
       cancel: { label: "Cancel" }
     },
-    default: "roll"
+    default: "roll",
+    render: (html) => { setupKarmaControlHandlers(html); }
   }).render(true);
 }

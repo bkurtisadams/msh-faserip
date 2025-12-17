@@ -12,6 +12,7 @@ import {
   bannerColors,
   getTargetingContext
 } from "./action-utils.js";
+import { generateKarmaControlsHTML, setupKarmaControlHandlers, extractKarmaFromDialog } from "../dice/dice-roller.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
 
 /**
@@ -64,7 +65,7 @@ export class GrabbingAction extends AttackAction {
         });
     }
     const { cappedTotal, totalKarmaUsed } =
-        await rollWithKarmaAndHistory(actor, actionName, choice.karma, roll);
+        await rollWithKarmaAndHistory(actor, actionName, 0, roll, { spendKarma: choice.spendKarma, rank: effectiveRank });
 
     // Universal Table result color
     const color = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
@@ -167,7 +168,8 @@ export class GrabbingAction extends AttackAction {
 
     // Load persisted settings
     const savedShift = await actor.getFlag("msh-faserip", "lastGrabbingShift") ?? 0;
-    const savedKarma = await actor.getFlag("msh-faserip", "lastGrabbingKarma") ?? 0;
+    const savedKarmaFlag = await actor.getFlag("msh-faserip", "lastGrabbingKarma") ?? 0;
+    const savedSpendKarma = (savedKarmaFlag === true) || (Number(savedKarmaFlag) > 0);
 
     const html = `
       <div style="margin-bottom:8px;">
@@ -212,12 +214,7 @@ export class GrabbingAction extends AttackAction {
         <input type="number" name="shift" value="${Number(savedShift)}" style="width:60px;">
         <span style="color:#666;font-size:.9em;">(+ easier, - harder)</span>
       </div>
-
-      <div style="margin-bottom:8px;">
-        <label style="display:inline-block;width:130px;">Karma:</label>
-        <input type="number" name="karma" value="${Number(savedKarma)}" min="0" style="width:60px;">
-      </div>
-
+      ${generateKarmaControlsHTML(actor, savedSpendKarma)}
       <div style="margin-top:6px;">
         <label><input type="checkbox" name="remember" checked> Remember these settings</label>
       </div>
@@ -246,13 +243,14 @@ export class GrabbingAction extends AttackAction {
             label: "Roll",
             callback: async (h) => {
               const $ = (s) => h.find(s);
+              const { spendKarma } = extractKarmaFromDialog(h);
               const result = {
                 targetName: String($('[name="targetName"]').val() || "Target"),
                 targetStrength: String($('[name="targetStrength"]').val() || ""),
                 itemLabel: String($('[name="itemLabel"]').val() || "Item"),
                 itemMaterial: String($('[name="itemMaterial"]').val() || ""),
                 shift: Number($('[name="shift"]').val() || 0),
-                karma: Number($('[name="karma"]').val() || 0),
+                spendKarma,
                 remember: !!$('[name="remember"]').is(':checked'),
                 skipDice: !!$('[name="skipDice"]').is(':checked')
               };
@@ -260,7 +258,7 @@ export class GrabbingAction extends AttackAction {
               // Persist settings if requested
               if (result.remember) {
                 await actor.setFlag("msh-faserip", "lastGrabbingShift", result.shift);
-                await actor.setFlag("msh-faserip", "lastGrabbingKarma", result.karma);
+                await actor.setFlag("msh-faserip", "lastGrabbingKarma", result.spendKarma ? 1 : 0);
               }
 
               resolve(result);
@@ -268,7 +266,8 @@ export class GrabbingAction extends AttackAction {
           },
           cancel: { label: "Cancel", callback: () => resolve(null) }
         },
-        default: "roll"
+        default: "roll",
+        render: (html) => { setupKarmaControlHandlers(html); }
       }).render(true);
     });
   }

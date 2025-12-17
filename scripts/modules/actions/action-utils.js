@@ -403,74 +403,56 @@ export const isBluntCapable = (it) => {
 };
 
 // Roll + Karma (same behavior you had, packaged up)
-export async function rollWithKarmaAndHistory(actor, actionLabel, requestedKarma = 0, baseTotal) {
+export async function rollWithKarmaAndHistory(actor, actionLabel, requestedKarma = 0, baseTotal, options = {}) {
+  const { spendKarma = false, rank = null } = options;
+  
   const roll = baseTotal instanceof Roll ? baseTotal : await (new Roll("1d100")).evaluate();
   const raw = baseTotal instanceof Roll ? baseTotal.total : roll.total;
 
   let cappedTotal = raw;
-  let dailyUsed = 0;
-  let lifetimeUsed = 0;
+  let karmaUsed = 0;
 
-  // NEW: only consider what’s needed to hit 100 (and what was requested)
-  const want = Math.max(0, Number(requestedKarma || 0));
-  const needTo100 = Math.max(0, 100 - raw);
-  const maxSpend = Math.min(want, needTo100);
+  // Determine if we're spending karma (legacy: requestedKarma > 0, new: spendKarma flag)
+  const isSpendingKarma = spendKarma || requestedKarma > 0;
 
-  if (maxSpend > 0) {
-    const dailyEnabled = game.settings.get("msh-faserip", "dailyKarmaEnabled");
-    if (dailyEnabled) {
-      const dailyRemaining = Math.max(0, (actor.system.karma.dailyKarmaMax || 0) - (actor.system.karma.dailyKarmaUsed || 0));
+  if (isSpendingKarma && rank) {
+    // NEW TWO-PHASE SYSTEM: Show dialog after rolling to let player decide amount
+    const { showKarmaDecisionDialog } = await import("../dice/dice-roller.js");
+    
+    // Get initial color result
+    const initialColor = game.msh.rollUniversalTable(rank, raw);
+    
+    // Show decision dialog (Phase 2)
+    const result = await showKarmaDecisionDialog(actor, raw, rank, actionLabel, initialColor);
+    
+    cappedTotal = result.finalResult;
+    karmaUsed = result.karmaSpent;
+    // Karma already deducted in showKarmaDecisionDialog
+    
+  } else if (requestedKarma > 0) {
+    // LEGACY FALLBACK: If no rank provided, use old direct spending method
+    const karmaToSpend = Math.max(0, Number(requestedKarma || 0));
+    
+    cappedTotal = Math.min(100, raw + karmaToSpend);
+    karmaUsed = karmaToSpend;
 
-      // Spend daily first, but no more than needed
-      dailyUsed = Math.min(maxSpend, dailyRemaining);
-      const stillNeed = maxSpend - dailyUsed;
-
-      // Only if still needed, use lifetime
-      lifetimeUsed = Math.max(0, stillNeed);
-
-      // Persist daily usage if any
-      if (dailyUsed > 0) {
-        await game.msh.runAsGM({
-          operation: 'update',
-          targetActorUuid: actor.uuid,
-          args: [{ "system.karma.dailyKarmaUsed": (actor.system.karma.dailyKarmaUsed || 0) + dailyUsed }]
-        });
-      }
-
-      cappedTotal = Math.min(100, raw + dailyUsed + lifetimeUsed);
-    } else {
-      // No daily pool: all from lifetime, still only up to what's needed
-      lifetimeUsed = maxSpend;
-      cappedTotal = Math.min(100, raw + lifetimeUsed);
-    }
-
-    // History (only record what we actually spent)
-    const history = [];
-    if (dailyUsed > 0) history.push({
+    const historyEntry = {
       realDate: new Date().toLocaleDateString(),
       gameDate: "",
-      amount: -dailyUsed,
-      type: "Daily Roll",
-      description: `Spent daily karma on ${actionLabel}`
-    });
-    if (lifetimeUsed > 0) history.push({
-      realDate: new Date().toLocaleDateString(),
-      gameDate: "",
-      amount: -lifetimeUsed,
+      amount: -karmaUsed,
       type: "Die Roll",
-      description: `Spent lifetime karma on ${actionLabel}`
+      description: `Spent karma on ${actionLabel}`
+    };
+
+    const currentHistory = foundry.utils.deepClone(actor.system.karma?.history || []);
+    await game.msh.runAsGM({
+      operation: 'update',
+      targetActorUuid: actor.uuid,
+      args: [{ "system.karma.history": currentHistory.concat([historyEntry]) }]
     });
-    if (history.length) {
-      const current = foundry.utils.deepClone(actor.system.karma?.history || []);
-      await game.msh.runAsGM({
-        operation: 'update',
-        targetActorUuid: actor.uuid,
-        args: [{ "system.karma.history": current.concat(history) }]
-      });
-    }
   }
 
-  return { roll, cappedTotal, totalKarmaUsed: dailyUsed + lifetimeUsed };
+  return { roll, cappedTotal, totalKarmaUsed: karmaUsed };
 }
 
 

@@ -1,6 +1,11 @@
 // scripts/modules/actions/force-action.js
 import { RangedAttackAction } from "./ranged-attack-action.js";
-import { resolveCombatMode } from "./action-dispatcher.js";
+// NOTE: resolveCombatMode imported dynamically to avoid circular dependency
+import { 
+  generateKarmaControlsHTML, 
+  setupKarmaControlHandlers, 
+  extractKarmaFromDialog 
+} from "../dice/dice-roller.js";
 
 import { 
   applyDamageToTargets,
@@ -106,10 +111,7 @@ export class ForceAction extends RangedAttackAction {
         <input type="number" name="shift" value="${savedShift}" style="width:60px;">
       </div>
 
-      <div style="margin-bottom:8px;">
-        <span style="display:inline-block;width:110px;">Karma Points:</span>
-        <input type="number" name="karma" value="${Number(this.opts.karma ?? 0)}" min="0" style="width:60px;">
-      </div>
+      ${generateKarmaControlsHTML(actor, 0)}
 
       <div style="margin-bottom:8px;">
         <input type="checkbox" id="usePowerToHit" name="usePowerToHit" ${defaultUsePowerToHit ? "checked" : ""}>
@@ -213,7 +215,8 @@ export class ForceAction extends RangedAttackAction {
               }
 
               const shift = Number($('[name="shift"]').val() || 0);
-              const karma = Number($('[name="karma"]').val() || 0);
+              const { spendKarma, karmaToSpend } = extractKarmaFromDialog(html);
+              const karma = karmaToSpend;
               const usePowerToHit = !!$('#usePowerToHit').is(':checked');
               const range = Number($('[name="range"]').val() || 1);
               const throughObstacle = !!$('[name="throughObstacle"]').is(':checked');
@@ -253,7 +256,7 @@ export class ForceAction extends RangedAttackAction {
 
               resolve({
                 powerName, powerDamage, powerRank, powerId, prettyRange,
-                karma, range, throughObstacle, skipDice, usePowerToHit,
+                karma, spendKarma, range, throughObstacle, skipDice, usePowerToHit,
                 totalShift: finalShift,
                 rangeModifier, 
                 obstacleModifier,
@@ -267,6 +270,7 @@ export class ForceAction extends RangedAttackAction {
         },
         default: "roll",
         render: async (html) => {
+          setupKarmaControlHandlers(html);
           await setupModeSelector(actor, html, this.opts || {}, "lastForceMode");
           const $adhoc = html.find('#adhoc-toggle');
 
@@ -330,7 +334,7 @@ export class ForceAction extends RangedAttackAction {
     }
 
     const { cappedTotal, totalKarmaUsed } =
-      await rollWithKarmaAndHistory(actor, actionName, choice.karma, roll);
+      await rollWithKarmaAndHistory(actor, actionName, choice.karma, roll, { spendKarma: choice.spendKarma, rank: effectiveRank });
 
     // Standardized card
     const color = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
@@ -417,6 +421,7 @@ export class ForceAction extends RangedAttackAction {
         afterArmor = Math.max(0, rawDamage - (armorData?.applicable ?? 0));
       }
 
+      const { resolveCombatMode } = await import("./action-dispatcher.js");
       const actions = (!isManualMode && isHit && afterArmor > 0 && tActor)
         ? buildActionsBox({
             showSlam: /slam/.test(effText),

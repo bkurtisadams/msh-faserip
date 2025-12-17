@@ -1,5 +1,10 @@
 // scripts/modules/actions/blunt-attack-action.js
 import { AttackAction } from "./attack-action.js";
+import { 
+  generateKarmaControlsHTML, 
+  setupKarmaControlHandlers, 
+  extractKarmaFromDialog 
+} from "../dice/dice-roller.js";
 import {
   RANKS, shiftRank, getAbilityInfo, getStrengthInfo,
   effectsFor, labelFor,
@@ -16,7 +21,7 @@ import { canEffectsApply } from "../../rules/effects-gate.js";
 import { buildColorOutcome } from "../dice/color-results.js";
 import { applyColumnShifts } from "../dice/column-shifts.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
-import { resolveCombatMode } from "./action-dispatcher.js";
+// NOTE: resolveCombatMode not imported here to avoid circular dependency
 
 
 export class BluntAttackAction extends AttackAction {
@@ -79,10 +84,7 @@ export class BluntAttackAction extends AttackAction {
           <input type="number" name="shift" value="${savedColumnShift }" style="width:45px;padding:2px;">
           <span style="color:#666;font-size:.8em;margin-left:4px;">(+/−)</span>
         </div>
-        <div style="margin-bottom:4px;">
-          <label style="display:inline-block;width:90px;font-size:.9em;">Karma Points:</label>
-          <input type="number" name="karma" value="${Number(this.opts.karma ?? 0)}" min="0" style="width:45px;padding:2px;">
-        </div>
+        ${generateKarmaControlsHTML(actor, 0)}
       </div>
 
       <div style="margin:6px 0;padding:6px;background:#fff3e0;border:1px solid #ff9800;border-radius:3px;">
@@ -219,7 +221,8 @@ export class BluntAttackAction extends AttackAction {
             const objectRank   = $dlg('[name="objectRank"]').val() || "Excellent";
             const objectValue  = parseInt($dlg('[name="objectValue"]').val() || 20);
             const shift        = parseInt($dlg('[name="shift"]').val() || 0);
-            const karma        = parseInt($dlg('[name="karma"]').val() || 0);
+            const { spendKarma, karmaToSpend } = extractKarmaFromDialog(html);
+            const karma        = karmaToSpend;
             const pulledDamage = parseInt($dlg('[name="pulledDamage"]').val() || 0);
             const resultCap    = $dlg('[name="resultCap"]').val() || "none";
 
@@ -268,7 +271,7 @@ export class BluntAttackAction extends AttackAction {
 
             // ===== return all values to the caller =====
             resolve({
-              src, itemId, objectName, objectRank, objectValue, shift, karma,
+              src, itemId, objectName, objectRank, objectValue, shift, karma, spendKarma,
               pulledDamage, resultCap, skipDice, weaponMat, weaponName, damage, note,
               multiAttacks, attackCount, multiAdjacent
             });
@@ -278,6 +281,7 @@ export class BluntAttackAction extends AttackAction {
         },
         default: "roll",
         render: async (html) => {
+          setupKarmaControlHandlers(html);
           const $dialog = html.closest('.dialog');
           
           // Setup mode selector with centralized persistence

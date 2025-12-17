@@ -1,5 +1,10 @@
 import { BaseAction } from "./base-action.js";
-import { resolveCombatMode } from "./action-dispatcher.js";
+// NOTE: resolveCombatMode imported dynamically to avoid circular dependency
+import { 
+  generateKarmaControlsHTML, 
+  setupKarmaControlHandlers, 
+  extractKarmaFromDialog 
+} from "../dice/dice-roller.js";
 
 import { 
   RANKS, getStrengthInfo, shiftRank, getAbilityInfo,
@@ -168,12 +173,7 @@ export class AttackAction extends BaseAction {
         </div>
         <hr style="margin: 10px 0;">
         <div style="margin-top: 10px;">
-          <label style="display: block; margin-bottom: 5px;">Spend Karma Points:</label>
-          <input type="number" id="karma-points" min="0" max="${availableKarma}" value="0" 
-            style="width: 80px; padding: 4px;">
-          <span style="margin-left: 8px; font-size: 0.9em; color: #666;">
-            (Available: ${availableKarma})
-          </span>
+          ${generateKarmaControlsHTML(actor, 0)}
 
           <div style="margin-top: 10px;">
           <label style="display: block; margin-bottom: 5px;">Column Shift (CS):</label>
@@ -198,10 +198,8 @@ export class AttackAction extends BaseAction {
             icon: '<i class="fas fa-dice-d20"></i>',
             label: "Roll FEAT",
             callback: async (html) => {
-              const karmaSpent = Math.min(
-                parseInt(html.find('#karma-points').val()) || 0,
-                availableKarma
-              );
+              const { spendKarma, karmaToSpend } = extractKarmaFromDialog(html);
+              const karmaSpent = karmaToSpend;
               
               // Roll 1d100
               const roll = await (new Roll("1d100")).evaluate();
@@ -314,7 +312,8 @@ export class AttackAction extends BaseAction {
             callback: () => resolve({ cancelled: true })
           }
         },
-        default: "roll"
+        default: "roll",
+        render: (html) => setupKarmaControlHandlers(html)
       }).render(true);
     });
   }
@@ -417,9 +416,10 @@ export class AttackAction extends BaseAction {
     let effectiveRank = ability.rank;
     if (choice.shift) effectiveRank = shiftRank(effectiveRank, choice.shift);
 
-    // Roll + karma
+    // Roll + karma (two-phase system: spendKarma flag triggers decision dialog after roll)
     const { roll, cappedTotal, totalKarmaUsed } = await rollWithKarmaAndHistory(
-      actor, actionLabel, choice.karma || 0, choice.skipDice ? null : undefined
+      actor, actionLabel, choice.karma || 0, choice.skipDice ? null : undefined,
+      { spendKarma: choice.spendKarma, rank: effectiveRank }
     );
 
     // Check if manual mode -- return if true
@@ -538,6 +538,7 @@ export class AttackAction extends BaseAction {
       }
 
       // Calculate autoSave before using it
+      const { resolveCombatMode } = await import("./action-dispatcher.js");
       const autoSave = (typeof resolveCombatMode === "function" && targetActor)
         ? (resolveCombatMode(targetActor) === "full")
         : false;

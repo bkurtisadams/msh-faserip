@@ -11,6 +11,7 @@ import {
   effectsFor,
   getTargetingContext
 } from "./action-utils.js";
+import { generateKarmaControlsHTML, setupKarmaControlHandlers, extractKarmaFromDialog } from "../dice/dice-roller.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
 
 export class EscapingAction extends AttackAction {
@@ -42,7 +43,7 @@ export class EscapingAction extends AttackAction {
     }
 
     const { cappedTotal, totalKarmaUsed } =
-      await rollWithKarmaAndHistory(actor, actionName, choice.karma, roll);
+      await rollWithKarmaAndHistory(actor, actionName, 0, roll, { spendKarma: choice.spendKarma, rank: effectiveRank });
 
     const color = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
     const colorLower = String(color || "").toLowerCase();
@@ -104,7 +105,8 @@ export class EscapingAction extends AttackAction {
 
     // Load persisted settings
     const savedShift = await actor.getFlag("msh-faserip", "lastEscapeShift") ?? 0;
-    const savedKarma = await actor.getFlag("msh-faserip", "lastEscapeKarma") ?? 0;
+    const savedKarmaFlag = await actor.getFlag("msh-faserip", "lastEscapeKarma") ?? 0;
+    const savedSpendKarma = (savedKarmaFlag === true) || (Number(savedKarmaFlag) > 0);
 
     const dialogHtml = `
       <div style="margin-bottom:8px;">
@@ -134,12 +136,7 @@ export class EscapingAction extends AttackAction {
         <input type="number" name="shift" value="${Number(savedShift)}" style="width:60px;">
         <span style="color:#666;font-size:.9em;">(+ easier, - harder)</span>
       </div>
-
-      <div style="margin-bottom:8px;">
-        <label style="display:inline-block;width:130px;">Karma:</label>
-        <input type="number" name="karma" value="${Number(savedKarma)}" min="0" style="width:60px;">
-      </div>
-
+      ${generateKarmaControlsHTML(actor, savedSpendKarma)}
       <div style="margin-top:6px;">
         <label><input type="checkbox" name="remember" checked> Remember these settings</label>
       </div>
@@ -167,11 +164,12 @@ export class EscapingAction extends AttackAction {
             label: "Roll",
             callback: async (html) => {
               const $ = (s) => html.find(s);
+              const { spendKarma } = extractKarmaFromDialog(html);
               const result = {
                 opponentName: String($('[name="opponentName"]').val() || "Opponent"),
                 opponentStr: String($('[name="opponentStr"]').val() || ""),
                 shift: Number($('[name="shift"]').val() || 0),
-                karma: Number($('[name="karma"]').val() || 0),
+                spendKarma,
                 remember: !!$('[name="remember"]').is(':checked'),
                 skipDice: !!$('[name="skipDice"]').is(':checked')
               };
@@ -179,7 +177,7 @@ export class EscapingAction extends AttackAction {
               // Persist settings if requested
               if (result.remember) {
                 await actor.setFlag("msh-faserip", "lastEscapeShift", result.shift);
-                await actor.setFlag("msh-faserip", "lastEscapeKarma", result.karma);
+                await actor.setFlag("msh-faserip", "lastEscapeKarma", result.spendKarma ? 1 : 0);
               }
               
               resolve(result);
@@ -187,7 +185,8 @@ export class EscapingAction extends AttackAction {
           },
           cancel: { label: "Cancel", callback: () => resolve(null) }
         },
-        default: "roll"
+        default: "roll",
+        render: (html) => { setupKarmaControlHandlers(html); }
       }).render(true);
     });
   }

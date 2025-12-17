@@ -1,7 +1,12 @@
 // scripts/modules/actions/throwing-blunt-action.js
 import { RangedAttackAction } from "./ranged-attack-action.js";
 import { attachAutoFillRange } from "./action-utils.js";
-import { resolveCombatMode } from "./action-dispatcher.js";
+// NOTE: resolveCombatMode imported dynamically if needed
+import { 
+  generateKarmaControlsHTML, 
+  setupKarmaControlHandlers, 
+  extractKarmaFromDialog 
+} from "../dice/dice-roller.js";
 
 import {
   getAbilityInfo,
@@ -92,10 +97,7 @@ export class ThrowingBluntAction extends RangedAttackAction {
         <input type="number" name="shift" value="${Number(this.opts.shift ?? 0)}" style="width:60px;">
       </div>
 
-      <div style="margin-bottom:8px;">
-        <span style="display:inline-block;width:110px;">Karma Points:</span>
-        <input type="number" name="karma" value="${Number(this.opts.karma ?? 0)}" min="0" style="width:60px;">
-      </div>
+      ${generateKarmaControlsHTML(actor, 0)}
 
       <fieldset style="margin:10px 0;padding:8px;border:1px solid #ddd;border-radius:4px;background:#fafafa;">
         <legend style="padding:0 6px;font-weight:bold;">Weapon Source</legend>
@@ -174,7 +176,8 @@ export class ThrowingBluntAction extends RangedAttackAction {
               }
 
               const shift = Number($('[name="shift"]').val() || 0);
-              const karma = Number($('[name="karma"]').val() || 0);
+              const { spendKarma, karmaToSpend } = extractKarmaFromDialog(html);
+              const karma = karmaToSpend;
               const range = Number($('[name="range"]').val() || 1);
               const throughObstacle = !!$('[name="throughObstacle"]').is(':checked');
 
@@ -210,6 +213,7 @@ export class ThrowingBluntAction extends RangedAttackAction {
                 weaponDamage,
                 weaponId,
                 karma,
+                spendKarma,
                 range,
                 throughObstacle,
                 skipDice,
@@ -226,6 +230,7 @@ export class ThrowingBluntAction extends RangedAttackAction {
         },
         default: "roll",
         render: (html) => {
+          setupKarmaControlHandlers(html);
           const $adhoc = html.find('#adhoc-toggle');
             const updatePreviewFromSelection = () => {
             this._setupRangePreview(html, { strengthRank: strRank });
@@ -263,7 +268,7 @@ export class ThrowingBluntAction extends RangedAttackAction {
       });
     }
     const { cappedTotal, totalKarmaUsed } =
-      await rollWithKarmaAndHistory(actor, actionName, choice.karma, roll);
+      await rollWithKarmaAndHistory(actor, actionName, choice.karma, roll, { spendKarma: choice.spendKarma, rank: effectiveRank });
     const color = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
 
     // Standardized card (same as Throwing Edged/Blunt Attack style)

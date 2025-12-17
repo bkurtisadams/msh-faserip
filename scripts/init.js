@@ -8,6 +8,7 @@ import { FaseripEquipmentSheet } from './equipment.js';
 import { FaseripRolls } from './rolls.js';
 //import { rollUniversalTable } from './universalTable.js';  // deprecated
 import { rollUniversalTable } from './modules/dice/universal-table.js';
+import { grantDailyKarma } from './modules/dice/dice-roller.js';
 import { openUniversalTableDialog } from './rolls.js';
 import { rollUniversalAction } from './rolls.js';
 import { FaseripInitiative } from './faserip-initiative.js';
@@ -541,12 +542,12 @@ Hooks.once("init", async () => {
   });
 
   game.settings.register('msh-faserip', 'dailyKarmaEnabled', {
-    name: "Enable Daily Karma",
-    hint: "If enabled, characters gain temporary Karma equal to their Reason+Intuition+Psyche at the start of each session, used before their lifetime Karma pool.",
-    scope: "world", // Can be 'world' or 'client'
-    config: true,   // Show in system settings UI
-    type: Boolean,  // Use the JavaScript Boolean class, not a string "Boolean"
-    default: false, // Default value
+    name: "Enable Daily Karma Grants",
+    hint: "House rule: When enabled, GMs can grant characters bonus karma equal to their Reason+Intuition+Psyche at the start of each session or adventure. This karma is added to their pool and can be used for any purpose.",
+    scope: "world",
+    config: true,
+    type: Boolean,
+    default: false,
   });
 
   game.settings.register('msh-faserip', 'maxStunDuration', {
@@ -878,6 +879,9 @@ Hooks.once("init", async () => {
 
   // Create game.msh namespace
   game.msh = game.msh || {};
+
+  // Daily Karma grant function (house rule)
+  game.msh.grantDailyKarma = grantDailyKarma;
 
   game.msh.getRankValue = function(rankName) {
     if (!rankName) return 0;

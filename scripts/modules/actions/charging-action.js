@@ -1,5 +1,10 @@
 // scripts/modules/actions/charging-action.js
 import { BaseAction } from "./base-action.js";
+import { 
+  generateKarmaControlsHTML, 
+  setupKarmaControlHandlers, 
+  extractKarmaFromDialog 
+} from "../dice/dice-roller.js";
 import {
   RANKS,
   shiftRank,
@@ -143,10 +148,7 @@ export class ChargingAction extends BaseAction {
         <input type="number" name="shift" value="${Number(this.opts.shift ?? 0)}" style="width:45px;padding:2px;">
         <span style="color:#666;font-size:.8em;margin-left:4px;">(+/−)</span>
       </div>
-      <div>
-        <label style="display:inline-block;width:90px;font-size:.9em;">Karma Points:</label>
-        <input type="number" name="karma" value="${Number(this.opts.karma ?? 0)}" min="0" style="width:45px;padding:2px;">
-      </div>
+      ${generateKarmaControlsHTML(actor, 0)}
     </div>
 
     <div style="margin:6px 0;padding:6px;background:#fff3e0;border:1px solid #ff9800;border-radius:3px;">
@@ -231,7 +233,8 @@ export class ChargingAction extends BaseAction {
             const $ = (sel) => html.find(sel);
             const areas = Math.max(1, Number($('[name="areas"]').val() || 1));
             const shift = Number($('[name="shift"]').val() || 0);
-            const karma = Number($('[name="karma"]').val() || 0);
+            const { spendKarma, karmaToSpend } = extractKarmaFromDialog(html);
+            const karma = karmaToSpend;
             const targetType = String($('[name="target-type"]:checked').val() || "character");
             const skipDice = !!$('[name="skipDice"]').is(':checked');
             const remember = !!$('[name="remember"]').is(':checked');
@@ -270,6 +273,7 @@ export class ChargingAction extends BaseAction {
               areas,
               shift,
               karma,
+              spendKarma,
               skipDice,
               targetType,
               targetBArank,
@@ -285,6 +289,7 @@ export class ChargingAction extends BaseAction {
       },
       default: "roll",
       render: (html) => {
+        setupKarmaControlHandlers(html);
         const $charPanel = html.find('#character-target-panel');
         const $objPanel = html.find('#object-target-panel');
 
@@ -408,7 +413,7 @@ export class ChargingAction extends BaseAction {
   }
 
   const { cappedTotal, totalKarmaUsed } =
-    await rollWithKarmaAndHistory(actor, actionName, choice.karma, roll);
+    await rollWithKarmaAndHistory(actor, actionName, choice.karma, roll, { spendKarma: choice.spendKarma, rank: effectiveRank });
 
   const color = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
   const colorLower = String(color || "").toLowerCase();

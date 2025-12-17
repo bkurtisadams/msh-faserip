@@ -1,6 +1,11 @@
 // scripts/modules/actions/energy-action.js
 import { RangedAttackAction } from "./ranged-attack-action.js";
-import { resolveCombatMode } from "./action-dispatcher.js";
+// NOTE: resolveCombatMode imported dynamically to avoid circular dependency
+import { 
+  generateKarmaControlsHTML, 
+  setupKarmaControlHandlers, 
+  extractKarmaFromDialog 
+} from "../dice/dice-roller.js";
 
 import { 
   applyDamageToTargets,
@@ -105,10 +110,7 @@ export class EnergyAction extends RangedAttackAction {
         <input type="number" name="shift" value="${Number(savedShift)}" style="width:60px;">
       </div>
 
-      <div style="margin-bottom:8px;">
-        <span style="display:inline-block;width:110px;">Karma Points:</span>
-        <input type="number" name="karma" value="${Number(this.opts.karma ?? 0)}" min="0" style="width:60px;">
-      </div>
+      ${generateKarmaControlsHTML(actor, 0)}
 
       <!-- usePowerToHit checkbox -->
       <div style="margin-bottom:8px;">
@@ -214,7 +216,8 @@ export class EnergyAction extends RangedAttackAction {
               }
 
               const shift = Number($('[name="shift"]').val() || 0);
-              const karma = Number($('[name="karma"]').val() || 0);
+              const { spendKarma, karmaToSpend } = extractKarmaFromDialog(html);
+              const karma = karmaToSpend;
               const usePowerToHit = !!$('#usePowerToHit').is(':checked');
 
               const range = Number($('[name="range"]').val() || 1);
@@ -258,7 +261,7 @@ export class EnergyAction extends RangedAttackAction {
               resolve({
                 powerName, powerDamage, powerRank, powerId, prettyRange,
                 useAdHoc,
-                shift, karma, range, throughObstacle, skipDice, usePowerToHit, html,
+                shift, karma, spendKarma, range, throughObstacle, skipDice, usePowerToHit, html,
                 totalShift: finalShift,
                 rangeModifier,
                 obstacleModifier,
@@ -273,6 +276,7 @@ export class EnergyAction extends RangedAttackAction {
         },
         default: "roll",
         render: async (html) => {
+          setupKarmaControlHandlers(html);
           await setupModeSelector(actor, html, this.opts || {}, "lastEnergyMode");
           const $adhoc = html.find('#adhoc-toggle');
 
@@ -353,7 +357,7 @@ export class EnergyAction extends RangedAttackAction {
     }
 
     const { cappedTotal, totalKarmaUsed } =
-      await rollWithKarmaAndHistory(actor, actionName, choice.karma, roll);
+      await rollWithKarmaAndHistory(actor, actionName, choice.karma, roll, { spendKarma: choice.spendKarma, rank: effectiveRank });
 
     const color = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
     const colorLower = String(color || "").toLowerCase();  // DECLARE IT HERE
@@ -437,6 +441,7 @@ export class EnergyAction extends RangedAttackAction {
       }
 
       // Per-target actions (skip in manual mode)
+      const { resolveCombatMode } = await import("./action-dispatcher.js");
       const actions = (!isManualMode && isHit && afterArmor > 0 && targetActor)
         ? buildActionsBox({
             showSlam: false,                                  // Energy doesn’t slam by default
