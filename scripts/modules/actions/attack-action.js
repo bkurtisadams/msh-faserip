@@ -59,10 +59,10 @@ export class AttackAction extends BaseAction {
 
   async _rollFightingFeat(actor, fightingAbility, intensity, attackCount) {
     // RAW: Auto when Ability ≥ Intensity + 4 ranks (diff >= 4)
-    // Optional “Impossible”: when Intensity ≥ Ability + 2 ranks (diff <= -2)
+    // Optional "Impossible": when Intensity ≥ Ability + 2 ranks (diff <= -2)
     const AUTO_DIFF = 4;
 
-    // Toggle this to enable (RAW optional). If disabled, nothing is “impossible”;
+    // Toggle this to enable (RAW optional). If disabled, nothing is "impossible";
     // the required color rule applies (e.g., Red-only).
     const USE_IMPOSSIBLE = true;
     const IMPOSSIBLE_DIFF = -2;
@@ -195,89 +195,43 @@ export class AttackAction extends BaseAction {
         content: dialogContent,
         buttons: {
           roll: {
-            icon: '<i class="fas fa-dice-d20"></i>',
             label: "Roll FEAT",
             callback: async (html) => {
               const { spendKarma, karmaToSpend } = extractKarmaFromDialog(html);
-              const karmaSpent = karmaToSpend;
+              const cs = Number(html.find('#multi-feat-cs').val() || 0);
               
-              // Roll 1d100
               const roll = await (new Roll("1d100")).evaluate();
-              const totalRoll = Math.min(100, roll.total + karmaSpent);
-              
-              // Get result color
-              const cs = parseInt(html.find('#multi-feat-cs').val()) || 0;
-              const effRank = shiftRank(fightingAbility.rank, cs);
-              const effFightingIndex = RANKS.indexOf(effRank);
-
-              // Re-check auto/impossible with CS applied
-              {
-                const d2 = effFightingIndex - intensityIndex;
-                if (d2 >= AUTO_DIFF) {
-                  await ChatMessage.create({
-                    speaker: ChatMessage.getSpeaker({ actor }),
-                    content: `<div style="background:#e8f5e9;border:1px solid #4caf50;border-radius:3px;padding:8px;margin:5px 0;">
-                      <div style="color:#2e7d32;font-weight:bold;margin-bottom:5px;">Multiple Attack FEAT - AUTOMATIC SUCCESS</div>
-                      <div style="font-size:.9em;">Fighting (eff.): ${effRank} vs Intensity: ${intensity} — no roll required</div>
-                    </div>`
-                  });
-                  return resolve({ success: true, intensity, roll: null, totalRoll: null, resultColor: "AUTO", cancelled: false, auto: true });
-                }
-                if (USE_IMPOSSIBLE && d2 <= IMPOSSIBLE_DIFF) {
-                  await ChatMessage.create({
-                    speaker: ChatMessage.getSpeaker({ actor }),
-                    content: `<div style="background:#ffebee;border:1px solid #f44336;border-radius:3px;padding:8px;margin:5px 0;">
-                      <div style="color:#d32f2f;font-weight:bold;margin-bottom:5px;">Multiple Attack FEAT - IMPOSSIBLE</div>
-                      <div style="font-size:.9em;">Fighting (eff.): ${effRank} vs Intensity: ${intensity}</div>
-                      <div style="font-size:.9em;margin-top:4px;">Proceed with a single attack at -3CS.</div>
-                    </div>`
-                  });
-                  return resolve({ success: false, intensity, roll: null, totalRoll: null, resultColor: "IMPOSSIBLE", cancelled: false, auto: false });
-                }
-              }
-
-              //const resultColor = game.msh.rollUniversalTable(effRank, totalRoll);
-              //const colorLower = resultColor.toLowerCase();
-              // Resolve color (always, even in manual mode)
-              let color = universalColor(effectiveRank, cappedTotal);
-              const colorLower = String(color || "white").toLowerCase();
-              
-              // Determine success based on FEAT intensity comparison rules
-              let success = false;
-              if (effFightingIndex > intensityIndex) {
-                // Fighting > Intensity: Green or better succeeds
-                success = ["green", "yellow", "red"].includes(colorLower);
-              } else if (effFightingIndex === intensityIndex) {
-                // Fighting = Intensity: Yellow or better succeeds
-                success = ["yellow", "red"].includes(colorLower);
-              } else {
-                // Fighting < Intensity: Only Red succeeds
-                success = colorLower === "red";
-              }
-              
-              // Deduct karma if spent
-              if (karmaSpent > 0) {
-                const newKarma = Math.max(0, availableKarma - karmaSpent);
-                await actor.update({"system.karma.value": newKarma});
-                
-                // Add karma history
-                const history = {
-                  realDate: new Date().toLocaleDateString(),
-                  gameDate: "",
-                  amount: -karmaSpent,
-                  type: "FEAT Roll",
-                  description: `Spent karma on Multiple Attack FEAT (${intensity})`
-                };
-                const currentHistory = foundry.utils.deepClone(actor.system.karma?.history || []);
-                await actor.update({"system.karma.history": currentHistory.concat([history])});
-              }
-              
-              // Show result in chat
               await roll.toMessage({
                 speaker: ChatMessage.getSpeaker({ actor }),
                 flavor: `Multiple Attack FEAT: ${intensity}`,
               });
               
+              const effFeatRank = shiftRank(fightingAbility.rank, cs);
+              let totalRoll = roll.total;
+              
+              // Apply karma if spending
+              if (spendKarma && karmaToSpend > 0) {
+                totalRoll = Math.min(100, totalRoll + karmaToSpend);
+                // Deduct karma
+                const currentKarma = actor.system.karma.value || 0;
+                const newKarma = Math.max(0, currentKarma - karmaToSpend);
+                await actor.update({ "system.karma.value": newKarma });
+              }
+              
+              const resultColor = game.msh.rollUniversalTable(effFeatRank, totalRoll);
+              const colorLower = resultColor.toLowerCase();
+              
+              // Determine success based on FEAT intensity comparison rules
+              let success = false;
+              if (fightingIndex > intensityIndex) {
+                success = ["green", "yellow", "red"].includes(colorLower);
+              } else if (fightingIndex === intensityIndex) {
+                success = ["yellow", "red"].includes(colorLower);
+              } else {
+                success = colorLower === "red";
+              }
+              
+              // Post result to chat
               const bgColor = success ? "#e8f5e9" : "#ffebee";
               const borderColor = success ? "#4caf50" : "#f44336";
               const textColor = success ? "#2e7d32" : "#d32f2f";
@@ -290,8 +244,8 @@ export class AttackAction extends BaseAction {
                       Multiple Attack FEAT - ${success ? "SUCCESS" : "FAILED"}
                     </div>
                     <div style="font-size:0.9em;">
-                      <div>Fighting: ${fightingAbility.rank} vs Intensity: ${intensity}</div>
-                      <div>Roll: ${roll.total} + Karma: ${karmaSpent} = ${totalRoll}</div>
+                      <div>Fighting: ${fightingAbility.rank}${cs ? ` (${cs > 0 ? '+' : ''}${cs}CS → ${effFeatRank})` : ''} vs Intensity: ${intensity}</div>
+                      <div>Roll: ${roll.total}${karmaToSpend ? ` + ${karmaToSpend} Karma = ${totalRoll}` : ''}</div>
                       <div>Result: <strong>${resultColor.toUpperCase()}</strong></div>
                       <div style="margin-top:5px; font-style:italic;">
                         ${success 
@@ -307,118 +261,101 @@ export class AttackAction extends BaseAction {
             }
           },
           cancel: {
-            icon: '<i class="fas fa-times"></i>',
             label: "Cancel",
-            callback: () => resolve({ cancelled: true })
+            callback: () => resolve({ success: false, cancelled: true })
           }
         },
         default: "roll",
-        render: (html) => setupKarmaControlHandlers(html)
+        render: (html) => {
+          setupKarmaControlHandlers(html);
+        }
       }).render(true);
     });
   }
 
   /**
-   * Unified attack execution for all attack types
-   * @param {Object} config - Attack configuration
-   * @param {Object} config.choice - User choices from dialog
-   * @param {Actor} config.actor - The attacking actor
-   * @param {Object} config.ability - Ability info {name, rank, value}
-   * @param {string} config.actionType - Action type identifier (e.g., "blunt-attack")
-   * @param {string} config.actionName - Display name for action
-   * @param {Object} config.effects - Effect mappings for colors
-   * @param {string} config.damageType - Damage type (e.g., "physical-blunt")
-   * @param {number} config.rawDamage - Base damage value
-   * @param {string} config.damageNote - Description of damage source
-   * @param {string} config.sourceName - Name of weapon/source
-   * @param {string} config.attackForm - Attack form for effects ("blunt", "edged", "shooting")
-   * @param {Object} config.breakingFeat - Optional breaking feat data
-   * @param {number} config.targetCount - Number of targets (for display)
+   * Core single-attack execution used by all attack types.
+   * Handles roll, damage calc, chat card, and optional auto-apply.
    */
-  async _executeSingleAttack(config) {
-    const {
-      choice, actor, ability, actionType, actionName, effects,
-      damageType, rawDamage, damageNote, sourceName, attackForm,
-      breakingFeat = null, targetCount = 1,
-      overrideTargets = null
-    } = config;
+  async _executeSingleAttack({
+    choice,
+    actor,
+    ability,
+    actionType,
+    actionName,
+    effects,
+    damageType = "physical-blunt",
+    rawDamage = 0,
+    damageNote = "",
+    sourceName = "Attack",
+    attackForm = "blunt",
+    breakingFeat = null,
+    targetCount = 1
+  }) {
+    // === EARLY WEAPON CHECK: Abort if firearm is empty ===
+    const weapon = choice?.weapon ?? null;
 
-    // ANCHOR: early-weapon-resolve
-    // Resolve weapon early so we can gate empty-mag attacks
-    let weapon =
-      this?.opts?.item
-      || choice?.weapon
-      || (choice?.weaponId ? this.actor.items.get(choice.weaponId) : null)
-      || null;
+    if (weapon?.system) {
+      const sys = weapon.system;
+      const isFirearm =
+        String(sys.weaponType || "").toLowerCase() === "firearm" ||
+        String(sys.weaponType || "").toLowerCase() === "shooting" ||
+        String(actionType).toLowerCase() === "shooting";
 
-    // Stop immediately if out of ammo (shooting only). Also play a 'click' SFX.
-    if (weapon?.system && String(actionType).toLowerCase() === "shooting") {
+      if (isFirearm) {
+      // Parse first numeric in a value
       const toNum = (v) => {
         if (v == null || v === "") return NaN;
         if (typeof v === "number") return v;
-        if (typeof v === "string") {
-          const m = v.match(/-?\d+(\.\d+)?/);
-          return m ? Number(m[0]) : NaN;
-        }
-        return NaN;
+        const m = String(v).match(/-?\d+(\.\d+)?/);
+        return m ? Number(m[0]) : NaN;
       };
-      // Pull current ammo from any supported field.
-      // NOTE: don't use ?? with toNum() because NaN is not nullish; instead, pick first finite value.
-      const ammoPaths = [
-        "system.shotsRemaining",
-        "system.ammo.current",
-        "system.ammo.value",
-        "system.uses.value",
-        "system.shots",
-        "system.clip",
-        "system.magazine"
-      ];
-      const cur = (() => {
-        for (const path of ammoPaths) {
-          const v = foundry.utils.getProperty(weapon, path);
-          const n = toNum(v);
-          if (Number.isFinite(n)) return n;
-        }
-        return NaN;
-      })();
 
-      if (!Number.isFinite(cur) || cur <= 0) {
-        // Play a 'dry fire' click. Use your own SFX filename here if different.
-        const CLICK_SFX = "systems/msh-faserip/assets/sfx/weapon-empty.mp3";
+      // Find first valid ammo field
+      const current = [
+        sys.ammo?.current,
+        sys.ammo?.value,
+        sys.shotsRemaining,
+        sys.shots,
+        sys.uses?.value,
+        sys.clip,
+        sys.magazine
+      ].map(v => toNum(v)).find(n => Number.isFinite(n));
 
-        try {
-          const AH = foundry?.audio?.AudioHelper ?? globalThis.AudioHelper; // fallback for older
-          if (AH?.play) {
-            await AH.play({ src: CLICK_SFX, volume: 0.8, autoplay: true, loop: false }, true);
-          } else if (game.msh?.playCombatSFX) {
-            await game.msh.playCombatSFX({
-              item: weapon,
-              actionType: "dry",
-              damageType: "none",
-              rollResult: "white",
-              isHit: false,
-              sourceName: weapon?.name ?? "Weapon (empty)",
-              sfxOverride: CLICK_SFX // only if your SFX layer supports it
-            });
+      if (Number.isFinite(current) && current <= 0) {
+          // ─── PLAY EMPTY-CLICK SFX ───
+          const CLICK_SFX = "systems/msh-faserip/audio/sfx/weapon-empty.mp3";
+          try {
+            if (game.msh?.playCombatSFX) {
+              await game.msh.playCombatSFX({
+                item: weapon,
+                actionType: "shooting",
+                damageType: "empty",
+                rollResult: "white",
+                isHit: false,
+                sourceName: weapon?.name ?? "Weapon (empty)",
+                sfxOverride: CLICK_SFX // only if your SFX layer supports it
+              });
+            }
+
+          } catch (e) {
+            console.warn("FASERIP | Could not play empty click SFX:", e);
           }
 
-        } catch (e) {
-          console.warn("FASERIP | Could not play empty click SFX:", e);
+          ui.notifications?.warn(`${weapon?.name ?? "Weapon"}: out of ammo`);
+
+          // (Optional) small chat card so players see the click in the log
+          await ChatMessage.create({
+            speaker: ChatMessage.getSpeaker({ actor }),
+            content: `
+              <div style="background:#fff;border:1px solid #bbb;border-radius:3px;padding:6px 8px;">
+                <b>${actor.name}</b> pulls the trigger — <i>click!</i> <span style="color:#888">(empty)</span>
+              </div>
+            `
+          });
+
+          return; // abort this attack before any rolls/effects
         }
-
-        ui.notifications?.warn(`${weapon?.name ?? "Weapon"}: out of ammo`);
-
-        // (Optional) small chat card so players see the click in the log
-        await ChatMessage.create({
-          speaker: ChatMessage.getSpeaker({ actor }),
-          content: `
-            <div style="background:#fff;border:1px solid #bbb;border-radius:3px;padding:6px 8px;">
-              <b>${actor.name}</b> pulls the trigger — <i>click!</i> <span style="color:#888">(empty)</span>
-            </div>
-          `
-        });
-
-        return; // abort this attack before any rolls/effects
       }
     }
     // ANCHOR: early-weapon-resolve
@@ -525,14 +462,13 @@ export class AttackAction extends BaseAction {
         case "edged-attack":
         case "throwing-edged":
           showStun = (colorLower === "yellow");
-          showKill = (colorLower === "red");    // ← NEW
-          // Red = Kill (resolved via Kill flow/UI elsewhere); no Slam.
+          showKill = (colorLower === "red");    // ← Kill on red
           break;
 
         case "shooting":
         case "energy":
-          // Yellow = Bullseye → no Slam/Stun check; Red = Kill (handled elsewhere)
-          showKill = (colorLower === "red");    // ← NEW
+          // Yellow = Bullseye → no Slam/Stun check; Red = Kill
+          showKill = (colorLower === "red");    // ← Kill on red
           break;
 
         case "force":
@@ -641,12 +577,15 @@ export class AttackAction extends BaseAction {
         flags: damageFlags
       });
 
-      // Auto-apply damage for this target ONLY if not manual mode
+      // ============================================================
+      // FIX: Auto-apply damage with wasKillResult for kill-capable attacks
+      // ============================================================
       if (!isManualMode && this.opts?.autoApply && isHit && rawDamage > 0 && targetActor) {
         debugLog("Auto-applying damage in full auto mode", {
           damage: rawDamage,
           afterArmor,
-          target: targetName
+          target: targetName,
+          wasKillResult: showKill  // NEW: pass kill result
         });
 
         await applyDamageToTargets({
@@ -657,7 +596,10 @@ export class AttackAction extends BaseAction {
           bypassArmor: choice.bypassArmor || false,
           attackForm: attackForm,
           armorPiercing: choice.armorPiercing || 0,
-          targets: [target]  // Changed from specificTarget to targets array
+          targets: [target],
+          // === FIX: Pass kill result flag ===
+          wasKillResult: showKill,
+          forceKilling: showKill  // ensure kill save triggers on red
         });
       }
     }

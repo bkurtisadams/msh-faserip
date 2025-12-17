@@ -995,13 +995,19 @@ export function getTargetingContext(actor, actionLabel) {
 
 /**
  * Apply damage to targeted or controlled tokens with Body Armor calculation
- * @param {number} damage - Base damage amount
- * @param {Object} options - Additional options
+ * @param {Object} options
+ *   - damage: Base damage amount
+ *   - bypassArmor: Skip armor calculation
  *   - attackerUuid: UUID of the attacker (optional)
- *   - damageType: Type of damage for resistance checks (optional)
+ *   - damageType: Type of damage for resistance checks (e.g., "physical-edged", "energy")
+ *   - attackForm: Form of attack (e.g., "edged", "shooting", "energy")
+ *   - targets: Array of target tokens (optional, defaults to game.user.targets)
  *   - showNotification: Whether to show UI notifications (default: true)
- *   - updateButton: Button element to update with "Applied" state (optional)
- * @returns {Array} - Array of results for each target: { target, damageDealt, absorbed, newHealth }
+ *   - wasKillResult: Whether the attack result was a Kill (red on Sh/EA/TE/En)
+ *   - forceKilling: Force lethal damage (triggers death save even with Four-Color)
+ *   - armorPiercing: Armor piercing value
+ *   - apMode: Armor piercing mode ("value" or "cs")
+ * @returns {Array} - Array of results for each target
  */
 // --- BEGIN PATCH: applyDamageToTargets ---
 export async function applyDamageToTargets({
@@ -1010,17 +1016,35 @@ export async function applyDamageToTargets({
   attackerUuid = null,
   damageType = "physical-blunt",
   attackForm = "blunt",
-  targets = null
+  targets = null,
+  showNotification = true,
+  wasKillResult = false,
+  forceKilling = false,
+  armorPiercing = 0,
+  armorPiercingCS = 0,
+  apMode = "value"
 } = {}) {
+  const results = [];
+  
   try {
     const userTargets = targets ?? Array.from(game.user?.targets ?? []);
     const targetTokens = userTargets.length ? userTargets : [];
-    console.log("FASERIP | Using", targetTokens.length, "targeted token(s)");
+    console.log("FASERIP | applyDamageToTargets:", {
+      targetCount: targetTokens.length,
+      damage,
+      wasKillResult,
+      attackForm
+    });
 
     for (const tok of targetTokens) {
       const token = tok.document ?? tok;
       const targetActor = token.actor ?? token?.getActor?.() ?? null;
       const targetName = token.name ?? targetActor?.name ?? "Target";
+
+      if (!targetActor) {
+        console.warn("FASERIP | No actor found for target:", targetName);
+        continue;
+      }
 
       const debug = {
         targetName,
@@ -1030,18 +1054,23 @@ export async function applyDamageToTargets({
         isOwner: !!targetActor?.isOwner,
         damageType,
         attackForm,
-        bypassArmor
+        bypassArmor,
+        wasKillResult
       };
       console.log("FASERIP | Apply Damage Debug:", debug);
 
       let netDamage = Number(damage) || 0;
 
+      // Calculate mitigation (armor, resistances, etc.)
       try {
         if (typeof calculateMitigation === "function" && targetActor) {
           const mit = calculateMitigation(netDamage, targetActor, {
             damageType,
             attackForm,
-            bypassArmor
+            bypassArmor,
+            armorPiercing,
+            armorPiercingCS,
+            apMode
           });
           if (mit && Number.isFinite(mit.netDamage)) {
             netDamage = Math.max(0, mit.netDamage);
@@ -1051,16 +1080,15 @@ export async function applyDamageToTargets({
         console.warn("FASERIP | Mitigation calc failed; using raw damage.", e);
       }
 
-      // Apply HP change
+      // Get health values
       const hpPath = "system.attributes.health.value";
       const before = Number(targetActor?.system?.attributes?.health?.value ?? 0);
       const after = Math.max(0, before - netDamage);
 
-      // ===== HANDLE DAMAGE TO 0 HP TARGET =====
+      // ===== HANDLE DAMAGE TO ALREADY 0 HP TARGET =====
       if (before === 0 && netDamage > 0) {
         console.log("⚠️ FASERIP | Hit on unconscious target:", targetActor.name, "- triggering death save");
         
-        // resolveCombatMode is already imported at top of file
         const mode = resolveCombatModeSafe(targetActor) || "manual";
         
         if (mode === "full") {
@@ -1071,7 +1099,7 @@ export async function applyDamageToTargets({
             opts: { autoApply: true, showConfirm: false }
           });
         } else {
-          // Manual mode - show button
+          // Manual/Semi mode - show button
           ChatMessage.create({
             content: `<div style="background:#ffebee;border:1px solid #ef5350;padding:8px;border-radius:3px;">
               <strong>${targetActor.name}</strong> was hit while unconscious!
@@ -1080,35 +1108,42 @@ export async function applyDamageToTargets({
           });
         }
           
-        // Still update (or not - health stays at 0), but death save already handled
+        results.push({
+          actorUuid: targetActor?.uuid,
+          tokenUuid: token?.uuid,
+          name: targetName,
+          hpBefore: before,
+          hpAfter: after,
+          absorbed: 0,
+          net: 0,
+          wasKillResult
+        });
         continue; // Skip to next target
       }
       // ===== END DAMAGE TO 0 HP HANDLING =====
+
       const canDirectUpdate = game.user.isGM || targetActor?.isOwner;
 
       if (canDirectUpdate) {
-        // GM or actor owner: update directly
         await targetActor?.update(
           { [hpPath]: after },
           { healthChange: { old: before, new: after } }
         );
 
         // Record damage timestamp for rest system
-        if (before > after) {
+        if (before > after && typeof recordDamage === "function") {
           await recordDamage(targetActor);
         }
       } else if (targetActor) {
-        // Non-owner player hitting a non-owned token: delegate to GM
+        // Non-owner player: delegate to GM
         try {
           if (game.msh?.runAsGM) {
             await game.msh.runAsGM({
               operation: "update",
               targetActorUuid: targetActor.uuid,
-              // gm-utils/updateActor uses args[0] as updateData
               args: [{ [hpPath]: after }]
             });
           } else if (game.msh?.socket?.executeAsGM) {
-            // Fallback: call through SocketLib directly if that’s how you configured it
             await game.msh.socket.executeAsGM("runGMCommand", {
               operation: "update",
               targetActorUuid: targetActor.uuid,
@@ -1118,22 +1153,210 @@ export async function applyDamageToTargets({
             console.warn("FASERIP | No GM helper available for applyDamageToTargets");
           }
         } catch (err) {
-          console.error("FASERIP | applyDamageToTargets GM update failed", err, {
-            targetActorUuid: targetActor.uuid,
-            hpPath,
-            before,
-            after
-          });
+          console.error("FASERIP | applyDamageToTargets GM update failed", err);
           ui.notifications?.warn?.("Could not apply damage via GM helper. See console.");
         }
       }
+
+      // ===== HANDLE REDUCTION TO 0 HP =====
+      if (after === 0 && before > 0 && netDamage > 0) {
+        console.log("💀 FASERIP | Target reduced to 0 HP:", targetName, { wasKillResult, forceKilling });
+        
+        const fourColor = game.settings.get("msh-faserip", "fourColorRule");
+        const isLethal = wasKillResult || forceKilling;
+        
+        // Determine if we need a death save
+        // Per rules: Kill result triggers Endurance FEAT vs Kill column
+        // Also triggers if reduced to 0 HP by any means
+        if (!fourColor || isLethal) {
+          const mode = resolveCombatModeSafe(targetActor) || "manual";
+          
+          if (mode === "full") {
+            // Full Auto: Roll death save automatically
+            console.log("FASERIP | Full auto - triggering death save");
+            const { ActionDispatcher } = await import("./action-dispatcher.js");
+            await ActionDispatcher.roll("death-save", { 
+              actor: targetActor,
+              opts: { 
+                autoApply: true, 
+                showConfirm: false,
+                wasKillResult: wasKillResult,
+                attackForm: attackForm  // E/S context for green result
+              }
+            });
+          } else {
+            // Manual/Semi: Show death save prompt
+            await postDeathSavePrompt(targetActor, { wasKillResult, attackForm });
+          }
+        } else {
+          // Four-Color rule: Non-lethal knockout
+          await ChatMessage.create({
+            content: `<div style="background:#e3f2fd;border:1px solid #2196F3;padding:8px;border-radius:3px;">
+              <strong>${targetActor.name}</strong> is unconscious (0 Health).
+              <div style="font-size:0.9em;color:#666;margin-top:4px;">Four-Color Rule: No death save (non-lethal).</div>
+            </div>`
+          });
+        }
+      }
+      // ===== HANDLE KILL RESULT THAT DIDN'T REDUCE TO 0 =====
+      // Per rules: "For any one of these three results to be effective on a target, 
+      // the attacker must inflict some damage on the target."
+      else if (wasKillResult && netDamage > 0 && after > 0) {
+        console.log("💀 FASERIP | Kill result with damage but target survived:", targetName);
+        
+        const mode = resolveCombatModeSafe(targetActor) || "manual";
+        
+        if (mode === "full") {
+          // Full Auto: Roll kill save automatically
+          console.log("FASERIP | Full auto - triggering kill save (damage penetrated)");
+          const { ActionDispatcher } = await import("./action-dispatcher.js");
+          await ActionDispatcher.roll("death-save", { 
+            actor: targetActor,
+            opts: { 
+              autoApply: true, 
+              showConfirm: false,
+              attackForm: attackForm  // E/S context for green result
+            }
+          });
+        } else {
+          // Manual/Semi: Show kill save prompt
+          await postKillSavePrompt(targetActor, { attackForm });
+        }
+      }
+      // ===== END 0 HP / KILL HANDLING =====
+
+      if (showNotification && netDamage > 0) {
+        const absorbed = (Number(damage) || 0) - netDamage;
+        const armorNote = absorbed > 0 ? ` (${damage} - ${absorbed} armor)` : "";
+        ui.notifications.info(`${targetName} took ${netDamage} damage${armorNote}. Health: ${before} → ${after}`);
+      } else if (showNotification && netDamage === 0) {
+        ui.notifications.info(`${targetName}'s armor absorbed all ${damage} damage.`);
+      }
+
+      results.push({
+        actorUuid: targetActor?.uuid,
+        tokenUuid: token?.uuid,
+        name: targetName,
+        hpBefore: before,
+        hpAfter: after,
+        absorbed: (Number(damage) || 0) - netDamage,
+        net: netDamage,
+        wasKillResult
+      });
     }
   } catch (outer) {
     console.error("FASERIP | applyDamageToTargets outer error", outer);
   }
+  
+  return results;
+}
+
+
+/**
+ * Post a chat card prompting for a kill save when a Kill result occurs
+ * (target not at 0 HP but took damage from a kill-capable attack)
+ */
+export async function postKillSavePrompt(actor, { attackForm = "edged" } = {}) {
+  const isFull = resolveCombatModeSafe(actor) === "full";
+  
+  // In full auto mode, don't post the prompt - kill save runs automatically
+  if (isFull) {
+    console.log("FASERIP | Skipping kill save prompt in full auto mode");
+    return;
+  }
+
+  const esNote = (attackForm === "edged" || attackForm === "shooting") 
+    ? `<div style="font-size:0.9em;color:#666;margin-top:4px;">
+        Note: Green (E/S) result means Endurance Loss for ${attackForm} attacks.
+      </div>`
+    : "";
+
+  const content = `
+    <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
+      <div style="padding:5px 10px;border-bottom:1px solid #c0c0c0;font-size:1.1em;color:#8b0000;">
+        <strong>${actor.name} - Kill Result!</strong>
+      </div>
+      
+      <div style="padding:5px 10px;font-size:.9em;">
+        <div style="color:#c62828;font-weight:bold;">Potential Kill</div>
+        <div style="margin-top:4px;">Target must roll an Endurance FEAT vs the Kill column.</div>
+        ${esNote}
+      </div>
+
+      <div style="text-align:center;padding:8px;margin:8px 10px;">
+        <a class="faserip-chip" 
+           data-action="kill-save"
+           data-actor-uuid="${actor.uuid}"
+           data-attack-form="${attackForm}"
+           style="display:inline-flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;padding:6px 14px;background:#ffebee;border:2px solid #c62828;border-radius:4px;color:#c62828;cursor:pointer;text-decoration:none;">
+          Roll Kill Save
+        </a>
+      </div>
+      
+      <div style="padding:5px 10px;font-size:0.85em;color:#666;border-top:1px solid #e0e0e0;">
+        <strong>Kill Results:</strong>
+        <ul style="margin:4px 0 0 16px;padding:0;">
+          <li><b>White:</b> Endurance Loss - Character is dying</li>
+          <li><b>Green (E/S):</b> Endurance Loss if Edged/Shooting attack</li>
+          <li><b>Yellow/Red:</b> No effect - takes damage only</li>
+        </ul>
+      </div>
+    </div>
+  `;
+
+  await ChatMessage.create({
+    speaker: ChatMessage.getSpeaker({ actor }),
+    content: content
+  });
+}
+
+
+/**
+ * Enhanced postDeathSavePrompt that includes kill context
+ */
+export async function postDeathSavePrompt(actor, { wasKillResult = false, attackForm = "" } = {}) {
+  const isFull = resolveCombatModeSafe(actor) === "full";
+  
+  // In full auto mode, don't post the prompt - death save runs automatically
+  if (isFull) {
+    console.log("FASERIP | Skipping death save prompt in full auto mode");
+    return;
+  }
+
+  const killNote = wasKillResult 
+    ? `<div style="color:#c62828;margin-top:4px;">⚠️ This was a KILL result attack!</div>` 
+    : "";
+
+  const content = `
+    <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
+      <div style="padding:5px 10px;border-bottom:1px solid #c0c0c0;font-size:1.1em;color:#8b0000;">
+        <strong>${actor.name} - Health Collapsed</strong>
+      </div>
+      
+      <div style="padding:5px 10px;font-size:.9em;">
+        <div style="color:#c62828;font-weight:bold;">Health: 0</div>
+        <div style="margin-top:4px;">Character is unconscious and must roll an Endurance FEAT vs the Kill column to determine if they are dying.</div>
+        ${killNote}
+      </div>
+
+      <div style="text-align:center;padding:8px;margin:8px 10px;">
+        <a class="faserip-chip" 
+           data-action="death-save"
+           data-actor-uuid="${actor.uuid}"
+           data-attack-form="${attackForm}"
+           style="display:inline-flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;padding:6px 14px;background:#ffebee;border:2px solid #c62828;border-radius:4px;color:#c62828;cursor:pointer;text-decoration:none;">
+          Roll Death Save
+        </a>
+      </div>
+    </div>
+  `;
+
+  await ChatMessage.create({
+    speaker: ChatMessage.getSpeaker({ actor }),
+    content: content
+  });
 }
 // --- END PATCH: applyDamageToTargets ---
-
 
 export async function applyDamageToActorUuid(damage, actorUuid, options = {}) {
   const { showNotification = true, updateButton = null } = options;
@@ -1549,47 +1772,6 @@ export async function applyNullifyToTarget(targetActor, attacker, { originUuid =
   if (!targetActor) return;
   const maintained = isAuraMaintained(attacker);
   await applyNullifiedEffect(targetActor, { maintained, originUuid, rounds });
-}
-
-
-/**
- * Post a chat card prompting for a death save when a character hits 0 Health
- */
-export async function postDeathSavePrompt(actor) {
-  const isFull = resolveCombatModeSafe(actor) === "full";
-  
-  // In full auto mode, don't post the prompt - death save runs automatically
-  if (isFull) {
-    console.log("FASERIP | Skipping death save prompt in full auto mode");
-    return;
-  }
-
-  const content = `
-    <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
-      <div style="padding:5px 10px;border-bottom:1px solid #c0c0c0;font-size:1.1em;color:#8b0000;">
-        <strong>${actor.name} - Health Collapsed</strong>
-      </div>
-      
-      <div style="padding:5px 10px;font-size:.9em;">
-        <div style="color:#c62828;font-weight:bold;">Health: 0</div>
-        <div style="margin-top:4px;">Character is unconscious and must roll an Endurance FEAT vs the Kill column to determine if they are dying.</div>
-      </div>
-
-      <div style="text-align:center;padding:8px;margin:8px 10px;">
-        <a class="faserip-chip" 
-           data-action="death-save"
-           data-actor-uuid="${actor.uuid}"
-           style="display:inline-block;font-size:13px;font-weight:600; ... ;cursor:pointer;">
-          Roll Death Save
-        </a>
-      </div>
-    </div>
-  `;
-
-  await ChatMessage.create({
-    speaker: ChatMessage.getSpeaker({ actor }),
-    content: content
-  });
 }
 
 // === [PREVIEW CONFIRM HELPERS] =============================================

@@ -8,7 +8,7 @@ import {
   bannerColors,
   getAbilityInfo,
 } from "./action-utils.js";
-import { resolveKillFeat, KILL_CONTEXTS } from "../../rules/kill-resolver.js";
+import { resolveKillFeat, KILL_CONTEXTS, getKillContextFromAttackForm } from "../../rules/kill-resolver.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
 import { applyDying } from "../effects/effect-engine.js";
 
@@ -24,12 +24,23 @@ export class DeathSaveAction extends BaseAction {
     const endurance = getAbilityInfo(actor, "endurance");
     const effects = effectsFor("kill"); // Reuse Kill column effects
 
+    // Get attack form from opts for E/S context (passed from applyDamageToTargets)
+    const attackForm = this.opts?.attackForm || "";
+    
+    // Determine kill context based on attack form
+    // If we know the attack form, use it; otherwise default to ZERO_HEALTH
+    const killContext = attackForm 
+      ? getKillContextFromAttackForm(attackForm)
+      : KILL_CONTEXTS.ZERO_HEALTH;
+
     // Add clear debug statement at the start
-    console.log(`🎲 DEATH SAVE | ${actor.name} rolling Endurance FEAT (${endurance.rank} rank) vs Kill table`);
+    console.log(`🎲 DEATH SAVE | ${actor.name} rolling Endurance FEAT (${endurance.rank} rank) vs Kill table`, {
+      attackForm,
+      killContext
+    });
 
     // --- AUTO MODE FAST-PATH: Full Auto skips dialog & rolls immediately ---
     if (this?.opts?.autoApply === true) {
-      const actor = this.actor;
       const endurance = {
         rank: actor.system?.abilities?.endurance?.rank || "Good",
         value: actor.system?.abilities?.endurance?.value || 8
@@ -47,12 +58,15 @@ export class DeathSaveAction extends BaseAction {
       const maxStunDuration = game.settings.get('msh-faserip', 'maxStunDuration') || 10;
       const unconsciousDuration = Math.min(durationRoll.total, maxStunDuration);
 
-      // Use Kill resolver to determine outcome
-      const killResult = resolveKillFeat(colorLower, KILL_CONTEXTS.ZERO_HEALTH);
+      // Use Kill resolver with proper context (E/S aware)
+      const killResult = resolveKillFeat(colorLower, killContext);
       const isDying = (killResult.outcome === "EnduranceLoss");
 
       // Add clear result statement
-      console.log(`💀 DEATH SAVE | ${actor.name} result: ${color.toUpperCase()} - ${killResult.label} (${killResult.description})`);
+      console.log(`💀 DEATH SAVE | ${actor.name} result: ${color.toUpperCase()} - ${killResult.label} (${killResult.description})`, {
+        isDying,
+        context: killContext
+      });
 
       const resultHtml = `
         <div style="background:#fafafa;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
@@ -63,8 +77,9 @@ export class DeathSaveAction extends BaseAction {
             <div>Endurance: ${endurance.rank}${this.opts?.featCs ? ` — Shift ${this.opts.featCs} → ${effectiveRank}` : ""}</div>
             <div>Roll: ${roll.total}</div>
             <div>Unconscious: ${unconsciousDuration} rounds</div>
+            ${attackForm ? `<div>Attack Type: ${attackForm}</div>` : ''}
             <div style="margin-top:6px;padding:6px;border-radius:3px;background:${bannerColors(isDying ? 'red' : 'green').bg};color:${bannerColors(isDying ? 'red' : 'green').fg};">
-              RESULT: ${isDying ? "DYING" : "STUNNED"}
+              RESULT: ${isDying ? "DYING" : "STUNNED"} (${killResult.label})
             </div>
           </div>
         </div>
@@ -83,6 +98,14 @@ export class DeathSaveAction extends BaseAction {
     }
     // --- END AUTO MODE FAST-PATH ---
 
+    // Determine if E/S context applies (for dialog display)
+    const isEdgedOrShooting = (killContext === KILL_CONTEXTS.EDGED_MELEE || killContext === KILL_CONTEXTS.SHOOTING);
+    const esNote = isEdgedOrShooting 
+      ? `<div style="color:#c62828;margin-top:4px;">⚠️ Edged/Shooting attack: Green result = Endurance Loss</div>`
+      : attackForm 
+        ? `<div style="color:#666;margin-top:4px;">Attack type: ${attackForm} (Green = No Effect)</div>`
+        : '';
+
     // Simple dialog - just endurance and shift
     const dialogHtml = `
     <div style="margin-bottom:12px;padding:8px;background:#ffebee;border:1px solid #ef5350;border-radius:3px;">
@@ -90,6 +113,7 @@ export class DeathSaveAction extends BaseAction {
         <div style="font-size:0.9em;color:#666;margin-top:4px;">
         Character has reached 0 Health and is unconscious. Roll Endurance FEAT vs Kill column.
         </div>
+        ${esNote}
     </div>
 
     <div style="margin-bottom:8px;">
@@ -178,30 +202,17 @@ export class DeathSaveAction extends BaseAction {
       rollMode: game.settings.get("core", "rollMode")
     });
 
-    // *** FIXED: Use centralized Kill resolver with ZERO_HEALTH context ***
-    const killResult = resolveKillFeat(colorLower, KILL_CONTEXTS.ZERO_HEALTH);
+    // *** FIXED: Use centralized Kill resolver with proper E/S context ***
+    const killResult = resolveKillFeat(colorLower, killContext);
     const isDying = (killResult.outcome === "EnduranceLoss");
 
     console.log("=== Death Save Result ===");
     console.log("Color:", colorLower);
+    console.log("Kill Context:", killContext);
     console.log("Kill Result:", killResult);
     console.log("Is Dying:", isDying);
     console.log("Unconscious Duration:", unconsciousDuration);
 
-    // --- Death Save on 0 Health (always, any source) --- covered in init.js
-
-    // Create appropriate effect
-    if (isDying) {
-      console.log("Calling _createDyingEffect...");
-      await this._createDyingEffect(actor, endurance, unconsciousDuration);
-      console.log("_createDyingEffect complete");
-    } else {
-      console.log("Calling _createStunnedEffect...");
-      await this._createStunnedEffect(actor, unconsciousDuration);
-      console.log("_createStunnedEffect complete");
-    }
-
-    // Build chat card
     const grid = buildResultGrid("kill", colorLower, effects);
     const { bg, fg } = bannerColors(colorLower);
 
@@ -247,6 +258,7 @@ export class DeathSaveAction extends BaseAction {
           <div>Endurance: ${endurance.rank} (${endurance.value})${choice.shift ? ` — Shift ${choice.shift} → ${effectiveRank}` : ""}</div>
           <div>Roll: ${roll.total} = ${cappedTotal}</div>
           <div>Unconscious Duration: ${unconsciousDuration} round${unconsciousDuration > 1 ? 's' : ''}</div>
+          ${attackForm ? `<div>Attack Type: ${attackForm} (${isEdgedOrShooting ? 'E/S applies' : 'No E/S'})</div>` : ''}
         </div>
 
         ${grid}
@@ -263,6 +275,23 @@ export class DeathSaveAction extends BaseAction {
       speaker: ChatMessage.getSpeaker({ actor }), 
       content: cardHtml 
     });
+
+    // =========================================================
+    // FIX: CREATE EFFECTS IN DIALOG PATH (was missing!)
+    // =========================================================
+    console.log(`💀 DEATH SAVE | Creating effects for ${actor.name}`, { isDying, unconsciousDuration });
+
+    // Always create unconscious effect when at 0 HP
+    await this._createStunnedEffect(actor, unconsciousDuration);
+
+    // If dying, ALSO create dying effect
+    if (isDying) {
+      await this._createDyingEffect(actor, endurance, unconsciousDuration);
+      ui.notifications.warn(`${actor.name} is DYING! Losing 1 Endurance rank per turn.`);
+    } else {
+      ui.notifications.info(`${actor.name} is unconscious for ${unconsciousDuration} rounds.`);
+    }
+    // =========================================================
   }
 
   /** Create the DYING effect: loses 1 Endurance rank per turn (6 seconds) */
@@ -314,6 +343,8 @@ export class DeathSaveAction extends BaseAction {
           args: ["ActiveEffect", [effectData]]
         });
       }
+      
+      console.log(`💀 DYING EFFECT | Created for ${actor.name}`);
     }
 
 
@@ -376,7 +407,7 @@ export class DeathSaveAction extends BaseAction {
       });
     }
     
-    ui.notifications.info(`Stunned effect created for ${actor.name} (${unconsciousRounds} rounds).`);
+    console.log(`😴 UNCONSCIOUS EFFECT | Created for ${actor.name} (${unconsciousRounds} rounds)`);
   }
 
 

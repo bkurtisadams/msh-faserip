@@ -280,9 +280,10 @@
       "sfx": {
         "hit": "",
         "miss": "",
-        "critical": ""
+        "empty": "",
+        "reload": ""
       },
-      "reloadSfx": "",
+
       "variantType": "standard",
       "specialAmmo": {
         "mercy": false,
