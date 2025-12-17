@@ -362,12 +362,25 @@ export class AttackAction extends BaseAction {
         }
         return NaN;
       };
-
-      // pull current ammo from any supported field
-      const cur =
-        (weapon.system.ammo && (toNum(weapon.system.ammo.current) ?? toNum(weapon.system.ammo.value))) ??
-        toNum(weapon.system.shotsRemaining) ??
-        toNum(weapon.system.shots);
+      // Pull current ammo from any supported field.
+      // NOTE: don't use ?? with toNum() because NaN is not nullish; instead, pick first finite value.
+      const ammoPaths = [
+        "system.shotsRemaining",
+        "system.ammo.current",
+        "system.ammo.value",
+        "system.uses.value",
+        "system.shots",
+        "system.clip",
+        "system.magazine"
+      ];
+      const cur = (() => {
+        for (const path of ammoPaths) {
+          const v = foundry.utils.getProperty(weapon, path);
+          const n = toNum(v);
+          if (Number.isFinite(n)) return n;
+        }
+        return NaN;
+      })();
 
       if (!Number.isFinite(cur) || cur <= 0) {
         // Play a 'dry fire' click. Use your own SFX filename here if different.
@@ -699,8 +712,7 @@ export class AttackAction extends BaseAction {
             // Choose the first finite, positive number; default to 1 if none.
             const candidates = [
               this?.opts?.roundsFired,
-              this?.opts?.shotsToSpend,
-              sys?.roundsFired, sys?.burst, sys?.burstSize, sys?.rateOfFire, sys?.rate
+              this?.opts?.shotsToSpend
             ];
             const first = candidates.map(v => toNum(v)).find(n => Number.isFinite(n) && n > 0);
             const rounds = Number.isFinite(first) ? Math.max(1, Math.trunc(first)) : 1;
