@@ -628,7 +628,11 @@ static _addInitiativeBar(html, data) {
      </div>
     <hr/>
     <div><em>Assigned tracker initiative:</em>
-      <strong>${goesFirst === 'pc' ? 'Side A: 2, Side B: 1' : 'Side A: 1, Side B: 2'}</strong>
+      <strong>${
+        goesFirst === 'pc'
+          ? `Side A: ${winnerInit}, Side B: ${loserInit}`
+          : `Side A: ${loserInit}, Side B: ${winnerInit}`
+      }</strong>
     </div>
    </div>
  `;
@@ -763,7 +767,7 @@ static async _getHighestIntuitionCharacters(combat) {
    */
   static _getModifierForIntuition(intuition) {
     // FASERIP initiative modifier table
-    if (intuition >= 75) return 6;
+    if (intuition >= 76) return 6;
     if (intuition >= 51) return 5;
     if (intuition >= 41) return 4;
     if (intuition >= 31) return 3;
