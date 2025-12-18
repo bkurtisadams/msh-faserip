@@ -141,7 +141,7 @@ export class ThrowingBluntAction extends RangedAttackAction {
       <div style="margin-top:8px;">
         <input type="checkbox" id="rememberSettings" name="rememberSettings" ${savedRemember ? 'checked' : ''}>
         <label for="rememberSettings">Remember settings</label>
-        <input type="checkbox" id="skipDiceRoll" name="skipDiceRoll" ${savedSkipDice ? 'checked' : ''}> style="margin-left:12px;">
+        <input type="checkbox" id="skipDiceRoll" name="skipDiceRoll" ${savedSkipDice ? 'checked' : ''} style="margin-left:12px;">
         <label for="skipDiceRoll">Skip dice animation</label>
       </div>
     `;

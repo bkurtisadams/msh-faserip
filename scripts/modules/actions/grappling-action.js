@@ -35,7 +35,7 @@ export class GrapplingAction extends AttackAction {
     const savedSkipDice = (await actor.getFlag("msh-faserip", "skipDiceRoll")) ?? (await actor.getFlag("msh-faserip", "lastGrappleSkipDice")) ?? false;
     const savedSpendKarma = (savedKarmaFlag === true) || (Number(savedKarmaFlag) > 0);
 
-    const choice = await this._showGrapplingDialog(actor, strength, { savedShift, savedSpendKarma });
+    const choice = await this._showGrapplingDialog(actor, strength, { savedShift, savedSpendKarma, savedRemember, savedSkipDice });
     if (!choice) return;
 
     // Always save remember/skipDice preferences
@@ -72,6 +72,30 @@ export class GrapplingAction extends AttackAction {
 
     // Show escape button for Partial Hold and Hold results
     const showEscape = (colorLower === "yellow" || colorLower === "red");
+    if (showEscape && choice?.targetUuid) {
+      try {
+        const tDoc = await fromUuid(choice.targetUuid);
+        const tActor = tDoc?.actor ?? (tDoc?.documentName === "Actor" ? tDoc : null);
+        if (tActor) {
+          const statusId = (colorLower === "yellow") ? "partial-hold" : "full-hold";
+          const label = (colorLower === "yellow") ? "Partial Hold" : "Full Hold";
+          const icon = (statusId === "partial-hold") ? "icons/svg/net.svg" : "icons/svg/shackles.svg";
+          const other = tActor.effects?.find(e => e.getFlag?.("core", "statusId") === ((statusId === "partial-hold") ? "full-hold" : "partial-hold"));
+          if (other) await other.delete();
+          const existing = tActor.effects?.find(e => e.getFlag?.("core", "statusId") === statusId);
+          if (existing) {
+            await existing.update({ name: label, icon, "flags.msh-faserip.hold": colorLower });
+          } else {
+            await tActor.createEmbeddedDocuments("ActiveEffect", [{
+              name: label, icon, origin: actor.uuid, disabled: false, statuses: [statusId],
+              flags: { core: { statusId }, "msh-faserip": { hold: colorLower } }
+            }]);
+          }
+        }
+      } catch (e) {
+        console.warn("FASERIP | Grappling hold status failed", e);
+      }
+    }
     const actions = buildActionsBox({
       showEscape: showEscape,
       targetUuid: choice.targetUuid,
@@ -104,7 +128,7 @@ export class GrapplingAction extends AttackAction {
     return { roll, color, effectiveRank, cappedTotal, totalKarmaUsed };
   }
 
-  async _showGrapplingDialog(actor, strength, { savedShift = 0, savedSpendKarma = false } = {}) {
+  async _showGrapplingDialog(actor, strength, { savedShift = 0, savedSpendKarma = false, savedRemember = false, savedSkipDice = false } = {}) {
     // auto-fill target from current single targeted token
     let prefillTargetName = "";
     let prefillTargetStr  = "";
