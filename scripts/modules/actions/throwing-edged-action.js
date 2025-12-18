@@ -45,7 +45,7 @@ export class ThrowingEdgedAction extends RangedAttackAction {
     // Candidate weapons: thrown + edged
     // Build the Throwing-Edged weapon list (back-compat + multi-mode support)
     let thrownEdged = actor.items.filter(i => {
-      if (i.type !== "equipment" || i.system?.category !== "weapon") return false;
+      if (i.type !== "equipment" || String(i.system?.category ?? "").toLowerCase() !== "weapon") return false;
 
       const s = i.system ?? {};
       
@@ -119,6 +119,7 @@ export class ThrowingEdgedAction extends RangedAttackAction {
     const savedAdHocDmg = Number(await actor.getFlag("msh-faserip", "lastThrowEdgedAdHocDamage") || 10);
     const savedRemember = (await actor.getFlag("msh-faserip", "rememberSettings")) ?? (await actor.getFlag("msh-faserip", "lastThrowEdgedRemember")) ?? true;
     const savedSkipDice = (await actor.getFlag("msh-faserip", "skipDiceRoll")) ?? (await actor.getFlag("msh-faserip", "lastThrowEdgedSkipDice")) ?? false;
+    const savedShift = savedRemember ? (await actor.getFlag("msh-faserip", "lastThrowEdgedShift") ?? 0) : 0;
 
     const itemOptions = thrownEdged
       .map(i => `<option value="${i.id}" ${i.id === savedItemId ? "selected" : ""}>${i.name}</option>`)
@@ -138,7 +139,7 @@ export class ThrowingEdgedAction extends RangedAttackAction {
 
       <div style="margin-bottom:8px;">
         <span style="display:inline-block;width:110px;">Column Shift:</span>
-        <input type="number" name="shift" value="${Number(this.opts.shift ?? 0)}" style="width:60px;">
+        <input type="number" name="shift" value="${Number(this.opts.shift ?? savedShift)}" style="width:60px;">
       </div>
 
       ${generateKarmaControlsHTML(actor, 0)}
@@ -263,6 +264,7 @@ export class ThrowingEdgedAction extends RangedAttackAction {
               await actor.setFlag("msh-faserip", "skipDiceRoll", skipDice);
               await actor.setFlag("msh-faserip", "lastThrowEdgedSkipDice", skipDice);
               if (remember) {
+                await actor.setFlag("msh-faserip", "lastThrowEdgedShift", shift);
                 await actor.setFlag("msh-faserip", "lastThrowEdgedAdHoc", useAdHoc);
                 await actor.setFlag("msh-faserip", "lastThrowEdgedAdHocName", weaponName);
                 await actor.setFlag("msh-faserip", "lastThrowEdgedAdHocDamage", weaponDamage);
