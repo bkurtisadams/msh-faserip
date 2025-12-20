@@ -330,14 +330,10 @@ export class AttackAction extends BaseAction {
               await game.msh.playCombatSFX({
                 item: weapon,
                 actionType: "shooting",
-                damageType: "empty",
-                rollResult: "white",
-                isHit: false,
-                sourceName: weapon?.name ?? "Weapon (empty)",
-                sfxOverride: CLICK_SFX // only if your SFX layer supports it
+                outOfAmmo: true,
+                sourceName: weapon?.name ?? "Weapon (empty)"
               });
             }
-
           } catch (e) {
             console.warn("FASERIP | Could not play empty click SFX:", e);
           }

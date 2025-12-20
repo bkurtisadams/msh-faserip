@@ -110,26 +110,25 @@ function getArrayish(val) {
   return [];
 }
 
-function pickFromItemSfx(item, { actionType, isHit, rollResult }) {
+function pickFromItemSfx(item, { actionType, isHit, rollResult, outOfAmmo }) {
   if (!item || typeof item !== "object") return null;
 
   const sfx = normalizeSfxShape(item.system?.sfx);
   const modes = getArrayish(item.system?.attackModes);
-  const crit = String(rollResult || "").toLowerCase() === "red";
 
-  // Per-mode override if the matching mode has its own sfx block
   const mode = modes.find(m => (m?.actionType || "").toLowerCase() === String(actionType || "").toLowerCase());
   const modeSfx = normalizeSfxShape(mode?.sfx);
 
-  // Priority: mode.critical → item.critical → mode.hit/miss → item.hit/miss
-  if (crit && (modeSfx.critical || sfx.critical)) return modeSfx.critical || sfx.critical;
-  if (isHit && (modeSfx.hit || sfx.hit))         return modeSfx.hit || sfx.hit;
-  if (!isHit && (modeSfx.miss || sfx.miss))      return modeSfx.miss || sfx.miss;
+  // Out of ammo takes priority
+  if (outOfAmmo && (modeSfx.empty || sfx.empty)) return modeSfx.empty || sfx.empty;
+
+  if (isHit && (modeSfx.hit || sfx.hit))   return modeSfx.hit || sfx.hit;
+  if (!isHit && (modeSfx.miss || sfx.miss)) return modeSfx.miss || sfx.miss;
 
   // Single-base style fallback
   if (sfx.base) {
-    if (crit)   return sfx.base.replace(/\.(wav|ogg|mp3)$/i, "-critical.$1");
-    if (isHit)  return sfx.base;
+    if (outOfAmmo) return sfx.base.replace(/\.(wav|ogg|mp3)$/i, "-empty.$1");
+    if (isHit)     return sfx.base;
     return sfx.base.replace(/\.(wav|ogg|mp3)$/i, "-miss.$1");
   }
   return null;
@@ -239,6 +238,27 @@ export async function playCombatSFX(...args) {
       volume
     });
 
+    const outOfAmmo = opts.outOfAmmo ?? false;
+
+    // Out of ammo - play empty click and return early
+    if (outOfAmmo) {
+      const itemEmpty = pickFromItemSfx(opts.item ?? null, { actionType, isHit: false, rollResult, outOfAmmo: true });
+      if (itemEmpty) {
+        dlog("play: item-empty-sfx", { src: itemEmpty });
+        await AudioHelperNS.play({ src: itemEmpty, volume, autoplay: true, loop: false }, true);
+        return;
+      }
+      // Default empty click
+      const defaultEmpty = `${BASE_PATH()}/click-empty.mp3`;
+      if (await soundFileExists(defaultEmpty)) {
+        dlog("play: default-empty", { src: defaultEmpty });
+        await AudioHelperNS.play({ src: defaultEmpty, volume, autoplay: true, loop: false }, true);
+      } else {
+        dlog("skip: no empty sound found");
+      }
+      return;
+    }
+
     // 1) Item-configured SFX
     const forcePsychic = lowerDamageType === "mental";
     if (!forcePsychic) {
@@ -318,18 +338,6 @@ export async function playCombatSFX(...args) {
         soundPath = isHit ? `${BASE_PATH()}/gunshot.wav` : `${BASE_PATH()}/gunshot-miss.wav`;
       }
       dlog("fallback: by-damageType", { lowerDamageType, isHit, soundPath });
-    }
-
-    // 4) Critical variant
-    if (isHit && rollResult === "red" && soundPath) {
-      const criticalPath = soundPath.replace(/\.(wav|ogg|mp3)$/i, "-critical.$1");
-      if (await soundFileExists(criticalPath)) {
-        dlog("critical: variant-found", { criticalPath });
-        soundPath = criticalPath;
-        volume = Math.min(volume * 1.2, 1.0);
-      } else {
-        dlog("critical: no-variant");
-      }
     }
 
     // 5) Special ammo override
