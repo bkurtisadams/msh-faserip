@@ -594,7 +594,7 @@ export function buildActionsBox({
   }
 
   // Stun chip
-  if (showStun) {
+  if (showStun && !autoApply) {
     parts.push(
       chip(
         "Resolve Stun",
@@ -611,7 +611,7 @@ export function buildActionsBox({
   }
 
   // Kill chip
-  if (showKill) {
+  if (showKill && !autoApply) {
     parts.push(
       chip(
         "Resolve Kill",
@@ -1124,11 +1124,14 @@ export async function applyDamageToTargets({
 
       const canDirectUpdate = game.user.isGM || targetActor?.isOwner;
 
+      // In action-utils.js, replace lines 1127-1131:
       if (canDirectUpdate) {
+        game.msh._combatDamageInProgress = true;  // new 12-20-25
         await targetActor?.update(
           { [hpPath]: after },
           { healthChange: { old: before, new: after } }
         );
+        delete game.msh._combatDamageInProgress;  // new 12-20-25
 
         // Record damage timestamp for rest system
         if (before > after && typeof recordDamage === "function") {

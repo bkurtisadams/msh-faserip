@@ -1419,7 +1419,12 @@ Hooks.on('updateActor', async (actor, updateData, options, userId) => {
 
     // === GAME RULE: Check if at/below 0 HP ===
     if (currentHealth <= 0) {
-      console.log(`⚠️ FASERIP | ${actor.name} is at ${currentHealth} HP - triggering death save`);
+      // Skip if combat system already handling death save
+      if (game.msh?._combatDamageInProgress) {
+        console.log(`FASERIP | Skipping init.js death save - combat system handling`);
+        return;
+      }
+      console.log(`%cFASERIP | !!! ${actor.name} is at ${currentHealth} HP - triggering death save`, 'color: #ef5350; font-weight: bold');
 
       const mode = resolveCombatMode(actor) || "manual";
       console.log("FASERIP DEBUG | Combat mode resolved to:", mode);
@@ -1532,7 +1537,7 @@ Hooks.on('renderChatMessage', (message, html) => {
 
 // Each turn, decrement Endurance one printed rank for actors who are Dying (RAW)
 Hooks.on("updateCombat", async (combat, changed, diff, userId) => {
-  // 🔒 GM-only – players don't mutate actors/effects here
+  // GM-only – players don't mutate actors/effects here
   if (!game.user.isGM) return;
 
   console.log("🔄 FASERIP | updateCombat hook fired", { changed, round: combat.round, turn: combat.turn });

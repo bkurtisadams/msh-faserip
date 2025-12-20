@@ -142,6 +142,17 @@ export function installActionChatHandlers() {
             }
             if (!saveActor) continue;
 
+            // Skip stun/slam if target is at 0 HP - death save handles unconscious state
+            if (checkType === "stun" || checkType === "slam") {
+              const currentHp = saveActor.system?.attributes?.health?.value ?? 0;
+              if (currentHp <= 0) {
+                if (game.settings.get("msh-faserip", "debugMode")) {
+                  console.log(`FASERIP | Skipping ${checkType} auto-save - target at 0 HP, death save handles state`);
+                }
+                continue;
+              }
+            }
+
             // Only auto-run on a client that can control this defender
             const canControlDefender = saveActor?.isOwner || game.user.isGM;
             if (!canControlDefender) {
@@ -193,9 +204,7 @@ export function installActionChatHandlers() {
               opts: { attackForm, prefill, autoApply: true }
             });
             firedAnyCheck = true;
-
           }
-
 
           // Nullify / Force Save auto-run if the message indicates a save is required
           const f = message?.flags?.[SCOPE] ?? {};
