@@ -1,3 +1,7 @@
+// attack-action.js v1.6.1 - 2025-12-21
+// v1.6.1: Add debug logging for multi-attack FEAT auto-success diagnosis
+// v1.6.0: Fix auto-trigger of Slam/Stun/Kill checks in full auto mode
+// v1.5.x: Previous version without auto-trigger
 import { BaseAction } from "./base-action.js";
 // NOTE: resolveCombatMode imported dynamically to avoid circular dependency
 import { 
@@ -74,7 +78,21 @@ export class AttackAction extends BaseAction {
     const fightingIndex  = RANKS.indexOf(fightingAbility.rank);
     const diff = fightingIndex - intensityIndex;
 
+    // Debug logging for multi-attack FEAT
+    console.log("[FASERIP] _rollFightingFeat check:", {
+      actorName: actor?.name,
+      fightingRank: fightingAbility?.rank,
+      fightingIndex,
+      intensity,
+      intensityIndex,
+      diff,
+      AUTO_DIFF,
+      willAutoSucceed: diff >= AUTO_DIFF,
+      RANKS_sample: RANKS.slice(0, 12)
+    });
+
     if (diff >= AUTO_DIFF) {
+      console.log("[FASERIP] Multi-attack FEAT: AUTOMATIC SUCCESS (diff >= 4)");
       return { success: true, intensity, roll: null, totalRoll: null, resultColor: "AUTO", cancelled: false, auto: true };
     }
     if (USE_IMPOSSIBLE && diff <= IMPOSSIBLE_DIFF) {
@@ -598,6 +616,118 @@ export class AttackAction extends BaseAction {
           forceKilling: showKill  // ensure kill save triggers on red
         });
       }
+
+      // ============================================================
+      // NEW v1.6.0: Auto-trigger status effect checks in full auto mode
+      // ============================================================
+      if (!isManualMode && this.opts?.autoApply && canEffectsApply(penetratingDamage) && targetActor) {
+        const { ActionDispatcher } = await import("./action-dispatcher.js");
+        
+        // Get attacker strength info for Slam checks
+        const attackerStrInfo = getStrengthInfo(actor);
+        const attackerStrength = attackerStrInfo?.value || 10;
+        const attackerStrengthRank = attackerStrInfo?.rank || "Typical";
+        
+        // Get target's endurance for the save
+        const targetEndInfo = getAbilityInfo(targetActor, "endurance");
+        const targetEndRank = targetEndInfo?.rank || "Typical";
+        
+        // Build common prefill data
+        const basePrefill = {
+          dmgThrough: penetratingDamage,
+          targetName: targetName,
+          targetEndRank: targetEndRank,
+          defenderUuid: target?.document?.uuid ?? targetActor?.uuid,
+          targetUuid: target?.document?.uuid ?? targetActor?.uuid,
+          attackForm: attackForm,
+          borderline: false
+        };
+
+        // === AUTO-TRIGGER SLAM CHECK ===
+        if (showSlam) {
+          debugLog("Auto-triggering Slam check", { 
+            target: targetName, 
+            damage: penetratingDamage,
+            attackerStrength: attackerStrengthRank
+          });
+          
+          try {
+            await ActionDispatcher.roll("slam", {
+              actor: targetActor,  // Defender makes the save
+              abilityName: "endurance",
+              opts: {
+                autoApply: true,
+                showConfirm: false,
+                attackForm: attackForm,
+                prefill: {
+                  ...basePrefill,
+                  attackerStrength: attackerStrength,
+                  attackerStrengthRank: attackerStrengthRank,
+                  attackerName: actor.name
+                }
+              }
+            });
+          } catch (e) {
+            console.error("[FASERIP ERROR] Auto-trigger Slam failed:", e);
+          }
+        }
+
+        // === AUTO-TRIGGER STUN CHECK ===
+        if (showStun) {
+          debugLog("Auto-triggering Stun check", { 
+            target: targetName, 
+            damage: penetratingDamage 
+          });
+          
+          try {
+            await ActionDispatcher.roll("stun", {
+              actor: targetActor,  // Defender makes the save
+              abilityName: "endurance",
+              opts: {
+                autoApply: true,
+                showConfirm: false,
+                attackForm: attackForm,
+                damageType: damageType,
+                prefill: {
+                  ...basePrefill
+                }
+              }
+            });
+          } catch (e) {
+            console.error("[FASERIP ERROR] Auto-trigger Stun failed:", e);
+          }
+        }
+
+        // === AUTO-TRIGGER KILL CHECK ===
+        if (showKill) {
+          debugLog("Auto-triggering Kill check", { 
+            target: targetName, 
+            damage: penetratingDamage,
+            attackForm: attackForm
+          });
+          
+          try {
+            await ActionDispatcher.roll("kill", {
+              actor: targetActor,  // Defender makes the save
+              abilityName: "endurance",
+              opts: {
+                autoApply: true,
+                showConfirm: false,
+                attackForm: attackForm,
+                damageType: damageType,
+                prefill: {
+                  ...basePrefill
+                }
+              }
+            });
+          } catch (e) {
+            console.error("[FASERIP ERROR] Auto-trigger Kill failed:", e);
+          }
+        }
+      }
+      // ============================================================
+      // END v1.6.0 auto-trigger block
+      // ============================================================
     }
 
     // Play combat SFX once after all cards (still plays in manual mode)
