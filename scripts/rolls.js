@@ -1898,6 +1898,20 @@ export class FaseripRolls {
       console.log("Weapon shots check:", equipment.name, currentShots); // Debug
 
       if (currentShots <= 0) {
+        // Play empty click SFX
+        try {
+          if (game.msh?.playCombatSFX) {
+            await game.msh.playCombatSFX({
+              item: equipment,
+              actionType: "shooting",
+              outOfAmmo: true,
+              sourceName: equipment.name ?? "Weapon (empty)"
+            });
+          }
+        } catch (e) {
+          console.warn("FASERIP | Could not play empty click SFX:", e);
+        }
+
         // Weapon is out of ammo - show notification and chat message
         ui.notifications.warn(`${equipment.name} is out of ammunition! Reload required.`);
 
