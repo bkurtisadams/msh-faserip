@@ -14,6 +14,26 @@
           <option value="Special" {{#if (eq system.bonus "Special")}}selected{{/if}}>Special</option>
         </select>
       </div>
+
+      <div class="form-group">
+        <label>Rank Override:</label>
+        <select name="system.rankOverride">
+          <option value="" {{#if (eq system.rankOverride "")}}selected{{/if}}>Use Bonus</option>
+          <option value="Feeble" {{#if (eq system.rankOverride "Feeble")}}selected{{/if}}>Feeble</option>
+          <option value="Poor" {{#if (eq system.rankOverride "Poor")}}selected{{/if}}>Poor</option>
+          <option value="Typical" {{#if (eq system.rankOverride "Typical")}}selected{{/if}}>Typical</option>
+          <option value="Good" {{#if (eq system.rankOverride "Good")}}selected{{/if}}>Good</option>
+          <option value="Excellent" {{#if (eq system.rankOverride "Excellent")}}selected{{/if}}>Excellent</option>
+          <option value="Remarkable" {{#if (eq system.rankOverride "Remarkable")}}selected{{/if}}>Remarkable</option>
+          <option value="Incredible" {{#if (eq system.rankOverride "Incredible")}}selected{{/if}}>Incredible</option>
+          <option value="Amazing" {{#if (eq system.rankOverride "Amazing")}}selected{{/if}}>Amazing</option>
+          <option value="Monstrous" {{#if (eq system.rankOverride "Monstrous")}}selected{{/if}}>Monstrous</option>
+          <option value="Unearthly" {{#if (eq system.rankOverride "Unearthly")}}selected{{/if}}>Unearthly</option>
+          <option value="Shift-X" {{#if (eq system.rankOverride "Shift-X")}}selected{{/if}}>Shift-X</option>
+          <option value="Shift-Y" {{#if (eq system.rankOverride "Shift-Y")}}selected{{/if}}>Shift-Y</option>
+          <option value="Shift-Z" {{#if (eq system.rankOverride "Shift-Z")}}selected{{/if}}>Shift-Z</option>
+        </select>
+      </div>
   
       <div class="form-group">
         <label>Ability Modified:</label>

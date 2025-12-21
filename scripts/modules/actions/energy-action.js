@@ -109,7 +109,7 @@ export class EnergyAction extends RangedAttackAction {
 
       <div style="margin-bottom:8px;">
         <span style="display:inline-block;width:110px;">Column Shift:</span>
-        <input type="number" name="shift" value="${Number(savedShift)}" style="width:60px;">
+        <input type="number" name="shift" value="${Number(this.opts?.shift ?? savedShift)}" style="width:60px;">
       </div>
 
       ${generateKarmaControlsHTML(actor, 0)}

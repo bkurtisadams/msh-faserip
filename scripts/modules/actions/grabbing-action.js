@@ -213,7 +213,7 @@ export class GrabbingAction extends AttackAction {
 
       <div style="margin-bottom:8px;">
         <label style="display:inline-block;width:130px;">Column Shift:</label>
-        <input type="number" name="shift" value="${Number(savedShift)}" style="width:60px;">
+        <input type="number" name="shift" value="${Number(this.opts?.shift ?? savedShift)}" style="width:60px;">
         <span style="color:#666;font-size:.9em;">(+ easier, - harder)</span>
       </div>
       ${generateKarmaControlsHTML(actor, savedSpendKarma)}

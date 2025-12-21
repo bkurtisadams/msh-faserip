@@ -128,7 +128,7 @@ export class ShootingAction extends RangedAttackAction {
         <span style="margin-left:6px;">(${ability.value})</span></div>
 
       <div style="margin-bottom:8px;"><label style="display:inline-block;width:120px;">Column Shift:</label>
-        <input type="number" name="shift" value="${savedShift}" style="width:52px;">
+        <input type="number" name="shift" value="${Number(this.opts?.shift ?? savedShift)}" style="width:52px;">
         <span style="color:#666;font-size:.9em;">(+ right, - left)</span></div>
 
       ${generateKarmaControlsHTML(actor, 0)}

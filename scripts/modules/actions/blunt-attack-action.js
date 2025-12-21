@@ -60,7 +60,7 @@ export class BluntAttackAction extends AttackAction {
     // 2. Load settings (Flag vs Default)
     // If remembering, load from actor flags. If not, force defaults.
     // Exception: passedItemId always overrides source default.
-    const defaultSource = passedItemId ? "weapon" : "hands";
+    const defaultSource = (passedItemId && passedItem?.type === "equipment") ? "weapon" : "hands";
     
     const savedSource = shouldRemember 
       ? ((await actor.getFlag("msh-faserip","lastBluntSource")) || defaultSource)
@@ -103,7 +103,7 @@ export class BluntAttackAction extends AttackAction {
       <div style="margin:6px 0;padding:6px 0;border-top:1px solid #ddd;">
         <div style="margin-bottom:4px;">
           <label style="display:inline-block;width:90px;font-size:.9em;">Column Shift:</label>
-          <input type="number" name="shift" value="${savedColumnShift }" style="width:45px;padding:2px;">
+          <input type="number" name="shift" value="${Number(this.opts?.shift ?? savedColumnShift)}" style="width:45px;padding:2px;">
           <span style="color:#666;font-size:.8em;margin-left:4px;">(+/−)</span>
         </div>
         ${generateKarmaControlsHTML(actor, 0)}
