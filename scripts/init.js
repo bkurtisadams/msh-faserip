@@ -1,4 +1,6 @@
-// init.js v1.5.0 - 2025-12-21
+// init.js v1.5.2 - 2025-12-21
+// v1.5.2: Refactored console messages to use severity prefixes)
+// v1.5.1: Fix dying check to only trigger on round change (not turn change)
 // v1.5.0: Consolidated updateCombat hooks, added dedup guard for dying checks
 import * as GMUtils from './gm-utils.js';
 import { FaseripActor } from './actor.js';
@@ -43,7 +45,7 @@ Hooks.on("combatRound", async (combat, updateData, updateOptions, userId) => {
   
   // Advance Foundry world time by 6 seconds (1 FASERIP turn)
   await game.time.advance(6);
-  console.log("🕐 FASERIP | Combat advanced time by 6 seconds");
+  console.log("[FASERIP] Combat advanced time by 6 seconds");
   
   // Trigger hook to update team sheet display
   Hooks.callAll("msh-faserip.timeUpdated");
@@ -1507,11 +1509,11 @@ Hooks.on("updateCombat", async (combat, changed, diff, userId) => {
   // GM-only – players don't mutate actors/effects here
   if (!game.user.isGM) return;
 
-  console.log("🔄 FASERIP | updateCombat hook fired", { changed, round: combat.round, turn: combat.turn });
+  console.debug("[FASERIP DEBUG] updateCombat hook fired", { changed, round: combat.round, turn: combat.turn });
   
   // Only act when the turn actually changes
   if (!("turn" in changed || "round" in changed)) {
-    console.log("⏭️ FASERIP | Skipping - no turn/round change");
+    console.debug("[FASERIP DEBUG] Skipping - no turn/round change");
     return;
   }
 
@@ -1519,7 +1521,7 @@ Hooks.on("updateCombat", async (combat, changed, diff, userId) => {
   const dyingKey = `${combat.round}-${combat.turn}`;
   const lastDyingKey = combat.getFlag("msh-faserip", "lastDyingProcessed");
   if (lastDyingKey === dyingKey) {
-    console.log("⏭️ FASERIP | Skipping - dying already processed for this round/turn");
+    console.debug("[FASERIP DEBUG] Skipping - dying already processed for this round/turn");
     return;
   }
   await combat.setFlag("msh-faserip", "lastDyingProcessed", dyingKey);
@@ -1593,7 +1595,7 @@ Hooks.on("updateCombat", async (combat, changed, diff, userId) => {
         const currentElapsed = game.settings.get("msh-faserip", "elapsedSeconds") || 0;
         const newElapsed = Math.max(0, currentElapsed + secondsChange);
         await game.settings.set("msh-faserip", "elapsedSeconds", newElapsed);
-        console.log(`🕐 FASERIP | Time tracker synced: ${secondsChange > 0 ? '+' : ''}${secondsChange} seconds`);
+        console.log(`[FASERIP] Time tracker synced: ${secondsChange > 0 ? '+' : ''}${secondsChange} seconds`);
         
         // Trigger hook to update any open team sheets
         Hooks.callAll("msh-faserip.timeUpdated", newElapsed);
@@ -1602,35 +1604,38 @@ Hooks.on("updateCombat", async (combat, changed, diff, userId) => {
   } */
 
   const scope = globalThis.MSH_FLAG_SCOPE || "msh-faserip";
-  console.log("🔍 FASERIP | Checking all combatants for Dying effects...");
 
-  // Check ALL combatants for dying effects, not just the current one
-  let dyingCount = 0;
-  for (const combatant of combat.combatants) {
-    const actor = combatant.actor;
-    if (!actor) {
-      console.log("⚠️ FASERIP | Combatant has no actor:", combatant.name);
-      continue;
-    }
+  // DYING CHECK: Only process on ROUND change (RAW: lose 1 Endurance rank per round)
+  if ("round" in changed) {
+    console.log("[FASERIP:DYING] Checking all combatants for Dying effects...");
 
-    // Identify "Dying" state via either status effect or flags
-    const dyingEffect = actor.effects.find(e =>
-      e.getFlag(scope, "isDying") || e.statuses?.has?.("dying")
-    );
-    
-    if (!dyingEffect) continue;
-    
-    dyingCount++;
-    console.log(`💀 FASERIP | Found Dying effect on ${actor.name}`, {
-      effectName: dyingEffect.name,
-      effectId: dyingEffect.id,
-      flags: dyingEffect.flags[scope]
-    });
+    // Check ALL combatants for dying effects, not just the current one
+    let dyingCount = 0;
+    for (const combatant of combat.combatants) {
+      const actor = combatant.actor;
+      if (!actor) {
+        console.warn("[FASERIP WARN] Combatant has no actor:", combatant.name);
+        continue;
+      }
+
+      // Identify "Dying" state via either status effect or flags
+      const dyingEffect = actor.effects.find(e =>
+        e.getFlag(scope, "isDying") || e.statuses?.has?.("dying")
+      );
+      
+      if (!dyingEffect) continue;
+      
+      dyingCount++;
+      console.log(`[FASERIP:DYING] Found Dying effect on ${actor.name}`, {
+        effectName: dyingEffect.name,
+        effectId: dyingEffect.id,
+        flags: dyingEffect.flags[scope]
+      });
 
     // Pause 1 round if stabilized
     const stabilizedRounds = dyingEffect.getFlag(scope, "stabilizedRounds") || 0;
     if (stabilizedRounds > 0) {
-      console.log(`⏸️ FASERIP | ${actor.name} is stabilized for ${stabilizedRounds} more rounds`);
+      console.log(`[FASERIP:DYING] ${actor.name} is stabilized for ${stabilizedRounds} more rounds`);
       await dyingEffect.setFlag(scope, "stabilizedRounds", stabilizedRounds - 1);
       continue;
     }
@@ -1643,7 +1648,7 @@ Hooks.on("updateCombat", async (combat, changed, diff, userId) => {
     const nextValue = game.msh.getRankValue(nextName) || 0;
 
     if (game.settings.get("msh-faserip", "debugMode")) {
-      console.log(`📉 FASERIP | ${actor.name} Endurance: ${curName} → ${nextName} (${nextValue})`);
+      console.log(`[FASERIP:DYING] ${actor.name} Endurance: ${curName} -> ${nextName} (${nextValue})`);
     }
 
     // line moved - right after the nextValue calculation and BEFORE the try block:
@@ -1691,7 +1696,7 @@ Hooks.on("updateCombat", async (combat, changed, diff, userId) => {
           }]
         }]);
         
-        console.log(`✅ FASERIP | Created Impaired Endurance effect for ${actor.name}`);
+        console.log(`[FASERIP:DYING] Created Impaired Endurance effect for ${actor.name}`);
       } else {
         // Update existing effect with new rank
         await impairedEffect.update({
@@ -1699,14 +1704,14 @@ Hooks.on("updateCombat", async (combat, changed, diff, userId) => {
           [`flags.${scope}.currentEndurance`]: nextName
         });
         
-        console.log(`✅ FASERIP | Updated Impaired Endurance effect for ${actor.name}`);
+        console.log(`[FASERIP:DYING] Updated Impaired Endurance effect for ${actor.name}`);
       }
       
       if (game.settings.get("msh-faserip", "debugMode")) {
-        console.log(`✅ FASERIP | Updated ${actor.name}'s Endurance to ${nextName} (${nextValue})`);
+        console.log(`[FASERIP:DYING] Updated ${actor.name}'s Endurance to ${nextName} (${nextValue})`);
       }
     } catch (err) {
-      console.error(`❌ FASERIP | Failed to update ${actor.name}'s Endurance:`, err);
+      console.error(`[FASERIP ERROR] Failed to update ${actor.name}'s Endurance:`, err);
     }
 
     // Update the effect's label and tracking flags
@@ -1718,9 +1723,9 @@ Hooks.on("updateCombat", async (combat, changed, diff, userId) => {
         [`flags.${scope}.currentTempRank`]: nextName,
         [`flags.${scope}.turnsElapsed`]: turnsElapsed
       });
-      console.log(`✅ FASERIP | Updated Dying effect label for ${actor.name}`);
+      console.log(`[FASERIP:DYING] Updated Dying effect label for ${actor.name}`);
     } catch (err) {
-      console.error(`❌ FASERIP | Failed to update Dying effect:`, err);
+      console.error(`[FASERIP ERROR] Failed to update Dying effect:`, err);
     }
 
     // Post message about Endurance loss
@@ -1734,7 +1739,7 @@ Hooks.on("updateCombat", async (combat, changed, diff, userId) => {
     if (nextName === "Shift-0") {
       if (curName === "Shift-0") {
         // Already at Shift-0 and trying to go lower = death
-        console.log(`💀 FASERIP | ${actor.name} has died (below Shift-0)`);
+        console.warn(`[FASERIP WARN] ${actor.name} has died (below Shift-0)`);
         
         // For linked actors, set isDead flag on base actor
         // For unlinked tokens, skip this to avoid affecting other tokens sharing the same base actor
@@ -1786,7 +1791,7 @@ Hooks.on("updateCombat", async (combat, changed, diff, userId) => {
         // Just reached Shift-0 this round
         // DEBUG: Log the exact values being compared (if debug mode enabled)
         if (game.settings.get("msh-faserip", "debugMode")) {
-          console.log(`🔍 FASERIP | Death check for ${actor.name}:`, {
+          console.debug(`[FASERIP DEBUG] Death check for ${actor.name}:`, {
             curName,
             nextName,
             curNameType: typeof curName,
@@ -1797,7 +1802,7 @@ Hooks.on("updateCombat", async (combat, changed, diff, userId) => {
             bothShift0: curName === "Shift-0" && nextName === "Shift-0"
           });
         }
-        console.log(`⚠️ FASERIP | ${actor.name} has reached Shift-0 Endurance (will die next round if not stabilized)`);
+        console.warn(`[FASERIP WARN] ${actor.name} has reached Shift-0 Endurance (will die next round if not stabilized)`);
         ChatMessage.create({
           content: `<div style="background:#fff3e0;border:1px solid #ff9800;padding:8px;border-radius:3px;color:#e65100;">
             <strong>⚠️ ${actor.name} has reached Shift-0 Endurance!</strong>
@@ -1810,17 +1815,18 @@ Hooks.on("updateCombat", async (combat, changed, diff, userId) => {
     // Handle the special 200-Karma "re-FEAT on slip"
     const reFeat = dyingEffect.getFlag(scope, "reFeatOnSlip");
     if (reFeat) {
-      console.log(`🎲 FASERIP | ${actor.name} gets re-FEAT on slip`);
+      console.log(`[FASERIP:DYING] ${actor.name} gets re-FEAT on slip`);
       await dyingEffect.setFlag(scope, "reFeatOnSlip", false);
       game.msh?.openUniversalTableDialog?.(actor, { mode: "death-save" });
     }
   }
   
   if (dyingCount === 0) {
-    console.log("✨ FASERIP | No dying combatants found");
+    console.debug("[FASERIP DEBUG] No dying combatants found");
   } else {
-    console.log(`📊 FASERIP | Processed ${dyingCount} dying combatant(s)`);
+    console.log(`[FASERIP:DYING] Processed ${dyingCount} dying combatant(s)`);
   }
+  } // end "round" in changed (dying check)
 
   // Check for Recovery/Healing timers
   
@@ -1880,7 +1886,7 @@ Hooks.on("updateCombat", async (combat, changed, diff, userId) => {
 
 // Add the hotbarDrop hook at module level (like in the older file)
 Hooks.on('hotbarDrop', (bar, data, slot) => {  // Remove async
-  console.log("📦 hotbarDrop received:", data);
+  console.debug("[FASERIP DEBUG] hotbarDrop received:", data);
   
   if (data.type === "FaseripItem" && data.actorId) {  // Changed from "Item"
     createFaseripItemMacro(data, slot).catch(err => {
