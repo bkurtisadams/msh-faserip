@@ -31,6 +31,7 @@ import { resolveCombatMode } from "./modules/actions/action-dispatcher.js";
 import { initRestSystem } from "./modules/rest-system.js";
 import { ACTIONS } from '../helpers/action-constants.js';
 import { playCombatSFX, classifyWeapon } from "./modules/actions/audio-utils.js";
+import { quickHeal } from "../macros/quick-heal.js";
 
 // Helper to resolve ACTIONS from CONFIG (for macro compatibility)
 function getActions() {
@@ -1259,6 +1260,12 @@ Hooks.once("ready", async () => {
   } catch (e) {
     console.warn("MSH FASERIP | Failed to auto-open Action HUD:", e);
   }
+
+  // Register macros
+  game.msh.macros = {
+    quickHeal
+  };
+  console.log("[FASERIP] Macros registered");
 
 });
 
