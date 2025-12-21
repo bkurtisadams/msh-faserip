@@ -1,5 +1,7 @@
-// init.js v1.5.2 - 2025-12-21
-// v1.5.2: Refactored console messages to use severity prefixes)
+// init.js v1.5.4 - 2025-12-21
+// v1.5.4: Fix icon property access to use Object.hasOwn (avoids triggering deprecated getter)
+// v1.5.3: Fix v12 deprecations (ActiveEffect#icon -> img, Token#toggleEffect -> Actor#toggleStatusEffect)
+// v1.5.2: Refactored console messages to use severity prefixes (no emojis)
 // v1.5.1: Fix dying check to only trigger on round change (not turn change)
 // v1.5.0: Consolidated updateCombat hooks, added dedup guard for dying checks
 import * as GMUtils from './gm-utils.js';
@@ -229,13 +231,12 @@ Hooks.once("init", async () => {
       return;
     }
 
-    // Back-compat for sheets/modules: ensure BOTH fields exist.
-    if (data?.img  && !data?.icon) data.icon = data.img;
-    if (data?.icon && !data?.img)  data.img  = data.icon;
+    // v12+: img is canonical, icon is deprecated - check property existence without triggering getter
+    if (data && Object.hasOwn(data, 'icon') && !data.img) data.img = data.icon;
 
     // Core doesn't have impact.svg; remap to a safe built-in.
-    if (data?.img === "icons/svg/impact.svg" || data?.icon === "icons/svg/impact.svg") {
-      data.img = data.icon = "icons/svg/target.svg";
+    if (data?.img === "icons/svg/impact.svg") {
+      data.img = "icons/svg/target.svg";
     }
 
 
@@ -345,10 +346,10 @@ Hooks.once("init", async () => {
 
 
   Hooks.on("preUpdateActiveEffect", function (effect, changes, options, userId) {
-    if (changes?.img  && !changes?.icon) changes.icon = changes.img;
-    if (changes?.icon && !changes?.img)  changes.img  = changes.icon;
-    if (changes?.img === "icons/svg/impact.svg" || changes?.icon === "icons/svg/impact.svg") {
-      changes.img = changes.icon = "icons/svg/target.svg";
+    // v12+: img is canonical, icon is deprecated - check property existence without triggering getter
+    if (changes && Object.hasOwn(changes, 'icon') && !changes.img) changes.img = changes.icon;
+    if (changes?.img === "icons/svg/impact.svg") {
+      changes.img = "icons/svg/target.svg";
     }
   });
 
@@ -1759,27 +1760,8 @@ Hooks.on("updateCombat", async (combat, changed, diff, userId) => {
           console.log(`FASERIP | Removed ${unconsciousEffects.length} unconscious effect(s) from dead ${actor.name}`);
         }
 
-        // Only affect the specific token if this is a token actor (unlinked)
-        if (actor.isToken) {
-          // This is an unlinked token - only affect this specific token
-          const token = actor.token?.object || combatant.token?.object;
-          if (token) {
-            await token.toggleEffect({
-              id: "dead",
-              label: "Dead",
-              icon: "icons/svg/skull.svg"
-            }, { active: true, overlay: true });
-          }
-        } else {
-          // This is a linked actor - affect all its tokens
-          for (const token of actor.getActiveTokens()) {
-            await token.toggleEffect({
-              id: "dead",
-              label: "Dead",
-              icon: "icons/svg/skull.svg"
-            }, { active: true, overlay: true });
-          }
-        }
+        // Apply dead status via actor (v12+ compatible)
+        await actor.toggleStatusEffect("dead", { active: true, overlay: true });
         
         ChatMessage.create({
           content: `<div style="background:#ffebee;border:1px solid #b71c1c;padding:8px;border-radius:3px;color:#b71c1c;">
