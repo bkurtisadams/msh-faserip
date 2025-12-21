@@ -1,4 +1,5 @@
-// In init.js
+// init.js v1.5.0 - 2025-12-21
+// v1.5.0: Consolidated updateCombat hooks, added dedup guard for dying checks
 import * as GMUtils from './gm-utils.js';
 import { FaseripActor } from './actor.js';
 import { FaseripItem } from './item.js';
@@ -329,41 +330,7 @@ Hooks.once("init", async () => {
     }
   });
 
-  // Delete round-based effects when they hit 0 remaining (safety net for custom flows)
-  Hooks.on("updateCombat", async (combat, changes) => {
-    // Only GM should handle timed-effect auto-expiry
-    if (!game.user.isGM) {
-      if (game.settings.get("msh-faserip", "debugMode")) {
-        console.log("FASERIP | Skipping timed-effect auto-expire on non-GM client", {
-          user: game.user.name,
-          combatId: combat?.id
-        });
-      }
-      return;
-    }
 
-    if (!("round" in changes) && !("turn" in changes)) return;    // only when advancing
-    if (!combat?.active) return;
-
-    const curRound = combat.round ?? 1;
-
-    for (const c of combat.combatants) {
-      const a = c?.actor; if (!a) continue;
-
-      for (const ef of a.effects) {
-        const d = ef.duration ?? {};
-        if (!Number.isFinite(d.rounds)) continue;                 // only timed-by-rounds
-
-        const startR   = d.startRound ?? curRound;
-        const elapsed  = Math.max(0, curRound - startR);
-        const remaining = Math.ceil((d.rounds ?? 0) - elapsed);
-
-        if (remaining <= 0 && !ef.disabled) {
-          try { await ef.delete(); } catch (e) { console.warn("AE auto-expire failed", e); }
-        }
-      }
-    }
-  });
 
 
   /* Hooks.on("updateCombat", async (combat, changes) => {
@@ -1548,6 +1515,15 @@ Hooks.on("updateCombat", async (combat, changed, diff, userId) => {
     return;
   }
 
+  // Dedup guard: track last processed round+turn to prevent duplicate dying checks
+  const dyingKey = `${combat.round}-${combat.turn}`;
+  const lastDyingKey = combat.getFlag("msh-faserip", "lastDyingProcessed");
+  if (lastDyingKey === dyingKey) {
+    console.log("⏭️ FASERIP | Skipping - dying already processed for this round/turn");
+    return;
+  }
+  await combat.setFlag("msh-faserip", "lastDyingProcessed", dyingKey);
+
   // Optional CTT sync
   const syncMode = game.settings.get("msh-faserip", "ctt.syncMode");
   try {
@@ -1559,6 +1535,25 @@ Hooks.on("updateCombat", async (combat, changed, diff, userId) => {
       Effects.advanceCTTByTurns(turns);
     }
   } catch (_) { /* no-op */ }
+
+  // Auto-expire round-based effects that have hit 0 remaining
+  if (combat?.active) {
+    const curRound = combat.round ?? 1;
+    for (const c of combat.combatants) {
+      const a = c?.actor;
+      if (!a) continue;
+      for (const ef of a.effects) {
+        const d = ef.duration ?? {};
+        if (!Number.isFinite(d.rounds)) continue;
+        const startR = d.startRound ?? curRound;
+        const elapsed = Math.max(0, curRound - startR);
+        const remaining = Math.ceil((d.rounds ?? 0) - elapsed);
+        if (remaining <= 0 && !ef.disabled) {
+          try { await ef.delete(); } catch (e) { console.warn("AE auto-expire failed", e); }
+        }
+      }
+    }
+  }
 
   // Refresh labels for round-based effects on all combatants
   for (const c of combat.combatants) {
