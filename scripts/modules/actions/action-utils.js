@@ -690,8 +690,8 @@ export function buildActionsBox({
     );
   }
 
-  // Slam chip — only if requested by caller
-  if (showSlam) {
+  // Slam chip — only if requested by caller and not in auto mode
+  if (showSlam && !autoApply) {
     parts.push(
       chip(
         "Resolve Slam",
