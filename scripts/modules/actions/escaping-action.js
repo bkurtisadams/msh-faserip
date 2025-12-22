@@ -1,4 +1,5 @@
-// scripts/modules/actions/escaping-action.js v1.1.0 - 2025-12-22
+// scripts/modules/actions/escaping-action.js v1.2.0 - 2025-12-22
+// v1.2.0: Accept prefill from opts for opponent name/strength
 // v1.1.0: Add inline rolls for consolidated chat cards
 import { AttackAction } from "./attack-action.js";
 import { 
@@ -117,13 +118,17 @@ export class EscapingAction extends AttackAction {
   }
 
   async _showDialog(actor, strength) {
-    // Auto-fill opponent from target if any
-    let prefillOpp = "";
-    let prefillOppStr = "";
-    const targets = Array.from(game.user?.targets ?? []);
-    if (targets.length === 1) {
-      prefillOpp = targets[0].name || "";
-      prefillOppStr = targets[0].actor?.system?.abilities?.strength?.rank || "";
+    // Auto-fill opponent from opts prefill first, then from target if any
+    let prefillOpp = this.opts?.prefill?.opponentName || "";
+    let prefillOppStr = this.opts?.prefill?.opponentStr || "";
+    
+    // If no prefill from opts, try from targeted token
+    if (!prefillOpp) {
+      const targets = Array.from(game.user?.targets ?? []);
+      if (targets.length === 1) {
+        prefillOpp = targets[0].name || "";
+        prefillOppStr = targets[0].actor?.system?.abilities?.strength?.rank || "";
+      }
     }
 
     // Load persisted settings

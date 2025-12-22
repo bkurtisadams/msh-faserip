@@ -19,6 +19,43 @@ import { rollUniversalTable } from "../dice/universal-table.js";
 import { generateKarmaControlsHTML, setupKarmaControlHandlers, extractKarmaFromDialog } from "../dice/dice-roller.js";
 import * as Effects from "../effects/effect-engine.js";
 
+/**
+ * Handle escape check from chat card button
+ * The escaping character is the current user's character or selected token
+ */
+async function handleEscapeCheck({ defenderUuid, defenderName, defenderRank }) {
+  // The "defender" in this context is the person holding - we need the escaping character
+  // which should be the current user's controlled token or character
+  let escapingActor = null;
+  
+  // Try selected token first
+  const controlled = canvas.tokens?.controlled?.[0];
+  if (controlled?.actor) {
+    escapingActor = controlled.actor;
+  }
+  
+  // Fall back to user's character
+  if (!escapingActor) {
+    escapingActor = game.user?.character;
+  }
+  
+  if (!escapingActor) {
+    ui.notifications.warn("Select your token or set a character to attempt escape.");
+    return;
+  }
+  
+  // Call the escaping action with prefill data about the holder
+  await ActionDispatcher.roll("escaping", {
+    actor: escapingActor,
+    opts: {
+      prefill: {
+        opponentName: defenderName || "",
+        opponentStr: defenderRank || ""
+      }
+    }
+  });
+}
+
 export function installActionChatHandlers() {
   // idempotent guard
   game.msh ??= {};

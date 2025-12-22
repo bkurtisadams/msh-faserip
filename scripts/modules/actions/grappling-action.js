@@ -1,4 +1,5 @@
-// scripts/modules/actions/grappling-action.js v1.2.0 - 2025-12-22
+// scripts/modules/actions/grappling-action.js v1.3.0 - 2025-12-22
+// v1.3.0: Fix escape button to pass holder info for dialog prefill
 // v1.2.0: Use effect-engine wrappers for Partial Hold/Full Hold effects
 // v1.1.0: Add inline rolls for consolidated chat cards
 import { AttackAction } from "./attack-action.js";
@@ -126,11 +127,17 @@ export class GrapplingAction extends AttackAction {
         console.warn("FASERIP | Grappling hold status failed", e);
       }
     }
+    
+    // For the escape button, the "defender" is the HOLDER (this actor), not the target
+    // This prefills the escape dialog with the holder's name and strength
+    const holderStrength = actor.system?.abilities?.strength?.rank || "Good";
+    
     const actions = buildActionsBox({
       showEscape: showEscape,
-      targetUuid: choice.targetUuid,
-      targetName: choice.targetName,
-      targetStrength: choice.targetStrength,
+      // Pass holder info as "target" since escape chip uses targetName/targetStrength for opponent prefill
+      targetUuid: actor.uuid,
+      targetName: actor.name,
+      targetStrength: holderStrength,
       actorUuid: actor.uuid,
       autoApply: !!this.opts?.autoApply,
 
