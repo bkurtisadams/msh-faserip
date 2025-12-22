@@ -29,6 +29,23 @@
           "reason": { "value": 10, "initialRoll": "", "initialRank": "", "rank": "Good" },
           "intuition": { "value": 10, "initialRoll": "", "initialRank": "", "rank": "Good" },
           "psyche": { "value": 10, "initialRoll": "", "initialRank": "", "rank": "Good" }
+        },
+        "combatMods": {
+          "attackShift": 0,
+          "defenseShift": 0,
+          "defenseShiftRanged": 0,
+          "abilityShifts": {
+            "fighting": 0,
+            "agility": 0,
+            "strength": 0,
+            "endurance": 0,
+            "reason": 0,
+            "intuition": 0,
+            "psyche": 0
+          },
+          "movementMult": 1,
+          "canAct": true,
+          "canMove": true
         }
       },
       "derived": {

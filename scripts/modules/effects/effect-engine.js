@@ -1,4 +1,5 @@
-// scripts/modules/effects/effect-engine.js
+// scripts/modules/effects/effect-engine.js v1.1.0 - 2025-12-22
+// v1.1.0: Add proper Foundry changes arrays to effect wrappers
 // Centralized Active Effect helpers for FASERIP on Foundry v13
 
 const SCOPE = () => (globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faserip");
@@ -128,7 +129,7 @@ export async function applyEffect(target, effectData = {}, opts = {}) {
   // Normalize actor (works for linked/unlinked tokens or raw Actor)
   const actor = target?.actor ?? target;
   if (!actor) {
-    console.error("[effect-engine] applyEffect: no valid actor/target", { target, effectData, opts });
+    console.error("[FASERIP ERROR] applyEffect: no valid actor/target", { target, effectData, opts });
     return null;
   }
 
@@ -143,22 +144,36 @@ export async function applyEffect(target, effectData = {}, opts = {}) {
     icon,          // deprecated; drop it
     originUuid,    // allow both originUuid and origin
     origin,
+    changes,       // explicitly extract changes array
+    statuses,      // explicitly extract statuses
+    name,          // explicitly extract name
+    flags,         // explicitly extract flags
     ...rest
   } = effectData;
 
   const duration = providedDuration || computeDuration({ rounds, seconds });
+  
+  // Build payload with explicit properties to ensure nothing is lost
   const payload = {
-    ...rest,
+    name: name || "Effect",
     img,
     duration,
     origin: origin ?? originUuid ?? actor.uuid,
+    changes: changes || [],
+    statuses: statuses || [],
     flags: {
-      ...(rest?.flags || {}),
+      ...(flags || {}),
       [SCOPE()]: {
-        ...(rest?.flags?.[SCOPE()] || {})
+        ...(flags?.[SCOPE()] || {})
       }
-    }
+    },
+    ...rest  // Any other properties
   };
+
+  // Debug log to verify changes are present
+  if (changes?.length > 0) {
+    console.log(`[FASERIP] applyEffect: ${name} with ${changes.length} changes`, changes);
+  }
 
   // Permission check: can the current user create effects on this actor?
   // For unlinked tokens (ActorDelta), we must check the parent token's ownership
@@ -228,12 +243,20 @@ export async function applyEffect(target, effectData = {}, opts = {}) {
 
   // User has permission - create directly
   try {
+    console.log(`[FASERIP] Creating effect "${payload.name}" on ${actor.name}`, {
+      changes: payload.changes,
+      duration: payload.duration,
+      statuses: payload.statuses
+    });
     const createdArr = await actor.createEmbeddedDocuments("ActiveEffect", [payload]);
     const created = Array.isArray(createdArr) ? createdArr[0] : createdArr;
-    if (created?.id) await renameEffectWithRemaining(created);
+    if (created?.id) {
+      console.log(`[FASERIP] Effect created with id ${created.id}, changes:`, created.changes);
+      await renameEffectWithRemaining(created);
+    }
     return created;
   } catch (err) {
-    console.error("[effect-engine] applyEffect failed:", err, { 
+    console.error("[FASERIP ERROR] applyEffect failed:", err, { 
       payload,
       actorName: actor.name
     });
@@ -246,12 +269,29 @@ export async function applyEffect(target, effectData = {}, opts = {}) {
 
 /* ===== Specific wrappers for common combat effects ===== */
 
+// Active Effect mode constants (from Foundry CONST.ACTIVE_EFFECT_MODES)
+const AE_MODE = {
+  MULTIPLY: 1,
+  ADD: 2,
+  DOWNGRADE: 3,
+  UPGRADE: 4,
+  OVERRIDE: 5
+};
+
 export async function applyStun(actor, { rounds = 1, originUuid = null } = {}, opts = {}) {
   return applyEffect(actor, {
     name: "Stunned",
     img: "icons/svg/daze.svg",
     rounds,
     originUuid,
+    changes: [
+      { key: "system.combatMods.attackShift", mode: AE_MODE.ADD, value: "-2", priority: 20 },
+      { key: "system.combatMods.defenseShift", mode: AE_MODE.ADD, value: "-2", priority: 20 },
+      { key: "system.combatMods.defenseShiftRanged", mode: AE_MODE.ADD, value: "-2", priority: 20 },
+      { key: "system.combatMods.movementMult", mode: AE_MODE.OVERRIDE, value: "0", priority: 50 },
+      { key: "system.combatMods.canAct", mode: AE_MODE.OVERRIDE, value: "false", priority: 50 },
+      { key: "system.combatMods.canMove", mode: AE_MODE.OVERRIDE, value: "false", priority: 50 }
+    ],
     flags: {
       effectType: "stunned",
       status: { isStunned: true },
@@ -266,6 +306,13 @@ export async function applyEvade(actor, { target = "", nextRoundAttackBonusCS = 
     name: target ? `Evaded ${target}` : "Evaded",
     img: "icons/svg/combat.svg",
     rounds: 1,
+    changes: [
+      { key: "system.combatMods.attackShift", mode: AE_MODE.ADD, value: "-3", priority: 20 },
+      { key: "system.combatMods.defenseShift", mode: AE_MODE.ADD, value: "2", priority: 20 },
+      { key: "system.combatMods.defenseShiftRanged", mode: AE_MODE.ADD, value: "2", priority: 20 },
+      { key: "system.combatMods.abilityShifts.agility", mode: AE_MODE.ADD, value: "2", priority: 20 },
+      { key: "system.combatMods.canAct", mode: AE_MODE.OVERRIDE, value: "false", priority: 50 }
+    ],
     flags: {
       effectType: "evading",
       status: { isEvading: true },
@@ -282,6 +329,9 @@ export async function applyBlock(actor, { armorRank = "Good", armorValue = 10, n
     name: `Blocking (${armorRank})`,
     img: "icons/svg/shield.svg",
     rounds: 1,
+    changes: [
+      { key: "system.combatMods.movementMult", mode: AE_MODE.MULTIPLY, value: "0.5", priority: 20 }
+    ],
     flags: {
       effectType: "blocking",
       status: { isBlocking: true },
@@ -304,6 +354,7 @@ export async function applyCatch(actor, { scenario = "generic", vsYou = "", note
     name: scenarioMap[scenario] || "Caught Object",
     img: "icons/svg/net.svg",
     rounds: 1,
+    changes: [],
     flags: {
       status: { isCatching: true },
       scenario,
@@ -317,13 +368,38 @@ export async function applyCatch(actor, { scenario = "generic", vsYou = "", note
 export async function applySlam(actor, { kind = "No Slam", knockbackAreas = 0, prone = false, stagger = false } = {}, opts = {}) {
   // Determine effect type based on slam kind
   let effectType = "slammed";
-  if (kind === "Grand Slam") effectType = "grandSlam";
-  else if (kind === "Stagger" || stagger) effectType = "staggered";
+  let changes = [];
+  
+  if (kind === "Grand Slam") {
+    effectType = "grandSlam";
+    changes = [
+      { key: "system.combatMods.defenseShift", mode: AE_MODE.ADD, value: "-2", priority: 20 },
+      { key: "system.combatMods.defenseShiftRanged", mode: AE_MODE.ADD, value: "-2", priority: 20 },
+      { key: "system.combatMods.abilityShifts.agility", mode: AE_MODE.ADD, value: "-2", priority: 20 },
+      { key: "system.combatMods.movementMult", mode: AE_MODE.OVERRIDE, value: "0", priority: 50 },
+      { key: "system.combatMods.canAct", mode: AE_MODE.OVERRIDE, value: "false", priority: 50 },
+      { key: "system.combatMods.canMove", mode: AE_MODE.OVERRIDE, value: "false", priority: 50 }
+    ];
+  } else if (kind === "Stagger" || stagger) {
+    effectType = "staggered";
+    changes = [
+      { key: "system.combatMods.movementMult", mode: AE_MODE.MULTIPLY, value: "0.5", priority: 20 }
+    ];
+  } else if (kind === "1 Area" || prone) {
+    effectType = "slammed";
+    changes = [
+      { key: "system.combatMods.attackShift", mode: AE_MODE.ADD, value: "-1", priority: 20 },
+      { key: "system.combatMods.defenseShift", mode: AE_MODE.ADD, value: "-1", priority: 20 },
+      { key: "system.combatMods.defenseShiftRanged", mode: AE_MODE.ADD, value: "1", priority: 20 },
+      { key: "system.combatMods.abilityShifts.agility", mode: AE_MODE.ADD, value: "-2", priority: 20 }
+    ];
+  }
   
   return applyEffect(actor, {
     name: `Slam (${kind})`,
     img: "icons/svg/target.svg",
     rounds: (stagger || prone) ? 1 : 0,
+    changes,
     flags: {
       effectType,
       status: { isSlammed: true },
@@ -343,6 +419,13 @@ export async function applyProne(actor, { rounds = 1, originUuid = null } = {}, 
     img: "icons/svg/falling.svg",
     rounds,
     originUuid,
+    changes: [
+      { key: "system.combatMods.attackShift", mode: AE_MODE.ADD, value: "-1", priority: 20 },
+      { key: "system.combatMods.defenseShift", mode: AE_MODE.ADD, value: "-1", priority: 20 },
+      { key: "system.combatMods.defenseShiftRanged", mode: AE_MODE.ADD, value: "1", priority: 20 },
+      { key: "system.combatMods.abilityShifts.agility", mode: AE_MODE.ADD, value: "-2", priority: 20 },
+      { key: "system.combatMods.movementMult", mode: AE_MODE.MULTIPLY, value: "0.5", priority: 20 }
+    ],
     flags: {
       effectType: "prone",
       status: { isProne: true }
@@ -351,12 +434,21 @@ export async function applyProne(actor, { rounds = 1, originUuid = null } = {}, 
   }, opts);
 }
 
-/** Apply grappled effect */
+/** Apply grappled effect (partial hold) */
 export async function applyGrappled(actor, { holderUuid = null, holderName = "", rounds = null } = {}, opts = {}) {
   return applyEffect(actor, {
     name: holderName ? `Grappled by ${holderName}` : "Grappled",
     img: "icons/svg/net.svg",
     rounds,
+    changes: [
+      { key: "system.combatMods.attackShift", mode: AE_MODE.ADD, value: "-2", priority: 20 },
+      { key: "system.combatMods.defenseShift", mode: AE_MODE.ADD, value: "-2", priority: 20 },
+      { key: "system.combatMods.defenseShiftRanged", mode: AE_MODE.ADD, value: "-2", priority: 20 },
+      { key: "system.combatMods.abilityShifts.fighting", mode: AE_MODE.ADD, value: "-2", priority: 20 },
+      { key: "system.combatMods.abilityShifts.agility", mode: AE_MODE.ADD, value: "-2", priority: 20 },
+      { key: "system.combatMods.movementMult", mode: AE_MODE.OVERRIDE, value: "0", priority: 50 },
+      { key: "system.combatMods.canMove", mode: AE_MODE.OVERRIDE, value: "false", priority: 50 }
+    ],
     flags: {
       effectType: "grappled",
       status: { isGrappled: true },
@@ -367,12 +459,22 @@ export async function applyGrappled(actor, { holderUuid = null, holderName = "",
   }, opts);
 }
 
-/** Apply held effect (stronger than grappled) */
+/** Apply held effect (full hold - stronger than grappled) */
 export async function applyHeld(actor, { holderUuid = null, holderName = "", rounds = null } = {}, opts = {}) {
   return applyEffect(actor, {
     name: holderName ? `Held by ${holderName}` : "Held",
     img: "icons/svg/padlock.svg",
     rounds,
+    changes: [
+      { key: "system.combatMods.attackShift", mode: AE_MODE.ADD, value: "-4", priority: 20 },
+      { key: "system.combatMods.defenseShift", mode: AE_MODE.ADD, value: "-4", priority: 20 },
+      { key: "system.combatMods.defenseShiftRanged", mode: AE_MODE.ADD, value: "-4", priority: 20 },
+      { key: "system.combatMods.abilityShifts.fighting", mode: AE_MODE.ADD, value: "-4", priority: 20 },
+      { key: "system.combatMods.abilityShifts.agility", mode: AE_MODE.ADD, value: "-4", priority: 20 },
+      { key: "system.combatMods.abilityShifts.strength", mode: AE_MODE.ADD, value: "-2", priority: 20 },
+      { key: "system.combatMods.movementMult", mode: AE_MODE.OVERRIDE, value: "0", priority: 50 },
+      { key: "system.combatMods.canMove", mode: AE_MODE.OVERRIDE, value: "false", priority: 50 }
+    ],
     flags: {
       effectType: "held",
       status: { isHeld: true },
@@ -389,6 +491,14 @@ export async function applyEntangled(actor, { materialRank = "Good", rounds = nu
     name: `Entangled (${materialRank})`,
     img: "icons/svg/net.svg",
     rounds,
+    changes: [
+      { key: "system.combatMods.attackShift", mode: AE_MODE.ADD, value: "-2", priority: 20 },
+      { key: "system.combatMods.defenseShift", mode: AE_MODE.ADD, value: "-1", priority: 20 },
+      { key: "system.combatMods.defenseShiftRanged", mode: AE_MODE.ADD, value: "-1", priority: 20 },
+      { key: "system.combatMods.abilityShifts.agility", mode: AE_MODE.ADD, value: "-4", priority: 20 },
+      { key: "system.combatMods.movementMult", mode: AE_MODE.OVERRIDE, value: "0", priority: 50 },
+      { key: "system.combatMods.canMove", mode: AE_MODE.OVERRIDE, value: "false", priority: 50 }
+    ],
     flags: {
       effectType: "entangled",
       status: { isEntangled: true },
@@ -405,6 +515,14 @@ export async function applyBlinded(actor, { rounds = 1, originUuid = null } = {}
     img: "icons/svg/blind.svg",
     rounds,
     originUuid,
+    changes: [
+      { key: "system.combatMods.attackShift", mode: AE_MODE.ADD, value: "-4", priority: 20 },
+      { key: "system.combatMods.defenseShift", mode: AE_MODE.ADD, value: "-2", priority: 20 },
+      { key: "system.combatMods.defenseShiftRanged", mode: AE_MODE.ADD, value: "-2", priority: 20 },
+      { key: "system.combatMods.abilityShifts.agility", mode: AE_MODE.ADD, value: "-4", priority: 20 },
+      { key: "system.combatMods.abilityShifts.intuition", mode: AE_MODE.ADD, value: "-2", priority: 20 },
+      { key: "system.combatMods.movementMult", mode: AE_MODE.MULTIPLY, value: "0.25", priority: 20 }
+    ],
     flags: {
       effectType: "blinded",
       status: { isBlinded: true }
@@ -420,6 +538,13 @@ export async function applyUnconscious(actor, { rounds = 1, originUuid = null } 
     img: "icons/svg/sleep.svg",
     rounds,
     originUuid,
+    changes: [
+      { key: "system.combatMods.defenseShift", mode: AE_MODE.ADD, value: "-4", priority: 20 },
+      { key: "system.combatMods.defenseShiftRanged", mode: AE_MODE.ADD, value: "-4", priority: 20 },
+      { key: "system.combatMods.movementMult", mode: AE_MODE.OVERRIDE, value: "0", priority: 50 },
+      { key: "system.combatMods.canAct", mode: AE_MODE.OVERRIDE, value: "false", priority: 50 },
+      { key: "system.combatMods.canMove", mode: AE_MODE.OVERRIDE, value: "false", priority: 50 }
+    ],
     flags: {
       effectType: "unconscious",
       status: { isUnconscious: true }
@@ -433,6 +558,13 @@ export async function applyDying(actor, { enduranceValue = null } = {}) {
   return applyEffect(actor, {
     name: "Dying",
     img: "icons/svg/skull.svg",
+    changes: [
+      { key: "system.combatMods.defenseShift", mode: AE_MODE.ADD, value: "-4", priority: 20 },
+      { key: "system.combatMods.defenseShiftRanged", mode: AE_MODE.ADD, value: "-4", priority: 20 },
+      { key: "system.combatMods.movementMult", mode: AE_MODE.OVERRIDE, value: "0", priority: 50 },
+      { key: "system.combatMods.canAct", mode: AE_MODE.OVERRIDE, value: "false", priority: 50 },
+      { key: "system.combatMods.canMove", mode: AE_MODE.OVERRIDE, value: "false", priority: 50 }
+    ],
     flags: {
       effectType: "dying",
       status: { isDying: true },
@@ -441,6 +573,25 @@ export async function applyDying(actor, { enduranceValue = null } = {}) {
     },
     statuses: ["dying"]
   });
+}
+
+/** Apply charging effect (for the attacker during a charge) */
+export async function applyCharging(actor, { rounds = 1 } = {}, opts = {}) {
+  return applyEffect(actor, {
+    name: "Charging",
+    img: "icons/svg/wing.svg",
+    rounds,
+    changes: [
+      { key: "system.combatMods.defenseShift", mode: AE_MODE.ADD, value: "-1", priority: 20 },
+      { key: "system.combatMods.defenseShiftRanged", mode: AE_MODE.ADD, value: "-1", priority: 20 },
+      { key: "system.combatMods.movementMult", mode: AE_MODE.MULTIPLY, value: "2", priority: 20 }
+    ],
+    flags: {
+      effectType: "charging",
+      status: { isCharging: true }
+    },
+    statuses: ["charging"]
+  }, opts);
 }
 
 /** Optionally advance CTT by N turns if sync is enabled */

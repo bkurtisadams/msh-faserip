@@ -1,4 +1,5 @@
-// scripts/modules/actions/grappling-action.js v1.1.0 - 2025-12-22
+// scripts/modules/actions/grappling-action.js v1.2.0 - 2025-12-22
+// v1.2.0: Use effect-engine wrappers for Partial Hold/Full Hold effects
 // v1.1.0: Add inline rolls for consolidated chat cards
 import { AttackAction } from "./attack-action.js";
 import {
@@ -16,6 +17,7 @@ import {
 } from "./action-utils.js";
 import { generateKarmaControlsHTML, setupKarmaControlHandlers, extractKarmaFromDialog } from "../dice/dice-roller.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
+import { applyGrappled, applyHeld } from "../effects/effect-engine.js";
 
 export class GrapplingAction extends AttackAction {
   constructor(args) {
@@ -92,19 +94,32 @@ export class GrapplingAction extends AttackAction {
         const tDoc = await fromUuid(choice.targetUuid);
         const tActor = tDoc?.actor ?? (tDoc?.documentName === "Actor" ? tDoc : null);
         if (tActor) {
-          const statusId = (colorLower === "yellow") ? "partial-hold" : "full-hold";
-          const label = (colorLower === "yellow") ? "Partial Hold" : "Full Hold";
-          const icon = (statusId === "partial-hold") ? "icons/svg/net.svg" : "icons/svg/shackles.svg";
-          const other = tActor.effects?.find(e => e.getFlag?.("core", "statusId") === ((statusId === "partial-hold") ? "full-hold" : "partial-hold"));
-          if (other) await other.delete();
-          const existing = tActor.effects?.find(e => e.getFlag?.("core", "statusId") === statusId);
-          if (existing) {
-            await existing.update({ name: label, icon, "flags.msh-faserip.hold": colorLower });
+          // Remove any existing hold effects
+          const existingHolds = tActor.effects?.filter(e => 
+            e.statuses?.has?.("grappled") || 
+            e.statuses?.has?.("held") ||
+            e.getFlag?.("core", "statusId") === "partial-hold" ||
+            e.getFlag?.("core", "statusId") === "full-hold"
+          );
+          for (const eff of existingHolds || []) {
+            await eff.delete();
+          }
+          
+          // Apply appropriate hold effect using effect-engine
+          if (colorLower === "yellow") {
+            // Partial Hold = Grappled
+            await applyGrappled(tActor, { 
+              holderUuid: actor.uuid, 
+              holderName: actor.name,
+              rounds: null  // Until escaped
+            });
           } else {
-            await tActor.createEmbeddedDocuments("ActiveEffect", [{
-              name: label, icon, origin: actor.uuid, disabled: false, statuses: [statusId],
-              flags: { core: { statusId }, "msh-faserip": { hold: colorLower } }
-            }]);
+            // Full Hold = Held
+            await applyHeld(tActor, { 
+              holderUuid: actor.uuid, 
+              holderName: actor.name,
+              rounds: null  // Until escaped
+            });
           }
         }
       } catch (e) {
