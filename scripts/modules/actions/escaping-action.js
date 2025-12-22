@@ -1,4 +1,5 @@
-// scripts/modules/actions/escaping-action.js
+// scripts/modules/actions/escaping-action.js v1.1.0 - 2025-12-22
+// v1.1.0: Add inline rolls for consolidated chat cards
 import { AttackAction } from "./attack-action.js";
 import { 
   getStrengthInfo, 
@@ -9,7 +10,8 @@ import {
   bannerColors, 
   labelFor, 
   effectsFor,
-  getTargetingContext
+  getTargetingContext,
+  buildInlineRollDisplay
 } from "./action-utils.js";
 import { generateKarmaControlsHTML, setupKarmaControlHandlers, extractKarmaFromDialog } from "../dice/dice-roller.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
@@ -33,8 +35,15 @@ export class EscapingAction extends AttackAction {
     // Escaping is rolled on the character's Strength
     const effectiveRank = shiftRank(strength.rank, choice.shift);
 
+    // Check consolidated chat card setting
+    let useConsolidated = false;
+    try {
+      useConsolidated = game.settings.get("msh-faserip", "consolidatedChatCards");
+    } catch (_e) { /* setting not registered yet */ }
+
     const roll = await (new Roll("1d100")).evaluate();
-    if (!choice.skipDice) {
+    // Only show separate roll message if NOT using consolidated mode
+    if (!choice.skipDice && !useConsolidated) {
       await roll.toMessage({
         speaker: ChatMessage.getSpeaker({ actor }),
         flavor: `${actor.name} attempts to Escape a Hold`,
@@ -43,7 +52,10 @@ export class EscapingAction extends AttackAction {
     }
 
     const { cappedTotal, totalKarmaUsed } =
-      await rollWithKarmaAndHistory(actor, actionName, 0, roll, { spendKarma: choice.spendKarma, rank: effectiveRank });
+      await rollWithKarmaAndHistory(actor, actionName, 0, roll, { spendKarma: choice.spendKarma, rank: effectiveRank, inlineRoll: useConsolidated });
+
+    // Build inline roll display for consolidated mode
+    const inlineRollHtml = useConsolidated ? buildInlineRollDisplay(roll, totalKarmaUsed, cappedTotal) : "";
 
     const color = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
     const colorLower = String(color || "").toLowerCase();
@@ -60,6 +72,21 @@ export class EscapingAction extends AttackAction {
 
     });
 
+    // Build roll info section - use inline display if consolidated, else plain text
+    const rollInfoSection = inlineRollHtml ? `
+      <div style="padding:5px 10px;font-size:.9em;">
+        <div>Strength: ${strength.rank} (${strength.value})${choice.shift ? ` — Shift ${choice.shift} → ${effectiveRank}` : ""}</div>
+        ${choice.opponentStr ? `<div>Opponent STR: ${choice.opponentStr}</div>` : ``}
+      </div>
+      ${inlineRollHtml}
+    ` : `
+      <div style="padding:5px 10px;font-size:.9em;">
+        <div>Strength: ${strength.rank} (${strength.value})${choice.shift ? ` — Shift ${choice.shift} → ${effectiveRank}` : ""}</div>
+        ${choice.opponentStr ? `<div>Opponent STR: ${choice.opponentStr}</div>` : ``}
+        <div>Roll: ${roll.total}${totalKarmaUsed ? ` + Karma: ${totalKarmaUsed}` : ``} = ${cappedTotal}</div>
+      </div>
+    `;
+
     const cardHtml = `
       <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
         <div style="padding:5px 10px;border-bottom:1px solid #c0c0c0;font-size:1.1em;color:#8b0000;">
@@ -71,11 +98,7 @@ export class EscapingAction extends AttackAction {
           <div>Opponent: ${choice.opponentName}</div>
         </div>
 
-        <div style="padding:5px 10px;font-size:.9em;">
-          <div>Strength: ${strength.rank} (${strength.value})${choice.shift ? ` — Shift ${choice.shift} → ${effectiveRank}` : ""}</div>
-          ${choice.opponentStr ? `<div>Opponent STR: ${choice.opponentStr}</div>` : ``}
-          <div>Roll: ${roll.total}${totalKarmaUsed ? ` + Karma: ${totalKarmaUsed}` : ``} = ${cappedTotal}</div>
-        </div>
+        ${rollInfoSection}
 
         ${grid}
 

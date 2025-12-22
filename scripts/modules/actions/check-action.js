@@ -1,4 +1,5 @@
-// scripts/modules/actions/check-action.js
+// scripts/modules/actions/check-action.js v1.1.0 - 2025-12-22
+// v1.1.0: Integrate effect modifiers for ability FEAT shifts
 import { BaseAction } from "./base-action.js";
 import {
   RANKS,
@@ -16,6 +17,7 @@ import { canEffectsApply } from "../../rules/effects-gate.js";
 import * as Effects from "../effects/effect-engine.js";
 import * as Nullify from "./nullify.js";
 import { resolveSlamFeat, getGrandSlamDistance } from "../combat/damage-resolution.js";
+import { getAbilityShift } from "../effects/effect-modifiers.js";
 
 const SCOPE = () => (globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faserip");
 
@@ -74,7 +76,21 @@ export class CheckAction extends BaseAction {
       const attackForm    = String(prefill.attackForm || this?.opts?.attackForm || "blunt").toLowerCase();
       const defenderUuid  = prefill.targetUuid || prefill.defenderUuid || "";
 
-      const effectiveEndRank = shift ? shiftRank(targetEndRank, shift) : targetEndRank;
+      // Get effect-based ability shift for the defender's endurance
+      let effectAbilityShift = 0;
+      if (defenderUuid) {
+        try {
+          const doc = await fromUuid(defenderUuid);
+          const defenderActor = doc?.actor ?? doc ?? null;
+          if (defenderActor) {
+            effectAbilityShift = getAbilityShift(defenderActor, "endurance");
+          }
+        } catch (_e) { /* uuid resolution failed */ }
+      }
+      
+      // Total shift = manual shift + effect shift
+      const totalShift = shift + effectAbilityShift;
+      const effectiveEndRank = totalShift ? shiftRank(targetEndRank, totalShift) : targetEndRank;
 
       // Check consolidated chat card setting
       let useConsolidated = false;
@@ -332,10 +348,19 @@ export class CheckAction extends BaseAction {
       const headerActorName  = actor?.name || targetName || "Actor";
       const headerTargetName = (targetName && targetName !== headerActorName) ? targetName : "";
 
+      // Build shift display text
+      let shiftDisplay = "";
+      if (totalShift !== 0) {
+        const parts = [];
+        if (shift !== 0) parts.push(`Manual ${shift > 0 ? '+' : ''}${shift}`);
+        if (effectAbilityShift !== 0) parts.push(`Effects ${effectAbilityShift > 0 ? '+' : ''}${effectAbilityShift}`);
+        shiftDisplay = ` (${parts.join(', ')})`;
+      }
+
       // Build roll info section - use inline display if consolidated, else show result only
       const rollInfoSection = inlineRollHtml ? `
         <div style="padding:4px 10px;">
-          <div style="font-size:.9em;color:#555;">Endurance: ${effectiveEndRank}${shift ? ` (${shift > 0 ? '+' : ''}${shift}CS)` : ''}</div>
+          <div style="font-size:.9em;color:#555;">Endurance: ${effectiveEndRank}${shiftDisplay}</div>
         </div>
         ${inlineRollHtml}
       ` : '';

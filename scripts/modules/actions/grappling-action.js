@@ -1,4 +1,5 @@
-// scripts/modules/actions/grappling-action.js
+// scripts/modules/actions/grappling-action.js v1.1.0 - 2025-12-22
+// v1.1.0: Add inline rolls for consolidated chat cards
 import { AttackAction } from "./attack-action.js";
 import {
   getStrengthInfo, 
@@ -10,7 +11,8 @@ import {
   labelFor, 
   effectsFor,
   getTargetingContext,
-  applyCapabilitiesToDialog
+  applyCapabilitiesToDialog,
+  buildInlineRollDisplay
 } from "./action-utils.js";
 import { generateKarmaControlsHTML, setupKarmaControlHandlers, extractKarmaFromDialog } from "../dice/dice-roller.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
@@ -53,8 +55,15 @@ export class GrapplingAction extends AttackAction {
 
     const effectiveRank = shiftRank(strength.rank, choice.shift);
 
+    // Check consolidated chat card setting
+    let useConsolidated = false;
+    try {
+      useConsolidated = game.settings.get("msh-faserip", "consolidatedChatCards");
+    } catch (_e) { /* setting not registered yet */ }
+
     const roll = await (new Roll("1d100")).evaluate();
-    if (!choice.skipDice) {
+    // Only show separate roll message if NOT using consolidated mode
+    if (!choice.skipDice && !useConsolidated) {
       await roll.toMessage({
         speaker: ChatMessage.getSpeaker({ actor }),
         flavor: `${actor.name} attempts to Grapple ${choice.targetName}`,
@@ -63,7 +72,10 @@ export class GrapplingAction extends AttackAction {
     }
 
     const { cappedTotal, totalKarmaUsed } =
-        await rollWithKarmaAndHistory(actor, actionName, 0, roll, { spendKarma: choice.spendKarma, rank: effectiveRank });
+        await rollWithKarmaAndHistory(actor, actionName, 0, roll, { spendKarma: choice.spendKarma, rank: effectiveRank, inlineRoll: useConsolidated });
+
+    // Build inline roll display for consolidated mode
+    const inlineRollHtml = useConsolidated ? buildInlineRollDisplay(roll, totalKarmaUsed, cappedTotal) : "";
 
     const color = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
     const colorLower = String(color || "").toLowerCase();
@@ -123,7 +135,8 @@ export class GrapplingAction extends AttackAction {
       bg, 
       fg,
       targetingContext,
-      actions
+      actions,
+      inlineRollHtml
     });
 
     await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor }), content: cardHtml });
@@ -223,7 +236,7 @@ export class GrapplingAction extends AttackAction {
     });
   }
 
-  _buildChatCard({ actor, choice, strength, effectiveRank, roll, totalKarmaUsed, cappedTotal, color, effect, grid, bg, fg, targetingContext, actions }) {
+  _buildChatCard({ actor, choice, strength, effectiveRank, roll, totalKarmaUsed, cappedTotal, color, effect, grid, bg, fg, targetingContext, actions, inlineRollHtml = "" }) {
     const partialMovement =
       choice.targetStrength
         ? this._compareRanks(strength.rank, choice.targetStrength) >= 0
@@ -259,6 +272,21 @@ export class GrapplingAction extends AttackAction {
 
     const effectLower = String(effect).toLowerCase();
 
+    // Build roll info section - use inline display if consolidated, else plain text
+    const rollInfoSection = inlineRollHtml ? `
+      <div style="padding:5px 10px;font-size:.9em;">
+        <div>Strength: ${strength.rank} (${strength.value})${(choice.shift ? ` — Shift ${choice.shift} → ${effectiveRank}` : '')}</div>
+        ${choice.targetStrength ? `<div>Target STR: ${choice.targetStrength}</div>` : ``}
+      </div>
+      ${inlineRollHtml}
+    ` : `
+      <div style="padding:5px 10px;font-size:.9em;">
+        <div>Strength: ${strength.rank} (${strength.value})${(choice.shift ? ` — Shift ${choice.shift} → ${effectiveRank}` : '')}</div>
+        ${choice.targetStrength ? `<div>Target STR: ${choice.targetStrength}</div>` : ``}
+        <div>Roll: ${roll.total}${totalKarmaUsed ? ` + Karma: ${totalKarmaUsed}` : ``} = ${cappedTotal}</div>
+      </div>
+    `;
+
     return `
       <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
         <div style="padding:5px 10px;border-bottom:1px solid #c0c0c0;font-size:1.1em;color:#8b0000;">
@@ -269,11 +297,7 @@ export class GrapplingAction extends AttackAction {
           ${targetingContext}
         </div>
 
-        <div style="padding:5px 10px;font-size:.9em;">
-          <div>Strength: ${strength.rank} (${strength.value})${(choice.shift ? ` — Shift ${choice.shift} → ${effectiveRank}` : '')}</div>
-          ${choice.targetStrength ? `<div>Target STR: ${choice.targetStrength}</div>` : ``}
-          <div>Roll: ${roll.total}${totalKarmaUsed ? ` + Karma: ${totalKarmaUsed}` : ``} = ${cappedTotal}</div>
-        </div>
+        ${rollInfoSection}
 
         ${grid}
 

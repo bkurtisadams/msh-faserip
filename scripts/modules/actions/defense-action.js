@@ -1,4 +1,5 @@
-// scripts/modules/actions/defense-action.js
+// scripts/modules/actions/defense-action.js v1.1.0 - 2025-12-22
+// v1.1.0: Add inline rolls for consolidated chat cards
 import { BaseAction } from "./base-action.js";
 import { 
   generateKarmaControlsHTML, 
@@ -13,7 +14,8 @@ import {
   labelFor,
   rollWithKarmaAndHistory,
   buildResultGrid,
-  bannerColors
+  bannerColors,
+  buildInlineRollDisplay
 } from "./action-utils.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
 
@@ -127,9 +129,16 @@ export class DefenseAction extends BaseAction {
     // Effective rank
     const effectiveRank = shiftRank(ability.rank, choice.shift);
 
+    // Check consolidated chat card setting
+    let useConsolidated = false;
+    try {
+      useConsolidated = game.settings.get("msh-faserip", "consolidatedChatCards");
+    } catch (_e) { /* setting not registered yet */ }
+
     // Roll
     const roll = await (new Roll("1d100")).evaluate();
-    if (!choice.skipDice) {
+    // Only show separate roll message if NOT using consolidated mode
+    if (!choice.skipDice && !useConsolidated) {
       await roll.toMessage({
         speaker: ChatMessage.getSpeaker({ actor }),
         flavor: `${actor.name} performs ${actionName}`,
@@ -139,7 +148,10 @@ export class DefenseAction extends BaseAction {
 
     // Karma (only up to 100)
     const { cappedTotal, totalKarmaUsed } =
-      await rollWithKarmaAndHistory(actor, actionName, choice.karma, roll, { spendKarma: choice.spendKarma, rank: effectiveRank });
+      await rollWithKarmaAndHistory(actor, actionName, choice.karma, roll, { spendKarma: choice.spendKarma, rank: effectiveRank, inlineRoll: useConsolidated });
+
+    // Build inline roll display for consolidated mode
+    const inlineRollHtml = useConsolidated ? buildInlineRollDisplay(roll, totalKarmaUsed, cappedTotal) : "";
 
     // Result & effect text
     const color = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
@@ -159,18 +171,30 @@ export class DefenseAction extends BaseAction {
     // Action chips (light placeholders)
     const actionsHtml = this._actionsBox({ actionType, colorLower });
 
+    // Build roll info section - use inline display if consolidated, else plain text
+    const rollInfoSection = inlineRollHtml ? `
+      <div style="padding:5px 10px;font-size:.9em;">
+        <div>Ability: ${ability.name}</div>
+        <div>Base Rank: ${ability.rank} (${ability.value})${choice.shift ? ` — Shift ${choice.shift} → ${effectiveRank}` : ""}</div>
+        ${this._contextLine(actionType, choice)}
+      </div>
+      ${inlineRollHtml}
+    ` : `
+      <div style="padding:5px 10px;font-size:.9em;">
+        <div>Ability: ${ability.name}</div>
+        <div>Base Rank: ${ability.rank} (${ability.value})${choice.shift ? ` — Shift ${choice.shift} → ${effectiveRank}` : ""}</div>
+        ${this._contextLine(actionType, choice)}
+        <div>Roll: ${roll.total}${totalKarmaUsed ? ` + Karma: ${totalKarmaUsed}` : ""} = ${cappedTotal}</div>
+      </div>
+    `;
+
     // Final card
     const cardHtml = `
       <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
         <div style="padding:5px 10px;border-bottom:1px solid #c0c0c0;font-size:1.1em;color:#0d47a1;">
           <strong>${actor.name} - ${actionName}</strong>
         </div>
-        <div style="padding:5px 10px;font-size:.9em;">
-          <div>Ability: ${ability.name}</div>
-          <div>Base Rank: ${ability.rank} (${ability.value})${choice.shift ? ` — Shift ${choice.shift} → ${effectiveRank}` : ""}</div>
-          ${this._contextLine(actionType, choice)}
-          <div>Roll: ${roll.total}${totalKarmaUsed ? ` + Karma: ${totalKarmaUsed}` : ""} = ${cappedTotal}</div>
-        </div>
+        ${rollInfoSection}
         ${grid}
         <div style="text-align:center;padding:8px;margin:5px;font-weight:bold;font-size:1.1em;border-radius:3px;background:${bg};color:${fg};">
           RESULT: ${String(color).toUpperCase()} — ${String(effectResult).toUpperCase()}

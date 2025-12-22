@@ -1,4 +1,5 @@
-// scripts/modules/actions/grabbing-action.js
+// scripts/modules/actions/grabbing-action.js v1.1.0 - 2025-12-22
+// v1.1.0: Add inline rolls for consolidated chat cards
 import { AttackAction } from "./attack-action.js";
 import {
   RANKS,
@@ -10,7 +11,8 @@ import {
   buildResultGrid,
   buildActionsBox,
   bannerColors,
-  getTargetingContext
+  getTargetingContext,
+  buildInlineRollDisplay
 } from "./action-utils.js";
 import { generateKarmaControlsHTML, setupKarmaControlHandlers, extractKarmaFromDialog } from "../dice/dice-roller.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
@@ -55,9 +57,16 @@ export class GrabbingAction extends AttackAction {
     const cmpRank = this._chooseComparatorRank(choice); // may be null/undefined
     const mustDowngradeGreen = cmpRank ? !this._rankGTE(strength.rank, cmpRank) : false;
 
+    // Check consolidated chat card setting
+    let useConsolidated = false;
+    try {
+      useConsolidated = game.settings.get("msh-faserip", "consolidatedChatCards");
+    } catch (_e) { /* setting not registered yet */ }
+
     // Roll + optional karma cap (uses your standard helper)
     const roll = await (new Roll("1d100")).evaluate();
-    if (!choice.skipDice) {
+    // Only show separate roll message if NOT using consolidated mode
+    if (!choice.skipDice && !useConsolidated) {
         await roll.toMessage({
         speaker: ChatMessage.getSpeaker({ actor }),
         flavor: `${actor.name} attempts to Grab ${choice.itemLabel} from ${choice.targetName}`,
@@ -65,7 +74,10 @@ export class GrabbingAction extends AttackAction {
         });
     }
     const { cappedTotal, totalKarmaUsed } =
-        await rollWithKarmaAndHistory(actor, actionName, 0, roll, { spendKarma: choice.spendKarma, rank: effectiveRank });
+        await rollWithKarmaAndHistory(actor, actionName, 0, roll, { spendKarma: choice.spendKarma, rank: effectiveRank, inlineRoll: useConsolidated });
+
+    // Build inline roll display for consolidated mode
+    const inlineRollHtml = useConsolidated ? buildInlineRollDisplay(roll, totalKarmaUsed, cappedTotal) : "";
 
     // Universal Table result color
     const color = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
@@ -97,7 +109,12 @@ export class GrabbingAction extends AttackAction {
 
     // Build the small details section
     const compNote = this._composeComparatorLine(choice);
-    const detailsHtml = `
+    const detailsHtml = inlineRollHtml ? `
+    <div>Attacker STR: ${strength.rank} (${strength.value})${choice.shift ? ` — Shift ${choice.shift} → ${effectiveRank}` : ""}</div>
+    ${choice.targetStrength ? `<div>Target STR: ${choice.targetStrength}</div>` : ``}
+    ${choice.itemMaterial ? `<div>Item Material: ${choice.itemMaterial}</div>` : ``}
+    ${compNote ? `<div style="font-size:.85em;color:#666;">Comparator for "Take": ${compNote}</div>` : ``}
+    ` : `
     <div>Attacker STR: ${strength.rank} (${strength.value})${choice.shift ? ` — Shift ${choice.shift} → ${effectiveRank}` : ""}</div>
     ${choice.targetStrength ? `<div>Target STR: ${choice.targetStrength}</div>` : ``}
     ${choice.itemMaterial ? `<div>Item Material: ${choice.itemMaterial}</div>` : ``}
@@ -136,7 +153,7 @@ export class GrabbingAction extends AttackAction {
         <div style="padding:5px 10px;font-size:.9em;">
           ${detailsHtml}
         </div>
-
+        ${inlineRollHtml}
         ${grid}
         ${noteHtml}
         

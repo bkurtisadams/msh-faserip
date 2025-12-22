@@ -1,4 +1,5 @@
-// scripts/modules/actions/energy-action.js
+// scripts/modules/actions/energy-action.js v1.1.0 - 2025-12-22
+// v1.1.0: Add inline rolls for consolidated chat cards
 import { RangedAttackAction } from "./ranged-attack-action.js";
 // NOTE: resolveCombatMode imported dynamically to avoid circular dependency
 import { 
@@ -30,7 +31,8 @@ import {
   shiftRank,
   playAttackEffect,
   playImpactEffect,
-  getAttackEffectPath
+  getAttackEffectPath,
+  buildInlineRollDisplay
 } from "./action-utils.js";
 
 import { isAuraMaintained } from "./nullify.js";
@@ -354,8 +356,15 @@ export class EnergyAction extends RangedAttackAction {
     const toHitRankName = choice.usePowerToHit ? choice.powerRank : ability.rank;
     const effectiveRank = shiftRank(toHitRankName, choice.totalShift);
 
+    // Check consolidated chat card setting
+    let useConsolidated = false;
+    try {
+      useConsolidated = game.settings.get("msh-faserip", "consolidatedChatCards");
+    } catch (_e) { /* setting not registered yet */ }
+
     const roll = await new Roll("1d100").evaluate();
-    if (!choice.skipDice) {
+    // Only show separate roll message if NOT using consolidated mode
+    if (!choice.skipDice && !useConsolidated) {
       await roll.toMessage({
         speaker: ChatMessage.getSpeaker({ actor }),
         flavor: `${actor.name} performs ${actionName}`,
@@ -364,7 +373,10 @@ export class EnergyAction extends RangedAttackAction {
     }
 
     const { cappedTotal, totalKarmaUsed } =
-      await rollWithKarmaAndHistory(actor, actionName, choice.karma, roll, { spendKarma: choice.spendKarma, rank: effectiveRank });
+      await rollWithKarmaAndHistory(actor, actionName, choice.karma, roll, { spendKarma: choice.spendKarma, rank: effectiveRank, inlineRoll: useConsolidated });
+
+    // Build inline roll display for consolidated mode
+    const inlineRollHtml = useConsolidated ? buildInlineRollDisplay(roll, totalKarmaUsed, cappedTotal) : "";
 
     const color = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
     const colorLower = String(color || "").toLowerCase();  // DECLARE IT HERE
@@ -423,7 +435,11 @@ export class EnergyAction extends RangedAttackAction {
         ? `To-Hit Rank: ${choice.powerRank} (Power)`
         : `To-Hit Rank: ${ability.rank} (${ability.value}) — Ability: ${ability.name}`;
 
-    const contextHtml = `
+    const contextHtml = inlineRollHtml ? `
+      <div>${toHitLine}${choice.totalShift ? ` — Shift ${choice.totalShift} → ${effectiveRank}` : ""}</div>
+      <div>Power: ${choice.powerName} — Damage: ${choice.powerDamage} — Rank: ${choice.powerRank}</div>
+      <div>Distance: ${rangeText}</div>
+    ` : `
       <div>${toHitLine}${choice.totalShift ? ` — Shift ${choice.totalShift} → ${effectiveRank}` : ""}</div>
       <div>Power: ${choice.powerName} — Damage: ${choice.powerDamage} — Rank: ${choice.powerRank}</div>
       <div>Distance: ${rangeText}</div>
@@ -488,6 +504,7 @@ export class EnergyAction extends RangedAttackAction {
             ${targetingContext}
           </div>
           <div style="padding:5px 10px;font-size:.9em;">${contextHtml}</div>
+          ${inlineRollHtml}
           ${damageBlock}
           ${grid}
           <div style="text-align:center;padding:8px;margin:5px;font-weight:bold;font-size:1.1em;border-radius:3px;background:${bg};color:${fg};">

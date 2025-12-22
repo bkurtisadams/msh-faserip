@@ -1,4 +1,5 @@
-// scripts/modules/actions/charging-action.js
+// scripts/modules/actions/charging-action.js v1.1.0 - 2025-12-22
+// v1.1.0: Add inline rolls for consolidated chat cards
 import { BaseAction } from "./base-action.js";
 import { 
   generateKarmaControlsHTML, 
@@ -18,7 +19,8 @@ import {
   getResultHoverText,
   getTargetingContext,
   debugLog,
-  applyCapabilitiesToDialog
+  applyCapabilitiesToDialog,
+  buildInlineRollDisplay
 } from "./action-utils.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
 
@@ -409,9 +411,16 @@ export class ChargingAction extends BaseAction {
     effectiveRank: effectiveRank
   });
 
+  // Check consolidated chat card setting
+  let useConsolidated = false;
+  try {
+    useConsolidated = game.settings.get("msh-faserip", "consolidatedChatCards");
+  } catch (_e) { /* setting not registered yet */ }
+
   // Roll
   const roll = await new Roll("1d100").evaluate();
-  if (!choice.skipDice) {
+  // Only show separate roll message if NOT using consolidated mode
+  if (!choice.skipDice && !useConsolidated) {
     await roll.toMessage({
       speaker: ChatMessage.getSpeaker({ actor }),
       flavor: `${actor.name} performs ${actionName}`,
@@ -420,7 +429,10 @@ export class ChargingAction extends BaseAction {
   }
 
   const { cappedTotal, totalKarmaUsed } =
-    await rollWithKarmaAndHistory(actor, actionName, choice.karma, roll, { spendKarma: choice.spendKarma, rank: effectiveRank });
+    await rollWithKarmaAndHistory(actor, actionName, choice.karma, roll, { spendKarma: choice.spendKarma, rank: effectiveRank, inlineRoll: useConsolidated });
+
+  // Build inline roll display for consolidated mode
+  const inlineRollHtml = useConsolidated ? buildInlineRollDisplay(roll, totalKarmaUsed, cappedTotal) : "";
 
   const color = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
   const colorLower = String(color || "").toLowerCase();
@@ -540,7 +552,16 @@ export class ChargingAction extends BaseAction {
     ? `Target: ${targetLabel} (Body Armor: ${choice.targetBArank} = ${choice.targetBAvalue})`
     : `Target: ${targetLabel} (Material: ${choice.targetBArank} = ${choice.targetBAvalue})`;
 
-  const contextHtml = `
+  // Build context section - use inline roll display if consolidated mode
+  const contextHtml = inlineRollHtml ? `
+    <div>Endurance: ${endurance.rank} (${endurance.value})</div>
+    <div>Body Armor: ${bodyArmorRank} (${bodyArmorValue})</div>
+    <div>Areas Moved: ${choice.areas} → Movement Bonus: +${choice.movementBonus}CS${choice.shift !== 0 ? ` (base shift: ${choice.shift > 0 ? '+' : ''}${choice.shift})` : ''}</div>
+    <div>Effective Rank: ${effectiveRank}</div>
+    <div>Damage: ${baseRankValue} (max of END/BA) + ${speedDamage} (2×${choice.areas}) = ${totalDamage} points</div>
+    <div>${targetInfo}</div>
+    ${!reflectionNote ? `<div>${targetLabel} takes: ${damageToTarget} damage (${totalDamage} - ${choice.targetBAvalue})</div>` : ''}
+  ` : `
     <div>Endurance: ${endurance.rank} (${endurance.value})</div>
     <div>Body Armor: ${bodyArmorRank} (${bodyArmorValue})</div>
     <div>Areas Moved: ${choice.areas} → Movement Bonus: +${choice.movementBonus}CS${choice.shift !== 0 ? ` (base shift: ${choice.shift > 0 ? '+' : ''}${choice.shift})` : ''}</div>
@@ -563,6 +584,7 @@ export class ChargingAction extends BaseAction {
         ${targetingContext}
       </div>
       <div style="padding:5px 10px;font-size:.9em;">${contextHtml}</div>
+      ${inlineRollHtml}
       ${grid}
       <div style="text-align:center;padding:8px;margin:5px;font-weight:bold;font-size:1.1em;border-radius:3px;background:${bg};color:${fg};">
         RESULT: ${String(color).toUpperCase()} — ${String(effectResult).toUpperCase()}

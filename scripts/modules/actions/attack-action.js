@@ -1,4 +1,5 @@
-// attack-action.js v1.6.1 - 2025-12-21
+// attack-action.js v1.7.0 - 2025-12-22
+// v1.7.0: Integrate effect modifiers system for combat penalties
 // v1.6.1: Add debug logging for multi-attack FEAT auto-success diagnosis
 // v1.6.0: Fix auto-trigger of Slam/Stun/Kill checks in full auto mode
 // v1.5.x: Previous version without auto-trigger
@@ -22,6 +23,7 @@ import { canEffectsApply } from "../../rules/effects-gate.js";
 import { ACTION_LABELS } from "./action-config.js";
 import { ACTION_EFFECTS } from "./action-config.js";
 import { SCOPE, getFlagScope } from "./flags.js";
+import { getAttackShift, getDefenseShift, canActorAct, getModifierSummary } from "../effects/effect-modifiers.js";
 
 
 export class AttackAction extends BaseAction {
@@ -393,9 +395,56 @@ export class AttackAction extends BaseAction {
 
     const actionLabel = `${actionName}${targetCount > 1 ? ` (${targetCount} targets)` : ''}`;
 
-    // Apply column shift
+    // === EFFECT MODIFIERS: Apply attack/defense shifts from active effects ===
+    const attackerMods = canActorAct(actor);
+    if (!attackerMods.canAct) {
+      ui.notifications?.warn(`${actor.name}: ${attackerMods.reason}`);
+      await ChatMessage.create({
+        speaker: ChatMessage.getSpeaker({ actor }),
+        content: `
+          <div style="background:#fff;border:1px solid #e57373;border-radius:3px;padding:6px 8px;">
+            <b>${actor.name}</b> cannot act — ${attackerMods.reason}
+          </div>
+        `
+      });
+      return; // abort attack
+    }
+    
+    // Get attacker's attack shift from effects
+    const attackerShift = getAttackShift(actor);
+    
+    // Get defender's defense shift (if single target)
+    let defenderShift = 0;
+    const primaryTarget = this._selectPrimaryTarget();
+    const defenderActor = primaryTarget?.actor ?? null;
+    if (defenderActor) {
+      // Check if ranged attack for prone modifier
+      const isRanged = ["shooting", "energy", "force"].includes(attackForm.toLowerCase());
+      defenderShift = getDefenseShift(defenderActor, isRanged);
+    }
+    
+    // Total effect shift (attacker bonus + defender penalty)
+    // Positive defenderShift = harder to hit, so we subtract it
+    const effectShift = attackerShift - defenderShift;
+
+    // Apply column shift (manual + effect modifiers)
     let effectiveRank = ability.rank;
-    if (choice.shift) effectiveRank = shiftRank(effectiveRank, choice.shift);
+    const manualShift = choice.shift || 0;
+    const totalShift = manualShift + effectShift;
+    if (totalShift) effectiveRank = shiftRank(effectiveRank, totalShift);
+    
+    // Log effect modifier application
+    if (effectShift !== 0) {
+      debugLog("Effect modifiers applied to attack:", {
+        attacker: actor.name,
+        attackerShift,
+        defender: defenderActor?.name || "none",
+        defenderShift,
+        totalEffectShift: effectShift,
+        manualShift,
+        finalShift: totalShift
+      });
+    }
 
     // Check consolidated chat card setting
     let useConsolidated = false;
@@ -576,7 +625,7 @@ export class AttackAction extends BaseAction {
       // Add manual mode notice if applicable
       const manualModeNotice = isManualMode ? `
         <div style="padding:6px;margin:5px;background:#fff3e0;border:1px solid #ff9800;border-radius:3px;text-align:center;font-style:italic;color:#e65100;">
-          ⚠ Manual Mode: GM adjudicates damage and effects
+          Manual Mode: GM adjudicates damage and effects
         </div>
       ` : "";
 
@@ -588,18 +637,27 @@ export class AttackAction extends BaseAction {
           )
         : "";
 
+      // Build shift display text
+      let shiftDisplay = "";
+      if (totalShift !== 0) {
+        const parts = [];
+        if (manualShift !== 0) parts.push(`Manual ${manualShift > 0 ? '+' : ''}${manualShift}`);
+        if (effectShift !== 0) parts.push(`Effects ${effectShift > 0 ? '+' : ''}${effectShift}`);
+        shiftDisplay = ` — ${parts.join(', ')} → ${effectiveRank}`;
+      }
+
       // Build roll info section - use inline display if consolidated, else plain text
       const rollInfoSection = inlineRollHtml ? `
         <div style="padding:5px 10px;font-size:.9em;">
           <div>Ability: ${ability.name}</div>
-          <div>Base Rank: ${ability.rank} (${ability.value})${choice.shift ? ` — Shift ${choice.shift} → ${effectiveRank}` : ""}</div>
+          <div>Base Rank: ${ability.rank} (${ability.value})${shiftDisplay}</div>
         </div>
         ${multiAttackFeatHtml}
         ${inlineRollHtml}
       ` : `
         <div style="padding:5px 10px;font-size:.9em;">
           <div>Ability: ${ability.name}</div>
-          <div>Base Rank: ${ability.rank} (${ability.value})${choice.shift ? ` — Shift ${choice.shift} → ${effectiveRank}` : ""}</div>
+          <div>Base Rank: ${ability.rank} (${ability.value})${shiftDisplay}</div>
           <div>Roll: ${roll.total}${totalKarmaUsed ? ` + Karma: ${totalKarmaUsed}` : ""} = ${cappedTotal}</div>
         </div>
       `;

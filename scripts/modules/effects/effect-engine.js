@@ -252,7 +252,12 @@ export async function applyStun(actor, { rounds = 1, originUuid = null } = {}, o
     img: "icons/svg/daze.svg",
     rounds,
     originUuid,
-    flags: { status: { isStunned: true }, meta: { unitLabel: "turn", unitLabelPlural: "turns" } }
+    flags: {
+      effectType: "stunned",
+      status: { isStunned: true },
+      meta: { unitLabel: "turn", unitLabelPlural: "turns" }
+    },
+    statuses: ["stunned"]
   }, opts);
 }
 
@@ -262,11 +267,13 @@ export async function applyEvade(actor, { target = "", nextRoundAttackBonusCS = 
     img: "icons/svg/combat.svg",
     rounds: 1,
     flags: {
+      effectType: "evading",
       status: { isEvading: true },
       evadedTarget: target,
       nextRoundAttackBonusCS,
       notes: note
-    }
+    },
+    statuses: ["evading"]
   });
 }
 
@@ -276,11 +283,13 @@ export async function applyBlock(actor, { armorRank = "Good", armorValue = 10, n
     img: "icons/svg/shield.svg",
     rounds: 1,
     flags: {
+      effectType: "blocking",
       status: { isBlocking: true },
       armorRank,
       armorValue,
       notes: note || "Applies vs physical (not Shooting/Energy; not Charging). Stacks with normal armor, not Force Fields."
-    }
+    },
+    statuses: ["blocking"]
   });
 }
 
@@ -295,17 +304,127 @@ export async function applyCatch(actor, { scenario = "generic", vsYou = "", note
     name: scenarioMap[scenario] || "Caught Object",
     img: "icons/svg/net.svg",
     rounds: 1,
-    flags: { status: { isCatching: true }, scenario, vsYou, notes: note }
+    flags: {
+      status: { isCatching: true },
+      scenario,
+      vsYou,
+      notes: note
+    }
   });
 }
 
 /** Apply Slam note/prone/stagger. Optionally drive token displacement elsewhere. */
 export async function applySlam(actor, { kind = "No Slam", knockbackAreas = 0, prone = false, stagger = false } = {}, opts = {}) {
+  // Determine effect type based on slam kind
+  let effectType = "slammed";
+  if (kind === "Grand Slam") effectType = "grandSlam";
+  else if (kind === "Stagger" || stagger) effectType = "staggered";
+  
   return applyEffect(actor, {
     name: `Slam (${kind})`,
     img: "icons/svg/target.svg",
-    rounds: (stagger || prone) ? 1 : 0, // stagger/prone last one round; pure note lasts 0 (timeless)
-    flags: { status: { isSlammed: true }, kind, knockbackAreas, prone, stagger }
+    rounds: (stagger || prone) ? 1 : 0,
+    flags: {
+      effectType,
+      status: { isSlammed: true },
+      kind,
+      knockbackAreas,
+      prone,
+      stagger
+    },
+    statuses: prone ? ["prone"] : (stagger ? ["staggered"] : [])
+  }, opts);
+}
+
+/** Apply prone effect */
+export async function applyProne(actor, { rounds = 1, originUuid = null } = {}, opts = {}) {
+  return applyEffect(actor, {
+    name: "Prone",
+    img: "icons/svg/falling.svg",
+    rounds,
+    originUuid,
+    flags: {
+      effectType: "prone",
+      status: { isProne: true }
+    },
+    statuses: ["prone"]
+  }, opts);
+}
+
+/** Apply grappled effect */
+export async function applyGrappled(actor, { holderUuid = null, holderName = "", rounds = null } = {}, opts = {}) {
+  return applyEffect(actor, {
+    name: holderName ? `Grappled by ${holderName}` : "Grappled",
+    img: "icons/svg/net.svg",
+    rounds,
+    flags: {
+      effectType: "grappled",
+      status: { isGrappled: true },
+      holderUuid,
+      holderName
+    },
+    statuses: ["grappled"]
+  }, opts);
+}
+
+/** Apply held effect (stronger than grappled) */
+export async function applyHeld(actor, { holderUuid = null, holderName = "", rounds = null } = {}, opts = {}) {
+  return applyEffect(actor, {
+    name: holderName ? `Held by ${holderName}` : "Held",
+    img: "icons/svg/padlock.svg",
+    rounds,
+    flags: {
+      effectType: "held",
+      status: { isHeld: true },
+      holderUuid,
+      holderName
+    },
+    statuses: ["held"]
+  }, opts);
+}
+
+/** Apply entangled effect */
+export async function applyEntangled(actor, { materialRank = "Good", rounds = null } = {}, opts = {}) {
+  return applyEffect(actor, {
+    name: `Entangled (${materialRank})`,
+    img: "icons/svg/net.svg",
+    rounds,
+    flags: {
+      effectType: "entangled",
+      status: { isEntangled: true },
+      materialRank
+    },
+    statuses: ["entangled"]
+  }, opts);
+}
+
+/** Apply blinded effect */
+export async function applyBlinded(actor, { rounds = 1, originUuid = null } = {}, opts = {}) {
+  return applyEffect(actor, {
+    name: "Blinded",
+    img: "icons/svg/blind.svg",
+    rounds,
+    originUuid,
+    flags: {
+      effectType: "blinded",
+      status: { isBlinded: true }
+    },
+    statuses: ["blinded"]
+  }, opts);
+}
+
+/** Apply unconscious effect */
+export async function applyUnconscious(actor, { rounds = 1, originUuid = null } = {}, opts = {}) {
+  return applyEffect(actor, {
+    name: "Unconscious",
+    img: "icons/svg/sleep.svg",
+    rounds,
+    originUuid,
+    flags: {
+      effectType: "unconscious",
+      status: { isUnconscious: true }
+    },
+    statuses: ["unconscious"]
   }, opts);
 }
 
@@ -315,10 +434,12 @@ export async function applyDying(actor, { enduranceValue = null } = {}) {
     name: "Dying",
     img: "icons/svg/skull.svg",
     flags: {
+      effectType: "dying",
       status: { isDying: true },
       enduranceBase: Number.isFinite(enduranceValue) ? enduranceValue : (actor.system?.abilities?.endurance?.value ?? 10),
       stabilizedRounds: 0
-    }
+    },
+    statuses: ["dying"]
   });
 }
 
