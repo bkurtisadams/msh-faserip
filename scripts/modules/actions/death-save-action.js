@@ -7,6 +7,7 @@ import {
   buildResultGrid,
   bannerColors,
   getAbilityInfo,
+  buildInlineRollDisplay,
 } from "./action-utils.js";
 import { resolveKillFeat, KILL_CONTEXTS, getKillContextFromAttackForm } from "../../rules/kill-resolver.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
@@ -47,8 +48,17 @@ export class DeathSaveAction extends BaseAction {
       };
       const effectiveRank = shiftRank(endurance.rank, Number(this.opts?.featCs ?? 0));
 
+      // Check consolidated chat card setting
+      let useConsolidated = false;
+      try {
+        useConsolidated = game.settings.get("msh-faserip", "consolidatedChatCards");
+      } catch (_e) { /* setting not registered yet */ }
+
       const roll = await (new Roll("1d100")).evaluate();
       const cappedTotal = Math.min(100, roll.total);
+      
+      // Build inline roll display for consolidated mode
+      const inlineRollHtml = useConsolidated ? buildInlineRollDisplay(roll, 0, roll.total) : "";
 
       const color = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
       const colorLower = String(color).toLowerCase();
@@ -63,7 +73,7 @@ export class DeathSaveAction extends BaseAction {
       const isDying = (killResult.outcome === "EnduranceLoss");
 
       // Add clear result statement
-      console.log(`💀 DEATH SAVE | ${actor.name} result: ${color.toUpperCase()} - ${killResult.label} (${killResult.description})`, {
+      console.log(`[FASERIP] DEATH SAVE | ${actor.name} result: ${color.toUpperCase()} - ${killResult.label} (${killResult.description})`, {
         isDying,
         context: killContext
       });
@@ -73,9 +83,11 @@ export class DeathSaveAction extends BaseAction {
           <div style="padding:5px 10px;border-bottom:1px solid #c0c0c0;font-size:1.1em;color:#4e342e;">
             <strong>${actor.name} — Death Save</strong>
           </div>
+          <div style="padding:4px 10px;font-size:.9em;color:#555;">
+            Endurance: ${endurance.rank}${this.opts?.featCs ? ` (${this.opts.featCs > 0 ? '+' : ''}${this.opts.featCs}CS) → ${effectiveRank}` : ""}
+          </div>
+          ${inlineRollHtml}
           <div style="padding:8px 10px;font-size:.95em;">
-            <div>Endurance: ${endurance.rank}${this.opts?.featCs ? ` — Shift ${this.opts.featCs} → ${effectiveRank}` : ""}</div>
-            <div>Roll: ${roll.total}</div>
             <div>Unconscious: ${unconsciousDuration} rounds</div>
             ${attackForm ? `<div>Attack Type: ${attackForm}</div>` : ''}
             <div style="margin-top:6px;padding:6px;border-radius:3px;background:${bannerColors(isDying ? 'red' : 'green').bg};color:${bannerColors(isDying ? 'red' : 'green').fg};">
@@ -94,7 +106,7 @@ export class DeathSaveAction extends BaseAction {
         await this._createDyingEffect(actor, endurance, unconsciousDuration);
       }
       
-      return; // ← skip dialog path
+      return; // <- skip dialog path
     }
     // --- END AUTO MODE FAST-PATH ---
 
@@ -173,15 +185,26 @@ export class DeathSaveAction extends BaseAction {
     // Effective rank after shifts
     const effectiveRank = shiftRank(endurance.rank, choice.shift);
 
+    // Check consolidated chat card setting
+    let useConsolidated = false;
+    try {
+      useConsolidated = game.settings.get("msh-faserip", "consolidatedChatCards");
+    } catch (_e) { /* setting not registered yet */ }
+
     // Roll d100 - no karma allowed on initial death save
     const roll = await (new Roll("1d100")).evaluate();
-    if (!choice.skipDice) {
-    await roll.toMessage({
+    
+    // Only show separate roll message if NOT using consolidated mode and not skipping dice
+    if (!choice.skipDice && !useConsolidated) {
+      await roll.toMessage({
         speaker: ChatMessage.getSpeaker({ actor }),
         flavor: `${actor.name} Death Save (Endurance FEAT)`,
         rollMode: game.settings.get("core", "rollMode")
-    });
+      });
     }
+    
+    // Build inline roll display for consolidated mode
+    const inlineRollHtml = useConsolidated ? buildInlineRollDisplay(roll, 0, roll.total) : "";
 
     const cappedTotal = roll.total; // No karma spending
 
@@ -196,29 +219,33 @@ export class DeathSaveAction extends BaseAction {
     const maxStunDuration = game.settings.get('msh-faserip', 'maxStunDuration') || 10;
     const unconsciousDuration = Math.min(rawDuration, maxStunDuration);
 
-    await durationRoll.toMessage({
-      speaker: ChatMessage.getSpeaker({ actor }),
-      flavor: `${actor.name} Unconscious Duration (1d10)${rawDuration > unconsciousDuration ? ` - Capped at ${maxStunDuration}` : ''}`,
-      rollMode: game.settings.get("core", "rollMode")
-    });
+    // Only show separate duration roll if NOT using consolidated mode
+    if (!useConsolidated) {
+      await durationRoll.toMessage({
+        speaker: ChatMessage.getSpeaker({ actor }),
+        flavor: `${actor.name} Unconscious Duration (1d10)${rawDuration > unconsciousDuration ? ` - Capped at ${maxStunDuration}` : ''}`,
+        rollMode: game.settings.get("core", "rollMode")
+      });
+    }
 
     // *** FIXED: Use centralized Kill resolver with proper E/S context ***
     const killResult = resolveKillFeat(colorLower, killContext);
     const isDying = (killResult.outcome === "EnduranceLoss");
 
-    console.log("=== Death Save Result ===");
-    console.log("Color:", colorLower);
-    console.log("Kill Context:", killContext);
-    console.log("Kill Result:", killResult);
-    console.log("Is Dying:", isDying);
-    console.log("Unconscious Duration:", unconsciousDuration);
+    console.log("[FASERIP] Death Save Result:", {
+      color: colorLower,
+      killContext,
+      killResult,
+      isDying,
+      unconsciousDuration
+    });
 
     const grid = buildResultGrid("kill", colorLower, effects);
     const { bg, fg } = bannerColors(colorLower);
 
     const rulesBlock = isDying ? `
       <div style="padding:8px 10px;margin:6px 10px;background:#ffebee;border:1px solid #ef5350;border-radius:3px;">
-        <div style="font-weight:bold;margin-bottom:6px;color:#c62828;">☠️ DYING</div>
+        <div style="font-weight:bold;margin-bottom:6px;color:#c62828;">DYING</div>
         <div style="margin-bottom:6px;">
           Character is unconscious for ${unconsciousDuration} round${unconsciousDuration > 1 ? 's' : ''} and losing 1 Endurance rank per turn:
         </div>
@@ -232,7 +259,7 @@ export class DeathSaveAction extends BaseAction {
           <li><strong>Any Aid:</strong> First aid, pulling to safety, checking if OK - stops Endurance loss</li>
         </ul>
         <div style="margin-top:8px;padding:6px;background:#fff9c4;border:1px solid #f57c00;border-radius:3px;font-size:0.85em;">
-          <strong>⚠️ Note:</strong> Manually edit the Dying effect in the Effects tab to track current rank and turns elapsed.
+          <strong>Note:</strong> Manually edit the Dying effect in the Effects tab to track current rank and turns elapsed.
         </div>
       </div>
     ` : `
@@ -254,10 +281,14 @@ export class DeathSaveAction extends BaseAction {
           <strong>${actor.name} - Death Save</strong>
         </div>
 
+        <div style="padding:4px 10px;font-size:.9em;color:#555;">
+          Endurance: ${endurance.rank} (${endurance.value})${choice.shift ? ` (${choice.shift > 0 ? '+' : ''}${choice.shift}CS) → ${effectiveRank}` : ""}
+        </div>
+        
+        ${inlineRollHtml}
+        
         <div style="padding:5px 10px;font-size:.9em;">
-          <div>Endurance: ${endurance.rank} (${endurance.value})${choice.shift ? ` — Shift ${choice.shift} → ${effectiveRank}` : ""}</div>
-          <div>Roll: ${roll.total} = ${cappedTotal}</div>
-          <div>Unconscious Duration: ${unconsciousDuration} round${unconsciousDuration > 1 ? 's' : ''}</div>
+          <div>Unconscious Duration: ${unconsciousDuration} round${unconsciousDuration > 1 ? 's' : ''}${rawDuration > unconsciousDuration ? ` (capped from ${rawDuration})` : ''}</div>
           ${attackForm ? `<div>Attack Type: ${attackForm} (${isEdgedOrShooting ? 'E/S applies' : 'No E/S'})</div>` : ''}
         </div>
 

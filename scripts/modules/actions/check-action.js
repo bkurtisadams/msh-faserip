@@ -7,7 +7,8 @@ import {
   effectsFor,
   bannerColors,
   getAbilityInfo,
-  universalColor
+  universalColor,
+  buildInlineRollDisplay
 } from "./action-utils.js";
 import { resolveKillFeat, getKillContextFromAttackForm } from "../../rules/kill-resolver.js";
 import { canEffectsApply } from "../../rules/effects-gate.js";
@@ -75,16 +76,28 @@ export class CheckAction extends BaseAction {
 
       const effectiveEndRank = shift ? shiftRank(targetEndRank, shift) : targetEndRank;
 
+      // Check consolidated chat card setting
+      let useConsolidated = false;
+      try {
+        useConsolidated = game.settings.get("msh-faserip", "consolidatedChatCards");
+      } catch (_e) { /* setting not registered yet */ }
+
       // Roll percent
       const roll = new Roll("1d100");
       await roll.evaluate(); // v13+: do not pass {async:true}
-      if (!this.opts?.skipDice) {
+      
+      // Only show separate roll message if NOT using consolidated mode
+      if (!this.opts?.skipDice && !useConsolidated) {
         await roll.toMessage({
           speaker: ChatMessage.getSpeaker({ actor }),
           flavor: `${actionName}: ${targetName} (${effectiveEndRank})`,
           rollMode: game.settings.get("core", "rollMode")
         });
       }
+      
+      // Build inline roll display for consolidated mode
+      const inlineRollHtml = useConsolidated ? buildInlineRollDisplay(roll, 0, roll.total) : "";
+      
 /*       const capped = Math.min(100, roll.total);
       const color = (typeof rollUniversalTable === "function")
         ? rollUniversalTable(effectiveEndRank, capped)
@@ -121,13 +134,17 @@ export class CheckAction extends BaseAction {
           rawDuration = d.total;
           const maxDur = game.settings?.get?.("msh-faserip","maxStunDuration") || 10;
           stunDuration = Math.min(rawDuration, maxDur);
-          await d.toMessage({
-            speaker: ChatMessage.getSpeaker({ actor }),
-            flavor: `${targetName} Stun Duration (1d10)${rawDuration>stunDuration?` - capped ${maxDur}`:""}`
-          });
+          // Only show separate duration message if NOT consolidated
+          if (!useConsolidated) {
+            await d.toMessage({
+              speaker: ChatMessage.getSpeaker({ actor }),
+              flavor: `${targetName} Stun Duration (1d10)${rawDuration>stunDuration?` - capped ${maxDur}`:""}`
+            });
+          }
           await this._createStunnedEffect(defenderUuid, targetName, stunDuration);
         } else if (colorLower === "green") {
           // Green = 1 round
+          stunDuration = 1;
           await this._createStunnedEffect(defenderUuid, targetName, 1);
         }
         // Yellow/Red = No effect (no stun applied)
@@ -315,6 +332,14 @@ export class CheckAction extends BaseAction {
       const headerActorName  = actor?.name || targetName || "Actor";
       const headerTargetName = (targetName && targetName !== headerActorName) ? targetName : "";
 
+      // Build roll info section - use inline display if consolidated, else show result only
+      const rollInfoSection = inlineRollHtml ? `
+        <div style="padding:4px 10px;">
+          <div style="font-size:.9em;color:#555;">Endurance: ${effectiveEndRank}${shift ? ` (${shift > 0 ? '+' : ''}${shift}CS)` : ''}</div>
+        </div>
+        ${inlineRollHtml}
+      ` : '';
+
       const content = `
         <div style="border:1px solid ${banner.bd};border-radius:3px;overflow:hidden;">
           <div style="padding:6px 10px;background:${banner.bg};color:${banner.fg};border-bottom:1px solid ${banner.bd};">
@@ -322,6 +347,7 @@ export class CheckAction extends BaseAction {
               headerTargetName ? ` vs <b>${headerTargetName}</b>` : ``
             }
           </div>
+          ${rollInfoSection}
           <div style="padding:8px 10px;font-size:.95em;">
             <div><b>Result:</b> <span style="text-transform:capitalize">${colorLower}</span> — ${effectText}</div>
             ${effectsSuppressed ? `<div style="margin-top:6px;color:#b71c1c;">No damage penetrated → effect suppressed.</div>` : ""}
@@ -392,12 +418,27 @@ export class CheckAction extends BaseAction {
     if (!choice) return;
 
     const effectiveEndRank = choice.shift ? shiftRank(choice.targetEndRank, choice.shift) : choice.targetEndRank;
+    
+    // Check consolidated chat card setting
+    let useConsolidated = false;
+    try {
+      useConsolidated = game.settings.get("msh-faserip", "consolidatedChatCards");
+    } catch (_e) { /* setting not registered yet */ }
+    
     const roll = new Roll("1d100");
     await roll.evaluate();
-    await roll.toMessage({
-      speaker: ChatMessage.getSpeaker({ actor }),
-      flavor: `${actionName}: ${choice.targetName} (${effectiveEndRank})`
-    });
+    
+    // Only show separate roll message if NOT using consolidated mode
+    if (!useConsolidated) {
+      await roll.toMessage({
+        speaker: ChatMessage.getSpeaker({ actor }),
+        flavor: `${actionName}: ${choice.targetName} (${effectiveEndRank})`
+      });
+    }
+    
+    // Build inline roll display for consolidated mode
+    const inlineRollHtml = useConsolidated ? buildInlineRollDisplay(roll, 0, roll.total) : "";
+    
     const color = (typeof rollUniversalTable === "function")
       ? rollUniversalTable(effectiveEndRank, Math.min(100, roll.total))
       : (game?.msh?.rollUniversalTable?.(effectiveEndRank, Math.min(100, roll.total)) ?? "white");
@@ -415,15 +456,20 @@ export class CheckAction extends BaseAction {
     });
 
     // Minimal effect application in manual mode (same as auto)
+    let manualStunDuration = null;
     if (actionType === "stun" && !effectsSuppressed) {
       if (colorLower === "white") {
         const d = new Roll("1d10");
         await d.evaluate();
         const maxDur = game.settings?.get?.("msh-faserip","maxStunDuration") || 10;
-        const dur = Math.min(d.total, maxDur);
-        await d.toMessage({ speaker: ChatMessage.getSpeaker({ actor }), flavor: `${choice.targetName} Stun Duration (1d10)` });
-        await this._createStunnedEffect(this.opts?.prefill?.targetUuid || "", choice.targetName, dur);
+        manualStunDuration = Math.min(d.total, maxDur);
+        // Only show separate duration message if NOT consolidated
+        if (!useConsolidated) {
+          await d.toMessage({ speaker: ChatMessage.getSpeaker({ actor }), flavor: `${choice.targetName} Stun Duration (1d10)` });
+        }
+        await this._createStunnedEffect(this.opts?.prefill?.targetUuid || "", choice.targetName, manualStunDuration);
       } else if (colorLower === "green") {
+        manualStunDuration = 1;
         await this._createStunnedEffect(this.opts?.prefill?.targetUuid || "", choice.targetName, 1);
       }
     }
@@ -478,13 +524,24 @@ export class CheckAction extends BaseAction {
 
     const banner = bannerColors[colorLower] || { bg:"#eee", fg:"#333", bd:"#ccc" };
     const extraHtml  = this._extraExplanationHtml({
-      actionType, targetAbility, colorLower, finalEffect, effectsSuppressed
+      actionType, targetAbility, colorLower, finalEffect, effectsSuppressed,
+      stunDuration: manualStunDuration
     });
+    
+    // Build roll info section - use inline display if consolidated, else show result only
+    const rollInfoSection = inlineRollHtml ? `
+      <div style="padding:4px 10px;">
+        <div style="font-size:.9em;color:#555;">Endurance: ${effectiveEndRank}${choice.shift ? ` (${choice.shift > 0 ? '+' : ''}${choice.shift}CS)` : ''}</div>
+      </div>
+      ${inlineRollHtml}
+    ` : '';
+    
     const content = `
       <div style="border:1px solid ${banner.bd};border-radius:3px;overflow:hidden;">
         <div style="padding:6px 10px;background:${banner.bg};color:${banner.fg};border-bottom:1px solid ${banner.bd};">
           <b>${actor.name}</b> — ${labelFor(actionType)} vs <b>${choice.targetName}</b>
         </div>
+        ${rollInfoSection}
         <div style="padding:8px 10px;font-size:.95em;">
           <div><b>Result:</b> <span style="text-transform:capitalize">${colorLower}</span> — ${(actionType === "kill") ? (finalEffect?.label ?? "No Effect") : finalEffect}</div>
           ${effectsSuppressed ? `<div style="margin-top:6px;color:#b71c1c;">No damage penetrated → effect suppressed.</div>` : ""}
