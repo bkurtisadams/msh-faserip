@@ -403,8 +403,17 @@ export const isBluntCapable = (it) => {
 };
 
 // Roll + Karma (same behavior you had, packaged up)
+// inlineRoll: true = suppress separate roll chat message (roll embedded in action card)
 export async function rollWithKarmaAndHistory(actor, actionLabel, requestedKarma = 0, baseTotal, options = {}) {
-  const { spendKarma = false, rank = null, skipDice = false } = options;
+  const { spendKarma = false, rank = null, skipDice = false, inlineRoll = false } = options;
+  
+  // Check game setting for consolidated chat cards
+  let useInlineRoll = inlineRoll;
+  try {
+    if (game.settings.get("msh-faserip", "consolidatedChatCards")) {
+      useInlineRoll = true;
+    }
+  } catch (_e) { /* setting not registered yet */ }
   
   // Create roll - if baseTotal is a Roll instance, use it; otherwise create new
   // skipDice controls whether we show the dice animation, not whether we roll
@@ -423,12 +432,14 @@ export async function rollWithKarmaAndHistory(actor, actionLabel, requestedKarma
     } else {
       // Normal evaluation - will trigger dice animation if DiceSoNice is active
       await roll.evaluate();
-      // Show dice roll in chat (triggers animation)
-      await roll.toMessage({
-        speaker: ChatMessage.getSpeaker({ actor }),
-        flavor: actionLabel,
-        rollMode: game.settings.get("core", "rollMode")
-      });
+      // Show dice roll in chat ONLY if not using inline roll mode
+      if (!useInlineRoll) {
+        await roll.toMessage({
+          speaker: ChatMessage.getSpeaker({ actor }),
+          flavor: actionLabel,
+          rollMode: game.settings.get("core", "rollMode")
+        });
+      }
     }
     raw = roll.total;
   }
@@ -477,6 +488,105 @@ export async function rollWithKarmaAndHistory(actor, actionLabel, requestedKarma
   }
 
   return { roll, cappedTotal, totalKarmaUsed: karmaUsed };
+}
+
+/**
+ * Build HTML for inline roll display in consolidated chat cards
+ * @param {Roll} roll - The Foundry Roll object
+ * @param {number} karmaUsed - Amount of karma spent
+ * @param {number} cappedTotal - Final total after karma (capped at 100)
+ * @returns {string} HTML string for the roll display
+ */
+export function buildInlineRollDisplay(roll, karmaUsed = 0, cappedTotal = null) {
+  if (!roll) return "";
+  
+  const finalTotal = cappedTotal ?? roll.total;
+  const diceResult = roll.total;
+  
+  // Determine dice face styling based on result
+  const getDiceStyle = (result) => {
+    if (result >= 90) return { bg: "#c62828", fg: "#fff" };  // High roll - red
+    if (result >= 70) return { bg: "#f57c00", fg: "#fff" };  // Good roll - orange
+    if (result >= 50) return { bg: "#fbc02d", fg: "#333" };  // Medium roll - yellow
+    if (result >= 30) return { bg: "#689f38", fg: "#fff" };  // Decent roll - green
+    return { bg: "#455a64", fg: "#fff" };                     // Low roll - gray
+  };
+  
+  const diceStyle = getDiceStyle(diceResult);
+  
+  let rollHtml = `
+    <div class="faserip-inline-roll" style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:#f8f8f8;border:1px solid #ddd;border-radius:3px;margin:4px 0;">
+      <div class="dice-result" style="
+        display:flex;align-items:center;justify-content:center;
+        min-width:42px;height:42px;
+        background:${diceStyle.bg};color:${diceStyle.fg};
+        border-radius:4px;font-weight:bold;font-size:1.3em;
+        box-shadow:inset 0 -2px 4px rgba(0,0,0,0.2), 0 2px 4px rgba(0,0,0,0.15);
+      ">
+        ${diceResult}
+      </div>
+      <div class="roll-details" style="flex:1;font-size:0.9em;">
+        <div style="color:#666;">d100 Roll</div>`;
+  
+  if (karmaUsed > 0) {
+    rollHtml += `
+        <div style="color:#8b4513;font-weight:500;">
+          ${diceResult} + ${karmaUsed} Karma = <strong>${finalTotal}</strong>
+        </div>`;
+  } else {
+    rollHtml += `
+        <div><strong>Total: ${finalTotal}</strong></div>`;
+  }
+  
+  rollHtml += `
+      </div>
+    </div>`;
+  
+  return rollHtml;
+}
+
+/**
+ * Build HTML for inline FEAT check result (e.g., multi-attack FEAT)
+ * @param {Object} featResult - Result from FEAT check
+ * @param {string} featName - Name of the FEAT check
+ * @returns {string} HTML string for the FEAT result display
+ */
+export function buildInlineFeatDisplay(featResult, featName = "FEAT Check") {
+  if (!featResult) return "";
+  
+  const { success, auto, intensity, roll, totalRoll, resultColor } = featResult;
+  
+  const bgColor = success ? "#e8f5e9" : "#ffebee";
+  const borderColor = success ? "#4caf50" : "#f44336";
+  const textColor = success ? "#2e7d32" : "#d32f2f";
+  const statusText = success ? "SUCCESS" : "FAILED";
+  const autoText = auto ? " (Automatic)" : "";
+  
+  let html = `
+    <div class="faserip-inline-feat" style="
+      background:${bgColor};border:1px solid ${borderColor};border-radius:3px;
+      padding:6px 8px;margin:4px 0;font-size:0.9em;
+    ">
+      <div style="color:${textColor};font-weight:600;margin-bottom:2px;">
+        ${featName}: ${statusText}${autoText}
+      </div>`;
+  
+  if (!auto && roll) {
+    html += `
+      <div style="color:#555;">
+        Roll: ${roll.total}${totalRoll !== roll.total ? ` + Karma = ${totalRoll}` : ""} 
+        vs ${intensity} → <strong style="text-transform:uppercase;">${resultColor}</strong>
+      </div>`;
+  } else if (auto) {
+    html += `
+      <div style="color:#555;font-style:italic;">
+        Ability rank sufficiently exceeds ${intensity} intensity
+      </div>`;
+  }
+  
+  html += `</div>`;
+  
+  return html;
 }
 
 

@@ -25,7 +25,8 @@ import {
   setupModeSelector,
   setupMultiAttackHandlers,
   applyCapabilitiesToDialog,
-  shiftRank
+  shiftRank,
+  buildInlineFeatDisplay
 } from "./action-utils.js";
 import { shouldConfirm, buildPreviewHtml } from "./action-utils.js";
 
@@ -303,6 +304,8 @@ export class ShootingAction extends RangedAttackAction {
 
     // Handle multi-attacks (2 or 3 attacks, must make FEAT; all attacks @-1 CS)
     let actualAttackCount = 1;
+    let multiAttackFeatResult = null;  // Store FEAT result for consolidated display
+    
     if (choice.multiAttacks) {
       const fightingAbility = getAbilityInfo(actor, "fighting");
       const intensity = choice.attackCount === 2 ? "Remarkable" : "Amazing";
@@ -317,6 +320,9 @@ export class ShootingAction extends RangedAttackAction {
         choice.attackCount
       );
       if (featResult.cancelled) return;
+      
+      // Store for consolidated display
+      multiAttackFeatResult = { ...featResult, intensity, attackCount: choice.attackCount };
       
       if (!featResult.success) {
         // Failed FEAT: 1 attack at -3CS
@@ -342,7 +348,8 @@ export class ShootingAction extends RangedAttackAction {
       const targetForThisAttack = actualAttackCount === 1 ? targets[0] : targets[(i-1) % targets.length];
       
       await this._executeSingleAttack({
-        choice: { ...choice, specificTarget: targetForThisAttack },  // Force specific target
+        // Only pass FEAT result on the first attack to avoid duplication
+        choice: { ...choice, specificTarget: targetForThisAttack, multiAttackFeatResult: i === 1 ? multiAttackFeatResult : null },
         actor: this.actor,
         ability,
         actionType,
@@ -358,15 +365,22 @@ export class ShootingAction extends RangedAttackAction {
       });
     }
 
-// Multi-attack completion message
-if (actualAttackCount > 1) {
-  await ChatMessage.create({
-    speaker: ChatMessage.getSpeaker({ actor }),
-    content: `<div style="background:#e8f5e9;border:1px solid #4caf50;border-radius:3px;padding:8px;margin:5px 0;">
-      <div style="color:#2e7d32;font-weight:bold;margin-bottom:5px;">Multiple Attack Sequence Complete</div>
-      <div style="font-size:0.9em;">${actor.name} completed ${actualAttackCount} attacks.</div>
-    </div>`
-  });
-}
+    // Multi-attack completion message (only if not using consolidated mode)
+    if (actualAttackCount > 1) {
+      let useConsolidated = false;
+      try {
+        useConsolidated = game.settings.get("msh-faserip", "consolidatedChatCards");
+      } catch (_e) { /* setting not registered yet */ }
+      
+      if (!useConsolidated) {
+        await ChatMessage.create({
+          speaker: ChatMessage.getSpeaker({ actor }),
+          content: `<div style="background:#e8f5e9;border:1px solid #4caf50;border-radius:3px;padding:8px;margin:5px 0;">
+            <div style="color:#2e7d32;font-weight:bold;margin-bottom:5px;">Multiple Attack Sequence Complete</div>
+            <div style="font-size:0.9em;">${actor.name} completed ${actualAttackCount} attacks.</div>
+          </div>`
+        });
+      }
+    }
   } // <-- CLOSE execute()
 }

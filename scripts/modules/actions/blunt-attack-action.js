@@ -15,7 +15,7 @@ import {
   getTargetingContext, getBodyArmorValues, applyDamageToTargets,
   buildMultiAttackSection, setupMultiAttackHandlers,
   buildModeSelector, attachModeSelectorHandlers, debugLog, setupModeSelector,
-  applyCapabilitiesToDialog
+  applyCapabilitiesToDialog, buildInlineFeatDisplay
 } from "./action-utils.js";
 import { getItemMaterialRank } from "../../gm-utils.js";
 import { makeDamageBlock, computeAfterArmor, buildDamageFlags } from "./damage-ui.js";
@@ -518,6 +518,8 @@ export class BluntAttackAction extends AttackAction {
 
     // Handle multi-attacks (2 or 3 attacks, must make FEAT; all attacks @-1 CS)
     let actualAttackCount = 1;
+    let multiAttackFeatResult = null;  // Store FEAT result for consolidated display
+    
     if (choice.multiAttacks) {
       const fightingAbility = getAbilityInfo(actor, "fighting");
       const intensity = choice.attackCount === 2 ? "Remarkable" : "Amazing";
@@ -532,14 +534,25 @@ export class BluntAttackAction extends AttackAction {
         choice.attackCount
       );
       
-      // (A) FEAT status banner so users see what happened
-      await ChatMessage.create({
-        speaker: ChatMessage.getSpeaker({ actor }),
-        content: `<div style="background:#eef6ff;border:1px solid #90caf9;border-radius:3px;padding:6px;margin:4px 0;">
-          <b>Multi-Attack FEAT:</b> ${intensity} — ${
-            featResult?.success ? "SUCCESS" : "FAIL"
-          } ${featResult?.auto ? "(Automatic)" : ""}</div>`
-      });
+      // Store for consolidated display
+      multiAttackFeatResult = { ...featResult, intensity, attackCount: choice.attackCount };
+      
+      // Check if using consolidated chat cards
+      let useConsolidated = false;
+      try {
+        useConsolidated = game.settings.get("msh-faserip", "consolidatedChatCards");
+      } catch (_e) { /* setting not registered yet */ }
+      
+      // Only show separate FEAT banner if NOT using consolidated mode
+      if (!useConsolidated) {
+        await ChatMessage.create({
+          speaker: ChatMessage.getSpeaker({ actor }),
+          content: `<div style="background:#eef6ff;border:1px solid #90caf9;border-radius:3px;padding:6px;margin:4px 0;">
+            <b>Multi-Attack FEAT:</b> ${intensity} — ${
+              featResult?.success ? "SUCCESS" : "FAIL"
+            } ${featResult?.auto ? "(Automatic)" : ""}</div>`
+        });
+      }
 
       const featSuccess    = !!(featResult?.auto || featResult?.resultColor === "AUTO" || featResult?.success);
       const featImpossible =  !!(featResult?.resultColor === "IMPOSSIBLE");
@@ -562,7 +575,8 @@ export class BluntAttackAction extends AttackAction {
     if (choice.multiAdjacent && targetCount > 1) {
       // Single roll for all adjacent targets
       await this._executeSingleAttack({
-        choice, actor, ability,
+        choice: { ...choice, multiAttackFeatResult },  // Pass FEAT result
+        actor, ability,
         actionType, actionName, effects,
         damageType: "physical-blunt",
         rawDamage: choice.damage,
@@ -586,7 +600,8 @@ export class BluntAttackAction extends AttackAction {
           : (selected.length ? selected[i % selected.length] : null);
 
         await this._executeSingleAttack({
-          choice: { ...choice, specificTarget: tgt },
+          // Only pass FEAT result on the first attack to avoid duplication
+          choice: { ...choice, specificTarget: tgt, multiAttackFeatResult: i === 0 ? multiAttackFeatResult : null },
           actor, ability,
           actionType, actionName, effects,
           damageType: "physical-blunt",

@@ -142,6 +142,17 @@ Hooks.once("init", async () => {
     requiresReload: false
   });
 
+  // Register consolidated chat cards setting
+  game.settings.register("msh-faserip", "consolidatedChatCards", {
+    name: "Consolidated Chat Cards",
+    hint: "When enabled, FEAT rolls are embedded in the main action chat card instead of appearing as separate messages. Reduces chat clutter.",
+    scope: "world",
+    config: true,
+    type: Boolean,
+    default: true,
+    requiresReload: false
+  });
+
   debugLog("init hook is running!");
   console.log("Marvel Super Heroes (FASERIP) system initializing...");
 

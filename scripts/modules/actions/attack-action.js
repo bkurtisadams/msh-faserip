@@ -14,7 +14,7 @@ import {
   RANKS, getStrengthInfo, shiftRank, getAbilityInfo,
   rollWithKarmaAndHistory, buildResultGrid, buildActionsBox, bannerColors,
   getTargetingContext, getBodyArmorValues, applyDamageToTargets,
-  debugLog, universalColor
+  debugLog, universalColor, buildInlineRollDisplay, buildInlineFeatDisplay
 } from "./action-utils.js";
 //import { rollUniversalTable } from "../dice/universal-table.js";
 import { buildDamageFlags } from "./damage-ui.js";
@@ -134,36 +134,45 @@ export class AttackAction extends BaseAction {
         success = colorLower === "red";
       }
       
-      // Show result in chat (auto-rolled)
-      await roll.toMessage({
-        speaker: ChatMessage.getSpeaker({ actor }),
-        flavor: `Multiple Attack FEAT: ${intensity} (Auto-rolled)`,
-      });
+      // Check if using consolidated chat cards
+      let useConsolidated = false;
+      try {
+        useConsolidated = game.settings.get("msh-faserip", "consolidatedChatCards");
+      } catch (_e) { /* setting not registered yet */ }
       
-      const bgColor = success ? "#e8f5e9" : "#ffebee";
-      const borderColor = success ? "#4caf50" : "#f44336";
-      const textColor = success ? "#2e7d32" : "#d32f2f";
-      
-      await ChatMessage.create({
-        speaker: ChatMessage.getSpeaker({ actor }),
-        content: `
-          <div style="background:${bgColor}; border:1px solid ${borderColor}; border-radius:3px; padding:8px; margin:5px 0;">
-            <div style="color:${textColor}; font-weight:bold; margin-bottom:5px;">
-              Multiple Attack FEAT - ${success ? "SUCCESS" : "FAILED"} (Full Auto)
-            </div>
-            <div style="font-size:0.9em;">
-              <div>Fighting: ${fightingAbility.rank} vs Intensity: ${intensity}</div>
-              <div>Roll: ${roll.total}</div>
-              <div>Result: <strong>${resultColor.toUpperCase()}</strong></div>
-              <div style="margin-top:5px; font-style:italic;">
-                ${success 
-                  ? `${attackCount} attacks at -1CS each` 
-                  : `FEAT failed: Only 1 attack at -3CS`}
+      // Only show separate messages if NOT using consolidated mode
+      if (!useConsolidated) {
+        // Show result in chat (auto-rolled)
+        await roll.toMessage({
+          speaker: ChatMessage.getSpeaker({ actor }),
+          flavor: `Multiple Attack FEAT: ${intensity} (Auto-rolled)`,
+        });
+        
+        const bgColor = success ? "#e8f5e9" : "#ffebee";
+        const borderColor = success ? "#4caf50" : "#f44336";
+        const textColor = success ? "#2e7d32" : "#d32f2f";
+        
+        await ChatMessage.create({
+          speaker: ChatMessage.getSpeaker({ actor }),
+          content: `
+            <div style="background:${bgColor}; border:1px solid ${borderColor}; border-radius:3px; padding:8px; margin:5px 0;">
+              <div style="color:${textColor}; font-weight:bold; margin-bottom:5px;">
+                Multiple Attack FEAT - ${success ? "SUCCESS" : "FAILED"} (Full Auto)
+              </div>
+              <div style="font-size:0.9em;">
+                <div>Fighting: ${fightingAbility.rank} vs Intensity: ${intensity}</div>
+                <div>Roll: ${roll.total}</div>
+                <div>Result: <strong>${resultColor.toUpperCase()}</strong></div>
+                <div style="margin-top:5px; font-style:italic;">
+                  ${success 
+                    ? `${attackCount} attacks at -1CS each` 
+                    : `FEAT failed: Only 1 attack at -3CS`}
+                </div>
               </div>
             </div>
-          </div>
-        `
-      });
+          `
+        });
+      }
       
       return { success, intensity, roll, totalRoll, resultColor, cancelled: false };
     }
@@ -249,31 +258,39 @@ export class AttackAction extends BaseAction {
                 success = colorLower === "red";
               }
               
-              // Post result to chat
-              const bgColor = success ? "#e8f5e9" : "#ffebee";
-              const borderColor = success ? "#4caf50" : "#f44336";
-              const textColor = success ? "#2e7d32" : "#d32f2f";
+              // Check if using consolidated chat cards
+              let useConsolidated = false;
+              try {
+                useConsolidated = game.settings.get("msh-faserip", "consolidatedChatCards");
+              } catch (_e) { /* setting not registered yet */ }
               
-              await ChatMessage.create({
-                speaker: ChatMessage.getSpeaker({ actor }),
-                content: `
-                  <div style="background:${bgColor}; border:1px solid ${borderColor}; border-radius:3px; padding:8px; margin:5px 0;">
-                    <div style="color:${textColor}; font-weight:bold; margin-bottom:5px;">
-                      Multiple Attack FEAT - ${success ? "SUCCESS" : "FAILED"}
-                    </div>
-                    <div style="font-size:0.9em;">
-                      <div>Fighting: ${fightingAbility.rank}${cs ? ` (${cs > 0 ? '+' : ''}${cs}CS → ${effFeatRank})` : ''} vs Intensity: ${intensity}</div>
-                      <div>Roll: ${roll.total}${karmaToSpend ? ` + ${karmaToSpend} Karma = ${totalRoll}` : ''}</div>
-                      <div>Result: <strong>${resultColor.toUpperCase()}</strong></div>
-                      <div style="margin-top:5px; font-style:italic;">
-                        ${success 
-                          ? `${attackCount} attacks at -1CS each` 
-                          : `FEAT failed: Only 1 attack at -3CS`}
+              // Only post separate chat result if NOT using consolidated mode
+              if (!useConsolidated) {
+                const bgColor = success ? "#e8f5e9" : "#ffebee";
+                const borderColor = success ? "#4caf50" : "#f44336";
+                const textColor = success ? "#2e7d32" : "#d32f2f";
+                
+                await ChatMessage.create({
+                  speaker: ChatMessage.getSpeaker({ actor }),
+                  content: `
+                    <div style="background:${bgColor}; border:1px solid ${borderColor}; border-radius:3px; padding:8px; margin:5px 0;">
+                      <div style="color:${textColor}; font-weight:bold; margin-bottom:5px;">
+                        Multiple Attack FEAT - ${success ? "SUCCESS" : "FAILED"}
+                      </div>
+                      <div style="font-size:0.9em;">
+                        <div>Fighting: ${fightingAbility.rank}${cs ? ` (${cs > 0 ? '+' : ''}${cs}CS → ${effFeatRank})` : ''} vs Intensity: ${intensity}</div>
+                        <div>Roll: ${roll.total}${karmaToSpend ? ` + ${karmaToSpend} Karma = ${totalRoll}` : ''}</div>
+                        <div>Result: <strong>${resultColor.toUpperCase()}</strong></div>
+                        <div style="margin-top:5px; font-style:italic;">
+                          ${success 
+                            ? `${attackCount} attacks at -1CS each` 
+                            : `FEAT failed: Only 1 attack at -3CS`}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                `
-              });
+                  `
+                });
+              }
               
               resolve({ success, intensity, roll, totalRoll, resultColor, cancelled: false });
             }
@@ -380,11 +397,21 @@ export class AttackAction extends BaseAction {
     let effectiveRank = ability.rank;
     if (choice.shift) effectiveRank = shiftRank(effectiveRank, choice.shift);
 
+    // Check consolidated chat card setting
+    let useConsolidated = false;
+    try {
+      useConsolidated = game.settings.get("msh-faserip", "consolidatedChatCards");
+    } catch (_e) { /* setting not registered yet */ }
+
     // Roll + karma (two-phase system: spendKarma flag triggers decision dialog after roll)
+    // inlineRoll suppresses separate roll chat message when consolidated is enabled
     const { roll, cappedTotal, totalKarmaUsed } = await rollWithKarmaAndHistory(
       actor, actionLabel, choice.karma || 0, null,
-      { spendKarma: choice.spendKarma, rank: effectiveRank, skipDice: choice.skipDice }
+      { spendKarma: choice.spendKarma, rank: effectiveRank, skipDice: choice.skipDice, inlineRoll: useConsolidated }
     );
+
+    // Build inline roll display if consolidated mode is enabled
+    const inlineRollHtml = useConsolidated ? buildInlineRollDisplay(roll, totalKarmaUsed, cappedTotal) : "";
 
     // Check if manual mode -- return if true
     const isManualMode = this.opts?.mode === "manual";
@@ -553,6 +580,30 @@ export class AttackAction extends BaseAction {
         </div>
       ` : "";
 
+      // Build inline FEAT display if multi-attack FEAT was performed and consolidated mode is enabled
+      const multiAttackFeatHtml = (useConsolidated && choice?.multiAttackFeatResult) 
+        ? buildInlineFeatDisplay(
+            choice.multiAttackFeatResult, 
+            `Multi-Attack FEAT (${choice.multiAttackFeatResult.attackCount} attacks)`
+          )
+        : "";
+
+      // Build roll info section - use inline display if consolidated, else plain text
+      const rollInfoSection = inlineRollHtml ? `
+        <div style="padding:5px 10px;font-size:.9em;">
+          <div>Ability: ${ability.name}</div>
+          <div>Base Rank: ${ability.rank} (${ability.value})${choice.shift ? ` — Shift ${choice.shift} → ${effectiveRank}` : ""}</div>
+        </div>
+        ${multiAttackFeatHtml}
+        ${inlineRollHtml}
+      ` : `
+        <div style="padding:5px 10px;font-size:.9em;">
+          <div>Ability: ${ability.name}</div>
+          <div>Base Rank: ${ability.rank} (${ability.value})${choice.shift ? ` — Shift ${choice.shift} → ${effectiveRank}` : ""}</div>
+          <div>Roll: ${roll.total}${totalKarmaUsed ? ` + Karma: ${totalKarmaUsed}` : ""} = ${cappedTotal}</div>
+        </div>
+      `;
+
       // Final chat card for this target
       const cardHtml = `
         <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
@@ -560,11 +611,7 @@ export class AttackAction extends BaseAction {
             <strong>${actor.name} - ${actionLabel}</strong>
             ${targetActor ? `<br><span style="font-size:.85em;color:#555;">→ ${targetName}</span>` : ''}
           </div>
-          <div style="padding:5px 10px;font-size:.9em;">
-            <div>Ability: ${ability.name}</div>
-            <div>Base Rank: ${ability.rank} (${ability.value})${choice.shift ? ` — Shift ${choice.shift} → ${effectiveRank}` : ""}</div>
-            <div>Roll: ${roll.total}${totalKarmaUsed ? ` + Karma: ${totalKarmaUsed}` : ""} = ${cappedTotal}</div>
-          </div>
+          ${rollInfoSection}
           ${damageBlock}
           ${grid}
           <div style="text-align:center;padding:8px;margin:5px;font-weight:bold;font-size:1.1em;border-radius:3px;background:${bg};color:${fg};">
