@@ -1,3 +1,7 @@
+// action-utils.js v1.0.1 - 2025-12-22
+// v1.0.1: Fix setupModeSelector to use FASERIP colors from data attributes (was overriding with blue)
+// v1.0.0: Mode selector now uses FASERIP traffic light colors (Manual=Red, Semi=Yellow, Full=Green)
+
 import { ACTION_LABELS, ACTION_EFFECTS } from "./action-config.js";
 import { applyNullifiedEffect, isAuraMaintained } from "./nullify.js";
 import { calculateMitigation } from "../../rules/mitigation.js";
@@ -212,11 +216,26 @@ export async function setupModeSelector(actor, $html, opts = {}, flagName = "las
       : { autoApply: false, showConfirm: false };
   Object.assign(opts, derived);
   
-  // Update visual state to match saved mode
+  // Update visual state to match saved mode using FASERIP colors from data attributes
   const $buttons = $html.find(".faserip-mode-row .faserip-mode");
-  $buttons.css({"background": "#f7f7f7", "color": "#444", "font-weight": "400", "border-color": "#bbb"});
+  $buttons.each(function() {
+    const $b = $(this);
+    $b.css({
+      "background": "#f7f7f7",
+      "color": "#444",
+      "font-weight": "400",
+      "border-color": $b.data("bg"),
+      "opacity": ".7"
+    });
+  });
   const $activeBtn = $buttons.filter(`[data-mode="${savedMode}"]`);
-  $activeBtn.css({"background":"#2196F3", "color":"#fff", "font-weight":"600", "border-color":"#1976D2"});
+  $activeBtn.css({
+    "background": $activeBtn.data("bg"),
+    "color": $activeBtn.data("text"),
+    "font-weight": "600",
+    "border-color": $activeBtn.data("border"),
+    "opacity": "1"
+  });
   
   // Attach handlers with auto-save
   attachModeSelectorHandlers($html, opts, async (mode, derived) => {
@@ -230,17 +249,25 @@ export async function setupModeSelector(actor, $html, opts = {}, flagName = "las
 
 /** Build the Manual / Semi / Full mode selector strip */
 export function buildModeSelector({ mode = "semi", disabled = false, disabledReason = "" } = {}) {
+  // FASERIP traffic light colors: Manual=Red (stop), Semi=Yellow (caution), Full=Green (go)
+  const colors = {
+    manual: { bg: '#c62828', border: '#b71c1c', text: '#fff' },  // Red
+    semi:   { bg: '#f9a825', border: '#f57f17', text: '#000' },  // Yellow
+    full:   { bg: '#2e7d32', border: '#1b5e20', text: '#fff' }   // Green
+  };
+  
   const mk = (val, label) => {
     const active = mode === val;
-    const base = "display:inline-block;padding:4px 8px;border:1px solid #bbb;border-radius:4px;margin-left:6px;cursor:pointer;font-size:12px;";
-    const on   = `${base}background:#2196F3;color:#fff;font-weight:600;border-color:#1976D2;`;  // Changed to blue
-    const off  = `${base}background:#f7f7f7;color:#444;opacity:.9;`;
-    const dis  = disabled ? "pointer-events:none;opacity:.5;filter:grayscale(.4);" : "";
-    return `<a class="faserip-mode" data-mode="${val}" title="${disabled ? disabledReason : ""}" style="${active ? on : off}${dis}">${label}</a>`;
+    const c = colors[val];
+    const base = "display:inline-block;padding:4px 10px;border:2px solid;border-radius:4px;margin-left:4px;cursor:pointer;font-size:12px;";
+    const on  = `${base}background:${c.bg};color:${c.text};font-weight:600;border-color:${c.border};`;
+    const off = `${base}background:#f7f7f7;color:#444;border-color:${c.bg};opacity:.7;`;
+    const dis = disabled ? "pointer-events:none;opacity:.5;filter:grayscale(.4);" : "";
+    return `<a class="faserip-mode" data-mode="${val}" data-bg="${c.bg}" data-border="${c.border}" data-text="${c.text}" title="${disabled ? disabledReason : ""}" style="${active ? on : off}${dis}">${label}</a>`;
   };
 
   return `
-    <div class="faserip-mode-row" style="display:flex;align-items:center;justify-content:flex-end;gap:6px;margin:4px 0 6px;">
+    <div class="faserip-mode-row" style="display:flex;align-items:center;justify-content:flex-end;gap:4px;margin:4px 0 8px;">
       <span style="font-size:12px;color:#666;margin-right:6px;">Mode:</span>
       ${mk("manual","Manual")}
       ${mk("semi","Semi")}
@@ -272,8 +299,25 @@ export function attachModeSelectorHandlers($html, opts = {}, onChange) {
   $buttons.on("click", (ev) => {
     const $btn = $(ev.currentTarget);
     const mode = $btn.data("mode");
-    $buttons.css({"background": "#f7f7f7", "color": "#444", "font-weight": "400", "border-color": "#bbb"});
-    $btn.css({"background":"#2196F3", "color":"#fff", "font-weight":"600", "border-color":"#1976D2"});
+    // Reset all buttons to inactive state with their color as border
+    $buttons.each(function() {
+      const $b = $(this);
+      $b.css({
+        "background": "#f7f7f7",
+        "color": "#444",
+        "font-weight": "400",
+        "border-color": $b.data("bg"),
+        "opacity": ".7"
+      });
+    });
+    // Set clicked button to active state
+    $btn.css({
+      "background": $btn.data("bg"),
+      "color": $btn.data("text"),
+      "font-weight": "600",
+      "border-color": $btn.data("border"),
+      "opacity": "1"
+    });
     applyFlags(mode);
   });
 

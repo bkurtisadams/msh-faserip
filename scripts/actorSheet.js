@@ -1,4 +1,5 @@
-// actorSheet.js v1.0.1 - 2025-12-22
+// actorSheet.js v1.0.2 - 2025-12-22
+// v1.0.2: Fix column shift persistence in blunt attack dialog
 // v1.0.1: Remove verbose debug logging on sheet render
 import { prepareActiveEffectCategories, onManageActiveEffect } from "../helpers/effects.mjs";
 import { getItemMaterialRank, getBluntNextRankMinRule } from "./gm-utils.js";
@@ -5035,7 +5036,6 @@ async _rollAction(actionType, abilityName) {
       abilityName,
       opts: {
         actionType,
-        shift: 0,
         karma: 0,
         pulled: false,
         source: "hands"
