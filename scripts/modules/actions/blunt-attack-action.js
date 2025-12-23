@@ -1,5 +1,7 @@
 //--- START OF FILE blunt-attack-action.js ---
-// blunt-attack-action.js v1.4.1 - 2025-12-23
+// blunt-attack-action.js v1.4.3 - 2025-12-23
+// v1.4.3: Yellow box on karma number, show multiple target names in dialog
+// v1.4.2: Compact karma section to match CS field size
 // v1.4.1: Fix pull punch persistence (save enabled state) and refresh value when source changes
 // v1.4.0: Multi-Attack/Pull Punch as inline radio/checkbox rows, CS field with directional colors and reset button
 // v1.2.0: Swap Multi-Attack/Pull Punch order, increase padding/font sizes throughout
@@ -13,7 +15,9 @@ import { AttackAction } from "./attack-action.js";
 import { 
   generateKarmaControlsHTML, 
   setupKarmaControlHandlers, 
-  extractKarmaFromDialog 
+  extractKarmaFromDialog,
+  getAvailableKarma,
+  getMinimumKarmaCommitment
 } from "../dice/dice-roller.js";
 import {
   RANKS, shiftRank, getAbilityInfo, getStrengthInfo,
@@ -99,12 +103,26 @@ export class BluntAttackAction extends AttackAction {
     const targets = Array.from(game.user?.targets ?? []);
     const primaryTarget = targets[0] ?? null;
     const primaryTargetActor = primaryTarget?.actor ?? null;
-    const targetName = primaryTarget?.name ?? (targets.length > 1 ? `${targets.length} targets` : "(none selected)");
+    
+    // Build target display - show all names if multiple
+    let targetDisplay = "(none selected)";
+    if (targets.length === 1) {
+      targetDisplay = primaryTarget.name;
+    } else if (targets.length > 1) {
+      targetDisplay = targets.map(t => t.name).join(", ");
+    }
+    
     const targetArmorInfo = primaryTargetActor ? getBodyArmorValues(primaryTargetActor, "physical-blunt") : null;
     const targetArmor = targetArmorInfo?.applicable ?? 0;
     const targetArmorSource = targetArmorInfo?.source ?? "";
+    const armorNote = targets.length > 1 ? " (1st target)" : "";
     const initialDamage = strength.value;
     const initialAfterArmor = Math.max(0, initialDamage - targetArmor);
+
+    // Karma info for compact display
+    const availableKarma = getAvailableKarma(actor);
+    const minKarma = getMinimumKarmaCommitment(actor);
+    const hasKarma = availableKarma > 0;
 
     // dialog HTML - Compact Prototype
     const dialogHtml = `
@@ -113,9 +131,9 @@ export class BluntAttackAction extends AttackAction {
       <!-- Context: Target + Attack stats side by side -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
         <div style="background:#f5f5f5;padding:8px;border-radius:3px;">
-          <div style="font-weight:600;color:#666;font-size:.8em;text-transform:uppercase;">Target</div>
-          <div style="font-weight:600;color:#d32f2f;">${targetName}</div>
-          <div style="color:#666;" id="target-armor-display">${primaryTargetActor ? `Armor: ${targetArmor}${targetArmorSource ? ` (${targetArmorSource})` : ''}` : ''}</div>
+          <div style="font-weight:600;color:#666;font-size:.8em;text-transform:uppercase;">Target${targets.length > 1 ? 's' : ''}</div>
+          <div style="font-weight:600;color:#d32f2f;">${targetDisplay}</div>
+          <div style="color:#666;" id="target-armor-display">${primaryTargetActor ? `Armor: ${targetArmor}${targetArmorSource ? ` (${targetArmorSource})` : ''}${armorNote}` : ''}</div>
         </div>
         <div style="background:#f5f5f5;padding:8px;border-radius:3px;">
           <div style="font-weight:600;color:#666;font-size:.8em;text-transform:uppercase;">Attack</div>
@@ -190,8 +208,15 @@ Common improvised weapons:
           <strong id="shifted-rank-display" style="${savedColumnShift < 0 ? 'color:#c62828;' : savedColumnShift > 0 ? 'color:#2e7d32;' : ''}">${shiftRank(ability.rank, savedColumnShift)}</strong>
           <button type="button" class="cs-reset" style="display:${savedColumnShift !== 0 ? 'inline-block' : 'none'};padding:1px 5px;font-size:.85em;cursor:pointer;border:1px solid #999;border-radius:2px;background:#eee;" title="Reset to 0">×</button>
         </div>
-        <div class="karma-field" style="display:flex;align-items:center;gap:4px;">
-          ${generateKarmaControlsHTML(actor, 0)}
+        <div class="karma-field" style="display:flex;align-items:center;gap:4px;padding:4px 6px;border-radius:3px;${hasKarma ? 'background:#f5f0e0;border:1px solid #c9b98a;' : ''}">
+          ${hasKarma ? `
+            <label style="display:flex;align-items:center;gap:4px;cursor:pointer;">
+              <input type="checkbox" id="spend-karma" name="spendKarma">
+              <span style="font-weight:600;">Karma:</span>
+            </label>
+            <span title="Available: ${availableKarma} | Min commitment: ${minKarma} | Amount chosen after roll" style="padding:1px 4px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${availableKarma}</span>
+            <span style="color:#999;font-size:.8em;">(min ${minKarma})</span>
+          ` : `<span style="color:#999;">No karma</span>`}
         </div>
       </div>
 

@@ -1,4 +1,5 @@
-// attack-action.js v1.8.2 - 2025-12-23
+// attack-action.js v1.8.3 - 2025-12-23
+// v1.8.3: Yellow box on rolled d100 in chat card to indicate hover text
 // v1.8.2: Fix result cap (Yellow/Green) - use capped color for effect lookup and Slam/Stun/Kill checks
 // v1.8.1: Fix pull punch - use afterArmor (with pull cap) in applyDamageToTargets
 // v1.8.0: Compact chat card layout - result badge in header, removed grid, inline damage display
@@ -166,7 +167,7 @@ export class AttackAction extends BaseAction {
               </div>
               <div style="font-size:0.9em;">
                 <div>Fighting: ${fightingAbility.rank} vs Intensity: ${intensity}</div>
-                <div>Roll: ${roll.total}</div>
+                <div>Roll: <span title="d100 = ${roll.total}" style="padding:0 3px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${roll.total}</span></div>
                 <div>Result: <strong>${resultColor.toUpperCase()}</strong></div>
                 <div style="margin-top:5px; font-style:italic;">
                   ${success 
@@ -284,7 +285,7 @@ export class AttackAction extends BaseAction {
                       </div>
                       <div style="font-size:0.9em;">
                         <div>Fighting: ${fightingAbility.rank}${cs ? ` (${cs > 0 ? '+' : ''}${cs}CS → ${effFeatRank})` : ''} vs Intensity: ${intensity}</div>
-                        <div>Roll: ${roll.total}${karmaToSpend ? ` + ${karmaToSpend} Karma = ${totalRoll}` : ''}</div>
+                        <div>Roll: <span title="d100 = ${roll.total}" style="padding:0 3px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${roll.total}</span>${karmaToSpend ? ` + ${karmaToSpend} Karma = ${totalRoll}` : ''}</div>
                         <div>Result: <strong>${resultColor.toUpperCase()}</strong></div>
                         <div style="margin-top:5px; font-style:italic;">
                           ${success 
@@ -629,9 +630,11 @@ export class AttackAction extends BaseAction {
       }
 
       // Build compact roll display: "Roll: 57 (42 + 15 karma)" or "Roll: 42"
+      // Yellow box on raw roll indicates hover text available
+      const rollBox = `<span title="d100 = ${roll.total}" style="padding:0 3px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${roll.total}</span>`;
       const rollDisplay = totalKarmaUsed 
-        ? `${cappedTotal} <span style="color:#666;" title="d100 = ${roll.total}, karma = ${totalKarmaUsed}">(${roll.total} + ${totalKarmaUsed} karma)</span>`
-        : `<span title="d100 = ${roll.total}">${roll.total}</span>`;
+        ? `${cappedTotal} <span style="color:#666;">(${rollBox} + ${totalKarmaUsed} karma)</span>`
+        : rollBox;
 
       // Get target armor info for display
       let armorDisplay = "";
