@@ -222,11 +222,11 @@ export async function setupModeSelector(actor, $html, opts = {}, flagName = "las
   $buttons.each(function() {
     const $b = $(this);
     $b.css({
-      "background": "#f7f7f7",
-      "color": "#444",
+      "background": "#e0e0e0",
+      "color": "#999",
       "font-weight": "400",
-      "border-color": $b.data("bg"),
-      "opacity": ".7"
+      "border-color": "#bbb",
+      "opacity": "1"
     });
   });
   const $activeBtn = $buttons.filter(`[data-mode="${savedMode}"]`);
@@ -262,7 +262,7 @@ export function buildModeSelector({ mode = "semi", disabled = false, disabledRea
     const c = colors[val];
     const baseStyle = "display:inline-flex;align-items:center;padding:4px 10px;border:2px solid;border-radius:4px;margin-left:4px;cursor:pointer;font-size:12px;";
     const activeStyle = `background:${c.bg};color:${c.text};font-weight:600;border-color:${c.border};`;
-    const inactiveStyle = `background:#f5f5f5;color:#666;border-color:#ccc;`;
+    const inactiveStyle = `background:#e0e0e0;color:#999;border-color:#bbb;`;
     const disStyle = disabled ? "pointer-events:none;opacity:.5;" : "";
     return `<label class="faserip-mode" data-mode="${val}" data-bg="${c.bg}" data-border="${c.border}" data-text="${c.text}" 
                    style="${baseStyle}${active ? activeStyle : inactiveStyle}${disStyle}" 
@@ -316,10 +316,10 @@ export function attachModeSelectorHandlers($html, opts = {}, onChange) {
     // Reset all labels to inactive
     $labels.each(function() {
       $(this).css({
-        "background": "#f5f5f5",
-        "color": "#666",
+        "background": "#e0e0e0",
+        "color": "#999",
         "font-weight": "400",
-        "border-color": "#ccc"
+        "border-color": "#bbb"
       });
     });
     

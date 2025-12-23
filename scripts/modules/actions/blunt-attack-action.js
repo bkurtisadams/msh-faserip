@@ -235,21 +235,19 @@ Common improvised weapons:
 
       <!-- Pull Punch Row -->
       <div style="padding:6px 8px;background:#fff3e0;border:1px solid #ffcc80;border-radius:3px;margin-bottom:8px;">
-        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-          <label title="Voluntarily reduce damage" style="display:flex;align-items:center;gap:4px;cursor:pointer;">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+          <label title="Voluntarily reduce damage and/or result" style="display:flex;align-items:center;gap:4px;cursor:pointer;">
             <input type="checkbox" id="pull-punch-enabled" ${savedPullEnabled ? 'checked' : ''}>
             <strong style="color:#e65100;">Pull Punch</strong>
           </label>
-          <div class="pull-damage-controls" style="display:${savedPullEnabled ? 'flex' : 'none'};align-items:center;gap:4px;">
-            <span>Cap:</span>
-            <input type="number" name="pulledDamage" value="${savedPullEnabled && savedPulledDamage > 0 ? savedPulledDamage : strength.value}" min="0" max="${strength.value}" style="width:50px;padding:3px;text-align:center;">
-            <span style="color:#666;font-size:.85em;">/ <span class="max-damage-display">${strength.value}</span></span>
+          <div class="pull-damage-controls" style="display:${savedPullEnabled ? 'flex' : 'none'};align-items:center;gap:3px;">
+            <input type="number" name="pulledDamage" title="Damage cap" value="${savedPullEnabled && savedPulledDamage > 0 ? savedPulledDamage : strength.value}" min="0" max="${strength.value}" style="width:40px;padding:2px;text-align:center;">
+            <span style="color:#666;font-size:.85em;">/<span class="max-damage-display">${strength.value}</span></span>
+            <span style="color:#ccc;margin:0 2px;">|</span>
+            <label title="No result cap" style="cursor:pointer;font-size:.9em;"><input type="radio" name="resultCap" value="none" ${savedResultCap==='none'?'checked':''}> Any</label>
+            <label title="Cap at Yellow (Slam max, no Stun)" style="cursor:pointer;font-size:.9em;"><input type="radio" name="resultCap" value="yellow" ${savedResultCap==='yellow'?'checked':''}> Ylw</label>
+            <label title="Cap at Green (Hit max, no Slam/Stun)" style="cursor:pointer;font-size:.9em;"><input type="radio" name="resultCap" value="green" ${savedResultCap==='green'?'checked':''}> Grn</label>
           </div>
-          <span style="color:#ccc;margin:0 2px;">|</span>
-          <span style="color:#e65100;font-weight:600;">Result:</span>
-          <label title="No result cap" style="cursor:pointer;"><input type="radio" name="resultCap" value="none" ${savedResultCap==='none'?'checked':''}> Any</label>
-          <label title="Cap at Yellow (Slam max, no Stun)" style="cursor:pointer;"><input type="radio" name="resultCap" value="yellow" ${savedResultCap==='yellow'?'checked':''}> Yellow</label>
-          <label title="Cap at Green (Hit max, no Slam/Stun)" style="cursor:pointer;"><input type="radio" name="resultCap" value="green" ${savedResultCap==='green'?'checked':''}> Green</label>
         </div>
       </div>
 
@@ -491,6 +489,7 @@ Common improvised weapons:
             html.find('[name="objectValue"]').val(value);
             update();
           });
+          html.find('[name="objectValue"]').on('input change', update);
           html.find('[name="objectName"]').on('input', update);
           
           // CS reset button handler
