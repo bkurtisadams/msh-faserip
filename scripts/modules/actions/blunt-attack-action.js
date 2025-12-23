@@ -1,6 +1,7 @@
 //--- START OF FILE blunt-attack-action.js ---
-// blunt-attack-action.js v1.3.0 - 2025-12-22
-// v1.3.0: Show status on toggle buttons (Multi-Attack: Off/2 attacks/3 attacks/Adjacent, Pull Punch: Off/20 dmg/Yellow/etc)
+// blunt-attack-action.js v1.4.1 - 2025-12-23
+// v1.4.1: Fix pull punch persistence (save enabled state) and refresh value when source changes
+// v1.4.0: Multi-Attack/Pull Punch as inline radio/checkbox rows, CS field with directional colors and reset button
 // v1.2.0: Swap Multi-Attack/Pull Punch order, increase padding/font sizes throughout
 // v1.1.2: Fix target name to use token name (shows "Counter-Strike 712" not just "Counter-Strike"), increase font sizes
 // v1.1.1: Fix multi-attack toggle, add dynamic highlighting for non-default saved values
@@ -20,7 +21,6 @@ import {
   isBluntCapable, computeBluntDamage,
   rollWithKarmaAndHistory, buildResultGrid, buildActionsBox, bannerColors,
   getTargetingContext, getBodyArmorValues, applyDamageToTargets,
-  buildMultiAttackSection, setupMultiAttackHandlers,
   buildModeSelector, attachModeSelectorHandlers, debugLog, setupModeSelector,
   applyCapabilitiesToDialog, buildInlineFeatDisplay
 } from "./action-utils.js";
@@ -80,6 +80,7 @@ export class BluntAttackAction extends AttackAction {
     const savedObjectValue = shouldRemember ? ((await actor.getFlag("msh-faserip","lastBluntObjectValue")) || 20) : 20;
     
     const savedPulledDamage = shouldRemember ? ((await actor.getFlag("msh-faserip","lastBluntPulledDamage")) || 0) : 0;
+    const savedPullEnabled = shouldRemember ? ((await actor.getFlag("msh-faserip","lastBluntPullEnabled")) || false) : false;
     const savedResultCap = shouldRemember ? ((await actor.getFlag("msh-faserip","lastBluntResultCap")) || "none") : "none";
 
     const savedMultiAttacks = shouldRemember ? (await actor.getFlag("msh-faserip","lastBluntMultiAttacks") || false) : false;
@@ -182,51 +183,46 @@ Common improvised weapons:
 
       <!-- Modifiers Row -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;font-size:.9em;">
-        <div class="cs-field" style="display:flex;align-items:center;gap:4px;padding:4px;border-radius:3px;${savedColumnShift !== 0 ? 'background:#fff8e1;border:1px solid #ffc107;' : ''}">
-          <label>CS:</label>
+        <div class="cs-field" style="display:flex;align-items:center;gap:4px;padding:4px 6px;border-radius:3px;${savedColumnShift < 0 ? 'background:#ffebee;border:1px solid #ef5350;' : savedColumnShift > 0 ? 'background:#e8f5e9;border:1px solid #66bb6a;' : ''}">
+          <label style="font-weight:600;">CS:</label>
           <input type="number" name="shift" value="${savedColumnShift}" style="width:45px;padding:3px;text-align:center;">
-          <span style="color:#666;font-size:.85em;" id="shifted-rank-display">→ ${shiftRank(ability.rank, savedColumnShift)}</span>
+          <span style="color:#666;">→</span>
+          <strong id="shifted-rank-display" style="${savedColumnShift < 0 ? 'color:#c62828;' : savedColumnShift > 0 ? 'color:#2e7d32;' : ''}">${shiftRank(ability.rank, savedColumnShift)}</strong>
+          <button type="button" class="cs-reset" style="display:${savedColumnShift !== 0 ? 'inline-block' : 'none'};padding:1px 5px;font-size:.85em;cursor:pointer;border:1px solid #999;border-radius:2px;background:#eee;" title="Reset to 0">×</button>
         </div>
         <div class="karma-field" style="display:flex;align-items:center;gap:4px;">
           ${generateKarmaControlsHTML(actor, 0)}
         </div>
       </div>
 
-      <!-- Collapsible Advanced Options with status display -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px;">
-        <div class="multi-attack-toggle" style="background:${savedMultiAttacks || savedMultiAdjacent ? '#c8e6c9' : '#e8f5e9'};border:1px solid #4caf50;border-radius:3px;padding:6px 8px;cursor:pointer;">
-          <span style="color:#2e7d32;">▸ Multi-Attack: <strong class="multi-status">${savedMultiAdjacent ? 'Adjacent' : savedMultiAttacks ? (savedAttackCount === 3 ? '3 attacks' : '2 attacks') : 'Off'}</strong></span>
-        </div>
-        <div class="pull-punch-toggle" style="background:${(savedPulledDamage > 0 && savedPulledDamage < strength.value) || savedResultCap !== 'none' ? '#ffebee' : '#fff3e0'};border:1px solid #ff9800;border-radius:3px;padding:6px 8px;cursor:pointer;">
-          <span style="color:#e65100;">▸ Pull Punch: <strong class="pull-status">${(() => {
-            const parts = [];
-            if (savedPulledDamage > 0 && savedPulledDamage < strength.value) parts.push(savedPulledDamage + ' dmg');
-            if (savedResultCap === 'yellow') parts.push('Yellow');
-            if (savedResultCap === 'green') parts.push('Green');
-            return parts.length ? parts.join(', ') : 'Off';
-          })()}</strong></span>
+      <!-- Multi-Attack Row -->
+      <div style="padding:6px 8px;background:#e8f5e9;border:1px solid #a5d6a7;border-radius:3px;margin-bottom:6px;">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <span style="font-weight:600;color:#2e7d32;">Multi:</span>
+          <label title="Single attack, no penalty" style="cursor:pointer;"><input type="radio" name="multiMode" value="off" ${!savedMultiAttacks && !savedMultiAdjacent ? 'checked' : ''}> Off</label>
+          <label title="Remarkable Fighting FEAT. Success: 2 attacks at -1CS each. Fail: 1 attack at -3CS." style="cursor:pointer;"><input type="radio" name="multiMode" value="2" ${savedMultiAttacks && savedAttackCount === 2 ? 'checked' : ''}> 2 atk</label>
+          <label title="Amazing Fighting FEAT. Success: 3 attacks at -1CS each. Fail: 1 attack at -3CS." style="cursor:pointer;"><input type="radio" name="multiMode" value="3" ${savedMultiAttacks && savedAttackCount === 3 ? 'checked' : ''}> 3 atk</label>
+          <label title="-4CS penalty, hits all adjacent targets with single roll." style="cursor:pointer;"><input type="radio" name="multiMode" value="adjacent" ${savedMultiAdjacent ? 'checked' : ''}> Adjacent</label>
         </div>
       </div>
 
-      <!-- Multi-Attack Content (hidden by default) -->
-      <div class="multi-attack-wrapper" style="display:none;margin-bottom:8px;">
-        ${buildMultiAttackSection("blunt-attack", game.user.targets.size, savedMultiAttacks, savedAttackCount, savedMultiAdjacent)}
-      </div>
-
-      <!-- Pull Punch Content (hidden by default) -->
-      <div class="pull-punch-section" style="display:none;margin-bottom:8px;padding:8px;background:#fff3e0;border:1px solid #ff9800;border-radius:3px;">
-        <div style="display:grid;grid-template-columns:auto 1fr;gap:6px 8px;align-items:center;">
-          <label>Damage Cap:</label>
-          <div style="display:flex;align-items:center;gap:6px;">
-            <input type="number" name="pulledDamage" value="${savedPulledDamage || strength.value}" min="0" max="${strength.value}" style="width:60px;padding:4px;">
-            <span style="color:#666;" id="dmg-cap-note">(max: ${strength.value})</span>
+      <!-- Pull Punch Row -->
+      <div style="padding:6px 8px;background:#fff3e0;border:1px solid #ffcc80;border-radius:3px;margin-bottom:8px;">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <label title="Voluntarily reduce damage" style="display:flex;align-items:center;gap:4px;cursor:pointer;">
+            <input type="checkbox" id="pull-punch-enabled" ${savedPullEnabled ? 'checked' : ''}>
+            <strong style="color:#e65100;">Pull Punch</strong>
+          </label>
+          <div class="pull-damage-controls" style="display:${savedPullEnabled ? 'flex' : 'none'};align-items:center;gap:4px;">
+            <span>Cap:</span>
+            <input type="number" name="pulledDamage" value="${savedPullEnabled && savedPulledDamage > 0 ? savedPulledDamage : strength.value}" min="0" max="${strength.value}" style="width:50px;padding:3px;text-align:center;">
+            <span style="color:#666;font-size:.85em;">/ <span class="max-damage-display">${strength.value}</span></span>
           </div>
-          <label>Result Cap:</label>
-          <select name="resultCap" style="padding:4px;">
-            <option value="none" ${savedResultCap==='none'?'selected':''}>No Limit</option>
-            <option value="yellow" ${savedResultCap==='yellow'?'selected':''}>Cap at Yellow</option>
-            <option value="green" ${savedResultCap==='green'?'selected':''}>Cap at Green</option>
-          </select>
+          <span style="color:#ccc;margin:0 2px;">|</span>
+          <span style="color:#e65100;font-weight:600;">Result:</span>
+          <label title="No result cap" style="cursor:pointer;"><input type="radio" name="resultCap" value="none" ${savedResultCap==='none'?'checked':''}> Any</label>
+          <label title="Cap at Yellow (Slam max, no Stun)" style="cursor:pointer;"><input type="radio" name="resultCap" value="yellow" ${savedResultCap==='yellow'?'checked':''}> Yellow</label>
+          <label title="Cap at Green (Hit max, no Slam/Stun)" style="cursor:pointer;"><input type="radio" name="resultCap" value="green" ${savedResultCap==='green'?'checked':''}> Green</label>
         </div>
       </div>
 
@@ -288,12 +284,17 @@ Common improvised weapons:
             const shift        = parseInt($dlg('[name="shift"]').val() || 0);
             const { spendKarma, karmaToSpend } = extractKarmaFromDialog(html);
             const karma        = karmaToSpend;
-            const pulledDamage = parseInt($dlg('[name="pulledDamage"]').val() || 0);
-            const resultCap    = $dlg('[name="resultCap"]').val() || "none";
+            
+            // Pull punch - only use value if checkbox is checked
+            const pullEnabled  = $dlg('#pull-punch-enabled').is(':checked');
+            const pulledDamage = pullEnabled ? parseInt($dlg('[name="pulledDamage"]').val() || 0) : 0;
+            const resultCap    = $dlg('[name="resultCap"]:checked').val() || "none";
 
-            const multiAttacks  = !!$dlg('[name="multiAttacks"]').is(':checked');
-            const attackCount   = parseInt($dlg('[name="attackCount"]:checked').val() || 2);
-            const multiAdjacent = !!$dlg('[name="multiAdjacent"]').is(':checked');
+            // Multi-attack - parse from radio
+            const multiMode = $dlg('[name="multiMode"]:checked').val() || "off";
+            const multiAttacks  = (multiMode === "2" || multiMode === "3");
+            const attackCount   = (multiMode === "3") ? 3 : 2;
+            const multiAdjacent = (multiMode === "adjacent");
 
             // ===== compute damage and notes =====
             let weaponMat = "", weaponName = "", damage = strength.value, note = "";
@@ -317,6 +318,7 @@ Common improvised weapons:
             // Only update flags if 'Remember Settings' is checked
             if (rememberSettings) {
               await actor.setFlag("msh-faserip", "lastBluntSource", src);
+              await actor.setFlag("msh-faserip", "lastBluntPullEnabled", pullEnabled);
               await actor.setFlag("msh-faserip", "lastBluntPulledDamage", pulledDamage);
               await actor.setFlag("msh-faserip", "lastBluntResultCap", resultCap);
               await actor.setFlag("msh-faserip", "lastBluntShift", shift);
@@ -369,8 +371,7 @@ Common improvised weapons:
             const $note = html.find('#dmg-note');
             const $afterArmor = html.find('#after-armor-display');
             const $pulledDamage = html.find('[name="pulledDamage"]');
-            const $dmgCapNote   = html.find('#dmg-cap-note');
-            const $shiftedRank  = html.find('#shifted-rank-display');
+            const $maxDmgDisplay = html.find('.max-damage-display');
 
             // Hide both rows first
             $weaponRow.hide();
@@ -410,17 +411,27 @@ Common improvised weapons:
               $afterArmor.html(`<strong>→ ${currentDamage} damage</strong>`);
             }
 
-            // Update shifted rank display
+            // Update shifted rank display with directional coloring
             const cs = parseInt(html.find('[name="shift"]').val()) || 0;
-            const shiftedRank = shiftRank(ability.rank, cs);
-            $shiftedRank.text(`→ ${shiftedRank}`);
+            const shiftedRankText = shiftRank(ability.rank, cs);
+            const $shiftedRank = html.find('#shifted-rank-display');
+            $shiftedRank.text(shiftedRankText);
             
-            // Update CS field highlighting
+            // Update CS field highlighting based on direction
             const $csField = html.find('.cs-field');
-            if (cs !== 0) {
-              $csField.css({ 'background': '#fff8e1', 'border': '1px solid #ffc107' });
+            const $resetBtn = html.find('.cs-reset');
+            if (cs < 0) {
+              $csField.css({ 'background': '#ffebee', 'border': '1px solid #ef5350' });
+              $shiftedRank.css('color', '#c62828');
+              $resetBtn.show();
+            } else if (cs > 0) {
+              $csField.css({ 'background': '#e8f5e9', 'border': '1px solid #66bb6a' });
+              $shiftedRank.css('color', '#2e7d32');
+              $resetBtn.show();
             } else {
               $csField.css({ 'background': '', 'border': '' });
+              $shiftedRank.css('color', '');
+              $resetBtn.hide();
             }
             
             // Update source section highlighting
@@ -431,12 +442,14 @@ Common improvised weapons:
               $sourceSection.css({ 'background': '#fff', 'border-color': '#ddd' });
             }
 
-            // Update pull punch damage cap max
+            // Update pull punch damage cap - always reset to new max when source changes
+            const oldMax = Number($pulledDamage.attr('max')) || 0;
             $pulledDamage.attr('max', maxDamage);
-            if (Number($pulledDamage.val()) > maxDamage) {
+            $maxDmgDisplay.text(maxDamage);
+            // If max changed (source switched), reset value to new max
+            if (oldMax !== maxDamage) {
               $pulledDamage.val(maxDamage);
             }
-            $dmgCapNote.text(`(max: ${maxDamage})`);
 
             if ($dialog.length) $dialog[0].style.height = 'auto';
           };
@@ -453,104 +466,23 @@ Common improvised weapons:
           });
           html.find('[name="objectName"]').on('input', update);
           
-          // Multi attack handlers - pass full html so it can find elements
-          setupMultiAttackHandlers(html);
-
-          // Pull punch status and color update
-          const updatePullPunchStatus = () => {
-            const $section = html.find('.pull-punch-section');
-            const $toggle = html.find('.pull-punch-toggle');
-            const $status = $toggle.find('.pull-status');
-            const $pulledDamage = html.find('[name="pulledDamage"]');
-            const $resultCap = html.find('[name="resultCap"]');
-            
-            const maxDamage = Number($pulledDamage.attr('max'));
-            const currentDamage = Number($pulledDamage.val());
-            const resultCapValue = $resultCap.val();
-            
-            // Build status text
-            const parts = [];
-            if (currentDamage < maxDamage) parts.push(currentDamage + ' dmg');
-            if (resultCapValue === 'yellow') parts.push('Yellow');
-            if (resultCapValue === 'green') parts.push('Green');
-            const statusText = parts.length ? parts.join(', ') : 'Off';
-            $status.text(statusText);
-            
-            // Update colors
-            const isPulling = parts.length > 0;
-            $section.css('background', isPulling ? '#ffebee' : '#fff3e0');
-            $toggle.css('background', isPulling ? '#ffebee' : '#fff3e0');
-          };
+          // CS reset button handler
+          html.find('.cs-reset').on('click', function(e) {
+            e.preventDefault();
+            html.find('[name="shift"]').val(0).trigger('change');
+          });
           
-          html.find('[name="pulledDamage"]').on('input change', updatePullPunchStatus);
-          html.find('[name="resultCap"]').on('change', updatePullPunchStatus);
-          
-          // Also update pull punch status when source changes (max damage may change)
-          html.find('[name="src"], [name="item"], [name="objectRank"]').on('change', () => {
-            setTimeout(updatePullPunchStatus, 10); // Small delay to let update() finish first
+          // Pull punch checkbox toggle
+          html.find('#pull-punch-enabled').on('change', function() {
+            const $controls = html.find('.pull-damage-controls');
+            if (this.checked) {
+              $controls.css('display', 'flex');
+            } else {
+              $controls.hide();
+            }
           });
           
           applyCapabilitiesToDialog(html, "blunt-attack", { actor });
-
-          // Collapsible toggle handlers
-          const LS_PULL = "msh.ba.pull.open";
-          const LS_MULTI = "msh.ba.multi.open";
-
-          // Pull Punch toggle
-          const $pullToggle = html.find('.pull-punch-toggle');
-          const $pullSection = html.find('.pull-punch-section');
-          let pullOpen = shouldRemember && getLS(LS_PULL, "0") === "1";
-          if (pullOpen) {
-            $pullSection.show();
-            $pullToggle.find('span').html($pullToggle.find('span').html().replace('▸', '▾'));
-          }
-          $pullToggle.on('click', () => {
-            pullOpen = !pullOpen;
-            $pullSection.slideToggle(150);
-            const $span = $pullToggle.find('span');
-            $span.html(pullOpen ? $span.html().replace('▸', '▾') : $span.html().replace('▾', '▸'));
-            if (html.find('#msh-remember-settings').prop('checked')) setLS(LS_PULL, pullOpen ? "1" : "0");
-            if ($dialog.length) setTimeout(() => { $dialog[0].style.height = 'auto'; }, 160);
-          });
-
-          // Multi-Attack toggle
-          const $multiToggle = html.find('.multi-attack-toggle');
-          const $multiWrapper = html.find('.multi-attack-wrapper');
-          let multiOpen = shouldRemember && getLS(LS_MULTI, "0") === "1";
-          if (multiOpen) {
-            $multiWrapper.show();
-            $multiToggle.find('span').html($multiToggle.find('span').html().replace('▸', '▾'));
-          }
-          $multiToggle.on('click', () => {
-            multiOpen = !multiOpen;
-            $multiWrapper.slideToggle(150);
-            const $span = $multiToggle.find('span');
-            $span.html(multiOpen ? $span.html().replace('▸', '▾') : $span.html().replace('▾', '▸'));
-            if (html.find('#msh-remember-settings').prop('checked')) setLS(LS_MULTI, multiOpen ? "1" : "0");
-            if ($dialog.length) setTimeout(() => { $dialog[0].style.height = 'auto'; }, 160);
-          });
-          
-          // Update multi-attack toggle status when checkboxes/radios change
-          const updateMultiStatus = () => {
-            const multiAttacks = html.find('[name="multiAttacks"]').is(':checked');
-            const multiAdjacent = html.find('[name="multiAdjacent"]').is(':checked');
-            const attackCount = html.find('[name="attackCount"]:checked').val();
-            const $status = $multiToggle.find('.multi-status');
-            
-            // Build status text
-            let statusText = 'Off';
-            if (multiAdjacent) {
-              statusText = 'Adjacent';
-            } else if (multiAttacks) {
-              statusText = attackCount === '3' ? '3 attacks' : '2 attacks';
-            }
-            $status.text(statusText);
-            
-            // Update color
-            const isActive = multiAttacks || multiAdjacent;
-            $multiToggle.css('background', isActive ? '#c8e6c9' : '#e8f5e9');
-          };
-          html.find('[name="multiAttacks"], [name="multiAdjacent"], [name="attackCount"]').on('change', updateMultiStatus);
 
           // Bottom controls persistence
           html.find('#msh-skip-dice').on('change', function() {

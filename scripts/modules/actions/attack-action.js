@@ -1,4 +1,6 @@
-// attack-action.js v1.8.0 - 2025-12-22
+// attack-action.js v1.8.2 - 2025-12-23
+// v1.8.2: Fix result cap (Yellow/Green) - use capped color for effect lookup and Slam/Stun/Kill checks
+// v1.8.1: Fix pull punch - use afterArmor (with pull cap) in applyDamageToTargets
 // v1.8.0: Compact chat card layout - result badge in header, removed grid, inline damage display
 // v1.7.0: Integrate effect modifiers system for combat penalties
 // v1.6.1: Add debug logging for multi-attack FEAT auto-success diagnosis
@@ -484,9 +486,11 @@ export class AttackAction extends BaseAction {
       }
     }
 
-    const effectResult = effects[colorLower] || color;
-    const { bg, fg } = bannerColors(colorLower);
-    const isHit = colorLower !== 'white';
+    // Use the (possibly capped) color for effect lookup
+    const effectColorLower = String(color || "white").toLowerCase();
+    const effectResult = effects[effectColorLower] || color;
+    const { bg, fg } = bannerColors(effectColorLower);
+    const isHit = effectColorLower !== 'white';
 
     // Create a chat card for each target
     let targetList;
@@ -527,7 +531,7 @@ export class AttackAction extends BaseAction {
       const afterArmor = penetratingDamage;
 
       // Calculate breaking feat for this attack
-      const currentBreakingFeat = (colorLower !== "white" && penetratingDamage > 0 && breakingFeat)
+      const currentBreakingFeat = (effectColorLower !== "white" && penetratingDamage > 0 && breakingFeat)
         ? breakingFeat
         : null;
 
@@ -545,30 +549,30 @@ export class AttackAction extends BaseAction {
       switch (String(actionType)) {
         case "blunt-attack":
         case "charging":
-          showSlam = (colorLower === "yellow");
-          showStun = (colorLower === "red");
+          showSlam = (effectColorLower === "yellow");
+          showStun = (effectColorLower === "red");
           break;
 
         case "edged-attack":
         case "throwing-edged":
-          showStun = (colorLower === "yellow");
-          showKill = (colorLower === "red");    // ← Kill on red
+          showStun = (effectColorLower === "yellow");
+          showKill = (effectColorLower === "red");    // ← Kill on red
           break;
 
         case "shooting":
         case "energy":
           // Yellow = Bullseye → no Slam/Stun check; Red = Kill
-          showKill = (colorLower === "red");    // ← Kill on red
+          showKill = (effectColorLower === "red");    // ← Kill on red
           break;
 
         case "force":
           // Yellow = Bullseye → no Slam; Red = Stun
-          showStun = (colorLower === "red");
+          showStun = (effectColorLower === "red");
           break;
 
         case "throwing-blunt":
           // Yellow = Hit; Red = Stun
-          showStun = (colorLower === "red");
+          showStun = (effectColorLower === "red");
           break;
 
         default:
@@ -712,11 +716,11 @@ export class AttackAction extends BaseAction {
         });
 
         await applyDamageToTargets({
-          damage: rawDamage,
+          damage: afterArmor,  // Use after-armor damage (includes pull punch cap)
           attackerUuid: actor.uuid,
           damageType: damageType,
           showNotification: false,
-          bypassArmor: choice.bypassArmor || false,
+          bypassArmor: true,  // Armor already calculated above
           attackForm: attackForm,
           armorPiercing: choice.armorPiercing || 0,
           targets: [target],
