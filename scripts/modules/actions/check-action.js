@@ -1,4 +1,7 @@
-// scripts/modules/actions/check-action.js v1.2.0 - 2025-12-22
+// scripts/modules/actions/check-action.js v1.4.1 - 2025-12-22
+// v1.4.1: Show stun duration with hover text for die type
+// v1.4.0: Change stun duration from "d10 + cap" to configurable die (stunDurationDie setting)
+// v1.3.0: Show when stun duration was capped by maxStunDuration setting in chat card
 // v1.2.0: Fix DiceSoNice animation in consolidated chat cards mode
 // v1.1.0: Integrate effect modifiers for ability FEAT shifts
 import { BaseAction } from "./base-action.js";
@@ -139,20 +142,18 @@ export class CheckAction extends BaseAction {
       // Apply effects according to type
       // STUN
       let stunDuration = null;
-      let rawDuration  = null;
       if (actionType === "stun" && !effectsSuppressed) {
         if (colorLower === "white") {
-          // White = 1-10 rounds (roll 1d10)
-          const d = new Roll("1d10");
+          // White = roll for stun duration (configurable die)
+          const stunDie = game.settings?.get?.("msh-faserip", "stunDurationDie") || "d10";
+          const d = new Roll(`1${stunDie}`);
           await d.evaluate();
-          rawDuration = d.total;
-          const maxDur = game.settings?.get?.("msh-faserip","maxStunDuration") || 10;
-          stunDuration = Math.min(rawDuration, maxDur);
+          stunDuration = d.total;
           // Only show separate duration message if NOT consolidated
           if (!useConsolidated) {
             await d.toMessage({
               speaker: ChatMessage.getSpeaker({ actor }),
-              flavor: `${targetName} Stun Duration (1d10)${rawDuration>stunDuration?` - capped ${maxDur}`:""}`
+              flavor: `${targetName} Stun Duration (1${stunDie})`
             });
           }
           await this._createStunnedEffect(defenderUuid, targetName, stunDuration);
@@ -340,7 +341,7 @@ export class CheckAction extends BaseAction {
         : (mapping[colorLower] || color);
       const extraHtml  = this._extraExplanationHtml({
         actionType, targetAbility, colorLower, finalEffect: effectText, effectsSuppressed,
-        stunDuration, rawStunDuration: rawDuration
+        stunDuration
       });
 
       const headerActorName  = actor?.name || targetName || "Actor";
@@ -482,13 +483,13 @@ export class CheckAction extends BaseAction {
     let manualStunDuration = null;
     if (actionType === "stun" && !effectsSuppressed) {
       if (colorLower === "white") {
-        const d = new Roll("1d10");
+        const stunDie = game.settings?.get?.("msh-faserip", "stunDurationDie") || "d10";
+        const d = new Roll(`1${stunDie}`);
         await d.evaluate();
-        const maxDur = game.settings?.get?.("msh-faserip","maxStunDuration") || 10;
-        manualStunDuration = Math.min(d.total, maxDur);
+        manualStunDuration = d.total;
         // Only show separate duration message if NOT consolidated
         if (!useConsolidated) {
-          await d.toMessage({ speaker: ChatMessage.getSpeaker({ actor }), flavor: `${choice.targetName} Stun Duration (1d10)` });
+          await d.toMessage({ speaker: ChatMessage.getSpeaker({ actor }), flavor: `${choice.targetName} Stun Duration (1${stunDie})` });
         }
         await this._createStunnedEffect(this.opts?.prefill?.targetUuid || "", choice.targetName, manualStunDuration);
       } else if (colorLower === "green") {
@@ -677,16 +678,24 @@ export class CheckAction extends BaseAction {
     }
   }
 
-  _extraExplanationHtml({ actionType, targetAbility, colorLower, finalEffect, effectsSuppressed, stunDuration=null, rawStunDuration=null }) {
+  _extraExplanationHtml({ actionType, targetAbility, colorLower, finalEffect, effectsSuppressed, stunDuration=null }) {
     if (actionType === "stun") {
-      const lines = {
-        white: stunDuration ? `1–10 rounds Stunned — rolled ${stunDuration} rounds.` : "1–10 rounds Stunned — roll 1d10; no actions.",
-        green: "1 round Stunned — no actions next round (can “play possum”).",
-        yellow: "No effect.",
-        red: "No effect."
-      };
-      return `<div style="margin-top:8px;color:#444;">${lines[colorLower]||""}</div>`;
+      let stunText = "";
+      if (colorLower === "white") {
+        const stunDie = game.settings?.get?.("msh-faserip", "stunDurationDie") || "d10";
+        if (stunDuration !== null) {
+          stunText = `Stunned <strong title="Rolled 1${stunDie}">${stunDuration}</strong> round${stunDuration !== 1 ? 's' : ''}.`;
+        } else {
+          stunText = `Stunned - roll 1${stunDie} for duration.`;
+        }
+      } else if (colorLower === "green") {
+        stunText = "Stunned 1 round - no actions next round.";
+      } else {
+        stunText = "No effect.";
+      }
+      return `<div style="margin-top:8px;color:#444;">${stunText}</div>`;
     }
+
     if (actionType === "slam") {
       if (effectsSuppressed) {
         return `<div style="margin-top:8px;color:#b71c1c;">No damage penetrated — Slam does not apply.</div>`;

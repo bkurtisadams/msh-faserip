@@ -1,4 +1,5 @@
-// scripts/modules/actions/death-save-action.js v1.1.0 - 2025-12-22
+// scripts/modules/actions/death-save-action.js v1.2.0 - 2025-12-22
+// v1.2.0: Change unconscious duration from "d10 + cap" to configurable die (stunDurationDie setting)
 // v1.1.0: Fix DiceSoNice animation in consolidated chat cards mode
 import { BaseAction } from "./base-action.js";
 import {
@@ -65,10 +66,10 @@ export class DeathSaveAction extends BaseAction {
       const color = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
       const colorLower = String(color).toLowerCase();
       
-      // Roll unconscious duration
-      const durationRoll = await (new Roll("1d10")).evaluate();
-      const maxStunDuration = game.settings.get('msh-faserip', 'maxStunDuration') || 10;
-      const unconsciousDuration = Math.min(durationRoll.total, maxStunDuration);
+      // Roll unconscious duration using configurable die
+      const stunDie = game.settings.get('msh-faserip', 'stunDurationDie') || "d10";
+      const durationRoll = await (new Roll(`1${stunDie}`)).evaluate();
+      const unconsciousDuration = durationRoll.total;
 
       // Use Kill resolver with proper context (E/S aware)
       const killResult = resolveKillFeat(colorLower, killContext);
@@ -211,17 +212,16 @@ export class DeathSaveAction extends BaseAction {
     const colorLower = String(color || "").toLowerCase();
     const baseEffect = effects[colorLower] || color;
 
-    // Roll 1d10 for unconscious duration
-    const durationRoll = await (new Roll("1d10")).evaluate();
-    const rawDuration = durationRoll.total;
-    const maxStunDuration = game.settings.get('msh-faserip', 'maxStunDuration') || 10;
-    const unconsciousDuration = Math.min(rawDuration, maxStunDuration);
+    // Roll for unconscious duration using configurable die
+    const stunDie = game.settings.get('msh-faserip', 'stunDurationDie') || "d10";
+    const durationRoll = await (new Roll(`1${stunDie}`)).evaluate();
+    const unconsciousDuration = durationRoll.total;
 
     // Only show separate duration roll if NOT using consolidated mode
     if (!useConsolidated) {
       await durationRoll.toMessage({
         speaker: ChatMessage.getSpeaker({ actor }),
-        flavor: `${actor.name} Unconscious Duration (1d10)${rawDuration > unconsciousDuration ? ` - Capped at ${maxStunDuration}` : ''}`,
+        flavor: `${actor.name} Unconscious Duration (1${stunDie})`,
         rollMode: game.settings.get("core", "rollMode")
       });
     }

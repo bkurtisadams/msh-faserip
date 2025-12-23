@@ -1,4 +1,5 @@
-// attack-action.js v1.7.0 - 2025-12-22
+// attack-action.js v1.8.0 - 2025-12-22
+// v1.8.0: Compact chat card layout - result badge in header, removed grid, inline damage display
 // v1.7.0: Integrate effect modifiers system for combat penalties
 // v1.6.1: Add debug logging for multi-attack FEAT auto-success diagnosis
 // v1.6.0: Fix auto-trigger of Slam/Stun/Kill checks in full auto mode
@@ -13,7 +14,7 @@ import {
 
 import { 
   RANKS, getStrengthInfo, shiftRank, getAbilityInfo,
-  rollWithKarmaAndHistory, buildResultGrid, buildActionsBox, bannerColors,
+  rollWithKarmaAndHistory, buildActionsBox, bannerColors,
   getTargetingContext, getBodyArmorValues, applyDamageToTargets,
   debugLog, universalColor, buildInlineRollDisplay, buildInlineFeatDisplay
 } from "./action-utils.js";
@@ -484,7 +485,6 @@ export class AttackAction extends BaseAction {
     }
 
     const effectResult = effects[colorLower] || color;
-    const grid = buildResultGrid(actionType, colorLower, effects, (globalThis._getResultHoverText || this._getResultHoverText));
     const { bg, fg } = bannerColors(colorLower);
     const isHit = colorLower !== 'white';
 
@@ -601,33 +601,14 @@ export class AttackAction extends BaseAction {
           })
         : "";
 
-      // Build pull punch indicator
+      // Build pull punch indicator (compact)
       let pullPunchNote = "";
       if (choice.pulledDamage > 0 && choice.pulledDamage < rawDamage) {
-        pullPunchNote += `<div style="color:#ff6f00;">⚠ Damage pulled: ${rawDamage} → ${choice.pulledDamage}</div>`;
+        pullPunchNote += `<span style="color:#ff6f00;font-size:.85em;"> (pulled to ${choice.pulledDamage})</span>`;
       }
       if (choice.resultCap && choice.resultCap !== 'none') {
-        pullPunchNote += `<div style="color:#ff6f00;">⚠ Result capped at ${choice.resultCap.toUpperCase()}</div>`;
+        pullPunchNote += `<span style="color:#ff6f00;font-size:.85em;"> (capped at ${choice.resultCap})</span>`;
       }
-
-      // Damage block for this target
-      const damageBlock = `
-        <div style="margin:6px 10px;padding:6px;border:1px solid #ccc;border-radius:3px;background:#fff;">
-          <div><b>Damage (raw):</b> ${rawDamage}${damageNote ? ` <span style="color:#666;">— ${damageNote}</span>` : ``}</div>
-          ${isHit ? `
-            <div><b>After Armor${targetActor ? ` (${targetName})` : ``}:</b> ${afterArmor}</div>
-          ` : ``}
-          <div style="font-size:.9em;color:#555;">Source: ${sourceName}</div>
-          ${pullPunchNote}
-        </div>
-      `;
-
-      // Add manual mode notice if applicable
-      const manualModeNotice = isManualMode ? `
-        <div style="padding:6px;margin:5px;background:#fff3e0;border:1px solid #ff9800;border-radius:3px;text-align:center;font-style:italic;color:#e65100;">
-          Manual Mode: GM adjudicates damage and effects
-        </div>
-      ` : "";
 
       // Build inline FEAT display if multi-attack FEAT was performed and consolidated mode is enabled
       const multiAttackFeatHtml = (useConsolidated && choice?.multiAttackFeatResult) 
@@ -637,44 +618,67 @@ export class AttackAction extends BaseAction {
           )
         : "";
 
-      // Build shift display text
+      // Build compact shift display
       let shiftDisplay = "";
       if (totalShift !== 0) {
-        const parts = [];
-        if (manualShift !== 0) parts.push(`Manual ${manualShift > 0 ? '+' : ''}${manualShift}`);
-        if (effectShift !== 0) parts.push(`Effects ${effectShift > 0 ? '+' : ''}${effectShift}`);
-        shiftDisplay = ` — ${parts.join(', ')} → ${effectiveRank}`;
+        shiftDisplay = ` (${totalShift > 0 ? '+' : ''}${totalShift}CS → ${effectiveRank})`;
       }
 
-      // Build roll info section - use inline display if consolidated, else plain text
-      const rollInfoSection = inlineRollHtml ? `
-        <div style="padding:5px 10px;font-size:.9em;">
-          <div>Ability: ${ability.name}</div>
-          <div>Base Rank: ${ability.rank} (${ability.value})${shiftDisplay}</div>
-        </div>
-        ${multiAttackFeatHtml}
-        ${inlineRollHtml}
-      ` : `
-        <div style="padding:5px 10px;font-size:.9em;">
-          <div>Ability: ${ability.name}</div>
-          <div>Base Rank: ${ability.rank} (${ability.value})${shiftDisplay}</div>
-          <div>Roll: ${roll.total}${totalKarmaUsed ? ` + Karma: ${totalKarmaUsed}` : ""} = ${cappedTotal}</div>
-        </div>
-      `;
+      // Build compact roll display: "Roll: 57 (42 + 15 karma)" or "Roll: 42"
+      const rollDisplay = totalKarmaUsed 
+        ? `${cappedTotal} <span style="color:#666;" title="d100 = ${roll.total}, karma = ${totalKarmaUsed}">(${roll.total} + ${totalKarmaUsed} karma)</span>`
+        : `<span title="d100 = ${roll.total}">${roll.total}</span>`;
 
-      // Final chat card for this target
+      // Get target armor info for display
+      let armorDisplay = "";
+      if (isHit && targetActor) {
+        const armorData = getBodyArmorValues(targetActor, damageType);
+        const armorValue = Number(armorData?.applicable) || 0;
+        if (armorValue > 0) {
+          armorDisplay = ` <span style="color:#666;">(vs ${armorValue} armor)</span>`;
+        }
+      }
+
+      // Add manual mode notice if applicable
+      const manualModeNotice = isManualMode ? `
+        <div style="padding:4px 8px;margin:4px 6px;background:#fff3e0;border:1px solid #ff9800;border-radius:3px;text-align:center;font-size:.85em;font-style:italic;color:#e65100;">
+          Manual Mode: GM adjudicates
+        </div>
+      ` : "";
+
+      // Compact chat card
       const cardHtml = `
         <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
-          <div style="padding:5px 10px;border-bottom:1px solid #c0c0c0;font-size:1.1em;color:#8b0000;">
-            <strong>${actor.name} - ${actionLabel}</strong>
-            ${targetActor ? `<br><span style="font-size:.85em;color:#555;">→ ${targetName}</span>` : ''}
+          <!-- Header: Action + Result badge -->
+          <div style="padding:6px 10px;border-bottom:1px solid #c0c0c0;display:flex;justify-content:space-between;align-items:center;">
+            <strong style="color:#8b0000;">${actionLabel.toUpperCase()}</strong>
+            <span style="padding:2px 8px;border-radius:3px;font-weight:bold;font-size:.9em;background:${bg};color:${fg};">
+              ${String(color).toUpperCase()} — ${String(effectResult).toUpperCase()}
+            </span>
           </div>
-          ${rollInfoSection}
-          ${damageBlock}
-          ${grid}
-          <div style="text-align:center;padding:8px;margin:5px;font-weight:bold;font-size:1.1em;border-radius:3px;background:${bg};color:${fg};">
-            RESULT: ${String(color).toUpperCase()} — ${String(effectResult).toUpperCase()}
+          
+          <!-- Attacker → Target -->
+          <div style="padding:4px 10px;font-size:.95em;">
+            <strong>${actor.name}</strong>${targetActor ? ` <span style="color:#666;">→</span> <strong style="color:#d32f2f;">${targetName}</strong>` : ''}
           </div>
+          
+          <!-- Ability + Roll -->
+          <div style="padding:2px 10px 6px;font-size:.9em;color:#555;">
+            <div>${ability.name}: ${ability.rank}${shiftDisplay}</div>
+            <div>Roll: ${rollDisplay}</div>
+          </div>
+          
+          ${multiAttackFeatHtml}
+          
+          <!-- Damage -->
+          <div style="margin:0 10px 6px;padding:6px 8px;background:#fff;border:1px solid #ddd;border-radius:3px;font-size:.9em;">
+            ${isHit 
+              ? `<div><strong>Damage:</strong> ${rawDamage} → <strong>${afterArmor}</strong> after armor${armorDisplay}${pullPunchNote}</div>`
+              : `<div><strong>Damage:</strong> ${rawDamage} <span style="color:#666;">(missed)</span></div>`
+            }
+            <div style="color:#666;font-size:.9em;">Source: ${sourceName}${damageNote ? ` — ${damageNote}` : ''}</div>
+          </div>
+          
           ${actions}
           ${manualModeNotice}
         </div>

@@ -1,4 +1,5 @@
-// init.js v1.5.7 - 2025-12-22
+// init.js v1.5.8 - 2025-12-22
+// v1.5.8: Add stunDurationDie setting (replaces maxStunDuration)
 // v1.5.7: Reduce console logging verbosity
 // v1.5.6: Improve effect expiration - advance worldTime per turn, comprehensive debug logging
 // v1.5.5: Improved effect auto-expiration with seconds-based support and debug logging
@@ -567,17 +568,21 @@ Hooks.once("init", async () => {
     default: false,
   });
 
-  game.settings.register('msh-faserip', 'maxStunDuration', {
-    name: "Maximum Stun Duration",
-    hint: "House rule: Cap the maximum rounds a character can be stunned (White result on Stun check rolls 1d10). Set to 10 for RAW, or lower (e.g., 3-5) to keep combats moving.",
+  game.settings.register('msh-faserip', 'stunDurationDie', {
+    name: "Stun Duration Die",
+    hint: "Die rolled for stun duration (White result on Stun check). RAW is d10 (1-10 rounds). Use smaller dice for faster combats.",
     scope: "world",
     config: true,
-    type: Number,
-    default: 10,
-    range: {
-      min: 1,
-      max: 10,
-      step: 1
+    type: String,
+    default: "d10",
+    choices: {
+      "d1": "d1 (always 1 round)",
+      "d2": "d2 (1-2 rounds)",
+      "d3": "d3 (1-3 rounds)",
+      "d4": "d4 (1-4 rounds)",
+      "d6": "d6 (1-6 rounds)",
+      "d8": "d8 (1-8 rounds)",
+      "d10": "d10 (1-10 rounds) - RAW"
     }
   });
 
