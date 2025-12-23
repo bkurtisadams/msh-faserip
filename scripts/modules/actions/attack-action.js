@@ -1,4 +1,5 @@
-// attack-action.js v1.8.6 - 2025-12-23
+// attack-action.js v1.9.0 - 2025-12-23
+// v1.9.0: Collapsible slam/stun sections inline in attack card (consolidatedChatCards mode)
 // v1.8.6: Show actual effect names in CS breakdown hover (e.g., "-2 Stunned" instead of "-2 attacker")
 // v1.8.5: CS breakdown in chat card (yellow box with hover showing manual/attacker/defender sources)
 // v1.8.4: Move result badge to roll line, add attack number in header (1 of 2, vs 3 targets)
@@ -22,7 +23,8 @@ import {
   RANKS, getStrengthInfo, shiftRank, getAbilityInfo,
   rollWithKarmaAndHistory, buildActionsBox, bannerColors,
   getTargetingContext, getBodyArmorValues, applyDamageToTargets,
-  debugLog, universalColor, buildInlineRollDisplay, buildInlineFeatDisplay
+  debugLog, universalColor, buildInlineRollDisplay, buildInlineFeatDisplay,
+  buildCollapsibleSlamSection, buildCollapsibleStunSection
 } from "./action-utils.js";
 //import { rollUniversalTable } from "../dice/universal-table.js";
 import { buildDamageFlags } from "./damage-ui.js";
@@ -633,6 +635,90 @@ export class AttackAction extends BaseAction {
           )
         : "";
 
+      // ============================================
+      // INLINE SLAM/STUN CHECKS (for consolidated chat cards)
+      // ============================================
+      let inlineSlamHtml = "";
+      let inlineStunHtml = "";
+      let inlineSlamResult = null;
+      let inlineStunResult = null;
+      
+      // Get inline check results if: consolidated mode + full auto + effect applies + has target
+      // Effects will be applied by the regular auto-trigger block, we just capture the results for display
+      if (useConsolidated && !isManualMode && this.opts?.autoApply && canEffectsApply(penetratingDamage) && targetActor) {
+        const { ActionDispatcher } = await import("./action-dispatcher.js");
+        
+        // Get attacker strength info for Slam checks
+        const attackerStrInfo = getStrengthInfo(actor);
+        const inlineAttackerStrength = attackerStrInfo?.value || 10;
+        const inlineAttackerStrengthRank = attackerStrInfo?.rank || "Typical";
+        
+        // Get target's endurance for the save
+        const targetEndInfo = getAbilityInfo(targetActor, "endurance");
+        const targetEndRank = targetEndInfo?.rank || "Typical";
+        
+        // Common prefill data
+        const inlinePrefill = {
+          dmgThrough: penetratingDamage,
+          targetName: targetName,
+          targetEndRank: targetEndRank,
+          defenderUuid: target?.document?.uuid ?? targetActor?.uuid,
+          targetUuid: target?.document?.uuid ?? targetActor?.uuid,
+          attackForm: attackForm,
+          borderline: false
+        };
+        
+        // GET INLINE SLAM RESULT (for display only - effects applied later)
+        if (showSlam) {
+          try {
+            inlineSlamResult = await ActionDispatcher.roll("slam", {
+              actor: targetActor,
+              abilityName: "endurance",
+              opts: {
+                autoApply: true,
+                returnResultOnly: true,
+                attackForm: attackForm,
+                prefill: {
+                  ...inlinePrefill,
+                  attackerStrength: inlineAttackerStrength,
+                  attackerStrengthRank: inlineAttackerStrengthRank,
+                  attackerName: actor.name
+                }
+              }
+            });
+            
+            if (inlineSlamResult) {
+              inlineSlamHtml = buildCollapsibleSlamSection(inlineSlamResult);
+            }
+          } catch (e) {
+            console.error("[FASERIP ERROR] Inline Slam check failed:", e);
+          }
+        }
+        
+        // GET INLINE STUN RESULT (for display only - effects applied later)
+        if (showStun) {
+          try {
+            inlineStunResult = await ActionDispatcher.roll("stun", {
+              actor: targetActor,
+              abilityName: "endurance",
+              opts: {
+                autoApply: true,
+                returnResultOnly: true,
+                attackForm: attackForm,
+                damageType: damageType,
+                prefill: { ...inlinePrefill }
+              }
+            });
+            
+            if (inlineStunResult) {
+              inlineStunHtml = buildCollapsibleStunSection(inlineStunResult);
+            }
+          } catch (e) {
+            console.error("[FASERIP ERROR] Inline Stun check failed:", e);
+          }
+        }
+      }
+
       // Build compact shift display with breakdown
       let shiftDisplay = "";
       if (totalShift !== 0) {
@@ -719,6 +805,9 @@ export class AttackAction extends BaseAction {
             <div style="color:#666;font-size:.9em;">Source: ${sourceName}${damageNote ? ` — ${damageNote}` : ''}</div>
           </div>
           
+          ${inlineSlamHtml}
+          ${inlineStunHtml}
+          
           ${actions}
           ${manualModeNotice}
         </div>
@@ -793,11 +882,14 @@ export class AttackAction extends BaseAction {
         };
 
         // === AUTO-TRIGGER SLAM CHECK ===
+        // In consolidated mode, pass pre-rolled result; otherwise normal flow
         if (showSlam) {
           debugLog("Auto-triggering Slam check", { 
             target: targetName, 
             damage: penetratingDamage,
-            attackerStrength: attackerStrengthRank
+            attackerStrength: attackerStrengthRank,
+            hasPreRolledResult: !!inlineSlamResult,
+            useConsolidated
           });
           
           try {
@@ -808,6 +900,9 @@ export class AttackAction extends BaseAction {
                 autoApply: true,
                 showConfirm: false,
                 attackForm: attackForm,
+                // In consolidated mode, skip chat message and use pre-rolled result
+                skipChatMessage: useConsolidated,
+                preRolledResult: inlineSlamResult,
                 prefill: {
                   ...basePrefill,
                   attackerStrength: attackerStrength,
@@ -822,10 +917,13 @@ export class AttackAction extends BaseAction {
         }
 
         // === AUTO-TRIGGER STUN CHECK ===
+        // In consolidated mode, pass pre-rolled result; otherwise normal flow
         if (showStun) {
           debugLog("Auto-triggering Stun check", { 
             target: targetName, 
-            damage: penetratingDamage 
+            damage: penetratingDamage,
+            hasPreRolledResult: !!inlineStunResult,
+            useConsolidated
           });
           
           try {
@@ -837,6 +935,9 @@ export class AttackAction extends BaseAction {
                 showConfirm: false,
                 attackForm: attackForm,
                 damageType: damageType,
+                // In consolidated mode, skip chat message and use pre-rolled result
+                skipChatMessage: useConsolidated,
+                preRolledResult: inlineStunResult,
                 prefill: {
                   ...basePrefill
                 }

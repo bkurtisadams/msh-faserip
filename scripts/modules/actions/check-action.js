@@ -1,4 +1,5 @@
-// scripts/modules/actions/check-action.js v1.4.1 - 2025-12-22
+// scripts/modules/actions/check-action.js v1.5.0 - 2025-12-23
+// v1.5.0: Add returnResultOnly mode for inline embedding in attack cards (collapsible sections)
 // v1.4.1: Show stun duration with hover text for die type
 // v1.4.0: Change stun duration from "d10 + cap" to configurable die (stunDurationDie setting)
 // v1.3.0: Show when stun duration was capped by maxStunDuration setting in chat card
@@ -14,7 +15,8 @@ import {
   getAbilityInfo,
   universalColor,
   buildInlineRollDisplay,
-  showDiceAnimation
+  showDiceAnimation,
+  debugLog
 } from "./action-utils.js";
 import { resolveKillFeat, getKillContextFromAttackForm } from "../../rules/kill-resolver.js";
 import { canEffectsApply } from "../../rules/effects-gate.js";
@@ -103,26 +105,113 @@ export class CheckAction extends BaseAction {
         useConsolidated = game.settings.get("msh-faserip", "consolidatedChatCards");
       } catch (_e) { /* setting not registered yet */ }
 
-      // Roll percent
-      const roll = new Roll("1d100");
-      await roll.evaluate(); // v13+: do not pass {async:true}
+      // Check for skipChatMessage (used in consolidated mode to apply effects without chat)
+      const skipChatMessage = this.opts?.skipChatMessage || false;
       
-      // Show dice animation
-      if (!this.opts?.skipDice) {
-        await showDiceAnimation(roll, actor, `${actionName}: ${targetName} (${effectiveEndRank})`, useConsolidated);
+      // Check for preRolledResult (use existing result instead of re-rolling)
+      const preRolled = this.opts?.preRolledResult;
+      
+      let roll, capped, colorLower;
+      
+      if (preRolled && preRolled.colorLower) {
+        // Use pre-rolled result (from inline check for consolidated mode)
+        colorLower = preRolled.colorLower;
+        capped = preRolled.roll || 50;
+        roll = { total: capped };  // Synthetic roll object for compatibility
+        debugLog("Using pre-rolled result", { colorLower, capped, preRolled });
+      } else {
+        // Roll percent normally
+        roll = new Roll("1d100");
+        await roll.evaluate();
+        
+        // Show dice animation (skip if using pre-rolled or skipChatMessage)
+        if (!this.opts?.skipDice && !skipChatMessage) {
+          await showDiceAnimation(roll, actor, `${actionName}: ${targetName} (${effectiveEndRank})`, useConsolidated);
+        }
+        
+        capped = Math.min(100, roll.total);
+        colorLower = String(universalColor(effectiveEndRank, capped) || "white").toLowerCase();
       }
       
       // Build inline roll display for consolidated mode
       const inlineRollHtml = useConsolidated ? buildInlineRollDisplay(roll, 0, roll.total) : "";
-      
-/*       const capped = Math.min(100, roll.total);
-      const color = (typeof rollUniversalTable === "function")
-        ? rollUniversalTable(effectiveEndRank, capped)
-        : (game?.msh?.rollUniversalTable?.(effectiveEndRank, capped) ?? "white");
-      const colorLower = String(color || "white").toLowerCase(); */
 
-      const capped = Math.min(100, roll.total);
-      const colorLower = String(universalColor(effectiveEndRank, capped) || "white").toLowerCase();
+      // ============================================
+      // RETURN RESULT ONLY MODE (for inline embedding)
+      // ============================================
+      if (this?.opts?.returnResultOnly) {
+        // Calculate result data without creating chat messages or applying effects
+        if (actionType === "slam") {
+          const attackerStrength = prefill.attackerStrength || 30;
+          const attackerStrengthRank = prefill.attackerStrengthRank || "Remarkable";
+          let slamEffect = "";
+          let knockbackDistance = 0;
+          
+          switch (colorLower) {
+            case "white":
+              slamEffect = "Grand Slam";
+              knockbackDistance = getGrandSlamDistance(attackerStrength);
+              break;
+            case "green":
+              slamEffect = "1 Area";
+              knockbackDistance = 1;
+              break;
+            case "yellow":
+              slamEffect = "Stagger";
+              break;
+            case "red":
+              slamEffect = "No Slam";
+              break;
+          }
+          
+          return {
+            actionType: "slam",
+            colorLower,
+            slamEffect,
+            knockbackDistance,
+            attackerStrength,
+            attackerStrengthRank,
+            targetName,
+            roll: roll.total,
+            effectiveEndRank,
+            defenderUuid,
+            effectsSuppressed: false
+          };
+        }
+        
+        if (actionType === "stun") {
+          let stunDur = null;
+          if (colorLower === "white") {
+            const stunDie = game.settings?.get?.("msh-faserip", "stunDurationDie") || "d10";
+            const d = new Roll(`1${stunDie}`);
+            await d.evaluate();
+            stunDur = d.total;
+          } else if (colorLower === "green") {
+            stunDur = 1;
+          }
+          
+          return {
+            actionType: "stun",
+            colorLower,
+            stunDuration: stunDur,
+            targetName,
+            roll: roll.total,
+            effectiveEndRank,
+            defenderUuid,
+            effectsSuppressed: false
+          };
+        }
+        
+        // For other action types, return generic result
+        return {
+          actionType,
+          colorLower,
+          targetName,
+          roll: roll.total,
+          effectiveEndRank,
+          defenderUuid
+        };
+      }
 
       // Determine base effect label
       let baseEffect = mapping[colorLower] || color;
@@ -144,17 +233,22 @@ export class CheckAction extends BaseAction {
       let stunDuration = null;
       if (actionType === "stun" && !effectsSuppressed) {
         if (colorLower === "white") {
-          // White = roll for stun duration (configurable die)
-          const stunDie = game.settings?.get?.("msh-faserip", "stunDurationDie") || "d10";
-          const d = new Roll(`1${stunDie}`);
-          await d.evaluate();
-          stunDuration = d.total;
-          // Only show separate duration message if NOT consolidated
-          if (!useConsolidated) {
-            await d.toMessage({
-              speaker: ChatMessage.getSpeaker({ actor }),
-              flavor: `${targetName} Stun Duration (1${stunDie})`
-            });
+          // Check for pre-rolled stun duration
+          if (preRolled && typeof preRolled.stunDuration === 'number') {
+            stunDuration = preRolled.stunDuration;
+          } else {
+            // White = roll for stun duration (configurable die)
+            const stunDie = game.settings?.get?.("msh-faserip", "stunDurationDie") || "d10";
+            const d = new Roll(`1${stunDie}`);
+            await d.evaluate();
+            stunDuration = d.total;
+            // Only show separate duration message if NOT consolidated and NOT skipChatMessage
+            if (!useConsolidated && !skipChatMessage) {
+              await d.toMessage({
+                speaker: ChatMessage.getSpeaker({ actor }),
+                flavor: `${targetName} Stun Duration (1${stunDie})`
+              });
+            }
           }
           await this._createStunnedEffect(defenderUuid, targetName, stunDuration);
         } else if (colorLower === "green") {
@@ -192,17 +286,19 @@ export class CheckAction extends BaseAction {
             break;
         }
         
-        // Create detailed chat message based on effect
-        await this._createSlamChatMessage({
-          targetName,
-          targetUuid: defenderUuid,
-          slamEffect,
-          knockbackDistance,
-          attackerStrength,
-          attackerStrengthRank,
-          attackerName,
-          colorLower
-        });
+        // Create detailed chat message based on effect (skip if in consolidated mode)
+        if (!skipChatMessage) {
+          await this._createSlamChatMessage({
+            targetName,
+            targetUuid: defenderUuid,
+            slamEffect,
+            knockbackDistance,
+            attackerStrength,
+            attackerStrengthRank,
+            attackerName,
+            colorLower
+          });
+        }
         
         // Create the Active Effect
         if (slamEffect !== "No Slam") {
@@ -379,11 +475,15 @@ export class CheckAction extends BaseAction {
           </div>
         </div>
       `;
-      await ChatMessage.create({
-        speaker: ChatMessage.getSpeaker({ actor }),
-        content,
-        flags: { [SCOPE()]: { autoChecksDone: true } }
-      });
+      
+      // Create chat card unless skipChatMessage is set (consolidated mode)
+      if (!skipChatMessage) {
+        await ChatMessage.create({
+          speaker: ChatMessage.getSpeaker({ actor }),
+          content,
+          flags: { [SCOPE()]: { autoChecksDone: true } }
+        });
+      }
       return;
     } // end auto fast-path
 

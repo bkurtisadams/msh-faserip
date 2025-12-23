@@ -1,4 +1,5 @@
-// action-utils.js v1.0.2 - 2025-12-22
+// action-utils.js v1.1.0 - 2025-12-23
+// v1.1.0: Add buildCollapsibleSlamSection and buildCollapsibleStunSection for inline check results
 // v1.0.2: Mode selector as radio buttons - active shows full color, inactive shows grey
 // v1.0.1: Fix setupModeSelector to use FASERIP colors from data attributes (was overriding with blue)
 // v1.0.0: Mode selector now uses FASERIP traffic light colors (Manual=Red, Semi=Yellow, Full=Green)
@@ -2255,4 +2256,175 @@ export function extractRememberSettings(html) {
 
   // Maintain legacy property names for existing call sites
   return { remember, skipDice };
+}
+
+// ============================================
+// COLLAPSIBLE CHECK SECTIONS
+// ============================================
+
+/**
+ * Build collapsible slam check section for inline display in attack cards
+ * @param {Object} result - Slam check result from CheckAction
+ * @returns {string} HTML string
+ */
+export function buildCollapsibleSlamSection(result) {
+  if (!result) return "";
+  
+  const { colorLower, slamEffect, knockbackDistance, attackerStrength, attackerStrengthRank, targetName, roll, effectiveEndRank } = result;
+  
+  // Color-coded summary based on slam effect
+  const effectColors = {
+    "Grand Slam": { bg: "#8B0000", fg: "#fff", icon: "&#x1F4A5;" },
+    "1 Area": { bg: "#DC3545", fg: "#fff", icon: "&#x1F4A2;" },
+    "Stagger": { bg: "#FFC107", fg: "#000", icon: "&#x1F635;" },
+    "No Slam": { bg: "#28A745", fg: "#fff", icon: "&#x1F6E1;" }
+  };
+  const colors = effectColors[slamEffect] || { bg: "#666", fg: "#fff", icon: "" };
+  
+  // Summary line (visible when collapsed)
+  const summaryText = slamEffect === "Grand Slam" 
+    ? `Slam Check - Grand Slam (${knockbackDistance} areas)` 
+    : `Slam Check - ${slamEffect}`;
+  
+  // Build detailed content
+  let detailContent = "";
+  if (slamEffect === "Grand Slam") {
+    detailContent = `
+      <div style="padding:8px;font-size:.9em;">
+        <div style="margin-bottom:6px;"><strong>${targetName}</strong> is launched away with tremendous force!</div>
+        <div style="margin-bottom:4px;"><strong>Mechanical Effects:</strong></div>
+        <div style="margin-left:8px;">
+          <div>Attacker Strength: ${attackerStrengthRank} (${attackerStrength})</div>
+          <div>Knockback Distance: ${knockbackDistance} areas</div>
+          <div>Launch Speed: ${knockbackDistance} areas/round</div>
+          <div>Direction: Attacker chooses (if damage dealt)</div>
+        </div>
+        <div style="margin-top:6px;"><strong>Collision Damage:</strong></div>
+        <div style="margin-left:8px;font-size:.85em;color:#555;">
+          <div>If target hits obstacle: charging damage applies</div>
+          <div>Buildings reduce knockback per movement rules</div>
+          <div>Target takes slam damage if hitting walls/objects</div>
+        </div>
+      </div>`;
+  } else if (slamEffect === "1 Area") {
+    detailContent = `
+      <div style="padding:8px;font-size:.9em;">
+        <div style="margin-bottom:6px;"><strong>${targetName}</strong> is knocked back 1 area!</div>
+        <div style="margin-bottom:4px;"><strong>Mechanical Effects:</strong></div>
+        <div style="margin-left:8px;font-size:.85em;">
+          <div>Knocked 1 area away from attacker</div>
+          <div>May hit obstacles during knockback</div>
+          <div>Takes damage if slammed into walls/objects</div>
+        </div>
+      </div>`;
+  } else if (slamEffect === "Stagger") {
+    detailContent = `
+      <div style="padding:8px;font-size:.9em;">
+        <div style="margin-bottom:6px;"><strong>${targetName}</strong> staggers from the impact!</div>
+        <div style="margin-left:8px;font-size:.85em;">
+          <div>Knocked back a step or two</div>
+          <div>No longer adjacent to attacker</div>
+          <div>Fully capable of combat next round</div>
+        </div>
+      </div>`;
+  } else {
+    detailContent = `
+      <div style="padding:8px;font-size:.9em;">
+        <div><strong>${targetName}</strong> plants their feet and resists!</div>
+        <div style="margin-top:4px;font-size:.85em;color:#555;">No knockback effect - remains in current position.</div>
+      </div>`;
+  }
+  
+  // Roll info line
+  const rollInfo = `
+    <div style="padding:4px 8px;font-size:.85em;color:#555;border-top:1px solid rgba(0,0,0,.1);">
+      Endurance: ${effectiveEndRank} | Roll: <span style="padding:0 3px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;">${roll}</span> | Result: <strong style="text-transform:capitalize;">${colorLower}</strong>
+    </div>`;
+  
+  return `
+    <details class="faserip-check-section slam-section" style="margin:6px 10px 8px;border:1px solid ${colors.bg};border-radius:4px;overflow:hidden;">
+      <summary style="padding:6px 10px;background:${colors.bg};color:${colors.fg};cursor:pointer;font-weight:600;font-size:.9em;list-style:none;display:flex;align-items:center;gap:6px;">
+        <span style="font-size:1.1em;">${colors.icon}</span>
+        <span>${summaryText}</span>
+        <span style="margin-left:auto;font-size:.8em;opacity:.8;">&#9660;</span>
+      </summary>
+      <div style="background:#fff;">
+        ${detailContent}
+        ${rollInfo}
+      </div>
+    </details>`;
+}
+
+/**
+ * Build collapsible stun check section for inline display in attack cards
+ * @param {Object} result - Stun check result from CheckAction
+ * @returns {string} HTML string
+ */
+export function buildCollapsibleStunSection(result) {
+  if (!result) return "";
+  
+  const { colorLower, stunDuration, targetName, roll, effectiveEndRank } = result;
+  
+  // Determine effect text and colors
+  let effectText = "";
+  let colors = { bg: "#28A745", fg: "#fff", icon: "&#x1F6E1;" };
+  
+  if (colorLower === "white" && stunDuration > 0) {
+    effectText = `Stunned ${stunDuration} round${stunDuration !== 1 ? 's' : ''}`;
+    colors = { bg: "#8B0000", fg: "#fff", icon: "&#x1F4A4;" };
+  } else if (colorLower === "green") {
+    effectText = "Stunned 1 round";
+    colors = { bg: "#DC3545", fg: "#fff", icon: "&#x1F635;" };
+  } else {
+    effectText = "No effect";
+  }
+  
+  const summaryText = `Stun Check - ${effectText}`;
+  
+  // Build detailed content
+  let detailContent = "";
+  if (colorLower === "white" && stunDuration > 0) {
+    const stunDie = game.settings?.get?.("msh-faserip", "stunDurationDie") || "d10";
+    detailContent = `
+      <div style="padding:8px;font-size:.9em;">
+        <div style="margin-bottom:6px;"><strong>${targetName}</strong> is knocked out!</div>
+        <div style="margin-left:8px;">
+          <div>Duration: <strong title="Rolled 1${stunDie}">${stunDuration}</strong> round${stunDuration !== 1 ? 's' : ''}</div>
+          <div style="font-size:.85em;color:#555;margin-top:4px;">May take no actions while stunned.</div>
+        </div>
+      </div>`;
+  } else if (colorLower === "green") {
+    detailContent = `
+      <div style="padding:8px;font-size:.9em;">
+        <div style="margin-bottom:6px;"><strong>${targetName}</strong> is knocked down!</div>
+        <div style="margin-left:8px;font-size:.85em;color:#555;">
+          <div>Stunned 1 round - no actions next round.</div>
+        </div>
+      </div>`;
+  } else {
+    detailContent = `
+      <div style="padding:8px;font-size:.9em;">
+        <div><strong>${targetName}</strong> shakes it off!</div>
+        <div style="margin-top:4px;font-size:.85em;color:#555;">No stun effect.</div>
+      </div>`;
+  }
+  
+  // Roll info line
+  const rollInfo = `
+    <div style="padding:4px 8px;font-size:.85em;color:#555;border-top:1px solid rgba(0,0,0,.1);">
+      Endurance: ${effectiveEndRank} | Roll: <span style="padding:0 3px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;">${roll}</span> | Result: <strong style="text-transform:capitalize;">${colorLower}</strong>
+    </div>`;
+  
+  return `
+    <details class="faserip-check-section stun-section" style="margin:6px 10px 8px;border:1px solid ${colors.bg};border-radius:4px;overflow:hidden;">
+      <summary style="padding:6px 10px;background:${colors.bg};color:${colors.fg};cursor:pointer;font-weight:600;font-size:.9em;list-style:none;display:flex;align-items:center;gap:6px;">
+        <span style="font-size:1.1em;">${colors.icon}</span>
+        <span>${summaryText}</span>
+        <span style="margin-left:auto;font-size:.8em;opacity:.8;">&#9660;</span>
+      </summary>
+      <div style="background:#fff;">
+        ${detailContent}
+        ${rollInfo}
+      </div>
+    </details>`;
 }
