@@ -1,4 +1,5 @@
-// attack-action.js v1.8.3 - 2025-12-23
+// attack-action.js v1.8.4 - 2025-12-23
+// v1.8.4: Move result badge to roll line, add attack number in header (1 of 2, vs 3 targets)
 // v1.8.3: Yellow box on rolled d100 in chat card to indicate hover text
 // v1.8.2: Fix result cap (Yellow/Green) - use capped color for effect lookup and Slam/Stun/Kill checks
 // v1.8.1: Fix pull punch - use afterArmor (with pull cap) in applyDamageToTargets
@@ -331,7 +332,9 @@ export class AttackAction extends BaseAction {
     sourceName = "Attack",
     attackForm = "blunt",
     breakingFeat = null,
-    targetCount = 1
+    targetCount = 1,
+    attackNumber = 1,
+    totalAttacks = 1
   }) {
     // === EARLY WEAPON CHECK: Abort if firearm is empty ===
     const weapon = choice?.weapon ?? null;
@@ -654,14 +657,17 @@ export class AttackAction extends BaseAction {
       ` : "";
 
       // Compact chat card
+      // For adjacent attacks (single roll, multiple targets), show "Attack vs X targets"
+      // For regular attacks, show "Attack N of M"
+      const attackIndicator = targetCount > 1
+        ? `<span style="color:#666;font-weight:normal;font-size:.85em;">Attack vs ${targetCount} targets</span>`
+        : `<span style="color:#666;font-weight:normal;font-size:.85em;">Attack ${attackNumber} of ${totalAttacks}</span>`;
       const cardHtml = `
         <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
-          <!-- Header: Action + Result badge -->
+          <!-- Header: Action + Attack number -->
           <div style="padding:6px 10px;border-bottom:1px solid #c0c0c0;display:flex;justify-content:space-between;align-items:center;">
             <strong style="color:#8b0000;">${actionLabel.toUpperCase()}</strong>
-            <span style="padding:2px 8px;border-radius:3px;font-weight:bold;font-size:.9em;background:${bg};color:${fg};">
-              ${String(color).toUpperCase()} — ${String(effectResult).toUpperCase()}
-            </span>
+            ${attackIndicator}
           </div>
           
           <!-- Attacker → Target -->
@@ -669,10 +675,15 @@ export class AttackAction extends BaseAction {
             <strong>${actor.name}</strong>${targetActor ? ` <span style="color:#666;">→</span> <strong style="color:#d32f2f;">${targetName}</strong>` : ''}
           </div>
           
-          <!-- Ability + Roll -->
+          <!-- Ability + Roll + Result -->
           <div style="padding:2px 10px 6px;font-size:.9em;color:#555;">
             <div>${ability.name}: ${ability.rank}${shiftDisplay}</div>
-            <div>Roll: ${rollDisplay}</div>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <span>Roll: ${rollDisplay}</span>
+              <span style="padding:2px 8px;border-radius:3px;font-weight:bold;font-size:.9em;background:${bg};color:${fg};">
+                ${String(color).toUpperCase()} — ${String(effectResult).toUpperCase()}
+              </span>
+            </div>
           </div>
           
           ${multiAttackFeatHtml}

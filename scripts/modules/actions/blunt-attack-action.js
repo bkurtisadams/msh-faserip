@@ -1,5 +1,6 @@
 //--- START OF FILE blunt-attack-action.js ---
-// blunt-attack-action.js v1.4.3 - 2025-12-23
+// blunt-attack-action.js v1.4.4 - 2025-12-23
+// v1.4.4: Pass attackNumber/totalAttacks to chat card for multi-attack display
 // v1.4.3: Yellow box on karma number, show multiple target names in dialog
 // v1.4.2: Compact karma section to match CS field size
 // v1.4.1: Fix pull punch persistence (save enabled state) and refresh value when source changes
@@ -622,7 +623,9 @@ Common improvised weapons:
           sourceName: choice.weaponName || "Bare Hands",
           attackForm: "blunt",
           breakingFeat: (choice.src === "weapon" || choice.src === "object") ? { weaponMat: choice.weaponMat } : null,
-          targetCount: 1
+          targetCount: 1,
+          attackNumber: i + 1,
+          totalAttacks: count
         });
       }
     }
