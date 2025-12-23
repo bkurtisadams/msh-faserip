@@ -1,4 +1,5 @@
-// action-utils.js v1.0.1 - 2025-12-22
+// action-utils.js v1.0.2 - 2025-12-22
+// v1.0.2: Mode selector as radio buttons - active shows full color, inactive shows grey
 // v1.0.1: Fix setupModeSelector to use FASERIP colors from data attributes (was overriding with blue)
 // v1.0.0: Mode selector now uses FASERIP traffic light colors (Manual=Red, Semi=Yellow, Full=Green)
 
@@ -259,11 +260,16 @@ export function buildModeSelector({ mode = "semi", disabled = false, disabledRea
   const mk = (val, label) => {
     const active = mode === val;
     const c = colors[val];
-    const base = "display:inline-block;padding:4px 10px;border:2px solid;border-radius:4px;margin-left:4px;cursor:pointer;font-size:12px;";
-    const on  = `${base}background:${c.bg};color:${c.text};font-weight:600;border-color:${c.border};`;
-    const off = `${base}background:#f7f7f7;color:#444;border-color:${c.bg};opacity:.7;`;
-    const dis = disabled ? "pointer-events:none;opacity:.5;filter:grayscale(.4);" : "";
-    return `<a class="faserip-mode" data-mode="${val}" data-bg="${c.bg}" data-border="${c.border}" data-text="${c.text}" title="${disabled ? disabledReason : ""}" style="${active ? on : off}${dis}">${label}</a>`;
+    const baseStyle = "display:inline-flex;align-items:center;padding:4px 10px;border:2px solid;border-radius:4px;margin-left:4px;cursor:pointer;font-size:12px;";
+    const activeStyle = `background:${c.bg};color:${c.text};font-weight:600;border-color:${c.border};`;
+    const inactiveStyle = `background:#f5f5f5;color:#666;border-color:#ccc;`;
+    const disStyle = disabled ? "pointer-events:none;opacity:.5;" : "";
+    return `<label class="faserip-mode" data-mode="${val}" data-bg="${c.bg}" data-border="${c.border}" data-text="${c.text}" 
+                   style="${baseStyle}${active ? activeStyle : inactiveStyle}${disStyle}" 
+                   title="${disabled ? disabledReason : ''}">
+              <input type="radio" name="combatMode" value="${val}" ${active ? 'checked' : ''} ${disabled ? 'disabled' : ''} style="display:none;">
+              ${label}
+            </label>`;
   };
 
   return `
@@ -278,8 +284,14 @@ export function buildModeSelector({ mode = "semi", disabled = false, disabledRea
 
 /** Attach click handlers; updates opts.mode and derived flags, calls onChange(mode) */
 export function attachModeSelectorHandlers($html, opts = {}, onChange) {
-  const $buttons = $html.find(".faserip-mode-row .faserip-mode");
-  if (!$buttons.length) return;
+  const $labels = $html.find(".faserip-mode-row .faserip-mode");
+  if (!$labels.length) return;
+
+  const colors = {
+    manual: { bg: '#c62828', border: '#b71c1c', text: '#fff' },
+    semi:   { bg: '#f9a825', border: '#f57f17', text: '#000' },
+    full:   { bg: '#2e7d32', border: '#1b5e20', text: '#fff' }
+  };
 
   const applyFlags = (modeVal) => {
     const mode = String(modeVal || "semi");
@@ -296,33 +308,34 @@ export function attachModeSelectorHandlers($html, opts = {}, onChange) {
     if (typeof onChange === "function") onChange(mode, derived);
   };
 
-  $buttons.on("click", (ev) => {
-    const $btn = $(ev.currentTarget);
-    const mode = $btn.data("mode");
-    // Reset all buttons to inactive state with their color as border
-    $buttons.each(function() {
-      const $b = $(this);
-      $b.css({
-        "background": "#f7f7f7",
-        "color": "#444",
+  $labels.on("click", (ev) => {
+    const $label = $(ev.currentTarget);
+    const mode = $label.data("mode");
+    const c = colors[mode];
+    
+    // Reset all labels to inactive
+    $labels.each(function() {
+      $(this).css({
+        "background": "#f5f5f5",
+        "color": "#666",
         "font-weight": "400",
-        "border-color": $b.data("bg"),
-        "opacity": ".7"
+        "border-color": "#ccc"
       });
     });
-    // Set clicked button to active state
-    $btn.css({
-      "background": $btn.data("bg"),
-      "color": $btn.data("text"),
+    
+    // Set clicked label to active with its color
+    $label.css({
+      "background": c.bg,
+      "color": c.text,
       "font-weight": "600",
-      "border-color": $btn.data("border"),
-      "opacity": "1"
+      "border-color": c.border
     });
+    
+    // Update the hidden radio
+    $label.find('input[type="radio"]').prop('checked', true);
+    
     applyFlags(mode);
   });
-
-  // REMOVE THIS LINE - it's causing double initialization:
-  // applyFlags(opts?.mode || "semi");
 }
 
 export const RANKS = [
