@@ -1,5 +1,6 @@
 //--- START OF FILE blunt-attack-action.js ---
-// blunt-attack-action.js v1.4.6 - 2025-12-23
+// blunt-attack-action.js v1.4.7 - 2025-12-23
+// v1.4.7: Track shiftBreakdown for detailed CS hover (manual, multi-attack, adjacent)
 // v1.4.6: Compact pull punch row, add objectValue handler for damage update
 // v1.4.5: Fix CS field jitter (box-sizing, visibility for reset btn, transparent border when CS=0)
 // v1.4.4: Pass attackNumber/totalAttacks to chat card for multi-attack display
@@ -524,8 +525,16 @@ Common improvised weapons:
     
     if (!choice) return;
 
+    // Track shift breakdown for detailed display
+    const shiftBreakdown = {
+      manual: choice.shift || 0,  // User-entered CS from dialog
+      multiAttack: 0,             // Multi-attack penalty (-1 success, -3 fail)
+      adjacent: 0                 // Adjacent targets penalty (-4)
+    };
+
     // Handle multiple adjacent targets (single roll @-4 CS)
     if (choice.multiAdjacent) {
+      shiftBreakdown.adjacent = -4;
       choice.shift = (choice.shift || 0) - 4;
       ui.notifications.info(`Attacking ${game.user.targets.size} adjacent targets at -4CS!`);
     }
@@ -573,15 +582,20 @@ Common improvised weapons:
       if (featSuccess && !featImpossible) {
         // Success: Make 2 or 3 attacks, each at -1CS
         actualAttackCount = choice.attackCount;
+        shiftBreakdown.multiAttack = -1;
         choice.shift = (choice.shift || 0) - 1;
         ui.notifications.info(`Multi-attack successful! Making ${actualAttackCount} attacks at -1CS each!`);
       } else {
         // Failed: Only 1 attack at -3CS
         actualAttackCount = 1;
+        shiftBreakdown.multiAttack = -3;
         choice.shift = (choice.shift || 0) - 3;
         ui.notifications.warn(`Multi-attack FEAT failed! Only making 1 attack at -3CS.`);
       }
     }
+
+    // Attach breakdown to choice for downstream use
+    choice.shiftBreakdown = shiftBreakdown;
 
     // Execute attacks
     const targetCount = game.user.targets.size || 1;

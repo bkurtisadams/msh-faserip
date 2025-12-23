@@ -1,4 +1,10 @@
-// attack-action.js v1.9.0 - 2025-12-23
+// attack-action.js v1.9.6 - 2025-12-23
+// v1.9.6: Breaking FEAT fallback to derive rank from numeric armor value; added debug logging
+// v1.9.5: Borderline rule - effects can apply when armor exactly equals damage (passed via prefill)
+// v1.9.4: Breaking FEAT shows when weapon mat < target mat; miss shows "Damage: 0 (miss)"
+// v1.9.3: Pass target armor rank to Breaking FEAT dialog for auto-population
+// v1.9.2: Damage line uses math notation (30 − 6 armor = 24) with source/armor hover text
+// v1.9.1: Detailed CS breakdown hover showing manual, multi-attack, adjacent, and effect modifiers
 // v1.9.0: Collapsible slam/stun sections inline in attack card (consolidatedChatCards mode)
 // v1.8.6: Show actual effect names in CS breakdown hover (e.g., "-2 Stunned" instead of "-2 attacker")
 // v1.8.5: CS breakdown in chat card (yellow box with hover showing manual/attacker/defender sources)
@@ -524,13 +530,18 @@ export class AttackAction extends BaseAction {
 
       // Calculate armor and penetrating damage for this specific target
      let penetratingDamage = 0;
+     let armorData = null;
+     let armorValue = 0;
+     let isBorderline = false;
      if (isHit && rawDamage > 0) {
        if (targetActor) {
-         const armorData = getBodyArmorValues(targetActor, damageType);
+         armorData = getBodyArmorValues(targetActor, damageType);
          // Ensure numbers whether rawDamage arrived as "20" or 20
          const rd = Number(rawDamage) || 0;
-         const ap = Number(armorData?.applicable) || 0;
-         penetratingDamage = Math.max(0, rd - ap);
+         armorValue = Number(armorData?.applicable) || 0;
+         penetratingDamage = Math.max(0, rd - armorValue);
+         // Borderline: armor exactly equals damage (effects can still apply per rules)
+         isBorderline = (rd > 0 && rd === armorValue);
        } else {
          penetratingDamage = Number(rawDamage) || 0;
          }
@@ -543,10 +554,60 @@ export class AttackAction extends BaseAction {
 
       const afterArmor = penetratingDamage;
 
-      // Calculate breaking feat for this attack
-      const currentBreakingFeat = (effectColorLower !== "white" && penetratingDamage > 0 && breakingFeat)
-        ? breakingFeat
-        : null;
+      // Calculate breaking feat for this attack - include target material for auto-population
+      // Show button when weapon material < target material (regardless of penetrating damage)
+      let currentBreakingFeat = null;
+      if (effectColorLower !== "white" && breakingFeat && targetActor) {
+        const RANKS = [
+          "Shift-0","Feeble","Poor","Typical","Good","Excellent",
+          "Remarkable","Incredible","Amazing","Monstrous","Unearthly",
+          "Shift-X","Shift-Y","Shift-Z","Class 1000","Class 3000","Class 5000","Beyond"
+        ];
+        const RANK_VALUES = [0, 1, 3, 5, 8, 16, 26, 36, 46, 63, 88, 150, 250, 500, 1000, 3000, 5000, Infinity];
+        
+        // Get target's armor rank for the Breaking FEAT dialog
+        const isEnergy = armorData?.isEnergyDamage;
+        let targetMatRank = isEnergy ? armorData?.energyRank : armorData?.physicalRank;
+        
+        // Fallback: if no rank string, derive from numeric armor value
+        if (!targetMatRank && armorData) {
+          const armorVal = isEnergy ? armorData.energy : armorData.physical;
+          if (armorVal > 0) {
+            // Find closest rank for this armor value
+            for (let i = RANK_VALUES.length - 1; i >= 0; i--) {
+              if (armorVal >= RANK_VALUES[i]) {
+                targetMatRank = RANKS[i];
+                break;
+              }
+            }
+          }
+        }
+        
+        const weaponIdx = RANKS.indexOf(breakingFeat.weaponMat);
+        const targetIdx = RANKS.indexOf(targetMatRank);
+        
+        console.log("[FASERIP] Breaking FEAT check:", {
+          weaponMat: breakingFeat.weaponMat,
+          weaponIdx,
+          targetMatRank,
+          targetIdx,
+          wouldShow: weaponIdx !== -1 && targetIdx !== -1 && weaponIdx < targetIdx
+        });
+        
+        // Only show Breaking FEAT if weapon material < target material
+        if (weaponIdx !== -1 && targetIdx !== -1 && weaponIdx < targetIdx) {
+          currentBreakingFeat = {
+            ...breakingFeat,
+            targetMat: targetMatRank || ""
+          };
+        }
+      } else if (effectColorLower !== "white") {
+        console.log("[FASERIP] Breaking FEAT skipped:", {
+          hasBreakingFeat: !!breakingFeat,
+          hasTargetActor: !!targetActor,
+          breakingFeat
+        });
+      }
 
       // Build actions box ONLY if not manual mode
       // Follow-ups must match the Universal Table per action type.
@@ -599,11 +660,15 @@ export class AttackAction extends BaseAction {
         ? (resolveCombatMode(targetActor) === "full")
         : false;
 
-      const actions = (!isManualMode && isHit && canEffectsApply(penetratingDamage) && targetActor)
+      // Show actions box if there are effects to apply OR a Breaking FEAT check is needed
+      const hasEffects = canEffectsApply(penetratingDamage, { borderline: isBorderline });
+      const needsActionsBox = !isManualMode && isHit && targetActor && (hasEffects || currentBreakingFeat);
+      
+      const actions = needsActionsBox
         ? buildActionsBox({
-            showSlam,
-            showStun,
-            showKill,
+            showSlam: hasEffects && showSlam,
+            showStun: hasEffects && showStun,
+            showKill: hasEffects && showKill,
             pulled: choice.resultCap !== 'none' || (choice.pulledDamage > 0 && choice.pulledDamage < rawDamage),
             breakingFeat: currentBreakingFeat,
             actorUuid: actor.uuid,
@@ -617,15 +682,6 @@ export class AttackAction extends BaseAction {
             autoSave: false,  // prevent chat button duplicates
           })
         : "";
-
-      // Build pull punch indicator (compact)
-      let pullPunchNote = "";
-      if (choice.pulledDamage > 0 && choice.pulledDamage < rawDamage) {
-        pullPunchNote += `<span style="color:#ff6f00;font-size:.85em;"> (pulled to ${choice.pulledDamage})</span>`;
-      }
-      if (choice.resultCap && choice.resultCap !== 'none') {
-        pullPunchNote += `<span style="color:#ff6f00;font-size:.85em;"> (capped at ${choice.resultCap})</span>`;
-      }
 
       // Build inline FEAT display if multi-attack FEAT was performed and consolidated mode is enabled
       const multiAttackFeatHtml = (useConsolidated && choice?.multiAttackFeatResult) 
@@ -645,7 +701,7 @@ export class AttackAction extends BaseAction {
       
       // Get inline check results if: consolidated mode + full auto + effect applies + has target
       // Effects will be applied by the regular auto-trigger block, we just capture the results for display
-      if (useConsolidated && !isManualMode && this.opts?.autoApply && canEffectsApply(penetratingDamage) && targetActor) {
+      if (useConsolidated && !isManualMode && this.opts?.autoApply && canEffectsApply(penetratingDamage, { borderline: isBorderline }) && targetActor) {
         const { ActionDispatcher } = await import("./action-dispatcher.js");
         
         // Get attacker strength info for Slam checks
@@ -665,7 +721,7 @@ export class AttackAction extends BaseAction {
           defenderUuid: target?.document?.uuid ?? targetActor?.uuid,
           targetUuid: target?.document?.uuid ?? targetActor?.uuid,
           attackForm: attackForm,
-          borderline: false
+          borderline: isBorderline
         };
         
         // GET INLINE SLAM RESULT (for display only - effects applied later)
@@ -723,9 +779,29 @@ export class AttackAction extends BaseAction {
       let shiftDisplay = "";
       if (totalShift !== 0) {
         const parts = [];
-        if (manualShift !== 0) {
+        const breakdown = choice.shiftBreakdown;
+        
+        // Manual shift from dialog (user-entered)
+        if (breakdown?.manual && breakdown.manual !== 0) {
+          parts.push(`${breakdown.manual > 0 ? '+' : ''}${breakdown.manual} manual`);
+        }
+        
+        // Multi-attack penalty
+        if (breakdown?.multiAttack && breakdown.multiAttack !== 0) {
+          const label = breakdown.multiAttack === -1 ? "multi-atk" : "multi-atk fail";
+          parts.push(`${breakdown.multiAttack} ${label}`);
+        }
+        
+        // Adjacent targets penalty
+        if (breakdown?.adjacent && breakdown.adjacent !== 0) {
+          parts.push(`${breakdown.adjacent} adjacent`);
+        }
+        
+        // Fallback: if no breakdown but manualShift exists, show as "other"
+        if (!breakdown && manualShift !== 0) {
           parts.push(`${manualShift > 0 ? '+' : ''}${manualShift} other`);
         }
+        
         // Show attacker effects by name
         for (const eff of attackerEffects) {
           parts.push(`${eff.shift > 0 ? '+' : ''}${eff.shift} ${eff.name}`);
@@ -735,8 +811,8 @@ export class AttackAction extends BaseAction {
           parts.push(`${eff.shift > 0 ? '-' : '+'}${Math.abs(eff.shift)} ${eff.name}`);
         }
         
-        const breakdown = parts.length > 0 ? parts.join(', ') : `${totalShift > 0 ? '+' : ''}${totalShift} total`;
-        const csBox = `<span title="${breakdown}" style="padding:0 3px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${totalShift > 0 ? '+' : ''}${totalShift}CS</span>`;
+        const breakdownText = parts.length > 0 ? parts.join(', ') : `${totalShift > 0 ? '+' : ''}${totalShift} total`;
+        const csBox = `<span title="${breakdownText}" style="padding:0 3px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${totalShift > 0 ? '+' : ''}${totalShift}CS</span>`;
         shiftDisplay = ` (${csBox} → ${effectiveRank})`;
       }
 
@@ -746,16 +822,6 @@ export class AttackAction extends BaseAction {
       const rollDisplay = totalKarmaUsed 
         ? `${cappedTotal} <span style="color:#666;">(${rollBox} + ${totalKarmaUsed} karma)</span>`
         : rollBox;
-
-      // Get target armor info for display
-      let armorDisplay = "";
-      if (isHit && targetActor) {
-        const armorData = getBodyArmorValues(targetActor, damageType);
-        const armorValue = Number(armorData?.applicable) || 0;
-        if (armorValue > 0) {
-          armorDisplay = ` <span style="color:#666;">(vs ${armorValue} armor)</span>`;
-        }
-      }
 
       // Add manual mode notice if applicable
       const manualModeNotice = isManualMode ? `
@@ -797,13 +863,49 @@ export class AttackAction extends BaseAction {
           ${multiAttackFeatHtml}
           
           <!-- Damage -->
-          <div style="margin:0 10px 6px;padding:6px 8px;background:#fff;border:1px solid #ddd;border-radius:3px;font-size:.9em;">
-            ${isHit 
-              ? `<div><strong>Damage:</strong> ${rawDamage} → <strong>${afterArmor}</strong> after armor${armorDisplay}${pullPunchNote}</div>`
-              : `<div><strong>Damage:</strong> ${rawDamage} <span style="color:#666;">(missed)</span></div>`
+          ${(() => {
+            if (!isHit) {
+              // Miss - show zero damage
+              return `<div style="margin:0 10px 6px;padding:6px 8px;background:#fff;border:1px solid #ddd;border-radius:3px;font-size:.9em;color:#666;">
+                <strong>Damage:</strong> 0 (miss)
+              </div>`;
             }
-            <div style="color:#666;font-size:.9em;">Source: ${sourceName}${damageNote ? ` — ${damageNote}` : ''}</div>
-          </div>
+            
+            // Build damage source hover text
+            const sourceHover = damageNote || `${sourceName}`;
+            const dmgBox = `<span title="${sourceHover}" style="cursor:help;">${rawDamage}</span>`;
+            
+            // Check if damage was pulled
+            let pullNote = "";
+            if (choice.pulledDamage > 0 && choice.pulledDamage < rawDamage) {
+              pullNote = ` <span style="color:#ff6f00;">(→${choice.pulledDamage} pulled)</span>`;
+            }
+            
+            // Build result cap note
+            let capNote = "";
+            if (choice.resultCap && choice.resultCap !== 'none') {
+              capNote = ` <span style="color:#ff6f00;">(capped ${choice.resultCap})</span>`;
+            }
+            
+            // Build armor display if applicable
+            if (armorValue > 0 && targetActor) {
+              // Build armor hover text with rank if available
+              const isEnergy = armorData?.isEnergyDamage;
+              const armorRank = isEnergy ? armorData?.energyRank : armorData?.physicalRank;
+              const armorType = armorData?.isForceField ? "Force Field" : "Body Armor";
+              const armorHover = armorRank ? `${armorRank} ${armorType} (${armorValue})` : `${armorType} (${armorValue})`;
+              const armorBox = `<span title="${armorHover}" style="cursor:help;">${armorValue} armor</span>`;
+              
+              return `<div style="margin:0 10px 6px;padding:6px 8px;background:#fff;border:1px solid #ddd;border-radius:3px;font-size:.9em;">
+                <strong>Damage:</strong> ${dmgBox}${pullNote} − ${armorBox} = <strong>${afterArmor}</strong>${capNote}
+              </div>`;
+            } else {
+              // No armor - simple display
+              return `<div style="margin:0 10px 6px;padding:6px 8px;background:#fff;border:1px solid #ddd;border-radius:3px;font-size:.9em;">
+                <strong>Damage:</strong> ${dmgBox}${pullNote}${capNote}
+              </div>`;
+            }
+          })()}
           
           ${inlineSlamHtml}
           ${inlineStunHtml}
@@ -858,7 +960,7 @@ export class AttackAction extends BaseAction {
       // ============================================================
       // NEW v1.6.0: Auto-trigger status effect checks in full auto mode
       // ============================================================
-      if (!isManualMode && this.opts?.autoApply && canEffectsApply(penetratingDamage) && targetActor) {
+      if (!isManualMode && this.opts?.autoApply && canEffectsApply(penetratingDamage, { borderline: isBorderline }) && targetActor) {
         const { ActionDispatcher } = await import("./action-dispatcher.js");
         
         // Get attacker strength info for Slam checks
@@ -878,7 +980,7 @@ export class AttackAction extends BaseAction {
           defenderUuid: target?.document?.uuid ?? targetActor?.uuid,
           targetUuid: target?.document?.uuid ?? targetActor?.uuid,
           attackForm: attackForm,
-          borderline: false
+          borderline: isBorderline
         };
 
         // === AUTO-TRIGGER SLAM CHECK ===

@@ -390,7 +390,15 @@ export function installActionChatHandlers() {
       ev.preventDefault();
       const btn = ev.currentTarget;
       const weaponMat = btn.dataset.weaponMat || "Excellent";
+      const targetMat = btn.dataset.targetMat || "";
       const actorUuid = btn.dataset.actorUuid;
+      
+      console.log("[FASERIP] Breaking FEAT button clicked:", {
+        weaponMat,
+        targetMat,
+        actorUuid,
+        allDataset: { ...btn.dataset }
+      });
 
       let actor = null;
       try {
@@ -400,7 +408,7 @@ export function installActionChatHandlers() {
         }
       } catch (_) {}
 
-      openBreakingFeatDialog({ weaponMatRank: weaponMat, actor });
+      openBreakingFeatDialog({ weaponMatRank: weaponMat, targetMatRank: targetMat, actor });
     });
 
     // 3) Grabbing Break Check chip

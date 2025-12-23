@@ -1,4 +1,6 @@
-// action-utils.js v1.1.0 - 2025-12-23
+// action-utils.js v1.1.2 - 2025-12-23
+// v1.1.2: Breaking FEAT chip includes data-actor-uuid attribute
+// v1.1.1: Breaking FEAT chip includes weapon-mat and target-mat data attributes
 // v1.1.0: Add buildCollapsibleSlamSection and buildCollapsibleStunSection for inline check results
 // v1.0.2: Mode selector as radio buttons - active shows full color, inactive shows grey
 // v1.0.1: Fix setupModeSelector to use FASERIP colors from data attributes (was overriding with blue)
@@ -847,12 +849,14 @@ export function buildActionsBox({
 
   // Optional utility chips
   if (breakingFeat) {
+    const weaponMat = breakingFeat.weaponMat || "Excellent";
+    const targetMat = breakingFeat.targetMat || "";
     parts.push(
       chip(
         "Breaking FEAT",
         "Attempt a Breaking FEAT against intensity",
         true,
-        `data-action="breaking-feat" ${prefillAttr}`
+        `data-action="breaking-feat" data-weapon-mat="${weaponMat}" data-target-mat="${targetMat}" data-actor-uuid="${actorUuid || ''}" ${prefillAttr}`
       )
     );
   }

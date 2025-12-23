@@ -1,14 +1,31 @@
-// breaking-feat.js
+// breaking-feat.js v1.2.1 - 2025-12-23
+// v1.2.1: Add debug logging
+// v1.2.0: Auto-populate target material from attack context
+// v1.1.0: Chat card styled to match attack action format
 
 import { rollUniversalTable } from "../dice/universal-table.js";
-export function openBreakingFeatDialog({ weaponMatRank = "Excellent", actor = null }) {
+
+// Banner colors for result display
+function bannerColors(color) {
+  switch (String(color).toLowerCase()) {
+    case "white": return { bg: "#e0e0e0", fg: "#333" };
+    case "green": return { bg: "#4caf50", fg: "#fff" };
+    case "yellow": return { bg: "#ffeb3b", fg: "#333" };
+    case "red": return { bg: "#f44336", fg: "#fff" };
+    default: return { bg: "#9e9e9e", fg: "#fff" };
+  }
+}
+
+export function openBreakingFeatDialog({ weaponMatRank = "Excellent", targetMatRank = "", actor = null }) {
+  console.log("[FASERIP] openBreakingFeatDialog called:", { weaponMatRank, targetMatRank, actorName: actor?.name });
+  
   const RANKS = [
     "Shift-0","Feeble","Poor","Typical","Good","Excellent",
     "Remarkable","Incredible","Amazing","Monstrous","Unearthly",
     "Shift-X","Shift-Y","Shift-Z","Class 1000","Class 3000","Class 5000","Beyond"
   ];
 
-  const options = RANKS.map(r => `<option value="${r}">${r}</option>`).join('');
+  const options = RANKS.map(r => `<option value="${r}" ${r === targetMatRank ? 'selected' : ''}>${r}</option>`).join('');
   const wielderStr = actor?.system?.abilities?.strength?.rank ?? 'Typical';
 
   const dlg = new Dialog({
@@ -34,9 +51,9 @@ export function openBreakingFeatDialog({ weaponMatRank = "Excellent", actor = nu
           <strong>Rule:</strong> When weapon hits tougher material (weapon material &lt; target material/BA), 
           roll Wielder's Strength vs Weapon Material to see if weapon breaks.
           <ul style="margin:4px 0 0 20px; padding:0;">
-            <li>Same rank: Green required</li>
-            <li>1 rank lower: Yellow required</li>
-            <li>2+ ranks lower: Red required</li>
+            <li>Strength &gt; Weapon Mat: Green required</li>
+            <li>Strength = Weapon Mat: Yellow required</li>
+            <li>Strength &lt; Weapon Mat: Red required</li>
             <li><strong>Failure = weapon breaks</strong></li>
           </ul>
         </div>
@@ -58,11 +75,12 @@ export function openBreakingFeatDialog({ weaponMatRank = "Excellent", actor = nu
           }
 
           // Roll wielder's Strength vs weapon material (as intensity)
-          const comparatorRank = wielderStr;  // Roll on Strength column
+          const comparatorRank = wielderStr;   // Roll on Strength column
           const intensityRank = weaponMatRank; // Against weapon material
 
           // Compute required color
           const reqColor = requiredColorForIntensity(comparatorRank, intensityRank);
+          const { bg: reqBg, fg: reqFg } = bannerColors(reqColor);
 
           // Roll
           const roll = new Roll("1d100");
@@ -70,40 +88,53 @@ export function openBreakingFeatDialog({ weaponMatRank = "Excellent", actor = nu
 
           // Determine rolled color on Strength column
           const color = game.msh.rollUniversalTable(comparatorRank, roll.total);
-          const passed = compareColors(color, reqColor); // true if FEAT succeeded
-
-          // INVERTED: passed = weapon survives, failed = weapon breaks
+          const colorLower = String(color).toLowerCase();
+          const { bg, fg } = bannerColors(colorLower);
+          
+          const passed = compareColors(color, reqColor);
           const weaponBreaks = !passed;
 
-          // Post result card
-          const content = `
-            <div style="background-color:#f5f5f0; border:1px solid #c0c0c0; border-radius:3px; margin-bottom:5px;">
-              <div style="padding:5px 10px; border-bottom:1px solid #c0c0c0; font-size:1.1em; color:#8b0000;">
-                <strong>${actor?.name ?? 'Character'} — Breaking FEAT</strong>
+          // Build chat card matching attack action format
+          const cardHtml = `
+            <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
+              <!-- Header -->
+              <div style="padding:6px 10px;border-bottom:1px solid #c0c0c0;">
+                <strong style="color:#8b0000;">BREAKING FEAT</strong>
               </div>
-              <div style="padding:5px 10px; font-size:0.9em;">
-                <div>Wielder Strength: ${comparatorRank}</div>
-                <div>Weapon Material: ${weaponMatRank}</div>
-                <div>Target Material: ${targetRank}</div>
-                <div>Required Color: ${reqColor.toUpperCase()}</div>
-                <div>Roll: ${roll.total} → ${color.toUpperCase()}</div>
+              
+              <!-- Actor -->
+              <div style="padding:4px 10px;font-size:.95em;">
+                <strong>${actor?.name ?? 'Character'}</strong>
               </div>
-              <div style="text-align:center; padding:8px; margin:5px; font-weight:bold; font-size:1.1em; border-radius:3px;
-                          background-color:${weaponBreaks ? '#F44336' : '#4CAF50'}; color:white;">
-                ${weaponBreaks ? '💔 WEAPON BREAKS!' : '✓ WEAPON SURVIVES'}
+              
+              <!-- Ability + Roll + Result -->
+              <div style="padding:2px 10px 6px;font-size:.9em;color:#555;">
+                <div>Strength: ${comparatorRank}</div>
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                  <span>Roll: <span title="d100 = ${roll.total}" style="padding:0 3px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${roll.total}</span></span>
+                  <span style="padding:2px 8px;border-radius:3px;font-weight:bold;font-size:.9em;background:${bg};color:${fg};">
+                    ${String(color).toUpperCase()}
+                  </span>
+                </div>
+              </div>
+              
+              <!-- Context -->
+              <div style="margin:0 10px 6px;padding:6px 8px;background:#fff;border:1px solid #ddd;border-radius:3px;font-size:.9em;">
+                <div><strong>Weapon:</strong> ${weaponMatRank} material</div>
+                <div><strong>Target:</strong> ${targetRank}</div>
+                <div><strong>Required:</strong> <span style="padding:1px 6px;border-radius:2px;background:${reqBg};color:${reqFg};font-size:.85em;">${reqColor.toUpperCase()}</span> <span style="color:#666;">(Str ${comparatorRank} vs ${intensityRank} intensity)</span></div>
+              </div>
+              
+              <!-- Result -->
+              <div style="margin:6px 10px 8px;padding:8px;text-align:center;font-weight:bold;border-radius:3px;background:${weaponBreaks ? '#ffebee' : '#e8f5e9'};border:1px solid ${weaponBreaks ? '#ef5350' : '#66bb6a'};color:${weaponBreaks ? '#c62828' : '#2e7d32'};">
+                ${weaponBreaks ? 'WEAPON BREAKS' : 'WEAPON SURVIVES'}
               </div>
             </div>
           `;
 
-          // Echo the d100
-          await roll.toMessage({
-            speaker: ChatMessage.getSpeaker({ actor }),
-            flavor: `${actor?.name ?? 'Character'} — Breaking FEAT`
-          });
-
           await ChatMessage.create({
             speaker: ChatMessage.getSpeaker({ actor }),
-            content
+            content: cardHtml
           });
         }
       },
@@ -126,10 +157,13 @@ export function requiredColorForIntensity(comparatorRank, intensityRank) {
   const ii = RANKS.indexOf(intensityRank);
   if (ci === -1 || ii === -1) return 'green';
 
-  const diff = ii - ci; // positive means intensity higher than comparator
-  if (diff <= 0) return 'green';   // comparator ≥ intensity → Green needed
-  if (diff === 1) return 'yellow'; // one rank lower → Yellow needed
-  return 'red';                    // ≥ two ranks lower → Red needed
+  // Per FASERIP rules:
+  // - Ability > Intensity: Green needed
+  // - Ability = Intensity: Yellow needed
+  // - Ability < Intensity: Red needed
+  if (ci > ii) return 'green';   // comparator > intensity -> Green
+  if (ci === ii) return 'yellow'; // equal -> Yellow
+  return 'red';                   // comparator < intensity -> Red
 }
 
 // Return true if rolled color meets/exceeds the required color
