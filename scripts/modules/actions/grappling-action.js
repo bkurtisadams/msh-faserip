@@ -1,4 +1,5 @@
-// scripts/modules/actions/grappling-action.js v1.3.0 - 2025-12-22
+// scripts/modules/actions/grappling-action.js v1.4.0 - 2025-12-22
+// v1.4.0: Fix DiceSoNice animation in consolidated chat cards mode
 // v1.3.0: Fix escape button to pass holder info for dialog prefill
 // v1.2.0: Use effect-engine wrappers for Partial Hold/Full Hold effects
 // v1.1.0: Add inline rolls for consolidated chat cards
@@ -14,7 +15,8 @@ import {
   effectsFor,
   getTargetingContext,
   applyCapabilitiesToDialog,
-  buildInlineRollDisplay
+  buildInlineRollDisplay,
+  showDiceAnimation
 } from "./action-utils.js";
 import { generateKarmaControlsHTML, setupKarmaControlHandlers, extractKarmaFromDialog } from "../dice/dice-roller.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
@@ -65,13 +67,10 @@ export class GrapplingAction extends AttackAction {
     } catch (_e) { /* setting not registered yet */ }
 
     const roll = await (new Roll("1d100")).evaluate();
-    // Only show separate roll message if NOT using consolidated mode
-    if (!choice.skipDice && !useConsolidated) {
-      await roll.toMessage({
-        speaker: ChatMessage.getSpeaker({ actor }),
-        flavor: `${actor.name} attempts to Grapple ${choice.targetName}`,
-        rollMode: game.settings.get("core", "rollMode")
-      });
+    
+    // Show dice animation
+    if (!choice.skipDice) {
+      await showDiceAnimation(roll, actor, `${actor.name} attempts to Grapple ${choice.targetName}`, useConsolidated);
     }
 
     const { cappedTotal, totalKarmaUsed } =

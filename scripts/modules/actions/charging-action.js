@@ -1,4 +1,5 @@
-// scripts/modules/actions/charging-action.js v1.1.0 - 2025-12-22
+// scripts/modules/actions/charging-action.js v1.2.0 - 2025-12-22
+// v1.2.0: Fix DiceSoNice animation in consolidated chat cards mode
 // v1.1.0: Add inline rolls for consolidated chat cards
 import { BaseAction } from "./base-action.js";
 import { 
@@ -20,7 +21,8 @@ import {
   getTargetingContext,
   debugLog,
   applyCapabilitiesToDialog,
-  buildInlineRollDisplay
+  buildInlineRollDisplay,
+  showDiceAnimation
 } from "./action-utils.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
 
@@ -419,13 +421,9 @@ export class ChargingAction extends BaseAction {
 
   // Roll
   const roll = await new Roll("1d100").evaluate();
-  // Only show separate roll message if NOT using consolidated mode
-  if (!choice.skipDice && !useConsolidated) {
-    await roll.toMessage({
-      speaker: ChatMessage.getSpeaker({ actor }),
-      flavor: `${actor.name} performs ${actionName}`,
-      rollMode: game.settings.get("core", "rollMode")
-    });
+  // Show dice animation
+  if (!choice.skipDice) {
+    await showDiceAnimation(roll, actor, `${actor.name} performs ${actionName}`, useConsolidated);
   }
 
   const { cappedTotal, totalKarmaUsed } =

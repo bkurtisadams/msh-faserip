@@ -1,4 +1,5 @@
-// scripts/modules/actions/escaping-action.js v1.2.0 - 2025-12-22
+// scripts/modules/actions/escaping-action.js v1.3.0 - 2025-12-22
+// v1.3.0: Fix DiceSoNice animation in consolidated chat cards mode
 // v1.2.0: Accept prefill from opts for opponent name/strength
 // v1.1.0: Add inline rolls for consolidated chat cards
 import { AttackAction } from "./attack-action.js";
@@ -12,7 +13,8 @@ import {
   labelFor, 
   effectsFor,
   getTargetingContext,
-  buildInlineRollDisplay
+  buildInlineRollDisplay,
+  showDiceAnimation
 } from "./action-utils.js";
 import { generateKarmaControlsHTML, setupKarmaControlHandlers, extractKarmaFromDialog } from "../dice/dice-roller.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
@@ -43,13 +45,9 @@ export class EscapingAction extends AttackAction {
     } catch (_e) { /* setting not registered yet */ }
 
     const roll = await (new Roll("1d100")).evaluate();
-    // Only show separate roll message if NOT using consolidated mode
-    if (!choice.skipDice && !useConsolidated) {
-      await roll.toMessage({
-        speaker: ChatMessage.getSpeaker({ actor }),
-        flavor: `${actor.name} attempts to Escape a Hold`,
-        rollMode: game.settings.get("core", "rollMode")
-      });
+    // Show dice animation
+    if (!choice.skipDice) {
+      await showDiceAnimation(roll, actor, `${actor.name} attempts to Escape a Hold`, useConsolidated);
     }
 
     const { cappedTotal, totalKarmaUsed } =

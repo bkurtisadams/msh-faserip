@@ -1,4 +1,5 @@
-// scripts/modules/actions/check-action.js v1.1.0 - 2025-12-22
+// scripts/modules/actions/check-action.js v1.2.0 - 2025-12-22
+// v1.2.0: Fix DiceSoNice animation in consolidated chat cards mode
 // v1.1.0: Integrate effect modifiers for ability FEAT shifts
 import { BaseAction } from "./base-action.js";
 import {
@@ -9,7 +10,8 @@ import {
   bannerColors,
   getAbilityInfo,
   universalColor,
-  buildInlineRollDisplay
+  buildInlineRollDisplay,
+  showDiceAnimation
 } from "./action-utils.js";
 import { resolveKillFeat, getKillContextFromAttackForm } from "../../rules/kill-resolver.js";
 import { canEffectsApply } from "../../rules/effects-gate.js";
@@ -102,13 +104,9 @@ export class CheckAction extends BaseAction {
       const roll = new Roll("1d100");
       await roll.evaluate(); // v13+: do not pass {async:true}
       
-      // Only show separate roll message if NOT using consolidated mode
-      if (!this.opts?.skipDice && !useConsolidated) {
-        await roll.toMessage({
-          speaker: ChatMessage.getSpeaker({ actor }),
-          flavor: `${actionName}: ${targetName} (${effectiveEndRank})`,
-          rollMode: game.settings.get("core", "rollMode")
-        });
+      // Show dice animation
+      if (!this.opts?.skipDice) {
+        await showDiceAnimation(roll, actor, `${actionName}: ${targetName} (${effectiveEndRank})`, useConsolidated);
       }
       
       // Build inline roll display for consolidated mode

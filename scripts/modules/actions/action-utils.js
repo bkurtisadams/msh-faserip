@@ -402,6 +402,30 @@ export const isBluntCapable = (it) => {
   return (s.damageType === "BA") || (s.attackType === "blunt") || tagHit;
 };
 
+/**
+ * Show dice animation for a roll
+ * In consolidated mode, uses DiceSoNice directly; otherwise uses toMessage
+ * @param {Roll} roll - The evaluated roll
+ * @param {Actor} actor - The actor making the roll
+ * @param {string} flavor - Flavor text for the roll message
+ * @param {boolean} useConsolidated - Whether to use consolidated mode (no chat message)
+ */
+export async function showDiceAnimation(roll, actor, flavor, useConsolidated = false) {
+  if (useConsolidated) {
+    // In consolidated mode, show dice via DiceSoNice directly (no chat message)
+    if (game.dice3d) {
+      await game.dice3d.showForRoll(roll, game.user, true);
+    }
+  } else {
+    // Normal mode: show roll as separate chat message
+    await roll.toMessage({
+      speaker: ChatMessage.getSpeaker({ actor }),
+      flavor,
+      rollMode: game.settings.get("core", "rollMode")
+    });
+  }
+}
+
 // Roll + Karma (same behavior you had, packaged up)
 // inlineRoll: true = suppress separate roll chat message (roll embedded in action card)
 export async function rollWithKarmaAndHistory(actor, actionLabel, requestedKarma = 0, baseTotal, options = {}) {
@@ -425,15 +449,17 @@ export async function rollWithKarmaAndHistory(actor, actionLabel, requestedKarma
     raw = baseTotal.total;
   } else {
     roll = new Roll("1d100");
-    // Evaluate with or without dice animation based on skipDice
-    if (skipDice) {
-      // Evaluate synchronously without triggering DiceSoNice
-      await roll.evaluate();
-    } else {
-      // Normal evaluation - will trigger dice animation if DiceSoNice is active
-      await roll.evaluate();
-      // Show dice roll in chat ONLY if not using inline roll mode
-      if (!useInlineRoll) {
+    await roll.evaluate();
+    
+    // Show dice animation unless skipped
+    if (!skipDice) {
+      if (useInlineRoll) {
+        // In consolidated mode, show dice via DiceSoNice directly (no chat message)
+        if (game.dice3d) {
+          await game.dice3d.showForRoll(roll, game.user, true);
+        }
+      } else {
+        // Normal mode: show roll as separate chat message
         await roll.toMessage({
           speaker: ChatMessage.getSpeaker({ actor }),
           flavor: actionLabel,

@@ -1,4 +1,5 @@
-// scripts/modules/actions/death-save-action.js
+// scripts/modules/actions/death-save-action.js v1.1.0 - 2025-12-22
+// v1.1.0: Fix DiceSoNice animation in consolidated chat cards mode
 import { BaseAction } from "./base-action.js";
 import {
   RANKS,
@@ -8,6 +9,7 @@ import {
   bannerColors,
   getAbilityInfo,
   buildInlineRollDisplay,
+  showDiceAnimation,
 } from "./action-utils.js";
 import { resolveKillFeat, KILL_CONTEXTS, getKillContextFromAttackForm } from "../../rules/kill-resolver.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
@@ -194,13 +196,9 @@ export class DeathSaveAction extends BaseAction {
     // Roll d100 - no karma allowed on initial death save
     const roll = await (new Roll("1d100")).evaluate();
     
-    // Only show separate roll message if NOT using consolidated mode and not skipping dice
-    if (!choice.skipDice && !useConsolidated) {
-      await roll.toMessage({
-        speaker: ChatMessage.getSpeaker({ actor }),
-        flavor: `${actor.name} Death Save (Endurance FEAT)`,
-        rollMode: game.settings.get("core", "rollMode")
-      });
+    // Show dice animation
+    if (!choice.skipDice) {
+      await showDiceAnimation(roll, actor, `${actor.name} Death Save (Endurance FEAT)`, useConsolidated);
     }
     
     // Build inline roll display for consolidated mode

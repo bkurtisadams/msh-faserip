@@ -1,4 +1,5 @@
-// scripts/modules/actions/grabbing-action.js v1.1.0 - 2025-12-22
+// scripts/modules/actions/grabbing-action.js v1.2.0 - 2025-12-22
+// v1.2.0: Fix DiceSoNice animation in consolidated chat cards mode
 // v1.1.0: Add inline rolls for consolidated chat cards
 import { AttackAction } from "./attack-action.js";
 import {
@@ -12,7 +13,8 @@ import {
   buildActionsBox,
   bannerColors,
   getTargetingContext,
-  buildInlineRollDisplay
+  buildInlineRollDisplay,
+  showDiceAnimation
 } from "./action-utils.js";
 import { generateKarmaControlsHTML, setupKarmaControlHandlers, extractKarmaFromDialog } from "../dice/dice-roller.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
@@ -65,13 +67,9 @@ export class GrabbingAction extends AttackAction {
 
     // Roll + optional karma cap (uses your standard helper)
     const roll = await (new Roll("1d100")).evaluate();
-    // Only show separate roll message if NOT using consolidated mode
-    if (!choice.skipDice && !useConsolidated) {
-        await roll.toMessage({
-        speaker: ChatMessage.getSpeaker({ actor }),
-        flavor: `${actor.name} attempts to Grab ${choice.itemLabel} from ${choice.targetName}`,
-        rollMode: game.settings.get("core", "rollMode")
-        });
+    // Show dice animation
+    if (!choice.skipDice) {
+      await showDiceAnimation(roll, actor, `${actor.name} attempts to Grab ${choice.itemLabel} from ${choice.targetName}`, useConsolidated);
     }
     const { cappedTotal, totalKarmaUsed } =
         await rollWithKarmaAndHistory(actor, actionName, 0, roll, { spendKarma: choice.spendKarma, rank: effectiveRank, inlineRoll: useConsolidated });

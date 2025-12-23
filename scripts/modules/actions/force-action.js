@@ -1,4 +1,5 @@
-// scripts/modules/actions/force-action.js v1.1.0 - 2025-12-22
+// scripts/modules/actions/force-action.js v1.2.0 - 2025-12-22
+// v1.2.0: Fix DiceSoNice animation in consolidated chat cards mode
 // v1.1.0: Add inline rolls for consolidated chat cards
 import { RangedAttackAction } from "./ranged-attack-action.js";
 // NOTE: resolveCombatMode imported dynamically to avoid circular dependency
@@ -32,7 +33,8 @@ import {
   playAttackEffect,
   playImpactEffect,
   getAttackEffectPath,
-  buildInlineRollDisplay
+  buildInlineRollDisplay,
+  showDiceAnimation
 } from "./action-utils.js";
 import { makeDamageBlock, computeAfterArmor, buildDamageFlags } from "./damage-ui.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
@@ -340,13 +342,9 @@ export class ForceAction extends RangedAttackAction {
 
     // === Roll ===
     const roll = await new Roll("1d100").evaluate();
-    // Only show separate roll message if NOT using consolidated mode
-    if (!choice.skipDice && !useConsolidated) {
-      await roll.toMessage({
-        speaker: ChatMessage.getSpeaker({ actor }),
-        flavor: `${actor.name} performs ${actionName}`,
-        rollMode: game.settings.get("core", "rollMode"),
-      });
+    // Show dice animation
+    if (!choice.skipDice) {
+      await showDiceAnimation(roll, actor, `${actor.name} performs ${actionName}`, useConsolidated);
     }
 
     const { cappedTotal, totalKarmaUsed } =
