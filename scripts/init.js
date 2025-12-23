@@ -2083,13 +2083,30 @@ async function createFaseripItemMacro(data, slot) {
     const macroName = `${item.name} (${actor?.name ?? "Actor"})`;
     let macro = game.macros.find(m => m.name === macroName && m.flags?.["faserip.itemMacro"]);
     if (!macro) {
-      macro = await Macro.create({
+      const macroData = {
         name: macroName,
         type: "script",
         img: item.img || "icons/svg/item-bag.svg",
         command,
         flags: { "faserip.itemMacro": true }
-      });
+      };
+      
+      // Use socket for non-GM users to create macro via GM
+      if (!game.user.isGM && game.msh?.runAsGM) {
+        await game.msh.runAsGM({
+          operation: "createMacro",
+          macroData,
+          slot,
+          userId: game.user.id
+        });
+        ui.notifications.info(`Created macro: ${macroName}`);
+        return true;
+      } else {
+        macro = await Macro.create({
+          ...macroData,
+          ownership: { [game.user.id]: CONST.DOCUMENT_OWNERSHIP_LEVELS.OWNER }
+        });
+      }
     }
     await game.user.assignHotbarMacro(macro, slot);
     ui.notifications.info(`Created macro: ${macroName}`);
@@ -2113,13 +2130,29 @@ async function createUniversalTableMacro(data, slot) {
   let macro = game.macros.find(m => m.name === macroName && m.command === command);
   
   if (!macro) {
-    macro = await Macro.create({
+    const macroData = {
       name: macroName,
       type: "script",
       img: data.data?.img || "icons/svg/d20-grey.svg", 
       command: command,
       flags: {"faserip.universalTableMacro": true}
-    });
+    };
+    
+    // Use socket for non-GM users to create macro via GM
+    if (!game.user.isGM && game.msh?.runAsGM) {
+      await game.msh.runAsGM({
+        operation: "createMacro",
+        macroData,
+        slot,
+        userId: game.user.id
+      });
+      return true;
+    } else {
+      macro = await Macro.create({
+        ...macroData,
+        ownership: { [game.user.id]: CONST.DOCUMENT_OWNERSHIP_LEVELS.OWNER }
+      });
+    }
   }
   
   // Assign to hotbar slot
@@ -2203,39 +2236,54 @@ async function createUniversalActionMacro(data, slot) {
   let macro = game.macros.find(m => m.name === macroName && m.command === command);
   
   if (!macro) {
-    const ACTIONS = [
-      { id:"blunt-attack", label:"BA", color:"#FF6B00", textColor:"#FFF" },
-      { id:"edged-attack", label:"EA", color:"#DC143C", textColor:"#FFF" },
-      { id:"shooting", label:"Sh", color:"#8B0000", textColor:"#FFF" },
-      { id:"throwing-edged", label:"TE", color:"#DC143C", textColor:"#FFF" },
-      { id:"throwing-blunt", label:"TB", color:"#FF8C00", textColor:"#000" },
-      { id:"energy", label:"En", color:"#8B0000", textColor:"#FFF" },
-      { id:"force", label:"Fo", color:"#FF6B00", textColor:"#FFF" },
-      { id:"grappling", label:"Gp", color:"#1E90FF", textColor:"#FFF" },
-      { id:"grabbing", label:"Gb", color:"#4169E1", textColor:"#FFF" },
-      { id:"escaping", label:"Es", color:"#4682B4", textColor:"#FFF" },
-      { id:"charging", label:"Ch", color:"#FF8C00", textColor:"#000" },
-      { id:"dodging", label:"Do", color:"#32CD32", textColor:"#000" },
-      { id:"evading", label:"Ev", color:"#228B22", textColor:"#FFF" },
-      { id:"blocking", label:"Bl", color:"#228B22", textColor:"#FFF" },
-      { id:"catching", label:"Ca", color:"#32CD32", textColor:"#000" },
-      { id:"stun", label:"St", color:"#9932CC", textColor:"#FFF" },
-      { id:"slam", label:"Sl", color:"#9932CC", textColor:"#FFF" },
-      { id:"kill", label:"Kl", color:"#8B008B", textColor:"#FFF" }
-    ];
+    // Map action codes to icon filenames in assets/icons/actions/
+    const ACTION_ICONS = {
+      "blunt-attack": "blunt",
+      "edged-attack": "edged",
+      "shooting": "shooting",
+      "throwing-edged": "thrown",
+      "throwing-blunt": "thrown_blunt",
+      "energy": "energy",
+      "force": "force",
+      "grappling": "grapple",
+      "grabbing": "grab",
+      "escaping": "escape",
+      "charging": "charge",
+      "dodging": "dodge",
+      "evading": "evade",
+      "blocking": "block",
+      "catching": "catch",
+      "stun": "stun",
+      "slam": "slam",
+      "kill": "kill"
+    };
     
-    const actionDef = ACTIONS.find(a => a.id === actionCode);
-    const img = actionDef 
-      ? generateActionIcon(actionCode, actionDef.label, actionDef.color, actionDef.textColor)
-      : "icons/svg/combat.svg";
+    const iconName = ACTION_ICONS[actionCode] || "dice-target";
+    const img = `systems/msh-faserip/assets/icons/actions/${iconName}.png`;
     
-    macro = await Macro.create({
+    const macroData = {
       name: macroName,
       type: "script",
       command: command,
       img: img,
       flags: {"faserip.universalActionMacro": true}
-    });
+    };
+    
+    // Use socket for non-GM users to create macro via GM
+    if (!game.user.isGM && game.msh?.runAsGM) {
+      await game.msh.runAsGM({
+        operation: "createMacro",
+        macroData,
+        slot,
+        userId: game.user.id
+      });
+      return true;
+    } else {
+      macro = await Macro.create({
+        ...macroData,
+        ownership: { [game.user.id]: CONST.DOCUMENT_OWNERSHIP_LEVELS.OWNER }
+      });
+    }
   }
   
   game.user.assignHotbarMacro(macro, slot);

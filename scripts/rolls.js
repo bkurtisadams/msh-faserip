@@ -3200,13 +3200,39 @@ export async function openUniversalTableDialog(actor) {
           const iconName = iconMap[action] || "dice-target";
           const img = `systems/msh-faserip/assets/icons/actions/${iconName}.png`;
 
-          macro = await Macro.create({
+          const macroData = {
             name: `FEAT: ${action} (${actor.name})`,
             type: "script",
             command,
             img,
             flags: {"faserip.universalActionMacro": true}
-          });
+          };
+
+          try {
+            macro = await Macro.create({
+              ...macroData,
+              ownership: { [game.user.id]: CONST.DOCUMENT_OWNERSHIP_LEVELS.OWNER }
+            });
+          } catch (err) {
+            // Player lacks create permission - use GM socket
+            if (game.msh?.runAsGM) {
+              await game.msh.runAsGM({
+                operation: "createMacro",
+                macroData,
+                slot: null,
+                userId: game.user.id
+              });
+              // Refetch the newly created macro
+              macro = game.macros.find(m => m.name === macroData.name && m.command === command);
+              if (!macro) {
+                ui.notifications.warn("Macro created - please drag again");
+                return;
+              }
+            } else {
+              ui.notifications.error("Cannot create macro - socketlib not available");
+              return;
+            }
+          }
         }
 
         ev.dataTransfer.setData("text/plain", JSON.stringify({

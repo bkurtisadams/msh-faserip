@@ -1,4 +1,5 @@
-// gm-utils.js
+// gm-utils.js v1.1.0 - 2025-12-23
+// v1.1.0: Add createMacroForPlayer socket handler for player macro creation
 // v13-safe socketlib wiring for "msh-faserip"
 import { applyDamageToTargets, debugLog } from "./modules/actions/action-utils.js";
 
@@ -152,6 +153,7 @@ export function registerSocket() {
     socket.register("createEmbeddedDocsOnActor", createEmbeddedDocsOnActor);
     socket.register("manageRecoveryEffect", manageRecoveryEffect);
     socket.register("applyRulesDamage", applyRulesDamage);
+    socket.register("createMacroForPlayer", createMacroForPlayer);
 
 
     // Expose on game.msh for other modules/files
@@ -228,6 +230,13 @@ async function runGMCommand(data = {}) {
       return await createActorEffect({
         targetActorUuid: data.targetActorUuid,
         effectData: data.effectData
+      });
+
+    case "createMacro":
+      return await createMacroForPlayer({
+        macroData: data.macroData,
+        slot: data.slot,
+        userId: data.userId
       });
 
     default:
@@ -328,4 +337,44 @@ async function manageRecoveryEffect({ actorUuid, action, effectData = null, effe
   else {
     throw new Error(`manageRecoveryEffect: unknown action: ${action}`);
   }
+}
+
+/**
+ * Create a macro on behalf of a player (GM executes this via socket)
+ */
+async function createMacroForPlayer({ macroData, slot, userId }) {
+  if (!macroData) throw new Error("createMacroForPlayer: macroData required");
+  
+  // Check if macro already exists
+  let macro = game.macros.find(m => m.name === macroData.name && m.command === macroData.command);
+  
+  if (!macro) {
+    // Create with owner permission for the requesting user
+    const ownership = { default: 0 };
+    if (userId) {
+      ownership[userId] = CONST.DOCUMENT_OWNERSHIP_LEVELS.OWNER;
+    }
+    
+    macro = await Macro.create({
+      ...macroData,
+      ownership
+    });
+  } else {
+    // Ensure the user has ownership of existing macro
+    if (userId && !macro.testUserPermission(game.users.get(userId), "OWNER")) {
+      const ownership = foundry.utils.deepClone(macro.ownership || {});
+      ownership[userId] = CONST.DOCUMENT_OWNERSHIP_LEVELS.OWNER;
+      await macro.update({ ownership });
+    }
+  }
+  
+  // Assign to hotbar for the requesting user
+  if (slot && userId) {
+    const user = game.users.get(userId);
+    if (user) {
+      await user.assignHotbarMacro(macro, slot);
+    }
+  }
+  
+  return { macroId: macro.id, macroUuid: macro.uuid };
 }
