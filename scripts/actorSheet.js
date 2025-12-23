@@ -1,4 +1,5 @@
-// actorSheet.js
+// actorSheet.js v1.0.1 - 2025-12-22
+// v1.0.1: Remove verbose debug logging on sheet render
 import { prepareActiveEffectCategories, onManageActiveEffect } from "../helpers/effects.mjs";
 import { getItemMaterialRank, getBluntNextRankMinRule } from "./gm-utils.js";
 import { ActionDispatcher } from "./modules/actions/action-dispatcher.js";
@@ -178,7 +179,6 @@ export class FaseripActorSheet extends ActorSheet {
     context.effects = prepareActiveEffectCategories(
       this.actor.allApplicableEffects ? this.actor.allApplicableEffects() : this.actor.effects
     );
-    console.log("Prepared effects:", context.effects);
 
     context.editable = this.isEditable;
     context.isBiographyOpen = this._isBiographyOpen;
@@ -502,11 +502,6 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
       }
     });
 
-
-    // Debug resistances data structure
-    console.log("Actor resistances on sheet load:", this.actor.system.resistances);
-    console.log("Resistances type:", typeof this.actor.system.resistances);
-    console.log("Is array:", Array.isArray(this.actor.system.resistances));
 
     // Collapsible effect sections
     html.find('.effect-header').click((event) => {

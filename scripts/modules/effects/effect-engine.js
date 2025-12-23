@@ -1,4 +1,5 @@
-// scripts/modules/effects/effect-engine.js v1.2.0 - 2025-12-22
+// scripts/modules/effects/effect-engine.js v1.2.1 - 2025-12-22
+// v1.2.1: Reduce console logging verbosity
 // v1.2.0: Improved debug logging for effect creation and duration tracking
 // v1.1.0: Add proper Foundry changes arrays to effect wrappers
 // Centralized Active Effect helpers for FASERIP on Foundry v13
@@ -171,11 +172,6 @@ export async function applyEffect(target, effectData = {}, opts = {}) {
     ...rest  // Any other properties
   };
 
-  // Debug log to verify changes are present
-  if (changes?.length > 0) {
-    console.log(`[FASERIP] applyEffect: ${name} with ${changes.length} changes`, changes);
-  }
-
   // Permission check: can the current user create effects on this actor?
   // For unlinked tokens (ActorDelta), we must check the parent token's ownership
   let canCreate = game.user.isGM;
@@ -244,20 +240,9 @@ export async function applyEffect(target, effectData = {}, opts = {}) {
 
   // User has permission - create directly
   try {
-    console.log(`[FASERIP] Creating effect "${payload.name}" on ${actor.name}`, {
-      changes: payload.changes,
-      duration: payload.duration,
-      statuses: payload.statuses
-    });
     const createdArr = await actor.createEmbeddedDocuments("ActiveEffect", [payload]);
     const created = Array.isArray(createdArr) ? createdArr[0] : createdArr;
     if (created?.id) {
-      // Log what duration the effect actually has after creation (may differ due to preCreateActiveEffect hook)
-      console.log(`[FASERIP] Effect created: "${created.name}" (id: ${created.id})`, {
-        requestedDuration: payload.duration,
-        actualDuration: created.duration,
-        changes: created.changes?.length || 0
-      });
       await renameEffectWithRemaining(created);
     }
     return created;

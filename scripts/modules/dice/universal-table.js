@@ -1,4 +1,5 @@
-// File: scripts/modules/dice/universal-table.js
+// File: scripts/modules/dice/universal-table.js v1.1.0 - 2025-12-22
+// v1.1.0: Reduce console logging verbosity
 // Universal Table data structures and rank lookup utilities for FASERIP system
 
 // Rank names array for lookups
@@ -315,8 +316,6 @@ export function rankNameAt(index) {
  * @returns {String} - The color result ("white", "green", "yellow", or "red")
  */
 export function rollUniversalTable(rank, roll) {
-  console.log("🎲 rollUniversalTable called with rank:", rank, "roll:", roll);
-  
   // Thresholds: [lastWhite, lastGreen, lastYellow]
   // roll <= lastWhite = white, roll <= lastGreen = green, roll <= lastYellow = yellow, else red
   const tableRanks = {
@@ -356,33 +355,17 @@ export function rollUniversalTable(rank, roll) {
   if (rank === "Class3000") normalizedRank = "Class 3000";
   if (rank === "Class5000") normalizedRank = "Class 5000";
   
-  console.log("🎲 Normalized rank:", normalizedRank);
-  
   const thresholds = tableRanks[normalizedRank];
   if (!thresholds) {
-    console.warn(`Rank ${rank} not found in universal table. Available ranks:`, Object.keys(tableRanks));
+    console.warn(`[FASERIP WARN] Rank ${rank} not found in universal table`);
     ui.notifications.error(`Rank ${rank} not found.`);
     return "white";
   }
 
-  console.log("🎲 Thresholds for", normalizedRank, ":", thresholds);
-  
   const [green, yellow, red] = thresholds;
-  let result;
   
-  if (roll <= green) {
-      result = "white";
-      console.log("🎲 Result: WHITE (roll", roll, "<=", green, ")");
-  } else if (roll <= yellow) {
-      result = "green";
-      console.log("🎲 Result: GREEN (roll", roll, "<=", yellow, ")");
-  } else if (roll <= red) {
-      result = "yellow";
-      console.log("🎲 Result: YELLOW (roll", roll, "<=", red, ")");
-  } else {
-      result = "red";
-      console.log("🎲 Result: RED (roll", roll, ">", red, ")");
-  }
-  
-  return result;
+  if (roll <= green) return "white";
+  if (roll <= yellow) return "green";
+  if (roll <= red) return "yellow";
+  return "red";
 }
