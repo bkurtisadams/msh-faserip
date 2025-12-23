@@ -1,5 +1,6 @@
 //--- START OF FILE blunt-attack-action.js ---
-// blunt-attack-action.js v1.4.4 - 2025-12-23
+// blunt-attack-action.js v1.4.5 - 2025-12-23
+// v1.4.5: Fix CS field jitter (box-sizing, visibility for reset btn, transparent border when CS=0)
 // v1.4.4: Pass attackNumber/totalAttacks to chat card for multi-attack display
 // v1.4.3: Yellow box on karma number, show multiple target names in dialog
 // v1.4.2: Compact karma section to match CS field size
@@ -202,12 +203,12 @@ Common improvised weapons:
 
       <!-- Modifiers Row -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;font-size:.9em;">
-        <div class="cs-field" style="display:flex;align-items:center;gap:4px;padding:4px 6px;border-radius:3px;${savedColumnShift < 0 ? 'background:#ffebee;border:1px solid #ef5350;' : savedColumnShift > 0 ? 'background:#e8f5e9;border:1px solid #66bb6a;' : ''}">
+        <div class="cs-field" style="display:flex;align-items:center;gap:4px;padding:4px 6px;border-radius:3px;${savedColumnShift < 0 ? 'background:#ffebee;border:1px solid #ef5350;' : savedColumnShift > 0 ? 'background:#e8f5e9;border:1px solid #66bb6a;' : 'border:1px solid transparent;'}">
           <label style="font-weight:600;">CS:</label>
-          <input type="number" name="shift" value="${savedColumnShift}" style="width:45px;padding:3px;text-align:center;">
+          <input type="number" name="shift" value="${savedColumnShift}" style="width:35px;padding:3px;text-align:center;box-sizing:border-box;">
           <span style="color:#666;">→</span>
           <strong id="shifted-rank-display" style="${savedColumnShift < 0 ? 'color:#c62828;' : savedColumnShift > 0 ? 'color:#2e7d32;' : ''}">${shiftRank(ability.rank, savedColumnShift)}</strong>
-          <button type="button" class="cs-reset" style="display:${savedColumnShift !== 0 ? 'inline-block' : 'none'};padding:1px 5px;font-size:.85em;cursor:pointer;border:1px solid #999;border-radius:2px;background:#eee;" title="Reset to 0">×</button>
+          <button type="button" class="cs-reset" style="visibility:${savedColumnShift !== 0 ? 'visible' : 'hidden'};padding:1px 5px;font-size:.85em;cursor:pointer;border:1px solid #999;border-radius:2px;background:#eee;" title="Reset to 0">×</button>
         </div>
         <div class="karma-field" style="display:flex;align-items:center;gap:4px;padding:4px 6px;border-radius:3px;${hasKarma ? 'background:#f5f0e0;border:1px solid #c9b98a;' : ''}">
           ${hasKarma ? `
@@ -449,15 +450,15 @@ Common improvised weapons:
             if (cs < 0) {
               $csField.css({ 'background': '#ffebee', 'border': '1px solid #ef5350' });
               $shiftedRank.css('color', '#c62828');
-              $resetBtn.show();
+              $resetBtn.css('visibility', 'visible');
             } else if (cs > 0) {
               $csField.css({ 'background': '#e8f5e9', 'border': '1px solid #66bb6a' });
               $shiftedRank.css('color', '#2e7d32');
-              $resetBtn.show();
+              $resetBtn.css('visibility', 'visible');
             } else {
-              $csField.css({ 'background': '', 'border': '' });
+              $csField.css({ 'background': '', 'border': '1px solid transparent' });
               $shiftedRank.css('color', '');
-              $resetBtn.hide();
+              $resetBtn.css('visibility', 'hidden');
             }
             
             // Update source section highlighting
