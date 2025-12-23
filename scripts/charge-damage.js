@@ -1,3 +1,6 @@
+// charge-damage.js v1.0.1 - 2025-12-23
+// v1.0.1: Disable legacy .calculate-slam-collision handler (now handled by chat-hooks.js + collision-damage.js)
+
 import { 
   resolveSlamFeat, 
   resolveStunFeat, 
@@ -543,8 +546,11 @@ export function initializeSlamHandlers() {
             $(this).prop('disabled', true).text('FEAT Rolled');
         });
 
-        // EXISTING collision damage handler (unchanged)
+        // LEGACY collision damage handler - DISABLED (now handled by chat-hooks.js + collision-damage.js)
         html.find('.calculate-slam-collision').on('click', async function() {
+            // Skip - this is now handled by the collision-damage.js module via chat-hooks.js
+            return;
+            
             console.log("🎯 Collision button clicked");
             const targetUuid = this.dataset.target;
             const slamDistance = parseInt(this.dataset.distance);

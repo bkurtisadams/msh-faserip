@@ -1,3 +1,7 @@
+// chat-hooks.js v1.0.4 - 2025-12-23
+// v1.0.4: Add apply-collision-damage handler that applies directly to UUID
+// v1.0.3: Add stopImmediatePropagation to collision handlers to prevent duplicate dialogs
+// v1.0.2: Add .calculate-slam-collision handler for slam result collision buttons (both standalone and collapsible)
 // scripts/modules/actions/chat-hooks.js
 import { ActionDispatcher } from "./action-dispatcher.js";
 import { resolveCombatMode } from "./action-dispatcher.js";
@@ -12,6 +16,7 @@ import {
   bannerColors, 
   effectsFor,
   applyDamageToTargets,
+  applyDamageToActorUuid,
   debugLog
 } from "./action-utils.js";
 import { startAura, stopAura, isAuraMaintained } from "./nullify.js";
@@ -431,6 +436,7 @@ export function installActionChatHandlers() {
     // 4) Collision Damage Calculator chip
     html.on("click", '[data-action="calculate-collision"]', async (ev) => {
       ev.preventDefault();
+      ev.stopImmediatePropagation();
       const btn = ev.currentTarget;
       
       const targetName = btn.dataset.targetName || "Target";
@@ -444,6 +450,62 @@ export function installActionChatHandlers() {
         targetEndurance, 
         slamDistance 
       });
+    });
+
+    // 4b) Slam Collision button (from slam check results)
+    html.on("click", '.calculate-slam-collision', async (ev) => {
+      ev.preventDefault();
+      ev.stopImmediatePropagation();
+      const btn = ev.currentTarget;
+      
+      const targetUuid = btn.dataset.target || "";
+      const slamDistance = Number(btn.dataset.distance || 1);
+      
+      // Try to get target name from UUID
+      let targetName = "Target";
+      if (targetUuid) {
+        try {
+          const resolved = await fromUuid(targetUuid);
+          targetName = resolved?.name || resolved?.actor?.name || "Target";
+        } catch (_) {}
+      }
+
+      openCollisionDamageDialog({ 
+        targetName, 
+        targetUuid,
+        targetEndurance: "Good",  // Will be auto-populated from UUID
+        slamDistance 
+      });
+    });
+
+    // 5b) Apply Collision Damage button (applies directly to UUID, not targeted tokens)
+    html.on("click", '[data-action="apply-collision-damage"]', async (ev) => {
+      ev.preventDefault();
+      ev.stopImmediatePropagation();
+      const btn = ev.currentTarget;
+      btn.disabled = true;
+
+      try {
+        const damage = Number(btn.dataset.damage || 0);
+        const targetUuid = btn.dataset.targetUuid;
+
+        if (!targetUuid || !damage) {
+          ui.notifications.warn("Missing target or damage for collision");
+          btn.disabled = false;
+          return;
+        }
+
+        // Note: applyDamageToActorUuid(damage, actorUuid, options)
+        await applyDamageToActorUuid(damage, targetUuid);
+        
+        btn.textContent = "Applied";
+        btn.style.background = "#c8e6c9";
+        btn.style.cursor = "default";
+      } catch (err) {
+        console.error("[FASERIP ERROR] Apply Collision Damage failed:", err);
+        ui.notifications.error("Failed to apply collision damage");
+        btn.disabled = false;
+      }
     });
 
     // 5) Apply Damage button

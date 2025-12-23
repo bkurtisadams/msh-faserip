@@ -1,4 +1,5 @@
-// action-utils.js v1.1.2 - 2025-12-23
+// action-utils.js v1.1.3 - 2025-12-23
+// v1.1.3: Add collision damage button to collapsible slam section (Grand Slam, 1 Area)
 // v1.1.2: Breaking FEAT chip includes data-actor-uuid attribute
 // v1.1.1: Breaking FEAT chip includes weapon-mat and target-mat data attributes
 // v1.1.0: Add buildCollapsibleSlamSection and buildCollapsibleStunSection for inline check results
@@ -2274,7 +2275,7 @@ export function extractRememberSettings(html) {
 export function buildCollapsibleSlamSection(result) {
   if (!result) return "";
   
-  const { colorLower, slamEffect, knockbackDistance, attackerStrength, attackerStrengthRank, targetName, roll, effectiveEndRank } = result;
+  const { colorLower, slamEffect, knockbackDistance, attackerStrength, attackerStrengthRank, targetName, defenderUuid, roll, effectiveEndRank } = result;
   
   // Color-coded summary based on slam effect
   const effectColors = {
@@ -2289,6 +2290,19 @@ export function buildCollapsibleSlamSection(result) {
   const summaryText = slamEffect === "Grand Slam" 
     ? `Slam Check - Grand Slam (${knockbackDistance} areas)` 
     : `Slam Check - ${slamEffect}`;
+  
+  // Collision button for knockback effects
+  const collisionButton = (slamEffect === "Grand Slam" || slamEffect === "1 Area") ? `
+    <div style="padding:6px 8px;text-align:center;border-top:1px solid rgba(0,0,0,.1);">
+      <button class="calculate-slam-collision"
+              data-target="${defenderUuid || ''}"
+              data-distance="${slamEffect === "Grand Slam" ? knockbackDistance : 1}"
+              data-speed="${slamEffect === "Grand Slam" ? knockbackDistance : 1}"
+              data-attacker-strength="${attackerStrength || 10}"
+              style="background:#DB747E;color:white;border:none;border-radius:3px;padding:5px 10px;cursor:pointer;font-size:.85em;">
+        Calculate Collision Damage
+      </button>
+    </div>` : "";
   
   // Build detailed content
   let detailContent = "";
@@ -2355,6 +2369,7 @@ export function buildCollapsibleSlamSection(result) {
       <div style="background:#fff;">
         ${detailContent}
         ${rollInfo}
+        ${collisionButton}
       </div>
     </details>`;
 }

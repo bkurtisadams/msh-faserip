@@ -1,4 +1,6 @@
-// scripts/modules/actions/collision-damage.js
+// collision-damage.js v1.1.1 - 2025-12-23
+// v1.1.1: Fix apply damage - use apply-collision-damage action with target-uuid
+// v1.1.0: Compact dialog layout, default to Good (brick) material
 import { applyDamageToActorUuid, debugLog } from "./action-utils.js";
 
 export function openCollisionDamageDialog({ 
@@ -89,83 +91,48 @@ export function openCollisionDamageDialog({
     return `<option value="${r}" ${r===autoPopulatedArmor?'selected':''}>${r} (${val})</option>`;
   }).join('');
   
-  // Material strength options with examples (for obstacles)
+  // Material strength options with examples (for obstacles) - default to Good (brick)
   const materialOptions = RANKS.map(r => {
     const val = game.msh.getRankValue(r);
     const example = MATERIAL_EXAMPLES[r] ? ` — ${MATERIAL_EXAMPLES[r]}` : '';
-    return `<option value="${r}">${r} (${val})${example}</option>`;
+    return `<option value="${r}" ${r === "Good" ? 'selected' : ''}>${r} (${val})${example}</option>`;
   }).join('');
 
   const dlg = new Dialog({
-    title: `Collision Damage Calculator — ${targetName}`,
+    title: `Collision Damage — ${targetName}`,
     content: `
-      <div style="line-height:1.6;">
-        <div style="margin-bottom:12px;padding:8px;background:#e3f2fd;border:1px solid #2196F3;border-radius:3px;">
-          <strong>Scenario:</strong> ${targetName} was slammed ${slamDistance} area${slamDistance > 1 ? 's' : ''} and hits an obstacle.
-          Damage is calculated as a Charging attack.
+      <div style="line-height:1.5;">
+        <p><strong>${targetName}</strong> slammed ${slamDistance} area${slamDistance > 1 ? 's' : ''} and hits an obstacle.</p>
+
+        <div style="margin-bottom:6px;">
+          <label style="display:inline-block;width:120px;">Endurance:</label>
+          <select name="target-endurance" style="width:180px;">${enduranceOptions}</select>
+        </div>
+        
+        <div style="margin-bottom:10px;">
+          <label style="display:inline-block;width:120px;">Body Armor:</label>
+          <select name="target-armor" style="width:180px;">${armorOptions}</select>
         </div>
 
-        ${autoPopulated ? `
-          <div style="margin-bottom:12px;padding:6px;background:#e8f5e9;border:1px solid #4CAF50;border-radius:3px;font-size:0.9em;color:#2e7d32;">
-            ✓ Auto-populated from ${targetName}
+        <div style="margin-bottom:6px;">
+          <label style="display:inline-block;width:120px;"><strong>Obstacle:</strong></label>
+          <label><input type="radio" name="obstacle-type" value="object" checked> Object</label>
+          <label style="margin-left:8px;"><input type="radio" name="obstacle-type" value="character"> Character</label>
+        </div>
+        
+        <div id="obstacle-object-panel" style="margin-left:120px;margin-bottom:8px;">
+          <select name="obstacle-material" style="width:280px;">${materialOptions}</select>
+        </div>
+        
+        <div id="obstacle-character-panel" style="margin-left:120px;margin-bottom:8px;display:none;">
+          <div style="margin-bottom:4px;">
+            <label>BA Rank:</label>
+            <select name="obstacle-armor-rank" style="width:140px;">${armorOptions}</select>
           </div>
-        ` : ''}
-
-        <div style="margin-bottom:8px;">
-          <label style="display:inline-block;width:160px;font-weight:bold;">Slammed Character:</label>
-        </div>
-        
-        <div style="margin-bottom:6px;margin-left:20px;">
-          <label style="display:inline-block;width:140px;">Name:</label>
-          <input type="text" name="target-name" value="${targetName}" readonly style="width:300px;background:#f5f5f5;">
-        </div>
-        
-        <div style="margin-bottom:6px;margin-left:20px;">
-          <label style="display:inline-block;width:140px;">Endurance:</label>
-          <select name="target-endurance" style="width:200px;">${enduranceOptions}</select>
-        </div>
-        
-        <div style="margin-bottom:6px;margin-left:20px;">
-          <label style="display:inline-block;width:140px;">Body Armor:</label>
-          <select name="target-armor" style="width:200px;">${armorOptions}</select>
-        </div>
-
-        <div style="margin:16px 0 8px 0;">
-          <label style="display:inline-block;width:160px;font-weight:bold;">Obstacle Type:</label>
-          <label><input type="radio" name="obstacle-type" value="object" checked> Inanimate Object</label>
-          <label style="margin-left:10px;"><input type="radio" name="obstacle-type" value="character"> Character</label>
-        </div>
-        
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-left:20px;">
-          <div id="obstacle-object-panel" style="padding:8px;border:1px solid #ddd;border-radius:3px;background:#fafafa;">
-            <div style="margin-bottom:6px;font-weight:bold;color:#555;">Inanimate Object</div>
-            <label style="display:block;margin-bottom:4px;">Material Strength:</label>
-            <select name="obstacle-material" style="width:100%;">${materialOptions}</select>
+          <div>
+            <label>BA Value:</label>
+            <input type="number" name="obstacle-armor-value" value="10" min="0" style="width:60px;">
           </div>
-          
-          <div id="obstacle-character-panel" style="padding:8px;border:1px solid #ddd;border-radius:3px;background:#fafafa;display:none;">
-            <div style="margin-bottom:6px;font-weight:bold;color:#555;">Character</div>
-            <div style="margin-bottom:6px;">
-              <label style="display:block;margin-bottom:4px;">Body Armor Rank:</label>
-              <select name="obstacle-armor-rank" style="width:100%;">${armorOptions}</select>
-            </div>
-            <div style="margin-bottom:6px;">
-              <label style="display:block;margin-bottom:4px;">Body Armor Value:</label>
-              <input type="number" name="obstacle-armor-value" value="10" min="0" style="width:100px;">
-              <div style="font-size:0.85em;color:#666;margin-top:2px;">Edit if non-standard</div>
-            </div>
-          </div>
-        </div>
-
-        <div style="margin-top:16px;padding:8px;background:#fff3e0;border:1px solid #ff9800;border-radius:3px;font-size:0.9em;">
-          <strong>Charging Damage Rules:</strong>
-          <ul style="margin:6px 0 0 0;padding-left:20px;">
-            <li>Base damage = max(Endurance or Body Armor, whichever is higher)</li>
-            <li>Speed damage = 2 × areas traveled (${2 * slamDistance} in this case)</li>
-            <li>Total damage = Base + Speed</li>
-            <li><strong>The absorbed portion rebounds to the attacker; the attacker's Body Armor may soak</strong></li>
-            <li><strong>Otherwise:</strong> The defender/object takes the remainder after its BA/Material</li>
-          </ul>
         </div>
       </div>
     `,
@@ -238,7 +205,7 @@ export function openCollisionDamageDialog({
         }
       });
     }
-  });
+  }, { width: 420 });
   
   dlg.render(true);
 }
@@ -345,12 +312,12 @@ async function postCollisionResult(result) {
   const chips = [];
 
   // Apply damage to slammed character (the primary damage)
-  if (result.damageToTarget > 0) {
+  if (result.damageToTarget > 0 && result.selfActorUuid) {
     chips.push(
       `<a class="faserip-chip"
-          data-action="apply-damage"
+          data-action="apply-collision-damage"
           data-damage="${result.damageToTarget}"
-          data-attacker-uuid="${result.selfActorUuid || ""}"
+          data-target-uuid="${result.selfActorUuid}"
           title="Apply collision damage to ${result.targetName}"
           style="display:inline-block;font-size:12px;line-height:1.1;padding:2px 6px;border:1px solid #bbb;border-radius:3px;text-decoration:none;white-space:nowrap;background:#fff;color:#333;cursor:pointer;">
           Apply Damage (${result.targetName})
@@ -362,9 +329,9 @@ async function postCollisionResult(result) {
   if (result.defenderActorUuid && result.obstacleType === "character" && result.damageToObstacle > 0) {
     chips.push(
       `<a class="faserip-chip"
-          data-action="apply-damage"
+          data-action="apply-collision-damage"
           data-damage="${result.damageToObstacle}"
-          data-attacker-uuid="${result.defenderActorUuid}"
+          data-target-uuid="${result.defenderActorUuid}"
           title="Apply collision damage to defender"
           style="display:inline-block;font-size:12px;line-height:1.1;padding:2px 6px;border:1px solid #bbb;border-radius:3px;text-decoration:none;white-space:nowrap;background:#fff;color:#333;cursor:pointer;">
           Apply Damage (Defender)
@@ -433,4 +400,3 @@ if (!globalThis.mshCollisionHandlersBound) {
   });
   globalThis.mshCollisionHandlersBound = true;
 }
-
