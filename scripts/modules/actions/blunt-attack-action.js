@@ -1,5 +1,8 @@
 //--- START OF FILE blunt-attack-action.js ---
-// blunt-attack-action.js v1.4.7 - 2025-12-23
+// blunt-attack-action.js v1.4.10 - 2025-12-23
+// v1.4.10: Compute initial pull punch max from saved source (weapon/object)
+// v1.4.9: Auto-populate pulled damage to current max when enabling checkbox
+// v1.4.8: Fix pull punch - reset resultCap and damage when checkbox unchecked
 // v1.4.7: Track shiftBreakdown for detailed CS hover (manual, multi-attack, adjacent)
 // v1.4.6: Compact pull punch row, add objectValue handler for damage update
 // v1.4.5: Fix CS field jitter (box-sizing, visibility for reset btn, transparent border when CS=0)
@@ -98,6 +101,20 @@ export class BluntAttackAction extends AttackAction {
     
     // Skip Dice is a client setting, mostly UI based, stored in LS
     const savedSkipDice = localStorage.getItem(lsSkipKey) === "1";
+
+    // Compute initial max damage based on saved source (for pull punch display)
+    let initialMaxDamage = strength.value;
+    if (savedSource === "weapon" && savedItemId) {
+      const savedItem = attackItems.find(i => i.id === savedItemId);
+      if (savedItem) {
+        const mat = getItemMaterialRank(savedItem);
+        const res = computeBluntDamage(strength.rank, strength.value, mat, RANKS);
+        initialMaxDamage = res.damage;
+      }
+    } else if (savedSource === "object") {
+      const res = computeBluntDamage(strength.rank, strength.value, savedObjectRank, RANKS);
+      initialMaxDamage = res.damage;
+    }
 
     const itemOptions = attackItems.map(i =>
       `<option value="${i.id}" ${i.id===savedItemId?'selected':''}>${i.name}</option>`
@@ -243,8 +260,8 @@ Common improvised weapons:
             <strong style="color:#e65100;">Pull Punch</strong>
           </label>
           <div class="pull-damage-controls" style="display:${savedPullEnabled ? 'flex' : 'none'};align-items:center;gap:3px;">
-            <input type="number" name="pulledDamage" title="Damage cap" value="${savedPullEnabled && savedPulledDamage > 0 ? savedPulledDamage : strength.value}" min="0" max="${strength.value}" style="width:40px;padding:2px;text-align:center;">
-            <span style="color:#666;font-size:.85em;">/<span class="max-damage-display">${strength.value}</span></span>
+            <input type="number" name="pulledDamage" title="Damage cap" value="${savedPullEnabled && savedPulledDamage > 0 ? savedPulledDamage : initialMaxDamage}" min="0" max="${initialMaxDamage}" style="width:40px;padding:2px;text-align:center;">
+            <span style="color:#666;font-size:.85em;">/<span class="max-damage-display">${initialMaxDamage}</span></span>
             <span style="color:#ccc;margin:0 2px;">|</span>
             <label title="No result cap" style="cursor:pointer;font-size:.9em;"><input type="radio" name="resultCap" value="none" ${savedResultCap==='none'?'checked':''}> Any</label>
             <label title="Cap at Yellow (Slam max, no Stun)" style="cursor:pointer;font-size:.9em;"><input type="radio" name="resultCap" value="yellow" ${savedResultCap==='yellow'?'checked':''}> Ylw</label>
@@ -312,10 +329,10 @@ Common improvised weapons:
             const { spendKarma, karmaToSpend } = extractKarmaFromDialog(html);
             const karma        = karmaToSpend;
             
-            // Pull punch - only use value if checkbox is checked
+            // Pull punch - only use values if checkbox is checked
             const pullEnabled  = $dlg('#pull-punch-enabled').is(':checked');
             const pulledDamage = pullEnabled ? parseInt($dlg('[name="pulledDamage"]').val() || 0) : 0;
-            const resultCap    = $dlg('[name="resultCap"]:checked').val() || "none";
+            const resultCap    = pullEnabled ? ($dlg('[name="resultCap"]:checked').val() || "none") : "none";
 
             // Multi-attack - parse from radio
             const multiMode = $dlg('[name="multiMode"]:checked').val() || "off";
@@ -503,10 +520,17 @@ Common improvised weapons:
           // Pull punch checkbox toggle
           html.find('#pull-punch-enabled').on('change', function() {
             const $controls = html.find('.pull-damage-controls');
+            const $pulledDamage = html.find('[name="pulledDamage"]');
             if (this.checked) {
               $controls.css('display', 'flex');
+              // Set value to current max (which reflects weapon/object damage)
+              const currentMax = Number($pulledDamage.attr('max')) || strength.value;
+              $pulledDamage.val(currentMax);
             } else {
               $controls.hide();
+              // Reset result cap to "none" and damage to max when disabling pull punch
+              html.find('[name="resultCap"][value="none"]').prop('checked', true);
+              $pulledDamage.val($pulledDamage.attr('max'));
             }
           });
           
