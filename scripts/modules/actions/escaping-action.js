@@ -1,4 +1,5 @@
-// scripts/modules/actions/escaping-action.js v1.3.0 - 2025-12-22
+// scripts/modules/actions/escaping-action.js v1.4.0 - 2025-12-22
+// v1.4.0: Remove grappled/held effects on successful escape
 // v1.3.0: Fix DiceSoNice animation in consolidated chat cards mode
 // v1.2.0: Accept prefill from opts for opponent name/strength
 // v1.1.0: Add inline rolls for consolidated chat cards
@@ -18,6 +19,37 @@ import {
 } from "./action-utils.js";
 import { generateKarmaControlsHTML, setupKarmaControlHandlers, extractKarmaFromDialog } from "../dice/dice-roller.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
+
+/**
+ * Remove grappled/held effects from an actor
+ * @param {Actor} actor 
+ */
+async function removeHoldEffects(actor) {
+  if (!actor?.effects) return;
+  
+  const holdEffects = actor.effects.filter(e => {
+    if (e.disabled) return false;
+    // Check statuses
+    if (e.statuses?.has?.("grappled") || e.statuses?.has?.("held")) return true;
+    // Check flags
+    const flags = e.flags?.["msh-faserip"] || {};
+    if (flags.effectType === "grappled" || flags.effectType === "held") return true;
+    if (flags.status?.isGrappled || flags.status?.isHeld) return true;
+    // Check name patterns
+    const name = (e.name || "").toLowerCase();
+    if (name.includes("grappled") || name.includes("held") || name.includes("partial hold") || name.includes("full hold")) return true;
+    return false;
+  });
+  
+  for (const eff of holdEffects) {
+    try {
+      await eff.delete();
+      console.log(`[FASERIP] Removed hold effect: ${eff.name}`);
+    } catch (err) {
+      console.warn(`[FASERIP WARN] Failed to remove effect ${eff.name}:`, err);
+    }
+  }
+}
 
 export class EscapingAction extends AttackAction {
   constructor(args) {
@@ -111,6 +143,11 @@ export class EscapingAction extends AttackAction {
     `;
 
     await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor }), content: cardHtml });
+
+    // Remove hold effects on successful escape (any result other than white/miss)
+    if (colorLower !== "white") {
+      await removeHoldEffects(actor);
+    }
 
     return { roll, color, effectiveRank, cappedTotal, totalKarmaUsed };
   }

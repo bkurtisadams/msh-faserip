@@ -1,4 +1,5 @@
-// scripts/modules/effects/effect-engine.js v1.1.0 - 2025-12-22
+// scripts/modules/effects/effect-engine.js v1.2.0 - 2025-12-22
+// v1.2.0: Improved debug logging for effect creation and duration tracking
 // v1.1.0: Add proper Foundry changes arrays to effect wrappers
 // Centralized Active Effect helpers for FASERIP on Foundry v13
 
@@ -251,7 +252,12 @@ export async function applyEffect(target, effectData = {}, opts = {}) {
     const createdArr = await actor.createEmbeddedDocuments("ActiveEffect", [payload]);
     const created = Array.isArray(createdArr) ? createdArr[0] : createdArr;
     if (created?.id) {
-      console.log(`[FASERIP] Effect created with id ${created.id}, changes:`, created.changes);
+      // Log what duration the effect actually has after creation (may differ due to preCreateActiveEffect hook)
+      console.log(`[FASERIP] Effect created: "${created.name}" (id: ${created.id})`, {
+        requestedDuration: payload.duration,
+        actualDuration: created.duration,
+        changes: created.changes?.length || 0
+      });
       await renameEffectWithRemaining(created);
     }
     return created;

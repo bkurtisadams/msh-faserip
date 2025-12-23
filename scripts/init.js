@@ -1,4 +1,6 @@
-// init.js v1.5.4 - 2025-12-21
+// init.js v1.5.6 - 2025-12-22
+// v1.5.6: Improve effect expiration - advance worldTime per turn, comprehensive debug logging
+// v1.5.5: Improved effect auto-expiration with seconds-based support and debug logging
 // v1.5.4: Fix icon property access to use Object.hasOwn (avoids triggering deprecated getter)
 // v1.5.3: Fix v12 deprecations (ActiveEffect#icon -> img, Token#toggleEffect -> Actor#toggleStatusEffect)
 // v1.5.2: Refactored console messages to use severity prefixes (no emojis)
@@ -52,6 +54,49 @@ Hooks.on("combatRound", async (combat, updateData, updateOptions, userId) => {
   
   // Trigger hook to update team sheet display
   Hooks.callAll("msh-faserip.timeUpdated");
+});
+
+// Handle effect expiration when world time advances (for CTT or out-of-combat time passage)
+Hooks.on("updateWorldTime", async (worldTime, dt, options, userId) => {
+  // GM-only
+  if (!game.user.isGM) return;
+  
+  // Skip if in active combat (handled by updateCombat hook)
+  if (game.combat?.active) return;
+  
+  console.debug("[FASERIP DEBUG] updateWorldTime hook fired, worldTime:", worldTime, "delta:", dt);
+  
+  // Check all actors for seconds-based effects that have expired
+  for (const actor of game.actors) {
+    if (!actor?.effects?.size) continue;
+    
+    const toDelete = [];
+    
+    for (const ef of actor.effects) {
+      if (ef.disabled) continue;
+      const d = ef.duration ?? {};
+      
+      // Handle seconds-based effects
+      if (Number.isFinite(d.seconds) && d.seconds > 0 && Number.isFinite(d.startTime)) {
+        const endTime = d.startTime + d.seconds;
+        const remaining = endTime - worldTime;
+        
+        if (remaining <= 0) {
+          toDelete.push({ effect: ef, reason: `time expired (${d.seconds}s duration)` });
+        }
+      }
+    }
+    
+    // Delete expired effects
+    for (const { effect, reason } of toDelete) {
+      console.log(`[FASERIP] Auto-expiring effect "${effect.name}" on ${actor.name}: ${reason}`);
+      try {
+        await effect.delete();
+      } catch (e) {
+        console.warn("[FASERIP WARN] Effect auto-expire failed", e);
+      }
+    }
+  }
 });
 
 Hooks.once("init", async () => {
@@ -237,9 +282,19 @@ Hooks.once("init", async () => {
 
   // Convert "duration.rounds" -> seconds (based on preset turn length: FASERIP: turn = 6s).
   Hooks.on("preCreateActiveEffect", function (effect, data, options, userId) {
+    const effectName = data?.name || effect?.name || "(unnamed)";
+    const hasCombat = !!game.combat;
+    const hasRounds = !!data?.duration?.rounds;
+    
+    console.log(`[FASERIP] preCreateActiveEffect: "${effectName}"`, {
+      hasCombat,
+      hasRounds,
+      incomingDuration: data?.duration
+    });
+    
     // KEEP ROUNDS DURING COMBAT — do not convert to seconds while combat is active.
     if (game.combat && data?.duration?.rounds) {
-      console.debug("[FASERIP] preCreateActiveEffect: SKIP conversion (combat active)");
+      console.log(`[FASERIP] preCreateActiveEffect: KEEPING rounds for "${effectName}" (combat active, rounds=${data.duration.rounds})`);
       return;
     }
 
@@ -330,15 +385,9 @@ Hooks.once("init", async () => {
       data.flags["msh-faserip"].unitLabel       = "turn";
       data.flags["msh-faserip"].unitLabelPlural = "turns";
 
-      // 7) Debug log (if you have the setting)
-      try {
-        if (game.settings && typeof game.settings.get === "function" &&
-            game.settings.get("msh-faserip", "debugMode")) {
-          var nm = (data && data.name) ? data.name : (effect && effect.name ? effect.name : "(unnamed)");
-          console.log("[FASERIP] preCreateActiveEffect:",
-            safeRounds, "round(s) ->", seconds + "s", "(turn=" + secPerTurn + "s)", nm);
-        }
-      } catch (e2) { /* ignore */ }
+      // Always log conversion for debugging
+      var nm = (data && data.name) ? data.name : (effect && effect.name ? effect.name : "(unnamed)");
+      console.log(`[FASERIP] preCreateActiveEffect: CONVERTED "${nm}" from ${safeRounds} round(s) to ${seconds}s (turn=${secPerTurn}s, startTime=${startTime})`);
 
     } catch (err) {
       console.warn("FASERIP preCreateActiveEffect conversion failed:", err);
@@ -1536,6 +1585,16 @@ Hooks.on("updateCombat", async (combat, changed, diff, userId) => {
     return;
   }
 
+  // Advance world time on turn changes (6 seconds per turn) for seconds-based effect tracking
+  // This ensures seconds-based effects expire correctly even when using combat tracker
+  // Note: Round changes already advance time via combatRound hook, so only advance on pure turn changes
+  const syncEnabled = game.settings.get("msh-faserip", "combatSyncEnabled");
+  if (syncEnabled && ("turn" in changed) && !("round" in changed)) {
+    const beforeTime = game.time?.worldTime ?? 0;
+    await game.time.advance(6);
+    console.log(`[FASERIP] Turn change: advanced world time by 6s (${beforeTime} -> ${game.time.worldTime})`);
+  }
+
   // Dedup guard: track last processed round+turn to prevent duplicate dying checks
   const dyingKey = `${combat.round}-${combat.turn}`;
   const lastDyingKey = combat.getFlag("msh-faserip", "lastDyingProcessed");
@@ -1557,23 +1616,75 @@ Hooks.on("updateCombat", async (combat, changed, diff, userId) => {
     }
   } catch (_) { /* no-op */ }
 
-  // Auto-expire round-based effects that have hit 0 remaining
+  // Auto-expire round-based and seconds-based effects
   if (combat?.active) {
     const curRound = combat.round ?? 1;
+    const worldTime = game.time?.worldTime ?? 0;
+    console.log("[FASERIP] Effect expiration check - round:", curRound, "worldTime:", worldTime);
+    
     for (const c of combat.combatants) {
       const a = c?.actor;
       if (!a) continue;
+      
+      // Log all effects on this actor for debugging
+      if (a.effects.size > 0) {
+        console.log(`[FASERIP] Checking ${a.effects.size} effects on ${a.name}`);
+      }
+      
+      // Collect effects to delete (avoid modifying collection while iterating)
+      const toDelete = [];
+      
       for (const ef of a.effects) {
+        if (ef.disabled) continue;
         const d = ef.duration ?? {};
-        if (!Number.isFinite(d.rounds)) continue;
-        const startR = d.startRound ?? curRound;
-        const elapsed = Math.max(0, curRound - startR);
-        const remaining = Math.ceil((d.rounds ?? 0) - elapsed);
-        if (remaining <= 0 && !ef.disabled) {
-          try { await ef.delete(); } catch (e) { console.warn("AE auto-expire failed", e); }
+        
+        // Log the effect's duration data
+        console.log(`[FASERIP] Effect "${ef.name}" duration:`, JSON.stringify(d));
+        
+        // Handle round-based effects
+        if (Number.isFinite(d.rounds) && d.rounds > 0) {
+          const startR = d.startRound ?? 0;
+          const elapsed = Math.max(0, curRound - startR);
+          const remaining = Math.ceil(d.rounds - elapsed);
+          
+          console.log(`[FASERIP] Round-based effect "${ef.name}": rounds=${d.rounds}, startRound=${startR}, curRound=${curRound}, elapsed=${elapsed}, remaining=${remaining}`);
+          
+          if (remaining <= 0) {
+            toDelete.push({ effect: ef, reason: `0 rounds remaining (${d.rounds} rounds, started round ${startR})` });
+          }
+        }
+        
+        // Handle seconds-based effects (world time)
+        else if (Number.isFinite(d.seconds) && d.seconds > 0) {
+          const startT = d.startTime ?? 0;
+          const endTime = startT + d.seconds;
+          const remaining = endTime - worldTime;
+          
+          console.log(`[FASERIP] Seconds-based effect "${ef.name}": seconds=${d.seconds}, startTime=${startT}, endTime=${endTime}, worldTime=${worldTime}, remaining=${remaining}s`);
+          
+          if (remaining <= 0) {
+            toDelete.push({ effect: ef, reason: `time expired (${d.seconds}s duration, started at ${startT}, ended at ${endTime}, worldTime is ${worldTime})` });
+          }
+        }
+        
+        // Effect has no trackable duration
+        else {
+          console.log(`[FASERIP] Effect "${ef.name}" has no trackable duration (rounds=${d.rounds}, seconds=${d.seconds})`);
+        }
+      }
+      
+      // Delete expired effects
+      for (const { effect, reason } of toDelete) {
+        console.log(`[FASERIP] Auto-expiring effect "${effect.name}" on ${a.name}: ${reason}`);
+        try { 
+          await effect.delete(); 
+        } catch (e) { 
+          console.warn("[FASERIP WARN] AE auto-expire failed", e); 
         }
       }
     }
+  } else {
+    console.log("[FASERIP] Effect expiration check skipped - combat not active");
   }
 
   // Refresh labels for round-based effects on all combatants
