@@ -1,4 +1,5 @@
-// scripts/modules/effects/effect-modifiers.js v1.1.0 - 2025-12-22
+// scripts/modules/effects/effect-modifiers.js v1.2.0 - 2025-12-23
+// v1.2.0: Add getAttackShiftBreakdown and getDefenseShiftBreakdown for effect name display
 // Effect modifier system for FASERIP combat
 // Reads combat modifiers from actor.system.combatMods (populated by Active Effects)
 
@@ -126,6 +127,32 @@ export function getAttackShift(actor) {
 }
 
 /**
+ * Get attack shift breakdown by effect name
+ * @param {Actor} actor 
+ * @returns {object} { total, breakdown: [{name, shift}] }
+ */
+export function getAttackShiftBreakdown(actor) {
+  const total = getAttackShift(actor);
+  const breakdown = [];
+  
+  if (!actor?.effects) return { total, breakdown };
+  
+  for (const effect of actor.effects) {
+    if (effect.disabled) continue;
+    for (const change of (effect.changes || [])) {
+      if (change.key === "system.combatMods.attackShift") {
+        const shift = Number(change.value) || 0;
+        if (shift !== 0) {
+          breakdown.push({ name: effect.name, shift });
+        }
+      }
+    }
+  }
+  
+  return { total, breakdown };
+}
+
+/**
  * Get total defense column shift for an actor
  * @param {Actor} actor 
  * @param {boolean} isRanged - Whether the attack is ranged
@@ -133,6 +160,35 @@ export function getAttackShift(actor) {
  */
 export function getDefenseShift(actor, isRanged = false) {
   return getActiveModifiers(actor, { isRanged }).defenseShift;
+}
+
+/**
+ * Get defense shift breakdown by effect name
+ * @param {Actor} actor 
+ * @param {boolean} isRanged - Whether the attack is ranged
+ * @returns {object} { total, breakdown: [{name, shift}] }
+ */
+export function getDefenseShiftBreakdown(actor, isRanged = false) {
+  const total = getDefenseShift(actor, isRanged);
+  const breakdown = [];
+  
+  if (!actor?.effects) return { total, breakdown };
+  
+  const key = isRanged ? "system.combatMods.defenseShiftRanged" : "system.combatMods.defenseShift";
+  
+  for (const effect of actor.effects) {
+    if (effect.disabled) continue;
+    for (const change of (effect.changes || [])) {
+      if (change.key === key) {
+        const shift = Number(change.value) || 0;
+        if (shift !== 0) {
+          breakdown.push({ name: effect.name, shift });
+        }
+      }
+    }
+  }
+  
+  return { total, breakdown };
 }
 
 /**

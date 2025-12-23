@@ -358,7 +358,13 @@ export function debugLog(...args) {
 export function shiftRank(rankName, delta) {
   const i = RANKS.indexOf(rankName);
   if (i < 0) return rankName;
-  return RANKS[Math.min(Math.max(i + delta, 0), RANKS.length - 1)];
+  
+  // Class 1000+ ranks cannot be shifted (indices 14-17). see rule pg. 15
+  if (i >= 14) return rankName;
+  
+  // Apply shift, capped between Shift-0 (0) and Shift-Z (13)
+  const newIndex = Math.min(Math.max(i + delta, 0), 13);
+  return RANKS[newIndex];
 }
 
 export function labelFor(actionType) { return ACTION_LABELS[actionType] ?? actionType; }

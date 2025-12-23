@@ -1,5 +1,6 @@
 //--- START OF FILE blunt-attack-action.js ---
-// blunt-attack-action.js v1.4.5 - 2025-12-23
+// blunt-attack-action.js v1.4.6 - 2025-12-23
+// v1.4.6: Compact pull punch row, add objectValue handler for damage update
 // v1.4.5: Fix CS field jitter (box-sizing, visibility for reset btn, transparent border when CS=0)
 // v1.4.4: Pass attackNumber/totalAttacks to chat card for multi-attack display
 // v1.4.3: Yellow box on karma number, show multiple target names in dialog

@@ -1,4 +1,6 @@
-// attack-action.js v1.8.4 - 2025-12-23
+// attack-action.js v1.8.6 - 2025-12-23
+// v1.8.6: Show actual effect names in CS breakdown hover (e.g., "-2 Stunned" instead of "-2 attacker")
+// v1.8.5: CS breakdown in chat card (yellow box with hover showing manual/attacker/defender sources)
 // v1.8.4: Move result badge to roll line, add attack number in header (1 of 2, vs 3 targets)
 // v1.8.3: Yellow box on rolled d100 in chat card to indicate hover text
 // v1.8.2: Fix result cap (Yellow/Green) - use capped color for effect lookup and Slam/Stun/Kill checks
@@ -28,7 +30,7 @@ import { canEffectsApply } from "../../rules/effects-gate.js";
 import { ACTION_LABELS } from "./action-config.js";
 import { ACTION_EFFECTS } from "./action-config.js";
 import { SCOPE, getFlagScope } from "./flags.js";
-import { getAttackShift, getDefenseShift, canActorAct, getModifierSummary } from "../effects/effect-modifiers.js";
+import { getAttackShiftBreakdown, getDefenseShiftBreakdown, canActorAct, getModifierSummary } from "../effects/effect-modifiers.js";
 
 
 export class AttackAction extends BaseAction {
@@ -417,17 +419,22 @@ export class AttackAction extends BaseAction {
       return; // abort attack
     }
     
-    // Get attacker's attack shift from effects
-    const attackerShift = getAttackShift(actor);
+    // Get attacker's attack shift from effects (with breakdown)
+    const attackerShiftData = getAttackShiftBreakdown(actor);
+    const attackerShift = attackerShiftData.total;
+    const attackerEffects = attackerShiftData.breakdown;
     
     // Get defender's defense shift (if single target)
     let defenderShift = 0;
+    let defenderEffects = [];
     const primaryTarget = this._selectPrimaryTarget();
     const defenderActor = primaryTarget?.actor ?? null;
     if (defenderActor) {
       // Check if ranged attack for prone modifier
       const isRanged = ["shooting", "energy", "force"].includes(attackForm.toLowerCase());
-      defenderShift = getDefenseShift(defenderActor, isRanged);
+      const defenderShiftData = getDefenseShiftBreakdown(defenderActor, isRanged);
+      defenderShift = defenderShiftData.total;
+      defenderEffects = defenderShiftData.breakdown;
     }
     
     // Total effect shift (attacker bonus + defender penalty)
@@ -626,10 +633,25 @@ export class AttackAction extends BaseAction {
           )
         : "";
 
-      // Build compact shift display
+      // Build compact shift display with breakdown
       let shiftDisplay = "";
       if (totalShift !== 0) {
-        shiftDisplay = ` (${totalShift > 0 ? '+' : ''}${totalShift}CS → ${effectiveRank})`;
+        const parts = [];
+        if (manualShift !== 0) {
+          parts.push(`${manualShift > 0 ? '+' : ''}${manualShift} other`);
+        }
+        // Show attacker effects by name
+        for (const eff of attackerEffects) {
+          parts.push(`${eff.shift > 0 ? '+' : ''}${eff.shift} ${eff.name}`);
+        }
+        // Show defender effects by name (flip sign since they're subtracted)
+        for (const eff of defenderEffects) {
+          parts.push(`${eff.shift > 0 ? '-' : '+'}${Math.abs(eff.shift)} ${eff.name}`);
+        }
+        
+        const breakdown = parts.length > 0 ? parts.join(', ') : `${totalShift > 0 ? '+' : ''}${totalShift} total`;
+        const csBox = `<span title="${breakdown}" style="padding:0 3px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${totalShift > 0 ? '+' : ''}${totalShift}CS</span>`;
+        shiftDisplay = ` (${csBox} → ${effectiveRank})`;
       }
 
       // Build compact roll display: "Roll: 57 (42 + 15 karma)" or "Roll: 42"
