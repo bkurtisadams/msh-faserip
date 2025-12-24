@@ -1,5 +1,6 @@
 //--- START OF FILE blunt-attack-action.js ---
-// blunt-attack-action.js v1.4.13 - 2025-12-24
+// blunt-attack-action.js v1.4.14 - 2025-12-24
+// v1.4.14: Add csNotes to shiftBreakdown for chat card hover text
 // v1.4.13: Add CS Notes text input row between Modifiers and Multi-Attack, restore UI colors
 // v1.4.12: UI color scheme - Damage=light red, Karma=light blue, border highlights on selection (Karma=dark blue, Multi=dark green, Pull=dark orange)
 // v1.4.11: Use getTargetData() from action-utils.js for target acquisition
@@ -239,7 +240,7 @@ Common improvised weapons:
 
       <!-- CS Notes Row (text input for explaining CS value) -->
       <div id="cs-notes-row" style="margin-bottom:6px;">
-        <input type="text" name="csNotes" id="cs-notes-input" placeholder="CS notes (e.g., Ultimate Skill +4)" value="${savedCsNotes}" style="width:100%;padding:4px 8px;border:1px solid #ccc;border-radius:3px;font-size:.9em;box-sizing:border-box;">
+        <input type="text" name="csNotes" id="cs-notes-input" placeholder="e.g., Ultimate Skill +4" value="${savedCsNotes}" style="width:100%;padding:4px 8px;border:1px solid #ccc;border-radius:3px;font-size:.9em;box-sizing:border-box;">
       </div>
 
       <!-- Multi-Attack Row -->
@@ -597,7 +598,8 @@ Common improvised weapons:
     const shiftBreakdown = {
       manual: choice.shift || 0,  // User-entered CS from dialog
       multiAttack: 0,             // Multi-attack penalty (-1 success, -3 fail)
-      adjacent: 0                 // Adjacent targets penalty (-4)
+      adjacent: 0,                // Adjacent targets penalty (-4)
+      csNotes: choice.csNotes || ""  // Explanation for the CS value
     };
 
     // Handle multiple adjacent targets (single roll @-4 CS)
