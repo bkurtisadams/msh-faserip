@@ -1,4 +1,5 @@
-// scripts/rules/kill-resolver.js
+// scripts/rules/kill-resolver.js v1.1.0 - 2025-12-24
+// v1.1.0: Include Thrown Edged in E/S group (Green = Endurance Loss)
 
 export const KILL_CONTEXTS = {
   EDGED_MELEE: "edged_melee",
@@ -36,6 +37,7 @@ export function resolveKillFeat(color, context) {
     switch (context) {
       case KILL_CONTEXTS.EDGED_MELEE:
       case KILL_CONTEXTS.SHOOTING:
+      case KILL_CONTEXTS.EDGED_THROWING:  // Thrown edged counts as E/S (Bullseye the supervillain rule)
         result = {
           outcome: KILL_OUTCOMES.ENDURANCE_LOSS,
           label: "Endurance Loss (E/S)",
@@ -43,7 +45,6 @@ export function resolveKillFeat(color, context) {
         };
         break;
         
-      case KILL_CONTEXTS.EDGED_THROWING:
       case KILL_CONTEXTS.ENERGY:
       case KILL_CONTEXTS.ZERO_HEALTH:
         result = {

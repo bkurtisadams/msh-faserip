@@ -1,4 +1,5 @@
-// chat-hooks.js v1.0.4 - 2025-12-23
+// chat-hooks.js v1.1.0 - 2025-12-24
+// v1.1.0: Add kill-save handler (conscious dying), update death-save to pass fromZeroHealth
 // v1.0.4: Add apply-collision-damage handler that applies directly to UUID
 // v1.0.3: Add stopImmediatePropagation to collision handlers to prevent duplicate dialogs
 // v1.0.2: Add .calculate-slam-collision handler for slam result collision buttons (both standalone and collapsible)
@@ -852,6 +853,8 @@ export function installActionChatHandlers() {
       ev.preventDefault();
       const btn = ev.currentTarget;
       const actorUuid = btn.dataset.actorUuid;
+      const attackForm = btn.dataset.attackForm || "";
+      const fromZeroHealth = btn.dataset.fromZeroHealth !== "false"; // Default true
       
       try {
         const resolved = await fromUuid(actorUuid);
@@ -864,10 +867,50 @@ export function installActionChatHandlers() {
           return;
         }
         
-        await ActionDispatcher.roll("death-save", { actor });
+        await ActionDispatcher.roll("death-save", { 
+          actor,
+          opts: { attackForm, fromZeroHealth }
+        });
       } catch (err) {
         console.error("Death save handler failed:", err);
         ui.notifications.error("Failed to open death save dialog.");
+      }
+    });
+
+    // 11) Kill Save (Kill result from attack while still has HP - character stays conscious)
+    html.on("click", '[data-action="kill-save"]', async (ev) => {
+      // Respect disabled state
+      const el = ev.currentTarget;
+      if (el.getAttribute?.("aria-disabled") === "true" || el.dataset.autoDisabled === "1") {
+        ev.preventDefault();
+        return;
+      }
+
+      ev.preventDefault();
+      const btn = ev.currentTarget;
+      const actorUuid = btn.dataset.actorUuid;
+      const attackForm = btn.dataset.attackForm || "";
+      // Kill save from attack = NOT from zero health, character stays conscious if they fail
+      const fromZeroHealth = false;
+      
+      try {
+        const resolved = await fromUuid(actorUuid);
+        const actor = resolved?.documentName === "Actor" 
+          ? resolved 
+          : (resolved?.documentName === "Token" ? resolved.actor : null);
+        
+        if (!actor) {
+          ui.notifications.warn("Could not find actor for kill save.");
+          return;
+        }
+        
+        await ActionDispatcher.roll("death-save", { 
+          actor,
+          opts: { attackForm, fromZeroHealth }
+        });
+      } catch (err) {
+        console.error("Kill save handler failed:", err);
+        ui.notifications.error("Failed to open kill save dialog.");
       }
     });
 

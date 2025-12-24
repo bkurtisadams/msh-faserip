@@ -1,4 +1,7 @@
-// action-utils.js v1.1.4 - 2025-12-24
+// action-utils.js v1.2.0 - 2025-12-24
+// v1.2.0: Add fromZeroHealth flag to death/kill save paths
+//         - 0 HP path: unconscious + potentially dying
+//         - Kill result path: conscious + potentially dying
 // v1.1.4: Add getTargetData() for centralized target acquisition, rename getTargetingContext to buildTargetingHTML
 // v1.1.3: Add collision damage button to collapsible slam section (Grand Slam, 1 Area)
 // v1.1.2: Breaking FEAT chip includes data-actor-uuid attribute
@@ -1413,12 +1416,13 @@ export async function applyDamageToTargets({
                 autoApply: true, 
                 showConfirm: false,
                 wasKillResult: wasKillResult,
-                attackForm: attackForm  // E/S context for green result
+                attackForm: attackForm,  // E/S context for green result
+                fromZeroHealth: true     // Unconscious from reaching 0 HP
               }
             });
           } else {
             // Manual/Semi: Show death save prompt
-            await postDeathSavePrompt(targetActor, { wasKillResult, attackForm });
+            await postDeathSavePrompt(targetActor, { wasKillResult, attackForm, fromZeroHealth: true });
           }
         } else {
           // Four-Color rule: Non-lethal knockout
@@ -1447,12 +1451,13 @@ export async function applyDamageToTargets({
             opts: { 
               autoApply: true, 
               showConfirm: false,
-              attackForm: attackForm  // E/S context for green result
+              attackForm: attackForm,   // E/S context for green result
+              fromZeroHealth: false     // NOT unconscious - Kill result while still has HP
             }
           });
         } else {
           // Manual/Semi: Show kill save prompt
-          await postKillSavePrompt(targetActor, { attackForm });
+          await postKillSavePrompt(targetActor, { attackForm, fromZeroHealth: false });
         }
       }
       // ===== END 0 HP / KILL HANDLING =====
@@ -1488,7 +1493,7 @@ export async function applyDamageToTargets({
  * Post a chat card prompting for a kill save when a Kill result occurs
  * (target not at 0 HP but took damage from a kill-capable attack)
  */
-export async function postKillSavePrompt(actor, { attackForm = "edged" } = {}) {
+export async function postKillSavePrompt(actor, { attackForm = "edged", fromZeroHealth = false } = {}) {
   const isFull = resolveCombatModeSafe(actor) === "full";
   
   // In full auto mode, don't post the prompt - kill save runs automatically
@@ -1512,6 +1517,7 @@ export async function postKillSavePrompt(actor, { attackForm = "edged" } = {}) {
       <div style="padding:5px 10px;font-size:.9em;">
         <div style="color:#c62828;font-weight:bold;">Potential Kill</div>
         <div style="margin-top:4px;">Target must roll an Endurance FEAT vs the Kill column.</div>
+        <div style="margin-top:4px;color:#1565c0;">Character remains conscious while bleeding out if they fail.</div>
         ${esNote}
       </div>
 
@@ -1520,6 +1526,7 @@ export async function postKillSavePrompt(actor, { attackForm = "edged" } = {}) {
            data-action="kill-save"
            data-actor-uuid="${actor.uuid}"
            data-attack-form="${attackForm}"
+           data-from-zero-health="${fromZeroHealth}"
            style="display:inline-flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;padding:6px 14px;background:#ffebee;border:2px solid #c62828;border-radius:4px;color:#c62828;cursor:pointer;text-decoration:none;">
           Roll Kill Save
         </a>
@@ -1546,7 +1553,7 @@ export async function postKillSavePrompt(actor, { attackForm = "edged" } = {}) {
 /**
  * Enhanced postDeathSavePrompt that includes kill context
  */
-export async function postDeathSavePrompt(actor, { wasKillResult = false, attackForm = "" } = {}) {
+export async function postDeathSavePrompt(actor, { wasKillResult = false, attackForm = "", fromZeroHealth = true } = {}) {
   const isFull = resolveCombatModeSafe(actor) === "full";
   
   // In full auto mode, don't post the prompt - death save runs automatically
@@ -1576,6 +1583,7 @@ export async function postDeathSavePrompt(actor, { wasKillResult = false, attack
            data-action="death-save"
            data-actor-uuid="${actor.uuid}"
            data-attack-form="${attackForm}"
+           data-from-zero-health="${fromZeroHealth}"
            style="display:inline-flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;padding:6px 14px;background:#ffebee;border:2px solid #c62828;border-radius:4px;color:#c62828;cursor:pointer;text-decoration:none;">
           Roll Death Save
         </a>

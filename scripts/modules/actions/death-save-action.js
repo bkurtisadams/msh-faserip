@@ -1,4 +1,13 @@
-// scripts/modules/actions/death-save-action.js v1.3.2 - 2025-12-24
+// scripts/modules/actions/death-save-action.js v1.5.1 - 2025-12-24
+// v1.5.1: UI improvements - remove emoji from Kill Check header, use green for No Effect,
+//         blue for Unconscious, style result color as badge (Yellow/Green/White/Red)
+// v1.5.0: Apply IMMEDIATE first Endurance rank loss when dying (per rules)
+//         - "Endurance is reduced by one rank" happens immediately on failed Kill save
+//         - Then continues to lose 1/turn via updateCombat hook
+//         - Also creates Impaired Endurance effect immediately
+// v1.4.0: Separate Kill Save (conscious) from Death Save (unconscious from 0 HP)
+//         - fromZeroHealth flag determines if character is unconscious
+//         - Kill result from attack while still has HP = conscious dying
 // v1.3.2: Store originalEndurance in Dying effect flags and actor flags for recovery tracking
 // v1.3.1: Fix structure - Death Save is outer card, Kill Check is collapsible inside
 //         - Roll number has hover text showing what was rolled
@@ -54,6 +63,10 @@ export class DeathSaveAction extends BaseAction {
     if (this?.opts?.autoApply === true) {
       console.log("[FASERIP DEBUG] Death Save AUTO MODE - entering fast path");
       
+      // Check if this came from 0 HP (unconscious) or Kill result (conscious)
+      // Use explicit check: if fromZeroHealth is literally false, then false; otherwise true
+      const fromZeroHealth = this.opts?.fromZeroHealth !== false; // Default true for backwards compat
+      
       const endurance = {
         rank: actor.system?.abilities?.endurance?.rank || "Good",
         value: actor.system?.abilities?.endurance?.value || 8
@@ -66,7 +79,7 @@ export class DeathSaveAction extends BaseAction {
       const color = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
       const colorLower = String(color).toLowerCase();
       
-      // Roll unconscious duration using configurable die
+      // Roll unconscious duration using configurable die (only used if from 0 HP)
       const stunDie = game.settings.get('msh-faserip', 'stunDurationDie') || "d10";
       const durationRoll = await (new Roll(`1${stunDie}`)).evaluate();
       const unconsciousDuration = durationRoll.total;
@@ -77,37 +90,59 @@ export class DeathSaveAction extends BaseAction {
 
       console.log(`[FASERIP DEBUG] DEATH SAVE AUTO | ${actor.name} result: ${color.toUpperCase()} - ${killResult.label}`, {
         isDying,
-        context: killContext
+        context: killContext,
+        fromZeroHealth
       });
 
       // Build Kill Check collapsible section (inside Death Save card)
+      // Use dark red for dying, blue for unconscious (from 0 HP), green for no effect
       const killColors = isDying 
-        ? { bg: "#8B0000", fg: "#fff", icon: "&#x1F480;" }
-        : { bg: "#1565c0", fg: "#fff", icon: "&#x1F4A4;" };
+        ? { bg: "#8B0000", fg: "#fff" }  // Dark red for dying
+        : (fromZeroHealth 
+            ? { bg: "#1565c0", fg: "#fff" }  // Blue for unconscious (from 0 HP)
+            : { bg: "#2e7d32", fg: "#fff" }); // Green for no effect (survived kill result)
       
-      const killSummaryText = isDying 
-        ? `Kill Check - DYING (Endurance Loss)`
-        : `Kill Check - Stunned`;
+      // Different summary based on fromZeroHealth
+      let killSummaryText;
+      if (isDying) {
+        killSummaryText = fromZeroHealth 
+          ? `Kill Check - DYING (Endurance Loss)` 
+          : `Kill Check - DYING (Conscious, bleeding out)`;
+      } else {
+        killSummaryText = fromZeroHealth 
+          ? `Kill Check - Unconscious` 
+          : `Kill Check - No Effect`;
+      }
       
       const killDetailContent = isDying ? `
         <div style="padding:8px;font-size:.9em;">
           <div>Losing 1 Endurance rank per turn until stabilized.</div>
+          ${!fromZeroHealth ? '<div style="color:#1565c0;margin-top:4px;">Character remains conscious while dying!</div>' : ''}
         </div>
       ` : `
         <div style="padding:8px;font-size:.9em;">
-          <div>No Endurance loss - character will recover.</div>
+          <div>No Endurance loss - ${fromZeroHealth ? 'character will recover.' : 'no effect.'}</div>
         </div>
       `;
       
+      // Style the result color as a badge (matching attack card style)
+      const colorBadgeStyles = {
+        white: "background:#333;color:#fff;",
+        green: "background:#4caf50;color:#fff;",
+        yellow: "background:#f57f17;color:#fff;",
+        red: "background:#c62828;color:#fff;"
+      };
+      const colorBadgeStyle = colorBadgeStyles[colorLower] || "background:#666;color:#fff;";
+      const colorBadge = `<span style="${colorBadgeStyle}padding:1px 6px;border-radius:2px;font-size:.85em;font-weight:600;text-transform:uppercase;">${colorLower}</span>`;
+      
       const killRollInfo = `
         <div style="padding:4px 8px;font-size:.85em;color:#555;border-top:1px solid rgba(0,0,0,.1);">
-          Endurance: ${effectiveRank}${this.opts?.featCs ? ` (${this.opts.featCs > 0 ? '+' : ''}${this.opts.featCs}CS)` : ''} | Roll: <span title="d100 vs ${effectiveRank} Endurance (Kill column)" style="padding:0 3px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${roll.total}</span> | Result: <strong style="text-transform:capitalize;">${colorLower}</strong>
+          Endurance: ${effectiveRank}${this.opts?.featCs ? ` (${this.opts.featCs > 0 ? '+' : ''}${this.opts.featCs}CS)` : ''} | Roll: <span title="d100 vs ${effectiveRank} Endurance (Kill column)" style="padding:0 3px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${roll.total}</span> | Result: ${colorBadge}
         </div>`;
       
       const killCheckSection = `
         <details class="faserip-check-section kill-check-section" style="margin:6px 10px 8px;border:1px solid ${killColors.bg};border-radius:4px;overflow:hidden;">
           <summary style="padding:6px 10px;background:${killColors.bg};color:${killColors.fg};cursor:pointer;font-weight:600;font-size:.9em;list-style:none;display:flex;align-items:center;gap:6px;">
-            <span style="font-size:1.1em;">${killColors.icon}</span>
             <span>${killSummaryText}</span>
             <span style="margin-left:auto;font-size:.8em;opacity:.8;">&#9660;</span>
           </summary>
@@ -119,16 +154,30 @@ export class DeathSaveAction extends BaseAction {
 
       console.log("[FASERIP DEBUG] AUTO killCheckSection built:", killCheckSection.substring(0, 100) + "...");
 
+      // Build result display - different based on fromZeroHealth
+      const cardTitle = fromZeroHealth ? "Death Save" : "Kill Save";
+      const unconsciousLine = fromZeroHealth 
+        ? `<div><strong>Unconscious:</strong> ${unconsciousDuration} round${unconsciousDuration !== 1 ? 's' : ''}</div>`
+        : '';
+      
+      const statusDisplay = isDying
+        ? (fromZeroHealth 
+            ? '<strong style="color:#c62828;">DYING (Unconscious)</strong>'
+            : '<strong style="color:#c62828;">DYING (Conscious)</strong>')
+        : (fromZeroHealth
+            ? '<strong style="color:#1565c0;">UNCONSCIOUS</strong>'
+            : '<strong style="color:#2e7d32;">NO EFFECT</strong>');
+
       const resultHtml = `
         <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
           <div style="padding:5px 10px;border-bottom:1px solid #c0c0c0;font-size:1.1em;color:#8b0000;">
-            <strong>${actor.name} - Death Save</strong>
+            <strong>${actor.name} - ${cardTitle}</strong>
           </div>
           <div style="padding:8px 10px;font-size:.9em;">
             <div><strong>Endurance:</strong> ${endurance.rank} (${endurance.value})</div>
-            <div><strong>Unconscious:</strong> ${unconsciousDuration} round${unconsciousDuration !== 1 ? 's' : ''}</div>
-            <div style="margin-top:6px;padding:6px;border-radius:3px;background:${isDying ? '#ffebee' : '#e3f2fd'};border:1px solid ${isDying ? '#ef5350' : '#90caf9'};">
-              <strong style="color:${isDying ? '#c62828' : '#1565c0'};">${isDying ? 'DYING' : 'STUNNED'}</strong>
+            ${unconsciousLine}
+            <div style="margin-top:6px;padding:6px;border-radius:3px;background:${isDying ? '#ffebee' : (fromZeroHealth ? '#e3f2fd' : '#e8f5e9')};border:1px solid ${isDying ? '#ef5350' : (fromZeroHealth ? '#90caf9' : '#a5d6a7')};">
+              ${statusDisplay}
             </div>
           </div>
           ${killCheckSection}
@@ -142,10 +191,12 @@ export class DeathSaveAction extends BaseAction {
       
       console.log("[FASERIP DEBUG] AUTO Death Save ChatMessage created - this should be the ONLY card");
 
-      // Always create unconscious effect when at 0 HP
-      await this._createStunnedEffect(actor, unconsciousDuration);
+      // Only create unconscious effect if from 0 HP path
+      if (fromZeroHealth) {
+        await this._createStunnedEffect(actor, unconsciousDuration);
+      }
 
-      // If dying, ALSO create dying effect
+      // If dying, create dying effect (regardless of path)
       if (isDying) {
         await this._createDyingEffect(actor, endurance, unconsciousDuration);
       }
@@ -154,18 +205,29 @@ export class DeathSaveAction extends BaseAction {
     }
     // --- END AUTO MODE FAST-PATH ---
 
+    // Check if this came from 0 HP (unconscious) or Kill result (conscious)
+    const fromZeroHealth = this.opts?.fromZeroHealth !== false; // Default true for backwards compat
+
     // Determine if E/S context applies (for dialog display)
     const isEdgedOrShooting = (killContext === KILL_CONTEXTS.EDGED_MELEE || killContext === KILL_CONTEXTS.SHOOTING);
+
+    // Different dialog based on path
+    const dialogTitle = fromZeroHealth ? "Death Save" : "Kill Save";
+    const dialogDesc = fromZeroHealth 
+      ? "Character has reached 0 Health. Roll Endurance FEAT vs Kill column."
+      : "Kill result from attack! Roll Endurance FEAT vs Kill column.";
+    const noEffectLabel = fromZeroHealth ? "Unconscious" : "No Effect";
 
     // Simple dialog - compact style matching slam/stun checks
     const dialogHtml = `
       <div class="frp-dialog" style="min-width:380px;">
         <!-- Header Banner -->
         <div style="background:#ffebee;border:1px solid #ef5350;border-radius:3px;padding:10px;margin-bottom:8px;">
-          <div style="font-weight:bold;color:#c62828;font-size:1.1em;">Death Save</div>
+          <div style="font-weight:bold;color:#c62828;font-size:1.1em;">${dialogTitle}</div>
           <div style="font-size:.85em;color:#666;margin-top:4px;">
-            Character has reached 0 Health. Roll Endurance FEAT vs Kill column.
+            ${dialogDesc}
           </div>
+          ${!fromZeroHealth ? '<div style="font-size:.85em;color:#1565c0;margin-top:4px;">Character remains conscious if they fail.</div>' : ''}
         </div>
 
         <!-- Character Info -->
@@ -187,7 +249,7 @@ export class DeathSaveAction extends BaseAction {
             <span style="font-weight:600;">Attack Type:</span> ${attackForm}
             ${isEdgedOrShooting 
               ? `<span style="color:#c62828;margin-left:8px;">⚠️ E/S: Green = Dying</span>` 
-              : `<span style="color:#1565c0;margin-left:8px;">Green = Stunned only</span>`}
+              : `<span style="color:#1565c0;margin-left:8px;">Green = ${noEffectLabel} only</span>`}
           </div>
         ` : ''}
 
@@ -204,10 +266,10 @@ export class DeathSaveAction extends BaseAction {
         <div style="padding:8px;background:#fff3e0;border:1px solid #ffcc80;border-radius:3px;margin-bottom:8px;font-size:.9em;">
           <div style="font-weight:600;margin-bottom:4px;">Possible Results:</div>
           <div style="display:grid;grid-template-columns:auto 1fr;gap:2px 8px;">
-            <span style="color:#333;font-weight:600;">White:</span><span>Endurance Loss (Dying)</span>
-            <span style="color:#4caf50;font-weight:600;">Green:</span><span>${isEdgedOrShooting ? 'Endurance Loss (E/S)' : 'Stunned'}</span>
-            <span style="color:#f57f17;font-weight:600;">Yellow:</span><span>Stunned</span>
-            <span style="color:#c62828;font-weight:600;">Red:</span><span>Stunned</span>
+            <span style="color:#333;font-weight:600;">White:</span><span>Endurance Loss (Dying${!fromZeroHealth ? ', conscious' : ''})</span>
+            <span style="color:#4caf50;font-weight:600;">Green:</span><span>${isEdgedOrShooting ? 'Endurance Loss (E/S)' : noEffectLabel}</span>
+            <span style="color:#f57f17;font-weight:600;">Yellow:</span><span>${noEffectLabel}</span>
+            <span style="color:#c62828;font-weight:600;">Red:</span><span>${noEffectLabel}</span>
           </div>
         </div>
 
@@ -319,17 +381,29 @@ export class DeathSaveAction extends BaseAction {
       killContext,
       killResult,
       isDying,
-      unconsciousDuration
+      unconsciousDuration,
+      fromZeroHealth
     });
 
     // Build Kill Check collapsible section (inside Death Save card)
+    // Use dark red for dying, blue for unconscious (from 0 HP), green for no effect
     const killColors = isDying 
-      ? { bg: "#8B0000", fg: "#fff", icon: "&#x1F480;" }  // Skull for dying
-      : { bg: "#1565c0", fg: "#fff", icon: "&#x1F4A4;" }; // Zzz for stunned
+      ? { bg: "#8B0000", fg: "#fff" }  // Dark red for dying
+      : (fromZeroHealth 
+          ? { bg: "#1565c0", fg: "#fff" }  // Blue for unconscious (from 0 HP)
+          : { bg: "#2e7d32", fg: "#fff" }); // Green for no effect (survived kill result)
     
-    const killSummaryText = isDying 
-      ? `Kill Check - DYING (Endurance Loss)`
-      : `Kill Check - Stunned`;
+    // Different summary based on fromZeroHealth
+    let killSummaryText;
+    if (isDying) {
+      killSummaryText = fromZeroHealth 
+        ? `Kill Check - DYING (Endurance Loss)` 
+        : `Kill Check - DYING (Conscious, bleeding out)`;
+    } else {
+      killSummaryText = fromZeroHealth 
+        ? `Kill Check - Unconscious` 
+        : `Kill Check - No Effect`;
+    }
     
     // Build kill check detail content based on outcome
     const killDetailContent = isDying ? `
@@ -338,6 +412,7 @@ export class DeathSaveAction extends BaseAction {
         <div style="margin-left:8px;margin-bottom:6px;font-family:monospace;font-size:.85em;">
           ${this._buildEnduranceLadder(endurance.rank)}
         </div>
+        ${!fromZeroHealth ? '<div style="color:#1565c0;margin-bottom:6px;font-weight:600;">Character remains conscious while dying!</div>' : ''}
         <div style="margin-top:8px;"><strong>Stabilization:</strong></div>
         <div style="margin-left:8px;font-size:.85em;">
           <div>• <strong>50 Karma:</strong> Stabilize 1 round</div>
@@ -345,25 +420,41 @@ export class DeathSaveAction extends BaseAction {
           <div>• <strong>Any Aid:</strong> Stops Endurance loss</div>
         </div>
       </div>
-    ` : `
+    ` : (fromZeroHealth ? `
       <div style="padding:8px;font-size:.9em;">
         <div>No Endurance loss - character will recover.</div>
         <div style="font-size:.85em;color:#555;margin-top:4px;">
           After waking, Health = Endurance rank value (${endurance.value}).
         </div>
       </div>
-    `;
+    ` : `
+      <div style="padding:8px;font-size:.9em;">
+        <div>No Endurance loss - no effect from Kill result.</div>
+        <div style="font-size:.85em;color:#555;margin-top:4px;">
+          Character takes damage as normal but is not dying.
+        </div>
+      </div>
+    `);
     
-    // Compact roll info line with yellow box around roll and hover text
+    // Style the result color as a badge (matching attack card style)
+    const colorBadgeStyles = {
+      white: "background:#333;color:#fff;",
+      green: "background:#4caf50;color:#fff;",
+      yellow: "background:#f57f17;color:#fff;",
+      red: "background:#c62828;color:#fff;"
+    };
+    const colorBadgeStyle = colorBadgeStyles[colorLower] || "background:#666;color:#fff;";
+    const colorBadge = `<span style="${colorBadgeStyle}padding:1px 6px;border-radius:2px;font-size:.85em;font-weight:600;text-transform:uppercase;">${colorLower}</span>`;
+    
+    // Compact roll info line with yellow box around roll and color badge
     const killRollInfo = `
       <div style="padding:4px 8px;font-size:.85em;color:#555;border-top:1px solid rgba(0,0,0,.1);">
-        Endurance: ${effectiveRank}${choice.shift ? ` (${choice.shift > 0 ? '+' : ''}${choice.shift}CS)` : ''} | Roll: <span title="d100 vs ${effectiveRank} Endurance (Kill column)" style="padding:0 3px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${roll.total}</span> | Result: <strong style="text-transform:capitalize;">${colorLower}</strong>
+        Endurance: ${effectiveRank}${choice.shift ? ` (${choice.shift > 0 ? '+' : ''}${choice.shift}CS)` : ''} | Roll: <span title="d100 vs ${effectiveRank} Endurance (Kill column)" style="padding:0 3px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${roll.total}</span> | Result: ${colorBadge}
       </div>`;
     
     const killCheckSection = `
       <details class="faserip-check-section kill-check-section" style="margin:6px 10px 8px;border:1px solid ${killColors.bg};border-radius:4px;overflow:hidden;">
         <summary style="padding:6px 10px;background:${killColors.bg};color:${killColors.fg};cursor:pointer;font-weight:600;font-size:.9em;list-style:none;display:flex;align-items:center;gap:6px;">
-          <span style="font-size:1.1em;">${killColors.icon}</span>
           <span>${killSummaryText}</span>
           <span style="margin-left:auto;font-size:.8em;opacity:.8;">&#9660;</span>
         </summary>
@@ -375,16 +466,30 @@ export class DeathSaveAction extends BaseAction {
     
     console.log("[FASERIP DEBUG] killCheckSection built:", killCheckSection.substring(0, 200) + "...");
     
+    // Build result display - different based on fromZeroHealth
+    const cardTitle = fromZeroHealth ? "Death Save" : "Kill Save";
+    const unconsciousLine = fromZeroHealth 
+      ? `<div><strong>Unconscious:</strong> ${unconsciousDuration} round${unconsciousDuration !== 1 ? 's' : ''}</div>`
+      : '';
+    
+    const statusDisplay = isDying
+      ? (fromZeroHealth 
+          ? '<strong style="color:#c62828;">DYING (Unconscious)</strong>'
+          : '<strong style="color:#c62828;">DYING (Conscious)</strong>')
+      : (fromZeroHealth
+          ? '<strong style="color:#1565c0;">UNCONSCIOUS</strong>'
+          : '<strong style="color:#2e7d32;">NO EFFECT</strong>');
+
     const cardHtml = `
       <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
         <div style="padding:5px 10px;border-bottom:1px solid #c0c0c0;font-size:1.1em;color:#8b0000;">
-          <strong>${actor.name} - Death Save</strong>
+          <strong>${actor.name} - ${cardTitle}</strong>
         </div>
         <div style="padding:8px 10px;font-size:.9em;">
           <div><strong>Endurance:</strong> ${endurance.rank} (${endurance.value})</div>
-          <div><strong>Unconscious:</strong> ${unconsciousDuration} round${unconsciousDuration !== 1 ? 's' : ''}</div>
-          <div style="margin-top:6px;padding:6px;border-radius:3px;background:${isDying ? '#ffebee' : '#e3f2fd'};border:1px solid ${isDying ? '#ef5350' : '#90caf9'};">
-            <strong style="color:${isDying ? '#c62828' : '#1565c0'};">${isDying ? 'DYING' : 'STUNNED'}</strong>
+          ${unconsciousLine}
+          <div style="margin-top:6px;padding:6px;border-radius:3px;background:${isDying ? '#ffebee' : (fromZeroHealth ? '#e3f2fd' : '#e8f5e9')};border:1px solid ${isDying ? '#ef5350' : (fromZeroHealth ? '#90caf9' : '#a5d6a7')};">
+            ${statusDisplay}
           </div>
         </div>
         ${killCheckSection}
@@ -402,19 +507,29 @@ export class DeathSaveAction extends BaseAction {
     console.log("[FASERIP DEBUG] Death Save ChatMessage created - this should be the ONLY card");
 
     // =========================================================
-    // FIX: CREATE EFFECTS IN DIALOG PATH (was missing!)
+    // CREATE EFFECTS BASED ON RESULT AND PATH
     // =========================================================
-    console.log(`💀 DEATH SAVE | Creating effects for ${actor.name}`, { isDying, unconsciousDuration });
+    console.log(`💀 DEATH SAVE | Creating effects for ${actor.name}`, { isDying, unconsciousDuration, fromZeroHealth });
 
-    // Always create unconscious effect when at 0 HP
-    await this._createStunnedEffect(actor, unconsciousDuration);
+    // Only create unconscious effect if from 0 HP path
+    if (fromZeroHealth) {
+      await this._createStunnedEffect(actor, unconsciousDuration);
+    }
 
-    // If dying, ALSO create dying effect
+    // If dying, create dying effect (regardless of path)
     if (isDying) {
       await this._createDyingEffect(actor, endurance, unconsciousDuration);
-      ui.notifications.warn(`${actor.name} is DYING! Losing 1 Endurance rank per turn.`);
+      if (fromZeroHealth) {
+        ui.notifications.warn(`${actor.name} is DYING (unconscious)! Losing 1 Endurance rank per turn.`);
+      } else {
+        ui.notifications.warn(`${actor.name} is DYING but conscious! Losing 1 Endurance rank per turn.`);
+      }
     } else {
-      ui.notifications.info(`${actor.name} is unconscious for ${unconsciousDuration} rounds.`);
+      if (fromZeroHealth) {
+        ui.notifications.info(`${actor.name} is unconscious for ${unconsciousDuration} rounds.`);
+      } else {
+        ui.notifications.info(`${actor.name} resisted the Kill result - no effect.`);
+      }
     }
     // =========================================================
   }
@@ -425,10 +540,112 @@ export class DeathSaveAction extends BaseAction {
 
       // Store original endurance on actor for recovery tracking
       const currentEndurance = actor.system?.abilities?.endurance?.rank || endurance.rank;
+      const currentEnduranceValue = actor.system?.abilities?.endurance?.value || endurance.value;
       const existingOriginal = actor.getFlag(scope, "originalEndurance");
       if (!existingOriginal) {
         await actor.setFlag(scope, "originalEndurance", currentEndurance);
       }
+      const originalRank = existingOriginal || currentEndurance;
+
+      // =========================================================
+      // IMMEDIATE FIRST RANK LOSS (per rules: "Endurance is reduced by one rank")
+      // The character loses 1 rank immediately, then continues to lose 1/turn
+      // =========================================================
+      const nextRank = game.msh.nextLowerRankName(currentEndurance);
+      const nextValue = game.msh.getRankValue(nextRank) || 0;
+      const enduranceLoss = currentEnduranceValue - nextValue;
+      
+      // Calculate new health (both max recalculates, current drops by endurance loss)
+      const currentHealth = actor.system?.attributes?.health?.value || 0;
+      const newHealth = Math.max(0, currentHealth - enduranceLoss);
+      
+      console.log(`💀 DYING | ${actor.name} IMMEDIATE Endurance loss: ${currentEndurance} (${currentEnduranceValue}) → ${nextRank} (${nextValue}), Health: ${currentHealth} → ${newHealth}`);
+      
+      // Apply immediate Endurance and Health loss
+      try {
+        if (game.user.isGM || actor.isOwner) {
+          await actor.update({
+            "system.abilities.endurance.rank": nextRank,
+            "system.abilities.endurance.value": nextValue,
+            "system.attributes.health.value": newHealth
+          });
+        } else {
+          const { runAsGM } = await import("../../gm-utils.js");
+          await runAsGM({
+            operation: "update",
+            targetActorUuid: actor.uuid,
+            args: [{
+              "system.abilities.endurance.rank": nextRank,
+              "system.abilities.endurance.value": nextValue,
+              "system.attributes.health.value": newHealth
+            }]
+          });
+        }
+        
+        // Create Impaired Endurance effect (first rank loss)
+        const hasMedicalCare = actor.getFlag(scope, "medicalCare") ?? false;
+        const daysUntilHealing = hasMedicalCare ? 1 : 7;
+        
+        // Remove any existing impaired effect first
+        const existingImpaired = actor.effects.find(e => e.getFlag(scope, "isImpairedEndurance"));
+        if (existingImpaired) {
+          if (game.user.isGM || actor.isOwner) {
+            await actor.deleteEmbeddedDocuments("ActiveEffect", [existingImpaired.id]);
+          }
+        }
+        
+        const impairedEffectData = {
+          name: `Impaired Endurance (${nextRank} of ${originalRank})`,
+          img: "icons/svg/blood.svg",
+          origin: actor.uuid,
+          statuses: ["impaired-endurance"],
+          flags: {
+            [scope]: {
+              isImpairedEndurance: true,
+              originalEndurance: originalRank,
+              currentEndurance: nextRank,
+              lastHealed: Date.now(),
+              medicalCare: hasMedicalCare
+            },
+            core: { statusId: "impaired-endurance" }
+          },
+          duration: {
+            rounds: daysUntilHealing * 600 * 24,
+            startRound: game.combat?.round || 0
+          },
+          changes: [{
+            key: "system.columnShift",
+            mode: CONST.ACTIVE_EFFECT_MODES.ADD,
+            value: "-2"
+          }]
+        };
+        
+        if (game.user.isGM || actor.isOwner) {
+          await actor.createEmbeddedDocuments("ActiveEffect", [impairedEffectData]);
+        } else {
+          const { runAsGM } = await import("../../gm-utils.js");
+          await runAsGM({
+            operation: "createEmbeddedDocuments",
+            targetActorUuid: actor.uuid,
+            args: ["ActiveEffect", [impairedEffectData]]
+          });
+        }
+        console.log(`💀 DYING | Created Impaired Endurance effect for ${actor.name}`);
+        
+        // Post chat message about immediate loss
+        await ChatMessage.create({
+          speaker: ChatMessage.getSpeaker({ actor }),
+          content: `<div style="background:#ffebee;border:1px solid #ef5350;padding:8px;border-radius:3px;">
+            <strong>${actor.name}</strong> begins dying - immediate Endurance loss: ${currentEndurance} → ${nextRank}
+            <div style="margin-top:4px;font-size:.9em;color:#666;">Health: ${currentHealth} → ${newHealth} (−${enduranceLoss})</div>
+            <div style="margin-top:4px;font-size:.85em;color:#c62828;">Will continue to lose 1 Endurance rank per turn until stabilized.</div>
+            <div style="margin-top:4px;font-size:.85em;color:#ff9800;">Impaired: -2CS to all actions until Endurance restored.</div>
+          </div>`
+        });
+      } catch (err) {
+        console.error(`[FASERIP ERROR] Failed to apply immediate Endurance loss for ${actor.name}:`, err);
+      }
+      // =========================================================
 
       // Remove any existing dying effects to avoid duplicates
       try {
@@ -448,7 +665,7 @@ export class DeathSaveAction extends BaseAction {
       } catch (_) {}
 
       const effectData = {
-        name: "Dying",
+        name: `Dying (${originalRank} → ${nextRank})`,
         img: "icons/svg/skull.svg",
         origin: actor.uuid,
         disabled: false,
@@ -456,7 +673,8 @@ export class DeathSaveAction extends BaseAction {
           [scope]: {
             isDying: true,
             zeroHealth: true,
-            originalEndurance: existingOriginal || currentEndurance
+            originalEndurance: originalRank,
+            turnsElapsed: 1  // Already processed first loss
           }
         },
         changes: [
@@ -477,7 +695,7 @@ export class DeathSaveAction extends BaseAction {
         });
       }
       
-      console.log(`💀 DYING EFFECT | Created for ${actor.name}`);
+      console.log(`💀 DYING EFFECT | Created for ${actor.name} (immediate loss applied: ${currentEndurance} → ${nextRank})`);
     }
 
 
