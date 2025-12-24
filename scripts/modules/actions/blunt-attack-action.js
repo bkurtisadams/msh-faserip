@@ -1,6 +1,7 @@
 //--- START OF FILE blunt-attack-action.js ---
-// blunt-attack-action.js v1.4.12 - 2025-12-24
-// v1.4.12: Add CS Notes text field for documenting column shift sources
+// blunt-attack-action.js v1.4.13 - 2025-12-24
+// v1.4.13: Add CS Notes text input row between Modifiers and Multi-Attack, restore UI colors
+// v1.4.12: UI color scheme - Damage=light red, Karma=light blue, border highlights on selection (Karma=dark blue, Multi=dark green, Pull=dark orange)
 // v1.4.11: Use getTargetData() from action-utils.js for target acquisition
 // v1.4.10: Compute initial pull punch max from saved source (weapon/object)
 // v1.4.9: Auto-populate pulled damage to current max when enabling checkbox
@@ -100,7 +101,6 @@ export class BluntAttackAction extends AttackAction {
     const savedAttackCount = shouldRemember ? (await actor.getFlag("msh-faserip","lastBluntAttackCount") || 2) : 2;
     const savedMultiAdjacent = shouldRemember ? (await actor.getFlag("msh-faserip","lastBluntMultiAdjacent") || false) : false;
     const savedColumnShift  = shouldRemember ? (await actor.getFlag("msh-faserip","lastBluntShift") || 0) : 0;
-    const savedCsNotes = shouldRemember ? ((await actor.getFlag("msh-faserip","lastBluntCsNotes")) || "") : "";
     
     // Skip Dice is a client setting, mostly UI based, stored in LS
     const savedSkipDice = localStorage.getItem(lsSkipKey) === "1";
@@ -137,6 +137,9 @@ export class BluntAttackAction extends AttackAction {
     const availableKarma = getAvailableKarma(actor);
     const minKarma = getMinimumKarmaCommitment(actor);
     const hasKarma = availableKarma > 0;
+
+    // Load CS Notes from actor flag
+    const savedCsNotes = (await actor.getFlag("msh-faserip", "csNotes")) || "";
 
     // dialog HTML - Compact Prototype
     const dialogHtml = `
@@ -206,7 +209,7 @@ Common improvised weapons:
       </div>
 
       <!-- Damage Preview -->
-      <div id="preview" style="background:#e3f2fd;border:1px solid #2196f3;border-radius:3px;padding:10px;margin-bottom:8px;">
+      <div id="preview" style="background:#ffebee;border:1px solid #ef9a9a;border-radius:3px;padding:10px;margin-bottom:8px;">
         <div style="display:flex;justify-content:space-between;align-items:center;">
           <span><strong>Damage:</strong> <span id="dmg-val">${initialDamage}</span> <span id="dmg-note" style="color:#555;">(Strength)</span></span>
           <span style="font-size:1.1em;" id="after-armor-display"><strong>→ ${initialAfterArmor} after armor</strong></span>
@@ -222,7 +225,7 @@ Common improvised weapons:
           <strong id="shifted-rank-display" style="${savedColumnShift < 0 ? 'color:#c62828;' : savedColumnShift > 0 ? 'color:#2e7d32;' : ''}">${shiftRank(ability.rank, savedColumnShift)}</strong>
           <button type="button" class="cs-reset" style="visibility:${savedColumnShift !== 0 ? 'visible' : 'hidden'};padding:1px 5px;font-size:.85em;cursor:pointer;border:1px solid #999;border-radius:2px;background:#eee;" title="Reset to 0">×</button>
         </div>
-        <div class="karma-field" style="display:flex;align-items:center;gap:4px;padding:4px 6px;border-radius:3px;${hasKarma ? 'background:#f5f0e0;border:1px solid #c9b98a;' : ''}">
+        <div class="karma-field" style="display:flex;align-items:center;gap:4px;padding:4px 6px;border-radius:3px;${hasKarma ? 'background:#e3f2fd;border:1px solid #90caf9;' : ''}">
           ${hasKarma ? `
             <label style="display:flex;align-items:center;gap:4px;cursor:pointer;">
               <input type="checkbox" id="spend-karma" name="spendKarma">
@@ -234,13 +237,13 @@ Common improvised weapons:
         </div>
       </div>
 
-      <!-- CS Notes -->
-      <div style="margin-bottom:8px;">
-        <input type="text" name="csNotes" value="${savedCsNotes}" placeholder="CS source (talents, powers...)" style="width:100%;padding:4px 6px;border:1px solid #ccc;border-radius:3px;font-size:.9em;box-sizing:border-box;">
+      <!-- CS Notes Row (text input for explaining CS value) -->
+      <div id="cs-notes-row" style="margin-bottom:6px;">
+        <input type="text" name="csNotes" id="cs-notes-input" placeholder="CS notes (e.g., Ultimate Skill +4)" value="${savedCsNotes}" style="width:100%;padding:4px 8px;border:1px solid #ccc;border-radius:3px;font-size:.9em;box-sizing:border-box;">
       </div>
 
       <!-- Multi-Attack Row -->
-      <div style="padding:6px 8px;background:#e8f5e9;border:1px solid #a5d6a7;border-radius:3px;margin-bottom:6px;">
+      <div class="multi-attack-section" style="padding:6px 8px;background:#e8f5e9;border:1px solid #a5d6a7;border-radius:3px;margin-bottom:6px;">
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
           <span style="font-weight:600;color:#2e7d32;">Multi:</span>
           <label title="Single attack, no penalty" style="cursor:pointer;"><input type="radio" name="multiMode" value="off" ${!savedMultiAttacks && !savedMultiAdjacent ? 'checked' : ''}> Off</label>
@@ -251,7 +254,7 @@ Common improvised weapons:
       </div>
 
       <!-- Pull Punch Row -->
-      <div style="padding:6px 8px;background:#fff3e0;border:1px solid #ffcc80;border-radius:3px;margin-bottom:8px;">
+      <div class="pull-punch-section" style="padding:6px 8px;background:#fff3e0;border:1px solid #ffcc80;border-radius:3px;margin-bottom:8px;">
         <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
           <label title="Voluntarily reduce damage and/or result" style="display:flex;align-items:center;gap:4px;cursor:pointer;">
             <input type="checkbox" id="pull-punch-enabled" ${savedPullEnabled ? 'checked' : ''}>
@@ -324,7 +327,6 @@ Common improvised weapons:
             const objectRank   = $dlg('[name="objectRank"]').val() || "Excellent";
             const objectValue  = parseInt($dlg('[name="objectValue"]').val() || 20);
             const shift        = parseInt($dlg('[name="shift"]').val() || 0);
-            const csNotes      = $dlg('[name="csNotes"]').val() || "";
             const { spendKarma, karmaToSpend } = extractKarmaFromDialog(html);
             const karma        = karmaToSpend;
             
@@ -338,6 +340,9 @@ Common improvised weapons:
             const multiAttacks  = (multiMode === "2" || multiMode === "3");
             const attackCount   = (multiMode === "3") ? 3 : 2;
             const multiAdjacent = (multiMode === "adjacent");
+
+            // CS Notes - read from input field
+            const csNotes = $dlg('[name="csNotes"]').val() || "";
 
             // ===== compute damage and notes =====
             let weaponMat = "", weaponName = "", damage = strength.value, note = "";
@@ -365,7 +370,6 @@ Common improvised weapons:
               await actor.setFlag("msh-faserip", "lastBluntPulledDamage", pulledDamage);
               await actor.setFlag("msh-faserip", "lastBluntResultCap", resultCap);
               await actor.setFlag("msh-faserip", "lastBluntShift", shift);
-              await actor.setFlag("msh-faserip", "lastBluntCsNotes", csNotes);
               await actor.setFlag("msh-faserip", "cs_blunt-attack", shift);  // For macro compatibility
               await actor.setFlag("msh-faserip", "lastBluntKarma", karma);
               await actor.setFlag("msh-faserip", "karma_blunt-attack", karma);  // For macro compatibility
@@ -382,12 +386,15 @@ Common improvised weapons:
                 await actor.setFlag("msh-faserip", "lastBluntObjectValue", objectValue);
               }
             }
+            
+            // Always save csNotes (explains current CS value)
+            await actor.setFlag("msh-faserip", "csNotes", csNotes);
 
             // ===== return all values to the caller =====
             resolve({
-              src, itemId, objectName, objectRank, objectValue, shift, csNotes, karma, spendKarma,
+              src, itemId, objectName, objectRank, objectValue, shift, karma, spendKarma,
               pulledDamage, resultCap, skipDice, weaponMat, weaponName, damage, note,
-              multiAttacks, attackCount, multiAdjacent
+              multiAttacks, attackCount, multiAdjacent, csNotes
             });
           }
         },
@@ -521,18 +528,55 @@ Common improvised weapons:
           html.find('#pull-punch-enabled').on('change', function() {
             const $controls = html.find('.pull-damage-controls');
             const $pulledDamage = html.find('[name="pulledDamage"]');
+            const $section = html.find('.pull-punch-section');
             if (this.checked) {
               $controls.css('display', 'flex');
               // Set value to current max (which reflects weapon/object damage)
               const currentMax = Number($pulledDamage.attr('max')) || strength.value;
               $pulledDamage.val(currentMax);
+              // Dark orange border when enabled
+              $section.css('border-color', '#e65100');
             } else {
               $controls.hide();
               // Reset result cap to "none" and damage to max when disabling pull punch
               html.find('[name="resultCap"][value="none"]').prop('checked', true);
               $pulledDamage.val($pulledDamage.attr('max'));
+              // Reset to default border
+              $section.css('border-color', '#ffcc80');
             }
           });
+          
+          // Initialize pull punch border on load
+          if (html.find('#pull-punch-enabled').is(':checked')) {
+            html.find('.pull-punch-section').css('border-color', '#e65100');
+          }
+          
+          // Karma checkbox border highlight
+          html.find('#spend-karma').on('change', function() {
+            const $field = html.find('.karma-field');
+            if (this.checked) {
+              $field.css('border-color', '#1565c0'); // Dark blue
+            } else {
+              $field.css('border-color', '#90caf9'); // Default light blue
+            }
+          });
+          
+          // Multi-attack border highlight
+          html.find('[name="multiMode"]').on('change', function() {
+            const mode = html.find('[name="multiMode"]:checked').val();
+            const $section = html.find('.multi-attack-section');
+            if (mode !== 'off') {
+              $section.css('border-color', '#2e7d32'); // Dark green
+            } else {
+              $section.css('border-color', '#a5d6a7'); // Default light green
+            }
+          });
+          
+          // Initialize multi-attack border on load
+          const initialMultiMode = html.find('[name="multiMode"]:checked').val();
+          if (initialMultiMode && initialMultiMode !== 'off') {
+            html.find('.multi-attack-section').css('border-color', '#2e7d32');
+          }
           
           applyCapabilitiesToDialog(html, "blunt-attack", { actor });
 
@@ -552,7 +596,6 @@ Common improvised weapons:
     // Track shift breakdown for detailed display
     const shiftBreakdown = {
       manual: choice.shift || 0,  // User-entered CS from dialog
-      notes: choice.csNotes || "",  // User notes explaining CS sources
       multiAttack: 0,             // Multi-attack penalty (-1 success, -3 fail)
       adjacent: 0                 // Adjacent targets penalty (-4)
     };
