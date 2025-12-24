@@ -1,4 +1,5 @@
-// attack-action.js v1.9.6 - 2025-12-23
+// attack-action.js v1.9.7 - 2025-12-24
+// v1.9.7: Remove duplicate kill check - applyDamageToTargets now handles via death-save
 // v1.9.6: Breaking FEAT fallback to derive rank from numeric armor value; added debug logging
 // v1.9.5: Borderline rule - effects can apply when armor exactly equals damage (passed via prefill)
 // v1.9.4: Breaking FEAT shows when weapon mat < target mat; miss shows "Damage: 0 (miss)"
@@ -1050,32 +1051,11 @@ export class AttackAction extends BaseAction {
           }
         }
 
-        // === AUTO-TRIGGER KILL CHECK ===
-        if (showKill) {
-          debugLog("Auto-triggering Kill check", { 
-            target: targetName, 
-            damage: penetratingDamage,
-            attackForm: attackForm
-          });
-          
-          try {
-            await ActionDispatcher.roll("kill", {
-              actor: targetActor,  // Defender makes the save
-              abilityName: "endurance",
-              opts: {
-                autoApply: true,
-                showConfirm: false,
-                attackForm: attackForm,
-                damageType: damageType,
-                prefill: {
-                  ...basePrefill
-                }
-              }
-            });
-          } catch (e) {
-            console.error("[FASERIP ERROR] Auto-trigger Kill failed:", e);
-          }
-        }
+        // === KILL CHECK ===
+        // NOTE: Kill check is now handled by applyDamageToTargets which calls death-save
+        // with the Kill Check embedded. We no longer trigger a separate kill check here
+        // to avoid duplicate chat cards.
+        // See: action-utils.js applyDamageToTargets() line ~1445
       }
       // ============================================================
       // END v1.6.0 auto-trigger block

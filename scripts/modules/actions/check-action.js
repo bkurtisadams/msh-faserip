@@ -48,11 +48,17 @@ export class CheckAction extends BaseAction {
       thisActor: this.actor,
       thisActorName: this.actor?.name,
       thisAbilityName: this.abilityName,
+      actionType: this.actionType,
       opts: this.opts
     });
 
     const actor       = this.actor;
     const actionType  = String(this.actionType || "").toLowerCase(); // "stun" | "slam" | "kill" | "save-nullify"
+    
+    if (actionType === "kill") {
+      console.log("[FASERIP DEBUG] CheckAction handling KILL action - this creates a SEPARATE chat card!");
+    }
+    
     const actionName  = labelFor(actionType);
     const mapping     = effectsFor(actionType) || {};
     //const attackerStr = getAbilityInfo(actor, "strength");

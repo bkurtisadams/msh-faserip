@@ -1,5 +1,6 @@
 //--- START OF FILE blunt-attack-action.js ---
-// blunt-attack-action.js v1.4.10 - 2025-12-23
+// blunt-attack-action.js v1.4.11 - 2025-12-24
+// v1.4.11: Use getTargetData() from action-utils.js for target acquisition
 // v1.4.10: Compute initial pull punch max from saved source (weapon/object)
 // v1.4.9: Auto-populate pulled damage to current max when enabling checkbox
 // v1.4.8: Fix pull punch - reset resultCap and damage when checkbox unchecked
@@ -31,7 +32,7 @@ import {
   effectsFor, labelFor,
   isBluntCapable, computeBluntDamage,
   rollWithKarmaAndHistory, buildResultGrid, buildActionsBox, bannerColors,
-  getTargetingContext, getBodyArmorValues, applyDamageToTargets,
+  getTargetData, getBodyArmorValues, applyDamageToTargets,
   buildModeSelector, attachModeSelectorHandlers, debugLog, setupModeSelector,
   applyCapabilitiesToDialog, buildInlineFeatDisplay
 } from "./action-utils.js";
@@ -121,17 +122,7 @@ export class BluntAttackAction extends AttackAction {
     ).join("");
 
     // Get target info for armor display
-    const targets = Array.from(game.user?.targets ?? []);
-    const primaryTarget = targets[0] ?? null;
-    const primaryTargetActor = primaryTarget?.actor ?? null;
-    
-    // Build target display - show all names if multiple
-    let targetDisplay = "(none selected)";
-    if (targets.length === 1) {
-      targetDisplay = primaryTarget.name;
-    } else if (targets.length > 1) {
-      targetDisplay = targets.map(t => t.name).join(", ");
-    }
+    const { targets, primaryTarget, primaryTargetActor, targetDisplay } = getTargetData();
     
     const targetArmorInfo = primaryTargetActor ? getBodyArmorValues(primaryTargetActor, "physical-blunt") : null;
     const targetArmor = targetArmorInfo?.applicable ?? 0;

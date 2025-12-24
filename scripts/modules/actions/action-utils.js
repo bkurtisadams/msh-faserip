@@ -1,4 +1,5 @@
-// action-utils.js v1.1.3 - 2025-12-23
+// action-utils.js v1.1.4 - 2025-12-24
+// v1.1.4: Add getTargetData() for centralized target acquisition, rename getTargetingContext to buildTargetingHTML
 // v1.1.3: Add collision damage button to collapsible slam section (Grand Slam, 1 Area)
 // v1.1.2: Breaking FEAT chip includes data-actor-uuid attribute
 // v1.1.1: Breaking FEAT chip includes weapon-mat and target-mat data attributes
@@ -1175,12 +1176,32 @@ export function getResultHoverText(actionType, color) {
 }
 
 /**
- * Get targeting context string for chat cards
+ * Get targeting data for action dialogs
+ * Returns an object with targets array and related info for use in action code
+ * @returns {Object} { targets, primaryTarget, primaryTargetActor, targetDisplay }
+ */
+export function getTargetData() {
+  const targets = Array.from(game.user?.targets ?? []);
+  const primaryTarget = targets[0] ?? null;
+  const primaryTargetActor = primaryTarget?.actor ?? null;
+  
+  let targetDisplay = "(No target)";
+  if (targets.length === 1) {
+    targetDisplay = primaryTarget.name;
+  } else if (targets.length > 1) {
+    targetDisplay = targets.map(t => t.name).join(", ");
+  }
+  
+  return { targets, primaryTarget, primaryTargetActor, targetDisplay };
+}
+
+/**
+ * Build HTML string for targeting context display in dialogs
  * @param {Actor} actor - The acting character
  * @param {string} actionLabel - The action being performed (e.g., "Blunt Attack")
  * @returns {string} HTML string describing the targeting context
  */
-export function getTargetingContext(actor, actionLabel) {
+export function buildTargetingHTML(actor, actionLabel) {
   const targets = Array.from(game.user?.targets ?? []);
 
   if (targets.length === 0) {
@@ -1197,6 +1218,9 @@ export function getTargetingContext(actor, actionLabel) {
   const targetNames = targets.map(t => t?.name || "Unknown").join(", ");
   return `<div>Targets: <strong>${targetNames}</strong> <span style="color:#666;">(${targets.length} targets)</span></div>`;
 }
+
+// Backward compatibility alias - deprecated, use buildTargetingHTML instead
+export const getTargetingContext = buildTargetingHTML;
 
 /**
  * Apply damage to targeted or controlled tokens with Body Armor calculation

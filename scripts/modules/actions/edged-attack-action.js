@@ -1,9 +1,21 @@
-// scripts/modules/actions/edged-attack-action.js
+//--- START OF FILE edged-attack-action.js ---
+// edged-attack-action.js v2.0.2 - 2025-12-24
+// v2.0.2: Use getTargetData() from action-utils.js for target acquisition
+// v2.0.1: Fix getTargetingContext - build target array manually like blunt-attack
+// v2.0.0: Complete dialog redesign to match blunt-attack compact style
+//         - Two-column Target/Attack info grid
+//         - Compact CS/Karma row with directional coloring
+//         - Inline multi-attack radios
+//         - Styled source section with highlight
+//         - After-armor damage preview with AP display
+
 import { AttackAction } from "./attack-action.js";
 import { 
   generateKarmaControlsHTML, 
   setupKarmaControlHandlers, 
-  extractKarmaFromDialog 
+  extractKarmaFromDialog,
+  getAvailableKarma,
+  getMinimumKarmaCommitment
 } from "../dice/dice-roller.js";
 import {
   RANKS,
@@ -15,21 +27,19 @@ import {
   rollWithKarmaAndHistory,
   buildResultGrid,
   bannerColors,
-  getTargetingContext,
   applyDamageToTargets,
   postDeathSavePrompt,
-  buildMultiAttackSection,
-  setupMultiAttackHandlers,
   applyCapabilitiesToDialog,
   buildModeSelector,
   setupModeSelector,
   debugLog,
   buildActionsBox,
-  buildInlineFeatDisplay
+  buildInlineFeatDisplay,
+  getTargetData,
+  getBodyArmorValues
 } from "./action-utils.js";
 import { getItemMaterialRank } from "../../gm-utils.js";
 import { makeDamageBlock, computeAfterArmor, buildDamageFlags } from "./damage-ui.js";
-import { getBodyArmorValues } from "./action-utils.js";
 import { canEffectsApply } from "../../rules/effects-gate.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
 
@@ -49,26 +59,34 @@ export class EdgedAttackAction extends AttackAction {
       const tagHit = Array.isArray(s.tags) && (s.tags.includes("EA") || s.tags.includes("edged"));
       return (s.damageType === "EA") || (s.attackType === "edged") || tagHit;
     };
+    
     const computeEdgedDamage = (strRank, strVal, matRank, weaponBase = 0) => {
       // Damage = max(min(STR rank value, material rank value), weapon base)
-      const getVal = (r)=> game.msh.getRankValue(r) || 0;
+      const getVal = (r) => game.msh.getRankValue(r) || 0;
       const sIdx = RANKS.indexOf(strRank);
       const mIdx = RANKS.indexOf(matRank);
       if (sIdx < 0 || mIdx < 0) {
-        return { damage: Math.max(strVal, weaponBase), note: weaponBase ? `Using weapon base floor (${weaponBase})` : "Using Strength value" };
+        return { damage: Math.max(strVal, weaponBase), note: weaponBase ? `Weapon base (${weaponBase})` : "Strength" };
       }
       const strCap = getVal(strRank);
       const matVal = getVal(matRank);
       const calc = Math.min(strCap, matVal);
       const finalDmg = Math.max(calc, Number(weaponBase || 0));
-      return { damage: finalDmg, note: `Damage = max(min(STR ${strCap}, MAT ${matVal}), base ${weaponBase||0})` };
+      let note = "";
+      if (finalDmg === weaponBase && weaponBase > calc) {
+        note = `Weapon base ${weaponBase}`;
+      } else if (strCap <= matVal) {
+        note = `STR capped (${strCap})`;
+      } else {
+        note = `Material capped (${matVal})`;
+      }
+      return { damage: finalDmg, note };
     };
 
     // Normalize Armor Piercing across possible fields and shapes
     const getArmorPiercing = (it) => {
       const s = it?.system || {};
       const props = s.properties || {};
-      // Prefer numeric; fall back to boolean (1) if present in props
       const ap =
         s.armorPiercing ??
         s.penetration ??
@@ -85,245 +103,392 @@ export class EdgedAttackAction extends AttackAction {
     
     let attackItems = attackItems_base;
     if (passedItem && passedItem.type === "equipment") {
-      // Add to list if not already present
       if (!attackItems.find(i => i.id === passedItem.id)) {
         attackItems = [passedItem, ...attackItems];
       }
     }
 
     // --- INITIALIZATION & DEFAULTS ---
-    // 1. Check LocalStorage for "Remember Settings" preference
     const lsRememberKey = "msh.ea.remember";
     const lsSkipKey = "msh.ea.skipDice";
-    const shouldRemember = localStorage.getItem(lsRememberKey) === "1";
-    const savedSkipDice = localStorage.getItem(lsSkipKey) === "1";
+    
+    const storedRemember = localStorage.getItem(lsRememberKey);
+    const shouldRemember = storedRemember === "1";
 
-    // 2. Determine Defaults vs Saved Flags
-    // Default Source is "weapon" (per rules/request) unless item passed overrides it
-    const defaultSource = passedItem ? "weapon" : "weapon"; 
-
+    // Load settings (Flag vs Default)
+    const defaultSource = (passedItemId && passedItem?.type === "equipment") ? "weapon" : "weapon";
+    
     const savedSource = shouldRemember 
-      ? (passedItem ? "weapon" : (await actor.getFlag("msh-faserip","lastEdgedSource") || defaultSource))
+      ? ((await actor.getFlag("msh-faserip","lastEdgedSource")) || defaultSource)
       : defaultSource;
 
     const savedItemId = passedItemId || (shouldRemember ? (await actor.getFlag("msh-faserip","lastEdgedItemId")) : "") || "";
     
-    const savedNatRank = shouldRemember ? (await actor.getFlag("msh-faserip","lastNaturalWeaponRank") || "Good") : "Good";
-    const savedNatDmg  = shouldRemember ? (await actor.getFlag("msh-faserip","lastNaturalWeaponDamage") || game.msh.getRankValue(savedNatRank)) : game.msh.getRankValue("Good");
+    const savedNatRank = shouldRemember ? ((await actor.getFlag("msh-faserip","lastNaturalWeaponRank")) || "Good") : "Good";
+    const savedNatDmg = shouldRemember ? ((await actor.getFlag("msh-faserip","lastNaturalWeaponDamage")) || game.msh.getRankValue(savedNatRank)) : game.msh.getRankValue("Good");
 
-    const savedShift = shouldRemember ? (await actor.getFlag("msh-faserip","lastEdgedShift") || 0) : 0;
     const savedMultiAttacks = shouldRemember ? (await actor.getFlag("msh-faserip","lastEdgedMultiAttacks") || false) : false;
     const savedAttackCount = shouldRemember ? (await actor.getFlag("msh-faserip","lastEdgedAttackCount") || 2) : 2;
+    const savedColumnShift = shouldRemember ? (await actor.getFlag("msh-faserip","lastEdgedShift") || 0) : 0;
+    
+    const savedSkipDice = localStorage.getItem(lsSkipKey) === "1";
 
     const itemOptions = attackItems.map(i =>
       `<option value="${i.id}" ${i.id===savedItemId?'selected':''}>${i.name}</option>`
     ).join("");
 
-    // dialog HTML
+    // Get target info for armor display
+    const { targets, primaryTarget, primaryTargetActor, targetDisplay } = getTargetData();
+    
+    const targetArmorInfo = primaryTargetActor ? getBodyArmorValues(primaryTargetActor, "physical-edged") : null;
+    const targetArmor = targetArmorInfo?.applicable ?? 0;
+    const targetArmorSource = targetArmorInfo?.source ?? "";
+    const armorNote = targets.length > 1 ? " (1st target)" : "";
+
+    // Compute initial damage based on saved source
+    let initialDamage = savedNatDmg;
+    let initialAP = 0;
+    if (savedSource === "weapon" && savedItemId) {
+      const savedWeapon = attackItems.find(i => i.id === savedItemId);
+      if (savedWeapon) {
+        const mat = getItemMaterialRank(savedWeapon);
+        const base = Number(savedWeapon.system?.damage || 0);
+        const res = computeEdgedDamage(strength.rank, strength.value, mat, base);
+        initialDamage = res.damage;
+        initialAP = getArmorPiercing(savedWeapon);
+      }
+    }
+    const initialAfterArmor = Math.max(0, initialDamage - Math.max(0, targetArmor - initialAP));
+
+    // Karma info for compact display
+    const availableKarma = getAvailableKarma(actor);
+    const minKarma = getMinimumKarmaCommitment(actor);
+    const hasKarma = availableKarma > 0;
+
+    // Dialog HTML - Compact style matching blunt-attack
     const dialogHtml = `
       ${buildModeSelector({ mode: "semi" })}
 
-      <div style="margin-bottom:8px;"><label style="display:inline-block;width:120px;">Action:</label><strong>${actionName}</strong></div>
-      <div style="margin-bottom:8px;"><label style="display:inline-block;width:120px;">Ability:</label><input type="text" value="${ability.name}" style="width:140px;" readonly></div>
-      <div style="margin-bottom:8px;"><label style="display:inline-block;width:120px;">Rank:</label><input type="text" value="${ability.rank}" style="width:120px;" readonly>
-        <span style="margin-left:6px;">(${ability.value})</span></div>
-
-      <div style="margin-bottom:8px;"><label style="display:inline-block;width:120px;">Column Shift:</label>
-        <input type="number" name="shift" value="${Number(this.opts?.shift ?? savedShift)}" style="width:52px;">
-        <span style="color:#666;font-size:.9em;">(+ right, - left)</span></div>
-
-      ${generateKarmaControlsHTML(actor, 0)}
-
-      <div style="margin:10px 0 6px;">
-        <label style="display:inline-block;width:120px;">Source:</label>
-        <label><input type="radio" name="src" value="natural" ${savedSource==='natural'?'checked':''}> Natural Weapon</label>
-        <label style="margin-left:10px;"><input type="radio" name="src" value="weapon" ${savedSource==='weapon'?'checked':''}> Edged Weapon</label>
-      </div>
-
-      <div id="natural-row" style="display:none;margin-bottom:8px;">
-        <div style="margin-bottom:6px;">
-          <label style="display:inline-block;width:120px;">Rank:</label>
-          <select name="natRank" style="width:170px;">
-            ${RANKS.map(r => `<option value="${r}" ${r===savedNatRank?'selected':''}>${r}</option>`).join('')}
-          </select>
+      <!-- Context: Target + Attack stats side by side -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+        <div style="background:#f5f5f5;padding:8px;border-radius:3px;">
+          <div style="font-weight:600;color:#666;font-size:.8em;text-transform:uppercase;">Target${targets.length > 1 ? 's' : ''}</div>
+          <div style="font-weight:600;color:#d32f2f;">${targetDisplay}</div>
+          <div style="color:#666;" id="target-armor-display">${primaryTargetActor ? `Armor: ${targetArmor}${targetArmorSource ? ` (${targetArmorSource})` : ''}${armorNote}` : ''}</div>
         </div>
-        <div style="margin-bottom:6px;">
-          <label style="display:inline-block;width:120px;">Damage:</label>
-          <input type="number" name="natDmg" value="${savedNatDmg}" style="width:80px;">
+        <div style="background:#f5f5f5;padding:8px;border-radius:3px;">
+          <div style="font-weight:600;color:#666;font-size:.8em;text-transform:uppercase;">Attack</div>
+          <div style="font-weight:600;">${ability.name}: ${ability.rank}</div>
+          <div style="color:#666;">Rank Value: ${ability.value}</div>
         </div>
       </div>
 
-      <div id="weapon-row" style="display:none;margin-bottom:8px;">
-        <div style="margin-bottom:6px;">
-          <label style="display:inline-block;width:120px;">Item:</label>
-          <select name="item" style="min-width:220px;">${itemOptions || `<option value="">(No edged weapons found)</option>`}</select>
+      <!-- Source Selection -->
+      <div class="source-section" style="padding:8px;background:${savedSource !== 'natural' ? '#fff8e1' : '#fff'};border:1px solid ${savedSource !== 'natural' ? '#ffc107' : '#ddd'};border-radius:3px;margin-bottom:8px;">
+        <div style="margin-bottom:4px;">
+          <label><input type="radio" name="src" value="natural" ${savedSource==='natural'?'checked':''}> Natural Weapon</label>
+          <label style="margin-left:12px;"><input type="radio" name="src" value="weapon" ${savedSource==='weapon'?'checked':''}> Edged Weapon</label>
+          <span style="display:inline-block;width:16px;height:16px;line-height:16px;text-align:center;border-radius:50%;background:#DC143C;color:#fff;font-size:11px;font-weight:bold;cursor:help;margin-left:6px;" title="EDGED DAMAGE RULES:
+- Natural Weapon: Uses rank damage directly
+- Edged Weapon: min(STR value, Material value)
+  then max with weapon base damage
+
+Armor Piercing (AP) reduces target armor by that value.">?</span>
         </div>
-        <div style="margin-bottom:6px;">
-          <label style="display:inline-block;width:120px;">Armor Piercing:</label>
-          <input type="text" name="apDisplay" value="0" style="width:80px;" readonly>
+        
+        <div id="natural-row" style="display:none;margin-top:6px;">
+          <div style="display:grid;grid-template-columns:auto 1fr auto 60px;gap:4px 8px;align-items:center;">
+            <label>Rank:</label>
+            <select name="natRank" style="padding:4px;">
+              ${RANKS.map(r => `<option value="${r}" ${r===savedNatRank?'selected':''}>${r}</option>`).join('')}
+            </select>
+            <label>Damage:</label>
+            <input type="number" name="natDmg" value="${savedNatDmg}" style="padding:4px;width:100%;">
+          </div>
+        </div>
+
+        <div id="weapon-row" style="display:none;margin-top:6px;">
+          <select name="item" style="width:100%;padding:4px;">${itemOptions || `<option value="">(No edged weapons)</option>`}</select>
         </div>
       </div>
 
-      ${buildMultiAttackSection("edged-attack", game.user.targets.size, savedMultiAttacks, savedAttackCount, false)}
-      
-      <div id="preview" style="margin-top:8px;padding:6px;background:#fff3e0;border:1px solid #FF9800;border-radius:3px;font-size:.9em;">
-        <strong>Damage:</strong> <span id="dmg-val">-</span>
-        <span id="dmg-note" style="margin-left:6px;color:#555;"></span>
+      <!-- Damage Preview -->
+      <div id="preview" style="background:#fce4ec;border:1px solid #e91e63;border-radius:3px;padding:10px;margin-bottom:8px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span><strong>Damage:</strong> <span id="dmg-val">${initialDamage}</span> <span id="dmg-note" style="color:#555;"></span></span>
+          <span style="font-size:1.1em;" id="after-armor-display"><strong>→ ${initialAfterArmor} after armor</strong></span>
+        </div>
+        <div id="ap-display" style="color:#666;font-size:.9em;margin-top:4px;${initialAP > 0 ? '' : 'display:none;'}">
+          Armor Piercing: <strong id="ap-val">${initialAP}</strong> (reduces target armor)
+        </div>
       </div>
 
-      <div id="msh-bottom-controls" style="margin-top:8px;">
-        <label><input type="checkbox" id="msh-remember-settings" name="remember" ${shouldRemember ? 'checked' : ''}> Remember these settings</label>
+      <!-- Modifiers Row -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;font-size:.9em;">
+        <div class="cs-field" style="display:flex;align-items:center;gap:4px;padding:4px 6px;border-radius:3px;${savedColumnShift < 0 ? 'background:#ffebee;border:1px solid #ef5350;' : savedColumnShift > 0 ? 'background:#e8f5e9;border:1px solid #66bb6a;' : 'border:1px solid transparent;'}">
+          <label style="font-weight:600;">CS:</label>
+          <input type="number" name="shift" value="${savedColumnShift}" style="width:35px;padding:3px;text-align:center;box-sizing:border-box;">
+          <span style="color:#666;">→</span>
+          <strong id="shifted-rank-display" style="${savedColumnShift < 0 ? 'color:#c62828;' : savedColumnShift > 0 ? 'color:#2e7d32;' : ''}">${shiftRank(ability.rank, savedColumnShift)}</strong>
+          <button type="button" class="cs-reset" style="visibility:${savedColumnShift !== 0 ? 'visible' : 'hidden'};padding:1px 5px;font-size:.85em;cursor:pointer;border:1px solid #999;border-radius:2px;background:#eee;" title="Reset to 0">×</button>
+        </div>
+        <div class="karma-field" style="display:flex;align-items:center;gap:4px;padding:4px 6px;border-radius:3px;${hasKarma ? 'background:#f5f0e0;border:1px solid #c9b98a;' : ''}">
+          ${hasKarma ? `
+            <label style="display:flex;align-items:center;gap:4px;cursor:pointer;">
+              <input type="checkbox" id="spend-karma" name="spendKarma">
+              <span style="font-weight:600;">Karma:</span>
+            </label>
+            <span title="Available: ${availableKarma} | Min commitment: ${minKarma} | Amount chosen after roll" style="padding:1px 4px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${availableKarma}</span>
+            <span style="color:#999;font-size:.8em;">(min ${minKarma})</span>
+          ` : `<span style="color:#999;">No karma</span>`}
+        </div>
       </div>
-      <div style="margin-top:8px;">
-        <label><input type="checkbox" id="msh-skip-dice" name="skipDice" ${savedSkipDice ? 'checked' : ''}> Skip dice animation</label>
+
+      <!-- Multi-Attack Row -->
+      <div style="padding:6px 8px;background:#e8f5e9;border:1px solid #a5d6a7;border-radius:3px;margin-bottom:8px;">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <span style="font-weight:600;color:#2e7d32;">Multi:</span>
+          <label title="Single attack, no penalty" style="cursor:pointer;"><input type="radio" name="multiMode" value="off" ${!savedMultiAttacks ? 'checked' : ''}> Off</label>
+          <label title="Remarkable Fighting FEAT. Success: 2 attacks at -1CS each. Fail: 1 attack at -3CS." style="cursor:pointer;"><input type="radio" name="multiMode" value="2" ${savedMultiAttacks && savedAttackCount === 2 ? 'checked' : ''}> 2 atk</label>
+          <label title="Amazing Fighting FEAT. Success: 3 attacks at -1CS each. Fail: 1 attack at -3CS." style="cursor:pointer;"><input type="radio" name="multiMode" value="3" ${savedMultiAttacks && savedAttackCount === 3 ? 'checked' : ''}> 3 atk</label>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div id="msh-bottom-controls" style="display:flex;justify-content:space-between;align-items:center;padding-top:8px;border-top:1px solid #ddd;">
+        <label><input type="checkbox" id="msh-remember-settings" name="remember" ${shouldRemember ? 'checked' : ''}> Remember</label>
+        <label><input type="checkbox" id="msh-skip-dice" name="skipDice" ${savedSkipDice ? 'checked' : ''}> Skip dice</label>
       </div>
     `;
 
-    const choice = await new Promise((resolve)=>{
+    const choice = await new Promise((resolve) => {
       new Dialog({
         title: `${actionName}: ${actor.name}`,
         content: dialogHtml,
         buttons: {
           roll: {
             label: "Roll",
-            callback: async (html)=>{
-              const $ = (sel)=> html.find(sel);
-              
-              // Read checkboxes from updated IDs
-              const remember = $("#msh-remember-settings").is(':checked');
-              const skipDice = $("#msh-skip-dice").is(':checked');
+            callback: async (html) => {
+              const $content = $(html).find(".dialog-content").first();
+              const $dlg = (sel) => html.find(sel);
 
-              // Persist LS settings immediately
-              localStorage.setItem(lsRememberKey, remember ? "1" : "0");
+              const rememberSettings = $content.find("#msh-remember-settings").length
+                ? $content.find("#msh-remember-settings").prop("checked")
+                : !!$dlg('[name="remember"]').is(':checked');
+
+              const skipDice = $content.find("#msh-skip-dice").length
+                ? $content.find("#msh-skip-dice").prop("checked")
+                : !!$dlg('[name="skipDice"]').is(':checked');
+
+              // Persist localStorage settings
+              localStorage.setItem(lsRememberKey, rememberSettings ? "1" : "0");
               localStorage.setItem(lsSkipKey, skipDice ? "1" : "0");
 
-              const src     = $('[name="src"]:checked').val() || "natural";
-              const itemId  = String($('[name="item"]').val() || "");
-              const natRank = String($('[name="natRank"]').val() || savedNatRank);
-              const natDmg  = Number($('[name="natDmg"]').val() || game.msh.getRankValue(natRank));
-              const shift   = Number($('[name="shift"]').val() || 0);
+              // Gather form values
+              const src = $dlg('[name="src"]:checked').val() || "natural";
+              const itemId = $dlg('[name="item"]').val() || "";
+              const natRank = $dlg('[name="natRank"]').val() || savedNatRank;
+              const natDmg = Number($dlg('[name="natDmg"]').val() || game.msh.getRankValue(natRank));
+              const shift = parseInt($dlg('[name="shift"]').val() || 0);
               const { spendKarma, karmaToSpend } = extractKarmaFromDialog(html);
-              const karma   = karmaToSpend;
-              
-              const multiAttacks = !!$('[name="multiAttacks"]').is(':checked');
-              const attackCount = parseInt($('[name="attackCount"]:checked').val() || 2);
+              const karma = karmaToSpend;
 
-              let weaponMat="", weaponName="", damage=natDmg, note="", ap=0, apCS=0, apMode="value";
+              // Multi-attack from radio
+              const multiMode = $dlg('[name="multiMode"]:checked').val() || "off";
+              const multiAttacks = (multiMode === "2" || multiMode === "3");
+              const attackCount = (multiMode === "3") ? 3 : 2;
+
+              // Compute damage and notes
+              let weaponMat = "", weaponName = "", damage = natDmg, note = "", ap = 0, apCS = 0, apMode = "value";
               if (src === "natural") {
                 weaponMat = natRank;
                 weaponName = "Natural Weapon";
                 damage = natDmg;
-                note = `${natRank} rank natural weapon`;
-                html.data('weaponNote', note);
+                note = `${natRank} natural weapon`;
               } else {
-                  // FIX: If no item selected (e.g. empty list), default damage to 0
-                  const item = attackItems.find(i=>i.id===itemId) || null;
-                  if (!item) {
-                    weaponMat = "Feeble";
-                    weaponName = "(No weapon)";
-                    damage = 0;
-                    note = "No edged weapon selected";
-                    ap = 0;
-                  } else {
-                    weaponMat = getItemMaterialRank(item);
-                    weaponName= item.name;
-                    const base = Number(item.system?.damage || 0);
-                    ap = getArmorPiercing(item);
-                    apCS = (Number(item.system.armorPiercingCS || 0) || 0);
-                    apMode = (item.system.apMode || "value");
-                    const res = computeEdgedDamage(strength.rank, strength.value, weaponMat, base);
-                    damage = res.damage; 
-                    note = res.note;
-                  }
-                  html.data('weaponNote', note);
-                }
-
-              // Only save flags if Remember is checked
-              if (remember) {
-                await actor.setFlag("msh-faserip","lastEdgedSource", src);
-                await actor.setFlag("msh-faserip","lastEdgedShift", shift);
-                await actor.setFlag("msh-faserip","lastEdgedMultiAttacks", multiAttacks);
-                await actor.setFlag("msh-faserip","lastEdgedAttackCount", attackCount);
-
-                if (src === "weapon") {
-                  await actor.setFlag("msh-faserip","lastEdgedItemId", itemId);
+                const item = attackItems.find(i => i.id === itemId) || null;
+                if (!item) {
+                  weaponMat = "Feeble";
+                  weaponName = "(No weapon)";
+                  damage = 0;
+                  note = "No weapon selected";
+                  ap = 0;
                 } else {
-                  await actor.setFlag("msh-faserip","lastNaturalWeaponRank", natRank);
-                  await actor.setFlag("msh-faserip","lastNaturalWeaponDamage", natDmg);
+                  weaponMat = getItemMaterialRank(item);
+                  weaponName = item.name;
+                  const base = Number(item.system?.damage || 0);
+                  ap = getArmorPiercing(item);
+                  apCS = Number(item.system?.armorPiercingCS || 0) || 0;
+                  apMode = item.system?.apMode || "value";
+                  const res = computeEdgedDamage(strength.rank, strength.value, weaponMat, base);
+                  damage = res.damage;
+                  note = res.note;
                 }
               }
 
-              resolve({ src, itemId, natRank, natDmg, shift, karma, spendKarma, skipDice, weaponMat, weaponName, damage, ap, apCS, apMode, html, multiAttacks, attackCount });
+              // Remember per-actor prefs
+              if (rememberSettings) {
+                await actor.setFlag("msh-faserip", "lastEdgedSource", src);
+                await actor.setFlag("msh-faserip", "lastEdgedShift", shift);
+                await actor.setFlag("msh-faserip", "cs_edged-attack", shift);
+                await actor.setFlag("msh-faserip", "lastEdgedKarma", karma);
+                await actor.setFlag("msh-faserip", "karma_edged-attack", karma);
+                await actor.setFlag("msh-faserip", "lastEdgedMultiAttacks", multiAttacks);
+                await actor.setFlag("msh-faserip", "lastEdgedAttackCount", attackCount);
 
+                if (src === "weapon") {
+                  await actor.setFlag("msh-faserip", "lastEdgedItemId", itemId);
+                } else {
+                  await actor.setFlag("msh-faserip", "lastNaturalWeaponRank", natRank);
+                  await actor.setFlag("msh-faserip", "lastNaturalWeaponDamage", natDmg);
+                }
+              }
+
+              resolve({
+                src, itemId, natRank, natDmg, shift, karma, spendKarma, skipDice,
+                weaponMat, weaponName, damage, note, ap, apCS, apMode,
+                multiAttacks, attackCount
+              });
             }
           },
-          cancel: { label: "Cancel", callback: ()=> resolve(null) }
+          cancel: { label: "Cancel", callback: () => resolve(null) }
         },
         default: "roll",
         render: async (html) => {
           setupKarmaControlHandlers(html);
           const $dialog = html.closest('.dialog');
+          
+          await setupModeSelector(actor, html, this.opts || {}, "lastEdgedMode");
 
-          // Initialize bottom controls event listeners
-          html.find("#msh-remember-settings").on("change", function() {
-              localStorage.setItem(lsRememberKey, this.checked ? "1" : "0");
-          });
-          html.find("#msh-skip-dice").on("change", function() {
-              localStorage.setItem(lsSkipKey, this.checked ? "1" : "0");
-          });
+          const getLS = (k, d=null) => {
+            try { const v = localStorage.getItem(k); return v === null ? d : v; } catch { return d; }
+          };
+          const setLS = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
 
-          const updatePreview = ()=>{
+          const update = () => {
             const src = html.find('[name="src"]:checked').val() || "natural";
-            const $nat = html.find('#natural-row');
-            const $wep = html.find('#weapon-row');
+            const $naturalRow = html.find('#natural-row');
+            const $weaponRow = html.find('#weapon-row');
             const $val = html.find('#dmg-val');
-            const $note= html.find('#dmg-note');
+            const $note = html.find('#dmg-note');
+            const $afterArmor = html.find('#after-armor-display');
+            const $apDisplay = html.find('#ap-display');
+            const $apVal = html.find('#ap-val');
+
+            $naturalRow.hide();
+            $weaponRow.hide();
+
+            let currentDamage = savedNatDmg;
+            let noteText = "";
+            let currentAP = 0;
 
             if (src === "natural") {
-              $nat.show(); $wep.hide();
-              const r = String(html.find('[name="natRank"]').val() || savedNatRank);
-              const d = Number(html.find('[name="natDmg"]').val() || game.msh.getRankValue(r));
-              $val.text(d);
-              $note.text(`Natural weapon (${r})`);
+              $naturalRow.show();
+              const rank = String(html.find('[name="natRank"]').val() || savedNatRank);
+              const dmg = Number(html.find('[name="natDmg"]').val() || game.msh.getRankValue(rank));
+              currentDamage = dmg;
+              noteText = `(${rank} natural)`;
+              currentAP = 0;
             } else {
-              $nat.hide(); $wep.show();
+              $weaponRow.show();
               const itemId = String(html.find('[name="item"]').val() || "");
-              const item = attackItems.find(i=>i.id===itemId) || null;
+              const item = attackItems.find(i => i.id === itemId) || null;
               
-              // FIX: Handle no item selected
               if (!item) {
-                $val.text("0");
-                $note.text("(No weapon selected)");
-                html.find('[name="apDisplay"]').val("0");
+                currentDamage = 0;
+                noteText = "(No weapon)";
+                currentAP = 0;
               } else {
                 const mat = getItemMaterialRank(item);
                 const base = Number(item.system?.damage || 0);
                 const res = computeEdgedDamage(strength.rank, strength.value, mat, base);
-                const ap  = getArmorPiercing(item);
-                $val.text(res.damage);
-                $note.text(`${item.name} (${mat}) — ${res.note}`);
-                html.find('[name="apDisplay"]').val(String(ap));
+                currentDamage = res.damage;
+                noteText = `(${item.name})`;
+                currentAP = getArmorPiercing(item);
               }
             }
+
+            $val.text(currentDamage);
+            $note.text(noteText);
+
+            // Update AP display
+            if (currentAP > 0) {
+              $apDisplay.show();
+              $apVal.text(currentAP);
+            } else {
+              $apDisplay.hide();
+            }
+
+            // Update after-armor display (accounting for AP)
+            const effectiveArmor = Math.max(0, targetArmor - currentAP);
+            const afterArmorDmg = Math.max(0, currentDamage - effectiveArmor);
+            if (primaryTarget) {
+              $afterArmor.html(`<strong>→ ${afterArmorDmg} after armor</strong>`);
+            } else {
+              $afterArmor.html(`<strong>→ ${currentDamage} damage</strong>`);
+            }
+
+            // Update shifted rank display with directional coloring
+            const cs = parseInt(html.find('[name="shift"]').val()) || 0;
+            const shiftedRankText = shiftRank(ability.rank, cs);
+            const $shiftedRank = html.find('#shifted-rank-display');
+            $shiftedRank.text(shiftedRankText);
+            
+            const $csField = html.find('.cs-field');
+            const $resetBtn = html.find('.cs-reset');
+            if (cs < 0) {
+              $csField.css({ 'background': '#ffebee', 'border': '1px solid #ef5350' });
+              $shiftedRank.css('color', '#c62828');
+              $resetBtn.css('visibility', 'visible');
+            } else if (cs > 0) {
+              $csField.css({ 'background': '#e8f5e9', 'border': '1px solid #66bb6a' });
+              $shiftedRank.css('color', '#2e7d32');
+              $resetBtn.css('visibility', 'visible');
+            } else {
+              $csField.css({ 'background': '', 'border': '1px solid transparent' });
+              $shiftedRank.css('color', '');
+              $resetBtn.css('visibility', 'hidden');
+            }
+            
+            // Update source section highlighting
+            const $sourceSection = html.find('.source-section');
+            if (src !== 'natural') {
+              $sourceSection.css({ 'background': '#fff8e1', 'border-color': '#ffc107' });
+            } else {
+              $sourceSection.css({ 'background': '#fff', 'border-color': '#ddd' });
+            }
+
             if ($dialog.length) $dialog[0].style.height = 'auto';
           };
 
-          const syncNatDamage = ()=>{
+          const syncNatDamage = () => {
             const r = String(html.find('[name="natRank"]').val() || savedNatRank);
             const v = game.msh.getRankValue(r);
             html.find('[name="natDmg"]').val(v);
-            updatePreview();
+            update();
           };
-
-          // init + listeners
-          updatePreview();
-          html.find('[name="src"]').on('change', updatePreview);
-          html.find('[name="item"]').on('change', updatePreview);
+          
+          update();
+          html.find('[name="src"]').on('change', update);
+          html.find('[name="item"]').on('change', update);
+          html.find('[name="shift"]').on('input change', update);
           html.find('[name="natRank"]').on('change', syncNatDamage);
+          html.find('[name="natDmg"]').on('input change', update);
+          
+          // CS reset button handler
+          html.find('.cs-reset').on('click', function(e) {
+            e.preventDefault();
+            html.find('[name="shift"]').val(0).trigger('change');
+          });
 
-         html.find('[name="natDmg"]').on('input', updatePreview);
-          await setupModeSelector(actor, html, this.opts || {}, "lastEdgedMode");
-          setupMultiAttackHandlers(html);
+          // Bottom controls persistence
+          html.find('#msh-skip-dice').on('change', function() {
+            setLS(lsSkipKey, this.checked ? "1" : "0");
+          });
+          html.find('#msh-remember-settings').on('change', function() {
+            setLS(lsRememberKey, this.checked ? "1" : "0");
+          });
+
           applyCapabilitiesToDialog(html, "edged-attack", { actor });
         }
       }).render(true);
@@ -331,29 +496,20 @@ export class EdgedAttackAction extends AttackAction {
     
     if (!choice) return;
 
-    // Reload mode from flags (user may have changed it in dialog)
-    this.opts.mode = await actor.getFlag("msh-faserip", "lastEdgedMode") || "semi";
-    const mode = this.opts.mode;
-    if (mode === "manual") {
-      this.opts.autoApply = false;
-      this.opts.showConfirm = false;
-    } else if (mode === "semi") {
-      this.opts.autoApply = false;
-      this.opts.showConfirm = true;
-    } else {
-      this.opts.autoApply = true;
-      this.opts.showConfirm = false;
-    }
+    // Track shift breakdown for detailed display
+    const shiftBreakdown = {
+      manual: choice.shift || 0,
+      multiAttack: 0
+    };
 
-    // Handle multi-attacks (2 or 3 attacks, must make FEAT; all attacks @-1 CS)
+    // Handle multi-attacks
     let actualAttackCount = 1;
-    let multiAttackFeatResult = null;  // Store FEAT result for consolidated display
+    let multiAttackFeatResult = null;
     
     if (choice.multiAttacks) {
       const fightingAbility = getAbilityInfo(actor, "fighting");
       const intensity = choice.attackCount === 2 ? "Remarkable" : "Amazing";
       
-      // Calculate effective Fighting rank with column shift
       const effectiveFightingRank = shiftRank(fightingAbility.rank, choice.shift || 0);
       
       const featResult = await this._rollFightingFeat(
@@ -362,58 +518,11 @@ export class EdgedAttackAction extends AttackAction {
         intensity, 
         choice.attackCount
       );
+      
       if (featResult.cancelled) return;
       
-      // Store for consolidated display
       multiAttackFeatResult = { ...featResult, intensity, attackCount: choice.attackCount };
       
-      if (!featResult.success) {
-        // Failed FEAT: 1 attack at -3CS
-        choice.shift = (choice.shift || 0) - 3;
-        actualAttackCount = 1;
-      } else {
-        // Success: Multiple attacks at -1CS each
-        choice.shift = (choice.shift || 0) - 1;
-        actualAttackCount = choice.attackCount;
-      }
-    }
-
-    // Execute attack(s)
-    const targets = Array.from(game.user?.targets ?? []);
-    // Distribute hits round-robin across selected targets
-    for (let i = 0; i < actualAttackCount; i++) {
-      if (i > 0) {
-        await new Promise(resolve => setTimeout(resolve, 500));
-      }
-
-      // If FEAT failed (actual=1), hit first target. 
-      // If FEAT success, distribute 1st attack to 1st target, 2nd to 2nd, 3rd to 3rd (or loop back)
-      const targetForThisAttack = actualAttackCount === 1 
-        ? targets[0] 
-        : targets.length ? targets[i % targets.length] : null;
-
-      const actionLabel = actualAttackCount > 1 ? `${actionName} (${i+1}/${actualAttackCount})` : actionName;
-      
-      await this._executeSingleAttack({
-        // Only pass FEAT result on the first attack to avoid duplication
-        choice: { ...choice, specificTarget: targetForThisAttack, multiAttackFeatResult: i === 0 ? multiAttackFeatResult : null },
-        actor: this.actor,
-        ability,
-        actionType,
-        actionName: actionLabel,
-        effects,
-        damageType: "physical-edged",
-        rawDamage: choice.damage,
-        damageNote: choice.note || "",
-        sourceName: choice.weaponName || "Natural Weapon",
-        attackForm: "edged",
-        breakingFeat: { weaponMat: choice.weaponMat },
-        targetCount: 1
-      });
-    }
-
-    // Multi-attack completion message (only if not using consolidated mode)
-    if (actualAttackCount > 1) {
       let useConsolidated = false;
       try {
         useConsolidated = game.settings.get("msh-faserip", "consolidatedChatCards");
@@ -422,12 +531,59 @@ export class EdgedAttackAction extends AttackAction {
       if (!useConsolidated) {
         await ChatMessage.create({
           speaker: ChatMessage.getSpeaker({ actor }),
-          content: `<div style="background:#e8f5e9;border:1px solid #4caf50;border-radius:3px;padding:8px;margin:5px 0;">
-            <div style="color:#2e7d32;font-weight:bold;margin-bottom:5px;">Multiple Attack Sequence Complete</div>
-            <div style="font-size:0.9em;">${actor.name} completed ${actualAttackCount} attacks.</div>
-          </div>`
+          content: `<div style="background:#eef6ff;border:1px solid #90caf9;border-radius:3px;padding:6px;margin:4px 0;">
+            <b>Multi-Attack FEAT:</b> ${intensity} — ${
+              featResult?.success ? "SUCCESS" : "FAIL"
+            } ${featResult?.auto ? "(Automatic)" : ""}</div>`
         });
       }
+
+      const featSuccess = !!(featResult?.auto || featResult?.resultColor === "AUTO" || featResult?.success);
+      const featImpossible = !!(featResult?.resultColor === "IMPOSSIBLE");
+      
+      if (featSuccess && !featImpossible) {
+        actualAttackCount = choice.attackCount;
+        shiftBreakdown.multiAttack = -1;
+        choice.shift = (choice.shift || 0) - 1;
+        ui.notifications.info(`Multi-attack successful! Making ${actualAttackCount} attacks at -1CS each!`);
+      } else {
+        actualAttackCount = 1;
+        shiftBreakdown.multiAttack = -3;
+        choice.shift = (choice.shift || 0) - 3;
+        ui.notifications.warn(`Multi-attack FEAT failed! Only making 1 attack at -3CS.`);
+      }
     }
-  } 
+
+    choice.shiftBreakdown = shiftBreakdown;
+
+    // Execute attacks
+    const selected = Array.from(game.user?.targets ?? []);
+    const count = Math.max(1, actualAttackCount);
+
+    for (let i = 0; i < count; i++) {
+      if (i > 0) await new Promise(r => setTimeout(r, 300));
+
+      const tgt = (count === 1)
+        ? (selected[0] ?? null)
+        : (selected.length ? selected[i % selected.length] : null);
+
+      await this._executeSingleAttack({
+        choice: { ...choice, specificTarget: tgt, multiAttackFeatResult: i === 0 ? multiAttackFeatResult : null },
+        actor,
+        ability,
+        actionType,
+        actionName,
+        effects,
+        damageType: "physical-edged",
+        rawDamage: choice.damage,
+        damageNote: choice.note,
+        sourceName: choice.weaponName || "Natural Weapon",
+        attackForm: "edged",
+        breakingFeat: { weaponMat: choice.weaponMat },
+        targetCount: 1,
+        attackNumber: i + 1,
+        totalAttacks: count
+      });
+    }
+  }
 }
