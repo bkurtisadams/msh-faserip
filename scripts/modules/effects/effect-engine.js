@@ -1,4 +1,5 @@
-// scripts/modules/effects/effect-engine.js v1.2.1 - 2025-12-22
+// scripts/modules/effects/effect-engine.js v1.3.0 - 2025-12-24
+// v1.3.0: Duplicate effect handling - stun keeps longer duration, slam keeps more severe
 // v1.2.1: Reduce console logging verbosity
 // v1.2.0: Improved debug logging for effect creation and duration tracking
 // v1.1.0: Add proper Foundry changes arrays to effect wrappers
@@ -270,6 +271,29 @@ const AE_MODE = {
 };
 
 export async function applyStun(actor, { rounds = 1, originUuid = null } = {}, opts = {}) {
+  // Check for existing stun effect
+  const existingStun = actor.effects.find(e => 
+    e.statuses?.has("stunned") || 
+    e.flags?.[SCOPE()]?.effectType === "stunned" ||
+    e.name?.toLowerCase().includes("stunned")
+  );
+  
+  if (existingStun) {
+    // Get remaining duration of existing stun
+    const existingRounds = existingStun.duration?.remaining ?? 
+                          existingStun.duration?.rounds ?? 0;
+    
+    if (rounds <= existingRounds) {
+      // New stun is shorter or equal - keep existing
+      console.log(`[FASERIP] Stun: Keeping existing (${existingRounds} rounds) over new (${rounds} rounds)`);
+      return existingStun;
+    } else {
+      // New stun is longer - remove existing and apply new
+      console.log(`[FASERIP] Stun: Replacing existing (${existingRounds} rounds) with new (${rounds} rounds)`);
+      await existingStun.delete();
+    }
+  }
+  
   return applyEffect(actor, {
     name: "Stunned",
     img: "icons/svg/daze.svg",
@@ -357,6 +381,54 @@ export async function applyCatch(actor, { scenario = "generic", vsYou = "", note
 
 /** Apply Slam note/prone/stagger. Optionally drive token displacement elsewhere. */
 export async function applySlam(actor, { kind = "No Slam", knockbackAreas = 0, prone = false, stagger = false } = {}, opts = {}) {
+  // Slam severity hierarchy: Grand Slam (3) > 1 Area (2) > Stagger (1) > No Slam (0)
+  const SLAM_SEVERITY = {
+    "Grand Slam": 3,
+    "1 Area": 2,
+    "Stagger": 1,
+    "No Slam": 0
+  };
+  
+  const newSeverity = SLAM_SEVERITY[kind] ?? 0;
+  
+  // Check for existing slam effects
+  const existingSlam = actor.effects.find(e => {
+    const effectType = e.flags?.[SCOPE()]?.effectType;
+    return effectType === "grandSlam" || effectType === "slammed" || effectType === "staggered" ||
+           e.statuses?.has("prone") || e.statuses?.has("staggered") ||
+           e.name?.toLowerCase().includes("slam");
+  });
+  
+  if (existingSlam) {
+    // Determine existing slam severity
+    const existingType = existingSlam.flags?.[SCOPE()]?.effectType;
+    const existingKind = existingSlam.flags?.[SCOPE()]?.kind;
+    let existingSeverity = 0;
+    
+    if (existingType === "grandSlam" || existingKind === "Grand Slam") {
+      existingSeverity = 3;
+    } else if (existingType === "slammed" || existingKind === "1 Area") {
+      existingSeverity = 2;
+    } else if (existingType === "staggered" || existingKind === "Stagger") {
+      existingSeverity = 1;
+    }
+    
+    if (newSeverity <= existingSeverity) {
+      // New slam is same or less severe - keep existing
+      console.log(`[FASERIP] Slam: Keeping existing (${existingKind || existingType}) over new (${kind})`);
+      return existingSlam;
+    } else {
+      // New slam is more severe - remove existing and apply new
+      console.log(`[FASERIP] Slam: Replacing existing (${existingKind || existingType}) with new (${kind})`);
+      await existingSlam.delete();
+    }
+  }
+  
+  // Don't create an effect for "No Slam"
+  if (kind === "No Slam" && !prone && !stagger) {
+    return null;
+  }
+  
   // Determine effect type based on slam kind
   let effectType = "slammed";
   let changes = [];

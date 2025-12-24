@@ -1,4 +1,5 @@
-// scripts/modules/actions/check-action.js v1.5.0 - 2025-12-23
+// scripts/modules/actions/check-action.js v1.5.1 - 2025-12-24
+// v1.5.1: Refactor _createSlamEffect to use Effects.applySlam (duplicate checking)
 // v1.5.0: Add returnResultOnly mode for inline embedding in attack cards (collapsible sections)
 // v1.4.1: Show stun duration with hover text for die type
 // v1.4.0: Change stun duration from "d10 + cap" to configurable die (stunDurationDie setting)
@@ -737,51 +738,13 @@ export class CheckAction extends BaseAction {
     const targetActor = await this._resolveTokenActor(targetUuid);
     if (!targetActor) return;
     
-    const SCOPE = globalThis.MSH_FLAG_SCOPE || "msh-faserip";
-    
-    if (slamEffect === "Grand Slam") {
-      await Effects.applyEffect(targetActor, {
-        name: `Grand Slam (Knockback ${knockbackDistance} areas)`,
-        img: "icons/svg/falling.svg",
-        rounds: 2,
-        origin: this.actor?.uuid ?? null,
-        flags: {
-          [SCOPE]: {
-            effectType: "grandSlam",
-            slamSpeed: knockbackDistance,
-            attackerStrength
-          }
-        },
-        changes: [
-          { key: "system.status.prone", mode: CONST.ACTIVE_EFFECT_MODES.OVERRIDE, value: true }
-        ],
-        statuses: ["prone"]
-      }, opts);
-    } else if (slamEffect === "1 Area") {
-      await Effects.applyEffect(targetActor, {
-        name: "Slammed (1 Area)",
-        img: "icons/svg/falling.svg",
-        rounds: 1,
-        origin: this.actor?.uuid ?? null,
-        flags: {
-          [SCOPE]: { slammed: true, distance: 1 }
-        },
-        changes: [
-          { key: "system.status.prone", mode: CONST.ACTIVE_EFFECT_MODES.OVERRIDE, value: true }
-        ],
-        statuses: ["prone"]
-      }, opts);
-    } else if (slamEffect === "Stagger") {
-      await Effects.applyEffect(targetActor, {
-        name: "Staggered",
-        img: "icons/svg/stoned.svg",
-        rounds: 1,
-        flags: {
-          [SCOPE]: { staggered: true }
-        },
-        statuses: ["staggered"]
-      }, opts);
-    }
+    // Use centralized applySlam which handles duplicate checking
+    await Effects.applySlam(targetActor, {
+      kind: slamEffect,
+      knockbackAreas: knockbackDistance || 0,
+      prone: (slamEffect === "Grand Slam" || slamEffect === "1 Area"),
+      stagger: (slamEffect === "Stagger")
+    }, opts);
   }
 
   _extraExplanationHtml({ actionType, targetAbility, colorLower, finalEffect, effectsSuppressed, stunDuration=null }) {
