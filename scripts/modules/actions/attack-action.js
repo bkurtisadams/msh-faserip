@@ -1,4 +1,7 @@
-// attack-action.js v1.9.7 - 2025-12-24
+// attack-action.js v1.9.10 - 2025-12-24
+// v1.9.10: CS breakdown shows unlabeled value if no notes (e.g., "+4" not "+4 manual")
+// v1.9.9: CS notes shown directly in hover (no redundant "+N manual:" prefix)
+// v1.9.8: Include CS notes in shift breakdown hover display
 // v1.9.7: Remove duplicate kill check - applyDamageToTargets now handles via death-save
 // v1.9.6: Breaking FEAT fallback to derive rank from numeric armor value; added debug logging
 // v1.9.5: Borderline rule - effects can apply when armor exactly equals damage (passed via prefill)
@@ -783,8 +786,12 @@ export class AttackAction extends BaseAction {
         const breakdown = choice.shiftBreakdown;
         
         // Manual shift from dialog (user-entered)
-        if (breakdown?.manual && breakdown.manual !== 0) {
-          parts.push(`${breakdown.manual > 0 ? '+' : ''}${breakdown.manual} manual`);
+        if (breakdown?.notes) {
+          // User provided notes - show them directly
+          parts.push(breakdown.notes);
+        } else if (breakdown?.manual && breakdown.manual !== 0) {
+          // No notes, just show the value (no label)
+          parts.push(`${breakdown.manual > 0 ? '+' : ''}${breakdown.manual}`);
         }
         
         // Multi-attack penalty

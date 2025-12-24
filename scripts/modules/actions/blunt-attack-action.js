@@ -1,5 +1,6 @@
 //--- START OF FILE blunt-attack-action.js ---
-// blunt-attack-action.js v1.4.11 - 2025-12-24
+// blunt-attack-action.js v1.4.12 - 2025-12-24
+// v1.4.12: Add CS Notes text field for documenting column shift sources
 // v1.4.11: Use getTargetData() from action-utils.js for target acquisition
 // v1.4.10: Compute initial pull punch max from saved source (weapon/object)
 // v1.4.9: Auto-populate pulled damage to current max when enabling checkbox
@@ -99,6 +100,7 @@ export class BluntAttackAction extends AttackAction {
     const savedAttackCount = shouldRemember ? (await actor.getFlag("msh-faserip","lastBluntAttackCount") || 2) : 2;
     const savedMultiAdjacent = shouldRemember ? (await actor.getFlag("msh-faserip","lastBluntMultiAdjacent") || false) : false;
     const savedColumnShift  = shouldRemember ? (await actor.getFlag("msh-faserip","lastBluntShift") || 0) : 0;
+    const savedCsNotes = shouldRemember ? ((await actor.getFlag("msh-faserip","lastBluntCsNotes")) || "") : "";
     
     // Skip Dice is a client setting, mostly UI based, stored in LS
     const savedSkipDice = localStorage.getItem(lsSkipKey) === "1";
@@ -232,6 +234,11 @@ Common improvised weapons:
         </div>
       </div>
 
+      <!-- CS Notes -->
+      <div style="margin-bottom:8px;">
+        <input type="text" name="csNotes" value="${savedCsNotes}" placeholder="CS source (talents, powers...)" style="width:100%;padding:4px 6px;border:1px solid #ccc;border-radius:3px;font-size:.9em;box-sizing:border-box;">
+      </div>
+
       <!-- Multi-Attack Row -->
       <div style="padding:6px 8px;background:#e8f5e9;border:1px solid #a5d6a7;border-radius:3px;margin-bottom:6px;">
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
@@ -317,6 +324,7 @@ Common improvised weapons:
             const objectRank   = $dlg('[name="objectRank"]').val() || "Excellent";
             const objectValue  = parseInt($dlg('[name="objectValue"]').val() || 20);
             const shift        = parseInt($dlg('[name="shift"]').val() || 0);
+            const csNotes      = $dlg('[name="csNotes"]').val() || "";
             const { spendKarma, karmaToSpend } = extractKarmaFromDialog(html);
             const karma        = karmaToSpend;
             
@@ -357,6 +365,7 @@ Common improvised weapons:
               await actor.setFlag("msh-faserip", "lastBluntPulledDamage", pulledDamage);
               await actor.setFlag("msh-faserip", "lastBluntResultCap", resultCap);
               await actor.setFlag("msh-faserip", "lastBluntShift", shift);
+              await actor.setFlag("msh-faserip", "lastBluntCsNotes", csNotes);
               await actor.setFlag("msh-faserip", "cs_blunt-attack", shift);  // For macro compatibility
               await actor.setFlag("msh-faserip", "lastBluntKarma", karma);
               await actor.setFlag("msh-faserip", "karma_blunt-attack", karma);  // For macro compatibility
@@ -376,7 +385,7 @@ Common improvised weapons:
 
             // ===== return all values to the caller =====
             resolve({
-              src, itemId, objectName, objectRank, objectValue, shift, karma, spendKarma,
+              src, itemId, objectName, objectRank, objectValue, shift, csNotes, karma, spendKarma,
               pulledDamage, resultCap, skipDice, weaponMat, weaponName, damage, note,
               multiAttacks, attackCount, multiAdjacent
             });
@@ -543,6 +552,7 @@ Common improvised weapons:
     // Track shift breakdown for detailed display
     const shiftBreakdown = {
       manual: choice.shift || 0,  // User-entered CS from dialog
+      notes: choice.csNotes || "",  // User notes explaining CS sources
       multiAttack: 0,             // Multi-attack penalty (-1 success, -3 fail)
       adjacent: 0                 // Adjacent targets penalty (-4)
     };
