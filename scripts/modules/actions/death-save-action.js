@@ -1,4 +1,5 @@
-// scripts/modules/actions/death-save-action.js v1.5.1 - 2025-12-24
+// scripts/modules/actions/death-save-action.js v1.5.2 - 2025-12-24
+// v1.5.2: Add fromDeathSave flag to Unconscious effect for wake-up health restoration
 // v1.5.1: UI improvements - remove emoji from Kill Check header, use green for No Effect,
 //         blue for Unconscious, style result color as badge (Yellow/Green/White/Red)
 // v1.5.0: Apply IMMEDIATE first Endurance rank loss when dying (per rules)
@@ -735,6 +736,7 @@ export class DeathSaveAction extends BaseAction {
         [scope]: {
           isUnconscious: true,
           zeroHealth: true,
+          fromDeathSave: true,  // Mark as from death save for wake-up health restoration
           durationRounds: Number(unconsciousRounds)
         }
       },

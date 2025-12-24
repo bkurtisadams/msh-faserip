@@ -1,4 +1,5 @@
-// init.js v1.6.0 - 2025-12-24
+// init.js v1.7.0 - 2025-12-24
+// v1.7.0: Restore health to Endurance value when waking from 0 HP knockout (not dying)
 // v1.6.0: Reduce current health when Endurance drops from dying (not just max health)
 // v1.5.9: Fix originalEndurance tracking - store in both actor and effect flags when first processing
 // v1.5.8: Add stunDurationDie setting (replaces maxStunDuration)
@@ -1651,6 +1652,38 @@ Hooks.on("updateCombat", async (combat, changed, diff, userId) => {
       // Delete expired effects
       for (const { effect, reason } of toDelete) {
         console.log(`[FASERIP] Auto-expiring effect "${effect.name}" on ${a.name}: ${reason}`);
+        
+        // Check if this is an Unconscious effect from death save (0 HP knockout)
+        // If so, restore health to Endurance rank value when waking up
+        const scope = globalThis.MSH_FLAG_SCOPE || "msh-faserip";
+        const isFromDeathSave = effect.getFlag(scope, "fromDeathSave") || 
+                                (effect.getFlag(scope, "zeroHealth") && effect.getFlag(scope, "isUnconscious"));
+        const isDying = a.effects.some(e => e.getFlag(scope, "isDying"));
+        
+        if (isFromDeathSave && !isDying) {
+          // Character is waking up from 0 HP knockout (not dying)
+          // Restore health to Endurance rank value
+          const enduranceValue = a.system?.abilities?.endurance?.value || 8;
+          const currentHealth = a.system?.attributes?.health?.value || 0;
+          
+          console.log(`[FASERIP] ${a.name} waking up from knockout - restoring health to Endurance value (${enduranceValue})`);
+          
+          try {
+            await a.update({ "system.attributes.health.value": enduranceValue });
+            
+            // Post wake-up message
+            await ChatMessage.create({
+              speaker: ChatMessage.getSpeaker({ actor: a }),
+              content: `<div style="background:#e3f2fd;border:1px solid #90caf9;padding:8px;border-radius:3px;">
+                <strong>${a.name}</strong> regains consciousness!
+                <div style="margin-top:4px;font-size:.9em;color:#666;">Health restored to ${enduranceValue} (Endurance rank value).</div>
+              </div>`
+            });
+          } catch (err) {
+            console.error(`[FASERIP ERROR] Failed to restore health for ${a.name}:`, err);
+          }
+        }
+        
         try { 
           await effect.delete(); 
         } catch (e) { 
