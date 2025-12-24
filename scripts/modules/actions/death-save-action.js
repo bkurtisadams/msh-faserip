@@ -1,4 +1,5 @@
-// scripts/modules/actions/death-save-action.js v1.3.1 - 2025-12-24
+// scripts/modules/actions/death-save-action.js v1.3.2 - 2025-12-24
+// v1.3.2: Store originalEndurance in Dying effect flags and actor flags for recovery tracking
 // v1.3.1: Fix structure - Death Save is outer card, Kill Check is collapsible inside
 //         - Roll number has hover text showing what was rolled
 // v1.3.0: Dialog and chat card redesign matching slam/stun check style
@@ -422,6 +423,13 @@ export class DeathSaveAction extends BaseAction {
   async _createDyingEffect(actor, endurance, _unconsciousDuration) {
       const scope = globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faserip";
 
+      // Store original endurance on actor for recovery tracking
+      const currentEndurance = actor.system?.abilities?.endurance?.rank || endurance.rank;
+      const existingOriginal = actor.getFlag(scope, "originalEndurance");
+      if (!existingOriginal) {
+        await actor.setFlag(scope, "originalEndurance", currentEndurance);
+      }
+
       // Remove any existing dying effects to avoid duplicates
       try {
         const existing = actor.effects.filter(e => e.flags?.[scope]?.isDying);
@@ -447,7 +455,8 @@ export class DeathSaveAction extends BaseAction {
         flags: {
           [scope]: {
             isDying: true,
-            zeroHealth: true
+            zeroHealth: true,
+            originalEndurance: existingOriginal || currentEndurance
           }
         },
         changes: [

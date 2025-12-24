@@ -1,4 +1,6 @@
-// init.js v1.5.8 - 2025-12-22
+// init.js v1.6.0 - 2025-12-24
+// v1.6.0: Reduce current health when Endurance drops from dying (not just max health)
+// v1.5.9: Fix originalEndurance tracking - store in both actor and effect flags when first processing
 // v1.5.8: Add stunDurationDie setting (replaces maxStunDuration)
 // v1.5.7: Reduce console logging verbosity
 // v1.5.6: Improve effect expiration - advance worldTime per turn, comprehensive debug logging
@@ -1745,21 +1747,35 @@ Hooks.on("updateCombat", async (combat, changed, diff, userId) => {
       const curName  = game.msh.getEnduranceRankName(actor);
       const nextName = game.msh.nextLowerRankName(curName);
 
-    // Calculate the numeric value for the new rank - ADD THIS BEFORE THE TRY BLOCK
+    // Calculate the numeric value for the new rank
+    const curValue = actor.system?.abilities?.endurance?.value || game.msh.getRankValue(curName) || 0;
     const nextValue = game.msh.getRankValue(nextName) || 0;
+    const enduranceLoss = curValue - nextValue;
+
+    // Calculate new health (both max and current drop by endurance loss)
+    const currentHealth = actor.system?.attributes?.health?.value || 0;
+    const newHealth = Math.max(0, currentHealth - enduranceLoss);
 
     if (game.settings.get("msh-faserip", "debugMode")) {
-      console.log(`[FASERIP:DYING] ${actor.name} Endurance: ${curName} -> ${nextName} (${nextValue})`);
+      console.log(`[FASERIP:DYING] ${actor.name} Endurance: ${curName} (${curValue}) -> ${nextName} (${nextValue}), Health: ${currentHealth} -> ${newHealth}`);
     }
 
-    // line moved - right after the nextValue calculation and BEFORE the try block:
-    const originalRank = dyingEffect.getFlag(scope, "originalEndurance") || curName;
+    // Get or set original endurance - check effect flags, actor flags, then use current
+    let originalRank = dyingEffect.getFlag(scope, "originalEndurance") || actor.getFlag(scope, "originalEndurance");
+    if (!originalRank) {
+      // First time processing - store original endurance
+      originalRank = curName;
+      await actor.setFlag(scope, "originalEndurance", originalRank);
+      await dyingEffect.setFlag(scope, "originalEndurance", originalRank);
+      console.log(`[FASERIP:DYING] Stored original Endurance for ${actor.name}: ${originalRank}`);
+    }
 
-    // Update the actor's printed rank AND value
+    // Update the actor's endurance AND health (both max recalculates automatically, current drops)
     try {
       await actor.update({
         "system.abilities.endurance.rank": nextName,
-        "system.abilities.endurance.value": nextValue
+        "system.abilities.endurance.value": nextValue,
+        "system.attributes.health.value": newHealth
       });
 
       // Create Impaired Endurance effect
@@ -1829,10 +1845,11 @@ Hooks.on("updateCombat", async (combat, changed, diff, userId) => {
       console.error(`[FASERIP ERROR] Failed to update Dying effect:`, err);
     }
 
-    // Post message about Endurance loss
+    // Post message about Endurance and Health loss
     ChatMessage.create({
       content: `<div style="background:#ffebee;border:1px solid #ef5350;padding:8px;border-radius:3px;">
         <strong>${actor.name}</strong> is dying and loses 1 Endurance rank: ${curName} → ${nextName}
+        <div style="margin-top:4px;font-size:.9em;color:#666;">Health: ${currentHealth} → ${newHealth} (−${enduranceLoss})</div>
       </div>`
     });
 

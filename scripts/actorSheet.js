@@ -1,4 +1,5 @@
-// actorSheet.js v1.0.2 - 2025-12-22
+// actorSheet.js v1.1.0 - 2025-12-24
+// v1.1.0: Add visual indicators for Endurance impairment and reduced health max (dying state)
 // v1.0.2: Fix column shift persistence in blunt attack dialog
 // v1.0.1: Remove verbose debug logging on sheet render
 import { prepareActiveEffectCategories, onManageActiveEffect } from "../helpers/effects.mjs";
@@ -218,6 +219,44 @@ export class FaseripActorSheet extends ActorSheet {
     context.movementInfo = this.actor.movementInfo;
 
     context.availableKarma = Math.max(0, lifetime - spent - advancement);
+    
+    // Check for Endurance impairment (from Dying state)
+    const scope = globalThis.MSH_FLAG_SCOPE || "msh-faserip";
+    const impairedEffect = this.actor.effects.find(e => e.getFlag(scope, "isImpairedEndurance"));
+    const dyingEffect = this.actor.effects.find(e => e.getFlag(scope, "isDying") || e.statuses?.has?.("dying"));
+    
+    if (impairedEffect || dyingEffect) {
+      const originalEndurance = impairedEffect?.getFlag(scope, "originalEndurance") || 
+                                dyingEffect?.getFlag(scope, "originalEndurance") ||
+                                this.actor.getFlag(scope, "originalEndurance");
+      const currentEndurance = context.system.abilities?.endurance?.rank;
+      
+      context.isEnduranceImpaired = originalEndurance && originalEndurance !== currentEndurance;
+      context.originalEndurance = originalEndurance;
+      context.currentEndurance = currentEndurance;
+      
+      // Calculate original health max from original endurance
+      if (originalEndurance) {
+        const rankValues = {
+          "Shift-0": 0, "Feeble": 2, "Poor": 4, "Typical": 6, "Good": 10,
+          "Excellent": 20, "Remarkable": 30, "Incredible": 40, "Amazing": 50,
+          "Monstrous": 75, "Unearthly": 100, "Shift-X": 150, "Shift-Y": 200,
+          "Shift-Z": 500, "Class 1000": 1000, "Class 3000": 3000, "Class 5000": 5000, "Beyond": 10000
+        };
+        const originalEnduranceValue = rankValues[originalEndurance] || 0;
+        const currentEnduranceValue = context.system.abilities?.endurance?.value || 0;
+        const healthMaxDiff = originalEnduranceValue - currentEnduranceValue;
+        context.originalHealthMax = context.system.attributes.health.max + healthMaxDiff;
+        context.healthMaxReduced = healthMaxDiff > 0;
+      }
+    } else {
+      context.isEnduranceImpaired = false;
+      context.healthMaxReduced = false;
+    }
+    
+    // Check for Dying state
+    context.isDying = !!dyingEffect;
+    
     return context;
   }
 
@@ -245,6 +284,89 @@ export class FaseripActorSheet extends ActorSheet {
       lockButton.removeClass('locked');
       lockButton.attr('title', 'Lock Sheet');
       lockIcon.removeClass('fa-lock').addClass('fa-lock-open');
+    }
+  }
+
+  /**
+   * Apply visual indicators for Endurance impairment and health max reduction
+   * Called from activateListeners to highlight affected fields
+   */
+  _applyImpairmentIndicators(html) {
+    const scope = globalThis.MSH_FLAG_SCOPE || "msh-faserip";
+    const impairedEffect = this.actor.effects.find(e => e.getFlag(scope, "isImpairedEndurance"));
+    const dyingEffect = this.actor.effects.find(e => e.getFlag(scope, "isDying") || e.statuses?.has?.("dying"));
+    
+    // Get original endurance for comparison
+    const originalEndurance = impairedEffect?.getFlag(scope, "originalEndurance") || 
+                              dyingEffect?.getFlag(scope, "originalEndurance") ||
+                              this.actor.getFlag(scope, "originalEndurance");
+    const currentEndurance = this.actor.system?.abilities?.endurance?.rank;
+    const isImpaired = originalEndurance && originalEndurance !== currentEndurance;
+    
+    // Style for impaired/dying state
+    const impairedStyle = "background: #ffebee !important; border-color: #ef5350 !important;";
+    const dyingStyle = "background: #ffcdd2 !important; border-color: #c62828 !important;";
+    
+    // Apply to Endurance row (the E row in the abilities table)
+    const enduranceRow = html.find('tr').filter(function() {
+      return $(this).find('.ability-key').text().trim() === 'E';
+    });
+    
+    if (dyingEffect) {
+      // Dying state - more severe styling
+      enduranceRow.find('select, input').css('cssText', dyingStyle);
+      enduranceRow.find('.ability-key').css('cssText', 'background: #c62828 !important; color: white !important;');
+      
+      // Add tooltip showing original value
+      if (originalEndurance) {
+        enduranceRow.find('select[name="system.abilities.endurance.rank"]')
+          .attr('title', `DYING - Originally: ${originalEndurance}`);
+      }
+    } else if (isImpaired) {
+      // Impaired state - warning styling
+      enduranceRow.find('select, input').css('cssText', impairedStyle);
+      enduranceRow.find('.ability-key').css('cssText', 'background: #ef5350 !important; color: white !important;');
+      
+      // Add tooltip showing original value
+      enduranceRow.find('select[name="system.abilities.endurance.rank"]')
+        .attr('title', `Impaired - Originally: ${originalEndurance}`);
+    }
+    
+    // Apply to Health display if max is reduced
+    if (isImpaired || dyingEffect) {
+      const healthSection = html.find('.sec-col.health');
+      const healthMaxInput = healthSection.find('input[name="system.attributes.health.max"]');
+      
+      // Calculate original health max
+      const rankValues = {
+        "Shift-0": 0, "Feeble": 2, "Poor": 4, "Typical": 6, "Good": 10,
+        "Excellent": 20, "Remarkable": 30, "Incredible": 40, "Amazing": 50,
+        "Monstrous": 75, "Unearthly": 100, "Shift-X": 150, "Shift-Y": 200,
+        "Shift-Z": 500, "Class 1000": 1000, "Class 3000": 3000, "Class 5000": 5000, "Beyond": 10000
+      };
+      const originalEnduranceValue = rankValues[originalEndurance] || 0;
+      const currentEnduranceValue = this.actor.system?.abilities?.endurance?.value || 0;
+      const currentHealthMax = this.actor.system?.attributes?.health?.max || 0;
+      const originalHealthMax = currentHealthMax + (originalEnduranceValue - currentEnduranceValue);
+      
+      if (originalEnduranceValue > currentEnduranceValue) {
+        if (dyingEffect) {
+          healthMaxInput.css('cssText', dyingStyle);
+          healthSection.find('.sec-head').css('cssText', 'background: #c62828 !important; color: white !important;');
+        } else {
+          healthMaxInput.css('cssText', impairedStyle);
+          healthSection.find('.sec-head').css('cssText', 'background: #ef5350 !important; color: white !important;');
+        }
+        healthMaxInput.attr('title', `Reduced from ${originalHealthMax} due to Endurance loss`);
+      }
+      
+      // Also check if current health exceeds new max and highlight
+      const currentHealth = this.actor.system?.attributes?.health?.value || 0;
+      if (currentHealth > currentHealthMax) {
+        const healthValueInput = healthSection.find('input[name="system.attributes.health.value"]');
+        healthValueInput.css('cssText', 'background: #fff3e0 !important; border-color: #ff9800 !important;');
+        healthValueInput.attr('title', `Health (${currentHealth}) exceeds max (${currentHealthMax})`);
+      }
     }
   }
 
@@ -290,6 +412,9 @@ export class FaseripActorSheet extends ActorSheet {
   // In actorSheet.js, add to the activateListeners function
   activateListeners(html) {
     super.activateListeners(html);
+
+    // Apply visual indicators for Endurance impairment and health max reduction
+    this._applyImpairmentIndicators(html);
 
     // Initialize Character Generation Tab
     this._initChargenTab(html);

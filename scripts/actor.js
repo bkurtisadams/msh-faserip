@@ -1,4 +1,6 @@
-// In actor.js, modify the prepareData method
+// actor.js v1.1.0 - 2025-12-24
+// v1.1.0: Initialize combatMods in prepareBaseData before Active Effects are applied
+
 export class FaseripActor extends Actor {
   prepareData() {
     super.prepareData();
@@ -133,10 +135,37 @@ export class FaseripActor extends Actor {
     }
   }
 
-  // ADD THIS NEW METHOD - This will set proper default dispositions
-  // In actor.js - Update the prepareBaseData method
   prepareBaseData() {
     super.prepareBaseData();
+    
+    // Initialize combatMods structure BEFORE Active Effects are applied
+    // This ensures the target paths exist for AE changes
+    // Only for character actors, not vehicles
+    if (this.type !== "vehicle") {
+      const system = this.system;
+      if (!system.combatMods) {
+        system.combatMods = {};
+      }
+      // Ensure all properties exist with defaults (AE changes require target path to exist)
+      system.combatMods.attackShift = system.combatMods.attackShift ?? 0;
+      system.combatMods.defenseShift = system.combatMods.defenseShift ?? 0;
+      system.combatMods.defenseShiftRanged = system.combatMods.defenseShiftRanged ?? 0;
+      system.combatMods.movementMult = system.combatMods.movementMult ?? 1;
+      system.combatMods.canAct = system.combatMods.canAct ?? true;
+      system.combatMods.canMove = system.combatMods.canMove ?? true;
+      
+      // Initialize nested abilityShifts
+      if (!system.combatMods.abilityShifts) {
+        system.combatMods.abilityShifts = {};
+      }
+      system.combatMods.abilityShifts.fighting = system.combatMods.abilityShifts.fighting ?? 0;
+      system.combatMods.abilityShifts.agility = system.combatMods.abilityShifts.agility ?? 0;
+      system.combatMods.abilityShifts.strength = system.combatMods.abilityShifts.strength ?? 0;
+      system.combatMods.abilityShifts.endurance = system.combatMods.abilityShifts.endurance ?? 0;
+      system.combatMods.abilityShifts.reason = system.combatMods.abilityShifts.reason ?? 0;
+      system.combatMods.abilityShifts.intuition = system.combatMods.abilityShifts.intuition ?? 0;
+      system.combatMods.abilityShifts.psyche = system.combatMods.abilityShifts.psyche ?? 0;
+    }
     
     // ALWAYS set the correct disposition based on actor type (remove the undefined check)
     let defaultDisposition;
