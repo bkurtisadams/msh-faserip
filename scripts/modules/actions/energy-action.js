@@ -263,7 +263,7 @@ export class EnergyAction extends RangedAttackAction {
       <!-- Use Power Rank checkbox -->
       <div style="margin-bottom:6px;">
         <input type="checkbox" id="usePowerToHit" name="usePowerToHit" ${defaultUsePowerToHit ? "checked" : ""}>
-        <label for="usePowerToHit">Use power rank to hit (instead of ${ability.name})</label>
+        <label for="usePowerToHit" title="Normally, ranged Energy attacks use Agility to hit. Exception: Weather Control stunt "Summon Lightning" can use Power rank as Agility (stormy conditions; damage is Power rank). Use this only when a rule or stunt explicitly allows it.">Use power rank to hit (instead of ${ability.name})</label>
       </div>
 
       <!-- Footer -->
@@ -512,6 +512,12 @@ export class EnergyAction extends RangedAttackAction {
           // Initial update
           update();
 
+
+          // Sync effect-cap controls with Reduce Damage toggle.
+          const reduceChecked = html.find('#reduce-damage-enabled').is(':checked');
+          html.find('input[name="resultCap"]').prop('disabled', !reduceChecked);
+          if (!reduceChecked) html.find('input[name="resultCap"][value="none"]').prop('checked', true);
+
           // Event handlers
           html.find('[name="powerSelect"]').on('change', update);
           html.find('[name="adhocDamage"]').on('input change', update);
@@ -544,7 +550,15 @@ export class EnergyAction extends RangedAttackAction {
               // Reset to default border
               $section.css('border-color', '#ffcc80');
             }
-          });
+          
+            // If Reduce Damage is off, don't allow capping the effect result.
+            const $caps = html.find('input[name="resultCap"]');
+            $caps.prop('disabled', !this.checked);
+            if (!this.checked) {
+              html.find('input[name="resultCap"][value="none"]').prop('checked', true);
+            }
+            update();
+});
 
           applyCapabilitiesToDialog(html, "energy", { actor });
           this._disposeAutoFill = attachAutoFillRange(html, actor, update);
