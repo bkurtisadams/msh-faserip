@@ -1,34 +1,43 @@
-// scripts/modules/actions/shooting-action.js
+// shooting-action.js v2.0.0 - 2025-12-24
+// v2.0.0: Complete dialog redesign to match blunt-attack-action.js structure
+//         - Context boxes (Target + Attack side by side)
+//         - Compact weapon row with damage/range inline
+//         - Damage preview with after-armor calculation
+//         - CS field with directional colors and reset button
+//         - Inline karma controls
+//         - CS Notes text input
+//         - Compact multi-attack radio row
+//         - LocalStorage-based remember settings
+
 import { RangedAttackAction } from "./ranged-attack-action.js";
 import { 
   generateKarmaControlsHTML, 
   setupKarmaControlHandlers, 
-  extractKarmaFromDialog 
+  extractKarmaFromDialog,
+  getAvailableKarma,
+  getMinimumKarmaCommitment
 } from "../dice/dice-roller.js";
 import { 
   applyDamageToTargets,
   attachAutoFillRange,
   bannerColors,
   buildActionsBox,
-  buildMultiAttackSection,
   buildModeSelector,
   buildResultGrid,
   debugLog,
   effectsFor,
   getAbilityInfo,
   getBodyArmorValues,
-  getTargetingContext,
+  getTargetData,
   labelFor,
   postDeathSavePrompt,
   RANKS,
   rollWithKarmaAndHistory,
   setupModeSelector,
-  setupMultiAttackHandlers,
   applyCapabilitiesToDialog,
   shiftRank,
   buildInlineFeatDisplay
 } from "./action-utils.js";
-import { shouldConfirm, buildPreviewHtml } from "./action-utils.js";
 
 import { makeDamageBlock, computeAfterArmor, buildDamageFlags } from "./damage-ui.js";
 import { canEffectsApply } from "../../rules/effects-gate.js";
@@ -60,35 +69,19 @@ export class ShootingAction extends RangedAttackAction {
     const passedItem = passedItemId ? actor.items.get(passedItemId) : null;
     
     if (passedItem && passedItem.type === "equipment") {
-      // Add to list if not already present
       if (!shootingWeapons.find(i => i.id === passedItem.id)) {
         shootingWeapons = [passedItem, ...shootingWeapons];
       }
     }
 
-    // Restore flags (but override with passed item if present)
-    const savedItemId = passedItemId || await actor.getFlag("msh-faserip", "lastShootingItemId") || "";
-    const savedRange = await actor.getFlag("msh-faserip", "lastShootingRange") || 1;
-    const savedObstacle = await actor.getFlag("msh-faserip", "lastShootingObstacle") || false;
-    const savedShift = await actor.getFlag("msh-faserip", "lastShootingShift") || 0;
-    const savedMultiAttacks = await actor.getFlag("msh-faserip", "lastShootingMultiAttacks") || false;
-    const savedAttackCount = await actor.getFlag("msh-faserip", "lastShootingAttackCount") || 2;
-    const savedRemember = (await actor.getFlag("msh-faserip", "rememberSettings")) ?? (await actor.getFlag("msh-faserip", "lastShootingRemember")) ?? true;
-    const savedSkipDice = (await actor.getFlag("msh-faserip", "skipDiceRoll")) ?? (await actor.getFlag("msh-faserip", "lastShootingSkipDice")) ?? false;
-
-    const itemOptions = shootingWeapons.map(i =>
-      `<option value="${i.id}" ${i.id === savedItemId ? 'selected' : ''}>${i.name}</option>`
-    ).join("");
-
     // If no shooting weapons, try to detect a non-shooting source item and reroute
-    if (!itemOptions) {
+    if (shootingWeapons.length === 0) {
       const src = this?.opts?.sourceItem || this?.opts?.equipment || null;
 
       if (src?.type === "equipment" && src.system?.category === "weapon") {
         const w  = String(src.system.weaponType || "").toLowerCase();
         const dt = String(src.system.damageType || "").toUpperCase();
 
-        // Minimal mapping that mirrors your action names/codes
         const fallbackAction =
           w === "thrown" ? (dt.startsWith("E") ? "Throwing Edged (TE)" : "Throwing Blunt (TB)") :
           w === "melee"  ? (dt.startsWith("E") ? "Edged Attack (EA)"   : "Blunt Attack (BA)") :
@@ -109,58 +102,170 @@ export class ShootingAction extends RangedAttackAction {
         }
       }
 
-      // Only warn if we truly have no weapon to act with and no source item fallback
       ui.notifications.warn(`${actor.name} has no shooting weapons.`);
       return;
     }
 
+    // --- INITIALIZATION & DEFAULTS ---
+    const lsRememberKey = "msh.shooting.remember";
+    const lsSkipKey = "msh.shooting.skipDice";
+    
+    const storedRemember = localStorage.getItem(lsRememberKey);
+    const shouldRemember = storedRemember === "1";
 
-    // Get initial weapon for range display
+    // Load settings from flags if remembering
+    const savedItemId = passedItemId || (shouldRemember ? (await actor.getFlag("msh-faserip", "lastShootingItemId")) : "") || "";
+    const savedRange = shouldRemember ? ((await actor.getFlag("msh-faserip", "lastShootingRange")) || 1) : 1;
+    const savedObstacle = shouldRemember ? ((await actor.getFlag("msh-faserip", "lastShootingObstacle")) || false) : false;
+    const savedColumnShift = shouldRemember ? ((await actor.getFlag("msh-faserip", "lastShootingShift")) || 0) : 0;
+    const savedMultiAttacks = shouldRemember ? ((await actor.getFlag("msh-faserip", "lastShootingMultiAttacks")) || false) : false;
+    const savedAttackCount = shouldRemember ? ((await actor.getFlag("msh-faserip", "lastShootingAttackCount")) || 2) : 2;
+    const savedSkipDice = localStorage.getItem(lsSkipKey) === "1";
+    const savedCsNotes = (await actor.getFlag("msh-faserip", "csNotes")) || "";
+
+    // Build weapon options
+    const itemOptions = shootingWeapons.map(i =>
+      `<option value="${i.id}" ${i.id === savedItemId ? 'selected' : ''}>${i.name}</option>`
+    ).join("");
+
+    // Get initial weapon for displays
     const initialWeapon = shootingWeapons.find(i => i.id === savedItemId) || shootingWeapons[0];
-    const initialRange = initialWeapon?.system?.range || 15;
+    const initialWeaponRange = initialWeapon?.system?.range || 15;
+    const initialWeaponDamage = initialWeapon?.system?.damage || 0;
 
-    // Dialog HTML
-   const dialogHtml = `
+    // Get target info for armor display
+    const { targets, primaryTarget, primaryTargetActor, targetDisplay } = getTargetData();
+    
+    const targetArmorInfo = primaryTargetActor ? getBodyArmorValues(primaryTargetActor, "physical-ranged") : null;
+    const targetArmor = targetArmorInfo?.applicable ?? 0;
+    const targetArmorSource = targetArmorInfo?.source ?? "";
+    const armorNote = targets.length > 1 ? " (1st target)" : "";
+    const initialAfterArmor = Math.max(0, initialWeaponDamage - targetArmor);
+
+    // Karma info for compact display
+    const availableKarma = getAvailableKarma(actor);
+    const minKarma = getMinimumKarmaCommitment(actor);
+    const hasKarma = availableKarma > 0;
+
+    // Helper for localStorage
+    const setLS = (k, v) => { try { localStorage.setItem(k, v); } catch (_e) { /* ignore */ } };
+
+    // Dialog HTML - Compact layout matching blunt-attack-action.js
+    const dialogHtml = `
       ${buildModeSelector({ mode: "semi" })}
 
-      <div style="margin-bottom:8px;"><label style="display:inline-block;width:120px;">Action:</label><strong>${actionName}</strong></div>
-      <div style="margin-bottom:8px;"><label style="display:inline-block;width:120px;">Ability:</label><input type="text" value="${ability.name}" style="width:140px;" readonly></div>
-      <div style="margin-bottom:8px;"><label style="display:inline-block;width:120px;">Rank:</label><input type="text" value="${ability.rank}" style="width:120px;" readonly>
-        <span style="margin-left:6px;">(${ability.value})</span></div>
-
-      <div style="margin-bottom:8px;"><label style="display:inline-block;width:120px;">Column Shift:</label>
-        <input type="number" name="shift" value="${Number(this.opts?.shift ?? savedShift)}" style="width:52px;">
-        <span style="color:#666;font-size:.9em;">(+ right, - left)</span></div>
-
-      ${generateKarmaControlsHTML(actor, 0)}
-
-      <div style="margin-bottom:8px;">
-        <label style="display:inline-block;width:120px;">Weapon:</label>
-        <select name="weapon" style="min-width:220px;">${itemOptions}</select>
+      <!-- Context: Target + Attack stats side by side -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+        <div style="background:#f5f5f5;padding:8px;border-radius:3px;">
+          <div style="font-weight:600;color:#666;font-size:.8em;text-transform:uppercase;">Target${targets.length > 1 ? 's' : ''}</div>
+          <div style="font-weight:600;color:#d32f2f;">${targetDisplay}</div>
+          <div style="color:#666;" id="target-armor-display">${primaryTargetActor ? `Armor: ${targetArmor}${targetArmorSource ? ` (${targetArmorSource})` : ''}${armorNote}` : ''}</div>
+        </div>
+        <div style="background:#f5f5f5;padding:8px;border-radius:3px;">
+          <div style="font-weight:600;color:#666;font-size:.8em;text-transform:uppercase;">Attack</div>
+          <div style="font-weight:600;">${ability.name}: ${ability.rank}</div>
+          <div style="color:#666;">Rank Value: ${ability.value}</div>
+        </div>
       </div>
 
-      ${this._buildRangeInputs({ 
-        defaultRange: savedRange, 
-        showObstacle: true, 
-        weaponMaxRange: initialRange 
-      })}
-
-      ${buildMultiAttackSection("shooting", game.user.targets.size, savedMultiAttacks, savedAttackCount, false)}
-
-      <div style="margin-top:10px;padding:6px;background:#fff3e0;border:1px solid #ff9800;border-radius:3px;font-size:0.85em;">
-        <strong>⚠ Shooting Attack Rules:</strong>
-        <ul style="margin:4px 0 0 0;padding-left:20px;">
-          <li>Cannot reduce effect or damage (no pulled punches)</li>
-          <li>Bullseye: targets &lt;1 ft, never fatal</li>
-          <li>Kill result may be lethal (hero loses all Karma if kills)</li>
-        </ul>
+      <!-- Weapon Selection -->
+      <div class="weapon-section" style="padding:8px;background:#fff;border:1px solid #ddd;border-radius:3px;margin-bottom:8px;">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <label style="font-weight:600;">Weapon:</label>
+          <select name="weapon" style="flex:1;min-width:150px;padding:4px;">${itemOptions}</select>
+          <span style="color:#666;font-size:.9em;">
+            Dmg: <strong id="weapon-damage-display">${initialWeaponDamage}</strong> | 
+            Range: <strong id="weapon-range-display">${initialWeaponRange}</strong> areas
+          </span>
+        </div>
       </div>
 
-      <div style="margin-top:8px;">
-        <label><input type="checkbox" name="remember" ${savedRemember ? 'checked' : ''}> Remember these settings</label>
+      <!-- Damage Preview -->
+      <div id="preview" style="background:#ffebee;border:1px solid #ef9a9a;border-radius:3px;padding:10px;margin-bottom:8px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span><strong>Damage:</strong> <span id="dmg-val">${initialWeaponDamage}</span> <span id="dmg-note" style="color:#555;">(Weapon)</span></span>
+          <span style="font-size:1.1em;" id="after-armor-display"><strong>→ ${initialAfterArmor} after armor</strong></span>
+        </div>
       </div>
-      <div style="margin-top:8px;">
-        <label><input type="checkbox" name="skipDice" ${savedSkipDice ? 'checked' : ''}> Skip dice animation</label>
+
+      <!-- Range & Modifiers -->
+      <div style="padding:8px;border:1px solid #ddd;background:#fafafa;border-radius:3px;margin-bottom:8px;">
+        <div style="font-weight:600;margin-bottom:6px;font-size:.9em;">Range & Modifiers</div>
+        
+        <div style="display:grid;grid-template-columns:auto 1fr;gap:4px 8px;align-items:center;font-size:.9em;">
+          <label>Distance:</label>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <input type="number" name="range" value="${savedRange}" min="0" style="width:50px;padding:3px;">
+            <span style="color:#666;font-size:.85em;">areas (Max: <span id="max-range-hint">${initialWeaponRange}</span>)</span>
+          </div>
+          
+          <label>Target:</label>
+          <select name="targetMovement" style="padding:3px;">
+            <option value="0">Stationary (0 CS)</option>
+            <option value="-1">Moving ≤5 areas (-1 CS)</option>
+            <option value="-2">Moving ≤10 areas (-2 CS)</option>
+            <option value="-4">Moving >10 areas (-4 CS)</option>
+            <option value="0-charging">Charging at you (0 CS)</option>
+          </select>
+          
+          <label>Obstacle:</label>
+          <label style="cursor:pointer;">
+            <input type="checkbox" name="throughObstacle" ${savedObstacle ? 'checked' : ''}> 
+            <span style="color:#666;font-size:.85em;">Through obstacle (-2 CS)</span>
+          </label>
+        </div>
+        
+        <div id="range-preview" style="margin-top:6px;padding:4px;background:#e3f2fd;border:1px solid #2196F3;border-radius:3px;font-size:.85em;">
+          <strong>Range Modifiers:</strong> <span id="range-mod-text">Calculating...</span>
+        </div>
+      </div>
+
+      <!-- Modifiers Row -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;font-size:.9em;">
+        <div class="cs-field" style="display:flex;align-items:center;gap:4px;padding:4px 6px;border-radius:3px;${savedColumnShift < 0 ? 'background:#ffebee;border:1px solid #ef5350;' : savedColumnShift > 0 ? 'background:#e8f5e9;border:1px solid #66bb6a;' : 'border:1px solid transparent;'}">
+          <label style="font-weight:600;">CS:</label>
+          <input type="number" name="shift" value="${savedColumnShift}" style="width:35px;padding:3px;text-align:center;box-sizing:border-box;">
+          <span style="color:#666;">→</span>
+          <strong id="shifted-rank-display" style="${savedColumnShift < 0 ? 'color:#c62828;' : savedColumnShift > 0 ? 'color:#2e7d32;' : ''}">${shiftRank(ability.rank, savedColumnShift)}</strong>
+          <button type="button" class="cs-reset" style="visibility:${savedColumnShift !== 0 ? 'visible' : 'hidden'};padding:1px 5px;font-size:.85em;cursor:pointer;border:1px solid #999;border-radius:2px;background:#eee;" title="Reset to 0">×</button>
+        </div>
+        <div class="karma-field" style="display:flex;align-items:center;gap:4px;padding:4px 6px;border-radius:3px;${hasKarma ? 'background:#e3f2fd;border:1px solid #90caf9;' : ''}">
+          ${hasKarma ? `
+            <label style="display:flex;align-items:center;gap:4px;cursor:pointer;">
+              <input type="checkbox" id="spend-karma" name="spendKarma">
+              <span style="font-weight:600;">Karma:</span>
+            </label>
+            <span title="Available: ${availableKarma} | Min commitment: ${minKarma} | Amount chosen after roll" style="padding:1px 4px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${availableKarma}</span>
+            <span style="color:#999;font-size:.8em;">(min ${minKarma})</span>
+          ` : `<span style="color:#999;">No karma</span>`}
+        </div>
+      </div>
+
+      <!-- CS Notes Row -->
+      <div id="cs-notes-row" style="margin-bottom:6px;">
+        <input type="text" name="csNotes" id="cs-notes-input" placeholder="e.g., Called shot -2, Scope +1" value="${savedCsNotes}" style="width:100%;padding:4px 8px;border:1px solid #ccc;border-radius:3px;font-size:.9em;box-sizing:border-box;">
+      </div>
+
+      <!-- Multi-Attack Row -->
+      <div class="multi-attack-section" style="padding:6px 8px;background:#e8f5e9;border:1px solid #a5d6a7;border-radius:3px;margin-bottom:6px;">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <span style="font-weight:600;color:#2e7d32;">Multi:</span>
+          <label title="Single attack, no penalty" style="cursor:pointer;"><input type="radio" name="multiMode" value="off" ${!savedMultiAttacks ? 'checked' : ''}> Off</label>
+          <label title="Remarkable Fighting FEAT. Success: 2 attacks at -1CS each. Fail: 1 attack at -3CS." style="cursor:pointer;"><input type="radio" name="multiMode" value="2" ${savedMultiAttacks && savedAttackCount === 2 ? 'checked' : ''}> 2 atk</label>
+          <label title="Amazing Fighting FEAT. Success: 3 attacks at -1CS each. Fail: 1 attack at -3CS." style="cursor:pointer;"><input type="radio" name="multiMode" value="3" ${savedMultiAttacks && savedAttackCount === 3 ? 'checked' : ''}> 3 atk</label>
+        </div>
+      </div>
+
+      <!-- Rules Reminder -->
+      <div style="padding:6px 8px;background:#fff3e0;border:1px solid #ff9800;border-radius:3px;margin-bottom:8px;font-size:.85em;">
+        <strong style="color:#e65100;">Shooting Rules:</strong>
+        <span style="color:#666;"> No pulled punches. Kill result may be lethal (hero loses all Karma).</span>
+      </div>
+
+      <!-- Footer -->
+      <div id="msh-bottom-controls" style="display:flex;justify-content:space-between;align-items:center;padding-top:8px;border-top:1px solid #ddd;">
+        <label><input type="checkbox" id="msh-remember-settings" name="remember" ${shouldRemember ? 'checked' : ''}> Remember</label>
+        <label><input type="checkbox" id="msh-skip-dice" name="skipDice" ${savedSkipDice ? 'checked' : ''}> Skip dice</label>
       </div>
     `;
 
@@ -172,8 +277,10 @@ export class ShootingAction extends RangedAttackAction {
           roll: {
             label: "Roll",
             callback: async (html) => {
-              const $ = (sel) => html.find(sel);
-              const weaponId = String($('[name="weapon"]').val() || "");
+              const $dlg = (sel) => html.find(sel);
+
+              // Read form values
+              const weaponId = String($dlg('[name="weapon"]').val() || "");
               const weapon = shootingWeapons.find(i => i.id === weaponId);
               
               if (!weapon) {
@@ -181,28 +288,25 @@ export class ShootingAction extends RangedAttackAction {
                 return resolve(null);
               }
 
-              const shift = Number($('[name="shift"]').val() || 0);
+              const shift = parseInt($dlg('[name="shift"]').val() || 0);
               const { spendKarma, karmaToSpend } = extractKarmaFromDialog(html);
               const karma = karmaToSpend;
-              const range = Number($('[name="range"]').val() || 1);
-              const throughObstacle = !!$('[name="throughObstacle"]').is(':checked');
-              const targetMovement = String($('[name="targetMovement"]').val() || "0");
+              const range = Number($dlg('[name="range"]').val() || 1);
+              const throughObstacle = !!$dlg('[name="throughObstacle"]').is(':checked');
+              const targetMovement = String($dlg('[name="targetMovement"]').val() || "0");
               const movementModifier = targetMovement === "0-charging" ? 0 : Number(targetMovement);
-              const remember = $(`[name="rememberSettings"]`).length ? !!$(`[name="rememberSettings"]`).is(':checked') : !!$(`[name="remember"]`).is(':checked');
-              const skipDice = $(`[name="skipDiceRoll"]`).length ? !!$(`[name="skipDiceRoll"]`).is(':checked') : !!$(`[name="skipDice"]`).is(':checked');
+              
+              const rememberSettings = !!$dlg('#msh-remember-settings').is(':checked');
+              const skipDice = !!$dlg('#msh-skip-dice').is(':checked');
+              
+              // Multi-attack from radio
+              const multiMode = $dlg('[name="multiMode"]:checked').val() || "off";
+              const multiAttacks = (multiMode === "2" || multiMode === "3");
+              const attackCount = (multiMode === "3") ? 3 : 2;
 
-              const multiAttacks = !!$('[name="multiAttacks"]').is(':checked');
-              const attackCount = parseInt($('[name="attackCount"]:checked').val() || 2);
+              // CS Notes
+              const csNotes = $dlg('[name="csNotes"]').val() || "";
 
-              await actor.setFlag("msh-faserip", "lastShootingShift", shift);
-              await actor.setFlag("msh-faserip", "lastShootingMultiAttacks", multiAttacks);
-              await actor.setFlag("msh-faserip", "lastShootingAttackCount", attackCount);
-
-              // Always save remember/skipDice preferences
-              await actor.setFlag("msh-faserip", "rememberSettings", remember);
-              await actor.setFlag("msh-faserip", "lastShootingRemember", remember);
-              await actor.setFlag("msh-faserip", "skipDiceRoll", skipDice);
-              await actor.setFlag("msh-faserip", "lastShootingSkipDice", skipDice);
               const weaponRange = weapon.system?.range || 15;
               const weaponDamage = weapon.system?.damage || 0;
 
@@ -210,18 +314,28 @@ export class ShootingAction extends RangedAttackAction {
               const { totalShift, impossible, rangeModifier, obstacleModifier } = 
                 this._applyRangeModifiers(shift, range, throughObstacle, weaponRange);
 
-              const finalShift = totalShift + movementModifier; // Add movement modifier
+              const finalShift = totalShift + movementModifier;
 
               if (impossible) {
                 ui.notifications.error(`Target is beyond weapon range (${weaponRange} areas)!`);
                 return resolve(null);
               }
 
-              if (remember) {
+              // Save settings
+              setLS(lsRememberKey, rememberSettings ? "1" : "0");
+              setLS(lsSkipKey, skipDice ? "1" : "0");
+
+              if (rememberSettings) {
                 await actor.setFlag("msh-faserip", "lastShootingItemId", weaponId);
                 await actor.setFlag("msh-faserip", "lastShootingRange", range);
                 await actor.setFlag("msh-faserip", "lastShootingObstacle", throughObstacle);
+                await actor.setFlag("msh-faserip", "lastShootingShift", shift);
+                await actor.setFlag("msh-faserip", "lastShootingMultiAttacks", multiAttacks);
+                await actor.setFlag("msh-faserip", "lastShootingAttackCount", attackCount);
               }
+              
+              // Always save csNotes
+              await actor.setFlag("msh-faserip", "csNotes", csNotes);
 
               resolve({ 
                 weapon, 
@@ -239,7 +353,16 @@ export class ShootingAction extends RangedAttackAction {
                 targetMovement,
                 movementModifier,
                 multiAttacks,
-                attackCount
+                attackCount,
+                csNotes,
+                shiftBreakdown: {
+                  manual: shift,
+                  range: rangeModifier,
+                  obstacle: obstacleModifier,
+                  movement: movementModifier,
+                  multiAttack: 0,
+                  csNotes: csNotes
+                }
               });
             }
           },
@@ -248,47 +371,119 @@ export class ShootingAction extends RangedAttackAction {
         default: "roll",
         render: async (html) => {
           setupKarmaControlHandlers(html);
-          this.opts = this.opts || {};  // Ensure opts exists
+          this.opts = this.opts || {};
           await setupModeSelector(actor, html, this.opts || {}, "lastShootingMode");
 
           // Setup range preview updates
-          this._setupRangePreview(html, { weaponMaxRange: initialRange });
+          this._setupRangePreview(html, { weaponMaxRange: initialWeaponRange });
 
-          // Update range preview when weapon changes
+          // Weapon change handler - update damage, range, and preview
           html.find('[name="weapon"]').on('change', () => {
-              const weaponId = html.find('[name="weapon"]').val();
-              const weapon = shootingWeapons.find(i => i.id === weaponId);
-              const newRange = weapon?.system?.range || 15;
-              
-              // Update the max range hint text in the UI
-              html.find('[name="range"]').siblings('span').text(`Max: ${newRange} areas`);
-              
-              // Refresh the range preview with new weapon range
-              this._setupRangePreview(html, { weaponMaxRange: newRange });
+            const weaponId = html.find('[name="weapon"]').val();
+            const weapon = shootingWeapons.find(i => i.id === weaponId);
+            const newRange = weapon?.system?.range || 15;
+            const newDamage = weapon?.system?.damage || 0;
+            
+            // Update weapon stats display
+            html.find('#weapon-damage-display').text(newDamage);
+            html.find('#weapon-range-display').text(newRange);
+            html.find('#max-range-hint').text(newRange);
+            
+            // Update damage preview
+            html.find('#dmg-val').text(newDamage);
+            const afterArmor = Math.max(0, newDamage - targetArmor);
+            html.find('#after-armor-display').html(`<strong>→ ${afterArmor} after armor</strong>`);
+            
+            // Refresh the range preview with new weapon range
+            this._setupRangePreview(html, { weaponMaxRange: newRange });
           });
+
+          // CS field handlers
+          const $csInput = html.find('[name="shift"]');
+          const $csField = html.find('.cs-field');
+          const $resetBtn = html.find('.cs-reset');
+          const $shiftedRank = html.find('#shifted-rank-display');
+
+          const updateCsDisplay = () => {
+            const val = parseInt($csInput.val()) || 0;
+            const newRank = shiftRank(ability.rank, val);
+            $shiftedRank.text(newRank);
+            
+            // Update colors
+            if (val < 0) {
+              $csField.css({ 'background': '#ffebee', 'border': '1px solid #ef5350' });
+              $shiftedRank.css('color', '#c62828');
+            } else if (val > 0) {
+              $csField.css({ 'background': '#e8f5e9', 'border': '1px solid #66bb6a' });
+              $shiftedRank.css('color', '#2e7d32');
+            } else {
+              $csField.css({ 'background': '', 'border': '1px solid transparent' });
+              $shiftedRank.css('color', '');
+            }
+            
+            $resetBtn.css('visibility', val !== 0 ? 'visible' : 'hidden');
+          };
+
+          $csInput.on('input change', updateCsDisplay);
+          $resetBtn.on('click', () => {
+            $csInput.val(0);
+            updateCsDisplay();
+          });
+
+          // Karma checkbox border highlight
+          html.find('#spend-karma').on('change', function() {
+            const $field = html.find('.karma-field');
+            if (this.checked) {
+              $field.css('border-color', '#1565c0');
+            } else {
+              $field.css('border-color', '#90caf9');
+            }
+          });
+
+          // Multi-attack border highlight
+          html.find('[name="multiMode"]').on('change', function() {
+            const mode = html.find('[name="multiMode"]:checked').val();
+            const $section = html.find('.multi-attack-section');
+            if (mode !== 'off') {
+              $section.css('border-color', '#2e7d32');
+            } else {
+              $section.css('border-color', '#a5d6a7');
+            }
+          });
+
+          // Initialize multi-attack border on load
+          const initialMultiMode = html.find('[name="multiMode"]:checked').val();
+          if (initialMultiMode && initialMultiMode !== 'off') {
+            html.find('.multi-attack-section').css('border-color', '#2e7d32');
+          }
+
+          applyCapabilitiesToDialog(html, "shooting", { actor });
 
           // Attach auto-fill to update range from token-to-target distance
           this._disposeAutoFill = attachAutoFillRange(html, actor, () => {
-              const weaponId = html.find('[name="weapon"]').val();
-              const weapon = shootingWeapons.find(i => i.id === weaponId);
-              const currentRange = weapon?.system?.range || 15;
-              this._setupRangePreview(html, { weaponMaxRange: currentRange });
+            const weaponId = html.find('[name="weapon"]').val();
+            const weapon = shootingWeapons.find(i => i.id === weaponId);
+            const currentRange = weapon?.system?.range || 15;
+            this._setupRangePreview(html, { weaponMaxRange: currentRange });
           });
 
-            setupMultiAttackHandlers(html);
-            applyCapabilitiesToDialog(html, "shooting", { actor });  // new
-          },
-          close: () => {
-            
-            // Clean up the auto-fill event listeners
-            if (this._disposeAutoFill) this._disposeAutoFill();
-            }
+          // Bottom controls persistence
+          html.find('#msh-skip-dice').on('change', function() {
+            setLS(lsSkipKey, this.checked ? "1" : "0");
+          });
+          html.find('#msh-remember-settings').on('change', function() {
+            setLS(lsRememberKey, this.checked ? "1" : "0");
+          });
+        },
+        close: () => {
+          if (this._disposeAutoFill) this._disposeAutoFill();
+        }
       }).render(true);
     });
 
     if (!choice) return;
 
-    // Reload mode from flags (user may have changed it in dialog)
+    // Reload mode from flags
     this.opts.mode = await actor.getFlag("msh-faserip", "lastShootingMode") || "semi";
     const mode = this.opts.mode;
     if (mode === "manual") {
@@ -302,15 +497,24 @@ export class ShootingAction extends RangedAttackAction {
       this.opts.showConfirm = false;
     }
 
-    // Handle multi-attacks (2 or 3 attacks, must make FEAT; all attacks @-1 CS)
+    // Track shift breakdown for detailed display
+    const shiftBreakdown = choice.shiftBreakdown || {
+      manual: choice.shift || 0,
+      range: choice.rangeModifier || 0,
+      obstacle: choice.obstacleModifier || 0,
+      movement: choice.movementModifier || 0,
+      multiAttack: 0,
+      csNotes: choice.csNotes || ""
+    };
+
+    // Handle multi-attacks
     let actualAttackCount = 1;
-    let multiAttackFeatResult = null;  // Store FEAT result for consolidated display
+    let multiAttackFeatResult = null;
     
     if (choice.multiAttacks) {
       const fightingAbility = getAbilityInfo(actor, "fighting");
       const intensity = choice.attackCount === 2 ? "Remarkable" : "Amazing";
       
-      // Calculate effective Fighting rank with column shift
       const effectiveFightingRank = shiftRank(fightingAbility.rank, choice.shift || 0);
       
       const featResult = await this._rollFightingFeat(
@@ -321,34 +525,36 @@ export class ShootingAction extends RangedAttackAction {
       );
       if (featResult.cancelled) return;
       
-      // Store for consolidated display
       multiAttackFeatResult = { ...featResult, intensity, attackCount: choice.attackCount };
       
-      if (!featResult.success) {
-        // Failed FEAT: 1 attack at -3CS
-        choice.shift = (choice.shift || 0) - 3;
-        choice.totalShift = (choice.totalShift || 0) - 3;
-        actualAttackCount = 1;
-      } else {
-        // Success: Multiple attacks at -1CS each
-        choice.shift = (choice.shift || 0) - 1;
-        choice.totalShift = (choice.totalShift || 0) - 1;
+      const featSuccess = !!(featResult?.auto || featResult?.resultColor === "AUTO" || featResult?.success);
+      const featImpossible = !!(featResult?.resultColor === "IMPOSSIBLE");
+      
+      if (featSuccess && !featImpossible) {
         actualAttackCount = choice.attackCount;
+        shiftBreakdown.multiAttack = -1;
+        choice.totalShift = (choice.totalShift || 0) - 1;
+        ui.notifications.info(`Multi-attack successful! Making ${actualAttackCount} attacks at -1CS each!`);
+      } else {
+        actualAttackCount = 1;
+        shiftBreakdown.multiAttack = -3;
+        choice.totalShift = (choice.totalShift || 0) - 3;
+        ui.notifications.warn(`Multi-attack FEAT failed! Only making 1 attack at -3CS.`);
       }
     }
 
+    // Attach breakdown to choice
+    choice.shiftBreakdown = shiftBreakdown;
+
     // Execute attack(s)
-    const targets = Array.from(game.user?.targets ?? []);
     for (let i = 1; i <= actualAttackCount; i++) {
       if (i > 1) await new Promise(resolve => setTimeout(resolve, 500));
       
       const actionLabel = actualAttackCount > 1 ? `${actionName} (${i}/${actualAttackCount})` : actionName;
       
-      // For failed FEAT (actualAttackCount=1), only attack first target
       const targetForThisAttack = actualAttackCount === 1 ? targets[0] : targets[(i-1) % targets.length];
       
       await this._executeSingleAttack({
-        // Only pass FEAT result on the first attack to avoid duplication
         choice: { ...choice, specificTarget: targetForThisAttack, multiAttackFeatResult: i === 1 ? multiAttackFeatResult : null },
         actor: this.actor,
         ability,
@@ -361,11 +567,13 @@ export class ShootingAction extends RangedAttackAction {
         sourceName: choice.weapon?.name || "Weapon",
         attackForm: "shooting",
         breakingFeat: null,
-        targetCount: 1
+        targetCount: 1,
+        attackNumber: i,
+        totalAttacks: actualAttackCount
       });
     }
 
-    // Multi-attack completion message (only if not using consolidated mode)
+    // Multi-attack completion message
     if (actualAttackCount > 1) {
       let useConsolidated = false;
       try {
@@ -382,5 +590,5 @@ export class ShootingAction extends RangedAttackAction {
         });
       }
     }
-  } // <-- CLOSE execute()
+  }
 }

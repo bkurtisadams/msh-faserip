@@ -1,4 +1,5 @@
-// scripts/modules/actions/force-action.js v1.2.0 - 2025-12-22
+// scripts/modules/actions/force-action.js v1.2.1 - 2025-12-25
+// v1.2.1: Fix specificTarget bug - pass targets as array to applyDamageToTargets
 // v1.2.0: Fix DiceSoNice animation in consolidated chat cards mode
 // v1.1.0: Add inline rolls for consolidated chat cards
 import { RangedAttackAction } from "./ranged-attack-action.js";
@@ -523,7 +524,7 @@ export class ForceAction extends RangedAttackAction {
           armorPiercing: 0,
           apMode: "value",
           wasKillResult: (colorLower === "red"),
-          specificTarget: target
+          targets: target ? [target] : []  // Fix: pass as array, not specificTarget
         });
       }
 

@@ -1,4 +1,9 @@
-// scripts/modules/actions/energy-action.js v1.2.0 - 2025-12-22
+// scripts/modules/actions/energy-action.js v1.4.0 - 2025-12-25
+// v1.4.0: Compact chat card matching blunt-attack style (inline rolls, hover boxes)
+// v1.3.2: Fix shifted rank display to use power rank when "use power rank to hit" is checked
+// v1.3.1: Fix armor display - show physical armor with energy reduction note
+// v1.3.0: Compact dialog UI (match blunt-attack style)
+// v1.2.1: Fix specificTarget bug - pass targets as array to applyDamageToTargets
 // v1.2.0: Fix DiceSoNice animation in consolidated chat cards mode
 // v1.1.0: Add inline rolls for consolidated chat cards
 import { RangedAttackAction } from "./ranged-attack-action.js";
@@ -15,13 +20,12 @@ import {
   bannerColors,
   buildActionsBox,
   buildMultiAttackSection,
-  buildResultGrid,
   buildModeSelector,
   debugLog,
   effectsFor,
   getAbilityInfo,
   getBodyArmorValues,
-  getTargetingContext,
+  getTargetData,
   labelFor,
   postDeathSavePrompt,
   RANKS,
@@ -33,7 +37,6 @@ import {
   playAttackEffect,
   playImpactEffect,
   getAttackEffectPath,
-  buildInlineRollDisplay,
   showDiceAnimation
 } from "./action-utils.js";
 
@@ -95,90 +98,153 @@ export class EnergyAction extends RangedAttackAction {
     const savedRemember = (await actor.getFlag("msh-faserip", "rememberSettings")) ?? (await actor.getFlag("msh-faserip", "lastEnergyRemember")) ?? true;
     const savedSkipDice = (await actor.getFlag("msh-faserip", "skipDiceRoll")) ?? (await actor.getFlag("msh-faserip", "lastEnergySkipDice")) ?? false;
 
-    const itemOptions = energyItems
-      .map((i) => `<option value="${i.id}" ${i.id === savedItemId ? "selected" : ""}>${i.name}</option>`)
-      .join("");
+
+    // === Target Info ===
+    const { targets, primaryTarget, primaryTargetActor, targetDisplay } = getTargetData();
+    const targetArmorInfo = primaryTargetActor ? getBodyArmorValues(primaryTargetActor, "energy") : null;
+    const physicalArmor = targetArmorInfo?.physical ?? 0;
+    const energyArmor = targetArmorInfo?.energy ?? 0;  // Already has -20 applied
+    const targetArmorSource = targetArmorInfo?.source ?? "";
+    const armorNote = targets.length > 1 ? " (1st target)" : "";
+    
+    // Get initial power info for damage preview
+    const initialPower = energyItems.find(i => i.id === savedItemId) || energyItems[0];
+    const initialPowerRank = savedAdHoc ? savedAdHocRank : (initialPower?.system?.rank ?? initialPower?.system?.powerRank ?? "Remarkable");
+    const initialDamage = savedAdHoc ? savedAdHocDmg : (initialPower?.system?.damage || initialPower?.system?.value || 0);
+    const initialAfterArmor = Math.max(0, initialDamage - energyArmor);
+    
+    // Determine which rank to display initially based on usePowerToHit setting
+    const initialDisplayRank = defaultUsePowerToHit ? initialPowerRank : ability.rank;
+    
+    // Karma info for compact display
+    const availableKarma = actor.system.attributes?.karma?.value || 0;
+    const hasKarma = availableKarma >= 10;
+    const minKarma = 10;
+    
+    // Build power radio options (inline style like blunt source selection)
+    const powerRadios = energyItems.map((item, idx) => {
+      const isSelected = item.id === savedItemId || (!savedItemId && idx === 0);
+      const shortName = item.name.length > 14 ? item.name.substring(0, 12) + "…" : item.name;
+      return `<label title="${item.name}" style="cursor:pointer;white-space:nowrap;"><input type="radio" name="powerSelect" value="${item.id}" ${isSelected && !savedAdHoc ? 'checked' : ''}> ${shortName}</label>`;
+    }).join(' ');
 
     // === Dialog ===
     const dialogHtml = `
       ${buildModeSelector({ mode: "semi" })}
-      
-      <div style="margin-bottom:8px;"><strong>${actionName}</strong></div>
 
-      <div style="margin-bottom:8px;">
-        <span style="display:inline-block;width:110px;">Ability:</span>
-        <input type="text" value="${ability.name}" style="width:120px" readonly>
-        <span style="margin-left:6px;">${ability.rank} (${ability.value})</span>
-      </div>
-
-      <div style="margin-bottom:8px;">
-        <span style="display:inline-block;width:110px;">Column Shift:</span>
-        <input type="number" name="shift" value="${Number(this.opts?.shift ?? savedShift)}" style="width:60px;">
-      </div>
-
-      ${generateKarmaControlsHTML(actor, 0)}
-
-      <!-- usePowerToHit checkbox -->
-      <div style="margin-bottom:8px;">
-        <input type="checkbox" id="usePowerToHit" name="usePowerToHit" ${defaultUsePowerToHit ? "checked" : ""}>
-        <label for="usePowerToHit">Use power rank to hit</label>
-      </div>
-
-      <fieldset style="margin:10px 0;padding:8px;border:1px solid #ddd;border-radius:4px;background:#fafafa;">
-        <legend style="padding:0 6px;font-weight:bold;">Power Source</legend>
-
-        <div style="margin:4px 0;">
-          <input type="checkbox" id="adhoc-toggle" name="adhoc" ${savedAdHoc ? "checked" : ""}>
-          <label for="adhoc-toggle">Use ad-hoc energy (no inventory power)</label>
+      <!-- Context: Target + Attack stats side by side -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+        <div style="background:#f5f5f5;padding:8px;border-radius:3px;">
+          <div style="font-weight:600;color:#666;font-size:.8em;text-transform:uppercase;">Target${targets.length > 1 ? 's' : ''}</div>
+          <div style="font-weight:600;color:#d32f2f;">${targetDisplay}</div>
+          <div style="color:#666;" id="target-armor-display">${primaryTargetActor && physicalArmor > 0 ? `Armor: ${physicalArmor}${targetArmorSource ? ` (${targetArmorSource})` : ''}${armorNote}` : (primaryTargetActor ? 'No armor' : '')}</div>
+          ${primaryTargetActor && physicalArmor > 0 ? `<div style="color:#1565c0;font-size:.85em;">→ ${energyArmor} vs Energy (-20)</div>` : ''}
         </div>
+        <div style="background:#f5f5f5;padding:8px;border-radius:3px;">
+          <div style="font-weight:600;color:#666;font-size:.8em;text-transform:uppercase;">Attack</div>
+          <div style="font-weight:600;">${ability.name}: ${ability.rank}</div>
+          <div style="color:#666;">Rank Value: ${ability.value}</div>
+        </div>
+      </div>
 
-        <div class="adhoc-fields" style="margin-top:8px;${savedAdHoc ? "" : "display:none"}">
-          <div style="margin-bottom:6px;">
-            <span style="display:inline-block;width:110px;">Name:</span>
-            <input type="text" name="adhocName" value="${savedAdHocName}" style="width:220px;">
-          </div>
-          <div style="margin-bottom:6px;">
-            <span style="display:inline-block;width:110px;">Damage:</span>
-            <input type="number" name="adhocDamage" value="${savedAdHocDmg}" min="0" style="width:80px;">
-            <span style="font-size:0.85em;color:#666;margin-left:6px;">numeric</span>
-          </div>
-          <div>
-            <span style="display:inline-block;width:110px;">Power Rank (range):</span>
-            <input type="text" name="adhocRank" value="${savedAdHocRank}" style="width:120px;">
-            <span style="font-size:0.85em;color:#666;margin-left:6px;">e.g., "Remarkable"</span>
+      <!-- Power Selection (inline radios) -->
+      <div class="power-section" style="padding:8px;background:${savedAdHoc ? '#fff8e1' : '#fff'};border:1px solid ${savedAdHoc ? '#ffc107' : '#ddd'};border-radius:3px;margin-bottom:8px;">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:4px;">
+          ${powerRadios}
+          <label style="cursor:pointer;white-space:nowrap;margin-left:8px;"><input type="radio" name="powerSelect" value="adhoc" ${savedAdHoc ? 'checked' : ''}> Ad-hoc</label>
+          <span style="display:inline-block;width:16px;height:16px;line-height:16px;text-align:center;border-radius:50%;background:#2196F3;color:#fff;font-size:11px;font-weight:bold;cursor:help;margin-left:4px;" title="ENERGY ATTACK RULES:
+• Damage = Power rank value
+• Range = Power rank areas
+• Body Armor -20 vs Energy
+• Kill result: White = Endurance Loss">?</span>
+        </div>
+        
+        <div id="adhoc-row" style="display:${savedAdHoc ? 'block' : 'none'};margin-top:6px;">
+          <div style="display:grid;grid-template-columns:auto 1fr auto 1fr auto 1fr;gap:4px 8px;align-items:center;">
+            <label>Name:</label>
+            <input type="text" name="adhocName" value="${savedAdHocName}" style="padding:4px;">
+            <label>Dmg:</label>
+            <input type="number" name="adhocDamage" value="${savedAdHocDmg}" min="0" style="width:50px;padding:4px;">
+            <label>Rank:</label>
+            <input type="text" name="adhocRank" value="${savedAdHocRank}" style="width:80px;padding:4px;" placeholder="Remarkable">
           </div>
         </div>
+      </div>
 
-        <div class="carried-fields" style="margin-top:8px;${savedAdHoc ? "display:none" : ""}">
-          <span style="display:inline-block;width:110px;">Power:</span>
-          <select name="power" style="min-width:240px">
-            ${itemOptions || '<option value="">(no energy powers found)</option>'}
+      <!-- Damage Preview -->
+      <div id="preview" style="background:#ffebee;border:1px solid #ef9a9a;border-radius:3px;padding:10px;margin-bottom:8px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span><strong>Damage:</strong> <span id="dmg-val">${initialDamage}</span> <span id="dmg-note" style="color:#555;">(${savedAdHoc ? 'Ad-hoc' : (initialPower?.name || 'Power')})</span></span>
+          <span style="font-size:1.1em;" id="after-armor-display"><strong>→ ${initialAfterArmor} after armor</strong></span>
+        </div>
+      </div>
+
+      <!-- Modifiers Row -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;font-size:.9em;">
+        <div class="cs-field" style="display:flex;align-items:center;gap:4px;padding:4px 6px;border-radius:3px;${savedShift < 0 ? 'background:#ffebee;border:1px solid #ef5350;' : savedShift > 0 ? 'background:#e8f5e9;border:1px solid #66bb6a;' : 'border:1px solid transparent;'}">
+          <label style="font-weight:600;">CS:</label>
+          <input type="number" name="shift" value="${Number(this.opts?.shift ?? savedShift)}" style="width:35px;padding:3px;text-align:center;box-sizing:border-box;">
+          <span style="color:#666;">→</span>
+          <strong id="shifted-rank-display" style="${savedShift < 0 ? 'color:#c62828;' : savedShift > 0 ? 'color:#2e7d32;' : ''}">${shiftRank(initialDisplayRank, savedShift)}</strong>
+          <button type="button" class="cs-reset" style="visibility:${savedShift !== 0 ? 'visible' : 'hidden'};padding:1px 5px;font-size:.85em;cursor:pointer;border:1px solid #999;border-radius:2px;background:#eee;" title="Reset to 0">×</button>
+        </div>
+        <div class="karma-field" style="display:flex;align-items:center;gap:4px;padding:4px 6px;border-radius:3px;${hasKarma ? 'background:#e3f2fd;border:1px solid #90caf9;' : ''}">
+          ${hasKarma ? `
+            <label style="display:flex;align-items:center;gap:4px;cursor:pointer;">
+              <input type="checkbox" id="spend-karma" name="spendKarma">
+              <span style="font-weight:600;">Karma:</span>
+            </label>
+            <span title="Available: ${availableKarma} | Min commitment: ${minKarma} | Amount chosen after roll" style="padding:1px 4px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${availableKarma}</span>
+            <span style="color:#999;font-size:.8em;">(min ${minKarma})</span>
+          ` : `<span style="color:#999;">No karma</span>`}
+        </div>
+      </div>
+
+      <!-- CS Notes Row -->
+      <div id="cs-notes-row" style="margin-bottom:6px;">
+        <input type="text" name="csNotes" id="cs-notes-input" placeholder="e.g., range -1CS, talent +1CS" value="" style="width:100%;padding:4px 8px;border:1px solid #ccc;border-radius:3px;font-size:.9em;box-sizing:border-box;">
+      </div>
+
+      <!-- Multi-Attack Row -->
+      <div class="multi-attack-section" style="padding:6px 8px;background:#e8f5e9;border:1px solid #a5d6a7;border-radius:3px;margin-bottom:6px;">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <span style="font-weight:600;color:#2e7d32;">Multi:</span>
+          <label title="Single attack, no penalty" style="cursor:pointer;"><input type="radio" name="multiMode" value="off" ${!savedMultiAdjacent ? 'checked' : ''}> Off</label>
+          <label title="-4CS penalty, hits all adjacent targets with single roll." style="cursor:pointer;"><input type="radio" name="multiMode" value="adjacent" ${savedMultiAdjacent ? 'checked' : ''}> Adjacent</label>
+        </div>
+      </div>
+
+      <!-- Range Row -->
+      <div class="range-section" style="padding:6px 8px;background:#f5f5f5;border:1px solid #ddd;border-radius:3px;margin-bottom:6px;">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <label style="font-weight:600;">Range:</label>
+          <input type="number" name="range" value="${savedRange}" min="0" style="width:40px;padding:3px;text-align:center;">
+          <span style="color:#666;">areas</span>
+          <label style="cursor:pointer;margin-left:8px;"><input type="checkbox" name="throughObstacle" ${savedObstacle ? 'checked' : ''}> Obstacle (-2CS)</label>
+          <span style="color:#666;margin-left:auto;font-size:.85em;" id="range-hint"></span>
+        </div>
+        <div style="margin-top:4px;">
+          <label style="font-weight:600;margin-right:6px;">Target:</label>
+          <select name="targetMovement" style="padding:3px;">
+            <option value="0">Standing</option>
+            <option value="0-charging">Charging attacker</option>
+            <option value="-1">Moving (−1CS)</option>
+            <option value="-2">Fast (−2CS)</option>
+            <option value="-4">Very Fast (−4CS)</option>
           </select>
-          <div style="margin-top:6px;font-size:.85em;color:#666;">
-            Damage and range use the power's damage/value and rank.
-          </div>
         </div>
-      </fieldset>
+      </div>
 
-      ${buildMultiAttackSection("energy", game.user.targets.size, false, 2, savedMultiAdjacent)}
-      
-      ${this._buildRangeInputs({
-        defaultRange: savedRange,
-        showObstacle: true,
-        weaponMaxRange: null,
-        powerRank: savedAdHoc
-          ? savedAdHocRank
-          : (energyItems.find(i => i.id === savedItemId)?.system?.rank
-             ?? energyItems.find(i => i.id === savedItemId)?.system?.powerRank
-             ?? "Remarkable"),
-        strengthRank: null
-      })}
+      <!-- Use Power Rank checkbox -->
+      <div style="margin-bottom:6px;">
+        <input type="checkbox" id="usePowerToHit" name="usePowerToHit" ${defaultUsePowerToHit ? "checked" : ""}>
+        <label for="usePowerToHit">Use power rank to hit (instead of ${ability.name})</label>
+      </div>
 
-      <div style="margin-top:8px;">
-        <input type="checkbox" id="rememberSettings" name="rememberSettings" ${savedRemember ? 'checked' : ''}>
-        <label for="rememberSettings">Remember settings</label>
-        <input type="checkbox" id="skipDiceRoll" name="skipDiceRoll" style="margin-left:12px;" ${savedSkipDice ? 'checked' : ''}>
-        <label for="skipDiceRoll">Skip dice animation</label>
+      <!-- Footer -->
+      <div id="msh-bottom-controls" style="display:flex;justify-content:space-between;align-items:center;padding-top:8px;border-top:1px solid #ddd;">
+        <label><input type="checkbox" id="msh-remember-settings" name="remember" ${savedRemember ? 'checked' : ''}> Remember</label>
+        <label><input type="checkbox" id="msh-skip-dice" name="skipDice" ${savedSkipDice ? 'checked' : ''}> Skip dice</label>
       </div>
     `;
 
@@ -191,34 +257,36 @@ export class EnergyAction extends RangedAttackAction {
             label: "Roll",
             callback: async (html) => {
               const $ = (sel) => html.find(sel);
-              const useAdHoc = !!$("#adhoc-toggle").is(":checked");
+              
+              // Get selected power from radio buttons
+              const selectedPower = $('[name="powerSelect"]:checked').val();
+              const useAdHoc = selectedPower === "adhoc";
 
               let powerName = "", powerDamage = 0, powerRank = "Remarkable", powerId = null, prettyRange = "";
-              let powerDamageType = "energy-generic"; // Default damage type
+              let powerDamageType = "energy-generic";
 
               if (useAdHoc) {
                 powerName = String($('[name="adhocName"]').val() || "Energy Blast");
                 powerDamage = Number($('[name="adhocDamage"]').val() || 0);
                 powerRank = String($('[name="adhocRank"]').val() || "Remarkable");
-                powerDamageType = "energy-generic"; // Ad-hoc uses generic energy
+                powerDamageType = "energy-generic";
                 if (!Number.isFinite(powerDamage) || powerDamage < 0) {
                   ui.notifications.error("Enter a valid non-negative damage value for the ad-hoc energy.");
                   return resolve(null);
                 }
               } else {
-                const wid = String($('[name="power"]').val() || "");
-                const item = energyItems.find((i) => i.id === wid);
+                const item = energyItems.find((i) => i.id === selectedPower);
                 if (!item) {
                   ui.notifications.error("Select an energy power or use ad-hoc.");
                   return resolve(null);
                 }
-                powerId = wid;
+                powerId = selectedPower;
                 const s = item.system || {};
                 powerName = item.name;
                 powerDamage = Number(s.damage && s.damage > 0 ? s.damage : s.value) || 0;
                 powerRank = String(s.rank ?? s.powerRank ?? "Remarkable");
                 prettyRange = String(s.calculatedRange || "");
-                powerDamageType = item.system.damageType || "energy-generic"; // Get from power or default
+                powerDamageType = item.system.damageType || "energy-generic";
               }
 
               const shift = Number($('[name="shift"]').val() || 0);
@@ -232,10 +300,11 @@ export class EnergyAction extends RangedAttackAction {
               const targetMovement = String($('[name="targetMovement"]').val() || "0");
               const movementModifier = targetMovement === "0-charging" ? 0 : Number(targetMovement);
               
-              const remember = $(`[name="rememberSettings"]`).length ? !!$(`[name="rememberSettings"]`).is(':checked') : !!$(`[name="remember"]`).is(':checked');
-              const skipDice = $(`[name="skipDiceRoll"]`).length ? !!$(`[name="skipDiceRoll"]`).is(':checked') : !!$(`[name="skipDice"]`).is(':checked');
+              const remember = !!$('#msh-remember-settings').is(':checked');
+              const skipDice = !!$('#msh-skip-dice').is(':checked');
 
-              const multiAdjacent = !!$('[name="multiAdjacent"]').is(':checked');
+              const multiMode = $('[name="multiMode"]:checked').val() || "off";
+              const multiAdjacent = (multiMode === "adjacent");
 
               // Always save remember/skipDice preferences
               await actor.setFlag("msh-faserip", "rememberSettings", remember);
@@ -255,7 +324,6 @@ export class EnergyAction extends RangedAttackAction {
                 await actor.setFlag("msh-faserip", "lastEnergyItemId", powerId || "");
                 await actor.setFlag("msh-faserip", "lastEnergyRange", range);
                 await actor.setFlag("msh-faserip", "lastEnergyObstacle", throughObstacle);
-                await actor.setFlag("msh-faserip", "lastEnergyShift", shift);
               }
 
               // Range & obstacle modifiers via powerRank path
@@ -289,36 +357,112 @@ export class EnergyAction extends RangedAttackAction {
         render: async (html) => {
           setupKarmaControlHandlers(html);
           await setupModeSelector(actor, html, this.opts || {}, "lastEnergyMode");
-          const $adhoc = html.find('#adhoc-toggle');
+          const $dialog = html.closest('.dialog');
 
-          const updatePreviewFromSelection = () => {
-            if ($adhoc.is(":checked")) {
-              const r = String(html.find('[name="adhocRank"]').val() || "Remarkable");
-              this._setupRangePreview(html, { powerRank: r });
+          // Update function for damage preview and CS highlighting
+          const update = () => {
+            const selectedPower = html.find('[name="powerSelect"]:checked').val();
+            const isAdHoc = selectedPower === "adhoc";
+            const $adhocRow = html.find('#adhoc-row');
+            const $val = html.find('#dmg-val');
+            const $note = html.find('#dmg-note');
+            const $afterArmor = html.find('#after-armor-display');
+            const $powerSection = html.find('.power-section');
+
+            // Show/hide ad-hoc row
+            $adhocRow.css('display', isAdHoc ? 'block' : 'none');
+            
+            // Update power section highlighting
+            if (isAdHoc) {
+              $powerSection.css({ 'background': '#fff8e1', 'border-color': '#ffc107' });
             } else {
-              const wid = String(html.find('[name="power"]').val() || "");
-              const s = energyItems.find((i) => i.id === wid)?.system || {};
-              const r = String(s.rank ?? s.powerRank ?? "Remarkable");
-              this._setupRangePreview(html, { powerRank: r });
+              $powerSection.css({ 'background': '#fff', 'border-color': '#ddd' });
             }
+
+            // Calculate damage
+            let currentDamage = 0;
+            let noteText = "";
+            let currentRank = "Remarkable";
+
+            if (isAdHoc) {
+              currentDamage = Number(html.find('[name="adhocDamage"]').val()) || 0;
+              noteText = "(Ad-hoc)";
+              currentRank = String(html.find('[name="adhocRank"]').val() || "Remarkable");
+            } else {
+              const item = energyItems.find(i => i.id === selectedPower);
+              if (item) {
+                const s = item.system || {};
+                currentDamage = Number(s.damage && s.damage > 0 ? s.damage : s.value) || 0;
+                noteText = `(${item.name})`;
+                currentRank = String(s.rank ?? s.powerRank ?? "Remarkable");
+              }
+            }
+
+            $val.text(currentDamage);
+            $note.text(noteText);
+
+            // Update after-armor display
+            const afterArmorDmg = Math.max(0, currentDamage - energyArmor);
+            if (primaryTarget) {
+              $afterArmor.html(`<strong>→ ${afterArmorDmg} after armor</strong>`);
+            } else {
+              $afterArmor.html(`<strong>→ ${currentDamage} damage</strong>`);
+            }
+
+            // Update shifted rank display with directional coloring
+            const cs = parseInt(html.find('[name="shift"]').val()) || 0;
+            const usePowerRank = html.find('#usePowerToHit').is(':checked');
+            const baseRank = usePowerRank ? currentRank : ability.rank;
+            const shiftedRankText = shiftRank(baseRank, cs);
+            const $shiftedRank = html.find('#shifted-rank-display');
+            $shiftedRank.text(shiftedRankText);
+            
+            // Show which rank is being used
+            const $csField = html.find('.cs-field');
+            const rankSource = usePowerRank ? '(power)' : `(${ability.name})`;
+            
+            // Update CS field highlighting based on direction
+            const $resetBtn = html.find('.cs-reset');
+            if (cs < 0) {
+              $csField.css({ 'background': '#ffebee', 'border': '1px solid #ef5350' });
+              $shiftedRank.css('color', '#c62828');
+              $resetBtn.css('visibility', 'visible');
+            } else if (cs > 0) {
+              $csField.css({ 'background': '#e8f5e9', 'border': '1px solid #66bb6a' });
+              $shiftedRank.css('color', '#2e7d32');
+              $resetBtn.css('visibility', 'visible');
+            } else {
+              $csField.css({ 'background': '', 'border': '1px solid transparent' });
+              $shiftedRank.css('color', '');
+              $resetBtn.css('visibility', 'hidden');
+            }
+
+            // Update range hint based on power rank
+            const $rangeHint = html.find('#range-hint');
+            const rankValue = game.msh?.getRankValue?.(currentRank) || RANKS[currentRank] || 30;
+            $rangeHint.text(`Max: ${rankValue} areas`);
+
+            if ($dialog.length) $dialog[0].style.height = 'auto';
           };
 
-          const applyToggle = () => {
-            const on = $adhoc.is(":checked");
-            html.find(".adhoc-fields").css("display", on ? "" : "none");
-            html.find(".carried-fields").css("display", on ? "none" : "");
-            updatePreviewFromSelection();
-          };
+          // Initial update
+          update();
 
-          $adhoc.on("change", applyToggle);
-          html.find('[name="adhocRank"]').on("input", updatePreviewFromSelection);
-          html.find('[name="power"]').on("change", updatePreviewFromSelection);
+          // Event handlers
+          html.find('[name="powerSelect"]').on('change', update);
+          html.find('[name="adhocDamage"]').on('input change', update);
+          html.find('[name="adhocRank"]').on('input change', update);
+          html.find('[name="shift"]').on('input change', update);
+          html.find('#usePowerToHit').on('change', update);
+          
+          // CS reset button handler
+          html.find('.cs-reset').on('click', function(e) {
+            e.preventDefault();
+            html.find('[name="shift"]').val(0).trigger('change');
+          });
 
-          applyToggle(); // initial
-          // multi adjacent targets, FEAT roll at -4 CS, if success all targets hit
-          setupMultiAttackHandlers(html);
-          applyCapabilitiesToDialog(html, "energy", { actor });  // new
-          this._disposeAutoFill = attachAutoFillRange(html, actor, updatePreviewFromSelection);
+          applyCapabilitiesToDialog(html, "energy", { actor });
+          this._disposeAutoFill = attachAutoFillRange(html, actor, update);
         },
         close: () => {
           if (this._disposeAutoFill) this._disposeAutoFill();
@@ -373,9 +517,6 @@ export class EnergyAction extends RangedAttackAction {
     const { cappedTotal, totalKarmaUsed } =
       await rollWithKarmaAndHistory(actor, actionName, choice.karma, roll, { spendKarma: choice.spendKarma, rank: effectiveRank, inlineRoll: useConsolidated });
 
-    // Build inline roll display for consolidated mode
-    const inlineRollHtml = useConsolidated ? buildInlineRollDisplay(roll, totalKarmaUsed, cappedTotal) : "";
-
     const color = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
     const colorLower = String(color || "").toLowerCase();  // DECLARE IT HERE
     const effectResult = effects[colorLower] || color;
@@ -414,39 +555,26 @@ export class EnergyAction extends RangedAttackAction {
     const isHit = colorLower !== 'white';
 
     // Use exactly the tokens the user targeted (no auto-adding)
-    let targets = Array.from(game.user?.targets ?? []);
-    const targetList = targets.length ? targets : [null];
+    const targetTokens = Array.from(game.user?.targets ?? []);
+    const targetList = targetTokens.length ? targetTokens : [null];
 
-    // Build shared chrome once
-    const grid = buildResultGrid(actionType, colorLower, effects, (globalThis._getResultHoverText || this._getResultHoverText));
+    // Build compact shift display
+    let shiftDisplay = "";
+    if (choice.totalShift !== 0) {
+      const csBox = `<span title="Range, obstacles, movement" style="padding:0 3px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${choice.totalShift > 0 ? '+' : ''}${choice.totalShift}CS</span>`;
+      shiftDisplay = ` (${csBox} → ${effectiveRank})`;
+    }
+
+    // Build compact roll display
+    const rollBox = `<span title="d100 = ${roll.total}" style="padding:0 3px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${roll.total}</span>`;
+    const rollDisplay = totalKarmaUsed 
+      ? `${cappedTotal} <span style="color:#666;">(${rollBox} + ${totalKarmaUsed} karma)</span>`
+      : rollBox;
+
     const { bg, fg } = bannerColors(colorLower);
-
-    // Shared context (same for all targets because the roll/result is shared)
-    const rangeText =
-      choice.prettyRange ||
-      `${choice.range} area${choice.range > 1 ? "s" : ""}` +
-      `${choice.rangeModifier ? ` (${choice.rangeModifier}CS)` : ""}` +
-      `${choice.throughObstacle ? `, obstacle (-2CS)` : ""}`;
-
-    const toHitLine =
-      choice.usePowerToHit
-        ? `To-Hit Rank: ${choice.powerRank} (Power)`
-        : `To-Hit Rank: ${ability.rank} (${ability.value}) — Ability: ${ability.name}`;
-
-    const contextHtml = inlineRollHtml ? `
-      <div>${toHitLine}${choice.totalShift ? ` — Shift ${choice.totalShift} → ${effectiveRank}` : ""}</div>
-      <div>Power: ${choice.powerName} — Damage: ${choice.powerDamage} — Rank: ${choice.powerRank}</div>
-      <div>Distance: ${rangeText}</div>
-    ` : `
-      <div>${toHitLine}${choice.totalShift ? ` — Shift ${choice.totalShift} → ${effectiveRank}` : ""}</div>
-      <div>Power: ${choice.powerName} — Damage: ${choice.powerDamage} — Rank: ${choice.powerRank}</div>
-      <div>Distance: ${rangeText}</div>
-      <div>Roll: ${roll.total}${totalKarmaUsed ? ` + Karma: ${totalKarmaUsed}` : ""} = ${cappedTotal}</div>
-    `;
-
-    const targetingContext = getTargetingContext(actor, actionName);
-    const effText = String(effectResult || "").toLowerCase();
     const isManualMode = this?.opts?.mode === "manual";
+    const targetCount = targetList.length;
+    const actionLabel = `${actionName}${targetCount > 1 ? ` (${targetCount} targets)` : ''}`;
 
     // One message per target
     for (const target of targetList) {
@@ -455,19 +583,26 @@ export class EnergyAction extends RangedAttackAction {
 
       const rawDamage = isHit ? (Number(choice.powerDamage) || 0) : 0;
 
+      // Get armor info for this target
+      let armorData = null;
+      let armorValue = 0;
       let afterArmor = rawDamage;
       if (isHit && rawDamage > 0 && targetActor) {
-        const armorData = getBodyArmorValues(targetActor, choice.powerDamageType);
-        afterArmor = Math.max(0, rawDamage - (armorData?.applicable ?? 0));
+        armorData = getBodyArmorValues(targetActor, choice.powerDamageType);
+        armorValue = armorData?.applicable ?? 0;
+        afterArmor = Math.max(0, rawDamage - armorValue);
       }
 
+      // Determine effect checks for energy: only Kill on red
+      const showKill = (colorLower === "red");
+      
       // Per-target actions (skip in manual mode)
       const { resolveCombatMode } = await import("./action-dispatcher.js");
       const actions = (!isManualMode && isHit && afterArmor > 0 && targetActor)
         ? buildActionsBox({
-            showSlam: false,                                  // Energy doesn’t slam by default
-            showStun: /stun|bullseye/.test(effText),
-            showKill: /kill/.test(effText),
+            showSlam: false,
+            showStun: false,
+            showKill: showKill,
             actorUuid: actor.uuid,
             targetUuid: targetActor?.uuid,
             damage: afterArmor,
@@ -475,44 +610,76 @@ export class EnergyAction extends RangedAttackAction {
             damageType: choice.powerDamageType,
             bypassArmor: false,
             autoApply: this.opts?.autoApply,
-            
             autoSave: (typeof resolveCombatMode === "function" && targetActor)
               ? (resolveCombatMode(targetActor) === "full")
               : false,
           })
         : "";
 
-      // Per-target damage summary
-      const sourceLabel = `Power: ${choice.powerName} (${choice.powerRank})`;
-      const damageBlock = `
-        <div style="margin:6px 10px;padding:6px;border:1px solid #ccc;border-radius:3px;background:#fff;">
-          <div><b>Damage (raw):</b> ${rawDamage}</div>
-          ${isHit ? `<div><b>After Armor${targetActor ? ` (${targetName})` : ``}:</b> ${afterArmor}</div>` : ``}
-          <div style="font-size:.9em;color:#555;">${sourceLabel}</div>
+      // Manual mode notice
+      const manualModeNotice = isManualMode ? `
+        <div style="padding:4px 8px;margin:4px 6px;background:#fff3e0;border:1px solid #ff9800;border-radius:3px;text-align:center;font-size:.85em;font-style:italic;color:#e65100;">
+          Manual Mode: GM adjudicates
         </div>
-      `;
+      ` : "";
 
+      // Build compact chat card matching blunt style
       const cardHtml = `
         <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
-          <div style="padding:5px 10px;border-bottom:1px solid #c0c0c0;font-size:1.1em;color:#8b0000;">
-            <strong>${actor.name} - ${actionName}</strong>
-            ${targetActor ? `<br><span style="font-size:.85em;color:#555;">→ ${targetName}</span>` : ``}
+          <!-- Header: Action name -->
+          <div style="padding:6px 10px;border-bottom:1px solid #c0c0c0;display:flex;justify-content:space-between;align-items:center;">
+            <strong style="color:#8b0000;">${actionLabel.toUpperCase()}</strong>
+            <span style="color:#666;font-size:.85em;">${choice.powerName}</span>
           </div>
-          <div style="padding:5px 10px;border-bottom:1px solid #e0e0e0;font-size:.9em;">
-            ${targetingContext}
+          
+          <!-- Attacker → Target -->
+          <div style="padding:4px 10px;font-size:.95em;">
+            <strong>${actor.name}</strong>${targetActor ? ` <span style="color:#666;">→</span> <strong style="color:#d32f2f;">${targetName}</strong>` : ''}
           </div>
-          <div style="padding:5px 10px;font-size:.9em;">${contextHtml}</div>
-          ${inlineRollHtml}
-          ${damageBlock}
-          ${grid}
-          <div style="text-align:center;padding:8px;margin:5px;font-weight:bold;font-size:1.1em;border-radius:3px;background:${bg};color:${fg};">
-            RESULT: ${String(color).toUpperCase()} — ${String(effectResult).toUpperCase()}
+          
+          <!-- Ability + Roll + Result -->
+          <div style="padding:2px 10px 6px;font-size:.9em;color:#555;">
+            <div>${choice.usePowerToHit ? `Power: ${choice.powerRank}` : `${ability.name}: ${ability.rank}`}${shiftDisplay}</div>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <span>Roll: ${rollDisplay}</span>
+              <span style="padding:2px 8px;border-radius:3px;font-weight:bold;font-size:.9em;background:${bg};color:${fg};">
+                ${String(color).toUpperCase()} — ${String(effectResult).toUpperCase()}
+              </span>
+            </div>
           </div>
+          
+          <!-- Damage -->
+          ${(() => {
+            if (!isHit) {
+              return `<div style="margin:0 10px 6px;padding:6px 8px;background:#fff;border:1px solid #ddd;border-radius:3px;font-size:.9em;color:#666;">
+                <strong>Damage:</strong> 0 (miss)
+              </div>`;
+            }
+            
+            const dmgBox = `<span title="Power: ${choice.powerName} (${choice.powerRank})" style="cursor:help;">${rawDamage}</span>`;
+            
+            if (armorValue > 0 && targetActor) {
+              const isEnergy = armorData?.isEnergyDamage !== false;
+              const armorType = armorData?.isForceField ? "Force Field" : "Body Armor";
+              const armorHover = `${armorType} (${armorValue}${isEnergy ? ', -20 vs Energy applied' : ''})`;
+              const armorBox = `<span title="${armorHover}" style="cursor:help;">${armorValue} armor</span>`;
+              
+              return `<div style="margin:0 10px 6px;padding:6px 8px;background:#fff;border:1px solid #ddd;border-radius:3px;font-size:.9em;">
+                <strong>Damage:</strong> ${dmgBox} − ${armorBox} = <strong>${afterArmor}</strong>
+              </div>`;
+            } else {
+              return `<div style="margin:0 10px 6px;padding:6px 8px;background:#fff;border:1px solid #ddd;border-radius:3px;font-size:.9em;">
+                <strong>Damage:</strong> ${dmgBox}
+              </div>`;
+            }
+          })()}
+          
           ${actions}
+          ${manualModeNotice}
         </div>
       `;
 
-      // Flags per target (no auto-apply trigger in flags to avoid loops)
+      // Flags per target
       const msgFlags = buildDamageFlags({
         actionId: actionType,
         damageType: choice.powerDamageType,
@@ -534,23 +701,24 @@ export class EnergyAction extends RangedAttackAction {
         flags: msgFlags
       });
 
-      // Explicit per-target apply in Full Auto
+      // Auto-apply damage in Full Auto mode
       if (!isManualMode && this.opts?.autoApply && isHit && rawDamage > 0 && targetActor) {
         await applyDamageToTargets({
           damage: rawDamage,
           attackerUuid: actor.uuid,
           damageType: choice.powerDamageType,
-          showNotification: true,
+          showNotification: false,
           bypassArmor: false,
           attackForm: "energy",
           armorPiercing: 0,
           apMode: "value",
-          wasKillResult: (colorLower === "red"),
-          specificTarget: target
+          wasKillResult: showKill,
+          targets: target ? [target] : []
         });
       }
 
     } // end for loop for target processing
+
 
     // Play combat SFX (Energy)
     try {
