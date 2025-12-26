@@ -1,4 +1,6 @@
-// scripts/modules/actions/energy-action.js v1.4.0 - 2025-12-25
+// scripts/modules/actions/energy-action.js v1.5.1 - 2025-12-25
+// v1.5.1: Add result cap for Energy Generation power (can reduce both damage AND effect)
+// v1.5.0: Add "Reduce Damage" option (energy can reduce damage but NOT effect per rules)
 // v1.4.0: Compact chat card matching blunt-attack style (inline rolls, hover boxes)
 // v1.3.2: Fix shifted rank display to use power rank when "use power rank to hit" is checked
 // v1.3.1: Fix armor display - show physical armor with energy reduction note
@@ -97,6 +99,8 @@ export class EnergyAction extends RangedAttackAction {
     const savedMultiAdjacent = await actor.getFlag("msh-faserip", "lastEnergyMultiAdjacent") || false;
     const savedRemember = (await actor.getFlag("msh-faserip", "rememberSettings")) ?? (await actor.getFlag("msh-faserip", "lastEnergyRemember")) ?? true;
     const savedSkipDice = (await actor.getFlag("msh-faserip", "skipDiceRoll")) ?? (await actor.getFlag("msh-faserip", "lastEnergySkipDice")) ?? false;
+    const savedReduceDamage = await actor.getFlag("msh-faserip", "lastEnergyReduceDamage") || false;
+    const savedReducedAmount = await actor.getFlag("msh-faserip", "lastEnergyReducedAmount") || 0;
 
 
     // === Target Info ===
@@ -235,6 +239,27 @@ export class EnergyAction extends RangedAttackAction {
         </div>
       </div>
 
+      <!-- Reduce Damage Row (energy can reduce damage; Energy Generation can also reduce effect) -->
+      <div class="reduce-damage-section" style="padding:6px 8px;background:#fff3e0;border:1px solid #ffcc80;border-radius:3px;margin-bottom:6px;">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+          <label title="Reduce damage output" style="display:flex;align-items:center;gap:4px;cursor:pointer;">
+            <input type="checkbox" id="reduce-damage-enabled" ${savedReduceDamage ? 'checked' : ''}>
+            <strong style="color:#e65100;">Reduce Damage</strong>
+          </label>
+          <div class="reduce-damage-controls" style="display:${savedReduceDamage ? 'flex' : 'none'};align-items:center;gap:4px;">
+            <input type="number" name="reducedDamage" title="Reduced damage amount" value="${savedReduceDamage && savedReducedAmount > 0 ? savedReducedAmount : initialDamage}" min="0" max="${initialDamage}" style="width:45px;padding:2px;text-align:center;">
+            <span style="color:#666;font-size:.85em;">/<span class="max-damage-display">${initialDamage}</span></span>
+            <span class="result-cap-controls" style="display:none;margin-left:6px;">
+              <span style="color:#ccc;margin:0 2px;">|</span>
+              <label title="No result cap" style="cursor:pointer;font-size:.9em;"><input type="radio" name="resultCap" value="none" checked> Any</label>
+              <label title="Cap at Yellow (no Kill)" style="cursor:pointer;font-size:.9em;"><input type="radio" name="resultCap" value="yellow"> Ylw</label>
+              <label title="Cap at Green (no Bullseye/Kill)" style="cursor:pointer;font-size:.9em;"><input type="radio" name="resultCap" value="green"> Grn</label>
+            </span>
+          </div>
+          <span class="effect-note" style="color:#888;font-size:.8em;margin-left:auto;" title="Per FASERIP rules: Energy attacks may reduce damage but not effect (red stays red)">Effect cannot be reduced</span>
+        </div>
+      </div>
+
       <!-- Use Power Rank checkbox -->
       <div style="margin-bottom:6px;">
         <input type="checkbox" id="usePowerToHit" name="usePowerToHit" ${defaultUsePowerToHit ? "checked" : ""}>
@@ -306,6 +331,11 @@ export class EnergyAction extends RangedAttackAction {
               const multiMode = $('[name="multiMode"]:checked').val() || "off";
               const multiAdjacent = (multiMode === "adjacent");
 
+              // Reduce damage (energy can reduce damage; Energy Generation can also reduce effect)
+              const reduceDamageEnabled = !!$('#reduce-damage-enabled').is(':checked');
+              const reducedDamage = reduceDamageEnabled ? parseInt($('[name="reducedDamage"]').val() || powerDamage) : powerDamage;
+              const resultCap = reduceDamageEnabled ? ($('[name="resultCap"]:checked').val() || 'none') : 'none';
+
               // Always save remember/skipDice preferences
               await actor.setFlag("msh-faserip", "rememberSettings", remember);
               await actor.setFlag("msh-faserip", "lastEnergyRemember", remember);
@@ -324,6 +354,8 @@ export class EnergyAction extends RangedAttackAction {
                 await actor.setFlag("msh-faserip", "lastEnergyItemId", powerId || "");
                 await actor.setFlag("msh-faserip", "lastEnergyRange", range);
                 await actor.setFlag("msh-faserip", "lastEnergyObstacle", throughObstacle);
+                await actor.setFlag("msh-faserip", "lastEnergyReduceDamage", reduceDamageEnabled);
+                await actor.setFlag("msh-faserip", "lastEnergyReducedAmount", reducedDamage);
               }
 
               // Range & obstacle modifiers via powerRank path
@@ -347,7 +379,10 @@ export class EnergyAction extends RangedAttackAction {
                 targetMovement,
                 movementModifier,
                 powerDamageType,
-                multiAdjacent
+                multiAdjacent,
+                reduceDamageEnabled,
+                reducedDamage,
+                resultCap
               });
             },
           },
@@ -383,6 +418,7 @@ export class EnergyAction extends RangedAttackAction {
             let currentDamage = 0;
             let noteText = "";
             let currentRank = "Remarkable";
+            let isEnergyGeneration = false;
 
             if (isAdHoc) {
               currentDamage = Number(html.find('[name="adhocDamage"]').val()) || 0;
@@ -395,7 +431,24 @@ export class EnergyAction extends RangedAttackAction {
                 currentDamage = Number(s.damage && s.damage > 0 ? s.damage : s.value) || 0;
                 noteText = `(${item.name})`;
                 currentRank = String(s.rank ?? s.powerRank ?? "Remarkable");
+                // Check if this is the Energy Generation power (can reduce both damage AND effect)
+                const nameLower = item.name.toLowerCase();
+                isEnergyGeneration = nameLower.includes('energy generation') || 
+                                     s.canReduceEffect === true ||
+                                     s.type?.toLowerCase() === 'energy generation';
               }
+            }
+
+            // Show/hide result cap controls based on Energy Generation
+            const $resultCapControls = html.find('.result-cap-controls');
+            const $effectNote = html.find('.effect-note');
+            if (isEnergyGeneration) {
+              $resultCapControls.css('display', 'inline');
+              $effectNote.text('Energy Generation: can reduce effect').css('color', '#2e7d32');
+            } else {
+              $resultCapControls.hide();
+              html.find('[name="resultCap"][value="none"]').prop('checked', true);
+              $effectNote.text('Effect cannot be reduced').css('color', '#888');
             }
 
             $val.text(currentDamage);
@@ -442,6 +495,17 @@ export class EnergyAction extends RangedAttackAction {
             const rankValue = game.msh?.getRankValue?.(currentRank) || RANKS[currentRank] || 30;
             $rangeHint.text(`Max: ${rankValue} areas`);
 
+            // Update reduce damage max when power changes
+            const $reducedDamage = html.find('[name="reducedDamage"]');
+            const $maxDmgDisplay = html.find('.max-damage-display');
+            const oldMax = Number($reducedDamage.attr('max')) || 0;
+            $reducedDamage.attr('max', currentDamage);
+            $maxDmgDisplay.text(currentDamage);
+            // If max changed (power switched), reset value to new max
+            if (oldMax !== currentDamage) {
+              $reducedDamage.val(currentDamage);
+            }
+
             if ($dialog.length) $dialog[0].style.height = 'auto';
           };
 
@@ -459,6 +523,27 @@ export class EnergyAction extends RangedAttackAction {
           html.find('.cs-reset').on('click', function(e) {
             e.preventDefault();
             html.find('[name="shift"]').val(0).trigger('change');
+          });
+
+          // Reduce damage checkbox toggle
+          html.find('#reduce-damage-enabled').on('change', function() {
+            const $controls = html.find('.reduce-damage-controls');
+            const $reducedDamage = html.find('[name="reducedDamage"]');
+            const $section = html.find('.reduce-damage-section');
+            if (this.checked) {
+              $controls.css('display', 'flex');
+              // Set value to current max (which reflects power damage)
+              const currentMax = Number($reducedDamage.attr('max')) || 20;
+              $reducedDamage.val(currentMax);
+              // Dark orange border when enabled
+              $section.css('border-color', '#e65100');
+            } else {
+              $controls.hide();
+              // Reset damage to max when disabling
+              $reducedDamage.val($reducedDamage.attr('max'));
+              // Reset to default border
+              $section.css('border-color', '#ffcc80');
+            }
           });
 
           applyCapabilitiesToDialog(html, "energy", { actor });
@@ -517,8 +602,22 @@ export class EnergyAction extends RangedAttackAction {
     const { cappedTotal, totalKarmaUsed } =
       await rollWithKarmaAndHistory(actor, actionName, choice.karma, roll, { spendKarma: choice.spendKarma, rank: effectiveRank, inlineRoll: useConsolidated });
 
-    const color = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
-    const colorLower = String(color || "").toLowerCase();  // DECLARE IT HERE
+    let color = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
+    let colorLower = String(color || "").toLowerCase();
+    
+    // Apply result cap if set (only for Energy Generation power)
+    let wasResultCapped = false;
+    if (choice.resultCap && choice.resultCap !== 'none') {
+      const capOrder = ['white', 'green', 'yellow', 'red'];
+      const currentIndex = capOrder.indexOf(colorLower);
+      const capIndex = capOrder.indexOf(choice.resultCap);
+      if (currentIndex > capIndex) {
+        color = choice.resultCap;
+        colorLower = choice.resultCap;
+        wasResultCapped = true;
+      }
+    }
+    
     const effectResult = effects[colorLower] || color;
 
     // === VISUAL EFFECTS ===
@@ -581,7 +680,10 @@ export class EnergyAction extends RangedAttackAction {
       const targetActor = target?.actor;
       const targetName  = target?.name || "Unknown Target";
 
-      const rawDamage = isHit ? (Number(choice.powerDamage) || 0) : 0;
+      // Use reduced damage if enabled, otherwise full power damage
+      const baseDamage = choice.reduceDamageEnabled ? choice.reducedDamage : choice.powerDamage;
+      const rawDamage = isHit ? (Number(baseDamage) || 0) : 0;
+      const wasReduced = choice.reduceDamageEnabled && choice.reducedDamage < choice.powerDamage;
 
       // Get armor info for this target
       let armorData = null;
@@ -643,7 +745,7 @@ export class EnergyAction extends RangedAttackAction {
             <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
               <span>Roll: ${rollDisplay}</span>
               <span style="padding:2px 8px;border-radius:3px;font-weight:bold;font-size:.9em;background:${bg};color:${fg};">
-                ${String(color).toUpperCase()} — ${String(effectResult).toUpperCase()}
+                ${String(color).toUpperCase()} — ${String(effectResult).toUpperCase()}${wasResultCapped ? ' <span style="font-weight:normal;font-size:.85em;">(capped)</span>' : ''}
               </span>
             </div>
           </div>
@@ -656,6 +758,7 @@ export class EnergyAction extends RangedAttackAction {
               </div>`;
             }
             
+            const reducedNote = wasReduced ? ` <span style="color:#ff6f00;">(reduced from ${choice.powerDamage})</span>` : '';
             const dmgBox = `<span title="Power: ${choice.powerName} (${choice.powerRank})" style="cursor:help;">${rawDamage}</span>`;
             
             if (armorValue > 0 && targetActor) {
@@ -665,11 +768,11 @@ export class EnergyAction extends RangedAttackAction {
               const armorBox = `<span title="${armorHover}" style="cursor:help;">${armorValue} armor</span>`;
               
               return `<div style="margin:0 10px 6px;padding:6px 8px;background:#fff;border:1px solid #ddd;border-radius:3px;font-size:.9em;">
-                <strong>Damage:</strong> ${dmgBox} − ${armorBox} = <strong>${afterArmor}</strong>
+                <strong>Damage:</strong> ${dmgBox}${reducedNote} − ${armorBox} = <strong>${afterArmor}</strong>
               </div>`;
             } else {
               return `<div style="margin:0 10px 6px;padding:6px 8px;background:#fff;border:1px solid #ddd;border-radius:3px;font-size:.9em;">
-                <strong>Damage:</strong> ${dmgBox}
+                <strong>Damage:</strong> ${dmgBox}${reducedNote}
               </div>`;
             }
           })()}
