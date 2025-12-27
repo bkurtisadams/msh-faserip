@@ -1,4 +1,5 @@
-// scripts/modules/actions/energy-action.js v1.5.2 - 2025-12-26
+// scripts/modules/actions/energy-action.js v1.5.3 - 2025-12-26
+// v1.5.3: Default usePowerToHit to false (Agility is standard for ranged attacks)
 // v1.5.2: Fix karma display to use getAvailableKarma (lifetime karma) instead of pool value
 // v1.5.1: Add result cap for Energy Generation power (can reduce both damage AND effect)
 // v1.5.0: Add "Reduce Damage" option (energy can reduce damage but NOT effect per rules)
@@ -95,7 +96,7 @@ export class EnergyAction extends RangedAttackAction {
     const savedAdHocRank = await actor.getFlag("msh-faserip", "lastEnergyAdHocRank") || "Remarkable";
 
     const savedUsePowerToHit = await actor.getFlag("msh-faserip", "lastEnergyUsePowerToHit");
-    const defaultUsePowerToHit = (savedUsePowerToHit === undefined || savedUsePowerToHit === null) ? true : !!savedUsePowerToHit;
+    const defaultUsePowerToHit = (savedUsePowerToHit === undefined || savedUsePowerToHit === null) ? false : !!savedUsePowerToHit;
 
     const savedShift = await actor.getFlag("msh-faserip", "lastEnergyShift") || 0;
     const savedMultiAdjacent = await actor.getFlag("msh-faserip", "lastEnergyMultiAdjacent") || false;
