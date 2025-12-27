@@ -1,4 +1,5 @@
-// scripts/modules/actions/death-save-action.js v1.5.2 - 2025-12-24
+// scripts/modules/actions/death-save-action.js v1.5.3 - 2025-12-26
+// v1.5.3: Remove redundant "NO EFFECT" status box for Kill Save (info already in collapsible)
 // v1.5.2: Add fromDeathSave flag to Unconscious effect for wake-up health restoration
 // v1.5.1: UI improvements - remove emoji from Kill Check header, use green for No Effect,
 //         blue for Unconscious, style result color as badge (Yellow/Green/White/Red)
@@ -161,13 +162,18 @@ export class DeathSaveAction extends BaseAction {
         ? `<div><strong>Unconscious:</strong> ${unconsciousDuration} round${unconsciousDuration !== 1 ? 's' : ''}</div>`
         : '';
       
+      // Only show status box for Dying/Unconscious - No Effect is shown in collapsible
+      const showStatusBox = isDying || fromZeroHealth;
       const statusDisplay = isDying
         ? (fromZeroHealth 
             ? '<strong style="color:#c62828;">DYING (Unconscious)</strong>'
             : '<strong style="color:#c62828;">DYING (Conscious)</strong>')
-        : (fromZeroHealth
-            ? '<strong style="color:#1565c0;">UNCONSCIOUS</strong>'
-            : '<strong style="color:#2e7d32;">NO EFFECT</strong>');
+        : '<strong style="color:#1565c0;">UNCONSCIOUS</strong>';
+      
+      const statusBox = showStatusBox ? `
+            <div style="margin-top:6px;padding:6px;border-radius:3px;background:${isDying ? '#ffebee' : '#e3f2fd'};border:1px solid ${isDying ? '#ef5350' : '#90caf9'};">
+              ${statusDisplay}
+            </div>` : '';
 
       const resultHtml = `
         <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
@@ -177,9 +183,7 @@ export class DeathSaveAction extends BaseAction {
           <div style="padding:8px 10px;font-size:.9em;">
             <div><strong>Endurance:</strong> ${endurance.rank} (${endurance.value})</div>
             ${unconsciousLine}
-            <div style="margin-top:6px;padding:6px;border-radius:3px;background:${isDying ? '#ffebee' : (fromZeroHealth ? '#e3f2fd' : '#e8f5e9')};border:1px solid ${isDying ? '#ef5350' : (fromZeroHealth ? '#90caf9' : '#a5d6a7')};">
-              ${statusDisplay}
-            </div>
+            ${statusBox}
           </div>
           ${killCheckSection}
         </div>
@@ -473,13 +477,18 @@ export class DeathSaveAction extends BaseAction {
       ? `<div><strong>Unconscious:</strong> ${unconsciousDuration} round${unconsciousDuration !== 1 ? 's' : ''}</div>`
       : '';
     
+    // Only show status box for Dying/Unconscious - No Effect is shown in collapsible
+    const showStatusBox = isDying || fromZeroHealth;
     const statusDisplay = isDying
       ? (fromZeroHealth 
           ? '<strong style="color:#c62828;">DYING (Unconscious)</strong>'
           : '<strong style="color:#c62828;">DYING (Conscious)</strong>')
-      : (fromZeroHealth
-          ? '<strong style="color:#1565c0;">UNCONSCIOUS</strong>'
-          : '<strong style="color:#2e7d32;">NO EFFECT</strong>');
+      : '<strong style="color:#1565c0;">UNCONSCIOUS</strong>';
+    
+    const statusBox = showStatusBox ? `
+          <div style="margin-top:6px;padding:6px;border-radius:3px;background:${isDying ? '#ffebee' : '#e3f2fd'};border:1px solid ${isDying ? '#ef5350' : '#90caf9'};">
+            ${statusDisplay}
+          </div>` : '';
 
     const cardHtml = `
       <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
@@ -489,9 +498,7 @@ export class DeathSaveAction extends BaseAction {
         <div style="padding:8px 10px;font-size:.9em;">
           <div><strong>Endurance:</strong> ${endurance.rank} (${endurance.value})</div>
           ${unconsciousLine}
-          <div style="margin-top:6px;padding:6px;border-radius:3px;background:${isDying ? '#ffebee' : (fromZeroHealth ? '#e3f2fd' : '#e8f5e9')};border:1px solid ${isDying ? '#ef5350' : (fromZeroHealth ? '#90caf9' : '#a5d6a7')};">
-            ${statusDisplay}
-          </div>
+          ${statusBox}
         </div>
         ${killCheckSection}
       </div>
