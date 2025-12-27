@@ -1,4 +1,5 @@
-// scripts/modules/actions/energy-action.js v1.5.1 - 2025-12-25
+// scripts/modules/actions/energy-action.js v1.5.2 - 2025-12-26
+// v1.5.2: Fix karma display to use getAvailableKarma (lifetime karma) instead of pool value
 // v1.5.1: Add result cap for Energy Generation power (can reduce both damage AND effect)
 // v1.5.0: Add "Reduce Damage" option (energy can reduce damage but NOT effect per rules)
 // v1.4.0: Compact chat card matching blunt-attack style (inline rolls, hover boxes)
@@ -13,7 +14,8 @@ import { RangedAttackAction } from "./ranged-attack-action.js";
 import { 
   generateKarmaControlsHTML, 
   setupKarmaControlHandlers, 
-  extractKarmaFromDialog 
+  extractKarmaFromDialog,
+  getAvailableKarma
 } from "../dice/dice-roller.js";
 
 import { 
@@ -121,8 +123,8 @@ export class EnergyAction extends RangedAttackAction {
     const initialDisplayRank = defaultUsePowerToHit ? initialPowerRank : ability.rank;
     
     // Karma info for compact display
-    const availableKarma = actor.system.attributes?.karma?.value || 0;
-    const hasKarma = availableKarma >= 10;
+    const availableKarma = getAvailableKarma(actor);
+    const hasKarma = availableKarma > 0;
     const minKarma = 10;
     
     // Build power radio options (inline style like blunt source selection)
