@@ -1,4 +1,8 @@
-// scripts/modules/actions/energy-action.js v1.5.3 - 2025-12-26
+// scripts/modules/actions/energy-action.js v1.5.7 - 2025-12-27
+// v1.5.7: Add effect modifier system - read target status (Stunned +2CS, etc) from active effects
+// v1.5.6: Add CS breakdown tooltip showing Manual/Range/Obstacle/Movement/Adjacent components
+// v1.5.5: Fix regex to use word boundaries - prevents "flight" matching "light"
+// v1.5.4: Respect isEnergyAttack flag; skip if other action flags explicitly set; remove generic distanceattacks match
 // v1.5.3: Default usePowerToHit to false (Agility is standard for ranged attacks)
 // v1.5.2: Fix karma display to use getAvailableKarma (lifetime karma) instead of pool value
 // v1.5.1: Add result cap for Energy Generation power (can reduce both damage AND effect)
@@ -48,6 +52,7 @@ import {
 import { isAuraMaintained } from "./nullify.js";
 import { buildDamageFlags } from "./damage-ui.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
+import { getAttackShiftBreakdown, getDefenseShiftBreakdown, canActorAct } from "../effects/effect-modifiers.js";
 
 export class EnergyAction extends RangedAttackAction {
   async execute() {
@@ -62,14 +67,20 @@ export class EnergyAction extends RangedAttackAction {
       if (i.type !== "power") return false;
       const s = i.system || {};
       
-      // NEW: Explicit flag (if you add one)
+      // Explicit flag takes priority
       if (s.isEnergyAttack === true) return true;
       
-      // EXISTING: Category/type detection
+      // If any other action type flag is explicitly set, don't auto-include
+      if (s.isForceAttack || s.isBluntAttack || s.isEdgedAttack || s.isShootingAttack || s.isMentalAttack) {
+        return false;
+      }
+      
+      // Category/type detection
       const cat = String(s.category || "").toLowerCase();
       const typ = String(s.type || "").toLowerCase();
-      const catIsEnergy = cat === "energycontrol" || cat === "distanceattacks";
-      const typeLooksEnergy = /energy|light|electric|plasma|beam|blast|fire|ice|cold|sound|darkforce|radiation|heat/.test(typ);
+      const catIsEnergy = cat === "energycontrol";
+      // Use word boundaries to avoid matching "flight" on "light", etc.
+      const typeLooksEnergy = /\b(energy|light|electric|plasma|beam|blast|fire|ice|cold|sound|darkforce|radiation|heat|lightning)\b/.test(typ);
       
       return catIsEnergy || typeLooksEnergy;
     });
@@ -599,6 +610,50 @@ export class EnergyAction extends RangedAttackAction {
           console.warn('Nullify aura guard check failed:', e);
     }
 
+    // === EFFECT MODIFIERS: Apply attack/defense shifts from active effects ===
+    const attackerMods = canActorAct(actor);
+    if (!attackerMods.canAct) {
+      ui.notifications?.warn(`${actor.name}: ${attackerMods.reason}`);
+      await ChatMessage.create({
+        speaker: ChatMessage.getSpeaker({ actor }),
+        content: `
+          <div style="background:#fff;border:1px solid #e57373;border-radius:3px;padding:6px 8px;">
+            <b>${actor.name}</b> cannot act — ${attackerMods.reason}
+          </div>
+        `
+      });
+      return; // abort attack
+    }
+    
+    // Get attacker's attack shift from effects (with breakdown)
+    const attackerShiftData = getAttackShiftBreakdown(actor);
+    const attackerShift = attackerShiftData.total;
+    const attackerEffects = attackerShiftData.breakdown;
+    
+    // Get defender's defense shift (if single target)
+    let defenderShift = 0;
+    let defenderEffects = [];
+    const effectTargetTokens = Array.from(game.user?.targets ?? []);
+    const effectPrimaryTarget = effectTargetTokens[0] ?? null;
+    const defenderActor = effectPrimaryTarget?.actor ?? null;
+    if (defenderActor) {
+      // Energy attacks are ranged
+      const defenderShiftData = getDefenseShiftBreakdown(defenderActor, true);
+      defenderShift = defenderShiftData.total;
+      defenderEffects = defenderShiftData.breakdown;
+    }
+    
+    // Total effect shift (attacker bonus + defender penalty)
+    // Positive defenderShift = harder to hit, so we subtract it
+    const effectShift = attackerShift - defenderShift;
+    
+    // Apply effect shift to choice.totalShift
+    const originalTotalShift = choice.totalShift || 0;
+    choice.totalShift = originalTotalShift + effectShift;
+    choice.effectShift = effectShift;
+    choice.attackerEffects = attackerEffects;
+    choice.defenderEffects = defenderEffects;
+
     // === Resolve roll ===
     // Rank → roll → karma → color
     const toHitRankName = choice.usePowerToHit ? choice.powerRank : ability.rank;
@@ -674,10 +729,32 @@ export class EnergyAction extends RangedAttackAction {
     const targetTokens = Array.from(game.user?.targets ?? []);
     const targetList = targetTokens.length ? targetTokens : [null];
 
-    // Build compact shift display
+    // Build compact shift display with breakdown tooltip
     let shiftDisplay = "";
     if (choice.totalShift !== 0) {
-      const csBox = `<span title="Range, obstacles, movement" style="padding:0 3px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${choice.totalShift > 0 ? '+' : ''}${choice.totalShift}CS</span>`;
+      // Build breakdown for tooltip
+      const breakdownParts = [];
+      if (choice.shift && choice.shift !== 0) breakdownParts.push(`Manual: ${choice.shift > 0 ? '+' : ''}${choice.shift}`);
+      if (choice.rangeModifier && choice.rangeModifier !== 0) breakdownParts.push(`Range: ${choice.rangeModifier > 0 ? '+' : ''}${choice.rangeModifier}`);
+      if (choice.obstacleModifier && choice.obstacleModifier !== 0) breakdownParts.push(`Obstacle: ${choice.obstacleModifier}`);
+      if (choice.movementModifier && choice.movementModifier !== 0) breakdownParts.push(`Movement: ${choice.movementModifier > 0 ? '+' : ''}${choice.movementModifier}`);
+      if (choice.multiAdjacent) breakdownParts.push(`Adjacent: -4`);
+      // Add effect modifiers from attacker
+      if (choice.attackerEffects?.length) {
+        for (const eff of choice.attackerEffects) {
+          breakdownParts.push(`${eff.name}: ${eff.shift > 0 ? '+' : ''}${eff.shift}`);
+        }
+      }
+      // Add effect modifiers from defender (inverted since defender shift reduces our attack)
+      if (choice.defenderEffects?.length) {
+        for (const eff of choice.defenderEffects) {
+          const inverted = -eff.shift;
+          breakdownParts.push(`${eff.name} (target): ${inverted > 0 ? '+' : ''}${inverted}`);
+        }
+      }
+      const breakdownTooltip = breakdownParts.length ? breakdownParts.join(', ') : 'Column shifts';
+      
+      const csBox = `<span title="${breakdownTooltip}" style="padding:0 3px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${choice.totalShift > 0 ? '+' : ''}${choice.totalShift}CS</span>`;
       shiftDisplay = ` (${csBox} → ${effectiveRank})`;
     }
 

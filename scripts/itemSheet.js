@@ -1,4 +1,5 @@
-// In itemSheet.js
+// itemSheet.js v1.1.0 - 2025-12-27
+// Added: Battle Effects Column, Damage Source, Force Field, action dialog flags
 export class FaseripItemSheet extends ItemSheet {
   static get defaultOptions() {
     return foundry.utils.mergeObject(super.defaultOptions, {
@@ -340,6 +341,146 @@ export class FaseripItemSheet extends ItemSheet {
         html.find('.combat-properties').show();
         html.find('.toggle-icon').removeClass('fa-chevron-down').addClass('fa-chevron-up');
       }
+
+      // ============ BATTLE EFFECTS COLUMN HANDLING ============
+      const BATTLE_EFFECTS_COLUMNS = {
+        "BA": { name: "Blunt Attack", results: { white: "Miss", green: "Hit", yellow: "Slam", red: "Stun" }, canPullPunch: true, canReduceEffect: true },
+        "EA": { name: "Edged Attack", results: { white: "Miss", green: "Hit", yellow: "Stun", red: "Kill" }, canPullPunch: false, canReduceEffect: false },
+        "S":  { name: "Shooting", results: { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Kill" }, canPullPunch: false, canReduceEffect: false },
+        "TE": { name: "Throwing Edged", results: { white: "Miss", green: "Hit", yellow: "Stun", red: "Kill" }, canPullPunch: true, canReduceEffect: false },
+        "TB": { name: "Throwing Blunt", results: { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Stun" }, canPullPunch: true, canReduceEffect: true },
+        "En": { name: "Energy", results: { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Kill" }, canPullPunch: true, canReduceEffect: false },
+        "Fo": { name: "Force", results: { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Stun" }, canPullPunch: true, canReduceEffect: false },
+        "Ch": { name: "Charging", results: { white: "Miss", green: "Hit", yellow: "Slam", red: "Stun" }, canPullPunch: true, canReduceEffect: true },
+        "Gp": { name: "Grappling", results: { white: "Miss", green: "Miss", yellow: "Partial", red: "Hold" }, canPullPunch: false, canReduceEffect: false },
+        "Gb": { name: "Grabbing", results: { white: "Miss", green: "Take", yellow: "Grab", red: "Break" }, canPullPunch: false, canReduceEffect: false }
+      };
+
+      // Update battle effects display
+      const updateBattleEffectsDisplay = (column) => {
+        const displayEl = html.find('#battle-effects-display')[0];
+        if (!displayEl) return;
+        
+        if (!column || !BATTLE_EFFECTS_COLUMNS[column]) {
+          displayEl.innerHTML = '<span class="no-column" style="color:#999;">Select a column to see results</span>';
+          return;
+        }
+        
+        const colData = BATTLE_EFFECTS_COLUMNS[column];
+        const r = colData.results;
+        displayEl.innerHTML = `
+          <span style="background:#f0f0f0;padding:2px 4px;border-radius:2px;margin-right:4px;">${r.white}</span>
+          <span style="background:#4CAF50;color:white;padding:2px 4px;border-radius:2px;margin-right:4px;">${r.green}</span>
+          <span style="background:#FFC107;padding:2px 4px;border-radius:2px;margin-right:4px;">${r.yellow}</span>
+          <span style="background:#F44336;color:white;padding:2px 4px;border-radius:2px;">${r.red}</span>
+        `;
+      };
+
+      // Update pull punch/reduce effect based on column (unless override is checked)
+      const updatePullPunchFromColumn = (column) => {
+        const overrideCheck = html.find('#override-pull-punch')[0];
+        if (overrideCheck?.checked) return;
+        
+        const pullPunchCheck = html.find('#can-pull-punch')[0];
+        const reduceEffectCheck = html.find('#can-reduce-effect')[0];
+        if (!pullPunchCheck || !reduceEffectCheck) return;
+        
+        if (!column || !BATTLE_EFFECTS_COLUMNS[column]) {
+          pullPunchCheck.checked = false;
+          reduceEffectCheck.checked = false;
+        } else {
+          const colData = BATTLE_EFFECTS_COLUMNS[column];
+          pullPunchCheck.checked = colData.canPullPunch;
+          reduceEffectCheck.checked = colData.canReduceEffect;
+        }
+      };
+
+      // Initial display on load
+      updateBattleEffectsDisplay(this.item.system.battleEffectsColumn);
+
+      // Battle effects column change handler
+      html.find('#battle-effects-column').change(async ev => {
+        const column = ev.currentTarget.value;
+        updateBattleEffectsDisplay(column);
+        updatePullPunchFromColumn(column);
+        
+        // Auto-update the stored values if not overridden
+        const overrideCheck = html.find('#override-pull-punch')[0];
+        if (!overrideCheck?.checked && BATTLE_EFFECTS_COLUMNS[column]) {
+          const colData = BATTLE_EFFECTS_COLUMNS[column];
+          await this.item.update({
+            "system.canPullPunch": colData.canPullPunch,
+            "system.canReduceEffect": colData.canReduceEffect
+          }, { render: false });
+        }
+      });
+
+      // Override checkbox - when unchecked, resync from column
+      html.find('#override-pull-punch').change(async ev => {
+        if (!ev.currentTarget.checked) {
+          const column = html.find('#battle-effects-column').val();
+          updatePullPunchFromColumn(column);
+          if (BATTLE_EFFECTS_COLUMNS[column]) {
+            const colData = BATTLE_EFFECTS_COLUMNS[column];
+            await this.item.update({
+              "system.canPullPunch": colData.canPullPunch,
+              "system.canReduceEffect": colData.canReduceEffect
+            }, { render: false });
+          }
+        }
+      });
+
+      // ============ DAMAGE SOURCE HANDLING ============
+      const updateDamageSourceUI = (source) => {
+        const damageInput = html.find('[name="system.damage"]')[0];
+        const hintEl = html.find('#damage-source-hint')[0];
+        if (!damageInput || !hintEl) return;
+        
+        const rankValue = this.item.system.value || 0;
+        switch (source) {
+          case "rank":
+            damageInput.disabled = true;
+            hintEl.textContent = `Uses rank (${rankValue})`;
+            break;
+          case "strength":
+            damageInput.disabled = true;
+            hintEl.textContent = "Uses actor's Strength";
+            break;
+          case "endurance":
+            damageInput.disabled = true;
+            hintEl.textContent = "Uses actor's Endurance";
+            break;
+          case "fixed":
+            damageInput.disabled = false;
+            hintEl.textContent = "Enter fixed value";
+            break;
+          default:
+            damageInput.disabled = true;
+            hintEl.textContent = "";
+        }
+      };
+
+      // Initial state
+      updateDamageSourceUI(this.item.system.damageSource || "rank");
+
+      html.find('#damage-source').change(ev => {
+        updateDamageSourceUI(ev.currentTarget.value);
+      });
+
+      // ============ FORCE FIELD CHECKBOX ============
+      html.find('#is-force-field').change(async ev => {
+        const checked = ev.currentTarget.checked;
+        await this.item.update({ "system.isForceField": checked }, { render: false });
+        this.render(true);
+      });
+
+      // ============ ARMOR USE RANK VALUE TOGGLE ============
+      html.find('#armor-use-rank').change(ev => {
+        const armorManualValues = html.find('.armor-manual-values')[0];
+        if (armorManualValues) {
+          armorManualValues.style.display = ev.currentTarget.checked ? 'none' : '';
+        }
+      });
     }
 
     // Update power type options when category changes

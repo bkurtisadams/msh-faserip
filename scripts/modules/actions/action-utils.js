@@ -1,4 +1,5 @@
-// action-utils.js v1.2.0 - 2025-12-24
+// action-utils.js v1.2.1 - 2025-12-27
+// v1.2.1: getBodyArmorValues respects armorUseRankValue flag - uses power.value when checked
 // v1.2.0: Add fromZeroHealth flag to death/kill save paths
 //         - 0 HP path: unconscious + potentially dying
 //         - Kill result path: conscious + potentially dying
@@ -1735,29 +1736,53 @@ export function getBodyArmorValues(targetActor, damageType = "physical-blunt") {
       isForceField = true;
     }
     
-    let physVal = power.system.armorPhysical;
-    let energyVal = power.system.armorEnergy;
+    let physVal;
+    let energyVal;
     
-    if (physVal === undefined || physVal === 0) {
+    // If "Use Rank Value" is checked, always use power.system.value
+    if (power.system.armorUseRankValue === true) {
       physVal = typeof power.system.value === 'number'
         ? power.system.value
         : (CONFIG.FASERIP?.rankValues?.[power.system.rank] || 0);
+      energyVal = Math.max(0, physVal - 20);
       
       // Store rank if available
       if (power.system.rank && !physicalRank) {
         physicalRank = power.system.rank;
       }
-    }
-    
-    if (energyVal === undefined || energyVal === 0) {
-      energyVal = Math.max(0, physVal - 20);
-      
       if (power.system.rank && !energyRank) {
         const rankIdx = RANKS.indexOf(power.system.rank);
         if (rankIdx >= 0) {
-          // Energy rank is typically 2 CS lower than physical
           const energyRankIdx = Math.max(0, rankIdx - 2);
           energyRank = RANKS[energyRankIdx];
+        }
+      }
+    } else {
+      // Use explicit armorPhysical/armorEnergy if set, otherwise fall back to value
+      physVal = power.system.armorPhysical;
+      energyVal = power.system.armorEnergy;
+      
+      if (physVal === undefined || physVal === 0) {
+        physVal = typeof power.system.value === 'number'
+          ? power.system.value
+          : (CONFIG.FASERIP?.rankValues?.[power.system.rank] || 0);
+        
+        // Store rank if available
+        if (power.system.rank && !physicalRank) {
+          physicalRank = power.system.rank;
+        }
+      }
+      
+      if (energyVal === undefined || energyVal === 0) {
+        energyVal = Math.max(0, physVal - 20);
+        
+        if (power.system.rank && !energyRank) {
+          const rankIdx = RANKS.indexOf(power.system.rank);
+          if (rankIdx >= 0) {
+            // Energy rank is typically 2 CS lower than physical
+            const energyRankIdx = Math.max(0, rankIdx - 2);
+            energyRank = RANKS[energyRankIdx];
+          }
         }
       }
     }

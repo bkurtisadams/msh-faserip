@@ -169,6 +169,27 @@
       "damageType": "",
       "primaryEffect": "damage",
       "damage": 0,
+      "damageSource": "rank",
+      
+      "battleEffectsColumn": "",
+      "canPullPunch": false,
+      "canReduceEffect": false,
+      "overridePullPunch": false,
+      
+      "isBluntAttack": false,
+      "isEdgedAttack": false,
+      "isShootingAttack": false,
+      "isEnergyAttack": false,
+      "isForceAttack": false,
+      "isThrowingBlunt": false,
+      "isThrowingEdged": false,
+      "isChargingAttack": false,
+      "isGrapplingAttack": false,
+      "isGrabbingAttack": false,
+      "isMentalAttack": false,
+      
+      "ensnaringStrength": "",
+      "stunningIntensity": "",
 
       "requiresSave": false,
       "save": {
@@ -200,8 +221,12 @@
       
       "isBodyArmor": false,
       "bodyArmorType": "both",
+      "armorNature": "natural",
       "armorPhysical": 0,
       "armorEnergy": 0,
+      
+      "isForceField": false,
+      "forceFieldType": "personal",
       
       "isResistance": false,
       "resistanceType": "",
