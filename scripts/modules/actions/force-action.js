@@ -1,4 +1,8 @@
-// scripts/modules/actions/force-action.js v1.2.1 - 2025-12-25
+// scripts/modules/actions/force-action.js v1.3.3 - 2025-12-27
+// v1.3.3: Fix power filter - exclude energy-type powers, remove generic distanceattacks match
+// v1.3.2: Fix bannerColors - call as function not object for proper result badge colors
+// v1.3.1: Fix colorLower temporal dead zone error (remove duplicate const in loop)
+// v1.3.0: Match blunt/energy chat card style with inline rolls, hover boxes, collapsible Stun
 // v1.2.1: Fix specificTarget bug - pass targets as array to applyDamageToTargets
 // v1.2.0: Fix DiceSoNice animation in consolidated chat cards mode
 // v1.1.0: Add inline rolls for consolidated chat cards
@@ -16,6 +20,7 @@ import {
   attachAutoFillRange,
   bannerColors,
   buildActionsBox,
+  buildCollapsibleStunSection,
   buildMultiAttackSection,
   buildResultGrid,
   buildModeSelector,
@@ -23,6 +28,7 @@ import {
   effectsFor,
   getAbilityInfo,
   getBodyArmorValues,
+  getStrengthInfo,
   getTargetData,
   getTargetingContext,
   labelFor,
@@ -41,6 +47,7 @@ import {
 } from "./action-utils.js";
 import { makeDamageBlock, computeAfterArmor, buildDamageFlags } from "./damage-ui.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
+import { canEffectsApply } from "../../rules/effects-gate.js";
 
 export class ForceAction extends RangedAttackAction {
   async execute() {
@@ -58,13 +65,22 @@ export class ForceAction extends RangedAttackAction {
       const s = i.system || {};
       const cat = String(s.category || "").toLowerCase();
       const typ = String(s.type || "").toLowerCase();
+      const nam = String(i.name || "").toLowerCase();
 
-      // Likely categories/types for "force" style ranged attacks
+      // Explicit flag takes priority
+      if (s.isForceAttack === true) return true;
+      
+      // Exclude energy-type powers (they belong in Energy Attack)
+      const looksEnergy = /energy|light|electric|plasma|beam|fire|ice|cold|sound|darkforce|radiation|heat|lightning/.test(typ) ||
+                          /energy|light|electric|plasma|beam|fire|ice|cold|sound|darkforce|radiation|heat|lightning/.test(nam);
+      if (looksEnergy) return false;
+
+      // Force-specific categories
       const catLooksForce =
-        cat === "distanceattacks" ||
         cat === "mattercontrol" ||
         /force|telekinesis|kinetic|concussion|shockwave/.test(cat);
 
+      // Force-specific types
       const typeLooksForce =
         /force|telekinesis|kinetic|pressure|concussion|shockwave|ram|air|wind|earth|water|magnetic|gravity/.test(typ);
 
@@ -503,6 +519,9 @@ export class ForceAction extends RangedAttackAction {
 
     // Build inline roll display for consolidated mode
     const inlineRollHtml = useConsolidated ? buildInlineRollDisplay(roll, totalKarmaUsed, cappedTotal) : "";
+    const rollDisplay = useConsolidated
+      ? buildInlineRollDisplay(roll, totalKarmaUsed, cappedTotal)
+      : `${roll.total}${totalKarmaUsed ? ` + Karma: ${totalKarmaUsed}` : ""} = ${cappedTotal}`;
 
     // Standardized card
     const color = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
@@ -584,60 +603,171 @@ export class ForceAction extends RangedAttackAction {
       const tActor = target?.actor;
       const tName  = target?.name || "Unknown Target";
 
+      let armorData = null;
+      let armorValue = 0;
       let afterArmor = rawDamage;
+      let isBorderline = false;
       if (isHit && rawDamage > 0 && tActor) {
-        const armorData = getBodyArmorValues(tActor, dmgType);
-        afterArmor = Math.max(0, rawDamage - (armorData?.applicable ?? 0));
+        armorData = getBodyArmorValues(tActor, dmgType);
+        armorValue = Number(armorData?.applicable ?? 0);
+        afterArmor = Math.max(0, rawDamage - armorValue);
+        // Borderline: armor exactly equals damage (effects can still apply)
+        isBorderline = (rawDamage > 0 && rawDamage === armorValue);
+      }
+
+      // Force: Red = Stun (no Slam, no Kill)
+      const showStun = (colorLower === "red");
+      
+      // ============================================
+      // INLINE STUN CHECK (for consolidated chat cards)
+      // ============================================
+      let inlineStunHtml = "";
+      let inlineStunResult = null;
+      
+      // Get inline stun result if: consolidated mode + full auto + Red result + has target + effects apply
+      if (useConsolidated && !isManualMode && this.opts?.autoApply && showStun && 
+          canEffectsApply(afterArmor, { borderline: isBorderline }) && tActor) {
+        const { ActionDispatcher } = await import("./action-dispatcher.js");
+        
+        // Get target's endurance for the save
+        const targetEndInfo = getAbilityInfo(tActor, "endurance");
+        const targetEndRank = targetEndInfo?.rank || "Typical";
+        
+        // Common prefill data
+        const inlinePrefill = {
+          dmgThrough: afterArmor,
+          targetName: tName,
+          targetEndRank: targetEndRank,
+          defenderUuid: target?.document?.uuid ?? tActor?.uuid,
+          targetUuid: target?.document?.uuid ?? tActor?.uuid,
+          attackForm: "force",
+          borderline: isBorderline
+        };
+        
+        try {
+          inlineStunResult = await ActionDispatcher.roll("stun", {
+            actor: tActor,
+            abilityName: "endurance",
+            opts: {
+              autoApply: true,
+              returnResultOnly: true,
+              attackForm: "force",
+              damageType: dmgType,
+              prefill: { ...inlinePrefill }
+            }
+          });
+          
+          if (inlineStunResult) {
+            inlineStunHtml = buildCollapsibleStunSection(inlineStunResult);
+          }
+        } catch (e) {
+          console.error("[FASERIP ERROR] Inline Stun check failed:", e);
+        }
       }
 
       const { resolveCombatMode } = await import("./action-dispatcher.js");
-      const actions = (!isManualMode && isHit && afterArmor > 0 && tActor)
+      const actions = (!isManualMode && isHit && canEffectsApply(afterArmor, { borderline: isBorderline }) && tActor)
         ? buildActionsBox({
-            showSlam: /slam/.test(effText),
-            showStun: /stun/.test(effText),
-            showKill: /kill/.test(effText),
+            // Force Attacks do not Slam/Kill on the Universal Table; Red = Stun
+            showSlam: false,
+            showStun: showStun,
+            showKill: false,
             actorUuid: actor.uuid,
             targetUuid: tActor?.uuid,
             damage: afterArmor,
             attackForm: "force",
             damageType: dmgType,
+            bypassArmor: false,
             autoApply: this.opts?.autoApply,
-
             autoSave: (typeof resolveCombatMode === "function" && tActor)
               ? (resolveCombatMode(tActor) === "full")
               : false,
           })
         : "";
 
-      const damageBlock = `
-        <div style="margin:6px 10px;padding:6px;border:1px solid #ccc;border-radius:3px;background:#fff;">
-          <div><b>Damage (raw):</b> ${rawDamage}</div>
-          ${isHit ? `<div><b>After Armor${tActor ? ` (${tName})` : ``}:</b> ${afterArmor}</div>` : ``}
-          <div style="font-size:.9em;color:#555;">Power: ${choice.powerName} (${choice.powerRank})</div>
+      const manualModeNotice = isManualMode ? `
+        <div style="padding:4px 8px;margin:4px 6px;background:#fff3e0;border:1px solid #ffcc80;border-radius:3px;text-align:center;font-size:.85em;font-style:italic;color:#e65100;">
+          Manual Mode: GM adjudicates
         </div>
-      `;
+      ` : "";
 
+      // Build compact shift display (match Energy/Blunt card style)
+      let shiftDisplay = "";
+      const totalShift = Number(choice.totalShift || 0);
+      if (totalShift !== 0) {
+        const csBox = `<span title="${choice.shiftBreakdown || 'Column shifts'}" style="padding:0 3px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${totalShift > 0 ? '+' : ''}${totalShift}CS</span>`;
+        shiftDisplay = ` (${csBox} → ${effectiveRank})`;
+      }
+
+      // Build roll display with proper yellow hover box (matching blunt/energy)
+      const rollBox = `<span title="d100 = ${roll.total}" style="padding:0 3px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${roll.total}</span>`;
+      const cardRollDisplay = totalKarmaUsed 
+        ? `${cappedTotal} <span style="color:#666;">(${rollBox} + ${totalKarmaUsed} karma)</span>`
+        : rollBox;
+
+      // bannerColors is a function, not an object
+      const { bg, fg } = bannerColors(colorLower);
+
+      // Damage block (kept as plain HTML like Energy/Blunt)
+      let damageHtml = "";
+      if (!isHit) {
+        damageHtml = `
+          <div style="margin:0 10px 6px;padding:6px 8px;background:#fff;border:1px solid #ddd;border-radius:3px;font-size:.9em;color:#666;">
+            <strong>Damage:</strong> 0 (miss)
+          </div>
+        `;
+      } else {
+        const dmgBox = `<span title="Power: ${choice.powerName} (${choice.powerRank})" style="cursor:help;">${rawDamage}</span>`;
+        if (armorValue > 0 && tActor) {
+          const armorType = armorData?.isForceField ? "Force Field" : "Body Armor";
+          const armorHover = `${armorType} (${armorValue})`;
+          const armorBox = `<span title="${armorHover}" style="cursor:help;">${armorValue} armor</span>`;
+          damageHtml = `
+            <div style="margin:0 10px 6px;padding:6px 8px;background:#fff;border:1px solid #ddd;border-radius:3px;font-size:.9em;">
+              <strong>Damage:</strong> ${dmgBox} − ${armorBox} = <strong>${afterArmor}</strong>
+            </div>
+          `;
+        } else {
+          damageHtml = `
+            <div style="margin:0 10px 6px;padding:6px 8px;background:#fff;border:1px solid #ddd;border-radius:3px;font-size:.9em;">
+              <strong>Damage:</strong> ${dmgBox}
+            </div>
+          `;
+        }
+      }
+
+      // Build compact chat card matching Energy/Blunt style
       const cardHtml = `
-        <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
-          <div style="padding:5px 10px;border-bottom:1px solid #c0c0c0;font-size:1.1em;color:#8b0000;">
-            <strong>${actor.name} - ${actionName}</strong>
-            ${tActor ? `<br><span style="font-size:.85em;color:#555;">→ ${tName}</span>` : ``}
+        <div class="faserip-chat-card" data-action="force">
+          <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
+            <div style="padding:6px 10px;border-bottom:1px solid #c0c0c0;display:flex;justify-content:space-between;align-items:center;">
+              <strong style="color:#8b0000;">${actionName.toUpperCase()}</strong>
+              <span style="color:#666;font-size:.85em;">${choice.powerName}</span>
+            </div>
+
+            <div style="padding:4px 10px;font-size:.95em;">
+              <strong>${actor.name}</strong>${tActor ? ` <span style="color:#666;">→</span> <strong style="color:#d32f2f;">${tName}</strong>` : ''}
+            </div>
+
+            <div style="padding:2px 10px 6px;font-size:.9em;color:#555;">
+              <div>${choice.usePowerToHit ? `Power: ${choice.powerRank}` : `${ability.name}: ${ability.rank}`}${shiftDisplay}</div>
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                <span>Roll: ${cardRollDisplay}</span>
+                <span style="padding:2px 8px;border-radius:3px;font-weight:bold;font-size:.9em;background:${bg};color:${fg};">
+                  ${String(color).toUpperCase()} — ${String(effectResult).toUpperCase()}
+                </span>
+              </div>
+            </div>
+
+            ${damageHtml}
+            ${inlineStunHtml}
+            ${actions}
+            ${manualModeNotice}
           </div>
-          <div style="padding:5px 10px;border-bottom:1px solid #e0e0e0;font-size:.9em;">
-            ${targetingContext}
-          </div>
-          <div style="padding:5px 10px;font-size:.9em;">${contextHtml}</div>
-          ${inlineRollHtml}
-          ${damageBlock}
-          ${grid}
-          <div style="text-align:center;padding:8px;margin:5px;font-weight:bold;font-size:1.1em;border-radius:3px;background:${bg};color:${fg};">
-            RESULT: ${String(color).toUpperCase()} — ${String(effectResult).toUpperCase()}
-          </div>
-          ${actions}
         </div>
       `;
 
-      // Flags per target (no auto-apply trigger to avoid loops)
+      // Flags per target (match Energy/Blunt chat card format)
       const msgFlags = buildDamageFlags({
         actionId: actionType,
         damageType: dmgType,
@@ -648,6 +778,7 @@ export class ForceAction extends RangedAttackAction {
         targets: target ? [target] : []
       });
       if (msgFlags && msgFlags["msh-faserip"]) {
+        // Force cards are per-target; don't carry batch results/autoApply hints
         delete msgFlags["msh-faserip"].autoApply;
         delete msgFlags["msh-faserip"].results;
         msgFlags["msh-faserip"].origin = "force-per-target";
@@ -665,14 +796,52 @@ export class ForceAction extends RangedAttackAction {
           damage: rawDamage,
           attackerUuid: actor.uuid,
           damageType: dmgType,
-          showNotification: true,
+          showNotification: false,
           bypassArmor: false,
           attackForm: "force",
           armorPiercing: 0,
           apMode: "value",
           wasKillResult: false,
-          targets: target ? [target] : []  // Fix: pass as array, not specificTarget
+          targets: target ? [target] : []
         });
+        
+        // Auto-trigger Stun check if Red result and effects can apply
+        if (showStun && canEffectsApply(afterArmor, { borderline: isBorderline })) {
+          const { ActionDispatcher } = await import("./action-dispatcher.js");
+          
+          debugLog("Auto-triggering Stun check for Force attack", { 
+            target: tName, 
+            damage: afterArmor,
+            hasPreRolledResult: !!inlineStunResult,
+            useConsolidated
+          });
+          
+          try {
+            await ActionDispatcher.roll("stun", {
+              actor: tActor,
+              abilityName: "endurance",
+              opts: {
+                autoApply: true,
+                showConfirm: false,
+                attackForm: "force",
+                damageType: dmgType,
+                // In consolidated mode, skip chat message and use pre-rolled result
+                skipChatMessage: useConsolidated,
+                preRolledResult: inlineStunResult,
+                prefill: {
+                  dmgThrough: afterArmor,
+                  targetName: tName,
+                  defenderUuid: target?.document?.uuid ?? tActor?.uuid,
+                  targetUuid: target?.document?.uuid ?? tActor?.uuid,
+                  attackForm: "force",
+                  borderline: isBorderline
+                }
+              }
+            });
+          } catch (e) {
+            console.error("[FASERIP ERROR] Auto-trigger Stun failed:", e);
+          }
+        }
       }
 
     }
