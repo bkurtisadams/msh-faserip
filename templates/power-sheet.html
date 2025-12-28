@@ -658,21 +658,37 @@
     <!-- TAB 4: MAGIC -->
     <div class="tab" data-group="primary" data-tab="magic">
 
-      <!-- Energy Type -->
-      <div class="form-group">
-        <label>Spell Energy Type <span style="color:red;">*</span></label>
-        <select name="system.magic.energyType">
-          <option value="">-- Select Energy Type --</option>
-          <option value="personal"   {{#if (eq system.magic.energyType "personal")}}selected{{/if}}>
-            Personal (1 HP/turn, self/willing only)
-          </option>
-          <option value="universal"  {{#if (eq system.magic.energyType "universal")}}selected{{/if}}>
-            Universal (chant OR gesture; target may resist; backlash on resist)
-          </option>
-          <option value="dimensional" {{#if (eq system.magic.energyType "dimensional")}}selected{{/if}}>
-            Dimensional (needs Contact; chant + gesture / ceremony)
-          </option>
-        </select>
+      <!-- Energy Type & School -->
+      <div class="form-row">
+        <div class="form-group half">
+          <label>Spell Energy Type <span style="color:red;">*</span></label>
+          <select name="system.magic.energyType" id="magic-energy-type">
+            <option value="">-- Select Energy Type --</option>
+            <option value="personal"   {{#if (eq system.magic.energyType "personal")}}selected{{/if}}>
+              Personal (1 HP/turn, self/willing only)
+            </option>
+            <option value="universal"  {{#if (eq system.magic.energyType "universal")}}selected{{/if}}>
+              Universal (chant OR gesture; target may resist)
+            </option>
+            <option value="dimensional" {{#if (eq system.magic.energyType "dimensional")}}selected{{/if}}>
+              Dimensional (needs Contact; chant + gesture)
+            </option>
+          </select>
+        </div>
+        <div class="form-group half">
+          <label>School of Magic:</label>
+          <select name="system.magic.school">
+            <option value="">-- Optional --</option>
+            <option value="alteration" {{#if (eq system.magic.school "alteration")}}selected{{/if}}>Alteration/Transmutation</option>
+            <option value="conjuration" {{#if (eq system.magic.school "conjuration")}}selected{{/if}}>Conjuration/Summoning</option>
+            <option value="divination" {{#if (eq system.magic.school "divination")}}selected{{/if}}>Divination</option>
+            <option value="enchantment" {{#if (eq system.magic.school "enchantment")}}selected{{/if}}>Enchantment/Charm</option>
+            <option value="evocation" {{#if (eq system.magic.school "evocation")}}selected{{/if}}>Evocation/Invocation</option>
+            <option value="illusion" {{#if (eq system.magic.school "illusion")}}selected{{/if}}>Illusion</option>
+            <option value="necromancy" {{#if (eq system.magic.school "necromancy")}}selected{{/if}}>Necromancy</option>
+            <option value="protection" {{#if (eq system.magic.school "protection")}}selected{{/if}}>Protection/Abjuration</option>
+          </select>
+        </div>
       </div>
 
       <!-- Dimensional: Source Entity -->
@@ -711,21 +727,30 @@
       {{/if}}
 
       <!-- Casting Requirements -->
-      <div class="form-group form-inline magic-casting-reqs">
-        <label class="checkbox">
-          <input type="checkbox" name="system.magic.chant" {{checked system.magic.chant}} data-dtype="Boolean">
-          Chant
-        </label>
-        <label class="checkbox">
-          <input type="checkbox" name="system.magic.gesture" {{checked system.magic.gesture}} data-dtype="Boolean">
-          Gesture
-        </label>
-        <label class="checkbox">
-          <input type="checkbox" name="system.magic.usesCeremony" {{checked system.magic.usesCeremony}} data-dtype="Boolean">
-          Ceremony
-        </label>
-        <small class="hint" style="display:block;margin-top:4px;color:#666;font-style:italic;">
-          Personal: none • Universal: chant OR gesture • Dimensional: both (ceremony optional/flavor; avatars skip permission)
+      <div class="form-group" style="margin-top:10px;padding:10px;background:#f8f8ff;border:1px solid #ddd;border-radius:4px;">
+        <label style="font-weight:600;margin-bottom:6px;display:block;">Casting Requirements</label>
+        <div class="form-inline magic-casting-reqs" style="display:flex;gap:16px;flex-wrap:wrap;">
+          <label class="checkbox" style="cursor:pointer;">
+            <input type="checkbox" name="system.magic.chant" id="magic-chant" {{checked system.magic.chant}} data-dtype="Boolean">
+            Chant
+          </label>
+          <label class="checkbox" style="cursor:pointer;">
+            <input type="checkbox" name="system.magic.gesture" id="magic-gesture" {{checked system.magic.gesture}} data-dtype="Boolean">
+            Gesture
+          </label>
+          <label class="checkbox" style="cursor:pointer;">
+            <input type="checkbox" name="system.magic.usesCeremony" id="magic-ceremony" {{checked system.magic.usesCeremony}} data-dtype="Boolean">
+            Ceremony
+          </label>
+        </div>
+        
+        <!-- CS Modifier Display -->
+        <div id="magic-cs-display" style="margin-top:8px;padding:6px 10px;border-radius:3px;font-size:0.9em;">
+          <!-- Populated by JS based on energy type and requirements -->
+        </div>
+        
+        <small style="display:block;margin-top:6px;color:#666;">
+          <strong>Requirements:</strong> Personal: none required • Universal: chant OR gesture (−1CS if skipped) • Dimensional: chant AND gesture required (−1CS each if skipped)
         </small>
       </div>
 

@@ -258,12 +258,16 @@
       "isMagic": false,
       "magic": {
         "energyType": "",
+        "school": "",
         "sourceEntity": "",
+        "chant": false,
+        "gesture": false,
         "usesCeremony": false,
         "successAbility": "psyche",
         "targetResistsWith": "",
         "backlashNotes": "",
-        "castCost": 0
+        "castCost": 0,
+        "csModifier": 0
       },
       
       "bonusPowers": [],

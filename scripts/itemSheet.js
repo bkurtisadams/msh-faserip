@@ -1,4 +1,5 @@
-// itemSheet.js v1.2.0 - 2025-12-27
+// itemSheet.js v1.3.0 - 2025-12-27
+// v1.3.0: Phase 3 Magic - Add school dropdown, CS modifier display for casting requirements
 // v1.2.0: Phase 2 Defense - Enhanced Resistance (specific type, invulnerability), Enhanced Absorption (specific, redirect)
 // v1.1.0: Added Battle Effects Column, Damage Source, Force Field, action dialog flags
 export class FaseripItemSheet extends ItemSheet {
@@ -489,6 +490,74 @@ export class FaseripItemSheet extends ItemSheet {
         await this.item.update({ "system.absorptionType": value }, { render: false });
         this.render(true);
       });
+
+      // ============ MAGIC CS MODIFIER CALCULATION ============
+      const updateMagicCSDisplay = () => {
+        const energyType = html.find('#magic-energy-type').val() || this.item.system.magic?.energyType || "";
+        const hasChant = html.find('#magic-chant').is(':checked');
+        const hasGesture = html.find('#magic-gesture').is(':checked');
+        const hasCeremony = html.find('#magic-ceremony').is(':checked');
+        const csDisplay = html.find('#magic-cs-display');
+        
+        if (!csDisplay.length) return;
+        
+        let csModifier = 0;
+        let message = "";
+        let bgColor = "#e8f5e9"; // green = good
+        
+        if (energyType === "personal") {
+          message = "✓ Personal magic requires no verbal/somatic components";
+        } else if (energyType === "universal") {
+          // Universal requires chant OR gesture
+          if (!hasChant && !hasGesture) {
+            csModifier = -1;
+            message = "⚠ Universal magic requires chant OR gesture (−1CS penalty)";
+            bgColor = "#fff3e0"; // orange warning
+          } else {
+            message = "✓ Universal magic requirement met (chant or gesture)";
+          }
+        } else if (energyType === "dimensional") {
+          // Dimensional requires BOTH chant AND gesture
+          if (!hasChant && !hasGesture) {
+            csModifier = -2;
+            message = "⚠ Dimensional magic requires chant AND gesture (−2CS penalty)";
+            bgColor = "#ffebee"; // red warning
+          } else if (!hasChant) {
+            csModifier = -1;
+            message = "⚠ Missing chant for Dimensional magic (−1CS penalty)";
+            bgColor = "#fff3e0";
+          } else if (!hasGesture) {
+            csModifier = -1;
+            message = "⚠ Missing gesture for Dimensional magic (−1CS penalty)";
+            bgColor = "#fff3e0";
+          } else {
+            message = "✓ Dimensional magic requirements met (chant + gesture)";
+          }
+          if (hasCeremony && csModifier < 0) {
+            message += " — Ceremony can offset penalties at GM discretion";
+          }
+        } else {
+          message = "Select an energy type to see casting requirements";
+          bgColor = "#f5f5f5";
+        }
+        
+        csDisplay.html(message);
+        csDisplay.css('background', bgColor);
+        
+        // Store csModifier for use in action dialogs
+        this.item.system.magic.csModifier = csModifier;
+      };
+      
+      // Run on load and when checkboxes change
+      updateMagicCSDisplay();
+      html.find('#magic-energy-type').change(async ev => {
+        updateMagicCSDisplay();
+        // Re-render to show/hide conditional sections (dimensional source, universal backlash)
+        const value = ev.currentTarget.value;
+        await this.item.update({ "system.magic.energyType": value }, { render: false });
+        this.render(true);
+      });
+      html.find('#magic-chant, #magic-gesture, #magic-ceremony').change(updateMagicCSDisplay);
     }
 
     // Update power type options when category changes
