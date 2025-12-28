@@ -1,4 +1,5 @@
-// scripts/modules/actions/escaping-action.js v1.4.0 - 2025-12-22
+// scripts/modules/actions/escaping-action.js v1.5.0 - 2025-12-27
+// v1.5.0: Fix escape to only remove grappled on yellow/red (green is also Miss), fix karma default unchecked
 // v1.4.0: Remove grappled/held effects on successful escape
 // v1.3.0: Fix DiceSoNice animation in consolidated chat cards mode
 // v1.2.0: Accept prefill from opts for opponent name/strength
@@ -144,8 +145,8 @@ export class EscapingAction extends AttackAction {
 
     await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor }), content: cardHtml });
 
-    // Remove hold effects on successful escape (any result other than white/miss)
-    if (colorLower !== "white") {
+    // Remove hold effects on successful escape (yellow=Escape or red=Reverse only; green is also Miss for escaping)
+    if (colorLower === "yellow" || colorLower === "red") {
       await removeHoldEffects(actor);
     }
 
@@ -166,12 +167,11 @@ export class EscapingAction extends AttackAction {
       }
     }
 
-    // Load persisted settings
+    // Load persisted settings (karma checkbox never persisted - always starts unchecked)
     const savedShift = await actor.getFlag("msh-faserip", "lastEscapeShift") ?? 0;
-    const savedKarmaFlag = await actor.getFlag("msh-faserip", "lastEscapeKarma") ?? 0;
     const savedRemember = (await actor.getFlag("msh-faserip", "rememberSettings")) ?? (await actor.getFlag("msh-faserip", "lastEscapeRemember")) ?? true;
     const savedSkipDice = (await actor.getFlag("msh-faserip", "skipDiceRoll")) ?? (await actor.getFlag("msh-faserip", "lastEscapeSkipDice")) ?? false;
-    const savedSpendKarma = (savedKarmaFlag === true) || (Number(savedKarmaFlag) > 0);
+    const savedSpendKarma = false; // Always default to unchecked
 
     const dialogHtml = `
       <div style="margin-bottom:8px;">
@@ -243,10 +243,9 @@ export class EscapingAction extends AttackAction {
               await actor.setFlag("msh-faserip", "lastEscapeRemember", result.remember);
               await actor.setFlag("msh-faserip", "lastEscapeSkipDice", result.skipDice);
               
-              // Persist settings if requested
+              // Persist shift if requested (karma checkbox never persisted)
               if (result.remember) {
                 await actor.setFlag("msh-faserip", "lastEscapeShift", result.shift);
-                await actor.setFlag("msh-faserip", "lastEscapeKarma", result.spendKarma ? 1 : 0);
               }
               
               resolve(result);

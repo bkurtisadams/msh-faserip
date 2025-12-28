@@ -1,4 +1,5 @@
-// scripts/modules/actions/grappling-action.js v1.4.0 - 2025-12-22
+// scripts/modules/actions/grappling-action.js v1.5.0 - 2025-12-27
+// v1.5.0: Fix karma checkbox to always default unchecked (not persisted)
 // v1.4.0: Fix DiceSoNice animation in consolidated chat cards mode
 // v1.3.0: Fix escape button to pass holder info for dialog prefill
 // v1.2.0: Use effect-engine wrappers for Partial Hold/Full Hold effects
@@ -35,12 +36,11 @@ export class GrapplingAction extends AttackAction {
     const actionName = this.label;
     const strength = getStrengthInfo(actor);
 
-    // Load persisted defaults
+    // Load persisted defaults (karma checkbox never persisted - always starts unchecked)
     const savedShift = await actor.getFlag("msh-faserip", "lastGrappleShift") ?? 0;
-    const savedKarmaFlag = await actor.getFlag("msh-faserip", "lastGrappleKarma") ?? 0;
     const savedRemember = (await actor.getFlag("msh-faserip", "rememberSettings")) ?? (await actor.getFlag("msh-faserip", "lastGrappleRemember")) ?? true;
     const savedSkipDice = (await actor.getFlag("msh-faserip", "skipDiceRoll")) ?? (await actor.getFlag("msh-faserip", "lastGrappleSkipDice")) ?? false;
-    const savedSpendKarma = (savedKarmaFlag === true) || (Number(savedKarmaFlag) > 0);
+    const savedSpendKarma = false; // Always default to unchecked
     const dialogShift = this.opts?.shift ?? (savedRemember ? savedShift : 0);
 
     const choice = await this._showGrapplingDialog(actor, strength, { savedShift: dialogShift, savedSpendKarma, savedRemember, savedSkipDice });
@@ -52,10 +52,9 @@ export class GrapplingAction extends AttackAction {
     await actor.setFlag("msh-faserip", "lastGrappleRemember", choice.remember);
     await actor.setFlag("msh-faserip", "lastGrappleSkipDice", choice.skipDice);
 
-    // Persist settings if requested
+    // Persist settings if requested (karma checkbox never persisted)
     if (choice.remember) {
       await actor.setFlag("msh-faserip", "lastGrappleShift", choice.shift);
-      await actor.setFlag("msh-faserip", "lastGrappleKarma", choice.spendKarma ? 1 : 0);
     }
 
     const effectiveRank = shiftRank(strength.rank, choice.shift);

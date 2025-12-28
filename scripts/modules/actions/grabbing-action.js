@@ -1,4 +1,5 @@
-// scripts/modules/actions/grabbing-action.js v1.2.0 - 2025-12-22
+// scripts/modules/actions/grabbing-action.js v1.3.0 - 2025-12-27
+// v1.3.0: Fix karma checkbox to always default unchecked (not persisted)
 // v1.2.0: Fix DiceSoNice animation in consolidated chat cards mode
 // v1.1.0: Add inline rolls for consolidated chat cards
 import { AttackAction } from "./attack-action.js";
@@ -181,12 +182,11 @@ export class GrabbingAction extends AttackAction {
       prefillTargetStr = t.actor?.system?.abilities?.strength?.rank || "";
     }
 
-    // Load persisted settings
+    // Load persisted settings (karma checkbox never persisted - always starts unchecked)
     const savedShift = await actor.getFlag("msh-faserip", "lastGrabbingShift") ?? 0;
-    const savedKarmaFlag = await actor.getFlag("msh-faserip", "lastGrabbingKarma") ?? 0;
     const savedRemember = (await actor.getFlag("msh-faserip", "rememberSettings")) ?? (await actor.getFlag("msh-faserip", "lastGrabbingRemember")) ?? true;
     const savedSkipDice = (await actor.getFlag("msh-faserip", "skipDiceRoll")) ?? (await actor.getFlag("msh-faserip", "lastGrabbingSkipDice")) ?? false;
-    const savedSpendKarma = (savedKarmaFlag === true) || (Number(savedKarmaFlag) > 0);
+    const savedSpendKarma = false; // Always default to unchecked
 
     const html = `
       <div style="margin-bottom:8px;">
@@ -276,10 +276,9 @@ export class GrabbingAction extends AttackAction {
               await actor.setFlag("msh-faserip", "lastGrabbingRemember", result.remember);
               await actor.setFlag("msh-faserip", "lastGrabbingSkipDice", result.skipDice);
 
-              // Persist settings if requested
+              // Persist shift if requested (karma checkbox never persisted)
               if (result.remember) {
                 await actor.setFlag("msh-faserip", "lastGrabbingShift", result.shift);
-                await actor.setFlag("msh-faserip", "lastGrabbingKarma", result.spendKarma ? 1 : 0);
               }
 
               resolve(result);

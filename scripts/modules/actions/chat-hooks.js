@@ -1,4 +1,5 @@
-// chat-hooks.js v1.1.0 - 2025-12-24
+// chat-hooks.js v1.2.0 - 2025-12-27
+// v1.2.0: Fix escape karma default unchecked, add grappled effect removal on successful escape
 // v1.1.0: Add kill-save handler (conscious dying), update death-save to pass fromZeroHealth
 // v1.0.4: Add apply-collision-damage handler that applies directly to UUID
 // v1.0.3: Add stopImmediatePropagation to collision handlers to prevent duplicate dialogs
@@ -1040,8 +1041,7 @@ export async function handleEscapeAttempt({ defenderUuid, defenderName, defender
   const actualDefenderName = defenderName || defender.name || "Target";
 
   const savedShift = await defender.getFlag("msh-faserip", "lastEscapeShift") ?? 0;
-  const savedKarmaFlag = await defender.getFlag("msh-faserip", "lastEscapeKarma") ?? 0;
-  const savedSpendKarma = (savedKarmaFlag === true) || (Number(savedKarmaFlag) > 0);
+  const savedSpendKarma = false; // Always default to unchecked
   const savedRemember = await defender.getFlag("msh-faserip", "lastEscapeRemember") ?? true;
   const savedSkipDice = await defender.getFlag("msh-faserip", "lastEscapeSkipDice") ?? false;
 
@@ -1100,9 +1100,9 @@ export async function handleEscapeAttempt({ defenderUuid, defenderName, defender
           await defender.setFlag("msh-faserip", "lastEscapeRemember", remember);
           await defender.setFlag("msh-faserip", "lastEscapeSkipDice", skipDice);
 
+          // Persist shift if requested (karma checkbox never persisted)
           if (remember) {
             await defender.setFlag("msh-faserip", "lastEscapeShift", shift);
-            await defender.setFlag("msh-faserip", "lastEscapeKarma", spendKarma ? 1 : 0);
           }
 
           const effectiveRank = shiftRank(defenderStrength, shift);
@@ -1164,6 +1164,28 @@ export async function handleEscapeAttempt({ defenderUuid, defenderName, defender
             speaker: ChatMessage.getSpeaker({ actor: defender }), 
             content: cardHtml 
           });
+
+          // Remove hold effects on successful escape (yellow=Escape or red=Reverse only)
+          if (colorLower === "yellow" || colorLower === "red") {
+            const holdEffects = defender.effects?.filter(e => {
+              if (e.disabled) return false;
+              if (e.statuses?.has?.("grappled") || e.statuses?.has?.("held")) return true;
+              const flags = e.flags?.["msh-faserip"] || {};
+              if (flags.effectType === "grappled" || flags.effectType === "held") return true;
+              if (flags.status?.isGrappled || flags.status?.isHeld) return true;
+              const name = (e.name || "").toLowerCase();
+              if (name.includes("grappled") || name.includes("held") || name.includes("partial hold") || name.includes("full hold")) return true;
+              return false;
+            }) || [];
+            for (const eff of holdEffects) {
+              try {
+                await eff.delete();
+                console.log(`[FASERIP] Removed hold effect: ${eff.name}`);
+              } catch (err) {
+                console.warn(`[FASERIP WARN] Failed to remove effect ${eff.name}:`, err);
+              }
+            }
+          }
         }
       },
       cancel: { label: "Cancel" }
