@@ -159,6 +159,18 @@
       "isLimited": false,
       "limitRankMax": "",
       "limitationColumnShift": 0,
+      "limitation": {
+        "usesPerDay": 0,
+        "usesPerScene": 0,
+        "timeRestriction": "",
+        "environmentalReq": "",
+        "materialRestriction": "",
+        "targetRestriction": "",
+        "failureChance": 0,
+        "sideEffect": "",
+        "sideEffectTrigger": "",
+        "rankBonus": 0
+      },
       
       "isActive": true,
       "isStarred": false,
@@ -286,6 +298,8 @@
       },
       
       "bonusPowers": [],
+      "hasBonusPowers": false,
+      "countsAsTwoPowers": false,
       "stunts": [],
       
       "healingType": "",
@@ -304,7 +318,65 @@
       "regenerationType": "",
       "regenerationRate": "",
       "extraAttacks": false,
-      "specialMechanics": ""
+      "specialMechanics": "",
+      
+      "isDetectionPower": false,
+      "detection": {
+        "enhancedSense": "",
+        "protectedSense": "",
+        "infravisionRange": 0,
+        "detectionType": "",
+        "detectionSpecific": "",
+        "canTrack": false,
+        "combatSense": false,
+        "cosmicAwareness": false,
+        "precognition": false,
+        "postcognition": false
+      },
+      
+      "isMentalPower": false,
+      "mental": {
+        "telepathy": false,
+        "telepathyRange": "",
+        "mentalProbe": false,
+        "mindControl": false,
+        "emotionControl": false,
+        "emotionType": "",
+        "singleEmotionBonus": false,
+        "empathy": false,
+        "psiScreen": false,
+        "imageGeneration": false,
+        "illusionsDamage": false,
+        "possession": false,
+        "astralProjection": false
+      },
+      
+      "isTransformation": false,
+      "transformation": {
+        "affects": "self",
+        "touchRequired": false,
+        "transformType": "",
+        "targetMaterial": "",
+        "targetForm": "",
+        "duration": "concentration",
+        "durationRounds": 0,
+        "targetResistsWith": ""
+      },
+      
+      "isControlPower": false,
+      "control": {
+        "controlType": "",
+        "controlSpecific": "",
+        "manipulateExisting": true,
+        "generateNew": false,
+        "useAsShield": false,
+        "shieldRank": "",
+        "useAsWeapon": false,
+        "weaponColumn": "",
+        "createConstructs": false,
+        "constructMaterial": "",
+        "animateObjects": false
+      }
 
     },
     "talent": {

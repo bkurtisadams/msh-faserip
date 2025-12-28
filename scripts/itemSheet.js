@@ -1,4 +1,6 @@
-// itemSheet.js v1.4.0 - 2025-12-27
+// itemSheet.js v1.6.0 - 2025-12-27
+// v1.6.0: Structured Limitations and Bonus Powers sections in Advanced tab
+// v1.5.0: Expanded Effects tab - Detection/Senses, Mental/Psionic, Transformation, Control sections
 // v1.4.0: Phase 4 Movement - New Movement tab with type-specific options, speed reference display
 // v1.3.0: Phase 3 Magic - Add school dropdown, CS modifier display for casting requirements
 // v1.2.0: Phase 2 Defense - Enhanced Resistance (specific type, invulnerability), Enhanced Absorption (specific, redirect)
@@ -617,6 +619,93 @@ export class FaseripItemSheet extends ItemSheet {
       
       updateSpeedReference();
       html.find('input[name="system.movement.areasPerRound"]').on('input', updateSpeedReference);
+
+      // ============ EFFECTS TAB HANDLERS ============
+      
+      // Detection checkbox - re-render to show options
+      html.find('#is-detection').change(async ev => {
+        const checked = ev.currentTarget.checked;
+        await this.item.update({ "system.isDetectionPower": checked }, { render: false });
+        this.render(true);
+      });
+
+      // Mental checkbox - re-render to show options
+      html.find('#is-mental').change(async ev => {
+        const checked = ev.currentTarget.checked;
+        await this.item.update({ "system.isMentalPower": checked }, { render: false });
+        this.render(true);
+      });
+
+      // Emotion control checkbox - re-render to show emotion type
+      html.find('#mental-emotion').change(async ev => {
+        const checked = ev.currentTarget.checked;
+        await this.item.update({ "system.mental.emotionControl": checked }, { render: false });
+        this.render(true);
+      });
+
+      // Image generation checkbox - re-render to show illusion options
+      html.find('#mental-illusion').change(async ev => {
+        const checked = ev.currentTarget.checked;
+        await this.item.update({ "system.mental.imageGeneration": checked }, { render: false });
+        this.render(true);
+      });
+
+      // Transformation checkbox - re-render to show options
+      html.find('#is-transformation').change(async ev => {
+        const checked = ev.currentTarget.checked;
+        await this.item.update({ "system.isTransformation": checked }, { render: false });
+        this.render(true);
+      });
+
+      // Control checkbox - re-render to show options
+      html.find('#is-control').change(async ev => {
+        const checked = ev.currentTarget.checked;
+        await this.item.update({ "system.isControlPower": checked }, { render: false });
+        this.render(true);
+      });
+
+      // Control sub-options - re-render for conditional fields
+      html.find('#control-shield, #control-weapon, #control-construct').change(async ev => {
+        const field = ev.currentTarget.name;
+        const checked = ev.currentTarget.checked;
+        await this.item.update({ [field]: checked }, { render: false });
+        this.render(true);
+      });
+
+      // ============ LIMITATIONS HANDLERS ============
+      
+      // Limitation checkbox - re-render to show options
+      html.find('#is-limited').change(async ev => {
+        const checked = ev.currentTarget.checked;
+        await this.item.update({ "system.isLimited": checked }, { render: false });
+        this.render(true);
+      });
+
+      // ============ BONUS POWERS HANDLERS ============
+      
+      // Bonus powers checkbox - re-render to show list
+      html.find('#has-bonus-powers').change(async ev => {
+        const checked = ev.currentTarget.checked;
+        await this.item.update({ "system.hasBonusPowers": checked }, { render: false });
+        this.render(true);
+      });
+
+      // Add bonus power
+      html.find('#add-bonus-power').click(async ev => {
+        ev.preventDefault();
+        const bonusPowers = foundry.utils.deepClone(this.item.system.bonusPowers || []);
+        bonusPowers.push({ name: "", rankMod: "same" });
+        await this.item.update({ "system.bonusPowers": bonusPowers });
+      });
+
+      // Remove bonus power
+      html.find('.remove-bonus-power').click(async ev => {
+        ev.preventDefault();
+        const index = parseInt(ev.currentTarget.dataset.index);
+        const bonusPowers = foundry.utils.deepClone(this.item.system.bonusPowers || []);
+        bonusPowers.splice(index, 1);
+        await this.item.update({ "system.bonusPowers": bonusPowers });
+      });
     }
 
     // Update power type options when category changes
