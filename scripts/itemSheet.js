@@ -1,4 +1,5 @@
-// itemSheet.js v1.3.0 - 2025-12-27
+// itemSheet.js v1.4.0 - 2025-12-27
+// v1.4.0: Phase 4 Movement - New Movement tab with type-specific options, speed reference display
 // v1.3.0: Phase 3 Magic - Add school dropdown, CS modifier display for casting requirements
 // v1.2.0: Phase 2 Defense - Enhanced Resistance (specific type, invulnerability), Enhanced Absorption (specific, redirect)
 // v1.1.0: Added Battle Effects Column, Damage Source, Force Field, action dialog flags
@@ -558,6 +559,64 @@ export class FaseripItemSheet extends ItemSheet {
         this.render(true);
       });
       html.find('#magic-chant, #magic-gesture, #magic-ceremony').change(updateMagicCSDisplay);
+
+      // ============ MOVEMENT TAB HANDLERS ============
+      
+      // Movement type change - re-render to show type-specific options
+      html.find('#movement-type').change(async ev => {
+        const value = ev.currentTarget.value;
+        await this.item.update({ "system.movement.type": value }, { render: false });
+        this.render(true);
+      });
+
+      // Use rank speed toggle
+      html.find('#movement-use-rank').change(ev => {
+        const manualSpeed = html.find('.movement-manual-speed')[0];
+        if (manualSpeed) {
+          manualSpeed.style.display = ev.currentTarget.checked ? 'none' : '';
+        }
+        updateSpeedReference();
+      });
+
+      // Passenger toggle
+      html.find('#movement-passengers').change(ev => {
+        const passengerLimit = html.find('.passenger-limit')[0];
+        if (passengerLimit) {
+          passengerLimit.style.display = ev.currentTarget.checked ? '' : 'none';
+        }
+      });
+
+      // Speed reference display
+      const updateSpeedReference = () => {
+        const speedRef = html.find('#speed-reference');
+        if (!speedRef.length) return;
+        
+        const useRank = html.find('#movement-use-rank').is(':checked');
+        const rankValue = this.item.system.value || 0;
+        const manualAreas = parseInt(html.find('input[name="system.movement.areasPerRound"]').val()) || 1;
+        
+        const areasPerRound = useRank ? rankValue : manualAreas;
+        
+        // FASERIP speed conversion (1 area = ~40 feet, 1 round = 6 seconds)
+        // So areas/round * 40 * 10 = feet/minute, / 5280 * 60 = MPH
+        const feetPerRound = areasPerRound * 40;
+        const mph = Math.round((feetPerRound / 6) * 0.682); // ft/sec to mph
+        
+        const movementType = html.find('#movement-type').val() || "";
+        let typeNote = "";
+        if (movementType === "flight") {
+          typeNote = " (Unaffected by terrain)";
+        } else if (movementType === "teleportation") {
+          typeNote = " (Range in areas, instantaneous)";
+        } else if (movementType === "tunneling") {
+          typeNote = " (Through solid material)";
+        }
+        
+        speedRef.html(`<strong>Speed:</strong> ${areasPerRound} areas/round (~${mph} MPH)${typeNote}`);
+      };
+      
+      updateSpeedReference();
+      html.find('input[name="system.movement.areasPerRound"]').on('input', updateSpeedReference);
     }
 
     // Update power type options when category changes

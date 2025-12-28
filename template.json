@@ -249,9 +249,24 @@
       "controlStrength": "",
       "controlQuantity": "",
       
-      "speed": "",
-      "areasPerRound": 1,
-      "teleportAccuracy": "",
+      "isMovementPower": false,
+      "movement": {
+        "type": "",
+        "useRankSpeed": true,
+        "areasPerRound": 1,
+        "speedMPH": 0,
+        "method": "",
+        "affectedByWind": false,
+        "requiresConcentration": false,
+        "lightningSpeed": false,
+        "canCarryPassengers": false,
+        "passengerLimit": 1,
+        "teleportAccuracy": "",
+        "teleportFamiliarityRequired": false,
+        "waterOnly": false,
+        "tunnelMaterial": "",
+        "leavesTunnel": false
+      },
       
       "recoveryRate": "",
       

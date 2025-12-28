@@ -36,6 +36,7 @@
       <a class="item" data-tab="basics">Basics</a>
       <a class="item" data-tab="combat">Combat</a>
       <a class="item" data-tab="effects">Effects</a>
+      <a class="item" data-tab="movement">Movement</a>
       <a class="item" data-tab="magic">Magic</a>
       <a class="item" data-tab="advanced">Advanced</a>
     </nav>
@@ -655,7 +656,154 @@
       </div>
     </div> <!-- /tab: effects -->
 
-    <!-- TAB 4: MAGIC -->
+    <!-- TAB 4: MOVEMENT -->
+    <div class="tab" data-group="primary" data-tab="movement">
+
+      <!-- Movement Type -->
+      <div class="form-row">
+        <div class="form-group half">
+          <label>Movement Type:</label>
+          <select name="system.movement.type" id="movement-type">
+            <option value="">-- Select Type --</option>
+            <option value="flight" {{#if (eq system.movement.type "flight")}}selected{{/if}}>Flight</option>
+            <option value="gliding" {{#if (eq system.movement.type "gliding")}}selected{{/if}}>Gliding</option>
+            <option value="levitation" {{#if (eq system.movement.type "levitation")}}selected{{/if}}>Levitation</option>
+            <option value="super-speed" {{#if (eq system.movement.type "super-speed")}}selected{{/if}}>Super Speed</option>
+            <option value="teleportation" {{#if (eq system.movement.type "teleportation")}}selected{{/if}}>Teleportation</option>
+            <option value="swimming" {{#if (eq system.movement.type "swimming")}}selected{{/if}}>Swimming</option>
+            <option value="tunneling" {{#if (eq system.movement.type "tunneling")}}selected{{/if}}>Tunneling</option>
+            <option value="wall-crawling" {{#if (eq system.movement.type "wall-crawling")}}selected{{/if}}>Wall-Crawling</option>
+            <option value="swinging" {{#if (eq system.movement.type "swinging")}}selected{{/if}}>Swinging</option>
+            <option value="dimensional" {{#if (eq system.movement.type "dimensional")}}selected{{/if}}>Dimensional Travel</option>
+            <option value="other" {{#if (eq system.movement.type "other")}}selected{{/if}}>Other</option>
+          </select>
+        </div>
+        <div class="form-group half">
+          <label>Method/Description:</label>
+          <input type="text" name="system.movement.method" value="{{system.movement.method}}" placeholder="e.g., Wings, Magnetic Levitation, Web-lines" />
+        </div>
+      </div>
+
+      <!-- Speed -->
+      <div class="form-group" style="margin-top:10px;padding:10px;background:#f0f8ff;border:1px solid #ddd;border-radius:4px;">
+        <label style="font-weight:600;margin-bottom:6px;display:block;">Speed</label>
+        <div style="margin-bottom:8px;">
+          <label style="cursor:pointer;">
+            <input type="checkbox" name="system.movement.useRankSpeed" id="movement-use-rank" {{checked system.movement.useRankSpeed}} data-dtype="Boolean" />
+            Use Power Rank for Speed ({{system.value}} areas/round)
+          </label>
+        </div>
+        <div class="form-row movement-manual-speed" {{#if system.movement.useRankSpeed}}style="display:none;"{{/if}}>
+          <div class="form-group half">
+            <label>Areas per Round:</label>
+            <input type="number" name="system.movement.areasPerRound" value="{{system.movement.areasPerRound}}" min="0" data-dtype="Number" />
+          </div>
+          <div class="form-group half">
+            <label>MPH (reference):</label>
+            <input type="number" name="system.movement.speedMPH" value="{{system.movement.speedMPH}}" min="0" data-dtype="Number" />
+            <small>For narrative reference only</small>
+          </div>
+        </div>
+        <div id="speed-reference" style="margin-top:6px;padding:4px 8px;background:#e8f4e8;border-radius:3px;font-size:0.85em;">
+          <!-- Populated by JS with speed conversion -->
+        </div>
+      </div>
+
+      <!-- Movement Properties -->
+      <div class="form-group" style="margin-top:10px;">
+        <label style="font-weight:600;margin-bottom:6px;display:block;">Properties</label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <label style="cursor:pointer;">
+            <input type="checkbox" name="system.movement.lightningSpeed" {{checked system.movement.lightningSpeed}} data-dtype="Boolean" />
+            Lightning Speed
+            <small style="display:block;color:#666;margin-left:20px;">Instant acceleration/deceleration, turn at max speed</small>
+          </label>
+          <label style="cursor:pointer;">
+            <input type="checkbox" name="system.movement.affectedByWind" {{checked system.movement.affectedByWind}} data-dtype="Boolean" />
+            Affected by Wind
+            <small style="display:block;color:#666;margin-left:20px;">Wind intensity > rank causes problems</small>
+          </label>
+          <label style="cursor:pointer;">
+            <input type="checkbox" name="system.movement.requiresConcentration" {{checked system.movement.requiresConcentration}} data-dtype="Boolean" />
+            Requires Concentration
+            <small style="display:block;color:#666;margin-left:20px;">Cannot take other actions while moving</small>
+          </label>
+          <label style="cursor:pointer;">
+            <input type="checkbox" name="system.movement.canCarryPassengers" id="movement-passengers" {{checked system.movement.canCarryPassengers}} data-dtype="Boolean" />
+            Can Carry Passengers
+          </label>
+        </div>
+        <div class="passenger-limit" {{#unless system.movement.canCarryPassengers}}style="display:none;"{{/unless}}>
+          <label>Passenger Limit:</label>
+          <input type="number" name="system.movement.passengerLimit" value="{{system.movement.passengerLimit}}" min="1" data-dtype="Number" style="width:60px;" />
+          <small>Based on Strength (lifting capacity)</small>
+        </div>
+      </div>
+
+      <!-- Teleportation Options -->
+      {{#if (eq system.movement.type "teleportation")}}
+      <div class="form-group teleport-options" style="margin-top:10px;padding:10px;background:#fff8e8;border:1px solid #ffd54f;border-radius:4px;">
+        <label style="font-weight:600;margin-bottom:6px;display:block;">Teleportation Options</label>
+        <div class="form-row">
+          <div class="form-group half">
+            <label>Accuracy:</label>
+            <select name="system.movement.teleportAccuracy">
+              <option value="precise" {{#if (eq system.movement.teleportAccuracy "precise")}}selected{{/if}}>Precise (exact location)</option>
+              <option value="general" {{#if (eq system.movement.teleportAccuracy "general")}}selected{{/if}}>General (within 1 area)</option>
+              <option value="rough" {{#if (eq system.movement.teleportAccuracy "rough")}}selected{{/if}}>Rough (within sight)</option>
+            </select>
+          </div>
+          <div class="form-group half">
+            <label style="cursor:pointer;">
+              <input type="checkbox" name="system.movement.teleportFamiliarityRequired" {{checked system.movement.teleportFamiliarityRequired}} data-dtype="Boolean" />
+              Requires Familiarity
+              <small style="display:block;color:#666;">Must have visited destination or have detailed knowledge</small>
+            </label>
+          </div>
+        </div>
+      </div>
+      {{/if}}
+
+      <!-- Swimming Options -->
+      {{#if (eq system.movement.type "swimming")}}
+      <div class="form-group swimming-options" style="margin-top:10px;padding:10px;background:#e0f7fa;border:1px solid #4dd0e1;border-radius:4px;">
+        <label style="font-weight:600;margin-bottom:6px;display:block;">Swimming Options</label>
+        <label style="cursor:pointer;">
+          <input type="checkbox" name="system.movement.waterOnly" {{checked system.movement.waterOnly}} data-dtype="Boolean" />
+          Water Only (cannot move normally on land)
+        </label>
+      </div>
+      {{/if}}
+
+      <!-- Tunneling Options -->
+      {{#if (eq system.movement.type "tunneling")}}
+      <div class="form-group tunneling-options" style="margin-top:10px;padding:10px;background:#efebe9;border:1px solid #a1887f;border-radius:4px;">
+        <label style="font-weight:600;margin-bottom:6px;display:block;">Tunneling Options</label>
+        <div class="form-row">
+          <div class="form-group half">
+            <label>Maximum Material Strength:</label>
+            <select name="system.movement.tunnelMaterial">
+              <option value="">-- Use Power Rank --</option>
+              {{#each (array "Feeble" "Poor" "Typical" "Good" "Excellent" "Remarkable" "Incredible" "Amazing" "Monstrous" "Unearthly") as |r|}}
+                <option value="{{r}}" {{#if (eq ../system.movement.tunnelMaterial r)}}selected{{/if}}>{{r}}</option>
+              {{/each}}
+            </select>
+            <small>Can tunnel through material up to this strength</small>
+          </div>
+          <div class="form-group half">
+            <label style="cursor:pointer;">
+              <input type="checkbox" name="system.movement.leavesTunnel" {{checked system.movement.leavesTunnel}} data-dtype="Boolean" />
+              Leaves Usable Tunnel
+              <small style="display:block;color:#666;">Others can follow through the tunnel</small>
+            </label>
+          </div>
+        </div>
+      </div>
+      {{/if}}
+
+    </div> <!-- /tab: movement -->
+
+    <!-- TAB 5: MAGIC -->
     <div class="tab" data-group="primary" data-tab="magic">
 
       <!-- Energy Type & School -->
