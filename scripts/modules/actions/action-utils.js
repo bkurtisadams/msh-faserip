@@ -1,4 +1,5 @@
-// action-utils.js v1.2.1 - 2025-12-27
+// action-utils.js v1.3.0 - 2025-12-27
+// v1.3.0: Add showHoldDamage chip to buildActionsBox for Full Hold grappling damage
 // v1.2.1: getBodyArmorValues respects armorUseRankValue flag - uses power.value when checked
 // v1.2.0: Add fromZeroHealth flag to death/kill save paths
 //         - 0 HP path: unconscious + potentially dying
@@ -723,6 +724,11 @@ export function buildActionsBox({
   showStun = false,
   showKill = false,
   showEscape = false,
+  showHoldDamage = false,
+  holdDamageMax = 0,
+  holdDamageRank = "",
+  holdTargetUuid = "",
+  holdTargetName = "",
   showNullifySave = false,
   nullifyIntensityRank = "",
   saveAbility = "endurance",  // NEW: which ability to save against (endurance, psyche, etc.)
@@ -849,6 +855,22 @@ export function buildActionsBox({
         "Open Escape check dialog",
         true,
         `data-check="escape" data-attack-form="${attackForm}" data-attacker-uuid="${actorUuid}" ${targetBits} ${prefillAttr}`
+      )
+    );
+  }
+
+  // Hold Damage chip (for Full Hold - red grappling result)
+  if (showHoldDamage && holdDamageMax > 0) {
+    const heldTargetBits = [
+      holdTargetUuid ? `data-target-uuid="${holdTargetUuid}"` : "",
+      holdTargetName ? `data-target-name="${holdTargetName}"` : ""
+    ].join(" ");
+    parts.push(
+      chip(
+        "Deal Hold Damage",
+        `Inflict up to ${holdDamageRank} (${holdDamageMax}) damage to held target`,
+        true,
+        `data-action="hold-damage" data-attacker-uuid="${actorUuid}" data-max-damage="${holdDamageMax}" data-damage-rank="${holdDamageRank}" ${heldTargetBits}`
       )
     );
   }

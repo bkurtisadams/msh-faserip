@@ -1,4 +1,5 @@
-// scripts/modules/actions/grappling-action.js v2.0.0 - 2025-12-27
+// scripts/modules/actions/grappling-action.js v2.1.0 - 2025-12-27
+// v2.1.0: Add Deal Hold Damage chip on Full Hold (red) result
 // v2.0.0: Compact chat card format matching blunt attack (inline result badge, CS hover, no grid)
 // v1.5.0: Fix karma checkbox to always default unchecked (not persisted)
 // v1.4.0: Fix DiceSoNice animation in consolidated chat cards mode
@@ -157,9 +158,17 @@ export class GrapplingAction extends AttackAction {
     // This prefills the escape dialog with the holder's name and strength
     const holderStrength = actor.system?.abilities?.strength?.rank || "Good";
     
+    // Show Hold Damage button only on Full Hold (red)
+    const showHoldDamage = (colorLower === "red");
+    
     const actions = buildActionsBox({
       showEscape: showEscape,
-      // Pass holder info as "target" since escape chip uses targetName/targetStrength for opponent prefill
+      showHoldDamage: showHoldDamage,
+      holdDamageMax: strength.value,
+      holdDamageRank: strength.rank,
+      holdTargetUuid: choice.targetUuid || "",
+      holdTargetName: choice.targetName || "Target",
+      // Escape chip uses targetUuid/Name/Strength for the holder (opponent to escape from)
       targetUuid: actor.uuid,
       targetName: actor.name,
       targetStrength: holderStrength,

@@ -1,4 +1,6 @@
-// chat-hooks.js v1.2.0 - 2025-12-27
+// chat-hooks.js v1.4.0 - 2025-12-27
+// v1.4.0: Add hold-damage handler for Full Hold grappling damage
+// v1.3.0: Add detailed logging for escape effect removal debugging
 // v1.2.0: Fix escape karma default unchecked, add grappled effect removal on successful escape
 // v1.1.0: Add kill-save handler (conscious dying), update death-save to pass fromZeroHealth
 // v1.0.4: Add apply-collision-damage handler that applies directly to UUID
@@ -19,6 +21,7 @@ import {
   effectsFor,
   applyDamageToTargets,
   applyDamageToActorUuid,
+  getBodyArmorValues,
   debugLog
 } from "./action-utils.js";
 import { startAura, stopAura, isAuraMaintained } from "./nullify.js";
@@ -659,6 +662,127 @@ export function installActionChatHandlers() {
       }
     });
 
+    // Hold Damage handler (Full Hold - grappling red result)
+    html.on("click", '[data-action="hold-damage"]', async (ev) => {
+      ev.preventDefault();
+      const btn = ev.currentTarget;
+      
+      const attackerUuid = btn.dataset.attackerUuid;
+      const maxDamage = Number(btn.dataset.maxDamage || 0);
+      const damageRank = btn.dataset.damageRank || "Strength";
+      const targetUuid = btn.dataset.targetUuid || "";
+      const targetName = btn.dataset.targetName || "Target";
+      
+      // Get target actor for armor display
+      let targetActor = null;
+      let targetArmor = 0;
+      let targetArmorSource = "";
+      
+      if (targetUuid) {
+        try {
+          const tDoc = await fromUuid(targetUuid);
+          targetActor = tDoc?.actor ?? (tDoc?.documentName === "Actor" ? tDoc : null);
+          if (targetActor) {
+            const armorInfo = getBodyArmorValues(targetActor, "physical-blunt");
+            targetArmor = armorInfo?.applicable ?? 0;
+            targetArmorSource = armorInfo?.source ?? "";
+          }
+        } catch (_e) { /* ignore */ }
+      }
+      
+      // Show dialog to choose damage amount
+      const dialogHtml = `
+        <div style="padding:4px 0;">
+          <div style="margin-bottom:8px;">
+            <strong>Deal Hold Damage</strong>
+            <div style="color:#666;font-size:.9em;">Full Hold allows damage up to ${damageRank} (${maxDamage})</div>
+          </div>
+          
+          <div style="margin-bottom:8px;">
+            <label style="display:block;margin-bottom:4px;">Damage to inflict:</label>
+            <input type="range" name="damage" min="0" max="${maxDamage}" value="${maxDamage}" style="width:100%;" id="hold-dmg-slider">
+            <div style="display:flex;justify-content:space-between;font-size:.85em;color:#666;">
+              <span>0</span>
+              <span id="hold-dmg-display" style="font-weight:bold;color:#d32f2f;">${maxDamage}</span>
+              <span>${maxDamage}</span>
+            </div>
+          </div>
+          
+          ${targetActor ? `
+          <div style="padding:6px;background:#f5f5f5;border:1px solid #ddd;border-radius:3px;margin-bottom:8px;">
+            <div><strong>${targetName}</strong></div>
+            <div style="font-size:.9em;">Body Armor: ${targetArmor}${targetArmorSource ? ` (${targetArmorSource})` : ''}</div>
+            <div style="font-size:.9em;color:#666;" id="hold-dmg-after">After armor: <strong>${Math.max(0, maxDamage - targetArmor)}</strong></div>
+          </div>
+          ` : `
+          <div style="padding:6px;background:#fff3e0;border:1px solid #ff9800;border-radius:3px;margin-bottom:8px;font-size:.9em;">
+            Target the held token to apply damage automatically, or apply manually.
+          </div>
+          `}
+        </div>
+      `;
+      
+      new Dialog({
+        title: "Deal Hold Damage",
+        content: dialogHtml,
+        buttons: {
+          apply: {
+            icon: '<i class="fas fa-fist-raised"></i>',
+            label: "Deal Damage",
+            callback: async (html) => {
+              const damage = Number(html.find('[name="damage"]').val() || 0);
+              if (damage <= 0) {
+                ui.notifications.info("No damage dealt.");
+                return;
+              }
+              
+              // Apply damage to target
+              if (targetActor) {
+                const results = await applyDamageToTargets({
+                  damage: damage,
+                  attackerUuid: attackerUuid,
+                  damageType: "physical-blunt",
+                  attackForm: "grappling",
+                  showNotification: true,
+                  bypassArmor: false
+                });
+                
+                // Update button to show damage was applied
+                btn.textContent = `Dealt ${damage}`;
+                btn.disabled = true;
+                btn.style.opacity = "0.6";
+              } else {
+                ui.notifications.info(`Deal ${damage} damage to held target (subject to Body Armor).`);
+                btn.textContent = `${damage} dmg`;
+                btn.disabled = true;
+                btn.style.opacity = "0.6";
+              }
+            }
+          },
+          cancel: {
+            icon: '<i class="fas fa-times"></i>',
+            label: "Cancel"
+          }
+        },
+        default: "apply",
+        render: (html) => {
+          // Update display as slider moves
+          const slider = html.find('#hold-dmg-slider');
+          const display = html.find('#hold-dmg-display');
+          const afterDisplay = html.find('#hold-dmg-after');
+          
+          slider.on('input', function() {
+            const val = Number(this.value);
+            display.text(val);
+            if (afterDisplay.length) {
+              const afterArmor = Math.max(0, val - targetArmor);
+              afterDisplay.html(`After armor: <strong>${afterArmor}</strong>`);
+            }
+          });
+        }
+      }).render(true);
+    });
+
     // 6) Force Save (Nullification / RAW: Endurance vs Power Rank)
     html.on("click", '[data-action="force-save"], [data-action="force-save-nullify"]', async (ev) => {
       // Respect disabled state
@@ -1167,16 +1291,34 @@ export async function handleEscapeAttempt({ defenderUuid, defenderName, defender
 
           // Remove hold effects on successful escape (yellow=Escape or red=Reverse only)
           if (colorLower === "yellow" || colorLower === "red") {
-            const holdEffects = defender.effects?.filter(e => {
-              if (e.disabled) return false;
-              if (e.statuses?.has?.("grappled") || e.statuses?.has?.("held")) return true;
+            console.log(`[FASERIP] Escape successful (${colorLower}), removing hold effects from ${actualDefenderName}`);
+            console.log(`[FASERIP] Checking ${defender.effects?.size || 0} effects`);
+            
+            const holdEffects = [];
+            for (const e of defender.effects || []) {
+              if (e.disabled) continue;
+              
+              // Check statuses (handle both Set and Array)
+              const hasGrappledStatus = e.statuses?.has?.("grappled") || Array.from(e.statuses || []).includes("grappled");
+              const hasHeldStatus = e.statuses?.has?.("held") || Array.from(e.statuses || []).includes("held");
+              
               const flags = e.flags?.["msh-faserip"] || {};
-              if (flags.effectType === "grappled" || flags.effectType === "held") return true;
-              if (flags.status?.isGrappled || flags.status?.isHeld) return true;
+              const hasGrappledFlag = flags.effectType === "grappled" || flags.status?.isGrappled;
+              const hasHeldFlag = flags.effectType === "held" || flags.status?.isHeld;
+              
               const name = (e.name || "").toLowerCase();
-              if (name.includes("grappled") || name.includes("held") || name.includes("partial hold") || name.includes("full hold")) return true;
-              return false;
-            }) || [];
+              const hasGrappledName = name.includes("grappled") || name.includes("partial hold");
+              const hasHeldName = name.includes("held") || name.includes("full hold");
+              
+              const isHoldEffect = hasGrappledStatus || hasHeldStatus || hasGrappledFlag || hasHeldFlag || hasGrappledName || hasHeldName;
+              
+              console.log(`[FASERIP] Effect "${e.name}": statuses=${Array.from(e.statuses || [])}, flagType=${flags.effectType}, isHold=${isHoldEffect}`);
+              
+              if (isHoldEffect) holdEffects.push(e);
+            }
+            
+            console.log(`[FASERIP] Found ${holdEffects.length} hold effects to remove`);
+            
             for (const eff of holdEffects) {
               try {
                 await eff.delete();
@@ -1185,6 +1327,8 @@ export async function handleEscapeAttempt({ defenderUuid, defenderName, defender
                 console.warn(`[FASERIP WARN] Failed to remove effect ${eff.name}:`, err);
               }
             }
+          } else {
+            console.log(`[FASERIP] Escape failed (${colorLower}), hold effects remain`);
           }
         }
       },
