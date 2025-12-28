@@ -222,6 +222,7 @@
       "isBodyArmor": false,
       "bodyArmorType": "both",
       "armorNature": "natural",
+      "armorUseRankValue": true,
       "armorPhysical": 0,
       "armorEnergy": 0,
       
@@ -230,8 +231,10 @@
       
       "isResistance": false,
       "resistanceType": "",
+      "resistanceSpecific": "",
       "resistanceEffect": "columnShift",
       "resistanceValue": 2,
+      "resistanceIsInvulnerability": false,
       
       "mentalEffect": "",
       "effectNotes": "",
@@ -269,7 +272,9 @@
       "healingType": "",
       "healingMaxPerDay": 0,
       "absorptionType": "",
+      "absorptionSpecific": "",
       "absorptionConvertsToHealth": true,
+      "absorptionCanRedirect": false,
       "forceFieldCoverage": 0,
       "forceFieldPersonal": false,
       "telekinesiStrength": "",

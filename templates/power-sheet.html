@@ -510,22 +510,42 @@
           </label>
           {{#if system.isResistance}}
           <div class="resistance-details" style="margin-top:6px;">
-            <label>Against:</label>
-            <select name="system.resistanceType">
-              <option value="">-- Select Type --</option>
-              {{#each (array "fire" "cold" "electricity" "radiation" "toxins" "corrosives" "emotion" "mental" "magic" "disease") as |t|}}
-                <option value="{{t}}" {{#if (eq ../system.resistanceType t)}}selected{{/if}}>{{capitalize t}}</option>
-              {{/each}}
-            </select>
-            <label>Effect:</label>
-            <select name="system.resistanceEffect">
-              <option value="columnShift"     {{#if (eq system.resistanceEffect "columnShift")}}selected{{/if}}>+CS to resist</option>
-              <option value="damageReduction" {{#if (eq system.resistanceEffect "damageReduction")}}selected{{/if}}>Reduce damage by rank#</option>
-              <option value="immunity"        {{#if (eq system.resistanceEffect "immunity")}}selected{{/if}}>Ignore if rank ≥ attack</option>
-              <option value="featNegate"      {{#if (eq system.resistanceEffect "featNegate")}}selected{{/if}}>FEAT to negate entirely</option>
-            </select>
-            <label>Value:</label>
-            <input type="number" name="system.resistanceValue" value="{{system.resistanceValue}}" data-dtype="Number" placeholder="2" />
+            <div class="form-row">
+              <div class="form-group half">
+                <label>Against:</label>
+                <select name="system.resistanceType">
+                  <option value="">-- Select Type --</option>
+                  {{#each (array "fire" "cold" "electricity" "radiation" "toxins" "corrosives" "emotion" "mental" "magic" "disease" "physical" "energy") as |t|}}
+                    <option value="{{t}}" {{#if (eq ../system.resistanceType t)}}selected{{/if}}>{{capitalize t}}</option>
+                  {{/each}}
+                </select>
+              </div>
+              <div class="form-group half">
+                <label>Specific:</label>
+                <input type="text" name="system.resistanceSpecific" value="{{system.resistanceSpecific}}" placeholder="e.g., electrical, heat" />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group half">
+                <label>Effect:</label>
+                <select name="system.resistanceEffect">
+                  <option value="columnShift"     {{#if (eq system.resistanceEffect "columnShift")}}selected{{/if}}>+CS to resist</option>
+                  <option value="damageReduction" {{#if (eq system.resistanceEffect "damageReduction")}}selected{{/if}}>Reduce damage by rank#</option>
+                  <option value="immunity"        {{#if (eq system.resistanceEffect "immunity")}}selected{{/if}}>Ignore if rank ≥ attack</option>
+                  <option value="featNegate"      {{#if (eq system.resistanceEffect "featNegate")}}selected{{/if}}>FEAT to negate entirely</option>
+                </select>
+              </div>
+              <div class="form-group half">
+                <label>Value/CS:</label>
+                <input type="number" name="system.resistanceValue" value="{{system.resistanceValue}}" data-dtype="Number" placeholder="2" />
+              </div>
+            </div>
+            <div style="margin-top:6px;">
+              <label style="cursor:pointer;">
+                <input type="checkbox" name="system.resistanceIsInvulnerability" {{checked system.resistanceIsInvulnerability}} data-dtype="Boolean" />
+                Invulnerability (Class 1000 – immune to this damage type)
+              </label>
+            </div>
           </div>
           {{/if}}
         </div>
@@ -600,21 +620,38 @@
       </div>
 
       <!-- Absorption -->
-      <div class="form-row">
-        <div class="form-group half">
-          <label>Absorption Type:</label>
-          <select id="absorption-type" name="system.absorptionType">
-            <option value="">None</option>
-            <option value="energy" {{#if (eq system.absorptionType "energy")}}selected{{/if}}>Energy</option>
-            <option value="physical" {{#if (eq system.absorptionType "physical")}}selected{{/if}}>Physical</option>
-          </select>
+      <div class="form-group" style="margin-top:15px;padding-top:15px;border-top:2px solid #ddd;">
+        <label style="font-weight:600;margin-bottom:6px;display:block;">Absorption</label>
+        <div class="form-row">
+          <div class="form-group half">
+            <label>Absorbs:</label>
+            <select id="absorption-type" name="system.absorptionType">
+              <option value="">None</option>
+              <option value="energy" {{#if (eq system.absorptionType "energy")}}selected{{/if}}>Energy</option>
+              <option value="physical" {{#if (eq system.absorptionType "physical")}}selected{{/if}}>Physical</option>
+              <option value="both" {{#if (eq system.absorptionType "both")}}selected{{/if}}>Both</option>
+            </select>
+          </div>
+          <div class="form-group half">
+            <label>Specific Type:</label>
+            <input type="text" name="system.absorptionSpecific" value="{{system.absorptionSpecific}}" placeholder="e.g., electrical, kinetic" />
+          </div>
         </div>
-        <div class="form-group half">
-          <label>
+        {{#if system.absorptionType}}
+        <div class="absorption-options" style="margin-top:6px;padding:8px;background:#f5f5f5;border-radius:4px;">
+          <label style="display:block;cursor:pointer;">
             <input type="checkbox" name="system.absorptionConvertsToHealth" {{checked system.absorptionConvertsToHealth}} data-dtype="Boolean">
-            Convert absorbed to Health
+            Convert absorbed energy to Health
           </label>
+          <label style="display:block;cursor:pointer;margin-top:4px;">
+            <input type="checkbox" name="system.absorptionCanRedirect" {{checked system.absorptionCanRedirect}} data-dtype="Boolean">
+            Can redirect absorbed energy as attack
+          </label>
+          <small style="display:block;margin-top:6px;color:#666;">
+            Max absorption per round = Power Rank number. Excess damage passes through.
+          </small>
         </div>
+        {{/if}}
       </div>
     </div> <!-- /tab: effects -->
 

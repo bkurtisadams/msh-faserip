@@ -1,5 +1,6 @@
-// itemSheet.js v1.1.0 - 2025-12-27
-// Added: Battle Effects Column, Damage Source, Force Field, action dialog flags
+// itemSheet.js v1.2.0 - 2025-12-27
+// v1.2.0: Phase 2 Defense - Enhanced Resistance (specific type, invulnerability), Enhanced Absorption (specific, redirect)
+// v1.1.0: Added Battle Effects Column, Damage Source, Force Field, action dialog flags
 export class FaseripItemSheet extends ItemSheet {
   static get defaultOptions() {
     return foundry.utils.mergeObject(super.defaultOptions, {
@@ -480,6 +481,13 @@ export class FaseripItemSheet extends ItemSheet {
         if (armorManualValues) {
           armorManualValues.style.display = ev.currentTarget.checked ? 'none' : '';
         }
+      });
+
+      // ============ ABSORPTION TYPE CHANGE (re-render to show/hide options) ============
+      html.find('#absorption-type').change(async ev => {
+        const value = ev.currentTarget.value;
+        await this.item.update({ "system.absorptionType": value }, { render: false });
+        this.render(true);
       });
     }
 
