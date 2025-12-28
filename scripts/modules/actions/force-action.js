@@ -1,4 +1,6 @@
-// scripts/modules/actions/force-action.js v1.3.7 - 2025-12-27
+// scripts/modules/actions/force-action.js v1.3.9 - 2025-12-27
+// v1.3.9: Fix usePowerToHit default - only true if explicitly saved as true (was defaulting to true)
+// v1.3.8: Fix CS hover text format to match attack-action.js (e.g., "+2 Stunned" not "Stunned (target): +2")
 // v1.3.7: Add effect modifier system - read target status (Stunned +2CS, etc) from active effects
 // v1.3.6: Add CS breakdown tooltip showing Manual/Range/Obstacle/Movement/Adjacent components
 // v1.3.5: Fix regex to use word boundaries - prevents false matches like "flight" on "light"
@@ -119,7 +121,7 @@ export class ForceAction extends RangedAttackAction {
     const savedAdHocDmg  = Number(await actor.getFlag("msh-faserip", "lastForceAdHocDamage") || 15);
     const savedAdHocRank = await actor.getFlag("msh-faserip", "lastForceAdHocRank") || "Remarkable";
     const savedUsePowerToHit = await actor.getFlag("msh-faserip", "lastForceUsePowerToHit");
-    const defaultUsePowerToHit = (savedUsePowerToHit === undefined || savedUsePowerToHit === null) ? true : !!savedUsePowerToHit;
+    const defaultUsePowerToHit = savedUsePowerToHit === true; // Only true if explicitly saved as true
 
     const savedShift = await actor.getFlag("msh-faserip", "lastForceShift") || 0;
     const savedRemember = (await actor.getFlag("msh-faserip", "rememberSettings")) ?? (await actor.getFlag("msh-faserip", "lastForceRemember")) ?? true;
@@ -746,33 +748,49 @@ export class ForceAction extends RangedAttackAction {
         </div>
       ` : "";
 
-      // Build compact shift display with breakdown tooltip (match Blunt card style)
+      // Build compact shift display with breakdown
       let shiftDisplay = "";
       const totalShift = Number(choice.totalShift || 0);
       if (totalShift !== 0) {
-        // Build breakdown for tooltip
-        const breakdownParts = [];
-        if (choice.shift && choice.shift !== 0) breakdownParts.push(`Manual: ${choice.shift > 0 ? '+' : ''}${choice.shift}`);
-        if (choice.rangeModifier && choice.rangeModifier !== 0) breakdownParts.push(`Range: ${choice.rangeModifier > 0 ? '+' : ''}${choice.rangeModifier}`);
-        if (choice.obstacleModifier && choice.obstacleModifier !== 0) breakdownParts.push(`Obstacle: ${choice.obstacleModifier}`);
-        if (choice.movementModifier && choice.movementModifier !== 0) breakdownParts.push(`Movement: ${choice.movementModifier > 0 ? '+' : ''}${choice.movementModifier}`);
-        if (choice.multiAdjacent) breakdownParts.push(`Adjacent: -4`);
-        // Add effect modifiers from attacker
-        if (choice.attackerEffects?.length) {
-          for (const eff of choice.attackerEffects) {
-            breakdownParts.push(`${eff.name}: ${eff.shift > 0 ? '+' : ''}${eff.shift}`);
-          }
-        }
-        // Add effect modifiers from defender (inverted since defender shift reduces our attack)
-        if (choice.defenderEffects?.length) {
-          for (const eff of choice.defenderEffects) {
-            const inverted = -eff.shift;
-            breakdownParts.push(`${eff.name} (target): ${inverted > 0 ? '+' : ''}${inverted}`);
-          }
-        }
-        const breakdownTooltip = breakdownParts.length ? breakdownParts.join(', ') : 'Column shifts';
+        const parts = [];
         
-        const csBox = `<span title="${breakdownTooltip}" style="padding:0 3px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${totalShift > 0 ? '+' : ''}${totalShift}CS</span>`;
+        // Manual shift from dialog
+        if (choice.shift && choice.shift !== 0) {
+          parts.push(`${choice.shift > 0 ? '+' : ''}${choice.shift}`);
+        }
+        
+        // Range modifier
+        if (choice.rangeModifier && choice.rangeModifier !== 0) {
+          parts.push(`${choice.rangeModifier > 0 ? '+' : ''}${choice.rangeModifier} range`);
+        }
+        
+        // Obstacle modifier
+        if (choice.obstacleModifier && choice.obstacleModifier !== 0) {
+          parts.push(`${choice.obstacleModifier} obstacle`);
+        }
+        
+        // Movement modifier
+        if (choice.movementModifier && choice.movementModifier !== 0) {
+          parts.push(`${choice.movementModifier > 0 ? '+' : ''}${choice.movementModifier} movement`);
+        }
+        
+        // Adjacent targets penalty
+        if (choice.multiAdjacent) {
+          parts.push(`-4 adjacent`);
+        }
+        
+        // Show attacker effects by name
+        for (const eff of attackerEffects) {
+          parts.push(`${eff.shift > 0 ? '+' : ''}${eff.shift} ${eff.name}`);
+        }
+        
+        // Show defender effects by name (flip sign since they're subtracted)
+        for (const eff of defenderEffects) {
+          parts.push(`${eff.shift > 0 ? '-' : '+'}${Math.abs(eff.shift)} ${eff.name}`);
+        }
+        
+        const breakdownText = parts.length > 0 ? parts.join(', ') : `${totalShift > 0 ? '+' : ''}${totalShift} total`;
+        const csBox = `<span title="${breakdownText}" style="padding:0 3px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${totalShift > 0 ? '+' : ''}${totalShift}CS</span>`;
         shiftDisplay = ` (${csBox} → ${effectiveRank})`;
       }
 
