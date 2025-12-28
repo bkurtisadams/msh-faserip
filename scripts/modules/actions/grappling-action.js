@@ -1,4 +1,5 @@
-// scripts/modules/actions/grappling-action.js v1.5.0 - 2025-12-27
+// scripts/modules/actions/grappling-action.js v2.0.0 - 2025-12-27
+// v2.0.0: Compact chat card format matching blunt attack (inline result badge, CS hover, no grid)
 // v1.5.0: Fix karma checkbox to always default unchecked (not persisted)
 // v1.4.0: Fix DiceSoNice animation in consolidated chat cards mode
 // v1.3.0: Fix escape button to pass holder info for dialog prefill
@@ -6,22 +7,20 @@
 // v1.1.0: Add inline rolls for consolidated chat cards
 import { AttackAction } from "./attack-action.js";
 import {
+  RANKS,
   getStrengthInfo, 
   shiftRank, 
   rollWithKarmaAndHistory,
-  buildResultGrid, 
   buildActionsBox,
   bannerColors, 
   labelFor, 
   effectsFor,
-  getTargetingContext,
   applyCapabilitiesToDialog,
-  buildInlineRollDisplay,
   showDiceAnimation
 } from "./action-utils.js";
 import { generateKarmaControlsHTML, setupKarmaControlHandlers, extractKarmaFromDialog } from "../dice/dice-roller.js";
-import { rollUniversalTable } from "../dice/universal-table.js";
 import { applyGrappled, applyHeld } from "../effects/effect-engine.js";
+import { getAttackShiftBreakdown, getDefenseShiftBreakdown } from "../effects/effect-modifiers.js";
 
 export class GrapplingAction extends AttackAction {
   constructor(args) {
@@ -41,9 +40,16 @@ export class GrapplingAction extends AttackAction {
     const savedRemember = (await actor.getFlag("msh-faserip", "rememberSettings")) ?? (await actor.getFlag("msh-faserip", "lastGrappleRemember")) ?? true;
     const savedSkipDice = (await actor.getFlag("msh-faserip", "skipDiceRoll")) ?? (await actor.getFlag("msh-faserip", "lastGrappleSkipDice")) ?? false;
     const savedSpendKarma = false; // Always default to unchecked
+    const savedCsNotes = (await actor.getFlag("msh-faserip", "lastGrappleCsNotes")) || "";
     const dialogShift = this.opts?.shift ?? (savedRemember ? savedShift : 0);
 
-    const choice = await this._showGrapplingDialog(actor, strength, { savedShift: dialogShift, savedSpendKarma, savedRemember, savedSkipDice });
+    const choice = await this._showGrapplingDialog(actor, strength, { 
+      savedShift: dialogShift, 
+      savedSpendKarma, 
+      savedRemember, 
+      savedSkipDice,
+      savedCsNotes
+    });
     if (!choice) return;
 
     // Always save remember/skipDice preferences
@@ -55,9 +61,36 @@ export class GrapplingAction extends AttackAction {
     // Persist settings if requested (karma checkbox never persisted)
     if (choice.remember) {
       await actor.setFlag("msh-faserip", "lastGrappleShift", choice.shift);
+      await actor.setFlag("msh-faserip", "lastGrappleCsNotes", choice.csNotes || "");
     }
 
-    const effectiveRank = shiftRank(strength.rank, choice.shift);
+    // Build shift breakdown for hover text
+    const shiftBreakdown = {
+      manual: choice.shift || 0,
+      csNotes: choice.csNotes || ""
+    };
+
+    // Get effect-based modifiers
+    const attackerEffects = getAttackShiftBreakdown(actor);
+    let targetActor = null;
+    let defenderEffects = { total: 0, breakdown: [] };
+    
+    if (choice.targetUuid) {
+      try {
+        const tDoc = await fromUuid(choice.targetUuid);
+        targetActor = tDoc?.actor ?? (tDoc?.documentName === "Actor" ? tDoc : null);
+        if (targetActor) {
+          defenderEffects = getDefenseShiftBreakdown(targetActor, false);
+        }
+      } catch (_e) { /* ignore */ }
+    }
+
+    // Calculate total shift including effects
+    const manualShift = choice.shift || 0;
+    const effectShift = (attackerEffects.total || 0) - (defenderEffects.total || 0);
+    const totalShift = manualShift + effectShift;
+
+    const effectiveRank = shiftRank(strength.rank, totalShift);
 
     // Check consolidated chat card setting
     let useConsolidated = false;
@@ -75,16 +108,10 @@ export class GrapplingAction extends AttackAction {
     const { cappedTotal, totalKarmaUsed } =
         await rollWithKarmaAndHistory(actor, actionName, 0, roll, { spendKarma: choice.spendKarma, rank: effectiveRank, inlineRoll: useConsolidated });
 
-    // Build inline roll display for consolidated mode
-    const inlineRollHtml = useConsolidated ? buildInlineRollDisplay(roll, totalKarmaUsed, cappedTotal) : "";
-
     const color = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
     const colorLower = String(color || "").toLowerCase();
     const effect = this.effects[colorLower] || "Miss";
-
-    const grid = buildResultGrid(this.actionType, colorLower, this.effects);
     const { bg, fg } = bannerColors(colorLower);
-    const targetingContext = getTargetingContext(actor, actionName);
 
     // Show escape button for Partial Hold and Hold results
     const showEscape = (colorLower === "yellow" || colorLower === "red");
@@ -122,7 +149,7 @@ export class GrapplingAction extends AttackAction {
           }
         }
       } catch (e) {
-        console.warn("FASERIP | Grappling hold status failed", e);
+        console.warn("[FASERIP WARN] Grappling hold status failed", e);
       }
     }
     
@@ -138,7 +165,6 @@ export class GrapplingAction extends AttackAction {
       targetStrength: holderStrength,
       actorUuid: actor.uuid,
       autoApply: !!this.opts?.autoApply,
-
     });
 
     const cardHtml = this._buildChatCard({
@@ -150,13 +176,14 @@ export class GrapplingAction extends AttackAction {
       totalKarmaUsed, 
       cappedTotal, 
       color, 
-      effect, 
-      grid, 
+      effect,
       bg, 
       fg,
-      targetingContext,
       actions,
-      inlineRollHtml
+      totalShift,
+      shiftBreakdown,
+      attackerEffects: attackerEffects.breakdown,
+      defenderEffects: defenderEffects.breakdown
     });
 
     await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor }), content: cardHtml });
@@ -164,7 +191,7 @@ export class GrapplingAction extends AttackAction {
     return { roll, color, effectiveRank, cappedTotal, totalKarmaUsed };
   }
 
-  async _showGrapplingDialog(actor, strength, { savedShift = 0, savedSpendKarma = false, savedRemember = false, savedSkipDice = false } = {}) {
+  async _showGrapplingDialog(actor, strength, { savedShift = 0, savedSpendKarma = false, savedRemember = false, savedSkipDice = false, savedCsNotes = "" } = {}) {
     // auto-fill target from current single targeted token
     let prefillTargetName = "";
     let prefillTargetStr  = "";
@@ -177,56 +204,62 @@ export class GrapplingAction extends AttackAction {
         prefillTargetUuid = tok?.actor?.uuid || "";
     }
 
+    // Check for Wrestling talent (+2 CS)
+    const hasWrestling = actor.items?.some(i => 
+      i.type === "talent" && 
+      (i.name?.toLowerCase().includes("wrestling") || i.system?.wrestling)
+    );
+
     const dialogHtml = `
-      <div style="margin-bottom:8px;">
-        <label style="display:inline-block;width:130px;">Action:</label>
-        <strong>${this.label}</strong>
+      <!-- Context: Target + Attack stats side by side -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+        <div style="background:#f5f5f5;padding:8px;border-radius:3px;">
+          <div style="font-weight:600;color:#666;font-size:.8em;text-transform:uppercase;">Target</div>
+          <input type="text" name="targetName" style="width:100%;margin-top:4px;font-weight:600;" placeholder="e.g., Doctor Doom" value="${prefillTargetName}">
+          <div style="margin-top:4px;">
+            <span style="color:#666;font-size:.85em;">STR:</span>
+            <input type="text" name="targetStrength" style="width:80px;" placeholder="Excellent" value="${prefillTargetStr}">
+          </div>
+        </div>
+        <div style="background:#f5f5f5;padding:8px;border-radius:3px;">
+          <div style="font-weight:600;color:#666;font-size:.8em;text-transform:uppercase;">Grapple</div>
+          <div style="font-weight:600;">Strength: ${strength.rank}</div>
+          <div style="color:#666;">Rank Value: ${strength.value}</div>
+          ${hasWrestling ? `<div style="color:#2e7d32;font-size:.85em;">Wrestling Talent: +2 CS</div>` : ''}
+        </div>
       </div>
 
-      <div style="margin-bottom:8px;">
-        <label style="display:inline-block;width:130px;">Your Strength:</label>
-        <input type="text" value="${strength.rank}" style="width:160px;" readonly>
-        <span style="margin-left:6px;">(${strength.value})</span>
+      <!-- Column Shift with Notes -->
+      <div style="display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:center;margin-bottom:8px;padding:8px;background:#fff8e1;border:1px solid #ffc107;border-radius:3px;">
+        <div>
+          <label style="font-weight:600;color:#666;font-size:.85em;">CS:</label>
+          <input type="number" name="shift" value="${Number(savedShift)}" style="width:50px;text-align:center;">
+        </div>
+        <div>
+          <input type="text" name="csNotes" value="${savedCsNotes}" placeholder="CS explanation (e.g., Wrestling +2, Stunned -2)" style="width:100%;font-size:.9em;">
+        </div>
       </div>
 
-      <div style="margin-bottom:8px;">
-        <label style="display:inline-block;width:130px;">Target:</label>
-        <input type="text" name="targetName" style="width:220px;" placeholder="e.g., Doctor Doom" value="${prefillTargetName}">
-      </div>
-
-      <div style="margin-bottom:8px;">
-        <label style="display:inline-block;width:130px;">Target Strength:</label>
-        <input type="text" name="targetStrength" style="width:180px;" placeholder="e.g., Excellent" value="${prefillTargetStr}">
-        <div style="margin-left:130px;font-size:.85em;color:#666;">Used to decide if movement is prevented on Partial Hold</div>
-      </div>
-
-      <div style="margin-bottom:8px;">
-        <label style="display:inline-block;width:130px;">Column Shift:</label>
-        <input type="number" name="shift" value="${Number(savedShift)}" style="width:60px;">
-        <span style="color:#666;font-size:.9em;">(+ easier, - harder)</span>
-      </div>
       ${generateKarmaControlsHTML(actor, savedSpendKarma)}
-      <div style="margin-top:6px;">
-        <label><input type="checkbox" name="remember" ${savedRemember ? 'checked' : ''}> Remember these settings</label>
-      </div>
-
-      <div style="margin-top:8px;">
-        <label><input type="checkbox" name="skipDice" ${savedSkipDice ? 'checked' : ''}> Skip dice animation</label>
+      
+      <div style="display:flex;gap:16px;margin-top:8px;">
+        <label style="font-size:.9em;"><input type="checkbox" name="remember" ${savedRemember ? 'checked' : ''}> Remember settings</label>
+        <label style="font-size:.9em;"><input type="checkbox" name="skipDice" ${savedSkipDice ? 'checked' : ''}> Skip dice animation</label>
       </div>
 
       <div style="margin-top:12px;padding:8px;background:#f5f5f5;border:1px solid #ddd;border-radius:3px;">
         <div style="font-weight:bold;margin-bottom:4px;">Grappling Results</div>
         <div style="font-size:.85em;color:#555;">
-          <strong>Miss:</strong> No hold; no other attacks this round.<br>
-          <strong>Partial Hold:</strong> Target acts at -2 CS; no move if your STR ≥ target STR; no damage.<br>
-          <strong>Hold:</strong> Target fully restrained; you may inflict up to STR damage (subject to Body Armor) and take one other action.
+          <strong>Miss (White/Green):</strong> No hold; no other attacks this round.<br>
+          <strong>Partial Hold (Yellow):</strong> Target acts at -2 CS; no move if your STR ≥ target STR; no damage.<br>
+          <strong>Full Hold (Red):</strong> Target restrained; you may inflict up to STR damage and take one other action.
         </div>
       </div>
     `;
 
     return new Promise((resolve) => {
       new Dialog({
-        title: `${this.label}: ${actor.name}`,
+        title: `Grappling: ${actor.name}`,
         content: dialogHtml,
         buttons: {
           roll: {
@@ -239,6 +272,7 @@ export class GrapplingAction extends AttackAction {
                 targetStrength: String($('[name="targetStrength"]').val() || ""),
                 targetUuid:     prefillTargetUuid,
                 shift:          Number($('[name="shift"]').val() || 0),
+                csNotes:        String($('[name="csNotes"]').val() || ""),
                 spendKarma,
                 remember:       !!$('[name="remember"]').is(':checked'),
                 skipDice:       !!$('[name="skipDice"]').is(':checked')
@@ -256,76 +290,98 @@ export class GrapplingAction extends AttackAction {
     });
   }
 
-  _buildChatCard({ actor, choice, strength, effectiveRank, roll, totalKarmaUsed, cappedTotal, color, effect, grid, bg, fg, targetingContext, actions, inlineRollHtml = "" }) {
-    const partialMovement =
-      choice.targetStrength
-        ? this._compareRanks(strength.rank, choice.targetStrength) >= 0
-          ? `<li style="color:#f57f17;font-weight:bold;">Target cannot move (your STR ${strength.rank} ≥ target ${choice.targetStrength})</li>`
-          : `<li>Target can still move (your STR ${strength.rank} &lt; target ${choice.targetStrength})</li>`
-        : `<li>Movement restriction depends on relative Strength</li>`;
+  _buildChatCard({ actor, choice, strength, effectiveRank, roll, totalKarmaUsed, cappedTotal, color, effect, bg, fg, actions, totalShift, shiftBreakdown, attackerEffects = [], defenderEffects = [] }) {
+    const effectLower = String(effect).toLowerCase();
+    
+    // Build CS hover breakdown
+    let shiftDisplay = "";
+    if (totalShift !== 0) {
+      const parts = [];
+      
+      // Manual shift from dialog
+      if (shiftBreakdown?.manual && shiftBreakdown.manual !== 0) {
+        if (shiftBreakdown.csNotes) {
+          parts.push(shiftBreakdown.csNotes);
+        } else {
+          parts.push(`${shiftBreakdown.manual > 0 ? '+' : ''}${shiftBreakdown.manual}`);
+        }
+      }
+      
+      // Attacker effects
+      for (const eff of attackerEffects) {
+        parts.push(`${eff.shift > 0 ? '+' : ''}${eff.shift} ${eff.name}`);
+      }
+      
+      // Defender effects (flip sign)
+      for (const eff of defenderEffects) {
+        parts.push(`${eff.shift > 0 ? '-' : '+'}${Math.abs(eff.shift)} ${eff.name}`);
+      }
+      
+      const breakdownText = parts.length > 0 ? parts.join(', ') : `${totalShift > 0 ? '+' : ''}${totalShift} total`;
+      const csBox = `<span title="${breakdownText}" style="padding:0 3px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${totalShift > 0 ? '+' : ''}${totalShift}CS</span>`;
+      shiftDisplay = ` (${csBox} → ${effectiveRank})`;
+    }
 
-    const blocks = {
+    // Build roll display with yellow hover box
+    const rollBox = `<span title="d100 = ${roll.total}" style="padding:0 3px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${roll.total}</span>`;
+    const rollDisplay = totalKarmaUsed 
+      ? `${cappedTotal} <span style="color:#666;">(${rollBox} + ${totalKarmaUsed} karma)</span>`
+      : rollBox;
+
+    // Effect-specific blocks
+    const partialMovement = choice.targetStrength
+      ? this._compareRanks(strength.rank, choice.targetStrength) >= 0
+        ? `<div style="color:#f57f17;font-weight:bold;">Target cannot move (STR ${strength.rank} ≥ ${choice.targetStrength})</div>`
+        : `<div>Target can still move (STR ${strength.rank} &lt; ${choice.targetStrength})</div>`
+      : `<div style="color:#666;font-style:italic;">Movement restriction depends on relative Strength</div>`;
+
+    const effectBlocks = {
       miss: `
-        <div style="padding:6px 10px;margin:6px 10px;background:#ffebee;border:1px solid #ef5350;border-radius:3px;">
+        <div style="padding:6px 10px;margin:4px 10px 6px;background:#ffebee;border:1px solid #ef5350;border-radius:3px;font-size:.9em;">
           <div style="font-weight:bold;color:#c62828;">Miss</div>
-          <div style="font-size:.9em;">No hold established. ${actor.name} may not make other attacks this round.</div>
+          <div>No hold established. ${actor.name} may not make other attacks this round.</div>
         </div>`,
-      "partial hold": `
-        <div style="padding:6px 10px;margin:6px 10px;background:#fff9c4;border:1px solid #fbc02d;border-radius:3px;">
+      partial: `
+        <div style="padding:6px 10px;margin:4px 10px 6px;background:#fff9c4;border:1px solid #fbc02d;border-radius:3px;font-size:.9em;">
           <div style="font-weight:bold;color:#f57f17;">Partial Hold</div>
-          <ul style="margin:6px 0 0 18px;font-size:.9em;">
-            <li>Target acts at -2 CS</li>
-            ${partialMovement}
-            <li>No damage inflicted</li>
-          </ul>
+          <div>Target acts at -2 CS; no damage inflicted.</div>
+          ${partialMovement}
         </div>`,
-      "hold": `
-        <div style="padding:6px 10px;margin:6px 10px;background:#e8f5e9;border:1px solid #66bb6a;border-radius:3px;">
+      hold: `
+        <div style="padding:6px 10px;margin:4px 10px 6px;background:#e8f5e9;border:1px solid #66bb6a;border-radius:3px;font-size:.9em;">
           <div style="font-weight:bold;color:#2e7d32;">Full Hold</div>
-          <ul style="margin:6px 0 0 18px;font-size:.9em;">
-            <li>Target fully restrained; cannot act</li>
-            <li>You may perform one additional action</li>
-            <li><strong>May inflict up to ${strength.rank} (${strength.value}) damage</strong> (subject to Body Armor)</li>
-          </ul>
+          <div>Target fully restrained; cannot act.</div>
+          <div>You may perform one additional action.</div>
+          <div><strong>May inflict up to ${strength.rank} (${strength.value}) damage</strong> (subject to Body Armor)</div>
         </div>`
     };
 
-    const effectLower = String(effect).toLowerCase();
-
-    // Build roll info section - use inline display if consolidated, else plain text
-    const rollInfoSection = inlineRollHtml ? `
-      <div style="padding:5px 10px;font-size:.9em;">
-        <div>Strength: ${strength.rank} (${strength.value})${(choice.shift ? ` — Shift ${choice.shift} → ${effectiveRank}` : '')}</div>
-        ${choice.targetStrength ? `<div>Target STR: ${choice.targetStrength}</div>` : ``}
-      </div>
-      ${inlineRollHtml}
-    ` : `
-      <div style="padding:5px 10px;font-size:.9em;">
-        <div>Strength: ${strength.rank} (${strength.value})${(choice.shift ? ` — Shift ${choice.shift} → ${effectiveRank}` : '')}</div>
-        ${choice.targetStrength ? `<div>Target STR: ${choice.targetStrength}</div>` : ``}
-        <div>Roll: ${roll.total}${totalKarmaUsed ? ` + Karma: ${totalKarmaUsed}` : ``} = ${cappedTotal}</div>
-      </div>
-    `;
-
     return `
       <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
-        <div style="padding:5px 10px;border-bottom:1px solid #c0c0c0;font-size:1.1em;color:#8b0000;">
-          <strong>${actor.name} — Grappling</strong>
+        <!-- Header -->
+        <div style="padding:6px 10px;border-bottom:1px solid #c0c0c0;display:flex;justify-content:space-between;align-items:center;">
+          <strong style="color:#8b0000;">GRAPPLING</strong>
+          <span style="color:#666;font-size:.85em;">Strength FEAT</span>
         </div>
-
-        <div style="padding:5px 10px;border-bottom:1px solid #e0e0e0;font-size:.9em;">
-          ${targetingContext}
+        
+        <!-- Attacker → Target -->
+        <div style="padding:4px 10px;font-size:.95em;">
+          <strong>${actor.name}</strong> <span style="color:#666;">→</span> <strong style="color:#d32f2f;">${choice.targetName}</strong>
+          ${choice.targetStrength ? `<span style="color:#666;font-size:.85em;margin-left:8px;">(STR: ${choice.targetStrength})</span>` : ''}
         </div>
-
-        ${rollInfoSection}
-
-        ${grid}
-
-        <div style="text-align:center;padding:8px;margin:5px;font-weight:bold;font-size:1.05em;border-radius:3px;background:${bg};color:${fg};">
-          RESULT: ${String(color).toUpperCase()} — ${String(effect).toUpperCase()}
+        
+        <!-- Ability + Roll + Result -->
+        <div style="padding:2px 10px 6px;font-size:.9em;color:#555;">
+          <div>Strength: ${strength.rank}${shiftDisplay}</div>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <span>Roll: ${rollDisplay}</span>
+            <span style="padding:2px 8px;border-radius:3px;font-weight:bold;font-size:.9em;background:${bg};color:${fg};">
+              ${String(color).toUpperCase()} — ${String(effect).toUpperCase()}
+            </span>
+          </div>
         </div>
-
-        ${blocks[effectLower] || ""}
+        
+        ${effectBlocks[effectLower] || ""}
         ${actions}
       </div>
     `;
