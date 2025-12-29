@@ -1,4 +1,6 @@
-// scripts/modules/actions/escaping-action.js v1.5.0 - 2025-12-27
+// scripts/modules/actions/escaping-action.js v2.0.0 - 2025-12-27
+// v2.0.0: Compact chat card format, CS notes, effect modifiers, Grapple Back chip on Reverse
+// v1.6.0: Add detailed logging for effect removal debugging
 // v1.5.0: Fix escape to only remove grappled on yellow/red (green is also Miss), fix karma default unchecked
 // v1.4.0: Remove grappled/held effects on successful escape
 // v1.3.0: Fix DiceSoNice animation in consolidated chat cards mode
@@ -6,41 +8,60 @@
 // v1.1.0: Add inline rolls for consolidated chat cards
 import { AttackAction } from "./attack-action.js";
 import { 
+  RANKS,
   getStrengthInfo, 
   shiftRank, 
   rollWithKarmaAndHistory,
-  buildResultGrid, 
   buildActionsBox,
   bannerColors, 
   labelFor, 
   effectsFor,
-  getTargetingContext,
-  buildInlineRollDisplay,
+  applyCapabilitiesToDialog,
   showDiceAnimation
 } from "./action-utils.js";
 import { generateKarmaControlsHTML, setupKarmaControlHandlers, extractKarmaFromDialog } from "../dice/dice-roller.js";
-import { rollUniversalTable } from "../dice/universal-table.js";
+import { getAttackShiftBreakdown, getDefenseShiftBreakdown } from "../effects/effect-modifiers.js";
 
 /**
  * Remove grappled/held effects from an actor
  * @param {Actor} actor 
  */
 async function removeHoldEffects(actor) {
-  if (!actor?.effects) return;
+  if (!actor?.effects) {
+    console.log(`[FASERIP] removeHoldEffects: No effects collection on actor`);
+    return;
+  }
   
-  const holdEffects = actor.effects.filter(e => {
-    if (e.disabled) return false;
-    // Check statuses
-    if (e.statuses?.has?.("grappled") || e.statuses?.has?.("held")) return true;
+  console.log(`[FASERIP] removeHoldEffects: Checking ${actor.effects.size} effects on ${actor.name}`);
+  
+  const holdEffects = [];
+  for (const e of actor.effects) {
+    if (e.disabled) continue;
+    
+    // Check statuses (Set in Foundry v13)
+    const hasGrappledStatus = e.statuses?.has?.("grappled") || Array.from(e.statuses || []).includes("grappled");
+    const hasHeldStatus = e.statuses?.has?.("held") || Array.from(e.statuses || []).includes("held");
+    
     // Check flags
     const flags = e.flags?.["msh-faserip"] || {};
-    if (flags.effectType === "grappled" || flags.effectType === "held") return true;
-    if (flags.status?.isGrappled || flags.status?.isHeld) return true;
+    const hasGrappledFlag = flags.effectType === "grappled" || flags.status?.isGrappled;
+    const hasHeldFlag = flags.effectType === "held" || flags.status?.isHeld;
+    
     // Check name patterns
     const name = (e.name || "").toLowerCase();
-    if (name.includes("grappled") || name.includes("held") || name.includes("partial hold") || name.includes("full hold")) return true;
-    return false;
-  });
+    const hasGrappledName = name.includes("grappled") || name.includes("partial hold");
+    const hasHeldName = name.includes("held") || name.includes("full hold");
+    
+    const isHoldEffect = hasGrappledStatus || hasHeldStatus || hasGrappledFlag || hasHeldFlag || hasGrappledName || hasHeldName;
+    
+    console.log(`[FASERIP] Effect "${e.name}": statuses=${Array.from(e.statuses || [])}, flagType=${flags.effectType}, isHold=${isHoldEffect}`);
+    
+    if (isHoldEffect) {
+      holdEffects.push(e);
+    }
+  }
+  
+  console.log(`[FASERIP] Found ${holdEffects.length} hold effects to remove`);
   
   for (const eff of holdEffects) {
     try {
@@ -68,8 +89,21 @@ export class EscapingAction extends AttackAction {
     const choice = await this._showDialog(actor, strength);
     if (!choice) return;
 
-    // Escaping is rolled on the character's Strength
-    const effectiveRank = shiftRank(strength.rank, choice.shift);
+    // Build shift breakdown for hover text
+    const shiftBreakdown = {
+      manual: choice.shift || 0,
+      csNotes: choice.csNotes || ""
+    };
+
+    // Get effect-based modifiers
+    const attackerEffects = getAttackShiftBreakdown(actor);
+    
+    // Calculate total shift including effects
+    const manualShift = choice.shift || 0;
+    const effectShift = attackerEffects.total || 0;
+    const totalShift = manualShift + effectShift;
+
+    const effectiveRank = shiftRank(strength.rank, totalShift);
 
     // Check consolidated chat card setting
     let useConsolidated = false;
@@ -78,6 +112,7 @@ export class EscapingAction extends AttackAction {
     } catch (_e) { /* setting not registered yet */ }
 
     const roll = await (new Roll("1d100")).evaluate();
+    
     // Show dice animation
     if (!choice.skipDice) {
       await showDiceAnimation(roll, actor, `${actor.name} attempts to Escape a Hold`, useConsolidated);
@@ -86,68 +121,47 @@ export class EscapingAction extends AttackAction {
     const { cappedTotal, totalKarmaUsed } =
       await rollWithKarmaAndHistory(actor, actionName, 0, roll, { spendKarma: choice.spendKarma, rank: effectiveRank, inlineRoll: useConsolidated });
 
-    // Build inline roll display for consolidated mode
-    const inlineRollHtml = useConsolidated ? buildInlineRollDisplay(roll, totalKarmaUsed, cappedTotal) : "";
-
     const color = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
     const colorLower = String(color || "").toLowerCase();
     const effect = this.effects[colorLower] || "Miss";
-
-    const grid = buildResultGrid(this.actionType, colorLower, this.effects);
     const { bg, fg } = bannerColors(colorLower);
-    const targetingContext = getTargetingContext(actor, actionName);
 
-    // No special action buttons needed for escaping
+    // Build actions box - show Grapple Back on Reverse (red)
+    const showGrappleBack = (colorLower === "red");
     const actions = buildActionsBox({
+      showGrappleBack: showGrappleBack,
+      grappleBackTargetUuid: choice.opponentUuid || "",
+      grappleBackTargetName: choice.opponentName || "Opponent",
       actorUuid: actor.uuid,
       autoApply: !!this.opts?.autoApply,
-
     });
 
-    // Build roll info section - use inline display if consolidated, else plain text
-    const rollInfoSection = inlineRollHtml ? `
-      <div style="padding:5px 10px;font-size:.9em;">
-        <div>Strength: ${strength.rank} (${strength.value})${choice.shift ? ` — Shift ${choice.shift} → ${effectiveRank}` : ""}</div>
-        ${choice.opponentStr ? `<div>Opponent STR: ${choice.opponentStr}</div>` : ``}
-      </div>
-      ${inlineRollHtml}
-    ` : `
-      <div style="padding:5px 10px;font-size:.9em;">
-        <div>Strength: ${strength.rank} (${strength.value})${choice.shift ? ` — Shift ${choice.shift} → ${effectiveRank}` : ""}</div>
-        ${choice.opponentStr ? `<div>Opponent STR: ${choice.opponentStr}</div>` : ``}
-        <div>Roll: ${roll.total}${totalKarmaUsed ? ` + Karma: ${totalKarmaUsed}` : ``} = ${cappedTotal}</div>
-      </div>
-    `;
-
-    const cardHtml = `
-      <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
-        <div style="padding:5px 10px;border-bottom:1px solid #c0c0c0;font-size:1.1em;color:#8b0000;">
-          <strong>${actor.name} — ${actionName}</strong>
-        </div>
-        
-        <div style="padding:5px 10px;border-bottom:1px solid #e0e0e0;font-size:.9em;">
-          ${targetingContext}
-          <div>Opponent: ${choice.opponentName}</div>
-        </div>
-
-        ${rollInfoSection}
-
-        ${grid}
-
-        <div style="text-align:center;padding:8px;margin:5px;font-weight:bold;font-size:1.05em;border-radius:3px;background:${bg};color:${fg};">
-          RESULT: ${String(color).toUpperCase()} — ${String(effect).toUpperCase()}
-        </div>
-
-        ${this._effectBlock(effect)}
-        ${actions}
-      </div>
-    `;
+    const cardHtml = this._buildChatCard({
+      actor,
+      choice,
+      strength,
+      effectiveRank,
+      roll,
+      totalKarmaUsed,
+      cappedTotal,
+      color,
+      effect,
+      bg,
+      fg,
+      actions,
+      totalShift,
+      shiftBreakdown,
+      attackerEffects: attackerEffects.breakdown
+    });
 
     await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor }), content: cardHtml });
 
     // Remove hold effects on successful escape (yellow=Escape or red=Reverse only; green is also Miss for escaping)
     if (colorLower === "yellow" || colorLower === "red") {
+      console.log(`[FASERIP] Escape successful (${colorLower}), removing hold effects from ${actor.name}`);
       await removeHoldEffects(actor);
+    } else {
+      console.log(`[FASERIP] Escape failed (${colorLower}), hold effects remain`);
     }
 
     return { roll, color, effectiveRank, cappedTotal, totalKarmaUsed };
@@ -157,6 +171,7 @@ export class EscapingAction extends AttackAction {
     // Auto-fill opponent from opts prefill first, then from target if any
     let prefillOpp = this.opts?.prefill?.opponentName || "";
     let prefillOppStr = this.opts?.prefill?.opponentStr || "";
+    let prefillOppUuid = this.opts?.prefill?.opponentUuid || "";
     
     // If no prefill from opts, try from targeted token
     if (!prefillOpp) {
@@ -164,6 +179,7 @@ export class EscapingAction extends AttackAction {
       if (targets.length === 1) {
         prefillOpp = targets[0].name || "";
         prefillOppStr = targets[0].actor?.system?.abilities?.strength?.rank || "";
+        prefillOppUuid = targets[0].actor?.uuid || "";
       }
     }
 
@@ -172,57 +188,57 @@ export class EscapingAction extends AttackAction {
     const savedRemember = (await actor.getFlag("msh-faserip", "rememberSettings")) ?? (await actor.getFlag("msh-faserip", "lastEscapeRemember")) ?? true;
     const savedSkipDice = (await actor.getFlag("msh-faserip", "skipDiceRoll")) ?? (await actor.getFlag("msh-faserip", "lastEscapeSkipDice")) ?? false;
     const savedSpendKarma = false; // Always default to unchecked
+    const savedCsNotes = (await actor.getFlag("msh-faserip", "lastEscapeCsNotes")) || "";
 
     const dialogHtml = `
-      <div style="margin-bottom:8px;">
-        <label style="display:inline-block;width:130px;">Action:</label>
-        <strong>${this.label}</strong>
+      <!-- Context: Opponent + Your stats side by side -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+        <div style="background:#f5f5f5;padding:8px;border-radius:3px;">
+          <div style="font-weight:600;color:#666;font-size:.8em;text-transform:uppercase;">Holding You</div>
+          <input type="text" name="opponentName" style="width:100%;margin-top:4px;font-weight:600;" placeholder="Who is holding you?" value="${prefillOpp}">
+          <div style="margin-top:4px;">
+            <span style="color:#666;font-size:.85em;">STR:</span>
+            <input type="text" name="opponentStr" style="width:80px;" placeholder="Excellent" value="${prefillOppStr}">
+          </div>
+        </div>
+        <div style="background:#f5f5f5;padding:8px;border-radius:3px;">
+          <div style="font-weight:600;color:#666;font-size:.8em;text-transform:uppercase;">Escape</div>
+          <div style="font-weight:600;">Strength: ${strength.rank}</div>
+          <div style="color:#666;">Rank Value: ${strength.value}</div>
+        </div>
       </div>
 
-      <div style="margin-bottom:8px;">
-        <label style="display:inline-block;width:130px;">Your Strength:</label>
-        <input type="text" value="${strength.rank}" style="width:160px;" readonly>
-        <span style="margin-left:6px;">(${strength.value})</span>
+      <!-- Column Shift with Notes -->
+      <div style="display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:center;margin-bottom:8px;padding:8px;background:#fff8e1;border:1px solid #ffc107;border-radius:3px;">
+        <div>
+          <label style="font-weight:600;color:#666;font-size:.85em;">CS:</label>
+          <input type="number" name="shift" value="${Number(this.opts?.shift ?? savedShift)}" style="width:50px;text-align:center;">
+        </div>
+        <div>
+          <input type="text" name="csNotes" value="${savedCsNotes}" placeholder="CS explanation (e.g., Acrobatics +1, Slippery -2)" style="width:100%;font-size:.9em;">
+        </div>
       </div>
 
-      <div style="margin-bottom:8px;">
-        <label style="display:inline-block;width:130px;">Opponent:</label>
-        <input type="text" name="opponentName" style="width:220px;" value="${prefillOpp}" placeholder="Who is holding you?">
-      </div>
-
-      <div style="margin-bottom:8px;">
-        <label style="display:inline-block;width:130px;">Opponent STR:</label>
-        <input type="text" name="opponentStr" style="width:160px;" value="${prefillOppStr}" placeholder="e.g., Excellent">
-        <div style="margin-left:130px;font-size:.85em;color:#666;">Optional: for reference only</div>
-      </div>
-
-      <div style="margin-bottom:8px;">
-        <label style="display:inline-block;width:130px;">Column Shift:</label>
-        <input type="number" name="shift" value="${Number(this.opts?.shift ?? savedShift)}" style="width:60px;">
-        <span style="color:#666;font-size:.9em;">(+ easier, - harder)</span>
-      </div>
       ${generateKarmaControlsHTML(actor, savedSpendKarma)}
-      <div style="margin-top:6px;">
-        <label><input type="checkbox" name="remember" ${savedRemember ? 'checked' : ''}> Remember these settings</label>
-      </div>
-
-      <div style="margin-top:8px;">
-        <label><input type="checkbox" name="skipDice" ${savedSkipDice ? 'checked' : ''}> Skip dice animation</label>
+      
+      <div style="display:flex;gap:16px;margin-top:8px;">
+        <label style="font-size:.9em;"><input type="checkbox" name="remember" ${savedRemember ? 'checked' : ''}> Remember settings</label>
+        <label style="font-size:.9em;"><input type="checkbox" name="skipDice" ${savedSkipDice ? 'checked' : ''}> Skip dice animation</label>
       </div>
 
       <div style="margin-top:12px;padding:8px;background:#f5f5f5;border:1px solid #ddd;border-radius:3px;">
         <div style="font-weight:bold;margin-bottom:4px;">Escaping Results</div>
         <div style="font-size:.85em;color:#555;">
-          <strong>Miss (White/Green):</strong> Still held; no other actions.<br>
-          <strong>Escape (Yellow):</strong> Free; may move up to half speed; no other actions.<br>
-          <strong>Reverse (Red):</strong> Free; move ½, Grapple attacker, or take another action at -2 CS.
+          <strong>Miss (White/Green):</strong> Still held; no other actions this turn.<br>
+          <strong>Escape (Yellow):</strong> Free; move up to half speed; no other actions.<br>
+          <strong>Reverse (Red):</strong> Free + choose: move ½, Grapple attacker, or other action at -2 CS.
         </div>
       </div>
     `;
 
     return new Promise((resolve) => {
       new Dialog({
-        title: `${this.label}: ${actor.name}`,
+        title: `Escape: ${actor.name}`,
         content: dialogHtml,
         buttons: {
           roll: {
@@ -233,7 +249,9 @@ export class EscapingAction extends AttackAction {
               const result = {
                 opponentName: String($('[name="opponentName"]').val() || "Opponent"),
                 opponentStr: String($('[name="opponentStr"]').val() || ""),
+                opponentUuid: prefillOppUuid,
                 shift: Number($('[name="shift"]').val() || 0),
+                csNotes: String($('[name="csNotes"]').val() || ""),
                 spendKarma,
                 remember: !!$('[name="remember"]').is(':checked'),
                 skipDice: !!$('[name="skipDice"]').is(':checked')
@@ -243,9 +261,10 @@ export class EscapingAction extends AttackAction {
               await actor.setFlag("msh-faserip", "lastEscapeRemember", result.remember);
               await actor.setFlag("msh-faserip", "lastEscapeSkipDice", result.skipDice);
               
-              // Persist shift if requested (karma checkbox never persisted)
+              // Persist settings if requested (karma checkbox never persisted)
               if (result.remember) {
                 await actor.setFlag("msh-faserip", "lastEscapeShift", result.shift);
+                await actor.setFlag("msh-faserip", "lastEscapeCsNotes", result.csNotes || "");
               }
               
               resolve(result);
@@ -254,34 +273,101 @@ export class EscapingAction extends AttackAction {
           cancel: { label: "Cancel", callback: () => resolve(null) }
         },
         default: "roll",
-        render: (html) => { setupKarmaControlHandlers(html); }
+        render: (html) => {
+          setupKarmaControlHandlers(html);
+          applyCapabilitiesToDialog(html, "escaping", { actor });
+        }
       }).render(true);
     });
   }
 
-  _effectBlock(effect) {
-    const e = String(effect).toLowerCase();
-    if (e === "miss") {
-      return `
-        <div style="padding:6px 10px;margin:6px 10px;background:#ffebee;border:1px solid #ef5350;border-radius:3px;">
+  _buildChatCard({ actor, choice, strength, effectiveRank, roll, totalKarmaUsed, cappedTotal, color, effect, bg, fg, actions, totalShift, shiftBreakdown, attackerEffects = [] }) {
+    const effectLower = String(effect).toLowerCase();
+    
+    // Build CS hover breakdown
+    let shiftDisplay = "";
+    if (totalShift !== 0) {
+      const parts = [];
+      
+      // Manual shift from dialog
+      if (shiftBreakdown?.manual && shiftBreakdown.manual !== 0) {
+        if (shiftBreakdown.csNotes) {
+          parts.push(shiftBreakdown.csNotes);
+        } else {
+          parts.push(`${shiftBreakdown.manual > 0 ? '+' : ''}${shiftBreakdown.manual}`);
+        }
+      }
+      
+      // Attacker effects (escaping character's modifiers)
+      for (const eff of attackerEffects) {
+        parts.push(`${eff.shift > 0 ? '+' : ''}${eff.shift} ${eff.name}`);
+      }
+      
+      const breakdownText = parts.length > 0 ? parts.join(', ') : `${totalShift > 0 ? '+' : ''}${totalShift} total`;
+      const csBox = `<span title="${breakdownText}" style="padding:0 3px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${totalShift > 0 ? '+' : ''}${totalShift}CS</span>`;
+      shiftDisplay = ` (${csBox} → ${effectiveRank})`;
+    }
+
+    // Build roll display with yellow hover box
+    const rollBox = `<span title="d100 = ${roll.total}" style="padding:0 3px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${roll.total}</span>`;
+    const rollDisplay = totalKarmaUsed 
+      ? `${cappedTotal} <span style="color:#666;">(${rollBox} + ${totalKarmaUsed} karma)</span>`
+      : rollBox;
+
+    // Effect-specific blocks
+    const effectBlocks = {
+      miss: `
+        <div style="padding:6px 10px;margin:4px 10px 6px;background:#ffebee;border:1px solid #ef5350;border-radius:3px;font-size:.9em;">
           <div style="font-weight:bold;color:#c62828;">Miss</div>
-          <div style="font-size:.9em;">You remain held this turn and may take no other actions.</div>
-        </div>`;
-    }
-    if (e === "escape") {
-      return `
-        <div style="padding:6px 10px;margin:6px 10px;background:#e3f2fd;border:1px solid #2196F3;border-radius:3px;">
+          <div>You remain held and may take no other actions this turn.</div>
+        </div>`,
+      escape: `
+        <div style="padding:6px 10px;margin:4px 10px 6px;background:#e3f2fd;border:1px solid #2196F3;border-radius:3px;font-size:.9em;">
           <div style="font-weight:bold;color:#0d47a1;">Escape</div>
-          <div style="font-size:.9em;">You slip free; you may move up to half speed this round (no other actions).</div>
-        </div>`;
-    }
-    if (e === "reverse") {
-      return `
-        <div style="padding:6px 10px;margin:6px 10px;background:#e8f5e9;border:1px solid #66bb6a;border-radius:3px;">
-          <div style="font-weight:bold;color:#2e7d32;">Reverse</div>
-          <div style="font-size:.9em;">You're free and may either: move up to ½ distance; attempt to Grapple the former attacker; or perform any other action at -2 CS.</div>
-        </div>`;
-    }
-    return "";
+          <div>You slip free of the hold.</div>
+          <div>You may move up to <strong>half speed</strong> this round.</div>
+          <div style="color:#666;font-style:italic;">No other actions permitted.</div>
+        </div>`,
+      reverse: `
+        <div style="padding:6px 10px;margin:4px 10px 6px;background:#e8f5e9;border:1px solid #66bb6a;border-radius:3px;font-size:.9em;">
+          <div style="font-weight:bold;color:#2e7d32;">Reverse!</div>
+          <div>You break free and gain the advantage. Choose one:</div>
+          <ul style="margin:4px 0 0 18px;">
+            <li>Move up to <strong>half distance</strong></li>
+            <li>Attempt to <strong>Grapple</strong> your former attacker</li>
+            <li>Perform any other action at <strong>-2 CS</strong></li>
+          </ul>
+        </div>`
+    };
+
+    return `
+      <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
+        <!-- Header -->
+        <div style="padding:6px 10px;border-bottom:1px solid #c0c0c0;display:flex;justify-content:space-between;align-items:center;">
+          <strong style="color:#8b0000;">ESCAPE</strong>
+          <span style="color:#666;font-size:.85em;">Strength FEAT</span>
+        </div>
+        
+        <!-- Escaper vs Holder -->
+        <div style="padding:4px 10px;font-size:.95em;">
+          <strong>${actor.name}</strong> <span style="color:#666;">escaping from</span> <strong style="color:#d32f2f;">${choice.opponentName}</strong>
+          ${choice.opponentStr ? `<span style="color:#666;font-size:.85em;margin-left:8px;">(STR: ${choice.opponentStr})</span>` : ''}
+        </div>
+        
+        <!-- Ability + Roll + Result -->
+        <div style="padding:2px 10px 6px;font-size:.9em;color:#555;">
+          <div>Strength: ${strength.rank}${shiftDisplay}</div>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <span>Roll: ${rollDisplay}</span>
+            <span style="padding:2px 8px;border-radius:3px;font-weight:bold;font-size:.9em;background:${bg};color:${fg};">
+              ${String(color).toUpperCase()} — ${String(effect).toUpperCase()}
+            </span>
+          </div>
+        </div>
+        
+        ${effectBlocks[effectLower] || ""}
+        ${actions}
+      </div>
+    `;
   }
 }

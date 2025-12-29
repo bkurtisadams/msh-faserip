@@ -1,4 +1,5 @@
-// scripts/modules/actions/grappling-action.js v2.1.0 - 2025-12-27
+// scripts/modules/actions/grappling-action.js v2.2.0 - 2025-12-27
+// v2.2.0: Add opts.prefill support for Grapple Back from escape reverse
 // v2.1.0: Add Deal Hold Damage chip on Full Hold (red) result
 // v2.0.0: Compact chat card format matching blunt attack (inline result badge, CS hover, no grid)
 // v1.5.0: Fix karma checkbox to always default unchecked (not persisted)
@@ -201,16 +202,20 @@ export class GrapplingAction extends AttackAction {
   }
 
   async _showGrapplingDialog(actor, strength, { savedShift = 0, savedSpendKarma = false, savedRemember = false, savedSkipDice = false, savedCsNotes = "" } = {}) {
-    // auto-fill target from current single targeted token
-    let prefillTargetName = "";
-    let prefillTargetStr  = "";
-    let prefillTargetUuid = "";
-    const targets = Array.from(game.user?.targets ?? []);
-    if (targets.length === 1) {
+    // Auto-fill target from opts prefill first, then from targeted token
+    let prefillTargetName = this.opts?.prefill?.targetName || "";
+    let prefillTargetStr  = this.opts?.prefill?.targetStrength || "";
+    let prefillTargetUuid = this.opts?.prefill?.targetUuid || "";
+    
+    // If no prefill from opts, try from targeted token
+    if (!prefillTargetName) {
+      const targets = Array.from(game.user?.targets ?? []);
+      if (targets.length === 1) {
         const tok = targets[0];
         prefillTargetName = tok?.name || "";
         prefillTargetStr  = tok?.actor?.system?.abilities?.strength?.rank || "";
         prefillTargetUuid = tok?.actor?.uuid || "";
+      }
     }
 
     // Check for Wrestling talent (+2 CS)
@@ -280,11 +285,17 @@ export class GrapplingAction extends AttackAction {
                 targetName:     String($('[name="targetName"]').val() || "Target"),
                 targetStrength: String($('[name="targetStrength"]').val() || ""),
                 targetUuid:     prefillTargetUuid,
-                shift:          Number($('[name="shift"]').val() || 0),
+                shift:          Number(($('[name="shift"]').val() ?? $('[name="columnShift"]').val() ?? 0)),
                 csNotes:        String($('[name="csNotes"]').val() || ""),
                 spendKarma,
-                remember:       !!$('[name="remember"]').is(':checked'),
-                skipDice:       !!$('[name="skipDice"]').is(':checked')
+                remember:       (
+                  !!$('[name="remember"]').is(':checked') ||
+                  !!$('[name="rememberSettings"]').is(':checked')
+                ),
+                skipDice:       (
+                  !!$('[name="skipDice"]').is(':checked') ||
+                  !!$('[name="skipDiceRoll"]').is(':checked')
+                )
               });
             }
           },

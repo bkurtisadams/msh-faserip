@@ -1,4 +1,5 @@
-// action-utils.js v1.3.0 - 2025-12-27
+// action-utils.js v1.4.0 - 2025-12-27
+// v1.4.0: Add showGrappleBack chip for Reverse escape result
 // v1.3.0: Add showHoldDamage chip to buildActionsBox for Full Hold grappling damage
 // v1.2.1: getBodyArmorValues respects armorUseRankValue flag - uses power.value when checked
 // v1.2.0: Add fromZeroHealth flag to death/kill save paths
@@ -729,6 +730,9 @@ export function buildActionsBox({
   holdDamageRank = "",
   holdTargetUuid = "",
   holdTargetName = "",
+  showGrappleBack = false,
+  grappleBackTargetUuid = "",
+  grappleBackTargetName = "",
   showNullifySave = false,
   nullifyIntensityRank = "",
   saveAbility = "endurance",  // NEW: which ability to save against (endurance, psyche, etc.)
@@ -871,6 +875,22 @@ export function buildActionsBox({
         `Inflict up to ${holdDamageRank} (${holdDamageMax}) damage to held target`,
         true,
         `data-action="hold-damage" data-attacker-uuid="${actorUuid}" data-max-damage="${holdDamageMax}" data-damage-rank="${holdDamageRank}" ${heldTargetBits}`
+      )
+    );
+  }
+
+  // Grapple Back chip (for Reverse - red escape result)
+  if (showGrappleBack) {
+    const grappleTargetBits = [
+      grappleBackTargetUuid ? `data-target-uuid="${grappleBackTargetUuid}"` : "",
+      grappleBackTargetName ? `data-target-name="${grappleBackTargetName}"` : ""
+    ].join(" ");
+    parts.push(
+      chip(
+        "Grapple Back",
+        `Attempt to grapple ${grappleBackTargetName || 'your former attacker'}`,
+        true,
+        `data-action="grapple-back" data-attacker-uuid="${actorUuid}" ${grappleTargetBits}`
       )
     );
   }

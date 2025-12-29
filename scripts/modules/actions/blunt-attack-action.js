@@ -1,5 +1,6 @@
 //--- START OF FILE blunt-attack-action.js ---
-// blunt-attack-action.js v1.4.14 - 2025-12-24
+// blunt-attack-action.js v1.4.15 - 2025-12-27
+// v1.4.15: Detect and display combat talents (Martial Arts A/B/D/E, Boxing) in dialog
 // v1.4.14: Add csNotes to shiftBreakdown for chat card hover text
 // v1.4.13: Add CS Notes text input row between Modifiers and Multi-Attack, restore UI colors
 // v1.4.12: UI color scheme - Damage=light red, Karma=light blue, border highlights on selection (Karma=dark blue, Multi=dark green, Pull=dark orange)
@@ -58,6 +59,38 @@ export class BluntAttackAction extends AttackAction {
     const ability = getAbilityInfo(actor, this.abilityName);
     const strength = getStrengthInfo(actor);
     let attackItems = actor.items.filter(isBluntCapable);
+
+    // Detect combat talents that affect Fighting attacks
+    const combatTalents = [];
+    for (const item of actor.items) {
+      if (item.type !== "talent") continue;
+      const name = (item.name || "").toLowerCase();
+      
+      // Martial Arts B: +1CS Fighting
+      if (name.includes("martial arts b") || name.includes("martial arts-b") || 
+          (name.includes("martial arts") && name.includes("(b)"))) {
+        combatTalents.push({ name: "Martial Arts B", bonus: "+1 CS" });
+      }
+      // Boxing: +1 CS to hit
+      else if (name.includes("boxing")) {
+        combatTalents.push({ name: "Boxing", bonus: "+1 CS" });
+      }
+      // Martial Arts A: Stun/Slam ignore Str/End (note only, no CS bonus)
+      else if (name.includes("martial arts a") || name.includes("martial arts-a") ||
+               (name.includes("martial arts") && name.includes("(a)"))) {
+        combatTalents.push({ name: "Martial Arts A", bonus: "Stun/Slam ignores Str/End" });
+      }
+      // Martial Arts D: Ignore armor for effects
+      else if (name.includes("martial arts d") || name.includes("martial arts-d") ||
+               (name.includes("martial arts") && name.includes("(d)"))) {
+        combatTalents.push({ name: "Martial Arts D", bonus: "Ignore armor (effects)" });
+      }
+      // Martial Arts E: +1 initiative
+      else if (name.includes("martial arts e") || name.includes("martial arts-e") ||
+               (name.includes("martial arts") && name.includes("(e)"))) {
+        combatTalents.push({ name: "Martial Arts E", bonus: "+1 Initiative" });
+      }
+    }
 
     // If a specific item was passed via opts, ensure it's in the list and pre-selected
     const passedItemId = this.opts?.itemId || this.opts?.item?.id || null;
@@ -157,6 +190,9 @@ export class BluntAttackAction extends AttackAction {
           <div style="font-weight:600;color:#666;font-size:.8em;text-transform:uppercase;">Attack</div>
           <div style="font-weight:600;">${ability.name}: ${ability.rank}</div>
           <div style="color:#666;">Rank Value: ${ability.value}</div>
+          ${combatTalents.length > 0 ? combatTalents.map(t => 
+            `<div style="color:#2e7d32;font-size:.85em;">${t.name}: ${t.bonus}</div>`
+          ).join('') : ''}
         </div>
       </div>
 

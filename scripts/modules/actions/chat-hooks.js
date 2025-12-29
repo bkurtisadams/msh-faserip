@@ -1,4 +1,5 @@
-// chat-hooks.js v1.4.0 - 2025-12-27
+// chat-hooks.js v1.5.0 - 2025-12-27
+// v1.5.0: Add grapple-back handler for Reverse escape result
 // v1.4.0: Add hold-damage handler for Full Hold grappling damage
 // v1.3.0: Add detailed logging for escape effect removal debugging
 // v1.2.0: Fix escape karma default unchecked, add grappled effect removal on successful escape
@@ -781,6 +782,70 @@ export function installActionChatHandlers() {
           });
         }
       }).render(true);
+    });
+
+    // Grapple Back handler (Reverse - red escape result)
+    html.on("click", '[data-action="grapple-back"]', async (ev) => {
+      ev.preventDefault();
+      const btn = ev.currentTarget;
+      
+      const attackerUuid = btn.dataset.attackerUuid;
+      const targetUuid = btn.dataset.targetUuid || "";
+      const targetName = btn.dataset.targetName || "Opponent";
+      
+      // Get the escaping actor (who will now be grappling)
+      let grapplingActor = null;
+      if (attackerUuid) {
+        try {
+          const doc = await fromUuid(attackerUuid);
+          grapplingActor = doc?.actor ?? (doc?.documentName === "Actor" ? doc : null);
+        } catch (_e) { /* ignore */ }
+      }
+      
+      // Fall back to selected token or user's character
+      if (!grapplingActor) {
+        const controlled = canvas.tokens?.controlled?.[0];
+        if (controlled?.actor) {
+          grapplingActor = controlled.actor;
+        }
+      }
+      if (!grapplingActor) {
+        grapplingActor = game.user?.character;
+      }
+      
+      if (!grapplingActor) {
+        ui.notifications.warn("Select your token to attempt Grapple Back.");
+        return;
+      }
+      
+      // Get target actor's strength for prefill
+      let targetStrength = "";
+      if (targetUuid) {
+        try {
+          const tDoc = await fromUuid(targetUuid);
+          const tActor = tDoc?.actor ?? (tDoc?.documentName === "Actor" ? tDoc : null);
+          if (tActor) {
+            targetStrength = tActor.system?.abilities?.strength?.rank || "";
+          }
+        } catch (_e) { /* ignore */ }
+      }
+      
+      // Open grappling dialog with target prefilled
+      await ActionDispatcher.roll("grappling", {
+        actor: grapplingActor,
+        opts: {
+          prefill: {
+            targetName: targetName,
+            targetStrength: targetStrength,
+            targetUuid: targetUuid
+          }
+        }
+      });
+      
+      // Disable button after use
+      btn.textContent = "Grappling...";
+      btn.disabled = true;
+      btn.style.opacity = "0.6";
     });
 
     // 6) Force Save (Nullification / RAW: Endurance vs Power Rank)
