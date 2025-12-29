@@ -1,4 +1,7 @@
-// scripts/modules/actions/grappling-action.js v2.2.0 - 2025-12-27
+// scripts/modules/actions/grappling-action.js v2.2.3 - 2025-12-28
+// v2.2.3: Fix shift override - treat opts.shift=0 as "not set" to allow saved values
+// v2.2.2: Fix CS persistence - decouple from global rememberSettings, use only local lastGrappleRemember flag
+// v2.2.1: Fix CS modifier persistence - use localStorage for Remember Settings checkbox (matches blunt attack pattern)
 // v2.2.0: Add opts.prefill support for Grapple Back from escape reverse
 // v2.1.0: Add Deal Hold Damage chip on Full Hold (red) result
 // v2.0.0: Compact chat card format matching blunt attack (inline result badge, CS hover, no grid)
@@ -39,11 +42,22 @@ export class GrapplingAction extends AttackAction {
 
     // Load persisted defaults (karma checkbox never persisted - always starts unchecked)
     const savedShift = await actor.getFlag("msh-faserip", "lastGrappleShift") ?? 0;
-    const savedRemember = (await actor.getFlag("msh-faserip", "rememberSettings")) ?? (await actor.getFlag("msh-faserip", "lastGrappleRemember")) ?? true;
-    const savedSkipDice = (await actor.getFlag("msh-faserip", "skipDiceRoll")) ?? (await actor.getFlag("msh-faserip", "lastGrappleSkipDice")) ?? false;
+
+    // FIX: Decouple from global "rememberSettings" to avoid cross-action contamination.
+    // We default to false so persistence is opt-in or strictly follows the specific flag.
+    const savedRemember = (await actor.getFlag("msh-faserip", "lastGrappleRemember")) ?? false;
+    const savedSkipDice = (await actor.getFlag("msh-faserip", "lastGrappleSkipDice")) ?? false;
+
     const savedSpendKarma = false; // Always default to unchecked
     const savedCsNotes = (await actor.getFlag("msh-faserip", "lastGrappleCsNotes")) || "";
-    const dialogShift = this.opts?.shift ?? (savedRemember ? savedShift : 0);
+
+    // Only apply the saved shift if Remember was explicitly checked last time
+    // Note: Use explicit undefined check - if caller passes shift:0, still use saved value
+    // (callers who want to override should pass a non-zero value or use prefill)
+    const optsShift = this.opts?.shift;
+    const dialogShift = (optsShift !== undefined && optsShift !== null && optsShift !== 0) 
+      ? optsShift 
+      : (savedRemember ? savedShift : 0);
 
     const choice = await this._showGrapplingDialog(actor, strength, { 
       savedShift: dialogShift, 
@@ -54,13 +68,11 @@ export class GrapplingAction extends AttackAction {
     });
     if (!choice) return;
 
-    // Always save remember/skipDice preferences
-    await actor.setFlag("msh-faserip", "rememberSettings", choice.remember);
-    await actor.setFlag("msh-faserip", "skipDiceRoll", choice.skipDice);
+    // Always save remember/skipDice preferences to specific flags only
     await actor.setFlag("msh-faserip", "lastGrappleRemember", choice.remember);
     await actor.setFlag("msh-faserip", "lastGrappleSkipDice", choice.skipDice);
 
-    // Persist settings if requested (karma checkbox never persisted)
+    // Persist modifiers only if requested
     if (choice.remember) {
       await actor.setFlag("msh-faserip", "lastGrappleShift", choice.shift);
       await actor.setFlag("msh-faserip", "lastGrappleCsNotes", choice.csNotes || "");
@@ -285,7 +297,8 @@ export class GrapplingAction extends AttackAction {
                 targetName:     String($('[name="targetName"]').val() || "Target"),
                 targetStrength: String($('[name="targetStrength"]').val() || ""),
                 targetUuid:     prefillTargetUuid,
-                shift:          Number(($('[name="shift"]').val() ?? $('[name="columnShift"]').val() ?? 0)),
+                // Handle alternative field names that may exist in shared templates
+                shift:          Number($('[name="shift"]').val() ?? $('[name="columnShift"]').val() ?? 0),
                 csNotes:        String($('[name="csNotes"]').val() || ""),
                 spendKarma,
                 remember:       (
