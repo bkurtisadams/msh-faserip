@@ -1,11 +1,13 @@
-// scripts/modules/actions/charging-action.js v1.2.0 - 2025-12-22
+// scripts/modules/actions/charging-action.js v1.3.0 - 2025-12-28
+// v1.3.0: Compact dialog layout matching blunt attack, fix CS persistence bug
 // v1.2.0: Fix DiceSoNice animation in consolidated chat cards mode
 // v1.1.0: Add inline rolls for consolidated chat cards
 import { BaseAction } from "./base-action.js";
 import { 
   generateKarmaControlsHTML, 
   setupKarmaControlHandlers, 
-  extractKarmaFromDialog 
+  extractKarmaFromDialog,
+  getAvailableKarma
 } from "../dice/dice-roller.js";
 import {
   RANKS,
@@ -22,7 +24,10 @@ import {
   debugLog,
   applyCapabilitiesToDialog,
   buildInlineRollDisplay,
-  showDiceAnimation
+  showDiceAnimation,
+  getTargetData,
+  buildModeSelector,
+  setupModeSelector
 } from "./action-utils.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
 
@@ -76,53 +81,53 @@ export class ChargingAction extends BaseAction {
     "Class 5000": "Virtually indestructible (Cap's shield, Thor's hammer)"
   };
 
-  // Auto-populate target's Body Armor from targeted token
+  // Get target info using standard helper
+  const { targets, primaryTarget, primaryTargetActor, targetDisplay } = getTargetData();
+  
+  // Auto-populate target's Body Armor
   let targetBArank = "Shift-0";
   let targetBAvalue = 0;
-  let targetName = "";
-  let targetUuid = "";
+  let targetName = primaryTarget?.name || "";
+  let targetUuid = primaryTargetActor?.uuid || "";
   let autoPopulated = false;
   
-  const targets = game.user.targets;
-  if (targets.size === 1) {
-    const targetToken = targets.first();
-    const targetActor = targetToken.actor;
-    
-    if (targetActor) {
-      targetName = targetToken.name;
-      autoPopulated = true; // Mark as auto-populated even if no BA found
-      
-      // Find target's Body Armor power
-      const targetBApower = targetActor.items.find(i => 
-        i.type === "power" && 
-        (i.name.toLowerCase().includes("body armor") || 
-         i.name.toLowerCase().includes("body armour"))
-      );
-      
-      if (targetBApower) {
-        targetBArank = targetBApower.system?.rank || "Shift-0";
-        targetBAvalue = targetBApower.system?.value || 0;
-        console.log(`FASERIP | Auto-populated target BA: ${targetName} (Body Armor: ${targetBArank} = ${targetBAvalue})`);
-      } else {
-        console.log(`FASERIP | Auto-populated target BA: ${targetName} (No Body Armor found - defaulting to Shift-0)`);
-      }
+  if (primaryTargetActor) {
+    autoPopulated = true;
+    const targetBApower = primaryTargetActor.items.find(i => 
+      i.type === "power" && 
+      (i.name.toLowerCase().includes("body armor") || 
+       i.name.toLowerCase().includes("body armour"))
+    );
+    if (targetBApower) {
+      targetBArank = targetBApower.system?.rank || "Shift-0";
+      targetBAvalue = targetBApower.system?.value || 0;
     }
-  } else if (targets.size > 1) {
-    ui.notifications.warn("Multiple tokens targeted. Please select only one target for charging.");
   }
 
-  // Restore saved settings
-  const savedAreas = await actor.getFlag("msh-faserip", "lastChargingAreas") || 1;
-  const savedTargetType = await actor.getFlag("msh-faserip", "lastChargingTargetType") || "character";
-  const savedTargetBA = autoPopulated ? targetBArank : (await actor.getFlag("msh-faserip", "lastChargingTargetBA") || "Shift-0");
-  const savedTargetBAValue = autoPopulated ? targetBAvalue : (await actor.getFlag("msh-faserip", "lastChargingTargetBAValue") || 0);
-  const savedObjectMaterial = await actor.getFlag("msh-faserip", "lastChargingObjectMaterial") || "Excellent";
-  const savedObjectDesc = await actor.getFlag("msh-faserip", "lastChargingObjectDesc") || "";
-  const savedRemember = (await actor.getFlag("msh-faserip", "rememberSettings")) ?? (await actor.getFlag("msh-faserip", "lastChargingRemember")) ?? true;
-  const savedSkipDice = (await actor.getFlag("msh-faserip", "skipDiceRoll")) ?? (await actor.getFlag("msh-faserip", "lastChargingSkipDice")) ?? false;
+  // --- INITIALIZATION & DEFAULTS ---
+  // Use localStorage for Remember Settings / Skip Dice (matches blunt attack pattern)
+  const lsRememberKey = "msh.charging.remember";
+  const lsSkipKey = "msh.charging.skipDice";
+  
+  const storedRemember = localStorage.getItem(lsRememberKey);
+  const shouldRemember = storedRemember === "1";
+  const savedSkipDice = localStorage.getItem(lsSkipKey) === "1";
 
-  // If auto-populated a character, override saved target type
-  const defaultTargetType = autoPopulated ? "character" : savedTargetType;
+  // Load settings based on remember state
+  const savedAreas = shouldRemember ? (await actor.getFlag("msh-faserip", "lastChargingAreas") || 1) : 1;
+  const savedShift = shouldRemember ? (await actor.getFlag("msh-faserip", "lastChargingShift") || 0) : 0;
+  const savedTargetType = autoPopulated ? "character" : (shouldRemember ? (await actor.getFlag("msh-faserip", "lastChargingTargetType") || "character") : "character");
+  const savedTargetBA = autoPopulated ? targetBArank : (shouldRemember ? (await actor.getFlag("msh-faserip", "lastChargingTargetBA") || "Shift-0") : "Shift-0");
+  const savedTargetBAValue = autoPopulated ? targetBAvalue : (shouldRemember ? (await actor.getFlag("msh-faserip", "lastChargingTargetBAValue") || 0) : 0);
+  const savedObjectMaterial = shouldRemember ? (await actor.getFlag("msh-faserip", "lastChargingObjectMaterial") || "Excellent") : "Excellent";
+  const savedObjectDesc = shouldRemember ? (await actor.getFlag("msh-faserip", "lastChargingObjectDesc") || "") : "";
+  const savedCsNotes = shouldRemember ? ((await actor.getFlag("msh-faserip", "lastChargingCsNotes")) || "") : "";
+
+  // Compute dialogShift - treat opts.shift=0 as "not set"
+  const optsShift = this.opts?.shift;
+  const dialogShift = (optsShift !== undefined && optsShift !== null && optsShift !== 0) 
+    ? optsShift 
+    : savedShift;
 
   // Material strength options with examples
   const materialOptions = RANKS.map(r => {
@@ -136,93 +141,127 @@ export class ChargingAction extends BaseAction {
     `<option value="${r}" ${r === savedTargetBA ? 'selected' : ''}>${r}</option>`
   ).join('');
 
-  // Build dialog
+  // Karma info for compact display
+  const availableKarma = getAvailableKarma(actor);
+  const hasKarma = availableKarma > 0;
+  const minKarma = 10;
+
+  // Initial damage calculation
+  const initialBaseRankValue = Math.max(endurance.value, bodyArmorValue);
+  const initialSpeedDamage = savedAreas * 2;
+  const initialTotalDamage = initialBaseRankValue + initialSpeedDamage;
+  const initialMovementBonus = Math.min(3, savedAreas);
+
+  // localStorage helper
+  const setLS = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
+
+  // Build dialog - Compact layout matching blunt attack
   const dialogHtml = `
-    <div style="margin-bottom:6px;">
-      <div style="display:grid;grid-template-columns:80px 1fr;gap:3px 8px;font-size:.9em;line-height:1.3;">
-        <span style="font-weight:600;">Action:</span><span style="font-weight:600;">${actionName}</span>
-        <span style="font-weight:600;">Target:</span><span style="color:#d32f2f;font-style:italic;">${targetName || "(no target selected)"}</span>
-        <span style="font-weight:600;">Endurance:</span><span>${endurance.rank} (${endurance.value})</span>
-        <span style="font-weight:600;">Body Armor:</span><span>${bodyArmorRank} (${bodyArmorValue})</span>
-        <span style="font-weight:600;">Agility:</span><span>${agility.rank} (${agility.value})</span>
-      </div>
-    </div>
-    
-    <div style="margin:4px 0 6px 0;padding:4px 0;border-top:1px solid #ddd;">
-      <div style="margin-bottom:3px;">
-        <label style="display:inline-block;width:90px;font-size:.9em;">Column Shift:</label>
-        <input type="number" name="shift" value="${Number(this.opts.shift ?? 0)}" style="width:45px;padding:2px;">
-        <span style="color:#666;font-size:.8em;margin-left:4px;">(+/−)</span>
-      </div>
-      ${generateKarmaControlsHTML(actor, 0)}
-    </div>
+    ${buildModeSelector({ mode: "semi" })}
 
-    <div style="margin:6px 0;padding:6px;background:#fff3e0;border:1px solid #ff9800;border-radius:3px;">
-      <div style="margin-bottom:4px;font-size:.9em;">
-        <label style="display:inline-block;width:80px;" title="Areas moved">Movement:</label>
-        <input type="number" name="areas" value="${savedAreas}" min="1" max="20" style="width:60px;padding:2px;">
-        <span id="charge-bonus" style="margin-left:6px;font-weight:bold;color:#2e7d32;" title="Column Shift bonus from movement">
-          CS: ${Math.min(3, savedAreas)}
-        </span>
+    <!-- Context: Target + Attack stats side by side -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+      <div style="background:#f5f5f5;padding:8px;border-radius:3px;">
+        <div style="font-weight:600;color:#666;font-size:.8em;text-transform:uppercase;">Target</div>
+        <div style="font-weight:600;color:#d32f2f;">${targetDisplay || "(no target)"}</div>
+        <div style="color:#666;" id="target-armor-display">${autoPopulated && targetBAvalue > 0 ? `Body Armor: ${targetBArank} (${targetBAvalue})` : (autoPopulated ? 'No armor' : '')}</div>
       </div>
-      <div style="font-size:0.8em;color:#777;">
-        Must move at least one area. Gain one CS per area moved (cap three at three or more areas).
+      <div style="background:#f5f5f5;padding:8px;border-radius:3px;">
+        <div style="font-weight:600;color:#666;font-size:.8em;text-transform:uppercase;">Charging</div>
+        <div style="font-weight:600;">Endurance: ${endurance.rank} (${endurance.value})</div>
+        <div style="color:#666;">Body Armor: ${bodyArmorRank} (${bodyArmorValue})</div>
+        <div style="color:#666;font-size:.85em;">Agility: ${agility.rank} (for miss recovery)</div>
       </div>
     </div>
 
-    <div style="margin:6px 0;font-size:.9em;">
-      <label style="font-weight:600;margin-right:8px;">Target Type:</label>
-      <label><input type="radio" name="target-type" value="character" ${defaultTargetType === 'character' ? 'checked' : ''}> Character</label>
-      <label style="margin-left:8px;"><input type="radio" name="target-type" value="object" ${defaultTargetType === 'object' ? 'checked' : ''}> Inanimate Object</label>
-    </div>
-
-    <div style="margin-bottom:12px;">
-      <div id="character-target-panel" style="padding:6px;border:1px solid #2196F3;border-radius:3px;background:#e3f2fd;font-size:0.9em;">
-        <div style="font-weight:bold;margin-bottom:6px;color:#1565c0;">Character Target</div>
-        <div style="margin-bottom:6px;">
-          <label style="display:inline-block;width:140px;">Body Armor Rank:</label>
-          <select name="targetBodyArmorRank" style="width:200px;padding:2px;">${rankOptions}</select>
-        </div>
-        <div style="margin-bottom:6px;">
-          <label style="display:inline-block;width:140px;">Body Armor Value:</label>
-          <input type="number" name="targetBodyArmorValue" value="${savedTargetBAValue}" min="0" style="width:100px;padding:2px;">
-        </div>
-        <div id="char-damage-preview" style="margin-top:4px;padding:4px;background:#fff;border:1px solid #2196F3;border-radius:3px;font-size:0.85em;">
-          <strong>Damage Preview:</strong><br>
-          <span id="char-damage-calc">Calculating...</span>
-        </div>
-        <div id="char-rebound-warning" style="margin-top:4px;padding:4px;display:none;background:#ffebee;border:1px solid #f44336;border-radius:3px;font-size:0.85em;color:#d32f2f;font-weight:bold;">
-          ⚠ Target BA > damage → rebounds!
-        </div>
+    <!-- Movement Row -->
+    <div class="movement-section" style="padding:8px;background:#fff3e0;border:1px solid #ff9800;border-radius:3px;margin-bottom:8px;">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <label style="font-weight:600;color:#e65100;">Areas:</label>
+        <input type="number" name="areas" value="${savedAreas}" min="1" max="20" style="width:50px;padding:3px;text-align:center;">
+        <span style="color:#666;">→</span>
+        <strong id="movement-bonus" style="color:#2e7d32;">+${initialMovementBonus} CS</strong>
+        <span style="color:#999;font-size:.85em;">(max +3)</span>
       </div>
-
-      <div id="object-target-panel" style="padding:6px;border:1px solid #ff9800;border-radius:3px;background:#fff3e0;display:none;font-size:0.9em;">
-        <div style="font-weight:bold;margin-bottom:6px;color:#e65100;">Inanimate Object</div>
-        <div style="margin-bottom:6px;">
-          <label style="display:inline-block;width:140px;">Description:</label>
-          <input type="text" name="objectDescription" value="${savedObjectDesc}" placeholder="e.g., Brick wall, Steel door" style="width:calc(100% - 145px);padding:2px;">
-        </div>
-        <div style="margin-bottom:6px;">
-          <label style="display:inline-block;width:140px;">Material Strength:</label>
-          <select name="objectMaterial" style="width:200px;padding:2px;">${materialOptions}</select>
-        </div>
-        <div id="obj-damage-preview" style="margin-top:4px;padding:4px;background:#fff;border:1px solid #ff9800;border-radius:3px;font-size:0.85em;">
-          <strong>Damage Preview:</strong><br>
-          <span id="obj-damage-calc">Calculating...</span>
-        </div>
-        <div id="obj-rebound-warning" style="margin-top:4px;padding:4px;display:none;background:#ffebee;border:1px solid #f44336;border-radius:3px;font-size:0.85em;color:#d32f2f;font-weight:bold;">
-          ⚠ Material > damage → rebounds!
-        </div>
+      <div style="font-size:.8em;color:#777;margin-top:4px;">
+        Must move at least 1 area. +1CS per area (max +3CS). Damage = END/BA + 2×areas.
       </div>
     </div>
 
-    <div style="font-size:0.8em;color:#777;margin-bottom:8px;">
-      Absorbed portion rebounds to the attacker; your Body Armor may soak it.
+    <!-- Damage Preview -->
+    <div id="preview" style="background:#ffebee;border:1px solid #ef9a9a;border-radius:3px;padding:10px;margin-bottom:8px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <span><strong>Damage:</strong> <span id="dmg-base">${initialBaseRankValue}</span> + <span id="dmg-speed">${initialSpeedDamage}</span> = <span id="dmg-total">${initialTotalDamage}</span></span>
+        <span style="font-size:.9em;color:#666;" id="dmg-note">(${initialBaseRankValue} base + 2×${savedAreas} speed)</span>
+      </div>
+      <div id="rebound-warning" style="display:none;margin-top:4px;padding:4px;background:#fff;border:1px solid #f44336;border-radius:3px;font-size:.85em;color:#d32f2f;font-weight:bold;">
+        ⚠ Target defense > damage → rebounds to you!
+      </div>
     </div>
 
-    <div style="margin-top:6px;padding-top:5px;border-top:1px solid #ddd;display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:.9em;">
-      <label><input type="checkbox" name="remember" ${savedRemember ? 'checked' : ''}> Remember settings</label>
-      <label><input type="checkbox" name="skipDice" ${savedSkipDice ? 'checked' : ''}> Skip dice animation</label>
+    <!-- Modifiers Row -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;font-size:.9em;">
+      <div class="cs-field" style="display:flex;align-items:center;gap:4px;padding:4px 6px;border-radius:3px;${dialogShift < 0 ? 'background:#ffebee;border:1px solid #ef5350;' : dialogShift > 0 ? 'background:#e8f5e9;border:1px solid #66bb6a;' : 'border:1px solid transparent;'}">
+        <label style="font-weight:600;">CS:</label>
+        <input type="number" name="shift" value="${Number(dialogShift)}" style="width:35px;padding:3px;text-align:center;box-sizing:border-box;">
+        <span style="color:#666;">→</span>
+        <strong id="shifted-rank-display" style="${dialogShift < 0 ? 'color:#c62828;' : dialogShift > 0 ? 'color:#2e7d32;' : ''}">${shiftRank(endurance.rank, dialogShift + initialMovementBonus)}</strong>
+        <button type="button" class="cs-reset" style="visibility:${dialogShift !== 0 ? 'visible' : 'hidden'};padding:1px 5px;font-size:.85em;cursor:pointer;border:1px solid #999;border-radius:2px;background:#eee;" title="Reset to 0">×</button>
+      </div>
+      <div class="karma-field" style="display:flex;align-items:center;gap:4px;padding:4px 6px;border-radius:3px;${hasKarma ? 'background:#e3f2fd;border:1px solid #90caf9;' : ''}">
+        ${hasKarma ? `
+          <label style="display:flex;align-items:center;gap:4px;cursor:pointer;">
+            <input type="checkbox" id="spend-karma" name="spendKarma">
+            <span style="font-weight:600;">Karma:</span>
+          </label>
+          <span title="Available: ${availableKarma} | Min: ${minKarma}" style="padding:1px 4px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${availableKarma}</span>
+          <span style="color:#999;font-size:.8em;">(min ${minKarma})</span>
+        ` : `<span style="color:#999;">No karma</span>`}
+      </div>
+    </div>
+
+    <!-- CS Notes Row -->
+    <div id="cs-notes-row" style="margin-bottom:6px;">
+      <input type="text" name="csNotes" id="cs-notes-input" placeholder="e.g., talent +1CS, situation -2CS" value="${savedCsNotes}" style="width:100%;padding:4px 8px;border:1px solid #ccc;border-radius:3px;font-size:.9em;box-sizing:border-box;">
+    </div>
+
+    <!-- Target Type Selection -->
+    <div class="target-type-section" style="padding:6px 8px;background:#e3f2fd;border:1px solid #90caf9;border-radius:3px;margin-bottom:6px;">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <span style="font-weight:600;color:#1565c0;">Target:</span>
+        <label style="cursor:pointer;"><input type="radio" name="targetType" value="character" ${savedTargetType === 'character' ? 'checked' : ''}> Character</label>
+        <label style="cursor:pointer;"><input type="radio" name="targetType" value="object" ${savedTargetType === 'object' ? 'checked' : ''}> Object</label>
+        <span style="display:inline-block;width:16px;height:16px;line-height:16px;text-align:center;border-radius:50%;background:#2196F3;color:#fff;font-size:11px;font-weight:bold;cursor:help;margin-left:auto;" title="CHARGING RULES:
+• Damage = max(END, BA) + 2×areas moved
+• If target defense > damage, rebounds to you
+• Your BA absorbs rebound damage
+• Miss: continue half-speed in straight line">?</span>
+      </div>
+    </div>
+
+    <!-- Character Target Panel -->
+    <div id="character-target-panel" style="display:${savedTargetType === 'character' ? 'block' : 'none'};padding:6px 8px;background:#fff;border:1px solid #90caf9;border-radius:3px;margin-bottom:6px;">
+      <div style="display:grid;grid-template-columns:auto 1fr auto;gap:4px 8px;align-items:center;">
+        <label style="font-size:.9em;">Body Armor:</label>
+        <select name="targetBodyArmorRank" style="padding:3px;">${rankOptions}</select>
+        <input type="number" name="targetBodyArmorValue" value="${savedTargetBAValue}" min="0" style="width:50px;padding:3px;text-align:center;">
+      </div>
+    </div>
+
+    <!-- Object Target Panel -->
+    <div id="object-target-panel" style="display:${savedTargetType === 'object' ? 'block' : 'none'};padding:6px 8px;background:#fff;border:1px solid #ffcc80;border-radius:3px;margin-bottom:6px;">
+      <div style="display:grid;grid-template-columns:auto 1fr;gap:4px 8px;align-items:center;">
+        <label style="font-size:.9em;">Description:</label>
+        <input type="text" name="objectDescription" value="${savedObjectDesc}" placeholder="e.g., Brick wall, Steel door" style="padding:3px;">
+        <label style="font-size:.9em;">Material:</label>
+        <select name="objectMaterial" style="padding:3px;">${materialOptions}</select>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div id="msh-bottom-controls" style="display:flex;justify-content:space-between;align-items:center;padding-top:8px;border-top:1px solid #ddd;">
+      <label><input type="checkbox" id="msh-remember-settings" name="remember" ${shouldRemember ? 'checked' : ''}> Remember</label>
+      <label><input type="checkbox" id="msh-skip-dice" name="skipDice" ${savedSkipDice ? 'checked' : ''}> Skip dice</label>
     </div>
     
     ${autoPopulated ? `<div style="margin-top:8px;padding:4px;background:#e8f5e9;border:1px solid #4CAF50;border-radius:3px;font-size:.85em;color:#2e7d32;">✓ Auto-populated from targeted token</div>` : ""}
@@ -239,11 +278,12 @@ export class ChargingAction extends BaseAction {
             const $ = (sel) => html.find(sel);
             const areas = Math.max(1, Number($('[name="areas"]').val() || 1));
             const shift = Number($('[name="shift"]').val() || 0);
+            const csNotes = String($('[name="csNotes"]').val() || "");
             const { spendKarma, karmaToSpend } = extractKarmaFromDialog(html);
             const karma = karmaToSpend;
-            const targetType = String($('[name="target-type"]:checked').val() || "character");
-            const skipDice = $(`[name="skipDiceRoll"]`).length ? !!$(`[name="skipDiceRoll"]`).is(':checked') : !!$(`[name="skipDice"]`).is(':checked');
-            const remember = $(`[name="rememberSettings"]`).length ? !!$(`[name="rememberSettings"]`).is(':checked') : !!$(`[name="remember"]`).is(':checked');
+            const targetType = String($('[name="targetType"]:checked').val() || "character");
+            const skipDice = !!$('#msh-skip-dice').is(':checked');
+            const remember = !!$('#msh-remember-settings').is(':checked');
 
             let targetBArank, targetBAvalue, objectMaterial, objectDesc;
 
@@ -259,13 +299,15 @@ export class ChargingAction extends BaseAction {
               targetBAvalue = game.msh.getRankValue(objectMaterial) || 20;
             }
 
-            // Always save remember/skipDice preferences
-            await actor.setFlag("msh-faserip", "rememberSettings", remember);
-              await actor.setFlag("msh-faserip", "lastChargingRemember", remember);
-              await actor.setFlag("msh-faserip", "skipDiceRoll", skipDice);
-              await actor.setFlag("msh-faserip", "lastChargingSkipDice", skipDice);
-              if (remember) {
+            // Save remember/skipDice to localStorage
+            setLS(lsRememberKey, remember ? "1" : "0");
+            setLS(lsSkipKey, skipDice ? "1" : "0");
+
+            // Save settings to actor flags if remember is checked
+            if (remember) {
               await actor.setFlag("msh-faserip", "lastChargingAreas", areas);
+              await actor.setFlag("msh-faserip", "lastChargingShift", shift);
+              await actor.setFlag("msh-faserip", "lastChargingCsNotes", csNotes);
               await actor.setFlag("msh-faserip", "lastChargingTargetType", targetType);
               if (targetType === "character") {
                 await actor.setFlag("msh-faserip", "lastChargingTargetBA", targetBArank);
@@ -301,11 +343,13 @@ export class ChargingAction extends BaseAction {
       default: "roll",
       render: (html) => {
         setupKarmaControlHandlers(html);
+        setupModeSelector(actor, html, this.opts || {}, "lastChargingMode");
+        
         const $charPanel = html.find('#character-target-panel');
         const $objPanel = html.find('#object-target-panel');
 
         const togglePanels = () => {
-          const type = html.find('[name="target-type"]:checked').val();
+          const type = html.find('[name="targetType"]:checked').val();
           if (type === 'character') {
             $charPanel.show();
             $objPanel.hide();
@@ -317,63 +361,69 @@ export class ChargingAction extends BaseAction {
         };
 
         const updatePreview = () => {
-        const areas = Math.max(1, Number(html.find('[name="areas"]').val() || 1));
-        const movementBonus = Math.min(3, areas);
+          const areas = Math.max(1, Number(html.find('[name="areas"]').val() || 1));
+          const movementBonus = Math.min(3, areas);
+          const cs = Number(html.find('[name="shift"]').val() || 0);
 
-        // UI: avoid + and - symbols in labels
-        html.find('#charge-bonus').text(`CS bonus: ${movementBonus}`);
+          // Update movement bonus display
+          html.find('#movement-bonus').text(`+${movementBonus} CS`);
 
-        // Numbers for the attacker
-        const baseRankValue = Math.max(endurance.value, bodyArmorValue);
-        const speedDamage = areas * 2;
-        const totalDamage = baseRankValue + speedDamage;
+          // Numbers for the attacker
+          const baseRankValue = Math.max(endurance.value, bodyArmorValue);
+          const speedDamage = areas * 2;
+          const totalDamage = baseRankValue + speedDamage;
 
-        const type = String(html.find('[name="target-type"]:checked').val() || "character");
+          // Update damage preview
+          html.find('#dmg-base').text(baseRankValue);
+          html.find('#dmg-speed').text(speedDamage);
+          html.find('#dmg-total').text(totalDamage);
+          html.find('#dmg-note').text(`(${baseRankValue} base + 2×${areas} speed)`);
 
-        if (type === 'character') {
-          // Character target preview
-          const targetBA = Number(html.find('[name="targetBodyArmorValue"]').val() || 0);
-          const absorbed = Math.min(targetBA, totalDamage);
-          const targetTakes = totalDamage - absorbed;
-          const reboundRaw = (targetBA > totalDamage) ? absorbed : 0;  // only rebound if BA > damage
-          const reboundFinal = Math.max(0, reboundRaw - bodyArmorValue);
+          // Update shifted rank display
+          const effectiveRank = shiftRank(endurance.rank, cs + movementBonus);
+          const $shiftedRank = html.find('#shifted-rank-display');
+          $shiftedRank.text(effectiveRank);
 
-          const $calc = html.find('#char-damage-calc');
-          const $warn = html.find('#char-rebound-warning');
+          // Update CS field styling based on value
+          const $csField = html.find('.cs-field');
+          const $resetBtn = html.find('.cs-reset');
+          if (cs < 0) {
+            $csField.css({ 'background': '#ffebee', 'border': '1px solid #ef5350' });
+            $shiftedRank.css('color', '#c62828');
+            $resetBtn.css('visibility', 'visible');
+          } else if (cs > 0) {
+            $csField.css({ 'background': '#e8f5e9', 'border': '1px solid #66bb6a' });
+            $shiftedRank.css('color', '#2e7d32');
+            $resetBtn.css('visibility', 'visible');
+          } else {
+            $csField.css({ 'background': '', 'border': '1px solid transparent' });
+            $shiftedRank.css('color', '');
+            $resetBtn.css('visibility', 'hidden');
+          }
 
-          $calc.html(
-            `${totalDamage} total (${baseRankValue} base, ${speedDamage} speed)<br>` +
-            `→ Target absorbs ${absorbed}, takes ${targetTakes}.<br>` +
-            `→ Rebound ${reboundRaw} to you; after your BA ${bodyArmorValue}, you take ${reboundFinal}.`
-          );
+          // Check for rebound
+          const type = String(html.find('[name="targetType"]:checked').val() || "character");
+          let targetDefense = 0;
+          
+          if (type === 'character') {
+            targetDefense = Number(html.find('[name="targetBodyArmorValue"]').val() || 0);
+          } else {
+            const objectMat = String(html.find('[name="objectMaterial"]').val() || "Excellent");
+            targetDefense = game.msh.getRankValue(objectMat) || 20;
+          }
 
-          if (reboundFinal > 0) $warn.show(); else $warn.hide();
+          const $warn = html.find('#rebound-warning');
+          if (targetDefense > totalDamage) {
+            $warn.show();
+          } else {
+            $warn.hide();
+          }
+        };
 
-        } else {
-          // Object (material) target preview
-          const objectMat = String(html.find('[name="objectMaterial"]').val() || "Excellent");
-          const objectMatValue = game.msh.getRankValue(objectMat) || 20;
-
-          const absorbed = Math.min(objectMatValue, totalDamage);
-          const objectTakes = totalDamage - absorbed;
-            const reboundRaw = (objectMatValue > totalDamage) ? absorbed : 0;  // only rebound if Material > damage
-          const reboundFinal = Math.max(0, reboundRaw - bodyArmorValue);
-
-          const $calc = html.find('#obj-damage-calc');
-          const $warn = html.find('#obj-rebound-warning');
-
-          $calc.html(
-            `${totalDamage} total (${baseRankValue} base, ${speedDamage} speed)<br>` +
-            `→ Object absorbs ${absorbed}, takes ${objectTakes}.<br>` +
-            `→ Rebound ${reboundRaw} to you; after your BA ${bodyArmorValue}, you take ${reboundFinal}.`
-          );
-
-          if (reboundFinal > 0) $warn.show(); else $warn.hide();
-        }
-      };
-
+        // Event handlers
         html.find('[name="areas"]').on('input', updatePreview);
-        html.find('[name="target-type"]').on('change', togglePanels);
+        html.find('[name="shift"]').on('input', updatePreview);
+        html.find('[name="targetType"]').on('change', togglePanels);
         html.find('[name="targetBodyArmorRank"]').on('change', () => {
           const rank = html.find('[name="targetBodyArmorRank"]').val();
           const value = game.msh.getRankValue(rank) || 0;
@@ -383,9 +433,23 @@ export class ChargingAction extends BaseAction {
         html.find('[name="targetBodyArmorValue"]').on('input', updatePreview);
         html.find('[name="objectMaterial"]').on('change', updatePreview);
 
-        togglePanels(); // Initial setup
-        updatePreview(); // Initial preview
-        applyCapabilitiesToDialog(html, "charging", { actor });  // new
+        // CS reset button
+        html.find('.cs-reset').on('click', function(e) {
+          e.preventDefault();
+          html.find('[name="shift"]').val(0);
+          updatePreview();
+        });
+
+        // Karma checkbox highlight
+        html.find('#spend-karma').on('change', function() {
+          const $field = html.find('.karma-field');
+          $field.css('border-color', this.checked ? '#1565c0' : '#90caf9');
+        });
+
+        // Initialize
+        togglePanels();
+        updatePreview();
+        applyCapabilitiesToDialog(html, "charging", { actor });
       }
     }).render(true);
   });
