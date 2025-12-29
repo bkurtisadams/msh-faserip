@@ -1,4 +1,5 @@
-// scripts/modules/actions/force-action.js v1.3.9 - 2025-12-27
+// scripts/modules/actions/force-action.js v1.4.0 - 2025-12-28
+// v1.4.0: Fix CS persistence - decouple from global rememberSettings, treat opts.shift=0 as "not set"
 // v1.3.9: Fix usePowerToHit default - only true if explicitly saved as true (was defaulting to true)
 // v1.3.8: Fix CS hover text format to match attack-action.js (e.g., "+2 Stunned" not "Stunned (target): +2")
 // v1.3.7: Add effect modifier system - read target status (Stunned +2CS, etc) from active effects
@@ -123,11 +124,16 @@ export class ForceAction extends RangedAttackAction {
     const savedUsePowerToHit = await actor.getFlag("msh-faserip", "lastForceUsePowerToHit");
     const defaultUsePowerToHit = savedUsePowerToHit === true; // Only true if explicitly saved as true
 
-    const savedShift = await actor.getFlag("msh-faserip", "lastForceShift") || 0;
-    const savedRemember = (await actor.getFlag("msh-faserip", "rememberSettings")) ?? (await actor.getFlag("msh-faserip", "lastForceRemember")) ?? true;
+    // FIX: Decouple from global "rememberSettings" to avoid cross-action contamination.
+    // We default to false so persistence is opt-in or strictly follows the specific flag.
+    const savedRemember = (await actor.getFlag("msh-faserip", "lastForceRemember")) ?? false;
+    const savedSkipDice = (await actor.getFlag("msh-faserip", "lastForceSkipDice")) ?? false;
+    
+    // Only load saved shift if Remember was explicitly checked last time
+    const savedShiftRaw = await actor.getFlag("msh-faserip", "lastForceShift") ?? 0;
+    const savedShift = savedRemember ? savedShiftRaw : 0;
     // Multi-attack must default OFF unless Remember Settings is enabled
     const savedMultiAdjacent = savedRemember ? ((await actor.getFlag("msh-faserip", "lastForceMultiAdjacent")) || false) : false;
-    const savedSkipDice = (await actor.getFlag("msh-faserip", "skipDiceRoll")) ?? (await actor.getFlag("msh-faserip", "lastForceSkipDice")) ?? false;
 
     // Build power radio options (inline style like EnergyAction)
     const powerRadios = forceItems.map((item, idx) => {
@@ -164,6 +170,12 @@ export class ForceAction extends RangedAttackAction {
     const availableKarma = getAvailableKarma(actor);
     const hasKarma = availableKarma > 0;
     const minKarma = 10;
+
+    // Compute dialog shift - treat opts.shift=0 as "not set" so saved values are used
+    const optsShift = this.opts?.shift;
+    const dialogShift = (optsShift !== undefined && optsShift !== null && optsShift !== 0) 
+      ? optsShift 
+      : savedShift;
 
     // === Dialog ===
     const dialogHtml = `
@@ -223,12 +235,12 @@ export class ForceAction extends RangedAttackAction {
 
       <!-- Modifiers Row -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;font-size:.9em;">
-        <div class="cs-field" style="display:flex;align-items:center;gap:4px;padding:4px 6px;border-radius:3px;${savedShift < 0 ? 'background:#ffebee;border:1px solid #ef5350;' : savedShift > 0 ? 'background:#e8f5e9;border:1px solid #66bb6a;' : 'border:1px solid transparent;'}">
+        <div class="cs-field" style="display:flex;align-items:center;gap:4px;padding:4px 6px;border-radius:3px;${dialogShift < 0 ? 'background:#ffebee;border:1px solid #ef5350;' : dialogShift > 0 ? 'background:#e8f5e9;border:1px solid #66bb6a;' : 'border:1px solid transparent;'}">
           <label style="font-weight:600;">CS:</label>
-          <input type="number" name="shift" value="${Number(this.opts?.shift ?? savedShift)}" style="width:35px;padding:3px;text-align:center;box-sizing:border-box;">
+          <input type="number" name="shift" value="${Number(dialogShift)}" style="width:35px;padding:3px;text-align:center;box-sizing:border-box;">
           <span style="color:#666;">→</span>
-          <strong id="shifted-rank-display" style="${savedShift < 0 ? 'color:#c62828;' : savedShift > 0 ? 'color:#2e7d32;' : ''}">${shiftRank(initialDisplayRank, savedShift)}</strong>
-          <button type="button" class="cs-reset" style="visibility:${savedShift !== 0 ? 'visible' : 'hidden'};padding:1px 5px;font-size:.85em;cursor:pointer;border:1px solid #999;border-radius:2px;background:#eee;" title="Reset to 0">×</button>
+          <strong id="shifted-rank-display" style="${dialogShift < 0 ? 'color:#c62828;' : dialogShift > 0 ? 'color:#2e7d32;' : ''}">${shiftRank(initialDisplayRank, dialogShift)}</strong>
+          <button type="button" class="cs-reset" style="visibility:${dialogShift !== 0 ? 'visible' : 'hidden'};padding:1px 5px;font-size:.85em;cursor:pointer;border:1px solid #999;border-radius:2px;background:#eee;" title="Reset to 0">×</button>
         </div>
         <div class="karma-field" style="display:flex;align-items:center;gap:4px;padding:4px 6px;border-radius:3px;${hasKarma ? 'background:#e3f2fd;border:1px solid #90caf9;' : ''}">
           ${hasKarma ? `
@@ -349,10 +361,8 @@ export class ForceAction extends RangedAttackAction {
                 return resolve(null);
               }
 
-              // Always save remember/skipDice preferences
-              await actor.setFlag("msh-faserip", "rememberSettings", remember);
+              // Always save remember/skipDice preferences to force-specific flags only
               await actor.setFlag("msh-faserip", "lastForceRemember", remember);
-              await actor.setFlag("msh-faserip", "skipDiceRoll", skipDice);
               await actor.setFlag("msh-faserip", "lastForceSkipDice", skipDice);
               if (remember) {
                 await actor.setFlag("msh-faserip", "lastForceAdHoc", useAdHoc);
