@@ -1,4 +1,5 @@
-// init.js v1.7.1 - 2026-01-02
+// init.js v1.7.2 - 2026-01-02
+// v1.7.2: Add separate FaseripTalentSheet and FaseripContactSheet with smaller dialog size
 // v1.7.1: Add expiresAtRound flag support for effect expiration (used by Evasion Bonus)
 // v1.7.0: Restore health to Endurance value when waking from 0 HP knockout (not dying)
 // v1.6.0: Reduce current health when Endurance drops from dying (not just max health)
@@ -16,7 +17,7 @@ import * as GMUtils from './gm-utils.js';
 import { FaseripActor } from './actor.js';
 import { FaseripItem } from './item.js';
 import { FaseripActorSheet } from './actorSheet.js';
-import { FaseripItemSheet } from './itemSheet.js';
+import { FaseripItemSheet, FaseripTalentSheet, FaseripContactSheet } from './itemSheet.js';
 import { FaseripEquipmentSheet } from './equipment.js';
 import { FaseripRolls } from './rolls.js';
 //import { rollUniversalTable } from './universalTable.js';  // deprecated
@@ -1181,7 +1182,19 @@ Hooks.once("init", async () => {
   
   // Make sure to register vehicle items with FaseripItemSheet
   Items.registerSheet("msh-faserip", FaseripItemSheet, { 
-    types: ["power", "talent", "contact", "headquarters", "vehicle"],
+    types: ["power", "headquarters", "vehicle"],
+    makeDefault: true 
+  });
+  
+  // Talent sheet - smaller dialog
+  Items.registerSheet("msh-faserip", FaseripTalentSheet, { 
+    types: ["talent"],
+    makeDefault: true 
+  });
+  
+  // Contact sheet - smaller dialog
+  Items.registerSheet("msh-faserip", FaseripContactSheet, { 
+    types: ["contact"],
     makeDefault: true 
   });
   

@@ -1,4 +1,5 @@
-// itemSheet.js v1.6.0 - 2025-12-27
+// itemSheet.js v1.6.1 - 2026-01-02
+// v1.6.1: Fixed talent/contact sheet dropdown text clipping
 // v1.6.0: Structured Limitations and Bonus Powers sections in Advanced tab
 // v1.5.0: Expanded Effects tab - Detection/Senses, Mental/Psionic, Transformation, Control sections
 // v1.4.0: Phase 4 Movement - New Movement tab with type-specific options, speed reference display
@@ -9,7 +10,7 @@ export class FaseripItemSheet extends ItemSheet {
   static get defaultOptions() {
     return foundry.utils.mergeObject(super.defaultOptions, {
       classes: ["faserip", "sheet", "item"],
-      width: 640, // a bit wider to avoid label wrap
+      width: 640,
       height: 600,
       tabs: [{ navSelector: ".sheet-tabs", contentSelector: ".sheet-body", initial: "basics" }],
       resizable: true,
@@ -1111,4 +1112,26 @@ _updatePowerTypeOptions(html, category) {
     return rankRanges[rank] || "Unknown";
   }
     
+}
+
+// Talent Sheet - smaller dialog for simple talent items
+export class FaseripTalentSheet extends FaseripItemSheet {
+  static get defaultOptions() {
+    return foundry.utils.mergeObject(super.defaultOptions, {
+      classes: ["faserip", "sheet", "item", "talent"],
+      width: 420,
+      height: 520
+    });
+  }
+}
+
+// Contact Sheet - smaller dialog for simple contact items
+export class FaseripContactSheet extends FaseripItemSheet {
+  static get defaultOptions() {
+    return foundry.utils.mergeObject(super.defaultOptions, {
+      classes: ["faserip", "sheet", "item", "contact"],
+      width: 420,
+      height: 520
+    });
+  }
 }

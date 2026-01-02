@@ -2241,41 +2241,9 @@
   padding: 20px !important;
 }
 
-/* Talent Sheet Styling */
-.talent-sheet .form-group {
-  margin-bottom: 12px;
-}
+/* Talent Sheet Styling - see talent-sheet.html inline styles */
 
-.talent-sheet select, 
-.talent-sheet input, 
-.talent-sheet textarea {
-  width: 100%;
-  padding: 5px;
-  border: 1px solid #ccc;
-  border-radius: 3px;
-}
-
-.talent-sheet textarea {
-  min-height: 100px;
-}
-
-/* Contact Sheet Styling */
-.contact-sheet .form-group {
-  margin-bottom: 12px;
-}
-
-.contact-sheet select, 
-.contact-sheet input, 
-.contact-sheet textarea {
-  width: 100%;
-  padding: 5px;
-  border: 1px solid #ccc;
-  border-radius: 3px;
-}
-
-.contact-sheet textarea {
-  min-height: 100px;
-}
+/* Contact Sheet Styling - see contact-sheet.html inline styles */
 
 .faserip-sheet .tab[data-tab="talents"] .drag-over,
 .faserip-sheet .tab[data-tab="contacts"] .drag-over,
