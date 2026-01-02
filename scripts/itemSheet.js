@@ -1,18 +1,12 @@
-// itemSheet.js v1.6.1 - 2026-01-02
-// v1.6.1: Fixed talent/contact sheet dropdown text clipping
-// v1.6.0: Structured Limitations and Bonus Powers sections in Advanced tab
-// v1.5.0: Expanded Effects tab - Detection/Senses, Mental/Psionic, Transformation, Control sections
-// v1.4.0: Phase 4 Movement - New Movement tab with type-specific options, speed reference display
-// v1.3.0: Phase 3 Magic - Add school dropdown, CS modifier display for casting requirements
-// v1.2.0: Phase 2 Defense - Enhanced Resistance (specific type, invulnerability), Enhanced Absorption (specific, redirect)
-// v1.1.0: Added Battle Effects Column, Damage Source, Force Field, action dialog flags
+// itemSheet.js v1.7.0
+// v1.7.0: Power Sheet layout reorganization
 export class FaseripItemSheet extends ItemSheet {
   static get defaultOptions() {
     return foundry.utils.mergeObject(super.defaultOptions, {
       classes: ["faserip", "sheet", "item"],
       width: 640,
       height: 600,
-      tabs: [{ navSelector: ".sheet-tabs", contentSelector: ".sheet-body", initial: "basics" }],
+      tabs: [{ navSelector: ".sheet-tabs", contentSelector: ".sheet-body", initial: "overview" }],
       resizable: true,
       submitOnChange: true
     });
