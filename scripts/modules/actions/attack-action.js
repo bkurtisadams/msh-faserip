@@ -1,4 +1,6 @@
-// attack-action.js v1.9.8 - 2025-12-24
+// attack-action.js v1.9.10 - 2026-01-02
+// v1.9.10: Fix evasion timing - evade blocks attack only in same round, bonus applies in next round
+// v1.9.9: Add evasion checking - successful evasion causes attack to miss, failed evasion gives auto-hit
 // v1.9.8: CS hover uses csNotes directly as label (e.g., "Ultimate Skill +4, +2 Stunned")
 // v1.9.7: Remove duplicate kill check - applyDamageToTargets now handles via death-save
 // v1.9.6: Breaking FEAT fallback to derive rank from numeric armor value; added debug logging
@@ -40,7 +42,7 @@ import { canEffectsApply } from "../../rules/effects-gate.js";
 import { ACTION_LABELS } from "./action-config.js";
 import { ACTION_EFFECTS } from "./action-config.js";
 import { SCOPE, getFlagScope } from "./flags.js";
-import { getAttackShiftBreakdown, getDefenseShiftBreakdown, canActorAct, getModifierSummary } from "../effects/effect-modifiers.js";
+import { getAttackShiftBreakdown, getDefenseShiftBreakdown, canActorAct, getModifierSummary, getEvasionAttackBonus, consumeEvasionAttackBonus } from "../effects/effect-modifiers.js";
 
 
 export class AttackAction extends BaseAction {
@@ -530,12 +532,95 @@ export class AttackAction extends BaseAction {
       const targetActor = target?.actor;
       const targetName = target?.name || "Unknown Target";
 
+      // ================================================================
+      // EVASION CHECK: See if target successfully evaded this attack
+      // ================================================================
+      let targetEffectColor = effectColorLower;  // May be modified by evasion
+      let targetIsHit = isHit;                   // May be modified by evasion
+      let evasionNote = "";
+      let evasionBonusApplied = 0;  // Track if attacker gets bonus from previous evasion
+      
+      // Get current combat round for timing checks
+      const currentRound = game.combat?.round || 0;
+      
+      if (targetActor) {
+        // Check for evasion effect on the target (did they evade US?)
+        const evadeEffect = targetActor.effects.find(e => 
+          e.flags?.["msh-faserip"]?.isEvading && !e.disabled
+        );
+        
+        if (evadeEffect) {
+          const evadeFlags = evadeEffect.flags?.["msh-faserip"] || {};
+          const evadeCreatedRound = evadeFlags.createdRound || 0;
+          
+          // Evasion only blocks attacks in the SAME round it was made
+          const isSameRound = (currentRound === evadeCreatedRound);
+          
+          if (isSameRound) {
+            // Check if evasion was successful (green/yellow/red result on evade roll)
+            if (evadeFlags.evadeSuccessful) {
+              // Successful evasion: attack misses regardless of roll
+              targetEffectColor = "white";
+              targetIsHit = false;
+              evasionNote = `<div style="padding:4px 8px;margin:4px 0;background:#e8f5e9;border:1px solid #4caf50;border-radius:3px;color:#2e7d32;font-weight:bold;text-align:center;">EVADED - Attack Misses!</div>`;
+              console.log("[FASERIP] Evasion success:", { 
+                attacker: actor.name, 
+                target: targetName, 
+                evadedTarget: evadeFlags.evadedTarget,
+                originalColor: effectColorLower 
+              });
+            } else if (evadeFlags.autoHit && effectColorLower === "white") {
+              // Failed evasion (white on evade roll): attacker gets at least green
+              targetEffectColor = "green";
+              targetIsHit = true;
+              evasionNote = `<div style="padding:4px 8px;margin:4px 0;background:#ffecb3;border:1px solid #ffc107;border-radius:3px;color:#f57f17;font-style:italic;text-align:center;">Evasion failed: Auto-Hit (White → Green)</div>`;
+              console.log("[FASERIP] Evasion auto-hit:", { 
+                attacker: actor.name, 
+                target: targetName,
+                originalColor: effectColorLower 
+              });
+            }
+          }
+        }
+        
+        // Check if ATTACKER has evasion bonus from previously evading this target
+        const evasionBonus = getEvasionAttackBonus(actor, target);
+        if (evasionBonus.hasBonus && evasionBonus.bonusCS > 0) {
+          evasionBonusApplied = evasionBonus.bonusCS;
+          
+          // Recalculate the result with the bonus applied (shift effective rank)
+          const bonusEffectiveRank = shiftRank(effectiveRank, evasionBonus.bonusCS);
+          const bonusColor = universalColor(bonusEffectiveRank, cappedTotal);
+          const bonusColorLower = String(bonusColor || "white").toLowerCase();
+          
+          // Only upgrade, never downgrade from evasion bonus
+          const colorOrder = ['white', 'green', 'yellow', 'red'];
+          if (colorOrder.indexOf(bonusColorLower) > colorOrder.indexOf(targetEffectColor)) {
+            targetEffectColor = bonusColorLower;
+            targetIsHit = targetEffectColor !== 'white';
+          }
+          
+          evasionNote += `<div style="padding:4px 8px;margin:4px 0;background:#e3f2fd;border:1px solid #1976d2;border-radius:3px;color:#0d47a1;font-style:italic;text-align:center;">Evasion Bonus: +${evasionBonus.bonusCS}CS vs ${evasionBonus.targetName}${bonusColorLower !== effectColorLower ? ` (${effectColorLower} → ${bonusColorLower})` : ''}</div>`;
+          
+          // Consume the bonus (mark as used)
+          await consumeEvasionAttackBonus(actor, evasionBonus.effectId);
+          
+          console.log("[FASERIP] Applied evasion attack bonus:", {
+            attacker: actor.name,
+            target: targetName,
+            bonusCS: evasionBonus.bonusCS,
+            originalColor: effectColorLower,
+            newColor: bonusColorLower
+          });
+        }
+      }
+
       // Calculate armor and penetrating damage for this specific target
      let penetratingDamage = 0;
      let armorData = null;
      let armorValue = 0;
      let isBorderline = false;
-     if (isHit && rawDamage > 0) {
+     if (targetIsHit && rawDamage > 0) {
        if (targetActor) {
          armorData = getBodyArmorValues(targetActor, damageType);
          // Ensure numbers whether rawDamage arrived as "20" or 20
@@ -559,7 +644,7 @@ export class AttackAction extends BaseAction {
       // Calculate breaking feat for this attack - include target material for auto-population
       // Show button when weapon material < target material (regardless of penetrating damage)
       let currentBreakingFeat = null;
-      if (effectColorLower !== "white" && breakingFeat && targetActor) {
+      if (targetEffectColor !== "white" && breakingFeat && targetActor) {
         const RANKS = [
           "Shift-0","Feeble","Poor","Typical","Good","Excellent",
           "Remarkable","Incredible","Amazing","Monstrous","Unearthly",
@@ -603,7 +688,7 @@ export class AttackAction extends BaseAction {
             targetMat: targetMatRank || ""
           };
         }
-      } else if (effectColorLower !== "white") {
+      } else if (targetEffectColor !== "white") {
         console.log("[FASERIP] Breaking FEAT skipped:", {
           hasBreakingFeat: !!breakingFeat,
           hasTargetActor: !!targetActor,
@@ -625,30 +710,30 @@ export class AttackAction extends BaseAction {
       switch (String(actionType)) {
         case "blunt-attack":
         case "charging":
-          showSlam = (effectColorLower === "yellow");
-          showStun = (effectColorLower === "red");
+          showSlam = (targetEffectColor === "yellow");
+          showStun = (targetEffectColor === "red");
           break;
 
         case "edged-attack":
         case "throwing-edged":
-          showStun = (effectColorLower === "yellow");
-          showKill = (effectColorLower === "red");    // ← Kill on red
+          showStun = (targetEffectColor === "yellow");
+          showKill = (targetEffectColor === "red");    // ← Kill on red
           break;
 
         case "shooting":
         case "energy":
           // Yellow = Bullseye → no Slam/Stun check; Red = Kill
-          showKill = (effectColorLower === "red");    // ← Kill on red
+          showKill = (targetEffectColor === "red");    // ← Kill on red
           break;
 
         case "force":
           // Yellow = Bullseye → no Slam; Red = Stun
-          showStun = (effectColorLower === "red");
+          showStun = (targetEffectColor === "red");
           break;
 
         case "throwing-blunt":
           // Yellow = Hit; Red = Stun
-          showStun = (effectColorLower === "red");
+          showStun = (targetEffectColor === "red");
           break;
 
         default:
@@ -664,7 +749,7 @@ export class AttackAction extends BaseAction {
 
       // Show actions box if there are effects to apply OR a Breaking FEAT check is needed
       const hasEffects = canEffectsApply(penetratingDamage, { borderline: isBorderline });
-      const needsActionsBox = !isManualMode && isHit && targetActor && (hasEffects || currentBreakingFeat);
+      const needsActionsBox = !isManualMode && targetIsHit && targetActor && (hasEffects || currentBreakingFeat);
       
       const actions = needsActionsBox
         ? buildActionsBox({
@@ -870,9 +955,11 @@ export class AttackAction extends BaseAction {
           
           ${multiAttackFeatHtml}
           
+          ${evasionNote}
+          
           <!-- Damage -->
           ${(() => {
-            if (!isHit) {
+            if (!targetIsHit) {
               // Miss - show zero damage
               return `<div style="margin:0 10px 6px;padding:6px 8px;background:#fff;border:1px solid #ddd;border-radius:3px;font-size:.9em;color:#666;">
                 <strong>Damage:</strong> 0 (miss)
@@ -942,7 +1029,7 @@ export class AttackAction extends BaseAction {
       // ============================================================
       // FIX: Auto-apply damage with wasKillResult for kill-capable attacks
       // ============================================================
-      if (!isManualMode && this.opts?.autoApply && isHit && rawDamage > 0 && targetActor) {
+      if (!isManualMode && this.opts?.autoApply && targetIsHit && rawDamage > 0 && targetActor) {
         debugLog("Auto-applying damage in full auto mode", {
           damage: rawDamage,
           afterArmor,

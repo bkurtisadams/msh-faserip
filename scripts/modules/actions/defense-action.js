@@ -1,4 +1,6 @@
-// scripts/modules/actions/defense-action.js v1.2.0 - 2025-12-22
+// scripts/modules/actions/defense-action.js v1.3.1 - 2026-01-02
+// v1.3.1: Fix evasion duration - yellow/red get 2 rounds for next-round bonus, track createdRound
+// v1.3.0: Fix evasion - track evadeSuccessful for green/yellow/red results, attacks check this to miss
 // v1.2.0: Fix DiceSoNice animation in consolidated chat cards mode
 // v1.1.0: Add inline rolls for consolidated chat cards
 import { BaseAction } from "./base-action.js";
@@ -517,9 +519,36 @@ export class DefenseAction extends BaseAction {
     }
 
     if (actionType === "evading") {
+      // Evasion results per rules:
+      // White: Auto-Hit - opponent gets at least green result
+      // Green: Evasion - dodge successful, attacker misses (no damage)
+      // Yellow: Evasion +1CS - dodge + next round bonus
+      // Red: Evasion +2CS - dodge + next round bonus
+      
       let nextRoundBonus = 0;
-      if (colorLower === 'yellow') nextRoundBonus = 1;
-      else if (colorLower === 'red') nextRoundBonus = 2;
+      let evadeSuccessful = false;  // Did we dodge the blow?
+      let durationRounds = 1;       // How long the effect lasts
+      
+      if (colorLower === 'white') {
+        // Auto-hit: attacker gets at least green
+        evadeSuccessful = false;
+        durationRounds = 1;  // Just this round
+      } else if (colorLower === 'green') {
+        // Evasion: dodge successful, no bonus
+        evadeSuccessful = true;
+        nextRoundBonus = 0;
+        durationRounds = 1;  // Just this round
+      } else if (colorLower === 'yellow') {
+        // Evasion +1CS: dodge + bonus
+        evadeSuccessful = true;
+        nextRoundBonus = 1;
+        durationRounds = 2;  // This round + next round for bonus
+      } else if (colorLower === 'red') {
+        // Evasion +2CS: dodge + bonus
+        evadeSuccessful = true;
+        nextRoundBonus = 2;
+        durationRounds = 2;  // This round + next round for bonus
+      }
 
       // Remove existing evading effect
       const existingEvade = this.actor.effects.find(e => 
@@ -527,30 +556,44 @@ export class DefenseAction extends BaseAction {
       );
       if (existingEvade) await existingEvade.delete();
 
-      // Create new evading effect
-      const bonusText = nextRoundBonus > 0 
-        ? `+${nextRoundBonus}CS next attack` 
-        : "no bonus";
+      // Build effect name based on result
+      let effectName;
+      if (colorLower === 'white') {
+        effectName = "Evasion Failed (Auto-Hit)";
+      } else if (nextRoundBonus > 0) {
+        effectName = `Evaded (+${nextRoundBonus}CS next attack)`;
+      } else {
+        effectName = "Evaded";
+      }
+      
+      // Store the evaded target name for matching during attacks
+      const evadedTargetName = choice.evadeTarget || "";
       
       const effectData = {
-        name: `Evaded (${bonusText})`,
-        icon: "icons/svg/combat.svg",
+        name: effectName,
+        icon: colorLower === 'white' ? "icons/svg/hazard.svg" : "icons/svg/combat.svg",
         origin: this.actor.uuid,
         disabled: false,
         duration: {
-          rounds: colorLower === 'white' ? 0 : 1, // Auto-hit lasts 0 rounds
+          rounds: durationRounds,
           startRound: game.combat?.round || 0,
           startTurn: game.combat?.turn || 0
         },
         flags: {
           "msh-faserip": {
             isEvading: true,
-            evadedTarget: choice.evadeTarget || "adjacent attacker",
+            evadeSuccessful: evadeSuccessful,  // TRUE = attacker's blow is dodged this round
+            autoHit: colorLower === 'white',   // TRUE = attacker gets at least green
+            evadedTarget: evadedTargetName,
+            evadedTargetLower: evadedTargetName.toLowerCase(),  // Pre-compute for matching
             nextRoundAttackBonusCS: nextRoundBonus,
-            autoHit: colorLower === 'white',
+            nextRoundBonusUsed: false,  // Track if bonus has been consumed
+            createdRound: game.combat?.round || 0,  // Track when created for bonus timing
             notes: colorLower === 'white' 
-              ? "Opponent auto-hits (at least Green result)"
-              : `Evaded successfully${nextRoundBonus ? `; +${nextRoundBonus}CS to next attack vs that target` : ""}`
+              ? "Opponent auto-hits (at least Green result on their attack)"
+              : evadeSuccessful 
+                ? `Evaded: attacker's blow misses${nextRoundBonus ? `; +${nextRoundBonus}CS to your next attack vs that target` : ""}`
+                : "Evasion in progress"
           }
         }
       };

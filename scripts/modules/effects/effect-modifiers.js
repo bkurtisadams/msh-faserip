@@ -1,4 +1,6 @@
-// scripts/modules/effects/effect-modifiers.js v1.2.0 - 2025-12-23
+// scripts/modules/effects/effect-modifiers.js v1.3.1 - 2026-01-02
+// v1.3.1: Fix evasion bonus - check createdRound so bonus only applies in next round, better target matching
+// v1.3.0: Add getEvasionAttackBonus and consumeEvasionAttackBonus for evasion next-round bonus
 // v1.2.0: Add getAttackShiftBreakdown and getDefenseShiftBreakdown for effect name display
 // Effect modifier system for FASERIP combat
 // Reads combat modifiers from actor.system.combatMods (populated by Active Effects)
@@ -255,4 +257,113 @@ export function debugActorModifiers(actor) {
     activeEffects: effects
   });
   return mods;
+}
+
+/**
+ * Check if attacker has an evasion bonus against a specific target
+ * This is used when the attacker previously evaded the target and got yellow/red
+ * The bonus only applies in the round AFTER the evasion was made
+ * @param {Actor} attacker - The attacking actor
+ * @param {Actor|Token} target - The target being attacked
+ * @returns {object} { hasBonus, bonusCS, effectId, targetName }
+ */
+export function getEvasionAttackBonus(attacker, target) {
+  if (!attacker?.effects) {
+    return { hasBonus: false, bonusCS: 0, effectId: null, targetName: null };
+  }
+  
+  // Get target name for matching
+  const targetName = target?.name || target?.actor?.name || "";
+  const targetLower = targetName.toLowerCase().trim();
+  
+  // Get current combat round
+  const currentRound = game.combat?.round || 0;
+  
+  // Find evasion effect with unused bonus
+  const evadeEffect = attacker.effects.find(e => {
+    if (e.disabled) return false;
+    const flags = e.flags?.[SCOPE()] || {};
+    
+    // Must be an evading effect
+    if (!flags.isEvading) return false;
+    
+    // Must have a bonus to apply
+    if (!flags.nextRoundAttackBonusCS || flags.nextRoundAttackBonusCS <= 0) return false;
+    
+    // Must not have been used already
+    if (flags.nextRoundBonusUsed) return false;
+    
+    // Bonus only applies in the round AFTER the evasion was made
+    const createdRound = flags.createdRound || 0;
+    if (currentRound <= createdRound) {
+      console.log("[FASERIP] Evasion bonus not yet applicable - same round as evasion", {
+        createdRound,
+        currentRound
+      });
+      return false;
+    }
+    
+    // Check if target matches the evaded target
+    const evadedTarget = (flags.evadedTarget || "").toLowerCase().trim();
+    const evadedTargetLower = flags.evadedTargetLower || evadedTarget;
+    
+    // If no specific target was named during evasion, the bonus applies to any melee attacker
+    if (!evadedTarget || evadedTarget === "" || evadedTarget === "adjacent attacker") {
+      console.log("[FASERIP] Evasion bonus applies - no specific target named");
+      return true;
+    }
+    
+    // Check for name match (case-insensitive, partial match allowed)
+    if (targetLower && evadedTargetLower) {
+      // Either the evaded target contains the attack target name, or vice versa
+      if (evadedTargetLower.includes(targetLower) || targetLower.includes(evadedTargetLower)) {
+        console.log("[FASERIP] Evasion bonus applies - target name matched", {
+          evadedTarget: evadedTargetLower,
+          attackTarget: targetLower
+        });
+        return true;
+      }
+    }
+    
+    return false;
+  });
+  
+  if (!evadeEffect) {
+    return { hasBonus: false, bonusCS: 0, effectId: null, targetName: null };
+  }
+  
+  const flags = evadeEffect.flags?.[SCOPE()] || {};
+  return {
+    hasBonus: true,
+    bonusCS: flags.nextRoundAttackBonusCS || 0,
+    effectId: evadeEffect.id,
+    targetName: flags.evadedTarget || "evaded target"
+  };
+}
+
+/**
+ * Consume (mark as used) the evasion attack bonus
+ * @param {Actor} attacker - The attacking actor
+ * @param {string} effectId - The effect ID to consume
+ */
+export async function consumeEvasionAttackBonus(attacker, effectId) {
+  if (!attacker || !effectId) return;
+  
+  const effect = attacker.effects.get(effectId);
+  if (!effect) return;
+  
+  try {
+    // Mark the bonus as used
+    await effect.update({
+      [`flags.${SCOPE()}.nextRoundBonusUsed`]: true,
+      name: effect.name.replace(/\(\+\d+CS\)/, "(bonus used)")
+    });
+    
+    console.log("[FASERIP] Consumed evasion attack bonus:", {
+      actor: attacker.name,
+      effectId
+    });
+  } catch (e) {
+    console.error("[FASERIP ERROR] Failed to consume evasion bonus:", e);
+  }
 }

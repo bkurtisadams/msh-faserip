@@ -1,4 +1,5 @@
-// scripts/modules/effects/effect-engine.js v1.3.0 - 2025-12-24
+// scripts/modules/effects/effect-engine.js v1.4.0 - 2026-01-02
+// v1.4.0: Fix applyEvade - properly track evadeSuccessful/autoHit flags, remove incorrect combat mod changes
 // v1.3.0: Duplicate effect handling - stun keeps longer duration, slam keeps more severe
 // v1.2.1: Reduce console logging verbosity
 // v1.2.0: Improved debug logging for effect creation and duration tracking
@@ -316,23 +317,41 @@ export async function applyStun(actor, { rounds = 1, originUuid = null } = {}, o
   }, opts);
 }
 
-export async function applyEvade(actor, { target = "", nextRoundAttackBonusCS = 0, note = "" } = {}) {
+export async function applyEvade(actor, { 
+  target = "", 
+  evadeSuccessful = true,
+  autoHit = false,
+  nextRoundAttackBonusCS = 0, 
+  note = "" 
+} = {}) {
+  // Evasion per FASERIP rules:
+  // - evadeSuccessful=true means the attacker's blow is dodged (green/yellow/red result)
+  // - autoHit=true means the evader fumbled (white result) and attacker gets at least green
+  // - nextRoundAttackBonusCS is the bonus for next attack vs that target (yellow=1, red=2)
+  
+  let effectName;
+  if (autoHit) {
+    effectName = "Evasion Failed (Auto-Hit)";
+  } else if (nextRoundAttackBonusCS > 0) {
+    effectName = target ? `Evaded ${target} (+${nextRoundAttackBonusCS}CS)` : `Evaded (+${nextRoundAttackBonusCS}CS)`;
+  } else {
+    effectName = target ? `Evaded ${target}` : "Evaded";
+  }
+  
   return applyEffect(actor, {
-    name: target ? `Evaded ${target}` : "Evaded",
-    img: "icons/svg/combat.svg",
+    name: effectName,
+    img: autoHit ? "icons/svg/hazard.svg" : "icons/svg/combat.svg",
     rounds: 1,
-    changes: [
-      { key: "system.combatMods.attackShift", mode: AE_MODE.ADD, value: "-3", priority: 20 },
-      { key: "system.combatMods.defenseShift", mode: AE_MODE.ADD, value: "2", priority: 20 },
-      { key: "system.combatMods.defenseShiftRanged", mode: AE_MODE.ADD, value: "2", priority: 20 },
-      { key: "system.combatMods.abilityShifts.agility", mode: AE_MODE.ADD, value: "2", priority: 20 },
-      { key: "system.combatMods.canAct", mode: AE_MODE.OVERRIDE, value: "false", priority: 50 }
-    ],
+    // No combat mod changes - evasion is tracked via flags, checked by attacks
+    changes: [],
     flags: {
       effectType: "evading",
       status: { isEvading: true },
+      evadeSuccessful,
+      autoHit,
       evadedTarget: target,
       nextRoundAttackBonusCS,
+      nextRoundBonusUsed: false,
       notes: note
     },
     statuses: ["evading"]
