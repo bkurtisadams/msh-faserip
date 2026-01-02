@@ -1,4 +1,5 @@
-// init.js v1.7.0 - 2025-12-24
+// init.js v1.7.1 - 2026-01-02
+// v1.7.1: Add expiresAtRound flag support for effect expiration (used by Evasion Bonus)
 // v1.7.0: Restore health to Endurance value when waking from 0 HP knockout (not dying)
 // v1.6.0: Reduce current health when Endurance drops from dying (not just max health)
 // v1.5.9: Fix originalEndurance tracking - store in both actor and effect flags when first processing
@@ -1625,6 +1626,17 @@ Hooks.on("updateCombat", async (combat, changed, diff, userId) => {
       for (const ef of a.effects) {
         if (ef.disabled) continue;
         const d = ef.duration ?? {};
+        const scope = globalThis.MSH_FLAG_SCOPE || "msh-faserip";
+        const efFlags = ef.flags?.[scope] || {};
+        
+        // Check for explicit expiresAtRound flag (used by Evasion Bonus)
+        // This takes precedence over duration-based expiration
+        if (Number.isFinite(efFlags.expiresAtRound)) {
+          if (curRound >= efFlags.expiresAtRound) {
+            toDelete.push({ effect: ef, reason: `expired at round ${efFlags.expiresAtRound} (current: ${curRound})` });
+          }
+          continue;  // Skip duration-based check for effects with explicit expiry
+        }
         
         // Handle round-based effects
         if (Number.isFinite(d.rounds) && d.rounds > 0) {

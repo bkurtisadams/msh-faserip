@@ -1,4 +1,5 @@
-// scripts/modules/effects/effect-modifiers.js v1.3.2 - 2026-01-02
+// scripts/modules/effects/effect-modifiers.js v1.3.3 - 2026-01-02
+// v1.3.3: Fix evasion bonus - only applies in exactly createdRound + 1, expires after that
 // v1.3.2: Update getEvasionAttackBonus to look for isEvasionBonus effect (not isEvading)
 // v1.3.1: Fix evasion bonus - check createdRound so bonus only applies in next round, better target matching
 // v1.3.0: Add getEvasionAttackBonus and consumeEvasionAttackBonus for evasion next-round bonus
@@ -263,7 +264,7 @@ export function debugActorModifiers(actor) {
 /**
  * Check if attacker has an evasion bonus against a specific target
  * This is used when the attacker previously evaded the target and got yellow/red
- * The bonus only applies in the round AFTER the evasion was made
+ * The bonus only applies in the round AFTER the evasion was made (cannot be saved)
  * @param {Actor} attacker - The attacking actor
  * @param {Actor|Token} target - The target being attacked
  * @returns {object} { hasBonus, bonusCS, effectId, targetName }
@@ -295,11 +296,13 @@ export function getEvasionAttackBonus(attacker, target) {
     if (flags.nextRoundBonusUsed) return false;
     
     // Bonus only applies in the round AFTER the evasion was made
+    // The effect's startRound is set to createdRound + 1
     const createdRound = flags.createdRound || 0;
-    if (currentRound <= createdRound) {
-      console.log("[FASERIP] Evasion bonus not yet applicable - same round as evasion", {
+    if (currentRound !== createdRound + 1) {
+      console.log("[FASERIP] Evasion bonus not applicable - wrong round", {
         createdRound,
-        currentRound
+        currentRound,
+        expectedRound: createdRound + 1
       });
       return false;
     }

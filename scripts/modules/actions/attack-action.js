@@ -1,4 +1,6 @@
-// attack-action.js v1.9.11 - 2026-01-02
+// attack-action.js v1.9.13 - 2026-01-02
+// v1.9.13: Fix evasion bonus - apply to attack shift BEFORE roll so it shows in CS breakdown and effective rank
+// v1.9.12: Fix chat card to display modified result after evasion bonus (use targetBg/targetFg/targetEffectResult)
 // v1.9.11: Fix evasion - block attacks while evading, fix SFX to not play hit sounds on evaded miss
 // v1.9.10: Fix evasion timing - evade blocks attack only in same round, bonus applies in next round
 // v1.9.9: Add evasion checking - successful evasion causes attack to miss, failed evasion gives auto-hit
@@ -453,14 +455,35 @@ export class AttackAction extends BaseAction {
     
     // Get attacker's attack shift from effects (with breakdown)
     const attackerShiftData = getAttackShiftBreakdown(actor);
-    const attackerShift = attackerShiftData.total;
-    const attackerEffects = attackerShiftData.breakdown;
+    let attackerShift = attackerShiftData.total;
+    const attackerEffects = [...attackerShiftData.breakdown];  // Copy so we can add to it
     
     // Get defender's defense shift (if single target)
     let defenderShift = 0;
     let defenderEffects = [];
     const primaryTarget = this._selectPrimaryTarget();
     const defenderActor = primaryTarget?.actor ?? null;
+    
+    // Check for evasion bonus BEFORE calculating effective rank
+    // This applies the +CS from a previous successful evasion (yellow/red result)
+    let evasionBonusData = { hasBonus: false, bonusCS: 0, effectId: null, targetName: null };
+    if (primaryTarget) {
+      evasionBonusData = getEvasionAttackBonus(actor, primaryTarget);
+      if (evasionBonusData.hasBonus && evasionBonusData.bonusCS > 0) {
+        attackerShift += evasionBonusData.bonusCS;
+        attackerEffects.push({
+          name: `Evasion Bonus vs ${evasionBonusData.targetName || 'target'}`,
+          shift: evasionBonusData.bonusCS
+        });
+        console.log("[FASERIP] Evasion bonus added to attack shift:", {
+          attacker: actor.name,
+          target: primaryTarget.name,
+          bonusCS: evasionBonusData.bonusCS,
+          newAttackerShift: attackerShift
+        });
+      }
+    }
+    
     if (defenderActor) {
       // Check if ranged attack for prone modifier
       const isRanged = ["shooting", "energy", "force"].includes(attackForm.toLowerCase());
@@ -488,7 +511,8 @@ export class AttackAction extends BaseAction {
         defenderShift,
         totalEffectShift: effectShift,
         manualShift,
-        finalShift: totalShift
+        finalShift: totalShift,
+        evasionBonus: evasionBonusData.hasBonus ? evasionBonusData.bonusCS : 0
       });
     }
 
@@ -561,7 +585,6 @@ export class AttackAction extends BaseAction {
       let targetEffectColor = effectColorLower;  // May be modified by evasion
       let targetIsHit = isHit;                   // May be modified by evasion
       let evasionNote = "";
-      let evasionBonusApplied = 0;  // Track if attacker gets bonus from previous evasion
       
       // Get current combat round for timing checks
       const currentRound = game.combat?.round || 0;
@@ -606,35 +629,21 @@ export class AttackAction extends BaseAction {
           }
         }
         
-        // Check if ATTACKER has evasion bonus from previously evading this target
-        const evasionBonus = getEvasionAttackBonus(actor, target);
-        if (evasionBonus.hasBonus && evasionBonus.bonusCS > 0) {
-          evasionBonusApplied = evasionBonus.bonusCS;
+        // If we have an evasion bonus that was applied earlier (to the attack shift),
+        // show a note and consume it now that the attack has resolved
+        if (evasionBonusData.hasBonus && evasionBonusData.bonusCS > 0) {
+          evasionNote += `<div style="padding:4px 8px;margin:4px 0;background:#e3f2fd;border:1px solid #1976d2;border-radius:3px;color:#0d47a1;font-style:italic;text-align:center;">Evasion Bonus: +${evasionBonusData.bonusCS}CS vs ${evasionBonusData.targetName || 'evaded target'}</div>`;
           
-          // Recalculate the result with the bonus applied (shift effective rank)
-          const bonusEffectiveRank = shiftRank(effectiveRank, evasionBonus.bonusCS);
-          const bonusColor = universalColor(bonusEffectiveRank, cappedTotal);
-          const bonusColorLower = String(bonusColor || "white").toLowerCase();
-          
-          // Only upgrade, never downgrade from evasion bonus
-          const colorOrder = ['white', 'green', 'yellow', 'red'];
-          if (colorOrder.indexOf(bonusColorLower) > colorOrder.indexOf(targetEffectColor)) {
-            targetEffectColor = bonusColorLower;
-            targetIsHit = targetEffectColor !== 'white';
+          // Consume the bonus (mark as used) - only consume once for the first target
+          if (!evasionBonusData.consumed) {
+            await consumeEvasionAttackBonus(actor, evasionBonusData.effectId);
+            evasionBonusData.consumed = true;
+            console.log("[FASERIP] Consumed evasion attack bonus after attack resolved:", {
+              attacker: actor.name,
+              target: targetName,
+              bonusCS: evasionBonusData.bonusCS
+            });
           }
-          
-          evasionNote += `<div style="padding:4px 8px;margin:4px 0;background:#e3f2fd;border:1px solid #1976d2;border-radius:3px;color:#0d47a1;font-style:italic;text-align:center;">Evasion Bonus: +${evasionBonus.bonusCS}CS vs ${evasionBonus.targetName}${bonusColorLower !== effectColorLower ? ` (${effectColorLower} → ${bonusColorLower})` : ''}</div>`;
-          
-          // Consume the bonus (mark as used)
-          await consumeEvasionAttackBonus(actor, evasionBonus.effectId);
-          
-          console.log("[FASERIP] Applied evasion attack bonus:", {
-            attacker: actor.name,
-            target: targetName,
-            bonusCS: evasionBonus.bonusCS,
-            originalColor: effectColorLower,
-            newColor: bonusColorLower
-          });
         }
       }
 
@@ -642,6 +651,12 @@ export class AttackAction extends BaseAction {
       if (targetIsHit) {
         anyTargetActuallyHit = true;
       }
+
+      // Recalculate display values based on modified result (after evasion)
+      // These may differ from the original roll if evasion blocked or bonus upgraded
+      const targetBg = bannerColors(targetEffectColor).bg;
+      const targetFg = bannerColors(targetEffectColor).fg;
+      const targetEffectResult = effects[targetEffectColor] || targetEffectColor;
 
       // Calculate armor and penetrating damage for this specific target
      let penetratingDamage = 0;
@@ -975,8 +990,8 @@ export class AttackAction extends BaseAction {
             <div>${ability.name}: ${ability.rank}${shiftDisplay}</div>
             <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
               <span>Roll: ${rollDisplay}</span>
-              <span style="padding:2px 8px;border-radius:3px;font-weight:bold;font-size:.9em;background:${bg};color:${fg};">
-                ${String(color).toUpperCase()} — ${String(effectResult).toUpperCase()}
+              <span style="padding:2px 8px;border-radius:3px;font-weight:bold;font-size:.9em;background:${targetBg};color:${targetFg};">
+                ${String(targetEffectColor).toUpperCase()} — ${String(targetEffectResult).toUpperCase()}
               </span>
             </div>
           </div>

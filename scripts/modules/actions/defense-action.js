@@ -1,4 +1,7 @@
-// scripts/modules/actions/defense-action.js v1.3.2 - 2026-01-02
+// scripts/modules/actions/defense-action.js v1.3.5 - 2026-01-02
+// v1.3.5: Add expiresAtRound flag to Evasion Bonus for reliable expiration tracking
+// v1.3.4: Fix evasion bonus duration - use 2 rounds to survive round-change expiration; usability controlled by createdRound check
+// v1.3.3: Fix evasion bonus duration - 1 round starting next round, cannot be saved
 // v1.3.2: Split evasion into two effects - "Evading" (blocks attacks, 1 round) and "Evasion Bonus" (+CS, 2 rounds)
 // v1.3.1: Fix evasion duration - yellow/red get 2 rounds for next-round bonus, track createdRound
 // v1.3.0: Fix evasion - track evadeSuccessful for green/yellow/red results, attacks check this to miss
@@ -607,12 +610,16 @@ export class DefenseAction extends BaseAction {
 
       await this.actor.createEmbeddedDocuments('ActiveEffect', [evadingEffectData]);
       
-      // ===== EFFECT 2: Evasion Bonus (2 rounds, yellow/red only) =====
+      // ===== EFFECT 2: Evasion Bonus (yellow/red only) =====
       // This effect gives +1CS or +2CS on the next attack vs the evaded target
+      // It only applies in the next round and cannot be saved
+      // Uses explicit expiresAtRound flag to survive Foundry's duration conversion
       if (nextRoundBonus > 0) {
         const bonusEffectName = evadedTargetName 
           ? `Evasion Bonus vs ${evadedTargetName} (+${nextRoundBonus}CS)` 
           : `Evasion Bonus (+${nextRoundBonus}CS)`;
+        
+        const currentRound = game.combat?.round || 0;
         
         const bonusEffectData = {
           name: bonusEffectName,
@@ -620,8 +627,8 @@ export class DefenseAction extends BaseAction {
           origin: this.actor.uuid,
           disabled: false,
           duration: {
-            rounds: 2,  // Lasts this round + next round
-            startRound: game.combat?.round || 0,
+            rounds: 2,  // Fallback duration; real expiry controlled by expiresAtRound flag
+            startRound: currentRound,
             startTurn: game.combat?.turn || 0
           },
           flags: {
@@ -631,13 +638,21 @@ export class DefenseAction extends BaseAction {
               evadedTargetLower: evadedTargetName.toLowerCase(),
               nextRoundAttackBonusCS: nextRoundBonus,
               nextRoundBonusUsed: false,
-              createdRound: game.combat?.round || 0,
-              notes: `+${nextRoundBonus}CS to your next attack vs ${evadedTargetName || "that attacker"} (first attack only, next round)`
+              createdRound: currentRound,
+              expiresAtRound: currentRound + 2,  // Expires at start of round N+2 (usable in round N+1 only)
+              notes: `+${nextRoundBonus}CS to your first attack vs ${evadedTargetName || "that attacker"} next round (cannot be saved)`
             }
           }
         };
 
         await this.actor.createEmbeddedDocuments('ActiveEffect', [bonusEffectData]);
+        console.log("[FASERIP] Created Evasion Bonus effect:", {
+          actor: this.actor.name,
+          bonus: nextRoundBonus,
+          createdRound: currentRound,
+          expiresAtRound: currentRound + 2,
+          usableInRound: currentRound + 1
+        });
       }
     }
   }
