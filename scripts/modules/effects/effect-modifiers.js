@@ -1,4 +1,5 @@
-// scripts/modules/effects/effect-modifiers.js v1.3.1 - 2026-01-02
+// scripts/modules/effects/effect-modifiers.js v1.3.2 - 2026-01-02
+// v1.3.2: Update getEvasionAttackBonus to look for isEvasionBonus effect (not isEvading)
 // v1.3.1: Fix evasion bonus - check createdRound so bonus only applies in next round, better target matching
 // v1.3.0: Add getEvasionAttackBonus and consumeEvasionAttackBonus for evasion next-round bonus
 // v1.2.0: Add getAttackShiftBreakdown and getDefenseShiftBreakdown for effect name display
@@ -279,13 +280,13 @@ export function getEvasionAttackBonus(attacker, target) {
   // Get current combat round
   const currentRound = game.combat?.round || 0;
   
-  // Find evasion effect with unused bonus
-  const evadeEffect = attacker.effects.find(e => {
+  // Find evasion BONUS effect (separate from evading status effect)
+  const bonusEffect = attacker.effects.find(e => {
     if (e.disabled) return false;
     const flags = e.flags?.[SCOPE()] || {};
     
-    // Must be an evading effect
-    if (!flags.isEvading) return false;
+    // Must be an evasion bonus effect (not the evading status effect)
+    if (!flags.isEvasionBonus) return false;
     
     // Must have a bonus to apply
     if (!flags.nextRoundAttackBonusCS || flags.nextRoundAttackBonusCS <= 0) return false;
@@ -328,15 +329,15 @@ export function getEvasionAttackBonus(attacker, target) {
     return false;
   });
   
-  if (!evadeEffect) {
+  if (!bonusEffect) {
     return { hasBonus: false, bonusCS: 0, effectId: null, targetName: null };
   }
   
-  const flags = evadeEffect.flags?.[SCOPE()] || {};
+  const flags = bonusEffect.flags?.[SCOPE()] || {};
   return {
     hasBonus: true,
     bonusCS: flags.nextRoundAttackBonusCS || 0,
-    effectId: evadeEffect.id,
+    effectId: bonusEffect.id,
     targetName: flags.evadedTarget || "evaded target"
   };
 }

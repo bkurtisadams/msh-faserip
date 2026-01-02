@@ -1,4 +1,5 @@
-// attack-action.js v1.9.10 - 2026-01-02
+// attack-action.js v1.9.11 - 2026-01-02
+// v1.9.11: Fix evasion - block attacks while evading, fix SFX to not play hit sounds on evaded miss
 // v1.9.10: Fix evasion timing - evade blocks attack only in same round, bonus applies in next round
 // v1.9.9: Add evasion checking - successful evasion causes attack to miss, failed evasion gives auto-hit
 // v1.9.8: CS hover uses csNotes directly as label (e.g., "Ultimate Skill +4, +2 Stunned")
@@ -431,6 +432,25 @@ export class AttackAction extends BaseAction {
       return; // abort attack
     }
     
+    // === CHECK FOR EVADING: Cannot attack while evading ===
+    const evadingEffect = actor.effects.find(e => 
+      e.flags?.["msh-faserip"]?.isEvading && !e.disabled
+    );
+    if (evadingEffect) {
+      const evadeTarget = evadingEffect.flags?.["msh-faserip"]?.evadedTarget || "an opponent";
+      ui.notifications?.warn(`${actor.name} is evading and cannot attack this round!`);
+      await ChatMessage.create({
+        speaker: ChatMessage.getSpeaker({ actor }),
+        content: `
+          <div style="background:#fff;border:1px solid #ff9800;border-radius:3px;padding:6px 8px;">
+            <b>${actor.name}</b> cannot attack — currently evading ${evadeTarget}
+            <div style="font-size:.85em;color:#666;margin-top:4px;">The evading character makes no attacks that round.</div>
+          </div>
+        `
+      });
+      return; // abort attack
+    }
+    
     // Get attacker's attack shift from effects (with breakdown)
     const attackerShiftData = getAttackShiftBreakdown(actor);
     const attackerShift = attackerShiftData.total;
@@ -528,6 +548,9 @@ export class AttackAction extends BaseAction {
 
     debugLog("FASERIP | _executeSingleAttack targetList:", targetList?.map(t => t?.name ?? "untargeted"));
 
+    // Track if any target was actually hit (considering evasion) for SFX purposes
+    let anyTargetActuallyHit = false;
+
     for (const target of targetList) {
       const targetActor = target?.actor;
       const targetName = target?.name || "Unknown Target";
@@ -613,6 +636,11 @@ export class AttackAction extends BaseAction {
             newColor: bonusColorLower
           });
         }
+      }
+
+      // Track if this target was actually hit (for SFX purposes)
+      if (targetIsHit) {
+        anyTargetActuallyHit = true;
       }
 
       // Calculate armor and penetrating damage for this specific target
@@ -1175,7 +1203,8 @@ export class AttackAction extends BaseAction {
           : actionType); // final fallback
 
       const rollResult = String(colorLower ?? "").toLowerCase();
-      const hit        = typeof isHit === "boolean" ? isHit : rollResult !== "white";
+      // Use the tracked actual hit status (accounts for evasion)
+      const hit = anyTargetActuallyHit;
 
         await game.msh.playCombatSFX({
           item: weapon,

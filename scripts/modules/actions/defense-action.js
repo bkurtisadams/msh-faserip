@@ -1,4 +1,5 @@
-// scripts/modules/actions/defense-action.js v1.3.1 - 2026-01-02
+// scripts/modules/actions/defense-action.js v1.3.2 - 2026-01-02
+// v1.3.2: Split evasion into two effects - "Evading" (blocks attacks, 1 round) and "Evasion Bonus" (+CS, 2 rounds)
 // v1.3.1: Fix evasion duration - yellow/red get 2 rounds for next-round bonus, track createdRound
 // v1.3.0: Fix evasion - track evadeSuccessful for green/yellow/red results, attacks check this to miss
 // v1.2.0: Fix DiceSoNice animation in consolidated chat cards mode
@@ -524,81 +525,120 @@ export class DefenseAction extends BaseAction {
       // Green: Evasion - dodge successful, attacker misses (no damage)
       // Yellow: Evasion +1CS - dodge + next round bonus
       // Red: Evasion +2CS - dodge + next round bonus
+      //
+      // The evading character makes NO ATTACKS that round.
+      // Two effects are created:
+      // 1) "Evading" effect - lasts 1 round, prevents attacking, causes attacker to miss/auto-hit
+      // 2) "Evasion Bonus" effect - lasts 2 rounds, gives +CS on next attack (yellow/red only)
       
       let nextRoundBonus = 0;
       let evadeSuccessful = false;  // Did we dodge the blow?
-      let durationRounds = 1;       // How long the effect lasts
       
       if (colorLower === 'white') {
-        // Auto-hit: attacker gets at least green
-        evadeSuccessful = false;
-        durationRounds = 1;  // Just this round
+        evadeSuccessful = false;  // Auto-hit: attacker gets at least green
       } else if (colorLower === 'green') {
-        // Evasion: dodge successful, no bonus
-        evadeSuccessful = true;
+        evadeSuccessful = true;   // Dodge successful, no bonus
         nextRoundBonus = 0;
-        durationRounds = 1;  // Just this round
       } else if (colorLower === 'yellow') {
-        // Evasion +1CS: dodge + bonus
         evadeSuccessful = true;
         nextRoundBonus = 1;
-        durationRounds = 2;  // This round + next round for bonus
       } else if (colorLower === 'red') {
-        // Evasion +2CS: dodge + bonus
         evadeSuccessful = true;
         nextRoundBonus = 2;
-        durationRounds = 2;  // This round + next round for bonus
       }
 
-      // Remove existing evading effect
+      // Remove existing evading effects
       const existingEvade = this.actor.effects.find(e => 
         e.flags?.["msh-faserip"]?.isEvading
       );
       if (existingEvade) await existingEvade.delete();
-
-      // Build effect name based on result
-      let effectName;
-      if (colorLower === 'white') {
-        effectName = "Evasion Failed (Auto-Hit)";
-      } else if (nextRoundBonus > 0) {
-        effectName = `Evaded (+${nextRoundBonus}CS next attack)`;
-      } else {
-        effectName = "Evaded";
-      }
       
+      const existingBonus = this.actor.effects.find(e => 
+        e.flags?.["msh-faserip"]?.isEvasionBonus
+      );
+      if (existingBonus) await existingBonus.delete();
+
       // Store the evaded target name for matching during attacks
       const evadedTargetName = choice.evadeTarget || "";
       
-      const effectData = {
-        name: effectName,
+      // ===== EFFECT 1: Evading Status (1 round) =====
+      // This effect:
+      // - Prevents the evader from attacking this round (canAct: false for attacks)
+      // - Causes the evaded attacker to miss (or auto-hit on white)
+      let evadingEffectName;
+      if (colorLower === 'white') {
+        evadingEffectName = evadedTargetName 
+          ? `Evasion Failed vs ${evadedTargetName} (Auto-Hit)` 
+          : "Evasion Failed (Auto-Hit)";
+      } else {
+        evadingEffectName = evadedTargetName 
+          ? `Evading ${evadedTargetName}` 
+          : "Evading";
+      }
+      
+      const evadingEffectData = {
+        name: evadingEffectName,
         icon: colorLower === 'white' ? "icons/svg/hazard.svg" : "icons/svg/combat.svg",
         origin: this.actor.uuid,
         disabled: false,
         duration: {
-          rounds: durationRounds,
+          rounds: 1,
           startRound: game.combat?.round || 0,
           startTurn: game.combat?.turn || 0
         },
+        // Evading prevents attacks this round
+        changes: [
+          { key: "system.combatMods.canAttack", mode: 5, value: "false", priority: 50 }
+        ],
         flags: {
           "msh-faserip": {
             isEvading: true,
-            evadeSuccessful: evadeSuccessful,  // TRUE = attacker's blow is dodged this round
+            evadeSuccessful: evadeSuccessful,  // TRUE = attacker's blow is dodged
             autoHit: colorLower === 'white',   // TRUE = attacker gets at least green
             evadedTarget: evadedTargetName,
-            evadedTargetLower: evadedTargetName.toLowerCase(),  // Pre-compute for matching
-            nextRoundAttackBonusCS: nextRoundBonus,
-            nextRoundBonusUsed: false,  // Track if bonus has been consumed
-            createdRound: game.combat?.round || 0,  // Track when created for bonus timing
+            evadedTargetLower: evadedTargetName.toLowerCase(),
+            createdRound: game.combat?.round || 0,
             notes: colorLower === 'white' 
-              ? "Opponent auto-hits (at least Green result on their attack)"
-              : evadeSuccessful 
-                ? `Evaded: attacker's blow misses${nextRoundBonus ? `; +${nextRoundBonus}CS to your next attack vs that target` : ""}`
-                : "Evasion in progress"
+              ? "Opponent auto-hits (at least Green result); you cannot attack this round"
+              : `Evading: opponent's blow misses; you cannot attack this round`
           }
         }
       };
 
-      await this.actor.createEmbeddedDocuments('ActiveEffect', [effectData]);
+      await this.actor.createEmbeddedDocuments('ActiveEffect', [evadingEffectData]);
+      
+      // ===== EFFECT 2: Evasion Bonus (2 rounds, yellow/red only) =====
+      // This effect gives +1CS or +2CS on the next attack vs the evaded target
+      if (nextRoundBonus > 0) {
+        const bonusEffectName = evadedTargetName 
+          ? `Evasion Bonus vs ${evadedTargetName} (+${nextRoundBonus}CS)` 
+          : `Evasion Bonus (+${nextRoundBonus}CS)`;
+        
+        const bonusEffectData = {
+          name: bonusEffectName,
+          icon: "icons/svg/upgrade.svg",
+          origin: this.actor.uuid,
+          disabled: false,
+          duration: {
+            rounds: 2,  // Lasts this round + next round
+            startRound: game.combat?.round || 0,
+            startTurn: game.combat?.turn || 0
+          },
+          flags: {
+            "msh-faserip": {
+              isEvasionBonus: true,
+              evadedTarget: evadedTargetName,
+              evadedTargetLower: evadedTargetName.toLowerCase(),
+              nextRoundAttackBonusCS: nextRoundBonus,
+              nextRoundBonusUsed: false,
+              createdRound: game.combat?.round || 0,
+              notes: `+${nextRoundBonus}CS to your next attack vs ${evadedTargetName || "that attacker"} (first attack only, next round)`
+            }
+          }
+        };
+
+        await this.actor.createEmbeddedDocuments('ActiveEffect', [bonusEffectData]);
+      }
     }
   }
 
