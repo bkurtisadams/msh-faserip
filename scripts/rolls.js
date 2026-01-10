@@ -1,3 +1,4 @@
+// rolls.js v1.9.27 - 2025-01-09
 // File: systems/msh-faserip/rolls.js
 import { applyColumnShiftToRank } from './actorSheet.js';
 import { CombatHandler } from './combat-handler.js';
@@ -995,6 +996,7 @@ export class FaseripRolls {
     const savedExtraShift = talent.getFlag("msh-faserip", "lastExtraShift") || 0;
     const savedDamageCS = talent.getFlag("msh-faserip", "lastDamageCS") || 0;
     const savedDamageType = talent.getFlag("msh-faserip", "lastDamageType") || "Physical-Blunt";
+    const savedIntensity = talent.getFlag("msh-faserip", "lastIntensity") || "";
     const skipDiceRoll = talent.getFlag("msh-faserip", "skipDiceRoll") || false;
     const savedRememberSettings = talent.getFlag("msh-faserip", "rememberSettings") ?? true;
 
@@ -1010,6 +1012,7 @@ export class FaseripRolls {
       const extraShift = options.extraShift ?? savedExtraShift;
       const damageCS = options.damageCS ?? savedDamageCS;
       const damageType = options.damageType || savedDamageType;
+      const intensity = options.intensity || savedIntensity || "";
       const spendKarma = options.spendKarma || false;
       const skipDice = options.skipDice ?? skipDiceRoll;
 
@@ -1032,6 +1035,52 @@ export class FaseripRolls {
         const shifted = applyColumnShifts(abilityRank, totalColumnShift);
         effectiveRank = shifted.name;
         console.log(`Applied ${totalColumnShift} column shifts to ${abilityRank}, now ${effectiveRank}`);
+      }
+
+      // Intensity comparison for Ability FEATs
+      // Ranks ordered from lowest to highest
+      const INTENSITY_RANKS = [
+        "Shift-0","Feeble","Poor","Typical","Good","Excellent",
+        "Remarkable","Incredible","Amazing","Monstrous","Unearthly",
+        "Shift-X","Shift-Y","Shift-Z","Class 1000","Class 3000","Class 5000","Beyond"
+      ];
+      
+      let requiredColor = "green"; // Default: any color succeeds
+      let intensityInfo = "";
+      let isAutomatic = false;
+      let isImpossible = false;
+      
+      if (actionType === "Ability FEAT" && intensity) {
+        const abilityIndex = INTENSITY_RANKS.indexOf(effectiveRank);
+        const intensityIndex = INTENSITY_RANKS.indexOf(intensity);
+        
+        if (abilityIndex >= 0 && intensityIndex >= 0) {
+          const rankDiff = abilityIndex - intensityIndex;
+          
+          if (rankDiff >= 3) {
+            // Ability 3+ ranks above intensity = automatic
+            isAutomatic = true;
+            requiredColor = "auto";
+            intensityInfo = `Automatic (Ability ${rankDiff} ranks above Intensity)`;
+          } else if (rankDiff > 0) {
+            // Ability > Intensity = green succeeds
+            requiredColor = "green";
+            intensityInfo = `Green+ required (Ability > Intensity)`;
+          } else if (rankDiff === 0) {
+            // Ability = Intensity = yellow succeeds
+            requiredColor = "yellow";
+            intensityInfo = `Yellow+ required (Ability = Intensity)`;
+          } else if (rankDiff === -1) {
+            // Intensity 1 rank above = red only
+            requiredColor = "red";
+            intensityInfo = `Red only (Intensity 1 rank above)`;
+          } else {
+            // Intensity more than 1 rank above = impossible
+            isImpossible = true;
+            requiredColor = "impossible";
+            intensityInfo = `Impossible (Intensity ${-rankDiff} ranks above Ability)`;
+          }
+        }
       }
 
       // Calculate damage rank based on damage CS
@@ -1059,33 +1108,73 @@ export class FaseripRolls {
         abilityModified.charAt(0).toUpperCase() + abilityModified.slice(1) :
         "None";
 
-      // Action result labels for talents - maps action type to color results
-      // Only includes actual Universal Table actions plus simple Ability FEAT
-      const TALENT_ACTION_RESULTS = {
-        // Non-combat Ability FEAT - success depends on intensity comparison (GM interprets)
-        "Ability FEAT": { white: "Failure", green: "Success", yellow: "Success", red: "Success" },
-        // Combat results (from Universal Table)
-        "Blunt Attack (BA)": { white: "Miss", green: "Hit", yellow: "Slam", red: "Stun" },
-        "Edged Attack (EA)": { white: "Miss", green: "Hit", yellow: "Stun", red: "Kill" },
-        "Shooting Attack (Sh)": { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Kill" },
-        "Throwing Edged (TE)": { white: "Miss", green: "Hit", yellow: "Stun", red: "Kill" },
-        "Throwing Blunt (TB)": { white: "Miss", green: "Hit", yellow: "Hit", red: "Stun" },
-        "Energy (En)": { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Kill" },
-        "Force (Fo)": { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Stun" },
-        "Grappling (GP)": { white: "Miss", green: "Miss", yellow: "Partial", red: "Hold" },
-        "Grabbing (Gb)": { white: "Miss", green: "Take", yellow: "Grab", red: "Break" },
-        "Escaping (ES)": { white: "Miss", green: "Miss", yellow: "Escape", red: "Reverse" },
-        "Charging (Ch)": { white: "Miss", green: "Hit", yellow: "Slam", red: "Stun" },
-        "Dodging (Do)": { white: "Autohit", green: "-2CS", yellow: "-4CS", red: "-6CS" },
-        "Evading (Ev)": { white: "Autohit", green: "Evasion", yellow: "+1CS", red: "+2CS" },
-        "Blocking (Bl)": { white: "-6CS", green: "-4CS", yellow: "-2CS", red: "+1CS" },
-        "Catching (Ca)": { white: "Autohit", green: "Miss", yellow: "Damage", red: "Catch" }
-      };
+      // Determine success/failure based on intensity for Ability FEATs
+      let featSuccess = false;
+      let featResultText = "";
+      
+      if (actionType === "Ability FEAT" && intensity) {
+        // Intensity-based success determination
+        const colorRank = { white: 0, green: 1, yellow: 2, red: 3 };
+        const rollColorRank = colorRank[resultColor.toLowerCase()] || 0;
+        const requiredColorRank = colorRank[requiredColor] || 0;
+        
+        if (isAutomatic) {
+          featSuccess = true;
+          featResultText = "Automatic Success";
+        } else if (isImpossible) {
+          featSuccess = false;
+          featResultText = "Impossible";
+        } else {
+          featSuccess = rollColorRank >= requiredColorRank;
+          featResultText = featSuccess ? "Success" : "Failure";
+        }
+      }
 
-      // Get the result labels for this action type
-      // Fall back to Ability FEAT for unknown types (e.g., old saved settings)
-      const effects = TALENT_ACTION_RESULTS[actionType] || TALENT_ACTION_RESULTS["Ability FEAT"];
-      const resultText = effects[resultColor.toLowerCase()] || resultColor.toUpperCase();
+      // Action result labels for talents - maps action type to color results
+      // For Ability FEAT with intensity, labels show what each color means in context
+      let effectLabels;
+      if (actionType === "Ability FEAT" && intensity) {
+        // Generate labels based on required color
+        if (isAutomatic) {
+          effectLabels = { white: "Auto", green: "Auto", yellow: "Auto", red: "Auto" };
+        } else if (isImpossible) {
+          effectLabels = { white: "Impossible", green: "Impossible", yellow: "Impossible", red: "Impossible" };
+        } else if (requiredColor === "red") {
+          effectLabels = { white: "Failure", green: "Failure", yellow: "Failure", red: "Success" };
+        } else if (requiredColor === "yellow") {
+          effectLabels = { white: "Failure", green: "Failure", yellow: "Success", red: "Success" };
+        } else {
+          effectLabels = { white: "Failure", green: "Success", yellow: "Success", red: "Success" };
+        }
+      } else {
+        // Standard action result labels
+        const TALENT_ACTION_RESULTS = {
+          // Non-combat Ability FEAT without intensity - any color succeeds
+          "Ability FEAT": { white: "Failure", green: "Success", yellow: "Success", red: "Success" },
+          // Combat results (from Universal Table)
+          "Blunt Attack (BA)": { white: "Miss", green: "Hit", yellow: "Slam", red: "Stun" },
+          "Edged Attack (EA)": { white: "Miss", green: "Hit", yellow: "Stun", red: "Kill" },
+          "Shooting Attack (Sh)": { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Kill" },
+          "Throwing Edged (TE)": { white: "Miss", green: "Hit", yellow: "Stun", red: "Kill" },
+          "Throwing Blunt (TB)": { white: "Miss", green: "Hit", yellow: "Hit", red: "Stun" },
+          "Energy (En)": { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Kill" },
+          "Force (Fo)": { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Stun" },
+          "Grappling (GP)": { white: "Miss", green: "Miss", yellow: "Partial", red: "Hold" },
+          "Grabbing (Gb)": { white: "Miss", green: "Take", yellow: "Grab", red: "Break" },
+          "Escaping (ES)": { white: "Miss", green: "Miss", yellow: "Escape", red: "Reverse" },
+          "Charging (Ch)": { white: "Miss", green: "Hit", yellow: "Slam", red: "Stun" },
+          "Dodging (Do)": { white: "Autohit", green: "-2CS", yellow: "-4CS", red: "-6CS" },
+          "Evading (Ev)": { white: "Autohit", green: "Evasion", yellow: "+1CS", red: "+2CS" },
+          "Blocking (Bl)": { white: "-6CS", green: "-4CS", yellow: "-2CS", red: "+1CS" },
+          "Catching (Ca)": { white: "Autohit", green: "Miss", yellow: "Damage", red: "Catch" }
+        };
+        effectLabels = TALENT_ACTION_RESULTS[actionType] || TALENT_ACTION_RESULTS["Ability FEAT"];
+      }
+      
+      // Get result text
+      const resultText = (actionType === "Ability FEAT" && intensity) 
+        ? featResultText 
+        : (effectLabels[resultColor.toLowerCase()] || resultColor.toUpperCase());
 
       // Build the visual result grid (same as combat actions)
       const buildTalentResultGrid = (activeColor, effectLabels) => {
@@ -1126,7 +1215,13 @@ export class FaseripRolls {
       const banner = getBannerColors(resultColor);
 
       // Build the result grid HTML
-      const resultGrid = buildTalentResultGrid(resultColor.toLowerCase(), effects);
+      const resultGrid = buildTalentResultGrid(resultColor.toLowerCase(), effectLabels);
+
+      // Build intensity info section for chat (only for Ability FEATs with intensity)
+      const intensitySection = (actionType === "Ability FEAT" && intensity) 
+        ? `<div><strong>Intensity:</strong> ${intensity}</div>
+           <div style="color: #666; font-style: italic;">${intensityInfo}</div>`
+        : "";
 
       // Create chat message with visual grid like combat actions
       let content = `
@@ -1139,6 +1234,7 @@ export class FaseripRolls {
             <div><strong>Ability:</strong> ${abilityName} - ${abilityRank} (${abilityValue})</div>
             <div><strong>Talent Bonus:</strong> +${talentBonus}CS${extraShift ? ` | Extra Shift: ${extraShift > 0 ? '+' : ''}${extraShift}CS` : ''}</div>
             <div><strong>Effective Rank:</strong> ${effectiveRank}</div>
+            ${intensitySection}
             ${damageCS !== 0 && damageRankName
               ? `<div><strong>Damage Rank:</strong> ${damageRankName} (${damageRankValue})</div>`
               : ""}
@@ -1426,6 +1522,17 @@ export class FaseripRolls {
           </div>
         `;
       }
+      
+      // Build intensity dropdown options
+      const INTENSITY_RANKS = [
+        "", "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent",
+        "Remarkable", "Incredible", "Amazing", "Monstrous", "Unearthly",
+        "Shift-X", "Shift-Y", "Shift-Z"
+      ];
+      const intensityOptionsHTML = INTENSITY_RANKS.map(rank => 
+        `<option value="${rank}" ${rank === savedIntensity ? 'selected' : ''}>${rank || '(None - any color succeeds)'}</option>`
+      ).join('');
+      
       // Create dialog for roll options
       let dialogContent = `
         <div style="background: #f0e8d8; padding: 10px; border-radius: 5px;">
@@ -1449,6 +1556,17 @@ export class FaseripRolls {
             <label style="display: inline-block; width: 120px;">Extra Column Shift:</label>
             <input type="number" id="shift" name="shift" value="${savedExtraShift}" style="width: 50px;">
             <span style="color: #666; font-size: 0.9em;">(additional +/- CS)</span>
+          </div>
+          <div id="intensity-container" ${isAbilityFeat ? '' : 'style="display:none;"'}>
+            <div style="margin-bottom: 10px;">
+              <label style="display: inline-block; width: 120px;">Intensity:</label>
+              <select id="intensity" name="intensity" style="width: 180px;">
+                ${intensityOptionsHTML}
+              </select>
+            </div>
+            <div id="intensity-info" style="margin-bottom: 10px; padding: 8px; background: #e8e8e8; border-radius: 4px; font-size: 0.9em; color: #555;">
+              <em>Select intensity to determine required FEAT color</em>
+            </div>
           </div>
           <div id="combat-options-container" ${isAbilityFeat ? 'style="display:none;"' : ''}>
             <div style="margin-bottom: 10px;">
@@ -1491,6 +1609,7 @@ export class FaseripRolls {
               const extraShift = parseInt(html.find('[name="shift"]').val()) || 0;
               const damageCS = parseInt(html.find('[name="damageCs"]').val()) || 0;
               const damageType = html.find('[name="damageType"]').val();
+              const intensity = html.find('[name="intensity"]').val();
               const { spendKarma, karmaToSpend } = extractKarmaFromDialog(html);
               if (game.settings.get("msh-faserip", "debugMode")) console.log("FASERIP DEBUG | TALENT KARMA - Dialog extracted:", { spendKarma, karmaToSpend });
               const skipDice = html.find('[name="skipDice"]').is(':checked');
@@ -1506,6 +1625,7 @@ export class FaseripRolls {
                 await talent.setFlag("msh-faserip", "lastExtraShift", extraShift);
                 await talent.setFlag("msh-faserip", "lastDamageCS", damageCS);
                 await talent.setFlag("msh-faserip", "lastDamageType", damageType);
+                await talent.setFlag("msh-faserip", "lastIntensity", intensity);
               }
 
               // Map talent action types to dispatcher action codes
@@ -1568,7 +1688,7 @@ export class FaseripRolls {
                 // Non-combat (Ability FEAT) - use existing logic
                 return FaseripRolls.rollTalent(actor, talent, {
                   useDirectRoll: true,
-                  actionType, extraShift, damageCS, damageType, spendKarma, skipDice
+                  actionType, extraShift, damageCS, damageType, intensity, spendKarma, skipDice
                 });
               }
             }
@@ -1583,18 +1703,67 @@ export class FaseripRolls {
           const actionSelect = html.find('#action-type');
           const multiContainer = html.find('#multi-target-container');
           const combatOptions = html.find('#combat-options-container');
+          const intensityContainer = html.find('#intensity-container');
+          const intensitySelect = html.find('#intensity');
+          const intensityInfo = html.find('#intensity-info');
+
+          // Ranks for intensity comparison
+          const INTENSITY_RANKS = [
+            "Shift-0","Feeble","Poor","Typical","Good","Excellent",
+            "Remarkable","Incredible","Amazing","Monstrous","Unearthly",
+            "Shift-X","Shift-Y","Shift-Z","Class 1000","Class 3000","Class 5000","Beyond"
+          ];
+          
+          function updateIntensityInfo() {
+            const selectedIntensity = intensitySelect.val();
+            if (!selectedIntensity) {
+              intensityInfo.html('<em>Select intensity to determine required FEAT color</em>');
+              return;
+            }
+            
+            const abilityIndex = INTENSITY_RANKS.indexOf(baseRank);
+            const intensityIndex = INTENSITY_RANKS.indexOf(selectedIntensity);
+            
+            if (abilityIndex >= 0 && intensityIndex >= 0) {
+              const rankDiff = abilityIndex - intensityIndex;
+              let infoText = "";
+              let bgColor = "#e8e8e8";
+              
+              if (rankDiff >= 3) {
+                infoText = `<strong style="color: #2e7d32;">Automatic Success</strong> (Ability ${rankDiff} ranks above)`;
+                bgColor = "#c8e6c9";
+              } else if (rankDiff > 0) {
+                infoText = `<strong style="color: #4CAF50;">Green or better</strong> required (Ability > Intensity)`;
+                bgColor = "#e8f5e9";
+              } else if (rankDiff === 0) {
+                infoText = `<strong style="color: #F57C00;">Yellow or better</strong> required (Ability = Intensity)`;
+                bgColor = "#fff3e0";
+              } else if (rankDiff === -1) {
+                infoText = `<strong style="color: #F44336;">Red only</strong> succeeds (Intensity 1 rank above)`;
+                bgColor = "#ffebee";
+              } else {
+                infoText = `<strong style="color: #b71c1c;">Impossible</strong> (Intensity ${-rankDiff} ranks above Ability)`;
+                bgColor = "#ffcdd2";
+              }
+              
+              intensityInfo.html(infoText).css('background', bgColor);
+            }
+          }
 
           function updateMultiOptions() {
             const selectedAction = actionSelect.val();
             const actionCode = selectedAction.match(/\(([^)]+)\)/)?.[1] || "";
             
-            // Hide multi-target and combat options for non-combat actions
+            // Hide multi-target and combat options for non-combat actions, show intensity
             if (selectedAction === "Ability FEAT") {
               multiContainer.hide();
               combatOptions.hide();
+              intensityContainer.show();
+              updateIntensityInfo();
             } else {
               multiContainer.show();
               combatOptions.show();
+              intensityContainer.hide();
               const newOptionsHTML = generateMultiTargetOptionsHTML(actionCode);
               multiContainer.html(newOptionsHTML);
             }
@@ -1620,6 +1789,7 @@ export class FaseripRolls {
           }
           
           actionSelect.on('change', updateMultiOptions);
+          intensitySelect.on('change', updateIntensityInfo);
           updateMultiOptions();
         }
       }).render(true);
