@@ -334,46 +334,6 @@ export async function rollD100(actor, flavorText = null, showInChat = true) {
 }
 
 /**
- * Grant daily karma to an actor (adds R+I+P to karma pool)
- */
-export async function grantDailyKarma(actor) {
-  const reason = actor.system.abilities?.reason?.value || 0;
-  const intuition = actor.system.abilities?.intuition?.value || 0;
-  const psyche = actor.system.abilities?.psyche?.value || 0;
-  const dailyAmount = reason + intuition + psyche;
-  
-  if (dailyAmount <= 0) {
-    ui.notifications.warn(`${actor.name} has no R+I+P to grant as daily karma.`);
-    return 0;
-  }
-  
-  const historyEntry = {
-    realDate: new Date().toLocaleDateString(),
-    gameDate: "",
-    amount: dailyAmount,
-    type: "Daily Karma",
-    description: `Daily karma grant (R${reason} + I${intuition} + P${psyche})`
-  };
-
-  const currentHistory = foundry.utils.deepClone(actor.system.karma?.history || []);
-  const newHistory = currentHistory.concat([historyEntry]);
-  
-  await runAsGM({
-    operation: 'update',
-    targetActorUuid: actor.uuid,
-    args: [{ "system.karma.history": newHistory }]
-  });
-
-  if (game.msh?.FaseripRolls?._updateCurrentKarma) {
-    await game.msh.FaseripRolls._updateCurrentKarma(actor);
-  }
-  
-  ui.notifications.info(`${actor.name} granted ${dailyAmount} daily karma (R+I+P)`);
-  
-  return dailyAmount;
-}
-
-/**
  * LEGACY COMPATIBILITY: Roll d100 and apply karma in one step
  * Used by rolls.js for talent/power/equipment rolls
  * This function supports the two-phase system when rank is provided in options

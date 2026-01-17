@@ -1,4 +1,5 @@
-// actor.js v1.1.0 - 2025-12-24
+// actor.js v1.2.0 - 2025-01-17
+// v1.2.0: Remove daily karma system - karma now uses lifetime only
 // v1.1.0: Initialize combatMods in prepareBaseData before Active Effects are applied
 
 export class FaseripActor extends Actor {
@@ -67,37 +68,20 @@ export class FaseripActor extends Actor {
         poolName: "",
         poolMembers: [],
         lifetime: 0,
-        history: [],
-        dailyKarmaUsed: 0,
-        dailyKarmaMax: 0
+        history: []
       };
     }
 
-    // Set dailyKarmaMax based on R+I+P
-    system.karma.dailyKarmaMax = karmaMax;
-
-    // Calculate AVAILABLE karma (for bottom left display) - this is lifetime karma
+    // Calculate AVAILABLE karma (lifetime minus spent minus funds)
     const lifetimeSpent = this._calculateTotalSpentLifetime(system.karma.history);
     const advancementFund = system.karma.advancement || 0;
     const karmaPool = system.karma.pool || 0;
     const availableLifetimeKarma = Math.max(0, system.karma.lifetime - lifetimeSpent - advancementFund - karmaPool);
 
-    // Calculate karma for the Health/Karma display (next to Health)
-    const dailyKarmaEnabled = game.settings.get("msh-faserip", "dailyKarmaEnabled");
-    let displayKarmaValue = 0;
+    // Set the attributes.karma.value to R+I+P (karmaMax) for display
+    system.attributes.karma.value = karmaMax;
 
-    if (dailyKarmaEnabled) {
-      const dailyRemaining = Math.max(0, system.karma.dailyKarmaMax - (system.karma.dailyKarmaUsed || 0));
-      displayKarmaValue = dailyRemaining;
-      // Remove the if statement that switches to lifetime karma
-    } else {
-      displayKarmaValue = availableLifetimeKarma;
-    }
-
-    // Set the attributes.karma.value to the display karma
-    system.attributes.karma.value = displayKarmaValue;
-
-    // Store available lifetime karma separately for bottom display
+    // Store available lifetime karma separately for other uses
     system.karma.availableLifetime = availableLifetimeKarma;
 
     // Set Resources value based on rank
@@ -233,14 +217,13 @@ export class FaseripActor extends Actor {
     return reason + intuition + psyche;
   }
 
-  // Helper method to calculate total spent karma, excluding "Daily Roll" entries
+  // Helper method to calculate total spent karma
   _calculateTotalSpentLifetime(history) {
     if (!history || !history.length) return 0;
 
     let totalSpent = 0;
     history.forEach(event => {
-      // Only count negative amounts (spending), and ignore daily roll entries completely
-      if (event.amount < 0 && event.type !== "Daily Roll") {
+      if (event.amount < 0) {
         totalSpent += Math.abs(event.amount);
       }
     });

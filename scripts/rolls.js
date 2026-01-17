@@ -5,7 +5,7 @@ import { CombatHandler } from './combat-handler.js';
 import { runAsGM } from './gm-utils.js';
 import { calculateChargeDamage, getBodyArmorValue, processChargeAttack } from './charge-damage.js';
 import { processMultipleAttackSequence } from "./rules/multiple-attacks.js";
-import { rollD100AndApplyKarma, generateKarmaControlsHTML, setupKarmaControlHandlers, extractKarmaFromDialog, getMinimumKarmaCommitment, grantDailyKarma } from "./modules/dice/dice-roller.js";
+import { rollD100AndApplyKarma, generateKarmaControlsHTML, setupKarmaControlHandlers, extractKarmaFromDialog, getMinimumKarmaCommitment } from "./modules/dice/dice-roller.js";
 import { 
   rankRows, 
   actionTypes, 

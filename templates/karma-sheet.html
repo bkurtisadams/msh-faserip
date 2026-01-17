@@ -17,12 +17,6 @@
       <label>Team<br>Pool</label>
       <div class="value">{{teamKarmaPool}}</div>
     </div>
-    {{#if dailyKarmaEnabled}}
-    <div class="summary-item daily-karma-summary">
-      <label>Daily Karma</label>
-      <div class="value">{{dailyKarmaRemaining}} / {{dailyKarmaMax}}</div>
-    </div>
-    {{/if}}
   </div>
 
   <!-- Control Buttons -->
@@ -35,10 +29,6 @@
     <button type="button" class="export-karma"><i class="fas fa-file-export"></i> Export</button>
     {{#if isGM}}
     <button type="button" class="clear-karma danger-button"><i class="fas fa-trash-alt"></i> Clear All Karma Data</button>
-    {{/if}}
-    <!-- NEW BUTTON -->
-    {{#if dailyKarmaEnabled}}
-    <button type="button" class="reset-daily-karma danger-button"><i class="fas fa-redo"></i> Reset Daily Karma</button>
     {{/if}}
   </div>
 

@@ -41,19 +41,19 @@ export class StuntRoller {
     _calculateAvailableKarma() {
     const totalEarned = this.actor.system.karma.lifetime || 0;
     
-    // Calculate total spent (excluding Daily Roll entries)
-    let totalSpentLifetime = 0;
+    // Calculate total spent
+    let totalSpent = 0;
     const history = this.actor.system.karma?.history || [];
     history.forEach(event => {
-        if (event.amount < 0 && event.type !== "Daily Roll") {
-        totalSpentLifetime += Math.abs(event.amount);
+        if (event.amount < 0) {
+        totalSpent += Math.abs(event.amount);
         }
     });
     
     const advancementFund = this.actor.system.karma.advancement || 0;
     const karmaPool = this.actor.system.karma.pool || 0;
     
-    return Math.max(0, totalEarned - totalSpentLifetime - advancementFund - karmaPool);
+    return Math.max(0, totalEarned - totalSpent - advancementFund - karmaPool);
     }
 
   _getFeatDifficulty(timesUsed) {

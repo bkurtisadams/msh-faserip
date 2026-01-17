@@ -53,22 +53,21 @@ export class KarmaPoolSheet extends DocumentSheet {
     // Force fresh actor data
     const freshActor = game.actors.get(this.object.id);
     
-    // Calculate lifetime karma minus spent (excluding daily rolls) minus advancement
+    // Calculate lifetime karma minus spent minus advancement
     const totalEarned = freshActor.system.karma?.lifetime || 0;
-    let totalSpentLifetime = 0;
+    let totalSpent = 0;
     
     if (freshActor.system.karma?.history && Array.isArray(freshActor.system.karma.history)) {
       freshActor.system.karma.history.forEach(event => {
-        // Only count non-daily roll spending toward lifetime spent
-        if (event.amount < 0 && event.type !== "Daily Roll") {
-          totalSpentLifetime += Math.abs(event.amount);
+        if (event.amount < 0) {
+          totalSpent += Math.abs(event.amount);
         }
       });
     }
     
     const advancementFund = freshActor.system.karma?.advancement || 0;
     
-    return Math.max(0, totalEarned - totalSpentLifetime - advancementFund);
+    return Math.max(0, totalEarned - totalSpent - advancementFund);
   }
 
   activateListeners(html) {

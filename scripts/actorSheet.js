@@ -196,17 +196,10 @@ export class FaseripActorSheet extends ActorSheet {
     // Individual contribution tracking (for reference)
     context.poolContribution = karma.poolContribution || 0;
 
-    // Daily karma data - FIX: Now karma is defined
-    const dailyKarmaEnabled = game.settings.get("msh-faserip", "dailyKarmaEnabled");
-    context.dailyKarmaEnabled = dailyKarmaEnabled;
-    context.dailyKarmaMax = karma.dailyKarmaMax || 0;
-    context.dailyKarmaUsed = karma.dailyKarmaUsed || 0;
-    context.dailyKarmaRemaining = Math.max(0, context.dailyKarmaMax - context.dailyKarmaUsed);
-
     let spent = 0;
     if (Array.isArray(karma.history)) {
       for (const event of karma.history) {
-        if (event.amount < 0 && event.type !== "Daily Roll") spent += Math.abs(event.amount);
+        if (event.amount < 0) spent += Math.abs(event.amount);
       }
     }
 
@@ -1040,16 +1033,6 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
         sheet.render(true);
       });
     });
-
-    // <-- NEW BUTTON START -->
-    // Reset Daily Karma button (available to all users)
-    html.find('.reset-daily-karma-button').click(async ev => {
-      const karmaSheetModule = await import('./karma.js');
-      const sheet = new karmaSheetModule.KarmaSheet(this.actor);
-      await sheet._onResetDailyKarma(ev);
-      this.render(false); // Re-render actor sheet after reset
-    });
-    // <-- NEW BUTTON END -->
 
     // Add Power button - more direct approach
     html.find('.add-power').click(ev => {
@@ -2160,91 +2143,31 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
               let cappedTotal = roll.total;
               let karmaUsed = 0;
 
-              // <-- NEW/MODIFIED SECTION START -->
-              const dailyKarmaEnabled = game.settings.get("msh-faserip", "dailyKarmaEnabled");
-              let dailyKarmaUsedAmount = 0;
-              let lifetimeKarmaUsedAmount = 0;
-
-              // Replace the complex daily karma logic with this simpler version:
+              // Karma spending - uses lifetime karma only
               if (karma > 0) {
-                /* const dailyKarmaEnabled = game.settings.get("msh-faserip", "dailyKarmaEnabled");
-                let dailyKarmaUsedAmount = 0;
-                let lifetimeKarmaUsedAmount = 0; */
+                cappedTotal = Math.min(100, roll.total + karma);
+                karmaUsed = karma;
 
-                if (dailyKarmaEnabled) {
-                  const dailyRemaining = this.actor.system.karma.dailyKarmaMax - (this.actor.system.karma.dailyKarmaUsed || 0);
-                  if (dailyRemaining > 0) {
-                    // Use daily karma first (no history entry needed)
-                    dailyKarmaUsedAmount = Math.min(karma, dailyRemaining);
-                    cappedTotal = Math.min(100, roll.total + dailyKarmaUsedAmount);
-                    
-                    // Update daily usage immediately
-                    await game.msh.runAsGM({
-                      operation: 'update',
-                      targetActorUuid: this.actor.uuid,
-                      args: [{ "system.karma.dailyKarmaUsed": (this.actor.system.karma.dailyKarmaUsed || 0) + dailyKarmaUsedAmount }]
-                    });
-                    
-                    // If we need more karma than daily provides, use lifetime
-                    const remainingNeeded = karma - dailyKarmaUsedAmount;
-                    if (remainingNeeded > 0) {
-                      lifetimeKarmaUsedAmount = remainingNeeded;
-                      cappedTotal = Math.min(100, cappedTotal + lifetimeKarmaUsedAmount);
-                    }
-                  } else {
-                    // No daily karma left, use lifetime
-                    lifetimeKarmaUsedAmount = karma;
-                    cappedTotal = Math.min(100, roll.total + lifetimeKarmaUsedAmount);
-                  }
-                } else {
-                  // Daily karma disabled, use lifetime
-                  lifetimeKarmaUsedAmount = karma;
-                  cappedTotal = Math.min(100, roll.total + lifetimeKarmaUsedAmount);
-                }
-
-                // Only create history entry for lifetime karma spending
-                if (lifetimeKarmaUsedAmount > 0) {
-                  const historyEntry = {
-                    realDate: new Date().toLocaleDateString(),
-                    gameDate: "",
-                    amount: -lifetimeKarmaUsedAmount,
-                    type: "Die Roll",
-                    description: `Spent lifetime karma on [ability/power/etc] roll`
-                  };
-                  
-                  const currentHistory = foundry.utils.deepClone(this.actor.system.karma?.history || []);
-                  currentHistory.push(historyEntry);
-                  
-                  await game.msh.runAsGM({
-                    operation: 'update',
-                    targetActorUuid: this.actor.uuid,
-                    args: [{ "system.karma.history": currentHistory }]
-                  });
-                }
-              }
-
-              // Only add lifetime karma spending to history (daily is tracked by counter only)
-              if (lifetimeKarmaUsedAmount > 0) {
+                // Create history entry for karma spending
                 const historyEntry = {
                   realDate: new Date().toLocaleDateString(),
                   gameDate: "",
-                  amount: -lifetimeKarmaUsedAmount,
+                  amount: -karma,
                   type: "Die Roll",
-                  description: `Spent lifetime karma on ${item.name} (Contact)`
+                  description: `Spent karma on ${item.name} (Contact)`
                 };
                 
-                const currentHistory = foundry.utils.deepClone(actor.system.karma?.history || []);
+                const currentHistory = foundry.utils.deepClone(this.actor.system.karma?.history || []);
                 currentHistory.push(historyEntry);
                 
                 await game.msh.runAsGM({
                   operation: 'update',
-                  targetActorUuid: actor.uuid,
+                  targetActorUuid: this.actor.uuid,
                   args: [{ "system.karma.history": currentHistory }]
                 });
               }
-              // <-- NEW/MODIFIED SECTION END -->
 
-              const totalKarmaUsed = dailyKarmaUsedAmount + lifetimeKarmaUsedAmount;
+              const totalKarmaUsed = karmaUsed;
 
               // Display the dice roll with flavor text if not skipped
               if (!skipDice) {
@@ -3383,66 +3306,33 @@ html.find('.headquarters-row').each((i, row) => {
               
               // Calculate the result with karma
               let cappedTotal = roll.total;
+              let karmaUsed = 0;
 
-              const dailyKarmaEnabled = game.settings.get("msh-faserip", "dailyKarmaEnabled");
-              let dailyKarmaUsedAmount = 0;
-              let lifetimeKarmaUsedAmount = 0;
-
-              // Replace the complex daily karma logic with this simpler version:
+              // Karma spending - uses lifetime karma only
               if (karma > 0) {
-                if (dailyKarmaEnabled) {
-                  const dailyRemaining = this.actor.system.karma.dailyKarmaMax - (this.actor.system.karma.dailyKarmaUsed || 0);
-                  if (dailyRemaining > 0) {
-                    // Use daily karma first (no history entry needed)
-                    dailyKarmaUsedAmount = Math.min(karma, dailyRemaining);
-                    cappedTotal = Math.min(100, roll.total + dailyKarmaUsedAmount);
-                    
-                    // Update daily usage immediately
-                    await game.msh.runAsGM({
-                      operation: 'update',
-                      targetActorUuid: this.actor.uuid,
-                      args: [{ "system.karma.dailyKarmaUsed": (this.actor.system.karma.dailyKarmaUsed || 0) + dailyKarmaUsedAmount }]
-                    });
-                    
-                    // If we need more karma than daily provides, use lifetime
-                    const remainingNeeded = karma - dailyKarmaUsedAmount;
-                    if (remainingNeeded > 0) {
-                      lifetimeKarmaUsedAmount = remainingNeeded;
-                      cappedTotal = Math.min(100, cappedTotal + lifetimeKarmaUsedAmount);
-                    }
-                  } else {
-                    // No daily karma left, use lifetime
-                    lifetimeKarmaUsedAmount = karma;
-                    cappedTotal = Math.min(100, roll.total + lifetimeKarmaUsedAmount);
-                  }
-                } else {
-                  // Daily karma disabled, use lifetime
-                  lifetimeKarmaUsedAmount = karma;
-                  cappedTotal = Math.min(100, roll.total + lifetimeKarmaUsedAmount);
-                }
+                cappedTotal = Math.min(100, roll.total + karma);
+                karmaUsed = karma;
 
-                // Only create history entry for lifetime karma spending
-                if (lifetimeKarmaUsedAmount > 0) {
-                  const historyEntry = {
-                    realDate: new Date().toLocaleDateString(),
-                    gameDate: "",
-                    amount: -lifetimeKarmaUsedAmount,
-                    type: "Die Roll",
-                    description: `Spent lifetime karma on ${abilityFullName} FEAT roll`
-                  };
-                  
-                  const currentHistory = foundry.utils.deepClone(this.actor.system.karma?.history || []);
-                  currentHistory.push(historyEntry);
-                  
-                  await game.msh.runAsGM({
-                    operation: 'update',
-                    targetActorUuid: this.actor.uuid,
-                    args: [{ "system.karma.history": currentHistory }]
-                  });
-                }
+                // Create history entry for karma spending
+                const historyEntry = {
+                  realDate: new Date().toLocaleDateString(),
+                  gameDate: "",
+                  amount: -karma,
+                  type: "Die Roll",
+                  description: `Spent karma on ${abilityFullName} FEAT roll`
+                };
+                
+                const currentHistory = foundry.utils.deepClone(this.actor.system.karma?.history || []);
+                currentHistory.push(historyEntry);
+                
+                await game.msh.runAsGM({
+                  operation: 'update',
+                  targetActorUuid: this.actor.uuid,
+                  args: [{ "system.karma.history": currentHistory }]
+                });
               }
 
-              const totalKarmaUsed = dailyKarmaUsedAmount + lifetimeKarmaUsedAmount;
+              const totalKarmaUsed = karmaUsed;
 
               const resultColor = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
               
@@ -4419,43 +4309,25 @@ html.find('.headquarters-row').each((i, row) => {
             label: "Confirm",
             callback: html => {
               const loss = parseInt(html.find('#karma-loss').val()) || 1;
-              // <-- NEW/MODIFIED SECTION START -->
-              const dailyKarmaEnabled = game.settings.get("msh-faserip", "dailyKarmaEnabled");
-              let dailyKarmaLoss = 0;
-              let lifetimeKarmaLoss = 0;
-
-              if (dailyKarmaEnabled) {
-                const dailyRemaining = this.actor.system.karma.dailyKarmaMax - this.actor.system.karma.dailyKarmaUsed;
-                dailyKarmaLoss = Math.min(loss, dailyRemaining);
-                lifetimeKarmaLoss = Math.max(0, loss - dailyKarmaLoss);
-              } else {
-                lifetimeKarmaLoss = loss;
-              }
-
-              // Only add lifetime karma loss to history (daily is tracked by counter only)
-              if (lifetimeKarmaLoss > 0) {
-                const historyEntry = {
-                  realDate: new Date().toLocaleDateString(),
-                  gameDate: "",
-                  amount: -lifetimeKarmaLoss,
-                  type: "Karma Loss",
-                  description: `Lost lifetime karma from negative popularity`
-                };
-                
-                const currentHistory = foundry.utils.deepClone(this.actor.system.karma?.history || []);
-                currentHistory.push(historyEntry);
-                
-                game.msh.runAsGM({
-                  operation: 'update',
-                  targetActorUuid: this.actor.uuid,
-                  args: [{ 
-                    "system.karma.history": currentHistory,
-                    "system.karma.dailyKarmaUsed": (this.actor.system.karma.dailyKarmaUsed || 0) + dailyKarmaLoss
-                  }]
-                });
-                // No need to call _updateCurrentKarma here, prepareData handles it on sheet re-render
-              }
-              // <-- NEW/MODIFIED SECTION END -->
+              
+              // Add karma loss to history
+              const historyEntry = {
+                realDate: new Date().toLocaleDateString(),
+                gameDate: "",
+                amount: -loss,
+                type: "Karma Loss",
+                description: `Lost karma from negative popularity`
+              };
+              
+              const currentHistory = foundry.utils.deepClone(this.actor.system.karma?.history || []);
+              currentHistory.push(historyEntry);
+              
+              game.msh.runAsGM({
+                operation: 'update',
+                targetActorUuid: this.actor.uuid,
+                args: [{ "system.karma.history": currentHistory }]
+              });
+              
               ui.notifications.info(`${this.actor.name} lost ${loss} Karma.`);
             }
           }
@@ -4678,57 +4550,31 @@ _rollVehicleControl(vehicle) {
             flavor: `${actor.name} makes a Vehicle Control FEAT${stunt ? ` to perform a stunt: ${stuntName}` : ""}`
           });
 
-          // Karma handling (daily first, then lifetime), building on your settings & history
+          // Karma spending - uses lifetime karma only
           let cappedTotal = controlRoll.total;
           let karmaUsed = 0;
 
-          const dailyKarmaEnabled = game.settings.get("msh-faserip", "dailyKarmaEnabled");
-          let dailyKarmaUsedAmount = 0;
-          let lifetimeKarmaUsedAmount = 0;
-
           if (karma > 0) {
-            if (dailyKarmaEnabled) {
-              const dailyRemaining = this.actor.system.karma.dailyKarmaMax - (this.actor.system.karma.dailyKarmaUsed || 0);
-              if (dailyRemaining > 0) {
-                dailyKarmaUsedAmount = Math.min(karma, dailyRemaining);
-                cappedTotal = Math.min(100, controlRoll.total + dailyKarmaUsedAmount);
-                await game.msh.runAsGM({
-                  operation: 'update',
-                  targetActorUuid: this.actor.uuid,
-                  args: [{ "system.karma.dailyKarmaUsed": (this.actor.system.karma.dailyKarmaUsed || 0) + dailyKarmaUsedAmount }]
-                });
-                const remainingNeeded = karma - dailyKarmaUsedAmount;
-                if (remainingNeeded > 0) {
-                  lifetimeKarmaUsedAmount = remainingNeeded;
-                  cappedTotal = Math.min(100, cappedTotal + lifetimeKarmaUsedAmount);
-                }
-              } else {
-                lifetimeKarmaUsedAmount = karma;
-                cappedTotal = Math.min(100, controlRoll.total + lifetimeKarmaUsedAmount);
-              }
-            } else {
-              lifetimeKarmaUsedAmount = karma;
-              cappedTotal = Math.min(100, controlRoll.total + lifetimeKarmaUsedAmount);
-            }
+            cappedTotal = Math.min(100, controlRoll.total + karma);
+            karmaUsed = karma;
 
-            if (lifetimeKarmaUsedAmount > 0) {
-              const historyEntry = {
-                realDate: new Date().toLocaleDateString(),
-                gameDate: "",
-                amount: -lifetimeKarmaUsedAmount,
-                type: "Die Roll",
-                description: `Spent lifetime karma on Vehicle Control for ${vehicle.name}`
-              };
-              const currentHistory = foundry.utils.deepClone(this.actor.system.karma?.history || []);
-              currentHistory.push(historyEntry);
-              await game.msh.runAsGM({
-                operation: 'update',
-                targetActorUuid: this.actor.uuid,
-                args: [{ "system.karma.history": currentHistory }]
-              });
-            }
+            // Create history entry for karma spending
+            const historyEntry = {
+              realDate: new Date().toLocaleDateString(),
+              gameDate: "",
+              amount: -karma,
+              type: "Die Roll",
+              description: `Spent karma on Vehicle Control for ${vehicle.name}`
+            };
+            const currentHistory = foundry.utils.deepClone(this.actor.system.karma?.history || []);
+            currentHistory.push(historyEntry);
+            await game.msh.runAsGM({
+              operation: 'update',
+              targetActorUuid: this.actor.uuid,
+              args: [{ "system.karma.history": currentHistory }]
+            });
           }
-          const totalKarmaUsed = dailyKarmaUsedAmount + lifetimeKarmaUsedAmount;
+          const totalKarmaUsed = karmaUsed;
 
           // ---- Defense-style banner helpers (safe local fallbacks) ----
           const colorStyles = (globalThis.colorStyles)

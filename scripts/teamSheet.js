@@ -110,7 +110,7 @@ export class TeamSheet extends Application {
     let spent = 0;
     
     (actor.system.karma?.history || []).forEach(event => {
-      if (event.amount < 0 && event.type !== "Daily Roll") {
+      if (event.amount < 0) {
         spent += Math.abs(event.amount);
       }
     });
@@ -147,6 +147,7 @@ export class TeamSheet extends Application {
     // Karma awards
     html.find('.award-team-karma').click(ev => this._onAwardTeamKarma(ev));
     html.find('.award-individual-karma').click(ev => this._onAwardIndividualKarma(ev));
+    html.find('.award-session-karma').click(ev => this._onAwardSessionKarma(ev));
     html.find('.clear-awards-history').click(ev => this._onClearAwardsHistory(ev));
 
     // Karma penalty
@@ -650,6 +651,145 @@ export class TeamSheet extends Application {
     
     ui.notifications.info(`${karmaAmount} karma awarded to ${hero.name}!`);
     this.render(true);
+  }
+
+  // Session Karma Award - GM can award R+I+P (or custom amount) to all team members at session start
+  _onAwardSessionKarma(event) {
+    if (!game.user.isGM) return;
+
+    const teamMemberIds = game.settings.get("msh-faserip", "teamMembers") || [];
+    const heroes = game.actors.filter(a => teamMemberIds.includes(a.id));
+    if (heroes.length === 0) return ui.notifications.warn("No team members to award karma to");
+
+    // Build table rows with checkboxes and editable amounts
+    const heroRows = heroes.map(hero => {
+      const r = hero.system.abilities?.reason?.value || 0;
+      const i = hero.system.abilities?.intuition?.value || 0;
+      const p = hero.system.abilities?.psyche?.value || 0;
+      const baseKarma = r + i + p;
+      return `
+        <tr data-hero-id="${hero.id}">
+          <td><input type="checkbox" name="include-${hero.id}" checked /></td>
+          <td><img src="${hero.img}" style="width:32px;height:32px;border-radius:4px;vertical-align:middle;margin-right:4px;" />${hero.name}</td>
+          <td style="text-align:center;">${r}</td>
+          <td style="text-align:center;">${i}</td>
+          <td style="text-align:center;">${p}</td>
+          <td><input type="number" name="amount-${hero.id}" value="${baseKarma}" min="0" style="width:60px;" /></td>
+        </tr>
+      `;
+    }).join('');
+
+    new Dialog({
+      title: "Award Session Karma",
+      content: `
+        <form>
+          <div class="form-group">
+            <label>Session/Reason:</label>
+            <input type="text" name="sessionName" placeholder="e.g., Session 12, Episode: The Hydro-Man Affair" style="width:100%;" />
+          </div>
+          
+          <p style="margin:10px 0;font-size:0.9em;color:#666;">
+            Default amounts are each hero's R+I+P. Adjust individually as needed.
+          </p>
+          
+          <table style="width:100%;border-collapse:collapse;margin-bottom:10px;">
+            <thead>
+              <tr style="background:#f5f5f5;">
+                <th style="width:30px;"></th>
+                <th style="text-align:left;">Hero</th>
+                <th style="text-align:center;width:40px;">R</th>
+                <th style="text-align:center;width:40px;">I</th>
+                <th style="text-align:center;width:40px;">P</th>
+                <th style="width:70px;">Award</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${heroRows}
+            </tbody>
+          </table>
+          
+          <div style="display:flex;gap:10px;margin-top:10px;">
+            <button type="button" class="select-all" style="flex:1;"><i class="fas fa-check-square"></i> Select All</button>
+            <button type="button" class="select-none" style="flex:1;"><i class="fas fa-square"></i> Select None</button>
+          </div>
+        </form>
+      `,
+      buttons: {
+        award: {
+          icon: '<i class="fas fa-star"></i>',
+          label: "Award Session Karma",
+          callback: async (html) => {
+            const sessionName = html.find('[name="sessionName"]').val() || "Session Award";
+            
+            // Collect selected heroes and amounts
+            const awards = [];
+            for (const hero of heroes) {
+              const included = html.find(`[name="include-${hero.id}"]`).is(':checked');
+              if (included) {
+                const amount = Number(html.find(`[name="amount-${hero.id}"]`).val()) || 0;
+                if (amount > 0) {
+                  awards.push({ hero, amount });
+                }
+              }
+            }
+            
+            if (awards.length === 0) {
+              ui.notifications.warn("No heroes selected for karma award");
+              return;
+            }
+            
+            // Award karma to each selected hero
+            for (const { hero, amount } of awards) {
+              const karmaEvent = {
+                realDate: new Date().toLocaleDateString(),
+                gameDate: "",
+                amount: amount,
+                type: "Session Award",
+                description: sessionName
+              };
+              
+              const history = foundry.utils.deepClone(hero.system.karma?.history || []);
+              history.push(karmaEvent);
+              
+              const newLifetime = (hero.system.karma?.lifetime || 0) + amount;
+              
+              await hero.update({
+                "system.karma.history": history,
+                "system.karma.lifetime": newLifetime
+              });
+            }
+            
+            // Add to team awards history
+            const teamAwards = game.settings.get("msh-faserip", "teamKarmaAwards") || [];
+            const totalAwarded = awards.reduce((sum, a) => sum + a.amount, 0);
+            teamAwards.unshift({
+              date: new Date().toLocaleDateString(),
+              totalAmount: totalAwarded,
+              destination: "Individual",
+              teamSize: awards.length,
+              reason: "Session Award",
+              description: sessionName,
+              multiplier: 1
+            });
+            await game.settings.set("msh-faserip", "teamKarmaAwards", teamAwards);
+            
+            ui.notifications.info(`Session karma awarded to ${awards.length} heroes (${totalAwarded} total)`);
+            this.render(true);
+          }
+        },
+        cancel: { icon: '<i class="fas fa-times"></i>', label: "Cancel" }
+      },
+      default: "award",
+      render: (html) => {
+        // Select all/none buttons
+        html.find('.select-all').click(() => {
+          html.find('input[type="checkbox"]').prop('checked', true);
+        });
+        html.find('.select-none').click(() => {
+          html.find('input[type="checkbox"]').prop('checked', false);
+        });
+      }
+    }, { width: 500 }).render(true);
   }
 
   async _onClearAwardsHistory(event) {

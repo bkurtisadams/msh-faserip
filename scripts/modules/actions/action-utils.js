@@ -404,69 +404,37 @@ export function universalColor(rankName, total) {
   return game.msh.rollUniversalTable(rankName, total); // uses your existing table resolver
 }
 
-// Roll + Karma (reuses your daily vs lifetime settings logic pattern)
+// Roll + Karma spending (uses lifetime karma only)
 export async function rollWithKarma(actor, actionLabel, requestedKarma = 0) {
   const roll = await (new Roll("1d100")).evaluate();
   let cappedTotal = roll.total;
-  let dailyUsed = 0, lifetimeUsed = 0;
+  let karmaUsed = 0;
 
   const k = Math.max(0, Number(requestedKarma||0));
   if (k > 0) {
-    const dailyEnabled = game.settings.get("msh-faserip", "dailyKarmaEnabled");
-    if (dailyEnabled) {
-      const dailyRemaining = actor.system.karma.dailyKarmaMax - (actor.system.karma.dailyKarmaUsed || 0);
-      if (dailyRemaining > 0) {
-        dailyUsed = Math.min(k, dailyRemaining);
-        cappedTotal = Math.min(100, roll.total + dailyUsed);
+    karmaUsed = k;
+    cappedTotal = Math.min(100, roll.total + karmaUsed);
 
-        await game.msh.runAsGM({
-          operation: 'update',
-          targetActorUuid: actor.uuid,
-          args: [{ "system.karma.dailyKarmaUsed": (actor.system.karma.dailyKarmaUsed || 0) + dailyUsed }]
-        });
-
-        const leftover = k - dailyUsed;
-        if (leftover > 0) {
-          lifetimeUsed = leftover;
-          cappedTotal = Math.min(100, cappedTotal + lifetimeUsed);
-        }
-      } else {
-        lifetimeUsed = k;
-        cappedTotal = Math.min(100, roll.total + lifetimeUsed);
-      }
-    } else {
-      lifetimeUsed = k;
-      cappedTotal = Math.min(100, roll.total + lifetimeUsed);
-    }
-
-    // history entries (kept identical to your pattern)
-    const history = [];
-    if (dailyUsed > 0) history.push({
+    // Create history entry for karma spending
+    const historyEntry = {
       realDate: new Date().toLocaleDateString(),
       gameDate: "",
-      amount: -dailyUsed,
-      type: "Daily Roll",
-      description: `Spent daily karma on ${actionLabel}`
-    });
-    if (lifetimeUsed > 0) history.push({
-      realDate: new Date().toLocaleDateString(),
-      gameDate: "",
-      amount: -lifetimeUsed,
+      amount: -karmaUsed,
       type: "Die Roll",
-      description: `Spent lifetime karma on ${actionLabel}`
+      description: `Spent karma on ${actionLabel}`
+    };
+    
+    const currentHistory = foundry.utils.deepClone(actor.system.karma?.history || []);
+    currentHistory.push(historyEntry);
+    
+    await game.msh.runAsGM({
+      operation: 'update',
+      targetActorUuid: actor.uuid,
+      args: [{ "system.karma.history": currentHistory }]
     });
-    if (history.length) {
-      const current = foundry.utils.deepClone(actor.system.karma?.history || []);
-      const newHistory = current.concat(history);
-      await game.msh.runAsGM({
-        operation: 'update',
-        targetActorUuid: actor.uuid,
-        args: [{ "system.karma.history": newHistory }]
-      });
-    }
   }
 
-  return { roll, cappedTotal, totalKarmaUsed: dailyUsed + lifetimeUsed };
+  return { roll, cappedTotal, totalKarmaUsed: karmaUsed };
 }
 
 // Item filters
