@@ -1,4 +1,5 @@
-// actor.js v1.2.0 - 2025-01-17
+// actor.js v1.2.1 - 2025-01-18
+// v1.2.1: Remove dead disposition code (now handled in preCreateActor hook)
 // v1.2.0: Remove daily karma system - karma now uses lifetime only
 // v1.1.0: Initialize combatMods in prepareBaseData before Active Effects are applied
 
@@ -150,35 +151,6 @@ export class FaseripActor extends Actor {
       system.combatMods.abilityShifts.intuition = system.combatMods.abilityShifts.intuition ?? 0;
       system.combatMods.abilityShifts.psyche = system.combatMods.abilityShifts.psyche ?? 0;
     }
-    
-    // ALWAYS set the correct disposition based on actor type (remove the undefined check)
-    let defaultDisposition;
-    switch (this.type) {
-      case "hero":
-        defaultDisposition = CONST.TOKEN_DISPOSITIONS.FRIENDLY; // 1
-        break;
-      case "villain":
-        defaultDisposition = CONST.TOKEN_DISPOSITIONS.HOSTILE; // -1
-        break;
-      case "npc":
-      case "vehicle":
-        defaultDisposition = CONST.TOKEN_DISPOSITIONS.NEUTRAL; // 0
-        // Optional safety: set token bar mapping if not present (helps existing worlds)
-        if (!this.prototypeToken?.bar1?.attribute) {
-          this.prototypeToken.updateSource({ bar1: { attribute: "system.resources.body" } });
-        }
-        break;
-
-      default:
-        defaultDisposition = CONST.TOKEN_DISPOSITIONS.NEUTRAL; // 0
-        break;
-    }
-    
-    // Force set the disposition if it's wrong
-    /* if (this.prototypeToken.disposition !== defaultDisposition) {
-      console.log(`FASERIP: Correcting disposition for ${this.type} "${this.name}" from ${this.prototypeToken.disposition} to ${defaultDisposition}`);
-      this.prototypeToken.updateSource({ disposition: defaultDisposition });
-    } */
   }
 
   prepareDerivedData() {

@@ -1,4 +1,6 @@
-// init.js v1.7.2 - 2026-01-02
+// init.js v1.7.4 - 2025-01-18
+// v1.7.4: Fix prototypeTokenOverrides check to detect keys with undefined values
+// v1.7.3: Fix preCreateActor to use updateSource() for persistent token disposition
 // v1.7.2: Add separate FaseripTalentSheet and FaseripContactSheet with smaller dialog size
 // v1.7.1: Add expiresAtRound flag support for effect expiration (used by Evasion Bonus)
 // v1.7.0: Restore health to Endurance value when waking from 0 HP knockout (not dying)
@@ -1205,42 +1207,48 @@ Hooks.once("init", async () => {
 });
 
 Hooks.on("preCreateActor", (document, data, options, userId) => {
-  console.log("FASERIP: preCreateActor - Type:", document.type);
-  console.log("FASERIP: preCreateActor - Data before fix:", data?.prototypeToken);
-
-  // Ensure prototypeToken object exists
-  data.prototypeToken ??= {};
-  const pt = data.prototypeToken;
-
-  // --- Disposition defaults by actor type ---
+  console.log("[FASERIP] preCreateActor - Type:", document.type);
+  
+  const updates = {};
+  
   switch (document.type) {
     case "hero":
-      pt.disposition = CONST.TOKEN_DISPOSITIONS.FRIENDLY; // 1
-      console.log("FASERIP: Forcing hero disposition to FRIENDLY (1)");
+      updates["prototypeToken.disposition"] = CONST.TOKEN_DISPOSITIONS.FRIENDLY;
+      console.log("[FASERIP] Setting hero disposition to FRIENDLY (1)");
       break;
     case "villain":
-      pt.disposition = CONST.TOKEN_DISPOSITIONS.HOSTILE; // -1
-      console.log("FASERIP: Forcing villain disposition to HOSTILE (-1)");
+      updates["prototypeToken.disposition"] = CONST.TOKEN_DISPOSITIONS.HOSTILE;
+      console.log("[FASERIP] Setting villain disposition to HOSTILE (-1)");
       break;
     case "vehicle":
-      // If a value was already provided (e.g., via import), keep it; else default to NEUTRAL.
-      pt.disposition ??= CONST.TOKEN_DISPOSITIONS.NEUTRAL; // 0
-      console.log("FASERIP: Defaulting vehicle disposition to NEUTRAL (0)");
-      // --- Vehicle-specific token defaults (only if not already set) ---
-      pt.lockRotation ??= true;              // vehicles usually don't rotate freely
-      pt.width ??= 2;                        // tweak to your grid scale
-      pt.height ??= 2;
-      pt.bar1 ??= {};
-      pt.bar1.attribute ??= "system.resources.body"; // Body HP bar
+      if (document.prototypeToken?.disposition === undefined) {
+        updates["prototypeToken.disposition"] = CONST.TOKEN_DISPOSITIONS.NEUTRAL;
+      }
+      if (document.prototypeToken?.lockRotation === undefined) {
+        updates["prototypeToken.lockRotation"] = true;
+      }
+      if (document.prototypeToken?.width === undefined) {
+        updates["prototypeToken.width"] = 2;
+      }
+      if (document.prototypeToken?.height === undefined) {
+        updates["prototypeToken.height"] = 2;
+      }
+      if (document.prototypeToken?.bar1?.attribute === undefined) {
+        updates["prototypeToken.bar1.attribute"] = "resources.body";
+      }
+      console.log("[FASERIP] Setting vehicle token defaults");
       break;
     case "npc":
     default:
-      pt.disposition = CONST.TOKEN_DISPOSITIONS.NEUTRAL; // 0
-      console.log("FASERIP: Forcing NPC disposition to NEUTRAL (0)");
+      updates["prototypeToken.disposition"] = CONST.TOKEN_DISPOSITIONS.NEUTRAL;
+      console.log("[FASERIP] Setting NPC disposition to NEUTRAL (0)");
       break;
   }
-
-  console.log("FASERIP: preCreateActor - Data after fix:", data.prototypeToken);
+  
+  if (Object.keys(updates).length > 0) {
+    document.updateSource(updates);
+    console.log("[FASERIP] preCreateActor updates applied:", updates);
+  }
 });
 
 
@@ -1264,25 +1272,32 @@ Hooks.once("ready", async () => {
     console.warn("MSH FASERIP | Slam handler init failed:", e);
   }
 
-  // Fix prototype token overrides (only if needed)
+  // Fix prototype token overrides - remove disposition keys entirely (even if undefined)
   try {
-    const o = game.settings.get("core", "prototypeTokenOverrides") ?? {};
-    const needsFix = o.hero?.disposition !== undefined || o.villain?.disposition !== undefined || o.npc?.disposition !== undefined;
+    const o = game.settings.get("core", "prototypeTokenOverrides");
+    const needsFix = "disposition" in (o.hero ?? {}) || 
+                     "disposition" in (o.villain ?? {}) || 
+                     "disposition" in (o.npc ?? {}) ||
+                     "disposition" in (o.vehicle ?? {}) ||
+                     "disposition" in (o.base ?? {});
     if (needsFix) {
       const fixed = {
-        base: o.base ?? {},
+        base: { ...(o.base ?? {}) },
         hero: { ...(o.hero ?? {}) },
         villain: { ...(o.villain ?? {}) },
-        npc: { ...(o.npc ?? {}) }
+        npc: { ...(o.npc ?? {}) },
+        vehicle: { ...(o.vehicle ?? {}) }
       };
+      delete fixed.base.disposition;
       delete fixed.hero.disposition;
       delete fixed.villain.disposition;
       delete fixed.npc.disposition;
+      delete fixed.vehicle.disposition;
       await game.settings.set("core", "prototypeTokenOverrides", fixed);
-      console.log("MSH FASERIP | Cleared disposition overrides");
+      console.log("[FASERIP] Cleared disposition keys from prototypeTokenOverrides");
     }
   } catch (e) {
-    console.warn("MSH FASERIP | Could not adjust prototypeTokenOverrides:", e);
+    console.warn("[FASERIP WARN] Could not adjust prototypeTokenOverrides:", e);
   }
 
   // Chat hooks (checks + breaking FEAT)
