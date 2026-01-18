@@ -137,23 +137,19 @@
         {{/if}}
       </div>
 
-      <!-- Available Heroes -->
-      {{#if availableHeroes.length}}
-      <div class="available-heroes-section">
-        <h3>Available Heroes</h3>
-        <div class="hero-grid">
-          {{#each availableHeroes as |hero|}}
-          <div class="hero-card">
-            <img src="{{hero.img}}" alt="{{hero.name}}" />
-            <div class="hero-card-name">{{hero.name}}</div>
-            {{#if ../isGM}}
-            <button type="button" class="add-hero-to-team" data-hero-id="{{hero.id}}">
-              <i class="fas fa-plus"></i> Add
-            </button>
-            {{/if}}
-          </div>
+      <!-- Add Team Member -->
+      {{#if isGM}}
+      <div class="add-member-section">
+        <label>Add Member:</label>
+        <select class="add-hero-select">
+          <option value="">— Select —</option>
+          {{#each availableHeroes as |actor|}}
+          <option value="{{actor.id}}">{{actor.name}}{{#if (eq actor.type "npc")}} (NPC){{/if}}</option>
           {{/each}}
-        </div>
+        </select>
+        <button type="button" class="add-hero-to-team-btn" title="Add to Team">
+          <i class="fas fa-plus"></i> Add
+        </button>
       </div>
       {{/if}}
     </div>

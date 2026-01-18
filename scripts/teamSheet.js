@@ -1,4 +1,5 @@
-// teamSheet.js - REFACTORED
+// teamSheet.js v1.1.0 - 2025-01-18
+// v1.1.0: Add dropdown for adding team members, include NPCs with friendly disposition
 export class TeamSheet extends Application {
   constructor(options = {}) {
     super(options);
@@ -74,16 +75,17 @@ export class TeamSheet extends Application {
       };
     }).filter(m => m !== null);
     
-    // Get available heroes
+    // Get available heroes and NPCs (friendly/neutral disposition)
     context.availableHeroes = game.actors.filter(a => 
-      a.type === "hero" && 
-      a.hasPlayerOwner &&
+      (a.type === "hero" || a.type === "npc") &&
+      a.prototypeToken.disposition >= 0 &&
       !teamMemberIds.includes(a.id)
-    ).map(hero => ({
-      id: hero.id,
-      name: hero.name,
-      img: hero.img || "icons/svg/mystery-man.svg"
-    }));
+    ).map(actor => ({
+      id: actor.id,
+      name: actor.name,
+      type: actor.type,
+      img: actor.img || "icons/svg/mystery-man.svg"
+    })).sort((a, b) => a.name.localeCompare(b.name));
     
     // Team karma pool
     context.teamKarmaPool = game.settings.get("msh-faserip", "teamKarmaPoolTotal") || 0;
@@ -135,8 +137,17 @@ export class TeamSheet extends Application {
       html.find(`[data-tab="${targetTab}"]`).addClass('active');
     });
 
-    // Member management
-    html.find('.add-hero-to-team').click(ev => this._onAddHeroToTeam(ev));
+    // Member management - dropdown + button pattern
+    html.find('.add-hero-to-team-btn').click(ev => {
+      const select = html.find('.add-hero-select');
+      const heroId = select.val();
+      if (heroId) {
+        this._onAddHeroToTeam(heroId);
+        select.val(''); // Reset dropdown
+      } else {
+        ui.notifications.warn("Select a character to add");
+      }
+    });
     html.find('.remove-hero-from-team').click(ev => this._onRemoveHeroFromTeam(ev));
     html.find('.hero-portrait').click(ev => {
       const heroId = ev.currentTarget.dataset.heroId;
@@ -217,14 +228,14 @@ export class TeamSheet extends Application {
 
   }
 
-  async _onAddHeroToTeam(event) {
-    const heroId = event.currentTarget.dataset.heroId;
+  async _onAddHeroToTeam(heroId) {
     const teamMembers = game.settings.get("msh-faserip", "teamMembers") || [];
     
     if (!teamMembers.includes(heroId)) {
       teamMembers.push(heroId);
       await game.settings.set("msh-faserip", "teamMembers", teamMembers);
-      ui.notifications.info(`Hero added to team.`);
+      const actor = game.actors.get(heroId);
+      ui.notifications.info(`${actor?.name || "Member"} added to team.`);
       this.render(true);
     }
   }

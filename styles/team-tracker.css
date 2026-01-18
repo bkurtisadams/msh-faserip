@@ -237,59 +237,46 @@
 }
 
 /* ==========================================================================
-   AVAILABLE HEROES
+   ADD MEMBER DROPDOWN
    ========================================================================== */
 
-.team-tracker .available-heroes-section {
+.team-tracker .add-member-section {
   margin-top: 14px;
-  padding-top: 10px;
-  border-top: 1px solid #ccc;
-}
-.team-tracker .available-heroes-section h3 {
-  margin: 0 0 8px 0;
-  color: #8b0000;
-  font-size: 1rem;
-}
-.team-tracker .hero-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
-  gap: 8px;
-}
-.team-tracker .hero-card {
+  padding: 10px;
   background: #fff;
   border: 1px solid #d9d9d9;
   border-radius: 4px;
-  padding: 8px;
-  text-align: center;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
-.team-tracker .hero-card img {
-  width: 44px;
-  height: 44px;
-  border-radius: 3px;               /* square */
-  border: 1px solid #e3e3e3;
-  object-fit: cover;
-  margin-bottom: 6px;
-}
-.team-tracker .hero-card-name {
-  font-size: 12px;
-  font-weight: 700;
-  margin-bottom: 6px;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.team-tracker .add-member-section label {
+  font-weight: 600;
+  color: #8b0000;
   white-space: nowrap;
 }
-.team-tracker .hero-card button {
-  width: 100%;
-  padding: 3px 6px;
-  font-size: 11px;
-  line-height: 1.15;
+.team-tracker .add-hero-select {
+  flex: 1;
+  padding: 6px 8px;
+  font-size: 13px;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  background: #fff;
+}
+.team-tracker .add-hero-to-team-btn {
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
   color: #fff;
   background: #8b0000;
   border: 0;
   border-radius: 3px;
   cursor: pointer;
+  white-space: nowrap;
 }
-.team-tracker .hero-card button:hover { background: #6b0000; }
+.team-tracker .add-hero-to-team-btn:hover {
+  background: #6b0000;
+}
 
 /* ==========================================================================
    AWARDS
@@ -354,10 +341,6 @@
 .team-tracker.compact .hero-portrait { width: 26px; height: 26px; }
 .team-tracker.compact .team-members-table th:nth-child(2),
 .team-tracker.compact .team-members-table td:nth-child(2) { width: 130px; } /* slightly tighter name */
-
-.team-tracker.compact .hero-card { padding: 6px; }
-.team-tracker.compact .hero-card img { width: 40px; height: 40px; }
-.team-tracker.compact .hero-card button { padding: 2px 5px; font-size: 10.5px; }
 
 /* --- Fix tabs: show only the active panel --- */
 .team-tracker .tab-panel { 
