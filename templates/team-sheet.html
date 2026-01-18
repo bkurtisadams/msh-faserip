@@ -1,5 +1,5 @@
 <form class="team-tracker compact" autocomplete="off">
-  <!-- Header with Team Pool Info -->
+  <!-- Header with Pool and Multiplier -->
   <div class="team-header">
     <div class="header-left">
       <h2>Team Tracker</h2>
@@ -7,78 +7,65 @@
     </div>
     <div class="header-right">
       <div class="pool-display">
-        <label>Team Karma Pool</label>
+        <label>Pool</label>
         <div class="pool-value">{{teamKarmaPool}}</div>
         <button type="button" class="open-pool-manager" title="Manage Pool">
           <i class="fas fa-cog"></i>
         </button>
       </div>
+      {{#if isGM}}
+      <div class="multiplier-display">
+        <label>Mult</label>
+        <select class="multiplier-select" title="Karma Multiplier">
+          {{#each multiplierOptions}}
+          <option value="{{this}}" {{#if (eq this ../karmaMultiplier)}}selected{{/if}}>×{{this}}</option>
+          {{/each}}
+        </select>
+      </div>
+      {{else}}
+      <div class="multiplier-display">
+        <label>Mult</label>
+        <div class="multiplier-value">×{{karmaMultiplier}}</div>
+      </div>
+      {{/if}}
+      <button type="button" class="time-settings-btn" title="Time Settings"><i class="fas fa-clock"></i></button>
     </div>
   </div>
 
   <!-- Tab Navigation -->
   <nav class="sheet-tabs">
-    <a class="tab-button active" data-tab="overview">
+    <a class="tab-button active" data-tab="team">
       <i class="fas fa-users"></i> Team
-    </a>
-    <a class="tab-button" data-tab="combat">
-      <i class="fas fa-fist-raised"></i> Combat
     </a>
     <a class="tab-button" data-tab="karma">
       <i class="fas fa-star"></i> Karma
     </a>
-    <a class="tab-button" data-tab="awards">
-      <i class="fas fa-trophy"></i> Awards
-    </a>
-    <a class="tab-button" data-tab="logs">
-      <i class="fas fa-book"></i> Logs
+    <a class="tab-button" data-tab="session">
+      <i class="fas fa-book"></i> Session
     </a>
   </nav>
 
-  <!-- Time Controls (Always Visible) -->
-  <div class="time-controls">
-    <div class="time-buttons">
-      <span style="font-weight:600;">Time:</span>
-      <button type="button" class="time-adjust-btn" data-unit="turn" title="Adjust by Turns (6 sec)">Turn</button>
-      <button type="button" class="time-adjust-btn" data-unit="minute" title="Adjust by Minutes (60 sec)">Minute</button>
-      <button type="button" class="time-adjust-btn" data-unit="hour" title="Adjust by Hours (3600 sec)">Hour</button>
-      <button type="button" class="time-adjust-btn" data-unit="day" title="Adjust by Days (86400 sec)">Day</button>
-      <button type="button" class="time-adjust-btn" data-unit="custom" title="Adjust by Custom Seconds">Custom</button>
-      <button type="button" class="time-settings-btn" title="Time Settings"><i class="fas fa-cog"></i></button>
-    </div>
-    <div class="time-display">
-      <span class="current-time">{{currentDateTime}}</span>
-      <label class="sync-checkbox">
-        <input type="checkbox" class="combat-sync-toggle" {{#if combatSyncEnabled}}checked{{/if}}>
-        Sync Combat
-      </label>
-    </div>
-  </div>
-
   <!-- Tab Content -->
   <section class="sheet-body">
-    <!-- Overview Tab -->
-    <div class="tab-panel active" data-tab="overview">
+    <!-- Team Tab -->
+    <div class="tab-panel active" data-tab="team">
       <!-- GM Award Buttons -->
       {{#if isGM}}
       <div class="gm-controls">
         <button type="button" class="award-session-karma">
-          <i class="fas fa-star"></i> Award Session Karma
+          <i class="fas fa-star"></i> Session Karma
         </button>
         <button type="button" class="award-team-karma">
-          <i class="fas fa-trophy"></i> Award Team Karma
+          <i class="fas fa-trophy"></i> Team Karma
         </button>
         <button type="button" class="award-individual-karma">
-          <i class="fas fa-user-plus"></i> Award Individual Karma
+          <i class="fas fa-user-plus"></i> Individual
         </button>
-
-        <!-- NEW: penalties/losses button -->
         <button type="button" class="apply-karma-penalty">
-          <i class="fas fa-exclamation-triangle"></i> Apply Penalty
+          <i class="fas fa-exclamation-triangle"></i> Penalty
         </button>
       </div>
       {{/if}}
-
 
       <!-- Team Members List -->
       <div class="team-members-section">
@@ -102,24 +89,17 @@
           <tbody>
             {{#each teamMembers as |member|}}
             <tr class="member-row">
-              <!-- Portrait -->
               <td class="col-por">
                 <img src="{{member.img}}" class="hero-portrait" data-hero-id="{{member.id}}" title="Click to open sheet" />
               </td>
-
-              <!-- Name (fixed width via CSS) -->
               <td class="member-name">
                 <span class="hero-name">{{member.name}}</span>
               </td>
-
-              <!-- Stats (health + resources removed) -->
               <td class="stat-cell">{{member.karma}}</td>
               <td class="stat-cell">{{member.lifetimeKarma}}</td>
               <td class="stat-cell karma-available">{{member.availableKarma}}</td>
               <td class="stat-cell">{{member.poolContribution}}</td>
               <td class="stat-cell">{{member.popularity}}</td>
-
-              <!-- Actions -->
               <td class="actions-cell">
                 {{#if ../isGM}}
                 <a class="remove-hero-from-team" data-hero-id="{{member.id}}" title="Remove from Team">
@@ -130,7 +110,6 @@
             </tr>
             {{/each}}
           </tbody>
-
         </table>
         {{else}}
         <p class="no-members">No team members yet. Add heroes below.</p>
@@ -154,8 +133,8 @@
       {{/if}}
     </div>
 
-    <!-- Awards History Tab -->
-    <div class="tab-panel" data-tab="awards">
+    <!-- Karma Tab (Award History) -->
+    <div class="tab-panel" data-tab="karma">
       <div class="awards-header">
         <h3>Team Karma Awards History</h3>
         {{#if isGM}}
@@ -170,17 +149,18 @@
           <thead>
             <tr>
               <th>Date</th>
-              <th>Total Karma</th>
+              <th>Total</th>
               <th>Destination</th>
-              <th>Team Size</th>
-              <th>Award Type</th>
+              <th>Size</th>
+              <th>Type</th>
               <th>Description</th>
-              <th>Multiplier</th>
+              <th>Mult</th>
+              {{#if isGM}}<th>Actions</th>{{/if}}
             </tr>
           </thead>
           <tbody>
             {{#if teamAwards.length}}
-              {{#each teamAwards as |award|}}
+              {{#each teamAwards as |award i|}}
               <tr>
                 <td>{{award.date}}</td>
                 <td class="karma-amount">{{award.totalAmount}}</td>
@@ -189,11 +169,17 @@
                 <td>{{award.reason}}</td>
                 <td class="description">{{award.description}}</td>
                 <td>{{#if (gt award.multiplier 1)}}×{{award.multiplier}}{{else}}—{{/if}}</td>
+                {{#if ../isGM}}
+                <td class="actions-cell">
+                  <a class="edit-award" data-index="{{i}}" title="Edit"><i class="fas fa-edit"></i></a>
+                  <a class="delete-award" data-index="{{i}}" title="Delete"><i class="fas fa-trash"></i></a>
+                </td>
+                {{/if}}
               </tr>
               {{/each}}
             {{else}}
               <tr>
-                <td colspan="7" class="empty-message">No team awards recorded yet.</td>
+                <td colspan="{{#if isGM}}8{{else}}7{{/if}}" class="empty-message">No team awards recorded yet.</td>
               </tr>
             {{/if}}
           </tbody>
@@ -201,23 +187,87 @@
       </div>
     </div>
 
-    <!-- Logs Tab -->
-    <div class="tab-panel" data-tab="logs">
-      <div class="logs-header">
-        <h3>Combat Log</h3>
-        {{#if isGM}}
-        <div class="logs-controls">
-          <button type="button" class="add-log-entry">
-            <i class="fas fa-plus"></i> Add Entry
-          </button>
-          <button type="button" class="clear-all-logs">
-            <i class="fas fa-broom"></i> Clear All
-          </button>
+    <!-- Session Tab -->
+    <div class="tab-panel" data-tab="session">
+      <!-- Time Controls -->
+      <div class="session-time-controls">
+        <div class="time-display-row">
+          <span class="current-time">{{currentDateTime}}</span>
+          <label class="sync-checkbox">
+            <input type="checkbox" class="combat-sync-toggle" {{#if combatSyncEnabled}}checked{{/if}}>
+            Sync Combat
+          </label>
         </div>
+        <div class="time-buttons">
+          <button type="button" class="time-adjust-btn" data-unit="turn" title="6 seconds">Turn</button>
+          <button type="button" class="time-adjust-btn" data-unit="minute" title="60 seconds">Min</button>
+          <button type="button" class="time-adjust-btn" data-unit="hour" title="3600 seconds">Hour</button>
+          <button type="button" class="time-adjust-btn" data-unit="day" title="86400 seconds">Day</button>
+          <button type="button" class="time-adjust-btn" data-unit="custom" title="Custom seconds">Custom</button>
+        </div>
+      </div>
+
+      <!-- Defeated Villains -->
+      <div class="defeated-villains-section">
+        <div class="section-header">
+          <h3>Defeated Villains</h3>
+          {{#if isGM}}
+          <button type="button" class="add-defeated-villain">
+            <i class="fas fa-plus"></i> Add Villain
+          </button>
+          {{/if}}
+        </div>
+        
+        {{#if defeatedVillains.length}}
+        <table class="defeated-villains-table">
+          <thead>
+            <tr>
+              <th>Villain</th>
+              <th>Rank</th>
+              <th>Date</th>
+              <th>Karma Awarded</th>
+              {{#if isGM}}<th>Actions</th>{{/if}}
+            </tr>
+          </thead>
+          <tbody>
+            {{#each defeatedVillains as |villain|}}
+            <tr>
+              <td class="villain-name">{{villain.name}}</td>
+              <td>{{villain.rank}} ({{villain.value}})</td>
+              <td>{{villain.date}}</td>
+              <td class="karma-amount">{{villain.karmaAwarded}}</td>
+              {{#if ../isGM}}
+              <td class="actions-cell">
+                <a class="delete-villain" data-villain-id="{{villain.id}}" title="Remove">
+                  <i class="fas fa-times"></i>
+                </a>
+              </td>
+              {{/if}}
+            </tr>
+            {{/each}}
+          </tbody>
+        </table>
+        {{else}}
+        <p class="no-villains">No villains defeated this session.</p>
         {{/if}}
       </div>
-      
-      <div class="logs-list-container">
+
+      <!-- Session Log -->
+      <div class="session-log-section">
+        <div class="section-header">
+          <h3>Session Log</h3>
+          {{#if isGM}}
+          <div class="log-controls">
+            <button type="button" class="add-log-entry">
+              <i class="fas fa-plus"></i> Add Entry
+            </button>
+            <button type="button" class="clear-all-logs">
+              <i class="fas fa-broom"></i> Clear
+            </button>
+          </div>
+          {{/if}}
+        </div>
+        
         {{#if combatLogs.length}}
         <div class="logs-list">
           {{#each combatLogs as |log|}}
@@ -226,6 +276,9 @@
             <div class="log-text">{{log.text}}</div>
             {{#if ../isGM}}
             <div class="log-actions">
+              <button type="button" class="award-from-log" data-log-id="{{log.id}}" data-log-text="{{log.text}}" title="Award Karma">
+                <i class="fas fa-star"></i>
+              </button>
               <button type="button" class="edit-log-btn" data-log-id="{{log.id}}" title="Edit">
                 <i class="fas fa-edit"></i>
               </button>
@@ -238,18 +291,18 @@
           {{/each}}
         </div>
         {{else}}
-        <p class="no-logs">No combat logs recorded yet.</p>
+        <p class="no-logs">No session log entries yet.</p>
+        {{/if}}
+        
+        {{#if isGM}}
+        <div class="auto-log-setting">
+          <label>
+            <input type="checkbox" class="auto-log-toggle" {{#if autoLogCombat}}checked{{/if}}>
+            Auto-log combat victories
+          </label>
+        </div>
         {{/if}}
       </div>
-      
-      {{#if isGM}}
-      <div class="auto-log-setting">
-        <label>
-          <input type="checkbox" class="auto-log-toggle" {{#if autoLogCombat}}checked{{/if}}>
-          Auto-log combat victories
-        </label>
-      </div>
-      {{/if}}
     </div>
     
   </section>

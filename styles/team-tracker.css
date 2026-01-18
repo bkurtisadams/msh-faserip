@@ -462,3 +462,288 @@
 .sync-checkbox input[type="checkbox"] {
   cursor: pointer;
 }
+
+/* ==========================================================================
+   HEADER MULTIPLIER DISPLAY
+   ========================================================================== */
+
+.team-tracker .header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.team-tracker .multiplier-display {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #fff8e1;
+  border: 1px solid #ffc107;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.team-tracker .multiplier-display label {
+  font-weight: 600;
+  font-size: 11px;
+  color: #f57c00;
+}
+
+.team-tracker .multiplier-select {
+  padding: 2px 4px;
+  font-size: 13px;
+  font-weight: 700;
+  border: 1px solid #ffc107;
+  border-radius: 3px;
+  background: #fff;
+  color: #e65100;
+}
+
+.team-tracker .multiplier-value {
+  font-weight: 700;
+  font-size: 14px;
+  color: #e65100;
+}
+
+.team-tracker .time-settings-btn {
+  padding: 6px 10px;
+  background: #e3f2fd;
+  border: 1px solid #90caf9;
+  border-radius: 4px;
+  color: #1565c0;
+  cursor: pointer;
+}
+
+.team-tracker .time-settings-btn:hover {
+  background: #bbdefb;
+}
+
+/* ==========================================================================
+   SESSION TAB
+   ========================================================================== */
+
+.team-tracker .session-time-section {
+  background: #f5f5f0;
+  padding: 10px;
+  border-radius: 4px;
+  margin-bottom: 12px;
+  border: 1px solid #ddd;
+}
+
+.team-tracker .time-display-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.team-tracker .session-time-section .time-buttons {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.team-tracker .session-time-section .time-adjust-btn {
+  padding: 4px 10px;
+  background: white;
+  border: 1px solid #c0c0c0;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 0.85em;
+}
+
+.team-tracker .session-time-section .time-adjust-btn:hover {
+  background: #e5e5e0;
+}
+
+/* ==========================================================================
+   DEFEATED VILLAINS SECTION
+   ========================================================================== */
+
+.team-tracker .defeated-villains-section,
+.team-tracker .session-log-section {
+  margin-bottom: 14px;
+}
+
+.team-tracker .section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 2px solid #8b0000;
+}
+
+.team-tracker .section-header h3 {
+  margin: 0;
+  color: #8b0000;
+  font-size: 1rem;
+}
+
+.team-tracker .section-header button {
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  background: #8b0000;
+  border: 0;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.team-tracker .section-header button:hover {
+  background: #6b0000;
+}
+
+.team-tracker .defeated-villains-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+  border: 1px solid #ddd;
+  font-size: 12px;
+}
+
+.team-tracker .defeated-villains-table thead {
+  background: #8b0000;
+  color: #fff;
+}
+
+.team-tracker .defeated-villains-table th,
+.team-tracker .defeated-villains-table td {
+  padding: 6px 8px;
+  text-align: left;
+  border-bottom: 1px solid #eee;
+}
+
+.team-tracker .defeated-villains-table .villain-name {
+  font-weight: 600;
+}
+
+.team-tracker .defeated-villains-table .karma-amount {
+  font-weight: 700;
+  color: #2e7d32;
+}
+
+.team-tracker .defeated-villains-table .actions-cell {
+  text-align: center;
+}
+
+.team-tracker .defeated-villains-table .actions-cell a {
+  color: #8b0000;
+  cursor: pointer;
+}
+
+.team-tracker .defeated-villains-table .actions-cell a:hover {
+  color: #c40000;
+}
+
+.team-tracker .no-villains,
+.team-tracker .no-logs {
+  padding: 12px;
+  text-align: center;
+  color: #666;
+  font-style: italic;
+  background: #fafafa;
+  border: 1px solid #ddd;
+  border-radius: 3px;
+}
+
+/* ==========================================================================
+   SESSION LOG (in Session tab)
+   ========================================================================== */
+
+.team-tracker .log-controls {
+  display: flex;
+  gap: 6px;
+}
+
+.team-tracker .logs-list {
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid #ddd;
+  border-radius: 3px;
+  background: #fff;
+}
+
+.team-tracker .log-entry {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  border-bottom: 1px solid #eee;
+}
+
+.team-tracker .log-entry:last-child {
+  border-bottom: none;
+}
+
+.team-tracker .log-timestamp {
+  font-size: 11px;
+  color: #888;
+  white-space: nowrap;
+}
+
+.team-tracker .log-text {
+  flex: 1;
+  font-size: 12px;
+}
+
+.team-tracker .log-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.team-tracker .log-actions button {
+  padding: 2px 6px;
+  font-size: 11px;
+  background: #f5f5f5;
+  border: 1px solid #ddd;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.team-tracker .log-actions button:hover {
+  background: #e0e0e0;
+}
+
+.team-tracker .log-actions .award-from-log {
+  color: #f57c00;
+}
+
+.team-tracker .log-actions .award-from-log:hover {
+  background: #fff3e0;
+}
+
+.team-tracker .auto-log-setting {
+  margin-top: 10px;
+  padding: 8px;
+  background: #f5f5f0;
+  border-radius: 3px;
+  font-size: 12px;
+}
+
+.team-tracker .auto-log-setting label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+/* ==========================================================================
+   AWARDS TABLE ACTIONS
+   ========================================================================== */
+
+.team-tracker .awards-table .actions-cell {
+  white-space: nowrap;
+  text-align: center;
+}
+
+.team-tracker .awards-table .actions-cell a {
+  margin: 0 3px;
+  cursor: pointer;
+  color: #555;
+}
+
+.team-tracker .awards-table .actions-cell a:hover {
+  color: #8b0000;
+}

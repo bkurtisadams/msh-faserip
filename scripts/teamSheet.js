@@ -1,4 +1,6 @@
-// teamSheet.js v1.1.0 - 2025-01-18
+// teamSheet.js v1.2.1 - 2025-01-18
+// v1.2.1: Add edit/delete for team karma award history entries
+// v1.2.0: Redesigned UI - 3 tabs (Team/Karma/Session), multiplier in header, defeated villains tracking
 // v1.1.0: Add dropdown for adding team members, include NPCs with friendly disposition
 export class TeamSheet extends Application {
   constructor(options = {}) {
@@ -103,6 +105,10 @@ export class TeamSheet extends Application {
     
     // Settings
     context.karmaMultiplier = game.settings.get("msh-faserip", "karmaMultiplier") || 1;
+    context.multiplierOptions = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+    
+    // Defeated villains
+    context.defeatedVillains = game.settings.get("msh-faserip", "defeatedVillains") || [];
     
     return context;
   }
@@ -160,6 +166,8 @@ export class TeamSheet extends Application {
     html.find('.award-individual-karma').click(ev => this._onAwardIndividualKarma(ev));
     html.find('.award-session-karma').click(ev => this._onAwardSessionKarma(ev));
     html.find('.clear-awards-history').click(ev => this._onClearAwardsHistory(ev));
+    html.find('.edit-award').click(ev => this._onEditAward(ev));
+    html.find('.delete-award').click(ev => this._onDeleteAward(ev));
 
     // Karma penalty
     html.find('.apply-karma-penalty').click(ev => this._onApplyKarmaPenalty(ev));
@@ -195,6 +203,20 @@ export class TeamSheet extends Application {
       await game.settings.set("msh-faserip", "autoLogCombat", ev.target.checked);
       ui.notifications.info(`Auto-log ${ev.target.checked ? 'enabled' : 'disabled'}`);
     });
+
+    // Multiplier change (header)
+    html.find('.multiplier-select').change(async (ev) => {
+      const newMultiplier = Number(ev.target.value);
+      await game.settings.set("msh-faserip", "karmaMultiplier", newMultiplier);
+      ui.notifications.info(`Karma multiplier set to ×${newMultiplier}`);
+    });
+
+    // Defeated villains
+    html.find('.add-defeated-villain').click(ev => this._onAddDefeatedVillain(ev));
+    html.find('.delete-villain').click(ev => this._onDeleteVillain(ev));
+
+    // Award karma from log entry
+    html.find('.award-from-log').click(ev => this._onAwardFromLog(ev));
 
     // Time adjustment handler (KEEP THIS ONE)
     html.find('.time-adjust-btn').on('click', async (ev) => {
@@ -818,6 +840,103 @@ export class TeamSheet extends Application {
     }
   }
 
+  _onEditAward(event) {
+    if (!game.user.isGM) return;
+    
+    const index = Number(event.currentTarget.dataset.index);
+    const awards = game.settings.get("msh-faserip", "teamKarmaAwards") || [];
+    
+    if (index < 0 || index >= awards.length) return;
+    
+    const award = awards[index];
+
+    new Dialog({
+      title: "Edit Award Entry",
+      content: `
+        <form>
+          <div class="form-group">
+            <label>Date:</label>
+            <input type="text" name="date" value="${award.date || ''}" />
+          </div>
+          <div class="form-group">
+            <label>Total Karma:</label>
+            <input type="number" name="totalAmount" value="${award.totalAmount || 0}" />
+          </div>
+          <div class="form-group">
+            <label>Destination:</label>
+            <input type="text" name="destination" value="${award.destination || ''}" />
+          </div>
+          <div class="form-group">
+            <label>Team Size:</label>
+            <input type="number" name="teamSize" value="${award.teamSize || 0}" />
+          </div>
+          <div class="form-group">
+            <label>Award Type:</label>
+            <input type="text" name="reason" value="${award.reason || ''}" />
+          </div>
+          <div class="form-group">
+            <label>Description:</label>
+            <textarea name="description" rows="2">${award.description || ''}</textarea>
+          </div>
+          <div class="form-group">
+            <label>Multiplier:</label>
+            <input type="number" name="multiplier" value="${award.multiplier || 1}" min="1" max="10" />
+          </div>
+        </form>
+      `,
+      buttons: {
+        save: {
+          icon: '<i class="fas fa-save"></i>',
+          label: "Save",
+          callback: async (html) => {
+            award.date = html.find('[name="date"]').val();
+            award.totalAmount = Number(html.find('[name="totalAmount"]').val());
+            award.destination = html.find('[name="destination"]').val();
+            award.teamSize = Number(html.find('[name="teamSize"]').val());
+            award.reason = html.find('[name="reason"]').val();
+            award.description = html.find('[name="description"]').val();
+            award.multiplier = Number(html.find('[name="multiplier"]').val());
+            
+            awards[index] = award;
+            await game.settings.set("msh-faserip", "teamKarmaAwards", awards);
+            ui.notifications.info("Award entry updated");
+            this.render(true);
+          }
+        },
+        cancel: {
+          icon: '<i class="fas fa-times"></i>',
+          label: "Cancel"
+        }
+      },
+      default: "save"
+    }).render(true);
+  }
+
+  async _onDeleteAward(event) {
+    if (!game.user.isGM) return;
+    
+    const index = Number(event.currentTarget.dataset.index);
+    const awards = game.settings.get("msh-faserip", "teamKarmaAwards") || [];
+    
+    if (index < 0 || index >= awards.length) return;
+    
+    const award = awards[index];
+
+    const confirmed = await Dialog.confirm({
+      title: "Delete Award Entry",
+      content: `<p>Delete this award entry?</p>
+                <p style="font-style:italic;color:#666;">${award.reason}: ${award.totalAmount} karma</p>
+                <p style="color:#d32f2f;font-size:0.9em;">Note: This only removes the log entry. It does not reverse karma already awarded to heroes or the pool.</p>`
+    });
+
+    if (confirmed) {
+      awards.splice(index, 1);
+      await game.settings.set("msh-faserip", "teamKarmaAwards", awards);
+      ui.notifications.info("Award entry deleted");
+      this.render(true);
+    }
+  }
+
   _onApplyKarmaPenalty(event) {
     if (!game.user.isGM) return;
 
@@ -1222,6 +1341,266 @@ export class TeamSheet extends Application {
       ui.notifications.info("All logs cleared");
       this.render(true);
     }
+  }
+
+  _onAddDefeatedVillain(event) {
+    if (!game.user.isGM) return;
+
+    const multiplier = game.settings.get("msh-faserip", "karmaMultiplier") || 1;
+    const teamMemberIds = game.settings.get("msh-faserip", "teamMembers") || [];
+    const teamSize = teamMemberIds.length;
+
+    const rankOptions = [
+      { rank: "Remarkable", value: 30 },
+      { rank: "Incredible", value: 40 },
+      { rank: "Amazing", value: 50 },
+      { rank: "Monstrous", value: 75 },
+      { rank: "Unearthly", value: 100 },
+      { rank: "Shift X", value: 150 },
+      { rank: "Shift Y", value: 200 },
+      { rank: "Shift Z", value: 500 },
+      { rank: "Class 1000", value: 1000 },
+      { rank: "Custom", value: 0 }
+    ];
+
+    const rankOptionsHtml = rankOptions.map(r => 
+      `<option value="${r.rank}" data-value="${r.value}">${r.rank} (${r.value})</option>`
+    ).join('');
+
+    new Dialog({
+      title: "Add Defeated Villain",
+      content: `
+        <form>
+          <div class="form-group">
+            <label>Villain Name:</label>
+            <input type="text" name="villainName" placeholder="Dr. Doom" />
+          </div>
+          <div class="form-group">
+            <label>Highest Rank:</label>
+            <select name="villainRank">${rankOptionsHtml}</select>
+          </div>
+          <div class="form-group" data-field="customValue" style="display:none;">
+            <label>Custom Rank Value:</label>
+            <input type="number" name="customValue" value="30" min="1" />
+          </div>
+          <hr style="margin: 10px 0;">
+          <div class="form-group">
+            <label>
+              <input type="checkbox" name="awardKarma" checked />
+              Award karma now
+            </label>
+          </div>
+          <div class="karma-preview" style="background:#e3f2fd;padding:10px;border-radius:4px;margin-top:8px;">
+            <div><strong>Base:</strong> <span class="base-value">30</span></div>
+            <div><strong>Multiplier:</strong> ×${multiplier}</div>
+            <div><strong>Total:</strong> <span class="total-value">${30 * multiplier}</span></div>
+            <div><strong>Per Hero:</strong> <span class="per-hero-value">${teamSize > 0 ? Math.floor((30 * multiplier) / teamSize) : 0}</span> (${teamSize} members)</div>
+          </div>
+          <div class="form-group" style="margin-top:10px;">
+            <label>
+              <input type="checkbox" name="addToPool" />
+              Add to Team Pool instead of splitting
+            </label>
+          </div>
+        </form>
+      `,
+      buttons: {
+        add: {
+          icon: '<i class="fas fa-skull"></i>',
+          label: "Add & Award",
+          callback: async (html) => {
+            const villainName = html.find('[name="villainName"]').val().trim();
+            if (!villainName) {
+              ui.notifications.warn("Please enter a villain name");
+              return;
+            }
+
+            const rankSelect = html.find('[name="villainRank"]');
+            const rank = rankSelect.val();
+            let value = Number(rankSelect.find(':selected').data('value'));
+            
+            if (rank === "Custom") {
+              value = Number(html.find('[name="customValue"]').val()) || 30;
+            }
+
+            const awardKarma = html.find('[name="awardKarma"]').is(':checked');
+            const addToPool = html.find('[name="addToPool"]').is(':checked');
+
+            // Save villain to list
+            const villains = game.settings.get("msh-faserip", "defeatedVillains") || [];
+            const totalKarma = value * multiplier;
+            const karmaPerHero = teamSize > 0 ? Math.floor(totalKarma / teamSize) : 0;
+
+            const villain = {
+              id: foundry.utils.randomID(),
+              name: villainName,
+              rank: rank,
+              value: value,
+              date: new Date().toLocaleDateString(),
+              karmaAwarded: awardKarma ? totalKarma : 0,
+              multiplier: multiplier,
+              addedToPool: addToPool
+            };
+            villains.push(villain);
+            await game.settings.set("msh-faserip", "defeatedVillains", villains);
+
+            // Award karma if checked
+            if (awardKarma && teamSize > 0) {
+              await this._awardTeamKarma(
+                value, 
+                `Defeated Foe - ${rank}`, 
+                `Defeated ${villainName}`, 
+                multiplier, 
+                addToPool
+              );
+            } else if (awardKarma && teamSize === 0) {
+              ui.notifications.warn("No team members to award karma to");
+            }
+
+            ui.notifications.info(`${villainName} added to defeated villains`);
+            this.render(true);
+          }
+        },
+        cancel: {
+          icon: '<i class="fas fa-times"></i>',
+          label: "Cancel"
+        }
+      },
+      default: "add",
+      render: (html) => {
+        const updatePreview = () => {
+          const rankSelect = html.find('[name="villainRank"]');
+          const rank = rankSelect.val();
+          let value = Number(rankSelect.find(':selected').data('value'));
+          
+          if (rank === "Custom") {
+            value = Number(html.find('[name="customValue"]').val()) || 30;
+            html.find('[data-field="customValue"]').show();
+          } else {
+            html.find('[data-field="customValue"]').hide();
+          }
+
+          const total = value * multiplier;
+          const perHero = teamSize > 0 ? Math.floor(total / teamSize) : 0;
+
+          html.find('.base-value').text(value);
+          html.find('.total-value').text(total);
+          html.find('.per-hero-value').text(perHero);
+        };
+
+        html.find('[name="villainRank"]').on('change', updatePreview);
+        html.find('[name="customValue"]').on('input', updatePreview);
+        updatePreview();
+      }
+    }).render(true);
+  }
+
+  async _onDeleteVillain(event) {
+    const villainId = event.currentTarget.dataset.villainId;
+    const villains = game.settings.get("msh-faserip", "defeatedVillains") || [];
+    const villain = villains.find(v => v.id === villainId);
+    
+    if (!villain) return;
+
+    const confirmed = await Dialog.confirm({
+      title: "Remove Villain",
+      content: `<p>Remove <strong>${villain.name}</strong> from defeated villains list?</p>
+                <p style="color:#666;font-size:0.9em;">Note: This does not reverse any karma already awarded.</p>`
+    });
+
+    if (confirmed) {
+      const filtered = villains.filter(v => v.id !== villainId);
+      await game.settings.set("msh-faserip", "defeatedVillains", filtered);
+      ui.notifications.info(`${villain.name} removed from list`);
+      this.render(true);
+    }
+  }
+
+  _onAwardFromLog(event) {
+    if (!game.user.isGM) return;
+
+    const logText = event.currentTarget.dataset.logText || "";
+    
+    // Open the team karma award dialog with pre-filled description
+    const currentMultiplier = game.settings.get("msh-faserip", "karmaMultiplier") || 1;
+
+    new Dialog({
+      title: "Award Karma from Log Entry",
+      content: `
+        <form>
+          <div class="form-group">
+            <label>Award Type:</label>
+            <select name="awardType">
+              <optgroup label="Rescue">
+                <option value="Rescue">Rescue (+20, cap 100)</option>
+                <option value="Multiple Rescues (5+)">Multiple Rescues (5+) (+100)</option>
+              </optgroup>
+              <optgroup label="Stop/Prevent vs Arrest">
+                <option value="Violent Crime (Stop)">Violent Crime — Stop (+30)</option>
+                <option value="Violent Crime (Arrest)">Violent Crime — Arrest (+15)</option>
+                <option value="Destructive Crime (Stop)">Destructive Crime — Stop (+20)</option>
+                <option value="Destructive Crime (Arrest)">Destructive Crime — Arrest (+10)</option>
+                <option value="Robbery (Stop)">Robbery — Stop (+20)</option>
+                <option value="Robbery (Arrest)">Robbery — Arrest (+10)</option>
+                <option value="Theft (Stop)">Theft — Stop (+10)</option>
+                <option value="Theft (Arrest)">Theft — Arrest (+5)</option>
+              </optgroup>
+              <optgroup label="Other">
+                <option value="Custom">Custom Award (enter amount)</option>
+              </optgroup>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Base Karma Amount:</label>
+            <input type="number" name="karmaAmount" value="20" min="1" />
+          </div>
+
+          <div class="form-group">
+            <label>Description:</label>
+            <textarea name="description" rows="2">${logText}</textarea>
+          </div>
+
+          <div class="form-group" style="background:#fff3e0;padding:10px;border-radius:3px;">
+            <label>
+              <input type="checkbox" name="addToPool" checked />
+              Add to Team Karma Pool
+            </label>
+          </div>
+        </form>
+      `,
+      buttons: {
+        award: {
+          icon: '<i class="fas fa-trophy"></i>',
+          label: "Award Karma",
+          callback: async (html) => {
+            const awardType = html.find('[name="awardType"]').val();
+            let karmaAmount = Number(html.find('[name="karmaAmount"]').val());
+            const description = html.find('[name="description"]').val();
+            const addToPool = html.find('[name="addToPool"]').is(':checked');
+
+            // Rescue caps
+            if (awardType.startsWith("Rescue")) karmaAmount = Math.min(karmaAmount, 100);
+            if (awardType.startsWith("Multiple Rescues")) karmaAmount = 100;
+
+            await this._awardTeamKarma(karmaAmount, awardType, description, currentMultiplier, addToPool);
+          }
+        },
+        cancel: { icon: '<i class="fas fa-times"></i>', label: "Cancel" }
+      },
+      default: "award",
+      render: (html) => {
+        const $amount = html.find('[name="karmaAmount"]');
+        $amount.on('input', () => $amount.data('touched', true));
+        
+        html.find('[name="awardType"]').on('change', () => {
+          if ($amount.data('touched')) return;
+          const type = html.find('[name="awardType"]').val();
+          const auto = this._getBaseKarmaFromTeamAward(type);
+          if (auto) $amount.val(auto);
+        });
+      }
+    }).render(true);
   }
 
 } // end of class TeamSheet

@@ -1,4 +1,5 @@
-// init.js v1.7.4 - 2025-01-18
+// init.js v1.7.5 - 2025-01-18
+// v1.7.5: Add defeatedVillains setting for team tracker
 // v1.7.4: Fix prototypeTokenOverrides check to detect keys with undefined values
 // v1.7.3: Fix preCreateActor to use updateSource() for persistent token disposition
 // v1.7.2: Add separate FaseripTalentSheet and FaseripContactSheet with smaller dialog size
@@ -619,6 +620,14 @@ Hooks.once("init", async () => {
     // Add this new one:
     game.settings.register("msh-faserip", "teamKarmaAwards", {
       name: "Team Karma Awards History",
+      scope: "world",
+      config: false,
+      type: Array,
+      default: []
+    });
+
+    game.settings.register("msh-faserip", "defeatedVillains", {
+      name: "Defeated Villains List",
       scope: "world",
       config: false,
       type: Array,
