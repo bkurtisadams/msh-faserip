@@ -1,4 +1,5 @@
-// karma.js with modifications
+// karma.js v1.1.0 - 2025-01-18
+// v1.1.0: Add multi-select delete for karma history entries
 export class KarmaSheet extends DocumentSheet {
   // Track current sort order (true = newest first, false = oldest first)
   sortNewestFirst = true;
@@ -179,6 +180,25 @@ export class KarmaSheet extends DocumentSheet {
       const index = Number(ev.currentTarget.dataset.index);
       this._onDeleteKarma(index);
     });
+
+    // Multi-select: Select all checkbox
+    html.find('.select-all-karma').change(ev => {
+      const isChecked = ev.currentTarget.checked;
+      html.find('.select-karma-entry').prop('checked', isChecked);
+      this._updateDeleteSelectedButton(html);
+    });
+
+    // Multi-select: Individual checkbox
+    html.find('.select-karma-entry').change(ev => {
+      this._updateDeleteSelectedButton(html);
+      // Update "select all" checkbox state
+      const total = html.find('.select-karma-entry').length;
+      const checked = html.find('.select-karma-entry:checked').length;
+      html.find('.select-all-karma').prop('checked', checked === total && total > 0);
+    });
+
+    // Multi-select: Delete selected button
+    html.find('.delete-selected-karma').click(ev => this._onDeleteSelectedKarma(html));
 
     // Clear All Karma button (GM only)
     if (game.user.isGM) {
@@ -946,6 +966,67 @@ export class KarmaSheet extends DocumentSheet {
             // Remove the entry at the specified index in the sorted array
             history.splice(index, 1);
             this._updateKarmaHistory(history);
+          }
+        },
+        cancel: {
+          icon: '<i class="fas fa-times"></i>',
+          label: "Cancel"
+        }
+      },
+      default: "cancel"
+    }).render(true);
+  }
+
+  _updateDeleteSelectedButton(html) {
+    const checkedCount = html.find('.select-karma-entry:checked').length;
+    const btn = html.find('.delete-selected-karma');
+    
+    if (checkedCount > 0) {
+      btn.prop('disabled', false);
+      btn.html(`<i class="fas fa-trash-alt"></i> Delete Selected (${checkedCount})`);
+    } else {
+      btn.prop('disabled', true);
+      btn.html('<i class="fas fa-trash-alt"></i> Delete Selected');
+    }
+  }
+
+  _onDeleteSelectedKarma(html) {
+    const checkedBoxes = html.find('.select-karma-entry:checked');
+    const count = checkedBoxes.length;
+    
+    if (count === 0) return;
+
+    // Get indices of selected entries (in display order)
+    const indices = [];
+    checkedBoxes.each((i, el) => {
+      indices.push(Number(el.dataset.index));
+    });
+
+    new Dialog({
+      title: "Confirm Deletion",
+      content: `<p>Are you sure you want to delete ${count} karma ${count === 1 ? 'entry' : 'entries'}?</p>
+                <p style="color: #8b0000; font-weight: bold;">This cannot be undone.</p>`,
+      buttons: {
+        delete: {
+          icon: '<i class="fas fa-trash"></i>',
+          label: `Delete ${count} ${count === 1 ? 'Entry' : 'Entries'}`,
+          callback: () => {
+            // Get sorted history (same order as displayed)
+            const history = foundry.utils.deepClone(this.object.system.karma?.history || []);
+            history.sort((a, b) => {
+              const dateA = new Date(a.realDate || 0);
+              const dateB = new Date(b.realDate || 0);
+              return this.sortNewestFirst ? dateB - dateA : dateA - dateB;
+            });
+
+            // Remove entries in reverse index order to maintain correct indices
+            indices.sort((a, b) => b - a);
+            for (const idx of indices) {
+              history.splice(idx, 1);
+            }
+
+            this._updateKarmaHistory(history);
+            ui.notifications.info(`Deleted ${count} karma ${count === 1 ? 'entry' : 'entries'}.`);
           }
         },
         cancel: {

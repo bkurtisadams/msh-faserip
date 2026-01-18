@@ -25,6 +25,7 @@
     <button type="button" class="spend-karma"><i class="fas fa-minus"></i> Spend Karma</button>
     <!-- <button type="button" class="open-advancement"><i class="fas fa-level-up-alt"></i> Advancement</button> -->
     <button type="button" class="open-pool"><i class="fas fa-users"></i> Karma Pool</button>
+    <button type="button" class="delete-selected-karma" disabled><i class="fas fa-trash-alt"></i> Delete Selected</button>
     <button type="button" class="import-karma"><i class="fas fa-file-import"></i> Import</button>
     <button type="button" class="export-karma"><i class="fas fa-file-export"></i> Export</button>
     {{#if isGM}}
@@ -39,6 +40,7 @@
       <table>
         <thead>
           <tr>
+            <th class="select-column"><input type="checkbox" class="select-all-karma" title="Select All"></th>
             <th>Real Date</th>
             <th>Game Date</th>
             <th>Amount</th>
@@ -56,6 +58,7 @@
           {{#if system.karma.history.length}}
             {{#each system.karma.history as |event i|}}
               <tr class="karma-entry {{event.cssClass}}">
+                <td class="select-column"><input type="checkbox" class="select-karma-entry" data-index="{{i}}"></td>
                 <td>{{event.realDate}}</td>
                 <td>{{event.gameDate}}</td>
                 <td class="karma-amount {{#if (lt event.amount 0)}}negative{{else}}positive{{/if}}">
@@ -72,7 +75,7 @@
             {{/each}}
           {{else}}
             <tr>
-              <td colspan="7" class="empty-message">No karma history recorded yet.</td>
+              <td colspan="8" class="empty-message">No karma history recorded yet.</td>
             </tr>
           {{/if}}
         </tbody>
