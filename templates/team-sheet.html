@@ -9,9 +9,15 @@
       <div class="pool-display">
         <label>Pool</label>
         <div class="pool-value">{{teamKarmaPool}}</div>
+        <div class="pool-share" title="If pool dissolved">÷{{teamMembers.length}}={{poolShareValue}}</div>
         <button type="button" class="open-pool-manager" title="Manage Pool">
           <i class="fas fa-cog"></i>
         </button>
+        {{#if isGM}}
+        <button type="button" class="dissolve-pool" title="Dissolve Pool (return shares to members)">
+          <i class="fas fa-hand-holding-usd"></i>
+        </button>
+        {{/if}}
       </div>
       {{#if isGM}}
       <div class="multiplier-display">

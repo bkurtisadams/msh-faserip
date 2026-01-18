@@ -57,14 +57,29 @@
   font-size: 14px;
   line-height: 1.2;
 }
+.team-tracker .pool-share {
+  font-size: 11px;
+  color: #1565c0;
+  white-space: nowrap;
+}
 .team-tracker .open-pool-manager {
   background: #bbdefb;
   border: 1px solid #90caf9;
   color: #0d47a1;
   padding: 4px 8px;
   border-radius: 4px;
+  cursor: pointer;
 }
 .team-tracker .open-pool-manager:hover { background: #a6d4fa; }
+.team-tracker .dissolve-pool {
+  background: #ffcdd2;
+  border: 1px solid #ef9a9a;
+  color: #c62828;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.team-tracker .dissolve-pool:hover { background: #ef9a9a; }
 
 
 /* Tabs */

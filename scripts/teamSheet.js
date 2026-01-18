@@ -1,4 +1,5 @@
-// teamSheet.js v1.2.1 - 2025-01-18
+// teamSheet.js v1.3.0 - 2025-01-18
+// v1.3.0: Pool share value display, dissolve pool function, property damage in awards
 // v1.2.1: Add edit/delete for team karma award history entries
 // v1.2.0: Redesigned UI - 3 tabs (Team/Karma/Session), multiplier in header, defeated villains tracking
 // v1.1.0: Add dropdown for adding team members, include NPCs with friendly disposition
@@ -91,6 +92,10 @@ export class TeamSheet extends Application {
     
     // Team karma pool
     context.teamKarmaPool = game.settings.get("msh-faserip", "teamKarmaPoolTotal") || 0;
+    
+    // Pool share value (if dissolved)
+    const teamSize = context.teamMembers.length || 1;
+    context.poolShareValue = Math.floor(context.teamKarmaPool / teamSize);
     
     // Team awards history
     context.teamAwards = game.settings.get("msh-faserip", "teamKarmaAwards") || [];
@@ -186,6 +191,8 @@ export class TeamSheet extends Application {
         }
       });
     });
+
+    html.find('.dissolve-pool').click(ev => this._onDissolvePool(ev));
 
     // Time tracking controls
     html.find('.time-settings-btn').click(ev => this._onTimeSettings(ev));
@@ -394,6 +401,14 @@ export class TeamSheet extends Application {
             <input type="number" name="karmaMultiplier" value="${currentMultiplier}" min="1" max="10" />
           </div>
 
+          <div class="form-group" style="background:#ffebee;padding:10px;border-radius:3px;border:1px solid #ffcdd2;">
+            <label><i class="fas fa-house-damage"></i> Property Damage (-5 karma per area, per hero):</label>
+            <div style="display:flex;align-items:center;gap:10px;margin-top:5px;">
+              <input type="number" name="propertyDamageAreas" value="0" min="0" style="width:60px;" />
+              <span>areas × 5 = <strong class="dmg-penalty-display">0</strong> per hero</span>
+            </div>
+          </div>
+
           <div class="form-group">
             <label>When:</label>
             <select name="awardWhen">
@@ -431,6 +446,7 @@ export class TeamSheet extends Application {
             const when = html.find('[name="awardWhen"]').val();
             const description = html.find('[name="description"]').val();
             const addToPool = html.find('[name="addToPool"]').is(':checked');
+            const propertyDamageAreas = Number(html.find('[name="propertyDamageAreas"]').val() || 0);
 
             // Auto base from type (you can still override in the field)
             const autoBase = this._getBaseKarmaFromTeamAward(awardType, { customFoeRank });
@@ -441,7 +457,7 @@ export class TeamSheet extends Application {
             if (awardType.startsWith("Multiple Rescues")) karmaAmount = 100;
 
             await game.settings.set("msh-faserip", "karmaMultiplier", multiplier);
-            await this._awardTeamKarma(karmaAmount, awardType, description, multiplier, addToPool, { when });
+            await this._awardTeamKarma(karmaAmount, awardType, description, multiplier, addToPool, { when, propertyDamageAreas });
           }
         },
         cancel: { icon: '<i class="fas fa-times"></i>', label: "Cancel" }
@@ -461,11 +477,19 @@ export class TeamSheet extends Application {
         html.find('[name="awardType"]').on('change', sync);
         html.find('[name="customFoeRank"]').on('input', sync);
         sync();
+
+        // Property damage penalty display
+        html.find('[name="propertyDamageAreas"]').on('input', (ev) => {
+          const areas = Number(ev.target.value) || 0;
+          const penalty = areas * 5;
+          html.find('.dmg-penalty-display').text(penalty);
+        });
       }
     }).render(true);
   }
 
-  async _awardTeamKarma(karmaAmount, awardType, description, multiplier, addToPool) {
+  async _awardTeamKarma(karmaAmount, awardType, description, multiplier, addToPool, options = {}) {
+    const { propertyDamageAreas = 0 } = options;
     const teamMemberIds = game.settings.get("msh-faserip", "teamMembers") || [];
     const heroes = game.actors.filter(a => teamMemberIds.includes(a.id));
     
@@ -482,11 +506,32 @@ export class TeamSheet extends Application {
     }
     
     const totalKarma = karmaAmount * multiplier;
+    const propertyPenaltyPerHero = propertyDamageAreas * 5; // -5 per area, per hero
     
     if (addToPool) {
-      // Add directly to team karma pool
+      // Add directly to team karma pool (property damage doesn't apply to pool awards)
       const currentPool = game.settings.get("msh-faserip", "teamKarmaPoolTotal") || 0;
       await game.settings.set("msh-faserip", "teamKarmaPoolTotal", currentPool + totalKarma);
+      
+      // If property damage, apply penalty separately to each hero
+      if (propertyPenaltyPerHero > 0) {
+        for (const hero of heroes) {
+          const penaltyEvent = {
+            realDate: new Date().toLocaleDateString(),
+            gameDate: "",
+            amount: -propertyPenaltyPerHero,
+            type: "Property Damage",
+            description: `${propertyDamageAreas} area(s) destroyed`
+          };
+          
+          const history = foundry.utils.deepClone(hero.system.karma?.history || []);
+          history.push(penaltyEvent);
+          
+          await hero.update({
+            "system.karma.history": history
+          });
+        }
+      }
       
       // Log award
       const teamAwards = game.settings.get("msh-faserip", "teamKarmaAwards") || [];
@@ -495,19 +540,27 @@ export class TeamSheet extends Application {
         totalAmount: totalKarma,
         destination: "Team Pool",
         teamSize: heroes.length,
-        reason: awardType,
+        reason: awardType + (propertyPenaltyPerHero > 0 ? ` (−${propertyPenaltyPerHero}/hero dmg)` : ''),
         description: description || "Team karma award added to pool",
         multiplier: multiplier
       });
       await game.settings.set("msh-faserip", "teamKarmaAwards", teamAwards);
       
-      ui.notifications.info(`${totalKarma} karma awarded to team pool!`);
+      let msg = `${totalKarma} karma awarded to team pool!`;
+      if (propertyPenaltyPerHero > 0) {
+        msg += ` Property damage: −${propertyPenaltyPerHero} per hero.`;
+      }
+      ui.notifications.info(msg);
       
     } else {
       // Split equally among members' personal karma
       const karmaPerHero = Math.floor(totalKarma / heroes.length);
+      const netPerHero = karmaPerHero - propertyPenaltyPerHero;
       
       for (const hero of heroes) {
+        const history = foundry.utils.deepClone(hero.system.karma?.history || []);
+        
+        // Award entry
         const karmaEvent = {
           realDate: new Date().toLocaleDateString(),
           gameDate: "",
@@ -515,9 +568,19 @@ export class TeamSheet extends Application {
           type: awardType,
           description: description || `Team award: ${karmaPerHero} of ${totalKarma} total${multiplier > 1 ? ` (${multiplier}x)` : ''}`
         };
-        
-        const history = foundry.utils.deepClone(hero.system.karma?.history || []);
         history.push(karmaEvent);
+        
+        // Property damage penalty entry (if any)
+        if (propertyPenaltyPerHero > 0) {
+          const penaltyEvent = {
+            realDate: new Date().toLocaleDateString(),
+            gameDate: "",
+            amount: -propertyPenaltyPerHero,
+            type: "Property Damage",
+            description: `${propertyDamageAreas} area(s) destroyed`
+          };
+          history.push(penaltyEvent);
+        }
         
         const newLifetime = (hero.system.karma?.lifetime || 0) + karmaPerHero;
         
@@ -532,15 +595,19 @@ export class TeamSheet extends Application {
       teamAwards.push({
         date: new Date().toLocaleDateString(),
         totalAmount: totalKarma,
-        destination: `Split (${karmaPerHero} each)`,
+        destination: `Split (${karmaPerHero} each${propertyPenaltyPerHero > 0 ? `, net ${netPerHero}` : ''})`,
         teamSize: heroes.length,
-        reason: awardType,
+        reason: awardType + (propertyPenaltyPerHero > 0 ? ` (−${propertyPenaltyPerHero} dmg)` : ''),
         description: description || "Team karma award split equally",
         multiplier: multiplier
       });
       await game.settings.set("msh-faserip", "teamKarmaAwards", teamAwards);
       
-      ui.notifications.info(`${totalKarma} karma split equally: ${karmaPerHero} each to ${heroes.length} heroes!`);
+      let msg = `${totalKarma} karma split equally: ${karmaPerHero} each to ${heroes.length} heroes!`;
+      if (propertyPenaltyPerHero > 0) {
+        msg += ` Property damage: −${propertyPenaltyPerHero} per hero (net ${netPerHero}).`;
+      }
+      ui.notifications.info(msg);
     }
     
     this.render(true);
@@ -935,6 +1002,81 @@ export class TeamSheet extends Application {
       ui.notifications.info("Award entry deleted");
       this.render(true);
     }
+  }
+
+  async _onDissolvePool(event) {
+    if (!game.user.isGM) return;
+
+    const poolTotal = game.settings.get("msh-faserip", "teamKarmaPoolTotal") || 0;
+    if (poolTotal <= 0) {
+      ui.notifications.warn("Pool is empty");
+      return;
+    }
+
+    const teamMemberIds = game.settings.get("msh-faserip", "teamMembers") || [];
+    const heroes = game.actors.filter(a => teamMemberIds.includes(a.id));
+    
+    if (heroes.length === 0) {
+      ui.notifications.warn("No team members to distribute to");
+      return;
+    }
+
+    const share = Math.floor(poolTotal / heroes.length);
+    const remainder = poolTotal % heroes.length;
+
+    const confirmed = await Dialog.confirm({
+      title: "Dissolve Karma Pool?",
+      content: `
+        <p>This will empty the team pool and return karma to each member.</p>
+        <div style="background:#e3f2fd;padding:10px;border-radius:4px;margin:10px 0;">
+          <div><strong>Pool Total:</strong> ${poolTotal}</div>
+          <div><strong>Members:</strong> ${heroes.length}</div>
+          <div><strong>Share Each:</strong> ${share}</div>
+          ${remainder > 0 ? `<div style="color:#666;font-size:0.9em;">Remainder lost: ${remainder}</div>` : ''}
+        </div>
+        <p>Continue?</p>
+      `
+    });
+
+    if (!confirmed) return;
+
+    // Distribute to each hero
+    for (const hero of heroes) {
+      const history = foundry.utils.deepClone(hero.system.karma?.history || []);
+      history.push({
+        realDate: new Date().toLocaleDateString(),
+        gameDate: "",
+        amount: share,
+        type: "Pool Dissolved",
+        description: `Team pool disbanded (${share} of ${poolTotal})`
+      });
+
+      const newLifetime = (hero.system.karma?.lifetime || 0) + share;
+
+      await hero.update({
+        "system.karma.history": history,
+        "system.karma.lifetime": newLifetime
+      });
+    }
+
+    // Empty the pool
+    await game.settings.set("msh-faserip", "teamKarmaPoolTotal", 0);
+
+    // Log it in team awards
+    const teamAwards = game.settings.get("msh-faserip", "teamKarmaAwards") || [];
+    teamAwards.push({
+      date: new Date().toLocaleDateString(),
+      totalAmount: -poolTotal,
+      destination: `Dissolved (${share} each)`,
+      teamSize: heroes.length,
+      reason: "Pool Dissolved",
+      description: `Pool disbanded, ${share} karma returned to each member`,
+      multiplier: 1
+    });
+    await game.settings.set("msh-faserip", "teamKarmaAwards", teamAwards);
+
+    ui.notifications.info(`Pool dissolved. ${share} karma returned to each of ${heroes.length} members.`);
+    this.render(true);
   }
 
   _onApplyKarmaPenalty(event) {
