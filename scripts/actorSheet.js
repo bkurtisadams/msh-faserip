@@ -1,4 +1,5 @@
-// actorSheet.js v1.5.0 - 2025-01-19
+// actorSheet.js v1.6.0 - 2025-01-19
+// v1.6.0: Add clickable Run label for movement FEAT dialog
 // v1.5.0: Refactor movement FEAT dialogs to separate movement-feats.js module
 // v1.4.0: Add clickable Fly label with FEAT dialog for flight maneuvers
 // v1.3.0: Add clickable Leap label with FEAT dialog for movement rolls
@@ -453,7 +454,10 @@ export class FaseripActorSheet extends ActorSheet {
         case 'fly':
           this._movementFeats.showFlyDialog();
           break;
-        // Future: 'run', 'swim', 'teleport'
+        case 'run':
+          this._movementFeats.showRunDialog();
+          break;
+        // Future: 'swim', 'teleport'
       }
     });
 

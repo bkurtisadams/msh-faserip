@@ -617,7 +617,7 @@
       <!-- ADD: movement as its own panel spanning both columns -->
       <div class="movement-panel">
         <div class="movement-item">
-          <label>Run</label>
+          <label class="movement-label clickable" data-movement="run" title="Click to roll Run FEAT">Run</label>
           <input type="number" name="system.movement.run" value="{{system.movement.run}}" 
                  placeholder="{{suggestedMovement}}" 
                  title="Base: {{suggestedMovement}} areas/turn (from Endurance)&#10;Speed: {{movementInfo.run.mph}} mph&#10;&#10;Actions while moving: half speed&#10;Turning >90°: half speed" />
