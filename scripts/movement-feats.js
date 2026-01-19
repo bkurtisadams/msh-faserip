@@ -1,4 +1,6 @@
-// movement-feats.js v1.6.0 - 2025-01-19
+// movement-feats.js v1.7.1 - 2025-01-19
+// v1.7.1: Fix teleport distance table to use Air speed (areas = max teleport distance)
+// v1.7.0: Add Teleport dialog with power rank dropdown, disorientation/passenger/solid object checks
 // v1.6.0: Add Swim dialog with Swimming power dropdown, add Lightning Speed dropdown to Run dialog
 // v1.5.3: Add hover text (title attributes) to compact dialog elements
 // v1.5.2: Fix speed links (use spans not anchors to prevent navigation)
@@ -1590,8 +1592,369 @@ export class MovementFeats {
   }
 
   // ============================================================
-  // FUTURE: TELEPORT
+  // TELEPORT FEAT
   // ============================================================
+
+  /**
+   * Teleport distance by rank - uses AIR speed table (areas = max teleport distance)
+   */
+  static TELEPORT_DISTANCE = {
+    "Feeble": { areas: 2, mph: 30, desc: "2 areas" },
+    "Poor": { areas: 4, mph: 60, desc: "4 areas" },
+    "Typical": { areas: 6, mph: 90, desc: "6 areas" },
+    "Good": { areas: 8, mph: 120, desc: "8 areas" },
+    "Excellent": { areas: 10, mph: 150, desc: "10 areas" },
+    "Remarkable": { areas: 15, mph: 225, desc: "15 areas" },
+    "Incredible": { areas: 20, mph: 300, desc: "20 areas" },
+    "Amazing": { areas: 25, mph: 375, desc: "25 areas" },
+    "Monstrous": { areas: 30, mph: 450, desc: "30 areas" },
+    "Unearthly": { areas: 40, mph: 600, desc: "40 areas" },
+    "Shift-X": { areas: 50, mph: 750, desc: "50 areas" },
+    "Shift-Y": { areas: 100, mph: 1500, desc: "100 areas" },
+    "Shift-Z": { areas: 200, mph: 3750, desc: "200 areas" },
+    "Class 1000": { areas: 0, mph: 0, desc: "Interplanetary" },
+    "Class 3000": { areas: 0, mph: 0, desc: "Near-Light" },
+    "Class 5000": { areas: 0, mph: 0, desc: "Teleportation (anywhere)" }
+  };
+
+  /**
+   * Build Teleport power rank dropdown options
+   */
+  _buildTeleportRankOptions(selectedValue) {
+    let html = '';
+    
+    const ranks = [
+      "Feeble", "Poor", "Typical", "Good", "Excellent", "Remarkable", 
+      "Incredible", "Amazing", "Monstrous", "Unearthly", 
+      "Shift-X", "Shift-Y", "Shift-Z", "Class 1000", "Class 3000", "Class 5000"
+    ];
+    
+    for (const rank of ranks) {
+      const distData = MovementFeats.TELEPORT_DISTANCE[rank];
+      if (distData) {
+        const isSelected = selectedValue === rank;
+        html += `<option value="${rank}" ${isSelected ? 'selected' : ''}>${rank} — ${distData.desc}</option>`;
+      }
+    }
+    
+    return html;
+  }
   
-  // async showTeleportDialog() { }
+  /**
+   * Get teleport info from rank selection
+   */
+  _getTeleportInfoFromSelection(selection) {
+    const distData = MovementFeats.TELEPORT_DISTANCE[selection] || MovementFeats.TELEPORT_DISTANCE["Typical"];
+    const rankValues = {
+      "Feeble": 2, "Poor": 4, "Typical": 6, "Good": 10, "Excellent": 20,
+      "Remarkable": 30, "Incredible": 40, "Amazing": 50, "Monstrous": 75,
+      "Unearthly": 100, "Shift-X": 150, "Shift-Y": 200, "Shift-Z": 500,
+      "Class 1000": 1000, "Class 3000": 3000, "Class 5000": 5000
+    };
+    
+    return {
+      rank: selection,
+      value: rankValues[selection] || 6,
+      ...distData
+    };
+  }
+
+  /**
+   * Show Teleport FEAT dialog
+   * Rules:
+   * - Normal Teleport: Power FEAT, failure = disoriented 1 round
+   * - Passenger: Green Endurance FEAT or disoriented 1-10 rounds
+   * - Unwilling Target: Yellow Endurance FEAT or disoriented 1-10 rounds
+   * - Into Solid: Endurance FEAT, fail = 2x material damage
+   */
+  async showTeleportDialog() {
+    const enduranceAbility = this.actor.system.abilities?.endurance;
+    const enduranceRank = enduranceAbility?.rank || "Typical";
+    const enduranceValue = enduranceAbility?.value || 6;
+    
+    // Get saved settings
+    const savedTeleportRank = this.actor.getFlag("msh-faserip", "lastTeleportRank") || "Typical";
+    const savedFeatType = this.actor.getFlag("msh-faserip", "lastTeleportFeatType") || "normal";
+    const savedColumnShift = this.actor.getFlag("msh-faserip", "lastTeleportColumnShift") || 0;
+    const savedCarryingPassengers = this.actor.getFlag("msh-faserip", "lastTeleportCarryingPassengers") || false;
+    const savedBlindTeleport = this.actor.getFlag("msh-faserip", "lastTeleportBlindTeleport") || false;
+    const skipDiceRoll = this.actor.getFlag("msh-faserip", "lastTeleportSkipDiceRoll") || false;
+    
+    // Get initial teleport info
+    const initialInfo = this._getTeleportInfoFromSelection(savedTeleportRank);
+    const teleportAbbrev = abbrevRank(savedTeleportRank);
+    const endAbbrev = abbrevRank(enduranceRank);
+    const self = this;
+    
+    // Build stats display
+    const statsHtml = `
+      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin-bottom: 8px; font-size: 0.85em;">
+        <div id="teleport-range" style="padding: 6px; background: #e3f2fd; border: 1px solid #90caf9; border-radius: 3px; text-align: center;" title="Maximum teleport distance based on power rank.">
+          <div style="font-weight: bold;">${initialInfo.desc}</div>
+          <div style="font-size: 0.85em; color: #1565c0;">Range</div>
+        </div>
+        <div style="padding: 6px; background: #fff3e0; border: 1px solid #ffcc80; border-radius: 3px; text-align: center;" title="Failure on normal teleport = disoriented for 1 round (no action next round).">
+          <div style="font-weight: bold;">1 round</div>
+          <div style="font-size: 0.85em; color: #e65100;">Disorient (fail)</div>
+        </div>
+        <div style="padding: 6px; background: #fce4ec; border: 1px solid #f48fb1; border-radius: 3px; text-align: center;" title="Passengers/targets who fail Endurance FEAT are disoriented 1-10 rounds.">
+          <div style="font-weight: bold;">1-10 rounds</div>
+          <div style="font-size: 0.85em; color: #c2185b;">Passenger disorient</div>
+        </div>
+      </div>
+    `;
+    
+    const dialogContent = `
+      <div style="background: #f5f5f0; padding: 8px; border-radius: 5px; font-size: 0.95em;">
+        ${statsHtml}
+        
+        <div style="margin-bottom: 8px;">
+          <label style="font-weight: bold;" title="Select your Teleportation power rank">Teleport Power Rank:</label>
+          <select name="teleportRank" style="width: 100%; margin-top: 4px;">
+            ${this._buildTeleportRankOptions(savedTeleportRank)}
+          </select>
+        </div>
+        
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; padding: 6px; background: #e8eaf6; border: 1px solid #9fa8da; border-radius: 3px; flex-wrap: wrap;">
+          <span id="teleport-power-display" style="color: #0d47a1; font-size: 0.9em;" title="Teleport: ${savedTeleportRank} (${initialInfo.value})&#10;Endurance: ${enduranceRank} (${enduranceValue})">Power: ${teleportAbbrev}(${initialInfo.value}) End: ${endAbbrev}(${enduranceValue})</span>
+        </div>
+        
+        <div style="margin-bottom: 8px;">
+          <div style="font-weight: bold; margin-bottom: 4px;">FEAT Type:</div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2px;">
+            <label style="padding: 3px; background: ${savedFeatType === 'normal' ? '#e3f2fd' : 'transparent'}; border-radius: 2px; font-size: 0.9em;" title="Power rank FEAT to teleport.&#10;Failure: Arrive but disoriented (no action next round).">
+              <input type="radio" name="teleportFeatType" value="normal" ${savedFeatType === 'normal' ? 'checked' : ''}> Normal <span style="color: #666;">(Power)</span>
+            </label>
+            <label style="padding: 3px; background: ${savedFeatType === 'passenger' ? '#e3f2fd' : 'transparent'}; border-radius: 2px; font-size: 0.9em;" title="Green Endurance FEAT for willing passengers.&#10;Failure: Disoriented 1-10 rounds.">
+              <input type="radio" name="teleportFeatType" value="passenger" ${savedFeatType === 'passenger' ? 'checked' : ''}> Passenger <span style="color: #666;">(Grn End)</span>
+            </label>
+            <label style="padding: 3px; background: ${savedFeatType === 'unwilling' ? '#e3f2fd' : 'transparent'}; border-radius: 2px; font-size: 0.9em;" title="Yellow Endurance FEAT for unwilling targets teleported from area.&#10;Failure: Disoriented 1-10 rounds.">
+              <input type="radio" name="teleportFeatType" value="unwilling" ${savedFeatType === 'unwilling' ? 'checked' : ''}> Unwilling <span style="color: #666;">(Yel End)</span>
+            </label>
+            <label style="padding: 3px; background: ${savedFeatType === 'solid' ? '#e3f2fd' : 'transparent'}; border-radius: 2px; font-size: 0.9em;" title="Endurance FEAT when teleporting into solid object.&#10;Failure: 2x material strength damage.&#10;Success: Random 'port, unconscious 1-10 rounds.">
+              <input type="radio" name="teleportFeatType" value="solid" ${savedFeatType === 'solid' ? 'checked' : ''}> Into Solid <span style="color: #666;">(End)</span>
+            </label>
+          </div>
+        </div>
+        
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px; padding: 6px; background: #f0f0f0; border-radius: 3px; flex-wrap: wrap; font-size: 0.9em;">
+          <label title="Carrying passengers within Strength limits."><input type="checkbox" name="carryingPassengers" ${savedCarryingPassengers ? 'checked' : ''}> Carrying passengers</label>
+          <label title="Teleporting to unseen/unfamiliar location. GM may apply column shift penalty."><input type="checkbox" name="blindTeleport" ${savedBlindTeleport ? 'checked' : ''}> Blind 'port</label>
+          <span style="margin-left: auto;" title="Column Shift: Positive shifts right (easier), negative shifts left (harder).">CS: <input type="number" name="teleportShift" value="${savedColumnShift}" style="width: 40px;" title="Column Shift (+right, -left)"></span>
+        </div>
+        
+        ${generateKarmaControlsHTML(this.actor)}
+        
+        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 0.9em;">
+          <label title="Save current settings for next time"><input type="checkbox" name="saveSettings" checked> Remember</label>
+          <label title="Skip the 3D dice animation"><input type="checkbox" name="skipDice" ${skipDiceRoll ? 'checked' : ''}> Skip dice</label>
+        </div>
+      </div>
+    `;
+    
+    new Dialog({
+      title: `Teleport FEAT: ${this.actor.name}`,
+      content: dialogContent,
+      buttons: {
+        roll: {
+          icon: '<i class="fas fa-bolt"></i>',
+          label: "Teleport!",
+          callback: async (html) => {
+            const teleportRankValue = html.find('[name="teleportRank"]').val();
+            const featType = html.find('[name="teleportFeatType"]:checked').val();
+            const columnShift = parseInt(html.find('[name="teleportShift"]').val()) || 0;
+            const spendKarma = html.find('#spend-karma').is(':checked');
+            const carryingPassengers = html.find('[name="carryingPassengers"]').is(':checked');
+            const blindTeleport = html.find('[name="blindTeleport"]').is(':checked');
+            const saveSettings = html.find('[name="saveSettings"]').is(':checked');
+            const skipDice = html.find('[name="skipDice"]').is(':checked');
+            
+            // Get teleport info from selection
+            const teleportInfo = self._getTeleportInfoFromSelection(teleportRankValue);
+            
+            if (saveSettings) {
+              await this.actor.setFlag("msh-faserip", "lastTeleportRank", teleportRankValue);
+              await this.actor.setFlag("msh-faserip", "lastTeleportFeatType", featType);
+              await this.actor.setFlag("msh-faserip", "lastTeleportColumnShift", columnShift);
+              await this.actor.setFlag("msh-faserip", "lastTeleportCarryingPassengers", carryingPassengers);
+              await this.actor.setFlag("msh-faserip", "lastTeleportBlindTeleport", blindTeleport);
+              await this.actor.setFlag("msh-faserip", "lastTeleportSkipDiceRoll", skipDice);
+            }
+            
+            await this._executeTeleportFeat(featType, columnShift, spendKarma, skipDice, carryingPassengers, blindTeleport, teleportInfo);
+          }
+        },
+        cancel: { label: "Cancel" }
+      },
+      default: "roll",
+      render: (html) => {
+        // FEAT type highlight
+        html.find('[name="teleportFeatType"]').on('change', function() {
+          html.find('[name="teleportFeatType"]').each(function() {
+            $(this).closest('label').css('background', $(this).is(':checked') ? '#e3f2fd' : 'transparent');
+          });
+        });
+        
+        // Update display when rank changes
+        html.find('[name="teleportRank"]').on('change', function() {
+          const selectedValue = $(this).val();
+          const teleportInfo = self._getTeleportInfoFromSelection(selectedValue);
+          const teleportAbbrev = abbrevRank(selectedValue);
+          
+          // Update range display
+          html.find('#teleport-range').html(`
+            <div style="font-weight: bold;">${teleportInfo.desc}</div>
+            <div style="font-size: 0.85em; color: #1565c0;">Range</div>
+          `);
+          
+          // Update power display
+          html.find('#teleport-power-display').html(`Power: ${teleportAbbrev}(${teleportInfo.value}) End: ${endAbbrev}(${enduranceValue})`);
+        });
+      }
+    }).render(true);
+  }
+  
+  /**
+   * Execute a Teleport FEAT roll
+   */
+  async _executeTeleportFeat(featType, columnShift, spendKarma, skipDice, carryingPassengers, blindTeleport, teleportInfo) {
+    const enduranceAbility = this.actor.system.abilities?.endurance;
+    const enduranceRank = enduranceAbility?.rank || "Typical";
+    const enduranceValue = enduranceAbility?.value || 6;
+    
+    // Determine which ability/rank to use based on FEAT type
+    const isNormalTeleport = featType === 'normal';
+    const isPassenger = featType === 'passenger';
+    const isUnwilling = featType === 'unwilling';
+    const isIntoSolid = featType === 'solid';
+    
+    // Normal teleport uses power rank, others use Endurance
+    const abilityRank = isNormalTeleport ? teleportInfo.rank : enduranceRank;
+    const abilityValue = isNormalTeleport ? teleportInfo.value : enduranceValue;
+    const abilityName = isNormalTeleport ? 'Teleport' : 'Endurance';
+    
+    // FEAT type info
+    const featTypeInfo = {
+      'normal': { 
+        name: 'Teleport', 
+        failure: 'Disoriented — no action next round', 
+        requirement: 'Green',
+        successNote: 'Teleport successful!'
+      },
+      'passenger': { 
+        name: 'Passenger Endurance', 
+        failure: 'Disoriented 1-10 rounds', 
+        requirement: 'Green',
+        successNote: 'Passenger unaffected'
+      },
+      'unwilling': { 
+        name: 'Unwilling Target', 
+        failure: 'Disoriented 1-10 rounds', 
+        requirement: 'Yellow',
+        successNote: 'Target resists disorientation'
+      },
+      'solid': { 
+        name: 'Teleport into Solid', 
+        failure: 'Takes 2× material strength damage!', 
+        requirement: 'Green',
+        successNote: 'Random teleport — unconscious 1-10 rounds'
+      }
+    };
+    const featInfo = featTypeInfo[featType] || featTypeInfo['normal'];
+    
+    // Apply column shifts
+    const effectiveRank = applyColumnShift(abilityRank, columnShift);
+    
+    // Roll
+    const roll = new Roll("1d100");
+    await roll.evaluate();
+    
+    if (!skipDice) {
+      await roll.toMessage({
+        speaker: ChatMessage.getSpeaker({ actor: this.actor }),
+        flavor: `${this.actor.name} attempts ${featInfo.name}`,
+        rollMode: game.settings.get("core", "rollMode")
+      });
+    }
+    
+    // Karma
+    let cappedTotal = roll.total;
+    let karmaUsed = 0;
+    
+    if (spendKarma && getAvailableKarma(this.actor) > 0) {
+      const initialColor = game.msh.rollUniversalTable(effectiveRank, roll.total);
+      const karmaResult = await showKarmaDecisionDialog(
+        this.actor,
+        roll.total,
+        effectiveRank,
+        featInfo.name,
+        initialColor
+      );
+      cappedTotal = karmaResult.finalResult;
+      karmaUsed = karmaResult.karmaSpent;
+    }
+    
+    const resultColor = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
+    
+    // Check success based on FEAT type
+    let featSuccess;
+    if (isUnwilling) {
+      // Unwilling requires Yellow
+      featSuccess = ['yellow', 'red'].includes(resultColor.toLowerCase());
+    } else {
+      // Normal, Passenger, Into Solid require Green
+      featSuccess = ['green', 'yellow', 'red'].includes(resultColor.toLowerCase());
+    }
+    
+    const colorStyle = COLOR_STYLES[resultColor.toLowerCase()] || COLOR_STYLES.white;
+    
+    // Build modifier notes
+    let modifierNotes = [];
+    if (carryingPassengers) modifierNotes.push('Carrying passengers');
+    if (blindTeleport) modifierNotes.push('Blind teleport');
+    
+    // For into solid, success is still bad (random port + unconscious)
+    const resultText = featSuccess 
+      ? featInfo.successNote
+      : `FAILED — ${featInfo.failure}`;
+    
+    // Special: roll disorientation duration for failures that cause it
+    let disorientRoll = '';
+    if (!featSuccess && (isPassenger || isUnwilling)) {
+      const disorientDuration = Math.floor(Math.random() * 10) + 1;
+      disorientRoll = ` (${disorientDuration} rounds)`;
+    }
+    if (featSuccess && isIntoSolid) {
+      const unconsciousDuration = Math.floor(Math.random() * 10) + 1;
+      disorientRoll = ` (${unconsciousDuration} rounds unconscious)`;
+    }
+    
+    const content = `
+      <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
+        <div style="padding: 5px 10px; border-bottom: 1px solid #c0c0c0; font-size: 1.1em; color: #8b0000;">
+          <strong>${this.actor.name} - ${featInfo.name}</strong>
+        </div>
+        <div style="padding: 5px 10px; font-size: 0.9em;">
+          <div>Teleport Power: ${teleportInfo.rank} (${teleportInfo.value}) — Range: ${teleportInfo.desc}</div>
+          <div>${abilityName}: ${abilityRank} (${abilityValue})</div>
+          ${columnShift !== 0 ? `<div>Column Shift: ${columnShift > 0 ? '+' : ''}${columnShift} → ${effectiveRank}</div>` : ''}
+          ${modifierNotes.length > 0 ? `<div style="color: #666; font-size: 0.85em;">${modifierNotes.join(' • ')}</div>` : ''}
+          <div>Required: <span style="color: ${isUnwilling ? '#f57f17' : '#2e7d32'}; font-weight: bold;">${featInfo.requirement}</span></div>
+          <div>Roll: ${roll.total}${karmaUsed > 0 ? ` + Karma: ${karmaUsed} = ${cappedTotal}` : ''}</div>
+        </div>
+        <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
+          background-color: ${colorStyle.bg}; color: ${colorStyle.text};">
+          ${resultColor.toUpperCase()} RESULT
+        </div>
+        <div style="padding: 5px 10px; font-size: 1.1em; text-align: center; font-weight: bold; color: ${featSuccess && !isIntoSolid ? '#4CAF50' : '#F44336'};">
+          ${resultText}${disorientRoll}
+        </div>
+      </div>
+    `;
+    
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor: this.actor }),
+      content: content
+    });
+  }
 }

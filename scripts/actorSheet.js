@@ -1,4 +1,5 @@
-// actorSheet.js v1.7.0 - 2025-01-19
+// actorSheet.js v1.8.0 - 2025-01-19
+// v1.8.0: Add clickable Teleport label for movement FEAT dialog
 // v1.7.0: Add clickable Swim label for movement FEAT dialog
 // v1.6.0: Add clickable Run label for movement FEAT dialog
 // v1.5.0: Refactor movement FEAT dialogs to separate movement-feats.js module
@@ -461,7 +462,9 @@ export class FaseripActorSheet extends ActorSheet {
         case 'swim':
           this._movementFeats.showSwimDialog();
           break;
-        // Future: 'teleport'
+        case 'teleport':
+          this._movementFeats.showTeleportDialog();
+          break;
       }
     });
 
