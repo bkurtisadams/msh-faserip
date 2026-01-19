@@ -1,4 +1,5 @@
-// actorSheet.js v1.2.0 - 2025-01-18
+// actorSheet.js v1.3.0 - 2025-01-19
+// v1.3.0: Add clickable Leap label with FEAT dialog for movement rolls
 // v1.2.0: Fix ability FEAT karma to use two-phase system per rules (declare before, decide amount after roll)
 // v1.1.0: Add visual indicators for Endurance impairment and reduced health max (dying state)
 // v1.0.2: Fix column shift persistence in blunt attack dialog
@@ -430,6 +431,16 @@ export class FaseripActorSheet extends ActorSheet {
     html.find('.movement-chat-btn').on('click', (event) => {
       event.preventDefault();
       this._sendMovementToChat();
+    });
+
+    // Movement label click handlers (for FEAT dialogs)
+    html.find('.movement-label.clickable').on('click', (event) => {
+      event.preventDefault();
+      const movementType = event.currentTarget.dataset.movement;
+      if (movementType === 'leap') {
+        this._showLeapDialog();
+      }
+      // Future: add handlers for 'run', 'swim', 'fly', 'teleport'
     });
 
     // Auto-populate Resources value when rank changes
@@ -5262,6 +5273,311 @@ async _rollAction(actionType, abilityName) {
     await ChatMessage.create({
       speaker: ChatMessage.getSpeaker({ actor: this.actor }),
       content: cardHtml
+    });
+  }
+
+  /**
+   * Show Leap FEAT dialog
+   * Rules:
+   * - Half distance: Automatic (no roll)
+   * - Full distance: Green Strength FEAT
+   * - Extended (+1 area): Red Strength FEAT
+   */
+  async _showLeapDialog() {
+    const strengthAbility = this.actor.system.abilities?.strength;
+    const strengthRank = strengthAbility?.rank || "Typical";
+    const strengthValue = strengthAbility?.value || 6;
+    const leapData = this.actor.leapingData;
+    
+    // Get saved settings
+    const savedDirection = this.actor.getFlag("msh-faserip", "lastLeapDirection") || "across";
+    const savedDistance = this.actor.getFlag("msh-faserip", "lastLeapDistance") || "full";
+    const savedColumnShift = this.actor.getFlag("msh-faserip", "lastLeapColumnShift") || 0;
+    const skipDiceRoll = this.actor.getFlag("msh-faserip", "lastLeapSkipDiceRoll") || false;
+    
+    // Build distance data table
+    const distanceTable = `
+      <table style="width: 100%; border-collapse: collapse; font-size: 0.85em; margin: 8px 0;">
+        <thead>
+          <tr style="background: #e0e0e0;">
+            <th style="padding: 4px; border: 1px solid #ccc;"></th>
+            <th style="padding: 4px; border: 1px solid #ccc;">Across</th>
+            <th style="padding: 4px; border: 1px solid #ccc;">Up</th>
+            <th style="padding: 4px; border: 1px solid #ccc;">Down</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="padding: 4px; border: 1px solid #ccc; font-weight: bold;">Half (Auto)</td>
+            <td style="padding: 4px; border: 1px solid #ccc; text-align: center;">${Math.floor(leapData.acrossFeet / 2)}'</td>
+            <td style="padding: 4px; border: 1px solid #ccc; text-align: center;">${Math.floor(leapData.upFeet / 2)}'</td>
+            <td style="padding: 4px; border: 1px solid #ccc; text-align: center;">${Math.floor(leapData.downFeet / 2)}'</td>
+          </tr>
+          <tr style="background: #e8f5e9;">
+            <td style="padding: 4px; border: 1px solid #ccc; font-weight: bold;">Full (Green)</td>
+            <td style="padding: 4px; border: 1px solid #ccc; text-align: center;">${leapData.acrossFeet}'</td>
+            <td style="padding: 4px; border: 1px solid #ccc; text-align: center;">${leapData.upFeet}' (${leapData.upFloors} flr)</td>
+            <td style="padding: 4px; border: 1px solid #ccc; text-align: center;">${leapData.downFeet}' (${leapData.downFloors} flr)</td>
+          </tr>
+          <tr style="background: #ffebee;">
+            <td style="padding: 4px; border: 1px solid #ccc; font-weight: bold;">Extended (Red)</td>
+            <td style="padding: 4px; border: 1px solid #ccc; text-align: center;">${leapData.acrossFeet * 2}'</td>
+            <td style="padding: 4px; border: 1px solid #ccc; text-align: center;">${leapData.upFeet * 2}' (${(leapData.upFloors * 2).toFixed(1)} flr)</td>
+            <td style="padding: 4px; border: 1px solid #ccc; text-align: center;">${leapData.downFeet * 2}' (${(leapData.downFloors * 2).toFixed(1)} flr)</td>
+          </tr>
+        </tbody>
+      </table>
+    `;
+    
+    const dialogContent = `
+      <div style="background: #f5f5f0; padding: 10px; border-radius: 5px;">
+        <div style="margin-bottom: 10px; padding: 8px; background: #fff; border: 1px solid #ccc; border-radius: 3px;">
+          <div style="font-weight: bold; color: #0d47a1;">Strength: ${strengthRank} (${strengthValue})</div>
+        </div>
+        
+        ${distanceTable}
+        
+        <div style="margin-bottom: 10px;">
+          <label style="display: block; font-weight: bold; margin-bottom: 5px;">Direction:</label>
+          <label style="margin-right: 15px;"><input type="radio" name="leapDirection" value="across" ${savedDirection === 'across' ? 'checked' : ''}> Across</label>
+          <label style="margin-right: 15px;"><input type="radio" name="leapDirection" value="up" ${savedDirection === 'up' ? 'checked' : ''}> Up</label>
+          <label><input type="radio" name="leapDirection" value="down" ${savedDirection === 'down' ? 'checked' : ''}> Down (controlled fall)</label>
+        </div>
+        
+        <div style="margin-bottom: 10px;">
+          <label style="display: block; font-weight: bold; margin-bottom: 5px;">Target Distance:</label>
+          <label style="display: block; margin: 3px 0;"><input type="radio" name="leapDistance" value="half" ${savedDistance === 'half' ? 'checked' : ''}> Half distance (Automatic - no roll)</label>
+          <label style="display: block; margin: 3px 0; color: #2e7d32;"><input type="radio" name="leapDistance" value="full" ${savedDistance === 'full' ? 'checked' : ''}> Full distance (Green Strength FEAT)</label>
+          <label style="display: block; margin: 3px 0; color: #c62828;"><input type="radio" name="leapDistance" value="extended" ${savedDistance === 'extended' ? 'checked' : ''}> Extended +1 area (Red Strength FEAT)</label>
+        </div>
+        
+        <div style="margin-bottom: 10px;">
+          <label style="display: inline-block; width: 100px;">Column Shift:</label>
+          <input type="number" id="leap-shift" name="leapShift" value="${savedColumnShift}" style="width: 50px;">
+          <span style="color: #666; font-size: 0.9em;">(+ right, - left)</span>
+        </div>
+        
+        ${generateKarmaControlsHTML(this.actor)}
+        
+        <div style="margin-bottom: 10px;">
+          <label>
+            <input type="checkbox" id="leap-save-settings" name="saveSettings" checked> 
+            Remember settings
+          </label>
+        </div>
+        <div>
+          <label>
+            <input type="checkbox" id="leap-skip-dice" name="skipDice" ${skipDiceRoll ? 'checked' : ''}> 
+            Skip dice animation
+          </label>
+        </div>
+      </div>
+    `;
+    
+    new Dialog({
+      title: `Leap FEAT: ${this.actor.name}`,
+      content: dialogContent,
+      buttons: {
+        roll: {
+          icon: '<i class="fas fa-fist-raised"></i>',
+          label: "Leap!",
+          callback: async (html) => {
+            const direction = html.find('[name="leapDirection"]:checked').val();
+            const distance = html.find('[name="leapDistance"]:checked').val();
+            const columnShift = parseInt(html.find('[name="leapShift"]').val()) || 0;
+            const spendKarma = html.find('#spend-karma').is(':checked');
+            const saveSettings = html.find('[name="saveSettings"]').is(':checked');
+            const skipDice = html.find('[name="skipDice"]').is(':checked');
+            
+            // Save settings if requested
+            if (saveSettings) {
+              await this.actor.setFlag("msh-faserip", "lastLeapDirection", direction);
+              await this.actor.setFlag("msh-faserip", "lastLeapDistance", distance);
+              await this.actor.setFlag("msh-faserip", "lastLeapColumnShift", columnShift);
+              await this.actor.setFlag("msh-faserip", "lastLeapSkipDiceRoll", skipDice);
+            }
+            
+            // Execute the leap
+            await this._executeLeapFeat(direction, distance, columnShift, spendKarma, skipDice, leapData);
+          }
+        },
+        cancel: { label: "Cancel" }
+      },
+      default: "roll"
+    }).render(true);
+  }
+  
+  /**
+   * Execute a Leap FEAT roll
+   */
+  async _executeLeapFeat(direction, distance, columnShift, spendKarma, skipDice, leapData) {
+    const strengthAbility = this.actor.system.abilities?.strength;
+    const strengthRank = strengthAbility?.rank || "Typical";
+    const strengthValue = strengthAbility?.value || 6;
+    
+    // Get distance values based on direction
+    let distanceFeet, distanceFloors;
+    switch (direction) {
+      case 'up':
+        distanceFeet = leapData.upFeet;
+        distanceFloors = leapData.upFloors;
+        break;
+      case 'down':
+        distanceFeet = leapData.downFeet;
+        distanceFloors = leapData.downFloors;
+        break;
+      default: // across
+        distanceFeet = leapData.acrossFeet;
+        distanceFloors = null;
+    }
+    
+    // Calculate actual distance based on distance type
+    let actualFeet, actualFloors, multiplier;
+    switch (distance) {
+      case 'half':
+        multiplier = 0.5;
+        break;
+      case 'extended':
+        multiplier = 2;
+        break;
+      default: // full
+        multiplier = 1;
+    }
+    actualFeet = Math.floor(distanceFeet * multiplier);
+    actualFloors = distanceFloors ? (distanceFloors * multiplier).toFixed(1) : null;
+    
+    // Determine FEAT requirement
+    let featRequirement, isAutomatic = false;
+    switch (distance) {
+      case 'half':
+        featRequirement = "Automatic";
+        isAutomatic = true;
+        break;
+      case 'extended':
+        featRequirement = "Red";
+        break;
+      default: // full
+        featRequirement = "Green";
+    }
+    
+    // Apply column shifts to get effective rank
+    let effectiveRank = strengthRank;
+    const ranks = [
+      "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent",
+      "Remarkable", "Incredible", "Amazing", "Monstrous", "Unearthly",
+      "Shift-X", "Shift-Y", "Shift-Z", "Class 1000", "Class 3000", "Class 5000", "Beyond"
+    ];
+    if (columnShift !== 0) {
+      const index = ranks.indexOf(strengthRank);
+      if (index !== -1) {
+        const newIndex = Math.min(Math.max(index + columnShift, 0), ranks.length - 1);
+        effectiveRank = ranks[newIndex];
+      }
+    }
+    
+    // Direction display
+    const directionDisplay = direction.charAt(0).toUpperCase() + direction.slice(1);
+    const distanceDisplay = distance === 'half' ? 'Half' : distance === 'extended' ? 'Extended' : 'Full';
+    const floorInfo = actualFloors ? ` (${actualFloors} floors)` : '';
+    
+    // Handle automatic success (half distance)
+    if (isAutomatic) {
+      const content = `
+        <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
+          <div style="padding: 5px 10px; border-bottom: 1px solid #c0c0c0; font-size: 1.1em; color: #8b0000;">
+            <strong>${this.actor.name} - Leap ${directionDisplay}</strong>
+          </div>
+          <div style="padding: 5px 10px; font-size: 0.9em;">
+            <div>Strength: ${strengthRank} (${strengthValue})</div>
+            <div>Distance: ${distanceDisplay} — ${actualFeet}'${floorInfo}</div>
+          </div>
+          <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
+            background-color: #4CAF50; color: white;">
+            AUTOMATIC SUCCESS
+          </div>
+          <div style="padding: 5px 10px; font-size: 0.85em; color: #666; text-align: center;">
+            Half distance requires no roll
+          </div>
+        </div>
+      `;
+      
+      await ChatMessage.create({
+        speaker: ChatMessage.getSpeaker({ actor: this.actor }),
+        content: content
+      });
+      return;
+    }
+    
+    // Create and evaluate the roll
+    const roll = new Roll("1d100");
+    await roll.evaluate();
+    
+    // Display the dice roll if not skipped
+    if (!skipDice) {
+      await roll.toMessage({
+        speaker: ChatMessage.getSpeaker({ actor: this.actor }),
+        flavor: `${this.actor.name} attempts a ${distanceDisplay.toLowerCase()} leap ${direction}`,
+        rollMode: game.settings.get("core", "rollMode")
+      });
+    }
+    
+    // Calculate result with karma (two-phase system)
+    let cappedTotal = roll.total;
+    let karmaUsed = 0;
+    
+    if (spendKarma && getAvailableKarma(this.actor) > 0) {
+      const initialColor = game.msh.rollUniversalTable(effectiveRank, roll.total);
+      const karmaResult = await showKarmaDecisionDialog(
+        this.actor,
+        roll.total,
+        effectiveRank,
+        `Leap ${directionDisplay}`,
+        initialColor
+      );
+      cappedTotal = karmaResult.finalResult;
+      karmaUsed = karmaResult.karmaSpent;
+    }
+    
+    const resultColor = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
+    
+    // Check if FEAT succeeded
+    const featSuccess = this._checkFeatSuccess(resultColor, featRequirement);
+    
+    // Determine result colors for display
+    const colorMap = {
+      'white': { bg: '#f8f8f8', text: '#333' },
+      'green': { bg: '#4CAF50', text: 'white' },
+      'yellow': { bg: '#FFC107', text: '#333' },
+      'red': { bg: '#F44336', text: 'white' }
+    };
+    const colorStyle = colorMap[resultColor.toLowerCase()] || colorMap.white;
+    
+    // Build the chat message
+    const content = `
+      <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
+        <div style="padding: 5px 10px; border-bottom: 1px solid #c0c0c0; font-size: 1.1em; color: #8b0000;">
+          <strong>${this.actor.name} - Leap ${directionDisplay}</strong>
+        </div>
+        <div style="padding: 5px 10px; font-size: 0.9em;">
+          <div>Strength: ${strengthRank} (${strengthValue})</div>
+          ${columnShift !== 0 ? `<div>Column Shift: ${columnShift > 0 ? '+' : ''}${columnShift} → ${effectiveRank}</div>` : ''}
+          <div>Distance: ${distanceDisplay} — ${actualFeet}'${floorInfo}</div>
+          <div>Required: <span style="color: ${featRequirement === 'Red' ? '#c62828' : '#2e7d32'}; font-weight: bold;">${featRequirement}</span></div>
+          <div>Roll: ${roll.total}${karmaUsed > 0 ? ` + Karma: ${karmaUsed} = ${cappedTotal}` : ''}</div>
+        </div>
+        <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
+          background-color: ${colorStyle.bg}; color: ${colorStyle.text};">
+          ${resultColor.toUpperCase()} RESULT
+        </div>
+        <div style="padding: 5px 10px; font-size: 1.1em; text-align: center; font-weight: bold; color: ${featSuccess ? '#4CAF50' : '#F44336'};">
+          ${featSuccess ? `LEAP SUCCEEDED — ${actualFeet}'${floorInfo}` : 'LEAP FAILED'}
+        </div>
+      </div>
+    `;
+    
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor: this.actor }),
+      content: content
     });
   }
 

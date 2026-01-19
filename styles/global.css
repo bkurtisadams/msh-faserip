@@ -3623,6 +3623,20 @@ form.faserip-sheet .movement-panel .movement-chat-btn:hover {
   background: #a00000;
 }
 
+/* Clickable movement labels */
+form.faserip-sheet .movement-panel label.movement-label.clickable {
+  cursor: pointer;
+  color: #0d47a1;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 2px;
+}
+
+form.faserip-sheet .movement-panel label.movement-label.clickable:hover {
+  color: #8b0000;
+  text-decoration-style: solid;
+}
+
 /* ===== Recovery & Rest Section ===== */
 form.faserip-sheet .recovery-rest-section {
   background: #fff;

@@ -623,7 +623,7 @@
                  title="Base: {{suggestedMovement}} areas/turn (from Endurance)&#10;Speed: {{movementInfo.run.mph}} mph&#10;&#10;Actions while moving: half speed&#10;Turning >90°: half speed" />
         </div>
         <div class="movement-item">
-          <label>Leap</label>
+          <label class="movement-label clickable" data-movement="leap" title="Click to roll Leap FEAT">Leap</label>
           <input type="number" name="system.movement.leap" value="{{system.movement.leap}}" 
                  placeholder="{{leapingData.acrossAreas}}"
                  title="Across: {{leapingData.acrossFeet}}' ({{leapingData.acrossAreas}} areas)&#10;Up: {{leapingData.upFeet}}' ({{leapingData.upFloors}} floors)&#10;Down: {{leapingData.downFeet}}' ({{leapingData.downFloors}} floors)&#10;(Based on Strength rank)" />
