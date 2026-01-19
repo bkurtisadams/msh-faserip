@@ -1,8 +1,10 @@
-// karma.js v1.1.0 - 2025-01-18
-// v1.1.0: Add multi-select delete for karma history entries
+// karma.js v1.2.1 - 2025-01-18
+// v1.2.1: Fix _onSpendKarma calling wrong method name
 export class KarmaSheet extends DocumentSheet {
   // Track current sort order (true = newest first, false = oldest first)
   sortNewestFirst = true;
+  // Track current search filter
+  searchFilter = "";
 
   static get defaultOptions() {
     return foundry.utils.mergeObject(super.defaultOptions, {
@@ -200,6 +202,16 @@ export class KarmaSheet extends DocumentSheet {
     // Multi-select: Delete selected button
     html.find('.delete-selected-karma').click(ev => this._onDeleteSelectedKarma(html));
 
+    // Search functionality
+    const searchInput = html.find('.karma-search');
+    searchInput.val(this.searchFilter);
+    searchInput.on('input', ev => this._onSearchInput(ev, html));
+    html.find('.karma-search-clear').click(ev => this._onSearchClear(ev, html));
+    // Apply existing filter on render
+    if (this.searchFilter) {
+      this._applySearchFilter(html, this.searchFilter);
+    }
+
     // Clear All Karma button (GM only)
     if (game.user.isGM) {
         html.find('.clear-karma').click(ev => this._onClearKarma(ev));
@@ -370,7 +382,7 @@ export class KarmaSheet extends DocumentSheet {
     
     // Calculate available karma properly
     const totalEarned = this.object.system.karma.lifetime || 0;
-    const totalSpentLifetime = this._calculateTotalSpentLifetime(this.object.system.karma.history || []);
+    const totalSpentLifetime = this._calculateTotalSpent(this.object.system.karma.history || []);
     const advancementFund = this.object.system.karma.advancement || 0;
     const karmaPool = this.object.system.karma.pool || 0;
     const availableKarma = Math.max(0, totalEarned - totalSpentLifetime - advancementFund - karmaPool);
@@ -840,6 +852,45 @@ export class KarmaSheet extends DocumentSheet {
     a.download = `karma-history-${this.object.name.replace(/\s+/g, '-')}.csv`;
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 100);
+  }
+
+  _onSearchInput(ev, html) {
+    const query = ev.currentTarget.value.toLowerCase().trim();
+    this.searchFilter = query;
+    this._applySearchFilter(html, query);
+  }
+
+  _onSearchClear(ev, html) {
+    ev.preventDefault();
+    this.searchFilter = "";
+    html.find('.karma-search').val("");
+    this._applySearchFilter(html, "");
+  }
+
+  _applySearchFilter(html, query) {
+    const rows = html.find('.karma-entry');
+    let visibleCount = 0;
+    
+    rows.each((i, row) => {
+      const $row = $(row);
+      const text = $row.text().toLowerCase();
+      
+      if (!query || text.includes(query)) {
+        $row.show();
+        visibleCount++;
+      } else {
+        $row.hide();
+      }
+    });
+
+    // Show/hide no-results message
+    html.find('.search-no-results').remove();
+    if (visibleCount === 0 && rows.length > 0 && query) {
+      html.find('tbody').append(`<tr class="search-no-results"><td colspan="8" class="empty-message">No matching entries found.</td></tr>`);
+    }
+
+    // Update clear button visibility
+    html.find('.karma-search-clear').toggle(query.length > 0);
   }
 
   _onSortToggle(event) {

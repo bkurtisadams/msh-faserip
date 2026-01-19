@@ -1994,6 +1994,49 @@
   background-color: #999;
 }
 
+/* Search input */
+.karma-sheet .karma-search-wrapper {
+  display: flex;
+  align-items: center;
+  background: #fff;
+  border: 1px solid #8b0000;
+  border-radius: 3px;
+  padding: 0 6px;
+  min-width: 100px;
+  flex: 1;
+  max-width: 140px;
+}
+
+.karma-sheet .karma-search-wrapper > i {
+  color: #8b0000;
+  font-size: 0.75em;
+}
+
+.karma-sheet .karma-search {
+  border: none;
+  outline: none;
+  padding: 4px 6px;
+  font-size: 0.75em;
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+}
+
+.karma-sheet .karma-search::placeholder {
+  color: #999;
+}
+
+.karma-sheet .karma-search-clear {
+  color: #999;
+  cursor: pointer;
+  font-size: 0.7em;
+  display: none;
+}
+
+.karma-sheet .karma-search-clear:hover {
+  color: #8b0000;
+}
+
 /* Karma Advancement Sheet Styles */
 .karma-advancement-sheet {
   font-family: Arial, sans-serif;
