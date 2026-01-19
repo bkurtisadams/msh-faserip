@@ -1,4 +1,5 @@
-// movement-feats.js v1.5.3 - 2025-01-19
+// movement-feats.js v1.6.0 - 2025-01-19
+// v1.6.0: Add Swim dialog with Swimming power dropdown, add Lightning Speed dropdown to Run dialog
 // v1.5.3: Add hover text (title attributes) to compact dialog elements
 // v1.5.2: Fix speed links (use spans not anchors to prevent navigation)
 // v1.5.1: Fix karma controls (restore generateKarmaControlsHTML), use text links for speed quick-fill
@@ -747,9 +748,74 @@ export class MovementFeats {
   // ============================================================
 
   /**
+   * Build Lightning Speed power rank dropdown options
+   */
+  _buildLightningSpeedRankOptions(selectedValue) {
+    const enduranceAbility = this.actor.system.abilities?.endurance;
+    const enduranceRank = enduranceAbility?.rank || "Typical";
+    const baseRunAreas = this.actor.suggestedMovement;
+    
+    // Default option: Normal Running (Endurance-based)
+    let html = `<option value="endurance" ${selectedValue === 'endurance' ? 'selected' : ''}>Normal Running — ${baseRunAreas} areas (End: ${enduranceRank})</option>`;
+    
+    // Optgroup for Lightning Speed Power ranks
+    html += `<optgroup label="Lightning Speed (select rank)">`;
+    
+    const ranks = [
+      "Feeble", "Poor", "Typical", "Good", "Excellent", "Remarkable", 
+      "Incredible", "Amazing", "Monstrous", "Unearthly", 
+      "Shift-X", "Shift-Y", "Shift-Z", "Class 1000", "Class 3000", "Class 5000"
+    ];
+    
+    const FaseripActor = CONFIG.Actor.documentClass;
+    for (const rank of ranks) {
+      const speedData = FaseripActor.MOVEMENT_DATA.landSpeed[rank];
+      if (speedData) {
+        const isSelected = selectedValue === rank;
+        html += `<option value="${rank}" ${isSelected ? 'selected' : ''}>${rank} — ${speedData.areas} areas (${speedData.mph} mph)</option>`;
+      }
+    }
+    
+    html += `</optgroup>`;
+    return html;
+  }
+  
+  /**
+   * Get run info from dropdown selection
+   */
+  _getRunInfoFromSelection(selection) {
+    if (selection === 'endurance') {
+      const enduranceAbility = this.actor.system.abilities?.endurance;
+      const baseRunAreas = this.actor.suggestedMovement;
+      return {
+        id: 'endurance',
+        name: 'Normal Running',
+        rank: enduranceAbility?.rank || "Typical",
+        areas: baseRunAreas,
+        mph: baseRunAreas * 15,
+        isLightningSpeed: false
+      };
+    }
+    
+    // It's a rank name for Lightning Speed power
+    const FaseripActor = CONFIG.Actor.documentClass;
+    const speedData = FaseripActor.MOVEMENT_DATA.landSpeed[selection];
+    
+    return {
+      id: selection,
+      name: 'Lightning Speed',
+      rank: selection,
+      areas: speedData?.areas || 3,
+      mph: speedData?.mph || 45,
+      isLightningSpeed: true
+    };
+  }
+
+  /**
    * Show Run FEAT dialog
    * Rules:
    * - Normal: No roll, uses Endurance-based speed
+   * - Lightning Speed: Power rank-based speed (vehicle movement)
    * - Speed FEAT: Yellow Strength FEAT for +1 area beyond max
    * - Exhaustion: Endurance FEAT after rank# turns at max speed
    */
@@ -762,11 +828,18 @@ export class MovementFeats {
     const strengthRank = strengthAbility?.rank || "Typical";
     const strengthValue = strengthAbility?.value || 6;
     
-    // Get run speed (custom or from Endurance)
-    const customRunAreas = this.actor.system.movement?.run;
-    const baseRunAreas = this.actor.suggestedMovement;
-    const runAreas = customRunAreas || baseRunAreas;
-    const runMph = runAreas * 15;
+    // Get saved settings
+    const savedRunSource = this.actor.getFlag("msh-faserip", "lastRunSource") || "endurance";
+    const savedFeatType = this.actor.getFlag("msh-faserip", "lastRunFeatType") || "normal";
+    const savedColumnShift = this.actor.getFlag("msh-faserip", "lastRunColumnShift") || 0;
+    const savedActionsWhileRunning = this.actor.getFlag("msh-faserip", "lastRunActionsWhileRunning") || false;
+    const savedTurning = this.actor.getFlag("msh-faserip", "lastRunTurning") || false;
+    const skipDiceRoll = this.actor.getFlag("msh-faserip", "lastRunSkipDiceRoll") || false;
+    
+    // Get initial run info
+    const initialInfo = this._getRunInfoFromSelection(savedRunSource);
+    const runAreas = initialInfo.areas;
+    const runMph = initialInfo.mph;
     
     // Get cruising speed (2 ranks lower, no exhaustion)
     const cruisingInfo = FaseripActor.getCruisingLand(runAreas);
@@ -775,26 +848,20 @@ export class MovementFeats {
     // Check for exhaustion immunity (Unearthly+ Endurance)
     const isExhaustionImmune = EXHAUSTION_IMMUNE_RANKS.includes(enduranceRank);
     
-    // Get saved settings
-    const savedFeatType = this.actor.getFlag("msh-faserip", "lastRunFeatType") || "normal";
-    const savedColumnShift = this.actor.getFlag("msh-faserip", "lastRunColumnShift") || 0;
-    const savedActionsWhileRunning = this.actor.getFlag("msh-faserip", "lastRunActionsWhileRunning") || false;
-    const savedTurning = this.actor.getFlag("msh-faserip", "lastRunTurning") || false;
-    const skipDiceRoll = this.actor.getFlag("msh-faserip", "lastRunSkipDiceRoll") || false;
-    
     const cruisingAreas = cruisingInfo?.areas || Math.max(1, runAreas - 2);
     const cruisingMph = cruisingInfo?.mph || (cruisingAreas * 15);
     const endAbbrev = abbrevRank(enduranceRank);
     const strAbbrev = abbrevRank(strengthRank);
+    const self = this;
     
     // Build compact speed stats display
     const speedStatsHtml = `
       <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-bottom: 8px; font-size: 0.85em;">
-        <div style="padding: 6px; background: #e3f2fd; border: 1px solid #90caf9; border-radius: 3px; text-align: center;" title="Maximum running speed based on Endurance. Running at max speed requires Exhaustion checks after ${exhaustionThreshold} turns.">
+        <div id="run-max-speed" style="padding: 6px; background: #e3f2fd; border: 1px solid #90caf9; border-radius: 3px; text-align: center;" title="Maximum running speed. At max speed, Exhaustion checks required after ${exhaustionThreshold} turns.">
           <div style="font-weight: bold;">${runAreas}/turn</div>
           <div style="font-size: 0.85em; color: #1565c0;">Max ${runMph}mph</div>
         </div>
-        <div style="padding: 6px; background: #e8f5e9; border: 1px solid #a5d6a7; border-radius: 3px; text-align: center;" title="Cruising speed (2 ranks below max). No Exhaustion checks required at this speed.">
+        <div id="run-cruise-speed" style="padding: 6px; background: #e8f5e9; border: 1px solid #a5d6a7; border-radius: 3px; text-align: center;" title="Cruising speed (2 ranks below max). No Exhaustion checks required at this speed.">
           <div style="font-weight: bold;">${cruisingAreas}/turn</div>
           <div style="font-size: 0.85em; color: #2e7d32;">Cruise ${cruisingMph}mph</div>
         </div>
@@ -813,11 +880,18 @@ export class MovementFeats {
       <div style="background: #f5f5f0; padding: 8px; border-radius: 5px; font-size: 0.95em;">
         ${speedStatsHtml}
         
+        <div style="margin-bottom: 8px;">
+          <label style="font-weight: bold;" title="Select normal running (Endurance-based) or Lightning Speed power rank">Running Source:</label>
+          <select name="runSource" style="width: 100%; margin-top: 4px;">
+            ${this._buildLightningSpeedRankOptions(savedRunSource)}
+          </select>
+        </div>
+        
         <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; padding: 6px; background: #e8eaf6; border: 1px solid #9fa8da; border-radius: 3px; flex-wrap: wrap;">
           <span style="font-weight: bold;" title="Current running speed in areas per turn">Speed:</span>
           <input type="number" name="runCurrentSpeed" value="${runAreas}" min="1" max="${runAreas + 5}" style="width: 45px;" title="Enter current running speed">
-          <span class="run-speed-btn" data-speed="${runAreas}" style="font-size: 0.85em; color: #0066cc; cursor: pointer; text-decoration: underline;" title="Set to maximum speed (${runAreas} areas/turn)">[Max]</span>
-          <span class="run-speed-btn" data-speed="${cruisingAreas}" style="font-size: 0.85em; color: #0066cc; cursor: pointer; text-decoration: underline;" title="Set to cruising speed (${cruisingAreas} areas/turn) - no exhaustion">[Cruise]</span>
+          <span class="run-speed-btn" data-speed="${runAreas}" style="font-size: 0.85em; color: #0066cc; cursor: pointer; text-decoration: underline;" title="Set to maximum speed">[Max]</span>
+          <span class="run-speed-btn" data-speed="${cruisingAreas}" style="font-size: 0.85em; color: #0066cc; cursor: pointer; text-decoration: underline;" title="Set to cruising speed - no exhaustion">[Cruise]</span>
           <span style="margin-left: auto; color: #0d47a1; font-size: 0.9em;" title="Endurance: ${enduranceRank} (${enduranceValue})&#10;Strength: ${strengthRank} (${strengthValue})">End: ${endAbbrev}(${enduranceValue}) Str: ${strAbbrev}(${strengthValue})${isExhaustionImmune ? ' ✓Immune' : ''}</span>
         </div>
         
@@ -838,7 +912,7 @@ export class MovementFeats {
         
         <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px; padding: 6px; background: #f0f0f0; border-radius: 3px; flex-wrap: wrap; font-size: 0.9em;">
           <label title="Performing actions (attacking, using powers) while running reduces speed by 50%."><input type="checkbox" name="actionsWhileRunning" ${savedActionsWhileRunning ? 'checked' : ''}> Actions <span style="color: #c62828;">(-50%)</span></label>
-          <label title="Turning more than 90° while running reduces speed by 50%."><input type="checkbox" name="turning" ${savedTurning ? 'checked' : ''}> Turn &gt;90° <span style="color: #c62828;">(-50%)</span></label>
+          <label id="run-turning-label" title="Turning more than 90° while running reduces speed by 50%.${initialInfo.isLightningSpeed ? '&#10;&#10;Lightning Speed: Can turn at max speed without penalty!' : ''}"><input type="checkbox" name="turning" ${savedTurning ? 'checked' : ''} ${initialInfo.isLightningSpeed ? 'disabled' : ''}> Turn &gt;90° <span style="color: #c62828;">(-50%)</span>${initialInfo.isLightningSpeed ? ' <span style="color: #2e7d32;">(LS: free)</span>' : ''}</label>
           <span style="margin-left: auto;" title="Column Shift: Positive shifts right (easier), negative shifts left (harder).">CS: <input type="number" name="runShift" value="${savedColumnShift}" style="width: 40px;" title="Column Shift (+right, -left)"></span>
         </div>
         
@@ -859,6 +933,7 @@ export class MovementFeats {
           icon: '<i class="fas fa-running"></i>',
           label: "Run!",
           callback: async (html) => {
+            const runSourceValue = html.find('[name="runSource"]').val();
             const featType = html.find('[name="runFeatType"]:checked').val();
             const currentSpeed = parseInt(html.find('[name="runCurrentSpeed"]').val()) || runAreas;
             const columnShift = parseInt(html.find('[name="runShift"]').val()) || 0;
@@ -868,7 +943,12 @@ export class MovementFeats {
             const saveSettings = html.find('[name="saveSettings"]').is(':checked');
             const skipDice = html.find('[name="skipDice"]').is(':checked');
             
+            // Get run info from selection
+            const runInfo = self._getRunInfoFromSelection(runSourceValue);
+            const newCruising = Math.max(1, runInfo.areas - 2);
+            
             if (saveSettings) {
+              await this.actor.setFlag("msh-faserip", "lastRunSource", runSourceValue);
               await this.actor.setFlag("msh-faserip", "lastRunFeatType", featType);
               await this.actor.setFlag("msh-faserip", "lastRunColumnShift", columnShift);
               await this.actor.setFlag("msh-faserip", "lastRunActionsWhileRunning", actionsWhileRunning);
@@ -876,23 +956,62 @@ export class MovementFeats {
               await this.actor.setFlag("msh-faserip", "lastRunSkipDiceRoll", skipDice);
             }
             
-            await this._executeRunFeat(featType, columnShift, spendKarma, skipDice, actionsWhileRunning, turning, currentSpeed, runAreas, cruisingAreas, exhaustionThreshold);
+            // Lightning Speed: turning penalty doesn't apply
+            const effectiveTurning = runInfo.isLightningSpeed ? false : turning;
+            
+            await this._executeRunFeat(featType, columnShift, spendKarma, skipDice, actionsWhileRunning, effectiveTurning, currentSpeed, runInfo, newCruising, exhaustionThreshold);
           }
         },
         cancel: { label: "Cancel" }
       },
       default: "roll",
       render: (html) => {
+        const FaseripActor = CONFIG.Actor.documentClass;
+        
         // FEAT type highlight
         html.find('[name="runFeatType"]').on('change', function() {
           html.find('[name="runFeatType"]').each(function() {
             $(this).closest('label').css('background', $(this).is(':checked') ? '#e3f2fd' : 'transparent');
           });
         });
+        
         // Speed quick-fill
         html.find('.run-speed-btn').on('click', function() {
           const speed = $(this).data('speed');
           html.find('[name="runCurrentSpeed"]').val(speed);
+        });
+        
+        // Update speeds when source changes
+        html.find('[name="runSource"]').on('change', function() {
+          const selectedValue = $(this).val();
+          const runInfo = self._getRunInfoFromSelection(selectedValue);
+          const newCruising = Math.max(1, runInfo.areas - 2);
+          
+          // Update stats display
+          html.find('#run-max-speed').html(`
+            <div style="font-weight: bold;">${runInfo.areas}/turn</div>
+            <div style="font-size: 0.85em; color: #1565c0;">Max ${runInfo.mph}mph</div>
+          `);
+          html.find('#run-cruise-speed').html(`
+            <div style="font-weight: bold;">${newCruising}/turn</div>
+            <div style="font-size: 0.85em; color: #2e7d32;">Cruise ${newCruising * 15}mph</div>
+          `);
+          
+          // Update speed input and buttons
+          html.find('[name="runCurrentSpeed"]').val(runInfo.areas);
+          html.find('.run-speed-btn').eq(0).data('speed', runInfo.areas);
+          html.find('.run-speed-btn').eq(1).data('speed', newCruising);
+          
+          // Lightning Speed: disable turning penalty
+          const turningCheckbox = html.find('[name="turning"]');
+          const turningLabel = html.find('#run-turning-label');
+          if (runInfo.isLightningSpeed) {
+            turningCheckbox.prop('disabled', true).prop('checked', false);
+            turningLabel.html(`<input type="checkbox" name="turning" disabled> Turn >90° <span style="color: #c62828;">(-50%)</span> <span style="color: #2e7d32;">(LS: free)</span>`);
+          } else {
+            turningCheckbox.prop('disabled', false);
+            turningLabel.html(`<input type="checkbox" name="turning"> Turn >90° <span style="color: #c62828;">(-50%)</span>`);
+          }
         });
       }
     }).render(true);
@@ -901,13 +1020,18 @@ export class MovementFeats {
   /**
    * Execute a Run FEAT roll
    */
-  async _executeRunFeat(featType, columnShift, spendKarma, skipDice, actionsWhileRunning, turning, currentSpeed, maxSpeed, cruisingAreas, exhaustionThreshold) {
+  async _executeRunFeat(featType, columnShift, spendKarma, skipDice, actionsWhileRunning, turning, currentSpeed, runInfo, cruisingAreas, exhaustionThreshold) {
     const enduranceAbility = this.actor.system.abilities?.endurance;
     const strengthAbility = this.actor.system.abilities?.strength;
     const enduranceRank = enduranceAbility?.rank || "Typical";
     const enduranceValue = enduranceAbility?.value || 6;
     const strengthRank = strengthAbility?.rank || "Typical";
     const strengthValue = strengthAbility?.value || 6;
+    
+    const maxSpeed = runInfo.areas;
+    const sourceNote = runInfo.isLightningSpeed 
+      ? `Lightning Speed (${runInfo.rank})` 
+      : 'Normal Running';
     
     // Determine which ability to use
     const isSpeedFeat = featType === 'speed';
@@ -949,11 +1073,13 @@ export class MovementFeats {
             <strong>${this.actor.name} - Running</strong>
           </div>
           <div style="padding: 5px 10px; font-size: 0.9em;">
+            <div>${sourceNote}</div>
             <div>Speed: ${currentSpeed} areas/turn (${currentSpeed * 15} mph)${isAtMax ? ' <strong style="color: #1565c0;">[MAX]</strong>' : ''}</div>
             <div style="color: #666; font-size: 0.85em;">Cruising: ${cruisingAreas} | Max: ${maxSpeed}</div>
             ${exhaustionNote}
             ${actionsWhileRunning ? `<div style="color: #c62828;">Actions while moving: speed halved</div>` : ''}
             ${turning ? `<div style="color: #c62828;">Turning >90°: speed halved</div>` : ''}
+            ${runInfo.isLightningSpeed && !turning ? `<div style="color: #2e7d32;">Lightning Speed: No turning penalty</div>` : ''}
             <div>Effective Speed: <strong>${effectiveSpeed} areas/turn</strong> (${effectiveSpeed * 15} mph)</div>
           </div>
           <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
@@ -1052,6 +1178,7 @@ export class MovementFeats {
           <strong>${this.actor.name} - ${featInfo.name}</strong>
         </div>
         <div style="padding: 5px 10px; font-size: 0.9em;">
+          <div>${sourceNote}</div>
           <div>${abilityName}: ${abilityRank} (${abilityValue})</div>
           ${columnShift !== 0 ? `<div>Column Shift: ${columnShift > 0 ? '+' : ''}${columnShift} → ${effectiveRank}</div>` : ''}
           ${modifierNotes.length > 0 ? `<div style="color: #666; font-size: 0.85em;">${modifierNotes.join(' • ')}</div>` : ''}
@@ -1075,9 +1202,396 @@ export class MovementFeats {
   }
 
   // ============================================================
-  // FUTURE: SWIM, TELEPORT
+  // SWIM FEAT
+  // ============================================================
+
+  /**
+   * Build Swimming power rank dropdown options
+   */
+  _buildSwimmingRankOptions(selectedValue) {
+    const enduranceAbility = this.actor.system.abilities?.endurance;
+    const enduranceRank = enduranceAbility?.rank || "Typical";
+    
+    // Default option: Normal Swimming (1 area/turn)
+    let html = `<option value="normal" ${selectedValue === 'normal' ? 'selected' : ''}>Normal Swimming — 1 area/turn</option>`;
+    
+    // Optgroup for Swimming Power ranks
+    html += `<optgroup label="Swimming Power (select rank)">`;
+    
+    const ranks = [
+      "Feeble", "Poor", "Typical", "Good", "Excellent", "Remarkable", 
+      "Incredible", "Amazing", "Monstrous", "Unearthly", 
+      "Shift-X", "Shift-Y", "Shift-Z", "Class 1000", "Class 3000", "Class 5000"
+    ];
+    
+    const FaseripActor = CONFIG.Actor.documentClass;
+    for (const rank of ranks) {
+      const speedData = FaseripActor.MOVEMENT_DATA.landSpeed[rank];
+      if (speedData) {
+        const isSelected = selectedValue === rank;
+        html += `<option value="${rank}" ${isSelected ? 'selected' : ''}>${rank} — ${speedData.areas} areas (${speedData.mph} mph)</option>`;
+      }
+    }
+    
+    html += `</optgroup>`;
+    return html;
+  }
+  
+  /**
+   * Get swimming info from dropdown selection
+   */
+  _getSwimmingInfoFromSelection(selection) {
+    if (selection === 'normal') {
+      return {
+        id: 'normal',
+        name: 'Normal Swimming',
+        rank: null,
+        areas: 1,
+        mph: 15
+      };
+    }
+    
+    // It's a rank name for Swimming power
+    const FaseripActor = CONFIG.Actor.documentClass;
+    const speedData = FaseripActor.MOVEMENT_DATA.landSpeed[selection];
+    
+    return {
+      id: selection,
+      name: 'Swimming',
+      rank: selection,
+      areas: speedData?.areas || 1,
+      mph: speedData?.mph || 15
+    };
+  }
+
+  /**
+   * Show Swim FEAT dialog
+   * Rules:
+   * - Normal swimming: 1 area/turn, limited by Endurance
+   * - Swimming Power: Vehicle-like speed based on power rank
+   * - Drowning: Endurance FEAT when out of breath
+   */
+  async showSwimDialog() {
+    const FaseripActor = CONFIG.Actor.documentClass;
+    const enduranceAbility = this.actor.system.abilities?.endurance;
+    const enduranceRank = enduranceAbility?.rank || "Typical";
+    const enduranceValue = enduranceAbility?.value || 6;
+    
+    // Get saved settings
+    const savedSwimSource = this.actor.getFlag("msh-faserip", "lastSwimSource") || "normal";
+    const savedFeatType = this.actor.getFlag("msh-faserip", "lastSwimFeatType") || "normal";
+    const savedColumnShift = this.actor.getFlag("msh-faserip", "lastSwimColumnShift") || 0;
+    const savedActionsWhileSwimming = this.actor.getFlag("msh-faserip", "lastSwimActionsWhileSwimming") || false;
+    const savedUnderwater = this.actor.getFlag("msh-faserip", "lastSwimUnderwater") || false;
+    const skipDiceRoll = this.actor.getFlag("msh-faserip", "lastSwimSkipDiceRoll") || false;
+    
+    // Get initial swimming info
+    const initialInfo = this._getSwimmingInfoFromSelection(savedSwimSource);
+    const swimAreas = initialInfo.areas;
+    const swimMph = initialInfo.mph;
+    const isSwimmingPower = initialInfo.id !== 'normal';
+    
+    // Exhaustion threshold and immunity
+    const exhaustionThreshold = this.actor.exhaustionThreshold;
+    const breathHoldTurns = enduranceValue; // Can hold breath for Endurance rank# turns
+    const isExhaustionImmune = EXHAUSTION_IMMUNE_RANKS.includes(enduranceRank);
+    
+    // Cruising speed (if Swimming power)
+    const cruisingAreas = isSwimmingPower ? Math.max(1, swimAreas - 2) : 1;
+    const cruisingMph = cruisingAreas * 15;
+    
+    const endAbbrev = abbrevRank(enduranceRank);
+    const self = this;
+    
+    // Build speed stats display
+    const speedStatsHtml = `
+      <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-bottom: 8px; font-size: 0.85em;">
+        <div id="swim-max-speed" style="padding: 6px; background: #e3f2fd; border: 1px solid #90caf9; border-radius: 3px; text-align: center;" title="Maximum swimming speed. At max speed, Exhaustion checks required after ${exhaustionThreshold} turns.">
+          <div style="font-weight: bold;">${swimAreas}/turn</div>
+          <div style="font-size: 0.85em; color: #1565c0;">Max ${swimMph}mph</div>
+        </div>
+        <div id="swim-cruise-speed" style="padding: 6px; background: #e8f5e9; border: 1px solid #a5d6a7; border-radius: 3px; text-align: center;" title="Cruising speed (2 ranks below max). No Exhaustion checks required.">
+          <div style="font-weight: bold;">${cruisingAreas}/turn</div>
+          <div style="font-size: 0.85em; color: #2e7d32;">Cruise ${cruisingMph}mph</div>
+        </div>
+        <div style="padding: 6px; background: #fff3e0; border: 1px solid #ffcc80; border-radius: 3px; text-align: center;" title="Number of turns you can hold your breath underwater. Based on Endurance rank number.">
+          <div style="font-weight: bold;">${breathHoldTurns} turns</div>
+          <div style="font-size: 0.85em; color: #e65100;">Breath hold</div>
+        </div>
+        <div style="padding: 6px; background: #fce4ec; border: 1px solid #f48fb1; border-radius: 3px; text-align: center;" title="Number of turns at max speed before first Exhaustion check. Based on Endurance rank number.">
+          <div style="font-weight: bold;">${exhaustionThreshold} turns</div>
+          <div style="font-size: 0.85em; color: #c2185b;">Exh. thresh</div>
+        </div>
+      </div>
+    `;
+    
+    const dialogContent = `
+      <div style="background: #f5f5f0; padding: 8px; border-radius: 5px; font-size: 0.95em;">
+        ${speedStatsHtml}
+        
+        <div style="margin-bottom: 8px;">
+          <label style="font-weight: bold;" title="Select normal swimming or Swimming power rank">Swimming Source:</label>
+          <select name="swimSource" style="width: 100%; margin-top: 4px;">
+            ${this._buildSwimmingRankOptions(savedSwimSource)}
+          </select>
+        </div>
+        
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; padding: 6px; background: #e8eaf6; border: 1px solid #9fa8da; border-radius: 3px; flex-wrap: wrap;">
+          <span style="font-weight: bold;" title="Current swimming speed in areas per turn">Speed:</span>
+          <input type="number" name="swimCurrentSpeed" value="${swimAreas}" min="1" max="${swimAreas + 5}" style="width: 45px;" title="Enter current swimming speed">
+          <span class="swim-speed-btn" data-speed="${swimAreas}" style="font-size: 0.85em; color: #0066cc; cursor: pointer; text-decoration: underline;" title="Set to maximum speed">[Max]</span>
+          <span class="swim-speed-btn" data-speed="${cruisingAreas}" style="font-size: 0.85em; color: #0066cc; cursor: pointer; text-decoration: underline;" title="Set to cruising speed - no exhaustion">[Cruise]</span>
+          <span style="margin-left: auto; color: #0d47a1; font-size: 0.9em;" title="Endurance: ${enduranceRank} (${enduranceValue})">End: ${endAbbrev}(${enduranceValue})${isExhaustionImmune ? ' ✓Immune' : ''}</span>
+        </div>
+        
+        <div style="margin-bottom: 8px;">
+          <div style="font-weight: bold; margin-bottom: 4px;">FEAT Type:</div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2px;">
+            <label style="padding: 3px; background: ${savedFeatType === 'normal' ? '#e3f2fd' : 'transparent'}; border-radius: 2px; font-size: 0.9em;" title="Normal swimming at current speed. No roll required.">
+              <input type="radio" name="swimFeatType" value="normal" ${savedFeatType === 'normal' ? 'checked' : ''}> Normal <span style="color: #666;">(no roll)</span>
+            </label>
+            <label style="padding: 3px; background: ${savedFeatType === 'exhaustion' ? '#e3f2fd' : 'transparent'}; border-radius: 2px; font-size: 0.9em; ${isExhaustionImmune ? 'opacity: 0.5;' : ''}" title="Green Endurance FEAT after ${exhaustionThreshold} turns at max speed.&#10;Failure: Must rest 1-10 turns.${isExhaustionImmune ? '&#10;&#10;IMMUNE: Unearthly+ Endurance' : ''}">
+              <input type="radio" name="swimFeatType" value="exhaustion" ${savedFeatType === 'exhaustion' ? 'checked' : ''} ${isExhaustionImmune ? 'disabled' : ''}> Exhaustion <span style="color: #666;">(Grn End)</span>
+            </label>
+            <label style="padding: 3px; background: ${savedFeatType === 'drowning' ? '#e3f2fd' : 'transparent'}; border-radius: 2px; font-size: 0.9em;" title="Endurance FEAT when out of breath (after ${breathHoldTurns} turns underwater).&#10;White: Drowning (lose 1 End rank/turn).&#10;Green+: Survive, check again next turn.">
+              <input type="radio" name="swimFeatType" value="drowning" ${savedFeatType === 'drowning' ? 'checked' : ''}> Drowning <span style="color: #666;">(End FEAT)</span>
+            </label>
+          </div>
+        </div>
+        
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px; padding: 6px; background: #f0f0f0; border-radius: 3px; flex-wrap: wrap; font-size: 0.9em;">
+          <label title="Performing actions (attacking, using powers) while swimming reduces speed by 50%."><input type="checkbox" name="actionsWhileSwimming" ${savedActionsWhileSwimming ? 'checked' : ''}> Actions <span style="color: #c62828;">(-50%)</span></label>
+          <label title="Swimming underwater. Requires breath holding. Reduced visibility."><input type="checkbox" name="underwater" ${savedUnderwater ? 'checked' : ''}> Underwater</label>
+          <span style="margin-left: auto;" title="Column Shift: Positive shifts right (easier), negative shifts left (harder).">CS: <input type="number" name="swimShift" value="${savedColumnShift}" style="width: 40px;" title="Column Shift (+right, -left)"></span>
+        </div>
+        
+        ${generateKarmaControlsHTML(this.actor)}
+        
+        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 0.9em;">
+          <label title="Save current settings for next time"><input type="checkbox" name="saveSettings" checked> Remember</label>
+          <label title="Skip the 3D dice animation"><input type="checkbox" name="skipDice" ${skipDiceRoll ? 'checked' : ''}> Skip dice</label>
+        </div>
+      </div>
+    `;
+    
+    new Dialog({
+      title: `Swim FEAT: ${this.actor.name}`,
+      content: dialogContent,
+      buttons: {
+        roll: {
+          icon: '<i class="fas fa-swimmer"></i>',
+          label: "Swim!",
+          callback: async (html) => {
+            const swimSourceValue = html.find('[name="swimSource"]').val();
+            const featType = html.find('[name="swimFeatType"]:checked').val();
+            const currentSpeed = parseInt(html.find('[name="swimCurrentSpeed"]').val()) || 1;
+            const columnShift = parseInt(html.find('[name="swimShift"]').val()) || 0;
+            const spendKarma = html.find('#spend-karma').is(':checked');
+            const actionsWhileSwimming = html.find('[name="actionsWhileSwimming"]').is(':checked');
+            const underwater = html.find('[name="underwater"]').is(':checked');
+            const saveSettings = html.find('[name="saveSettings"]').is(':checked');
+            const skipDice = html.find('[name="skipDice"]').is(':checked');
+            
+            // Get swimming info from selection
+            const swimInfo = self._getSwimmingInfoFromSelection(swimSourceValue);
+            
+            if (saveSettings) {
+              await this.actor.setFlag("msh-faserip", "lastSwimSource", swimSourceValue);
+              await this.actor.setFlag("msh-faserip", "lastSwimFeatType", featType);
+              await this.actor.setFlag("msh-faserip", "lastSwimColumnShift", columnShift);
+              await this.actor.setFlag("msh-faserip", "lastSwimActionsWhileSwimming", actionsWhileSwimming);
+              await this.actor.setFlag("msh-faserip", "lastSwimUnderwater", underwater);
+              await this.actor.setFlag("msh-faserip", "lastSwimSkipDiceRoll", skipDice);
+            }
+            
+            await this._executeSwimFeat(featType, columnShift, spendKarma, skipDice, actionsWhileSwimming, underwater, currentSpeed, swimInfo, breathHoldTurns, exhaustionThreshold);
+          }
+        },
+        cancel: { label: "Cancel" }
+      },
+      default: "roll",
+      render: (html) => {
+        const FaseripActor = CONFIG.Actor.documentClass;
+        
+        // FEAT type highlight
+        html.find('[name="swimFeatType"]').on('change', function() {
+          html.find('[name="swimFeatType"]').each(function() {
+            $(this).closest('label').css('background', $(this).is(':checked') ? '#e3f2fd' : 'transparent');
+          });
+        });
+        
+        // Speed quick-fill
+        html.find('.swim-speed-btn').on('click', function() {
+          const speed = $(this).data('speed');
+          html.find('[name="swimCurrentSpeed"]').val(speed);
+        });
+        
+        // Update speeds when source changes
+        html.find('[name="swimSource"]').on('change', function() {
+          const selectedValue = $(this).val();
+          const swimInfo = self._getSwimmingInfoFromSelection(selectedValue);
+          const newCruising = swimInfo.id === 'normal' ? 1 : Math.max(1, swimInfo.areas - 2);
+          
+          // Update stats display
+          html.find('#swim-max-speed').html(`
+            <div style="font-weight: bold;">${swimInfo.areas}/turn</div>
+            <div style="font-size: 0.85em; color: #1565c0;">Max ${swimInfo.mph}mph</div>
+          `);
+          html.find('#swim-cruise-speed').html(`
+            <div style="font-weight: bold;">${newCruising}/turn</div>
+            <div style="font-size: 0.85em; color: #2e7d32;">Cruise ${newCruising * 15}mph</div>
+          `);
+          
+          // Update speed input and buttons
+          html.find('[name="swimCurrentSpeed"]').val(swimInfo.areas);
+          html.find('.swim-speed-btn').eq(0).data('speed', swimInfo.areas);
+          html.find('.swim-speed-btn').eq(1).data('speed', newCruising);
+        });
+      }
+    }).render(true);
+  }
+  
+  /**
+   * Execute a Swim FEAT roll
+   */
+  async _executeSwimFeat(featType, columnShift, spendKarma, skipDice, actionsWhileSwimming, underwater, currentSpeed, swimInfo, breathHoldTurns, exhaustionThreshold) {
+    const enduranceAbility = this.actor.system.abilities?.endurance;
+    const enduranceRank = enduranceAbility?.rank || "Typical";
+    const enduranceValue = enduranceAbility?.value || 6;
+    
+    const cruisingAreas = swimInfo.id === 'normal' ? 1 : Math.max(1, swimInfo.areas - 2);
+    const isAboveCruising = currentSpeed > cruisingAreas;
+    
+    // FEAT type info
+    const featTypeInfo = {
+      'normal': { name: 'Normal Swimming', failure: null },
+      'exhaustion': { name: 'Exhaustion Check', failure: 'Must rest 1-10 turns', requirement: 'Green' },
+      'drowning': { name: 'Drowning Check', failure: 'Drowning! Lose 1 Endurance rank/turn', requirement: 'Green' }
+    };
+    const featInfo = featTypeInfo[featType] || featTypeInfo['normal'];
+    
+    // Handle normal swimming (no roll)
+    if (featType === 'normal') {
+      let effectiveSpeed = currentSpeed;
+      
+      if (actionsWhileSwimming) {
+        effectiveSpeed = Math.ceil(effectiveSpeed / 2);
+      }
+      
+      // Note about exhaustion if swimming above cruising speed
+      const exhaustionNote = isAboveCruising 
+        ? `<div style="color: #c2185b; font-size: 0.85em;">Above cruising speed — Exhaustion check after ${exhaustionThreshold} turns</div>`
+        : '';
+      
+      const sourceNote = swimInfo.id === 'normal' 
+        ? 'Normal Swimming' 
+        : `Swimming Power (${swimInfo.rank})`;
+      
+      const content = `
+        <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
+          <div style="padding: 5px 10px; border-bottom: 1px solid #c0c0c0; font-size: 1.1em; color: #8b0000;">
+            <strong>${this.actor.name} - Swimming</strong>
+          </div>
+          <div style="padding: 5px 10px; font-size: 0.9em;">
+            <div>${sourceNote}</div>
+            <div>Speed: ${currentSpeed} areas/turn (${currentSpeed * 15} mph)${currentSpeed >= swimInfo.areas ? ' <strong style="color: #1565c0;">[MAX]</strong>' : ''}</div>
+            <div style="color: #666; font-size: 0.85em;">Cruising: ${cruisingAreas} | Max: ${swimInfo.areas}</div>
+            ${exhaustionNote}
+            ${actionsWhileSwimming ? `<div style="color: #c62828;">Actions while swimming: speed halved</div>` : ''}
+            ${underwater ? `<div style="color: #0277bd;">Underwater — can hold breath ${breathHoldTurns} turns</div>` : ''}
+            <div>Effective Speed: <strong>${effectiveSpeed} areas/turn</strong> (${effectiveSpeed * 15} mph)</div>
+          </div>
+          <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
+            background-color: #4CAF50; color: white;">
+            SWIMMING OK — NO ROLL NEEDED
+          </div>
+        </div>
+      `;
+      
+      await ChatMessage.create({
+        speaker: ChatMessage.getSpeaker({ actor: this.actor }),
+        content: content
+      });
+      return;
+    }
+    
+    // Apply column shifts
+    const effectiveRank = applyColumnShift(enduranceRank, columnShift);
+    
+    // Roll
+    const roll = new Roll("1d100");
+    await roll.evaluate();
+    
+    if (!skipDice) {
+      await roll.toMessage({
+        speaker: ChatMessage.getSpeaker({ actor: this.actor }),
+        flavor: `${this.actor.name} attempts ${featInfo.name}`,
+        rollMode: game.settings.get("core", "rollMode")
+      });
+    }
+    
+    // Karma
+    let cappedTotal = roll.total;
+    let karmaUsed = 0;
+    
+    if (spendKarma && getAvailableKarma(this.actor) > 0) {
+      const initialColor = game.msh.rollUniversalTable(effectiveRank, roll.total);
+      const karmaResult = await showKarmaDecisionDialog(
+        this.actor,
+        roll.total,
+        effectiveRank,
+        featInfo.name,
+        initialColor
+      );
+      cappedTotal = karmaResult.finalResult;
+      karmaUsed = karmaResult.karmaSpent;
+    }
+    
+    const resultColor = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
+    const featSuccess = ['green', 'yellow', 'red'].includes(resultColor.toLowerCase());
+    const colorStyle = COLOR_STYLES[resultColor.toLowerCase()] || COLOR_STYLES.white;
+    
+    // Build modifier notes
+    let modifierNotes = [];
+    if (actionsWhileSwimming) modifierNotes.push('Actions while swimming (-50%)');
+    if (underwater) modifierNotes.push('Underwater');
+    
+    const sourceNote = swimInfo.id === 'normal' 
+      ? 'Normal Swimming' 
+      : `Swimming Power (${swimInfo.rank})`;
+    
+    const content = `
+      <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
+        <div style="padding: 5px 10px; border-bottom: 1px solid #c0c0c0; font-size: 1.1em; color: #8b0000;">
+          <strong>${this.actor.name} - ${featInfo.name}</strong>
+        </div>
+        <div style="padding: 5px 10px; font-size: 0.9em;">
+          <div>${sourceNote}</div>
+          <div>Endurance: ${enduranceRank} (${enduranceValue})</div>
+          ${columnShift !== 0 ? `<div>Column Shift: ${columnShift > 0 ? '+' : ''}${columnShift} → ${effectiveRank}</div>` : ''}
+          ${modifierNotes.length > 0 ? `<div style="color: #666; font-size: 0.85em;">${modifierNotes.join(' • ')}</div>` : ''}
+          <div>Required: <span style="color: #2e7d32; font-weight: bold;">${featInfo.requirement}</span></div>
+          <div>Roll: ${roll.total}${karmaUsed > 0 ? ` + Karma: ${karmaUsed} = ${cappedTotal}` : ''}</div>
+        </div>
+        <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
+          background-color: ${colorStyle.bg}; color: ${colorStyle.text};">
+          ${resultColor.toUpperCase()} RESULT
+        </div>
+        <div style="padding: 5px 10px; font-size: 1.1em; text-align: center; font-weight: bold; color: ${featSuccess ? '#4CAF50' : '#F44336'};">
+          ${featSuccess ? 'SUCCESS' : `FAILED — ${featInfo.failure}`}
+        </div>
+      </div>
+    `;
+    
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor: this.actor }),
+      content: content
+    });
+  }
+
+  // ============================================================
+  // FUTURE: TELEPORT
   // ============================================================
   
-  // async showSwimDialog() { }
   // async showTeleportDialog() { }
 }
