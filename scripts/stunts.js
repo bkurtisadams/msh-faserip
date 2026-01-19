@@ -319,6 +319,7 @@ async _finalizeStuntRoll(stunt, stuntIndex, rollResult, featColor, extraKarma, b
     
     // Create karma history entry
     const karmaEvent = {
+        timestamp: new Date().toISOString(),
         realDate: new Date().toLocaleDateString(),
         gameDate: "",
         amount: -totalKarma,

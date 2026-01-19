@@ -585,6 +585,7 @@ export class CombatHandler {
                                 // Add karma history
                                 const history = foundry.utils.deepClone(actor.system.karma?.history || []);
                                 history.push({
+                                    timestamp: new Date().toISOString(),
                                     realDate: new Date().toLocaleDateString(),
                                     gameDate: "",
                                     amount: -karmaSpent,
@@ -1597,6 +1598,7 @@ export class CombatHandler {
                     // Create a new karma history entry
                     const history = foundry.utils.deepClone(targetActor.system.karma?.history || []);
                     const newEvent = {
+                        timestamp: new Date().toISOString(),
                         realDate: new Date().toLocaleDateString(),
                         gameDate: game.time?.worldTime ? game.time.worldTime.toString() : "",
                         amount: -karmaSpent,

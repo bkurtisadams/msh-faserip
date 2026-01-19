@@ -1,4 +1,5 @@
-// actorSheet.js v1.1.0 - 2025-12-24
+// actorSheet.js v1.2.0 - 2025-01-18
+// v1.2.0: Fix ability FEAT karma to use two-phase system per rules (declare before, decide amount after roll)
 // v1.1.0: Add visual indicators for Endurance impairment and reduced health max (dying state)
 // v1.0.2: Fix column shift persistence in blunt attack dialog
 // v1.0.1: Remove verbose debug logging on sheet render
@@ -9,6 +10,7 @@ import { ACTION_INFO } from "./modules/actions/action-config.js";
 import { StuntRoller } from './stunts.js';
 import { rollUniversalTable } from "./modules/dice/universal-table.js";
 import { ChargenUIManager } from './chargen.js';
+import { generateKarmaControlsHTML, showKarmaDecisionDialog, getAvailableKarma } from './modules/dice/dice-roller.js';
 
 
 function getPopularityRankWithRange(value, context) {
@@ -2150,6 +2152,7 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
 
                 // Create history entry for karma spending
                 const historyEntry = {
+                  timestamp: new Date().toISOString(),
                   realDate: new Date().toLocaleDateString(),
                   gameDate: "",
                   amount: -karma,
@@ -3155,10 +3158,7 @@ html.find('.headquarters-row').each((i, row) => {
           <input type="number" id="shift" name="shift" value="${savedColumnShift}" style="width: 50px;">
           <span style="color: #666; font-size: 0.9em;">(+ right, - left)</span>
         </div>
-        <div style="margin-bottom: 10px;">
-          <label style="display: inline-block; width: 120px;">Karma Points:</label>
-          <input type="number" id="karma" name="karma" value="0" min="0" style="width: 50px;">
-        </div>
+        ${generateKarmaControlsHTML(this.actor)}
         <div style="margin-bottom: 10px;">
           <label>
             <input type="checkbox" id="save-settings" name="saveSettings" checked> 
@@ -3181,7 +3181,7 @@ html.find('.headquarters-row').each((i, row) => {
             callback: async (html) => {
               const intensity = html.find('[name="intensity"]').val();
               const columnShift = parseInt(html.find('[name="shift"]').val()) || 0;
-              const karma = parseInt(html.find('[name="karma"]').val()) || 0;
+              const spendKarma = html.find('#spend-karma').is(':checked');
               const saveSettings = html.find('[name="saveSettings"]').is(':checked');
               const skipDice = html.find('[name="skipDice"]').is(':checked');
               
@@ -3304,32 +3304,23 @@ html.find('.headquarters-row').each((i, row) => {
                 });
               }
               
-              // Calculate the result with karma
+              // Calculate the result with karma (two-phase system per rules)
               let cappedTotal = roll.total;
               let karmaUsed = 0;
 
-              // Karma spending - uses lifetime karma only
-              if (karma > 0) {
-                cappedTotal = Math.min(100, roll.total + karma);
-                karmaUsed = karma;
-
-                // Create history entry for karma spending
-                const historyEntry = {
-                  realDate: new Date().toLocaleDateString(),
-                  gameDate: "",
-                  amount: -karma,
-                  type: "Die Roll",
-                  description: `Spent karma on ${abilityFullName} FEAT roll`
-                };
-                
-                const currentHistory = foundry.utils.deepClone(this.actor.system.karma?.history || []);
-                currentHistory.push(historyEntry);
-                
-                await game.msh.runAsGM({
-                  operation: 'update',
-                  targetActorUuid: this.actor.uuid,
-                  args: [{ "system.karma.history": currentHistory }]
-                });
+              // Phase 2: If karma was declared, show decision dialog AFTER rolling
+              if (spendKarma && getAvailableKarma(this.actor) > 0) {
+                const initialColor = game.msh.rollUniversalTable(effectiveRank, roll.total);
+                const karmaResult = await showKarmaDecisionDialog(
+                  this.actor, 
+                  roll.total, 
+                  effectiveRank, 
+                  `${abilityFullName} FEAT`, 
+                  initialColor
+                );
+                cappedTotal = karmaResult.finalResult;
+                karmaUsed = karmaResult.karmaSpent;
+                // Note: karma already deducted by showKarmaDecisionDialog
               }
 
               const totalKarmaUsed = karmaUsed;
@@ -4312,6 +4303,7 @@ html.find('.headquarters-row').each((i, row) => {
               
               // Add karma loss to history
               const historyEntry = {
+                timestamp: new Date().toISOString(),
                 realDate: new Date().toLocaleDateString(),
                 gameDate: "",
                 amount: -loss,
@@ -4560,6 +4552,7 @@ _rollVehicleControl(vehicle) {
 
             // Create history entry for karma spending
             const historyEntry = {
+              timestamp: new Date().toISOString(),
               realDate: new Date().toLocaleDateString(),
               gameDate: "",
               amount: -karma,
@@ -4929,6 +4922,7 @@ _rollVehicleControl(vehicle) {
     
     // Base 100 Karma cost
     await karmaSheet._addKarmaEvent({
+      timestamp: new Date().toISOString(),
       realDate: new Date().toLocaleDateString(),
       gameDate: "",
       amount: -100,
@@ -4939,6 +4933,7 @@ _rollVehicleControl(vehicle) {
     // Additional karma bonus
     if (karmaBonus > 0) {
       await karmaSheet._addKarmaEvent({
+        timestamp: new Date().toISOString(),
         realDate: new Date().toLocaleDateString(),
         gameDate: "",
         amount: -karmaBonus,

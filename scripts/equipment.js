@@ -572,7 +572,7 @@ async rollEquipment() {
               }
               if (karmaUsed > 0) {
                 const history = foundry.utils.deepClone(actor.system.karma?.history || []);
-                history.push({ realDate: new Date().toLocaleDateString(), gameDate: "", amount: -karmaUsed, type: "Die Roll", description: `Spent on ${item.name} - ${mode.name}` });
+                history.push({ timestamp: new Date().toISOString(), realDate: new Date().toLocaleDateString(), gameDate: "", amount: -karmaUsed, type: "Die Roll", description: `Spent on ${item.name} - ${mode.name}` });
                 await actor.update({ "system.karma.history": history });
               }
 
@@ -778,6 +778,7 @@ async rollEquipment() {
             if (karmaUsed > 0) {
               const history = foundry.utils.deepClone(actor.system.karma?.history || []);
               const newEvent = {
+                timestamp: new Date().toISOString(),
                 realDate: new Date().toLocaleDateString(),
                 gameDate: "",
                 amount: -karmaUsed,
@@ -1043,6 +1044,7 @@ async rollEquipment() {
             if (karmaUsed > 0) {
               const history = foundry.utils.deepClone(actor.system.karma?.history || []);
               const newEvent = {
+                timestamp: new Date().toISOString(),
                 realDate: new Date().toLocaleDateString(),
                 gameDate: "",
                 amount: -karmaUsed,

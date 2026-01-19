@@ -293,6 +293,7 @@ export async function deductKarma(actor, amount, sourceName) {
   debugLog(`Deducting ${amount} karma from ${actor.name} for ${sourceName}`);
   
   const historyEntry = {
+    timestamp: new Date().toISOString(),
     realDate: new Date().toLocaleDateString(),
     gameDate: "",
     amount: -amount,

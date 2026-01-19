@@ -1,5 +1,5 @@
-// karma.js v1.2.1 - 2025-01-18
-// v1.2.1: Fix _onSpendKarma calling wrong method name
+// karma.js v1.3.0 - 2025-01-18
+// v1.3.0: Add timestamp field to karma entries for reliable sorting
 export class KarmaSheet extends DocumentSheet {
   // Track current sort order (true = newest first, false = oldest first)
   sortNewestFirst = true;
@@ -57,10 +57,11 @@ export class KarmaSheet extends DocumentSheet {
     // Get shared team karma pool from settings
     context.teamKarmaPool = game.settings.get("msh-faserip", "teamKarmaPoolTotal") || 0;
     
-    // Sort history by date (newest first or oldest first based on user preference)
+    // Sort history by timestamp (newest first or oldest first based on user preference)
+    // Falls back to realDate for backward compatibility with older entries
     context.system.karma.history.sort((a, b) => {
-      const dateA = new Date(a.realDate || 0);
-      const dateB = new Date(b.realDate || 0);
+      const dateA = new Date(a.timestamp || a.realDate || 0);
+      const dateB = new Date(b.timestamp || b.realDate || 0);
       return this.sortNewestFirst ? dateB - dateA : dateA - dateB;
     });
     
@@ -493,6 +494,7 @@ export class KarmaSheet extends DocumentSheet {
             
             // Create the karma event with negative amount
             const karmaEvent = {
+              timestamp: new Date().toISOString(),
               realDate: new Date().toLocaleDateString(),
               gameDate: "",
               amount: -amount,
@@ -909,8 +911,8 @@ export class KarmaSheet extends DocumentSheet {
     
     // Sort the history array the same way it's displayed (based on current sort preference)
     history.sort((a, b) => {
-      const dateA = new Date(a.realDate || 0);
-      const dateB = new Date(b.realDate || 0);
+      const dateA = new Date(a.timestamp || a.realDate || 0);
+      const dateB = new Date(b.timestamp || b.realDate || 0);
       return this.sortNewestFirst ? dateB - dateA : dateA - dateB;
     });
     
@@ -998,8 +1000,8 @@ export class KarmaSheet extends DocumentSheet {
     
     // Sort the history array the same way it's displayed (based on current sort preference)
     history.sort((a, b) => {
-      const dateA = new Date(a.realDate || 0);
-      const dateB = new Date(b.realDate || 0);
+      const dateA = new Date(a.timestamp || a.realDate || 0);
+      const dateB = new Date(b.timestamp || b.realDate || 0);
       return this.sortNewestFirst ? dateB - dateA : dateA - dateB;
     });
     
@@ -1065,8 +1067,8 @@ export class KarmaSheet extends DocumentSheet {
             // Get sorted history (same order as displayed)
             const history = foundry.utils.deepClone(this.object.system.karma?.history || []);
             history.sort((a, b) => {
-              const dateA = new Date(a.realDate || 0);
-              const dateB = new Date(b.realDate || 0);
+              const dateA = new Date(a.timestamp || a.realDate || 0);
+              const dateB = new Date(b.timestamp || b.realDate || 0);
               return this.sortNewestFirst ? dateB - dateA : dateA - dateB;
             });
 

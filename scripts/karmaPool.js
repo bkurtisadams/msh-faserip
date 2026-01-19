@@ -120,6 +120,7 @@ export class KarmaPoolSheet extends DocumentSheet {
             
             // Create karma event for pool contribution
             const karmaEvent = {
+              timestamp: new Date().toISOString(),
               realDate: new Date().toLocaleDateString(),
               gameDate: "",
               amount: -amount,
@@ -349,6 +350,7 @@ export class KarmaPoolSheet extends DocumentSheet {
         
         if (currentPool > 0 && refundPerMember > 0) {
           const karmaEvent = {
+            timestamp: new Date().toISOString(),
             realDate: new Date().toLocaleDateString(),
             gameDate: "",
             amount: refundPerMember,
@@ -430,6 +432,7 @@ export class KarmaPoolSheet extends DocumentSheet {
             
             // Add karma to actor's history
             const karmaEvent = {
+              timestamp: new Date().toISOString(),
               realDate: new Date().toLocaleDateString(),
               gameDate: "",
               amount: equalShare,

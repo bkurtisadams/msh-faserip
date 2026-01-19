@@ -517,6 +517,7 @@ export class TeamSheet extends Application {
       if (propertyPenaltyPerHero > 0) {
         for (const hero of heroes) {
           const penaltyEvent = {
+            timestamp: new Date().toISOString(),
             realDate: new Date().toLocaleDateString(),
             gameDate: "",
             amount: -propertyPenaltyPerHero,
@@ -562,6 +563,7 @@ export class TeamSheet extends Application {
         
         // Award entry
         const karmaEvent = {
+          timestamp: new Date().toISOString(),
           realDate: new Date().toLocaleDateString(),
           gameDate: "",
           amount: karmaPerHero,
@@ -573,6 +575,7 @@ export class TeamSheet extends Application {
         // Property damage penalty entry (if any)
         if (propertyPenaltyPerHero > 0) {
           const penaltyEvent = {
+            timestamp: new Date().toISOString(),
             realDate: new Date().toLocaleDateString(),
             gameDate: "",
             amount: -propertyPenaltyPerHero,
@@ -732,6 +735,7 @@ export class TeamSheet extends Application {
     if (!hero) return;
     
     const karmaEvent = {
+      timestamp: new Date().toISOString(),
       realDate: new Date().toLocaleDateString(),
       gameDate: "",
       amount: karmaAmount,
@@ -841,6 +845,7 @@ export class TeamSheet extends Application {
             // Award karma to each selected hero
             for (const { hero, amount } of awards) {
               const karmaEvent = {
+                timestamp: new Date().toISOString(),
                 realDate: new Date().toLocaleDateString(),
                 gameDate: "",
                 amount: amount,
@@ -1044,6 +1049,7 @@ export class TeamSheet extends Application {
     for (const hero of heroes) {
       const history = foundry.utils.deepClone(hero.system.karma?.history || []);
       history.push({
+        timestamp: new Date().toISOString(),
         realDate: new Date().toLocaleDateString(),
         gameDate: "",
         amount: share,
