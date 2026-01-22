@@ -1,5 +1,6 @@
-// rolls.js v1.9.27 - 2025-01-09
+// rolls.js v1.9.29 - 2025-01-21
 // File: systems/msh-faserip/rolls.js
+// Fixed intensity comparison to use effective rank (base + talent bonus + extra shift)
 import { applyColumnShiftToRank } from './actorSheet.js';
 import { CombatHandler } from './combat-handler.js';
 import { runAsGM } from './gm-utils.js';
@@ -997,6 +998,7 @@ export class FaseripRolls {
     const savedDamageCS = talent.getFlag("msh-faserip", "lastDamageCS") || 0;
     const savedDamageType = talent.getFlag("msh-faserip", "lastDamageType") || "Physical-Blunt";
     const savedIntensity = talent.getFlag("msh-faserip", "lastIntensity") || "";
+    const savedAbility = talent.getFlag("msh-faserip", "lastAbility") || "";
     const skipDiceRoll = talent.getFlag("msh-faserip", "skipDiceRoll") || false;
     const savedRememberSettings = talent.getFlag("msh-faserip", "rememberSettings") ?? true;
 
@@ -1024,10 +1026,10 @@ export class FaseripRolls {
         console.log("Applied -4CS penalty for multi-adjacent talent attack");
       }
 
-      // Get ability information
-      let abilityModified = talent.system.abilityModified;
-      let abilityRank = abilityModified ? actor.system.abilities[abilityModified].rank : "Typical";
-      let abilityValue = abilityModified ? actor.system.abilities[abilityModified].value : 6;
+      // Get ability information - use selectedAbility from options if provided, else savedAbility, else talent default
+      let abilityModified = options.selectedAbility || savedAbility || talent.system.abilityModified;
+      let abilityRank = abilityModified ? actor.system.abilities[abilityModified]?.rank : "Typical";
+      let abilityValue = abilityModified ? actor.system.abilities[abilityModified]?.value : 6;
 
       // Apply column shifts to get effective rank
       let effectiveRank = abilityRank;
@@ -1480,7 +1482,9 @@ export class FaseripRolls {
       let effectiveRankDisplay = "";
       let talentBonusDisplay = "";
       const rankOverride = talent.system.rankOverride;
-      const baseRank = abilityModified ? actor.system.abilities[abilityModified]?.rank : "Typical";
+      // Use savedAbility if set, otherwise use talent's configured ability
+      const initialAbility = savedAbility || abilityModified;
+      const baseRank = initialAbility ? actor.system.abilities[initialAbility]?.rank : "Typical";
 
       const RANKS = [
         "Shift-0","Feeble","Poor","Typical","Good","Excellent",
@@ -1533,6 +1537,36 @@ export class FaseripRolls {
         `<option value="${rank}" ${rank === savedIntensity ? 'selected' : ''}>${rank || '(None - any color succeeds)'}</option>`
       ).join('');
       
+      // Build ability dropdown options
+      const ABILITIES = ["fighting", "agility", "strength", "endurance", "reason", "intuition", "psyche"];
+      const defaultAbility = savedAbility || abilityModified || "fighting";
+      const abilityOptionsHTML2 = ABILITIES.map(ability => {
+        const abilityRank = actor.system.abilities[ability]?.rank || "Typical";
+        const abilityValue = actor.system.abilities[ability]?.value || 6;
+        const label = ability.charAt(0).toUpperCase() + ability.slice(1);
+        const selected = ability === defaultAbility ? 'selected' : '';
+        return `<option value="${ability}" data-rank="${abilityRank}" data-value="${abilityValue}" ${selected}>${label} (${abilityRank})</option>`;
+      }).join('');
+
+      // Map action types to their required abilities (for combat actions)
+      const COMBAT_ACTION_ABILITIES = {
+        "Blunt Attack (BA)": "fighting",
+        "Edged Attack (EA)": "fighting",
+        "Shooting Attack (Sh)": "agility",
+        "Throwing Edged (TE)": "agility",
+        "Throwing Blunt (TB)": "agility",
+        "Energy (En)": "agility",
+        "Force (Fo)": "agility",
+        "Grappling (GP)": "strength",
+        "Grabbing (Gb)": "strength",
+        "Escaping (ES)": "strength",
+        "Charging (Ch)": "endurance",
+        "Dodging (Do)": "agility",
+        "Evading (Ev)": "fighting",
+        "Blocking (Bl)": "strength",
+        "Catching (Ca)": "agility"
+      };
+
       // Create dialog for roll options
       let dialogContent = `
         <div style="background: #f0e8d8; padding: 10px; border-radius: 5px;">
@@ -1543,15 +1577,22 @@ export class FaseripRolls {
             </select>
           </div>
           ${talentBonusDisplay}
-          <div style="margin-bottom: 10px;">
-            <label style="display: inline-block; width: 120px;">Ability:</label>
-            <span>${abilityLabel}</span>
+          <div id="ability-container" style="margin-bottom: 10px; padding: 8px; background: #e8e8e8; border: 1px solid #ccc; border-radius: 4px;">
+            <div style="margin-bottom: 6px;">
+              <label style="display: inline-block; width: 120px;">Ability:</label>
+              <select id="ability-select" name="abilitySelect" style="width: 180px;">
+                ${abilityOptionsHTML2}
+              </select>
+            </div>
+            <div id="ability-hint" style="font-size: 0.85em; color: #666; margin-left: 124px;">
+              ${abilityModified ? `(Talent default: ${abilityLabel})` : '(No default ability set)'}
+            </div>
           </div>
           <div style="margin-bottom: 10px;">
             <label style="display: inline-block; width: 120px;">Base Rank:</label>
-            <span>${baseRank}</span>
+            <span id="base-rank-display">${baseRank}</span>
           </div>
-          ${effectiveRankDisplay}
+          <div id="effective-rank-container">${effectiveRankDisplay}</div>
           <div style="margin-bottom: 10px;">
             <label style="display: inline-block; width: 120px;">Extra Column Shift:</label>
             <input type="number" id="shift" name="shift" value="${savedExtraShift}" style="width: 50px;">
@@ -1606,12 +1647,13 @@ export class FaseripRolls {
             label: "Roll",
             callback: async (html) => {
               const actionType = html.find('[name="actionType"]').val();
+              const selectedAbility = html.find('[name="abilitySelect"]').val();
               const extraShift = parseInt(html.find('[name="shift"]').val()) || 0;
               const damageCS = parseInt(html.find('[name="damageCs"]').val()) || 0;
               const damageType = html.find('[name="damageType"]').val();
               const intensity = html.find('[name="intensity"]').val();
               const { spendKarma, karmaToSpend } = extractKarmaFromDialog(html);
-              if (game.settings.get("msh-faserip", "debugMode")) console.log("FASERIP DEBUG | TALENT KARMA - Dialog extracted:", { spendKarma, karmaToSpend });
+              if (game.settings.get("msh-faserip", "debugMode")) console.log("FASERIP DEBUG | TALENT KARMA - Dialog extracted:", { spendKarma, karmaToSpend, selectedAbility });
               const skipDice = html.find('[name="skipDice"]').is(':checked');
               const saveSettings = html.find('[name="saveSettings"]').is(':checked');
 
@@ -1626,6 +1668,7 @@ export class FaseripRolls {
                 await talent.setFlag("msh-faserip", "lastDamageCS", damageCS);
                 await talent.setFlag("msh-faserip", "lastDamageType", damageType);
                 await talent.setFlag("msh-faserip", "lastIntensity", intensity);
+                await talent.setFlag("msh-faserip", "lastAbility", selectedAbility);
               }
 
               // Map talent action types to dispatcher action codes
@@ -1651,7 +1694,9 @@ export class FaseripRolls {
 
               // Route combat actions through ActionDispatcher
               if (dispatcherActionCode) {
-                const baseRank = abilityModified ? actor.system.abilities[abilityModified]?.rank : "Typical";
+                // For combat actions, use the action's required ability (already set by the dialog)
+                const combatAbility = selectedAbility || abilityModified || "fighting";
+                const baseRank = actor.system.abilities[combatAbility]?.rank || "Typical";
                 
                 // Calculate total shift
                 let totalShift = talentBonus + extraShift;
@@ -1674,7 +1719,7 @@ export class FaseripRolls {
                 const { ActionDispatcher } = await import("./modules/actions/action-dispatcher.js");
                 return ActionDispatcher.roll(dispatcherActionCode, {
                   actor,
-                  abilityName: abilityModified,
+                  abilityName: combatAbility,
                   opts: {
                     shift: totalShift,
                     spendKarma,
@@ -1685,10 +1730,11 @@ export class FaseripRolls {
                   }
                 });
               } else {
-                // Non-combat (Ability FEAT) - use existing logic
+                // Non-combat (Ability FEAT) - use selected ability
                 return FaseripRolls.rollTalent(actor, talent, {
                   useDirectRoll: true,
-                  actionType, extraShift, damageCS, damageType, intensity, spendKarma, skipDice
+                  actionType, extraShift, damageCS, damageType, intensity, spendKarma, skipDice,
+                  selectedAbility: selectedAbility
                 });
               }
             }
@@ -1701,18 +1747,90 @@ export class FaseripRolls {
           setupKarmaControlHandlers(html);
           
           const actionSelect = html.find('#action-type');
+          const abilitySelect = html.find('#ability-select');
+          const abilityContainer = html.find('#ability-container');
+          const abilityHint = html.find('#ability-hint');
+          const baseRankDisplay = html.find('#base-rank-display');
+          const effectiveRankContainer = html.find('#effective-rank-container');
           const multiContainer = html.find('#multi-target-container');
           const combatOptions = html.find('#combat-options-container');
           const intensityContainer = html.find('#intensity-container');
           const intensitySelect = html.find('#intensity');
           const intensityInfo = html.find('#intensity-info');
 
-          // Ranks for intensity comparison
-          const INTENSITY_RANKS = [
+          // Ranks for intensity comparison and effective rank calculation
+          const DIALOG_RANKS = [
             "Shift-0","Feeble","Poor","Typical","Good","Excellent",
             "Remarkable","Incredible","Amazing","Monstrous","Unearthly",
             "Shift-X","Shift-Y","Shift-Z","Class 1000","Class 3000","Class 5000","Beyond"
           ];
+
+          // Combat action ability map
+          const COMBAT_ACTION_ABILITIES = {
+            "Blunt Attack (BA)": "fighting",
+            "Edged Attack (EA)": "fighting",
+            "Shooting Attack (Sh)": "agility",
+            "Throwing Edged (TE)": "agility",
+            "Throwing Blunt (TB)": "agility",
+            "Energy (En)": "agility",
+            "Force (Fo)": "agility",
+            "Grappling (GP)": "strength",
+            "Grabbing (Gb)": "strength",
+            "Escaping (ES)": "strength",
+            "Charging (Ch)": "endurance",
+            "Dodging (Do)": "agility",
+            "Evading (Ev)": "fighting",
+            "Blocking (Bl)": "strength",
+            "Catching (Ca)": "agility"
+          };
+
+          // Get current ability rank from selected option
+          function getCurrentAbilityRank() {
+            const selectedOption = abilitySelect.find('option:selected');
+            return selectedOption.data('rank') || "Typical";
+          }
+
+          // Update base rank and effective rank displays
+          function updateRankDisplays() {
+            const currentRank = getCurrentAbilityRank();
+            baseRankDisplay.text(currentRank);
+            
+            // Calculate effective rank
+            const rankOverride = talent.system.rankOverride;
+            const extraShift = parseInt(html.find('[name="shift"]').val()) || 0;
+            
+            if (rankOverride) {
+              const baseIndex = DIALOG_RANKS.indexOf(currentRank);
+              const overrideIndex = DIALOG_RANKS.indexOf(rankOverride);
+              const overrideShift = (baseIndex >= 0 && overrideIndex >= 0) ? (overrideIndex - baseIndex) : 0;
+              
+              effectiveRankContainer.html(`
+                <div style="margin-bottom: 10px; padding: 8px; background: #e8f5e9; border: 1px solid #4caf50; border-radius: 4px;">
+                  <div style="font-weight: bold; color: #2e7d32; margin-bottom: 4px;">★ ULTIMATE SKILL OVERRIDE</div>
+                  <div style="font-size: 0.9em;">
+                    ${currentRank} → <strong>${rankOverride}</strong> (+${overrideShift} CS)
+                  </div>
+                </div>
+              `);
+            } else {
+              const baseIndex = DIALOG_RANKS.indexOf(currentRank);
+              const effectiveIndex = Math.min(Math.max(baseIndex + talentBonus + extraShift, 0), DIALOG_RANKS.length - 1);
+              const effectiveRank = DIALOG_RANKS[effectiveIndex];
+              const totalShift = talentBonus + extraShift;
+              
+              effectiveRankContainer.html(`
+                <div style="margin-bottom: 10px;">
+                  <label style="display: inline-block; width: 120px;">Effective Rank:</label>
+                  <span>${currentRank} → <strong>${effectiveRank}</strong> (${totalShift >= 0 ? '+' : ''}${totalShift}CS)</span>
+                </div>
+              `);
+            }
+            
+            // Update intensity info if visible
+            if (intensityContainer.is(':visible')) {
+              updateIntensityInfo();
+            }
+          }
           
           function updateIntensityInfo() {
             const selectedIntensity = intensitySelect.val();
@@ -1721,8 +1839,22 @@ export class FaseripRolls {
               return;
             }
             
-            const abilityIndex = INTENSITY_RANKS.indexOf(baseRank);
-            const intensityIndex = INTENSITY_RANKS.indexOf(selectedIntensity);
+            // Calculate effective rank including talent bonus and extra shifts
+            const currentRank = getCurrentAbilityRank();
+            const extraShift = parseInt(html.find('[name="shift"]').val()) || 0;
+            const rankOverride = talent.system.rankOverride;
+            
+            let effectiveRankForIntensity;
+            if (rankOverride) {
+              effectiveRankForIntensity = rankOverride;
+            } else {
+              const baseIndex = DIALOG_RANKS.indexOf(currentRank);
+              const effectiveIndex = Math.min(Math.max(baseIndex + talentBonus + extraShift, 0), DIALOG_RANKS.length - 1);
+              effectiveRankForIntensity = DIALOG_RANKS[effectiveIndex];
+            }
+            
+            const abilityIndex = DIALOG_RANKS.indexOf(effectiveRankForIntensity);
+            const intensityIndex = DIALOG_RANKS.indexOf(selectedIntensity);
             
             if (abilityIndex >= 0 && intensityIndex >= 0) {
               const rankDiff = abilityIndex - intensityIndex;
@@ -1730,19 +1862,19 @@ export class FaseripRolls {
               let bgColor = "#e8e8e8";
               
               if (rankDiff >= 3) {
-                infoText = `<strong style="color: #2e7d32;">Automatic Success</strong> (Ability ${rankDiff} ranks above)`;
+                infoText = `<strong style="color: #2e7d32;">Automatic Success</strong> (Effective rank ${rankDiff} above intensity)`;
                 bgColor = "#c8e6c9";
               } else if (rankDiff > 0) {
-                infoText = `<strong style="color: #4CAF50;">Green or better</strong> required (Ability > Intensity)`;
+                infoText = `<strong style="color: #4CAF50;">Green or better</strong> required (Effective > Intensity)`;
                 bgColor = "#e8f5e9";
               } else if (rankDiff === 0) {
-                infoText = `<strong style="color: #F57C00;">Yellow or better</strong> required (Ability = Intensity)`;
+                infoText = `<strong style="color: #F57C00;">Yellow or better</strong> required (Effective = Intensity)`;
                 bgColor = "#fff3e0";
               } else if (rankDiff === -1) {
                 infoText = `<strong style="color: #F44336;">Red only</strong> succeeds (Intensity 1 rank above)`;
                 bgColor = "#ffebee";
               } else {
-                infoText = `<strong style="color: #b71c1c;">Impossible</strong> (Intensity ${-rankDiff} ranks above Ability)`;
+                infoText = `<strong style="color: #b71c1c;">Impossible</strong> (Intensity ${-rankDiff} ranks above Effective)`;
                 bgColor = "#ffcdd2";
               }
               
@@ -1753,20 +1885,37 @@ export class FaseripRolls {
           function updateMultiOptions() {
             const selectedAction = actionSelect.val();
             const actionCode = selectedAction.match(/\(([^)]+)\)/)?.[1] || "";
+            const requiredAbility = COMBAT_ACTION_ABILITIES[selectedAction];
             
-            // Hide multi-target and combat options for non-combat actions, show intensity
+            // Handle ability selector based on action type
             if (selectedAction === "Ability FEAT") {
+              // Non-combat: enable ability selector, show talent default hint
+              abilitySelect.prop('disabled', false);
+              abilityContainer.css('background', '#e8e8e8');
+              abilityHint.html(abilityModified ? `(Talent default: ${abilityLabel})` : '(No default ability set)');
+              
               multiContainer.hide();
               combatOptions.hide();
               intensityContainer.show();
               updateIntensityInfo();
             } else {
+              // Combat action: auto-select required ability and disable selector
+              if (requiredAbility) {
+                abilitySelect.val(requiredAbility);
+                abilitySelect.prop('disabled', true);
+                abilityContainer.css('background', '#d0d8e0');
+                abilityHint.html(`(${selectedAction} uses ${requiredAbility.charAt(0).toUpperCase() + requiredAbility.slice(1)})`);
+              }
+              
               multiContainer.show();
               combatOptions.show();
               intensityContainer.hide();
               const newOptionsHTML = generateMultiTargetOptionsHTML(actionCode);
               multiContainer.html(newOptionsHTML);
             }
+            
+            // Update rank displays after ability change
+            updateRankDisplays();
             
             const multiAdjacentCheckbox = multiContainer.find('#multi-adjacent');
             const multiAttacksCheckbox = multiContainer.find('#multi-attacks');
@@ -1788,8 +1937,13 @@ export class FaseripRolls {
             });
           }
           
+          // Event listeners
           actionSelect.on('change', updateMultiOptions);
+          abilitySelect.on('change', updateRankDisplays);
           intensitySelect.on('change', updateIntensityInfo);
+          html.find('[name="shift"]').on('change input', updateRankDisplays);
+          
+          // Initial update
           updateMultiOptions();
         }
       }).render(true);
