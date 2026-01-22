@@ -1,5 +1,6 @@
 //--- START OF FILE blunt-attack-action.js ---
-// blunt-attack-action.js v1.4.15 - 2025-12-27
+// blunt-attack-action.js v1.4.16 - 2025-01-21
+// v1.4.16: Pass weapon base damage to computeBluntDamage for minimum damage enforcement
 // v1.4.15: Detect and display combat talents (Martial Arts A/B/D/E, Boxing) in dialog
 // v1.4.14: Add csNotes to shiftBreakdown for chat card hover text
 // v1.4.13: Add CS Notes text input row between Modifiers and Multi-Attack, restore UI colors
@@ -145,11 +146,12 @@ export class BluntAttackAction extends AttackAction {
       const savedItem = attackItems.find(i => i.id === savedItemId);
       if (savedItem) {
         const mat = getItemMaterialRank(savedItem);
-        const res = computeBluntDamage(strength.rank, strength.value, mat, RANKS);
+        const base = Number(savedItem.system?.damage || 0);
+        const res = computeBluntDamage(strength.rank, strength.value, mat, base, RANKS);
         initialMaxDamage = res.damage;
       }
     } else if (savedSource === "object") {
-      const res = computeBluntDamage(strength.rank, strength.value, savedObjectRank, RANKS);
+      const res = computeBluntDamage(strength.rank, strength.value, savedObjectRank, 0, RANKS);
       initialMaxDamage = res.damage;
     }
 
@@ -387,12 +389,13 @@ Common improvised weapons:
               const item = attackItems.find(i => i.id === itemId);
               weaponMat  = item ? getItemMaterialRank(item) : "Excellent";
               weaponName = item ? item.name : "";
-              const res  = computeBluntDamage(strength.rank, strength.value, weaponMat, RANKS);
+              const base = item ? Number(item.system?.damage || 0) : 0;
+              const res  = computeBluntDamage(strength.rank, strength.value, weaponMat, base, RANKS);
               damage = res.damage; note = res.note;
             } else if (src === "object") {
               weaponMat  = objectRank;
               weaponName = objectName || "Object";
-              const res  = computeBluntDamage(strength.rank, strength.value, weaponMat, RANKS);
+              const res  = computeBluntDamage(strength.rank, strength.value, weaponMat, 0, RANKS);
               damage = res.damage; note = res.note;
             } else {
               damage = strength.value;
@@ -474,14 +477,15 @@ Common improvised weapons:
               const itemId = String(html.find('[name="item"]').val() || "");
               const item = attackItems.find(i => i.id === itemId) || null;
               const mat  = item ? getItemMaterialRank(item) : "Excellent";
-              const res  = computeBluntDamage(strength.rank, strength.value, mat, RANKS);
+              const base = item ? Number(item.system?.damage || 0) : 0;
+              const res  = computeBluntDamage(strength.rank, strength.value, mat, base, RANKS);
               maxDamage = res.damage;
               currentDamage = res.damage;
               noteText = `(${item?.name || "Weapon"})`;
             } else if (src === "object") {
               $objectRow.show();
               const mat = String(html.find('[name="objectRank"]').val() || "Excellent");
-              const res = computeBluntDamage(strength.rank, strength.value, mat, RANKS);
+              const res = computeBluntDamage(strength.rank, strength.value, mat, 0, RANKS);
               maxDamage = res.damage;
               currentDamage = res.damage;
               const objName = html.find('[name="objectName"]').val() || "Object";
