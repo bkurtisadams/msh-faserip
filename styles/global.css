@@ -1963,6 +1963,14 @@
   background-color: #e1bee7;
 }
 
+.karma-sheet .karma-entry.karma-resource-feat {
+  background-color: #fff3e0;
+}
+
+.karma-sheet .karma-entry.karma-popularity-feat {
+  background-color: #e3f2fd;
+}
+
 .karma-sheet .empty-message {
   text-align: center;
   font-style: italic;

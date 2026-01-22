@@ -1,5 +1,5 @@
-// karma.js v1.3.0 - 2025-01-18
-// v1.3.0: Add timestamp field to karma entries for reliable sorting
+// karma.js v1.4.0 - 2025-01-22
+// v1.4.0: Add Resource FEAT and Popularity FEAT type support for activity tracking
 export class KarmaSheet extends DocumentSheet {
   // Track current sort order (true = newest first, false = oldest first)
   sortNewestFirst = true;
@@ -81,6 +81,10 @@ export class KarmaSheet extends DocumentSheet {
         event.cssClass = "karma-power-stunt";
       } else if (event.type === "Session Award") {
         event.cssClass = "karma-session-award";
+      } else if (event.type === "Resource FEAT") {
+        event.cssClass = "karma-resource-feat";
+      } else if (event.type === "Popularity FEAT") {
+        event.cssClass = "karma-popularity-feat";
       } else if (event.amount < 0) {
         event.cssClass = "karma-loss";
       } else if (event.amount > 0) {

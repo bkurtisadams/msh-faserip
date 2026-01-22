@@ -1,4 +1,5 @@
-// actorSheet.js v1.8.0 - 2025-01-19
+// actorSheet.js v1.9.0 - 2025-01-22
+// v1.9.0: Log Resource and Popularity FEATs to karma history
 // v1.8.0: Add clickable Teleport label for movement FEAT dialog
 // v1.7.0: Add clickable Swim label for movement FEAT dialog
 // v1.6.0: Add clickable Run label for movement FEAT dialog
@@ -4206,6 +4207,29 @@ html.find('.headquarters-row').each((i, row) => {
               speaker: ChatMessage.getSpeaker({ actor: this.actor }),
               content: chatContent
             });
+
+            // Log Resource FEAT to karma history
+            const historyEntry = {
+              timestamp: new Date().toISOString(),
+              realDate: new Date().toLocaleDateString(),
+              gameDate: "",
+              amount: 0,
+              type: "Resource FEAT",
+              description: `${itemDescription} (${itemRank}) - ${success ? 'SUCCESS' : 'FAILED'}${bankLoan ? ' [Bank Loan]' : ''}`
+            };
+            
+            const currentHistory = foundry.utils.deepClone(this.actor.system.karma?.history || []);
+            currentHistory.push(historyEntry);
+            
+            if (typeof game.msh?.runAsGM === 'function') {
+              game.msh.runAsGM({
+                operation: 'update',
+                targetActorUuid: this.actor.uuid,
+                args: [{ "system.karma.history": currentHistory }]
+              });
+            } else {
+              await this.actor.update({ "system.karma.history": currentHistory });
+            }
           }
         },
         cancel: { label: "Cancel" }
@@ -4325,6 +4349,29 @@ html.find('.headquarters-row').each((i, row) => {
       speaker: ChatMessage.getSpeaker({ actor: this.actor }),
       content
     });
+
+    // Log Popularity FEAT to karma history
+    const featHistoryEntry = {
+      timestamp: new Date().toISOString(),
+      realDate: new Date().toLocaleDateString(),
+      gameDate: "",
+      amount: 0,
+      type: "Popularity FEAT",
+      description: `${requestDescription} (${disposition}) - ${success ? 'SUCCESS' : 'FAILED'}`
+    };
+    
+    const featHistory = foundry.utils.deepClone(this.actor.system.karma?.history || []);
+    featHistory.push(featHistoryEntry);
+    
+    if (typeof game.msh?.runAsGM === 'function') {
+      game.msh.runAsGM({
+        operation: 'update',
+        targetActorUuid: this.actor.uuid,
+        args: [{ "system.karma.history": featHistory }]
+      });
+    } else {
+      await this.actor.update({ "system.karma.history": featHistory });
+    }
   
     if (isNegative) {
       new Dialog({
