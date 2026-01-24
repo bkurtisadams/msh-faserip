@@ -39,14 +39,14 @@
   </div>
 
   <!-- Tab Navigation -->
-  <nav class="sheet-tabs">
-    <a class="tab-button active" data-tab="team">
+  <nav class="sheet-tabs tabs">
+    <a class="item" data-tab="team">
       <i class="fas fa-users"></i> Team
     </a>
-    <a class="tab-button" data-tab="karma">
+    <a class="item" data-tab="karma">
       <i class="fas fa-star"></i> Karma
     </a>
-    <a class="tab-button" data-tab="session">
+    <a class="item" data-tab="session">
       <i class="fas fa-book"></i> Session
     </a>
   </nav>
@@ -54,7 +54,7 @@
   <!-- Tab Content -->
   <section class="sheet-body">
     <!-- Team Tab -->
-    <div class="tab-panel active" data-tab="team">
+    <div class="tab" data-tab="team">
       <!-- GM Award Buttons -->
       {{#if isGM}}
       <div class="gm-controls">
@@ -140,7 +140,7 @@
     </div>
 
     <!-- Karma Tab (Award History) -->
-    <div class="tab-panel" data-tab="karma">
+    <div class="tab" data-tab="karma">
       <div class="awards-header">
         <h3>Team Karma Awards History</h3>
         {{#if isGM}}
@@ -194,22 +194,69 @@
     </div>
 
     <!-- Session Tab -->
-    <div class="tab-panel" data-tab="session">
+    <div class="tab" data-tab="session">
       <!-- Time Controls -->
       <div class="session-time-controls">
-        <div class="time-display-row">
-          <span class="current-time">{{currentDateTime}}</span>
+        <div class="time-edit-row">
+          <div class="time-field">
+            <label>Year</label>
+            <div class="field-controls">
+              <button type="button" class="time-dec-btn" data-unit="year" title="-1 Year">−</button>
+              <input type="number" class="time-input" data-field="year" value="{{timeYear}}" min="1" max="9999">
+              <button type="button" class="time-inc-btn" data-unit="year" title="+1 Year">+</button>
+            </div>
+          </div>
+          <div class="time-field">
+            <label>Month</label>
+            <div class="field-controls">
+              <button type="button" class="time-dec-btn" data-unit="month" title="-1 Month">−</button>
+              <input type="number" class="time-input" data-field="month" value="{{timeMonth}}" min="1" max="12">
+              <button type="button" class="time-inc-btn" data-unit="month" title="+1 Month">+</button>
+            </div>
+          </div>
+          <div class="time-field">
+            <label>Day</label>
+            <div class="field-controls">
+              <button type="button" class="time-dec-btn" data-unit="day" title="-1 Day">−</button>
+              <input type="number" class="time-input" data-field="day" value="{{timeDay}}" min="1" max="31">
+              <button type="button" class="time-inc-btn" data-unit="day" title="+1 Day">+</button>
+            </div>
+          </div>
+          <div class="time-field">
+            <label>Hour</label>
+            <div class="field-controls">
+              <button type="button" class="time-dec-btn" data-unit="hour" title="-1 Hour">−</button>
+              <input type="number" class="time-input" data-field="hour" value="{{timeHour}}" min="0" max="23">
+              <button type="button" class="time-inc-btn" data-unit="hour" title="+1 Hour">+</button>
+            </div>
+          </div>
+          <div class="time-field">
+            <label>Min</label>
+            <div class="field-controls">
+              <button type="button" class="time-dec-btn" data-unit="minute" title="-1 Minute">−</button>
+              <input type="number" class="time-input" data-field="minute" value="{{timeMinute}}" min="0" max="59">
+              <button type="button" class="time-inc-btn" data-unit="minute" title="+1 Minute">+</button>
+            </div>
+          </div>
+          <div class="time-field">
+            <label>Sec</label>
+            <div class="field-controls">
+              <button type="button" class="time-dec-btn" data-unit="second" title="-1 Second">−</button>
+              <input type="number" class="time-input" data-field="second" value="{{timeSecond}}" min="0" max="59">
+              <button type="button" class="time-inc-btn" data-unit="second" title="+1 Second">+</button>
+            </div>
+          </div>
+        </div>
+        <div class="time-quick-buttons">
+          <button type="button" class="time-adjust-btn" data-unit="turn" data-direction="-1" title="-6 seconds">−Turn</button>
+          <button type="button" class="time-adjust-btn" data-unit="turn" data-direction="1" title="+6 seconds">+Turn</button>
+          <button type="button" class="time-adjust-btn" data-unit="10min" data-direction="-1" title="-10 minutes">−10m</button>
+          <button type="button" class="time-adjust-btn" data-unit="10min" data-direction="1" title="+10 minutes">+10m</button>
+          <button type="button" class="time-set-btn" title="Set to specific date/time"><i class="fas fa-calendar-alt"></i> Set</button>
           <label class="sync-checkbox">
             <input type="checkbox" class="combat-sync-toggle" {{#if combatSyncEnabled}}checked{{/if}}>
-            Sync Combat
+            Combat Sync
           </label>
-        </div>
-        <div class="time-buttons">
-          <button type="button" class="time-adjust-btn" data-unit="turn" title="6 seconds">Turn</button>
-          <button type="button" class="time-adjust-btn" data-unit="minute" title="60 seconds">Min</button>
-          <button type="button" class="time-adjust-btn" data-unit="hour" title="3600 seconds">Hour</button>
-          <button type="button" class="time-adjust-btn" data-unit="day" title="86400 seconds">Day</button>
-          <button type="button" class="time-adjust-btn" data-unit="custom" title="Custom seconds">Custom</button>
         </div>
       </div>
 

@@ -1,4 +1,5 @@
-// init.js v1.7.5 - 2025-01-18
+// init.js v1.7.6 - 2025-01-24
+// v1.7.6: Fix getCampaignDateTime - worldTime is already seconds, remove /1000
 // v1.7.5: Add defeatedVillains setting for team tracker
 // v1.7.4: Fix prototypeTokenOverrides check to detect keys with undefined values
 // v1.7.3: Fix preCreateActor to use updateSource() for persistent token disposition
@@ -228,7 +229,8 @@ Hooks.once("init", async () => {
     const startWorldTime = game.settings.get("msh-faserip", "campaignStartWorldTime");
     const currentWorldTime = game.time.worldTime;
     
-    const elapsedSeconds = Math.floor((currentWorldTime - startWorldTime) / 1000);
+    // worldTime is in seconds, so no division needed
+    const elapsedSeconds = currentWorldTime - startWorldTime;
     const currentDate = new Date(startDate.getTime() + (elapsedSeconds * 1000));
     
     return {

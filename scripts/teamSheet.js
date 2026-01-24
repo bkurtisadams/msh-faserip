@@ -1,4 +1,7 @@
-// teamSheet.js v1.3.0 - 2025-01-18
+// teamSheet.js v1.3.3 - 2025-01-24
+// v1.3.3: Redesigned Session tab time controls with editable fields and +/- buttons
+// v1.3.2: Fix time unit mismatch - worldTime is seconds not milliseconds
+// v1.3.1: Fix Session tab - use Foundry native tabs, fix initial tab state
 // v1.3.0: Pool share value display, dissolve pool function, property damage in awards
 // v1.2.1: Add edit/delete for team karma award history entries
 // v1.2.0: Redesigned UI - 3 tabs (Team/Karma/Session), multiplier in header, defeated villains tracking
@@ -27,7 +30,7 @@ export class TeamSheet extends Application {
         {
           navSelector: ".sheet-tabs",
           contentSelector: ".sheet-body",
-          initial: "overview"
+          initial: "team"
         }
       ]
     });
@@ -104,6 +107,15 @@ export class TeamSheet extends Application {
     context.currentDateTime = campaignTime.formatted;
     context.combatSyncEnabled = game.settings.get("msh-faserip", "combatSyncEnabled") ?? true;
     
+    // Individual time components for editing
+    const timeDate = campaignTime.date;
+    context.timeYear = timeDate.getFullYear();
+    context.timeMonth = timeDate.getMonth() + 1; // JS months are 0-indexed
+    context.timeDay = timeDate.getDate();
+    context.timeHour = timeDate.getHours();
+    context.timeMinute = timeDate.getMinutes();
+    context.timeSecond = timeDate.getSeconds();
+    
     // Combat logs
     context.combatLogs = game.settings.get("msh-faserip", "combatLogs") || [];
     context.autoLogCombat = game.settings.get("msh-faserip", "autoLogCombat") ?? false;
@@ -137,16 +149,7 @@ export class TeamSheet extends Application {
   activateListeners(html) {
     super.activateListeners(html);
 
-    // Tab switching
-    html.find('.tab-button').click(ev => {
-      ev.preventDefault();
-      const targetTab = ev.currentTarget.dataset.tab;
-      
-      html.find('.tab-button').removeClass('active');
-      html.find('.tab-panel').removeClass('active');
-      
-      html.find(`[data-tab="${targetTab}"]`).addClass('active');
-    });
+    // Note: Tab switching is handled by Foundry's built-in tab system (see defaultOptions.tabs)
 
     // Member management - dropdown + button pattern
     html.find('.add-hero-to-team-btn').click(ev => {
@@ -194,12 +197,8 @@ export class TeamSheet extends Application {
 
     html.find('.dissolve-pool').click(ev => this._onDissolvePool(ev));
 
-    // Time tracking controls
+    // Time settings button (header clock icon)
     html.find('.time-settings-btn').click(ev => this._onTimeSettings(ev));
-    html.find('.combat-sync-toggle').change(async (ev) => {
-      await game.settings.set("msh-faserip", "combatSyncEnabled", ev.target.checked);
-      ui.notifications.info(`Combat sync ${ev.target.checked ? 'enabled' : 'disabled'}`);
-    });
 
     // Combat logs controls
     html.find('.add-log-entry').click(ev => this._onAddLogEntry(ev));
@@ -225,34 +224,63 @@ export class TeamSheet extends Application {
     // Award karma from log entry
     html.find('.award-from-log').click(ev => this._onAwardFromLog(ev));
 
-    // Time adjustment handler (KEEP THIS ONE)
-    html.find('.time-adjust-btn').on('click', async (ev) => {
+    // ========== TIME CONTROLS ==========
+    
+    // Increment/decrement buttons for each time field
+    html.find('.time-inc-btn, .time-dec-btn').on('click', async (ev) => {
+      if (!game.user.isGM) return;
+      ev.preventDefault();
+      
+      const btn = ev.currentTarget;
+      const unit = btn.dataset.unit;
+      const direction = btn.classList.contains('time-inc-btn') ? 1 : -1;
+      
+      await this._adjustTimeByUnit(unit, direction);
+    });
+    
+    // Direct input field changes
+    html.find('.time-input').on('change', async (ev) => {
       if (!game.user.isGM) return;
       
-      const unit = ev.currentTarget.dataset.unit;
-      let seconds = 0;
+      await this._setTimeFromInputs(html);
+    });
+    
+    // Quick adjust buttons (+Turn, -Turn, +10m, -10m)
+    html.find('.time-adjust-btn').on('click', async (ev) => {
+      if (!game.user.isGM) return;
+      ev.preventDefault();
       
+      const unit = ev.currentTarget.dataset.unit;
+      const direction = parseInt(ev.currentTarget.dataset.direction) || 1;
+      
+      let seconds = 0;
       switch(unit) {
-        case 'turn': seconds = 6; break;
-        case 'minute': seconds = 60; break;
-        case 'hour': seconds = 3600; break;
-        case 'day': seconds = 86400; break;
-        case 'custom':
-          const input = await Dialog.prompt({
-            title: "Custom Time Adjustment",
-            content: '<p>Enter seconds to advance (negative to go back):</p><input type="number" id="custom-seconds" value="0" style="width: 100%; padding: 5px;">',
-            callback: (html) => parseInt(html.find('#custom-seconds').val()) || 0
-          });
-          seconds = input;
-          break;
+        case 'turn': seconds = 6 * direction; break;
+        case '10min': seconds = 600 * direction; break;
+        case 'minute': seconds = 60 * direction; break;
+        case 'hour': seconds = 3600 * direction; break;
+        case 'day': seconds = 86400 * direction; break;
       }
       
       if (seconds !== 0) {
         await game.time.advance(seconds);
-        console.log(`🕐 FASERIP | Manually advanced time by ${seconds} seconds`);
+        console.log(`[FASERIP] Adjusted time by ${seconds} seconds`);
         Hooks.callAll("msh-faserip.timeUpdated");
-        this.render(false); // Refresh sheet to show new time
+        this.render(false);
       }
+    });
+    
+    // Set button - open calendar picker dialog
+    html.find('.time-set-btn').on('click', async (ev) => {
+      if (!game.user.isGM) return;
+      ev.preventDefault();
+      this._onTimeSettings(ev);
+    });
+    
+    // Combat sync toggle
+    html.find('.combat-sync-toggle').change(async (ev) => {
+      await game.settings.set("msh-faserip", "combatSyncEnabled", ev.target.checked);
+      ui.notifications.info(`Combat sync ${ev.target.checked ? 'enabled' : 'disabled'}`);
     });
 
   }
@@ -1277,12 +1305,76 @@ export class TeamSheet extends Application {
     // Advance Foundry's world time
     await game.time.advance(seconds);
     
-    console.log(`🕐 FASERIP | Manually advanced time by ${seconds} seconds`);
+    console.log(`[FASERIP] Manually advanced time by ${seconds} seconds`);
     
     // Trigger update hook to refresh displays
     Hooks.callAll("msh-faserip.timeUpdated");
     
     // Refresh the sheet to show new time
+    this.render(false);
+  }
+  
+  // Adjust time by a specific unit (year, month, day, hour, minute, second)
+  async _adjustTimeByUnit(unit, direction) {
+    const campaignTime = game.msh.getCampaignDateTime();
+    const currentDate = new Date(campaignTime.date);
+    
+    switch(unit) {
+      case 'year':
+        currentDate.setFullYear(currentDate.getFullYear() + direction);
+        break;
+      case 'month':
+        currentDate.setMonth(currentDate.getMonth() + direction);
+        break;
+      case 'day':
+        currentDate.setDate(currentDate.getDate() + direction);
+        break;
+      case 'hour':
+        currentDate.setHours(currentDate.getHours() + direction);
+        break;
+      case 'minute':
+        currentDate.setMinutes(currentDate.getMinutes() + direction);
+        break;
+      case 'second':
+        currentDate.setSeconds(currentDate.getSeconds() + direction);
+        break;
+    }
+    
+    await this._setCampaignTimeTo(currentDate);
+  }
+  
+  // Set time from the input fields in the Session tab
+  async _setTimeFromInputs(html) {
+    const year = parseInt(html.find('.time-input[data-field="year"]').val()) || 1976;
+    const month = parseInt(html.find('.time-input[data-field="month"]').val()) || 1;
+    const day = parseInt(html.find('.time-input[data-field="day"]').val()) || 1;
+    const hour = parseInt(html.find('.time-input[data-field="hour"]').val()) || 0;
+    const minute = parseInt(html.find('.time-input[data-field="minute"]').val()) || 0;
+    const second = parseInt(html.find('.time-input[data-field="second"]').val()) || 0;
+    
+    // Create the target date (month is 0-indexed in JS)
+    const targetDate = new Date(year, month - 1, day, hour, minute, second);
+    
+    await this._setCampaignTimeTo(targetDate);
+  }
+  
+  // Set the campaign time to a specific Date object
+  async _setCampaignTimeTo(targetDate) {
+    const startDateStr = game.settings.get("msh-faserip", "campaignStartDate");
+    const startDate = new Date(startDateStr);
+    
+    // Calculate elapsed seconds from campaign start to target
+    const elapsedSeconds = Math.floor((targetDate - startDate) / 1000);
+    
+    // campaignStartWorldTime + elapsedSeconds = worldTime needed
+    // So: newStartWorldTime = currentWorldTime - elapsedSeconds
+    const startWorldTime = game.settings.get("msh-faserip", "campaignStartWorldTime");
+    const newStartWorldTime = game.time.worldTime - elapsedSeconds;
+    
+    await game.settings.set("msh-faserip", "campaignStartWorldTime", newStartWorldTime);
+    
+    console.log(`[FASERIP] Set campaign time to ${targetDate.toLocaleString()}`);
+    Hooks.callAll("msh-faserip.timeUpdated");
     this.render(false);
   }
   
@@ -1332,21 +1424,21 @@ export class TeamSheet extends Application {
             const newCurrentTime = html.find('[name="currentDateTime"]').val() + ":00";
             const combatSync = html.find('[name="combatSync"]').prop('checked');
             
-            // Calculate desired elapsed time (in milliseconds)
+            // Calculate desired elapsed time in seconds (JS Date math gives ms, convert to seconds)
             const startDate = new Date(newStartDate);
             const currentDate = new Date(newCurrentTime);
-            const desiredElapsedMs = currentDate - startDate;
+            const desiredElapsedSeconds = Math.floor((currentDate - startDate) / 1000);
             
-            // Update the reference point: worldTime - desiredElapsed = campaignStartWorldTime
-            const newStartWorldTime = game.time.worldTime - desiredElapsedMs;
+            // Update the reference point: worldTime (seconds) - desiredElapsed (seconds) = campaignStartWorldTime
+            const newStartWorldTime = game.time.worldTime - desiredElapsedSeconds;
             
             // Update all settings
             await game.settings.set("msh-faserip", "campaignStartDate", newStartDate);
             await game.settings.set("msh-faserip", "campaignStartWorldTime", newStartWorldTime);
             await game.settings.set("msh-faserip", "combatSyncEnabled", combatSync);
             
-            console.log(`FASERIP | Updated campaign time: ${newCurrentTime}`);
-            console.log(`FASERIP | Reference point: ${newStartWorldTime}`);
+            console.log(`[FASERIP] Updated campaign time: ${newCurrentTime}`);
+            console.log(`[FASERIP] Reference point: ${newStartWorldTime}, elapsed: ${desiredElapsedSeconds}s`);
             
             ui.notifications.info("Time settings updated");
             this.render(false); // Refresh the sheet

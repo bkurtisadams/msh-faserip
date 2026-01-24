@@ -88,7 +88,7 @@
   border-bottom: 1px solid #8b0000;
   background: #e0e0e0;
 }
-.team-tracker .tab-button {
+.team-tracker .sheet-tabs .item {
   flex: 1 1 0;
   text-align: center;
   padding: 6px 8px;
@@ -98,9 +98,9 @@
   color: #444;
   font-size: 12px;
 }
-.team-tracker .tab-button:last-child { border-right: 0; }
-.team-tracker .tab-button:hover { background: #c9c9c9; color: #222; }
-.team-tracker .tab-button.active {
+.team-tracker .sheet-tabs .item:last-child { border-right: 0; }
+.team-tracker .sheet-tabs .item:hover { background: #c9c9c9; color: #222; }
+.team-tracker .sheet-tabs .item.active {
   background: #f5f5f0;
   color: #8b0000;
   font-weight: 700;
@@ -358,10 +358,10 @@
 .team-tracker.compact .team-members-table td:nth-child(2) { width: 130px; } /* slightly tighter name */
 
 /* --- Fix tabs: show only the active panel --- */
-.team-tracker .tab-panel { 
+.team-tracker .sheet-body > .tab { 
   display: none !important;   /* hide all panels by default */
 }
-.team-tracker .tab-panel.active { 
+.team-tracker .sheet-body > .tab.active { 
   display: block !important;  /* only the active one shows */
 }
 
@@ -534,10 +534,10 @@
 }
 
 /* ==========================================================================
-   SESSION TAB
+   SESSION TAB - TIME CONTROLS
    ========================================================================== */
 
-.team-tracker .session-time-section {
+.team-tracker .session-time-controls {
   background: #f5f5f0;
   padding: 10px;
   border-radius: 4px;
@@ -545,30 +545,146 @@
   border: 1px solid #ddd;
 }
 
-.team-tracker .time-display-row {
+/* Time edit row - holds all the year/month/day/hour/min/sec fields */
+.team-tracker .time-edit-row {
   display: flex;
+  gap: 6px;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 
-.team-tracker .session-time-section .time-buttons {
+.team-tracker .time-field {
   display: flex;
-  gap: 4px;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+}
+
+.team-tracker .time-field label {
+  font-size: 10px;
+  font-weight: 600;
+  color: #666;
+  margin-bottom: 2px;
+  text-transform: uppercase;
+}
+
+.team-tracker .field-controls {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.team-tracker .time-input {
+  width: 45px;
+  padding: 4px 2px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  background: #fff;
+}
+
+.team-tracker .time-input:focus {
+  border-color: #8b0000;
+  outline: none;
+}
+
+/* Remove spinner arrows from number inputs */
+.team-tracker .time-input::-webkit-outer-spin-button,
+.team-tracker .time-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.team-tracker .time-input[type=number] {
+  -moz-appearance: textfield;
+}
+
+.team-tracker .time-inc-btn,
+.team-tracker .time-dec-btn {
+  width: 20px;
+  height: 24px;
+  padding: 0;
+  font-size: 14px;
+  font-weight: bold;
+  line-height: 1;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  background: #f0f0f0;
+  cursor: pointer;
+  color: #333;
+}
+
+.team-tracker .time-inc-btn:hover,
+.team-tracker .time-dec-btn:hover {
+  background: #e0e0e0;
+  border-color: #999;
+}
+
+.team-tracker .time-inc-btn:active,
+.team-tracker .time-dec-btn:active {
+  background: #d0d0d0;
+}
+
+/* Quick buttons row */
+.team-tracker .time-quick-buttons {
+  display: flex;
+  gap: 6px;
+  align-items: center;
   flex-wrap: wrap;
 }
 
-.team-tracker .session-time-section .time-adjust-btn {
-  padding: 4px 10px;
-  background: white;
-  border: 1px solid #c0c0c0;
+.team-tracker .time-quick-buttons .time-adjust-btn {
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  background: #fff;
+  border: 1px solid #ccc;
   border-radius: 3px;
   cursor: pointer;
-  font-size: 0.85em;
 }
 
-.team-tracker .session-time-section .time-adjust-btn:hover {
-  background: #e5e5e0;
+.team-tracker .time-quick-buttons .time-adjust-btn:hover {
+  background: #f0f0f0;
+  border-color: #999;
+}
+
+.team-tracker .time-quick-buttons .time-adjust-btn[data-direction="-1"] {
+  color: #c62828;
+}
+
+.team-tracker .time-quick-buttons .time-adjust-btn[data-direction="1"] {
+  color: #2e7d32;
+}
+
+.team-tracker .time-set-btn {
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  background: #e3f2fd;
+  border: 1px solid #90caf9;
+  border-radius: 3px;
+  cursor: pointer;
+  color: #1565c0;
+}
+
+.team-tracker .time-set-btn:hover {
+  background: #bbdefb;
+}
+
+.team-tracker .time-quick-buttons .sync-checkbox {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: #666;
+  cursor: pointer;
+}
+
+.team-tracker .time-quick-buttons .sync-checkbox input {
+  cursor: pointer;
 }
 
 /* ==========================================================================
