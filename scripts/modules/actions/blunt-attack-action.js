@@ -1,5 +1,6 @@
 //--- START OF FILE blunt-attack-action.js ---
-// blunt-attack-action.js v1.4.16 - 2025-01-21
+// blunt-attack-action.js v1.4.17 - 2025-01-21
+// v1.4.17: Add cancelled check to abort multi-attack when FEAT dialog is cancelled
 // v1.4.16: Pass weapon base damage to computeBluntDamage for minimum damage enforcement
 // v1.4.15: Detect and display combat talents (Martial Arts A/B/D/E, Boxing) in dialog
 // v1.4.14: Add csNotes to shiftBreakdown for chat card hover text
@@ -666,6 +667,12 @@ Common improvised weapons:
         intensity, 
         choice.attackCount
       );
+      
+      // If user cancelled the FEAT dialog, abort the entire attack
+      if (featResult?.cancelled) {
+        ui.notifications.info("Multi-attack cancelled.");
+        return;
+      }
       
       // Store for consolidated display
       multiAttackFeatResult = { ...featResult, intensity, attackCount: choice.attackCount };

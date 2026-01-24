@@ -1,4 +1,5 @@
-// rolls.js v1.9.29 - 2025-01-21
+// rolls.js v1.9.30 - 2025-01-24
+// v1.9.30: Fix equipment macro attack type - respect damageType field instead of overriding with item name heuristics
 // File: systems/msh-faserip/rolls.js
 // Fixed intensity comparison to use effective rank (base + talent bonus + extra shift)
 import { applyColumnShiftToRank } from './actorSheet.js';
@@ -2518,10 +2519,23 @@ export class FaseripRolls {
 
         // --- THROWING ---
         if (isThrowing) {
-          const dmgStr   = `${String(equipment.system?.damageType || "")} ${equipment.name}`.toLowerCase();
-          const throwKey = /(edg|edge|slash|cut|stab|spear|dagger|knife)/.test(dmgStr)
-            ? "throwing-edged"
-            : "throwing-blunt";
+          // Check explicit damageType first, fallback to name heuristics only if unset
+          const explicitThrowType = String(equipment.system?.damageType || "").toUpperCase();
+          let throwKey;
+          if (explicitThrowType === "TE" || explicitThrowType === "EA") {
+            throwKey = "throwing-edged";
+          } else if (explicitThrowType === "TB" || explicitThrowType === "BA") {
+            throwKey = "throwing-blunt";
+          } else if (!explicitThrowType) {
+            // Fallback: only check name if damageType is empty
+            const nameStr = equipment.name.toLowerCase();
+            throwKey = /(edg|edge|slash|cut|stab|spear|dagger|knife)/.test(nameStr)
+              ? "throwing-edged"
+              : "throwing-blunt";
+          } else {
+            // Unknown damageType, default to blunt
+            throwKey = "throwing-blunt";
+          }
 
           await game.msh.actions.roll(throwKey, {
             actor,
@@ -2539,10 +2553,23 @@ export class FaseripRolls {
         }
 
         // --- MELEE (default) ---
-        const dmgTypeStr = `${String(equipment.system?.damageType || "")} ${equipment.name}`.toLowerCase();
-        const meleeKey   = /(edg|edge|slash|cut|stab|sword|spear|axe|dagger|knife)/.test(dmgTypeStr)
-          ? "edged-attack"
-          : "blunt-attack";
+        // Check explicit damageType first, fallback to name heuristics only if unset
+        const explicitMeleeType = String(equipment.system?.damageType || "").toUpperCase();
+        let meleeKey;
+        if (explicitMeleeType === "EA") {
+          meleeKey = "edged-attack";
+        } else if (explicitMeleeType === "BA") {
+          meleeKey = "blunt-attack";
+        } else if (!explicitMeleeType) {
+          // Fallback: only check name if damageType is empty
+          const nameStr = equipment.name.toLowerCase();
+          meleeKey = /(edg|edge|slash|cut|stab|sword|spear|axe|dagger|knife)/.test(nameStr)
+            ? "edged-attack"
+            : "blunt-attack";
+        } else {
+          // Unknown damageType, default to blunt
+          meleeKey = "blunt-attack";
+        }
 
         await game.msh.actions.roll(meleeKey, {
           actor,
