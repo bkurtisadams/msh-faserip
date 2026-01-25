@@ -419,7 +419,11 @@
         "hit": "",
         "miss": "",
         "empty": "",
-        "reload": ""
+        "reload": "",
+        "hitVolume": 80,
+        "missVolume": 80,
+        "emptyVolume": 80,
+        "reloadVolume": 80
       },
 
       "variantType": "standard",
