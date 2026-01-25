@@ -1144,18 +1144,23 @@
       {{!-- SFX --}}
       <div class="form-group">
         <label>SFX (Hit)</label>
-        <div class="form-fields">
+        <div class="form-fields" style="display:flex;align-items:center;gap:2px;">
           <input type="text"
                 name="system.sfx.hit"
                 value="{{system.sfx.hit}}"
                 data-dtype="String"
                 data-edit="system.sfx.hit"
+                style="flex:1 1 auto;min-width:0;"
                 placeholder="systems/msh-faserip/assets/sfx/gunshot.mp3" />
+          <button type="button" class="sfx-preview" data-sfx-field="system.sfx.hit" data-volume-field="system.sfx.hitVolume" title="Preview" style="width:24px;height:24px;padding:0;flex-shrink:0;"><i class="fas fa-play"></i></button>
+          <input type="number" name="system.sfx.hitVolume" value="{{system.sfx.hitVolume}}" min="0" max="100" placeholder="80" title="Volume %" style="width:36px!important;min-width:36px;max-width:36px;flex-shrink:0;flex-grow:0;text-align:center;padding:0 2px;"/>
+          <span style="font-size:0.85em;color:#666;flex-shrink:0;">%</span>
           <button type="button"
                   class="file-picker"
                   data-type="audio"
                   data-target="system.sfx.hit"
                   data-current="{{system.sfx.hit}}"
+                  style="flex-shrink:0;"
                   title="{{localize 'FILE.Browse'}}">
             <i class="fas fa-file-import"></i>
           </button>
@@ -1163,18 +1168,23 @@
       </div>
       <div class="form-group">
         <label>SFX (Miss)</label>
-        <div class="form-fields">
+        <div class="form-fields" style="display:flex;align-items:center;gap:2px;">
           <input type="text"
                 name="system.sfx.miss"
                 value="{{system.sfx.miss}}"
                 data-dtype="String"
                 data-edit="system.sfx.miss"
+                style="flex:1 1 auto;min-width:0;"
                 placeholder="systems/msh-faserip/assets/sfx/gunshot-miss.mp3" />
+          <button type="button" class="sfx-preview" data-sfx-field="system.sfx.miss" data-volume-field="system.sfx.missVolume" title="Preview" style="width:24px;height:24px;padding:0;flex-shrink:0;"><i class="fas fa-play"></i></button>
+          <input type="number" name="system.sfx.missVolume" value="{{system.sfx.missVolume}}" min="0" max="100" placeholder="80" title="Volume %" style="width:36px!important;min-width:36px;max-width:36px;flex-shrink:0;flex-grow:0;text-align:center;padding:0 2px;"/>
+          <span style="font-size:0.85em;color:#666;flex-shrink:0;">%</span>
           <button type="button"
                   class="file-picker"
                   data-type="audio"
                   data-target="system.sfx.miss"
                   data-current="{{system.sfx.miss}}"
+                  style="flex-shrink:0;"
                   title="{{localize 'FILE.Browse'}}">
             <i class="fas fa-file-import"></i>
           </button>

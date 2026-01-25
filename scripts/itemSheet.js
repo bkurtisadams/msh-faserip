@@ -1,4 +1,5 @@
-// itemSheet.js v1.7.0
+// itemSheet.js v1.8.0 - 2026-01-24
+// v1.8.0: Add SFX preview buttons and volume controls to power sheet
 // v1.7.0: Power Sheet layout reorganization
 export class FaseripItemSheet extends ItemSheet {
   static get defaultOptions() {
@@ -144,6 +145,59 @@ export class FaseripItemSheet extends ItemSheet {
 
   async activateListeners(html) {
     super.activateListeners(html);
+
+    // SFX Preview button handler
+    html.find(".sfx-preview").on("click", async (ev) => {
+      ev.preventDefault();
+      const button = ev.currentTarget;
+      const sfxField = button.dataset.sfxField;
+      const volumeField = button.dataset.volumeField;
+      
+      // Get SFX path from the corresponding input field
+      const sfxInput = html.find(`input[name="${sfxField}"]`);
+      const sfxPath = sfxInput.val();
+      
+      if (!sfxPath) {
+        ui.notifications.warn("No sound file selected");
+        return;
+      }
+      
+      // Get volume (default 80 if not set)
+      const volumeInput = html.find(`input[name="${volumeField}"]`);
+      const volume = (parseInt(volumeInput.val()) || 80) / 100;
+      
+      // Stop any currently playing preview
+      if (this._previewSound) {
+        this._previewSound.stop();
+        html.find(".sfx-preview").removeClass("playing");
+      }
+      
+      try {
+        button.classList.add("playing");
+        this._previewSound = await foundry.audio.AudioHelper.play({
+          src: sfxPath,
+          volume: volume,
+          autoplay: true,
+          loop: false
+        }, false);
+        
+        // Remove playing class when sound ends
+        if (this._previewSound) {
+          this._previewSound.addEventListener("end", () => {
+            button.classList.remove("playing");
+            this._previewSound = null;
+          });
+          this._previewSound.addEventListener("stop", () => {
+            button.classList.remove("playing");
+            this._previewSound = null;
+          });
+        }
+      } catch (err) {
+        console.error("[FASERIP ERROR] Failed to play SFX preview:", err);
+        ui.notifications.error("Failed to play sound: " + err.message);
+        button.classList.remove("playing");
+      }
+    });
 
     // One-time migration: telekinesiStrength -> telekinesisStrength
     try {

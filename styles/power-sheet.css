@@ -394,3 +394,46 @@
 .power-sheet .custom-range-input input {
   width: 100%;
 }
+
+/* SFX Preview Controls */
+.power-sheet .sfx-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.power-sheet .sfx-row input[type="text"] {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.power-sheet .sfx-preview {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  line-height: 24px;
+  text-align: center;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.power-sheet .sfx-preview:hover {
+  background: #e0e0e0;
+}
+.power-sheet .sfx-preview.playing {
+  background: #4CAF50;
+  color: white;
+}
+.power-sheet .sfx-volume {
+  width: 36px !important;
+  min-width: 36px;
+  max-width: 36px;
+  text-align: center;
+  flex-shrink: 0;
+  padding: 0 2px;
+}
+.power-sheet .sfx-volume-label {
+  font-size: 0.85em;
+  color: #666;
+  flex-shrink: 0;
+}
+.power-sheet .sfx-row .file-picker {
+  flex-shrink: 0;
+}

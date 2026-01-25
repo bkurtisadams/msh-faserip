@@ -144,6 +144,13 @@
       "effectColor": "blue",
       "effectVariant": "01",
       
+      "sfx": {
+        "hit": "",
+        "miss": "",
+        "hitVolume": 80,
+        "missVolume": 80
+      },
+      
       "category": "",
       "type": "",
       "subtype": "",
