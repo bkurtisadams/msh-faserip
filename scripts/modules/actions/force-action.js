@@ -1,4 +1,5 @@
-// scripts/modules/actions/force-action.js v1.4.0 - 2025-12-28
+// scripts/modules/actions/force-action.js v1.5.0 - 2026-02-01
+// v1.5.0: Add support for equipment items with Force (F) damage type (concussion pistols, etc.)
 // v1.4.0: Fix CS persistence - decouple from global rememberSettings, treat opts.shift=0 as "not set"
 // v1.3.9: Fix usePowerToHit default - only true if explicitly saved as true (was defaulting to true)
 // v1.3.8: Fix CS hover text format to match attack-action.js (e.g., "+2 Stunned" not "Stunned (target): +2")
@@ -101,11 +102,21 @@ export class ForceAction extends RangedAttackAction {
       return catLooksForce || typeLooksForce;
     });
 
+    // Also include equipment items with Force (F) damage type
+    const forceEquipment = actor.items.filter((i) => {
+      if (i.type !== "equipment") return false;
+      const s = i.system || {};
+      const damageType = String(s.damageType || "").toUpperCase();
+      return damageType === "F" && s.category === "weapon";
+    });
+    forceItems = [...forceItems, ...forceEquipment];
+
     // If a specific item was passed via opts, ensure it's in the list and pre-selected
     const passedItemId = this.opts?.itemId || this.opts?.item?.id || null;
     const passedItem = passedItemId ? actor.items.get(passedItemId) : null;
     
-    if (passedItem && passedItem.type === "power") {
+    // Accept both power and equipment items
+    if (passedItem && (passedItem.type === "power" || passedItem.type === "equipment")) {
       // Add to list if not already present
       if (!forceItems.find(i => i.id === passedItem.id)) {
         forceItems = [passedItem, ...forceItems];

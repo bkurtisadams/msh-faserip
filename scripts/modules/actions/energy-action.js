@@ -1,4 +1,5 @@
-// scripts/modules/actions/energy-action.js v1.6.0 - 2025-12-28
+// scripts/modules/actions/energy-action.js v1.7.0 - 2026-02-01
+// v1.7.0: Add support for equipment items with Energy (E) damage type (laser pistols, etc.)
 // v1.6.0: Fix CS persistence - decouple from global rememberSettings, treat opts.shift=0 as "not set"
 // v1.5.9: Fix usePowerToHit default - only true if explicitly saved as true (stricter check)
 // v1.5.8: Fix CS hover text format to match attack-action.js (e.g., "+2 Stunned" not "Stunned (target): +2")
@@ -88,11 +89,21 @@ export class EnergyAction extends RangedAttackAction {
       return catIsEnergy || typeLooksEnergy;
     });
 
+    // Also include equipment items with Energy (E) damage type
+    const energyEquipment = actor.items.filter((i) => {
+      if (i.type !== "equipment") return false;
+      const s = i.system || {};
+      const damageType = String(s.damageType || "").toUpperCase();
+      return damageType === "E" && s.category === "weapon";
+    });
+    energyItems = [...energyItems, ...energyEquipment];
+
     // If a specific item was passed via opts, ensure it's in the list and pre-selected
     const passedItemId = this.opts?.itemId || this.opts?.item?.id || null;
     const passedItem = passedItemId ? actor.items.get(passedItemId) : null;
     
-    if (passedItem && passedItem.type === "power") {
+    // Accept both power and equipment items
+    if (passedItem && (passedItem.type === "power" || passedItem.type === "equipment")) {
       // Add to list if not already present
       if (!energyItems.find(i => i.id === passedItem.id)) {
         energyItems = [passedItem, ...energyItems];

@@ -1,4 +1,5 @@
-// scripts/modules/actions/grappling-action.js v2.2.3 - 2025-12-28
+// scripts/modules/actions/grappling-action.js v2.3.0 - 2026-02-01
+// v2.3.0: Add support for weapon-based grappling (whips with GP damage type use material strength)
 // v2.2.3: Fix shift override - treat opts.shift=0 as "not set" to allow saved values
 // v2.2.2: Fix CS persistence - decouple from global rememberSettings, use only local lastGrappleRemember flag
 // v2.2.1: Fix CS modifier persistence - use localStorage for Remember Settings checkbox (matches blunt attack pattern)
@@ -38,7 +39,31 @@ export class GrapplingAction extends AttackAction {
   async execute() {
     const actor = this.actor;
     const actionName = this.label;
-    const strength = getStrengthInfo(actor);
+    
+    // Check if a weapon was passed (e.g., whip with GP damage type)
+    const passedItem = this.opts?.item || this.opts?.sourceItem || this.opts?.equipment || null;
+    const isWeaponGrapple = passedItem?.type === "equipment" && 
+                            passedItem?.system?.damageType?.toUpperCase() === "GP";
+    
+    // For weapon grapples, use material strength; otherwise use actor's Strength
+    let strength;
+    let strengthSource;
+    if (isWeaponGrapple) {
+      const materialRank = passedItem.system?.materialStrength || "Typical";
+      const rankValues = {
+        "Shift-0": 0, "Feeble": 2, "Poor": 4, "Typical": 6, "Good": 10, "Excellent": 20,
+        "Remarkable": 30, "Incredible": 40, "Amazing": 50, "Monstrous": 75, "Unearthly": 100,
+        "Shift X": 150, "Shift Y": 200, "Shift Z": 500, "Class 1000": 1000
+      };
+      strength = {
+        rank: materialRank,
+        value: rankValues[materialRank] || 6
+      };
+      strengthSource = passedItem.name;
+    } else {
+      strength = getStrengthInfo(actor);
+      strengthSource = "Strength";
+    }
 
     // Load persisted defaults (karma checkbox never persisted - always starts unchecked)
     const savedShift = await actor.getFlag("msh-faserip", "lastGrappleShift") ?? 0;
@@ -64,7 +89,10 @@ export class GrapplingAction extends AttackAction {
       savedSpendKarma, 
       savedRemember, 
       savedSkipDice,
-      savedCsNotes
+      savedCsNotes,
+      isWeaponGrapple,
+      weaponName: isWeaponGrapple ? passedItem.name : null,
+      strengthSource
     });
     if (!choice) return;
 
@@ -213,7 +241,7 @@ export class GrapplingAction extends AttackAction {
     return { roll, color, effectiveRank, cappedTotal, totalKarmaUsed };
   }
 
-  async _showGrapplingDialog(actor, strength, { savedShift = 0, savedSpendKarma = false, savedRemember = false, savedSkipDice = false, savedCsNotes = "" } = {}) {
+  async _showGrapplingDialog(actor, strength, { savedShift = 0, savedSpendKarma = false, savedRemember = false, savedSkipDice = false, savedCsNotes = "", isWeaponGrapple = false, weaponName = null, strengthSource = "Strength" } = {}) {
     // Auto-fill target from opts prefill first, then from targeted token
     let prefillTargetName = this.opts?.prefill?.targetName || "";
     let prefillTargetStr  = this.opts?.prefill?.targetStrength || "";
@@ -236,6 +264,10 @@ export class GrapplingAction extends AttackAction {
       (i.name?.toLowerCase().includes("wrestling") || i.system?.wrestling)
     );
 
+    // Title and ability display
+    const dialogTitle = isWeaponGrapple ? `Grappling with ${weaponName}: ${actor.name}` : `Grappling: ${actor.name}`;
+    const abilityLabel = isWeaponGrapple ? `${weaponName} (Material)` : "Strength";
+
     const dialogHtml = `
       <!-- Context: Target + Attack stats side by side -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
@@ -249,8 +281,9 @@ export class GrapplingAction extends AttackAction {
         </div>
         <div style="background:#f5f5f5;padding:8px;border-radius:3px;">
           <div style="font-weight:600;color:#666;font-size:.8em;text-transform:uppercase;">Grapple</div>
-          <div style="font-weight:600;">Strength: ${strength.rank}</div>
+          <div style="font-weight:600;">${abilityLabel}: ${strength.rank}</div>
           <div style="color:#666;">Rank Value: ${strength.value}</div>
+          ${isWeaponGrapple ? `<div style="color:#6a1b9a;font-size:.85em;">Using weapon material strength</div>` : ''}
           ${hasWrestling ? `<div style="color:#2e7d32;font-size:.85em;">Wrestling Talent: +2 CS</div>` : ''}
         </div>
       </div>
@@ -285,7 +318,7 @@ export class GrapplingAction extends AttackAction {
 
     return new Promise((resolve) => {
       new Dialog({
-        title: `Grappling: ${actor.name}`,
+        title: dialogTitle,
         content: dialogHtml,
         buttons: {
           roll: {

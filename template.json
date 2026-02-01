@@ -140,251 +140,59 @@
     },
     "power": {
       "templates": ["base", "ranked"],
-      "effectAnimation": "",
-      "effectColor": "blue",
-      "effectVariant": "01",
-      
-      "sfx": {
-        "hit": "",
-        "miss": "",
-        "hitVolume": 80,
-        "missVolume": 80
-      },
-      
-      "category": "",
-      "type": "",
-      "subtype": "",
-      
-      "range": "",
-      "customRange": "",
-      "calculatedRange": "",
-      "area": "",
-      "duration": "",
-      "customDuration": "",
-      
-      "limitations": "",
-      "isLimited": false,
-      "limitRankMax": "",
-      "limitationColumnShift": 0,
-      "limitation": {
-        "usesPerDay": 0,
-        "usesPerScene": 0,
-        "timeRestriction": "",
-        "environmentalReq": "",
-        "materialRestriction": "",
-        "targetRestriction": "",
-        "failureChance": 0,
-        "sideEffect": "",
-        "sideEffectTrigger": "",
-        "rankBonus": 0
-      },
       
       "isActive": true,
       "isStarred": false,
       "source": "natural",
-      "grantedByEquipment": false,
       
-      "attackType": "",
-      "damageType": "",
-      "primaryEffect": "damage",
-      "damage": 0,
-      "damageSource": "rank",
+      "range": "",
+      "customRange": "",
+      "area": 0,
+      "duration": "",
+      "customDuration": "",
       
+      "isAttackPower": false,
       "battleEffectsColumn": "",
+      "damageSource": "rank",
+      "damage": 0,
       "canPullPunch": false,
       "canReduceEffect": false,
-      "overridePullPunch": false,
-      
-      "isBluntAttack": false,
-      "isEdgedAttack": false,
-      "isShootingAttack": false,
-      "isEnergyAttack": false,
-      "isForceAttack": false,
-      "isThrowingBlunt": false,
-      "isThrowingEdged": false,
-      "isChargingAttack": false,
-      "isGrapplingAttack": false,
-      "isGrabbingAttack": false,
-      "isMentalAttack": false,
-      
+      "armorPiercing": false,
+      "ignoresNaturalArmor": false,
+      "ignoresArtificialArmor": false,
+      "continuingDamage": false,
+      "continuingDamageRounds": 3,
       "ensnaringStrength": "",
-      "stunningIntensity": "",
-
+      
       "requiresSave": false,
       "save": {
-        "ability": "endurance",          
-        "intensity": "power-rank",       
-        "fixedRank": "",                 
-        "ignoreDamageGate": true,        
-        "mapping": {                     
-          "white":  "fail",
-          "green":  "fail",
-          "yellow": "partial",
-          "red":    "success"
-        },
+        "ability": "endurance",
+        "intensity": "power-rank",
+        "fixedRank": "",
         "onFail": {
-          "effect": "nullified",         
-          "duration": "rank",            
-          "rounds": 0,                   
-          "notes": "Target’s powers are suppressed while effect lasts."
-        },
-        "onPartial": {
-          "effect": "reduced",
-          "notes": "Reduced effect or disadvantage at GM’s option."
-        },
-        "onSuccess": {
-          "effect": "none",
+          "effect": "stunned",
+          "duration": "1-10",
           "notes": ""
         }
       },
       
-      "isBodyArmor": false,
-      "bodyArmorType": "both",
+      "isDefensePower": false,
+      "defenseType": "bodyArmor",
       "armorNature": "natural",
-      "armorUseRankValue": true,
-      "armorPhysical": 0,
-      "armorEnergy": 0,
-      
-      "isForceField": false,
-      "forceFieldType": "personal",
-      
-      "isResistance": false,
+      "bodyArmorType": "both",
+      "protectionValue": 0,
+      "forceFieldPersonal": false,
+      "forceFieldCoverage": 0,
       "resistanceType": "",
-      "resistanceSpecific": "",
-      "resistanceEffect": "columnShift",
-      "resistanceValue": 2,
       "resistanceIsInvulnerability": false,
       
-      "mentalEffect": "",
-      "effectNotes": "",
-      "targetResistsWith": "",
-      
-      "karmaCost": 0,
-      "karmaLoss": 0,
-      
-      "continuingDamage": false,
-      "continuingDamageRounds": 3,
-      
-      "controlStrength": "",
-      "controlQuantity": "",
-      
-      "isMovementPower": false,
-      "movement": {
-        "type": "",
-        "useRankSpeed": true,
-        "areasPerRound": 1,
-        "speedMPH": 0,
-        "method": "",
-        "affectedByWind": false,
-        "requiresConcentration": false,
-        "lightningSpeed": false,
-        "canCarryPassengers": false,
-        "passengerLimit": 1,
-        "teleportAccuracy": "",
-        "teleportFamiliarityRequired": false,
-        "waterOnly": false,
-        "tunnelMaterial": "",
-        "leavesTunnel": false
+      "isLimited": false,
+      "limitation": {
+        "usesPerDay": 0,
+        "usesPerScene": 0,
+        "rankBonus": 0
       },
-      
-      "recoveryRate": "",
-      
-      "isMagic": false,
-      "magic": {
-        "energyType": "",
-        "school": "",
-        "sourceEntity": "",
-        "chant": false,
-        "gesture": false,
-        "usesCeremony": false,
-        "successAbility": "psyche",
-        "targetResistsWith": "",
-        "backlashNotes": "",
-        "castCost": 0,
-        "csModifier": 0
-      },
-      
-      "bonusPowers": [],
-      "hasBonusPowers": false,
-      "countsAsTwoPowers": false,
-      "stunts": [],
-      
-      "healingType": "",
-      "healingMaxPerDay": 0,
-      "absorptionType": "",
-      "absorptionSpecific": "",
-      "absorptionConvertsToHealth": true,
-      "absorptionCanRedirect": false,
-      "forceFieldCoverage": 0,
-      "forceFieldPersonal": false,
-      "telekinesiStrength": "",
-      "extraBodyParts": [],
-      "clawMaterialStrength": "",
-      "lifeSupport": false,
-      "lifeSupportTurns": 0,
-      "regenerationType": "",
-      "regenerationRate": "",
-      "extraAttacks": false,
-      "specialMechanics": "",
-      
-      "isDetectionPower": false,
-      "detection": {
-        "enhancedSense": "",
-        "protectedSense": "",
-        "infravisionRange": 0,
-        "detectionType": "",
-        "detectionSpecific": "",
-        "canTrack": false,
-        "combatSense": false,
-        "cosmicAwareness": false,
-        "precognition": false,
-        "postcognition": false
-      },
-      
-      "isMentalPower": false,
-      "mental": {
-        "telepathy": false,
-        "telepathyRange": "",
-        "mentalProbe": false,
-        "mindControl": false,
-        "emotionControl": false,
-        "emotionType": "",
-        "singleEmotionBonus": false,
-        "empathy": false,
-        "psiScreen": false,
-        "imageGeneration": false,
-        "illusionsDamage": false,
-        "possession": false,
-        "astralProjection": false
-      },
-      
-      "isTransformation": false,
-      "transformation": {
-        "affects": "self",
-        "touchRequired": false,
-        "transformType": "",
-        "targetMaterial": "",
-        "targetForm": "",
-        "duration": "concentration",
-        "durationRounds": 0,
-        "targetResistsWith": ""
-      },
-      
-      "isControlPower": false,
-      "control": {
-        "controlType": "",
-        "controlSpecific": "",
-        "manipulateExisting": true,
-        "generateNew": false,
-        "useAsShield": false,
-        "shieldRank": "",
-        "useAsWeapon": false,
-        "weaponColumn": "",
-        "createConstructs": false,
-        "constructMaterial": "",
-        "animateObjects": false
-      }
-
+      "limitations": ""
     },
     "talent": {
       "templates": ["base"],
@@ -508,8 +316,7 @@
       "controlCSLoss": 0,
       "damageLog": [],
 
-      "resources": { "body": { "value": 20, "max": 20 }
-  }
+      "resources": { "body": { "value": 20, "max": 20 } }
     },
     "headquarters": {
       "templates": ["base"],

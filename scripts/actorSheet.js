@@ -1,4 +1,5 @@
-// actorSheet.js v1.9.0 - 2025-01-22
+// actorSheet.js v2.0.0 - 2026-02-01
+// v2.0.0: Fix equipment roll routing for Energy/Force/Grappling/Grabbing damage types
 // v1.9.0: Log Resource and Popularity FEATs to karma history
 // v1.8.0: Add clickable Teleport label for movement FEAT dialog
 // v1.7.0: Add clickable Swim label for movement FEAT dialog
@@ -2489,8 +2490,19 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
       const damageType = item.system.damageType?.toUpperCase();
 
       if (category === "weapon") {
-        // Check weaponType to determine the correct action
-        if (weaponType === "shooting" || weaponType === "firearm") {
+        // First check damageType for special types that override weaponType
+        if (damageType === "E") {
+          actionType = "energy";
+        } else if (damageType === "F") {
+          actionType = "force";
+        } else if (damageType === "GP") {
+          actionType = "grappling";
+        } else if (damageType === "GB") {
+          actionType = "grabbing";
+        } else if (damageType === "STUN") {
+          // Stun weapons use Shooting column but have special stun effect
+          actionType = "shooting";
+        } else if (weaponType === "shooting" || weaponType === "firearm") {
           actionType = "shooting";
         } else if (weaponType === "melee") {
           // Use damageType to determine if edged or blunt
@@ -2515,13 +2527,26 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
         // Unknown equipment type - use old system
         return item.rollItem();
       }
+
+      // Determine ability based on action type
+      let abilityName;
+      if (actionType === "energy" || actionType === "force" || actionType === "shooting" || 
+          actionType === "throwing-edged" || actionType === "throwing-blunt") {
+        abilityName = "agility";
+      } else if (actionType === "grappling" || actionType === "grabbing") {
+        abilityName = "strength";
+      } else {
+        abilityName = "fighting";
+      }
             
       return ActionDispatcher.roll(actionType, {
         actor: this.actor,
-        abilityName: actionType.includes("shooting") || actionType.includes("throwing") ? "agility" : "fighting",
+        abilityName: abilityName,
         opts: { 
           itemId: item.id,
-          item: item
+          item: item,
+          sourceItem: item,
+          equipment: item
         }
       });
     });

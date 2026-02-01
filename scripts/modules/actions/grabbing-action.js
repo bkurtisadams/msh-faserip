@@ -1,4 +1,5 @@
-// scripts/modules/actions/grabbing-action.js v1.3.0 - 2025-12-27
+// scripts/modules/actions/grabbing-action.js v1.4.0 - 2026-02-01
+// v1.4.0: Add support for weapon-based grabbing (whips with Gb damage type use material strength)
 // v1.3.0: Fix karma checkbox to always default unchecked (not persisted)
 // v1.2.0: Fix DiceSoNice animation in consolidated chat cards mode
 // v1.1.0: Add inline rolls for consolidated chat cards
@@ -46,11 +47,33 @@ export class GrabbingAction extends AttackAction {
     const actionName = this.actionName;
     const effects = this.effects;
 
-    // Attacker uses Strength for Wrestling: Grabbing
-    const strength = getStrengthInfo(actor);
+    // Check if a weapon was passed (e.g., whip with Gb damage type)
+    const passedItem = this.opts?.item || this.opts?.sourceItem || this.opts?.equipment || null;
+    const isWeaponGrab = passedItem?.type === "equipment" && 
+                         passedItem?.system?.damageType?.toUpperCase() === "GB";
+    
+    // For weapon grabs, use material strength; otherwise use actor's Strength
+    let strength;
+    let strengthSource;
+    if (isWeaponGrab) {
+      const materialRank = passedItem.system?.materialStrength || "Typical";
+      const rankValues = {
+        "Shift-0": 0, "Feeble": 2, "Poor": 4, "Typical": 6, "Good": 10, "Excellent": 20,
+        "Remarkable": 30, "Incredible": 40, "Amazing": 50, "Monstrous": 75, "Unearthly": 100,
+        "Shift X": 150, "Shift Y": 200, "Shift Z": 500, "Class 1000": 1000
+      };
+      strength = {
+        rank: materialRank,
+        value: rankValues[materialRank] || 6
+      };
+      strengthSource = passedItem.name;
+    } else {
+      strength = getStrengthInfo(actor);
+      strengthSource = "Strength";
+    }
 
     // Build dialog with auto-filled target + strength if exactly one token targeted
-    const choice = await this._prompt(actor, strength);
+    const choice = await this._prompt(actor, strength, { isWeaponGrab, weaponName: isWeaponGrab ? passedItem.name : null, strengthSource });
     if (!choice) return;
 
     // Effective rank after CS
@@ -171,7 +194,7 @@ export class GrabbingAction extends AttackAction {
    * Dialog to collect/confirm target, target STR, item label, and optional item material.
    * Auto-fills target name + STR if a single token is targeted.
    */
-  async _prompt(actor, strength) {
+  async _prompt(actor, strength, { isWeaponGrab = false, weaponName = null, strengthSource = "Strength" } = {}) {
     // Try to pull a single targeted token
     let prefillTargetName = "";
     let prefillTargetStr = "";
@@ -188,16 +211,22 @@ export class GrabbingAction extends AttackAction {
     const savedSkipDice = (await actor.getFlag("msh-faserip", "skipDiceRoll")) ?? (await actor.getFlag("msh-faserip", "lastGrabbingSkipDice")) ?? false;
     const savedSpendKarma = false; // Always default to unchecked
 
+    // Title and ability label
+    const dialogTitle = isWeaponGrab ? `Grabbing with ${weaponName}: ${actor.name}` : `${this.actionName}: ${actor.name}`;
+    const abilityLabel = isWeaponGrab ? `${weaponName} (Material)` : "Your Strength";
+
     const html = `
       <div style="margin-bottom:8px;">
         <label style="display:inline-block;width:130px;">Action:</label>
         <strong>${this.actionName}</strong>
+        ${isWeaponGrab ? `<span style="color:#6a1b9a;margin-left:8px;">(using ${weaponName})</span>` : ''}
       </div>
 
       <div style="margin-bottom:8px;">
-        <label style="display:inline-block;width:130px;">Your Strength:</label>
+        <label style="display:inline-block;width:130px;">${abilityLabel}:</label>
         <input type="text" value="${strength.rank}" style="width:160px;" readonly>
         <span style="margin-left:6px;">(${strength.value})</span>
+        ${isWeaponGrab ? `<div style="margin-left:130px;font-size:.85em;color:#6a1b9a;">Using weapon material strength</div>` : ''}
       </div>
 
       <div style="margin-bottom:8px;">
@@ -253,7 +282,7 @@ export class GrabbingAction extends AttackAction {
 
     return new Promise((resolve) => {
       new Dialog({
-        title: `${this.actionName}: ${actor.name}`,
+        title: dialogTitle,
         content: html,
         buttons: {
           roll: {
