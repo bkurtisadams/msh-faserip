@@ -1,4 +1,5 @@
-// init.js v1.7.6 - 2025-01-24
+// init.js v1.7.7 - 2026-02-07
+// v1.7.7: Add FaseripTokenRuler - speed-based color coding for V13 drag ruler
 // v1.7.6: Fix getCampaignDateTime - worldTime is already seconds, remove /1000
 // v1.7.5: Add defeatedVillains setting for team tracker
 // v1.7.4: Fix prototypeTokenOverrides check to detect keys with undefined values
@@ -44,6 +45,7 @@ import { initRestSystem } from "./modules/rest-system.js";
 import { ACTIONS } from '../helpers/action-constants.js';
 import { playCombatSFX, classifyWeapon } from "./modules/actions/audio-utils.js";
 import { quickHeal } from "../macros/quick-heal.js";
+import { FaseripTokenRuler } from "./modules/canvas/faserip-token-ruler.js";
 
 // Helper to resolve ACTIONS from CONFIG (for macro compatibility)
 function getActions() {
@@ -1167,6 +1169,9 @@ Hooks.once("init", async () => {
   // Register document classes
   CONFIG.Actor.documentClass = FaseripActor;
   CONFIG.Item.documentClass = FaseripItem;
+
+  // Register custom token ruler (speed-based color coding)
+  CONFIG.Token.rulerClass = FaseripTokenRuler;
 
   // Register sheet application classes
   Actors.unregisterSheet("core", ActorSheet);
