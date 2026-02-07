@@ -1,4 +1,5 @@
-// scripts/modules/actions/defense-action.js v1.3.5 - 2026-01-02
+// scripts/modules/actions/defense-action.js v1.3.6 - 2026-02-07
+// v1.3.6: Fix dodging - add Active Effect changes so defense CS actually applies to incoming attacks
 // v1.3.5: Add expiresAtRound flag to Evasion Bonus for reliable expiration tracking
 // v1.3.4: Fix evasion bonus duration - use 2 rounds to survive round-change expiration; usability controlled by createdRound check
 // v1.3.3: Fix evasion bonus duration - 1 round starting next round, cannot be saved
@@ -497,8 +498,23 @@ export class DefenseAction extends BaseAction {
       if (existingDodge) await existingDodge.delete();
 
       // Create new dodging effect
+      // Defense shift = positive value (harder to hit), derived from attacker penalty
+      const defenseBonus = Math.abs(penalty);
       const penaltyText = penalty !== 0 ? `${penalty}CS penalty to attackers` : "no penalty";
       
+      // Build changes array: apply defense shift to both melee and ranged keys
+      // Per rules, dodge works vs ranged & charging but NOT slugfest/wrestling;
+      // GM should override for adjacent slugfest/wrestling attacks
+      const changes = [
+        { key: "system.combatMods.movementMult", mode: 5, value: "0.5", priority: 20 }
+      ];
+      if (defenseBonus > 0) {
+        changes.push(
+          { key: "system.combatMods.defenseShift", mode: 2, value: String(defenseBonus), priority: 20 },
+          { key: "system.combatMods.defenseShiftRanged", mode: 2, value: String(defenseBonus), priority: 20 }
+        );
+      }
+
       const effectData = {
         name: `Dodging (${penaltyText})`,
         icon: "icons/svg/windmill.svg",
@@ -509,12 +525,13 @@ export class DefenseAction extends BaseAction {
           startRound: game.combat?.round || 0,
           startTurn: game.combat?.turn || 0
         },
+        changes,
         flags: {
           "msh-faserip": {
             isDodging: true,
             attackerPenaltyCS: penalty,
             selfPenaltyCS: -2,
-            notes: "Attackers suffer CS penalty; your FEATs at -2CS; half move only"
+            notes: "Attackers suffer CS penalty; your FEATs at -2CS; half move only; no effect vs adjacent Slugfest/Wrestling"
           }
         }
       };

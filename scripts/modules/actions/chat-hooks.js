@@ -1,4 +1,5 @@
-// chat-hooks.js v1.5.0 - 2025-12-27
+// chat-hooks.js v1.5.1 - 2026-02-07
+// v1.5.1: Fix createDodgingEffect - add Active Effect changes so defense CS applies to attacks
 // v1.5.0: Add grapple-back handler for Reverse escape result
 // v1.4.0: Add hold-damage handler for Full Hold grappling damage
 // v1.3.0: Add detailed logging for escape effect removal debugging
@@ -1127,6 +1128,7 @@ async function createDodgingEffect(actor, data) {
     ? `${attackerPenaltyCS}CS to attackers` 
     : "no penalty";
   
+  const defenseBonus = Math.abs(attackerPenaltyCS);
   const effectData = {
     name: `Dodging (${penaltyText})`,
     icon: "icons/svg/windmill.svg",
@@ -1144,9 +1146,12 @@ async function createDodgingEffect(actor, data) {
         notes: notes
       }
     },
-    changes: [
-      // This is a visual/reminder effect; actual CS penalties handled manually
-      // Could add system-specific change rules here if your system supports them
+    changes: defenseBonus > 0 ? [
+      { key: "system.combatMods.movementMult", mode: 5, value: "0.5", priority: 20 },
+      { key: "system.combatMods.defenseShift", mode: 2, value: String(defenseBonus), priority: 20 },
+      { key: "system.combatMods.defenseShiftRanged", mode: 2, value: String(defenseBonus), priority: 20 }
+    ] : [
+      { key: "system.combatMods.movementMult", mode: 5, value: "0.5", priority: 20 }
     ]
   };
   
