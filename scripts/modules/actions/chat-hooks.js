@@ -1,5 +1,6 @@
-// chat-hooks.js v1.5.1 - 2026-02-07
-// v1.5.1: Fix createDodgingEffect - add Active Effect changes so defense CS applies to attacks
+// chat-hooks.js v1.5.2 - 2026-02-07
+// v1.5.2: Fix createEvadingEffect - pass evadeSuccessful/autoHit to applyEvade for proper flag tracking
+// v1.5.1: Wire dodge CS penalty to Active Effect changes (defenseShift/defenseShiftRanged)
 // v1.5.0: Add grapple-back handler for Reverse escape result
 // v1.4.0: Add hold-damage handler for Full Hold grappling damage
 // v1.3.0: Add detailed logging for escape effect removal debugging
@@ -1147,12 +1148,9 @@ async function createDodgingEffect(actor, data) {
       }
     },
     changes: defenseBonus > 0 ? [
-      { key: "system.combatMods.movementMult", mode: 5, value: "0.5", priority: 20 },
       { key: "system.combatMods.defenseShift", mode: 2, value: String(defenseBonus), priority: 20 },
       { key: "system.combatMods.defenseShiftRanged", mode: 2, value: String(defenseBonus), priority: 20 }
-    ] : [
-      { key: "system.combatMods.movementMult", mode: 5, value: "0.5", priority: 20 }
-    ]
+    ] : []
   };
   
   await actor.createEmbeddedDocuments('ActiveEffect', [effectData]);
@@ -1162,8 +1160,14 @@ async function createDodgingEffect(actor, data) {
  * Create an Evading effect
  */
 async function createEvadingEffect(actor, data) {
-  const { target, nextRoundAttackBonusCS, note } = data;
-  await Effects.applyEvade(actor, { target, nextRoundAttackBonusCS, note });
+  const { target, evadeSuccessful, autoHit, nextRoundAttackBonusCS, note } = data;
+  await Effects.applyEvade(actor, { 
+    target, 
+    evadeSuccessful: evadeSuccessful ?? true, 
+    autoHit: autoHit ?? false,
+    nextRoundAttackBonusCS, 
+    note 
+  });
 }
 
 

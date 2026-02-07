@@ -1,4 +1,6 @@
-// scripts/modules/effects/effect-engine.js v1.4.0 - 2026-01-02
+// scripts/modules/effects/effect-engine.js v1.5.0 - 2026-02-07
+// v1.5.0: Fix applyEvade - add canAct:false, nest flags under SCOPE, create separate bonus effect
+//         Fix applyBlock - add canAct:false, nest flags under SCOPE, remove incorrect movementMult
 // v1.4.0: Fix applyEvade - properly track evadeSuccessful/autoHit flags, remove incorrect combat mod changes
 // v1.3.0: Duplicate effect handling - stun keeps longer duration, slam keeps more severe
 // v1.2.1: Reduce console logging verbosity
@@ -331,47 +333,92 @@ export async function applyEvade(actor, {
   
   let effectName;
   if (autoHit) {
-    effectName = "Evasion Failed (Auto-Hit)";
-  } else if (nextRoundAttackBonusCS > 0) {
-    effectName = target ? `Evaded ${target} (+${nextRoundAttackBonusCS}CS)` : `Evaded (+${nextRoundAttackBonusCS}CS)`;
+    effectName = target ? `Evasion Failed vs ${target} (Auto-Hit)` : "Evasion Failed (Auto-Hit)";
   } else {
-    effectName = target ? `Evaded ${target}` : "Evaded";
+    effectName = target ? `Evading ${target}` : "Evading";
   }
   
-  return applyEffect(actor, {
+  const currentRound = game.combat?.round || 0;
+  
+  // Create the evading status effect (prevents attacks, tracks evasion result)
+  const evadeEffect = await applyEffect(actor, {
     name: effectName,
     img: autoHit ? "icons/svg/hazard.svg" : "icons/svg/combat.svg",
     rounds: 1,
-    // No combat mod changes - evasion is tracked via flags, checked by attacks
-    changes: [],
+    // Evading prevents attacks this round
+    changes: [
+      { key: "system.combatMods.canAct", mode: AE_MODE.OVERRIDE, value: "false", priority: 50 }
+    ],
     flags: {
-      effectType: "evading",
-      status: { isEvading: true },
-      evadeSuccessful,
-      autoHit,
-      evadedTarget: target,
-      nextRoundAttackBonusCS,
-      nextRoundBonusUsed: false,
-      notes: note
+      [SCOPE()]: {
+        effectType: "evading",
+        isEvading: true,
+        evadeSuccessful,
+        autoHit,
+        evadedTarget: target,
+        evadedTargetLower: target.toLowerCase(),
+        createdRound: currentRound,
+        notes: note || (autoHit 
+          ? "Opponent auto-hits (at least Green result); you cannot attack this round"
+          : "Evading: opponent's blow misses; you cannot attack this round")
+      }
     },
     statuses: ["evading"]
   });
+
+  // Create separate evasion bonus effect for next-round attack bonus (yellow/red only)
+  // Must be a separate effect with isEvasionBonus so getEvasionAttackBonus() can find it
+  if (nextRoundAttackBonusCS > 0) {
+    const bonusName = target 
+      ? `Evasion Bonus vs ${target} (+${nextRoundAttackBonusCS}CS)` 
+      : `Evasion Bonus (+${nextRoundAttackBonusCS}CS)`;
+    
+    await applyEffect(actor, {
+      name: bonusName,
+      img: "icons/svg/upgrade.svg",
+      rounds: 2,
+      changes: [],
+      flags: {
+        [SCOPE()]: {
+          effectType: "evasionBonus",
+          isEvasionBonus: true,
+          evadedTarget: target,
+          evadedTargetLower: target.toLowerCase(),
+          nextRoundAttackBonusCS,
+          nextRoundBonusUsed: false,
+          createdRound: currentRound,
+          expiresAtRound: currentRound + 2,
+          notes: `+${nextRoundAttackBonusCS}CS to first attack vs ${target || "that attacker"} next round (cannot be saved)`
+        }
+      }
+    });
+    
+    console.log("[FASERIP] Created Evasion Bonus effect:", {
+      actor: actor.name, bonus: nextRoundAttackBonusCS,
+      createdRound: currentRound, usableInRound: currentRound + 1
+    });
+  }
+
+  return evadeEffect;
 }
 
 export async function applyBlock(actor, { armorRank = "Good", armorValue = 10, note = "" } = {}) {
   return applyEffect(actor, {
-    name: `Blocking (${armorRank})`,
+    name: `Blocking (${armorRank} Armor)`,
     img: "icons/svg/shield.svg",
     rounds: 1,
     changes: [
-      { key: "system.combatMods.movementMult", mode: AE_MODE.MULTIPLY, value: "0.5", priority: 20 }
+      // Block: "may take no other action"
+      { key: "system.combatMods.canAct", mode: AE_MODE.OVERRIDE, value: "false", priority: 50 }
     ],
     flags: {
-      effectType: "blocking",
-      status: { isBlocking: true },
-      armorRank,
-      armorValue,
-      notes: note || "Applies vs physical (not Shooting/Energy; not Charging). Stacks with normal armor, not Force Fields."
+      [SCOPE()]: {
+        effectType: "blocking",
+        isBlocking: true,
+        armorRank,
+        armorValue,
+        notes: note || "Strength as Body Armor vs physical (not Shooting/Energy/Charging). No attacks this round."
+      }
     },
     statuses: ["blocking"]
   });

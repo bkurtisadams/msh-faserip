@@ -1,6 +1,6 @@
-// scripts/modules/actions/defense-action.js v1.3.6 - 2026-02-07
-// v1.3.6: Fix dodging - add Active Effect changes so defense CS actually applies to incoming attacks
-// v1.3.5: Add expiresAtRound flag to Evasion Bonus for reliable expiration tracking
+// scripts/modules/actions/defense-action.js v1.3.7 - 2026-02-07
+// v1.3.7: Add canAttack:false to blocking effect; blocking now prevents attacks per rules
+// v1.3.6: Wire dodge CS penalty and half movement to Active Effect changes array
 // v1.3.4: Fix evasion bonus duration - use 2 rounds to survive round-change expiration; usability controlled by createdRound check
 // v1.3.3: Fix evasion bonus duration - 1 round starting next round, cannot be saved
 // v1.3.2: Split evasion into two effects - "Evading" (blocks attacks, 1 round) and "Evasion Bonus" (+CS, 2 rounds)
@@ -390,6 +390,8 @@ export class DefenseAction extends BaseAction {
       // Store a small temp flag so you can apply the next-round bonus manually
       await this._setTempFlag("evading", {
         target: choice.evadeTarget || "(adjacent attacker)",
+        evadeSuccessful: colorLower !== 'white',
+        autoHit: colorLower === 'white',
         nextRoundAttackBonusCS: nextRoundBonus,
         note
       });
@@ -462,6 +464,8 @@ export class DefenseAction extends BaseAction {
         if (existingBlock) await existingBlock.delete();
 
         // Create new blocking effect
+        // Per rules: "may take no other action" — prevent attacks
+        // Blocking armor is checked by getBodyArmorValues() during attack resolution
         const effectData = {
           name: `Blocking (${armorRank} Armor)`,
           icon: "icons/svg/shield.svg",
@@ -472,12 +476,16 @@ export class DefenseAction extends BaseAction {
             startRound: game.combat?.round || 0,
             startTurn: game.combat?.turn || 0
           },
+          changes: [
+            // Block: "may take no other action"
+            { key: "system.combatMods.canAct", mode: 5, value: "false", priority: 50 }
+          ],
           flags: {
             "msh-faserip": {
               isBlocking: true,
               armorRank: armorRank,
               armorValue: armorValue,
-              notes: "Strength as Body Armor vs physical attacks (not Shooting/Energy/Charging)"
+              notes: "Strength as Body Armor vs physical attacks (not Shooting/Energy/Charging). No attacks this round."
             }
           }
         };
@@ -505,9 +513,7 @@ export class DefenseAction extends BaseAction {
       // Build changes array: apply defense shift to both melee and ranged keys
       // Per rules, dodge works vs ranged & charging but NOT slugfest/wrestling;
       // GM should override for adjacent slugfest/wrestling attacks
-      const changes = [
-        { key: "system.combatMods.movementMult", mode: 5, value: "0.5", priority: 20 }
-      ];
+      const changes = [];
       if (defenseBonus > 0) {
         changes.push(
           { key: "system.combatMods.defenseShift", mode: 2, value: String(defenseBonus), priority: 20 },
@@ -583,7 +589,7 @@ export class DefenseAction extends BaseAction {
       
       // ===== EFFECT 1: Evading Status (1 round) =====
       // This effect:
-      // - Prevents the evader from attacking this round (canAct: false for attacks)
+      // - Prevents the evader from acting this round (canAct: false)
       // - Causes the evaded attacker to miss (or auto-hit on white)
       let evadingEffectName;
       if (colorLower === 'white') {
@@ -606,9 +612,9 @@ export class DefenseAction extends BaseAction {
           startRound: game.combat?.round || 0,
           startTurn: game.combat?.turn || 0
         },
-        // Evading prevents attacks this round
+        // Evading prevents actions this round (per rules: "makes no attacks that round")
         changes: [
-          { key: "system.combatMods.canAttack", mode: 5, value: "false", priority: 50 }
+          { key: "system.combatMods.canAct", mode: 5, value: "false", priority: 50 }
         ],
         flags: {
           "msh-faserip": {

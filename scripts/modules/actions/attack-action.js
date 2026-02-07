@@ -1,4 +1,5 @@
-// attack-action.js v1.9.13 - 2026-01-02
+// attack-action.js v1.9.14 - 2026-02-07
+// v1.9.14: Evasion chat card shows real roll color instead of fake White; damage shows "evaded" not "miss"
 // v1.9.13: Fix evasion bonus - apply to attack shift BEFORE roll so it shows in CS breakdown and effective rank
 // v1.9.12: Fix chat card to display modified result after evasion bonus (use targetBg/targetFg/targetEffectResult)
 // v1.9.11: Fix evasion - block attacks while evading, fix SFX to not play hit sounds on evaded miss
@@ -606,9 +607,9 @@ export class AttackAction extends BaseAction {
             // Check if evasion was successful (green/yellow/red result on evade roll)
             if (evadeFlags.evadeSuccessful) {
               // Successful evasion: attack misses regardless of roll
-              targetEffectColor = "white";
+              // Keep targetEffectColor as the real roll result for display clarity
               targetIsHit = false;
-              evasionNote = `<div style="padding:4px 8px;margin:4px 0;background:#e8f5e9;border:1px solid #4caf50;border-radius:3px;color:#2e7d32;font-weight:bold;text-align:center;">EVADED - Attack Misses!</div>`;
+              evasionNote = `<div style="padding:4px 8px;margin:4px 0;background:#e8f5e9;border:1px solid #4caf50;border-radius:3px;color:#2e7d32;font-weight:bold;text-align:center;">EVADED — Target dodged the attack!</div>`;
               console.log("[FASERIP] Evasion success:", { 
                 attacker: actor.name, 
                 target: targetName, 
@@ -687,7 +688,7 @@ export class AttackAction extends BaseAction {
       // Calculate breaking feat for this attack - include target material for auto-population
       // Show button when weapon material < target material (regardless of penetrating damage)
       let currentBreakingFeat = null;
-      if (targetEffectColor !== "white" && breakingFeat && targetActor) {
+      if (targetIsHit && targetEffectColor !== "white" && breakingFeat && targetActor) {
         const RANKS = [
           "Shift-0","Feeble","Poor","Typical","Good","Excellent",
           "Remarkable","Incredible","Amazing","Monstrous","Unearthly",
@@ -1003,9 +1004,10 @@ export class AttackAction extends BaseAction {
           <!-- Damage -->
           ${(() => {
             if (!targetIsHit) {
-              // Miss - show zero damage
+              // Miss - show zero damage with reason
+              const missReason = evasionNote ? "evaded" : "miss";
               return `<div style="margin:0 10px 6px;padding:6px 8px;background:#fff;border:1px solid #ddd;border-radius:3px;font-size:.9em;color:#666;">
-                <strong>Damage:</strong> 0 (miss)
+                <strong>Damage:</strong> 0 (${missReason})
               </div>`;
             }
             

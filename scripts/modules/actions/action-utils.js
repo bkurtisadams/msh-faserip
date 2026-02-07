@@ -1,4 +1,5 @@
-// action-utils.js v1.4.1 - 2025-01-21
+// action-utils.js v1.5.0 - 2026-02-07
+// v1.5.0: getBodyArmorValues checks for active Blocking effect (Strength as Body Armor)
 // v1.4.1: Fix computeBluntDamage to respect weapon minimum base damage per FASERIP rules
 // v1.4.0: Add showGrappleBack chip for Reverse escape result
 // v1.3.0: Add showHoldDamage chip to buildActionsBox for Full Hold grappling damage
@@ -1822,6 +1823,55 @@ export function getBodyArmorValues(targetActor, damageType = "physical-blunt") {
 
   const isEnergy = CONFIG.FASERIP?.isEnergyDamage?.(dmgTypeLower) ?? 
                    (dmgTypeLower && dmgTypeLower.includes("energy"));
+
+  // Check for active Blocking effect (Strength as Body Armor)
+  // Block applies vs: Slugfest, Grappling, Wrestling, Edged/Blunt Throwing, Force
+  // Block does NOT apply vs: Shooting (physical-ranged), Energy, Charging (GM call)
+  let blockingArmor = 0;
+  let blockingRank = "";
+  const blockEligible = !isEnergy && dmgTypeLower !== "physical-ranged";
+  
+  if (blockEligible) {
+    const blockEffect = targetActor.effects?.find(e => {
+      if (e.disabled) return false;
+      const flags = e.flags?.["msh-faserip"] || {};
+      return flags.isBlocking === true;
+    });
+    
+    if (blockEffect) {
+      const blockFlags = blockEffect.flags?.["msh-faserip"] || {};
+      blockingArmor = Number(blockFlags.armorValue) || 0;
+      blockingRank = blockFlags.armorRank || "";
+      
+      // Per rules: "Normal Body Armor, but not Force Fields, still apply to defense"
+      // Use the higher of blocking armor or regular body armor (armor doesn't stack)
+      // If target has a force field, it does NOT apply during blocking
+      if (blockingArmor > 0) {
+        if (isForceField) {
+          // Force field excluded during block; use blocking armor instead
+          physicalArmor = Math.max(blockingArmor, physicalArmor);
+          // Note: ideally we'd exclude force field value here, but getBodyArmorValues
+          // doesn't track force field vs regular armor separately. Use max as safe fallback.
+        } else {
+          // Regular armor stacks: use whichever is higher
+          physicalArmor = Math.max(physicalArmor, blockingArmor);
+        }
+        
+        if (blockingArmor >= physicalArmor && blockingRank) {
+          physicalRank = blockingRank;
+        }
+        
+        console.log("[FASERIP] Blocking armor applied:", {
+          targetName: targetActor.name,
+          blockingArmor,
+          blockingRank,
+          resultPhysicalArmor: physicalArmor,
+          damageType
+        });
+      }
+    }
+  }
+
   const applicable = isEnergy ? energyArmor : physicalArmor;
 
   console.log("FASERIP DEBUG | getBodyArmorValues result:", {
@@ -1833,6 +1883,7 @@ export function getBodyArmorValues(targetActor, damageType = "physical-blunt") {
     energyRank,
     isForceField,
     isEnergy,
+    blockingArmor: blockEligible ? blockingArmor : "N/A (ineligible)",
     applicable
   });
 
@@ -1852,7 +1903,10 @@ return {
   energyRank: energyRank,
   applicable: applicable,
   isEnergyDamage: isEnergy,
-  isForceField: isForceField
+  isForceField: isForceField,
+  isBlocking: blockEligible && blockingArmor > 0,
+  blockingArmor: blockEligible ? blockingArmor : 0,
+  blockingRank: blockEligible ? blockingRank : ""
 };
 
 }
