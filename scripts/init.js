@@ -1173,6 +1173,58 @@ Hooks.once("init", async () => {
   // Register custom token ruler (speed-based color coding)
   CONFIG.Token.rulerClass = FaseripTokenRuler;
 
+  // Register FASERIP movement actions for Token HUD
+  // Foundry V13 built-in: users select via Token HUD or TAB during waypoint movement
+  if (CONFIG.Token.movement?.actions) {
+    const actions = CONFIG.Token.movement.actions;
+
+    // Walk/Run - always available, default
+    if (actions.walk) {
+      actions.walk.label = "Run";
+      actions.walk.canSelect = () => true;
+      actions.walk.order = 0;
+    }
+
+    // Fly - only if actor has fly speed > 0
+    if (actions.fly) {
+      actions.fly.canSelect = (token) => {
+        const actor = token.actor ?? token.parent;
+        return (actor?.system?.movement?.fly || 0) > 0;
+      };
+      actions.fly.order = 1;
+    }
+
+    // Swim - only if actor has swim speed
+    if (actions.swim) {
+      actions.swim.canSelect = (token) => {
+        const actor = token.actor ?? token.parent;
+        return (actor?.system?.movement?.swim || 0) > 0;
+      };
+      actions.swim.order = 2;
+    }
+
+    // Teleport - only if actor has teleport speed > 0
+    if (actions.teleport) {
+      actions.teleport.teleport = true;
+      actions.teleport.canSelect = (token) => {
+        const actor = token.actor ?? token.parent;
+        return (actor?.system?.movement?.teleport || 0) > 0;
+      };
+      actions.teleport.order = 3;
+    }
+
+    // Hide movement types FASERIP doesn't use
+    const hideActions = ["burrow", "crawl", "climb"];
+    for (const key of hideActions) {
+      if (actions[key]) {
+        actions[key].canSelect = () => false;
+      }
+    }
+
+    // Set default action to walk
+    CONFIG.Token.movement.defaultAction = "walk";
+  }
+
   // Register sheet application classes
   Actors.unregisterSheet("core", ActorSheet);
   Items.unregisterSheet("core", ItemSheet);

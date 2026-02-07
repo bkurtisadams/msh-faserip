@@ -3,13 +3,13 @@
 // Wait for Foundry to be ready
 Hooks.once('ready', () => {
   console.log("FASERIP | Setting up Elevation Ruler integration");
-  
+
   // Configure Elevation Ruler for FASERIP system
   if (!CONFIG.elevationruler) CONFIG.elevationruler = {};
-  
+
   // Set measurement units to "areas"
   CONFIG.elevationruler.measurementUnits = "areas";
-  
+
   // Define attributes for different movement types
   CONFIG.elevationruler.SPEED = CONFIG.elevationruler.SPEED || {};
   CONFIG.elevationruler.SPEED.ATTRIBUTES = {
@@ -18,21 +18,17 @@ Hooks.once('ready', () => {
     SWIM: "actor.system.movement.swim",
     TELEPORT: "actor.system.movement.teleport"
   };
-  
-  // Define token type detection function
+
+  // Define token type detection function - reads V13 movementAction
   CONFIG.elevationruler.SPEED.tokenMovementType = function(token) {
-    // Check if token has flying status effect
-    if (token.actor?.effects.some(e => e.name?.toLowerCase().includes("fly"))) {
-      return "FLY";
-    }
-    
-    // Default to walking/running
-    return "WALK";
+    const action = token.document?.movementAction || "walk";
+    const actionMap = { walk: "WALK", fly: "FLY", swim: "SWIM", teleport: "TELEPORT" };
+    return actionMap[action] || "WALK";
   };
-  
+
   // Ensure we don't replace existing categories
   const originalCategories = CONFIG.elevationruler.SPEED.CATEGORIES || [];
-  
+
   // Define speed categories for FASERIP - ensure all properties are properly set
   const faseripCategories = [
     {
@@ -51,7 +47,7 @@ Hooks.once('ready', () => {
       multiplier: 3
     }
   ];
-  
+
   // Only set our categories if none exist already
   if (!originalCategories.length) {
     CONFIG.elevationruler.SPEED.CATEGORIES = faseripCategories;
@@ -63,7 +59,7 @@ Hooks.once('ready', () => {
       }
     });
   }
-  
+
   // Override the maximum category distance calculation to handle our structure
   const originalMaxCategoryDistance = CONFIG.elevationruler.SPEED.maximumCategoryDistance;
   CONFIG.elevationruler.SPEED.maximumCategoryDistance = function(token, speedCategory, tokenSpeed) {
@@ -71,7 +67,7 @@ Hooks.once('ready', () => {
     if (speedCategory && speedCategory.multiplier === undefined) {
       speedCategory.multiplier = 1;
     }
-    
+
     // Call original function if it exists, otherwise calculate ourselves
     if (typeof originalMaxCategoryDistance === 'function') {
       return originalMaxCategoryDistance.call(this, token, speedCategory, tokenSpeed);
@@ -80,14 +76,14 @@ Hooks.once('ready', () => {
       return (speedCategory?.multiplier || 1) * tokenSpeed;
     }
   };
-  
+
   // Override speed function to select appropriate movement type
   CONFIG.elevationruler.SPEED.tokenSpeed = function(token) {
     if (!token.actor) return 0;
-    
+
     const movementType = this.tokenMovementType(token);
     let speed = 0;
-    
+
     switch (movementType) {
       case "FLY":
         speed = token.actor.system.movement.fly || 0;
@@ -101,9 +97,9 @@ Hooks.once('ready', () => {
       default: // WALK
         speed = token.actor.system.movement.run || 0;
     }
-    
+
     return speed;
   };
-  
+
   console.log("FASERIP | Elevation Ruler integration complete");
 });

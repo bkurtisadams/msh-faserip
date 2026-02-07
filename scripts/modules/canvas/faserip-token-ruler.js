@@ -1,5 +1,6 @@
-// scripts/modules/canvas/faserip-token-ruler.js v1.0.0 - 2026-02-07
-// Custom TokenRuler for FASERIP: color-codes drag ruler by movement speed
+// scripts/modules/canvas/faserip-token-ruler.js v1.1.0 - 2026-02-07
+// Custom TokenRuler for FASERIP: color-codes drag ruler by movement mode
+// Reads token.document.movementAction (V13 Token HUD selection)
 // Green = within normal movement, Yellow = Speed FEAT zone (+1 area), Red = over max
 
 const TokenRuler = foundry.canvas.placeables.tokens.TokenRuler;
@@ -10,11 +11,23 @@ const COLOR_YELLOW = 0xFFCC00;
 const COLOR_RED    = 0xFF3333;
 const COLOR_DEFAULT = 0xCCCCCC;
 
+// Map Foundry movement action keys to actor.system.movement fields
+const ACTION_SPEED_MAP = {
+  walk:     "run",
+  fly:      "fly",
+  swim:     "swim",
+  teleport: "teleport",
+  climb:    "run",      // no separate climb speed in FASERIP, use run
+  burrow:   "run",      // no separate burrow speed in FASERIP, use run
+  crawl:    "run"       // no separate crawl speed in FASERIP, use run
+};
+
 export class FaseripTokenRuler extends TokenRuler {
 
   /**
    * Get the actor's effective movement ranges in scene distance units.
-   * Returns { normal, feat } where feat = normal + 1 area converted to scene units.
+   * Reads token.document.movementAction to determine which speed to use.
+   * Returns { normal, feat, action } where feat = normal + 1 area.
    * Returns null if no actor (falls back to default behavior).
    */
   _getMovementRanges() {
@@ -22,13 +35,25 @@ export class FaseripTokenRuler extends TokenRuler {
     if (!actor?.system) return null;
 
     const movement = actor.system.movement || {};
+    const action = this.token.document?.movementAction || "walk";
+    const speedField = ACTION_SPEED_MAP[action] || "run";
 
-    // Base movement in areas/round
-    let baseAreas = movement.run ?? actor.suggestedMovement ?? 2;
-
-    // Use flight if token has it and it's higher
-    const flyAreas = movement.fly || 0;
-    if (flyAreas > baseAreas) baseAreas = flyAreas;
+    // Resolve areas/round based on active movement action
+    let baseAreas;
+    switch (speedField) {
+      case "fly":
+        baseAreas = movement.fly || 0;
+        break;
+      case "swim":
+        baseAreas = movement.swim || 1;
+        break;
+      case "teleport":
+        baseAreas = movement.teleport || 0;
+        break;
+      default:
+        baseAreas = movement.run ?? actor.suggestedMovement ?? 2;
+        break;
+    }
 
     // Active Effect modifier (e.g. 0.5 from Dodging)
     const movementMult = Number(actor.system.combatMods?.movementMult) || 1;
@@ -37,9 +62,7 @@ export class FaseripTokenRuler extends TokenRuler {
     // Speed FEAT grants +1 area
     const featAreas = effectiveAreas + 1;
 
-    // Measurement cost is in scene distance units (which should be areas)
-    // So thresholds are directly in areas - no conversion needed
-    return { normal: effectiveAreas, feat: featAreas, movementMult };
+    return { normal: effectiveAreas, feat: featAreas, movementMult, action };
   }
 
   /**
@@ -141,11 +164,15 @@ export class FaseripTokenRuler extends TokenRuler {
     const gridDistance = canvas.scene?.grid?.distance || 1;
     const gridUnits = canvas.scene?.grid?.units || "areas";
 
-    // If the grid unit is area-based, show "X / Y areas"
+    // Action label for display
+    const actionLabels = { walk: "Run", fly: "Fly", swim: "Swim", teleport: "Tel", climb: "Climb" };
+    const actionLabel = actionLabels[ranges.action] || "Run";
+
+    // If the grid unit is area-based, show "X / Y areas (Mode)"
     if (gridUnits.toLowerCase().includes("area")) {
       const costAreas = cost;
       const maxAreas = ranges.normal;
-      base.distance = `${this._round(costAreas)} / ${this._round(maxAreas)} ${gridUnits}`;
+      base.distance = `${this._round(costAreas)} / ${this._round(maxAreas)} ${gridUnits} (${actionLabel})`;
     }
 
     return base;
