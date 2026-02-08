@@ -1,4 +1,5 @@
-// chat-hooks.js v1.5.2 - 2026-02-07
+// chat-hooks.js v1.5.3 - 2026-02-08
+// v1.5.3: Fix dodge reapply - add movementMult and selfPenaltyCS to AE changes (was missing same as defense-action.js)
 // v1.5.2: Fix createEvadingEffect - pass evadeSuccessful/autoHit to applyEvade for proper flag tracking
 // v1.5.1: Wire dodge CS penalty to Active Effect changes (defenseShift/defenseShiftRanged)
 // v1.5.0: Add grapple-back handler for Reverse escape result
@@ -1147,10 +1148,16 @@ async function createDodgingEffect(actor, data) {
         notes: notes
       }
     },
-    changes: defenseBonus > 0 ? [
-      { key: "system.combatMods.defenseShift", mode: 2, value: String(defenseBonus), priority: 20 },
-      { key: "system.combatMods.defenseShiftRanged", mode: 2, value: String(defenseBonus), priority: 20 }
-    ] : []
+    changes: [
+      // Half movement while dodging (ruler reads this multiplier)
+      { key: "system.combatMods.movementMult", mode: 5, value: "0.5", priority: 20 },
+      // -2CS on all own FEATs while dodging
+      { key: "system.combatMods.selfPenaltyCS", mode: 2, value: "-2", priority: 20 },
+      ...(defenseBonus > 0 ? [
+        { key: "system.combatMods.defenseShift", mode: 2, value: String(defenseBonus), priority: 20 },
+        { key: "system.combatMods.defenseShiftRanged", mode: 2, value: String(defenseBonus), priority: 20 }
+      ] : [])
+    ]
   };
   
   await actor.createEmbeddedDocuments('ActiveEffect', [effectData]);

@@ -1,4 +1,5 @@
-// scripts/modules/actions/defense-action.js v1.3.7 - 2026-02-07
+// scripts/modules/actions/defense-action.js v1.3.8 - 2026-02-08
+// v1.3.8: Fix dodge movementMult and selfPenaltyCS not wired as AE changes (only in flags); ruler now enforces half speed
 // v1.3.7: Add canAttack:false to blocking effect; blocking now prevents attacks per rules
 // v1.3.6: Wire dodge CS penalty and half movement to Active Effect changes array
 // v1.3.4: Fix evasion bonus duration - use 2 rounds to survive round-change expiration; usability controlled by createdRound check
@@ -513,7 +514,12 @@ export class DefenseAction extends BaseAction {
       // Build changes array: apply defense shift to both melee and ranged keys
       // Per rules, dodge works vs ranged & charging but NOT slugfest/wrestling;
       // GM should override for adjacent slugfest/wrestling attacks
-      const changes = [];
+      const changes = [
+        // Half movement while dodging (ruler reads this multiplier)
+        { key: "system.combatMods.movementMult", mode: 5, value: "0.5", priority: 20 },
+        // -2CS on all own FEATs while dodging
+        { key: "system.combatMods.selfPenaltyCS", mode: 2, value: "-2", priority: 20 }
+      ];
       if (defenseBonus > 0) {
         changes.push(
           { key: "system.combatMods.defenseShift", mode: 2, value: String(defenseBonus), priority: 20 },

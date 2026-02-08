@@ -1,4 +1,5 @@
-// scripts/modules/effects/effect-modifiers.js v1.3.3 - 2026-01-02
+// scripts/modules/effects/effect-modifiers.js v1.4.0 - 2026-02-08
+// v1.4.0: getAttackShiftBreakdown now includes selfPenaltyCS (Dodging -2CS) in attack shift total and breakdown
 // v1.3.3: Fix evasion bonus - only applies in exactly createdRound + 1, expires after that
 // v1.3.2: Update getEvasionAttackBonus to look for isEvasionBonus effect (not isEvading)
 // v1.3.1: Fix evasion bonus - check createdRound so bonus only applies in next round, better target matching
@@ -32,6 +33,7 @@ export function getActiveModifiers(actor, options = {}) {
       psyche: 0
     },
     movementMult: 1,
+    selfPenaltyCS: 0,
     canAct: true,
     canMove: true
   };
@@ -132,11 +134,12 @@ export function getAttackShift(actor) {
 
 /**
  * Get attack shift breakdown by effect name
+ * Includes selfPenaltyCS (e.g. -2CS from Dodging) as an attacker penalty
  * @param {Actor} actor 
  * @returns {object} { total, breakdown: [{name, shift}] }
  */
 export function getAttackShiftBreakdown(actor) {
-  const total = getAttackShift(actor);
+  let total = getAttackShift(actor);
   const breakdown = [];
   
   if (!actor?.effects) return { total, breakdown };
@@ -148,6 +151,14 @@ export function getAttackShiftBreakdown(actor) {
         const shift = Number(change.value) || 0;
         if (shift !== 0) {
           breakdown.push({ name: effect.name, shift });
+        }
+      }
+      // selfPenaltyCS applies to all own FEATs including attacks (e.g. Dodging -2CS)
+      if (change.key === "system.combatMods.selfPenaltyCS") {
+        const shift = Number(change.value) || 0;
+        if (shift !== 0) {
+          total += shift;
+          breakdown.push({ name: effect.name + " (self penalty)", shift });
         }
       }
     }
@@ -224,6 +235,9 @@ export function getModifierSummary(actor) {
   }
   if (!mods.canAct) {
     parts.push("Cannot Act");
+  }
+  if (mods.selfPenaltyCS !== 0) {
+    parts.push(`Self Penalty: ${mods.selfPenaltyCS}CS (all FEATs)`);
   }
   if (!mods.canMove) {
     parts.push("Cannot Move");

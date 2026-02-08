@@ -44,6 +44,7 @@
             "psyche": 0
           },
           "movementMult": 1,
+          "selfPenaltyCS": 0,
           "canAct": true,
           "canMove": true
         }
