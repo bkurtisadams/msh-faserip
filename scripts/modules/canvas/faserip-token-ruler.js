@@ -1,5 +1,5 @@
-// scripts/modules/canvas/faserip-token-ruler.js v1.1.0 - 2026-02-07
-// Custom TokenRuler for FASERIP: color-codes drag ruler by movement mode
+// scripts/modules/canvas/faserip-token-ruler.js v1.2.0 - 2026-02-08
+// v1.2.0: Add flight sub-mode support (Full/Low Alt/Cruise) - resolves speed from MOVEMENT_DATA
 // Reads token.document.movementAction (V13 Token HUD selection)
 // Green = within normal movement, Yellow = Speed FEAT zone (+1 area), Red = over max
 
@@ -11,15 +11,19 @@ const COLOR_YELLOW = 0xFFCC00;
 const COLOR_RED    = 0xFF3333;
 const COLOR_DEFAULT = 0xCCCCCC;
 
-// Map Foundry movement action keys to actor.system.movement fields
+// Map Foundry movement action keys to speed resolution
+// Flight sub-modes resolve dynamically via MOVEMENT_DATA
 const ACTION_SPEED_MAP = {
-  walk:     "run",
-  fly:      "fly",
-  swim:     "swim",
-  teleport: "teleport",
-  climb:    "run",      // no separate climb speed in FASERIP, use run
-  burrow:   "run",      // no separate burrow speed in FASERIP, use run
-  crawl:    "run"       // no separate crawl speed in FASERIP, use run
+  walk:       "run",
+  fly:        "flyFull",    // fallback if default fly is somehow selected
+  flyFull:    "flyFull",
+  flyLowAlt:  "flyLowAlt",
+  flyCruise:  "flyCruise",
+  swim:       "swim",
+  teleport:   "teleport",
+  climb:      "run",
+  burrow:     "run",
+  crawl:      "run"
 };
 
 export class FaseripTokenRuler extends TokenRuler {
@@ -40,10 +44,28 @@ export class FaseripTokenRuler extends TokenRuler {
 
     // Resolve areas/round based on active movement action
     let baseAreas;
+    let modeLabel = "";
     switch (speedField) {
-      case "fly":
+      case "flyFull":
         baseAreas = movement.fly || 0;
+        modeLabel = "Full";
         break;
+      case "flyLowAlt": {
+        // Low altitude / enclosed spaces: ground speed for the flight power rank
+        const flyAreas = movement.fly || 0;
+        const flightInfo = actor.constructor.getFlightInfo?.(flyAreas);
+        baseAreas = flightInfo?.groundAreas ?? Math.max(1, Math.floor(flyAreas / 2));
+        modeLabel = "Low Alt";
+        break;
+      }
+      case "flyCruise": {
+        // Cruise: 2 ranks lower air speed, no exhaustion
+        const flyAreas = movement.fly || 0;
+        const cruising = actor.constructor.getCruisingFlight?.(flyAreas);
+        baseAreas = cruising?.areas ?? Math.max(1, Math.floor(flyAreas / 2));
+        modeLabel = "Cruise";
+        break;
+      }
       case "swim":
         baseAreas = movement.swim || 1;
         break;
@@ -62,7 +84,7 @@ export class FaseripTokenRuler extends TokenRuler {
     // Speed FEAT grants +1 area
     const featAreas = effectiveAreas + 1;
 
-    return { normal: effectiveAreas, feat: featAreas, movementMult, action };
+    return { normal: effectiveAreas, feat: featAreas, movementMult, action, modeLabel };
   }
 
   /**
@@ -165,8 +187,12 @@ export class FaseripTokenRuler extends TokenRuler {
     const gridUnits = canvas.scene?.grid?.units || "areas";
 
     // Action label for display
-    const actionLabels = { walk: "Run", fly: "Fly", swim: "Swim", teleport: "Tel", climb: "Climb" };
-    const actionLabel = actionLabels[ranges.action] || "Run";
+    const actionLabels = {
+      walk: "Run", fly: "Fly", flyFull: "Fly", flyLowAlt: "Fly", flyCruise: "Fly",
+      swim: "Swim", teleport: "Tel", climb: "Climb"
+    };
+    const baseLabel = actionLabels[ranges.action] || "Run";
+    const actionLabel = ranges.modeLabel ? `${baseLabel} (${ranges.modeLabel})` : baseLabel;
 
     // If the grid unit is area-based, show "X / Y areas (Mode)"
     if (gridUnits.toLowerCase().includes("area")) {

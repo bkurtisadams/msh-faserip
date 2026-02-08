@@ -1,4 +1,5 @@
-// init.js v1.7.7 - 2026-02-07
+// init.js v1.7.8 - 2026-02-08
+// v1.7.8: Replace single Fly movement action with three sub-modes (Full/Low Alt/Cruise) in Token HUD
 // v1.7.7: Add FaseripTokenRuler - speed-based color coding for V13 drag ruler
 // v1.7.6: Fix getCampaignDateTime - worldTime is already seconds, remove /1000
 // v1.7.5: Add defeatedVillains setting for team tracker
@@ -1185,14 +1186,37 @@ Hooks.once("init", async () => {
       actions.walk.order = 0;
     }
 
-    // Fly - only if actor has fly speed > 0
+    // Fly - replace single entry with three flight sub-modes
+    // Full: max air speed (subject to exhaustion)
+    // Low Alt: ground speed for flight rank (< 2 stories or enclosed spaces)
+    // Cruise: 2 ranks lower air speed (no exhaustion)
+    const canFly = (token) => {
+      const actor = token.actor ?? token.parent;
+      return (actor?.system?.movement?.fly || 0) > 0;
+    };
+
     if (actions.fly) {
-      actions.fly.canSelect = (token) => {
-        const actor = token.actor ?? token.parent;
-        return (actor?.system?.movement?.fly || 0) > 0;
-      };
-      actions.fly.order = 1;
+      actions.fly.canSelect = () => false;  // Hide default fly
     }
+
+    actions.flyFull = {
+      label: "Fly (Full)",
+      icon: "fa-solid fa-jet-fighter-up",
+      canSelect: canFly,
+      order: 1
+    };
+    actions.flyLowAlt = {
+      label: "Fly (Low Alt)",
+      icon: "fa-solid fa-plane-arrival",
+      canSelect: canFly,
+      order: 2
+    };
+    actions.flyCruise = {
+      label: "Fly (Cruise)",
+      icon: "fa-solid fa-plane",
+      canSelect: canFly,
+      order: 3
+    };
 
     // Swim - only if actor has swim speed
     if (actions.swim) {
@@ -1200,7 +1224,7 @@ Hooks.once("init", async () => {
         const actor = token.actor ?? token.parent;
         return (actor?.system?.movement?.swim || 0) > 0;
       };
-      actions.swim.order = 2;
+      actions.swim.order = 4;
     }
 
     // Teleport - only if actor has teleport speed > 0
@@ -1210,7 +1234,7 @@ Hooks.once("init", async () => {
         const actor = token.actor ?? token.parent;
         return (actor?.system?.movement?.teleport || 0) > 0;
       };
-      actions.teleport.order = 3;
+      actions.teleport.order = 5;
     }
 
     // Hide movement types FASERIP doesn't use
