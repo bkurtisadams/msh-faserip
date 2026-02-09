@@ -591,6 +591,24 @@ export class AttackAction extends BaseAction {
       const currentRound = game.combat?.round || 0;
       
       if (targetActor) {
+        // DEBUG: Log all evading effects on target, including disabled ones
+        const allEvadeEffects = targetActor.effects.filter(e => 
+          e.flags?.["msh-faserip"]?.isEvading
+        );
+        if (allEvadeEffects.length > 0) {
+          console.log("[FASERIP] Evasion check on target:", {
+            target: targetName,
+            attackRollColor: effectColorLower,
+            currentRound,
+            effectsFound: allEvadeEffects.map(e => ({
+              name: e.name,
+              disabled: e.disabled,
+              flags: e.flags?.["msh-faserip"],
+              durationRemaining: e.duration?.remaining,
+              isTemporary: e.isTemporary
+            }))
+          });
+        }
         // Check for evasion effect on the target (did they evade US?)
         const evadeEffect = targetActor.effects.find(e => 
           e.flags?.["msh-faserip"]?.isEvading && !e.disabled
@@ -602,6 +620,13 @@ export class AttackAction extends BaseAction {
           
           // Evasion only blocks attacks in the SAME round it was made
           const isSameRound = (currentRound === evadeCreatedRound);
+          console.log("[FASERIP] Evasion conditions:", {
+            isSameRound, evadeCreatedRound, currentRound,
+            evadeSuccessful: evadeFlags.evadeSuccessful,
+            autoHit: evadeFlags.autoHit,
+            attackColor: effectColorLower,
+            wouldAutoHit: evadeFlags.autoHit && effectColorLower === "white"
+          });
           
           if (isSameRound) {
             // Check if evasion was successful (green/yellow/red result on evade roll)
@@ -625,6 +650,12 @@ export class AttackAction extends BaseAction {
                 attacker: actor.name, 
                 target: targetName,
                 originalColor: effectColorLower 
+              });
+            } else if (evadeFlags.autoHit && effectColorLower !== "white") {
+              // Failed evasion auto-hit is active, but attack already rolled green+ naturally
+              evasionNote = `<div style="padding:4px 8px;margin:4px 0;background:#fff3e0;border:1px solid #ff9800;border-radius:3px;color:#e65100;font-style:italic;text-align:center;font-size:.9em;">Evasion failed (auto-hit) — attack hit naturally (${effectColorLower})</div>`;
+              console.log("[FASERIP] Evasion auto-hit irrelevant (attack already hit):", {
+                attacker: actor.name, target: targetName, attackColor: effectColorLower
               });
             }
           }
