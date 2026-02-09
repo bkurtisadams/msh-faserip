@@ -780,7 +780,12 @@ export class CheckAction extends BaseAction {
       return `<div style="margin-top:8px;color:#444;">${notes[colorLower]||""}</div>`;
     }
     if (actionType === "kill") {
-      return `<div style="margin-top:8px;color:#444;">${String(finalEffect||"").replace(/E\/S/,"Edged/Shooting")}</div>`;
+      const effectStr = String(finalEffect||"").replace(/E\/S/,"Edged/Shooting");
+      const isLethal = effectStr.toLowerCase().includes("endurance");
+      const karmaNote = isLethal
+        ? `<div style="margin-top:6px;padding:4px 8px;background:#fff3e0;border:1px solid #ff9800;border-radius:3px;font-size:.85em;color:#e65100;">Attacker loses ALL Karma if target dies</div>`
+        : "";
+      return `<div style="margin-top:8px;color:#444;">${effectStr}</div>${karmaNote}`;
     }
     return "";
   }
