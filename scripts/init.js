@@ -1,7 +1,7 @@
-// init.js v1.8.0 - 2026-02-10
-// v1.8.0: Add Regeneration power — disabled-by-default AE, player toggle on/off,
-//         auto-heal on worldTime advance, damage interruption. getAllTokenActors
-//         for linked+unlinked token iteration in updateWorldTime hook.
+// init.js v1.9.1 - 2026-02-10
+// v1.9.1: Auto-sync power sheet → ongoing effects. Setting regenerationType on a power's
+//         Functions tab auto-registers/removes ongoing AE on the actor. createItem,
+//         updateItem, deleteItem hooks replace old name-based matching.
 // v1.7.8: Replace single Fly movement action with three sub-modes (Full/Low Alt/Cruise) in Token HUD
 // v1.7.7: Add FaseripTokenRuler - speed-based color coding for V13 drag ruler
 // v1.7.6: Fix getCampaignDateTime - worldTime is already seconds, remove /1000
@@ -113,11 +113,12 @@ Hooks.on("updateWorldTime", async (worldTime, dt, options, userId) => {
     }
   }
 
-  // Regeneration: ALWAYS process when time advances (not gated by combat state)
+  // Ongoing periodic effects: ALWAYS process when time advances (not gated by combat state)
   try {
-    await Effects.processRegeneration(worldTime, dt);
+    const { processOngoingEffects } = await import("./modules/effects/ongoing-engine.js");
+    await processOngoingEffects(worldTime, dt);
   } catch (e) {
-    console.error("[FASERIP ERROR] processRegeneration failed:", e);
+    console.error("[FASERIP ERROR] processOngoingEffects failed:", e);
   }
 });
 
@@ -1304,11 +1305,32 @@ Hooks.once("init", async () => {
   // Initialize rest system
   initRestSystem();
 
-  // ── Regeneration helpers ──────────────────────────────────────────────
+  // ── Ongoing Effects Engine API ────────────────────────────────────────
+  // Generic periodic effects (Regeneration, Solar Regen, Dying, etc.)
+  let OngoingEngine;
+  try {
+    OngoingEngine = await import("./modules/effects/ongoing-engine.js");
+  } catch (e) {
+    console.error("[FASERIP ERROR] Failed to load ongoing-engine.js:", e);
+  }
+
+  // Generic API
+  game.msh.ongoing = {
+    register: OngoingEngine?.registerOngoingEffect,
+    remove: OngoingEngine?.removeOngoingEffect,
+    interrupt: OngoingEngine?.interruptOngoingEffects,
+    process: OngoingEngine?.processOngoingEffects,
+    // Power-specific shortcuts
+    applyRegeneration: OngoingEngine?.applyRegenerationOngoing,
+    applySolarRegeneration: OngoingEngine?.applySolarRegenerationOngoing,
+    applyDying: OngoingEngine?.applyDyingOngoing,
+  };
+
+  // Backward compat
   game.msh.applyRegeneration = Effects.applyRegeneration;
   game.msh.getAllTokenActors = Effects.getAllTokenActors;
 
-  /** Start Regeneration for selected token or explicit actor */
+  /** Start Regeneration for selected token or explicit actor (manual override) */
   game.msh.startRegeneration = async function (target) {
     const actor = target?.actor ?? target
       ?? canvas.tokens.controlled[0]?.actor
@@ -1317,14 +1339,23 @@ Hooks.once("init", async () => {
       ui.notifications.warn("Select a token or pass an actor to start Regeneration.");
       return null;
     }
+    // Find by field first, fall back to name
     const regenPower = actor.items.find(i =>
-      i.type === "power" && /^regenerat/i.test(i.name)
+      i.type === "power" && (i.system?.regenerationType === "rest" || /^regenerat/i.test(i.name))
     );
     if (!regenPower) {
-      ui.notifications.warn(`${actor.name} has no Regeneration power.`);
+      ui.notifications.warn(`${actor.name} has no Regeneration power. Set Regeneration Type on the power's Functions tab.`);
       return null;
     }
     const endValue = actor.system?.abilities?.endurance?.value ?? 10;
+    if (OngoingEngine) {
+      return OngoingEngine.applyRegenerationOngoing(actor, {
+        healAmount: endValue,
+        cycleTurns: 10,
+        powerRank: regenPower.system?.rank || null,
+        powerItemId: regenPower.id,
+      });
+    }
     return Effects.applyRegeneration(actor, {
       healAmount: endValue,
       cycleTurns: 10,
@@ -1333,21 +1364,51 @@ Hooks.once("init", async () => {
     });
   };
 
-  /** Remove the Regeneration AE from selected token */
+  /** Start Solar Regeneration for selected token (manual override) */
+  game.msh.startSolarRegeneration = async function (target) {
+    const actor = target?.actor ?? target
+      ?? canvas.tokens.controlled[0]?.actor
+      ?? game.user?.character;
+    if (!actor) {
+      ui.notifications.warn("Select a token or pass an actor.");
+      return null;
+    }
+    // Find by field first, fall back to name
+    const power = actor.items.find(i =>
+      i.type === "power" && (i.system?.regenerationType === "solar" || /solar\s*regen/i.test(i.name))
+    );
+    if (!power) {
+      ui.notifications.warn(`${actor.name} has no Solar Regeneration power. Set Regeneration Type to "Solar" on the power's Functions tab.`);
+      return null;
+    }
+    if (!OngoingEngine) return null;
+    return OngoingEngine.applySolarRegenerationOngoing(actor, {
+      powerRank: power.system?.rank || null,
+      powerItemId: power.id,
+    });
+  };
+
+  /** Remove regeneration ongoing effects from selected token */
   game.msh.stopRegeneration = async function (target) {
     const actor = target?.actor ?? target
       ?? canvas.tokens.controlled[0]?.actor
       ?? game.user?.character;
     if (!actor) return;
     const scope = globalThis.MSH_FLAG_SCOPE || "msh-faserip";
-    const ef = actor.effects.find(e => e.flags?.[scope]?.effectType === "regeneration");
-    if (ef) {
-      await ef.delete({ mshIntentional: true });
-      console.log(`[FASERIP] Regeneration AE removed from ${actor.name}`);
-    } else {
-      ui.notifications.info(`${actor.name} has no Regeneration effect.`);
+
+    if (OngoingEngine) {
+      await OngoingEngine.removeOngoingEffect(actor, "regeneration");
+      await OngoingEngine.removeOngoingEffect(actor, "solarRegeneration");
     }
+
+    // Also clean up legacy flags/AEs
+    const ef = actor.effects.find(e =>
+      e.flags?.[scope]?.effectType === "regeneration" && !e.flags?.[scope]?.ongoingId
+    );
+    if (ef) await ef.delete({ mshIntentional: true });
     try { await actor.unsetFlag(scope, "regeneration"); } catch (_) {}
+
+    console.log(`[FASERIP] Regeneration removed from ${actor.name}`);
   };
 
   // end of hooks.once
@@ -1550,41 +1611,105 @@ Hooks.on("preDeleteActiveEffect", (effect, options, userId) => {
 });
 
 // ── Regeneration: sync AEs with power items ──
+// ── Power → Ongoing Effect Auto-Sync ──────────────────────────────────────
+// When a power item with regenerationType/absorptionType is added, edited,
+// or removed from an actor, automatically register/remove the corresponding
+// ongoing effect. The player sees the AE in their Effects tab and toggles it.
+
+async function syncPowerOngoingEffects(actor, item, removing = false) {
+  if (!game.user.isGM) return;
+  if (!actor || actor.documentName !== "Actor") return;
+  if (item.type !== "power") return;
+
+  let OngoingEngine;
+  try {
+    OngoingEngine = await import("./modules/effects/ongoing-engine.js");
+  } catch (e) {
+    console.error("[FASERIP ERROR] Failed to load ongoing-engine.js for sync:", e);
+    return;
+  }
+
+  const regenType = removing ? "" : (item.system?.regenerationType || "");
+  const scope = globalThis.MSH_FLAG_SCOPE || "msh-faserip";
+
+  // ── Regeneration (Resting) ──────────────────────────────────────────
+  if (regenType === "rest") {
+    // Remove solar if it was previously set
+    const hasSolar = actor.effects.some(e => e.flags?.[scope]?.ongoingId === "solarRegeneration");
+    if (hasSolar) await OngoingEngine.removeOngoingEffect(actor, "solarRegeneration");
+
+    // Register resting regeneration (skip if already exists)
+    const hasRegen = actor.effects.some(e => e.flags?.[scope]?.ongoingId === "regeneration");
+    if (!hasRegen) {
+      const endValue = actor.system?.abilities?.endurance?.value ?? 10;
+      await OngoingEngine.applyRegenerationOngoing(actor, {
+        healAmount: endValue,
+        cycleTurns: 10,
+        powerRank: item.system?.rank || null,
+        powerItemId: item.id,
+      });
+      console.log(`[FASERIP] Regeneration (Resting) auto-registered on ${actor.name}`);
+    }
+
+  // ── Regeneration (Solar) ────────────────────────────────────────────
+  } else if (regenType === "solar") {
+    // Remove resting if it was previously set
+    const hasRegen = actor.effects.some(e => e.flags?.[scope]?.ongoingId === "regeneration");
+    if (hasRegen) await OngoingEngine.removeOngoingEffect(actor, "regeneration");
+
+    // Register solar regeneration
+    const hasSolar = actor.effects.some(e => e.flags?.[scope]?.ongoingId === "solarRegeneration");
+    if (!hasSolar) {
+      await OngoingEngine.applySolarRegenerationOngoing(actor, {
+        powerRank: item.system?.rank || null,
+        powerItemId: item.id,
+      });
+      console.log(`[FASERIP] Solar Regeneration auto-registered on ${actor.name}`);
+    }
+
+  // ── None / Removing ─────────────────────────────────────────────────
+  } else {
+    // Clean up both types
+    const hasRegen = actor.effects.some(e => e.flags?.[scope]?.ongoingId === "regeneration");
+    const hasSolar = actor.effects.some(e => e.flags?.[scope]?.ongoingId === "solarRegeneration");
+    if (hasRegen) {
+      await OngoingEngine.removeOngoingEffect(actor, "regeneration");
+      console.log(`[FASERIP] Regeneration ongoing removed from ${actor.name}`);
+    }
+    if (hasSolar) {
+      await OngoingEngine.removeOngoingEffect(actor, "solarRegeneration");
+      console.log(`[FASERIP] Solar Regeneration ongoing removed from ${actor.name}`);
+    }
+    // Clean up legacy flags too
+    try { await actor.unsetFlag(scope, "regeneration"); } catch (_) {}
+  }
+}
+
 Hooks.on("createItem", async (item, options, userId) => {
   if (!game.user.isGM) return;
-  if (item.type !== "power" || !/^regenerat/i.test(item.name)) return;
+  const actor = item.parent;
+  await syncPowerOngoingEffects(actor, item);
+});
+
+Hooks.on("updateItem", async (item, changes, options, userId) => {
+  if (!game.user.isGM) return;
   const actor = item.parent;
   if (!actor || actor.documentName !== "Actor") return;
+  if (item.type !== "power") return;
 
-  const scope = globalThis.MSH_FLAG_SCOPE || "msh-faserip";
-  if (actor.effects.some(e => e.flags?.[scope]?.effectType === "regeneration")) return;
+  // Only re-sync if relevant fields changed
+  const relevantChange = changes.system?.regenerationType !== undefined
+    || changes.system?.regenerationRate !== undefined
+    || changes.system?.rank !== undefined;
+  if (!relevantChange) return;
 
-  const endValue = actor.system?.abilities?.endurance?.value ?? 10;
-  await Effects.applyRegeneration(actor, {
-    healAmount: endValue,
-    cycleTurns: 10,
-    powerRank: item.system?.rank || null,
-    powerItemId: item.id,
-  });
-  console.log(`[FASERIP] Regeneration power added to ${actor.name} — AE created`);
+  await syncPowerOngoingEffects(actor, item);
 });
 
 Hooks.on("deleteItem", async (item, options, userId) => {
   if (!game.user.isGM) return;
-  if (item.type !== "power" || !/^regenerat/i.test(item.name)) return;
   const actor = item.parent;
-  if (!actor || actor.documentName !== "Actor") return;
-
-  const scope = globalThis.MSH_FLAG_SCOPE || "msh-faserip";
-  const regenAE = actor.effects.find(e =>
-    e.flags?.[scope]?.effectType === "regeneration"
-  );
-  if (regenAE) {
-    await regenAE.delete({ mshIntentional: true });
-    console.log(`[FASERIP] Regeneration power removed from ${actor.name} — AE deleted`);
-  }
-  // Clean up actor regen flags
-  try { await actor.unsetFlag(scope, "regeneration"); } catch (_) {}
+  await syncPowerOngoingEffects(actor, item, true);
 });
 
 // Capture old health value before update

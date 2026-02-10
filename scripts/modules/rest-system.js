@@ -746,7 +746,7 @@ static async attemptRegainConsciousness(actor) {
 
 /**
  * Update damage timestamp when actor takes damage.
- * Also disables any enabled Regeneration AE (interrupts rest).
+ * Also interrupts any ongoing effects flagged with interruptOnDamage.
  * @param {Actor} actor - The actor taking damage
  */
 export async function recordDamage(actor) {
@@ -755,26 +755,19 @@ export async function recordDamage(actor) {
   await actor.setFlag(SCOPE, "lastDamageTime", now);
   await actor.setFlag(SCOPE, "lastDamageWorldTime", worldNow);
 
-  // Interrupt active Regeneration AEs — disable and reset actor timer
-  // (RAW: "hero must start again to recover")
-  for (const ef of actor.effects) {
-    if (ef.disabled) continue;
-    const flags = ef.flags?.[SCOPE];
-    if (flags?.effectType === "regeneration") {
-      await ef.update({ disabled: true });
-      await actor.setFlag(SCOPE, "regeneration.restingStartedAt", null);
-
-      await ChatMessage.create({
-        speaker: ChatMessage.getSpeaker({ actor }),
-        content: `<div style="background:#fff3e0;border:2px solid #ff9800;padding:10px;border-radius:5px;">
-          <div style="font-size:1.1em;font-weight:bold;color:#e65100;margin-bottom:4px;">
-            <i class="fas fa-heart-crack"></i> Regeneration Interrupted
-          </div>
-          <div><strong>${actor.name}</strong> took damage — regeneration rest interrupted!</div>
-        </div>`,
-      });
-
-      console.log(`[FASERIP] Regeneration disabled for ${actor.name} — took damage`);
+  // Interrupt all ongoing effects that are damage-sensitive
+  try {
+    const { interruptOngoingEffects } = await import("./effects/ongoing-engine.js");
+    await interruptOngoingEffects(actor);
+  } catch (e) {
+    console.warn("[FASERIP WARN] interruptOngoingEffects failed, falling back to legacy:", e);
+    // Legacy fallback: interrupt regeneration AEs directly
+    for (const ef of actor.effects) {
+      if (ef.disabled) continue;
+      const flags = ef.flags?.[SCOPE];
+      if (flags?.effectType === "regeneration" || flags?.ongoingId) {
+        await ef.update({ disabled: true });
+      }
     }
   }
 
