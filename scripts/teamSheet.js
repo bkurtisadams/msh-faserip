@@ -1,4 +1,5 @@
-// teamSheet.js v1.3.3 - 2025-01-24
+// teamSheet.js v1.3.4 - 2026-02-10
+// v1.3.4: CTT↔FASERIP time sync — route time controls through CTT API when ctt.timeAuthority is on
 // v1.3.3: Redesigned Session tab time controls with editable fields and +/- buttons
 // v1.3.2: Fix time unit mismatch - worldTime is seconds not milliseconds
 // v1.3.1: Fix Session tab - use Foundry native tabs, fix initial tab state
@@ -263,9 +264,16 @@ export class TeamSheet extends Application {
       }
       
       if (seconds !== 0) {
-        await game.time.advance(seconds);
-        console.log(`[FASERIP] Adjusted time by ${seconds} seconds`);
-        Hooks.callAll("msh-faserip.timeUpdated");
+        // Route through CTT when it is the time authority
+        const ctt = game.modules.get("calendar-time-tracker");
+        const useAuthority = game.settings.get("msh-faserip", "ctt.timeAuthority") ?? false;
+        if (useAuthority && ctt?.active && ctt.api) {
+          ctt.api.advanceTime(seconds, "second");
+        } else {
+          await game.time.advance(seconds);
+          console.log(`[FASERIP] Adjusted time by ${seconds} seconds`);
+          Hooks.callAll("msh-faserip.timeUpdated");
+        }
         this.render(false);
       }
     });
@@ -1301,14 +1309,20 @@ export class TeamSheet extends Application {
       ui.notifications.warn("Only GMs can adjust time");
       return;
     }
-    
-    // Advance Foundry's world time
-    await game.time.advance(seconds);
-    
-    console.log(`[FASERIP] Manually advanced time by ${seconds} seconds`);
-    
-    // Trigger update hook to refresh displays
-    Hooks.callAll("msh-faserip.timeUpdated");
+
+    // Route through CTT when it is the time authority
+    const ctt = game.modules.get("calendar-time-tracker");
+    const useAuthority = game.settings.get("msh-faserip", "ctt.timeAuthority") ?? false;
+    if (useAuthority && ctt?.active && ctt.api) {
+      ctt.api.advanceTime(seconds, "second");
+      console.log(`[FASERIP] Adjusted time via CTT by ${seconds} seconds`);
+    } else {
+      // Advance Foundry's world time
+      await game.time.advance(seconds);
+      console.log(`[FASERIP] Manually advanced time by ${seconds} seconds`);
+      // Trigger update hook to refresh displays
+      Hooks.callAll("msh-faserip.timeUpdated");
+    }
     
     // Refresh the sheet to show new time
     this.render(false);
@@ -1316,6 +1330,33 @@ export class TeamSheet extends Application {
   
   // Adjust time by a specific unit (year, month, day, hour, minute, second)
   async _adjustTimeByUnit(unit, direction) {
+    // Route through CTT when it is the time authority
+    const ctt = game.modules.get("calendar-time-tracker");
+    const useAuthority = game.settings.get("msh-faserip", "ctt.timeAuthority") ?? false;
+    if (useAuthority && ctt?.active && ctt.api) {
+      const unitMap = {
+        year:   { amount: direction, unit: "year" },
+        month:  { amount: direction, unit: "month" },
+        day:    { amount: direction, unit: "day" },
+        hour:   { amount: direction, unit: "hour" },
+        minute: { amount: direction, unit: "minute" },
+        second: { amount: direction, unit: "second" }
+      };
+      const mapped = unitMap[unit];
+      if (mapped) {
+        if (direction > 0) {
+          ctt.api.advanceTime(mapped.amount, mapped.unit);
+        } else {
+          // CTT advanceTime handles negative via time-engine
+          ctt.api.advanceTime(mapped.amount, mapped.unit);
+        }
+        // CTT's setDateTime/advanceTime fires timeTracker hooks which
+        // relay to msh-faserip.timeUpdated, triggering re-render.
+        return;
+      }
+    }
+
+    // Fallback: original worldTime-based approach
     const campaignTime = game.msh.getCampaignDateTime();
     const currentDate = new Date(campaignTime.date);
     
@@ -1351,15 +1392,43 @@ export class TeamSheet extends Application {
     const hour = parseInt(html.find('.time-input[data-field="hour"]').val()) || 0;
     const minute = parseInt(html.find('.time-input[data-field="minute"]').val()) || 0;
     const second = parseInt(html.find('.time-input[data-field="second"]').val()) || 0;
-    
-    // Create the target date (month is 0-indexed in JS)
+
+    // Route through CTT when it is the time authority
+    const ctt = game.modules.get("calendar-time-tracker");
+    const useAuthority = game.settings.get("msh-faserip", "ctt.timeAuthority") ?? false;
+    if (useAuthority && ctt?.active && ctt.api) {
+      // CTT months are 0-indexed, input fields are 1-indexed
+      ctt.api.setDateTime({
+        year, month: month - 1, day, hour, minute, second
+      });
+      return;
+    }
+
+    // Fallback: original worldTime-based approach (month is 0-indexed in JS)
     const targetDate = new Date(year, month - 1, day, hour, minute, second);
-    
     await this._setCampaignTimeTo(targetDate);
   }
   
   // Set the campaign time to a specific Date object
   async _setCampaignTimeTo(targetDate) {
+    // Route through CTT when it is the time authority
+    const ctt = game.modules.get("calendar-time-tracker");
+    const useAuthority = game.settings.get("msh-faserip", "ctt.timeAuthority") ?? false;
+    if (useAuthority && ctt?.active && ctt.api) {
+      ctt.api.setDateTime({
+        year: targetDate.getFullYear(),
+        month: targetDate.getMonth(),  // CTT months are 0-indexed
+        day: targetDate.getDate(),
+        hour: targetDate.getHours(),
+        minute: targetDate.getMinutes(),
+        second: targetDate.getSeconds()
+      });
+      console.log(`[FASERIP] Set campaign time via CTT to ${targetDate.toLocaleString()}`);
+      // CTT fires timeTracker.timeSet → bridge hook → msh-faserip.timeUpdated → re-render
+      return;
+    }
+
+    // Fallback: original worldTime-based approach
     const startDateStr = game.settings.get("msh-faserip", "campaignStartDate");
     const startDate = new Date(startDateStr);
     
@@ -1423,27 +1492,44 @@ export class TeamSheet extends Application {
             const newStartDate = html.find('[name="startDateTime"]').val() + ":00";
             const newCurrentTime = html.find('[name="currentDateTime"]').val() + ":00";
             const combatSync = html.find('[name="combatSync"]').prop('checked');
-            
-            // Calculate desired elapsed time in seconds (JS Date math gives ms, convert to seconds)
+
             const startDate = new Date(newStartDate);
             const currentDate = new Date(newCurrentTime);
-            const desiredElapsedSeconds = Math.floor((currentDate - startDate) / 1000);
-            
-            // Update the reference point: worldTime (seconds) - desiredElapsed (seconds) = campaignStartWorldTime
-            const newStartWorldTime = game.time.worldTime - desiredElapsedSeconds;
-            
-            // Update all settings
-            await game.settings.set("msh-faserip", "campaignStartDate", newStartDate);
-            await game.settings.set("msh-faserip", "campaignStartWorldTime", newStartWorldTime);
-            await game.settings.set("msh-faserip", "combatSyncEnabled", combatSync);
-            
-            console.log(`[FASERIP] Updated campaign time: ${newCurrentTime}`);
-            console.log(`[FASERIP] Reference point: ${newStartWorldTime}, elapsed: ${desiredElapsedSeconds}s`);
+
+            // Route through CTT when it is the time authority
+            const cttMod = game.modules.get("calendar-time-tracker");
+            const useAuthority = game.settings.get("msh-faserip", "ctt.timeAuthority") ?? false;
+            if (useAuthority && cttMod?.active && cttMod.api) {
+              // Update campaign start date setting (still useful as reference)
+              await game.settings.set("msh-faserip", "campaignStartDate", newStartDate);
+              await game.settings.set("msh-faserip", "combatSyncEnabled", combatSync);
+
+              // Set CTT to the desired current time
+              cttMod.api.setDateTime({
+                year: currentDate.getFullYear(),
+                month: currentDate.getMonth(),
+                day: currentDate.getDate(),
+                hour: currentDate.getHours(),
+                minute: currentDate.getMinutes(),
+                second: currentDate.getSeconds()
+              });
+
+              console.log(`[FASERIP] Updated campaign time via CTT: ${newCurrentTime}`);
+            } else {
+              // Original worldTime-based approach
+              const desiredElapsedSeconds = Math.floor((currentDate - startDate) / 1000);
+              const newStartWorldTime = game.time.worldTime - desiredElapsedSeconds;
+
+              await game.settings.set("msh-faserip", "campaignStartDate", newStartDate);
+              await game.settings.set("msh-faserip", "campaignStartWorldTime", newStartWorldTime);
+              await game.settings.set("msh-faserip", "combatSyncEnabled", combatSync);
+
+              console.log(`[FASERIP] Updated campaign time: ${newCurrentTime}`);
+              console.log(`[FASERIP] Reference point: ${newStartWorldTime}, elapsed: ${desiredElapsedSeconds}s`);
+            }
             
             ui.notifications.info("Time settings updated");
-            this.render(false); // Refresh the sheet
-            
-            // Trigger update hook
+            this.render(false);
             Hooks.callAll("msh-faserip.timeUpdated");
           }
         },

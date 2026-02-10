@@ -1,4 +1,6 @@
-// init.js v1.9.1 - 2026-02-10
+// init.js v1.9.2 - 2026-02-10
+// v1.9.2: CTT↔FASERIP time sync — ctt.timeAuthority setting, getCampaignDateTime reads CTT API,
+//         updateWorldTime fires timeUpdated, bridge hooks for timeTracker.timeSet/timeAdvanced
 // v1.9.1: Auto-sync power sheet → ongoing effects. Setting regenerationType on a power's
 //         Functions tab auto-registers/removes ongoing AE on the actor. createItem,
 //         updateItem, deleteItem hooks replace old name-based matching.
@@ -74,7 +76,10 @@ Hooks.on("combatRound", async (combat, updateData, updateOptions, userId) => {
 
 // Handle effect expiration when world time advances (for CTT or out-of-combat time passage)
 Hooks.on("updateWorldTime", async (worldTime, dt, options, userId) => {
-  // GM-only
+  // Refresh team sheet time display for ALL clients
+  Hooks.callAll("msh-faserip.timeUpdated");
+
+  // GM-only for effect processing
   if (!game.user.isGM) return;
   
   console.debug("[FASERIP DEBUG] updateWorldTime hook fired, worldTime:", worldTime, "delta:", dt);
@@ -238,6 +243,39 @@ Hooks.once("init", async () => {
   CONFIG.MSHF.ACTIONS = ACTIONS;
 
   game.msh.getCampaignDateTime = function() {
+    // When CTT is active and set as time authority, read directly from CTT API
+    const cttModule = game.modules.get("calendar-time-tracker");
+    const useAuthority = game.settings.get("msh-faserip", "ctt.timeAuthority") ?? false;
+    if (useAuthority && cttModule?.active && cttModule.api) {
+      try {
+        const cttDate = cttModule.api.getCurrentDate();
+        if (cttDate) {
+          // Build a JS Date from CTT fields for backward compat with code
+          // that reads .date (e.g. team sheet input fields)
+          const jsDate = new Date(
+            cttDate.year ?? 1976,
+            (cttDate.monthIndex ?? cttDate.month ?? 0),
+            cttDate.day ?? 1,
+            cttDate.hour ?? 0,
+            cttDate.minute ?? 0,
+            cttDate.second ?? 0
+          );
+          return {
+            date: jsDate,
+            formatted: cttDate.fullDateTime || jsDate.toLocaleString("en-US", {
+              year: "numeric", month: "long", day: "numeric",
+              hour: "2-digit", minute: "2-digit", second: "2-digit"
+            }),
+            elapsedSeconds: cttDate.totalSeconds ?? 0,
+            source: "ctt"
+          };
+        }
+      } catch (err) {
+        console.warn("[FASERIP WARN] CTT timeAuthority read failed, falling back to worldTime:", err);
+      }
+    }
+
+    // Fallback: compute from worldTime (original behavior)
     const startDate = new Date(game.settings.get("msh-faserip", "campaignStartDate"));
     const startWorldTime = game.settings.get("msh-faserip", "campaignStartWorldTime");
     const currentWorldTime = game.time.worldTime;
@@ -256,7 +294,8 @@ Hooks.once("init", async () => {
         minute: "2-digit",
         second: "2-digit"
       }),
-      elapsedSeconds
+      elapsedSeconds,
+      source: "worldTime"
     };
   };
 
@@ -685,7 +724,26 @@ Hooks.once("init", async () => {
       default: "off"
     });
 
+    game.settings.register("msh-faserip", "ctt.timeAuthority", {
+      name: "CTT Is Time Authority",
+      hint: "When ON and CTT is active, the Team Tracker reads date/time from CTT and time controls route through CTT. When OFF, FASERIP uses its own worldTime-based clock.",
+      scope: "world",
+      config: true,
+      type: Boolean,
+      default: false
+    });
+
     debugLog("FASERIP DEBUG: Team settings registered.");
+
+    // ========== CTT ↔ FASERIP Bridge Hooks ==========
+    // When CTT fires its own hooks, relay them to msh-faserip.timeUpdated
+    // so the team sheet and any other FASERIP listeners refresh.
+    Hooks.on("timeTracker.timeAdvanced", () => {
+      Hooks.callAll("msh-faserip.timeUpdated");
+    });
+    Hooks.on("timeTracker.timeSet", () => {
+      Hooks.callAll("msh-faserip.timeUpdated");
+    });
 
   // Register custom grappling effects so they show token HUD icons and work with ActiveEffect.statuses
   CONFIG.statusEffects.push(
