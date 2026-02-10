@@ -1,4 +1,7 @@
-// scripts/modules/effects/effect-engine.js v1.5.0 - 2026-02-07
+// scripts/modules/effects/effect-engine.js v1.6.0 - 2026-02-10
+// v1.6.0: Add Regeneration power — disabled-by-default AE with canAct/canMove changes,
+//         player toggles ON to rest, auto-disables on full HP or damage interrupt.
+//         getAllTokenActors() iterates linked + unlinked scene tokens.
 // v1.5.0: Fix applyEvade - add canAct:false, nest flags under SCOPE, create separate bonus effect
 //         Fix applyBlock - add canAct:false, nest flags under SCOPE, remove incorrect movementMult
 // v1.4.0: Fix applyEvade - properly track evadeSuccessful/autoHit flags, remove incorrect combat mod changes
@@ -728,4 +731,198 @@ export function advanceCTTByTurns(n = 1) {
   const te = getCTT();
   if (!te || typeof te.advance !== "function") return false;
   try { te.advance(n, "turn"); return true; } catch { return false; }
+}
+
+
+/* ===== Regeneration Power Support ===== */
+
+/**
+ * Get current game time in seconds.
+ * Prefers CTT totalSeconds, falls back to Foundry worldTime.
+ * @returns {number}
+ */
+export function getGameTime() {
+  const te = getCTT();
+  if (te) {
+    const t = te.getCurrentTime?.()?.totalSeconds;
+    if (Number.isFinite(t)) return t;
+  }
+  return game.time?.worldTime ?? 0;
+}
+
+/**
+ * Collect every unique actor in the world, including unlinked scene tokens.
+ * @returns {Actor[]}
+ */
+export function getAllTokenActors() {
+  const seen = new Set();
+  const actors = [];
+
+  for (const a of game.actors) {
+    if (!a || seen.has(a.id)) continue;
+    seen.add(a.id);
+    actors.push(a);
+  }
+
+  for (const scene of game.scenes) {
+    for (const tokenDoc of scene.tokens) {
+      const a = tokenDoc.actor;
+      if (!a) continue;
+      const key = tokenDoc.actorLink ? a.id : `token-${tokenDoc.id}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      actors.push(a);
+    }
+  }
+  return actors;
+}
+
+/**
+ * Apply a persistent Regeneration Active Effect.
+ * Created DISABLED — player toggles ON in Effects tab when resting.
+ * While enabled: canAct=false, canMove=false enforced via changes.
+ *
+ * All timing state is stored in ACTOR flags (not AE flags) to prevent
+ * CTT effects-manager from interfering with the timer.
+ * AE flags only hold effectType:"regeneration" for identification.
+ */
+export async function applyRegeneration(target, {
+  healAmount = null,
+  cycleTurns = 10,
+  powerRank = null,
+  powerItemId = null,
+} = {}, extraOpts = {}) {
+  const actor = target?.actor ?? target;
+  if (!actor) return null;
+
+  const endValue = actor.system?.abilities?.endurance?.value ?? 10;
+  const heal = healAmount ?? endValue;
+  const cycleSeconds = cycleTurns * getTurnSeconds();
+  const scope = SCOPE();
+
+  // Store regen config on the ACTOR — CTT can't touch these
+  await actor.setFlag(scope, "regeneration", {
+    healAmount: heal,
+    cycleSeconds,
+    cycleTurns,
+    powerRank,
+    powerItemId,
+    restingStartedAt: null,
+    lastHealedAt: null,
+  });
+
+  // Prevent duplicate AE
+  const existing = actor.effects.find(e =>
+    e.flags?.[scope]?.effectType === "regeneration"
+  );
+  if (existing) {
+    console.log(`[FASERIP] Regeneration AE already exists on ${actor.name}`);
+    return existing;
+  }
+
+  const label = powerRank
+    ? `Regeneration (${powerRank}: ${heal} HP)`
+    : `Regeneration (${heal} HP)`;
+
+  return applyEffect(actor, {
+    name: label,
+    img: "icons/svg/regen.svg",
+    disabled: true,
+    changes: [
+      { key: "system.combatMods.canAct", mode: AE_MODE.OVERRIDE, value: "false", priority: 20 },
+      { key: "system.combatMods.canMove", mode: AE_MODE.OVERRIDE, value: "false", priority: 20 }
+    ],
+    flags: {
+      [scope]: {
+        effectType: "regeneration",
+      }
+    },
+    statuses: ["regenerating"],
+  }, extraOpts);
+}
+
+/**
+ * Process Regeneration for all actors when worldTime advances.
+ * Reads timing from ACTOR flags. Only heals if the Regeneration AE is enabled.
+ *
+ * @param {number} worldTime - Current worldTime (after advance)
+ * @param {number} [dt=0]    - Delta seconds of this advance (so first advance counts)
+ */
+export async function processRegeneration(worldTime, dt = 0) {
+  const scope = SCOPE();
+
+  for (const actor of getAllTokenActors()) {
+    const regenFlags = actor.getFlag(scope, "regeneration");
+    if (!regenFlags) continue;
+
+    // Must have an enabled Regeneration AE (player toggled resting ON)
+    const regenAE = actor.effects.find(e =>
+      e.flags?.[scope]?.effectType === "regeneration" && !e.disabled
+    );
+    if (!regenAE) continue;
+
+    const currentHP = actor.system?.attributes?.health?.value ?? 0;
+    const maxHP = actor.system?.attributes?.health?.max ?? 0;
+
+    if (currentHP <= 0) continue;
+
+    if (currentHP >= maxHP) {
+      await regenAE.update({ disabled: true });
+      await actor.setFlag(scope, "regeneration.restingStartedAt", null);
+      console.log(`[FASERIP] ${actor.name}: Regeneration auto-disabled (full HP)`);
+      continue;
+    }
+
+    let restingAt = regenFlags.restingStartedAt;
+
+    // Player just enabled the AE — start the rest timer
+    // Use (worldTime - dt) so the current advance counts toward the cycle
+    if (!Number.isFinite(restingAt)) {
+      restingAt = worldTime - Math.abs(dt || 0);
+      await actor.setFlag(scope, "regeneration.restingStartedAt", restingAt);
+      console.log(`[FASERIP] ${actor.name}: Regeneration rest timer started at ${restingAt} (wt=${worldTime}, dt=${dt})`);
+      // Fall through — check if this advance already completes a cycle
+    }
+
+    const cycleSeconds = regenFlags.cycleSeconds || 60;
+    const elapsed = worldTime - restingAt;
+    if (elapsed < cycleSeconds) continue;
+
+    const cycles = Math.floor(elapsed / cycleSeconds);
+    const heal = regenFlags.healAmount || (actor.system?.abilities?.endurance?.value ?? 10);
+    const totalHeal = Math.min(heal * cycles, maxHP - currentHP);
+    const newHP = currentHP + totalHeal;
+
+    await actor.update({ "system.attributes.health.value": newHP });
+
+    const newRestingAt = restingAt + (cycles * cycleSeconds);
+    const updatedFlags = { ...regenFlags, lastHealedAt: worldTime };
+    if (newHP >= maxHP) {
+      await regenAE.update({ disabled: true });
+      updatedFlags.restingStartedAt = null;
+    } else {
+      updatedFlags.restingStartedAt = newRestingAt;
+    }
+    await actor.setFlag(scope, "regeneration", updatedFlags);
+
+    const turnLabel = regenFlags.cycleTurns || Math.round(cycleSeconds / getTurnSeconds());
+    const cycleNote = cycles > 1 ? ` (${cycles} cycles)` : "";
+    const doneNote = newHP >= maxHP ? " — fully healed!" : "";
+
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor }),
+      content: `<div style="background:#e8f5e9;border:2px solid #4caf50;padding:10px;border-radius:5px;">
+        <div style="font-size:1.1em;font-weight:bold;color:#2e7d32;margin-bottom:4px;">
+          <i class="fas fa-heart-pulse"></i> Regeneration
+        </div>
+        <div><strong>${actor.name}</strong> regenerated <strong>${totalHeal} HP</strong>${cycleNote}${doneNote}</div>
+        <div style="margin-top:4px;font-size:0.9em;color:#555;">
+          Health: ${currentHP} &rarr; ${newHP} / ${maxHP}
+          &nbsp;|&nbsp; ${heal} HP per ${turnLabel} turns
+        </div>
+      </div>`,
+    });
+
+    console.log(`[FASERIP] ${actor.name}: Regenerated ${totalHeal} HP (${cycles} cycle(s)), HP ${currentHP} → ${newHP}`);
+  }
 }

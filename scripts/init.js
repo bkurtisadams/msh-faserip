@@ -1,4 +1,7 @@
-// init.js v1.7.8 - 2026-02-08
+// init.js v1.8.0 - 2026-02-10
+// v1.8.0: Add Regeneration power — disabled-by-default AE, player toggle on/off,
+//         auto-heal on worldTime advance, damage interruption. getAllTokenActors
+//         for linked+unlinked token iteration in updateWorldTime hook.
 // v1.7.8: Replace single Fly movement action with three sub-modes (Full/Low Alt/Cruise) in Token HUD
 // v1.7.7: Add FaseripTokenRuler - speed-based color coding for V13 drag ruler
 // v1.7.6: Fix getCampaignDateTime - worldTime is already seconds, remove /1000
@@ -74,41 +77,47 @@ Hooks.on("updateWorldTime", async (worldTime, dt, options, userId) => {
   // GM-only
   if (!game.user.isGM) return;
   
-  // Skip if in active combat (handled by updateCombat hook)
-  if (game.combat?.active) return;
-  
   console.debug("[FASERIP DEBUG] updateWorldTime hook fired, worldTime:", worldTime, "delta:", dt);
-  
-  // Check all actors for seconds-based effects that have expired
-  for (const actor of game.actors) {
-    if (!actor?.effects?.size) continue;
-    
-    const toDelete = [];
-    
-    for (const ef of actor.effects) {
-      if (ef.disabled) continue;
-      const d = ef.duration ?? {};
+
+  // Effect expiration: skip during active combat (updateCombat hook handles that)
+  if (!game.combat?.active) {
+    for (const actor of Effects.getAllTokenActors()) {
+      if (!actor?.effects?.size) continue;
       
-      // Handle seconds-based effects
-      if (Number.isFinite(d.seconds) && d.seconds > 0 && Number.isFinite(d.startTime)) {
-        const endTime = d.startTime + d.seconds;
-        const remaining = endTime - worldTime;
+      const toDelete = [];
+      
+      for (const ef of actor.effects) {
+        if (ef.disabled) continue;
+        const d = ef.duration ?? {};
         
-        if (remaining <= 0) {
-          toDelete.push({ effect: ef, reason: `time expired (${d.seconds}s duration)` });
+        // Handle seconds-based effects
+        if (Number.isFinite(d.seconds) && d.seconds > 0 && Number.isFinite(d.startTime)) {
+          const endTime = d.startTime + d.seconds;
+          const remaining = endTime - worldTime;
+          
+          if (remaining <= 0) {
+            toDelete.push({ effect: ef, reason: `time expired (${d.seconds}s duration)` });
+          }
+        }
+      }
+      
+      // Delete expired effects
+      for (const { effect, reason } of toDelete) {
+        console.log(`[FASERIP] Auto-expiring effect "${effect.name}" on ${actor.name}: ${reason}`);
+        try {
+          await effect.delete();
+        } catch (e) {
+          console.warn("[FASERIP WARN] Effect auto-expire failed", e);
         }
       }
     }
-    
-    // Delete expired effects
-    for (const { effect, reason } of toDelete) {
-      console.log(`[FASERIP] Auto-expiring effect "${effect.name}" on ${actor.name}: ${reason}`);
-      try {
-        await effect.delete();
-      } catch (e) {
-        console.warn("[FASERIP WARN] Effect auto-expire failed", e);
-      }
-    }
+  }
+
+  // Regeneration: ALWAYS process when time advances (not gated by combat state)
+  try {
+    await Effects.processRegeneration(worldTime, dt);
+  } catch (e) {
+    console.error("[FASERIP ERROR] processRegeneration failed:", e);
   }
 });
 
@@ -1295,6 +1304,52 @@ Hooks.once("init", async () => {
   // Initialize rest system
   initRestSystem();
 
+  // ── Regeneration helpers ──────────────────────────────────────────────
+  game.msh.applyRegeneration = Effects.applyRegeneration;
+  game.msh.getAllTokenActors = Effects.getAllTokenActors;
+
+  /** Start Regeneration for selected token or explicit actor */
+  game.msh.startRegeneration = async function (target) {
+    const actor = target?.actor ?? target
+      ?? canvas.tokens.controlled[0]?.actor
+      ?? game.user?.character;
+    if (!actor) {
+      ui.notifications.warn("Select a token or pass an actor to start Regeneration.");
+      return null;
+    }
+    const regenPower = actor.items.find(i =>
+      i.type === "power" && /^regenerat/i.test(i.name)
+    );
+    if (!regenPower) {
+      ui.notifications.warn(`${actor.name} has no Regeneration power.`);
+      return null;
+    }
+    const endValue = actor.system?.abilities?.endurance?.value ?? 10;
+    return Effects.applyRegeneration(actor, {
+      healAmount: endValue,
+      cycleTurns: 10,
+      powerRank: regenPower.system?.rank || null,
+      powerItemId: regenPower.id,
+    });
+  };
+
+  /** Remove the Regeneration AE from selected token */
+  game.msh.stopRegeneration = async function (target) {
+    const actor = target?.actor ?? target
+      ?? canvas.tokens.controlled[0]?.actor
+      ?? game.user?.character;
+    if (!actor) return;
+    const scope = globalThis.MSH_FLAG_SCOPE || "msh-faserip";
+    const ef = actor.effects.find(e => e.flags?.[scope]?.effectType === "regeneration");
+    if (ef) {
+      await ef.delete({ mshIntentional: true });
+      console.log(`[FASERIP] Regeneration AE removed from ${actor.name}`);
+    } else {
+      ui.notifications.info(`${actor.name} has no Regeneration effect.`);
+    }
+    try { await actor.unsetFlag(scope, "regeneration"); } catch (_) {}
+  };
+
   // end of hooks.once
 });
 
@@ -1426,6 +1481,110 @@ Hooks.once("ready", async () => {
   };
   console.log("[FASERIP] Macros registered");
 
+  // ── Regeneration power auto-sync ──────────────────────────────
+  // Clean up old/broken AEs, then create missing ones
+  if (game.user.isGM) {
+    try {
+      const scope = globalThis.MSH_FLAG_SCOPE || "msh-faserip";
+      let cleaned = 0;
+      let applied = 0;
+
+      for (const actor of Effects.getAllTokenActors()) {
+        if (!actor?.items) continue;
+        const regenPower = actor.items.find(i =>
+          i.type === "power" && /^regenerat/i.test(i.name)
+        );
+
+        // Clean up old/broken Regeneration AEs (flags at wrong level from earlier code)
+        for (const ef of [...actor.effects]) {
+          const scopeFlags = ef.flags?.[scope];
+          const isCorrect = scopeFlags?.effectType === "regeneration";
+          const isOldBroken = !isCorrect && ef.name?.startsWith("Regeneration") &&
+            (ef.statuses?.has?.("regenerating") || "effectType" in (ef.flags || {}));
+          const isOrphan = !regenPower && isCorrect;
+          if (isOldBroken || isOrphan) {
+            await ef.delete({ mshIntentional: true });
+            cleaned++;
+            console.log(`[FASERIP] Removed ${isOldBroken ? "old-style" : "orphaned"} Regeneration AE from ${actor.name}`);
+          }
+        }
+
+        if (!regenPower) continue;
+
+        // Already has a correct Regeneration AE?
+        const hasAE = actor.effects.some(e =>
+          e.flags?.[scope]?.effectType === "regeneration"
+        );
+        if (hasAE) continue;
+
+        // Create new AE
+        const endValue = actor.system?.abilities?.endurance?.value ?? 10;
+        await Effects.applyRegeneration(actor, {
+          healAmount: endValue,
+          cycleTurns: 10,
+          powerRank: regenPower.system?.rank || null,
+          powerItemId: regenPower.id,
+        });
+        applied++;
+        console.log(`[FASERIP] Auto-created Regeneration AE for ${actor.name}`);
+      }
+      if (cleaned) console.log(`[FASERIP] Regeneration cleanup: removed ${cleaned} old AE(s)`);
+      if (applied) console.log(`[FASERIP] Regeneration auto-sync: created ${applied} AE(s)`);
+    } catch (e) {
+      console.warn("[FASERIP WARN] Regeneration auto-sync failed:", e);
+    }
+  }
+
+});
+
+// ── Regeneration: block CTT from auto-expiring the Regeneration AE ──
+// CTT's effects-manager tracks AEs and can expire them with a 1-second
+// default duration. This hook prevents that while allowing intentional
+// deletions (stopRegeneration, removing the power item, etc).
+Hooks.on("preDeleteActiveEffect", (effect, options, userId) => {
+  const scope = globalThis.MSH_FLAG_SCOPE || "msh-faserip";
+  if (effect.flags?.[scope]?.effectType !== "regeneration") return;
+  if (options?.mshIntentional) return;  // Allow explicit deletions
+  console.log(`[FASERIP] Blocked auto-expiration of Regeneration AE on ${effect.parent?.name}`);
+  return false;
+});
+
+// ── Regeneration: sync AEs with power items ──
+Hooks.on("createItem", async (item, options, userId) => {
+  if (!game.user.isGM) return;
+  if (item.type !== "power" || !/^regenerat/i.test(item.name)) return;
+  const actor = item.parent;
+  if (!actor || actor.documentName !== "Actor") return;
+
+  const scope = globalThis.MSH_FLAG_SCOPE || "msh-faserip";
+  if (actor.effects.some(e => e.flags?.[scope]?.effectType === "regeneration")) return;
+
+  const endValue = actor.system?.abilities?.endurance?.value ?? 10;
+  await Effects.applyRegeneration(actor, {
+    healAmount: endValue,
+    cycleTurns: 10,
+    powerRank: item.system?.rank || null,
+    powerItemId: item.id,
+  });
+  console.log(`[FASERIP] Regeneration power added to ${actor.name} — AE created`);
+});
+
+Hooks.on("deleteItem", async (item, options, userId) => {
+  if (!game.user.isGM) return;
+  if (item.type !== "power" || !/^regenerat/i.test(item.name)) return;
+  const actor = item.parent;
+  if (!actor || actor.documentName !== "Actor") return;
+
+  const scope = globalThis.MSH_FLAG_SCOPE || "msh-faserip";
+  const regenAE = actor.effects.find(e =>
+    e.flags?.[scope]?.effectType === "regeneration"
+  );
+  if (regenAE) {
+    await regenAE.delete({ mshIntentional: true });
+    console.log(`[FASERIP] Regeneration power removed from ${actor.name} — AE deleted`);
+  }
+  // Clean up actor regen flags
+  try { await actor.unsetFlag(scope, "regeneration"); } catch (_) {}
 });
 
 // Capture old health value before update

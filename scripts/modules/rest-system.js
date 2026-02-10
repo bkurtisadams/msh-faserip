@@ -745,16 +745,41 @@ static async attemptRegainConsciousness(actor) {
 }
 
 /**
- * Update damage timestamp when actor takes damage
- * This should be called from your damage application code
+ * Update damage timestamp when actor takes damage.
+ * Also disables any enabled Regeneration AE (interrupts rest).
  * @param {Actor} actor - The actor taking damage
  */
 export async function recordDamage(actor) {
   const now = Date.now();
+  const worldNow = game.time?.worldTime ?? 0;
   await actor.setFlag(SCOPE, "lastDamageTime", now);
-  
+  await actor.setFlag(SCOPE, "lastDamageWorldTime", worldNow);
+
+  // Interrupt active Regeneration AEs — disable and reset actor timer
+  // (RAW: "hero must start again to recover")
+  for (const ef of actor.effects) {
+    if (ef.disabled) continue;
+    const flags = ef.flags?.[SCOPE];
+    if (flags?.effectType === "regeneration") {
+      await ef.update({ disabled: true });
+      await actor.setFlag(SCOPE, "regeneration.restingStartedAt", null);
+
+      await ChatMessage.create({
+        speaker: ChatMessage.getSpeaker({ actor }),
+        content: `<div style="background:#fff3e0;border:2px solid #ff9800;padding:10px;border-radius:5px;">
+          <div style="font-size:1.1em;font-weight:bold;color:#e65100;margin-bottom:4px;">
+            <i class="fas fa-heart-crack"></i> Regeneration Interrupted
+          </div>
+          <div><strong>${actor.name}</strong> took damage — regeneration rest interrupted!</div>
+        </div>`,
+      });
+
+      console.log(`[FASERIP] Regeneration disabled for ${actor.name} — took damage`);
+    }
+  }
+
   if (game.settings.get(SCOPE, "debugMode")) {
-    console.log(`FASERIP | Damage timestamp recorded for ${actor.name}`);
+    console.log(`FASERIP | Damage timestamp recorded for ${actor.name} (worldTime: ${worldNow})`);
   }
 }
 
