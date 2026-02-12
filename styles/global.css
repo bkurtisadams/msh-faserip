@@ -6,6 +6,7 @@
   color: #222;
   padding: 8px;
   min-height: 400px;
+  box-sizing: border-box;
  }
  
  .faserip-sheet .sheet-header {
@@ -1315,23 +1316,17 @@
   cursor: grabbing;
  }
  
- /* Abilities Section Layout */
+ /* Abilities Section Layout — legacy flex removed, grid rules in lower block */
  .faserip-sheet .abilities-section {
-  display: flex;
-  gap: 10px;
   margin-bottom: 10px;
  }
  
- /* Primary Abilities (finalized width) */
  .faserip-sheet .primary-abilities {
-  flex: 0 0 36%;
-  min-width: 280px;
+  min-width: 0;
  }
  
- /* Final narrow adjustment for Secondary Abilities */
  .faserip-sheet .secondary-abilities {
-  flex: 1 1 auto; /* Flex to fill remaining space */
-  min-width: 300px; /* Optional: prevent it from shrinking too much */
+  min-width: 0;
 }
 
  
@@ -1362,18 +1357,7 @@
   text-align: center;
  }
  
- /* Responsive adjustments */
- @media (max-width: 768px) {
-  .faserip-sheet .abilities-section {
-    flex-direction: column;
-  }
- 
-  .faserip-sheet .primary-abilities,
-  .faserip-sheet .secondary-abilities {
-    flex: 1 1 100%;
-    min-width: unset;
-  }
- }
+ /* Responsive adjustments — handled by grid @media block below */
  
  /* Karma advancement section */
  .faserip-sheet .karma-advancement {
@@ -3202,7 +3186,7 @@ form.faserip-sheet .abilities-section {
   grid-template-columns: minmax(0, var(--colP, 1fr)) minmax(0, var(--colS, 1fr));
   gap: 12px;
   padding: 8px 10px;
-  border: 1px solid var(--mred);
+  border: 1px solid var(--mred, #8b0000);
   border-radius: 3px;
   background: #fff;
   align-items: stretch;
@@ -3224,7 +3208,7 @@ form.faserip-sheet .abilities-section .abilities-container {
   margin: 0 !important;  /* must match secondary container */
 }
 
-@media (max-width: 780px) {
+@media (max-width: 500px) {
   form.faserip-sheet .abilities-section {
     grid-template-columns: 1fr;
   }
@@ -3427,7 +3411,7 @@ form.faserip-sheet .secondary-abilities .sec-col {
   flex-direction: column;
   min-width: 0;
   min-height: 0;
-  border-right: 1px solid var(--line-grey);
+  border-right: 1px solid var(--line-grey, #d7d7d7);
 }
 
 form.faserip-sheet .secondary-abilities .sec-col:last-child {
@@ -3496,7 +3480,7 @@ form.faserip-sheet .secondary-abilities select {
   padding: 2px 6px;
   font-size: 12.5px;
   line-height: 1.2;
-  background: var(--cell-grey);
+  background: var(--cell-grey, #f5f5f0);
   border: 1px solid #ccc;
   border-radius: 2px;
   box-sizing: border-box;
@@ -3583,7 +3567,7 @@ form.faserip-sheet .secondary-abilities .popularity-values .divider {
 /* ===== Movement Panel ===== */
 form.faserip-sheet .movement-panel {
   grid-column: 1 / -1;
-  border: 1px solid var(--mred);
+  border: 1px solid var(--mred, #8b0000);
   border-radius: 3px;
   background: #fff;
   padding: 8px 10px;
@@ -3605,7 +3589,7 @@ form.faserip-sheet .movement-panel input[type="number"] {
   padding: 2px 6px;
   font-size: 12.5px;
   line-height: 1.2;
-  background: var(--cell-grey);
+  background: var(--cell-grey, #f5f5f0);
   border: 1px solid #ccc;
   border-radius: 2px;
   box-sizing: border-box;
