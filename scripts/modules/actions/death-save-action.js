@@ -1,4 +1,7 @@
-// scripts/modules/actions/death-save-action.js v1.5.3 - 2025-12-26
+// scripts/modules/actions/death-save-action.js v1.6.0 - 2026-02-11
+// v1.6.0: Migrate dying effect creation to ongoing effects engine (applyDyingOngoing).
+//         _createDyingEffect now delegates to ongoing-engine.js which handles immediate
+//         first rank loss, impaired endurance AE, combat mods, and per-turn timer.
 // v1.5.3: Remove redundant "NO EFFECT" status box for Kill Save (info already in collapsible)
 // v1.5.2: Add fromDeathSave flag to Unconscious effect for wake-up health restoration
 // v1.5.1: UI improvements - remove emoji from Kill Check header, use green for No Effect,
@@ -27,7 +30,7 @@ import {
 } from "./action-utils.js";
 import { resolveKillFeat, KILL_CONTEXTS, getKillContextFromAttackForm } from "../../rules/kill-resolver.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
-import { applyDying } from "../effects/effect-engine.js";
+import { applyDyingOngoing } from "../effects/ongoing-engine.js";
 
 export class DeathSaveAction extends BaseAction {
   constructor(a) {
@@ -542,169 +545,22 @@ export class DeathSaveAction extends BaseAction {
     // =========================================================
   }
 
-  /** Create the DYING effect: loses 1 Endurance rank per turn (6 seconds) */
-  async _createDyingEffect(actor, endurance, _unconsciousDuration) {
-      const scope = globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faserip";
-
-      // Store original endurance on actor for recovery tracking
-      const currentEndurance = actor.system?.abilities?.endurance?.rank || endurance.rank;
-      const currentEnduranceValue = actor.system?.abilities?.endurance?.value || endurance.value;
-      const existingOriginal = actor.getFlag(scope, "originalEndurance");
-      if (!existingOriginal) {
-        await actor.setFlag(scope, "originalEndurance", currentEndurance);
+  /** Create the DYING effect via the ongoing effects engine.
+   *  Handles immediate first rank loss, impaired endurance AE, combat mods,
+   *  and per-turn endurance loss via the ongoing engine timer.
+   */
+  async _createDyingEffect(actor, _endurance, _unconsciousDuration) {
+    const fromZeroHealth = this.opts?.fromZeroHealth !== false;
+    try {
+      await applyDyingOngoing(actor, { fromZeroHealth });
+    } catch (err) {
+      console.error(`[FASERIP ERROR] _createDyingEffect: ongoing engine call failed for ${actor.name}:`, err);
+      // Fallback: try via game.msh API in case direct import failed
+      if (game.msh?.ongoing?.applyDying) {
+        await game.msh.ongoing.applyDying(actor, { fromZeroHealth });
       }
-      const originalRank = existingOriginal || currentEndurance;
-
-      // =========================================================
-      // IMMEDIATE FIRST RANK LOSS (per rules: "Endurance is reduced by one rank")
-      // The character loses 1 rank immediately, then continues to lose 1/turn
-      // =========================================================
-      const nextRank = game.msh.nextLowerRankName(currentEndurance);
-      const nextValue = game.msh.getRankValue(nextRank) || 0;
-      const enduranceLoss = currentEnduranceValue - nextValue;
-      
-      // Calculate new health (both max recalculates, current drops by endurance loss)
-      const currentHealth = actor.system?.attributes?.health?.value || 0;
-      const newHealth = Math.max(0, currentHealth - enduranceLoss);
-      
-      console.log(`💀 DYING | ${actor.name} IMMEDIATE Endurance loss: ${currentEndurance} (${currentEnduranceValue}) → ${nextRank} (${nextValue}), Health: ${currentHealth} → ${newHealth}`);
-      
-      // Apply immediate Endurance and Health loss
-      try {
-        if (game.user.isGM || actor.isOwner) {
-          await actor.update({
-            "system.abilities.endurance.rank": nextRank,
-            "system.abilities.endurance.value": nextValue,
-            "system.attributes.health.value": newHealth
-          });
-        } else {
-          const { runAsGM } = await import("../../gm-utils.js");
-          await runAsGM({
-            operation: "update",
-            targetActorUuid: actor.uuid,
-            args: [{
-              "system.abilities.endurance.rank": nextRank,
-              "system.abilities.endurance.value": nextValue,
-              "system.attributes.health.value": newHealth
-            }]
-          });
-        }
-        
-        // Create Impaired Endurance effect (first rank loss)
-        const hasMedicalCare = actor.getFlag(scope, "medicalCare") ?? false;
-        const daysUntilHealing = hasMedicalCare ? 1 : 7;
-        
-        // Remove any existing impaired effect first
-        const existingImpaired = actor.effects.find(e => e.getFlag(scope, "isImpairedEndurance"));
-        if (existingImpaired) {
-          if (game.user.isGM || actor.isOwner) {
-            await actor.deleteEmbeddedDocuments("ActiveEffect", [existingImpaired.id]);
-          }
-        }
-        
-        const impairedEffectData = {
-          name: `Impaired Endurance (${nextRank} of ${originalRank})`,
-          img: "icons/svg/blood.svg",
-          origin: actor.uuid,
-          statuses: ["impaired-endurance"],
-          flags: {
-            [scope]: {
-              isImpairedEndurance: true,
-              originalEndurance: originalRank,
-              currentEndurance: nextRank,
-              lastHealed: Date.now(),
-              medicalCare: hasMedicalCare
-            },
-            core: { statusId: "impaired-endurance" }
-          },
-          duration: {
-            rounds: daysUntilHealing * 600 * 24,
-            startRound: game.combat?.round || 0
-          },
-          changes: [{
-            key: "system.columnShift",
-            mode: CONST.ACTIVE_EFFECT_MODES.ADD,
-            value: "-2"
-          }]
-        };
-        
-        if (game.user.isGM || actor.isOwner) {
-          await actor.createEmbeddedDocuments("ActiveEffect", [impairedEffectData]);
-        } else {
-          const { runAsGM } = await import("../../gm-utils.js");
-          await runAsGM({
-            operation: "createEmbeddedDocuments",
-            targetActorUuid: actor.uuid,
-            args: ["ActiveEffect", [impairedEffectData]]
-          });
-        }
-        console.log(`💀 DYING | Created Impaired Endurance effect for ${actor.name}`);
-        
-        // Post chat message about immediate loss
-        await ChatMessage.create({
-          speaker: ChatMessage.getSpeaker({ actor }),
-          content: `<div style="background:#ffebee;border:1px solid #ef5350;padding:8px;border-radius:3px;">
-            <strong>${actor.name}</strong> begins dying - immediate Endurance loss: ${currentEndurance} → ${nextRank}
-            <div style="margin-top:4px;font-size:.9em;color:#666;">Health: ${currentHealth} → ${newHealth} (−${enduranceLoss})</div>
-            <div style="margin-top:4px;font-size:.85em;color:#c62828;">Will continue to lose 1 Endurance rank per turn until stabilized.</div>
-            <div style="margin-top:4px;font-size:.85em;color:#ff9800;">Impaired: -2CS to all actions until Endurance restored.</div>
-          </div>`
-        });
-      } catch (err) {
-        console.error(`[FASERIP ERROR] Failed to apply immediate Endurance loss for ${actor.name}:`, err);
-      }
-      // =========================================================
-
-      // Remove any existing dying effects to avoid duplicates
-      try {
-        const existing = actor.effects.filter(e => e.flags?.[scope]?.isDying);
-        if (existing.length) {
-          if (game.user.isGM || actor.isOwner) {
-            await actor.deleteEmbeddedDocuments("ActiveEffect", existing.map(e => e.id));
-          } else {
-            const { runAsGM } = await import("../../gm-utils.js");
-            await runAsGM({
-              operation: "deleteEmbeddedDocuments",
-              targetActorUuid: actor.uuid,
-              args: ["ActiveEffect", existing.map(e => e.id)]
-            });
-          }
-        }
-      } catch (_) {}
-
-      const effectData = {
-        name: `Dying (${originalRank} → ${nextRank})`,
-        img: "icons/svg/skull.svg",
-        origin: actor.uuid,
-        disabled: false,
-        flags: {
-          [scope]: {
-            isDying: true,
-            zeroHealth: true,
-            originalEndurance: originalRank,
-            turnsElapsed: 1  // Already processed first loss
-          }
-        },
-        changes: [
-          { key: "system.status.dying", mode: CONST.ACTIVE_EFFECT_MODES.OVERRIDE, value: true }
-        ],
-        statuses: ["dying"]
-        // NO DURATION - persists until manually removed
-      };
-
-      if (game.user.isGM || actor.isOwner) {
-        await actor.createEmbeddedDocuments("ActiveEffect", [effectData]);
-      } else {
-        const { runAsGM } = await import("../../gm-utils.js");
-        await runAsGM({
-          operation: "createEmbeddedDocuments",
-          targetActorUuid: actor.uuid,
-          args: ["ActiveEffect", [effectData]]
-        });
-      }
-      
-      console.log(`💀 DYING EFFECT | Created for ${actor.name} (immediate loss applied: ${currentEndurance} → ${nextRank})`);
     }
+  }
 
 
   /** Create an UNCONSCIOUS effect for non-dying outcomes (N rounds) */

@@ -1,4 +1,8 @@
-// init.js v1.9.2 - 2026-02-10
+// init.js v1.9.4 - 2026-02-11
+// v1.9.4: Skip spurious death save re-trigger when actor is already dying (ongoing engine
+//         endurance loss updates health → updateActor fires → was re-triggering death save).
+// v1.9.3: Add ongoing engine guard in updateCombat dying loop — skip actors whose dying
+//         is managed by ongoing-engine.js (ongoing.dying flag present) to prevent double-processing.
 // v1.9.2: CTT↔FASERIP time sync — ctt.timeAuthority setting, getCampaignDateTime reads CTT API,
 //         updateWorldTime fires timeUpdated, bridge hooks for timeTracker.timeSet/timeAdvanced
 // v1.9.1: Auto-sync power sheet → ongoing effects. Setting regenerationType on a power's
@@ -1902,6 +1906,16 @@ Hooks.on('updateActor', async (actor, updateData, options, userId) => {
         console.log(`FASERIP | Skipping init.js death save - combat system handling`);
         return;
       }
+      // Skip if actor is already dying — the ongoing engine's endurance loss
+      // updates health which re-triggers this hook; don't re-roll death save
+      const _scope = globalThis.MSH_FLAG_SCOPE || "msh-faserip";
+      const alreadyDying = actor.effects.some(e =>
+        e.getFlag(_scope, "isDying") || e.statuses?.has?.("dying")
+      );
+      if (alreadyDying) {
+        console.log(`FASERIP | Skipping death save for ${actor.name} - already dying`);
+        return;
+      }
       console.log(`%cFASERIP | !!! ${actor.name} is at ${currentHealth} HP - triggering death save`, 'color: #ef5350; font-weight: bold');
 
       const mode = resolveCombatMode(actor) || "manual";
@@ -2219,6 +2233,14 @@ Hooks.on("updateCombat", async (combat, changed, diff, userId) => {
       
       if (!dyingEffect) continue;
       
+      // If the ongoing engine owns this actor's dying, skip — it handles the per-turn
+      // endurance loss via updateWorldTime. This prevents double-processing.
+      const ongoingDying = actor.getFlag(scope, "ongoing.dying");
+      if (ongoingDying && typeof ongoingDying === "object") {
+        console.debug(`[FASERIP:DYING] Skipping ${actor.name} — ongoing engine owns dying`);
+        continue;
+      }
+
       dyingCount++;
       console.log(`[FASERIP:DYING] Found Dying effect on ${actor.name}`, {
         effectName: dyingEffect.name,
