@@ -1,8 +1,7 @@
 // scripts/modules/actions/death-save-action.js v1.6.0 - 2026-02-11
-// v1.6.0: Migrate dying effect creation to ongoing effects engine (applyDyingOngoing).
-//         _createDyingEffect now delegates to ongoing-engine.js which handles immediate
-//         first rank loss, impaired endurance AE, combat mods, and per-turn timer.
-// v1.5.3: Remove redundant "NO EFFECT" status box for Kill Save (info already in collapsible)
+// v1.6.0: _createDyingEffect delegates to ongoing-engine.applyDyingOngoing.
+//         All dying mechanics consolidated in ongoing engine (single entry point).
+//         Removes duplicate Endurance step-down, Impaired Endurance, and dying AE creation.
 // v1.5.2: Add fromDeathSave flag to Unconscious effect for wake-up health restoration
 // v1.5.1: UI improvements - remove emoji from Kill Check header, use green for No Effect,
 //         blue for Unconscious, style result color as badge (Yellow/Green/White/Red)
@@ -30,7 +29,7 @@ import {
 } from "./action-utils.js";
 import { resolveKillFeat, KILL_CONTEXTS, getKillContextFromAttackForm } from "../../rules/kill-resolver.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
-import { applyDyingOngoing } from "../effects/ongoing-engine.js";
+// applyDying import removed — _createDyingEffect delegates to ongoing-engine.applyDyingOngoing
 
 export class DeathSaveAction extends BaseAction {
   constructor(a) {
@@ -545,21 +544,21 @@ export class DeathSaveAction extends BaseAction {
     // =========================================================
   }
 
-  /** Create the DYING effect via the ongoing effects engine.
-   *  Handles immediate first rank loss, impaired endurance AE, combat mods,
-   *  and per-turn endurance loss via the ongoing engine timer.
-   */
-  async _createDyingEffect(actor, _endurance, _unconsciousDuration) {
-    const fromZeroHealth = this.opts?.fromZeroHealth !== false;
-    try {
-      await applyDyingOngoing(actor, { fromZeroHealth });
-    } catch (err) {
-      console.error(`[FASERIP ERROR] _createDyingEffect: ongoing engine call failed for ${actor.name}:`, err);
-      // Fallback: try via game.msh API in case direct import failed
-      if (game.msh?.ongoing?.applyDying) {
-        await game.msh.ongoing.applyDying(actor, { fromZeroHealth });
+  /** Create the DYING effect: loses 1 Endurance rank per turn (6 seconds) */
+  async _createDyingEffect(actor, endurance, _unconsciousDuration) {
+      // Delegate entirely to the ongoing engine's consolidated applyDyingOngoing.
+      // It handles: immediate first rank loss, HP reduction, Impaired Endurance,
+      // dying AE with combat mods, and chat messages.
+      try {
+        if (game.msh?.ongoing?.applyDying) {
+          await game.msh.ongoing.applyDying(actor);
+        } else {
+          const { applyDyingOngoing } = await import("../effects/ongoing-engine.js");
+          await applyDyingOngoing(actor);
+        }
+      } catch (err) {
+        console.error(`[FASERIP ERROR] _createDyingEffect delegation failed for ${actor.name}:`, err);
       }
-    }
   }
 
 

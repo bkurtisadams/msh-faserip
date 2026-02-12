@@ -1,11 +1,14 @@
-// scripts/modules/effects/ongoing-engine.js v1.1.1 - 2026-02-11
-// v1.1.1: Add combat round gate — during active combat, dying endurance loss fires once
-//         per Foundry round (matching RAW: 1 FASERIP turn = 1 Foundry round), not per
-//         Foundry turn (which is just resolution order within the 6-second turn).
-// v1.1.0: Full dying implementation — immediate first rank loss, impaired endurance AE,
-//         stabilization pause, Shift-0 death handling, 200-Karma re-FEAT, combat mods,
-//         isDying compat flag. Shared ensureImpairedEndurance helper.
-// v1.0.0: Core engine with Regeneration, Solar Regeneration support.
+// scripts/modules/effects/ongoing-engine.js v1.4.0 - 2026-02-11
+// v1.4.0: Consolidated dying initiation into applyDyingOngoing (immediate first rank loss,
+//         Impaired Endurance, HP reduction, chat). All callers now use this single entry point.
+//         Removed duration from dying AE (lifecycle managed by engine, not expiry).
+//         processDyingRound handles subsequent rank losses (1 per FASERIP turn via combatRound hook).
+// v1.3.0: Active-scene-only processing (getActiveSceneActors replaces getAllTokenActors).
+//         processOneEffect hard-skips "dying" effectId — dying only via processDyingRound.
+//         Legacy migration sets combatOnly: true, no immediate processing.
+// v1.2.0: Legacy dying AE migration: auto-registers ongoing config, strips duration.
+// v1.1.0: Full dying mechanics via processDyingRound() — stabilization, HP reduction,
+//         Impaired Endurance effect, Shift-0 warning/death, re-FEAT, combat mods.
 // Generic periodic effect engine for FASERIP.
 // Handles Regeneration, Solar Regeneration, Recovery, Dying, Absorption decay,
 // Corrosive damage, and any future timed effects via a declarative config schema.
@@ -15,6 +18,27 @@ import { getAllTokenActors, applyEffect } from "./effect-engine.js";
 const SCOPE = () => (globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faserip");
 
 const AE_MODES = { MULTIPLY: 1, ADD: 2, DOWNGRADE: 3, UPGRADE: 4, OVERRIDE: 5 };
+
+/**
+ * Get actors from the current (viewed) scene only.
+ * Falls back to getAllTokenActors() if no active scene.
+ */
+function getActiveSceneActors() {
+  const scene = canvas?.scene ?? game.scenes?.active;
+  if (!scene) return getAllTokenActors();
+
+  const seen = new Set();
+  const actors = [];
+  for (const tokenDoc of scene.tokens) {
+    const a = tokenDoc.actor;
+    if (!a) continue;
+    const key = tokenDoc.actorLink ? a.id : `token-${tokenDoc.id}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    actors.push(a);
+  }
+  return actors;
+}
 
 function getTurnSeconds() {
   const v = Number(game.settings?.get?.("msh-faserip", "turnSeconds"));
@@ -37,13 +61,6 @@ function getTurnSeconds() {
      oncePerDay: false,
      capAtMax:   true,         // stop at max HP (false for Absorption overheal)
      autoDisable: true,        // disable AE when fully healed / effect done
-     // Dying-specific (only for effectId "dying"):
-     originalEndurance: "Good",   // rank before dying began
-     fromZeroHealth:    true,     // true = unconscious dying, false = conscious dying
-     stabilizedRounds:  0,        // 50-Karma pause: skip N cycles
-     reFeatOnSlip:      false,    // 200-Karma: trigger re-FEAT on next rank loss
-     turnsElapsed:      0,        // total rank losses so far (for AE label)
-     lastProcessedRound: 0,      // combat round gate: last Foundry round processed
      // Runtime state (managed by engine):
      startedAt:    null,       // worldTime when timer started
      lastTriggered: null,      // worldTime of last trigger
@@ -186,109 +203,10 @@ function stepEnduranceRank(actor, direction) {
   if (direction === "down") {
     return game.msh?.nextLowerRankName?.(current) ?? "Shift-0";
   }
-  // "up" — would need nextHigherRankName, but dying only goes down
-  // For future stat.gain: walk RANK_ORDER up
+  if (direction === "up") {
+    return game.msh?.nextHigherRankName?.(current) ?? current;
+  }
   return current;
-}
-
-// ─── Shared helpers: Impaired Endurance & Death ─────────────────────────────
-
-async function ensureImpairedEndurance(actor, newRank, originalRank, scope) {
-  const hasMedicalCare = actor.getFlag(scope, "medicalCare") ?? false;
-  const daysUntilHealing = hasMedicalCare ? 1 : 7;
-
-  let impaired = actor.effects.find(e => e.getFlag(scope, "isImpairedEndurance"));
-
-  if (!impaired) {
-    const aeData = {
-      name: `Impaired Endurance (${newRank} of ${originalRank})`,
-      img: "icons/svg/blood.svg",
-      origin: actor.uuid,
-      statuses: ["impaired-endurance"],
-      flags: {
-        [scope]: {
-          isImpairedEndurance: true,
-          originalEndurance: originalRank,
-          currentEndurance: newRank,
-          lastHealed: Date.now(),
-          medicalCare: hasMedicalCare
-        },
-        core: { statusId: "impaired-endurance" }
-      },
-      duration: {
-        rounds: daysUntilHealing * 600 * 24,
-        startRound: game.combat?.round || 0
-      },
-      changes: [{ key: "system.columnShift", mode: AE_MODES.ADD, value: "-2" }]
-    };
-
-    if (game.user.isGM || actor.isOwner) {
-      await actor.createEmbeddedDocuments("ActiveEffect", [aeData]);
-    } else {
-      try {
-        const { runAsGM } = await import("../../gm-utils.js");
-        await runAsGM({
-          operation: "createEmbeddedDocuments",
-          targetActorUuid: actor.uuid,
-          args: ["ActiveEffect", [aeData]]
-        });
-      } catch (e) {
-        console.error("[FASERIP ERROR] ensureImpairedEndurance: runAsGM failed", e);
-      }
-    }
-    console.log(`[FASERIP:DYING] Created Impaired Endurance for ${actor.name}: ${newRank} of ${originalRank}`);
-  } else {
-    await impaired.update({
-      name: `Impaired Endurance (${newRank} of ${originalRank})`,
-      [`flags.${scope}.currentEndurance`]: newRank
-    });
-    console.log(`[FASERIP:DYING] Updated Impaired Endurance for ${actor.name}: ${newRank} of ${originalRank}`);
-  }
-}
-
-async function handleDeath(actor, ae, effectId, scope) {
-  console.warn(`[FASERIP:DYING] ${actor.name} has died (below Shift-0)`);
-
-  // Set isDead on linked actors only (unlinked tokens share a base actor)
-  if (!actor.isToken || actor.prototypeToken?.actorLink) {
-    try {
-      await actor.update({ "system.details.isDead": true });
-    } catch (e) {
-      console.error("[FASERIP ERROR] handleDeath: failed to set isDead", e);
-    }
-  }
-
-  // Remove the ongoing dying effect (AE + flags)
-  if (ae) {
-    try { await ae.delete(); } catch (_) {}
-  }
-  try {
-    await actor.unsetFlag(scope, `ongoing.${effectId}`);
-  } catch (_) {}
-
-  // Remove any Unconscious effects from dead character
-  const unconsciousEffects = actor.effects.filter(e =>
-    e.statuses?.has?.("unconscious") || /unconscious/i.test(e.name)
-  );
-  if (unconsciousEffects.length) {
-    try {
-      await actor.deleteEmbeddedDocuments("ActiveEffect", unconsciousEffects.map(e => e.id));
-      console.log(`[FASERIP:DYING] Removed ${unconsciousEffects.length} unconscious effect(s) from dead ${actor.name}`);
-    } catch (_) {}
-  }
-
-  // Apply dead status overlay
-  try {
-    await actor.toggleStatusEffect("dead", { active: true, overlay: true });
-  } catch (e) {
-    console.error("[FASERIP ERROR] handleDeath: failed to toggle dead status", e);
-  }
-
-  await sendOngoingChat(actor, "Death", "stat.loss",
-    `<div style="text-align:center;font-size:1.2em;font-weight:bold;color:#b71c1c;">
-      ${actor.name} has died.
-    </div>`
-  );
 }
 
 // ─── Core processor ───────────────────────────────────────────────────────────
@@ -303,11 +221,57 @@ async function handleDeath(actor, ae, effectId, scope) {
 export async function processOngoingEffects(worldTime, dt = 0) {
   const scope = SCOPE();
 
-  for (const actor of getAllTokenActors()) {
+  for (const actor of getActiveSceneActors()) {
     const ongoingMap = actor.getFlag(scope, "ongoing");
-    if (!ongoingMap || typeof ongoingMap !== "object") continue;
 
-    for (const [effectId, config] of Object.entries(ongoingMap)) {
+    // ── Legacy dying AE migration ──────────────────────────────────
+    // Detect old-format dying AEs (isDying flag but no ongoing.dying config)
+    // and auto-register them with the ongoing engine
+    const hasDyingConfig = ongoingMap?.dying;
+    if (!hasDyingConfig) {
+      const legacyDying = actor.effects.find(e =>
+        (e.flags?.[scope]?.isDying || e.statuses?.has?.("dying")) && !e.disabled
+      );
+      if (legacyDying) {
+        console.log(`[FASERIP] Migrating legacy dying AE on ${actor.name} to ongoing engine`);
+        const dyingConfig = {
+          type: "stat.loss",
+          stat: "endurance",
+          formula: "1rank",
+          rate: 1,
+          cycle: "round",
+          count: -1,
+          gate: "none",
+          interruptOnDamage: false,
+          capAtMax: false,
+          autoDisable: false,
+          combatOnly: true,  // Dying processed by processDyingRound, not worldTime ticks
+          originalEndurance: legacyDying.getFlag(scope, "originalEndurance")
+            || actor.getFlag(scope, "originalEndurance")
+            || actor.system?.abilities?.endurance?.rank,
+          startedAt: worldTime - Math.abs(dt || 0),
+          lastTriggered: null,
+          triggerCount: legacyDying.getFlag(scope, "turnsElapsed") || 0,
+        };
+        await actor.setFlag(scope, "ongoing.dying", dyingConfig);
+        // Tag the legacy AE so we can find it, and remove duration so CTT doesn't expire it
+        if (!legacyDying.flags?.[scope]?.ongoingId) {
+          await legacyDying.update({
+            [`flags.${scope}.ongoingId`]: "dying",
+            [`flags.${scope}.effectType`]: "ongoing",
+            "duration.rounds": null,
+            "duration.seconds": null,
+          });
+        }
+        // combatOnly: dying will be processed by processDyingRound on next round change
+      }
+    }
+
+    // Re-read ongoingMap in case migration just added dying config
+    const currentMap = actor.getFlag(scope, "ongoing");
+    if (!currentMap || typeof currentMap !== "object") continue;
+
+    for (const [effectId, config] of Object.entries(currentMap)) {
       if (!config || typeof config !== "object") continue;
 
       try {
@@ -320,6 +284,10 @@ export async function processOngoingEffects(worldTime, dt = 0) {
 }
 
 async function processOneEffect(actor, effectId, config, worldTime, dt, scope) {
+  // Skip combat-only effects — dying is handled by processDyingRound on round change,
+  // not by worldTime ticks. Hard-code "dying" as safety net for saved configs missing the flag.
+  if (config.combatOnly || effectId === "dying") return;
+
   // Find corresponding AE — must be enabled
   const ae = actor.effects.find(e =>
     e.flags?.[scope]?.ongoingId === effectId && !e.disabled
@@ -329,7 +297,6 @@ async function processOneEffect(actor, effectId, config, worldTime, dt, scope) {
   // Once-per-day check
   if (config.oncePerDay) {
     const lastDate = config.lastTriggeredDate;
-    // Use CTT calendar date if available, else real date
     const today = _getGameDate();
     if (lastDate === today) return;
   }
@@ -339,8 +306,9 @@ async function processOneEffect(actor, effectId, config, worldTime, dt, scope) {
 
   // Count limit
   if (config.count > 0 && (config.triggerCount || 0) >= config.count) {
+    const activeAE = ae || dyingAE;
     if (config.autoDisable !== false) {
-      await ae.update({ disabled: true });
+      await activeAE.update({ disabled: true });
       console.log(`[FASERIP] ${actor.name}: ${effectId} auto-disabled (count exhausted)`);
     }
     return;
@@ -360,6 +328,23 @@ async function processOneEffect(actor, effectId, config, worldTime, dt, scope) {
   if (elapsed < cycleSeconds) return;
 
   const cycles = Math.floor(elapsed / cycleSeconds);
+
+  // ── Dying: delegate to processDyingRound ────────────────────────
+  if (effectId === "dying") {
+    for (let i = 0; i < cycles; i++) {
+      const result = await processDyingRound(actor);
+      if (result === "dead") break;
+    }
+    // Update timing state
+    const newStartedAt = startedAt + (cycles * cycleSeconds);
+    await actor.setFlag(scope, `ongoing.${effectId}`, {
+      ...config,
+      startedAt: newStartedAt,
+      lastTriggered: worldTime,
+      triggerCount: (config.triggerCount || 0) + cycles,
+    });
+    return;
+  }
 
   // Resolve formula
   const rawAmount = resolveFormula(config.formula, actor, config);
@@ -470,134 +455,239 @@ async function executeHealthDamage(actor, ae, effectId, config, dmgPerCycle, cyc
 }
 
 async function executeEnduranceLoss(actor, ae, effectId, config, rawAmount, cycles, worldTime, scope, cycleSeconds, startedAt, effectName) {
+  // Called by processOngoingEffects for worldTime-based stat.loss.
+  // Dying uses processDyingRound() instead (combatOnly: true skips this).
+  // This handles any future non-combat stat.loss effects (e.g. poison).
   const isRankStep = rawAmount === "1rank";
 
-  // ── Combat round gate ──
-  // During active combat, worldTime advances 6s per Foundry turn, but a FASERIP
-  // "turn" is one full Foundry round (all combatants act simultaneously in 6s).
-  // Only process dying once per Foundry round to match RAW timing.
-  if (game.combat?.active && isRankStep) {
-    const currentRound = game.combat.round;
-    const lastRound = config.lastProcessedRound ?? 0;
-    if (currentRound <= lastRound) {
-      // Already processed this round — just bump the timer forward
-      const newStartedAt = startedAt + (cycles * cycleSeconds);
-      await actor.setFlag(scope, `ongoing.${effectId}.startedAt`, newStartedAt);
-      return;
-    }
-    // Record that we're processing this round
-    await actor.setFlag(scope, `ongoing.${effectId}.lastProcessedRound`, currentRound);
-  }
-
-  // ── Stabilization pause (50 Karma: skip 1 cycle) ──
-  const stabilized = config.stabilizedRounds || 0;
-  if (stabilized > 0) {
-    const newStabilized = stabilized - 1;
-    const newStartedAt = startedAt + (cycles * cycleSeconds);
-    await actor.setFlag(scope, `ongoing.${effectId}`, {
-      ...config,
-      stabilizedRounds: newStabilized,
-      startedAt: newStartedAt,
-      lastTriggered: worldTime,
-    });
-    console.log(`[FASERIP:DYING] ${actor.name} stabilized for ${stabilized} round(s), ${newStabilized} remaining`);
-    return;
-  }
-
   if (isRankStep) {
-    // Process one rank step per cycle. For multi-cycle catch-up, loop.
-    // In practice dying processes 1 cycle at a time (rate=1, cycle=turn).
     for (let i = 0; i < cycles; i++) {
       const currentRank = actor.system?.abilities?.endurance?.rank;
-      const currentValue = actor.system?.abilities?.endurance?.value
-        ?? game.msh?.getRankValue?.(currentRank) ?? 0;
-
-      // ── Already at Shift-0: DEATH ──
       if (!currentRank || currentRank === "Shift-0" || currentRank === "Shift0") {
-        await handleDeath(actor, ae, effectId, scope);
+        if (config.autoDisable !== false) await ae.update({ disabled: true });
+        await sendOngoingChat(actor, effectName, "stat.loss",
+          `<strong>${actor.name}</strong> has reached Shift-0 Endurance`
+        );
         return;
       }
-
-      // ── Step down 1 rank ──
       const newRank = stepEnduranceRank(actor, "down");
       const newValue = game.msh?.getRankValue?.(newRank) ?? 0;
-      const enduranceLoss = currentValue - newValue;
-      const currentHealth = actor.system?.attributes?.health?.value ?? 0;
-      const newHealth = Math.max(0, currentHealth - enduranceLoss);
-      const newMaxHealth = _recalcMaxHealth(actor, newValue);
-
       await actor.update({
         "system.abilities.endurance.rank": newRank,
         "system.abilities.endurance.value": newValue,
-        "system.attributes.health.value": newHealth,
-        "system.attributes.health.max": newMaxHealth,
+        "system.attributes.health.max": _recalcMaxHealth(actor, newValue),
       });
-
-      // ── Impaired Endurance AE ──
-      const originalRank = config.originalEndurance || actor.getFlag(scope, "originalEndurance") || currentRank;
-      await ensureImpairedEndurance(actor, newRank, originalRank, scope);
-
-      // ── Update dying AE label + turnsElapsed ──
-      const turnsElapsed = (config.turnsElapsed || 0) + i + 1;
-      try {
-        await ae.update({
-          name: `Dying (${originalRank} → ${newRank}, ${turnsElapsed} turns)`,
-          [`flags.${scope}.currentTempRank`]: newRank,
-          [`flags.${scope}.turnsElapsed`]: turnsElapsed,
-        });
-      } catch (_) {}
-
-      // ── Chat message ──
-      if (newRank === "Shift-0" || newRank === "Shift0") {
-        // Just reached Shift-0 — warning, not death yet (they get 1 round to be saved)
-        await sendOngoingChat(actor, effectName, "stat.loss",
-          `<strong>${actor.name}</strong> lost 1 Endurance rank: now <strong>${newRank} (${newValue})</strong>
-           <div style="margin-top:4px;font-size:0.9em;color:#666;">Health: ${currentHealth} &rarr; ${newHealth} (&minus;${enduranceLoss})</div>
-           <div style="margin-top:6px;padding:6px;border-radius:3px;background:#fff3e0;border:1px solid #ff9800;color:#e65100;font-weight:bold;">
-             ${actor.name} has reached Shift-0 Endurance! Will die next round unless stabilized.
-           </div>`
-        );
-        console.warn(`[FASERIP:DYING] ${actor.name} reached Shift-0 — will die next round if not stabilized`);
-      } else {
-        await sendOngoingChat(actor, effectName, "stat.loss",
-          `<strong>${actor.name}</strong> lost 1 Endurance rank: now <strong>${newRank} (${newValue})</strong>
-           <div style="margin-top:4px;font-size:0.9em;color:#555;">
-             Health: ${currentHealth} &rarr; ${newHealth} (&minus;${enduranceLoss})
-           </div>
-           <div style="margin-top:4px;font-size:0.9em;color:#555;">
-             Endurance loss continues each turn until stabilized or Shift-0 (death)
-           </div>`
-        );
-      }
-
-      console.log(`[FASERIP:DYING] ${actor.name}: Endurance ${currentRank} (${currentValue}) → ${newRank} (${newValue}), Health ${currentHealth} → ${newHealth}`);
-
-      // ── 200-Karma re-FEAT on slip ──
-      if (config.reFeatOnSlip) {
-        console.log(`[FASERIP:DYING] ${actor.name} gets re-FEAT on slip`);
-        // Clear the flag before triggering
-        await actor.setFlag(scope, `ongoing.${effectId}.reFeatOnSlip`, false);
-        config.reFeatOnSlip = false;
-        game.msh?.openUniversalTableDialog?.(actor, { mode: "death-save" });
-      }
+      await sendOngoingChat(actor, effectName, "stat.loss",
+        `<strong>${actor.name}</strong> lost 1 Endurance rank: now <strong>${newRank} (${newValue})</strong>`
+      );
     }
   } else {
-    // Flat numeric loss (non-dying use case)
     const currentVal = actor.system?.abilities?.endurance?.value ?? 0;
     const loss = (typeof rawAmount === "number" ? rawAmount : 0) * cycles;
     const newVal = Math.max(0, currentVal - loss);
     await actor.update({ "system.abilities.endurance.value": newVal });
   }
 
-  // ── Update timer state ──
   const newStartedAt = startedAt + (cycles * cycleSeconds);
   await actor.setFlag(scope, `ongoing.${effectId}`, {
     ...config,
     startedAt: newStartedAt,
     lastTriggered: worldTime,
     triggerCount: (config.triggerCount || 0) + cycles,
-    turnsElapsed: (config.turnsElapsed || 0) + cycles,
   });
+}
+
+// ─── Dying: combat-round processor ────────────────────────────────────────────
+
+/**
+ * Process one round of dying for an actor.
+ * Called from the updateCombat hook on round change.
+ * Handles stabilization, Endurance rank loss, HP reduction,
+ * Impaired Endurance effect, Shift-0 warning, death, and re-FEAT.
+ *
+ * @param {Actor} actor
+ * @returns {string} "stepped" | "dead" | "stabilized" | "shift0-warning" | "none"
+ */
+export async function processDyingRound(actor) {
+  if (!actor) return "none";
+  const scope = SCOPE();
+
+  // Find the dying AE (by ongoingId or legacy isDying flag)
+  const dyingAE = actor.effects.find(e =>
+    e.flags?.[scope]?.ongoingId === "dying" ||
+    e.flags?.[scope]?.isDying ||
+    e.statuses?.has?.("dying")
+  );
+  if (!dyingAE) return "none";
+
+  // ── Dedup: prevent double-processing if both combat tracker and CTT fire ──
+  const lastProcessedWT = dyingAE.getFlag(scope, "lastProcessedWorldTime") || 0;
+  const currentWT = game.time?.worldTime ?? 0;
+  if (currentWT > 0 && currentWT === lastProcessedWT) {
+    console.log(`[FASERIP:DYING] Skipping duplicate processDyingRound for ${actor.name} (worldTime ${currentWT})`);
+    return "none";
+  }
+  await dyingAE.setFlag(scope, "lastProcessedWorldTime", currentWT);
+
+  console.log(`[FASERIP:DYING] Processing dying for ${actor.name}`, {
+    effectName: dyingAE.name,
+    effectId: dyingAE.id,
+  });
+
+  // ── Stabilization pause ──────────────────────────────────────────
+  const stabilizedRounds = dyingAE.getFlag(scope, "stabilizedRounds") || 0;
+  if (stabilizedRounds > 0) {
+    console.log(`[FASERIP:DYING] ${actor.name} is stabilized for ${stabilizedRounds} more round(s)`);
+    await dyingAE.setFlag(scope, "stabilizedRounds", stabilizedRounds - 1);
+    return "stabilized";
+  }
+
+  // ── Current endurance ────────────────────────────────────────────
+  const curName = game.msh?.getEnduranceRankName?.(actor) ?? actor.system?.abilities?.endurance?.rank;
+  const curValue = actor.system?.abilities?.endurance?.value ?? game.msh?.getRankValue?.(curName) ?? 0;
+
+  // ── Already at Shift-0: death ────────────────────────────────────
+  if (curName === "Shift-0") {
+    console.warn(`[FASERIP WARN] ${actor.name} has died (below Shift-0)`);
+
+    // Set isDead on linked actors only
+    if (!actor.isToken || actor.prototypeToken?.actorLink) {
+      await actor.update({ "system.details.isDead": true });
+    }
+
+    // Clean up dying AE and flags
+    await dyingAE.delete();
+    const ongoingConfig = actor.getFlag(scope, "ongoing.dying");
+    if (ongoingConfig) await actor.unsetFlag(scope, "ongoing.dying");
+
+    // Remove unconscious effects
+    const unconsciousEffects = actor.effects.filter(e =>
+      e.statuses?.has?.("unconscious") || /unconscious/i.test(e.name)
+    );
+    if (unconsciousEffects.length) {
+      await actor.deleteEmbeddedDocuments("ActiveEffect", unconsciousEffects.map(e => e.id));
+    }
+
+    // Apply dead overlay
+    await actor.toggleStatusEffect("dead", { active: true, overlay: true });
+
+    await sendOngoingChat(actor, "Dying", "stat.loss",
+      `<strong style="color:#b71c1c;">💀 ${actor.name} has died.</strong>`
+    );
+
+    return "dead";
+  }
+
+  // ── Step endurance down ──────────────────────────────────────────
+  const nextName = game.msh?.nextLowerRankName?.(curName) ?? "Shift-0";
+  const nextValue = game.msh?.getRankValue?.(nextName) ?? 0;
+  const enduranceLoss = curValue - nextValue;
+
+  // Reduce current HP by the difference
+  const currentHealth = actor.system?.attributes?.health?.value ?? 0;
+  const newHealth = Math.max(0, currentHealth - enduranceLoss);
+
+  // Store original endurance on first dying tick
+  let originalRank = dyingAE.getFlag(scope, "originalEndurance")
+    || actor.getFlag(scope, "originalEndurance");
+  if (!originalRank) {
+    originalRank = curName;
+    await actor.setFlag(scope, "originalEndurance", originalRank);
+    await dyingAE.setFlag(scope, "originalEndurance", originalRank);
+    console.log(`[FASERIP:DYING] Stored original Endurance for ${actor.name}: ${originalRank}`);
+  }
+
+  // Update actor stats
+  try {
+    await actor.update({
+      "system.abilities.endurance.rank": nextName,
+      "system.abilities.endurance.value": nextValue,
+      "system.attributes.health.value": newHealth,
+    });
+  } catch (err) {
+    console.error(`[FASERIP ERROR] Failed to update ${actor.name}'s Endurance:`, err);
+    return "none";
+  }
+
+  // ── Create / update Impaired Endurance effect ────────────────────
+  let impairedEffect = actor.effects.find(e => e.getFlag(scope, "isImpairedEndurance"));
+  if (!impairedEffect) {
+    const hasMedicalCare = actor.getFlag(scope, "medicalCare") ?? false;
+    const daysUntilHealing = hasMedicalCare ? 1 : 7;
+    await actor.createEmbeddedDocuments("ActiveEffect", [{
+      name: `Impaired Endurance (${nextName} of ${originalRank})`,
+      icon: "icons/svg/blood.svg",
+      origin: actor.uuid,
+      statuses: ["impaired-endurance"],
+      flags: {
+        [scope]: {
+          isImpairedEndurance: true,
+          originalEndurance: originalRank,
+          currentEndurance: nextName,
+          lastHealed: Date.now(),
+          medicalCare: hasMedicalCare,
+        },
+        core: { statusId: "impaired-endurance" },
+      },
+      duration: {
+        rounds: daysUntilHealing * 600 * 24,
+        startRound: game.combat?.round || 0,
+      },
+      changes: [{
+        key: "system.columnShift",
+        mode: CONST.ACTIVE_EFFECT_MODES.ADD,
+        value: "-2",
+      }],
+    }]);
+    console.log(`[FASERIP:DYING] Created Impaired Endurance effect for ${actor.name}`);
+  } else {
+    await impairedEffect.update({
+      name: `Impaired Endurance (${nextName} of ${originalRank})`,
+      [`flags.${scope}.currentEndurance`]: nextName,
+    });
+    console.log(`[FASERIP:DYING] Updated Impaired Endurance effect for ${actor.name}`);
+  }
+
+  // ── Update dying AE label ────────────────────────────────────────
+  const turnsElapsed = (dyingAE.getFlag(scope, "turnsElapsed") || 0) + 1;
+  try {
+    await dyingAE.update({
+      name: `Dying (${originalRank} → ${nextName}, ${turnsElapsed} rounds)`,
+      [`flags.${scope}.currentTempRank`]: nextName,
+      [`flags.${scope}.turnsElapsed`]: turnsElapsed,
+    });
+  } catch (err) {
+    console.error(`[FASERIP ERROR] Failed to update Dying effect label:`, err);
+  }
+
+  // ── Chat message ─────────────────────────────────────────────────
+  await sendOngoingChat(actor, "Dying", "stat.loss",
+    `<strong>${actor.name}</strong> is dying — Endurance: ${curName} → ${nextName}
+     <div style="margin-top:4px;font-size:.9em;color:#666;">Health: ${currentHealth} → ${newHealth} (−${enduranceLoss})</div>`
+  );
+
+  // ── Shift-0 warning ──────────────────────────────────────────────
+  if (nextName === "Shift-0") {
+    console.warn(`[FASERIP WARN] ${actor.name} has reached Shift-0 Endurance (will die next round if not stabilized)`);
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor }),
+      content: `<div style="background:#fff3e0;border:1px solid #ff9800;padding:8px;border-radius:3px;color:#e65100;">
+        <strong>⚠️ ${actor.name} has reached Shift-0 Endurance!</strong>
+        <div style="font-size:0.9em;margin-top:4px;">Will die next round unless stabilized.</div>
+      </div>`,
+    });
+    return "shift0-warning";
+  }
+
+  // ── Re-FEAT on slip (200 Karma flag) ─────────────────────────────
+  const reFeat = dyingAE.getFlag(scope, "reFeatOnSlip");
+  if (reFeat) {
+    console.log(`[FASERIP:DYING] ${actor.name} gets re-FEAT on slip`);
+    await dyingAE.setFlag(scope, "reFeatOnSlip", false);
+    game.msh?.openUniversalTableDialog?.(actor, { mode: "death-save" });
+  }
+
+  return "stepped";
 }
 
 async function executeEnduranceGain(actor, ae, effectId, config, rawAmount, cycles, worldTime, scope, cycleSeconds, startedAt, effectName) {
@@ -727,7 +817,6 @@ export async function registerOngoingEffect(target, effectId, config, aeOverride
   }
 
   // Create AE
-  const extraFlags = aeOverrides.extraFlags || {};
   const aeData = {
     name: aeOverrides.name || effectId,
     img: aeOverrides.img || "icons/svg/aura.svg",
@@ -738,7 +827,7 @@ export async function registerOngoingEffect(target, effectId, config, aeOverride
       [scope]: {
         effectType: "ongoing",
         ongoingId: effectId,
-        ...extraFlags,
+        ...(aeOverrides.extraFlags || {}),
       }
     },
     ...( aeOverrides.duration ? { duration: aeOverrides.duration } : {} ),
@@ -833,130 +922,122 @@ export async function applySolarRegenerationOngoing(target, { powerRank, powerIt
   });
 }
 
-/**
- * Register dying as an ongoing effect. Applies the immediate first rank loss
- * per rules ("Endurance is reduced by one rank"), then the engine handles
- * subsequent per-turn losses via executeEnduranceLoss.
- *
- * NOTE: Timing difference from legacy init.js updateCombat hook —
- *   Legacy: processed once per Foundry combat ROUND change.
- *   Ongoing engine: processes every 6s of worldTime (once per Foundry turn change).
- *   The ongoing engine behavior matches RAW ("one rank per turn").
- *   If this proves too aggressive, add a combat-round gate in executeEnduranceLoss.
- *
- * @param {Actor|Token} target
- * @param {Object} [opts]
- * @param {boolean} [opts.fromZeroHealth=true] - true = unconscious dying, false = conscious (Kill result)
- * @returns {ActiveEffect|null}
- */
-export async function applyDyingOngoing(target, opts = {}) {
+export async function applyDyingOngoing(target, { skipImmediateLoss = false } = {}) {
   const actor = target?.actor ?? target;
   if (!actor) return null;
+
   const scope = SCOPE();
-  const fromZeroHealth = opts.fromZeroHealth ?? true;
 
-  // ── Store original endurance (only first time) ──
-  const currentRank = actor.system?.abilities?.endurance?.rank || "Typical";
-  const currentValue = actor.system?.abilities?.endurance?.value
-    ?? game.msh?.getRankValue?.(currentRank) ?? 10;
-  const existingOriginal = actor.getFlag(scope, "originalEndurance");
-  if (!existingOriginal) {
-    await actor.setFlag(scope, "originalEndurance", currentRank);
-  }
-  const originalRank = existingOriginal || currentRank;
-
-  // ── Remove any existing legacy dying AEs (dedup) ──
-  const legacyDying = actor.effects.filter(e =>
-    e.getFlag(scope, "isDying") || (e.flags?.[scope]?.ongoingId === "dying")
+  // Prevent duplicate dying registrations
+  const existingDying = actor.effects.find(e =>
+    e.flags?.[scope]?.ongoingId === "dying" ||
+    (e.flags?.[scope]?.isDying && !e.disabled)
   );
-  if (legacyDying.length) {
-    try {
-      await actor.deleteEmbeddedDocuments("ActiveEffect", legacyDying.map(e => e.id));
-    } catch (_) {}
-    try {
-      await actor.unsetFlag(scope, "ongoing.dying");
-    } catch (_) {}
+  if (existingDying) {
+    console.log(`[FASERIP:DYING] ${actor.name} already has dying effect, skipping applyDyingOngoing`);
+    return existingDying;
   }
 
-  // ── Immediate first rank loss (per rules) ──
-  let nextRank = currentRank;
-  let nextValue = currentValue;
-  let enduranceLoss = 0;
-  let immediateHealthBefore = actor.system?.attributes?.health?.value ?? 0;
-  let immediateHealthAfter = immediateHealthBefore;
+  // Get current endurance info
+  const currentEndurance = game.msh?.getEnduranceRankName?.(actor)
+    ?? actor.system?.abilities?.endurance?.rank ?? "Unknown";
+  const currentEnduranceValue = actor.system?.abilities?.endurance?.value ?? 10;
 
-  if (currentRank !== "Shift-0" && currentRank !== "Shift0") {
-    nextRank = game.msh?.nextLowerRankName?.(currentRank) ?? "Shift-0";
-    nextValue = game.msh?.getRankValue?.(nextRank) ?? 0;
-    enduranceLoss = currentValue - nextValue;
-    immediateHealthAfter = Math.max(0, immediateHealthBefore - enduranceLoss);
-    const newMaxHealth = _recalcMaxHealth(actor, nextValue);
+  // Store original endurance on actor flags for recovery reference
+  const existingOriginal = actor.getFlag(scope, "originalEndurance");
+  const originalEndurance = existingOriginal || currentEndurance;
+  if (!existingOriginal) {
+    await actor.setFlag(scope, "originalEndurance", originalEndurance);
+  }
 
+  // ── Immediate first rank loss (per rules: dying = immediate Endurance reduction) ──
+  let firstLossRank = currentEndurance;
+
+  if (!skipImmediateLoss) {
+    const nextRank = game.msh?.nextLowerRankName?.(currentEndurance) ?? "Shift-0";
+    const nextValue = game.msh?.getRankValue?.(nextRank) ?? 0;
+    const enduranceLoss = currentEnduranceValue - nextValue;
+    const currentHealth = actor.system?.attributes?.health?.value ?? 0;
+    const newHealth = Math.max(0, currentHealth - enduranceLoss);
+
+    firstLossRank = nextRank;
+
+    // Apply immediate Endurance + Health loss
     try {
-      if (game.user.isGM || actor.isOwner) {
-        await actor.update({
-          "system.abilities.endurance.rank": nextRank,
-          "system.abilities.endurance.value": nextValue,
-          "system.attributes.health.value": immediateHealthAfter,
-          "system.attributes.health.max": newMaxHealth,
-        });
-      } else {
-        const { runAsGM } = await import("../../gm-utils.js");
-        await runAsGM({
-          operation: "update",
-          targetActorUuid: actor.uuid,
-          args: [{
-            "system.abilities.endurance.rank": nextRank,
-            "system.abilities.endurance.value": nextValue,
-            "system.attributes.health.value": immediateHealthAfter,
-            "system.attributes.health.max": newMaxHealth,
-          }]
-        });
-      }
-
-      // Create Impaired Endurance AE
-      await ensureImpairedEndurance(actor, nextRank, originalRank, scope);
-
-      // Chat message: immediate loss
-      await ChatMessage.create({
-        speaker: ChatMessage.getSpeaker({ actor }),
-        content: `<div style="background:#ffebee;border:1px solid #ef5350;padding:8px;border-radius:3px;">
-          <strong>${actor.name}</strong> begins dying — immediate Endurance loss: ${currentRank} → ${nextRank}
-          <div style="margin-top:4px;font-size:.9em;color:#666;">Health: ${immediateHealthBefore} → ${immediateHealthAfter} (−${enduranceLoss})</div>
-          <div style="margin-top:4px;font-size:.85em;color:#c62828;">Will continue to lose 1 Endurance rank per turn until stabilized.</div>
-          <div style="margin-top:4px;font-size:.85em;color:#ff9800;">Impaired: -2CS to all actions until Endurance restored.</div>
-        </div>`
+      await actor.update({
+        "system.abilities.endurance.rank": nextRank,
+        "system.abilities.endurance.value": nextValue,
+        "system.attributes.health.value": newHealth,
+        "system.attributes.health.max": _recalcMaxHealth(actor, nextValue),
       });
-
-      console.log(`[FASERIP:DYING] ${actor.name} IMMEDIATE loss: ${currentRank} (${currentValue}) → ${nextRank} (${nextValue}), Health ${immediateHealthBefore} → ${immediateHealthAfter}`);
     } catch (err) {
-      console.error(`[FASERIP ERROR] applyDyingOngoing: immediate rank loss failed for ${actor.name}:`, err);
+      console.error(`[FASERIP ERROR] Failed to apply immediate Endurance loss for ${actor.name}:`, err);
     }
+
+    // Create Impaired Endurance effect
+    const impairedEffect = actor.effects.find(e => e.getFlag(scope, "isImpairedEndurance"));
+    if (!impairedEffect) {
+      const hasMedicalCare = actor.getFlag(scope, "medicalCare") ?? false;
+      const daysUntilHealing = hasMedicalCare ? 1 : 7;
+      await actor.createEmbeddedDocuments("ActiveEffect", [{
+        name: `Impaired Endurance (${nextRank} of ${originalEndurance})`,
+        img: "icons/svg/blood.svg",
+        origin: actor.uuid,
+        statuses: ["impaired-endurance"],
+        flags: {
+          [scope]: {
+            isImpairedEndurance: true,
+            originalEndurance: originalEndurance,
+            currentEndurance: nextRank,
+            lastHealed: Date.now(),
+            medicalCare: hasMedicalCare,
+          },
+          core: { statusId: "impaired-endurance" },
+        },
+        duration: {
+          rounds: daysUntilHealing * 600 * 24,
+          startRound: game.combat?.round || 0,
+        },
+        changes: [{
+          key: "system.columnShift",
+          mode: CONST.ACTIVE_EFFECT_MODES.ADD,
+          value: "-2",
+        }],
+      }]);
+    }
+
+    // Chat message about immediate first loss
+    await sendOngoingChat(actor, "Dying", "stat.loss",
+      `<strong>${actor.name}</strong> begins dying — immediate Endurance loss: ${currentEndurance} → ${nextRank}
+       <div style="margin-top:4px;font-size:.9em;color:#666;">Health: ${currentHealth} → ${newHealth} (−${enduranceLoss})</div>
+       <div style="margin-top:4px;font-size:.85em;color:#c62828;">Will lose 1 Endurance rank per turn until stabilized.</div>
+       <div style="margin-top:4px;font-size:.85em;color:#ff9800;">Impaired: -2CS to all actions until Endurance restored.</div>`
+    );
+
+    console.log(`[FASERIP:DYING] ${actor.name} immediate Endurance loss: ${currentEndurance} (${currentEnduranceValue}) → ${nextRank} (${nextValue})`);
   }
 
-  // ── Register the ongoing effect ──
+  // Register ongoing effect (creates config + AE)
+  // No duration — dying AE persists until death, stabilization, or aid removes it.
   return registerOngoingEffect(actor, "dying", {
     type: "stat.loss",
     stat: "endurance",
     formula: "1rank",
     rate: 1,
-    cycle: "turn",
+    cycle: "round",
     count: -1,
     gate: "none",
     interruptOnDamage: false,
     capAtMax: false,
     autoDisable: false,
-    // Dying-specific state
-    originalEndurance: originalRank,
-    fromZeroHealth,
-    stabilizedRounds: 0,
-    reFeatOnSlip: false,
-    turnsElapsed: 1,  // Immediate first loss already processed
-    lastProcessedRound: game.combat?.round ?? 0,  // Gate: don't re-process this round
+    combatOnly: true,  // Processed by combatRound hook, not worldTime ticks
+    originalEndurance,
+    triggerCount: skipImmediateLoss ? 0 : 1,  // Track that first loss already happened
   }, {
-    name: `Dying (${originalRank} → ${nextRank})`,
+    name: `Dying (${originalEndurance}${!skipImmediateLoss ? ` → ${firstLossRank}, 1 round` : ''})`,
     img: "icons/svg/skull.svg",
     disabled: false,
+    statuses: ["dying"],
     changes: [
       { key: "system.combatMods.defenseShift", mode: AE_MODES.ADD, value: "-4", priority: 20 },
       { key: "system.combatMods.defenseShiftRanged", mode: AE_MODES.ADD, value: "-4", priority: 20 },
@@ -964,14 +1045,14 @@ export async function applyDyingOngoing(target, opts = {}) {
       { key: "system.combatMods.canAct", mode: AE_MODES.OVERRIDE, value: "false", priority: 50 },
       { key: "system.combatMods.canMove", mode: AE_MODES.OVERRIDE, value: "false", priority: 50 },
     ],
-    statuses: ["dying"],
-    // Backward compat: consumers check getFlag("isDying") || statuses.has("dying")
     extraFlags: {
       isDying: true,
-      zeroHealth: fromZeroHealth,
-      originalEndurance: originalRank,
-      turnsElapsed: 1,
+      stabilizedRounds: 0,
+      originalEndurance,
+      enduranceBase: currentEnduranceValue,
+      turnsElapsed: skipImmediateLoss ? 0 : 1,
     },
+    // No duration — lifecycle managed by processDyingRound, not time-based expiry
   });
 }
 

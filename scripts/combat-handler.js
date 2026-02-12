@@ -1,4 +1,8 @@
-// combat-handler.js
+// combat-handler.js v1.1.0 - 2026-02-11
+// v1.1.0: Remove legacy dying code from rollSecondaryFeat Kill handler and handleZeroHealth.
+//         Delegate all dying mechanics to ongoing-engine.applyDyingOngoing.
+//         Set _combatDamageInProgress flag to prevent init.js duplicate death saves.
+//         applyDyingEffect is now a thin wrapper to ongoing engine.
 import { 
     calculateChargeDamage, 
     calculateSlamDamage, 
@@ -284,6 +288,9 @@ export class CombatHandler {
 
     const update = { "system.attributes.health.value": newHealth };
 
+    // Prevent init.js updateActor hook from triggering a duplicate death save
+    if (game.msh) game.msh._combatDamageInProgress = true;
+
     try {
     if (isUnlinkedToken && (game.user.isGM || targetActor.isOwner)) {
         // Update the token’s own data if it’s an unlinked token
@@ -411,6 +418,9 @@ export class CombatHandler {
                 
             await this.handleZeroHealth(target, attacker, isLethalDamage);
         }
+
+        // Clear combat damage flag so init.js updateActor hook can process non-combat 0 HP
+        if (game.msh) game.msh._combatDamageInProgress = false;
 
         console.log("CombatHandler.processAttack completed");
     }
@@ -1622,87 +1632,21 @@ export class CombatHandler {
                     // =========================
                     if (featType === "Kill") {
                         if (featResultText === "End. Loss") {
-                            const currentEnduranceRank = targetActor.system.abilities.endurance.rank;
-                            
-                            // Get proper next lower rank
-                            const ranks = [
-                                "Shift-0", "Feeble", "Poor", "Typical", "Good", 
-                                "Excellent", "Remarkable", "Incredible", "Amazing", 
-                                "Monstrous", "Unearthly", "Shift X", "Shift Y", "Shift Z",
-                                "Class 1000", "Class 3000", "Class 5000", "Beyond"
-                            ];
-                            const currentIndex = ranks.indexOf(currentEnduranceRank);
-                            const newEnduranceRank = (currentIndex > 0) ? ranks[currentIndex - 1] : "Shift-0";
-                            
                             ui.notifications.error(`${target.name} loses an Endurance rank and is dying!`);
-                            await game.msh.runAsGM({
-                                operation: "update",
-                                targetActorUuid: target.uuid,
-                                args: [{"system.abilities.endurance.rank": newEnduranceRank}]
-                            });
-                            
-                            // Start dying timer using new system
-                            const scope = globalThis.MSH_FLAG_SCOPE || "msh-faserip";
-                            
-                            // Track original endurance
-                            const originalEndurance = target.getFlag(scope, "originalEndurance");
-                            if (!originalEndurance) {
-                                await target.setFlag(scope, "originalEndurance", currentEnduranceRank);
+
+                            // Delegate dying entirely to the ongoing engine
+                            // applyDyingOngoing handles: immediate first rank loss, HP reduction,
+                            // Impaired Endurance effect, dying AE, and chat messages
+                            try {
+                              if (game.msh?.ongoing?.applyDying) {
+                                await game.msh.ongoing.applyDying(targetActor);
+                              } else {
+                                const { applyDyingOngoing } = await import("./modules/effects/ongoing-engine.js");
+                                await applyDyingOngoing(targetActor);
+                              }
+                            } catch (err) {
+                              console.error("[FASERIP ERROR] Failed to start dying via ongoing engine:", err);
                             }
-                            
-                            // Create dying effect with 6 second duration
-                            const dyingEffect = {
-                                name: "Dying",
-                                icon: "icons/svg/skull.svg",
-                                duration: {
-                                    seconds: 6  // 1 turn
-                                },
-                                flags: {
-                                    [scope]: {
-                                        dyingTimer: true,
-                                        isDying: true,
-                                        unitLabel: "turn",
-                                        unitLabelPlural: "turns"
-                                    }
-                                },
-                                changes: [
-                                    {
-                                        key: "system.status.dying",
-                                        mode: CONST.ACTIVE_EFFECT_MODES.OVERRIDE,
-                                        value: true
-                                    }
-                                ],
-                                statuses: ["dying"]
-                            };
-                            
-                            await game.msh.runAsGM({
-                                operation: "createEmbeddedDocuments",
-                                targetActorUuid: target.uuid,
-                                args: ["ActiveEffect", [dyingEffect]]
-                            });
-                            
-                            // Create detailed dying status message
-                            await ChatMessage.create({
-                                content: `
-                                <div style="background-color: #8B0000; color: white; padding: 10px; border-radius: 5px; margin: 5px 0;">
-                                    <div style="font-size: 1.2em; font-weight: bold; text-align: center; margin-bottom: 8px;">
-                                        💀 DYING! 💀
-                                    </div>
-                                    <div style="padding: 5px; font-size: 0.9em;">
-                                        <div><strong>${target.name}</strong> suffers Endurance Loss!</div>
-                                        <div style="margin: 5px 0;"><strong>Mechanical Effects:</strong></div>
-                                        <div>• Endurance reduced: ${currentEnduranceRank} → ${newEnduranceRank}</div>
-                                        <div>• Will lose 1 Endurance rank per turn (6 seconds)</div>
-                                        <div>• Dies when Endurance drops below Shift-0</div>
-                                        <div style="margin-top: 8px;"><strong>How to Help:</strong></div>
-                                        <div>• Spend 50 Karma per round to stabilize</div>
-                                        <div>• Any aid/first aid halts Endurance loss</div>
-                                        <div>• Medicine talent may help at Shift-0</div>
-                                    </div>
-                                </div>
-                                `,
-                                speaker: ChatMessage.getSpeaker({ alias: "Death Save" })
-                            });
                             effectApplied = true;
                             
                         } else if (featResultText === "E/S") {
@@ -1714,84 +1658,19 @@ export class CombatHandler {
                                                 attackType.toLowerCase() === "sh";
                             
                             if (edgedOrShooting) {
-                                const currentEnduranceRank = targetActor.system.abilities.endurance.rank;
-                                
-                                // Get proper next lower rank
-                                const ranks = [
-                                    "Shift-0", "Feeble", "Poor", "Typical", "Good", 
-                                    "Excellent", "Remarkable", "Incredible", "Amazing", 
-                                    "Monstrous", "Unearthly", "Shift X", "Shift Y", "Shift Z",
-                                    "Class 1000", "Class 3000", "Class 5000", "Beyond"
-                                ];
-                                const currentIndex = ranks.indexOf(currentEnduranceRank);
-                                const newEnduranceRank = (currentIndex > 0) ? ranks[currentIndex - 1] : "Shift-0";
-                                
-                                ui.notifications.error(`${target.name} loses an Endurance rank and is dying!`);
-                                await game.msh.runAsGM({
-                                    operation: "update",
-                                    targetActorUuid: target.uuid,
-                                    args: [{"system.abilities.endurance.rank": newEnduranceRank}]
-                                });
-                                
-                                // Start dying timer
-                                const scope = globalThis.MSH_FLAG_SCOPE || "msh-faserip";
-                                
-                                const originalEndurance = target.getFlag(scope, "originalEndurance");
-                                if (!originalEndurance) {
-                                    await target.setFlag(scope, "originalEndurance", currentEnduranceRank);
+                                ui.notifications.error(`${target.name} loses an Endurance rank and is dying! (E/S result on Edged/Shooting)`);
+
+                                // Delegate dying entirely to the ongoing engine
+                                try {
+                                  if (game.msh?.ongoing?.applyDying) {
+                                    await game.msh.ongoing.applyDying(targetActor);
+                                  } else {
+                                    const { applyDyingOngoing } = await import("./modules/effects/ongoing-engine.js");
+                                    await applyDyingOngoing(targetActor);
+                                  }
+                                } catch (err) {
+                                  console.error("[FASERIP ERROR] Failed to start dying via ongoing engine (E/S):", err);
                                 }
-                                
-                                const dyingEffect = {
-                                    name: "Dying",
-                                    icon: "icons/svg/skull.svg",
-                                    duration: {
-                                        seconds: 6
-                                    },
-                                    flags: {
-                                        [scope]: {
-                                            dyingTimer: true,
-                                            isDying: true,
-                                            unitLabel: "turn",
-                                            unitLabelPlural: "turns"
-                                        }
-                                    },
-                                    changes: [
-                                        {
-                                            key: "system.status.dying",
-                                            mode: CONST.ACTIVE_EFFECT_MODES.OVERRIDE,
-                                            value: true
-                                        }
-                                    ],
-                                    statuses: ["dying"]
-                                };
-                                
-                                await game.msh.runAsGM({
-                                    operation: "createEmbeddedDocuments",
-                                    targetActorUuid: target.uuid,
-                                    args: ["ActiveEffect", [dyingEffect]]
-                                });
-                                
-                                await ChatMessage.create({
-                                    content: `
-                                    <div style="background-color: #8B0000; color: white; padding: 10px; border-radius: 5px; margin: 5px 0;">
-                                        <div style="font-size: 1.1em; font-weight: bold; text-align: center; margin-bottom: 5px;">
-                                            💀 E/S RESULT - ENDURANCE LOSS 💀
-                                        </div>
-                                        <div style="padding: 5px; font-size: 0.9em;">
-                                            <div><strong>${target.name}</strong> gets E/S result on Kill save</div>
-                                            <div style="margin: 5px 0;"><strong>Attack Type:</strong> ${attackType} (Edged/Shooting)</div>
-                                            <div style="margin: 5px 0;"><strong>Effect:</strong> Endurance Loss</div>
-                                            <div>• Endurance reduced: ${currentEnduranceRank} → ${newEnduranceRank}</div>
-                                            <div>• Character is now dying</div>
-                                            <div>• Will lose 1 Endurance rank per turn (6 seconds)</div>
-                                            <div style="margin-top: 8px;"><strong>How to Help:</strong></div>
-                                            <div>• Spend 50 Karma per round to stabilize</div>
-                                            <div>• Any aid/first aid halts Endurance loss</div>
-                                        </div>
-                                    </div>
-                                    `,
-                                    speaker: ChatMessage.getSpeaker({ alias: "Death Save" })
-                                });
                                 effectApplied = true;
                                 
                             } else {
@@ -2267,7 +2146,6 @@ export class CombatHandler {
         // Generate unconsciousness effect (1-10 rounds)
         const unconsciousDuration = Math.floor(Math.random() * 10) + 1;
         
-        // Define the unconsciousness effect with proper changes
         const effectData = {
             name: "Unconscious", 
             icon: "icons/svg/unconscious.svg",
@@ -2297,113 +2175,39 @@ export class CombatHandler {
             statuses: ["unconscious"]
         };
         
-        // Apply the effect
         await game.msh.runAsGM({
             operation: "createEmbeddedDocuments",
             targetActorUuid: target.uuid,
             args: ["ActiveEffect", [effectData]]
         });
         
-                
-        // ALL characters who reach 0 Health must make an Endurance FEAT vs Kill (pg 31)
-        let killCheckResult = "";
-            let chatContent = `
-            <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
-            <div style="padding: 5px 10px; font-size: 0.9em;">
-                <div>${target.name} is Unconscious for ${unconsciousDuration} rounds.</div>
-            </div>
-            </div>
-            `;
-
-            // Only roll Kill check if damage was from a potentially lethal source
-            if (isLethalDamage) {
-                const killCheckResult = await this.rollSecondaryFeat(target, "Kill", "Reaching 0 Health");
-                chatContent += `
-                <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
-                <div style="padding: 5px 10px; font-size: 0.9em;">
-                    <div><strong>Death Check:</strong> ${killCheckResult}</div>
-                </div>
-                </div>
-                `;
-                
-                // [Keep the existing logic for handling Kill check results]
-                if (killCheckResult.includes("End. Loss")) {
-                    // Character starts dying
-                    // [existing code]
-                }
-            } else {
-                // Non-lethal damage - just unconscious, no death possible
-                chatContent += `
-                <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
-                <div style="padding: 5px 10px; font-size: 0.9em;">
-                    <div>Non-lethal damage - unconscious but stable (no death check required).</div>
-                </div>
-                </div>
-                `;
-            }
-
-        chatContent += `
+        let chatContent = `
         <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
         <div style="padding: 5px 10px; font-size: 0.9em;">
-            <div><strong>Death Check:</strong> ${killCheckResult}</div>
+            <div>${target.name} is Unconscious for ${unconsciousDuration} rounds.</div>
         </div>
         </div>
         `;
 
-        // Check the result and determine what happens
-        if (killCheckResult.includes("End. Loss") && isLethalDamage) {
-        // Failed death save with lethal damage = start dying
-        ui.notifications.error(`${target.name} is dying!`);
-        
-        // Apply dying effect using our dedicated method
-        await this.applyDyingEffect(target);
-        
-        // Immediately lose the FIRST Endurance rank
-        const currentRank = targetActor.system.abilities.endurance.rank;
-        const ranks = Object.keys(CONFIG.FASERIP.rankValues);
-        const currentRankIndex = ranks.indexOf(currentRank);
-        
-        if (currentRankIndex > 0) {
-            const newRank = ranks[currentRankIndex - 1];
-            await game.msh.runAsGM({
-                operation: "update",
-                targetActorUuid: target.uuid,
-                args: [{"system.abilities.endurance.rank": newRank}]
-            });
-            
+        if (isLethalDamage) {
+            // Roll Endurance FEAT vs Kill column (pg 31)
+            // rollSecondaryFeat handles mechanical effects:
+            //   End. Loss → applyDyingOngoing (rank loss, Impaired, dying AE, chat)
+            //   No Effect → character wakes with Health = Endurance value
+            const killCheckResult = await this.rollSecondaryFeat(target, "Kill", "Reaching 0 Health");
             chatContent += `
             <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
             <div style="padding: 5px 10px; font-size: 0.9em;">
-                <div>${target.name} loses first Endurance rank: ${currentRank} → ${newRank}. Will lose another rank each turn!</div>
+                <div><strong>Death Check:</strong> ${killCheckResult}</div>
             </div>
             </div>
             `;
+            // No additional dying logic here — rollSecondaryFeat delegates to ongoing engine
         } else {
-            // Already at Shift-0, character dies immediately
             chatContent += `
             <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
             <div style="padding: 5px 10px; font-size: 0.9em;">
-                <div>${target.name} was already at Shift-0 Endurance and dies immediately!</div>
-            </div>
-            </div>
-            `;
-        }
-        } else if (killCheckResult.includes("End. Loss") && !isLethalDamage) {
-            // Failed death save but non-lethal damage = extended unconsciousness only
-            chatContent += `
-            <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
-            <div style="padding: 5px 10px; font-size: 0.9em;">
-                <div>Failed death save but non-lethal damage - extended unconsciousness only.</div>
-            </div>
-            </div>
-            `;
-            
-        } else {
-            // Passed the death save = just unconscious and stable
-            chatContent += `
-            <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
-            <div style="padding: 5px 10px; font-size: 0.9em;">
-                <div>Passed death save - unconscious but stable.</div>
+                <div>Non-lethal damage - unconscious but stable (no death check required).</div>
             </div>
             </div>
             `;
@@ -2416,55 +2220,17 @@ export class CombatHandler {
         });
     }
 
+    // Thin wrapper — all dying mechanics live in ongoing-engine.applyDyingOngoing
     static async applyDyingEffect(target) {
-        const scope = globalThis.MSH_FLAG_SCOPE || "msh-faserip";
-        
-        // Remove any existing dying effects
-        const existingDyingEffects = target.effects.filter(e => e.flags?.[scope]?.isDying);
-        if (existingDyingEffects.length > 0) {
-            await game.msh.runAsGM({
-                operation: "deleteEmbeddedDocuments",
-                targetActorUuid: target.uuid,
-                args: ["ActiveEffect", existingDyingEffects.map(e => e.id)]
-            });
+        try {
+            if (game.msh?.ongoing?.applyDying) {
+                return game.msh.ongoing.applyDying(target);
+            }
+            const { applyDyingOngoing } = await import("./modules/effects/ongoing-engine.js");
+            return applyDyingOngoing(target);
+        } catch (err) {
+            console.error("[FASERIP ERROR] applyDyingEffect delegation failed:", err);
         }
-
-        // Track original endurance for recovery calculation
-        const currentRank = targetActor.system.abilities.endurance.rank;
-        const originalEndurance = target.getFlag(scope, "originalEndurance");
-        if (!originalEndurance) {
-            await target.setFlag(scope, "originalEndurance", currentRank);
-        }
-
-        // Create dying effect that repeats every turn (6 seconds)
-        const dyingEffect = {
-            name: "Dying",
-            icon: "icons/svg/skull.svg",
-            duration: {
-                seconds: 6  // 1 turn = 6 seconds
-            },
-            flags: {
-                [scope]: {
-                    isDying: true,
-                    unitLabel: "turn",
-                    unitLabelPlural: "turns"
-                }
-            },
-            changes: [
-                {
-                    key: "system.status.dying",
-                    mode: CONST.ACTIVE_EFFECT_MODES.OVERRIDE,
-                    value: true
-                }
-            ],
-            statuses: ["dying"]
-        };
-
-        await game.msh.runAsGM({
-            operation: "createEmbeddedDocuments",
-            targetActorUuid: target.uuid,
-            args: ["ActiveEffect", [dyingEffect]]
-        });
     }
 
     /**
