@@ -1,0 +1,441 @@
+/* actor-sheet-enhanced.css
+ * Drop this after global.css and actor-sheet.css in system.json.
+ * Adds: Oswald/Barlow fonts, comics-print texture, Marvel logo treatment,
+ * gold accents, tighter spacing, and better narrow-flex layout.
+ */
+
+/* ── Fonts ─────────────────────────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;600;700&family=Barlow+Condensed:ital,wght@0,400;0,500;0,600;1,400&display=swap');
+
+/* ── CSS vars ───────────────────────────────────────────────────────────── */
+.faserip-sheet {
+  --mred:     #8b0000;
+  --mred-dk:  #660000;
+  --mred-lit: #a80000;
+  --gold:     #c8960c;
+  --gold-lit: #e2ab14;
+  --cream:    #f7f3eb;
+  --cream-dk: #ede8dc;
+  --txt:      #1a1a1a;
+  --txt-soft: #555;
+  --hdr-h:    32px;
+}
+
+/* ── Sheet background: warm cream + faint halftone dots ─────────────────── */
+form.faserip-sheet {
+  font-family: 'Barlow Condensed', Arial Narrow, sans-serif;
+  background-color: var(--cream);
+  background-image: radial-gradient(circle at 1px 1px, rgba(0,0,0,.05) 1px, transparent 0);
+  background-size: 5px 5px;
+  color: var(--txt);
+  gap: 4px;                         /* tighter than original 6px */
+}
+
+/* ── MARVEL logo block ──────────────────────────────────────────────────── */
+.msh-compact-header {
+  background: var(--cream);
+  border-color: var(--mred-dk);
+  padding: 5px 8px;
+  gap: 10px;
+}
+
+.msh-logo .msh-marvel {
+  font-family: 'Oswald', 'Arial Black', sans-serif;
+  font-weight: 900;
+  font-size: 28px;
+  line-height: 1;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  display: inline-block;
+  padding: 1px 7px 3px;
+  background: var(--mred);
+  color: #fff;
+  border-radius: 2px;
+}
+
+.msh-logo .msh-super {
+  font-family: 'Oswald', sans-serif;
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 3.5px;
+  color: var(--mred-dk);
+  text-transform: uppercase;
+  margin-top: 3px;
+}
+
+.msh-logo .msh-chartext {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--txt-soft);
+  letter-spacing: 0.3px;
+  line-height: 1.25;
+  margin-top: 2px;
+}
+
+/* ── Identity section: tighter ──────────────────────────────────────────── */
+.msh-identity {
+  padding: 6px 8px;
+  row-gap: 4px;
+  background: var(--cream);
+  border-color: var(--mred-dk);
+}
+
+.msh-identity .msh-row {
+  row-gap: 4px;
+  column-gap: 10px;
+}
+
+.msh-identity label {
+  font-family: 'Oswald', sans-serif;
+  font-weight: 600;
+  font-size: 10px;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--mred-dk);
+  margin-bottom: 1px;
+}
+
+/* ── Dark-red section headers: gradient instead of flat ─────────────────── */
+form.faserip-sheet .primary-abilities .abilities-table thead th,
+form.faserip-sheet .secondary-abilities .sec-head,
+form.faserip-sheet .secondary-abilities .sec-head,
+form.faserip-sheet .recovery-header,
+form.faserip-sheet .resistances-table th,
+.stunts-table thead,
+.stunts-table th {
+  background: linear-gradient(180deg, var(--mred-lit) 0%, var(--mred-dk) 100%) !important;
+  font-family: 'Oswald', sans-serif !important;
+  letter-spacing: 0.6px !important;
+  font-weight: 600 !important;
+}
+
+/* Shorter header rows */
+form.faserip-sheet .primary-abilities .abilities-table thead th,
+form.faserip-sheet .secondary-abilities .sec-head {
+  height: var(--hdr-h) !important;
+  min-height: var(--hdr-h) !important;
+  max-height: var(--hdr-h) !important;
+  font-size: 11px !important;
+  padding: 4px 6px !important;
+}
+
+/* Subtitle formula under header (F+A+S+E etc.) */
+form.faserip-sheet .secondary-abilities .sec-head small {
+  font-family: 'Barlow Condensed', sans-serif !important;
+  font-size: 8.5px;
+  color: rgba(255,220,120,.85);
+  letter-spacing: 0.5px;
+}
+
+/* ── Ability key cells: bold Oswald, warm background ───────────────────── */
+form.faserip-sheet .primary-abilities .abilities-table td.ability-key {
+  font-family: 'Oswald', sans-serif;
+  font-weight: 700;
+  font-size: 18px;
+  color: var(--mred);
+  background: var(--cream-dk);
+  border-right: 2px solid var(--mred-dk) !important;
+  cursor: pointer;
+  text-align: center;
+}
+
+form.faserip-sheet .primary-abilities .abilities-table td.ability-key:hover {
+  background: #ffe0c0;
+  color: #c00;
+}
+
+/* ── Abilities section: tighter overall ─────────────────────────────────── */
+form.faserip-sheet .abilities-section {
+  gap: 8px;
+  padding: 6px 8px;
+  background: var(--cream-dk);
+  border-color: var(--mred-dk);
+}
+
+/* Zebra rows in ability table */
+form.faserip-sheet .primary-abilities .abilities-table tbody tr:nth-child(even) td {
+  background-color: #f8f5ee;
+}
+form.faserip-sheet .primary-abilities .abilities-table tbody tr:nth-child(odd) td {
+  background-color: #fff;
+}
+/* Don't zebra the key cell — it has its own bg */
+form.faserip-sheet .primary-abilities .abilities-table tbody tr td.ability-key {
+  background: var(--cream-dk) !important;
+}
+
+/* Input/select styling: slightly warmer */
+form.faserip-sheet .primary-abilities .abilities-table input,
+form.faserip-sheet .primary-abilities .abilities-table select,
+form.faserip-sheet .secondary-abilities input[type="number"],
+form.faserip-sheet .secondary-abilities input[type="text"],
+form.faserip-sheet .secondary-abilities select {
+  background: #fffdf8 !important;
+  border-color: #ccc3a8 !important;
+}
+
+form.faserip-sheet .primary-abilities .abilities-table input:focus,
+form.faserip-sheet .primary-abilities .abilities-table select:focus,
+form.faserip-sheet .secondary-abilities input:focus,
+form.faserip-sheet .secondary-abilities select:focus {
+  outline: 2px solid var(--gold);
+  outline-offset: -1px;
+  border-color: var(--gold) !important;
+}
+
+/* ── Secondary grid: border-color match ─────────────────────────────────── */
+form.faserip-sheet .secondary-abilities .sec-col {
+  border-right-color: #ccc3a8;
+}
+form.faserip-sheet .secondary-abilities {
+  background: #fff;
+  border: 1px solid var(--mred-dk);
+}
+
+/* ── Movement panel: tighter + better wrapping ──────────────────────────── */
+form.faserip-sheet .movement-panel {
+  gap: 6px 10px;
+  padding: 6px 8px;
+  border-color: var(--mred-dk);
+  background: var(--cream);
+}
+
+form.faserip-sheet .movement-panel label {
+  font-family: 'Oswald', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--mred-dk);
+}
+
+form.faserip-sheet .movement-panel label.movement-label.clickable {
+  color: var(--mred-dk);
+  text-decoration-color: var(--gold);
+}
+form.faserip-sheet .movement-panel label.movement-label.clickable:hover {
+  color: var(--gold);
+}
+
+form.faserip-sheet .movement-panel .movement-chat-btn {
+  background: var(--mred);
+}
+form.faserip-sheet .movement-panel .movement-chat-btn:hover {
+  background: var(--mred-lit);
+}
+
+/* Better wrapping at narrow widths */
+@media (max-width: 580px) {
+  form.faserip-sheet .movement-panel {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 380px) {
+  form.faserip-sheet .movement-panel {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* ── Tab navigation: bolder, gold accent ────────────────────────────────── */
+form.faserip-sheet .sheet-tabs {
+  border-color: var(--mred-dk);
+  background: var(--cream);
+}
+
+form.faserip-sheet .sheet-tabs-navigation {
+  background: var(--cream-dk);
+  border-bottom-color: var(--mred-dk);
+}
+
+form.faserip-sheet .sheet-tabs-navigation .item {
+  background: var(--cream-dk);
+  border-color: var(--mred-dk);
+  color: var(--mred-dk);
+  transition: background 0.15s, color 0.15s;
+}
+
+form.faserip-sheet .sheet-tabs-navigation .item:hover {
+  background: #f0e0c0;
+  color: var(--mred);
+}
+
+form.faserip-sheet .sheet-tabs-navigation .item.active {
+  background: linear-gradient(180deg, var(--mred-lit) 0%, var(--mred-dk) 100%);
+  color: #fff;
+  border-bottom-color: var(--mred-dk);
+}
+
+form.faserip-sheet .sheet-tab-content {
+  padding: 6px 8px;
+  background: #fff;
+}
+
+/* ── Powers/talents/contacts tables ─────────────────────────────────────── */
+form.faserip-sheet .powers-table th,
+form.faserip-sheet .equipment-table th,
+form.faserip-sheet .headquarters-table th,
+form.faserip-sheet .vehicles-table th,
+form.faserip-sheet .stunts-table thead {
+  background: linear-gradient(180deg, var(--mred-lit) 0%, var(--mred-dk) 100%);
+  font-family: 'Oswald', sans-serif;
+  letter-spacing: 0.5px;
+  font-size: 11px;
+}
+
+/* ── Recovery section ───────────────────────────────────────────────────── */
+form.faserip-sheet .recovery-rest-section {
+  background: var(--cream);
+}
+
+form.faserip-sheet .recovery-btn {
+  font-family: 'Barlow Condensed', sans-serif;
+  background: var(--cream-dk);
+  border-color: #bbb3a0;
+}
+form.faserip-sheet .recovery-btn:hover {
+  background: #e8e0d0;
+  border-color: var(--gold);
+}
+
+form.faserip-sheet .recovery-btn.medical-toggle.active {
+  background: #d4edda;
+  border-color: #28a745;
+}
+
+/* ── Karma section ──────────────────────────────────────────────────────── */
+form.faserip-sheet .karma-section {
+  border: 1px solid var(--mred-dk);
+  border-radius: 3px;
+  background: var(--cream);
+  padding: 5px 8px;
+}
+
+/* ── Mini roll button: gold ──────────────────────────────────────────────── */
+.mini-roll {
+  border-color: var(--gold) !important;
+  color: var(--gold) !important;
+  background: rgba(200, 150, 12, .08) !important;
+}
+.mini-roll:hover {
+  background: rgba(200, 150, 12, .2) !important;
+  filter: none !important;
+}
+
+/* ── Lock toggle button ─────────────────────────────────────────────────── */
+.sheet-lock-toggle {
+  background: var(--cream-dk);
+  border-color: #bbb3a0;
+}
+.sheet-lock-toggle:hover {
+  border-color: var(--gold);
+}
+.sheet-lock-toggle.locked {
+  background: var(--mred);
+  border-color: var(--mred-dk);
+}
+
+/* ── Secondary sec-col narrow flex ─────────────────────────────────────── */
+/* Wrap the 4-col grid to 2x2 on very narrow windows */
+@media (max-width: 380px) {
+  form.faserip-sheet .secondary-abilities .sec-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* ── Action buttons: sharper and more distinct ──────────────────────────── */
+.action-buttons {
+  background-color: var(--mred-dk) !important;
+  border-color: var(--mred-dk) !important;
+}
+
+.action-btn {
+  font-family: 'Barlow Condensed', sans-serif;
+  background-color: var(--cream) !important;
+}
+.action-btn:hover {
+  background-color: #ffe8d0 !important;
+}
+
+.action-btn .action-abbr {
+  font-family: 'Oswald', sans-serif;
+  font-weight: 700;
+  font-size: 1.35em;
+}
+
+.action-btn .action-name {
+  font-size: 0.72em;
+  font-family: 'Barlow Condensed', sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+/* ── Scroll indicators: off-cream bg ────────────────────────────────────── */
+form.faserip-sheet .stunts-header,
+form.faserip-sheet .chargen-container {
+  background: var(--cream);
+}
+
+/* ── Section label text: use Oswald ─────────────────────────────────────── */
+.section-title,
+.effect-section .effect-header .section-title {
+  font-family: 'Oswald', sans-serif;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+}
+
+/* ── Highlighted/roll cells: gold instead of blue ───────────────────────── */
+.universal-rank-table .rank-cell.highlighted {
+  outline-color: var(--gold) !important;
+}
+
+@keyframes pulse-highlight {
+  0%, 100% { outline-color: var(--gold-lit); box-shadow: 0 0 15px rgba(200,150,12,.8); }
+  50%       { outline-color: var(--gold);    box-shadow: 0 0 22px rgba(200,150,12,1);  }
+}
+
+/* ── Buttons across the sheet: consistent treatment ─────────────────────── */
+form.faserip-sheet button[type="button"]:not(.sheet-lock-toggle):not(.recovery-btn):not(.action-btn):not(.mini-roll) {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 500;
+}
+
+form.faserip-sheet .add-power,
+form.faserip-sheet .add-talent,
+form.faserip-sheet .add-contact,
+form.faserip-sheet .add-equipment,
+form.faserip-sheet .add-headquarters,
+form.faserip-sheet .add-vehicle,
+form.faserip-sheet .add-stunt-general {
+  background: var(--mred);
+  color: #fff;
+  border-color: var(--mred-dk);
+  font-family: 'Oswald', sans-serif;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  font-size: 12px;
+}
+
+form.faserip-sheet .add-power:hover,
+form.faserip-sheet .add-talent:hover,
+form.faserip-sheet .add-contact:hover,
+form.faserip-sheet .add-equipment:hover,
+form.faserip-sheet .add-headquarters:hover,
+form.faserip-sheet .add-vehicle:hover,
+form.faserip-sheet .add-stunt-general:hover {
+  background: var(--mred-lit);
+  border-color: var(--mred);
+}
+
+/* ── Tab-style buttons (karma history, team tracker) ────────────────────── */
+form.faserip-sheet .tab-style-button {
+  font-family: 'Barlow Condensed', sans-serif;
+  background: var(--cream-dk);
+  border: 1px solid #bbb3a0;
+  color: var(--txt);
+}
+form.faserip-sheet .tab-style-button:hover {
+  background: #e8e0d0;
+  border-color: var(--gold);
+}

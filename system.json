@@ -47,6 +47,7 @@
     "styles": [
         "styles/global.css",
         "styles/actor-sheet.css",
+        "styles/actor-sheet-enhanced.css",
         "styles/item-sheet.css",
         "styles/karma-dialog.css",
         "styles/faserip-initiative.css",
