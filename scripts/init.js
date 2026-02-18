@@ -1420,6 +1420,23 @@ Hooks.once("init", async () => {
     applyDying: OngoingEngine?.applyDyingOngoing,
   };
 
+  // Defense effects API
+  let DefenseEffects = null;
+  try {
+    DefenseEffects = await import("./modules/effects/defense-effects.js");
+  } catch (e) {
+    console.error("[FASERIP ERROR] Failed to load defense-effects.js:", e);
+  }
+
+  game.msh.defense = {
+    sync: DefenseEffects?.syncDefenseEffects,
+    syncAll: DefenseEffects?.syncAllDefenseEffects,
+    getActive: DefenseEffects?.getActiveDefenseEffects,
+    getBodyArmor: DefenseEffects?.getBodyArmorFromEffects,
+    getForceField: DefenseEffects?.getForceFieldFromEffects,
+    getResistance: DefenseEffects?.getResistanceFromEffects,
+  };
+
   // Backward compat
   game.msh.applyRegeneration = Effects.applyRegeneration;
   game.msh.getAllTokenActors = Effects.getAllTokenActors;
@@ -1688,6 +1705,35 @@ Hooks.once("ready", async () => {
     } catch (e) {
       console.warn("[FASERIP WARN] Regeneration auto-sync failed:", e);
     }
+
+    // ── Defense power auto-sync ──────────────────────────────────
+    // Create missing defense AEs for actors with body armor, force field, or resistance powers
+    try {
+      const { syncAllDefenseEffects } = await import("./modules/effects/defense-effects.js");
+      let defenseSynced = 0;
+      const scope = globalThis.MSH_FLAG_SCOPE || "msh-faserip";
+
+      for (const actor of Effects.getAllTokenActors()) {
+        if (!actor?.items) continue;
+        const hasDefensePower = actor.items.some(i =>
+          i.type === "power" && (i.system?.isBodyArmor || i.system?.isForceField ||
+            (i.system?.isResistance && i.system?.resistanceType))
+        );
+        if (!hasDefensePower) continue;
+
+        // Check if defense AEs already exist
+        const hasDefenseAE = actor.effects.some(e =>
+          e.flags?.[scope]?.effectCategory === "defense"
+        );
+        if (hasDefenseAE) continue;
+
+        await syncAllDefenseEffects(actor);
+        defenseSynced++;
+      }
+      if (defenseSynced) console.log(`[FASERIP] Defense auto-sync: synced ${defenseSynced} actor(s)`);
+    } catch (e) {
+      console.warn("[FASERIP WARN] Defense auto-sync failed:", e);
+    }
   }
 
 });
@@ -1710,6 +1756,12 @@ Hooks.on("preDeleteActiveEffect", (effect, options, userId) => {
     console.log(`[FASERIP] Blocked auto-expiration of Regeneration AE on ${effect.parent?.name}`);
     return false;
   }
+
+  // Protect defense AEs (body armor, force field, resistance)
+  if (effect.flags?.[scope]?.effectCategory === "defense") {
+    console.log(`[FASERIP] Blocked auto-expiration of defense AE on ${effect.parent?.name}`);
+    return false;
+  }
 });
 
 // ── Regeneration: sync AEs with power items ──
@@ -1729,6 +1781,14 @@ async function syncPowerOngoingEffects(actor, item, removing = false) {
   } catch (e) {
     console.error("[FASERIP ERROR] Failed to load ongoing-engine.js for sync:", e);
     return;
+  }
+
+  // ── Defense effects sync (body armor, force field, resistance) ──
+  try {
+    const { syncDefenseEffects } = await import("./modules/effects/defense-effects.js");
+    await syncDefenseEffects(actor, item, removing);
+  } catch (e) {
+    console.error("[FASERIP ERROR] Failed to sync defense effects:", e);
   }
 
   const regenType = removing ? "" : (item.system?.regenerationType || "");
@@ -1802,7 +1862,22 @@ Hooks.on("updateItem", async (item, changes, options, userId) => {
   // Only re-sync if relevant fields changed
   const relevantChange = changes.system?.regenerationType !== undefined
     || changes.system?.regenerationRate !== undefined
-    || changes.system?.rank !== undefined;
+    || changes.system?.rank !== undefined
+    || changes.system?.value !== undefined
+    || changes.system?.isBodyArmor !== undefined
+    || changes.system?.isForceField !== undefined
+    || changes.system?.isResistance !== undefined
+    || changes.system?.bodyArmorType !== undefined
+    || changes.system?.armorNature !== undefined
+    || changes.system?.armorUseRankValue !== undefined
+    || changes.system?.armorPhysical !== undefined
+    || changes.system?.armorEnergy !== undefined
+    || changes.system?.resistanceType !== undefined
+    || changes.system?.resistanceEffect !== undefined
+    || changes.system?.resistanceIsInvulnerability !== undefined
+    || changes.system?.forceFieldType !== undefined
+    || changes.system?.forceFieldPersonal !== undefined
+    || changes.system?.forceFieldCoverage !== undefined;
   if (!relevantChange) return;
 
   await syncPowerOngoingEffects(actor, item);
