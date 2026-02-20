@@ -1,4 +1,5 @@
-// scripts/modules/actions/escaping-action.js v2.0.0 - 2025-12-27
+// scripts/modules/actions/escaping-action.js v2.1.0 - 2026-02-20
+// v2.1.0: Restyle chat card to match attack card pattern (inline badge, white result box, no color banner)
 // v2.0.0: Compact chat card format, CS notes, effect modifiers, Grapple Back chip on Reverse
 // v1.6.0: Add detailed logging for effect removal debugging
 // v1.5.0: Fix escape to only remove grappled on yellow/red (green is also Miss), fix karma default unchecked
@@ -283,60 +284,44 @@ export class EscapingAction extends AttackAction {
 
   _buildChatCard({ actor, choice, strength, effectiveRank, roll, totalKarmaUsed, cappedTotal, color, effect, bg, fg, actions, totalShift, shiftBreakdown, attackerEffects = [] }) {
     const effectLower = String(effect).toLowerCase();
-    
-    // Build CS hover breakdown
+
+    // CS shift display (hover tooltip style)
     let shiftDisplay = "";
     if (totalShift !== 0) {
       const parts = [];
-      
-      // Manual shift from dialog
       if (shiftBreakdown?.manual && shiftBreakdown.manual !== 0) {
-        if (shiftBreakdown.csNotes) {
-          parts.push(shiftBreakdown.csNotes);
-        } else {
-          parts.push(`${shiftBreakdown.manual > 0 ? '+' : ''}${shiftBreakdown.manual}`);
-        }
+        parts.push(shiftBreakdown.csNotes || `${shiftBreakdown.manual > 0 ? '+' : ''}${shiftBreakdown.manual}`);
       }
-      
-      // Attacker effects (escaping character's modifiers)
       for (const eff of attackerEffects) {
         parts.push(`${eff.shift > 0 ? '+' : ''}${eff.shift} ${eff.name}`);
       }
-      
       const breakdownText = parts.length > 0 ? parts.join(', ') : `${totalShift > 0 ? '+' : ''}${totalShift} total`;
       const csBox = `<span title="${breakdownText}" style="padding:0 3px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${totalShift > 0 ? '+' : ''}${totalShift}CS</span>`;
       shiftDisplay = ` (${csBox} → ${effectiveRank})`;
     }
 
-    // Build roll display with yellow hover box
+    // Roll display (yellow hover box)
     const rollBox = `<span title="d100 = ${roll.total}" style="padding:0 3px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${roll.total}</span>`;
-    const rollDisplay = totalKarmaUsed 
+    const rollDisplay = totalKarmaUsed
       ? `${cappedTotal} <span style="color:#666;">(${rollBox} + ${totalKarmaUsed} karma)</span>`
       : rollBox;
 
-    // Effect-specific blocks
+    // Effect-specific result boxes (white bg, subtle border — matches attack card)
     const effectBlocks = {
       miss: `
-        <div style="padding:6px 10px;margin:4px 10px 6px;background:#ffebee;border:1px solid #ef5350;border-radius:3px;font-size:.9em;">
-          <div style="font-weight:bold;color:#c62828;">Miss</div>
+        <div style="margin:0 10px 6px;padding:6px 8px;background:#fff;border:1px solid #ddd;border-radius:3px;font-size:.9em;">
+          <div style="font-weight:bold;color:#555;">Miss</div>
           <div>You remain held and may take no other actions this turn.</div>
         </div>`,
       escape: `
-        <div style="padding:6px 10px;margin:4px 10px 6px;background:#e3f2fd;border:1px solid #2196F3;border-radius:3px;font-size:.9em;">
-          <div style="font-weight:bold;color:#0d47a1;">Escape</div>
-          <div>You slip free of the hold.</div>
-          <div>You may move up to <strong>half speed</strong> this round.</div>
-          <div style="color:#666;font-style:italic;">No other actions permitted.</div>
+        <div style="margin:0 10px 6px;padding:6px 8px;background:#fff;border:1px solid #ddd;border-radius:3px;font-size:.9em;">
+          <div style="font-weight:bold;color:#555;">Escape</div>
+          <div>You slip free of the hold. Move up to <strong>half speed</strong> — no other actions.</div>
         </div>`,
       reverse: `
-        <div style="padding:6px 10px;margin:4px 10px 6px;background:#e8f5e9;border:1px solid #66bb6a;border-radius:3px;font-size:.9em;">
-          <div style="font-weight:bold;color:#2e7d32;">Reverse!</div>
-          <div>You break free and gain the advantage. Choose one:</div>
-          <ul style="margin:4px 0 0 18px;">
-            <li>Move up to <strong>half distance</strong></li>
-            <li>Attempt to <strong>Grapple</strong> your former attacker</li>
-            <li>Perform any other action at <strong>-2 CS</strong></li>
-          </ul>
+        <div style="margin:0 10px 6px;padding:6px 8px;background:#fff;border:1px solid #ddd;border-radius:3px;font-size:.9em;">
+          <div style="font-weight:bold;color:#555;">Reverse</div>
+          <div>You break free. Choose one: move up to half distance · attempt Grapple on former attacker · any other action at <strong>-2CS</strong>.</div>
         </div>`
     };
 
@@ -347,24 +332,21 @@ export class EscapingAction extends AttackAction {
           <strong style="color:#8b0000;">ESCAPE</strong>
           <span style="color:#666;font-size:.85em;">Strength FEAT</span>
         </div>
-        
         <!-- Escaper vs Holder -->
         <div style="padding:4px 10px;font-size:.95em;">
           <strong>${actor.name}</strong> <span style="color:#666;">escaping from</span> <strong style="color:#d32f2f;">${choice.opponentName}</strong>
-          ${choice.opponentStr ? `<span style="color:#666;font-size:.85em;margin-left:8px;">(STR: ${choice.opponentStr})</span>` : ''}
+          ${choice.opponentStr ? `<span style="color:#666;font-size:.85em;margin-left:8px;">(their STR: ${choice.opponentStr})</span>` : ''}
         </div>
-        
-        <!-- Ability + Roll + Result -->
+        <!-- Strength + Roll + inline result badge -->
         <div style="padding:2px 10px 6px;font-size:.9em;color:#555;">
           <div>Strength: ${strength.rank}${shiftDisplay}</div>
-          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:3px;">
             <span>Roll: ${rollDisplay}</span>
             <span style="padding:2px 8px;border-radius:3px;font-weight:bold;font-size:.9em;background:${bg};color:${fg};">
               ${String(color).toUpperCase()} — ${String(effect).toUpperCase()}
             </span>
           </div>
         </div>
-        
         ${effectBlocks[effectLower] || ""}
         ${actions}
       </div>

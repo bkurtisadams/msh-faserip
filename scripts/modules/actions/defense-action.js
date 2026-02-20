@@ -1,4 +1,5 @@
-// scripts/modules/actions/defense-action.js v1.3.8 - 2026-02-08
+// scripts/modules/actions/defense-action.js v1.4.1 - 2026-02-20
+// v1.4.1: Always use compact badge layout — drop buildInlineRollDisplay widget from defense cards
 // v1.3.8: Fix dodge movementMult and selfPenaltyCS not wired as AE changes (only in flags); ruler now enforces half speed
 // v1.3.7: Add canAttack:false to blocking effect; blocking now prevents attacks per rules
 // v1.3.6: Wire dodge CS penalty and half movement to Active Effect changes array
@@ -22,9 +23,7 @@ import {
   effectsFor,
   labelFor,
   rollWithKarmaAndHistory,
-  buildResultGrid,
   bannerColors,
-  buildInlineRollDisplay,
   showDiceAnimation
 } from "./action-utils.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
@@ -156,16 +155,13 @@ export class DefenseAction extends BaseAction {
     const { cappedTotal, totalKarmaUsed } =
       await rollWithKarmaAndHistory(actor, actionName, choice.karma, roll, { spendKarma: choice.spendKarma, rank: effectiveRank, inlineRoll: useConsolidated });
 
-    // Build inline roll display for consolidated mode
-    const inlineRollHtml = useConsolidated ? buildInlineRollDisplay(roll, totalKarmaUsed, cappedTotal) : "";
+    // Defense cards always use the compact badge layout (no inline dice widget)
 
     // Result & effect text
     const color = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
     const colorLower = String(color || "").toLowerCase();
     const effectResult = effects[colorLower] || color;
 
-    // Build grid & banner
-    const grid = buildResultGrid(actionType, colorLower, effects, (globalThis._getResultHoverText||this._getResultHoverText));
     const { bg, fg } = bannerColors(colorLower);
 
     // Compute special outcome blocks per action
@@ -177,34 +173,48 @@ export class DefenseAction extends BaseAction {
     // Action chips (light placeholders)
     const actionsHtml = this._actionsBox({ actionType, colorLower });
 
-    // Build roll info section - use inline display if consolidated, else plain text
-    const rollInfoSection = inlineRollHtml ? `
-      <div style="padding:5px 10px;font-size:.9em;">
-        <div>Ability: ${ability.name}</div>
-        <div>Base Rank: ${ability.rank} (${ability.value})${choice.shift ? ` — Shift ${choice.shift} → ${effectiveRank}` : ""}</div>
-        ${this._contextLine(actionType, choice)}
-      </div>
-      ${inlineRollHtml}
-    ` : `
-      <div style="padding:5px 10px;font-size:.9em;">
-        <div>Ability: ${ability.name}</div>
-        <div>Base Rank: ${ability.rank} (${ability.value})${choice.shift ? ` — Shift ${choice.shift} → ${effectiveRank}` : ""}</div>
-        ${this._contextLine(actionType, choice)}
-        <div>Roll: ${roll.total}${totalKarmaUsed ? ` + Karma: ${totalKarmaUsed}` : ""} = ${cappedTotal}</div>
-      </div>
-    `;
+    // Ability label for header context
+    const abilityLabel = { dodging: 'Agility', evading: 'Fighting', blocking: 'Strength', catching: 'Agility' }[actionType] || ability.name;
+    const featLabel = `${abilityLabel} FEAT`;
 
-    // Final card
+    // Shift display (hover tooltip style)
+    let shiftDisplay = "";
+    if (choice.shift) {
+      const csBox = `<span title="${choice.shift > 0 ? '+' : ''}${choice.shift}CS" style="padding:0 3px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${choice.shift > 0 ? '+' : ''}${choice.shift}CS</span>`;
+      shiftDisplay = ` (${csBox} → ${effectiveRank})`;
+    }
+
+    // Roll display (yellow hover box)
+    const rollBox = `<span title="d100 = ${roll.total}" style="padding:0 3px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${roll.total}</span>`;
+    const rollDisplay = totalKarmaUsed
+      ? `${cappedTotal} <span style="color:#666;">(${rollBox} + ${totalKarmaUsed} karma)</span>`
+      : rollBox;
+
+    // Context line (evasion target, catching scenario)
+    const contextLine = this._contextLine(actionType, choice);
+
+    // Final card — matches attack/check card pattern
     const cardHtml = `
       <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
-        <div style="padding:5px 10px;border-bottom:1px solid #c0c0c0;font-size:1.1em;color:#0d47a1;">
-          <strong>${actor.name} - ${actionName}</strong>
+        <!-- Header: Action + FEAT type -->
+        <div style="padding:6px 10px;border-bottom:1px solid #c0c0c0;display:flex;justify-content:space-between;align-items:center;">
+          <strong style="color:#8b0000;">${actionName.toUpperCase()}</strong>
+          <span style="color:#666;font-size:.85em;">${featLabel}</span>
         </div>
-        ${rollInfoSection}
-        ${grid}
-        <div style="text-align:center;padding:8px;margin:5px;font-weight:bold;font-size:1.1em;border-radius:3px;background:${bg};color:${fg};">
-          RESULT: ${String(color).toUpperCase()} — ${String(effectResult).toUpperCase()}
+        <!-- Actor row -->
+        <div style="padding:4px 10px;font-size:.95em;"><strong>${actor.name}</strong></div>
+        <!-- Ability + Roll + inline result badge -->
+        <div style="padding:2px 10px 6px;font-size:.9em;color:#555;">
+          <div>${abilityLabel}: ${ability.rank} (${ability.value})${shiftDisplay}</div>
+          ${contextLine ? `<div style="color:#666;">${contextLine}</div>` : ''}
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:3px;">
+            <span>Roll: ${rollDisplay}</span>
+            <span style="padding:2px 8px;border-radius:3px;font-weight:bold;font-size:.9em;background:${bg};color:${fg};">
+              ${String(color).toUpperCase()} — ${String(effectResult).toUpperCase()}
+            </span>
+          </div>
         </div>
+        <!-- Outcome detail box -->
         ${specialHtml}
         ${actionsHtml}
       </div>
@@ -344,9 +354,11 @@ export class DefenseAction extends BaseAction {
         await this._setTempFlag("blocking", { armorRank, armorValue });
 
         return `
-          <div style="padding:6px 10px;margin:6px 10px;background:#e8f5e9;border:1px solid #4CAF50;border-radius:3px;text-align:center;">
-            <strong>Body Armor Granted: ${armorRank} (${armorValue})</strong>
-            <div style="font-size:.85em;color:#2e7d32;">Applies vs physical (not Shooting/Energy; not Charging). Use manually for next incoming attack.</div>
+          <div style="margin:0 10px 6px;padding:6px 8px;background:#fff;border:1px solid #ddd;border-radius:3px;font-size:.88em;">
+            <div style="font-weight:700;color:#e65100;margin-bottom:2px;">BODY ARMOR: ${armorRank} (${armorValue})</div>
+            <div style="color:#555;">${ability.rank} Strength −${Math.abs(blockShift > 0 ? 0 : blockShift)}CS = ${armorRank} Body Armor.</div>
+            <div style="color:#555;margin-top:2px;">Applies vs physical attacks (Grappling, Slugfest, Throwing, Force, Wrestling). Not vs Shooting, Energy, or Charging. Normal Armor also applies; Force Fields do not stack.</div>
+            <div style="color:#c62828;margin-top:3px;">No other action this round.</div>
           </div>
         `;
       }
@@ -365,9 +377,10 @@ export class DefenseAction extends BaseAction {
       });
 
       return `
-        <div style="padding:6px 10px;margin:6px 10px;background:#e3f2fd;border:1px solid #1976d2;border-radius:3px;">
-          <div><strong>Dodging Effect:</strong> Attacker suffers ${penalty ? `${penalty} CS` : "no"} penalty on attacks you’re aware of this phase.</div>
-          <div style="font-size:.85em;color:#0d47a1;">Your own FEATs this turn: -2CS. Half move; no Charge; only one other action.</div>
+        <div style="margin:0 10px 6px;padding:6px 8px;background:#fff;border:1px solid #ddd;border-radius:3px;font-size:.88em;">
+          <div style="font-weight:700;color:#2e7d32;margin-bottom:2px;">${penalty ? `${penalty}CS PENALTY TO ATTACKERS` : 'NO PENALTY (WHITE)'}</div>
+          <div style="color:#555;">Applies to attacks you're aware of this phase. Half move only; no Charge; only one other action.</div>
+          <div style="color:#888;margin-top:3px;">Your own FEATs this round: -2CS. No effect vs adjacent Slugfest/Wrestling.</div>
         </div>
       `;
     }
@@ -398,9 +411,11 @@ export class DefenseAction extends BaseAction {
       });
 
       return `
-        <div style="padding:6px 10px;margin:6px 10px;background:#fffde7;border:1px solid #fbc02d;border-radius:3px;">
-          <div><strong>Evasion Result:</strong> ${note}</div>
-          ${nextRoundBonus ? `<div style="font-size:.85em;color:#f57f17;">Remember: next round, first attack vs ${choice.evadeTarget || "that attacker"}: +${nextRoundBonus}CS.</div>` : ""}
+        <div style="margin:0 10px 6px;padding:6px 8px;background:#fff;border:1px solid #ddd;border-radius:3px;font-size:.88em;">
+          <div style="font-weight:700;color:${colorLower === 'white' ? '#c62828' : '#2e7d32'};margin-bottom:2px;">${colorLower === 'white' ? 'AUTO-HIT' : 'EVASION' + (nextRoundBonus ? ' +' + nextRoundBonus + 'CS' : '')}</div>
+          <div style="color:#555;">${note}</div>
+          ${nextRoundBonus ? `<div style="color:#1565c0;font-weight:600;margin-top:3px;">Next round: first attack vs ${choice.evadeTarget || "that attacker"}: +${nextRoundBonus}CS (cannot save).</div>` : ""}
+          ${colorLower !== 'white' ? '<div style="color:#c62828;margin-top:3px;">No attacks this round.</div>' : ""}
         </div>
       `;
     }
@@ -428,9 +443,10 @@ export class DefenseAction extends BaseAction {
 
       return `
         ${prereqHtml}
-        <div style="padding:6px 10px;margin:6px 10px;background:#f1f8e9;border:1px solid #7cb342;border-radius:3px;">
-          <div><strong>Catching Result:</strong> ${hint}</div>
-          ${choice.catchVsYou ? `<div style="font-size:.85em;color:#558b2f;">This catch was vs you: apply an additional -3CS to the catching attempt.</div>` : ""}
+        <div style="margin:0 10px 6px;padding:6px 8px;background:#fff;border:1px solid #ddd;border-radius:3px;font-size:.88em;">
+          <div style="font-weight:700;color:#2e7d32;margin-bottom:2px;">${colorLower === 'red' ? 'CLEAN CATCH' : colorLower === 'yellow' ? 'DAMAGE' : colorLower === 'green' ? 'MISS' : 'AUTO-HIT'}</div>
+          <div style="color:#555;">${hint}</div>
+          ${choice.catchVsYou ? '<div style="color:#888;margin-top:3px;">Directed at you: -3CS was applied to this roll.</div>' : ""}
         </div>
       `;
     }
@@ -717,25 +733,16 @@ export class DefenseAction extends BaseAction {
   }
 
     _actionsBox({ actionType, colorLower }) {
-    const chip = (label, title, enabled) => {
-      const base = "display:inline-block;font-size:12px;line-height:1.1;padding:2px 6px;border:1px solid #bbb;border-radius:3px;text-decoration:none;white-space:nowrap;";
-      const style = enabled
-        ? `${base}background:#fff;color:#333;cursor:pointer;`
-        : `${base}background:#f7f7f7;color:#333;cursor:not-allowed;opacity:.55;filter:grayscale(.3);`;
-      const key = label.toLowerCase().replace(/\s+/g,'-');
-      return `<a class="faserip-chip" data-action="${key}" ${enabled? "" : 'aria-disabled="true"'} title="${title}" style="${style}">${label}</a>`;
+    const labels = {
+      dodging:  "Dodging effect applied to token",
+      evading:  colorLower === "white" ? "Evasion failed \u2014 Auto-Hit" : "Evading + Evasion Bonus effects applied to token",
+      blocking: "Blocking effect applied to token",
+      catching: "Catching result noted"
     };
-    
-    // Enable “Use Armor” only when blocking result wasn’t White
-    const useArmor = (actionType === "blocking" && colorLower !== "white");
-
+    const label = labels[actionType] || "Effect applied to token";
     return `
-      <div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;padding:8px 10px;margin:6px 10px 10px;border:1px solid #c0c0c0;background:#fafafa;border-radius:4px;">
-        <div style="font-size:0.85em;color:#2e7d32;font-weight:bold;width:100%;text-align:center;margin-bottom:4px;">
-          ✓ Effect Applied to Token
-        </div>
-        ${chip("Reapply Effect","Manually reapply this defense effect if needed", true)}
-        ${useArmor ? chip("Use Armor","Apply temporary Body Armor vs next attack", true) : ""}
+      <div style="padding:4px 8px;margin:0 10px 6px;background:#e8f5e9;border:1px solid #4CAF50;border-radius:3px;font-size:.8em;font-weight:700;color:#2e7d32;text-align:center;">
+        \u2713 ${label}
       </div>
     `;
   }

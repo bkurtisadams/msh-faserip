@@ -1,4 +1,5 @@
-// scripts/modules/actions/grabbing-action.js v1.4.0 - 2026-02-01
+// scripts/modules/actions/grabbing-action.js v1.5.0 - 2026-02-20
+// v1.5.0: Restyle chat card to match attack card pattern (flex header, inline badge, no buildResultGrid/banner)
 // v1.4.0: Add support for weapon-based grabbing (whips with Gb damage type use material strength)
 // v1.3.0: Fix karma checkbox to always default unchecked (not persisted)
 // v1.2.0: Fix DiceSoNice animation in consolidated chat cards mode
@@ -11,10 +12,8 @@ import {
   rollWithKarmaAndHistory,
   effectsFor,
   labelFor,
-  buildResultGrid,
   buildActionsBox,
   bannerColors,
-  getTargetingContext,
   buildInlineRollDisplay,
   showDiceAnimation
 } from "./action-utils.js";
@@ -114,74 +113,67 @@ export class GrabbingAction extends AttackAction {
         takeDowngraded = true;
     }
 
-    // Adjust legend and build grid so it always matches the matchup (not the roll)
-    const legendEffects = mustDowngradeGreen ? { ...effects, green: "Miss" } : effects;
-    const grid = buildResultGrid(actionType, colorLower, legendEffects);
-
-    // Optional: explain why the legend shows Green → Miss
-    const noteHtml = takeDowngraded
-    ? `<div style="font-size:.85em;color:#666;margin-top:4px;">
-        Note: Green downgraded to <strong>Miss</strong> (Attacker STR &lt; comparator).
-        </div>`
-    : "";
-
     const { bg, fg } = bannerColors(colorLower);
-    // Targeting context line (consistent with BluntAttackAction)
-    const targetingContext = getTargetingContext(actor, actionName);
 
-    // Build the small details section
+    // Shift display (hover tooltip style)
+    let shiftDisplay = "";
+    if (choice.shift) {
+      const csBox = `<span title="${choice.shift > 0 ? '+' : ''}${choice.shift}CS" style="padding:0 3px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${choice.shift > 0 ? '+' : ''}${choice.shift}CS</span>`;
+      shiftDisplay = ` (${csBox} → ${effectiveRank})`;
+    }
+
+    // Roll display (yellow hover box)
+    const rollBox = `<span title="d100 = ${roll.total}" style="padding:0 3px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${roll.total}</span>`;
+    const rollDisplay = totalKarmaUsed
+      ? `${cappedTotal} <span style="color:#666;">(${rollBox} + ${totalKarmaUsed} karma)</span>`
+      : rollBox;
+
     const compNote = this._composeComparatorLine(choice);
-    const detailsHtml = inlineRollHtml ? `
-    <div>Attacker STR: ${strength.rank} (${strength.value})${choice.shift ? ` — Shift ${choice.shift} → ${effectiveRank}` : ""}</div>
-    ${choice.targetStrength ? `<div>Target STR: ${choice.targetStrength}</div>` : ``}
-    ${choice.itemMaterial ? `<div>Item Material: ${choice.itemMaterial}</div>` : ``}
-    ${compNote ? `<div style="font-size:.85em;color:#666;">Comparator for "Take": ${compNote}</div>` : ``}
-    ` : `
-    <div>Attacker STR: ${strength.rank} (${strength.value})${choice.shift ? ` — Shift ${choice.shift} → ${effectiveRank}` : ""}</div>
-    ${choice.targetStrength ? `<div>Target STR: ${choice.targetStrength}</div>` : ``}
-    ${choice.itemMaterial ? `<div>Item Material: ${choice.itemMaterial}</div>` : ``}
-    ${compNote ? `<div style="font-size:.85em;color:#666;">Comparator for "Take": ${compNote}</div>` : ``}
-    <div>Roll: ${roll.total}${totalKarmaUsed ? ` + Karma: ${totalKarmaUsed}` : ""} = ${cappedTotal}</div>
-    `;
+    const takeNote = takeDowngraded
+      ? `<div style="font-size:.85em;color:#666;margin-top:2px;">Green downgraded to <strong>Miss</strong> (Attacker STR &lt; comparator).</div>`
+      : "";
 
     // For RED (Break), show a "Grabbing Break Check" button
     const grabbingBreak = (String(effectResult).toLowerCase() === "break")
-    ? { 
-        itemMaterial: choice.itemMaterial || "Excellent",
-        itemName: choice.itemLabel || "Item"
-        }
-    : null;
+      ? { itemMaterial: choice.itemMaterial || "Excellent", itemName: choice.itemLabel || "Item" }
+      : null;
 
     const actions = buildActionsBox({
-    grabbingBreak,  // ← NEW: use grabbing break instead of breaking feat
-    actorUuid: actor.uuid,
-    autoApply: !!this.opts?.autoApply,
-
+      grabbingBreak,
+      actorUuid: actor.uuid,
+      autoApply: !!this.opts?.autoApply,
     });
-    // Effect blocks for the four results (text-only; no auto-ops)
+
     const effectBlock = this._effectBlock(String(effectResult).toLowerCase(), strength, choice);
 
-    // Final chat card
+    // Final card — matches attack card pattern
     const cardHtml = `
       <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
-        <div style="padding:5px 10px;border-bottom:1px solid #c0c0c0;font-size:1.1em;color:#8b0000;">
-          <strong>${actor.name} — ${actionName}</strong>
+        <!-- Header: Action + FEAT type -->
+        <div style="padding:6px 10px;border-bottom:1px solid #c0c0c0;display:flex;justify-content:space-between;align-items:center;">
+          <strong style="color:#8b0000;">${actionName.toUpperCase()}</strong>
+          <span style="color:#666;font-size:.85em;">Strength FEAT</span>
         </div>
-        <div style="padding:5px 10px;border-bottom:1px solid #e0e0e0;font-size:.9em;">
-          ${targetingContext}
-          <div>Item: ${choice.itemLabel}</div>
-        <!--  <div>Target: ${choice.targetName}</div>  -->
+        <!-- Actor → Target + item -->
+        <div style="padding:4px 10px;font-size:.95em;">
+          <strong>${actor.name}</strong>${choice.targetName ? ` <span style="color:#666;">→</span> <strong style="color:#d32f2f;">${choice.targetName}</strong>` : ''}
+          <span style="color:#666;font-size:.85em;margin-left:6px;">· ${choice.itemLabel}</span>
         </div>
-        <div style="padding:5px 10px;font-size:.9em;">
-          ${detailsHtml}
+        <!-- Strength + Roll + inline result badge -->
+        <div style="padding:2px 10px 6px;font-size:.9em;color:#555;">
+          <div>Strength: ${strength.rank}${shiftDisplay}${choice.targetStrength ? ` <span style="color:#666;font-size:.9em;">(vs ${choice.targetStrength})</span>` : ''}</div>
+          ${compNote ? `<div style="font-size:.85em;color:#666;">Take comparator: ${compNote}</div>` : ''}
+          ${choice.itemMaterial ? `<div style="font-size:.85em;color:#666;">Item material: ${choice.itemMaterial}</div>` : ''}
+          ${inlineRollHtml ? '' : `
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:3px;">
+            <span>Roll: ${rollDisplay}</span>
+            <span style="padding:2px 8px;border-radius:3px;font-weight:bold;font-size:.9em;background:${bg};color:${fg};">
+              ${String(color).toUpperCase()} — ${String(effectResult).toUpperCase()}
+            </span>
+          </div>`}
+          ${takeNote}
         </div>
         ${inlineRollHtml}
-        ${grid}
-        ${noteHtml}
-        
-        <div style="text-align:center;padding:8px;margin:5px;font-weight:bold;font-size:1.05em;border-radius:3px;background:${bg};color:${fg};">
-          RESULT: ${String(color).toUpperCase()} — ${String(effectResult).toUpperCase()}
-        </div>
         ${effectBlock}
         ${actions}
       </div>

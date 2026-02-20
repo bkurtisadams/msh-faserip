@@ -1,4 +1,6 @@
-// scripts/modules/actions/ranged-attack-action.js
+// scripts/modules/actions/ranged-attack-action.js v1.1.0 - 2026-02-20
+// v1.1.0: Fix weapon range penalty — RAW is -1CS per area traveled (was incorrectly -1CS per area beyond first)
+//         Thrown items have max range only, no per-area penalty within range
 import { AttackAction } from "./attack-action.js";
 import { RANKS, getAbilityInfo } from "./action-utils.js";
 
@@ -29,27 +31,23 @@ export class RangedAttackAction extends AttackAction {
         note = `Within power range (${powerRange} areas) - no penalty`;
       }
     } else if (strengthRank) {
-      // Thrown items: -1CS per area beyond the FIRST (not per area traveled)
+      // Thrown items: max range only per rules — no per-area penalty within range
       const throwRange = this._getThrowingRangeInAreas(strengthRank);
       if (rangeInAreas > throwRange) {
         note = `Beyond max throwing range (${throwRange} areas) - cannot hit`;
-        modifier = -999; // Indicates impossible shot
+        modifier = -999;
       } else {
-        modifier = -(rangeInAreas - 1); // -1CS per area beyond the first
-        note = rangeInAreas === 1 
-          ? `At 1 area: no range penalty`
-          : `Throwing ${rangeInAreas} areas: ${modifier}CS (${rangeInAreas - 1} areas beyond first)`;
+        modifier = 0;
+        note = `Throwing ${rangeInAreas} area${rangeInAreas !== 1 ? 's' : ''} (max ${throwRange}): no penalty`;
       }
     } else if (weaponMaxRange !== null) {
-      // Weapons (shooting): -1CS per area beyond the FIRST (not per area traveled)
+      // Weapons (shooting): -1CS per area traveled (RAW: "for each area traveled, reduce by -1CS")
       if (rangeInAreas > weaponMaxRange) {
         note = `Beyond max weapon range (${weaponMaxRange} areas) - cannot hit`;
         modifier = -999;
       } else {
-        modifier = -(rangeInAreas - 1); // -1CS per area beyond the first
-        note = rangeInAreas === 1
-          ? `At 1 area: no range penalty`
-          : `Range ${rangeInAreas} areas: ${modifier}CS (${rangeInAreas - 1} areas beyond first)`;
+        modifier = -rangeInAreas; // -1CS per area traveled, starting at area 1
+        note = `Range ${rangeInAreas} areas: ${modifier}CS`;
       }
     }
 

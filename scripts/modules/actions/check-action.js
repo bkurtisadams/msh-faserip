@@ -1,4 +1,5 @@
-// scripts/modules/actions/check-action.js v1.6.2 - 2026-02-19
+// scripts/modules/actions/check-action.js v1.7.0 - 2026-02-20
+// v1.7.0: Consolidate slam dual-card — _createSlamChatMessage replaced by _slamDetailHtml folded into check card result box
 // v1.6.2: Read Endurance rank from actor directly (actor IS the defender) - prefill.targetEndRank was stale/missing
 // v1.6.1: Fix check card showing literal 'Target' — actor IS the defender, drop targetName from card header
 // v1.6.0: Restyle stun/slam/kill check cards to match attack card style (gray card, inline roll badge, white result box)
@@ -266,6 +267,7 @@ export class CheckAction extends BaseAction {
       }
 
       // SLAM - CORRECTED LOGIC (White = worst, Red = best for defender)
+      let slamDetails = null;
       if (actionType === "slam" && !effectsSuppressed) {
         const attackerStrength = prefill.attackerStrength || 30;
         const attackerStrengthRank = prefill.attackerStrengthRank || "Remarkable";
@@ -291,20 +293,20 @@ export class CheckAction extends BaseAction {
             slamEffect = "No Slam";
             break;
         }
+
+        // Capture for folding into the check card result box
+        slamDetails = {
+          targetName,
+          targetUuid: defenderUuid,
+          slamEffect,
+          knockbackDistance,
+          attackerStrength,
+          attackerStrengthRank,
+          attackerName,
+          colorLower
+        };
         
-        // Create detailed chat message based on effect (skip if in consolidated mode)
-        if (!skipChatMessage) {
-          await this._createSlamChatMessage({
-            targetName,
-            targetUuid: defenderUuid,
-            slamEffect,
-            knockbackDistance,
-            attackerStrength,
-            attackerStrengthRank,
-            attackerName,
-            colorLower
-          });
-        }
+        // _createSlamChatMessage is now a no-op; details fold into _buildCheckCard via slamDetails
         
         // Create the Active Effect
         if (slamEffect !== "No Slam") {
@@ -442,7 +444,7 @@ export class CheckAction extends BaseAction {
         : (mapping[colorLower] || color);
       const extraHtml  = this._extraExplanationHtml({
         actionType, targetAbility, colorLower, finalEffect: effectText, effectsSuppressed,
-        stunDuration
+        stunDuration, slamDetails
       });
 
       // Build shift display text
@@ -730,7 +732,7 @@ export class CheckAction extends BaseAction {
     `;
   }
 
-  _extraExplanationHtml({ actionType, targetAbility, colorLower, finalEffect, effectsSuppressed, stunDuration=null }) {
+  _extraExplanationHtml({ actionType, targetAbility, colorLower, finalEffect, effectsSuppressed, stunDuration=null, slamDetails=null }) {
     if (actionType === "stun") {
       let stunText = "";
       if (colorLower === "white") {
@@ -752,7 +754,10 @@ export class CheckAction extends BaseAction {
       if (effectsSuppressed) {
         return `<div style="margin-top:8px;color:#b71c1c;">No damage penetrated — Slam does not apply.</div>`;
       }
-      // Note: areas here is an estimate; actual Grand Slam uses attacker Strength from prefill
+      // If full slam details available (from prefill), use rich HTML; else fall back to brief note
+      if (slamDetails) {
+        return this._slamDetailHtml(slamDetails);
+      }
       const strRank = targetAbility?.rank || "Typical";
       const areas   = this._strengthToAreas(strRank);
       const notes = {
@@ -775,105 +780,53 @@ export class CheckAction extends BaseAction {
   }
 
   async _createSlamChatMessage(options) {
-    const {
-      targetName,
-      targetUuid,
-      slamEffect,
-      knockbackDistance,
-      attackerStrength,
-      attackerStrengthRank,
-      attackerName,
-      colorLower
-    } = options;
-    
-    let content = "";
-    
+    // Deprecated: slam detail now folded into the check card via _slamDetailHtml().
+    // This method is kept as a no-op so existing call sites don't throw.
+  }
+
+  _slamDetailHtml({ targetName, targetUuid, slamEffect, knockbackDistance, attackerStrength, attackerStrengthRank, attackerName }) {
     if (slamEffect === "Grand Slam") {
-      content = `
-        <div style="background-color:#8B0000;color:white;padding:10px;border-radius:5px;margin:5px 0;">
-          <div style="font-size:1.2em;font-weight:bold;text-align:center;margin-bottom:8px;">💥 GRAND SLAM! 💥</div>
-          <div style="padding:5px;font-size:0.9em;">
-            <div><strong>${targetName}</strong> is launched away with tremendous force!</div>
-            <div style="margin:5px 0;"><strong>Mechanical Effects:</strong></div>
-            <div>• Attacker Strength: ${attackerStrengthRank} (${attackerStrength})</div>
-            <div>• Knockback Distance: ${knockbackDistance} areas</div>
-            <div>• Launch Speed: ${knockbackDistance} areas/round</div>
-            <div>• Direction: ${attackerName} chooses (if damage dealt)</div>
-            <div style="margin-top:8px;"><strong>Collision Damage:</strong></div>
-            <div>• If target hits obstacle: charging damage applies</div>
-            <div>• Buildings reduce knockback per movement rules</div>
-            <div>• Target takes slam damage if hitting walls/objects</div>
-          </div>
-          <div style="margin-top:10px;text-align:center;">
+      return `
+        <div style="margin-top:6px;">
+          <strong>Grand Slam</strong> — ${targetName} launched ${knockbackDistance} area${knockbackDistance !== 1 ? 's' : ''} away at ${attackerStrengthRank} (${attackerStrength}) speed.
+          <div style="color:#666;font-size:.9em;margin-top:2px;">${attackerName} chooses direction (if damage dealt). Collision damage applies if target hits obstacle.</div>
+          <div style="margin-top:6px;">
             <button class="calculate-slam-collision"
                     data-target="${targetUuid}"
                     data-distance="${knockbackDistance}"
                     data-speed="${knockbackDistance}"
                     data-attacker-strength="${attackerStrength}"
-                    style="background:#DB747E;color:white;border-radius:3px;padding:5px 10px;border-radius:3px;cursor:pointer;">
+                    style="background:#8b0000;color:white;border:none;border-radius:3px;padding:3px 8px;cursor:pointer;font-size:.85em;">
               Calculate Collision Damage
             </button>
           </div>
-        </div>
-      `;
-    } else if (slamEffect === "1 Area") {
-      content = `
-        <div style="background-color:#DC3545;color:white;padding:10px;border-radius:5px;margin:5px 0;">
-          <div style="font-size:1.2em;font-weight:bold;text-align:center;margin-bottom:8px;">💢 SLAMMED - 1 AREA 💢</div>
-          <div style="padding:5px;font-size:0.9em;">
-            <div><strong>${targetName}</strong> is knocked back 1 area!</div>
-            <div style="margin:5px 0;"><strong>Mechanical Effects:</strong></div>
-            <div>• Knocked 1 area away from attacker</div>
-            <div>• May hit obstacles during knockback</div>
-            <div>• Takes damage if slammed into walls/objects</div>
-            <div>• ${attackerName} chooses direction (if damage dealt)</div>
-            <div>• Target chooses direction (if no damage dealt)</div>
-          </div>
-          <div style="margin-top:10px;text-align:center;">
+        </div>`;
+    }
+    if (slamEffect === "1 Area") {
+      return `
+        <div style="margin-top:6px;">
+          <strong>Slam — 1 Area</strong> — ${targetName} knocked back 1 area.
+          <div style="color:#666;font-size:.9em;margin-top:2px;">${attackerName} chooses direction (if damage dealt); target chooses (if no damage). Collision damage applies if hitting obstacle.</div>
+          <div style="margin-top:6px;">
             <button class="calculate-slam-collision"
                     data-target="${targetUuid}"
                     data-distance="1"
                     data-speed="1"
                     data-attacker-strength="${attackerStrength}"
-                    style="background:#DB747E;color:white;border-radius:3px;padding:5px 10px;border-radius:3px;cursor:pointer;">
+                    style="background:#8b0000;color:white;border:none;border-radius:3px;padding:3px 8px;cursor:pointer;font-size:.85em;">
               Calculate Collision Damage
             </button>
           </div>
-        </div>
-      `;
-    } else if (slamEffect === "Stagger") {
-      content = `
-        <div style="background-color:#FFC107;color:black;padding:10px;border-radius:5px;margin:5px 0;">
-          <div style="font-size:1.2em;font-weight:bold;text-align:center;margin-bottom:8px;">😵‍💫 STAGGERED 😵‍💫</div>
-          <div style="padding:5px;font-size:0.9em;">
-            <div><strong>${targetName}</strong> staggers from the impact!</div>
-            <div style="margin:5px 0;"><strong>Mechanical Effects:</strong></div>
-            <div>• Knocked back a step or two</div>
-            <div>• No longer adjacent to attacker</div>
-            <div>• Fully capable of combat next round</div>
-            <div>• No movement penalty or damage</div>
-            <div>• May fall off cliffs if near edges</div>
-          </div>
-        </div>
-      `;
-    } else { // No Slam
-      content = `
-        <div style="background-color:#28A745;color:white;padding:10px;border-radius:5px;margin:5px 0;">
-          <div style="font-size:1.1em;font-weight:bold;text-align:center;margin-bottom:5px;">🛡️ SLAM RESISTED 🛡️</div>
-          <div style="padding:5px;font-size:0.9em;">
-            <div><strong>${targetName}</strong> plants their feet and resists!</div>
-            <div style="margin:5px 0;"><strong>Effect:</strong></div>
-            <div>• No knockback effect</div>
-            <div>• Remains in current position</div>
-            <div>• Still adjacent to attacker</div>
-          </div>
-        </div>
-      `;
+        </div>`;
     }
-    
-    await ChatMessage.create({
-      speaker: ChatMessage.getSpeaker({ alias: "Slam Effect" }),
-      content
-    });
+    if (slamEffect === "Stagger") {
+      return `
+        <div style="margin-top:6px;">
+          <strong>Stagger</strong> — ${targetName} pushed back but not adjacent. No movement penalty; no damage; combat continues next round.
+        </div>`;
+    }
+    // No Slam
+    return `<div style="margin-top:6px;"><strong>No Slam</strong> — ${targetName} resists, remains in position.</div>`;
   }
+
 } // end class
