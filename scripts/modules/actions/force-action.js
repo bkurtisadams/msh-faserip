@@ -1,4 +1,5 @@
-// scripts/modules/actions/force-action.js v1.5.0 - 2026-02-01
+// scripts/modules/actions/force-action.js v1.5.1 - 2026-02-19
+// v1.5.1: Fix double-armor: buildActionsBox bypassArmor:true (damage is afterArmor); auto-apply uses afterArmor+bypassArmor:true
 // v1.5.0: Add support for equipment items with Force (F) damage type (concussion pistols, etc.)
 // v1.4.0: Fix CS persistence - decouple from global rememberSettings, treat opts.shift=0 as "not set"
 // v1.3.9: Fix usePowerToHit default - only true if explicitly saved as true (was defaulting to true)
@@ -755,7 +756,7 @@ export class ForceAction extends RangedAttackAction {
             damage: afterArmor,
             attackForm: "force",
             damageType: dmgType,
-            bypassArmor: false,
+            bypassArmor: true,   // afterArmor already has armor removed
             autoApply: this.opts?.autoApply,
             autoSave: (typeof resolveCombatMode === "function" && tActor)
               ? (resolveCombatMode(tActor) === "full")
@@ -909,11 +910,11 @@ export class ForceAction extends RangedAttackAction {
       // Explicit per-target apply in Full Auto
       if (!isManualMode && this.opts?.autoApply && isHit && rawDamage > 0 && tActor) {
         await applyDamageToTargets({
-          damage: rawDamage,
+          damage: afterArmor,   // armor already subtracted above for display; bypass re-calculation
           attackerUuid: actor.uuid,
           damageType: dmgType,
           showNotification: false,
-          bypassArmor: false,
+          bypassArmor: true,
           attackForm: "force",
           armorPiercing: 0,
           apMode: "value",

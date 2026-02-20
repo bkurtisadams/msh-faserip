@@ -1,5 +1,8 @@
-// scripts/modules/actions/check-action.js v1.5.1 - 2025-12-24
-// v1.5.1: Refactor _createSlamEffect to use Effects.applySlam (duplicate checking)
+// scripts/modules/actions/check-action.js v1.6.2 - 2026-02-19
+// v1.6.2: Read Endurance rank from actor directly (actor IS the defender) - prefill.targetEndRank was stale/missing
+// v1.6.1: Fix check card showing literal 'Target' — actor IS the defender, drop targetName from card header
+// v1.6.0: Restyle stun/slam/kill check cards to match attack card style (gray card, inline roll badge, white result box)
+// v1.5.2: Fix slam explanation text in _extraExplanationHtml - was completely backwards (White↔Red, Green↔Yellow)
 // v1.5.0: Add returnResultOnly mode for inline embedding in attack cards (collapsible sections)
 // v1.4.1: Show stun duration with hover text for die type
 // v1.4.0: Change stun duration from "d10 + cap" to configurable die (stunDurationDie setting)
@@ -15,7 +18,6 @@ import {
   bannerColors,
   getAbilityInfo,
   universalColor,
-  buildInlineRollDisplay,
   showDiceAnimation,
   debugLog
 } from "./action-utils.js";
@@ -83,7 +85,7 @@ export class CheckAction extends BaseAction {
 
       // Build choice (synthetic dialog result)
       const targetName    = prefill.targetName     || "Target";
-      const targetEndRank = prefill.targetEndRank  || "Good";
+      const targetEndRank = actor?.system?.abilities?.endurance?.rank || prefill.targetEndRank || "Good";
       const shift         = Number(prefill.shift ?? 0) || 0;
       const dmgThrough    = Number(prefill.dmgThrough ?? 0) || 0;
       const borderline    = !!prefill.borderline;
@@ -140,9 +142,6 @@ export class CheckAction extends BaseAction {
         colorLower = String(universalColor(effectiveEndRank, capped) || "white").toLowerCase();
       }
       
-      // Build inline roll display for consolidated mode
-      const inlineRollHtml = useConsolidated ? buildInlineRollDisplay(roll, 0, roll.total) : "";
-
       // ============================================
       // RETURN RESULT ONLY MODE (for inline embedding)
       // ============================================
@@ -437,8 +436,7 @@ export class CheckAction extends BaseAction {
         }
       }
 
-      // Build and post a light-weight chat card
-      const banner = bannerColors[colorLower] || { bg:"#eee", fg:"#333", bd:"#ccc" };
+      // Build and post a chat card matching attack card style
       const effectText = (actionType === "kill")
         ? (baseEffect?.label || color)
         : (mapping[colorLower] || color);
@@ -446,9 +444,6 @@ export class CheckAction extends BaseAction {
         actionType, targetAbility, colorLower, finalEffect: effectText, effectsSuppressed,
         stunDuration
       });
-
-      const headerActorName  = actor?.name || targetName || "Actor";
-      const headerTargetName = (targetName && targetName !== headerActorName) ? targetName : "";
 
       // Build shift display text
       let shiftDisplay = "";
@@ -459,29 +454,10 @@ export class CheckAction extends BaseAction {
         shiftDisplay = ` (${parts.join(', ')})`;
       }
 
-      // Build roll info section - use inline display if consolidated, else show result only
-      const rollInfoSection = inlineRollHtml ? `
-        <div style="padding:4px 10px;">
-          <div style="font-size:.9em;color:#555;">Endurance: ${effectiveEndRank}${shiftDisplay}</div>
-        </div>
-        ${inlineRollHtml}
-      ` : '';
-
-      const content = `
-        <div style="border:1px solid ${banner.bd};border-radius:3px;overflow:hidden;">
-          <div style="padding:6px 10px;background:${banner.bg};color:${banner.fg};border-bottom:1px solid ${banner.bd};">
-            <b>${headerActorName}</b> — ${labelFor(actionType)}${
-              headerTargetName ? ` vs <b>${headerTargetName}</b>` : ``
-            }
-          </div>
-          ${rollInfoSection}
-          <div style="padding:8px 10px;font-size:.95em;">
-            <div><b>Result:</b> <span style="text-transform:capitalize">${colorLower}</span> — ${effectText}</div>
-            ${effectsSuppressed ? `<div style="margin-top:6px;color:#b71c1c;">No damage penetrated → effect suppressed.</div>` : ""}
-            ${extraHtml || ""}
-          </div>
-        </div>
-      `;
+      const content = this._buildCheckCard({
+        actor, actionType, effectiveEndRank, shiftDisplay,
+        roll, colorLower, effectText, effectsSuppressed, extraHtml
+      });
       
       // Create chat card unless skipChatMessage is set (consolidated mode)
       if (!skipChatMessage) {
@@ -497,7 +473,7 @@ export class CheckAction extends BaseAction {
     // ------------------------------
     // MANUAL / SEMI: show a compact dialog
     // ------------------------------
-    const targetRanks = this._rankOptions(prefill.targetEndRank || "Good");
+    const targetRanks = this._rankOptions(actor?.system?.abilities?.endurance?.rank || prefill.targetEndRank || "Good");
     const preDmg = Number(prefill.dmgThrough ?? 0) || 0;
     const html = `
       <div class="frp-dialog" style="min-width:410px;">
@@ -559,16 +535,7 @@ export class CheckAction extends BaseAction {
     const roll = new Roll("1d100");
     await roll.evaluate();
     
-    // Only show separate roll message if NOT using consolidated mode
-    if (!useConsolidated) {
-      await roll.toMessage({
-        speaker: ChatMessage.getSpeaker({ actor }),
-        flavor: `${actionName}: ${choice.targetName} (${effectiveEndRank})`
-      });
-    }
-    
-    // Build inline roll display for consolidated mode
-    const inlineRollHtml = useConsolidated ? buildInlineRollDisplay(roll, 0, roll.total) : "";
+    // Roll is always embedded in the card (no separate roll.toMessage)
     
     const color = (typeof rollUniversalTable === "function")
       ? rollUniversalTable(effectiveEndRank, Math.min(100, roll.total))
@@ -653,33 +620,17 @@ export class CheckAction extends BaseAction {
       }
     }
 
-    const banner = bannerColors[colorLower] || { bg:"#eee", fg:"#333", bd:"#ccc" };
+    const effectText = (actionType === "kill") ? (finalEffect?.label ?? "No Effect") : finalEffect;
     const extraHtml  = this._extraExplanationHtml({
-      actionType, targetAbility, colorLower, finalEffect, effectsSuppressed,
+      actionType, targetAbility, colorLower, finalEffect: effectText, effectsSuppressed,
       stunDuration: manualStunDuration
     });
-    
-    // Build roll info section - use inline display if consolidated, else show result only
-    const rollInfoSection = inlineRollHtml ? `
-      <div style="padding:4px 10px;">
-        <div style="font-size:.9em;color:#555;">Endurance: ${effectiveEndRank}${choice.shift ? ` (${choice.shift > 0 ? '+' : ''}${choice.shift}CS)` : ''}</div>
-      </div>
-      ${inlineRollHtml}
-    ` : '';
-    
-    const content = `
-      <div style="border:1px solid ${banner.bd};border-radius:3px;overflow:hidden;">
-        <div style="padding:6px 10px;background:${banner.bg};color:${banner.fg};border-bottom:1px solid ${banner.bd};">
-          <b>${actor.name}</b> — ${labelFor(actionType)} vs <b>${choice.targetName}</b>
-        </div>
-        ${rollInfoSection}
-        <div style="padding:8px 10px;font-size:.95em;">
-          <div><b>Result:</b> <span style="text-transform:capitalize">${colorLower}</span> — ${(actionType === "kill") ? (finalEffect?.label ?? "No Effect") : finalEffect}</div>
-          ${effectsSuppressed ? `<div style="margin-top:6px;color:#b71c1c;">No damage penetrated → effect suppressed.</div>` : ""}
-          ${extraHtml || ""}
-        </div>
-      </div>
-    `;
+    const shiftDisplay = choice.shift ? ` (${choice.shift > 0 ? '+' : ''}${choice.shift}CS)` : '';
+
+    const content = this._buildCheckCard({
+      actor, actionType, effectiveEndRank, shiftDisplay,
+      roll, colorLower, effectText, effectsSuppressed, extraHtml
+    });
     await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor }), content });
   }
 
@@ -747,6 +698,38 @@ export class CheckAction extends BaseAction {
     }, opts);
   }
 
+  _buildCheckCard({ actor, actionType, effectiveEndRank, shiftDisplay, roll, colorLower, effectText, effectsSuppressed, extraHtml }) {
+    const { bg, fg } = bannerColors(colorLower);
+    const actionLabel = labelFor(actionType).toUpperCase();
+    const rollBox = `<span title="d100 = ${roll.total}" style="padding:0 3px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${roll.total}</span>`;
+
+    const resultBox = (effectsSuppressed || extraHtml) ? `
+      <div style="margin:0 10px 6px;padding:6px 8px;background:#fff;border:1px solid #ddd;border-radius:3px;font-size:.9em;">
+        ${effectsSuppressed ? '<div style="color:#b71c1c;">No damage penetrated — effect suppressed.</div>' : ''}
+        ${extraHtml || ''}
+      </div>` : '';
+
+    return `
+      <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
+        <div style="padding:6px 10px;border-bottom:1px solid #c0c0c0;display:flex;justify-content:space-between;align-items:center;">
+          <strong style="color:#8b0000;">${actionLabel}</strong>
+          <span style="color:#666;font-weight:normal;font-size:.85em;">Endurance FEAT</span>
+        </div>
+        <div style="padding:4px 10px;font-size:.95em;"><strong>${actor.name}</strong></div>
+        <div style="padding:2px 10px 6px;font-size:.9em;color:#555;">
+          <div>Endurance: ${effectiveEndRank}${shiftDisplay}</div>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:3px;">
+            <span>Roll: ${rollBox}</span>
+            <span style="padding:2px 8px;border-radius:3px;font-weight:bold;font-size:.9em;background:${bg};color:${fg};">
+              ${colorLower.toUpperCase()} — ${String(effectText).toUpperCase()}
+            </span>
+          </div>
+        </div>
+        ${resultBox}
+      </div>
+    `;
+  }
+
   _extraExplanationHtml({ actionType, targetAbility, colorLower, finalEffect, effectsSuppressed, stunDuration=null }) {
     if (actionType === "stun") {
       let stunText = "";
@@ -769,13 +752,14 @@ export class CheckAction extends BaseAction {
       if (effectsSuppressed) {
         return `<div style="margin-top:8px;color:#b71c1c;">No damage penetrated — Slam does not apply.</div>`;
       }
+      // Note: areas here is an estimate; actual Grand Slam uses attacker Strength from prefill
       const strRank = targetAbility?.rank || "Typical";
       const areas   = this._strengthToAreas(strRank);
       const notes = {
-        white: `No effect.`,
-        green: `Stagger; half-move next round.`,
-        yellow:`Knockback 1 area; prone.`,
-        red:  `Grand Slam — knocked away up to ~${areas} areas; prone.`
+        white: `Grand Slam — knocked away up to ~${areas} areas; prone.`,
+        green: `Knockback 1 area; prone.`,
+        yellow:`Stagger — no longer adjacent, fully capable next round.`,
+        red:   `No Slam — target resists.`
       };
       return `<div style="margin-top:8px;color:#444;">${notes[colorLower]||""}</div>`;
     }

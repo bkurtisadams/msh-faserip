@@ -1,4 +1,5 @@
-// scripts/modules/actions/energy-action.js v1.7.0 - 2026-02-01
+// scripts/modules/actions/energy-action.js v1.7.1 - 2026-02-19
+// v1.7.1: Fix double-armor: buildActionsBox bypassArmor:true (damage is afterArmor); auto-apply uses afterArmor+bypassArmor:true
 // v1.7.0: Add support for equipment items with Energy (E) damage type (laser pistols, etc.)
 // v1.6.0: Fix CS persistence - decouple from global rememberSettings, treat opts.shift=0 as "not set"
 // v1.5.9: Fix usePowerToHit default - only true if explicitly saved as true (stricter check)
@@ -843,7 +844,7 @@ export class EnergyAction extends RangedAttackAction {
             damage: afterArmor,
             attackForm: "energy",
             damageType: choice.powerDamageType,
-            bypassArmor: false,
+            bypassArmor: true,   // afterArmor already has armor removed
             autoApply: this.opts?.autoApply,
             autoSave: (typeof resolveCombatMode === "function" && targetActor)
               ? (resolveCombatMode(targetActor) === "full")
@@ -940,11 +941,11 @@ export class EnergyAction extends RangedAttackAction {
       // Auto-apply damage in Full Auto mode
       if (!isManualMode && this.opts?.autoApply && isHit && rawDamage > 0 && targetActor) {
         await applyDamageToTargets({
-          damage: rawDamage,
+          damage: afterArmor,   // armor already subtracted above for display; bypass re-calculation
           attackerUuid: actor.uuid,
           damageType: choice.powerDamageType,
           showNotification: false,
-          bypassArmor: false,
+          bypassArmor: true,
           attackForm: "energy",
           armorPiercing: 0,
           apMode: "value",

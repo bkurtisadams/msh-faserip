@@ -1,5 +1,8 @@
-// File: scripts/modules/dice/universal-table.js v1.1.0 - 2025-12-22
-// v1.1.0: Reduce console logging verbosity
+// File: scripts/modules/dice/universal-table.js v1.3.0 - 2026-02-19
+// v1.3.0: Fix Blocking (Bl) in ACTION_RESULT_LABELS: white/green/yellow were all wrong (Autohit/+4CS/+2CS → -6CS/-4CS/-2CS)
+//         Fix resultRows display: Ev/Bl swapped in white row; +4CS→-4CS green Bl; +2CS→-2CS yellow Bl
+// v1.2.0: Fix 4 table errors vs published chart: Ch green Slam→Hit; rankRows 02-03 ShiftZ green→white;
+//         rankRows 76-80 ShiftY red→yellow; rankRows row 100 add missing Beyond column
 // Universal Table data structures and rank lookup utilities for FASERIP system
 
 // Rank names array for lookups
@@ -72,10 +75,10 @@ export const ACTION_RESULT_LABELS = {
   Gp: { white: "Miss", green: "Miss", yellow: "Partial", red: "Hold" },
   Gb: { white: "Miss", green: "Take", yellow: "Grab", red: "Break" },
   Es: { white: "Miss", green: "Miss", yellow: "Escape", red: "Reverse" },
-  Ch: { white: "None", green: "Slam", yellow: "Slam", red: "Stun" },
+  Ch: { white: "None", green: "Hit", yellow: "Slam", red: "Stun" },
   Do: { white: "Autohit", green: "-2 CS", yellow: "-4 CS", red: "-6 CS" },
   Ev: { white: "Autohit", green: "Evasion", yellow: "+1 CS", red: "+2 CS" },
-  Bl: { white: "Autohit", green: "+4 CS", yellow: "+2 CS", red: "+1 CS" },
+  Bl: { white: "-6 CS", green: "-4 CS", yellow: "-2 CS", red: "+1 CS" },
   Ca: { white: "Miss", green: "Catch", yellow: "Catch", red: "No" },
   St: { white: "1–10", green: "1", yellow: "Damage", red: "No" },
   Sl: { white: "Gr. Slam", green: "1 area", yellow: "Stagger", red: "No" },
@@ -86,7 +89,7 @@ export const ACTION_RESULT_LABELS = {
 // Columns: Shift-0, Feeble, Poor, Typical, Good, Excellent, Remarkable, Incredible, Amazing, Monstrous, Unearthly, Shift X, Shift Y, Shift Z, Class 1000, Class 3000, Class 5000, Beyond
 export const rankRows = [
   { label: "01", colors:    ["white","white","white","white","white","white","white","white","white","white","white","white","white","white","white","white","white","white"] },
-  { label: "02–03", colors: ["white","white","white","white","white","white","white","white","white","white","white","white","white","green","green","green","green","green"] },
+  { label: "02–03", colors: ["white","white","white","white","white","white","white","white","white","white","white","white","white","white","green","green","green","green"] },
   { label: "04–06", colors: ["white","white","white","white","white","white","white","white","white","white","white","white","white","green","green","green","green","green"] },
   { label: "07–10", colors: ["white","white","white","white","white","white","white","white","white","white","white","white","green","green","green","green","green","green"] },
   { label: "11–15", colors: ["white","white","white","white","white","white","white","white","white","white","white","green","green","green","green","green","green","green"] },
@@ -102,13 +105,13 @@ export const rankRows = [
   { label: "61–65", colors: ["white","green","green","green","green","green","green","yellow","yellow","yellow","yellow","yellow","yellow","yellow","yellow","yellow","yellow"   ,"red"] },
   { label: "66–70", colors: ["green","green","green","green","green","green","yellow","yellow","yellow","yellow","yellow","yellow","yellow","yellow","yellow","yellow"   ,"red"  ,"red"] },
   { label: "71–75", colors: ["green","green","green","green","green","yellow","yellow","yellow","yellow","yellow","yellow","yellow","yellow","yellow","yellow"  ,"red"   ,"red"  ,"red"] },
-  { label: "76–80", colors: ["green","green","green","green","yellow","yellow","yellow","yellow","yellow","yellow","yellow","yellow"  ,"red"  ,"red"   ,"red"   ,"red"   ,"red"  ,"red"] },
+  { label: "76–80", colors: ["green","green","green","green","yellow","yellow","yellow","yellow","yellow","yellow","yellow","yellow"  ,"yellow","red"   ,"red"   ,"red"   ,"red"  ,"red"] },
   { label: "81–85", colors: ["green","green","green","yellow","yellow","yellow","yellow","yellow","yellow" ,"yellow","yellow","red"   ,"red"  ,"red"   ,"red"   ,"red"   ,"red"  ,"red"] },
   { label: "86–90", colors: ["green","green","yellow","yellow","yellow","yellow","yellow","yellow","yellow","red"   ,"red"   ,"red"   ,"red"  ,"red"   ,"red"   ,"red"   ,"red"  ,"red"] },
   { label: "91–94", colors: ["green","yellow","yellow","yellow","yellow","yellow","yellow","red"  ,"red"   ,"red"   ,"red"   ,"red"   ,"red"  ,"red"   ,"red"   ,"red"   ,"red"  ,"red"] },
   { label: "95–97", colors: ["yellow","yellow","yellow","yellow","yellow","red"  ,"red"  ,"red"   ,"red"   ,"red"   ,"red"   ,"red"   ,"red"  ,"red"   ,"red"   ,"red"   ,"red"  ,"red"] },
   { label: "98–99", colors: ["yellow","yellow","yellow","red"   ,"red"   ,"red"  ,"red"  ,"red"   ,"red"   ,"red"   ,"red"   ,"red"   ,"red"  ,"red"   ,"red"   ,"red"   ,"red"  ,"red"] },
-  { label: "100", colors:   ["red"   ,"red"   ,"red"   ,"red"   ,"red"   ,"red"  ,"red"  ,"red"   ,"red"   ,"red"   ,"red"   ,"red"  ,"red"   ,"red"   ,"red"   ,"red"  ,"red"] }
+  { label: "100", colors:   ["red"   ,"red"   ,"red"   ,"red"   ,"red"   ,"red"  ,"red"  ,"red"   ,"red"   ,"red"   ,"red"   ,"red"  ,"red"   ,"red"   ,"red"   ,"red"  ,"red"   ,"red"] }
 ];
 
 // Power Rank Range Table - maps ranks to range in areas
@@ -131,7 +134,7 @@ export const resultRows = [
     cells: [
       { value: "Miss", span: 5 }, { value: "Miss", span: 2 }, { value: "Miss", span: 1 },
       { value: "Miss", span: 1 }, { value: "Miss", span: 1 }, { value: "None", span: 1 },
-      { value: "Autohit", span: 1 }, { value: "-6 CS", span: 1 }, { value: "Autohit", span: 1 },
+      { value: "Autohit", span: 1 }, { value: "Autohit", span: 1 }, { value: "-6 CS", span: 1 },
       { value: "Miss", span: 1 }, { value: "1–10", span: 1 }, { value: "Gr. Slam", span: 1 },
       { value: "En. Loss", span: 1 }
     ]
@@ -141,7 +144,7 @@ export const resultRows = [
     cells: [
       { value: "Hit", span: 5 }, { value: "Hit", span: 2 }, { value: "Hit", span: 1 },
       { value: "Hit", span: 1 }, { value: "Hit", span: 1 }, { value: "-2 CS", span: 1 },
-      { value: "Evasion", span: 1 }, { value: "+4 CS", span: 1 }, { value: "Catch", span: 1 },
+      { value: "Evasion", span: 1 }, { value: "-4 CS", span: 1 }, { value: "Catch", span: 1 },
       { value: "1", span: 1 }, { value: "1 area", span: 1 }, { value: "E/S", span: 1 }
     ]
   },
@@ -152,7 +155,7 @@ export const resultRows = [
       { value: "Stun", span: 1 }, { value: "Bullseye", span: 1 }, { value: "Bullseye", span: 1 },
       { value: "Partial", span: 1 }, { value: "Grab", span: 1 }, { value: "Escape", span: 1 },
       { value: "Slam", span: 1 }, { value: "-4 CS", span: 1 }, { value: "+1 CS", span: 1 },
-      { value: "+2 CS", span: 1 }, { value: "Catch", span: 1 }, { value: "Damage", span: 1 },
+      { value: "-2 CS", span: 1 }, { value: "Catch", span: 1 }, { value: "Damage", span: 1 },
       { value: "Stagger", span: 1 }, { value: "No", span: 1 }
     ]
   },

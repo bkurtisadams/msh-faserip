@@ -1,4 +1,5 @@
-// scripts/modules/actions/throwing-blunt-action.js
+// scripts/modules/actions/throwing-blunt-action.js v1.0.1 - 2026-02-19
+// v1.0.1: Fix auto-apply call - applyDamageToTargets takes a single destructured object, not positional args
 import { RangedAttackAction } from "./ranged-attack-action.js";
 import { attachAutoFillRange } from "./action-utils.js";
 // NOTE: resolveCombatMode imported dynamically if needed
@@ -381,12 +382,14 @@ export class ThrowingBluntAction extends RangedAttackAction {
 
     // === AUTO-APPLY DAMAGE IN FULL AUTO MODE ===
     if (this.opts?.autoApply && isHit && rawDamage > 0) {
-      await applyDamageToTargets(rawDamage, {
+      await applyDamageToTargets({
+        damage: rawDamage,
         attackerUuid: actor.uuid,
         damageType: "physical-blunt",
         attackForm: "blunt",
         showNotification: true,
-        bypassArmor: false
+        bypassArmor: false,
+        wasKillResult: false
       });
     }
     // === END AUTO-APPLY ===
