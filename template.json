@@ -224,6 +224,7 @@
       "legality": "legal",
 
       "weaponType": "",
+      "attackType": "",
       "range": "",
       "damage": "",
       "damageType": "",

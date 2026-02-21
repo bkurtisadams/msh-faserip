@@ -2518,8 +2518,12 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
       const category = item.system.category?.toLowerCase();
       const weaponType = item.system.weaponType?.toLowerCase();
       const damageType = item.system.damageType?.toUpperCase();
+      const explicitAttackType = item.system.attackType || "";
 
-      if (category === "other") {
+      // Explicit attackType always wins
+      if (explicitAttackType) {
+        actionType = explicitAttackType;
+      } else if (category === "other") {
         // Other weapons: grenade or missile
         if (weaponType === "grenade") {
           actionType = "grenade";
@@ -2550,8 +2554,13 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
           // Use damageType to determine if edged or blunt
           actionType = (damageType === "EA") ? "edged-attack" : "blunt-attack";
         } else if (weaponType === "thrown") {
-          // Use damageType to determine if edged or blunt
-          actionType = (damageType === "TE") ? "throwing-edged" : "throwing-blunt";
+          // Check attackModes first, then damageType (EA and TE both = throwing-edged)
+          const throwMode = (item.system.attackModes || []).find(m => m.actionType === "throwing-edged" || m.actionType === "throwing-blunt");
+          if (throwMode) {
+            actionType = throwMode.actionType;
+          } else {
+            actionType = (damageType === "TE" || damageType === "EA") ? "throwing-edged" : "throwing-blunt";
+          }
         } else {
           // Fallback: try to infer from damageType
           if (damageType === "S") actionType = "shooting";
@@ -2562,9 +2571,14 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
           else actionType = "shooting"; // ultimate fallback
         }
       } else if (category === "melee" || category === "melee weapon") {
-        actionType = item.system.attackForm === "edged" ? "edged-attack" : "blunt-attack";
+        actionType = (damageType === "EA") ? "edged-attack" : "blunt-attack";
       } else if (category === "thrown") {
-        actionType = item.system.attackForm === "edged" ? "throwing-edged" : "throwing-blunt";
+        const throwMode = (item.system.attackModes || []).find(m => m.actionType === "throwing-edged" || m.actionType === "throwing-blunt");
+        if (throwMode) {
+          actionType = throwMode.actionType;
+        } else {
+          actionType = (damageType === "TE" || damageType === "EA") ? "throwing-edged" : "throwing-blunt";
+        }
       } else {
         // Check for grenade items regardless of category (catches gear default + old data)
         if (item.system.grenadeType) {

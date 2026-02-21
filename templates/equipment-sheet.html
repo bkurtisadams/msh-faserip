@@ -84,6 +84,23 @@
           <p class="notes">Use weaponPowerRank for attack rolls instead of an ability like Agility.</p>
         </div>
   
+        <!-- Attack Type: maps directly to action dispatcher -->
+        <div class="form-group">
+          <label>Attack Type:</label>
+          <select name="system.attackType">
+            <option value="" {{#if (eq system.attackType "")}}selected{{/if}}>(auto-detect)</option>
+            <option value="blunt-attack" {{#if (eq system.attackType "blunt-attack")}}selected{{/if}}>Blunt Attack</option>
+            <option value="edged-attack" {{#if (eq system.attackType "edged-attack")}}selected{{/if}}>Edged Attack</option>
+            <option value="shooting" {{#if (eq system.attackType "shooting")}}selected{{/if}}>Shooting</option>
+            <option value="throwing-blunt" {{#if (eq system.attackType "throwing-blunt")}}selected{{/if}}>Throwing Blunt</option>
+            <option value="throwing-edged" {{#if (eq system.attackType "throwing-edged")}}selected{{/if}}>Throwing Edged</option>
+            <option value="energy" {{#if (eq system.attackType "energy")}}selected{{/if}}>Energy</option>
+            <option value="force" {{#if (eq system.attackType "force")}}selected{{/if}}>Force</option>
+            <option value="grappling" {{#if (eq system.attackType "grappling")}}selected{{/if}}>Grappling</option>
+            <option value="grabbing" {{#if (eq system.attackType "grabbing")}}selected{{/if}}>Grabbing</option>
+          </select>
+        </div>
+
         <!-- Damage Type: shooting, energy, edged, etc. -->
         <div class="form-group">
           <label>Damage Type:</label>
