@@ -13,11 +13,16 @@
         "description": "",
         "race": "",
         "sex": "",
+        "nationality": "",
         "handedness": "",
         "height": "",
         "weight": "",
         "eyeColor": "",
         "hairColor": "",
+        "placeOfBirth": "",
+        "legalStatus": "",
+        "occupation": "",
+        "maritalStatus": "",
         "history": ""
       },
       "abilities": {

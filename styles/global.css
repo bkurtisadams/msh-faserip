@@ -3171,6 +3171,7 @@ form.faserip-sheet .identity-section input[type="radio"] {
 /* biography details grid */
 .msh-bio{ display:grid; row-gap:8px; margin-top:6px; }
 .msh-biorow{ display:grid; grid-template-columns:1fr 1fr; column-gap:12px; row-gap:6px; }
+.msh-biorow.msh-biorow-3col{ grid-template-columns:1fr 1fr 1fr; }
 .msh-biofield label{ display:block;font-size:12.5px;margin:0 0 2px 0; }
 .msh-biofield input, .msh-biofield textarea{ width:100%; box-sizing:border-box; font-size:12.5px; }
 .msh-biofield textarea{ padding:6px; }
