@@ -679,11 +679,6 @@
         <!-- Powers Tab -->
         <div class="tab" data-tab="powers">
           <!-- Powers content here -->
-          <div class="powers-controls">
-            <button type="button" class="add-power">+ Add Power</button>
-            <button type="button" class="browse-compendium" data-type="powers">Browse Powers Compendium</button>
-          </div>
-
           <table class="powers-table">
             <thead>
               <tr>
@@ -692,7 +687,10 @@
                 <th>Value</th>
                 <th>Range</th>
                 <th>Type</th>
-                <th>Actions</th>
+                <th class="th-actions">
+                  <a class="th-action-link add-power" title="Add Power">+ add</a>
+                  <a class="th-action-link browse-compendium" data-type="powers" title="Browse Powers Compendium">browse</a>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -737,9 +735,12 @@
 
         <!-- Talents Tab -->
         <div class="tab" data-tab="talents">
-          <div class="talents-controls tab-controls">
-            <button type="button" class="add-talent">+ Add Talent</button>
-            <button type="button" class="browse-compendium" data-type="talents">Browse Talents Compendium</button>
+          <div class="tab-list-header">
+            <span>Talents</span>
+            <div class="th-actions">
+              <a class="th-action-link add-talent" title="Add Talent">+ add</a>
+              <a class="th-action-link browse-compendium" data-type="talents" title="Browse Talents Compendium">browse</a>
+            </div>
           </div>
 
           <div class="talents-list">
@@ -764,9 +765,12 @@
 
         <!-- Contacts Tab -->
         <div class="tab" data-tab="contacts">
-          <div class="contacts-controls tab-controls">
-            <button type="button" class="add-contact">+ Add Contact</button>
-            <button type="button" class="browse-compendium" data-type="contacts">Browse Contacts Compendium</button>
+          <div class="tab-list-header">
+            <span>Contacts</span>
+            <div class="th-actions">
+              <a class="th-action-link add-contact" title="Add Contact">+ add</a>
+              <a class="th-action-link browse-compendium" data-type="contacts" title="Browse Contacts Compendium">browse</a>
+            </div>
           </div>
           <div class="contacts-list">
             {{#each contacts as |contact|}}
@@ -790,9 +794,12 @@
 
         <!-- Equipment Tab -->
         <div class="tab" data-tab="equipment">
-          <div class="equipment-controls tab-controls">
-            <button type="button" class="add-equipment">+ Add Equipment</button>
-            <button type="button" class="browse-compendium" data-type="equipment">Browse Equipment Compendium</button>
+          <div class="tab-list-header">
+            <span>Equipment</span>
+            <div class="th-actions">
+              <a class="th-action-link add-equipment" title="Add Equipment">+ add</a>
+              <a class="th-action-link browse-compendium" data-type="equipment" title="Browse Equipment Compendium">browse</a>
+            </div>
           </div>
 
           {{! ── WEAPONS ── }}
@@ -1013,12 +1020,6 @@
 
         <!-- HQ Tab -->
         <div class="tab" data-tab="headquarters">
-          <div class="headquarters-controls tab-controls">
-            <button type="button" class="add-headquarters">+ Add Headquarters</button>
-            <button type="button" class="browse-compendium" data-type="headquarters">Browse Headquarters
-              Compendium</button>
-          </div>
-
           <table class="headquarters-table">
             <thead>
               <tr>
@@ -1027,7 +1028,10 @@
                 <th class="size-col">Size</th>
                 <th class="material-col">Material</th>
                 <th class="cost-col">Cost</th>
-                <th class="actions-col">Actions</th>
+                <th class="th-actions">
+                  <a class="th-action-link add-headquarters" title="Add Headquarters">+ add</a>
+                  <a class="th-action-link browse-compendium" data-type="headquarters" title="Browse Headquarters Compendium">browse</a>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -1065,11 +1069,6 @@
 
         <!-- Vehicles Tab -->
         <div class="tab" data-tab="vehicles">
-          <div class="tab-controls">
-            <button type="button" class="add-vehicle">+ Add Vehicle</button>
-            <button type="button" class="browse-compendium" data-type="vehicles">Browse Vehicles Compendium</button>
-          </div>
-
           <table class="vehicles-table">
             <thead>
               <tr>
@@ -1081,7 +1080,10 @@
                 <th class="speed-col">Spd</th>
                 <th class="body-col">Bod</th>
                 <th class="protection-col">Prot</th>
-                <th class="actions-col">Actions</th>
+                <th class="th-actions">
+                  <a class="th-action-link add-vehicle" title="Add Vehicle">+ add</a>
+                  <a class="th-action-link browse-compendium" data-type="vehicles" title="Browse Vehicles Compendium">browse</a>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -1123,22 +1125,6 @@
 
       <!-- Stunts Tab -->
       <div class="tab" data-tab="stunts">
-        <div class="stunts-top-section">
-          <div class="stunts-controls">
-            <button type="button" class="add-stunt-general">+ Add Power Stunt</button>
-          </div>
-          
-          <div class="stunts-header">
-            <h2>Power Stunts</h2>
-            <p class="stunt-rules">Power Stunts allow creative use of powers or abilities. Cost: 100 Karma. Difficulty decreases with practice:
-              <strong style="color:#F44336">Red FEAT</strong> (never tried), 
-              <strong style="color:#FFC107">Yellow FEAT</strong> (1-3 times), 
-              <strong style="color:#4CAF50">Green FEAT</strong> (4-9 times), 
-              <strong>Mastered</strong> (10+ times, no cost).
-            </p>
-          </div>
-        </div>
-
         <table class="stunts-table">
           <thead>
             <tr>
@@ -1149,7 +1135,9 @@
               <th>Value</th>
               <th>Difficulty</th>
               <th>Times Used</th>
-              <th>Actions</th>
+              <th class="th-actions">
+                <a class="th-action-link add-stunt-general" title="Add Power Stunt">+ add</a>
+              </th>
             </tr>
           </thead>
           <tbody>

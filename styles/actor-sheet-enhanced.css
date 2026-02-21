@@ -483,3 +483,140 @@ form.faserip-sheet .browse-compendium {
   font-size: 11px !important;
   line-height: 1 !important;
 }
+
+/* ── Tab icons: dark red bg, small icon, colored label below ────────────── */
+form.faserip-sheet .sheet-tabs-navigation .item {
+  background: var(--mred-dk) !important;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 5px 4px !important;
+}
+
+form.faserip-sheet .sheet-tabs-navigation .item i {
+  font-size: 14px;
+  color: #fff;
+}
+
+/* Colored labels via ::after */
+form.faserip-sheet .sheet-tabs-navigation .item::after {
+  font-size: 8px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  line-height: 1;
+  opacity: 1;
+  /* override tooltip positioning from actor-sheet.css */
+  position: static;
+  bottom: unset;
+  left: unset;
+  transform: none;
+  background: none;
+  padding: 0;
+  border-radius: 0;
+  pointer-events: none;
+  white-space: nowrap;
+  transition: none;
+}
+
+form.faserip-sheet .sheet-tabs-navigation [data-tab="powers"]::after        { content: "Powers";   color: #c8960c; }
+form.faserip-sheet .sheet-tabs-navigation [data-tab="talents"]::after       { content: "Talents";  color: #2e7d32; }
+form.faserip-sheet .sheet-tabs-navigation [data-tab="contacts"]::after      { content: "Contacts"; color: #90caf9; }
+form.faserip-sheet .sheet-tabs-navigation [data-tab="equipment"]::after     { content: "Equip";    color: #bdbdbd; }
+form.faserip-sheet .sheet-tabs-navigation [data-tab="headquarters"]::after  { content: "HQ";       color: #e0e0e0; }
+form.faserip-sheet .sheet-tabs-navigation [data-tab="vehicles"]::after      { content: "Vehicles"; color: #ce93d8; }
+form.faserip-sheet .sheet-tabs-navigation [data-tab="stunts"]::after        { content: "Stunts";   color: #ffb74d; }
+form.faserip-sheet .sheet-tabs-navigation [data-tab="actions"]::after       { content: "Actions";  color: #ef9a9a; }
+form.faserip-sheet .sheet-tabs-navigation [data-tab="effects"]::after       { content: "Effects";  color: #f48fb1; }
+form.faserip-sheet .sheet-tabs-navigation [data-tab="chargen"]::after       { content: "Chargen";  color: #80deea; }
+form.faserip-sheet .sheet-tabs-navigation [data-tab="universal-table"]::after { content: "Table";  color: #fff59d; }
+
+/* Universal Table icon — rainbow */
+form.faserip-sheet .sheet-tabs-navigation [data-tab="universal-table"] i {
+  animation: tab-rainbow 6s linear infinite;
+}
+@keyframes tab-rainbow {
+  0%   { color: #e53935; }
+  17%  { color: #fb8c00; }
+  33%  { color: #fdd835; }
+  50%  { color: #43a047; }
+  67%  { color: #1e88e5; }
+  83%  { color: #8e24aa; }
+  100% { color: #e53935; }
+}
+
+/* Active: slightly lighter red, bottom border removed */
+form.faserip-sheet .sheet-tabs-navigation .item.active {
+  background: var(--mred) !important;
+  border-bottom-color: var(--mred) !important;
+}
+form.faserip-sheet .sheet-tabs-navigation .item.active i {
+  animation: none !important;
+}
+
+/* Hover */
+form.faserip-sheet .sheet-tabs-navigation .item:hover {
+  background: var(--mred-lit) !important;
+}
+
+/* ── Add/browse links in table header cells ─────────────────────────────── */
+form.faserip-sheet .th-actions {
+  text-align: right;
+  white-space: nowrap;
+}
+
+form.faserip-sheet .th-action-link {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.75) !important;
+  text-decoration: none !important;
+  text-transform: lowercase;
+  cursor: pointer;
+  margin-left: 6px;
+}
+
+form.faserip-sheet .th-action-link:hover {
+  color: #fff !important;
+  text-decoration: underline !important;
+}
+
+/* ── tab-list-header: fake thead for non-table tabs (talents, contacts, equip) */
+form.faserip-sheet .tab-list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--mred);
+  color: #fff;
+  font-family: 'Oswald', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  padding: 4px 8px;
+  margin-bottom: 2px;
+}
+
+form.faserip-sheet .tab-list-header .th-actions {
+  display: flex;
+  gap: 6px;
+}
+
+/* ── Active tab: white bg, lifts into content area ──────────────────────── */
+form.faserip-sheet .sheet-tabs-navigation .item.active {
+  background: #fff !important;
+  border-bottom-color: #fff !important;
+  filter: none !important;
+  position: relative;
+  z-index: 2;
+}
+form.faserip-sheet .sheet-tabs-navigation .item.active i {
+  color: var(--mred) !important;
+  animation: none !important;
+}
+form.faserip-sheet .sheet-tabs-navigation .item.active::after {
+  color: var(--mred) !important;
+}
