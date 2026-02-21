@@ -757,7 +757,19 @@ export class AttackAction extends BaseAction {
          armorData = getBodyArmorValues(targetActor, damageType);
          // Ensure numbers whether rawDamage arrived as "20" or 20
          const rd = Number(rawDamage) || 0;
-         armorValue = Number(armorData?.applicable) || 0;
+         const _apFlat = Number(choice?.armorPiercing || 0);
+         const _apCS   = Number(choice?.armorPiercingCS || 0);
+         const _apMode = choice?.apMode || "value";
+         const _baseArmor = Number(armorData?.applicable) || 0;
+         if (_apMode === "cs" && _apCS > 0 && _baseArmor > 0) {
+           const _RV = [0,1,3,5,8,16,26,36,46,63,88,150,250,500,1000,3000,5000,Infinity];
+           let _i = _RV.findIndex(v => v >= _baseArmor);
+           if (_i < 0) _i = _RV.length - 1;
+           if (_i > 0 && _RV[_i] > _baseArmor) _i--;
+           armorValue = _RV[Math.max(0, _i - _apCS)];
+         } else {
+           armorValue = Math.max(0, _baseArmor - _apFlat);
+         }
          penetratingDamage = Math.max(0, rd - armorValue);
          // Borderline: armor exactly equals damage (effects can still apply per rules)
          isBorderline = (rd > 0 && rd === armorValue);
@@ -900,6 +912,10 @@ export class AttackAction extends BaseAction {
             attackForm,
             damageType,
             bypassArmor: choice.bypassArmor || false,
+            armorPiercing: Number(choice?.armorPiercing || 0),
+            armorPiercingCS: Number(choice?.armorPiercingCS || 0),
+            apMode: choice?.apMode || "value",
+            bypassForceField: !!choice?.bypassForceField,
             autoApply: !!this.opts?.autoApply,
             autoSave: false,  // prevent chat button duplicates
           })
@@ -1125,11 +1141,20 @@ export class AttackAction extends BaseAction {
               const isEnergy = armorData?.isEnergyDamage;
               const armorRank = isEnergy ? armorData?.energyRank : armorData?.physicalRank;
               const armorType = armorData?.isForceField ? "Force Field" : "Body Armor";
+              const _apFlat = Number(choice?.armorPiercing || 0);
+              const _apCS   = Number(choice?.armorPiercingCS || 0);
+              const _apMode = choice?.apMode || "value";
+              const _apApplied = (_apMode === "cs" && _apCS > 0) || (_apMode !== "cs" && _apFlat > 0);
+              const _apNote = _apApplied
+                ? (_apMode === "cs"
+                    ? ` <span style="color:#1565c0;font-size:.85em;" title="AP ammo: armor reduced ${_apCS}CS">(AP -${_apCS}CS)</span>`
+                    : ` <span style="color:#1565c0;font-size:.85em;" title="Armor Piercing: armor reduced by ${_apFlat}">(AP -${_apFlat})</span>`)
+                : "";
               const armorHover = armorRank ? `${armorRank} ${armorType} (${armorValue})` : `${armorType} (${armorValue})`;
               const armorBox = `<span title="${armorHover}" style="cursor:help;">${armorValue} armor</span>`;
               
               return `<div style="margin:0 10px 6px;padding:6px 8px;background:#fff;border:1px solid #ddd;border-radius:3px;font-size:.9em;">
-                <strong>Damage:</strong> ${dmgBox}${pullNote} − ${armorBox} = <strong>${afterArmor}</strong>${capNote}
+                <strong>Damage:</strong> ${dmgBox}${pullNote} − ${armorBox}${_apNote} = <strong>${afterArmor}</strong>${capNote}
               </div>`;
             } else {
               // No armor - simple display
@@ -1182,6 +1207,7 @@ export class AttackAction extends BaseAction {
           bypassArmor: true,  // Armor already calculated above
           attackForm: attackForm,
           armorPiercing: choice.armorPiercing || 0,
+          bypassForceField: !!choice?.bypassForceField,
           targets: [target],
           // === FIX: Pass kill result flag ===
           wasKillResult: showKill,

@@ -734,7 +734,8 @@ export function buildActionsBox({
   targetStrength = "",
   autoApply = false,  // attacker-side auto apply (damage)
   autoSave  = false,  // defender-side auto save (disable save chips)
-  bypassArmor = false
+  bypassArmor = false,
+  bypassForceField = false
 }) {
 
   // Small helper to render a chip
@@ -775,7 +776,8 @@ export function buildActionsBox({
         data-attack-form="${attackForm || 'blunt'}"
         data-armor-piercing="${Number(armorPiercing || 0)}"
         data-armor-piercing-cs="${Number(armorPiercingCS || 0)}"
-        data-ap-mode="${apMode}"`
+        data-ap-mode="${apMode}"
+        data-bypass-force-field="${bypassForceField ? 'true' : 'false'}"`
       )
     );
   }
@@ -1977,6 +1979,7 @@ export async function applyDamageNow({
   armorPiercing = 0,
   armorPiercingCS = 0,
   apMode = "value",
+  bypassForceField = false,
   showNotification = true
 }) {
   try {
@@ -1998,7 +2001,8 @@ export async function applyDamageNow({
         bypassArmor: !!bypassArmor,
         armorPiercing: apVal,
         armorPiercingCS: apCS,
-        apMode
+        apMode,
+        bypassForceField: !!bypassForceField
       });
 
       const net      = Math.max(0, m?.netDamage || 0);

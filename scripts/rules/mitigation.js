@@ -15,7 +15,8 @@ export function calculateMitigation(rawDamage, targetActor, options = {}) {
     bypassArmor = false,
     armorPiercing = 0,
     armorPiercingCS = 0,
-    apMode = "value"
+    apMode = "value",
+    bypassForceField = false
   } = options;
   
   if (debug) {
@@ -69,7 +70,7 @@ export function calculateMitigation(rawDamage, targetActor, options = {}) {
     }
 
     // Layer 2: Force Field (from AEs)
-    if (aeDefenses.hasForceField) {
+    if (aeDefenses.hasForceField && !bypassForceField) {
       const ffLayer = applyForceFieldFromAE(currentDamage, aeDefenses.forceField, {
         isEnergyDamage
       });
@@ -121,7 +122,7 @@ export function calculateMitigation(rawDamage, targetActor, options = {}) {
     }
     
     // Layer 2: Force Field
-    if (armorData.isForceField) {
+    if (armorData.isForceField && !bypassForceField) {
       const forceFieldLayer = applyForceField(currentDamage, armorData, { isEnergyDamage });
       if (forceFieldLayer.absorbed > 0) {
         currentDamage -= forceFieldLayer.absorbed;

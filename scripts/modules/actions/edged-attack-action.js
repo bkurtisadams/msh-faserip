@@ -299,7 +299,7 @@ Armor Piercing (AP) reduces target armor by that value.">?</span>
               const attackCount = (multiMode === "3") ? 3 : 2;
 
               // Compute damage and notes
-              let weaponMat = "", weaponName = "", damage = natDmg, note = "", ap = 0, apCS = 0, apMode = "value";
+              let weaponMat = "", weaponName = "", damage = natDmg, note = "", ap = 0, apCS = 0, apMode = "value", bypassFF = false;
               if (src === "natural") {
                 weaponMat = natRank;
                 weaponName = "Natural Weapon";
@@ -320,6 +320,7 @@ Armor Piercing (AP) reduces target armor by that value.">?</span>
                   ap = getArmorPiercing(item);
                   apCS = Number(item.system?.armorPiercingCS || 0) || 0;
                   apMode = item.system?.apMode || "value";
+                  bypassFF = !!item.system?.bypassForceField;
                   const res = computeEdgedDamage(strength.rank, strength.value, weaponMat, base);
                   damage = res.damage;
                   note = res.note;
@@ -346,7 +347,7 @@ Armor Piercing (AP) reduces target armor by that value.">?</span>
 
               resolve({
                 src, itemId, natRank, natDmg, shift, karma, spendKarma, skipDice,
-                weaponMat, weaponName, damage, note, ap, apCS, apMode,
+                weaponMat, weaponName, damage, note, armorPiercing: ap, armorPiercingCS: apCS, apMode, bypassForceField: bypassFF,
                 multiAttacks, attackCount
               });
             }
@@ -381,6 +382,8 @@ Armor Piercing (AP) reduces target armor by that value.">?</span>
             let currentDamage = savedNatDmg;
             let noteText = "";
             let currentAP = 0;
+            let currentAPCS = 0;
+            let currentAPMode = "value";
 
             if (src === "natural") {
               $naturalRow.show();
@@ -405,22 +408,34 @@ Armor Piercing (AP) reduces target armor by that value.">?</span>
                 currentDamage = res.damage;
                 noteText = `(${item.name})`;
                 currentAP = getArmorPiercing(item);
+                currentAPCS = Number(item.system?.armorPiercingCS || 0) || 0;
+                currentAPMode = item.system?.apMode || "value";
               }
             }
 
             $val.text(currentDamage);
             $note.text(noteText);
 
-            // Update AP display
-            if (currentAP > 0) {
+            // Update AP display (flat or CS)
+            const _showAP = (currentAPMode === "cs" && currentAPCS > 0) || (currentAPMode !== "cs" && currentAP > 0);
+            if (_showAP) {
               $apDisplay.show();
-              $apVal.text(currentAP);
+              $apVal.text(currentAPMode === "cs" ? `${currentAPCS}CS` : currentAP);
             } else {
               $apDisplay.hide();
             }
 
-            // Update after-armor display (accounting for AP)
-            const effectiveArmor = Math.max(0, targetArmor - currentAP);
+            // Update after-armor display (accounting for AP, flat or CS)
+            let effectiveArmor = targetArmor;
+            if (currentAPMode === "cs" && currentAPCS > 0 && targetArmor > 0) {
+              const _RV = [0,1,3,5,8,16,26,36,46,63,88,150,250,500,1000,3000,5000,Infinity];
+              let _i = _RV.findIndex(v => v >= targetArmor);
+              if (_i < 0) _i = _RV.length - 1;
+              if (_i > 0 && _RV[_i] > targetArmor) _i--;
+              effectiveArmor = _RV[Math.max(0, _i - currentAPCS)];
+            } else {
+              effectiveArmor = Math.max(0, targetArmor - currentAP);
+            }
             const afterArmorDmg = Math.max(0, currentDamage - effectiveArmor);
             if (primaryTarget) {
               $afterArmor.html(`<strong>→ ${afterArmorDmg} after armor</strong>`);

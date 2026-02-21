@@ -120,6 +120,7 @@ export class ShootingAction extends RangedAttackAction {
     const savedColumnShift = shouldRemember ? ((await actor.getFlag("msh-faserip", "lastShootingShift")) || 0) : 0;
     const savedMultiAttacks = shouldRemember ? ((await actor.getFlag("msh-faserip", "lastShootingMultiAttacks")) || false) : false;
     const savedAttackCount = shouldRemember ? ((await actor.getFlag("msh-faserip", "lastShootingAttackCount")) || 2) : 2;
+    const savedVariantType = shouldRemember ? ((await actor.getFlag("msh-faserip", "lastShootingVariant")) || "") : "";
     const savedSkipDice = localStorage.getItem(lsSkipKey) === "1";
     const savedCsNotes = (await actor.getFlag("msh-faserip", "csNotes")) || "";
 
@@ -140,7 +141,48 @@ export class ShootingAction extends RangedAttackAction {
     const targetArmor = targetArmorInfo?.applicable ?? 0;
     const targetArmorSource = targetArmorInfo?.source ?? "";
     const armorNote = targets.length > 1 ? " (1st target)" : "";
-    const initialAfterArmor = Math.max(0, initialWeaponDamage - targetArmor);
+    const initialWeaponAP   = Number(initialWeapon?.system?.armorPiercing || 0) || 0;
+    const initialWeaponAPCS = Number(initialWeapon?.system?.armorPiercingCS || 0) || 0;
+    const initialWeaponAPMode = initialWeapon?.system?.apMode || "value";
+    // Build variant selector options from specialAmmo flags
+    const _buildVariantOptions = (weapon, currentVariant) => {
+      const sa = weapon?.system?.specialAmmo || {};
+      const saved = currentVariant || weapon?.system?.variantType || "standard";
+      const opts = [{ v: "standard", label: "Standard" }];
+      if (sa.ap)         opts.push({ v: "ap",        label: "Armor Piercing (AP)" });
+      if (sa.mercy)      opts.push({ v: "mercy",     label: "Mercy/Non-Lethal" });
+      if (sa.rubber)     opts.push({ v: "rubber",    label: "Blunted/Rubber" });
+      if (sa.explosive)  opts.push({ v: "explosive", label: "Explosive/Enhanced" });
+      if (sa.canister)   opts.push({ v: "canister",  label: "Canister Shot" });
+      if (sa.heatSeeker) opts.push({ v: "heatSeeker",label: "Heat-Seeker" });
+      if (sa.powerPack)  opts.push({ v: "powerPack", label: "Power Pack" });
+      if (opts.length === 1) return "";  // only standard
+      return opts.map(o => `<option value="${o.v}" ${o.v === saved ? "selected" : ""}>${o.label}</option>`).join("");
+    };
+    const _getEffectiveAPForVariant = (weapon, variantType) => {
+      if (variantType === "ap") return { ap: 0, apCS: 2, apMode: "cs", bypassFF: false };
+      return {
+        ap: Number(weapon?.system?.armorPiercing || 0) || 0,
+        apCS: Number(weapon?.system?.armorPiercingCS || 0) || 0,
+        apMode: weapon?.system?.apMode || "value",
+        bypassFF: !!weapon?.system?.bypassForceField
+      };
+    };
+    const initialVariant = savedVariantType || initialWeapon?.system?.variantType || "standard";
+    const initialVariantOptions = _buildVariantOptions(initialWeapon, initialVariant);
+    const initialAPInfo = _getEffectiveAPForVariant(initialWeapon, initialVariant);
+    const _getEffectiveArmor = (base, ap, apCS, apMode) => {
+      if (apMode === "cs" && apCS > 0 && base > 0) {
+        const _RV = [0,1,3,5,8,16,26,36,46,63,88,150,250,500,1000,3000,5000,Infinity];
+        let _i = _RV.findIndex(v => v >= base);
+        if (_i < 0) _i = _RV.length - 1;
+        if (_i > 0 && _RV[_i] > base) _i--;
+        return _RV[Math.max(0, _i - apCS)];
+      }
+      return Math.max(0, base - ap);
+    };
+    const initialAfterArmor = Math.max(0, initialWeaponDamage - _getEffectiveArmor(targetArmor, initialAPInfo.ap, initialAPInfo.apCS, initialAPInfo.apMode));
+    const initialAPLabel = (initialAPInfo.apMode === "cs" && initialAPInfo.apCS > 0) ? `${initialAPInfo.apCS}CS` : (initialAPInfo.ap > 0 ? String(initialAPInfo.ap) : "");
 
     // Karma info for compact display
     const availableKarma = getAvailableKarma(actor);
@@ -178,6 +220,11 @@ export class ShootingAction extends RangedAttackAction {
             Range: <strong id="weapon-range-display">${initialWeaponRange}</strong> areas
           </span>
         </div>
+        ${initialVariantOptions ? `
+        <div style="display:flex;align-items:center;gap:8px;margin-top:6px;">
+          <label style="font-weight:600;white-space:nowrap;">Loaded Ammo:</label>
+          <select name="variantType" id="variant-select" style="flex:1;padding:4px;">${initialVariantOptions}</select>
+        </div>` : ""}
       </div>
 
       <!-- Damage Preview -->
@@ -185,6 +232,9 @@ export class ShootingAction extends RangedAttackAction {
         <div style="display:flex;justify-content:space-between;align-items:center;">
           <span><strong>Damage:</strong> <span id="dmg-val">${initialWeaponDamage}</span> <span id="dmg-note" style="color:#555;">(Weapon)</span></span>
           <span style="font-size:1.1em;" id="after-armor-display"><strong>→ ${initialAfterArmor} after armor</strong></span>
+        </div>
+        <div id="ap-display" style="color:#1565c0;font-size:.9em;margin-top:4px;${initialAPLabel ? '' : 'display:none;'}">
+          Armor Piercing: <strong id="ap-val">${initialAPLabel}</strong> (reduces target armor)
         </div>
       </div>
 
@@ -309,6 +359,12 @@ export class ShootingAction extends RangedAttackAction {
 
               const weaponRange = weapon.system?.range || 15;
               const weaponDamage = weapon.system?.damage || 0;
+              const variantType = $dlg('[name="variantType"]').val() || weapon.system?.variantType || "standard";
+              const _apInfo = _getEffectiveAPForVariant(weapon, variantType);
+              const weaponAP = _apInfo.ap;
+              const weaponAPCS = _apInfo.apCS;
+              const weaponAPMode = _apInfo.apMode;
+              const weaponBypassFF = _apInfo.bypassFF;
 
               // Check if shot is possible
               const { totalShift, impossible, rangeModifier, obstacleModifier } = 
@@ -332,6 +388,7 @@ export class ShootingAction extends RangedAttackAction {
                 await actor.setFlag("msh-faserip", "lastShootingShift", shift);
                 await actor.setFlag("msh-faserip", "lastShootingMultiAttacks", multiAttacks);
                 await actor.setFlag("msh-faserip", "lastShootingAttackCount", attackCount);
+                await actor.setFlag("msh-faserip", "lastShootingVariant", variantType);
               }
               
               // Always save csNotes
@@ -355,6 +412,10 @@ export class ShootingAction extends RangedAttackAction {
                 multiAttacks,
                 attackCount,
                 csNotes,
+                armorPiercing: weaponAP,
+                armorPiercingCS: weaponAPCS,
+                apMode: weaponAPMode,
+                bypassForceField: weaponBypassFF,
                 shiftBreakdown: {
                   manual: shift,
                   range: rangeModifier,
@@ -389,14 +450,52 @@ export class ShootingAction extends RangedAttackAction {
             html.find('#weapon-range-display').text(newRange);
             html.find('#max-range-hint').text(newRange);
             
+            // Rebuild variant selector for new weapon
+            const newVariantOpts = _buildVariantOptions(weapon, "");
+            const $variantRow = html.find('#variant-select').closest('div');
+            if (newVariantOpts) {
+              if (html.find('#variant-select').length) {
+                html.find('#variant-select').html(newVariantOpts);
+              } else {
+                html.find('.weapon-section').append(`<div style="display:flex;align-items:center;gap:8px;margin-top:6px;"><label style="font-weight:600;white-space:nowrap;">Loaded Ammo:</label><select name="variantType" id="variant-select" style="flex:1;padding:4px;">${newVariantOpts}</select></div>`);
+                html.find('#variant-select').on('change', updatePreview);
+              }
+            } else {
+              html.find('#variant-select').closest('div').remove();
+            }
             // Update damage preview
             html.find('#dmg-val').text(newDamage);
-            const afterArmor = Math.max(0, newDamage - targetArmor);
+            const currentVariant = html.find('[name="variantType"]').val() || weapon?.system?.variantType || "standard";
+            const newAPInfo = _getEffectiveAPForVariant(weapon, currentVariant);
+            const effArmor = _getEffectiveArmor(targetArmor, newAPInfo.ap, newAPInfo.apCS, newAPInfo.apMode);
+            const afterArmor = Math.max(0, newDamage - effArmor);
             html.find('#after-armor-display').html(`<strong>→ ${afterArmor} after armor</strong>`);
+            const apLabel = (newAPInfo.apMode === "cs" && newAPInfo.apCS > 0) ? `${newAPInfo.apCS}CS` : (newAPInfo.ap > 0 ? String(newAPInfo.ap) : "");
+            if (apLabel) {
+              html.find('#ap-display').show();
+              html.find('#ap-val').text(apLabel);
+            } else {
+              html.find('#ap-display').hide();
+            }
             
             // Refresh the range preview with new weapon range
             this._setupRangePreview(html, { weaponMaxRange: newRange });
           });
+
+          // Variant change handler - update AP preview when ammo type changes
+          const updatePreview = () => {
+            const wId = html.find('[name="weapon"]').val();
+            const w = shootingWeapons.find(i => i.id === wId);
+            const vt = html.find('[name="variantType"]').val() || "standard";
+            const dmg = Number(w?.system?.damage || 0);
+            const apInfo = _getEffectiveAPForVariant(w, vt);
+            const eff = _getEffectiveArmor(targetArmor, apInfo.ap, apInfo.apCS, apInfo.apMode);
+            html.find('#after-armor-display').html(`<strong>→ ${Math.max(0, dmg - eff)} after armor</strong>`);
+            const lbl = (apInfo.apMode === "cs" && apInfo.apCS > 0) ? `${apInfo.apCS}CS` : (apInfo.ap > 0 ? String(apInfo.ap) : "");
+            if (lbl) { html.find('#ap-display').show(); html.find('#ap-val').text(lbl); }
+            else { html.find('#ap-display').hide(); }
+          };
+          html.on('change', '[name="variantType"]', updatePreview);
 
           // CS field handlers
           const $csInput = html.find('[name="shift"]');

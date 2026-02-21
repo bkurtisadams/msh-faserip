@@ -53,339 +53,190 @@
   
       <!-- Weapon-specific fields -->
       <div class="weapon-fields" {{#unless (eq system.category "weapon")}}style="display: none;"{{/unless}}>
-        <div class="form-group">
-          <label>Weapon Type:</label>
-          <select name="system.weaponType">
-            <option value="" {{#if (eq system.weaponType "")}}selected{{/if}}>None</option>
-            <option value="shooting" {{#if (eq system.weaponType "shooting")}}selected{{/if}}>Shooting Weapon</option>
-            <option value="melee" {{#if (eq system.weaponType "melee")}}selected{{/if}}>Melee Weapon</option>
-            <option value="thrown" {{#if (eq system.weaponType "thrown")}}selected{{/if}}>Thrown Weapon</option>
-          </select>
-        </div>
-  
-        <div class="form-group">
-          <label>Range (in areas):</label>
-          <input type="text" name="system.range" value="{{system.range}}" />
-        </div>
-  
-        <div class="form-group">
-          <label>Damage:</label>
-          <input type="text" name="system.damage" value="{{system.damage}}" />
-        </div>
 
-        <div class="form-group">
-          <label for="system.weaponPowerRank">Power Rank</label>
-          <input type="text" name="system.weaponPowerRank" value="{{system.weaponPowerRank}}" />
-        </div>
+        <!-- ═══ COMBAT ═══════════════════════════════════════════════════ -->
+        <div class="specialized-section" style="margin-bottom:10px;">
+          <div class="section-header" style="background:#e8f0fe;border-bottom:1px solid #c5d5f8;">
+            <h3 style="margin:0;font-size:1em;font-weight:700;color:#1a237e;">Combat</h3>
+          </div>
+          <div style="padding:8px;">
 
-        <div class="form-group">
-          <label for="system.treatAsPower">Treat as Power</label>
-          <input type="checkbox" name="system.treatAsPower" {{checked system.treatAsPower}} />
-          <p class="notes">Use weaponPowerRank for attack rolls instead of an ability like Agility.</p>
-        </div>
-  
-        <!-- Attack Type: maps directly to action dispatcher -->
-        <div class="form-group">
-          <label>Attack Type:</label>
-          <select name="system.attackType">
-            <option value="" {{#if (eq system.attackType "")}}selected{{/if}}>(auto-detect)</option>
-            <option value="blunt-attack" {{#if (eq system.attackType "blunt-attack")}}selected{{/if}}>Blunt Attack</option>
-            <option value="edged-attack" {{#if (eq system.attackType "edged-attack")}}selected{{/if}}>Edged Attack</option>
-            <option value="shooting" {{#if (eq system.attackType "shooting")}}selected{{/if}}>Shooting</option>
-            <option value="throwing-blunt" {{#if (eq system.attackType "throwing-blunt")}}selected{{/if}}>Throwing Blunt</option>
-            <option value="throwing-edged" {{#if (eq system.attackType "throwing-edged")}}selected{{/if}}>Throwing Edged</option>
-            <option value="energy" {{#if (eq system.attackType "energy")}}selected{{/if}}>Energy</option>
-            <option value="force" {{#if (eq system.attackType "force")}}selected{{/if}}>Force</option>
-            <option value="grappling" {{#if (eq system.attackType "grappling")}}selected{{/if}}>Grappling</option>
-            <option value="grabbing" {{#if (eq system.attackType "grabbing")}}selected{{/if}}>Grabbing</option>
-          </select>
-        </div>
-
-        <!-- Damage Type: shooting, energy, edged, etc. -->
-        <div class="form-group">
-          <label>Damage Type:</label>
-          <select name="system.damageType">
-            <option value="" {{#if (eq system.damageType "")}}selected{{/if}}>None</option>
-            <option value="S" {{#if (eq system.damageType "S")}}selected{{/if}}>Shooting (S)</option>
-            <option value="E" {{#if (eq system.damageType "E")}}selected{{/if}}>Energy (E)</option>
-            <option value="F" {{#if (eq system.damageType "F")}}selected{{/if}}>Force (F)</option>
-            <option value="EA" {{#if (eq system.damageType "EA")}}selected{{/if}}>Edged Attack (EA)</option>
-            <option value="BA" {{#if (eq system.damageType "BA")}}selected{{/if}}>Blunt Attack (BA)</option>
-            <option value="TE" {{#if (eq system.damageType "TE")}}selected{{/if}}>Throwing Edged (TE)</option>
-            <option value="TB" {{#if (eq system.damageType "TB")}}selected{{/if}}>Throwing Blunt (TB)</option>
-            <option value="GP" {{#if (eq system.damageType "GP")}}selected{{/if}}>Grappling (GP)</option>
-            <option value="Gb" {{#if (eq system.damageType "Gb")}}selected{{/if}}>Grabbing (Gb)</option>
-            <option value="Stun" {{#if (eq system.damageType "Stun")}}selected{{/if}}>Stunning (Stun)</option>
-          </select>
-        </div>
-        
-        <!-- SFX -->
-        <div class="form-group">
-          <label>SFX (Hit)</label>
-          <div class="form-fields sfx-row">
-            <input type="text" name="system.sfx.hit" value="{{system.sfx.hit}}" placeholder="systems/msh-faserip/assets/sfx/gunshot.wav"/>
-            <button type="button" class="sfx-preview" data-sfx-field="system.sfx.hit" data-volume-field="system.sfx.hitVolume" title="Preview"><i class="fas fa-play"></i></button>
-            <input type="number" class="sfx-volume" name="system.sfx.hitVolume" value="{{system.sfx.hitVolume}}" min="0" max="100" placeholder="80" title="Volume %"/>
-            <span class="sfx-volume-label">%</span>
-            {{filePicker type="audio" target="system.sfx.hit"}}
-          </div>
-        </div>
-
-        <div class="form-group">
-          <label>SFX (Miss)</label>
-          <div class="form-fields sfx-row">
-            <input type="text" name="system.sfx.miss" value="{{system.sfx.miss}}" placeholder="systems/msh-faserip/assets/sfx/gunshot-miss.wav"/>
-            <button type="button" class="sfx-preview" data-sfx-field="system.sfx.miss" data-volume-field="system.sfx.missVolume" title="Preview"><i class="fas fa-play"></i></button>
-            <input type="number" class="sfx-volume" name="system.sfx.missVolume" value="{{system.sfx.missVolume}}" min="0" max="100" placeholder="80" title="Volume %"/>
-            <span class="sfx-volume-label">%</span>
-            {{filePicker type="audio" target="system.sfx.miss"}}
-          </div>
-        </div>
-
-        <div class="form-group">
-          <label>SFX (Out of Ammo)</label>
-          <div class="form-fields sfx-row">
-            <input type="text" name="system.sfx.empty" value="{{system.sfx.empty}}" placeholder="(optional) .../click-empty.wav"/>
-            <button type="button" class="sfx-preview" data-sfx-field="system.sfx.empty" data-volume-field="system.sfx.emptyVolume" title="Preview"><i class="fas fa-play"></i></button>
-            <input type="number" class="sfx-volume" name="system.sfx.emptyVolume" value="{{system.sfx.emptyVolume}}" min="0" max="100" placeholder="80" title="Volume %"/>
-            <span class="sfx-volume-label">%</span>
-            {{filePicker type="audio" target="system.sfx.empty"}}
-          </div>
-        </div>
-
-        <div class="form-group">
-          <label>SFX (Reload)</label>
-          <div class="form-fields sfx-row">
-            <input type="text" name="system.sfx.reload" value="{{system.sfx.reload}}" placeholder="(optional) .../reload.wav"/>
-            <button type="button" class="sfx-preview" data-sfx-field="system.sfx.reload" data-volume-field="system.sfx.reloadVolume" title="Preview"><i class="fas fa-play"></i></button>
-            <input type="number" class="sfx-volume" name="system.sfx.reloadVolume" value="{{system.sfx.reloadVolume}}" min="0" max="100" placeholder="80" title="Volume %"/>
-            <span class="sfx-volume-label">%</span>
-            {{filePicker type="audio" target="system.sfx.reload"}}
-          </div>
-        </div>
-
-  
-        <div class="form-row">
-          <div class="form-group half">
-            <label>Rate of Fire:</label>
-            <input type="text" name="system.rate" value="{{system.rate}}" />
-          </div>
-          <div class="form-group half">
-            <label>Shots Before Reload:</label>
-            <input type="text" name="system.shots" value="{{system.shots}}" />
-          </div>
-        </div>
-
-        <div class="form-row">
-          <div class="form-group half">
-            <label>One-Handed Use:</label>
-            <select name="system.oneHandedUse">
-              <option value="normal" {{#if (eq system.oneHandedUse "normal")}}selected{{/if}}>Can Use One-Handed</option>
-              <option value="-1cs" {{#if (eq system.oneHandedUse "-1cs")}}selected{{/if}}>One-Handed at -1CS</option>
-              <option value="-2cs" {{#if (eq system.oneHandedUse "-2cs")}}selected{{/if}}>One-Handed at -2CS</option>
-              <option value="two-handed-only" {{#if (eq system.oneHandedUse "two-handed-only")}}selected{{/if}}>Requires Two Hands</option>
-            </select>
-          </div>
-          <div class="form-group half">
-            <label>Precision Weapon:</label>
-            <input type="checkbox" name="system.noRangePenalty" {{checked system.noRangePenalty}}/>
-            <span style="font-size:0.85em; color:#666;">No range penalty</span>
-          </div>
-        </div>
-
-        <div class="form-row">
-          <div class="form-group half">
-            <label>Throwable (Melee):</label>
-            <input type="checkbox" name="system.throwable" {{checked system.throwable}}/>
-            <span style="font-size:0.85em; color:#666;">Can be thrown</span>
-          </div>
-          <div class="form-group half">
-            <label>Entangling:</label>
-            <input type="checkbox" name="system.entangling" {{checked system.entangling}}/>
-            <span style="font-size:0.85em; color:#666;">Net, bola, webbing</span>
-          </div>
-        </div>
-
-        <div class="form-group" style="background:#fff3e0; border:1px solid #ff9800; border-radius:3px; padding:8px; margin-top:8px; font-size:0.85em;">
-          <strong>⚠ Entangling Weapons:</strong> Target must make Agility FEAT vs weapon's Material Strength. 
-          On failure, target is enmeshed and can escape via Strength FEAT (break) or Agility (slip).
-        </div>
-        
-        <div class="form-group">
-          <label>Default Weapon Variant <span style="font-size:0.9em; color:#666;">(can be changed during roll)</span>:</label>
-          <select name="system.variantType">
-            <option value="standard" {{#if (eq system.variantType "standard")}}selected{{/if}}>Standard</option>
-            <option value="ap" {{#if (eq system.variantType "ap")}}selected{{/if}}>Armor Piercing</option>
-            <option value="mercy" {{#if (eq system.variantType "mercy")}}selected{{/if}}>Mercy/Non-Lethal</option>
-            <option value="rubber" {{#if (eq system.variantType "rubber")}}selected{{/if}}>Blunted/Rubber</option>
-            <option value="explosive" {{#if (eq system.variantType "explosive")}}selected{{/if}}>Explosive/Enhanced</option>
-            <option value="canister" {{#if (eq system.variantType "canister")}}selected{{/if}}>Canister Shot</option>
-            <option value="heatSeeker" {{#if (eq system.variantType "heatSeeker")}}selected{{/if}}>Heat-Seeker</option>
-            <option value="powerPack" {{#if (eq system.variantType "powerPack")}}selected{{/if}}>Power Pack</option>
-          </select>
-        </div>
-
-        <div class="form-group">
-          <label>Legality:</label>
-          <select name="system.legality">
-            <option value="legal" {{#if (eq system.legality "legal")}}selected{{/if}}>Legal</option>
-            <option value="restricted" {{#if (eq system.legality "restricted")}}selected{{/if}}>Restricted</option>
-            <option value="military" {{#if (eq system.legality "military")}}selected{{/if}}>Military Only</option>
-            <option value="illegal" {{#if (eq system.legality "illegal")}}selected{{/if}}>Illegal</option>
-          </select>
-        </div>
-        
-        <div class="form-row">
-          <div class="form-group half">
-            <label>Burst/Scatter:</label>
-            <select name="system.burstScatter">
-              <option value="none" {{#if (eq system.burstScatter "none")}}selected{{/if}}>None</option>
-              <option value="burst" {{#if (eq system.burstScatter "burst")}}selected{{/if}}>Burst</option>
-              <option value="scatter" {{#if (eq system.burstScatter "scatter")}}selected{{/if}}>Scatter</option>
-            </select>
-          </div>
-          <div class="form-group half">
-            <label>Requires Two Operators:</label>
-            <input type="checkbox" name="system.requiresTwoOperators" {{checked system.requiresTwoOperators}}/>
-          </div>
-        </div>
-        
-        <div class="form-group">
-          <label>Stun/Gas Intensity:</label>
-          <select name="system.stunIntensity">
-            <option value="" {{#if (eq system.stunIntensity "")}}selected{{/if}}>None</option>
-            <option value="Shift-0" {{#if (eq system.stunIntensity "Shift-0")}}selected{{/if}}>Shift-0</option>
-            <option value="Feeble" {{#if (eq system.stunIntensity "Feeble")}}selected{{/if}}>Feeble</option>
-            <option value="Poor" {{#if (eq system.stunIntensity "Poor")}}selected{{/if}}>Poor</option>
-            <option value="Typical" {{#if (eq system.stunIntensity "Typical")}}selected{{/if}}>Typical</option>
-            <option value="Good" {{#if (eq system.stunIntensity "Good")}}selected{{/if}}>Good</option>
-            <option value="Excellent" {{#if (eq system.stunIntensity "Excellent")}}selected{{/if}}>Excellent</option>
-            <option value="Remarkable" {{#if (eq system.stunIntensity "Remarkable")}}selected{{/if}}>Remarkable</option>
-            <option value="Incredible" {{#if (eq system.stunIntensity "Incredible")}}selected{{/if}}>Incredible</option>
-            <option value="Amazing" {{#if (eq system.stunIntensity "Amazing")}}selected{{/if}}>Amazing</option>
-            <option value="Monstrous" {{#if (eq system.stunIntensity "Monstrous")}}selected{{/if}}>Monstrous</option>
-            <option value="Unearthly" {{#if (eq system.stunIntensity "Unearthly")}}selected{{/if}}>Unearthly</option>
-            <option value="Shift-X" {{#if (eq system.stunIntensity "Shift-X")}}selected{{/if}}>Shift-X</option>
-            <option value="Class 1000" {{#if (eq system.stunIntensity "Class 1000")}}selected{{/if}}>Class 1000</option>
-            <option value="Class 3000" {{#if (eq system.stunIntensity "Class 3000")}}selected{{/if}}>Class 3000</option>
-            <option value="Class 5000" {{#if (eq system.stunIntensity "Class 5000")}}selected{{/if}}>Class 5000</option>
-          </select>
-        </div>
-        
-        <div class="form-row">
-          <div class="form-group half">
-            <label>Continuing Damage:</label>
-            <input type="text" name="system.continuingDamage" value="{{system.continuingDamage}}" />
-          </div>
-          <div class="form-group half">
-            <label>Duration:</label>
-            <input type="text" name="system.continuingDamageRounds" value="{{system.continuingDamageRounds}}" placeholder="e.g., 5 or 1d10" />
-          </div>
-        </div>
-
-        <!-- Attack Modes Section -->
-        <div class="specialized-section">
-          <div class="section-header collapsible" data-section="attack-modes">
-            <h3>Attack Modes <span style="font-size:0.8em; color:#666;">(for multi-mode weapons)</span></h3>
-            <i class="fas fa-chevron-down"></i>
-          </div>
-          <div class="attack-modes-section section-content" style="display: none;">
-            <p class="hint">Define multiple ways to attack with this weapon (e.g., Spear: Thrust/Shaft Strike)</p>
-            
-            <button type="button" class="add-attack-mode" style="margin-bottom:8px;">
-              <i class="fas fa-plus"></i> Add Attack Mode
-            </button>
-            
-            <div class="attack-modes-list">
-              {{#each system.attackModes as |mode i|}}
-              <div class="attack-mode" style="border:1px solid #ccc; padding:8px; margin-bottom:8px; border-radius:4px; background:#fafafa;">
-                <!-- Mode Name Row -->
-                <div class="form-group" style="margin-bottom:8px;">
-                  <label style="display:block; margin-bottom:4px; font-weight:bold;">Mode Name:</label>
-                  <div style="display:grid; grid-template-columns: 1fr auto; gap:8px; align-items:center;">
-                    <input type="text" name="system.attackModes.{{i}}.name" 
-                          value="{{mode.name}}" placeholder="Mode Name (e.g., Thrust)"/>
-                    <button type="button" class="remove-attack-mode" data-index="{{i}}" 
-                            title="Delete Mode"
-                            style="background:#dc3545; color:white; border:none; padding:8px 12px; border-radius:3px; cursor:pointer; min-width:80px;">
-                      <i class="fas fa-trash"></i>
-                    </button>
-                  </div>
-                </div>
-                
-                <div class="form-row">
-                  <div class="form-group half">
-                    <label>Action Type:</label>
-                    <select name="system.attackModes.{{i}}.actionType">
-                      <option value="blunt-attack" {{#if (eq mode.actionType "blunt-attack")}}selected{{/if}}>Blunt Attack (BA)</option>
-                      <option value="edged-attack" {{#if (eq mode.actionType "edged-attack")}}selected{{/if}}>Edged Attack (EA)</option>
-                      <option value="shooting" {{#if (eq mode.actionType "shooting")}}selected{{/if}}>Shooting (Sh)</option>
-                      <option value="throwing-edged" {{#if (eq mode.actionType "throwing-edged")}}selected{{/if}}>Throwing Edged (TE)</option>
-                      <option value="throwing-blunt" {{#if (eq mode.actionType "throwing-blunt")}}selected{{/if}}>Throwing Blunt (TB)</option>
-                      <option value="energy" {{#if (eq mode.actionType "energy")}}selected{{/if}}>Energy (En)</option>
-                      <option value="force" {{#if (eq mode.actionType "force")}}selected{{/if}}>Force (Fo)</option>
-                      <option value="grappling" {{#if (eq mode.actionType "grappling")}}selected{{/if}}>Grappling (Gp)</option>
-                    </select>
-                  </div>
-                  
-                  <div class="form-group half">
-                    <label>Damage Type:</label>
-                    <select name="system.attackModes.{{i}}.damageType">
-                      <option value="BA" {{#if (eq mode.damageType "BA")}}selected{{/if}}>BA (Blunt)</option>
-                      <option value="EA" {{#if (eq mode.damageType "EA")}}selected{{/if}}>EA (Edged)</option>
-                      <option value="S" {{#if (eq mode.damageType "S")}}selected{{/if}}>S (Shooting)</option>
-                      <option value="E" {{#if (eq mode.damageType "E")}}selected{{/if}}>E (Energy)</option>
-                      <option value="F" {{#if (eq mode.damageType "F")}}selected{{/if}}>F (Force)</option>
-                      <option value="TE" {{#if (eq mode.damageType "TE")}}selected{{/if}}>TE (Throwing Edged)</option>
-                      <option value="TB" {{#if (eq mode.damageType "TB")}}selected{{/if}}>TB (Throwing Blunt)</option>
-                    </select>
-                  </div>
-                </div>
-                
-                <div class="form-row">
-                  <div class="form-group half">
-                    <label>Damage:</label>
-                    <input type="number" name="system.attackModes.{{i}}.damage" 
-                          value="{{mode.damage}}" placeholder="10"/>
-                  </div>
-                  <div class="form-group half">
-                    <label>Ability:</label>
-                    <select name="system.attackModes.{{i}}.ability">
-                      <option value="fighting" {{#if (eq mode.ability "fighting")}}selected{{/if}}>Fighting</option>
-                      <option value="agility" {{#if (eq mode.ability "agility")}}selected{{/if}}>Agility</option>
-                      <option value="strength" {{#if (eq mode.ability "strength")}}selected{{/if}}>Strength</option>
-                    </select>
-                  </div>
-                </div>
-                
-                <div class="form-group">
-                  <label>Description:</label>
-                  <input type="text" name="system.attackModes.{{i}}.description" 
-                        value="{{mode.description}}" placeholder="e.g., Thrust with the spearhead"/>
-                </div>
+            <div class="form-row">
+              <div class="form-group half">
+                <label>Weapon Type:</label>
+                <select name="system.weaponType">
+                  <option value="" {{#if (eq system.weaponType "")}}selected{{/if}}>None</option>
+                  <option value="shooting" {{#if (eq system.weaponType "shooting")}}selected{{/if}}>Shooting Weapon</option>
+                  <option value="melee" {{#if (eq system.weaponType "melee")}}selected{{/if}}>Melee Weapon</option>
+                  <option value="thrown" {{#if (eq system.weaponType "thrown")}}selected{{/if}}>Thrown Weapon</option>
+                </select>
               </div>
-              {{/each}}
+              <div class="form-group half">
+                <label>Legality:</label>
+                <select name="system.legality">
+                  <option value="legal" {{#if (eq system.legality "legal")}}selected{{/if}}>Legal</option>
+                  <option value="restricted" {{#if (eq system.legality "restricted")}}selected{{/if}}>Restricted</option>
+                  <option value="military" {{#if (eq system.legality "military")}}selected{{/if}}>Military Only</option>
+                  <option value="illegal" {{#if (eq system.legality "illegal")}}selected{{/if}}>Illegal</option>
+                </select>
+              </div>
             </div>
+
+            <div class="form-row">
+              <div class="form-group half">
+                <label>Attack Type:</label>
+                <select name="system.attackType">
+                  <option value="" {{#if (eq system.attackType "")}}selected{{/if}}>(auto-detect)</option>
+                  <option value="blunt-attack" {{#if (eq system.attackType "blunt-attack")}}selected{{/if}}>Blunt Attack</option>
+                  <option value="edged-attack" {{#if (eq system.attackType "edged-attack")}}selected{{/if}}>Edged Attack</option>
+                  <option value="shooting" {{#if (eq system.attackType "shooting")}}selected{{/if}}>Shooting</option>
+                  <option value="throwing-blunt" {{#if (eq system.attackType "throwing-blunt")}}selected{{/if}}>Throwing Blunt</option>
+                  <option value="throwing-edged" {{#if (eq system.attackType "throwing-edged")}}selected{{/if}}>Throwing Edged</option>
+                  <option value="energy" {{#if (eq system.attackType "energy")}}selected{{/if}}>Energy</option>
+                  <option value="force" {{#if (eq system.attackType "force")}}selected{{/if}}>Force</option>
+                  <option value="grappling" {{#if (eq system.attackType "grappling")}}selected{{/if}}>Grappling</option>
+                  <option value="grabbing" {{#if (eq system.attackType "grabbing")}}selected{{/if}}>Grabbing</option>
+                </select>
+              </div>
+              <div class="form-group half">
+                <label>Damage Type:</label>
+                <select name="system.damageType">
+                  <option value="" {{#if (eq system.damageType "")}}selected{{/if}}>None</option>
+                  <option value="S" {{#if (eq system.damageType "S")}}selected{{/if}}>Shooting (S)</option>
+                  <option value="E" {{#if (eq system.damageType "E")}}selected{{/if}}>Energy (E)</option>
+                  <option value="F" {{#if (eq system.damageType "F")}}selected{{/if}}>Force (F)</option>
+                  <option value="EA" {{#if (eq system.damageType "EA")}}selected{{/if}}>Edged Attack (EA)</option>
+                  <option value="BA" {{#if (eq system.damageType "BA")}}selected{{/if}}>Blunt Attack (BA)</option>
+                  <option value="TE" {{#if (eq system.damageType "TE")}}selected{{/if}}>Throwing Edged (TE)</option>
+                  <option value="TB" {{#if (eq system.damageType "TB")}}selected{{/if}}>Throwing Blunt (TB)</option>
+                  <option value="GP" {{#if (eq system.damageType "GP")}}selected{{/if}}>Grappling (GP)</option>
+                  <option value="Gb" {{#if (eq system.damageType "Gb")}}selected{{/if}}>Grabbing (Gb)</option>
+                  <option value="Stun" {{#if (eq system.damageType "Stun")}}selected{{/if}}>Stunning (Stun)</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group half">
+                <label>Range (in areas):</label>
+                <input type="text" name="system.range" value="{{system.range}}" />
+              </div>
+              <div class="form-group half">
+                <label>Damage:</label>
+                <input type="text" name="system.damage" value="{{system.damage}}" />
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group half">
+                <label>Rate of Fire:</label>
+                <input type="text" name="system.rate" value="{{system.rate}}" />
+              </div>
+              <div class="form-group half">
+                <label>Shots Before Reload:</label>
+                <input type="text" name="system.shots" value="{{system.shots}}" />
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group half">
+                <label>One-Handed Use:</label>
+                <select name="system.oneHandedUse">
+                  <option value="normal" {{#if (eq system.oneHandedUse "normal")}}selected{{/if}}>Can Use One-Handed</option>
+                  <option value="-1cs" {{#if (eq system.oneHandedUse "-1cs")}}selected{{/if}}>One-Handed at -1CS</option>
+                  <option value="-2cs" {{#if (eq system.oneHandedUse "-2cs")}}selected{{/if}}>One-Handed at -2CS</option>
+                  <option value="two-handed-only" {{#if (eq system.oneHandedUse "two-handed-only")}}selected{{/if}}>Requires Two Hands</option>
+                </select>
+              </div>
+              <div class="form-group half">
+                <label>Burst/Scatter:</label>
+                <select name="system.burstScatter">
+                  <option value="none" {{#if (eq system.burstScatter "none")}}selected{{/if}}>None</option>
+                  <option value="burst" {{#if (eq system.burstScatter "burst")}}selected{{/if}}>Burst</option>
+                  <option value="scatter" {{#if (eq system.burstScatter "scatter")}}selected{{/if}}>Scatter</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group half">
+                <label>Precision Weapon:</label>
+                <input type="checkbox" name="system.noRangePenalty" {{checked system.noRangePenalty}}/>
+                <span style="font-size:0.85em;color:#666;">No range penalty</span>
+              </div>
+              <div class="form-group half">
+                <label>Requires Two Operators:</label>
+                <input type="checkbox" name="system.requiresTwoOperators" {{checked system.requiresTwoOperators}}/>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group half">
+                <label>Throwable (Melee):</label>
+                <input type="checkbox" name="system.throwable" {{checked system.throwable}}/>
+                <span style="font-size:0.85em;color:#666;">Can be thrown</span>
+              </div>
+              <div class="form-group half">
+                <label>Entangling:</label>
+                <input type="checkbox" name="system.entangling" {{checked system.entangling}}/>
+                <span style="font-size:0.85em;color:#666;">Net, bola, webbing</span>
+              </div>
+            </div>
+
+            {{#if system.entangling}}
+            <div class="form-group" style="background:#fff3e0;border:1px solid #ff9800;border-radius:3px;padding:8px;font-size:0.85em;">
+              <strong>⚠ Entangling Weapons:</strong> Target must make Agility FEAT vs weapon's Material Strength.
+              On failure, target is enmeshed and can escape via Strength FEAT (break) or Agility (slip).
+            </div>
+            {{/if}}
+
+            <div class="form-row">
+              <div class="form-group half">
+                <label for="system.weaponPowerRank">Power Rank</label>
+                <input type="text" name="system.weaponPowerRank" value="{{system.weaponPowerRank}}" />
+              </div>
+              <div class="form-group half">
+                <label for="system.treatAsPower">Treat as Power</label>
+                <input type="checkbox" name="system.treatAsPower" {{checked system.treatAsPower}} />
+                <span style="font-size:0.85em;color:#666;">Uses power rank, not ability</span>
+              </div>
+            </div>
+
           </div>
         </div>
 
-        <!-- Special Ammunition -->
-        <div class="specialized-section">
-          <div class="section-header collapsible" data-section="ammo-fields">
-              <h3>Available Weapon Variants</h3>
-              <i class="fas fa-chevron-down"></i>
+        <!-- ═══ AMMUNITION (shooting weapons only) ════════════════════════ -->
+        {{#if (eq system.weaponType "shooting")}}
+        <div class="specialized-section" style="margin-bottom:10px;">
+          <div class="section-header" style="background:#e8f5e9;border-bottom:1px solid #a5d6a7;">
+            <h3 style="margin:0;font-size:1em;font-weight:700;color:#1b5e20;">Ammunition</h3>
+          </div>
+          <div style="padding:8px;">
+
+            <div class="form-group">
+              <label>Loaded Ammo <span style="font-size:0.85em;color:#666;">(active during roll)</span>:</label>
+              <select name="system.variantType">
+                <option value="standard" {{#if (eq system.variantType "standard")}}selected{{/if}}>Standard</option>
+                {{#if system.specialAmmo.ap}}<option value="ap" {{#if (eq system.variantType "ap")}}selected{{/if}}>Armor Piercing (AP)</option>{{/if}}
+                {{#if system.specialAmmo.mercy}}<option value="mercy" {{#if (eq system.variantType "mercy")}}selected{{/if}}>Mercy/Non-Lethal</option>{{/if}}
+                {{#if system.specialAmmo.rubber}}<option value="rubber" {{#if (eq system.variantType "rubber")}}selected{{/if}}>Blunted/Rubber</option>{{/if}}
+                {{#if system.specialAmmo.explosive}}<option value="explosive" {{#if (eq system.variantType "explosive")}}selected{{/if}}>Explosive/Enhanced</option>{{/if}}
+                {{#if system.specialAmmo.canister}}<option value="canister" {{#if (eq system.variantType "canister")}}selected{{/if}}>Canister Shot</option>{{/if}}
+                {{#if system.specialAmmo.heatSeeker}}<option value="heatSeeker" {{#if (eq system.variantType "heatSeeker")}}selected{{/if}}>Heat-Seeker</option>{{/if}}
+                {{#if system.specialAmmo.powerPack}}<option value="powerPack" {{#if (eq system.variantType "powerPack")}}selected{{/if}}>Power Pack</option>{{/if}}
+              </select>
             </div>
-            <div class="ammo-fields section-content" style="display: none;">
-              <div class="form-group">
-                <label>Check which variants this weapon can use (unchecked = all available):</label>
+
+            <div class="form-group">
+              <label>Available Ammo Types <span style="font-size:0.85em;color:#666;">(check all this weapon can use)</span>:</label>
               <div class="ammo-types-grid">
-                <div class="ammo-type-item">
-                  <input type="checkbox" name="system.specialAmmo.mercy" {{checked system.specialAmmo.mercy}}/>
-                  <label>Mercy Shot</label>
-                </div>
                 <div class="ammo-type-item">
                   <input type="checkbox" name="system.specialAmmo.ap" {{checked system.specialAmmo.ap}}/>
                   <label>Armor Piercing</label>
+                </div>
+                <div class="ammo-type-item">
+                  <input type="checkbox" name="system.specialAmmo.mercy" {{checked system.specialAmmo.mercy}}/>
+                  <label>Mercy Shot</label>
                 </div>
                 <div class="ammo-type-item">
                   <input type="checkbox" name="system.specialAmmo.rubber" {{checked system.specialAmmo.rubber}}/>
@@ -403,10 +254,226 @@
                   <input type="checkbox" name="system.specialAmmo.heatSeeker" {{checked system.specialAmmo.heatSeeker}}/>
                   <label>Heat-Seeker</label>
                 </div>
+                <div class="ammo-type-item">
+                  <input type="checkbox" name="system.specialAmmo.powerPack" {{checked system.specialAmmo.powerPack}}/>
+                  <label>Power Pack</label>
+                </div>
               </div>
+            </div>
+
+            <p class="notes" style="margin:4px 0 0;color:#555;">
+              AP ammo = -2CS to target armor, no force field bypass (per rules).
+              Loaded type can also be changed in the shooting roll dialog.
+            </p>
+
+          </div>
+        </div>
+        {{/if}}
+
+        <!-- ═══ ARMOR PENETRATION (melee / thrown / non-shooting) ════════ -->
+        {{#unless (eq system.weaponType "shooting")}}
+        <div class="specialized-section" style="margin-bottom:10px;">
+          <div class="section-header" style="background:#fce4ec;border-bottom:1px solid #f48fb1;">
+            <h3 style="margin:0;font-size:1em;font-weight:700;color:#880e4f;">Armor Penetration</h3>
+          </div>
+          <div style="padding:8px;">
+
+            <div class="form-group">
+              <label>Mode:</label>
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                <select name="system.apMode" style="width:auto;">
+                  <option value="value" {{#if (eq system.apMode "value")}}selected{{/if}}>Flat value</option>
+                  <option value="cs" {{#if (eq system.apMode "cs")}}selected{{/if}}>Column shift (CS)</option>
+                </select>
+                <span style="font-size:.85em;color:#555;">
+                  Flat: <input type="number" name="system.armorPiercing" value="{{system.armorPiercing}}" min="0" style="width:50px;" placeholder="0" title="Subtracts directly from armor value" />
+                  &nbsp;CS: <input type="number" name="system.armorPiercingCS" value="{{system.armorPiercingCS}}" min="0" style="width:50px;" placeholder="0" title="Reduces armor rank by this many column shifts" />
+                </span>
+                <label style="display:flex;align-items:center;gap:4px;font-size:.85em;" title="AP ammo cannot pierce force fields per rules; enable only for Vibranium, Adamantium, etc.">
+                  <input type="checkbox" name="system.bypassForceField" {{checked system.bypassForceField}} />
+                  Bypass Force Fields
+                </label>
+              </div>
+              <p class="notes" style="margin:4px 0 0;color:#555;">For special materials only: Vibranium, Adamantium, GM-assigned weapons. Leave at 0 for standard weapons.</p>
+            </div>
+
+          </div>
+        </div>
+        {{/unless}}
+
+        <!-- ═══ SPECIAL EFFECTS ════════════════════════════════════════════ -->
+        <div class="specialized-section" style="margin-bottom:10px;">
+          <div class="section-header" style="background:#fff8e1;border-bottom:1px solid #ffe082;">
+            <h3 style="margin:0;font-size:1em;font-weight:700;color:#5d4037;">Special Effects</h3>
+          </div>
+          <div style="padding:8px;">
+
+            <div class="form-group">
+              <label>Stun/Gas Intensity:</label>
+              <select name="system.stunIntensity">
+                <option value="" {{#if (eq system.stunIntensity "")}}selected{{/if}}>None</option>
+                <option value="Shift-0" {{#if (eq system.stunIntensity "Shift-0")}}selected{{/if}}>Shift-0</option>
+                <option value="Feeble" {{#if (eq system.stunIntensity "Feeble")}}selected{{/if}}>Feeble</option>
+                <option value="Poor" {{#if (eq system.stunIntensity "Poor")}}selected{{/if}}>Poor</option>
+                <option value="Typical" {{#if (eq system.stunIntensity "Typical")}}selected{{/if}}>Typical</option>
+                <option value="Good" {{#if (eq system.stunIntensity "Good")}}selected{{/if}}>Good</option>
+                <option value="Excellent" {{#if (eq system.stunIntensity "Excellent")}}selected{{/if}}>Excellent</option>
+                <option value="Remarkable" {{#if (eq system.stunIntensity "Remarkable")}}selected{{/if}}>Remarkable</option>
+                <option value="Incredible" {{#if (eq system.stunIntensity "Incredible")}}selected{{/if}}>Incredible</option>
+                <option value="Amazing" {{#if (eq system.stunIntensity "Amazing")}}selected{{/if}}>Amazing</option>
+                <option value="Monstrous" {{#if (eq system.stunIntensity "Monstrous")}}selected{{/if}}>Monstrous</option>
+                <option value="Unearthly" {{#if (eq system.stunIntensity "Unearthly")}}selected{{/if}}>Unearthly</option>
+                <option value="Shift-X" {{#if (eq system.stunIntensity "Shift-X")}}selected{{/if}}>Shift-X</option>
+                <option value="Class 1000" {{#if (eq system.stunIntensity "Class 1000")}}selected{{/if}}>Class 1000</option>
+                <option value="Class 3000" {{#if (eq system.stunIntensity "Class 3000")}}selected{{/if}}>Class 3000</option>
+                <option value="Class 5000" {{#if (eq system.stunIntensity "Class 5000")}}selected{{/if}}>Class 5000</option>
+              </select>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group half">
+                <label>Continuing Damage:</label>
+                <input type="text" name="system.continuingDamage" value="{{system.continuingDamage}}" />
+              </div>
+              <div class="form-group half">
+                <label>Duration:</label>
+                <input type="text" name="system.continuingDamageRounds" value="{{system.continuingDamageRounds}}" placeholder="e.g., 5 or 1d10" />
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- ═══ ATTACK MODES (collapsible) ════════════════════════════════ -->
+        <div class="specialized-section" style="margin-bottom:10px;">
+          <div class="section-header collapsible" data-section="attack-modes">
+            <h3>Attack Modes <span style="font-size:0.8em;color:#666;">(for multi-mode weapons)</span></h3>
+            <i class="fas fa-chevron-down"></i>
+          </div>
+          <div class="attack-modes-section section-content" style="display:none;">
+            <p class="hint">Define multiple ways to attack with this weapon (e.g., Spear: Thrust/Shaft Strike)</p>
+            <button type="button" class="add-attack-mode" style="margin-bottom:8px;">
+              <i class="fas fa-plus"></i> Add Attack Mode
+            </button>
+            <div class="attack-modes-list">
+              {{#each system.attackModes as |mode i|}}
+              <div class="attack-mode" style="border:1px solid #ccc;padding:8px;margin-bottom:8px;border-radius:4px;background:#fafafa;">
+                <div class="form-group" style="margin-bottom:8px;">
+                  <label style="display:block;margin-bottom:4px;font-weight:bold;">Mode Name:</label>
+                  <div style="display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;">
+                    <input type="text" name="system.attackModes.{{i}}.name" value="{{mode.name}}" placeholder="Mode Name (e.g., Thrust)"/>
+                    <button type="button" class="remove-attack-mode" data-index="{{i}}" title="Delete Mode"
+                            style="background:#dc3545;color:white;border:none;padding:8px 12px;border-radius:3px;cursor:pointer;min-width:80px;">
+                      <i class="fas fa-trash"></i>
+                    </button>
+                  </div>
+                </div>
+                <div class="form-row">
+                  <div class="form-group half">
+                    <label>Action Type:</label>
+                    <select name="system.attackModes.{{i}}.actionType">
+                      <option value="blunt-attack" {{#if (eq mode.actionType "blunt-attack")}}selected{{/if}}>Blunt Attack (BA)</option>
+                      <option value="edged-attack" {{#if (eq mode.actionType "edged-attack")}}selected{{/if}}>Edged Attack (EA)</option>
+                      <option value="shooting" {{#if (eq mode.actionType "shooting")}}selected{{/if}}>Shooting (Sh)</option>
+                      <option value="throwing-edged" {{#if (eq mode.actionType "throwing-edged")}}selected{{/if}}>Throwing Edged (TE)</option>
+                      <option value="throwing-blunt" {{#if (eq mode.actionType "throwing-blunt")}}selected{{/if}}>Throwing Blunt (TB)</option>
+                      <option value="energy" {{#if (eq mode.actionType "energy")}}selected{{/if}}>Energy (En)</option>
+                      <option value="force" {{#if (eq mode.actionType "force")}}selected{{/if}}>Force (Fo)</option>
+                      <option value="grappling" {{#if (eq mode.actionType "grappling")}}selected{{/if}}>Grappling (Gp)</option>
+                    </select>
+                  </div>
+                  <div class="form-group half">
+                    <label>Damage Type:</label>
+                    <select name="system.attackModes.{{i}}.damageType">
+                      <option value="BA" {{#if (eq mode.damageType "BA")}}selected{{/if}}>BA (Blunt)</option>
+                      <option value="EA" {{#if (eq mode.damageType "EA")}}selected{{/if}}>EA (Edged)</option>
+                      <option value="S" {{#if (eq mode.damageType "S")}}selected{{/if}}>S (Shooting)</option>
+                      <option value="E" {{#if (eq mode.damageType "E")}}selected{{/if}}>E (Energy)</option>
+                      <option value="F" {{#if (eq mode.damageType "F")}}selected{{/if}}>F (Force)</option>
+                      <option value="TE" {{#if (eq mode.damageType "TE")}}selected{{/if}}>TE (Throwing Edged)</option>
+                      <option value="TB" {{#if (eq mode.damageType "TB")}}selected{{/if}}>TB (Throwing Blunt)</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="form-row">
+                  <div class="form-group half">
+                    <label>Damage:</label>
+                    <input type="number" name="system.attackModes.{{i}}.damage" value="{{mode.damage}}" placeholder="10"/>
+                  </div>
+                  <div class="form-group half">
+                    <label>Ability:</label>
+                    <select name="system.attackModes.{{i}}.ability">
+                      <option value="fighting" {{#if (eq mode.ability "fighting")}}selected{{/if}}>Fighting</option>
+                      <option value="agility" {{#if (eq mode.ability "agility")}}selected{{/if}}>Agility</option>
+                      <option value="strength" {{#if (eq mode.ability "strength")}}selected{{/if}}>Strength</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label>Description:</label>
+                  <input type="text" name="system.attackModes.{{i}}.description" value="{{mode.description}}" placeholder="e.g., Thrust with the spearhead"/>
+                </div>
+              </div>
+              {{/each}}
             </div>
           </div>
         </div>
+
+        <!-- ═══ SOUND EFFECTS (collapsible) ═══════════════════════════════ -->
+        <div class="specialized-section" style="margin-bottom:10px;">
+          <div class="section-header collapsible" data-section="sfx-fields">
+            <h3>Sound Effects</h3>
+            <i class="fas fa-chevron-down"></i>
+          </div>
+          <div class="sfx-fields section-content" style="display:none;">
+
+            <div class="form-group">
+              <label>SFX (Hit)</label>
+              <div class="form-fields sfx-row">
+                <input type="text" name="system.sfx.hit" value="{{system.sfx.hit}}" placeholder="systems/msh-faserip/assets/sfx/gunshot.wav"/>
+                <button type="button" class="sfx-preview" data-sfx-field="system.sfx.hit" data-volume-field="system.sfx.hitVolume" title="Preview"><i class="fas fa-play"></i></button>
+                <input type="number" class="sfx-volume" name="system.sfx.hitVolume" value="{{system.sfx.hitVolume}}" min="0" max="100" placeholder="80" title="Volume %"/>
+                <span class="sfx-volume-label">%</span>
+                {{filePicker type="audio" target="system.sfx.hit"}}
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>SFX (Miss)</label>
+              <div class="form-fields sfx-row">
+                <input type="text" name="system.sfx.miss" value="{{system.sfx.miss}}" placeholder="systems/msh-faserip/assets/sfx/gunshot-miss.wav"/>
+                <button type="button" class="sfx-preview" data-sfx-field="system.sfx.miss" data-volume-field="system.sfx.missVolume" title="Preview"><i class="fas fa-play"></i></button>
+                <input type="number" class="sfx-volume" name="system.sfx.missVolume" value="{{system.sfx.missVolume}}" min="0" max="100" placeholder="80" title="Volume %"/>
+                <span class="sfx-volume-label">%</span>
+                {{filePicker type="audio" target="system.sfx.miss"}}
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>SFX (Out of Ammo)</label>
+              <div class="form-fields sfx-row">
+                <input type="text" name="system.sfx.empty" value="{{system.sfx.empty}}" placeholder="(optional) .../click-empty.wav"/>
+                <button type="button" class="sfx-preview" data-sfx-field="system.sfx.empty" data-volume-field="system.sfx.emptyVolume" title="Preview"><i class="fas fa-play"></i></button>
+                <input type="number" class="sfx-volume" name="system.sfx.emptyVolume" value="{{system.sfx.emptyVolume}}" min="0" max="100" placeholder="80" title="Volume %"/>
+                <span class="sfx-volume-label">%</span>
+                {{filePicker type="audio" target="system.sfx.empty"}}
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>SFX (Reload)</label>
+              <div class="form-fields sfx-row">
+                <input type="text" name="system.sfx.reload" value="{{system.sfx.reload}}" placeholder="(optional) .../reload.wav"/>
+                <button type="button" class="sfx-preview" data-sfx-field="system.sfx.reload" data-volume-field="system.sfx.reloadVolume" title="Preview"><i class="fas fa-play"></i></button>
+                <input type="number" class="sfx-volume" name="system.sfx.reloadVolume" value="{{system.sfx.reloadVolume}}" min="0" max="100" placeholder="80" title="Volume %"/>
+                <span class="sfx-volume-label">%</span>
+                {{filePicker type="audio" target="system.sfx.reload"}}
+              </div>
+            </div>
+
+          </div>
+        </div>
+
       </div>
       <!-- END weapon-fields -->
 

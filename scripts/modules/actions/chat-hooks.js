@@ -559,6 +559,7 @@ export function installActionChatHandlers() {
         const armorPiercing   = Number(btn.dataset.armorPiercing || 0) || 0;
         const armorPiercingCS = Number(btn.dataset.armorPiercingCs || 0) || 0; // note the 'Cs' in dataset
         const apMode          = btn.dataset.apMode || "value";
+        const bypassForceField = btn.dataset.bypassForceField === "true";
         const wasKillResult   = btn.dataset.isKill === "true";
 
         // 2) Apply via rules and CAPTURE RETURNED RESULTS (one entry per target)
@@ -572,7 +573,8 @@ export function installActionChatHandlers() {
           apMode,
           wasKillResult,
           showNotification: true,
-          bypassArmor
+          bypassArmor,
+          bypassForceField
         }) ?? [];
 
         debugLog("Chat Apply results", results);
