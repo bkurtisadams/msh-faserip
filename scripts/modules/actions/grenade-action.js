@@ -346,6 +346,9 @@ export class GrenadeAction extends RangedAttackAction {
     }
 
     // Apply to all targeted tokens at landing point (hit or scatter)
+    // RAW: frag/edged grenades trigger kill saves on any hit (treat as Kill-capable)
+    const isKillCapable = ["physical-edged", "energy"].includes(typeDef.damageType);
+    const wasKillResult = isKillCapable; // area hits always treated as Red (Kill column) per RAW
     if (damage > 0 && affectedTargets.length > 0) {
       await applyDamageToTargets({
         damage,
@@ -353,7 +356,9 @@ export class GrenadeAction extends RangedAttackAction {
         attackerUuid: actor.uuid,
         damageType: typeDef.damageType,
         attackForm: typeDef.damageType?.includes("edged") ? "edged" : typeDef.damageType === "energy" ? "energy" : "blunt",
-        showNotification: true
+        showNotification: true,
+        wasKillResult,
+        forceKilling: wasKillResult
       });
     }
   }

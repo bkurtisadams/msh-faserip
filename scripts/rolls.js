@@ -2858,6 +2858,25 @@ export class FaseripRolls {
         }
       }).render(true);
     }
+    else if (category === "other") {
+      // Grenades and missiles — route through ActionDispatcher same as actor sheet click
+      const weaponType = (equipment.system.weaponType || "").toLowerCase();
+      if (weaponType === "grenade" || equipment.system.grenadeType) {
+        const { ActionDispatcher } = await import("./modules/actions/action-dispatcher.js");
+        return ActionDispatcher.roll("grenade", {
+          actor,
+          abilityName: "agility",
+          opts: {
+            itemId: equipment.id,
+            item: equipment,
+            sourceItem: equipment,
+            equipment: equipment
+          }
+        });
+      } else {
+        ui.notifications.warn(`Unknown other weapon type: ${equipment.system.weaponType}`);
+      }
+    }
     else if (category === "power-item") {
       // For power items, roll using the power mechanism
       const powerRank = equipment.system.powerRank || "Typical";

@@ -13,18 +13,10 @@ export class AreaTemplate {
   // Place a circular template and wait for the user to click a location.
   // Returns an AreaTemplate instance, or null if cancelled.
   static async place({ radiusInAreas = 1, label = "AE", fillColor = "#ff0000", fillAlpha = 0.25 } = {}) {
-    // Convert radius from areas to grid units (squares)
-    // canvas.scene.grid.distance = areas per square (e.g. 0.1 means 1 area = 10 squares)
-    const areasPerSquare = canvas.scene?.grid?.distance || 0.1;
-    const radiusInSquares = radiusInAreas / areasPerSquare;
-    // Foundry template distance is in grid units (squares)
-    const distance = radiusInSquares * (canvas.scene?.grid?.size || 100);
-
-    // Build template data
     const templateData = {
       t: "circle",
       user: game.user.id,
-      distance: radiusInAreas,     // in scene units (areas) — Foundry renders (distance/grid.distance)*grid.size px
+      distance: radiusInAreas,
       direction: 0,
       x: 0,
       y: 0,
@@ -33,23 +25,20 @@ export class AreaTemplate {
       flags: { "msh-faserip": { areaTemplate: true, radiusInAreas, label } }
     };
 
-    // Create a temporary template document and enter placement mode
+    // Create a temporary doc+object for preview
     const cls = CONFIG.MeasuredTemplate.documentClass;
-    const template = new cls(templateData, { parent: canvas.scene });
-    const object = new CONFIG.MeasuredTemplate.objectClass(template);
+    const tempDoc = new cls(templateData, { parent: canvas.scene });
+    const object = new CONFIG.MeasuredTemplate.objectClass(tempDoc);
 
-    // Inject into the template layer for preview
     canvas.templates.preview.addChild(object);
     object.draw();
 
-    // Wait for user to place it
-    // Foundry v13 / PIXI v7: listen on canvas.stage with federated events
     return new Promise((resolve) => {
       const cleanup = () => {
         canvas.stage.off("mousemove", moveHandler);
         canvas.stage.off("click", clickHandler);
         canvas.stage.off("rightclick", cancelHandler);
-        canvas.templates.preview.removeChild(object);
+        try { canvas.templates.preview.removeChild(object); } catch(e) {}
       };
 
       const moveHandler = (event) => {
@@ -63,13 +52,11 @@ export class AreaTemplate {
         const pos = event.getLocalPosition(canvas.templates);
         const snapped = canvas.templates.getSnappedPoint(pos);
         cleanup();
-
         const [doc] = await canvas.scene.createEmbeddedDocuments("MeasuredTemplate", [{
           ...templateData,
           x: snapped.x,
           y: snapped.y
         }]);
-
         resolve(new AreaTemplate(doc));
       };
 
