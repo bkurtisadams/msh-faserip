@@ -3748,6 +3748,19 @@ form.faserip-sheet .recovery-btn:disabled:hover {
   border-color: #c0c0c0;
   box-shadow: none;
 }
+
+form.faserip-sheet .recovery-btn.used-today:disabled {
+  background: #e8f5e9;
+  border-color: #a5d6a7;
+  color: #558b2f;
+  opacity: 0.7;
+}
+
+form.faserip-sheet .recovery-btn.used-today:disabled:hover {
+  background: #e8f5e9;
+  border-color: #a5d6a7;
+  box-shadow: none;
+}
 /* stack header + mini icon only for these two columns */
 .sec-col.resources .sec-head,
 .sec-col.popularity .sec-head {

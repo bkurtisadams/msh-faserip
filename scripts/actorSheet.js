@@ -265,6 +265,10 @@ export class FaseripActorSheet extends ActorSheet {
     // Crisis row visibility: show Wake Up / Stabilize only when relevant
     const currentHP = context.system?.attributes?.health?.value ?? 1;
     context.isInCrisis = context.isDying || currentHP === 0;
+
+    // Recovery button: disable if already used today
+    const lastRecoveryDate = this.actor.getFlag(scope, "lastRecoveryDate");
+    context.recoveryUsedToday = lastRecoveryDate === new Date().toDateString();
     
     return context;
   }

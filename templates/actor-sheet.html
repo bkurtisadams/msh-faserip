@@ -595,8 +595,8 @@
         </div>
         <div class="recovery-buttons">
           <div class="recovery-row">
-            <button type="button" class="recovery-btn" data-action="recovery" title="Attempt Recovery (10 rounds)&#10;Regain Health equal to Endurance rank">
-              <i class="fas fa-clock"></i> Recovery (10 rnd)
+            <button type="button" class="recovery-btn{{#if recoveryUsedToday}} used-today{{/if}}" data-action="recovery" {{#if recoveryUsedToday}}disabled{{/if}} title="Attempt Recovery (10 rounds)&#10;Regain Health equal to Endurance rank{{#if recoveryUsedToday}}&#10;Already used today{{/if}}">
+              <i class="fas {{#if recoveryUsedToday}}fa-check{{else}}fa-clock{{/if}}"></i> {{#if recoveryUsedToday}}Recovered{{else}}Recovery (10 rnd){{/if}}
             </button>
             <button type="button" class="recovery-btn" data-action="healing" title="Attempt Healing (1 hour)&#10;Regain Health equal to Endurance rank">
               <i class="fas fa-heart"></i> Healing (1 hr)
