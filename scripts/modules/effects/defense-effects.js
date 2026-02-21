@@ -1,4 +1,5 @@
-// scripts/modules/effects/defense-effects.js v1.0.0 - 2026-02-12
+// scripts/modules/effects/defense-effects.js v1.0.1 - 2026-02-21
+// v1.0.1: Strip token badge icons from passive defense AEs (body armor, force field, resistance)
 // Passive defense Active Effects for Body Armor, Force Field, and Resistance powers.
 // These are always-on (no timer/cycle), toggleable, and auto-sync from power items.
 // The mitigation pipeline reads protection values from AE flags.
@@ -120,9 +121,7 @@ function buildBodyArmorAE(item, values) {
 
   return {
     name: label,
-    img: values.armorNature === "artificial"
-      ? "icons/svg/shield.svg"
-      : "icons/svg/statue.svg",
+    img: "",  // no token badge - passive defense tracked in effects list only
     disabled: false,
     changes: [],
     statuses: ["body-armor"],
@@ -151,10 +150,7 @@ function buildForceFieldAE(item, values) {
 
   return {
     name: label,
-    img: "icons/svg/aura.svg",
-    disabled: false,
-    changes: [],
-    statuses: ["force-field"],
+    img: "",  // no token badge - passive defense tracked in effects list only
     flags: {
       [scope]: {
         effectCategory: "defense",
@@ -186,9 +182,7 @@ function buildResistanceAE(item, values) {
 
   return {
     name: label,
-    img: values.isInvulnerability
-      ? "icons/svg/daze.svg"
-      : "icons/svg/ice-aura.svg",
+    img: "",  // no token badge - passive defense tracked in effects list only
     disabled: false,
     changes: [],
     statuses: [`resistance-${values.resistanceType}`],

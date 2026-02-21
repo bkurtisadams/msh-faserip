@@ -1,4 +1,5 @@
-// action-utils.js v1.5.0 - 2026-02-07
+// action-utils.js v1.5.1 - 2026-02-21
+// v1.5.1: Fix setupModeSelector ignoring global mode - per-dialog mode now capped at global setting
 // v1.5.0: getBodyArmorValues checks for active Blocking effect (Strength as Body Armor)
 // v1.4.1: Fix computeBluntDamage to respect weapon minimum base damage per FASERIP rules
 // v1.4.0: Add showGrappleBack chip for Reverse escape result
@@ -218,8 +219,19 @@ export function getAttackEffectPath(attackType, color = "blue", variant = "01") 
  * @returns {string} Current mode value
  */
 export async function setupModeSelector(actor, $html, opts = {}, flagName = "lastActionMode") {
-  // Load saved mode
-  const savedMode = (await actor.getFlag("msh-faserip", flagName)) || "semi";
+  // Global mode is the ceiling - never allow per-dialog to exceed it
+  let globalMode = "semi";
+  try {
+    globalMode = game.settings?.get?.("msh-faserip", "defaultCombatMode") || "semi";
+  } catch (_) {}
+
+  const modeRank = { manual: 0, semi: 1, full: 2 };
+  const globalRank = modeRank[globalMode] ?? 1;
+
+  // Load saved mode but cap it at global
+  const rawSaved = (await actor.getFlag("msh-faserip", flagName)) || "semi";
+  const savedRank = modeRank[rawSaved] ?? 1;
+  const savedMode = savedRank <= globalRank ? rawSaved : globalMode;
   
   // Initialize opts
   opts.mode = savedMode;
