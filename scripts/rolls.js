@@ -1500,7 +1500,7 @@ export class FaseripRolls {
         
         effectiveRankDisplay = `
           <div style="margin-bottom: 10px; padding: 8px; background: #e8f5e9; border: 1px solid #4caf50; border-radius: 4px;">
-            <div style="font-weight: bold; color: #2e7d32; margin-bottom: 4px;">★ ULTIMATE SKILL OVERRIDE</div>
+            <div style="font-weight: bold; color: #2e7d32; margin-bottom: 4px;">★ RANK OVERRIDE</div>
             <div style="font-size: 0.9em;">
               ${baseRank} → <strong>${rankOverride}</strong> (+${overrideShift} CS)
             </div>
@@ -1535,7 +1535,7 @@ export class FaseripRolls {
         "Shift-X", "Shift-Y", "Shift-Z"
       ];
       const intensityOptionsHTML = INTENSITY_RANKS.map(rank => 
-        `<option value="${rank}" ${rank === savedIntensity ? 'selected' : ''}>${rank || '(None - any color succeeds)'}</option>`
+        `<option value="${rank}" ${rank === savedIntensity ? 'selected' : ''}>${rank || '(None - Green or better succeeds)'}</option>`
       ).join('');
       
       // Build ability dropdown options
@@ -1807,7 +1807,7 @@ export class FaseripRolls {
               
               effectiveRankContainer.html(`
                 <div style="margin-bottom: 10px; padding: 8px; background: #e8f5e9; border: 1px solid #4caf50; border-radius: 4px;">
-                  <div style="font-weight: bold; color: #2e7d32; margin-bottom: 4px;">★ ULTIMATE SKILL OVERRIDE</div>
+                  <div style="font-weight: bold; color: #2e7d32; margin-bottom: 4px;">★ RANK OVERRIDE</div>
                   <div style="font-size: 0.9em;">
                     ${currentRank} → <strong>${rankOverride}</strong> (+${overrideShift} CS)
                   </div>
@@ -1990,19 +1990,22 @@ export class FaseripRolls {
       // Get contact type
       const contactType = contact.system.type || "General";
 
-      // Determine effective disposition (normally Friendly, but affected by negative popularity)
-      let effectiveDisposition = "Friendly";
-      if (heroPopularity < 0) {
-        effectiveDisposition = "Neutral";
-      }
+      // Disposition: base on stored contact value, degrade one step on negative popularity
+      const DISP_ORDER = ["Friendly", "Neutral", "Suspicious", "Hostile"];
+      const storedDisposition = contact.system.disposition || "Friendly";
+      const storedDispIdx = DISP_ORDER.indexOf(storedDisposition);
+      const effectiveDispIdx = (heroPopularity < 0)
+        ? Math.min(storedDispIdx + 1, DISP_ORDER.length - 1)
+        : storedDispIdx;
+      const effectiveDisposition = DISP_ORDER[effectiveDispIdx] ?? "Friendly";
 
       // Map disposition to required FEAT color
       let requiredFeatColor;
       switch (effectiveDisposition) {
-        case "Friendly": requiredFeatColor = "Green"; break;
-        case "Neutral": requiredFeatColor = "Yellow"; break;
+        case "Friendly":   requiredFeatColor = "Green"; break;
+        case "Neutral":    requiredFeatColor = "Yellow"; break;
         case "Suspicious": requiredFeatColor = "Red"; break;
-        case "Hostile": requiredFeatColor = "Impossible"; break;
+        case "Hostile":    requiredFeatColor = "Impossible"; break;
       }
 
       // Apply column shifts to get effective rank
@@ -2013,9 +2016,8 @@ export class FaseripRolls {
         console.log(`Applied ${columnShift} column shifts to ${heroPopularityRank}, now ${effectiveRank}`);
       }
 
-      // Apply mutant penalty if applicable
-      if (isMutant) {
-        // Apply a -1CS to reflect mutant penalty
+      // Apply mutant penalty if applicable (skipped for mutant-friendly contacts)
+      if (isMutant && !contact.system.ignoreMutantPenalty) {
         const shifted = applyColumnShifts(effectiveRank, -1);
         effectiveRank = shifted.name;
         console.log(`Applied -1CS mutant penalty, now ${effectiveRank}`);
@@ -2052,20 +2054,17 @@ export class FaseripRolls {
           break;
       }
 
-      // Determine resource level based on contact type (simplified for brevity)
-      let resourceLevel = "Typical";
-      switch (contactType) {
-        case "Law Enforcement": resourceLevel = "Remarkable"; break;
-        case "Military": resourceLevel = "Amazing"; break;
-        case "Business World": resourceLevel = "Incredible"; break;
-        case "Journalism": resourceLevel = "Poor"; break;
-        case "Scientific": resourceLevel = "Good"; break;
-        case "State": resourceLevel = "Remarkable"; break;
-        case "National": resourceLevel = "Monstrous"; break;
-        case "International": resourceLevel = "Monstrous"; break;
-        case "Planetary": resourceLevel = "Unearthly"; break;
-        default: resourceLevel = "Typical";
-      }
+      // Resource level by actual contact type names used in the contact sheet
+      const CONTACT_RESOURCE_LEVELS = {
+        "Professional":  "Remarkable",
+        "Scientific":    "Incredible",
+        "Political":     "Amazing",
+        "Mystic":        "Good",
+        "Criminal":      "Typical",
+        "Hero Group":    "Incredible",
+        "Other":         "Typical"
+      };
+      const resourceLevel = CONTACT_RESOURCE_LEVELS[contactType] ?? "Typical";
 
       // Define all possible results by color 
       const ALL_RESULTS = {
@@ -2123,8 +2122,8 @@ export class FaseripRolls {
           </div>
           <div style="padding: 5px 10px; font-size: 0.9em;">
             <div>Popularity: ${heroPopularityRank} (${heroPopularity})</div>
-            <div>Disposition: ${effectiveDisposition} (Required: ${requiredFeatColor})</div>
-            ${isMutant ? '<div style="color: #aa0000;">Mutant Penalty Applied (-1CS)</div>' : ''}
+            <div>Disposition: ${storedDisposition}${effectiveDisposition !== storedDisposition ? ` → ${effectiveDisposition} (negative popularity)` : ''} (Required: ${requiredFeatColor})</div>
+            ${isMutant && !contact.system.ignoreMutantPenalty ? '<div style="color: #aa0000;">Mutant Penalty Applied (-1CS)</div>' : ''}
             <div>Effective Rank: ${heroPopularityRank} ${columnShift !== 0 ? `→ ${effectiveRank} (${columnShift > 0 ? '+' : ''}${columnShift}CS)` : ''}</div>
             <div>Roll: ${roll.total} + Karma: ${karmaUsed} = ${cappedTotal}</div>
           </div>
@@ -2177,19 +2176,22 @@ export class FaseripRolls {
       const heroPopularityRank = actor.system.attributes?.popularity?.rank || "Typical";
       const isMutant = actor.system.powerOrigin === "mutant" || actor.system.isMutant;
 
-      // Determine effective disposition (normally Friendly, but affected by negative popularity)
-      let effectiveDisposition = "Friendly";
-      if (heroPopularity < 0) {
-        effectiveDisposition = "Neutral";
-      }
+      // Disposition: base on stored contact value, degrade one step on negative popularity
+      const DISP_ORDER_D = ["Friendly", "Neutral", "Suspicious", "Hostile"];
+      const storedDispD = contact.system.disposition || "Friendly";
+      const storedIdxD = DISP_ORDER_D.indexOf(storedDispD);
+      const effectiveIdxD = (heroPopularity < 0)
+        ? Math.min(storedIdxD + 1, DISP_ORDER_D.length - 1)
+        : storedIdxD;
+      const effectiveDisposition = DISP_ORDER_D[effectiveIdxD] ?? "Friendly";
 
       // Map disposition to required FEAT color
       let requiredFeatColor;
       switch (effectiveDisposition) {
-        case "Friendly": requiredFeatColor = "Green"; break;
-        case "Neutral": requiredFeatColor = "Yellow"; break;
+        case "Friendly":   requiredFeatColor = "Green"; break;
+        case "Neutral":    requiredFeatColor = "Yellow"; break;
         case "Suspicious": requiredFeatColor = "Red"; break;
-        case "Hostile": requiredFeatColor = "Impossible"; break;
+        case "Hostile":    requiredFeatColor = "Impossible"; break;
       }
 
       // Create dialog for roll options

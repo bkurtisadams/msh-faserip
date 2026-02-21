@@ -2048,40 +2048,33 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
 
       // Get contact type and determine potential resource level
       const contactType = item.system.type || "General";
-      let resourceLevel = "Typical";
+      const CONTACT_RESOURCE_LEVELS = {
+        "Professional":  "Remarkable",
+        "Scientific":    "Incredible",
+        "Political":     "Amazing",
+        "Mystic":        "Good",
+        "Criminal":      "Typical",
+        "Hero Group":    "Incredible",
+        "Other":         "Typical"
+      };
+      const resourceLevel = CONTACT_RESOURCE_LEVELS[contactType] ?? "Typical";
 
-      // Determine resource level based on contact type (from your provided info)
-      switch (contactType) {
-        case "Law Enforcement": resourceLevel = "Remarkable"; break;
-        case "Military": resourceLevel = "Amazing"; break;
-        case "Business World": resourceLevel = "Incredible"; break;
-        case "Journalism": resourceLevel = "Poor"; break;
-        case "Crime":
-          // Resources depend on level, let's assume Typical
-          resourceLevel = "Typical";
-          break;
-        case "Espionage": resourceLevel = "Incredible"; break;
-        case "Scientific": resourceLevel = "Good"; break;
-        case "State": resourceLevel = "Remarkable"; break;
-        case "National": resourceLevel = "Monstrous"; break;
-        case "International": resourceLevel = "Monstrous"; break;
-        case "Planetary": resourceLevel = "Unearthly"; break;
-        default: resourceLevel = "Typical";
-      }
-
-      // Determine effective disposition (normally Friendly, but affected by negative popularity)
-      let effectiveDisposition = "Friendly";
-      if (heroPopularity < 0) {
-        effectiveDisposition = "Neutral";
-      }
+      // Disposition: base on stored contact value, degrade one step on negative popularity
+      const DISP_ORDER = ["Friendly", "Neutral", "Suspicious", "Hostile"];
+      const storedDisposition = item.system.disposition || "Friendly";
+      const storedDispIdx = DISP_ORDER.indexOf(storedDisposition);
+      const effectiveDispIdx = (heroPopularity < 0)
+        ? Math.min(storedDispIdx + 1, DISP_ORDER.length - 1)
+        : storedDispIdx;
+      const effectiveDisposition = DISP_ORDER[effectiveDispIdx] ?? "Friendly";
 
       // Map disposition to required FEAT color
       let requiredFeatColor;
       switch (effectiveDisposition) {
-        case "Friendly": requiredFeatColor = "Green"; break;
-        case "Neutral": requiredFeatColor = "Yellow"; break;
+        case "Friendly":   requiredFeatColor = "Green"; break;
+        case "Neutral":    requiredFeatColor = "Yellow"; break;
         case "Suspicious": requiredFeatColor = "Red"; break;
-        case "Hostile": requiredFeatColor = "Impossible"; break;
+        case "Hostile":    requiredFeatColor = "Impossible"; break;
       }
 
       // Create dialog for roll options
@@ -2173,15 +2166,14 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
                 }
               }
 
-              // Apply mutant penalty if applicable
-              if (isMutant) {
-                // Apply a -1CS to reflect mutant penalty
+              // Apply mutant penalty if applicable (skipped for mutant-friendly contacts)
+              if (isMutant && !item.system.ignoreMutantPenalty) {
                 const ranks = [
                   "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent",
                   "Remarkable", "Incredible", "Amazing", "Monstrous", "Unearthly"
                 ];
                 const index = ranks.indexOf(effectiveRank);
-                if (index > 0) { // Don't go below Shift-0
+                if (index > 0) {
                   effectiveRank = ranks[index - 1];
                   console.log(`Applied -1CS mutant penalty, now ${effectiveRank}`);
                 }
@@ -2310,8 +2302,8 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
               </div>
               <div style="padding: 5px 10px; font-size: 0.9em;">
                 <div>Popularity: ${heroPopularityRank} (${heroPopularity})</div>
-                <div>Disposition: ${effectiveDisposition} (Required: ${requiredFeatColor})</div>
-                ${isMutant ? '<div style="color: #aa0000;">Mutant Penalty Applied (-1CS)</div>' : ''}
+                <div>Disposition: ${storedDisposition}${effectiveDisposition !== storedDisposition ? ` → ${effectiveDisposition} (negative popularity)` : ''} (Required: ${requiredFeatColor})</div>
+                ${isMutant && !item.system.ignoreMutantPenalty ? '<div style="color: #aa0000;">Mutant Penalty Applied (-1CS)</div>' : ''}
                 <div>Effective Rank: ${heroPopularityRank} ${columnShift !== 0 ? `→ ${effectiveRank} (${columnShift > 0 ? '+' : ''}${columnShift}CS)` : ''}</div>
 
                 <div>Roll: ${roll.total} + Karma: ${totalKarmaUsed} = ${cappedTotal}</div>
