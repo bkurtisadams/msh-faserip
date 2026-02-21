@@ -1,5 +1,6 @@
-// scripts/modules/actions/throwing-edged-action.js v1.0.1 - 2026-02-19
-// v1.0.1: Fix auto-apply call - applyDamageToTargets takes a single destructured object, not positional args
+// scripts/modules/actions/throwing-edged-action.js v1.1.0 - 2026-02-20
+// v1.1.0: Allow any edged weapon to be thrown (not just weaponType=thrown); remove physical-edged from filter;
+//         normalize downstream damageType to physical-edged; remove debug console.log block
 import { RangedAttackAction } from "./ranged-attack-action.js";
 import { attachAutoFillRange } from "./action-utils.js";
 // NOTE: resolveCombatMode imported dynamically if needed
@@ -50,51 +51,37 @@ export class ThrowingEdgedAction extends RangedAttackAction {
       if (i.type !== "equipment" || String(i.system?.category ?? "").toLowerCase() !== "weapon") return false;
 
       const s = i.system ?? {};
-      
-      // Check if weapon has a throwing-edged attack mode
+
+      // Check if weapon has an explicit throwing-edged attack mode
       if (s.attackModes) {
         const modes = Object.values(s.attackModes);
-        const hasThrowingEdged = modes.some(m => 
-          m.actionType === "throwing-edged" || 
-          (m.damageType === "TE" && m.name?.toLowerCase().includes("throw"))
-        );
-        if (hasThrowingEdged) return true;
+        if (modes.some(m => m.actionType === "throwing-edged" ||
+            (m.damageType === "TE" && m.name?.toLowerCase().includes("throw")))) return true;
       }
-      
-      // EXISTING LOGIC BELOW (keep all of this):
-      const tags = (s.tags ?? []).map(t => String(t).toLowerCase());
-      const forms = Array.isArray(s.attackForms) ? s.attackForms.map(f => String(f).toLowerCase()) : [];
-      const props = s.properties ?? {};
 
-      const weaponType  = String(s.weaponType ?? "").toLowerCase();
-      const category    = String(s.category ?? "").toLowerCase();
-      const damageType  = String(s.damageType ?? "").toLowerCase();
-      const attackType  = String(s.attackType ?? "").toLowerCase();
+      const tags       = (s.tags ?? []).map(t => String(t).toLowerCase());
+      const forms      = Array.isArray(s.attackForms) ? s.attackForms.map(f => String(f).toLowerCase()) : [];
+      const weaponType = String(s.weaponType ?? "").toLowerCase();
+      const damageType = String(s.damageType ?? "").toUpperCase();
+      const attackType = String(s.attackType ?? "").toLowerCase();
 
-      // Ways to consider a weapon "throwable"
-      const isThrowable =
-        props.throwable === true ||
-        weaponType === "thrown" ||
-        category === "throwing" ||
-        tags.includes("thrown") ||
-        forms.includes("throwing") ||
-        forms.includes("throwing-edged");
-
-      // Ways to consider a weapon "edged"
+      // Any edged weapon can be thrown (melee or designated thrown)
       const isEdged =
-        damageType === "ea" ||
-        damageType === "te" ||
+        damageType === "EA" ||
+        damageType === "TE" ||
         attackType === "edged" ||
         attackType === "throwing-edged" ||
         tags.includes("edged") ||
         tags.includes("ea") ||
         tags.includes("te") ||
-        damageType === "edged" ||
-        damageType === "physical-edged" ||
         forms.includes("edged") ||
         forms.includes("throwing-edged");
 
-      return isThrowable && isEdged;
+      // Exclude firearms/shooting weapons
+      const isShooting = weaponType === "shooting" || weaponType === "firearm" ||
+        damageType === "S" || attackType === "shooting";
+
+      return isEdged && !isShooting;
     });
 
     // If a specific item was passed via opts, ensure it's in the list and pre-selected
@@ -224,19 +211,6 @@ export class ThrowingEdgedAction extends RangedAttackAction {
                   ui.notifications.error("Select a carried thrown-edged weapon or use ad-hoc.");
                   return resolve(null);
                 }
-                // DEBUG BLOCK:
-                console.log("=== THROWING WEAPON SELECTED ===");
-                console.log("Weapon:", weapon.name);
-                console.log("Attack modes:", weapon.system.attackModes);
-                console.log("Root damage:", weapon.system.damage);
-                console.log("Root AP CS:", weapon.system.armorPiercingCS);
-                console.log("Root AP mode:", weapon.system.apMode);
-                
-                // Find the throwing-edged mode
-                const throwMode = Object.values(weapon.system.attackModes || {})
-                  .find(m => m.actionType === "throwing-edged");
-                console.log("Throwing mode found:", throwMode);
-                console.log("================================");
                 
                 weaponId = wid;
                 weaponName = weapon.name;
@@ -245,7 +219,9 @@ export class ThrowingEdgedAction extends RangedAttackAction {
                 weaponAP = getArmorPiercing(weapon);
                 weaponAPCS = Number(weapon.system?.armorPiercingCS || 0) || 0;
                 weaponAPMode = weapon.system?.apMode || "value";
-                weaponDamageType = String(weapon.system?.damageType || "physical-edged").toLowerCase();
+                // Normalize to downstream type string
+                const rawDt = String(weapon.system?.damageType || "").toUpperCase();
+                weaponDamageType = (rawDt === "EA" || rawDt === "TE" || rawDt === "edged") ? "physical-edged" : "physical-edged";
               }
 
               const shift = Number($('[name="shift"]').val() || 0);

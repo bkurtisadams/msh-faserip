@@ -13,6 +13,7 @@
           <option value="power-item" {{#if (eq system.category "power-item")}}selected{{/if}}>Power Item</option>
           <option value="custom" {{#if (eq system.category "custom")}}selected{{/if}}>Custom</option>
           <option value="gear" {{#if (eq system.category "gear")}}selected{{/if}}>Gear</option>
+          <option value="other" {{#if (eq system.category "other")}}selected{{/if}}>Other Weapon</option>
         </select>
       </div>
   
@@ -351,6 +352,76 @@
           </div>
         </div>
 
+        <!-- Special Ammunition -->
+        <div class="specialized-section">
+          <div class="section-header collapsible" data-section="ammo-fields">
+              <h3>Available Weapon Variants</h3>
+              <i class="fas fa-chevron-down"></i>
+            </div>
+            <div class="ammo-fields section-content" style="display: none;">
+              <div class="form-group">
+                <label>Check which variants this weapon can use (unchecked = all available):</label>
+              <div class="ammo-types-grid">
+                <div class="ammo-type-item">
+                  <input type="checkbox" name="system.specialAmmo.mercy" {{checked system.specialAmmo.mercy}}/>
+                  <label>Mercy Shot</label>
+                </div>
+                <div class="ammo-type-item">
+                  <input type="checkbox" name="system.specialAmmo.ap" {{checked system.specialAmmo.ap}}/>
+                  <label>Armor Piercing</label>
+                </div>
+                <div class="ammo-type-item">
+                  <input type="checkbox" name="system.specialAmmo.rubber" {{checked system.specialAmmo.rubber}}/>
+                  <label>Rubber Shot</label>
+                </div>
+                <div class="ammo-type-item">
+                  <input type="checkbox" name="system.specialAmmo.explosive" {{checked system.specialAmmo.explosive}}/>
+                  <label>Explosive Shot</label>
+                </div>
+                <div class="ammo-type-item">
+                  <input type="checkbox" name="system.specialAmmo.canister" {{checked system.specialAmmo.canister}}/>
+                  <label>Canister Shot</label>
+                </div>
+                <div class="ammo-type-item">
+                  <input type="checkbox" name="system.specialAmmo.heatSeeker" {{checked system.specialAmmo.heatSeeker}}/>
+                  <label>Heat-Seeker</label>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- END weapon-fields -->
+
+      <!-- Other Weapon fields (grenade, missile) -->
+      <div class="other-fields" {{#unless (eq system.category "other")}}style="display: none;"{{/unless}}>
+        <div class="form-group">
+          <label>Weapon Type:</label>
+          <select name="system._otherWeaponType" class="other-weapon-type-select">
+            <option value="" {{#if (eq system.weaponType "")}}selected{{/if}}>Select Type</option>
+            <option value="grenade" {{#if (eq system.weaponType "grenade")}}selected{{/if}}>Grenade</option>
+            <option value="missile" {{#if (eq system.weaponType "missile")}}selected{{/if}}>Missile</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Quantity:</label>
+          <input type="number" name="system._otherShots" value="{{system.shots}}" min="0" step="1"/>
+          <p class="notes">Starting count. Decrements when used.</p>
+        </div>
+
+        <div class="form-group">
+          <label>Legality:</label>
+          <select name="system._otherLegality">
+            <option value="legal" {{#if (eq system.legality "legal")}}selected{{/if}}>Legal</option>
+            <option value="restricted" {{#if (eq system.legality "restricted")}}selected{{/if}}>Restricted</option>
+            <option value="military" {{#if (eq system.legality "military")}}selected{{/if}}>Military Only</option>
+            <option value="illegal" {{#if (eq system.legality "illegal")}}selected{{/if}}>Illegal</option>
+          </select>
+        </div>
+
+        <!-- Grenade sub-fields -->
+        <div class="other-grenade-fields" {{#unless (eq system.weaponType "grenade")}}style="display: none;"{{/unless}}>
         <!-- Grenade Fields -->
         <div class="specialized-section">
           <div class="section-header collapsible" data-section="grenade-fields">
@@ -414,7 +485,10 @@
             </div>
           </div>
         </div>
+        </div>
 
+        <!-- Missile sub-fields -->
+        <div class="other-missile-fields" {{#unless (eq system.weaponType "missile")}}style="display: none;"{{/unless}}>
         <!-- Missile Fields -->
         <div class="specialized-section">
           <div class="section-header collapsible" data-section="missile-fields">
@@ -512,47 +586,10 @@
             </div>
           </div>
         </div>
-
-        <!-- Special Ammunition -->
-        <div class="specialized-section">
-          <div class="section-header collapsible" data-section="ammo-fields">
-              <h3>Available Weapon Variants</h3>
-              <i class="fas fa-chevron-down"></i>
-            </div>
-            <div class="ammo-fields section-content" style="display: none;">
-              <div class="form-group">
-                <label>Check which variants this weapon can use (unchecked = all available):</label>
-              <div class="ammo-types-grid">
-                <div class="ammo-type-item">
-                  <input type="checkbox" name="system.specialAmmo.mercy" {{checked system.specialAmmo.mercy}}/>
-                  <label>Mercy Shot</label>
-                </div>
-                <div class="ammo-type-item">
-                  <input type="checkbox" name="system.specialAmmo.ap" {{checked system.specialAmmo.ap}}/>
-                  <label>Armor Piercing</label>
-                </div>
-                <div class="ammo-type-item">
-                  <input type="checkbox" name="system.specialAmmo.rubber" {{checked system.specialAmmo.rubber}}/>
-                  <label>Rubber Shot</label>
-                </div>
-                <div class="ammo-type-item">
-                  <input type="checkbox" name="system.specialAmmo.explosive" {{checked system.specialAmmo.explosive}}/>
-                  <label>Explosive Shot</label>
-                </div>
-                <div class="ammo-type-item">
-                  <input type="checkbox" name="system.specialAmmo.canister" {{checked system.specialAmmo.canister}}/>
-                  <label>Canister Shot</label>
-                </div>
-                <div class="ammo-type-item">
-                  <input type="checkbox" name="system.specialAmmo.heatSeeker" {{checked system.specialAmmo.heatSeeker}}/>
-                  <label>Heat-Seeker</label>
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
-      <!-- END weapon-fields -->
+      <!-- END other-fields -->
+
   
       <!-- Armor-specific fields -->
       <div class="armor-fields" {{#unless (eq system.category "armor")}}style="display: none;"{{/unless}}>

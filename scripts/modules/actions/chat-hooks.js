@@ -1,4 +1,6 @@
-// chat-hooks.js v1.5.3 - 2026-02-08
+// chat-hooks.js v1.5.5 - 2026-02-20
+// v1.5.5: Fix reload handler - resolve synthetic token actors via canvas.tokens
+// v1.5.4: Add reload button handler for out-of-ammo chat card
 // v1.5.3: Fix dodge reapply - add movementMult and selfPenaltyCS to AE changes (was missing same as defense-action.js)
 // v1.5.2: Fix createEvadingEffect - pass evadeSuccessful/autoHit to applyEvade for proper flag tracking
 // v1.5.1: Wire dodge CS penalty to Active Effect changes (defenseShift/defenseShiftRanged)
@@ -459,6 +461,34 @@ export function installActionChatHandlers() {
         targetEndurance, 
         slamDistance 
       });
+    });
+
+    // Reload weapon from out-of-ammo chat card
+    html.on("click", ".faserip-reload-weapon", async (ev) => {
+      ev.preventDefault();
+      const btn = ev.currentTarget;
+      const actorId  = btn.dataset.actorId;
+      const itemId   = btn.dataset.itemId;
+      const tokenId  = btn.dataset.tokenId;
+
+      // Resolve actor: world actor first, then synthetic token actor
+      let actor = game.actors?.get(actorId);
+      if (!actor && tokenId) {
+        actor = canvas.tokens?.get(tokenId)?.actor;
+      }
+      if (!actor) {
+        ui.notifications.warn("Could not find actor to reload.");
+        return;
+      }
+
+      const item = actor.items?.get(itemId);
+      if (!item) { ui.notifications.warn("Could not find weapon to reload."); return; }
+
+      const fullShots = item.system.shots || 0;
+      await item.update({ "system.shotsRemaining": fullShots });
+      btn.textContent = `✓ ${item.name} reloaded (${fullShots})`;
+      btn.disabled = true;
+      btn.style.background = "#2e7d32";
     });
 
     // 4b) Slam Collision button (from slam check results)

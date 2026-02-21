@@ -350,7 +350,9 @@ export class DeathSaveAction extends BaseAction {
     ];
     const i = order.indexOf(startRank);
     if (i < 0) return `${startRank} → … → Shift-0 → Death`;
-    const tail = order.slice(Math.max(0, i - 3), i + 1);
-    return tail.join(" → ") + " → … → Shift-0 → Death";
+    // Show up to 4 ranks descending from current toward Shift-0
+    const descent = order.slice(Math.max(0, i - 3), i + 1).reverse();
+    if (i <= 3) return descent.join(" → ") + " → Death";
+    return descent.join(" → ") + " → … → Shift-0 → Death";
   }
 }

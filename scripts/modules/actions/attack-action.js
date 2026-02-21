@@ -1,4 +1,6 @@
-// attack-action.js v1.9.14 - 2026-02-07
+// attack-action.js v1.9.16 - 2026-02-20
+// v1.9.16: Fix reload button - store token ID for synthetic actor lookup
+// v1.9.15: Add reload button to out-of-ammo chat card
 // v1.9.14: Evasion chat card shows real roll color instead of fake White; damage shows "evaded" not "miss"
 // v1.9.13: Fix evasion bonus - apply to attack shift BEFORE roll so it shows in CS breakdown and effective rank
 // v1.9.12: Fix chat card to display modified result after evasion bonus (use targetBg/targetFg/targetEffectResult)
@@ -407,7 +409,16 @@ export class AttackAction extends BaseAction {
             speaker: ChatMessage.getSpeaker({ actor }),
             content: `
               <div style="background:#fff;border:1px solid #bbb;border-radius:3px;padding:6px 8px;">
-                <b>${actor.name}</b> pulls the trigger — <i>click!</i> <span style="color:#888">(empty)</span>
+                <b>${actor.name}</b> pulls the trigger — <i>click!</i> <span style="color:#888">(${weapon.name} empty)</span>
+                <div style="margin-top:6px;">
+                  <button class="faserip-reload-weapon"
+                          data-item-id="${weapon.id}"
+                          data-actor-id="${actor.id}"
+                          data-token-id="${actor.token?.id ?? actor.getActiveTokens?.()?.[0]?.id ?? ''}"
+                          style="background:#8b0000;color:#fff;border:none;border-radius:3px;padding:3px 10px;cursor:pointer;font-size:.85em;">
+                    ↺ Reload ${weapon.name}
+                  </button>
+                </div>
               </div>
             `
           });

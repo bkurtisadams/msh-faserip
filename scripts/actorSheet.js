@@ -1,4 +1,5 @@
-// actorSheet.js v2.0.0 - 2026-02-01
+// actorSheet.js v2.1.0 - 2026-02-20
+// v2.1.0: Equipment tab - group by category, hide empty groups, decode damage type codes
 // v2.0.0: Fix equipment roll routing for Energy/Force/Grappling/Grabbing damage types
 // v1.9.0: Log Resource and Popularity FEATs to karma history
 // v1.8.0: Add clickable Teleport label for movement FEAT dialog
@@ -416,6 +417,18 @@ export class FaseripActorSheet extends ActorSheet {
   // In actorSheet.js, add to the activateListeners function
   activateListeners(html) {
     super.activateListeners(html);
+
+    // Inline item-field edits (e.g. shotsRemaining count on equipment rows)
+    html.find('.item-field').change(async ev => {
+      const input  = ev.currentTarget;
+      const itemId = input.dataset.itemId;
+      const field  = input.name;          // e.g. "system.shotsRemaining"
+      const value  = Number(input.value);
+      if (!itemId || !field) return;
+      const item = this.actor.items.get(itemId);
+      if (!item) return;
+      await item.update({ [field]: value });
+    });
 
     // Apply visual indicators for Endurance impairment and health max reduction
     this._applyImpairmentIndicators(html);
@@ -2338,6 +2351,23 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
       }).render(true);
     });
 
+    // Equipment tab: hide empty groups, decode damage type badges
+    const dtypeLabels = {
+      S: "Shooting", E: "Energy", F: "Force",
+      EA: "Edged", BA: "Blunt", TE: "Throw-Edged", TB: "Throw-Blunt",
+      GP: "Grappling", Gb: "Grabbing", Stun: "Stunning"
+    };
+    html.find('.equip-group').each(function() {
+      const group = $(this);
+      const hasRows = group.find('tbody tr').length > 0;
+      if (!hasRows) group.hide();
+    });
+    html.find('.equipment-type-badge').each(function() {
+      const el = $(this);
+      const code = el.data('dtype') || el.text().trim();
+      if (dtypeLabels[code]) el.text(dtypeLabels[code]);
+    });
+
     // Add Equipment button
     html.find('.add-equipment').click(ev => {
       console.log("Add Equipment button clicked"); // Debug line
@@ -2405,6 +2435,14 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
         content += `
           <p><strong>Protection:</strong> ${item.system.protection || 'None'}</p>
           <p><strong>Coverage:</strong> ${item.system.coverage || 'Partial'}</p>`;
+      } else if (item.system.category === "other") {
+        details += `<p><strong>Type:</strong> ${item.system.weaponType || 'Other'}</p>`;
+        if (item.system.weaponType === "grenade") {
+          details += `<p><strong>Grenade Type:</strong> ${item.system.grenadeType || 'Unknown'}</p>`;
+          details += `<p><strong>Damage:</strong> ${item.system.grenadeDamage || '—'}</p>`;
+          details += `<p><strong>Radius:</strong> ${item.system.grenadeRadius || 1} area(s)</p>`;
+          details += `<p><strong>Count:</strong> ${item.system.shotsRemaining ?? item.system.shots ?? 0}</p>`;
+        }
       } else if (item.system.category === "power-item") {
         content += `
           <p><strong>Power Rank:</strong> ${item.system.powerRank || 'Typical'}</p>
@@ -2489,9 +2527,21 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
       const weaponType = item.system.weaponType?.toLowerCase();
       const damageType = item.system.damageType?.toUpperCase();
 
-      if (category === "weapon") {
-        // First check damageType for special types that override weaponType
-        if (damageType === "E") {
+      if (category === "other") {
+        // Other weapons: grenade or missile
+        if (weaponType === "grenade") {
+          actionType = "grenade";
+        } else if (weaponType === "missile") {
+          actionType = "missile"; // future
+        } else {
+          return; // unknown other type
+        }
+      } else if (category === "weapon") {
+        // Legacy grenade items (category=weapon + grenadeType set) — migrate on the fly
+        if (item.system.grenadeType) {
+          await item.update({ "system.category": "other", "system.weaponType": "grenade" });
+          actionType = "grenade";
+        } else if (damageType === "E") {
           actionType = "energy";
         } else if (damageType === "F") {
           actionType = "force";
@@ -2524,14 +2574,19 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
       } else if (category === "thrown") {
         actionType = item.system.attackForm === "edged" ? "throwing-edged" : "throwing-blunt";
       } else {
-        // Unknown equipment type - use old system
-        return item.rollItem();
+        // Check for grenade items regardless of category (catches gear default + old data)
+        if (item.system.grenadeType) {
+          await item.update({ "system.category": "other", "system.weaponType": "grenade" });
+          actionType = "grenade";
+        } else {
+          return item.rollItem();
+        }
       }
 
       // Determine ability based on action type
       let abilityName;
       if (actionType === "energy" || actionType === "force" || actionType === "shooting" || 
-          actionType === "throwing-edged" || actionType === "throwing-blunt") {
+          actionType === "throwing-edged" || actionType === "throwing-blunt" || actionType === "grenade" || actionType === "missile") {
         abilityName = "agility";
       } else if (actionType === "grappling" || actionType === "grabbing") {
         abilityName = "strength";

@@ -1,5 +1,5 @@
-// equipment.js v1.1.0 - 2026-01-24
-// v1.1.0: Add SFX preview buttons and per-sound volume controls
+// equipment.js v1.2.0 - 2026-02-20
+// v1.2.0: Add "other" category (grenade/missile); other-fields show/hide; weaponType sub-section toggle
 import { applyDamageToTargets } from "./modules/actions/action-utils.js";
 import { debugLog } from "./modules/actions/action-utils.js";
 import { rollUniversalTable } from "./modules/dice/universal-table.js";
@@ -79,17 +79,32 @@ export class FaseripEquipmentSheet extends ItemSheet {
 
   /** @override */
   async _updateObject(event, formData) {
-    // Clean the formData to prevent field contamination
-    const cleanedData = foundry.utils.expandObject(formData);
-    
-    // Detailed debug logging to see what's being submitted
-    /* console.log("Equipment form data being submitted:", cleanedData);
-    console.log("System data specifically:", cleanedData.system);
-    console.log("PowerRank specifically:", cleanedData.system?.powerRank);
-    console.log("Original item data before update:", this.object.system);
-    console.log("Original powerRank before update:", this.object.system?.powerRank); */
-    
-    return super._updateObject(event, cleanedData);
+    const data = foundry.utils.expandObject(formData);
+    if (!data.system) data.system = {};
+    // Use the submitted category if present, otherwise fall back to what's saved on the item
+    const category = (data.system.category !== undefined) ? data.system.category : this.object.system.category;
+
+    // other-fields uses _-prefixed names to avoid form collision with weapon-fields.
+    // Always map them regardless of category — they're only present when other-fields is shown.
+    if (data.system._otherWeaponType !== undefined) {
+      if (category === "other") data.system.weaponType = data.system._otherWeaponType;
+    }
+    if (data.system._otherShots !== undefined) {
+      if (category === "other") {
+        const qty = parseInt(data.system._otherShots, 10);
+        data.system.shots = isNaN(qty) ? 0 : qty;
+        // Always sync shotsRemaining to shots — GM editing Quantity means restocking to full
+        data.system.shotsRemaining = data.system.shots;
+      }
+    }
+    if (data.system._otherLegality !== undefined) {
+      if (category === "other") data.system.legality = data.system._otherLegality;
+    }
+    delete data.system._otherWeaponType;
+    delete data.system._otherShots;
+    delete data.system._otherLegality;
+
+    return super._updateObject(event, foundry.utils.flattenObject(data));
   }
 
   activateListeners(html) {
@@ -294,6 +309,8 @@ export class FaseripEquipmentSheet extends ItemSheet {
       }
     });
 
+
+
     // Show/hide category-specific fields when category changes
     html.find('.equipment-category-select').change(async ev => {
       const category = ev.currentTarget.value;
@@ -304,7 +321,7 @@ export class FaseripEquipmentSheet extends ItemSheet {
       }
       
       // Show/hide sections immediately without re-rendering
-      html.find('.weapon-fields, .armor-fields, .power-item-fields, .custom-fields').hide();
+      html.find('.weapon-fields, .armor-fields, .power-item-fields, .custom-fields, .other-fields').hide();
       
       if (category === 'weapon') {
         html.find('.weapon-fields').show();
@@ -314,6 +331,13 @@ export class FaseripEquipmentSheet extends ItemSheet {
         html.find('.power-item-fields').show();
       } else if (category === 'custom') {
         html.find('.custom-fields').show();
+      } else if (category === 'other') {
+        html.find('.other-fields').show();
+        // Show correct weapon type sub-section
+        const wt = this.object.system.weaponType || '';
+        html.find('.other-grenade-fields, .other-missile-fields').hide();
+        if (wt === 'grenade') html.find('.other-grenade-fields').show();
+        else if (wt === 'missile') html.find('.other-missile-fields').show();
       }
       
       // Delay the update to prevent conflicts
@@ -324,7 +348,7 @@ export class FaseripEquipmentSheet extends ItemSheet {
 
     // Make sure correct fields are shown on initial load
     const currentCategory = this.object.system.category;
-    html.find('.weapon-fields, .armor-fields, .power-item-fields, .custom-fields').hide(); // Hide all initially
+    html.find('.weapon-fields, .armor-fields, .power-item-fields, .custom-fields, .other-fields').hide(); // Hide all initially
     if (currentCategory === 'weapon') {
       html.find('.weapon-fields').show();
     } else if (currentCategory === 'armor') {
@@ -333,7 +357,24 @@ export class FaseripEquipmentSheet extends ItemSheet {
       html.find('.power-item-fields').show();
     } else if (currentCategory === 'custom') {
       html.find('.custom-fields').show();
+    } else if (currentCategory === 'other') {
+      html.find('.other-fields').show();
+      const wt = this.object.system.weaponType || '';
+      html.find('.other-grenade-fields, .other-missile-fields').hide();
+      if (wt === 'grenade') html.find('.other-grenade-fields').show();
+      else if (wt === 'missile') html.find('.other-missile-fields').show();
     }
+
+
+    // Other weapon type sub-section toggle (grenade vs missile)
+    html.find('.other-weapon-type-select').change(ev => {
+      const wt = ev.currentTarget.value;
+      html.find('.other-grenade-fields, .other-missile-fields').hide();
+      if (wt === 'grenade') html.find('.other-grenade-fields').show();
+      else if (wt === 'missile') html.find('.other-missile-fields').show();
+      // Don't need explicit update — _updateObject handles _otherWeaponType → weaponType mapping
+    });
+
 
     // Add custom ability handler
     html.find('.add-custom-ability').click(async ev => {

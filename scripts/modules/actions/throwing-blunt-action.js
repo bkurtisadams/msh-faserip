@@ -1,5 +1,5 @@
-// scripts/modules/actions/throwing-blunt-action.js v1.0.1 - 2026-02-19
-// v1.0.1: Fix auto-apply call - applyDamageToTargets takes a single destructured object, not positional args
+// scripts/modules/actions/throwing-blunt-action.js v1.1.0 - 2026-02-20
+// v1.1.0: Allow any blunt weapon to be thrown (not just weaponType=thrown); exclude shooting weapons
 import { RangedAttackAction } from "./ranged-attack-action.js";
 import { attachAutoFillRange } from "./action-utils.js";
 // NOTE: resolveCombatMode imported dynamically if needed
@@ -41,9 +41,10 @@ export class ThrowingBluntAction extends RangedAttackAction {
       const tags = (s.tags || []).map(t => String(t).toLowerCase());
       const damageType = String(s.damageType || "").toUpperCase();
       const attackType = String(s.attackType || "").toLowerCase();
-      
-      const isThrown = String(s.weaponType || "").toLowerCase() === "thrown" || tags.includes("thrown");
-      const isBlunt  =
+      const weaponType = String(s.weaponType || "").toLowerCase();
+
+      // Any blunt weapon can be thrown regardless of weaponType
+      const isBlunt =
         damageType === "BA" ||
         damageType === "TB" ||
         attackType === "blunt" ||
@@ -51,7 +52,12 @@ export class ThrowingBluntAction extends RangedAttackAction {
         tags.includes("blunt") ||
         tags.includes("ba") ||
         tags.includes("tb");
-      return isThrown && isBlunt;
+
+      // Exclude shooting weapons (firearms can't be thrown as blunt)
+      const isShooting = weaponType === "shooting" || weaponType === "firearm" ||
+        damageType === "S" || attackType === "shooting";
+
+      return isBlunt && !isShooting;
     });
 
     // If a specific item was passed via opts, ensure it's in the list and pre-selected

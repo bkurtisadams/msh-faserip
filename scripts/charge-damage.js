@@ -394,10 +394,10 @@ export function getBodyArmorValue(actor) {
 export function initializeSlamHandlers() {
     console.log("🔧 initializeSlamHandlers() called");
     // Add event listener for collision damage calculation
-    Hooks.on("renderChatMessage", (app, html, data) => {
+    Hooks.on("renderChatMessageHTML", (message, htmlEl) => {
         
         // Handle slam FEAT rolls - FIXED
-        html.find('.resolve-slam-feat').on('click', async function() {
+        htmlEl.querySelectorAll('.resolve-slam-feat').forEach(el => el.addEventListener('click', async function() {
             console.log("🎲 Slam FEAT button clicked");
             const targetUuid = this.dataset.target;
             const attackerStrength = parseInt(this.dataset.attackerStrength);
@@ -459,11 +459,11 @@ export function initializeSlamHandlers() {
             });
             
             // Disable the button
-            $(this).prop('disabled', true).text('FEAT Rolled');
-        });
+            this.disabled = true; this.textContent = 'FEAT Rolled';
+        }));
 
         // Handle stun FEAT rolls - FIXED
-        html.find('.resolve-stun-feat').on('click', async function() {
+        htmlEl.querySelectorAll('.resolve-stun-feat').forEach(el => el.addEventListener('click', async function() {
             console.log("😵 Stun FEAT button clicked");
             const targetUuid = this.dataset.target;
             const attackerStrength = parseInt(this.dataset.attackerStrength);
@@ -543,11 +543,11 @@ export function initializeSlamHandlers() {
             });
             
             // Disable the button
-            $(this).prop('disabled', true).text('FEAT Rolled');
-        });
+            this.disabled = true; this.textContent = 'FEAT Rolled';
+        }));
 
         // LEGACY collision damage handler - DISABLED (now handled by chat-hooks.js + collision-damage.js)
-        html.find('.calculate-slam-collision').on('click', async function() {
+        htmlEl.querySelectorAll('.calculate-slam-collision').forEach(el => el.addEventListener('click', async function() {
             // Skip - this is now handled by the collision-damage.js module via chat-hooks.js
             return;
             
@@ -632,9 +632,9 @@ export function initializeSlamHandlers() {
                             icon: '<i class="fas fa-calculator"></i>',
                             label: "Calculate Collision",
                             callback: (html) => {
-                                const distanceToObstacle = parseFloat(html.find('#distance-to-obstacle').val());
-                                const obstacleType = html.find('input[name="obstacle-type"]:checked').val();
-                                const materialStrength = parseInt(html.find('#obstacle-material').val());
+                                const distanceToObstacle = parseFloat(el.closest('[data-message-id]')?.querySelector('#distance-to-obstacle')?.value ?? 0);
+                                const obstacleType = el.closest('[data-message-id]')?.querySelector('input[name="obstacle-type"]:checked')?.value;
+                                const materialStrength = parseInt(el.closest('[data-message-id]')?.querySelector('#obstacle-material')?.value ?? 0);
                                 resolve({ distanceToObstacle, obstacleType, materialStrength });
                             }
                         },
@@ -840,8 +840,8 @@ export function initializeSlamHandlers() {
             }
             
             // Disable the button to prevent multiple calculations
-            $(this).prop('disabled', true).text('Collision Calculated');
+            this.disabled = true; this.textContent = 'Collision Calculated';
             
-        }); // end of html.find('.calculate-slam-collision').on('click', async function() {
-    }); // end of Hooks.on("renderChatMessage", (app, html, data) => {
+        })); // end of querySelectorAll forEach + click handler
+    }); // end of Hooks.on("renderChatMessageHTML")
 }

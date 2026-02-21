@@ -255,6 +255,15 @@ Hooks.once("init", async () => {
     requiresReload: false
   });
 
+  game.settings.register("msh-faserip", "persistedTemplates", {
+    name: "Persisted Area Templates",
+    hint: "Internal storage for area effect templates (smoke, gas, etc.) that auto-expire over time.",
+    scope: "world",
+    config: false,
+    type: Object,
+    default: {}
+  });
+
   debugLog("init hook is running!");
   console.log("Marvel Super Heroes (FASERIP) system initializing...");
 
@@ -2071,8 +2080,8 @@ Hooks.on('updateActor', async (actor, updateData, options, userId) => {
 });
 
 // Handle medical care toggle button in chat
-Hooks.on('renderChatMessage', (message, html) => {
-  html.find('.toggle-medical-care').click(async (event) => {
+Hooks.on('renderChatMessageHTML', (message, htmlEl) => {
+  htmlEl.querySelector('.toggle-medical-care')?.addEventListener('click', async (event) => {
     const button = event.currentTarget;
     const actorId = button.dataset.actorId;
     
@@ -2123,9 +2132,9 @@ Hooks.on('renderChatMessage', (message, html) => {
       // (Quiet mode) — no chat card spam on toggle
             
             // Disable the button to prevent spam
-            $(button).prop('disabled', true)
-                    .css('opacity', '0.6')
-                    .html('<i class="fas fa-check"></i> Updated!');
+            button.disabled = true;
+            button.style.opacity = '0.6';
+            button.innerHTML = '<i class="fas fa-check"></i> Updated!';
           } else {
             ui.notifications.warn("No active Healing timer found");
           }

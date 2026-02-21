@@ -970,6 +970,26 @@
   border-top: 1px solid #ccc;
  }
  
+ /* Equipment group labels */
+ .equip-group { margin-bottom: 12px; }
+ .equip-group-label {
+   font-size: .75em;
+   font-weight: 700;
+   text-transform: uppercase;
+   letter-spacing: .06em;
+   color: #8b0000;
+   padding: 4px 2px 2px;
+   border-bottom: 1px solid #c0c0c0;
+   margin-bottom: 2px;
+ }
+
+ /* Damage type badge */
+ .equipment-type-badge {
+   font-size: .78em;
+   font-weight: 600;
+   white-space: nowrap;
+ }
+
  /* Equipment table styles */
  .equipment-table {
   width: 100%;
