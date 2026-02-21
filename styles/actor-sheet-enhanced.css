@@ -14,8 +14,8 @@
   --mred-lit: #a80000;
   --gold:     #c8960c;
   --gold-lit: #e2ab14;
-  --cream:    #f7f3eb;
-  --cream-dk: #ede8dc;
+  --cream:    #ffffff;
+  --cream-dk: #f5f5f5;
   --txt:      #1a1a1a;
   --txt-soft: #555;
   --hdr-h:    32px;
@@ -23,7 +23,7 @@
 
 /* ── Sheet background: warm cream + faint halftone dots ─────────────────── */
 form.faserip-sheet {
-  font-family: 'Barlow Condensed', Arial Narrow, sans-serif;
+  font-family: Arial, sans-serif;
   background-color: var(--cream);
   background-image: radial-gradient(circle at 1px 1px, rgba(0,0,0,.05) 1px, transparent 0);
   background-size: 5px 5px;
@@ -87,13 +87,9 @@ form.faserip-sheet {
 }
 
 .msh-identity label {
-  font-family: 'Oswald', sans-serif;
-  font-weight: 600;
-  font-size: 10px;
-  letter-spacing: 0.8px;
-  text-transform: uppercase;
-  color: var(--mred-dk);
-  margin-bottom: 1px;
+  font-size: 12.5px;
+  font-weight: bold;
+  margin-bottom: 2px;
 }
 
 /* ── Dark-red section headers: gradient instead of flat ─────────────────── */
@@ -171,8 +167,8 @@ form.faserip-sheet .primary-abilities .abilities-table select,
 form.faserip-sheet .secondary-abilities input[type="number"],
 form.faserip-sheet .secondary-abilities input[type="text"],
 form.faserip-sheet .secondary-abilities select {
-  background: #fffdf8 !important;
-  border-color: #ccc3a8 !important;
+  background: #efefef !important;
+  border-color: #cccccc !important;
 }
 
 form.faserip-sheet .primary-abilities .abilities-table input:focus,
@@ -186,7 +182,7 @@ form.faserip-sheet .secondary-abilities select:focus {
 
 /* ── Secondary grid: border-color match ─────────────────────────────────── */
 form.faserip-sheet .secondary-abilities .sec-col {
-  border-right-color: #ccc3a8;
+  border-right-color: #d7d7d7;
 }
 form.faserip-sheet .secondary-abilities {
   background: #fff;
@@ -202,12 +198,9 @@ form.faserip-sheet .movement-panel {
 }
 
 form.faserip-sheet .movement-panel label {
-  font-family: 'Oswald', sans-serif;
-  font-size: 11px;
+  font-size: 12.5px;
   font-weight: 600;
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
-  color: var(--mred-dk);
+  color: #0d47a1;
 }
 
 form.faserip-sheet .movement-panel label.movement-label.clickable {
@@ -290,13 +283,13 @@ form.faserip-sheet .recovery-rest-section {
 }
 
 form.faserip-sheet .recovery-btn {
-  font-family: 'Barlow Condensed', sans-serif;
-  background: var(--cream-dk);
-  border-color: #bbb3a0;
+  font-family: Arial, sans-serif;
+  background: #f5f5f5;
+  border-color: #c0c0c0;
 }
 form.faserip-sheet .recovery-btn:hover {
-  background: #e8e0d0;
-  border-color: var(--gold);
+  background: #e5e5e5;
+  border-color: #a0a0a0;
 }
 
 form.faserip-sheet .recovery-btn.medical-toggle.active {
@@ -325,8 +318,8 @@ form.faserip-sheet .karma-section {
 
 /* ── Lock toggle button ─────────────────────────────────────────────────── */
 .sheet-lock-toggle {
-  background: var(--cream-dk);
-  border-color: #bbb3a0;
+  background: #f5f5f5;
+  border-color: #c0c0c0;
 }
 .sheet-lock-toggle:hover {
   border-color: var(--gold);
@@ -432,7 +425,7 @@ form.faserip-sheet .add-stunt-general:hover {
 form.faserip-sheet .tab-style-button {
   font-family: 'Barlow Condensed', sans-serif;
   background: var(--cream-dk);
-  border: 1px solid #bbb3a0;
+  border: 1px solid #c0c0c0;
   color: var(--txt);
 }
 form.faserip-sheet .tab-style-button:hover {

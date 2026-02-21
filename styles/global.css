@@ -2165,7 +2165,7 @@
 }
 
 .pool-summary {
-  background: #f5f5f0;
+  background: #f5f5f5;
   padding: 15px;
   border-radius: 5px;
   margin-bottom: 15px;
@@ -3500,7 +3500,7 @@ form.faserip-sheet .secondary-abilities select {
   padding: 2px 6px;
   font-size: 12.5px;
   line-height: 1.2;
-  background: var(--cell-grey, #f5f5f0);
+  background: var(--cell-grey);
   border: 1px solid #ccc;
   border-radius: 2px;
   box-sizing: border-box;
@@ -3609,7 +3609,7 @@ form.faserip-sheet .movement-panel input[type="number"] {
   padding: 2px 6px;
   font-size: 12.5px;
   line-height: 1.2;
-  background: var(--cell-grey, #f5f5f0);
+  background: var(--cell-grey);
   border: 1px solid #ccc;
   border-radius: 2px;
   box-sizing: border-box;
@@ -3683,7 +3683,7 @@ form.faserip-sheet .recovery-row {
 form.faserip-sheet .recovery-btn {
   flex: 1;
   padding: 2px 4px;
-  background: #f5f5f0;
+  background: #f5f5f5;
   color: #333;
   border: 1px solid #c0c0c0;
   border-radius: 2px;
