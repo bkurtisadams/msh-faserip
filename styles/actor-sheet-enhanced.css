@@ -432,3 +432,32 @@ form.faserip-sheet .tab-style-button:hover {
   background: #e8e0d0;
   border-color: var(--gold);
 }
+
+/* ── Secondary ability header label + button colors ─────────────────────── */
+/* Health (F+A+S+E) — green text */
+form.faserip-sheet .sec-col.health .sec-head,
+form.faserip-sheet .sec-col.health .sec-head > button,
+form.faserip-sheet .sec-col.health .sec-head small {
+  color: #a5d6a7 !important;
+}
+
+/* Karma (R+I+P) — steel blue text */
+form.faserip-sheet .sec-col.karma .sec-head,
+form.faserip-sheet .sec-col.karma .sec-head > button,
+form.faserip-sheet .sec-col.karma .sec-head small {
+  color: #90caf9 !important;
+}
+
+/* Resources — gold text */
+form.faserip-sheet .sec-col.resources .sec-head,
+form.faserip-sheet .sec-col.resources .sec-head > button,
+form.faserip-sheet .sec-col.resources .sec-head small {
+  color: #ffe082 !important;
+}
+
+/* Popularity — magenta text */
+form.faserip-sheet .sec-col.popularity .sec-head,
+form.faserip-sheet .sec-col.popularity .sec-head > button,
+form.faserip-sheet .sec-col.popularity .sec-head small {
+  color: #f48fb1 !important;
+}
