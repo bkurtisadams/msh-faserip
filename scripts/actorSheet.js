@@ -261,6 +261,10 @@ export class FaseripActorSheet extends ActorSheet {
     
     // Check for Dying state
     context.isDying = !!dyingEffect;
+
+    // Crisis row visibility: show Wake Up / Stabilize only when relevant
+    const currentHP = context.system?.attributes?.health?.value ?? 1;
+    context.isInCrisis = context.isDying || currentHP === 0;
     
     return context;
   }

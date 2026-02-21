@@ -607,6 +607,7 @@
               <i class="fas fa-hospital"></i> Medical: {{#if flags.msh-faserip.medicalCare}}ON{{else}}OFF{{/if}}
             </button>
           </div>
+          {{#if isInCrisis}}
           <div class="recovery-row">
             <button type="button" class="recovery-btn crisis-btn" data-action="wake-up" title="Attempt to Regain Consciousness&#10;Only available at 0 HP">
               <i class="fas fa-eye"></i> Wake Up (0 HP)
@@ -615,6 +616,7 @@
               <i class="fas fa-medkit"></i> Stabilize Dying
             </button>
           </div>
+          {{/if}}
         </div>
       </div>
 

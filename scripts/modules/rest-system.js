@@ -157,20 +157,21 @@ export class RestSystem {
       };
     }
 
-    // Check if enough time has passed (600 turns = 1 hour = 3600 seconds)
-    const lastDamageTime = actor.getFlag(SCOPE, "lastDamageTime");
-    if (!lastDamageTime) {
+    // Check if enough time has passed (600 turns = 1 hour = 3600 world seconds)
+    const lastDamageWorldTime = actor.getFlag(SCOPE, "lastDamageWorldTime");
+    if (!lastDamageWorldTime && lastDamageWorldTime !== 0) {
       return { 
         canHeal: false, 
         reason: "No damage recorded - take damage first to start healing timer" 
       };
     }
 
-    const timeSinceDamage = Date.now() - lastDamageTime;
-    const oneHour = 3600 * 1000; // 1 hour in milliseconds
-    
+    const worldNow = game.time?.worldTime ?? 0;
+    const timeSinceDamage = worldNow - lastDamageWorldTime;
+    const oneHour = 3600; // 1 hour in world seconds
+
     if (timeSinceDamage < oneHour) {
-      const remaining = Math.ceil((oneHour - timeSinceDamage) / 1000 / 60); // minutes
+      const remaining = Math.ceil((oneHour - timeSinceDamage) / 60); // minutes
       return { 
         canHeal: false, 
         reason: `Must wait ${remaining} more minutes since last damage (1 hour total)` 
@@ -667,10 +668,17 @@ static async attemptRegainConsciousness(actor) {
     }
 
     const newRank = rankNames[newRankIndex];
+    const newValue = game.msh?.getRankValue?.(newRank) ?? 0;
+    const newHealthMax = (actor.system.abilities.fighting.value || 0) +
+                         (actor.system.abilities.agility.value || 0) +
+                         (actor.system.abilities.strength.value || 0) +
+                         newValue;
 
-    // Update actor's Endurance rank
+    // Update actor Endurance rank, value, and derived health max
     await actor.update({
-      "system.abilities.endurance.rank": newRank
+      "system.abilities.endurance.rank": newRank,
+      "system.abilities.endurance.value": newValue,
+      "system.attributes.health.max": newHealthMax
     });
 
     // Check if fully healed
@@ -707,9 +715,9 @@ static async attemptRegainConsciousness(actor) {
       
       await impairedEffect.update({
         name: `Impaired Endurance (${newRank} of ${originalEndurance})`,
-        "flags.msh.currentEndurance": newRank,
-        "flags.msh.lastHealed": now,
-        "flags.msh.medicalCare": medicalCare,
+        [`flags.${SCOPE}.currentEndurance`]: newRank,
+        [`flags.${SCOPE}.lastHealed`]: now,
+        [`flags.${SCOPE}.medicalCare`]: medicalCare,
         "duration.rounds": daysUntilNextHealing * 600 * 24,
         "duration.startRound": game.combat?.round || 0
       });

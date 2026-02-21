@@ -1432,6 +1432,11 @@ export async function applyDamageToTargets({
           console.error("FASERIP | applyDamageToTargets GM update failed", err);
           ui.notifications?.warn?.("Could not apply damage via GM helper. See console.");
         }
+
+        // Record damage timestamp for rest system (non-owner path)
+        if (before > after && typeof recordDamage === "function") {
+          await recordDamage(targetActor);
+        }
       }
 
       // ===== HANDLE REDUCTION TO 0 HP =====
