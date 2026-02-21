@@ -269,6 +269,18 @@ export class FaseripActorSheet extends ActorSheet {
     // Recovery button: disable if already used today
     const lastRecoveryDate = this.actor.getFlag(scope, "lastRecoveryDate");
     context.recoveryUsedToday = lastRecoveryDate === new Date().toDateString();
+
+    // Healing button: disable if health at max, no damage recorded, or still on 1-hour cooldown
+    const hpValue = context.system?.attributes?.health?.value ?? 0;
+    const hpMax = context.system?.attributes?.health?.max ?? 0;
+    const lastDamageWorldTime = this.actor.getFlag(scope, "lastDamageWorldTime");
+    const worldNow = game.time?.worldTime ?? 0;
+    const timeSinceDamage = (lastDamageWorldTime != null) ? (worldNow - lastDamageWorldTime) : -1;
+    const healingCooldownRemaining = (timeSinceDamage >= 0 && timeSinceDamage < 3600)
+      ? Math.ceil((3600 - timeSinceDamage) / 60) : 0;
+    context.healthAtMax = hpMax > 0 && hpValue >= hpMax;
+    context.healingUnavailable = context.healthAtMax || lastDamageWorldTime == null || healingCooldownRemaining > 0;
+    context.healingCooldownRemaining = healingCooldownRemaining;
     
     return context;
   }

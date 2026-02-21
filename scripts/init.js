@@ -1956,7 +1956,15 @@ Hooks.on('updateActor', async (actor, updateData, options, userId) => {
     }
 
     // Ignore healing or non-damage changes (including 0->0)
-    if (newHealth >= oldHealth && newHealth > 0) return;
+    if (newHealth >= oldHealth && newHealth > 0) {
+      // HP went up - clear damage timer so healing cooldown resets
+      if (newHealth > oldHealth) {
+        const SCOPE = globalThis.MSH_FLAG_SCOPE || "msh-faserip";
+        await actor.unsetFlag(SCOPE, "lastDamageWorldTime");
+        await actor.unsetFlag(SCOPE, "lastDamageTime");
+      }
+      return;
+    }
 
 
 
@@ -2055,6 +2063,10 @@ Hooks.on('updateActor', async (actor, updateData, options, userId) => {
       }
 
       console.log("FASERIP | At 0 HP - death save will handle effects");
+
+      // Still record damage timestamp for rest system
+      const { recordDamage } = await import("./modules/rest-system.js");
+      await recordDamage(actor);
     } else {
       // === Above 0 HP: record damage for rest system ===
       console.log("FASERIP | Above 0 HP - recording damage for rest eligibility");

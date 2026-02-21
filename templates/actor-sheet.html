@@ -598,7 +598,7 @@
             <button type="button" class="recovery-btn{{#if recoveryUsedToday}} used-today{{/if}}" data-action="recovery" {{#if recoveryUsedToday}}disabled{{/if}} title="Attempt Recovery (10 rounds)&#10;Regain Health equal to Endurance rank{{#if recoveryUsedToday}}&#10;Already used today{{/if}}">
               <i class="fas {{#if recoveryUsedToday}}fa-check{{else}}fa-clock{{/if}}"></i> {{#if recoveryUsedToday}}Recovered{{else}}Recovery (10 rnd){{/if}}
             </button>
-            <button type="button" class="recovery-btn" data-action="healing" title="Attempt Healing (1 hour)&#10;Regain Health equal to Endurance rank">
+            <button type="button" class="recovery-btn" data-action="healing" {{#if healingUnavailable}}disabled{{/if}} title="Attempt Healing (1 hour)&#10;Regain Health equal to Endurance rank{{#if healthAtMax}}&#10;Health is already at maximum{{else}}{{#if healingCooldownRemaining}}&#10;On cooldown: {{healingCooldownRemaining}} min remaining{{else}}{{#if healingUnavailable}}&#10;Take damage first to start healing timer{{/if}}{{/if}}{{/if}}">
               <i class="fas fa-heart"></i> Healing (1 hr)
             </button>
             <button type="button" class="recovery-btn medical-toggle {{#if flags.msh-faserip.medicalCare}}active{{/if}}" 

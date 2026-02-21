@@ -210,7 +210,8 @@ export class RestSystem {
     });
 
     // Clear damage timer
-    await actor.unsetFlag(SCOPE, "lastDamageTime");
+    await actor.unsetFlag(SCOPE, "lastDamageWorldTime");
+    await actor.unsetFlag(SCOPE, "lastDamageTime"); // legacy cleanup
 
     const medicalNote = hasMedicalCare ? " (with medical care)" : "";
     const message = `${actor.name} healed ${healAmount} Health${medicalNote}`;
@@ -355,6 +356,10 @@ static async attemptRegainConsciousness(actor) {
       await actor.update({
         "system.attributes.health.value": enduranceValue
       });
+
+      // Clear damage timer - healing already granted by wake-up, no immediate re-heal
+      await actor.unsetFlag(SCOPE, "lastDamageWorldTime");
+      await actor.unsetFlag(SCOPE, "lastDamageTime"); // legacy cleanup
 
       const message = `${actor.name} regained consciousness with ${enduranceValue} Health!`;
       
