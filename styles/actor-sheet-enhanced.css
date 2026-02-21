@@ -461,3 +461,25 @@ form.faserip-sheet .sec-col.popularity .sec-head > button,
 form.faserip-sheet .sec-col.popularity .sec-head small {
   color: #f48fb1 !important;
 }
+
+/* ── Tab navigation: flex-wrap so tabs don't clip ───────────────────────── */
+form.faserip-sheet .sheet-tabs-navigation {
+  flex-wrap: wrap;
+  overflow: visible;
+}
+
+/* ── Add/Browse buttons: slim down to utility size ──────────────────────── */
+form.faserip-sheet .add-power,
+form.faserip-sheet .add-talent,
+form.faserip-sheet .add-contact,
+form.faserip-sheet .add-equipment,
+form.faserip-sheet .add-headquarters,
+form.faserip-sheet .add-vehicle,
+form.faserip-sheet .add-stunt-general,
+form.faserip-sheet .browse-compendium {
+  padding: 3px 10px !important;
+  height: 24px !important;
+  min-height: unset !important;
+  font-size: 11px !important;
+  line-height: 1 !important;
+}

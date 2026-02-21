@@ -9,14 +9,14 @@
 .stunts-header {
   flex: 1;
   background: #f5f5f5;
-  padding: 8px 12px;
+  padding: 8px 6px;
   border: 1px solid #c0c0c0;
   border-radius: 3px;
 }
 
 .stunts-header h2 {
   margin: 0 0 4px 0;
-  color: #8b0000;
+  color: #660000;
   font-size: 1em;
 }
 
@@ -28,7 +28,7 @@
 }
 
 .stunts-controls {
-  flex: 0 0 auto;
+  flex: 1 1 auto;
 }
 
 .add-stunt-general {
@@ -57,7 +57,7 @@
 }
 
 .stunts-table thead {
-  background: #8b0000;
+  background: #660000;
   color: white;
 }
 
@@ -92,7 +92,7 @@
 }
 
 .stunt-roll-link {
-  color: #8b0000;
+  color: #660000;
   cursor: pointer;
   margin-right: 5px;
 }
@@ -159,11 +159,12 @@
 }
 
 .sheet-tabs-navigation .item {
-  flex: 0 0 auto;
-  padding: 8px 12px;
+  flex: 1 1 auto;
+  padding: 8px 6px;
   font-size: 0.85em;
   text-align: center;
-  min-width: 40px;
+  min-width: 32px;
+  max-width: 60px;
 }
 
 /* Hide text on smaller tabs, show only icons */
@@ -282,7 +283,7 @@
 .action-btn[data-action="shooting"] .action-abbr,
 .action-btn[data-action="throwing-edged"] .action-abbr,
 .action-btn[data-action="energy"] .action-abbr {
-  color: #8b0000;
+  color: #660000;
 }
 
 /* Blue - Grappling actions */
@@ -357,7 +358,8 @@
   padding: 4px 6px;
   text-align: center;
   font-weight: bold;
-  min-width: 40px;
+  min-width: 32px;
+  max-width: 60px;
 }
 
 .universal-rank-table .rank-cell {
@@ -448,7 +450,7 @@
 }
 
 .sheet-lock-toggle.locked {
-  background: #8b0000;
+  background: #660000;
   border-color: #660000;
   color: #fff;
 }
