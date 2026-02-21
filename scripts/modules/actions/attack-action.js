@@ -1,4 +1,7 @@
-// attack-action.js v1.9.16 - 2026-02-20
+// attack-action.js v1.9.19 - 2026-02-21
+// v1.9.19: Semi mode always shows multi-attack FEAT dialog (auto/impossible shown as confirmation)
+// v1.9.18: Multi-attack FEAT - CS now correctly affects success determination
+// v1.9.17: Multi-attack FEAT dialog redesigned to match compact blunt-attack style
 // v1.9.16: Fix reload button - store token ID for synthetic actor lookup
 // v1.9.15: Add reload button to out-of-ammo chat card
 // v1.9.14: Evasion chat card shows real roll color instead of fake White; damage shows "evaded" not "miss"
@@ -120,23 +123,30 @@ export class AttackAction extends BaseAction {
 
     if (diff >= AUTO_DIFF) {
       console.log("[FASERIP] Multi-attack FEAT: AUTOMATIC SUCCESS (diff >= 4)");
-      return { success: true, intensity, roll: null, totalRoll: null, resultColor: "AUTO", cancelled: false, auto: true };
+      // Full Auto: return immediately. Semi: fall through to dialog which shows "Automatic".
+      if (this.opts?.autoApply === true) {
+        return { success: true, intensity, roll: null, totalRoll: null, resultColor: "AUTO", cancelled: false, auto: true };
+      }
     }
     if (USE_IMPOSSIBLE && diff <= IMPOSSIBLE_DIFF) {
-      return { success: false, intensity, roll: null, totalRoll: null, resultColor: "IMPOSSIBLE", cancelled: false, auto: false };
+      // Full Auto: return immediately. Semi: fall through to dialog which shows "Impossible".
+      if (this.opts?.autoApply === true) {
+        return { success: false, intensity, roll: null, totalRoll: null, resultColor: "IMPOSSIBLE", cancelled: false, auto: false };
+      }
     }
 
     if (diff <= IMPOSSIBLE_DIFF) {
-      // Impossible under standard rules (no roll)
-      return {
-        success: false,
-        intensity,
-        roll: null,
-        totalRoll: null,
-        resultColor: "IMPOSSIBLE",  // sentinel for UI/logging
-        cancelled: false,
-        auto: false
-      };
+      if (this.opts?.autoApply === true) {
+        return {
+          success: false,
+          intensity,
+          roll: null,
+          totalRoll: null,
+          resultColor: "IMPOSSIBLE",
+          cancelled: false,
+          auto: false
+        };
+      }
     }
 
     // otherwise fall through to the normal roll path
@@ -216,31 +226,48 @@ export class AttackAction extends BaseAction {
       else                                        requiredColor = "Red only";
     }
     
+    const isAuto       = diff >= AUTO_DIFF;
+    const isImpossible = USE_IMPOSSIBLE && diff <= IMPOSSIBLE_DIFF;
+    const isPreDetermined = isAuto || isImpossible;
+
     const dialogContent = `
-      <div style="text-align: center; padding: 10px;">
-        <h3>${actor.name} - Multiple Attack FEAT</h3>
-        <p>Attempting <strong>${attackCount} attacks</strong> requires a Fighting FEAT roll.</p>
-        <div style="margin: 15px 0; padding: 10px; background: #f5f5f5; border-radius: 4px;">
-          <p><strong>Fighting Rank:</strong> ${fightingAbility.rank} (${fightingAbility.value})</p>
-          <p><strong>Intensity:</strong> ${intensity}</p>
-          <p><strong>Required Result:</strong> ${requiredColor}</p>
+      <!-- Context: Attacker + FEAT info side by side -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+        <div style="background:#f5f5f5;padding:8px;border-radius:3px;">
+          <div style="font-weight:600;color:#666;font-size:.8em;text-transform:uppercase;">Attacker</div>
+          <div style="font-weight:600;">${actor.name}</div>
+          <div style="font-weight:600;">Fighting: ${fightingAbility.rank}</div>
+          <div style="color:#666;">Rank Value: ${fightingAbility.value}</div>
         </div>
-        <hr style="margin: 10px 0;">
-        <div style="margin-top: 10px;">
-          ${generateKarmaControlsHTML(actor, 0)}
-
-          <div style="margin-top: 10px;">
-          <label style="display: block; margin-bottom: 5px;">Column Shift (CS):</label>
-          <input type="number" id="multi-feat-cs" value="0" min="-10" max="10" step="1"
-                style="width: 60px; padding: 4px; text-align:center; border:1px solid #bbb; border-radius:4px;">
-          <span style="margin-left: 8px; font-size: 0.9em; color: #666;">
-            (from talents / powers / equipment)
-          </span>
-
-        </div>
-
+        <div style="background:${isAuto ? '#e8f5e9' : isImpossible ? '#ffebee' : '#f5f5f5'};padding:8px;border-radius:3px;border:1px solid ${isAuto ? '#a5d6a7' : isImpossible ? '#ef9a9a' : 'transparent'};">
+          <div style="font-weight:600;color:#666;font-size:.8em;text-transform:uppercase;">FEAT</div>
+          <div style="font-weight:600;">${attackCount} attacks</div>
+          <div style="color:#666;">Intensity: ${intensity}</div>
+          <div style="color:${isAuto ? '#2e7d32' : isImpossible ? '#c62828' : '#555'};font-size:.9em;font-weight:${isPreDetermined ? '700' : '400'};">
+            ${isAuto ? '✓ Automatic' : isImpossible ? '✗ Impossible' : `Need: <strong>${requiredColor}</strong>`}
+          </div>
         </div>
       </div>
+
+      ${isPreDetermined ? '' : `
+      <!-- CS row with notes -->
+      <div style="display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:center;margin-bottom:8px;padding:8px;background:#fff8e1;border:1px solid #ffc107;border-radius:3px;">
+        <div style="display:flex;align-items:center;gap:4px;">
+          <label style="font-weight:600;color:#666;font-size:.85em;">CS:</label>
+          <input type="number" name="shift" value="0" style="width:50px;padding:3px;text-align:center;box-sizing:border-box;">
+          <span style="color:#666;">→</span>
+          <strong id="shifted-rank-display">${fightingAbility.rank}</strong>
+          <button type="button" class="cs-reset" style="visibility:hidden;padding:1px 5px;font-size:.85em;cursor:pointer;border:1px solid #999;border-radius:2px;background:#eee;" title="Reset to 0">×</button>
+        </div>
+        <input type="text" name="csNotes" placeholder="e.g., Martial Arts B +1" style="width:100%;padding:3px 6px;font-size:.9em;box-sizing:border-box;">
+      </div>
+
+      ${generateKarmaControlsHTML(actor, 0)}
+
+      <div style="display:flex;justify-content:flex-end;padding-top:8px;border-top:1px solid #ddd;margin-top:8px;">
+        <label><input type="checkbox" name="skipDice"> Skip dice animation</label>
+      </div>
+      `}
     `;
     
     return new Promise((resolve) => {
@@ -249,10 +276,18 @@ export class AttackAction extends BaseAction {
         content: dialogContent,
         buttons: {
           roll: {
-            label: "Roll FEAT",
+            label: isAuto ? "Proceed" : isImpossible ? "Acknowledge" : "Roll FEAT",
             callback: async (html) => {
+              // Auto/Impossible: no roll needed, resolve immediately
+              if (isAuto) {
+                return resolve({ success: true, intensity, roll: null, totalRoll: null, resultColor: "AUTO", cancelled: false, auto: true });
+              }
+              if (isImpossible) {
+                return resolve({ success: false, intensity, roll: null, totalRoll: null, resultColor: "IMPOSSIBLE", cancelled: false, auto: false });
+              }
+
               const { spendKarma, karmaToSpend } = extractKarmaFromDialog(html);
-              const cs = Number(html.find('#multi-feat-cs').val() || 0);
+              const cs = Number(html.find('[name="shift"]').val() || 0);
               
               const roll = await (new Roll("1d100")).evaluate();
               await roll.toMessage({
@@ -275,11 +310,12 @@ export class AttackAction extends BaseAction {
               const resultColor = game.msh.rollUniversalTable(effFeatRank, totalRoll);
               const colorLower = resultColor.toLowerCase();
               
-              // Determine success based on FEAT intensity comparison rules
+              // Determine success using shifted fighting rank so CS actually affects outcome
+              const shiftedFightingIndex = RANKS.indexOf(effFeatRank);
               let success = false;
-              if (fightingIndex > intensityIndex) {
+              if (shiftedFightingIndex > intensityIndex) {
                 success = ["green", "yellow", "red"].includes(colorLower);
-              } else if (fightingIndex === intensityIndex) {
+              } else if (shiftedFightingIndex === intensityIndex) {
                 success = ["yellow", "red"].includes(colorLower);
               } else {
                 success = colorLower === "red";
@@ -329,7 +365,17 @@ export class AttackAction extends BaseAction {
         },
         default: "roll",
         render: (html) => {
+          if (isPreDetermined) return; // No controls to wire up
           setupKarmaControlHandlers(html);
+          // Live CS rank display
+          html.find('[name="shift"]').on("input", function() {
+            const cs = Number(this.value) || 0;
+            html.find("#shifted-rank-display").text(shiftRank(fightingAbility.rank, cs));
+            html.find(".cs-reset").css("visibility", cs !== 0 ? "visible" : "hidden");
+          });
+          html.find(".cs-reset").on("click", function() {
+            html.find('[name="shift"]').val(0).trigger("input");
+          });
         }
       }).render(true);
     });

@@ -1,4 +1,5 @@
-// chat-hooks.js v1.5.5 - 2026-02-20
+// chat-hooks.js v1.5.6 - 2026-02-21
+// v1.5.6: Fix Apply Damage and Resolve Slam buttons not working in semi mode - canDriveAutoSaves bail was blocking all button handler registration for non-owners
 // v1.5.5: Fix reload handler - resolve synthetic token actors via canvas.tokens
 // v1.5.4: Add reload button handler for out-of-ammo chat card
 // v1.5.3: Fix dodge reapply - add movementMult and selfPenaltyCS to AE changes (was missing same as defense-action.js)
@@ -117,20 +118,12 @@ export function installActionChatHandlers() {
 
     // Bail if already auto-processed (prevents double-fire on rerender/notify)
     const alreadyHandled = await message.getFlag(SCOPE, "autoSaveHandled");
-    if (alreadyHandled) return;
 
     // Only a user who can edit this message should drive auto-save logic.
-    // safeSetFlag will enforce this too, but this keeps the logs cleaner.
     const canDriveAutoSaves = message.isOwner || game.user.isGM;
-    if (!canDriveAutoSaves) {
-      if (game.settings.get("msh-faserip", "debugMode")) {
-        console.log("FASERIP | Auto-save skipping (no message ownership)", {
-          msgId: message.id,
-          user: game.user.name
-        });
-      }
-      return;
-    }
+
+    // Auto-save logic block — only runs for message owner/GM, only once per message
+    if (canDriveAutoSaves && !alreadyHandled) {
 
     let firedAnyCheck = false; // <— track if we actually ran something
 
@@ -146,8 +139,9 @@ export function installActionChatHandlers() {
               user: game.user.name
             });
           }
-          return;
+          // Skip auto-saves but fall through to button handler registration
         }
+        if (didSet) {
 
         // Derive an "owner" actor (attacker or speaker)
         let ownerActor = null;
@@ -301,12 +295,14 @@ export function installActionChatHandlers() {
           if (firedAnyCheck) {
             await safeSetFlag(message, SCOPE, "autoSaveHandled", true);
           }
-        }
-      }
+        } // end if (mode === "full")
+        } // end if (didSet)
+      } // end !alreadyChecks
     } catch (err) {
       console.error("Auto-save rolling failed:", err);
     }
     // --- END auto-rolling saves ---
+    } // end canDriveAutoSaves && !alreadyHandled block
 
     // Check if this message has an undo flag
     const undoData = message.flags?.[SCOPE]?.undo;

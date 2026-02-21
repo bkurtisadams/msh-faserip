@@ -1452,10 +1452,14 @@ export async function applyDamageToTargets({
             await postDeathSavePrompt(targetActor, { wasKillResult, attackForm, fromZeroHealth: true });
           }
         } else {
-          // Four-Color rule: Non-lethal knockout
+          // Four-Color rule: Non-lethal knockout — roll 1d10 for duration, apply unconscious effect
+          const stunDie = game.settings?.get?.("msh-faserip", "stunDurationDie") || "d10";
+          const durationRoll = await new Roll(`1${stunDie}`).evaluate();
+          const rounds = durationRoll.total;
+          await _applyFourColorKnockout(targetActor, rounds);
           await ChatMessage.create({
             content: `<div style="background:#e3f2fd;border:1px solid #2196F3;padding:8px;border-radius:3px;">
-              <strong>${targetActor.name}</strong> is unconscious (0 Health).
+              <strong>${targetActor.name}</strong> is unconscious (0 Health) for ${rounds} round${rounds !== 1 ? "s" : ""}.
               <div style="font-size:0.9em;color:#666;margin-top:4px;">Four-Color Rule: No death save (non-lethal).</div>
             </div>`
           });
@@ -1576,6 +1580,30 @@ export async function postKillSavePrompt(actor, { attackForm = "edged", fromZero
   });
 }
 
+
+/**
+ * Apply unconscious active effect for Four-Color Rule knockout.
+ * Duration matches the normal stun mechanic (1d10 rounds).
+ */
+async function _applyFourColorKnockout(actor, rounds) {
+  try {
+    const existing = actor.effects.filter(e => e.statuses?.has?.("unconscious"));
+    for (const e of existing) await e.delete().catch(() => {});
+  } catch (_e) {}
+  const inCombat = !!game.combat;
+  const effectData = {
+    name: `Unconscious (${rounds} rounds)`,
+    icon: "icons/svg/unconscious.svg",
+    flags: { "msh-faserip": { isUnconscious: true, fromDeathSave: true, durationRounds: Number(rounds) } },
+    changes: [{ key: "system.status.unconscious", mode: CONST.ACTIVE_EFFECT_MODES.OVERRIDE, value: true }],
+    statuses: ["unconscious"],
+    duration: inCombat
+      ? { rounds: Math.max(1, Number(rounds)), startRound: game.combat?.round || 0 }
+      : { seconds: Math.max(1, Number(rounds)) * 6, startTime: game.time.worldTime }
+  };
+  await actor.createEmbeddedDocuments("ActiveEffect", [effectData]);
+  console.log(`[FASERIP] Four-Color knockout: ${actor.name} unconscious for ${rounds} rounds`);
+}
 
 /**
  * Enhanced postDeathSavePrompt that includes kill context
@@ -1984,9 +2012,13 @@ export async function applyDamageNow({
           if (!fourColor || lethal) {
             await postDeathSavePrompt(targetActor);
           } else {
+            const stunDie = game.settings?.get?.("msh-faserip", "stunDurationDie") || "d10";
+            const durationRoll = await new Roll(`1${stunDie}`).evaluate();
+            const rounds = durationRoll.total;
+            await _applyFourColorKnockout(targetActor, rounds);
             await ChatMessage.create({
               content: `<div style="background:#e3f2fd;border:1px solid #2196F3;padding:8px;border-radius:3px;">
-                <strong>${targetActor.name}</strong> is unconscious (0 Health).
+                <strong>${targetActor.name}</strong> is unconscious (0 Health) for ${rounds} round${rounds !== 1 ? "s" : ""}.
                 <div style="font-size:0.9em;color:#666;margin-top:4px;">Four-Color Rule: No death save (non-lethal).</div>
               </div>`
             });
