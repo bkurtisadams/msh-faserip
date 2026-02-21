@@ -609,12 +609,16 @@
           </div>
           {{#if isInCrisis}}
           <div class="recovery-row">
+            {{#unless isDying}}
             <button type="button" class="recovery-btn crisis-btn" data-action="wake-up" title="Attempt to Regain Consciousness&#10;Only available at 0 HP">
               <i class="fas fa-eye"></i> Wake Up (0 HP)
             </button>
+            {{/unless}}
+            {{#if isDying}}
             <button type="button" class="recovery-btn crisis-btn" data-action="stabilize" title="Stabilize Dying Character&#10;Only available when dying">
               <i class="fas fa-medkit"></i> Stabilize Dying
             </button>
+            {{/if}}
           </div>
           {{/if}}
         </div>
