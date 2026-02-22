@@ -1825,6 +1825,56 @@ Hooks.once("ready", async () => {
     }
   }
 
+  // Migration: strip legacy canAct/canMove/movementMult changes from existing Dying AEs.
+  // These were incorrectly added; dying characters above 0 HP can still act (rules p.31).
+  // Migration: fix Impaired Endurance AEs that used wrong key system.columnShift instead of
+  // system.combatMods.attackShift — the old key was never read during attack resolution.
+  if (game.user.isGM) {
+    try {
+      const DYING_STALE_KEYS = new Set([
+        "system.combatMods.canAct",
+        "system.combatMods.canMove",
+        "system.combatMods.movementMult"
+      ]);
+      let dyingMigrated = 0;
+      let impairedMigrated = 0;
+      for (const actor of game.actors) {
+        for (const effect of actor.effects) {
+          // Dying AE cleanup
+          const isDying = effect.flags?.["msh-faserip"]?.effectType === "dying"
+            || effect.statuses?.has?.("dying")
+            || effect.name === "Dying";
+          if (isDying) {
+            const stale = (effect.changes || []).filter(c => DYING_STALE_KEYS.has(c.key));
+            if (stale.length) {
+              const clean = (effect.changes || []).filter(c => !DYING_STALE_KEYS.has(c.key));
+              await effect.update({ changes: clean });
+              dyingMigrated++;
+            }
+          }
+          // Impaired Endurance key fix
+          const isImpaired = effect.flags?.["msh-faserip"]?.isImpairedEndurance;
+          if (isImpaired) {
+            const needsFix = (effect.changes || []).some(c => c.key === "system.columnShift");
+            if (needsFix) {
+              const fixed = (effect.changes || []).map(c =>
+                c.key === "system.columnShift"
+                  ? { ...c, key: "system.combatMods.attackShift" }
+                  : c
+              );
+              await effect.update({ changes: fixed });
+              impairedMigrated++;
+            }
+          }
+        }
+      }
+      if (dyingMigrated) console.log(`[FASERIP] Migrated ${dyingMigrated} Dying AE(s): removed stale canAct/canMove/movementMult changes`);
+      if (impairedMigrated) console.log(`[FASERIP] Migrated ${impairedMigrated} Impaired Endurance AE(s): fixed columnShift → combatMods.attackShift`);
+    } catch (e) {
+      console.warn("[FASERIP WARN] AE migration failed:", e);
+    }
+  }
+
 });
 
 // ── Block CTT/auto-expiry from deleting ongoing engine AEs ──

@@ -579,7 +579,7 @@ static async attemptRegainConsciousness(actor) {
             startRound: game.combat?.round || 0
           },
           changes: [{
-            key: "system.columnShift",
+            key: "system.combatMods.attackShift",
             mode: CONST.ACTIVE_EFFECT_MODES.ADD,
             value: "-2"
           }]

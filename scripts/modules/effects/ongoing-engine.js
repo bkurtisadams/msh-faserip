@@ -641,7 +641,7 @@ export async function processDyingRound(actor) {
         startTime: game.time?.worldTime ?? 0,
       },
       changes: [{
-        key: "system.columnShift",
+        key: "system.combatMods.attackShift",
         mode: CONST.ACTIVE_EFFECT_MODES.ADD,
         value: "-2",
       }],
@@ -1006,7 +1006,7 @@ export async function applyDyingOngoing(target, { skipImmediateLoss = false } = 
           startTime: game.time?.worldTime ?? 0,
         },
         changes: [{
-          key: "system.columnShift",
+          key: "system.combatMods.attackShift",
           mode: CONST.ACTIVE_EFFECT_MODES.ADD,
           value: "-2",
         }],
