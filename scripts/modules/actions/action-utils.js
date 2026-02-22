@@ -1,4 +1,4 @@
-// action-utils.js v1.5.1 - 2026-02-21
+// action-utils.js v1.6.0 - 2026-02-21
 // v1.5.1: Fix setupModeSelector ignoring global mode - per-dialog mode now capped at global setting
 // v1.5.0: getBodyArmorValues checks for active Blocking effect (Strength as Body Armor)
 // v1.4.1: Fix computeBluntDamage to respect weapon minimum base damage per FASERIP rules
@@ -1373,10 +1373,11 @@ export async function applyDamageToTargets({
           });
         } else {
           // Manual/Semi mode - show button
+          const _isRobotUncon = targetActor.system?.origin === "Robot";
           ChatMessage.create({
             content: `<div style="background:#ffebee;border:1px solid #ef5350;padding:8px;border-radius:3px;">
-              <strong>${targetActor.name}</strong> was hit while unconscious!
-              <button class="death-save-button" data-actor-id="${targetActor.id}">Roll Death Save</button>
+              <strong>${targetActor.name}</strong> was hit while ${_isRobotUncon ? "offline" : "unconscious"}!
+              <button class="death-save-button" data-actor-id="${targetActor.id}">${_isRobotUncon ? "Roll Deactivation Save" : "Roll Death Save"}</button>
             </div>`
           });
         }
@@ -1636,6 +1637,12 @@ export async function postDeathSavePrompt(actor, { wasKillResult = false, attack
     return;
   }
 
+  const isRobot = actor.system?.origin === "Robot";
+  const headerLabel = isRobot ? `${actor.name} — Structural Failure` : `${actor.name} - Health Collapsed`;
+  const bodyText    = isRobot
+    ? "Robot/construct reached 0 Health. Roll Endurance FEAT vs the Kill column to determine deactivation severity."
+    : "Character is unconscious and must roll an Endurance FEAT vs the Kill column to determine if they are dying.";
+  const buttonLabel = isRobot ? "Roll Deactivation Save" : "Roll Death Save";
   const killNote = wasKillResult 
     ? `<div style="color:#c62828;margin-top:4px;">⚠️ This was a KILL result attack!</div>` 
     : "";
@@ -1643,12 +1650,12 @@ export async function postDeathSavePrompt(actor, { wasKillResult = false, attack
   const content = `
     <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
       <div style="padding:5px 10px;border-bottom:1px solid #c0c0c0;font-size:1.1em;color:#8b0000;">
-        <strong>${actor.name} - Health Collapsed</strong>
+        <strong>${headerLabel}</strong>
       </div>
       
       <div style="padding:5px 10px;font-size:.9em;">
         <div style="color:#c62828;font-weight:bold;">Health: 0</div>
-        <div style="margin-top:4px;">Character is unconscious and must roll an Endurance FEAT vs the Kill column to determine if they are dying.</div>
+        <div style="margin-top:4px;">${bodyText}</div>
         ${killNote}
       </div>
 
@@ -1659,7 +1666,7 @@ export async function postDeathSavePrompt(actor, { wasKillResult = false, attack
            data-attack-form="${attackForm}"
            data-from-zero-health="${fromZeroHealth}"
            style="display:inline-flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;padding:6px 14px;background:#ffebee;border:2px solid #c62828;border-radius:4px;color:#c62828;cursor:pointer;text-decoration:none;">
-          Roll Death Save
+          ${buttonLabel}
         </a>
       </div>
     </div>

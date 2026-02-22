@@ -1,4 +1,4 @@
-// scripts/modules/actions/check-action.js v1.8.0 - 2026-02-21
+// scripts/modules/actions/check-action.js v1.9.0 - 2026-02-21
 // v1.7.0: Consolidate slam dual-card — _createSlamChatMessage replaced by _slamDetailHtml folded into check card result box
 // v1.6.2: Read Endurance rank from actor directly (actor IS the defender) - prefill.targetEndRank was stale/missing
 // v1.6.1: Fix check card showing literal 'Target' — actor IS the defender, drop targetName from card header
@@ -328,7 +328,11 @@ export class CheckAction extends BaseAction {
             await Effects.applyDying(targetActor, {
               enduranceValue: targetActor.system?.abilities?.endurance?.value ?? 10
             });
-            ui.notifications.warn(`${targetActor.name} is DYING (Endurance steps down each round unless stabilized).`);
+            if (targetActor.system?.origin === "Robot") {
+              ui.notifications.warn(`${targetActor.name} is DEACTIVATING — losing structural integrity each round until stabilized or repaired.`);
+            } else {
+              ui.notifications.warn(`${targetActor.name} is DYING (Endurance steps down each round unless stabilized).`);
+            }
           }
         }
       }
@@ -618,7 +622,11 @@ export class CheckAction extends BaseAction {
           await Effects.applyDying(targetActor, {
             enduranceValue: targetActor.system?.abilities?.endurance?.value ?? 10
           });
-          ui.notifications.warn(`${targetActor.name} is DYING (Endurance steps down each round unless stabilized).`);
+          if (targetActor.system?.origin === "Robot") {
+            ui.notifications.warn(`${targetActor.name} is DEACTIVATING — losing structural integrity each round until stabilized or repaired.`);
+          } else {
+            ui.notifications.warn(`${targetActor.name} is DYING (Endurance steps down each round unless stabilized).`);
+          }
         }
       }
     }

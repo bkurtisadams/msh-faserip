@@ -1,4 +1,4 @@
-// scripts/modules/actions/death-save-action.js v1.7.0 - 2026-02-19
+// scripts/modules/actions/death-save-action.js v1.9.1 - 2026-02-22
 // v1.7.0: Restyle card to match attack/check card layout (gray card, flex header, color badge, white result box)
 //         Drop <details> collapsible, embed duration roll in card, remove emoji from console.log
 // v1.6.0: _createDyingEffect delegates to ongoing-engine.applyDyingOngoing.
@@ -53,6 +53,7 @@ export class DeathSaveAction extends BaseAction {
 
       const killResult = resolveKillFeat(colorLower, killContext);
       const isDying    = (killResult.outcome === "EnduranceLoss");
+      const isRobot    = actor.system?.origin === "Robot";
 
       console.log(`[FASERIP] Death Save | ${actor.name} rolled ${colorLower.toUpperCase()} (${roll.total}) vs ${effectiveRank} — ${killResult.label}`);
 
@@ -61,7 +62,7 @@ export class DeathSaveAction extends BaseAction {
         content: this._buildDeathSaveCard({
           actor, effectiveRank, shiftDisplay, endValue,
           roll, colorLower, killResult, isDying, fromZeroHealth,
-          unconsciousDuration, attackForm, killContext
+          unconsciousDuration, attackForm, killContext, isRobot
         })
       });
 
@@ -73,9 +74,16 @@ export class DeathSaveAction extends BaseAction {
 
     const fromZeroHealth    = this.opts?.fromZeroHealth !== false;
     const isEdgedOrShooting = (killContext === KILL_CONTEXTS.EDGED_MELEE || killContext === KILL_CONTEXTS.SHOOTING);
-    const dialogTitle       = fromZeroHealth ? "Death Save" : "Kill Save";
+    const isRobot           = actor.system?.origin === "Robot";
+    const atZeroHealth      = (actor?.system?.attributes?.health?.value ?? 1) === 0;
+    const isUnconscious     = fromZeroHealth || atZeroHealth;
+    const dialogTitle       = isUnconscious
+      ? (isRobot ? "Deactivation Save" : "Death Save")
+      : "Kill Save";
     const dialogDesc        = fromZeroHealth
-      ? "Character has reached 0 Health. Roll Endurance FEAT vs Kill column."
+      ? (isRobot
+          ? "Robot/construct reached 0 Health. Roll Endurance FEAT vs Kill column (deactivation check)."
+          : "Character has reached 0 Health. Roll Endurance FEAT vs Kill column.")
       : "Kill result from attack! Roll Endurance FEAT vs Kill column.";
     const noEffectLabel     = fromZeroHealth ? "Unconscious" : "No Effect";
 
@@ -206,14 +214,18 @@ export class DeathSaveAction extends BaseAction {
       content: this._buildDeathSaveCard({
         actor, effectiveRank, shiftDisplay, endValue: endurance.value,
         roll, colorLower, killResult, isDying, fromZeroHealth,
-        unconsciousDuration, attackForm, killContext
+        unconsciousDuration, attackForm, killContext, isRobot
       })
     });
 
     if (fromZeroHealth) await this._createStunnedEffect(actor, unconsciousDuration ?? 1);
     if (isDying) {
       await this._createDyingEffect(actor, endurance);
-      ui.notifications.warn(`${actor.name} is DYING — losing 1 Endurance rank per turn until stabilized.`);
+      if (isRobot) {
+        ui.notifications.warn(`${actor.name} is DEACTIVATING — losing 1 Endurance rank per turn until stabilized or repaired.`);
+      } else {
+        ui.notifications.warn(`${actor.name} is DYING — losing 1 Endurance rank per turn until stabilized.`);
+      }
     } else {
       if (fromZeroHealth) ui.notifications.info(`${actor.name} is unconscious for ${unconsciousDuration} rounds.`);
       else                ui.notifications.info(`${actor.name} resisted the Kill result — no effect.`);
@@ -223,19 +235,29 @@ export class DeathSaveAction extends BaseAction {
   // ----------------------------------------------------------------
   // Card builder — matches attack card / check card layout exactly
   // ----------------------------------------------------------------
-  _buildDeathSaveCard({ actor, effectiveRank, shiftDisplay, endValue, roll, colorLower, killResult, isDying, fromZeroHealth, unconsciousDuration, attackForm, killContext }) {
+  _buildDeathSaveCard({ actor, effectiveRank, shiftDisplay, endValue, roll, colorLower, killResult, isDying, fromZeroHealth, unconsciousDuration, attackForm, killContext, isRobot=false }) {
     const isEdgedOrShooting = (killContext === KILL_CONTEXTS.EDGED_MELEE || killContext === KILL_CONTEXTS.SHOOTING);
-    const cardLabel   = fromZeroHealth ? "DEATH SAVE" : "KILL SAVE";
+    // 0 HP = unconscious regardless of how the kill save was triggered
+    const atZeroHealth = (actor?.system?.attributes?.health?.value ?? 1) === 0;
+    const isUnconscious = fromZeroHealth || atZeroHealth;
+    const cardLabel   = isUnconscious ? (isRobot ? "DEACTIVATION SAVE" : "DEATH SAVE") : "KILL SAVE";
     const resultLabel = killResult.label || (isDying ? "Endurance Loss" : "No Effect");
     const { bg, fg }  = bannerColors(colorLower);
     const rollBox = `<span title="d100 vs ${effectiveRank} Endurance (Kill column)" style="padding:0 3px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${roll.total}</span>`;
 
     let outcomeLines = [];
     if (isDying) {
-      outcomeLines.push(fromZeroHealth
-        ? `<div style="color:#c62828;font-weight:700;">DYING — Unconscious</div>`
-        : `<div style="color:#c62828;font-weight:700;">DYING — Conscious (bleeding out)</div>`);
-      outcomeLines.push(`<div style="margin-top:4px;font-size:.9em;color:#555;">Losing 1 Endurance rank per turn until stabilized.</div>`);
+      if (isRobot) {
+        outcomeLines.push(isUnconscious
+          ? `<div style="color:#c62828;font-weight:700;">DEACTIVATING — Offline</div>`
+          : `<div style="color:#c62828;font-weight:700;">DEACTIVATING — Losing structural integrity</div>`);
+        outcomeLines.push(`<div style="margin-top:4px;font-size:.9em;color:#555;">Losing 1 Endurance rank per turn until stabilized or repaired.</div>`);
+      } else {
+        outcomeLines.push(isUnconscious
+          ? `<div style="color:#c62828;font-weight:700;">DYING — Unconscious</div>`
+          : `<div style="color:#c62828;font-weight:700;">DYING — Conscious (bleeding out)</div>`);
+        outcomeLines.push(`<div style="margin-top:4px;font-size:.9em;color:#555;">Losing 1 Endurance rank per turn until stabilized.</div>`);
+      }
       outcomeLines.push(`<div style="margin-top:4px;font-size:.85em;color:#555;">${this._buildEnduranceLadder(effectiveRank)}</div>`);
       outcomeLines.push(`<div style="margin-top:6px;font-size:.85em;color:#555;">
         <strong>Stabilize:</strong>

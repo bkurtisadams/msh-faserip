@@ -398,7 +398,7 @@ static async attemptRegainConsciousness(actor) {
         e.getFlag(SCOPE, "isDying") || e.statuses?.has?.("dying")
       );
       if (dyingEffect) {
-        await actor.deleteEmbeddedDocuments("ActiveEffect", [dyingEffect.id]);
+        await actor.deleteEmbeddedDocuments("ActiveEffect", [dyingEffect.id], { mshIntentional: true });
         
         if (game.settings.get(SCOPE, "debugMode")) {
           console.log(`FASERIP | Removed Dying effect from ${actor.name} (regained consciousness)`);
@@ -500,14 +500,14 @@ static async attemptRegainConsciousness(actor) {
     const currentEndurance = actor.system.abilities.endurance.rank;
 
     // Remove Dying effect
-    await actor.deleteEmbeddedDocuments("ActiveEffect", [dyingEffect.id]);
+    await actor.deleteEmbeddedDocuments("ActiveEffect", [dyingEffect.id], { mshIntentional: true });
     
     // Remove original Unconscious effect from death save (if present)
     const unconsciousFromDeathSave = actor.effects.find(e => 
       e.getFlag(SCOPE, "fromDeathSave")
     );
     if (unconsciousFromDeathSave) {
-      await actor.deleteEmbeddedDocuments("ActiveEffect", [unconsciousFromDeathSave.id]);
+      await actor.deleteEmbeddedDocuments("ActiveEffect", [unconsciousFromDeathSave.id], { mshIntentional: true });
     }
     
     // Unconscious for 1-10 hours
@@ -689,7 +689,7 @@ static async attemptRegainConsciousness(actor) {
     // Check if fully healed
     if (newRankIndex >= originalRankIndex) {
       // Remove Impaired Endurance effect
-      await actor.deleteEmbeddedDocuments("ActiveEffect", [impairedEffect.id]);
+      await actor.deleteEmbeddedDocuments("ActiveEffect", [impairedEffect.id], { mshIntentional: true });
       
       const message = `${actor.name}'s Endurance fully restored to ${originalEndurance}!`;
       

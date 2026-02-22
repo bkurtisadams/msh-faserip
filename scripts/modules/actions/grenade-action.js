@@ -1,4 +1,4 @@
-// scripts/modules/actions/grenade-action.js v1.2.0 - 2026-02-20
+// scripts/modules/actions/grenade-action.js v1.3.0 - 2026-02-22
 // v1.2.0: Item category changed to "other" with weaponType="grenade"; reads grenadeType from item; template auto-target
 import { RangedAttackAction } from "./ranged-attack-action.js";
 import { AreaTemplate } from "./area-template.js";
@@ -350,16 +350,46 @@ export class GrenadeAction extends RangedAttackAction {
     const isKillCapable = ["physical-edged", "energy"].includes(typeDef.damageType);
     const wasKillResult = isKillCapable; // area hits always treated as Red (Kill column) per RAW
     if (damage > 0 && affectedTargets.length > 0) {
-      await applyDamageToTargets({
+      const dmgResults = await applyDamageToTargets({
         damage,
         targets: affectedTargets,
         attackerUuid: actor.uuid,
         damageType: typeDef.damageType,
         attackForm: typeDef.damageType?.includes("edged") ? "edged" : typeDef.damageType === "energy" ? "energy" : "blunt",
-        showNotification: true,
+        showNotification: false,
         wasKillResult,
         forceKilling: wasKillResult
       });
+
+      // Post damage summary chat card for each target
+      if (dmgResults?.length) {
+        const dmgLabel = typeDef.damageType?.replace("physical-", "") ?? "damage";
+        const rows = dmgResults.map(r => {
+          if (r.net === 0 && r.absorbed > 0) {
+            return `<tr><td style="padding:2px 6px;">${r.name}</td><td style="padding:2px 6px;color:#888;">All absorbed by armor</td><td style="padding:2px 6px;color:#888;">${r.hpBefore} → ${r.hpAfter}</td></tr>`;
+          }
+          const armorNote = r.absorbed > 0 ? ` <span style="color:#888;font-size:.85em;">(${damage} − ${r.absorbed} armor)</span>` : "";
+          return `<tr><td style="padding:2px 6px;">${r.name}</td><td style="padding:2px 6px;color:#c62828;font-weight:600;">−${r.net}${armorNote}</td><td style="padding:2px 6px;">${r.hpBefore} → ${r.hpAfter}</td></tr>`;
+        }).join("");
+
+        await ChatMessage.create({
+          speaker: ChatMessage.getSpeaker({ actor }),
+          content: `<div style="font-family:'Segoe UI',system-ui,sans-serif;background:#fff;border:1px solid #c0c0c0;border-radius:4px;overflow:hidden;margin-bottom:4px;">
+            <div style="display:flex;justify-content:space-between;align-items:baseline;padding:5px 10px;border-bottom:1px solid #e0e0e0;">
+              <span style="font-weight:700;color:#8b0000;letter-spacing:.03em;text-transform:uppercase;">GRENADE DAMAGE</span>
+              <span style="font-size:.8em;color:#666;">${damage} pts ${dmgLabel} — ${dmgResults.length} target${dmgResults.length !== 1 ? "s" : ""}</span>
+            </div>
+            <table style="width:100%;border-collapse:collapse;font-size:.88em;padding:4px;">
+              <thead><tr style="border-bottom:1px solid #eee;color:#666;font-size:.82em;">
+                <th style="padding:2px 6px;text-align:left;">Target</th>
+                <th style="padding:2px 6px;text-align:left;">Damage</th>
+                <th style="padding:2px 6px;text-align:left;">Health</th>
+              </tr></thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>`
+        });
+      }
     }
   }
 }

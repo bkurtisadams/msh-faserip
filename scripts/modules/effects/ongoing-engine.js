@@ -1,4 +1,4 @@
-// scripts/modules/effects/ongoing-engine.js v1.5.0 - 2026-02-21
+// scripts/modules/effects/ongoing-engine.js v1.6.1 - 2026-02-21
 // v1.5.0: Robot origin check — death treated as deactivation (reactivatable, no karma loss).
 // v1.4.0: Consolidated dying initiation into applyDyingOngoing (immediate first rank loss,
 //         Impaired Endurance, HP reduction, chat). All callers now use this single entry point.
@@ -513,7 +513,20 @@ export async function processDyingRound(actor) {
   if (!actor) return "none";
   const scope = SCOPE();
 
-  // Find the dying AE (by ongoingId or legacy isDying flag)
+  // ── Already dead / deactivated — do not re-fire ──────────────────
+  if (actor.system?.details?.isDead || actor.system?.details?.isDeactivated) {
+    console.log(`[FASERIP:DYING] Skipping processDyingRound for ${actor.name} — already dead/deactivated`);
+    return "none";
+  }
+
+  // ── In-memory per-actor lock prevents concurrent async calls ─────
+  if (!globalThis._faseripdyingLocks) globalThis._faseripdyingLocks = new Set();
+  const lockKey = actor.uuid;
+  if (globalThis._faseripdyingLocks.has(lockKey)) {
+    console.log(`[FASERIP:DYING] Skipping re-entrant processDyingRound for ${actor.name}`);
+    return "none";
+  }
+  // Find the dying AE before acquiring lock — bail early if none
   const dyingAE = actor.effects.find(e =>
     e.flags?.[scope]?.ongoingId === "dying" ||
     e.flags?.[scope]?.isDying ||
@@ -521,11 +534,15 @@ export async function processDyingRound(actor) {
   );
   if (!dyingAE) return "none";
 
+  globalThis._faseripdyingLocks.add(lockKey);
+
+  try {
+
   // ── Dedup: prevent double-processing if multiple hooks fire for same time tick ──
-  // CTT calls game.time.advance() internally so worldTime always advances with CTT.
-  const lastProcessedWT = dyingAE.getFlag(scope, "lastProcessedWorldTime") || 0;
+  // worldTime === 0 guard removed — dedup now always applies (lock handles zero-time edge case).
+  const lastProcessedWT = dyingAE.getFlag(scope, "lastProcessedWorldTime") || -1;
   const currentWT = game.time?.worldTime ?? 0;
-  if (currentWT > 0 && currentWT === lastProcessedWT) {
+  if (currentWT === lastProcessedWT) {
     console.log(`[FASERIP:DYING] Skipping duplicate processDyingRound for ${actor.name} (worldTime ${currentWT})`);
     return "none";
   }
@@ -568,7 +585,7 @@ export async function processDyingRound(actor) {
     }
 
     // Clean up dying AE and flags
-    await dyingAE.delete();
+    await dyingAE.delete({ mshIntentional: true });
     const ongoingConfig = actor.getFlag(scope, "ongoing.dying");
     if (ongoingConfig) await actor.unsetFlag(scope, "ongoing.dying");
 
@@ -708,6 +725,9 @@ export async function processDyingRound(actor) {
   }
 
   return "stepped";
+  } finally {
+    globalThis._faseripdyingLocks.delete(lockKey);
+  }
 }
 
 async function executeEnduranceGain(actor, ae, effectId, config, rawAmount, cycles, worldTime, scope, cycleSeconds, startedAt, effectName) {
@@ -866,7 +886,7 @@ export async function removeOngoingEffect(actor, effectId) {
   const scope = SCOPE();
 
   const ae = actor.effects.find(e => e.flags?.[scope]?.ongoingId === effectId);
-  if (ae) await ae.delete();
+  if (ae) await ae.delete({ mshIntentional: true });
 
   try {
     await actor.unsetFlag(scope, `ongoing.${effectId}`);
