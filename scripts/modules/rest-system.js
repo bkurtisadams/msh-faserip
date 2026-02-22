@@ -510,27 +510,29 @@ static async attemptRegainConsciousness(actor) {
       await actor.deleteEmbeddedDocuments("ActiveEffect", [unconsciousFromDeathSave.id], { mshIntentional: true });
     }
     
-    // Unconscious for 1-10 hours
+    // Only apply unconscious if at 0 HP — conscious dying characters (health > 0)
+    // are stabilized but remain conscious (rules p.31: unconscious only at 0 HP).
+    const currentHealth = actor.system?.attributes?.health?.value ?? 0;
     const hours = Math.floor(Math.random() * 10) + 1;
-    
-    const unconsciousEffect = {
-      name: `Unconscious (${hours} hours)`,
-      icon: "icons/svg/unconscious.svg",
-      origin: actor.uuid,
-      flags: {
-        [SCOPE]: {
-          isStunned: true,
-          fromDeathSave: true,      // ← Changed from fromStabilization
-          fromStabilization: true   // ← Keep this too for tracking
+    if (currentHealth <= 0) {
+      const unconsciousEffect = {
+        name: `Unconscious (${hours} hours)`,
+        icon: "icons/svg/unconscious.svg",
+        origin: actor.uuid,
+        flags: {
+          [SCOPE]: {
+            isStunned: true,
+            fromDeathSave: true,
+            fromStabilization: true
+          }
+        },
+        duration: {
+          rounds: hours * 600,
+          startRound: game.combat?.round || 0
         }
-      },
-      duration: {
-        rounds: hours * 600,
-        startRound: game.combat?.round || 0
-      }
-    };
-    
-    await actor.createEmbeddedDocuments("ActiveEffect", [unconsciousEffect]);
+      };
+      await actor.createEmbeddedDocuments("ActiveEffect", [unconsciousEffect]);
+    }
     
     // Create or update Impaired Endurance effect if Endurance was reduced
     let impairedEffect = actor.effects.find(e => e.getFlag(SCOPE, "isImpairedEndurance"));
@@ -586,14 +588,19 @@ static async attemptRegainConsciousness(actor) {
       }
     }
     
-    const message = `${actor.name} stabilized! Unconscious for ${hours} hours. Endurance impaired (${currentEndurance} of ${originalEndurance}).`;
-    
+    const consciousMsg = currentHealth > 0
+      ? `Dying halted - conscious but impaired`
+      : `Dying halted - unconscious for ${hours} hours`;
+    const message = currentHealth > 0
+      ? `${actor.name} stabilized! Conscious. Endurance impaired (${currentEndurance} of ${originalEndurance}).`
+      : `${actor.name} stabilized! Unconscious for ${hours} hours. Endurance impaired (${currentEndurance} of ${originalEndurance}).`;
+
     await ChatMessage.create({
       content: `<div style="background:#e8f5e9;border:2px solid #4CAF50;padding:10px;border-radius:5px;">
         <div style="font-size:1.2em;font-weight:bold;color:#2e7d32;margin-bottom:8px;">
           <i class="fas fa-medkit"></i> ${actor.name} Stabilized!
         </div>
-        <div>Dying halted - unconscious for ${hours} hours</div>
+        <div>${consciousMsg}</div>
         <div>Endurance impaired: ${currentEndurance} of ${originalEndurance} (-2CS penalty)</div>
       </div>`,
       speaker: ChatMessage.getSpeaker({ actor })
