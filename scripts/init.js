@@ -1,8 +1,7 @@
-// init.js v1.9.7 - 2026-02-22
-// v1.9.7: CTT/worldTime dying hooks now process 1 dying round per character per advance
-//         (not N turns per deltaSeconds). GM controls dying pacing via CTT advances.
-//         During combat, combatRound hook handles dying (1 per round). Prevents instant
-//         death when advancing hours/days via CTT.
+// init.js v1.9.9 - 2026-02-22
+// v1.9.9: Fix double death save caused by v1.9.8's await setFlag("wasKnockedOut") before
+//         _combatDamageInProgress guard. The await yielded event loop, letting combat system
+//         fire its own death save. Fix: move setFlag after guard, use fire-and-forget (no await).
 // v1.9.4: Dying now processes via worldTime (works with CTT advances and combat tracker).
 //         Removed ~30-line dying block from updateCombat hook — processOngoingEffects handles it.
 // v1.9.3: Dying delegated to ongoing-engine.js processDyingRound(). ~200-line dying
@@ -2232,6 +2231,9 @@ Hooks.on('updateActor', async (actor, updateData, options, userId) => {
       // Skip if combat system already handling death save
       if (game.msh?._combatDamageInProgress) {
         console.log(`FASERIP | Skipping init.js death save - combat system handling`);
+        // Still mark KO for Recovery guard (fire-and-forget, no await to avoid re-entrant updateActor)
+        const scope = globalThis.MSH_FLAG_SCOPE || "msh-faserip";
+        actor.setFlag(scope, "wasKnockedOut", true);
         return;
       }
       console.log(`%cFASERIP | !!! ${actor.name} is at ${currentHealth} HP - triggering death save`, 'color: #ef5350; font-weight: bold');
@@ -2260,12 +2262,22 @@ Hooks.on('updateActor', async (actor, updateData, options, userId) => {
 
       console.log("FASERIP | At 0 HP - death save will handle effects");
 
+      // Mark KO for Recovery guard AFTER death save (fire-and-forget to avoid re-entrant updateActor)
+      const scope = globalThis.MSH_FLAG_SCOPE || "msh-faserip";
+      actor.setFlag(scope, "wasKnockedOut", true);
+
       // Still record damage timestamp for rest system
       const { recordDamage } = await import("./modules/rest-system.js");
       await recordDamage(actor);
     } else {
       // === Above 0 HP: record damage for rest system ===
       console.log("FASERIP | Above 0 HP - recording damage for rest eligibility");
+
+      // Clear KO flag — new conscious damage cycle, Recovery is eligible again
+      const scope = globalThis.MSH_FLAG_SCOPE || "msh-faserip";
+      if (actor.getFlag(scope, "wasKnockedOut")) {
+        await actor.unsetFlag(scope, "wasKnockedOut");
+      }
 
       const { recordDamage } = await import("./modules/rest-system.js");
       await recordDamage(actor);

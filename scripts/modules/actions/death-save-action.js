@@ -1,4 +1,5 @@
-// scripts/modules/actions/death-save-action.js v1.9.1 - 2026-02-22
+// scripts/modules/actions/death-save-action.js v1.9.4 - 2026-02-22
+// v1.9.4: Add canAct:false to Unconscious effect changes so existing canActorAct guard blocks attacks.
 // v1.7.0: Restyle card to match attack/check card layout (gray card, flex header, color badge, white result box)
 //         Drop <details> collapsible, embed duration roll in card, remove emoji from console.log
 // v1.6.0: _createDyingEffect delegates to ongoing-engine.applyDyingOngoing.
@@ -347,7 +348,10 @@ export class DeathSaveAction extends BaseAction {
           durationRounds: Number(unconsciousRounds)
         }
       },
-      changes: [{ key: "system.status.unconscious", mode: CONST.ACTIVE_EFFECT_MODES.OVERRIDE, value: true }],
+      changes: [
+        { key: "system.status.unconscious", mode: CONST.ACTIVE_EFFECT_MODES.OVERRIDE, value: true },
+        { key: "system.combatMods.canAct", mode: CONST.ACTIVE_EFFECT_MODES.OVERRIDE, value: "false" }
+      ],
       statuses: ["unconscious"],
       duration: usesCTT
         ? { seconds: Math.max(1, Number(unconsciousRounds)) * 6, startTime: game.time.worldTime }

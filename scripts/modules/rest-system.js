@@ -1,4 +1,6 @@
-// scripts/modules/rest-system.js
+// scripts/modules/rest-system.js v1.3.0 - 2026-02-22
+// v1.3.0: Add canAct:false + statuses:["unconscious"] to stabilization and consciousness-fail
+//         Unconscious effects so existing canActorAct guard blocks attacks.
 // Player-driven rest, recovery, and healing system for FASERIP
 
 import { getFlagScope } from "./actions/flags.js";
@@ -40,6 +42,15 @@ export class RestSystem {
       return { 
         canRest: false, 
         reason: "Cannot recover while unconscious (Health must be above 0)" 
+      };
+    }
+
+    // Per rules p.32: Recovery only applies "provided the character is not knocked
+    // unconscious." If KO'd, only hourly Healing applies after waking.
+    if (actor.getFlag(SCOPE, "wasKnockedOut")) {
+      return {
+        canRest: false,
+        reason: "Recovery unavailable — was knocked unconscious. Heals via Healing (hourly) instead."
       };
     }
 
@@ -430,6 +441,10 @@ static async attemptRegainConsciousness(actor) {
             fromConsciousnessFail: true
           }
         },
+        changes: [
+          { key: "system.combatMods.canAct", mode: CONST.ACTIVE_EFFECT_MODES.OVERRIDE, value: "false" }
+        ],
+        statuses: ["unconscious"],
         duration: {
           rounds: rounds,
           startRound: game.combat?.round || 0
@@ -503,11 +518,12 @@ static async attemptRegainConsciousness(actor) {
     await actor.deleteEmbeddedDocuments("ActiveEffect", [dyingEffect.id], { mshIntentional: true });
     
     // Remove original Unconscious effect from death save (if present)
+    // Pass mshStabilizing flag so deleteActiveEffect hook does NOT auto-attempt consciousness
     const unconsciousFromDeathSave = actor.effects.find(e => 
       e.getFlag(SCOPE, "fromDeathSave")
     );
     if (unconsciousFromDeathSave) {
-      await actor.deleteEmbeddedDocuments("ActiveEffect", [unconsciousFromDeathSave.id], { mshIntentional: true });
+      await actor.deleteEmbeddedDocuments("ActiveEffect", [unconsciousFromDeathSave.id], { mshIntentional: true, mshStabilizing: true });
     }
     
     // Only apply unconscious if at 0 HP — conscious dying characters (health > 0)
@@ -526,6 +542,10 @@ static async attemptRegainConsciousness(actor) {
             fromStabilization: true
           }
         },
+        changes: [
+          { key: "system.combatMods.canAct", mode: CONST.ACTIVE_EFFECT_MODES.OVERRIDE, value: "false" }
+        ],
+        statuses: ["unconscious"],
         duration: {
           rounds: hours * 600,
           startRound: game.combat?.round || 0
@@ -802,6 +822,10 @@ export function initRestSystem() {
   Hooks.on("deleteActiveEffect", async (effect, options, userId) => {
     // Only GM should handle this to avoid duplicates
     if (!game.user.isGM) return;
+    
+    // Skip if this deletion is part of stabilizeDying — new unconscious timer
+    // hasn't been created yet, so consciousness check would incorrectly pass
+    if (options.mshStabilizing) return;
     
     const actor = effect.parent;
     if (!actor || actor.documentName !== "Actor") return;
