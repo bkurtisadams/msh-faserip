@@ -409,7 +409,7 @@ static async attemptRegainConsciousness(actor) {
       const impairedEffect = actor.effects.find(e => e.getFlag(SCOPE, "isImpairedEndurance"));
       if (impairedEffect) {
         await impairedEffect.update({
-          [`flags.${SCOPE}.lastHealed`]: Date.now()
+          [`flags.${SCOPE}.lastHealed`]: game.time.worldTime
         });
       }
 
@@ -540,7 +540,7 @@ static async attemptRegainConsciousness(actor) {
     if (impairedEffect) {
       // Effect already exists from dying - update it with stabilization timestamp
       await impairedEffect.update({
-        [`flags.${SCOPE}.lastHealed`]: Date.now(),
+        [`flags.${SCOPE}.lastHealed`]: game.time.worldTime,
         [`flags.${SCOPE}.medicalCare`]: actor.getFlag(SCOPE, "medicalCare") ?? false
       });
       
@@ -568,7 +568,7 @@ static async attemptRegainConsciousness(actor) {
               isImpairedEndurance: true,
               originalEndurance: originalEndurance,
               currentEndurance: currentEndurance,
-              lastHealed: Date.now(),
+              lastHealed: game.time.worldTime,
               medicalCare: actor.getFlag(SCOPE, "medicalCare") ?? false
             },
             core: { statusId: "impaired-endurance" }
@@ -636,16 +636,16 @@ static async attemptRegainConsciousness(actor) {
     const currentEndurance = actor.system.abilities.endurance.rank;
     const lastHealed = impairedEffect.getFlag(SCOPE, "lastHealed") || 0;
     
-    // Check if enough time has passed
-    const now = Date.now();
-    const dayInMs = 24 * 60 * 60 * 1000;
-    const weekInMs = 7 * dayInMs;
-    const requiredTime = medicalCare ? dayInMs : weekInMs;
+    // Check if enough time has passed (world time in seconds)
+    const now = game.time.worldTime;
+    const dayInSeconds = 86400;
+    const weekInSeconds = 7 * dayInSeconds;
+    const requiredTime = medicalCare ? dayInSeconds : weekInSeconds;
     const timeSinceHealing = now - lastHealed;
     
     if (timeSinceHealing < requiredTime) {
       const timeRemaining = requiredTime - timeSinceHealing;
-      const hoursRemaining = Math.ceil(timeRemaining / (60 * 60 * 1000));
+      const hoursRemaining = Math.ceil(timeRemaining / 3600);
       return { 
         success: false, 
         message: `${actor.name} needs ${hoursRemaining} more hours before healing another Endurance rank` 

@@ -1,4 +1,8 @@
-// scripts/modules/effects/ongoing-engine.js v1.5.3 - 2026-02-22
+// scripts/modules/effects/ongoing-engine.js v1.6.0 - 2026-02-22
+// v1.6.0: Dying updates pass { mshDyingTick: true } so init.js updateActor hook skips
+//         spurious DAMAGE DETECTED processing for endurance rank loss HP changes.
+//         Health reduction is correct per rules: Health = F+A+S+E, so both current and
+//         max Health drop when Endurance rank drops during dying.
 // v1.5.0: Robot origin check — death treated as deactivation (reactivatable, no karma loss).
 // v1.4.0: Consolidated dying initiation into applyDyingOngoing (immediate first rank loss,
 //         Impaired Endurance, HP reduction, chat). All callers now use this single entry point.
@@ -19,6 +23,11 @@ import { getAllTokenActors, applyEffect } from "./effect-engine.js";
 const SCOPE = () => (globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faserip");
 
 const AE_MODES = { MULTIPLY: 1, ADD: 2, DOWNGRADE: 3, UPGRADE: 4, OVERRIDE: 5 };
+
+// Synchronous in-memory lock to prevent concurrent processDyingRound calls per actor.
+// Solves race condition where combatRound + timeAdvanced hooks both call processDyingRound
+// before the async setFlag dedup can complete.
+const _dyingLocks = new Set();
 
 /**
  * Get actors from the current (viewed) scene only.
@@ -528,15 +537,21 @@ export async function processDyingRound(actor) {
     return "dead";
   }
 
-  // ── Dedup: prevent double-processing if multiple hooks fire for same time tick ──
-  // CTT calls game.time.advance() internally so worldTime always advances with CTT.
-  const lastProcessedWT = dyingAE.getFlag(scope, "lastProcessedWorldTime") || 0;
-  const currentWT = game.time?.worldTime ?? 0;
-  if (currentWT > 0 && currentWT === lastProcessedWT) {
-    console.log(`[FASERIP:DYING] Skipping duplicate processDyingRound for ${actor.name} (worldTime ${currentWT})`);
+  // ── Synchronous in-memory lock: prevents race between combatRound + CTT hooks ──
+  const lockKey = actor.id;
+  if (_dyingLocks.has(lockKey)) {
     return "none";
   }
-  await dyingAE.setFlag(scope, "lastProcessedWorldTime", currentWT);
+  _dyingLocks.add(lockKey);
+
+  try {
+    return await _processDyingRoundInner(actor, dyingAE, scope);
+  } finally {
+    _dyingLocks.delete(lockKey);
+  }
+}
+
+async function _processDyingRoundInner(actor, dyingAE, scope) {
 
   console.log(`[FASERIP:DYING] Processing dying for ${actor.name}`, {
     effectName: dyingAE.name,
@@ -586,13 +601,14 @@ export async function processDyingRound(actor) {
   }
 
   // ── Step endurance down ──────────────────────────────────────────
+  // Per rules: Health = F+A+S+E. When Endurance rank drops, both current and max Health
+  // decrease by the difference in rank values.
   const nextName = game.msh?.nextLowerRankName?.(curName) ?? "Shift-0";
   const nextValue = game.msh?.getRankValue?.(nextName) ?? 0;
   const enduranceLoss = curValue - nextValue;
-
-  // Reduce current HP by the difference
   const currentHealth = actor.system?.attributes?.health?.value ?? 0;
   const newHealth = Math.max(0, currentHealth - enduranceLoss);
+  const newMaxHealth = _recalcMaxHealth(actor, nextValue);
 
   // Store original endurance on first dying tick
   let originalRank = dyingAE.getFlag(scope, "originalEndurance")
@@ -604,13 +620,14 @@ export async function processDyingRound(actor) {
     console.log(`[FASERIP:DYING] Stored original Endurance for ${actor.name}: ${originalRank}`);
   }
 
-  // Update actor stats
+  // Update Endurance rank + Health (current and max)
   try {
     await actor.update({
       "system.abilities.endurance.rank": nextName,
       "system.abilities.endurance.value": nextValue,
       "system.attributes.health.value": newHealth,
-    });
+      "system.attributes.health.max": newMaxHealth,
+    }, { mshDyingTick: true });
   } catch (err) {
     console.error(`[FASERIP ERROR] Failed to update ${actor.name}'s Endurance:`, err);
     return "none";
@@ -963,14 +980,14 @@ export async function applyDyingOngoing(target, { skipImmediateLoss = false } = 
 
     firstLossRank = nextRank;
 
-    // Apply immediate Endurance + Health loss
+    // Apply immediate Endurance + Health loss (Health = F+A+S+E)
     try {
       await actor.update({
         "system.abilities.endurance.rank": nextRank,
         "system.abilities.endurance.value": nextValue,
         "system.attributes.health.value": newHealth,
         "system.attributes.health.max": _recalcMaxHealth(actor, nextValue),
-      });
+      }, { mshDyingTick: true });
     } catch (err) {
       console.error(`[FASERIP ERROR] Failed to apply immediate Endurance loss for ${actor.name}:`, err);
     }

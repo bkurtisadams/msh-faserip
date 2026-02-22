@@ -1,7 +1,8 @@
-// init.js v1.9.5 - 2026-02-11
-// v1.9.5: Wire processDyingRound into combatRound hook (1 rank loss per FASERIP turn/Foundry round).
-//         Dying no longer relies on worldTime-based processing which caused multi-rank loss
-//         when multiple combatant turns advanced worldTime within a single Foundry round.
+// init.js v1.9.7 - 2026-02-22
+// v1.9.7: CTT/worldTime dying hooks now process 1 dying round per character per advance
+//         (not N turns per deltaSeconds). GM controls dying pacing via CTT advances.
+//         During combat, combatRound hook handles dying (1 per round). Prevents instant
+//         death when advancing hours/days via CTT.
 // v1.9.4: Dying now processes via worldTime (works with CTT advances and combat tracker).
 //         Removed ~30-line dying block from updateCombat hook — processOngoingEffects handles it.
 // v1.9.3: Dying delegated to ongoing-engine.js processDyingRound(). ~200-line dying
@@ -83,6 +84,8 @@ Hooks.on("combatRound", async (combat, updateData, updateOptions, userId) => {
   // ── Process dying for all actors in this combat (1 rank loss per round) ──
   // This is the ONLY place processDyingRound is called during combat.
   // combatRound fires once per Foundry round = 1 FASERIP turn.
+  // Set global lock so CTT timeAdvanced (triggered by game.time.advance above) skips dying.
+  game.msh._dyingInProgress = true;
   try {
     const { processDyingRound } = await import("./modules/effects/ongoing-engine.js");
     const scope = globalThis.MSH_FLAG_SCOPE || "msh-faserip";
@@ -100,6 +103,8 @@ Hooks.on("combatRound", async (combat, updateData, updateOptions, userId) => {
     }
   } catch (e) {
     console.error("[FASERIP ERROR] Dying round processing failed:", e);
+  } finally {
+    game.msh._dyingInProgress = false;
   }
 });
 
@@ -160,9 +165,8 @@ Hooks.on("updateWorldTime", async (worldTime, dt, options, userId) => {
   // timeTracker.timeAdvanced hook owns this when CTT is active (avoids race condition,
   // since CTT calls game.time.advance() internally which also fires this hook).
   const cttActiveForDying = game.modules.get("calendar-time-tracker")?.active;
-  if (!game.combat?.active && !cttActiveForDying) {
-    const turns = Math.floor(dt / 6);
-    if (turns > 0) {
+  if (!game.combat?.active && !cttActiveForDying && !game.msh._dyingInProgress) {
+    if (dt >= 6) {
       try {
         const { processDyingRound } = await import("./modules/effects/ongoing-engine.js");
         const scope = globalThis.MSH_FLAG_SCOPE || "msh-faserip";
@@ -173,12 +177,9 @@ Hooks.on("updateWorldTime", async (worldTime, dt, options, userId) => {
             !e.disabled
           );
           if (!dyingAE) continue;
-          console.log(`[FASERIP:DYING] worldTime advance: processing ${turns} turn(s) for ${actor.name} (dt=${dt}s)`);
-          for (let i = 0; i < turns; i++) {
-            const result = await processDyingRound(actor);
-            console.log(`[FASERIP:DYING] turn ${i + 1}/${turns}: ${actor.name} → ${result}`);
-            if (result === "dead") break;
-          }
+          console.log(`[FASERIP:DYING] worldTime advance: processing 1 dying round for ${actor.name} (dt=${dt}s)`);
+          const result = await processDyingRound(actor);
+          console.log(`[FASERIP:DYING] worldTime: ${actor.name} → ${result}`);
         }
       } catch (e) {
         console.error("[FASERIP ERROR] worldTime dying round processing failed:", e);
@@ -815,29 +816,29 @@ Hooks.once("init", async () => {
       if (!game.user.isGM) return;
 
       // Guard against re-entrant calls while an async processDyingRound is in flight
-      if (game.msh._cttDyingInProgress) return;
+      // Also skip if combatRound hook is already processing dying (race condition fix)
+      if (game.msh._cttDyingInProgress || game.msh._dyingInProgress) return;
       game.msh._cttDyingInProgress = true;
+
+      // Convert the CTT advancement directly to seconds (hoisted so healing block can read it)
+      const cttModule = game.modules.get("calendar-time-tracker");
+      let deltaSeconds = 0;
+      if (cttModule?.api?.timeEngine && amount && unitId) {
+        try {
+          deltaSeconds = cttModule.api.timeEngine.convertToSeconds(Number(amount), unitId) || 0;
+        } catch (_) {}
+      }
+      if (deltaSeconds <= 0 && amount > 0) {
+        deltaSeconds = Number(amount) * 6;
+      }
 
       try {
         const { processDyingRound } = await import("./modules/effects/ongoing-engine.js");
         const scope = globalThis.MSH_FLAG_SCOPE || "msh-faserip";
 
-        // Convert the CTT advancement directly to seconds, then turns
-        // CTT's time-engine has already called game.time.advance() with this delta
-        const cttModule = game.modules.get("calendar-time-tracker");
-        let deltaSeconds = 0;
-        if (cttModule?.api?.timeEngine && amount && unitId) {
-          try {
-            deltaSeconds = cttModule.api.timeEngine.convertToSeconds(Number(amount), unitId) || 0;
-          } catch (_) {}
-        }
-        // Fallback: if unitId is "turn" or amount maps to 6s chunks
-        if (deltaSeconds <= 0 && amount > 0) {
-          // Unknown unit — assume 1 turn = 6s minimum
-          deltaSeconds = Number(amount) * 6;
-        }
-        const turns = Math.max(1, Math.floor(deltaSeconds / 6));
-
+        // Process 1 dying round per character per CTT advance.
+        // During combat, combatRound hook handles dying (1 per round).
+        // Out of combat, each manual CTT advance ticks dying once — GM controls pacing.
         for (const actor of Effects.getAllTokenActors()) {
           if (!actor?.effects?.size) continue;
           const dyingAE = actor.effects.find(e =>
@@ -846,17 +847,41 @@ Hooks.once("init", async () => {
           );
           if (!dyingAE) continue;
 
-          console.log(`[FASERIP:DYING] CTT timeAdvanced: ${amount} ${unitId} = ${deltaSeconds}s = ${turns} turn(s) for ${actor.name}`);
-          for (let i = 0; i < turns; i++) {
-            const result = await processDyingRound(actor);
-            console.log(`[FASERIP:DYING] CTT turn ${i + 1}/${turns}: ${actor.name} → ${result}`);
-            if (result === "dead") break;
-          }
+          console.log(`[FASERIP:DYING] CTT timeAdvanced: ${amount} ${unitId} = ${deltaSeconds}s — processing 1 dying round for ${actor.name}`);
+          const result = await processDyingRound(actor);
+          console.log(`[FASERIP:DYING] CTT: ${actor.name} → ${result}`);
         }
       } catch (e) {
         console.error("[FASERIP ERROR] CTT dying processing failed:", e);
       } finally {
         game.msh._cttDyingInProgress = false;
+      }
+
+      // Process impaired Endurance healing on day/week advance
+      if (deltaSeconds >= 86400) {
+        try {
+          const { RestSystem } = await import("./modules/rest-system.js");
+          for (const actor of Effects.getAllTokenActors()) {
+            if (!actor?.effects?.size) continue;
+            const scope = globalThis.MSH_FLAG_SCOPE || "msh-faserip";
+            const impairedAE = actor.effects.find(e => e.getFlag(scope, "isImpairedEndurance") && !e.disabled);
+            if (!impairedAE) continue;
+            const medicalCare = actor.getFlag(scope, "medicalCare") ?? false;
+            const dayInSeconds = 86400;
+            const weekInSeconds = 7 * dayInSeconds;
+            const required = medicalCare ? dayInSeconds : weekInSeconds;
+            const lastHealed = impairedAE.getFlag(scope, "lastHealed") || 0;
+            const elapsed = game.time.worldTime - lastHealed;
+            if (elapsed >= required) {
+              const result = await RestSystem.healImpairedEndurance(actor, medicalCare);
+              if (result.success) {
+                console.log(`[FASERIP] Impaired Endurance healed: ${actor.name} — ${result.message}`);
+              }
+            }
+          }
+        } catch (e) {
+          console.error("[FASERIP ERROR] Impaired Endurance auto-heal failed:", e);
+        }
       }
     });
     Hooks.on("timeTracker.timeSet", () => {
@@ -2062,6 +2087,7 @@ Hooks.on("deleteItem", async (item, options, userId) => {
 
 // Capture old health value before update
 Hooks.on('preUpdateActor', (actor, updateData, options, userId) => {
+  if (options.mshDyingTick) return;
   const newHealth = updateData.system?.attributes?.health?.value;
   if (newHealth === undefined) return;
   
@@ -2087,6 +2113,11 @@ Hooks.on('updateActor', async (actor, updateData, options, userId) => {
       }
       return;
     }
+
+    // --- DYING TICK GUARD -----------------------------------------
+    // Dying only reduces Endurance ranks (not Health). If HP was capped
+    // at the new max Health, skip damage processing — this is not combat damage.
+    if (options.mshDyingTick) return;
     // -----------------------------------------------------------
 
     // We prefer explicit healthChange when present (local updates),
