@@ -1,4 +1,4 @@
-// scripts/modules/actions/check-action.js v1.9.0 - 2026-02-21
+// scripts/modules/actions/check-action.js v1.9.1 - 2026-02-22
 // v1.7.0: Consolidate slam dual-card — _createSlamChatMessage replaced by _slamDetailHtml folded into check card result box
 // v1.6.2: Read Endurance rank from actor directly (actor IS the defender) - prefill.targetEndRank was stale/missing
 // v1.6.1: Fix check card showing literal 'Target' — actor IS the defender, drop targetName from card header
@@ -94,6 +94,7 @@ export class CheckAction extends BaseAction {
       const defenderUuid  = prefill.targetUuid || prefill.defenderUuid || "";
 
       // Get effect-based ability shift for the defender's endurance
+      // Also include selfPenaltyCS (e.g. Impaired Endurance -2CS on all FEATs)
       let effectAbilityShift = 0;
       if (defenderUuid) {
         try {
@@ -101,6 +102,7 @@ export class CheckAction extends BaseAction {
           const defenderActor = doc?.actor ?? doc ?? null;
           if (defenderActor) {
             effectAbilityShift = getAbilityShift(defenderActor, "endurance");
+            effectAbilityShift += Number(defenderActor.system?.combatMods?.selfPenaltyCS) || 0;
           }
         } catch (_e) { /* uuid resolution failed */ }
       }
@@ -531,7 +533,10 @@ export class CheckAction extends BaseAction {
     });
     if (!choice) return;
 
-    const effectiveEndRank = choice.shift ? shiftRank(choice.targetEndRank, choice.shift) : choice.targetEndRank;
+    // Include actor's own selfPenaltyCS (e.g. Impaired Endurance -2CS) in the shift
+    const _selfPenalty = Number(actor?.system?.combatMods?.selfPenaltyCS) || 0;
+    const _totalShift  = choice.shift + _selfPenalty;
+    const effectiveEndRank = _totalShift ? shiftRank(choice.targetEndRank, _totalShift) : choice.targetEndRank;
     
     // Check consolidated chat card setting
     let useConsolidated = false;

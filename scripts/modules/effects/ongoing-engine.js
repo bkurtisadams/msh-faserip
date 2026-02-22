@@ -1,4 +1,4 @@
-// scripts/modules/effects/ongoing-engine.js v1.6.1 - 2026-02-21
+// scripts/modules/effects/ongoing-engine.js v1.5.3 - 2026-02-22
 // v1.5.0: Robot origin check — death treated as deactivation (reactivatable, no karma loss).
 // v1.4.0: Consolidated dying initiation into applyDyingOngoing (immediate first rank loss,
 //         Impaired Endurance, HP reduction, chat). All callers now use this single entry point.
@@ -513,20 +513,7 @@ export async function processDyingRound(actor) {
   if (!actor) return "none";
   const scope = SCOPE();
 
-  // ── Already dead / deactivated — do not re-fire ──────────────────
-  if (actor.system?.details?.isDead || actor.system?.details?.isDeactivated) {
-    console.log(`[FASERIP:DYING] Skipping processDyingRound for ${actor.name} — already dead/deactivated`);
-    return "none";
-  }
-
-  // ── In-memory per-actor lock prevents concurrent async calls ─────
-  if (!globalThis._faseripdyingLocks) globalThis._faseripdyingLocks = new Set();
-  const lockKey = actor.uuid;
-  if (globalThis._faseripdyingLocks.has(lockKey)) {
-    console.log(`[FASERIP:DYING] Skipping re-entrant processDyingRound for ${actor.name}`);
-    return "none";
-  }
-  // Find the dying AE before acquiring lock — bail early if none
+  // Find the dying AE (by ongoingId or legacy isDying flag)
   const dyingAE = actor.effects.find(e =>
     e.flags?.[scope]?.ongoingId === "dying" ||
     e.flags?.[scope]?.isDying ||
@@ -534,15 +521,18 @@ export async function processDyingRound(actor) {
   );
   if (!dyingAE) return "none";
 
-  globalThis._faseripdyingLocks.add(lockKey);
-
-  try {
+  // ── Already dead: clean up lingering dying AE and bail ─────────────────────
+  if (actor.system?.details?.isDead || actor.system?.details?.isDeactivated) {
+    console.log(`[FASERIP:DYING] ${actor.name} already dead/deactivated — cleaning up dying AE`);
+    try { await dyingAE.delete({ mshIntentional: true }); } catch (_e) {}
+    return "dead";
+  }
 
   // ── Dedup: prevent double-processing if multiple hooks fire for same time tick ──
-  // worldTime === 0 guard removed — dedup now always applies (lock handles zero-time edge case).
-  const lastProcessedWT = dyingAE.getFlag(scope, "lastProcessedWorldTime") || -1;
+  // CTT calls game.time.advance() internally so worldTime always advances with CTT.
+  const lastProcessedWT = dyingAE.getFlag(scope, "lastProcessedWorldTime") || 0;
   const currentWT = game.time?.worldTime ?? 0;
-  if (currentWT === lastProcessedWT) {
+  if (currentWT > 0 && currentWT === lastProcessedWT) {
     console.log(`[FASERIP:DYING] Skipping duplicate processDyingRound for ${actor.name} (worldTime ${currentWT})`);
     return "none";
   }
@@ -565,24 +555,12 @@ export async function processDyingRound(actor) {
   const curName = game.msh?.getEnduranceRankName?.(actor) ?? actor.system?.abilities?.endurance?.rank;
   const curValue = actor.system?.abilities?.endurance?.value ?? game.msh?.getRankValue?.(curName) ?? 0;
 
-  // ── Already at Shift-0: death / deactivation ─────────────────────
+  // ── Already at Shift-0: death ────────────────────────────────────
   if (curName === "Shift-0") {
-    const isRobot = actor.system?.origin === "Robot";
+    console.warn(`[FASERIP WARN] ${actor.name} has died (below Shift-0)`);
 
-    if (isRobot) {
-      console.warn(`[FASERIP WARN] ${actor.name} has been deactivated (robot, Shift-0 Endurance)`);
-    } else {
-      console.warn(`[FASERIP WARN] ${actor.name} has died (below Shift-0)`);
-    }
-
-    // Set isDead / isDeactivated on linked actors only
-    if (!actor.isToken || actor.prototypeToken?.actorLink) {
-      if (isRobot) {
-        await actor.update({ "system.details.isDeactivated": true });
-      } else {
-        await actor.update({ "system.details.isDead": true });
-      }
-    }
+    // Set isDead on both linked and unlinked actors
+    try { await actor.update({ "system.details.isDead": true }); } catch(_e) {}
 
     // Clean up dying AE and flags
     await dyingAE.delete({ mshIntentional: true });
@@ -594,23 +572,15 @@ export async function processDyingRound(actor) {
       e.statuses?.has?.("unconscious") || /unconscious/i.test(e.name)
     );
     if (unconsciousEffects.length) {
-      await actor.deleteEmbeddedDocuments("ActiveEffect", unconsciousEffects.map(e => e.id));
+      await actor.deleteEmbeddedDocuments("ActiveEffect", unconsciousEffects.map(e => e.id), { mshIntentional: true });
     }
 
     // Apply dead overlay
     await actor.toggleStatusEffect("dead", { active: true, overlay: true });
 
-    if (isRobot) {
-      await sendOngoingChat(actor, "Dying", "stat.loss",
-        `<strong style="color:#b71c1c;">${actor.name} has been DEACTIVATED.</strong>` +
-        `<div style="margin-top:4px;font-size:.9em;color:#555;">Robot/construct — no Karma loss for attacker. ` +
-        `May be rebuilt (Reason FEAT vs highest ability/power rank). Returns with 0 Karma.</div>`
-      );
-    } else {
-      await sendOngoingChat(actor, "Dying", "stat.loss",
-        `<strong style="color:#b71c1c;">💀 ${actor.name} has died.</strong>`
-      );
-    }
+    await sendOngoingChat(actor, "Dying", "stat.loss",
+      `<strong style="color:#b71c1c;">💀 ${actor.name} has died.</strong>`
+    );
 
     return "dead";
   }
@@ -725,9 +695,6 @@ export async function processDyingRound(actor) {
   }
 
   return "stepped";
-  } finally {
-    globalThis._faseripdyingLocks.delete(lockKey);
-  }
 }
 
 async function executeEnduranceGain(actor, ae, effectId, config, rawAmount, cycles, worldTime, scope, cycleSeconds, startedAt, effectName) {
@@ -886,7 +853,7 @@ export async function removeOngoingEffect(actor, effectId) {
   const scope = SCOPE();
 
   const ae = actor.effects.find(e => e.flags?.[scope]?.ongoingId === effectId);
-  if (ae) await ae.delete({ mshIntentional: true });
+  if (ae) await ae.delete();
 
   try {
     await actor.unsetFlag(scope, `ongoing.${effectId}`);

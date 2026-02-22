@@ -1853,14 +1853,24 @@ Hooks.on("preDeleteActiveEffect", (effect, options, userId) => {
   }
 
   // Protect impaired endurance — managed by rest system, not time expiry
+  // But allow expiry on dead/deactivated actors (no point preserving it)
   if (effect.flags?.[scope]?.isImpairedEndurance) {
-    console.log(`[FASERIP] Blocked auto-expiration of Impaired Endurance AE on ${effect.parent?.name}`);
+    const parentActor = effect.parent;
+    if (parentActor?.system?.details?.isDead || parentActor?.system?.details?.isDeactivated) {
+      return; // allow — actor is dead, let it clean up
+    }
+    console.log(`[FASERIP] Blocked auto-expiration of Impaired Endurance AE on ${parentActor?.name}`);
     return false;
   }
 
   // Protect dying AE — managed by processDyingRound, not time expiry
+  // But allow deletion if actor is already dead/deactivated (processDyingRound death path)
   if (effect.flags?.[scope]?.isDying || effect.flags?.[scope]?.ongoingId === "dying") {
-    console.log(`[FASERIP] Blocked auto-expiration of Dying AE on ${effect.parent?.name}`);
+    const parentActor = effect.parent;
+    if (parentActor?.system?.details?.isDead || parentActor?.system?.details?.isDeactivated) {
+      return; // allow — actor already dead, clean up the AE
+    }
+    console.log(`[FASERIP] Blocked auto-expiration of Dying AE on ${parentActor?.name}`);
     return false;
   }
 });
