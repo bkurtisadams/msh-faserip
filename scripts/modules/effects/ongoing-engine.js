@@ -1,4 +1,5 @@
-// scripts/modules/effects/ongoing-engine.js v1.4.0 - 2026-02-11
+// scripts/modules/effects/ongoing-engine.js v1.5.0 - 2026-02-21
+// v1.5.0: Robot origin check — death treated as deactivation (reactivatable, no karma loss).
 // v1.4.0: Consolidated dying initiation into applyDyingOngoing (immediate first rank loss,
 //         Impaired Endurance, HP reduction, chat). All callers now use this single entry point.
 //         Removed duration from dying AE (lifecycle managed by engine, not expiry).
@@ -520,7 +521,8 @@ export async function processDyingRound(actor) {
   );
   if (!dyingAE) return "none";
 
-  // ── Dedup: prevent double-processing if both combat tracker and CTT fire ──
+  // ── Dedup: prevent double-processing if multiple hooks fire for same time tick ──
+  // CTT calls game.time.advance() internally so worldTime always advances with CTT.
   const lastProcessedWT = dyingAE.getFlag(scope, "lastProcessedWorldTime") || 0;
   const currentWT = game.time?.worldTime ?? 0;
   if (currentWT > 0 && currentWT === lastProcessedWT) {
@@ -546,13 +548,23 @@ export async function processDyingRound(actor) {
   const curName = game.msh?.getEnduranceRankName?.(actor) ?? actor.system?.abilities?.endurance?.rank;
   const curValue = actor.system?.abilities?.endurance?.value ?? game.msh?.getRankValue?.(curName) ?? 0;
 
-  // ── Already at Shift-0: death ────────────────────────────────────
+  // ── Already at Shift-0: death / deactivation ─────────────────────
   if (curName === "Shift-0") {
-    console.warn(`[FASERIP WARN] ${actor.name} has died (below Shift-0)`);
+    const isRobot = actor.system?.origin === "Robot";
 
-    // Set isDead on linked actors only
+    if (isRobot) {
+      console.warn(`[FASERIP WARN] ${actor.name} has been deactivated (robot, Shift-0 Endurance)`);
+    } else {
+      console.warn(`[FASERIP WARN] ${actor.name} has died (below Shift-0)`);
+    }
+
+    // Set isDead / isDeactivated on linked actors only
     if (!actor.isToken || actor.prototypeToken?.actorLink) {
-      await actor.update({ "system.details.isDead": true });
+      if (isRobot) {
+        await actor.update({ "system.details.isDeactivated": true });
+      } else {
+        await actor.update({ "system.details.isDead": true });
+      }
     }
 
     // Clean up dying AE and flags
@@ -571,9 +583,17 @@ export async function processDyingRound(actor) {
     // Apply dead overlay
     await actor.toggleStatusEffect("dead", { active: true, overlay: true });
 
-    await sendOngoingChat(actor, "Dying", "stat.loss",
-      `<strong style="color:#b71c1c;">💀 ${actor.name} has died.</strong>`
-    );
+    if (isRobot) {
+      await sendOngoingChat(actor, "Dying", "stat.loss",
+        `<strong style="color:#b71c1c;">${actor.name} has been DEACTIVATED.</strong>` +
+        `<div style="margin-top:4px;font-size:.9em;color:#555;">Robot/construct — no Karma loss for attacker. ` +
+        `May be rebuilt (Reason FEAT vs highest ability/power rank). Returns with 0 Karma.</div>`
+      );
+    } else {
+      await sendOngoingChat(actor, "Dying", "stat.loss",
+        `<strong style="color:#b71c1c;">💀 ${actor.name} has died.</strong>`
+      );
+    }
 
     return "dead";
   }
@@ -630,8 +650,8 @@ export async function processDyingRound(actor) {
         core: { statusId: "impaired-endurance" },
       },
       duration: {
-        rounds: daysUntilHealing * 600 * 24,
-        startRound: game.combat?.round || 0,
+        seconds: daysUntilHealing * 86400,
+        startTime: game.time?.worldTime ?? 0,
       },
       changes: [{
         key: "system.columnShift",
@@ -995,8 +1015,8 @@ export async function applyDyingOngoing(target, { skipImmediateLoss = false } = 
           core: { statusId: "impaired-endurance" },
         },
         duration: {
-          rounds: daysUntilHealing * 600 * 24,
-          startRound: game.combat?.round || 0,
+          seconds: daysUntilHealing * 86400,
+          startTime: game.time?.worldTime ?? 0,
         },
         changes: [{
           key: "system.columnShift",

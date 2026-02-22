@@ -1,4 +1,4 @@
-// scripts/modules/actions/check-action.js v1.7.0 - 2026-02-20
+// scripts/modules/actions/check-action.js v1.8.0 - 2026-02-21
 // v1.7.0: Consolidate slam dual-card — _createSlamChatMessage replaced by _slamDetailHtml folded into check card result box
 // v1.6.2: Read Endurance rank from actor directly (actor IS the defender) - prefill.targetEndRank was stale/missing
 // v1.6.1: Fix check card showing literal 'Target' — actor IS the defender, drop targetName from card header
@@ -444,7 +444,8 @@ export class CheckAction extends BaseAction {
         : (mapping[colorLower] || color);
       const extraHtml  = this._extraExplanationHtml({
         actionType, targetAbility, colorLower, finalEffect: effectText, effectsSuppressed,
-        stunDuration, slamDetails
+        stunDuration, slamDetails,
+        targetIsRobot: (await this._resolveTokenActor(defenderUuid))?.system?.origin === "Robot"
       });
 
       // Build shift display text
@@ -625,7 +626,8 @@ export class CheckAction extends BaseAction {
     const effectText = (actionType === "kill") ? (finalEffect?.label ?? "No Effect") : finalEffect;
     const extraHtml  = this._extraExplanationHtml({
       actionType, targetAbility, colorLower, finalEffect: effectText, effectsSuppressed,
-      stunDuration: manualStunDuration
+      stunDuration: manualStunDuration,
+      targetIsRobot: (await this._resolveTokenActor(this.opts?.prefill?.targetUuid || ""))?.system?.origin === "Robot"
     });
     const shiftDisplay = choice.shift ? ` (${choice.shift > 0 ? '+' : ''}${choice.shift}CS)` : '';
 
@@ -732,7 +734,7 @@ export class CheckAction extends BaseAction {
     `;
   }
 
-  _extraExplanationHtml({ actionType, targetAbility, colorLower, finalEffect, effectsSuppressed, stunDuration=null, slamDetails=null }) {
+  _extraExplanationHtml({ actionType, targetAbility, colorLower, finalEffect, effectsSuppressed, stunDuration=null, slamDetails=null, targetIsRobot=false }) {
     if (actionType === "stun") {
       let stunText = "";
       if (colorLower === "white") {
@@ -771,9 +773,12 @@ export class CheckAction extends BaseAction {
     if (actionType === "kill") {
       const effectStr = String(finalEffect||"").replace(/E\/S/,"Edged/Shooting");
       const isLethal = effectStr.toLowerCase().includes("endurance");
-      const karmaNote = isLethal
-        ? `<div style="margin-top:6px;padding:4px 8px;background:#fff3e0;border:1px solid #ff9800;border-radius:3px;font-size:.85em;color:#e65100;">Attacker loses ALL Karma if target dies</div>`
-        : "";
+      let karmaNote = "";
+      if (isLethal && targetIsRobot) {
+        karmaNote = `<div style="margin-top:6px;padding:4px 8px;background:#e3f2fd;border:1px solid #90caf9;border-radius:3px;font-size:.85em;color:#1565c0;">Target is a Robot/construct — no Karma loss for attacker.</div>`;
+      } else if (isLethal) {
+        karmaNote = `<div style="margin-top:6px;padding:4px 8px;background:#fff3e0;border:1px solid #ff9800;border-radius:3px;font-size:.85em;color:#e65100;">Attacker loses ALL Karma if target dies</div>`;
+      }
       return `<div style="margin-top:8px;color:#444;">${effectStr}</div>${karmaNote}`;
     }
     return "";

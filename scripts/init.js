@@ -154,7 +154,37 @@ Hooks.on("updateWorldTime", async (worldTime, dt, options, userId) => {
   } catch (e) {
     console.error("[FASERIP ERROR] processOngoingEffects failed:", e);
   }
-});
+
+  // Dying out-of-combat: process 1 rank loss per turn elapsed.
+  // combatRound hook owns this during active combat.
+  // timeTracker.timeAdvanced hook owns this when CTT is active (avoids race condition,
+  // since CTT calls game.time.advance() internally which also fires this hook).
+  const cttActiveForDying = game.modules.get("calendar-time-tracker")?.active;
+  if (!game.combat?.active && !cttActiveForDying) {
+    const turns = Math.floor(dt / 6);
+    if (turns > 0) {
+      try {
+        const { processDyingRound } = await import("./modules/effects/ongoing-engine.js");
+        const scope = globalThis.MSH_FLAG_SCOPE || "msh-faserip";
+        for (const actor of Effects.getAllTokenActors()) {
+          if (!actor?.effects?.size) continue;
+          const dyingAE = actor.effects.find(e =>
+            (e.flags?.[scope]?.ongoingId === "dying" || e.flags?.[scope]?.isDying) &&
+            !e.disabled
+          );
+          if (!dyingAE) continue;
+          console.log(`[FASERIP:DYING] worldTime advance: processing ${turns} turn(s) for ${actor.name} (dt=${dt}s)`);
+          for (let i = 0; i < turns; i++) {
+            const result = await processDyingRound(actor);
+            console.log(`[FASERIP:DYING] turn ${i + 1}/${turns}: ${actor.name} → ${result}`);
+            if (result === "dead") break;
+          }
+        }
+      } catch (e) {
+        console.error("[FASERIP ERROR] worldTime dying round processing failed:", e);
+      }
+    }
+  }});
 
 Hooks.once("init", async () => {
   // --- Global flag scope & namespace ---
@@ -776,8 +806,58 @@ Hooks.once("init", async () => {
     // ========== CTT ↔ FASERIP Bridge Hooks ==========
     // When CTT fires its own hooks, relay them to msh-faserip.timeUpdated
     // so the team sheet and any other FASERIP listeners refresh.
-    Hooks.on("timeTracker.timeAdvanced", () => {
+    Hooks.on("timeTracker.timeAdvanced", async (amount, unitId) => {
       Hooks.callAll("msh-faserip.timeUpdated");
+
+      // Process dying whenever CTT manually advances time (in OR out of combat).
+      // If ctt.syncMode also fires this after a combatRound hook, the dedup stamp
+      // in processDyingRound (lastProcessedWorldTime) blocks the duplicate.
+      if (!game.user.isGM) return;
+
+      // Guard against re-entrant calls while an async processDyingRound is in flight
+      if (game.msh._cttDyingInProgress) return;
+      game.msh._cttDyingInProgress = true;
+
+      try {
+        const { processDyingRound } = await import("./modules/effects/ongoing-engine.js");
+        const scope = globalThis.MSH_FLAG_SCOPE || "msh-faserip";
+
+        // Convert the CTT advancement directly to seconds, then turns
+        // CTT's time-engine has already called game.time.advance() with this delta
+        const cttModule = game.modules.get("calendar-time-tracker");
+        let deltaSeconds = 0;
+        if (cttModule?.api?.timeEngine && amount && unitId) {
+          try {
+            deltaSeconds = cttModule.api.timeEngine.convertToSeconds(Number(amount), unitId) || 0;
+          } catch (_) {}
+        }
+        // Fallback: if unitId is "turn" or amount maps to 6s chunks
+        if (deltaSeconds <= 0 && amount > 0) {
+          // Unknown unit — assume 1 turn = 6s minimum
+          deltaSeconds = Number(amount) * 6;
+        }
+        const turns = Math.max(1, Math.floor(deltaSeconds / 6));
+
+        for (const actor of Effects.getAllTokenActors()) {
+          if (!actor?.effects?.size) continue;
+          const dyingAE = actor.effects.find(e =>
+            (e.flags?.[scope]?.ongoingId === "dying" || e.flags?.[scope]?.isDying) &&
+            !e.disabled
+          );
+          if (!dyingAE) continue;
+
+          console.log(`[FASERIP:DYING] CTT timeAdvanced: ${amount} ${unitId} = ${deltaSeconds}s = ${turns} turn(s) for ${actor.name}`);
+          for (let i = 0; i < turns; i++) {
+            const result = await processDyingRound(actor);
+            console.log(`[FASERIP:DYING] CTT turn ${i + 1}/${turns}: ${actor.name} → ${result}`);
+            if (result === "dead") break;
+          }
+        }
+      } catch (e) {
+        console.error("[FASERIP ERROR] CTT dying processing failed:", e);
+      } finally {
+        game.msh._cttDyingInProgress = false;
+      }
     });
     Hooks.on("timeTracker.timeSet", () => {
       Hooks.callAll("msh-faserip.timeUpdated");
@@ -1771,6 +1851,18 @@ Hooks.on("preDeleteActiveEffect", (effect, options, userId) => {
     console.log(`[FASERIP] Blocked auto-expiration of defense AE on ${effect.parent?.name}`);
     return false;
   }
+
+  // Protect impaired endurance — managed by rest system, not time expiry
+  if (effect.flags?.[scope]?.isImpairedEndurance) {
+    console.log(`[FASERIP] Blocked auto-expiration of Impaired Endurance AE on ${effect.parent?.name}`);
+    return false;
+  }
+
+  // Protect dying AE — managed by processDyingRound, not time expiry
+  if (effect.flags?.[scope]?.isDying || effect.flags?.[scope]?.ongoingId === "dying") {
+    console.log(`[FASERIP] Blocked auto-expiration of Dying AE on ${effect.parent?.name}`);
+    return false;
+  }
 });
 
 // ── Regeneration: sync AEs with power items ──
@@ -1966,6 +2058,9 @@ Hooks.on('updateActor', async (actor, updateData, options, userId) => {
       return;
     }
 
+    // Skip no-op updates where HP was already at/below 0
+    // (endurance rank changes from processDyingRound fire updateActor with healthChange:{old:0,new:0})
+    if (oldHealth <= 0 && newHealth <= 0) return;
 
 
     // DEAD LEGACY CODE START
