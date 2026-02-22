@@ -619,8 +619,6 @@ export async function processDyingRound(actor) {
   // ── Create / update Impaired Endurance effect ────────────────────
   let impairedEffect = actor.effects.find(e => e.getFlag(scope, "isImpairedEndurance"));
   if (!impairedEffect) {
-    const hasMedicalCare = actor.getFlag(scope, "medicalCare") ?? false;
-    const daysUntilHealing = hasMedicalCare ? 1 : 7;
     await actor.createEmbeddedDocuments("ActiveEffect", [{
       name: `Impaired Endurance (${nextName} of ${originalRank})`,
       icon: "icons/svg/blood.svg",
@@ -632,13 +630,9 @@ export async function processDyingRound(actor) {
           originalEndurance: originalRank,
           currentEndurance: nextName,
           lastHealed: Date.now(),
-          medicalCare: hasMedicalCare,
+          medicalCare: actor.getFlag(scope, "medicalCare") ?? false,
         },
         core: { statusId: "impaired-endurance" },
-      },
-      duration: {
-        seconds: daysUntilHealing * 86400,
-        startTime: game.time?.worldTime ?? 0,
       },
       changes: [{
         key: "system.combatMods.attackShift",
@@ -984,8 +978,6 @@ export async function applyDyingOngoing(target, { skipImmediateLoss = false } = 
     // Create Impaired Endurance effect
     const impairedEffect = actor.effects.find(e => e.getFlag(scope, "isImpairedEndurance"));
     if (!impairedEffect) {
-      const hasMedicalCare = actor.getFlag(scope, "medicalCare") ?? false;
-      const daysUntilHealing = hasMedicalCare ? 1 : 7;
       await actor.createEmbeddedDocuments("ActiveEffect", [{
         name: `Impaired Endurance (${nextRank} of ${originalEndurance})`,
         img: "icons/svg/blood.svg",
@@ -997,13 +989,9 @@ export async function applyDyingOngoing(target, { skipImmediateLoss = false } = 
             originalEndurance: originalEndurance,
             currentEndurance: nextRank,
             lastHealed: Date.now(),
-            medicalCare: hasMedicalCare,
+            medicalCare: actor.getFlag(scope, "medicalCare") ?? false,
           },
           core: { statusId: "impaired-endurance" },
-        },
-        duration: {
-          seconds: daysUntilHealing * 86400,
-          startTime: game.time?.worldTime ?? 0,
         },
         changes: [{
           key: "system.combatMods.attackShift",
@@ -1048,9 +1036,6 @@ export async function applyDyingOngoing(target, { skipImmediateLoss = false } = 
     changes: [
       { key: "system.combatMods.defenseShift", mode: AE_MODES.ADD, value: "-4", priority: 20 },
       { key: "system.combatMods.defenseShiftRanged", mode: AE_MODES.ADD, value: "-4", priority: 20 },
-      { key: "system.combatMods.movementMult", mode: AE_MODES.OVERRIDE, value: "0", priority: 50 },
-      { key: "system.combatMods.canAct", mode: AE_MODES.OVERRIDE, value: "false", priority: 50 },
-      { key: "system.combatMods.canMove", mode: AE_MODES.OVERRIDE, value: "false", priority: 50 },
     ],
     extraFlags: {
       isDying: true,

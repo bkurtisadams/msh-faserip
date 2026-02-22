@@ -556,9 +556,6 @@ static async attemptRegainConsciousness(actor) {
       const originalIndex = rankNames.indexOf(originalEndurance);
       
       if (currentIndex >= 0 && originalIndex >= 0 && currentIndex < originalIndex) {
-        const hasMedicalCare = actor.getFlag(SCOPE, "medicalCare") ?? false;
-        const daysUntilHealing = hasMedicalCare ? 1 : 7;
-        
         const impairedEffectData = {
           name: `Impaired Endurance (${currentEndurance} of ${originalEndurance})`,
           icon: "icons/svg/blood.svg",
@@ -570,13 +567,9 @@ static async attemptRegainConsciousness(actor) {
               originalEndurance: originalEndurance,
               currentEndurance: currentEndurance,
               lastHealed: Date.now(),
-              medicalCare: hasMedicalCare
+              medicalCare: actor.getFlag(SCOPE, "medicalCare") ?? false
             },
             core: { statusId: "impaired-endurance" }
-          },
-          duration: {
-            rounds: daysUntilHealing * 600 * 24,
-            startRound: game.combat?.round || 0
           },
           changes: [{
             key: "system.combatMods.attackShift",
@@ -715,16 +708,12 @@ static async attemptRegainConsciousness(actor) {
       
       return { success: true, message, rankRestored: newRank };
     } else {
-      // Update effect to reflect new rank and reset timer
-      const daysUntilNextHealing = medicalCare ? 1 : 7;
-      
+      // Update effect to reflect new rank; no duration — effect persists until Endurance fully restored
       await impairedEffect.update({
         name: `Impaired Endurance (${newRank} of ${originalEndurance})`,
         [`flags.${SCOPE}.currentEndurance`]: newRank,
         [`flags.${SCOPE}.lastHealed`]: now,
         [`flags.${SCOPE}.medicalCare`]: medicalCare,
-        "duration.rounds": daysUntilNextHealing * 600 * 24,
-        "duration.startRound": game.combat?.round || 0
       });
       
       const careNote = medicalCare ? " (with medical care)" : "";

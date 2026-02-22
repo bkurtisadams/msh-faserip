@@ -1856,13 +1856,23 @@ Hooks.once("ready", async () => {
           const isImpaired = effect.flags?.["msh-faserip"]?.isImpairedEndurance;
           if (isImpaired) {
             const needsFix = (effect.changes || []).some(c => c.key === "system.columnShift");
-            if (needsFix) {
-              const fixed = (effect.changes || []).map(c =>
-                c.key === "system.columnShift"
-                  ? { ...c, key: "system.combatMods.attackShift" }
-                  : c
-              );
-              await effect.update({ changes: fixed });
+            const hasDuration = effect.duration?.seconds > 0 || effect.duration?.rounds > 0;
+            if (needsFix || hasDuration) {
+              const updates = {};
+              if (needsFix) {
+                updates.changes = (effect.changes || []).map(c =>
+                  c.key === "system.columnShift"
+                    ? { ...c, key: "system.combatMods.attackShift" }
+                    : c
+                );
+              }
+              if (hasDuration) {
+                updates["duration.seconds"] = null;
+                updates["duration.rounds"] = null;
+                updates["duration.startTime"] = null;
+                updates["duration.startRound"] = null;
+              }
+              await effect.update(updates);
               impairedMigrated++;
             }
           }
