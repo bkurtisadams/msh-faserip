@@ -503,3 +503,82 @@
   pointer-events: none; /* Prevent icon from capturing clicks */
   font-size: 14px;
 }
+
+/* Unified action-type header rows inside universal rank table */
+.universal-rank-table .uat-head1 th {
+  background-color: #c8c8c8;
+  font-weight: bold;
+  font-size: 0.78em;
+  white-space: normal;
+  line-height: 1.1;
+  padding: 2px 2px;
+}
+
+.universal-rank-table .uat-head2 th {
+  background-color: #e0e0e0;
+  font-weight: bold;
+  font-size: 1em;
+  padding: 1px 2px;
+}
+
+.universal-rank-table .uat-head3 th {
+  background-color: #d8d8d8;
+  font-weight: normal;
+  font-size: 0.78em;
+  white-space: normal;
+  line-height: 1.1;
+  padding: 2px 2px;
+}
+
+.universal-rank-table .uat-result td,
+.universal-rank-table .uat-result th {
+  border: 1px solid #666;
+  padding: 2px 2px;
+  text-align: center;
+  font-size: 0.78em;
+  font-weight: bold !important;
+  line-height: 1.1;
+  cursor: default;
+  opacity: 1 !important;
+  color: inherit !important;
+  text-shadow: none !important;
+  -webkit-text-fill-color: unset !important;
+}
+
+.universal-rank-table .uat-result th.uat-color-label {
+  font-size: 0.8em;
+  padding: 2px 4px;
+  text-align: center;
+  background-color: #e0e0e0;
+}
+
+.universal-rank-table .uat-white td,
+.universal-rank-table .uat-white th.uat-color-label { background-color: #ffffff; color: #000 !important; }
+.universal-rank-table .uat-green  td,
+.universal-rank-table .uat-green  th.uat-color-label { background-color: #00c000; color: #000 !important; }
+.universal-rank-table .uat-yellow td,
+.universal-rank-table .uat-yellow th.uat-color-label { background-color: #e8e000; color: #000 !important; }
+.universal-rank-table .uat-red    td,
+.universal-rank-table .uat-red    th.uat-color-label { background-color: #cc0000; color: #000 !important; }
+
+/* Highlight the rolled color result row */
+.universal-rank-table .uat-result.uat-result-active td,
+.universal-rank-table .uat-result.uat-result-active th {
+  outline: 3px solid #0048ff;
+  outline-offset: -3px;
+  position: relative;
+  z-index: 5;
+}
+
+
+/* Action panel header clickable hint */
+.universal-rank-table .uat-head1 th:not(:first-child),
+.universal-rank-table .uat-head2 th:not(:first-child) {
+  cursor: pointer;
+}
+
+.universal-rank-table .uat-head1 th:not(:first-child):hover,
+.universal-rank-table .uat-head2 th:not(:first-child):hover {
+  outline: 2px solid #0048ff;
+  outline-offset: -2px;
+}

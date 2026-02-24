@@ -1371,6 +1371,71 @@
         <div class="universal-rank-table">
           <table>
             <thead>
+              <!-- Action type result rows -->
+              <tr class="uat-head1">
+                <th></th>
+                <th>Blunt<br>Attacks</th>
+                <th>Edged<br>Attacks</th>
+                <th>Shooting<br>Attacks</th>
+                <th>Throwing<br>Edged</th>
+                <th>Throwing<br>Blunt</th>
+                <th>Energy</th>
+                <th>Force</th>
+                <th>Grap-<br>pling</th>
+                <th>Grab-<br>bing</th>
+                <th>Escap-<br>ing</th>
+                <th>Char-<br>ging</th>
+                <th>Dodging</th>
+                <th>Evad-<br>ing</th>
+                <th>Blocking</th>
+                <th>Catching</th>
+                <th>Stun?</th>
+                <th>Slam?</th>
+                <th>Kill?</th>
+              </tr>
+              <tr class="uat-head2">
+                <th></th>
+                <th>BA</th><th>EA</th><th>Sh</th><th>TE</th><th>TB</th>
+                <th>En</th><th>Fo</th><th>Gp</th><th>Gb</th><th>Es</th>
+                <th>Ch</th><th>Do</th><th>Ev</th><th>Bl</th>
+                <th>Ca</th><th>St</th><th>Sl</th><th>Ki</th>
+              </tr>
+              <tr class="uat-head3">
+                <th></th>
+                <th>Fighting</th><th>Fighting</th><th>Agility</th><th>Agility</th><th>Agility</th>
+                <th>Agility</th><th>Agility</th><th>Strength</th><th>Strength</th><th>Strength</th>
+                <th>Endur-<br>ance</th><th>Agility</th><th>Fighting</th><th>Strength</th>
+                <th>Agility</th><th>Endur-<br>ance</th><th>Endur-<br>ance</th><th>Endur-<br>ance</th>
+              </tr>
+              <tr class="uat-result uat-white" data-result-color="white">
+                <th class="uat-color-label">&#x25A1;</th>
+                <td data-col-idx="0">Miss</td><td data-col-idx="1">Miss</td><td data-col-idx="2">Miss</td><td data-col-idx="3">Miss</td><td data-col-idx="4">Miss</td>
+                <td data-col-idx="5">Miss</td><td data-col-idx="6">Miss</td><td data-col-idx="7">Miss</td><td data-col-idx="8">Miss</td><td data-col-idx="9">Miss</td>
+                <td data-col-idx="10">Miss</td><td data-col-idx="11">None</td><td data-col-idx="12">Autohit</td><td data-col-idx="13">-6 CS</td>
+                <td data-col-idx="14">Autohit</td><td data-col-idx="15">1-10</td><td data-col-idx="16">Gr. Slam</td><td data-col-idx="17">En. Loss</td>
+              </tr>
+              <tr class="uat-result uat-green" data-result-color="green">
+                <th class="uat-color-label">&#x25A1;</th>
+                <td data-col-idx="0">Hit</td><td data-col-idx="1">Hit</td><td data-col-idx="2">Hit</td><td data-col-idx="3">Hit</td><td data-col-idx="4">Hit</td>
+                <td data-col-idx="5">Hit</td><td data-col-idx="6">Hit</td><td data-col-idx="7">Miss</td><td data-col-idx="8">Take</td><td data-col-idx="9">Miss</td>
+                <td data-col-idx="10">Hit</td><td data-col-idx="11">-2 CS</td><td data-col-idx="12">Evasion</td><td data-col-idx="13">-4 CS</td>
+                <td data-col-idx="14">Miss</td><td data-col-idx="15">1</td><td data-col-idx="16">1 area</td><td data-col-idx="17">E/S</td>
+              </tr>
+              <tr class="uat-result uat-yellow" data-result-color="yellow">
+                <th class="uat-color-label">&#x25A1;</th>
+                <td data-col-idx="0">Slam</td><td data-col-idx="1">Stun</td><td data-col-idx="2">Bullseye</td><td data-col-idx="3">Stun</td><td data-col-idx="4">Hit</td>
+                <td data-col-idx="5">Bullseye</td><td data-col-idx="6">Bullseye</td><td data-col-idx="7">Partial</td><td data-col-idx="8">Grab</td><td data-col-idx="9">Escape</td>
+                <td data-col-idx="10">Slam</td><td data-col-idx="11">-4 CS</td><td data-col-idx="12">+1 CS</td><td data-col-idx="13">-2 CS</td>
+                <td data-col-idx="14">Damage</td><td data-col-idx="15">No</td><td data-col-idx="16">Stagger</td><td data-col-idx="17">No</td>
+              </tr>
+              <tr class="uat-result uat-red" data-result-color="red">
+                <th class="uat-color-label">&#x25A1;</th>
+                <td data-col-idx="0">Stun</td><td data-col-idx="1">Kill</td><td data-col-idx="2">Kill</td><td data-col-idx="3">Kill</td><td data-col-idx="4">Stun</td>
+                <td data-col-idx="5">Kill</td><td data-col-idx="6">Stun</td><td data-col-idx="7">Hold</td><td data-col-idx="8">Break</td><td data-col-idx="9">Reverse</td>
+                <td data-col-idx="10">Stun</td><td data-col-idx="11">-6 CS</td><td data-col-idx="12">+2 CS</td><td data-col-idx="13">+1 CS</td>
+                <td data-col-idx="14">Catch</td><td data-col-idx="15">No</td><td data-col-idx="16">No</td><td data-col-idx="17">No</td>
+              </tr>
+              <!-- Rank header rows -->
               <tr class="header-top">
                 <th style="color: #000; text-shadow: none;">&nbsp;</th>
                 <th style="color: #000; text-shadow: none;">0</th>
@@ -1432,7 +1497,7 @@
                 <th>1000</th>
                 <th>3000</th>
                 <th>5000</th>
-                <th>∞</th>
+                <th>&#8734;</th>
               </tr>
               <tr>
                 <th></th>
