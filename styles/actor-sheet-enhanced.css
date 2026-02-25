@@ -14,27 +14,37 @@
   --mred-lit: #a80000;
   --gold:     #c8960c;
   --gold-lit: #e2ab14;
-  --cream:    #ffffff;
-  --cream-dk: #f5f5f5;
+  --cream:    #faf8f3;
+  --cream-dk: #f5f3ee;
+  --ink:      #1a1a1a;
   --txt:      #1a1a1a;
-  --txt-soft: #555;
-  --hdr-h:    32px;
+  --txt-soft: #444;
+  --txt-muted:#777;
+  --hdr-h:    36px;
+
+  /* Ben Day dot layers */
+  --dots-magenta: radial-gradient(circle, rgba(180,0,60,.07) 1.2px, transparent 1.2px);
+  --dots-cyan:    radial-gradient(circle, rgba(0,140,200,.055) 1.2px, transparent 1.2px);
+  --dots-yellow:  radial-gradient(circle, rgba(200,180,0,.06) 1.2px, transparent 1.2px);
+  --dots-size:    6px 6px;
 }
 
-/* ── Sheet background: warm cream + faint halftone dots ─────────────────── */
+/* ── Sheet background: warm cream + magenta Ben Day halftone ──────────── */
 form.faserip-sheet {
-  font-family: Arial, sans-serif;
+  font-family: 'Barlow Condensed', Arial, sans-serif;
+  font-size: 13px;
   background-color: var(--cream);
-  background-image: radial-gradient(circle at 1px 1px, rgba(0,0,0,.05) 1px, transparent 0);
-  background-size: 5px 5px;
+  background-image: var(--dots-magenta);
+  background-size: var(--dots-size);
   color: var(--txt);
-  gap: 4px;                         /* tighter than original 6px */
+  gap: 5px;
 }
 
 /* ── MARVEL logo block ──────────────────────────────────────────────────── */
 .msh-compact-header {
   background: var(--cream);
-  border-color: var(--mred-dk);
+  border: 2.5px solid var(--ink) !important;
+  box-shadow: 1px 1px 0 var(--ink);
   padding: 5px 8px;
   gap: 10px;
 }
@@ -73,12 +83,13 @@ form.faserip-sheet {
   margin-top: 2px;
 }
 
-/* ── Identity section: tighter ──────────────────────────────────────────── */
+/* ── Identity section: comic panel border + label upgrade ─────────────── */
 .msh-identity {
   padding: 6px 8px;
   row-gap: 4px;
   background: var(--cream);
-  border-color: var(--mred-dk);
+  border: 2.5px solid var(--ink) !important;
+  box-shadow: 1px 1px 0 var(--ink);
 }
 
 .msh-identity .msh-row {
@@ -87,8 +98,12 @@ form.faserip-sheet {
 }
 
 .msh-identity label {
-  font-size: 12.5px;
-  font-weight: bold;
+  font-family: 'Oswald', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--mred);
   margin-bottom: 2px;
 }
 
@@ -106,29 +121,29 @@ form.faserip-sheet .resistances-table th,
   font-weight: 600 !important;
 }
 
-/* Shorter header rows */
+/* Taller header rows, bigger text */
 form.faserip-sheet .primary-abilities .abilities-table thead th,
 form.faserip-sheet .secondary-abilities .sec-head {
   height: var(--hdr-h) !important;
   min-height: var(--hdr-h) !important;
   max-height: var(--hdr-h) !important;
-  font-size: 11px !important;
+  font-size: 12px !important;
   padding: 4px 6px !important;
 }
 
-/* Subtitle formula under header (F+A+S+E etc.) */
+/* Subtitle formula under header (F+A+S+E etc.) — full opacity */
 form.faserip-sheet .secondary-abilities .sec-head small {
   font-family: 'Barlow Condensed', sans-serif !important;
-  font-size: 8.5px;
-  color: rgba(255,220,120,.85);
+  font-size: 9px;
+  color: rgba(255,220,120,1);
   letter-spacing: 0.5px;
 }
 
-/* ── Ability key cells: bold Oswald, warm background ───────────────────── */
+/* ── Ability key cells: bigger, bolder Oswald ────────────────────────── */
 form.faserip-sheet .primary-abilities .abilities-table td.ability-key {
   font-family: 'Oswald', sans-serif;
   font-weight: 700;
-  font-size: 18px;
+  font-size: 22px;
   color: var(--mred);
   background: var(--cream-dk);
   border-right: 2px solid var(--mred-dk) !important;
@@ -141,17 +156,22 @@ form.faserip-sheet .primary-abilities .abilities-table td.ability-key:hover {
   color: #c00;
 }
 
-/* ── Abilities section: tighter overall ─────────────────────────────────── */
+/* ── Abilities section: cyan Ben Day dots + comic panel border ─────────── */
 form.faserip-sheet .abilities-section {
   gap: 8px;
   padding: 6px 8px;
-  background: var(--cream-dk);
-  border-color: var(--mred-dk);
+  background-color: var(--cream-dk);
+  background-image: var(--dots-cyan);
+  background-size: var(--dots-size);
+  border: 2.5px solid var(--ink) !important;
+  box-shadow: 1px 1px 0 var(--ink);
 }
 
-/* Zebra rows in ability table */
+/* Zebra rows: cyan Ben Day dots on even rows */
 form.faserip-sheet .primary-abilities .abilities-table tbody tr:nth-child(even) td {
-  background-color: #f8f5ee;
+  background-color: #fafafa;
+  background-image: radial-gradient(circle, rgba(0,140,200,.035) 1px, transparent 1px);
+  background-size: 5px 5px;
 }
 form.faserip-sheet .primary-abilities .abilities-table tbody tr:nth-child(odd) td {
   background-color: #fff;
@@ -159,16 +179,71 @@ form.faserip-sheet .primary-abilities .abilities-table tbody tr:nth-child(odd) t
 /* Don't zebra the key cell — it has its own bg */
 form.faserip-sheet .primary-abilities .abilities-table tbody tr td.ability-key {
   background: var(--cream-dk) !important;
+  background-image: none !important;
 }
 
-/* Input/select styling: slightly warmer */
+/* Input/select styling: white bg, visible borders, inset shadow */
 form.faserip-sheet .primary-abilities .abilities-table input,
 form.faserip-sheet .primary-abilities .abilities-table select,
 form.faserip-sheet .secondary-abilities input[type="number"],
 form.faserip-sheet .secondary-abilities input[type="text"],
 form.faserip-sheet .secondary-abilities select {
-  background: #efefef !important;
-  border-color: #cccccc !important;
+  background: #fff !important;
+  border-color: #b8b8b8 !important;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.06);
+}
+
+/* Rank dropdown — bigger text for readability */
+form.faserip-sheet .primary-abilities .abilities-table select {
+  font-size: 13px !important;
+  font-family: 'Barlow Condensed', sans-serif !important;
+  font-weight: 500 !important;
+}
+
+/* Rank # value — THE most-read number on the sheet */
+form.faserip-sheet .primary-abilities .abilities-table td:last-child input[type="number"] {
+  font-family: 'Oswald', sans-serif !important;
+  font-size: 16px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.5px;
+}
+
+/* Health/Karma current values — dashboard-big */
+form.faserip-sheet .secondary-abilities .stacked-values input[type="number"]:first-child {
+  font-family: 'Oswald', sans-serif !important;
+  font-size: 20px !important;
+  font-weight: 700 !important;
+  height: 32px !important;
+}
+
+/* Health/Karma max values — de-emphasized */
+form.faserip-sheet .secondary-abilities .stacked-values input[type="number"]:disabled {
+  font-family: 'Oswald', sans-serif !important;
+  font-size: 14px !important;
+  font-weight: 400 !important;
+  color: var(--txt-muted) !important;
+  background: var(--cream-dk) !important;
+}
+
+/* Resources rank number */
+form.faserip-sheet .secondary-abilities .resources-row input[type="number"] {
+  font-family: 'Oswald', sans-serif !important;
+  font-size: 16px !important;
+  font-weight: 700 !important;
+}
+
+/* Resources dropdown */
+form.faserip-sheet .secondary-abilities .resources-row select {
+  font-size: 13px !important;
+  font-family: 'Barlow Condensed', sans-serif !important;
+  font-weight: 500 !important;
+}
+
+/* Popularity values */
+form.faserip-sheet .secondary-abilities .popularity-values input[type="number"] {
+  font-family: 'Oswald', sans-serif !important;
+  font-size: 18px !important;
+  font-weight: 700 !important;
 }
 
 form.faserip-sheet .primary-abilities .abilities-table input:focus,
@@ -180,27 +255,46 @@ form.faserip-sheet .secondary-abilities select:focus {
   border-color: var(--gold) !important;
 }
 
-/* ── Secondary grid: border-color match ─────────────────────────────────── */
+/* ── Secondary grid: yellow Ben Day dots + comic panel border ─────────── */
 form.faserip-sheet .secondary-abilities .sec-col {
   border-right-color: #d7d7d7;
 }
 form.faserip-sheet .secondary-abilities {
-  background: #fff;
-  border: 1px solid var(--mred-dk);
+  background-color: #fff;
+  background-image: var(--dots-yellow);
+  background-size: var(--dots-size);
+  border: 2px solid var(--ink) !important;
+  box-shadow: 1px 1px 0 rgba(0,0,0,0.15);
 }
 
-/* ── Movement panel: tighter + better wrapping ──────────────────────────── */
+/* ── Movement panel: faint magenta dots + Oswald labels ──────────────── */
 form.faserip-sheet .movement-panel {
   gap: 6px 10px;
   padding: 6px 8px;
-  border-color: var(--mred-dk);
-  background: var(--cream);
+  border: 2px solid var(--ink) !important;
+  box-shadow: 1px 1px 0 rgba(0,0,0,0.15);
+  background-color: var(--cream);
+  background-image: radial-gradient(circle, rgba(180,0,60,.04) 1px, transparent 1px);
+  background-size: 5px 5px;
 }
 
 form.faserip-sheet .movement-panel label {
-  font-size: 12.5px;
+  font-family: 'Oswald', sans-serif;
+  font-size: 11px;
   font-weight: 600;
-  color: #0d47a1;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--mred-dk);
+}
+
+/* Movement number inputs — bigger for quick reference */
+form.faserip-sheet .movement-panel input[type="number"] {
+  font-family: 'Oswald', sans-serif !important;
+  font-size: 15px !important;
+  font-weight: 600 !important;
+  background: #fff !important;
+  border-color: #b8b8b8 !important;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.06);
 }
 
 form.faserip-sheet .movement-panel label.movement-label.clickable {
@@ -231,9 +325,10 @@ form.faserip-sheet .movement-panel .movement-chat-btn:hover {
   }
 }
 
-/* ── Tab navigation: bolder, gold accent ────────────────────────────────── */
+/* ── Tab navigation: comic panel border, gold accent ──────────────────── */
 form.faserip-sheet .sheet-tabs {
-  border-color: var(--mred-dk);
+  border: 2.5px solid var(--ink) !important;
+  box-shadow: 1px 1px 0 var(--ink);
   background: var(--cream);
 }
 
@@ -354,7 +449,7 @@ form.faserip-sheet .karma-section {
 .action-btn .action-abbr {
   font-family: 'Oswald', sans-serif;
   font-weight: 700;
-  font-size: 1.35em;
+  font-size: 1.5em;
 }
 
 .action-btn .action-name {
@@ -500,9 +595,9 @@ form.faserip-sheet .sheet-tabs-navigation .item i {
   color: #fff;
 }
 
-/* Colored labels via ::after */
+/* Colored labels via ::after — bumped to 10px for readability */
 form.faserip-sheet .sheet-tabs-navigation .item::after {
-  font-size: 8px;
+  font-size: 10px;
   font-family: 'Barlow Condensed', sans-serif;
   font-weight: 600;
   letter-spacing: 0.3px;
@@ -589,14 +684,14 @@ form.faserip-sheet .tab-list-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: var(--mred);
+  background: linear-gradient(180deg, var(--mred-lit) 0%, var(--mred-dk) 100%);
   color: #fff;
   font-family: 'Oswald', sans-serif;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.5px;
   text-transform: uppercase;
-  padding: 4px 8px;
+  padding: 5px 8px;
   margin-bottom: 2px;
 }
 
@@ -619,4 +714,134 @@ form.faserip-sheet .sheet-tabs-navigation .item.active i {
 }
 form.faserip-sheet .sheet-tabs-navigation .item.active::after {
   color: var(--mred) !important;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   LEGIBILITY PASS — Ben Day action buttons, table text, input treatment
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Action buttons: Ben Day dots per color family ─────────────────────── */
+.action-btn[data-action="blunt-attack"],
+.action-btn[data-action="throwing-blunt"],
+.action-btn[data-action="force"],
+.action-btn[data-action="charging"] {
+  background-image: radial-gradient(circle, rgba(200,100,0,.045) 1px, transparent 1px) !important;
+  background-size: 5px 5px;
+}
+.action-btn[data-action="edged-attack"],
+.action-btn[data-action="shooting"],
+.action-btn[data-action="throwing-edged"],
+.action-btn[data-action="energy"] {
+  background-image: radial-gradient(circle, rgba(140,0,0,.04) 1px, transparent 1px) !important;
+  background-size: 5px 5px;
+}
+.action-btn[data-action="grappling"],
+.action-btn[data-action="grabbing"],
+.action-btn[data-action="escaping"] {
+  background-image: radial-gradient(circle, rgba(0,100,200,.04) 1px, transparent 1px) !important;
+  background-size: 5px 5px;
+}
+.action-btn[data-action="dodging"],
+.action-btn[data-action="evading"],
+.action-btn[data-action="blocking"],
+.action-btn[data-action="catching"] {
+  background-image: radial-gradient(circle, rgba(0,150,0,.04) 1px, transparent 1px) !important;
+  background-size: 5px 5px;
+}
+.action-btn[data-action="stun"],
+.action-btn[data-action="slam"],
+.action-btn[data-action="kill"] {
+  background-image: radial-gradient(circle, rgba(130,0,170,.04) 1px, transparent 1px) !important;
+  background-size: 5px 5px;
+}
+
+/* ── Powers table: bigger body text, bold rank ─────────────────────────── */
+form.faserip-sheet .powers-table td {
+  font-size: 13px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 500;
+}
+form.faserip-sheet .powers-table td.power-rank {
+  font-family: 'Oswald', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+}
+form.faserip-sheet .powers-table td.power-value {
+  font-family: 'Oswald', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+}
+form.faserip-sheet .powers-table th {
+  font-size: 12px !important;
+}
+
+/* ── Equipment/HQ/Vehicles tables: bigger body text ────────────────────── */
+form.faserip-sheet .equipment-table td,
+form.faserip-sheet .headquarters-table td,
+form.faserip-sheet .vehicles-table td {
+  font-size: 12.5px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 500;
+}
+form.faserip-sheet .equipment-table th,
+form.faserip-sheet .headquarters-table th,
+form.faserip-sheet .vehicles-table th {
+  font-size: 11px !important;
+}
+
+/* ── Stunts table: bigger body text ────────────────────────────────────── */
+form.faserip-sheet .stunts-table td {
+  font-size: 13px;
+  font-family: 'Barlow Condensed', sans-serif;
+}
+
+/* ── Talents/Contacts card text ────────────────────────────────────────── */
+form.faserip-sheet .talent-name-text,
+form.faserip-sheet .contact-name-text {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* ── Global input treatment: white bg + visible border everywhere ──────── */
+form.faserip-sheet .msh-identity input[type="text"],
+form.faserip-sheet .msh-identity input[type="number"],
+form.faserip-sheet .msh-identity select,
+form.faserip-sheet .msh-player input,
+form.faserip-sheet .msh-player select {
+  background: #fff !important;
+  border-color: #b8b8b8 !important;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.06);
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* ── Tab content area: clean white, no dots ────────────────────────────── */
+form.faserip-sheet .sheet-tab-content {
+  background: #fff !important;
+  background-image: none !important;
+}
+
+/* ── Recovery section: match styling ───────────────────────────────────── */
+form.faserip-sheet .recovery-btn {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* ── Roll button icons: slightly bigger ────────────────────────────────── */
+form.faserip-sheet .power-roll i,
+form.faserip-sheet .talent-roll i,
+form.faserip-sheet .contact-roll i,
+form.faserip-sheet .equipment-roll i {
+  font-size: 14px;
+}
+
+/* ── Equipment group labels: Oswald ────────────────────────────────────── */
+form.faserip-sheet .equip-group-label {
+  font-family: 'Oswald', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.6px;
 }
