@@ -1,5 +1,5 @@
-// scripts/modules/actions/grenade-action.js v1.3.0 - 2026-02-22
-// v1.2.0: Item category changed to "other" with weaponType="grenade"; reads grenadeType from item; template auto-target
+// scripts/modules/actions/grenade-action.js v1.4.0 - 2026-02-25
+// v1.4.0: Rebuild chat cards using unified card builder utilities; remove font-family override
 import { RangedAttackAction } from "./ranged-attack-action.js";
 import { AreaTemplate } from "./area-template.js";
 import {
@@ -7,7 +7,13 @@ import {
   labelFor,
   shiftRank,
   rollWithKarmaAndHistory,
-  bannerColors,
+  buildShiftDisplay,
+  buildRollDisplay,
+  buildResultBadge,
+  buildContentBox,
+  buildCardShell,
+  buildActorTargetHtml,
+  buildAbilitySection,
   getTargetData,
   applyDamageToTargets,
   buildModeSelector,
@@ -248,12 +254,15 @@ export class GrenadeAction extends RangedAttackAction {
     const color      = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
     const colorLower = String(color || "").toLowerCase();
     const isHit      = colorLower !== "white";
-    const { bg, fg } = bannerColors(colorLower);
 
-    // Badge html
-    const badgeColor = { white: "#888", green: "#4CAF50", yellow: "#FFC107", red: "#F44336" }[colorLower] || "#888";
-    const badgeBg    = { white: "#f5f5f5", green: "#e8f5e9", yellow: "#fff8e1", red: "#ffebee" }[colorLower] || "#f5f5f5";
-    const badgeHtml  = `<span style="display:inline-block;padding:1px 8px;border-radius:3px;font-weight:700;font-size:.85em;background:${badgeBg};color:${badgeColor};border:1px solid ${badgeColor};">${color.toUpperCase()}</span>`;
+    // Build standard roll display and badge
+    const shiftBreakdown = {};
+    if (choice.shift) shiftBreakdown.manual = Number(choice.shift);
+    if (choice.rangeModifier) shiftBreakdown.range = choice.rangeModifier;
+    const shiftDisplay = buildShiftDisplay(choice.totalShift, effectiveRank, shiftBreakdown);
+    const rollDisplay = buildRollDisplay(roll, totalKarmaUsed, cappedTotal);
+    const effectLabel = isHit ? "HIT" : "MISS";
+    const resultBadge = buildResultBadge(color, effectLabel);
 
     // Result box
     let resultHtml = "";
@@ -304,26 +313,23 @@ export class GrenadeAction extends RangedAttackAction {
       }
     }
 
-    const cardHtml = `
-      <div style="font-family:'Segoe UI',system-ui,sans-serif;background:#fff;border:1px solid #c0c0c0;border-radius:4px;overflow:hidden;margin-bottom:4px;">
-        <div style="display:flex;justify-content:space-between;align-items:baseline;padding:5px 10px;border-bottom:1px solid #e0e0e0;">
-          <span style="font-weight:700;color:#8b0000;letter-spacing:.03em;text-transform:uppercase;">GRENADE</span>
-          <span style="font-size:.8em;color:#666;">Agility FEAT</span>
-        </div>
-        <div style="padding:5px 10px 3px;font-size:.88em;">
-          <div style="font-weight:700;">${actor.name}</div>
-          <div style="color:#555;">Agility: ${ability.rank} (${ability.value})</div>
-          <div style="color:#555;">Range: ${choice.range} area${choice.range !== 1 ? "s" : ""} (${choice.rangeModifier}CS)${choice.shift ? ` + manual ${choice.shift > 0 ? "+" : ""}${choice.shift}CS` : ""} → ${shiftRank(ability.rank, choice.totalShift)}</div>
-          <div style="margin-top:2px;">Roll: <strong>${roll.total}</strong>${totalKarmaUsed ? ` + Karma: ${totalKarmaUsed}` : ""} = <strong>${cappedTotal}</strong>
-            &nbsp;${badgeHtml}
-          </div>
-        </div>
-        ${resultHtml}
-        <div style="padding:4px 8px;margin:0 10px 6px;background:#e8f5e9;border:1px solid #4CAF50;border-radius:3px;font-size:.8em;font-weight:700;color:#2e7d32;text-align:center;">
-          ${item.name} thrown — ${newShots} remaining
-        </div>
-      </div>
-    `;
+    // Ammo counter
+    const ammoNote = buildContentBox(`<strong>${item.name}</strong> thrown — ${newShots} remaining`);
+
+    const cardHtml = buildCardShell({
+      actionLabel: "Grenade",
+      headerRight: `${typeDef.label} · Agility FEAT`,
+      actorHtml: buildActorTargetHtml(actor.name),
+      abilityHtml: buildAbilitySection({
+        abilityLabel: "Agility",
+        abilityRank: ability.rank,
+        shiftDisplay,
+        rollDisplay,
+        resultBadge,
+        extraLine: `Range: ${choice.range} area${choice.range !== 1 ? "s" : ""}`
+      }),
+      sections: [resultHtml, ammoNote]
+    });
 
     await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor }), content: cardHtml });
 
@@ -374,20 +380,18 @@ export class GrenadeAction extends RangedAttackAction {
 
         await ChatMessage.create({
           speaker: ChatMessage.getSpeaker({ actor }),
-          content: `<div style="font-family:'Segoe UI',system-ui,sans-serif;background:#fff;border:1px solid #c0c0c0;border-radius:4px;overflow:hidden;margin-bottom:4px;">
-            <div style="display:flex;justify-content:space-between;align-items:baseline;padding:5px 10px;border-bottom:1px solid #e0e0e0;">
-              <span style="font-weight:700;color:#8b0000;letter-spacing:.03em;text-transform:uppercase;">GRENADE DAMAGE</span>
-              <span style="font-size:.8em;color:#666;">${damage} pts ${dmgLabel} — ${dmgResults.length} target${dmgResults.length !== 1 ? "s" : ""}</span>
-            </div>
-            <table style="width:100%;border-collapse:collapse;font-size:.88em;padding:4px;">
+          content: buildCardShell({
+            actionLabel: "Grenade Damage",
+            headerRight: `${damage} pts ${dmgLabel} — ${dmgResults.length} target${dmgResults.length !== 1 ? "s" : ""}`,
+            sections: [`<table style="width:100%;border-collapse:collapse;font-size:.88em;padding:4px 10px;">
               <thead><tr style="border-bottom:1px solid #eee;color:#666;font-size:.82em;">
                 <th style="padding:2px 6px;text-align:left;">Target</th>
                 <th style="padding:2px 6px;text-align:left;">Damage</th>
                 <th style="padding:2px 6px;text-align:left;">Health</th>
               </tr></thead>
               <tbody>${rows}</tbody>
-            </table>
-          </div>`
+            </table>`]
+          })
         });
       }
     }

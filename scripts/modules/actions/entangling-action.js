@@ -1,10 +1,19 @@
-// scripts/modules/actions/entangling-action.js
+// scripts/modules/actions/entangling-action.js v1.1.0 - 2026-02-25
+// v1.1.0: Rebuild chat cards using unified card builder utilities; remove emoji and full-width banners
 import { rollUniversalTable } from "../dice/universal-table.js";
 import { 
   generateKarmaControlsHTML, 
   setupKarmaControlHandlers, 
   extractKarmaFromDialog 
 } from "../dice/dice-roller.js";
+import {
+  buildRollDisplay,
+  buildResultBadge,
+  buildContentBox,
+  buildCardShell,
+  buildAbilitySection,
+  shiftRank
+} from "./action-utils.js";
 
 /**
  * Handle entangling weapon mechanics
@@ -91,31 +100,29 @@ export async function processEntanglingHit({
           const entangled = (color.toLowerCase() === "white");
 
           // Create result message
-          const content = `
-            <div style="background-color:#f5f5f0; border:1px solid #c0c0c0; border-radius:3px; margin-bottom:5px;">
-              <div style="padding:5px 10px; border-bottom:1px solid #c0c0c0; font-size:1.1em; color:#8b0000;">
-                <strong>${target.name} — Entangling Check</strong>
-              </div>
-              <div style="padding:5px 10px; font-size:0.9em;">
-                <div><strong>Weapon:</strong> ${weapon.name} (${weaponMaterialStrength})</div>
-                <div><strong>Target Agility:</strong> ${targetAgility} ${targetShift !== 0 ? `→ ${effectiveAgility}` : ''}</div>
-                <div><strong>Roll:</strong> ${roll.total} → ${color.toUpperCase()}</div>
-              </div>
-              <div style="text-align:center; padding:8px; margin:5px; font-weight:bold; font-size:1.1em; border-radius:3px;
-                          background-color:${entangled ? '#F44336' : '#4CAF50'}; color:white;">
-                ${entangled ? '🕸️ ENTANGLED!' : '✓ AVOIDED ENTANGLEMENT'}
-              </div>
-              ${entangled ? `
-                <div style="padding:5px 10px; font-size:0.85em; background:#ffebee; border-top:1px solid #c0c0c0;">
-                  <strong>Escape Options:</strong>
-                  <ul style="margin:4px 0; padding-left:20px;">
-                    <li>Strength FEAT vs ${weaponMaterialStrength} to break bonds</li>
-                    <li>Special abilities (slipping, intangibility, etc.)</li>
-                  </ul>
-                </div>
-              ` : ''}
-            </div>
-          `;
+          const effectLabel = entangled ? "ENTANGLED" : "AVOIDED";
+          const resultBadge = buildResultBadge(color, effectLabel);
+          const rollDisplay = buildRollDisplay(roll);
+          const shiftDisplay = targetShift !== 0 ? ` (${targetShift > 0 ? '+' : ''}${targetShift}CS → ${effectiveAgility})` : "";
+
+          const outcomeHtml = entangled
+            ? buildContentBox(`<strong style="color:#c62828;">Entangled!</strong> Target is enmeshed and cannot move.<br>
+                <span style="font-size:.85em;color:#555;">Escape: Strength FEAT vs ${weaponMaterialStrength} to break bonds, or special abilities.</span>`)
+            : buildContentBox(`<strong style="color:#2e7d32;">Avoided!</strong> Target dodged the entanglement.`);
+
+          const content = buildCardShell({
+            actionLabel: "Entangling Check",
+            headerRight: `${weapon.name} (${weaponMaterialStrength})`,
+            actorHtml: `<strong>${target.name}</strong> <span style="color:#666;">vs</span> <strong style="color:#d32f2f;">${attacker.name}</strong>`,
+            abilityHtml: buildAbilitySection({
+              abilityLabel: "Agility",
+              abilityRank: targetAgility + shiftDisplay,
+              shiftDisplay: "",
+              rollDisplay,
+              resultBadge
+            }),
+            sections: [outcomeHtml]
+          });
 
           // Display the roll
           await roll.toMessage({
@@ -283,23 +290,28 @@ export async function attemptEscapeEntanglement(actor) {
           });
 
           // Display result
-          const content = `
-            <div style="background-color:#f5f5f0; border:1px solid #c0c0c0; border-radius:3px; margin-bottom:5px;">
-              <div style="padding:5px 10px; border-bottom:1px solid #c0c0c0; font-size:1.1em; color:#8b0000;">
-                <strong>${actor.name} — Escape Attempt</strong>
-              </div>
-              <div style="padding:5px 10px; font-size:0.9em;">
-                <div><strong>Entangled By:</strong> ${weaponName} (${materialStrength})</div>
-                <div><strong>Strength:</strong> ${actorStrength} ${shift !== 0 ? `→ ${effectiveStrength}` : ''}</div>
-                <div><strong>Roll:</strong> ${roll.total} + Karma: ${karmaUsed} = ${cappedTotal}</div>
-                <div><strong>Result:</strong> ${color.toUpperCase()}</div>
-              </div>
-              <div style="text-align:center; padding:8px; margin:5px; font-weight:bold; font-size:1.1em; border-radius:3px;
-                          background-color:${escaped ? '#4CAF50' : '#F44336'}; color:white;">
-                ${escaped ? '✓ ESCAPED!' : '❌ STILL ENTANGLED'}
-              </div>
-            </div>
-          `;
+          const effectLabel = escaped ? "ESCAPED" : "STILL HELD";
+          const resultBadge = buildResultBadge(color, effectLabel);
+          const rollDisplay = buildRollDisplay(roll, karmaUsed, cappedTotal);
+          const shiftDisplay = shift !== 0 ? ` (${shift > 0 ? '+' : ''}${shift}CS → ${effectiveStrength})` : "";
+
+          const outcomeHtml = escaped
+            ? buildContentBox(`<strong style="color:#2e7d32;">Broke free!</strong> ${actor.name} escapes the entanglement.`)
+            : buildContentBox(`<strong style="color:#c62828;">Still held.</strong> ${actor.name} remains entangled by ${weaponName}.`);
+
+          const content = buildCardShell({
+            actionLabel: "Escape Entanglement",
+            headerRight: `${weaponName} (${materialStrength})`,
+            actorHtml: `<strong>${actor.name}</strong>`,
+            abilityHtml: buildAbilitySection({
+              abilityLabel: "Strength",
+              abilityRank: actorStrength + shiftDisplay,
+              shiftDisplay: "",
+              rollDisplay,
+              resultBadge
+            }),
+            sections: [outcomeHtml]
+          });
 
           await ChatMessage.create({
             speaker: ChatMessage.getSpeaker({ actor }),
