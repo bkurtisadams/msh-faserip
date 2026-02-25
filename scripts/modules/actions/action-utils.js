@@ -1,4 +1,5 @@
-// action-utils.js v1.6.0 - 2026-02-21
+// action-utils.js v1.7.0 - 2026-02-25
+// v1.7.0: Add unified chat card builder utilities (buildShiftDisplay, buildRollDisplay, buildResultBadge, buildContentBox, buildCardShell, buildManualModeNotice)
 // v1.5.1: Fix setupModeSelector ignoring global mode - per-dialog mode now capped at global setting
 // v1.5.0: getBodyArmorValues checks for active Blocking effect (Strength as Body Armor)
 // v1.4.1: Fix computeBluntDamage to respect weapon minimum base damage per FASERIP rules
@@ -2642,4 +2643,218 @@ export function buildCollapsibleStunSection(result) {
         ${rollInfo}
       </div>
     </details>`;
+}
+
+// ============================================================================
+// UNIFIED CHAT CARD BUILDERS (v1.7.0)
+// Standard visual components for all action chat cards.
+// Every action should use these to ensure consistent layout.
+// ============================================================================
+
+/**
+ * Build the CS shift display with hover tooltip breakdown.
+ * Returns empty string if totalShift is 0.
+ *
+ * @param {number} totalShift - Net column shift applied
+ * @param {string} effectiveRank - Rank name after shift
+ * @param {Object} [breakdown={}] - Shift breakdown object
+ * @param {number} [breakdown.manual] - Manual shift from dialog
+ * @param {string} [breakdown.csNotes] - User-entered CS explanation
+ * @param {number} [breakdown.multiAttack] - Multi-attack penalty
+ * @param {number} [breakdown.adjacent] - Adjacent targets penalty
+ * @param {Array}  [attackerEffects=[]] - {name, shift} from active effects on attacker
+ * @param {Array}  [defenderEffects=[]] - {name, shift} from active effects on defender
+ * @returns {string} HTML like " (+2CS → Remarkable)" or ""
+ */
+export function buildShiftDisplay(totalShift, effectiveRank, breakdown = {}, attackerEffects = [], defenderEffects = []) {
+  if (!totalShift) return "";
+
+  const parts = [];
+
+  // Manual shift from dialog
+  if (breakdown?.manual && breakdown.manual !== 0) {
+    if (breakdown.csNotes) {
+      parts.push(breakdown.csNotes);
+    } else {
+      parts.push(`${breakdown.manual > 0 ? '+' : ''}${breakdown.manual}`);
+    }
+  }
+
+  // Multi-attack penalty
+  if (breakdown?.multiAttack && breakdown.multiAttack !== 0) {
+    const label = breakdown.multiAttack === -1 ? "multi-atk" : "multi-atk fail";
+    parts.push(`${breakdown.multiAttack} ${label}`);
+  }
+
+  // Adjacent targets penalty
+  if (breakdown?.adjacent && breakdown.adjacent !== 0) {
+    parts.push(`${breakdown.adjacent} adjacent`);
+  }
+
+  // Fallback: no breakdown object but shift exists
+  if (!breakdown?.manual && !breakdown?.multiAttack && !breakdown?.adjacent && parts.length === 0) {
+    // Check if breakdown has any custom keys we didn't handle
+    const knownKeys = new Set(["manual", "csNotes", "multiAttack", "adjacent"]);
+    for (const [k, v] of Object.entries(breakdown)) {
+      if (!knownKeys.has(k) && typeof v === "number" && v !== 0) {
+        parts.push(`${v > 0 ? '+' : ''}${v} ${k}`);
+      }
+    }
+  }
+
+  // Attacker effect modifiers
+  for (const eff of attackerEffects) {
+    parts.push(`${eff.shift > 0 ? '+' : ''}${eff.shift} ${eff.name}`);
+  }
+
+  // Defender effect modifiers (flip sign — positive defense = harder to hit)
+  for (const eff of defenderEffects) {
+    parts.push(`${eff.shift > 0 ? '-' : '+'}${Math.abs(eff.shift)} ${eff.name}`);
+  }
+
+  const breakdownText = parts.length > 0
+    ? parts.join(', ')
+    : `${totalShift > 0 ? '+' : ''}${totalShift} total`;
+
+  const csBox = `<span title="${breakdownText}" style="padding:0 3px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${totalShift > 0 ? '+' : ''}${totalShift}CS</span>`;
+  return ` (${csBox} → ${effectiveRank})`;
+}
+
+/**
+ * Build compact roll display: "Roll: [42]" or "Roll: 57 ([42] + 15 karma)"
+ * Yellow hover box on the raw d100 result.
+ *
+ * @param {Roll}   roll - Foundry Roll object (needs .total)
+ * @param {number} [totalKarmaUsed=0] - Karma spent
+ * @param {number} [cappedTotal=null] - Final capped total (roll + karma, max 100)
+ * @returns {string} HTML fragment (no wrapping div — intended for inline use)
+ */
+export function buildRollDisplay(roll, totalKarmaUsed = 0, cappedTotal = null) {
+  const raw = roll?.total ?? 0;
+  const final = cappedTotal ?? raw;
+  const rollBox = `<span title="d100 = ${raw}" style="padding:0 3px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${raw}</span>`;
+
+  if (totalKarmaUsed) {
+    return `${final} <span style="color:#666;">(${rollBox} + ${totalKarmaUsed} karma)</span>`;
+  }
+  return rollBox;
+}
+
+/**
+ * Build inline result color badge: "GREEN — HIT"
+ *
+ * @param {string} color - Result color (white/green/yellow/red)
+ * @param {string} effectLabel - Effect text (e.g. "Hit", "Slam", "Miss")
+ * @param {Object} [opts={}]
+ * @param {string} [opts.suffix] - Extra text after effect (e.g. "(capped)")
+ * @returns {string} HTML span
+ */
+export function buildResultBadge(color, effectLabel, opts = {}) {
+  const colorLower = String(color || "white").toLowerCase();
+  const { bg, fg } = bannerColors(colorLower);
+  const suffix = opts.suffix ? ` <span style="font-weight:normal;font-size:.85em;">${opts.suffix}</span>` : "";
+
+  return `<span style="padding:2px 8px;border-radius:3px;font-weight:bold;font-size:.9em;background:${bg};color:${fg};">${String(colorLower).toUpperCase()} — ${String(effectLabel).toUpperCase()}${suffix}</span>`;
+}
+
+/**
+ * Build a standard content box (white bg, gray border).
+ * Used for damage readouts, outcome descriptions, context info.
+ *
+ * @param {string} innerHtml - Content to place inside the box
+ * @returns {string} HTML div
+ */
+export function buildContentBox(innerHtml) {
+  if (!innerHtml) return "";
+  return `<div style="margin:0 10px 6px;padding:6px 8px;background:#fff;border:1px solid #ddd;border-radius:3px;font-size:.9em;">${innerHtml}</div>`;
+}
+
+/**
+ * Build the "Manual Mode: GM adjudicates" notice.
+ * Returns empty string when not in manual mode.
+ *
+ * @param {boolean} isManualMode
+ * @returns {string} HTML div or ""
+ */
+export function buildManualModeNotice(isManualMode) {
+  if (!isManualMode) return "";
+  return `<div style="padding:4px 8px;margin:4px 6px;background:#fff3e0;border:1px solid #ff9800;border-radius:3px;text-align:center;font-size:.85em;font-style:italic;color:#e65100;">Manual Mode: GM adjudicates</div>`;
+}
+
+/**
+ * Build a complete chat card shell with standard layout.
+ * All sections are optional — pass empty string to omit.
+ *
+ * Layout (top to bottom):
+ *   ┌─ HEADER: actionLabel (maroon)   headerRight (gray) ─┐
+ *   ├─ ACTOR ROW: actorHtml ──────────────────────────────┤
+ *   ├─ ABILITY SECTION: abilityHtml ──────────────────────┤
+ *   ├─ BODY SECTIONS: ...sections[] ──────────────────────┤
+ *   └──────────────────────────────────────────────────────┘
+ *
+ * @param {Object} opts
+ * @param {string} opts.actionLabel - Left header text (will be uppercased, colored maroon)
+ * @param {string} [opts.headerRight=""] - Right header text (gray, smaller)
+ * @param {string} [opts.actorHtml=""] - Actor → Target row HTML
+ * @param {string} [opts.abilityHtml=""] - Ability + Roll + Badge section HTML
+ * @param {string[]} [opts.sections=[]] - Additional HTML sections (damage, outcome, actions, etc.)
+ * @returns {string} Complete chat card HTML
+ */
+export function buildCardShell({ actionLabel, headerRight = "", actorHtml = "", abilityHtml = "", sections = [] }) {
+  const headerRightEl = headerRight
+    ? `<span style="color:#666;font-weight:normal;font-size:.85em;">${headerRight}</span>`
+    : "";
+
+  const body = sections.filter(s => s).join("\n");
+
+  return `<div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
+  <div style="padding:6px 10px;border-bottom:1px solid #c0c0c0;display:flex;justify-content:space-between;align-items:center;">
+    <strong style="color:#8b0000;">${String(actionLabel).toUpperCase()}</strong>
+    ${headerRightEl}
+  </div>
+  ${actorHtml ? `<div style="padding:4px 10px;font-size:.95em;">${actorHtml}</div>` : ""}
+  ${abilityHtml ? `<div style="padding:2px 10px 6px;font-size:.9em;color:#555;">${abilityHtml}</div>` : ""}
+  ${body}
+</div>`;
+}
+
+/**
+ * Build the standard "Actor → Target" row HTML.
+ *
+ * @param {string} actorName
+ * @param {string} [targetName=""] - Omit or pass empty to show actor only
+ * @param {string} [contextNote=""] - Optional small note after target (weapon, item, range)
+ * @returns {string} HTML fragment (no wrapping div — buildCardShell adds it)
+ */
+export function buildActorTargetHtml(actorName, targetName = "", contextNote = "") {
+  let html = `<strong>${actorName}</strong>`;
+  if (targetName) {
+    html += ` <span style="color:#666;">→</span> <strong style="color:#d32f2f;">${targetName}</strong>`;
+  }
+  if (contextNote) {
+    html += ` <span style="color:#666;font-size:.85em;margin-left:6px;">${contextNote}</span>`;
+  }
+  return html;
+}
+
+/**
+ * Build the ability + roll + result badge section HTML.
+ * This is the core "Strength: Remarkable (+2CS → Incredible) / Roll: [57] GREEN — HIT" block.
+ *
+ * @param {Object} opts
+ * @param {string} opts.abilityLabel - e.g. "Strength", "Endurance", "Agility"
+ * @param {string} opts.abilityRank - e.g. "Remarkable"
+ * @param {string} opts.shiftDisplay - Output from buildShiftDisplay()
+ * @param {string} opts.rollDisplay - Output from buildRollDisplay()
+ * @param {string} opts.resultBadge - Output from buildResultBadge()
+ * @param {string} [opts.extraLine=""] - Optional line between ability and roll (e.g. context)
+ * @returns {string} HTML fragment (no wrapping div — buildCardShell adds it)
+ */
+export function buildAbilitySection({ abilityLabel, abilityRank, shiftDisplay = "", rollDisplay, resultBadge, extraLine = "" }) {
+  return `<div>${abilityLabel}: ${abilityRank}${shiftDisplay}</div>
+${extraLine ? `<div>${extraLine}</div>` : ""}
+<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;${extraLine ? "" : "margin-top:3px;"}">
+  <span>Roll: ${rollDisplay}</span>
+  ${resultBadge}
+</div>`;
 }

@@ -1,5 +1,5 @@
-// scripts/modules/actions/energy-action.js v1.7.1 - 2026-02-19
-// v1.7.1: Fix double-armor: buildActionsBox bypassArmor:true (damage is afterArmor); auto-apply uses afterArmor+bypassArmor:true
+// scripts/modules/actions/energy-action.js v1.8.0 - 2026-02-25
+// v1.8.0: Refactor chat card to use unified card builder utilities (buildCardShell, buildRollDisplay, etc.)
 // v1.7.0: Add support for equipment items with Energy (E) damage type (laser pistols, etc.)
 // v1.6.0: Fix CS persistence - decouple from global rememberSettings, treat opts.shift=0 as "not set"
 // v1.5.9: Fix usePowerToHit default - only true if explicitly saved as true (stricter check)
@@ -31,10 +31,17 @@ import {
 import { 
   applyDamageToTargets,
   attachAutoFillRange,
-  bannerColors,
   buildActionsBox,
   buildMultiAttackSection,
   buildModeSelector,
+  buildShiftDisplay,
+  buildRollDisplay,
+  buildResultBadge,
+  buildContentBox,
+  buildManualModeNotice,
+  buildCardShell,
+  buildActorTargetHtml,
+  buildAbilitySection,
   debugLog,
   effectsFor,
   getAbilityInfo,
@@ -753,58 +760,18 @@ export class EnergyAction extends RangedAttackAction {
     const targetTokens = Array.from(game.user?.targets ?? []);
     const targetList = targetTokens.length ? targetTokens : [null];
 
-    // Build compact shift display with breakdown
-    let shiftDisplay = "";
-    if (choice.totalShift !== 0) {
-      const parts = [];
-      
-      // Manual shift from dialog
-      if (choice.shift && choice.shift !== 0) {
-        parts.push(`${choice.shift > 0 ? '+' : ''}${choice.shift}`);
-      }
-      
-      // Range modifier
-      if (choice.rangeModifier && choice.rangeModifier !== 0) {
-        parts.push(`${choice.rangeModifier > 0 ? '+' : ''}${choice.rangeModifier} range`);
-      }
-      
-      // Obstacle modifier
-      if (choice.obstacleModifier && choice.obstacleModifier !== 0) {
-        parts.push(`${choice.obstacleModifier} obstacle`);
-      }
-      
-      // Movement modifier
-      if (choice.movementModifier && choice.movementModifier !== 0) {
-        parts.push(`${choice.movementModifier > 0 ? '+' : ''}${choice.movementModifier} movement`);
-      }
-      
-      // Adjacent targets penalty
-      if (choice.multiAdjacent) {
-        parts.push(`-4 adjacent`);
-      }
-      
-      // Show attacker effects by name
-      for (const eff of attackerEffects) {
-        parts.push(`${eff.shift > 0 ? '+' : ''}${eff.shift} ${eff.name}`);
-      }
-      
-      // Show defender effects by name (flip sign since they're subtracted)
-      for (const eff of defenderEffects) {
-        parts.push(`${eff.shift > 0 ? '-' : '+'}${Math.abs(eff.shift)} ${eff.name}`);
-      }
-      
-      const breakdownText = parts.length > 0 ? parts.join(', ') : `${choice.totalShift > 0 ? '+' : ''}${choice.totalShift} total`;
-      const csBox = `<span title="${breakdownText}" style="padding:0 3px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${choice.totalShift > 0 ? '+' : ''}${choice.totalShift}CS</span>`;
-      shiftDisplay = ` (${csBox} → ${effectiveRank})`;
-    }
+    // Build shift breakdown for display
+    const shiftBreakdown = {};
+    if (choice.shift && choice.shift !== 0) shiftBreakdown.manual = choice.shift;
+    if (choice.rangeModifier && choice.rangeModifier !== 0) shiftBreakdown.range = choice.rangeModifier;
+    if (choice.obstacleModifier && choice.obstacleModifier !== 0) shiftBreakdown.obstacle = choice.obstacleModifier;
+    if (choice.movementModifier && choice.movementModifier !== 0) shiftBreakdown.movement = choice.movementModifier;
+    if (choice.multiAdjacent) shiftBreakdown.adjacent = -4;
+    const shiftDisplay = buildShiftDisplay(choice.totalShift, effectiveRank, shiftBreakdown, attackerEffects, defenderEffects);
 
     // Build compact roll display
-    const rollBox = `<span title="d100 = ${roll.total}" style="padding:0 3px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${roll.total}</span>`;
-    const rollDisplay = totalKarmaUsed 
-      ? `${cappedTotal} <span style="color:#666;">(${rollBox} + ${totalKarmaUsed} karma)</span>`
-      : rollBox;
+    const rollDisplay = buildRollDisplay(roll, totalKarmaUsed, cappedTotal);
 
-    const { bg, fg } = bannerColors(colorLower);
     const isManualMode = this?.opts?.mode === "manual";
     const targetCount = targetList.length;
     const actionLabel = `${actionName}${targetCount > 1 ? ` (${targetCount} targets)` : ''}`;
@@ -852,69 +819,41 @@ export class EnergyAction extends RangedAttackAction {
           })
         : "";
 
-      // Manual mode notice
-      const manualModeNotice = isManualMode ? `
-        <div style="padding:4px 8px;margin:4px 6px;background:#fff3e0;border:1px solid #ff9800;border-radius:3px;text-align:center;font-size:.85em;font-style:italic;color:#e65100;">
-          Manual Mode: GM adjudicates
-        </div>
-      ` : "";
+      // Build damage section
+      const damageHtml = (() => {
+        if (!isHit) {
+          return buildContentBox(`<strong>Damage:</strong> 0 (miss)`);
+        }
+        
+        const reducedNote = wasReduced ? ` <span style="color:#ff6f00;">(reduced from ${choice.powerDamage})</span>` : '';
+        const dmgBox = `<span title="Power: ${choice.powerName} (${choice.powerRank})" style="cursor:help;">${rawDamage}</span>`;
+        
+        if (armorValue > 0 && targetActor) {
+          const isEnergy = armorData?.isEnergyDamage !== false;
+          const armorType = armorData?.isForceField ? "Force Field" : "Body Armor";
+          const armorHover = `${armorType} (${armorValue}${isEnergy ? ', -20 vs Energy applied' : ''})`;
+          const armorBox = `<span title="${armorHover}" style="cursor:help;">${armorValue} armor</span>`;
+          
+          return buildContentBox(`<strong>Damage:</strong> ${dmgBox}${reducedNote} − ${armorBox} = <strong>${afterArmor}</strong>`);
+        } else {
+          return buildContentBox(`<strong>Damage:</strong> ${dmgBox}${reducedNote}`);
+        }
+      })();
 
-      // Build compact chat card matching blunt style
-      const cardHtml = `
-        <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
-          <!-- Header: Action name -->
-          <div style="padding:6px 10px;border-bottom:1px solid #c0c0c0;display:flex;justify-content:space-between;align-items:center;">
-            <strong style="color:#8b0000;">${actionLabel.toUpperCase()}</strong>
-            <span style="color:#666;font-size:.85em;">${choice.powerName}</span>
-          </div>
-          
-          <!-- Attacker → Target -->
-          <div style="padding:4px 10px;font-size:.95em;">
-            <strong>${actor.name}</strong>${targetActor ? ` <span style="color:#666;">→</span> <strong style="color:#d32f2f;">${targetName}</strong>` : ''}
-          </div>
-          
-          <!-- Ability + Roll + Result -->
-          <div style="padding:2px 10px 6px;font-size:.9em;color:#555;">
-            <div>${choice.usePowerToHit ? `Power: ${choice.powerRank}` : `${ability.name}: ${ability.rank}`}${shiftDisplay}</div>
-            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-              <span>Roll: ${rollDisplay}</span>
-              <span style="padding:2px 8px;border-radius:3px;font-weight:bold;font-size:.9em;background:${bg};color:${fg};">
-                ${String(color).toUpperCase()} — ${String(effectResult).toUpperCase()}${wasResultCapped ? ' <span style="font-weight:normal;font-size:.85em;">(capped)</span>' : ''}
-              </span>
-            </div>
-          </div>
-          
-          <!-- Damage -->
-          ${(() => {
-            if (!isHit) {
-              return `<div style="margin:0 10px 6px;padding:6px 8px;background:#fff;border:1px solid #ddd;border-radius:3px;font-size:.9em;color:#666;">
-                <strong>Damage:</strong> 0 (miss)
-              </div>`;
-            }
-            
-            const reducedNote = wasReduced ? ` <span style="color:#ff6f00;">(reduced from ${choice.powerDamage})</span>` : '';
-            const dmgBox = `<span title="Power: ${choice.powerName} (${choice.powerRank})" style="cursor:help;">${rawDamage}</span>`;
-            
-            if (armorValue > 0 && targetActor) {
-              const isEnergy = armorData?.isEnergyDamage !== false;
-              const armorType = armorData?.isForceField ? "Force Field" : "Body Armor";
-              const armorHover = `${armorType} (${armorValue}${isEnergy ? ', -20 vs Energy applied' : ''})`;
-              const armorBox = `<span title="${armorHover}" style="cursor:help;">${armorValue} armor</span>`;
-              
-              return `<div style="margin:0 10px 6px;padding:6px 8px;background:#fff;border:1px solid #ddd;border-radius:3px;font-size:.9em;">
-                <strong>Damage:</strong> ${dmgBox}${reducedNote} − ${armorBox} = <strong>${afterArmor}</strong>
-              </div>`;
-            } else {
-              return `<div style="margin:0 10px 6px;padding:6px 8px;background:#fff;border:1px solid #ddd;border-radius:3px;font-size:.9em;">
-                <strong>Damage:</strong> ${dmgBox}${reducedNote}
-              </div>`;
-            }
-          })()}
-          
-          ${actions}
-          ${manualModeNotice}
-        </div>
-      `;
+      // Build ability section
+      const abilityLabel = choice.usePowerToHit ? "Power" : ability.name;
+      const abilityRank = choice.usePowerToHit ? choice.powerRank : ability.rank;
+      const resultBadge = buildResultBadge(color, effectResult, { suffix: wasResultCapped ? "(capped)" : "" });
+      const abilityHtml = buildAbilitySection({ abilityLabel, abilityRank, shiftDisplay, rollDisplay, resultBadge });
+
+      // Assemble card
+      const cardHtml = buildCardShell({
+        actionLabel,
+        headerRight: choice.powerName,
+        actorHtml: buildActorTargetHtml(actor.name, targetActor ? targetName : ""),
+        abilityHtml,
+        sections: [damageHtml, actions, buildManualModeNotice(isManualMode)]
+      });
 
       // Flags per target
       const msgFlags = buildDamageFlags({
