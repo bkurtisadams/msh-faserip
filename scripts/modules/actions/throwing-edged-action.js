@@ -1,6 +1,5 @@
-// scripts/modules/actions/throwing-edged-action.js v1.1.0 - 2026-02-20
-// v1.1.0: Allow any edged weapon to be thrown (not just weaponType=thrown); remove physical-edged from filter;
-//         normalize downstream damageType to physical-edged; remove debug console.log block
+// scripts/modules/actions/throwing-edged-action.js v1.2.0 - 2026-02-25
+// v1.2.0: Rebuild chat card using unified card builder utilities (inline badge, hover roll, standard layout)
 import { RangedAttackAction } from "./ranged-attack-action.js";
 import { attachAutoFillRange } from "./action-utils.js";
 // NOTE: resolveCombatMode imported dynamically if needed
@@ -18,10 +17,14 @@ import {
   setupModeSelector,
   shiftRank,
   rollWithKarmaAndHistory,
-  buildResultGrid,
   buildActionsBox,
-  bannerColors,
-  getTargetingContext,
+  buildShiftDisplay,
+  buildRollDisplay,
+  buildResultBadge,
+  buildContentBox,
+  buildCardShell,
+  buildActorTargetHtml,
+  buildAbilitySection,
   applyDamageToTargets
 } from "./action-utils.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
@@ -364,10 +367,11 @@ export class ThrowingEdgedAction extends RangedAttackAction {
     const colorLower = String(color || "").toLowerCase();
     const effectResult = effects[colorLower] || color;
 
-    const grid = buildResultGrid(actionType, colorLower, effects, (globalThis._getResultHoverText || this._getResultHoverText));
-    const { bg, fg } = bannerColors(colorLower);
-
     const isHit = colorLower !== 'white';
+    const targets = Array.from(game.user?.targets ?? []);
+    const primaryTarget = targets[0] ?? null;
+    const targetName = primaryTarget?.name || "";
+
     const actions = buildActionsBox({
       showStun: colorLower === "yellow",
       showKill: colorLower === "red",
@@ -378,40 +382,39 @@ export class ThrowingEdgedAction extends RangedAttackAction {
       armorPiercing: Number(choice.armorPiercing || 0),
       armorPiercingCS: Number(choice.armorPiercingCS || 0),
       apMode: choice.apMode || "value",
-      //autoApply: !!this.opts?.autoApply,
-      // IMPORTANT: let the action flow handle auto-saves; the card should NOT auto-save.
       autoSave: false,
     });
 
-    const contextHtml = `
-      <div>Ability: ${ability.name}</div>
-      <div>Base Rank: ${ability.rank} (${ability.value})</div>
-        <div>Weapon: ${choice.weaponName} — Damage: ${choice.weaponDamage}${Number(choice.armorPiercing||0) ? ` — AP: ${Number(choice.armorPiercing)}` : ""}</div>
+    // Build shift breakdown
+    const shiftBreakdown = {};
+    if (choice.shift) shiftBreakdown.manual = Number(choice.shift);
+    if (choice.rangeModifier) shiftBreakdown.range = choice.rangeModifier;
+    if (choice.obstacleModifier) shiftBreakdown.obstacle = choice.obstacleModifier;
+    if (choice.movementModifier) shiftBreakdown.movement = choice.movementModifier;
+    const shiftDisplay = buildShiftDisplay(choice.totalShift, effectiveRank, shiftBreakdown);
+    const rollDisplay = buildRollDisplay(roll, totalKarmaUsed, cappedTotal);
+    const resultBadge = buildResultBadge(color, effectResult);
 
-      <div>Distance: ${choice.range} area${choice.range > 1 ? "s" : ""} ${choice.rangeModifier ? `(${choice.rangeModifier}CS)` : ""}${choice.throughObstacle ? `, obstacle (-2CS)` : ""}${choice.movementModifier ? `, target movement (${choice.movementModifier > 0 ? '+' : ''}${choice.movementModifier}CS)` : ""}</div>
-      ${choice.totalShift !== 0 ? `<div>Effective Rank: ${effectiveRank} (${choice.totalShift > 0 ? '+' : ''}${choice.totalShift}CS total)</div>` : ""}
-      <div>Roll: ${roll.total}${totalKarmaUsed ? ` + Karma: ${totalKarmaUsed}` : ""} = ${cappedTotal}</div>
-    `;
+    // Damage section (no per-target armor calc — thrown edged bypasses to downstream)
+    const apNote = Number(choice.armorPiercing || 0) ? ` <span style="color:#1565c0;font-size:.85em;">(AP ${choice.armorPiercing})</span>` : "";
+    const damageHtml = isHit
+      ? buildContentBox(`<strong>Damage:</strong> <span title="Weapon: ${choice.weaponName}" style="cursor:help;">${choice.weaponDamage}</span>${apNote}`)
+      : buildContentBox(`<strong>Damage:</strong> 0 (miss)`);
 
-    const targetingContext = getTargetingContext(actor, actionName);
-
-    // final chat card
-    const cardHtml = `
-      <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
-        <div style="padding:5px 10px;border-bottom:1px solid #c0c0c0;font-size:1.1em;color:#8b0000;">
-          <strong>${actor.name} - ${actionName}</strong>
-        </div>
-        <div style="padding:5px 10px;border-bottom:1px solid #e0e0e0;font-size:.9em;">
-          ${targetingContext}
-        </div>
-        <div style="padding:5px 10px;font-size:.9em;">${contextHtml}</div>
-        ${grid}
-        <div style="text-align:center;padding:8px;margin:5px;font-weight:bold;font-size:1.1em;border-radius:3px;background:${bg};color:${fg};">
-          RESULT: ${String(color).toUpperCase()} — ${String(effectResult).toUpperCase()}
-        </div>
-        ${actions}
-      </div>
-    `;
+    // Assemble card
+    const cardHtml = buildCardShell({
+      actionLabel: actionName,
+      headerRight: choice.weaponName,
+      actorHtml: buildActorTargetHtml(actor.name, targetName),
+      abilityHtml: buildAbilitySection({
+        abilityLabel: ability.name,
+        abilityRank: ability.rank,
+        shiftDisplay,
+        rollDisplay,
+        resultBadge
+      }),
+      sections: [damageHtml, actions]
+    });
 
     await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor }), content: cardHtml });
 
