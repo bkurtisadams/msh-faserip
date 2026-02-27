@@ -232,7 +232,7 @@ Armor Piercing (AP) reduces target armor by that value.">?</span>
           <strong id="shifted-rank-display" style="${savedColumnShift < 0 ? 'color:#c62828;' : savedColumnShift > 0 ? 'color:#2e7d32;' : ''}">${shiftRank(ability.rank, savedColumnShift)}</strong>
           <button type="button" class="cs-reset" style="visibility:${savedColumnShift !== 0 ? 'visible' : 'hidden'};padding:1px 5px;font-size:.85em;cursor:pointer;border:1px solid #999;border-radius:2px;background:#eee;" title="Reset to 0">×</button>
         </div>
-        <div class="karma-field" style="display:flex;align-items:center;gap:4px;padding:4px 6px;border-radius:3px;${hasKarma ? 'background:#f5f0e0;border:1px solid #c9b98a;' : ''}">
+        <div class="karma-field" style="display:flex;align-items:center;gap:4px;padding:4px 6px;border-radius:3px;${hasKarma ? 'background:#e3f2fd;border:1px solid #90caf9;' : ''}">
           ${hasKarma ? `
             <label style="display:flex;align-items:center;gap:4px;cursor:pointer;">
               <input type="checkbox" id="spend-karma" name="spendKarma">

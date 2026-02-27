@@ -1,4 +1,5 @@
-// scripts/modules/actions/grabbing-action.js v1.5.0 - 2026-02-20
+// scripts/modules/actions/grabbing-action.js v1.6.0 - 2026-02-27
+// v1.6.0: Redesign dialog to Style A (grid header, inline CS/karma, standardized footer)
 // v1.5.0: Restyle chat card to match attack card pattern (flex header, inline badge, no buildResultGrid/banner)
 // v1.4.0: Add support for weapon-based grabbing (whips with Gb damage type use material strength)
 // v1.3.0: Fix karma checkbox to always default unchecked (not persisted)
@@ -15,9 +16,10 @@ import {
   buildActionsBox,
   bannerColors,
   buildInlineRollDisplay,
-  showDiceAnimation
+  showDiceAnimation,
+  getTargetData
 } from "./action-utils.js";
-import { generateKarmaControlsHTML, setupKarmaControlHandlers, extractKarmaFromDialog } from "../dice/dice-roller.js";
+import { extractKarmaFromDialog, getAvailableKarma, getMinimumKarmaCommitment } from "../dice/dice-roller.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
 
 /**
@@ -205,70 +207,86 @@ export class GrabbingAction extends AttackAction {
 
     // Title and ability label
     const dialogTitle = isWeaponGrab ? `Grabbing with ${weaponName}: ${actor.name}` : `${this.actionName}: ${actor.name}`;
-    const abilityLabel = isWeaponGrab ? `${weaponName} (Material)` : "Your Strength";
+    const abilityLabel = isWeaponGrab ? `${weaponName} (Material)` : "Strength";
+
+    // Karma data
+    const availableKarma = getAvailableKarma(actor);
+    const minKarma = getMinimumKarmaCommitment(actor);
+    const hasKarma = availableKarma > 0;
 
     const html = `
-      <div style="margin-bottom:8px;">
-        <label style="display:inline-block;width:130px;">Action:</label>
-        <strong>${this.actionName}</strong>
-        ${isWeaponGrab ? `<span style="color:#6a1b9a;margin-left:8px;">(using ${weaponName})</span>` : ''}
-      </div>
-
-      <div style="margin-bottom:8px;">
-        <label style="display:inline-block;width:130px;">${abilityLabel}:</label>
-        <input type="text" value="${strength.rank}" style="width:160px;" readonly>
-        <span style="margin-left:6px;">(${strength.value})</span>
-        ${isWeaponGrab ? `<div style="margin-left:130px;font-size:.85em;color:#6a1b9a;">Using weapon material strength</div>` : ''}
-      </div>
-
-      <div style="margin-bottom:8px;">
-        <label style="display:inline-block;width:130px;">Target:</label>
-        <input type="text" name="targetName" style="width:240px;" value="${prefillTargetName}" placeholder="Who holds the item?">
-      </div>
-
-      <div style="margin-bottom:8px;">
-        <label style="display:inline-block;width:130px;">Target STR:</label>
-        <input type="text" name="targetStrength" style="width:160px;" value="${prefillTargetStr}" placeholder="e.g., Excellent">
-        <div style="margin-left:130px;font-size:.85em;color:#666;">
-          Used for GREEN "Take": possession only if your STR ≥ comparator (target STR, or item material if glued/clamped).
+      <!-- Context: Target + Grab stats side by side -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+        <div style="background:#f5f5f5;padding:8px;border-radius:3px;">
+          <div style="font-weight:600;color:#666;font-size:.8em;text-transform:uppercase;">Target</div>
+          <input type="text" name="targetName" style="width:100%;margin-top:4px;font-weight:600;" placeholder="Who holds the item?" value="${prefillTargetName}">
+          <div style="margin-top:4px;">
+            <span style="color:#666;font-size:.85em;">STR:</span>
+            <input type="text" name="targetStrength" style="width:80px;" placeholder="Excellent" value="${prefillTargetStr}">
+          </div>
+        </div>
+        <div style="background:#f5f5f5;padding:8px;border-radius:3px;">
+          <div style="font-weight:600;color:#666;font-size:.8em;text-transform:uppercase;">Grab</div>
+          <div style="font-weight:600;">${abilityLabel}: ${strength.rank}</div>
+          <div style="color:#666;">Rank Value: ${strength.value}</div>
+          ${isWeaponGrab ? `<div style="color:#6a1b9a;font-size:.85em;">Using weapon material strength</div>` : ''}
         </div>
       </div>
 
-      <div style="margin-bottom:8px;">
-        <label style="display:inline-block;width:130px;">Item (label):</label>
-        <input type="text" name="itemLabel" style="width:240px;" placeholder="e.g., Pistol, Bomb, Idol" value="">
-      </div>
-
-      <div style="margin-bottom:8px;">
-        <label style="display:inline-block;width:130px;">Item Material (opt):</label>
-        <input type="text" name="itemMaterial" style="width:160px;" placeholder="e.g., Incredible">
-        <div style="margin-left:130px;font-size:.85em;color:#666;">
-          If item is glued/clamped/locked, enter its material to use as the Take comparator.
+      <!-- Item Details -->
+      <div style="padding:8px;background:#fff;border:1px solid #ddd;border-radius:3px;margin-bottom:8px;">
+        <div style="display:grid;grid-template-columns:auto 1fr;gap:4px 8px;align-items:center;">
+          <label style="font-weight:600;">Item:</label>
+          <input type="text" name="itemLabel" placeholder="e.g., Pistol, Bomb, Idol" value="" style="padding:4px;">
+          <label style="font-size:.9em;">Material:</label>
+          <div>
+            <input type="text" name="itemMaterial" placeholder="e.g., Incredible" style="width:120px;padding:4px;">
+            <span style="font-size:.8em;color:#666;margin-left:4px;">If glued/clamped</span>
+          </div>
         </div>
       </div>
 
-      <div style="margin-bottom:8px;">
-        <label style="display:inline-block;width:130px;">Column Shift:</label>
-        <input type="number" name="shift" value="${Number(this.opts?.shift ?? savedShift)}" style="width:60px;">
-        <span style="color:#666;font-size:.9em;">(+ easier, - harder)</span>
-      </div>
-      ${generateKarmaControlsHTML(actor, savedSpendKarma)}
-      <div style="margin-top:6px;">
-        <label><input type="checkbox" name="remember" ${savedRemember ? 'checked' : ''}> Remember these settings</label>
+      <!-- Modifiers Row -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;font-size:.9em;">
+        <div class="cs-field" style="display:flex;align-items:center;gap:4px;padding:4px 6px;border-radius:3px;${savedShift < 0 ? 'background:#ffebee;border:1px solid #ef5350;' : savedShift > 0 ? 'background:#e8f5e9;border:1px solid #66bb6a;' : 'border:1px solid transparent;'}">
+          <label style="font-weight:600;">CS:</label>
+          <input type="number" name="shift" value="${Number(this.opts?.shift ?? savedShift)}" style="width:35px;padding:3px;text-align:center;box-sizing:border-box;">
+          <span style="color:#666;">→</span>
+          <strong id="shifted-rank-display" style="${savedShift < 0 ? 'color:#c62828;' : savedShift > 0 ? 'color:#2e7d32;' : ''}">${shiftRank(strength.rank, savedShift)}</strong>
+          <button type="button" class="cs-reset" style="visibility:${savedShift !== 0 ? 'visible' : 'hidden'};padding:1px 5px;font-size:.85em;cursor:pointer;border:1px solid #999;border-radius:2px;background:#eee;" title="Reset to 0">×</button>
+        </div>
+        <div class="karma-field" style="display:flex;align-items:center;gap:4px;padding:4px 6px;border-radius:3px;${hasKarma ? 'background:#e3f2fd;border:1px solid #90caf9;' : ''}">
+          ${hasKarma ? `
+            <label style="display:flex;align-items:center;gap:4px;cursor:pointer;">
+              <input type="checkbox" id="spend-karma" name="spendKarma">
+              <span style="font-weight:600;">Karma:</span>
+            </label>
+            <span title="Available: ${availableKarma} | Min commitment: ${minKarma} | Amount chosen after roll" style="padding:1px 4px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${availableKarma}</span>
+            <span style="color:#999;font-size:.8em;">(min ${minKarma})</span>
+          ` : `<span style="color:#999;">No karma</span>`}
+        </div>
       </div>
 
-      <div style="margin-top:8px;">
-        <label><input type="checkbox" name="skipDice" ${savedSkipDice ? 'checked' : ''}> Skip dice animation</label>
+      <!-- CS Notes Row -->
+      <div id="cs-notes-row" style="margin-bottom:6px;">
+        <input type="text" name="csNotes" id="cs-notes-input" placeholder="e.g., Martial Arts C +1CS" value="" style="width:100%;padding:4px 8px;border:1px solid #ccc;border-radius:3px;font-size:.9em;box-sizing:border-box;">
       </div>
 
-      <div style="margin-top:12px;padding:8px;background:#f5f5f5;border:1px solid #ddd;border-radius:3px;">
+      <!-- Results Reference -->
+      <div style="padding:8px;background:#f5f5f5;border:1px solid #ddd;border-radius:3px;margin-bottom:8px;">
         <div style="font-weight:bold;margin-bottom:4px;">Grabbing Results</div>
         <div style="font-size:.85em;color:#555;">
-          <strong>Miss:</strong> No possession; loose item may scatter up to 1 area (GM).<br>
-          <strong>Take (Green):</strong> Possession only if your STR ≥ comparator (target STR <em>or</em> item material if glued/clamped). Else, treat as Miss.<br>
-          <strong>Grab (Yellow):</strong> Gain possession regardless of STR.<br>
-          <strong>Break (Red):</strong> Gain possession; then use the <em>Breaking FEAT</em> button to roll vs item material (handled by dialog).
+          <strong>Miss:</strong> No possession; item may scatter 1 area.<br>
+          <strong>Take (Grn):</strong> Only if STR ≥ comparator.<br>
+          <strong>Grab (Ylw):</strong> Gain possession regardless.<br>
+          <strong>Break (Red):</strong> Gain + Breaking FEAT vs item material.
         </div>
+      </div>
+
+      <!-- Footer -->
+      <div id="msh-bottom-controls" style="display:flex;justify-content:space-between;align-items:center;padding-top:8px;border-top:1px solid #ddd;">
+        <label><input type="checkbox" name="remember" ${savedRemember ? 'checked' : ''}> Remember</label>
+        <label><input type="checkbox" name="skipDice" ${savedSkipDice ? 'checked' : ''}> Skip dice</label>
       </div>
     `;
 
@@ -308,7 +326,24 @@ export class GrabbingAction extends AttackAction {
           cancel: { label: "Cancel", callback: () => resolve(null) }
         },
         default: "roll",
-        render: (html) => { setupKarmaControlHandlers(html); }
+        render: (html) => {
+          // CS field handlers
+          const $shift = html.find('[name="shift"]');
+          const $csField = html.find('.cs-field');
+          const $rankDisplay = html.find('#shifted-rank-display');
+          const $csReset = html.find('.cs-reset');
+          const updateCS = () => {
+            const s = Number($shift.val()) || 0;
+            const shifted = shiftRank(strength.rank, s);
+            $rankDisplay.text(shifted);
+            $rankDisplay.css('color', s < 0 ? '#c62828' : s > 0 ? '#2e7d32' : '');
+            $csField.css('background', s < 0 ? '#ffebee' : s > 0 ? '#e8f5e9' : '');
+            $csField.css('border-color', s < 0 ? '#ef5350' : s > 0 ? '#66bb6a' : 'transparent');
+            $csReset.css('visibility', s !== 0 ? 'visible' : 'hidden');
+          };
+          $shift.on('input', updateCS);
+          $csReset.on('click', () => { $shift.val(0); updateCS(); });
+        }
       }).render(true);
     });
   }

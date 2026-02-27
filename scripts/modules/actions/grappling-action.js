@@ -24,7 +24,7 @@ import {
   applyCapabilitiesToDialog,
   showDiceAnimation
 } from "./action-utils.js";
-import { generateKarmaControlsHTML, setupKarmaControlHandlers, extractKarmaFromDialog } from "../dice/dice-roller.js";
+import { extractKarmaFromDialog, getAvailableKarma, getMinimumKarmaCommitment } from "../dice/dice-roller.js";
 import { applyGrappled, applyHeld } from "../effects/effect-engine.js";
 import { getAttackShiftBreakdown, getDefenseShiftBreakdown } from "../effects/effect-modifiers.js";
 
@@ -268,6 +268,11 @@ export class GrapplingAction extends AttackAction {
     const dialogTitle = isWeaponGrapple ? `Grappling with ${weaponName}: ${actor.name}` : `Grappling: ${actor.name}`;
     const abilityLabel = isWeaponGrapple ? `${weaponName} (Material)` : "Strength";
 
+    // Karma data for inline display
+    const availableKarma = getAvailableKarma(actor);
+    const minKarma = getMinimumKarmaCommitment(actor);
+    const hasKarma = availableKarma > 0;
+
     const dialogHtml = `
       <!-- Context: Target + Attack stats side by side -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
@@ -284,35 +289,50 @@ export class GrapplingAction extends AttackAction {
           <div style="font-weight:600;">${abilityLabel}: ${strength.rank}</div>
           <div style="color:#666;">Rank Value: ${strength.value}</div>
           ${isWeaponGrapple ? `<div style="color:#6a1b9a;font-size:.85em;">Using weapon material strength</div>` : ''}
-          ${hasWrestling ? `<div style="color:#2e7d32;font-size:.85em;">Wrestling Talent: +2 CS</div>` : ''}
+          ${hasWrestling ? `<div style="color:#2e7d32;font-size:.85em;">Wrestling: +2CS</div>` : ''}
         </div>
       </div>
 
-      <!-- Column Shift with Notes -->
-      <div style="display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:center;margin-bottom:8px;padding:8px;background:#fff8e1;border:1px solid #ffc107;border-radius:3px;">
-        <div>
-          <label style="font-weight:600;color:#666;font-size:.85em;">CS:</label>
-          <input type="number" name="shift" value="${Number(savedShift)}" style="width:50px;text-align:center;">
+      <!-- Modifiers Row -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;font-size:.9em;">
+        <div class="cs-field" style="display:flex;align-items:center;gap:4px;padding:4px 6px;border-radius:3px;${savedShift < 0 ? 'background:#ffebee;border:1px solid #ef5350;' : savedShift > 0 ? 'background:#e8f5e9;border:1px solid #66bb6a;' : 'border:1px solid transparent;'}">
+          <label style="font-weight:600;">CS:</label>
+          <input type="number" name="shift" value="${Number(savedShift)}" style="width:35px;padding:3px;text-align:center;box-sizing:border-box;">
+          <span style="color:#666;">→</span>
+          <strong id="shifted-rank-display" style="${savedShift < 0 ? 'color:#c62828;' : savedShift > 0 ? 'color:#2e7d32;' : ''}">${shiftRank(strength.rank, savedShift)}</strong>
+          <button type="button" class="cs-reset" style="visibility:${savedShift !== 0 ? 'visible' : 'hidden'};padding:1px 5px;font-size:.85em;cursor:pointer;border:1px solid #999;border-radius:2px;background:#eee;" title="Reset to 0">×</button>
         </div>
-        <div>
-          <input type="text" name="csNotes" value="${savedCsNotes}" placeholder="CS explanation (e.g., Wrestling +2, Stunned -2)" style="width:100%;font-size:.9em;">
+        <div class="karma-field" style="display:flex;align-items:center;gap:4px;padding:4px 6px;border-radius:3px;${hasKarma ? 'background:#e3f2fd;border:1px solid #90caf9;' : ''}">
+          ${hasKarma ? `
+            <label style="display:flex;align-items:center;gap:4px;cursor:pointer;">
+              <input type="checkbox" id="spend-karma" name="spendKarma" ${savedSpendKarma ? 'checked' : ''}>
+              <span style="font-weight:600;">Karma:</span>
+            </label>
+            <span title="Available: ${availableKarma} | Min commitment: ${minKarma} | Amount chosen after roll" style="padding:1px 4px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${availableKarma}</span>
+            <span style="color:#999;font-size:.8em;">(min ${minKarma})</span>
+          ` : `<span style="color:#999;">No karma</span>`}
         </div>
       </div>
 
-      ${generateKarmaControlsHTML(actor, savedSpendKarma)}
-      
-      <div style="display:flex;gap:16px;margin-top:8px;">
-        <label style="font-size:.9em;"><input type="checkbox" name="remember" ${savedRemember ? 'checked' : ''}> Remember settings</label>
-        <label style="font-size:.9em;"><input type="checkbox" name="skipDice" ${savedSkipDice ? 'checked' : ''}> Skip dice animation</label>
+      <!-- CS Notes Row -->
+      <div id="cs-notes-row" style="margin-bottom:6px;">
+        <input type="text" name="csNotes" id="cs-notes-input" placeholder="e.g., Wrestling +2CS, Stunned -2CS" value="${savedCsNotes}" style="width:100%;padding:4px 8px;border:1px solid #ccc;border-radius:3px;font-size:.9em;box-sizing:border-box;">
       </div>
 
-      <div style="margin-top:12px;padding:8px;background:#f5f5f5;border:1px solid #ddd;border-radius:3px;">
+      <!-- Results Reference -->
+      <div style="padding:8px;background:#f5f5f5;border:1px solid #ddd;border-radius:3px;margin-bottom:8px;">
         <div style="font-weight:bold;margin-bottom:4px;">Grappling Results</div>
         <div style="font-size:.85em;color:#555;">
-          <strong>Miss (White/Green):</strong> No hold; no other attacks this round.<br>
-          <strong>Partial Hold (Yellow):</strong> Target acts at -2 CS; no move if your STR ≥ target STR; no damage.<br>
-          <strong>Full Hold (Red):</strong> Target restrained; you may inflict up to STR damage and take one other action.
+          <strong>Miss (W/G):</strong> No hold; no other attacks this round.<br>
+          <strong>Partial (Ylw):</strong> -2CS; no move if STR≥.<br>
+          <strong>Full Hold (Red):</strong> Restrained; STR dmg + 1 other action.
         </div>
+      </div>
+
+      <!-- Footer -->
+      <div id="msh-bottom-controls" style="display:flex;justify-content:space-between;align-items:center;padding-top:8px;border-top:1px solid #ddd;">
+        <label><input type="checkbox" name="remember" ${savedRemember ? 'checked' : ''}> Remember</label>
+        <label><input type="checkbox" name="skipDice" ${savedSkipDice ? 'checked' : ''}> Skip dice</label>
       </div>
     `;
 
@@ -349,7 +369,22 @@ export class GrapplingAction extends AttackAction {
         },
         default: "roll",
         render: (html) => {
-          setupKarmaControlHandlers(html);
+          // CS field handlers
+          const $shift = html.find('[name="shift"]');
+          const $csField = html.find('.cs-field');
+          const $rankDisplay = html.find('#shifted-rank-display');
+          const $csReset = html.find('.cs-reset');
+          const updateCS = () => {
+            const s = Number($shift.val()) || 0;
+            const shifted = shiftRank(strength.rank, s);
+            $rankDisplay.text(shifted);
+            $rankDisplay.css('color', s < 0 ? '#c62828' : s > 0 ? '#2e7d32' : '');
+            $csField.css('background', s < 0 ? '#ffebee' : s > 0 ? '#e8f5e9' : '');
+            $csField.css('border-color', s < 0 ? '#ef5350' : s > 0 ? '#66bb6a' : 'transparent');
+            $csReset.css('visibility', s !== 0 ? 'visible' : 'hidden');
+          };
+          $shift.on('input', updateCS);
+          $csReset.on('click', () => { $shift.val(0); updateCS(); });
           applyCapabilitiesToDialog(html, "grappling", { actor });
         }
       }).render(true);
@@ -372,6 +407,7 @@ export class GrapplingAction extends AttackAction {
           parts.push(`${shiftBreakdown.manual > 0 ? '+' : ''}${shiftBreakdown.manual}`);
         }
       }
+
       
       // Attacker effects
       for (const eff of attackerEffects) {

@@ -1,11 +1,10 @@
-// scripts/modules/actions/throwing-blunt-action.js v1.2.0 - 2026-02-25
+// scripts/modules/actions/throwing-blunt-action.js v1.3.0 - 2026-02-27
+// v1.3.0: Redesign dialog to Style A (grid header, inline CS/karma, damage preview, standardized footer)
 // v1.2.0: Rebuild chat card using unified card builder utilities (inline badge, hover roll, standard layout)
 import { RangedAttackAction } from "./ranged-attack-action.js";
 import { attachAutoFillRange } from "./action-utils.js";
 // NOTE: resolveCombatMode imported dynamically if needed
 import { 
-  generateKarmaControlsHTML, 
-  setupKarmaControlHandlers, 
   extractKarmaFromDialog 
 } from "../dice/dice-roller.js";
 
@@ -24,11 +23,16 @@ import {
   buildActorTargetHtml,
   buildAbilitySection,
   getBodyArmorValues,
+  getTargetData,
   applyDamageToTargets,
   buildModeSelector,
   setupModeSelector,
   applyCapabilitiesToDialog
 } from "./action-utils.js";
+import {
+  getAvailableKarma,
+  getMinimumKarmaCommitment
+} from "../dice/dice-roller.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
 
 export class ThrowingBluntAction extends RangedAttackAction {
@@ -94,70 +98,137 @@ export class ThrowingBluntAction extends RangedAttackAction {
       .map(i => `<option value="${i.id}" ${i.id === savedItemId ? "selected" : ""}>${i.name}</option>`)
       .join("");
 
+    // Target data for header
+    const { targets, primaryTarget, primaryTargetActor, targetDisplay } = getTargetData();
+    let targetArmor = 0, targetArmorSource = "";
+    if (primaryTargetActor) {
+      const armorData = getBodyArmorValues(primaryTargetActor, "physical-blunt");
+      targetArmor = armorData?.applicable ?? 0;
+      targetArmorSource = armorData?.source ?? "";
+    }
+
+    // Karma data
+    const availableKarma = getAvailableKarma(actor);
+    const minKarma = getMinimumKarmaCommitment(actor);
+    const hasKarma = availableKarma > 0;
+
+    // Initial damage estimate
+    const initialWeapon = savedAdHoc ? null : thrownBlunt.find(i => i.id === savedItemId);
+    const initialDamage = savedAdHoc ? savedAdHocDmg : Number(initialWeapon?.system?.damage || 0);
+    const initialAfterArmor = Math.max(0, initialDamage - targetArmor);
+    const maxThrowRange = this._getThrowingRangeInAreas(strRank);
+
+    // Throwing talents
+    const combatTalents = (actor.items ?? []).filter(i => {
+      if (i.type !== "talent") return false;
+      const n = (i.name || "").toLowerCase();
+      return n.includes("thrown") || n.includes("throwing");
+    }).map(t => ({ name: t.name, bonus: "+1CS" }));
+
     // Dialog
     const dialogHtml = `
       ${buildModeSelector({ mode: "semi" })}
-      
-      <div style="margin-bottom:8px;"><strong>${actionName}</strong></div>
 
-      <div style="margin-bottom:8px;">
-        <span style="display:inline-block;width:110px;">Ability:</span>
-        <input type="text" value="${ability.name}" style="width:120px" readonly>
-        <span style="margin-left:6px;">${ability.rank} (${ability.value})</span>
+      <!-- Context: Target + Attack stats side by side -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+        <div style="background:#f5f5f5;padding:8px;border-radius:3px;">
+          <div style="font-weight:600;color:#666;font-size:.8em;text-transform:uppercase;">Target${targets.length > 1 ? 's' : ''}</div>
+          <div style="font-weight:600;color:#d32f2f;">${targetDisplay}</div>
+          <div style="color:#666;" id="target-armor-display">${primaryTargetActor ? `Armor: ${targetArmor}${targetArmorSource ? ` (${targetArmorSource})` : ''}` : ''}</div>
+        </div>
+        <div style="background:#f5f5f5;padding:8px;border-radius:3px;">
+          <div style="font-weight:600;color:#666;font-size:.8em;text-transform:uppercase;">Throw</div>
+          <div style="font-weight:600;">${ability.name}: ${ability.rank}</div>
+          <div style="color:#666;">Rank Value: ${ability.value}</div>
+          ${combatTalents.length > 0 ? combatTalents.map(t => 
+            `<div style="color:#2e7d32;font-size:.85em;">${t.name}: ${t.bonus}</div>`
+          ).join('') : ''}
+        </div>
       </div>
 
-      <div style="margin-bottom:8px;">
-        <span style="display:inline-block;width:110px;">Column Shift:</span>
-        <input type="number" name="shift" value="${Number(this.opts.shift ?? savedShift)}" style="width:60px;">
+      <!-- Weapon Source -->
+      <div class="source-section" style="padding:8px;background:${savedAdHoc ? '#fff8e1' : '#fff'};border:1px solid ${savedAdHoc ? '#ffc107' : '#ddd'};border-radius:3px;margin-bottom:8px;">
+        <div style="margin-bottom:4px;">
+          <label><input type="radio" name="src" value="carried" ${!savedAdHoc ? 'checked' : ''}> Carried</label>
+          <label style="margin-left:12px;"><input type="radio" name="src" value="adhoc" ${savedAdHoc ? 'checked' : ''}> Ad-hoc</label>
+        </div>
+        <div id="carried-row" style="display:${savedAdHoc ? 'none' : 'block'};margin-top:6px;">
+          <select name="weapon" style="width:100%;padding:4px;">${itemOptions || '<option value="">(none in inventory)</option>'}</select>
+        </div>
+        <div id="adhoc-row" style="display:${savedAdHoc ? 'block' : 'none'};margin-top:6px;">
+          <div style="display:grid;grid-template-columns:auto 1fr auto 60px;gap:4px 8px;align-items:center;">
+            <label>Name:</label>
+            <input type="text" name="adhocName" value="${savedAdHocName}" placeholder="Rock, Mug, Wrench" style="padding:4px;">
+            <label>Dmg:</label>
+            <input type="number" name="adhocDamage" value="${savedAdHocDmg}" min="0" style="padding:4px;width:100%;">
+          </div>
+        </div>
       </div>
 
-      ${generateKarmaControlsHTML(actor, 0)}
-
-      <fieldset style="margin:10px 0;padding:8px;border:1px solid #ddd;border-radius:4px;background:#fafafa;">
-        <legend style="padding:0 6px;font-weight:bold;">Weapon Source</legend>
-
-        <div style="margin:4px 0;">
-          <input type="checkbox" id="adhoc-toggle" name="adhoc" ${savedAdHoc ? "checked" : ""}>
-          <label for="adhoc-toggle">Use weapon of opportunity (ad-hoc)</label>
+      <!-- Damage Preview -->
+      <div id="preview" style="background:#ffebee;border:1px solid #ef9a9a;border-radius:3px;padding:10px;margin-bottom:8px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span><strong>Damage:</strong> <span id="dmg-val">${initialDamage}</span> <span id="dmg-note" style="color:#555;">(${savedAdHoc ? 'Ad-hoc' : (initialWeapon?.name || 'Weapon')})</span></span>
+          <span style="font-size:1.1em;" id="after-armor-display"><strong>→ ${initialAfterArmor} after armor</strong></span>
         </div>
+      </div>
 
-        <div class="adhoc-fields" style="margin-top:8px;${savedAdHoc ? "" : "display:none"}">
-          <div style="margin-bottom:6px;">
-            <span style="display:inline-block;width:110px;">Name:</span>
-            <input type="text" name="adhocName" value="${savedAdHocName}" style="width:220px;">
-            <span style="font-size:0.85em;color:#666;margin-left:6px;">e.g., “Rock”, “Mug”, “Wrench”</span>
-          </div>
-          <div>
-            <span style="display:inline-block;width:110px;">Damage:</span>
-            <input type="number" name="adhocDamage" value="${savedAdHocDmg}" min="0" style="width:80px;">
-            <span style="font-size:0.85em;color:#666;margin-left:6px;">numeric damage</span>
-          </div>
+      <!-- Modifiers Row -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;font-size:.9em;">
+        <div class="cs-field" style="display:flex;align-items:center;gap:4px;padding:4px 6px;border-radius:3px;${savedShift < 0 ? 'background:#ffebee;border:1px solid #ef5350;' : savedShift > 0 ? 'background:#e8f5e9;border:1px solid #66bb6a;' : 'border:1px solid transparent;'}">
+          <label style="font-weight:600;">CS:</label>
+          <input type="number" name="shift" value="${Number(this.opts.shift ?? savedShift)}" style="width:35px;padding:3px;text-align:center;box-sizing:border-box;">
+          <span style="color:#666;">→</span>
+          <strong id="shifted-rank-display" style="${savedShift < 0 ? 'color:#c62828;' : savedShift > 0 ? 'color:#2e7d32;' : ''}">${shiftRank(ability.rank, savedShift)}</strong>
+          <button type="button" class="cs-reset" style="visibility:${savedShift !== 0 ? 'visible' : 'hidden'};padding:1px 5px;font-size:.85em;cursor:pointer;border:1px solid #999;border-radius:2px;background:#eee;" title="Reset to 0">×</button>
         </div>
+        <div class="karma-field" style="display:flex;align-items:center;gap:4px;padding:4px 6px;border-radius:3px;${hasKarma ? 'background:#e3f2fd;border:1px solid #90caf9;' : ''}">
+          ${hasKarma ? `
+            <label style="display:flex;align-items:center;gap:4px;cursor:pointer;">
+              <input type="checkbox" id="spend-karma" name="spendKarma">
+              <span style="font-weight:600;">Karma:</span>
+            </label>
+            <span title="Available: ${availableKarma} | Min commitment: ${minKarma} | Amount chosen after roll" style="padding:1px 4px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${availableKarma}</span>
+            <span style="color:#999;font-size:.8em;">(min ${minKarma})</span>
+          ` : `<span style="color:#999;">No karma</span>`}
+        </div>
+      </div>
 
-        <div class="carried-fields" style="margin-top:8px;${savedAdHoc ? "display:none" : ""}">
-          <span style="display:inline-block;width:110px;">Weapon:</span>
-          <select name="weapon" style="min-width:220px">
-            ${itemOptions || '<option value="">(none in inventory)</option>'}
+      <!-- CS Notes Row -->
+      <div id="cs-notes-row" style="margin-bottom:6px;">
+        <input type="text" name="csNotes" id="cs-notes-input" placeholder="e.g., Thrown Objects +1CS, range -2CS" value="" style="width:100%;padding:4px 8px;border:1px solid #ccc;border-radius:3px;font-size:.9em;box-sizing:border-box;">
+      </div>
+
+      <!-- Range Row -->
+      <div class="range-section" style="padding:6px 8px;background:#f5f5f5;border:1px solid #ddd;border-radius:3px;margin-bottom:6px;">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <label style="font-weight:600;">Range:</label>
+          <input type="number" name="range" value="${savedRange}" min="0" style="width:40px;padding:3px;text-align:center;">
+          <span style="color:#666;">areas</span>
+          <span style="color:#666;font-size:.85em;">(Max: ${maxThrowRange})</span>
+          <label style="cursor:pointer;margin-left:8px;"><input type="checkbox" name="throughObstacle" ${savedObstacle ? 'checked' : ''}> Obstacle (-2CS)</label>
+        </div>
+        <div style="margin-top:4px;">
+          <label style="font-weight:600;margin-right:6px;">Target:</label>
+          <select name="targetMovement" style="padding:3px;">
+            <option value="0">Standing</option>
+            <option value="0-charging">Charging attacker</option>
+            <option value="-1">Moving (−1CS)</option>
+            <option value="-2">Fast (−2CS)</option>
+            <option value="-4">Very Fast (−4CS)</option>
           </select>
         </div>
-      </fieldset>
+        <div id="range-preview" style="margin-top:4px;padding:4px;background:#e3f2fd;border:1px solid #2196F3;border-radius:3px;font-size:.85em;">
+          <strong>Range Modifiers:</strong> <span id="range-mod-text">Calculating...</span>
+        </div>
+      </div>
 
-      ${this._buildRangeInputs({
-        defaultRange: savedRange,
-        showObstacle: true,
-        weaponMaxRange: null,
-        powerRank: null,
-        strengthRank: strRank
-      })}
-
-      <div style="margin-top:8px;">
-        <input type="checkbox" id="rememberSettings" name="rememberSettings" ${savedRemember ? 'checked' : ''}>
-        <label for="rememberSettings">Remember settings</label>
-        <input type="checkbox" id="skipDiceRoll" name="skipDiceRoll" ${savedSkipDice ? 'checked' : ''} style="margin-left:12px;">
-        <label for="skipDiceRoll">Skip dice animation</label>
+      <!-- Footer -->
+      <div id="msh-bottom-controls" style="display:flex;justify-content:space-between;align-items:center;padding-top:8px;border-top:1px solid #ddd;">
+        <label><input type="checkbox" id="msh-remember-settings" name="remember" ${savedRemember ? 'checked' : ''}> Remember</label>
+        <label><input type="checkbox" id="msh-skip-dice" name="skipDice" ${savedSkipDice ? 'checked' : ''}> Skip dice</label>
       </div>
     `;
-
     const choice = await new Promise(resolve => {
       new Dialog({
         title: `${actionName}: ${actor.name}`,
@@ -167,7 +238,7 @@ export class ThrowingBluntAction extends RangedAttackAction {
             label: "Roll",
             callback: async (html) => {
               const $ = (sel) => html.find(sel);
-              const useAdHoc = !!$('#adhoc-toggle').is(':checked');
+              const useAdHoc = html.find('[name="src"]:checked').val() === 'adhoc';
 
               let weaponName, weaponDamage, weaponId = null;
               if (useAdHoc) {
@@ -198,8 +269,8 @@ export class ThrowingBluntAction extends RangedAttackAction {
               const targetMovement = String($('[name="targetMovement"]').val() || "0");
               const movementModifier = targetMovement === "0-charging" ? 0 : Number(targetMovement);
 
-              const remember = $(`[name="rememberSettings"]`).length ? !!$(`[name="rememberSettings"]`).is(':checked') : !!$(`[name="remember"]`).is(':checked');
-              const skipDice = $(`[name="skipDiceRoll"]`).length ? !!$(`[name="skipDiceRoll"]`).is(':checked') : !!$(`[name="skipDice"]`).is(':checked');
+              const remember = !!$(`[name="remember"]`).is(':checked');
+              const skipDice = !!$(`[name="skipDice"]`).is(':checked');
 
               // Always save remember/skipDice preferences
               await actor.setFlag("msh-faserip", "rememberSettings", remember);
@@ -250,23 +321,66 @@ export class ThrowingBluntAction extends RangedAttackAction {
         },
         default: "roll",
         render: (html) => {
-          setupKarmaControlHandlers(html);
-          const $adhoc = html.find('#adhoc-toggle');
-            const updatePreviewFromSelection = () => {
+          // Source radio toggle
+          const $srcRadios = html.find('[name="src"]');
+          const updateSourceDisplay = () => {
+            const src = html.find('[name="src"]:checked').val();
+            const isAdHoc = src === 'adhoc';
+            html.find('#carried-row').css('display', isAdHoc ? 'none' : 'block');
+            html.find('#adhoc-row').css('display', isAdHoc ? 'block' : 'none');
+            const $section = html.find('.source-section');
+            $section.css('background', isAdHoc ? '#fff8e1' : '#fff');
+            $section.css('border-color', isAdHoc ? '#ffc107' : '#ddd');
+            updateDamagePreview();
+          };
+          $srcRadios.on('change', updateSourceDisplay);
+
+          // Damage preview updater
+          const updateDamagePreview = () => {
+            const isAdHoc = html.find('[name="src"]:checked').val() === 'adhoc';
+            let dmg, note;
+            if (isAdHoc) {
+              dmg = Number(html.find('[name="adhocDamage"]').val()) || 0;
+              note = 'Ad-hoc';
+            } else {
+              const wid = html.find('[name="weapon"]').val();
+              const weapon = thrownBlunt.find(i => i.id === wid);
+              dmg = Number(weapon?.system?.damage || 0);
+              note = weapon?.name || 'Weapon';
+            }
+            html.find('#dmg-val').text(dmg);
+            html.find('#dmg-note').text(`(${note})`);
+            const after = Math.max(0, dmg - targetArmor);
+            html.find('#after-armor-display').html(`<strong>→ ${after} after armor</strong>`);
+          };
+          html.find('[name="weapon"]').on('change', updateDamagePreview);
+          html.find('[name="adhocDamage"]').on('input', updateDamagePreview);
+
+          // CS field handlers
+          const $shift = html.find('[name="shift"]');
+          const $csField = html.find('.cs-field');
+          const $rankDisplay = html.find('#shifted-rank-display');
+          const $csReset = html.find('.cs-reset');
+          const updateCS = () => {
+            const s = Number($shift.val()) || 0;
+            const shifted = shiftRank(ability.rank, s);
+            $rankDisplay.text(shifted);
+            $rankDisplay.css('color', s < 0 ? '#c62828' : s > 0 ? '#2e7d32' : '');
+            $csField.css('background', s < 0 ? '#ffebee' : s > 0 ? '#e8f5e9' : '');
+            $csField.css('border-color', s < 0 ? '#ef5350' : s > 0 ? '#66bb6a' : 'transparent');
+            $csReset.css('visibility', s !== 0 ? 'visible' : 'hidden');
+          };
+          $shift.on('input', updateCS);
+          $csReset.on('click', () => { $shift.val(0); updateCS(); });
+
+          // Range preview
+          const updatePreviewFromSelection = () => {
             this._setupRangePreview(html, { strengthRank: strRank });
           };
+          updatePreviewFromSelection();
 
-          const applyToggle = () => {
-            const on = $adhoc.is(':checked');
-            html.find('.adhoc-fields').css('display', on ? '' : 'none');
-            html.find('.carried-fields').css('display', on ? 'none' : '');
-            updatePreviewFromSelection();
-          };
-
-         $adhoc.on('change', applyToggle);
-          applyToggle();
           setupModeSelector(actor, html, this.opts || {}, "lastThrowBluntMode");
-          applyCapabilitiesToDialog(html, "throwing-blunt", { actor });  // new
+          applyCapabilitiesToDialog(html, "throwing-blunt", { actor });
           this._disposeAutoFill = attachAutoFillRange(html, actor, updatePreviewFromSelection);
         },
         close: () => {
@@ -297,9 +411,7 @@ export class ThrowingBluntAction extends RangedAttackAction {
 
     // Calculate penetrating damage by checking targeted token's Body Armor
     const isHit = colorLower !== 'white';
-    const targets = Array.from(game.user?.targets ?? []);
-    const primaryTarget = targets[0] ?? null;
-    const targetActor = primaryTarget?.actor ?? null;
+    const targetActor = primaryTargetActor;
     const targetName = primaryTarget?.name || "";
     const rawDamage = choice.weaponDamage;
 

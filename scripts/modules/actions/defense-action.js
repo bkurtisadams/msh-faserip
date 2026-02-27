@@ -1,4 +1,5 @@
-// scripts/modules/actions/defense-action.js v1.4.1 - 2026-02-20
+// scripts/modules/actions/defense-action.js v1.5.0 - 2026-02-27
+// v1.5.0: Redesign dialog to Style A (grid header, inline CS/karma, standardized footer)
 // v1.4.1: Always use compact badge layout — drop buildInlineRollDisplay widget from defense cards
 // v1.3.8: Fix dodge movementMult and selfPenaltyCS not wired as AE changes (only in flags); ruler now enforces half speed
 // v1.3.7: Add canAttack:false to blocking effect; blocking now prevents attacks per rules
@@ -12,9 +13,9 @@
 // v1.1.0: Add inline rolls for consolidated chat cards
 import { BaseAction } from "./base-action.js";
 import { 
-  generateKarmaControlsHTML, 
-  setupKarmaControlHandlers, 
-  extractKarmaFromDialog 
+  extractKarmaFromDialog, 
+  getAvailableKarma, 
+  getMinimumKarmaCommitment 
 } from "../dice/dice-roller.js";
 import {
   RANKS,
@@ -91,28 +92,56 @@ export class DefenseAction extends BaseAction {
     // Per-action extra inputs
     const extra = this._buildExtraInputs(actionType);
 
+    // Karma data
+    const availableKarma = getAvailableKarma(actor);
+    const minKarma = getMinimumKarmaCommitment(actor);
+    const hasKarma = availableKarma > 0;
+    const savedShift = Number(this.opts.shift ?? 0);
+
     // ------- Dialog -------
     const dialogHtml = `
-      <div style="margin-bottom:8px;"><label style="display:inline-block;width:120px;">Action:</label><strong>${actionName}</strong></div>
-      <div style="margin-bottom:8px;"><label style="display:inline-block;width:120px;">Ability:</label>
-        <input type="text" value="${ability.name}" style="width:160px;" readonly></div>
-      <div style="margin-bottom:8px;"><label style="display:inline-block;width:120px;">Rank:</label>
-        <input type="text" value="${ability.rank}" style="width:120px;" readonly>
-        <span style="margin-left:6px;">(${ability.value})</span></div>
+      <!-- Context: Defender + Action stats side by side -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+        <div style="background:#f5f5f5;padding:8px;border-radius:3px;">
+          <div style="font-weight:600;color:#666;font-size:.8em;text-transform:uppercase;">Defender</div>
+          <div style="font-weight:600;">${actor.name}</div>
+        </div>
+        <div style="background:#f5f5f5;padding:8px;border-radius:3px;">
+          <div style="font-weight:600;color:#666;font-size:.8em;text-transform:uppercase;">${actionName}</div>
+          <div style="font-weight:600;">${ability.name}: ${ability.rank}</div>
+          <div style="color:#666;">Rank Value: ${ability.value}</div>
+        </div>
+      </div>
 
-      <div style="margin-bottom:8px;"><label style="display:inline-block;width:120px;">Column Shift:</label>
-        <input type="number" name="shift" value="${Number(this.opts.shift ?? 0)}" style="width:60px;">
-        <span style="color:#666;font-size:.9em;">(+ right, - left)</span></div>
-
-      ${generateKarmaControlsHTML(actor, 0)}
+      <!-- Modifiers Row -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;font-size:.9em;">
+        <div class="cs-field" style="display:flex;align-items:center;gap:4px;padding:4px 6px;border-radius:3px;${savedShift < 0 ? 'background:#ffebee;border:1px solid #ef5350;' : savedShift > 0 ? 'background:#e8f5e9;border:1px solid #66bb6a;' : 'border:1px solid transparent;'}">
+          <label style="font-weight:600;">CS:</label>
+          <input type="number" name="shift" value="${savedShift}" style="width:35px;padding:3px;text-align:center;box-sizing:border-box;">
+          <span style="color:#666;">→</span>
+          <strong id="shifted-rank-display" style="${savedShift < 0 ? 'color:#c62828;' : savedShift > 0 ? 'color:#2e7d32;' : ''}">${shiftRank(ability.rank, savedShift)}</strong>
+          <button type="button" class="cs-reset" style="visibility:${savedShift !== 0 ? 'visible' : 'hidden'};padding:1px 5px;font-size:.85em;cursor:pointer;border:1px solid #999;border-radius:2px;background:#eee;" title="Reset to 0">×</button>
+        </div>
+        <div class="karma-field" style="display:flex;align-items:center;gap:4px;padding:4px 6px;border-radius:3px;${hasKarma ? 'background:#e3f2fd;border:1px solid #90caf9;' : ''}">
+          ${hasKarma ? `
+            <label style="display:flex;align-items:center;gap:4px;cursor:pointer;">
+              <input type="checkbox" id="spend-karma" name="spendKarma">
+              <span style="font-weight:600;">Karma:</span>
+            </label>
+            <span title="Available: ${availableKarma} | Min commitment: ${minKarma} | Amount chosen after roll" style="padding:1px 4px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${availableKarma}</span>
+            <span style="color:#999;font-size:.8em;">(min ${minKarma})</span>
+          ` : `<span style="color:#999;">No karma</span>`}
+        </div>
+      </div>
 
       ${extra.html}
 
-      <div style="margin-top:8px;">
-        <label><input type="checkbox" name="skipDice" ${this.opts.skipDice ? "checked" : ""}> Skip dice animation</label>
-      </div>
-
       ${this._actionNotes(actionType)}
+
+      <!-- Footer -->
+      <div id="msh-bottom-controls" style="display:flex;justify-content:space-between;align-items:center;padding-top:8px;border-top:1px solid #ddd;">
+        <label><input type="checkbox" name="skipDice" ${this.opts.skipDice ? "checked" : ""}> Skip dice</label>
+      </div>
     `;
 
     const choice = await new Promise((resolve) => {
@@ -128,7 +157,22 @@ export class DefenseAction extends BaseAction {
         },
         default: "roll",
         render: (html) => {
-          setupKarmaControlHandlers(html);
+          // CS field handlers
+          const $shift = html.find('[name="shift"]');
+          const $csField = html.find('.cs-field');
+          const $rankDisplay = html.find('#shifted-rank-display');
+          const $csReset = html.find('.cs-reset');
+          const updateCS = () => {
+            const s = Number($shift.val()) || 0;
+            const shifted = shiftRank(ability.rank, s);
+            $rankDisplay.text(shifted);
+            $rankDisplay.css('color', s < 0 ? '#c62828' : s > 0 ? '#2e7d32' : '');
+            $csField.css('background', s < 0 ? '#ffebee' : s > 0 ? '#e8f5e9' : '');
+            $csField.css('border-color', s < 0 ? '#ef5350' : s > 0 ? '#66bb6a' : 'transparent');
+            $csReset.css('visibility', s !== 0 ? 'visible' : 'hidden');
+          };
+          $shift.on('input', updateCS);
+          $csReset.on('click', () => { $shift.val(0); updateCS(); });
           extra.onRender?.(html);
         }
       }).render(true);

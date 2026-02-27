@@ -20,7 +20,7 @@ import {
   applyCapabilitiesToDialog,
   showDiceAnimation
 } from "./action-utils.js";
-import { generateKarmaControlsHTML, setupKarmaControlHandlers, extractKarmaFromDialog } from "../dice/dice-roller.js";
+import { extractKarmaFromDialog, getAvailableKarma, getMinimumKarmaCommitment } from "../dice/dice-roller.js";
 import { getAttackShiftBreakdown, getDefenseShiftBreakdown } from "../effects/effect-modifiers.js";
 
 /**
@@ -191,6 +191,12 @@ export class EscapingAction extends AttackAction {
     const savedSpendKarma = false; // Always default to unchecked
     const savedCsNotes = (await actor.getFlag("msh-faserip", "lastEscapeCsNotes")) || "";
 
+    // Karma data for inline display
+    const availableKarma = getAvailableKarma(actor);
+    const minKarma = getMinimumKarmaCommitment(actor);
+    const hasKarma = availableKarma > 0;
+    const savedShiftVal = Number(this.opts?.shift ?? savedShift);
+
     const dialogHtml = `
       <!-- Context: Opponent + Your stats side by side -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
@@ -209,31 +215,46 @@ export class EscapingAction extends AttackAction {
         </div>
       </div>
 
-      <!-- Column Shift with Notes -->
-      <div style="display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:center;margin-bottom:8px;padding:8px;background:#fff8e1;border:1px solid #ffc107;border-radius:3px;">
-        <div>
-          <label style="font-weight:600;color:#666;font-size:.85em;">CS:</label>
-          <input type="number" name="shift" value="${Number(this.opts?.shift ?? savedShift)}" style="width:50px;text-align:center;">
+      <!-- Modifiers Row -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;font-size:.9em;">
+        <div class="cs-field" style="display:flex;align-items:center;gap:4px;padding:4px 6px;border-radius:3px;${savedShiftVal < 0 ? 'background:#ffebee;border:1px solid #ef5350;' : savedShiftVal > 0 ? 'background:#e8f5e9;border:1px solid #66bb6a;' : 'border:1px solid transparent;'}">
+          <label style="font-weight:600;">CS:</label>
+          <input type="number" name="shift" value="${savedShiftVal}" style="width:35px;padding:3px;text-align:center;box-sizing:border-box;">
+          <span style="color:#666;">→</span>
+          <strong id="shifted-rank-display" style="${savedShiftVal < 0 ? 'color:#c62828;' : savedShiftVal > 0 ? 'color:#2e7d32;' : ''}">${shiftRank(strength.rank, savedShiftVal)}</strong>
+          <button type="button" class="cs-reset" style="visibility:${savedShiftVal !== 0 ? 'visible' : 'hidden'};padding:1px 5px;font-size:.85em;cursor:pointer;border:1px solid #999;border-radius:2px;background:#eee;" title="Reset to 0">×</button>
         </div>
-        <div>
-          <input type="text" name="csNotes" value="${savedCsNotes}" placeholder="CS explanation (e.g., Acrobatics +1, Slippery -2)" style="width:100%;font-size:.9em;">
+        <div class="karma-field" style="display:flex;align-items:center;gap:4px;padding:4px 6px;border-radius:3px;${hasKarma ? 'background:#e3f2fd;border:1px solid #90caf9;' : ''}">
+          ${hasKarma ? `
+            <label style="display:flex;align-items:center;gap:4px;cursor:pointer;">
+              <input type="checkbox" id="spend-karma" name="spendKarma">
+              <span style="font-weight:600;">Karma:</span>
+            </label>
+            <span title="Available: ${availableKarma} | Min commitment: ${minKarma} | Amount chosen after roll" style="padding:1px 4px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${availableKarma}</span>
+            <span style="color:#999;font-size:.8em;">(min ${minKarma})</span>
+          ` : `<span style="color:#999;">No karma</span>`}
         </div>
       </div>
 
-      ${generateKarmaControlsHTML(actor, savedSpendKarma)}
-      
-      <div style="display:flex;gap:16px;margin-top:8px;">
-        <label style="font-size:.9em;"><input type="checkbox" name="remember" ${savedRemember ? 'checked' : ''}> Remember settings</label>
-        <label style="font-size:.9em;"><input type="checkbox" name="skipDice" ${savedSkipDice ? 'checked' : ''}> Skip dice animation</label>
+      <!-- CS Notes Row -->
+      <div id="cs-notes-row" style="margin-bottom:6px;">
+        <input type="text" name="csNotes" id="cs-notes-input" placeholder="e.g., Acrobatics +1CS, Slippery -2CS" value="${savedCsNotes}" style="width:100%;padding:4px 8px;border:1px solid #ccc;border-radius:3px;font-size:.9em;box-sizing:border-box;">
       </div>
 
-      <div style="margin-top:12px;padding:8px;background:#f5f5f5;border:1px solid #ddd;border-radius:3px;">
+      <!-- Results Reference -->
+      <div style="padding:8px;background:#f5f5f5;border:1px solid #ddd;border-radius:3px;margin-bottom:8px;">
         <div style="font-weight:bold;margin-bottom:4px;">Escaping Results</div>
         <div style="font-size:.85em;color:#555;">
-          <strong>Miss (White/Green):</strong> Still held; no other actions this turn.<br>
-          <strong>Escape (Yellow):</strong> Free; move up to half speed; no other actions.<br>
-          <strong>Reverse (Red):</strong> Free + choose: move ½, Grapple attacker, or other action at -2 CS.
+          <strong>Miss (W):</strong> Still held; no actions this turn.<br>
+          <strong>Escape (G/Y):</strong> Free; half move; no other actions.<br>
+          <strong>Reverse (Red):</strong> Free + grapple back or act at -2CS.
         </div>
+      </div>
+
+      <!-- Footer -->
+      <div id="msh-bottom-controls" style="display:flex;justify-content:space-between;align-items:center;padding-top:8px;border-top:1px solid #ddd;">
+        <label><input type="checkbox" name="remember" ${savedRemember ? 'checked' : ''}> Remember</label>
+        <label><input type="checkbox" name="skipDice" ${savedSkipDice ? 'checked' : ''}> Skip dice</label>
       </div>
     `;
 
@@ -275,7 +296,22 @@ export class EscapingAction extends AttackAction {
         },
         default: "roll",
         render: (html) => {
-          setupKarmaControlHandlers(html);
+          // CS field handlers
+          const $shift = html.find('[name="shift"]');
+          const $csField = html.find('.cs-field');
+          const $rankDisplay = html.find('#shifted-rank-display');
+          const $csReset = html.find('.cs-reset');
+          const updateCS = () => {
+            const s = Number($shift.val()) || 0;
+            const shifted = shiftRank(strength.rank, s);
+            $rankDisplay.text(shifted);
+            $rankDisplay.css('color', s < 0 ? '#c62828' : s > 0 ? '#2e7d32' : '');
+            $csField.css('background', s < 0 ? '#ffebee' : s > 0 ? '#e8f5e9' : '');
+            $csField.css('border-color', s < 0 ? '#ef5350' : s > 0 ? '#66bb6a' : 'transparent');
+            $csReset.css('visibility', s !== 0 ? 'visible' : 'hidden');
+          };
+          $shift.on('input', updateCS);
+          $csReset.on('click', () => { $shift.val(0); updateCS(); });
           applyCapabilitiesToDialog(html, "escaping", { actor });
         }
       }).render(true);
