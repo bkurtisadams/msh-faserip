@@ -178,8 +178,7 @@ export class FaseripActor extends Actor {
   get availableKarma() {
     const lifetimeSpent = this._calculateTotalSpentLifetime(this.system.karma?.history || []);
     const advancementFund = this.system.karma?.advancement || 0;
-    const karmaPool = this.system.karma?.pool || 0;
-    return Math.max(0, (this.system.karma?.lifetime || 0) - lifetimeSpent - advancementFund - karmaPool);
+    return Math.max(0, (this.system.karma?.lifetime || 0) - lifetimeSpent - advancementFund);
   }
 
   get currentKarma() {

@@ -40,9 +40,8 @@ export class KarmaAdvancementSheet extends DocumentSheet {
     }
     
     const advancementFund = this.object.system.karma.advancement || 0;
-    const karmaPool = this.object.system.karma.pool || 0;
     
-    return Math.max(0, totalEarned - totalSpent - advancementFund - karmaPool);
+    return Math.max(0, totalEarned - totalSpent - advancementFund);
   }
 
   activateListeners(html) {

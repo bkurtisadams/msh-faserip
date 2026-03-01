@@ -1,110 +1,108 @@
 <form class="karma-pool-sheet" autocomplete="off">
-  <!-- Pool Summary Header -->
+  <!-- Pool Summary -->
   <div class="pool-summary">
     <div class="pool-header">
       <h2>Team Karma Pool</h2>
       <div class="pool-total">
-        <label>Total Pool</label>
+        <label>Pool Total</label>
         <div class="value">{{teamKarmaPool}}</div>
       </div>
     </div>
-    
-    <div class="current-actor-info">
-      <div class="info-item">
-        <label>{{actorName}}</label>
+
+    <div class="pool-stats">
+      <div class="pool-stat">
+        <label>Members</label>
+        <span class="value">{{memberCount}}</span>
       </div>
-      <div class="info-item">
-        <label>Available Karma:</label>
+      <div class="pool-stat">
+        <label>Equal Share</label>
+        <span class="value">{{equalShare}}</span>
+      </div>
+      <div class="pool-stat">
+        <label>{{actorName}}'s Karma</label>
         <span class="value">{{currentKarma}}</span>
       </div>
-      <div class="info-item">
-        <label>Pool Contribution:</label>
-        <span class="value">{{system.karma.poolContribution}}</span>
-      </div>
     </div>
-  </div>
-
-  <!-- Action Buttons -->
-  <div class="pool-actions">
-    <button type="button" class="contribute-to-pool">
-      <i class="fas fa-hand-holding-heart"></i> Contribute
-    </button>
-    <button type="button" class="withdraw-from-pool">
-      <i class="fas fa-hand-holding-usd"></i> Withdraw My Share
-    </button>
-    <button type="button" class="use-from-pool">
-      <i class="fas fa-dice-d20"></i> Use for Roll
-    </button>
-    {{#if isGM}}
-    <button type="button" class="gm-adjust-pool">
-      <i class="fas fa-edit"></i> GM: Adjust Pool
-    </button>
-    {{/if}}
   </div>
 
   <!-- Team Members Table -->
   <section class="team-members-section">
     <div class="section-header">
-      <h3>Team Members ({{poolMembers.length}})</h3>
+      <h3>Team Members</h3>
       {{#if isGM}}
-      <button type="button" class="add-to-pool">
-        <i class="fas fa-user-plus"></i> Add Member
-      </button>
+      <button type="button" class="add-to-pool"><i class="fas fa-user-plus"></i> Add Member</button>
       {{/if}}
     </div>
 
     <table class="team-members-table">
       <thead>
         <tr>
-          <th>Hero Name</th>
+          <th>Hero</th>
           <th>Personal Karma</th>
-          <th>Pool Contribution</th>
-          <th>Actions</th>
+          <th>Contributed</th>
+          {{#if isGM}}<th>Actions</th>{{/if}}
         </tr>
       </thead>
       <tbody>
         {{#if poolMembers.length}}
           {{#each poolMembers as |member|}}
-          <tr class="member-row {{#if (eq member.id ../system._id)}}current-actor{{/if}}">
+          <tr class="member-row {{#if member.isCurrent}}current-actor{{/if}}">
             <td class="member-name">
               {{member.name}}
-              {{#if (eq member.id ../system._id)}}
-                <span class="current-badge">(You)</span>
-              {{/if}}
+              {{#if member.isCurrent}}<span class="current-badge">(You)</span>{{/if}}
             </td>
             <td class="member-karma">{{member.karma}}</td>
             <td class="member-contribution">{{member.poolContribution}}</td>
+            {{#if ../isGM}}
             <td class="member-actions">
-              {{#if ../isGM}}
               <a class="gm-edit-contribution" data-id="{{member.id}}" data-name="{{member.name}}" title="Edit Contribution">
                 <i class="fas fa-edit"></i>
               </a>
               <a class="remove-from-pool danger" data-id="{{member.id}}" title="Remove from Team">
                 <i class="fas fa-user-minus"></i>
               </a>
-              {{/if}}
             </td>
+            {{/if}}
           </tr>
           {{/each}}
         {{else}}
           <tr>
-            <td colspan="4" class="empty-message">No team members yet. Add heroes to start a karma pool.</td>
+            <td colspan="{{#if isGM}}4{{else}}3{{/if}}" class="empty-message">No team members yet. Add heroes to start a karma pool.</td>
           </tr>
         {{/if}}
       </tbody>
     </table>
   </section>
 
-  <!-- Pool Management (GM Only) -->
+  <!-- Player Actions -->
+  <section class="pool-player-actions">
+    <button type="button" class="contribute-to-pool">
+      <i class="fas fa-hand-holding-heart"></i> Contribute to Pool
+    </button>
+    <button type="button" class="use-from-pool">
+      <i class="fas fa-dice-d20"></i> Use Pool Karma
+    </button>
+    <button type="button" class="withdraw-from-pool">
+      <i class="fas fa-hand-holding-usd"></i> Withdraw My Share
+    </button>
+  </section>
+
+  <!-- GM Controls -->
   {{#if isGM}}
-  <section class="pool-management">
-    <h3>GM Pool Management</h3>
+  <section class="pool-gm-section">
+    <h3>GM Controls</h3>
     <div class="gm-controls">
+      <button type="button" class="gm-award-pool">
+        <i class="fas fa-plus-circle"></i> Award to Pool
+      </button>
+      <button type="button" class="gm-adjust-pool">
+        <i class="fas fa-edit"></i> Adjust Pool
+      </button>
       <button type="button" class="reset-all-contributions">
-        <i class="fas fa-eraser"></i> Reset All Contributions
+        <i class="fas fa-eraser"></i> Reset Tracking
       </button>
       <button type="button" class="delete-pool danger-button">
-        <i class="fas fa-trash-alt"></i> Dissolve Pool (Refund All)
+        <i class="fas fa-trash-alt"></i> Dissolve Pool
       </button>
     </div>
   </section>

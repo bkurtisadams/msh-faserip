@@ -2049,6 +2049,23 @@
   color: #8b0000;
 }
 
+/* Pool event rows */
+.karma-sheet .karma-entry.karma-pool-event {
+  background: #e3f2fd;
+}
+
+/* Multiplier display in summary bar */
+.karma-sheet .karma-multiplier-item .value {
+  color: #ff8f00;
+}
+.karma-sheet .karma-multiplier-display.gm-clickable {
+  cursor: pointer;
+  border-bottom: 1px dashed #ff8f00;
+}
+.karma-sheet .karma-multiplier-display.gm-clickable:hover {
+  color: #e65100;
+}
+
 /* Karma Advancement Sheet Styles */
 .karma-advancement-sheet {
   font-family: Arial, sans-serif;
@@ -2162,13 +2179,15 @@
 /* Karma Pool Sheet Improvements */
 .karma-pool-sheet {
   padding: 10px;
+  font-family: Arial, sans-serif;
+  overflow-y: auto;
 }
 
 .pool-summary {
   background: #f5f5f5;
-  padding: 15px;
+  padding: 12px 15px;
   border-radius: 5px;
-  margin-bottom: 15px;
+  margin-bottom: 12px;
   border: 1px solid #ccc;
 }
 
@@ -2176,14 +2195,15 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 15px;
-  padding-bottom: 10px;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
   border-bottom: 2px solid #8b0000;
 }
 
 .pool-header h2 {
   margin: 0;
   color: #8b0000;
+  font-size: 1.2em;
 }
 
 .pool-total {
@@ -2192,60 +2212,60 @@
 
 .pool-total label {
   display: block;
-  font-size: 0.9em;
+  font-size: 0.8em;
   color: #666;
-  margin-bottom: 5px;
+  margin-bottom: 2px;
 }
 
 .pool-total .value {
-  font-size: 2em;
+  font-size: 1.8em;
   font-weight: bold;
   color: #2196F3;
 }
 
-.current-actor-info {
+.pool-stats {
   display: flex;
   gap: 20px;
   flex-wrap: wrap;
 }
 
-.current-actor-info .info-item {
+.pool-stat {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
-.current-actor-info .value {
+.pool-stat label {
+  font-size: 0.85em;
+  color: #666;
+}
+
+.pool-stat .value {
   font-weight: bold;
-  color: #2196F3;
+  color: #333;
 }
 
-.pool-actions {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 15px;
-  flex-wrap: wrap;
-}
-
-.pool-actions button {
-  flex: 1;
-  min-width: 140px;
-}
-
+/* Team Members Table */
 .team-members-section {
-  margin-bottom: 15px;
+  margin-bottom: 12px;
 }
 
 .section-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
 .section-header h3 {
   margin: 0;
   color: #8b0000;
+  font-size: 1em;
+}
+
+.section-header button {
+  font-size: 0.85em;
+  padding: 3px 8px;
 }
 
 .team-members-table {
@@ -2256,13 +2276,15 @@
 .team-members-table th {
   background: #8b0000;
   color: white;
-  padding: 8px;
+  padding: 6px 8px;
   text-align: left;
+  font-size: 0.85em;
 }
 
 .team-members-table td {
-  padding: 8px;
+  padding: 6px 8px;
   border-bottom: 1px solid #ddd;
+  font-size: 0.9em;
 }
 
 .member-row.current-actor {
@@ -2277,10 +2299,11 @@
 
 .member-actions {
   text-align: center;
+  white-space: nowrap;
 }
 
 .member-actions a {
-  margin: 0 5px;
+  margin: 0 4px;
   cursor: pointer;
 }
 
@@ -2288,20 +2311,45 @@
   color: #f44336;
 }
 
-.pool-management {
-  margin-top: 20px;
-  padding-top: 15px;
+/* Player Actions */
+.pool-player-actions {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.pool-player-actions button {
+  flex: 1;
+  min-width: 130px;
+  font-size: 0.85em;
+  padding: 5px 8px;
+}
+
+/* GM Controls */
+.pool-gm-section {
+  margin-top: 10px;
+  padding-top: 10px;
   border-top: 2px solid #ccc;
 }
 
-.pool-management h3 {
+.pool-gm-section h3 {
   color: #8b0000;
-  margin-bottom: 10px;
+  margin: 0 0 8px 0;
+  font-size: 1em;
 }
 
-.gm-controls {
+.pool-gm-section .gm-controls {
   display: flex;
-  gap: 10px;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.pool-gm-section .gm-controls button {
+  flex: 1;
+  min-width: 120px;
+  font-size: 0.85em;
+  padding: 4px 6px;
 }
 
 .danger-button {

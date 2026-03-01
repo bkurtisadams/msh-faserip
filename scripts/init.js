@@ -756,6 +756,23 @@ Hooks.once("init", async () => {
       default: []
     });
 
+    game.settings.register("msh-faserip", "useKarmaPool", {
+      name: "Enable Team Karma Pool",
+      hint: "Enable the shared team karma pool (RAW rules). When off, all group awards split directly to individual heroes.",
+      scope: "world",
+      config: true,
+      type: Boolean,
+      default: false
+    });
+
+    game.settings.register("msh-faserip", "pendingKarmaAwards", {
+      name: "Pending Karma Awards",
+      scope: "world",
+      config: false,
+      type: Array,
+      default: []
+    });
+
     game.settings.register("msh-faserip", "turnSeconds", {
       name: "Turn Length (seconds)",
       hint: "Used when Calendar Time Tracker is not present.",

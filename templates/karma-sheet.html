@@ -17,6 +17,12 @@
       <label>Team<br>Pool</label>
       <div class="value">{{teamKarmaPool}}</div>
     </div>
+    <div class="summary-item karma-multiplier-item">
+      <label>Karma<br>Mult</label>
+      <div class="value karma-multiplier-display {{#if isGM}}gm-clickable{{/if}}" title="{{#if isGM}}Click to change multiplier{{/if}}">
+        x{{karmaMultiplier}}
+      </div>
+    </div>
   </div>
 
   <!-- Control Buttons -->
