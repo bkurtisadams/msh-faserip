@@ -331,10 +331,18 @@
     },
     "headquarters": {
       "templates": ["base"],
+      "buildingType": "",
       "location": "",
       "size": "",
       "materialStrength": "Typical",
-      "features": []
+      "ownership": "owned",
+      "purchaseCost": "",
+      "rentalCost": "",
+      "isRichArea": false,
+      "packages": [],
+      "staff": [],
+      "features": "",
+      "notes": ""
     }
   }
 }

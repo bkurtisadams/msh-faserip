@@ -36,6 +36,7 @@ import { FaseripActor } from './actor.js';
 import { FaseripItem } from './item.js';
 import { FaseripActorSheet } from './actorSheet.js';
 import { FaseripItemSheet, FaseripTalentSheet, FaseripContactSheet } from './itemSheet.js';
+import { FaseripHeadquartersSheet } from './headquartersSheet.js';
 import { FaseripEquipmentSheet } from './equipment.js';
 import { FaseripRolls } from './rolls.js';
 //import { rollUniversalTable } from './universalTable.js';  // deprecated
@@ -1493,8 +1494,14 @@ Hooks.once("init", async () => {
   
   // Make sure to register vehicle items with FaseripItemSheet
   Items.registerSheet("msh-faserip", FaseripItemSheet, { 
-    types: ["power", "headquarters", "vehicle"],
+    types: ["power", "vehicle"],
     makeDefault: true 
+  });
+
+  // Headquarters sheet - dedicated
+  Items.registerSheet("msh-faserip", FaseripHeadquartersSheet, {
+    types: ["headquarters"],
+    makeDefault: true
   });
   
   // Talent sheet - smaller dialog

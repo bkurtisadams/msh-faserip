@@ -2872,22 +2872,24 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
     // Add Headquarters button
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     html.find('.add-headquarters').click(ev => {
-      console.log("Add Headquarters button clicked"); // Debug line
-
-      // Create the new headquarters item data
       const itemData = {
         name: "New Headquarters",
         type: "headquarters",
         system: {
           description: "",
+          buildingType: "",
           location: "",
           size: "",
           materialStrength: "Typical",
           ownership: "owned",
           purchaseCost: "",
+          rentCost: "",
           rentalCost: "",
           isRichArea: false,
-          features: ""
+          packages: [],
+          staff: [],
+          features: "",
+          notes: ""
         }
       };
 
@@ -2914,25 +2916,41 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
     });
 
     // Headquarters info button (clickable image)
-    html.find('.headquarters-info').click(ev => {
+    html.find('.headquarters-info').click(async ev => {
       const itemId = $(ev.currentTarget).data("itemId");
       const item = this.actor.items.get(itemId);
       if (!item) return;
 
-      // Show headquarters details in a dialog
+      const { ROOM_PACKAGES, STAFF_ROLES } = await import('./hq-constants.js');
+      const packages = (item.system.packages || []).map(p => {
+        const def = ROOM_PACKAGES[p.type];
+        if (!def) return null;
+        const tier = def.tiers[p.tier] || def.tiers[0];
+        const qty = (p.quantity || 1) > 1 ? ` &times;${p.quantity}` : '';
+        return `<li><strong>${def.name}${qty}</strong> (${tier.label}, ${tier.cost}) — ${tier.desc}</li>`;
+      }).filter(Boolean).join('');
+
+      const staff = (item.system.staff || []).map(s => {
+        const def = STAFF_ROLES[s.role];
+        if (!def) return null;
+        const qty = (s.quantity || 1) > 1 ? ` &times;${s.quantity}` : '';
+        return `<li><strong>${def.name}${qty}</strong> (${def.cost}/mo)</li>`;
+      }).filter(Boolean).join('');
+
       let content = `
         <h2>${item.name}</h2>
         <div class="headquarters-details">
           <p><strong>Location:</strong> ${item.system.location || 'Unknown'}</p>
-          <p><strong>Size:</strong> ${item.system.size || 'Typical'}</p>
+          <p><strong>Size:</strong> ${item.system.size || 'Unknown'}</p>
           <p><strong>Material Strength:</strong> ${item.system.materialStrength || 'Typical'}</p>
-          <p><strong>Ownership:</strong> ${item.system.ownership || 'Owned'}</p>
-          ${item.system.purchaseCost ? `<p><strong>Purchase Cost:</strong> ${item.system.purchaseCost}</p>` : ''}
-          ${item.system.rentalCost ? `<p><strong>Rental Cost:</strong> ${item.system.rentalCost}</p>` : ''}
-          ${item.system.isRichArea ? `<p><strong>Located in Rich Area:</strong> Yes</p>` : ''}
-          ${item.system.features ? `<p><strong>Features:</strong> ${item.system.features}</p>` : ''}
+          <p><strong>Ownership:</strong> ${item.system.ownership === 'rented' ? 'Rented' : 'Owned'}</p>
+          ${item.system.purchaseCost ? `<p><strong>Buy Cost:</strong> ${item.system.purchaseCost}</p>` : ''}
+          ${item.system.rentCost ? `<p><strong>Rent Cost:</strong> ${item.system.rentCost}</p>` : ''}
+          ${item.system.isRichArea ? `<p><strong>Rich Area:</strong> +1CS cost</p>` : ''}
+          ${packages ? `<h3>Room Packages</h3><ul>${packages}</ul>` : ''}
+          ${staff ? `<h3>Staff</h3><ul>${staff}</ul>` : ''}
         </div>
-        ${item.system.description ? `<div class="description">${item.system.description}</div>` : ''}
+        ${item.system.notes ? `<div class="description">${item.system.notes}</div>` : ''}
       `;
 
       new Dialog({

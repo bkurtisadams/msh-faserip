@@ -24,9 +24,6 @@ export class FaseripItemSheet extends ItemSheet {
     else if (this.item.type === 'contact') {
       return `systems/msh-faserip/templates/contact-sheet.html`;
     }
-    else if (this.item.type === 'headquarters') {
-      return `systems/msh-faserip/templates/hq-sheet.html`;
-    }
     else if (this.item.type === 'vehicle') {
       return `systems/msh-faserip/templates/vehicle-sheet.html`;
     }

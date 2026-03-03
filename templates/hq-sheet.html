@@ -1,70 +1,153 @@
-<form class="faserip-dialog headquarters-dialog">
-    <div class="dialog-header">
-      <h2><img src="{{item.img}}" width="32" height="32"> {{#if item._id}}Edit{{else}}New{{/if}} Headquarters</h2>
-    </div>
-  
-    <div class="dialog-body">
-      <!-- Basic Information Section -->
-      <div class="form-group">
-        <label>Name</label>
-        <input type="text" name="name" value="{{item.name}}" placeholder="Headquarters Name">
-      </div>
-      
-      <div class="form-group">
-        <label>Location</label>
-        <input type="text" name="system.location" value="{{system.location}}" placeholder="Location">
-      </div>
-      
-      <div class="form-group">
-        <label>Size</label>
-        <input type="text" name="system.size" value="{{system.size}}" placeholder="Small, Mid-sized, Large, or Deluxe">
-      </div>
-      
-      <div class="form-group">
-        <label>Material Strength</label>
-        <input type="text" name="system.materialStrength" value="{{system.materialStrength}}" placeholder="Ex: Excellent, Remarkable">
-      </div>
-      
-      <div class="form-group">
-        <label>Ownership</label>
-        <div class="radio-group">
-          <label><input type="radio" name="system.ownership" value="owned" {{#if (eq system.ownership "owned")}}checked{{/if}}> Owned</label>
-          <label><input type="radio" name="system.ownership" value="rented" {{#if (eq system.ownership "rented")}}checked{{/if}}> Rented</label>
+<form class="faserip-dialog headquarters-dialog" autocomplete="off">
+  <div class="hq-header">
+    <img src="{{item.img}}" data-edit="img" width="32" height="32" class="hq-portrait" />
+    <input type="text" name="name" value="{{item.name}}" class="hq-name-input" placeholder="Headquarters Name" />
+  </div>
+
+  <div class="hq-body">
+
+    <!-- Building — 2-col grid -->
+    <fieldset class="hq-fieldset">
+      <legend>Building</legend>
+      <div class="hq-grid-2col">
+        <div class="hq-field">
+          <label>Type</label>
+          <select class="building-type-select">
+            <option value="">— Custom —</option>
+            {{#each buildingCategories}}
+            <optgroup label="{{this.label}}">
+              {{#each this.types}}
+              <option value="{{this.key}}" {{#if (eq this.key ../../system.buildingType)}}selected{{/if}}>{{this.name}}</option>
+              {{/each}}
+            </optgroup>
+            {{/each}}
+          </select>
+        </div>
+        <div class="hq-field">
+          <label>Location</label>
+          <input type="text" name="system.location" value="{{system.location}}" placeholder="e.g. Manhattan" />
+        </div>
+        <div class="hq-field">
+          <label>Size</label>
+          <select name="system.size" class="size-select">
+            <option value="">—</option>
+            {{#each sizeOptions}}
+            <option value="{{@key}}" {{#if (eq @key ../system.size)}}selected{{/if}}>{{this.label}}</option>
+            {{/each}}
+          </select>
+        </div>
+        <div class="hq-field">
+          <label>Material</label>
+          <select name="system.materialStrength" class="material-select">
+            {{#each allRanks}}
+            <option value="{{this}}" {{#if (eq this ../system.materialStrength)}}selected{{/if}}>{{this}}</option>
+            {{/each}}
+          </select>
+        </div>
+        <div class="hq-field">
+          <label>Rent Cost</label>
+          <select name="system.rentCost">
+            <option value="">—</option>
+            {{#each allRanks}}
+            <option value="{{this}}" {{#if (eq this ../system.rentCost)}}selected{{/if}}>{{this}}</option>
+            {{/each}}
+          </select>
+        </div>
+        <div class="hq-field">
+          <label>Buy Cost</label>
+          <select name="system.purchaseCost">
+            <option value="">—</option>
+            {{#each allRanks}}
+            <option value="{{this}}" {{#if (eq this ../system.purchaseCost)}}selected{{/if}}>{{this}}</option>
+            {{/each}}
+          </select>
+        </div>
+        <div class="hq-field hq-field-row">
+          <label class="hq-check"><input type="checkbox" name="system.isRichArea" {{#if system.isRichArea}}checked{{/if}} /> Rich Area (+1CS)</label>
+        </div>
+        <div class="hq-field hq-field-row">
+          <label class="hq-check"><input type="radio" name="system.ownership" value="owned" {{#if (eq system.ownership "owned")}}checked{{/if}} /> Owned</label>
+          <label class="hq-check"><input type="radio" name="system.ownership" value="rented" {{#if (eq system.ownership "rented")}}checked{{/if}} /> Rented</label>
         </div>
       </div>
-  
-      <div class="form-group">
-        <label>Cost Information</label>
-        <div class="form-row">
-          <div class="form-group half">
-            <label>Purchase Cost</label>
-            <input type="text" name="system.purchaseCost" value="{{system.purchaseCost}}" placeholder="Ex: Amazing, Monstrous">
+    </fieldset>
+
+    <!-- Packages -->
+    <fieldset class="hq-fieldset">
+      <legend>Packages <span class="hq-room-counter {{#if (gt roomsUsed roomCapacity)}}over-capacity{{/if}}">{{roomsUsed}}/{{roomCapacity}} rooms</span></legend>
+
+      {{#if packages.length}}
+      <div class="hq-pkg-list">
+        {{#each packages}}
+        <div class="pkg-row" data-index="{{this.index}}">
+          <div class="pkg-left">
+            <span class="pkg-name">{{this.name}}</span>
+            {{#if (gt this.maxTier 0)}}
+            <span class="pkg-tier">
+              <a class="pkg-tier-down {{#unless this.canDowngrade}}disabled{{/unless}}" title="Downgrade"><i class="fas fa-caret-down"></i></a>
+              <span class="pkg-tier-label">{{this.tierData.label}}</span>
+              <a class="pkg-tier-up {{#unless this.canUpgrade}}disabled{{/unless}}" title="Upgrade"><i class="fas fa-caret-up"></i></a>
+            </span>
+            {{/if}}
+            <span class="pkg-cost">{{this.tierData.cost}}</span>
+            {{#if this.tierData.abilityRank}}<span class="pkg-ability">{{this.tierData.abilityRank}}</span>{{/if}}
+            <div class="pkg-desc">{{this.tierData.desc}}</div>
           </div>
-          <div class="form-group half">
-            <div class="checkbox-group">
-              <label><input type="checkbox" name="system.isRichArea" {{#if system.isRichArea}}checked{{/if}}> Rich Area (+1CS)</label>
-            </div>
+          <div class="pkg-right">
+            {{#if (gt this.rooms 0)}}<span class="pkg-rooms">{{this.rooms}}rm</span>{{/if}}
+            <input type="number" class="pkg-qty-input" value="{{this.quantity}}" min="1" max="20" title="Qty" />
+            <a class="pkg-delete" title="Remove"><i class="fas fa-times"></i></a>
           </div>
         </div>
-        <div class="form-group">
-          <label>Rental Cost</label>
-          <input type="text" name="system.rentalCost" value="{{system.rentalCost}}" placeholder="Ex: Excellent, Remarkable">
+        {{/each}}
+      </div>
+      {{/if}}
+
+      <div class="hq-add-row">
+        <select class="add-package-select">
+          <option value="">— Add Package —</option>
+          {{#each packageDefs}}
+          <option value="{{@key}}">{{this.name}} ({{this.tiers.0.cost}}+)</option>
+          {{/each}}
+        </select>
+        <button type="button" class="add-package-btn"><i class="fas fa-plus"></i></button>
+      </div>
+    </fieldset>
+
+    <!-- Staff -->
+    <fieldset class="hq-fieldset">
+      <legend>Staff</legend>
+
+      {{#if staff.length}}
+      <div class="hq-staff-list">
+        {{#each staff}}
+        <div class="staff-row" data-index="{{this.index}}">
+          <span class="staff-role">{{this.name}}</span>
+          <input type="text" class="staff-name-input" value="{{this.customName}}" placeholder="Name..." title="Name" />
+          <span class="staff-cost">{{this.cost}}/mo</span>
+          <input type="number" class="staff-qty-input" value="{{this.quantity}}" min="1" max="99" title="Qty" />
+          <a class="staff-delete" title="Remove"><i class="fas fa-times"></i></a>
         </div>
+        {{/each}}
       </div>
-      
-      <div class="form-group">
-        <label>Features</label>
-        <textarea name="system.features" rows="4" placeholder="List the features and packages of the headquarters">{{system.features}}</textarea>
+      {{/if}}
+
+      <div class="hq-add-row">
+        <select class="add-staff-select">
+          <option value="">— Add Staff —</option>
+          {{#each staffDefs}}
+          <option value="{{@key}}">{{this.name}} ({{this.cost}}/mo)</option>
+          {{/each}}
+        </select>
+        <button type="button" class="add-staff-btn"><i class="fas fa-plus"></i></button>
       </div>
-      
-      <div class="form-group">
-        <label>Description</label>
-        <textarea name="system.description" rows="4" placeholder="General description and notes">{{system.description}}</textarea>
-      </div>
-    </div>
-  
-    <div class="dialog-footer">
-      <button type="button" class="cancel-button">Cancel</button>
-      <button type="submit" class="submit-button">{{#if item._id}}Update{{else}}Create{{/if}} Headquarters</button>
-    </div>
-  </form>
+    </fieldset>
+
+    <!-- Notes -->
+    <fieldset class="hq-fieldset">
+      <legend>Notes</legend>
+      <textarea name="system.notes" rows="3" placeholder="History, special features, custom modifications...">{{system.notes}}</textarea>
+    </fieldset>
+
+  </div>
+</form>

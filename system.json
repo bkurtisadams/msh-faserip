@@ -52,7 +52,8 @@
         "styles/karma-dialog.css",
         "styles/faserip-initiative.css",
         "styles/team-tracker.css",
-        "styles/chargen.css"
+        "styles/chargen.css",
+        "styles/hq-sheet.css"
     ],
     "packs": [
         {
