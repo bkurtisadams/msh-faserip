@@ -20,6 +20,11 @@
   margin: 0; font-family: 'Oswald', sans-serif;
   font-size: 15px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
 }
+.team-tracker .campaign-datetime {
+  font-family: 'Oswald', sans-serif;
+  font-size: 14px; font-weight: 600; letter-spacing: 0.5px;
+  color: rgba(255,255,255,0.9);
+}
 .team-tracker .header-right { display: flex; align-items: center; gap: 8px; }
 .team-tracker .pool-display {
   display: flex; align-items: center; gap: 5px;
@@ -59,24 +64,25 @@
 
 /* ===== ROSTER ===== */
 .team-tracker .roster-rows {
-  display: flex; flex-direction: column; gap: 2px;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 2px;
   background: #fff; border: 1px solid #ccc; border-radius: 3px; padding: 3px;
 }
 .team-tracker .member-row {
-  display: flex; align-items: center; gap: 6px; padding: 2px 4px; border-radius: 2px;
+  display: flex; align-items: center; gap: 4px; padding: 2px 3px; border-radius: 2px;
+  min-width: 0;
 }
 .team-tracker .member-row:hover { background: #fefdf8; }
 .team-tracker .hero-portrait {
-  width: 24px; height: 24px; border-radius: 3px; object-fit: cover;
-  cursor: pointer; border: 1px solid #ddd;
+  width: 22px; height: 22px; border-radius: 3px; object-fit: cover;
+  cursor: pointer; border: 1px solid #ddd; flex-shrink: 0;
 }
 .team-tracker .hero-name {
-  flex: 1; min-width: 0; font-weight: 600; font-size: 12px; color: #333;
+  flex: 1; min-width: 0; font-weight: 600; font-size: 11px; color: #333;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.team-tracker .stat { font-size: 11px; color: #555; white-space: nowrap; }
+.team-tracker .stat { font-size: 10px; color: #555; white-space: nowrap; }
 .team-tracker .stat.health-low { color: #c62828; font-weight: 700; }
-.team-tracker .action-icon { color: #8b0000; cursor: pointer; padding: 0 2px; font-size: 11px; }
+.team-tracker .action-icon { color: #8b0000; cursor: pointer; padding: 0 2px; font-size: 10px; flex-shrink: 0; }
 .team-tracker .action-icon:hover { color: #a80000; }
 .team-tracker .no-members {
   padding: 10px; text-align: center; color: #777; font-style: italic; font-size: 12px;

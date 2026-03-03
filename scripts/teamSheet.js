@@ -86,6 +86,10 @@ export class TeamSheet extends Application {
 
     context.teamKarmaPool = game.settings.get("msh-faserip", "teamKarmaPoolTotal") || 0;
 
+    // Campaign date/time for header
+    const { gameDate, gameTime } = TeamSheet._getGameDateTimeStatic();
+    context.campaignDateTime = [gameDate, gameTime].filter(Boolean).join(' ') || "";
+
     const multiplier = game.settings.get("msh-faserip", "karmaMultiplier") || 1;
     context.karmaMultiplier = multiplier;
     context.multiplierOptions = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];

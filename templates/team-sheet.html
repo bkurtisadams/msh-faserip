@@ -2,7 +2,7 @@
   <!-- Header -->
   <div class="team-header">
     <div class="header-left">
-      <h2>Team Tracker</h2>
+      {{#if campaignDateTime}}<span class="campaign-datetime">{{campaignDateTime}}</span>{{/if}}
     </div>
     <div class="header-right">
       {{#if useKarmaPool}}
