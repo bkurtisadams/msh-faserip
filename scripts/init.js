@@ -1705,6 +1705,16 @@ Hooks.on("preCreateActor", (document, data, options, userId) => {
 Hooks.once("ready", async () => {
   game.msh ??= {};
 
+  // Register team tracker combat hook for auto-capturing defeated villains
+  try {
+    import('./teamSheet.js').then(module => {
+      module.TeamSheet.registerCombatHook();
+      console.log("MSH FASERIP | Team tracker combat hook registered");
+    });
+  } catch (e) {
+    console.warn("MSH FASERIP | Team tracker combat hook failed:", e);
+  }
+
   // SocketLib + GM handlers
   try {
     GMUtils.registerSocket();

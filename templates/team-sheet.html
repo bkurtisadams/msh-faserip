@@ -9,7 +9,6 @@
       <div class="pool-display">
         <label>Pool</label>
         <div class="pool-value">{{teamKarmaPool}}</div>
-        <div class="pool-share" title="Equal share if dissolved">÷{{teamSize}}={{poolShareValue}}</div>
         <button type="button" class="open-pool-manager" title="Manage Pool"><i class="fas fa-cog"></i></button>
       </div>
       {{/if}}
@@ -28,104 +27,31 @@
         <div class="multiplier-value">×{{karmaMultiplier}}</div>
       </div>
       {{/if}}
+      <button type="button" class="time-settings-btn" title="Time Settings"><i class="fas fa-clock"></i></button>
     </div>
   </div>
 
-  <!-- Single scrollable body -->
+  <!-- Body -->
   <div class="tracker-body">
 
-    <!-- Campaign Time -->
-    <div class="time-section">
-      <div class="time-edit-row">
-        <div class="time-field">
-          <label>Year</label>
-          <div class="field-controls">
-            <button type="button" class="time-dec-btn" data-unit="year">−</button><button type="button" class="time-inc-btn" data-unit="year">+</button>
-            <input type="number" class="time-input" data-field="year" value="{{timeYear}}" min="1" max="9999">
-          </div>
-        </div>
-        <div class="time-field">
-          <label>Month</label>
-          <div class="field-controls">
-            <button type="button" class="time-dec-btn" data-unit="month">−</button><button type="button" class="time-inc-btn" data-unit="month">+</button>
-            <input type="number" class="time-input" data-field="month" value="{{timeMonth}}" min="1" max="12">
-          </div>
-        </div>
-        <div class="time-field">
-          <label>Day</label>
-          <div class="field-controls">
-            <button type="button" class="time-dec-btn" data-unit="day">−</button><button type="button" class="time-inc-btn" data-unit="day">+</button>
-            <input type="number" class="time-input" data-field="day" value="{{timeDay}}" min="1" max="31">
-          </div>
-        </div>
-        <div class="time-field">
-          <label>Hour</label>
-          <div class="field-controls">
-            <button type="button" class="time-dec-btn" data-unit="hour">−</button><button type="button" class="time-inc-btn" data-unit="hour">+</button>
-            <input type="number" class="time-input" data-field="hour" value="{{timeHour}}" min="0" max="23">
-          </div>
-        </div>
-        <div class="time-field">
-          <label>Min</label>
-          <div class="field-controls">
-            <button type="button" class="time-dec-btn" data-unit="minute">−</button><button type="button" class="time-inc-btn" data-unit="minute">+</button>
-            <input type="number" class="time-input" data-field="minute" value="{{timeMinute}}" min="0" max="59">
-          </div>
-        </div>
-        <div class="time-field">
-          <label>Sec</label>
-          <div class="field-controls">
-            <button type="button" class="time-dec-btn" data-unit="second">−</button><button type="button" class="time-inc-btn" data-unit="second">+</button>
-            <input type="number" class="time-input" data-field="second" value="{{timeSecond}}" min="0" max="59">
-          </div>
-        </div>
-      </div>
-      <div class="time-quick-row">
-        <span class="adjust-label">Turn</span>
-        <button type="button" class="time-adjust-btn adj-dec" data-unit="turn" data-direction="-1">−</button><button type="button" class="time-adjust-btn adj-inc" data-unit="turn" data-direction="1">+</button>
-        <span class="adjust-label">Min</span>
-        <button type="button" class="time-adjust-btn adj-dec" data-unit="minute" data-direction="-1">−</button><button type="button" class="time-adjust-btn adj-inc" data-unit="minute" data-direction="1">+</button>
-        <span class="adjust-label">10m</span>
-        <button type="button" class="time-adjust-btn adj-dec" data-unit="10min" data-direction="-1">−</button><button type="button" class="time-adjust-btn adj-inc" data-unit="10min" data-direction="1">+</button>
-        <button type="button" class="time-set-btn"><i class="fas fa-calendar-alt"></i> Set</button>
-        <label class="sync-checkbox"><input type="checkbox" class="combat-sync-toggle" {{#if combatSyncEnabled}}checked{{/if}}> Sync</label>
-      </div>
-    </div>
-
-    <!-- Team Roster -->
+    <!-- Team Roster (compact) -->
     <div class="team-roster-section">
       {{#if teamMembers.length}}
-      <table class="team-roster-table">
-        <thead>
-          <tr>
-            <th class="col-portrait"></th>
-            <th>Hero</th>
-            <th>Health</th>
-            <th>Karma</th>
-            <th>Pop</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {{#each teamMembers as |member|}}
-          <tr class="member-row">
-            <td class="col-portrait">
-              <img src="{{member.img}}" class="hero-portrait" data-hero-id="{{member.id}}" title="Open character sheet" />
-            </td>
-            <td class="member-name"><span class="hero-name">{{member.name}}</span></td>
-            <td class="stat-cell {{#if member.healthLow}}health-low{{/if}}">{{member.health}}/{{member.healthMax}}</td>
-            <td class="stat-cell">{{member.availableKarma}}</td>
-            <td class="stat-cell">{{member.popularity}}</td>
-            <td class="actions-cell">
-              <a class="open-karma-sheet" data-hero-id="{{member.id}}" title="Karma History"><i class="fas fa-book"></i></a>
-              {{#if ../isGM}}
-              <a class="remove-hero-from-team" data-hero-id="{{member.id}}" title="Remove"><i class="fas fa-user-minus"></i></a>
-              {{/if}}
-            </td>
-          </tr>
-          {{/each}}
-        </tbody>
-      </table>
+      <div class="roster-rows">
+        {{#each teamMembers as |member|}}
+        <div class="member-row">
+          <img src="{{member.img}}" class="hero-portrait" data-hero-id="{{member.id}}" title="Open {{member.name}}'s sheet" />
+          <span class="hero-name" title="{{member.name}}">{{member.name}}</span>
+          <span class="stat hp {{#if member.healthLow}}health-low{{/if}}" title="Health">{{member.health}}/{{member.healthMax}}</span>
+          <span class="stat karma" title="Available Karma">K:{{member.availableKarma}}</span>
+          <span class="stat pop" title="Popularity">P:{{member.popularity}}</span>
+          <a class="action-icon open-karma-sheet" data-hero-id="{{member.id}}" title="Karma History"><i class="fas fa-book"></i></a>
+          {{#if ../removeMode}}
+          <a class="action-icon remove-hero-from-team" data-hero-id="{{member.id}}" title="Remove from team"><i class="fas fa-user-minus"></i></a>
+          {{/if}}
+        </div>
+        {{/each}}
+      </div>
       {{else}}
       <p class="no-members">No team members yet. Add heroes below.</p>
       {{/if}}
@@ -139,109 +65,118 @@
           {{/each}}
         </select>
         <button type="button" class="add-hero-to-team-btn"><i class="fas fa-plus"></i></button>
+        <button type="button" class="remove-member-toggle {{#if removeMode}}active{{/if}}" title="Toggle remove mode"><i class="fas fa-user-minus"></i></button>
       </div>
       {{/if}}
     </div>
 
-    <!-- Pending Karma Awards -->
+    <!-- Defeated Villains -->
     {{#if isGM}}
-    <div class="pending-awards-section">
+    <div class="defeated-villains-section">
       <div class="section-header">
-        <h3>Pending Karma Awards</h3>
-        <div class="pending-buttons">
-          <button type="button" class="add-pending-villain"><i class="fas fa-skull"></i> Villain</button>
-          <button type="button" class="add-pending-event"><i class="fas fa-trophy"></i> Event</button>
-          <button type="button" class="award-individual-karma"><i class="fas fa-user-plus"></i> Individual</button>
-          <button type="button" class="apply-karma-penalty"><i class="fas fa-exclamation-triangle"></i> Penalty</button>
-          <button type="button" class="award-session-bonus" title="Award R+I+P to each team member"><i class="fas fa-star"></i> R+I+P</button>
+        <h3>Defeated Villains ({{defeatedVillains.length}})</h3>
+        <div class="section-btns">
+          <button type="button" class="add-villain-manual"><i class="fas fa-skull"></i> Add Foe</button>
         </div>
       </div>
 
-      {{#if pendingAwards.length}}
-      <table class="pending-awards-table">
-        <thead>
-          <tr>
-            <th>Event</th>
-            <th>Base</th>
-            <th>×Mult</th>
-            <th>÷{{teamSize}}</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {{#each pendingAwards as |award i|}}
-          <tr class="pending-row {{#if (lt award.amount 0)}}penalty-row{{/if}}">
-            <td>{{award.label}}</td>
-            <td class="stat-cell">{{award.baseAmount}}</td>
-            <td class="stat-cell">{{award.totalAmount}}</td>
-            <td class="stat-cell">{{award.perHero}}</td>
-            <td class="actions-cell">
-              <a class="edit-pending" data-index="{{i}}" title="Edit"><i class="fas fa-edit"></i></a>
-              <a class="delete-pending" data-index="{{i}}" title="Remove"><i class="fas fa-times"></i></a>
-            </td>
-          </tr>
-          {{/each}}
-        </tbody>
-        <tfoot>
-          <tr class="pending-total-row">
-            <td colspan="3"><strong>Net Per Hero:</strong></td>
-            <td class="stat-cell"><strong>{{pendingNetPerHero}}</strong></td>
-            <td></td>
-          </tr>
-        </tfoot>
-      </table>
+      {{#if defeatedVillains.length}}
+      <div class="villains-list">
+        {{#each defeatedVillains as |v|}}
+        <div class="villain-entry {{#if v.awarded}}awarded{{/if}} {{#if v.expanded}}expanded{{/if}}" data-villain-idx="{{@index}}">
+          <!-- Collapsed row -->
+          <div class="villain-row" data-villain-idx="{{@index}}">
+            <span class="expand-toggle"><i class="fas fa-chevron-{{#if v.expanded}}down{{else}}right{{/if}}"></i></span>
+            <img src="{{v.img}}" class="villain-portrait" />
+            <span class="villain-name">{{v.name}}</span>
+            <span class="rank-badge {{#if v.subRemarkable}}sub-rm{{/if}}">{{v.rankLabel}}({{v.rankValue}})</span>
+            {{#if v.karmaEligible}}
+            <span class="karma-val">+{{v.rankValue}}</span>
+            {{else}}
+            <span class="karma-val no-award">--</span>
+            {{/if}}
+            {{#unless v.awarded}}
+            {{#if v.karmaEligible}}
+            <button type="button" class="award-villain-heroes btn-award" data-villain-idx="{{@index}}" title="Award to participating heroes"><i class="fas fa-check"></i></button>
+            {{#if ../useKarmaPool}}
+            <button type="button" class="award-villain-pool btn-pool" data-villain-idx="{{@index}}" title="Award to pool"><i class="fas fa-piggy-bank"></i></button>
+            {{/if}}
+            {{/if}}
+            {{/unless}}
+            {{#if v.awarded}}<span class="awarded-badge" title="Awarded"><i class="fas fa-check-circle"></i></span>{{/if}}
+            <a class="delete-villain" data-villain-idx="{{@index}}" title="Remove"><i class="fas fa-times"></i></a>
+          </div>
 
-      <div class="award-actions">
-        <button type="button" class="award-all-to-heroes"><i class="fas fa-users"></i> Award All to Heroes</button>
-        {{#if useKarmaPool}}
-        <button type="button" class="award-all-to-pool"><i class="fas fa-piggy-bank"></i> Award All to Pool</button>
-        {{/if}}
-        <button type="button" class="clear-pending"><i class="fas fa-broom"></i> Clear</button>
-      </div>
-      {{else}}
-      <p class="no-pending">No pending awards. Add defeated villains or events above.</p>
-      {{/if}}
-    </div>
-    {{/if}}
+          <!-- Expanded detail -->
+          {{#if v.expanded}}
+          <div class="villain-detail">
+            <div class="detail-section">
+              <label>Present Heroes:</label>
+              <div class="present-heroes">
+                {{#each v.heroChecks as |hc|}}
+                <label class="hero-check" title="{{hc.name}}">
+                  <input type="checkbox" class="hero-present-toggle" data-villain-idx="{{@../index}}" data-hero-id="{{hc.id}}" {{#if hc.present}}checked{{/if}} />
+                  <img src="{{hc.img}}" class="hero-check-portrait" />
+                  <span>{{hc.name}}</span>
+                </label>
+                {{/each}}
+              </div>
+            </div>
 
-    <!-- Session Log -->
-    <div class="session-log-section">
-      <div class="section-header">
-        <h3>Session Log</h3>
-        {{#if isGM}}
-        <div class="log-controls">
-          <button type="button" class="add-log-entry"><i class="fas fa-plus"></i> Add</button>
-          <button type="button" class="clear-all-logs"><i class="fas fa-broom"></i> Clear</button>
-        </div>
-        {{/if}}
-      </div>
+            <div class="detail-section">
+              <div class="detail-row">
+                <label>Crime:
+                  <select class="crime-type-select" data-villain-idx="{{@index}}">
+                    <option value="">— None —</option>
+                    <option value="violent" {{#if (eq v.crimeType "violent")}}selected{{/if}}>Violent Crime (30/15)</option>
+                    <option value="destructive" {{#if (eq v.crimeType "destructive")}}selected{{/if}}>Destructive Crime (20/10)</option>
+                    <option value="theft" {{#if (eq v.crimeType "theft")}}selected{{/if}}>Theft (10/5)</option>
+                    <option value="robbery" {{#if (eq v.crimeType "robbery")}}selected{{/if}}>Robbery (20/10)</option>
+                    <option value="misdemeanor" {{#if (eq v.crimeType "misdemeanor")}}selected{{/if}}>Misdemeanor (5/5)</option>
+                    <option value="national" {{#if (eq v.crimeType "national")}}selected{{/if}}>National Offense (20/10)</option>
+                    <option value="localConspiracy" {{#if (eq v.crimeType "localConspiracy")}}selected{{/if}}>Local Conspiracy (30/15)</option>
+                    <option value="nationalConspiracy" {{#if (eq v.crimeType "nationalConspiracy")}}selected{{/if}}>National Conspiracy (40/20)</option>
+                    <option value="globalConspiracy" {{#if (eq v.crimeType "globalConspiracy")}}selected{{/if}}>Global Conspiracy (50/25)</option>
+                    <option value="other" {{#if (eq v.crimeType "other")}}selected{{/if}}>Other Crimes (15/5)</option>
+                  </select>
+                </label>
+                {{#if v.crimeType}}
+                <label class="crime-flag"><input type="checkbox" class="crime-stopped-toggle" data-villain-idx="{{@index}}" {{#if v.stopped}}checked{{/if}} /> Stopped (+{{v.stopValue}})</label>
+                <label class="crime-flag"><input type="checkbox" class="crime-arrested-toggle" data-villain-idx="{{@index}}" {{#if v.arrested}}checked{{/if}} /> Arrested (+{{v.arrestValue}})</label>
+                {{/if}}
+              </div>
+            </div>
 
-      {{#if combatLogs.length}}
-      <div class="logs-list">
-        {{#each combatLogs as |log|}}
-        <div class="log-entry" data-log-id="{{log.id}}">
-          <div class="log-timestamp">{{log.timestamp}}</div>
-          <div class="log-text">{{log.text}}</div>
-          {{#if ../isGM}}
-          <div class="log-actions">
-            <button type="button" class="award-from-log" data-log-text="{{log.text}}" title="Add to Pending"><i class="fas fa-star"></i></button>
-            <button type="button" class="edit-log-btn" data-log-id="{{log.id}}" title="Edit"><i class="fas fa-edit"></i></button>
-            <button type="button" class="delete-log-btn" data-log-id="{{log.id}}" title="Delete"><i class="fas fa-trash"></i></button>
+            <div class="detail-section">
+              <div class="detail-row extras">
+                <label>Rescues: <input type="number" class="rescue-count" data-villain-idx="{{@index}}" value="{{v.rescues}}" min="0" max="99" /></label>
+                <label>Prop Dmg (areas): <input type="number" class="prop-damage" data-villain-idx="{{@index}}" value="{{v.propertyDamage}}" min="0" max="99" /></label>
+              </div>
+            </div>
+
+            <div class="villain-summary">
+              <div class="sum-breakdown">
+                {{#if v.karmaEligible}}<span class="sum-pos">Foe +{{v.rankValue}}</span>{{/if}}
+                {{#if v.stopped}}<span class="sum-pos">Stop +{{v.stopValue}}</span>{{/if}}
+                {{#if v.arrested}}<span class="sum-pos">Arrest +{{v.arrestValue}}</span>{{/if}}
+                {{#if v.rescueKarma}}<span class="sum-pos">Rescue +{{v.rescueKarma}}</span>{{/if}}
+                {{#if v.penaltyKarma}}<span class="sum-neg">Dmg {{v.penaltyKarma}}</span>{{/if}}
+              </div>
+              <div class="sum-total">
+                +{{v.positiveTotal}} ×{{../karmaMultiplier}} = +{{v.positiveMultiplied}} ÷{{v.heroCount}} = <strong>+{{v.perHeroPositive}}/ea</strong>
+                {{#if v.penaltyKarma}} &nbsp;|&nbsp; {{v.penaltyKarma}} ÷{{v.heroCount}} = <strong>{{v.perHeroPenalty}}/ea</strong>{{/if}}
+              </div>
+            </div>
           </div>
           {{/if}}
         </div>
         {{/each}}
       </div>
       {{else}}
-      <p class="no-logs">No session log entries yet.</p>
-      {{/if}}
-
-      {{#if isGM}}
-      <div class="auto-log-setting">
-        <label><input type="checkbox" class="auto-log-toggle" {{#if autoLogCombat}}checked{{/if}}> Auto-log combat</label>
-      </div>
+      <p class="no-villains">No defeated villains yet. Foes auto-capture from combat.</p>
       {{/if}}
     </div>
+    {{/if}}
 
   </div>
 </form>

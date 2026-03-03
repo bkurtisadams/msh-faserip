@@ -1,9 +1,12 @@
-/* team-tracker.css v2.0.0 - 2026-02-28 - Single page layout */
+/* team-tracker.css v3.0.0 - 2026-03-02
+ * v3.0.0: Compact roster, defeated villains with expand/collapse, per-villain award */
 
 .team-tracker {
-  font-family: Arial, sans-serif;
-  color: #222;
-  background: #f5f5f0;
+  font-family: 'Barlow Condensed', Arial, sans-serif;
+  color: #1a1a1a;
+  background-color: #faf8f3;
+  background-image: radial-gradient(circle, rgba(180,0,60,.07) 1.2px, transparent 1.2px);
+  background-size: 6px 6px;
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -15,291 +18,296 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 8px 12px;
-  background: linear-gradient(#8b0000, #6b0000);
+  gap: 10px;
+  padding: 6px 10px;
+  background: linear-gradient(#8b0000, #660000);
   color: #fff;
-  border-bottom: 2px solid #5b0000;
+  border-bottom: 2px solid #4a0000;
   flex-shrink: 0;
 }
-.team-tracker .header-left h2 { margin: 0; font-size: 1.1rem; }
-.team-tracker .header-right { display: flex; align-items: center; gap: 10px; }
-
-/* Pool display */
-.team-tracker .pool-display {
-  display: flex; align-items: center; gap: 8px;
-  background: #e3f2fd; border: 1px solid #90caf9; color: #0d47a1;
-  padding: 4px 8px; border-radius: 5px;
+.team-tracker .header-left h2 {
+  margin: 0;
+  font-family: 'Oswald', sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
 }
-.team-tracker .pool-display label { font-weight: 600; font-size: 11px; }
+.team-tracker .header-right { display: flex; align-items: center; gap: 8px; }
+
+/* Pool */
+.team-tracker .pool-display {
+  display: flex; align-items: center; gap: 5px;
+  background: #e3f2fd; border: 1px solid #90caf9; color: #0d47a1;
+  padding: 2px 6px; border-radius: 4px; font-size: 11px;
+}
+.team-tracker .pool-display label { font-weight: 600; }
 .team-tracker .pool-value {
   background: #fff; border: 1px solid #bbdefb; border-radius: 3px;
-  padding: 1px 6px; min-width: 50px; text-align: center;
-  font-weight: 700; font-size: 13px;
+  padding: 1px 5px; min-width: 36px; text-align: center;
+  font-weight: 700; font-size: 12px;
 }
-.team-tracker .pool-share { font-size: 10px; color: #1565c0; white-space: nowrap; }
 .team-tracker .open-pool-manager {
   background: #bbdefb; border: 1px solid #90caf9; color: #0d47a1;
-  padding: 3px 6px; border-radius: 3px; cursor: pointer;
+  padding: 2px 5px; border-radius: 3px; cursor: pointer; font-size: 10px;
 }
 .team-tracker .open-pool-manager:hover { background: #a6d4fa; }
 
 /* Multiplier */
-.team-tracker .multiplier-display { display: flex; align-items: center; gap: 4px; }
+.team-tracker .multiplier-display { display: flex; align-items: center; gap: 3px; }
 .team-tracker .multiplier-display label { font-size: 11px; font-weight: 600; }
 .team-tracker .multiplier-select {
-  padding: 2px 4px; font-size: 12px; border-radius: 3px;
+  padding: 1px 3px; font-size: 11px; border-radius: 3px;
   border: 1px solid rgba(255,255,255,0.4); background: rgba(255,255,255,0.15);
-  color: #fff; cursor: pointer;
+  color: #fff; cursor: pointer; font-family: 'Barlow Condensed', sans-serif;
 }
+.team-tracker .multiplier-select option { color: #333; background: #fff; }
 .team-tracker .multiplier-value { font-weight: 700; font-size: 13px; }
 
-/* ========== SCROLLABLE BODY ========== */
+/* Time button */
+.team-tracker .time-settings-btn {
+  background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3);
+  color: #fff; padding: 2px 6px; border-radius: 3px; cursor: pointer; font-size: 12px;
+}
+.team-tracker .time-settings-btn:hover { background: rgba(255,255,255,0.25); }
+
+/* ========== BODY ========== */
 .team-tracker .tracker-body {
   flex: 1 1 auto;
   overflow-y: auto;
-  padding: 10px;
+  padding: 8px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
-/* ========== TIME SECTION ========== */
-.team-tracker .time-section {
-  background: #fff;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  padding: 8px;
-}
-
-.team-tracker .time-edit-row {
+/* ========== ROSTER (compact rows) ========== */
+.team-tracker .roster-rows {
   display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: #fff;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  padding: 3px;
+}
+.team-tracker .member-row {
+  display: flex;
+  align-items: center;
   gap: 6px;
-  flex-wrap: nowrap;
-  margin-bottom: 6px;
+  padding: 2px 4px;
+  border-radius: 2px;
 }
-.team-tracker .time-field { flex: 1; min-width: 0; }
-.team-tracker .time-field label {
-  display: block; font-size: 10px; color: #666;
-  text-align: center; margin-bottom: 2px;
-}
-.team-tracker .field-controls { display: flex; align-items: center; gap: 0; }
+.team-tracker .member-row:hover { background: #fefdf8; }
 
-.team-tracker .time-dec-btn, .team-tracker .time-inc-btn {
-  width: 20px; height: 24px; padding: 0;
-  font-size: 13px; font-weight: bold; line-height: 1;
-  border: 1px solid #999; background: #e8e8e8; cursor: pointer; color: #333;
-}
-.team-tracker .time-dec-btn { border-radius: 3px 0 0 3px; border-right: none; }
-.team-tracker .time-inc-btn { border-radius: 0 3px 3px 0; margin-right: 3px; }
-.team-tracker .time-dec-btn:hover, .team-tracker .time-inc-btn:hover { background: #d8d8d8; }
-
-.team-tracker .time-input {
-  width: 38px; padding: 3px 2px; text-align: center;
-  font-size: 12px; font-weight: 600;
-  border: 1px solid #999; border-radius: 3px; background: #fff;
-}
-.team-tracker .time-input:focus { border-color: #8b0000; outline: none; }
-.team-tracker .time-input::-webkit-outer-spin-button,
-.team-tracker .time-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-.team-tracker .time-input[type=number] { -moz-appearance: textfield; }
-
-.team-tracker .time-quick-row {
-  display: flex; align-items: center; gap: 4px; flex-wrap: nowrap;
-}
-.team-tracker .time-quick-row .adjust-label {
-  font-size: 10px; font-weight: 600; color: #555; margin-left: 6px;
-}
-.team-tracker .time-quick-row .adjust-label:first-child { margin-left: 0; }
-.team-tracker .time-adjust-btn {
-  width: 22px; height: 22px; padding: 0;
-  font-size: 13px; font-weight: bold; line-height: 1;
-  background: #fff; border: 1px solid #999; cursor: pointer;
-}
-.team-tracker .time-adjust-btn.adj-dec { border-radius: 3px 0 0 3px; border-right: none; color: #c62828; }
-.team-tracker .time-adjust-btn.adj-inc { border-radius: 0 3px 3px 0; color: #2e7d32; }
-.team-tracker .time-adjust-btn:hover { background: #f0f0f0; }
-.team-tracker .time-set-btn {
-  margin-left: 6px; padding: 3px 8px; font-size: 11px; font-weight: 600;
-  background: #e3f2fd; border: 1px solid #90caf9; border-radius: 3px;
-  cursor: pointer; color: #1565c0; white-space: nowrap;
-}
-.team-tracker .time-set-btn:hover { background: #bbdefb; }
-.team-tracker .sync-checkbox {
-  margin-left: auto; display: flex; align-items: center; gap: 3px;
-  font-size: 10px; color: #555; cursor: pointer; white-space: nowrap;
-}
-
-/* ========== TEAM ROSTER ========== */
-.team-tracker .team-roster-table {
-  width: 100%; border-collapse: collapse;
-  background: #fff; border: 1px solid #cfcfcf;
-}
-.team-tracker .team-roster-table thead { background: #8b0000; color: #fff; }
-.team-tracker .team-roster-table thead th {
-  padding: 4px 6px; font-size: 11px; font-weight: 700;
-  white-space: nowrap; border-right: 1px solid rgba(255,255,255,0.25);
-}
-.team-tracker .team-roster-table thead th:last-child { border-right: 0; }
-.team-tracker .team-roster-table tbody td {
-  padding: 3px 6px; font-size: 12px; line-height: 1.2;
-  border-bottom: 1px solid #eee; vertical-align: middle;
-}
-.team-tracker .member-row:hover { background: #fafafa; }
-
-.team-tracker .col-portrait { width: 36px; text-align: center; }
 .team-tracker .hero-portrait {
-  width: 28px; height: 28px; border-radius: 3px;
-  border: none; object-fit: cover; cursor: pointer;
+  width: 24px; height: 24px;
+  border-radius: 3px; object-fit: cover;
+  cursor: pointer; border: 1px solid #ddd;
 }
-.team-tracker .member-name { min-width: 0; }
 .team-tracker .hero-name {
-  display: block; overflow: hidden; text-overflow: ellipsis;
-  white-space: nowrap; font-weight: 600; color: #333;
+  flex: 1; min-width: 0;
+  font-weight: 600; font-size: 12px; color: #333;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.team-tracker .stat-cell { text-align: center; }
-.team-tracker .health-low { color: #d32f2f; font-weight: 700; }
-.team-tracker .actions-cell { text-align: center; white-space: nowrap; }
-.team-tracker .actions-cell a { color: #8b0000; padding: 0 3px; cursor: pointer; }
-.team-tracker .actions-cell a:hover { color: #c40000; }
+.team-tracker .stat {
+  font-size: 11px; color: #555; white-space: nowrap;
+}
+.team-tracker .stat.health-low { color: #c62828; font-weight: 700; }
+.team-tracker .action-icon {
+  color: #8b0000; cursor: pointer; padding: 0 2px; font-size: 11px;
+}
+.team-tracker .action-icon:hover { color: #a80000; }
 
 .team-tracker .no-members {
-  padding: 12px; text-align: center; color: #666; font-style: italic;
-  background: #fff; border: 1px solid #ddd;
+  padding: 10px; text-align: center; color: #777;
+  font-style: italic; font-size: 12px;
+  background: #fff; border: 1px solid #ddd; border-radius: 3px;
 }
 
-/* Add member row */
+/* Add/remove row */
 .team-tracker .add-member-row {
-  margin-top: 6px; display: flex; align-items: center; gap: 6px;
+  display: flex; gap: 4px; margin-top: 4px; align-items: center;
 }
 .team-tracker .add-hero-select {
-  flex: 1; padding: 4px 6px; font-size: 12px;
+  flex: 1; padding: 3px 5px; font-size: 11px;
+  font-family: 'Barlow Condensed', sans-serif;
   border: 1px solid #ccc; border-radius: 3px; background: #fff;
 }
-.team-tracker .add-hero-to-team-btn {
-  padding: 4px 8px; font-size: 12px; font-weight: 600;
+.team-tracker .add-hero-to-team-btn,
+.team-tracker .remove-member-toggle {
+  padding: 3px 7px; font-size: 11px; font-weight: 600;
   color: #fff; background: #8b0000; border: 0;
   border-radius: 3px; cursor: pointer;
 }
-.team-tracker .add-hero-to-team-btn:hover { background: #6b0000; }
+.team-tracker .add-hero-to-team-btn:hover,
+.team-tracker .remove-member-toggle:hover { background: #660000; }
+.team-tracker .remove-member-toggle.active { background: #c62828; }
 
-/* ========== GM KARMA CONTROLS ========== */
-.team-tracker .gm-karma-controls {
-  display: flex; gap: 6px;
-}
-.team-tracker .gm-karma-controls button {
-  flex: 1; padding: 5px 8px; font-size: 11px; font-weight: 600;
-  color: #fff; background: #555; border: 0; border-radius: 3px; cursor: pointer;
-}
-.team-tracker .gm-karma-controls button:hover { background: #333; }
-.team-tracker .gm-karma-controls button i { margin-right: 3px; }
-
-/* ========== PENDING AWARDS ========== */
-.team-tracker .pending-awards-section .section-header {
-  flex-wrap: wrap;
-}
-.team-tracker .pending-buttons {
-  display: flex; gap: 4px;
-}
-.team-tracker .pending-buttons button {
-  padding: 3px 7px; font-size: 10px; font-weight: 600;
-  color: #fff; background: #555; border: 0; border-radius: 3px; cursor: pointer;
-}
-.team-tracker .pending-buttons button:hover { background: #333; }
-.team-tracker .pending-buttons button i { margin-right: 2px; }
-
-.team-tracker .pending-awards-table {
-  width: 100%; border-collapse: collapse;
-  background: #fff; border: 1px solid #ddd; font-size: 12px;
-}
-.team-tracker .pending-awards-table thead { background: #555; color: #fff; }
-.team-tracker .pending-awards-table th,
-.team-tracker .pending-awards-table td {
-  padding: 4px 6px; border-bottom: 1px solid #eee;
-}
-.team-tracker .pending-row.penalty-row { background: #fff5f5; color: #c62828; }
-.team-tracker .pending-total-row { background: #f5f5f0; }
-.team-tracker .pending-total-row td { border-top: 2px solid #8b0000; }
-
-.team-tracker .no-pending {
-  padding: 10px; text-align: center; color: #666; font-style: italic;
-  background: #fafafa; border: 1px solid #ddd; border-radius: 3px; font-size: 12px;
-}
-
-.team-tracker .award-actions {
-  display: flex; gap: 6px; margin-top: 6px;
-}
-.team-tracker .award-actions button {
-  flex: 1; padding: 6px 8px; font-size: 11px; font-weight: 600;
-  border: 0; border-radius: 3px; cursor: pointer; color: #fff;
-}
-.team-tracker .award-all-to-heroes { background: #2e7d32; }
-.team-tracker .award-all-to-heroes:hover { background: #1b5e20; }
-.team-tracker .award-all-to-pool { background: #1565c0; }
-.team-tracker .award-all-to-pool:hover { background: #0d47a1; }
-.team-tracker .clear-pending { background: #888; }
-.team-tracker .clear-pending:hover { background: #666; }
-
-/* ========== DEFEATED VILLAINS ========== */
-.team-tracker .defeated-villains-section,
-.team-tracker .session-log-section { /* spacing handled by parent gap */ }
-
+/* ========== SECTION HEADER ========== */
 .team-tracker .section-header {
   display: flex; justify-content: space-between; align-items: center;
-  margin-bottom: 6px; padding-bottom: 4px; border-bottom: 2px solid #8b0000;
+  padding-bottom: 3px; border-bottom: 2px solid #8b0000; margin-bottom: 4px;
 }
-.team-tracker .section-header h3 { margin: 0; color: #8b0000; font-size: 0.9rem; }
-.team-tracker .section-header button {
-  padding: 3px 8px; font-size: 11px; font-weight: 600;
-  color: #fff; background: #8b0000; border: 0; border-radius: 3px; cursor: pointer;
+.team-tracker .section-header h3 {
+  margin: 0;
+  font-family: 'Oswald', sans-serif;
+  font-size: 13px; font-weight: 600;
+  color: #8b0000; text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
-.team-tracker .section-header button:hover { background: #6b0000; }
+.team-tracker .section-btns { display: flex; gap: 3px; }
+.team-tracker .section-btns button {
+  padding: 2px 7px; font-size: 10px; font-weight: 600;
+  font-family: 'Barlow Condensed', sans-serif;
+  color: #fff; background: #8b0000; border: 0;
+  border-radius: 3px; cursor: pointer;
+}
+.team-tracker .section-btns button:hover { background: #660000; }
+.team-tracker .section-btns button i { margin-right: 2px; }
 
-.team-tracker .defeated-villains-table {
-  width: 100%; border-collapse: collapse;
-  background: #fff; border: 1px solid #ddd; font-size: 12px;
+/* ========== VILLAIN ENTRIES ========== */
+.team-tracker .villains-list {
+  display: flex; flex-direction: column; gap: 3px;
 }
-.team-tracker .defeated-villains-table thead { background: #8b0000; color: #fff; }
-.team-tracker .defeated-villains-table th,
-.team-tracker .defeated-villains-table td {
-  padding: 4px 6px; text-align: left; border-bottom: 1px solid #eee;
+.team-tracker .villain-entry {
+  background: #fff;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  overflow: hidden;
 }
-.team-tracker .defeated-villains-table .villain-name { font-weight: 600; }
-.team-tracker .defeated-villains-table .karma-amount { font-weight: 700; color: #2e7d32; }
-.team-tracker .defeated-villains-table .actions-cell { text-align: center; }
-.team-tracker .defeated-villains-table .actions-cell a { color: #8b0000; cursor: pointer; }
+.team-tracker .villain-entry.expanded { border-color: #8b0000; }
+.team-tracker .villain-entry.awarded { opacity: 0.55; }
 
-.team-tracker .no-villains, .team-tracker .no-logs {
-  padding: 10px; text-align: center; color: #666; font-style: italic;
-  background: #fafafa; border: 1px solid #ddd; border-radius: 3px; font-size: 12px;
+/* Collapsed row */
+.team-tracker .villain-row {
+  display: flex; align-items: center; gap: 5px;
+  padding: 3px 6px; cursor: pointer;
+  font-size: 12px;
+}
+.team-tracker .villain-row:hover { background: #fefdf8; }
+
+.team-tracker .expand-toggle {
+  width: 14px; text-align: center; font-size: 10px; color: #888;
+}
+.team-tracker .villain-portrait {
+  width: 24px; height: 24px;
+  border-radius: 3px; object-fit: cover; border: 1px solid #ddd;
+}
+.team-tracker .villain-name {
+  flex: 1; min-width: 0;
+  font-weight: 600; color: #1a1a1a;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.team-tracker .rank-badge {
+  display: inline-block;
+  background: #c8960c; color: #fff;
+  padding: 0 5px; border-radius: 3px;
+  font-size: 10px; font-weight: 700;
+  font-family: 'Oswald', sans-serif;
+  white-space: nowrap;
+}
+.team-tracker .rank-badge.sub-rm { background: #999; }
+
+.team-tracker .karma-val {
+  font-weight: 700; color: #2e7d32; font-size: 12px;
+  min-width: 28px; text-align: center;
+}
+.team-tracker .karma-val.no-award { color: #999; font-weight: 400; }
+
+.team-tracker .btn-award, .team-tracker .btn-pool {
+  padding: 1px 5px; font-size: 10px; font-weight: 600;
+  color: #fff; border: 0; border-radius: 3px; cursor: pointer;
+}
+.team-tracker .btn-award { background: #2e7d32; }
+.team-tracker .btn-award:hover { background: #1b5e20; }
+.team-tracker .btn-pool { background: #1565c0; }
+.team-tracker .btn-pool:hover { background: #0d47a1; }
+
+.team-tracker .awarded-badge { color: #2e7d32; font-size: 12px; }
+
+.team-tracker .delete-villain {
+  color: #999; cursor: pointer; font-size: 11px; padding: 0 2px;
+}
+.team-tracker .delete-villain:hover { color: #c62828; }
+
+/* ========== EXPANDED DETAIL ========== */
+.team-tracker .villain-detail {
+  padding: 6px 8px 8px 28px;
+  border-top: 1px solid #eee;
+  background: #fefdf8;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.team-tracker .detail-section > label {
+  font-size: 10px; font-weight: 600; color: #8b0000;
+  text-transform: uppercase; letter-spacing: 0.3px;
+  display: block; margin-bottom: 2px;
+}
+.team-tracker .detail-row {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+}
+.team-tracker .detail-row label { font-size: 11px; color: #444; }
+.team-tracker .detail-row select {
+  padding: 2px 4px; font-size: 11px;
+  font-family: 'Barlow Condensed', sans-serif;
+  border: 1px solid #ccc; border-radius: 3px; background: #fff;
+}
+.team-tracker .crime-flag {
+  font-size: 11px; display: flex; align-items: center; gap: 2px;
+  white-space: nowrap;
+}
+.team-tracker .crime-flag input { accent-color: #8b0000; }
+
+/* Present heroes */
+.team-tracker .present-heroes {
+  display: flex; flex-wrap: wrap; gap: 4px;
+}
+.team-tracker .hero-check {
+  display: flex; align-items: center; gap: 3px;
+  font-size: 10px; cursor: pointer;
+  padding: 1px 4px; border: 1px solid #ddd;
+  border-radius: 3px; background: #fff;
+}
+.team-tracker .hero-check:has(input:checked) {
+  border-color: #2e7d32; background: #e8f5e9;
+}
+.team-tracker .hero-check input { accent-color: #2e7d32; width: 12px; height: 12px; }
+.team-tracker .hero-check-portrait {
+  width: 16px; height: 16px; border-radius: 2px; object-fit: cover;
 }
 
-/* ========== SESSION LOG ========== */
-.team-tracker .log-controls { display: flex; gap: 4px; }
-.team-tracker .logs-list {
-  max-height: 180px; overflow-y: auto;
-  border: 1px solid #ddd; border-radius: 3px; background: #fff;
+/* Extras row */
+.team-tracker .detail-row.extras label { display: flex; align-items: center; gap: 3px; }
+.team-tracker .detail-row.extras input[type="number"] {
+  width: 36px; padding: 1px 3px; font-size: 11px;
+  font-family: 'Barlow Condensed', sans-serif;
+  border: 1px solid #ccc; border-radius: 3px;
+  text-align: center;
 }
-.team-tracker .log-entry {
-  display: flex; align-items: center; gap: 8px;
-  padding: 4px 8px; border-bottom: 1px solid #eee;
+.team-tracker .detail-row.extras input[type="number"]::-webkit-outer-spin-button,
+.team-tracker .detail-row.extras input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none; margin: 0;
 }
-.team-tracker .log-entry:last-child { border-bottom: none; }
-.team-tracker .log-timestamp { font-size: 10px; color: #888; white-space: nowrap; }
-.team-tracker .log-text { flex: 1; font-size: 12px; }
-.team-tracker .log-actions { display: flex; gap: 3px; }
-.team-tracker .log-actions button {
-  padding: 2px 5px; font-size: 10px;
-  background: #f5f5f5; border: 1px solid #ddd; border-radius: 3px; cursor: pointer;
-}
-.team-tracker .log-actions button:hover { background: #e0e0e0; }
-.team-tracker .log-actions .award-from-log { color: #f57c00; }
-.team-tracker .log-actions .award-from-log:hover { background: #fff3e0; }
 
-.team-tracker .auto-log-setting {
-  margin-top: 6px; padding: 6px; background: #f5f5f0;
-  border-radius: 3px; font-size: 11px;
+/* ========== VILLAIN SUMMARY ========== */
+.team-tracker .villain-summary {
+  background: #f5f3ee;
+  border: 1px solid #ddd;
+  border-radius: 3px;
+  padding: 4px 8px;
+  font-size: 11px;
 }
-.team-tracker .auto-log-setting label {
-  display: flex; align-items: center; gap: 5px; cursor: pointer;
+.team-tracker .sum-breakdown {
+  display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 2px;
+}
+.team-tracker .sum-pos { color: #2e7d32; font-weight: 600; }
+.team-tracker .sum-neg { color: #c62828; font-weight: 600; }
+.team-tracker .sum-total { color: #444; }
+.team-tracker .sum-total strong { color: #1a1a1a; }
+
+/* ========== EMPTY STATE ========== */
+.team-tracker .no-villains {
+  padding: 10px; text-align: center; color: #777;
+  font-style: italic; font-size: 12px;
+  background: #fff; border: 1px solid #ddd; border-radius: 3px;
 }
