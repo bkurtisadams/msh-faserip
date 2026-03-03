@@ -53,7 +53,8 @@
         "styles/faserip-initiative.css",
         "styles/team-tracker.css",
         "styles/chargen.css",
-        "styles/hq-sheet.css"
+        "styles/hq-sheet.css",
+        "styles/talent-sheet.css"
     ],
     "packs": [
         {

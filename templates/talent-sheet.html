@@ -1,108 +1,107 @@
-<form class="{{cssClass}} talent-sheet" autocomplete="off">
-    <header class="sheet-header">
-      <img class="profile-img" src="{{item.img}}" data-edit="img" title="{{item.name}}" />
-      <h1><input name="name" type="text" value="{{item.name}}" placeholder="Talent Name"/></h1>
-    </header>
-  
-    <section class="sheet-body">
-      <div class="form-group">
-        <label>Bonus:</label>
-        <select name="system.bonus">
-          <option value="+1CS" {{#if (eq system.bonus "+1CS")}}selected{{/if}}>+1CS</option>
-          <option value="+2CS" {{#if (eq system.bonus "+2CS")}}selected{{/if}}>+2CS</option>
-          <option value="+3CS" {{#if (eq system.bonus "+3CS")}}selected{{/if}}>+3CS</option>
-          <option value="Special" {{#if (eq system.bonus "Special")}}selected{{/if}}>Special</option>
-        </select>
-      </div>
+<form class="faserip-dialog talent-dialog" autocomplete="off">
+  <div class="talent-header">
+    <img src="{{item.img}}" data-edit="img" width="32" height="32" class="talent-portrait" />
+    <input type="text" name="name" value="{{item.name}}" class="talent-name-input" placeholder="Talent Name" />
+  </div>
 
-      <div class="form-group">
-        <label>Rank Override:</label>
-        <select name="system.rankOverride">
-          <option value="" {{#if (eq system.rankOverride "")}}selected{{/if}}>Use Bonus</option>
-          <option value="Feeble" {{#if (eq system.rankOverride "Feeble")}}selected{{/if}}>Feeble</option>
-          <option value="Poor" {{#if (eq system.rankOverride "Poor")}}selected{{/if}}>Poor</option>
-          <option value="Typical" {{#if (eq system.rankOverride "Typical")}}selected{{/if}}>Typical</option>
-          <option value="Good" {{#if (eq system.rankOverride "Good")}}selected{{/if}}>Good</option>
-          <option value="Excellent" {{#if (eq system.rankOverride "Excellent")}}selected{{/if}}>Excellent</option>
-          <option value="Remarkable" {{#if (eq system.rankOverride "Remarkable")}}selected{{/if}}>Remarkable</option>
-          <option value="Incredible" {{#if (eq system.rankOverride "Incredible")}}selected{{/if}}>Incredible</option>
-          <option value="Amazing" {{#if (eq system.rankOverride "Amazing")}}selected{{/if}}>Amazing</option>
-          <option value="Monstrous" {{#if (eq system.rankOverride "Monstrous")}}selected{{/if}}>Monstrous</option>
-          <option value="Unearthly" {{#if (eq system.rankOverride "Unearthly")}}selected{{/if}}>Unearthly</option>
-          <option value="Shift-X" {{#if (eq system.rankOverride "Shift-X")}}selected{{/if}}>Shift-X</option>
-          <option value="Shift-Y" {{#if (eq system.rankOverride "Shift-Y")}}selected{{/if}}>Shift-Y</option>
-          <option value="Shift-Z" {{#if (eq system.rankOverride "Shift-Z")}}selected{{/if}}>Shift-Z</option>
-        </select>
-      </div>
-  
-      <div class="form-group">
-        <label>Ability Modified:</label>
-        <select name="system.abilityModified">
-          <option value="" {{#if (eq system.abilityModified "")}}selected{{/if}}>None</option>
-          <option value="fighting" {{#if (eq system.abilityModified "fighting")}}selected{{/if}}>Fighting</option>
-          <option value="agility" {{#if (eq system.abilityModified "agility")}}selected{{/if}}>Agility</option>
-          <option value="strength" {{#if (eq system.abilityModified "strength")}}selected{{/if}}>Strength</option>
-          <option value="endurance" {{#if (eq system.abilityModified "endurance")}}selected{{/if}}>Endurance</option>
-          <option value="reason" {{#if (eq system.abilityModified "reason")}}selected{{/if}}>Reason</option>
-          <option value="intuition" {{#if (eq system.abilityModified "intuition")}}selected{{/if}}>Intuition</option>
-          <option value="psyche" {{#if (eq system.abilityModified "psyche")}}selected{{/if}}>Psyche</option>
-        </select>
-      </div>
-  
-      <div class="form-group">
-        <label>Talent Category:</label>
-        <select name="system.type" id="talent-category">
-          <option value="" {{#if (eq system.type "")}}selected{{/if}}>--Select Category--</option>
-          <option value="Weapon Skill" {{#if (eq system.type "Weapon Skill")}}selected{{/if}}>Weapon Skill</option>
-          <option value="Fighting Skill" {{#if (eq system.type "Fighting Skill")}}selected{{/if}}>Fighting Skill</option>
-          <option value="Professional Skill" {{#if (eq system.type "Professional Skill")}}selected{{/if}}>Professional Skill</option>
-          <option value="Scientific Skill" {{#if (eq system.type "Scientific Skill")}}selected{{/if}}>Scientific Skill</option>
-          <option value="Mystic/Mental Skill" {{#if (eq system.type "Mystic/Mental Skill")}}selected{{/if}}>Mystic/Mental Skill</option>
-          <option value="Other" {{#if (eq system.type "Other")}}selected{{/if}}>Other</option>
-        </select>
-      </div>
-  
-      <div class="form-group specialty-group">
-        <label>Specialty:</label>
-        <select name="system.specialty" id="talent-specialty">
-          <option value="" {{#if (eq system.specialty "")}}selected{{/if}}>--Select Specialty--</option>
-          <!-- Specialty options will be populated via JavaScript -->
-        </select>
-      </div>
-  
-      <div class="form-group">
-        <label>Description:</label>
-        <textarea name="system.description">{{system.description}}</textarea>
-      </div>
-    </section>
-  </form>
+  <div class="talent-body">
 
-<style>
-  .talent-sheet .form-group {
-    margin-bottom: 10px;
-  }
-  .talent-sheet .form-group label {
-    display: block;
-    font-weight: bold;
-    margin-bottom: 4px;
-  }
-  .talent-sheet select,
-  .talent-sheet input[type="text"],
-  .talent-sheet textarea {
-    width: 100%;
-    padding: 6px 8px;
-    border: 1px solid #ccc;
-    border-radius: 3px;
-    font-size: 14px;
-    line-height: 1.4;
-    box-sizing: border-box;
-  }
-  .talent-sheet select {
-    height: auto;
-    min-height: 32px;
-  }
-  .talent-sheet textarea {
-    min-height: 80px;
-    resize: vertical;
-  }
-</style>
+    <!-- Category -->
+    <fieldset class="talent-fieldset">
+      <legend>Category</legend>
+      <div class="talent-grid-2col">
+        <div class="talent-field">
+          <label>Category</label>
+          <select name="system.type" class="talent-category-select">
+            <option value="">-- Select --</option>
+            <option value="Weapon Skill" {{#if (eq system.type "Weapon Skill")}}selected{{/if}}>Weapon Skill</option>
+            <option value="Fighting Skill" {{#if (eq system.type "Fighting Skill")}}selected{{/if}}>Fighting Skill</option>
+            <option value="Professional Skill" {{#if (eq system.type "Professional Skill")}}selected{{/if}}>Professional Skill</option>
+            <option value="Scientific Skill" {{#if (eq system.type "Scientific Skill")}}selected{{/if}}>Scientific Skill</option>
+            <option value="Mystic/Mental Skill" {{#if (eq system.type "Mystic/Mental Skill")}}selected{{/if}}>Mystic/Mental Skill</option>
+            <option value="Other" {{#if (eq system.type "Other")}}selected{{/if}}>Other</option>
+          </select>
+        </div>
+        <div class="talent-field">
+          <label>Specialty</label>
+          <select name="system.specialty" class="talent-specialty-select">
+            <option value="">-- Select --</option>
+          </select>
+        </div>
+      </div>
+    </fieldset>
+
+    <!-- Modifiers -->
+    <fieldset class="talent-fieldset">
+      <legend>Modifiers</legend>
+      <div class="talent-grid-2col">
+        <div class="talent-field">
+          <label data-tooltip="Column shift applied to the modified ability when making a FEAT roll">Bonus</label>
+          <select name="system.bonus" class="talent-bonus-select">
+            <option value="+1CS" {{#if (eq system.bonus "+1CS")}}selected{{/if}}>+1CS</option>
+            <option value="+2CS" {{#if (eq system.bonus "+2CS")}}selected{{/if}}>+2CS</option>
+            <option value="+3CS" {{#if (eq system.bonus "+3CS")}}selected{{/if}}>+3CS</option>
+            <option value="Special" {{#if (eq system.bonus "Special")}}selected{{/if}}>Special</option>
+          </select>
+        </div>
+        <div class="talent-field">
+          <label>Ability Modified</label>
+          <select name="system.abilityModified" class="talent-ability-select">
+            <option value="" {{#if (eq system.abilityModified "")}}selected{{/if}}>None</option>
+            <option value="fighting" {{#if (eq system.abilityModified "fighting")}}selected{{/if}}>Fighting</option>
+            <option value="agility" {{#if (eq system.abilityModified "agility")}}selected{{/if}}>Agility</option>
+            <option value="strength" {{#if (eq system.abilityModified "strength")}}selected{{/if}}>Strength</option>
+            <option value="endurance" {{#if (eq system.abilityModified "endurance")}}selected{{/if}}>Endurance</option>
+            <option value="reason" {{#if (eq system.abilityModified "reason")}}selected{{/if}}>Reason</option>
+            <option value="intuition" {{#if (eq system.abilityModified "intuition")}}selected{{/if}}>Intuition</option>
+            <option value="psyche" {{#if (eq system.abilityModified "psyche")}}selected{{/if}}>Psyche</option>
+          </select>
+        </div>
+        <div class="talent-field talent-field-full">
+          <label data-tooltip="Use a fixed rank instead of applying the bonus as a column shift to the base ability">Rank Override</label>
+          <select name="system.rankOverride">
+            <option value="" {{#if (eq system.rankOverride "")}}selected{{/if}}>Use Bonus</option>
+            <option value="Feeble" {{#if (eq system.rankOverride "Feeble")}}selected{{/if}}>Feeble</option>
+            <option value="Poor" {{#if (eq system.rankOverride "Poor")}}selected{{/if}}>Poor</option>
+            <option value="Typical" {{#if (eq system.rankOverride "Typical")}}selected{{/if}}>Typical</option>
+            <option value="Good" {{#if (eq system.rankOverride "Good")}}selected{{/if}}>Good</option>
+            <option value="Excellent" {{#if (eq system.rankOverride "Excellent")}}selected{{/if}}>Excellent</option>
+            <option value="Remarkable" {{#if (eq system.rankOverride "Remarkable")}}selected{{/if}}>Remarkable</option>
+            <option value="Incredible" {{#if (eq system.rankOverride "Incredible")}}selected{{/if}}>Incredible</option>
+            <option value="Amazing" {{#if (eq system.rankOverride "Amazing")}}selected{{/if}}>Amazing</option>
+            <option value="Monstrous" {{#if (eq system.rankOverride "Monstrous")}}selected{{/if}}>Monstrous</option>
+            <option value="Unearthly" {{#if (eq system.rankOverride "Unearthly")}}selected{{/if}}>Unearthly</option>
+            <option value="Shift-X" {{#if (eq system.rankOverride "Shift-X")}}selected{{/if}}>Shift-X</option>
+            <option value="Shift-Y" {{#if (eq system.rankOverride "Shift-Y")}}selected{{/if}}>Shift-Y</option>
+            <option value="Shift-Z" {{#if (eq system.rankOverride "Shift-Z")}}selected{{/if}}>Shift-Z</option>
+          </select>
+        </div>
+        <div class="talent-check-row">
+          <label class="talent-check" data-tooltip="Bonuses from this talent stack with other Fighting Talents (e.g. MA-B + Wrestling = +3CS Grappling)">
+            <input type="checkbox" name="system.isCumulative" {{#if system.isCumulative}}checked{{/if}} />
+            Cumulative w/ Fighting Talents
+          </label>
+          <label class="talent-check" data-tooltip="Weapon Talents do not stack with each other. Only the highest bonus applies.">
+            <input type="checkbox" name="system.isWeaponTalent" {{#if system.isWeaponTalent}}checked{{/if}} />
+            Weapon Talent (no stacking)
+          </label>
+        </div>
+      </div>
+    </fieldset>
+
+    <!-- Rule Summary -->
+    <fieldset class="talent-fieldset">
+      <legend>Rule Summary</legend>
+      <div class="talent-rule-summary">
+        <!-- Populated by JS from specialty data -->
+      </div>
+    </fieldset>
+
+    <!-- Notes -->
+    <fieldset class="talent-fieldset">
+      <legend>Notes</legend>
+      <textarea name="system.notes" rows="3" placeholder="Player notes...">{{system.notes}}</textarea>
+    </fieldset>
+
+  </div>
+</form>

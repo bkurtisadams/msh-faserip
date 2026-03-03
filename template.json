@@ -205,7 +205,11 @@
       "bonus": "+1CS",
       "abilityModified": "",
       "type": "",
-      "specialty": ""
+      "specialty": "",
+      "rankOverride": "",
+      "isCumulative": false,
+      "isWeaponTalent": false,
+      "notes": ""
     },
     "contact": {
       "templates": ["base"],

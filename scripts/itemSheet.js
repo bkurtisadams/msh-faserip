@@ -1,4 +1,6 @@
-// itemSheet.js v1.8.0 - 2026-01-24
+// itemSheet.js v1.10.0 - 2026-03-03
+// v1.10.0: Extract talent sheet to standalone talentSheet.js
+// v1.9.0: Redesign talent sheet to HQ-style with fieldsets, auto-fill from specialty data, rule summary
 // v1.8.0: Add SFX preview buttons and volume controls to power sheet
 // v1.7.0: Power Sheet layout reorganization
 export class FaseripItemSheet extends ItemSheet {
@@ -17,9 +19,6 @@ export class FaseripItemSheet extends ItemSheet {
     // Use specific templates for different item types
     if (this.item.type === 'power') {
       return `systems/msh-faserip/templates/power-sheet.html`;
-    }
-    else if (this.item.type === 'talent') {
-      return `systems/msh-faserip/templates/talent-sheet.html`;
     }
     else if (this.item.type === 'contact') {
       return `systems/msh-faserip/templates/contact-sheet.html`;
@@ -863,54 +862,6 @@ export class FaseripItemSheet extends ItemSheet {
       }
     }
 
-    // Handle talent specialty dropdown (for talent sheets)
-    if (this.item.type === "talent") {
-      // Define talent specialties by category
-      const talentSpecialties = {
-        "Weapon Skill": ["Guns", "Thrown Weapons", "Bows", "Blunt Weapons", "Sharp Weapons", 
-                        "Oriental Weapons", "Marksman", "Weapons Master", "Weapons Specialist"],
-        "Fighting Skill": ["Martial Arts A", "Martial Arts B", "Martial Arts C", "Martial Arts D", 
-                          "Martial Arts E", "Wrestling", "Thrown Objects", "Acrobatics", "Tumbling"],
-        "Professional Skill": ["Medicine", "Law", "Law Enforcement", "Pilot", "Military", 
-                              "Business/Finance", "Journalism", "Engineering", "Criminology", 
-                              "Psychiatry", "Detective/Espionage"],
-        "Scientific Skill": ["Chemistry", "Biology", "Geology", "Genetics", "Archaeology", 
-                            "Physics", "Computers", "Electronics"],
-        "Mystic/Mental Skill": ["Trance", "Mesmerism and Hypnosis", "Sleight of Hand", 
-                              "Resist Domination", "Occult Lore", "Mystic Background"],
-        "Other": ["Artist", "Languages", "First Aid", "Repair/Tinkering", "Trivia", 
-                  "Performer", "Animal Training", "Heir to Fortune", "Student", "Leadership"]
-      };
-
-      // Function to update specialty dropdown based on selected category
-      const updateSpecialtyDropdown = () => {
-        const category = html.find('#talent-category').val();
-        const specialtySelect = html.find('#talent-specialty');
-        specialtySelect.empty();
-        
-        // Add default option
-        specialtySelect.append($('<option></option>').val('').text('--Select Specialty--'));
-        
-        // If a category is selected, add its specialties
-        if (category && talentSpecialties[category]) {
-          talentSpecialties[category].forEach(specialty => {
-            const option = $('<option></option>').val(specialty).text(specialty);
-            // Select this option if it matches the current specialty
-            if (specialty === this.item.system.specialty) {
-              option.attr('selected', 'selected');
-            }
-            specialtySelect.append(option);
-          });
-        }
-      };
-
-      // Update specialty dropdown when category changes
-      html.find('#talent-category').change(updateSpecialtyDropdown);
-      
-      // Initially populate the dropdown
-      updateSpecialtyDropdown();
-    }
-
     // Show/hide body armor fields
     html.find('#is-body-armor').change(ev => {
       const checked = ev.currentTarget.checked;
@@ -1157,17 +1108,6 @@ _updatePowerTypeOptions(html, category) {
     return rankRanges[rank] || "Unknown";
   }
     
-}
-
-// Talent Sheet - smaller dialog for simple talent items
-export class FaseripTalentSheet extends FaseripItemSheet {
-  static get defaultOptions() {
-    return foundry.utils.mergeObject(super.defaultOptions, {
-      classes: ["faserip", "sheet", "item", "talent"],
-      width: 420,
-      height: 520
-    });
-  }
 }
 
 // Contact Sheet - smaller dialog for simple contact items
