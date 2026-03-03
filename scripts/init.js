@@ -757,6 +757,14 @@ Hooks.once("init", async () => {
       default: []
     });
 
+    game.settings.register("msh-faserip", "teamHQActorId", {
+      name: "Team HQ Actor ID",
+      scope: "world",
+      config: false,
+      type: String,
+      default: ""
+    });
+
     game.settings.register("msh-faserip", "useKarmaPool", {
       name: "Enable Team Karma Pool",
       hint: "Enable the shared team karma pool (RAW rules). When off, all group awards split directly to individual heroes.",

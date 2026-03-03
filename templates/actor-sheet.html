@@ -1033,6 +1033,35 @@
 
         <!-- HQ Tab -->
         <div class="tab" data-tab="headquarters">
+
+          {{#if teamHQs.length}}
+          <div class="team-hq-label">Team HQs</div>
+          <table class="headquarters-table team-hq-table">
+            <tbody>
+              {{#each teamHQs}}
+              <tr class="headquarters-row team-hq-row" data-hq-id="{{this.id}}">
+                <td class="headquarters-name">
+                  <img src="{{this.img}}" class="headquarters-icon team-hq-view" data-hq-id="{{this.id}}" width="24" height="24" />
+                  <span class="headquarters-name-text team-hq-view" data-hq-id="{{this.id}}">{{this.name}}</span>
+                </td>
+                <td class="headquarters-location">{{this.location}}</td>
+                <td class="headquarters-size">{{this.size}}</td>
+                <td class="headquarters-material">{{this.materialStrength}}</td>
+                <td class="headquarters-cost">
+                  {{#if (eq this.ownership "owned")}}
+                  {{this.purchaseCost}} (Owner)
+                  {{else}}
+                  {{this.rentCost}} (Rent)
+                  {{/if}}
+                </td>
+                <td class="headquarters-controls"></td>
+              </tr>
+              {{/each}}
+            </tbody>
+          </table>
+          {{/if}}
+
+          <div class="team-hq-label">Personal</div>
           <table class="headquarters-table">
             <thead>
               <tr>
@@ -1062,7 +1091,7 @@
                   {{#if (eq hq.system.ownership "owned")}}
                   {{hq.system.purchaseCost}} (Owner)
                   {{else}}
-                  {{hq.system.rentalCost}} (Rent)
+                  {{#if hq.system.rentCost}}{{hq.system.rentCost}}{{else}}{{hq.system.rentalCost}}{{/if}} (Rent)
                   {{/if}}
                 </td>
                 <td class="headquarters-controls">

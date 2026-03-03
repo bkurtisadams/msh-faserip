@@ -35,6 +35,19 @@ export class TeamSheet extends Application {
     this._timeUpdateHook = Hooks.on("msh-faserip.timeUpdated", () => {
       if (this.rendered) this.render(false);
     });
+    // Re-render when team HQ actor items change
+    this._itemHook = Hooks.on("updateItem", (item) => {
+      const hqActorId = game.settings.get("msh-faserip", "teamHQActorId");
+      if (hqActorId && item.parent?.id === hqActorId && this.rendered) this.render(false);
+    });
+    this._createItemHook = Hooks.on("createItem", (item) => {
+      const hqActorId = game.settings.get("msh-faserip", "teamHQActorId");
+      if (hqActorId && item.parent?.id === hqActorId && this.rendered) this.render(false);
+    });
+    this._deleteItemHook = Hooks.on("deleteItem", (item) => {
+      const hqActorId = game.settings.get("msh-faserip", "teamHQActorId");
+      if (hqActorId && item.parent?.id === hqActorId && this.rendered) this.render(false);
+    });
   }
 
   static get defaultOptions() {
@@ -48,6 +61,9 @@ export class TeamSheet extends Application {
 
   async close(options) {
     if (this._timeUpdateHook) Hooks.off("msh-faserip.timeUpdated", this._timeUpdateHook);
+    if (this._itemHook) Hooks.off("updateItem", this._itemHook);
+    if (this._createItemHook) Hooks.off("createItem", this._createItemHook);
+    if (this._deleteItemHook) Hooks.off("deleteItem", this._deleteItemHook);
     return super.close(options);
   }
 
@@ -157,6 +173,12 @@ export class TeamSheet extends Application {
     });
 
     context.encounterCount = context.encounters.length;
+
+    // Team Headquarters
+    const hqActorId = game.settings.get("msh-faserip", "teamHQActorId");
+    const hqActor = hqActorId ? game.actors.get(hqActorId) : null;
+    context.teamHQs = hqActor ? hqActor.items.filter(i => i.type === "headquarters").map(i => ({ id: i.id, name: i.name, img: i.img, location: i.system.location, size: i.system.size, materialStrength: i.system.materialStrength, ownership: i.system.ownership, purchaseCost: i.system.purchaseCost, rentCost: i.system.rentCost })) : [];
+
     return context;
   }
 
@@ -228,6 +250,12 @@ export class TeamSheet extends Application {
     html.find('.award-encounter-heroes').click(ev => this._onAwardEncounterToHeroes(ev));
     html.find('.award-encounter-pool').click(ev => this._onAwardEncounterToPool(ev));
     html.find('.undo-award').click(ev => this._onUndoAward(ev));
+
+    // Team HQ
+    html.find('.add-team-hq').click(() => this._onAddTeamHQ());
+    html.find('.edit-team-hq').click(ev => this._onEditTeamHQ(ev.currentTarget.dataset.hqId));
+    html.find('.delete-team-hq').click(ev => this._onDeleteTeamHQ(ev.currentTarget.dataset.hqId));
+    html.find('.team-hq-img').click(ev => this._onViewTeamHQ(ev.currentTarget.dataset.hqId));
   }
 
   // ===== TEAM =====
@@ -657,6 +685,115 @@ export class TeamSheet extends Application {
       "system.karma.lifetime": earned,
       "system.attributes.karma.value": Math.max(0, earned - spent - adv)
     });
+  }
+
+
+  // ===== TEAM HQ =====
+
+  // Get or create the hidden team HQ actor
+  static async getTeamHQActor() {
+    const actorId = game.settings.get("msh-faserip", "teamHQActorId");
+    let actor = actorId ? game.actors.get(actorId) : null;
+    if (actor) return actor;
+
+    // Create hidden team HQ actor
+    actor = await Actor.create({
+      name: "Team Headquarters",
+      type: "hero",
+      img: "icons/svg/house.svg",
+      prototypeToken: { disposition: 0, actorLink: false },
+      ownership: { default: CONST.DOCUMENT_OWNERSHIP_LEVELS.OBSERVER }
+    });
+    await game.settings.set("msh-faserip", "teamHQActorId", actor.id);
+    console.log("[FASERIP] Created Team HQ actor:", actor.id);
+    return actor;
+  }
+
+  async _onAddTeamHQ() {
+    if (!game.user.isGM) return;
+    const actor = await TeamSheet.getTeamHQActor();
+    const items = await actor.createEmbeddedDocuments("Item", [{
+      name: "New Headquarters",
+      type: "headquarters",
+      system: {
+        description: "", buildingType: "", location: "", size: "",
+        materialStrength: "Typical", ownership: "owned",
+        purchaseCost: "", rentCost: "", rentalCost: "",
+        isRichArea: false, packages: [], staff: [], features: "", notes: ""
+      }
+    }]);
+    if (items?.[0]) items[0].sheet.render(true);
+    this.render(true);
+  }
+
+  _onEditTeamHQ(itemId) {
+    if (!game.user.isGM) return;
+    const actorId = game.settings.get("msh-faserip", "teamHQActorId");
+    const actor = actorId ? game.actors.get(actorId) : null;
+    if (!actor) return;
+    const item = actor.items.get(itemId);
+    if (item) item.sheet.render(true);
+  }
+
+  async _onDeleteTeamHQ(itemId) {
+    if (!game.user.isGM) return;
+    const actor = await TeamSheet.getTeamHQActor();
+    const item = actor.items.get(itemId);
+    if (!item) return;
+    if (!await Dialog.confirm({
+      title: "Delete Headquarters",
+      content: `<p>Delete <strong>${item.name}</strong>?</p>`
+    })) return;
+    await actor.deleteEmbeddedDocuments("Item", [itemId]);
+    this.render(true);
+  }
+
+  async _onViewTeamHQ(itemId) {
+    const actorId = game.settings.get("msh-faserip", "teamHQActorId");
+    const actor = actorId ? game.actors.get(actorId) : null;
+    if (!actor) return;
+    const item = actor.items.get(itemId);
+    if (!item) return;
+
+    const { ROOM_PACKAGES, STAFF_ROLES } = await import('./hq-constants.js');
+    const packages = (item.system.packages || []).map(p => {
+      const def = ROOM_PACKAGES[p.type];
+      if (!def) return null;
+      const tier = def.tiers[p.tier] || def.tiers[0];
+      const qty = (p.quantity || 1) > 1 ? ` &times;${p.quantity}` : '';
+      return `<li><strong>${def.name}${qty}</strong> (${tier.label}, ${tier.cost}) — ${tier.desc}</li>`;
+    }).filter(Boolean).join('');
+
+    const staff = (item.system.staff || []).map(s => {
+      const def = STAFF_ROLES[s.role];
+      if (!def) return null;
+      const qty = (s.quantity || 1) > 1 ? ` &times;${s.quantity}` : '';
+      const nameStr = s.name ? ` (${s.name})` : '';
+      return `<li><strong>${def.name}${nameStr}${qty}</strong> (${def.cost}/mo)</li>`;
+    }).filter(Boolean).join('');
+
+    const hasCustomImg = item.img && !item.img.includes("mystery-man") && !item.img.includes("default");
+    new Dialog({
+      title: item.name,
+      content: `
+        ${hasCustomImg ? `<img src="${item.img}" style="width:100%;border-radius:4px;margin-bottom:8px;" />` : ''}
+        <h2>${item.name}</h2>
+        <div class="headquarters-details">
+          <p><strong>Location:</strong> ${item.system.location || 'Unknown'}</p>
+          <p><strong>Size:</strong> ${item.system.size || 'Unknown'}</p>
+          <p><strong>Material Strength:</strong> ${item.system.materialStrength || 'Typical'}</p>
+          <p><strong>Ownership:</strong> ${item.system.ownership === 'rented' ? 'Rented' : 'Owned'}</p>
+          ${item.system.purchaseCost ? `<p><strong>Buy Cost:</strong> ${item.system.purchaseCost}</p>` : ''}
+          ${item.system.rentCost ? `<p><strong>Rent Cost:</strong> ${item.system.rentCost}</p>` : ''}
+          ${item.system.isRichArea ? `<p><strong>Rich Area:</strong> +1CS cost</p>` : ''}
+          ${packages ? `<h3>Room Packages</h3><ul>${packages}</ul>` : ''}
+          ${staff ? `<h3>Staff</h3><ul>${staff}</ul>` : ''}
+        </div>
+        ${item.system.notes ? `<div class="description">${item.system.notes}</div>` : ''}
+      `,
+      buttons: { close: { label: "Close" } },
+      width: 500
+    }).render(true);
   }
 
   // ===== RANK =====

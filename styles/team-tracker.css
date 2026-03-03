@@ -327,3 +327,21 @@
   font-style: italic; font-size: 12px;
   background: #fff; border: 1px solid #ddd; border-radius: 3px;
 }
+/* ===== TEAM HQ SECTION ===== */
+.team-tracker .team-hq-section { margin-bottom: 8px; }
+.team-tracker .team-hq-list { display: flex; flex-direction: column; gap: 2px; }
+.team-tracker .team-hq-row {
+  display: flex; align-items: center; gap: 6px;
+  padding: 3px 5px; background: #fff; border: 1px solid #ddd; border-radius: 3px;
+  font-size: 11px;
+}
+.team-tracker .team-hq-row:hover { background: #f5f0e8; }
+.team-tracker .team-hq-img {
+  width: 28px; height: 28px; border: 1px solid #8b0000; border-radius: 3px; cursor: pointer;
+  object-fit: cover;
+}
+.team-tracker .team-hq-info { flex: 1; min-width: 0; }
+.team-tracker .team-hq-name { font-weight: bold; display: block; }
+.team-tracker .team-hq-detail { font-size: 10px; color: #888; }
+.team-tracker .team-hq-section .action-icon { color: #999; cursor: pointer; padding: 0 2px; }
+.team-tracker .team-hq-section .action-icon:hover { color: #8b0000; }

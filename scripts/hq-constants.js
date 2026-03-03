@@ -153,6 +153,16 @@ export const ROOM_PACKAGES = {
       { cost: "Amazing",     label: "Advanced", desc: "Add automatic processing (factory for simple goods)" }
     ]
   },
+  "electronics-lab": {
+    name: "Electronics Lab",
+    icon: "fa-microchip",
+    rooms: 1,
+    tiers: [
+      { cost: "Remarkable",  label: "Basic",    desc: "Soldering, oscilloscopes, basic circuit fabrication", abilityRank: "Remarkable" },
+      { cost: "Incredible",  label: "Standard", desc: "Add micro-circuitry tools, spectrum analyzer", abilityRank: "Incredible" },
+      { cost: "Amazing",     label: "Advanced", desc: "Add chip fabrication, advanced diagnostic systems", abilityRank: "Amazing" }
+    ]
+  },
   "laboratory": {
     name: "Laboratory",
     icon: "fa-flask",

@@ -797,6 +797,15 @@ form.faserip-sheet .vehicles-table th {
   font-size: 11px !important;
 }
 
+/* ── Team HQ section label ─────────────────────────────────────────────── */
+form.faserip-sheet .team-hq-label {
+  font-size: 10px; font-weight: bold; color: #8b0000;
+  text-transform: uppercase; letter-spacing: 0.5px;
+  padding: 2px 4px; margin-top: 4px;
+}
+form.faserip-sheet .team-hq-table tr { cursor: pointer; }
+form.faserip-sheet .team-hq-table tr:hover { background: #f5f0e8; }
+
 /* ── Stunts table: bigger body text ────────────────────────────────────── */
 form.faserip-sheet .stunts-table td {
   font-size: 13px;

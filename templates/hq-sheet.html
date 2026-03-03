@@ -2,6 +2,7 @@
   <div class="hq-header">
     <img src="{{item.img}}" data-edit="img" width="32" height="32" class="hq-portrait" />
     <input type="text" name="name" value="{{item.name}}" class="hq-name-input" placeholder="Headquarters Name" />
+    <button type="button" class="hq-img-btn" title="Set HQ Image"><i class="fas fa-image"></i></button>
   </div>
 
   <div class="hq-body">
@@ -68,6 +69,7 @@
         <div class="hq-field hq-field-row">
           <label class="hq-check"><input type="radio" name="system.ownership" value="owned" {{#if (eq system.ownership "owned")}}checked{{/if}} /> Owned</label>
           <label class="hq-check"><input type="radio" name="system.ownership" value="rented" {{#if (eq system.ownership "rented")}}checked{{/if}} /> Rented</label>
+          <button type="button" class="hq-resource-feat" title="Resource FEAT for rent/purchase">Resource FEAT</button>
         </div>
       </div>
     </fieldset>

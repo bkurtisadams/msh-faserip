@@ -253,6 +253,18 @@ export class FaseripActorSheet extends ActorSheet {
       .filter(item => item.type === "headquarters")
       .sort((a, b) => (a.sort || 0) - (b.sort || 0));
 
+    // Team headquarters from team HQ actor
+    const hqActorId = game.settings.get("msh-faserip", "teamHQActorId");
+    const hqActor = hqActorId ? game.actors.get(hqActorId) : null;
+    context.teamHQs = hqActor ? hqActor.items.filter(i => i.type === "headquarters").map(i => ({
+      id: i.id, name: i.name, img: i.img,
+      location: i.system.location, size: i.system.size,
+      materialStrength: i.system.materialStrength,
+      ownership: i.system.ownership,
+      purchaseCost: i.system.purchaseCost,
+      rentCost: i.system.rentCost
+    })) : [];
+
     // vehicles made sortable
     context.vehicles = this.actor.items
       .filter(item => item.type === "vehicle")
@@ -2915,6 +2927,78 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
       }
     });
 
+    // Team HQ view (on actor sheet HQ tab)
+    html.find('.team-hq-view').click(async ev => {
+      const itemId = $(ev.currentTarget).data('hqId');
+      const hqActorId = game.settings.get("msh-faserip", "teamHQActorId");
+      const hqActor = hqActorId ? game.actors.get(hqActorId) : null;
+      if (!hqActor) return;
+      const item = hqActor.items.get(itemId);
+      if (!item) return;
+
+      const { ROOM_PACKAGES, STAFF_ROLES } = await import('./hq-constants.js');
+      const { FaseripHeadquartersSheet } = await import('./headquartersSheet.js');
+      const pkgData = (item.system.packages || []).map((p, i) => {
+        const def = ROOM_PACKAGES[p.type];
+        if (!def) return null;
+        const tier = def.tiers[p.tier] || def.tiers[0];
+        const qty = (p.quantity || 1) > 1 ? ` &times;${p.quantity}` : '';
+        return { html: `<li class="hq-pkg-chat-link" data-pkg-idx="${i}" style="cursor:pointer;"><strong>${def.name}${qty}</strong> (${tier.label}, ${tier.cost}) — ${tier.desc}</li>`, pkg: p };
+      }).filter(Boolean);
+      const packages = pkgData.map(d => d.html).join('');
+
+      const staff = (item.system.staff || []).map(s => {
+        const def = STAFF_ROLES[s.role];
+        if (!def) return null;
+        const qty = (s.quantity || 1) > 1 ? ` &times;${s.quantity}` : '';
+        const nameStr = s.name ? ` (${s.name})` : '';
+        return `<li><strong>${def.name}${nameStr}${qty}</strong> (${def.cost}/mo)</li>`;
+      }).filter(Boolean).join('');
+
+      const hasCustomImg = item.img && !item.img.includes("mystery-man") && !item.img.includes("default");
+      new Dialog({
+        title: item.name,
+        content: `
+          ${hasCustomImg ? `<img src="${item.img}" style="width:100%;border-radius:4px;margin-bottom:8px;" />` : ''}
+          <h2>${item.name}</h2>
+          <div class="headquarters-details">
+            <p><strong>Location:</strong> ${item.system.location || 'Unknown'}</p>
+            <p><strong>Size:</strong> ${item.system.size || 'Unknown'}</p>
+            <p><strong>Material Strength:</strong> ${item.system.materialStrength || 'Typical'}</p>
+            <p><strong>Ownership:</strong> ${item.system.ownership === 'rented' ? 'Rented' : 'Owned'}</p>
+            ${item.system.purchaseCost ? `<p><strong>Buy Cost:</strong> ${item.system.purchaseCost}</p>` : ''}
+            ${item.system.rentCost ? `<p><strong>Rent Cost:</strong> ${item.system.rentCost}</p>` : ''}
+            ${item.system.isRichArea ? `<p><strong>Rich Area:</strong> +1CS cost</p>` : ''}
+            ${packages ? `<h3>Room Packages</h3><ul>${packages}</ul>` : ''}
+            ${staff ? `<h3>Staff</h3><ul>${staff}</ul>` : ''}
+          </div>
+          ${item.system.notes ? `<div class="description">${item.system.notes}</div>` : ''}
+          <div style="margin-top:8px;text-align:center;">
+            <button type="button" class="hq-info-resource-feat" style="padding:4px 12px;font-size:11px;border:1px solid #8b0000;border-radius:3px;background:#f5f0e8;color:#8b0000;cursor:pointer;">Resource FEAT</button>
+          </div>
+        `,
+        buttons: { close: { label: "Close" } },
+        width: 500,
+        render: (html) => {
+          html.find('.hq-pkg-chat-link').click(ev => {
+            const idx = Number(ev.currentTarget.dataset.pkgIdx);
+            const pkg = item.system.packages?.[idx];
+            if (pkg) FaseripHeadquartersSheet.sendPackageChatCard(pkg, item.name);
+          });
+          html.find('.hq-pkg-chat-link strong').hover(
+            function() { $(this).css('color', '#8b0000'); },
+            function() { $(this).css('color', ''); }
+          );
+          html.find('.hq-info-resource-feat').click(() => {
+            const isRented = item.system.ownership === "rented";
+            const costRank = isRented ? (item.system.rentCost || "Typical") : (item.system.purchaseCost || "Typical");
+            const costType = isRented ? "Rent" : "Purchase";
+            FaseripHeadquartersSheet.rollHQResourceFEAT(item.name, costRank, costType);
+          });
+        }
+      }).render(true);
+    });
+
     // Headquarters info button (clickable image)
     html.find('.headquarters-info').click(async ev => {
       const itemId = $(ev.currentTarget).data("itemId");
@@ -2922,13 +3006,15 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
       if (!item) return;
 
       const { ROOM_PACKAGES, STAFF_ROLES } = await import('./hq-constants.js');
-      const packages = (item.system.packages || []).map(p => {
+      const { FaseripHeadquartersSheet } = await import('./headquartersSheet.js');
+      const pkgData = (item.system.packages || []).map((p, i) => {
         const def = ROOM_PACKAGES[p.type];
         if (!def) return null;
         const tier = def.tiers[p.tier] || def.tiers[0];
         const qty = (p.quantity || 1) > 1 ? ` &times;${p.quantity}` : '';
-        return `<li><strong>${def.name}${qty}</strong> (${tier.label}, ${tier.cost}) — ${tier.desc}</li>`;
-      }).filter(Boolean).join('');
+        return { html: `<li class="hq-pkg-chat-link" data-pkg-idx="${i}" style="cursor:pointer;"><strong>${def.name}${qty}</strong> (${tier.label}, ${tier.cost}) — ${tier.desc}</li>`, pkg: p };
+      }).filter(Boolean);
+      const packages = pkgData.map(d => d.html).join('');
 
       const staff = (item.system.staff || []).map(s => {
         const def = STAFF_ROLES[s.role];
@@ -2937,7 +3023,9 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
         return `<li><strong>${def.name}${qty}</strong> (${def.cost}/mo)</li>`;
       }).filter(Boolean).join('');
 
+      const hasCustomImg = item.img && !item.img.includes("mystery-man") && !item.img.includes("default");
       let content = `
+        ${hasCustomImg ? `<img src="${item.img}" style="width:100%;border-radius:4px;margin-bottom:8px;" />` : ''}
         <h2>${item.name}</h2>
         <div class="headquarters-details">
           <p><strong>Location:</strong> ${item.system.location || 'Unknown'}</p>
@@ -2951,14 +3039,35 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
           ${staff ? `<h3>Staff</h3><ul>${staff}</ul>` : ''}
         </div>
         ${item.system.notes ? `<div class="description">${item.system.notes}</div>` : ''}
+        <div style="margin-top:8px;text-align:center;">
+          <button type="button" class="hq-info-resource-feat" style="padding:4px 12px;font-size:11px;border:1px solid #8b0000;border-radius:3px;background:#f5f0e8;color:#8b0000;cursor:pointer;">Resource FEAT</button>
+        </div>
       `;
 
-      new Dialog({
+      const dlg = new Dialog({
         title: "Headquarters Information",
         content,
         buttons: { close: { label: "Close" } },
-        width: 400
-      }).render(true);
+        width: 500,
+        render: (html) => {
+          html.find('.hq-pkg-chat-link').click(ev => {
+            const idx = Number(ev.currentTarget.dataset.pkgIdx);
+            const pkg = item.system.packages?.[idx];
+            if (pkg) FaseripHeadquartersSheet.sendPackageChatCard(pkg, item.name);
+          });
+          html.find('.hq-pkg-chat-link strong').hover(
+            function() { $(this).css('color', '#8b0000'); },
+            function() { $(this).css('color', ''); }
+          );
+          html.find('.hq-info-resource-feat').click(() => {
+            const isRented = item.system.ownership === "rented";
+            const costRank = isRented ? (item.system.rentCost || "Typical") : (item.system.purchaseCost || "Typical");
+            const costType = isRented ? "Rent" : "Purchase";
+            FaseripHeadquartersSheet.rollHQResourceFEAT(item.name, costRank, costType);
+          });
+        }
+      });
+      dlg.render(true);
     });
 
     // Headquarters - draggable and sortable
