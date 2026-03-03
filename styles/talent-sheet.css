@@ -1,36 +1,19 @@
-/* talent-sheet.css v1.1.0 - 2026-03-03 */
+/* talent-sheet.css v1.2.0 - 2026-03-03 */
 
-/* ── Reset Foundry defaults on the talent dialog ── */
-.app.talent-dialog .window-content {
-  padding: 0; background: #f5f0e8;
-}
-.app.talent-dialog .window-content form {
-  padding: 0; margin: 0; display: flex; flex-direction: column; height: 100%;
-}
-.app.talent-dialog .window-content form .sheet-header,
-.app.talent-dialog .window-content form > header {
-  display: none;
-}
+/* ── Layout ──────────────────────────── */
+.talent-dialog { max-height: 90vh; background: #f5f0e8; }
+.talent-dialog .talent-body { padding: 4px 8px; overflow-y: auto; }
 
 /* ── Header ──────────────────────────── */
 .talent-dialog .talent-header {
-  display: flex; align-items: center; gap: 6px;
-  padding: 6px 8px; background: #f5f0e8;
-  border-bottom: 1px solid #c0a070;
+  display: flex; align-items: center; gap: 6px; padding: 4px 8px;
 }
 .talent-dialog .talent-portrait {
   border: 1px solid #8b0000; border-radius: 3px; cursor: pointer;
-  flex-shrink: 0;
 }
 .talent-dialog .talent-name-input {
   flex: 1; font-size: 14px; font-weight: bold;
   border: 1px solid #ccc; border-radius: 3px; padding: 3px 6px;
-  background: #fff; color: #333; height: 28px;
-}
-
-/* ── Scrollable body ─────────────────── */
-.talent-dialog .talent-body {
-  padding: 6px 8px; overflow-y: auto; flex: 1;
 }
 
 /* ── Fieldsets ────────────────────────── */
@@ -46,19 +29,14 @@
 .talent-dialog .talent-grid-2col {
   display: grid; grid-template-columns: 1fr 1fr; gap: 4px 8px;
 }
-.talent-dialog .talent-field {
-  display: flex; flex-direction: column;
-}
+.talent-dialog .talent-field { display: flex; flex-direction: column; }
 .talent-dialog .talent-field label {
-  font-size: 9px; font-weight: bold; color: #666;
-  margin-bottom: 1px; display: block;
+  font-size: 9px; font-weight: bold; color: #666; margin-bottom: 1px;
 }
 .talent-dialog .talent-field input,
 .talent-dialog .talent-field select {
-  height: 24px; font-size: 11px; padding: 1px 4px;
+  height: 24px; font-size: 11px; padding: 1px 3px;
   border: 1px solid #ccc; border-radius: 3px;
-  background: #fff; color: #333; box-sizing: border-box;
-  width: 100%;
 }
 .talent-dialog .talent-field-full {
   grid-column: 1 / -1;
@@ -67,28 +45,25 @@
 /* ── Checkboxes ──────────────────────── */
 .talent-dialog .talent-check-row {
   grid-column: 1 / -1;
-  display: flex; gap: 12px; padding-top: 3px;
+  display: flex; gap: 12px; padding-top: 2px;
 }
 .talent-dialog .talent-check {
   font-size: 10px; cursor: pointer; display: inline-flex;
   align-items: center; gap: 3px; font-weight: normal; color: #555;
 }
-.talent-dialog .talent-check input[type="checkbox"] {
-  margin: 0; width: auto; height: auto;
-}
+.talent-dialog .talent-check input[type="checkbox"] { margin: 0; }
 
 /* ── Rule summary ────────────────────── */
 .talent-dialog .talent-rule-line {
-  font-size: 11px; color: #333; line-height: 1.5; padding: 2px 0;
+  font-size: 11px; color: #333; line-height: 1.4; padding: 2px 0;
 }
 .talent-dialog .talent-badge {
   font-size: 9px; color: #fff; background: #5b7a3a; border-radius: 2px;
-  padding: 1px 5px; font-weight: bold; display: inline-block;
-  vertical-align: middle; margin-right: 2px;
+  padding: 1px 4px; font-weight: bold; display: inline-block; vertical-align: middle;
 }
 .talent-dialog .talent-rule-desc {
   font-size: 9px; color: #888; font-style: italic; line-height: 1.3;
-  margin-top: 3px; padding: 2px 0;
+  margin-top: 2px; padding: 2px 0;
 }
 .talent-dialog .talent-rule-empty {
   font-size: 10px; color: #aaa; font-style: italic; padding: 4px 0;
@@ -98,6 +73,4 @@
 .talent-dialog .talent-fieldset textarea {
   width: 100%; font-size: 11px; border: 1px solid #ccc;
   border-radius: 3px; padding: 3px 5px; resize: vertical;
-  background: #fff; box-sizing: border-box;
-  min-height: 50px;
 }

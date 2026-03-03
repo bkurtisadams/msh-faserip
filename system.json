@@ -54,7 +54,8 @@
         "styles/team-tracker.css",
         "styles/chargen.css",
         "styles/hq-sheet.css",
-        "styles/talent-sheet.css"
+        "styles/talent-sheet.css",
+        "styles/contact-sheet.css"
     ],
     "packs": [
         {

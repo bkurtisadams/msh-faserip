@@ -1,5 +1,5 @@
-// itemSheet.js v1.10.0 - 2026-03-03
-// v1.10.0: Extract talent sheet to standalone talentSheet.js
+// itemSheet.js v1.11.0 - 2026-03-03
+// v1.11.0: Extract contact sheet to standalone contactSheet.js
 // v1.9.0: Redesign talent sheet to HQ-style with fieldsets, auto-fill from specialty data, rule summary
 // v1.8.0: Add SFX preview buttons and volume controls to power sheet
 // v1.7.0: Power Sheet layout reorganization
@@ -19,9 +19,6 @@ export class FaseripItemSheet extends ItemSheet {
     // Use specific templates for different item types
     if (this.item.type === 'power') {
       return `systems/msh-faserip/templates/power-sheet.html`;
-    }
-    else if (this.item.type === 'contact') {
-      return `systems/msh-faserip/templates/contact-sheet.html`;
     }
     else if (this.item.type === 'vehicle') {
       return `systems/msh-faserip/templates/vehicle-sheet.html`;
@@ -1110,13 +1107,3 @@ _updatePowerTypeOptions(html, category) {
     
 }
 
-// Contact Sheet - smaller dialog for simple contact items
-export class FaseripContactSheet extends FaseripItemSheet {
-  static get defaultOptions() {
-    return foundry.utils.mergeObject(super.defaultOptions, {
-      classes: ["faserip", "sheet", "item", "contact"],
-      width: 420,
-      height: 520
-    });
-  }
-}

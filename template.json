@@ -216,7 +216,10 @@
       "type": "",
       "disposition": "Friendly",
       "specialties": [],
-      "location": ""
+      "location": "",
+      "notes": "",
+      "resourceRank": "",
+      "services": []
     },
     "equipment": {
       "templates": ["base", "ranked"],
