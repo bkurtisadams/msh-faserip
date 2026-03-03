@@ -180,40 +180,43 @@
 .team-tracker .villain-entry.awarded { opacity: 0.55; }
 
 /* Collapsed row */
-.team-tracker .villain-row {
-  display: flex; align-items: center; gap: 5px;
-  padding: 3px 6px; cursor: pointer;
-  font-size: 12px;
+.faserip.sheet.team-tracker .villain-row {
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 6px; cursor: pointer;
+  font-size: 13px;
 }
-.team-tracker .villain-row:hover { background: #fefdf8; }
+.faserip.sheet.team-tracker .villain-row:hover { background: #f5f5f5; }
 
-.team-tracker .expand-toggle {
-  width: 14px; text-align: center; font-size: 10px; color: #888;
+.faserip.sheet.team-tracker .expand-toggle {
+  width: 14px; text-align: center; font-size: 10px; color: #555;
 }
-.team-tracker .villain-portrait {
-  width: 24px; height: 24px;
-  border-radius: 3px; object-fit: cover; border: 1px solid #ddd;
+.faserip.sheet.team-tracker .villain-portrait {
+  width: 28px; height: 28px;
+  border-radius: 3px; object-fit: cover; border: 1px solid #aaa;
 }
-.team-tracker .villain-name {
+.faserip.sheet.team-tracker .villain-name {
   flex: 1; min-width: 0;
-  font-weight: 600; color: #1a1a1a;
+  font-weight: 700 !important; color: #000 !important; font-size: 14px !important;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.team-tracker .rank-badge {
+.faserip.sheet.team-tracker .villain-date {
+  font-size: 11px; color: #555; white-space: nowrap;
+}
+.faserip.sheet.team-tracker .rank-badge {
   display: inline-block;
   background: #c8960c; color: #fff;
-  padding: 0 5px; border-radius: 3px;
-  font-size: 10px; font-weight: 700;
+  padding: 1px 6px; border-radius: 3px;
+  font-size: 11px; font-weight: 700;
   font-family: 'Oswald', sans-serif;
   white-space: nowrap;
 }
-.team-tracker .rank-badge.sub-rm { background: #999; }
+.faserip.sheet.team-tracker .rank-badge.sub-rm { background: #888; }
 
-.team-tracker .karma-val {
-  font-weight: 700; color: #2e7d32; font-size: 12px;
-  min-width: 28px; text-align: center;
+.faserip.sheet.team-tracker .karma-val {
+  font-weight: 700 !important; color: #1b5e20 !important; font-size: 14px !important;
+  min-width: 30px; text-align: center;
 }
-.team-tracker .karma-val.no-award { color: #999; font-weight: 400; }
+.faserip.sheet.team-tracker .karma-val.no-award { color: #888 !important; font-weight: 400 !important; }
 
 .team-tracker .btn-award, .team-tracker .btn-pool {
   padding: 1px 5px; font-size: 10px; font-weight: 600;
@@ -232,78 +235,94 @@
 .team-tracker .delete-villain:hover { color: #c62828; }
 
 /* ========== EXPANDED DETAIL ========== */
-.team-tracker .villain-detail {
-  padding: 6px 8px 8px 28px;
-  border-top: 1px solid #eee;
-  background: #fefdf8;
-  display: flex; flex-direction: column; gap: 6px;
+.faserip.sheet.team-tracker .villain-detail {
+  padding: 10px 12px;
+  border-top: 2px solid #8b0000;
+  background: #ffffff !important;
+  display: flex; flex-direction: column; gap: 10px;
 }
-.team-tracker .detail-section > label {
-  font-size: 10px; font-weight: 600; color: #8b0000;
+.faserip.sheet.team-tracker .villain-detail .detail-section > label {
+  font-size: 13px !important; font-weight: 700 !important; color: #000 !important;
   text-transform: uppercase; letter-spacing: 0.3px;
-  display: block; margin-bottom: 2px;
+  display: block; margin-bottom: 4px;
 }
-.team-tracker .detail-row {
-  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+.faserip.sheet.team-tracker .villain-detail .detail-row {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
 }
-.team-tracker .detail-row label { font-size: 11px; color: #444; }
-.team-tracker .detail-row select {
-  padding: 2px 4px; font-size: 11px;
+.faserip.sheet.team-tracker .villain-detail .detail-row label {
+  font-size: 13px !important; color: #000 !important; font-weight: 600 !important;
+}
+.faserip.sheet.team-tracker .villain-detail .detail-row select {
+  padding: 3px 6px; font-size: 13px !important;
   font-family: 'Barlow Condensed', sans-serif;
-  border: 1px solid #ccc; border-radius: 3px; background: #fff;
+  border: 1px solid #888 !important; border-radius: 3px; background: #fff !important;
+  color: #000 !important;
 }
-.team-tracker .crime-flag {
-  font-size: 11px; display: flex; align-items: center; gap: 2px;
+.faserip.sheet.team-tracker .villain-detail .crime-flag {
+  font-size: 13px !important; color: #000 !important; font-weight: 600 !important;
+  display: flex; align-items: center; gap: 4px;
   white-space: nowrap;
 }
-.team-tracker .crime-flag input { accent-color: #8b0000; }
+.faserip.sheet.team-tracker .villain-detail .crime-flag input[type="checkbox"] {
+  accent-color: #8b0000; width: 15px; height: 15px;
+}
 
 /* Present heroes */
-.team-tracker .present-heroes {
-  display: flex; flex-wrap: wrap; gap: 4px;
+.faserip.sheet.team-tracker .villain-detail .present-heroes {
+  display: flex; flex-wrap: wrap; gap: 5px;
 }
-.team-tracker .hero-check {
-  display: flex; align-items: center; gap: 3px;
-  font-size: 10px; cursor: pointer;
-  padding: 1px 4px; border: 1px solid #ddd;
-  border-radius: 3px; background: #fff;
+.faserip.sheet.team-tracker .villain-detail .hero-check {
+  display: flex; align-items: center; gap: 4px;
+  font-size: 12px !important; color: #000 !important; font-weight: 500 !important;
+  cursor: pointer;
+  padding: 3px 6px; border: 1px solid #aaa;
+  border-radius: 3px; background: #fff !important;
 }
-.team-tracker .hero-check:has(input:checked) {
-  border-color: #2e7d32; background: #e8f5e9;
+.faserip.sheet.team-tracker .villain-detail .hero-check:has(input:checked) {
+  border-color: #2e7d32; background: #e8f5e9 !important;
 }
-.team-tracker .hero-check input { accent-color: #2e7d32; width: 12px; height: 12px; }
-.team-tracker .hero-check-portrait {
-  width: 16px; height: 16px; border-radius: 2px; object-fit: cover;
+.faserip.sheet.team-tracker .villain-detail .hero-check input[type="checkbox"] {
+  accent-color: #2e7d32; width: 14px !important; height: 14px !important;
+}
+.faserip.sheet.team-tracker .villain-detail .hero-check span {
+  color: #000 !important; font-size: 12px !important;
+}
+.faserip.sheet.team-tracker .villain-detail .hero-check-portrait {
+  width: 20px; height: 20px; border-radius: 2px; object-fit: cover;
 }
 
 /* Extras row */
-.team-tracker .detail-row.extras label { display: flex; align-items: center; gap: 3px; }
-.team-tracker .detail-row.extras input[type="number"] {
-  width: 36px; padding: 1px 3px; font-size: 11px;
-  font-family: 'Barlow Condensed', sans-serif;
-  border: 1px solid #ccc; border-radius: 3px;
-  text-align: center;
+.faserip.sheet.team-tracker .villain-detail .detail-row.extras label {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 13px !important; color: #000 !important; font-weight: 600 !important;
 }
-.team-tracker .detail-row.extras input[type="number"]::-webkit-outer-spin-button,
-.team-tracker .detail-row.extras input[type="number"]::-webkit-inner-spin-button {
+.faserip.sheet.team-tracker .villain-detail .detail-row.extras input[type="number"] {
+  width: 44px; padding: 3px 5px; font-size: 13px !important;
+  font-family: 'Barlow Condensed', sans-serif;
+  border: 1px solid #888 !important; border-radius: 3px;
+  text-align: center; color: #000 !important; background: #fff !important;
+}
+.faserip.sheet.team-tracker .villain-detail .detail-row.extras input[type="number"]::-webkit-outer-spin-button,
+.faserip.sheet.team-tracker .villain-detail .detail-row.extras input[type="number"]::-webkit-inner-spin-button {
   -webkit-appearance: none; margin: 0;
 }
 
 /* ========== VILLAIN SUMMARY ========== */
-.team-tracker .villain-summary {
-  background: #f5f3ee;
-  border: 1px solid #ddd;
+.faserip.sheet.team-tracker .villain-summary {
+  background: #f5f5f5 !important;
+  border: 2px solid #888;
   border-radius: 3px;
-  padding: 4px 8px;
-  font-size: 11px;
+  padding: 8px 10px;
+  font-size: 13px !important;
+  color: #000 !important;
 }
-.team-tracker .sum-breakdown {
-  display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 2px;
+.faserip.sheet.team-tracker .villain-summary .sum-breakdown {
+  display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 4px;
 }
-.team-tracker .sum-pos { color: #2e7d32; font-weight: 600; }
-.team-tracker .sum-neg { color: #c62828; font-weight: 600; }
-.team-tracker .sum-total { color: #444; }
-.team-tracker .sum-total strong { color: #1a1a1a; }
+.faserip.sheet.team-tracker .villain-summary .sum-pos { color: #1b5e20 !important; font-weight: 700 !important; }
+.faserip.sheet.team-tracker .villain-summary .sum-neg { color: #b71c1c !important; font-weight: 700 !important; }
+.faserip.sheet.team-tracker .villain-summary .sum-total { color: #000 !important; font-weight: 600 !important; }
+.faserip.sheet.team-tracker .villain-summary .sum-total strong { color: #000 !important; font-size: 14px !important; font-weight: 800 !important; }
 
 /* ========== EMPTY STATE ========== */
 .team-tracker .no-villains {

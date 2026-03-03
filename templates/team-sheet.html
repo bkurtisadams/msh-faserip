@@ -89,6 +89,7 @@
             <span class="expand-toggle"><i class="fas fa-chevron-{{#if v.expanded}}down{{else}}right{{/if}}"></i></span>
             <img src="{{v.img}}" class="villain-portrait" />
             <span class="villain-name">{{v.name}}</span>
+            {{#if v.gameDate}}<span class="villain-date">{{v.gameDate}}</span>{{/if}}
             <span class="rank-badge {{#if v.subRemarkable}}sub-rm{{/if}}">{{v.rankLabel}}({{v.rankValue}})</span>
             {{#if v.karmaEligible}}
             <span class="karma-val">+{{v.rankValue}}</span>
