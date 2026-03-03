@@ -589,6 +589,7 @@
   width: 100%;
   border-collapse: collapse;
   margin-bottom: 10px;
+  border-spacing: 0;
  }
  
  .faserip-sheet .powers-table th {
@@ -602,6 +603,10 @@
  .faserip-sheet .powers-table td {
   padding: 5px;
   text-align: center;
+  border-bottom: none;
+ }
+
+ .faserip-sheet .powers-table tbody tr {
   border-bottom: 1px solid #ccc;
  }
  
@@ -615,7 +620,6 @@
  
  .faserip-sheet .power-icon {
   cursor: pointer;
-  border: 1px solid #ccc;
  }
  
  .faserip-sheet .power-icon img {
