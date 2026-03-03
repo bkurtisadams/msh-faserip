@@ -677,12 +677,6 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
       });
     }
 
-    html.find('.open-team-tracker').click(ev => {
-      import('./teamSheet.js').then(module => {
-        const sheet = new module.TeamSheet();
-        sheet.render(true);
-      });
-    });
     // Recovery & Rest Button Handlers
     html.find('.recovery-btn').click(async (event) => {
       event.preventDefault();
@@ -1173,9 +1167,8 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
       this.actor.update(formData);
     }); */
 
-    // Karma History button
-    html.find('.view-karma-history').click(ev => {
-      // Import dynamically to avoid circular dependencies
+    // Karma History — click the Karma header in secondary abilities
+    html.find('.karma-history-link').click(ev => {
       import('./karma.js').then(module => {
         const sheet = new module.KarmaSheet(this.actor);
         sheet.render(true);
