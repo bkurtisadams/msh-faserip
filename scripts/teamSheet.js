@@ -1,9 +1,8 @@
-// teamSheet.js v3.0.0 - 2026-03-02
-// v3.0.0: Compact layout, defeated villains with expand/collapse per-villain award,
-//         auto-capture from combat tracker, stripped pending queue/session log
+// teamSheet.js v4.0.0 - 2026-03-02
+// v4.0.0: Encounter-grouped defeated villains. Crime/rescue/losses are per-encounter,
+//         foe karma stacks per villain within encounter. Undo award support.
 export class TeamSheet extends Application {
 
-  // Rank thresholds for karma eligibility (Remarkable+ = 30+)
   static RANK_TABLE = [
     { rank: "Shift-0", value: 0 }, { rank: "Feeble", value: 2 },
     { rank: "Poor", value: 4 }, { rank: "Typical", value: 6 },
@@ -16,7 +15,6 @@ export class TeamSheet extends Application {
     { rank: "Class 5000", value: 5000 }, { rank: "Beyond", value: 10000 }
   ];
 
-  // Crime type stop/arrest karma values
   static CRIME_VALUES = {
     violent:              { stop: 30, arrest: 15 },
     destructive:          { stop: 20, arrest: 10 },
@@ -33,7 +31,7 @@ export class TeamSheet extends Application {
   constructor(options = {}) {
     super(options);
     this._removeMode = false;
-    this._expandedVillains = new Set();
+    this._expandedEncounters = new Set();
     this._timeUpdateHook = Hooks.on("msh-faserip.timeUpdated", () => {
       if (this.rendered) this.render(false);
     });
@@ -43,7 +41,8 @@ export class TeamSheet extends Application {
     return foundry.utils.mergeObject(super.defaultOptions, {
       classes: ["faserip", "sheet", "team-tracker"],
       template: "systems/msh-faserip/templates/team-sheet.html",
-      width: 480, height: 520, resizable: true, title: "Team Tracker"
+      width: 500, height: 560, resizable: true, title: "Team Tracker",
+      scrollY: [".tracker-body"]
     });
   }
 
@@ -85,46 +84,75 @@ export class TeamSheet extends Application {
     ).map(a => ({ id: a.id, name: a.name, type: a.type }))
      .sort((a, b) => a.name.localeCompare(b.name));
 
-    // Pool
     context.teamKarmaPool = game.settings.get("msh-faserip", "teamKarmaPoolTotal") || 0;
 
-    // Multiplier
     const multiplier = game.settings.get("msh-faserip", "karmaMultiplier") || 1;
     context.karmaMultiplier = multiplier;
     context.multiplierOptions = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
-    // Defeated villains with computed fields
-    const villains = game.settings.get("msh-faserip", "defeatedVillains") || [];
-    context.defeatedVillains = villains.map((v, idx) => {
-      const expanded = this._expandedVillains.has(idx);
-      const karmaEligible = v.defeated !== false && v.rankValue >= 30;
-      const subRemarkable = v.rankValue < 30;
-      const crimeVals = v.crimeType ? TeamSheet.CRIME_VALUES[v.crimeType] : null;
-      const stopValue = crimeVals && v.stopped ? crimeVals.stop : 0;
-      const arrestValue = crimeVals && v.arrested ? crimeVals.arrest : 0;
-      const rescueKarma = Math.min((v.rescues || 0) * 20, 100);
-      const penaltyKarma = (v.propertyDamage || 0) * -5;
-      const positiveTotal = (karmaEligible ? v.rankValue : 0) + stopValue + arrestValue + rescueKarma;
-      const positiveMultiplied = positiveTotal * multiplier;
-      const heroCount = Math.max(1, (v.presentHeroIds || []).length);
-      const perHeroPositive = Math.floor(positiveMultiplied / heroCount);
-      const perHeroPenalty = penaltyKarma ? Math.floor(penaltyKarma / heroCount) : 0;
+    // Encounters — migrate v3 flat villains to v4 encounter format
+    let encounters = game.settings.get("msh-faserip", "defeatedVillains") || [];
+    let needsMigration = false;
+    encounters = encounters.map(entry => {
+      if (entry.villains) return entry; // already v4
+      needsMigration = true;
+      return {
+        id: entry.id || `enc_${Date.now()}_${Math.random().toString(36).slice(2,6)}`,
+        villains: [{ name: entry.name, img: entry.img, actorId: entry.actorId || null,
+                     rankValue: entry.rankValue || 0, rankLabel: entry.rankLabel || "Unknown" }],
+        presentHeroIds: entry.presentHeroIds || [],
+        crimeType: entry.crimeType || "", stopped: entry.stopped || false, arrested: entry.arrested || false,
+        rescues: entry.rescues || 0, losses: entry.propertyDamage ? entry.propertyDamage * 5 : 0,
+        awarded: entry.awarded || false,
+        gameDate: entry.gameDate || "", gameTime: entry.gameTime || "",
+        timestamp: entry.timestamp || new Date().toISOString()
+      };
+    });
+    if (needsMigration) {
+      game.settings.set("msh-faserip", "defeatedVillains", encounters);
+      console.log("[FASERIP] Migrated defeated villains from v3 to v4 encounter format");
+    }
+    context.encounters = encounters.map((enc, idx) => {
+      const expanded = this._expandedEncounters.has(idx);
+      const villainRows = (enc.villains || []).map(v => {
+        const eligible = v.rankValue >= 30;
+        return { ...v, eligible, subRemarkable: !eligible };
+      });
+      const foeTotal = villainRows.reduce((sum, v) => sum + (v.eligible ? v.rankValue : 0), 0);
 
-      // Build hero check data for expanded view
+      const crimeVals = enc.crimeType ? TeamSheet.CRIME_VALUES[enc.crimeType] : null;
+      const stopValue = crimeVals && enc.stopped ? crimeVals.stop : 0;
+      const arrestValue = crimeVals && enc.arrested ? crimeVals.arrest : 0;
+      const rescueKarma = Math.min((enc.rescues || 0) * 20, 100);
+      const lossKarma = -Math.abs(enc.losses || 0);
+
+      const positiveTotal = foeTotal + stopValue + arrestValue + rescueKarma;
+      const positiveMultiplied = positiveTotal * multiplier;
+      const heroCount = Math.max(1, (enc.presentHeroIds || []).length);
+      const perHeroPositive = Math.floor(positiveMultiplied / heroCount);
+      const perHeroLoss = lossKarma ? Math.floor(lossKarma / heroCount) : 0;
+      const perHeroNet = perHeroPositive + perHeroLoss;
+
       const heroChecks = (context.teamMembers || []).map(tm => ({
         id: tm.id, name: tm.name, img: tm.img,
-        present: (v.presentHeroIds || []).includes(tm.id)
+        present: (enc.presentHeroIds || []).includes(tm.id)
       }));
 
+      const villainNames = villainRows.map(v => v.name).join(', ');
+      const dateDisplay = [enc.gameDate, enc.gameTime].filter(Boolean).join(' ');
+
       return {
-        ...v, expanded, karmaEligible, subRemarkable,
-        stopValue, arrestValue, rescueKarma, penaltyKarma,
+        ...enc, expanded, villainRows, foeTotal,
+        stopValue, arrestValue, rescueKarma, lossKarma,
         positiveTotal, positiveMultiplied, heroCount,
-        perHeroPositive, perHeroPenalty, heroChecks,
-        crimeType: v.crimeType || ""
+        perHeroPositive, perHeroLoss, perHeroNet,
+        heroChecks, villainNames, dateDisplay,
+        crimeType: enc.crimeType || "",
+        hasPositive: positiveTotal > 0
       };
     });
 
+    context.encounterCount = context.encounters.length;
     return context;
   }
 
@@ -147,8 +175,7 @@ export class TeamSheet extends Application {
       else ui.notifications.warn("Select a character to add");
     });
     html.find('.remove-member-toggle').click(() => {
-      this._removeMode = !this._removeMode;
-      this.render(false);
+      this._removeMode = !this._removeMode; this.render(false);
     });
     html.find('.remove-hero-from-team').click(ev => this._onRemoveHeroFromTeam(ev));
     html.find('.hero-portrait').click(ev => {
@@ -166,41 +193,40 @@ export class TeamSheet extends Application {
       });
     });
 
-    // Multiplier
     html.find('.multiplier-select').change(async (ev) => {
       await game.settings.set("msh-faserip", "karmaMultiplier", Number(ev.target.value));
       this.render(true);
     });
-
-    // Time settings
     html.find('.time-settings-btn').click(ev => this._onTimeSettings(ev));
 
-    // Villain rows
-    html.find('.villain-row').click(ev => {
-      // Don't toggle if clicking a button/link inside the row
-      if (ev.target.closest('button, a')) return;
-      const idx = Number(ev.currentTarget.dataset.villainIdx);
-      if (this._expandedVillains.has(idx)) this._expandedVillains.delete(idx);
-      else this._expandedVillains.add(idx);
+    // Encounter expand/collapse
+    html.find('.encounter-header').click(ev => {
+      if (ev.target.closest('button, a, input, select')) return;
+      const idx = Number(ev.currentTarget.dataset.encIdx);
+      if (this._expandedEncounters.has(idx)) this._expandedEncounters.delete(idx);
+      else this._expandedEncounters.add(idx);
       this.render(false);
     });
 
-    // Villain detail controls
+    // Encounter controls
     html.find('.hero-present-toggle').change(ev => this._onToggleHeroPresent(ev));
-    html.find('.crime-type-select').change(ev => this._onCrimeTypeChange(ev));
-    html.find('.crime-stopped-toggle').change(ev => this._onCrimeFlagChange(ev, 'stopped'));
-    html.find('.crime-arrested-toggle').change(ev => this._onCrimeFlagChange(ev, 'arrested'));
-    html.find('.rescue-count').change(ev => this._onNumericFieldChange(ev, 'rescues'));
-    html.find('.prop-damage').change(ev => this._onNumericFieldChange(ev, 'propertyDamage'));
+    html.find('.crime-type-select').change(ev => this._onEncFieldChange(ev, 'crimeType', ev.currentTarget.value, true));
+    html.find('.crime-stopped-toggle').change(ev => this._onEncFieldChange(ev, 'stopped', ev.currentTarget.checked));
+    html.find('.crime-arrested-toggle').change(ev => this._onEncFieldChange(ev, 'arrested', ev.currentTarget.checked));
+    html.find('.rescue-count').change(ev => this._onEncNumericChange(ev, 'rescues'));
+    html.find('.loss-amount').change(ev => this._onEncNumericChange(ev, 'losses'));
 
-    // Villain actions
-    html.find('.add-villain-manual').click(() => this._onAddVillainManual());
-    html.find('.delete-villain').click(ev => this._onDeleteVillain(ev));
-    html.find('.award-villain-heroes').click(ev => this._onAwardVillainToHeroes(ev));
-    html.find('.award-villain-pool').click(ev => this._onAwardVillainToPool(ev));
+    // Actions
+    html.find('.add-encounter-manual').click(() => this._onAddEncounterManual());
+    html.find('.add-foe-to-encounter').click(ev => this._onAddFoeToEncounter(ev));
+    html.find('.delete-foe').click(ev => this._onDeleteFoe(ev));
+    html.find('.delete-encounter').click(ev => this._onDeleteEncounter(ev));
+    html.find('.award-encounter-heroes').click(ev => this._onAwardEncounterToHeroes(ev));
+    html.find('.award-encounter-pool').click(ev => this._onAwardEncounterToPool(ev));
+    html.find('.undo-award').click(ev => this._onUndoAward(ev));
   }
 
-  // ===== TEAM MANAGEMENT =====
+  // ===== TEAM =====
 
   async _onAddHeroToTeam(heroId) {
     const tm = game.settings.get("msh-faserip", "teamMembers") || [];
@@ -227,54 +253,52 @@ export class TeamSheet extends Application {
     }
   }
 
-  // ===== VILLAIN FIELD UPDATES =====
+  // ===== ENCOUNTER FIELDS =====
 
-  async _updateVillainField(idx, field, value) {
-    const villains = game.settings.get("msh-faserip", "defeatedVillains") || [];
-    if (idx < 0 || idx >= villains.length) return;
-    villains[idx][field] = value;
-    await game.settings.set("msh-faserip", "defeatedVillains", villains);
+  async _updateEncField(idx, field, value) {
+    const encounters = game.settings.get("msh-faserip", "defeatedVillains") || [];
+    if (idx < 0 || idx >= encounters.length) return;
+    encounters[idx][field] = value;
+    await game.settings.set("msh-faserip", "defeatedVillains", encounters);
     this.render(false);
   }
 
+  _onEncFieldChange(ev, field, value, resetFlags) {
+    const idx = Number(ev.currentTarget.dataset.encIdx);
+    if (resetFlags && field === 'crimeType' && !value) {
+      const encounters = game.settings.get("msh-faserip", "defeatedVillains") || [];
+      if (encounters[idx]) {
+        encounters[idx].crimeType = "";
+        encounters[idx].stopped = false;
+        encounters[idx].arrested = false;
+        game.settings.set("msh-faserip", "defeatedVillains", encounters).then(() => this.render(false));
+      }
+      return;
+    }
+    this._updateEncField(idx, field, value);
+  }
+
+  _onEncNumericChange(ev, field) {
+    const idx = Number(ev.currentTarget.dataset.encIdx);
+    this._updateEncField(idx, field, Math.max(0, Number(ev.currentTarget.value) || 0));
+  }
+
   _onToggleHeroPresent(ev) {
-    const idx = Number(ev.currentTarget.dataset.villainIdx);
+    const idx = Number(ev.currentTarget.dataset.encIdx);
     const heroId = ev.currentTarget.dataset.heroId;
-    const villains = game.settings.get("msh-faserip", "defeatedVillains") || [];
-    if (!villains[idx]) return;
-    const ids = new Set(villains[idx].presentHeroIds || []);
-    if (ev.currentTarget.checked) ids.add(heroId);
-    else ids.delete(heroId);
-    this._updateVillainField(idx, 'presentHeroIds', [...ids]);
+    const encounters = game.settings.get("msh-faserip", "defeatedVillains") || [];
+    if (!encounters[idx]) return;
+    const ids = new Set(encounters[idx].presentHeroIds || []);
+    if (ev.currentTarget.checked) ids.add(heroId); else ids.delete(heroId);
+    this._updateEncField(idx, 'presentHeroIds', [...ids]);
   }
 
-  _onCrimeTypeChange(ev) {
-    const idx = Number(ev.currentTarget.dataset.villainIdx);
-    const val = ev.currentTarget.value;
-    const villains = game.settings.get("msh-faserip", "defeatedVillains") || [];
-    if (!villains[idx]) return;
-    villains[idx].crimeType = val;
-    if (!val) { villains[idx].stopped = false; villains[idx].arrested = false; }
-    game.settings.set("msh-faserip", "defeatedVillains", villains).then(() => this.render(false));
-  }
+  // ===== ADD / DELETE =====
 
-  _onCrimeFlagChange(ev, flag) {
-    const idx = Number(ev.currentTarget.dataset.villainIdx);
-    this._updateVillainField(idx, flag, ev.currentTarget.checked);
-  }
-
-  _onNumericFieldChange(ev, field) {
-    const idx = Number(ev.currentTarget.dataset.villainIdx);
-    this._updateVillainField(idx, field, Math.max(0, Number(ev.currentTarget.value) || 0));
-  }
-
-  // ===== ADD / DELETE VILLAINS =====
-
-  _onAddVillainManual() {
+  _onAddEncounterManual() {
     if (!game.user.isGM) return;
-    // Build list of hostile NPCs for quick-pick
     const hostiles = game.actors.filter(a =>
-      (a.type === "npc" || a.type === "hero") &&
+      (a.type === "npc" || a.type === "villain" || a.type === "hero") &&
       a.prototypeToken.disposition < 0
     ).sort((a, b) => a.name.localeCompare(b.name));
 
@@ -282,27 +306,21 @@ export class TeamSheet extends Application {
       const { rankValue, rankLabel } = TeamSheet.getHighestRank(a);
       return `<option value="${a.id}" data-rank="${rankValue}" data-label="${rankLabel}">${a.name} — ${rankLabel}(${rankValue})</option>`;
     }).join('');
-
-    const rankOpts = TeamSheet.RANK_TABLE.filter(r => r.value >= 30).map(r =>
+    const rankOpts = TeamSheet.RANK_TABLE.map(r =>
       `<option value="${r.value}" data-label="${r.rank}">${r.rank} (${r.value})</option>`
     ).join('');
 
     new Dialog({
-      title: "Add Defeated Villain",
+      title: "Add Encounter",
       content: `<form>
         <div class="form-group"><label>Pick from actors:</label>
-          <select name="actorId" style="width:100%">
-            <option value="">— Manual entry —</option>
-            ${hostileOpts}
-          </select></div>
+          <select name="actorId" style="width:100%"><option value="">— Manual entry —</option>${hostileOpts}</select></div>
         <hr/>
         <div class="form-group"><label>Villain Name:</label>
           <input type="text" name="name" placeholder="e.g., Rhino" /></div>
         <div class="form-group"><label>Highest Rank:</label>
-          <select name="rank" style="width:100%">
-            <option value="0" data-label="Below Rm">Below Remarkable (no foe karma)</option>
-            ${rankOpts}
-          </select></div>
+          <select name="rank" style="width:100%">${rankOpts}</select></div>
+        <p class="notes" style="font-size:11px;color:#666;">Creates encounter with one foe. Add more after.</p>
       </form>`,
       buttons: {
         add: { icon: '<i class="fas fa-skull"></i>', label: "Add",
@@ -312,11 +330,8 @@ export class TeamSheet extends Application {
             if (actorId) {
               const actor = game.actors.get(actorId);
               if (!actor) return;
-              name = actor.name;
-              img = actor.img || "icons/svg/mystery-man.svg";
-              const highest = TeamSheet.getHighestRank(actor);
-              rankValue = highest.rankValue;
-              rankLabel = highest.rankLabel;
+              name = actor.name; img = actor.img || "icons/svg/mystery-man.svg";
+              ({ rankValue, rankLabel } = TeamSheet.getHighestRank(actor));
             } else {
               name = html.find('[name="name"]').val()?.trim();
               if (!name) { ui.notifications.warn("Enter a villain name"); return; }
@@ -325,7 +340,7 @@ export class TeamSheet extends Application {
               rankLabel = html.find('[name="rank"] option:selected').data('label') || "Unknown";
             }
             const teamIds = game.settings.get("msh-faserip", "teamMembers") || [];
-            await this._addVillainEntry({ name, img, rankValue, rankLabel, presentHeroIds: [...teamIds] });
+            await this._addEncounter([{ name, img, actorId: actorId || null, rankValue, rankLabel }], [...teamIds]);
           }
         },
         cancel: { label: "Cancel" }
@@ -335,185 +350,300 @@ export class TeamSheet extends Application {
         html.find('[name="actorId"]').on('change', () => {
           const sel = html.find('[name="actorId"]');
           if (sel.val()) {
-            const opt = sel.find(':selected');
-            html.find('[name="name"]').val(opt.text().split(' — ')[0]);
-            // Find matching rank
-            const rv = Number(opt.data('rank'));
-            html.find('[name="rank"]').val(rv >= 30 ? rv : 0);
+            html.find('[name="name"]').val(sel.find(':selected').text().split(' — ')[0]);
+            html.find('[name="rank"]').val(Number(sel.find(':selected').data('rank')));
           }
         });
       }
     }).render(true);
   }
 
-  async _addVillainEntry(data) {
-    const villains = game.settings.get("msh-faserip", "defeatedVillains") || [];
-    villains.push({
-      name: data.name,
-      img: data.img || "icons/svg/mystery-man.svg",
-      rankValue: data.rankValue || 0,
-      rankLabel: data.rankLabel || "Unknown",
-      defeated: true,
-      presentHeroIds: data.presentHeroIds || [],
-      crimeType: "",
-      stopped: false,
-      arrested: false,
-      rescues: 0,
-      propertyDamage: 0,
-      awarded: false,
-      gameDate: this._getGameDate(),
-      timestamp: new Date().toISOString()
-    });
-    await game.settings.set("msh-faserip", "defeatedVillains", villains);
-    // Auto-expand the new entry
-    this._expandedVillains.add(villains.length - 1);
-    this.render(true);
-  }
-
-  async _onDeleteVillain(ev) {
-    ev.stopPropagation();
-    const idx = Number(ev.currentTarget.dataset.villainIdx);
-    const villains = game.settings.get("msh-faserip", "defeatedVillains") || [];
-    if (idx < 0 || idx >= villains.length) return;
-    const name = villains[idx].name;
-    if (!await Dialog.confirm({ title: "Remove", content: `<p>Remove <strong>${name}</strong>?</p>` })) return;
-    villains.splice(idx, 1);
-    this._expandedVillains.delete(idx);
-    // Re-index expanded set
-    const newExpanded = new Set();
-    for (const i of this._expandedVillains) {
-      if (i > idx) newExpanded.add(i - 1);
-      else if (i < idx) newExpanded.add(i);
-    }
-    this._expandedVillains = newExpanded;
-    await game.settings.set("msh-faserip", "defeatedVillains", villains);
-    this.render(true);
-  }
-
-  // ===== AWARD PER VILLAIN =====
-
-  async _onAwardVillainToHeroes(ev) {
+  _onAddFoeToEncounter(ev) {
     ev.stopPropagation();
     if (!game.user.isGM) return;
-    const idx = Number(ev.currentTarget.dataset.villainIdx);
-    const villains = game.settings.get("msh-faserip", "defeatedVillains") || [];
-    const v = villains[idx];
-    if (!v || v.awarded) return;
+    const encIdx = Number(ev.currentTarget.dataset.encIdx);
+
+    const hostiles = game.actors.filter(a =>
+      (a.type === "npc" || a.type === "villain" || a.type === "hero") &&
+      a.prototypeToken.disposition < 0
+    ).sort((a, b) => a.name.localeCompare(b.name));
+
+    const hostileOpts = hostiles.map(a => {
+      const { rankValue, rankLabel } = TeamSheet.getHighestRank(a);
+      return `<option value="${a.id}" data-rank="${rankValue}" data-label="${rankLabel}">${a.name} — ${rankLabel}(${rankValue})</option>`;
+    }).join('');
+    const rankOpts = TeamSheet.RANK_TABLE.map(r =>
+      `<option value="${r.value}" data-label="${r.rank}">${r.rank} (${r.value})</option>`
+    ).join('');
+
+    new Dialog({
+      title: "Add Foe to Encounter",
+      content: `<form>
+        <div class="form-group"><label>Pick from actors:</label>
+          <select name="actorId" style="width:100%"><option value="">— Manual entry —</option>${hostileOpts}</select></div>
+        <hr/>
+        <div class="form-group"><label>Villain Name:</label>
+          <input type="text" name="name" placeholder="e.g., Rhino" /></div>
+        <div class="form-group"><label>Highest Rank:</label>
+          <select name="rank" style="width:100%">${rankOpts}</select></div>
+      </form>`,
+      buttons: {
+        add: { icon: '<i class="fas fa-skull"></i>', label: "Add",
+          callback: async (html) => {
+            const actorId = html.find('[name="actorId"]').val();
+            let name, img, rankValue, rankLabel;
+            if (actorId) {
+              const actor = game.actors.get(actorId);
+              if (!actor) return;
+              name = actor.name; img = actor.img || "icons/svg/mystery-man.svg";
+              ({ rankValue, rankLabel } = TeamSheet.getHighestRank(actor));
+            } else {
+              name = html.find('[name="name"]').val()?.trim();
+              if (!name) { ui.notifications.warn("Enter a villain name"); return; }
+              img = "icons/svg/mystery-man.svg";
+              rankValue = Number(html.find('[name="rank"]').val()) || 0;
+              rankLabel = html.find('[name="rank"] option:selected').data('label') || "Unknown";
+            }
+            const encounters = game.settings.get("msh-faserip", "defeatedVillains") || [];
+            if (!encounters[encIdx]) return;
+            encounters[encIdx].villains.push({ name, img, actorId: actorId || null, rankValue, rankLabel });
+            await game.settings.set("msh-faserip", "defeatedVillains", encounters);
+            this.render(true);
+          }
+        },
+        cancel: { label: "Cancel" }
+      },
+      default: "add",
+      render: (html) => {
+        html.find('[name="actorId"]').on('change', () => {
+          const sel = html.find('[name="actorId"]');
+          if (sel.val()) {
+            html.find('[name="name"]').val(sel.find(':selected').text().split(' — ')[0]);
+            html.find('[name="rank"]').val(Number(sel.find(':selected').data('rank')));
+          }
+        });
+      }
+    }).render(true);
+  }
+
+  async _addEncounter(villains, presentHeroIds) {
+    const encounters = game.settings.get("msh-faserip", "defeatedVillains") || [];
+    const { gameDate, gameTime } = TeamSheet._getGameDateTimeStatic();
+    encounters.push({
+      id: `enc_${Date.now()}`,
+      villains,
+      presentHeroIds: presentHeroIds || [],
+      crimeType: "", stopped: false, arrested: false,
+      rescues: 0, losses: 0,
+      awarded: false,
+      gameDate, gameTime,
+      timestamp: new Date().toISOString()
+    });
+    await game.settings.set("msh-faserip", "defeatedVillains", encounters);
+    this._expandedEncounters.add(encounters.length - 1);
+    this.render(true);
+  }
+
+  async _onDeleteFoe(ev) {
+    ev.stopPropagation();
+    const encIdx = Number(ev.currentTarget.dataset.encIdx);
+    const foeIdx = Number(ev.currentTarget.dataset.foeIdx);
+    const encounters = game.settings.get("msh-faserip", "defeatedVillains") || [];
+    if (!encounters[encIdx]?.villains?.[foeIdx]) return;
+    const name = encounters[encIdx].villains[foeIdx].name;
+    if (!await Dialog.confirm({ title: "Remove Foe", content: `<p>Remove <strong>${name}</strong>?</p>` })) return;
+    encounters[encIdx].villains.splice(foeIdx, 1);
+    if (!encounters[encIdx].villains.length) {
+      encounters.splice(encIdx, 1);
+      this._rebuildExpandedSet(encIdx);
+    }
+    await game.settings.set("msh-faserip", "defeatedVillains", encounters);
+    this.render(true);
+  }
+
+  async _onDeleteEncounter(ev) {
+    ev.stopPropagation();
+    const idx = Number(ev.currentTarget.dataset.encIdx);
+    const encounters = game.settings.get("msh-faserip", "defeatedVillains") || [];
+    if (!encounters[idx]) return;
+    const names = (encounters[idx].villains || []).map(v => v.name).join(', ') || encounters[idx].name || 'Unknown';
+    if (!await Dialog.confirm({ title: "Delete Encounter", content: `<p>Delete encounter (${names})?</p>` })) return;
+    encounters.splice(idx, 1);
+    this._rebuildExpandedSet(idx);
+    await game.settings.set("msh-faserip", "defeatedVillains", encounters);
+    this.render(true);
+  }
+
+  _rebuildExpandedSet(removedIdx) {
+    this._expandedEncounters.delete(removedIdx);
+    const s = new Set();
+    for (const i of this._expandedEncounters) {
+      if (i > removedIdx) s.add(i - 1); else if (i < removedIdx) s.add(i);
+    }
+    this._expandedEncounters = s;
+  }
+
+  // ===== AWARD =====
+
+  async _onAwardEncounterToHeroes(ev) {
+    ev.stopPropagation();
+    if (!game.user.isGM) return;
+    const idx = Number(ev.currentTarget.dataset.encIdx);
+    const encounters = game.settings.get("msh-faserip", "defeatedVillains") || [];
+    const enc = encounters[idx];
+    if (!enc || enc.awarded) return;
 
     const multiplier = game.settings.get("msh-faserip", "karmaMultiplier") || 1;
-    const heroIds = v.presentHeroIds || [];
-    const heroes = heroIds.map(id => game.actors.get(id)).filter(Boolean);
+    const heroes = (enc.presentHeroIds || []).map(id => game.actors.get(id)).filter(Boolean);
     if (!heroes.length) { ui.notifications.warn("No heroes marked as present"); return; }
 
-    const { positiveTotal, penaltyKarma } = this._calcVillainTotals(v);
-    const positiveMultiplied = positiveTotal * multiplier;
-    const perHeroPos = Math.floor(positiveMultiplied / heroes.length);
-    const perHeroPen = penaltyKarma ? Math.floor(penaltyKarma / heroes.length) : 0;
-    const netPerHero = perHeroPos + perHeroPen;
+    const { positiveTotal, lossKarma } = this._calcEncounterTotals(enc);
+    const perHeroPos = Math.floor((positiveTotal * multiplier) / heroes.length);
+    const perHeroLoss = lossKarma ? Math.floor(lossKarma / heroes.length) : 0;
+    const net = perHeroPos + perHeroLoss;
 
-    const breakdown = this._buildBreakdownText(v, multiplier, heroes.length);
+    const breakdown = this._buildBreakdownText(enc, multiplier, heroes.length);
+    const villainNames = enc.villains.map(v => v.name).join(', ');
     if (!await Dialog.confirm({
-      title: `Award — ${v.name}`,
-      content: `<p>${breakdown}</p>
-        <p>Award <strong>+${perHeroPos}</strong>${perHeroPen ? ` / <strong>${perHeroPen}</strong> penalty` : ''} (net <strong>${netPerHero}</strong>) to each of <strong>${heroes.length}</strong> heroes?</p>`
+      title: `Award — ${villainNames}`,
+      content: `<p>${breakdown}</p><p>Award <strong>+${perHeroPos}</strong>${perHeroLoss ? ` / <strong>${perHeroLoss}</strong> loss` : ''} (net <strong>${net}</strong>) to each of <strong>${heroes.length}</strong> heroes?</p>`
     })) return;
 
-    const gameDate = v.gameDate || this._getGameDate();
-    const descParts = [`Defeated ${v.name} (${v.rankLabel} ${v.rankValue})`];
-    if (v.stopped) descParts.push(`Stop ${this._crimeLabel(v.crimeType)}`);
-    if (v.arrested) descParts.push(`Arrest ${this._crimeLabel(v.crimeType)}`);
-    if (v.rescues > 0) descParts.push(`Rescue ×${v.rescues}`);
+    const gameDate = enc.gameDate || TeamSheet._getGameDateTimeStatic().gameDate;
+    const foeNames = enc.villains.filter(v => v.rankValue >= 30).map(v => `${v.name}(${v.rankValue})`).join('+');
+    const descParts = [];
+    if (foeNames) descParts.push(`Foe: ${foeNames}`);
+    if (enc.stopped) descParts.push(`Stop ${this._crimeLabel(enc.crimeType)}`);
+    if (enc.arrested) descParts.push(`Arrest ${this._crimeLabel(enc.crimeType)}`);
+    if (enc.rescues > 0) descParts.push(`Rescue ×${enc.rescues}`);
     const desc = descParts.join(', ');
     const baseNote = `(base ${positiveTotal} ×${multiplier} ÷${heroes.length})`;
 
     for (const hero of heroes) {
       if (perHeroPos > 0) {
         await this._addHeroKarmaEvent(hero, {
-          amount: perHeroPos, type: "Defeated Foe",
-          description: `${desc} ${baseNote}`, gameDate
+          amount: perHeroPos, type: "Encounter Award",
+          description: `${desc} ${baseNote}`, gameDate, encounterId: enc.id
         });
       }
-      if (perHeroPen < 0) {
+      if (perHeroLoss < 0) {
         await this._addHeroKarmaEvent(hero, {
-          amount: perHeroPen, type: "Property Damage",
-          description: `${v.propertyDamage} area(s) — ${v.name}`, gameDate
+          amount: perHeroLoss, type: "Encounter Loss",
+          description: `Losses — ${villainNames}`, gameDate, encounterId: enc.id
         });
       }
     }
 
-    villains[idx].awarded = true;
-    await game.settings.set("msh-faserip", "defeatedVillains", villains);
-    ui.notifications.info(`${v.name}: ${netPerHero} net karma to each of ${heroes.length} heroes.`);
+    encounters[idx].awarded = true;
+    await game.settings.set("msh-faserip", "defeatedVillains", encounters);
+    ui.notifications.info(`${villainNames}: ${net} net karma to each of ${heroes.length} heroes.`);
     this.render(true);
   }
 
-  async _onAwardVillainToPool(ev) {
+  async _onAwardEncounterToPool(ev) {
     ev.stopPropagation();
     if (!game.user.isGM) return;
-    const idx = Number(ev.currentTarget.dataset.villainIdx);
-    const villains = game.settings.get("msh-faserip", "defeatedVillains") || [];
-    const v = villains[idx];
-    if (!v || v.awarded) return;
+    const idx = Number(ev.currentTarget.dataset.encIdx);
+    const encounters = game.settings.get("msh-faserip", "defeatedVillains") || [];
+    const enc = encounters[idx];
+    if (!enc || enc.awarded) return;
 
     const multiplier = game.settings.get("msh-faserip", "karmaMultiplier") || 1;
-    const { positiveTotal, penaltyKarma } = this._calcVillainTotals(v);
-    const total = (positiveTotal * multiplier) + penaltyKarma;
+    const { positiveTotal, lossKarma } = this._calcEncounterTotals(enc);
+    const total = (positiveTotal * multiplier) + lossKarma;
+    const villainNames = enc.villains.map(v => v.name).join(', ');
 
     if (!await Dialog.confirm({
-      title: `Award to Pool — ${v.name}`,
+      title: `Award to Pool — ${villainNames}`,
       content: `<p>Add <strong>${total}</strong> karma to team pool?</p>`
     })) return;
 
     const pool = game.settings.get("msh-faserip", "teamKarmaPoolTotal") || 0;
     await game.settings.set("msh-faserip", "teamKarmaPoolTotal", Math.max(0, pool + total));
-    villains[idx].awarded = true;
-    await game.settings.set("msh-faserip", "defeatedVillains", villains);
-    ui.notifications.info(`${total} karma added to team pool for ${v.name}.`);
+    encounters[idx].awarded = true;
+    await game.settings.set("msh-faserip", "defeatedVillains", encounters);
+    ui.notifications.info(`${total} karma added to pool for ${villainNames}.`);
+    this.render(true);
+  }
+
+  async _onUndoAward(ev) {
+    ev.stopPropagation();
+    if (!game.user.isGM) return;
+    const idx = Number(ev.currentTarget.dataset.encIdx);
+    const encounters = game.settings.get("msh-faserip", "defeatedVillains") || [];
+    const enc = encounters[idx];
+    if (!enc || !enc.awarded) return;
+
+    const villainNames = enc.villains.map(v => v.name).join(', ');
+    if (!await Dialog.confirm({
+      title: `Undo Award — ${villainNames}`,
+      content: `<p>Remove karma history entries for this encounter from all participating heroes?</p>`
+    })) return;
+
+    for (const heroId of (enc.presentHeroIds || [])) {
+      const hero = game.actors.get(heroId);
+      if (!hero) continue;
+      const history = foundry.utils.deepClone(hero.system.karma?.history || []);
+      const filtered = history.filter(e => e.encounterId !== enc.id);
+      if (filtered.length !== history.length) {
+        let earned = 0, spent = 0;
+        filtered.forEach(e => { const a = Number(e.amount) || 0; if (a > 0) earned += a; else spent += Math.abs(a); });
+        const adv = hero.system.karma?.advancement || 0;
+        await hero.update({
+          "system.karma.history": filtered,
+          "system.karma.lifetime": earned,
+          "system.attributes.karma.value": Math.max(0, earned - spent - adv)
+        });
+      }
+    }
+
+    encounters[idx].awarded = false;
+    await game.settings.set("msh-faserip", "defeatedVillains", encounters);
+    ui.notifications.info(`Award undone for ${villainNames}.`);
     this.render(true);
   }
 
   // ===== KARMA HELPERS =====
 
-  _calcVillainTotals(v) {
-    const karmaEligible = v.defeated !== false && v.rankValue >= 30;
-    const crimeVals = v.crimeType ? TeamSheet.CRIME_VALUES[v.crimeType] : null;
-    const stopValue = crimeVals && v.stopped ? crimeVals.stop : 0;
-    const arrestValue = crimeVals && v.arrested ? crimeVals.arrest : 0;
-    const rescueKarma = Math.min((v.rescues || 0) * 20, 100);
-    const penaltyKarma = (v.propertyDamage || 0) * -5;
-    const positiveTotal = (karmaEligible ? v.rankValue : 0) + stopValue + arrestValue + rescueKarma;
-    return { positiveTotal, penaltyKarma, karmaEligible };
+  _calcEncounterTotals(enc) {
+    const foeTotal = (enc.villains || []).reduce((sum, v) => sum + (v.rankValue >= 30 ? v.rankValue : 0), 0);
+    const cv = enc.crimeType ? TeamSheet.CRIME_VALUES[enc.crimeType] : null;
+    const stopValue = cv && enc.stopped ? cv.stop : 0;
+    const arrestValue = cv && enc.arrested ? cv.arrest : 0;
+    const rescueKarma = Math.min((enc.rescues || 0) * 20, 100);
+    const lossKarma = -Math.abs(enc.losses || 0);
+    const positiveTotal = foeTotal + stopValue + arrestValue + rescueKarma;
+    return { positiveTotal, lossKarma, foeTotal };
   }
 
-  _buildBreakdownText(v, multiplier, heroCount) {
+  _buildBreakdownText(enc, multiplier, heroCount) {
     const parts = [];
-    if (v.rankValue >= 30) parts.push(`Foe +${v.rankValue}`);
-    const cv = v.crimeType ? TeamSheet.CRIME_VALUES[v.crimeType] : null;
-    if (cv && v.stopped) parts.push(`Stop +${cv.stop}`);
-    if (cv && v.arrested) parts.push(`Arrest +${cv.arrest}`);
-    if (v.rescues > 0) parts.push(`Rescue +${Math.min(v.rescues * 20, 100)}`);
-    if (v.propertyDamage > 0) parts.push(`Dmg -${v.propertyDamage * 5}`);
+    const foeTotal = (enc.villains || []).reduce((sum, v) => sum + (v.rankValue >= 30 ? v.rankValue : 0), 0);
+    if (foeTotal > 0) parts.push(`Foe +${foeTotal}`);
+    const cv = enc.crimeType ? TeamSheet.CRIME_VALUES[enc.crimeType] : null;
+    if (cv && enc.stopped) parts.push(`Stop +${cv.stop}`);
+    if (cv && enc.arrested) parts.push(`Arrest +${cv.arrest}`);
+    if (enc.rescues > 0) parts.push(`Rescue +${Math.min(enc.rescues * 20, 100)}`);
+    if (enc.losses > 0) parts.push(`Loss -${enc.losses}`);
     return parts.join(', ') + ` (×${multiplier} ÷${heroCount})`;
   }
 
   _crimeLabel(crimeType) {
-    const labels = {
-      violent: "Violent Crime", destructive: "Destructive Crime",
-      theft: "Theft", robbery: "Robbery", misdemeanor: "Misdemeanor",
-      national: "National Offense", localConspiracy: "Local Conspiracy",
-      nationalConspiracy: "National Conspiracy", globalConspiracy: "Global Conspiracy",
-      other: "Other Crime"
-    };
-    return labels[crimeType] || crimeType;
+    return { violent: "Violent Crime", destructive: "Destructive Crime", theft: "Theft",
+      robbery: "Robbery", misdemeanor: "Misdemeanor", national: "National Offense",
+      localConspiracy: "Local Conspiracy", nationalConspiracy: "National Conspiracy",
+      globalConspiracy: "Global Conspiracy", other: "Other Crime"
+    }[crimeType] || crimeType;
   }
 
-  async _addHeroKarmaEvent(hero, { amount, type, description, gameDate }) {
+  async _addHeroKarmaEvent(hero, { amount, type, description, gameDate, encounterId }) {
     const history = foundry.utils.deepClone(hero.system.karma?.history || []);
     history.push({
       timestamp: new Date().toISOString(),
       realDate: new Date().toLocaleDateString(),
-      gameDate: gameDate || this._getGameDate(),
-      amount, type, description
+      gameDate: gameDate || TeamSheet._getGameDateTimeStatic().gameDate,
+      amount, type, description,
+      encounterId: encounterId || null
     });
     let earned = 0, spent = 0;
     history.forEach(e => { const a = Number(e.amount) || 0; if (a > 0) earned += a; else spent += Math.abs(a); });
@@ -525,33 +655,21 @@ export class TeamSheet extends Application {
     });
   }
 
-  // ===== RANK UTILITY =====
+  // ===== RANK =====
 
   static getHighestRank(actor) {
-    let highest = 0;
-    let highLabel = "Shift-0";
-
-    // Check FASERIP abilities
+    let highest = 0, highLabel = "Shift-0";
     const abilities = actor.system.abilities?.abilities || {};
     for (const key of Object.keys(abilities)) {
       const val = abilities[key]?.value || 0;
-      if (val > highest) {
-        highest = val;
-        highLabel = abilities[key]?.rank || TeamSheet._rankLabelFromValue(val);
-      }
+      if (val > highest) { highest = val; highLabel = abilities[key]?.rank || TeamSheet._rankLabelFromValue(val); }
     }
-
-    // Check powers (items of type "power")
     for (const item of actor.items) {
       if (item.type === "power") {
         const val = item.system?.value || 0;
-        if (val > highest) {
-          highest = val;
-          highLabel = item.system?.rank || TeamSheet._rankLabelFromValue(val);
-        }
+        if (val > highest) { highest = val; highLabel = item.system?.rank || TeamSheet._rankLabelFromValue(val); }
       }
     }
-
     return { rankValue: highest, rankLabel: highLabel };
   }
 
@@ -562,7 +680,7 @@ export class TeamSheet extends Application {
     return "Shift-0";
   }
 
-  // ===== AUTO-CAPTURE FROM COMBAT =====
+  // ===== COMBAT HOOK =====
 
   static registerCombatHook() {
     Hooks.on("deleteCombat", (combat) => {
@@ -576,94 +694,78 @@ export class TeamSheet extends Application {
   static async _captureDefeatedFromCombat(combat) {
     const teamMemberIds = game.settings.get("msh-faserip", "teamMembers") || [];
     if (!teamMemberIds.length) {
-      console.log("[FASERIP] No team members set, skipping villain capture");
+      console.log("[FASERIP] No team members set, skipping capture");
       return;
     }
 
     const heroCombatantIds = [];
-    const villainCombatants = [];
+    const villainActors = [];
 
     for (const c of combat.combatants) {
       const actor = c.actor;
-      if (!actor) {
-        console.log("[FASERIP] Combatant has no actor:", c.name);
-        continue;
-      }
-      // Check disposition from multiple sources: token document, actor prototype, or actor type
+      if (!actor) { console.log("[FASERIP] Combatant has no actor:", c.name); continue; }
       const tokenDisp = c.token?.disposition;
       const protoDisp = actor.prototypeToken?.disposition;
       const disp = tokenDisp ?? protoDisp ?? (actor.type === "villain" ? -1 : 0);
       console.log(`[FASERIP] Combatant: ${actor.name}, tokenDisp=${tokenDisp}, protoDisp=${protoDisp}, resolved=${disp}, type=${actor.type}`);
 
-      if (teamMemberIds.includes(actor.id) || disp >= 0) {
+      if (teamMemberIds.includes(actor.id) || disp > 0) {
         heroCombatantIds.push(actor.id);
-      } else if (disp < 0) {
-        villainCombatants.push(actor);
+      } else if (disp < 0 || actor.type === "villain") {
+        villainActors.push(actor);
+        console.log(`[FASERIP] Capturing villain: ${actor.name} (type=${actor.type}, disp=${disp})`);
+      } else {
+        console.log(`[FASERIP] Skipping neutral: ${actor.name} (type=${actor.type}, disp=${disp})`);
       }
     }
 
-    if (!villainCombatants.length) {
-      console.log("[FASERIP] No hostile combatants found in combat");
-      return;
-    }
+    if (!villainActors.length) { console.log("[FASERIP] No hostile combatants found"); return; }
+    console.log(`[FASERIP] Found ${villainActors.length} villains, ${heroCombatantIds.length} heroes`);
 
-    console.log(`[FASERIP] Found ${villainCombatants.length} villains, ${heroCombatantIds.length} heroes`);
-
-    // Filter to unique actors, get highest rank
     const seen = new Set();
-    const newVillains = [];
-    for (const actor of villainCombatants) {
+    const villains = [];
+    for (const actor of villainActors) {
       if (seen.has(actor.id)) continue;
       seen.add(actor.id);
       const { rankValue, rankLabel } = TeamSheet.getHighestRank(actor);
-      newVillains.push({
-        name: actor.name,
-        img: actor.img || "icons/svg/mystery-man.svg",
-        actorId: actor.id,
-        rankValue, rankLabel,
-        defeated: true,
-        presentHeroIds: [...heroCombatantIds],
-        crimeType: "",
-        stopped: false,
-        arrested: false,
-        rescues: 0,
-        propertyDamage: 0,
-        awarded: false,
-        gameDate: TeamSheet._getGameDateStatic(),
-        timestamp: new Date().toISOString()
-      });
+      villains.push({ name: actor.name, img: actor.img || "icons/svg/mystery-man.svg", actorId: actor.id, rankValue, rankLabel });
     }
+    if (!villains.length) return;
 
-    if (!newVillains.length) return;
+    const { gameDate, gameTime } = TeamSheet._getGameDateTimeStatic();
+    const encounters = game.settings.get("msh-faserip", "defeatedVillains") || [];
+    encounters.push({
+      id: `enc_${Date.now()}`,
+      villains,
+      presentHeroIds: [...heroCombatantIds],
+      crimeType: "", stopped: false, arrested: false,
+      rescues: 0, losses: 0,
+      awarded: false,
+      gameDate, gameTime,
+      timestamp: new Date().toISOString()
+    });
+    await game.settings.set("msh-faserip", "defeatedVillains", encounters);
 
-    const villains = game.settings.get("msh-faserip", "defeatedVillains") || [];
-    villains.push(...newVillains);
-    await game.settings.set("msh-faserip", "defeatedVillains", villains);
-
-    const names = newVillains.map(v => `${v.name} (${v.rankLabel})`).join(', ');
+    const names = villains.map(v => `${v.name} (${v.rankLabel})`).join(', ');
     ui.notifications.info(`[FASERIP] Combat ended — captured: ${names}`);
-
-    // Re-render if open
     for (const w of Object.values(ui.windows)) {
       if (w instanceof TeamSheet) w.render(true);
     }
   }
 
-  static _getGameDateStatic() {
+  // ===== TIME =====
+
+  static _getGameDateTimeStatic() {
     try {
       const d = game.msh.getCampaignDateTime().date;
-      return `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`;
-    } catch { return ""; }
+      const gameDate = `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`;
+      const h = d.getHours(), m = d.getMinutes();
+      const gameTime = `${h % 12 || 12}:${String(m).padStart(2, '0')}${h >= 12 ? 'pm' : 'am'}`;
+      return { gameDate, gameTime };
+    } catch { return { gameDate: "", gameTime: "" }; }
   }
 
-  // ===== TIME SETTINGS =====
-
-  _getGameDate() {
-    try {
-      const d = game.msh.getCampaignDateTime().date;
-      return `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`;
-    } catch { return ""; }
-  }
+  _getGameDate() { return TeamSheet._getGameDateTimeStatic().gameDate; }
 
   _onTimeSettings(event) {
     event.preventDefault();
@@ -671,10 +773,7 @@ export class TeamSheet extends Application {
     try {
       ct = game.msh.getCampaignDateTime();
       startDate = game.settings.get("msh-faserip", "campaignStartDate");
-    } catch {
-      ui.notifications.warn("Campaign time not available.");
-      return;
-    }
+    } catch { ui.notifications.warn("Campaign time not available."); return; }
     new Dialog({
       title: "Time Settings",
       content: `<form>

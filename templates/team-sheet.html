@@ -34,7 +34,7 @@
   <!-- Body -->
   <div class="tracker-body">
 
-    <!-- Team Roster (compact) -->
+    <!-- Team Roster -->
     <div class="team-roster-section">
       {{#if teamMembers.length}}
       <div class="roster-rows">
@@ -70,53 +70,73 @@
       {{/if}}
     </div>
 
-    <!-- Defeated Villains -->
+    <!-- Encounters -->
     {{#if isGM}}
-    <div class="defeated-villains-section">
+    <div class="encounters-section">
       <div class="section-header">
-        <h3>Defeated Villains ({{defeatedVillains.length}})</h3>
+        <h3>Encounters ({{encounterCount}})</h3>
         <div class="section-btns">
-          <button type="button" class="add-villain-manual"><i class="fas fa-skull"></i> Add Foe</button>
+          <button type="button" class="add-encounter-manual"><i class="fas fa-skull"></i> Add Foe</button>
         </div>
       </div>
 
-      {{#if defeatedVillains.length}}
-      <div class="villains-list">
-        {{#each defeatedVillains as |v|}}
-        <div class="villain-entry {{#if v.awarded}}awarded{{/if}} {{#if v.expanded}}expanded{{/if}}" data-villain-idx="{{@index}}">
-          <!-- Collapsed row -->
-          <div class="villain-row" data-villain-idx="{{@index}}">
-            <span class="expand-toggle"><i class="fas fa-chevron-{{#if v.expanded}}down{{else}}right{{/if}}"></i></span>
-            <img src="{{v.img}}" class="villain-portrait" />
-            <span class="villain-name">{{v.name}}</span>
-            {{#if v.gameDate}}<span class="villain-date">{{v.gameDate}}</span>{{/if}}
-            <span class="rank-badge {{#if v.subRemarkable}}sub-rm{{/if}}">{{v.rankLabel}}({{v.rankValue}})</span>
-            {{#if v.karmaEligible}}
-            <span class="karma-val">+{{v.rankValue}}</span>
+      {{#if encounters.length}}
+      <div class="encounters-list">
+        {{#each encounters as |enc|}}
+        <div class="encounter-entry {{#if enc.awarded}}awarded{{/if}} {{#if enc.expanded}}expanded{{/if}}" data-enc-idx="{{@index}}">
+
+          <!-- Encounter header (collapsed row) -->
+          <div class="encounter-header" data-enc-idx="{{@index}}">
+            <span class="expand-toggle"><i class="fas fa-chevron-{{#if enc.expanded}}down{{else}}right{{/if}}"></i></span>
+            <span class="enc-label">ENCOUNTER</span>
+            {{#if enc.dateDisplay}}<span class="enc-date">{{enc.dateDisplay}}</span>{{/if}}
+            <span class="enc-villains-summary">{{enc.villainNames}}</span>
+            {{#if enc.hasPositive}}
+            <span class="karma-val">+{{enc.positiveTotal}}</span>
             {{else}}
             <span class="karma-val no-award">--</span>
             {{/if}}
-            {{#unless v.awarded}}
-            {{#if v.karmaEligible}}
-            <button type="button" class="award-villain-heroes btn-award" data-villain-idx="{{@index}}" title="Award to participating heroes"><i class="fas fa-check"></i></button>
-            {{#if ../useKarmaPool}}
-            <button type="button" class="award-villain-pool btn-pool" data-villain-idx="{{@index}}" title="Award to pool"><i class="fas fa-piggy-bank"></i></button>
+            {{#if enc.awarded}}
+            <span class="awarded-badge" title="Awarded"><i class="fas fa-check-circle"></i></span>
+            <button type="button" class="undo-award btn-undo" data-enc-idx="{{@index}}" title="Undo award"><i class="fas fa-undo"></i></button>
             {{/if}}
-            {{/if}}
-            {{/unless}}
-            {{#if v.awarded}}<span class="awarded-badge" title="Awarded"><i class="fas fa-check-circle"></i></span>{{/if}}
-            <a class="delete-villain" data-villain-idx="{{@index}}" title="Remove"><i class="fas fa-times"></i></a>
+            <a class="delete-encounter" data-enc-idx="{{@index}}" title="Delete encounter"><i class="fas fa-times"></i></a>
           </div>
 
           <!-- Expanded detail -->
-          {{#if v.expanded}}
-          <div class="villain-detail">
+          {{#if enc.expanded}}
+          <div class="encounter-detail">
+
+            <!-- Villain list -->
             <div class="detail-section">
-              <label>Present Heroes:</label>
+              <label>Foes:</label>
+              <div class="foe-list">
+                {{#each enc.villainRows as |v|}}
+                <div class="foe-row">
+                  <img src="{{v.img}}" class="foe-portrait" />
+                  <span class="foe-name">{{v.name}}</span>
+                  <span class="rank-badge {{#if v.subRemarkable}}sub-rm{{/if}}">{{v.rankLabel}}({{v.rankValue}})</span>
+                  {{#if v.eligible}}<span class="foe-karma">+{{v.rankValue}}</span>{{else}}<span class="foe-karma sub">--</span>{{/if}}
+                  <a class="delete-foe" data-enc-idx="{{@../index}}" data-foe-idx="{{@index}}" title="Remove foe"><i class="fas fa-times"></i></a>
+                </div>
+                {{/each}}
+                <div class="foe-row foe-total-row">
+                  <span class="foe-total-label">Foe Total:</span>
+                  <span class="foe-total-val">+{{enc.foeTotal}}</span>
+                </div>
+              </div>
+              {{#unless enc.awarded}}
+              <button type="button" class="add-foe-to-encounter btn-add-foe" data-enc-idx="{{@index}}"><i class="fas fa-plus"></i> Add Foe</button>
+              {{/unless}}
+            </div>
+
+            <!-- Heroes -->
+            <div class="detail-section">
+              <label>Heroes Present:</label>
               <div class="present-heroes">
-                {{#each v.heroChecks as |hc|}}
+                {{#each enc.heroChecks as |hc|}}
                 <label class="hero-check" title="{{hc.name}}">
-                  <input type="checkbox" class="hero-present-toggle" data-villain-idx="{{@../index}}" data-hero-id="{{hc.id}}" {{#if hc.present}}checked{{/if}} />
+                  <input type="checkbox" class="hero-present-toggle" data-enc-idx="{{@../index}}" data-hero-id="{{hc.id}}" {{#if hc.present}}checked{{/if}} />
                   <img src="{{hc.img}}" class="hero-check-portrait" />
                   <span>{{hc.name}}</span>
                 </label>
@@ -124,57 +144,74 @@
               </div>
             </div>
 
+            <!-- Crime -->
             <div class="detail-section">
               <div class="detail-row">
                 <label>Crime:
-                  <select class="crime-type-select" data-villain-idx="{{@index}}">
+                  <select class="crime-type-select" data-enc-idx="{{@index}}">
                     <option value="">— None —</option>
-                    <option value="violent" {{#if (eq v.crimeType "violent")}}selected{{/if}}>Violent Crime (30/15)</option>
-                    <option value="destructive" {{#if (eq v.crimeType "destructive")}}selected{{/if}}>Destructive Crime (20/10)</option>
-                    <option value="theft" {{#if (eq v.crimeType "theft")}}selected{{/if}}>Theft (10/5)</option>
-                    <option value="robbery" {{#if (eq v.crimeType "robbery")}}selected{{/if}}>Robbery (20/10)</option>
-                    <option value="misdemeanor" {{#if (eq v.crimeType "misdemeanor")}}selected{{/if}}>Misdemeanor (5/5)</option>
-                    <option value="national" {{#if (eq v.crimeType "national")}}selected{{/if}}>National Offense (20/10)</option>
-                    <option value="localConspiracy" {{#if (eq v.crimeType "localConspiracy")}}selected{{/if}}>Local Conspiracy (30/15)</option>
-                    <option value="nationalConspiracy" {{#if (eq v.crimeType "nationalConspiracy")}}selected{{/if}}>National Conspiracy (40/20)</option>
-                    <option value="globalConspiracy" {{#if (eq v.crimeType "globalConspiracy")}}selected{{/if}}>Global Conspiracy (50/25)</option>
-                    <option value="other" {{#if (eq v.crimeType "other")}}selected{{/if}}>Other Crimes (15/5)</option>
+                    <option value="violent" {{#if (eq enc.crimeType "violent")}}selected{{/if}}>Violent Crime (30/15)</option>
+                    <option value="destructive" {{#if (eq enc.crimeType "destructive")}}selected{{/if}}>Destructive Crime (20/10)</option>
+                    <option value="theft" {{#if (eq enc.crimeType "theft")}}selected{{/if}}>Theft (10/5)</option>
+                    <option value="robbery" {{#if (eq enc.crimeType "robbery")}}selected{{/if}}>Robbery (20/10)</option>
+                    <option value="misdemeanor" {{#if (eq enc.crimeType "misdemeanor")}}selected{{/if}}>Misdemeanor (5/5)</option>
+                    <option value="national" {{#if (eq enc.crimeType "national")}}selected{{/if}}>National Offense (20/10)</option>
+                    <option value="localConspiracy" {{#if (eq enc.crimeType "localConspiracy")}}selected{{/if}}>Local Conspiracy (30/15)</option>
+                    <option value="nationalConspiracy" {{#if (eq enc.crimeType "nationalConspiracy")}}selected{{/if}}>National Conspiracy (40/20)</option>
+                    <option value="globalConspiracy" {{#if (eq enc.crimeType "globalConspiracy")}}selected{{/if}}>Global Conspiracy (50/25)</option>
+                    <option value="other" {{#if (eq enc.crimeType "other")}}selected{{/if}}>Other Crimes (15/5)</option>
                   </select>
                 </label>
-                {{#if v.crimeType}}
-                <label class="crime-flag"><input type="checkbox" class="crime-stopped-toggle" data-villain-idx="{{@index}}" {{#if v.stopped}}checked{{/if}} /> Stopped (+{{v.stopValue}})</label>
-                <label class="crime-flag"><input type="checkbox" class="crime-arrested-toggle" data-villain-idx="{{@index}}" {{#if v.arrested}}checked{{/if}} /> Arrested (+{{v.arrestValue}})</label>
+                {{#if enc.crimeType}}
+                <label class="crime-flag"><input type="checkbox" class="crime-stopped-toggle" data-enc-idx="{{@index}}" {{#if enc.stopped}}checked{{/if}} /> Stopped (+{{enc.stopValue}})</label>
+                <label class="crime-flag"><input type="checkbox" class="crime-arrested-toggle" data-enc-idx="{{@index}}" {{#if enc.arrested}}checked{{/if}} /> Arrested (+{{enc.arrestValue}})</label>
                 {{/if}}
               </div>
             </div>
 
+            <!-- Rescues & Losses -->
             <div class="detail-section">
               <div class="detail-row extras">
-                <label>Rescues: <input type="number" class="rescue-count" data-villain-idx="{{@index}}" value="{{v.rescues}}" min="0" max="99" /></label>
-                <label>Prop Dmg (areas): <input type="number" class="prop-damage" data-villain-idx="{{@index}}" value="{{v.propertyDamage}}" min="0" max="99" /></label>
+                <label>Rescues: <input type="number" class="rescue-count" data-enc-idx="{{@index}}" value="{{enc.rescues}}" min="0" max="99" /></label>
+                <label>Losses: <input type="number" class="loss-amount" data-enc-idx="{{@index}}" value="{{enc.losses}}" min="0" max="9999" /></label>
               </div>
             </div>
 
-            <div class="villain-summary">
+            <!-- Summary -->
+            <div class="encounter-summary">
               <div class="sum-breakdown">
-                {{#if v.karmaEligible}}<span class="sum-pos">Foe +{{v.rankValue}}</span>{{/if}}
-                {{#if v.stopped}}<span class="sum-pos">Stop +{{v.stopValue}}</span>{{/if}}
-                {{#if v.arrested}}<span class="sum-pos">Arrest +{{v.arrestValue}}</span>{{/if}}
-                {{#if v.rescueKarma}}<span class="sum-pos">Rescue +{{v.rescueKarma}}</span>{{/if}}
-                {{#if v.penaltyKarma}}<span class="sum-neg">Dmg {{v.penaltyKarma}}</span>{{/if}}
+                {{#if enc.foeTotal}}<span class="sum-pos">Foe +{{enc.foeTotal}}</span>{{/if}}
+                {{#if enc.stopValue}}<span class="sum-pos">Stop +{{enc.stopValue}}</span>{{/if}}
+                {{#if enc.arrestValue}}<span class="sum-pos">Arrest +{{enc.arrestValue}}</span>{{/if}}
+                {{#if enc.rescueKarma}}<span class="sum-pos">Rescue +{{enc.rescueKarma}}</span>{{/if}}
+                {{#if enc.lossKarma}}<span class="sum-neg">Loss {{enc.lossKarma}}</span>{{/if}}
               </div>
               <div class="sum-total">
-                +{{v.positiveTotal}} ×{{../karmaMultiplier}} = +{{v.positiveMultiplied}} ÷{{v.heroCount}} = <strong>+{{v.perHeroPositive}}/ea</strong>
-                {{#if v.penaltyKarma}} &nbsp;|&nbsp; {{v.penaltyKarma}} ÷{{v.heroCount}} = <strong>{{v.perHeroPenalty}}/ea</strong>{{/if}}
+                +{{enc.positiveTotal}} ×{{../karmaMultiplier}} = +{{enc.positiveMultiplied}} ÷{{enc.heroCount}} = <strong>+{{enc.perHeroPositive}}/ea</strong>
+                {{#if enc.lossKarma}} &nbsp;|&nbsp; {{enc.lossKarma}} ÷{{enc.heroCount}} = <strong>{{enc.perHeroLoss}}/ea</strong>{{/if}}
+              </div>
+              <div class="sum-net">
+                Net: <strong>{{enc.perHeroNet}}/ea</strong> to {{enc.heroCount}} heroes
               </div>
             </div>
+
+            <!-- Award buttons -->
+            {{#unless enc.awarded}}
+            <div class="encounter-actions">
+              <button type="button" class="award-encounter-heroes btn-award" data-enc-idx="{{@index}}"><i class="fas fa-check"></i> Award to Heroes</button>
+              {{#if ../useKarmaPool}}
+              <button type="button" class="award-encounter-pool btn-pool" data-enc-idx="{{@index}}"><i class="fas fa-piggy-bank"></i> Award to Pool</button>
+              {{/if}}
+            </div>
+            {{/unless}}
+
           </div>
           {{/if}}
         </div>
         {{/each}}
       </div>
       {{else}}
-      <p class="no-villains">No defeated villains yet. Foes auto-capture from combat.</p>
+      <p class="no-encounters">No encounters yet. Foes auto-capture from combat.</p>
       {{/if}}
     </div>
     {{/if}}
