@@ -690,89 +690,130 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
     }
 
     // Recovery & Rest Button Handlers
-    html.find('.recovery-btn').click(async (event) => {
+    // Health header click -> Recovery & Rest dialog
+    html.find('.health-recovery-link').click(async (event) => {
       event.preventDefault();
-      const button = $(event.currentTarget);
-      const action = button.data('action');
-      
-      // Check if rest system is available
-      if (!game.msh?.rest) {
-        ui.notifications.error("Rest system not initialized!");
-        return;
+      const actor = this.actor;
+      const recoveryUsedToday = this.getData().recoveryUsedToday;
+      const healingUnavailable = this.getData().healingUnavailable;
+      const healthAtMax = this.getData().healthAtMax;
+      const healingCooldownRemaining = this.getData().healingCooldownRemaining;
+      const medicalCare = actor.getFlag('msh-faserip', 'medicalCare') || false;
+      const isInCrisis = this.getData().isInCrisis;
+      const isDying = this.getData().isDying;
+      const sheet = this;
+
+      let crisisHtml = '';
+      if (isInCrisis) {
+        if (!isDying) {
+          crisisHtml += `<button type="button" class="recovery-btn crisis-btn" data-action="wake-up" title="Attempt to Regain Consciousness"><i class="fas fa-eye"></i> Wake Up (0 HP)</button>`;
+        }
+        if (isDying) {
+          crisisHtml += `<button type="button" class="recovery-btn crisis-btn" data-action="stabilize" title="Stabilize Dying Character"><i class="fas fa-medkit"></i> Stabilize Dying</button>`;
+        }
       }
-      
-      switch(action) {
-        case 'recovery':
-          await game.msh.rest.attemptRecovery(this.actor);
-          break;
-          
-        case 'healing':
-          await game.msh.rest.attemptHealing(this.actor);
-          break;
-          
-        case 'medical-care':
-          const currentCare = this.actor.getFlag('msh-faserip', 'medicalCare') || false;
-          await game.msh.rest.setMedicalCare(this.actor, !currentCare);
-          this.render(false);
-          break;
-          
-        case 'wake-up':
-          await game.msh.rest.attemptRegainConsciousness(this.actor);
-          break;
-          
-        case 'stabilize':
-          // Check if dying
-          const scope = "msh-faserip";
-          const dyingEffect = this.actor.effects.find(e => 
-            e.getFlag(scope, "isDying") || e.statuses?.has?.("dying")
-          );
-          
-          if (!dyingEffect) {
-            ui.notifications.warn(`${this.actor.name} is not dying`);
-            return;
-          }
-          
-          // Show stabilization options dialog
-          new Dialog({
-            title: `Stabilize ${this.actor.name}`,
-            content: `
-              <div style="padding:8px;">
-                <p><strong>${this.actor.name}</strong> is dying!</p>
-                <p>Choose stabilization method:</p>
-              </div>
-            `,
-            buttons: {
-              karma50: {
-                label: "50 Karma (1 round pause)",
-                callback: async () => {
-                  await dyingEffect.setFlag(scope, "stabilizedRounds", 1);
-                  ChatMessage.create({
-                    content: `<p style="color:#ff9800;"><strong>${this.actor.name}</strong> stabilized for 1 round (50 Karma spent)!</p>`
-                  });
-                  ui.notifications.info(`${this.actor.name} stabilized for 1 round`);
-                }
-              },
-              karma200: {
-                label: "200 Karma + FEAT",
-                callback: async () => {
-                  ui.notifications.info("Roll Endurance FEAT manually - success = stabilized");
-                }
-              },
-              aid: {
-                label: "Aid/First Aid (permanent)",
-                callback: async () => {
-                  await game.msh.rest.stabilizeDying(this.actor);
-                }
-              },
-              cancel: {
-                label: "Cancel",
-                callback: () => {}
+
+      // Build healing tooltip
+      let healingTitle = 'Attempt Healing (1 hour)\nRegain Health equal to Endurance rank';
+      if (healthAtMax) healingTitle += '\nHealth is already at maximum';
+      else if (healingCooldownRemaining) healingTitle += `\nOn cooldown: ${healingCooldownRemaining} min remaining`;
+      else if (healingUnavailable) healingTitle += '\nTake damage first to start healing timer';
+
+      const dlg = new Dialog({
+        title: `${actor.name} — Recovery & Rest`,
+        content: `
+          <div class="faserip-recovery-dialog" style="padding:8px;">
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
+              <button type="button" class="recovery-btn${recoveryUsedToday ? ' used-today' : ''}" data-action="recovery" ${recoveryUsedToday ? 'disabled' : ''}
+                      title="Attempt Recovery (10 rounds)\nRegain Health equal to Endurance rank${recoveryUsedToday ? '\nAlready used today' : ''}">
+                <i class="fas ${recoveryUsedToday ? 'fa-check' : 'fa-clock'}"></i> ${recoveryUsedToday ? 'Recovered' : 'Recovery (10 rnd)'}
+              </button>
+              <button type="button" class="recovery-btn" data-action="healing" ${healingUnavailable ? 'disabled' : ''}
+                      title="${healingTitle}">
+                <i class="fas fa-heart"></i> Healing (1 hr)
+              </button>
+              <button type="button" class="recovery-btn medical-toggle${medicalCare ? ' active' : ''}" data-action="medical-care"
+                      title="Toggle Medical Care\nDoubles healing rate when active">
+                <i class="fas fa-hospital"></i> Medical: ${medicalCare ? 'ON' : 'OFF'}
+              </button>
+            </div>
+            ${crisisHtml ? `<div style="display:flex;gap:6px;flex-wrap:wrap;">${crisisHtml}</div>` : ''}
+          </div>`,
+        buttons: {},
+        render: (html) => {
+          html.find('.recovery-btn').click(async (ev) => {
+            ev.preventDefault();
+            const action = $(ev.currentTarget).data('action');
+            if (!game.msh?.rest) {
+              ui.notifications.error("Rest system not initialized!");
+              return;
+            }
+            switch(action) {
+              case 'recovery':
+                await game.msh.rest.attemptRecovery(actor);
+                dlg.close();
+                sheet.render(false);
+                break;
+              case 'healing':
+                await game.msh.rest.attemptHealing(actor);
+                dlg.close();
+                sheet.render(false);
+                break;
+              case 'medical-care': {
+                const cur = actor.getFlag('msh-faserip', 'medicalCare') || false;
+                await game.msh.rest.setMedicalCare(actor, !cur);
+                const btn = $(ev.currentTarget);
+                btn.toggleClass('active');
+                btn.html(`<i class="fas fa-hospital"></i> Medical: ${!cur ? 'ON' : 'OFF'}`);
+                sheet.render(false);
+                break;
               }
-            },
-            default: "aid"
-          }).render(true);
-          break;
-      }
+              case 'wake-up':
+                await game.msh.rest.attemptRegainConsciousness(actor);
+                dlg.close();
+                sheet.render(false);
+                break;
+              case 'stabilize': {
+                const scope = "msh-faserip";
+                const dyingEffect = actor.effects.find(e => 
+                  e.getFlag(scope, "isDying") || e.statuses?.has?.("dying")
+                );
+                if (!dyingEffect) {
+                  ui.notifications.warn(`${actor.name} is not dying`);
+                  return;
+                }
+                dlg.close();
+                new Dialog({
+                  title: `Stabilize ${actor.name}`,
+                  content: `<div style="padding:8px;"><p><strong>${actor.name}</strong> is dying!</p><p>Choose stabilization method:</p></div>`,
+                  buttons: {
+                    karma50: {
+                      label: "50 Karma (1 round pause)",
+                      callback: async () => {
+                        await dyingEffect.setFlag(scope, "stabilizedRounds", 1);
+                        ChatMessage.create({ content: `<p style="color:#ff9800;"><strong>${actor.name}</strong> stabilized for 1 round (50 Karma spent)!</p>` });
+                        ui.notifications.info(`${actor.name} stabilized for 1 round`);
+                      }
+                    },
+                    karma200: {
+                      label: "200 Karma + FEAT",
+                      callback: async () => { ui.notifications.info("Roll Endurance FEAT manually - success = stabilized"); }
+                    },
+                    aid: {
+                      label: "Aid/First Aid (permanent)",
+                      callback: async () => { await game.msh.rest.stabilizeDying(actor); }
+                    },
+                    cancel: { label: "Cancel", callback: () => {} }
+                  },
+                  default: "aid"
+                }).render(true);
+                break;
+              }
+            }
+          });
+        }
+      }, { width: 380 });
+      dlg.render(true);
     });
 
 

@@ -494,7 +494,7 @@
   <div class="sec-grid">
     <!-- HEALTH -->
     <div class="sec-col health">
-      <div class="sec-head">
+      <div class="sec-head health-recovery-link" title="Click to open Recovery & Rest">
         <span>Health</span>
         <small>F + A + S + E</small>
       </div>
@@ -588,82 +588,46 @@
     </div>
   </div> <!-- closes sec-grid -->
   
-      <!-- Recovery & Rest Section -->
-      <div class="recovery-rest-section">
-        <div class="recovery-header">
-          <span>Recovery & Rest</span>
+      <!-- Movement (inline, replaces Recovery & Rest) -->
+      <div class="movement-inline">
+        <div class="movement-inline-item">
+          <label class="movement-label clickable" data-movement="run" title="Click to roll Run FEAT">RUN</label>
+          <input type="number" name="system.movement.run" value="{{system.movement.run}}" 
+                 placeholder="{{suggestedMovement}}" 
+                 title="Base: {{suggestedMovement}} areas/turn (from Endurance)&#10;Speed: {{movementInfo.run.mph}} mph&#10;&#10;Actions while moving: half speed&#10;Turning >90°: half speed" />
         </div>
-        <div class="recovery-buttons">
-          <div class="recovery-row">
-            <button type="button" class="recovery-btn{{#if recoveryUsedToday}} used-today{{/if}}" data-action="recovery" {{#if recoveryUsedToday}}disabled{{/if}} title="Attempt Recovery (10 rounds)&#10;Regain Health equal to Endurance rank{{#if recoveryUsedToday}}&#10;Already used today{{/if}}">
-              <i class="fas {{#if recoveryUsedToday}}fa-check{{else}}fa-clock{{/if}}"></i> {{#if recoveryUsedToday}}Recovered{{else}}Recovery (10 rnd){{/if}}
-            </button>
-            <button type="button" class="recovery-btn" data-action="healing" {{#if healingUnavailable}}disabled{{/if}} title="Attempt Healing (1 hour)&#10;Regain Health equal to Endurance rank{{#if healthAtMax}}&#10;Health is already at maximum{{else}}{{#if healingCooldownRemaining}}&#10;On cooldown: {{healingCooldownRemaining}} min remaining{{else}}{{#if healingUnavailable}}&#10;Take damage first to start healing timer{{/if}}{{/if}}{{/if}}">
-              <i class="fas fa-heart"></i> Healing (1 hr)
-            </button>
-            <button type="button" class="recovery-btn medical-toggle {{#if flags.msh-faserip.medicalCare}}active{{/if}}" 
-                    data-action="medical-care" 
-                    title="Toggle Medical Care&#10;Doubles healing rate when active">
-              <i class="fas fa-hospital"></i> Medical: {{#if flags.msh-faserip.medicalCare}}ON{{else}}OFF{{/if}}
-            </button>
-          </div>
-          {{#if isInCrisis}}
-          <div class="recovery-row">
-            {{#unless isDying}}
-            <button type="button" class="recovery-btn crisis-btn" data-action="wake-up" title="Attempt to Regain Consciousness&#10;Only available at 0 HP">
-              <i class="fas fa-eye"></i> Wake Up (0 HP)
-            </button>
-            {{/unless}}
-            {{#if isDying}}
-            <button type="button" class="recovery-btn crisis-btn" data-action="stabilize" title="Stabilize Dying Character&#10;Only available when dying">
-              <i class="fas fa-medkit"></i> Stabilize Dying
-            </button>
-            {{/if}}
-          </div>
-          {{/if}}
+        <div class="movement-inline-item">
+          <label class="movement-label clickable" data-movement="leap" title="Click to roll Leap FEAT">LEAP</label>
+          <input type="number" name="system.movement.leap" value="{{system.movement.leap}}" 
+                 placeholder="{{leapingData.acrossAreas}}"
+                 title="Across: {{leapingData.acrossFeet}}' ({{leapingData.acrossAreas}} areas)&#10;Up: {{leapingData.upFeet}}' ({{leapingData.upFloors}} floors)&#10;Down: {{leapingData.downFeet}}' ({{leapingData.downFloors}} floors)&#10;(Based on Strength rank)" />
+        </div>
+        <div class="movement-inline-item">
+          <label class="movement-label clickable" data-movement="swim" title="Click to roll Swim FEAT">SWIM</label>
+          <input type="number" name="system.movement.swim" value="{{system.movement.swim}}" 
+                 placeholder="1"
+                 title="Default: 1 area/turn without powers&#10;Max: 9 areas/turn (Monstrous)&#10;&#10;Drowning: Hold breath for Endurance rank # of rounds" />
+        </div>
+        <div class="movement-inline-item">
+          <label class="movement-label clickable" data-movement="fly" title="Click to roll Fly FEAT">FLY</label>
+          <input type="number" name="system.movement.fly" value="{{system.movement.fly}}" 
+                 placeholder="0"
+                 title="Max speed subject to exhaustion&#10;Cruising (2 ranks lower): no exhaustion&#10;Low altitude max: ground speed for rank&#10;Acceleration: {{suggestedMovement}} areas/turn&#10;90° turn costs 1 area&#10;>90° turn requires Agility FEAT" />
+        </div>
+        <div class="movement-inline-item">
+          <label class="movement-label clickable" data-movement="teleport" title="Click to roll Teleport FEAT">TELE</label>
+          <input type="number" name="system.movement.teleport" value="{{system.movement.teleport}}" 
+                 placeholder="0"
+                 title="Instantaneous - no speed&#10;Multiple teleports: Endurance FEAT&#10;Carrying others: Power Stunt required" />
+        </div>
+        <div class="movement-inline-item movement-info-btn">
+          <a class="movement-chat-btn" title="Send movement info to chat"><i class="fas fa-comment-dots"></i></a>
         </div>
       </div>
 
 </div> <!-- closes secondary-abilities -->
  <!-- end of ability section -->
 
-      <!-- ADD: movement as its own panel spanning both columns -->
-      <div class="movement-panel">
-        <div class="movement-item">
-          <label class="movement-label clickable" data-movement="run" title="Click to roll Run FEAT">Run</label>
-          <input type="number" name="system.movement.run" value="{{system.movement.run}}" 
-                 placeholder="{{suggestedMovement}}" 
-                 title="Base: {{suggestedMovement}} areas/turn (from Endurance)&#10;Speed: {{movementInfo.run.mph}} mph&#10;&#10;Actions while moving: half speed&#10;Turning >90°: half speed" />
-        </div>
-        <div class="movement-item">
-          <label class="movement-label clickable" data-movement="leap" title="Click to roll Leap FEAT">Leap</label>
-          <input type="number" name="system.movement.leap" value="{{system.movement.leap}}" 
-                 placeholder="{{leapingData.acrossAreas}}"
-                 title="Across: {{leapingData.acrossFeet}}' ({{leapingData.acrossAreas}} areas)&#10;Up: {{leapingData.upFeet}}' ({{leapingData.upFloors}} floors)&#10;Down: {{leapingData.downFeet}}' ({{leapingData.downFloors}} floors)&#10;(Based on Strength rank)" />
-        </div>
-        <div class="movement-item">
-          <label class="movement-label clickable" data-movement="swim" title="Click to roll Swim FEAT">Swim</label>
-          <input type="number" name="system.movement.swim" value="{{system.movement.swim}}" 
-                 placeholder="1"
-                 title="Default: 1 area/turn without powers&#10;Max: 9 areas/turn (Monstrous)&#10;&#10;Drowning: Hold breath for Endurance rank # of rounds" />
-        </div>
-        <div class="movement-item">
-          <label class="movement-label clickable" data-movement="fly" title="Click to roll Fly FEAT">Fly</label>
-          <input type="number" name="system.movement.fly" value="{{system.movement.fly}}" 
-                 placeholder="0"
-                 title="Max speed subject to exhaustion&#10;Cruising (2 ranks lower): no exhaustion&#10;Low altitude max: ground speed for rank&#10;Acceleration: {{suggestedMovement}} areas/turn&#10;90° turn costs 1 area&#10;>90° turn requires Agility FEAT" />
-        </div>
-        <div class="movement-item">
-          <label class="movement-label clickable" data-movement="teleport" title="Click to roll Teleport FEAT">Teleport</label>
-          <input type="number" name="system.movement.teleport" value="{{system.movement.teleport}}" 
-                 placeholder="0"
-                 title="Instantaneous - no speed&#10;Multiple teleports: Endurance FEAT&#10;Carrying others: Power Stunt required" />
-        </div>
-        <div class="movement-item movement-info-btn">
-          <label>&nbsp;</label>
-          <a class="movement-chat-btn" title="Send movement info to chat"><i class="fas fa-comment-dots"></i></a>
-        </div>
-      </div>
     </div>
     </div>
 
