@@ -1,50 +1,23 @@
 <form class="faserip-sheet" autocomplete="off">
-  <!-- COMPACT HEADER -->
+  <!-- COMPACT HEADER (merged — logo+portrait left, fields right, 2 rows) -->
 <div class="msh-compact-header">
-  <div class="msh-portrait">
-    <img src="{{actor.img}}" data-edit="img" alt="{{actor.name}}" />
-  </div>
-
-  <div class="msh-logo">
-    <div class="msh-marvel">MARVEL</div>
-    <div class="msh-super">SUPER HEROES</div>
-    <div class="msh-chartext">Character<br>Information<br>Sheet</div>
-  </div>
-
-    <div class="msh-player">
-    <label>Player Name</label>
-    <input type="text" name="system.player" value="{{system.player}}" />
-    
-    <label style="margin-top:6px;">Character Type</label>
-    <div style="display: flex; align-items: flex-end; gap: 6px;">
-      <select name="system.characterType" style="height:26px;padding:2px 6px;font-size:12.5px;flex:1;">
-        <option value="player" {{#if (eq system.characterType "player")}}selected{{/if}}>Player</option>
-        <option value="npc-hero" {{#if (eq system.characterType "npc-hero")}}selected{{/if}}>NPC Hero</option>
-        <option value="npc-villain" {{#if (eq system.characterType "npc-villain")}}selected{{/if}}>NPC Villain</option>
-        <option value="civilian" {{#if (eq system.characterType "civilian")}}selected{{/if}}>Civilian</option>
-      </select>
-      <button type="button" class="sheet-lock-toggle {{#if flags.msh-faserip.sheetLocked}}locked{{/if}}" 
-              title="{{#if flags.msh-faserip.sheetLocked}}Unlock Sheet{{else}}Lock Sheet{{/if}}">
-        <i class="fas {{#if flags.msh-faserip.sheetLocked}}fa-lock{{else}}fa-lock-open{{/if}}"></i>
-      </button>
+  <!-- Left: Logo over Portrait -->
+  <div class="msh-left">
+    <div class="msh-logo">
+      <div class="msh-marvel">MARVEL</div>
+      <div class="msh-super">SUPER HEROES</div>
+    </div>
+    <div class="msh-portrait">
+      <img src="{{actor.img}}" data-edit="img" alt="{{actor.name}}" />
     </div>
   </div>
-</div>
 
-<!-- COMPACT IDENTITY (same fields/order) -->
-<div class="msh-identity">
-  <div class="msh-row">
+  <!-- Row 1 middle: Hero Name | Identity S/P | Age -->
+  <div class="msh-row1">
     <div class="msh-field">
       <label>Hero's Name</label>
       <input type="text" name="name" value="{{actor.name}}" />
     </div>
-    <div class="msh-field">
-      <label>Group Affiliation</label>
-      <input type="text" name="system.group" value="{{system.group}}" />
-    </div>
-  </div>
-
-  <div class="msh-row">
     <div class="msh-field">
       <div class="msh-inline">
         <label>Hero's Identity</label>
@@ -61,20 +34,21 @@
       </div>
       <input type="text" name="system.identity" value="{{system.identity}}" />
     </div>
-
-    <div class="msh-field">
-      <label>Base of Operations</label>
-      <input type="text" name="system.base" value="{{system.base}}" />
-    </div>
-  </div>
-
-  <div class="msh-row msh-3">
-    <div class="msh-field">
+    <div class="msh-field msh-field-age">
       <label>Age</label>
       <input type="text" name="system.age" value="{{system.age}}" />
     </div>
+  </div>
 
-    <div class="msh-field">
+  <!-- Row 1 right: Player Name -->
+  <div class="msh-player-top">
+    <label>Player Name</label>
+    <input type="text" name="system.player" value="{{system.player}}" />
+  </div>
+
+  <!-- Row 2 middle: Origin | Group | Base | Bio -->
+  <div class="msh-row2">
+    <div class="msh-field msh-field-origin">
       <label>Origin</label>
       <input type="text" name="system.origin" value="{{system.origin}}" list="origin-options" />
       <datalist id="origin-options">
@@ -86,51 +60,72 @@
         <option value="Alien">
       </datalist>
     </div>
-
-    <div class="msh-field msh-biography">
+    <div class="msh-field msh-field-group">
+      <label>Group</label>
+      <input type="text" name="system.group" value="{{system.group}}" />
+    </div>
+    <div class="msh-field msh-field-base">
+      <label>Base of Operations</label>
+      <input type="text" name="system.base" value="{{system.base}}" />
+    </div>
+    <div class="msh-field msh-field-bio">
       <button type="button" class="biography-toggle">
-        Biography {{#if isBiographyOpen}}▲{{else}}▼{{/if}}
+        Bio {{#if isBiographyOpen}}▲{{else}}▼{{/if}}
       </button>
     </div>
   </div>
 
-  {{#if isBiographyOpen}}
-  <div class="msh-bio">
-    <div class="msh-biorow msh-biorow-3col">
-      <div class="msh-biofield"><label>Race</label><input type="text" name="system.race" value="{{system.race}}" /></div>
-      <div class="msh-biofield"><label>Sex</label><input type="text" name="system.sex" value="{{system.sex}}" /></div>
-      <div class="msh-biofield"><label>Nationality</label><input type="text" name="system.nationality" value="{{system.nationality}}" /></div>
-    </div>
-    <div class="msh-biorow msh-biorow-3col">
-      <div class="msh-biofield"><label>Handedness</label><input type="text" name="system.handedness" value="{{system.handedness}}" /></div>
-      <div class="msh-biofield"><label>Height</label><input type="text" name="system.height" value="{{system.height}}" /></div>
-      <div class="msh-biofield"><label>Weight</label><input type="text" name="system.weight" value="{{system.weight}}" /></div>
-    </div>
-    <div class="msh-biorow msh-biorow-3col">
-      <div class="msh-biofield"><label>Eye Color</label><input type="text" name="system.eyeColor" value="{{system.eyeColor}}" /></div>
-      <div class="msh-biofield"><label>Hair Color</label><input type="text" name="system.hairColor" value="{{system.hairColor}}" /></div>
-      <div class="msh-biofield"><label>Place of Birth</label><input type="text" name="system.placeOfBirth" value="{{system.placeOfBirth}}" /></div>
-    </div>
-    <div class="msh-biorow msh-biorow-3col">
-      <div class="msh-biofield"><label>Legal Status</label><input type="text" name="system.legalStatus" value="{{system.legalStatus}}" /></div>
-      <div class="msh-biofield"><label>Occupation</label><input type="text" name="system.occupation" value="{{system.occupation}}" /></div>
-      <div class="msh-biofield"><label>Marital Status</label><input type="text" name="system.maritalStatus" value="{{system.maritalStatus}}" /></div>
-    </div>
-    <div class="msh-biofield msh-full biography-details">
-      <label>History</label>
-      {{editor system.history
-              target="system.history"
-              button=true
-              owner=owner
-              editable=editable
-              collaborate=false
-              documents=true
-              relativeTo=actor}}
-    </div>
-
+  <!-- Row 2 right: Character Type + Lock -->
+  <div class="msh-player-bottom">
+    <select name="system.characterType">
+      <option value="player" {{#if (eq system.characterType "player")}}selected{{/if}}>Player</option>
+      <option value="npc-hero" {{#if (eq system.characterType "npc-hero")}}selected{{/if}}>NPC Hero</option>
+      <option value="npc-villain" {{#if (eq system.characterType "npc-villain")}}selected{{/if}}>NPC Villain</option>
+      <option value="civilian" {{#if (eq system.characterType "civilian")}}selected{{/if}}>Civilian</option>
+    </select>
+    <button type="button" class="sheet-lock-toggle {{#if flags.msh-faserip.sheetLocked}}locked{{/if}}" 
+            title="{{#if flags.msh-faserip.sheetLocked}}Unlock Sheet{{else}}Lock Sheet{{/if}}">
+      <i class="fas {{#if flags.msh-faserip.sheetLocked}}fa-lock{{else}}fa-lock-open{{/if}}"></i>
+    </button>
   </div>
-  {{/if}}
 </div>
+
+<!-- BIOGRAPHY (expandable) -->
+{{#if isBiographyOpen}}
+<div class="msh-bio">
+  <div class="msh-biorow msh-biorow-3col">
+    <div class="msh-biofield"><label>Race</label><input type="text" name="system.race" value="{{system.race}}" /></div>
+    <div class="msh-biofield"><label>Sex</label><input type="text" name="system.sex" value="{{system.sex}}" /></div>
+    <div class="msh-biofield"><label>Date of Birth</label><input type="text" name="system.dob" value="{{system.dob}}" /></div>
+  </div>
+  <div class="msh-biorow msh-biorow-3col">
+    <div class="msh-biofield"><label>Height</label><input type="text" name="system.height" value="{{system.height}}" /></div>
+    <div class="msh-biofield"><label>Weight</label><input type="text" name="system.weight" value="{{system.weight}}" /></div>
+    <div class="msh-biofield"><label>Handedness</label><input type="text" name="system.handedness" value="{{system.handedness}}" /></div>
+  </div>
+  <div class="msh-biorow msh-biorow-3col">
+    <div class="msh-biofield"><label>Eye Color</label><input type="text" name="system.eyeColor" value="{{system.eyeColor}}" /></div>
+    <div class="msh-biofield"><label>Hair Color</label><input type="text" name="system.hairColor" value="{{system.hairColor}}" /></div>
+    <div class="msh-biofield"><label>Nationality</label><input type="text" name="system.nationality" value="{{system.nationality}}" /></div>
+  </div>
+  <div class="msh-biorow msh-biorow-3col">
+    <div class="msh-biofield"><label>Legal Status</label><input type="text" name="system.legalStatus" value="{{system.legalStatus}}" /></div>
+    <div class="msh-biofield"><label>Marital Status</label><input type="text" name="system.maritalStatus" value="{{system.maritalStatus}}" /></div>
+    <div class="msh-biofield"><label>Occupation</label><input type="text" name="system.occupation" value="{{system.occupation}}" /></div>
+  </div>
+  <div class="msh-biofield msh-full biography-details">
+    <label>History</label>
+    {{editor system.history
+            target="system.history"
+            button=true
+            owner=owner
+            editable=editable
+            collaborate=false
+            documents=true
+            relativeTo=actor}}
+  </div>
+</div>
+{{/if}}
 
 
   <div class="sheet-body">

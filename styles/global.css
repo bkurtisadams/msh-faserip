@@ -3174,46 +3174,82 @@ form.faserip-sheet .identity-section input[type="radio"] {
 }
 
 /* ===== Compact, from-scratch header ===== */
+/* ===== Merged compact header: logo+portrait left, fields right, 2 rows ===== */
 .msh-compact-header{
   display:grid;
-  grid-template-columns:72px 1fr auto;      /* portrait | logo | player */
-  align-items:center;
-  column-gap:12px;
+  grid-template-columns:90px 1fr auto;
+  grid-template-rows:auto auto;
+  column-gap:10px;
+  row-gap:4px;
   padding:6px 8px;
-  border:1px solid #7a0b0b;                 /* your red box style */
+  border:1px solid #7a0b0b;
   border-radius:3px;
   background:#fff;
   line-height:1.1;
 }
 
+/* Left column: logo over portrait, spans both rows */
+.msh-left{
+  grid-column:1; grid-row:1 / 3;
+  display:flex; flex-direction:column; align-items:center; gap:4px;
+}
+.msh-logo{ text-align:center; }
+.msh-logo .msh-marvel{ font-weight:900;font-size:16px;line-height:1.0;margin:0; display:inline-block; padding:1px 5px 2px; }
+.msh-logo .msh-super{  font-weight:700;font-size:7.5px;line-height:1.0;margin:2px 0 0 0; text-align:center; letter-spacing:1.8px; }
+.msh-portrait{ width:62px; height:62px; }
 .msh-portrait img{
   width:100%;height:100%;object-fit:contain;border-radius:4px;display:block;
   border:1px solid rgba(0,0,0,.25);
 }
 
-.msh-logo{ margin:0; }
-.msh-logo .msh-marvel{ font-weight:900;font-size:28px;line-height:1.0;margin:0; }
-.msh-logo .msh-super{  font-weight:700;font-size:12px;line-height:1.0;margin:0; }
-.msh-logo .msh-chartext{ font-weight:700;font-size:13px;line-height:1.05;margin:2px 0 0 0; }
+/* Row 1 middle: Hero Name | Identity S/P | Age */
+.msh-row1{
+  grid-column:2; grid-row:1;
+  display:grid; grid-template-columns:1fr 1fr 55px;
+  column-gap:10px; align-items:end; min-width:0;
+}
+.msh-row1 .msh-field{ min-width:0; }
 
-.msh-player label{ display:block;font-size:12.5px;line-height:1.1;margin:0 0 2px 0; }
-.msh-player input{ height:26px;padding:2px 6px;font-size:12.5px;line-height:1.1; box-sizing:border-box; }
+/* Row 1 right: Player Name */
+.msh-player-top{
+  grid-column:3; grid-row:1;
+  min-width:120px; align-self:end;
+}
+.msh-player-top label{ display:block;font-size:12.5px;line-height:1.1;margin:0 0 2px 0; }
+.msh-player-top input{ height:24px;padding:2px 6px;font-size:12.5px;line-height:1.1;box-sizing:border-box;width:100%; }
 
-/* ===== Identity section (same fields/order, just tight) ===== */
-.msh-identity{
-  border:1px solid #7a0b0b;border-radius:3px;background:#fff;
-  padding:8px 10px; display:grid; row-gap:6px; line-height:1.1;
+/* Row 2 middle: Origin | Group | Base | Bio */
+.msh-row2{
+  grid-column:2; grid-row:2;
+  display:flex; gap:8px; align-items:end; min-width:0;
+}
+.msh-row2 .msh-field{ min-width:0; }
+.msh-field-origin{ flex:0 0 85px; }
+.msh-field-group{ flex:1; }
+.msh-field-base{ flex:1.5; }
+.msh-field-bio{ flex:0 0 auto; }
+.msh-field-age{ } /* width set by grid column */
+
+/* Row 2 right: Character Type + Lock */
+.msh-player-bottom{
+  grid-column:3; grid-row:2;
+  min-width:120px;
+  display:flex; gap:4px; align-items:end;
+}
+.msh-player-bottom select{
+  flex:1; height:24px; padding:1px 4px; font-size:12px;
+  border:1px solid #ccc; border-radius:2px;
+  font-family:'Barlow Condensed', sans-serif; box-sizing:border-box;
+}
+.msh-player-bottom .sheet-lock-toggle{
+  width:24px; height:24px; font-size:11px; flex:0 0 24px;
 }
 
-/* rows: 2-col by default, 3-col when .msh-3 */
-.msh-identity .msh-row{ display:grid; grid-template-columns:1fr 1fr; column-gap:12px; row-gap:6px; }
-.msh-identity .msh-row.msh-3{ grid-template-columns:1fr 1fr 1fr; }
-.msh-identity .msh-field{ min-width:0; } /* allow shrink */
-
-.msh-identity label{ display:block;font-size:12.5px;margin:0 0 2px 0; }
-.msh-identity input[type="text"],
-.msh-identity input[type="number"],
-.msh-identity select{
+/* Shared field labels/inputs inside header */
+.msh-compact-header label{ display:block;font-size:12.5px;margin:0 0 2px 0; }
+.msh-compact-header input[type="text"],
+.msh-compact-header input[type="number"],
+.msh-compact-header select{
   width:100%;height:24px;padding:2px 6px;font-size:12.5px;line-height:1.1;box-sizing:border-box;
 }
 
@@ -3221,16 +3257,19 @@ form.faserip-sheet .identity-section input[type="radio"] {
 .msh-inline{ display:flex; align-items:center; gap:8px; }
 .msh-radios{ display:inline-flex; align-items:center; gap:8px; }
 .msh-radio{ display:inline-flex; align-items:center; gap:4px; }
-.msh-identity input[type="radio"]{ margin:0; transform:scale(.95); }
+.msh-compact-header input[type="radio"]{ margin:0; transform:scale(.95); }
 
-/* biography button sized like inputs */
+/* biography button */
 .msh-biography{ display:flex; align-items:end; }
-.msh-biography .biography-toggle{
-  height:26px; line-height:24px; padding:2px 8px; box-sizing:border-box;
+.msh-biography .biography-toggle,
+.msh-field-bio .biography-toggle{
+  height:24px; line-height:22px; padding:2px 8px; box-sizing:border-box;
+  white-space:nowrap;
 }
 
-/* biography details grid */
-.msh-bio{ display:grid; row-gap:8px; margin-top:6px; }
+/* biography details grid (now outside identity, directly in form) */
+.msh-bio{ display:grid; row-gap:8px; padding:6px 8px;
+  border:1px solid #7a0b0b; border-radius:3px; background:#fff; }
 .msh-biorow{ display:grid; grid-template-columns:1fr 1fr; column-gap:12px; row-gap:6px; }
 .msh-biorow.msh-biorow-3col{ grid-template-columns:1fr 1fr 1fr; }
 .msh-biofield label{ display:block;font-size:12.5px;margin:0 0 2px 0; }

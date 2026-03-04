@@ -40,24 +40,25 @@ form.faserip-sheet {
   gap: 5px;
 }
 
-/* ── MARVEL logo block ──────────────────────────────────────────────────── */
+/* ── Merged header: comic panel border ─────────────────────────────────── */
 .msh-compact-header {
   background: var(--cream);
   border: 2.5px solid var(--ink) !important;
   box-shadow: 1px 1px 0 var(--ink);
-  padding: 5px 8px;
-  gap: 10px;
+  padding: 6px 8px;
+  column-gap: 10px;
+  row-gap: 4px;
 }
 
 .msh-logo .msh-marvel {
   font-family: 'Oswald', 'Arial Black', sans-serif;
   font-weight: 900;
-  font-size: 28px;
+  font-size: 16px;
   line-height: 1;
-  letter-spacing: 2px;
+  letter-spacing: 1.5px;
   text-transform: uppercase;
   display: inline-block;
-  padding: 1px 7px 3px;
+  padding: 1px 5px 2px;
   background: var(--mred);
   color: #fff;
   border-radius: 2px;
@@ -66,38 +67,17 @@ form.faserip-sheet {
 .msh-logo .msh-super {
   font-family: 'Oswald', sans-serif;
   font-weight: 700;
-  font-size: 11px;
-  letter-spacing: 3.5px;
+  font-size: 7.5px;
+  letter-spacing: 1.8px;
   color: var(--mred-dk);
   text-transform: uppercase;
-  margin-top: 3px;
-}
-
-.msh-logo .msh-chartext {
-  font-family: 'Barlow Condensed', sans-serif;
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--txt-soft);
-  letter-spacing: 0.3px;
-  line-height: 1.25;
   margin-top: 2px;
+  text-align: center;
 }
 
-/* ── Identity section: comic panel border + label upgrade ─────────────── */
-.msh-identity {
-  padding: 6px 8px;
-  row-gap: 4px;
-  background: var(--cream);
-  border: 2.5px solid var(--ink) !important;
-  box-shadow: 1px 1px 0 var(--ink);
-}
-
-.msh-identity .msh-row {
-  row-gap: 4px;
-  column-gap: 10px;
-}
-
-.msh-identity label {
+/* ── Header labels ────────────────────────────────────────────────────── */
+.msh-compact-header label,
+.msh-player-top label {
   font-family: 'Oswald', sans-serif;
   font-size: 11px;
   font-weight: 600;
@@ -105,6 +85,13 @@ form.faserip-sheet {
   text-transform: uppercase;
   color: var(--mred);
   margin-bottom: 2px;
+}
+
+/* ── Biography panel: comic panel border ──────────────────────────────── */
+.msh-bio {
+  background: var(--cream);
+  border: 2.5px solid var(--ink) !important;
+  box-shadow: 1px 1px 0 var(--ink);
 }
 
 /* ── Dark-red section headers: gradient instead of flat ─────────────────── */
@@ -822,11 +809,11 @@ form.faserip-sheet .contact-name-text {
 }
 
 /* ── Global input treatment: white bg + visible border everywhere ──────── */
-form.faserip-sheet .msh-identity input[type="text"],
-form.faserip-sheet .msh-identity input[type="number"],
-form.faserip-sheet .msh-identity select,
-form.faserip-sheet .msh-player input,
-form.faserip-sheet .msh-player select {
+form.faserip-sheet .msh-compact-header input[type="text"],
+form.faserip-sheet .msh-compact-header input[type="number"],
+form.faserip-sheet .msh-compact-header select,
+form.faserip-sheet .msh-player-top input,
+form.faserip-sheet .msh-player-bottom select {
   background: #fff !important;
   border-color: #b8b8b8 !important;
   box-shadow: inset 0 1px 2px rgba(0,0,0,0.06);
