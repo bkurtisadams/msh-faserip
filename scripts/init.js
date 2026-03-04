@@ -1758,7 +1758,13 @@ function _collectTokenEffectState(actor) {
 // Reconcile token state: apply desired or revert to baseline
 async function _reconcileTokenEffects(actor) {
   if (!canvas?.scene || !game.user.isGM) return;
-  const tokens = canvas.scene.tokens.filter(t => t.actorId === actor.id);
+
+  // Find tokens for this actor — handle both linked and unlinked (synthetic) actors
+  const tokens = canvas.scene.tokens.filter(t => {
+    if (t.actorLink) return t.actorId === actor.id;
+    // Unlinked: the token's synthetic actor IS the actor
+    return t.actor === actor;
+  });
   if (!tokens.length) return;
 
   const desired = _collectTokenEffectState(actor);

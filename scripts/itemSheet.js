@@ -1,8 +1,10 @@
-// itemSheet.js v1.11.0 - 2026-03-03
+// itemSheet.js v1.12.0 - 2026-03-04
+// v1.12.0: Add Effects tab to power sheet with ActiveEffect presets and management
 // v1.11.0: Extract contact sheet to standalone contactSheet.js
 // v1.9.0: Redesign talent sheet to HQ-style with fieldsets, auto-fill from specialty data, rule summary
 // v1.8.0: Add SFX preview buttons and volume controls to power sheet
 // v1.7.0: Power Sheet layout reorganization
+import { prepareActiveEffectCategories, onManageActiveEffect } from "../helpers/effects.mjs";
 export class FaseripItemSheet extends ItemSheet {
   static get defaultOptions() {
     return foundry.utils.mergeObject(super.defaultOptions, {
@@ -92,6 +94,9 @@ export class FaseripItemSheet extends ItemSheet {
       console.log("Power sheet data:", context);
     }
 
+    // Active Effects on this item (powers and any other item type)
+    context.effects = prepareActiveEffectCategories(this.item.effects ?? []);
+
     // ANCHOR: vehicle-item-sheet-getData
       if (this.item?.type === "vehicle") {
         context.allRanks = context.allRanks || [
@@ -102,6 +107,195 @@ export class FaseripItemSheet extends ItemSheet {
       }
 
     return context;
+  }
+
+  _buildPowerPresetEffect(preset) {
+    const MODES = CONST.ACTIVE_EFFECT_MODES;
+    const origin = this.item.uuid;
+    const base = { origin, disabled: true, transfer: true };
+
+    switch (preset) {
+
+      // ── Defensive ──
+      case "body-armor":
+        return foundry.utils.mergeObject(base, {
+          name: "Body Armor",
+          img: "icons/svg/shield.svg",
+          disabled: false,
+          changes: [
+            { key: "system.combatMods.defenseShift", mode: MODES.ADD, value: "0" }
+          ]
+        });
+
+      case "forcefield":
+        return foundry.utils.mergeObject(base, {
+          name: "Force Field",
+          img: "icons/svg/aura.svg",
+          changes: [
+            { key: "system.combatMods.defenseShift", mode: MODES.ADD, value: "0" },
+            { key: "faserip.token.light.bright", mode: MODES.CUSTOM, value: "0" },
+            { key: "faserip.token.light.dim", mode: MODES.CUSTOM, value: "0.15" },
+            { key: "faserip.token.light.color", mode: MODES.CUSTOM, value: "#4488ff" },
+            { key: "faserip.token.light.alpha", mode: MODES.CUSTOM, value: "0.15" },
+            { key: "faserip.token.light.animation.type", mode: MODES.CUSTOM, value: "pulse" },
+            { key: "faserip.token.light.animation.speed", mode: MODES.CUSTOM, value: "2" },
+            { key: "faserip.token.light.animation.intensity", mode: MODES.CUSTOM, value: "2" }
+          ]
+        });
+
+      case "defense-bonus":
+        return foundry.utils.mergeObject(base, {
+          name: "Defense Bonus",
+          img: "icons/svg/shield.svg",
+          disabled: false,
+          changes: [
+            { key: "system.combatMods.defenseShift", mode: MODES.ADD, value: "1" }
+          ]
+        });
+
+      case "resistance":
+        return foundry.utils.mergeObject(base, {
+          name: "Resistance",
+          img: "icons/svg/fire-shield.svg",
+          disabled: false,
+          changes: [
+            { key: "system.combatMods.defenseShift", mode: MODES.ADD, value: "0" }
+          ]
+        });
+
+      // ── Offensive ──
+      case "attack-bonus":
+        return foundry.utils.mergeObject(base, {
+          name: "Attack Bonus",
+          img: "icons/svg/sword.svg",
+          disabled: false,
+          changes: [
+            { key: "system.combatMods.attackShift", mode: MODES.ADD, value: "1" }
+          ]
+        });
+
+      case "ability-boost":
+        return foundry.utils.mergeObject(base, {
+          name: "Ability Boost",
+          img: "icons/svg/upgrade.svg",
+          disabled: false,
+          changes: [
+            { key: "system.combatMods.abilityShifts.strength", mode: MODES.ADD, value: "0" }
+          ]
+        });
+
+      // ── Visual ──
+      case "light":
+        return foundry.utils.mergeObject(base, {
+          name: "Light Emission",
+          img: "icons/svg/light.svg",
+          changes: [
+            { key: "faserip.token.light.bright", mode: MODES.CUSTOM, value: "0.1" },
+            { key: "faserip.token.light.dim", mode: MODES.CUSTOM, value: "0.2" },
+            { key: "faserip.token.light.color", mode: MODES.CUSTOM, value: "#ffdd88" },
+            { key: "faserip.token.light.alpha", mode: MODES.CUSTOM, value: "0.3" },
+            { key: "faserip.token.light.angle", mode: MODES.CUSTOM, value: "360" },
+            { key: "faserip.token.light.animation.type", mode: MODES.CUSTOM, value: "torch" },
+            { key: "faserip.token.light.animation.speed", mode: MODES.CUSTOM, value: "3" },
+            { key: "faserip.token.light.animation.intensity", mode: MODES.CUSTOM, value: "3" }
+          ]
+        });
+
+      case "energy-aura":
+        return foundry.utils.mergeObject(base, {
+          name: "Energy Aura",
+          img: "icons/svg/fire.svg",
+          changes: [
+            { key: "faserip.token.light.bright", mode: MODES.CUSTOM, value: "0" },
+            { key: "faserip.token.light.dim", mode: MODES.CUSTOM, value: "0.1" },
+            { key: "faserip.token.light.color", mode: MODES.CUSTOM, value: "#ff4400" },
+            { key: "faserip.token.light.alpha", mode: MODES.CUSTOM, value: "0.25" },
+            { key: "faserip.token.light.animation.type", mode: MODES.CUSTOM, value: "flame" },
+            { key: "faserip.token.light.animation.speed", mode: MODES.CUSTOM, value: "4" },
+            { key: "faserip.token.light.animation.intensity", mode: MODES.CUSTOM, value: "4" }
+          ]
+        });
+
+      case "stealth":
+        return foundry.utils.mergeObject(base, {
+          name: "Invisibility",
+          img: "icons/svg/invisible.svg",
+          changes: [
+            { key: "faserip.token.alpha", mode: MODES.CUSTOM, value: "0.3" }
+          ]
+        });
+
+      case "phasing":
+        return foundry.utils.mergeObject(base, {
+          name: "Phasing",
+          img: "icons/svg/mystery-man.svg",
+          changes: [
+            { key: "faserip.token.alpha", mode: MODES.CUSTOM, value: "0.5" },
+            { key: "faserip.token.light.dim", mode: MODES.CUSTOM, value: "0.1" },
+            { key: "faserip.token.light.color", mode: MODES.CUSTOM, value: "#aaccff" },
+            { key: "faserip.token.light.alpha", mode: MODES.CUSTOM, value: "0.1" },
+            { key: "faserip.token.light.animation.type", mode: MODES.CUSTOM, value: "fog" },
+            { key: "faserip.token.light.animation.speed", mode: MODES.CUSTOM, value: "2" },
+            { key: "faserip.token.light.animation.intensity", mode: MODES.CUSTOM, value: "2" }
+          ]
+        });
+
+      case "darkness":
+        return foundry.utils.mergeObject(base, {
+          name: "Darkness Generation",
+          img: "icons/svg/blind.svg",
+          changes: [
+            { key: "faserip.token.light.bright", mode: MODES.CUSTOM, value: "0" },
+            { key: "faserip.token.light.dim", mode: MODES.CUSTOM, value: "0.2" },
+            { key: "faserip.token.light.color", mode: MODES.CUSTOM, value: "#220044" },
+            { key: "faserip.token.light.alpha", mode: MODES.CUSTOM, value: "0.6" },
+            { key: "faserip.token.light.luminosity", mode: MODES.CUSTOM, value: "-0.5" },
+            { key: "faserip.token.light.animation.type", mode: MODES.CUSTOM, value: "fog" },
+            { key: "faserip.token.light.animation.speed", mode: MODES.CUSTOM, value: "2" },
+            { key: "faserip.token.light.animation.intensity", mode: MODES.CUSTOM, value: "3" }
+          ]
+        });
+
+      // ── Movement ──
+      case "flight":
+        return foundry.utils.mergeObject(base, {
+          name: "Flight Active",
+          img: "icons/svg/wing.svg",
+          statuses: ["fly"],
+          changes: [
+            { key: "faserip.token.light.dim", mode: MODES.CUSTOM, value: "0.1" },
+            { key: "faserip.token.light.color", mode: MODES.CUSTOM, value: "#ff6600" },
+            { key: "faserip.token.light.alpha", mode: MODES.CUSTOM, value: "0.2" },
+            { key: "faserip.token.light.animation.type", mode: MODES.CUSTOM, value: "flame" },
+            { key: "faserip.token.light.animation.speed", mode: MODES.CUSTOM, value: "4" },
+            { key: "faserip.token.light.animation.intensity", mode: MODES.CUSTOM, value: "3" }
+          ]
+        });
+
+      case "immobilize":
+        return foundry.utils.mergeObject(base, {
+          name: "Immobilized",
+          img: "icons/svg/net.svg",
+          changes: [
+            { key: "system.combatMods.canMove", mode: MODES.OVERRIDE, value: "false" }
+          ]
+        });
+
+      // ── Sensory ──
+      case "darkvision":
+        return foundry.utils.mergeObject(base, {
+          name: "Darkvision / Infravision",
+          img: "icons/svg/eye.svg",
+          changes: [
+            { key: "faserip.token.sight.range", mode: MODES.CUSTOM, value: "120" },
+            { key: "faserip.token.sight.visionMode", mode: MODES.CUSTOM, value: "darkvision" }
+          ]
+        });
+
+      default:
+        console.warn(`[FASERIP WARN] Unknown power effect preset: ${preset}`);
+        return null;
+    }
   }
 
   _detectActionButtons(system) {
@@ -138,6 +332,28 @@ export class FaseripItemSheet extends ItemSheet {
 
   async activateListeners(html) {
     super.activateListeners(html);
+
+    // ── Active Effect controls (all item types) ──
+    html.find('.effect-control').click(ev => {
+      onManageActiveEffect(ev, this.item);
+    });
+
+    // Collapsible effect sections
+    html.find('.effect-header').click((event) => {
+      if ($(event.target).closest('.effect-control, .btn-add').length) return;
+      const section = event.currentTarget.closest('.effect-section');
+      section.classList.toggle('collapsed');
+    });
+
+    // ── Effect Preset buttons ──
+    html.find('.effect-preset-btn').click(async (ev) => {
+      ev.preventDefault();
+      const preset = ev.currentTarget.dataset.preset;
+      const effectData = this._buildPowerPresetEffect(preset);
+      if (effectData) {
+        await this.item.createEmbeddedDocuments('ActiveEffect', [effectData]);
+      }
+    });
 
     // SFX Preview button handler
     html.find(".sfx-preview").on("click", async (ev) => {
@@ -1106,4 +1322,3 @@ _updatePowerTypeOptions(html, category) {
   }
     
 }
-

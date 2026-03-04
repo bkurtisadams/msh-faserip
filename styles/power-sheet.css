@@ -437,3 +437,62 @@
 .power-sheet .sfx-row .file-picker {
   flex-shrink: 0;
 }
+/* ═══════════════════ Effects Tab ═══════════════════ */
+.power-sheet .power-effects-info {
+  background: #fff8e1; border: 1px solid #ffe082; border-radius: 4px;
+  padding: 8px 10px; margin-bottom: 10px; font-size: 0.8em; color: #5d4037;
+}
+.power-sheet .power-effects-info code {
+  background: #f5f0e8; padding: 1px 4px; border-radius: 2px; font-size: 0.95em;
+}
+.power-sheet .power-effect-presets {
+  margin-bottom: 6px; display: flex; flex-wrap: wrap; gap: 4px; align-items: center;
+}
+.power-sheet .power-effect-presets .presets-label {
+  font-size: 0.8em; color: #666; margin-right: 2px; font-weight: 600; min-width: 65px;
+}
+.power-sheet .power-effect-presets button {
+  padding: 2px 7px; font-size: 0.78em;
+  border: 1px solid #c0a070; border-radius: 3px;
+  background: #faf8f2; color: #5d4037; cursor: pointer; white-space: nowrap;
+}
+.power-sheet .power-effect-presets button:hover {
+  background: #8b0000; color: #fff; border-color: #8b0000;
+}
+.power-sheet .power-effect-presets button i { margin-right: 2px; }
+
+/* Effect sections */
+.power-sheet .effect-section { margin-top: 8px; border: 1px solid #ddd; border-radius: 4px; }
+.power-sheet .effect-section.collapsed .effects-list { display: none; }
+.power-sheet .effect-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 4px 8px; background: #f5f0e8; cursor: pointer;
+  border-bottom: 1px solid #ddd; font-size: 0.85em; font-weight: 600;
+}
+.power-sheet .effect-header .header-left { display: flex; align-items: center; gap: 6px; }
+.power-sheet .effect-header .header-columns { display: flex; gap: 12px; font-weight: normal; color: #888; font-size: 0.9em; }
+.power-sheet .effect-header .btn-add {
+  padding: 2px 6px; font-size: 0.85em; color: #4a7c3f; cursor: pointer;
+}
+.power-sheet .effect-header .btn-add:hover { color: #2d5a1e; }
+.power-sheet .collapse-icon { font-size: 0.7em; color: #999; transition: transform 0.2s; }
+.power-sheet .effect-section.collapsed .collapse-icon { transform: rotate(-90deg); }
+
+.power-sheet .effects-list {
+  list-style: none; margin: 0; padding: 0;
+}
+.power-sheet .effect-row {
+  display: flex; align-items: center; padding: 4px 8px; gap: 6px;
+  border-bottom: 1px solid #eee;
+}
+.power-sheet .effect-row:last-child { border-bottom: none; }
+.power-sheet .effect-row:hover { background: #faf8f2; }
+.power-sheet .effect-icon { width: 24px; height: 24px; flex-shrink: 0; }
+.power-sheet .effect-icon img { width: 100%; height: 100%; object-fit: cover; border-radius: 2px; border: none; }
+.power-sheet .effect-name { flex: 1; font-size: 0.85em; font-weight: 600; }
+.power-sheet .effect-source { flex: 0 0 80px; font-size: 0.75em; color: #888; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.power-sheet .effect-duration { flex: 0 0 60px; font-size: 0.75em; color: #666; text-align: center; }
+.power-sheet .effect-controls { display: flex; gap: 4px; flex-shrink: 0; }
+.power-sheet .effect-controls a { cursor: pointer; color: #666; font-size: 0.85em; }
+.power-sheet .effect-controls a:hover { color: #8b0000; }
+.power-sheet .no-effects { padding: 8px; text-align: center; color: #999; font-style: italic; font-size: 0.85em; }

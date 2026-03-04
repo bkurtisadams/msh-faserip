@@ -49,6 +49,7 @@
       <a class="item" data-tab="functions">Functions</a>
       <a class="item" data-tab="magic">Magic</a>
       <a class="item" data-tab="modifiers">Modifiers</a>
+      <a class="item" data-tab="effects">Effects</a>
     </nav>
 
     <!-- TAB 1: OVERVIEW (Basics) -->
@@ -1337,6 +1338,103 @@
       </div>
 
     </div> <!-- /tab: modifiers -->
+
+    <!-- ═══════════════════ Effects Tab ═══════════════════ -->
+    <div class="tab" data-group="primary" data-tab="effects">
+      <div class="power-effects-info">
+        <i class="fas fa-info-circle"></i>
+        ActiveEffects transfer to the owning actor when this power is on their sheet.
+        Use presets or add custom changes. Edit with the pencil icon.<br>
+        <b>Token keys</b> (CUSTOM mode): <code>faserip.token.light.bright</code>,
+        <code>.dim</code>, <code>.color</code>, <code>.alpha</code>, <code>.angle</code>,
+        <code>.animation.type</code>/<code>.speed</code>/<code>.intensity</code>,
+        <code>faserip.token.alpha</code>, <code>faserip.token.sight.range</code>,
+        <code>.visionMode</code><br>
+        <b>Mechanic keys</b> (ADD mode): <code>system.combatMods.attackShift</code>,
+        <code>.defenseShift</code>, <code>.abilityShifts.strength</code> (etc),
+        <code>.canMove</code>, <code>.canAct</code>
+      </div>
+
+      <div class="power-effect-presets">
+        <span class="presets-label">Defensive:</span>
+        <button type="button" class="effect-preset-btn" data-preset="body-armor" title="Defense shift from armor"><i class="fas fa-shield-alt"></i> Body Armor</button>
+        <button type="button" class="effect-preset-btn" data-preset="forcefield" title="Force field aura"><i class="fas fa-circle-notch"></i> Force Field</button>
+        <button type="button" class="effect-preset-btn" data-preset="defense-bonus" title="+CS to defense"><i class="fas fa-chess-rook"></i> Defense Bonus</button>
+        <button type="button" class="effect-preset-btn" data-preset="resistance" title="Resistance to damage type"><i class="fas fa-fire-extinguisher"></i> Resistance</button>
+      </div>
+      <div class="power-effect-presets">
+        <span class="presets-label">Offensive:</span>
+        <button type="button" class="effect-preset-btn" data-preset="attack-bonus" title="+CS to attacks"><i class="fas fa-crosshairs"></i> Attack Bonus</button>
+        <button type="button" class="effect-preset-btn" data-preset="ability-boost" title="Boost an ability rank"><i class="fas fa-arrow-up"></i> Ability Boost</button>
+      </div>
+      <div class="power-effect-presets">
+        <span class="presets-label">Visual:</span>
+        <button type="button" class="effect-preset-btn" data-preset="light" title="Token light emission (360°)"><i class="fas fa-lightbulb"></i> Light</button>
+        <button type="button" class="effect-preset-btn" data-preset="energy-aura" title="Glowing energy aura"><i class="fas fa-sun"></i> Energy Aura</button>
+        <button type="button" class="effect-preset-btn" data-preset="stealth" title="Semi-transparent token"><i class="fas fa-user-secret"></i> Invisibility</button>
+        <button type="button" class="effect-preset-btn" data-preset="phasing" title="Phasing / intangible look"><i class="fas fa-ghost"></i> Phasing</button>
+        <button type="button" class="effect-preset-btn" data-preset="darkness" title="Darkness generation"><i class="fas fa-moon"></i> Darkness</button>
+      </div>
+      <div class="power-effect-presets">
+        <span class="presets-label">Movement:</span>
+        <button type="button" class="effect-preset-btn" data-preset="flight" title="Flight glow + status"><i class="fas fa-feather-alt"></i> Flight</button>
+        <button type="button" class="effect-preset-btn" data-preset="immobilize" title="Prevent movement"><i class="fas fa-lock"></i> Immobilize</button>
+      </div>
+      <div class="power-effect-presets">
+        <span class="presets-label">Sensory:</span>
+        <button type="button" class="effect-preset-btn" data-preset="darkvision" title="Darkvision / infravision"><i class="fas fa-eye"></i> Darkvision</button>
+      </div>
+
+      {{#each effects as |section|}}
+      <div class="effect-section" data-section-type="{{section.type}}">
+        <div class="effect-header" data-section="{{section.type}}">
+          <div class="header-left">
+            <i class="fas fa-chevron-down collapse-icon"></i>
+            <span class="section-title">{{section.label}} Effects</span>
+          </div>
+          <div class="header-columns">
+            <span class="col-source">Source</span>
+            {{#if (eq section.type "temporary")}}
+              <span class="col-duration">Duration</span>
+            {{/if}}
+          </div>
+          <li data-effect-type="{{section.type}}" style="list-style: none; margin: 0;">
+            <a class="effect-control btn-add" data-action="create">
+              <i class="fas fa-plus"></i> Add
+            </a>
+          </li>
+        </div>
+        <ol class="effects-list">
+          {{#if section.effects.length}}
+            {{#each section.effects as |effect|}}
+              <li class="effect-row {{#unless (eq ../section.type "temporary")}}no-duration{{/unless}}" data-effect-id="{{effect.id}}" data-parent-id="{{effect.parent.id}}">
+                <div class="effect-icon"><img src="{{effect.img}}" alt="{{effect.name}}" /></div>
+                <div class="effect-name">{{effect.name}}</div>
+                <div class="effect-source">{{#if effect.origin}}{{effect.origin}}{{else}}—{{/if}}</div>
+                {{#if (eq ../section.type "temporary")}}
+                  <div class="effect-duration">
+                    {{#if effect.duration.rounds}}{{effect.duration.rounds}} Rounds
+                    {{else if effect.duration.seconds}}{{effect.duration.seconds}}s
+                    {{else if effect.duration.turns}}{{effect.duration.turns}} Turns
+                    {{else}}Unlimited{{/if}}
+                  </div>
+                {{/if}}
+                <div class="effect-controls">
+                  <a class="effect-control" data-action="toggle" title="{{#if effect.disabled}}Enable{{else}}Disable{{/if}} Effect">
+                    <i class="fas fa-{{#if effect.disabled}}eye-slash{{else}}eye{{/if}}"></i>
+                  </a>
+                  <a class="effect-control" data-action="edit" title="Edit Effect"><i class="fas fa-edit"></i></a>
+                  <a class="effect-control" data-action="delete" title="Delete Effect"><i class="fas fa-trash"></i></a>
+                </div>
+              </li>
+            {{/each}}
+          {{else}}
+            <li class="no-effects">No {{section.label}} effects</li>
+          {{/if}}
+        </ol>
+      </div>
+      {{/each}}
+    </div><!-- /tab: effects -->
 
   </section>
 </form>
