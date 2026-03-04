@@ -599,7 +599,7 @@
   text-align: center;
   padding: 5px;
  }
- 
+
  .faserip-sheet .powers-table td {
   padding: 5px;
   text-align: center;
@@ -609,23 +609,30 @@
  .faserip-sheet .powers-table tbody tr {
   border-bottom: 1px solid #ccc;
  }
+
+ /* Column widths handled by colgroup in HTML */
  
  .faserip-sheet .power-name {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 8px;
   text-align: left;
   font-weight: bold;
+  padding-left: 8px;
  }
  
  .faserip-sheet .power-icon {
   cursor: pointer;
+  width: 24px;
+  height: 24px;
+  border: 1px solid #777;
+  border-radius: 4px;
  }
  
  .faserip-sheet .power-icon img {
-  width: 32px;
-  height: 32px;
-  border: 1px solid #777;
+  width: 24px;
+  height: 24px;
+  border: none;
   border-radius: 4px;
   cursor: pointer;
  }
@@ -635,6 +642,7 @@
   cursor: pointer;
   color: #555;
   margin-right: 2px;
+  font-size: 16px;
  }
  
  .faserip-sheet .power-roll:hover {
@@ -644,13 +652,14 @@
  /* Style for the power name text */
  .faserip-sheet .power-name-text {
   flex: 1;
-  cursor: grab; /* Shows this is draggable */
+  cursor: grab;
+  font-size: 14px;
  }
  
  .faserip-sheet .power-controls {
   display: flex;
-  gap: 10px;
-  justify-content: center;
+  gap: 6px;
+  justify-content: flex-end;
  }
  
  .faserip-sheet .item-control {

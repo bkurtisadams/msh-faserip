@@ -657,16 +657,26 @@
         <div class="tab" data-tab="powers">
           <!-- Powers content here -->
           <table class="powers-table">
+            <colgroup>
+              <col style="width: auto;" />
+              <col style="width: 85px;" />
+              <col style="width: 45px;" />
+              <col style="width: 45px;" />
+              <col style="width: 120px;" />
+              <col style="width: 30px;" />
+            </colgroup>
             <thead>
               <tr>
-                <th>Name</th>
+                <th style="text-align: left; padding-left: 8px;">Name</th>
                 <th>Rank</th>
                 <th>Value</th>
                 <th>Range</th>
-                <th>Type</th>
-                <th class="th-actions">
-                  <a class="th-action-link add-power" title="Add Power">+ add</a>
-                  <a class="th-action-link browse-compendium" data-type="powers" title="Browse Powers Compendium">browse</a>
+                <th colspan="2" style="text-align: center;">
+                  Type
+                  <span class="th-actions">
+                    <a class="th-action-link add-power" title="Add Power">+ add</a>
+                    <a class="th-action-link browse-compendium" data-type="powers" title="Browse Powers Compendium">browse</a>
+                  </span>
                 </th>
               </tr>
             </thead>

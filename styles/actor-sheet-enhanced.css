@@ -667,8 +667,9 @@ form.faserip-sheet .sheet-tabs-navigation .item:hover {
 
 /* ── Add/browse links in table header cells ─────────────────────────────── */
 form.faserip-sheet .th-actions {
-  text-align: right;
+  display: inline;
   white-space: nowrap;
+  margin-left: 8px;
 }
 
 form.faserip-sheet .th-action-link {
