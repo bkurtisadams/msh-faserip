@@ -7,9 +7,20 @@ export function onManageActiveEffect(event, owner) {
   event.preventDefault();
   const a = event.currentTarget;
   const li = a.closest('li');
-  const effect = li.dataset.effectId
-    ? owner.effects.get(li.dataset.effectId)
-    : null;
+  const effectId = li?.dataset.effectId;
+  const parentId = li?.dataset.parentId;
+
+  // Find the effect: it may be on the actor directly or on an owned item
+  let effect = null;
+  if (effectId) {
+    effect = owner.effects.get(effectId);
+    if (!effect && parentId) {
+      // Non-legacy: effect lives on an owned item
+      const parentItem = owner.items?.get(parentId);
+      if (parentItem) effect = parentItem.effects.get(effectId);
+    }
+  }
+
   switch (a.dataset.action) {
     case 'create':
       return owner.createEmbeddedDocuments('ActiveEffect', [
@@ -25,11 +36,11 @@ export function onManageActiveEffect(event, owner) {
         },
       ]);
     case 'edit':
-      return effect.sheet.render(true);
+      return effect?.sheet.render(true);
     case 'delete':
-      return effect.delete();
+      return effect?.delete();
     case 'toggle':
-      return effect.update({ disabled: !effect.disabled });
+      return effect?.update({ disabled: !effect.disabled });
   }
 }
 
@@ -97,5 +108,3 @@ export function buildDyingEffect(actor, { rounds } = {}) {
 
   return data;
 }
-
-

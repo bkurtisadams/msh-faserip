@@ -3,8 +3,16 @@
       <img class="profile-img" src="{{item.img}}" data-edit="img" title="{{item.name}}" />
       <h1><input name="name" type="text" value="{{item.name}}" placeholder="Equipment Name"/></h1>
     </header>
+
+    <nav class="sheet-tabs tabs" data-group="primary">
+      <a class="item active" data-tab="properties"><i class="fas fa-cog"></i> Properties</a>
+      <a class="item" data-tab="effects"><i class="fas fa-bolt"></i> Effects</a>
+    </nav>
   
     <section class="sheet-body">
+
+      <!-- ══════════════ PROPERTIES TAB ══════════════ -->
+      <div class="tab active" data-tab="properties" data-group="primary">
       <div class="form-group">
         <label>Category:</label>
         <select name="system.category" class="equipment-category-select">
@@ -879,6 +887,91 @@
         <label>Description:</label>
         <textarea name="system.description" rows="5">{{system.description}}</textarea>
       </div>
+      </div><!-- END properties tab -->
+
+      <!-- ══════════════ EFFECTS TAB ══════════════ -->
+      <div class="tab" data-tab="effects" data-group="primary">
+        <div class="equip-effects-info">
+          <i class="fas fa-info-circle"></i>
+          Use presets below or add custom changes. Edit any effect with the pencil icon.<br>
+          <b>Token keys</b> (CUSTOM mode): <code>faserip.token.light.bright</code>,
+          <code>.dim</code>, <code>.color</code>, <code>.alpha</code>, <code>.angle</code>,
+          <code>.animation.type</code>/<code>.speed</code>/<code>.intensity</code>,
+          <code>faserip.token.alpha</code>, <code>faserip.token.sight.range</code>,
+          <code>.visionMode</code><br>
+          <b>Mechanic keys</b> (ADD mode): <code>system.combatMods.attackShift</code>,
+          <code>.defenseShift</code>, <code>.abilityShifts.strength</code> (etc),
+          <code>.canMove</code>, <code>.canAct</code>
+        </div>
+
+        <div class="equip-effect-presets">
+          <span class="presets-label">Visual:</span>
+          <button type="button" class="effect-preset-btn" data-preset="light" title="Token light emission (360°)"><i class="fas fa-lightbulb"></i> Light</button>
+          <button type="button" class="effect-preset-btn" data-preset="flashlight" title="Directed beam (60° cone)"><i class="fas fa-bolt"></i> Flashlight</button>
+          <button type="button" class="effect-preset-btn" data-preset="darkvision" title="Darkvision / infravision"><i class="fas fa-eye"></i> Darkvision</button>
+          <button type="button" class="effect-preset-btn" data-preset="stealth" title="Semi-transparent token"><i class="fas fa-user-secret"></i> Stealth</button>
+          <button type="button" class="effect-preset-btn" data-preset="forcefield" title="Energy aura"><i class="fas fa-shield-alt"></i> Force Field</button>
+          <button type="button" class="effect-preset-btn" data-preset="flight" title="Flight glow + status"><i class="fas fa-feather-alt"></i> Flight</button>
+        </div>
+        <div class="equip-effect-presets">
+          <span class="presets-label">Combat:</span>
+          <button type="button" class="effect-preset-btn" data-preset="body-armor" title="Defense shift"><i class="fas fa-shield-alt"></i> Body Armor</button>
+          <button type="button" class="effect-preset-btn" data-preset="attack-bonus" title="+CS to attacks"><i class="fas fa-crosshairs"></i> Attack Bonus</button>
+          <button type="button" class="effect-preset-btn" data-preset="defense-bonus" title="+CS to defense"><i class="fas fa-chess-rook"></i> Defense Bonus</button>
+          <button type="button" class="effect-preset-btn" data-preset="ability-boost" title="Boost an ability"><i class="fas fa-arrow-up"></i> Ability Boost</button>
+          <button type="button" class="effect-preset-btn" data-preset="immobilize" title="Prevent movement"><i class="fas fa-lock"></i> Immobilize</button>
+        </div>
+
+        {{#each effects as |section|}}
+        <div class="effect-section" data-section-type="{{section.type}}">
+          <div class="effect-header" data-section="{{section.type}}">
+            <div class="header-left">
+              <i class="fas fa-chevron-down collapse-icon"></i>
+              <span class="section-title">{{section.label}} Effects</span>
+            </div>
+            <div class="header-columns">
+              <span class="col-source">Source</span>
+              {{#if (eq section.type "temporary")}}
+                <span class="col-duration">Duration</span>
+              {{/if}}
+            </div>
+            <li data-effect-type="{{section.type}}" style="list-style: none; margin: 0;">
+              <a class="effect-control btn-add" data-action="create">
+                <i class="fas fa-plus"></i> Add
+              </a>
+            </li>
+          </div>
+          <ol class="effects-list">
+            {{#if section.effects.length}}
+              {{#each section.effects as |effect|}}
+                <li class="effect-row {{#unless (eq ../section.type "temporary")}}no-duration{{/unless}}" data-effect-id="{{effect.id}}" data-parent-id="{{effect.parent.id}}">
+                  <div class="effect-icon"><img src="{{effect.img}}" alt="{{effect.name}}" /></div>
+                  <div class="effect-name">{{effect.name}}</div>
+                  <div class="effect-source">{{#if effect.origin}}{{effect.origin}}{{else}}—{{/if}}</div>
+                  {{#if (eq ../section.type "temporary")}}
+                    <div class="effect-duration">
+                      {{#if effect.duration.rounds}}{{effect.duration.rounds}} Rounds
+                      {{else if effect.duration.seconds}}{{effect.duration.seconds}}s
+                      {{else if effect.duration.turns}}{{effect.duration.turns}} Turns
+                      {{else}}Unlimited{{/if}}
+                    </div>
+                  {{/if}}
+                  <div class="effect-controls">
+                    <a class="effect-control" data-action="toggle" title="{{#if effect.disabled}}Enable{{else}}Disable{{/if}} Effect">
+                      <i class="fas fa-{{#if effect.disabled}}eye-slash{{else}}eye{{/if}}"></i>
+                    </a>
+                    <a class="effect-control" data-action="edit" title="Edit Effect"><i class="fas fa-edit"></i></a>
+                    <a class="effect-control" data-action="delete" title="Delete Effect"><i class="fas fa-trash"></i></a>
+                  </div>
+                </li>
+              {{/each}}
+            {{else}}
+              <li class="no-effects">No {{section.label}} effects</li>
+            {{/if}}
+          </ol>
+        </div>
+        {{/each}}
+      </div><!-- END effects tab -->
     </section>
   </form>
   
@@ -980,4 +1073,47 @@
     .sfx-row button[data-type="audio"] {
       flex-shrink: 0;
     }
+
+    /* Equipment sheet tabs */
+    .equipment-sheet .sheet-tabs.tabs {
+      display: flex; gap: 0;
+      border-bottom: 2px solid #c0a070;
+      margin: 4px 0 8px; padding: 0;
+    }
+    .equipment-sheet .sheet-tabs .item {
+      padding: 4px 12px; font-size: 0.85em; font-weight: 600;
+      color: #666; border: 1px solid transparent; border-bottom: none;
+      border-radius: 4px 4px 0 0; cursor: pointer; text-decoration: none;
+      margin-bottom: -2px; background: #f5f0e8;
+    }
+    .equipment-sheet .sheet-tabs .item:hover { color: #8b0000; background: #faf8f2; }
+    .equipment-sheet .sheet-tabs .item.active {
+      color: #8b0000; background: #fff;
+      border-color: #c0a070; border-bottom: 2px solid #fff;
+    }
+    .equipment-sheet .sheet-tabs .item i { margin-right: 3px; }
+
+    /* Effects tab */
+    .equip-effects-info {
+      background: #fff8e1; border: 1px solid #ffe082; border-radius: 4px;
+      padding: 8px 10px; margin-bottom: 10px; font-size: 0.8em; color: #5d4037;
+    }
+    .equip-effects-info code {
+      background: #f5f0e8; padding: 1px 4px; border-radius: 2px; font-size: 0.95em;
+    }
+    .equip-effect-presets {
+      margin-bottom: 6px; display: flex; flex-wrap: wrap; gap: 4px; align-items: center;
+    }
+    .equip-effect-presets .presets-label {
+      font-size: 0.8em; color: #666; margin-right: 2px; font-weight: 600; min-width: 50px;
+    }
+    .equip-effect-presets button {
+      padding: 2px 7px; font-size: 0.78em;
+      border: 1px solid #c0a070; border-radius: 3px;
+      background: #faf8f2; color: #5d4037; cursor: pointer; white-space: nowrap;
+    }
+    .equip-effect-presets button:hover {
+      background: #8b0000; color: #fff; border-color: #8b0000;
+    }
+    .equip-effect-presets button i { margin-right: 2px; }
   </style>

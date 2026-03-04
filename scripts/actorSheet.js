@@ -277,9 +277,9 @@ export class FaseripActorSheet extends ActorSheet {
       "Shift-X", "Shift-Y", "Shift-Z", "Class 1000", "Class 3000", "Class 5000", "Beyond"
     ];
 
-    // active effects — use actor.effects directly; allApplicableEffects() in v13 can silently
-    // drop directly-created AEs (e.g. Impaired Endurance) that are still present and applying.
-    context.effects = prepareActiveEffectCategories(this.actor.effects);
+    // active effects — allApplicableEffects() includes both actor-owned effects
+    // AND effects from owned items with transfer:true (non-legacy transferral mode).
+    context.effects = prepareActiveEffectCategories(this.actor.allApplicableEffects());
 
     context.editable = this.isEditable;
     context.isBiographyOpen = this._isBiographyOpen;

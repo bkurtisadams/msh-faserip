@@ -1,8 +1,10 @@
-// equipment.js v1.2.0 - 2026-02-20
+// equipment.js v1.4.0 - 2026-03-03
+// v1.4.0: Rewrite effects to use standard changes[] — system.* for mechanics, faserip.token.* for visuals
 // v1.2.0: Add "other" category (grenade/missile); other-fields show/hide; weaponType sub-section toggle
 import { applyDamageToTargets } from "./modules/actions/action-utils.js";
 import { debugLog } from "./modules/actions/action-utils.js";
 import { rollUniversalTable } from "./modules/dice/universal-table.js";
+import { prepareActiveEffectCategories, onManageActiveEffect } from "../helpers/effects.mjs";
 
 // Power Rank Range Table (based on "Faserip Combat 02.txt")
 const POWER_RANGE_VALUES = {
@@ -24,7 +26,7 @@ export class FaseripEquipmentSheet extends ItemSheet {
       template: "systems/msh-faserip/templates/equipment-sheet.html",
       width: 530,
       height: 680,
-      tabs: [{ navSelector: ".sheet-tabs", contentSelector: ".sheet-body", initial: "description" }]
+      tabs: [{ navSelector: ".sheet-tabs", contentSelector: ".sheet-body", initial: "properties" }]
     });
   }
 
@@ -74,6 +76,9 @@ export class FaseripEquipmentSheet extends ItemSheet {
 
     // --- END NEW ---
 
+    // Active Effects on this equipment item
+    context.effects = prepareActiveEffectCategories(this.item.effects);
+
     return context;
   }
 
@@ -109,6 +114,28 @@ export class FaseripEquipmentSheet extends ItemSheet {
 
   activateListeners(html) {
     super.activateListeners(html);
+
+    // ── Active Effect controls ──
+    html.find('.effect-control').click(ev => {
+      onManageActiveEffect(ev, this.item);
+    });
+
+    // Collapsible effect sections
+    html.find('.effect-header').click((event) => {
+      if ($(event.target).closest('.effect-control, .btn-add').length) return;
+      const section = event.currentTarget.closest('.effect-section');
+      section.classList.toggle('collapsed');
+    });
+
+    // ── Effect Preset buttons ──
+    html.find('.effect-preset-btn').click(async (ev) => {
+      ev.preventDefault();
+      const preset = ev.currentTarget.dataset.preset;
+      const effectData = this._buildPresetEffect(preset);
+      if (effectData) {
+        await this.item.createEmbeddedDocuments('ActiveEffect', [effectData]);
+      }
+    });
 
     // SFX Preview button handler
     html.find(".sfx-preview").on("click", async (ev) => {
@@ -510,6 +537,154 @@ export class FaseripEquipmentSheet extends ItemSheet {
     html.find('.roll-equipment').click(ev => {
       this.rollEquipment();
     });
+  }
+
+  // ── Preset effect templates using standard Foundry changes[] ──
+  // system.* keys are applied by Foundry's applyActiveEffects automatically.
+  // faserip.token.* keys use CUSTOM mode and are handled by our applyActiveEffect hook.
+  _buildPresetEffect(preset) {
+    const MODES = CONST.ACTIVE_EFFECT_MODES;
+    const origin = this.item.uuid;
+    const base = { origin, disabled: true, transfer: true };
+
+    switch (preset) {
+
+      // ── Visual / Token presets ──
+      case "light":
+        return foundry.utils.mergeObject(base, {
+          name: "Light Source",
+          img: "icons/svg/light.svg",
+          changes: [
+            { key: "faserip.token.light.bright", mode: MODES.CUSTOM, value: "4" },
+            { key: "faserip.token.light.dim", mode: MODES.CUSTOM, value: "8" },
+            { key: "faserip.token.light.color", mode: MODES.CUSTOM, value: "#ffdd88" },
+            { key: "faserip.token.light.alpha", mode: MODES.CUSTOM, value: "0.3" },
+            { key: "faserip.token.light.angle", mode: MODES.CUSTOM, value: "360" },
+            { key: "faserip.token.light.animation.type", mode: MODES.CUSTOM, value: "torch" },
+            { key: "faserip.token.light.animation.speed", mode: MODES.CUSTOM, value: "3" },
+            { key: "faserip.token.light.animation.intensity", mode: MODES.CUSTOM, value: "3" }
+          ]
+        });
+
+      case "flashlight":
+        return foundry.utils.mergeObject(base, {
+          name: "Flashlight Beam",
+          img: "icons/svg/light.svg",
+          changes: [
+            { key: "faserip.token.light.bright", mode: MODES.CUSTOM, value: "6" },
+            { key: "faserip.token.light.dim", mode: MODES.CUSTOM, value: "12" },
+            { key: "faserip.token.light.color", mode: MODES.CUSTOM, value: "#ffffcc" },
+            { key: "faserip.token.light.alpha", mode: MODES.CUSTOM, value: "0.5" },
+            { key: "faserip.token.light.angle", mode: MODES.CUSTOM, value: "60" },
+            { key: "faserip.token.light.animation.type", mode: MODES.CUSTOM, value: "" },
+            { key: "faserip.token.light.animation.speed", mode: MODES.CUSTOM, value: "0" },
+            { key: "faserip.token.light.animation.intensity", mode: MODES.CUSTOM, value: "0" }
+          ]
+        });
+
+      case "darkvision":
+        return foundry.utils.mergeObject(base, {
+          name: "Darkvision / Infravision",
+          img: "icons/svg/eye.svg",
+          changes: [
+            { key: "faserip.token.sight.range", mode: MODES.CUSTOM, value: "120" },
+            { key: "faserip.token.sight.visionMode", mode: MODES.CUSTOM, value: "darkvision" }
+          ]
+        });
+
+      case "stealth":
+        return foundry.utils.mergeObject(base, {
+          name: "Stealth Field",
+          img: "icons/svg/invisible.svg",
+          changes: [
+            { key: "faserip.token.alpha", mode: MODES.CUSTOM, value: "0.4" }
+          ]
+        });
+
+      case "forcefield":
+        return foundry.utils.mergeObject(base, {
+          name: "Force Field Aura",
+          img: "icons/svg/aura.svg",
+          changes: [
+            { key: "faserip.token.light.bright", mode: MODES.CUSTOM, value: "0.5" },
+            { key: "faserip.token.light.dim", mode: MODES.CUSTOM, value: "1.5" },
+            { key: "faserip.token.light.color", mode: MODES.CUSTOM, value: "#4488ff" },
+            { key: "faserip.token.light.alpha", mode: MODES.CUSTOM, value: "0.15" },
+            { key: "faserip.token.light.animation.type", mode: MODES.CUSTOM, value: "pulse" },
+            { key: "faserip.token.light.animation.speed", mode: MODES.CUSTOM, value: "2" },
+            { key: "faserip.token.light.animation.intensity", mode: MODES.CUSTOM, value: "2" }
+          ]
+        });
+
+      case "flight":
+        return foundry.utils.mergeObject(base, {
+          name: "Flight Active",
+          img: "icons/svg/wing.svg",
+          statuses: ["fly"],
+          changes: [
+            { key: "faserip.token.light.dim", mode: MODES.CUSTOM, value: "1" },
+            { key: "faserip.token.light.color", mode: MODES.CUSTOM, value: "#ff6600" },
+            { key: "faserip.token.light.alpha", mode: MODES.CUSTOM, value: "0.2" },
+            { key: "faserip.token.light.animation.type", mode: MODES.CUSTOM, value: "flame" },
+            { key: "faserip.token.light.animation.speed", mode: MODES.CUSTOM, value: "4" },
+            { key: "faserip.token.light.animation.intensity", mode: MODES.CUSTOM, value: "3" }
+          ]
+        });
+
+      // ── Mechanical presets ──
+      case "body-armor":
+        return foundry.utils.mergeObject(base, {
+          name: "Body Armor",
+          img: "icons/svg/shield.svg",
+          disabled: false,
+          changes: [
+            { key: "system.combatMods.defenseShift", mode: MODES.ADD, value: "0" }
+          ]
+        });
+
+      case "attack-bonus":
+        return foundry.utils.mergeObject(base, {
+          name: "Attack Bonus",
+          img: "icons/svg/sword.svg",
+          disabled: false,
+          changes: [
+            { key: "system.combatMods.attackShift", mode: MODES.ADD, value: "1" }
+          ]
+        });
+
+      case "defense-bonus":
+        return foundry.utils.mergeObject(base, {
+          name: "Defense Bonus",
+          img: "icons/svg/shield.svg",
+          disabled: false,
+          changes: [
+            { key: "system.combatMods.defenseShift", mode: MODES.ADD, value: "1" }
+          ]
+        });
+
+      case "ability-boost":
+        return foundry.utils.mergeObject(base, {
+          name: "Ability Boost",
+          img: "icons/svg/upgrade.svg",
+          disabled: false,
+          changes: [
+            { key: "system.combatMods.abilityShifts.strength", mode: MODES.ADD, value: "0" }
+          ]
+        });
+
+      case "immobilize":
+        return foundry.utils.mergeObject(base, {
+          name: "Immobilized",
+          img: "icons/svg/net.svg",
+          changes: [
+            { key: "system.combatMods.canMove", mode: MODES.OVERRIDE, value: "false" }
+          ]
+        });
+
+      default:
+        ui.notifications.warn(`Unknown preset: ${preset}`);
+        return null;
+    }
   }
 
   // Method to handle equipment rolls

@@ -309,6 +309,10 @@ Hooks.once("init", async () => {
 
   CONFIG.FASERIP = CONFIG.FASERIP || {};
 
+  // Non-legacy transferral: effects on items apply to actors via allApplicableEffects()
+  // without being copied. Toggle/edit the effect on the item directly.
+  CONFIG.ActiveEffect.legacyTransferral = false;
+
   // Make ACTIONS available to macros via CONFIG
   CONFIG.MSHF = CONFIG.MSHF || {};
   CONFIG.MSHF.ACTIONS = ACTIONS;
@@ -1719,6 +1723,142 @@ Hooks.on("preCreateActor", (document, data, options, userId) => {
 
 
 // CONSOLIDATED READY HOOK - All ready logic in one place
+// ─── Handle faserip.token.* ActiveEffect changes ────────────────────────────
+// Pattern follows Active Token Lighting (ATL) by kandashi:
+//   - applyActiveEffect hook blocks faserip.token.* from writing to actor data
+//   - On any effect CRUD event, re-collect all active faserip.token.* changes
+//   - Save baseline token state in flags before first application
+//   - Apply merged desired state to all tokens for the actor
+//   - When no effects remain, revert to saved baseline and clear flags
+//
+// Baseline stored at: tokenDoc.flags.msh-faserip.tokenBaseline = { "light.bright": 0, ... }
+
+const _TOKEN_FLAG_SCOPE = "msh-faserip";
+const _TOKEN_BASELINE_KEY = "tokenBaseline";
+
+// Collect all active faserip.token.* changes for an actor into a flat object
+function _collectTokenEffectState(actor) {
+  const desired = {};
+  for (const effect of actor.allApplicableEffects()) {
+    if (effect.disabled || effect.isSuppressed) continue;
+    for (const change of effect.changes) {
+      if (change.mode !== CONST.ACTIVE_EFFECT_MODES.CUSTOM) continue;
+      if (!change.key.startsWith("faserip.token.")) continue;
+      const tokenKey = change.key.replace("faserip.token.", "");
+      let val = change.value;
+      if (/^-?\d+(\.\d+)?$/.test(val)) val = Number(val);
+      else if (val === "true") val = true;
+      else if (val === "false") val = false;
+      desired[tokenKey] = val;
+    }
+  }
+  return desired;
+}
+
+// Reconcile token state: apply desired or revert to baseline
+async function _reconcileTokenEffects(actor) {
+  if (!canvas?.scene || !game.user.isGM) return;
+  const tokens = canvas.scene.tokens.filter(t => t.actorId === actor.id);
+  if (!tokens.length) return;
+
+  const desired = _collectTokenEffectState(actor);
+  const desiredFlat = foundry.utils.flattenObject(desired);
+  const hasDesired = Object.keys(desiredFlat).length > 0;
+
+  for (const tokenDoc of tokens) {
+    const savedBaseline = tokenDoc.getFlag(_TOKEN_FLAG_SCOPE, _TOKEN_BASELINE_KEY);
+
+    if (hasDesired) {
+      // Build or extend the baseline: snapshot current value for every key we're about to change
+      const baseline = savedBaseline ? foundry.utils.duplicate(savedBaseline) : {};
+      let baselineChanged = false;
+      for (const key of Object.keys(desiredFlat)) {
+        if (!(key in baseline)) {
+          baseline[key] = foundry.utils.getProperty(tokenDoc, key) ?? null;
+          baselineChanged = true;
+        }
+      }
+      if (!savedBaseline || baselineChanged) {
+        await tokenDoc.setFlag(_TOKEN_FLAG_SCOPE, _TOKEN_BASELINE_KEY, baseline);
+      }
+      // Apply desired state
+      await tokenDoc.update(desired);
+
+    } else if (savedBaseline) {
+      // No active token effects — revert every key to its baseline value
+      const revert = {};
+      for (const [key, val] of Object.entries(savedBaseline)) {
+        foundry.utils.setProperty(revert, key, val);
+      }
+      await tokenDoc.update(revert);
+      await tokenDoc.unsetFlag(_TOKEN_FLAG_SCOPE, _TOKEN_BASELINE_KEY);
+    }
+  }
+}
+
+// Debounce: multiple effect changes in quick succession get one reconcile
+let _reconcileTimer = null;
+function _scheduleReconcile(actor) {
+  if (!actor) return;
+  clearTimeout(_reconcileTimer);
+  _reconcileTimer = setTimeout(() => _reconcileTokenEffects(actor), 200);
+}
+
+// Helper: resolve an effect's parent chain to find the owning actor
+function _resolveEffectActor(effect) {
+  const parent = effect.parent;
+  if (parent?.documentName === "Actor") return parent;
+  if (parent?.documentName === "Item" && parent.actor) return parent.actor;
+  return null;
+}
+
+// ── Hook: block faserip.token.* from being written to actor system data ──
+Hooks.on("applyActiveEffect", (actor, change, current, delta, changes) => {
+  if (change.mode !== CONST.ACTIVE_EFFECT_MODES.CUSTOM) return;
+  if (!change.key.startsWith("faserip.token.")) return;
+  return false;
+});
+
+// ── Hooks: reconcile when effects change ──
+Hooks.on("updateActiveEffect", (effect, changes, options, userId) => {
+  if (game.user.id !== userId) return;
+  const actor = _resolveEffectActor(effect);
+  if (actor) _scheduleReconcile(actor);
+});
+
+Hooks.on("createActiveEffect", (effect, options, userId) => {
+  if (game.user.id !== userId) return;
+  if (!effect.changes?.some(c => c.key.startsWith("faserip.token."))) return;
+  const actor = _resolveEffectActor(effect);
+  if (actor) _scheduleReconcile(actor);
+});
+
+Hooks.on("deleteActiveEffect", (effect, options, userId) => {
+  if (game.user.id !== userId) return;
+  const actor = _resolveEffectActor(effect);
+  if (actor) _scheduleReconcile(actor);
+});
+
+// Item added/removed from actor (carries effects with it)
+Hooks.on("createItem", (item, options, userId) => {
+  if (game.user.id !== userId) return;
+  if (item.actor && item.effects.size) _scheduleReconcile(item.actor);
+});
+
+Hooks.on("deleteItem", (item, options, userId) => {
+  if (game.user.id !== userId) return;
+  if (item.actor) _scheduleReconcile(item.actor);
+});
+
+// On canvas ready, reconcile all tokens (handles reload/scene switch)
+Hooks.on("canvasReady", () => {
+  if (!game.user.isGM) return;
+  for (const tokenDoc of canvas.scene.tokens) {
+    const actor = tokenDoc.actor;
+    if (actor) _reconcileTokenEffects(actor);
+  }
+});
+
 Hooks.once("ready", async () => {
   game.msh ??= {};
 
