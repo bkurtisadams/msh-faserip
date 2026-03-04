@@ -496,3 +496,197 @@
 .power-sheet .effect-controls a { cursor: pointer; color: #666; font-size: 0.85em; }
 .power-sheet .effect-controls a:hover { color: #8b0000; }
 .power-sheet .no-effects { padding: 8px; text-align: center; color: #999; font-style: italic; font-size: 0.85em; }
+
+/* ═══ NEW STRUCTURAL STYLES (5-tab layout) ═══ */
+
+/* Fieldsets replacing inline-styled boxes */
+.power-sheet .ps-fieldset {
+  border: 1px solid #c8bfa8;
+  border-radius: 4px;
+  padding: 8px 10px 10px;
+  margin-bottom: 10px;
+  background: #faf8f2;
+}
+.power-sheet .ps-fieldset legend {
+  font-size: 11px;
+  font-weight: bold;
+  text-transform: uppercase;
+  color: #8b0000;
+  padding: 0 4px;
+  letter-spacing: 0.05em;
+}
+
+/* Sub-section indented block */
+.power-sheet .ps-sub {
+  margin-top: 6px;
+  padding: 6px 8px;
+  background: #f0ede6;
+  border-left: 2px solid #c8bfa8;
+  border-radius: 0 3px 3px 0;
+}
+
+/* Inline checkbox labels - normal weight, pointer cursor */
+.power-sheet .ps-inline-label {
+  font-weight: normal;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Checkbox grid - 2 or 3 columns of checkboxes */
+.power-sheet .ps-checkbox-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px 8px;
+  padding: 4px 0;
+}
+.power-sheet .ps-checkbox-grid label {
+  font-weight: normal;
+  cursor: pointer;
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+/* Collapsible sections for Special tab */
+.power-sheet .ps-collapsible {
+  border: 1px solid #d0c8b8;
+  border-radius: 4px;
+  margin-bottom: 6px;
+  overflow: hidden;
+}
+.power-sheet .ps-collapsible-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: linear-gradient(to bottom, #eee8de, #e4ddd2);
+  cursor: pointer;
+  font-weight: bold;
+  font-size: 12px;
+  color: #5a3a1a;
+  user-select: none;
+}
+.power-sheet .ps-collapsible-header:hover {
+  background: linear-gradient(to bottom, #e8dece, #dbd4c8);
+}
+.power-sheet .ps-caret {
+  font-size: 0.75em;
+  color: #8b0000;
+  transition: transform 0.15s;
+  flex-shrink: 0;
+}
+.power-sheet .ps-collapsible.collapsed .ps-caret {
+  transform: rotate(-90deg);
+}
+.power-sheet .ps-collapsible-body {
+  padding: 8px 10px;
+  background: #faf8f2;
+}
+.power-sheet .ps-collapsible.collapsed .ps-collapsible-body {
+  display: none;
+}
+
+/* Speed reference display */
+.power-sheet .ps-speed-ref {
+  margin-top: 20px;
+  padding: 4px 8px;
+  background: #e8f4e8;
+  border-radius: 3px;
+  font-size: 0.85em;
+  min-height: 28px;
+}
+
+/* Bonus power buttons */
+.power-sheet .ps-btn-add {
+  margin-top: 6px;
+  padding: 3px 10px;
+  background: #4a90d9;
+  color: white;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 11px;
+}
+.power-sheet .ps-btn-add:hover { background: #3a7bc8; }
+.power-sheet .ps-btn-del {
+  background: #cc4444;
+  color: white;
+  border: none;
+  border-radius: 3px;
+  padding: 2px 6px;
+  cursor: pointer;
+  flex-shrink: 0;
+  align-self: center;
+}
+.power-sheet .ps-btn-del:hover { background: #aa2222; }
+
+/* Battle effects display bar */
+.power-sheet .battle-effects-results {
+  font-size: 0.88em;
+  padding: 3px 8px;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 3px;
+  min-height: 22px;
+  margin-top: 4px;
+}
+
+/* ── Collapsible Special sections (details/summary) ─────────────────────── */
+.power-section {
+  border: 1px solid #c8b89a;
+  border-radius: 4px;
+  margin-bottom: 6px;
+  background: #faf8f2;
+}
+
+.power-section-header {
+  font-weight: bold;
+  font-size: 0.9em;
+  color: #5a3e1b;
+  padding: 5px 8px;
+  cursor: pointer;
+  list-style: none;
+  background: #ede5d0;
+  border-radius: 3px 3px 0 0;
+  user-select: none;
+}
+
+.power-section-header::-webkit-details-marker { display: none; }
+
+.power-section-header::before {
+  content: "▶ ";
+  font-size: 0.75em;
+  color: #8b6540;
+}
+
+details[open] > .power-section-header::before {
+  content: "▼ ";
+}
+
+.power-section-body {
+  padding: 8px 10px 10px;
+}
+
+/* ── Combat fieldsets ────────────────────────────────────────────────────── */
+.power-fieldset {
+  border: 1px solid #c0a070;
+  border-radius: 4px;
+  padding: 8px 10px 10px;
+  background: #faf8f2;
+}
+
+.power-fieldset legend {
+  color: #8b0000;
+  font-weight: bold;
+  font-size: 0.9em;
+  padding: 0 4px;
+}
+
+/* ── third-width form groups ─────────────────────────────────────────────── */
+.form-group.third {
+  flex: 1;
+  min-width: 0;
+}

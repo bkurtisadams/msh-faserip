@@ -1,4 +1,6 @@
-// init.js v1.9.9 - 2026-02-22
+// init.js v1.10.0 - 2026-03-04
+// v1.10.0: updateActiveEffect reconcile now filtered to faserip.token.* changes + disabled toggles only,
+//          preventing unnecessary token updates on every stat/karma AE change.
 // v1.9.9: Fix double death save caused by v1.9.8's await setFlag("wasKnockedOut") before
 //         _combatDamageInProgress guard. The await yielded event loop, letting combat system
 //         fire its own death save. Fix: move setFlag after guard, use fire-and-forget (no await).
@@ -1828,6 +1830,11 @@ Hooks.on("applyActiveEffect", (actor, change, current, delta, changes) => {
 // ── Hooks: reconcile when effects change ──
 Hooks.on("updateActiveEffect", (effect, changes, options, userId) => {
   if (game.user.id !== userId) return;
+  // Only reconcile if the effect has faserip.token.* changes (avoid thrashing on every stat AE update)
+  const hasTokenChanges = effect.changes?.some(c => c.key?.startsWith("faserip.token."));
+  // Also reconcile if disabled state changed (enabling/disabling a token-visual effect)
+  const disabledToggled = "disabled" in changes;
+  if (!hasTokenChanges && !disabledToggled) return;
   const actor = _resolveEffectActor(effect);
   if (actor) _scheduleReconcile(actor);
 });
