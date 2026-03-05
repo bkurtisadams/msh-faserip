@@ -3268,28 +3268,29 @@ form.faserip-sheet .identity-section input[type="radio"] {
   white-space:nowrap;
 }
 
-/* biography details grid (now outside identity, directly in form) */
-.msh-bio{ display:grid; row-gap:8px; padding:6px 8px;
+/* biography details grid */
+.msh-bio{ display:grid; row-gap:6px; padding:6px 8px;
   border:1px solid #7a0b0b; border-radius:3px; background:#fff; }
-.msh-biorow{ display:grid; grid-template-columns:1fr 1fr; column-gap:12px; row-gap:6px; }
+.msh-biorow{ display:grid; grid-template-columns:1fr 1fr; column-gap:12px; row-gap:4px; }
 .msh-biorow.msh-biorow-3col{ grid-template-columns:1fr 1fr 1fr; }
-.msh-biofield label{ display:block;font-size:12.5px;margin:0 0 2px 0; }
-.msh-biofield input, .msh-biofield textarea{ width:100%; box-sizing:border-box; font-size:12.5px; }
-.msh-biofield textarea{ padding:6px; }
+.msh-biorow.msh-biorow-4col{ grid-template-columns:1fr 1fr 1fr 1fr; }
+.msh-biofield label{ display:block; font-size:9px; font-weight:bold; color:#666;
+  text-transform:uppercase; margin:0 0 1px 0; }
+.msh-biofield input, .msh-biofield textarea{ width:100%; box-sizing:border-box;
+  font-size:12px; height:22px; padding:1px 4px; }
+.msh-biofield textarea{ padding:4px; height:auto; }
 .msh-biofield.msh-full{ grid-column:1 / -1; }
 
-/* Larger history box with scrollbar in the FASERIP sheet */
-.faserip-sheet .msh-biofield.msh-full .editor {
-  height: 260px;           /* overall size of the History area */
-}
+/* history + civilian id side by side */
+.msh-bio-bottom{ display:flex; gap:10px; align-items:flex-start; }
+.msh-bio-history{ flex:1; min-width:0; }
+.msh-bio-civilianid{ flex:0 0 130px; }
+.msh-bio-civilianid-img{ width:120px; height:160px; border:1px solid #ccc;
+  border-radius:3px; overflow:hidden; display:flex; align-items:center;
+  justify-content:center; background:#f5f5f5; }
+.msh-bio-civilianid-img img{ width:100%; height:100%; object-fit:cover; }
+.msh-bio-civilianid-placeholder{ font-size:10px; color:#999; text-align:center; padding:8px; }
 
-.faserip-sheet .msh-biofield.msh-full .editor .editor-content {
-  /* height: 100%; */            /* fill the box */
-  min-height: 220px;
-  max-height: 320px;
-  overflow-y: auto;        /* vertical scrollbar when text overflows */
-  padding-right: 4px;      /* a little room next to the scrollbar */
-}
 
 /* ========================================
    ABILITIES & MOVEMENT SECTION - MATCHED HEADERS
