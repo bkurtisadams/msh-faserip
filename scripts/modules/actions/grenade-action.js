@@ -1,5 +1,5 @@
-// scripts/modules/actions/grenade-action.js v2.1.0 - 2026-03-04
-// v2.1.0: Add SFX playback via playCombatSFX — uses item-configured sounds from equipment sheet
+// scripts/modules/actions/grenade-action.js v2.2.0 - 2026-03-05
+// v2.2.0: Template placement happens BEFORE roll — user picks landing zone, then system rolls to hit
 import { RangedAttackAction } from "./ranged-attack-action.js";
 import { AreaTemplate } from "./area-template.js";
 import {
@@ -214,11 +214,23 @@ export class GrenadeAction extends RangedAttackAction {
 
     if (!choice) return;
 
+    // ── Step 1: Place template FIRST — user picks the landing zone ──
+    const radiusInAreas = item.system.grenadeRadius || 1;
+    const template = await AreaTemplate.createAtTarget({
+      radiusInAreas,
+      label: item.name,
+      fillColor: "#ff4400",
+      fillAlpha: 0.25
+    });
+
+    // User cancelled placement — abort the throw entirely
+    if (!template) return;
+
     // Decrement shots
     const newShots = Math.max(0, Number(shotsRemaining) - 1);
     await item.update({ "system.shotsRemaining": newShots });
 
-    // Roll Agility FEAT (Blunt Throwing column per RAW)
+    // ── Step 2: Roll Agility FEAT (Blunt Throwing column per RAW) ──
     const effectiveRank = shiftRank(ability.rank, choice.totalShift);
     const roll = await (new Roll("1d100")).evaluate();
     if (!choice.skipDice) {
@@ -255,32 +267,19 @@ export class GrenadeAction extends RangedAttackAction {
     const resultBadge = buildResultBadge(color, effectLabel);
 
     let resultHtml = "";
-    let template = null;
     let affectedTargets = [];
 
     if (!isHit) {
-      // ── MISS: grenade lost, no effect ──
+      // ── MISS: remove template, grenade lost ──
+      await template.dismiss();
       resultHtml = `<div style="padding:6px 8px;margin:0 10px 6px;background:#fff;border:1px solid #ddd;border-radius:3px;font-size:.88em;">
         <div style="font-weight:700;color:#888;">MISS</div>
         <div style="color:#555;">Grenade fails to reach target area. No effect.</div>
       </div>`;
     } else {
-      // ── HIT: place template, target tokens in area, apply effects ──
-      const radiusInAreas = item.system.grenadeRadius || 1;
-
-      // Place template centered on first targeted token
-      template = await AreaTemplate.createAtTarget({
-        radiusInAreas,
-        label: item.name,
-        fillColor: "#ff4400",
-        fillAlpha: 0.25
-      });
-
-      // Auto-target all tokens inside the template
-      if (template) {
-        await template.target();
-        affectedTargets = Array.from(game.user.targets);
-      }
+      // ── HIT: auto-target all tokens inside the template ──
+      await template.target();
+      affectedTargets = Array.from(game.user.targets);
 
       // Build result HTML
       if (typeDef.effectType === "damage" || typeDef.effectType === "damage+stun") {
