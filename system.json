@@ -99,6 +99,13 @@
             "system": "msh-faserip",
             "path": "./packs/headquarters.db",
             "type": "Item"
+        },
+        {
+            "name": "vehicle-weapons",
+            "label": "Vehicle Weapons",
+            "system": "msh-faserip",
+            "path": "./packs/vehicle-weapons.db",
+            "type": "Item"
         }
     ],
     "documentTypes": {

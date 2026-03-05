@@ -24,6 +24,7 @@ import { calculateMitigation } from "../../rules/mitigation.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
 // NOTE: do NOT import resolveCombatMode here – that creates a circular dependency
 import { recordDamage } from "../rest-system.js";
+import { applyDamageToVehicle } from "./vehicle-damage.js";
 
 // Local helper to read the global combat mode without importing action-dispatcher
 function resolveCombatModeSafe(actor) {
@@ -1317,6 +1318,22 @@ export async function applyDamageToTargets({
 
       if (!targetActor) {
         console.warn("FASERIP | No actor found for target:", targetName);
+        continue;
+      }
+
+      // --- Vehicle routing: skip entire character damage path ---
+      if (targetActor.type === "vehicle") {
+        console.log("FASERIP | Vehicle target detected, routing to vehicle damage:", targetName);
+        const vResult = await applyDamageToVehicle({
+          targetActor,
+          token,
+          damage: Number(damage) || 0,
+          damageType,
+          attackForm,
+          bypassArmor,
+          showNotification
+        });
+        results.push(vResult);
         continue;
       }
 

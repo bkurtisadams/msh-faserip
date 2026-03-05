@@ -5,13 +5,14 @@
   </header>
 
   <nav class="sheet-tabs tabs">
-    <a class="item" data-tab="info">Vehicle Info</a>
+    <a class="item" data-tab="info">Info</a>
     <a class="item" data-tab="crew">Crew &amp; Condition</a>
-    <a class="item" data-tab="arm">Armament</a>
+    <a class="item" data-tab="equipment">Equipment</a>
+    <a class="item" data-tab="effects">Effects</a>
   </nav>
 
   <section class="sheet-body">
-    <!-- Tab: Info -->
+    <!-- ═══════ Tab: Info ═══════ -->
     <div class="tab" data-tab="info">
       <div class="form-group">
         <label>Type</label>
@@ -82,72 +83,300 @@
       </div>
     </div>
 
-    <!-- Tab: Crew & Condition -->
+    <!-- ═══════ Tab: Crew & Condition ═══════ -->
     <div class="tab" data-tab="crew">
-      <div class="form-group">
-        <label>Driver (name or UUID)</label>
-        <input type="text" name="system.driver" value="{{system.driver}}" />
-      </div>
-      <div class="form-group">
-        <label>Passengers (comma-separated)</label>
-        <input type="text" name="system.passengers" value="{{system.passengers}}" />
-      </div>
 
-      <hr/>
+      <!-- ── Crew Section ── -->
+      <fieldset class="vehicle-crew-fieldset" style="border:1px solid #c0a070;background:#faf8f2;border-radius:3px;padding:8px;margin-bottom:8px;">
+        <legend style="font-weight:bold;color:#8b0000;font-size:.9em;padding:0 4px;">Crew &amp; Passengers</legend>
 
-      <div class="grid grid-3col">
-        <div class="form-group">
-          <label>Body HP</label>
-          <input type="number" name="system.bodyHP" value="{{system.bodyHP}}" /> /
-          <input type="number" name="system.bodyHPMax" value="{{system.bodyHPMax}}" />
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+          <label style="font-size:.85em;font-weight:bold;color:#666;min-width:50px;">Driver</label>
+          {{#if driverActor}}
+            <div class="crew-slot crew-driver" style="display:flex;align-items:center;gap:6px;flex:1;background:#f0ede4;border:1px solid #d0c8b0;border-radius:3px;padding:3px 6px;">
+              <img src="{{driverActor.img}}" width="24" height="24" style="border-radius:2px;border:1px solid #999;" />
+              <a class="crew-link" data-uuid="{{driverActor.uuid}}" style="font-weight:bold;color:#333;cursor:pointer;" title="Open sheet">{{driverActor.name}}</a>
+              <span style="font-size:.8em;color:#666;margin-left:auto;">Agi: {{driverActor.agility}}</span>
+              <a class="crew-remove" data-slot="driver" title="Remove driver" style="cursor:pointer;color:#c62828;margin-left:4px;"><i class="fas fa-times"></i></a>
+            </div>
+          {{else}}
+            <div class="crew-drop-zone" data-slot="driver" style="flex:1;border:2px dashed #c0a070;border-radius:3px;padding:6px;text-align:center;font-size:.85em;color:#999;cursor:default;">
+              Drag actor here
+            </div>
+          {{/if}}
         </div>
-        <div class="form-group">
-          <label>Body CS Loss</label>
-          <input type="number" name="system.bodyCSLoss" value="{{system.bodyCSLoss}}" />
-        </div>
-        <div class="form-group">
-          <label>Speed CS Loss</label>
-          <input type="number" name="system.speedCSLoss" value="{{system.speedCSLoss}}" />
-        </div>
-        <div class="form-group">
-          <label>Control CS Loss</label>
-          <input type="number" name="system.controlCSLoss" value="{{system.controlCSLoss}}" />
-        </div>
-      </div>
 
-      <div class="form-group">
-        <button type="button" class="vehicle-damage-quick" data-amt="5">-5 Body</button>
-        <button type="button" class="vehicle-damage-quick" data-amt="10">-10 Body</button>
-      </div>
+        <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:6px;">
+          <label style="font-size:.85em;font-weight:bold;color:#666;min-width:50px;padding-top:4px;">Crew</label>
+          <div style="flex:1;">
+            {{#each passengerActors}}
+              <div class="crew-slot crew-passenger" style="display:flex;align-items:center;gap:6px;background:#f0ede4;border:1px solid #d0c8b0;border-radius:3px;padding:3px 6px;margin-bottom:3px;">
+                <img src="{{this.img}}" width="24" height="24" style="border-radius:2px;border:1px solid #999;" />
+                <a class="crew-link" data-uuid="{{this.uuid}}" style="font-weight:bold;color:#333;cursor:pointer;" title="Open sheet">{{this.name}}</a>
+                <a class="crew-remove" data-slot="passenger" data-uuid="{{this.uuid}}" title="Remove" style="cursor:pointer;color:#c62828;margin-left:auto;"><i class="fas fa-times"></i></a>
+              </div>
+            {{/each}}
+            <div class="crew-drop-zone" data-slot="passenger" style="border:2px dashed #c0a070;border-radius:3px;padding:6px;text-align:center;font-size:.85em;color:#999;cursor:default;">
+              Drag actor here to add passenger
+            </div>
+          </div>
+        </div>
 
-      <div class="form-group">
-        <label>Damage Log</label>
-        <textarea name="system.damageLog">{{#each system.damageLog}}{{this}}
+        <div style="display:flex;align-items:center;gap:8px;">
+          <label style="font-size:.85em;font-weight:bold;color:#666;min-width:50px;">Seats</label>
+          <input type="number" name="system.seatingCapacity" value="{{system.seatingCapacity}}" min="1" style="width:50px;text-align:center;" />
+          <span style="font-size:.8em;color:#666;">
+            ({{crewCount}} / {{system.seatingCapacity}} occupied)
+          </span>
+        </div>
+      </fieldset>
+
+      <!-- ── Condition Section ── -->
+      <fieldset class="vehicle-condition-fieldset" style="border:1px solid #c0a070;background:#faf8f2;border-radius:3px;padding:8px;margin-bottom:8px;">
+        <legend style="font-weight:bold;color:#8b0000;font-size:.9em;padding:0 4px;">Vehicle Condition</legend>
+
+        <div class="grid grid-3col">
+          <div class="form-group">
+            <label>Body HP</label>
+            <input type="number" name="system.bodyHP" value="{{system.bodyHP}}" /> /
+            <input type="number" name="system.bodyHPMax" value="{{system.bodyHPMax}}" />
+          </div>
+          <div class="form-group">
+            <label>Body CS Loss</label>
+            <input type="number" name="system.bodyCSLoss" value="{{system.bodyCSLoss}}" />
+          </div>
+          <div class="form-group">
+            <label>Speed CS Loss</label>
+            <input type="number" name="system.speedCSLoss" value="{{system.speedCSLoss}}" />
+          </div>
+          <div class="form-group">
+            <label>Control CS Loss</label>
+            <input type="number" name="system.controlCSLoss" value="{{system.controlCSLoss}}" />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <button type="button" class="vehicle-damage-quick" data-amt="5">-5 Body</button>
+          <button type="button" class="vehicle-damage-quick" data-amt="10">-10 Body</button>
+        </div>
+
+        <div class="form-group">
+          <label>Damage Log</label>
+          <textarea name="system.damageLog">{{#each system.damageLog}}{{this}}
 {{/each}}</textarea>
-      </div>
+        </div>
+      </fieldset>
     </div>
 
-    <!-- Tab: Armament -->
-    <div class="tab" data-tab="arm">
-      {{#if mounted.length}}
-        <table class="msh-table">
+    <!-- ═══════ Tab: Equipment ═══════ -->
+    <div class="tab" data-tab="equipment">
+      <div class="tab-list-header">
+        <span>Vehicle Equipment</span>
+        <div class="th-actions">
+          <a class="th-action-link add-equipment" title="Add Equipment">+ add</a>
+          <a class="th-action-link browse-compendium" data-type="equipment" title="Browse Equipment Compendium">browse</a>
+        </div>
+      </div>
+
+      {{! ── WEAPONS ── }}
+      <div class="equip-group" data-group="weapon">
+        <div class="equip-group-label">Mounted Weapons</div>
+        <table class="equipment-table">
           <thead>
-            <tr><th>Name</th><th>Type</th><th>Qty/Ammo</th><th>Notes</th></tr>
+            <tr>
+              <th class="name-col">Name</th>
+              <th class="material-col">Mat.</th>
+              <th class="damage-col">Dmg</th>
+              <th class="type-col">Type</th>
+              <th class="range-col">Range</th>
+              <th class="rate-col">Rate</th>
+              <th class="shots-col">Shots</th>
+              <th class="actions-col">Actions</th>
+            </tr>
           </thead>
           <tbody>
-            {{#each mounted}}
-              <tr>
-                <td title="{{this.name}}">{{this.name}}</td>
-                <td>{{this.type}}</td>
-                <td>{{this.system.ammo}}{{#if this.system.quantity}} / {{this.system.quantity}}{{/if}}</td>
-                <td>{{this.system.description}}</td>
-              </tr>
+            {{#each equipment as |item|}}
+            {{#if (eq item.system.category "weapon")}}
+            <tr class="equipment-row item" data-item-id="{{item._id}}" title="{{item.system.description}}">
+              <td class="equipment-name">
+                <a class="item-control equipment-roll" data-item-id="{{item._id}}" title="Fire"><i class="fas fa-dice-d20"></i></a>
+                <img src="{{item.img}}" class="equipment-icon equipment-info" width="24" height="24" title="Click for info." />
+                <span class="equipment-name-text">{{item.name}}</span>
+              </td>
+              <td class="equipment-material">{{item.system.materialStrength}}</td>
+              <td class="equipment-damage">{{item.system.damage}}</td>
+              <td class="equipment-type equipment-type-badge" data-dtype="{{item.system.damageType}}">{{item.system.damageType}}</td>
+              <td class="equipment-range">{{item.system.range}}</td>
+              <td class="equipment-rate">{{item.system.rate}}</td>
+              <td class="equipment-shots">
+                <div class="shots-control">
+                  <span>{{item.system.shotsRemaining}}/{{item.system.shots}}</span>
+                  {{#if (lt item.system.shotsRemaining item.system.shots)}}
+                  <a class="reload-weapon" title="Reload" data-item-id="{{item._id}}"><i class="fas fa-sync-alt"></i></a>
+                  {{/if}}
+                </div>
+              </td>
+              <td class="equipment-controls">
+                <a class="item-control item-edit" title="Edit" data-item-id="{{item._id}}"><i class="fas fa-edit"></i></a>
+                <a class="item-control item-delete" title="Delete" data-item-id="{{item._id}}"><i class="fas fa-trash"></i></a>
+              </td>
+            </tr>
+            {{/if}}
             {{/each}}
           </tbody>
         </table>
-      {{else}}
-        <p class="hint">No mounted equipment. Add Items to the vehicle actor.</p>
-      {{/if}}
+      </div>
+
+      {{! ── OTHER WEAPONS (grenades, missiles, bombs) ── }}
+      <div class="equip-group" data-group="other">
+        <div class="equip-group-label">Ordnance (Missiles, Bombs, Torpedoes)</div>
+        <table class="equipment-table">
+          <thead>
+            <tr>
+              <th class="name-col">Name</th>
+              <th class="type-col">Type</th>
+              <th class="damage-col">Dmg</th>
+              <th class="range-col">Range</th>
+              <th class="shots-col">Count</th>
+              <th class="actions-col">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {{#each equipment as |item|}}
+            {{#if (eq item.system.category "other")}}
+            <tr class="equipment-row item" data-item-id="{{item._id}}" title="{{item.system.description}}">
+              <td class="equipment-name">
+                <a class="item-control equipment-roll" data-item-id="{{item._id}}" title="Use"><i class="fas fa-dice-d20"></i></a>
+                <img src="{{item.img}}" class="equipment-icon equipment-info" width="24" height="24" title="Click for info." />
+                <span class="equipment-name-text">{{item.name}}</span>
+              </td>
+              <td class="equipment-type">{{item.system.grenadeType}}{{item.system.missileType}}</td>
+              <td class="equipment-damage">{{item.system.grenadeDamage}}{{item.system.missileDamage}}</td>
+              <td class="equipment-range">{{item.system.range}}</td>
+              <td class="equipment-shots">
+                <input type="number" class="item-field" name="system.shotsRemaining" value="{{item.system.shotsRemaining}}" data-item-id="{{item._id}}" min="0" style="width:40px;text-align:center;" title="Current count">
+                <span style="font-size:.75em;color:#888;">/{{item.system.shots}}</span>
+              </td>
+              <td class="equipment-controls">
+                <a class="item-control item-edit" title="Edit" data-item-id="{{item._id}}"><i class="fas fa-edit"></i></a>
+                <a class="item-control item-delete" title="Delete" data-item-id="{{item._id}}"><i class="fas fa-trash"></i></a>
+              </td>
+            </tr>
+            {{/if}}
+            {{/each}}
+          </tbody>
+        </table>
+      </div>
+
+      {{! ── GEAR (non-weapon equipment) ── }}
+      <div class="equip-group" data-group="gear">
+        <div class="equip-group-label">Gear &amp; Systems</div>
+        <table class="equipment-table">
+          <thead>
+            <tr>
+              <th class="name-col">Name</th>
+              <th class="material-col">Mat.</th>
+              <th class="damage-col">Rank</th>
+              <th class="type-col">Notes</th>
+              <th class="actions-col">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {{#each equipment as |item|}}
+            {{#if (eq item.system.category "gear")}}
+            <tr class="equipment-row item" data-item-id="{{item._id}}" title="{{item.system.description}}">
+              <td class="equipment-name">
+                <img src="{{item.img}}" class="equipment-icon equipment-info" width="24" height="24" title="Click for info." />
+                <span class="equipment-name-text">{{item.name}}</span>
+              </td>
+              <td class="equipment-material">{{item.system.materialStrength}}</td>
+              <td class="equipment-damage">{{item.system.rank}}</td>
+              <td class="equipment-type">{{item.system.notes}}</td>
+              <td class="equipment-controls">
+                <a class="item-control item-edit" title="Edit" data-item-id="{{item._id}}"><i class="fas fa-edit"></i></a>
+                <a class="item-control item-delete" title="Delete" data-item-id="{{item._id}}"><i class="fas fa-trash"></i></a>
+              </td>
+            </tr>
+            {{/if}}
+            {{/each}}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ═══════ Tab: Effects ═══════ -->
+    <div class="tab effects-tab" data-tab="effects">
+
+      {{#each effects as |section|}}
+      <div class="effect-section" data-section-type="{{section.type}}">
+        <div class="effect-header" data-section="{{section.type}}">
+          <div class="header-left">
+            <i class="fas fa-chevron-down collapse-icon"></i>
+            <span class="section-title">{{section.label}} Effects</span>
+          </div>
+          <div class="header-columns">
+            <span class="col-source">Source</span>
+            {{#if (eq section.type "temporary")}}
+              <span class="col-duration">Duration</span>
+            {{/if}}
+          </div>
+          <li data-effect-type="{{section.type}}" style="list-style: none; margin: 0;">
+            <a class="effect-control btn-add" data-action="create">
+              <i class="fas fa-plus"></i> Add
+            </a>
+          </li>
+        </div>
+
+        <ol class="effects-list">
+          {{#if section.effects.length}}
+            {{#each section.effects as |effect|}}
+              <li class="effect-row {{#unless (eq ../section.type "temporary")}}no-duration{{/unless}}" data-effect-id="{{effect.id}}" data-parent-id="{{effect.parent.id}}">
+                <div class="effect-icon">
+                  <img src="{{effect.img}}" alt="{{effect.name}}" />
+                </div>
+                <div class="effect-name">
+                  {{effect.name}}
+                </div>
+                <div class="effect-source">
+                  {{#if effect.origin}}
+                    {{effect.origin}}
+                  {{else}}
+                    —
+                  {{/if}}
+                </div>
+                {{#if (eq ../section.type "temporary")}}
+                  <div class="effect-duration">
+                    {{#if effect.duration.rounds}}
+                      {{effect.duration.rounds}} Rounds
+                    {{else if effect.duration.seconds}}
+                      {{effect.duration.seconds}}s
+                    {{else if effect.duration.turns}}
+                      {{effect.duration.turns}} Turns
+                    {{else}}
+                      Unlimited
+                    {{/if}}
+                  </div>
+                {{/if}}
+                <div class="effect-controls">
+                  <a class="effect-control" data-action="toggle" title="{{#if effect.disabled}}Enable{{else}}Disable{{/if}} Effect">
+                    <i class="fas fa-{{#if effect.disabled}}eye-slash{{else}}eye{{/if}}"></i>
+                  </a>
+                  <a class="effect-control" data-action="edit" title="Edit Effect">
+                    <i class="fas fa-edit"></i>
+                  </a>
+                  <a class="effect-control" data-action="delete" title="Delete Effect">
+                    <i class="fas fa-trash"></i>
+                  </a>
+                </div>
+              </li>
+            {{/each}}
+          {{else}}
+            <li class="no-effects">No {{section.label}} effects</li>
+          {{/if}}
+        </ol>
+      </div>
+      {{/each}}
+
     </div>
   </section>
 </form>

@@ -123,7 +123,10 @@
       "features": "",
       "description": "",
       "driver": "",
+      "driverUuid": "",
       "passengers": "",
+      "passengerUuids": [],
+      "seatingCapacity": 5,
       "bodyHP": 20,
       "bodyHPMax": 20,
       "bodyCSLoss": 0,
@@ -325,7 +328,10 @@
       "description": "",
 
       "driver": "",
+      "driverUuid": "",
       "passengers": "",
+      "passengerUuids": [],
+      "seatingCapacity": 5,
 
       "bodyHP": 20,
       "bodyHPMax": 20,
