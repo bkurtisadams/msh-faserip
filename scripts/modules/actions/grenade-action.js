@@ -1,5 +1,5 @@
-// scripts/modules/actions/grenade-action.js v2.0.0 - 2026-03-04
-// v2.0.0: RAW grenade rules — roll first, hit=template+damage, miss=nothing. No scatter. No auto-dismiss.
+// scripts/modules/actions/grenade-action.js v2.1.0 - 2026-03-04
+// v2.1.0: Add SFX playback via playCombatSFX — uses item-configured sounds from equipment sheet
 import { RangedAttackAction } from "./ranged-attack-action.js";
 import { AreaTemplate } from "./area-template.js";
 import {
@@ -52,6 +52,9 @@ export class GrenadeAction extends RangedAttackAction {
     const _sr = item.system.shotsRemaining;
     const shotsRemaining = (_sr !== "" && _sr != null) ? _sr : (item.system.shots !== "" && item.system.shots != null ? item.system.shots : 1);
     if (Number.isFinite(Number(shotsRemaining)) && Number(shotsRemaining) <= 0) {
+      if (game.msh?.playCombatSFX) {
+        await game.msh.playCombatSFX({ item, actionType: "grenade", outOfAmmo: true });
+      }
       await ChatMessage.create({
         speaker: ChatMessage.getSpeaker({ actor }),
         content: `<div style="background:#fff;border:1px solid #bbb;border-radius:3px;padding:6px 8px;">
@@ -230,6 +233,17 @@ export class GrenadeAction extends RangedAttackAction {
     const color      = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
     const colorLower = String(color || "").toLowerCase();
     const isHit      = colorLower !== "white";
+
+    // Play SFX based on item-configured sounds or fallback
+    if (game.msh?.playCombatSFX) {
+      await game.msh.playCombatSFX({
+        item,
+        actionType: "grenade",
+        damageType: typeDef.damageType || "physical-blunt",
+        rollResult: colorLower,
+        isHit
+      });
+    }
 
     // Build roll display
     const shiftBreakdown = {};
