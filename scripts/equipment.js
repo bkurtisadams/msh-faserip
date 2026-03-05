@@ -349,6 +349,7 @@ export class FaseripEquipmentSheet extends ItemSheet {
       
       // Show/hide sections immediately without re-rendering
       html.find('.weapon-fields, .armor-fields, .power-item-fields, .custom-fields, .other-fields').hide();
+      html.find('.sfx-shared-fields').toggle(category === 'weapon' || category === 'other');
       
       if (category === 'weapon') {
         html.find('.weapon-fields').show();
@@ -376,6 +377,7 @@ export class FaseripEquipmentSheet extends ItemSheet {
     // Make sure correct fields are shown on initial load
     const currentCategory = this.object.system.category;
     html.find('.weapon-fields, .armor-fields, .power-item-fields, .custom-fields, .other-fields').hide(); // Hide all initially
+    html.find('.sfx-shared-fields').toggle(currentCategory === 'weapon' || currentCategory === 'other');
     if (currentCategory === 'weapon') {
       html.find('.weapon-fields').show();
     } else if (currentCategory === 'armor') {

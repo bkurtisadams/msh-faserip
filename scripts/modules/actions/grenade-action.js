@@ -1,5 +1,5 @@
-// scripts/modules/actions/grenade-action.js v1.4.0 - 2026-02-25
-// v1.4.0: Rebuild chat cards using unified card builder utilities; remove font-family override
+// scripts/modules/actions/grenade-action.js v2.0.0 - 2026-03-04
+// v2.0.0: RAW grenade rules — roll first, hit=template+damage, miss=nothing. No scatter. No auto-dismiss.
 import { RangedAttackAction } from "./ranged-attack-action.js";
 import { AreaTemplate } from "./area-template.js";
 import {
@@ -17,11 +17,9 @@ import {
   getTargetData,
   applyDamageToTargets,
   buildModeSelector,
-  setupModeSelector,
-  attachAutoFillRange
+  setupModeSelector
 } from "./action-utils.js";
 import {
-  generateKarmaControlsHTML,
   setupKarmaControlHandlers,
   extractKarmaFromDialog,
   getAvailableKarma,
@@ -51,7 +49,6 @@ export class GrenadeAction extends RangedAttackAction {
     }
 
     // Check ammo
-    // shotsRemaining defaults to "" in template — treat "" same as null
     const _sr = item.system.shotsRemaining;
     const shotsRemaining = (_sr !== "" && _sr != null) ? _sr : (item.system.shots !== "" && item.system.shots != null ? item.system.shots : 1);
     if (Number.isFinite(Number(shotsRemaining)) && Number(shotsRemaining) <= 0) {
@@ -66,18 +63,15 @@ export class GrenadeAction extends RangedAttackAction {
 
     const grenadeType  = item.system.grenadeType || "fragmentation";
     let typeDef        = GRENADE_TYPES[grenadeType] || GRENADE_TYPES.fragmentation;
-    // Item damage/intensity can override defaults
-    // grenadeDamage may be a string like "RM (30)" or "30" or a plain number
     const _dmgRaw = item.system.grenadeDamage ?? typeDef.damage ?? 0;
     const _dmgMatch = String(_dmgRaw).match(/\d+/);
     const damage = _dmgMatch ? parseInt(_dmgMatch[0], 10) : (typeDef.damage ?? 0);
     const intensity    = item.system.grenadeIntensity || typeDef.rank || "";
 
-    // Normalize grenadeDamageType from item sheet (EA→physical-edged, BA→physical-blunt, E→energy, etc.)
+    // Normalize grenadeDamageType from item sheet
     const _rawDt = String(item.system.grenadeDamageType || "").toUpperCase();
     const _dtMap = { EA: "physical-edged", TE: "physical-edged", BA: "physical-blunt", TB: "physical-blunt", E: "energy", F: "force", S: "physical-blunt" };
     const itemDamageType = _dtMap[_rawDt] || null;
-    // Override typeDef.damageType with item's explicit setting if present
     if (itemDamageType) typeDef = { ...typeDef, damageType: itemDamageType };
 
     const ability      = getAbilityInfo(actor, "agility");
@@ -121,7 +115,7 @@ export class GrenadeAction extends RangedAttackAction {
       <div style="background:#fff8e1;border:1px solid #ffc107;border-radius:3px;padding:8px;margin-bottom:8px;">
         <div style="font-weight:700;color:#e65100;">${item.name} — ${typeDef.label}</div>
         <div style="color:#555;font-size:.88em;margin-top:2px;">${effectDesc}</div>
-        <div style="color:#888;font-size:.82em;margin-top:2px;">White = miss. Any other result = hits target area, affects all in it.</div>
+        <div style="color:#888;font-size:.82em;margin-top:2px;">White = miss (grenade lost). Green+ = hits target area, affects all in it.</div>
       </div>
 
       <!-- Range -->
@@ -140,13 +134,13 @@ export class GrenadeAction extends RangedAttackAction {
           <strong id="shifted-rank-display">${shiftRank(ability.rank, savedShift)}</strong>
           <button type="button" class="cs-reset" style="visibility:${savedShift !== 0 ? "visible" : "hidden"};padding:1px 5px;font-size:.85em;cursor:pointer;border:1px solid #999;border-radius:2px;background:#eee;" title="Reset to 0">×</button>
         </div>
-        <div style="display:flex;align-items:center;gap:4px;padding:4px 6px;border-radius:3px;${hasKarma ? "background:#e3f2fd;border:1px solid #90caf9;" : ""}">
+        <div class="karma-field" style="display:flex;align-items:center;gap:4px;padding:4px 6px;border-radius:3px;${hasKarma ? "background:#e3f2fd;border:1px solid #90caf9;" : ""}">
           ${hasKarma ? `
             <label style="display:flex;align-items:center;gap:4px;cursor:pointer;">
               <input type="checkbox" id="spend-karma" name="spendKarma">
               <span style="font-weight:600;">Karma:</span>
             </label>
-            <span style="padding:1px 4px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;">${availableKarma}</span>
+            <span title="Available: ${availableKarma} | Min commitment: ${minKarma} | Amount chosen after roll" style="padding:1px 4px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${availableKarma}</span>
             <span style="color:#999;font-size:.8em;">(min ${minKarma})</span>
           ` : `<span style="color:#999;">No karma</span>`}
         </div>
@@ -194,6 +188,9 @@ export class GrenadeAction extends RangedAttackAction {
           setupKarmaControlHandlers(html);
           await setupModeSelector(actor, html, this.opts || {}, "lastGrenadeMode");
 
+          const $dialog = html.closest('.dialog');
+          if ($dialog.length) $dialog[0].style.height = 'auto';
+
           const update = () => {
             const cs = parseInt(html.find('[name="shift"]').val()) || 0;
             const shifted = shiftRank(ability.rank, cs);
@@ -214,32 +211,11 @@ export class GrenadeAction extends RangedAttackAction {
 
     if (!choice) return;
 
-    // Place area template — user clicks location on canvas
-    const radiusInAreas = item.system.grenadeRadius || 1;
-    ui.notifications.info(`Click on the canvas to place the ${item.name} (${radiusInAreas} area radius).`);
-    const template = await AreaTemplate.place({
-      radiusInAreas,
-      label: item.name,
-      fillColor: "#ff4400",
-      fillAlpha: 0.25
-    });
-
-    if (!template) {
-      ui.notifications.info("Grenade throw cancelled.");
-      return;
-    }
-
-    // Auto-target all tokens inside the template
-    await template.target();
-
-    // Capture targets NOW — scatter will call target() again and overwrite game.user.targets
-    let affectedTargets = Array.from(game.user.targets);
-
     // Decrement shots
     const newShots = Math.max(0, Number(shotsRemaining) - 1);
     await item.update({ "system.shotsRemaining": newShots });
 
-    // Roll
+    // Roll Agility FEAT (Blunt Throwing column per RAW)
     const effectiveRank = shiftRank(ability.rank, choice.totalShift);
     const roll = await (new Roll("1d100")).evaluate();
     if (!choice.skipDice) {
@@ -255,7 +231,7 @@ export class GrenadeAction extends RangedAttackAction {
     const colorLower = String(color || "").toLowerCase();
     const isHit      = colorLower !== "white";
 
-    // Build standard roll display and badge
+    // Build roll display
     const shiftBreakdown = {};
     if (choice.shift) shiftBreakdown.manual = Number(choice.shift);
     if (choice.rangeModifier) shiftBreakdown.range = choice.rangeModifier;
@@ -264,34 +240,35 @@ export class GrenadeAction extends RangedAttackAction {
     const effectLabel = isHit ? "HIT" : "MISS";
     const resultBadge = buildResultBadge(color, effectLabel);
 
-    // Result box
     let resultHtml = "";
-    // Scatter on miss
-    let scatterDirLabel = "";
-    if (!isHit) {
-      const dirs = ["N","NE","E","SE","S","SW","W","NW"];
-      const d8 = Math.floor(Math.random() * 8);
-      scatterDirLabel = dirs[d8];
-      const scatterAreas = Math.max(0.5, choice.range / 2);
-      const areasPerSq   = canvas.scene?.grid?.distance || 0.1;
-      const pxPerSq      = canvas.scene?.grid?.size || 100;
-      const scatterPx    = (scatterAreas / areasPerSq) * pxPerSq;
-      // Cardinal/diagonal offset in pixels
-      const rad = (d8 * 45) * (Math.PI / 180);
-      const dx  = Math.round(Math.cos(rad) * scatterPx);
-      const dy  = Math.round(-Math.sin(rad) * scatterPx); // canvas Y is inverted
-      // Move template to scatter position
-      await template._doc.update({ x: template._doc.x + dx, y: template._doc.y + dy });
-      // Retarget at new position
-      await template.target();
-    }
+    let template = null;
+    let affectedTargets = [];
 
     if (!isHit) {
+      // ── MISS: grenade lost, no effect ──
       resultHtml = `<div style="padding:6px 8px;margin:0 10px 6px;background:#fff;border:1px solid #ddd;border-radius:3px;font-size:.88em;">
-        <div style="font-weight:700;color:#888;">MISS — SCATTER</div>
-        <div style="color:#555;">Grenade scatters ${Math.max(0.5, choice.range / 2)} area(s) ${scatterDirLabel} of target. Effects apply at scatter point.</div>
+        <div style="font-weight:700;color:#888;">MISS</div>
+        <div style="color:#555;">Grenade fails to reach target area. No effect.</div>
       </div>`;
     } else {
+      // ── HIT: place template, target tokens in area, apply effects ──
+      const radiusInAreas = item.system.grenadeRadius || 1;
+
+      // Place template centered on first targeted token
+      template = await AreaTemplate.createAtTarget({
+        radiusInAreas,
+        label: item.name,
+        fillColor: "#ff4400",
+        fillAlpha: 0.25
+      });
+
+      // Auto-target all tokens inside the template
+      if (template) {
+        await template.target();
+        affectedTargets = Array.from(game.user.targets);
+      }
+
+      // Build result HTML
       if (typeDef.effectType === "damage" || typeDef.effectType === "damage+stun") {
         const dmgLabel = typeDef.damageType?.replace("physical-", "") ?? "damage";
         resultHtml = `<div style="padding:6px 8px;margin:0 10px 6px;background:#fff;border:1px solid #ddd;border-radius:3px;font-size:.88em;">
@@ -333,29 +310,10 @@ export class GrenadeAction extends RangedAttackAction {
 
     await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor }), content: cardHtml });
 
-    // On a miss, scatter may have found additional targets — merge them in
-    const scatterTargets = Array.from(game.user.targets);
-    for (const t of scatterTargets) {
-      if (!affectedTargets.includes(t)) affectedTargets.push(t);
-    }
-
-    // Handle template — persist smoke/gas regardless of hit/miss (scatter lands somewhere)
-    const isPersistent = ["smoke", "tearGas", "knockout", "flash"].includes(grenadeType);
-    if (isPersistent) {
-      const durationMap = { smoke: 10, tearGas: 5, knockout: 5, flash: 2 };
-      await template.persist({
-        durationTurns: durationMap[grenadeType] || 5,
-        label: `${typeDef.label} (${item.name})`
-      });
-    } else {
-      await template.dismiss();
-    }
-
-    // Apply to all targeted tokens at landing point (hit or scatter)
-    // RAW: frag/edged grenades trigger kill saves on any hit (treat as Kill-capable)
+    // Apply damage to all tokens in blast area (hit only)
     const isKillCapable = ["physical-edged", "energy"].includes(typeDef.damageType);
-    const wasKillResult = isKillCapable; // area hits always treated as Red (Kill column) per RAW
-    if (damage > 0 && affectedTargets.length > 0) {
+    const wasKillResult = isKillCapable;
+    if (isHit && damage > 0 && affectedTargets.length > 0) {
       const dmgResults = await applyDamageToTargets({
         damage,
         targets: affectedTargets,
@@ -367,7 +325,6 @@ export class GrenadeAction extends RangedAttackAction {
         forceKilling: wasKillResult
       });
 
-      // Post damage summary chat card for each target
       if (dmgResults?.length) {
         const dmgLabel = typeDef.damageType?.replace("physical-", "") ?? "damage";
         const rows = dmgResults.map(r => {

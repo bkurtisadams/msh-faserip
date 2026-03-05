@@ -427,61 +427,6 @@
           </div>
         </div>
 
-        <!-- ═══ SOUND EFFECTS (collapsible) ═══════════════════════════════ -->
-        <div class="specialized-section" style="margin-bottom:10px;">
-          <div class="section-header collapsible" data-section="sfx-fields">
-            <h3>Sound Effects</h3>
-            <i class="fas fa-chevron-down"></i>
-          </div>
-          <div class="sfx-fields section-content" style="display:none;">
-
-            <div class="form-group">
-              <label>SFX (Hit)</label>
-              <div class="form-fields sfx-row">
-                <input type="text" name="system.sfx.hit" value="{{system.sfx.hit}}" placeholder="systems/msh-faserip/assets/sfx/gunshot.wav"/>
-                <button type="button" class="sfx-preview" data-sfx-field="system.sfx.hit" data-volume-field="system.sfx.hitVolume" title="Preview"><i class="fas fa-play"></i></button>
-                <input type="number" class="sfx-volume" name="system.sfx.hitVolume" value="{{system.sfx.hitVolume}}" min="0" max="100" placeholder="80" title="Volume %"/>
-                <span class="sfx-volume-label">%</span>
-                {{filePicker type="audio" target="system.sfx.hit"}}
-              </div>
-            </div>
-
-            <div class="form-group">
-              <label>SFX (Miss)</label>
-              <div class="form-fields sfx-row">
-                <input type="text" name="system.sfx.miss" value="{{system.sfx.miss}}" placeholder="systems/msh-faserip/assets/sfx/gunshot-miss.wav"/>
-                <button type="button" class="sfx-preview" data-sfx-field="system.sfx.miss" data-volume-field="system.sfx.missVolume" title="Preview"><i class="fas fa-play"></i></button>
-                <input type="number" class="sfx-volume" name="system.sfx.missVolume" value="{{system.sfx.missVolume}}" min="0" max="100" placeholder="80" title="Volume %"/>
-                <span class="sfx-volume-label">%</span>
-                {{filePicker type="audio" target="system.sfx.miss"}}
-              </div>
-            </div>
-
-            <div class="form-group">
-              <label>SFX (Out of Ammo)</label>
-              <div class="form-fields sfx-row">
-                <input type="text" name="system.sfx.empty" value="{{system.sfx.empty}}" placeholder="(optional) .../click-empty.wav"/>
-                <button type="button" class="sfx-preview" data-sfx-field="system.sfx.empty" data-volume-field="system.sfx.emptyVolume" title="Preview"><i class="fas fa-play"></i></button>
-                <input type="number" class="sfx-volume" name="system.sfx.emptyVolume" value="{{system.sfx.emptyVolume}}" min="0" max="100" placeholder="80" title="Volume %"/>
-                <span class="sfx-volume-label">%</span>
-                {{filePicker type="audio" target="system.sfx.empty"}}
-              </div>
-            </div>
-
-            <div class="form-group">
-              <label>SFX (Reload)</label>
-              <div class="form-fields sfx-row">
-                <input type="text" name="system.sfx.reload" value="{{system.sfx.reload}}" placeholder="(optional) .../reload.wav"/>
-                <button type="button" class="sfx-preview" data-sfx-field="system.sfx.reload" data-volume-field="system.sfx.reloadVolume" title="Preview"><i class="fas fa-play"></i></button>
-                <input type="number" class="sfx-volume" name="system.sfx.reloadVolume" value="{{system.sfx.reloadVolume}}" min="0" max="100" placeholder="80" title="Volume %"/>
-                <span class="sfx-volume-label">%</span>
-                {{filePicker type="audio" target="system.sfx.reload"}}
-              </div>
-            </div>
-
-          </div>
-        </div>
-
       </div>
       <!-- END weapon-fields -->
 
@@ -679,6 +624,7 @@
           </div>
         </div>
         </div>
+
       </div>
       <!-- END other-fields -->
 
@@ -876,6 +822,63 @@
         </div>
       </div>
       <!-- END custom-fields -->
+
+      <!-- ═══ SOUND EFFECTS — shared across weapon & other categories ═══ -->
+      <div class="sfx-shared-fields" style="display: none;">
+        <div class="specialized-section" style="margin-bottom:10px;">
+          <div class="section-header collapsible" data-section="sfx-fields">
+            <h3>Sound Effects</h3>
+            <i class="fas fa-chevron-down"></i>
+          </div>
+          <div class="sfx-fields section-content" style="display:none;">
+
+            <div class="form-group">
+              <label>SFX (Hit)</label>
+              <div class="form-fields sfx-row">
+                <input type="text" name="system.sfx.hit" value="{{system.sfx.hit}}" placeholder="path/to/sound.wav"/>
+                <button type="button" class="sfx-preview" data-sfx-field="system.sfx.hit" data-volume-field="system.sfx.hitVolume" title="Preview"><i class="fas fa-play"></i></button>
+                <input type="number" class="sfx-volume" name="system.sfx.hitVolume" value="{{system.sfx.hitVolume}}" min="0" max="100" placeholder="80" title="Volume %"/>
+                <span class="sfx-volume-label">%</span>
+                {{filePicker type="audio" target="system.sfx.hit"}}
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>SFX (Miss)</label>
+              <div class="form-fields sfx-row">
+                <input type="text" name="system.sfx.miss" value="{{system.sfx.miss}}" placeholder="(optional) path/to/miss.wav"/>
+                <button type="button" class="sfx-preview" data-sfx-field="system.sfx.miss" data-volume-field="system.sfx.missVolume" title="Preview"><i class="fas fa-play"></i></button>
+                <input type="number" class="sfx-volume" name="system.sfx.missVolume" value="{{system.sfx.missVolume}}" min="0" max="100" placeholder="80" title="Volume %"/>
+                <span class="sfx-volume-label">%</span>
+                {{filePicker type="audio" target="system.sfx.miss"}}
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>SFX (Out of Ammo)</label>
+              <div class="form-fields sfx-row">
+                <input type="text" name="system.sfx.empty" value="{{system.sfx.empty}}" placeholder="(optional) path/to/empty.wav"/>
+                <button type="button" class="sfx-preview" data-sfx-field="system.sfx.empty" data-volume-field="system.sfx.emptyVolume" title="Preview"><i class="fas fa-play"></i></button>
+                <input type="number" class="sfx-volume" name="system.sfx.emptyVolume" value="{{system.sfx.emptyVolume}}" min="0" max="100" placeholder="80" title="Volume %"/>
+                <span class="sfx-volume-label">%</span>
+                {{filePicker type="audio" target="system.sfx.empty"}}
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>SFX (Reload)</label>
+              <div class="form-fields sfx-row">
+                <input type="text" name="system.sfx.reload" value="{{system.sfx.reload}}" placeholder="(optional) path/to/reload.wav"/>
+                <button type="button" class="sfx-preview" data-sfx-field="system.sfx.reload" data-volume-field="system.sfx.reloadVolume" title="Preview"><i class="fas fa-play"></i></button>
+                <input type="number" class="sfx-volume" name="system.sfx.reloadVolume" value="{{system.sfx.reloadVolume}}" min="0" max="100" placeholder="80" title="Volume %"/>
+                <span class="sfx-volume-label">%</span>
+                {{filePicker type="audio" target="system.sfx.reload"}}
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
 
       <!-- GENERAL FIELDS - Visible for ALL equipment types -->
       <div class="form-group">
