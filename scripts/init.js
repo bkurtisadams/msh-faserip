@@ -1327,12 +1327,14 @@ Hooks.once("init", async () => {
   FaseripInitiative.init();
 
   game.msh.rollFaseripInitiative = () => {
-  if (!game.combat) {
-    ui.notifications.warn("No active combat encounter");
-    return;
-  }
-    
-    FaseripInitiative.rollSideInitiative(game.combat);
+    if (!game.combat) {
+      ui.notifications.warn("No active combat encounter");
+      return;
+    }
+    const mode = game.settings.get("msh-faserip", "initiativeMode");
+    if (mode === "side") FaseripInitiative.rollSideInitiative(game.combat);
+    else if (mode === "individual") FaseripInitiative.rollIndividualInitiative(game.combat);
+    else game.combat.rollInitiative();
   };
   
   // Add the vehicle control roll function

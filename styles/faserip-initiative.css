@@ -1,6 +1,8 @@
-/* CSS for FASERIP initiative with improved display */
+/* faserip-initiative.css v2.0.0 - 2026-03-05 */
 
-/* Initiative display bar */
+/* =====================
+   COMBAT TRACKER BAR
+   ===================== */
 .faserip-initiative-bar {
   font-size: 0.9em;
   padding: 3px 6px;
@@ -17,7 +19,9 @@
   font-style: italic;
 }
 
-/* Combatant styling */
+/* =====================
+   COMBATANT SIDE COLORS
+   ===================== */
 .combatant.pc-side {
   border-left: 3px solid rgba(0, 100, 0, 0.5);
 }
@@ -30,26 +34,32 @@
   font-weight: bold;
 }
 
-.intuition-indicator {
-  color: #8B0000;
-  margin-left: 5px;
-  font-size: 0.8em;
+.combatant.active {
+  background: rgba(0, 0, 0, 0.1);
+  font-weight: bold;
 }
 
-.pc-side .intuition-indicator {
-  color: #006400;
+.combatant.pc-side.active {
+  background: linear-gradient(90deg, rgba(0, 100, 0, 0.2), rgba(0, 100, 0, 0.05));
+  border-left-color: #00ff00;
 }
 
-/* Improved initiative display in tracker */
-.init-roll-display {
-  font-size: 0.9em;
-  padding: 2px 4px;
-  background: rgba(0, 0, 0, 0.05);
-  border-radius: 3px;
-  cursor: help;
+.combatant.npc-side.active {
+  background: linear-gradient(90deg, rgba(139, 0, 0, 0.2), rgba(139, 0, 0, 0.05));
+  border-left-color: #ff0000;
 }
 
-/* Initiative roll results in chat */
+.combatant.faserip-highlight {
+  background: linear-gradient(90deg, rgba(255, 215, 0, 0.3), transparent);
+  border-left-color: #FFC107 !important;
+  border-left-width: 6px !important;
+  transition: all 0.3s ease-in-out;
+  box-shadow: 0 2px 8px rgba(255, 215, 0, 0.4);
+}
+
+/* =====================
+   CHAT CARD - SHARED
+   ===================== */
 .faserip-initiative-result {
   background: rgba(0, 0, 0, 0.03);
   border: 1px solid #AAA;
@@ -66,6 +76,9 @@
   color: #8B0000;
 }
 
+/* =====================
+   CHAT CARD - SIDE-BASED
+   ===================== */
 .initiative-sides {
   display: flex;
   justify-content: space-between;
@@ -81,12 +94,12 @@
   border: 1px solid #AAA;
 }
 
-.pc-side {
+.faserip-initiative-result .pc-side {
   background: rgba(0, 100, 0, 0.1);
   border-color: #006400;
 }
 
-.npc-side {
+.faserip-initiative-result .npc-side {
   background: rgba(139, 0, 0, 0.1);
   border-color: #8B0000;
 }
@@ -101,6 +114,11 @@
   color: #555;
 }
 
+.roll-modifier .mod-cancelled {
+  text-decoration: line-through;
+  opacity: 0.5;
+}
+
 .roll-total {
   font-size: 1.5em;
   font-weight: bold;
@@ -108,6 +126,7 @@
   padding: 2px 8px;
   background: #F0F0F0;
   border-radius: 3px;
+  display: inline-block;
 }
 
 .turn-order {
@@ -126,7 +145,70 @@
   background: #006400;
 }
 
-/* Initiative tie message */
+/* =====================
+   CHAT CARD - INDIVIDUAL
+   ===================== */
+.faserip-init-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9em;
+  margin-top: 6px;
+}
+
+.faserip-init-table th {
+  background: #444;
+  color: #fff;
+  padding: 3px 6px;
+  text-align: left;
+  font-size: 0.85em;
+  text-transform: uppercase;
+}
+
+.faserip-init-table td {
+  padding: 3px 6px;
+  border-bottom: 1px solid #ddd;
+}
+
+.faserip-init-table .init-roll,
+.faserip-init-table .init-total {
+  text-align: center;
+}
+
+.faserip-init-table .init-mods {
+  font-size: 0.85em;
+  color: #555;
+}
+
+.faserip-init-table .init-mods .mod-cancelled {
+  text-decoration: line-through;
+  opacity: 0.5;
+}
+
+.faserip-init-table .pc-side-row {
+  border-left: 3px solid rgba(0, 100, 0, 0.5);
+}
+
+.faserip-init-table .npc-side-row {
+  border-left: 3px solid rgba(139, 0, 0, 0.5);
+}
+
+/* =====================
+   PHASE REMINDER
+   ===================== */
+.faserip-phase-reminder {
+  margin-top: 8px;
+  padding: 4px 8px;
+  background: rgba(0, 0, 0, 0.04);
+  border-top: 1px solid #ddd;
+  font-size: 0.8em;
+  color: #666;
+  text-align: center;
+  font-style: italic;
+}
+
+/* =====================
+   TIE MESSAGE
+   ===================== */
 .faserip-initiative-tie {
   background: rgba(255, 215, 0, 0.2);
   border: 1px solid #DAA520;
@@ -136,83 +218,4 @@
   font-weight: bold;
   font-size: 1.1em;
   margin-bottom: 5px;
-}
-
-/* ==========================================
-   V13 COMBAT CONTROL BUTTONS (MINIMAL)
-   ========================================== */
-.faserip-initiative-controls {
-  display: flex;
-  gap: 2px;
-}
-
-.faserip-initiative-controls .combat-control {
-  min-width: 24px;
-  height: 24px;
-  line-height: 24px;
-  text-align: center;
-  border: 1px solid #7a7971;
-  border-radius: 3px;
-  background: rgba(0, 0, 0, 0.1);
-  color: #f0f0e0;
-  font-size: 12px;
-  cursor: pointer;
-  margin: 0;
-}
-
-.faserip-initiative-controls .combat-control:hover {
-  background: rgba(0, 0, 0, 0.2);
-  border-color: #ff6400;
-  color: #ff6400;
-}
-
-.faserip-initiative-controls .faserip-initiative-btn {
-  background: rgba(0, 100, 0, 0.1);
-  border-color: #00ff00;
-}
-
-.faserip-initiative-controls .faserip-initiative-btn:hover {
-  background: rgba(0, 100, 0, 0.2);
-  border-color: #00ff00;
-  color: #00ff00;
-}
-
-.faserip-initiative-controls .faserip-settings-btn {
-  background: rgba(100, 100, 0, 0.1);
-  border-color: #ffff00;
-}
-
-.faserip-initiative-controls .faserip-settings-btn:hover {
-  background: rgba(100, 100, 0, 0.2);
-  border-color: #ffff00;
-  color: #ffff00;
-}
-
-/* Add this to your faserip-initiative.css file */
-
-/* Highlight effect for newly activated combatant */
-.combatant.faserip-highlight {
-  background: linear-gradient(90deg, rgba(255, 215, 0, 0.3), transparent);
-  border-left-color: #FFC107 !important;
-  border-left-width: 6px !important;
-  transition: all 0.3s ease-in-out;
-  box-shadow: 0 2px 8px rgba(255, 215, 0, 0.4);
-}
-
-/* Ensure active combatant is clearly visible */
-.combatant.active {
-  background: rgba(0, 0, 0, 0.1);
-  font-weight: bold;
-}
-
-/* Enhanced active state for PC side */
-.combatant.pc-side.active {
-  background: linear-gradient(90deg, rgba(0, 100, 0, 0.2), rgba(0, 100, 0, 0.05));
-  border-left-color: #00ff00;
-}
-
-/* Enhanced active state for NPC side */
-.combatant.npc-side.active {
-  background: linear-gradient(90deg, rgba(139, 0, 0, 0.2), rgba(139, 0, 0, 0.05));
-  border-left-color: #ff0000;
 }
