@@ -519,6 +519,14 @@ function getRankData(rankName) {
   return RANKS.find(r => r.name === rankName) || RANKS[3];
 }
 
+// Return min or standard rank number based on game setting
+function rankValue(rankData) {
+  try {
+    if (game.settings.get("msh-faserip", "chargenStandardRanks")) return rankData.standard;
+  } catch (e) { /* setting not registered yet or unavailable */ }
+  return rankData.min;
+}
+
 // Calculate slots used by chosen powers/talents (starred = 2 slots, normal = 1)
 function calcSlotsUsed(chosen) {
   return (chosen || []).reduce((acc, item) => acc + (item.star ? 2 : 1), 0);
@@ -620,12 +628,12 @@ export class CharacterGenerator {
       results[ability] = {
         roll,
         rank: result.rank,
-        value: rankData.min,
+        value: rankValue(rankData),
         initialRank: result.rank,
         initialRoll: roll,
-        initialValue: rankData.min
+        initialValue: rankValue(rankData)
       };
-      this.log(`${ability.charAt(0).toUpperCase() + ability.slice(1)}: Roll ${roll} → ${result.rank} (${rankData.min})`);
+      this.log(`${ability.charAt(0).toUpperCase() + ability.slice(1)}: Roll ${roll} → ${result.rank} (${rankValue(rankData)})`);
     }
 
     this.applyOriginModifiers(results);
@@ -643,14 +651,14 @@ export class CharacterGenerator {
 
       case "Mutant":
         abilities.endurance.rank = shiftRank(abilities.endurance.rank, 1);
-        abilities.endurance.value = getRankData(abilities.endurance.rank).min;
+        abilities.endurance.value = rankValue(getRankData(abilities.endurance.rank));
         abilities.endurance.modified = true;
         this.log(`Mutant: Endurance raised to ${abilities.endurance.rank}`);
         break;
 
       case "Hi-Tech":
         abilities.reason.rank = shiftRank(abilities.reason.rank, 2);
-        abilities.reason.value = getRankData(abilities.reason.rank).min;
+        abilities.reason.value = rankValue(getRankData(abilities.reason.rank));
         abilities.reason.modified = true;
         this.log(`Hi-Tech: Reason raised to ${abilities.reason.rank}`);
         break;
@@ -675,7 +683,7 @@ export class CharacterGenerator {
     if (!ability) return false;
 
     ability.rank = shiftRank(ability.rank, 1);
-    ability.value = getRankData(ability.rank).min;
+    ability.value = rankValue(getRankData(ability.rank));
     ability.modified = true;
     this.state.alteredBonusUsed = true;
     this.log(`Altered Human bonus: ${abilityKey} raised to ${ability.rank}`);
@@ -713,7 +721,7 @@ export class CharacterGenerator {
 
     this.state.resources = {
       rank: finalResourceRank,
-      value: getRankData(finalResourceRank).min,
+      value: rankValue(getRankData(finalResourceRank)),
       roll: roll,
       modShift: result.mod
     };
@@ -879,7 +887,7 @@ export class CharacterGenerator {
       categoryRoll: catEntry?.roll || "",
       star: power.star,
       rank: rankName,
-      value: rankData.min,
+      value: rankValue(rankData),
       roll,
       description: powerInfo.description || "",
       stunts: powerInfo.stunts || [],
@@ -889,7 +897,7 @@ export class CharacterGenerator {
     };
 
     this.state.powersData.chosen.push(chosenPower);
-    this.log(`Chose Power: ${powerName} (${category}) - ${rankName} (${rankData.min})`);
+    this.log(`Chose Power: ${powerName} (${category}) - ${rankName} (${rankValue(rankData)})`);
 
     // Handle bonus power
     if (powerInfo.bonusPower && !this.state.powersData.chosen.some(p => p.name === powerInfo.bonusPower)) {

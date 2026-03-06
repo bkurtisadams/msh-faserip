@@ -871,6 +871,15 @@ Hooks.once("init", async () => {
       default: false
     });
 
+    game.settings.register("msh-faserip", "chargenStandardRanks", {
+      name: "House Rule: Standard Rank Numbers",
+      hint: "Generated characters use standard rank numbers (e.g. Good=10, Remarkable=30) instead of minimum rank numbers (Good=8, Remarkable=26). RAW uses minimum for generated characters and standard for pregenerated/established heroes.",
+      scope: "world",
+      config: true,
+      type: Boolean,
+      default: false
+    });
+
     debugLog("FASERIP DEBUG: Team settings registered.");
 
     // ========== CTT ↔ FASERIP Bridge Hooks ==========
