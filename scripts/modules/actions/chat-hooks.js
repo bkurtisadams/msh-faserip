@@ -189,6 +189,14 @@ export function installActionChatHandlers() {
             }
             if (!saveActor) continue;
 
+            // Skip stun/slam/kill if target is a vehicle — no Endurance stat
+            if (saveActor.type === "vehicle") {
+              if (game.settings.get("msh-faserip", "debugMode")) {
+                console.log(`FASERIP | Skipping ${checkType} auto-save - target is a vehicle`);
+              }
+              continue;
+            }
+
             // Skip stun/slam if target is at 0 HP - death save handles unconscious state
             if (checkType === "stun" || checkType === "slam") {
               const currentHp = saveActor.system?.attributes?.health?.value ?? 0;

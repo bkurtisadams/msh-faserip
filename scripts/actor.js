@@ -9,6 +9,9 @@ export class FaseripActor extends Actor {
 
     // Minimal preparation of data
     const system = this.system;
+
+    // Vehicle actors have no abilities/health/karma — skip character prep
+    if (this.type === "vehicle") return;
     
     // Initialize only if missing completely
     if (!system.abilities) {

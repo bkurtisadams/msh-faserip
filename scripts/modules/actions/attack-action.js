@@ -853,6 +853,9 @@ export class AttackAction extends BaseAction {
       let showStun = false;
       let showKill = false;
 
+      // Vehicles have no Endurance — Slam/Stun/Kill effects do not apply
+      const targetIsVehicle = targetActor?.type === "vehicle";
+
       switch (String(actionType)) {
         case "blunt-attack":
         case "charging":
@@ -887,6 +890,13 @@ export class AttackAction extends BaseAction {
           break;
       }
 
+      // Vehicles have no Endurance — suppress all combat effect checks
+      if (targetIsVehicle) {
+        showSlam = false;
+        showStun = false;
+        showKill = false;
+      }
+
       // Kill result karma warning for attack card
       const targetIsRobot = targetActor?.system?.origin === "Robot";
       const killWarning = (showKill && !targetIsRobot) ? `<div style="padding:4px 8px;margin:4px 10px;background:#fff3e0;border:1px solid #ff9800;border-radius:3px;font-size:.85em;color:#e65100;text-align:center;">Kill result — hero loses ALL Karma if target dies</div>` : (showKill && targetIsRobot) ? `<div style="padding:4px 8px;margin:4px 10px;background:#e3f2fd;border:1px solid #90caf9;border-radius:3px;font-size:.85em;color:#1565c0;text-align:center;">Kill result — target is a Robot/construct. No Karma loss for attacker.</div>` : "";
@@ -903,9 +913,9 @@ export class AttackAction extends BaseAction {
       
       const actions = needsActionsBox
         ? buildActionsBox({
-            showSlam: hasEffects && showSlam,
-            showStun: hasEffects && showStun,
-            showKill: hasEffects && showKill,
+            showSlam: hasEffects && showSlam && !targetIsVehicle,
+            showStun: hasEffects && showStun && !targetIsVehicle,
+            showKill: hasEffects && showKill && !targetIsVehicle,
             pulled: choice.resultCap !== 'none' || (choice.pulledDamage > 0 && choice.pulledDamage < rawDamage),
             breakingFeat: currentBreakingFeat,
             actorUuid: actor.uuid,
@@ -942,7 +952,7 @@ export class AttackAction extends BaseAction {
       
       // Get inline check results if: consolidated mode + full auto + effect applies + has target
       // Effects will be applied by the regular auto-trigger block, we just capture the results for display
-      if (useConsolidated && !isManualMode && this.opts?.autoApply && canEffectsApply(penetratingDamage, { borderline: isBorderline }) && targetActor) {
+      if (useConsolidated && !isManualMode && this.opts?.autoApply && canEffectsApply(penetratingDamage, { borderline: isBorderline }) && targetActor && !targetIsVehicle) {
         const { ActionDispatcher } = await import("./action-dispatcher.js");
         
         // Get attacker strength info for Slam checks
@@ -1236,7 +1246,7 @@ export class AttackAction extends BaseAction {
       // ============================================================
       // NEW v1.6.0: Auto-trigger status effect checks in full auto mode
       // ============================================================
-      if (!isManualMode && this.opts?.autoApply && canEffectsApply(penetratingDamage, { borderline: isBorderline }) && targetActor) {
+      if (!isManualMode && this.opts?.autoApply && canEffectsApply(penetratingDamage, { borderline: isBorderline }) && targetActor && !targetIsVehicle) {
         const { ActionDispatcher } = await import("./action-dispatcher.js");
         
         // Get attacker strength info for Slam checks
