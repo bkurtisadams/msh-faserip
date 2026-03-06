@@ -135,15 +135,20 @@ export class FaseripInitiative {
     };
 
     Hooks.on("renderCombatTracker", (app, html) => {
-      if (!this._isSideMode()) return;
+      if (!this._isFaseripMode()) return;
       const root = html instanceof HTMLElement ? html : html[0];
       const combat = app.viewed;
       if (!combat) return;
 
-      const data = this._getFlagData(combat);
-      if (this._hasCompleteData(data) && !root.querySelector(".faserip-initiative-bar")) {
-        this._addInitiativeBar_native(root, data);
-        this._modifyCombatantDisplay_native(root, combat, data);
+      // Side coloring on combatant rows (both modes)
+      this._modifyCombatantDisplay_native(root, combat);
+
+      // Initiative bar (side mode only)
+      if (this._isSideMode()) {
+        const data = this._getFlagData(combat);
+        if (this._hasCompleteData(data) && !root.querySelector(".faserip-initiative-bar")) {
+          this._addInitiativeBar_native(root, data);
+        }
       }
     });
 
@@ -460,7 +465,26 @@ export class FaseripInitiative {
       // Chat card
       await this._postIndividualInitiativeCard(combat, results);
 
+      // Set turn to highest initiative combatant
       await combat.setupTurns();
+      const turnIndex = combat.turns.length ? 0 : -1;
+      if (turnIndex >= 0) {
+        await combat.update({ turn: turnIndex });
+        setTimeout(() => {
+          try {
+            ui.combat?.scrollToTurn?.();
+            const firstId = combat.turns[turnIndex]?.id;
+            const root = ui.combat?.element;
+            if (root && firstId) {
+              const target = (root.find ? root.find(`[data-combatant-id="${firstId}"]`)?.[0] : root.querySelector(`[data-combatant-id="${firstId}"]`));
+              if (target) {
+                target.classList.add("faserip-highlight");
+                setTimeout(() => target.classList.remove("faserip-highlight"), 1000);
+              }
+            }
+          } catch (e) { /* noop */ }
+        }, 100);
+      }
       ui.combat?.render(true);
 
     } catch (error) {
@@ -518,101 +542,110 @@ export class FaseripInitiative {
     const labels = this._getSideLabels();
     const roundInfo = combat.round ? `Round ${combat.round}` : "Combat Start";
     const showPhase = game.settings.get("msh-faserip", "showPhaseReminder");
+    const winner = d.goesFirst === "pc" ? labels.pc : labels.npc;
+    const loser = d.goesFirst === "pc" ? labels.npc : labels.pc;
 
-    // Build modifier breakdown strings
-    const pcBreakdown = this._buildModBreakdown(d.pcRoll, d.pcMod, d.pcHighest.name, d.pcTalent);
-    const npcBreakdown = this._buildModBreakdown(d.npcRoll, d.npcMod, d.npcHighest.name, d.npcTalent);
+    const pcLine = this._buildSideLine(labels.pc, d.pcRoll, d.pcMod, d.pcHighest.name, d.pcTalent, d.pcTotal, d.goesFirst === "pc");
+    const npcLine = this._buildSideLine(labels.npc, d.npcRoll, d.npcMod, d.npcHighest.name, d.npcTalent, d.npcTotal, d.goesFirst === "npc");
+
+    const phaseHtml = showPhase
+      ? `<div class="faserip-phase-reminder">${winner} → ${loser}</div>`
+      : "";
 
     const content = `
   <div class="faserip-initiative-result">
-    <h2>${roundInfo} — Initiative</h2>
-    <div class="initiative-sides">
-      <div class="side pc-side ${d.goesFirst === 'pc' ? 'first' : 'second'}">
-        <h3>${labels.pc}</h3>
-        <div class="roll-result">
-          <div class="roll-value">${d.pcRoll}</div>
-          ${pcBreakdown}
-          <div class="roll-total">${d.pcTotal}</div>
-        </div>
-        <div class="turn-order">${d.goesFirst === 'pc' ? 'Acts First' : 'Acts Second'}</div>
-      </div>
-      <div class="side npc-side ${d.goesFirst === 'npc' ? 'first' : 'second'}">
-        <h3>${labels.npc}</h3>
-        <div class="roll-result">
-          <div class="roll-value">${d.npcRoll}</div>
-          ${npcBreakdown}
-          <div class="roll-total">${d.npcTotal}</div>
-        </div>
-        <div class="turn-order">${d.goesFirst === 'npc' ? 'Acts First' : 'Acts Second'}</div>
-      </div>
-    </div>${showPhase ? `
-    <div class="faserip-phase-reminder">Pre-Action (Dodge/Block/Evade) → ${d.goesFirst === 'pc' ? labels.pc : labels.npc} → ${d.goesFirst === 'pc' ? labels.npc : labels.pc}</div>` : ''}
+    <div class="faserip-init-header">${roundInfo}</div>
+    <div class="faserip-init-rows">
+      ${pcLine}
+      ${npcLine}
+    </div>
+    ${phaseHtml}
   </div>`;
 
     await ChatMessage.create({
-      user: game.user.id,
-      content,
+      user: game.user.id, content,
       flavor: `${roundInfo} — Initiative`,
       sound: CONFIG.sounds.dice
     });
   }
 
-  static _buildModBreakdown(roll, intMod, intName, talent) {
+  static _buildSideLine(label, roll, intMod, intName, talent, total, isWinner) {
+    const modParts = [];
+    let hasMods = false;
     if (roll === 1) {
-      // Roll of 1 is always 1 — show mods greyed out
-      const parts = [];
-      if (intMod > 0) parts.push(`<span class="mod-cancelled">+${intMod} ${intName}</span>`);
-      if (talent.bonus > 0) parts.push(`<span class="mod-cancelled">+${talent.bonus} ${talent.source}</span>`);
-      if (parts.length === 0) return "";
-      return `<div class="roll-modifier">${parts.join(" ")} <em>(natural 1)</em></div>`;
+      if (intMod > 0 || talent.bonus > 0) {
+        modParts.push(`<span class="mod-cancelled">${this._modStr(intMod, intName, talent)}</span> <em>nat 1</em>`);
+        hasMods = true;
+      }
+    } else {
+      const s = this._modStr(intMod, intName, talent);
+      if (s) { modParts.push(s); hasMods = true; }
     }
+    const modHtml = modParts.length ? `<span class="init-mods">${modParts.join(" ")}</span>` : "";
+    const formula = hasMods
+      ? `${roll} ${modHtml} = <strong>${total}</strong>`
+      : `<strong>${total}</strong>`;
+    const star = isWinner ? `<span class="init-winner" title="Acts First">★</span>` : "";
+    return `<div class="init-row ${isWinner ? 'winner' : 'loser'}">
+      <span class="init-label">${label}</span>
+      <span class="init-formula">${formula}</span>
+      ${star}
+    </div>`;
+  }
+
+  static _modStr(intMod, intName, talent) {
     const parts = [];
-    if (intMod > 0) parts.push(`+${intMod} (${intName})`);
-    if (talent.bonus > 0) parts.push(`+${talent.bonus} (${talent.source})`);
-    if (parts.length === 0) return "";
-    return `<div class="roll-modifier">${parts.join(" ")}</div>`;
+    if (intMod > 0) parts.push(`+${intMod} ${intName}`);
+    if (talent.bonus > 0) parts.push(`+${talent.bonus} ${talent.source}`);
+    return parts.join(" ");
   }
 
   static async _postIndividualInitiativeCard(combat, results) {
     const roundInfo = combat.round ? `Round ${combat.round}` : "Combat Start";
     const showPhase = game.settings.get("msh-faserip", "showPhaseReminder");
 
-    // Sort by total descending
     results.sort((a, b) => b.total - a.total);
 
     let rows = "";
     for (const r of results) {
-      const modParts = [];
-      if (r.roll === 1) {
-        if (r.intMod > 0) modParts.push(`<span class="mod-cancelled">+${r.intMod}</span>`);
-        if (r.talentBonus > 0) modParts.push(`<span class="mod-cancelled">+${r.talentBonus}</span>`);
-        if (modParts.length) modParts.push(`<em>(nat 1)</em>`);
+      let modHtml = "";
+      let hasMods = false;
+      if (r.roll === 1 && (r.intMod > 0 || r.talentBonus > 0)) {
+        const parts = [];
+        if (r.intMod > 0) parts.push(`+${r.intMod}`);
+        if (r.talentBonus > 0) parts.push(`+${r.talentBonus}`);
+        modHtml = `<span class="mod-cancelled">${parts.join(" ")}</span> <em>nat 1</em>`;
+        hasMods = true;
       } else {
-        if (r.intMod > 0) modParts.push(`+${r.intMod} Int`);
-        if (r.talentBonus > 0) modParts.push(`+${r.talentBonus} ${r.talentSource}`);
+        const parts = [];
+        if (r.intMod > 0) parts.push(`+${r.intMod} Int`);
+        if (r.talentBonus > 0) parts.push(`+${r.talentBonus} ${r.talentSource}`);
+        if (parts.length) { modHtml = parts.join(" "); hasMods = true; }
       }
-      rows += `
-      <tr class="${r.side}-side-row">
+      const formula = hasMods
+        ? `${r.roll} <span class="init-mods">${modHtml}</span> = <strong>${r.total}</strong>`
+        : `<strong>${r.total}</strong>`;
+      rows += `<tr class="${r.side}-side-row">
         <td class="init-name">${r.name}</td>
-        <td class="init-roll">${r.roll}</td>
-        <td class="init-mods">${modParts.join(" ") || "—"}</td>
-        <td class="init-total"><strong>${r.total}</strong></td>
+        <td class="init-formula">${formula}</td>
       </tr>`;
     }
 
+    const phaseHtml = showPhase
+      ? `<div class="faserip-phase-reminder">Actions in initiative order</div>`
+      : "";
+
     const content = `
   <div class="faserip-initiative-result faserip-individual">
-    <h2>${roundInfo} — Initiative</h2>
+    <div class="faserip-init-header">${roundInfo}</div>
     <table class="faserip-init-table">
-      <thead><tr><th>Name</th><th>Roll</th><th>Mod</th><th>Total</th></tr></thead>
       <tbody>${rows}</tbody>
-    </table>${showPhase ? `
-    <div class="faserip-phase-reminder">Pre-Action (Dodge/Block/Evade) → Actions in initiative order</div>` : ''}
+    </table>
+    ${phaseHtml}
   </div>`;
 
     await ChatMessage.create({
-      user: game.user.id,
-      content,
+      user: game.user.id, content,
       flavor: `${roundInfo} — Initiative`,
       sound: CONFIG.sounds.dice
     });

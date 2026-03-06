@@ -1,4 +1,4 @@
-/* faserip-initiative.css v2.0.0 - 2026-03-05 */
+/* faserip-initiative.css v2.1.0 - 2026-03-06 */
 
 /* =====================
    COMBAT TRACKER BAR
@@ -30,10 +30,6 @@
   border-left: 3px solid rgba(139, 0, 0, 0.5);
 }
 
-.combatant.highest-intuition .token-name {
-  font-weight: bold;
-}
-
 .combatant.active {
   background: rgba(0, 0, 0, 0.1);
   font-weight: bold;
@@ -58,125 +54,111 @@
 }
 
 /* =====================
-   CHAT CARD - SHARED
+   CHAT CARD — SHARED
    ===================== */
 .faserip-initiative-result {
   background: rgba(0, 0, 0, 0.03);
   border: 1px solid #AAA;
   border-radius: 5px;
-  padding: 10px;
+  padding: 6px 8px;
 }
 
-.faserip-initiative-result h2 {
-  margin: 0 0 10px 0;
-  padding-bottom: 5px;
+.faserip-init-header {
   text-align: center;
-  border-bottom: 1px solid #DDD;
-  font-size: 1.2em;
+  font-weight: bold;
+  font-size: 1em;
   color: #8B0000;
+  padding-bottom: 4px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid #ddd;
 }
 
 /* =====================
-   CHAT CARD - SIDE-BASED
+   CHAT CARD — SIDE-BASED (compact rows)
    ===================== */
-.initiative-sides {
+.faserip-init-rows {
   display: flex;
-  justify-content: space-between;
-  gap: 15px;
-  margin-top: 10px;
+  flex-direction: column;
+  gap: 3px;
 }
 
-.faserip-initiative-result .side {
-  flex: 1;
-  padding: 8px;
-  border-radius: 5px;
-  text-align: center;
-  border: 1px solid #AAA;
+.init-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 6px;
+  border-radius: 3px;
+  font-size: 0.95em;
 }
 
-.faserip-initiative-result .pc-side {
-  background: rgba(0, 100, 0, 0.1);
-  border-color: #006400;
+.init-row.winner {
+  background: rgba(0, 100, 0, 0.08);
+  border-left: 3px solid #006400;
 }
 
-.faserip-initiative-result .npc-side {
-  background: rgba(139, 0, 0, 0.1);
-  border-color: #8B0000;
+.init-row.loser {
+  background: rgba(0, 0, 0, 0.03);
+  border-left: 3px solid #999;
 }
 
-.roll-value {
-  font-size: 1.8em;
+.init-row .init-label {
   font-weight: bold;
+  min-width: 60px;
 }
 
-.roll-modifier {
-  font-size: 0.9em;
-  color: #555;
+.init-row .init-formula {
+  flex: 1;
 }
 
-.roll-modifier .mod-cancelled {
+.init-row .init-formula strong {
+  font-size: 1.1em;
+}
+
+.init-row .init-mods {
+  font-size: 0.85em;
+  color: #666;
+}
+
+.init-row .init-winner {
+  color: #006400;
+  font-size: 1.1em;
+  line-height: 1;
+}
+
+.init-row .mod-cancelled {
   text-decoration: line-through;
   opacity: 0.5;
 }
 
-.roll-total {
-  font-size: 1.5em;
-  font-weight: bold;
-  margin-top: 5px;
-  padding: 2px 8px;
-  background: #F0F0F0;
-  border-radius: 3px;
-  display: inline-block;
-}
-
-.turn-order {
-  font-weight: bold;
-  margin-top: 5px;
-  padding: 3px 0;
-}
-
-.first .turn-order {
-  background: #8B0000;
-  color: white;
-  border-radius: 3px;
-}
-
-.pc-side.first .turn-order {
-  background: #006400;
-}
-
 /* =====================
-   CHAT CARD - INDIVIDUAL
+   CHAT CARD — INDIVIDUAL (compact table)
    ===================== */
 .faserip-init-table {
   width: 100%;
   border-collapse: collapse;
   font-size: 0.9em;
-  margin-top: 6px;
-}
-
-.faserip-init-table th {
-  background: #444;
-  color: #fff;
-  padding: 3px 6px;
-  text-align: left;
-  font-size: 0.85em;
-  text-transform: uppercase;
 }
 
 .faserip-init-table td {
-  padding: 3px 6px;
-  border-bottom: 1px solid #ddd;
+  padding: 2px 6px;
+  border-bottom: 1px solid #eee;
 }
 
-.faserip-init-table .init-roll,
-.faserip-init-table .init-total {
-  text-align: center;
+.faserip-init-table .init-name {
+  font-weight: 600;
+}
+
+.faserip-init-table .init-formula {
+  text-align: right;
+}
+
+.faserip-init-table .init-formula strong {
+  font-size: 1.05em;
 }
 
 .faserip-init-table .init-mods {
   font-size: 0.85em;
-  color: #555;
+  color: #666;
 }
 
 .faserip-init-table .init-mods .mod-cancelled {
@@ -186,18 +168,20 @@
 
 .faserip-init-table .pc-side-row {
   border-left: 3px solid rgba(0, 100, 0, 0.5);
+  background: rgba(0, 100, 0, 0.1);
 }
 
 .faserip-init-table .npc-side-row {
   border-left: 3px solid rgba(139, 0, 0, 0.5);
+  background: rgba(139, 0, 0, 0.1);
 }
 
 /* =====================
    PHASE REMINDER
    ===================== */
 .faserip-phase-reminder {
-  margin-top: 8px;
-  padding: 4px 8px;
+  margin-top: 4px;
+  padding: 3px 6px;
   background: rgba(0, 0, 0, 0.04);
   border-top: 1px solid #ddd;
   font-size: 0.8em;
@@ -213,9 +197,8 @@
   background: rgba(255, 215, 0, 0.2);
   border: 1px solid #DAA520;
   border-radius: 5px;
-  padding: 8px;
+  padding: 6px;
   text-align: center;
   font-weight: bold;
-  font-size: 1.1em;
-  margin-bottom: 5px;
+  font-size: 1em;
 }
