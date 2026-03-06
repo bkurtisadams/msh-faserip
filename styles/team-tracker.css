@@ -1,11 +1,14 @@
-/* team-tracker.css v4.0.0 - 2026-03-02 */
+/* team-tracker.css v4.1.0 - 2026-03-06 */
 
 .team-tracker {
   font-family: 'Barlow Condensed', Arial, sans-serif;
   color: #1a1a1a;
-  background-color: #faf8f3;
-  background-image: radial-gradient(circle, rgba(180,0,60,.07) 1.2px, transparent 1.2px);
-  background-size: 6px 6px;
+  background-color: #fcf8eb;
+  background-image:
+    repeating-conic-gradient(from 0deg at -8% -8%, rgba(180,130,0,.018) 0deg, transparent 1.5deg, transparent 3deg),
+    radial-gradient(ellipse at 65% 30%, rgba(210,170,0,.12) 0%, transparent 45%),
+    radial-gradient(circle, rgba(200,160,0,.08) 0.9px, transparent 0.9px);
+  background-size: 100% 100%, 100% 100%, 3.5px 3.5px;
   height: 100%; display: flex; flex-direction: column; overflow: hidden;
 }
 
@@ -13,7 +16,9 @@
 .team-tracker .team-header {
   display: flex; align-items: center; justify-content: space-between;
   gap: 8px; padding: 4px 8px;
-  background: linear-gradient(#8b0000, #660000);
+  background:
+    repeating-conic-gradient(from 0deg at 50% 50%, rgba(255,255,255,.05) 0deg, transparent 2deg, transparent 4deg),
+    linear-gradient(135deg, #8b0000 0%, #a01010 50%, #8b0000 100%);
   color: #fff; border-bottom: 2px solid #4a0000; flex-shrink: 0;
 }
 .team-tracker .header-left h2 {

@@ -22,20 +22,29 @@
   --txt-muted:#777;
   --hdr-h:    36px;
 
-  /* Ben Day dot layers */
-  --dots-magenta: radial-gradient(circle, rgba(180,0,60,.07) 1.2px, transparent 1.2px);
-  --dots-cyan:    radial-gradient(circle, rgba(0,140,200,.055) 1.2px, transparent 1.2px);
-  --dots-yellow:  radial-gradient(circle, rgba(200,180,0,.06) 1.2px, transparent 1.2px);
-  --dots-size:    6px 6px;
+  /* Ben Day dot layers — 3.5px grid, 0.9px dots */
+  --dots-magenta: radial-gradient(circle, rgba(180,0,60,.07) 0.9px, transparent 0.9px);
+  --dots-cyan:    radial-gradient(circle, rgba(0,120,180,.06) 0.9px, transparent 0.9px);
+  --dots-yellow:  radial-gradient(circle, rgba(200,160,0,.08) 0.9px, transparent 0.9px);
+  --dots-size:    3.5px 3.5px;
+
+  /* Density blobs — soft radial concentrations per zone */
+  --density-yellow:  radial-gradient(ellipse at 65% 30%, rgba(210,170,0,.12) 0%, transparent 45%);
+  --density-cyan:    radial-gradient(ellipse at 30% 70%, rgba(0,130,200,.10) 0%, transparent 50%);
+  --density-magenta: radial-gradient(ellipse at 70% 80%, rgba(180,60,20,.08) 0%, transparent 50%);
+
+  /* Speed-line bursts — faint conic rays from off-screen */
+  --burst-tl: repeating-conic-gradient(from 0deg at -8% -8%, rgba(180,130,0,.018) 0deg, transparent 1.5deg, transparent 3deg);
+  --burst-br: repeating-conic-gradient(from 0deg at 110% 110%, rgba(0,100,160,.015) 0deg, transparent 1.5deg, transparent 3deg);
 }
 
-/* ── Sheet background: warm cream + magenta Ben Day halftone ──────────── */
+/* ── Sheet background: warm yellow Ben Day halftone + speed lines ─────── */
 form.faserip-sheet {
   font-family: 'Barlow Condensed', Arial, sans-serif;
   font-size: 13px;
-  background-color: var(--cream);
-  background-image: var(--dots-magenta);
-  background-size: var(--dots-size);
+  background-color: #fcf8eb;
+  background-image: var(--burst-tl), var(--density-yellow), var(--dots-yellow);
+  background-size: 100% 100%, 100% 100%, var(--dots-size);
   color: var(--txt);
   gap: 5px;
 }
@@ -149,9 +158,9 @@ form.faserip-sheet .primary-abilities .abilities-table td.ability-key:hover {
 form.faserip-sheet .abilities-section {
   gap: 8px;
   padding: 6px 8px;
-  background-color: var(--cream-dk);
-  background-image: var(--dots-cyan);
-  background-size: var(--dots-size);
+  background-color: #f0f5f9;
+  background-image: var(--burst-br), var(--density-cyan), var(--dots-cyan);
+  background-size: 100% 100%, 100% 100%, var(--dots-size);
   border: 2.5px solid var(--ink) !important;
   box-shadow: 1px 1px 0 var(--ink);
 }
@@ -159,8 +168,8 @@ form.faserip-sheet .abilities-section {
 /* Zebra rows: cyan Ben Day dots on even rows */
 form.faserip-sheet .primary-abilities .abilities-table tbody tr:nth-child(even) td {
   background-color: #fafafa;
-  background-image: radial-gradient(circle, rgba(0,140,200,.035) 1px, transparent 1px);
-  background-size: 5px 5px;
+  background-image: radial-gradient(circle, rgba(0,130,200,.04) 0.7px, transparent 0.7px);
+  background-size: 3px 3px;
 }
 form.faserip-sheet .primary-abilities .abilities-table tbody tr:nth-child(odd) td {
   background-color: #fff;
@@ -249,9 +258,9 @@ form.faserip-sheet .secondary-abilities .sec-col {
   border-right-color: #d7d7d7;
 }
 form.faserip-sheet .secondary-abilities {
-  background-color: #fff;
-  background-image: var(--dots-yellow);
-  background-size: var(--dots-size);
+  background-color: #fffcf2;
+  background-image: radial-gradient(ellipse at 50% 50%, rgba(210,170,0,.10) 0%, transparent 55%), var(--dots-yellow);
+  background-size: 100% 100%, var(--dots-size);
   border: 2px solid var(--ink) !important;
   box-shadow: 1px 1px 0 rgba(0,0,0,0.15);
 }
@@ -263,8 +272,8 @@ form.faserip-sheet .movement-panel {
   border: 2px solid var(--ink) !important;
   box-shadow: 1px 1px 0 rgba(0,0,0,0.15);
   background-color: var(--cream);
-  background-image: radial-gradient(circle, rgba(180,0,60,.04) 1px, transparent 1px);
-  background-size: 5px 5px;
+  background-image: radial-gradient(circle, rgba(180,0,60,.04) 0.7px, transparent 0.7px);
+  background-size: 3px 3px;
 }
 
 form.faserip-sheet .movement-panel label {
@@ -723,34 +732,34 @@ form.faserip-sheet .sheet-tabs-navigation .item.active::after {
 .action-btn[data-action="throwing-blunt"],
 .action-btn[data-action="force"],
 .action-btn[data-action="charging"] {
-  background-image: radial-gradient(circle, rgba(200,100,0,.045) 1px, transparent 1px) !important;
-  background-size: 5px 5px;
+  background-image: radial-gradient(ellipse at 50% 50%, rgba(200,120,0,.06) 0%, transparent 70%), radial-gradient(circle, rgba(200,100,0,.05) 0.7px, transparent 0.7px) !important;
+  background-size: 100% 100%, 3px 3px;
 }
 .action-btn[data-action="edged-attack"],
 .action-btn[data-action="shooting"],
 .action-btn[data-action="throwing-edged"],
 .action-btn[data-action="energy"] {
-  background-image: radial-gradient(circle, rgba(140,0,0,.04) 1px, transparent 1px) !important;
-  background-size: 5px 5px;
+  background-image: radial-gradient(ellipse at 50% 50%, rgba(160,0,0,.05) 0%, transparent 70%), radial-gradient(circle, rgba(140,0,0,.045) 0.7px, transparent 0.7px) !important;
+  background-size: 100% 100%, 3px 3px;
 }
 .action-btn[data-action="grappling"],
 .action-btn[data-action="grabbing"],
 .action-btn[data-action="escaping"] {
-  background-image: radial-gradient(circle, rgba(0,100,200,.04) 1px, transparent 1px) !important;
-  background-size: 5px 5px;
+  background-image: radial-gradient(ellipse at 50% 50%, rgba(0,80,180,.05) 0%, transparent 70%), radial-gradient(circle, rgba(0,100,200,.045) 0.7px, transparent 0.7px) !important;
+  background-size: 100% 100%, 3px 3px;
 }
 .action-btn[data-action="dodging"],
 .action-btn[data-action="evading"],
 .action-btn[data-action="blocking"],
 .action-btn[data-action="catching"] {
-  background-image: radial-gradient(circle, rgba(0,150,0,.04) 1px, transparent 1px) !important;
-  background-size: 5px 5px;
+  background-image: radial-gradient(ellipse at 50% 50%, rgba(0,130,0,.05) 0%, transparent 70%), radial-gradient(circle, rgba(0,150,0,.045) 0.7px, transparent 0.7px) !important;
+  background-size: 100% 100%, 3px 3px;
 }
 .action-btn[data-action="stun"],
 .action-btn[data-action="slam"],
 .action-btn[data-action="kill"] {
-  background-image: radial-gradient(circle, rgba(130,0,170,.04) 1px, transparent 1px) !important;
-  background-size: 5px 5px;
+  background-image: radial-gradient(ellipse at 50% 50%, rgba(110,0,150,.05) 0%, transparent 70%), radial-gradient(circle, rgba(130,0,170,.045) 0.7px, transparent 0.7px) !important;
+  background-size: 100% 100%, 3px 3px;
 }
 
 /* ── Powers table: bigger body text, bold rank ─────────────────────────── */
