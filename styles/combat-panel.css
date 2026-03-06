@@ -1,4 +1,5 @@
-/* combat-panel.css v1.0.0 - 2026-03-06 */
+/* combat-panel.css v1.3.0 - 2026-03-06
+   v1.3.0: Add cyan selected pip state, separate from gold active */
 
 /* ── Container ─────────────────────────── */
 .faserip-combat-panel { min-width: 280px; max-width: 400px; }
@@ -6,6 +7,66 @@
   padding: 0; background: #1a1a2e; color: #e0ddd4; overflow-y: auto;
 }
 .fcp-body { padding: 4px 6px 6px; display: flex; flex-direction: column; gap: 4px; }
+
+/* ── Combatant strip + turn controls ───── */
+.fcp-strip-row {
+  display: flex; align-items: center; gap: 3px;
+  padding: 2px 0; min-height: 32px;
+}
+.fcp-strip {
+  display: flex; gap: 2px; flex: 1; overflow-x: auto;
+  scrollbar-width: none; /* Firefox */
+  padding: 2px 0;
+}
+.fcp-strip::-webkit-scrollbar { display: none; }
+
+.fcp-combatant {
+  position: relative; flex-shrink: 0; cursor: pointer;
+  width: 28px; height: 28px; border-radius: 3px;
+  border: 1px solid #555; overflow: hidden;
+  transition: all .15s;
+}
+.fcp-combatant img {
+  width: 100%; height: 100%; object-fit: cover; object-position: top center;
+  display: block;
+}
+.fcp-combatant.friendly { border-color: #2e7d32; }
+.fcp-combatant.hostile { border-color: #c62828; }
+.fcp-combatant.active {
+  border: 2px solid #ffc107; box-shadow: 0 0 5px #ffc107;
+  transform: scale(1.12); z-index: 1;
+}
+.fcp-combatant.selected {
+  border: 2px solid #4dd0e1; box-shadow: 0 0 4px rgba(77,208,225,.5);
+  transform: scale(1.08); z-index: 1;
+}
+.fcp-combatant.defeated {
+  opacity: .35; filter: grayscale(1);
+}
+.fcp-combatant:hover:not(.active) {
+  border-color: #aaa; transform: scale(1.06);
+}
+
+/* HP micro-bar at bottom of combatant pip */
+.fcp-combatant-hp {
+  position: absolute; bottom: 0; left: 0; height: 2px;
+  background: #4caf50; transition: width .3s;
+}
+.fcp-combatant.hostile .fcp-combatant-hp { background: #ef5350; }
+
+/* Turn control buttons */
+.fcp-turn-btn {
+  background: #2a2a40; border: 1px solid rgba(255,255,255,.15);
+  color: #aaa; cursor: pointer; padding: 2px 4px;
+  border-radius: 3px; font-size: 10px; line-height: 1;
+  flex-shrink: 0; transition: all .1s;
+}
+.fcp-turn-btn:hover:not(:disabled) { background: #3a3a55; color: #fff; }
+.fcp-turn-btn:disabled { opacity: .3; cursor: default; }
+.fcp-next-round { color: #ffc107; border-color: rgba(255,193,7,.3); }
+.fcp-next-round:hover:not(:disabled) { background: #4a3a10; color: #ffd54f; }
+.fcp-roll-init { color: #81d4fa; border-color: rgba(129,212,250,.3); }
+.fcp-roll-init:hover { background: #0d3b5c; color: #b3e5fc; }
 
 /* ── Header row: portrait + info ───────── */
 .fcp-header { display: flex; gap: 6px; align-items: flex-start; }
@@ -21,13 +82,13 @@
 
 /* Name / HP / K / Round row */
 .fcp-top-line {
-  display: flex; align-items: baseline; gap: 4px; flex-wrap: wrap;
-  font-size: 11px; line-height: 1.3;
+  display: flex; align-items: baseline; gap: 4px;
+  font-size: 11px; line-height: 1.3; white-space: nowrap;
 }
 .fcp-name {
   font-weight: bold; font-size: 12px; color: #fff;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  max-width: 120px;
+  flex: 0 1 auto; min-width: 40px;
 }
 .fcp-hp { color: #66bb6a; }
 .fcp-hp.wounded { color: #ef5350; }
@@ -124,13 +185,36 @@
 /* Hover brightens all */
 .fcp-action-btn[data-type]:hover { filter: brightness(1.3); }
 
-/* ── Gear button ───────────────────────── */
-.fcp-footer { display: flex; justify-content: flex-end; }
+/* ── Gear + End Combat buttons ─────────── */
+.fcp-footer { display: flex; justify-content: flex-end; gap: 4px; }
 .fcp-gear-btn {
   background: none; border: none; color: #777;
   cursor: pointer; font-size: 11px; padding: 2px 4px;
 }
 .fcp-gear-btn:hover { color: #fff; }
+.fcp-end-combat {
+  background: none; border: none; color: #777;
+  cursor: pointer; font-size: 11px; padding: 2px 4px;
+}
+.fcp-end-combat:hover { color: #ef5350; }
+
+/* Hidden combatant pip */
+.fcp-combatant.hidden-combatant {
+  opacity: .5; border-style: dashed;
+}
+
+/* ── Right-click context menu ─────────── */
+.fcp-context-menu {
+  background: #2a2a40; border: 1px solid #555; border-radius: 4px;
+  padding: 2px 0; min-width: 160px; box-shadow: 0 4px 12px rgba(0,0,0,.5);
+  font-size: 11px; color: #e0ddd4;
+}
+.fcp-ctx-item {
+  padding: 4px 10px; cursor: pointer; white-space: nowrap;
+  display: flex; align-items: center; gap: 6px;
+}
+.fcp-ctx-item:hover { background: #3a3a55; }
+.fcp-ctx-item i { width: 14px; text-align: center; color: #999; font-size: 10px; }
 
 /* ── Edit mode ─────────────────────────── */
 .fcp-edit-overlay {
