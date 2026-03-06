@@ -1,4 +1,6 @@
-// scripts/modules/canvas/faserip-token-ruler.js v1.2.0 - 2026-02-08
+// scripts/modules/canvas/faserip-token-ruler.js v1.3.0 - 2026-03-05
+// v1.3.0: Fix combat tracker interference — track passedWaypoints cost so color coding
+//         accounts for prior movement this turn. Override refresh() to capture prior cost.
 // v1.2.0: Add flight sub-mode support (Full/Low Alt/Cruise) - resolves speed from MOVEMENT_DATA
 // Reads token.document.movementAction (V13 Token HUD selection)
 // Green = within normal movement, Yellow = Speed FEAT zone (+1 area), Red = over max
@@ -27,6 +29,9 @@ const ACTION_SPEED_MAP = {
 };
 
 export class FaseripTokenRuler extends TokenRuler {
+
+  /** Cost already spent by passed (completed) movements this combat turn */
+  _priorCost = 0;
 
   /**
    * Get the actor's effective movement ranges in scene distance units.
@@ -87,17 +92,42 @@ export class FaseripTokenRuler extends TokenRuler {
     return { normal: effectiveAreas, feat: featAreas, movementMult, action, modeLabel };
   }
 
+  /* ---------------------------------------- */
+  /*  Override: refresh to capture prior cost  */
+  /* ---------------------------------------- */
+
+  refresh({ passedWaypoints, pendingWaypoints, plannedMovement } = {}) {
+    // Calculate cumulative cost of already-completed movements this turn.
+    // passedWaypoints are waypoints from prior drags in the same combat turn;
+    // the last one's measurement.cost is the total distance already moved.
+    this._priorCost = 0;
+    if (passedWaypoints?.length) {
+      const last = passedWaypoints[passedWaypoints.length - 1];
+      const m = last?.measurement;
+      if (m) {
+        this._priorCost = (typeof m.cost === "number") ? m.cost
+                        : (typeof m.distance === "number") ? m.distance
+                        : 0;
+      }
+    }
+    return super.refresh({ passedWaypoints, pendingWaypoints, plannedMovement });
+  }
+
   /**
-   * Extract cumulative movement cost from a waypoint.
-   * Tries measurement.cost first (movement cost including terrain), then distance.
+   * Extract cumulative movement cost from a waypoint, including prior combat movement.
+   * During combat, pending waypoints reset their cost to 0; we add _priorCost to get
+   * the true total movement this turn.
    */
   _getCost(waypoint) {
     const m = waypoint?.measurement;
-    if (!m) return 0;
-    // cost accounts for terrain multipliers; distance is raw distance
-    if (typeof m.cost === "number") return m.cost;
-    if (typeof m.distance === "number") return m.distance;
-    return 0;
+    if (!m) return this._priorCost;
+    const wpCost = (typeof m.cost === "number") ? m.cost
+                 : (typeof m.distance === "number") ? m.distance
+                 : 0;
+    // Passed waypoints already carry absolute cumulative cost — don't double-add.
+    // Pending/planned waypoints restart from 0 so we offset by prior movement.
+    if (waypoint.stage === "passed") return wpCost;
+    return wpCost + this._priorCost;
   }
 
   /**
@@ -167,8 +197,9 @@ export class FaseripTokenRuler extends TokenRuler {
   _configureOutline() {
     const base = super._configureOutline();
     if (!this.token?.actor?.system) return base;
-    // Start green; actual per-cell color comes from grid highlights
-    return { ...base, color: COLOR_GREEN };
+    // Color outline based on how much movement is already spent
+    const color = this._getSpeedColor(this._priorCost);
+    return { ...base, color };
   }
 
   /* ---------------------------------------- */
