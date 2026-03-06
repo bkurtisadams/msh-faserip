@@ -103,7 +103,7 @@ function injectCSS() {
 }
 
 // ── ApplicationV2 ──
-export class FaseripActionHUD extends HandlebarsApplicationMixin(ApplicationV2) {
+export class FaseripActionPanel extends HandlebarsApplicationMixin(ApplicationV2) {
 
   static DEFAULT_OPTIONS = {
     id: "faserip-action-hud",
@@ -134,8 +134,8 @@ export class FaseripActionHUD extends HandlebarsApplicationMixin(ApplicationV2) 
       height: "auto",
     },
     actions: {
-      toggleEdit: FaseripActionHUD._onToggleEdit,
-      resetLayout: FaseripActionHUD._onResetLayout,
+      toggleEdit: FaseripActionPanel._onToggleEdit,
+      resetLayout: FaseripActionPanel._onResetLayout,
     },
   };
 
@@ -149,19 +149,20 @@ export class FaseripActionHUD extends HandlebarsApplicationMixin(ApplicationV2) 
     super(options);
     this.editMode = false;
     this.actions = applyLayout(ACTIONS, loadLayout());
+    this._zoom = parseFloat(localStorage.getItem(`${storageKey()}-zoom`)) || 1.0;
   }
 
   get actor() { return canvas.tokens?.controlled[0]?.actor || null; }
 
   // ── Static action handlers (called via DEFAULT_OPTIONS.actions) ──
   static _onToggleEdit(event, target) {
-    const app = Object.values(ui.windows ?? {}).find(w => w instanceof FaseripActionHUD)
+    const app = Object.values(ui.windows ?? {}).find(w => w instanceof FaseripActionPanel)
       ?? game.msh?.actionHUD ?? ui.faseripHUD;
     if (app) app._toggleEdit();
   }
 
   static _onResetLayout(event, target) {
-    const app = Object.values(ui.windows ?? {}).find(w => w instanceof FaseripActionHUD)
+    const app = Object.values(ui.windows ?? {}).find(w => w instanceof FaseripActionPanel)
       ?? game.msh?.actionHUD ?? ui.faseripHUD;
     if (app) app._confirmReset();
   }
@@ -280,6 +281,18 @@ export class FaseripActionHUD extends HandlebarsApplicationMixin(ApplicationV2) 
       }
     });
     el.tabIndex = -1;
+
+    // ── Ctrl+Wheel zoom ──
+    grid.style.zoom = this._zoom;
+    el.addEventListener("wheel", (ev) => {
+      if (!ev.ctrlKey) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      const delta = ev.deltaY > 0 ? -0.1 : 0.1;
+      this._zoom = Math.max(0.5, Math.min(2.0, this._zoom + delta));
+      grid.style.zoom = this._zoom;
+      localStorage.setItem(`${storageKey()}-zoom`, this._zoom.toFixed(2));
+    }, { passive: false });
 
     // Update title with actor name
     this._updateTitle();

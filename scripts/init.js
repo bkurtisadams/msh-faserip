@@ -52,7 +52,7 @@ import { CombatHandler } from './combat-handler.js';
 import { initializeSlamHandlers } from './charge-damage.js';
 import { installActionChatHandlers } from "./modules/actions/chat-hooks.js";
 import { openCollisionDamageDialog } from './modules/actions/collision-damage.js';
-import { FaseripActionHUD } from './action-hud.js';
+import { FaseripActionPanel } from './action-hud.js';
 import { debugLog } from './modules/actions/action-utils.js';
 import { ActionDispatcher } from './modules/actions/action-dispatcher.js';
 import { ManualModeDialog } from './modules/actions/manual-mode-dialog.js';
@@ -550,7 +550,7 @@ Hooks.once("init", async () => {
       if (ui.faseripHUD?.rendered) {
         ui.faseripHUD.bringToFront();
       } else {
-        ui.faseripHUD = new FaseripActionHUD();
+        ui.faseripHUD = new FaseripActionPanel();
         ui.faseripHUD.render(true);
       }
       return true;
@@ -1341,7 +1341,7 @@ Hooks.once("init", async () => {
   }
 
   // Add the Action HUD to the namespace
-  game.msh.FaseripActionHUD = FaseripActionHUD;  // <-- ADD THIS LINE
+  game.msh.FaseripActionPanel = FaseripActionPanel;  // <-- ADD THIS LINE
 
   // Add the collision damage dialog
   game.msh.openCollisionDamageDialog = openCollisionDamageDialog;
@@ -1993,7 +1993,7 @@ Hooks.once("ready", async () => {
 
   // Auto-open Action HUD
   try {
-    ui.faseripHUD = new FaseripActionHUD();
+    ui.faseripHUD = new FaseripActionPanel();
     ui.faseripHUD.render(true);
     console.log("MSH FASERIP | Action HUD auto-opened");
   } catch (e) {
