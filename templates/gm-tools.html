@@ -1,0 +1,70 @@
+<div class="gm-tools-container">
+  <div class="gm-tools-bulk-actions">
+    <button type="button" class="gm-backup-all-btn"><i class="fas fa-save"></i> Backup All</button>
+    <button type="button" class="gm-export-all-btn"><i class="fas fa-file-export"></i> Export All</button>
+    <button type="button" class="gm-import-btn"><i class="fas fa-file-import"></i> Import</button>
+    <input type="file" class="gm-import-file" accept=".json" style="display:none" />
+  </div>
+
+  <table class="gm-tools-actor-table">
+    <thead>
+      <tr>
+        <th class="col-img"></th>
+        <th class="col-name">Character</th>
+        <th class="col-type">Type</th>
+        <th class="col-backup">Last Backup</th>
+        <th class="col-actions">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{#each actors}}
+      <tr class="actor-row {{#if hasBackup}}has-backup{{/if}}">
+        <td class="col-img"><img src="{{img}}" alt="" width="28" height="28" /></td>
+        <td class="col-name">{{name}}</td>
+        <td class="col-type">{{type}}</td>
+        <td class="col-backup">
+          {{#if hasBackup}}
+            <span class="backup-date">{{backupDate}}</span>
+          {{else}}
+            <span class="no-backup">—</span>
+          {{/if}}
+        </td>
+        <td class="col-actions">
+          <button type="button" class="gm-backup-btn" data-actor-id="{{id}}" data-tooltip="Backup"><i class="fas fa-save"></i></button>
+          <button type="button" class="gm-restore-btn" data-actor-id="{{id}}" data-tooltip="Restore" {{#unless hasBackup}}disabled{{/unless}}><i class="fas fa-undo"></i></button>
+          <button type="button" class="gm-export-btn" data-actor-id="{{id}}" data-tooltip="Export JSON"><i class="fas fa-file-export"></i></button>
+        </td>
+      </tr>
+      {{/each}}
+    </tbody>
+  </table>
+
+  {{#if hasOrphans}}
+  <fieldset class="gm-tools-orphans">
+    <legend>Deleted Characters (Backups Remain)</legend>
+    <table class="gm-tools-orphan-table">
+      <thead>
+        <tr>
+          <th class="col-name">Character</th>
+          <th class="col-type">Type</th>
+          <th class="col-backup">Backup Date</th>
+          <th class="col-actions">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{#each orphans}}
+        <tr class="orphan-row">
+          <td class="col-name">{{name}}</td>
+          <td class="col-type">{{type}}</td>
+          <td class="col-backup">{{timestamp}}</td>
+          <td class="col-actions">
+            <button type="button" class="gm-restore-orphan-btn" data-backup-id="{{id}}" data-tooltip="Restore as new actor"><i class="fas fa-user-plus"></i></button>
+            <button type="button" class="gm-delete-backup-btn" data-backup-id="{{id}}" data-tooltip="Delete backup"><i class="fas fa-trash"></i></button>
+          </td>
+        </tr>
+        {{/each}}
+      </tbody>
+    </table>
+  </fieldset>
+  {{/if}}
+</div>

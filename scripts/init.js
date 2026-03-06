@@ -34,6 +34,7 @@
 // v1.5.1: Fix dying check to only trigger on round change (not turn change)
 // v1.5.0: Consolidated updateCombat hooks, added dedup guard for dying checks
 import * as GMUtils from './gm-utils.js';
+import { registerGMTools } from './gm-tools.js';
 import { FaseripActor } from './actor.js';
 import { FaseripItem } from './item.js';
 import { FaseripActorSheet } from './actorSheet.js';
@@ -1941,6 +1942,14 @@ Hooks.once("ready", async () => {
     console.log("MSH FASERIP | Socket/GM registered");
   } catch (e) {
     console.warn("MSH FASERIP | Socket/GM registration failed:", e);
+  }
+
+  // GM Tools (backup/restore)
+  try {
+    registerGMTools();
+    console.log("MSH FASERIP | GM Tools registered");
+  } catch (e) {
+    console.warn("MSH FASERIP | GM Tools registration failed:", e);
   }
 
   // Slam collision handlers (optional, safe)

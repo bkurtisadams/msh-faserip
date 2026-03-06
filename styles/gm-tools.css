@@ -1,0 +1,204 @@
+/* gm-tools.css v1.0.0 - 2026-03-06 */
+
+/* ── Sidebar button ── */
+.gm-tools-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  margin-left: 4px;
+  border: 1px solid #8b0000;
+  border-radius: 3px;
+  background: #f5f0e8;
+  color: #8b0000;
+  cursor: pointer;
+  font-size: 13px;
+}
+.gm-tools-btn:hover {
+  background: #8b0000;
+  color: #fff;
+}
+
+/* ── Container ── */
+.faserip-gm-tools .window-content {
+  padding: 8px;
+  background: #faf8f2;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 12px;
+}
+
+/* ── Bulk actions bar ── */
+.gm-tools-bulk-actions {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #c0a070;
+}
+.gm-tools-bulk-actions button {
+  padding: 4px 10px;
+  border: 1px solid #8b0000;
+  border-radius: 3px;
+  background: #f5f0e8;
+  color: #333;
+  font-size: 11px;
+  cursor: pointer;
+}
+.gm-tools-bulk-actions button:hover {
+  background: #8b0000;
+  color: #fff;
+}
+.gm-tools-bulk-actions button i {
+  margin-right: 4px;
+}
+
+/* ── Actor table ── */
+.gm-tools-actor-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.gm-tools-actor-table thead th {
+  background: #e8e0d0;
+  border-bottom: 2px solid #c0a070;
+  padding: 4px 6px;
+  text-align: left;
+  font-size: 10px;
+  font-weight: bold;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.gm-tools-actor-table tbody tr {
+  border-bottom: 1px solid #e0d8c8;
+}
+.gm-tools-actor-table tbody tr:hover {
+  background: #f0ece0;
+}
+.gm-tools-actor-table td {
+  padding: 4px 6px;
+  vertical-align: middle;
+}
+.gm-tools-actor-table .col-img {
+  width: 32px;
+}
+.gm-tools-actor-table .col-img img {
+  border-radius: 2px;
+  border: 1px solid #c0a070;
+}
+.gm-tools-actor-table .col-name {
+  font-weight: bold;
+  color: #333;
+}
+.gm-tools-actor-table .col-type {
+  color: #888;
+  font-size: 11px;
+  text-transform: capitalize;
+}
+.gm-tools-actor-table .col-backup {
+  font-size: 10px;
+}
+.gm-tools-actor-table .backup-date {
+  color: #5b7a3a;
+}
+.gm-tools-actor-table .no-backup {
+  color: #aaa;
+}
+.gm-tools-actor-table .col-actions {
+  text-align: right;
+  white-space: nowrap;
+}
+.gm-tools-actor-table .col-actions button {
+  width: 26px;
+  height: 24px;
+  padding: 0;
+  margin-left: 2px;
+  border: 1px solid #c0a070;
+  border-radius: 2px;
+  background: #f5f0e8;
+  color: #555;
+  cursor: pointer;
+  font-size: 11px;
+}
+.gm-tools-actor-table .col-actions button:hover {
+  background: #8b0000;
+  color: #fff;
+  border-color: #8b0000;
+}
+.gm-tools-actor-table .col-actions button:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+.gm-tools-actor-table .col-actions button:disabled:hover {
+  background: #f5f0e8;
+  color: #555;
+  border-color: #c0a070;
+}
+
+/* ── Has backup indicator ── */
+.actor-row.has-backup .col-name::after {
+  content: "●";
+  color: #5b7a3a;
+  font-size: 8px;
+  margin-left: 4px;
+  vertical-align: super;
+}
+
+/* ── Orphans section ── */
+.gm-tools-orphans {
+  margin-top: 12px;
+  border: 1px solid #c0a070;
+  border-radius: 4px;
+  background: #faf8f2;
+  padding: 6px 8px;
+}
+.gm-tools-orphans legend {
+  color: #8b0000;
+  font-weight: bold;
+  font-size: 11px;
+  padding: 0 4px;
+}
+.gm-tools-orphan-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.gm-tools-orphan-table thead th {
+  background: #e8e0d0;
+  border-bottom: 1px solid #c0a070;
+  padding: 3px 6px;
+  text-align: left;
+  font-size: 10px;
+  font-weight: bold;
+  color: #666;
+  text-transform: uppercase;
+}
+.gm-tools-orphan-table tbody tr {
+  border-bottom: 1px solid #e0d8c8;
+}
+.gm-tools-orphan-table td {
+  padding: 3px 6px;
+  vertical-align: middle;
+}
+.orphan-row .col-name {
+  font-weight: bold;
+  color: #8b0000;
+  font-style: italic;
+}
+.gm-tools-orphan-table .col-actions button {
+  width: 26px;
+  height: 24px;
+  padding: 0;
+  margin-left: 2px;
+  border: 1px solid #c0a070;
+  border-radius: 2px;
+  background: #f5f0e8;
+  color: #555;
+  cursor: pointer;
+  font-size: 11px;
+}
+.gm-tools-orphan-table .col-actions button:hover {
+  background: #8b0000;
+  color: #fff;
+  border-color: #8b0000;
+}

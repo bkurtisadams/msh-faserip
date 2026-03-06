@@ -56,7 +56,8 @@
         "styles/hq-sheet.css",
         "styles/talent-sheet.css",
         "styles/contact-sheet.css",
-        "styles/combat-panel.css"
+        "styles/combat-panel.css",
+        "styles/gm-tools.css"
     ],
     "packs": [
         {
