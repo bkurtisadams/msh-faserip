@@ -66,21 +66,23 @@
         </select>
         <button type="button" class="add-hero-to-team-btn"><i class="fas fa-plus"></i></button>
         <button type="button" class="remove-member-toggle {{#if removeMode}}active{{/if}}" title="Toggle remove mode"><i class="fas fa-user-minus"></i></button>
+        <button type="button" class="award-session-bonus" title="Award Session Bonus: each hero receives their Reason + Intuition + Psyche as bonus karma"><i class="fas fa-star"></i> R+I+P</button>
       </div>
       {{/if}}
     </div>
 
-    <!-- Team Headquarters -->
+    <!-- Team Headquarters (collapsible) -->
     <div class="team-hq-section">
-      <div class="section-header">
-        <h3>Headquarters ({{teamHQs.length}})</h3>
+      <div class="section-header hq-toggle" title="Click to expand/collapse">
+        <h3><i class="fas fa-chevron-{{#if hqExpanded}}down{{else}}right{{/if}} hq-toggle-icon"></i> HQ ({{teamHQs.length}})</h3>
         {{#if isGM}}
         <div class="section-btns">
-          <button type="button" class="add-team-hq"><i class="fas fa-plus"></i> Add HQ</button>
+          <button type="button" class="add-team-hq"><i class="fas fa-plus"></i> Add</button>
         </div>
         {{/if}}
       </div>
 
+      <div class="team-hq-body" {{#unless hqExpanded}}style="display:none;"{{/unless}}>
       {{#if teamHQs.length}}
       <div class="team-hq-list">
         {{#each teamHQs}}
@@ -100,6 +102,7 @@
       {{else}}
       <p class="no-encounters">No team headquarters.</p>
       {{/if}}
+      </div>
     </div>
 
     <!-- Encounters -->

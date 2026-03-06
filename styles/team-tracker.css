@@ -12,7 +12,7 @@
 /* ===== HEADER ===== */
 .team-tracker .team-header {
   display: flex; align-items: center; justify-content: space-between;
-  gap: 10px; padding: 6px 10px;
+  gap: 8px; padding: 4px 8px;
   background: linear-gradient(#8b0000, #660000);
   color: #fff; border-bottom: 2px solid #4a0000; flex-shrink: 0;
 }
@@ -22,7 +22,7 @@
 }
 .team-tracker .campaign-datetime {
   font-family: 'Oswald', sans-serif;
-  font-size: 14px; font-weight: 600; letter-spacing: 0.5px;
+  font-size: 12px; font-weight: 600; letter-spacing: 0.5px;
   color: rgba(255,255,255,0.9);
 }
 .team-tracker .header-right { display: flex; align-items: center; gap: 8px; }
@@ -42,19 +42,23 @@
 }
 .team-tracker .open-pool-manager:hover { background: #a6d4fa; }
 .team-tracker .multiplier-display { display: flex; align-items: center; gap: 3px; }
-.team-tracker .multiplier-display label { font-size: 11px; font-weight: 600; }
+.team-tracker .multiplier-display label { font-size: 10px; font-weight: 600; }
 .team-tracker .multiplier-select {
   padding: 1px 3px; font-size: 11px; border-radius: 3px;
-  border: 1px solid rgba(255,255,255,0.4); background: rgba(255,255,255,0.15);
+  border: 1px solid #64b5f6; background: #1565c0;
   color: #fff; cursor: pointer; font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 600;
 }
 .team-tracker .multiplier-select option { color: #333; background: #fff; }
-.team-tracker .multiplier-value { font-weight: 700; font-size: 13px; }
-.team-tracker .time-settings-btn {
-  background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3);
-  color: #fff; padding: 2px 6px; border-radius: 3px; cursor: pointer; font-size: 12px;
+.team-tracker .multiplier-value {
+  font-weight: 700; font-size: 13px; background: #1565c0;
+  padding: 1px 6px; border-radius: 3px; border: 1px solid #64b5f6;
 }
-.team-tracker .time-settings-btn:hover { background: rgba(255,255,255,0.25); }
+.team-tracker .time-settings-btn {
+  background: #5c6bc0; border: 1px solid #3f51b5;
+  color: #fff; padding: 2px 6px; border-radius: 3px; cursor: pointer; font-size: 11px;
+}
+.team-tracker .time-settings-btn:hover { background: #7986cb; }
 
 /* ===== BODY ===== */
 .team-tracker .tracker-body {
@@ -88,20 +92,27 @@
   padding: 10px; text-align: center; color: #777; font-style: italic; font-size: 12px;
   background: #fff; border: 1px solid #ddd; border-radius: 3px;
 }
-.team-tracker .add-member-row { display: flex; gap: 4px; margin-top: 4px; align-items: center; }
+.team-tracker .add-member-row { display: flex; gap: 3px; margin-top: 3px; align-items: center; }
 .team-tracker .add-hero-select {
-  flex: 1; padding: 3px 5px; font-size: 11px;
+  flex: 1; padding: 1px 4px; font-size: 10px;
   font-family: 'Barlow Condensed', sans-serif;
   border: 1px solid #ccc; border-radius: 3px; background: #fff;
 }
 .team-tracker .add-hero-to-team-btn,
 .team-tracker .remove-member-toggle {
-  padding: 3px 7px; font-size: 11px; font-weight: 600;
+  padding: 1px 5px; font-size: 10px; font-weight: 600;
   color: #fff; background: #8b0000; border: 0; border-radius: 3px; cursor: pointer;
 }
 .team-tracker .add-hero-to-team-btn:hover,
 .team-tracker .remove-member-toggle:hover { background: #660000; }
 .team-tracker .remove-member-toggle.active { background: #c62828; }
+.team-tracker .award-session-bonus {
+  background: #b8860b; color: #fff; border: 1px solid #8b6508; border-radius: 3px;
+  padding: 1px 6px; font-size: 10px; font-weight: 600; cursor: pointer;
+  margin-left: auto; white-space: nowrap;
+}
+.team-tracker .award-session-bonus:hover { background: #d4a017; border-color: #b8860b; }
+.team-tracker .award-session-bonus i { margin-right: 2px; color: #fff59d; }
 
 /* ===== SECTION HEADER ===== */
 .team-tracker .section-header {
@@ -327,8 +338,11 @@
   font-style: italic; font-size: 12px;
   background: #fff; border: 1px solid #ddd; border-radius: 3px;
 }
-/* ===== TEAM HQ SECTION ===== */
-.team-tracker .team-hq-section { margin-bottom: 8px; }
+/* ===== TEAM HQ SECTION (collapsible) ===== */
+.team-tracker .team-hq-section { margin-bottom: 4px; }
+.team-tracker .hq-toggle { cursor: pointer; }
+.team-tracker .hq-toggle:hover h3 { color: #a00; }
+.team-tracker .hq-toggle-icon { font-size: 10px; margin-right: 3px; transition: transform 0.15s; }
 .team-tracker .team-hq-list { display: flex; flex-direction: column; gap: 2px; }
 .team-tracker .team-hq-row {
   display: flex; align-items: center; gap: 6px;

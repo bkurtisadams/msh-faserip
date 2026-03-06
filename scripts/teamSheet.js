@@ -73,6 +73,7 @@ export class TeamSheet extends Application {
     const context = super.getData();
     context.isGM = game.user.isGM;
     context.removeMode = this._removeMode;
+    context.hqExpanded = this._hqExpanded ?? false;
     context.useKarmaPool = game.settings.get("msh-faserip", "useKarmaPool") ?? false;
 
     const teamMemberIds = game.settings.get("msh-faserip", "teamMembers") || [];
@@ -204,6 +205,7 @@ export class TeamSheet extends Application {
       this._removeMode = !this._removeMode; this.render(false);
     });
     html.find('.remove-hero-from-team').click(ev => this._onRemoveHeroFromTeam(ev));
+    html.find('.award-session-bonus').click(ev => this._onAwardSessionBonus(ev));
     html.find('.hero-portrait').click(ev => {
       const h = game.actors.get(ev.currentTarget.dataset.heroId); if (h) h.sheet.render(true);
     });
@@ -252,6 +254,12 @@ export class TeamSheet extends Application {
     html.find('.undo-award').click(ev => this._onUndoAward(ev));
 
     // Team HQ
+    html.find('.hq-toggle').click(ev => {
+      if ($(ev.target).closest('.section-btns').length) return;
+      this._hqExpanded = !this._hqExpanded;
+      html.find('.team-hq-body').slideToggle(150);
+      html.find('.hq-toggle-icon').toggleClass('fa-chevron-right fa-chevron-down');
+    });
     html.find('.add-team-hq').click(() => this._onAddTeamHQ());
     html.find('.edit-team-hq').click(ev => this._onEditTeamHQ(ev.currentTarget.dataset.hqId));
     html.find('.delete-team-hq').click(ev => this._onDeleteTeamHQ(ev.currentTarget.dataset.hqId));
@@ -666,6 +674,74 @@ export class TeamSheet extends Application {
       localConspiracy: "Local Conspiracy", nationalConspiracy: "National Conspiracy",
       globalConspiracy: "Global Conspiracy", other: "Other Crime"
     }[crimeType] || crimeType;
+  }
+
+  // Session Bonus: award each hero their R+I+P as bonus karma
+  async _onAwardSessionBonus(event) {
+    event.preventDefault();
+    if (!game.user.isGM) return;
+
+    const teamMemberIds = game.settings.get("msh-faserip", "teamMembers") || [];
+    const heroes = game.actors.filter(a => teamMemberIds.includes(a.id));
+    if (!heroes.length) return ui.notifications.warn("No team members to award.");
+
+    const rows = heroes.map(h => {
+      const r = h.system.abilities?.reason?.value || 0;
+      const i = h.system.abilities?.intuition?.value || 0;
+      const p = h.system.abilities?.psyche?.value || 0;
+      const total = r + i + p;
+      return `<tr>
+        <td><input type="checkbox" name="inc-${h.id}" checked /></td>
+        <td>${h.name}</td>
+        <td style="text-align:center">${r}</td>
+        <td style="text-align:center">${i}</td>
+        <td style="text-align:center">${p}</td>
+        <td><input type="number" name="amt-${h.id}" value="${total}" min="0" style="width:55px;text-align:center;" /></td>
+      </tr>`;
+    }).join("");
+
+    new Dialog({
+      title: "Session Bonus (R+I+P)",
+      content: `<form>
+        <div style="margin-bottom:8px;">
+          <label style="font-weight:600;">Session Name:</label>
+          <input type="text" name="reason" value="Session Award" style="width:100%;margin-top:2px;" />
+        </div>
+        <p style="font-size:.85em;color:#666;">Each hero receives their Reason + Intuition + Psyche as bonus karma. Adjust individually.</p>
+        <table style="width:100%;border-collapse:collapse;font-size:12px;">
+          <thead><tr style="background:#f5f5f5;">
+            <th style="width:30px"></th><th style="text-align:left">Hero</th>
+            <th style="width:35px;text-align:center">R</th>
+            <th style="width:35px;text-align:center">I</th>
+            <th style="width:35px;text-align:center">P</th>
+            <th style="width:60px">Award</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </form>`,
+      buttons: {
+        award: { icon: '<i class="fas fa-star"></i>', label: "Award",
+          callback: async (html) => {
+            const reason = html.find('[name="reason"]').val() || "Session Award";
+            let count = 0, total = 0;
+            for (const hero of heroes) {
+              if (!html.find(`[name="inc-${hero.id}"]`).is(':checked')) continue;
+              const amount = Number(html.find(`[name="amt-${hero.id}"]`).val()) || 0;
+              if (amount <= 0) continue;
+              await this._addHeroKarmaEvent(hero, {
+                amount, type: "Session Award",
+                description: reason
+              });
+              count++; total += amount;
+            }
+            if (count) ui.notifications.info(`Session bonus: +${total} total karma to ${count} heroes.`);
+            this.render(true);
+          }
+        },
+        cancel: { icon: '<i class="fas fa-times"></i>', label: "Cancel" }
+      },
+      default: "award"
+    }, { width: 420 }).render(true);
   }
 
   async _addHeroKarmaEvent(hero, { amount, type, description, gameDate, encounterId }) {
