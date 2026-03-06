@@ -1,0 +1,177 @@
+/* combat-panel.css v1.0.0 - 2026-03-06 */
+
+/* ── Container ─────────────────────────── */
+.faserip-combat-panel { min-width: 280px; max-width: 400px; }
+.faserip-combat-panel .window-content {
+  padding: 0; background: #1a1a2e; color: #e0ddd4; overflow-y: auto;
+}
+.fcp-body { padding: 4px 6px 6px; display: flex; flex-direction: column; gap: 4px; }
+
+/* ── Header row: portrait + info ───────── */
+.fcp-header { display: flex; gap: 6px; align-items: flex-start; }
+.fcp-portrait {
+  width: 52px; height: 52px; min-width: 52px; max-width: 52px;
+  min-height: 52px; max-height: 52px;
+  border: 2px solid #8b0000; border-radius: 3px;
+  object-fit: cover; object-position: top center;
+  cursor: pointer; background: #111; display: block; flex-shrink: 0;
+}
+.fcp-portrait:hover { border-color: #ff4444; }
+.fcp-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+
+/* Name / HP / K / Round row */
+.fcp-top-line {
+  display: flex; align-items: baseline; gap: 4px; flex-wrap: wrap;
+  font-size: 11px; line-height: 1.3;
+}
+.fcp-name {
+  font-weight: bold; font-size: 12px; color: #fff;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  max-width: 120px;
+}
+.fcp-hp { color: #66bb6a; }
+.fcp-hp.wounded { color: #ef5350; }
+.fcp-karma { color: #42a5f5; }
+.fcp-round { color: #999; margin-left: auto; white-space: nowrap; }
+
+/* FASERIP ability row */
+.fcp-abilities { display: flex; gap: 0; margin-top: 1px; }
+.fcp-ability {
+  flex: 1; text-align: center; cursor: pointer;
+  padding: 2px 0; border-radius: 2px;
+  transition: background .1s;
+  min-width: 0;
+}
+.fcp-ability:hover { background: rgba(255,255,255,.12); }
+.fcp-ability:active { background: rgba(255,255,255,.2); }
+.fcp-ability-key {
+  font-size: 9px; font-weight: bold; color: #999;
+  text-transform: uppercase; letter-spacing: .5px;
+  display: block; line-height: 1;
+}
+.fcp-ability-rank {
+  font-size: 11px; font-weight: bold; color: #e0ddd4;
+  display: block; line-height: 1.3;
+}
+
+/* ── Status + Target row (conditional) ─── */
+.fcp-status-row {
+  display: flex; gap: 4px; flex-wrap: wrap;
+  align-items: center; font-size: 10px;
+  min-height: 0; /* collapses when empty */
+}
+.fcp-status-row:empty { display: none; }
+.fcp-status {
+  display: inline-flex; align-items: center; gap: 2px;
+  padding: 1px 4px; border-radius: 2px;
+  font-weight: bold; font-size: 10px;
+}
+.fcp-status.stunned { background: #e65100; color: #fff; }
+.fcp-status.unconscious { background: #6a1b9a; color: #fff; }
+.fcp-status.impaired { background: #c62828; color: #fff; }
+.fcp-status.dying { background: #b71c1c; color: #fff; animation: fcp-pulse 1.5s infinite; }
+.fcp-status.grappled { background: #1565c0; color: #fff; }
+.fcp-status.generic { background: #555; color: #ddd; }
+
+@keyframes fcp-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .6; }
+}
+
+.fcp-target {
+  margin-left: auto; color: #ffab40; font-size: 10px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  max-width: 120px;
+}
+.fcp-target:empty { display: none; }
+
+/* ── Action buttons ────────────────────── */
+.fcp-actions {
+  display: flex; flex-wrap: wrap; gap: 3px;
+}
+.fcp-action-btn {
+  padding: 3px 6px; font-size: 10px; font-weight: 600;
+  border: 1px solid rgba(255,255,255,.15); border-radius: 3px;
+  cursor: pointer; white-space: nowrap;
+  background: #2a2a40; color: #e0ddd4;
+  transition: all .1s;
+  line-height: 1.2;
+}
+.fcp-action-btn:hover {
+  background: #3a3a55; border-color: rgba(255,255,255,.3);
+  transform: translateY(-1px);
+}
+.fcp-action-btn:active { transform: translateY(0); }
+
+/* Color-coded action types */
+.fcp-action-btn[data-type="blunt-attack"],
+.fcp-action-btn[data-type="charging"] { background: #bf360c; }
+.fcp-action-btn[data-type="edged-attack"],
+.fcp-action-btn[data-type="shooting"],
+.fcp-action-btn[data-type="throwing-edged"] { background: #880e4f; }
+.fcp-action-btn[data-type="energy"],
+.fcp-action-btn[data-type="force"] { background: #4a148c; }
+.fcp-action-btn[data-type="grappling"],
+.fcp-action-btn[data-type="grabbing"],
+.fcp-action-btn[data-type="escaping"] { background: #0d47a1; }
+.fcp-action-btn[data-type="dodging"],
+.fcp-action-btn[data-type="evading"],
+.fcp-action-btn[data-type="blocking"],
+.fcp-action-btn[data-type="catching"] { background: #1b5e20; }
+.fcp-action-btn[data-type="throwing-blunt"] { background: #e65100; }
+.fcp-action-btn[data-type="power"] { background: #311b92; }
+
+/* Hover brightens all */
+.fcp-action-btn[data-type]:hover { filter: brightness(1.3); }
+
+/* ── Gear button ───────────────────────── */
+.fcp-footer { display: flex; justify-content: flex-end; }
+.fcp-gear-btn {
+  background: none; border: none; color: #777;
+  cursor: pointer; font-size: 11px; padding: 2px 4px;
+}
+.fcp-gear-btn:hover { color: #fff; }
+
+/* ── Edit mode ─────────────────────────── */
+.fcp-edit-overlay {
+  padding: 4px; font-size: 10px; color: #aaa;
+}
+.fcp-edit-actions { display: flex; flex-wrap: wrap; gap: 3px; }
+.fcp-edit-actions .fcp-action-btn { position: relative; }
+.fcp-edit-actions .fcp-remove-btn {
+  position: absolute; top: -4px; right: -4px;
+  width: 14px; height: 14px; font-size: 9px; line-height: 14px;
+  text-align: center; background: #c62828; color: #fff;
+  border: none; border-radius: 50%; cursor: pointer;
+  padding: 0; display: none;
+}
+.fcp-edit-actions .fcp-action-btn:hover .fcp-remove-btn { display: block; }
+
+.fcp-add-row {
+  display: flex; gap: 3px; margin-top: 4px; align-items: center;
+}
+.fcp-add-select {
+  flex: 1; font-size: 10px; height: 22px;
+  background: #2a2a40; color: #e0ddd4;
+  border: 1px solid #555; border-radius: 3px;
+  padding: 0 4px;
+}
+.fcp-add-btn {
+  width: 22px; height: 22px; font-size: 11px;
+  background: #1b5e20; color: #fff; border: none;
+  border-radius: 3px; cursor: pointer; padding: 0;
+}
+.fcp-add-btn:hover { background: #2e7d32; }
+.fcp-edit-done {
+  margin-top: 4px; width: 100%; padding: 3px;
+  font-size: 10px; font-weight: bold;
+  background: #8b0000; color: #fff; border: none;
+  border-radius: 3px; cursor: pointer;
+}
+.fcp-edit-done:hover { background: #a00; }
+
+/* ── No combat state ───────────────────── */
+.fcp-no-combat {
+  padding: 12px; text-align: center;
+  color: #777; font-size: 11px; font-style: italic;
+}

@@ -55,7 +55,8 @@
         "styles/chargen.css",
         "styles/hq-sheet.css",
         "styles/talent-sheet.css",
-        "styles/contact-sheet.css"
+        "styles/contact-sheet.css",
+        "styles/combat-panel.css"
     ],
     "packs": [
         {

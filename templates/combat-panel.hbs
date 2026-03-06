@@ -1,0 +1,83 @@
+{{!-- combat-panel.hbs --}}
+{{#if hasCombat}}
+  {{#if hasActor}}
+    <div class="fcp-body">
+      <div class="fcp-header">
+        <img class="fcp-portrait" src="{{img}}" data-actor-id="{{actorId}}" title="Open Sheet" style="width:52px;height:52px;max-width:52px;max-height:52px;min-width:52px;min-height:52px;object-fit:cover;object-position:top center;flex-shrink:0;display:block;border:2px solid #8b0000;border-radius:3px;cursor:pointer;">
+        <div class="fcp-info">
+          <div class="fcp-top-line">
+            <span class="fcp-name" title="{{name}}">{{name}}</span>
+            <span class="fcp-hp {{#if wounded}}wounded{{/if}}">{{hp}}/{{hpMax}}</span>
+            <span class="fcp-karma">K:{{karma}}</span>
+            <span class="fcp-round">R{{round}} T{{turn}}</span>
+          </div>
+          <div class="fcp-abilities">
+            {{#each abilities}}
+            <div class="fcp-ability" data-ability="{{this.key}}" title="{{this.tooltip}}">
+              <span class="fcp-ability-key">{{this.letter}}</span>
+              <span class="fcp-ability-rank">{{this.abbr}}</span>
+            </div>
+            {{/each}}
+          </div>
+        </div>
+      </div>
+
+      {{#if hasStatusOrTarget}}
+      <div class="fcp-status-row">
+        {{#each statuses}}
+        <span class="fcp-status {{this.cls}}" title="{{this.name}}">{{this.name}}{{this.dur}}</span>
+        {{/each}}
+        {{#if targetName}}
+        <span class="fcp-target" title="Target: {{targetName}}">► {{targetName}}</span>
+        {{/if}}
+      </div>
+      {{/if}}
+
+      {{#unless editMode}}
+      <div class="fcp-actions">
+        {{#each actions}}
+        <button class="fcp-action-btn" data-type="{{this.type}}" data-action-id="{{this.id}}" data-power-id="{{this.powerId}}" title="{{this.fullName}}">{{this.label}}</button>
+        {{/each}}
+      </div>
+      <div class="fcp-footer"><button class="fcp-gear-btn" title="Edit Actions"><i class="fas fa-cog"></i></button></div>
+      {{/unless}}
+
+      {{#if editMode}}
+      <div class="fcp-edit-overlay">
+        <div class="fcp-edit-actions">
+          {{#each actions}}
+          <div class="fcp-action-btn" data-type="{{this.type}}" data-action-id="{{this.id}}">
+            {{this.label}}
+            <button class="fcp-remove-btn" data-remove-id="{{this.id}}">✕</button>
+          </div>
+          {{/each}}
+        </div>
+        <div class="fcp-add-row">
+          <select class="fcp-add-select">
+            {{#if availableStandard.length}}
+            <optgroup label="Actions">
+              {{#each availableStandard}}
+              <option value="{{this.id}}" data-source="standard">{{this.label}}</option>
+              {{/each}}
+            </optgroup>
+            {{/if}}
+            {{#if availablePowers.length}}
+            <optgroup label="Powers">
+              {{#each availablePowers}}
+              <option value="{{this.id}}" data-source="power" data-power-id="{{this.powerId}}" data-rank="{{this.rank}}">{{this.fullName}}</option>
+              {{/each}}
+            </optgroup>
+            {{/if}}
+          </select>
+          <button class="fcp-add-btn" title="Add">+</button>
+        </div>
+        <button class="fcp-edit-done">Done</button>
+      </div>
+      {{/if}}
+    </div>
+  {{else}}
+    <div class="fcp-body"><div class="fcp-no-combat">No combatant</div></div>
+  {{/if}}
+{{else}}
+  <div class="fcp-body"><div class="fcp-no-combat">No active combat</div></div>
+{{/if}}

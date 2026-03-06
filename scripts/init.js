@@ -644,6 +644,32 @@ Hooks.once("init", async () => {
       console.log("FASERIP | 'faserip-team' already existed, skipping re-insert");
     }
 
+    // 4b. Combat Panel (GM-only)
+    if (game.user?.isGM && !existingToolsObj["faserip-combat-panel"]) {
+      existingToolsObj["faserip-combat-panel"] = {
+        name: "faserip-combat-panel",
+        title: "Combat Panel",
+        icon: "fas fa-fist-raised",
+        visible: true,
+        button: true,
+        onChange: () => {
+          import('./combat-panel.js').then(module => {
+            game.msh = game.msh || {};
+            if (game.msh.combatPanel?.rendered) {
+              game.msh.combatPanel.close();
+            } else {
+              if (!game.msh.combatPanel) game.msh.combatPanel = new module.FaseripCombatPanel();
+              game.msh.combatPanel.render(true);
+            }
+          }).catch(err => {
+            console.error("FASERIP | Combat Panel load failed:", err);
+            ui.notifications.error("Could not load Combat Panel");
+          });
+        }
+      };
+      console.log("FASERIP | Added 'faserip-combat-panel' to tools object");
+    }
+
     // 5. Assign the reconstructed tools-object back onto tokenGroup.tools
     tokenGroup.tools = existingToolsObj;
 
@@ -1915,6 +1941,8 @@ Hooks.once("ready", async () => {
   } catch (e) {
     console.warn("MSH FASERIP | Slam handler init failed:", e);
   }
+
+  // Combat Panel button registered via getSceneControlButtons hook (init phase)
 
   // Fix prototype token overrides - remove disposition keys entirely (even if undefined)
   try {
