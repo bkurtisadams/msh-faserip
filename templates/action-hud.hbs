@@ -1,0 +1,16 @@
+{{!-- action-hud.hbs --}}
+<div class="fah-wrap">
+  <div class="fah-grid">
+    {{#each actions}}
+    <button class="fah-btn {{#if this.icon}}has-icon{{/if}}" draggable="true"
+      data-action="{{this.id}}"
+      data-ability="{{this.ability}}"
+      data-full="{{this.full}}"
+      title="{{this.label}} — {{this.full}} ({{this.ability}})"
+      style="background-color:{{this.color}};color:{{this.textColor}};">
+      {{#if this.icon}}<img src="{{this.icon}}" alt="{{this.label}}">{{/if}}
+      <span class="fah-code">{{this.label}}</span>
+    </button>
+    {{/each}}
+  </div>
+</div>

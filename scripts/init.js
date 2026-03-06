@@ -548,7 +548,7 @@ Hooks.once("init", async () => {
     editable: [{ key: "KeyH", modifiers: ["Control"] }],  // Ctrl+H
     onDown: () => {
       if (ui.faseripHUD?.rendered) {
-        ui.faseripHUD.bringToTop();
+        ui.faseripHUD.bringToFront();
       } else {
         ui.faseripHUD = new FaseripActionHUD();
         ui.faseripHUD.render(true);

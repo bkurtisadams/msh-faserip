@@ -237,6 +237,12 @@ export class FaseripCombatPanel extends HandlebarsApplicationMixin(ApplicationV2
   _onRender(context, options) {
     this._registerHooks();
     this._injectCSS();
+
+    // Register in ui.windows for Popout! module compatibility
+    if (this._appId && ui.windows) {
+      ui.windows[this._appId] = this;
+    }
+
     const el = this.element;
     if (!el) return;
 
@@ -383,6 +389,9 @@ export class FaseripCombatPanel extends HandlebarsApplicationMixin(ApplicationV2
 
   async close(options = {}) {
     this._unregisterHooks();
+    if (this._appId && ui.windows) {
+      delete ui.windows[this._appId];
+    }
     return super.close(options);
   }
 }
