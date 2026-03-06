@@ -1,8 +1,9 @@
-// combat-panel.js v1.1.0 - 2026-03-06
-// v1.1.0: Rewrite as ApplicationV2 + HandlebarsApplicationMixin for Foundry v13.
+// combat-panel.js v1.2.0 - 2026-03-06
+// v1.2.0: Delegate ability FEAT rolls to shared ability-feat-dialog.js module.
 // GM-only combat panel that follows the active combatant.
 
 import { ActionDispatcher } from "./modules/actions/action-dispatcher.js";
+import { showAbilityFeatDialog } from "./modules/actions/ability-feat-dialog.js";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
@@ -318,61 +319,7 @@ export class FaseripCombatPanel extends HandlebarsApplicationMixin(ApplicationV2
   }
 
   async _rollAbilityFeat(actor, abilityKey) {
-    const ability = actor.system.abilities[abilityKey];
-    if (!ability) return;
-    const fullName = abilityKey.charAt(0).toUpperCase() + abilityKey.slice(1);
-    const rank = ability.rank;
-    const value = ability.value;
-    const allRanks = [
-      "None","Shift-0","Feeble","Poor","Typical","Good","Excellent",
-      "Remarkable","Incredible","Amazing","Monstrous","Unearthly",
-      "Shift-X","Shift-Y","Shift-Z","Class 1000","Class 3000","Class 5000","Beyond"
-    ];
-    new Dialog({
-      title: `${fullName} FEAT — ${actor.name}`,
-      content: `
-        <div style="font-size:12px;">
-          <div style="margin-bottom:6px;"><strong>${fullName}</strong> — ${rank} (${value})</div>
-          <div style="margin-bottom:6px;">
-            <label style="display:inline-block;width:80px;">Intensity:</label>
-            <select id="fcp-intensity" style="width:120px;">
-              ${allRanks.map(r => `<option value="${r}">${r}</option>`).join("")}
-            </select>
-          </div>
-          <div style="margin-bottom:6px;">
-            <label style="display:inline-block;width:80px;">Column Shift:</label>
-            <input type="number" id="fcp-cs" value="0" style="width:50px;">
-          </div>
-        </div>`,
-      buttons: {
-        roll: {
-          icon: '<i class="fas fa-dice-d20"></i>', label: "Roll",
-          callback: async (html) => {
-            const intensity = html.find("#fcp-intensity").val();
-            const cs = parseInt(html.find("#fcp-cs").val()) || 0;
-            const roll = new Roll("1d100");
-            await roll.evaluate();
-            const shifted = game.msh.applyColumnShift?.(rank, cs) || rank;
-            const color = game.msh.rollUniversalTable(shifted, roll.total);
-            const styles = { white:"background:#ddd;color:#333;", green:"background:#4caf50;color:#fff;", yellow:"background:#ffc107;color:#000;", red:"background:#f44336;color:#fff;" };
-            const iStr = intensity && intensity !== "None" ? ` vs ${intensity}` : "";
-            await ChatMessage.create({
-              speaker: ChatMessage.getSpeaker({ actor }),
-              content: `<div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;">
-                <div style="padding:4px 8px;border-bottom:1px solid #c0c0c0;font-weight:bold;">${fullName} FEAT${iStr}</div>
-                <div style="padding:6px 8px;font-size:12px;">
-                  <div>Rank: <strong>${rank}</strong> (${value})${cs ? ` | CS: ${cs > 0 ? "+" : ""}${cs} → ${shifted}` : ""}</div>
-                  <div>Roll: <strong>${roll.total}</strong></div>
-                  <div style="margin-top:4px;padding:3px 8px;border-radius:3px;font-weight:bold;display:inline-block;${styles[color.toLowerCase()] || ""}">${color}</div>
-                </div></div>`,
-              rolls: [roll],
-            });
-          }
-        },
-        cancel: { label: "Cancel" }
-      },
-      default: "roll"
-    }).render(true);
+    showAbilityFeatDialog(actor, abilityKey);
   }
 
   async _rollPower(actor, powerId) {
