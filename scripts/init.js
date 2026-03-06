@@ -64,6 +64,7 @@ import { ACTIONS } from '../helpers/action-constants.js';
 import { playCombatSFX, classifyWeapon } from "./modules/actions/audio-utils.js";
 import { quickHeal } from "../macros/quick-heal.js";
 import { FaseripTokenRuler } from "./modules/canvas/faserip-token-ruler.js";
+import { initDotToken } from "./modules/canvas/faserip-dot-token.js";
 
 // Helper to resolve ACTIONS from CONFIG (for macro compatibility)
 function getActions() {
@@ -722,6 +723,15 @@ Hooks.once("init", async () => {
     config: true,
     type: Number,
     default: 132
+  });
+
+  game.settings.register("msh-faserip", "dotMode", {
+    name: "Dot Mode (Theater of the Mind)",
+    hint: "Default dot mode for new scenes. Individual scenes can override this in Scene Config → Grid tab. Right-click tokens to override per-token. Ctrl+hover a dot for portrait.",
+    scope: "world",
+    config: true,
+    type: Boolean,
+    default: false
   });
 
   game.settings.register("msh-faserip", "teamKarmaPoolTotal", {
@@ -1423,6 +1433,9 @@ Hooks.once("init", async () => {
 
   // Register custom token ruler (speed-based color coding)
   CONFIG.Token.rulerClass = FaseripTokenRuler;
+
+  // Register dot-mode token display and hooks
+  initDotToken();
 
   // Register FASERIP movement actions for Token HUD
   // Foundry V13 built-in: users select via Token HUD or TAB during waypoint movement

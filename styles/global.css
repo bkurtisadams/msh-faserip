@@ -3891,3 +3891,38 @@ form.faserip-sheet .secondary-abilities .sec-col.resources > .sec-body.resources
   justify-content: flex-start; /* left (main axis) */
   padding-top: 4;            /* keep it tight; !important if needed */
 }
+
+/* ── Dot Mode: Hover Portrait Popup ── */
+.faserip-dot-portrait {
+  position: fixed;
+  z-index: 10000;
+  pointer-events: none;
+  background: #1a1a1a;
+  border: 2px solid #c0a070;
+  border-radius: 4px;
+  padding: 3px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.6);
+  animation: faseripDotFadeIn 0.15s ease-out;
+}
+.faserip-dot-portrait img {
+  display: block;
+  width: 64px;
+  height: 64px;
+  object-fit: cover;
+  border-radius: 2px;
+}
+.faserip-dot-portrait-name {
+  text-align: center;
+  font-size: 10px;
+  font-weight: bold;
+  color: #e0d8c8;
+  padding: 2px 4px 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 64px;
+}
+@keyframes faseripDotFadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
