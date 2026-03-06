@@ -96,6 +96,25 @@ form.faserip-sheet {
   margin-bottom: 2px;
 }
 
+/* ── Identity radios: subscript-sized ────────────────────────────────── */
+.msh-compact-header .msh-radios {
+  gap: 4px;
+}
+.msh-compact-header .msh-radio {
+  gap: 2px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 8.5px;
+  font-weight: 500;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: #999;
+  vertical-align: sub;
+}
+.msh-compact-header .msh-radio input[type="radio"] {
+  transform: scale(0.7);
+  margin: 0 -1px;
+}
+
 /* ── Biography panel: comic panel border ──────────────────────────────── */
 .msh-bio {
   background: var(--cream);
