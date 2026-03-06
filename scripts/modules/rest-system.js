@@ -905,8 +905,11 @@ export function initRestSystem() {
   });
   
   // Register click handler for consciousness buttons
-  Hooks.on("renderChatMessage", (message, html) => {
-    html.find(".regain-consciousness-button").click(async (event) => {
+  Hooks.on("renderChatMessageHTML", (message, html) => {
+    const root = html instanceof HTMLElement ? html : html[0] ?? html;
+    const btn = root.querySelector(".regain-consciousness-button");
+    if (!btn) return;
+    btn.addEventListener("click", async (event) => {
       const actorId = event.currentTarget.dataset.actorId;
       const actor = game.actors.get(actorId);
       

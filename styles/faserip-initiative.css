@@ -177,17 +177,319 @@
 }
 
 /* =====================
-   PHASE REMINDER
+   COLLAPSIBLE STEP LIST
    ===================== */
-.faserip-phase-reminder {
+.faserip-steps-section {
   margin-top: 4px;
-  padding: 3px 6px;
-  background: rgba(0, 0, 0, 0.04);
   border-top: 1px solid #ddd;
+}
+
+.faserip-steps-toggle {
+  padding: 3px 6px;
   font-size: 0.8em;
   color: #666;
+  cursor: pointer;
+  user-select: none;
+}
+
+.faserip-steps-toggle:hover {
+  color: #8B0000;
+}
+
+.faserip-steps-arrow {
+  display: inline-block;
+  width: 12px;
+  font-size: 0.9em;
+}
+
+.faserip-steps-list {
+  padding: 2px 6px 4px 20px;
+  font-size: 0.78em;
+  color: #555;
+  line-height: 1.5;
+}
+
+.faserip-step {
+  padding: 1px 0;
+}
+
+/* =====================
+   COMBATANT ROSTER (RAW mode)
+   ===================== */
+.faserip-roster-section {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid #eee;
+}
+
+.faserip-roster {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.faserip-roster-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  font-size: 0.85em;
+  border-radius: 2px;
+}
+
+.faserip-roster-row.pc-side-row {
+  background: rgba(0, 100, 0, 0.08);
+  border-left: 2px solid rgba(0, 100, 0, 0.5);
+}
+
+.faserip-roster-row.npc-side-row {
+  background: rgba(139, 0, 0, 0.08);
+  border-left: 2px solid rgba(139, 0, 0, 0.5);
+}
+
+.faserip-roster-name {
+  flex: 1;
+  font-weight: 600;
+  font-size: 0.9em;
+}
+
+/* =====================
+   PRE-ACTION BUTTONS
+   ===================== */
+.faserip-preaction-icons {
+  display: inline-flex;
+  gap: 2px;
+  margin-left: 4px;
+  vertical-align: middle;
+}
+
+.faserip-preaction-btn,
+.faserip-change-action-btn {
+  width: 18px;
+  height: 18px;
+  line-height: 18px;
   text-align: center;
-  font-style: italic;
+  border: 1px solid #999;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.05);
+  color: #555;
+  font-size: 9px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.faserip-preaction-btn:hover {
+  background: rgba(0, 100, 0, 0.15);
+  border-color: #006400;
+  color: #006400;
+}
+
+.faserip-change-action-btn {
+  border-color: #DAA520;
+  background: rgba(255, 215, 0, 0.1);
+}
+
+.faserip-change-action-btn:hover {
+  background: rgba(255, 215, 0, 0.25);
+  border-color: #B8860B;
+  color: #B8860B;
+}
+
+/* =====================
+   PHASE INDICATOR BAR
+   ===================== */
+.faserip-phase-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 3px 8px;
+  border-radius: 3px;
+  margin-bottom: 4px;
+  font-size: 0.85em;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.faserip-phase-label {
+  flex: 1;
+  text-align: center;
+}
+
+.faserip-phase-advance-btn {
+  padding: 2px 8px;
+  font-size: 0.85em;
+  font-weight: 600;
+  border: 1px solid rgba(255,255,255,0.5);
+  border-radius: 3px;
+  background: rgba(0,0,0,0.2);
+  color: #fff;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.faserip-phase-advance-btn:hover {
+  background: rgba(0,0,0,0.4);
+  border-color: #fff;
+}
+
+/* =====================
+   DECLARATION BADGES
+   ===================== */
+.faserip-declared-badge {
+  display: inline-block;
+  padding: 1px 6px;
+  font-size: 0.8em;
+  font-weight: 600;
+  border-radius: 3px;
+  background: rgba(0,0,0,0.08);
+  border: 1px solid #999;
+  color: #444;
+}
+
+.faserip-declared-badge-sm {
+  display: inline-block;
+  padding: 0 4px;
+  font-size: 0.75em;
+  font-weight: 600;
+  border-radius: 2px;
+  background: rgba(0,0,0,0.06);
+  border: 1px solid #bbb;
+  color: #555;
+  margin-right: 2px;
+}
+
+.faserip-declare-btn {
+  border-color: #1E90FF !important;
+  background: rgba(30, 144, 255, 0.08) !important;
+}
+
+.faserip-declare-btn:hover {
+  background: rgba(30, 144, 255, 0.2) !important;
+  border-color: #1E90FF !important;
+  color: #1E90FF !important;
+}
+
+/* =====================
+   DECLARATION CHAT CARD
+   ===================== */
+.faserip-declaration-card {
+  padding: 4px 8px;
+  background: rgba(30, 144, 255, 0.06);
+  border: 1px solid rgba(30, 144, 255, 0.3);
+  border-radius: 4px;
+  font-size: 0.9em;
+}
+
+/* =====================
+   TRACKER PRE-ACTION BUTTONS
+   ===================== */
+.faserip-tracker-actions {
+  display: flex;
+  gap: 2px;
+  padding: 1px 0;
+  flex-shrink: 0;
+}
+
+.faserip-tracker-btn {
+  width: 20px;
+  height: 20px;
+  line-height: 20px;
+  text-align: center;
+  border: 1px solid #999;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.05);
+  color: #555;
+  font-size: 10px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.faserip-tracker-btn:hover {
+  background: rgba(0, 100, 0, 0.15);
+  border-color: #006400;
+  color: #006400;
+}
+
+.faserip-tracker-btn.faserip-multi-btn {
+  border-color: #1E90FF;
+  background: rgba(30, 144, 255, 0.05);
+}
+
+.faserip-tracker-btn.faserip-multi-btn:hover {
+  background: rgba(30, 144, 255, 0.2);
+  border-color: #1E90FF;
+  color: #1E90FF;
+}
+
+.faserip-tracker-btn.faserip-change-btn {
+  border-color: #DAA520;
+  background: rgba(255, 215, 0, 0.08);
+}
+
+.faserip-tracker-btn.faserip-change-btn:hover {
+  background: rgba(255, 215, 0, 0.25);
+  border-color: #B8860B;
+  color: #B8860B;
+}
+
+/* =====================
+   MULTI-ATTACK RESULT
+   ===================== */
+.faserip-multi-attack-result {
+  border: 1px solid #AAA;
+  border-radius: 4px;
+  padding: 6px 8px;
+  font-size: 0.9em;
+}
+
+.faserip-multi-header {
+  font-weight: bold;
+  color: #1E90FF;
+  font-size: 1em;
+  margin-bottom: 4px;
+}
+
+.faserip-multi-roll {
+  color: #555;
+  font-size: 0.9em;
+  margin: 2px 0;
+}
+
+.faserip-multi-outcome {
+  margin-top: 4px;
+  padding: 3px 6px;
+  border-radius: 3px;
+}
+
+.faserip-multi-success {
+  background: rgba(0, 100, 0, 0.06);
+  border-color: #006400;
+}
+
+.faserip-multi-success .faserip-multi-outcome {
+  background: rgba(0, 100, 0, 0.1);
+}
+
+.faserip-multi-fail {
+  background: rgba(139, 0, 0, 0.06);
+  border-color: #8B0000;
+}
+
+.faserip-multi-fail .faserip-multi-outcome {
+  background: rgba(139, 0, 0, 0.1);
+}
+
+/* =====================
+   CHANGE ACTION RESULT
+   ===================== */
+.faserip-change-action-result {
+  background: rgba(255, 215, 0, 0.1);
+  border: 1px solid #DAA520;
+  border-radius: 4px;
+  padding: 6px 8px;
+  font-size: 0.9em;
 }
 
 /* =====================

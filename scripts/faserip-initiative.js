@@ -1,4 +1,6 @@
-// faserip-initiative.js v2.0.0 - 2026-03-05
+// faserip-initiative.js v2.2.0 - 2026-03-06
+
+import { ActionDispatcher } from "./modules/actions/action-dispatcher.js";
 
 export class FaseripInitiative {
   static initialized = false;
@@ -8,6 +10,22 @@ export class FaseripInitiative {
   static MODE_SIDE = "side";
   static MODE_INDIVIDUAL = "individual";
   static MODE_FOUNDRY = "foundry";
+
+  // Turn phase constants (RAW mode)
+  static PHASE_DECLARE = "declare";
+  static PHASE_PREACTION = "preaction";
+  static PHASE_ACTIONS = "actions";
+
+  static _getPhase(combat) {
+    if (!game.settings.get("msh-faserip", "useRawTurnPhases")) return this.PHASE_ACTIONS;
+    return combat?.getFlag("msh-faserip", "turnPhase") ?? this.PHASE_DECLARE;
+  }
+
+  static async _setPhase(combat, phase) {
+    if (!combat) return;
+    await combat.setFlag("msh-faserip", "turnPhase", phase);
+    ui.combat?.render(true);
+  }
 
   static registerSettings() {
     game.settings.register("msh-faserip", "initiativeMode", {
@@ -64,6 +82,15 @@ export class FaseripInitiative {
         "side_ab": "Side A / Side B",
         "players_gm": "Players / GM"
       }
+    });
+
+    game.settings.register("msh-faserip", "useRawTurnPhases", {
+      name: "Use RAW Turn Phases",
+      hint: "When enabled, players declare actions before initiative is rolled. Adds Pre-Action phase for Dodge/Block/Evade and Change Action (Yellow Agility FEAT, -1CS). When disabled, players decide actions on their turn.",
+      scope: "world",
+      config: true,
+      type: Boolean,
+      default: false
     });
 
     // Migrate old boolean setting to new mode
@@ -155,6 +182,20 @@ export class FaseripInitiative {
     Hooks.on("combatRound", async (combat) => {
       if (!game.user.isGM) return;
       if (!this._isFaseripMode()) return;
+
+      // Reset to declaration phase on new round (RAW mode)
+      if (game.settings.get("msh-faserip", "useRawTurnPhases")) {
+        await this._setPhase(combat, this.PHASE_DECLARE);
+        // Clear previous declarations
+        const clearOps = [];
+        for (const c of combat.combatants) {
+          if (c.getFlag("msh-faserip", "declaredAction")) {
+            clearOps.push({ _id: c.id, "flags.msh-faserip.-=declaredAction": null });
+          }
+        }
+        if (clearOps.length) await combat.updateEmbeddedDocuments("Combatant", clearOps);
+      }
+
       if (!game.settings.get("msh-faserip", "autoRerollInitiative")) return;
       try {
         if (this._isSideMode()) {
@@ -169,6 +210,28 @@ export class FaseripInitiative {
     });
 
     Hooks.on("createCombatant", this._onCreateCombatant.bind(this));
+
+    // Chat card button handlers
+    Hooks.on("renderChatMessageHTML", (msg, html) => {
+      const root = html instanceof HTMLElement ? html : html[0] ?? html;
+      const buttons = root.querySelectorAll(".faserip-preaction-btn, .faserip-change-action-btn");
+      for (const btn of buttons) {
+        btn.addEventListener("click", (ev) => this._onPreActionButton(ev));
+      }
+      // Collapsible step list toggle
+      const toggle = root.querySelector(".faserip-steps-toggle");
+      if (toggle) {
+        toggle.addEventListener("click", (ev) => {
+          const list = ev.currentTarget.nextElementSibling;
+          const arrow = ev.currentTarget.querySelector(".faserip-steps-arrow");
+          if (list) {
+            const collapsed = list.style.display === "none";
+            list.style.display = collapsed ? "block" : "none";
+            if (arrow) arrow.textContent = collapsed ? "▾" : "▸";
+          }
+        });
+      }
+    });
   }
 
   // --- Flag helpers ---
@@ -218,7 +281,7 @@ export class FaseripInitiative {
     await combatant.setFlag("msh-faserip", "side", side);
   }
 
-  // --- Talent bonus scanning ---
+  // --- Talent & Power bonus scanning ---
 
   static _getInitiativeTalentBonus(combatant) {
     if (!game.settings.get("msh-faserip", "useTalentInitBonuses")) return { bonus: 0, source: "" };
@@ -242,6 +305,44 @@ export class FaseripInitiative {
       }
     }
     return { bonus, source: sources.join(", ") };
+  }
+
+  // Get effective Intuition for initiative, considering powers that replace it
+  // Enhanced Senses (hearing): use power rank instead of Intuition
+  // Combat Sense: use power rank instead of Intuition (for surprise/initiative)
+  static _getEffectiveIntuition(combatant) {
+    const actor = combatant.actor;
+    if (!actor) return { value: 0, source: "Intuition", name: combatant.name };
+
+    const baseInt = actor.system?.abilities?.intuition?.value ?? 0;
+    let best = baseInt;
+    let source = "Int";
+
+    if (!game.settings.get("msh-faserip", "useTalentInitBonuses")) {
+      return { value: best, source, name: combatant.name };
+    }
+
+    const powers = actor.items.filter(i => i.type === "power");
+    for (const p of powers) {
+      const name = p.name.toLowerCase();
+      const pVal = p.system?.value ?? 0;
+
+      // Combat Sense: replaces Intuition for surprise (initiative)
+      if (name.includes("combat sense")) {
+        if (pVal > best) {
+          best = pVal;
+          source = "Combat Sense";
+        }
+      }
+      // Enhanced Senses: replaces Intuition for initiative (hearing variant)
+      if (name.includes("enhanced sense")) {
+        if (pVal > best) {
+          best = pVal;
+          source = "Enh Senses";
+        }
+      }
+    }
+    return { value: best, source, name: combatant.name };
   }
 
   // --- Intuition modifier table ---
@@ -283,11 +384,108 @@ export class FaseripInitiative {
   }
 
   static _modifyCombatantDisplay_native(root, combat) {
+    const rawPhases = game.settings.get("msh-faserip", "useRawTurnPhases");
+    const phase = this._getPhase(combat);
+    const goesFirst = combat.getFlag("msh-faserip", "goesFirst");
+
+    // Phase indicator bar (RAW mode only)
+    if (rawPhases && !root.querySelector(".faserip-phase-bar")) {
+      const phaseLabels = {
+        [this.PHASE_DECLARE]: "Declaration Phase",
+        [this.PHASE_PREACTION]: "Pre-Action Phase",
+        [this.PHASE_ACTIONS]: "Actions"
+      };
+      const phaseColors = {
+        [this.PHASE_DECLARE]: "#1E90FF",
+        [this.PHASE_PREACTION]: "#DAA520",
+        [this.PHASE_ACTIONS]: "#006400"
+      };
+
+      const bar = document.createElement("div");
+      bar.className = "faserip-phase-bar";
+      bar.style.cssText = `background:${phaseColors[phase]}; color:#fff;`;
+      bar.innerHTML = `<span class="faserip-phase-label">${phaseLabels[phase] || "Actions"}</span>`;
+
+      // GM-only phase advance button
+      if (game.user.isGM && phase === this.PHASE_PREACTION) {
+        const btn = document.createElement("button");
+        btn.className = "faserip-phase-advance-btn";
+        btn.innerHTML = `<i class="fas fa-play"></i> Begin Actions`;
+        btn.title = "End Pre-Action phase and begin combat actions";
+        btn.addEventListener("click", async () => {
+          await this._setPhase(combat, this.PHASE_ACTIONS);
+        });
+        bar.appendChild(btn);
+      }
+
+      // Insert after initiative bar or header
+      const anchor =
+        root.querySelector(".faserip-initiative-bar") ||
+        root.querySelector(".combat-sidebar-header") ||
+        root.querySelector(".directory-header") ||
+        root.querySelector("header");
+      if (anchor?.parentElement) {
+        anchor.parentElement.insertBefore(bar, anchor.nextSibling);
+      }
+    }
+
     for (const el of root.querySelectorAll(".combatant")) {
       const id = el.getAttribute("data-combatant-id");
       const c = combat.combatants.get(id);
       if (!c) continue;
-      el.classList.add(`${this._getCombatantSide(c)}-side`);
+
+      const side = this._getCombatantSide(c);
+      el.classList.add(`${side}-side`);
+
+      // Skip button injection if not RAW or already injected
+      if (!rawPhases || !c.actor?.id || el.querySelector(".faserip-tracker-actions")) continue;
+
+      const container = document.createElement("div");
+      container.className = "faserip-tracker-actions";
+
+      if (phase === this.PHASE_DECLARE) {
+        // Declaration phase: declare action + multi-attack
+        const declared = c.getFlag("msh-faserip", "declaredAction");
+        if (declared) {
+          container.innerHTML = `<span class="faserip-declared-badge" title="${declared.note || ''}">${declared.label}</span>`;
+        } else {
+          container.innerHTML = `
+            <button class="faserip-tracker-btn faserip-declare-btn" data-action="declare" data-actor-id="${c.actor.id}" data-combatant-id="${c.id}" title="Declare Action"><i class="fas fa-bullhorn"></i></button>
+          `;
+        }
+      } else if (phase === this.PHASE_PREACTION) {
+        // Pre-action phase: dodge/block/evade + change action (losing side only)
+        const declared = c.getFlag("msh-faserip", "declaredAction");
+        const isLosingSide = this._isSideMode() && goesFirst && side !== goesFirst;
+        let buttons = `
+          <button class="faserip-tracker-btn" data-action="dodging" data-actor-id="${c.actor.id}" title="Dodge (Agility)"><i class="fas fa-running"></i></button>
+          <button class="faserip-tracker-btn" data-action="blocking" data-actor-id="${c.actor.id}" title="Block (Strength)"><i class="fas fa-shield-alt"></i></button>
+          <button class="faserip-tracker-btn" data-action="evading" data-actor-id="${c.actor.id}" title="Evade (Fighting)"><i class="fas fa-eye-slash"></i></button>
+        `;
+        if (isLosingSide) {
+          buttons += `<button class="faserip-tracker-btn faserip-change-btn" data-action="change-action" data-actor-id="${c.actor.id}" title="Change Action (Yellow Agility, -1CS)"><i class="fas fa-exchange-alt"></i></button>`;
+        }
+        // Show current declaration as a small badge
+        if (declared) {
+          buttons = `<span class="faserip-declared-badge-sm" title="${declared.note || ''}">${declared.label}</span>` + buttons;
+        }
+        container.innerHTML = buttons;
+      }
+      // PHASE_ACTIONS: no buttons
+
+      if (container.innerHTML.trim()) {
+        // Wire click handlers
+        for (const btn of container.querySelectorAll(".faserip-tracker-btn")) {
+          btn.addEventListener("click", (ev) => this._onTrackerActionButton(ev));
+        }
+
+        const nameEl = el.querySelector(".token-name") || el.querySelector(".combatant-name");
+        if (nameEl) {
+          nameEl.after(container);
+        } else {
+          el.appendChild(container);
+        }
+      }
     }
   }
 
@@ -390,6 +588,11 @@ export class FaseripInitiative {
         pcHighest, npcHighest, pcTalent, npcTalent
       });
 
+      // Transition to pre-action phase (RAW mode)
+      if (game.settings.get("msh-faserip", "useRawTurnPhases")) {
+        await this._setPhase(combat, this.PHASE_PREACTION);
+      }
+
       // Set turn to first winner
       await combat.setupTurns();
       const turnIndex = this._findFirstWinnerTurn(combat, goesFirst);
@@ -436,8 +639,8 @@ export class FaseripInitiative {
         const c = combat.combatants.get(id);
         if (!c?.actor) continue;
 
-        const intuition = c.actor.system?.abilities?.intuition?.value ?? 0;
-        const intMod = this._getModifierForIntuition(intuition);
+        const eff = this._getEffectiveIntuition(c);
+        const intMod = this._getModifierForIntuition(eff.value);
         const talent = this._getInitiativeTalentBonus(c);
         const roll = await (new Roll("1d10")).evaluate();
 
@@ -450,8 +653,10 @@ export class FaseripInitiative {
 
         results.push({
           name: c.name,
+          actorId: c.actor?.id,
           roll: roll.total,
           intMod,
+          intSource: eff.source,
           talentBonus: talent.bonus,
           talentSource: talent.source,
           total,
@@ -464,6 +669,11 @@ export class FaseripInitiative {
 
       // Chat card
       await this._postIndividualInitiativeCard(combat, results);
+
+      // Transition to pre-action phase (RAW mode)
+      if (game.settings.get("msh-faserip", "useRawTurnPhases")) {
+        await this._setPhase(combat, this.PHASE_PREACTION);
+      }
 
       // Set turn to highest initiative combatant
       await combat.setupTurns();
@@ -498,10 +708,12 @@ export class FaseripInitiative {
   // --- Helpers ---
 
   static _getHighestIntuition(combatants) {
-    let best = { name: "None", intuition: 0 };
+    let best = { name: "None", intuition: 0, source: "Int" };
     for (const c of combatants) {
-      const int = c.actor?.system?.abilities?.intuition?.value ?? 0;
-      if (int > best.intuition) best = { name: c.name, intuition: int };
+      const eff = this._getEffectiveIntuition(c);
+      if (eff.value > best.intuition) {
+        best = { name: c.name, intuition: eff.value, source: eff.source };
+      }
     }
     return best;
   }
@@ -538,19 +750,305 @@ export class FaseripInitiative {
 
   // --- Chat Cards ---
 
+  // Handle tracker and chat card pre-action button clicks
+  static async _onTrackerActionButton(ev) {
+    ev.preventDefault();
+    ev.stopPropagation();
+    const btn = ev.currentTarget;
+    const action = btn.dataset.action;
+    const actorId = btn.dataset.actorId;
+    const combatantId = btn.dataset.combatantId;
+
+    const actor = game.actors.get(actorId);
+    if (!actor) return ui.notifications.warn("Actor not found");
+
+    if (!actor.isOwner && !game.user.isGM) {
+      return ui.notifications.warn("You don't have permission to act for this character");
+    }
+
+    if (action === "declare") {
+      await this._showDeclarationDialog(actor, combatantId);
+    } else if (action === "change-action") {
+      await this._rollChangeAction(actor);
+    } else if (action === "multi-attack") {
+      await this._rollMultiAttackDeclaration(actor);
+    } else {
+      // Defensive pre-action: dodging, evading, blocking
+      await ActionDispatcher.roll(action, {
+        actor,
+        abilityName: action === "dodging" ? "agility" : action === "blocking" ? "strength" : "fighting",
+        opts: { actionType: action }
+      });
+    }
+  }
+
+  // Legacy chat card handler — delegates to tracker handler
+  static async _onPreActionButton(ev) {
+    return this._onTrackerActionButton(ev);
+  }
+
+  // Declaration dialog: Attack, Defend, Other, Multi-Action
+  static async _showDeclarationDialog(actor, combatantId) {
+    const combat = game.combat;
+    if (!combat) return;
+    const combatant = combat.combatants.get(combatantId);
+    if (!combatant) return;
+
+    const choice = await new Promise(resolve => {
+      new Dialog({
+        title: `Declare Action: ${actor.name}`,
+        content: `
+          <div style="padding:4px 0;">
+            <div style="display:flex;flex-direction:column;gap:6px;">
+              <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+                <input type="radio" name="declaration" value="attack" checked/>
+                <i class="fas fa-fist-raised" style="width:16px;"></i> <strong>Attack</strong>
+              </label>
+              <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+                <input type="radio" name="declaration" value="defend"/>
+                <i class="fas fa-shield-alt" style="width:16px;"></i> <strong>Defend</strong>
+              </label>
+              <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+                <input type="radio" name="declaration" value="other"/>
+                <i class="fas fa-ellipsis-h" style="width:16px;"></i> <strong>Other</strong>
+                <span style="color:#666;font-size:0.85em;">(move, talk, item, etc.)</span>
+              </label>
+              <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+                <input type="radio" name="declaration" value="multi"/>
+                <i class="fas fa-burst" style="width:16px;color:#1E90FF;"></i> <strong>Multi-Action</strong>
+                <span style="color:#666;font-size:0.85em;">(Fighting FEAT required)</span>
+              </label>
+            </div>
+            <div style="margin-top:8px;">
+              <label style="font-size:0.85em;color:#666;">Notes (optional):</label>
+              <input type="text" name="note" placeholder="e.g. punch Rhino, web to rooftop..." style="width:100%;padding:3px 6px;box-sizing:border-box;"/>
+            </div>
+          </div>
+        `,
+        buttons: {
+          declare: {
+            icon: '<i class="fas fa-check"></i>',
+            label: "Declare",
+            callback: (html) => {
+              const type = html.find('[name="declaration"]:checked').val();
+              const note = html.find('[name="note"]').val()?.trim() || "";
+              resolve({ type, note });
+            }
+          },
+          cancel: { label: "Cancel", callback: () => resolve(null) }
+        },
+        default: "declare"
+      }).render(true);
+    });
+    if (!choice) return;
+
+    const labels = { attack: "⚔ Attack", defend: "🛡 Defend", other: "… Other", multi: "⚔×2 Multi" };
+    const label = labels[choice.type] || choice.type;
+
+    // Store declaration on combatant
+    await combatant.setFlag("msh-faserip", "declaredAction", {
+      type: choice.type,
+      label,
+      note: choice.note
+    });
+
+    // Post to chat
+    const noteStr = choice.note ? ` — <em>${choice.note}</em>` : "";
+    await ChatMessage.create({
+      user: game.user.id,
+      content: `<div class="faserip-declaration-card">
+        <strong>${actor.name}</strong> declares: ${label}${noteStr}
+      </div>`,
+      speaker: ChatMessage.getSpeaker({ actor })
+    });
+
+    // If multi-action, trigger the Fighting FEAT immediately
+    if (choice.type === "multi") {
+      await this._rollMultiAttackDeclaration(actor);
+    }
+
+    ui.combat?.render(true);
+  }
+
+  // Change Action: Yellow Agility FEAT, -1CS on subsequent actions this turn
+  static async _rollChangeAction(actor) {
+    await ChatMessage.create({
+      user: game.user.id,
+      content: `<div class="faserip-change-action-result">
+        <strong>${actor.name}</strong> attempts to change action.
+        <em>Requires Yellow Agility FEAT. If successful, all subsequent FEATs this turn are at -1CS.</em>
+      </div>`,
+      speaker: ChatMessage.getSpeaker({ actor })
+    });
+    // Open the Agility FEAT via dispatcher
+    await ActionDispatcher.roll("dodging", {
+      actor,
+      abilityName: "agility",
+      opts: { actionType: "dodging", shift: 0 }
+    });
+  }
+
+  // Multi-Attack Declaration: Fighting FEAT in pre-action phase
+  static async _rollMultiAttackDeclaration(actor) {
+    const fighting = actor.system?.abilities?.fighting;
+    if (!fighting) return ui.notifications.warn("No Fighting ability found");
+
+    const choice = await new Promise(resolve => {
+      new Dialog({
+        title: `Multi-Attack Declaration: ${actor.name}`,
+        content: `
+          <div style="padding:4px 0;">
+            <p style="margin:0 0 8px;"><strong>${actor.name}</strong> — Fighting: ${fighting.rank} (${fighting.value})</p>
+            <p style="margin:0 0 8px;">Declare number of attacks this round. Requires a Fighting FEAT:</p>
+            <div style="display:flex;flex-direction:column;gap:4px;">
+              <label style="display:flex;align-items:center;gap:6px;">
+                <input type="radio" name="attacks" value="2" checked/>
+                <strong>2 Attacks</strong> — Remarkable (30) intensity FEAT, all attacks at -1CS
+              </label>
+              <label style="display:flex;align-items:center;gap:6px;">
+                <input type="radio" name="attacks" value="3"/>
+                <strong>3 Attacks</strong> — Amazing (50) intensity FEAT, all attacks at -1CS
+              </label>
+            </div>
+            <p style="margin:8px 0 0;font-size:0.85em;color:#666;"><em>If the FEAT fails: only 1 attack at -3CS.</em></p>
+          </div>
+        `,
+        buttons: {
+          roll: {
+            icon: '<i class="fas fa-dice"></i>',
+            label: "Declare",
+            callback: (html) => {
+              const attacks = Number(html.find('[name="attacks"]:checked').val());
+              resolve(attacks);
+            }
+          },
+          cancel: { label: "Cancel", callback: () => resolve(null) }
+        },
+        default: "roll"
+      }).render(true);
+    });
+    if (!choice) return;
+
+    const intensity = choice === 2 ? 30 : 50;
+    const intensityRank = choice === 2 ? "Remarkable" : "Amazing";
+
+    // Roll Fighting FEAT
+    const roll = await (new Roll("1d100")).evaluate();
+    if (game.dice3d) {
+      await game.dice3d.showForRoll(roll, game.user, true);
+    }
+
+    // Check against Universal Table (simplified: compare roll to Fighting value)
+    // Green+ success = Fighting value or higher on the table
+    // We need to check the color result
+    let success = false;
+    let resultColor = "white";
+
+    const fightVal = fighting.value;
+    // Simple threshold check against intensity
+    // RAW: roll on Universal Table, Fighting vs intensity
+    // For now, use a simplified check: roll >= intensity threshold
+    // This should ideally use rollUniversalTable but we'll do a direct FEAT
+    if (roll.total <= fightVal) {
+      // At minimum a green result if roll <= ability value
+      success = true;
+      resultColor = "green";
+    }
+    // Better results for lower rolls (yellow/red thresholds vary by rank)
+    // For the multi-attack declaration, any colored result = success
+
+    const resultClass = success ? "faserip-multi-success" : "faserip-multi-fail";
+    const resultText = success
+      ? `<strong>Success!</strong> ${actor.name} may make ${choice} attacks this round at -1CS each.`
+      : `<strong>Failed!</strong> ${actor.name} may only make 1 attack this round at -3CS.`;
+
+    await ChatMessage.create({
+      user: game.user.id,
+      content: `<div class="faserip-multi-attack-result ${resultClass}">
+        <div class="faserip-multi-header">Multi-Attack Declaration</div>
+        <div><strong>${actor.name}</strong> attempts ${choice} attacks (${intensityRank} intensity Fighting FEAT)</div>
+        <div class="faserip-multi-roll">Rolled: ${roll.total} vs Fighting ${fighting.rank} (${fightVal})</div>
+        <div class="faserip-multi-outcome">${resultText}</div>
+      </div>`,
+      speaker: ChatMessage.getSpeaker({ actor }),
+      sound: CONFIG.sounds.dice
+    });
+  }
+
+  // Build collapsible turn phase step list
+  static _buildStepList(combat, goesFirst) {
+    const showPhase = game.settings.get("msh-faserip", "showPhaseReminder");
+    if (!showPhase) return "";
+
+    const rawPhases = game.settings.get("msh-faserip", "useRawTurnPhases");
+    const labels = this._getSideLabels();
+    const winner = goesFirst === "pc" ? labels.pc : labels.npc;
+    const loser = goesFirst === "pc" ? labels.npc : labels.pc;
+
+    let steps;
+    if (rawPhases) {
+      steps = [
+        "Judge plans NPC actions",
+        "Players declare actions (Attack / Defend / Other / Multi-Action)",
+        "Roll Initiative",
+        "Pre-Action — Dodge / Block / Evade / Change Action",
+        `${winner} act`,
+        `${loser} act`
+      ];
+    } else {
+      steps = [
+        "Initiative (above)",
+        `${winner} act`,
+        `${loser} act`
+      ];
+    }
+
+    const stepHtml = steps.map((s, i) => `<div class="faserip-step">${i + 1}. ${s}</div>`).join("");
+    return `
+    <div class="faserip-steps-section">
+      <div class="faserip-steps-toggle"><span class="faserip-steps-arrow">▸</span> Turn Sequence</div>
+      <div class="faserip-steps-list" style="display:none;">${stepHtml}</div>
+    </div>`;
+  }
+
+  // Build individual mode step list (no sides)
+  static _buildIndividualStepList() {
+    const showPhase = game.settings.get("msh-faserip", "showPhaseReminder");
+    if (!showPhase) return "";
+
+    const rawPhases = game.settings.get("msh-faserip", "useRawTurnPhases");
+
+    let steps;
+    if (rawPhases) {
+      steps = [
+        "Judge plans NPC actions",
+        "Players declare actions (Attack / Defend / Other / Multi-Action)",
+        "Roll Initiative",
+        "Pre-Action — Dodge / Block / Evade / Change Action",
+        "Actions in initiative order"
+      ];
+    } else {
+      steps = [
+        "Initiative (above)",
+        "Actions in initiative order"
+      ];
+    }
+
+    const stepHtml = steps.map((s, i) => `<div class="faserip-step">${i + 1}. ${s}</div>`).join("");
+    return `
+    <div class="faserip-steps-section">
+      <div class="faserip-steps-toggle"><span class="faserip-steps-arrow">▸</span> Turn Sequence</div>
+      <div class="faserip-steps-list" style="display:none;">${stepHtml}</div>
+    </div>`;
+  }
+
   static async _postSideInitiativeCard(combat, d) {
     const labels = this._getSideLabels();
     const roundInfo = combat.round ? `Round ${combat.round}` : "Combat Start";
-    const showPhase = game.settings.get("msh-faserip", "showPhaseReminder");
-    const winner = d.goesFirst === "pc" ? labels.pc : labels.npc;
-    const loser = d.goesFirst === "pc" ? labels.npc : labels.pc;
 
-    const pcLine = this._buildSideLine(labels.pc, d.pcRoll, d.pcMod, d.pcHighest.name, d.pcTalent, d.pcTotal, d.goesFirst === "pc");
-    const npcLine = this._buildSideLine(labels.npc, d.npcRoll, d.npcMod, d.npcHighest.name, d.npcTalent, d.npcTotal, d.goesFirst === "npc");
-
-    const phaseHtml = showPhase
-      ? `<div class="faserip-phase-reminder">${winner} → ${loser}</div>`
-      : "";
+    const pcLine = this._buildSideLine(labels.pc, d.pcRoll, d.pcMod, d.pcHighest.name, d.pcHighest.source, d.pcTalent, d.pcTotal, d.goesFirst === "pc");
+    const npcLine = this._buildSideLine(labels.npc, d.npcRoll, d.npcMod, d.npcHighest.name, d.npcHighest.source, d.npcTalent, d.npcTotal, d.goesFirst === "npc");
+    const stepsHtml = this._buildStepList(combat, d.goesFirst);
 
     const content = `
   <div class="faserip-initiative-result">
@@ -559,7 +1057,7 @@ export class FaseripInitiative {
       ${pcLine}
       ${npcLine}
     </div>
-    ${phaseHtml}
+    ${stepsHtml}
   </div>`;
 
     await ChatMessage.create({
@@ -569,16 +1067,16 @@ export class FaseripInitiative {
     });
   }
 
-  static _buildSideLine(label, roll, intMod, intName, talent, total, isWinner) {
+  static _buildSideLine(label, roll, intMod, intName, intSource, talent, total, isWinner) {
     const modParts = [];
     let hasMods = false;
     if (roll === 1) {
       if (intMod > 0 || talent.bonus > 0) {
-        modParts.push(`<span class="mod-cancelled">${this._modStr(intMod, intName, talent)}</span> <em>nat 1</em>`);
+        modParts.push(`<span class="mod-cancelled">${this._modStr(intMod, intName, intSource, talent)}</span> <em>nat 1</em>`);
         hasMods = true;
       }
     } else {
-      const s = this._modStr(intMod, intName, talent);
+      const s = this._modStr(intMod, intName, intSource, talent);
       if (s) { modParts.push(s); hasMods = true; }
     }
     const modHtml = modParts.length ? `<span class="init-mods">${modParts.join(" ")}</span>` : "";
@@ -593,16 +1091,18 @@ export class FaseripInitiative {
     </div>`;
   }
 
-  static _modStr(intMod, intName, talent) {
+  static _modStr(intMod, intName, intSource, talent) {
     const parts = [];
-    if (intMod > 0) parts.push(`+${intMod} ${intName}`);
+    if (intMod > 0) {
+      const sourceTag = intSource && intSource !== "Int" ? ` [${intSource}]` : "";
+      parts.push(`+${intMod} ${intName}${sourceTag}`);
+    }
     if (talent.bonus > 0) parts.push(`+${talent.bonus} ${talent.source}`);
     return parts.join(" ");
   }
 
   static async _postIndividualInitiativeCard(combat, results) {
     const roundInfo = combat.round ? `Round ${combat.round}` : "Combat Start";
-    const showPhase = game.settings.get("msh-faserip", "showPhaseReminder");
 
     results.sort((a, b) => b.total - a.total);
 
@@ -618,22 +1118,24 @@ export class FaseripInitiative {
         hasMods = true;
       } else {
         const parts = [];
-        if (r.intMod > 0) parts.push(`+${r.intMod} Int`);
+        if (r.intMod > 0) {
+          const srcLabel = r.intSource && r.intSource !== "Int" ? r.intSource : "Int";
+          parts.push(`+${r.intMod} ${srcLabel}`);
+        }
         if (r.talentBonus > 0) parts.push(`+${r.talentBonus} ${r.talentSource}`);
         if (parts.length) { modHtml = parts.join(" "); hasMods = true; }
       }
       const formula = hasMods
         ? `${r.roll} <span class="init-mods">${modHtml}</span> = <strong>${r.total}</strong>`
         : `<strong>${r.total}</strong>`;
+
       rows += `<tr class="${r.side}-side-row">
         <td class="init-name">${r.name}</td>
         <td class="init-formula">${formula}</td>
       </tr>`;
     }
 
-    const phaseHtml = showPhase
-      ? `<div class="faserip-phase-reminder">Actions in initiative order</div>`
-      : "";
+    const stepsHtml = this._buildIndividualStepList();
 
     const content = `
   <div class="faserip-initiative-result faserip-individual">
@@ -641,7 +1143,7 @@ export class FaseripInitiative {
     <table class="faserip-init-table">
       <tbody>${rows}</tbody>
     </table>
-    ${phaseHtml}
+    ${stepsHtml}
   </div>`;
 
     await ChatMessage.create({

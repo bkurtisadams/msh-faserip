@@ -2586,15 +2586,8 @@ Hooks.on("updateCombat", async (combat, changed, diff, userId) => {
     return;
   }
 
-  // Advance world time on turn changes (6 seconds per turn) for seconds-based effect tracking
-  // This ensures seconds-based effects expire correctly even when using combat tracker
-  // Note: Round changes already advance time via combatRound hook, so only advance on pure turn changes
-  const syncEnabled = game.settings.get("msh-faserip", "combatSyncEnabled");
-  if (syncEnabled && ("turn" in changed) && !("round" in changed)) {
-    const beforeTime = game.time?.worldTime ?? 0;
-    await game.time.advance(6);
-    console.log(`[FASERIP] Turn change: advanced world time by 6s (${beforeTime} -> ${game.time.worldTime})`);
-  }
+  // Note: World time advances on round changes (6 seconds per FASERIP turn) via combatRound hook.
+  // Individual combatant turn changes within a round do NOT advance time.
 
   // Dedup guard: track last processed round+turn to prevent duplicate effect processing
   // NOTE: Dying is NOT processed here — it's handled exclusively by the combatRound hook.
