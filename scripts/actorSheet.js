@@ -370,6 +370,10 @@ export class FaseripActorSheet extends ActorSheet {
     context.healingUnavailable = context.healthAtMax || lastDamageWorldTime == null || healingCooldownRemaining > 0;
     context.healingCooldownRemaining = healingCooldownRemaining;
     
+    // NPC detection for template labels
+    const charType = context.system.characterType || "player";
+    context.isNPC = charType !== "player";
+
     return context;
   }
 

@@ -15,12 +15,12 @@
   <!-- Row 1 middle: Hero Name | Identity S/P | Age -->
   <div class="msh-row1">
     <div class="msh-field">
-      <label>Hero's Name</label>
+      <label>Name</label>
       <input type="text" name="name" value="{{actor.name}}" />
     </div>
     <div class="msh-field">
       <div class="msh-inline">
-        <label>Hero's Identity</label>
+        <label>Identity</label>
         <span class="msh-radios">
           <label class="msh-radio">
             <input type="radio" name="system.identityType" value="secret"
@@ -40,10 +40,10 @@
     </div>
   </div>
 
-  <!-- Row 1 right: Player Name -->
+  <!-- Row 1 right: Player -->
   <div class="msh-player-top">
-    <label>Player Name</label>
-    <input type="text" name="system.player" value="{{system.player}}" />
+    <label>{{#if isNPC}}Judge{{else}}Player{{/if}}</label>
+    <input type="text" name="system.player" value="{{system.player}}" {{#if isNPC}}placeholder="GM"{{/if}} />
   </div>
 
   <!-- Row 2 middle: Origin | Group | Base | Bio -->
@@ -65,7 +65,7 @@
       <input type="text" name="system.group" value="{{system.group}}" />
     </div>
     <div class="msh-field msh-field-base">
-      <label>Base of Operations</label>
+      <label>Base</label>
       <input type="text" name="system.base" value="{{system.base}}" />
     </div>
     <div class="msh-field msh-field-bio">

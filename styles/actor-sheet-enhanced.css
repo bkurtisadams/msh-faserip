@@ -59,6 +59,10 @@ form.faserip-sheet {
   row-gap: 4px;
 }
 
+/* Tighten player column — "NPC Villain" still fits */
+.msh-player-top,
+.msh-player-bottom { min-width: 85px; }
+
 .msh-logo .msh-marvel {
   font-family: 'Oswald', 'Arial Black', sans-serif;
   font-weight: 900;
