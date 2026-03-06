@@ -151,10 +151,24 @@
   display: flex; gap: 3px; margin-top: 4px; align-items: center;
 }
 .fcp-add-select {
-  flex: 1; font-size: 10px; height: 22px;
-  background: #2a2a40; color: #e0ddd4;
-  border: 1px solid #555; border-radius: 3px;
-  padding: 0 4px;
+  flex: 1; font-size: 11px; height: 24px;
+  background: var(--color-bg-option, #fff) !important;
+  color: var(--color-text-primary, #000) !important;
+  border: 1px solid var(--color-border-light, #999) !important;
+  border-radius: 3px; padding: 0 4px;
+}
+.fcp-add-select option,
+.fcp-add-select optgroup {
+  background: var(--color-bg-option, #fff) !important;
+  color: var(--color-text-primary, #000) !important;
+  font-size: 11px;
+}
+.fcp-add-select option:checked {
+  background: var(--color-bg-btn, #4a4a6a) !important;
+  color: var(--color-text-hyperlink, #fff) !important;
+}
+.fcp-add-select optgroup {
+  font-weight: bold;
 }
 .fcp-add-btn {
   width: 22px; height: 22px; font-size: 11px;

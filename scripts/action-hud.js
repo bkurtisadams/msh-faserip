@@ -195,34 +195,39 @@ export class FaseripActionPanel extends HandlebarsApplicationMixin(ApplicationV2
       img.style.pointerEvents = "none";
     }
 
+    // ── Drag: attach directly to each button (deferred to ensure DOM is settled) ──
     let dragSrc = null;
+    requestAnimationFrame(() => {
+      for (const btn of grid.querySelectorAll(".fah-btn")) {
+        btn.addEventListener("dragstart", (ev) => {
+          if (this.editMode) {
+            dragSrc = btn;
+            btn.classList.add("dragging");
+            ev.dataTransfer.effectAllowed = "move";
+          } else {
+            const actor = this.actor;
+            if (!actor) {
+              ui.notifications.warn("Select a token first.");
+              ev.preventDefault();
+              return;
+            }
+            ev.dataTransfer.setData("text/plain", JSON.stringify({
+              type: "UniversalAction",
+              actionCode: btn.dataset.action,
+              actionName: btn.dataset.full,
+              actorId: actor.id,
+              actorName: actor.name,
+              iconName: btn.dataset.action
+            }));
+          }
+        });
 
-    // ── Drag: attach directly to each button (AppV2 frame blocks delegation) ──
-    for (const btn of grid.querySelectorAll(".fah-btn")) {
-      btn.addEventListener("dragstart", (ev) => {
-        if (this.editMode) {
-          dragSrc = btn;
-          btn.classList.add("dragging");
-          ev.dataTransfer.effectAllowed = "move";
-        } else {
-          const actor = this.actor;
-          if (!actor) { ev.preventDefault(); return; }
-          ev.dataTransfer.setData("text/plain", JSON.stringify({
-            type: "UniversalAction",
-            actionCode: btn.dataset.action,
-            actionName: btn.dataset.full,
-            actorId: actor.id,
-            actorName: actor.name,
-            iconName: btn.dataset.action
-          }));
-        }
-      });
-
-      btn.addEventListener("dragend", () => {
-        btn.classList.remove("dragging");
-        grid.querySelectorAll(".drop-indicator").forEach(c => c.classList.remove("drop-indicator"));
-      });
-    }
+        btn.addEventListener("dragend", () => {
+          btn.classList.remove("dragging");
+          grid.querySelectorAll(".drop-indicator").forEach(c => c.classList.remove("drop-indicator"));
+        });
+      }
+    });
 
     // ── Click: dispatch action ──
     grid.addEventListener("click", async (ev) => {
@@ -328,10 +333,12 @@ export class FaseripActionPanel extends HandlebarsApplicationMixin(ApplicationV2
   _confirmReset() {
     Dialog.confirm({
       title: "Reset HUD Layout",
-      content: "<p>Reset to the default button order?</p>",
+      content: "<p>Reset to the default button order and zoom?</p>",
       yes: () => {
         localStorage.removeItem(storageKey());
+        localStorage.removeItem(`${storageKey()}-zoom`);
         this.actions = [...ACTIONS];
+        this._zoom = 1.0;
         this.editMode = false;
         this.render(true);
         ui.notifications?.info("Layout reset.");
