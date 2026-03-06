@@ -622,7 +622,8 @@ export class CharacterGenerator {
         rank: result.rank,
         value: rankData.min,
         initialRank: result.rank,
-        initialRoll: roll
+        initialRoll: roll,
+        initialValue: rankData.min
       };
       this.log(`${ability.charAt(0).toUpperCase() + ability.slice(1)}: Roll ${roll} → ${result.rank} (${rankData.min})`);
     }
@@ -713,7 +714,8 @@ export class CharacterGenerator {
     this.state.resources = {
       rank: finalResourceRank,
       value: getRankData(finalResourceRank).min,
-      roll: roll
+      roll: roll,
+      modShift: result.mod
     };
 
     let basePop = 10;
@@ -869,10 +871,12 @@ export class CharacterGenerator {
     }
 
     // Store full power data
+    const catEntry = categoryIndex !== null ? this.state.powersData.categories[categoryIndex] : null;
     const chosenPower = {
       name: powerName,
       category,
       categoryIndex,
+      categoryRoll: catEntry?.roll || "",
       star: power.star,
       rank: rankName,
       value: rankData.min,
@@ -1012,10 +1016,12 @@ export class CharacterGenerator {
     }
 
     // Store full talent data
+    const talCatEntry = categoryIndex !== null ? this.state.talentsData.categories[categoryIndex] : null;
     this.state.talentsData.chosen.push({
       name: talentName,
       category,
       categoryIndex,
+      categoryRoll: talCatEntry?.roll || "",
       star: talent.star,
       effect: talentInfo.effect || "",
       ability: talentInfo.ability || null,
@@ -1201,48 +1207,25 @@ export class CharacterGenerator {
     if (!s || !s.abilities) return null;
 
     const a = s.abilities;
-
-    return {
+    const abilities = ["fighting", "agility", "strength", "endurance", "reason", "intuition", "psyche"];
+    const updates = {
       "system.origin": s.origin || "",
       "system.powerOrigin": s.origin?.toLowerCase().replace("-", " ") || "altered human",
       "system.isMutant": s.origin === "Mutant",
       "system.identityType": s.hasSecretId ? "secret" : "public",
+    };
 
-      "system.abilities.fighting.value": a.fighting.value,
-      "system.abilities.fighting.rank": a.fighting.rank,
-      "system.abilities.fighting.initialRoll": a.fighting.initialRoll || "",
-      "system.abilities.fighting.initialRank": a.fighting.initialRank || "",
+    for (const ab of abilities) {
+      const d = a[ab];
+      updates[`system.abilities.${ab}.value`] = d.value;
+      updates[`system.abilities.${ab}.rank`] = d.rank;
+      updates[`system.abilities.${ab}.initialRoll`] = d.initialRoll || "";
+      updates[`system.abilities.${ab}.initialRank`] = d.initialRank || "";
+      updates[`system.abilities.${ab}.initialValue`] = d.initialValue || d.value;
+      updates[`system.abilities.${ab}.originModified`] = d.modified || false;
+    }
 
-      "system.abilities.agility.value": a.agility.value,
-      "system.abilities.agility.rank": a.agility.rank,
-      "system.abilities.agility.initialRoll": a.agility.initialRoll || "",
-      "system.abilities.agility.initialRank": a.agility.initialRank || "",
-
-      "system.abilities.strength.value": a.strength.value,
-      "system.abilities.strength.rank": a.strength.rank,
-      "system.abilities.strength.initialRoll": a.strength.initialRoll || "",
-      "system.abilities.strength.initialRank": a.strength.initialRank || "",
-
-      "system.abilities.endurance.value": a.endurance.value,
-      "system.abilities.endurance.rank": a.endurance.rank,
-      "system.abilities.endurance.initialRoll": a.endurance.initialRoll || "",
-      "system.abilities.endurance.initialRank": a.endurance.initialRank || "",
-
-      "system.abilities.reason.value": a.reason.value,
-      "system.abilities.reason.rank": a.reason.rank,
-      "system.abilities.reason.initialRoll": a.reason.initialRoll || "",
-      "system.abilities.reason.initialRank": a.reason.initialRank || "",
-
-      "system.abilities.intuition.value": a.intuition.value,
-      "system.abilities.intuition.rank": a.intuition.rank,
-      "system.abilities.intuition.initialRoll": a.intuition.initialRoll || "",
-      "system.abilities.intuition.initialRank": a.intuition.initialRank || "",
-
-      "system.abilities.psyche.value": a.psyche.value,
-      "system.abilities.psyche.rank": a.psyche.rank,
-      "system.abilities.psyche.initialRoll": a.psyche.initialRoll || "",
-      "system.abilities.psyche.initialRank": a.psyche.initialRank || "",
-
+    Object.assign(updates, {
       "system.attributes.health.value": s.health,
       "system.attributes.health.max": s.health,
       "system.attributes.karma.value": s.karma,
@@ -1250,8 +1233,27 @@ export class CharacterGenerator {
       "system.attributes.resources.rank": s.resources.rank,
       "system.attributes.resources.value": s.resources.value,
       "system.attributes.popularity.hero.value": s.popularity.hero,
-      "system.attributes.popularity.secretId.value": s.hasSecretId ? s.popularity.secretId : 0
-    };
+      "system.attributes.popularity.secretId.value": s.hasSecretId ? s.popularity.secretId : 0,
+
+      "system.chargen.originRoll": s.originRoll || "",
+      "system.chargen.resourcesBaseRank": s.origin === "Alien" ? "Poor" : s.origin === "Hi-Tech" ? "Good" : "Typical",
+      "system.chargen.resourcesModRoll": s.resources.roll || "",
+      "system.chargen.resourcesModShift": s.resources.modShift ?? "",
+      "system.chargen.popularityBase": s.origin === "Mutant" || s.origin === "Robot" ? 0 : 10,
+      "system.chargen.powersRoll": s.powersData?.roll || "",
+      "system.chargen.powersInitial": s.powersData?.initial || "",
+      "system.chargen.powersMax": s.powersData?.max || "",
+      "system.chargen.talentsRoll": s.talentsData?.roll || "",
+      "system.chargen.talentsInitial": s.talentsData?.initial || "",
+      "system.chargen.talentsMax": s.talentsData?.max || "",
+      "system.chargen.contactsRoll": s.contactsData?.roll || "",
+      "system.chargen.contactsInitial": s.contactsData?.initial || "",
+      "system.chargen.contactsMax": s.contactsData?.max || "",
+      "system.chargen.alteredBonusAbility": s.alteredBonusUsed ? (abilities.find(ab => a[ab].modified && s.origin === "Altered Human") || "") : "",
+      "system.chargen.log": s.log || []
+    });
+
+    return updates;
   }
 
   buildItemData() {
@@ -1269,9 +1271,15 @@ export class CharacterGenerator {
           isStarred: p.star || false,
           isBonus: p.isBonus || false,
           bonusFrom: p.bonusFrom || "",
+          initialRoll: p.roll || "",
+          initialRank: p.rank,
+          initialValue: p.value,
+          categoryRoll: p.categoryRoll || "",
+          limitationRequired: p.limitationRequired || false,
+          limitationDetail: p.limitationDetail || "",
+          preLimitationRank: p.preLimitationRank || "",
           description: p.description || `Generated power from ${p.category} category.`,
           stunts: (p.stunts || []).join("\n"),
-          limitationRequired: p.limitationRequired || false,
           notes: p.notes || ""
         }
       });
@@ -1283,9 +1291,12 @@ export class CharacterGenerator {
         type: "talent",
         system: {
           type: t.category,
+          category: t.category,
+          categoryRoll: t.categoryRoll || "",
           effect: t.effect || "",
           ability: t.ability || "",
           modifier: t.modifier || 0,
+          grantsContact: t.grantsContact || "",
           description: t.effect || `Generated talent from ${t.category} category.`,
           notes: t.notes || ""
         }

@@ -27,13 +27,13 @@
       },
       "abilities": {
         "abilities": {
-          "fighting": { "value": 10, "initialRoll": "", "initialRank": "", "rank": "Good" },
-          "agility": { "value": 10, "initialRoll": "", "initialRank": "", "rank": "Good" },
-          "strength": { "value": 10, "initialRoll": "", "initialRank": "", "rank": "Good" },
-          "endurance": { "value": 10, "initialRoll": "", "initialRank": "", "rank": "Good" },
-          "reason": { "value": 10, "initialRoll": "", "initialRank": "", "rank": "Good" },
-          "intuition": { "value": 10, "initialRoll": "", "initialRank": "", "rank": "Good" },
-          "psyche": { "value": 10, "initialRoll": "", "initialRank": "", "rank": "Good" }
+          "fighting": { "value": 10, "initialRoll": "", "initialRank": "", "initialValue": "", "originModified": false, "rank": "Good" },
+          "agility": { "value": 10, "initialRoll": "", "initialRank": "", "initialValue": "", "originModified": false, "rank": "Good" },
+          "strength": { "value": 10, "initialRoll": "", "initialRank": "", "initialValue": "", "originModified": false, "rank": "Good" },
+          "endurance": { "value": 10, "initialRoll": "", "initialRank": "", "initialValue": "", "originModified": false, "rank": "Good" },
+          "reason": { "value": 10, "initialRoll": "", "initialRank": "", "initialValue": "", "originModified": false, "rank": "Good" },
+          "intuition": { "value": 10, "initialRoll": "", "initialRank": "", "initialValue": "", "originModified": false, "rank": "Good" },
+          "psyche": { "value": 10, "initialRoll": "", "initialRank": "", "initialValue": "", "originModified": false, "rank": "Good" }
         },
         "combatMods": {
           "attackShift": 0,
@@ -96,7 +96,25 @@
       "powerOrigin": "altered human",
       "isMutant": false,
       "resistances": [],
-      "stunts": []
+      "stunts": [],
+      "chargen": {
+        "originRoll": "",
+        "resourcesBaseRank": "",
+        "resourcesModRoll": "",
+        "resourcesModShift": "",
+        "popularityBase": "",
+        "powersRoll": "",
+        "powersInitial": "",
+        "powersMax": "",
+        "talentsRoll": "",
+        "talentsInitial": "",
+        "talentsMax": "",
+        "contactsRoll": "",
+        "contactsInitial": "",
+        "contactsMax": "",
+        "alteredBonusAbility": "",
+        "log": []
+      }
     },
     "villain": {
       "templates": ["base", "abilities", "derived", "movement", "progress"],
@@ -104,7 +122,25 @@
       "powerOrigin": "altered human",
       "isMutant": false,
       "resistances": [],
-      "stunts": []
+      "stunts": [],
+      "chargen": {
+        "originRoll": "",
+        "resourcesBaseRank": "",
+        "resourcesModRoll": "",
+        "resourcesModShift": "",
+        "popularityBase": "",
+        "powersRoll": "",
+        "powersInitial": "",
+        "powersMax": "",
+        "talentsRoll": "",
+        "talentsInitial": "",
+        "talentsMax": "",
+        "contactsRoll": "",
+        "contactsInitial": "",
+        "contactsMax": "",
+        "alteredBonusAbility": "",
+        "log": []
+      }
     },
     "npc": {
       "templates": ["base", "abilities", "derived", "movement", "progress"],
@@ -153,6 +189,17 @@
       "isActive": true,
       "isStarred": false,
       "source": "natural",
+      
+      "category": "",
+      "isBonus": false,
+      "bonusFrom": "",
+      "initialRoll": "",
+      "initialRank": "",
+      "initialValue": "",
+      "categoryRoll": "",
+      "limitationRequired": false,
+      "limitationDetail": "",
+      "preLimitationRank": "",
       
       "range": "",
       "customRange": "",
@@ -212,7 +259,10 @@
       "rankOverride": "",
       "isCumulative": false,
       "isWeaponTalent": false,
-      "notes": ""
+      "notes": "",
+      "category": "",
+      "categoryRoll": "",
+      "grantsContact": ""
     },
     "contact": {
       "templates": ["base"],
