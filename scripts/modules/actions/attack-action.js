@@ -554,9 +554,11 @@ export class AttackAction extends BaseAction {
     // Positive defenderShift = harder to hit, so we subtract it
     const effectShift = attackerShift - defenderShift;
 
-    // Apply column shift (manual + effect modifiers)
+    // Apply column shift (manual + range/obstacle/movement + effect modifiers)
+    // Ranged actions set choice.totalShift which already includes manual + range + obstacle + movement.
+    // Melee actions only set choice.shift (manual CS). Use totalShift when present.
     let effectiveRank = ability.rank;
-    const manualShift = choice.shift || 0;
+    const manualShift = (choice.totalShift != null) ? choice.totalShift : (choice.shift || 0);
     const totalShift = manualShift + effectShift;
     if (totalShift) effectiveRank = shiftRank(effectiveRank, totalShift);
     
@@ -1037,6 +1039,21 @@ export class AttackAction extends BaseAction {
           parts.push(`${breakdown.multiAttack} ${label}`);
         }
         
+        // Range penalty (ranged attacks)
+        if (breakdown?.range && breakdown.range !== 0) {
+          parts.push(`${breakdown.range} range`);
+        }
+        
+        // Obstacle penalty (ranged attacks)
+        if (breakdown?.obstacle && breakdown.obstacle !== 0) {
+          parts.push(`${breakdown.obstacle} obstacle`);
+        }
+        
+        // Movement penalty (ranged attacks)
+        if (breakdown?.movement && breakdown.movement !== 0) {
+          parts.push(`${breakdown.movement} movement`);
+        }
+        
         // Adjacent targets penalty
         if (breakdown?.adjacent && breakdown.adjacent !== 0) {
           parts.push(`${breakdown.adjacent} adjacent`);
@@ -1367,11 +1384,11 @@ export class AttackAction extends BaseAction {
               return dflt;
             };
 
-            // Decide rounds to spend: prefer HUD/sender opts, then item hints, else 1
-            // Choose the first finite, positive number; default to 1 if none.
+            // Decide rounds to spend: prefer HUD/sender opts, then weapon rate of fire, else 1
             const candidates = [
               this?.opts?.roundsFired,
-              this?.opts?.shotsToSpend
+              this?.opts?.shotsToSpend,
+              sys.rate
             ];
             const first = candidates.map(v => toNum(v)).find(n => Number.isFinite(n) && n > 0);
             const rounds = Number.isFinite(first) ? Math.max(1, Math.trunc(first)) : 1;
