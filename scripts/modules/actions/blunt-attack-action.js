@@ -1,6 +1,6 @@
 //--- START OF FILE blunt-attack-action.js ---
-// blunt-attack-action.js v1.4.17 - 2025-01-21
-// v1.4.17: Add cancelled check to abort multi-attack when FEAT dialog is cancelled
+// blunt-attack-action.js v1.5.0 - 2026-03-06
+// v1.5.0: Restyle dialog with frp-dlg CSS classes from v3 mockup (attack-dialog.css), remove inline styles
 // v1.4.16: Pass weapon base damage to computeBluntDamage for minimum damage enforcement
 // v1.4.15: Detect and display combat talents (Martial Arts A/B/D/E, Boxing) in dialog
 // v1.4.14: Add csNotes to shiftBreakdown for chat card hover text
@@ -179,58 +179,52 @@ export class BluntAttackAction extends AttackAction {
     const savedCsNotes = (await actor.getFlag("msh-faserip", "csNotes")) || "";
 
     // dialog HTML - Compact Prototype
+    // Column shift initial CSS classes
+    const csInputCls = savedColumnShift > 0 ? ' cs-pos' : savedColumnShift < 0 ? ' cs-neg' : '';
+    const csResultCls = savedColumnShift > 0 ? ' positive' : savedColumnShift < 0 ? ' negative' : '';
+
     const dialogHtml = `
+    <div class="frp-dlg">
       ${buildModeSelector({ mode: "semi" })}
 
-      <!-- Context: Target + Attack stats side by side -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
-        <div style="background:#f5f5f5;padding:8px;border-radius:3px;">
-          <div style="font-weight:600;color:#666;font-size:.8em;text-transform:uppercase;">Target${targets.length > 1 ? 's' : ''}</div>
-          <div style="font-weight:600;color:#d32f2f;">${targetDisplay}</div>
-          <div style="color:#666;" id="target-armor-display">${primaryTargetActor ? `Armor: ${targetArmor}${targetArmorSource ? ` (${targetArmorSource})` : ''}${armorNote}` : ''}</div>
+      <!-- CS + Target side by side -->
+      <div class="frp-top-grid">
+        <div class="frp-box frp-cs-box">
+          <div class="frp-box-label gold">Column Shift</div>
+          <div class="frp-cs-line">
+            <input type="number" class="frp-cs-input${csInputCls}" name="shift" value="${savedColumnShift}">
+            <span class="frp-cs-arrow">→</span>
+            <span class="frp-cs-result${csResultCls}" id="shifted-rank-display">${shiftRank(ability.rank, savedColumnShift)}</span>
+            <button type="button" class="frp-cs-reset cs-reset" style="visibility:${savedColumnShift !== 0 ? 'visible' : 'hidden'}">×</button>
+          </div>
+          <input type="text" class="frp-cs-notes" name="csNotes" id="cs-notes-input" placeholder="e.g., MA-B +1, high ground +1" value="${savedCsNotes}">
+          ${combatTalents.length > 0 ? `<div class="frp-cs-talents">${combatTalents.map(t => `${t.name}: ${t.bonus}`).join(', ')}</div>` : ''}
         </div>
-        <div style="background:#f5f5f5;padding:8px;border-radius:3px;">
-          <div style="font-weight:600;color:#666;font-size:.8em;text-transform:uppercase;">Attack</div>
-          <div style="font-weight:600;">${ability.name}: ${ability.rank}</div>
-          <div style="color:#666;">Rank Value: ${ability.value}</div>
-          ${combatTalents.length > 0 ? combatTalents.map(t => 
-            `<div style="color:#2e7d32;font-size:.85em;">${t.name}: ${t.bonus}</div>`
-          ).join('') : ''}
+        <div class="frp-box">
+          <div class="frp-box-label muted">Target${targets.length > 1 ? 's' : ''}</div>
+          <div class="frp-target-name">${targetDisplay}</div>
+          <div class="frp-target-info" id="target-armor-display">${primaryTargetActor ? `Armor: ${targetArmor}${targetArmorSource ? ` (${targetArmorSource})` : ''}${armorNote}` : `${ability.name}: ${ability.rank} (${ability.value})`}</div>
         </div>
       </div>
 
-      <!-- Source Selection -->
-      <div class="source-section" style="padding:8px;background:${savedSource !== 'hands' ? '#fff8e1' : '#fff'};border:1px solid ${savedSource !== 'hands' ? '#ffc107' : '#ddd'};border-radius:3px;margin-bottom:8px;">
-        <div style="margin-bottom:4px;">
+      <!-- Source -->
+      <div class="frp-box source-section${savedSource !== 'hands' ? ' src-active' : ''}" id="source-box">
+        <div class="frp-src-line">
           <label><input type="radio" name="src" value="hands" ${savedSource==='hands'?'checked':''}> Hands</label>
-          <label style="margin-left:12px;"><input type="radio" name="src" value="weapon" ${savedSource==='weapon'?'checked':''}> Weapon</label>
-          <label style="margin-left:12px;"><input type="radio" name="src" value="object" ${savedSource==='object'?'checked':''}> Object</label>
-          <span style="display:inline-block;width:16px;height:16px;line-height:16px;text-align:center;border-radius:50%;background:#2196F3;color:#fff;font-size:11px;font-weight:bold;cursor:help;margin-left:6px;" title="BLUNT DAMAGE RULES:
-- Bare hands = Strength value
-- Weapon material ≤ Strength: damage = Strength
-- Weapon material > Strength: damage = next rank up from Strength
-
-Common improvised weapons:
-  Bottle/glass: Feeble (2)
-  Trash can lid: Poor (4)
-  Brick, wooden chair: Typical (6)
-  Metal pipe, crowbar: Good (10)
-  Car door: Excellent (20)
-  Lamp post: Remarkable (30)
-  Dumpster: Incredible (40)">?</span>
+          <label><input type="radio" name="src" value="weapon" ${savedSource==='weapon'?'checked':''}> Weapon</label>
+          <label><input type="radio" name="src" value="object" ${savedSource==='object'?'checked':''}> Object</label>
+          <span class="frp-info-dot" title="BLUNT DAMAGE RULES:\n- Bare hands = Strength value\n- Weapon material ≤ Strength: damage = Strength\n- Weapon material > Strength: damage = next rank up\n\nCommon improvised weapons:\n  Bottle/glass: Feeble (2)\n  Trash can lid: Poor (4)\n  Brick, chair: Typical (6)\n  Metal pipe: Good (10)\n  Car door: Excellent (20)\n  Lamp post: Remarkable (30)\n  Dumpster: Incredible (40)">?</span>
         </div>
-        
-        <div id="weapon-row" style="display:none;margin-top:6px;">
-          <select name="item" style="width:100%;padding:4px;">${itemOptions || `<option value="">(none)</option>`}</select>
+        <div class="weapon-row" id="weapon-row" style="display:none">
+          <select name="item">${itemOptions || `<option value="">(none)</option>`}</select>
         </div>
-
-        <div id="object-row" style="display:none;margin-top:6px;">
-          <div style="display:grid;grid-template-columns:auto 1fr;gap:4px 8px;align-items:center;">
+        <div class="object-row" id="object-row" style="display:none">
+          <div class="obj-grid">
             <label>Name:</label>
-            <input type="text" name="objectName" value="${savedObjectName}" placeholder="rock, pipe..." style="padding:4px;">
+            <input type="text" name="objectName" value="${savedObjectName}" placeholder="rock, pipe...">
             <label>Material:</label>
-            <div style="display:flex;gap:4px;">
-              <select name="objectRank" style="flex:1;padding:4px;">
+            <div class="obj-mat-row">
+              <select name="objectRank">
                 <option value="Feeble" ${savedObjectRank==='Feeble'?'selected':''}>Feeble</option>
                 <option value="Poor" ${savedObjectRank==='Poor'?'selected':''}>Poor</option>
                 <option value="Typical" ${savedObjectRank==='Typical'?'selected':''}>Typical</option>
@@ -242,80 +236,72 @@ Common improvised weapons:
                 <option value="Monstrous" ${savedObjectRank==='Monstrous'?'selected':''}>Monstrous</option>
                 <option value="Unearthly" ${savedObjectRank==='Unearthly'?'selected':''}>Unearthly</option>
               </select>
-              <input type="number" name="objectValue" value="${savedObjectValue}" style="width:50px;padding:4px;">
+              <input type="number" name="objectValue" value="${savedObjectValue}">
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Damage Preview -->
-      <div id="preview" style="background:#ffebee;border:1px solid #ef9a9a;border-radius:3px;padding:10px;margin-bottom:8px;">
-        <div style="display:flex;justify-content:space-between;align-items:center;">
-          <span><strong>Damage:</strong> <span id="dmg-val">${initialDamage}</span> <span id="dmg-note" style="color:#555;">(Strength)</span></span>
-          <span style="font-size:1.1em;" id="after-armor-display"><strong>→ ${initialAfterArmor} after armor</strong></span>
-        </div>
-      </div>
-
-      <!-- Modifiers Row -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;font-size:.9em;">
-        <div class="cs-field" style="display:flex;align-items:center;gap:4px;padding:4px 6px;border-radius:3px;${savedColumnShift < 0 ? 'background:#ffebee;border:1px solid #ef5350;' : savedColumnShift > 0 ? 'background:#e8f5e9;border:1px solid #66bb6a;' : 'border:1px solid transparent;'}">
-          <label style="font-weight:600;">CS:</label>
-          <input type="number" name="shift" value="${savedColumnShift}" style="width:35px;padding:3px;text-align:center;box-sizing:border-box;">
-          <span style="color:#666;">→</span>
-          <strong id="shifted-rank-display" style="${savedColumnShift < 0 ? 'color:#c62828;' : savedColumnShift > 0 ? 'color:#2e7d32;' : ''}">${shiftRank(ability.rank, savedColumnShift)}</strong>
-          <button type="button" class="cs-reset" style="visibility:${savedColumnShift !== 0 ? 'visible' : 'hidden'};padding:1px 5px;font-size:.85em;cursor:pointer;border:1px solid #999;border-radius:2px;background:#eee;" title="Reset to 0">×</button>
-        </div>
-        <div class="karma-field" style="display:flex;align-items:center;gap:4px;padding:4px 6px;border-radius:3px;${hasKarma ? 'background:#e3f2fd;border:1px solid #90caf9;' : ''}">
-          ${hasKarma ? `
-            <label style="display:flex;align-items:center;gap:4px;cursor:pointer;">
-              <input type="checkbox" id="spend-karma" name="spendKarma">
-              <span style="font-weight:600;">Karma:</span>
-            </label>
-            <span title="Available: ${availableKarma} | Min commitment: ${minKarma} | Amount chosen after roll" style="padding:1px 4px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${availableKarma}</span>
-            <span style="color:#999;font-size:.8em;">(min ${minKarma})</span>
-          ` : `<span style="color:#999;">No karma</span>`}
-        </div>
-      </div>
-
-      <!-- CS Notes Row (text input for explaining CS value) -->
-      <div id="cs-notes-row" style="margin-bottom:6px;">
-        <input type="text" name="csNotes" id="cs-notes-input" placeholder="e.g., Ultimate Skill +4" value="${savedCsNotes}" style="width:100%;padding:4px 8px;border:1px solid #ccc;border-radius:3px;font-size:.9em;box-sizing:border-box;">
-      </div>
-
-      <!-- Multi-Attack Row -->
-      <div class="multi-attack-section" style="padding:6px 8px;background:#e8f5e9;border:1px solid #a5d6a7;border-radius:3px;margin-bottom:6px;">
-        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-          <span style="font-weight:600;color:#2e7d32;">Multi:</span>
-          <label title="Single attack, no penalty" style="cursor:pointer;"><input type="radio" name="multiMode" value="off" ${!savedMultiAttacks && !savedMultiAdjacent ? 'checked' : ''}> Off</label>
-          <label title="Remarkable Fighting FEAT. Success: 2 attacks at -1CS each. Fail: 1 attack at -3CS." style="cursor:pointer;"><input type="radio" name="multiMode" value="2" ${savedMultiAttacks && savedAttackCount === 2 ? 'checked' : ''}> 2 atk</label>
-          <label title="Amazing Fighting FEAT. Success: 3 attacks at -1CS each. Fail: 1 attack at -3CS." style="cursor:pointer;"><input type="radio" name="multiMode" value="3" ${savedMultiAttacks && savedAttackCount === 3 ? 'checked' : ''}> 3 atk</label>
-          <label title="-4CS penalty, hits all adjacent targets with single roll." style="cursor:pointer;"><input type="radio" name="multiMode" value="adjacent" ${savedMultiAdjacent ? 'checked' : ''}> Adjacent</label>
-        </div>
-      </div>
-
-      <!-- Pull Punch Row -->
-      <div class="pull-punch-section" style="padding:6px 8px;background:#fff3e0;border:1px solid #ffcc80;border-radius:3px;margin-bottom:8px;">
-        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-          <label title="Voluntarily reduce damage and/or result" style="display:flex;align-items:center;gap:4px;cursor:pointer;">
-            <input type="checkbox" id="pull-punch-enabled" ${savedPullEnabled ? 'checked' : ''}>
-            <strong style="color:#e65100;">Pull Punch</strong>
-          </label>
-          <div class="pull-damage-controls" style="display:${savedPullEnabled ? 'flex' : 'none'};align-items:center;gap:3px;">
-            <input type="number" name="pulledDamage" title="Damage cap" value="${savedPullEnabled && savedPulledDamage > 0 ? savedPulledDamage : initialMaxDamage}" min="0" max="${initialMaxDamage}" style="width:40px;padding:2px;text-align:center;">
-            <span style="color:#666;font-size:.85em;">/<span class="max-damage-display">${initialMaxDamage}</span></span>
-            <span style="color:#ccc;margin:0 2px;">|</span>
-            <label title="No result cap" style="cursor:pointer;font-size:.9em;"><input type="radio" name="resultCap" value="none" ${savedResultCap==='none'?'checked':''}> Any</label>
-            <label title="Cap at Yellow (Slam max, no Stun)" style="cursor:pointer;font-size:.9em;"><input type="radio" name="resultCap" value="yellow" ${savedResultCap==='yellow'?'checked':''}> Ylw</label>
-            <label title="Cap at Green (Hit max, no Slam/Stun)" style="cursor:pointer;font-size:.9em;"><input type="radio" name="resultCap" value="green" ${savedResultCap==='green'?'checked':''}> Grn</label>
+      <!-- Damage -->
+      <div class="frp-box frp-dmg-box">
+        <div class="frp-dmg-row">
+          <div class="frp-dmg-left">
+            <span class="frp-dmg-label">Damage:</span>
+            <span class="frp-dmg-num" id="dmg-val">${initialDamage}</span>
+            <span class="frp-dmg-note" id="dmg-note">(Strength)</span>
+          </div>
+          <div>
+            <span class="frp-dmg-arrow">→</span>
+            <span class="frp-dmg-after" id="after-armor-display">${primaryTarget ? `${initialAfterArmor} after armor` : `${initialDamage} damage`}</span>
           </div>
         </div>
       </div>
 
+      <!-- Pull Punch -->
+      <div class="frp-box frp-pull-box pull-punch-section${savedPullEnabled ? ' pull-active' : ''}" id="pull-box">
+        <div class="frp-pull-line">
+          <label>
+            <input type="checkbox" id="pull-punch-enabled" ${savedPullEnabled ? 'checked' : ''}>
+            <span class="frp-pull-label">Pull</span>
+          </label>
+          <span>damage to</span>
+          <input type="number" class="frp-pull-dmg" name="pulledDamage" value="${savedPullEnabled && savedPulledDamage > 0 ? savedPulledDamage : initialMaxDamage}" min="0" max="${initialMaxDamage}">
+          <span class="frp-pull-sep">Cap result at</span>
+          <select class="frp-pull-cap-select" name="resultCap">
+            <option value="none" ${savedResultCap==='none'?'selected':''}>None</option>
+            <option value="yellow" ${savedResultCap==='yellow'?'selected':''}>Yellow</option>
+            <option value="green" ${savedResultCap==='green'?'selected':''}>Green</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Multi -->
+      <div class="frp-box frp-multi-box multi-attack-section${(savedMultiAttacks || savedMultiAdjacent) ? ' multi-active' : ''}" id="multi-box">
+        <div class="frp-multi-line">
+          <span class="frp-multi-label">Multi:</span>
+          <label title="Single attack, no penalty"><input type="radio" name="multiMode" value="off" ${!savedMultiAttacks && !savedMultiAdjacent ? 'checked' : ''}> Off</label>
+          <label title="Remarkable FEAT. Success: 2 attacks at -1CS. Fail: 1 at -3CS."><input type="radio" name="multiMode" value="2" ${savedMultiAttacks && savedAttackCount === 2 ? 'checked' : ''}> 2 atk</label>
+          <label title="Amazing FEAT. Success: 3 attacks at -1CS. Fail: 1 at -3CS."><input type="radio" name="multiMode" value="3" ${savedMultiAttacks && savedAttackCount === 3 ? 'checked' : ''}> 3 atk</label>
+          <label title="-4CS penalty, hits all adjacent targets."><input type="radio" name="multiMode" value="adjacent" ${savedMultiAdjacent ? 'checked' : ''}> Adjacent</label>
+        </div>
+      </div>
+
+      <!-- Karma -->
+      <div class="frp-box frp-karma-box${hasKarma ? ' karma-active' : ''}" id="karma-box">
+        <div class="frp-karma-line">
+          ${hasKarma ? `
+            <label><input type="checkbox" id="spend-karma" name="spendKarma"> Spend Karma</label>
+            <span class="frp-karma-pool">Pool: <strong>${availableKarma}</strong> available (min ${minKarma})</span>
+          ` : `<label style="color:var(--txt-m);">No karma available</label>`}
+        </div>
+      </div>
+
       <!-- Footer -->
-      <div id="msh-bottom-controls" style="display:flex;justify-content:space-between;align-items:center;padding-top:8px;border-top:1px solid #ddd;">
+      <div class="frp-foot">
         <label><input type="checkbox" id="msh-remember-settings" name="remember" ${shouldRemember ? 'checked' : ''}> Remember</label>
         <label><input type="checkbox" id="msh-skip-dice" name="skipDice" ${savedSkipDice ? 'checked' : ''}> Skip dice</label>
       </div>
+    </div>
     `;
 
     const choice = await new Promise((resolve) => {
@@ -373,7 +359,7 @@ Common improvised weapons:
             // Pull punch - only use values if checkbox is checked
             const pullEnabled  = $dlg('#pull-punch-enabled').is(':checked');
             const pulledDamage = pullEnabled ? parseInt($dlg('[name="pulledDamage"]').val() || 0) : 0;
-            const resultCap    = pullEnabled ? ($dlg('[name="resultCap"]:checked').val() || "none") : "none";
+            const resultCap    = pullEnabled ? ($dlg('[name="resultCap"]').val() || "none") : "none";
 
             // Multi-attack - parse from radio
             const multiMode = $dlg('[name="multiMode"]:checked').val() || "off";
@@ -463,7 +449,6 @@ Common improvised weapons:
             const $note = html.find('#dmg-note');
             const $afterArmor = html.find('#after-armor-display');
             const $pulledDamage = html.find('[name="pulledDamage"]');
-            const $maxDmgDisplay = html.find('.max-damage-display');
 
             // Hide both rows first
             $weaponRow.hide();
@@ -499,46 +484,45 @@ Common improvised weapons:
             // Update after-armor display
             const afterArmorDmg = Math.max(0, currentDamage - targetArmor);
             if (primaryTarget) {
-              $afterArmor.html(`<strong>→ ${afterArmorDmg} after armor</strong>`);
+              $afterArmor.text(`${afterArmorDmg} after armor`);
             } else {
-              $afterArmor.html(`<strong>→ ${currentDamage} damage</strong>`);
+              $afterArmor.text(`${currentDamage} damage`);
             }
 
             // Update shifted rank display with directional coloring
             const cs = parseInt(html.find('[name="shift"]').val()) || 0;
             const shiftedRankText = shiftRank(ability.rank, cs);
             const $shiftedRank = html.find('#shifted-rank-display');
+            const $csInput = html.find('.frp-cs-input');
             $shiftedRank.text(shiftedRankText);
             
-            // Update CS field highlighting based on direction
-            const $csField = html.find('.cs-field');
+            // Update CS input/result classes
             const $resetBtn = html.find('.cs-reset');
-            if (cs < 0) {
-              $csField.css({ 'background': '#ffebee', 'border': '1px solid #ef5350' });
-              $shiftedRank.css('color', '#c62828');
+            $csInput.removeClass('cs-pos cs-neg');
+            $shiftedRank.removeClass('positive negative');
+            if (cs > 0) {
+              $csInput.addClass('cs-pos');
+              $shiftedRank.addClass('positive');
               $resetBtn.css('visibility', 'visible');
-            } else if (cs > 0) {
-              $csField.css({ 'background': '#e8f5e9', 'border': '1px solid #66bb6a' });
-              $shiftedRank.css('color', '#2e7d32');
+            } else if (cs < 0) {
+              $csInput.addClass('cs-neg');
+              $shiftedRank.addClass('negative');
               $resetBtn.css('visibility', 'visible');
             } else {
-              $csField.css({ 'background': '', 'border': '1px solid transparent' });
-              $shiftedRank.css('color', '');
               $resetBtn.css('visibility', 'hidden');
             }
             
             // Update source section highlighting
             const $sourceSection = html.find('.source-section');
             if (src !== 'hands') {
-              $sourceSection.css({ 'background': '#fff8e1', 'border-color': '#ffc107' });
+              $sourceSection.addClass('src-active');
             } else {
-              $sourceSection.css({ 'background': '#fff', 'border-color': '#ddd' });
+              $sourceSection.removeClass('src-active');
             }
 
             // Update pull punch damage cap - always reset to new max when source changes
             const oldMax = Number($pulledDamage.attr('max')) || 0;
             $pulledDamage.attr('max', maxDamage);
-            $maxDmgDisplay.text(maxDamage);
             // If max changed (source switched), reset value to new max
             if (oldMax !== maxDamage) {
               $pulledDamage.val(maxDamage);
@@ -568,57 +552,29 @@ Common improvised weapons:
           
           // Pull punch checkbox toggle
           html.find('#pull-punch-enabled').on('change', function() {
-            const $controls = html.find('.pull-damage-controls');
             const $pulledDamage = html.find('[name="pulledDamage"]');
             const $section = html.find('.pull-punch-section');
             if (this.checked) {
-              $controls.css('display', 'flex');
-              // Set value to current max (which reflects weapon/object damage)
               const currentMax = Number($pulledDamage.attr('max')) || strength.value;
               $pulledDamage.val(currentMax);
-              // Dark orange border when enabled
-              $section.css('border-color', '#e65100');
+              $section.addClass('pull-active');
             } else {
-              $controls.hide();
-              // Reset result cap to "none" and damage to max when disabling pull punch
-              html.find('[name="resultCap"][value="none"]').prop('checked', true);
+              html.find('[name="resultCap"]').val('none');
               $pulledDamage.val($pulledDamage.attr('max'));
-              // Reset to default border
-              $section.css('border-color', '#ffcc80');
+              $section.removeClass('pull-active');
             }
           });
           
-          // Initialize pull punch border on load
-          if (html.find('#pull-punch-enabled').is(':checked')) {
-            html.find('.pull-punch-section').css('border-color', '#e65100');
-          }
-          
-          // Karma checkbox border highlight
+          // Karma checkbox toggle
           html.find('#spend-karma').on('change', function() {
-            const $field = html.find('.karma-field');
-            if (this.checked) {
-              $field.css('border-color', '#1565c0'); // Dark blue
-            } else {
-              $field.css('border-color', '#90caf9'); // Default light blue
-            }
+            html.find('#karma-box').toggleClass('karma-active', this.checked);
           });
           
-          // Multi-attack border highlight
+          // Multi-attack toggle
           html.find('[name="multiMode"]').on('change', function() {
             const mode = html.find('[name="multiMode"]:checked').val();
-            const $section = html.find('.multi-attack-section');
-            if (mode !== 'off') {
-              $section.css('border-color', '#2e7d32'); // Dark green
-            } else {
-              $section.css('border-color', '#a5d6a7'); // Default light green
-            }
+            html.find('.multi-attack-section').toggleClass('multi-active', mode !== 'off');
           });
-          
-          // Initialize multi-attack border on load
-          const initialMultiMode = html.find('[name="multiMode"]:checked').val();
-          if (initialMultiMode && initialMultiMode !== 'off') {
-            html.find('.multi-attack-section').css('border-color', '#2e7d32');
-          }
           
           applyCapabilitiesToDialog(html, "blunt-attack", { actor });
 
