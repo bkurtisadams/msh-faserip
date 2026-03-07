@@ -400,12 +400,20 @@
       "materialStrength": "Typical",
       "ownership": "owned",
       "purchaseCost": "",
-      "rentalCost": "",
+      "rentCost": "",
       "isRichArea": false,
+      "locationModifier": "normal",
       "packages": [],
       "staff": [],
       "features": "",
-      "notes": ""
+      "notes": "",
+      "rentLastPaid": "",
+      "rentLastPaidGameDate": "",
+      "loanPaymentRank": "",
+      "loanPaymentsRemaining": 0,
+      "loanPaymentsTotal": 0,
+      "loanLastPaid": "",
+      "loanLastPaidGameDate": ""
     }
   }
 }

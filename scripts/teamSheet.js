@@ -263,6 +263,7 @@ export class TeamSheet extends Application {
     html.find('.add-team-hq').click(() => this._onAddTeamHQ());
     html.find('.edit-team-hq').click(ev => this._onEditTeamHQ(ev.currentTarget.dataset.hqId));
     html.find('.delete-team-hq').click(ev => this._onDeleteTeamHQ(ev.currentTarget.dataset.hqId));
+    html.find('.process-rent-btn').click(() => this._onProcessRent());
     html.find('.team-hq-img').click(ev => this._onViewTeamHQ(ev.currentTarget.dataset.hqId));
   }
 
@@ -822,6 +823,71 @@ export class TeamSheet extends Application {
     })) return;
     await actor.deleteEmbeddedDocuments("Item", [itemId]);
     this.render(true);
+  }
+
+  async _onProcessRent() {
+    if (!game.user.isGM) return;
+    const { FaseripHeadquartersSheet } = await import('./headquartersSheet.js');
+    const teamIds = game.settings.get("msh-faserip", "teamMembers") || [];
+
+    // Collect all rented HQs: team HQs + personal HQs on team members
+    const rentedHQs = [];
+
+    // Team HQs (from the shared team HQ actor)
+    const hqActorId = game.settings.get("msh-faserip", "teamHQActorId");
+    const hqActor = hqActorId ? game.actors.get(hqActorId) : null;
+    if (hqActor) {
+      for (const item of hqActor.items) {
+        if (item.type === "headquarters" && item.system.ownership === "rented") {
+          rentedHQs.push({ item, ownerActorIds: [...teamIds] });
+        }
+      }
+    }
+
+    // Personal HQs on each team member
+    for (const actorId of teamIds) {
+      const actor = game.actors.get(actorId);
+      if (!actor) continue;
+      for (const item of actor.items) {
+        if (item.type === "headquarters" && item.system.ownership === "rented") {
+          rentedHQs.push({ item, ownerActorIds: [actorId] });
+        }
+      }
+    }
+
+    if (!rentedHQs.length) {
+      ui.notifications.info("No rented headquarters found.");
+      return;
+    }
+
+    let count = 0;
+    for (const { item, ownerActorIds } of rentedHQs) {
+      await FaseripHeadquartersSheet.sendRentDueChatCard(item, ownerActorIds);
+      count++;
+    }
+
+    // Also process loan payments due
+    // (loans on owned properties from bank loan purchases)
+    let loanCount = 0;
+    if (hqActor) {
+      for (const item of hqActor.items) {
+        if (item.type === "headquarters" && (item.system.loanPaymentsRemaining || 0) > 0) {
+          loanCount++;
+        }
+      }
+    }
+    for (const actorId of teamIds) {
+      const actor = game.actors.get(actorId);
+      if (!actor) continue;
+      for (const item of actor.items) {
+        if (item.type === "headquarters" && (item.system.loanPaymentsRemaining || 0) > 0) {
+          loanCount++;
+        }
+      }
+    }
+
+    const loanNote = loanCount > 0 ? ` (${loanCount} loan payments also pending)` : '';
+    ui.notifications.info(`Sent ${count} rent due notice${count !== 1 ? 's' : ''}${loanNote}.`);
   }
 
   async _onViewTeamHQ(itemId) {

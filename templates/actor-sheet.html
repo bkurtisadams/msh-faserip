@@ -1018,6 +1018,7 @@
                   {{this.purchaseCost}} (Owner)
                   {{else}}
                   {{this.rentCost}} (Rent)
+                  {{#if this.rentStatus}}<span class="hq-rent-badge {{this.rentStatus.cssClass}}">{{this.rentStatus.label}}</span>{{/if}}
                   {{/if}}
                 </td>
                 <td class="headquarters-controls"></td>
@@ -1058,6 +1059,9 @@
                   {{hq.system.purchaseCost}} (Owner)
                   {{else}}
                   {{#if hq.system.rentCost}}{{hq.system.rentCost}}{{else}}{{hq.system.rentalCost}}{{/if}} (Rent)
+                  {{#with (lookup ../hqRentStatus hq._id)}}
+                  <span class="hq-rent-badge {{this.cssClass}}">{{this.label}}</span>
+                  {{/with}}
                   {{/if}}
                 </td>
                 <td class="headquarters-controls">

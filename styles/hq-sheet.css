@@ -8,6 +8,7 @@
   display: flex; align-items: center; gap: 6px; padding: 4px 8px;
 }
 .headquarters-dialog .hq-portrait {
+  width: 32px; height: 32px; object-fit: cover;
   border: 1px solid #8b0000; border-radius: 3px; cursor: pointer;
 }
 .headquarters-dialog .hq-name-input {
@@ -145,6 +146,51 @@
   background: #f5f0e8; color: #8b0000; cursor: pointer;
 }
 .headquarters-dialog .hq-add-row button:hover { background: #8b0000; color: #fff; }
+
+/* ── Rent fieldset ────────────────────── */
+.headquarters-dialog .hq-rent-fieldset { background: #fdf8f0; }
+.headquarters-dialog .hq-rent-info { font-size: 11px; }
+.headquarters-dialog .hq-rent-row {
+  display: flex; align-items: center; gap: 6px;
+  padding: 2px 0; flex-wrap: wrap;
+}
+.headquarters-dialog .hq-rent-label { font-weight: bold; color: #666; font-size: 9px; }
+.headquarters-dialog .hq-rent-value { color: #333; margin-right: 8px; }
+.headquarters-dialog .hq-rent-date-input {
+  width: 80px; height: 18px; font-size: 10px; color: #333;
+  border: 1px solid #ddd; border-radius: 3px; padding: 0 4px;
+  margin-right: 8px;
+}
+.headquarters-dialog .hq-rent-date-input:focus { border-color: #c0a070; }
+.headquarters-dialog .hq-rent-date-input:placeholder-shown { border-color: transparent; font-style: italic; color: #999; }
+.headquarters-dialog .hq-rent-status {
+  font-size: 9px; font-weight: bold; border-radius: 3px;
+  padding: 1px 6px; margin-left: auto;
+}
+.headquarters-dialog .hq-rent-status.rent-current { background: #5b7a3a; color: #fff; }
+.headquarters-dialog .hq-rent-status.rent-due { background: #e6a817; color: #333; }
+.headquarters-dialog .hq-rent-status.rent-overdue { background: #c0392b; color: #fff; }
+.headquarters-dialog .hq-rent-status.rent-new { background: #888; color: #fff; }
+.headquarters-dialog .hq-rent-actions {
+  display: flex; gap: 6px; margin-top: 4px; justify-content: flex-end;
+}
+.headquarters-dialog .hq-pay-rent,
+.headquarters-dialog .hq-pay-loan {
+  font-size: 10px; padding: 2px 8px; font-weight: bold;
+  border: 1px solid #8b0000; border-radius: 3px;
+  background: #f5f0e8; color: #8b0000; cursor: pointer;
+}
+.headquarters-dialog .hq-pay-rent:hover,
+.headquarters-dialog .hq-pay-loan:hover { background: #8b0000; color: #fff; }
+
+/* ── Data row ────────────────────────── */
+.headquarters-dialog .hq-data-row { display: flex; gap: 6px; }
+.headquarters-dialog .hq-data-row button {
+  font-size: 10px; padding: 2px 8px; font-weight: bold;
+  border: 1px solid #c0a070; border-radius: 3px;
+  background: #f5f0e8; color: #666; cursor: pointer;
+}
+.headquarters-dialog .hq-data-row button:hover { background: #8b0000; color: #fff; border-color: #8b0000; }
 
 /* ── Notes ────────────────────────────── */
 .headquarters-dialog .hq-fieldset textarea {

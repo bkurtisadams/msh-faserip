@@ -249,22 +249,39 @@ export class FaseripActorSheet extends ActorSheet {
       .filter(item => item.type === "equipment")
       .sort((a, b) => (a.sort || 0) - (b.sort || 0));
 
-    // headquarters made sortable
+    // headquarters made sortable, with rent status
     context.headquarters = this.actor.items
       .filter(item => item.type === "headquarters")
       .sort((a, b) => (a.sort || 0) - (b.sort || 0));
 
-    // Team headquarters from team HQ actor
+    // Compute rent status for personal HQs
+    context.hqRentStatus = {};
+    for (const hq of context.headquarters) {
+      if (hq.system.ownership === "rented") {
+        context.hqRentStatus[hq._id] = this._computeHQRentStatus(hq.system.rentLastPaidGameDate);
+      }
+    }
+
+    // Team headquarters from team HQ actor — only for team members
+    const teamIds = game.settings.get("msh-faserip", "teamMembers") || [];
+    const isTeamMember = teamIds.includes(this.actor.id);
     const hqActorId = game.settings.get("msh-faserip", "teamHQActorId");
-    const hqActor = hqActorId ? game.actors.get(hqActorId) : null;
-    context.teamHQs = hqActor ? hqActor.items.filter(i => i.type === "headquarters").map(i => ({
-      id: i.id, name: i.name, img: i.img,
-      location: i.system.location, size: i.system.size,
-      materialStrength: i.system.materialStrength,
-      ownership: i.system.ownership,
-      purchaseCost: i.system.purchaseCost,
-      rentCost: i.system.rentCost
-    })) : [];
+    const hqActor = (isTeamMember && hqActorId) ? game.actors.get(hqActorId) : null;
+    context.teamHQs = hqActor ? hqActor.items.filter(i => i.type === "headquarters").map(i => {
+      let rentStatus = null;
+      if (i.system.ownership === "rented") {
+        rentStatus = this._computeHQRentStatus(i.system.rentLastPaidGameDate);
+      }
+      return {
+        id: i.id, name: i.name, img: i.img,
+        location: i.system.location, size: i.system.size,
+        materialStrength: i.system.materialStrength,
+        ownership: i.system.ownership,
+        purchaseCost: i.system.purchaseCost,
+        rentCost: i.system.rentCost,
+        rentStatus
+      };
+    }) : [];
 
     // vehicles made sortable
     context.vehicles = this.actor.items
@@ -524,6 +541,23 @@ export class FaseripActorSheet extends ActorSheet {
       this._universalTableHookId = null;
     }
     return super.close(options);
+  }
+
+  _computeHQRentStatus(lastPaidStr) {
+    try {
+      const d = game.msh.getCampaignDateTime().date;
+      const nowMonth = d.getMonth();
+      const nowYear = d.getFullYear();
+      if (!lastPaidStr) return { status: "new", label: "NEW", cssClass: "rent-new" };
+      const parts = lastPaidStr.split("/");
+      if (parts.length < 3) return { status: "new", label: "NEW", cssClass: "rent-new" };
+      const paidMonth = parseInt(parts[0]) - 1;
+      const paidYear = parseInt(parts[2]);
+      const monthsDiff = (nowYear - paidYear) * 12 + (nowMonth - paidMonth);
+      if (monthsDiff <= 0) return { status: "current", label: "CURRENT", cssClass: "rent-current" };
+      if (monthsDiff === 1) return { status: "due", label: "DUE", cssClass: "rent-due" };
+      return { status: "overdue", label: "OVERDUE", cssClass: "rent-overdue" };
+    } catch { return null; }
   }
 
   // In actorSheet.js, add to the activateListeners function

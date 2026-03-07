@@ -63,16 +63,51 @@
             {{/each}}
           </select>
         </div>
-        <div class="hq-field hq-field-row">
-          <label class="hq-check"><input type="checkbox" name="system.isRichArea" {{#if system.isRichArea}}checked{{/if}} /> Rich Area (+1CS)</label>
+        <div class="hq-field">
+          <label>Area</label>
+          <select name="system.locationModifier" class="location-modifier-select">
+            <option value="normal" {{#if (eq system.locationModifier "normal")}}selected{{/if}}>Normal</option>
+            <option value="rich" {{#if (eq system.locationModifier "rich")}}selected{{/if}}>Rich (+1CS)</option>
+            <option value="secluded" {{#if (eq system.locationModifier "secluded")}}selected{{/if}}>Secluded (-1CS)</option>
+          </select>
         </div>
         <div class="hq-field hq-field-row">
           <label class="hq-check"><input type="radio" name="system.ownership" value="owned" {{#if (eq system.ownership "owned")}}checked{{/if}} /> Owned</label>
           <label class="hq-check"><input type="radio" name="system.ownership" value="rented" {{#if (eq system.ownership "rented")}}checked{{/if}} /> Rented</label>
-          <button type="button" class="hq-resource-feat" title="Resource FEAT for rent/purchase">Resource FEAT</button>
+          <button type="button" class="hq-resource-feat" title="Resource FEAT for purchase">Resource FEAT</button>
         </div>
       </div>
     </fieldset>
+
+    <!-- Rent — only visible when rented -->
+    {{#if (eq system.ownership "rented")}}
+    <fieldset class="hq-fieldset hq-rent-fieldset">
+      <legend>Rent</legend>
+      <div class="hq-rent-info">
+        <div class="hq-rent-row">
+          <span class="hq-rent-label">Rent:</span>
+          <span class="hq-rent-value">{{rentDisplayCost}}/mo</span>
+          <span class="hq-rent-label">Last Paid:</span>
+          <input type="text" value="{{system.rentLastPaidGameDate}}" class="hq-rent-date-input" placeholder="Never" title="Game date of last rent payment (e.g. 3/1/1976)" />
+          <span class="hq-rent-status {{rentStatusClass}}">{{rentStatusLabel}}</span>
+        </div>
+        {{#if hasLoan}}
+        <div class="hq-rent-row">
+          <span class="hq-rent-label">Loan:</span>
+          <span class="hq-rent-value">{{system.loanPaymentRank}}/mo</span>
+          <span class="hq-rent-label">Remaining:</span>
+          <span class="hq-rent-value">{{system.loanPaymentsRemaining}} of {{system.loanPaymentsTotal}}</span>
+        </div>
+        {{/if}}
+        <div class="hq-rent-actions">
+          <button type="button" class="hq-pay-rent" title="Make Resource FEAT for monthly rent"><i class="fas fa-dice-d20"></i> Pay Rent</button>
+          {{#if hasLoan}}
+          <button type="button" class="hq-pay-loan" title="Make Resource FEAT for loan payment"><i class="fas fa-dice-d20"></i> Pay Loan</button>
+          {{/if}}
+        </div>
+      </div>
+    </fieldset>
+    {{/if}}
 
     <!-- Packages -->
     <fieldset class="hq-fieldset">
@@ -149,6 +184,15 @@
     <fieldset class="hq-fieldset">
       <legend>Notes</legend>
       <textarea name="system.notes" rows="3" placeholder="History, special features, custom modifications...">{{system.notes}}</textarea>
+    </fieldset>
+
+    <!-- Data -->
+    <fieldset class="hq-fieldset">
+      <legend>Data</legend>
+      <div class="hq-data-row">
+        <button type="button" class="hq-export-json" title="Export HQ data as JSON"><i class="fas fa-download"></i> Export JSON</button>
+        <button type="button" class="hq-import-json" title="Import HQ data from JSON"><i class="fas fa-upload"></i> Import JSON</button>
+      </div>
     </fieldset>
 
   </div>

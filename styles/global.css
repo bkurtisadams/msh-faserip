@@ -1134,7 +1134,8 @@
  .headquarters-table .size-col { width: 10%; }
  .headquarters-table .material-col { width: 10%; }
  .headquarters-table .cost-col { width: 15%; }
- .headquarters-table .actions-col { width: 10%; text-align: center; }
+ .headquarters-table .actions-col,
+ .headquarters-table .th-actions { width: 10%; text-align: center; }
  
  .headquarters-row:hover {
   background-color: #f5f5f5;
@@ -1146,8 +1147,10 @@
  }
  
  .headquarters-icon {
+  width: 24px; height: 24px; object-fit: cover;
   margin-right: 5px;
   vertical-align: middle;
+  flex-shrink: 0;
  }
  
  .headquarters-controls {
@@ -1162,6 +1165,18 @@
  .headquarters-controls a:hover {
   color: #8B0000;
  }
+
+ /* Rent status badges */
+ .hq-rent-badge {
+  display: inline-block;
+  font-size: 8px; font-weight: bold; text-transform: uppercase;
+  border-radius: 2px; padding: 0 4px; margin-left: 3px;
+  vertical-align: middle; line-height: 14px;
+ }
+ .hq-rent-badge.rent-current { background: #5b7a3a; color: #fff; }
+ .hq-rent-badge.rent-due { background: #e6a817; color: #333; }
+ .hq-rent-badge.rent-overdue { background: #c0392b; color: #fff; }
+ .hq-rent-badge.rent-new { background: #888; color: #fff; }
  
  /* Vehicles table styles */
  .vehicles-table {
@@ -3031,7 +3046,13 @@
 /* ====== OUTER FORM ====== */
 /* Let the window scroll */
 /* scope to FASERIP sheets only */
-.faserip-sheet .window-content { overflow: auto !important; }
+.faserip-sheet .window-content { overflow: auto !important; scrollbar-gutter: stable; }
+.faserip-sheet .headquarters-table thead tr,
+.faserip-sheet .equipment-table thead tr,
+.faserip-sheet .vehicles-table thead tr,
+.faserip-sheet .powers-table thead tr {
+  background: linear-gradient(180deg, var(--mred-lit, #8B0000) 0%, var(--mred-dk, #6b0000) 100%);
+}
 
 /* Form should NOT create its own scrollbar */
 form.faserip-sheet {
