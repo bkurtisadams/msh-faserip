@@ -2640,6 +2640,38 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
       }).render(true);
     });
 
+    // ── Equipment effect toggle: inject power button for items with effects ──
+    html.find('.equipment-row').each((i, row) => {
+      const itemId = row.dataset.itemId;
+      const item = this.actor.items.get(itemId);
+      if (!item || !item.effects.size) return;
+      const hasTransfer = item.effects.some(e => e.transfer);
+      if (!hasTransfer) return;
+      const anyActive = item.effects.some(e => e.transfer && !e.disabled);
+      const controls = row.querySelector('.equipment-controls');
+      if (!controls) return;
+      const btn = document.createElement('a');
+      btn.classList.add('item-control', 'equipment-effect-toggle');
+      btn.dataset.itemId = itemId;
+      btn.title = anyActive ? 'Deactivate effects' : 'Activate effects';
+      btn.innerHTML = `<i class="fas fa-power-off" style="color:${anyActive ? '#4CAF50' : '#999'};"></i>`;
+      controls.prepend(btn);
+    });
+
+    html.on('click', '.equipment-effect-toggle', async (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const itemId = ev.currentTarget.dataset.itemId;
+      const item = this.actor.items.get(itemId);
+      if (!item) return;
+      const transferEffects = item.effects.filter(e => e.transfer);
+      if (!transferEffects.length) return;
+      // Toggle: if any are active, disable all; otherwise enable all
+      const anyActive = transferEffects.some(e => !e.disabled);
+      const updates = transferEffects.map(e => ({ _id: e.id, disabled: anyActive }));
+      await item.updateEmbeddedDocuments("ActiveEffect", updates);
+    });
+
     // Edit equipment button
     html.find('.item-edit').click(ev => {
       const li = $(ev.currentTarget).closest(".equipment-row");

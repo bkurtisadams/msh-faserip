@@ -557,8 +557,8 @@ export class FaseripEquipmentSheet extends ItemSheet {
           name: "Light Source",
           img: "icons/svg/light.svg",
           changes: [
-            { key: "faserip.token.light.bright", mode: MODES.CUSTOM, value: "0.1" },
-            { key: "faserip.token.light.dim", mode: MODES.CUSTOM, value: "0.2" },
+            { key: "faserip.token.light.bright", mode: MODES.CUSTOM, value: "20" },
+            { key: "faserip.token.light.dim", mode: MODES.CUSTOM, value: "40" },
             { key: "faserip.token.light.color", mode: MODES.CUSTOM, value: "#ffdd88" },
             { key: "faserip.token.light.alpha", mode: MODES.CUSTOM, value: "0.3" },
             { key: "faserip.token.light.angle", mode: MODES.CUSTOM, value: "360" },
@@ -573,8 +573,8 @@ export class FaseripEquipmentSheet extends ItemSheet {
           name: "Flashlight Beam",
           img: "icons/svg/light.svg",
           changes: [
-            { key: "faserip.token.light.bright", mode: MODES.CUSTOM, value: "0.15" },
-            { key: "faserip.token.light.dim", mode: MODES.CUSTOM, value: "0.3" },
+            { key: "faserip.token.light.bright", mode: MODES.CUSTOM, value: "30" },
+            { key: "faserip.token.light.dim", mode: MODES.CUSTOM, value: "60" },
             { key: "faserip.token.light.color", mode: MODES.CUSTOM, value: "#ffffcc" },
             { key: "faserip.token.light.alpha", mode: MODES.CUSTOM, value: "0.5" },
             { key: "faserip.token.light.angle", mode: MODES.CUSTOM, value: "60" },
@@ -609,7 +609,7 @@ export class FaseripEquipmentSheet extends ItemSheet {
           img: "icons/svg/aura.svg",
           changes: [
             { key: "faserip.token.light.bright", mode: MODES.CUSTOM, value: "0" },
-            { key: "faserip.token.light.dim", mode: MODES.CUSTOM, value: "0.15" },
+            { key: "faserip.token.light.dim", mode: MODES.CUSTOM, value: "10" },
             { key: "faserip.token.light.color", mode: MODES.CUSTOM, value: "#4488ff" },
             { key: "faserip.token.light.alpha", mode: MODES.CUSTOM, value: "0.15" },
             { key: "faserip.token.light.animation.type", mode: MODES.CUSTOM, value: "pulse" },
@@ -624,7 +624,7 @@ export class FaseripEquipmentSheet extends ItemSheet {
           img: "icons/svg/wing.svg",
           statuses: ["fly"],
           changes: [
-            { key: "faserip.token.light.dim", mode: MODES.CUSTOM, value: "0.1" },
+            { key: "faserip.token.light.dim", mode: MODES.CUSTOM, value: "5" },
             { key: "faserip.token.light.color", mode: MODES.CUSTOM, value: "#ff6600" },
             { key: "faserip.token.light.alpha", mode: MODES.CUSTOM, value: "0.2" },
             { key: "faserip.token.light.animation.type", mode: MODES.CUSTOM, value: "flame" },
