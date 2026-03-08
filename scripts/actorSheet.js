@@ -2670,6 +2670,11 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
       const anyActive = transferEffects.some(e => !e.disabled);
       const updates = transferEffects.map(e => ({ _id: e.id, disabled: anyActive }));
       await item.updateEmbeddedDocuments("ActiveEffect", updates);
+      const state = anyActive ? "OFF" : "ON";
+      ChatMessage.create({
+        content: `<div class="faserip-chat-card"><strong>${this.actor.name}</strong> turns <strong>${state}</strong>: ${item.name}</div>`,
+        speaker: ChatMessage.getSpeaker({ actor: this.actor })
+      });
     });
 
     // Edit equipment button

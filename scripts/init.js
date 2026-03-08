@@ -1960,37 +1960,45 @@ Hooks.on("applyActiveEffect", (actor, change, current, delta, changes) => {
 
 // ── Hooks: reconcile when effects change ──
 Hooks.on("updateActiveEffect", (effect, changes, options, userId) => {
-  if (game.user.id !== userId) return;
-  // Only reconcile if the effect has faserip.token.* changes (avoid thrashing on every stat AE update)
   const hasTokenChanges = effect.changes?.some(c => c.key?.startsWith("faserip.token."));
-  // Also reconcile if disabled state changed (enabling/disabling a token-visual effect)
   const disabledToggled = "disabled" in changes;
   if (!hasTokenChanges && !disabledToggled) return;
+  if (!game.user.isGM) return;
   const actor = _resolveEffectActor(effect);
   if (actor) _scheduleReconcile(actor);
 });
 
 Hooks.on("createActiveEffect", (effect, options, userId) => {
-  if (game.user.id !== userId) return;
+  if (!game.user.isGM) return;
   if (!effect.changes?.some(c => c.key.startsWith("faserip.token."))) return;
   const actor = _resolveEffectActor(effect);
   if (actor) _scheduleReconcile(actor);
 });
 
-Hooks.on("deleteActiveEffect", (effect, options, userId) => {
-  if (game.user.id !== userId) return;
+// Stash actor ref before effect deletion (parent may be null after delete)
+const _pendingDeleteActors = new Map();
+Hooks.on("preDeleteActiveEffect", (effect, options, userId) => {
+  if (!game.user.isGM) return;
+  if (!effect.changes?.some(c => c.key?.startsWith("faserip.token."))) return;
   const actor = _resolveEffectActor(effect);
+  if (actor) _pendingDeleteActors.set(effect.id, actor);
+});
+
+Hooks.on("deleteActiveEffect", (effect, options, userId) => {
+  if (!game.user.isGM) return;
+  const actor = _pendingDeleteActors.get(effect.id) ?? _resolveEffectActor(effect);
+  _pendingDeleteActors.delete(effect.id);
   if (actor) _scheduleReconcile(actor);
 });
 
 // Item added/removed from actor (carries effects with it)
 Hooks.on("createItem", (item, options, userId) => {
-  if (game.user.id !== userId) return;
+  if (!game.user.isGM) return;
   if (item.actor && item.effects.size) _scheduleReconcile(item.actor);
 });
 
 Hooks.on("deleteItem", (item, options, userId) => {
-  if (game.user.id !== userId) return;
+  if (!game.user.isGM) return;
   if (item.actor) _scheduleReconcile(item.actor);
 });
 
@@ -3050,9 +3058,23 @@ async function createFaseripItemMacro(data, slot) {
           game.msh.rollTalent(actor, item);
           break;
 
-        case "equipment":
-          game.msh.rollEquipment(actor, item);
+        case "equipment": {
+          // Gear with transferable effects: toggle on/off instead of rolling
+          const transferEffects = item.effects.filter(e => e.transfer);
+          if (transferEffects.length && ["gear", "custom"].includes(system.category)) {
+            const anyActive = transferEffects.some(e => !e.disabled);
+            const updates = transferEffects.map(e => ({ _id: e.id, disabled: anyActive }));
+            await item.updateEmbeddedDocuments("ActiveEffect", updates);
+            const state = anyActive ? "OFF" : "ON";
+            ChatMessage.create({
+              content: \`<div class="faserip-chat-card"><strong>\${actor.name}</strong> turns <strong>\${state}</strong>: \${item.name}</div>\`,
+              speaker: ChatMessage.getSpeaker({ actor })
+            });
+          } else {
+            game.msh.rollEquipment(actor, item);
+          }
           break;
+        }
 
         default:
           ui.notifications.warn("Cannot roll item type: " + item.type);
