@@ -881,6 +881,22 @@
       </div>
 
       <!-- GENERAL FIELDS - Visible for ALL equipment types -->
+      <div class="form-group duration-row">
+        <label>Duration:</label>
+        <div class="form-fields" style="display:flex;gap:4px;align-items:center;">
+          <input type="number" name="system.duration" value="{{system.duration}}" min="0" step="1" style="width:60px;" placeholder="0" title="0 = unlimited"/>
+          <select name="system.durationUnit" style="width:auto;">
+            <option value="second" {{#if (eq system.durationUnit "second")}}selected{{/if}}>Seconds</option>
+            <option value="turn" {{#if (eq system.durationUnit "turn")}}selected{{/if}}>Turns</option>
+            <option value="minute" {{#if (eq system.durationUnit "minute")}}selected{{/if}}>Minutes</option>
+            <option value="hour" {{#if (eq system.durationUnit "hour")}}selected{{/if}}>Hours</option>
+            <option value="day" {{#if (eq system.durationUnit "day")}}selected{{/if}}>Days</option>
+            <option value="week" {{#if (eq system.durationUnit "week")}}selected{{/if}}>Weeks</option>
+          </select>
+          <span style="font-size:0.75em;color:#888;margin-left:2px;" title="0 = unlimited / not applicable">{{#unless system.duration}}(unlimited){{/unless}}</span>
+        </div>
+      </div>
+
       <div class="form-group">
         <label>Notes:</label>
         <textarea name="system.notes" rows="3">{{system.notes}}</textarea>

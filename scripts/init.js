@@ -127,30 +127,67 @@ Hooks.on("updateWorldTime", async (worldTime, dt, options, userId) => {
   // Effect expiration: skip during active combat (updateCombat hook handles that)
   if (!game.combat?.active) {
     for (const actor of Effects.getAllTokenActors()) {
-      if (!actor?.effects?.size) continue;
+      const toExpire = [];
       
-      const toDelete = [];
-      
-      for (const ef of actor.effects) {
+      // Check actor-level effects
+      for (const ef of (actor.effects ?? [])) {
         if (ef.disabled) continue;
         const d = ef.duration ?? {};
-        
-        // Handle seconds-based effects
         if (Number.isFinite(d.seconds) && d.seconds > 0 && Number.isFinite(d.startTime)) {
-          const endTime = d.startTime + d.seconds;
-          const remaining = endTime - worldTime;
-          
-          if (remaining <= 0) {
-            toDelete.push({ effect: ef, reason: `time expired (${d.seconds}s duration)` });
+          if (d.startTime + d.seconds <= worldTime) {
+            toExpire.push({ effect: ef, item: null, reason: `time expired (${d.seconds}s duration)` });
           }
         }
       }
+
+      // Check effects on owned equipment items (v13: transfer doesn't always put them on actor)
+      for (const item of (actor.items ?? [])) {
+        if (item.type !== "equipment") continue;
+        for (const ef of (item.effects ?? [])) {
+          if (ef.disabled) continue;
+          const d = ef.duration ?? {};
+          if (Number.isFinite(d.seconds) && d.seconds > 0 && Number.isFinite(d.startTime)) {
+            if (d.startTime + d.seconds <= worldTime) {
+              toExpire.push({ effect: ef, item, reason: `time expired (${d.seconds}s duration)` });
+            }
+          }
+        }
+      }
+
+      if (!toExpire.length) continue;
       
-      // Delete expired effects
-      for (const { effect, reason } of toDelete) {
+      // Disable or delete expired effects
+      for (const { effect, item, reason } of toExpire) {
         console.log(`[FASERIP] Auto-expiring effect "${effect.name}" on ${actor.name}: ${reason}`);
         try {
-          await effect.delete();
+          if (item) {
+            // Equipment effect: disable (reusable) and clear duration stamp
+            await effect.update({ disabled: true, duration: { seconds: null, startTime: null } });
+            ChatMessage.create({
+              content: `<div class="faserip-chat"><b>${actor.name}</b>'s <b>${item.name}</b> has expired — ${effect.name} deactivated.</div>`,
+              speaker: ChatMessage.getSpeaker({ actor })
+            });
+          } else {
+            // Check if it's a transferred equipment effect via origin
+            let equipItem = null;
+            if (effect.origin) {
+              const originParts = effect.origin.split(".");
+              const itemIdx = originParts.indexOf("Item");
+              if (itemIdx >= 0 && originParts[itemIdx + 1]) {
+                const candidate = actor.items?.get(originParts[itemIdx + 1]);
+                if (candidate?.type === "equipment") equipItem = candidate;
+              }
+            }
+            if (equipItem) {
+              await effect.update({ disabled: true, duration: { seconds: null, startTime: null } });
+              ChatMessage.create({
+                content: `<div class="faserip-chat"><b>${actor.name}</b>'s <b>${equipItem.name}</b> has expired — ${effect.name} deactivated.</div>`,
+                speaker: ChatMessage.getSpeaker({ actor })
+              });
+            } else {
+              await effect.delete();
+            }
+          }
         } catch (e) {
           console.warn("[FASERIP WARN] Effect auto-expire failed", e);
         }
@@ -526,6 +563,62 @@ Hooks.once("init", async () => {
     if (changes && Object.hasOwn(changes, 'icon') && !changes.img) changes.img = changes.icon;
     if (changes?.img === "icons/svg/impact.svg") {
       changes.img = "icons/svg/target.svg";
+    }
+
+    // Equipment duration: when toggling an effect ON, stamp duration.seconds + duration.startTime
+    // from the parent equipment item's duration/durationUnit fields.
+    // The existing updateWorldTime expiration code handles auto-disable.
+    if (changes?.disabled === false && effect.disabled === true) {
+      // Find the source equipment item — direct parent if on item sheet, or via origin if transferred to actor
+      let item = null;
+      const parent = effect.parent;
+      if (parent?.type === "equipment") {
+        item = parent;
+      } else if (parent?.items && effect.origin) {
+        // Transferred effect on actor — origin is "Actor.xxx.Item.yyy" or a UUID
+        const originParts = effect.origin.split(".");
+        const itemIdx = originParts.indexOf("Item");
+        if (itemIdx >= 0 && originParts[itemIdx + 1]) {
+          item = parent.items.get(originParts[itemIdx + 1]);
+        }
+      }
+      if (!item || item.type !== "equipment") return;
+      const dur = Number(item.system?.duration);
+      const unit = item.system?.durationUnit;
+      if (!dur || dur <= 0 || !unit) return;
+
+      // Convert to seconds — try CTT first, then manual lookup
+      let seconds = 0;
+      const cttMod = game.modules.get("calendar-time-tracker");
+      if (cttMod?.active && cttMod.api?.timeEngine) {
+        try { seconds = cttMod.api.timeEngine.convertToSeconds(dur, unit) || 0; } catch (_) {}
+      }
+      if (!seconds) {
+        const table = { second: 1, turn: 6, round: 6, minute: 60, hour: 3600, day: 86400, week: 604800 };
+        seconds = dur * (table[unit] || 0);
+      }
+      if (seconds > 0) {
+        changes.duration = { seconds, startTime: game.time.worldTime };
+        console.log(`[FASERIP] Equipment duration stamped: "${effect.name}" on "${item.name}" — ${dur} ${unit} (${seconds}s), expires at worldTime ${game.time.worldTime + seconds}`);
+      }
+    }
+
+    // When toggling an effect OFF, clear the duration stamp so re-enabling starts fresh
+    if (changes?.disabled === true && effect.disabled === false) {
+      let item = null;
+      const parent = effect.parent;
+      if (parent?.type === "equipment") {
+        item = parent;
+      } else if (parent?.items && effect.origin) {
+        const originParts = effect.origin.split(".");
+        const itemIdx = originParts.indexOf("Item");
+        if (itemIdx >= 0 && originParts[itemIdx + 1]) {
+          item = parent.items.get(originParts[itemIdx + 1]);
+        }
+      }
+      if (item?.type === "equipment" && Number(item.system?.duration) > 0) {
+        changes.duration = { seconds: null, startTime: null };
+      }
     }
   });
 
