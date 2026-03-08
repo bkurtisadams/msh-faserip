@@ -316,13 +316,19 @@ export function installActionChatHandlers() {
     const undoData = message.flags?.[SCOPE]?.undo;
 
     if (undoData?.results?.length) {
-      // This message has been applied - transform button
+      // This message has been applied - transform button (GM only)
       const applyBtn = html.find('[data-action="apply-damage"]');
       if (applyBtn.length) {
-        applyBtn.attr('data-action', 'undo-apply');
-        applyBtn.text('Undo');
-        applyBtn.attr('title', 'Revert these HP changes');
-        applyBtn.prop('disabled', false);
+        if (game.user.isGM) {
+          applyBtn.attr('data-action', 'undo-apply');
+          applyBtn.text('Undo');
+          applyBtn.attr('title', 'Revert these HP changes');
+          applyBtn.prop('disabled', false);
+        } else {
+          applyBtn.text('Applied');
+          applyBtn.attr('title', 'Damage applied');
+          applyBtn.prop('disabled', true);
+        }
       }
     }
 
@@ -666,11 +672,17 @@ export function installActionChatHandlers() {
           });
         }
 
-        // 4) Flip button into Undo state
-        btn.dataset.action = "undo-apply";
-        btn.textContent    = "Undo";
-        btn.title          = "Revert these HP changes";
-        btn.disabled       = false;
+        // 4) Flip button into Undo state (GM only)
+        if (game.user.isGM) {
+          btn.dataset.action = "undo-apply";
+          btn.textContent    = "Undo";
+          btn.title          = "Revert these HP changes";
+          btn.disabled       = false;
+        } else {
+          btn.textContent    = "Applied";
+          btn.title          = "Damage applied";
+          btn.disabled       = true;
+        }
 
       } catch (err) {
         console.error("Apply Damage error:", err);

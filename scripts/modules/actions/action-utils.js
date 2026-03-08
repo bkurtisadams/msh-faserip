@@ -1588,11 +1588,15 @@ export async function applyDamageToTargets({
       // ===== END 0 HP / KILL HANDLING =====
 
       if (showNotification && netDamage > 0) {
-        const absorbed = (Number(damage) || 0) - netDamage;
-        const armorNote = absorbed > 0 ? ` (${damage} - ${absorbed} armor)` : "";
-        ui.notifications.info(`${targetName} took ${netDamage} damage${armorNote}. Health: ${before} → ${after}`);
+        if (game.user.isGM) {
+          const absorbed = (Number(damage) || 0) - netDamage;
+          const armorNote = absorbed > 0 ? ` (${damage} - ${absorbed} armor)` : "";
+          ui.notifications.info(`${targetName} took ${netDamage} damage${armorNote}. Health: ${before} → ${after}`);
+        } else {
+          ui.notifications.info(`${targetName} took ${netDamage} damage.`);
+        }
       } else if (showNotification && netDamage === 0) {
-        ui.notifications.info(`${targetName}'s armor absorbed all ${damage} damage.`);
+        ui.notifications.info(`${targetName}'s armor absorbed all damage.`);
       }
 
       results.push({
@@ -1796,7 +1800,11 @@ export async function applyDamageToActorUuid(damage, actorUuid, options = {}) {
     }
 
     if (showNotification) {
-      ui.notifications.info(`${actor.name} took ${amt} collision damage. Health: ${current} to ${newVal}`);
+      if (game.user.isGM) {
+        ui.notifications.info(`${actor.name} took ${amt} collision damage. Health: ${current} to ${newVal}`);
+      } else {
+        ui.notifications.info(`${actor.name} took ${amt} collision damage.`);
+      }
     }
 
     if (updateButton) {
@@ -2128,11 +2136,15 @@ export async function applyDamageNow({
         }
 
         if (showNotification) {
-          const armorNote = absorbed > 0 ? ` (${baseDamage} - ${absorbed} Body Armor)` : "";
-          ui.notifications.info(`${targetActor.name} took ${net} damage${armorNote}. Health: ${hpBefore} → ${hpAfter}`);
+          if (game.user.isGM) {
+            const armorNote = absorbed > 0 ? ` (${baseDamage} - ${absorbed} Body Armor)` : "";
+            ui.notifications.info(`${targetActor.name} took ${net} damage${armorNote}. Health: ${hpBefore} → ${hpAfter}`);
+          } else {
+            ui.notifications.info(`${targetActor.name} took ${net} damage.`);
+          }
         }
       } else if (showNotification) {
-        ui.notifications.info(`${targetActor.name}'s Body Armor (${absorbed}) absorbed all ${baseDamage} damage.`);
+        ui.notifications.info(`${targetActor.name}'s armor absorbed all damage.`);
       }
 
       results.push({

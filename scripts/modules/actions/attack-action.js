@@ -1186,6 +1186,12 @@ export class AttackAction extends BaseAction {
               const armorHover = armorRank ? `${armorRank} ${armorType} (${armorValue})` : `${armorType} (${armorValue})`;
               const armorBox = `<span title="${armorHover}" style="cursor:help;">${armorValue} armor</span>`;
               
+              if (!game.user.isGM) {
+                // Player sees net damage only
+                return `<div style="margin:0 10px 6px;padding:6px 8px;background:#fff;border:1px solid #ddd;border-radius:3px;font-size:.9em;">
+                  <strong>Damage:</strong> <strong>${afterArmor}</strong>${capNote}
+                </div>`;
+              }
               return `<div style="margin:0 10px 6px;padding:6px 8px;background:#fff;border:1px solid #ddd;border-radius:3px;font-size:.9em;">
                 <strong>Damage:</strong> ${dmgBox}${pullNote} − ${armorBox}${_apNote} = <strong>${afterArmor}</strong>${capNote}
               </div>`;

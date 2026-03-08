@@ -768,7 +768,11 @@ export class CheckAction extends BaseAction {
       if (colorLower === "white") {
         const stunDie = game.settings?.get?.("msh-faserip", "stunDurationDie") || "d10";
         if (stunDuration !== null) {
-          stunText = `Stunned <strong title="Rolled 1${stunDie}">${stunDuration}</strong> round${stunDuration !== 1 ? 's' : ''}.`;
+          if (game.user.isGM) {
+            stunText = `Stunned <strong title="Rolled 1${stunDie}">${stunDuration}</strong> round${stunDuration !== 1 ? 's' : ''}.`;
+          } else {
+            stunText = `Stunned — knocked out for multiple rounds.`;
+          }
         } else {
           stunText = `Stunned - roll 1${stunDie} for duration.`;
         }
