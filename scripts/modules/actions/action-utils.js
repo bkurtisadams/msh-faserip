@@ -221,7 +221,7 @@ export function getAttackEffectPath(attackType, color = "blue", variant = "01") 
  * @returns {string} Current mode value
  */
 export async function setupModeSelector(actor, $html, opts = {}, flagName = "lastActionMode") {
-  // Global mode is the ceiling - never allow per-dialog to exceed it
+  // Read global combat mode — the single source of truth
   let globalMode = "semi";
   try {
     globalMode = game.settings?.get?.("msh-faserip", "defaultCombatMode") || "semi";
@@ -230,53 +230,87 @@ export async function setupModeSelector(actor, $html, opts = {}, flagName = "las
   const modeRank = { manual: 0, semi: 1, full: 2 };
   const globalRank = modeRank[globalMode] ?? 1;
 
-  // Load saved mode but cap it at global
-  const rawSaved = (await actor.getFlag("msh-faserip", flagName)) || "semi";
-  const savedRank = modeRank[rawSaved] ?? 1;
-  const savedMode = savedRank <= globalRank ? rawSaved : globalMode;
+  // If global is "full" or "manual", lock to that mode (no per-dialog override)
+  const lockedMode = (globalMode === "full" || globalMode === "manual") ? globalMode : null;
+
+  let activeMode;
+  if (lockedMode) {
+    activeMode = lockedMode;
+  } else {
+    // Semi mode: allow manual or semi, cap at global
+    const rawSaved = (await actor.getFlag("msh-faserip", flagName)) || "semi";
+    const savedRank = modeRank[rawSaved] ?? 1;
+    activeMode = savedRank <= globalRank ? rawSaved : globalMode;
+  }
   
   // Initialize opts
-  opts.mode = savedMode;
-  const derived = (savedMode === "full")
+  opts.mode = activeMode;
+  const derived = (activeMode === "full")
     ? { autoApply: true, showConfirm: false }
-    : (savedMode === "semi")
+    : (activeMode === "semi")
       ? { autoApply: false, showConfirm: true }
       : { autoApply: false, showConfirm: false };
   Object.assign(opts, derived);
   
-  // Update visual state to match saved mode using FASERIP colors from data attributes
+  // Update visual state to match active mode
   const $buttons = $html.find(".faserip-mode-row .faserip-mode");
   $buttons.each(function() {
     const $b = $(this);
-    $b.css({
-      "background": "#e0e0e0",
-      "color": "#999",
-      "font-weight": "400",
-      "border-color": "#bbb",
-      "opacity": "1"
+    const btnMode = $b.data("mode");
+    const btnRank = modeRank[btnMode] ?? 1;
+    const isActive = btnMode === activeMode;
+    const isDisabled = !!lockedMode || (btnRank > globalRank);
+
+    if (isActive) {
+      $b.css({
+        "background": $b.data("bg"),
+        "color": $b.data("text"),
+        "font-weight": "600",
+        "border-color": $b.data("border"),
+        "opacity": "1"
+      });
+    } else {
+      $b.css({
+        "background": "#e0e0e0",
+        "color": "#999",
+        "font-weight": "400",
+        "border-color": "#bbb",
+        "opacity": isDisabled ? "0.5" : "1"
+      });
+    }
+    if (isDisabled) {
+      $b.css("pointer-events", "none");
+      $b.find("input").prop("disabled", true);
+    }
+  });
+  
+  // Only attach click handlers if mode is not locked
+  if (!lockedMode) {
+    attachModeSelectorHandlers($html, opts, async (mode, derived) => {
+      await actor.setFlag("msh-faserip", flagName, mode);
+      debugLog(`Mode changed to ${mode} and saved to ${flagName}`);
     });
-  });
-  const $activeBtn = $buttons.filter(`[data-mode="${savedMode}"]`);
-  $activeBtn.css({
-    "background": $activeBtn.data("bg"),
-    "color": $activeBtn.data("text"),
-    "font-weight": "600",
-    "border-color": $activeBtn.data("border"),
-    "opacity": "1"
-  });
+  }
   
-  // Attach handlers with auto-save
-  attachModeSelectorHandlers($html, opts, async (mode, derived) => {
-    await actor.setFlag("msh-faserip", flagName, mode);
-    debugLog(`Mode changed to ${mode} and saved to ${flagName}`);
-  });
-  
-  return savedMode;
+  return activeMode;
 }
 
 
-/** Build the Manual / Semi / Full mode selector strip */
-export function buildModeSelector({ mode = "semi", disabled = false, disabledReason = "" } = {}) {
+/** Build the Manual / Semi / Full mode selector strip.
+ *  When global mode is "full" or "manual", the selector is locked to that mode.
+ *  When global is "semi", manual and semi are available (full is disabled).
+ */
+export function buildModeSelector({ mode, disabled = false, disabledReason = "" } = {}) {
+  // Read global combat mode as the authority
+  let globalMode = "semi";
+  try {
+    globalMode = game.settings?.get?.("msh-faserip", "defaultCombatMode") || "semi";
+  } catch (_) {}
+
+  // If global is "full" or "manual", lock to that mode
+  const lockedMode = (globalMode === "full" || globalMode === "manual") ? globalMode : null;
+  const activeMode = lockedMode || mode || "semi";
+
   // FASERIP traffic light colors: Manual=Red (stop), Semi=Yellow (caution), Full=Green (go)
   const colors = {
     manual: { bg: '#c62828', border: '#b71c1c', text: '#fff' },  // Red
@@ -284,20 +318,31 @@ export function buildModeSelector({ mode = "semi", disabled = false, disabledRea
     full:   { bg: '#2e7d32', border: '#1b5e20', text: '#fff' }   // Green
   };
   
+  const modeRank = { manual: 0, semi: 1, full: 2 };
+  const globalRank = modeRank[globalMode] ?? 1;
+
   const mk = (val, label) => {
-    const active = mode === val;
+    const active = activeMode === val;
+    const valRank = modeRank[val] ?? 1;
+    // Disable buttons above global ceiling, or all buttons when locked
+    const isDisabled = disabled || !!lockedMode || (valRank > globalRank);
     const c = colors[val];
     const baseStyle = "display:inline-flex;align-items:center;padding:4px 10px;border:2px solid;border-radius:4px;margin-left:4px;cursor:pointer;font-size:12px;";
     const activeStyle = `background:${c.bg};color:${c.text};font-weight:600;border-color:${c.border};`;
     const inactiveStyle = `background:#e0e0e0;color:#999;border-color:#bbb;`;
-    const disStyle = disabled ? "pointer-events:none;opacity:.5;" : "";
+    const disStyle = isDisabled ? "pointer-events:none;opacity:.5;" : "";
+    const tip = isDisabled ? (disabledReason || `Locked by global setting: ${globalMode}`) : "";
     return `<label class="faserip-mode" data-mode="${val}" data-bg="${c.bg}" data-border="${c.border}" data-text="${c.text}" 
                    style="${baseStyle}${active ? activeStyle : inactiveStyle}${disStyle}" 
-                   title="${disabled ? disabledReason : ''}">
-              <input type="radio" name="combatMode" value="${val}" ${active ? 'checked' : ''} ${disabled ? 'disabled' : ''} style="display:none;">
+                   title="${tip}">
+              <input type="radio" name="combatMode" value="${val}" ${active ? 'checked' : ''} ${isDisabled ? 'disabled' : ''} style="display:none;">
               ${label}
             </label>`;
   };
+
+  const lockNote = lockedMode 
+    ? `<span style="font-size:11px;color:#666;margin-left:8px;">(locked: ${lockedMode})</span>` 
+    : "";
 
   return `
     <div class="faserip-mode-row" style="display:flex;align-items:center;justify-content:flex-end;gap:4px;margin:4px 0 8px;">
@@ -305,7 +350,8 @@ export function buildModeSelector({ mode = "semi", disabled = false, disabledRea
       ${mk("manual","Manual")}
       ${mk("semi","Semi")}
       ${mk("full","Full")}
-      ${disabled ? `<span style="font-size:11px;color:#a33;margin-left:8px;">${disabledReason}</span>` : ""}
+      ${lockNote}
+      ${disabled && disabledReason ? `<span style="font-size:11px;color:#a33;margin-left:8px;">${disabledReason}</span>` : ""}
     </div>`;
 }
 
@@ -313,6 +359,14 @@ export function buildModeSelector({ mode = "semi", disabled = false, disabledRea
 export function attachModeSelectorHandlers($html, opts = {}, onChange) {
   const $labels = $html.find(".faserip-mode-row .faserip-mode");
   if (!$labels.length) return;
+
+  // Read global ceiling
+  let globalMode = "semi";
+  try {
+    globalMode = game.settings?.get?.("msh-faserip", "defaultCombatMode") || "semi";
+  } catch (_) {}
+  const modeRank = { manual: 0, semi: 1, full: 2 };
+  const globalRank = modeRank[globalMode] ?? 1;
 
   const colors = {
     manual: { bg: '#c62828', border: '#b71c1c', text: '#fff' },
@@ -338,6 +392,11 @@ export function attachModeSelectorHandlers($html, opts = {}, onChange) {
   $labels.on("click", (ev) => {
     const $label = $(ev.currentTarget);
     const mode = $label.data("mode");
+    const clickRank = modeRank[mode] ?? 1;
+
+    // Enforce ceiling: ignore clicks above global mode
+    if (clickRank > globalRank) return;
+
     const c = colors[mode];
     
     // Reset all labels to inactive

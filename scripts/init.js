@@ -378,25 +378,13 @@ Hooks.once("init", async () => {
     };
   };
 
-  game.settings.register("msh-faserip", "combatMode", {
-    name: "Combat Mode",
-    hint: "Choose between Classic (automated) and Refactor (manual control).",
-    scope: "world",
-    config: true,
-    type: String,
-    choices: {
-    classic:  "Classic (Automated)",
-    manual:   "Manual",
-    semi:     "Semi-auto (Preview/Confirm)",
-    auto:     "Full auto"
-  },
-  default: "semi"
-  });
-
-  // Helper: resolve mode (per-actor flag > world)
+  // Helper: resolve combat mode from the single defaultCombatMode setting
   game.msh.getCombatModeFor = function(actor) {
-    const actorPref = actor?.getFlag?.("msh-faserip", "combatModeOverride");
-    return actorPref || game.settings.get("msh-faserip", "combatMode") || "semi";
+    try {
+      return game.settings.get("msh-faserip", "defaultCombatMode") || "semi";
+    } catch (_) {
+      return "semi";
+    }
   };
 
   // Four-Color: no death save at 0 Health, unless a 'Kill' action type used.
@@ -1344,11 +1332,9 @@ Hooks.once("init", async () => {
 
   // Add the CombatHandler to the namespace
   game.msh.CombatHandler = CombatHandler;
-  // Anchor: expose legacy handler only in classic mode
-  if (game.msh?.getCombatModeFor?.() !== "classic") {
-    // Do not expose CombatHandler in refactor modes
-    delete game.msh.CombatHandler;
-  }
+  // Anchor: expose legacy handler only in classic mode (no longer a valid mode)
+  // CombatHandler is always available via namespace
+  
 
   // Add the Action HUD to the namespace
   game.msh.FaseripActionPanel = FaseripActionPanel;  // <-- ADD THIS LINE

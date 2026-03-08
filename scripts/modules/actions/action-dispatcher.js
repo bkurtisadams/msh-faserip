@@ -171,11 +171,12 @@ export class ActionDispatcher {
     const Handler = registry[type];
     if (!Handler) throw new Error(`Unknown actionType: ${type}`);
 
-    // Always carry the chosen mode through
-    let modeFlags = { mode };
-    if (mode === "auto" || mode === "classic" || mode === "full") {
-      modeFlags = { mode, autoApply: true, showConfirm: false };
-    } else if (mode === "semi") {
+    // Normalize legacy mode values and set flags
+    const normalizedMode = (mode === "auto" || mode === "classic") ? "full" : (mode || "semi");
+    let modeFlags;
+    if (normalizedMode === "full") {
+      modeFlags = { mode: "full", autoApply: true, showConfirm: false };
+    } else if (normalizedMode === "semi") {
       modeFlags = { mode: "semi", autoApply: false, showConfirm: true };
     } else {
       modeFlags = { mode: "manual", autoApply: false, showConfirm: false };
