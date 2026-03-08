@@ -869,6 +869,100 @@ Hooks.once("init", async () => {
       default: false
     });
 
+    // ========== Action HUD Settings ==========
+    game.settings.register("msh-faserip", "actionHudEnabled", {
+      name: "Action HUD: Show on Login",
+      hint: "Automatically open the Action HUD when the game loads.",
+      scope: "client",
+      config: true,
+      type: Boolean,
+      default: false
+    });
+
+    game.settings.register("msh-faserip", "actionHudRememberPosition", {
+      name: "Action HUD: Remember Position",
+      hint: "Persist the HUD window position between sessions.",
+      scope: "client",
+      config: true,
+      type: Boolean,
+      default: true
+    });
+
+    game.settings.register("msh-faserip", "actionHudColumns", {
+      name: "Action HUD: Grid Columns",
+      hint: "Number of button columns in the HUD grid.",
+      scope: "client",
+      config: true,
+      type: Number,
+      default: 6,
+      choices: { 3: "3", 4: "4", 5: "5", 6: "6", 8: "8" }
+    });
+
+    game.settings.register("msh-faserip", "actionHudZoom", {
+      name: "Action HUD: Button Scale",
+      hint: "Zoom level for HUD buttons (0.5–2.0). Also adjustable with Ctrl+Wheel.",
+      scope: "client",
+      config: true,
+      type: Number,
+      default: 1.0,
+      range: { min: 0.5, max: 2.0, step: 0.1 }
+    });
+
+    game.settings.register("msh-faserip", "actionHudStyle", {
+      name: "Action HUD: Display Style",
+      hint: "Show icon art or text labels on HUD buttons.",
+      scope: "client",
+      config: true,
+      type: String,
+      default: "icons",
+      choices: { icons: "Icons Only", labels: "Labels Only" }
+    });
+
+    game.settings.register("msh-faserip", "actionHudLocked", {
+      name: "Action HUD: Lock Position",
+      hint: "Prevent the HUD window from being dragged or moved.",
+      scope: "client",
+      config: true,
+      type: Boolean,
+      default: false
+    });
+
+    game.settings.register("msh-faserip", "actionHudShowDefenses", {
+      name: "Action HUD: Show Defensive Actions",
+      hint: "Show Dodge, Evade, Block, and Catch buttons on the HUD.",
+      scope: "world",
+      config: true,
+      type: Boolean,
+      default: true
+    });
+
+    game.settings.register("msh-faserip", "actionHudShowEffects", {
+      name: "Action HUD: Show Effect Checks",
+      hint: "Show Slam, Stun, and Kill check buttons on the HUD.",
+      scope: "world",
+      config: true,
+      type: Boolean,
+      default: true
+    });
+
+    game.settings.register("msh-faserip", "actionHudLayout", {
+      name: "Action HUD Layout",
+      hint: "Persisted button order for the Action HUD.",
+      scope: "client",
+      config: false,
+      type: String,
+      default: ""
+    });
+
+    game.settings.register("msh-faserip", "actionHudPosition", {
+      name: "Action HUD Position",
+      hint: "Persisted window position.",
+      scope: "client",
+      config: false,
+      type: Object,
+      default: {}
+    });
+
     debugLog("FASERIP DEBUG: Team settings registered.");
 
     // ========== CTT ↔ FASERIP Bridge Hooks ==========
@@ -1995,13 +2089,15 @@ Hooks.once("ready", async () => {
   }
 
 
-  // Auto-open Action HUD
-  try {
-    ui.faseripHUD = new FaseripActionPanel();
-    ui.faseripHUD.render(true);
-    console.log("MSH FASERIP | Action HUD auto-opened");
-  } catch (e) {
-    console.warn("MSH FASERIP | Failed to auto-open Action HUD:", e);
+  // Auto-open Action HUD if enabled in settings
+  if (game.settings.get("msh-faserip", "actionHudEnabled")) {
+    try {
+      ui.faseripHUD = new FaseripActionPanel();
+      ui.faseripHUD.render(true);
+      console.log("MSH FASERIP | Action HUD auto-opened");
+    } catch (e) {
+      console.warn("MSH FASERIP | Failed to auto-open Action HUD:", e);
+    }
   }
 
   // Register macros

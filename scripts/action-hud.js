@@ -1,7 +1,7 @@
-// scripts/action-hud.js v2.0.0 - 2026-03-06
-// v2.0.0: Rewrite as ApplicationV2 for Foundry v13. Compact single-line buttons.
-//         Drag-to-reorder in edit mode. Drag-to-hotbar in normal mode.
-//         Layout persisted per-user via localStorage.
+// scripts/action-hud.js v3.0.0 - 2026-03-08
+// v3.0.0: Migrate localStorage to game.settings. Add configurable columns,
+//         display style, lock position, show/hide defense & effect buttons.
+//         Ctrl+Wheel zoom writes to game.settings.
 
 import { ActionDispatcher } from "./modules/actions/action-dispatcher.js";
 
@@ -10,6 +10,9 @@ const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 const SCOPE = "msh-faserip";
 
 const ICON_PATH = "systems/msh-faserip/assets/icons/actions";
+
+const DEFENSE_IDS = new Set(["dodging", "evading", "blocking", "catching"]);
+const EFFECT_IDS  = new Set(["stun", "slam", "kill"]);
 
 const ACTIONS = [
   { id:"blunt-attack",   label:"BA",  full:"Blunt Attack",   ability:"fighting",  color:"#FF6B00", textColor:"#FFF", icon:`${ICON_PATH}/blunt.png` },
@@ -32,23 +35,29 @@ const ACTIONS = [
   { id:"kill",           label:"Kl",  full:"Kill",           ability:"endurance", color:"#8B008B", textColor:"#FFF", icon:`${ICON_PATH}/kill.png` }
 ];
 
-function storageKey() {
-  const w = game?.world?.id ?? "world";
-  const u = game?.user?.id ?? "user";
-  return `faserip-hud-layout:${w}:${u}`;
+// ── Settings helpers ──
+
+function getSetting(key, fallback) {
+  try { return game.settings.get(SCOPE, key); }
+  catch { return fallback; }
+}
+
+function setSetting(key, value) {
+  try { return game.settings.set(SCOPE, key, value); }
+  catch (e) { console.warn("[FASERIP:HUD] Failed to save setting", key, e); }
 }
 
 function loadLayout() {
+  const raw = getSetting("actionHudLayout", "");
+  if (!raw) return null;
   try {
-    const raw = localStorage.getItem(storageKey());
-    if (!raw) return null;
     const arr = JSON.parse(raw);
     return Array.isArray(arr) ? arr : null;
   } catch { return null; }
 }
 
 function saveLayout(ids) {
-  localStorage.setItem(storageKey(), JSON.stringify(ids));
+  setSetting("actionHudLayout", JSON.stringify(ids));
 }
 
 function applyLayout(actions, order) {
@@ -59,15 +68,27 @@ function applyLayout(actions, order) {
   return [...ordered, ...missing];
 }
 
+function filterActions(actions) {
+  const showDef = getSetting("actionHudShowDefenses", true);
+  const showEff = getSetting("actionHudShowEffects", true);
+  if (showDef && showEff) return actions;
+  return actions.filter(a => {
+    if (!showDef && DEFENSE_IDS.has(a.id)) return false;
+    if (!showEff && EFFECT_IDS.has(a.id)) return false;
+    return true;
+  });
+}
+
 // ── CSS (injected once) ──
 const CSS = `
 .faserip-action-hud { --fah-bg: #1a1a2eee; }
 .faserip-action-hud .window-content {
   padding: 4px; background: var(--fah-bg); overflow-y: auto;
 }
+.faserip-action-hud.fah-locked .window-header { cursor: default; }
 .fah-wrap { display: flex; flex-direction: column; gap: 4px; }
 .fah-grid {
-  display: grid; grid-template-columns: repeat(6, 1fr); gap: 3px;
+  display: grid; gap: 3px;
 }
 .fah-btn {
   position: relative; padding: 0; border: 1px solid rgba(0,0,0,.4);
@@ -87,7 +108,10 @@ const CSS = `
 }
 /* Hide text code when icon is present (art has text baked in) */
 .fah-btn.has-icon .fah-code { display: none; }
-
+/* Labels-only style: always show text, hide icon */
+.fah-style-labels img { display: none !important; }
+.fah-style-labels .fah-code,
+.fah-style-labels.has-icon .fah-code { display: flex !important; }
 /* Edit mode */
 .faserip-action-hud.editing .fah-btn { cursor: move; }
 .fah-btn.dragging { opacity: .5; }
@@ -149,7 +173,16 @@ export class FaseripActionPanel extends HandlebarsApplicationMixin(ApplicationV2
     super(options);
     this.editMode = false;
     this.actions = applyLayout(ACTIONS, loadLayout());
-    this._zoom = parseFloat(localStorage.getItem(`${storageKey()}-zoom`)) || 1.0;
+    this._zoom = getSetting("actionHudZoom", 1.0);
+
+    // Restore saved position
+    if (getSetting("actionHudRememberPosition", true)) {
+      const pos = getSetting("actionHudPosition", {});
+      if (pos.left != null && pos.top != null) {
+        this.position.left = pos.left;
+        this.position.top = pos.top;
+      }
+    }
   }
 
   get actor() { return canvas.tokens?.controlled[0]?.actor || null; }
@@ -168,10 +201,14 @@ export class FaseripActionPanel extends HandlebarsApplicationMixin(ApplicationV2
   }
 
   async _prepareContext(options = {}) {
+    const columns = getSetting("actionHudColumns", 6);
+    const style = getSetting("actionHudStyle", "icons");
     return {
-      actions: this.actions,
+      actions: filterActions(this.actions),
       editMode: this.editMode,
       actorName: this.actor?.name ?? "No Actor Selected",
+      columns,
+      style,
     };
   }
 
@@ -188,6 +225,31 @@ export class FaseripActionPanel extends HandlebarsApplicationMixin(ApplicationV2
 
     const grid = el.querySelector(".fah-grid");
     if (!grid) return;
+
+    // ── Apply settings to DOM ──
+    const columns = getSetting("actionHudColumns", 6);
+    const style = getSetting("actionHudStyle", "icons");
+    const locked = getSetting("actionHudLocked", false);
+
+    grid.style.gridTemplateColumns = `repeat(${columns}, 1fr)`;
+
+    // Apply style classes to buttons
+    for (const btn of grid.querySelectorAll(".fah-btn")) {
+      btn.classList.add(`fah-style-${style}`);
+    }
+
+    // Lock: prevent window dragging
+    el.classList.toggle("fah-locked", locked);
+    if (locked) {
+      const header = el.querySelector(".window-header");
+      if (header) {
+        header.addEventListener("pointerdown", (ev) => {
+          if (!ev.target.closest("button") && !ev.target.closest("a")) {
+            ev.stopPropagation();
+          }
+        }, true);
+      }
+    }
 
     // ── Prevent images from capturing drag events ──
     for (const img of grid.querySelectorAll(".fah-btn img")) {
@@ -244,7 +306,7 @@ export class FaseripActionPanel extends HandlebarsApplicationMixin(ApplicationV2
         });
       } catch (e) {
         if (e.message && e.message !== "cancelled") {
-          console.error("[HUD] Action error:", e);
+          console.error("[FASERIP:HUD] Action error:", e);
         }
       }
     });
@@ -287,16 +349,16 @@ export class FaseripActionPanel extends HandlebarsApplicationMixin(ApplicationV2
     });
     el.tabIndex = -1;
 
-    // ── Ctrl+Wheel zoom ──
+    // ── Ctrl+Wheel zoom (reads/writes game.settings) ──
     grid.style.zoom = this._zoom;
     el.addEventListener("wheel", (ev) => {
       if (!ev.ctrlKey) return;
       ev.preventDefault();
       ev.stopPropagation();
       const delta = ev.deltaY > 0 ? -0.1 : 0.1;
-      this._zoom = Math.max(0.5, Math.min(2.0, this._zoom + delta));
+      this._zoom = Math.round(Math.max(0.5, Math.min(2.0, this._zoom + delta)) * 10) / 10;
       grid.style.zoom = this._zoom;
-      localStorage.setItem(`${storageKey()}-zoom`, this._zoom.toFixed(2));
+      setSetting("actionHudZoom", this._zoom);
     }, { passive: false });
 
     // Update title with actor name
@@ -306,6 +368,25 @@ export class FaseripActionPanel extends HandlebarsApplicationMixin(ApplicationV2
     if (!this._controlHook) {
       this._controlHook = Hooks.on("controlToken", () => this._updateTitle());
     }
+
+    // ── Save position on move (debounced) ──
+    if (!this._positionHook) {
+      this._positionHook = true;
+      const savePos = foundry.utils.debounce(() => {
+        if (!getSetting("actionHudRememberPosition", true)) return;
+        const pos = this.position;
+        if (pos.left != null && pos.top != null) {
+          setSetting("actionHudPosition", { left: pos.left, top: pos.top });
+        }
+      }, 500);
+      // ApplicationV2 fires a position change when dragged
+      const origSetPos = this.setPosition.bind(this);
+      this.setPosition = (...args) => {
+        const result = origSetPos(...args);
+        savePos();
+        return result;
+      };
+    }
   }
 
   _toggleEdit() {
@@ -313,11 +394,15 @@ export class FaseripActionPanel extends HandlebarsApplicationMixin(ApplicationV2
     if (!grid) return;
 
     if (this.editMode) {
-      // Save
-      const ids = [...grid.querySelectorAll(".fah-btn")].map(b => b.dataset.action);
-      saveLayout(ids);
+      // Save — read from ALL actions (including filtered-out ones) to preserve full order
+      const visibleIds = [...grid.querySelectorAll(".fah-btn")].map(b => b.dataset.action);
+      // Merge: visible order first, then any hidden actions in their original order
+      const visibleSet = new Set(visibleIds);
+      const hiddenIds = this.actions.filter(a => !visibleSet.has(a.id)).map(a => a.id);
+      const allIds = [...visibleIds, ...hiddenIds];
+      saveLayout(allIds);
       const map = new Map(ACTIONS.map(a => [a.id, a]));
-      this.actions = ids.map(id => map.get(id)).filter(Boolean);
+      this.actions = allIds.map(id => map.get(id)).filter(Boolean);
       this.editMode = false;
       ui.notifications?.info("Layout saved.");
     } else {
@@ -325,7 +410,6 @@ export class FaseripActionPanel extends HandlebarsApplicationMixin(ApplicationV2
       ui.notifications?.info("Edit mode: drag to reorder, press E to exit.");
     }
     this.element?.classList.toggle("editing", this.editMode);
-    // Update edit button label
     const btn = this.element?.querySelector(".fah-edit-btn");
     if (btn) btn.innerHTML = `<i class="fas fa-arrows-alt"></i> ${this.editMode ? "Done" : "Edit"}`;
   }
@@ -335,8 +419,9 @@ export class FaseripActionPanel extends HandlebarsApplicationMixin(ApplicationV2
       title: "Reset HUD Layout",
       content: "<p>Reset to the default button order and zoom?</p>",
       yes: () => {
-        localStorage.removeItem(storageKey());
-        localStorage.removeItem(`${storageKey()}-zoom`);
+        setSetting("actionHudLayout", "");
+        setSetting("actionHudZoom", 1.0);
+        setSetting("actionHudPosition", {});
         this.actions = [...ACTIONS];
         this._zoom = 1.0;
         this.editMode = false;
