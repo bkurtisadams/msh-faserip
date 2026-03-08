@@ -326,6 +326,21 @@ export function installActionChatHandlers() {
       }
     }
 
+    // Disable chips for checks already resolved (persisted across re-renders)
+    const resolvedChecks = message.flags?.[SCOPE]?.resolvedChecks || [];
+    if (resolvedChecks.length) {
+      html.find("a.faserip-chip[data-check]").each(function() {
+        const chipEl = this;
+        if (resolvedChecks.includes(chipEl.dataset.check)) {
+          chipEl.setAttribute("aria-disabled", "true");
+          chipEl.style.pointerEvents = "none";
+          chipEl.style.opacity = "0.55";
+          chipEl.style.cursor = "not-allowed";
+          chipEl.style.filter = "grayscale(.3)";
+        }
+      });
+    }
+
     // 1) Stun/Slam/Kill/Escape chips
     html.on("click", "a.faserip-chip[data-check]", async (ev) => {
         // Respect disabled state
@@ -336,12 +351,26 @@ export function installActionChatHandlers() {
         }
 
       ev.preventDefault();
+
+      // Disable immediately to prevent double-clicks
+      el.setAttribute("aria-disabled", "true");
+      el.style.pointerEvents = "none";
+      el.style.opacity = "0.55";
+      el.style.cursor = "not-allowed";
+      el.style.filter = "grayscale(.3)";
+
       //const el = ev.currentTarget;
 
       const checkType    = el.dataset.check;                // "stun" | "slam" | "kill" | "escape"
       const attackForm   = el.dataset.attackForm || "blunt";
       const dmgThrough   = Number(el.dataset.dmg || 0);
       if (dmgThrough <= 0 && checkType !== "escape") {
+        // Re-enable if not applicable
+        el.removeAttribute("aria-disabled");
+        el.style.pointerEvents = "";
+        el.style.opacity = "";
+        el.style.cursor = "pointer";
+        el.style.filter = "";
         ui.notifications.info("No penetrating damage; effect not applicable.");
         return;
       }
@@ -396,13 +425,30 @@ export function installActionChatHandlers() {
 
       console.debug("FASERIP chip click ->", { checkType, attackForm, dmgThrough, ownerActor: ownerActor?.name, prefill });
 
-      await ActionDispatcher.roll(checkType, {
-        actor: ownerActor,
-        opts: {
-          attackForm,
-          prefill
+      try {
+        await ActionDispatcher.roll(checkType, {
+          actor: ownerActor,
+          opts: {
+            attackForm,
+            prefill
+          }
+        });
+
+        // Persist resolved check to message flags so re-renders keep it disabled
+        const resolved = message.getFlag(SCOPE, "resolvedChecks") || [];
+        if (!resolved.includes(checkType)) {
+          resolved.push(checkType);
+          await safeSetFlag(message, SCOPE, "resolvedChecks", resolved);
         }
-      });
+      } catch (err) {
+        // Re-enable on error so user can retry
+        el.removeAttribute("aria-disabled");
+        el.style.pointerEvents = "";
+        el.style.opacity = "";
+        el.style.cursor = "pointer";
+        el.style.filter = "";
+        console.error(`FASERIP | ${checkType} resolve error:`, err);
+      }
     });
 
     // 2) Breaking FEAT chip

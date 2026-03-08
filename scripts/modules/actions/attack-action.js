@@ -924,7 +924,7 @@ export class AttackAction extends BaseAction {
             prefill: { dmgThrough: Number(penetratingDamage) || 0 },
             attackForm,
             damageType,
-            bypassArmor: choice.bypassArmor || false,
+            bypassArmor: true,  // damage is already post-armor (penetratingDamage)
             armorPiercing: Number(choice?.armorPiercing || 0),
             armorPiercingCS: Number(choice?.armorPiercingCS || 0),
             apMode: choice?.apMode || "value",
