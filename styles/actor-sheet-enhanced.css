@@ -429,6 +429,22 @@ form.faserip-sheet .karma-history-link:hover {
   filter: brightness(1.3);
 }
 
+/* ── Clickable Resources header ───────────────────────────────────────── */
+form.faserip-sheet .resources-header-link {
+  cursor: pointer;
+}
+form.faserip-sheet .resources-header-link:hover {
+  filter: brightness(1.3);
+}
+
+/* ── Clickable Popularity header ──────────────────────────────────────── */
+form.faserip-sheet .popularity-header-link {
+  cursor: pointer;
+}
+form.faserip-sheet .popularity-header-link:hover {
+  filter: brightness(1.3);
+}
+
 /* ── Mini roll button: gold ──────────────────────────────────────────────── */
 .mini-roll {
   border-color: var(--gold) !important;

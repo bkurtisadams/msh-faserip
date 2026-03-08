@@ -3267,7 +3267,7 @@ html.find('.headquarters-row').each((i, row) => {
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // RESOURCE BUTTON method
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    html.find('.resources-header-button').click(ev => {
+    html.find('.resources-header-link').click(ev => {
       ev.preventDefault();
     
       // Ctrl+Click opens the info dialog
@@ -3281,7 +3281,7 @@ html.find('.headquarters-row').each((i, row) => {
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Popularity activateListeners method
-    html.find('.popularity-header-button').click(ev => {
+    html.find('.popularity-header-link').click(ev => {
       const isMutant = this.actor.system.powerOrigin === "mutant" || this.actor.system.isMutant;
       const hasSecretId = this.actor.system.identityType === "secret";
       const heroPopularity = this.actor.system.attributes.popularity.value;
@@ -3351,24 +3351,6 @@ html.find('.headquarters-row').each((i, row) => {
       }).render(true);
     });
 
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    // Mini roll under RESOURCES: instant roll (ignore Ctrl/info)
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    html.on('click', '.resources-mini-roll', (ev) => {
-      ev.preventDefault();
-      ev.stopPropagation();
-      this._onResourceRoll();
-    });
-
-    // Mini roll under POPULARITY: open the same dialog as the header
-    html.on('click', '.popularity-mini-roll', (ev) => {
-      ev.preventDefault();
-      ev.stopPropagation();
-      // just trigger the existing header click so it builds the dialog
-      const col = $(ev.currentTarget).closest('.sec-col.popularity');
-      col.find('.popularity-header-button').trigger('click');
-    });
-        
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Ability FEAT roll buttons — delegated to ability-feat-dialog.js
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
