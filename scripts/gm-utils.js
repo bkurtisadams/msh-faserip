@@ -1,5 +1,6 @@
-// gm-utils.js v1.1.0 - 2025-12-23
-// v1.1.0: Add createMacroForPlayer socket handler for player macro creation
+// gm-utils.js v1.2.0 - 2026-03-08
+// v1.2.0: Add updateActiveEffect and renameEffectWithRemaining GM socket handlers
+//         for player-initiated effect updates on unowned actors
 // v13-safe socketlib wiring for "msh-faserip"
 import { applyDamageToTargets, debugLog } from "./modules/actions/action-utils.js";
 
@@ -122,6 +123,8 @@ export async function executeAsGM(action, payload) {
       case "updateActor":           return await updateActor(payload);
       case "deleteActiveEffects":   return await deleteActiveEffects(payload);
       case "deleteEmbeddedDocsOnActor": return await deleteEmbeddedDocsOnActor(payload);
+      case "updateActiveEffect":    return await updateActiveEffect(payload);
+      case "renameEffectWithRemaining": return await gmRenameEffectWithRemaining(payload);
 
       default: throw new Error(`Unknown GM action: ${action}`);
     }
@@ -154,6 +157,8 @@ export function registerSocket() {
     socket.register("manageRecoveryEffect", manageRecoveryEffect);
     socket.register("applyRulesDamage", applyRulesDamage);
     socket.register("createMacroForPlayer", createMacroForPlayer);
+    socket.register("updateActiveEffect", updateActiveEffect);
+    socket.register("renameEffectWithRemaining", gmRenameEffectWithRemaining);
 
 
     // Expose on game.msh for other modules/files
@@ -293,6 +298,30 @@ async function deleteActiveEffects({ targetActorUuid, effectIds }) {
   if (!actor || !Array.isArray(effectIds) || effectIds.length === 0) return false;
   await actor.deleteEmbeddedDocuments("ActiveEffect", effectIds);
   return true;
+}
+
+async function updateActiveEffect({ targetActorUuid, effectId, updateData }) {
+  const actor = await getActorFromUuid(targetActorUuid);
+  if (!actor) throw new Error(`updateActiveEffect: actor not found: ${targetActorUuid}`);
+  const effect = actor.effects.get(effectId);
+  if (!effect) throw new Error(`updateActiveEffect: effect not found: ${effectId}`);
+  await effect.update(updateData);
+  return true;
+}
+
+async function gmRenameEffectWithRemaining({ targetActorUuid, effectId }) {
+  const actor = await getActorFromUuid(targetActorUuid);
+  if (!actor) return false;
+  const effect = actor.effects.get(effectId);
+  if (!effect) return false;
+  try {
+    const { renameEffectWithRemaining } = await import("./modules/effects/effect-engine.js");
+    await renameEffectWithRemaining(effect);
+    return true;
+  } catch (e) {
+    console.warn("[FASERIP] gmRenameEffectWithRemaining failed:", e);
+    return false;
+  }
 }
 
 async function updateActor({ targetActorUuid, updateData }) {

@@ -1,6 +1,6 @@
-// scripts/modules/effects/effect-engine.js v1.7.0 - 2026-02-10
-// v1.7.0: Delegate Regeneration to generic ongoing-engine.js; applyRegeneration and
-//         processRegeneration are now backward-compatible wrappers.
+// scripts/modules/effects/effect-engine.js v1.8.0 - 2026-03-08
+// v1.8.0: Fix permission error — rename-with-remaining now routed through GM socket
+//         when player creates effects on unowned actors
 // v1.5.0: Fix applyEvade - add canAct:false, nest flags under SCOPE, create separate bonus effect
 //         Fix applyBlock - add canAct:false, nest flags under SCOPE, remove incorrect movementMult
 // v1.4.0: Fix applyEvade - properly track evadeSuccessful/autoHit flags, remove incorrect combat mod changes
@@ -223,10 +223,17 @@ export async function applyEffect(target, effectData = {}, opts = {}) {
         effectData: payload
       });
       
-      // Rename with remaining time if successful
+      // Rename with remaining time — must also go through GM socket
+      // since the player can't update effects on unowned actors
       if (created?.[0]?.id) {
-        const effect = actor.effects.get(created[0].id);
-        if (effect) await renameEffectWithRemaining(effect);
+        try {
+          await executeAsGM("renameEffectWithRemaining", {
+            targetActorUuid: actor.uuid,
+            effectId: created[0].id
+          });
+        } catch (renameErr) {
+          console.warn("[FASERIP] GM rename-effect-with-remaining failed (non-fatal):", renameErr);
+        }
       }
       
       return Array.isArray(created) ? created[0] : created;
