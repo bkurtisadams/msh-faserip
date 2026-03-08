@@ -363,7 +363,9 @@
       "missileSpeed": "",
       "guidanceSystem": "",
       "payload": "",
-      "payloadDamage": ""
+      "payloadDamage": "",
+      "duration": 0,
+      "durationUnit": "hour"
     },
     "vehicle": {
       "templates": ["base"],
