@@ -462,16 +462,44 @@ export class ThrowingEdgedAction extends RangedAttackAction {
     const isHit = colorLower !== 'white';
     const targetName = primaryTarget?.name || "";
 
+    // Calculate penetrating damage by checking targeted token's Body Armor
+    const rawDamage = Number(choice.weaponDamage) || 0;
+    const dmgType = (choice.damageType || "physical-edged");
+    let armorValue = 0;
+    let afterArmor = rawDamage;
+    if (isHit && rawDamage > 0 && primaryTargetActor) {
+      const armorData = getBodyArmorValues(primaryTargetActor, dmgType);
+      armorValue = armorData?.applicable ?? 0;
+      // Apply armor piercing
+      const _apFlat = Number(choice.armorPiercing || 0);
+      const _apCS = Number(choice.armorPiercingCS || 0);
+      const _apMode = choice.apMode || "value";
+      let effectiveArmor = armorValue;
+      if (_apMode === "cs" && _apCS > 0 && effectiveArmor > 0) {
+        const _RV = [0,1,3,5,8,16,26,36,46,63,88,150,250,500,1000,3000,5000,Infinity];
+        let _i = _RV.findIndex(v => v >= effectiveArmor);
+        if (_i < 0) _i = _RV.length - 1;
+        if (_i > 0 && _RV[_i] > effectiveArmor) _i--;
+        effectiveArmor = _RV[Math.max(0, _i - _apCS)];
+      } else if (_apFlat > 0) {
+        effectiveArmor = Math.max(0, effectiveArmor - _apFlat);
+      }
+      afterArmor = Math.max(0, rawDamage - effectiveArmor);
+      armorValue = effectiveArmor;
+    }
+
     const actions = buildActionsBox({
-      showStun: colorLower === "yellow",
-      showKill: colorLower === "red",
+      showStun: colorLower === "yellow" && afterArmor > 0,
+      showKill: colorLower === "red" && afterArmor > 0,
       actorUuid: actor.uuid,
-      damage: isHit ? choice.weaponDamage : 0,
+      damage: isHit ? rawDamage : 0,
       attackForm: "edged",
-      damageType: (choice.damageType || "physical-edged"),
+      damageType: dmgType,
+      bypassArmor: false,
       armorPiercing: Number(choice.armorPiercing || 0),
       armorPiercingCS: Number(choice.armorPiercingCS || 0),
       apMode: choice.apMode || "value",
+      autoApply: !!this.opts?.autoApply,
       autoSave: false,
     });
 
@@ -485,11 +513,17 @@ export class ThrowingEdgedAction extends RangedAttackAction {
     const rollDisplay = buildRollDisplay(roll, totalKarmaUsed, cappedTotal);
     const resultBadge = buildResultBadge(color, effectResult);
 
-    // Damage section (no per-target armor calc — thrown edged bypasses to downstream)
+    // Damage section
     const apNote = Number(choice.armorPiercing || 0) ? ` <span style="color:#1565c0;font-size:.85em;">(AP ${choice.armorPiercing})</span>` : "";
-    const damageHtml = isHit
-      ? buildContentBox(`<strong>Damage:</strong> <span title="Weapon: ${choice.weaponName}" style="cursor:help;">${choice.weaponDamage}</span>${apNote}`)
-      : buildContentBox(`<strong>Damage:</strong> 0 (miss)`);
+    const damageHtml = (() => {
+      if (!isHit) return buildContentBox(`<strong>Damage:</strong> 0 (miss)`);
+      const dmgBox = `<span title="Weapon: ${choice.weaponName}" style="cursor:help;">${rawDamage}</span>${apNote}`;
+      if (armorValue > 0 && primaryTargetActor) {
+        const armorBox = `<span title="Body Armor (${armorValue})" style="cursor:help;">${armorValue} armor</span>`;
+        return buildContentBox(`<strong>Damage:</strong> ${dmgBox} − ${armorBox} = <strong>${afterArmor}</strong>`);
+      }
+      return buildContentBox(`<strong>Damage:</strong> ${dmgBox}`);
+    })();
 
     // Assemble card
     const cardHtml = buildCardShell({
