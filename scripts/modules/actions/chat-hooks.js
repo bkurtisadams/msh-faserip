@@ -646,7 +646,7 @@ export function installActionChatHandlers() {
         if (!msg) {
           console.warn("Undo flag: could not resolve ChatMessage from element; skipping flag write.");
         } else {
-          await msg.setFlag(SCOPE, "undo", {
+          await safeSetFlag(msg, SCOPE, "undo", {
             ts: Date.now(),
             results: (results || []).map(r => ({
               actorUuid: r.actorUuid ?? r.targetActorUuid ?? r.targetUuid ?? null,
@@ -716,18 +716,17 @@ export function installActionChatHandlers() {
           // Try local update; fall back to GM bridge
           if (game.user.isGM || actor.isOwner) {
             await actor.update(update);
-          } else if (game.msh?.socket?.executeAsGM) {
-            // MODERN API (preferred)
-            await game.msh.socket.executeAsGM("updateActor", {
-              targetActorUuid: actor.uuid,
-              updateData: update
-            });
           } else if (game.msh?.runAsGM) {
-            // LEGACY API (fallback)
             await game.msh.runAsGM({
-              operation: "update",          // ← FIXED: was "updateActor"
+              operation: "update",
               targetActorUuid: actor.uuid,
-              args: [update]                // ← FIXED: was "data: update"
+              args: [update]
+            });
+          } else if (game.msh?.socket?.executeAsGM) {
+            await game.msh.socket.executeAsGM("runGMCommand", {
+              operation: "update",
+              targetActorUuid: actor.uuid,
+              args: [update]
             });
           } else {
             ui.notifications?.warn?.(`Cannot undo for ${actor.name}: insufficient permission.`);

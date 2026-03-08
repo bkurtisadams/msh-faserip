@@ -582,8 +582,14 @@ export class ShootingAction extends RangedAttackAction {
 
     if (!choice) return;
 
-    // Reload mode from flags
-    this.opts.mode = await actor.getFlag("msh-faserip", "lastShootingMode") || "semi";
+    // Reload mode from flags — respect global mode ceiling
+    let globalMode = "semi";
+    try { globalMode = game.settings.get("msh-faserip", "defaultCombatMode") || "semi"; } catch (_) {}
+    const modeRank = { manual: 0, semi: 1, full: 2 };
+    const globalRank = modeRank[globalMode] ?? 1;
+    const savedMode = await actor.getFlag("msh-faserip", "lastShootingMode") || "semi";
+    const savedRank = modeRank[savedMode] ?? 1;
+    this.opts.mode = savedRank <= globalRank ? savedMode : globalMode;
     const mode = this.opts.mode;
     if (mode === "manual") {
       this.opts.autoApply = false;

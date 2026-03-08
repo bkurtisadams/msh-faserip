@@ -431,7 +431,14 @@ export class ThrowingEdgedAction extends RangedAttackAction {
     if (!choice) return;
 
     // Reload mode from flags (user may have changed it in dialog)
-    this.opts.mode = await actor.getFlag("msh-faserip", "lastEdgedMode") || "semi";
+    // Respect global mode ceiling — per-dialog mode cannot exceed global setting
+    let globalMode = "semi";
+    try { globalMode = game.settings.get("msh-faserip", "defaultCombatMode") || "semi"; } catch (_) {}
+    const modeRank = { manual: 0, semi: 1, full: 2 };
+    const globalRank = modeRank[globalMode] ?? 1;
+    const savedMode = await actor.getFlag("msh-faserip", "lastEdgedMode") || "semi";
+    const savedRank = modeRank[savedMode] ?? 1;
+    this.opts.mode = savedRank <= globalRank ? savedMode : globalMode;
     const mode = this.opts.mode;
     if (mode === "manual") {
       this.opts.autoApply = false;
@@ -446,15 +453,20 @@ export class ThrowingEdgedAction extends RangedAttackAction {
 
 
     const effectiveRank = shiftRank(ability.rank, choice.totalShift);
-    const roll = await (new Roll("1d100")).evaluate();
-    if (!choice.skipDice) {
-      await roll.toMessage({
-        speaker: ChatMessage.getSpeaker({ actor }),
-        flavor: `${actor.name} performs ${actionName}`
-      });
-    }
 
-    const { cappedTotal, totalKarmaUsed } = await rollWithKarmaAndHistory(actor, actionName, choice.karma, roll, { spendKarma: choice.spendKarma, rank: effectiveRank });
+    // Check consolidated chat card setting
+    let useConsolidated = false;
+    try {
+      useConsolidated = game.settings.get("msh-faserip", "consolidatedChatCards");
+    } catch (_e) {}
+
+    // Let rollWithKarmaAndHistory create and manage the roll
+    // - Non-consolidated: posts separate roll chat message
+    // - Consolidated: shows DiceSoNice only, no chat message
+    const { roll, cappedTotal, totalKarmaUsed } = await rollWithKarmaAndHistory(
+      actor, actionName, choice.karma, null,
+      { spendKarma: choice.spendKarma, rank: effectiveRank, skipDice: choice.skipDice, inlineRoll: useConsolidated }
+    );
     const color = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
     const colorLower = String(color || "").toLowerCase();
     const effectResult = effects[colorLower] || color;
@@ -489,8 +501,8 @@ export class ThrowingEdgedAction extends RangedAttackAction {
     }
 
     const actions = buildActionsBox({
-      showStun: colorLower === "yellow" && afterArmor > 0,
-      showKill: colorLower === "red" && afterArmor > 0,
+      showStun: colorLower === "yellow",
+      showKill: colorLower === "red",
       actorUuid: actor.uuid,
       damage: isHit ? rawDamage : 0,
       attackForm: "edged",
