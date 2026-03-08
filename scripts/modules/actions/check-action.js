@@ -465,10 +465,9 @@ export class CheckAction extends BaseAction {
 
       const content = this._buildCheckCard({
         actor, actionType, effectiveEndRank, shiftDisplay,
-        roll, colorLower, effectText, effectsSuppressed, extraHtml
+        roll, colorLower, effectText, effectsSuppressed, extraHtml,
+        targetName
       });
-      
-      // Create chat card unless skipChatMessage is set (consolidated mode)
       if (!skipChatMessage) {
         await ChatMessage.create({
           speaker: ChatMessage.getSpeaker({ actor }),
@@ -661,7 +660,8 @@ export class CheckAction extends BaseAction {
 
     const content = this._buildCheckCard({
       actor, actionType, effectiveEndRank, shiftDisplay,
-      roll, colorLower, effectText, effectsSuppressed, extraHtml
+      roll, colorLower, effectText, effectsSuppressed, extraHtml,
+      targetName: choice.targetName || prefill.targetName || null
     });
     await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor }), content });
   }
@@ -730,10 +730,11 @@ export class CheckAction extends BaseAction {
     }, opts);
   }
 
-  _buildCheckCard({ actor, actionType, effectiveEndRank, shiftDisplay, roll, colorLower, effectText, effectsSuppressed, extraHtml }) {
+  _buildCheckCard({ actor, actionType, effectiveEndRank, shiftDisplay, roll, colorLower, effectText, effectsSuppressed, extraHtml, targetName = null }) {
     const { bg, fg } = bannerColors(colorLower);
     const actionLabel = labelFor(actionType).toUpperCase();
     const rollBox = `<span title="d100 = ${roll.total}" style="padding:0 3px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${roll.total}</span>`;
+    const displayName = targetName || actor.name;
 
     const resultBox = (effectsSuppressed || extraHtml) ? `
       <div style="margin:0 10px 6px;padding:6px 8px;background:#fff;border:1px solid #ddd;border-radius:3px;font-size:.9em;">
@@ -747,7 +748,7 @@ export class CheckAction extends BaseAction {
           <strong style="color:#8b0000;">${actionLabel}</strong>
           <span style="color:#666;font-weight:normal;font-size:.85em;">Endurance FEAT</span>
         </div>
-        <div style="padding:4px 10px;font-size:.95em;"><strong>${actor.name}</strong></div>
+        <div style="padding:4px 10px;font-size:.95em;"><strong>${displayName}</strong></div>
         <div style="padding:2px 10px 6px;font-size:.9em;color:#555;">
           <div>Endurance: ${effectiveEndRank}${shiftDisplay}</div>
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:3px;">
