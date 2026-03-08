@@ -482,7 +482,7 @@ export class CheckAction extends BaseAction {
     // ------------------------------
     // MANUAL / SEMI: show a compact dialog
     // ------------------------------
-    const targetRanks = this._rankOptions(actor?.system?.abilities?.endurance?.rank || prefill.targetEndRank || "Good");
+    const targetRanks = this._rankOptions(prefill.targetEndRank || actor?.system?.abilities?.endurance?.rank || "Good");
     const preDmg = Number(prefill.dmgThrough ?? 0) || 0;
     const html = `
       <div class="frp-dialog" style="min-width:410px;">
@@ -584,10 +584,13 @@ export class CheckAction extends BaseAction {
       }
     }
 
+    let manualSlamDetails = null;
     if (actionType === "slam" && !effectsSuppressed) {
       // Manual path - map color to slam effect (same logic as auto path)
       const prefill = this.opts?.prefill || {};
       const attackerStrength = prefill.attackerStrength || 30;
+      const attackerStrengthRank = prefill.attackerStrengthRank || "Remarkable";
+      const attackerName = prefill.attackerName || "Attacker";
       let slamEffect = "";
       let knockbackDistance = 0;
       
@@ -607,6 +610,17 @@ export class CheckAction extends BaseAction {
           slamEffect = "No Slam";
           break;
       }
+
+      manualSlamDetails = {
+        targetName: choice.targetName || "Target",
+        targetUuid: prefill.targetUuid || "",
+        slamEffect,
+        knockbackDistance,
+        attackerStrength,
+        attackerStrengthRank,
+        attackerName,
+        colorLower
+      };
       
       if (slamEffect !== "No Slam") {
         await this._createSlamEffect(actor, {
@@ -640,6 +654,7 @@ export class CheckAction extends BaseAction {
     const extraHtml  = this._extraExplanationHtml({
       actionType, targetAbility, colorLower, finalEffect: effectText, effectsSuppressed,
       stunDuration: manualStunDuration,
+      slamDetails: manualSlamDetails,
       targetIsRobot: (await this._resolveTokenActor(this.opts?.prefill?.targetUuid || ""))?.system?.origin === "Robot"
     });
     const shiftDisplay = choice.shift ? ` (${choice.shift > 0 ? '+' : ''}${choice.shift}CS)` : '';

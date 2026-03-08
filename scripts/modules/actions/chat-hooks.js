@@ -400,6 +400,15 @@ export function installActionChatHandlers() {
 
       // Smart auto-population from targeted tokens
       let prefill = { dmgThrough, attackForm };
+
+      // Merge prefill data from the chip (includes attackerStrength, attackerName, etc.)
+      try {
+        if (el.dataset.prefill) {
+          const chipPrefill = JSON.parse(el.dataset.prefill.replaceAll("&apos;","'"));
+          Object.assign(prefill, chipPrefill);
+        }
+      } catch (_) {}
+
       const targets = game.user.targets;
       
       if (targets.size === 1) {

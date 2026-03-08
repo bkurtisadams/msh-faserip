@@ -921,7 +921,12 @@ export class AttackAction extends BaseAction {
             actorUuid: actor.uuid,
             targetUuid: target?.document?.uuid ?? target?.actor?.uuid,
             damage: Number(penetratingDamage) || 0,
-            prefill: { dmgThrough: Number(penetratingDamage) || 0 },
+            prefillData: {
+              dmgThrough: Number(penetratingDamage) || 0,
+              attackerStrength: getStrengthInfo(actor)?.value || 10,
+              attackerStrengthRank: getStrengthInfo(actor)?.rank || "Typical",
+              attackerName: actor.name
+            },
             attackForm,
             damageType,
             bypassArmor: true,  // damage is already post-armor (penetratingDamage)
