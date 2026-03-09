@@ -2740,108 +2740,10 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
       const li = $(ev.currentTarget).closest(".equipment-row");
       const itemId = li.data("itemId");
       const item = this.actor.items.get(itemId);
-
       if (!item) return;
 
-      const { ActionDispatcher } = await import("./modules/actions/action-dispatcher.js");
-      
-      // Determine action type based on equipment category
-      let actionType;
-      const category = item.system.category?.toLowerCase();
-      const weaponType = item.system.weaponType?.toLowerCase();
-      const damageType = item.system.damageType?.toUpperCase();
-      const explicitAttackType = item.system.attackType || "";
-
-      // Explicit attackType always wins
-      if (explicitAttackType) {
-        actionType = explicitAttackType;
-      } else if (category === "other") {
-        // Other weapons: grenade or missile
-        if (weaponType === "grenade") {
-          actionType = "grenade";
-        } else if (weaponType === "missile") {
-          actionType = "missile"; // future
-        } else {
-          return; // unknown other type
-        }
-      } else if (category === "weapon") {
-        // Legacy grenade items (category=weapon + grenadeType set) — migrate on the fly
-        if (item.system.grenadeType) {
-          await item.update({ "system.category": "other", "system.weaponType": "grenade" });
-          actionType = "grenade";
-        } else if (damageType === "E") {
-          actionType = "energy";
-        } else if (damageType === "F") {
-          actionType = "force";
-        } else if (damageType === "GP") {
-          actionType = "grappling";
-        } else if (damageType === "GB") {
-          actionType = "grabbing";
-        } else if (damageType === "STUN") {
-          // Stun weapons use Shooting column but have special stun effect
-          actionType = "shooting";
-        } else if (weaponType === "shooting" || weaponType === "firearm") {
-          actionType = "shooting";
-        } else if (weaponType === "melee") {
-          // Use damageType to determine if edged or blunt
-          actionType = (damageType === "EA") ? "edged-attack" : "blunt-attack";
-        } else if (weaponType === "thrown") {
-          // Check attackModes first, then damageType (EA and TE both = throwing-edged)
-          const throwMode = (item.system.attackModes || []).find(m => m.actionType === "throwing-edged" || m.actionType === "throwing-blunt");
-          if (throwMode) {
-            actionType = throwMode.actionType;
-          } else {
-            actionType = (damageType === "TE" || damageType === "EA") ? "throwing-edged" : "throwing-blunt";
-          }
-        } else {
-          // Fallback: try to infer from damageType
-          if (damageType === "S") actionType = "shooting";
-          else if (damageType === "EA") actionType = "edged-attack";
-          else if (damageType === "BA") actionType = "blunt-attack";
-          else if (damageType === "TE") actionType = "throwing-edged";
-          else if (damageType === "TB") actionType = "throwing-blunt";
-          else actionType = "shooting"; // ultimate fallback
-        }
-      } else if (category === "melee" || category === "melee weapon") {
-        actionType = (damageType === "EA") ? "edged-attack" : "blunt-attack";
-      } else if (category === "thrown") {
-        const throwMode = (item.system.attackModes || []).find(m => m.actionType === "throwing-edged" || m.actionType === "throwing-blunt");
-        if (throwMode) {
-          actionType = throwMode.actionType;
-        } else {
-          actionType = (damageType === "TE" || damageType === "EA") ? "throwing-edged" : "throwing-blunt";
-        }
-      } else {
-        // Check for grenade items regardless of category (catches gear default + old data)
-        if (item.system.grenadeType) {
-          await item.update({ "system.category": "other", "system.weaponType": "grenade" });
-          actionType = "grenade";
-        } else {
-          return item.rollItem();
-        }
-      }
-
-      // Determine ability based on action type
-      let abilityName;
-      if (actionType === "energy" || actionType === "force" || actionType === "shooting" || 
-          actionType === "throwing-edged" || actionType === "throwing-blunt" || actionType === "grenade" || actionType === "missile") {
-        abilityName = "agility";
-      } else if (actionType === "grappling" || actionType === "grabbing") {
-        abilityName = "strength";
-      } else {
-        abilityName = "fighting";
-      }
-            
-      return ActionDispatcher.roll(actionType, {
-        actor: this.actor,
-        abilityName: abilityName,
-        opts: { 
-          itemId: item.id,
-          item: item,
-          sourceItem: item,
-          equipment: item
-        }
-      });
+      const { openEquipmentActionDialog } = await import("./modules/actions/equipment-action-dialog.js");
+      return openEquipmentActionDialog(this.actor, item);
     });
 
     // Reload weapon
@@ -2865,21 +2767,17 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
       }
     });
 
-    // Intensity roll for gear/equipment items
+    // Intensity roll button (gear rows) — also opens unified dialog
     html.find('.equipment-intensity-roll').click(async ev => {
       ev.preventDefault();
       ev.stopPropagation();
       const li = $(ev.currentTarget).closest(".equipment-row");
       const itemId = li.data("itemId");
       const item = this.actor.items.get(itemId);
-      if (!item || !item.system.intensityRank) return;
+      if (!item) return;
 
-      const { ActionDispatcher } = await import("./modules/actions/action-dispatcher.js");
-      return ActionDispatcher.roll("intensity", {
-        actor: this.actor,
-        abilityName: "endurance",
-        opts: { itemId: item.id, item, sourceItem: item, equipment: item }
-      });
+      const { openEquipmentActionDialog } = await import("./modules/actions/equipment-action-dialog.js");
+      return openEquipmentActionDialog(this.actor, item);
     });
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

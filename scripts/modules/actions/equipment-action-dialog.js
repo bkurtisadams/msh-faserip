@@ -1,0 +1,502 @@
+// equipment-action-dialog.js v1.0.0 - 2026-03-08
+// Unified equipment action hub. Inspects item fields and presents contextual action buttons.
+// Replaces fragmented click handlers with a single dialog opened from the equipment roll button.
+import { AreaTemplate } from "./area-template.js";
+import { getTargetData } from "./action-utils.js";
+
+// Determine which action buttons to show based on item data
+function getAvailableActions(item, actor) {
+  const actions = [];
+  const sys = item.system || {};
+  const cat = (sys.category || "").toLowerCase();
+  const hasTransferEffects = item.effects?.some(e => e.transfer);
+  const anyEffectActive = item.effects?.some(e => e.transfer && !e.disabled);
+
+  // ── Attack (weapon categories route to ActionDispatcher) ──
+  if (cat === "weapon" && (sys.attackType || sys.damageType || sys.weaponType)) {
+    actions.push({
+      id: "attack",
+      label: "Attack",
+      icon: "fas fa-crosshairs",
+      color: "#c62828"
+    });
+  }
+
+  // ── Attack Modes (multi-mode weapons) ──
+  const modes = Array.isArray(sys.attackModes) ? sys.attackModes.filter(m => m?.name) : [];
+  if (modes.length > 1) {
+    // Replace single attack with per-mode buttons
+    const atkIdx = actions.findIndex(a => a.id === "attack");
+    if (atkIdx >= 0) actions.splice(atkIdx, 1);
+    for (let i = 0; i < modes.length; i++) {
+      actions.push({
+        id: `attack-mode-${i}`,
+        label: modes[i].name,
+        icon: "fas fa-crosshairs",
+        color: "#c62828",
+        modeIndex: i
+      });
+    }
+  }
+
+  // ── Grenade ──
+  if (cat === "other" && sys.weaponType === "grenade") {
+    actions.push({
+      id: "grenade",
+      label: "Throw Grenade",
+      icon: "fas fa-bomb",
+      color: "#e65100"
+    });
+  }
+
+  // ── Missile ──
+  if (cat === "other" && sys.weaponType === "missile") {
+    actions.push({
+      id: "missile",
+      label: "Launch Missile",
+      icon: "fas fa-rocket",
+      color: "#e65100"
+    });
+  }
+
+  // ── Toggle On/Off (transfer effects) ──
+  if (hasTransferEffects) {
+    actions.push({
+      id: "toggle",
+      label: anyEffectActive ? "Turn Off" : "Turn On",
+      icon: "fas fa-power-off",
+      color: anyEffectActive ? "#c62828" : "#2e7d32",
+      active: anyEffectActive
+    });
+  }
+
+  // ── Intensity Attack ──
+  if (sys.intensityRank) {
+    actions.push({
+      id: "intensity",
+      label: "Intensity Attack",
+      icon: "fas fa-radiation",
+      color: "#e65100"
+    });
+  }
+
+  // ── Place Template (area effect) ──
+  const areaRadius = Number(sys.areaRadius) || Number(sys.grenadeRadius) || 0;
+  if (areaRadius > 0) {
+    actions.push({
+      id: "template",
+      label: `Place Template (${areaRadius} area${areaRadius > 1 ? "s" : ""})`,
+      icon: "fas fa-bullseye",
+      color: "#1565c0"
+    });
+  }
+
+  // ── Stun/Gas (stunIntensity without a regular attack) ──
+  if (sys.stunIntensity && !actions.some(a => a.id === "attack" || a.id.startsWith("attack-mode"))) {
+    actions.push({
+      id: "stun-intensity",
+      label: `Stun/Gas (${sys.stunIntensity})`,
+      icon: "fas fa-cloud",
+      color: "#6a1b9a"
+    });
+  }
+
+  // ── Throw (melee weapons with throwable flag) ──
+  if (sys.throwable && cat === "weapon") {
+    actions.push({
+      id: "throw",
+      label: "Throw",
+      icon: "fas fa-location-arrow",
+      color: "#ef6c00"
+    });
+  }
+
+  // ── Custom Abilities ──
+  const customs = Array.isArray(sys.customAbilities) ? sys.customAbilities.filter(a => a?.name) : [];
+  for (let i = 0; i < customs.length; i++) {
+    actions.push({
+      id: `custom-${i}`,
+      label: customs[i].name,
+      icon: "fas fa-star",
+      color: "#5d4037",
+      customIndex: i
+    });
+  }
+
+  // ── Power Item roll ──
+  if (cat === "power-item" && sys.powerRank) {
+    actions.push({
+      id: "power-item",
+      label: "Use Power",
+      icon: "fas fa-bolt",
+      color: "#6a1b9a"
+    });
+  }
+
+  // ── Reload (weapon with shots) ──
+  const shots = Number(sys.shots);
+  const remaining = Number(sys.shotsRemaining);
+  if (shots > 0 && Number.isFinite(remaining) && remaining < shots) {
+    actions.push({
+      id: "reload",
+      label: "Reload",
+      icon: "fas fa-sync-alt",
+      color: "#666"
+    });
+  }
+
+  return actions;
+}
+
+// Build stat summary HTML based on item category
+function buildStatSummary(item) {
+  const sys = item.system || {};
+  const cat = (sys.category || "").toLowerCase();
+  const rows = [];
+
+  const add = (label, value) => {
+    if (value !== undefined && value !== null && value !== "" && value !== 0 && value !== "0") {
+      rows.push(`<div><span style="color:#666;font-size:.8em;text-transform:uppercase;">${label}</span><br><strong>${value}</strong></div>`);
+    }
+  };
+
+  add("Material", sys.materialStrength);
+
+  if (cat === "weapon" || cat === "other") {
+    add("Damage", sys.damage || sys.grenadeDamage || sys.missileDamage);
+    add("Type", sys.damageType || sys.grenadeDamageType || sys.missileDamageType);
+    add("Range", sys.range || (sys.grenadeRadius ? `${sys.grenadeRadius} area radius` : ""));
+    add("Rate", sys.rate);
+    const shots = sys.shots;
+    const rem = sys.shotsRemaining;
+    if (shots) add("Shots", `${rem ?? shots}/${shots}`);
+  }
+
+  if (cat === "armor") {
+    add("Protection", sys.protection);
+    add("Coverage", sys.coverage);
+  }
+
+  if (cat === "power-item") {
+    add("Power Rank", sys.powerRank);
+    add("Power Type", sys.powerType);
+    add("Range", sys.powerRange);
+  }
+
+  if (sys.intensityRank) add("Intensity", sys.intensityRank);
+  if (sys.areaRadius) add("Area", `${sys.areaRadius} area${sys.areaRadius > 1 ? "s" : ""} radius`);
+
+  const dur = Number(sys.duration);
+  if (dur > 0) {
+    const unit = sys.durationUnit || "hour";
+    add("Duration", `${dur} ${dur === 1 ? unit : unit + "s"}`);
+  }
+
+  if (!rows.length) return "";
+
+  return `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:6px;margin-bottom:10px;padding:8px;background:#f5f5f0;border:1px solid #ddd;border-radius:3px;">
+    ${rows.join("")}
+  </div>`;
+}
+
+// Build action button HTML
+function buildActionButtons(actions) {
+  if (!actions.length) return `<div style="color:#888;font-style:italic;padding:8px;">No actions available for this item.</div>`;
+
+  return actions.map(a => {
+    return `<button type="button" class="equip-action-btn" data-action-id="${a.id}"
+      ${a.modeIndex !== undefined ? `data-mode-index="${a.modeIndex}"` : ""}
+      ${a.customIndex !== undefined ? `data-custom-index="${a.customIndex}"` : ""}
+      style="display:flex;align-items:center;gap:8px;width:100%;padding:8px 12px;margin-bottom:4px;
+             border:1px solid #c0c0c0;border-radius:4px;background:#fff;cursor:pointer;
+             font-size:0.95em;text-align:left;">
+      <i class="${a.icon}" style="color:${a.color};width:18px;text-align:center;"></i>
+      <span style="flex:1;font-weight:600;">${a.label}</span>
+    </button>`;
+  }).join("");
+}
+
+/**
+ * Open the Equipment Action Dialog for an item.
+ * Called from the actor sheet equipment-roll click handler.
+ */
+export async function openEquipmentActionDialog(actor, item) {
+  if (!actor || !item) return;
+
+  const actions = getAvailableActions(item, actor);
+  const statSummary = buildStatSummary(item);
+  const actionButtons = buildActionButtons(actions);
+
+  const descText = item.system?.description || "";
+  const descHtml = descText
+    ? `<div style="font-size:.85em;color:#555;margin-bottom:8px;max-height:60px;overflow-y:auto;">${descText}</div>`
+    : "";
+
+  const content = `
+    <div style="min-width:320px;">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+        <img src="${item.img}" width="40" height="40" style="border:1px solid #ccc;border-radius:3px;"/>
+        <div>
+          <div style="font-weight:bold;font-size:1.15em;">${item.name}</div>
+          <div style="font-size:.8em;color:#888;text-transform:uppercase;">${item.system.category || "equipment"}</div>
+        </div>
+      </div>
+      ${descHtml}
+      ${statSummary}
+      <div class="equip-action-buttons">
+        ${actionButtons}
+      </div>
+    </div>`;
+
+  const dlg = new Dialog({
+    title: item.name,
+    content,
+    buttons: {
+      close: { label: "Close" }
+    },
+    default: "close",
+    render: (html) => {
+      html.find('.equip-action-btn').on('click', async (ev) => {
+        const btn = ev.currentTarget;
+        const actionId = btn.dataset.actionId;
+        dlg.close();
+        await _executeAction(actionId, actor, item, btn.dataset);
+      });
+    }
+  }, {
+    width: 380,
+    classes: ["faserip", "equipment-action-dialog"]
+  });
+
+  dlg.render(true);
+}
+
+// Route an action button click to the appropriate handler
+async function _executeAction(actionId, actor, item, dataset) {
+  const sys = item.system || {};
+
+  switch (actionId) {
+
+    // ── Standard attack (routes to ActionDispatcher) ──
+    case "attack": {
+      const { ActionDispatcher } = await import("./action-dispatcher.js");
+      const actionType = _resolveAttackType(item);
+      const abilityName = _resolveAbility(actionType);
+      return ActionDispatcher.roll(actionType, {
+        actor, abilityName,
+        opts: { itemId: item.id, item, sourceItem: item, equipment: item }
+      });
+    }
+
+    // ── Attack mode ──
+    default: {
+      if (actionId.startsWith("attack-mode-")) {
+        const idx = Number(dataset.modeIndex);
+        const modes = Array.isArray(sys.attackModes) ? sys.attackModes : [];
+        const mode = modes[idx];
+        if (!mode) return;
+        const { ActionDispatcher } = await import("./action-dispatcher.js");
+        const actionType = mode.actionType || "blunt-attack";
+        const abilityName = mode.ability || _resolveAbility(actionType);
+        return ActionDispatcher.roll(actionType, {
+          actor, abilityName,
+          opts: { itemId: item.id, item, sourceItem: item, equipment: item, attackMode: mode }
+        });
+      }
+
+      if (actionId.startsWith("custom-")) {
+        const idx = Number(dataset.customIndex);
+        const customs = Array.isArray(sys.customAbilities) ? sys.customAbilities : [];
+        const ability = customs[idx];
+        if (!ability) return;
+        // Use existing custom ability roll from equipment sheet
+        const sheet = item.sheet;
+        if (sheet?._rollSpecificCustomAbility) {
+          return sheet._rollSpecificCustomAbility(item, actor, ability);
+        }
+      }
+
+      break;
+    }
+
+    // ── Grenade ──
+    case "grenade": {
+      const { ActionDispatcher } = await import("./action-dispatcher.js");
+      return ActionDispatcher.roll("grenade", {
+        actor, abilityName: "agility",
+        opts: { itemId: item.id, item, sourceItem: item, equipment: item }
+      });
+    }
+
+    // ── Toggle effects on/off ──
+    case "toggle": {
+      const transferEffects = item.effects.filter(e => e.transfer);
+      if (!transferEffects.length) return;
+      const anyActive = transferEffects.some(e => !e.disabled);
+      const updates = transferEffects.map(e => ({ _id: e.id, disabled: anyActive }));
+      await item.updateEmbeddedDocuments("ActiveEffect", updates);
+      const state = anyActive ? "OFF" : "ON";
+      const stateColor = anyActive ? "#c62828" : "#2e7d32";
+      const dur = Number(sys.duration);
+      const unit = sys.durationUnit || "hour";
+      let durationLine = "";
+      if (!anyActive && dur > 0) {
+        const unitLabel = dur === 1 ? unit : unit + "s";
+        durationLine = `<div style="font-size:.85em;color:#666;">Duration: ${dur} ${unitLabel}</div>`;
+      }
+      return ChatMessage.create({
+        content: `<div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;">
+          <div style="padding:6px 10px;border-bottom:1px solid #c0c0c0;">
+            <strong style="color:#8b0000;">EQUIPMENT</strong>
+          </div>
+          <div style="padding:6px 10px;">
+            <div><strong>${actor.name}</strong> turns <strong style="color:${stateColor};">${state}</strong>: <strong>${item.name}</strong></div>
+            ${durationLine}
+          </div>
+        </div>`,
+        speaker: ChatMessage.getSpeaker({ actor })
+      });
+    }
+
+    // ── Intensity attack ──
+    case "intensity": {
+      const { ActionDispatcher } = await import("./action-dispatcher.js");
+      return ActionDispatcher.roll("intensity", {
+        actor, abilityName: "endurance",
+        opts: { itemId: item.id, item, sourceItem: item, equipment: item }
+      });
+    }
+
+    // ── Place Template ──
+    case "template": {
+      const radius = Number(sys.areaRadius) || Number(sys.grenadeRadius) || 1;
+      const template = await AreaTemplate.createAtTarget({
+        radiusInAreas: radius,
+        label: item.name,
+        fillColor: "#ff4400",
+        fillAlpha: 0.25
+      });
+      if (template) {
+        await template.target();
+        ChatMessage.create({
+          content: `<div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;">
+            <div style="padding:6px 10px;border-bottom:1px solid #c0c0c0;">
+              <strong style="color:#8b0000;">AREA EFFECT</strong>
+            </div>
+            <div style="padding:6px 10px;">
+              <div><strong>${actor.name}</strong> places <strong>${item.name}</strong> template (${radius} area${radius > 1 ? "s" : ""} radius)</div>
+            </div>
+          </div>`,
+          speaker: ChatMessage.getSpeaker({ actor })
+        });
+      }
+      return;
+    }
+
+    // ── Stun/Gas intensity (uses stunIntensity field) ──
+    case "stun-intensity": {
+      // Treat stunIntensity as an intensity rank, route through intensity action
+      const origRank = sys.intensityRank;
+      const origDesc = sys.intensityDescription;
+      // Temporarily set intensity fields from stunIntensity
+      await item.update({
+        "system.intensityRank": sys.stunIntensity,
+        "system.intensityDescription": sys.intensityDescription || `${sys.stunIntensity} Intensity stunning/gas`
+      });
+      const { ActionDispatcher } = await import("./action-dispatcher.js");
+      await ActionDispatcher.roll("intensity", {
+        actor, abilityName: "endurance",
+        opts: { itemId: item.id, item, sourceItem: item, equipment: item }
+      });
+      // Restore original values
+      await item.update({
+        "system.intensityRank": origRank || "",
+        "system.intensityDescription": origDesc || ""
+      });
+      return;
+    }
+
+    // ── Throw (throwable melee weapon) ──
+    case "throw": {
+      const { ActionDispatcher } = await import("./action-dispatcher.js");
+      const throwType = (sys.damageType === "EA" || sys.damageType === "TE")
+        ? "throwing-edged" : "throwing-blunt";
+      return ActionDispatcher.roll(throwType, {
+        actor, abilityName: "agility",
+        opts: { itemId: item.id, item, sourceItem: item, equipment: item }
+      });
+    }
+
+    // ── Power Item ──
+    case "power-item": {
+      const sheet = item.sheet;
+      if (sheet?._rollPowerItem) {
+        return sheet._rollPowerItem(item, actor);
+      }
+      return;
+    }
+
+    // ── Reload ──
+    case "reload": {
+      await item.update({ "system.shotsRemaining": sys.shots });
+      const rechargeLabel = sys.rechargeLabel || "Reload";
+      ChatMessage.create({
+        content: `<div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;">
+          <div style="padding:6px 10px;border-bottom:1px solid #c0c0c0;">
+            <strong style="color:#8b0000;">EQUIPMENT</strong>
+          </div>
+          <div style="padding:6px 10px;">
+            <div><strong>${actor.name}</strong> ${rechargeLabel.toLowerCase()}s <strong>${item.name}</strong></div>
+          </div>
+        </div>`,
+        speaker: ChatMessage.getSpeaker({ actor })
+      });
+      return;
+    }
+  }
+}
+
+// Resolve attack type from item fields (same logic as actorSheet.js equipment-roll handler)
+function _resolveAttackType(item) {
+  const sys = item.system || {};
+  const explicit = sys.attackType;
+  if (explicit) return explicit;
+
+  const dt = (sys.damageType || "").toUpperCase();
+  const wt = (sys.weaponType || "").toLowerCase();
+
+  if (dt === "E") return "energy";
+  if (dt === "F") return "force";
+  if (dt === "GP") return "grappling";
+  if (dt === "GB") return "grabbing";
+  if (dt === "STUN") return "shooting";
+
+  if (wt === "shooting" || wt === "firearm") return "shooting";
+  if (wt === "melee") return dt === "EA" ? "edged-attack" : "blunt-attack";
+  if (wt === "thrown") return (dt === "TE" || dt === "EA") ? "throwing-edged" : "throwing-blunt";
+
+  if (dt === "S") return "shooting";
+  if (dt === "EA") return "edged-attack";
+  if (dt === "BA") return "blunt-attack";
+  if (dt === "TE") return "throwing-edged";
+  if (dt === "TB") return "throwing-blunt";
+
+  return "shooting";
+}
+
+function _resolveAbility(actionType) {
+  const map = {
+    "blunt-attack": "fighting",
+    "edged-attack": "fighting",
+    "shooting": "agility",
+    "throwing-edged": "agility",
+    "throwing-blunt": "agility",
+    "energy": "agility",
+    "force": "agility",
+    "grappling": "strength",
+    "grabbing": "strength",
+    "charging": "endurance",
+    "grenade": "agility"
+  };
+  return map[actionType] || "fighting";
+}

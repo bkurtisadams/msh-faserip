@@ -368,7 +368,8 @@
       "durationUnit": "hour",
       "rechargeLabel": "",
       "intensityRank": "",
-      "intensityDescription": ""
+      "intensityDescription": "",
+      "areaRadius": 0
     },
     "vehicle": {
       "templates": ["base"],

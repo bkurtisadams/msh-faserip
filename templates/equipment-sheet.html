@@ -931,6 +931,14 @@
       </div>
 
       <div class="form-group">
+        <label>Area Radius:</label>
+        <div class="form-fields" style="display:flex;gap:4px;align-items:center;">
+          <input type="number" name="system.areaRadius" value="{{system.areaRadius}}" min="0" step="1" style="width:60px;" placeholder="0" title="0 = single target"/>
+          <span style="font-size:0.75em;color:#888;">areas (0 = single target). Enables Place Template.</span>
+        </div>
+      </div>
+
+      <div class="form-group">
         <label>Notes:</label>
         <textarea name="system.notes" rows="3">{{system.notes}}</textarea>
       </div>

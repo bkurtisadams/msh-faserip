@@ -953,11 +953,7 @@
                 {{#if (or (eq item.system.category "gear") (eq item.system.category "custom"))}}
                 <tr class="equipment-row item" data-item-id="{{item._id}}" title="{{item.system.description}}">
                   <td class="equipment-name">
-                    {{#if (eq item.system.category "custom")}}
-                    <a class="item-control equipment-roll" data-item-id="{{item._id}}" title="Roll"><i class="fas fa-dice-d20"></i></a>
-                    {{else if item.system.intensityRank}}
-                    <a class="item-control equipment-intensity-roll" data-item-id="{{item._id}}" title="Roll Intensity"><i class="fas fa-radiation"></i></a>
-                    {{/if}}
+                    <a class="item-control equipment-roll" data-item-id="{{item._id}}" title="Actions"><i class="fas fa-dice-d20"></i></a>
                     <img src="{{item.img}}" class="equipment-icon equipment-info" width="24" height="24" title="Click for info." />
                     <span class="equipment-name-text">{{item.name}}</span>
                   </td>
