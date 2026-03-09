@@ -59,14 +59,16 @@ function getAvailableActions(item, actor) {
     });
   }
 
-  // ── Toggle On/Off (transfer effects) ──
-  if (hasTransferEffects) {
+  // ── Toggle On/Off (transfer effects OR items with duration) ──
+  const hasDuration = Number(sys.duration) > 0;
+  if (hasTransferEffects || hasDuration) {
+    const isActive = anyEffectActive;
     actions.push({
       id: "toggle",
-      label: anyEffectActive ? "Turn Off" : "Turn On",
+      label: isActive ? "Turn Off" : "Turn On",
       icon: "fas fa-power-off",
-      color: anyEffectActive ? "#c62828" : "#2e7d32",
-      active: anyEffectActive
+      color: isActive ? "#c62828" : "#2e7d32",
+      active: isActive
     });
   }
 
@@ -80,8 +82,8 @@ function getAvailableActions(item, actor) {
     });
   }
 
-  // ── Place Template (area effect) ──
-  const areaRadius = Number(sys.areaRadius) || Number(sys.grenadeRadius) || 0;
+  // ── Place Template (area effect — only explicit areaRadius, not grenadeRadius) ──
+  const areaRadius = Number(sys.areaRadius) || 0;
   if (areaRadius > 0) {
     actions.push({
       id: "template",
@@ -330,15 +332,37 @@ async function _executeAction(actionId, actor, item, dataset) {
 
     // ── Toggle effects on/off ──
     case "toggle": {
-      const transferEffects = item.effects.filter(e => e.transfer);
+      const SCOPE = "msh-faserip";
+      let transferEffects = item.effects.filter(e => e.transfer);
+      const dur = Number(sys.duration);
+      const unit = sys.durationUnit || "hour";
+
+      // If item has duration but no transfer effects, auto-create one on the item
+      if (!transferEffects.length && dur > 0) {
+        await item.createEmbeddedDocuments("ActiveEffect", [{
+          name: `${item.name} (Active)`,
+          img: item.img || "icons/svg/aura.svg",
+          origin: item.uuid,
+          disabled: true,
+          transfer: true,
+          changes: [],
+          flags: {
+            [SCOPE]: {
+              equipmentToggle: true
+            }
+          }
+        }]);
+        // Re-fetch after creation
+        transferEffects = item.effects.filter(e => e.transfer);
+      }
+
       if (!transferEffects.length) return;
+
       const anyActive = transferEffects.some(e => !e.disabled);
       const updates = transferEffects.map(e => ({ _id: e.id, disabled: anyActive }));
       await item.updateEmbeddedDocuments("ActiveEffect", updates);
       const state = anyActive ? "OFF" : "ON";
       const stateColor = anyActive ? "#c62828" : "#2e7d32";
-      const dur = Number(sys.duration);
-      const unit = sys.durationUnit || "hour";
       let durationLine = "";
       if (!anyActive && dur > 0) {
         const unitLabel = dur === 1 ? unit : unit + "s";
