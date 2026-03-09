@@ -582,3 +582,39 @@
   outline: 2px solid #0048ff;
   outline-offset: -2px;
 }
+/* Equipment intensity badge */
+.intensity-badge {
+  display: inline-block;
+  padding: 1px 5px;
+  background: #fff3e0;
+  border: 1px solid #ff9800;
+  border-radius: 3px;
+  font-size: 0.8em;
+  font-weight: 600;
+  color: #e65100;
+}
+
+/* Equipment intensity roll button */
+.equipment-intensity-roll {
+  cursor: pointer;
+  color: #e65100;
+}
+.equipment-intensity-roll:hover {
+  color: #bf360c;
+}
+
+/* Equipment chat cards */
+.faserip-equip-toggle,
+.faserip-equip-expired,
+.faserip-intensity-card {
+  background: #f9f8f4;
+  border: 1px solid #c0a070;
+  border-radius: 4px;
+  padding: 8px;
+  font-family: Arial, sans-serif;
+}
+.faserip-equip-expired .faserip-recharge-btn:hover {
+  background: #8b0000 !important;
+  color: #fff !important;
+  border-color: #8b0000 !important;
+}

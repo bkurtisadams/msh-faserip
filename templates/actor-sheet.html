@@ -955,12 +955,14 @@
                   <td class="equipment-name">
                     {{#if (eq item.system.category "custom")}}
                     <a class="item-control equipment-roll" data-item-id="{{item._id}}" title="Roll"><i class="fas fa-dice-d20"></i></a>
+                    {{else if item.system.intensityRank}}
+                    <a class="item-control equipment-intensity-roll" data-item-id="{{item._id}}" title="Roll Intensity"><i class="fas fa-radiation"></i></a>
                     {{/if}}
                     <img src="{{item.img}}" class="equipment-icon equipment-info" width="24" height="24" title="Click for info." />
                     <span class="equipment-name-text">{{item.name}}</span>
                   </td>
                   <td class="equipment-material">{{item.system.materialStrength}}</td>
-                  <td></td>
+                  <td>{{#if item.system.intensityRank}}<span class="intensity-badge" title="Intensity">{{item.system.intensityRank}}</span>{{/if}}</td>
                   <td class="equipment-type">{{item.system.description}}</td>
                   <td></td><td></td><td></td>
                   <td class="equipment-controls">

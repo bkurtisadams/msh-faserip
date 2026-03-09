@@ -160,33 +160,38 @@ Hooks.on("updateWorldTime", async (worldTime, dt, options, userId) => {
       for (const { effect, item, reason } of toExpire) {
         console.log(`[FASERIP] Auto-expiring effect "${effect.name}" on ${actor.name}: ${reason}`);
         try {
-          if (item) {
+          // Resolve the source equipment item (direct parent or transferred via origin)
+          let equipItem = item;
+          if (!equipItem && effect.origin) {
+            const originParts = effect.origin.split(".");
+            const itemIdx = originParts.indexOf("Item");
+            if (itemIdx >= 0 && originParts[itemIdx + 1]) {
+              const candidate = actor.items?.get(originParts[itemIdx + 1]);
+              if (candidate?.type === "equipment") equipItem = candidate;
+            }
+          }
+
+          if (equipItem) {
             // Equipment effect: disable (reusable) and clear duration stamp
             await effect.update({ disabled: true, duration: { seconds: null, startTime: null } });
+            const rechargeLabel = equipItem.system?.rechargeLabel || "Reload";
             ChatMessage.create({
-              content: `<div class="faserip-chat"><b>${actor.name}</b>'s <b>${item.name}</b> has expired — ${effect.name} deactivated.</div>`,
+              content: `<div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;">
+                <div style="padding:6px 10px;border-bottom:1px solid #c0c0c0;">
+                  <strong style="color:#8b0000;">EQUIPMENT EXPIRED</strong>
+                </div>
+                <div style="padding:6px 10px;">
+                  <div><strong>${actor.name}</strong>'s <strong>${equipItem.name}</strong> has expired — ${effect.name} deactivated.</div>
+                  <button class="faserip-recharge-btn" data-actor-id="${actor.id}" data-item-id="${equipItem.id}"
+                    style="margin-top:6px;padding:4px 12px;border:1px solid #c0c0c0;border-radius:3px;background:#fff;cursor:pointer;font-size:0.85em;">
+                    <i class="fas fa-sync-alt"></i> ${rechargeLabel}
+                  </button>
+                </div>
+              </div>`,
               speaker: ChatMessage.getSpeaker({ actor })
             });
           } else {
-            // Check if it's a transferred equipment effect via origin
-            let equipItem = null;
-            if (effect.origin) {
-              const originParts = effect.origin.split(".");
-              const itemIdx = originParts.indexOf("Item");
-              if (itemIdx >= 0 && originParts[itemIdx + 1]) {
-                const candidate = actor.items?.get(originParts[itemIdx + 1]);
-                if (candidate?.type === "equipment") equipItem = candidate;
-              }
-            }
-            if (equipItem) {
-              await effect.update({ disabled: true, duration: { seconds: null, startTime: null } });
-              ChatMessage.create({
-                content: `<div class="faserip-chat"><b>${actor.name}</b>'s <b>${equipItem.name}</b> has expired — ${effect.name} deactivated.</div>`,
-                speaker: ChatMessage.getSpeaker({ actor })
-              });
-            } else {
-              await effect.delete();
-            }
+            await effect.delete();
           }
         } catch (e) {
           console.warn("[FASERIP WARN] Effect auto-expire failed", e);
@@ -2742,6 +2747,43 @@ Hooks.on('updateActor', async (actor, updateData, options, userId) => {
 
 // Handle medical care toggle button in chat
 Hooks.on('renderChatMessageHTML', (message, htmlEl) => {
+  // Recharge button on expired equipment chat cards
+  htmlEl.querySelector('.faserip-recharge-btn')?.addEventListener('click', async (event) => {
+    const button = event.currentTarget;
+    const actorId = button.dataset.actorId;
+    const itemId = button.dataset.itemId;
+    const actor = game.actors.get(actorId);
+    if (!actor) return ui.notifications.warn("Actor not found.");
+    const item = actor.items.get(itemId);
+    if (!item) return ui.notifications.warn("Equipment not found.");
+
+    // Re-enable all transfer effects on this item
+    const transferEffects = item.effects.filter(e => e.transfer && e.disabled);
+    if (!transferEffects.length) return ui.notifications.info(`${item.name} is already active.`);
+
+    const updates = transferEffects.map(e => ({ _id: e.id, disabled: false }));
+    await item.updateEmbeddedDocuments("ActiveEffect", updates);
+
+    // Disable button after use
+    button.disabled = true;
+    button.style.opacity = '0.5';
+    button.innerHTML = '<i class="fas fa-check"></i> Recharged';
+
+    // Post confirmation chat card
+    const rechargeLabel = item.system?.rechargeLabel || "Reload";
+    ChatMessage.create({
+      content: `<div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;">
+        <div style="padding:6px 10px;border-bottom:1px solid #c0c0c0;">
+          <strong style="color:#8b0000;">EQUIPMENT</strong>
+        </div>
+        <div style="padding:6px 10px;">
+          <div><strong>${actor.name}</strong> turns <strong style="color:#2e7d32;">ON</strong>: <strong>${item.name}</strong> (${rechargeLabel})</div>
+        </div>
+      </div>`,
+      speaker: ChatMessage.getSpeaker({ actor })
+    });
+  });
+
   htmlEl.querySelector('.toggle-medical-care')?.addEventListener('click', async (event) => {
     const button = event.currentTarget;
     const actorId = button.dataset.actorId;
@@ -3159,9 +3201,32 @@ async function createFaseripItemMacro(data, slot) {
             const updates = transferEffects.map(e => ({ _id: e.id, disabled: anyActive }));
             await item.updateEmbeddedDocuments("ActiveEffect", updates);
             const state = anyActive ? "OFF" : "ON";
+            const dur = Number(item.system.duration);
+            const unit = item.system.durationUnit || "hour";
+            let durationLine = "";
+            if (!anyActive && dur > 0) {
+              const unitLabel = dur === 1 ? unit : unit + "s";
+              durationLine = \`<div style="font-size:0.85em;color:#666;margin-top:4px;">Duration: \${dur} \${unitLabel}</div>\`;
+            }
             ChatMessage.create({
-              content: \`<div class="faserip-chat-card"><strong>\${actor.name}</strong> turns <strong>\${state}</strong>: \${item.name}</div>\`,
+              content: \`<div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;">
+                <div style="padding:6px 10px;border-bottom:1px solid #c0c0c0;">
+                  <strong style="color:#8b0000;">EQUIPMENT</strong>
+                </div>
+                <div style="padding:6px 10px;">
+                  <div><strong>\${actor.name}</strong> turns <strong style="color:\${anyActive ? '#c62828' : '#2e7d32'}">\${state}</strong>: <strong>\${item.name}</strong></div>
+                  \${durationLine}
+                </div>
+              </div>\`,
               speaker: ChatMessage.getSpeaker({ actor })
+            });
+          } else if (system.intensityRank && !transferEffects.length) {
+            // Gear with intensity rank but no toggle effects: roll intensity
+            const { ActionDispatcher } = await import(\`/systems/\${game.system.id}/scripts/modules/actions/action-dispatcher.js\`);
+            await ActionDispatcher.roll("intensity", {
+              actor,
+              abilityName: "endurance",
+              opts: { itemId: item.id, item, sourceItem: item, equipment: item }
             });
           } else {
             game.msh.rollEquipment(actor, item);

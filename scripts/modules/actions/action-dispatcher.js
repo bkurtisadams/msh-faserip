@@ -17,6 +17,7 @@ import { ManualModeDialog } from "./manual-mode-dialog.js";
 import { debugLog } from "./action-utils.js";
 import { MentalPowerAction } from "./mental-power-action.js";
 import { GrenadeAction } from "./grenade-action.js";
+import { IntensityAction } from "./intensity-action.js";
 
 // Anchor: mode resolver (safe even if settings not registered yet)
 export function resolveCombatMode(actor) {
@@ -61,7 +62,8 @@ const CANONICAL_CODES = {
   "death": "death-save",
   "deathsave": "death-save",
   "death-save": "death-save",
-  "grenade": "grenade"
+  "grenade": "grenade",
+  "intensity": "Int"
 
 };
 
@@ -109,7 +111,8 @@ const ACTION_ABILITIES = {
   "kill": "endurance",
   "save-nullify": "endurance",
   "death-save": "endurance",
-  "grenade": "agility"
+  "grenade": "agility",
+  "intensity": "endurance"
 };
 
 const registry = {
@@ -134,7 +137,8 @@ const registry = {
   "save-nullify":   CheckAction,
   "death-save":     DeathSaveAction,
   "mental-power":   MentalPowerAction,
-  "grenade":        GrenadeAction
+  "grenade":        GrenadeAction,
+  "intensity":      IntensityAction
 };
 
 export class ActionDispatcher {

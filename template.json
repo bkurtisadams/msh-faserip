@@ -365,7 +365,10 @@
       "payload": "",
       "payloadDamage": "",
       "duration": 0,
-      "durationUnit": "hour"
+      "durationUnit": "hour",
+      "rechargeLabel": "",
+      "intensityRank": "",
+      "intensityDescription": ""
     },
     "vehicle": {
       "templates": ["base"],

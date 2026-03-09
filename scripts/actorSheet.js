@@ -2666,13 +2666,28 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
       if (!item) return;
       const transferEffects = item.effects.filter(e => e.transfer);
       if (!transferEffects.length) return;
-      // Toggle: if any are active, disable all; otherwise enable all
       const anyActive = transferEffects.some(e => !e.disabled);
       const updates = transferEffects.map(e => ({ _id: e.id, disabled: anyActive }));
       await item.updateEmbeddedDocuments("ActiveEffect", updates);
       const state = anyActive ? "OFF" : "ON";
+      const stateColor = anyActive ? "#c62828" : "#2e7d32";
+      const dur = Number(item.system.duration);
+      const unit = item.system.durationUnit || "hour";
+      let durationLine = "";
+      if (!anyActive && dur > 0) {
+        const unitLabel = dur === 1 ? unit : unit + "s";
+        durationLine = `<div style="font-size:.85em;color:#666;">Duration: ${dur} ${unitLabel}</div>`;
+      }
       ChatMessage.create({
-        content: `<div class="faserip-chat-card"><strong>${this.actor.name}</strong> turns <strong>${state}</strong>: ${item.name}</div>`,
+        content: `<div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;">
+          <div style="padding:6px 10px;border-bottom:1px solid #c0c0c0;">
+            <strong style="color:#8b0000;">EQUIPMENT</strong>
+          </div>
+          <div style="padding:6px 10px;">
+            <div><strong>${this.actor.name}</strong> turns <strong style="color:${stateColor};">${state}</strong>: <strong>${item.name}</strong></div>
+            ${durationLine}
+          </div>
+        </div>`,
         speaker: ChatMessage.getSpeaker({ actor: this.actor })
       });
     });
@@ -2848,6 +2863,23 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
             ui.notifications.error("Could not reload weapon.");
           });
       }
+    });
+
+    // Intensity roll for gear/equipment items
+    html.find('.equipment-intensity-roll').click(async ev => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const li = $(ev.currentTarget).closest(".equipment-row");
+      const itemId = li.data("itemId");
+      const item = this.actor.items.get(itemId);
+      if (!item || !item.system.intensityRank) return;
+
+      const { ActionDispatcher } = await import("./modules/actions/action-dispatcher.js");
+      return ActionDispatcher.roll("intensity", {
+        actor: this.actor,
+        abilityName: "endurance",
+        opts: { itemId: item.id, item, sourceItem: item, equipment: item }
+      });
     });
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
