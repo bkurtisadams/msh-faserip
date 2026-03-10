@@ -3250,7 +3250,7 @@ form.faserip-sheet .identity-section input[type="radio"] {
 .msh-field-group{ flex:1.2; }
 .msh-field-base{ flex:1.5; }
 .msh-field-bio{ flex:0 0 auto; }
-.msh-field-age{ } /* width set by grid column */
+
 
 /* Row 2 right: Character Type + Lock */
 .msh-player-bottom{
@@ -3927,21 +3927,21 @@ form.faserip-sheet .secondary-abilities .sec-col.resources > .sec-body.resources
 }
 .faserip-dot-portrait img {
   display: block;
-  width: 64px;
-  height: 64px;
+  width: 48px;
+  height: 48px;
   object-fit: cover;
   border-radius: 2px;
 }
 .faserip-dot-portrait-name {
   text-align: center;
-  font-size: 10px;
+  font-size: 9px;
   font-weight: bold;
   color: #e0d8c8;
   padding: 2px 4px 1px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 64px;
+  max-width: 48px;
 }
 @keyframes faseripDotFadeIn {
   from { opacity: 0; transform: translateY(4px); }

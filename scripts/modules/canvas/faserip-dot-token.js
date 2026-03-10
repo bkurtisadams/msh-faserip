@@ -1,4 +1,6 @@
-// scripts/modules/canvas/faserip-dot-token.js v1.3.0 - 2026-03-05
+// scripts/modules/canvas/faserip-dot-token.js v1.6.0 - 2026-03-10
+// v1.6.0: Facing tick (notch line at token rotation), plain hover portrait (48px, no Ctrl),
+//         fix top-of-screen clipping. Tick drawn at 0° with cheap pivot rotation sync.
 // v1.3.0: Per-scene dot mode — scene flag overrides world setting, injected into scene config
 // v1.2.0: Smaller dots (12%), Ctrl+hover for portrait (64px), vehicles draw as rectangles
 // v1.1.0: Add hover portrait popup — hovering a dot for 500ms shows token artwork
@@ -46,7 +48,7 @@ function _getDotColor(token) {
 }
 
 // ---------------------------------------------------------------------------
-// Hover portrait — Ctrl+hover shows token art in a floating popup
+// Hover portrait — hovering a dot shows token art in a floating popup
 // ---------------------------------------------------------------------------
 
 let _hoverTimer = null;
@@ -65,11 +67,20 @@ function _showPortraitPopup(token) {
     <div class="faserip-dot-portrait-name">${token.document.name}</div>
   `;
 
-  // Position near the token's screen location
+  // Position near the token's screen location, clamped to viewport
   const pos = token.getGlobalPosition();
   const rect = canvas.app.view.getBoundingClientRect();
-  popup.style.left = `${rect.left + pos.x + 24}px`;
-  popup.style.top = `${rect.top + pos.y - 40}px`;
+  const popupW = 54; // 48 img + padding + border
+  const popupH = 68; // img + name + padding
+  let left = rect.left + pos.x + 20;
+  let top = rect.top + pos.y - popupH - 4;
+
+  // Clamp: don't let it go above or off-right of viewport
+  if (top < 4) top = rect.top + pos.y + 20;
+  if (left + popupW > window.innerWidth - 4) left = window.innerWidth - popupW - 4;
+
+  popup.style.left = `${left}px`;
+  popup.style.top = `${top}px`;
 
   document.body.appendChild(popup);
   _hoverPopup = popup;
@@ -91,33 +102,13 @@ function _hidePortraitPopup() {
 function _onDotPointerEnter(event) {
   const token = event.currentTarget._parentToken;
   if (!token || !_isDotMode(token)) return;
-  // Only start timer — portrait requires Ctrl held at the time it fires
   _hoverTimer = setTimeout(() => {
-    if (game.keyboard?.isModifierActive(KeyboardManager.MODIFIER_KEYS.CONTROL)) {
-      _showPortraitPopup(token);
-    }
+    _showPortraitPopup(token);
   }, HOVER_DELAY);
 }
 
 function _onDotPointerLeave(event) {
   _hidePortraitPopup();
-}
-
-// Also show portrait if Ctrl is pressed while already hovering
-function _onKeyDown(event) {
-  if (event.key !== "Control") return;
-  // Check if we're hovering a dot right now
-  if (!_hoverToken && _hoverTimer) {
-    // Timer is pending — let it handle it (it checks Ctrl)
-    return;
-  }
-}
-
-// Hide portrait if Ctrl is released
-function _onKeyUp(event) {
-  if (event.key === "Control" && _hoverPopup) {
-    _hidePortraitPopup();
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -139,6 +130,9 @@ function _drawDot(g, token) {
   g.beginFill(fill, 1.0);
   g.drawCircle(cx, cy, r);
   g.endFill();
+
+  // Facing tick — drawn at 0°, PIXI rotation handles facing
+  _drawFacingTick(g, cx, cy, r);
 
   // Hit area for hover
   g.hitArea = new PIXI.Circle(cx, cy, r + 6);
@@ -163,29 +157,73 @@ function _drawVehicleRect(g, token) {
   g.drawRoundedRect(cx - hw, cy - hh, hw * 2, hh * 2, corner);
   g.endFill();
 
+  // Facing tick — drawn at 0°, PIXI rotation handles facing
+  _drawFacingTick(g, cx, cy, Math.max(hw, hh));
+
   // Hit area for hover
   g.hitArea = new PIXI.Rectangle(cx - hw - 4, cy - hh - 4, (hw + 4) * 2, (hh + 4) * 2);
 }
 
+/** Draw a short facing tick mark pointing straight up (0°) — rotation handled by _refreshRotation */
+function _drawFacingTick(g, cx, cy, radius) {
+  const innerR = radius * 0.5;
+  const outerR = radius + 3;
+  const x1 = cx;
+  const y1 = cy + innerR;
+  const x2 = cx;
+  const y2 = cy + outerR;
+
+  g.lineStyle(3, 0x000000, 0.7);
+  g.moveTo(x1, y1);
+  g.lineTo(x2, y2);
+  g.lineStyle(1.5, 0xFFFFFF, 0.9);
+  g.moveTo(x1, y1);
+  g.lineTo(x2, y2);
+  g.lineStyle(0);
+}
+
+/** Sync dot graphic rotation to token document — just 3 property sets, no redraw */
+function _syncDotRotation(token) {
+  const g = token._faseripDot;
+  if (!g) return;
+  const cx = token.w / 2;
+  const cy = token.h / 2;
+  const rad = (token.document.rotation ?? 0) * Math.PI / 180;
+  if (g.pivot.x !== cx || g.pivot.y !== cy) {
+    g.pivot.set(cx, cy);
+    g.position.set(cx, cy);
+  }
+  if (g.rotation !== rad) g.rotation = rad;
+}
+
 // ---------------------------------------------------------------------------
-// refreshToken hook — draw or remove dot/rect overlay
+// refreshToken hook — draw or remove dot overlay, sync rotation
 // ---------------------------------------------------------------------------
 
 function _refreshTokenDot(token) {
-  // Always destroy stale dot first
-  if (token._faseripDot) {
-    token._faseripDot.destroy({ children: true });
-    token._faseripDot = null;
-  }
-
   if (!_isDotMode(token)) {
-    // Restore mesh if we hid it previously
+    if (token._faseripDot) {
+      token._faseripDot.destroy({ children: true });
+      token._faseripDot = null;
+    }
     if (token.mesh) token.mesh.visible = true;
     return;
   }
 
-  // Hide the token artwork mesh
+  // Hide artwork — dot replaces it visually
   if (token.mesh) token.mesh.visible = false;
+
+  // Only redraw if dot doesn't exist or size/disposition changed
+  if (token._faseripDot) {
+    const g = token._faseripDot;
+    if (g._faseripW === token.w && g._faseripH === token.h
+        && g._faseripDisp === token.document.disposition) {
+      _syncDotRotation(token);
+      return;
+    }
+    g.destroy({ children: true });
+    token._faseripDot = null;
+  }
 
   const g = new PIXI.Graphics();
 
@@ -195,7 +233,7 @@ function _refreshTokenDot(token) {
     _drawDot(g, token);
   }
 
-  // Make interactive for Ctrl+hover portrait
+  // Make interactive for hover portrait
   g.eventMode = "static";
   g._parentToken = token;
   g.on("pointerenter", _onDotPointerEnter);
@@ -203,6 +241,13 @@ function _refreshTokenDot(token) {
 
   token.addChild(g);
   token._faseripDot = g;
+
+  // Cache token dimensions/disposition so we know when a full redraw is needed
+  g._faseripW = token.w;
+  g._faseripH = token.h;
+  g._faseripDisp = token.document.disposition;
+
+  _syncDotRotation(token);
 }
 
 // ---------------------------------------------------------------------------
@@ -288,9 +333,6 @@ export function initDotToken() {
 
   // Clean up portrait popup on canvas pan/zoom
   Hooks.on("canvasPan", _hidePortraitPopup);
-
-  // Keyboard listeners for Ctrl+hover gating
-  document.addEventListener("keyup", _onKeyUp);
 
   // Inject "Dot Mode" select into Scene Config → Grid tab (V13 AppV2)
   Hooks.on("renderSceneConfig", (app, html, context, options) => {
