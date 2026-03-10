@@ -926,8 +926,21 @@
       </div>
 
       <div class="form-group">
-        <label>Intensity Effect:</label>
-        <input type="text" name="system.intensityDescription" value="{{system.intensityDescription}}" placeholder="e.g., Blinded 1-10 turns, Incapacitated" title="What happens on a failed FEAT vs intensity"/>
+        <label>Intensity Apply:</label>
+        <select name="system.intensityEffect" style="width:auto;">
+          <option value="" {{#if (eq system.intensityEffect "")}}selected{{/if}}>None (GM adjudicate)</option>
+          <option value="blinded" {{#if (eq system.intensityEffect "blinded")}}selected{{/if}}>Blinded</option>
+          <option value="stunned" {{#if (eq system.intensityEffect "stunned")}}selected{{/if}}>Stunned</option>
+          <option value="unconscious" {{#if (eq system.intensityEffect "unconscious")}}selected{{/if}}>Unconscious</option>
+          <option value="incapacitated" {{#if (eq system.intensityEffect "incapacitated")}}selected{{/if}}>Incapacitated</option>
+          <option value="immobilized" {{#if (eq system.intensityEffect "immobilized")}}selected{{/if}}>Immobilized</option>
+          <option value="custom" {{#if (eq system.intensityEffect "custom")}}selected{{/if}}>Custom (use description)</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Intensity Desc:</label>
+        <input type="text" name="system.intensityDescription" value="{{system.intensityDescription}}" placeholder="e.g., Chemical spray causes blindness" title="Flavor text shown on chat card"/>
       </div>
 
       <div class="form-group">

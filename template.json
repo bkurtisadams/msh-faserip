@@ -369,6 +369,7 @@
       "rechargeLabel": "",
       "intensityRank": "",
       "intensityDescription": "",
+      "intensityEffect": "",
       "areaRadius": 0
     },
     "vehicle": {
