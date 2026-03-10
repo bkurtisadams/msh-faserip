@@ -950,7 +950,7 @@
               </thead>
               <tbody>
                 {{#each equipment as |item|}}
-                {{#if (or (eq item.system.category "gear") (eq item.system.category "custom"))}}
+                {{#if (or (eq item.system.category "gear") (eq item.system.category "custom") (eq item.system.category "device"))}}
                 <tr class="equipment-row item" data-item-id="{{item._id}}" title="{{item.system.description}}">
                   <td class="equipment-name">
                     <a class="item-control equipment-roll" data-item-id="{{item._id}}" title="Actions"><i class="fas fa-dice-d20"></i></a>

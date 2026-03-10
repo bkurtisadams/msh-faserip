@@ -1,6 +1,11 @@
 {
   "Actor": {
-    "types": ["hero", "villain", "npc", "vehicle"],
+    "types": [
+      "hero",
+      "villain",
+      "npc",
+      "vehicle"
+    ],
     "templates": {
       "base": {
         "identity": "",
@@ -27,13 +32,62 @@
       },
       "abilities": {
         "abilities": {
-          "fighting": { "value": 10, "initialRoll": "", "initialRank": "", "initialValue": "", "originModified": false, "rank": "Good" },
-          "agility": { "value": 10, "initialRoll": "", "initialRank": "", "initialValue": "", "originModified": false, "rank": "Good" },
-          "strength": { "value": 10, "initialRoll": "", "initialRank": "", "initialValue": "", "originModified": false, "rank": "Good" },
-          "endurance": { "value": 10, "initialRoll": "", "initialRank": "", "initialValue": "", "originModified": false, "rank": "Good" },
-          "reason": { "value": 10, "initialRoll": "", "initialRank": "", "initialValue": "", "originModified": false, "rank": "Good" },
-          "intuition": { "value": 10, "initialRoll": "", "initialRank": "", "initialValue": "", "originModified": false, "rank": "Good" },
-          "psyche": { "value": 10, "initialRoll": "", "initialRank": "", "initialValue": "", "originModified": false, "rank": "Good" }
+          "fighting": {
+            "value": 10,
+            "initialRoll": "",
+            "initialRank": "",
+            "initialValue": "",
+            "originModified": false,
+            "rank": "Good"
+          },
+          "agility": {
+            "value": 10,
+            "initialRoll": "",
+            "initialRank": "",
+            "initialValue": "",
+            "originModified": false,
+            "rank": "Good"
+          },
+          "strength": {
+            "value": 10,
+            "initialRoll": "",
+            "initialRank": "",
+            "initialValue": "",
+            "originModified": false,
+            "rank": "Good"
+          },
+          "endurance": {
+            "value": 10,
+            "initialRoll": "",
+            "initialRank": "",
+            "initialValue": "",
+            "originModified": false,
+            "rank": "Good"
+          },
+          "reason": {
+            "value": 10,
+            "initialRoll": "",
+            "initialRank": "",
+            "initialValue": "",
+            "originModified": false,
+            "rank": "Good"
+          },
+          "intuition": {
+            "value": 10,
+            "initialRoll": "",
+            "initialRank": "",
+            "initialValue": "",
+            "originModified": false,
+            "rank": "Good"
+          },
+          "psyche": {
+            "value": 10,
+            "initialRoll": "",
+            "initialRank": "",
+            "initialValue": "",
+            "originModified": false,
+            "rank": "Good"
+          }
         },
         "combatMods": {
           "attackShift": 0,
@@ -56,12 +110,29 @@
       },
       "derived": {
         "attributes": {
-          "health": { "value": 40, "max": 40 },
-          "karma": { "value": 30, "max": 30 },
-          "resources": { "rank": "Typical", "value": 6 },
+          "health": {
+            "value": 40,
+            "max": 40
+          },
+          "karma": {
+            "value": 30,
+            "max": 30
+          },
+          "resources": {
+            "rank": "Typical",
+            "value": 6
+          },
           "popularity": {
-            "hero": { "value": 10, "max": 100, "isNegative": false },
-            "secretId": { "value": 0, "max": 100, "isNegative": false }
+            "hero": {
+              "value": 10,
+              "max": 100,
+              "isNegative": false
+            },
+            "secretId": {
+              "value": 0,
+              "max": 100,
+              "isNegative": false
+            }
           }
         }
       },
@@ -91,7 +162,13 @@
       }
     },
     "hero": {
-      "templates": ["base", "abilities", "derived", "movement", "progress"],
+      "templates": [
+        "base",
+        "abilities",
+        "derived",
+        "movement",
+        "progress"
+      ],
       "characterType": "player",
       "powerOrigin": "altered human",
       "isMutant": false,
@@ -117,7 +194,13 @@
       }
     },
     "villain": {
-      "templates": ["base", "abilities", "derived", "movement", "progress"],
+      "templates": [
+        "base",
+        "abilities",
+        "derived",
+        "movement",
+        "progress"
+      ],
       "characterType": "npc-villain",
       "powerOrigin": "altered human",
       "isMutant": false,
@@ -143,12 +226,20 @@
       }
     },
     "npc": {
-      "templates": ["base", "abilities", "derived", "movement", "progress"],
+      "templates": [
+        "base",
+        "abilities",
+        "derived",
+        "movement",
+        "progress"
+      ],
       "characterType": "civilian",
       "resistances": []
     },
     "vehicle": {
-      "templates": ["base"],
+      "templates": [
+        "base"
+      ],
       "type": "Road",
       "cost": "Typical",
       "control": "Typical",
@@ -169,11 +260,23 @@
       "speedCSLoss": 0,
       "controlCSLoss": 0,
       "damageLog": [],
-      "resources": { "body": { "value": 20, "max": 20 } }
+      "resources": {
+        "body": {
+          "value": 20,
+          "max": 20
+        }
+      }
     }
   },
   "Item": {
-    "types": ["power", "talent", "contact", "equipment", "vehicle", "headquarters"],
+    "types": [
+      "power",
+      "talent",
+      "contact",
+      "equipment",
+      "vehicle",
+      "headquarters"
+    ],
     "templates": {
       "base": {
         "description": ""
@@ -184,12 +287,13 @@
       }
     },
     "power": {
-      "templates": ["base", "ranked"],
-      
+      "templates": [
+        "base",
+        "ranked"
+      ],
       "isActive": true,
       "isStarred": false,
       "source": "natural",
-      
       "category": "",
       "isBonus": false,
       "bonusFrom": "",
@@ -200,13 +304,11 @@
       "limitationRequired": false,
       "limitationDetail": "",
       "preLimitationRank": "",
-      
       "range": "",
       "customRange": "",
       "area": 0,
       "duration": "",
       "customDuration": "",
-      
       "isAttackPower": false,
       "battleEffectsColumn": "",
       "damageSource": "rank",
@@ -219,7 +321,6 @@
       "continuingDamage": false,
       "continuingDamageRounds": 3,
       "ensnaringStrength": "",
-      
       "requiresSave": false,
       "save": {
         "ability": "endurance",
@@ -231,7 +332,6 @@
           "notes": ""
         }
       },
-      
       "isDefensePower": false,
       "defenseType": "bodyArmor",
       "armorNature": "natural",
@@ -241,7 +341,6 @@
       "forceFieldCoverage": 0,
       "resistanceType": "",
       "resistanceIsInvulnerability": false,
-      
       "isLimited": false,
       "limitation": {
         "usesPerDay": 0,
@@ -251,7 +350,9 @@
       "limitations": ""
     },
     "talent": {
-      "templates": ["base"],
+      "templates": [
+        "base"
+      ],
       "bonus": "+1CS",
       "abilityModified": "",
       "type": "",
@@ -265,7 +366,9 @@
       "grantsContact": ""
     },
     "contact": {
-      "templates": ["base"],
+      "templates": [
+        "base"
+      ],
       "type": "",
       "disposition": "Friendly",
       "specialties": [],
@@ -275,14 +378,16 @@
       "services": []
     },
     "equipment": {
-      "templates": ["base", "ranked"],
+      "templates": [
+        "base",
+        "ranked"
+      ],
       "category": "gear",
       "materialStrength": "Typical",
       "description": "",
       "notes": "",
       "price": "Poor",
       "legality": "legal",
-
       "weaponType": "",
       "attackType": "",
       "range": "",
@@ -295,12 +400,10 @@
       "rate": "1",
       "shots": "",
       "shotsRemaining": "",
-
       "noRangePenalty": false,
       "oneHandedUse": "normal",
       "throwable": false,
       "entangling": false,
-
       "sfx": {
         "hit": "",
         "miss": "",
@@ -311,7 +414,6 @@
         "emptyVolume": 80,
         "reloadVolume": 80
       },
-
       "variantType": "standard",
       "specialAmmo": {
         "mercy": false,
@@ -321,7 +423,6 @@
         "canister": false,
         "heatSeeker": false
       },
-
       "attackModes": [
         {
           "name": "Thrust",
@@ -330,32 +431,33 @@
           "damage": 10,
           "ability": "fighting",
           "description": "",
-          "allowedVariants": ["standard", "ap"],
-          "sfx": { "hit": "", "miss": "", "critical": "" }
+          "allowedVariants": [
+            "standard",
+            "ap"
+          ],
+          "sfx": {
+            "hit": "",
+            "miss": "",
+            "critical": ""
+          }
         }
       ],
-
       "burstScatter": "none",
       "stunIntensity": "",
       "continuingDamage": "",
       "continuingDamageRounds": "",
       "requiresTwoOperators": false,
-
       "protection": "",
       "coverage": "partial",
-
       "powerRank": "Typical",
       "linkedAbility": "reason",
       "powerType": "",
       "powerRange": "",
-
       "customAbilities": [],
       "powers": [],
-
       "isGrenade": false,
       "grenadeType": "",
       "grenadeRadius": 1,
-
       "isMissile": false,
       "missileType": "Standard",
       "missileBody": "",
@@ -370,10 +472,19 @@
       "intensityRank": "",
       "intensityDescription": "",
       "intensityEffect": "",
-      "areaRadius": 0
+      "areaRadius": 0,
+      "resistances": [],
+      "gearType": "",
+      "sensoryType": "",
+      "sensoryRange": "",
+      "movementType": "",
+      "movementSpeed": "",
+      "abilityModifiers": []
     },
     "vehicle": {
-      "templates": ["base"],
+      "templates": [
+        "base"
+      ],
       "type": "Road",
       "cost": "Typical",
       "control": "Typical",
@@ -383,24 +494,28 @@
       "compartmented": false,
       "features": "",
       "description": "",
-
       "driver": "",
       "driverUuid": "",
       "passengers": "",
       "passengerUuids": [],
       "seatingCapacity": 5,
-
       "bodyHP": 20,
       "bodyHPMax": 20,
       "bodyCSLoss": 0,
       "speedCSLoss": 0,
       "controlCSLoss": 0,
       "damageLog": [],
-
-      "resources": { "body": { "value": 20, "max": 20 } }
+      "resources": {
+        "body": {
+          "value": 20,
+          "max": 20
+        }
+      }
     },
     "headquarters": {
-      "templates": ["base"],
+      "templates": [
+        "base"
+      ],
       "buildingType": "",
       "location": "",
       "size": "",

@@ -3227,7 +3227,7 @@ async function createFaseripItemMacro(data, slot) {
         case "equipment": {
           // Gear with transferable effects: toggle on/off instead of rolling
           const transferEffects = item.effects.filter(e => e.transfer);
-          if (transferEffects.length && ["gear", "custom"].includes(system.category)) {
+          if (transferEffects.length && ["gear", "custom", "device", "armor"].includes(system.category)) {
             const anyActive = transferEffects.some(e => !e.disabled);
             const updates = transferEffects.map(e => ({ _id: e.id, disabled: anyActive }));
             await item.updateEmbeddedDocuments("ActiveEffect", updates);

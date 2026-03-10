@@ -17,11 +17,12 @@
         <label>Category:</label>
         <select name="system.category" class="equipment-category-select">
           <option value="weapon" {{#if (eq system.category "weapon")}}selected{{/if}}>Weapon</option>
-          <option value="armor" {{#if (eq system.category "armor")}}selected{{/if}}>Armor</option>
-          <option value="power-item" {{#if (eq system.category "power-item")}}selected{{/if}}>Power Item</option>
-          <option value="custom" {{#if (eq system.category "custom")}}selected{{/if}}>Custom</option>
-          <option value="gear" {{#if (eq system.category "gear")}}selected{{/if}}>Gear</option>
           <option value="other" {{#if (eq system.category "other")}}selected{{/if}}>Other Weapon</option>
+          <option value="armor" {{#if (eq system.category "armor")}}selected{{/if}}>Armor</option>
+          <option value="gear" {{#if (eq system.category "gear")}}selected{{/if}}>Gear</option>
+          <option value="device" {{#if (eq system.category "device")}}selected{{/if}}>Device</option>
+          {{#if (eq system.category "power-item")}}<option value="power-item" selected>Power Item (legacy)</option>{{/if}}
+          {{#if (eq system.category "custom")}}<option value="custom" selected>Custom (legacy)</option>{{/if}}
         </select>
       </div>
   
@@ -60,7 +61,8 @@
       </div>
   
       <!-- Weapon-specific fields -->
-      <div class="weapon-fields" {{#unless (eq system.category "weapon")}}style="display: none;"{{/unless}}>
+      {{#if isWeapon}}
+      <div class="weapon-fields">
 
         <!-- ═══ COMBAT ═══════════════════════════════════════════════════ -->
         <div class="specialized-section" style="margin-bottom:10px;">
@@ -429,9 +431,11 @@
 
       </div>
       <!-- END weapon-fields -->
+      {{/if}}
 
       <!-- Other Weapon fields (grenade, missile) -->
-      <div class="other-fields" {{#unless (eq system.category "other")}}style="display: none;"{{/unless}}>
+      {{#if isOther}}
+      <div class="other-fields">
         <div class="form-group">
           <label>Weapon Type:</label>
           <select name="system._otherWeaponType" class="other-weapon-type-select">
@@ -627,27 +631,269 @@
 
       </div>
       <!-- END other-fields -->
+      {{/if}}
 
   
       <!-- Armor-specific fields -->
-      <div class="armor-fields" {{#unless (eq system.category "armor")}}style="display: none;"{{/unless}}>
-        <div class="form-group">
-          <label>Protection Value:</label>
-          <input type="text" name="system.protection" value="{{system.protection}}" />
-        </div>
-  
-        <div class="form-group">
-          <label>Coverage:</label>
-          <select name="system.coverage">
-            <option value="partial" {{#if (eq system.coverage "partial")}}selected{{/if}}>Partial</option>
-            <option value="full" {{#if (eq system.coverage "full")}}selected{{/if}}>Full</option>
-          </select>
+      {{#if isArmor}}
+      <div class="armor-fields">
+        <div class="specialized-section" style="margin-bottom:10px;">
+          <div class="section-header" style="background:#e3f2fd;border-bottom:1px solid #90caf9;">
+            <h3 style="margin:0;font-size:1em;font-weight:700;color:#0d47a1;">Body Armor</h3>
+          </div>
+          <div style="padding:8px;">
+            <div class="form-row">
+              <div class="form-group half">
+                <label>Protection Rank:</label>
+                <select name="system.protection">
+                  <option value="" {{#if (eq system.protection "")}}selected{{/if}}>None</option>
+                  {{#each ranks as |rank|}}
+                  <option value="{{rank}}" {{#if (eq ../system.protection rank)}}selected{{/if}}>{{rank}}</option>
+                  {{/each}}
+                </select>
+              </div>
+              <div class="form-group half">
+                <label>Coverage:</label>
+                <select name="system.coverage">
+                  <option value="full" {{#if (eq system.coverage "full")}}selected{{/if}}>Full</option>
+                  <option value="partial" {{#if (eq system.coverage "partial")}}selected{{/if}}>Partial</option>
+                </select>
+              </div>
+            </div>
+            <p style="margin:4px 0 0;color:#555;font-size:0.8em;">
+              Body Armor reduces physical damage by rank number. -20 vs Energy attacks per rules.
+            </p>
+          </div>
         </div>
       </div>
+      {{/if}}
       <!-- END armor-fields -->
 
+      <!-- Gear fields -->
+      {{#if isGear}}
+      <div class="gear-fields">
+        <div class="form-group">
+          <label>Gear Type:</label>
+          <select name="system.gearType" class="gear-type-select">
+            <option value="" {{#if (eq system.gearType "")}}selected{{/if}}>General</option>
+            <option value="protective" {{#if (eq system.gearType "protective")}}selected{{/if}}>Protective Gear</option>
+            <option value="sensory" {{#if (eq system.gearType "sensory")}}selected{{/if}}>Sensory / Detection</option>
+            <option value="movement" {{#if (eq system.gearType "movement")}}selected{{/if}}>Movement Gear</option>
+            <option value="restraint" {{#if (eq system.gearType "restraint")}}selected{{/if}}>Restraint / Inhibitor</option>
+            <option value="sundry" {{#if (eq system.gearType "sundry")}}selected{{/if}}>Sundry / Salary</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Legality:</label>
+          <select name="system.legality">
+            <option value="legal" {{#if (eq system.legality "legal")}}selected{{/if}}>Legal</option>
+            <option value="restricted" {{#if (eq system.legality "restricted")}}selected{{/if}}>Restricted</option>
+            <option value="military" {{#if (eq system.legality "military")}}selected{{/if}}>Military Only</option>
+            <option value="illegal" {{#if (eq system.legality "illegal")}}selected{{/if}}>Illegal</option>
+          </select>
+        </div>
+
+        {{#if isGearProtective}}
+        <div class="specialized-section" style="margin-bottom:10px;">
+          <div class="section-header" style="background:#e3f2fd;border-bottom:1px solid #90caf9;">
+            <h3 style="margin:0;font-size:1em;font-weight:700;color:#0d47a1;">Protection</h3>
+          </div>
+          <div style="padding:8px;">
+            <div class="form-row">
+              <div class="form-group half">
+                <label>Body Armor Rank:</label>
+                <select name="system.protection">
+                  <option value="" {{#if (eq system.protection "")}}selected{{/if}}>None</option>
+                  {{#each ranks as |rank|}}
+                  <option value="{{rank}}" {{#if (eq ../system.protection rank)}}selected{{/if}}>{{rank}}</option>
+                  {{/each}}
+                </select>
+              </div>
+              <div class="form-group half">
+                <label>Coverage:</label>
+                <select name="system.coverage">
+                  <option value="full" {{#if (eq system.coverage "full")}}selected{{/if}}>Full</option>
+                  <option value="partial" {{#if (eq system.coverage "partial")}}selected{{/if}}>Partial</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+        {{/if}}
+
+        {{#if isGearSensory}}
+        <div class="specialized-section" style="margin-bottom:10px;">
+          <div class="section-header" style="background:#fff3e0;border-bottom:1px solid #ffcc80;">
+            <h3 style="margin:0;font-size:1em;font-weight:700;color:#e65100;">Sensory</h3>
+          </div>
+          <div style="padding:8px;">
+            <div class="form-group">
+              <label>Sensory Type:</label>
+              <select name="system.sensoryType">
+                <option value="" {{#if (eq system.sensoryType "")}}selected{{/if}}>None</option>
+                <option value="infravision" {{#if (eq system.sensoryType "infravision")}}selected{{/if}}>Infravision (see in dark)</option>
+                <option value="protectedSight" {{#if (eq system.sensoryType "protectedSight")}}selected{{/if}}>Protected Sight (vs light/flash)</option>
+                <option value="protectedHearing" {{#if (eq system.sensoryType "protectedHearing")}}selected{{/if}}>Protected Hearing (vs sonic)</option>
+                <option value="illumination" {{#if (eq system.sensoryType "illumination")}}selected{{/if}}>Illumination (flashlight/flare)</option>
+                <option value="mutantDetection" {{#if (eq system.sensoryType "mutantDetection")}}selected{{/if}}>Mutant Detection</option>
+                <option value="energyDetection" {{#if (eq system.sensoryType "energyDetection")}}selected{{/if}}>Energy Detection</option>
+                <option value="translation" {{#if (eq system.sensoryType "translation")}}selected{{/if}}>Translation</option>
+                <option value="custom" {{#if (eq system.sensoryType "custom")}}selected{{/if}}>Custom</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Range (areas):</label>
+              <input type="text" name="system.sensoryRange" value="{{system.sensoryRange}}" placeholder="e.g., 5"/>
+            </div>
+          </div>
+        </div>
+        {{/if}}
+
+        {{#if isGearMovement}}
+        <div class="specialized-section" style="margin-bottom:10px;">
+          <div class="section-header" style="background:#e8eaf6;border-bottom:1px solid #9fa8da;">
+            <h3 style="margin:0;font-size:1em;font-weight:700;color:#283593;">Movement</h3>
+          </div>
+          <div style="padding:8px;">
+            <div class="form-group">
+              <label>Movement Type:</label>
+              <select name="system.movementType">
+                <option value="" {{#if (eq system.movementType "")}}selected{{/if}}>None</option>
+                <option value="flight" {{#if (eq system.movementType "flight")}}selected{{/if}}>Flight (rocket pack, jet boots)</option>
+                <option value="groundSpeed" {{#if (eq system.movementType "groundSpeed")}}selected{{/if}}>Ground Speed (roller skates)</option>
+                <option value="swimming" {{#if (eq system.movementType "swimming")}}selected{{/if}}>Swimming (scuba, fins)</option>
+                <option value="wallCrawling" {{#if (eq system.movementType "wallCrawling")}}selected{{/if}}>Wall Crawling</option>
+                <option value="tunneling" {{#if (eq system.movementType "tunneling")}}selected{{/if}}>Tunneling</option>
+                <option value="custom" {{#if (eq system.movementType "custom")}}selected{{/if}}>Custom</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Speed Rank:</label>
+              <select name="system.movementSpeed">
+                <option value="" {{#if (eq system.movementSpeed "")}}selected{{/if}}>None</option>
+                {{#each ranks as |rank|}}
+                <option value="{{rank}}" {{#if (eq ../system.movementSpeed rank)}}selected{{/if}}>{{rank}}</option>
+                {{/each}}
+              </select>
+            </div>
+          </div>
+        </div>
+        {{/if}}
+
+        {{#if isGearRestraint}}
+        <div class="specialized-section" style="margin-bottom:10px;">
+          <div class="section-header" style="background:#fce4ec;border-bottom:1px solid #f48fb1;">
+            <h3 style="margin:0;font-size:1em;font-weight:700;color:#880e4f;">Restraint / Inhibitor</h3>
+          </div>
+          <div style="padding:8px;">
+            <p style="margin:0 0 6px;color:#555;font-size:0.8em;">
+              Ability shifts applied when equipped. Negative values penalize.
+            </p>
+            <button type="button" class="add-ability-modifier" style="margin-bottom:8px;">
+              <i class="fas fa-plus"></i> Add Ability Modifier
+            </button>
+            <div class="ability-modifiers-list">
+              {{#each system.abilityModifiers as |mod i|}}
+              <div class="ability-mod-row" style="display:grid;grid-template-columns:1fr 80px auto;gap:6px;align-items:center;margin-bottom:6px;padding:6px;background:#fafafa;border:1px solid #ddd;border-radius:4px;">
+                <select name="system.abilityModifiers.{{i}}.ability">
+                  <option value="fighting" {{#if (eq mod.ability "fighting")}}selected{{/if}}>Fighting</option>
+                  <option value="agility" {{#if (eq mod.ability "agility")}}selected{{/if}}>Agility</option>
+                  <option value="strength" {{#if (eq mod.ability "strength")}}selected{{/if}}>Strength</option>
+                  <option value="endurance" {{#if (eq mod.ability "endurance")}}selected{{/if}}>Endurance</option>
+                  <option value="reason" {{#if (eq mod.ability "reason")}}selected{{/if}}>Reason</option>
+                  <option value="intuition" {{#if (eq mod.ability "intuition")}}selected{{/if}}>Intuition</option>
+                  <option value="psyche" {{#if (eq mod.ability "psyche")}}selected{{/if}}>Psyche</option>
+                  <option value="allPhysical" {{#if (eq mod.ability "allPhysical")}}selected{{/if}}>All Physical (FASE)</option>
+                  <option value="allPowers" {{#if (eq mod.ability "allPowers")}}selected{{/if}}>All Powers (-CS)</option>
+                </select>
+                <input type="number" name="system.abilityModifiers.{{i}}.shiftCS" value="{{mod.shiftCS}}" title="Column shifts (negative = penalty)" style="text-align:center;"/>
+                <button type="button" class="remove-ability-modifier" data-index="{{i}}" title="Remove"
+                        style="background:#dc3545;color:white;border:none;padding:4px 8px;border-radius:3px;cursor:pointer;">
+                  <i class="fas fa-trash"></i>
+                </button>
+              </div>
+              {{/each}}
+            </div>
+            <p style="margin:4px 0 0;color:#888;font-size:0.75em;">
+              Inhibitor bands: -5CS physical, -7CS powers. Handcuffs: Excellent material to break.
+            </p>
+          </div>
+        </div>
+        {{/if}}
+
+        {{#if isGearSundry}}
+        <div class="specialized-section" style="margin-bottom:10px;">
+          <div class="section-header" style="background:#f3e5f5;border-bottom:1px solid #ce93d8;">
+            <h3 style="margin:0;font-size:1em;font-weight:700;color:#4a148c;">Sundry</h3>
+          </div>
+          <div style="padding:8px;">
+            <p style="margin:0 0 6px;color:#555;font-size:0.8em;">
+              Salaries, clothing, entertainment, and other non-combat items. Use Notes and Description below.
+            </p>
+          </div>
+        </div>
+        {{/if}}
+      </div>
+      {{/if}}
+      <!-- END gear-fields -->
+
+      <!-- Shared Resistances block — rendered once for armor OR gear-protective -->
+      {{#if showResistances}}
+      <div class="specialized-section resistances-section" style="margin-bottom:10px;">
+        <div class="section-header" style="background:#e8f5e9;border-bottom:1px solid #a5d6a7;">
+          <h3 style="margin:0;font-size:1em;font-weight:700;color:#1b5e20;">Resistances</h3>
+        </div>
+        <div style="padding:8px;">
+          <p style="margin:0 0 6px;color:#555;font-size:0.8em;">
+            Per FASERIP rules: damage of that type reduced by rank number. Intensity below rank = no effect.
+          </p>
+          <button type="button" class="add-resistance" style="margin-bottom:8px;">
+            <i class="fas fa-plus"></i> Add Resistance
+          </button>
+          <div class="resistances-list">
+            {{#each system.resistances as |res i|}}
+            <div class="resistance-row" style="display:grid;grid-template-columns:1fr 1fr auto;gap:6px;align-items:center;margin-bottom:6px;padding:6px;background:#fafafa;border:1px solid #ddd;border-radius:4px;">
+              <select name="system.resistances.{{i}}.type">
+                <option value="fireHeat" {{#if (eq res.type "fireHeat")}}selected{{/if}}>Fire / Heat</option>
+                <option value="cold" {{#if (eq res.type "cold")}}selected{{/if}}>Cold</option>
+                <option value="electricity" {{#if (eq res.type "electricity")}}selected{{/if}}>Electricity</option>
+                <option value="radiation" {{#if (eq res.type "radiation")}}selected{{/if}}>Radiation</option>
+                <option value="toxins" {{#if (eq res.type "toxins")}}selected{{/if}}>Toxins</option>
+                <option value="corrosives" {{#if (eq res.type "corrosives")}}selected{{/if}}>Corrosives</option>
+                <option value="emotion" {{#if (eq res.type "emotion")}}selected{{/if}}>Emotion Attacks</option>
+                <option value="mental" {{#if (eq res.type "mental")}}selected{{/if}}>Mental Attacks</option>
+                <option value="magical" {{#if (eq res.type "magical")}}selected{{/if}}>Magical Attacks</option>
+                <option value="disease" {{#if (eq res.type "disease")}}selected{{/if}}>Disease</option>
+                <option value="sonic" {{#if (eq res.type "sonic")}}selected{{/if}}>Sonic</option>
+                <option value="light" {{#if (eq res.type "light")}}selected{{/if}}>Light</option>
+                <option value="gas" {{#if (eq res.type "gas")}}selected{{/if}}>Gas (Smoke/Tear/KO)</option>
+                <option value="physical" {{#if (eq res.type "physical")}}selected{{/if}}>Physical (general)</option>
+                <option value="energy" {{#if (eq res.type "energy")}}selected{{/if}}>Energy (general)</option>
+                <option value="custom" {{#if (eq res.type "custom")}}selected{{/if}}>Custom</option>
+              </select>
+              <select name="system.resistances.{{i}}.rank">
+                {{#each ../ranks as |rank|}}
+                <option value="{{rank}}" {{#if (eq res.rank rank)}}selected{{/if}}>{{rank}}</option>
+                {{/each}}
+              </select>
+              <button type="button" class="remove-resistance" data-index="{{i}}" title="Remove"
+                      style="background:#dc3545;color:white;border:none;padding:4px 8px;border-radius:3px;cursor:pointer;">
+                <i class="fas fa-trash"></i>
+              </button>
+              {{#if (eq res.type "custom")}}
+              <input type="text" name="system.resistances.{{i}}.customLabel" value="{{res.customLabel}}" placeholder="Custom resistance name" style="grid-column:1/3;"/>
+              {{/if}}
+            </div>
+            {{/each}}
+          </div>
+        </div>
+      </div>
+      {{/if}}
+      <!-- END shared resistances -->
+
       <!-- Power item fields -->
-      <div class="power-item-fields" {{#unless (eq system.category "power-item")}}style="display: none;"{{/unless}}>
+      {{#if isPowerItem}}
+      <div class="power-item-fields">
         <div class="form-group">
           <label>Power Rank:</label>
           <select name="system.powerRank">
@@ -698,10 +944,12 @@
           <input type="text" name="system.powerRange" value="{{system.powerRange}}" />
         </div>
       </div>
+      {{/if}}
       <!-- END power-item-fields -->
   
       <!-- Custom equipment fields -->
-      <div class="custom-fields" {{#unless (eq system.category "custom")}}style="display: none;"{{/unless}}>
+      {{#if isDevice}}
+      <div class="custom-fields device-fields">
         <!-- Custom Abilities -->
         <div class="form-group">
           <label>Custom Abilities:</label>
@@ -821,10 +1069,12 @@
           {{/each}}
         </div>
       </div>
-      <!-- END custom-fields -->
+      {{/if}}
+      <!-- END custom-fields / device-fields -->
 
       <!-- ═══ SOUND EFFECTS — shared across weapon & other categories ═══ -->
-      <div class="sfx-shared-fields" style="display: none;">
+      {{#if showSfx}}
+      <div class="sfx-shared-fields">
         <div class="specialized-section" style="margin-bottom:10px;">
           <div class="section-header collapsible" data-section="sfx-fields">
             <h3>Sound Effects</h3>
@@ -879,6 +1129,8 @@
           </div>
         </div>
       </div>
+      {{/if}}
+      <!-- END sfx-shared-fields -->
 
       <!-- GENERAL FIELDS - Visible for ALL equipment types -->
       <div class="form-group duration-row">

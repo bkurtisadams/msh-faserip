@@ -3235,7 +3235,7 @@ form.faserip-sheet .identity-section input[type="radio"] {
 /* Row 1 right: Player Name */
 .msh-player-top{
   grid-column:3; grid-row:1;
-  min-width:100px; align-self:end;
+  min-width:80px; align-self:end;
 }
 .msh-player-top label{ display:block;font-size:12.5px;line-height:1.1;margin:0 0 2px 0; }
 .msh-player-top input{ height:24px;padding:2px 6px;font-size:12.5px;line-height:1.1;box-sizing:border-box;width:100%; }
@@ -3255,7 +3255,7 @@ form.faserip-sheet .identity-section input[type="radio"] {
 /* Row 2 right: Character Type + Lock */
 .msh-player-bottom{
   grid-column:3; grid-row:2;
-  min-width:100px;
+  min-width:80px;
   display:flex; gap:4px; align-items:end;
 }
 .msh-player-bottom select{

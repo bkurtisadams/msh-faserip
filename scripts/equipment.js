@@ -1,4 +1,6 @@
-// equipment.js v1.4.0 - 2026-03-03
+// equipment.js v1.5.0 - 2026-03-10
+// v1.5.0: Expanded categories (gear subtypes, device, armor resistances). Computed display flags
+//         in getData() — no duplicate form fields. Array reconstruction in _updateObject.
 // v1.4.0: Rewrite effects to use standard changes[] — system.* for mechanics, faserip.token.* for visuals
 // v1.2.0: Add "other" category (grenade/missile); other-fields show/hide; weaponType sub-section toggle
 import { applyDamageToTargets } from "./modules/actions/action-utils.js";
@@ -69,12 +71,26 @@ export class FaseripEquipmentSheet extends ItemSheet {
       "magic",
       "disease",
       "emotion"
-      // Note: "Stun" is an *effect* type, not a damage type on the Universal Table column.
-          // If you want a "Stun" damage type, you'd need to define how it maps to the table.
-          // Current weapon sheet already has stunIntensity for weapons that only stun.
     ];
 
-    // --- END NEW ---
+    // Computed display flags — controls which sections render (no duplicate form fields)
+    const cat = this.item.system.category || "gear";
+    const gt = this.item.system.gearType || "";
+    context.isWeapon = (cat === "weapon");
+    context.isOther = (cat === "other");
+    context.isArmor = (cat === "armor");
+    context.isGear = (cat === "gear");
+    context.isDevice = (cat === "device" || cat === "custom");
+    context.isPowerItem = (cat === "power-item");
+    context.isGearProtective = (cat === "gear" && gt === "protective");
+    context.isGearSensory = (cat === "gear" && gt === "sensory");
+    context.isGearMovement = (cat === "gear" && gt === "movement");
+    context.isGearRestraint = (cat === "gear" && gt === "restraint");
+    context.isGearSundry = (cat === "gear" && gt === "sundry");
+    // Show protection + resistances for armor OR gear-protective
+    context.showProtection = (cat === "armor" || (cat === "gear" && gt === "protective"));
+    context.showResistances = (cat === "armor" || (cat === "gear" && gt === "protective"));
+    context.showSfx = (cat === "weapon" || cat === "other");
 
     // Active Effects on this equipment item
     context.effects = prepareActiveEffectCategories(this.item.effects);
@@ -86,11 +102,9 @@ export class FaseripEquipmentSheet extends ItemSheet {
   async _updateObject(event, formData) {
     const data = foundry.utils.expandObject(formData);
     if (!data.system) data.system = {};
-    // Use the submitted category if present, otherwise fall back to what's saved on the item
     const category = (data.system.category !== undefined) ? data.system.category : this.object.system.category;
 
     // other-fields uses _-prefixed names to avoid form collision with weapon-fields.
-    // Always map them regardless of category — they're only present when other-fields is shown.
     if (data.system._otherWeaponType !== undefined) {
       if (category === "other") data.system.weaponType = data.system._otherWeaponType;
     }
@@ -98,7 +112,6 @@ export class FaseripEquipmentSheet extends ItemSheet {
       if (category === "other") {
         const qty = parseInt(data.system._otherShots, 10);
         data.system.shots = isNaN(qty) ? 0 : qty;
-        // Always sync shotsRemaining to shots — GM editing Quantity means restocking to full
         data.system.shotsRemaining = data.system.shots;
       }
     }
@@ -108,6 +121,54 @@ export class FaseripEquipmentSheet extends ItemSheet {
     delete data.system._otherWeaponType;
     delete data.system._otherShots;
     delete data.system._otherLegality;
+
+    // Rebuild arrays — expandObject turns indexed form names into objects with numeric keys
+    if (data.system.resistances && !Array.isArray(data.system.resistances)) {
+      data.system.resistances = Object.values(data.system.resistances).map(r => ({
+        type: r.type || "fireHeat",
+        rank: r.rank || "Typical",
+        customLabel: r.customLabel || ""
+      }));
+    }
+    if (data.system.abilityModifiers && !Array.isArray(data.system.abilityModifiers)) {
+      data.system.abilityModifiers = Object.values(data.system.abilityModifiers).map(m => ({
+        ability: m.ability || "fighting",
+        shiftCS: parseInt(m.shiftCS) || 0
+      }));
+    }
+    if (data.system.attackModes && !Array.isArray(data.system.attackModes)) {
+      data.system.attackModes = Object.values(data.system.attackModes).map(m => ({
+        name: m.name || "",
+        actionType: m.actionType || "blunt-attack",
+        damageType: m.damageType || "BA",
+        damage: parseInt(m.damage) || 0,
+        ability: m.ability || "fighting",
+        description: m.description || "",
+        allowedVariants: m.allowedVariants || ["standard"],
+        sfx: m.sfx || { hit: "", miss: "", critical: "" }
+      }));
+    }
+    if (data.system.customAbilities && !Array.isArray(data.system.customAbilities)) {
+      data.system.customAbilities = Object.values(data.system.customAbilities).map(a => ({
+        name: a.name || "",
+        description: a.description || "",
+        rank: a.rank || "Typical",
+        damageType: a.damageType || "",
+        range: a.range || "",
+        isPassiveArmor: a.isPassiveArmor || false,
+        armorDamageType: a.armorDamageType || ""
+      }));
+    }
+    if (data.system.powers && !Array.isArray(data.system.powers)) {
+      data.system.powers = Object.values(data.system.powers).map(p => ({
+        name: p.name || "",
+        rank: p.rank || "Typical",
+        value: parseInt(p.value) || 0,
+        damageType: p.damageType || "",
+        isPassiveArmor: p.isPassiveArmor || false,
+        grantedByEquipment: p.grantedByEquipment || "true"
+      }));
+    }
 
     return super._updateObject(event, foundry.utils.flattenObject(data));
   }
@@ -338,70 +399,63 @@ export class FaseripEquipmentSheet extends ItemSheet {
 
 
 
-    // Show/hide category-specific fields when category changes
+    // Category change — update data and re-render (template uses {{#if}} flags from getData)
     html.find('.equipment-category-select').change(async ev => {
-      const category = ev.currentTarget.value;
-      
-      // Prevent multiple rapid updates
-      if (this._categoryUpdateTimeout) {
-        clearTimeout(this._categoryUpdateTimeout);
-      }
-      
-      // Show/hide sections immediately without re-rendering
-      html.find('.weapon-fields, .armor-fields, .power-item-fields, .custom-fields, .other-fields').hide();
-      html.find('.sfx-shared-fields').toggle(category === 'weapon' || category === 'other');
-      
-      if (category === 'weapon') {
-        html.find('.weapon-fields').show();
-      } else if (category === 'armor') {
-        html.find('.armor-fields').show();
-      } else if (category === 'power-item') {
-        html.find('.power-item-fields').show();
-      } else if (category === 'custom') {
-        html.find('.custom-fields').show();
-      } else if (category === 'other') {
-        html.find('.other-fields').show();
-        // Show correct weapon type sub-section
-        const wt = this.object.system.weaponType || '';
-        html.find('.other-grenade-fields, .other-missile-fields').hide();
-        if (wt === 'grenade') html.find('.other-grenade-fields').show();
-        else if (wt === 'missile') html.find('.other-missile-fields').show();
-      }
-      
-      // Delay the update to prevent conflicts
-      this._categoryUpdateTimeout = setTimeout(() => {
-        this.object.update({"system.category": category});
-      }, 100);
+      ev.preventDefault();
+      await this.object.update({"system.category": ev.currentTarget.value});
     });
 
-    // Make sure correct fields are shown on initial load
-    const currentCategory = this.object.system.category;
-    html.find('.weapon-fields, .armor-fields, .power-item-fields, .custom-fields, .other-fields').hide(); // Hide all initially
-    html.find('.sfx-shared-fields').toggle(currentCategory === 'weapon' || currentCategory === 'other');
-    if (currentCategory === 'weapon') {
-      html.find('.weapon-fields').show();
-    } else if (currentCategory === 'armor') {
-      html.find('.armor-fields').show();
-    } else if (currentCategory === 'power-item') {
-      html.find('.power-item-fields').show();
-    } else if (currentCategory === 'custom') {
-      html.find('.custom-fields').show();
-    } else if (currentCategory === 'other') {
-      html.find('.other-fields').show();
-      const wt = this.object.system.weaponType || '';
-      html.find('.other-grenade-fields, .other-missile-fields').hide();
-      if (wt === 'grenade') html.find('.other-grenade-fields').show();
-      else if (wt === 'missile') html.find('.other-missile-fields').show();
-    }
+    // Gear sub-type change — update and re-render
+    html.find('.gear-type-select').change(async ev => {
+      ev.preventDefault();
+      await this.object.update({"system.gearType": ev.currentTarget.value});
+    });
 
 
-    // Other weapon type sub-section toggle (grenade vs missile)
+    // Other weapon type sub-section toggle
     html.find('.other-weapon-type-select').change(ev => {
       const wt = ev.currentTarget.value;
       html.find('.other-grenade-fields, .other-missile-fields').hide();
       if (wt === 'grenade') html.find('.other-grenade-fields').show();
       else if (wt === 'missile') html.find('.other-missile-fields').show();
-      // Don't need explicit update — _updateObject handles _otherWeaponType → weaponType mapping
+    });
+
+    // Add resistance
+    html.find('.add-resistance').click(async ev => {
+      ev.preventDefault();
+      const resistances = foundry.utils.duplicate(this.object.system.resistances || []);
+      resistances.push({ type: "fireHeat", rank: "Typical", customLabel: "" });
+      await this.object.update({ "system.resistances": resistances }, {diff: false});
+    });
+
+    // Remove resistance
+    html.find('.remove-resistance').click(async ev => {
+      ev.preventDefault();
+      const index = parseInt(ev.currentTarget.dataset.index);
+      const resistances = foundry.utils.duplicate(this.object.system.resistances || []);
+      if (resistances.length > index) {
+        resistances.splice(index, 1);
+        await this.object.update({ "system.resistances": resistances }, {diff: false});
+      }
+    });
+
+    // Add ability modifier (restraint gear)
+    html.find('.add-ability-modifier').click(async ev => {
+      ev.preventDefault();
+      const mods = foundry.utils.duplicate(this.object.system.abilityModifiers || []);
+      mods.push({ ability: "fighting", shiftCS: -1 });
+      await this.object.update({ "system.abilityModifiers": mods }, {diff: false});
+    });
+
+    // Remove ability modifier
+    html.find('.remove-ability-modifier').click(async ev => {
+      ev.preventDefault();
+      const index = parseInt(ev.currentTarget.dataset.index);
+      const mods = foundry.utils.duplicate(this.object.system.abilityModifiers || []);
+      if (mods.length > index) {
+        mods.splice(index, 1);
+        await this.object.update({ "system.abilityModifiers": mods }, {diff: false});
+      }
     });
 
 
