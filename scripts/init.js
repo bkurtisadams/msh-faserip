@@ -1,4 +1,7 @@
-// init.js v1.10.0 - 2026-03-04
+// init.js v1.11.0 - 2026-03-10
+// v1.11.0: Fix light persistence bug — baseline flag storage now uses pipe-delimited keys
+//          to prevent Foundry flattenObject from corrupting dot-notation keys during setFlag.
+//          Per-actor debounce map replaces single global timer.
 // v1.10.0: updateActiveEffect reconcile now filtered to faserip.token.* changes + disabled toggles only,
 //          preventing unnecessary token updates on every stat/karma AE change.
 // v1.9.9: Fix double death save caused by v1.9.8's await setFlag("wasKnockedOut") before
@@ -1955,21 +1958,24 @@ Hooks.on("preCreateActor", (document, data, options, userId) => {
 
 // CONSOLIDATED READY HOOK - All ready logic in one place
 // ─── Handle faserip.token.* ActiveEffect changes ────────────────────────────
-// Pattern follows Active Token Lighting (ATL) by kandashi:
-//   - applyActiveEffect hook blocks faserip.token.* from writing to actor data
-//   - On any effect CRUD event, re-collect all active faserip.token.* changes
-//   - Save baseline token state in flags before first application
-//   - Apply merged desired state to all tokens for the actor
-//   - When no effects remain, revert to saved baseline and clear flags
+// Effects with change keys like "faserip.token.light.bright" are intercepted
+// by the applyActiveEffect hook (blocked from writing to actor system data)
+// and instead applied directly to the owning token(s).
 //
-// Baseline stored at: tokenDoc.flags.msh-faserip.tokenBaseline = { "light.bright": 0, ... }
+// Baseline is stored in tokenDoc flags using pipe-delimited keys to avoid
+// Foundry's flattenObject interpreting dots as nested paths during flag storage.
+// e.g. "light.bright" is stored as "light|bright" in the baseline object.
 
 const _TOKEN_FLAG_SCOPE = "msh-faserip";
 const _TOKEN_BASELINE_KEY = "tokenBaseline";
 
-// Collect all active faserip.token.* changes for an actor into a flat object
+// Encode/decode baseline keys: dots ↔ pipes
+function _baselineEncode(dotKey) { return dotKey.replaceAll(".", "|"); }
+function _baselineDecode(pipeKey) { return pipeKey.replaceAll("|", "."); }
+
+// Collect all active faserip.token.* changes for an actor — returns Map<dotKey, value>
 function _collectTokenEffectState(actor) {
-  const desired = {};
+  const desired = new Map();
   for (const effect of actor.allApplicableEffects()) {
     if (effect.disabled || effect.isSuppressed) continue;
     for (const change of effect.changes) {
@@ -1980,7 +1986,7 @@ function _collectTokenEffectState(actor) {
       if (/^-?\d+(\.\d+)?$/.test(val)) val = Number(val);
       else if (val === "true") val = true;
       else if (val === "false") val = false;
-      desired[tokenKey] = val;
+      desired.set(tokenKey, val);
     }
   }
   return desired;
@@ -1990,42 +1996,45 @@ function _collectTokenEffectState(actor) {
 async function _reconcileTokenEffects(actor) {
   if (!canvas?.scene || !game.user.isGM) return;
 
-  // Find tokens for this actor — handle both linked and unlinked (synthetic) actors
   const tokens = canvas.scene.tokens.filter(t => {
     if (t.actorLink) return t.actorId === actor.id;
-    // Unlinked: the token's synthetic actor IS the actor
     return t.actor === actor;
   });
   if (!tokens.length) return;
 
   const desired = _collectTokenEffectState(actor);
-  const desiredFlat = foundry.utils.flattenObject(desired);
-  const hasDesired = Object.keys(desiredFlat).length > 0;
+  const hasDesired = desired.size > 0;
 
   for (const tokenDoc of tokens) {
     const savedBaseline = tokenDoc.getFlag(_TOKEN_FLAG_SCOPE, _TOKEN_BASELINE_KEY);
 
     if (hasDesired) {
-      // Build or extend the baseline: snapshot current value for every key we're about to change
+      // Build or extend baseline: snapshot current token value for each key we're changing
       const baseline = savedBaseline ? foundry.utils.duplicate(savedBaseline) : {};
       let baselineChanged = false;
-      for (const key of Object.keys(desiredFlat)) {
-        if (!(key in baseline)) {
-          baseline[key] = foundry.utils.getProperty(tokenDoc, key) ?? null;
+      for (const dotKey of desired.keys()) {
+        const safeKey = _baselineEncode(dotKey);
+        if (!(safeKey in baseline)) {
+          baseline[safeKey] = foundry.utils.getProperty(tokenDoc, dotKey) ?? null;
           baselineChanged = true;
         }
       }
       if (!savedBaseline || baselineChanged) {
         await tokenDoc.setFlag(_TOKEN_FLAG_SCOPE, _TOKEN_BASELINE_KEY, baseline);
       }
-      // Apply desired state
-      await tokenDoc.update(desired);
+      // Build nested update object from dot-notation keys
+      const update = {};
+      for (const [dotKey, val] of desired) {
+        foundry.utils.setProperty(update, dotKey, val);
+      }
+      await tokenDoc.update(update);
 
     } else if (savedBaseline) {
       // No active token effects — revert every key to its baseline value
       const revert = {};
-      for (const [key, val] of Object.entries(savedBaseline)) {
-        foundry.utils.setProperty(revert, key, val);
+      for (const [safeKey, val] of Object.entries(savedBaseline)) {
+        const dotKey = _baselineDecode(safeKey);
+        foundry.utils.setProperty(revert, dotKey, val);
       }
       await tokenDoc.update(revert);
       await tokenDoc.unsetFlag(_TOKEN_FLAG_SCOPE, _TOKEN_BASELINE_KEY);
@@ -2034,11 +2043,15 @@ async function _reconcileTokenEffects(actor) {
 }
 
 // Debounce: multiple effect changes in quick succession get one reconcile
-let _reconcileTimer = null;
+const _pendingReconcile = new Map();
 function _scheduleReconcile(actor) {
   if (!actor) return;
-  clearTimeout(_reconcileTimer);
-  _reconcileTimer = setTimeout(() => _reconcileTokenEffects(actor), 200);
+  const id = actor.id ?? actor.uuid;
+  clearTimeout(_pendingReconcile.get(id));
+  _pendingReconcile.set(id, setTimeout(() => {
+    _pendingReconcile.delete(id);
+    _reconcileTokenEffects(actor);
+  }, 200));
 }
 
 // Helper: resolve an effect's parent chain to find the owning actor
@@ -2100,10 +2113,28 @@ Hooks.on("deleteItem", (item, options, userId) => {
   if (item.actor) _scheduleReconcile(item.actor);
 });
 
-// On canvas ready, reconcile all tokens (handles reload/scene switch)
-Hooks.on("canvasReady", () => {
+// On canvas ready, migrate any old dot-key baselines and reconcile all tokens
+Hooks.on("canvasReady", async () => {
   if (!game.user.isGM) return;
   for (const tokenDoc of canvas.scene.tokens) {
+    // Migrate old dot-notation baselines to pipe-delimited format
+    const bl = tokenDoc.getFlag(_TOKEN_FLAG_SCOPE, _TOKEN_BASELINE_KEY);
+    if (bl && typeof bl === "object") {
+      const hasDotKeys = Object.keys(bl).some(k => k.includes("."));
+      const hasNestedFromCorruption = !hasDotKeys && Object.values(bl).some(v => v && typeof v === "object");
+      if (hasDotKeys) {
+        // Old format: { "light.bright": 0 } → { "light|bright": 0 }
+        const migrated = {};
+        for (const [k, v] of Object.entries(bl)) migrated[_baselineEncode(k)] = v;
+        await tokenDoc.setFlag(_TOKEN_FLAG_SCOPE, _TOKEN_BASELINE_KEY, migrated);
+      } else if (hasNestedFromCorruption) {
+        // Corrupted: { light: { bright: 0 } } → flatten and re-encode
+        const flat = foundry.utils.flattenObject(bl);
+        const migrated = {};
+        for (const [k, v] of Object.entries(flat)) migrated[_baselineEncode(k)] = v;
+        await tokenDoc.setFlag(_TOKEN_FLAG_SCOPE, _TOKEN_BASELINE_KEY, migrated);
+      }
+    }
     const actor = tokenDoc.actor;
     if (actor) _reconcileTokenEffects(actor);
   }
