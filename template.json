@@ -479,7 +479,8 @@
       "sensoryRange": "",
       "movementType": "",
       "movementSpeed": "",
-      "abilityModifiers": []
+      "abilityModifiers": [],
+      "protectionValue": 0
     },
     "vehicle": {
       "templates": [

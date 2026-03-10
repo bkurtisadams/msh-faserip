@@ -92,6 +92,23 @@ export class FaseripEquipmentSheet extends ItemSheet {
     context.showResistances = (cat === "armor" || (cat === "gear" && gt === "protective"));
     context.showSfx = (cat === "weapon" || cat === "other");
 
+    // Auto-compute protectionValue from rank if value is 0 and rank is set
+    if (this.item.system.protection && !this.item.system.protectionValue) {
+      const rv = CONFIG.FASERIP?.rankValues?.[this.item.system.protection];
+      if (rv !== undefined) context.system.protectionValue = rv;
+    }
+
+    // Auto-compute resistance values from rank if not set
+    if (Array.isArray(this.item.system.resistances)) {
+      context.system.resistances = this.item.system.resistances.map(r => {
+        if (r.rank && !r.value) {
+          const rv = CONFIG.FASERIP?.rankValues?.[r.rank];
+          if (rv !== undefined) return { ...r, value: rv };
+        }
+        return r;
+      });
+    }
+
     // Active Effects on this equipment item
     context.effects = prepareActiveEffectCategories(this.item.effects);
 
@@ -127,6 +144,7 @@ export class FaseripEquipmentSheet extends ItemSheet {
       data.system.resistances = Object.values(data.system.resistances).map(r => ({
         type: r.type || "fireHeat",
         rank: r.rank || "Typical",
+        value: parseInt(r.value) || 0,
         customLabel: r.customLabel || ""
       }));
     }
@@ -399,6 +417,18 @@ export class FaseripEquipmentSheet extends ItemSheet {
 
 
 
+    // Auto-fill rank number when rank dropdown changes
+    html.find('.rank-with-value').change(ev => {
+      const rank = ev.currentTarget.value;
+      const targetName = ev.currentTarget.dataset.valueTarget;
+      if (!targetName) return;
+      const rv = CONFIG.FASERIP?.rankValues?.[rank];
+      if (rv !== undefined) {
+        const valueInput = html.find(`[name="${targetName}"]`);
+        if (valueInput.length) valueInput.val(rv);
+      }
+    });
+
     // Category change — update data and re-render (template uses {{#if}} flags from getData)
     html.find('.equipment-category-select').change(async ev => {
       ev.preventDefault();
@@ -424,7 +454,7 @@ export class FaseripEquipmentSheet extends ItemSheet {
     html.find('.add-resistance').click(async ev => {
       ev.preventDefault();
       const resistances = foundry.utils.duplicate(this.object.system.resistances || []);
-      resistances.push({ type: "fireHeat", rank: "Typical", customLabel: "" });
+      resistances.push({ type: "fireHeat", rank: "Typical", value: 6, customLabel: "" });
       await this.object.update({ "system.resistances": resistances }, {diff: false});
     });
 

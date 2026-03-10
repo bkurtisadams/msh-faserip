@@ -642,26 +642,23 @@
             <h3 style="margin:0;font-size:1em;font-weight:700;color:#0d47a1;">Body Armor</h3>
           </div>
           <div style="padding:8px;">
-            <div class="form-row">
-              <div class="form-group half">
-                <label>Protection Rank:</label>
-                <select name="system.protection">
-                  <option value="" {{#if (eq system.protection "")}}selected{{/if}}>None</option>
-                  {{#each ranks as |rank|}}
-                  <option value="{{rank}}" {{#if (eq ../system.protection rank)}}selected{{/if}}>{{rank}}</option>
-                  {{/each}}
-                </select>
-              </div>
-              <div class="form-group half">
-                <label>Coverage:</label>
-                <select name="system.coverage">
-                  <option value="full" {{#if (eq system.coverage "full")}}selected{{/if}}>Full</option>
-                  <option value="partial" {{#if (eq system.coverage "partial")}}selected{{/if}}>Partial</option>
-                </select>
-              </div>
+            <div style="display:flex;gap:6px;align-items:center;">
+              <label style="font-size:0.85em;font-weight:600;color:#666;white-space:nowrap;">Rank:</label>
+              <select name="system.protection" class="rank-with-value" data-value-target="system.protectionValue" style="flex:1;">
+                <option value="" {{#if (eq system.protection "")}}selected{{/if}}>None</option>
+                {{#each ranks as |rank|}}
+                <option value="{{rank}}" {{#if (eq ../system.protection rank)}}selected{{/if}}>{{rank}}</option>
+                {{/each}}
+              </select>
+              <input type="number" name="system.protectionValue" value="{{system.protectionValue}}" min="0" style="width:44px;text-align:center;font-weight:bold;"/>
+              <label style="font-size:0.85em;font-weight:600;color:#666;white-space:nowrap;margin-left:4px;">Coverage:</label>
+              <select name="system.coverage" style="width:auto;">
+                <option value="full" {{#if (eq system.coverage "full")}}selected{{/if}}>Full</option>
+                <option value="partial" {{#if (eq system.coverage "partial")}}selected{{/if}}>Partial</option>
+              </select>
             </div>
-            <p style="margin:4px 0 0;color:#555;font-size:0.8em;">
-              Body Armor reduces physical damage by rank number. -20 vs Energy attacks per rules.
+            <p style="margin:4px 0 0;color:#555;font-size:0.75em;">
+              Reduces physical damage by rank number. -20 vs Energy attacks per rules.
             </p>
           </div>
         </div>
@@ -699,23 +696,20 @@
             <h3 style="margin:0;font-size:1em;font-weight:700;color:#0d47a1;">Protection</h3>
           </div>
           <div style="padding:8px;">
-            <div class="form-row">
-              <div class="form-group half">
-                <label>Body Armor Rank:</label>
-                <select name="system.protection">
-                  <option value="" {{#if (eq system.protection "")}}selected{{/if}}>None</option>
-                  {{#each ranks as |rank|}}
-                  <option value="{{rank}}" {{#if (eq ../system.protection rank)}}selected{{/if}}>{{rank}}</option>
-                  {{/each}}
-                </select>
-              </div>
-              <div class="form-group half">
-                <label>Coverage:</label>
-                <select name="system.coverage">
-                  <option value="full" {{#if (eq system.coverage "full")}}selected{{/if}}>Full</option>
-                  <option value="partial" {{#if (eq system.coverage "partial")}}selected{{/if}}>Partial</option>
-                </select>
-              </div>
+            <div style="display:flex;gap:6px;align-items:center;">
+              <label style="font-size:0.85em;font-weight:600;color:#666;white-space:nowrap;">Rank:</label>
+              <select name="system.protection" class="rank-with-value" data-value-target="system.protectionValue" style="flex:1;">
+                <option value="" {{#if (eq system.protection "")}}selected{{/if}}>None</option>
+                {{#each ranks as |rank|}}
+                <option value="{{rank}}" {{#if (eq ../system.protection rank)}}selected{{/if}}>{{rank}}</option>
+                {{/each}}
+              </select>
+              <input type="number" name="system.protectionValue" value="{{system.protectionValue}}" min="0" style="width:44px;text-align:center;font-weight:bold;"/>
+              <label style="font-size:0.85em;font-weight:600;color:#666;white-space:nowrap;margin-left:4px;">Coverage:</label>
+              <select name="system.coverage" style="width:auto;">
+                <option value="full" {{#if (eq system.coverage "full")}}selected{{/if}}>Full</option>
+                <option value="partial" {{#if (eq system.coverage "partial")}}selected{{/if}}>Partial</option>
+              </select>
             </div>
           </div>
         </div>
@@ -794,8 +788,8 @@
             </button>
             <div class="ability-modifiers-list">
               {{#each system.abilityModifiers as |mod i|}}
-              <div class="ability-mod-row" style="display:grid;grid-template-columns:1fr 80px auto;gap:6px;align-items:center;margin-bottom:6px;padding:6px;background:#fafafa;border:1px solid #ddd;border-radius:4px;">
-                <select name="system.abilityModifiers.{{i}}.ability">
+              <div class="ability-mod-row" style="display:flex;gap:4px;align-items:center;margin-bottom:4px;">
+                <select name="system.abilityModifiers.{{i}}.ability" style="flex:1;font-size:0.85em;">
                   <option value="fighting" {{#if (eq mod.ability "fighting")}}selected{{/if}}>Fighting</option>
                   <option value="agility" {{#if (eq mod.ability "agility")}}selected{{/if}}>Agility</option>
                   <option value="strength" {{#if (eq mod.ability "strength")}}selected{{/if}}>Strength</option>
@@ -806,11 +800,8 @@
                   <option value="allPhysical" {{#if (eq mod.ability "allPhysical")}}selected{{/if}}>All Physical (FASE)</option>
                   <option value="allPowers" {{#if (eq mod.ability "allPowers")}}selected{{/if}}>All Powers (-CS)</option>
                 </select>
-                <input type="number" name="system.abilityModifiers.{{i}}.shiftCS" value="{{mod.shiftCS}}" title="Column shifts (negative = penalty)" style="text-align:center;"/>
-                <button type="button" class="remove-ability-modifier" data-index="{{i}}" title="Remove"
-                        style="background:#dc3545;color:white;border:none;padding:4px 8px;border-radius:3px;cursor:pointer;">
-                  <i class="fas fa-trash"></i>
-                </button>
+                <input type="number" name="system.abilityModifiers.{{i}}.shiftCS" value="{{mod.shiftCS}}" title="Column shifts (negative = penalty)" style="width:50px;text-align:center;font-weight:bold;font-size:0.85em;"/>
+                <a class="item-control remove-ability-modifier" data-index="{{i}}" title="Delete"><i class="fas fa-trash"></i></a>
               </div>
               {{/each}}
             </div>
@@ -845,15 +836,15 @@
         </div>
         <div style="padding:8px;">
           <p style="margin:0 0 6px;color:#555;font-size:0.8em;">
-            Per FASERIP rules: damage of that type reduced by rank number. Intensity below rank = no effect.
+            Per FASERIP rules: FEAT roll vs damage as Intensity. Success = no damage. Failure = rank number as Body Armor.
           </p>
           <button type="button" class="add-resistance" style="margin-bottom:8px;">
             <i class="fas fa-plus"></i> Add Resistance
           </button>
           <div class="resistances-list">
             {{#each system.resistances as |res i|}}
-            <div class="resistance-row" style="display:grid;grid-template-columns:1fr 1fr auto;gap:6px;align-items:center;margin-bottom:6px;padding:6px;background:#fafafa;border:1px solid #ddd;border-radius:4px;">
-              <select name="system.resistances.{{i}}.type">
+            <div class="resistance-row" style="display:flex;gap:4px;align-items:center;margin-bottom:4px;">
+              <select name="system.resistances.{{i}}.type" style="flex:2;font-size:0.85em;">
                 <option value="fireHeat" {{#if (eq res.type "fireHeat")}}selected{{/if}}>Fire / Heat</option>
                 <option value="cold" {{#if (eq res.type "cold")}}selected{{/if}}>Cold</option>
                 <option value="electricity" {{#if (eq res.type "electricity")}}selected{{/if}}>Electricity</option>
@@ -871,19 +862,19 @@
                 <option value="energy" {{#if (eq res.type "energy")}}selected{{/if}}>Energy (general)</option>
                 <option value="custom" {{#if (eq res.type "custom")}}selected{{/if}}>Custom</option>
               </select>
-              <select name="system.resistances.{{i}}.rank">
+              <select name="system.resistances.{{i}}.rank" class="rank-with-value" data-value-target="system.resistances.{{i}}.value" style="flex:1;font-size:0.85em;">
                 {{#each ../ranks as |rank|}}
                 <option value="{{rank}}" {{#if (eq res.rank rank)}}selected{{/if}}>{{rank}}</option>
                 {{/each}}
               </select>
-              <button type="button" class="remove-resistance" data-index="{{i}}" title="Remove"
-                      style="background:#dc3545;color:white;border:none;padding:4px 8px;border-radius:3px;cursor:pointer;">
-                <i class="fas fa-trash"></i>
-              </button>
-              {{#if (eq res.type "custom")}}
-              <input type="text" name="system.resistances.{{i}}.customLabel" value="{{res.customLabel}}" placeholder="Custom resistance name" style="grid-column:1/3;"/>
-              {{/if}}
+              <input type="number" name="system.resistances.{{i}}.value" value="{{res.value}}" min="0" style="width:40px;text-align:center;font-weight:bold;font-size:0.85em;"/>
+              <a class="item-control remove-resistance" data-index="{{i}}" title="Delete"><i class="fas fa-trash"></i></a>
             </div>
+            {{#if (eq res.type "custom")}}
+            <div style="margin:-2px 0 4px 0;">
+              <input type="text" name="system.resistances.{{i}}.customLabel" value="{{res.customLabel}}" placeholder="Custom resistance name" style="font-size:0.85em;"/>
+            </div>
+            {{/if}}
             {{/each}}
           </div>
         </div>
