@@ -166,8 +166,8 @@ export class GrapplingAction extends AttackAction {
           const existingHolds = tActor.effects?.filter(e => 
             e.statuses?.has?.("grappled") || 
             e.statuses?.has?.("held") ||
-            e.getFlag?.("core", "statusId") === "partial-hold" ||
-            e.getFlag?.("core", "statusId") === "full-hold"
+            e.statuses?.has?.("partial-hold") ||
+            e.statuses?.has?.("full-hold")
           );
           for (const eff of existingHolds || []) {
             await eff.delete();
