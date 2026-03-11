@@ -1119,7 +1119,7 @@ export class AttackAction extends BaseAction {
         <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
           <!-- Header: Action + Attack number -->
           <div style="padding:6px 10px;border-bottom:1px solid #c0c0c0;display:flex;justify-content:space-between;align-items:center;">
-            <strong style="color:#8b0000;">${actionLabel.toUpperCase()}</strong>
+            <span><strong style="color:#8b0000;">${actionLabel.toUpperCase()}</strong>${weapon?.name ? ` <span style="color:#555;font-size:.85em;font-weight:normal;">— ${weapon.name}</span>` : ''}</span>
             ${attackIndicator}
           </div>
           
