@@ -1839,9 +1839,23 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
           }
         }
         
+        // Route to intensity if power has requiresSave + save.intensity configured
+        // This catches gas, flash, sonic, etc. — non-mental intensity powers
+        if (!actionType && requiresSave) {
+          const saveBlock = item.system.save || {};
+          if (saveBlock.intensity && saveBlock.intensity !== "none") {
+            const saveAbility = saveBlock.ability || "endurance";
+            return ActionDispatcher.roll("intensity", {
+              actor: this.actor,
+              abilityName: saveAbility,
+              opts: { itemId: item.id, item }
+            });
+          }
+        }
+
         // Category-based fallbacks if no specific type matched
         if (!actionType) {
-          if (catLower === "mentalpowers" || requiresSave) {
+          if (catLower === "mentalpowers") {
             actionType = "mental";
           } else if (catLower === "mattercontrol") {
             // Matter Control defaults to Force (physical manipulation)

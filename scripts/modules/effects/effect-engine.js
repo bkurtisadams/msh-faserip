@@ -729,6 +729,69 @@ export async function applyCharging(actor, { rounds = 1 } = {}, opts = {}) {
   }, opts);
 }
 
+/** Apply deafened effect — impaired hearing, -2CS Intuition, -2CS to detect ambush */
+export async function applyDeafened(actor, { rounds = 1, originUuid = null } = {}, opts = {}) {
+  return applyEffect(actor, {
+    name: "Deafened",
+    img: "icons/svg/deaf.svg",
+    rounds,
+    originUuid,
+    changes: [
+      { key: "system.combatMods.abilityShifts.intuition", mode: AE_MODE.ADD, value: "-2", priority: 20 },
+      { key: "system.combatMods.defenseShift", mode: AE_MODE.ADD, value: "-1", priority: 20 }
+    ],
+    flags: {
+      effectType: "deafened",
+      status: { isDeafened: true }
+    },
+    statuses: ["deafened"]
+  }, opts);
+}
+
+/** Apply paralyzed effect — cannot move or act, -4CS defense (worse than immobilized) */
+export async function applyParalyzed(actor, { rounds = 1, originUuid = null } = {}, opts = {}) {
+  return applyEffect(actor, {
+    name: "Paralyzed",
+    img: "icons/svg/paralysis.svg",
+    rounds,
+    originUuid,
+    changes: [
+      { key: "system.combatMods.canAct", mode: AE_MODE.OVERRIDE, value: "false", priority: 50 },
+      { key: "system.combatMods.canMove", mode: AE_MODE.OVERRIDE, value: "false", priority: 50 },
+      { key: "system.combatMods.movementMult", mode: AE_MODE.OVERRIDE, value: "0", priority: 50 },
+      { key: "system.combatMods.defenseShift", mode: AE_MODE.ADD, value: "-4", priority: 20 },
+      { key: "system.combatMods.defenseShiftRanged", mode: AE_MODE.ADD, value: "-4", priority: 20 }
+    ],
+    flags: {
+      effectType: "paralyzed",
+      status: { isParalyzed: true }
+    },
+    statuses: ["paralysis"]
+  }, opts);
+}
+
+/** Apply weakened effect — general debility, -2CS on all actions */
+export async function applyWeakened(actor, { rounds = 1, originUuid = null } = {}, opts = {}) {
+  return applyEffect(actor, {
+    name: "Weakened",
+    img: "icons/svg/downgrade.svg",
+    rounds,
+    originUuid,
+    changes: [
+      { key: "system.combatMods.attackShift", mode: AE_MODE.ADD, value: "-2", priority: 20 },
+      { key: "system.combatMods.defenseShift", mode: AE_MODE.ADD, value: "-1", priority: 20 },
+      { key: "system.combatMods.defenseShiftRanged", mode: AE_MODE.ADD, value: "-1", priority: 20 },
+      { key: "system.combatMods.abilityShifts.strength", mode: AE_MODE.ADD, value: "-2", priority: 20 },
+      { key: "system.combatMods.abilityShifts.endurance", mode: AE_MODE.ADD, value: "-2", priority: 20 }
+    ],
+    flags: {
+      effectType: "weakened",
+      status: { isWeakened: true }
+    },
+    statuses: ["weakened"]
+  }, opts);
+}
+
 /** Optionally advance CTT by N turns if sync is enabled */
 export function advanceCTTByTurns(n = 1) {
   const te = getCTT();

@@ -1173,10 +1173,16 @@
         <select name="system.intensityEffect" style="width:auto;">
           <option value="" {{#if (eq system.intensityEffect "")}}selected{{/if}}>None (GM adjudicate)</option>
           <option value="blinded" {{#if (eq system.intensityEffect "blinded")}}selected{{/if}}>Blinded</option>
+          <option value="deafened" {{#if (eq system.intensityEffect "deafened")}}selected{{/if}}>Deafened</option>
           <option value="stunned" {{#if (eq system.intensityEffect "stunned")}}selected{{/if}}>Stunned</option>
           <option value="unconscious" {{#if (eq system.intensityEffect "unconscious")}}selected{{/if}}>Unconscious</option>
           <option value="incapacitated" {{#if (eq system.intensityEffect "incapacitated")}}selected{{/if}}>Incapacitated</option>
           <option value="immobilized" {{#if (eq system.intensityEffect "immobilized")}}selected{{/if}}>Immobilized</option>
+          <option value="paralyzed" {{#if (eq system.intensityEffect "paralyzed")}}selected{{/if}}>Paralyzed</option>
+          <option value="nullified" {{#if (eq system.intensityEffect "nullified")}}selected{{/if}}>Nullified</option>
+          <option value="slammed" {{#if (eq system.intensityEffect "slammed")}}selected{{/if}}>Slammed</option>
+          <option value="grabbed" {{#if (eq system.intensityEffect "grabbed")}}selected{{/if}}>Grabbed</option>
+          <option value="weakened" {{#if (eq system.intensityEffect "weakened")}}selected{{/if}}>Weakened</option>
           <option value="custom" {{#if (eq system.intensityEffect "custom")}}selected{{/if}}>Custom (use description)</option>
         </select>
       </div>

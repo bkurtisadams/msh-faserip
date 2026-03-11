@@ -434,11 +434,18 @@
             <div class="form-group half">
               <label>On Fail:</label>
               <select name="system.save.onFail.effect">
-                <option value="nullified" {{#if (eq system.save.onFail.effect "nullified")}}selected{{/if}}>Nullified</option>
-                <option value="stunned"   {{#if (eq system.save.onFail.effect "stunned")}}selected{{/if}}>Stunned</option>
-                <option value="slammed"   {{#if (eq system.save.onFail.effect "slammed")}}selected{{/if}}>Slammed</option>
-                <option value="grabbed"   {{#if (eq system.save.onFail.effect "grabbed")}}selected{{/if}}>Grabbed</option>
-                <option value="custom"    {{#if (eq system.save.onFail.effect "custom")}}selected{{/if}}>Custom</option>
+                <option value="blinded"       {{#if (eq system.save.onFail.effect "blinded")}}selected{{/if}}>Blinded</option>
+                <option value="deafened"      {{#if (eq system.save.onFail.effect "deafened")}}selected{{/if}}>Deafened</option>
+                <option value="stunned"       {{#if (eq system.save.onFail.effect "stunned")}}selected{{/if}}>Stunned</option>
+                <option value="unconscious"   {{#if (eq system.save.onFail.effect "unconscious")}}selected{{/if}}>Unconscious</option>
+                <option value="incapacitated" {{#if (eq system.save.onFail.effect "incapacitated")}}selected{{/if}}>Incapacitated</option>
+                <option value="immobilized"   {{#if (eq system.save.onFail.effect "immobilized")}}selected{{/if}}>Immobilized</option>
+                <option value="paralyzed"     {{#if (eq system.save.onFail.effect "paralyzed")}}selected{{/if}}>Paralyzed</option>
+                <option value="nullified"     {{#if (eq system.save.onFail.effect "nullified")}}selected{{/if}}>Nullified</option>
+                <option value="slammed"       {{#if (eq system.save.onFail.effect "slammed")}}selected{{/if}}>Slammed</option>
+                <option value="grabbed"       {{#if (eq system.save.onFail.effect "grabbed")}}selected{{/if}}>Grabbed</option>
+                <option value="weakened"      {{#if (eq system.save.onFail.effect "weakened")}}selected{{/if}}>Weakened</option>
+                <option value="custom"        {{#if (eq system.save.onFail.effect "custom")}}selected{{/if}}>Custom</option>
               </select>
             </div>
             <div class="form-group half">
