@@ -1,4 +1,5 @@
-// scripts/modules/canvas/faserip-dot-token.js v1.6.1 - 2026-03-11
+// scripts/modules/canvas/faserip-dot-token.js v1.7.0 - 2026-03-11
+// v1.7.0: Ctrl+click dot HUD button toggles token size between 1x1 and 0.5x0.5.
 // v1.6.1: Thicker facing tick (5px outline / 3px white) for better visibility on green dots.
 // v1.6.0: Facing tick (notch line at token rotation), plain hover portrait (48px, no Ctrl),
 //         fix top-of-screen clipping. Tick drawn at 0° with cheap pivot rotation sync.
@@ -281,12 +282,22 @@ function _onRenderTokenHUD(app, html, data) {
   btn.classList.add("control-icon");
   if (isDot) btn.classList.add("active");
   btn.dataset.action = "faserip-dot-toggle";
-  btn.title = isDot ? "Switch to Normal Token" : "Switch to Dot Display";
+  btn.title = isDot ? "Switch to Normal Token (Ctrl: resize)" : "Switch to Dot Display (Ctrl: resize)";
   btn.innerHTML = `<i class="fas ${isDot ? "fa-image" : "fa-circle"}"></i>`;
 
   btn.addEventListener("click", async (ev) => {
     ev.preventDefault();
     ev.stopPropagation();
+
+    // Ctrl+click: toggle token size between 1x1 and 0.5x0.5
+    if (ev.ctrlKey) {
+      const isSmall = token.document.width <= 0.5;
+      const newSize = isSmall ? 1 : 0.5;
+      await token.document.update({ width: newSize, height: newSize });
+      app.render();
+      return;
+    }
+
     // Three-state cycle: unset → dot → normal → unset
     if (current === true) {
       // Currently forced dot → force normal
