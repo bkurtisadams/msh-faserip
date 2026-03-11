@@ -1,4 +1,5 @@
-// scripts/modules/actions/force-action.js v1.6.0 - 2026-02-25
+// scripts/modules/actions/force-action.js v2.0.0 - 2026-03-10
+// v2.0.0: Refactor - dialog only, delegates resolution to _executeSingleAttack
 // v1.6.0: Refactor chat card to use unified card builder utilities; remove dead old-style card variables
 // v1.5.0: Add support for equipment items with Force (F) damage type (concussion pistols, etc.)
 // v1.4.0: Fix CS persistence - decouple from global rememberSettings, treat opts.shift=0 as "not set"
@@ -16,52 +17,25 @@
 // v1.2.0: Fix DiceSoNice animation in consolidated chat cards mode
 // v1.1.0: Add inline rolls for consolidated chat cards
 import { RangedAttackAction } from "./ranged-attack-action.js";
-// NOTE: resolveCombatMode imported dynamically to avoid circular dependency
 import { 
-  generateKarmaControlsHTML, 
   setupKarmaControlHandlers, 
   extractKarmaFromDialog,
   getAvailableKarma
 } from "../dice/dice-roller.js";
 
 import { 
-  applyDamageToTargets,
   attachAutoFillRange,
-  buildActionsBox,
-  buildCollapsibleStunSection,
-  buildMultiAttackSection,
   buildModeSelector,
-  buildShiftDisplay,
-  buildRollDisplay,
-  buildResultBadge,
-  buildContentBox,
-  buildManualModeNotice,
-  buildCardShell,
-  buildActorTargetHtml,
-  buildAbilitySection,
-  debugLog,
   effectsFor,
   getAbilityInfo,
   getBodyArmorValues,
-  getStrengthInfo,
   getTargetData,
   labelFor,
-  postDeathSavePrompt,
   RANKS,
-  rollWithKarmaAndHistory,
   setupModeSelector,
-  setupMultiAttackHandlers,
   applyCapabilitiesToDialog,
-  shiftRank,
-  playAttackEffect,
-  playImpactEffect,
-  getAttackEffectPath,
-  showDiceAnimation
+  shiftRank
 } from "./action-utils.js";
-import { makeDamageBlock, computeAfterArmor, buildDamageFlags } from "./damage-ui.js";
-import { rollUniversalTable } from "../dice/universal-table.js";
-import { canEffectsApply } from "../../rules/effects-gate.js";
-import { getAttackShiftBreakdown, getDefenseShiftBreakdown, canActorAct } from "../effects/effect-modifiers.js";
 
 export class ForceAction extends RangedAttackAction {
   async execute() {
@@ -278,7 +252,7 @@ export class ForceAction extends RangedAttackAction {
       <!-- Multi-Attack Row -->
       <div class="multi-attack-section" style="padding:6px 8px;background:#e8f5e9;border:1px solid #a5d6a7;border-radius:3px;margin-bottom:6px;">
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-          <span style="font-weight:600;color:#2e7d32;">Multi:</span>
+          <span class="multi-label" style="font-weight:600;color:#2e7d32;">Multi:</span>
           <label title="Single attack, no penalty" style="cursor:pointer;"><input type="radio" name="multiMode" value="off" ${!savedMultiAdjacent ? 'checked' : ''}> Off</label>
           <label title="-4CS penalty, hits all adjacent targets with single roll." style="cursor:pointer;"><input type="radio" name="multiMode" value="adjacent" ${savedMultiAdjacent ? 'checked' : ''}> Adjacent</label>
         </div>
@@ -521,6 +495,22 @@ export class ForceAction extends RangedAttackAction {
           update();
           applyCapabilitiesToDialog(html, "force", { actor });
           this._disposeAutoFill = attachAutoFillRange(html, actor, update);
+
+          // Highlight dangerous sticky settings with bold red when active
+          const updateWarnings = () => {
+            const multiVal = html.find('[name="multiMode"]:checked').val();
+            const $multiLabel = html.find('.multi-attack-section .multi-label');
+            const $multiSection = html.find('.multi-attack-section');
+            if (multiVal !== "off") {
+              $multiLabel.css({ color: '#c62828', 'font-weight': '700' });
+              $multiSection.css({ background: '#ffebee', 'border-color': '#ef5350' });
+            } else {
+              $multiLabel.css({ color: '#2e7d32', 'font-weight': '600' });
+              $multiSection.css({ background: '#e8f5e9', 'border-color': '#a5d6a7' });
+            }
+          };
+          updateWarnings();
+          html.find('[name="multiMode"]').on('change', updateWarnings);
         },
         close: () => {
           if (this._disposeAutoFill) this._disposeAutoFill();
@@ -536,357 +526,67 @@ export class ForceAction extends RangedAttackAction {
       ui.notifications.info(`Attacking ${game.user.targets.size} adjacent targets at -4CS!`);
     }
 
-    // === EFFECT MODIFIERS: Apply attack/defense shifts from active effects ===
-    const attackerMods = canActorAct(actor);
-    if (!attackerMods.canAct) {
-      ui.notifications?.warn(`${actor.name}: ${attackerMods.reason}`);
-      await ChatMessage.create({
-        speaker: ChatMessage.getSpeaker({ actor }),
-        content: `
-          <div style="background:#fff;border:1px solid #e57373;border-radius:3px;padding:6px 8px;">
-            <b>${actor.name}</b> cannot act — ${attackerMods.reason}
-          </div>
-        `
-      });
-      return; // abort attack
+    // Reload mode from flags — respect global mode ceiling
+    let globalMode = "semi";
+    try { globalMode = game.settings.get("msh-faserip", "defaultCombatMode") || "semi"; } catch (_) {}
+    const modeRank = { manual: 0, semi: 1, full: 2 };
+    const globalRank = modeRank[globalMode] ?? 1;
+    const savedMode = await actor.getFlag("msh-faserip", "lastForceMode") || "semi";
+    const savedModeRank = modeRank[savedMode] ?? 1;
+    this.opts.mode = savedModeRank <= globalRank ? savedMode : globalMode;
+    const mode = this.opts.mode;
+    if (mode === "manual") {
+      this.opts.autoApply = false;
+      this.opts.showConfirm = false;
+    } else if (mode === "semi") {
+      this.opts.autoApply = false;
+      this.opts.showConfirm = true;
+    } else {
+      this.opts.autoApply = true;
+      this.opts.showConfirm = false;
     }
-    
-    // Get attacker's attack shift from effects (with breakdown)
-    const attackerShiftData = getAttackShiftBreakdown(actor);
-    const attackerShift = attackerShiftData.total;
-    const attackerEffects = attackerShiftData.breakdown;
-    
-    // Get defender's defense shift (if single target)
-    let defenderShift = 0;
-    let defenderEffects = [];
-    const effectTargetTokens = Array.from(game.user?.targets ?? []);
-    const effectPrimaryTarget = effectTargetTokens[0] ?? null;
-    const defenderActor = effectPrimaryTarget?.actor ?? null;
-    if (defenderActor) {
-      // Force attacks are ranged
-      const defenderShiftData = getDefenseShiftBreakdown(defenderActor, true);
-      defenderShift = defenderShiftData.total;
-      defenderEffects = defenderShiftData.breakdown;
-    }
-    
-    // Total effect shift (attacker bonus + defender penalty)
-    // Positive defenderShift = harder to hit, so we subtract it
-    const effectShift = attackerShift - defenderShift;
-    
-    // Apply effect shift to choice.totalShift
-    const originalTotalShift = choice.totalShift || 0;
-    choice.totalShift = originalTotalShift + effectShift;
-    choice.effectShift = effectShift;
-    choice.attackerEffects = attackerEffects;
-    choice.defenderEffects = defenderEffects;
-
-    // === To-hit column rank selection ===
-    const toHitRankName = choice.usePowerToHit ? choice.powerRank : ability.rank;
-    const effectiveRank = shiftRank(toHitRankName, choice.totalShift);
-
-    // Check consolidated chat card setting
-    let useConsolidated = false;
-    try {
-      useConsolidated = game.settings.get("msh-faserip", "consolidatedChatCards");
-    } catch (_e) { /* setting not registered yet */ }
-
-    // === Roll ===
-    const roll = await new Roll("1d100").evaluate();
-    // Show dice animation
-    if (!choice.skipDice) {
-      await showDiceAnimation(roll, actor, `${actor.name} performs ${actionName}`, useConsolidated);
-    }
-
-    const { cappedTotal, totalKarmaUsed } =
-      await rollWithKarmaAndHistory(actor, actionName, choice.karma, roll, { spendKarma: choice.spendKarma, rank: effectiveRank, inlineRoll: useConsolidated });
-
-
-    // Standardized card
-    const color = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
-    const colorLower = String(color || "").toLowerCase();
-    const effectResult = effects[colorLower] || color;
-
-    // === VISUAL EFFECTS ===
-    const sourceToken = actor.getActiveTokens()[0];
-    if (sourceToken && !choice.skipDice) {
-      let effectPath;
-      
-      if (!choice.useAdHoc && choice.powerItem) {
-        // Use power's configured effect
-        const effectAnim = choice.powerItem.system?.effectAnimation || "";
-        const effectColor = choice.powerItem.system?.effectColor || "blue";
-        const effectVariant = choice.powerItem.system?.effectVariant || "01";
-        
-        if (effectAnim) {
-          effectPath = effectAnim; // Custom path from item
-        } else {
-          effectPath = getAttackEffectPath("energy", effectColor, effectVariant);
-        }
-      } else {
-        // Default energy effect
-        effectPath = getAttackEffectPath("energy", "blue", "01");
-      }
-      
-      await playAttackEffect(effectPath, sourceToken);
-      
-      // Add impact effect on hit
-      if (colorLower !== "white") {
-        await playImpactEffect("jb2a.impact.010.blue", Array.from(game.user.targets));
-      }
-    }
-    // === END VISUAL EFFECTS ===
-
-    // Then continue with chat message...
-    // === Standardized per-target cards ===
-    const effText = String(effectResult || "").toLowerCase();
-    const isHit = colorLower !== 'white';
-
-    // Derive damage type once
-    const dmgType = "physical-force";
-
-    const isManualMode = this?.opts?.mode === "manual";
-    const rawDamage = isHit ? Number(choice.powerDamage || 0) : 0;
 
     // Build shift breakdown for display
-    const shiftBreakdown = {};
-    if (choice.shift && choice.shift !== 0) shiftBreakdown.manual = choice.shift;
-    if (choice.rangeModifier && choice.rangeModifier !== 0) shiftBreakdown.range = choice.rangeModifier;
-    if (choice.obstacleModifier && choice.obstacleModifier !== 0) shiftBreakdown.obstacle = choice.obstacleModifier;
-    if (choice.movementModifier && choice.movementModifier !== 0) shiftBreakdown.movement = choice.movementModifier;
+    const shiftBreakdown = {
+      manual: choice.shift || 0,
+      range: choice.rangeModifier || 0,
+      obstacle: choice.obstacleModifier || 0,
+      movement: choice.movementModifier || 0,
+      csNotes: choice.csNotes || ""
+    };
     if (choice.multiAdjacent) shiftBreakdown.adjacent = -4;
-    const shiftDisplay = buildShiftDisplay(Number(choice.totalShift || 0), effectiveRank, shiftBreakdown, attackerEffects, defenderEffects);
+    choice.shiftBreakdown = shiftBreakdown;
 
-    // Build roll display (shared across all targets)
-    const rollDisplay = buildRollDisplay(roll, totalKarmaUsed, cappedTotal);
+    // Resolve ability — use power rank if toggled
+    const toHitAbility = choice.usePowerToHit
+      ? { name: "Power", rank: choice.powerRank, value: RANKS[choice.powerRank] || 30 }
+      : ability;
 
-    // Build result badge (shared across all targets)
-    const resultBadge = buildResultBadge(color, effectResult);
+    const rawDamage = Number(choice.powerDamage) || 0;
 
-    // Build ability section (shared across all targets)
-    const abilityLabel = choice.usePowerToHit ? "Power" : ability.name;
-    const abilityRank = choice.usePowerToHit ? choice.powerRank : ability.rank;
-    const abilityHtml = buildAbilitySection({ abilityLabel, abilityRank, shiftDisplay, rollDisplay, resultBadge });
+    // Build a synthetic weapon-like reference for the power item (for SFX + chat header)
+    const powerItem = choice.powerId ? actor.items.get(choice.powerId) : null;
 
-    // Only the tokens the user targeted
-    let targetTokens = Array.from(game.user?.targets ?? []);
-    const targetList = targetTokens.length ? targetTokens : [null];
+    // Delegate to shared resolution pipeline
+    const targetCount = choice.multiAdjacent ? targets.length : 1;
 
-    for (const target of targetList) {
-      const tActor = target?.actor;
-      const tName  = target?.name || "Unknown Target";
+    await this._executeSingleAttack({
+      choice: { ...choice, weapon: powerItem },
+      actor,
+      ability: toHitAbility,
+      actionType,
+      actionName,
+      effects,
+      damageType: "physical-force",
+      rawDamage,
+      damageNote: `Power: ${choice.powerName} (${choice.powerRank})`,
+      sourceName: choice.powerName || "Force Blast",
+      attackForm: "force",
+      breakingFeat: null,
+      targetCount,
+      attackNumber: 1,
+      totalAttacks: 1
+    });
 
-      let armorData = null;
-      let armorValue = 0;
-      let afterArmor = rawDamage;
-      let isBorderline = false;
-      if (isHit && rawDamage > 0 && tActor) {
-        armorData = getBodyArmorValues(tActor, dmgType);
-        armorValue = Number(armorData?.applicable ?? 0);
-        afterArmor = Math.max(0, rawDamage - armorValue);
-        // Borderline: armor exactly equals damage (effects can still apply)
-        isBorderline = (rawDamage > 0 && rawDamage === armorValue);
-      }
-
-      // Force: Red = Stun (no Slam, no Kill)
-      const showStun = (colorLower === "red");
-      
-      // ============================================
-      // INLINE STUN CHECK (for consolidated chat cards)
-      // ============================================
-      let inlineStunHtml = "";
-      let inlineStunResult = null;
-      
-      // Get inline stun result if: consolidated mode + full auto + Red result + has target + effects apply
-      if (useConsolidated && !isManualMode && this.opts?.autoApply && showStun && 
-          canEffectsApply(afterArmor, { borderline: isBorderline }) && tActor) {
-        const { ActionDispatcher } = await import("./action-dispatcher.js");
-        
-        // Get target's endurance for the save
-        const targetEndInfo = getAbilityInfo(tActor, "endurance");
-        const targetEndRank = targetEndInfo?.rank || "Typical";
-        
-        // Common prefill data
-        const inlinePrefill = {
-          dmgThrough: afterArmor,
-          targetName: tName,
-          targetEndRank: targetEndRank,
-          defenderUuid: target?.document?.uuid ?? tActor?.uuid,
-          targetUuid: target?.document?.uuid ?? tActor?.uuid,
-          attackForm: "force",
-          borderline: isBorderline
-        };
-        
-        try {
-          inlineStunResult = await ActionDispatcher.roll("stun", {
-            actor: tActor,
-            abilityName: "endurance",
-            opts: {
-              autoApply: true,
-              returnResultOnly: true,
-              attackForm: "force",
-              damageType: dmgType,
-              prefill: { ...inlinePrefill }
-            }
-          });
-          
-          if (inlineStunResult) {
-            inlineStunHtml = buildCollapsibleStunSection(inlineStunResult);
-          }
-        } catch (e) {
-          console.error("[FASERIP ERROR] Inline Stun check failed:", e);
-        }
-      }
-
-      const { resolveCombatMode } = await import("./action-dispatcher.js");
-      const actions = (!isManualMode && isHit && canEffectsApply(afterArmor, { borderline: isBorderline }) && tActor)
-        ? buildActionsBox({
-            // Force Attacks do not Slam/Kill on the Universal Table; Red = Stun
-            showSlam: false,
-            showStun: showStun,
-            showKill: false,
-            actorUuid: actor.uuid,
-            targetUuid: tActor?.uuid,
-            damage: afterArmor,
-            attackForm: "force",
-            damageType: dmgType,
-            bypassArmor: true,   // afterArmor already has armor removed
-            autoApply: this.opts?.autoApply,
-            autoSave: (typeof resolveCombatMode === "function" && tActor)
-              ? (resolveCombatMode(tActor) === "full")
-              : false,
-          })
-        : "";
-
-      // Build damage section
-      const damageHtml = (() => {
-        if (!isHit) {
-          return buildContentBox(`<strong>Damage:</strong> 0 (miss)`);
-        }
-        const dmgBox = `<span title="Power: ${choice.powerName} (${choice.powerRank})" style="cursor:help;">${rawDamage}</span>`;
-        if (armorValue > 0 && tActor) {
-          const armorType = armorData?.isForceField ? "Force Field" : "Body Armor";
-          const armorHover = `${armorType} (${armorValue})`;
-          const armorBox = `<span title="${armorHover}" style="cursor:help;">${armorValue} armor</span>`;
-          return buildContentBox(`<strong>Damage:</strong> ${dmgBox} − ${armorBox} = <strong>${afterArmor}</strong>`);
-        } else {
-          return buildContentBox(`<strong>Damage:</strong> ${dmgBox}`);
-        }
-      })();
-
-      // Assemble card
-      const targetCount = targetList.length;
-      const actionLabel = `${actionName}${targetCount > 1 ? ` (${targetCount} targets)` : ''}`;
-
-      const cardHtml = buildCardShell({
-        actionLabel,
-        headerRight: choice.powerName,
-        actorHtml: buildActorTargetHtml(actor.name, tActor ? tName : ""),
-        abilityHtml,
-        sections: [damageHtml, inlineStunHtml, actions, buildManualModeNotice(isManualMode)]
-      });
-
-      // Flags per target (match Energy/Blunt chat card format)
-      const msgFlags = buildDamageFlags({
-        actionId: actionType,
-        damageType: dmgType,
-        rawDamage,
-        afterArmor,
-        resultColor: colorLower,
-        cappedTotal,
-        targets: target ? [target] : []
-      });
-      if (msgFlags && msgFlags["msh-faserip"]) {
-        // Force cards are per-target; don't carry batch results/autoApply hints
-        delete msgFlags["msh-faserip"].autoApply;
-        delete msgFlags["msh-faserip"].results;
-        msgFlags["msh-faserip"].origin = "force-per-target";
-      }
-
-      await ChatMessage.create({
-        speaker: ChatMessage.getSpeaker({ actor }),
-        content: cardHtml,
-        flags: msgFlags
-      });
-
-      // Explicit per-target apply in Full Auto
-      if (!isManualMode && this.opts?.autoApply && isHit && rawDamage > 0 && tActor) {
-        await applyDamageToTargets({
-          damage: afterArmor,   // armor already subtracted above for display; bypass re-calculation
-          attackerUuid: actor.uuid,
-          damageType: dmgType,
-          showNotification: false,
-          bypassArmor: true,
-          attackForm: "force",
-          armorPiercing: 0,
-          apMode: "value",
-          wasKillResult: false,
-          targets: target ? [target] : []
-        });
-        
-        // Auto-trigger Stun check if Red result and effects can apply
-        if (showStun && canEffectsApply(afterArmor, { borderline: isBorderline })) {
-          const { ActionDispatcher } = await import("./action-dispatcher.js");
-          
-          debugLog("Auto-triggering Stun check for Force attack", { 
-            target: tName, 
-            damage: afterArmor,
-            hasPreRolledResult: !!inlineStunResult,
-            useConsolidated
-          });
-          
-          try {
-            await ActionDispatcher.roll("stun", {
-              actor: tActor,
-              abilityName: "endurance",
-              opts: {
-                autoApply: true,
-                showConfirm: false,
-                attackForm: "force",
-                damageType: dmgType,
-                // In consolidated mode, skip chat message and use pre-rolled result
-                skipChatMessage: useConsolidated,
-                preRolledResult: inlineStunResult,
-                prefill: {
-                  dmgThrough: afterArmor,
-                  targetName: tName,
-                  defenderUuid: target?.document?.uuid ?? tActor?.uuid,
-                  targetUuid: target?.document?.uuid ?? tActor?.uuid,
-                  attackForm: "force",
-                  borderline: isBorderline
-                }
-              }
-            });
-          } catch (e) {
-            console.error("[FASERIP ERROR] Auto-trigger Stun failed:", e);
-          }
-        }
-      }
-
-    }
-    // === END AUTO-APPLY ===
-
-
-    // Play combat SFX (Force)
-    try {
-      const sourceName   = choice?.powerName || "Force Blast";
-      const srcItem      = this?.opts?.item || actor.items.get?.(choice?.powerId) || null;
-      const damageType   = choice?.powerDamageType || srcItem?.system?.damageType || "physical-force";
-      const rollResult   = String(colorLower ?? "").toLowerCase();   // e.g. "white" | "green" | "yellow" | "red"
-      const isHitResult  = typeof isHit === "boolean" ? isHit : rollResult !== "white";
-
-      if (game.msh?.playCombatSFX) {
-        await game.msh.playCombatSFX({
-          item: srcItem,                 // enables per-power SFX (system.sfx.* or attackModes[].sfx)
-          actionType: "force",          // lets the SFX picker use mode-specific overrides
-          damageType,                    // e.g. "energy-electricity" or generic "energy"
-          rollResult,                    // normalized
-          isHit: isHitResult,
-          sourceName                     // optional, for heuristic fallback naming
-        });
-      }
-    } catch (e) {
-      console.warn("EnergyAction SFX error:", e);
-    }
-
-  }
+  } // end execute()
 }
