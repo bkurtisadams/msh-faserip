@@ -403,7 +403,9 @@ export class AttackAction extends BaseAction {
     totalAttacks = 1
   }) {
     // === EARLY WEAPON CHECK: Abort if firearm is empty ===
-    const weapon = choice?.weapon ?? null;
+    const weapon = choice?.weapon
+      ?? (choice?.weaponId ? this.actor.items.get(choice.weaponId) : null)
+      ?? null;
 
     if (weapon?.system) {
       const sys = weapon.system;
@@ -1356,6 +1358,25 @@ export class AttackAction extends BaseAction {
       // ============================================================
       // END v1.6.0 auto-trigger block
       // ============================================================
+
+      // ============================================================
+      // ENTANGLING WEAPON CHECK: If weapon has entangling flag and hit landed
+      // Rules: Agility FEAT to hit (already resolved), then target Agility FEAT
+      // vs material strength or enmeshed. Handled by entangling-action.
+      // ============================================================
+      if (targetIsHit && weapon?.system?.entangling && targetActor) {
+        try {
+          const { processEntanglingHit } = await import("./entangling-action.js");
+          await processEntanglingHit({
+            attacker: actor,
+            target: targetActor,
+            weapon,
+            weaponMaterialStrength: weapon.system.materialStrength || "Typical"
+          });
+        } catch (e) {
+          console.error("[FASERIP ERROR] Entangling check failed:", e);
+        }
+      }
     }
 
     // Play combat SFX once after all cards (still plays in manual mode)
