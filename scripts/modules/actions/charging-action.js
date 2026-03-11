@@ -1,4 +1,6 @@
-// scripts/modules/actions/charging-action.js v1.5.0 - 2026-01-09
+// scripts/modules/actions/charging-action.js v2.0.0 - 2026-03-11
+// v2.0.0: Refactor - dialog only, delegates character target resolution to _executeSingleAttack.
+//         Object targets get a simple card. Rebound handled post-pipeline.
 // v1.5.0: Add inline Slam/Stun results and auto-trigger effects in Full Auto mode
 // v1.4.4: Fix rebound button to use apply-collision-damage handler, move mode checks earlier
 // v1.4.3: Add more debug logging, pass targetUuid to actions box, simplify conditions
@@ -8,7 +10,7 @@
 // v1.3.0: Compact dialog layout matching blunt attack, fix CS persistence bug
 // v1.2.0: Fix DiceSoNice animation in consolidated chat cards mode
 // v1.1.0: Add inline rolls for consolidated chat cards
-import { BaseAction } from "./base-action.js";
+import { AttackAction } from "./attack-action.js";
 import { 
   generateKarmaControlsHTML, 
   setupKarmaControlHandlers, 
@@ -24,28 +26,26 @@ import {
   getAbilityInfo,
   getStrengthInfo,
   rollWithKarmaAndHistory,
-  buildActionsBox,
   debugLog,
   applyCapabilitiesToDialog,
   showDiceAnimation,
   getTargetData,
   buildModeSelector,
   setupModeSelector,
-  applyDamageToTargets,
-  buildCollapsibleSlamSection,
-  buildCollapsibleStunSection
+  applyDamageToTargets
 } from "./action-utils.js";
-import { canEffectsApply } from "../../rules/effects-gate.js";
 
 /**
  * ChargingAction - Endurance-based attack combining movement and combat
  * Rules:
  * - Must move at least 1 area to charge
- * - +1CS per area moved (max +3CS)
+ * - +1CS per area moved (max +3CS, cap Shift-Z)
  * - Damage = Endurance or Body Armor (higher) + 2pts per area moved
- * - Body Armor can reflect damage back to attacker
+ * - If target defense > damage, rebounds to attacker (attacker BA absorbs)
+ * - Miss: continue at half speed in straight line
+ * - Yellow = Slam, Red = Stun (same as Blunt)
  */
-export class ChargingAction extends BaseAction {
+export class ChargingAction extends AttackAction {
   async execute() {
   const actor = this.actor;
   const actionType = "charging";
@@ -111,7 +111,6 @@ export class ChargingAction extends BaseAction {
   }
 
   // --- INITIALIZATION & DEFAULTS ---
-  // Use localStorage for Remember Settings / Skip Dice (matches blunt attack pattern)
   const lsRememberKey = "msh.charging.remember";
   const lsSkipKey = "msh.charging.skipDice";
   
@@ -119,7 +118,6 @@ export class ChargingAction extends BaseAction {
   const shouldRemember = storedRemember === "1";
   const savedSkipDice = localStorage.getItem(lsSkipKey) === "1";
 
-  // Load settings based on remember state
   const savedAreas = shouldRemember ? (await actor.getFlag("msh-faserip", "lastChargingAreas") || 1) : 1;
   const savedShift = shouldRemember ? (await actor.getFlag("msh-faserip", "lastChargingShift") || 0) : 0;
   const savedTargetType = autoPopulated ? "character" : (shouldRemember ? (await actor.getFlag("msh-faserip", "lastChargingTargetType") || "character") : "character");
@@ -129,39 +127,35 @@ export class ChargingAction extends BaseAction {
   const savedObjectDesc = shouldRemember ? (await actor.getFlag("msh-faserip", "lastChargingObjectDesc") || "") : "";
   const savedCsNotes = shouldRemember ? ((await actor.getFlag("msh-faserip", "lastChargingCsNotes")) || "") : "";
 
-  // Compute dialogShift - treat opts.shift=0 as "not set"
   const optsShift = this.opts?.shift;
   const dialogShift = (optsShift !== undefined && optsShift !== null && optsShift !== 0) 
     ? optsShift 
     : savedShift;
 
-  // Material strength options with examples
   const materialOptions = RANKS.map(r => {
     const val = game.msh.getRankValue(r);
     const example = MATERIAL_EXAMPLES[r] ? ` — ${MATERIAL_EXAMPLES[r]}` : '';
     return `<option value="${r}" ${r === savedObjectMaterial ? 'selected' : ''}>${r} (${val})${example}</option>`;
   }).join('');
 
-  // Build rank options for character BA
   const rankOptions = RANKS.map(r => 
     `<option value="${r}" ${r === savedTargetBA ? 'selected' : ''}>${r}</option>`
   ).join('');
 
-  // Karma info for compact display
   const availableKarma = getAvailableKarma(actor);
   const hasKarma = availableKarma > 0;
   const minKarma = 10;
 
-  // Initial damage calculation
   const initialBaseRankValue = Math.max(endurance.value, bodyArmorValue);
   const initialSpeedDamage = savedAreas * 2;
   const initialTotalDamage = initialBaseRankValue + initialSpeedDamage;
   const initialMovementBonus = Math.min(3, savedAreas);
 
-  // localStorage helper
   const setLS = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
 
-  // Build dialog - Compact layout matching blunt attack
+  // ================================================================
+  // DIALOG
+  // ================================================================
   const dialogHtml = `
     ${buildModeSelector({ mode: "semi" })}
 
@@ -201,7 +195,7 @@ export class ChargingAction extends BaseAction {
         <span style="font-size:.9em;color:#666;" id="dmg-note">(${initialBaseRankValue} base + 2×${savedAreas} speed)</span>
       </div>
       <div id="rebound-warning" style="display:none;margin-top:4px;padding:4px;background:#fff;border:1px solid #f44336;border-radius:3px;font-size:.85em;color:#d32f2f;font-weight:bold;">
-        ⚠ Target defense > damage → rebounds to you!
+        Target defense > damage — rebounds to you!
       </div>
     </div>
 
@@ -270,7 +264,7 @@ export class ChargingAction extends BaseAction {
       <label><input type="checkbox" id="msh-skip-dice" name="skipDice" ${savedSkipDice ? 'checked' : ''}> Skip dice</label>
     </div>
     
-    ${autoPopulated ? `<div style="margin-top:8px;padding:4px;background:#e8f5e9;border:1px solid #4CAF50;border-radius:3px;font-size:.85em;color:#2e7d32;">✓ Auto-populated from targeted token</div>` : ""}
+    ${autoPopulated ? `<div style="margin-top:8px;padding:4px;background:#e8f5e9;border:1px solid #4CAF50;border-radius:3px;font-size:.85em;color:#2e7d32;">Auto-populated from targeted token</div>` : ""}
   `;
 
   const choice = await new Promise(resolve => {
@@ -305,11 +299,9 @@ export class ChargingAction extends BaseAction {
               targetBAvalue = game.msh.getRankValue(objectMaterial) || 20;
             }
 
-            // Save remember/skipDice to localStorage
             setLS(lsRememberKey, remember ? "1" : "0");
             setLS(lsSkipKey, skipDice ? "1" : "0");
 
-            // Save settings to actor flags if remember is checked
             if (remember) {
               await actor.setFlag("msh-faserip", "lastChargingAreas", areas);
               await actor.setFlag("msh-faserip", "lastChargingShift", shift);
@@ -324,7 +316,6 @@ export class ChargingAction extends BaseAction {
               }
             }
 
-            // Calculate movement bonus (max +3CS)
             const movementBonus = Math.min(3, areas);
             const totalShift = shift + movementBonus;
 
@@ -340,7 +331,8 @@ export class ChargingAction extends BaseAction {
               objectMaterial,
               objectDesc,
               totalShift,
-              movementBonus
+              movementBonus,
+              csNotes
             });
           }
         },
@@ -371,26 +363,21 @@ export class ChargingAction extends BaseAction {
           const movementBonus = Math.min(3, areas);
           const cs = Number(html.find('[name="shift"]').val() || 0);
 
-          // Update movement bonus display
           html.find('#movement-bonus').text(`+${movementBonus} CS`);
 
-          // Numbers for the attacker
           const baseRankValue = Math.max(endurance.value, bodyArmorValue);
           const speedDamage = areas * 2;
           const totalDamage = baseRankValue + speedDamage;
 
-          // Update damage preview
           html.find('#dmg-base').text(baseRankValue);
           html.find('#dmg-speed').text(speedDamage);
           html.find('#dmg-total').text(totalDamage);
           html.find('#dmg-note').text(`(${baseRankValue} base + 2×${areas} speed)`);
 
-          // Update shifted rank display
           const effectiveRank = shiftRank(endurance.rank, cs + movementBonus);
           const $shiftedRank = html.find('#shifted-rank-display');
           $shiftedRank.text(effectiveRank);
 
-          // Update CS field styling based on value
           const $csField = html.find('.cs-field');
           const $resetBtn = html.find('.cs-reset');
           if (cs < 0) {
@@ -407,7 +394,6 @@ export class ChargingAction extends BaseAction {
             $resetBtn.css('visibility', 'hidden');
           }
 
-          // Check for rebound
           const type = String(html.find('[name="targetType"]:checked').val() || "character");
           let targetDefense = 0;
           
@@ -426,7 +412,6 @@ export class ChargingAction extends BaseAction {
           }
         };
 
-        // Event handlers
         html.find('[name="areas"]').on('input', updatePreview);
         html.find('[name="shift"]').on('input', updatePreview);
         html.find('[name="targetType"]').on('change', togglePanels);
@@ -439,20 +424,17 @@ export class ChargingAction extends BaseAction {
         html.find('[name="targetBodyArmorValue"]').on('input', updatePreview);
         html.find('[name="objectMaterial"]').on('change', updatePreview);
 
-        // CS reset button
         html.find('.cs-reset').on('click', function(e) {
           e.preventDefault();
           html.find('[name="shift"]').val(0);
           updatePreview();
         });
 
-        // Karma checkbox highlight
         html.find('#spend-karma').on('change', function() {
           const $field = html.find('.karma-field');
           $field.css('border-color', this.checked ? '#1565c0' : '#90caf9');
         });
 
-        // Initialize
         togglePanels();
         updatePreview();
         applyCapabilitiesToDialog(html, "charging", { actor });
@@ -462,273 +444,234 @@ export class ChargingAction extends BaseAction {
 
   if (!choice) return;
 
-  // Effective rank after all modifiers (with Shift-Z cap)
+  // ================================================================
+  // POST-DIALOG RESOLUTION
+  // ================================================================
+
+  // Cap effective rank at Shift-Z per charging rules
   let effectiveRank = shiftRank(endurance.rank, choice.totalShift);
   const shiftZindex = RANKS.indexOf("Shift-Z");
   const effectiveIndex = RANKS.indexOf(effectiveRank);
   if (shiftZindex >= 0 && effectiveIndex > shiftZindex) {
     effectiveRank = "Shift-Z";
-    console.log("FASERIP | Charging: Effective rank capped at Shift-Z per rules");
+    console.log("[FASERIP] Charging: Effective rank capped at Shift-Z per rules");
   }
 
-  debugLog("Charging: Dialog choices", {
-    areas: choice.areas,
-    shift: choice.shift,
-    karma: choice.karma,
-    totalShift: choice.totalShift,
-    movementBonus: choice.movementBonus,
-    targetType: choice.targetType,
-    targetBArank: choice.targetBArank,
-    targetBAvalue: choice.targetBAvalue,
-    effectiveRank: effectiveRank
-  });
-
-  // Check consolidated chat card setting
-  let useConsolidated = false;
-  try {
-    useConsolidated = game.settings.get("msh-faserip", "consolidatedChatCards");
-  } catch (_e) { /* setting not registered yet */ }
-
-  // Roll
-  const roll = await new Roll("1d100").evaluate();
-  // Show dice animation
-  if (!choice.skipDice) {
-    await showDiceAnimation(roll, actor, `${actor.name} performs ${actionName}`, useConsolidated);
-  }
-
-  const { cappedTotal, totalKarmaUsed } =
-    await rollWithKarmaAndHistory(actor, actionName, choice.karma, roll, { spendKarma: choice.spendKarma, rank: effectiveRank, inlineRoll: useConsolidated });
-
-  const color = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
-  const colorLower = String(color || "").toLowerCase();
-
-  // define once, above this block (right after you have colorLower)
-  const targetLabel = (choice.targetType === "character")
-    ? ((typeof targetName !== "undefined" && targetName) ? targetName : "Target")
-    : (choice.objectDesc ? choice.objectDesc : "Object");
-
-  // Calculate damage numbers for this attempt
+  // Calculate raw damage: max(Endurance, Body Armor) + 2 * areas
   const baseRankValue = Math.max(endurance.value, bodyArmorValue);
   const speedDamage = choice.areas * 2;
-  const totalDamage = baseRankValue + speedDamage;
+  const rawDamage = baseRankValue + speedDamage;
 
-  // Check mode early for use throughout
-  const isManualMode = this.opts?.mode === "manual";
-  const autoApply = !!this.opts?.autoApply;
+  const damageSourceHover = `max(End ${endurance.rank} ${endurance.value}, BA ${bodyArmorRank} ${bodyArmorValue}) = ${baseRankValue} + 2x${choice.areas} areas = ${rawDamage}`;
 
-  // Outputs used by the chat card
-  let damageToTarget = 0;
-  let damageToAttacker = 0;
-  let reflectionNote = "";
-  let penetratingDamage = 0;
+  debugLog("Charging: post-dialog", {
+    areas: choice.areas,
+    shift: choice.shift,
+    totalShift: choice.totalShift,
+    movementBonus: choice.movementBonus,
+    effectiveRank,
+    targetType: choice.targetType,
+    rawDamage,
+    baseRankValue,
+    speedDamage
+  });
 
-  if (colorLower !== "white") {
-    const absorbedByDefense = Math.min(choice.targetBAvalue, totalDamage);
-    const reboundAmount = (choice.targetBAvalue > totalDamage) ? absorbedByDefense : 0;
+  // Build shift breakdown for CS hover in chat card
+  const shiftBreakdown = {
+    manual: choice.shift || 0,
+    csNotes: choice.csNotes || "",
+    movement: choice.movementBonus || 0
+  };
 
-    damageToTarget = Math.max(0, totalDamage - absorbedByDefense);
-    damageToAttacker = Math.max(0, reboundAmount - bodyArmorValue);
-    penetratingDamage = damageToTarget;
+  // ================================================================
+  // CHARACTER TARGET: delegate to _executeSingleAttack
+  // ================================================================
+  if (choice.targetType === "character") {
+    const mergedChoice = {
+      ...choice,
+      shiftBreakdown,
+      totalShift: choice.totalShift
+    };
 
-    if (reboundAmount > 0) {
-      const defenseType = choice.targetType === "character" ? "BA" : "Material Strength";
-      reflectionNote = `
-        <div style="padding:6px;margin:6px 10px;background:#ffebee;border:1px solid #f44336;border-radius:3px;">
-          <strong>Rebound:</strong> ${targetLabel}'s ${defenseType} (${choice.targetBAvalue}) exceeded your damage (${totalDamage}) and returns ${absorbedByDefense} to you.
-          Your BA (${bodyArmorValue}) soaks what it can.
-          <strong> You take ${damageToAttacker} damage.</strong>
-        </div>
+    await this._executeSingleAttack({
+      choice: mergedChoice,
+      actor,
+      ability: endurance,
+      actionType,
+      actionName,
+      effects,
+      damageType: "physical-blunt",
+      rawDamage,
+      damageNote: damageSourceHover,
+      sourceName: `Charging (${choice.areas} area${choice.areas > 1 ? 's' : ''})`,
+      attackForm: "charging",
+      breakingFeat: null,
+      targetCount: 1,
+      attackNumber: 1,
+      totalAttacks: 1
+    });
+
+    // ============================================================
+    // REBOUND CHECK (post-pipeline)
+    // If dialog-entered target BA > rawDamage, damage reflects back.
+    // _executeSingleAttack used getBodyArmorValues() for its armor
+    // calc, which may differ from the dialog value. We use the
+    // dialog value for rebound since that's what the player entered.
+    // ============================================================
+    const dialogTargetBA = choice.targetBAvalue || 0;
+    
+    if (dialogTargetBA > rawDamage) {
+      const reboundAmount = dialogTargetBA;
+      const damageToAttacker = Math.max(0, reboundAmount - bodyArmorValue);
+      const isManualMode = this.opts?.mode === "manual";
+      const autoApply = !!this.opts?.autoApply;
+      
+      debugLog("Charging: Rebound triggered", {
+        targetBA: dialogTargetBA,
+        rawDamage,
+        reboundAmount,
+        attackerBA: bodyArmorValue,
+        damageToAttacker
+      });
+
+      const targetLabel = targetName || "Target";
+      let reboundHtml = `
+        <div style="background:#f5f5f0;border:1px solid #f44336;border-radius:3px;margin-bottom:5px;">
+          <div style="padding:6px 10px;border-bottom:1px solid #f44336;background:#ffebee;">
+            <strong style="color:#c62828;">CHARGING REBOUND</strong>
+          </div>
+          <div style="padding:8px 10px;font-size:.9em;">
+            ${targetLabel}'s defense (${dialogTargetBA}) exceeded charging damage (${rawDamage}).
+            Rebound: ${reboundAmount} - ${bodyArmorValue} attacker BA = <strong>${damageToAttacker} damage to ${actor.name}</strong>.
+          </div>
       `;
-      if (damageToAttacker > 0 && !isManualMode) {
-        reflectionNote += `
-          <div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;padding:8px 10px;margin:6px 10px 10px;border:1px solid #c0c0c0;background:#fafafa;border-radius:4px;">
+
+      if (!isManualMode && !autoApply && damageToAttacker > 0) {
+        reboundHtml += `
+          <div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;padding:8px 10px;border-top:1px solid #e0e0e0;background:#fafafa;">
             <a class="faserip-chip"
               data-action="apply-collision-damage"
               data-target-uuid="${actor.uuid}"
               data-damage="${damageToAttacker}"
               title="Apply rebound damage to attacker"
               style="display:inline-block;font-size:12px;line-height:1.1;padding:2px 6px;border:1px solid #bbb;border-radius:3px;text-decoration:none;white-space:nowrap;background:#fff;color:#333;cursor:pointer;">
-              Apply Rebound Damage
+              Apply Rebound Damage (${damageToAttacker})
             </a>
           </div>
         `;
       }
+
+      if (isManualMode) {
+        reboundHtml += `
+          <div style="padding:4px 8px;background:#fff3e0;border-top:1px solid #ff9800;text-align:center;font-size:.85em;font-style:italic;color:#e65100;">
+            Manual Mode: GM adjudicates rebound
+          </div>
+        `;
+      }
+
+      reboundHtml += `</div>`;
+
+      await ChatMessage.create({
+        speaker: ChatMessage.getSpeaker({ actor }),
+        content: reboundHtml
+      });
+
+      if (!isManualMode && autoApply && damageToAttacker > 0) {
+        const attackerToken = canvas.tokens?.placeables?.find(t => t.actor?.id === actor.id);
+        if (attackerToken) {
+          await applyDamageToTargets({
+            damage: damageToAttacker,
+            attackerUuid: actor.uuid,
+            damageType: "physical-blunt",
+            showNotification: true,
+            bypassArmor: true,
+            attackForm: "charging-rebound",
+            targets: [attackerToken],
+            wasKillResult: false,
+            forceKilling: false
+          });
+        }
+      }
     }
 
-    debugLog("Charging Resolve (contact)", {
-      attacker: actor?.name,
-      target: targetLabel,
-      areas: choice.areas,
-      baseRankValue,
-      speedDamage,
-      totalDamage,
-      targetDefense: choice.targetBAvalue,
-      absorbedByDefense,
-      reboundAmount,
-      damageToTarget,
-      attackerBA: bodyArmorValue,
-      damageToAttacker,
-      penetratingDamage
-    });
-  } else {
-    penetratingDamage = 0;
-    debugLog("Charging Resolve (miss)", {
-      attacker: actor?.name,
-      target: targetLabel,
-      areas: choice.areas,
-      baseRankValue,
-      speedDamage,
-      totalDamage
-    });
+    return;
   }
 
-  // Build result grid and banner
+  // ================================================================
+  // OBJECT TARGET: simple card (no evasion, no effects, no slam/stun)
+  // ================================================================
+  const isManualMode = this.opts?.mode === "manual";
+  const autoApply = !!this.opts?.autoApply;
+
+  let useConsolidated = false;
+  try {
+    useConsolidated = game.settings.get("msh-faserip", "consolidatedChatCards");
+  } catch (_e) { /* setting not registered */ }
+
+  const roll = await new Roll("1d100").evaluate();
+  if (!choice.skipDice) {
+    await showDiceAnimation(roll, actor, `${actor.name} charges into ${choice.objectDesc || "object"}`, useConsolidated);
+  }
+
+  const { cappedTotal, totalKarmaUsed } =
+    await rollWithKarmaAndHistory(actor, actionName, choice.karma, roll, {
+      spendKarma: choice.spendKarma,
+      rank: effectiveRank,
+      inlineRoll: useConsolidated
+    });
+
+  const color = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
+  const colorLower = String(color || "").toLowerCase();
   const { bg, fg } = bannerColors(colorLower);
   const effectResult = effects[colorLower] || color;
 
-  debugLog("Charging: Mode and damage info", {
-    mode: this.opts?.mode,
-    isManualMode,
-    autoApply,
-    damageToTarget,
-    penetratingDamage,
-    colorLower,
-    targetType: choice.targetType,
-    targetUuid,
-    targetName
-  });
+  const targetLabel = choice.objectDesc || "Object";
+  const materialDefense = choice.targetBAvalue;
+  const damageToObject = colorLower !== "white" ? Math.max(0, rawDamage - materialDefense) : 0;
 
-  // Determine if Slam/Stun should be checked (per Charging effects table)
-  const showSlam = colorLower === "yellow" && choice.targetType === "character" && damageToTarget > 0;
-  const showStun = colorLower === "red" && choice.targetType === "character" && damageToTarget > 0;
-
-  // ============================================================
-  // INLINE SLAM/STUN RESULTS (for Full Auto + Consolidated mode)
-  // ============================================================
-  let inlineSlamHtml = "";
-  let inlineStunHtml = "";
-  let inlineSlamResult = null;
-  let inlineStunResult = null;
-  
-  // Get inline check results if: consolidated mode + full auto + effect applies + has target
-  const isBorderline = (damageToTarget === 0 && totalDamage === choice.targetBAvalue);
-  if (useConsolidated && !isManualMode && autoApply && canEffectsApply(penetratingDamage, { borderline: isBorderline }) && primaryTargetActor) {
-    const { ActionDispatcher } = await import("./action-dispatcher.js");
-    
-    // Get attacker strength info for Slam checks (charging uses Endurance for speed)
-    const attackerStrInfo = getStrengthInfo(actor);
-    const inlineAttackerStrength = attackerStrInfo?.value || endurance.value;
-    const inlineAttackerStrengthRank = attackerStrInfo?.rank || endurance.rank;
-    
-    // Get target's endurance for the save
-    const targetEndInfo = getAbilityInfo(primaryTargetActor, "endurance");
-    const targetEndRank = targetEndInfo?.rank || "Typical";
-    
-    // Common prefill data
-    const inlinePrefill = {
-      dmgThrough: penetratingDamage,
-      targetName: targetName,
-      targetEndRank: targetEndRank,
-      defenderUuid: primaryTarget?.document?.uuid ?? primaryTargetActor?.uuid,
-      targetUuid: primaryTarget?.document?.uuid ?? primaryTargetActor?.uuid,
-      attackForm: "charging",
-      borderline: isBorderline
-    };
-    
-    // GET INLINE SLAM RESULT (for display only - effects applied later)
-    if (showSlam) {
-      try {
-        inlineSlamResult = await ActionDispatcher.roll("slam", {
-          actor: primaryTargetActor,
-          abilityName: "endurance",
-          opts: {
-            autoApply: true,
-            returnResultOnly: true,
-            attackForm: "charging",
-            prefill: {
-              ...inlinePrefill,
-              attackerStrength: inlineAttackerStrength,
-              attackerStrengthRank: inlineAttackerStrengthRank,
-              attackerName: actor.name
-            }
-          }
-        });
-        
-        if (inlineSlamResult) {
-          inlineSlamHtml = buildCollapsibleSlamSection(inlineSlamResult);
-        }
-      } catch (e) {
-        console.error("[FASERIP ERROR] Inline Slam check failed:", e);
-      }
-    }
-    
-    // GET INLINE STUN RESULT (for display only - effects applied later)
-    if (showStun) {
-      try {
-        inlineStunResult = await ActionDispatcher.roll("stun", {
-          actor: primaryTargetActor,
-          abilityName: "endurance",
-          opts: {
-            autoApply: true,
-            returnResultOnly: true,
-            attackForm: "charging",
-            damageType: "physical-blunt",
-            prefill: { ...inlinePrefill }
-          }
-        });
-        
-        if (inlineStunResult) {
-          inlineStunHtml = buildCollapsibleStunSection(inlineStunResult);
-        }
-      } catch (e) {
-        console.error("[FASERIP ERROR] Inline Stun check failed:", e);
-      }
+  // Rebound for objects
+  let reboundNote = "";
+  let damageToAttacker = 0;
+  if (colorLower !== "white" && materialDefense > rawDamage) {
+    damageToAttacker = Math.max(0, materialDefense - bodyArmorValue);
+    reboundNote = `
+      <div style="padding:6px;margin:6px 10px;background:#ffebee;border:1px solid #f44336;border-radius:3px;">
+        <strong>Rebound:</strong> Material Strength (${materialDefense}) exceeded damage (${rawDamage}).
+        Returns ${materialDefense} to you. Your BA (${bodyArmorValue}) soaks what it can.
+        <strong>You take ${damageToAttacker} damage.</strong>
+      </div>
+    `;
+    if (!isManualMode && !autoApply && damageToAttacker > 0) {
+      reboundNote += `
+        <div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;padding:8px 10px;margin:6px 10px 10px;border:1px solid #c0c0c0;background:#fafafa;border-radius:4px;">
+          <a class="faserip-chip"
+            data-action="apply-collision-damage"
+            data-target-uuid="${actor.uuid}"
+            data-damage="${damageToAttacker}"
+            title="Apply rebound damage to attacker"
+            style="display:inline-block;font-size:12px;line-height:1.1;padding:2px 6px;border:1px solid #bbb;border-radius:3px;text-decoration:none;white-space:nowrap;background:#fff;color:#333;cursor:pointer;">
+            Apply Rebound Damage (${damageToAttacker})
+          </a>
+        </div>
+      `;
     }
   }
 
-  // Action chips (only in non-manual modes, non-auto modes)
-  const actions = (!isManualMode && !autoApply && colorLower !== "white" && choice.targetType === "character" && damageToTarget > 0) 
-    ? buildActionsBox({
-        showSlam: showSlam,
-        showStun: showStun,
-        actorUuid: actor.uuid,
-        damage: damageToTarget,
-        damageType: "physical-blunt",
-        attackForm: "charging",
-        bypassArmor: true,
-        autoApply: false,
-        targetUuid: targetUuid,
-        targetName: targetName || targetLabel,
-
-        // Add prefill data for Slam/Stun checks
-        prefillData: {
-          dmgThrough: penetratingDamage,
-          attackForm: "charging",
-          ownerActor: actor.name,
-          ownerActorUuid: actor.uuid,
-          targetName: targetName || "Target",
-          targetUuid: targetUuid || ""
-        }
-      }) 
-    : "";
-
-  // Manual mode notice
-  const manualModeNotice = isManualMode ? `
-    <div style="padding:4px 8px;margin:4px 6px;background:#fff3e0;border:1px solid #ff9800;border-radius:3px;text-align:center;font-size:.85em;font-style:italic;color:#e65100;">
-      Manual Mode: GM adjudicates damage and effects
-    </div>
-  ` : "";
-
-  // Special miss handling
   const missNote = colorLower === "white" ? `
     <div style="padding:6px;margin:6px 10px;background:#fff3e0;border:1px solid #ff9800;border-radius:3px;">
-      <strong>Miss - Continued Movement:</strong> You continue moving at half your speed in a straight line.
+      <strong>Miss — Continued Movement:</strong> You continue moving at half your speed in a straight line.
       Changing direction requires an Agility FEAT (${agility.rank}).
       If you hit an obstacle, you make a collision attack against it.
     </div>
   ` : "";
 
-  // Build compact shift display with breakdown
+  // Roll display
+  const rollBox = `<span title="d100 = ${roll.total}" style="padding:0 3px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${roll.total}</span>`;
+  const rollDisplay = totalKarmaUsed 
+    ? `${cappedTotal} <span style="color:#666;">(${rollBox} + ${totalKarmaUsed} karma)</span>`
+    : rollBox;
+
+  // Shift display
   const totalShift = choice.totalShift;
   let shiftDisplay = "";
   if (totalShift !== 0) {
@@ -740,48 +683,40 @@ export class ChargingAction extends BaseAction {
     shiftDisplay = ` (${csBox} → ${effectiveRank})`;
   }
 
-  // Build compact roll display
-  const rollBox = `<span title="d100 = ${roll.total}" style="padding:0 3px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${roll.total}</span>`;
-  const rollDisplay = totalKarmaUsed 
-    ? `${cappedTotal} <span style="color:#666;">(${rollBox} + ${totalKarmaUsed} karma)</span>`
-    : rollBox;
-
-  // Build damage display
-  const damageSourceHover = `Endurance ${endurance.rank} (${endurance.value}) or Body Armor ${bodyArmorRank} (${bodyArmorValue}), whichever higher`;
-  const speedHover = `${choice.areas} areas × 2 pts/area`;
-  
+  // Damage display
   let damageHtml;
   if (colorLower === "white") {
     damageHtml = `<div style="margin:0 10px 6px;padding:6px 8px;background:#fff;border:1px solid #ddd;border-radius:3px;font-size:.9em;color:#666;">
       <strong>Damage:</strong> 0 (miss)
     </div>`;
-  } else if (choice.targetBAvalue > 0) {
-    const defenseType = choice.targetType === "character" ? "Body Armor" : "Material Strength";
-    const defenseHover = `${choice.targetBArank} ${defenseType}`;
+  } else if (materialDefense > 0) {
     damageHtml = `<div style="margin:0 10px 6px;padding:6px 8px;background:#fff;border:1px solid #ddd;border-radius:3px;font-size:.9em;">
-      <strong>Damage:</strong> <span title="${damageSourceHover}" style="cursor:help;">${baseRankValue}</span> + <span title="${speedHover}" style="cursor:help;">${speedDamage}</span> = ${totalDamage} − <span title="${defenseHover}" style="cursor:help;">${choice.targetBAvalue} defense</span> = <strong>${damageToTarget}</strong>
+      <strong>Damage:</strong> <span title="${damageSourceHover}" style="cursor:help;">${rawDamage}</span> - <span title="${choice.objectMaterial} Material Strength" style="cursor:help;">${materialDefense} material</span> = <strong>${damageToObject}</strong>
     </div>`;
   } else {
     damageHtml = `<div style="margin:0 10px 6px;padding:6px 8px;background:#fff;border:1px solid #ddd;border-radius:3px;font-size:.9em;">
-      <strong>Damage:</strong> <span title="${damageSourceHover}" style="cursor:help;">${baseRankValue}</span> + <span title="${speedHover}" style="cursor:help;">${speedDamage}</span> = <strong>${totalDamage}</strong>
+      <strong>Damage:</strong> <span title="${damageSourceHover}" style="cursor:help;"><strong>${rawDamage}</strong></span>
     </div>`;
   }
 
-  // Compact chat card matching attack-action.js format
+  const manualModeNotice = isManualMode ? `
+    <div style="padding:4px 8px;margin:4px 6px;background:#fff3e0;border:1px solid #ff9800;border-radius:3px;text-align:center;font-size:.85em;font-style:italic;color:#e65100;">
+      Manual Mode: GM adjudicates damage and effects
+    </div>
+  ` : "";
+
   const cardHtml = `
     <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
-      <!-- Header: Action name -->
       <div style="padding:6px 10px;border-bottom:1px solid #c0c0c0;display:flex;justify-content:space-between;align-items:center;">
         <strong style="color:#8b0000;">CHARGING</strong>
-        <span style="color:#666;font-weight:normal;font-size:.85em;">${choice.areas} area${choice.areas > 1 ? 's' : ''}</span>
+        <span style="color:#666;font-weight:normal;font-size:.85em;">${choice.areas} area${choice.areas > 1 ? 's' : ''} → ${targetLabel}</span>
       </div>
       
-      <!-- Attacker → Target -->
       <div style="padding:4px 10px;font-size:.95em;">
         <strong>${actor.name}</strong> <span style="color:#666;">→</span> <strong style="color:#d32f2f;">${targetLabel}</strong>
+        <span style="color:#999;font-size:.85em;">(${choice.objectMaterial} material)</span>
       </div>
       
-      <!-- Ability + Roll + Result -->
       <div style="padding:2px 10px 6px;font-size:.9em;color:#555;">
         <div>Endurance: ${endurance.rank}${shiftDisplay}</div>
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
@@ -792,73 +727,17 @@ export class ChargingAction extends BaseAction {
         </div>
       </div>
       
-      <!-- Damage -->
       ${damageHtml}
-      
-      ${inlineSlamHtml}
-      ${inlineStunHtml}
-      
-      ${reflectionNote}
+      ${reboundNote}
       ${missNote}
-      ${actions}
       ${manualModeNotice}
     </div>
   `;
 
   await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor }), content: cardHtml });
 
-  // ============================================================
-  // DAMAGE APPLICATION (Full Auto mode only)
-  // In Semi mode, user clicks "Apply Damage" button
-  // ============================================================
-  debugLog("Charging: Damage application check", {
-    mode: this.opts?.mode,
-    isManualMode,
-    autoApply,
-    colorLower,
-    targetType: choice.targetType,
-    damageToTarget,
-    damageToAttacker,
-    hasPrimaryTarget: !!primaryTarget,
-    primaryTargetName: primaryTarget?.name
-  });
-  
-  // Apply damage to target (Full Auto mode only, character targets only)
-  if (!isManualMode && autoApply && colorLower !== "white" && choice.targetType === "character" && damageToTarget > 0) {
-    // Get fresh target data at time of damage application
-    const currentTargets = Array.from(game.user?.targets ?? []);
-    const damageTarget = currentTargets[0] ?? primaryTarget;
-    
-    if (damageTarget) {
-      debugLog("Charging: Auto-applying damage to target", {
-        target: damageTarget?.name || targetLabel,
-        damage: damageToTarget,
-        totalDamage,
-        targetDefense: choice.targetBAvalue
-      });
-
-      await applyDamageToTargets({
-        damage: damageToTarget,
-        attackerUuid: actor.uuid,
-        damageType: "physical-blunt",
-        showNotification: true,
-        bypassArmor: true,  // Armor already calculated in damageToTarget
-        attackForm: "charging",
-        targets: [damageTarget],
-        wasKillResult: false,  // Charging doesn't have Kill results
-        forceKilling: false
-      });
-    }
-  }
-
-  // Apply rebound damage to attacker if applicable (Full Auto mode only)
+  // Auto-apply rebound to attacker in full auto
   if (!isManualMode && autoApply && colorLower !== "white" && damageToAttacker > 0) {
-    debugLog("Charging: Auto-applying rebound damage to attacker", {
-      attacker: actor.name,
-      damage: damageToAttacker
-    });
-
-    // Get attacker's token for damage application
     const attackerToken = canvas.tokens?.placeables?.find(t => t.actor?.id === actor.id);
     if (attackerToken) {
       await applyDamageToTargets({
@@ -875,97 +754,16 @@ export class ChargingAction extends BaseAction {
     }
   }
 
-  // ============================================================
-  // AUTO-TRIGGER SLAM/STUN EFFECTS (Full Auto mode only)
-  // ============================================================
-  const isBorderlineEffect = (damageToTarget === 0 && totalDamage === choice.targetBAvalue);
-  if (!isManualMode && autoApply && canEffectsApply(penetratingDamage, { borderline: isBorderlineEffect }) && primaryTargetActor) {
-    const { ActionDispatcher } = await import("./action-dispatcher.js");
-    
-    // Get attacker strength info for Slam checks
-    const attackerStrInfo = getStrengthInfo(actor);
-    const attackerStrength = attackerStrInfo?.value || endurance.value;
-    const attackerStrengthRank = attackerStrInfo?.rank || endurance.rank;
-    
-    // Get target's endurance for the save
-    const targetEndInfo = getAbilityInfo(primaryTargetActor, "endurance");
-    const targetEndRank = targetEndInfo?.rank || "Typical";
-    
-    // Build common prefill data
-    const basePrefill = {
-      dmgThrough: penetratingDamage,
-      targetName: targetName,
-      targetEndRank: targetEndRank,
-      defenderUuid: primaryTarget?.document?.uuid ?? primaryTargetActor?.uuid,
-      targetUuid: primaryTarget?.document?.uuid ?? primaryTargetActor?.uuid,
-      attackForm: "charging",
-      borderline: isBorderlineEffect
-    };
-
-    // === AUTO-TRIGGER SLAM CHECK ===
-    if (showSlam) {
-      debugLog("Charging: Auto-triggering Slam check", { 
-        target: targetName, 
-        damage: penetratingDamage,
-        attackerStrength: attackerStrengthRank,
-        hasPreRolledResult: !!inlineSlamResult,
-        useConsolidated
-      });
-      
-      try {
-        await ActionDispatcher.roll("slam", {
-          actor: primaryTargetActor,  // Defender makes the save
-          abilityName: "endurance",
-          opts: {
-            autoApply: true,
-            showConfirm: false,
-            attackForm: "charging",
-            // In consolidated mode, skip chat message and use pre-rolled result
-            skipChatMessage: useConsolidated,
-            preRolledResult: inlineSlamResult,
-            prefill: {
-              ...basePrefill,
-              attackerStrength: attackerStrength,
-              attackerStrengthRank: attackerStrengthRank,
-              attackerName: actor.name
-            }
-          }
-        });
-      } catch (e) {
-        console.error("[FASERIP ERROR] Auto-trigger Slam failed:", e);
-      }
-    }
-
-    // === AUTO-TRIGGER STUN CHECK ===
-    if (showStun) {
-      debugLog("Charging: Auto-triggering Stun check", { 
-        target: targetName, 
-        damage: penetratingDamage,
-        hasPreRolledResult: !!inlineStunResult,
-        useConsolidated
-      });
-      
-      try {
-        await ActionDispatcher.roll("stun", {
-          actor: primaryTargetActor,  // Defender makes the save
-          abilityName: "endurance",
-          opts: {
-            autoApply: true,
-            showConfirm: false,
-            attackForm: "charging",
-            damageType: "physical-blunt",
-            // In consolidated mode, skip chat message and use pre-rolled result
-            skipChatMessage: useConsolidated,
-            preRolledResult: inlineStunResult,
-            prefill: {
-              ...basePrefill
-            }
-          }
-        });
-      } catch (e) {
-        console.error("[FASERIP ERROR] Auto-trigger Stun failed:", e);
-      }
-    }
+  // SFX for object target
+  if (game.msh?.playCombatSFX) {
+    await game.msh.playCombatSFX({
+      actionType: "charging",
+      damageType: "physical-blunt",
+      rollResult: colorLower,
+      isHit: colorLower !== "white",
+      sourceName: `Charging (${choice.areas} areas)`
+    });
   }
+
 }
 }

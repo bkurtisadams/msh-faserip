@@ -1,4 +1,5 @@
-// scripts/modules/canvas/faserip-dot-token.js v1.6.0 - 2026-03-10
+// scripts/modules/canvas/faserip-dot-token.js v1.6.1 - 2026-03-11
+// v1.6.1: Thicker facing tick (5px outline / 3px white) for better visibility on green dots.
 // v1.6.0: Facing tick (notch line at token rotation), plain hover portrait (48px, no Ctrl),
 //         fix top-of-screen clipping. Tick drawn at 0° with cheap pivot rotation sync.
 // v1.3.0: Per-scene dot mode — scene flag overrides world setting, injected into scene config
@@ -173,10 +174,10 @@ function _drawFacingTick(g, cx, cy, radius) {
   const x2 = cx;
   const y2 = cy + outerR;
 
-  g.lineStyle(3, 0x000000, 0.7);
+  g.lineStyle(5, 0x000000, 0.8);
   g.moveTo(x1, y1);
   g.lineTo(x2, y2);
-  g.lineStyle(1.5, 0xFFFFFF, 0.9);
+  g.lineStyle(3, 0xFFFFFF, 0.95);
   g.moveTo(x1, y1);
   g.lineTo(x2, y2);
   g.lineStyle(0);

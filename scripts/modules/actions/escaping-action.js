@@ -1,4 +1,5 @@
-// scripts/modules/actions/escaping-action.js v2.1.0 - 2026-02-20
+// scripts/modules/actions/escaping-action.js v2.2.0 - 2026-03-11
+// v2.2.0: Consistency fixes — add mode selector, fix remember settings to localStorage pattern
 // v2.1.0: Restyle chat card to match attack card pattern (inline badge, white result box, no color banner)
 // v2.0.0: Compact chat card format, CS notes, effect modifiers, Grapple Back chip on Reverse
 // v1.6.0: Add detailed logging for effect removal debugging
@@ -18,7 +19,9 @@ import {
   labelFor, 
   effectsFor,
   applyCapabilitiesToDialog,
-  showDiceAnimation
+  showDiceAnimation,
+  buildModeSelector,
+  setupModeSelector
 } from "./action-utils.js";
 import { extractKarmaFromDialog, getAvailableKarma, getMinimumKarmaCommitment } from "../dice/dice-roller.js";
 import { getAttackShiftBreakdown, getDefenseShiftBreakdown } from "../effects/effect-modifiers.js";
@@ -184,12 +187,14 @@ export class EscapingAction extends AttackAction {
       }
     }
 
-    // Load persisted settings (karma checkbox never persisted - always starts unchecked)
-    const savedShift = await actor.getFlag("msh-faserip", "lastEscapeShift") ?? 0;
-    const savedRemember = (await actor.getFlag("msh-faserip", "rememberSettings")) ?? (await actor.getFlag("msh-faserip", "lastEscapeRemember")) ?? true;
-    const savedSkipDice = (await actor.getFlag("msh-faserip", "skipDiceRoll")) ?? (await actor.getFlag("msh-faserip", "lastEscapeSkipDice")) ?? false;
+    // Load persisted settings - localStorage pattern (matches blunt attack)
+    const lsRememberKey = "msh.escaping.remember";
+    const lsSkipKey = "msh.escaping.skipDice";
+    const savedRemember = localStorage.getItem(lsRememberKey) === "1";
+    const savedSkipDice = localStorage.getItem(lsSkipKey) === "1";
+    const savedShift = savedRemember ? (await actor.getFlag("msh-faserip", "lastEscapeShift") ?? 0) : 0;
     const savedSpendKarma = false; // Always default to unchecked
-    const savedCsNotes = (await actor.getFlag("msh-faserip", "lastEscapeCsNotes")) || "";
+    const savedCsNotes = savedRemember ? ((await actor.getFlag("msh-faserip", "lastEscapeCsNotes")) || "") : "";
 
     // Karma data for inline display
     const availableKarma = getAvailableKarma(actor);
@@ -198,6 +203,8 @@ export class EscapingAction extends AttackAction {
     const savedShiftVal = Number(this.opts?.shift ?? savedShift);
 
     const dialogHtml = `
+      ${buildModeSelector({ mode: "semi" })}
+
       <!-- Context: Opponent + Your stats side by side -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
         <div style="background:#f5f5f5;padding:8px;border-radius:3px;">
@@ -279,9 +286,11 @@ export class EscapingAction extends AttackAction {
                 skipDice: !!$('[name="skipDice"]').is(':checked')
               };
               
-              // Always save remember/skipDice preferences
-              await actor.setFlag("msh-faserip", "lastEscapeRemember", result.remember);
-              await actor.setFlag("msh-faserip", "lastEscapeSkipDice", result.skipDice);
+              // Save remember/skipDice to localStorage
+              try {
+                localStorage.setItem(lsRememberKey, result.remember ? "1" : "0");
+                localStorage.setItem(lsSkipKey, result.skipDice ? "1" : "0");
+              } catch (_e) {}
               
               // Persist settings if requested (karma checkbox never persisted)
               if (result.remember) {
@@ -296,6 +305,7 @@ export class EscapingAction extends AttackAction {
         },
         default: "roll",
         render: (html) => {
+          setupModeSelector(actor, html, this.opts || {}, "lastEscapingMode");
           // CS field handlers
           const $shift = html.find('[name="shift"]');
           const $csField = html.find('.cs-field');

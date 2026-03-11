@@ -1,4 +1,6 @@
-// scripts/modules/actions/grappling-action.js v2.3.0 - 2026-02-01
+// scripts/modules/actions/grappling-action.js v2.4.0 - 2026-03-11
+// v2.4.0: Consistency fixes — replace local rankValues with game.msh.getRankValue,
+//         add mode selector (manual/semi/full), bump version
 // v2.3.0: Add support for weapon-based grappling (whips with GP damage type use material strength)
 // v2.2.3: Fix shift override - treat opts.shift=0 as "not set" to allow saved values
 // v2.2.2: Fix CS persistence - decouple from global rememberSettings, use only local lastGrappleRemember flag
@@ -22,7 +24,9 @@ import {
   labelFor, 
   effectsFor,
   applyCapabilitiesToDialog,
-  showDiceAnimation
+  showDiceAnimation,
+  buildModeSelector,
+  setupModeSelector
 } from "./action-utils.js";
 import { extractKarmaFromDialog, getAvailableKarma, getMinimumKarmaCommitment } from "../dice/dice-roller.js";
 import { applyGrappled, applyHeld } from "../effects/effect-engine.js";
@@ -50,14 +54,9 @@ export class GrapplingAction extends AttackAction {
     let strengthSource;
     if (isWeaponGrapple) {
       const materialRank = passedItem.system?.materialStrength || "Typical";
-      const rankValues = {
-        "Shift-0": 0, "Feeble": 2, "Poor": 4, "Typical": 6, "Good": 10, "Excellent": 20,
-        "Remarkable": 30, "Incredible": 40, "Amazing": 50, "Monstrous": 75, "Unearthly": 100,
-        "Shift X": 150, "Shift Y": 200, "Shift Z": 500, "Class 1000": 1000
-      };
       strength = {
         rank: materialRank,
-        value: rankValues[materialRank] || 6
+        value: game.msh.getRankValue(materialRank) || 6
       };
       strengthSource = passedItem.name;
     } else {
@@ -274,6 +273,8 @@ export class GrapplingAction extends AttackAction {
     const hasKarma = availableKarma > 0;
 
     const dialogHtml = `
+      ${buildModeSelector({ mode: "semi" })}
+
       <!-- Context: Target + Attack stats side by side -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
         <div style="background:#f5f5f5;padding:8px;border-radius:3px;">
@@ -369,6 +370,7 @@ export class GrapplingAction extends AttackAction {
         },
         default: "roll",
         render: (html) => {
+          setupModeSelector(actor, html, this.opts || {}, "lastGrapplingMode");
           // CS field handlers
           const $shift = html.find('[name="shift"]');
           const $csField = html.find('.cs-field');

@@ -1,4 +1,7 @@
-// scripts/modules/actions/grabbing-action.js v1.6.0 - 2026-02-27
+// scripts/modules/actions/grabbing-action.js v1.7.0 - 2026-03-11
+// v1.7.0: Consistency fixes — add effect modifiers, mode selector, replace local rankValues
+//         with game.msh.getRankValue, fix remember settings to localStorage pattern,
+//         remove unused rollUniversalTable import, add applyCapabilitiesToDialog
 // v1.6.0: Redesign dialog to Style A (grid header, inline CS/karma, standardized footer)
 // v1.5.0: Restyle chat card to match attack card pattern (flex header, inline badge, no buildResultGrid/banner)
 // v1.4.0: Add support for weapon-based grabbing (whips with Gb damage type use material strength)
@@ -17,10 +20,13 @@ import {
   bannerColors,
   buildInlineRollDisplay,
   showDiceAnimation,
-  getTargetData
+  getTargetData,
+  applyCapabilitiesToDialog,
+  buildModeSelector,
+  setupModeSelector
 } from "./action-utils.js";
 import { extractKarmaFromDialog, getAvailableKarma, getMinimumKarmaCommitment } from "../dice/dice-roller.js";
-import { rollUniversalTable } from "../dice/universal-table.js";
+import { getAttackShiftBreakdown, getDefenseShiftBreakdown } from "../effects/effect-modifiers.js";
 
 /**
  * Grabbing (Wrestling) — STR vs UT → Miss / Take / Grab / Break
@@ -58,14 +64,9 @@ export class GrabbingAction extends AttackAction {
     let strengthSource;
     if (isWeaponGrab) {
       const materialRank = passedItem.system?.materialStrength || "Typical";
-      const rankValues = {
-        "Shift-0": 0, "Feeble": 2, "Poor": 4, "Typical": 6, "Good": 10, "Excellent": 20,
-        "Remarkable": 30, "Incredible": 40, "Amazing": 50, "Monstrous": 75, "Unearthly": 100,
-        "Shift X": 150, "Shift Y": 200, "Shift Z": 500, "Class 1000": 1000
-      };
       strength = {
         rank: materialRank,
-        value: rankValues[materialRank] || 6
+        value: game.msh.getRankValue(materialRank) || 6
       };
       strengthSource = passedItem.name;
     } else {
@@ -77,8 +78,21 @@ export class GrabbingAction extends AttackAction {
     const choice = await this._prompt(actor, strength, { isWeaponGrab, weaponName: isWeaponGrab ? passedItem.name : null, strengthSource });
     if (!choice) return;
 
-    // Effective rank after CS
-    const effectiveRank = shiftRank(strength.rank, choice.shift);
+    // Effective rank after CS + effect modifiers
+    const attackerEffects = getAttackShiftBreakdown(actor);
+    let defenderEffects = { total: 0, breakdown: [] };
+
+    // Try to get target actor for defender effects
+    const targetTokens = Array.from(game.user?.targets ?? []);
+    const targetActor = targetTokens[0]?.actor ?? null;
+    if (targetActor) {
+      defenderEffects = getDefenseShiftBreakdown(targetActor, false);
+    }
+
+    const manualShift = choice.shift || 0;
+    const effectShift = (attackerEffects.total || 0) - (defenderEffects.total || 0);
+    const totalShift = manualShift + effectShift;
+    const effectiveRank = shiftRank(strength.rank, totalShift);
 
     // Decide comparator once (target STR or item material if fixed) for both legend and outcome
     const cmpRank = this._chooseComparatorRank(choice); // may be null/undefined
@@ -117,10 +131,19 @@ export class GrabbingAction extends AttackAction {
 
     const { bg, fg } = bannerColors(colorLower);
 
-    // Shift display (hover tooltip style)
+    // Shift display (hover tooltip style with breakdown)
     let shiftDisplay = "";
-    if (choice.shift) {
-      const csBox = `<span title="${choice.shift > 0 ? '+' : ''}${choice.shift}CS" style="padding:0 3px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${choice.shift > 0 ? '+' : ''}${choice.shift}CS</span>`;
+    if (totalShift) {
+      const parts = [];
+      if (manualShift !== 0) parts.push(`${manualShift > 0 ? '+' : ''}${manualShift} manual`);
+      for (const eff of (attackerEffects.breakdown || [])) {
+        parts.push(`${eff.shift > 0 ? '+' : ''}${eff.shift} ${eff.name}`);
+      }
+      for (const eff of (defenderEffects.breakdown || [])) {
+        parts.push(`${eff.shift > 0 ? '-' : '+'}${Math.abs(eff.shift)} ${eff.name}`);
+      }
+      const breakdownText = parts.length > 0 ? parts.join(', ') : `${totalShift > 0 ? '+' : ''}${totalShift} total`;
+      const csBox = `<span title="${breakdownText}" style="padding:0 3px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${totalShift > 0 ? '+' : ''}${totalShift}CS</span>`;
       shiftDisplay = ` (${csBox} → ${effectiveRank})`;
     }
 
@@ -199,10 +222,12 @@ export class GrabbingAction extends AttackAction {
       prefillTargetStr = t.actor?.system?.abilities?.strength?.rank || "";
     }
 
-    // Load persisted settings (karma checkbox never persisted - always starts unchecked)
-    const savedShift = await actor.getFlag("msh-faserip", "lastGrabbingShift") ?? 0;
-    const savedRemember = (await actor.getFlag("msh-faserip", "rememberSettings")) ?? (await actor.getFlag("msh-faserip", "lastGrabbingRemember")) ?? true;
-    const savedSkipDice = (await actor.getFlag("msh-faserip", "skipDiceRoll")) ?? (await actor.getFlag("msh-faserip", "lastGrabbingSkipDice")) ?? false;
+    // Load persisted settings - localStorage pattern (matches blunt attack)
+    const lsRememberKey = "msh.grabbing.remember";
+    const lsSkipKey = "msh.grabbing.skipDice";
+    const savedRemember = localStorage.getItem(lsRememberKey) === "1";
+    const savedSkipDice = localStorage.getItem(lsSkipKey) === "1";
+    const savedShift = savedRemember ? (await actor.getFlag("msh-faserip", "lastGrabbingShift") ?? 0) : 0;
     const savedSpendKarma = false; // Always default to unchecked
 
     // Title and ability label
@@ -215,6 +240,8 @@ export class GrabbingAction extends AttackAction {
     const hasKarma = availableKarma > 0;
 
     const html = `
+      ${buildModeSelector({ mode: "semi" })}
+
       <!-- Context: Target + Grab stats side by side -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
         <div style="background:#f5f5f5;padding:8px;border-radius:3px;">
@@ -311,11 +338,13 @@ export class GrabbingAction extends AttackAction {
                 skipDice: !!$('[name="skipDice"]').is(':checked')
               };
 
-              // Always save remember/skipDice preferences
-              await actor.setFlag("msh-faserip", "lastGrabbingRemember", result.remember);
-              await actor.setFlag("msh-faserip", "lastGrabbingSkipDice", result.skipDice);
+              // Save remember/skipDice to localStorage
+              try {
+                localStorage.setItem(lsRememberKey, result.remember ? "1" : "0");
+                localStorage.setItem(lsSkipKey, result.skipDice ? "1" : "0");
+              } catch (_e) {}
 
-              // Persist shift if requested (karma checkbox never persisted)
+              // Persist shift if requested
               if (result.remember) {
                 await actor.setFlag("msh-faserip", "lastGrabbingShift", result.shift);
               }
@@ -327,6 +356,7 @@ export class GrabbingAction extends AttackAction {
         },
         default: "roll",
         render: (html) => {
+          setupModeSelector(actor, html, this.opts || {}, "lastGrabbingMode");
           // CS field handlers
           const $shift = html.find('[name="shift"]');
           const $csField = html.find('.cs-field');
@@ -343,6 +373,7 @@ export class GrabbingAction extends AttackAction {
           };
           $shift.on('input', updateCS);
           $csReset.on('click', () => { $shift.val(0); updateCS(); });
+          applyCapabilitiesToDialog(html, "grabbing", { actor });
         }
       }).render(true);
     });
