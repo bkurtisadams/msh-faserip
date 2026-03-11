@@ -1113,13 +1113,13 @@ export class AttackAction extends BaseAction {
       // For adjacent attacks (single roll, multiple targets), show "Attack vs X targets"
       // For regular attacks, show "Attack N of M"
       const attackIndicator = targetCount > 1
-        ? `<span style="color:#666;font-weight:normal;font-size:.85em;">Attack vs ${targetCount} targets</span>`
-        : `<span style="color:#666;font-weight:normal;font-size:.85em;">Attack ${attackNumber} of ${totalAttacks}</span>`;
+        ? `<span style="color:#666;font-weight:normal;font-size:.85em;flex-shrink:0;white-space:nowrap;">Attack vs ${targetCount} targets</span>`
+        : `<span style="color:#666;font-weight:normal;font-size:.85em;flex-shrink:0;white-space:nowrap;">Attack ${attackNumber} of ${totalAttacks}</span>`;
       const cardHtml = `
         <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
           <!-- Header: Action + Attack number -->
-          <div style="padding:6px 10px;border-bottom:1px solid #c0c0c0;display:flex;justify-content:space-between;align-items:center;">
-            <span><strong style="color:#8b0000;">${actionLabel.toUpperCase()}</strong>${weapon?.name ? ` <span style="color:#555;font-size:.85em;font-weight:normal;">— ${weapon.name}</span>` : ''}</span>
+          <div style="padding:6px 10px;border-bottom:1px solid #c0c0c0;display:flex;justify-content:space-between;align-items:center;gap:8px;">
+            <span style="min-width:0;"><strong style="color:#8b0000;">${actionLabel.toUpperCase()}</strong>${weapon?.name ? `<br><span style="color:#555;font-size:.85em;font-weight:normal;">${weapon.name}</span>` : ''}</span>
             ${attackIndicator}
           </div>
           

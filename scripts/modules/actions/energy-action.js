@@ -1,4 +1,5 @@
-// scripts/modules/actions/energy-action.js v1.8.0 - 2026-02-25
+// scripts/modules/actions/energy-action.js v2.0.0 - 2026-03-10
+// v2.0.0: Refactor - dialog only, delegates resolution to _executeSingleAttack
 // v1.8.0: Refactor chat card to use unified card builder utilities (buildCardShell, buildRollDisplay, etc.)
 // v1.7.0: Add support for equipment items with Energy (E) damage type (laser pistols, etc.)
 // v1.6.0: Fix CS persistence - decouple from global rememberSettings, treat opts.shift=0 as "not set"
@@ -20,51 +21,27 @@
 // v1.2.0: Fix DiceSoNice animation in consolidated chat cards mode
 // v1.1.0: Add inline rolls for consolidated chat cards
 import { RangedAttackAction } from "./ranged-attack-action.js";
-// NOTE: resolveCombatMode imported dynamically to avoid circular dependency
 import { 
-  generateKarmaControlsHTML, 
   setupKarmaControlHandlers, 
   extractKarmaFromDialog,
   getAvailableKarma
 } from "../dice/dice-roller.js";
 
 import { 
-  applyDamageToTargets,
   attachAutoFillRange,
-  buildActionsBox,
-  buildMultiAttackSection,
   buildModeSelector,
-  buildShiftDisplay,
-  buildRollDisplay,
-  buildResultBadge,
-  buildContentBox,
-  buildManualModeNotice,
-  buildCardShell,
-  buildActorTargetHtml,
-  buildAbilitySection,
-  debugLog,
   effectsFor,
   getAbilityInfo,
   getBodyArmorValues,
   getTargetData,
   labelFor,
-  postDeathSavePrompt,
   RANKS,
-  rollWithKarmaAndHistory,
   setupModeSelector,
-  setupMultiAttackHandlers,
   applyCapabilitiesToDialog,
-  shiftRank,
-  playAttackEffect,
-  playImpactEffect,
-  getAttackEffectPath,
-  showDiceAnimation
+  shiftRank
 } from "./action-utils.js";
 
 import { isAuraMaintained } from "./nullify.js";
-import { buildDamageFlags } from "./damage-ui.js";
-import { rollUniversalTable } from "../dice/universal-table.js";
-import { getAttackShiftBreakdown, getDefenseShiftBreakdown, canActorAct } from "../effects/effect-modifiers.js";
 
 export class EnergyAction extends RangedAttackAction {
   async execute() {
@@ -142,6 +119,7 @@ export class EnergyAction extends RangedAttackAction {
     const savedMultiAdjacent = savedRemember ? (await actor.getFlag("msh-faserip", "lastEnergyMultiAdjacent") || false) : false;
     const savedReduceDamage = savedRemember ? (await actor.getFlag("msh-faserip", "lastEnergyReduceDamage") || false) : false;
     const savedReducedAmount = savedRemember ? (await actor.getFlag("msh-faserip", "lastEnergyReducedAmount") || 0) : 0;
+    const savedResultCap = savedRemember ? (await actor.getFlag("msh-faserip", "lastEnergyResultCap") || "none") : "none";
 
 
     // === Target Info ===
@@ -259,7 +237,7 @@ export class EnergyAction extends RangedAttackAction {
       <!-- Multi-Attack Row -->
       <div class="multi-attack-section" style="padding:6px 8px;background:#e8f5e9;border:1px solid #a5d6a7;border-radius:3px;margin-bottom:6px;">
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-          <span style="font-weight:600;color:#2e7d32;">Multi:</span>
+          <span class="multi-label" style="font-weight:600;color:#2e7d32;">Multi:</span>
           <label title="Single attack, no penalty" style="cursor:pointer;"><input type="radio" name="multiMode" value="off" ${!savedMultiAdjacent ? 'checked' : ''}> Off</label>
           <label title="-4CS penalty, hits all adjacent targets with single roll." style="cursor:pointer;"><input type="radio" name="multiMode" value="adjacent" ${savedMultiAdjacent ? 'checked' : ''}> Adjacent</label>
         </div>
@@ -291,16 +269,16 @@ export class EnergyAction extends RangedAttackAction {
         <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
           <label title="Reduce damage output" style="display:flex;align-items:center;gap:4px;cursor:pointer;">
             <input type="checkbox" id="reduce-damage-enabled" ${savedReduceDamage ? 'checked' : ''}>
-            <strong style="color:#e65100;">Reduce Damage</strong>
+            <strong class="reduce-damage-label" style="color:#e65100;">Reduce Damage</strong>
           </label>
           <div class="reduce-damage-controls" style="display:${savedReduceDamage ? 'flex' : 'none'};align-items:center;gap:4px;">
             <input type="number" name="reducedDamage" title="Reduced damage amount" value="${savedReduceDamage && savedReducedAmount > 0 ? savedReducedAmount : initialDamage}" min="0" max="${initialDamage}" style="width:45px;padding:2px;text-align:center;">
             <span style="color:#666;font-size:.85em;">/<span class="max-damage-display">${initialDamage}</span></span>
             <span class="result-cap-controls" style="display:none;margin-left:6px;">
               <span style="color:#ccc;margin:0 2px;">|</span>
-              <label title="No result cap" style="cursor:pointer;font-size:.9em;"><input type="radio" name="resultCap" value="none" checked> Any</label>
-              <label title="Cap at Yellow (no Kill)" style="cursor:pointer;font-size:.9em;"><input type="radio" name="resultCap" value="yellow"> Ylw</label>
-              <label title="Cap at Green (no Bullseye/Kill)" style="cursor:pointer;font-size:.9em;"><input type="radio" name="resultCap" value="green"> Grn</label>
+              <label title="No result cap" style="cursor:pointer;font-size:.9em;"><input type="radio" name="resultCap" value="none" ${savedResultCap === 'none' ? 'checked' : ''}> Any</label>
+              <label title="Cap at Yellow (no Kill)" style="cursor:pointer;font-size:.9em;"><input type="radio" name="resultCap" value="yellow" ${savedResultCap === 'yellow' ? 'checked' : ''}> Ylw</label>
+              <label title="Cap at Green (no Bullseye/Kill)" style="cursor:pointer;font-size:.9em;"><input type="radio" name="resultCap" value="green" ${savedResultCap === 'green' ? 'checked' : ''}> Grn</label>
             </span>
           </div>
           <span class="effect-note" style="color:#888;font-size:.8em;margin-left:auto;" title="Per FASERIP rules: Energy attacks may reduce damage but not effect (red stays red)">Effect cannot be reduced</span>
@@ -401,6 +379,7 @@ export class EnergyAction extends RangedAttackAction {
                 await actor.setFlag("msh-faserip", "lastEnergyObstacle", throughObstacle);
                 await actor.setFlag("msh-faserip", "lastEnergyReduceDamage", reduceDamageEnabled);
                 await actor.setFlag("msh-faserip", "lastEnergyReducedAmount", reducedDamage);
+                await actor.setFlag("msh-faserip", "lastEnergyResultCap", resultCap);
               }
 
               // Range & obstacle modifiers via powerRank path
@@ -554,8 +533,48 @@ export class EnergyAction extends RangedAttackAction {
             if ($dialog.length) $dialog[0].style.height = 'auto';
           };
 
+          // Highlight dangerous sticky settings with bold red when active
+          const updateWarnings = () => {
+            // Multi-attack: Adjacent mode
+            const multiVal = html.find('[name="multiMode"]:checked').val();
+            const $multiLabel = html.find('.multi-attack-section .multi-label');
+            const $multiSection = html.find('.multi-attack-section');
+            if (multiVal !== "off") {
+              $multiLabel.css({ color: '#c62828', 'font-weight': '700' });
+              $multiSection.css({ background: '#ffebee', 'border-color': '#ef5350' });
+            } else {
+              $multiLabel.css({ color: '#2e7d32', 'font-weight': '600' });
+              $multiSection.css({ background: '#e8f5e9', 'border-color': '#a5d6a7' });
+            }
+
+            // Reduce Damage enabled
+            const reduceOn = html.find('#reduce-damage-enabled').is(':checked');
+            const $reduceLabel = html.find('.reduce-damage-label');
+            const $reduceSection = html.find('.reduce-damage-section');
+            if (reduceOn) {
+              $reduceLabel.css({ color: '#c62828', 'font-weight': '700' });
+              $reduceSection.css({ background: '#ffebee', 'border-color': '#c62828' });
+            } else {
+              $reduceLabel.css({ color: '#e65100', 'font-weight': '700' });
+              $reduceSection.css({ background: '#fff3e0', 'border-color': '#ffcc80' });
+            }
+
+            // Result cap (non-"Any")
+            const capVal = html.find('[name="resultCap"]:checked').val();
+            html.find('.result-cap-controls label').each(function() {
+              const $lbl = $(this);
+              const val = $lbl.find('input').val();
+              if (val === capVal && capVal !== 'none') {
+                $lbl.css({ color: '#c62828', 'font-weight': '700' });
+              } else {
+                $lbl.css({ color: '', 'font-weight': '' });
+              }
+            });
+          };
+
           // Initial update
           update();
+          updateWarnings();
 
 
           // Sync effect-cap controls with Reduce Damage toggle.
@@ -580,20 +599,13 @@ export class EnergyAction extends RangedAttackAction {
           html.find('#reduce-damage-enabled').on('change', function() {
             const $controls = html.find('.reduce-damage-controls');
             const $reducedDamage = html.find('[name="reducedDamage"]');
-            const $section = html.find('.reduce-damage-section');
             if (this.checked) {
               $controls.css('display', 'flex');
-              // Set value to current max (which reflects power damage)
               const currentMax = Number($reducedDamage.attr('max')) || 20;
               $reducedDamage.val(currentMax);
-              // Dark orange border when enabled
-              $section.css('border-color', '#e65100');
             } else {
               $controls.hide();
-              // Reset damage to max when disabling
               $reducedDamage.val($reducedDamage.attr('max'));
-              // Reset to default border
-              $section.css('border-color', '#ffcc80');
             }
           
             // If Reduce Damage is off, don't allow capping the effect result.
@@ -603,7 +615,14 @@ export class EnergyAction extends RangedAttackAction {
               html.find('input[name="resultCap"][value="none"]').prop('checked', true);
             }
             update();
+            updateWarnings();
 });
+
+          // Multi-attack mode change
+          html.find('[name="multiMode"]').on('change', updateWarnings);
+
+          // Result cap radio change
+          html.find('[name="resultCap"]').on('change', updateWarnings);
 
           applyCapabilitiesToDialog(html, "energy", { actor });
           this._disposeAutoFill = attachAutoFillRange(html, actor, update);
@@ -615,12 +634,6 @@ export class EnergyAction extends RangedAttackAction {
     });
 
     if (!choice) return;
-
-    // Handle multiple adjacent targets (single roll @-4 CS)
-    if (choice.multiAdjacent) {
-      choice.totalShift = (choice.totalShift || 0) - 4;
-      ui.notifications.info(`Attacking ${game.user.targets.size} adjacent targets at -4CS!`);
-    }
 
     // --- Nullify RAW guard: while maintaining aura, user cannot use other inborn powers
     try {
@@ -641,282 +654,75 @@ export class EnergyAction extends RangedAttackAction {
           console.warn('Nullify aura guard check failed:', e);
     }
 
-    // === EFFECT MODIFIERS: Apply attack/defense shifts from active effects ===
-    const attackerMods = canActorAct(actor);
-    if (!attackerMods.canAct) {
-      ui.notifications?.warn(`${actor.name}: ${attackerMods.reason}`);
-      await ChatMessage.create({
-        speaker: ChatMessage.getSpeaker({ actor }),
-        content: `
-          <div style="background:#fff;border:1px solid #e57373;border-radius:3px;padding:6px 8px;">
-            <b>${actor.name}</b> cannot act — ${attackerMods.reason}
-          </div>
-        `
-      });
-      return; // abort attack
-    }
-    
-    // Get attacker's attack shift from effects (with breakdown)
-    const attackerShiftData = getAttackShiftBreakdown(actor);
-    const attackerShift = attackerShiftData.total;
-    const attackerEffects = attackerShiftData.breakdown;
-    
-    // Get defender's defense shift (if single target)
-    let defenderShift = 0;
-    let defenderEffects = [];
-    const effectTargetTokens = Array.from(game.user?.targets ?? []);
-    const effectPrimaryTarget = effectTargetTokens[0] ?? null;
-    const defenderActor = effectPrimaryTarget?.actor ?? null;
-    if (defenderActor) {
-      // Energy attacks are ranged
-      const defenderShiftData = getDefenseShiftBreakdown(defenderActor, true);
-      defenderShift = defenderShiftData.total;
-      defenderEffects = defenderShiftData.breakdown;
-    }
-    
-    // Total effect shift (attacker bonus + defender penalty)
-    // Positive defenderShift = harder to hit, so we subtract it
-    const effectShift = attackerShift - defenderShift;
-    
-    // Apply effect shift to choice.totalShift
-    const originalTotalShift = choice.totalShift || 0;
-    choice.totalShift = originalTotalShift + effectShift;
-    choice.effectShift = effectShift;
-    choice.attackerEffects = attackerEffects;
-    choice.defenderEffects = defenderEffects;
-
-    // === Resolve roll ===
-    // Rank → roll → karma → color
-    const toHitRankName = choice.usePowerToHit ? choice.powerRank : ability.rank;
-    const effectiveRank = shiftRank(toHitRankName, choice.totalShift);
-
-    // Check consolidated chat card setting
-    let useConsolidated = false;
-    try {
-      useConsolidated = game.settings.get("msh-faserip", "consolidatedChatCards");
-    } catch (_e) { /* setting not registered yet */ }
-
-    const roll = await new Roll("1d100").evaluate();
-    // Show dice animation
-    if (!choice.skipDice) {
-      await showDiceAnimation(roll, actor, `${actor.name} performs ${actionName}`, useConsolidated);
+    // Handle multiple adjacent targets (single roll @-4 CS)
+    if (choice.multiAdjacent) {
+      choice.totalShift = (choice.totalShift || 0) - 4;
+      ui.notifications.info(`Attacking ${game.user.targets.size} adjacent targets at -4CS!`);
     }
 
-    const { cappedTotal, totalKarmaUsed } =
-      await rollWithKarmaAndHistory(actor, actionName, choice.karma, roll, { spendKarma: choice.spendKarma, rank: effectiveRank, inlineRoll: useConsolidated });
-
-    let color = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
-    let colorLower = String(color || "").toLowerCase();
-    
-    // Apply result cap if set (only for Energy Generation power)
-    let wasResultCapped = false;
-    if (choice.resultCap && choice.resultCap !== 'none') {
-      const capOrder = ['white', 'green', 'yellow', 'red'];
-      const currentIndex = capOrder.indexOf(colorLower);
-      const capIndex = capOrder.indexOf(choice.resultCap);
-      if (currentIndex > capIndex) {
-        color = choice.resultCap;
-        colorLower = choice.resultCap;
-        wasResultCapped = true;
-      }
+    // Reload mode from flags — respect global mode ceiling
+    let globalMode = "semi";
+    try { globalMode = game.settings.get("msh-faserip", "defaultCombatMode") || "semi"; } catch (_) {}
+    const modeRank = { manual: 0, semi: 1, full: 2 };
+    const globalRank = modeRank[globalMode] ?? 1;
+    const savedMode = await actor.getFlag("msh-faserip", "lastEnergyMode") || "semi";
+    const savedRank = modeRank[savedMode] ?? 1;
+    this.opts.mode = savedRank <= globalRank ? savedMode : globalMode;
+    const mode = this.opts.mode;
+    if (mode === "manual") {
+      this.opts.autoApply = false;
+      this.opts.showConfirm = false;
+    } else if (mode === "semi") {
+      this.opts.autoApply = false;
+      this.opts.showConfirm = true;
+    } else {
+      this.opts.autoApply = true;
+      this.opts.showConfirm = false;
     }
-    
-    const effectResult = effects[colorLower] || color;
-
-    // === VISUAL EFFECTS ===
-    const sourceToken = actor.getActiveTokens()[0];
-    if (sourceToken && !choice.skipDice) {
-      let effectPath;
-      
-      if (!choice.useAdHoc && choice.powerItem) {
-        // Use power's configured effect
-        const effectAnim = choice.powerItem.system?.effectAnimation || "";
-        const effectColor = choice.powerItem.system?.effectColor || "blue";
-        const effectVariant = choice.powerItem.system?.effectVariant || "01";
-        
-        if (effectAnim) {
-          effectPath = effectAnim; // Custom path from item
-        } else {
-          effectPath = getAttackEffectPath("energy", effectColor, effectVariant);
-        }
-      } else {
-        // Default energy effect
-        effectPath = getAttackEffectPath("energy", "blue", "01");
-      }
-      
-      await playAttackEffect(effectPath, sourceToken);
-      
-      // Add impact effect on hit
-      if (colorLower !== "white") {
-        await playImpactEffect("jb2a.impact.010.blue", Array.from(game.user.targets));
-      }
-    }
-    // === END VISUAL EFFECTS ===
-
-    // Hit state — per-target cards (Multiple Attack Adjacent keeps the single roll & penalty)
-    const isHit = colorLower !== 'white';
-
-    // Use exactly the tokens the user targeted (no auto-adding)
-    const targetTokens = Array.from(game.user?.targets ?? []);
-    const targetList = targetTokens.length ? targetTokens : [null];
 
     // Build shift breakdown for display
-    const shiftBreakdown = {};
-    if (choice.shift && choice.shift !== 0) shiftBreakdown.manual = choice.shift;
-    if (choice.rangeModifier && choice.rangeModifier !== 0) shiftBreakdown.range = choice.rangeModifier;
-    if (choice.obstacleModifier && choice.obstacleModifier !== 0) shiftBreakdown.obstacle = choice.obstacleModifier;
-    if (choice.movementModifier && choice.movementModifier !== 0) shiftBreakdown.movement = choice.movementModifier;
+    const shiftBreakdown = {
+      manual: choice.shift || 0,
+      range: choice.rangeModifier || 0,
+      obstacle: choice.obstacleModifier || 0,
+      movement: choice.movementModifier || 0,
+      csNotes: choice.csNotes || ""
+    };
     if (choice.multiAdjacent) shiftBreakdown.adjacent = -4;
-    const shiftDisplay = buildShiftDisplay(choice.totalShift, effectiveRank, shiftBreakdown, attackerEffects, defenderEffects);
+    choice.shiftBreakdown = shiftBreakdown;
 
-    // Build compact roll display
-    const rollDisplay = buildRollDisplay(roll, totalKarmaUsed, cappedTotal);
+    // Resolve ability — use power rank if toggled
+    const toHitAbility = choice.usePowerToHit
+      ? { name: "Power", rank: choice.powerRank, value: RANKS[choice.powerRank] || 30 }
+      : ability;
 
-    const isManualMode = this?.opts?.mode === "manual";
-    const targetCount = targetList.length;
-    const actionLabel = `${actionName}${targetCount > 1 ? ` (${targetCount} targets)` : ''}`;
+    // Use reduced damage if enabled, otherwise full power damage
+    const baseDamage = choice.reduceDamageEnabled ? choice.reducedDamage : choice.powerDamage;
+    const rawDamage = Number(baseDamage) || 0;
 
-    // One message per target
-    for (const target of targetList) {
-      const targetActor = target?.actor;
-      const targetName  = target?.name || "Unknown Target";
+    // Build a synthetic weapon-like reference for the power item (for SFX + chat header)
+    const powerItem = choice.powerId ? actor.items.get(choice.powerId) : null;
 
-      // Use reduced damage if enabled, otherwise full power damage
-      const baseDamage = choice.reduceDamageEnabled ? choice.reducedDamage : choice.powerDamage;
-      const rawDamage = isHit ? (Number(baseDamage) || 0) : 0;
-      const wasReduced = choice.reduceDamageEnabled && choice.reducedDamage < choice.powerDamage;
+    // Delegate to shared resolution pipeline
+    const targetCount = choice.multiAdjacent ? targets.length : 1;
 
-      // Get armor info for this target
-      let armorData = null;
-      let armorValue = 0;
-      let afterArmor = rawDamage;
-      if (isHit && rawDamage > 0 && targetActor) {
-        armorData = getBodyArmorValues(targetActor, choice.powerDamageType);
-        armorValue = armorData?.applicable ?? 0;
-        afterArmor = Math.max(0, rawDamage - armorValue);
-      }
-
-      // Determine effect checks for energy: only Kill on red
-      const showKill = (colorLower === "red");
-      
-      // Per-target actions (skip in manual mode)
-      const { resolveCombatMode } = await import("./action-dispatcher.js");
-      const actions = (!isManualMode && isHit && afterArmor > 0 && targetActor)
-        ? buildActionsBox({
-            showSlam: false,
-            showStun: false,
-            showKill: showKill,
-            actorUuid: actor.uuid,
-            targetUuid: targetActor?.uuid,
-            damage: afterArmor,
-            attackForm: "energy",
-            damageType: choice.powerDamageType,
-            bypassArmor: true,   // afterArmor already has armor removed
-            autoApply: this.opts?.autoApply,
-            autoSave: (typeof resolveCombatMode === "function" && targetActor)
-              ? (resolveCombatMode(targetActor) === "full")
-              : false,
-          })
-        : "";
-
-      // Build damage section
-      const damageHtml = (() => {
-        if (!isHit) {
-          return buildContentBox(`<strong>Damage:</strong> 0 (miss)`);
-        }
-        
-        const reducedNote = wasReduced ? ` <span style="color:#ff6f00;">(reduced from ${choice.powerDamage})</span>` : '';
-        const dmgBox = `<span title="Power: ${choice.powerName} (${choice.powerRank})" style="cursor:help;">${rawDamage}</span>`;
-        
-        if (armorValue > 0 && targetActor) {
-          const isEnergy = armorData?.isEnergyDamage !== false;
-          const armorType = armorData?.isForceField ? "Force Field" : "Body Armor";
-          const armorHover = `${armorType} (${armorValue}${isEnergy ? ', -20 vs Energy applied' : ''})`;
-          const armorBox = `<span title="${armorHover}" style="cursor:help;">${armorValue} armor</span>`;
-          
-          return buildContentBox(`<strong>Damage:</strong> ${dmgBox}${reducedNote} − ${armorBox} = <strong>${afterArmor}</strong>`);
-        } else {
-          return buildContentBox(`<strong>Damage:</strong> ${dmgBox}${reducedNote}`);
-        }
-      })();
-
-      // Build ability section
-      const abilityLabel = choice.usePowerToHit ? "Power" : ability.name;
-      const abilityRank = choice.usePowerToHit ? choice.powerRank : ability.rank;
-      const resultBadge = buildResultBadge(color, effectResult, { suffix: wasResultCapped ? "(capped)" : "" });
-      const abilityHtml = buildAbilitySection({ abilityLabel, abilityRank, shiftDisplay, rollDisplay, resultBadge });
-
-      // Assemble card
-      const cardHtml = buildCardShell({
-        actionLabel,
-        headerRight: choice.powerName,
-        actorHtml: buildActorTargetHtml(actor.name, targetActor ? targetName : ""),
-        abilityHtml,
-        sections: [damageHtml, actions, buildManualModeNotice(isManualMode)]
-      });
-
-      // Flags per target
-      const msgFlags = buildDamageFlags({
-        actionId: actionType,
-        damageType: choice.powerDamageType,
-        rawDamage,
-        afterArmor,
-        resultColor: colorLower,
-        cappedTotal,
-        targets: target ? [target] : []
-      });
-      if (msgFlags && msgFlags["msh-faserip"]) {
-        delete msgFlags["msh-faserip"].autoApply;
-        delete msgFlags["msh-faserip"].results;
-        msgFlags["msh-faserip"].origin = "energy-per-target";
-      }
-
-      await ChatMessage.create({
-        speaker: ChatMessage.getSpeaker({ actor }),
-        content: cardHtml,
-        flags: msgFlags
-      });
-
-      // Auto-apply damage in Full Auto mode
-      if (!isManualMode && this.opts?.autoApply && isHit && rawDamage > 0 && targetActor) {
-        await applyDamageToTargets({
-          damage: afterArmor,   // armor already subtracted above for display; bypass re-calculation
-          attackerUuid: actor.uuid,
-          damageType: choice.powerDamageType,
-          showNotification: false,
-          bypassArmor: true,
-          attackForm: "energy",
-          armorPiercing: 0,
-          apMode: "value",
-          wasKillResult: showKill,
-          targets: target ? [target] : []
-        });
-      }
-
-    } // end for loop for target processing
-
-
-    // Play combat SFX (Energy)
-    try {
-      const sourceName   = choice?.powerName || "Energy Blast";
-      const srcItem      = this?.opts?.item || actor.items.get?.(choice?.powerId) || null;
-      const damageType   = choice?.powerDamageType || srcItem?.system?.damageType || "energy";
-      const rollResult   = String(colorLower ?? "").toLowerCase();   // e.g. "white" | "green" | "yellow" | "red"
-      const isHitResult  = typeof isHit === "boolean" ? isHit : rollResult !== "white";
-
-      if (game.msh?.playCombatSFX) {
-        await game.msh.playCombatSFX({
-          item: srcItem,                 // enables per-power SFX (system.sfx.* or attackModes[].sfx)
-          actionType: "energy",          // lets the SFX picker use mode-specific overrides
-          damageType,                    // e.g. "energy-electricity" or generic "energy"
-          rollResult,                    // normalized
-          isHit: isHitResult,
-          sourceName                     // optional, for heuristic fallback naming
-        });
-      }
-    } catch (e) {
-      console.warn("EnergyAction SFX error:", e);
-    }
+    await this._executeSingleAttack({
+      choice: { ...choice, weapon: powerItem },
+      actor,
+      ability: toHitAbility,
+      actionType,
+      actionName,
+      effects,
+      damageType: choice.powerDamageType || "energy-generic",
+      rawDamage,
+      damageNote: `Power: ${choice.powerName} (${choice.powerRank})`,
+      sourceName: choice.powerName || "Energy Blast",
+      attackForm: "energy",
+      breakingFeat: null,
+      targetCount,
+      attackNumber: 1,
+      totalAttacks: 1
+    });
 
   } // end execute()
 }
