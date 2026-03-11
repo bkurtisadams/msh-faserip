@@ -12,8 +12,12 @@
  */
 import { rollUniversalTable } from "../dice/universal-table.js";
 export function getGrandSlamDistance(strengthValue) {
-  // Convert strength value to areas for knockback
-  if (strengthValue >= 100) return 10; // Unearthly and above
+  // Grand Slam: target knocked away at attacker's Strength as ground speed
+  // Values from Land speed table (areas/round)
+  if (strengthValue >= 500) return 16; // Shift-Z
+  if (strengthValue >= 200) return 14; // Shift-Y
+  if (strengthValue >= 150) return 12; // Shift-X
+  if (strengthValue >= 100) return 10; // Unearthly
   if (strengthValue >= 75) return 9;   // Monstrous
   if (strengthValue >= 50) return 8;   // Amazing
   if (strengthValue >= 40) return 7;   // Incredible

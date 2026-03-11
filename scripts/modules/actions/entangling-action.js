@@ -160,32 +160,11 @@ export async function processEntanglingHit({
 }
 
 /**
- * Apply "Entangled" active effect to target
+ * Apply "Entangled" active effect to target via effect-engine
  */
 async function applyEntangledEffect(target, weapon, materialStrength) {
-  const effectData = {
-    name: `Entangled (${weapon.name})`,
-    icon: "icons/svg/net.svg",
-    origin: weapon.uuid,
-    flags: {
-      "msh-faserip": {
-        entangling: true,
-        weaponName: weapon.name,
-        materialStrength: materialStrength,
-        escapeMethod: "strength-feat"
-      }
-    },
-    changes: [
-      {
-        key: "system.movement.run",
-        mode: CONST.ACTIVE_EFFECT_MODES.MULTIPLY,
-        value: "0"
-      }
-    ]
-  };
-
-  await target.createEmbeddedDocuments("ActiveEffect", [effectData]);
-  
+  const { applyEntangled } = await import("../effects/effect-engine.js");
+  await applyEntangled(target, { materialRank: materialStrength });
   ui.notifications.info(`${target.name} is entangled by ${weapon.name}!`);
 }
 
