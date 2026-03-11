@@ -451,6 +451,7 @@
             <div class="form-group half">
               <label>Duration:</label>
               <select name="system.save.onFail.duration">
+                <option value="1-10"   {{#if (eq system.save.onFail.duration "1-10")}}selected{{/if}}>1d10 Rounds</option>
                 <option value="rank"   {{#if (eq system.save.onFail.duration "rank")}}selected{{/if}}>Power Rank Rounds</option>
                 <option value="rounds" {{#if (eq system.save.onFail.duration "rounds")}}selected{{/if}}>Fixed Rounds...</option>
                 <option value="scene"  {{#if (eq system.save.onFail.duration "scene")}}selected{{/if}}>Scene</option>
