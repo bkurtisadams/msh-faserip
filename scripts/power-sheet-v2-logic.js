@@ -1,4 +1,5 @@
-// power-sheet-v2-logic.js v1.2.0 - 2026-03-12
+// power-sheet-v2-logic.js v1.3.0 - 2026-03-12
+// v1.3.0: Persistent textarea resize heights (localStorage per item)
 // v1.2.0: Collapsible Active Effects, Healing/Absorption toggle, bigger textareas
 // v1.1.0: Rank→Value auto-fill, special strength type change handler, field reorder support
 // Drop-in: call ps2ActivateListeners(html, itemSheet) from activateListeners
@@ -191,5 +192,28 @@ export function ps2ActivateListeners(html, sheet) {
       effectsBody.slideDown(150);
       effectsFieldset.attr('data-expanded', 'true');
     }
+  });
+
+  // Persistent textarea heights (localStorage keyed by item ID + field name)
+  const itemId = sheet.item?.id ?? 'unknown';
+  html.find('.ps2-textarea').each(function () {
+    const ta = this;
+    const $ta = $(ta);
+    const field = $ta.attr('name');
+    if (!field) return;
+    const key = `ps2-ta-${itemId}-${field}`;
+    const saved = localStorage.getItem(key);
+    if (saved) {
+      ta.style.height = saved + 'px';
+      ta.removeAttribute('rows');
+    }
+    // Save on drag-resize (mouseup after resize changes offsetHeight)
+    let lastH = ta.offsetHeight;
+    $ta.on('mouseup', () => {
+      if (ta.offsetHeight !== lastH) {
+        lastH = ta.offsetHeight;
+        localStorage.setItem(key, lastH);
+      }
+    });
   });
 }
