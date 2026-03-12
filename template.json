@@ -330,7 +330,9 @@
           "effect": "stunned",
           "duration": "1-10",
           "notes": ""
-        }
+        },
+        "rerollOnKarmaLoss": false,
+        "rerollOnLifeThreat": false
       },
       "isDefensePower": false,
       "defenseType": "bodyArmor",
@@ -345,9 +347,146 @@
       "limitation": {
         "usesPerDay": 0,
         "usesPerScene": 0,
-        "rankBonus": 0
+        "rankBonus": 0,
+        "maxRank": ""
       },
-      "limitations": ""
+      "limitations": "",
+      "countsAsTwoPowers": false,
+      "grantedByEquipment": false,
+      "damageType": "",
+      "extraAttacks": false,
+      "specialStrengthType": "",
+      "clawMaterialStrength": "",
+      "telekinesisStrength": "",
+      "isBodyArmor": false,
+      "armorUseRankValue": true,
+      "armorPhysical": 0,
+      "armorEnergy": 0,
+      "isForceField": false,
+      "forceFieldType": "personal",
+      "isResistance": false,
+      "resistanceEffect": "damageReduction",
+      "resistanceIsConductive": false,
+      "resistanceMinRank": "",
+      "isEnergyReflection": false,
+      "energyReflectionType": "",
+      "energyReflectionRank": "full",
+      "detection": {
+        "enhancedSense": "",
+        "protectedSense": "",
+        "detectionType": "",
+        "infravisionRange": 0,
+        "combatSense": false,
+        "cosmicAwareness": false,
+        "precognition": false,
+        "postcognition": false,
+        "computerLinks": false,
+        "mechanicalIntuition": false,
+        "canTrack": false
+      },
+      "abilitySubstitution": {
+        "fighting": {
+          "enabled": false,
+          "context": ""
+        },
+        "agility": {
+          "enabled": false,
+          "context": ""
+        },
+        "strength": {
+          "enabled": false,
+          "context": ""
+        },
+        "endurance": {
+          "enabled": false,
+          "context": ""
+        },
+        "reason": {
+          "enabled": false,
+          "context": ""
+        },
+        "intuition": {
+          "enabled": false,
+          "context": ""
+        },
+        "psyche": {
+          "enabled": false,
+          "context": ""
+        }
+      },
+      "movement": {
+        "type": "",
+        "areasPerRound": 0,
+        "useRankSpeed": false,
+        "leavesTunnel": false
+      },
+      "control": {
+        "controlType": "",
+        "controlSpecific": "",
+        "manipulateExisting": false,
+        "generateNew": false,
+        "useAsShield": false,
+        "useAsWeapon": false,
+        "createConstructs": false,
+        "animateObjects": false
+      },
+      "mental": {
+        "telepathy": false,
+        "mentalProbe": false,
+        "mindControl": false,
+        "emotionControl": false,
+        "empathy": false,
+        "psiScreen": false,
+        "imageGeneration": false,
+        "possession": false,
+        "astralProjection": false,
+        "psionicAttack": false,
+        "transferral": false,
+        "animateDrawings": false,
+        "pheromones": false,
+        "emotionType": "",
+        "singleEmotionBonus": false
+      },
+      "transformation": {
+        "affects": "self",
+        "transformType": "",
+        "targetMaterial": "",
+        "targetResistsWith": "",
+        "duration": "concentration",
+        "touchRequired": false,
+        "retainsMental": true,
+        "retainsPowers": false
+      },
+      "healingType": "",
+      "regenerationType": "",
+      "absorptionType": "",
+      "absorptionSpecific": "",
+      "hasRecoveryPower": false,
+      "isDamageTransfer": false,
+      "isImmortality": false,
+      "absorptionConvertsToHealth": false,
+      "absorptionCanRedirect": false,
+      "isLifeSupport": false,
+      "isMagic": false,
+      "magic": {
+        "energyType": "",
+        "school": "",
+        "castCost": 0,
+        "successAbility": "psyche",
+        "chant": false,
+        "gesture": false,
+        "usesCeremony": false,
+        "sourceEntity": ""
+      },
+      "hasBonusPowers": false,
+      "bonusPowers": [],
+      "sfx": {
+        "hit": "",
+        "miss": "",
+        "hitVolume": 80,
+        "missVolume": 80
+      },
+      "specialMechanics": ""
     },
     "talent": {
       "templates": [

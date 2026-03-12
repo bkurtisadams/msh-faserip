@@ -174,8 +174,9 @@ function buildForceFieldAE(item, values) {
 
 function buildResistanceAE(item, values) {
   const scope = SCOPE();
-  const typeLabel = values.resistanceType
-    ? values.resistanceType.charAt(0).toUpperCase() + values.resistanceType.slice(1)
+  const rt = String(values.resistanceType || "");
+  const typeLabel = rt
+    ? rt.charAt(0).toUpperCase() + rt.slice(1)
     : "Unknown";
   const invulnLabel = values.isInvulnerability ? "Invulnerability" : "Resistance";
   const label = `${invulnLabel}: ${typeLabel} (${values.rank}: ${values.resistanceValue})`;
@@ -445,6 +446,7 @@ function isResistanceMatch(baseType, resType, fullDmgType) {
   if ((resType === "fire" || resType === "heat") && (baseType === "fire" || baseType === "heat")) return true;
   if ((resType === "cold" || resType === "ice") && (baseType === "cold" || baseType === "ice")) return true;
   if ((resType === "electricity" || resType === "electric") && (baseType === "electricity" || baseType === "electric")) return true;
+  if (resType === "radiation" && baseType === "light") return true;
 
   return fullDmgType.includes(resType);
 }

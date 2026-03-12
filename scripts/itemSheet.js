@@ -1,15 +1,18 @@
-// itemSheet.js v1.12.0 - 2026-03-04
+// itemSheet.js v1.14.0 - 2026-03-12
+// v1.14.0: Power sheet v2 layout redesign — reorder fields, rank→value auto-fill, 520px width, conditional special strength
+// v1.13.0: Power sheet v2 — single scrollable form, HQ-style, category-driven sections
 // v1.12.0: Add Effects tab to power sheet with ActiveEffect presets and management
 // v1.11.0: Extract contact sheet to standalone contactSheet.js
 // v1.9.0: Redesign talent sheet to HQ-style with fieldsets, auto-fill from specialty data, rule summary
 // v1.8.0: Add SFX preview buttons and volume controls to power sheet
 // v1.7.0: Power Sheet layout reorganization
 import { prepareActiveEffectCategories, onManageActiveEffect } from "../helpers/effects.mjs";
+import { ps2ActivateListeners } from "./power-sheet-v2-logic.js";
 export class FaseripItemSheet extends ItemSheet {
   static get defaultOptions() {
     return foundry.utils.mergeObject(super.defaultOptions, {
       classes: ["faserip", "sheet", "item"],
-      width: 640,
+      width: 520,
       height: 600,
       tabs: [{ navSelector: ".sheet-tabs", contentSelector: ".sheet-body", initial: "overview" }],
       resizable: true,
@@ -17,10 +20,14 @@ export class FaseripItemSheet extends ItemSheet {
     });
   }
 
+  /** @override — power v2 uses 520x700, no tabs */
+  _getHeaderButtons() {
+    return super._getHeaderButtons();
+  }
+
   get template() {
-    // Use specific templates for different item types
     if (this.item.type === 'power') {
-      return `systems/msh-faserip/templates/power-sheet.html`;
+      return `systems/msh-faserip/templates/power-sheet-v2.html`;
     }
     else if (this.item.type === 'vehicle') {
       return `systems/msh-faserip/templates/vehicle-sheet.html`;
@@ -424,188 +431,14 @@ export class FaseripItemSheet extends ItemSheet {
     }
 
 
-   // ============ TAB HANDLING ============
-    // Manual tab switching (compatible with all Foundry versions)
-    html.find('.sheet-tabs .item').click(ev => {
-      ev.preventDefault();
-      const tab = ev.currentTarget.dataset.tab;
-      
-      // Update tab nav
-      html.find('.sheet-tabs .item').removeClass('active');
-      ev.currentTarget.classList.add('active');
-      
-      // Update tab content
-      html.find('.tab').removeClass('active');
-      html.find(`.tab[data-tab="${tab}"]`).addClass('active');
-    });
-
-    // Respect existing active state; if none, default to the first
-    if (!html.find('.sheet-tabs .item.active').length) {
-      html.find('.sheet-tabs .item:first').addClass('active');
-    }
-    if (!html.find('.tab.active').length) {  // ← Fixed: proper if statement
-      html.find('.tab:first').addClass('active');
-    }
-    const activeTab = html.find('.sheet-tabs .item.active').data('tab') 
-                    ?? html.find('.sheet-tabs .item:first').data('tab');
-    html.find(`.tab[data-tab="${activeTab}"]`).addClass('active');
-
-    // --- HEALING ---
-    html.find('#healing-type').change(async ev => {
-      const value = ev.currentTarget.value || "";
-      await this.item.update({ "system.healingType": value }, { render: false });
-      this.render(true); // re-test {{#if system.healingType}}
-    });
-
-    html.find('input[name="system.healingMaxPerDay"]').change(async ev => {
-      const num = Number(ev.currentTarget.value ?? 0) || 0;
-      await this.item.update({ "system.healingMaxPerDay": num }, { render: false });
-    });
-
-    // --- REGENERATION ---
-    html.find('#regen-type').change(async ev => {
-      const value = ev.currentTarget.value || "";
-      // If switching to solar, provide a sensible default for the rate
-      const patch = { "system.regenerationType": value };
-      if (value === "solar" && !this.item.system?.regenerationRate) {
-        patch["system.regenerationRate"] = "10-minutes";
-      }
-      await this.item.update(patch, { render: false });
-      this.render(true); // re-test {{#if system.regenerationType}}
-    });
-
-    html.find('select[name="system.regenerationRate"]').change(async ev => {
-      const value = ev.currentTarget.value || "";
-      await this.item.update({ "system.regenerationRate": value }, { render: false });
-    });
-
-    // --- ABSORPTION (same pattern so its {{#if}} toggles immediately) ---
-    html.find('#absorption-type').change(async ev => {
-      const value = ev.currentTarget.value || "";
-      await this.item.update({ "system.absorptionType": value }, { render: false });
-      this.render(true); // re-test {{#if system.absorptionType}}
-    });
-
-    html.find('input[name="system.absorptionConvertsToHealth"]').change(async ev => {
-      await this.item.update({ "system.absorptionConvertsToHealth": ev.currentTarget.checked }, { render: false });
-    });
-
-    // If Source set to 'mystical', prefill energyType (if empty) and switch to Magic tab
-    html.find('select[name="system.source"]').change(async ev => {
-      if (ev.currentTarget.value === 'mystical') {
-        const current = this.item.system?.magic?.energyType || "";
-        if (!current) await this.item.update({ "system.magic.energyType": "universal" });
-        html.find('.sheet-tabs .item[data-tab="magic"]').trigger('click');
-      }
-    });
-
-    // ============ ADVANCED SECTION TOGGLE ============
-    html.find('h4.advanced-toggle').click(ev => {
-      const target = ev.currentTarget;
-      const collapseId = target.dataset.collapse;
-      const section = html.find(`#${collapseId}`);
-      
-      target.classList.toggle('collapsed');
-      section.toggleClass('collapsed');
-    });
-
-    // ============ CONDITIONAL FIELD VISIBILITY ============
-    // These trigger re-renders so {{#if}} conditions in template update
-
-    html.find('#is-life-support, #healing-type, #regen-type, #absorption-type, #is-limited, #save-intensity').change(ev => {
-      this.render(true);
-    });
-
-
-    // Handle magic energy type dropdown - MERGED VERSION (replaces both handlers)
-    html.find('select[name="system.magic.energyType"]').on('change', async ev => {
-      const value  = ev.currentTarget.value;
-      const magic  = this.item.system?.magic ?? {};
-      const updates = { "system.magic.energyType": value };
-
-      // Ceremony only for Dimensional (Universal = chant OR gesture)
-      updates["system.magic.usesCeremony"] = (value === 'dimensional');
-
-      // Set chant/gesture defaults ONLY if both are currently undefined
-      const untouched = (magic.chant === undefined) && (magic.gesture === undefined);
-
-      if (untouched) {
-        if (value === 'personal') {
-          updates["system.magic.chant"]   = false;
-          updates["system.magic.gesture"] = false;
-        } else if (value === 'universal') {
-          updates["system.magic.chant"]   = true;   // default to chant
-          updates["system.magic.gesture"] = false;
-        } else if (value === 'dimensional') {
-          updates["system.magic.chant"]   = true;
-          updates["system.magic.gesture"] = true;
-        }
-      }
-
-      // Sensible resist defaults per type
-      if (value === 'personal') {
-        updates["system.magic.targetResistsWith"] = "";
-      } else if (value === 'universal') {
-        updates["system.magic.targetResistsWith"] = "psyche";
-      }
-      // dimensional: leave as-is (depends on emulated effect)
-
-      // Personal default cost (1 HP/turn) if not already set
-      if (value === 'personal' && !magic.castCost) {
-        updates["system.magic.castCost"] = 1;
-      }
-
-      await this.item.update(updates);
-
-      // Optional: avatar quality-of-life (skip scary notes on dimensional)
-      const isAvatar = this.actor?.getFlag?.('msh-faserip', 'isAvatar') === true;
-      if (value === 'dimensional' && isAvatar) {
-        await this.item.update({ "system.magic.backlashNotes": "" }, { render: false });
-      }
-    });
-
-
-    // Toggle combat properties section
-    html.find('.toggle-combat-section').click(ev => {
-      const button = $(ev.currentTarget);
-      const section = button.next('.combat-properties');
-      const icon = button.find('.toggle-icon');
-      
-      section.slideToggle(200);
-      icon.toggleClass('fa-chevron-down fa-chevron-up');
-    });
-
-    // --- COMBAT TAB CHECKBOXES ---
-    html.find('#requires-save').change(async ev => {
-      const checked = ev.currentTarget.checked;
-      await this.item.update({ "system.requiresSave": checked }, { render: false });
-      this.render(true);
-    });
-
-    html.find('#is-body-armor').change(async ev => {
-      const checked = ev.currentTarget.checked;
-      await this.item.update({ "system.isBodyArmor": checked }, { render: false });
-      this.render(true);
-    });
-
-    html.find('#is-resistance').change(async ev => {
-      const checked = ev.currentTarget.checked;
-      await this.item.update({ "system.isResistance": checked }, { render: false });
-      this.render(true);
-    });
+    // ============ CONDITIONAL FIELD VISIBILITY (v2: handled by ps2ActivateListeners) ============
 
     // Auto-expand combat section if combat data exists
     if (this.item.type === "power") {
-      const hasAttackType = this.item.system.attackType;
-      const hasBodyArmor = this.item.system.isBodyArmor;
-      const hasResistance = this.item.system.isResistance;
-      
-      if (hasAttackType || hasBodyArmor || hasResistance) {
-        html.find('.combat-properties').show();
-        html.find('.toggle-icon').removeClass('fa-chevron-down').addClass('fa-chevron-up');
-      }
+      // Power sheet v2: category-driven section visibility and all toggle logic
+      ps2ActivateListeners(html, this);
 
-      // ============ BATTLE EFFECTS COLUMN HANDLING ============
+      // Battle effects column data (kept for action dialogs / combat-handler references)
       const BATTLE_EFFECTS_COLUMNS = {
         "BA": { name: "Blunt Attack", results: { white: "Miss", green: "Hit", yellow: "Slam", red: "Stun" }, canPullPunch: true, canReduceEffect: true },
         "EA": { name: "Edged Attack", results: { white: "Miss", green: "Hit", yellow: "Stun", red: "Kill" }, canPullPunch: false, canReduceEffect: false },
@@ -619,58 +452,11 @@ export class FaseripItemSheet extends ItemSheet {
         "Gb": { name: "Grabbing", results: { white: "Miss", green: "Take", yellow: "Grab", red: "Break" }, canPullPunch: false, canReduceEffect: false }
       };
 
-      // Update battle effects display
-      const updateBattleEffectsDisplay = (column) => {
-        const displayEl = html.find('#battle-effects-display')[0];
-        if (!displayEl) return;
-        
-        if (!column || !BATTLE_EFFECTS_COLUMNS[column]) {
-          displayEl.innerHTML = '<span class="no-column" style="color:#999;">Select a column to see results</span>';
-          return;
-        }
-        
-        const colData = BATTLE_EFFECTS_COLUMNS[column];
-        const r = colData.results;
-        displayEl.innerHTML = `
-          <span style="background:#f0f0f0;padding:2px 4px;border-radius:2px;margin-right:4px;">${r.white}</span>
-          <span style="background:#4CAF50;color:white;padding:2px 4px;border-radius:2px;margin-right:4px;">${r.green}</span>
-          <span style="background:#FFC107;padding:2px 4px;border-radius:2px;margin-right:4px;">${r.yellow}</span>
-          <span style="background:#F44336;color:white;padding:2px 4px;border-radius:2px;">${r.red}</span>
-        `;
-      };
-
-      // Update pull punch/reduce effect based on column (unless override is checked)
-      const updatePullPunchFromColumn = (column) => {
-        const overrideCheck = html.find('#override-pull-punch')[0];
-        if (overrideCheck?.checked) return;
-        
-        const pullPunchCheck = html.find('#can-pull-punch')[0];
-        const reduceEffectCheck = html.find('#can-reduce-effect')[0];
-        if (!pullPunchCheck || !reduceEffectCheck) return;
-        
-        if (!column || !BATTLE_EFFECTS_COLUMNS[column]) {
-          pullPunchCheck.checked = false;
-          reduceEffectCheck.checked = false;
-        } else {
-          const colData = BATTLE_EFFECTS_COLUMNS[column];
-          pullPunchCheck.checked = colData.canPullPunch;
-          reduceEffectCheck.checked = colData.canReduceEffect;
-        }
-      };
-
-      // Initial display on load
-      updateBattleEffectsDisplay(this.item.system.battleEffectsColumn);
-
-      // Battle effects column change handler
-      html.find('#battle-effects-column').change(async ev => {
+      // Auto-set pull punch/reduce effect when battle column changes
+      html.find('#ps2-battle-col').on('change', async ev => {
         const column = ev.currentTarget.value;
-        updateBattleEffectsDisplay(column);
-        updatePullPunchFromColumn(column);
-        
-        // Auto-update the stored values if not overridden
-        const overrideCheck = html.find('#override-pull-punch')[0];
-        if (!overrideCheck?.checked && BATTLE_EFFECTS_COLUMNS[column]) {
-          const colData = BATTLE_EFFECTS_COLUMNS[column];
+        const colData = BATTLE_EFFECTS_COLUMNS[column];
+        if (colData) {
           await this.item.update({
             "system.canPullPunch": colData.canPullPunch,
             "system.canReduceEffect": colData.canReduceEffect
@@ -678,408 +464,43 @@ export class FaseripItemSheet extends ItemSheet {
         }
       });
 
-      // Override checkbox - when unchecked, resync from column
-      html.find('#override-pull-punch').change(async ev => {
-        if (!ev.currentTarget.checked) {
-          const column = html.find('#battle-effects-column').val();
-          updatePullPunchFromColumn(column);
-          if (BATTLE_EFFECTS_COLUMNS[column]) {
-            const colData = BATTLE_EFFECTS_COLUMNS[column];
-            await this.item.update({
-              "system.canPullPunch": colData.canPullPunch,
-              "system.canReduceEffect": colData.canReduceEffect
-            }, { render: false });
-          }
-        }
-      });
-
-      // ============ DAMAGE SOURCE HANDLING ============
-      const updateDamageSourceUI = (source) => {
-        const damageInput = html.find('[name="system.damage"]')[0];
-        const hintEl = html.find('#damage-source-hint')[0];
-        if (!damageInput || !hintEl) return;
-        
-        const rankValue = this.item.system.value || 0;
-        switch (source) {
-          case "rank":
-            damageInput.disabled = true;
-            hintEl.textContent = `Uses rank (${rankValue})`;
-            break;
-          case "strength":
-            damageInput.disabled = true;
-            hintEl.textContent = "Uses actor's Strength";
-            break;
-          case "endurance":
-            damageInput.disabled = true;
-            hintEl.textContent = "Uses actor's Endurance";
-            break;
-          case "fixed":
-            damageInput.disabled = false;
-            hintEl.textContent = "Enter fixed value";
-            break;
-          default:
-            damageInput.disabled = true;
-            hintEl.textContent = "";
-        }
-      };
-
-      // Initial state
-      updateDamageSourceUI(this.item.system.damageSource || "rank");
-
-      html.find('#damage-source').change(ev => {
-        updateDamageSourceUI(ev.currentTarget.value);
-      });
-
-      // ============ FORCE FIELD CHECKBOX ============
-      html.find('#is-force-field').change(async ev => {
-        const checked = ev.currentTarget.checked;
-        await this.item.update({ "system.isForceField": checked }, { render: false });
+      // Emotion control checkbox -> re-render for conditional block
+      html.find('input[name="system.mental.emotionControl"]').on('change', async ev => {
+        await this.item.update({ "system.mental.emotionControl": ev.currentTarget.checked }, { render: false });
         this.render(true);
       });
 
-      // ============ ARMOR USE RANK VALUE TOGGLE ============
-      html.find('#armor-use-rank').change(ev => {
-        const armorManualValues = html.find('.armor-manual-values')[0];
-        if (armorManualValues) {
-          armorManualValues.style.display = ev.currentTarget.checked ? 'none' : '';
-        }
-      });
-
-      // ============ ABSORPTION TYPE CHANGE (re-render to show/hide options) ============
-      html.find('#absorption-type').change(async ev => {
+      // Magic energy type -> re-render for conditional fields
+      html.find('select[name="system.magic.energyType"]').on('change', async ev => {
         const value = ev.currentTarget.value;
-        await this.item.update({ "system.absorptionType": value }, { render: false });
+        const updates = { "system.magic.energyType": value };
+        if (value === 'dimensional') {
+          updates["system.magic.chant"] = true;
+          updates["system.magic.gesture"] = true;
+          updates["system.magic.usesCeremony"] = true;
+        } else if (value === 'personal' && !this.item.system?.magic?.castCost) {
+          updates["system.magic.castCost"] = 1;
+        }
+        await this.item.update(updates, { render: false });
         this.render(true);
       });
 
-      // ============ MAGIC CS MODIFIER CALCULATION ============
-      const updateMagicCSDisplay = () => {
-        const energyType = html.find('#magic-energy-type').val() || this.item.system.magic?.energyType || "";
-        const hasChant = html.find('#magic-chant').is(':checked');
-        const hasGesture = html.find('#magic-gesture').is(':checked');
-        const hasCeremony = html.find('#magic-ceremony').is(':checked');
-        const csDisplay = html.find('#magic-cs-display');
-        
-        if (!csDisplay.length) return;
-        
-        let csModifier = 0;
-        let message = "";
-        let bgColor = "#e8f5e9"; // green = good
-        
-        if (energyType === "personal") {
-          message = "✓ Personal magic requires no verbal/somatic components";
-        } else if (energyType === "universal") {
-          // Universal requires chant OR gesture
-          if (!hasChant && !hasGesture) {
-            csModifier = -1;
-            message = "⚠ Universal magic requires chant OR gesture (−1CS penalty)";
-            bgColor = "#fff3e0"; // orange warning
-          } else {
-            message = "✓ Universal magic requirement met (chant or gesture)";
+      // Source set to 'mystical' -> pre-fill magic energy type
+      html.find('select[name="system.source"]').on('change', async ev => {
+        if (ev.currentTarget.value === 'mystical') {
+          const current = this.item.system?.magic?.energyType || "";
+          if (!current) {
+            await this.item.update({ "system.magic.energyType": "universal", "system.isMagic": true });
           }
-        } else if (energyType === "dimensional") {
-          // Dimensional requires BOTH chant AND gesture
-          if (!hasChant && !hasGesture) {
-            csModifier = -2;
-            message = "⚠ Dimensional magic requires chant AND gesture (−2CS penalty)";
-            bgColor = "#ffebee"; // red warning
-          } else if (!hasChant) {
-            csModifier = -1;
-            message = "⚠ Missing chant for Dimensional magic (−1CS penalty)";
-            bgColor = "#fff3e0";
-          } else if (!hasGesture) {
-            csModifier = -1;
-            message = "⚠ Missing gesture for Dimensional magic (−1CS penalty)";
-            bgColor = "#fff3e0";
-          } else {
-            message = "✓ Dimensional magic requirements met (chant + gesture)";
-          }
-          if (hasCeremony && csModifier < 0) {
-            message += " — Ceremony can offset penalties at GM discretion";
-          }
-        } else {
-          message = "Select an energy type to see casting requirements";
-          bgColor = "#f5f5f5";
-        }
-        
-        csDisplay.html(message);
-        csDisplay.css('background', bgColor);
-        
-        // Store csModifier for use in action dialogs
-        this.item.system.magic.csModifier = csModifier;
-      };
-      
-      // Run on load and when checkboxes change
-      updateMagicCSDisplay();
-      html.find('#magic-energy-type').change(async ev => {
-        updateMagicCSDisplay();
-        // Re-render to show/hide conditional sections (dimensional source, universal backlash)
-        const value = ev.currentTarget.value;
-        await this.item.update({ "system.magic.energyType": value }, { render: false });
-        this.render(true);
-      });
-      html.find('#magic-chant, #magic-gesture, #magic-ceremony').change(updateMagicCSDisplay);
-
-      // ============ MOVEMENT TAB HANDLERS ============
-      
-      // Movement type change - re-render to show type-specific options
-      html.find('#movement-type').change(async ev => {
-        const value = ev.currentTarget.value;
-        await this.item.update({ "system.movement.type": value }, { render: false });
-        this.render(true);
-      });
-
-      // Use rank speed toggle
-      html.find('#movement-use-rank').change(ev => {
-        const manualSpeed = html.find('.movement-manual-speed')[0];
-        if (manualSpeed) {
-          manualSpeed.style.display = ev.currentTarget.checked ? 'none' : '';
-        }
-        updateSpeedReference();
-      });
-
-      // Passenger toggle
-      html.find('#movement-passengers').change(ev => {
-        const passengerLimit = html.find('.passenger-limit')[0];
-        if (passengerLimit) {
-          passengerLimit.style.display = ev.currentTarget.checked ? '' : 'none';
         }
       });
 
-      // Speed reference display
-      const updateSpeedReference = () => {
-        const speedRef = html.find('#speed-reference');
-        if (!speedRef.length) return;
-        
-        const useRank = html.find('#movement-use-rank').is(':checked');
-        const rankValue = this.item.system.value || 0;
-        const manualAreas = parseInt(html.find('input[name="system.movement.areasPerRound"]').val()) || 1;
-        
-        const areasPerRound = useRank ? rankValue : manualAreas;
-        
-        // FASERIP speed conversion (1 area = ~40 feet, 1 round = 6 seconds)
-        // So areas/round * 40 * 10 = feet/minute, / 5280 * 60 = MPH
-        const feetPerRound = areasPerRound * 40;
-        const mph = Math.round((feetPerRound / 6) * 0.682); // ft/sec to mph
-        
-        const movementType = html.find('#movement-type').val() || "";
-        let typeNote = "";
-        if (movementType === "flight") {
-          typeNote = " (Unaffected by terrain)";
-        } else if (movementType === "teleportation") {
-          typeNote = " (Range in areas, instantaneous)";
-        } else if (movementType === "tunneling") {
-          typeNote = " (Through solid material)";
-        }
-        
-        speedRef.html(`<strong>Speed:</strong> ${areasPerRound} areas/round (~${mph} MPH)${typeNote}`);
-      };
-      
-      updateSpeedReference();
-      html.find('input[name="system.movement.areasPerRound"]').on('input', updateSpeedReference);
-
-      // ============ EFFECTS TAB HANDLERS ============
-      
-      // Detection checkbox - re-render to show options
-      html.find('#is-detection').change(async ev => {
-        const checked = ev.currentTarget.checked;
-        await this.item.update({ "system.isDetectionPower": checked }, { render: false });
+      // Movement type change -> re-render
+      html.find('#ps2-movement-type').on('change', async ev => {
+        await this.item.update({ "system.movement.type": ev.currentTarget.value }, { render: false });
         this.render(true);
-      });
-
-      // Mental checkbox - re-render to show options
-      html.find('#is-mental').change(async ev => {
-        const checked = ev.currentTarget.checked;
-        await this.item.update({ "system.isMentalPower": checked }, { render: false });
-        this.render(true);
-      });
-
-      // Emotion control checkbox - re-render to show emotion type
-      html.find('#mental-emotion').change(async ev => {
-        const checked = ev.currentTarget.checked;
-        await this.item.update({ "system.mental.emotionControl": checked }, { render: false });
-        this.render(true);
-      });
-
-      // Image generation checkbox - re-render to show illusion options
-      html.find('#mental-illusion').change(async ev => {
-        const checked = ev.currentTarget.checked;
-        await this.item.update({ "system.mental.imageGeneration": checked }, { render: false });
-        this.render(true);
-      });
-
-      // Transformation checkbox - re-render to show options
-      html.find('#is-transformation').change(async ev => {
-        const checked = ev.currentTarget.checked;
-        await this.item.update({ "system.isTransformation": checked }, { render: false });
-        this.render(true);
-      });
-
-      // Control checkbox - re-render to show options
-      html.find('#is-control').change(async ev => {
-        const checked = ev.currentTarget.checked;
-        await this.item.update({ "system.isControlPower": checked }, { render: false });
-        this.render(true);
-      });
-
-      // Control sub-options - re-render for conditional fields
-      html.find('#control-shield, #control-weapon, #control-construct').change(async ev => {
-        const field = ev.currentTarget.name;
-        const checked = ev.currentTarget.checked;
-        await this.item.update({ [field]: checked }, { render: false });
-        this.render(true);
-      });
-
-      // ============ LIMITATIONS HANDLERS ============
-      
-      // Limitation checkbox - re-render to show options
-      html.find('#is-limited').change(async ev => {
-        const checked = ev.currentTarget.checked;
-        await this.item.update({ "system.isLimited": checked }, { render: false });
-        this.render(true);
-      });
-
-      // ============ BONUS POWERS HANDLERS ============
-      
-      // Bonus powers checkbox - re-render to show list
-      html.find('#has-bonus-powers').change(async ev => {
-        const checked = ev.currentTarget.checked;
-        await this.item.update({ "system.hasBonusPowers": checked }, { render: false });
-        this.render(true);
-      });
-
-      // Add bonus power
-      html.find('#add-bonus-power').click(async ev => {
-        ev.preventDefault();
-        const bonusPowers = foundry.utils.deepClone(this.item.system.bonusPowers || []);
-        bonusPowers.push({ name: "", rankMod: "same" });
-        await this.item.update({ "system.bonusPowers": bonusPowers });
-      });
-
-      // Remove bonus power
-      html.find('.remove-bonus-power').click(async ev => {
-        ev.preventDefault();
-        const index = parseInt(ev.currentTarget.dataset.index);
-        const bonusPowers = foundry.utils.deepClone(this.item.system.bonusPowers || []);
-        bonusPowers.splice(index, 1);
-        await this.item.update({ "system.bonusPowers": bonusPowers });
       });
     }
-
-    // Update power type options when category changes
-    html.find('#power-category').change(ev => {
-      const category = ev.currentTarget.value;
-      this._updatePowerTypeOptions(html, category);
-    });
-
-    // If the category is already selected on load, populate the types
-    const selectedCategory = html.find('#power-category').val();
-    if (selectedCategory) {
-      this._updatePowerTypeOptions(html, selectedCategory);
-    }
-    
-    if (this.item.type === "power") {
-      // Normalize and set attack type dropdown (handle legacy values)
-      const rawAttackType = this.item.system.attackType || "";
-      const legacyMap = {
-        "ranged-energy": "energy",
-        "ranged-force": "force",
-        "ranged-projectile": "shooting",
-        "ranged-thrown": "throwing-blunt",
-        "melee-blunt": "blunt-attack",
-        "melee-edged": "edged-attack",
-        "touch": "energy",
-        "grapple": "grappling",
-        "charging": "charging"
-      };
-      const normalizedType = legacyMap[rawAttackType] || rawAttackType;
-      const attackTypeSelect = html.find('#attack-type');
-      if (attackTypeSelect.length && normalizedType) {
-        attackTypeSelect.val(normalizedType);
-      }
-
-      // Initially show/hide custom range field based on current selection
-      const currentRange = this.item.system.range;
-      const customRangeInput = html.find('.custom-range-input');
-      
-      if (currentRange === "custom") {
-        customRangeInput.show();
-      } else {
-        customRangeInput.hide();
-      }
-      
-      // Handle range dropdown changes
-      html.find('select[name="system.range"]').change(ev => {
-        const selectedRange = ev.currentTarget.value;
-        const customRangeInput = html.find('.custom-range-input');
-        const calculatedRangeField = html.find('.calculated-range');
-      
-        if (selectedRange === "custom") {
-          customRangeInput.show();
-        } else {
-          customRangeInput.hide();
-        }
-      
-        if (selectedRange === "rank") {
-          calculatedRangeField.show();
-          const rank = html.find('select[name="system.rank"]').val();
-          const rangeText = this._getRangeByRank(rank);
-          html.find('#calculated-range-display').val(rangeText);
-          this.item.update({ "system.calculatedRange": rangeText });
-        } else {
-          calculatedRangeField.hide();
-          html.find('#calculated-range-display').val('');
-          this.item.update({ "system.calculatedRange": "" });
-        }
-      });
-
-      // On load, if range is "rank", show the calculated field and fill it
-      const rangeValue = html.find('select[name="system.range"]').val();
-      if (rangeValue === "rank") {
-        const rank = html.find('select[name="system.rank"]').val();
-        const rangeText = this._getRangeByRank(rank);
-        html.find('.calculated-range').show();
-        html.find('#calculated-range-display').val(rangeText);
-      }
-
-      // When Rank dropdown changes, update calculated range if using "By Rank"
-      html.find('select[name="system.rank"]').change(ev => {
-        const newRank = ev.currentTarget.value;
-        const selectedRange = html.find('select[name="system.range"]').val();
-        if (selectedRange === "rank") {
-          const rangeText = this._getRangeByRank(newRank);
-          html.find('#calculated-range-display').val(rangeText);
-          this.item.update({ "system.calculatedRange": rangeText });
-        }
-      });
-
-      // Handle duration dropdown changes
-      html.find('select[name="system.duration"]').change(ev => {
-        const selectedDuration = ev.currentTarget.value;
-        const customDurationInput = html.find('.custom-duration-input');
-        
-        if (selectedDuration === "custom" || selectedDuration === "rounds") {
-          customDurationInput.show();
-        } else {
-          customDurationInput.hide();
-        }
-      });
-
-      // Initialize duration input visibility on load
-      const currentDuration = html.find('select[name="system.duration"]').val();
-      const customDurationInput = html.find('.custom-duration-input');
-      if (currentDuration === "custom" || currentDuration === "rounds") {
-        customDurationInput.show();
-      } else {
-        customDurationInput.hide();
-      }
-    }
-
-    // Show/hide body armor fields
-    html.find('#is-body-armor').change(ev => {
-      const checked = ev.currentTarget.checked;
-      html.find('.armor-details').toggle(checked);
-    });
 
     // Delete button
     html.find('.delete-power').click(async () => {

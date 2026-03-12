@@ -1,0 +1,925 @@
+<form class="{{cssClass}} power-sheet-v2" autocomplete="off">
+
+  <!-- ══════════ HEADER ══════════ -->
+  <div class="ps2-header">
+    <img class="ps2-portrait" src="{{item.img}}" data-edit="img" title="{{item.name}}" />
+    <input class="ps2-name" name="name" type="text" value="{{item.name}}" placeholder="Power Name"/>
+    <div class="ps2-header-controls">
+      <label class="ps2-toggle" title="Active">
+        <input type="checkbox" name="system.isActive" {{checked system.isActive}} data-dtype="Boolean">
+        <i class="fas fa-bolt"></i>
+      </label>
+      <label class="ps2-toggle" title="Starred">
+        <input type="checkbox" name="system.isStarred" {{checked system.isStarred}} data-dtype="Boolean">
+        <i class="fas fa-star"></i>
+      </label>
+    </div>
+  </div>
+
+  <!-- ══════════ SCROLLABLE BODY ══════════ -->
+  <div class="ps2-body">
+
+    <!-- ── RANK (always visible) ────────────────────── -->
+    <fieldset class="ps2-fieldset">
+      <legend>Rank &amp; Identity</legend>
+      <div class="ps2-grid-2col">
+        <div class="ps2-field">
+          <label>Category</label>
+          <select name="system.category" id="ps2-category">
+            <option value="">-- Select --</option>
+            <option value="resistances"              {{#if (eq system.category "resistances")}}selected{{/if}}>Resistances</option>
+            <option value="senses"                   {{#if (eq system.category "senses")}}selected{{/if}}>Senses</option>
+            <option value="movement"                 {{#if (eq system.category "movement")}}selected{{/if}}>Movement</option>
+            <option value="matterControl"            {{#if (eq system.category "matterControl")}}selected{{/if}}>Matter Control</option>
+            <option value="energyControl"            {{#if (eq system.category "energyControl")}}selected{{/if}}>Energy Control</option>
+            <option value="bodyControl"              {{#if (eq system.category "bodyControl")}}selected{{/if}}>Body Control</option>
+            <option value="distanceAttacks"          {{#if (eq system.category "distanceAttacks")}}selected{{/if}}>Distance Attacks</option>
+            <option value="mentalPowers"             {{#if (eq system.category "mentalPowers")}}selected{{/if}}>Mental Powers</option>
+            <option value="bodyAlterationsOffensive" {{#if (eq system.category "bodyAlterationsOffensive")}}selected{{/if}}>Body Alt / Offensive</option>
+            <option value="bodyAlterationsDefensive" {{#if (eq system.category "bodyAlterationsDefensive")}}selected{{/if}}>Body Alt / Defensive</option>
+          </select>
+        </div>
+        <div class="ps2-field">
+          <label>Source</label>
+          <select name="system.source">
+            <option value="natural"   {{#if (eq system.source "natural")}}selected{{/if}}>Natural</option>
+            <option value="equipment" {{#if (eq system.source "equipment")}}selected{{/if}}>Equipment</option>
+            <option value="mystical"  {{#if (eq system.source "mystical")}}selected{{/if}}>Mystical</option>
+          </select>
+        </div>
+        <div class="ps2-field">
+          <label>Rank</label>
+          <select name="system.rank" id="ps2-rank">
+            {{#each (array "Shift-0" "Feeble" "Poor" "Typical" "Good" "Excellent" "Remarkable" "Incredible" "Amazing" "Monstrous" "Unearthly" "Shift-X" "Shift-Y" "Shift-Z" "Class 1000" "Class 3000" "Class 5000" "Beyond") as |r|}}
+              <option value="{{r}}" {{#if (eq ../system.rank r)}}selected{{/if}}>{{r}}</option>
+            {{/each}}
+          </select>
+        </div>
+        <div class="ps2-field">
+          <label>Value</label>
+          <input type="number" name="system.value" id="ps2-value" value="{{system.value}}" data-dtype="Number" />
+        </div>
+        <div class="ps2-field">
+          <label>Range</label>
+          <select name="system.range" id="ps2-range">
+            <option value="">None</option>
+            <option value="touch"       {{#if (eq system.range "touch")}}selected{{/if}}>Touch</option>
+            <option value="lineOfSight" {{#if (eq system.range "lineOfSight")}}selected{{/if}}>Line of Sight</option>
+            <option value="areas"       {{#if (eq system.range "areas")}}selected{{/if}}>Areas (fixed)</option>
+            <option value="rank"        {{#if (eq system.range "rank")}}selected{{/if}}>By Rank</option>
+            <option value="custom"      {{#if (eq system.range "custom")}}selected{{/if}}>Custom</option>
+          </select>
+        </div>
+        <div class="ps2-field">
+          <label>Duration</label>
+          <select name="system.duration" id="ps2-duration">
+            <option value="">Instant</option>
+            <option value="rounds" {{#if (eq system.duration "rounds")}}selected{{/if}}>Rounds</option>
+            <option value="rank"   {{#if (eq system.duration "rank")}}selected{{/if}}>By Rank</option>
+            <option value="concentration" {{#if (eq system.duration "concentration")}}selected{{/if}}>Concentration</option>
+            <option value="scene"  {{#if (eq system.duration "scene")}}selected{{/if}}>Scene</option>
+            <option value="custom" {{#if (eq system.duration "custom")}}selected{{/if}}>Custom</option>
+          </select>
+        </div>
+      </div>
+      {{#if (eq system.range "custom")}}
+      <div class="ps2-field" style="margin-top:4px;">
+        <label>Custom Range</label>
+        <input type="text" name="system.customRange" value="{{system.customRange}}" placeholder="e.g., 10 areas or 500m">
+      </div>
+      {{/if}}
+      {{#if (eq system.duration "custom")}}
+      <div class="ps2-field" style="margin-top:4px;">
+        <label>Custom Duration</label>
+        <input type="text" name="system.customDuration" value="{{system.customDuration}}" placeholder="e.g., 1 hour; until sunrise">
+      </div>
+      {{/if}}
+      <div class="ps2-flags">
+        <label><input type="checkbox" name="system.countsAsTwoPowers" {{checked system.countsAsTwoPowers}} data-dtype="Boolean"> Counts as 2</label>
+        <label><input type="checkbox" name="system.isBonus" {{checked system.isBonus}} data-dtype="Boolean"> Bonus Power</label>
+        <label><input type="checkbox" name="system.grantedByEquipment" {{checked system.grantedByEquipment}} data-dtype="Boolean"> From Equipment</label>
+        <label><input type="checkbox" name="system.continuingDamage" {{checked system.continuingDamage}} data-dtype="Boolean"> Continuing Dmg</label>
+      </div>
+      {{#if system.isBonus}}
+      <div class="ps2-field" style="margin-top:4px;">
+        <label>Bonus From</label>
+        <input type="text" name="system.bonusFrom" value="{{system.bonusFrom}}" placeholder="Parent power name" />
+      </div>
+      {{/if}}
+      {{#if system.continuingDamage}}
+      <div class="ps2-field" style="margin-top:4px;">
+        <label>Continuing Rounds</label>
+        <input type="number" name="system.continuingDamageRounds" value="{{system.continuingDamageRounds}}" min="1" placeholder="3" style="width:80px;" />
+      </div>
+      {{/if}}
+    </fieldset>
+
+    <!-- ── ATTACK ──────────────────────────────────── -->
+    <fieldset class="ps2-fieldset ps2-section" data-section="attack">
+      <legend>
+        <label class="ps2-section-toggle">
+          <input type="checkbox" name="system.isAttackPower" {{checked system.isAttackPower}} data-dtype="Boolean" class="ps2-section-check" data-section="attack">
+          Attack
+        </label>
+      </legend>
+      <div class="ps2-section-body" {{#unless system.isAttackPower}}style="display:none;"{{/unless}}>
+        <div class="ps2-grid-2col">
+          <div class="ps2-field">
+            <label>Battle Effects Column</label>
+            <select name="system.battleEffectsColumn" id="ps2-battle-col">
+              <option value="">-- None --</option>
+              <option value="BA" {{#if (eq system.battleEffectsColumn "BA")}}selected{{/if}}>Blunt Attack</option>
+              <option value="EA" {{#if (eq system.battleEffectsColumn "EA")}}selected{{/if}}>Edged Attack</option>
+              <option value="S"  {{#if (eq system.battleEffectsColumn "S")}}selected{{/if}}>Shooting</option>
+              <option value="TE" {{#if (eq system.battleEffectsColumn "TE")}}selected{{/if}}>Throwing Edged</option>
+              <option value="TB" {{#if (eq system.battleEffectsColumn "TB")}}selected{{/if}}>Throwing Blunt</option>
+              <option value="En" {{#if (eq system.battleEffectsColumn "En")}}selected{{/if}}>Energy</option>
+              <option value="Fo" {{#if (eq system.battleEffectsColumn "Fo")}}selected{{/if}}>Force</option>
+              <option value="Ch" {{#if (eq system.battleEffectsColumn "Ch")}}selected{{/if}}>Charging</option>
+              <option value="Gp" {{#if (eq system.battleEffectsColumn "Gp")}}selected{{/if}}>Grappling</option>
+              <option value="Gb" {{#if (eq system.battleEffectsColumn "Gb")}}selected{{/if}}>Grabbing</option>
+            </select>
+          </div>
+          <div class="ps2-field">
+            <label>Damage Source</label>
+            <select name="system.damageSource" id="ps2-dmg-source">
+              <option value="rank"      {{#if (eq system.damageSource "rank")}}selected{{/if}}>Power Rank</option>
+              <option value="strength"  {{#if (eq system.damageSource "strength")}}selected{{/if}}>Strength</option>
+              <option value="endurance" {{#if (eq system.damageSource "endurance")}}selected{{/if}}>Endurance</option>
+              <option value="material"  {{#if (eq system.damageSource "material")}}selected{{/if}}>Material Str</option>
+              <option value="fixed"     {{#if (eq system.damageSource "fixed")}}selected{{/if}}>Fixed</option>
+            </select>
+          </div>
+          <div class="ps2-field">
+            <label>Damage Type</label>
+            <select name="system.damageType">
+              <option value="">-- None --</option>
+              <option value="physical-blunt"      {{#if (eq system.damageType "physical-blunt")}}selected{{/if}}>Physical: Blunt</option>
+              <option value="physical-edged"      {{#if (eq system.damageType "physical-edged")}}selected{{/if}}>Physical: Edged</option>
+              <option value="energy-generic"      {{#if (eq system.damageType "energy-generic")}}selected{{/if}}>Energy: Generic</option>
+              <option value="energy-force"        {{#if (eq system.damageType "energy-force")}}selected{{/if}}>Energy: Force</option>
+              <option value="energy-fire"         {{#if (eq system.damageType "energy-fire")}}selected{{/if}}>Energy: Fire/Heat</option>
+              <option value="energy-cold"         {{#if (eq system.damageType "energy-cold")}}selected{{/if}}>Energy: Cold/Ice</option>
+              <option value="energy-electricity"  {{#if (eq system.damageType "energy-electricity")}}selected{{/if}}>Energy: Electricity</option>
+              <option value="energy-sound"        {{#if (eq system.damageType "energy-sound")}}selected{{/if}}>Energy: Sound/Sonic</option>
+              <option value="energy-radiation"    {{#if (eq system.damageType "energy-radiation")}}selected{{/if}}>Energy: Radiation/Light</option>
+              <option value="energy-darkforce"    {{#if (eq system.damageType "energy-darkforce")}}selected{{/if}}>Energy: Darkforce</option>
+              <option value="corrosive"           {{#if (eq system.damageType "corrosive")}}selected{{/if}}>Corrosive/Acid</option>
+              <option value="mental"              {{#if (eq system.damageType "mental")}}selected{{/if}}>Mental/Psionic</option>
+              <option value="touch-energy"        {{#if (eq system.damageType "touch-energy")}}selected{{/if}}>Touch: Energy</option>
+              <option value="touch-paralyzing"    {{#if (eq system.damageType "touch-paralyzing")}}selected{{/if}}>Touch: Paralyzing</option>
+              <option value="touch-rotting"       {{#if (eq system.damageType "touch-rotting")}}selected{{/if}}>Touch: Rotting</option>
+              <option value="touch-corrosive"     {{#if (eq system.damageType "touch-corrosive")}}selected{{/if}}>Touch: Corrosive</option>
+              <option value="touch-healthdrain"   {{#if (eq system.damageType "touch-healthdrain")}}selected{{/if}}>Touch: Health Drain</option>
+              <option value="touch-blinding"      {{#if (eq system.damageType "touch-blinding")}}selected{{/if}}>Touch: Blinding</option>
+            </select>
+          </div>
+          <div class="ps2-field">
+            <label>Fixed Damage</label>
+            <input type="number" name="system.damage" value="{{system.damage}}" data-dtype="Number" placeholder="Auto" {{#if (ne system.damageSource "fixed")}}disabled{{/if}} />
+          </div>
+        </div>
+        <div class="ps2-flags" style="margin-top:4px;">
+          <label title="Can reduce damage"><input type="checkbox" name="system.canPullPunch" {{checked system.canPullPunch}} data-dtype="Boolean"> Pull Dmg</label>
+          <label title="Can reduce effect color"><input type="checkbox" name="system.canReduceEffect" {{checked system.canReduceEffect}} data-dtype="Boolean"> Pull Effect</label>
+          <label title="Pierces artificial armor"><input type="checkbox" name="system.armorPiercing" {{checked system.armorPiercing}} data-dtype="Boolean"> Armor Pierce</label>
+          <label title="Extra Attacks power"><input type="checkbox" name="system.extraAttacks" {{checked system.extraAttacks}} data-dtype="Boolean"> Extra Attacks</label>
+        </div>
+        <div class="ps2-material-row">
+          <div class="ps2-field">
+            <label>Special Strength</label>
+            <select name="system.specialStrengthType" id="ps2-special-str-type">
+              <option value="" {{#unless system.specialStrengthType}}selected{{/unless}}>N/A</option>
+              <option value="claw" {{#if (eq system.specialStrengthType "claw")}}selected{{/if}}>Claw Material</option>
+              <option value="tk" {{#if (eq system.specialStrengthType "tk")}}selected{{/if}}>TK Strength</option>
+              <option value="ensnare" {{#if (eq system.specialStrengthType "ensnare")}}selected{{/if}}>Ensnare Str</option>
+            </select>
+          </div>
+          {{#if system.specialStrengthType}}
+          <div class="ps2-field">
+            <label>Rank</label>
+            {{#if (eq system.specialStrengthType "claw")}}
+            <select name="system.clawMaterialStrength">
+              <option value="">N/A</option>
+              {{#each (array "Typical" "Good" "Excellent" "Remarkable" "Incredible" "Amazing" "Monstrous" "Unearthly") as |r|}}
+              <option value="{{r}}" {{#if (eq ../system.clawMaterialStrength r)}}selected{{/if}}>{{r}}</option>
+              {{/each}}
+            </select>
+            {{else if (eq system.specialStrengthType "tk")}}
+            <select name="system.telekinesisStrength">
+              <option value="">N/A</option>
+              {{#each (array "Feeble" "Poor" "Typical" "Good" "Excellent" "Remarkable" "Incredible" "Amazing" "Monstrous" "Unearthly") as |r|}}
+              <option value="{{r}}" {{#if (eq ../system.telekinesisStrength r)}}selected{{/if}}>{{r}}</option>
+              {{/each}}
+            </select>
+            {{else if (eq system.specialStrengthType "ensnare")}}
+            <select name="system.ensnaringStrength">
+              <option value="">N/A</option>
+              {{#each (array "Feeble" "Poor" "Typical" "Good" "Excellent" "Remarkable" "Incredible" "Amazing" "Monstrous" "Unearthly") as |r|}}
+              <option value="{{r}}" {{#if (eq ../system.ensnaringStrength r)}}selected{{/if}}>{{r}}</option>
+              {{/each}}
+            </select>
+            {{/if}}
+          </div>
+          {{/if}}
+        </div>
+      </div>
+    </fieldset>
+
+    <!-- ── DEFENSE ─────────────────────────────────── -->
+    <fieldset class="ps2-fieldset ps2-section" data-section="defense">
+      <legend>
+        <label class="ps2-section-toggle">
+          <input type="checkbox" name="system.isDefensePower" {{checked system.isDefensePower}} data-dtype="Boolean" class="ps2-section-check" data-section="defense">
+          Defense
+        </label>
+      </legend>
+      <div class="ps2-section-body" {{#unless system.isDefensePower}}style="display:none;"{{/unless}}>
+
+        <!-- Body Armor -->
+        <div class="ps2-subsection">
+          <label class="ps2-subsection-label"><input type="checkbox" name="system.isBodyArmor" {{checked system.isBodyArmor}} data-dtype="Boolean" class="ps2-sub-check" data-sub="bodyarmor"> Body Armor</label>
+          <div class="ps2-sub-body" data-sub="bodyarmor" {{#unless system.isBodyArmor}}style="display:none;"{{/unless}}>
+            <div class="ps2-grid-2col">
+              <div class="ps2-field">
+                <label>Type</label>
+                <select name="system.bodyArmorType">
+                  <option value="both"     {{#if (eq system.bodyArmorType "both")}}selected{{/if}}>Both</option>
+                  <option value="physical" {{#if (eq system.bodyArmorType "physical")}}selected{{/if}}>Physical Only</option>
+                  <option value="energy"   {{#if (eq system.bodyArmorType "energy")}}selected{{/if}}>Energy Only</option>
+                </select>
+              </div>
+              <div class="ps2-field">
+                <label>Nature</label>
+                <select name="system.armorNature">
+                  <option value="natural"    {{#if (eq system.armorNature "natural")}}selected{{/if}}>Natural</option>
+                  <option value="artificial" {{#if (eq system.armorNature "artificial")}}selected{{/if}}>Artificial</option>
+                </select>
+              </div>
+            </div>
+            <label class="ps2-inline"><input type="checkbox" name="system.armorUseRankValue" {{checked system.armorUseRankValue}} data-dtype="Boolean"> Use Power Rank Value</label>
+            {{#unless system.armorUseRankValue}}
+            <div class="ps2-grid-2col" style="margin-top:4px;">
+              <div class="ps2-field"><label>Phys</label><input type="number" name="system.armorPhysical" value="{{system.armorPhysical}}" data-dtype="Number" /></div>
+              <div class="ps2-field"><label>Energy</label><input type="number" name="system.armorEnergy" value="{{system.armorEnergy}}" data-dtype="Number" /></div>
+            </div>
+            {{/unless}}
+          </div>
+        </div>
+
+        <!-- Force Field -->
+        <div class="ps2-subsection">
+          <label class="ps2-subsection-label"><input type="checkbox" name="system.isForceField" {{checked system.isForceField}} data-dtype="Boolean" class="ps2-sub-check" data-sub="forcefield"> Force Field</label>
+          <div class="ps2-sub-body" data-sub="forcefield" {{#unless system.isForceField}}style="display:none;"{{/unless}}>
+            <div class="ps2-grid-2col">
+              <div class="ps2-field">
+                <label>Type</label>
+                <select name="system.forceFieldType">
+                  <option value="personal"  {{#if (eq system.forceFieldType "personal")}}selected{{/if}}>Personal (+1CS)</option>
+                  <option value="projected" {{#if (eq system.forceFieldType "projected")}}selected{{/if}}>Projected</option>
+                </select>
+              </div>
+              <div class="ps2-field">
+                <label>Coverage (areas)</label>
+                <input type="number" name="system.forceFieldCoverage" value="{{system.forceFieldCoverage}}" min="0" data-dtype="Number" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Resistance -->
+        <div class="ps2-subsection">
+          <label class="ps2-subsection-label"><input type="checkbox" name="system.isResistance" {{checked system.isResistance}} data-dtype="Boolean" class="ps2-sub-check" data-sub="resistance"> Resistance / Invulnerability</label>
+          <div class="ps2-sub-body" data-sub="resistance" {{#unless system.isResistance}}style="display:none;"{{/unless}}>
+            <div class="ps2-grid-2col">
+              <div class="ps2-field">
+                <label>Against</label>
+                <select name="system.resistanceType">
+                  <option value="">-- Select --</option>
+                  {{#each (array "fire" "cold" "electricity" "radiation" "toxins" "corrosives" "emotion" "mental" "magic" "disease" "physical" "energy" "psionic" "astral") as |t|}}
+                    <option value="{{t}}" {{#if (eq ../system.resistanceType t)}}selected{{/if}}>{{capitalize t}}</option>
+                  {{/each}}
+                </select>
+              </div>
+              <div class="ps2-field">
+                <label>Effect</label>
+                <select name="system.resistanceEffect">
+                  <option value="damageReduction" {{#if (eq system.resistanceEffect "damageReduction")}}selected{{/if}}>Reduce Dmg by Rank</option>
+                  <option value="immunity"        {{#if (eq system.resistanceEffect "immunity")}}selected{{/if}}>Ignore if Rank &ge; Atk</option>
+                  <option value="columnShift"     {{#if (eq system.resistanceEffect "columnShift")}}selected{{/if}}>+CS to resist</option>
+                  <option value="featNegate"      {{#if (eq system.resistanceEffect "featNegate")}}selected{{/if}}>FEAT to negate</option>
+                  <option value="featReplace"     {{#if (eq system.resistanceEffect "featReplace")}}selected{{/if}}>Replace ability FEAT</option>
+                </select>
+              </div>
+            </div>
+            <div class="ps2-flags">
+              <label><input type="checkbox" name="system.resistanceIsInvulnerability" {{checked system.resistanceIsInvulnerability}} data-dtype="Boolean"> Invulnerability (CL1000)</label>
+              <label><input type="checkbox" name="system.resistanceIsConductive" {{checked system.resistanceIsConductive}} data-dtype="Boolean"> Conductive</label>
+            </div>
+            <div class="ps2-field" style="margin-top:4px;">
+              <label>Min Rank Rule</label>
+              <select name="system.resistanceMinRank">
+                <option value="">None</option>
+                <option value="endurance+1" {{#if (eq system.resistanceMinRank "endurance+1")}}selected{{/if}}>Endurance +1CS (Toxin/Disease)</option>
+                <option value="intuition+1" {{#if (eq system.resistanceMinRank "intuition+1")}}selected{{/if}}>Intuition +1CS (Emotion)</option>
+                <option value="psyche+1"    {{#if (eq system.resistanceMinRank "psyche+1")}}selected{{/if}}>Psyche +1CS (Mental)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Energy Reflection -->
+        <div class="ps2-subsection">
+          <label class="ps2-subsection-label"><input type="checkbox" name="system.isEnergyReflection" {{checked system.isEnergyReflection}} data-dtype="Boolean" class="ps2-sub-check" data-sub="reflection"> Energy Reflection</label>
+          <div class="ps2-sub-body" data-sub="reflection" {{#unless system.isEnergyReflection}}style="display:none;"{{/unless}}>
+            <div class="ps2-grid-2col">
+              <div class="ps2-field">
+                <label>Reflects</label>
+                <input type="text" name="system.energyReflectionType" value="{{system.energyReflectionType}}" placeholder="e.g., all energy" />
+              </div>
+              <div class="ps2-field">
+                <label>Reflected At</label>
+                <select name="system.energyReflectionRank">
+                  <option value="full"   {{#if (eq system.energyReflectionRank "full")}}selected{{/if}}>Full Attack</option>
+                  <option value="rank"   {{#if (eq system.energyReflectionRank "rank")}}selected{{/if}}>Power Rank</option>
+                  <option value="minus1" {{#if (eq system.energyReflectionRank "minus1")}}selected{{/if}}>Attack -1CS</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </fieldset>
+
+    <!-- ── TARGET SAVE ─────────────────────────────── -->
+    <fieldset class="ps2-fieldset ps2-section" data-section="save">
+      <legend>
+        <label class="ps2-section-toggle">
+          <input type="checkbox" name="system.requiresSave" {{checked system.requiresSave}} data-dtype="Boolean" class="ps2-section-check" data-section="save">
+          Target Save
+        </label>
+      </legend>
+      <div class="ps2-section-body" {{#unless system.requiresSave}}style="display:none;"{{/unless}}>
+        <div class="ps2-grid-2col">
+          <div class="ps2-field">
+            <label>Resist Ability</label>
+            <select name="system.save.ability">
+              {{#each (array "endurance" "psyche" "intuition" "reason" "fighting" "agility" "strength") as |a|}}
+                <option value="{{a}}" {{#if (eq ../system.save.ability a)}}selected{{/if}}>{{capitalize a}}</option>
+              {{/each}}
+            </select>
+          </div>
+          <div class="ps2-field">
+            <label>Intensity</label>
+            <select name="system.save.intensity">
+              <option value="power-rank" {{#if (eq system.save.intensity "power-rank")}}selected{{/if}}>Power Rank</option>
+              <option value="fixed-rank" {{#if (eq system.save.intensity "fixed-rank")}}selected{{/if}}>Fixed</option>
+              <option value="none"       {{#if (eq system.save.intensity "none")}}selected{{/if}}>None</option>
+            </select>
+          </div>
+          <div class="ps2-field">
+            <label>On Fail</label>
+            <select name="system.save.onFail.effect">
+              <option value="stunned"       {{#if (eq system.save.onFail.effect "stunned")}}selected{{/if}}>Stunned</option>
+              <option value="unconscious"   {{#if (eq system.save.onFail.effect "unconscious")}}selected{{/if}}>Unconscious</option>
+              <option value="blinded"       {{#if (eq system.save.onFail.effect "blinded")}}selected{{/if}}>Blinded</option>
+              <option value="paralyzed"     {{#if (eq system.save.onFail.effect "paralyzed")}}selected{{/if}}>Paralyzed</option>
+              <option value="immobilized"   {{#if (eq system.save.onFail.effect "immobilized")}}selected{{/if}}>Immobilized</option>
+              <option value="nullified"     {{#if (eq system.save.onFail.effect "nullified")}}selected{{/if}}>Nullified</option>
+              <option value="slammed"       {{#if (eq system.save.onFail.effect "slammed")}}selected{{/if}}>Slammed</option>
+              <option value="grabbed"       {{#if (eq system.save.onFail.effect "grabbed")}}selected{{/if}}>Grabbed</option>
+              <option value="weakened"      {{#if (eq system.save.onFail.effect "weakened")}}selected{{/if}}>Weakened</option>
+              <option value="custom"        {{#if (eq system.save.onFail.effect "custom")}}selected{{/if}}>Custom</option>
+            </select>
+          </div>
+          <div class="ps2-field">
+            <label>Duration</label>
+            <select name="system.save.onFail.duration">
+              <option value="1-10"   {{#if (eq system.save.onFail.duration "1-10")}}selected{{/if}}>1d10 Rounds</option>
+              <option value="rank"   {{#if (eq system.save.onFail.duration "rank")}}selected{{/if}}>Power Rank Rds</option>
+              <option value="scene"  {{#if (eq system.save.onFail.duration "scene")}}selected{{/if}}>Scene</option>
+              <option value="escape" {{#if (eq system.save.onFail.duration "escape")}}selected{{/if}}>Until Escape</option>
+              <option value="custom" {{#if (eq system.save.onFail.duration "custom")}}selected{{/if}}>Custom</option>
+            </select>
+          </div>
+        </div>
+        <div class="ps2-flags">
+          <label><input type="checkbox" name="system.save.rerollOnKarmaLoss" {{checked system.save.rerollOnKarmaLoss}} data-dtype="Boolean"> Re-roll if Karma-losing</label>
+          <label><input type="checkbox" name="system.save.rerollOnLifeThreat" {{checked system.save.rerollOnLifeThreat}} data-dtype="Boolean"> Re-roll if life-threatening</label>
+        </div>
+      </div>
+    </fieldset>
+
+    <!-- ── DETECTION / SENSES ──────────────────────── -->
+    <fieldset class="ps2-fieldset ps2-section" data-section="detection">
+      <legend>Detection / Senses</legend>
+      <div class="ps2-section-body">
+        <div class="ps2-grid-2col">
+          <div class="ps2-field">
+            <label>Enhanced Sense</label>
+            <select name="system.detection.enhancedSense">
+              <option value="">None</option>
+              <option value="sight"   {{#if (eq system.detection.enhancedSense "sight")}}selected{{/if}}>Sight</option>
+              <option value="hearing" {{#if (eq system.detection.enhancedSense "hearing")}}selected{{/if}}>Hearing</option>
+              <option value="smell"   {{#if (eq system.detection.enhancedSense "smell")}}selected{{/if}}>Smell</option>
+              <option value="touch"   {{#if (eq system.detection.enhancedSense "touch")}}selected{{/if}}>Touch</option>
+              <option value="taste"   {{#if (eq system.detection.enhancedSense "taste")}}selected{{/if}}>Taste</option>
+            </select>
+          </div>
+          <div class="ps2-field">
+            <label>Protected Sense</label>
+            <select name="system.detection.protectedSense">
+              <option value="">None</option>
+              <option value="sight"   {{#if (eq system.detection.protectedSense "sight")}}selected{{/if}}>Sight</option>
+              <option value="hearing" {{#if (eq system.detection.protectedSense "hearing")}}selected{{/if}}>Hearing</option>
+              <option value="smell"   {{#if (eq system.detection.protectedSense "smell")}}selected{{/if}}>Smell</option>
+              <option value="all"     {{#if (eq system.detection.protectedSense "all")}}selected{{/if}}>All</option>
+            </select>
+          </div>
+          <div class="ps2-field">
+            <label>Detection Type</label>
+            <select name="system.detection.detectionType">
+              <option value="">None</option>
+              <option value="energy"    {{#if (eq system.detection.detectionType "energy")}}selected{{/if}}>Energy</option>
+              <option value="life"      {{#if (eq system.detection.detectionType "life")}}selected{{/if}}>Life/Bio</option>
+              <option value="magic"     {{#if (eq system.detection.detectionType "magic")}}selected{{/if}}>Magic</option>
+              <option value="mutant"    {{#if (eq system.detection.detectionType "mutant")}}selected{{/if}}>Mutant</option>
+              <option value="psionic"   {{#if (eq system.detection.detectionType "psionic")}}selected{{/if}}>Psionic</option>
+              <option value="radiation" {{#if (eq system.detection.detectionType "radiation")}}selected{{/if}}>Radiation</option>
+              <option value="emotion"   {{#if (eq system.detection.detectionType "emotion")}}selected{{/if}}>Emotion</option>
+              <option value="astral"    {{#if (eq system.detection.detectionType "astral")}}selected{{/if}}>Astral</option>
+              <option value="magnetic"  {{#if (eq system.detection.detectionType "magnetic")}}selected{{/if}}>Magnetic</option>
+            </select>
+          </div>
+          <div class="ps2-field">
+            <label>Infravision (areas)</label>
+            <input type="number" name="system.detection.infravisionRange" value="{{system.detection.infravisionRange}}" min="0" data-dtype="Number" />
+          </div>
+        </div>
+        <div class="ps2-flags">
+          <label><input type="checkbox" name="system.detection.combatSense"         {{checked system.detection.combatSense}}> Combat Sense</label>
+          <label><input type="checkbox" name="system.detection.cosmicAwareness"     {{checked system.detection.cosmicAwareness}}> Cosmic Awareness</label>
+          <label><input type="checkbox" name="system.detection.precognition"        {{checked system.detection.precognition}}> Precognition</label>
+          <label><input type="checkbox" name="system.detection.postcognition"       {{checked system.detection.postcognition}}> Postcognition</label>
+          <label><input type="checkbox" name="system.detection.computerLinks"       {{checked system.detection.computerLinks}}> Computer Links</label>
+          <label><input type="checkbox" name="system.detection.mechanicalIntuition" {{checked system.detection.mechanicalIntuition}}> Mechanical Intuition</label>
+          <label><input type="checkbox" name="system.detection.canTrack"            {{checked system.detection.canTrack}}> Tracking</label>
+        </div>
+      </div>
+    </fieldset>
+
+    <!-- ── ABILITY SUBSTITUTION ────────────────────── -->
+    <fieldset class="ps2-fieldset ps2-section" data-section="abilitySubstitution">
+      <legend>Ability Substitution</legend>
+      <div class="ps2-section-body">
+        <p class="ps2-hint">Power Rank replaces ability for specific actions</p>
+        <div class="ps2-ability-sub-grid">
+          {{#each (array "fighting" "agility" "strength" "endurance" "reason" "intuition" "psyche") as |ab|}}
+          <div class="ps2-ability-sub-row">
+            <label class="ps2-ability-sub-check"><input type="checkbox" name="system.abilitySubstitution.{{ab}}.enabled" {{checked (lookup (lookup ../system.abilitySubstitution ab) "enabled")}} data-dtype="Boolean"> {{capitalize ab}}</label>
+            <input type="text" name="system.abilitySubstitution.{{ab}}.context" value="{{lookup (lookup ../system.abilitySubstitution ab) "context"}}" placeholder="e.g., Blocking, Dodging" class="ps2-ability-sub-context" />
+          </div>
+          {{/each}}
+        </div>
+      </div>
+    </fieldset>
+
+    <!-- ── MOVEMENT ────────────────────────────────── -->
+    <fieldset class="ps2-fieldset ps2-section" data-section="movement">
+      <legend>Movement</legend>
+      <div class="ps2-section-body">
+        <div class="ps2-grid-2col">
+          <div class="ps2-field">
+            <label>Type</label>
+            <select name="system.movement.type" id="ps2-movement-type">
+              <option value="">-- Select --</option>
+              <option value="flight"        {{#if (eq system.movement.type "flight")}}selected{{/if}}>Flight</option>
+              <option value="gliding"       {{#if (eq system.movement.type "gliding")}}selected{{/if}}>Gliding</option>
+              <option value="levitation"    {{#if (eq system.movement.type "levitation")}}selected{{/if}}>Levitation</option>
+              <option value="leaping"       {{#if (eq system.movement.type "leaping")}}selected{{/if}}>Leaping</option>
+              <option value="super-speed"   {{#if (eq system.movement.type "super-speed")}}selected{{/if}}>Lightning Speed</option>
+              <option value="teleportation" {{#if (eq system.movement.type "teleportation")}}selected{{/if}}>Teleportation</option>
+              <option value="swimming"      {{#if (eq system.movement.type "swimming")}}selected{{/if}}>Swimming</option>
+              <option value="climbing"      {{#if (eq system.movement.type "climbing")}}selected{{/if}}>Climbing</option>
+              <option value="tunneling"     {{#if (eq system.movement.type "tunneling")}}selected{{/if}}>Tunneling/Digging</option>
+              <option value="wall-crawling" {{#if (eq system.movement.type "wall-crawling")}}selected{{/if}}>Wall-Crawling</option>
+              <option value="dimensional"   {{#if (eq system.movement.type "dimensional")}}selected{{/if}}>Dimensional Travel</option>
+            </select>
+          </div>
+          <div class="ps2-field">
+            <label>Areas/Round</label>
+            <input type="number" name="system.movement.areasPerRound" value="{{system.movement.areasPerRound}}" min="0" data-dtype="Number" />
+          </div>
+        </div>
+        <div class="ps2-flags">
+          <label><input type="checkbox" name="system.movement.useRankSpeed" {{checked system.movement.useRankSpeed}} data-dtype="Boolean"> Use Rank for Speed</label>
+          <label><input type="checkbox" name="system.movement.leavesTunnel" {{checked system.movement.leavesTunnel}} data-dtype="Boolean"> Leaves Tunnel</label>
+        </div>
+      </div>
+    </fieldset>
+
+    <!-- ── CONTROL / MANIPULATION ──────────────────── -->
+    <fieldset class="ps2-fieldset ps2-section" data-section="control">
+      <legend>Control / Manipulation</legend>
+      <div class="ps2-section-body">
+        <div class="ps2-grid-2col">
+          <div class="ps2-field">
+            <label>Type</label>
+            <select name="system.control.controlType">
+              <option value="">-- Select --</option>
+              <option value="air"         {{#if (eq system.control.controlType "air")}}selected{{/if}}>Air/Wind</option>
+              <option value="earth"       {{#if (eq system.control.controlType "earth")}}selected{{/if}}>Earth/Stone</option>
+              <option value="fire"        {{#if (eq system.control.controlType "fire")}}selected{{/if}}>Fire/Heat</option>
+              <option value="water"       {{#if (eq system.control.controlType "water")}}selected{{/if}}>Water/Ice</option>
+              <option value="electricity" {{#if (eq system.control.controlType "electricity")}}selected{{/if}}>Electricity</option>
+              <option value="magnetism"   {{#if (eq system.control.controlType "magnetism")}}selected{{/if}}>Magnetism</option>
+              <option value="light"       {{#if (eq system.control.controlType "light")}}selected{{/if}}>Light</option>
+              <option value="darkforce"   {{#if (eq system.control.controlType "darkforce")}}selected{{/if}}>Darkforce</option>
+              <option value="gravity"     {{#if (eq system.control.controlType "gravity")}}selected{{/if}}>Gravity</option>
+              <option value="sound"       {{#if (eq system.control.controlType "sound")}}selected{{/if}}>Sound</option>
+              <option value="plant"       {{#if (eq system.control.controlType "plant")}}selected{{/if}}>Plants</option>
+              <option value="weather"     {{#if (eq system.control.controlType "weather")}}selected{{/if}}>Weather</option>
+              <option value="time"        {{#if (eq system.control.controlType "time")}}selected{{/if}}>Time</option>
+              <option value="probability" {{#if (eq system.control.controlType "probability")}}selected{{/if}}>Probability</option>
+              <option value="nullifying"  {{#if (eq system.control.controlType "nullifying")}}selected{{/if}}>Nullifying</option>
+              <option value="animate"     {{#if (eq system.control.controlType "animate")}}selected{{/if}}>Animate Objects</option>
+            </select>
+          </div>
+          <div class="ps2-field">
+            <label>Specific</label>
+            <input type="text" name="system.control.controlSpecific" value="{{system.control.controlSpecific}}" placeholder="e.g., ferrous metals" />
+          </div>
+        </div>
+        <div class="ps2-flags">
+          <label><input type="checkbox" name="system.control.manipulateExisting" {{checked system.control.manipulateExisting}}> Manipulate Existing</label>
+          <label><input type="checkbox" name="system.control.generateNew"        {{checked system.control.generateNew}}> Generate New</label>
+          <label><input type="checkbox" name="system.control.useAsShield"        {{checked system.control.useAsShield}}> Use as Shield</label>
+          <label><input type="checkbox" name="system.control.useAsWeapon"        {{checked system.control.useAsWeapon}}> Use as Weapon</label>
+          <label><input type="checkbox" name="system.control.createConstructs"   {{checked system.control.createConstructs}}> Create Constructs</label>
+          <label><input type="checkbox" name="system.control.animateObjects"     {{checked system.control.animateObjects}}> Animate Objects</label>
+        </div>
+      </div>
+    </fieldset>
+
+    <!-- ── MENTAL / PSIONIC ────────────────────────── -->
+    <fieldset class="ps2-fieldset ps2-section" data-section="mental">
+      <legend>Mental / Psionic</legend>
+      <div class="ps2-section-body">
+        <div class="ps2-flags ps2-mental-flags">
+          <label><input type="checkbox" name="system.mental.telepathy"        {{checked system.mental.telepathy}}> Telepathy</label>
+          <label><input type="checkbox" name="system.mental.mentalProbe"      {{checked system.mental.mentalProbe}}> Mental Probe</label>
+          <label><input type="checkbox" name="system.mental.mindControl"      {{checked system.mental.mindControl}}> Mind Control</label>
+          <label><input type="checkbox" name="system.mental.emotionControl"   {{checked system.mental.emotionControl}}> Emotion Control</label>
+          <label><input type="checkbox" name="system.mental.empathy"          {{checked system.mental.empathy}}> Empathy</label>
+          <label><input type="checkbox" name="system.mental.psiScreen"        {{checked system.mental.psiScreen}}> Psi-Screen</label>
+          <label><input type="checkbox" name="system.mental.imageGeneration"  {{checked system.mental.imageGeneration}}> Image Generation</label>
+          <label><input type="checkbox" name="system.mental.possession"       {{checked system.mental.possession}}> Possession</label>
+          <label><input type="checkbox" name="system.mental.astralProjection" {{checked system.mental.astralProjection}}> Astral Projection</label>
+          <label><input type="checkbox" name="system.mental.psionicAttack"    {{checked system.mental.psionicAttack}}> Psionic Attack</label>
+          <label><input type="checkbox" name="system.mental.transferral"      {{checked system.mental.transferral}}> Transferral</label>
+          <label><input type="checkbox" name="system.mental.animateDrawings"  {{checked system.mental.animateDrawings}}> Animate Drawings</label>
+          <label><input type="checkbox" name="system.mental.pheromones"       {{checked system.mental.pheromones}}> Pheromones</label>
+        </div>
+        {{#if system.mental.emotionControl}}
+        <div class="ps2-conditional-block">
+          <div class="ps2-grid-2col">
+            <div class="ps2-field">
+              <label>Emotion Type</label>
+              <select name="system.mental.emotionType">
+                <option value="">Any</option>
+                <option value="fear"     {{#if (eq system.mental.emotionType "fear")}}selected{{/if}}>Fear</option>
+                <option value="love"     {{#if (eq system.mental.emotionType "love")}}selected{{/if}}>Love</option>
+                <option value="hatred"   {{#if (eq system.mental.emotionType "hatred")}}selected{{/if}}>Hatred</option>
+                <option value="respect"  {{#if (eq system.mental.emotionType "respect")}}selected{{/if}}>Respect</option>
+                <option value="loyalty"  {{#if (eq system.mental.emotionType "loyalty")}}selected{{/if}}>Loyalty</option>
+                <option value="doubt"    {{#if (eq system.mental.emotionType "doubt")}}selected{{/if}}>Doubt</option>
+                <option value="pleasure" {{#if (eq system.mental.emotionType "pleasure")}}selected{{/if}}>Pleasure</option>
+              </select>
+            </div>
+            <div class="ps2-field" style="align-self:end;">
+              <label class="ps2-inline"><input type="checkbox" name="system.mental.singleEmotionBonus" {{checked system.mental.singleEmotionBonus}}> Single Emotion (+2CS)</label>
+            </div>
+          </div>
+        </div>
+        {{/if}}
+      </div>
+    </fieldset>
+
+    <!-- ── TRANSFORMATION ──────────────────────────── -->
+    <fieldset class="ps2-fieldset ps2-section" data-section="transformation">
+      <legend>Transformation</legend>
+      <div class="ps2-section-body">
+        <div class="ps2-grid-3col">
+          <div class="ps2-field">
+            <label>Affects</label>
+            <select name="system.transformation.affects">
+              <option value="self"   {{#if (eq system.transformation.affects "self")}}selected{{/if}}>Self</option>
+              <option value="others" {{#if (eq system.transformation.affects "others")}}selected{{/if}}>Others</option>
+              <option value="both"   {{#if (eq system.transformation.affects "both")}}selected{{/if}}>Both</option>
+            </select>
+          </div>
+          <div class="ps2-field">
+            <label>Transform Type</label>
+            <select name="system.transformation.transformType">
+              <option value="">-- Select --</option>
+              <option value="body"       {{#if (eq system.transformation.transformType "body")}}selected{{/if}}>Body</option>
+              <option value="animal"     {{#if (eq system.transformation.transformType "animal")}}selected{{/if}}>Animal</option>
+              <option value="density"    {{#if (eq system.transformation.transformType "density")}}selected{{/if}}>Density</option>
+              <option value="shape"      {{#if (eq system.transformation.transformType "shape")}}selected{{/if}}>Shape</option>
+              <option value="imitation"  {{#if (eq system.transformation.transformType "imitation")}}selected{{/if}}>Imitation</option>
+              <option value="phasing"    {{#if (eq system.transformation.transformType "phasing")}}selected{{/if}}>Phasing</option>
+              <option value="size"       {{#if (eq system.transformation.transformType "size")}}selected{{/if}}>Size (Growth/Shrink)</option>
+              <option value="plasticity" {{#if (eq system.transformation.transformType "plasticity")}}selected{{/if}}>Plasticity</option>
+              <option value="elongation" {{#if (eq system.transformation.transformType "elongation")}}selected{{/if}}>Elongation</option>
+              <option value="invisibility" {{#if (eq system.transformation.transformType "invisibility")}}selected{{/if}}>Invisibility</option>
+              <option value="blending"   {{#if (eq system.transformation.transformType "blending")}}selected{{/if}}>Blending</option>
+            </select>
+          </div>
+          <div class="ps2-field">
+            <label>Target Material</label>
+            <input type="text" name="system.transformation.targetMaterial" value="{{system.transformation.targetMaterial}}" placeholder="e.g., Stone, Wolf" />
+          </div>
+        </div>
+        <div class="ps2-grid-2col" style="margin-top:4px;">
+          <div class="ps2-field">
+            <label>Resists With</label>
+            <select name="system.transformation.targetResistsWith">
+              <option value=""         {{#if (eq system.transformation.targetResistsWith "")}}selected{{/if}}>None (willing)</option>
+              <option value="psyche"   {{#if (eq system.transformation.targetResistsWith "psyche")}}selected{{/if}}>Psyche</option>
+              <option value="endurance"{{#if (eq system.transformation.targetResistsWith "endurance")}}selected{{/if}}>Endurance</option>
+            </select>
+          </div>
+          <div class="ps2-field">
+            <label>Duration</label>
+            <select name="system.transformation.duration">
+              <option value="concentration" {{#if (eq system.transformation.duration "concentration")}}selected{{/if}}>Concentration</option>
+              <option value="rounds"        {{#if (eq system.transformation.duration "rounds")}}selected{{/if}}>1-10 Rounds</option>
+              <option value="hour"          {{#if (eq system.transformation.duration "hour")}}selected{{/if}}>1 Hour</option>
+              <option value="permanent"     {{#if (eq system.transformation.duration "permanent")}}selected{{/if}}>Permanent</option>
+            </select>
+          </div>
+        </div>
+        <div class="ps2-flags">
+          <label><input type="checkbox" name="system.transformation.touchRequired" {{checked system.transformation.touchRequired}}> Touch Required</label>
+          <label><input type="checkbox" name="system.transformation.retainsMental" {{checked system.transformation.retainsMental}}> Retains Mental</label>
+          <label><input type="checkbox" name="system.transformation.retainsPowers" {{checked system.transformation.retainsPowers}}> Retains Powers</label>
+        </div>
+      </div>
+    </fieldset>
+
+    <!-- ── HEALING / ABSORPTION ────────────────────── -->
+    <fieldset class="ps2-fieldset ps2-section" data-section="healing">
+      <legend>Healing / Absorption</legend>
+      <div class="ps2-section-body">
+        <div class="ps2-grid-2col">
+          <div class="ps2-field">
+            <label>Healing Type</label>
+            <select name="system.healingType">
+              <option value="">None</option>
+              <option value="touch" {{#if (eq system.healingType "touch")}}selected{{/if}}>Touch</option>
+              <option value="range" {{#if (eq system.healingType "range")}}selected{{/if}}>Ranged</option>
+            </select>
+          </div>
+          <div class="ps2-field">
+            <label>Regen Type</label>
+            <select name="system.regenerationType">
+              <option value="">None</option>
+              <option value="rest"  {{#if (eq system.regenerationType "rest")}}selected{{/if}}>Resting (10 turns)</option>
+              <option value="solar" {{#if (eq system.regenerationType "solar")}}selected{{/if}}>Solar (10 min)</option>
+            </select>
+          </div>
+          <div class="ps2-field">
+            <label>Absorption Type</label>
+            <select name="system.absorptionType">
+              <option value="">None</option>
+              <option value="energy"   {{#if (eq system.absorptionType "energy")}}selected{{/if}}>Energy</option>
+              <option value="physical" {{#if (eq system.absorptionType "physical")}}selected{{/if}}>Physical</option>
+              <option value="both"     {{#if (eq system.absorptionType "both")}}selected{{/if}}>Both</option>
+            </select>
+          </div>
+          <div class="ps2-field">
+            <label>Absorption Specific</label>
+            <input type="text" name="system.absorptionSpecific" value="{{system.absorptionSpecific}}" placeholder="e.g., electrical" />
+          </div>
+        </div>
+        <div class="ps2-flags">
+          <label><input type="checkbox" name="system.hasRecoveryPower" {{checked system.hasRecoveryPower}} data-dtype="Boolean"> Recovery Power</label>
+          <label><input type="checkbox" name="system.isDamageTransfer" {{checked system.isDamageTransfer}} data-dtype="Boolean"> Damage Transfer</label>
+          <label><input type="checkbox" name="system.isImmortality" {{checked system.isImmortality}} data-dtype="Boolean"> Immortality</label>
+          <label><input type="checkbox" name="system.absorptionConvertsToHealth" {{checked system.absorptionConvertsToHealth}} data-dtype="Boolean"> Absorb &rarr; Health</label>
+          <label><input type="checkbox" name="system.absorptionCanRedirect" {{checked system.absorptionCanRedirect}} data-dtype="Boolean"> Can Redirect</label>
+          <label><input type="checkbox" name="system.isLifeSupport" {{checked system.isLifeSupport}} data-dtype="Boolean"> Life Support</label>
+        </div>
+      </div>
+    </fieldset>
+
+    <!-- ── MAGIC ───────────────────────────────────── -->
+    <fieldset class="ps2-fieldset ps2-section" data-section="magic">
+      <legend>
+        <label class="ps2-section-toggle">
+          <input type="checkbox" name="system.isMagic" {{checked system.isMagic}} data-dtype="Boolean" class="ps2-section-check" data-section="magic">
+          Magic
+        </label>
+      </legend>
+      <div class="ps2-section-body" {{#unless system.isMagic}}style="display:none;"{{/unless}}>
+        <div class="ps2-grid-2col">
+          <div class="ps2-field">
+            <label>Energy Type</label>
+            <select name="system.magic.energyType">
+              <option value="">-- Select --</option>
+              <option value="personal"    {{#if (eq system.magic.energyType "personal")}}selected{{/if}}>Personal</option>
+              <option value="universal"   {{#if (eq system.magic.energyType "universal")}}selected{{/if}}>Universal</option>
+              <option value="dimensional" {{#if (eq system.magic.energyType "dimensional")}}selected{{/if}}>Dimensional</option>
+            </select>
+          </div>
+          <div class="ps2-field">
+            <label>School</label>
+            <select name="system.magic.school">
+              <option value="">-- Optional --</option>
+              <option value="alteration"  {{#if (eq system.magic.school "alteration")}}selected{{/if}}>Alteration</option>
+              <option value="conjuration" {{#if (eq system.magic.school "conjuration")}}selected{{/if}}>Conjuration</option>
+              <option value="divination"  {{#if (eq system.magic.school "divination")}}selected{{/if}}>Divination</option>
+              <option value="enchantment" {{#if (eq system.magic.school "enchantment")}}selected{{/if}}>Enchantment</option>
+              <option value="evocation"   {{#if (eq system.magic.school "evocation")}}selected{{/if}}>Evocation</option>
+              <option value="illusion"    {{#if (eq system.magic.school "illusion")}}selected{{/if}}>Illusion</option>
+              <option value="necromancy"  {{#if (eq system.magic.school "necromancy")}}selected{{/if}}>Necromancy</option>
+              <option value="protection"  {{#if (eq system.magic.school "protection")}}selected{{/if}}>Protection</option>
+            </select>
+          </div>
+          <div class="ps2-field">
+            <label>Cast Cost (HP)</label>
+            <input type="number" name="system.magic.castCost" value="{{system.magic.castCost}}" data-dtype="Number" />
+          </div>
+          <div class="ps2-field">
+            <label>Casting Ability</label>
+            <select name="system.magic.successAbility">
+              <option value="psyche"    {{#if (eq system.magic.successAbility "psyche")}}selected{{/if}}>Psyche</option>
+              <option value="reason"    {{#if (eq system.magic.successAbility "reason")}}selected{{/if}}>Reason</option>
+              <option value="intuition" {{#if (eq system.magic.successAbility "intuition")}}selected{{/if}}>Intuition</option>
+            </select>
+          </div>
+        </div>
+        <div class="ps2-flags">
+          <label><input type="checkbox" name="system.magic.chant"   {{checked system.magic.chant}}   data-dtype="Boolean"> Chant</label>
+          <label><input type="checkbox" name="system.magic.gesture" {{checked system.magic.gesture}} data-dtype="Boolean"> Gesture</label>
+          <label><input type="checkbox" name="system.magic.usesCeremony" {{checked system.magic.usesCeremony}} data-dtype="Boolean"> Ceremony</label>
+        </div>
+        {{#if (eq system.magic.energyType "dimensional")}}
+        <div class="ps2-field" style="margin-top:4px;">
+          <label>Source Entity</label>
+          <input type="text" name="system.magic.sourceEntity" value="{{system.magic.sourceEntity}}" placeholder="e.g., Agamotto, Cyttorak" />
+        </div>
+        {{/if}}
+      </div>
+    </fieldset>
+
+    <!-- ── LIMITATION (always visible) ─────────────── -->
+    <fieldset class="ps2-fieldset ps2-section" data-section="limitation">
+      <legend>
+        <label class="ps2-section-toggle">
+          <input type="checkbox" name="system.isLimited" {{checked system.isLimited}} data-dtype="Boolean" class="ps2-section-check" data-section="limitation">
+          Limitation
+        </label>
+      </legend>
+      <div class="ps2-section-body" {{#unless system.isLimited}}style="display:none;"{{/unless}}>
+        <div class="ps2-grid-3col">
+          <div class="ps2-field">
+            <label>Uses/Day</label>
+            <input type="number" name="system.limitation.usesPerDay" value="{{system.limitation.usesPerDay}}" min="0" data-dtype="Number" placeholder="0=unlim" />
+          </div>
+          <div class="ps2-field">
+            <label>Max Rank</label>
+            <select name="system.limitation.maxRank">
+              <option value="">None</option>
+              <option value="Excellent"   {{#if (eq system.limitation.maxRank "Excellent")}}selected{{/if}}>Excellent</option>
+              <option value="Remarkable"  {{#if (eq system.limitation.maxRank "Remarkable")}}selected{{/if}}>Remarkable</option>
+              <option value="Incredible"  {{#if (eq system.limitation.maxRank "Incredible")}}selected{{/if}}>Incredible</option>
+              <option value="Amazing"     {{#if (eq system.limitation.maxRank "Amazing")}}selected{{/if}}>Amazing</option>
+              <option value="Monstrous"   {{#if (eq system.limitation.maxRank "Monstrous")}}selected{{/if}}>Monstrous</option>
+              <option value="Unearthly"   {{#if (eq system.limitation.maxRank "Unearthly")}}selected{{/if}}>Unearthly</option>
+            </select>
+          </div>
+          <div class="ps2-field">
+            <label>Rank Bonus</label>
+            <select name="system.limitation.rankBonus">
+              <option value="0" {{#if (eq system.limitation.rankBonus 0)}}selected{{/if}}>None</option>
+              <option value="1" {{#if (eq system.limitation.rankBonus 1)}}selected{{/if}}>+1CS</option>
+              <option value="2" {{#if (eq system.limitation.rankBonus 2)}}selected{{/if}}>+2CS</option>
+            </select>
+          </div>
+        </div>
+        <div class="ps2-field" style="margin-top:4px;">
+          <label>Detail</label>
+          <textarea name="system.limitations" rows="2" placeholder="e.g., Daytime only, fails on 01-05, only affects metal">{{system.limitations}}</textarea>
+        </div>
+      </div>
+    </fieldset>
+
+    <!-- ── BONUS POWERS (always visible) ───────────── -->
+    <fieldset class="ps2-fieldset ps2-section" data-section="bonusPowers">
+      <legend>
+        <label class="ps2-section-toggle">
+          <input type="checkbox" name="system.hasBonusPowers" {{checked system.hasBonusPowers}} data-dtype="Boolean" class="ps2-section-check" data-section="bonusPowers">
+          Grants Bonus Powers
+        </label>
+      </legend>
+      <div class="ps2-section-body" {{#unless system.hasBonusPowers}}style="display:none;"{{/unless}}>
+        <div class="ps2-bonus-list">
+          {{#each system.bonusPowers as |bp idx|}}
+          <div class="ps2-bonus-row" data-index="{{idx}}">
+            <input type="text" name="system.bonusPowers.{{idx}}.name" value="{{bp.name}}" placeholder="Power name" class="ps2-bonus-name" />
+            <select name="system.bonusPowers.{{idx}}.rankMod" class="ps2-bonus-mod">
+              <option value="same"  {{#if (eq bp.rankMod "same")}}selected{{/if}}>Same</option>
+              <option value="-1"    {{#if (eq bp.rankMod "-1")}}selected{{/if}}>-1CS</option>
+              <option value="-2"    {{#if (eq bp.rankMod "-2")}}selected{{/if}}>-2CS</option>
+              <option value="-3"    {{#if (eq bp.rankMod "-3")}}selected{{/if}}>-3CS</option>
+            </select>
+            <button type="button" class="ps2-remove-bonus" data-index="{{idx}}" title="Remove">&times;</button>
+          </div>
+          {{/each}}
+        </div>
+        <button type="button" id="ps2-add-bonus" class="ps2-add-btn">+ Add Bonus Power</button>
+      </div>
+    </fieldset>
+
+    <!-- ── SFX (always visible, compact) ───────────── -->
+    <fieldset class="ps2-fieldset">
+      <legend>SFX</legend>
+      <div class="ps2-grid-2col">
+        <div class="ps2-field">
+          <label>Hit</label>
+          <div class="ps2-sfx-row">
+            <input type="text" name="system.sfx.hit" value="{{system.sfx.hit}}" placeholder="audio path" />
+            <button type="button" class="sfx-preview" data-sfx-field="system.sfx.hit" data-volume-field="system.sfx.hitVolume" title="Preview"><i class="fas fa-play"></i></button>
+            <button type="button" class="file-picker" data-type="audio" data-target="system.sfx.hit" title="Browse"><i class="fas fa-file-import"></i></button>
+          </div>
+        </div>
+        <div class="ps2-field">
+          <label>Miss</label>
+          <div class="ps2-sfx-row">
+            <input type="text" name="system.sfx.miss" value="{{system.sfx.miss}}" placeholder="audio path" />
+            <button type="button" class="sfx-preview" data-sfx-field="system.sfx.miss" data-volume-field="system.sfx.missVolume" title="Preview"><i class="fas fa-play"></i></button>
+            <button type="button" class="file-picker" data-type="audio" data-target="system.sfx.miss" title="Browse"><i class="fas fa-file-import"></i></button>
+          </div>
+        </div>
+      </div>
+    </fieldset>
+
+    <!-- ── EFFECTS (always visible) ────────────────── -->
+    <fieldset class="ps2-fieldset">
+      <legend>Active Effects</legend>
+      <div class="ps2-effect-presets">
+        <button type="button" class="effect-preset-btn" data-preset="body-armor"><i class="fas fa-shield-alt"></i></button>
+        <button type="button" class="effect-preset-btn" data-preset="forcefield"><i class="fas fa-circle-notch"></i></button>
+        <button type="button" class="effect-preset-btn" data-preset="attack-bonus"><i class="fas fa-crosshairs"></i></button>
+        <button type="button" class="effect-preset-btn" data-preset="ability-boost"><i class="fas fa-arrow-up"></i></button>
+        <button type="button" class="effect-preset-btn" data-preset="light"><i class="fas fa-lightbulb"></i></button>
+        <button type="button" class="effect-preset-btn" data-preset="stealth"><i class="fas fa-user-secret"></i></button>
+        <button type="button" class="effect-preset-btn" data-preset="phasing"><i class="fas fa-ghost"></i></button>
+        <button type="button" class="effect-preset-btn" data-preset="flight"><i class="fas fa-feather-alt"></i></button>
+        <button type="button" class="effect-preset-btn" data-preset="darkvision"><i class="fas fa-eye"></i></button>
+      </div>
+      {{#each effects as |section|}}
+      <div class="effect-section" data-section-type="{{section.type}}">
+        <div class="ps2-effect-header">
+          <span>{{section.label}}</span>
+          <li data-effect-type="{{section.type}}" style="list-style:none;margin:0;">
+            <a class="effect-control btn-add" data-action="create"><i class="fas fa-plus"></i></a>
+          </li>
+        </div>
+        <ol class="ps2-effects-list">
+          {{#each section.effects as |effect|}}
+          <li class="ps2-effect-row" data-effect-id="{{effect.id}}" data-parent-id="{{effect.parent.id}}">
+            <img src="{{effect.img}}" alt="" class="ps2-effect-icon" />
+            <span class="ps2-effect-name">{{effect.name}}</span>
+            <div class="ps2-effect-controls">
+              <a class="effect-control" data-action="toggle" title="Toggle"><i class="fas fa-{{#if effect.disabled}}eye-slash{{else}}eye{{/if}}"></i></a>
+              <a class="effect-control" data-action="edit" title="Edit"><i class="fas fa-edit"></i></a>
+              <a class="effect-control" data-action="delete" title="Delete"><i class="fas fa-trash"></i></a>
+            </div>
+          </li>
+          {{/each}}
+          {{#unless section.effects.length}}
+          <li class="ps2-no-effects">No {{section.label}} effects</li>
+          {{/unless}}
+        </ol>
+      </div>
+      {{/each}}
+    </fieldset>
+
+    <!-- ── NOTES (always visible) ──────────────────── -->
+    <fieldset class="ps2-fieldset">
+      <legend>Description &amp; Notes</legend>
+      <div class="ps2-field">
+        <label>Description</label>
+        <textarea name="system.description" rows="4" class="ps2-textarea">{{system.description}}</textarea>
+      </div>
+      <div class="ps2-field" style="margin-top:4px;">
+        <label>Special Mechanics</label>
+        <textarea name="system.specialMechanics" rows="3" class="ps2-textarea" placeholder="Additional rules for this power...">{{system.specialMechanics}}</textarea>
+      </div>
+    </fieldset>
+
+  </div><!-- /ps2-body -->
+</form>

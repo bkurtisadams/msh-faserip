@@ -2561,6 +2561,23 @@ Hooks.on("deleteItem", async (item, options, userId) => {
   await syncPowerOngoingEffects(actor, item, true);
 });
 
+// Sync defense AEs when an unlinked token is placed on the canvas
+Hooks.on("createToken", async (tokenDoc, options, userId) => {
+  if (!game.user.isGM) return;
+  const actor = tokenDoc.actor;
+  if (!actor || tokenDoc.actorLink) return;
+  const powers = actor.items.filter(i => i.type === "power");
+  const hasDefense = powers.some(p => p.system?.isBodyArmor || p.system?.isForceField || p.system?.isResistance);
+  if (!hasDefense) return;
+  try {
+    const { syncAllDefenseEffects } = await import("./modules/effects/defense-effects.js");
+    await syncAllDefenseEffects(actor);
+    console.log(`[FASERIP] Defense AEs synced for new token: ${tokenDoc.name}`);
+  } catch (e) {
+    console.error("[FASERIP ERROR] Failed to sync defense AEs on token create:", e);
+  }
+});
+
 // Capture old health value before update
 Hooks.on('preUpdateActor', (actor, updateData, options, userId) => {
   if (options.mshDyingTick) return;

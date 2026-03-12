@@ -39,11 +39,6 @@ export function calculateMitigation(rawDamage, targetActor, options = {}) {
     layers: []
   };
   
-  if (bypassArmor) {
-    if (debug) console.log('[MITIGATION] Armor bypassed');
-    return result;
-  }
-  
   const dmgTypeLower = String(damageType).toLowerCase();
   const isEnergyDamage = dmgTypeLower.includes("energy");
   
@@ -52,6 +47,36 @@ export function calculateMitigation(rawDamage, targetActor, options = {}) {
   // ── Try defense AEs first, fall back to item-based lookup ──
   const aeDefenses = getDefensesFromAEs(targetActor, dmgTypeLower);
   const hasAEDefenses = aeDefenses.hasArmor || aeDefenses.hasForceField || aeDefenses.hasResistance;
+
+  // bypassArmor means body armor / force field were already subtracted upstream,
+  // but resistance was NOT pre-calculated — still need to check it.
+  if (bypassArmor) {
+    if (debug) console.log('[MITIGATION] Armor/FF bypassed (pre-calculated), checking resistance');
+
+    // AE-based resistance
+    if (hasAEDefenses && aeDefenses.hasResistance) {
+      const resLayer = applyResistanceFromAE(currentDamage, aeDefenses.resistance, { rawDamage });
+      if (resLayer.absorbed > 0 || resLayer.immune) {
+        currentDamage = resLayer.remainingDamage;
+        result.absorbed += resLayer.absorbed;
+        result.layers.push(resLayer);
+      }
+    } else if (!hasAEDefenses) {
+      // Legacy item-based resistance
+      const resistanceLayer = applyResistance(currentDamage, targetActor, {
+        damageType: dmgTypeLower, rawDamage
+      });
+      if (resistanceLayer.absorbed > 0 || resistanceLayer.immune) {
+        currentDamage = resistanceLayer.remainingDamage;
+        result.absorbed += resistanceLayer.absorbed;
+        result.layers.push(resistanceLayer);
+      }
+    }
+
+    result.netDamage = Math.max(0, currentDamage);
+    if (debug) console.log('[MITIGATION] Result (bypass+resistance)', result);
+    return result;
+  }
 
   if (hasAEDefenses) {
     // ── AE-based mitigation path ──
@@ -239,6 +264,7 @@ function isResMatch(baseType, resType, fullDmgType) {
   if ((resType === "fire" || resType === "heat") && (baseType === "fire" || baseType === "heat")) return true;
   if ((resType === "cold" || resType === "ice") && (baseType === "cold" || baseType === "ice")) return true;
   if ((resType === "electricity" || resType === "electric") && (baseType === "electricity" || baseType === "electric")) return true;
+  if (resType === "radiation" && baseType === "light") return true;
   return fullDmgType.includes(resType);
 }
 
@@ -496,6 +522,7 @@ function isResistanceApplicable(damageType, resistanceType) {
   if (resLower === "cold" || resLower === "ice") return dmgLower.includes("cold") || dmgLower.includes("ice");
   if (resLower === "fire" || resLower === "heat") return dmgLower.includes("fire") || dmgLower.includes("heat");
   if (resLower === "electricity" || resLower === "electric") return dmgLower.includes("electricity") || dmgLower.includes("electric");
+  if (resLower === "radiation") return dmgLower.includes("radiation") || dmgLower.includes("light");
   
   return dmgLower.includes(resLower);
 }

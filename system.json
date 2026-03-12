@@ -45,6 +45,7 @@
         "scripts/teamSheet.js"
         ],
     "styles": [
+        "styles/power-sheet-v2.css",
         "styles/global.css",
         "styles/actor-sheet.css",
         "styles/actor-sheet-enhanced.css",
