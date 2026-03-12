@@ -670,8 +670,13 @@
 
     <!-- ── HEALING / ABSORPTION ────────────────────── -->
     <fieldset class="ps2-fieldset ps2-section" data-section="healing">
-      <legend>Healing / Absorption</legend>
-      <div class="ps2-section-body">
+      <legend>
+        <label class="ps2-section-toggle">
+          <input type="checkbox" name="system.isHealingPower" {{checked system.isHealingPower}} data-dtype="Boolean" class="ps2-section-check" data-section="healing">
+          Healing / Absorption
+        </label>
+      </legend>
+      <div class="ps2-section-body" {{#unless system.isHealingPower}}style="display:none;"{{/unless}}>
         <div class="ps2-grid-2col">
           <div class="ps2-field">
             <label>Healing Type</label>
@@ -866,46 +871,53 @@
       </div>
     </fieldset>
 
-    <!-- ── EFFECTS (always visible) ────────────────── -->
-    <fieldset class="ps2-fieldset">
-      <legend>Active Effects</legend>
-      <div class="ps2-effect-presets">
-        <button type="button" class="effect-preset-btn" data-preset="body-armor"><i class="fas fa-shield-alt"></i></button>
-        <button type="button" class="effect-preset-btn" data-preset="forcefield"><i class="fas fa-circle-notch"></i></button>
-        <button type="button" class="effect-preset-btn" data-preset="attack-bonus"><i class="fas fa-crosshairs"></i></button>
-        <button type="button" class="effect-preset-btn" data-preset="ability-boost"><i class="fas fa-arrow-up"></i></button>
-        <button type="button" class="effect-preset-btn" data-preset="light"><i class="fas fa-lightbulb"></i></button>
-        <button type="button" class="effect-preset-btn" data-preset="stealth"><i class="fas fa-user-secret"></i></button>
-        <button type="button" class="effect-preset-btn" data-preset="phasing"><i class="fas fa-ghost"></i></button>
-        <button type="button" class="effect-preset-btn" data-preset="flight"><i class="fas fa-feather-alt"></i></button>
-        <button type="button" class="effect-preset-btn" data-preset="darkvision"><i class="fas fa-eye"></i></button>
-      </div>
-      {{#each effects as |section|}}
-      <div class="effect-section" data-section-type="{{section.type}}">
-        <div class="ps2-effect-header">
-          <span>{{section.label}}</span>
-          <li data-effect-type="{{section.type}}" style="list-style:none;margin:0;">
-            <a class="effect-control btn-add" data-action="create"><i class="fas fa-plus"></i></a>
-          </li>
+    <!-- ── EFFECTS (collapsible) ──────────────────── -->
+    <fieldset class="ps2-fieldset ps2-effects-fieldset">
+      <legend>
+        <span class="ps2-effects-legend-row">
+          <span class="ps2-effects-label">Active Effects ({{effectCount}})</span>
+          <button type="button" class="ps2-effects-expand" title="Toggle effects"><i class="fas fa-plus"></i></button>
+        </span>
+      </legend>
+      <div class="ps2-effects-body" style="display:none;">
+        <div class="ps2-effect-presets">
+          <button type="button" class="effect-preset-btn" data-preset="body-armor"><i class="fas fa-shield-alt"></i></button>
+          <button type="button" class="effect-preset-btn" data-preset="forcefield"><i class="fas fa-circle-notch"></i></button>
+          <button type="button" class="effect-preset-btn" data-preset="attack-bonus"><i class="fas fa-crosshairs"></i></button>
+          <button type="button" class="effect-preset-btn" data-preset="ability-boost"><i class="fas fa-arrow-up"></i></button>
+          <button type="button" class="effect-preset-btn" data-preset="light"><i class="fas fa-lightbulb"></i></button>
+          <button type="button" class="effect-preset-btn" data-preset="stealth"><i class="fas fa-user-secret"></i></button>
+          <button type="button" class="effect-preset-btn" data-preset="phasing"><i class="fas fa-ghost"></i></button>
+          <button type="button" class="effect-preset-btn" data-preset="flight"><i class="fas fa-feather-alt"></i></button>
+          <button type="button" class="effect-preset-btn" data-preset="darkvision"><i class="fas fa-eye"></i></button>
         </div>
-        <ol class="ps2-effects-list">
-          {{#each section.effects as |effect|}}
-          <li class="ps2-effect-row" data-effect-id="{{effect.id}}" data-parent-id="{{effect.parent.id}}">
-            <img src="{{effect.img}}" alt="" class="ps2-effect-icon" />
-            <span class="ps2-effect-name">{{effect.name}}</span>
-            <div class="ps2-effect-controls">
-              <a class="effect-control" data-action="toggle" title="Toggle"><i class="fas fa-{{#if effect.disabled}}eye-slash{{else}}eye{{/if}}"></i></a>
-              <a class="effect-control" data-action="edit" title="Edit"><i class="fas fa-edit"></i></a>
-              <a class="effect-control" data-action="delete" title="Delete"><i class="fas fa-trash"></i></a>
-            </div>
-          </li>
-          {{/each}}
-          {{#unless section.effects.length}}
-          <li class="ps2-no-effects">No {{section.label}} effects</li>
-          {{/unless}}
-        </ol>
+        {{#each effects as |section|}}
+        <div class="effect-section" data-section-type="{{section.type}}">
+          <div class="ps2-effect-header">
+            <span>{{section.label}}</span>
+            <li data-effect-type="{{section.type}}" style="list-style:none;margin:0;">
+              <a class="effect-control btn-add" data-action="create"><i class="fas fa-plus"></i></a>
+            </li>
+          </div>
+          <ol class="ps2-effects-list">
+            {{#each section.effects as |effect|}}
+            <li class="ps2-effect-row" data-effect-id="{{effect.id}}" data-parent-id="{{effect.parent.id}}">
+              <img src="{{effect.img}}" alt="" class="ps2-effect-icon" />
+              <span class="ps2-effect-name">{{effect.name}}</span>
+              <div class="ps2-effect-controls">
+                <a class="effect-control" data-action="toggle" title="Toggle"><i class="fas fa-{{#if effect.disabled}}eye-slash{{else}}eye{{/if}}"></i></a>
+                <a class="effect-control" data-action="edit" title="Edit"><i class="fas fa-edit"></i></a>
+                <a class="effect-control" data-action="delete" title="Delete"><i class="fas fa-trash"></i></a>
+              </div>
+            </li>
+            {{/each}}
+            {{#unless section.effects.length}}
+            <li class="ps2-no-effects">No {{section.label}} effects</li>
+            {{/unless}}
+          </ol>
+        </div>
+        {{/each}}
       </div>
-      {{/each}}
     </fieldset>
 
     <!-- ── NOTES (always visible) ──────────────────── -->
@@ -913,11 +925,11 @@
       <legend>Description &amp; Notes</legend>
       <div class="ps2-field">
         <label>Description</label>
-        <textarea name="system.description" rows="4" class="ps2-textarea">{{system.description}}</textarea>
+        <textarea name="system.description" rows="6" class="ps2-textarea">{{system.description}}</textarea>
       </div>
       <div class="ps2-field" style="margin-top:4px;">
         <label>Special Mechanics</label>
-        <textarea name="system.specialMechanics" rows="3" class="ps2-textarea" placeholder="Additional rules for this power...">{{system.specialMechanics}}</textarea>
+        <textarea name="system.specialMechanics" rows="5" class="ps2-textarea" placeholder="Additional rules for this power...">{{system.specialMechanics}}</textarea>
       </div>
     </fieldset>
 

@@ -103,6 +103,7 @@ export class FaseripItemSheet extends ItemSheet {
 
     // Active Effects on this item (powers and any other item type)
     context.effects = prepareActiveEffectCategories(this.item.effects ?? []);
+    context.effectCount = this.item.effects?.size ?? 0;
 
     // ANCHOR: vehicle-item-sheet-getData
       if (this.item?.type === "vehicle") {

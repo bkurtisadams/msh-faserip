@@ -1985,7 +1985,7 @@ export class FaseripRolls {
       // Get the hero's popularity
       const heroPopularity = actor.system.attributes?.popularity?.value || 0;
       const heroPopularityRank = actor.system.attributes?.popularity?.rank || "Typical";
-      const isMutant = actor.system.powerOrigin === "mutant" || actor.system.isMutant;
+      const isMutant = actor.system.origin === "Mutant" || actor.system.isMutant;
 
       // Get contact type
       const contactType = contact.system.type || "General";
@@ -2174,7 +2174,7 @@ export class FaseripRolls {
       // Get the hero's popularity for display
       const heroPopularity = actor.system.attributes?.popularity?.value || 0;
       const heroPopularityRank = actor.system.attributes?.popularity?.rank || "Typical";
-      const isMutant = actor.system.powerOrigin === "mutant" || actor.system.isMutant;
+      const isMutant = actor.system.origin === "Mutant" || actor.system.isMutant;
 
       // Disposition: base on stored contact value, degrade one step on negative popularity
       const DISP_ORDER_D = ["Friendly", "Neutral", "Suspicious", "Hostile"];

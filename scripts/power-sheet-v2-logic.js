@@ -1,4 +1,5 @@
-// power-sheet-v2-logic.js v1.1.0 - 2026-03-12
+// power-sheet-v2-logic.js v1.2.0 - 2026-03-12
+// v1.2.0: Collapsible Active Effects, Healing/Absorption toggle, bigger textareas
 // v1.1.0: Rank→Value auto-fill, special strength type change handler, field reorder support
 // Drop-in: call ps2ActivateListeners(html, itemSheet) from activateListeners
 
@@ -170,5 +171,25 @@ export function ps2ActivateListeners(html, sheet) {
     const audio = new Audio(path);
     audio.volume = vol;
     audio.play().catch(() => {});
+  });
+
+  // Active Effects: auto-expand if effects exist, collapse if none
+  const effectsFieldset = html.find('.ps2-effects-fieldset');
+  const effectsBody = html.find('.ps2-effects-body');
+  const hasEffects = effectsBody.find('.ps2-effect-row').length > 0;
+  if (hasEffects) {
+    effectsBody.show();
+    effectsFieldset.attr('data-expanded', 'true');
+  }
+  html.find('.ps2-effects-expand').on('click', ev => {
+    ev.preventDefault();
+    const expanded = effectsFieldset.attr('data-expanded') === 'true';
+    if (expanded) {
+      effectsBody.slideUp(150);
+      effectsFieldset.attr('data-expanded', 'false');
+    } else {
+      effectsBody.slideDown(150);
+      effectsFieldset.attr('data-expanded', 'true');
+    }
   });
 }

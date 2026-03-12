@@ -2238,7 +2238,7 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
       // Get the hero's popularity
       const heroPopularity = this.actor.system.attributes?.popularity?.value || 0;
       const heroPopularityRank = this.actor.system.attributes?.popularity?.rank || "Typical";
-      const isMutant = this.actor.system.powerOrigin === "mutant" || this.actor.system.isMutant;
+      const isMutant = this.actor.system.origin === "Mutant" || this.actor.system.isMutant;
 
       // Get contact type and determine potential resource level
       const contactType = item.system.type || "General";
@@ -3263,7 +3263,7 @@ html.find('.headquarters-row').each((i, row) => {
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Popularity activateListeners method
     html.find('.popularity-header-link').click(ev => {
-      const isMutant = this.actor.system.powerOrigin === "mutant" || this.actor.system.isMutant;
+      const isMutant = this.actor.system.origin === "Mutant" || this.actor.system.isMutant;
       const hasSecretId = this.actor.system.identityType === "secret";
       const heroPopularity = this.actor.system.attributes.popularity.value;
       const secretIdPopularity = hasSecretId ? (this.actor.system.attributes.popularity.secretId?.value || 0) : 0;
@@ -3956,7 +3956,7 @@ html.find('.headquarters-row').each((i, row) => {
   
     const heroPopularity = this.actor.system.attributes.popularity.hero?.value ?? 0;
     const secretIdPopularity = this.actor.system.attributes.popularity.secretId?.value ?? 0;
-    const isMutant = this.actor.system.powerOrigin === "mutant" || this.actor.system.isMutant;
+    const isMutant = this.actor.system.origin === "Mutant" || this.actor.system.isMutant;
   
     console.log("Hero Pop:", heroPopularity);
     console.log("Secret ID Pop:", secretIdPopularity);

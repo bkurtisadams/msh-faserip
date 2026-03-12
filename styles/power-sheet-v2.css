@@ -141,7 +141,7 @@
 }
 .power-sheet-v2 .ps2-field textarea {
   height: auto;
-  min-height: 40px;
+  min-height: 60px;
   resize: vertical;
 }
 .power-sheet-v2 .ps2-field input:focus,
@@ -356,6 +356,32 @@
   flex-shrink: 0;
 }
 .power-sheet-v2 .ps2-sfx-row button:hover { background: #e8e0d0; }
+
+/* ── Effects (collapsible) ────────────────── */
+.power-sheet-v2 .ps2-effects-legend-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.power-sheet-v2 .ps2-effects-label {
+  font-size: 11px;
+}
+.power-sheet-v2 .ps2-effects-expand {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  font-size: 9px;
+  line-height: 1;
+  border: 1px solid #c0a070;
+  border-radius: 2px;
+  background: #f5f0e8;
+  color: #8b0000;
+  cursor: pointer;
+}
+.power-sheet-v2 .ps2-effects-expand:hover { background: #8b0000; color: #fff; }
+.power-sheet-v2 .ps2-effects-fieldset[data-expanded="true"] .ps2-effects-expand i::before {
+  content: "\f068"; /* fa-minus */
+}
 
 /* ── Effects ──────────────────────────────── */
 .power-sheet-v2 .ps2-effect-presets {
