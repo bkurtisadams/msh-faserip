@@ -185,6 +185,7 @@ export class FaseripActor extends Actor {
   }
 
   get currentKarma() {
+    if (!this.system.abilities) return 0;
     const reason = this.system.abilities.reason?.value || 0;
     const intuition = this.system.abilities.intuition?.value || 0;
     const psyche = this.system.abilities.psyche?.value || 0;
@@ -377,4 +378,4 @@ export class FaseripActor extends Actor {
       strengthRank: strRank
     };
   }
-}
+}
