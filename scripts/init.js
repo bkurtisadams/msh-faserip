@@ -457,6 +457,25 @@ Hooks.once("init", async () => {
 
   // Convert "duration.rounds" -> seconds (based on preset turn length: FASERIP: turn = 6s).
   Hooks.on("preCreateActiveEffect", function (effect, data, options, userId) {
+    // ── Duplicate status guard ──────────────────────────────────────────────
+    // If this AE has statuses (e.g. "fly" from token HUD), check whether
+    // the actor already has a non-disabled AE providing the same status
+    // (e.g. from a power item's transfer effect). Uses allApplicableEffects()
+    // which includes both actor-level and item-transferred effects.
+    const actor = effect.parent?.documentName === "Actor" ? effect.parent : null;
+    if (actor && data?.statuses?.length) {
+      for (const statusId of data.statuses) {
+        let existing = null;
+        for (const e of actor.allApplicableEffects()) {
+          if (!e.disabled && e.statuses?.has(statusId)) { existing = e; break; }
+        }
+        if (existing) {
+          ui.notifications.info(`${actor.name} already has "${existing.name}" providing that status.`);
+          return false;
+        }
+      }
+    }
+
     // KEEP ROUNDS DURING COMBAT — do not convert to seconds while combat is active.
     if (game.combat && data?.duration?.rounds) {
       return;
@@ -3495,4 +3514,4 @@ async function createUniversalActionMacro(data, slot) {
   
   game.user.assignHotbarMacro(macro, slot);
   return true;
-}
+}

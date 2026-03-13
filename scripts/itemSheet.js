@@ -270,14 +270,7 @@ export class FaseripItemSheet extends ItemSheet {
           name: "Flight Active",
           img: "icons/svg/wing.svg",
           statuses: ["fly"],
-          changes: [
-            { key: "faserip.token.light.dim", mode: MODES.CUSTOM, value: "0.1" },
-            { key: "faserip.token.light.color", mode: MODES.CUSTOM, value: "#ff6600" },
-            { key: "faserip.token.light.alpha", mode: MODES.CUSTOM, value: "0.2" },
-            { key: "faserip.token.light.animation.type", mode: MODES.CUSTOM, value: "flame" },
-            { key: "faserip.token.light.animation.speed", mode: MODES.CUSTOM, value: "4" },
-            { key: "faserip.token.light.animation.intensity", mode: MODES.CUSTOM, value: "3" }
-          ]
+          changes: []
         });
 
       case "immobilize":
