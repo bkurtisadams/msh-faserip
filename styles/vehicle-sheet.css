@@ -1,0 +1,327 @@
+/* styles/vehicle-sheet.css v1.0.0 - 2026-03-13 */
+/* Compact vehicle actor sheet layout */
+
+/* ── HEADER ROW ── */
+.vehicle-sheet .veh-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border-bottom: 2px solid #8b0000;
+  background: #f5f0e8;
+}
+.vehicle-sheet .veh-header .profile-img {
+  border: 1px solid #999;
+  border-radius: 3px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.vehicle-sheet .veh-name {
+  flex: 1;
+  font-size: 1.1em;
+  font-weight: bold;
+  border: none;
+  border-bottom: 1px solid #ccc;
+  background: transparent;
+  padding: 2px 4px;
+}
+.vehicle-sheet .veh-type-sel,
+.vehicle-sheet .veh-cost-sel {
+  width: auto;
+  min-width: 80px;
+  font-size: .85em;
+  padding: 2px 4px;
+}
+.vehicle-sheet .veh-comp {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: .8em;
+  font-weight: bold;
+  color: #666;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.vehicle-sheet .veh-comp input[type="checkbox"] { margin: 0; }
+
+/* ── STAT BAR ── */
+.vehicle-sheet .veh-stat-bar {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+  padding: 4px 6px;
+  background: #eae5da;
+  border-bottom: 1px solid #c0a070;
+}
+.vehicle-sheet .veh-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+}
+.vehicle-sheet .veh-stat label {
+  font-size: .75em;
+  font-weight: bold;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+}
+.vehicle-sheet .veh-stat select {
+  width: 100%;
+  font-size: .85em;
+  text-align: center;
+  padding: 1px 2px;
+}
+.vehicle-sheet .veh-eff {
+  font-size: .75em;
+  color: #c62828;
+  font-weight: bold;
+}
+
+/* ── CONDITION STRIP ── */
+.vehicle-sheet .veh-condition-strip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 6px;
+  background: #f9f6f0;
+  border-bottom: 1px solid #ddd;
+  flex-wrap: wrap;
+}
+.vehicle-sheet .veh-hp-group {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.vehicle-sheet .veh-hp-group label {
+  font-size: .8em;
+  font-weight: bold;
+  color: #666;
+}
+.vehicle-sheet .veh-hp-input {
+  width: 42px;
+  text-align: center;
+  font-size: .9em;
+  padding: 1px;
+}
+.vehicle-sheet .veh-hp-sep {
+  font-size: .85em;
+  color: #999;
+}
+.vehicle-sheet .veh-cspeed-group {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.vehicle-sheet .veh-cspeed-group label {
+  font-size: .8em;
+  font-weight: bold;
+  color: #666;
+}
+.vehicle-sheet .veh-cur-speed {
+  width: auto;
+  min-width: 70px;
+  font-size: .85em;
+  padding: 1px 2px;
+}
+.vehicle-sheet .veh-ooc {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: .8em;
+  font-weight: bold;
+  color: #666;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 3px;
+  border: 1px solid transparent;
+}
+.vehicle-sheet .veh-ooc input[type="checkbox"] { margin: 0; }
+.vehicle-sheet .veh-ooc-active {
+  background: #ffcdd2;
+  border-color: #c62828;
+  color: #c62828;
+}
+.vehicle-sheet .veh-feat-rank,
+.vehicle-sheet .veh-charge-rank {
+  font-size: .8em;
+  font-weight: bold;
+  color: #333;
+  background: #e8e0d0;
+  padding: 1px 6px;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+
+/* ── FIELDSETS ── */
+.vehicle-sheet .veh-fieldset {
+  border: 1px solid #c0a070;
+  background: #faf8f2;
+  border-radius: 3px;
+  padding: 6px 8px;
+  margin-bottom: 6px;
+}
+.vehicle-sheet .veh-fieldset legend {
+  font-weight: bold;
+  color: #8b0000;
+  font-size: .85em;
+  padding: 0 4px;
+}
+
+/* ── CREW ── */
+.vehicle-sheet .veh-crew-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+.vehicle-sheet .veh-crew-passengers {
+  align-items: flex-start;
+}
+.vehicle-sheet .veh-crew-label {
+  font-size: .8em;
+  font-weight: bold;
+  color: #666;
+  min-width: 42px;
+  flex-shrink: 0;
+}
+.vehicle-sheet .crew-slot {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: #f0ede4;
+  border: 1px solid #d0c8b0;
+  border-radius: 3px;
+  padding: 2px 5px;
+  flex: 1;
+}
+.vehicle-sheet .crew-slot img {
+  border-radius: 2px;
+  border: 1px solid #999;
+}
+.vehicle-sheet .crew-link {
+  font-weight: bold;
+  color: #333;
+  cursor: pointer;
+  font-size: .85em;
+}
+.vehicle-sheet .crew-link:hover { color: #8b0000; }
+.vehicle-sheet .veh-crew-agi {
+  font-size: .75em;
+  color: #666;
+  margin-left: auto;
+}
+.vehicle-sheet .crew-remove {
+  cursor: pointer;
+  color: #c62828;
+  margin-left: 4px;
+  font-size: .8em;
+}
+.vehicle-sheet .crew-drop-zone {
+  flex: 1;
+  border: 2px dashed #c0a070;
+  border-radius: 3px;
+  padding: 4px;
+  text-align: center;
+  font-size: .8em;
+  color: #999;
+}
+.vehicle-sheet .veh-passenger-list {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.vehicle-sheet .crew-passenger { margin-bottom: 0; }
+.vehicle-sheet .veh-seats-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+.vehicle-sheet .veh-seats-row label {
+  font-size: .8em;
+  font-weight: bold;
+  color: #666;
+  min-width: 42px;
+}
+.vehicle-sheet .veh-seats-input {
+  width: 42px;
+  text-align: center;
+}
+.vehicle-sheet .veh-seats-info {
+  font-size: .8em;
+  color: #666;
+}
+
+/* ── DETAILS ── */
+.vehicle-sheet .veh-detail-row {
+  margin-bottom: 4px;
+}
+.vehicle-sheet .veh-detail-row label {
+  font-size: .8em;
+  font-weight: bold;
+  color: #666;
+  display: block;
+  margin-bottom: 1px;
+}
+.vehicle-sheet .veh-detail-row textarea {
+  width: 100%;
+  font-size: .85em;
+}
+
+/* ── CONDITION TAB ── */
+.vehicle-sheet .veh-cs-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.vehicle-sheet .veh-cs-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.vehicle-sheet .veh-cs-cell label {
+  font-size: .75em;
+  font-weight: bold;
+  color: #666;
+}
+.vehicle-sheet .veh-cs-input {
+  width: 42px;
+  text-align: center;
+}
+.vehicle-sheet .veh-cs-eff {
+  font-size: .75em;
+  color: #c62828;
+  font-weight: bold;
+}
+.vehicle-sheet .veh-dmg-buttons {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.vehicle-sheet .veh-dmg-buttons button {
+  font-size: .8em;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+.vehicle-sheet .vehicle-damage-quick {
+  background: #fff3e0;
+  border: 1px solid #ff9800;
+  border-radius: 3px;
+  color: #c62828;
+}
+.vehicle-sheet .vehicle-damage-quick:hover {
+  background: #ffe0b2;
+}
+.vehicle-sheet .vehicle-repair-quick {
+  background: #e8f5e9;
+  border: 1px solid #4caf50;
+  border-radius: 3px;
+  color: #2e7d32;
+}
+.vehicle-sheet .vehicle-repair-quick:hover {
+  background: #c8e6c9;
+}

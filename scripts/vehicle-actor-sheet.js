@@ -1,18 +1,44 @@
-// scripts/vehicle-actor-sheet.js v2.1.0 - 2026-03-05
+// scripts/vehicle-actor-sheet.js v3.0.0 - 2026-03-13
+// v3.0.0: Compact layout, effective ranks, current speed, OOC flag, FEAT/charging display, repair button
 // v2.1.0: Use Foundry v13 _onDropActor API instead of custom _onDrop parsing
 // v2.0.0: Crew linking via actor UUID drag-drop, seating capacity, agility display
 // v1.0.0: Initial vehicle actor sheet
 
 import { FaseripActorSheet } from "./actorSheet.js";
 
+const RANK_ORDER = [
+  "Shift-0","Feeble","Poor","Typical","Good","Excellent",
+  "Remarkable","Incredible","Amazing","Monstrous","Unearthly",
+  "Shift-X","Shift-Y","Shift-Z","Class 1000","Class 3000","Class 5000","Beyond"
+];
+
+const RANK_VALUES = {
+  "Shift-0":0,"Feeble":2,"Poor":4,"Typical":6,"Good":10,
+  "Excellent":20,"Remarkable":30,"Incredible":40,"Amazing":50,
+  "Monstrous":75,"Unearthly":100,"Shift-X":150,"Shift-Y":200,
+  "Shift-Z":500,"Class 1000":1000,"Class 3000":3000,"Class 5000":5000,"Beyond":9999
+};
+
+function shiftRank(name, steps) {
+  const idx = RANK_ORDER.indexOf(name);
+  if (idx < 0) return name;
+  return RANK_ORDER[Math.max(0, Math.min(RANK_ORDER.length - 1, idx + steps))];
+}
+
+function rankVal(name) { return RANK_VALUES[name] ?? 0; }
+
+function lesserRank(a, b) {
+  return rankVal(a) <= rankVal(b) ? a : b;
+}
+
 export class MSHVehicleActorSheet extends FaseripActorSheet {
   static get defaultOptions() {
     return foundry.utils.mergeObject(super.defaultOptions, {
       classes: ["faserip-sheet", "sheet", "actor", "vehicle"],
       template: "systems/msh-faserip/templates/actor/vehicle-actor-sheet.html",
-      width: 720,
-      height: 680,
-      tabs: [{ navSelector: ".sheet-tabs", contentSelector: ".sheet-body", initial: "info" }],
+      width: 620,
+      height: 580,
+      tabs: [{ navSelector: ".sheet-tabs", contentSelector: ".sheet-body", initial: "crew" }],
       dragDrop: [
         { dragSelector: ".item[data-item-id]", dropSelector: null }
       ]
@@ -35,23 +61,26 @@ export class MSHVehicleActorSheet extends FaseripActorSheet {
       ["equipment","weapon","vehicle-weapon","vehicle-system"].includes(i.type)
     );
 
-    // Resolve driver UUID to actor data
+    // --- Resolve driver ---
     data.driverActor = null;
     const driverUuid = sys.driverUuid || "";
+    let driverAgility = null;
     if (driverUuid) {
       const driverDoc = fromUuidSync(driverUuid);
       if (driverDoc) {
+        const agiRank = driverDoc.system?.abilities?.agility?.rank
+          || driverDoc.system?.abilities?.agility?.value || null;
+        driverAgility = agiRank;
         data.driverActor = {
           name: driverDoc.name,
           img: driverDoc.img || "icons/svg/mystery-man.svg",
           uuid: driverUuid,
-          agility: driverDoc.system?.abilities?.agility?.rank
-            || driverDoc.system?.abilities?.agility?.value || "?"
+          agility: agiRank || "?"
         };
       }
     }
 
-    // Resolve passenger UUIDs
+    // --- Resolve passengers ---
     const pUuids = Array.isArray(sys.passengerUuids) ? sys.passengerUuids : [];
     data.passengerActors = [];
     for (const uuid of pUuids) {
@@ -64,9 +93,33 @@ export class MSHVehicleActorSheet extends FaseripActorSheet {
         });
       }
     }
-
-    // Crew count (driver + passengers)
     data.crewCount = (data.driverActor ? 1 : 0) + data.passengerActors.length;
+
+    // --- Effective ranks after CS losses ---
+    const bodyCSLoss = Number(sys.bodyCSLoss) || 0;
+    const speedCSLoss = Number(sys.speedCSLoss) || 0;
+    const controlCSLoss = Number(sys.controlCSLoss) || 0;
+
+    const effBody = bodyCSLoss > 0 ? shiftRank(sys.body || "Typical", -bodyCSLoss) : null;
+    const effSpeed = speedCSLoss > 0 ? shiftRank(sys.speed || "Typical", -speedCSLoss) : null;
+    const effControl = controlCSLoss > 0 ? shiftRank(sys.control || "Typical", -controlCSLoss) : null;
+
+    data.effectiveBody = effBody;
+    data.effectiveSpeed = effSpeed;
+    data.effectiveControl = effControl;
+
+    // --- Control FEAT rank = lesser(driver Agility, effective Control) ---
+    const actualControl = effControl || sys.control || "Typical";
+    if (driverAgility && RANK_ORDER.includes(driverAgility)) {
+      data.effectiveControlFEAT = lesserRank(driverAgility, actualControl);
+    } else {
+      data.effectiveControlFEAT = null;
+    }
+
+    // --- Charging rank = lesser(Body, Speed) ---
+    const actualBody = effBody || sys.body || "Typical";
+    const actualSpeed = effSpeed || sys.speed || "Typical";
+    data.chargingRank = lesserRank(actualBody, actualSpeed);
 
     return data;
   }
@@ -86,6 +139,18 @@ export class MSHVehicleActorSheet extends FaseripActorSheet {
       });
     });
 
+    // Quick repair button
+    html.find(".vehicle-repair-quick").on("click", async (ev) => {
+      const amt = Number(ev.currentTarget.dataset.amt || 0);
+      const s = this.actor.system ?? {};
+      const max = Number(s.bodyHPMax) || 0;
+      const next = Math.min(max, (Number(s.bodyHP) || 0) + Math.max(0, amt));
+      await this.actor.update({
+        "system.bodyHP": next,
+        "system.resources.body.value": next
+      });
+    });
+
     // Crew link — click name to open actor sheet
     html.find(".crew-link").on("click", async (ev) => {
       ev.preventDefault();
@@ -95,7 +160,7 @@ export class MSHVehicleActorSheet extends FaseripActorSheet {
       doc?.sheet?.render(true);
     });
 
-    // Crew remove — remove driver or passenger
+    // Crew remove
     html.find(".crew-remove").on("click", async (ev) => {
       ev.preventDefault();
       const slot = ev.currentTarget.dataset.slot;
@@ -123,10 +188,6 @@ export class MSHVehicleActorSheet extends FaseripActorSheet {
   /**
    * Handle dropping an Actor onto the vehicle sheet.
    * Foundry v13 routes Actor drops here from _onDrop automatically.
-   * Determines crew slot from the drop target element.
-   * @param {DragEvent} event
-   * @param {object} data - The drop data containing uuid and type
-   * @returns {Promise<boolean|object>}
    */
   async _onDropActor(event, data) {
     if (!this.isEditable) return false;
@@ -140,14 +201,10 @@ export class MSHVehicleActorSheet extends FaseripActorSheet {
       return false;
     }
 
-    // Determine which slot was the drop target
     const dropZone = event.target.closest?.(".crew-drop-zone");
     const slot = dropZone?.dataset?.slot;
 
-    // If not dropped on a crew zone, check if it's an actor being dropped
-    // on the sheet generally — default to passenger
     if (!slot) {
-      // Not on a crew drop zone — don't handle, let parent deal with it
       return super._onDropActor(event, data);
     }
 

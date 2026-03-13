@@ -259,6 +259,8 @@
       "bodyCSLoss": 0,
       "speedCSLoss": 0,
       "controlCSLoss": 0,
+      "currentSpeed": "",
+      "outOfControl": false,
       "damageLog": [],
       "resources": {
         "body": {
@@ -679,4 +681,4 @@
       "loanLastPaidGameDate": ""
     }
   }
-}
+}

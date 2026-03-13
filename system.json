@@ -59,7 +59,8 @@
         "styles/contact-sheet.css",
         "styles/combat-panel.css",
         "styles/gm-tools.css",
-        "styles/action-dialog.css"
+        "styles/action-dialog.css",
+        "styles/vehicle-sheet.css"
     ],
     "packs": [
         {
