@@ -1741,9 +1741,9 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
         // GRAPPLING attacks
         const grapplingTypes = ["ensnaring missile"];
         
-        // MENTAL attacks (Psyche FEAT, no to-hit)
+        // MENTAL attacks (Psyche FEAT, no to-hit) — NOT psionic attack (uses intensity)
         const mentalTypes = [
-          "psionic attack", "mind control", "emotion control",
+          "mind control", "emotion control",
           "possession", "transferral", "mental probe",
           "telepathy", "image generation"
         ];
@@ -1860,6 +1860,16 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
           }
         }
         
+        // Route Psionic Attack explicitly to intensity (Psyche FEAT vs power rank)
+        // Target rolls Psyche vs power's intensity; white = unconscious 1-10 rounds
+        if (!actionType && powerTypeLower.includes("psionic attack")) {
+          return ActionDispatcher.roll("intensity", {
+            actor: this.actor,
+            abilityName: "psyche",
+            opts: { itemId: item.id, item }
+          });
+        }
+
         // Route to intensity if power has requiresSave + save.intensity configured
         // This catches gas, flash, sonic, etc. — non-mental intensity powers
         if (!actionType && requiresSave) {

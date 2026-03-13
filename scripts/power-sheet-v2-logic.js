@@ -48,7 +48,10 @@ const CATEGORY_ACTIVATION_TYPE = {
 //                                    subs: [sub-check data-sub values] }
 const CATEGORY_AUTO_EXPAND = {
   resistances:              { sections: ["defense"], subs: ["resistance"] },
-  bodyAlterationsDefensive: { sections: ["defense"], subs: [] }
+  bodyAlterationsDefensive: { sections: ["defense"], subs: [] },
+  mentalPowers:             { sections: ["save"], subs: [] },
+  distanceAttacks:          { sections: ["save"], subs: [] },
+  bodyAlterationsOffensive: { sections: ["save"], subs: [] }
 };
 
 // Sections always shown regardless of category
