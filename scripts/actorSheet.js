@@ -1282,7 +1282,8 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
           range: "",
           type: "",
           subtype: "",
-          isActive: true
+          isActive: true,
+          activationType: "activated"
         },
         sort: this.actor.items.size  // sort added
       };
@@ -1565,6 +1566,26 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
         pack.render(true);
       } else {
         ui.notifications.warn("Powers compendium not found.");
+      }
+    });
+
+    // Toggle power isActive from powers tab
+    // Flips system.isActive AND enables/disables all transfer AEs on the power item
+    // Passive powers are always on and cannot be toggled
+    html.find('.power-active-toggle').click(async ev => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const itemId = $(ev.currentTarget).data("itemId");
+      const item = this.actor.items.get(itemId);
+      if (!item) return;
+      if (item.system.activationType === "passive") return;
+      const newState = !item.system.isActive;
+      await item.update({ "system.isActive": newState });
+      // Sync transfer ActiveEffects: disabled = !isActive
+      const transferEffects = item.effects.filter(e => e.transfer);
+      if (transferEffects.length) {
+        const updates = transferEffects.map(e => ({ _id: e.id, disabled: !newState }));
+        await item.updateEmbeddedDocuments("ActiveEffect", updates);
       }
     });
 
@@ -5287,4 +5308,4 @@ class UniversalTablePopout extends Application {
       ChatMessage.create({ content, flags: { 'msh-faserip': { type: 'action-info' } } });
     });
   }
-}
+}

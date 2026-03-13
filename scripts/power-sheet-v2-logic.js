@@ -26,6 +26,22 @@ const CATEGORY_SECTIONS = {
   bodyAlterationsDefensive: ["defense", "healing"]
 };
 
+// Category -> suggested activationType
+// passive = always-on (Body Armor, Resistances, Senses)
+// activated = toggled on/off (Flight, Energy Blasts)
+const CATEGORY_ACTIVATION_TYPE = {
+  resistances:              "passive",
+  senses:                   "passive",
+  bodyAlterationsDefensive: "passive",
+  movement:                 "activated",
+  matterControl:            "activated",
+  energyControl:            "activated",
+  bodyControl:              "activated",
+  distanceAttacks:          "activated",
+  mentalPowers:             "activated",
+  bodyAlterationsOffensive: "activated"
+};
+
 // When a category is selected, auto-check these section toggles and sub-toggles
 // so the user doesn't have to manually dig through 3 layers of checkboxes.
 // Keys = category value, values = { sections: [section-check data-section values],
@@ -99,6 +115,29 @@ export function ps2ActivateListeners(html, sheet) {
   // Category change -> re-evaluate visibility
   html.find('#ps2-category').on('change', ev => {
     updateSectionVisibility(html, ev.currentTarget.value);
+    // Auto-suggest activationType if it hasn't been manually set or is still default
+    const suggested = CATEGORY_ACTIVATION_TYPE[ev.currentTarget.value];
+    if (suggested) {
+      const atSelect = html.find('.ps2-activation-type');
+      atSelect.val(suggested).trigger('change');
+    }
+  });
+
+  // Activation type change -> if set to passive, force isActive true + enable AEs
+  html.find('.ps2-activation-type').on('change', async ev => {
+    const val = ev.currentTarget.value;
+    if (val === "passive") {
+      await sheet.item.update({
+        "system.activationType": val,
+        "system.isActive": true
+      });
+      // Enable all transfer AEs for passive powers
+      const transferEffects = sheet.item.effects.filter(e => e.transfer);
+      if (transferEffects.length) {
+        const updates = transferEffects.map(e => ({ _id: e.id, disabled: false }));
+        await sheet.item.updateEmbeddedDocuments("ActiveEffect", updates);
+      }
+    }
   });
 
   // Section toggle checkboxes -> show/hide body

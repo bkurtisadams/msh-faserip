@@ -12,7 +12,7 @@ export class FaseripItemSheet extends ItemSheet {
   static get defaultOptions() {
     return foundry.utils.mergeObject(super.defaultOptions, {
       classes: ["faserip", "sheet", "item"],
-      width: 520,
+      width: 580,
       height: 600,
       tabs: [{ navSelector: ".sheet-tabs", contentSelector: ".sheet-body", initial: "overview" }],
       resizable: true,
@@ -743,4 +743,4 @@ _updatePowerTypeOptions(html, category) {
     return rankRanges[rank] || "Unknown";
   }
     
-}
+}

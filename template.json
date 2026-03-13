@@ -292,6 +292,7 @@
         "ranked"
       ],
       "isActive": true,
+      "activationType": "activated",
       "isStarred": false,
       "source": "natural",
       "category": "",
@@ -678,4 +679,4 @@
       "loanLastPaidGameDate": ""
     }
   }
-}
+}

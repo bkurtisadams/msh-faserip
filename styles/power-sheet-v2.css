@@ -2,7 +2,7 @@
 
 /* ── Sheet container ──────────────────────── */
 .power-sheet-v2.sheet {
-  width: 520px;
+  width: 580px;
   height: 700px;
 }
 .power-sheet-v2 .window-content {
@@ -44,16 +44,29 @@
   gap: 4px;
   align-items: center;
 }
+.power-sheet-v2 .ps2-activation-type {
+  height: 22px;
+  font-size: 10px;
+  padding: 1px 3px;
+  border: 1px solid #ccc;
+  border-radius: 2px;
+  background: #fff;
+  color: #444;
+  cursor: pointer;
+}
+.power-sheet-v2 .ps2-activation-type:focus {
+  border-color: #8b0000;
+  outline: none;
+}
 .power-sheet-v2 .ps2-toggle {
   cursor: pointer;
 }
 .power-sheet-v2 .ps2-toggle input { display: none; }
 .power-sheet-v2 .ps2-toggle i {
-  font-size: 1.1em;
-  color: #999;
+  font-size: 1.3em;
+  color: #bbb;
   transition: color 0.15s;
 }
-.power-sheet-v2 .ps2-toggle input:checked + i.fa-bolt { color: #d4a017; }
 .power-sheet-v2 .ps2-toggle input:checked + i.fa-star { color: #f5a623; }
 .power-sheet-v2 .ps2-toggle:hover i { color: #8b0000; }
 

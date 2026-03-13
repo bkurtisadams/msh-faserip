@@ -662,6 +662,37 @@
   gap: 6px;
   justify-content: flex-end;
  }
+
+ /* ── Power Active toggle (inline in name cell) ──────────────────────────── */
+ .faserip-sheet .power-active-toggle {
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+ }
+
+ .faserip-sheet .power-active-toggle i {
+  color: #ccc;
+  transition: color 0.15s;
+ }
+
+ .faserip-sheet .power-active-toggle i.active {
+  color: #4CAF50;
+ }
+
+ .faserip-sheet .power-active-toggle:hover i {
+  color: #2e7d32;
+ }
+
+ /* Passive power indicator (shield, non-clickable) */
+ .faserip-sheet .power-passive-indicator {
+  font-size: 12px;
+  line-height: 1;
+  color: #c0a060;
+ }
+
+ .faserip-sheet .power-row.power-inactive td {
+  opacity: 0.45;
+ }
  
  .faserip-sheet .item-control {
   cursor: pointer;
@@ -3946,4 +3977,4 @@ form.faserip-sheet .secondary-abilities .sec-col.resources > .sec-body.resources
 @keyframes faseripDotFadeIn {
   from { opacity: 0; transform: translateY(4px); }
   to   { opacity: 1; transform: translateY(0); }
-}
+}

@@ -656,15 +656,23 @@
             </thead>
             <tbody>
               {{#each powers as |power|}}
-              <tr class="power-row item" data-item-id="{{power._id}}" draggable="true">
+              <tr class="power-row item {{#unless power.system.isActive}}power-inactive{{/unless}}" data-item-id="{{power._id}}" draggable="true">
                 <td class="power-name">
                   <a class="item-control power-roll" title="Roll" data-item-id="{{power._id}}">
                     <i class="fas fa-dice-d20"></i>
                   </a>
-                  <!-- Change this line in the powers section of your HTML -->
                   <img src="{{power.img}}" class="power-icon power-info" width="24" height="24"
                     data-item-id="{{power._id}}" 
                     title="Click for info. Shift+drag to reorder." />
+                  {{#if (eq power.system.activationType "passive")}}
+                  <span class="power-passive-indicator" title="Passive (always on)">
+                    <i class="fas fa-shield-alt"></i>
+                  </span>
+                  {{else}}
+                  <a class="power-active-toggle" data-item-id="{{power._id}}" title="Toggle Active">
+                    <i class="fas fa-bolt {{#if power.system.isActive}}active{{/if}}"></i>
+                  </a>
+                  {{/if}}
                   <span class="power-name-text 
                             {{#if (getFlag power 'msh-faserip' 'isBonusPower')}} bonus-power {{/if}}
                             {{#if (getFlag power 'msh-faserip' 'isStuntPower')}} stunt-power {{/if}}">
@@ -2117,4 +2125,4 @@
     </div>
   </div>
 
-</form>
+</form>
