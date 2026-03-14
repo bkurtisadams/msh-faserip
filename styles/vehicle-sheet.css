@@ -357,3 +357,87 @@
 .vehicle-sheet .vehicle-repair-quick:hover {
   background: #c8e6c9 !important;
 }
+
+/* ══════════════════════════════════════════
+   VEHICLE ITEM SHEET (compendium stat card)
+   ══════════════════════════════════════════ */
+.vehicle-item-sheet .veh-item-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  background: #f5f0e8;
+  border-bottom: 2px solid #8b0000;
+}
+.vehicle-item-sheet .veh-item-header .profile-img {
+  border: 1px solid #999;
+  border-radius: 3px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.vehicle-item-sheet .veh-item-name {
+  flex: 1;
+  font-size: 1.15em;
+  font-weight: bold;
+  border: none;
+  border-bottom: 1px solid #ccc;
+  background: transparent;
+  padding: 2px 4px;
+}
+.vehicle-item-sheet .veh-item-row3 {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 8px;
+  align-items: end;
+  margin-bottom: 8px;
+}
+.vehicle-item-sheet .veh-item-comp {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: .85em;
+  font-weight: bold;
+  color: #666;
+  white-space: nowrap;
+  cursor: pointer;
+  padding-bottom: 2px;
+}
+.vehicle-item-sheet .veh-item-comp input[type="checkbox"] { margin: 0; }
+.vehicle-item-sheet .veh-item-fieldset {
+  border: 1px solid #c0a070;
+  background: #faf8f2;
+  border-radius: 3px;
+  padding: 6px 8px;
+  margin-bottom: 8px;
+}
+.vehicle-item-sheet .veh-item-fieldset legend {
+  font-weight: bold;
+  color: #8b0000;
+  font-size: .85em;
+  padding: 0 4px;
+}
+.vehicle-item-sheet .veh-item-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+.vehicle-item-sheet .veh-item-stats label {
+  font-size: .8em;
+  font-weight: bold;
+  color: #666;
+}
+.vehicle-item-sheet .veh-item-stats select {
+  width: 100%;
+  font-size: .85em;
+}
+.vehicle-item-sheet textarea {
+  width: 100%;
+  font-size: .85em;
+}
+.vehicle-item-sheet .dialog-footer {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+  padding: 6px 8px;
+  border-top: 1px solid #c0a070;
+}
