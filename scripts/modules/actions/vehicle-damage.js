@@ -1,5 +1,6 @@
-// scripts/modules/actions/vehicle-damage.js v1.0.0 - 2026-03-04
-// Vehicle damage routing for applyDamageToTargets
+// scripts/modules/actions/vehicle-damage.js v1.1.0 - 2026-03-13
+// v1.1.0: Store CS losses as negative (matching rules "-1CS"), abs for rank math
+// v1.0.0: Vehicle damage routing for applyDamageToTargets
 // Implements: Protection as passenger armor, Body as vehicle HP,
 // Vehicle Damage Table (p.50-51) for CS degradation
 
@@ -120,36 +121,36 @@ export async function applyDamageToVehicle({
   // Determine vehicle damage effects from the table
   const tableResult = getVehicleDamageResult(damageCategory, featColor);
 
-  // Apply CS losses
+  // Apply CS losses (stored as negative per rules "-1CS", abs for rank math)
   let bodyCSLoss = Number(sys.bodyCSLoss) || 0;
   let speedCSLoss = Number(sys.speedCSLoss) || 0;
   let controlCSLoss = Number(sys.controlCSLoss) || 0;
 
   if (tableResult.bodyCS) {
-    bodyCSLoss += 1;
+    bodyCSLoss = -(Math.abs(bodyCSLoss) + 1);
     updates["system.bodyCSLoss"] = bodyCSLoss;
   }
   if (tableResult.speedCS) {
-    speedCSLoss += 1;
+    speedCSLoss = -(Math.abs(speedCSLoss) + 1);
     updates["system.speedCSLoss"] = speedCSLoss;
   }
   if (tableResult.controlCS) {
-    controlCSLoss += 1;
+    controlCSLoss = -(Math.abs(controlCSLoss) + 1);
     updates["system.controlCSLoss"] = controlCSLoss;
   }
   if (tableResult.allCS) {
-    bodyCSLoss += 1;
-    speedCSLoss += 1;
-    controlCSLoss += 1;
+    bodyCSLoss = -(Math.abs(bodyCSLoss) + 1);
+    speedCSLoss = -(Math.abs(speedCSLoss) + 1);
+    controlCSLoss = -(Math.abs(controlCSLoss) + 1);
     updates["system.bodyCSLoss"] = bodyCSLoss;
     updates["system.speedCSLoss"] = speedCSLoss;
     updates["system.controlCSLoss"] = controlCSLoss;
   }
 
   // Effective ranks after CS losses
-  const effBody = shiftRank(bodyRank, -bodyCSLoss);
-  const effSpeed = shiftRank(sys.speed || "Typical", -speedCSLoss);
-  const effControl = shiftRank(sys.control || "Typical", -controlCSLoss);
+  const effBody = shiftRank(bodyRank, -Math.abs(bodyCSLoss));
+  const effSpeed = shiftRank(sys.speed || "Typical", -Math.abs(speedCSLoss));
+  const effControl = shiftRank(sys.control || "Typical", -Math.abs(controlCSLoss));
 
   // Apply updates
   const canDirect = game.user.isGM || targetActor?.isOwner;

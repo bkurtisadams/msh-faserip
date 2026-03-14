@@ -1,4 +1,5 @@
-// scripts/vehicle-actor-sheet.js v3.0.0 - 2026-03-13
+// scripts/vehicle-actor-sheet.js v3.0.1 - 2026-03-13
+// v3.0.1: Fix button inline layout, horizontal tabs, clamp CS loss to 0+
 // v3.0.0: Compact layout, effective ranks, current speed, OOC flag, FEAT/charging display, repair button
 // v2.1.0: Use Foundry v13 _onDropActor API instead of custom _onDrop parsing
 // v2.0.0: Crew linking via actor UUID drag-drop, seating capacity, agility display
@@ -95,10 +96,10 @@ export class MSHVehicleActorSheet extends FaseripActorSheet {
     }
     data.crewCount = (data.driverActor ? 1 : 0) + data.passengerActors.length;
 
-    // --- Effective ranks after CS losses ---
-    const bodyCSLoss = Number(sys.bodyCSLoss) || 0;
-    const speedCSLoss = Number(sys.speedCSLoss) || 0;
-    const controlCSLoss = Number(sys.controlCSLoss) || 0;
+    // --- Effective ranks after CS losses (abs so -1 or 1 both = 1 rank lost) ---
+    const bodyCSLoss = Math.abs(Number(sys.bodyCSLoss) || 0);
+    const speedCSLoss = Math.abs(Number(sys.speedCSLoss) || 0);
+    const controlCSLoss = Math.abs(Number(sys.controlCSLoss) || 0);
 
     const effBody = bodyCSLoss > 0 ? shiftRank(sys.body || "Typical", -bodyCSLoss) : null;
     const effSpeed = speedCSLoss > 0 ? shiftRank(sys.speed || "Typical", -speedCSLoss) : null;

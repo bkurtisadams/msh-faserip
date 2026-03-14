@@ -1,5 +1,32 @@
-/* styles/vehicle-sheet.css v1.0.0 - 2026-03-13 */
+/* styles/vehicle-sheet.css v1.1.0 - 2026-03-13 */
 /* Compact vehicle actor sheet layout */
+
+/* ── TABS — force horizontal ── */
+.vehicle-sheet .sheet-tabs.tabs {
+  display: flex !important;
+  flex-direction: row !important;
+  justify-content: center;
+  gap: 0;
+  border-bottom: 1px solid #c0a070;
+  background: #f0ede4;
+}
+.vehicle-sheet .sheet-tabs.tabs .item {
+  display: inline-block !important;
+  padding: 5px 14px;
+  font-size: .85em;
+  font-weight: bold;
+  color: #666;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  text-align: center;
+}
+.vehicle-sheet .sheet-tabs.tabs .item:hover {
+  color: #333;
+}
+.vehicle-sheet .sheet-tabs.tabs .item.active {
+  color: #8b0000;
+  border-bottom-color: #8b0000;
+}
 
 /* ── HEADER ROW ── */
 .vehicle-sheet .veh-header {
@@ -298,30 +325,35 @@
   font-weight: bold;
 }
 .vehicle-sheet .veh-dmg-buttons {
-  display: flex;
+  display: flex !important;
+  flex-direction: row !important;
   gap: 4px;
   flex-wrap: wrap;
 }
 .vehicle-sheet .veh-dmg-buttons button {
   font-size: .8em;
-  padding: 2px 8px;
+  padding: 2px 12px;
   cursor: pointer;
+  width: auto !important;
+  flex: 0 0 auto;
+  display: inline-block !important;
+  line-height: 1.6;
 }
 .vehicle-sheet .vehicle-damage-quick {
-  background: #fff3e0;
-  border: 1px solid #ff9800;
+  background: #fff3e0 !important;
+  border: 1px solid #ff9800 !important;
   border-radius: 3px;
-  color: #c62828;
+  color: #c62828 !important;
 }
 .vehicle-sheet .vehicle-damage-quick:hover {
-  background: #ffe0b2;
+  background: #ffe0b2 !important;
 }
 .vehicle-sheet .vehicle-repair-quick {
-  background: #e8f5e9;
-  border: 1px solid #4caf50;
+  background: #e8f5e9 !important;
+  border: 1px solid #4caf50 !important;
   border-radius: 3px;
-  color: #2e7d32;
+  color: #2e7d32 !important;
 }
 .vehicle-sheet .vehicle-repair-quick:hover {
-  background: #c8e6c9;
+  background: #c8e6c9 !important;
 }
