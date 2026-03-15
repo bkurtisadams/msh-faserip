@@ -941,124 +941,53 @@
       <!-- Custom equipment fields -->
       {{#if isDevice}}
       <div class="custom-fields device-fields">
-        <!-- Custom Abilities -->
-        <div class="form-group">
-          <label>Custom Abilities:</label>
-          <button type="button" class="add-custom-ability">+ Add Ability</button>
-        </div>
+        <div class="df-section-label">DEVICE FUNCTIONS</div>
 
-        <div class="custom-abilities-list">
-          {{#each system.customAbilities as |ability i|}}
-          <div class="custom-ability">
-            <div class="ability-header">
-              <input type="text" name="system.customAbilities.{{i}}.name" value="{{ability.name}}" placeholder="Ability Name"/>
-              <button type="button" class="remove-custom-ability" data-index="{{i}}"><i class="fas fa-trash"></i></button>
+        <div class="df-functions-list">
+          {{#each deviceFunctionsDisplay as |fn i|}}
+          <div class="df-card" data-fn-index="{{i}}" data-fn-type="{{fn.type}}">
+            <div class="df-card-header">
+              <span class="df-type-badge df-badge-{{fn.type}}">{{fn.typeLabel}}</span>
+              <span class="df-card-name">{{fn.name}}</span>
+              <span class="df-card-right">
+                {{#if (eq fn.type "buff")}}
+                  <span class="df-cs-label">{{fn.csLabel}}</span>
+                  <label class="df-toggle" title="Enable/disable this buff">
+                    <input type="checkbox" class="df-buff-toggle" data-fn-index="{{i}}" {{#if fn.enabled}}checked{{/if}} />
+                    <span class="df-toggle-slider"></span>
+                  </label>
+                {{else}}
+                  <span class="df-rank-display">{{fn.rankAbbr}} ({{fn.rankValue}})</span>
+                {{/if}}
+              </span>
+              <button type="button" class="df-edit-btn" data-fn-index="{{i}}" title="Edit"><i class="fas fa-pen"></i></button>
+              <button type="button" class="df-remove-btn" data-fn-index="{{i}}" title="Delete"><i class="fas fa-trash"></i></button>
             </div>
-
-            <div class="ability-details">
-              <div class="form-row">
-                <div class="form-group half">
-                  <label>Rank:</label>
-                  <select name="system.customAbilities.{{i}}.rank">
-                    {{#each ../ranks as |rank|}}
-                    <option value="{{rank}}" {{#if (eq ability.rank rank)}}selected{{/if}}>{{rank}}</option>
-                    {{/each}}
-                  </select>
-                </div>
-
-                <div class="form-group half">
-                  <label>Damage Type:</label>
-                  <select name="system.customAbilities.{{i}}.damageType">
-                    <option value="" {{#if (eq ability.damageType "")}}selected{{/if}}>None</option>
-                    {{#each ../damageTypes as |type|}}
-                    <option value="{{type}}" {{#if (eq ability.damageType type)}}selected{{/if}}>{{type}}</option>
-                    {{/each}}
-                  </select>
-                </div>
-              </div>
-
-              <div class="form-group">
-                <label>Range:</label>
-                <input type="text" name="system.customAbilities.{{i}}.range" value="{{ability.range}}" />
-              </div>
-
-              <div class="form-group">
-                <label>Description:</label>
-                <textarea name="system.customAbilities.{{i}}.description">{{ability.description}}</textarea>
-              </div>
-
-              <div class="form-group">
-                <label>
-                  <input type="checkbox" name="system.customAbilities.{{i}}.isPassiveArmor" {{checked ability.isPassiveArmor}} />
-                  Grants Passive Armor
-                </label>
-              </div>
-
-              <div class="form-group {{#unless ability.isPassiveArmor}}hidden{{/unless}}">
-                <label>Armor Type (Specific):</label>
-                <select name="system.customAbilities.{{i}}.armorDamageType">
-                  <option value="" {{#if (eq ability.armorDamageType "")}}selected{{/if}}>None</option>
-                  {{#each ../damageTypes as |type|}}
-                  <option value="{{type}}" {{#if (eq ability.armorDamageType type)}}selected{{/if}}>{{type}}</option>
-                  {{/each}}
-                </select>
-              </div>
+            <div class="df-card-body">
+              {{#if (eq fn.type "attack")}}
+                <span>Type: {{fn.damageTypeLabel}}</span>
+                <span class="df-sep">&nbsp;&nbsp;</span>
+                <span>Range: {{fn.rangeDisplay}}</span>
+              {{else if (eq fn.type "buff")}}
+                <span>Ability: {{fn.abilityLabel}}</span>
+                <span class="df-sep">&nbsp;&nbsp;</span>
+                <span>Base → Effective: {{fn.baseRank}} → {{fn.effectiveRank}}</span>
+              {{else if (eq fn.type "power")}}
+                <span>FEAT roll to activate</span>
+              {{else if (eq fn.type "defense")}}
+                <span>Type: {{fn.defenseTypeLabel}}</span>
+                <span class="df-sep">&nbsp;&nbsp;</span>
+                <span>Rank: {{fn.rankAbbr}} ({{fn.rankValue}})</span>
+              {{/if}}
+              {{#if fn.description}}
+                <div class="df-card-desc">{{fn.description}}</div>
+              {{/if}}
             </div>
           </div>
           {{/each}}
         </div>
 
-        <!-- Powers Granted by This Equipment -->
-        <div class="form-group">
-          <label>Granted Powers:</label>
-          <button type="button" class="add-granted-power">+ Add Power</button>
-        </div>
-
-        <div class="granted-powers-list">
-          {{#each system.powers as |power i|}}
-          <div class="granted-power">
-            <div class="power-header">
-              <input type="text" name="system.powers.{{i}}.name" value="{{power.name}}" placeholder="Power Name" />
-              <button type="button" class="remove-granted-power" data-index="{{i}}"><i class="fas fa-trash"></i></button>
-            </div>
-
-            <div class="form-row">
-              <div class="form-group half">
-                <label>Rank:</label>
-                <select name="system.powers.{{i}}.rank">
-                  {{#each ../ranks as |rank|}}
-                  <option value="{{rank}}" {{#if (eq power.rank rank)}}selected{{/if}}>{{rank}}</option>
-                  {{/each}}
-                </select>
-              </div>
-              <div class="form-group half">
-                <label>Value:</label>
-                <input type="number" name="system.powers.{{i}}.value" value="{{power.value}}" />
-              </div>
-            </div>
-
-            <div class="form-group">
-              <label>Applies To Damage Type:</label>
-              <select name="system.powers.{{i}}.damageType">
-                <option value="" {{#if (eq power.damageType "")}}selected{{/if}}>All</option>
-                {{#each ../damageTypes as |type|}}
-                  <option value="{{type}}" {{#if (eq power.damageType type)}}selected{{/if}}>{{type}}</option>
-                {{/each}}
-                <option value="sensory" {{#if (eq power.damageType "sensory")}}selected{{/if}}>Sensory</option>
-              </select>
-            </div>
-
-            <div class="form-group">
-              <label>
-                <input type="checkbox" name="system.powers.{{i}}.isPassiveArmor" {{checked power.isPassiveArmor}} />
-                Grants Passive Armor
-              </label>
-            </div>
-
-            <input type="hidden" name="system.powers.{{i}}.grantedByEquipment" value="true" />
-          </div>
-          {{/each}}
-        </div>
+        <button type="button" class="df-add-btn">+ Add function</button>
       </div>
       {{/if}}
       <!-- END custom-fields / device-fields -->
@@ -1438,4 +1367,89 @@
       background: #8b0000; color: #fff; border-color: #8b0000;
     }
     .equip-effect-presets button i { margin-right: 2px; }
+
+    /* ── Device Functions ── */
+    .df-section-label {
+      font-size: 0.72em; font-weight: 600; letter-spacing: 0.08em;
+      color: #999; text-transform: uppercase; margin: 8px 0 6px;
+    }
+    .df-functions-list { display: flex; flex-direction: column; gap: 6px; }
+    .df-card {
+      border: 1px solid #e0ddd5; border-radius: 6px;
+      background: #fff; padding: 0; overflow: hidden;
+    }
+    .df-card-header {
+      display: flex; align-items: center; gap: 6px;
+      padding: 6px 8px; background: #faf8f2; border-bottom: 1px solid #f0ede5;
+    }
+    .df-type-badge {
+      display: inline-block; font-size: 0.68em; font-weight: 600;
+      padding: 2px 8px; border-radius: 10px; text-transform: capitalize;
+      line-height: 1.4; white-space: nowrap;
+    }
+    .df-badge-attack { background: #fce4e4; color: #a82020; }
+    .df-badge-buff   { background: #e0f0e8; color: #2d6a2e; }
+    .df-badge-power  { background: #ece0f4; color: #5c3d84; }
+    .df-badge-defense{ background: #e0e8f0; color: #2d4a6e; }
+    .df-card-name { font-weight: 700; font-size: 0.95em; color: #333; }
+    .df-card-right { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+    .df-cs-label { font-size: 0.82em; color: #2d6a2e; font-weight: 600; }
+    .df-rank-display { font-size: 0.82em; color: #666; font-weight: 600; }
+    .df-edit-btn, .df-remove-btn {
+      background: none; border: none; cursor: pointer;
+      color: #999; padding: 2px 4px; font-size: 0.8em;
+    }
+    .df-edit-btn:hover { color: #8b0000; }
+    .df-remove-btn:hover { color: #c00; }
+    .df-card-body {
+      padding: 4px 8px 6px; font-size: 0.82em; color: #666;
+    }
+    .df-card-desc {
+      margin-top: 3px; font-style: italic; color: #888; font-size: 0.95em;
+    }
+    .df-sep { color: #ccc; }
+    .df-add-btn {
+      margin-top: 8px; padding: 5px 14px; font-size: 0.82em;
+      border: 1px solid #d0cdc5; border-radius: 16px;
+      background: #fff; color: #666; cursor: pointer;
+    }
+    .df-add-btn:hover { border-color: #8b0000; color: #8b0000; }
+
+    /* Toggle switch */
+    .df-toggle { position: relative; display: inline-block; width: 36px; height: 20px; }
+    .df-toggle input { opacity: 0; width: 0; height: 0; }
+    .df-toggle-slider {
+      position: absolute; cursor: pointer; inset: 0;
+      background: #ccc; border-radius: 20px; transition: 0.2s;
+    }
+    .df-toggle-slider::before {
+      content: ""; position: absolute; width: 16px; height: 16px;
+      left: 2px; bottom: 2px; background: #fff;
+      border-radius: 50%; transition: 0.2s;
+    }
+    .df-toggle input:checked + .df-toggle-slider { background: #2d6a2e; }
+    .df-toggle input:checked + .df-toggle-slider::before { transform: translateX(16px); }
+
+    /* Type selector dialog */
+    .df-type-selector { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+    .df-type-option {
+      border: 2px solid #e0ddd5; border-radius: 8px;
+      padding: 10px 12px; text-align: center; cursor: pointer;
+      background: #fff; transition: 0.15s;
+    }
+    .df-type-option:hover { border-color: #8b0000; background: #faf8f2; }
+    .df-type-option.selected { border-color: #2c3e6b; background: #e8ecf4; }
+    .df-type-option-title { font-weight: 700; font-size: 0.95em; margin-bottom: 2px; }
+    .df-type-option-desc { font-size: 0.75em; color: #888; }
+    .df-type-hint { font-size: 0.8em; color: #888; margin-bottom: 8px; }
+    .df-edit-form .form-group { margin-bottom: 8px; }
+    .df-edit-form label { display: block; font-size: 0.78em; font-weight: 600; color: #666; margin-bottom: 2px; }
+    .df-edit-form input, .df-edit-form select, .df-edit-form textarea {
+      width: 100%; box-sizing: border-box; padding: 4px 6px;
+      border: 1px solid #ddd; border-radius: 4px; font-size: 0.9em;
+    }
+    .df-edit-form textarea { min-height: 48px; resize: vertical; }
+    .df-edit-row { display: flex; gap: 8px; }
+    .df-edit-row > .form-group { flex: 1; }
+    .df-edit-row > .form-group.narrow { flex: 0 0 80px; }
   </style>

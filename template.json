@@ -597,6 +597,7 @@
       "powerRange": "",
       "customAbilities": [],
       "powers": [],
+      "deviceFunctions": [],
       "isGrenade": false,
       "grenadeType": "",
       "grenadeRadius": 1,

@@ -112,6 +112,11 @@ export class FaseripEquipmentSheet extends ItemSheet {
     // Active Effects on this equipment item
     context.effects = prepareActiveEffectCategories(this.item.effects);
 
+    // ── Device Functions display data ──
+    if (context.isDevice) {
+      context.deviceFunctionsDisplay = this._buildDeviceFunctionsDisplay();
+    }
+
     return context;
   }
 
@@ -186,6 +191,9 @@ export class FaseripEquipmentSheet extends ItemSheet {
         isPassiveArmor: p.isPassiveArmor || false,
         grantedByEquipment: p.grantedByEquipment || "true"
       }));
+    }
+    if (data.system.deviceFunctions && !Array.isArray(data.system.deviceFunctions)) {
+      data.system.deviceFunctions = Object.values(data.system.deviceFunctions);
     }
 
     return super._updateObject(event, foundry.utils.flattenObject(data));
@@ -577,6 +585,55 @@ export class FaseripEquipmentSheet extends ItemSheet {
         }
     });
 
+    // ── Device Functions listeners ──
+    html.find('.df-add-btn').click(async ev => {
+      ev.preventDefault();
+      this._openDeviceFunctionTypeSelector();
+    });
+
+    html.find('.df-remove-btn').click(async ev => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const index = parseInt(ev.currentTarget.dataset.fnIndex);
+      const fns = foundry.utils.duplicate(this.object.system.deviceFunctions || []);
+      if (index < fns.length) {
+        const removed = fns[index];
+        // If buff, also remove the managed Active Effect
+        if (removed.type === "buff" && removed._effectId) {
+          const eff = this.object.effects.get(removed._effectId);
+          if (eff) await eff.delete();
+        }
+        fns.splice(index, 1);
+        await this.object.update({ "system.deviceFunctions": fns }, { diff: false });
+        this.render(true);
+      }
+    });
+
+    html.find('.df-edit-btn').click(async ev => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const index = parseInt(ev.currentTarget.dataset.fnIndex);
+      this._openDeviceFunctionEditDialog(index);
+    });
+
+    html.find('.df-buff-toggle').on('change', async ev => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const index = parseInt(ev.currentTarget.dataset.fnIndex);
+      const fns = foundry.utils.duplicate(this.object.system.deviceFunctions || []);
+      if (index >= fns.length) return;
+      const fn = fns[index];
+      const enabled = ev.currentTarget.checked;
+      fn.enabled = enabled;
+
+      // Toggle the managed Active Effect
+      if (fn._effectId) {
+        const eff = this.object.effects.get(fn._effectId);
+        if (eff) await eff.update({ disabled: !enabled });
+      }
+      await this.object.update({ "system.deviceFunctions": fns }, { diff: false });
+    });
+
     // Attack Modes listeners
     html.find('.add-attack-mode').click(async ev => {
       ev.preventDefault();
@@ -805,10 +862,17 @@ async rollEquipment() {
     const actor = item.actor;
     if (!actor) return ui.notifications.error("No actor linked to item!");
 
-    const type = item.system?.type || "weapon";
-    if (type === "weapon") return this._rollWeapon(item, actor);
-    if (type === "power")  return this._rollPowerItem(item, actor);
-    if (type === "custom") return this._rollCustomAbility(item, actor);
+    const type = item.system?.type || "";
+    const cat = item.system?.category || "";
+
+    // Device category check first — devices may not have system.type set
+    if (cat === "device" || cat === "custom" || type === "custom") {
+      const dfns = item.system.deviceFunctions || [];
+      if (dfns.length > 0) return this._rollDeviceFunction(item, actor);
+      return this._rollCustomAbility(item, actor);
+    }
+    if (type === "weapon" || cat === "weapon") return this._rollWeapon(item, actor);
+    if (type === "power" || cat === "power-item") return this._rollPowerItem(item, actor);
     return ui.notifications.warn("This equipment type cannot be rolled!");
   }
 
@@ -1269,7 +1333,372 @@ async rollEquipment() {
     }).render(true);
   }
 
-  // Roll a custom ability
+  // ── Device Functions helpers ──
+
+  static DAMAGE_TYPE_LABELS = {
+    "S": "Shooting (S)", "E": "Energy (E)", "F": "Force (F)",
+    "EA": "Edged (EA)", "BA": "Blunt (BA)",
+    "TE": "Thrown Edged (TE)", "TB": "Thrown Blunt (TB)",
+    "GP": "Grappling (GP)", "Gb": "Grabbing (Gb)"
+  };
+
+  static ATTACK_DAMAGE_TYPES = ["S", "E", "F", "EA", "BA", "TE", "TB"];
+
+  static RANK_ABBR = {
+    "Shift-0": "Sh0", "Feeble": "Fe", "Poor": "Pr", "Typical": "Ty",
+    "Good": "Gd", "Excellent": "Ex", "Remarkable": "Rm", "Incredible": "In",
+    "Amazing": "Am", "Monstrous": "Mn", "Unearthly": "Un",
+    "Shift X": "ShX", "Shift Y": "ShY", "Shift Z": "ShZ",
+    "Class 1000": "CL1000", "Class 3000": "CL3000", "Class 5000": "CL5000",
+    "Beyond": "Beyond"
+  };
+
+  static RANKS_ORDERED = [
+    "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent",
+    "Remarkable", "Incredible", "Amazing", "Monstrous", "Unearthly",
+    "Shift X", "Shift Y", "Shift Z",
+    "Class 1000", "Class 3000", "Class 5000", "Beyond"
+  ];
+
+  static ABILITIES = ["fighting", "agility", "strength", "endurance", "reason", "intuition", "psyche"];
+
+  static DEFENSE_TYPES = {
+    "bodyArmor": "Body Armor",
+    "forceField": "Force Field",
+    "resistance": "Resistance"
+  };
+
+  _buildDeviceFunctionsDisplay() {
+    const fns = this.item.system.deviceFunctions || [];
+    const rv = CONFIG.FASERIP?.rankValues || {};
+    const C = this.constructor;
+
+    return fns.map((fn, i) => {
+      const base = {
+        ...fn,
+        typeLabel: { attack: "Attack", buff: "Passive buff", power: "Power", defense: "Defense" }[fn.type] || fn.type,
+        rankAbbr: C.RANK_ABBR[fn.rank] || fn.rank || "",
+        rankValue: rv[fn.rank] ?? ""
+      };
+
+      if (fn.type === "attack") {
+        base.damageTypeLabel = C.DAMAGE_TYPE_LABELS[fn.damageType] || fn.damageType || "—";
+        const r = fn.range;
+        base.rangeDisplay = (!r || r === "0" || r === "adjacent") ? "Adjacent" : `${r} area${r !== "1" ? "s" : ""}`;
+      } else if (fn.type === "buff") {
+        const ab = fn.ability || "strength";
+        base.abilityLabel = ab.charAt(0).toUpperCase() + ab.slice(1);
+        const cs = parseInt(fn.csShift) || 0;
+        base.csLabel = `${cs >= 0 ? "+" : ""}${cs} CS`;
+        // Compute effective rank from owner actor's base
+        const owner = this.item.parent;
+        if (owner) {
+          const baseRank = owner.system?.abilities?.[ab]?.rank || "Typical";
+          base.baseRank = baseRank;
+          const idx = C.RANKS_ORDERED.indexOf(baseRank);
+          const eff = Math.max(0, Math.min(C.RANKS_ORDERED.length - 1, idx + cs));
+          base.effectiveRank = C.RANKS_ORDERED[eff];
+        } else {
+          base.baseRank = "—";
+          base.effectiveRank = "—";
+        }
+      } else if (fn.type === "defense") {
+        base.defenseTypeLabel = C.DEFENSE_TYPES[fn.defenseType] || fn.defenseType || "Body Armor";
+      }
+
+      return base;
+    });
+  }
+
+  _openDeviceFunctionTypeSelector() {
+    const html = `
+      <div class="df-type-selector">
+        <div class="df-type-option" data-type="attack">
+          <div class="df-type-option-title">Attack</div>
+          <div class="df-type-option-desc">Rollable combat action</div>
+        </div>
+        <div class="df-type-option" data-type="buff">
+          <div class="df-type-option-title">Passive buff</div>
+          <div class="df-type-option-desc">Modify an ability while active</div>
+        </div>
+        <div class="df-type-option" data-type="power">
+          <div class="df-type-option-title">Power</div>
+          <div class="df-type-option-desc">Granted power (FEAT roll)</div>
+        </div>
+        <div class="df-type-option" data-type="defense">
+          <div class="df-type-option-title">Defense</div>
+          <div class="df-type-option-desc">Body armor, force field, resistance</div>
+        </div>
+      </div>
+      <div class="df-type-hint">Select a function type, then configure it.</div>
+    `;
+
+    let selectedType = "attack";
+
+    const d = new Dialog({
+      title: "Add Device Function",
+      content: html,
+      buttons: {
+        add: {
+          label: "Next",
+          callback: () => {
+            this._addDeviceFunction(selectedType);
+          }
+        },
+        cancel: { label: "Cancel" }
+      },
+      default: "add",
+      render: (jq) => {
+        const options = jq.find('.df-type-option');
+        options.first().addClass('selected');
+        options.on('click', function () {
+          options.removeClass('selected');
+          $(this).addClass('selected');
+          selectedType = this.dataset.type;
+        });
+      }
+    }, { width: 380 });
+    d.render(true);
+  }
+
+  async _addDeviceFunction(type) {
+    const defaults = {
+      attack:  { type: "attack",  name: "New Attack",  rank: "Typical", damageType: "BA", range: "adjacent", description: "" },
+      buff:    { type: "buff",    name: "New Buff",     ability: "strength", csShift: 1, enabled: true, _effectId: null },
+      power:   { type: "power",   name: "New Power",    rank: "Typical", description: "" },
+      defense: { type: "defense", name: "New Defense",  rank: "Typical", defenseType: "bodyArmor", description: "" }
+    };
+
+    const fn = defaults[type] || defaults.attack;
+    const fns = foundry.utils.duplicate(this.object.system.deviceFunctions || []);
+    fns.push(fn);
+    await this.object.update({ "system.deviceFunctions": fns }, { diff: false });
+    this.render(true);
+
+    // Open edit dialog for the new function
+    this._openDeviceFunctionEditDialog(fns.length - 1);
+  }
+
+  _openDeviceFunctionEditDialog(index) {
+    const fns = foundry.utils.duplicate(this.object.system.deviceFunctions || []);
+    if (index >= fns.length) return;
+    const fn = fns[index];
+    const C = this.constructor;
+    const rv = CONFIG.FASERIP?.rankValues || {};
+
+    let fieldsHtml = "";
+
+    // Name field (all types)
+    fieldsHtml += `<div class="form-group"><label>Name</label>
+      <input type="text" name="df-name" value="${fn.name || ""}" /></div>`;
+
+    if (fn.type === "attack") {
+      // Rank
+      const rankOpts = C.RANKS_ORDERED.map(r =>
+        `<option value="${r}" ${fn.rank === r ? "selected" : ""}>${r} (${rv[r] ?? ""})</option>`
+      ).join("");
+      // Damage type
+      const dtOpts = C.ATTACK_DAMAGE_TYPES.map(t =>
+        `<option value="${t}" ${fn.damageType === t ? "selected" : ""}>${C.DAMAGE_TYPE_LABELS[t]}</option>`
+      ).join("");
+
+      fieldsHtml += `<div class="df-edit-row">
+        <div class="form-group"><label>Rank</label><select name="df-rank">${rankOpts}</select></div>
+        </div>`;
+      fieldsHtml += `<div class="df-edit-row">
+        <div class="form-group"><label>Damage type</label><select name="df-damageType">${dtOpts}</select></div>
+        <div class="form-group narrow"><label>Range (areas)</label>
+          <input type="text" name="df-range" value="${fn.range || "adjacent"}" /></div>
+        </div>`;
+      fieldsHtml += `<div class="form-group"><label>Description (optional)</label>
+        <textarea name="df-description">${fn.description || ""}</textarea></div>`;
+
+    } else if (fn.type === "buff") {
+      const abOpts = C.ABILITIES.map(a =>
+        `<option value="${a}" ${fn.ability === a ? "selected" : ""}>${a.charAt(0).toUpperCase() + a.slice(1)}</option>`
+      ).join("");
+      fieldsHtml += `<div class="df-edit-row">
+        <div class="form-group"><label>Ability</label><select name="df-ability">${abOpts}</select></div>
+        <div class="form-group narrow"><label>CS Shift</label>
+          <input type="number" name="df-csShift" value="${fn.csShift ?? 1}" /></div>
+        </div>`;
+
+    } else if (fn.type === "power") {
+      const rankOpts = C.RANKS_ORDERED.map(r =>
+        `<option value="${r}" ${fn.rank === r ? "selected" : ""}>${r} (${rv[r] ?? ""})</option>`
+      ).join("");
+      fieldsHtml += `<div class="form-group"><label>Rank</label><select name="df-rank">${rankOpts}</select></div>`;
+      fieldsHtml += `<div class="form-group"><label>Description (optional)</label>
+        <textarea name="df-description">${fn.description || ""}</textarea></div>`;
+
+    } else if (fn.type === "defense") {
+      const dtOpts = Object.entries(C.DEFENSE_TYPES).map(([k, v]) =>
+        `<option value="${k}" ${fn.defenseType === k ? "selected" : ""}>${v}</option>`
+      ).join("");
+      const rankOpts = C.RANKS_ORDERED.map(r =>
+        `<option value="${r}" ${fn.rank === r ? "selected" : ""}>${r} (${rv[r] ?? ""})</option>`
+      ).join("");
+      fieldsHtml += `<div class="df-edit-row">
+        <div class="form-group"><label>Defense type</label><select name="df-defenseType">${dtOpts}</select></div>
+        <div class="form-group"><label>Rank</label><select name="df-rank">${rankOpts}</select></div>
+        </div>`;
+      fieldsHtml += `<div class="form-group"><label>Description (optional)</label>
+        <textarea name="df-description">${fn.description || ""}</textarea></div>`;
+    }
+
+    const content = `<form class="df-edit-form">${fieldsHtml}</form>`;
+    const sheet = this;
+
+    new Dialog({
+      title: `Edit: ${fn.name || "Device Function"}`,
+      content,
+      buttons: {
+        save: {
+          label: "Save",
+          callback: async (jq) => {
+            const form = jq.find('.df-edit-form');
+            fn.name = form.find('[name="df-name"]').val() || fn.name;
+
+            if (fn.type === "attack") {
+              fn.rank = form.find('[name="df-rank"]').val();
+              fn.damageType = form.find('[name="df-damageType"]').val();
+              fn.range = form.find('[name="df-range"]').val();
+              fn.description = form.find('[name="df-description"]').val();
+            } else if (fn.type === "buff") {
+              fn.ability = form.find('[name="df-ability"]').val();
+              fn.csShift = parseInt(form.find('[name="df-csShift"]').val()) || 0;
+            } else if (fn.type === "power") {
+              fn.rank = form.find('[name="df-rank"]').val();
+              fn.description = form.find('[name="df-description"]').val();
+            } else if (fn.type === "defense") {
+              fn.defenseType = form.find('[name="df-defenseType"]').val();
+              fn.rank = form.find('[name="df-rank"]').val();
+              fn.description = form.find('[name="df-description"]').val();
+            }
+
+            fns[index] = fn;
+            await sheet.object.update({ "system.deviceFunctions": fns }, { diff: false });
+
+            // Manage Active Effect for buffs
+            if (fn.type === "buff") {
+              await sheet._syncBuffEffect(index, fn);
+            }
+
+            sheet.render(true);
+          }
+        },
+        cancel: { label: "Cancel" }
+      },
+      default: "save"
+    }, { width: 400 }).render(true);
+  }
+
+  // Create or update the Active Effect that backs a passive buff function
+  async _syncBuffEffect(index, fn) {
+    const MODES = CONST.ACTIVE_EFFECT_MODES;
+    const ability = fn.ability || "strength";
+    const cs = parseInt(fn.csShift) || 0;
+    const key = `system.combatMods.abilityShifts.${ability}`;
+
+    const effectData = {
+      name: `${fn.name || "Buff"} (${this.object.name})`,
+      icon: "icons/svg/upgrade.svg",
+      origin: this.object.uuid,
+      disabled: !fn.enabled,
+      changes: [{ key, mode: MODES.ADD, value: String(cs) }]
+    };
+
+    if (fn._effectId) {
+      // Update existing effect
+      const existing = this.object.effects.get(fn._effectId);
+      if (existing) {
+        await existing.update(effectData);
+        return;
+      }
+    }
+
+    // Create new effect
+    const created = await this.object.createEmbeddedDocuments("ActiveEffect", [effectData]);
+    if (created?.length) {
+      // Store the effect ID back on the function
+      const fns = foundry.utils.duplicate(this.object.system.deviceFunctions || []);
+      if (fns[index]) {
+        fns[index]._effectId = created[0].id;
+        await this.object.update({ "system.deviceFunctions": fns }, { diff: false });
+      }
+    }
+  }
+
+  // Roll a device function (new system)
+  async _rollDeviceFunction(item, actor) {
+    const fns = item.system.deviceFunctions || [];
+    // Filter to rollable types only (not buff, not defense)
+    const rollable = fns.map((fn, i) => ({ ...fn, _idx: i }))
+      .filter(fn => fn.type === "attack" || fn.type === "power");
+
+    if (rollable.length === 0) {
+      return ui.notifications.info("This device has no rollable functions (attacks or powers).");
+    }
+
+    const pickAndRoll = (fn) => {
+      if (fn.type === "attack") {
+        // Route through ActionDispatcher-compatible custom ability roll
+        const abilityObj = {
+          name: fn.name,
+          rank: fn.rank || "Typical",
+          damageType: fn.damageType || "",
+          range: fn.range || "",
+          description: fn.description || ""
+        };
+        this._rollSpecificCustomAbility(item, actor, abilityObj);
+      } else if (fn.type === "power") {
+        const abilityObj = {
+          name: fn.name,
+          rank: fn.rank || "Typical",
+          damageType: "",
+          range: "",
+          description: fn.description || ""
+        };
+        this._rollSpecificCustomAbility(item, actor, abilityObj);
+      }
+    };
+
+    if (rollable.length === 1) {
+      return pickAndRoll(rollable[0]);
+    }
+
+    // Multiple rollable — show picker
+    const options = rollable.map(fn => {
+      const C = this.constructor;
+      const abbr = C.RANK_ABBR[fn.rank] || fn.rank;
+      const label = fn.type === "attack"
+        ? `${fn.name} — ${C.DAMAGE_TYPE_LABELS[fn.damageType] || fn.damageType} (${abbr})`
+        : `${fn.name} (${abbr})`;
+      return `<option value="${fn._idx}">${label}</option>`;
+    }).join("");
+
+    new Dialog({
+      title: `${item.name}: Choose Function`,
+      content: `<div style="margin-bottom:10px;">
+        <label>Function:</label>
+        <select id="df-pick" style="width:100%;">${options}</select>
+      </div>`,
+      buttons: {
+        roll: {
+          label: "Roll",
+          callback: (html) => {
+            const idx = parseInt(html.find('#df-pick').val());
+            const fn = fns[idx];
+            if (fn) pickAndRoll(fn);
+          }
+        },
+        cancel: { label: "Cancel" }
+      },
+      default: "roll"
+    }).render(true);
+  }
+
+  // Roll a custom ability (legacy)
   async _rollCustomAbility(item, actor) {
     // If no custom abilities, prompt to create one
     if (!item.system.customAbilities || item.system.customAbilities.length === 0) {

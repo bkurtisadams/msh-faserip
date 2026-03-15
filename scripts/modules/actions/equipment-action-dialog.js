@@ -149,6 +149,32 @@ function getAvailableActions(item, actor) {
     });
   }
 
+  // ── Device Functions (new unified system — takes priority over legacy custom/powers) ──
+  const devFns = Array.isArray(sys.deviceFunctions) ? sys.deviceFunctions.filter(f => f?.name) : [];
+  if (devFns.length > 0) {
+    // Remove any legacy custom/power buttons we just added — deviceFunctions replaces them
+    for (let i = actions.length - 1; i >= 0; i--) {
+      if (actions[i].id.startsWith("custom-") || actions[i].id.startsWith("power-")) {
+        actions.splice(i, 1);
+      }
+    }
+    for (let i = 0; i < devFns.length; i++) {
+      const fn = devFns[i];
+      if (fn.type === "buff" || fn.type === "defense") continue; // Not rollable from action dialog
+      const { icon: fnIcon, color: fnColor } = fn.type === "attack"
+        ? _damageTypePresentation(fn.damageType)
+        : { icon: "fas fa-star", color: "#5d4037" };
+      const rankTag = fn.rank ? ` (${fn.rank})` : "";
+      actions.push({
+        id: `devfn-${i}`,
+        label: `${fn.name}${rankTag}`,
+        icon: fnIcon,
+        color: fnColor,
+        devFnIndex: i
+      });
+    }
+  }
+
   // ── Power Item roll ──
   if (cat === "power-item" && sys.powerRank) {
     actions.push({
@@ -210,10 +236,23 @@ function buildStatSummary(item) {
   }
 
   if (cat === "device" || cat === "custom") {
-    const cas = Array.isArray(sys.customAbilities) ? sys.customAbilities.filter(a => a?.name) : [];
-    const pws = Array.isArray(sys.powers) ? sys.powers.filter(p => p?.name) : [];
-    add("Abilities", cas.length || "");
-    add("Powers", pws.length || "");
+    const dfns = Array.isArray(sys.deviceFunctions) ? sys.deviceFunctions.filter(f => f?.name) : [];
+    if (dfns.length > 0) {
+      const attacks = dfns.filter(f => f.type === "attack").length;
+      const powers = dfns.filter(f => f.type === "power").length;
+      const buffs = dfns.filter(f => f.type === "buff").length;
+      const defs = dfns.filter(f => f.type === "defense").length;
+      if (attacks) add("Attacks", attacks);
+      if (powers) add("Powers", powers);
+      if (buffs) add("Buffs", buffs);
+      if (defs) add("Defenses", defs);
+    } else {
+      // Legacy fallback
+      const cas = Array.isArray(sys.customAbilities) ? sys.customAbilities.filter(a => a?.name) : [];
+      const pws = Array.isArray(sys.powers) ? sys.powers.filter(p => p?.name) : [];
+      add("Abilities", cas.length || "");
+      add("Powers", pws.length || "");
+    }
   }
 
   if (sys.intensityRank) add("Intensity", sys.intensityRank);
@@ -241,6 +280,7 @@ function buildActionButtons(actions) {
       ${a.modeIndex !== undefined ? `data-mode-index="${a.modeIndex}"` : ""}
       ${a.customIndex !== undefined ? `data-custom-index="${a.customIndex}"` : ""}
       ${a.powerIndex !== undefined ? `data-power-index="${a.powerIndex}"` : ""}
+      ${a.devFnIndex !== undefined ? `data-devfn-index="${a.devFnIndex}"` : ""}
       style="display:flex;align-items:center;gap:8px;width:100%;padding:8px 12px;margin-bottom:4px;
              border:1px solid #c0c0c0;border-radius:4px;background:#fff;cursor:pointer;
              font-size:0.95em;text-align:left;">
@@ -403,6 +443,46 @@ async function _executeAction(actionId, actor, item, dataset) {
               description: `Granted by ${item.name}`
             });
           }
+        }
+      }
+
+      // ── Device Function (new unified system) ──
+      if (actionId.startsWith("devfn-")) {
+        const idx = Number(dataset.devfnIndex);
+        const devFns = Array.isArray(sys.deviceFunctions) ? sys.deviceFunctions : [];
+        const fn = devFns[idx];
+        if (!fn) return;
+
+        if (fn.type === "attack") {
+          const actionType = _resolveDamageTypeToAction(fn.damageType);
+          if (actionType) {
+            const { ActionDispatcher } = await import("./action-dispatcher.js");
+            const abilityName = _resolveAbility(actionType);
+            return ActionDispatcher.roll(actionType, {
+              actor, abilityName,
+              opts: {
+                itemId: item.id, item, sourceItem: item, equipment: item,
+                deviceAbility: {
+                  name: fn.name,
+                  rank: fn.rank,
+                  damageType: fn.damageType,
+                  range: fn.range || "",
+                  description: fn.description || ""
+                }
+              }
+            });
+          }
+        }
+        // Non-combat (power type) — standalone FEAT roll
+        const sheet = item.sheet;
+        if (sheet?._rollSpecificCustomAbility) {
+          return sheet._rollSpecificCustomAbility(item, actor, {
+            name: fn.name,
+            rank: fn.rank || "Typical",
+            damageType: fn.damageType || "",
+            range: fn.range || "",
+            description: fn.description || ""
+          });
         }
       }
 
