@@ -572,24 +572,23 @@ export class FaseripActorSheet extends ActorSheet {
 
         // Set the rank dropdown to show the effective rank
         const rankSelect = row.find(`select[name="system.abilities.${ability}.rank"]`);
-        // Add the effective rank as an option if it doesn't exist, then select it
         if (rankSelect.find(`option[value="${effectiveRank}"]`).length) {
           rankSelect.val(effectiveRank);
         }
+        // Disable and remove name to prevent submitOnChange from saving boosted value
+        rankSelect.prop('disabled', true);
+        rankSelect.removeAttr('name');
         rankSelect.css('cssText', boostStyle);
         rankSelect.attr('title', tooltip);
-        // Prevent saving the displayed value back — intercept changes
-        rankSelect.on('mousedown keydown', (ev) => {
-          ev.preventDefault();
-          ui.notifications?.info?.(`${this.actor.name}'s ${ability.charAt(0).toUpperCase() + ability.slice(1)} is modified by ${sourceName}. Base: ${baseRank}. Disable the effect to edit.`);
-        });
 
         // Set the value input to show the effective value
         const valueInput = row.find(`input[name="system.abilities.${ability}.value"]`);
         valueInput.val(effectiveValue);
+        // Remove name to prevent submitOnChange from saving boosted value
+        valueInput.removeAttr('name');
+        valueInput.prop('readonly', true);
         valueInput.css('cssText', boostStyle + " text-align: center !important;");
         valueInput.attr('title', tooltip);
-        valueInput.attr('readonly', true);
 
       } else {
         // Penalty — orange/amber highlight
@@ -603,18 +602,17 @@ export class FaseripActorSheet extends ActorSheet {
         if (rankSelect.find(`option[value="${effectiveRank}"]`).length) {
           rankSelect.val(effectiveRank);
         }
+        rankSelect.prop('disabled', true);
+        rankSelect.removeAttr('name');
         rankSelect.css('cssText', penaltyStyle);
         rankSelect.attr('title', tooltip);
-        rankSelect.on('mousedown keydown', (ev) => {
-          ev.preventDefault();
-          ui.notifications?.info?.(`${this.actor.name}'s ${ability.charAt(0).toUpperCase() + ability.slice(1)} is modified by ${sourceName}. Base: ${baseRank}. Disable the effect to edit.`);
-        });
 
         const valueInput = row.find(`input[name="system.abilities.${ability}.value"]`);
         valueInput.val(effectiveValue);
+        valueInput.removeAttr('name');
+        valueInput.prop('readonly', true);
         valueInput.css('cssText', penaltyStyle + " text-align: center !important;");
         valueInput.attr('title', tooltip);
-        valueInput.attr('readonly', true);
       }
     }
 
@@ -646,13 +644,16 @@ export class FaseripActorSheet extends ActorSheet {
 
       if (healthDelta > 0) {
         healthMaxInput.val(effectiveHealth);
+        healthMaxInput.removeAttr('name');
+        healthMaxInput.prop('readonly', true);
         healthMaxInput.css('cssText', boostStyle);
         healthMaxInput.attr('title', `Base: ${baseHealth}, Boosted: +${healthDelta}`);
-        healthMaxInput.attr('readonly', true);
 
         const currentStored = parseInt(this.actor.system.attributes?.health?.value || 0);
         const boostedCurrent = Math.min(effectiveHealth, currentStored + healthDelta);
         healthValInput.val(boostedCurrent);
+        healthValInput.removeAttr('name');
+        healthValInput.prop('readonly', true);
         healthValInput.css('cssText', boostStyle);
         healthValInput.attr('title', `Base: ${currentStored}, Boosted: +${healthDelta}`);
 
@@ -660,13 +661,16 @@ export class FaseripActorSheet extends ActorSheet {
       } else if (healthDelta < 0) {
         const penaltyStyle = "background: #fff3e0 !important; border-color: #ef6c00 !important; color: #ef6c00 !important; font-weight: bold !important;";
         healthMaxInput.val(effectiveHealth);
+        healthMaxInput.removeAttr('name');
+        healthMaxInput.prop('readonly', true);
         healthMaxInput.css('cssText', penaltyStyle);
         healthMaxInput.attr('title', `Base: ${baseHealth}, Penalty: ${healthDelta}`);
-        healthMaxInput.attr('readonly', true);
 
         const currentStored = parseInt(this.actor.system.attributes?.health?.value || 0);
         const penalizedCurrent = Math.max(0, Math.min(effectiveHealth, currentStored + healthDelta));
         healthValInput.val(penalizedCurrent);
+        healthValInput.removeAttr('name');
+        healthValInput.prop('readonly', true);
         healthValInput.css('cssText', penaltyStyle);
         healthValInput.attr('title', `Base: ${currentStored}, Penalty: ${healthDelta}`);
 
@@ -700,9 +704,10 @@ export class FaseripActorSheet extends ActorSheet {
       if (karmaDelta !== 0) {
         const style = karmaDelta > 0 ? boostStyle : penaltyStyle;
         karmaMaxInput.val(effectiveKarma);
+        karmaMaxInput.removeAttr('name');
+        karmaMaxInput.prop('readonly', true);
         karmaMaxInput.css('cssText', style);
         karmaMaxInput.attr('title', `Base: ${baseKarma}, ${karmaDelta > 0 ? "Boosted" : "Penalty"}: ${karmaDelta > 0 ? "+" : ""}${karmaDelta}`);
-        karmaMaxInput.attr('readonly', true);
       }
     }
   }
