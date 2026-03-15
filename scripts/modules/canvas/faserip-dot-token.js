@@ -1,4 +1,8 @@
-// scripts/modules/canvas/faserip-dot-token.js v1.7.0 - 2026-03-11
+// scripts/modules/canvas/faserip-dot-token.js v1.8.0 - 2026-03-15
+// v1.8.0: DOM portrait in #hud overlay, positioned via canvas.clientCoordinatesFromCanvas()
+//         (v13 API). Constant screen size, no rotation, tracks token drag/pan/zoom.
+//         No name label, 36px thumbnail. Hit area = full token bounds (hoverToken hook).
+//         "V" hotkey toggles persistent portraits.
 // v1.7.0: Ctrl+click dot HUD button toggles token size between 1x1 and 0.5x0.5.
 // v1.6.1: Thicker facing tick (5px outline / 3px white) for better visibility on green dots.
 // v1.6.0: Facing tick (notch line at token rotation), plain hover portrait (48px, no Ctrl),
@@ -13,8 +17,9 @@
 
 const SCOPE = "msh-faserip";
 const DOT_FLAG = "dotMode";
-const HOVER_DELAY = 400; // ms before portrait appears
+const HOVER_DELAY = 300; // ms before portrait appears
 const DOT_RATIO = 0.12;  // dot radius as fraction of smaller token dimension
+const PORTRAIT_SIZE = 36; // px — rendered portrait thumbnail size
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -50,67 +55,88 @@ function _getDotColor(token) {
 }
 
 // ---------------------------------------------------------------------------
-// Hover portrait — hovering a dot shows token art in a floating popup
+// Hover portrait — fixed-position DOM element on document.body.
+// Positioned via canvas.clientCoordinatesFromCanvas() (v13 API) which returns
+// viewport pixel coords directly. Tracked each frame via rAF.
+// NOTE: #hud has its own scale/offset transform matching canvas zoom, so we
+// cannot use it — appending to body with position:fixed is zoom-independent.
 // ---------------------------------------------------------------------------
 
 let _hoverTimer = null;
-let _hoverPopup = null;
-let _hoverToken = null;
+let _persistentPortraits = false; // "V" hotkey toggle
+let _activePortraits = new Map(); // token.id → { el, token, raf }
 
-function _showPortraitPopup(token) {
-  _hidePortraitPopup();
-  const img = token.document.texture?.src || token.actor?.img;
-  if (!img || img.includes("mystery-man")) return;
-
-  const popup = document.createElement("div");
-  popup.classList.add("faserip-dot-portrait");
-  popup.innerHTML = `
-    <img src="${img}" alt="${token.document.name}">
-    <div class="faserip-dot-portrait-name">${token.document.name}</div>
-  `;
-
-  // Position near the token's screen location, clamped to viewport
-  const pos = token.getGlobalPosition();
-  const rect = canvas.app.view.getBoundingClientRect();
-  const popupW = 54; // 48 img + padding + border
-  const popupH = 68; // img + name + padding
-  let left = rect.left + pos.x + 20;
-  let top = rect.top + pos.y - popupH - 4;
-
-  // Clamp: don't let it go above or off-right of viewport
-  if (top < 4) top = rect.top + pos.y + 20;
-  if (left + popupW > window.innerWidth - 4) left = window.innerWidth - popupW - 4;
-
-  popup.style.left = `${left}px`;
-  popup.style.top = `${top}px`;
-
-  document.body.appendChild(popup);
-  _hoverPopup = popup;
-  _hoverToken = token;
+function _updatePortraitPosition(entry) {
+  const { el, token } = entry;
+  if (!token || token.destroyed || !el.isConnected) {
+    _removePortraitEntry(entry);
+    return;
+  }
+  // Use token.x/y (live PIXI position) not token.document.x/y (only updates on drop)
+  const pt = canvas.clientCoordinatesFromCanvas({
+    x: token.x + (token.w / 2),
+    y: token.y
+  });
+  el.style.left = `${pt.x}px`;
+  el.style.top = `${pt.y - 4}px`;
+  entry.raf = requestAnimationFrame(() => _updatePortraitPosition(entry));
 }
 
-function _hidePortraitPopup() {
+function _removePortraitEntry(entry) {
+  if (entry.raf) cancelAnimationFrame(entry.raf);
+  entry.raf = null;
+  if (entry.el?.isConnected) entry.el.remove();
+}
+
+function _showPortrait(token) {
+  if (_activePortraits.has(token.id)) return;
+  const src = token.document.texture?.src || token.actor?.img;
+  if (!src || src.includes("mystery-man")) return;
+
+  const el = document.createElement("div");
+  el.classList.add("faserip-dot-portrait");
+  el.innerHTML = `<img src="${src}" alt="">`;
+  document.body.appendChild(el);
+
+  const entry = { el, token, raf: null };
+  _activePortraits.set(token.id, entry);
+  entry.raf = requestAnimationFrame(() => _updatePortraitPosition(entry));
+}
+
+function _hidePortrait(token) {
+  const entry = _activePortraits.get(token?.id);
+  if (!entry) return;
+  _removePortraitEntry(entry);
+  _activePortraits.delete(token.id);
+}
+
+function _hideAllPortraits() {
+  for (const entry of _activePortraits.values()) {
+    _removePortraitEntry(entry);
+  }
+  _activePortraits.clear();
+}
+
+function _cancelHoverTimer() {
   if (_hoverTimer) {
     clearTimeout(_hoverTimer);
     _hoverTimer = null;
   }
-  if (_hoverPopup) {
-    _hoverPopup.remove();
-    _hoverPopup = null;
-  }
-  _hoverToken = null;
 }
 
-function _onDotPointerEnter(event) {
-  const token = event.currentTarget._parentToken;
-  if (!token || !_isDotMode(token)) return;
+function _onTokenPointerEnter(token) {
+  if (!_isDotMode(token)) return;
+  _cancelHoverTimer();
   _hoverTimer = setTimeout(() => {
-    _showPortraitPopup(token);
+    _showPortrait(token);
   }, HOVER_DELAY);
 }
 
-function _onDotPointerLeave(event) {
-  _hidePortraitPopup();
+function _onTokenPointerLeave(token) {
+  _cancelHoverTimer();
+  if (!_persistentPortraits) {
+    _hidePortrait(token);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -135,9 +161,6 @@ function _drawDot(g, token) {
 
   // Facing tick — drawn at 0°, PIXI rotation handles facing
   _drawFacingTick(g, cx, cy, r);
-
-  // Hit area for hover
-  g.hitArea = new PIXI.Circle(cx, cy, r + 6);
 }
 
 function _drawVehicleRect(g, token) {
@@ -161,9 +184,6 @@ function _drawVehicleRect(g, token) {
 
   // Facing tick — drawn at 0°, PIXI rotation handles facing
   _drawFacingTick(g, cx, cy, Math.max(hw, hh));
-
-  // Hit area for hover
-  g.hitArea = new PIXI.Rectangle(cx - hw - 4, cy - hh - 4, (hw + 4) * 2, (hh + 4) * 2);
 }
 
 /** Draw a short facing tick mark pointing straight up (0°) — rotation handled by _refreshRotation */
@@ -204,6 +224,7 @@ function _syncDotRotation(token) {
 
 function _refreshTokenDot(token) {
   if (!_isDotMode(token)) {
+    if (!_persistentPortraits) _hidePortrait(token);
     if (token._faseripDot) {
       token._faseripDot.destroy({ children: true });
       token._faseripDot = null;
@@ -235,14 +256,12 @@ function _refreshTokenDot(token) {
     _drawDot(g, token);
   }
 
-  // Make interactive for hover portrait
-  g.eventMode = "static";
-  g._parentToken = token;
-  g.on("pointerenter", _onDotPointerEnter);
-  g.on("pointerleave", _onDotPointerLeave);
-
   token.addChild(g);
   token._faseripDot = g;
+
+  // Make dot interactive with full-token hit area so Foundry's hoverToken fires
+  g.eventMode = "static";
+  g.hitArea = new PIXI.Rectangle(0, 0, token.w, token.h);
 
   // Cache token dimensions/disposition so we know when a full redraw is needed
   g._faseripW = token.w;
@@ -257,7 +276,8 @@ function _refreshTokenDot(token) {
 // ---------------------------------------------------------------------------
 
 function _destroyTokenDot(token) {
-  _hidePortraitPopup();
+  _cancelHoverTimer();
+  if (!_persistentPortraits) _hidePortrait(token);
   if (token._faseripDot) {
     token._faseripDot.destroy({ children: true });
     token._faseripDot = null;
@@ -343,8 +363,31 @@ export function initDotToken() {
   // Token HUD: dot toggle button
   Hooks.on("renderTokenHUD", _onRenderTokenHUD);
 
-  // Clean up portrait popup on canvas pan/zoom
-  Hooks.on("canvasPan", _hidePortraitPopup);
+  // Token-level hover for portrait (full token bounds, not just dot graphic)
+  Hooks.on("hoverToken", (token, hovering) => {
+    if (hovering) {
+      _onTokenPointerEnter(token);
+    } else {
+      _onTokenPointerLeave(token);
+    }
+  });
+
+  // Cancel pending hover timer on pan/zoom
+  Hooks.on("canvasPan", _cancelHoverTimer);
+
+  // "V" hotkey: toggle persistent portrait mode
+  document.addEventListener("keydown", (ev) => {
+    if (ev.key !== "v" && ev.key !== "V") return;
+    const tag = document.activeElement?.tagName;
+    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+    if (ev.ctrlKey || ev.altKey || ev.metaKey) return;
+
+    _persistentPortraits = !_persistentPortraits;
+    if (!_persistentPortraits) {
+      _hideAllPortraits();
+    }
+    ui.notifications?.info(`Dot portraits: ${_persistentPortraits ? "persistent (hover to pin)" : "hover only"}`);
+  });
 
   // Inject "Dot Mode" select into Scene Config → Grid tab (V13 AppV2)
   Hooks.on("renderSceneConfig", (app, html, context, options) => {

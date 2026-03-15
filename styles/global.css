@@ -3945,36 +3945,27 @@ form.faserip-sheet .secondary-abilities .sec-col.resources > .sec-body.resources
 }
 
 /* ── Dot Mode: Hover Portrait Popup ── */
+/* dot-mode hover portrait — fixed on body, positioned via clientCoordinatesFromCanvas */
 .faserip-dot-portrait {
   position: fixed;
   z-index: 10000;
   pointer-events: none;
   background: #1a1a1a;
   border: 2px solid #c0a070;
-  border-radius: 4px;
-  padding: 3px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.6);
-  animation: faseripDotFadeIn 0.15s ease-out;
+  border-radius: 3px;
+  padding: 2px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.6);
+  transform: translate(-50%, -100%);
 }
 .faserip-dot-portrait img {
   display: block;
-  width: 48px;
-  height: 48px;
-  object-fit: cover;
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
   border-radius: 2px;
-}
-.faserip-dot-portrait-name {
-  text-align: center;
-  font-size: 9px;
-  font-weight: bold;
-  color: #e0d8c8;
-  padding: 2px 4px 1px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 48px;
+  background: #111;
 }
 @keyframes faseripDotFadeIn {
-  from { opacity: 0; transform: translateY(4px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
+  from { opacity: 0; transform: translate(-50%, -100%) translateY(4px); }
+  to   { opacity: 1; transform: translate(-50%, -100%) translateY(0); }
+}
