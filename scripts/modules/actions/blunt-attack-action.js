@@ -1,5 +1,9 @@
 //--- START OF FILE blunt-attack-action.js ---
-// blunt-attack-action.js v2.0.0 - 2026-03-15
+// blunt-attack-action.js v2.1.1 - 2026-03-15
+// v2.1.1: Fix chip persistence — save/restore active chip states via lastBluntActiveChips flag,
+//         render chips with correct active class on dialog open, prevent CS double-counting
+// v2.1.0: Ultimate Skill chip — talents with rankOverride get gold ★ chip that computes
+//         CS delta to override rank, mutually exclusive with normal +NCS chip for same talent
 // v2.0.0: Redesign dialog to v2 mockup — header banner, summary line, talent chips,
 //         consolidated options box, effect preview grid, updated CSS classes
 // v1.5.0: Restyle dialog with frp-dlg CSS classes from v3 mockup (attack-dialog.css), remove inline styles
@@ -69,25 +73,35 @@ export class BluntAttackAction extends AttackAction {
     for (const item of actor.items) {
       if (item.type !== "talent") continue;
       const name = (item.name || "").toLowerCase();
+      const rankOverride = item.system?.rankOverride || "";
       
+      // Determine if this talent has an Ultimate Skill override
+      // rankOverride set on the talent item means "use this rank instead of base + bonus"
+      let ultimateCS = 0;
+      if (rankOverride) {
+        const baseIdx = RANKS.indexOf(ability.rank);
+        const overIdx = RANKS.indexOf(rankOverride);
+        if (baseIdx >= 0 && overIdx >= 0) ultimateCS = overIdx - baseIdx;
+      }
+
       if (name.includes("martial arts b") || name.includes("martial arts-b") || 
           (name.includes("martial arts") && name.includes("(b)"))) {
-        combatTalents.push({ name: "MA-B", cs: 1, flag: null, note: "+1 CS" });
+        combatTalents.push({ name: "MA-B", cs: 1, flag: null, note: "+1 CS", ultimateCS, rankOverride });
       }
       else if (name.includes("boxing")) {
-        combatTalents.push({ name: "Boxing", cs: 1, flag: null, note: "+1 CS" });
+        combatTalents.push({ name: "Boxing", cs: 1, flag: null, note: "+1 CS", ultimateCS, rankOverride });
       }
       else if (name.includes("martial arts a") || name.includes("martial arts-a") ||
                (name.includes("martial arts") && name.includes("(a)"))) {
-        combatTalents.push({ name: "MA-A", cs: 0, flag: "ignore-str-end", note: "ignore Str/End" });
+        combatTalents.push({ name: "MA-A", cs: 0, flag: "ignore-str-end", note: "ignore Str/End", ultimateCS, rankOverride });
       }
       else if (name.includes("martial arts d") || name.includes("martial arts-d") ||
                (name.includes("martial arts") && name.includes("(d)"))) {
-        combatTalents.push({ name: "MA-D", cs: 0, flag: "ignore-armor-fx", note: "ignore armor (fx)" });
+        combatTalents.push({ name: "MA-D", cs: 0, flag: "ignore-armor-fx", note: "ignore armor (fx)", ultimateCS, rankOverride });
       }
       else if (name.includes("martial arts e") || name.includes("martial arts-e") ||
                (name.includes("martial arts") && name.includes("(e)"))) {
-        combatTalents.push({ name: "MA-E", cs: 0, flag: "initiative", note: "+1 Initiative" });
+        combatTalents.push({ name: "MA-E", cs: 0, flag: "initiative", note: "+1 Initiative", ultimateCS, rankOverride });
       }
     }
 
@@ -128,6 +142,7 @@ export class BluntAttackAction extends AttackAction {
     const savedAttackCount = shouldRemember ? (await actor.getFlag("msh-faserip","lastBluntAttackCount") || 2) : 2;
     const savedMultiAdjacent = shouldRemember ? (await actor.getFlag("msh-faserip","lastBluntMultiAdjacent") || false) : false;
     const savedColumnShift  = shouldRemember ? (await actor.getFlag("msh-faserip","lastBluntShift") || 0) : 0;
+    const savedActiveChips  = shouldRemember ? (await actor.getFlag("msh-faserip","lastBluntActiveChips") || {}) : {};
     
     const savedSkipDice = localStorage.getItem(lsSkipKey) === "1";
 
@@ -185,19 +200,35 @@ export class BluntAttackAction extends AttackAction {
     const csRankStyle = savedColumnShift > 0 ? 'color:#2e7d32;' : savedColumnShift < 0 ? 'color:#c62828;' : '';
 
     // Build talent chips HTML
+    // Talents with rankOverride get a gold ★ Ultimate chip (mutually exclusive with normal +CS chip)
     const talentChipsHtml = combatTalents.length > 0 ? `
       <div class="frp-talent-row">
         ${combatTalents.map(t => {
+          const savedState = savedActiveChips[t.name] || '';
+          const csActive = savedState === 'cs';
+          const ultActive = savedState === 'ultimate';
+          const flagActive = savedState.includes('flag');
+          let chips = '';
+          // Normal CS chip (only if talent grants a CS bonus)
           if (t.cs > 0) {
-            return `<span class="frp-talent-chip" data-cs="${t.cs}" data-talent="${t.name}">
+            chips += `<span class="frp-talent-chip${csActive ? ' active-cs' : ''}" data-cs="${t.cs}" data-talent="${t.name}" data-group="${t.name}">
               ${t.name} <span class="chip-cs">+${t.cs}</span>
             </span>`;
-          } else if (t.flag) {
-            return `<span class="frp-talent-chip" data-flag="${t.flag}" data-talent="${t.name}">
+          }
+          // Ultimate Skill chip (if talent has rankOverride)
+          if (t.rankOverride && t.ultimateCS > 0) {
+            const shortRank = t.rankOverride.substring(0, 2);
+            chips += `<span class="frp-talent-chip${ultActive ? ' active-ultimate' : ''}" data-cs="${t.ultimateCS}" data-talent="${t.name}" data-group="${t.name}" data-ultimate="1">
+              ★ ${t.name} <span class="chip-cs">&rarr;${shortRank}</span>
+            </span>`;
+          }
+          // Flag-only chip (no CS, just a combat effect toggle)
+          if (t.flag) {
+            chips += `<span class="frp-talent-chip${flagActive ? ' active-flag' : ''}" data-flag="${t.flag}" data-talent="${t.name}">
               ${t.name} <span class="chip-note">${t.note}</span>
             </span>`;
           }
-          return '';
+          return chips;
         }).join('')}
       </div>` : '';
 
@@ -410,6 +441,18 @@ export class BluntAttackAction extends AttackAction {
               if (flag) talentFlags[flag] = true;
             });
 
+            // Collect active chip states for persistence
+            const activeChips = {};
+            html.find('.frp-talent-chip.active-cs, .frp-talent-chip.active-ultimate').each(function() {
+              const talent = $(this).data('talent');
+              const isUlt = !!$(this).data('ultimate');
+              if (talent) activeChips[talent] = isUlt ? 'ultimate' : 'cs';
+            });
+            html.find('.frp-talent-chip.active-flag').each(function() {
+              const talent = $(this).data('talent');
+              if (talent) activeChips[talent] = (activeChips[talent] || '') + ',flag';
+            });
+
             // Compute damage and notes
             let weaponMat = "", weaponName = "", damage = strength.value, note = "";
             if (src === "weapon") {
@@ -447,6 +490,7 @@ export class BluntAttackAction extends AttackAction {
               await actor.setFlag("msh-faserip", "lastBluntMultiAttacks", multiAttacks);
               await actor.setFlag("msh-faserip", "lastBluntAttackCount", attackCount);
               await actor.setFlag("msh-faserip", "lastBluntMultiAdjacent", multiAdjacent);
+              await actor.setFlag("msh-faserip", "lastBluntActiveChips", activeChips);
 
               if (src === "weapon") {
                 await actor.setFlag("msh-faserip", "lastBluntItemId", itemId);
@@ -482,19 +526,37 @@ export class BluntAttackAction extends AttackAction {
           const setLS = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
 
           // ── Talent chip click handler ──
+          // Chips with the same data-group are mutually exclusive (normal +1CS vs Ultimate ★)
           html.find('.frp-talent-chip').on('click', function() {
             const $chip = $(this);
             const cs = parseInt($chip.data('cs')) || 0;
             const flag = $chip.data('flag') || null;
+            const isUltimate = !!$chip.data('ultimate');
+            const group = $chip.data('group') || null;
             const $csInput = html.find('[name="shift"]');
 
             if (cs > 0) {
-              const wasActive = $chip.hasClass('active-cs');
+              const wasActive = $chip.hasClass('active-cs') || $chip.hasClass('active-ultimate');
+              const activeClass = isUltimate ? 'active-ultimate' : 'active-cs';
+
               if (wasActive) {
-                $chip.removeClass('active-cs');
+                // Deactivate this chip
+                $chip.removeClass('active-cs active-ultimate');
                 $csInput.val(parseInt($csInput.val()) - cs);
               } else {
-                $chip.addClass('active-cs');
+                // Deactivate any other CS chip in the same group first
+                if (group) {
+                  html.find(`.frp-talent-chip[data-group="${group}"]`).not($chip).each(function() {
+                    const $sibling = $(this);
+                    const sibCs = parseInt($sibling.data('cs')) || 0;
+                    if ($sibling.hasClass('active-cs') || $sibling.hasClass('active-ultimate')) {
+                      $sibling.removeClass('active-cs active-ultimate');
+                      if (sibCs > 0) $csInput.val(parseInt($csInput.val()) - sibCs);
+                    }
+                  });
+                }
+                // Activate this chip
+                $chip.addClass(activeClass);
                 $csInput.val(parseInt($csInput.val()) + cs);
               }
               $csInput.trigger('change');
@@ -603,11 +665,11 @@ export class BluntAttackAction extends AttackAction {
           html.find('[name="objectValue"]').on('input change', update);
           html.find('[name="objectName"]').on('input', update);
           
-          // CS reset — also deactivates talent chips
+          // CS reset — also deactivates talent chips and ultimate chips
           html.find('.frp-cs-reset').on('click', function(e) {
             e.preventDefault();
             html.find('[name="shift"]').val(0);
-            html.find('.frp-talent-chip.active-cs').removeClass('active-cs');
+            html.find('.frp-talent-chip.active-cs, .frp-talent-chip.active-ultimate').removeClass('active-cs active-ultimate');
             html.find('[name="shift"]').trigger('change');
           });
           

@@ -1,4 +1,5 @@
-/* action-dialog.css v2.0.0 - 2026-03-15 */
+/* action-dialog.css v2.1.0 - 2026-03-15 */
+/* v2.1.0: Add active-ultimate chip style (gold/amber) for Ultimate Skill rank overrides */
 /* v2.0.0: Add header banner, summary line, talent chips, effect preview grid,
            consolidated option rows, 2-col grid. Styles from dialog-mockup-v2. */
 
@@ -264,6 +265,16 @@
   background: #f3e5f5;
   border-color: #ba68c8;
   color: #6a1b9a;
+}
+/* Active: Ultimate Skill override (gold — power-tier, overrides normal talent CS) */
+.frp-dlg .frp-talent-chip.active-ultimate {
+  background: #fff8e1;
+  border-color: var(--gold);
+  color: #7b6b00;
+}
+.frp-dlg .frp-talent-chip.active-ultimate .chip-cs {
+  color: #c8960c;
+  font-weight: 700;
 }
 .frp-dlg .frp-talent-chip:hover {
   filter: brightness(0.95);
