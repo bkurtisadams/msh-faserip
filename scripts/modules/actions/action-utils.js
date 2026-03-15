@@ -61,15 +61,15 @@ export const ACTION_CAPS = {
   "blunt-attack":   { multi:true,  reduceDamage:true,  lowerEffect:true  },  // Slugfest
   "edged-attack":   { multi:true,  reduceDamage:false, lowerEffect:false },  // Slugfest (cannot pull/lower by default)
   "shooting":       { multi:true,  reduceDamage:false, lowerEffect:false },  // Shooting (trick shots are separate)
-  "throwing-blunt": { multi:false, reduceDamage:true,  lowerEffect:false },
-  "throwing-edged": { multi:false, reduceDamage:false, lowerEffect:false },
-  "energy": { multi:false, reduceDamage:true, lowerEffect:true, adjacentOnly:true },
-  "force":  { multi:false, reduceDamage:true, lowerEffect:true, adjacentOnly:true },
+  "throwing-blunt": { multi:false, reduceDamage:true,  lowerEffect:true  },  // "can be reduced in effect or damage"
+  "throwing-edged": { multi:false, reduceDamage:true,  lowerEffect:false },  // "may inflict less damage" but cannot reduce effect
+  "energy": { multi:false, reduceDamage:true, lowerEffect:false, adjacentOnly:true },  // can reduce damage, NOT effect (Kill stands)
+  "force":  { multi:false, reduceDamage:true, lowerEffect:false, adjacentOnly:true },  // can reduce damage, NOT effect (Stun stands)
 
   "grappling":      { multi:false, reduceDamage:true,  lowerEffect:true  },
   "grabbing":       { multi:false, reduceDamage:false, lowerEffect:false },   // treated separately from Grappling
   "escaping":       { multi:false, reduceDamage:false, lowerEffect:false },
-  "charging":       { multi:false, reduceDamage:false, lowerEffect:true  },
+  "charging":       { multi:false, reduceDamage:true,  lowerEffect:true  },  // "inflicts up to" + "may choose lesser effect"
   "dodging":        { multi:false, reduceDamage:false, lowerEffect:false },
   "evading":        { multi:false, reduceDamage:false, lowerEffect:false },
   "blocking":       { multi:false, reduceDamage:false, lowerEffect:false },
@@ -1062,7 +1062,7 @@ export function computeBluntDamage(strRank, strVal, matRank, weaponBase = 0, RAN
     const RANK_BOTTOM_VALUES = {
        "Feeble": 2, "Poor": 3, "Typical": 5, "Good": 8, "Excellent": 16,
        "Remarkable": 26, "Incredible": 36, "Amazing": 46, "Monstrous": 63,
-       "Unearthly": 88, "Shift-X": 126, "Shift-Y": 176, "Shift-Z": 251,
+       "Unearthly": 88, "Shift-X": 126, "Shift-Y": 176, "Shift-Z": 351,
        "Class 1000": 1000, "Class 3000": 3000, "Class 5000": 5000
     };
 
@@ -1904,6 +1904,12 @@ export function getBodyArmorValues(targetActor, damageType = "physical-blunt") {
     
     // Check for force field flag
     isForceField = bestArmor.system.isForceField === true;
+    
+    // Force Fields: full vs Energy, -10 vs physical (inverted from Body Armor)
+    if (isForceField) {
+      energyArmor = armorValue;
+      physicalArmor = Math.max(0, armorValue - 10);
+    }
   }
 
   // Check Body Armor powers
@@ -1930,10 +1936,18 @@ export function getBodyArmorValues(targetActor, damageType = "physical-blunt") {
     
     // If "Use Rank Value" is checked, always use power.system.value
     if (power.system.armorUseRankValue === true) {
-      physVal = typeof power.system.value === 'number'
+      const baseVal = typeof power.system.value === 'number'
         ? power.system.value
         : (CONFIG.FASERIP?.rankValues?.[power.system.rank] || 0);
-      energyVal = Math.max(0, physVal - 20);
+      
+      // Force Fields: full vs Energy, -10 vs physical. Body Armor: full vs physical, -20 vs energy.
+      if (power.system.isForceField) {
+        physVal = Math.max(0, baseVal - 10);
+        energyVal = baseVal;
+      } else {
+        physVal = baseVal;
+        energyVal = Math.max(0, baseVal - 20);
+      }
       
       // Store rank if available
       if (power.system.rank && !physicalRank) {
@@ -1963,7 +1977,14 @@ export function getBodyArmorValues(targetActor, damageType = "physical-blunt") {
       }
       
       if (energyVal === undefined || energyVal === 0) {
-        energyVal = Math.max(0, physVal - 20);
+        // Force Fields: full vs Energy, -10 vs physical. Body Armor: -20 vs energy.
+        if (power.system.isForceField) {
+          energyVal = physVal;
+          // Also adjust physVal for FF: -10 vs physical
+          physVal = Math.max(0, physVal - 10);
+        } else {
+          energyVal = Math.max(0, physVal - 20);
+        }
         
         if (power.system.rank && !energyRank) {
           const rankIdx = RANKS.indexOf(power.system.rank);
@@ -1989,10 +2010,11 @@ export function getBodyArmorValues(targetActor, damageType = "physical-blunt") {
 
   // Check for active Blocking effect (Strength as Body Armor)
   // Block applies vs: Slugfest, Grappling, Wrestling, Edged/Blunt Throwing, Force
-  // Block does NOT apply vs: Shooting (physical-ranged), Energy, Charging (GM call)
+  // Block does NOT apply vs: Shooting (physical-ranged), Energy, Charging
   let blockingArmor = 0;
   let blockingRank = "";
-  const blockEligible = !isEnergy && dmgTypeLower !== "physical-ranged";
+  const isCharging = dmgTypeLower === "charging" || dmgTypeLower === "physical-charging" || dmgTypeLower.includes("charging");
+  const blockEligible = !isEnergy && dmgTypeLower !== "physical-ranged" && !isCharging;
   
   if (blockEligible) {
     const blockEffect = targetActor.effects?.find(e => {
