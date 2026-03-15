@@ -1,7 +1,7 @@
-// scripts/modules/actions/grenade-action.js v2.2.1 - 2026-03-15
-// v2.2.1: Fix range penalty off-by-one (first area free). Fix Kill result logic —
-//         frag (edged) and energy grenades are killing attacks (wasKillResult/forceKilling),
-//         concussive/sonic/smoke/gas/flash are not.
+// scripts/modules/actions/grenade-action.js v2.3.0 - 2026-03-15
+// v2.3.0: Fix range penalty off-by-one (first area free). Fix Kill result logic —
+//         frag (edged) and energy grenades are killing attacks, others are not.
+//         Fix input focus (stopPropagation on mousedown). Fix range input layout.
 // v2.2.0: Template placement happens BEFORE roll — user picks landing zone, then system rolls to hit
 import { RangedAttackAction } from "./ranged-attack-action.js";
 import { AreaTemplate } from "./area-template.js";
@@ -125,9 +125,9 @@ export class GrenadeAction extends RangedAttackAction {
       </div>
 
       <!-- Range -->
-      <div style="display:grid;grid-template-columns:auto 1fr auto;gap:6px;align-items:center;margin-bottom:8px;padding:6px 8px;border:1px solid #ddd;border-radius:3px;background:#fafafa;">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;padding:6px 8px;border:1px solid #ddd;border-radius:3px;background:#fafafa;">
         <label style="font-weight:600;">Range:</label>
-        <input type="number" name="range" value="${savedRange}" min="1" max="${maxRange}" style="width:50px;padding:3px;text-align:center;">
+        <input type="number" name="range" value="${savedRange}" min="1" max="${maxRange}" style="width:60px;padding:3px;text-align:center;box-sizing:border-box;">
         <span style="color:#666;font-size:.85em;">areas (max ${maxRange})</span>
       </div>
 
@@ -193,6 +193,9 @@ export class GrenadeAction extends RangedAttackAction {
         render: async (html) => {
           setupKarmaControlHandlers(html);
           await setupModeSelector(actor, html, this.opts || {}, "lastGrenadeMode");
+
+          // Prevent Foundry drag handler from stealing first click on inputs
+          html.find('input, select').on('mousedown', (e) => e.stopPropagation());
 
           const $dialog = html.closest('.dialog');
           if ($dialog.length) $dialog[0].style.height = 'auto';
