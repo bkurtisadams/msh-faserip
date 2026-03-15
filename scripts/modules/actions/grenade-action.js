@@ -1,4 +1,7 @@
-// scripts/modules/actions/grenade-action.js v2.2.0 - 2026-03-05
+// scripts/modules/actions/grenade-action.js v2.2.1 - 2026-03-15
+// v2.2.1: Fix range penalty off-by-one (first area free). Fix Kill result logic —
+//         frag (edged) and energy grenades are killing attacks (wasKillResult/forceKilling),
+//         concussive/sonic/smoke/gas/flash are not.
 // v2.2.0: Template placement happens BEFORE roll — user picks landing zone, then system rolls to hit
 import { RangedAttackAction } from "./ranged-attack-action.js";
 import { AreaTemplate } from "./area-template.js";
@@ -174,8 +177,8 @@ export class GrenadeAction extends RangedAttackAction {
                 return resolve(null);
               }
 
-              // -1CS per area traveled (weapons rule RAW)
-              const rangeModifier = -range;
+              // -1CS per area beyond first (weapons rule)
+              const rangeModifier = -(Math.max(0, range - 1));
               const totalShift = shift + rangeModifier;
 
               await actor.setFlag("msh-faserip", "lastGrenadeRange", range);
@@ -324,8 +327,12 @@ export class GrenadeAction extends RangedAttackAction {
     await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor }), content: cardHtml });
 
     // Apply damage to all tokens in blast area (hit only)
-    const isKillCapable = ["physical-edged", "energy"].includes(typeDef.damageType);
-    const wasKillResult = isKillCapable;
+    // Frag grenades are Edged Killing — shrapnel carries Kill potential on any hit.
+    // Energy grenades also carry Kill potential (Energy column red = Kill).
+    // Concussive/sonic/smoke/gas/flash are NOT killing attacks.
+    // wasKillResult triggers a Kill save on targets that take damage.
+    // forceKilling bypasses Four-Color knockout — appropriate for lethal weapons.
+    const isKillingDamage = ["physical-edged", "energy"].includes(typeDef.damageType);
     if (isHit && damage > 0 && affectedTargets.length > 0) {
       const dmgResults = await applyDamageToTargets({
         damage,
@@ -334,8 +341,8 @@ export class GrenadeAction extends RangedAttackAction {
         damageType: typeDef.damageType,
         attackForm: typeDef.damageType?.includes("edged") ? "edged" : typeDef.damageType === "energy" ? "energy" : "blunt",
         showNotification: false,
-        wasKillResult,
-        forceKilling: wasKillResult
+        wasKillResult: isKillingDamage,
+        forceKilling: isKillingDamage
       });
 
       if (dmgResults?.length) {
