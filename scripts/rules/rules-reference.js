@@ -1,4 +1,6 @@
-// rules-reference.js v1.0.0 - 2026-03-14
+// rules-reference.js v1.0.1 - 2026-03-15
+// v1.0.1: Fix WRESTLING.escaping.green (was "Escape", should be "Miss" per Es column),
+//         fix ATTACK_RESULTS.throwingBlunt.yellow (was "Bullseye", should be "Hit" per TB column)
 // Canonical FASERIP rules reference. All mechanics data in one place.
 // Source: Marvel Super Heroes (TSR) Advanced Set / Ultimate Powers Book.
 
@@ -41,7 +43,7 @@ export const ATTACK_RESULTS = {
   edged:         { white: "Miss", green: "Hit",      yellow: "Stun",     red: "Kill" },
   shooting:      { white: "Miss", green: "Hit",      yellow: "Bullseye", red: "Kill" },
   throwingEdged: { white: "Miss", green: "Hit",      yellow: "Stun",     red: "Kill" },
-  throwingBlunt: { white: "Miss", green: "Hit",      yellow: "Bullseye", red: "Stun" },
+  throwingBlunt: { white: "Miss", green: "Hit",      yellow: "Hit",      red: "Stun" },
   energy:        { white: "Miss", green: "Hit",      yellow: "Bullseye", red: "Kill" },
   force:         { white: "Miss", green: "Hit",      yellow: "Bullseye", red: "Stun" },
   charging:      { white: "Miss", green: "Hit",      yellow: "Slam",     red: "Stun" },
@@ -206,7 +208,7 @@ export const WRESTLING = {
   },
   escaping: {
     white: "Miss (still held, no action)",
-    green: "Escape (free, half move, no other actions)",
+    green: "Miss (still held, no action)",
     yellow: "Escape (free, half move, no other actions)",
     red: "Reverse (free + grapple back or action at -2CS)"
   },

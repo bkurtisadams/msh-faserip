@@ -1,4 +1,9 @@
-// actorSheet.js v2.2.0 - 2026-03-06
+// actorSheet.js v2.2.3 - 2026-03-15
+// v2.2.3: Targeted _updateObject guard — only blocks formData values that exactly match
+//         what the shift display code would have injected (shifted rank name + standard
+//         rank number). Custom ability values within a rank range pass through normally.
+// v2.2.1: Fix ability corruption race — removeAttr('name') BEFORE setting visual val()
+//         to prevent submitOnChange from persisting effect-shifted values to actor data
 // v2.2.0: Extract ability FEAT dialog to modules/actions/ability-feat-dialog.js
 // v2.0.0: Fix equipment roll routing for Energy/Force/Grappling/Grabbing damage types
 // v1.9.0: Log Resource and Popularity FEATs to karma history
@@ -572,21 +577,21 @@ export class FaseripActorSheet extends ActorSheet {
 
         // Set the rank dropdown to show the effective rank
         const rankSelect = row.find(`select[name="system.abilities.${ability}.rank"]`);
+        // CRITICAL: Remove name FIRST to prevent submitOnChange from saving the visual value
+        rankSelect.prop('disabled', true);
+        rankSelect.removeAttr('name');
         if (rankSelect.find(`option[value="${effectiveRank}"]`).length) {
           rankSelect.val(effectiveRank);
         }
-        // Disable and remove name to prevent submitOnChange from saving boosted value
-        rankSelect.prop('disabled', true);
-        rankSelect.removeAttr('name');
         rankSelect.css('cssText', boostStyle);
         rankSelect.attr('title', tooltip);
 
         // Set the value input to show the effective value
         const valueInput = row.find(`input[name="system.abilities.${ability}.value"]`);
-        valueInput.val(effectiveValue);
-        // Remove name to prevent submitOnChange from saving boosted value
+        // CRITICAL: Remove name FIRST to prevent submitOnChange from saving the visual value
         valueInput.removeAttr('name');
         valueInput.prop('readonly', true);
+        valueInput.val(effectiveValue);
         valueInput.css('cssText', boostStyle + " text-align: center !important;");
         valueInput.attr('title', tooltip);
 
@@ -599,18 +604,20 @@ export class FaseripActorSheet extends ActorSheet {
         const tooltip = `Penalized ${cs}CS by ${sourceName}: ${baseRank}(${rankValues[baseRank] || 0}) → ${effectiveRank}(${effectiveValue})`;
 
         const rankSelect = row.find(`select[name="system.abilities.${ability}.rank"]`);
+        // CRITICAL: Remove name FIRST to prevent submitOnChange from saving the visual value
+        rankSelect.prop('disabled', true);
+        rankSelect.removeAttr('name');
         if (rankSelect.find(`option[value="${effectiveRank}"]`).length) {
           rankSelect.val(effectiveRank);
         }
-        rankSelect.prop('disabled', true);
-        rankSelect.removeAttr('name');
         rankSelect.css('cssText', penaltyStyle);
         rankSelect.attr('title', tooltip);
 
         const valueInput = row.find(`input[name="system.abilities.${ability}.value"]`);
-        valueInput.val(effectiveValue);
+        // CRITICAL: Remove name FIRST to prevent submitOnChange from saving the visual value
         valueInput.removeAttr('name');
         valueInput.prop('readonly', true);
+        valueInput.val(effectiveValue);
         valueInput.css('cssText', penaltyStyle + " text-align: center !important;");
         valueInput.attr('title', tooltip);
       }
@@ -728,6 +735,53 @@ export class FaseripActorSheet extends ActorSheet {
 
   /** @override */
   _updateObject(event, formData) {
+    // ── GUARD: Prevent effect-shifted ability display values from being persisted ──
+    // The sheet display code overwrites rank selects and value inputs with shifted
+    // visuals (e.g. Remarkable→Typical when grappled at -2CS). Despite removeAttr('name'),
+    // Foundry's submitOnChange can race and include the shifted values in formData.
+    // We only strip values that exactly match what the display code would have written
+    // (the standard rank number for the shifted rank). Custom values pass through.
+    const shifts = this.actor.system?.combatMods?.abilityShifts;
+    if (shifts) {
+      const RANKS = [
+        "Shift-0","Feeble","Poor","Typical","Good","Excellent",
+        "Remarkable","Incredible","Amazing","Monstrous","Unearthly",
+        "Shift-X","Shift-Y","Shift-Z","Class 1000","Class 3000","Class 5000","Beyond"
+      ];
+      const rankValues = {
+        "Shift-0": 0, "Feeble": 2, "Poor": 4, "Typical": 6, "Good": 10,
+        "Excellent": 20, "Remarkable": 30, "Incredible": 40, "Amazing": 50,
+        "Monstrous": 75, "Unearthly": 100, "Shift-X": 150, "Shift-Y": 200,
+        "Shift-Z": 500, "Class 1000": 1000, "Class 3000": 3000, "Class 5000": 5000, "Beyond": 10000
+      };
+      const abilities = ["fighting", "agility", "strength", "endurance", "reason", "intuition", "psyche"];
+      for (const ab of abilities) {
+        const cs = Number(shifts[ab]) || 0;
+        if (cs === 0) continue;
+
+        // Compute what the display code would have injected
+        const baseRank = this.actor.system.abilities?.[ab]?.rank;
+        if (!baseRank) continue;
+        const baseIdx = RANKS.indexOf(baseRank);
+        if (baseIdx < 0) continue;
+        const shiftedIdx = Math.min(Math.max(baseIdx + cs, 0), RANKS.length - 1);
+        const shiftedRank = RANKS[shiftedIdx];
+        const shiftedValue = rankValues[shiftedRank] || 0;
+
+        // Only strip if formData contains the exact shifted display values
+        const fdRank = formData[`system.abilities.${ab}.rank`];
+        const fdValue = formData[`system.abilities.${ab}.value`];
+        if (fdRank === shiftedRank && fdRank !== baseRank) {
+          console.warn(`[FASERIP] _updateObject guard: blocking shifted rank for ${ab}: ${fdRank} (base: ${baseRank})`);
+          delete formData[`system.abilities.${ab}.rank`];
+        }
+        if (fdValue !== undefined && Number(fdValue) === shiftedValue && shiftedValue !== (this.actor.system.abilities[ab]?.value ?? -1)) {
+          console.warn(`[FASERIP] _updateObject guard: blocking shifted value for ${ab}: ${fdValue} (stored: ${this.actor.system.abilities[ab]?.value})`);
+          delete formData[`system.abilities.${ab}.value`];
+        }
+      }
+    }
+
     // Expand the form data
     const expandedData = foundry.utils.expandObject(formData);
 

@@ -1,6 +1,7 @@
-// scripts/modules/effects/effect-engine.js v1.8.0 - 2026-03-08
-// v1.8.0: Fix permission error — rename-with-remaining now routed through GM socket
-//         when player creates effects on unowned actors
+// scripts/modules/effects/effect-engine.js v1.9.0 - 2026-03-15
+// v1.9.0: Fix applyGrappled/applyHeld per rules — Partial Hold uses selfPenaltyCS (-2CS
+//         all actions) with no ability shifts. Full Hold uses canAct=false (restrained).
+//         Neither effect modifies fighting/agility/strength ability values.
 // v1.5.0: Fix applyEvade - add canAct:false, nest flags under SCOPE, create separate bonus effect
 //         Fix applyBlock - add canAct:false, nest flags under SCOPE, remove incorrect movementMult
 // v1.4.0: Fix applyEvade - properly track evadeSuccessful/autoHit flags, remove incorrect combat mod changes
@@ -574,16 +575,15 @@ export async function applyProne(actor, { rounds = 1, originUuid = null } = {}, 
 
 /** Apply grappled effect (partial hold) */
 export async function applyGrappled(actor, { holderUuid = null, holderName = "", rounds = null } = {}, opts = {}) {
+  // Partial Hold: -2CS on all actions, cannot move if attacker Str >= target
+  // Per rules: "The target may perform any normal actions, but at a -2 CS penalty"
+  // This is a general action penalty, NOT individual ability reductions
   return applyEffect(actor, {
     name: holderName ? `Grappled by ${holderName}` : "Grappled",
     img: "icons/svg/net.svg",
     rounds,
     changes: [
-      { key: "system.combatMods.attackShift", mode: AE_MODE.ADD, value: "-2", priority: 20 },
-      { key: "system.combatMods.defenseShift", mode: AE_MODE.ADD, value: "-2", priority: 20 },
-      { key: "system.combatMods.defenseShiftRanged", mode: AE_MODE.ADD, value: "-2", priority: 20 },
-      { key: "system.combatMods.abilityShifts.fighting", mode: AE_MODE.ADD, value: "-2", priority: 20 },
-      { key: "system.combatMods.abilityShifts.agility", mode: AE_MODE.ADD, value: "-2", priority: 20 },
+      { key: "system.combatMods.selfPenaltyCS", mode: AE_MODE.ADD, value: "-2", priority: 20 },
       { key: "system.combatMods.movementMult", mode: AE_MODE.OVERRIDE, value: "0", priority: 50 },
       { key: "system.combatMods.canMove", mode: AE_MODE.OVERRIDE, value: "false", priority: 50 }
     ],
@@ -599,17 +599,15 @@ export async function applyGrappled(actor, { holderUuid = null, holderName = "",
 
 /** Apply held effect (full hold - stronger than grappled) */
 export async function applyHeld(actor, { holderUuid = null, holderName = "", rounds = null } = {}, opts = {}) {
+  // Full Hold: target fully restrained, cannot act (only escape attempts)
+  // Per rules: "restrained, attacker +1 action, Str dmg"
+  // Target cannot take any actions — canAct=false handles this
   return applyEffect(actor, {
     name: holderName ? `Held by ${holderName}` : "Held",
     img: "icons/svg/padlock.svg",
     rounds,
     changes: [
-      { key: "system.combatMods.attackShift", mode: AE_MODE.ADD, value: "-4", priority: 20 },
-      { key: "system.combatMods.defenseShift", mode: AE_MODE.ADD, value: "-4", priority: 20 },
-      { key: "system.combatMods.defenseShiftRanged", mode: AE_MODE.ADD, value: "-4", priority: 20 },
-      { key: "system.combatMods.abilityShifts.fighting", mode: AE_MODE.ADD, value: "-4", priority: 20 },
-      { key: "system.combatMods.abilityShifts.agility", mode: AE_MODE.ADD, value: "-4", priority: 20 },
-      { key: "system.combatMods.abilityShifts.strength", mode: AE_MODE.ADD, value: "-2", priority: 20 },
+      { key: "system.combatMods.canAct", mode: AE_MODE.OVERRIDE, value: "false", priority: 50 },
       { key: "system.combatMods.movementMult", mode: AE_MODE.OVERRIDE, value: "0", priority: 50 },
       { key: "system.combatMods.canMove", mode: AE_MODE.OVERRIDE, value: "false", priority: 50 }
     ],
@@ -617,7 +615,8 @@ export async function applyHeld(actor, { holderUuid = null, holderName = "", rou
       effectType: "held",
       status: { isHeld: true },
       holderUuid,
-      holderName
+      holderName,
+      allowEscape: true  // target can still attempt escape action
     },
     statuses: ["held"]
   }, opts);

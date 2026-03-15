@@ -1,4 +1,7 @@
-// action-utils.js v1.7.0 - 2026-02-25
+// action-utils.js v1.7.1 - 2026-03-15
+// v1.7.1: Fix postKillSavePrompt E/S note to include throwing-edged,
+//         fix applyDamageNow undefined targetToken reference,
+//         fix grappling hover text "no other actions" → "no other attacks"
 // v1.7.0: Add unified chat card builder utilities (buildShiftDisplay, buildRollDisplay, buildResultBadge, buildContentBox, buildCardShell, buildManualModeNotice)
 // v1.5.1: Fix setupModeSelector ignoring global mode - per-dialog mode now capped at global setting
 // v1.5.0: getBodyArmorValues checks for active Blocking effect (Strength as Body Armor)
@@ -1237,8 +1240,8 @@ export function getResultHoverText(actionType, color) {
       red: 'Stun - Inflict damage and may Stun opponent'
     },
     'grappling': {
-      white: 'Miss - Failed to hold opponent, no other actions',
-      green: 'Miss - Failed to hold opponent, no other actions',
+      white: 'Miss - Failed to hold opponent, no other attacks this turn',
+      green: 'Miss - Failed to hold opponent, no other attacks this turn',
       yellow: 'Partial Hold - Grabbed limb, target acts at -2CS',
       red: 'Hold - Target fully restrained, can inflict Strength damage'
     },
@@ -1658,7 +1661,7 @@ export async function postKillSavePrompt(actor, { attackForm = "edged", fromZero
     return;
   }
 
-  const esNote = (attackForm === "edged" || attackForm === "shooting") 
+  const esNote = (attackForm === "edged" || attackForm === "shooting" || attackForm === "throwing-edged") 
     ? `<div style="font-size:0.9em;color:#666;margin-top:4px;">
         Note: Green (E/S) result means Endurance Loss for ${attackForm} attacks.
       </div>`
@@ -2197,8 +2200,8 @@ export async function applyDamageNow({
       }
 
       results.push({
-        actorUuid: targetActor?.uuid ?? null,     // works for base actors or token actors
-        tokenUuid: targetToken?.document?.uuid ?? targetToken?.uuid ?? null, // if you have token
+        actorUuid: targetActor?.uuid ?? null,
+        tokenUuid: td?.uuid ?? null,
         name: targetActor?.name ?? "Target",
         hpBefore,
         hpAfter,
