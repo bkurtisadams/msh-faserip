@@ -1,4 +1,5 @@
-// scripts/modules/actions/check-action.js v1.9.1 - 2026-02-22
+// scripts/modules/actions/check-action.js v1.9.2 - 2026-03-15
+// v1.9.2: Fix _strengthToAreas fallback — use Speed rank table (Grand Slam rule) not walking speed
 // v1.7.0: Consolidate slam dual-card — _createSlamChatMessage replaced by _slamDetailHtml folded into check card result box
 // v1.6.2: Read Endurance rank from actor directly (actor IS the defender) - prefill.targetEndRank was stale/missing
 // v1.6.1: Fix check card showing literal 'Target' — actor IS the defender, drop targetName from card header
@@ -706,14 +707,15 @@ export class CheckAction extends BaseAction {
   }
 
   _strengthToAreas(rankName) {
-    // Rough mapping; tweak as desired
-    const idx = rankIndex(rankName);
-    if (idx <= rankIndex("Typical"))    return 1;
-    if (idx <= rankIndex("Excellent"))  return 2;
-    if (idx <= rankIndex("Remarkable")) return 3;
-    if (idx <= rankIndex("Incredible")) return 4;
-    if (idx <= rankIndex("Amazing"))    return 5;
-    return 6;
+    // Grand Slam: attacker Strength taken as ground speed (Speed rank table)
+    // Same mapping as getGrandSlamDistance but by rank name instead of value
+    const table = {
+      "Shift-0": 0, "Feeble": 1, "Poor": 2, "Typical": 3, "Good": 4,
+      "Excellent": 5, "Remarkable": 6, "Incredible": 7, "Amazing": 8,
+      "Monstrous": 9, "Unearthly": 10, "Shift-X": 12, "Shift-Y": 14,
+      "Shift-Z": 16, "Class 1000": 32, "Class 3000": 50, "Class 5000": 100
+    };
+    return table[rankName] || 3;
   }
 
   async _createSlamEffect(actor, options, opts = {}) {
