@@ -1,4 +1,5 @@
-// scripts/modules/actions/death-save-action.js v1.9.4 - 2026-02-22
+// scripts/modules/actions/death-save-action.js v1.9.5 - 2026-03-15
+// v1.9.5: Fix _buildEnduranceLadder rank format: "Shift X" → "Shift-X" to match actor data
 // v1.9.4: Add canAct:false to Unconscious effect changes so existing canActorAct guard blocks attacks.
 // v1.7.0: Restyle card to match attack/check card layout (gray card, flex header, color badge, white result box)
 //         Drop <details> collapsible, embed duration roll in card, remove emoji from console.log
@@ -371,7 +372,7 @@ export class DeathSaveAction extends BaseAction {
   _buildEnduranceLadder(startRank = "Typical") {
     const order = [
       "Shift-0","Feeble","Poor","Typical","Good","Excellent","Remarkable",
-      "Incredible","Amazing","Monstrous","Unearthly","Shift X","Shift Y","Shift Z",
+      "Incredible","Amazing","Monstrous","Unearthly","Shift-X","Shift-Y","Shift-Z",
       "Class 1000","Class 3000","Class 5000","Beyond"
     ];
     const i = order.indexOf(startRank);

@@ -1,4 +1,5 @@
-// scripts/rules/kill-resolver.js v1.1.0 - 2025-12-24
+// scripts/rules/kill-resolver.js v1.2.0 - 2026-03-15
+// v1.2.0: Add throwing-blunt to non-lethal attack forms (zero_health context on 0HP kill check)
 // v1.1.0: Include Thrown Edged in E/S group (Green = Endurance Loss)
 
 export const KILL_CONTEXTS = {
@@ -118,7 +119,8 @@ export function getKillContextFromAttackForm(attackForm) {
   // Non-lethal attack forms (shouldn't normally trigger Kill, but handle gracefully)
   else if (formLower === "blunt" || formLower === "bluntattack" || 
            formLower === "force" || formLower === "forceattack" ||
-           formLower === "charging") {
+           formLower === "charging" ||
+           formLower === "throwingblunt" || formLower === "throwblunt") {
     if (debug) {
       console.log('[KILL RESOLVER] Non-lethal attack form, treating as zero_health context');
     }

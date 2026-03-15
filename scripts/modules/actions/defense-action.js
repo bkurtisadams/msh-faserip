@@ -1,4 +1,6 @@
-// scripts/modules/actions/defense-action.js v1.5.0 - 2026-02-27
+// scripts/modules/actions/defense-action.js v1.5.1 - 2026-03-15
+// v1.5.1: Fix dodge — only write defenseShiftRanged (not defenseShift) so dodge has
+//         no effect on adjacent Slugfest/Wrestling per rules
 // v1.5.0: Redesign dialog to Style A (grid header, inline CS/karma, standardized footer)
 // v1.4.1: Always use compact badge layout — drop buildInlineRollDisplay widget from defense cards
 // v1.3.8: Fix dodge movementMult and selfPenaltyCS not wired as AE changes (only in flags); ruler now enforces half speed
@@ -571,9 +573,9 @@ export class DefenseAction extends BaseAction {
       const defenseBonus = Math.abs(penalty);
       const penaltyText = penalty !== 0 ? `${penalty}CS penalty to attackers` : "no penalty";
       
-      // Build changes array: apply defense shift to both melee and ranged keys
-      // Per rules, dodge works vs ranged & charging but NOT slugfest/wrestling;
-      // GM should override for adjacent slugfest/wrestling attacks
+      // Build changes array: defense shift applies to ranged/charging only
+      // Per rules: "Only vs attacks character is aware of. No effect on adjacent Slugfest/Wrestling."
+      // defenseShiftRanged is read for ranged attacks; defenseShift (melee) is NOT set.
       const changes = [
         // Half movement while dodging (ruler reads this multiplier)
         { key: "system.combatMods.movementMult", mode: 5, value: "0.5", priority: 20 },
@@ -582,7 +584,6 @@ export class DefenseAction extends BaseAction {
       ];
       if (defenseBonus > 0) {
         changes.push(
-          { key: "system.combatMods.defenseShift", mode: 2, value: String(defenseBonus), priority: 20 },
           { key: "system.combatMods.defenseShiftRanged", mode: 2, value: String(defenseBonus), priority: 20 }
         );
       }

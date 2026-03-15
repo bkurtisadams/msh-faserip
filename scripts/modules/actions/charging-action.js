@@ -1,4 +1,6 @@
-// scripts/modules/actions/charging-action.js v2.0.0 - 2026-03-11
+// scripts/modules/actions/charging-action.js v2.0.1 - 2026-03-15
+// v2.0.1: Fix damageType "physical-blunt" → "physical-charging" so blocking armor
+//         exclusion and other charging-specific rules apply correctly
 // v2.0.0: Refactor - dialog only, delegates character target resolution to _executeSingleAttack.
 //         Object targets get a simple card. Rebound handled post-pipeline.
 // v1.5.0: Add inline Slam/Stun results and auto-trigger effects in Full Auto mode
@@ -522,7 +524,7 @@ export class ChargingAction extends AttackAction {
       actionType,
       actionName,
       effects,
-      damageType: "physical-blunt",
+      damageType: "physical-charging",
       rawDamage,
       damageNote: damageSourceHover,
       sourceName: `Charging (${choice.areas} area${choice.areas > 1 ? 's' : ''})`,
@@ -604,7 +606,7 @@ export class ChargingAction extends AttackAction {
           await applyDamageToTargets({
             damage: damageToAttacker,
             attackerUuid: actor.uuid,
-            damageType: "physical-blunt",
+            damageType: "physical-charging",
             showNotification: true,
             bypassArmor: true,
             attackForm: "charging-rebound",
@@ -765,7 +767,7 @@ export class ChargingAction extends AttackAction {
       await applyDamageToTargets({
         damage: damageToAttacker,
         attackerUuid: actor.uuid,
-        damageType: "physical-blunt",
+        damageType: "physical-charging",
         showNotification: true,
         bypassArmor: true,
         attackForm: "charging-rebound",
@@ -780,7 +782,7 @@ export class ChargingAction extends AttackAction {
   if (game.msh?.playCombatSFX) {
     await game.msh.playCombatSFX({
       actionType: "charging",
-      damageType: "physical-blunt",
+      damageType: "physical-charging",
       rollResult: colorLower,
       isHit: colorLower !== "white",
       sourceName: `Charging (${choice.areas} areas)`

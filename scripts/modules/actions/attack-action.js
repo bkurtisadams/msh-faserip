@@ -1,4 +1,5 @@
-// attack-action.js v1.9.19 - 2026-02-21
+// attack-action.js v1.9.20 - 2026-03-15
+// v1.9.20: Expand isRanged to include charging/throwing so dodge defenseShiftRanged applies correctly
 // v1.9.19: Semi mode always shows multi-attack FEAT dialog (auto/impossible shown as confirmation)
 // v1.9.18: Multi-attack FEAT - CS now correctly affects success determination
 // v1.9.17: Multi-attack FEAT dialog redesigned to match compact blunt-attack style
@@ -545,8 +546,12 @@ export class AttackAction extends BaseAction {
     }
     
     if (defenderActor) {
-      // Check if ranged attack for prone modifier
-      const isRanged = ["shooting", "energy", "force"].includes(attackForm.toLowerCase());
+      // Check if non-adjacent attack — dodge applies to ranged, charging, and throwing but NOT adjacent slugfest/wrestling
+      // attackForm can be "blunt"/"edged" for both melee and throwing, so check actionType too
+      const atLower = String(actionType).toLowerCase();
+      const afLower = String(attackForm).toLowerCase();
+      const isRanged = ["shooting", "energy", "force"].includes(afLower) ||
+                       ["charging", "throwing-blunt", "throwing-edged"].includes(atLower);
       const defenderShiftData = getDefenseShiftBreakdown(defenderActor, isRanged);
       defenderShift = defenderShiftData.total;
       defenderEffects = defenderShiftData.breakdown;
