@@ -33,7 +33,8 @@ export class FaseripActor extends Actor {
       };
     }
 
-    // Calculate Health (sum of Fighting, Agility, Strength, Endurance)
+    // Calculate Health (sum of Fighting, Agility, Strength, Endurance) using BASE values
+    // Ability shift boosts are applied as display-only on the actor sheet
     const healthMax = 
       parseInt(system.abilities.fighting.value || 0) +
       parseInt(system.abilities.agility.value || 0) +
@@ -53,14 +54,6 @@ export class FaseripActor extends Actor {
       parseInt(system.abilities.reason.value || 0) +
       parseInt(system.abilities.intuition.value || 0) +
       parseInt(system.abilities.psyche.value || 0);
-
-    // Update the karma max value
-    system.attributes.karma.max = karmaMax;
-
-    // Only initialize Karma value if it's missing completely
-    if (typeof system.attributes.karma.value !== 'number') {
-      system.attributes.karma.value = karmaMax;
-    }
 
     // Initialize karma sub-fields if missing
     if (!system.karma) {
@@ -135,24 +128,28 @@ export class FaseripActor extends Actor {
         system.combatMods = {};
       }
       // Ensure all properties exist with defaults (AE changes require target path to exist)
-      system.combatMods.attackShift = system.combatMods.attackShift ?? 0;
-      system.combatMods.defenseShift = system.combatMods.defenseShift ?? 0;
-      system.combatMods.defenseShiftRanged = system.combatMods.defenseShiftRanged ?? 0;
-      system.combatMods.movementMult = system.combatMods.movementMult ?? 1;
-      system.combatMods.canAct = system.combatMods.canAct ?? true;
-      system.combatMods.canMove = system.combatMods.canMove ?? true;
+      // IMPORTANT: Use = 0, not ?? 0. Active Effects with ADD mode accumulate on top of the
+      // base value each data prep cycle. Using ?? preserves the previous cycle's result,
+      // causing the effect to stack on itself every render.
+      system.combatMods.attackShift = 0;
+      system.combatMods.defenseShift = 0;
+      system.combatMods.defenseShiftRanged = 0;
+      system.combatMods.movementMult = 1;
+      system.combatMods.selfPenaltyCS = 0;
+      system.combatMods.canAct = true;
+      system.combatMods.canMove = true;
       
       // Initialize nested abilityShifts
       if (!system.combatMods.abilityShifts) {
         system.combatMods.abilityShifts = {};
       }
-      system.combatMods.abilityShifts.fighting = system.combatMods.abilityShifts.fighting ?? 0;
-      system.combatMods.abilityShifts.agility = system.combatMods.abilityShifts.agility ?? 0;
-      system.combatMods.abilityShifts.strength = system.combatMods.abilityShifts.strength ?? 0;
-      system.combatMods.abilityShifts.endurance = system.combatMods.abilityShifts.endurance ?? 0;
-      system.combatMods.abilityShifts.reason = system.combatMods.abilityShifts.reason ?? 0;
-      system.combatMods.abilityShifts.intuition = system.combatMods.abilityShifts.intuition ?? 0;
-      system.combatMods.abilityShifts.psyche = system.combatMods.abilityShifts.psyche ?? 0;
+      system.combatMods.abilityShifts.fighting = 0;
+      system.combatMods.abilityShifts.agility = 0;
+      system.combatMods.abilityShifts.strength = 0;
+      system.combatMods.abilityShifts.endurance = 0;
+      system.combatMods.abilityShifts.reason = 0;
+      system.combatMods.abilityShifts.intuition = 0;
+      system.combatMods.abilityShifts.psyche = 0;
     }
   }
 
@@ -378,4 +375,4 @@ export class FaseripActor extends Actor {
       strengthRank: strRank
     };
   }
-}
+}

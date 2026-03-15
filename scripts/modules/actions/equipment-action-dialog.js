@@ -1,6 +1,11 @@
-// equipment-action-dialog.js v1.0.0 - 2026-03-08
-// Unified equipment action hub. Inspects item fields and presents contextual action buttons.
-// Replaces fragmented click handlers with a single dialog opened from the equipment roll button.
+// equipment-action-dialog.js v1.1.0 - 2026-03-14
+// v1.1.0: Route Device custom abilities through ActionDispatcher combat pipeline.
+//         Custom abilities with damageType resolve to proper attack actions (BA→blunt, EA→edged, E→energy, etc).
+//         Custom abilities without damageType use standalone FEAT roller (teleportation, utility, etc).
+//         Add Granted Powers (sys.powers) to action button list.
+//         Improve button icons/labels with rank and damage type info.
+// v1.0.0: Unified equipment action hub. Inspects item fields and presents contextual action buttons.
+//         Replaces fragmented click handlers with a single dialog opened from the equipment roll button.
 import { AreaTemplate } from "./area-template.js";
 import { getTargetData } from "./action-utils.js";
 
@@ -116,12 +121,31 @@ function getAvailableActions(item, actor) {
   // ── Custom Abilities ──
   const customs = Array.isArray(sys.customAbilities) ? sys.customAbilities.filter(a => a?.name) : [];
   for (let i = 0; i < customs.length; i++) {
+    const ca = customs[i];
+    const isCombat = !!ca.damageType;
+    const { icon: caIcon, color: caColor } = _damageTypePresentation(ca.damageType);
+    const rankTag = ca.rank ? ` (${ca.rank})` : "";
     actions.push({
       id: `custom-${i}`,
-      label: customs[i].name,
-      icon: "fas fa-star",
-      color: "#5d4037",
+      label: `${ca.name}${rankTag}`,
+      icon: caIcon,
+      color: caColor,
       customIndex: i
+    });
+  }
+
+  // ── Granted Powers ──
+  const powers = Array.isArray(sys.powers) ? sys.powers.filter(p => p?.name) : [];
+  for (let i = 0; i < powers.length; i++) {
+    const pw = powers[i];
+    const { icon: pwIcon, color: pwColor } = _damageTypePresentation(pw.damageType);
+    const rankTag = pw.rank ? ` (${pw.rank})` : "";
+    actions.push({
+      id: `power-${i}`,
+      label: `${pw.name}${rankTag}`,
+      icon: pwIcon,
+      color: pwColor,
+      powerIndex: i
     });
   }
 
@@ -185,6 +209,13 @@ function buildStatSummary(item) {
     add("Range", sys.powerRange);
   }
 
+  if (cat === "device" || cat === "custom") {
+    const cas = Array.isArray(sys.customAbilities) ? sys.customAbilities.filter(a => a?.name) : [];
+    const pws = Array.isArray(sys.powers) ? sys.powers.filter(p => p?.name) : [];
+    add("Abilities", cas.length || "");
+    add("Powers", pws.length || "");
+  }
+
   if (sys.intensityRank) add("Intensity", sys.intensityRank);
   if (sys.areaRadius) add("Area", `${sys.areaRadius} area${sys.areaRadius > 1 ? "s" : ""} radius`);
 
@@ -209,6 +240,7 @@ function buildActionButtons(actions) {
     return `<button type="button" class="equip-action-btn" data-action-id="${a.id}"
       ${a.modeIndex !== undefined ? `data-mode-index="${a.modeIndex}"` : ""}
       ${a.customIndex !== undefined ? `data-custom-index="${a.customIndex}"` : ""}
+      ${a.powerIndex !== undefined ? `data-power-index="${a.powerIndex}"` : ""}
       style="display:flex;align-items:center;gap:8px;width:100%;padding:8px 12px;margin-bottom:4px;
              border:1px solid #c0c0c0;border-radius:4px;background:#fff;cursor:pointer;
              font-size:0.95em;text-align:left;">
@@ -306,15 +338,71 @@ async function _executeAction(actionId, actor, item, dataset) {
         });
       }
 
+      // ── Custom Ability (combat or utility) ──
       if (actionId.startsWith("custom-")) {
         const idx = Number(dataset.customIndex);
         const customs = Array.isArray(sys.customAbilities) ? sys.customAbilities : [];
-        const ability = customs[idx];
-        if (!ability) return;
-        // Use existing custom ability roll from equipment sheet
-        const sheet = item.sheet;
-        if (sheet?._rollSpecificCustomAbility) {
-          return sheet._rollSpecificCustomAbility(item, actor, ability);
+        const ca = customs[idx];
+        if (!ca) return;
+
+        const actionType = _resolveDamageTypeToAction(ca.damageType);
+        if (actionType) {
+          // Combat ability — route through ActionDispatcher
+          const { ActionDispatcher } = await import("./action-dispatcher.js");
+          const abilityName = _resolveAbility(actionType);
+          return ActionDispatcher.roll(actionType, {
+            actor, abilityName,
+            opts: {
+              itemId: item.id, item, sourceItem: item, equipment: item,
+              deviceAbility: ca
+            }
+          });
+        } else {
+          // Non-combat ability (teleportation, utility, etc) — standalone FEAT roll
+          const sheet = item.sheet;
+          if (sheet?._rollSpecificCustomAbility) {
+            return sheet._rollSpecificCustomAbility(item, actor, ca);
+          }
+        }
+      }
+
+      // ── Granted Power (combat or utility) ──
+      if (actionId.startsWith("power-")) {
+        const idx = Number(dataset.powerIndex);
+        const powers = Array.isArray(sys.powers) ? sys.powers : [];
+        const pw = powers[idx];
+        if (!pw) return;
+
+        const actionType = _resolveDamageTypeToAction(pw.damageType);
+        if (actionType) {
+          // Combat power — route through ActionDispatcher
+          const { ActionDispatcher } = await import("./action-dispatcher.js");
+          const abilityName = _resolveAbility(actionType);
+          return ActionDispatcher.roll(actionType, {
+            actor, abilityName,
+            opts: {
+              itemId: item.id, item, sourceItem: item, equipment: item,
+              deviceAbility: {
+                name: pw.name,
+                rank: pw.rank,
+                damageType: pw.damageType,
+                range: "",
+                description: ""
+              }
+            }
+          });
+        } else {
+          // Non-combat granted power — standalone FEAT roll
+          const sheet = item.sheet;
+          if (sheet?._rollSpecificCustomAbility) {
+            return sheet._rollSpecificCustomAbility(item, actor, {
+              name: pw.name,
+              rank: pw.rank,
+              damageType: pw.damageType || "",
+              range: "",
+              description: `Granted by ${item.name}`
+            });
+          }
         }
       }
 
@@ -523,4 +611,38 @@ function _resolveAbility(actionType) {
     "grenade": "agility"
   };
   return map[actionType] || "fighting";
+}
+
+// Resolve a custom ability / granted power damageType code to an ActionDispatcher action type.
+// Returns null for non-combat types (teleportation, sensory, etc).
+function _resolveDamageTypeToAction(dt) {
+  if (!dt) return null;
+  const map = {
+    "BA": "blunt-attack",
+    "EA": "edged-attack",
+    "S":  "shooting",
+    "E":  "energy",
+    "F":  "force",
+    "TE": "throwing-edged",
+    "TB": "throwing-blunt",
+    "GP": "grappling",
+    "Gb": "grabbing"
+  };
+  return map[dt.toUpperCase?.()] || map[dt] || null;
+}
+
+// Icon and color for a given damage type code (used in action buttons)
+function _damageTypePresentation(dt) {
+  const map = {
+    "BA": { icon: "fas fa-fist-raised",     color: "#c62828" },
+    "EA": { icon: "fas fa-cut",             color: "#b71c1c" },
+    "S":  { icon: "fas fa-crosshairs",      color: "#d84315" },
+    "E":  { icon: "fas fa-bolt",            color: "#f57f17" },
+    "F":  { icon: "fas fa-hand-rock",       color: "#1565c0" },
+    "TE": { icon: "fas fa-location-arrow",  color: "#b71c1c" },
+    "TB": { icon: "fas fa-location-arrow",  color: "#ef6c00" },
+    "GP": { icon: "fas fa-hands",           color: "#4e342e" },
+    "Gb": { icon: "fas fa-hand-paper",      color: "#4e342e" }
+  };
+  return map[dt] || { icon: "fas fa-star", color: "#5d4037" };
 }

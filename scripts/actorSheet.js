@@ -504,6 +504,223 @@ export class FaseripActorSheet extends ActorSheet {
     }
   }
 
+  /**
+   * Apply visual indicators for ability boosts/penalties from Active Effects (equipment, powers, etc.)
+   * Highlights ability rows on the sheet when combatMods.abilityShifts has non-zero values.
+   * Called from activateListeners alongside _applyImpairmentIndicators.
+   */
+  _applyAbilityBoostIndicators(html) {
+    const mods = this.actor.system?.combatMods?.abilityShifts;
+    if (!mods) return;
+
+    const abilityKeys = {
+      fighting:  "F",
+      agility:   "A",
+      strength:  "S",
+      endurance: "E",
+      reason:    "R",
+      intuition: "I",
+      psyche:    "P"
+    };
+
+    const rankValues = {
+      "Shift-0": 0, "Feeble": 2, "Poor": 4, "Typical": 6, "Good": 10,
+      "Excellent": 20, "Remarkable": 30, "Incredible": 40, "Amazing": 50,
+      "Monstrous": 75, "Unearthly": 100, "Shift-X": 150, "Shift-Y": 200,
+      "Shift-Z": 500, "Class 1000": 1000, "Class 3000": 3000, "Class 5000": 5000, "Beyond": 10000
+    };
+
+    const RANKS = [
+      "Shift-0","Feeble","Poor","Typical","Good","Excellent",
+      "Remarkable","Incredible","Amazing","Monstrous","Unearthly",
+      "Shift-X","Shift-Y","Shift-Z","Class 1000","Class 3000","Class 5000","Beyond"
+    ];
+
+    for (const [ability, letter] of Object.entries(abilityKeys)) {
+      const cs = Number(mods[ability]) || 0;
+      if (cs === 0) continue;
+
+      // Don't overwrite dying/impaired indicators on Endurance
+      if (ability === "endurance") {
+        const scope = globalThis.MSH_FLAG_SCOPE || "msh-faserip";
+        const hasDying = this.actor.effects.find(e => e.getFlag(scope, "isDying") || e.statuses?.has?.("dying"));
+        const hasImpaired = this.actor.effects.find(e => e.getFlag(scope, "isImpairedEndurance"));
+        if (hasDying || hasImpaired) continue;
+      }
+
+      const row = html.find('tr').filter(function() {
+        return $(this).find('.ability-key').text().trim() === letter;
+      });
+      if (!row.length) continue;
+
+      const baseRank = this.actor.system.abilities?.[ability]?.rank;
+      if (!baseRank) continue;
+
+      const baseIdx = RANKS.indexOf(baseRank);
+      if (baseIdx < 0) continue;
+      const effectiveIdx = Math.min(Math.max(baseIdx + cs, 0), RANKS.length - 1);
+      const effectiveRank = RANKS[effectiveIdx];
+      const effectiveValue = rankValues[effectiveRank] || 0;
+
+      if (cs > 0) {
+        // Boost — blue highlight
+        const boostStyle = "background: #e3f2fd !important; border-color: #1565c0 !important; color: #1565c0 !important; font-weight: bold !important;";
+        row.find('.ability-key').css('cssText', 'background: #1565c0 !important; color: white !important;');
+
+        const sourceName = this._findAbilityShiftSource(ability);
+        const tooltip = `Boosted +${cs}CS by ${sourceName}: ${baseRank}(${rankValues[baseRank] || 0}) → ${effectiveRank}(${effectiveValue})`;
+
+        // Set the rank dropdown to show the effective rank
+        const rankSelect = row.find(`select[name="system.abilities.${ability}.rank"]`);
+        // Add the effective rank as an option if it doesn't exist, then select it
+        if (rankSelect.find(`option[value="${effectiveRank}"]`).length) {
+          rankSelect.val(effectiveRank);
+        }
+        rankSelect.css('cssText', boostStyle);
+        rankSelect.attr('title', tooltip);
+        // Prevent saving the displayed value back — intercept changes
+        rankSelect.on('mousedown keydown', (ev) => {
+          ev.preventDefault();
+          ui.notifications?.info?.(`${this.actor.name}'s ${ability.charAt(0).toUpperCase() + ability.slice(1)} is modified by ${sourceName}. Base: ${baseRank}. Disable the effect to edit.`);
+        });
+
+        // Set the value input to show the effective value
+        const valueInput = row.find(`input[name="system.abilities.${ability}.value"]`);
+        valueInput.val(effectiveValue);
+        valueInput.css('cssText', boostStyle + " text-align: center !important;");
+        valueInput.attr('title', tooltip);
+        valueInput.attr('readonly', true);
+
+      } else {
+        // Penalty — orange/amber highlight
+        const penaltyStyle = "background: #fff3e0 !important; border-color: #ef6c00 !important; color: #ef6c00 !important; font-weight: bold !important;";
+        row.find('.ability-key').css('cssText', 'background: #ef6c00 !important; color: white !important;');
+
+        const sourceName = this._findAbilityShiftSource(ability);
+        const tooltip = `Penalized ${cs}CS by ${sourceName}: ${baseRank}(${rankValues[baseRank] || 0}) → ${effectiveRank}(${effectiveValue})`;
+
+        const rankSelect = row.find(`select[name="system.abilities.${ability}.rank"]`);
+        if (rankSelect.find(`option[value="${effectiveRank}"]`).length) {
+          rankSelect.val(effectiveRank);
+        }
+        rankSelect.css('cssText', penaltyStyle);
+        rankSelect.attr('title', tooltip);
+        rankSelect.on('mousedown keydown', (ev) => {
+          ev.preventDefault();
+          ui.notifications?.info?.(`${this.actor.name}'s ${ability.charAt(0).toUpperCase() + ability.slice(1)} is modified by ${sourceName}. Base: ${baseRank}. Disable the effect to edit.`);
+        });
+
+        const valueInput = row.find(`input[name="system.abilities.${ability}.value"]`);
+        valueInput.val(effectiveValue);
+        valueInput.css('cssText', penaltyStyle + " text-align: center !important;");
+        valueInput.attr('title', tooltip);
+        valueInput.attr('readonly', true);
+      }
+    }
+
+    // ── Adjust Health / Karma display if any FASE or RIP abilities are shifted ──
+    const faseShift = (Number(mods.fighting) || 0) + (Number(mods.agility) || 0) +
+                      (Number(mods.strength) || 0) + (Number(mods.endurance) || 0);
+    if (faseShift !== 0) {
+      // Compute boosted health max from effective FASE values
+      const effectiveHealth = ["fighting","agility","strength","endurance"].reduce((sum, ab) => {
+        const base = this.actor.system.abilities?.[ab];
+        const cs = Number(mods[ab]) || 0;
+        if (cs === 0) return sum + parseInt(base?.value || 0);
+        const idx = RANKS.indexOf(base?.rank);
+        if (idx < 0) return sum + parseInt(base?.value || 0);
+        const newIdx = Math.min(Math.max(idx + cs, 0), RANKS.length - 1);
+        return sum + (rankValues[RANKS[newIdx]] || 0);
+      }, 0);
+
+      const baseHealth = parseInt(this.actor.system.abilities?.fighting?.value || 0) +
+                          parseInt(this.actor.system.abilities?.agility?.value || 0) +
+                          parseInt(this.actor.system.abilities?.strength?.value || 0) +
+                          parseInt(this.actor.system.abilities?.endurance?.value || 0);
+      const healthDelta = effectiveHealth - baseHealth;
+
+      const healthSection = html.find('.sec-col.health');
+      const healthMaxInput = healthSection.find('input[name="system.attributes.health.max"]');
+      const healthValInput = healthSection.find('input[name="system.attributes.health.value"]');
+      const boostStyle = "background: #e3f2fd !important; border-color: #1565c0 !important; color: #1565c0 !important; font-weight: bold !important;";
+
+      if (healthDelta > 0) {
+        healthMaxInput.val(effectiveHealth);
+        healthMaxInput.css('cssText', boostStyle);
+        healthMaxInput.attr('title', `Base: ${baseHealth}, Boosted: +${healthDelta}`);
+        healthMaxInput.attr('readonly', true);
+
+        const currentStored = parseInt(this.actor.system.attributes?.health?.value || 0);
+        const boostedCurrent = Math.min(effectiveHealth, currentStored + healthDelta);
+        healthValInput.val(boostedCurrent);
+        healthValInput.css('cssText', boostStyle);
+        healthValInput.attr('title', `Base: ${currentStored}, Boosted: +${healthDelta}`);
+
+        healthSection.find('.sec-head').css('cssText', 'background: #1565c0 !important; color: white !important;');
+      } else if (healthDelta < 0) {
+        const penaltyStyle = "background: #fff3e0 !important; border-color: #ef6c00 !important; color: #ef6c00 !important; font-weight: bold !important;";
+        healthMaxInput.val(effectiveHealth);
+        healthMaxInput.css('cssText', penaltyStyle);
+        healthMaxInput.attr('title', `Base: ${baseHealth}, Penalty: ${healthDelta}`);
+        healthMaxInput.attr('readonly', true);
+
+        const currentStored = parseInt(this.actor.system.attributes?.health?.value || 0);
+        const penalizedCurrent = Math.max(0, Math.min(effectiveHealth, currentStored + healthDelta));
+        healthValInput.val(penalizedCurrent);
+        healthValInput.css('cssText', penaltyStyle);
+        healthValInput.attr('title', `Base: ${currentStored}, Penalty: ${healthDelta}`);
+
+        healthSection.find('.sec-head').css('cssText', 'background: #ef6c00 !important; color: white !important;');
+      }
+    }
+
+    const ripShift = (Number(mods.reason) || 0) + (Number(mods.intuition) || 0) +
+                     (Number(mods.psyche) || 0);
+    if (ripShift !== 0) {
+      const effectiveKarma = ["reason","intuition","psyche"].reduce((sum, ab) => {
+        const base = this.actor.system.abilities?.[ab];
+        const cs = Number(mods[ab]) || 0;
+        if (cs === 0) return sum + parseInt(base?.value || 0);
+        const idx = RANKS.indexOf(base?.rank);
+        if (idx < 0) return sum + parseInt(base?.value || 0);
+        const newIdx = Math.min(Math.max(idx + cs, 0), RANKS.length - 1);
+        return sum + (rankValues[RANKS[newIdx]] || 0);
+      }, 0);
+
+      const baseKarma = parseInt(this.actor.system.abilities?.reason?.value || 0) +
+                         parseInt(this.actor.system.abilities?.intuition?.value || 0) +
+                         parseInt(this.actor.system.abilities?.psyche?.value || 0);
+      const karmaDelta = effectiveKarma - baseKarma;
+
+      const karmaSection = html.find('.sec-col.karma');
+      const karmaMaxInput = karmaSection.find('input[name="system.attributes.karma.max"]');
+      const boostStyle = "background: #e3f2fd !important; border-color: #1565c0 !important; color: #1565c0 !important; font-weight: bold !important;";
+      const penaltyStyle = "background: #fff3e0 !important; border-color: #ef6c00 !important; color: #ef6c00 !important; font-weight: bold !important;";
+
+      if (karmaDelta !== 0) {
+        const style = karmaDelta > 0 ? boostStyle : penaltyStyle;
+        karmaMaxInput.val(effectiveKarma);
+        karmaMaxInput.css('cssText', style);
+        karmaMaxInput.attr('title', `Base: ${baseKarma}, ${karmaDelta > 0 ? "Boosted" : "Penalty"}: ${karmaDelta > 0 ? "+" : ""}${karmaDelta}`);
+        karmaMaxInput.attr('readonly', true);
+      }
+    }
+  }
+
+  /**
+   * Find the name of the effect causing an ability shift
+   */
+  _findAbilityShiftSource(ability) {
+    const key = `system.combatMods.abilityShifts.${ability}`;
+    for (const eff of this.actor.allApplicableEffects?.() || []) {
+      if (eff.disabled) continue;
+      for (const c of (eff.changes || [])) {
+        if (c.key === key && Number(c.value) !== 0) return eff.name;
+      }
+    }
+    return "Active Effect";
+  }
+
   /** @override */
   _updateObject(event, formData) {
     // Expand the form data
@@ -578,6 +795,9 @@ export class FaseripActorSheet extends ActorSheet {
 
     // Apply visual indicators for Endurance impairment and health max reduction
     this._applyImpairmentIndicators(html);
+
+    // Apply visual indicators for ability boosts/penalties from equipment Active Effects
+    this._applyAbilityBoostIndicators(html);
 
     // Initialize Character Generation Tab
     this._initChargenTab(html);
@@ -5318,4 +5538,4 @@ class UniversalTablePopout extends Application {
       ChatMessage.create({ content, flags: { 'msh-faserip': { type: 'action-info' } } });
     });
   }
-}
+}

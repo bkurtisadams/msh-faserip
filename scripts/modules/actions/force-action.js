@@ -107,10 +107,19 @@ export class ForceAction extends RangedAttackAction {
     const savedRange     = await actor.getFlag("msh-faserip", "lastForceRange") || 1;
     const savedObstacle  = await actor.getFlag("msh-faserip", "lastForceObstacle") || false;
     // If a specific item was passed, don't use ad-hoc mode
-    const savedAdHoc     = passedItem ? false : (await actor.getFlag("msh-faserip", "lastForceAdHoc") || (!forceItems.length));
-    const savedAdHocName = await actor.getFlag("msh-faserip", "lastForceAdHocName") || "Force Blast";
-    const savedAdHocDmg  = Number(await actor.getFlag("msh-faserip", "lastForceAdHocDamage") || 15);
-    const savedAdHocRank = await actor.getFlag("msh-faserip", "lastForceAdHocRank") || "Remarkable";
+    let savedAdHoc     = passedItem ? false : (await actor.getFlag("msh-faserip", "lastForceAdHoc") || (!forceItems.length));
+    let savedAdHocName = await actor.getFlag("msh-faserip", "lastForceAdHocName") || "Force Blast";
+    let savedAdHocDmg  = Number(await actor.getFlag("msh-faserip", "lastForceAdHocDamage") || 15);
+    let savedAdHocRank = await actor.getFlag("msh-faserip", "lastForceAdHocRank") || "Remarkable";
+
+    // Device custom ability override — force ad-hoc pre-populated with ability stats
+    const deviceAbility = this.opts?.deviceAbility;
+    if (deviceAbility) {
+      savedAdHoc = true;
+      savedAdHocName = `${deviceAbility.name}${passedItem ? ` (${passedItem.name})` : ""}`;
+      savedAdHocRank = deviceAbility.rank || "Remarkable";
+      savedAdHocDmg = CONFIG.FASERIP?.rankValues?.[deviceAbility.rank] || 15;
+    }
     const savedUsePowerToHit = await actor.getFlag("msh-faserip", "lastForceUsePowerToHit");
     const defaultUsePowerToHit = savedUsePowerToHit === true; // Only true if explicitly saved as true
 

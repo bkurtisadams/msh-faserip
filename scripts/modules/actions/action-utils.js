@@ -22,6 +22,7 @@ import { ACTION_LABELS, ACTION_EFFECTS } from "./action-config.js";
 import { applyNullifiedEffect, isAuraMaintained } from "./nullify.js";
 import { calculateMitigation } from "../../rules/mitigation.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
+import { getAbilityShift } from "../effects/effect-modifiers.js";
 // NOTE: do NOT import resolveCombatMode here – that creates a circular dependency
 import { recordDamage } from "../rest-system.js";
 import { applyDamageToVehicle } from "./vehicle-damage.js";
@@ -459,16 +460,42 @@ export function effectsFor(actionType) { return ACTION_EFFECTS[actionType] ?? {w
 export function getAbilityInfo(actor, abilityName) {
   const ability = actor?.system?.abilities?.[abilityName];
   if (!ability) throw new Error(`Ability ${abilityName} not found for ${actor?.name}`);
+  // Apply ability shift from Active Effects (equipment boosts, impairment, etc.)
+  const cs = getAbilityShift(actor, abilityName);
+  if (cs !== 0) {
+    const shifted = shiftRank(ability.rank, cs);
+    const shiftedVal = game.msh?.getRankValue?.(shifted) ?? ability.value;
+    return {
+      name: abilityName.charAt(0).toUpperCase() + abilityName.slice(1),
+      rank: shifted,
+      value: shiftedVal,
+      baseRank: ability.rank,
+      baseValue: ability.value,
+      abilityShiftCS: cs
+    };
+  }
   return {
     name: abilityName.charAt(0).toUpperCase() + abilityName.slice(1),
     rank: ability.rank,
-    value: ability.value
+    value: ability.value,
+    baseRank: ability.rank,
+    baseValue: ability.value,
+    abilityShiftCS: 0
   };
 }
 
 export function getStrengthInfo(actor) {
   const s = actor?.system?.abilities?.strength;
-  return { rank: s?.rank ?? "Typical", value: s?.value ?? 6 };
+  const baseRank = s?.rank ?? "Typical";
+  const baseValue = s?.value ?? 6;
+  // Apply strength shift from Active Effects
+  const cs = getAbilityShift(actor, "strength");
+  if (cs !== 0) {
+    const shifted = shiftRank(baseRank, cs);
+    const shiftedVal = game.msh?.getRankValue?.(shifted) ?? baseValue;
+    return { rank: shifted, value: shiftedVal, baseRank, baseValue, abilityShiftCS: cs };
+  }
+  return { rank: baseRank, value: baseValue, baseRank, baseValue, abilityShiftCS: 0 };
 }
 
 export function rollD100() {

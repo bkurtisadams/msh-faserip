@@ -152,7 +152,12 @@ export class EdgedAttackAction extends AttackAction {
       const savedWeapon = attackItems.find(i => i.id === savedItemId);
       if (savedWeapon) {
         const mat = getItemMaterialRank(savedWeapon);
-        const base = Number(savedWeapon.system?.damage || 0);
+        let base = Number(savedWeapon.system?.damage || 0);
+        // Device custom ability: use ability rank value as weapon base damage
+        const da = this.opts?.deviceAbility;
+        if (da?.rank && savedWeapon?.system?.category === "device") {
+          base = Math.max(base, CONFIG.FASERIP?.rankValues?.[da.rank] || 0);
+        }
         const res = computeEdgedDamage(strength.rank, strength.value, mat, base);
         initialDamage = res.damage;
         initialAP = getArmorPiercing(savedWeapon);
@@ -316,7 +321,13 @@ Armor Piercing (AP) reduces target armor by that value.">?</span>
                 } else {
                   weaponMat = getItemMaterialRank(item);
                   weaponName = item.name;
-                  const base = Number(item.system?.damage || 0);
+                  let base = Number(item.system?.damage || 0);
+                  // Device custom ability: use ability rank value as weapon base damage
+                  const da = this.opts?.deviceAbility;
+                  if (da?.rank && item?.system?.category === "device") {
+                    base = Math.max(base, CONFIG.FASERIP?.rankValues?.[da.rank] || 0);
+                    weaponName = `${da.name} (${item.name})`;
+                  }
                   ap = getArmorPiercing(item);
                   apCS = Number(item.system?.armorPiercingCS || 0) || 0;
                   apMode = item.system?.apMode || "value";
@@ -403,10 +414,14 @@ Armor Piercing (AP) reduces target armor by that value.">?</span>
                 currentAP = 0;
               } else {
                 const mat = getItemMaterialRank(item);
-                const base = Number(item.system?.damage || 0);
+                let base = Number(item.system?.damage || 0);
+                const da = this.opts?.deviceAbility;
+                if (da?.rank && item?.system?.category === "device") {
+                  base = Math.max(base, CONFIG.FASERIP?.rankValues?.[da.rank] || 0);
+                }
                 const res = computeEdgedDamage(strength.rank, strength.value, mat, base);
                 currentDamage = res.damage;
-                noteText = `(${item.name})`;
+                noteText = `(${da?.name ? `${da.name} — ${item.name}` : item.name})`;
                 currentAP = getArmorPiercing(item);
                 currentAPCS = Number(item.system?.armorPiercingCS || 0) || 0;
                 currentAPMode = item.system?.apMode || "value";

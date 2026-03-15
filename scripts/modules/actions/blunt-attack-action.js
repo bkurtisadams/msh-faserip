@@ -147,7 +147,11 @@ export class BluntAttackAction extends AttackAction {
       const savedItem = attackItems.find(i => i.id === savedItemId);
       if (savedItem) {
         const mat = getItemMaterialRank(savedItem);
-        const base = Number(savedItem.system?.damage || 0);
+        let base = Number(savedItem.system?.damage || 0);
+        const da = this.opts?.deviceAbility;
+        if (da?.rank && savedItem?.system?.category === "device") {
+          base = Math.max(base, CONFIG.FASERIP?.rankValues?.[da.rank] || 0);
+        }
         const res = computeBluntDamage(strength.rank, strength.value, mat, base, RANKS);
         initialMaxDamage = res.damage;
       }
@@ -376,7 +380,13 @@ export class BluntAttackAction extends AttackAction {
               const item = attackItems.find(i => i.id === itemId);
               weaponMat  = item ? getItemMaterialRank(item) : "Excellent";
               weaponName = item ? item.name : "";
-              const base = item ? Number(item.system?.damage || 0) : 0;
+              let base = item ? Number(item.system?.damage || 0) : 0;
+              // Device custom ability: use ability rank value as weapon base damage
+              const da = this.opts?.deviceAbility;
+              if (da?.rank && item?.system?.category === "device") {
+                base = Math.max(base, CONFIG.FASERIP?.rankValues?.[da.rank] || 0);
+                weaponName = `${da.name} (${item.name})`;
+              }
               const res  = computeBluntDamage(strength.rank, strength.value, weaponMat, base, RANKS);
               damage = res.damage; note = res.note;
             } else if (src === "object") {
@@ -463,11 +473,15 @@ export class BluntAttackAction extends AttackAction {
               const itemId = String(html.find('[name="item"]').val() || "");
               const item = attackItems.find(i => i.id === itemId) || null;
               const mat  = item ? getItemMaterialRank(item) : "Excellent";
-              const base = item ? Number(item.system?.damage || 0) : 0;
+              let base = item ? Number(item.system?.damage || 0) : 0;
+              const da = this.opts?.deviceAbility;
+              if (da?.rank && item?.system?.category === "device") {
+                base = Math.max(base, CONFIG.FASERIP?.rankValues?.[da.rank] || 0);
+              }
               const res  = computeBluntDamage(strength.rank, strength.value, mat, base, RANKS);
               maxDamage = res.damage;
               currentDamage = res.damage;
-              noteText = `(${item?.name || "Weapon"})`;
+              noteText = `(${da?.name ? `${da.name} — ${item?.name}` : item?.name || "Weapon"})`;
             } else if (src === "object") {
               $objectRow.show();
               const mat = String(html.find('[name="objectRank"]').val() || "Excellent");
