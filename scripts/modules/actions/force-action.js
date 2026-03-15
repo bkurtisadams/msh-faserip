@@ -288,6 +288,17 @@ export class ForceAction extends RangedAttackAction {
         </div>
       </div>
 
+      <div class="frp-box frp-pull-box pull-punch-section" id="pull-box" style="padding:4px 8px;background:#fff8e1;border:1px solid #ffe082;border-radius:3px;margin-top:6px;margin-bottom:6px;">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+          <label>
+            <input type="checkbox" id="pull-punch-enabled">
+            <span style="font-weight:600;color:#e65100;">Reduce damage to</span>
+          </label>
+          <input type="number" class="frp-pull-dmg" name="pulledDamage" value="0" min="0" style="width:45px;padding:2px;text-align:center;">
+          <span style="color:#888;font-size:.8em;">Effect cannot be reduced</span>
+        </div>
+      </div>
+
       <div style="margin-top:8px;">
         <input type="checkbox" id="rememberSettings" name="rememberSettings" ${savedRemember ? 'checked' : ''}>
         <label for="rememberSettings">Remember settings</label>
@@ -388,6 +399,9 @@ export class ForceAction extends RangedAttackAction {
                 return resolve(null);
               }
 
+              const pullEnabled   = !!html.find('#pull-punch-enabled').is(':checked');
+              const pulledDamage  = pullEnabled ? parseInt(html.find('[name="pulledDamage"]').val() || 0) : 0;
+
               resolve({
                 powerName, powerDamage, powerRank, powerId, prettyRange,
                 shift, karma, spendKarma, range, throughObstacle, skipDice, usePowerToHit,
@@ -396,7 +410,8 @@ export class ForceAction extends RangedAttackAction {
                 obstacleModifier,
                 targetMovement,
                 movementModifier,
-                multiAdjacent
+                multiAdjacent,
+                pulledDamage, resultCap: "none"
               });
             },
           },

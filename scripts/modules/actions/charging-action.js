@@ -259,6 +259,22 @@ export class ChargingAction extends AttackAction {
     </div>
 
     <!-- Footer -->
+    <div class="frp-box frp-pull-box pull-punch-section" id="pull-box" style="padding:4px 8px;background:#fff8e1;border:1px solid #ffe082;border-radius:3px;margin-bottom:6px;">
+      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+        <label>
+          <input type="checkbox" id="pull-punch-enabled">
+          <span style="font-weight:600;color:#e65100;">Pull</span>
+        </label>
+        <span>damage to</span>
+        <input type="number" class="frp-pull-dmg" name="pulledDamage" value="0" min="0" style="width:45px;padding:2px;text-align:center;">
+        <span>Cap result at</span>
+        <select name="resultCap" style="padding:2px;">
+          <option value="none">None</option>
+          <option value="yellow">Yellow</option>
+          <option value="green">Green</option>
+        </select>
+      </div>
+    </div>
     <div id="msh-bottom-controls" style="display:flex;justify-content:space-between;align-items:center;padding-top:8px;border-top:1px solid #ddd;">
       <label><input type="checkbox" id="msh-remember-settings" name="remember" ${shouldRemember ? 'checked' : ''}> Remember</label>
       <label><input type="checkbox" id="msh-skip-dice" name="skipDice" ${savedSkipDice ? 'checked' : ''}> Skip dice</label>
@@ -319,6 +335,10 @@ export class ChargingAction extends AttackAction {
             const movementBonus = Math.min(3, areas);
             const totalShift = shift + movementBonus;
 
+            const pullEnabled   = !!html.find('#pull-punch-enabled').is(':checked');
+            const pulledDamage  = pullEnabled ? parseInt(html.find('[name="pulledDamage"]').val() || 0) : 0;
+            const resultCap     = pullEnabled ? (html.find('[name="resultCap"]').val() || "none") : "none";
+
             resolve({
               areas,
               shift,
@@ -332,7 +352,9 @@ export class ChargingAction extends AttackAction {
               objectDesc,
               totalShift,
               movementBonus,
-              csNotes
+              csNotes,
+              pulledDamage,
+              resultCap
             });
           }
         },

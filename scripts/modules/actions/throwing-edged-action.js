@@ -179,6 +179,16 @@ export class ThrowingEdgedAction extends RangedAttackAction {
           <strong>Range Modifiers:</strong> <span id="range-mod-text">Calculating...</span>
         </div>
       </div>
+      <div class="frp-box frp-pull-box pull-punch-section" id="pull-box" style="padding:4px 8px;background:#fff8e1;border:1px solid #ffe082;border-radius:3px;margin-bottom:6px;">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+          <label>
+            <input type="checkbox" id="pull-punch-enabled">
+            <span style="font-weight:600;color:#e65100;">Reduce damage to</span>
+          </label>
+          <input type="number" class="frp-pull-dmg" name="pulledDamage" value="0" min="0" style="width:45px;padding:2px;text-align:center;">
+          <span style="color:#888;font-size:.8em;">Effect cannot be reduced</span>
+        </div>
+      </div>
       <div id="msh-bottom-controls" style="display:flex;justify-content:space-between;align-items:center;padding-top:8px;border-top:1px solid #ddd;">
         <label><input type="checkbox" id="msh-remember-settings" name="remember" ${savedRemember ? 'checked' : ''}> Remember</label>
         <label><input type="checkbox" id="msh-skip-dice" name="skipDice" ${savedSkipDice ? 'checked' : ''}> Skip dice</label>
@@ -256,6 +266,9 @@ export class ThrowingEdgedAction extends RangedAttackAction {
               if (obstacleModifier) shiftBreakdown.obstacle = obstacleModifier;
               if (movementModifier) shiftBreakdown.movement = movementModifier;
 
+              const pullEnabled   = !!html.find('#pull-punch-enabled').is(':checked');
+              const pulledDamage  = pullEnabled ? parseInt(html.find('[name="pulledDamage"]').val() || 0) : 0;
+
               resolve({
                 weaponId, weaponName, weaponDamage,
                 totalShift: finalShift, shift,
@@ -264,7 +277,8 @@ export class ThrowingEdgedAction extends RangedAttackAction {
                 armorPiercing: weaponAP,
                 armorPiercingCS: weaponAPCS,
                 apMode: weaponAPMode,
-                damageType: weaponDamageType
+                damageType: weaponDamageType,
+                pulledDamage, resultCap: "none"
               });
             }
           },
