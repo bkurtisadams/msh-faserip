@@ -1,4 +1,6 @@
-// action-utils.js v1.7.1 - 2026-03-15
+// action-utils.js v1.7.2 - 2026-03-15
+// v1.7.2: Fix measureAreasBetweenTokens — Math.round → Math.ceil so any fraction
+//         into the next area counts as that area for range penalty purposes
 // v1.7.1: Fix postKillSavePrompt E/S note to include throwing-edged,
 //         fix applyDamageNow undefined targetToken reference,
 //         fix grappling hover text "no other actions" → "no other attacks"
@@ -1151,8 +1153,8 @@ export function measureAreasBetweenTokens(src, dst) {
   const dist = measureSceneDistance(src.center, dst.center);
   const unitsPerArea = getUnitsPerArea();
   const areas = unitsPerArea === 1 ? dist : (dist / unitsPerArea);
-  // keep minimum 1 only if you want to force ranged min; otherwise allow 0.x
-  return Math.max(1, Math.round(areas));
+  // Any fraction into the next area counts as being in that area for range purposes
+  return Math.max(1, Math.ceil(areas));
 }
 
 /**

@@ -1,4 +1,6 @@
-// ranged-attack-action.js v1.2.0 - 2026-02-20
+// ranged-attack-action.js v1.3.0 - 2026-03-15
+// v1.3.0: Fix range penalty off-by-one: -1CS per area beyond first (not per area traveled)
+//         Affects both weapon shooting and thrown items
 // v1.2.0: Thrown weapons -1CS per area traveled (same as weapons RAW); Strength rank sets max range only
 //         Thrown items have max range only, no per-area penalty within range
 import { AttackAction } from "./attack-action.js";
@@ -31,23 +33,27 @@ export class RangedAttackAction extends AttackAction {
         note = `Within power range (${powerRange} areas) - no penalty`;
       }
     } else if (strengthRank) {
-      // Thrown items: Strength sets max range, -1CS per area traveled (weapons rule RAW)
+      // Thrown items: Strength sets max range, -1CS per area beyond first
       const throwRange = this._getThrowingRangeInAreas(strengthRank);
       if (rangeInAreas > throwRange) {
         note = `Beyond max throwing range (${throwRange} areas) - cannot hit`;
         modifier = -999;
       } else {
-        modifier = -rangeInAreas;
-        note = `Range ${rangeInAreas} area${rangeInAreas !== 1 ? 's' : ''} (max ${throwRange}): ${modifier}CS`;
+        modifier = -(Math.max(0, rangeInAreas - 1));
+        note = rangeInAreas <= 1
+          ? `Range ${rangeInAreas} area (max ${throwRange}): no penalty`
+          : `Range ${rangeInAreas} areas (max ${throwRange}): ${modifier}CS`;
       }
     } else if (weaponMaxRange !== null) {
-      // Weapons (shooting): -1CS per area traveled (RAW: "for each area traveled, reduce by -1CS")
+      // Weapons (shooting): -1CS per area beyond first (RAW: "-1CS for each area beyond the first")
       if (rangeInAreas > weaponMaxRange) {
         note = `Beyond max weapon range (${weaponMaxRange} areas) - cannot hit`;
         modifier = -999;
       } else {
-        modifier = -rangeInAreas; // -1CS per area traveled, starting at area 1
-        note = `Range ${rangeInAreas} areas: ${modifier}CS`;
+        modifier = -(Math.max(0, rangeInAreas - 1));
+        note = rangeInAreas <= 1
+          ? `Range ${rangeInAreas} area: no penalty`
+          : `Range ${rangeInAreas} areas: ${modifier}CS`;
       }
     }
 

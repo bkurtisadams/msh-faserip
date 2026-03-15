@@ -1,4 +1,6 @@
-// scripts/modules/actions/escaping-action.js v2.2.0 - 2026-03-11
+// scripts/modules/actions/escaping-action.js v2.3.0 - 2026-03-15
+// v2.3.0: Apply post-escape effects — Yellow: half move + no actions. Red: half move + -2CS.
+//         Exclude selfPenaltyCS from escape rolls (escape is wrestling, not "normal action")
 // v2.2.0: Consistency fixes — add mode selector, fix remember settings to localStorage pattern
 // v2.1.0: Restyle chat card to match attack card pattern (inline badge, white result box, no color banner)
 // v2.0.0: Compact chat card format, CS notes, effect modifiers, Grapple Back chip on Reverse
@@ -25,6 +27,7 @@ import {
 } from "./action-utils.js";
 import { extractKarmaFromDialog, getAvailableKarma, getMinimumKarmaCommitment } from "../dice/dice-roller.js";
 import { getAttackShiftBreakdown, getDefenseShiftBreakdown } from "../effects/effect-modifiers.js";
+import { applyEscaped, applyReversed } from "../effects/effect-engine.js";
 
 /**
  * Remove grappled/held effects from an actor
@@ -100,11 +103,21 @@ export class EscapingAction extends AttackAction {
     };
 
     // Get effect-based modifiers
-    const attackerEffects = getAttackShiftBreakdown(actor);
+    // NOTE: Escape is a wrestling action, NOT a "normal action" — the Partial Hold
+    // -2CS selfPenaltyCS applies to "normal actions" only per rules text.
+    // Use getAttackShift (attackShift only) instead of getAttackShiftBreakdown (which includes selfPenaltyCS).
+    const rawAttackShift = getAttackShiftBreakdown(actor);
+    // Filter out selfPenaltyCS entries from the total and breakdown
+    let effectShift = 0;
+    const filteredBreakdown = [];
+    for (const entry of rawAttackShift.breakdown) {
+      if (entry.name.includes("(self penalty)")) continue; // skip selfPenaltyCS
+      effectShift += entry.shift;
+      filteredBreakdown.push(entry);
+    }
     
-    // Calculate total shift including effects
+    // Calculate total shift including effects (excluding selfPenaltyCS)
     const manualShift = choice.shift || 0;
-    const effectShift = attackerEffects.total || 0;
     const totalShift = manualShift + effectShift;
 
     const effectiveRank = shiftRank(strength.rank, totalShift);
@@ -155,15 +168,22 @@ export class EscapingAction extends AttackAction {
       actions,
       totalShift,
       shiftBreakdown,
-      attackerEffects: attackerEffects.breakdown
+      attackerEffects: filteredBreakdown
     });
 
     await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor }), content: cardHtml });
 
     // Remove hold effects on successful escape (yellow=Escape or red=Reverse only; green is also Miss for escaping)
-    if (colorLower === "yellow" || colorLower === "red") {
-      console.log(`[FASERIP] Escape successful (${colorLower}), removing hold effects from ${actor.name}`);
+    if (colorLower === "yellow") {
+      console.log(`[FASERIP] Escape successful (yellow), removing hold effects from ${actor.name}`);
       await removeHoldEffects(actor);
+      // Per rules: "free of the hold, may move at half speed, may not perform any other actions"
+      await applyEscaped(actor);
+    } else if (colorLower === "red") {
+      console.log(`[FASERIP] Escape reversed (red), removing hold effects from ${actor.name}`);
+      await removeHoldEffects(actor);
+      // Per rules: "free + may grapple back, or perform any other action at -2CS, half move"
+      await applyReversed(actor);
     } else {
       console.log(`[FASERIP] Escape failed (${colorLower}), hold effects remain`);
     }

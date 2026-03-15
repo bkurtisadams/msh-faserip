@@ -1,7 +1,6 @@
-// scripts/modules/effects/effect-engine.js v1.9.0 - 2026-03-15
-// v1.9.0: Fix applyGrappled/applyHeld per rules — Partial Hold uses selfPenaltyCS (-2CS
-//         all actions) with no ability shifts. Full Hold uses canAct=false (restrained).
-//         Neither effect modifies fighting/agility/strength ability values.
+// scripts/modules/effects/effect-engine.js v1.10.0 - 2026-03-15
+// v1.10.0: Add applyEscaped (half move, no actions) and applyReversed (half move, -2CS)
+//          for post-escape wrestling results
 // v1.5.0: Fix applyEvade - add canAct:false, nest flags under SCOPE, create separate bonus effect
 //         Fix applyBlock - add canAct:false, nest flags under SCOPE, remove incorrect movementMult
 // v1.4.0: Fix applyEvade - properly track evadeSuccessful/autoHit flags, remove incorrect combat mod changes
@@ -619,6 +618,42 @@ export async function applyHeld(actor, { holderUuid = null, holderName = "", rou
       allowEscape: true  // target can still attempt escape action
     },
     statuses: ["held"]
+  }, opts);
+}
+
+/** Apply post-escape effect (Yellow Escape: half move, no other actions this round) */
+export async function applyEscaped(actor, opts = {}) {
+  return applyEffect(actor, {
+    name: "Just Escaped (half move, no actions)",
+    img: "icons/svg/running.svg",
+    rounds: 1,
+    changes: [
+      { key: "system.combatMods.movementMult", mode: AE_MODE.OVERRIDE, value: "0.5", priority: 20 },
+      { key: "system.combatMods.canAct", mode: AE_MODE.OVERRIDE, value: "false", priority: 50 }
+    ],
+    flags: {
+      effectType: "escaped",
+      status: { isEscaped: true }
+    },
+    statuses: ["escaped"]
+  }, opts);
+}
+
+/** Apply post-reverse effect (Red Escape: half move, can act at -2CS or grapple back) */
+export async function applyReversed(actor, opts = {}) {
+  return applyEffect(actor, {
+    name: "Reversed Hold (half move, -2CS actions)",
+    img: "icons/svg/upgrade.svg",
+    rounds: 1,
+    changes: [
+      { key: "system.combatMods.movementMult", mode: AE_MODE.OVERRIDE, value: "0.5", priority: 20 },
+      { key: "system.combatMods.selfPenaltyCS", mode: AE_MODE.ADD, value: "-2", priority: 20 }
+    ],
+    flags: {
+      effectType: "reversed",
+      status: { isReversed: true }
+    },
+    statuses: ["reversed"]
   }, opts);
 }
 
