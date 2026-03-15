@@ -1,5 +1,6 @@
-/* attack-dialog.css v1.0.0 - 2026-03-06 */
-/* Blunt/Edged/Shooting/Energy attack dialog styles from v3 Final Mockup */
+/* action-dialog.css v2.0.0 - 2026-03-15 */
+/* v2.0.0: Add header banner, summary line, talent chips, effect preview grid,
+           consolidated option rows, 2-col grid. Styles from dialog-mockup-v2. */
 
 /* ── Dialog content wrapper ──────────────────────────────────────────── */
 .frp-dlg {
@@ -19,33 +20,52 @@
   background-size: 100% 100%, 100% 100%, 3.5px 3.5px;
 }
 
+/* ── Header banner ───────────────────────────────────────────────────── */
+.frp-dlg .frp-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 5px 8px;
+  margin: -8px -8px 6px;
+  background: linear-gradient(90deg, var(--mred) 0%, var(--mred-dk) 100%);
+  color: #fff;
+}
+.frp-dlg .frp-header-action {
+  font-family: 'Oswald', sans-serif;
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.frp-dlg .frp-header-ability {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 12px;
+  opacity: 0.8;
+}
+
 /* ── Mode row ────────────────────────────────────────────────────────── */
+.frp-dlg .frp-mode-row,
 .frp-dlg .mode-row {
   display: flex;
-  align-items: center;
   justify-content: flex-end;
-  gap: 4px;
-  margin-bottom: 6px;
+  gap: 3px;
+  margin-bottom: 4px;
 }
-.frp-dlg .mode-row span.mode-label {
-  font-family: 'Oswald', sans-serif;
-  font-size: 10px;
-  color: var(--txt-m);
-  letter-spacing: 0.8px;
-  text-transform: uppercase;
-  margin-right: 4px;
-}
+.frp-dlg .frp-mode-btn,
 .frp-dlg .mbtn {
-  padding: 2px 10px;
-  border: 2px solid #bbb;
-  border-radius: 3px;
-  font-size: 11px;
+  padding: 1px 8px;
+  border: 1px solid #bbb;
+  border-radius: 2px;
+  font-size: 10px;
   font-family: 'Barlow Condensed', sans-serif;
   font-weight: 500;
-  background: #e0e0e0;
+  background: #e8e8e8;
   color: #999;
   cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
+.frp-dlg .frp-mode-btn.active,
 .frp-dlg .mbtn.active-yellow {
   background: #f9a825;
   color: #000;
@@ -64,28 +84,45 @@
   font-weight: 600;
   border-color: #1b5e20;
 }
+.frp-dlg .mode-row span.mode-label {
+  font-family: 'Oswald', sans-serif;
+  font-size: 10px;
+  color: var(--txt-m);
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  margin-right: 4px;
+}
+
+/* ── Actor → Target summary line ─────────────────────────────────────── */
+.frp-dlg .frp-summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  margin-bottom: 6px;
+  font-size: 13px;
+  border-bottom: 1px solid #e0d8c8;
+}
+.frp-dlg .frp-summary .actor { font-weight: 700; }
+.frp-dlg .frp-summary .arrow { color: var(--gold); font-weight: 700; }
+.frp-dlg .frp-summary .target { font-weight: 700; color: var(--mred); }
+
+/* ── 2-column grid ───────────────────────────────────────────────────── */
+.frp-dlg .frp-2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+  margin-bottom: 5px;
+}
 
 /* ── Boxed section ───────────────────────────────────────────────────── */
 .frp-dlg .frp-box {
   border: 1px solid #d0c8b8;
   border-radius: 3px;
-  padding: 6px 8px;
-  margin-bottom: 6px;
+  padding: 5px 8px;
+  margin-bottom: 5px;
   background: var(--cream);
   transition: background 0.25s ease, border-color 0.25s ease;
-}
-
-/* ── Top grid: CS + Target ───────────────────────────────────────────── */
-.frp-dlg .frp-top-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  margin-bottom: 6px;
-}
-
-/* CS box */
-.frp-dlg .frp-cs-box {
-  border-color: var(--gold);
 }
 .frp-dlg .frp-box-label {
   font-family: 'Oswald', sans-serif;
@@ -93,24 +130,28 @@
   font-size: 10px;
   letter-spacing: 0.8px;
   text-transform: uppercase;
-  margin-bottom: 3px;
+  color: var(--txt-m);
+  margin-bottom: 2px;
 }
 .frp-dlg .frp-box-label.gold { color: var(--gold); }
+.frp-dlg .frp-box-label.red { color: var(--mred); }
 .frp-dlg .frp-box-label.muted { color: var(--txt-m); }
+.frp-dlg .frp-box-label.green { color: #2e7d32; }
 
+/* ── CS line ─────────────────────────────────────────────────────────── */
 .frp-dlg .frp-cs-line {
   display: flex;
   align-items: center;
   gap: 4px;
 }
 .frp-dlg .frp-cs-input {
-  width: 38px;
-  padding: 3px 2px;
+  width: 36px;
+  padding: 2px;
   text-align: center;
   border: 1px solid #b8b8b8;
   border-radius: 2px;
   font-family: 'Oswald', sans-serif;
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 700;
   background: #fff;
   box-shadow: inset 0 1px 2px rgba(0,0,0,0.06);
@@ -122,11 +163,13 @@
   outline-offset: -1px;
   border-color: var(--gold);
 }
+.frp-dlg .frp-cs-input.pos,
 .frp-dlg .frp-cs-input.cs-pos {
   background: #e8f5e9;
   border-color: #66bb6a;
   color: #2e7d32;
 }
+.frp-dlg .frp-cs-input.neg,
 .frp-dlg .frp-cs-input.cs-neg {
   background: #ffebee;
   border-color: #ef5350;
@@ -135,8 +178,9 @@
 .frp-dlg .frp-cs-arrow {
   color: var(--gold);
   font-weight: 700;
-  font-size: 14px;
+  font-size: 13px;
 }
+.frp-dlg .frp-cs-rank,
 .frp-dlg .frp-cs-result {
   font-family: 'Oswald', sans-serif;
   font-weight: 700;
@@ -145,13 +189,14 @@
 .frp-dlg .frp-cs-result.positive { color: #2e7d32; }
 .frp-dlg .frp-cs-result.negative { color: #c62828; }
 .frp-dlg .frp-cs-reset {
-  padding: 1px 5px;
-  font-size: 12px;
-  border: 1px solid #999;
+  padding: 0px 4px;
+  font-size: 11px;
+  border: 1px solid #aaa;
   border-radius: 2px;
   background: #eee;
   cursor: pointer;
   margin-left: auto;
+  line-height: 1.2;
 }
 .frp-dlg .frp-cs-notes {
   width: 100%;
@@ -161,7 +206,7 @@
   font-family: 'Barlow Condensed', sans-serif;
   font-size: 11px;
   background: #fff;
-  margin-top: 4px;
+  margin-top: 3px;
   box-sizing: border-box;
 }
 .frp-dlg .frp-cs-notes::placeholder { color: #bbb; }
@@ -172,7 +217,60 @@
   font-style: italic;
 }
 
-/* Target box */
+/* ── Talent Chips ────────────────────────────────────────────────────── */
+.frp-dlg .frp-talent-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-top: 4px;
+}
+.frp-dlg .frp-talent-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 7px;
+  border-radius: 3px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.15s ease;
+  border: 1px solid #bbb;
+  background: #eee;
+  color: #888;
+}
+.frp-dlg .frp-talent-chip .chip-cs {
+  font-family: 'Oswald', sans-serif;
+  font-weight: 700;
+  font-size: 11px;
+}
+.frp-dlg .frp-talent-chip .chip-note {
+  font-size: 10px;
+  font-weight: 400;
+  font-style: italic;
+}
+/* Active: CS-granting talent (green) */
+.frp-dlg .frp-talent-chip.active-cs {
+  background: #e8f5e9;
+  border-color: #66bb6a;
+  color: #2e7d32;
+}
+.frp-dlg .frp-talent-chip.active-cs .chip-cs {
+  color: #1b5e20;
+}
+/* Active: flag-only talent (purple) */
+.frp-dlg .frp-talent-chip.active-flag {
+  background: #f3e5f5;
+  border-color: #ba68c8;
+  color: #6a1b9a;
+}
+.frp-dlg .frp-talent-chip:hover {
+  filter: brightness(0.95);
+  transform: translateY(-1px);
+}
+
+/* ── Target box (inside 2col) ────────────────────────────────────────── */
 .frp-dlg .frp-target-name {
   font-family: 'Oswald', sans-serif;
   font-weight: 700;
@@ -189,7 +287,16 @@
   font-style: italic;
 }
 
-/* ── Source ───────────────────────────────────────────────────────────── */
+/* ── Source / weapon / object rows ────────────────────────────────────── */
+.frp-dlg .frp-select {
+  width: 100%;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 13px;
+  padding: 2px 4px;
+  border: 1px solid #b8b8b8;
+  border-radius: 2px;
+  background: #fff;
+}
 .frp-dlg .frp-src-line {
   display: flex;
   align-items: center;
@@ -259,34 +366,28 @@
   width: 50px;
 }
 
-/* ── Damage ──────────────────────────────────────────────────────────── */
-.frp-dlg .frp-dmg-box {
-  background: #ffebee;
-  border-color: #ef9a9a;
-}
+/* ── Damage row ──────────────────────────────────────────────────────── */
 .frp-dlg .frp-dmg-row {
   display: flex;
-  justify-content: space-between;
   align-items: baseline;
-}
-.frp-dlg .frp-dmg-left {
-  display: flex;
-  align-items: baseline;
-  gap: 4px;
-}
-.frp-dlg .frp-dmg-label {
-  font-family: 'Oswald', sans-serif;
-  font-weight: 700;
-  font-size: 12px;
-  color: var(--mred);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  gap: 6px;
 }
 .frp-dlg .frp-dmg-num {
   font-family: 'Oswald', sans-serif;
   font-weight: 700;
   font-size: 18px;
   color: var(--mred);
+}
+.frp-dlg .frp-dmg-label {
+  font-size: 12px;
+  color: var(--txt-m);
+}
+.frp-dlg .frp-dmg-after {
+  margin-left: auto;
+  font-family: 'Oswald', sans-serif;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--txt-s);
 }
 .frp-dlg .frp-dmg-note {
   font-size: 12px;
@@ -297,14 +398,74 @@
   font-weight: 700;
   font-size: 14px;
 }
-.frp-dlg .frp-dmg-after {
+
+/* ── Consolidated option rows (Pull / Multi / Karma) ─────────────────── */
+.frp-dlg .frp-opt-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+}
+.frp-dlg .frp-opt-row label {
+  font-size: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.frp-dlg .frp-opt-row .frp-opt-label {
   font-family: 'Oswald', sans-serif;
   font-weight: 600;
-  font-size: 14px;
-  color: var(--ink);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.frp-dlg .frp-opt-row .frp-opt-label.orange { color: #e65100; }
+.frp-dlg .frp-opt-row .frp-opt-label.green { color: #2e7d32; }
+.frp-dlg .frp-opt-row .frp-opt-label.blue { color: #1565c0; }
+
+.frp-dlg .frp-pull-input {
+  width: 36px;
+  padding: 2px;
+  text-align: center;
+  border: 1px solid #b8b8b8;
+  border-radius: 2px;
+  font-family: 'Oswald', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  box-sizing: border-box;
 }
 
-/* ── Pull Punch ──────────────────────────────────────────────────────── */
+.frp-dlg .frp-karma-pool {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--txt-s);
+}
+.frp-dlg .frp-karma-pool strong {
+  font-family: 'Oswald', sans-serif;
+  font-size: 14px;
+}
+
+/* ── Effect preview grid (W/G/Y/R) ──────────────────────────────────── */
+.frp-dlg .frp-fx-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 2px;
+  margin-top: 3px;
+}
+.frp-dlg .frp-fx-cell {
+  text-align: center;
+  font-size: 10px;
+  padding: 2px 0;
+  border-radius: 2px;
+  font-weight: 600;
+}
+.frp-dlg .frp-fx-cell.w { background: #fff; border: 1px solid #ddd; color: #666; }
+.frp-dlg .frp-fx-cell.g { background: #e8f5e9; border: 1px solid #a5d6a7; color: #2e7d32; }
+.frp-dlg .frp-fx-cell.y { background: #fff8e1; border: 1px solid #ffe082; color: #f57f17; }
+.frp-dlg .frp-fx-cell.r { background: #ffebee; border: 1px solid #ef9a9a; color: #c62828; }
+
+/* ── Legacy pull/multi/karma box styles (kept for compat) ────────────── */
 .frp-dlg .frp-pull-box.pull-active {
   background: #fff3e0;
   border-color: #ff9800;
@@ -352,8 +513,6 @@
   border-radius: 2px;
   font-family: 'Barlow Condensed', sans-serif;
 }
-
-/* ── Multi ────────────────────────────────────────────────────────────── */
 .frp-dlg .frp-multi-box.multi-active {
   background: #e8f5e9;
   border-color: #66bb6a;
@@ -374,8 +533,6 @@
   font-size: 13px;
   cursor: pointer;
 }
-
-/* ── Karma ────────────────────────────────────────────────────────────── */
 .frp-dlg .frp-karma-box.karma-active {
   background: #e3f2fd;
   border-color: #90caf9;
@@ -393,60 +550,113 @@
   align-items: center;
   gap: 3px;
 }
-.frp-dlg .frp-karma-pool {
-  margin-left: auto;
-  font-size: 13px;
+
+/* ── Info row (for Escape etc.) ──────────────────────────────────────── */
+.frp-dlg .frp-info {
+  font-size: 12px;
   color: var(--txt-s);
+  display: flex;
+  gap: 4px;
+  align-items: baseline;
 }
-.frp-dlg .frp-karma-pool strong {
+.frp-dlg .frp-info .rank-val {
   font-family: 'Oswald', sans-serif;
   font-weight: 700;
   font-size: 14px;
+  color: var(--txt);
+}
+
+/* ── Range rows (shooting) ───────────────────────────────────────────── */
+.frp-dlg .frp-range-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.frp-dlg .frp-range-input {
+  width: 40px;
+  padding: 2px;
+  text-align: center;
+  border: 1px solid #b8b8b8;
+  border-radius: 2px;
+  font-family: 'Oswald', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+}
+.frp-dlg .frp-range-note { font-size: 11px; color: var(--txt-m); }
+.frp-dlg .frp-range-penalty {
+  margin-left: auto;
+  font-family: 'Oswald', sans-serif;
+  font-weight: 600;
+  font-size: 13px;
+  color: #c62828;
 }
 
 /* ── Footer ──────────────────────────────────────────────────────────── */
 .frp-dlg .frp-foot {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-top: 6px;
-  padding-top: 6px;
+  gap: 8px;
+  margin-top: 4px;
+  padding-top: 5px;
   border-top: 1px solid #d8cfb8;
 }
 .frp-dlg .frp-foot label {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--txt-m);
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 3px;
 }
 .frp-dlg .frp-foot-btns {
   display: flex;
-  gap: 6px;
+  gap: 5px;
   margin-left: auto;
 }
 .frp-dlg .frp-btn-roll {
-  padding: 5px 24px;
-  background: linear-gradient(180deg, var(--mred-lit) 0%, var(--mred-dk) 100%);
+  padding: 4px 22px;
+  background: linear-gradient(180deg, var(--mred-lit), var(--mred-dk));
   color: #fff;
   border: 2px solid var(--ink);
   border-radius: 3px;
   box-shadow: 1px 1px 0 var(--ink);
   font-family: 'Oswald', sans-serif;
   font-weight: 700;
-  font-size: 14px;
+  font-size: 13px;
   letter-spacing: 1px;
   text-transform: uppercase;
   cursor: pointer;
 }
 .frp-dlg .frp-btn-roll:hover { filter: brightness(1.15); }
 .frp-dlg .frp-btn-cancel {
-  padding: 5px 18px;
+  padding: 4px 14px;
   background: var(--cream-dk);
   color: var(--txt-s);
   border: 2px solid #bbb;
   border-radius: 3px;
   font-family: 'Oswald', sans-serif;
   font-weight: 600;
-  font-size: 13px;
+  font-size: 12px;
   cursor: pointer;
 }
 .frp-dlg .frp-btn-cancel:hover { background: #eee; }
+
+/* ── Legacy compat: old top-grid class ───────────────────────────────── */
+.frp-dlg .frp-top-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.frp-dlg .frp-cs-box {
+  border-color: var(--gold);
+}
+.frp-dlg .frp-dmg-box {
+  background: #ffebee;
+  border-color: #ef9a9a;
+}
+.frp-dlg .frp-dmg-left {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
