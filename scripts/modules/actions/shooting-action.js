@@ -282,14 +282,6 @@ export class ShootingAction extends RangedAttackAction {
               <option value="1" data-label="Higher Ground" title="Elevated position, terrain advantage">Higher Ground +1CS</option>
               <option value="3" data-label="Point Blank" title="Adjacent, not engaged in Slugfest/Wrestling">Point Blank +3CS</option>
             </optgroup>
-            <optgroup label="Range (-1CS/area beyond first)">
-              <option value="-1" data-label="Range 2" title="2 areas distance">Range 2 areas -1CS</option>
-              <option value="-2" data-label="Range 3" title="3 areas distance">Range 3 areas -2CS</option>
-              <option value="-3" data-label="Range 4" title="4 areas distance">Range 4 areas -3CS</option>
-              <option value="-4" data-label="Range 5" title="5 areas distance">Range 5 areas -4CS</option>
-              <option value="-5" data-label="Range 6" title="6 areas distance">Range 6 areas -5CS</option>
-              <option value="-6" data-label="Range 7+" title="7+ areas distance">Range 7+ areas -6CS</option>
-            </optgroup>
             <optgroup label="Target Movement">
               <option value="-1" data-label="Moving" title="Target moving &le;5 areas/round">Moving &le;5 areas -1CS</option>
               <option value="-2" data-label="Fast" title="Target moving &le;10 areas/round">Moving &le;10 areas -2CS</option>
@@ -340,14 +332,19 @@ export class ShootingAction extends RangedAttackAction {
         </div>` : ""}
       </div>
 
-      <!-- Range info box -->
-      <div class="frp-box" style="padding:3px 8px;">
+      <!-- Range info box (blue) — auto-filled from token distance -->
+      <div class="frp-box" style="padding:3px 8px;background:#e3f2fd;border-color:#90caf9;">
         <div style="display:flex;align-items:center;gap:6px;font-size:12px;">
           <span style="font-family:'Oswald',sans-serif;font-size:10px;color:#1565c0;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;">Range</span>
-          <input type="number" name="range" value="${savedRange}" min="0" class="frp-pull-input" style="width:36px;">
+          <input type="number" name="range" value="${savedRange}" min="0" readonly class="frp-pull-input" style="width:36px;">
           <span style="color:#777;">areas</span>
           <span style="color:#999;font-size:11px;">(max <span id="max-range-hint">${initialWeaponRange}</span>)</span>
-          <span id="range-penalty-display" style="margin-left:auto;font-family:'Oswald',sans-serif;font-weight:600;font-size:12px;color:#c62828;"></span>
+          <span id="range-penalty-display" style="font-family:'Oswald',sans-serif;font-weight:600;font-size:12px;color:#c62828;"></span>
+          <span id="range-shift-display" style="display:flex;align-items:center;gap:4px;margin-left:auto;font-size:12px;">
+            <span style="color:#777;">${abilityShort}</span>
+            <span style="color:var(--gold);font-weight:700;">&rarr;</span>
+            <span id="range-shifted-rank" style="font-family:'Oswald',sans-serif;font-weight:700;font-size:13px;color:#c62828;">${abilityShort}</span>
+          </span>
         </div>
       </div>
 
@@ -586,7 +583,55 @@ export class ShootingAction extends RangedAttackAction {
               $afterArmor.text(`${currentDamage} damage`);
             }
 
-            // CS display update
+            // Range penalty — auto-sync sit tag + Agility shift display (before CS display)
+            const rangeVal = Number(html.find('[name="range"]').val() || 0);
+            const $rangePenalty = html.find('#range-penalty-display');
+            const $rangeShiftDisplay = html.find('#range-shift-display');
+            const $rangeShiftedRank = html.find('#range-shifted-rank');
+            const oldRangeTag = html.find('.frp-sit-tag[data-auto="range"]');
+            const oldRangeCS = oldRangeTag.length ? (parseInt(oldRangeTag.data('cs')) || 0) : 0;
+
+            if (rangeVal > currentRange) {
+              $rangePenalty.text('OUT OF RANGE').css('color', '#c62828');
+              $rangeShiftDisplay.hide();
+              if (oldRangeTag.length) {
+                const $csI = html.find('[name="shift"]');
+                $csI.val(parseInt($csI.val()) - oldRangeCS);
+                oldRangeTag.remove();
+              }
+            } else {
+              const penalty = rangeVal > 1 ? -(rangeVal - 1) : 0;
+              $rangePenalty.text(penalty < 0 ? `${penalty}CS` : '').css('color', '#e65100');
+
+              if (penalty < 0) {
+                const rangeShifted = shiftRank(ability.rank, penalty);
+                const rangeShiftedAbbr = RANK_ABBR[rangeShifted] || rangeShifted;
+                $rangeShiftedRank.text(rangeShiftedAbbr).css('color', '#c62828');
+                $rangeShiftDisplay.show();
+              } else {
+                $rangePenalty.text('');
+                $rangeShiftedRank.text(abilityShort).css('color', '#2e7d32');
+                $rangeShiftDisplay.show();
+              }
+
+              if (penalty !== oldRangeCS) {
+                const $csI = html.find('[name="shift"]');
+                if (oldRangeTag.length) {
+                  $csI.val(parseInt($csI.val()) - oldRangeCS);
+                  oldRangeTag.remove();
+                }
+                if (penalty < 0) {
+                  const tag = $(`<span class="frp-sit-tag penalty" data-cs="${penalty}" data-label="Range ${rangeVal}" data-auto="range">
+                    Range ${rangeVal} <span class="tag-cs">${penalty}</span>
+                    <span class="tag-x">&times;</span>
+                  </span>`);
+                  html.find('#sit-tags').append(tag);
+                  $csI.val(parseInt($csI.val()) + penalty);
+                }
+              }
+            }
+
+            // CS display update (after range sync so shift value is current)
             const cs = parseInt(html.find('[name="shift"]').val()) || 0;
             const shiftedRankText = shiftRank(ability.rank, cs);
             const $shiftedRank = html.find('#rank-shooting');
@@ -606,18 +651,6 @@ export class ShootingAction extends RangedAttackAction {
             } else {
               $shiftedRank.css('color', '');
               $resetBtn.css('visibility', 'hidden');
-            }
-
-            // Range penalty display (informational)
-            const rangeVal = Number(html.find('[name="range"]').val() || 0);
-            const $rangePenalty = html.find('#range-penalty-display');
-            if (rangeVal > currentRange) {
-              $rangePenalty.text('OUT OF RANGE').css('color', '#c62828');
-            } else if (rangeVal > 1) {
-              const penalty = -(rangeVal - 1);
-              $rangePenalty.text(`${penalty}CS range`).css('color', '#e65100');
-            } else {
-              $rangePenalty.text('');
             }
 
             if ($dialog.length) $dialog[0].style.height = 'auto';
