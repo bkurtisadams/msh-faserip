@@ -1,5 +1,9 @@
 //--- START OF FILE blunt-attack-action.js ---
-// blunt-attack-action.js v2.1.1 - 2026-03-15
+// blunt-attack-action.js v3.2.0 - 2026-03-15
+// v3.2.0: Move mode buttons to titlebar (injected during render), remove target/mode row,
+//         narrow dialog to 360px
+// v2.1.2: Simplify chip logic — one chip per talent, Ultimate replaces normal when
+//         rankOverride is set (no duplication, no mutual exclusion needed)
 // v2.1.1: Fix chip persistence — save/restore active chip states via lastBluntActiveChips flag,
 //         render chips with correct active class on dialog open, prevent CS double-counting
 // v2.1.0: Ultimate Skill chip — talents with rankOverride get gold ★ chip that computes
@@ -54,6 +58,7 @@ import { canEffectsApply } from "../../rules/effects-gate.js";
 import { buildColorOutcome } from "../dice/color-results.js";
 import { applyColumnShifts } from "../dice/column-shifts.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
+import { RANK_ABBR } from "../../rules/rules-reference.js";
 // NOTE: resolveCombatMode not imported here to avoid circular dependency
 
 
@@ -170,22 +175,27 @@ export class BluntAttackAction extends AttackAction {
     
     const targetArmorInfo = primaryTargetActor ? getBodyArmorValues(primaryTargetActor, "physical-blunt") : null;
     const targetArmor = targetArmorInfo?.applicable ?? 0;
-    const targetArmorSource = targetArmorInfo?.source ?? "";
-    const armorNote = targets.length > 1 ? " (1st target)" : "";
+    const targetArmorRank = targetArmorInfo?.physicalRank || "";
+    const targetArmorAbbr = targetArmorRank ? (RANK_ABBR[targetArmorRank] || targetArmorRank) : "";
+    const armorNote = targets.length > 1 ? " (1st)" : "";
     const initialDamage = strength.value;
     const initialAfterArmor = Math.max(0, initialDamage - targetArmor);
 
     // Target health and effects for display
     const targetHealth = primaryTargetActor?.system?.health;
-    const targetHealthStr = targetHealth ? `Health: ${targetHealth.value}/${targetHealth.max}` : "";
-    const targetEffects = primaryTargetActor?.effects?.filter(e => !e.disabled) ?? [];
+    const targetHealthStr = targetHealth ? `${targetHealth.value}/${targetHealth.max}` : "";
+    const targetEffects = (primaryTargetActor?.effects?.filter(e => !e.disabled) ?? [])
+      .filter(e => {
+        const n = (e.name || e.label || '').toLowerCase();
+        return !n.includes('body armor') && !n.includes('force field');
+      });
     const targetStatusStr = targetEffects.length > 0
       ? targetEffects.map(e => e.name || e.label).join(", ")
-      : "No active effects";
+      : "";
 
-    // Armor label for summary line
-    const armorRankLabel = targetArmorInfo
-      ? `BA: ${targetArmorSource ? targetArmorSource : ""}(${targetArmor})${armorNote}`
+    // Armor display for target row
+    const armorDisplay = targetArmor > 0
+      ? `BA: ${targetArmorAbbr}(${targetArmor})${armorNote}`
       : "";
 
     // Karma info
@@ -199,38 +209,33 @@ export class BluntAttackAction extends AttackAction {
     const csInputCls = savedColumnShift > 0 ? ' pos' : savedColumnShift < 0 ? ' neg' : '';
     const csRankStyle = savedColumnShift > 0 ? 'color:#2e7d32;' : savedColumnShift < 0 ? 'color:#c62828;' : '';
 
-    // Build talent chips HTML
-    // Talents with rankOverride get a gold ★ Ultimate chip (mutually exclusive with normal +CS chip)
-    const talentChipsHtml = combatTalents.length > 0 ? `
-      <div class="frp-talent-row">
-        ${combatTalents.map(t => {
-          const savedState = savedActiveChips[t.name] || '';
-          const csActive = savedState === 'cs';
-          const ultActive = savedState === 'ultimate';
-          const flagActive = savedState.includes('flag');
-          let chips = '';
-          // Normal CS chip (only if talent grants a CS bonus)
-          if (t.cs > 0) {
-            chips += `<span class="frp-talent-chip${csActive ? ' active-cs' : ''}" data-cs="${t.cs}" data-talent="${t.name}" data-group="${t.name}">
-              ${t.name} <span class="chip-cs">+${t.cs}</span>
-            </span>`;
-          }
-          // Ultimate Skill chip (if talent has rankOverride)
-          if (t.rankOverride && t.ultimateCS > 0) {
-            const shortRank = t.rankOverride.substring(0, 2);
-            chips += `<span class="frp-talent-chip${ultActive ? ' active-ultimate' : ''}" data-cs="${t.ultimateCS}" data-talent="${t.name}" data-group="${t.name}" data-ultimate="1">
-              ★ ${t.name} <span class="chip-cs">&rarr;${shortRank}</span>
-            </span>`;
-          }
-          // Flag-only chip (no CS, just a combat effect toggle)
-          if (t.flag) {
-            chips += `<span class="frp-talent-chip${flagActive ? ' active-flag' : ''}" data-flag="${t.flag}" data-talent="${t.name}">
-              ${t.name} <span class="chip-note">${t.note}</span>
-            </span>`;
-          }
-          return chips;
-        }).join('')}
-      </div>` : '';
+    // Build talent chips HTML (inline, no wrapper — goes directly inside frp-cs-line)
+    const talentChipsHtml = combatTalents.map(t => {
+      const savedState = savedActiveChips[t.name] || '';
+      const flagActive = savedState.includes('flag');
+
+      // CS-granting chip: either Ultimate override or normal bonus (never both)
+      if (t.rankOverride && t.ultimateCS > 0) {
+        const shortRank = RANK_ABBR[t.rankOverride] || t.rankOverride;
+        const ultActive = savedState === 'ultimate';
+        return `<span class="frp-talent-chip${ultActive ? ' active-ultimate' : ''}" data-cs="${t.ultimateCS}" data-talent="${t.name}" data-ultimate="1">
+          ★ ${t.name} <span class="chip-cs">&rarr;${shortRank}</span>
+        </span>`;
+      }
+      if (t.cs > 0) {
+        const csActive = savedState === 'cs';
+        return `<span class="frp-talent-chip${csActive ? ' active-cs' : ''}" data-cs="${t.cs}" data-talent="${t.name}">
+          ${t.name} <span class="chip-cs">+${t.cs}</span>
+        </span>`;
+      }
+      // Flag-only chip
+      if (t.flag) {
+        return `<span class="frp-talent-chip${flagActive ? ' active-flag' : ''}" data-flag="${t.flag}" data-talent="${t.name}">
+          ${t.name} <span class="chip-note">${t.note}</span>
+        </span>`;
+      }
+      return '';
+    }).join('');
 
     // Object material rank options
     const rankOpts = ["Feeble","Poor","Typical","Good","Excellent","Remarkable","Incredible","Amazing","Monstrous","Unearthly"]
@@ -258,57 +263,75 @@ export class BluntAttackAction extends AttackAction {
     if (savedSource === "weapon" && savedItemId) initDamageSrcVal = `weapon:${savedItemId}`;
     else if (savedSource === "object") initDamageSrcVal = "object";
 
-    // ── Dialog HTML — v2 Mockup Layout ──
+    const abilityShort = RANK_ABBR[ability.rank] || ability.rank;
+
+    // ── Dialog HTML — v3 Ultra Compact Layout ──
+    const multiEnabled = savedMultiAttacks || savedMultiAdjacent;
     const dialogHtml = `
     <div class="frp-dlg">
 
-      <!-- Header banner -->
-      <div class="frp-header">
-        <span class="frp-header-action">${actionName}</span>
-        <span class="frp-header-ability">Fighting FEAT</span>
+      <!-- Header: Actor (Base Fighting / Rank Value) attacks Target -->
+      <div class="frp-header-v3">
+        <span class="h-actor">${actor.name}</span>
+        <span class="h-paren">(</span>
+        <span class="h-stat">
+          <span class="h-stat-label">Base Fighting:</span>
+          <span class="h-stat-rank">${abilityShort} ${ability.value}</span>
+        </span>
+        <span class="h-paren">)</span>
+        ${targetDisplay
+          ? `<span class="h-verb">attacks</span><span class="h-target">${targetDisplay}</span>`
+          : ''}
       </div>
 
-      <!-- Mode selector -->
-      ${buildModeSelector({ mode: "semi" })}
-
-      <!-- Actor → Target summary -->
-      <div class="frp-summary">
-        <span class="actor">${actor.name}</span>
-        <span class="arrow">&rarr;</span>
-        <span class="target">${targetDisplay || "No target"}</span>
-        ${armorRankLabel ? `<span style="margin-left:auto;font-size:11px;color:#777;">${armorRankLabel}</span>` : ''}
-      </div>
-
-      <!-- CS + Target 2-col -->
-      <div class="frp-2col">
-        <div class="frp-box" style="border-color:#c8960c;">
-          <div class="frp-box-label gold">Column Shift</div>
-          <div class="frp-cs-line">
-            <input type="number" class="frp-cs-input${csInputCls}" name="shift" value="${savedColumnShift}" id="cs-blunt">
-            <span class="frp-cs-arrow">&rarr;</span>
-            <span class="frp-cs-rank" id="rank-blunt" style="${csRankStyle}">${shiftRank(ability.rank, savedColumnShift)}</span>
-            <button type="button" class="frp-cs-reset" style="visibility:${savedColumnShift !== 0 ? 'visible' : 'hidden'}">&times;</button>
-          </div>
+      <!-- CS box: chips + situational dropdown all in one flowing line -->
+      <div class="frp-box frp-cs-box">
+        <div class="frp-cs-line">
+          <span class="frp-cs-label">CS</span>
+          <input type="number" class="frp-cs-input${csInputCls}" name="shift" value="${savedColumnShift}" id="cs-blunt">
+          <span class="frp-cs-arrow">&rarr;</span>
+          <span class="frp-cs-rank" id="rank-blunt" style="${csRankStyle}">${shiftRank(ability.rank, savedColumnShift)}</span>
+          <button type="button" class="frp-cs-reset" style="visibility:${savedColumnShift !== 0 ? 'visible' : 'hidden'}">&times;</button>
+          ${combatTalents.length > 0 ? '<span class="chip-sep"></span>' : ''}
           ${talentChipsHtml}
-          <input type="text" class="frp-cs-notes" name="csNotes" placeholder="other modifiers&hellip;" value="${savedCsNotes}">
+          <span class="chip-sep"></span>
+          <select class="frp-sit-select" id="sit-select">
+            <option value="">+ situational&hellip;</option>
+            <optgroup label="Bonuses">
+              <option value="2" data-label="Blindside" title="Target unaware, from behind, distracted, or attacker playing possum">Blindside +2CS</option>
+              <option value="1" data-label="Ambush" title="Pre-set position, triggers when target enters area">Ambush +1CS</option>
+              <option value="1" data-label="Double Team" title="Ally has Hold on target, second attacker gets bonus">Double Team +1CS</option>
+              <option value="1" data-label="Combined" title="Two attackers within 1 rank damage, lower makes Agi FEAT">Combined Atk +1CS</option>
+              <option value="1" data-label="Higher Ground" title="Judge discretion — elevated position, terrain advantage">Higher Ground +1CS</option>
+            </optgroup>
+            <optgroup label="Penalties">
+              <option value="-2" data-label="Shielding" title="Using object as cover, -2CS all FEATs unless common item">Shielding -2CS</option>
+              <option value="-2" data-label="Impaired" title="Lost Endurance ranks, -2CS all actions until healed">Impaired -2CS</option>
+            </optgroup>
+            <optgroup label="Target Size">
+              <option value="1" data-label="Growth +1" title="Target is 12-18ft tall">Growth 12-18ft +1CS</option>
+              <option value="2" data-label="Growth +2" title="Target is 18-22ft tall">Growth 18-22ft +2CS</option>
+              <option value="3" data-label="Growth +3" title="Target is over 22ft tall">Growth 22ft+ +3CS</option>
+              <option value="-1" data-label="Shrink -1" title="Target shrunk to ~1 inch">Shrunk 1&Prime; -1CS</option>
+              <option value="-2" data-label="Shrink -2" title="Target shrunk to ~&frac14; inch">Shrunk &frac14;&Prime; -2CS</option>
+              <option value="-3" data-label="Shrink -3" title="Target smaller than &frac14; inch">Shrunk smaller -3CS</option>
+            </optgroup>
+          </select>
         </div>
-        <div class="frp-box">
-          <div class="frp-box-label red">Target${targets.length > 1 ? 's' : ''}</div>
-          <div style="font-family:'Oswald';font-weight:700;font-size:14px;color:#8b0000;">${targetDisplay || "None"}</div>
-          <div style="font-size:11px;color:#444;" id="target-health-display">${targetHealthStr || `${ability.name}: ${ability.rank} (${ability.value})`}</div>
-          <div style="font-size:11px;color:#6a1b9a;font-style:italic;" id="target-status-display">${targetStatusStr}</div>
-        </div>
+        <div class="frp-sit-tags" id="sit-tags"></div>
       </div>
 
-      <!-- Damage source box -->
-      <div class="frp-box" style="background:#ffebee;border-color:#ef9a9a;" id="source-box">
-        <div class="frp-box-label red">Damage</div>
-        <div style="margin-bottom:3px;">
+      <!-- Damage: select + numbers inline -->
+      <div class="frp-box frp-dmg-box">
+        <div class="frp-dmg-inline">
           <select class="frp-select" name="damageSource" id="damage-source-select">
             ${damageSrcOptions.join('')}
           </select>
+          <span class="frp-dmg-num" id="dmg-val">${initialDamage}</span>
+          <span class="frp-cs-arrow">&rarr;</span>
+          <span class="frp-dmg-after" id="after-armor-display">${primaryTarget ? `${initialAfterArmor} after armor` : `${initialDamage} damage`}</span>
         </div>
-        <!-- Object sub-fields -->
+        <!-- Object sub-fields (hidden unless object selected) -->
         <div class="object-row" id="object-row" style="display:${savedSource==='object'?'block':'none'}">
           <div class="obj-grid">
             <label>Name:</label>
@@ -320,18 +343,11 @@ export class BluntAttackAction extends AttackAction {
             </div>
           </div>
         </div>
-        <div class="frp-dmg-row" style="margin-top:3px;">
-          <span class="frp-dmg-num" id="dmg-val">${initialDamage}</span>
-          <span class="frp-dmg-label" id="dmg-note">raw</span>
-          <span class="frp-cs-arrow">&rarr;</span>
-          <span class="frp-dmg-after" id="after-armor-display">${primaryTarget ? `${initialAfterArmor} after armor` : `${initialDamage} damage`}</span>
-        </div>
       </div>
 
-      <!-- Consolidated options: Pull / Multi / Karma -->
-      <div class="frp-box" style="padding:4px 8px;" id="options-box">
-        <!-- Pull Punch -->
-        <div class="frp-opt-row" style="border-bottom:1px solid #e8e0d0;padding-bottom:3px;">
+      <!-- Options: Pull / Multi / Karma (greyed when unchecked) -->
+      <div class="frp-box frp-opts-box">
+        <div class="frp-opt-row${!savedPullEnabled ? ' inactive' : ''}" style="border-bottom:1px solid #e8e0d0;">
           <label><input type="checkbox" id="pull-punch-enabled" ${savedPullEnabled ? 'checked' : ''}> <span class="frp-opt-label orange">Pull</span></label>
           <span style="font-size:11px;color:#777;">to</span>
           <input type="number" class="frp-pull-input" name="pulledDamage" value="${savedPullEnabled && savedPulledDamage > 0 ? savedPulledDamage : initialMaxDamage}" min="0" max="${initialMaxDamage}" ${!savedPullEnabled ? 'disabled' : ''}>
@@ -342,15 +358,13 @@ export class BluntAttackAction extends AttackAction {
             <option value="green" ${savedResultCap==='green'?'selected':''}>Hit</option>
           </select>
         </div>
-        <!-- Multi-Attack -->
-        <div class="frp-opt-row" style="border-bottom:1px solid #e8e0d0;padding-bottom:3px;">
-          <label><input type="checkbox" id="multi-enabled" ${savedMultiAttacks || savedMultiAdjacent ? 'checked' : ''}> <span class="frp-opt-label green">Multi</span></label>
-          <label style="margin-left:8px;"><input type="radio" name="multiCount" value="2" ${!savedMultiAdjacent && (!savedMultiAttacks || savedAttackCount === 2) ? 'checked' : ''}> &times;2</label>
-          <label><input type="radio" name="multiCount" value="3" ${!savedMultiAdjacent && savedAttackCount === 3 ? 'checked' : ''}> &times;3</label>
-          <label><input type="radio" name="multiCount" value="adjacent" ${savedMultiAdjacent ? 'checked' : ''}> Adj</label>
+        <div class="frp-opt-row${!multiEnabled ? ' inactive' : ''}" style="border-bottom:1px solid #e8e0d0;">
+          <label><input type="checkbox" id="multi-enabled" ${multiEnabled ? 'checked' : ''}> <span class="frp-opt-label green">Multi</span></label>
+          <label style="margin-left:8px;"><input type="radio" name="multiCount" value="2" ${!savedMultiAdjacent && (!savedMultiAttacks || savedAttackCount === 2) ? 'checked' : ''} ${!multiEnabled ? 'disabled' : ''}> &times;2</label>
+          <label><input type="radio" name="multiCount" value="3" ${!savedMultiAdjacent && savedAttackCount === 3 ? 'checked' : ''} ${!multiEnabled ? 'disabled' : ''}> &times;3</label>
+          <label><input type="radio" name="multiCount" value="adjacent" ${savedMultiAdjacent ? 'checked' : ''} ${!multiEnabled ? 'disabled' : ''}> Adj</label>
         </div>
-        <!-- Karma -->
-        <div class="frp-opt-row">
+        <div class="frp-opt-row${!hasKarma ? ' inactive' : hasKarma ? ' inactive' : ''}">
           ${hasKarma ? `
             <label><input type="checkbox" id="spend-karma" name="spendKarma"> <span class="frp-opt-label blue">Karma</span></label>
             <span class="frp-karma-pool"><strong>${availableKarma}</strong> avail (min ${minKarma})</span>
@@ -366,21 +380,17 @@ export class BluntAttackAction extends AttackAction {
         <div class="frp-fx-cell r">Stun</div>
       </div>
 
-      <!-- Footer -->
+      <!-- Footer: checkboxes only (Roll/Cancel from Dialog buttons) -->
       <div class="frp-foot">
-        <label><input type="checkbox" id="msh-skip-dice" name="skipDice" ${savedSkipDice ? 'checked' : ''}> Skip dice</label>
         <label><input type="checkbox" id="msh-remember-settings" name="remember" ${shouldRemember ? 'checked' : ''}> Remember</label>
-        <div class="frp-foot-btns">
-          <button type="button" class="frp-btn-cancel">Cancel</button>
-          <button type="button" class="frp-btn-roll">Roll</button>
-        </div>
+        <label><input type="checkbox" id="msh-skip-dice" name="skipDice" ${savedSkipDice ? 'checked' : ''}> Skip dice</label>
       </div>
     </div>
     `;
 
     const choice = await new Promise((resolve) => {
       new Dialog({
-        title: `${actionName}: ${actor.name}`,
+        title: actionName,
         content: dialogHtml,
         buttons: {
           roll: {
@@ -432,7 +442,14 @@ export class BluntAttackAction extends AttackAction {
             const multiAttacks  = multiEnabled && !multiAdjacent;
             const attackCount   = multiCountVal === "3" ? 3 : 2;
 
-            const csNotes = $dlg('[name="csNotes"]').val() || "";
+            // Build csNotes automatically from active situational tags
+            const sitParts = [];
+            html.find('.frp-sit-tag').each(function() {
+              const label = $(this).data('label') || '';
+              const cs = parseInt($(this).data('cs')) || 0;
+              if (label) sitParts.push(`${label} ${cs > 0 ? '+' : ''}${cs}`);
+            });
+            const csNotes = sitParts.join(', ');
 
             // Collect active talent flags
             const talentFlags = {};
@@ -518,7 +535,21 @@ export class BluntAttackAction extends AttackAction {
           setupKarmaControlHandlers(html);
           const $dialog = html.closest('.dialog');
           
-          await setupModeSelector(actor, html, this.opts || {}, "lastBluntMode");
+          // Inject mode buttons into the titlebar
+          const $titlebar = $dialog.find('.window-title, .dialog-title').first();
+          if ($titlebar.length) {
+            const modeHtml = buildModeSelector({ mode: "semi" });
+            const $modeWrap = $('<span class="frp-titlebar-mode"></span>').append(modeHtml);
+            $titlebar.after($modeWrap);
+          }
+          // Setup mode selector on the full dialog (buttons are now in titlebar)
+          await setupModeSelector(actor, $dialog, this.opts || {}, "lastBluntMode");
+
+          // Set dialog width
+          if ($dialog.length) {
+            $dialog.css('width', '360px');
+            $dialog[0].style.height = 'auto';
+          }
 
           const getLS = (k, d=null) => {
             try { const v = localStorage.getItem(k); return v === null ? d : v; } catch { return d; }
@@ -526,13 +557,11 @@ export class BluntAttackAction extends AttackAction {
           const setLS = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
 
           // ── Talent chip click handler ──
-          // Chips with the same data-group are mutually exclusive (normal +1CS vs Ultimate ★)
           html.find('.frp-talent-chip').on('click', function() {
             const $chip = $(this);
             const cs = parseInt($chip.data('cs')) || 0;
             const flag = $chip.data('flag') || null;
             const isUltimate = !!$chip.data('ultimate');
-            const group = $chip.data('group') || null;
             const $csInput = html.find('[name="shift"]');
 
             if (cs > 0) {
@@ -540,22 +569,9 @@ export class BluntAttackAction extends AttackAction {
               const activeClass = isUltimate ? 'active-ultimate' : 'active-cs';
 
               if (wasActive) {
-                // Deactivate this chip
                 $chip.removeClass('active-cs active-ultimate');
                 $csInput.val(parseInt($csInput.val()) - cs);
               } else {
-                // Deactivate any other CS chip in the same group first
-                if (group) {
-                  html.find(`.frp-talent-chip[data-group="${group}"]`).not($chip).each(function() {
-                    const $sibling = $(this);
-                    const sibCs = parseInt($sibling.data('cs')) || 0;
-                    if ($sibling.hasClass('active-cs') || $sibling.hasClass('active-ultimate')) {
-                      $sibling.removeClass('active-cs active-ultimate');
-                      if (sibCs > 0) $csInput.val(parseInt($csInput.val()) - sibCs);
-                    }
-                  });
-                }
-                // Activate this chip
                 $chip.addClass(activeClass);
                 $csInput.val(parseInt($csInput.val()) + cs);
               }
@@ -665,18 +681,58 @@ export class BluntAttackAction extends AttackAction {
           html.find('[name="objectValue"]').on('input change', update);
           html.find('[name="objectName"]').on('input', update);
           
-          // CS reset — also deactivates talent chips and ultimate chips
+          // CS reset — deactivates talent chips, ultimate chips, and removes situational tags
           html.find('.frp-cs-reset').on('click', function(e) {
             e.preventDefault();
             html.find('[name="shift"]').val(0);
             html.find('.frp-talent-chip.active-cs, .frp-talent-chip.active-ultimate').removeClass('active-cs active-ultimate');
+            html.find('#sit-tags').empty();
             html.find('[name="shift"]').trigger('change');
           });
+
+          // ── Situational modifier: apply on select change ──
+          html.find('#sit-select').on('change', function() {
+            const $sel = $(this);
+            const opt = $sel.find('option:selected');
+            const cs = parseInt(opt.val());
+            const label = opt.data('label') || '';
+            if (!cs || !label) return;
+
+            // Prevent duplicate
+            let exists = false;
+            html.find('.frp-sit-tag').each(function() {
+              if ($(this).data('label') === label) exists = true;
+            });
+            if (exists) { $sel.val(''); return; }
+
+            const sign = cs > 0 ? '+' : '';
+            const cls = cs < 0 ? ' penalty' : '';
+            const tag = $(`<span class="frp-sit-tag${cls}" data-cs="${cs}" data-label="${label}">
+              ${label} <span class="tag-cs">${sign}${cs}</span>
+              <span class="tag-x">&times;</span>
+            </span>`);
+            html.find('#sit-tags').append(tag);
+
+            const $csInput = html.find('[name="shift"]');
+            $csInput.val(parseInt($csInput.val()) + cs).trigger('change');
+            $sel.val('');
+          });
+
+          // ── Situational modifier: remove tag ──
+          html.find('#sit-tags').on('click', '.tag-x', function() {
+            const $tag = $(this).closest('.frp-sit-tag');
+            const cs = parseInt($tag.data('cs')) || 0;
+            const $csInput = html.find('[name="shift"]');
+            $csInput.val(parseInt($csInput.val()) - cs).trigger('change');
+            $tag.remove();
+          });
           
-          // Pull punch toggle — enable/disable sub-controls
+          // Pull punch toggle — enable/disable sub-controls + inactive styling
           html.find('#pull-punch-enabled').on('change', function() {
+            const $row = $(this).closest('.frp-opt-row');
             const $pulledDamage = html.find('[name="pulledDamage"]');
             const $resultCap = html.find('[name="resultCap"]');
+            $row.toggleClass('inactive', !this.checked);
             if (this.checked) {
               const currentMax = Number($pulledDamage.attr('max')) || strength.value;
               $pulledDamage.val(currentMax).prop('disabled', false);
@@ -685,6 +741,18 @@ export class BluntAttackAction extends AttackAction {
               $resultCap.val('none').prop('disabled', true);
               $pulledDamage.val($pulledDamage.attr('max')).prop('disabled', true);
             }
+          });
+
+          // Multi-attack toggle — inactive styling + disable radios
+          html.find('#multi-enabled').on('change', function() {
+            const $row = $(this).closest('.frp-opt-row');
+            $row.toggleClass('inactive', !this.checked);
+            $row.find('[name="multiCount"]').prop('disabled', !this.checked);
+          });
+
+          // Karma toggle — inactive styling
+          html.find('#spend-karma').on('change', function() {
+            $(this).closest('.frp-opt-row').toggleClass('inactive', !this.checked);
           });
           
           applyCapabilitiesToDialog(html, "blunt-attack", { actor });

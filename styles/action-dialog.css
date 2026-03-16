@@ -1,4 +1,6 @@
-/* action-dialog.css v2.1.0 - 2026-03-15 */
+/* action-dialog.css v3.2.0 - 2026-03-15 */
+/* v3.2.0: Titlebar mode buttons (frp-titlebar-mode), remove mode+target row,
+           tiny mode button overrides for titlebar context */
 /* v2.1.0: Add active-ultimate chip style (gold/amber) for Ultimate Skill rank overrides */
 /* v2.0.0: Add header banner, summary line, talent chips, effect preview grid,
            consolidated option rows, 2-col grid. Styles from dialog-mockup-v2. */
@@ -10,9 +12,9 @@
   --cream: #faf8f3; --cream-dk: #f5f3ee;
   --ink: #1a1a1a; --txt: #1a1a1a; --txt-s: #444; --txt-m: #777;
   font-family: 'Barlow Condensed', Arial, sans-serif;
-  font-size: 13px;
+  font-size: 14px;
   color: var(--txt);
-  padding: 8px;
+  padding: 6px;
   background-color: #fcf8eb;
   background-image:
     repeating-conic-gradient(from 0deg at -8% -8%, rgba(180,130,0,.018) 0deg, transparent 1.5deg, transparent 3deg),
@@ -21,7 +23,35 @@
   background-size: 100% 100%, 100% 100%, 3.5px 3.5px;
 }
 
-/* ── Header banner ───────────────────────────────────────────────────── */
+/* ── Foundry v13 base style resets ───────────────────────────────────── */
+/* Foundry's .dialog-content applies its own input/select/button sizing. */
+/* We override aggressively within .frp-dlg to keep our compact layout. */
+.frp-dlg input[type="number"],
+.frp-dlg input[type="text"] {
+  height: auto;
+  margin: 0;
+  line-height: 1.2;
+}
+.frp-dlg select {
+  height: auto;
+  margin: 0;
+  line-height: 1.2;
+}
+.frp-dlg button {
+  margin: 0;
+  line-height: 1.2;
+}
+.frp-dlg input[type="checkbox"],
+.frp-dlg input[type="radio"] {
+  margin: 0 2px 0 0;
+  width: auto;
+  height: auto;
+}
+.frp-dlg label {
+  margin: 0;
+}
+
+/* ── Header banner (v2 — kept for other dialogs) ────────────────────── */
 .frp-dlg .frp-header {
   display: flex;
   justify-content: space-between;
@@ -42,6 +72,196 @@
   font-family: 'Barlow Condensed', sans-serif;
   font-size: 12px;
   opacity: 0.8;
+}
+
+/* ── Merged header banner (v3) ───────────────────────────────────────── */
+.frp-dlg .frp-header-v3 {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 8px;
+  margin: -6px -6px 4px;
+  background: linear-gradient(90deg, var(--mred) 0%, var(--mred-dk) 100%);
+  color: #fff;
+  flex-wrap: wrap;
+}
+.frp-dlg .frp-header-v3 .h-action {
+  font-family: 'Oswald', sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.frp-dlg .frp-header-v3 .h-actor {
+  font-family: 'Oswald', sans-serif;
+  font-weight: 700;
+  font-size: 15px;
+  color: #fff;
+}
+.frp-dlg .frp-header-v3 .h-paren {
+  font-size: 14px;
+  opacity: 0.5;
+  font-weight: 300;
+}
+.frp-dlg .frp-header-v3 .h-stat {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.1;
+}
+.frp-dlg .frp-header-v3 .h-stat-label {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 9px;
+  opacity: 0.7;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+.frp-dlg .frp-header-v3 .h-stat-rank {
+  font-family: 'Oswald', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--gold-lit);
+}
+.frp-dlg .frp-header-v3 .h-verb {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 13px;
+  opacity: 0.7;
+}
+.frp-dlg .frp-header-v3 .h-arrow {
+  color: var(--gold-lit);
+  font-weight: 700;
+  font-size: 14px;
+}
+.frp-dlg .frp-header-v3 .h-target {
+  font-family: 'Oswald', sans-serif;
+  font-weight: 700;
+  font-size: 15px;
+  color: #ffcdd2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Mode buttons in titlebar ─────────────────────────────────────────── */
+.frp-titlebar-mode {
+  display: inline-flex;
+  align-items: center;
+  margin-left: auto;
+  margin-right: 4px;
+}
+.frp-titlebar-mode .faserip-mode-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+}
+/* Hide "Mode:" label in titlebar */
+.frp-titlebar-mode .faserip-mode-row > span:first-child {
+  display: none;
+}
+/* Make mode buttons tiny for titlebar */
+.frp-titlebar-mode .faserip-mode {
+  padding: 1px 6px !important;
+  font-size: 10px !important;
+  border-width: 1px !important;
+  border-radius: 2px !important;
+  margin-left: 1px !important;
+}
+/* Also hide lock note in titlebar */
+.frp-titlebar-mode .faserip-mode-row > span:last-child {
+  display: none;
+}
+
+/* ── Target compact line (v3) ────────────────────────────────────────── */
+.frp-dlg .frp-target-compact {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--txt-s);
+}
+.frp-dlg .frp-target-compact .t-name {
+  font-family: 'Oswald', sans-serif;
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--mred);
+}
+.frp-dlg .frp-target-compact .t-hp { font-size: 11px; color: var(--txt-s); }
+.frp-dlg .frp-target-compact .t-armor {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--txt-m);
+}
+.frp-dlg .frp-target-compact .t-status {
+  font-size: 10px;
+  color: #6a1b9a;
+  font-style: italic;
+}
+.frp-dlg .frp-target-compact .t-none {
+  font-size: 11px;
+  color: #999;
+  font-style: italic;
+}
+
+/* ── CS label (v3 inline) ────────────────────────────────────────────── */
+.frp-dlg .frp-cs-label {
+  font-family: 'Oswald', sans-serif;
+  font-size: 10px;
+  color: var(--gold);
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+/* ── Chip separator (vertical pipe between CS controls and chips) ────── */
+.frp-dlg .chip-sep {
+  width: 1px;
+  height: 14px;
+  background: #ccc;
+  margin: 0 1px;
+  flex-shrink: 0;
+}
+
+/* ── Inline damage row (v3) ──────────────────────────────────────────── */
+.frp-dlg .frp-dmg-inline {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.frp-dlg .frp-dmg-inline select {
+  flex: 1;
+  min-width: 0;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 12px;
+  padding: 2px 3px;
+  border: 1px solid #b8b8b8;
+  border-radius: 2px;
+  background: #fff;
+  height: auto;
+  min-height: 0;
+}
+.frp-dlg .frp-dmg-box {
+  background: #ffebee;
+  border-color: #ef9a9a;
+  padding: 3px 8px;
+}
+.frp-dlg .frp-opts-box {
+  padding: 3px 8px;
+}
+.frp-dlg .frp-cs-box {
+  border-color: var(--gold);
+}
+
+/* ── Inactive option row (v3) ────────────────────────────────────────── */
+.frp-dlg .frp-opt-row.inactive {
+  opacity: 0.4;
+  transition: opacity 0.15s ease;
+}
+.frp-dlg .frp-opt-row.inactive select,
+.frp-dlg .frp-opt-row.inactive input[type="number"],
+.frp-dlg .frp-opt-row.inactive input[type="radio"] {
+  pointer-events: none;
 }
 
 /* ── Mode row ────────────────────────────────────────────────────────── */
@@ -144,6 +364,7 @@
   display: flex;
   align-items: center;
   gap: 4px;
+  flex-wrap: wrap;
 }
 .frp-dlg .frp-cs-input {
   width: 36px;
@@ -152,12 +373,20 @@
   border: 1px solid #b8b8b8;
   border-radius: 2px;
   font-family: 'Oswald', sans-serif;
-  font-size: 15px;
+  font-size: 17px;
   font-weight: 700;
   background: #fff;
   box-shadow: inset 0 1px 2px rgba(0,0,0,0.06);
   transition: background 0.2s, border-color 0.2s, color 0.2s;
   box-sizing: border-box;
+  /* Foundry v13 overrides */
+  min-height: 0;
+  -moz-appearance: textfield;
+}
+.frp-dlg .frp-cs-input::-webkit-inner-spin-button,
+.frp-dlg .frp-cs-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 .frp-dlg .frp-cs-input:focus {
   outline: 2px solid var(--gold);
@@ -185,19 +414,31 @@
 .frp-dlg .frp-cs-result {
   font-family: 'Oswald', sans-serif;
   font-weight: 700;
-  font-size: 14px;
+  font-size: 15px;
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .frp-dlg .frp-cs-result.positive { color: #2e7d32; }
 .frp-dlg .frp-cs-result.negative { color: #c62828; }
 .frp-dlg .frp-cs-reset {
-  padding: 0px 4px;
-  font-size: 11px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  font-size: 14px;
   border: 1px solid #aaa;
   border-radius: 2px;
   background: #eee;
   cursor: pointer;
-  margin-left: auto;
-  line-height: 1.2;
+  line-height: 1;
+  min-height: 0;
+  min-width: 0;
+  flex-shrink: 0;
+  box-sizing: border-box;
 }
 .frp-dlg .frp-cs-notes {
   width: 100%;
@@ -229,10 +470,10 @@
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  padding: 2px 7px;
+  padding: 1px 6px;
   border-radius: 3px;
   font-family: 'Barlow Condensed', sans-serif;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   cursor: pointer;
   user-select: none;
@@ -240,11 +481,14 @@
   border: 1px solid #bbb;
   background: #eee;
   color: #888;
+  white-space: nowrap;
+  flex-shrink: 0;
+  line-height: 1.3;
 }
 .frp-dlg .frp-talent-chip .chip-cs {
   font-family: 'Oswald', sans-serif;
   font-weight: 700;
-  font-size: 11px;
+  font-size: 12px;
 }
 .frp-dlg .frp-talent-chip .chip-note {
   font-size: 10px;
@@ -281,6 +525,86 @@
   transform: translateY(-1px);
 }
 
+/* ── Situational modifier dropdown (inline in CS line) ───────────────── */
+.frp-dlg .frp-sit-select {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 11px;
+  padding: 1px 3px;
+  border: 1px solid #d0c8b8;
+  border-radius: 2px;
+  background: #fff;
+  color: var(--txt-m);
+  height: auto;
+  min-height: 0;
+  max-width: 140px;
+  flex-shrink: 1;
+  min-width: 0;
+}
+.frp-dlg .frp-sit-add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  font-size: 14px;
+  font-weight: 700;
+  border: 1px solid #66bb6a;
+  border-radius: 2px;
+  background: #e8f5e9;
+  color: #2e7d32;
+  cursor: pointer;
+  line-height: 1;
+  min-height: 0;
+  min-width: 0;
+  flex-shrink: 0;
+}
+.frp-dlg .frp-sit-add:hover { background: #c8e6c9; }
+
+/* ── Applied situational tags ────────────────────────────────────────── */
+.frp-dlg .frp-sit-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-top: 3px;
+}
+.frp-dlg .frp-sit-tags:empty { margin-top: 0; }
+.frp-dlg .frp-sit-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  line-height: 1.3;
+  background: #e3f2fd;
+  border: 1px solid #90caf9;
+  color: #1565c0;
+}
+.frp-dlg .frp-sit-tag .tag-cs {
+  font-family: 'Oswald', sans-serif;
+  font-weight: 700;
+  font-size: 12px;
+}
+.frp-dlg .frp-sit-tag .tag-x {
+  font-size: 11px;
+  cursor: pointer;
+  color: #1565c0;
+  opacity: 0.6;
+  margin-left: 1px;
+}
+.frp-dlg .frp-sit-tag .tag-x:hover { opacity: 1; }
+/* Penalty tags (negative CS) */
+.frp-dlg .frp-sit-tag.penalty {
+  background: #fff3e0;
+  border-color: #ffcc80;
+  color: #e65100;
+}
+.frp-dlg .frp-sit-tag.penalty .tag-x { color: #e65100; }
+
 /* ── Target box (inside 2col) ────────────────────────────────────────── */
 .frp-dlg .frp-target-name {
   font-family: 'Oswald', sans-serif;
@@ -307,6 +631,8 @@
   border: 1px solid #b8b8b8;
   border-radius: 2px;
   background: #fff;
+  height: auto;
+  min-height: 0;
 }
 .frp-dlg .frp-src-line {
   display: flex;
@@ -386,8 +712,9 @@
 .frp-dlg .frp-dmg-num {
   font-family: 'Oswald', sans-serif;
   font-weight: 700;
-  font-size: 18px;
+  font-size: 17px;
   color: var(--mred);
+  white-space: nowrap;
 }
 .frp-dlg .frp-dmg-label {
   font-size: 12px;
@@ -397,8 +724,9 @@
   margin-left: auto;
   font-family: 'Oswald', sans-serif;
   font-weight: 600;
-  font-size: 13px;
+  font-size: 14px;
   color: var(--txt-s);
+  white-space: nowrap;
 }
 .frp-dlg .frp-dmg-note {
   font-size: 12px;
@@ -418,7 +746,7 @@
   padding: 4px 0;
 }
 .frp-dlg .frp-opt-row label {
-  font-size: 12px;
+  font-size: 13px;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -427,7 +755,7 @@
 .frp-dlg .frp-opt-row .frp-opt-label {
   font-family: 'Oswald', sans-serif;
   font-weight: 600;
-  font-size: 12px;
+  font-size: 13px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -445,6 +773,7 @@
   font-size: 13px;
   font-weight: 600;
   box-sizing: border-box;
+  min-height: 0;
 }
 
 .frp-dlg .frp-karma-pool {
