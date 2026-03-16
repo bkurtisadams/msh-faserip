@@ -1044,15 +1044,13 @@ export class AttackAction extends BaseAction {
         const parts = [];
         const breakdown = choice.shiftBreakdown;
         
-        // Manual shift from dialog (user-entered)
-        if (breakdown?.manual && breakdown.manual !== 0) {
-          if (breakdown.csNotes) {
-            // Use csNotes as the full label (user enters "Ultimate Skill +4")
-            parts.push(breakdown.csNotes);
-          } else {
-            // No notes, just show the number
-            parts.push(`${breakdown.manual > 0 ? '+' : ''}${breakdown.manual}`);
-          }
+        // Manual shift from dialog (user-entered) + situational tags
+        if (breakdown?.csNotes) {
+          // csNotes contains the full label from sit tags (e.g., "Range 3 -2, Blindside +2")
+          parts.push(breakdown.csNotes);
+        } else if (breakdown?.manual && breakdown.manual !== 0) {
+          // No notes, just show the number
+          parts.push(`${breakdown.manual > 0 ? '+' : ''}${breakdown.manual}`);
         }
         
         // Multi-attack penalty
