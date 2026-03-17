@@ -1,4 +1,7 @@
-// scripts/modules/canvas/faserip-dot-token.js v1.8.0 - 2026-03-15
+// scripts/modules/canvas/faserip-dot-token.js v1.9.0 - 2026-03-17
+// v1.9.0: Auto-resize tokens to 0.5x0.5 on dot-mode entry, restore original size on exit.
+//         Stashes original dimensions in dotOrigSize flag. Removed Ctrl+click resize.
+//         New world setting "dotSize" (Small/Medium/Large) controls dot radius for all tokens.
 // v1.8.0: DOM portrait in #hud overlay, positioned via canvas.clientCoordinatesFromCanvas()
 //         (v13 API). Constant screen size, no rotation, tracks token drag/pan/zoom.
 //         No name label, 36px thumbnail. Hit area = full token bounds (hoverToken hook).
@@ -17,9 +20,22 @@
 
 const SCOPE = "msh-faserip";
 const DOT_FLAG = "dotMode";
+const SIZE_FLAG = "dotOrigSize"; // stashed {w,h} before dot-mode shrink
+const DOT_SIZE_SETTING = "dotSize"; // world setting: "small" | "medium" | "large"
 const HOVER_DELAY = 300; // ms before portrait appears
-const DOT_RATIO = 0.12;  // dot radius as fraction of smaller token dimension
 const PORTRAIT_SIZE = 36; // px — rendered portrait thumbnail size
+
+// Dot radius as fraction of smaller token dimension, keyed by setting
+const DOT_RATIOS = { small: 0.12, medium: 0.20, large: 0.30 };
+
+function _getDotRatio() {
+  try {
+    const size = game.settings.get(SCOPE, DOT_SIZE_SETTING);
+    return DOT_RATIOS[size] ?? DOT_RATIOS.small;
+  } catch {
+    return DOT_RATIOS.small;
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -140,13 +156,32 @@ function _onTokenPointerLeave(token) {
 }
 
 // ---------------------------------------------------------------------------
+// Auto-resize: shrink to 0.5×0.5 on dot-mode entry, restore on exit
+// ---------------------------------------------------------------------------
+
+async function _shrinkForDotMode(tokenDoc) {
+  const w = tokenDoc.width;
+  const h = tokenDoc.height;
+  if (w <= 0.5 && h <= 0.5) return; // already small
+  await tokenDoc.setFlag(SCOPE, SIZE_FLAG, { w, h });
+  await tokenDoc.update({ width: 0.5, height: 0.5 });
+}
+
+async function _restoreFromDotMode(tokenDoc) {
+  const orig = tokenDoc.getFlag(SCOPE, SIZE_FLAG);
+  if (!orig) return;
+  await tokenDoc.unsetFlag(SCOPE, SIZE_FLAG);
+  await tokenDoc.update({ width: orig.w, height: orig.h });
+}
+
+// ---------------------------------------------------------------------------
 // Drawing helpers
 // ---------------------------------------------------------------------------
 
 function _drawDot(g, token) {
   const cx = token.w / 2;
   const cy = token.h / 2;
-  const r = Math.min(token.w, token.h) * DOT_RATIO;
+  const r = Math.min(token.w, token.h) * _getDotRatio();
   const fill = _getDotColor(token);
 
   // Dark outline ring
@@ -236,11 +271,13 @@ function _refreshTokenDot(token) {
   // Hide artwork — dot replaces it visually
   if (token.mesh) token.mesh.visible = false;
 
-  // Only redraw if dot doesn't exist or size/disposition changed
+  // Only redraw if dot doesn't exist or size/disposition/dotRatio changed
+  const curRatio = _getDotRatio();
   if (token._faseripDot) {
     const g = token._faseripDot;
     if (g._faseripW === token.w && g._faseripH === token.h
-        && g._faseripDisp === token.document.disposition) {
+        && g._faseripDisp === token.document.disposition
+        && g._faseripRatio === curRatio) {
       _syncDotRotation(token);
       return;
     }
@@ -263,10 +300,11 @@ function _refreshTokenDot(token) {
   g.eventMode = "static";
   g.hitArea = new PIXI.Rectangle(0, 0, token.w, token.h);
 
-  // Cache token dimensions/disposition so we know when a full redraw is needed
+  // Cache token dimensions/disposition/ratio so we know when a full redraw is needed
   g._faseripW = token.w;
   g._faseripH = token.h;
   g._faseripDisp = token.document.disposition;
+  g._faseripRatio = curRatio;
 
   _syncDotRotation(token);
 }
@@ -302,32 +340,23 @@ function _onRenderTokenHUD(app, html, data) {
   btn.classList.add("control-icon");
   if (isDot) btn.classList.add("active");
   btn.dataset.action = "faserip-dot-toggle";
-  btn.title = isDot ? "Switch to Normal Token (Ctrl: resize)" : "Switch to Dot Display (Ctrl: resize)";
+  btn.title = isDot ? "Switch to Normal Token" : "Switch to Dot Display";
   btn.innerHTML = `<i class="fas ${isDot ? "fa-image" : "fa-circle"}"></i>`;
 
   btn.addEventListener("click", async (ev) => {
     ev.preventDefault();
     ev.stopPropagation();
 
-    // Ctrl+click: toggle token size between 1x1 and 0.5x0.5
-    if (ev.ctrlKey) {
-      const isSmall = token.document.width <= 0.5;
-      const newSize = isSmall ? 1 : 0.5;
-      await token.document.update({ width: newSize, height: newSize });
-      app.render();
-      return;
-    }
-
     // Three-state cycle: unset → dot → normal → unset
     if (current === true) {
-      // Currently forced dot → force normal
       await token.document.setFlag(SCOPE, DOT_FLAG, false);
+      await _restoreFromDotMode(token.document);
     } else if (current === false) {
-      // Currently forced normal → clear override (use scene/world)
       await token.document.unsetFlag(SCOPE, DOT_FLAG);
+      if (_isDotMode(token)) await _shrinkForDotMode(token.document);
     } else {
-      // No override → force dot
       await token.document.setFlag(SCOPE, DOT_FLAG, true);
+      await _shrinkForDotMode(token.document);
     }
     token.renderFlags.set({ refreshMesh: true });
     app.render();
@@ -345,6 +374,26 @@ function _onRenderTokenHUD(app, html, data) {
 // ---------------------------------------------------------------------------
 
 export function initDotToken() {
+  // Register dot size setting
+  game.settings.register(SCOPE, DOT_SIZE_SETTING, {
+    name: "Dot Size",
+    hint: "Controls the visual size of dots in dot mode. Affects all dot-mode tokens.",
+    scope: "world",
+    config: true,
+    type: String,
+    default: "small",
+    choices: { small: "Small", medium: "Medium", large: "Large" },
+    onChange: () => {
+      for (const token of canvas.tokens?.placeables ?? []) {
+        if (_isDotMode(token) && token._faseripDot) {
+          token._faseripDot.destroy({ children: true });
+          token._faseripDot = null;
+          token.renderFlags.set({ refreshMesh: true });
+        }
+      }
+    }
+  });
+
   const BaseToken = CONFIG.Token.objectClass;
 
   class FaseripToken extends BaseToken {
@@ -438,12 +487,17 @@ export function initDotToken() {
     }
   });
 
-  // When the scene's dot flag changes, redraw all tokens on the current scene
+  // When the scene's dot flag changes, redraw and auto-resize all tokens
   Hooks.on("updateScene", (scene, changes) => {
     if (scene.id !== canvas.scene?.id) return;
     if (changes?.flags?.[SCOPE]?.[DOT_FLAG] !== undefined
       || changes?.flags?.[SCOPE]?.[`-=${DOT_FLAG}`] !== undefined) {
       for (const token of canvas.tokens?.placeables ?? []) {
+        const perToken = token.document.getFlag(SCOPE, DOT_FLAG);
+        if (perToken === null || perToken === undefined) {
+          if (_isDotMode(token)) _shrinkForDotMode(token.document);
+          else _restoreFromDotMode(token.document);
+        }
         token.renderFlags.set({ refreshMesh: true });
       }
     }
