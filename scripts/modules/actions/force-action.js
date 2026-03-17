@@ -458,7 +458,12 @@ export class ForceAction extends RangedAttackAction {
                 if (talent) activeChips[talent] = (activeChips[talent] || '') + ',flag';
               });
 
-              // Save settings
+              // Save settings — strip sit tags + range (NOT talent chips) so remembered CS = manual + talents
+              let sitTagCS = 0;
+              html.find('.frp-sit-tag').each(function() {
+                sitTagCS += parseInt($(this).data('cs')) || 0;
+              });
+              const baseShift = shift - sitTagCS;
               if (rememberSettings) {
                 await actor.setFlag("msh-faserip", "lastForceAdHoc", useAdHoc);
                 await actor.setFlag("msh-faserip", "lastForceAdHocName", powerName);
@@ -467,8 +472,8 @@ export class ForceAction extends RangedAttackAction {
                 await actor.setFlag("msh-faserip", "lastForceItemId", powerId || "");
                 await actor.setFlag("msh-faserip", "lastForceRange", range);
                 await actor.setFlag("msh-faserip", "lastForceUsePowerToHit", usePowerToHit);
-                await actor.setFlag("msh-faserip", "lastForceShift", shift);
-                await actor.setFlag("msh-faserip", "cs_force", shift);
+                await actor.setFlag("msh-faserip", "lastForceShift", baseShift);
+                await actor.setFlag("msh-faserip", "cs_force", baseShift);
                 await actor.setFlag("msh-faserip", "lastForceMultiAdjacent", multiAdjacent);
                 await actor.setFlag("msh-faserip", "lastForcePullEnabled", pullEnabled);
                 await actor.setFlag("msh-faserip", "lastForcePulledDamage", pulledDamage);

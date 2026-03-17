@@ -463,10 +463,16 @@ export class EdgedAttackAction extends AttackAction {
             }
 
             // Persist actor flags if remembering
+            // Strip sit tags (NOT talent chips) so remembered CS = manual + talents
+            let sitTagCS = 0;
+            html.find('.frp-sit-tag').each(function() {
+              sitTagCS += parseInt($(this).data('cs')) || 0;
+            });
+            const baseShift = shift - sitTagCS;
             if (rememberSettings) {
               await actor.setFlag("msh-faserip", "lastEdgedSource", src);
-              await actor.setFlag("msh-faserip", "lastEdgedShift", shift);
-              await actor.setFlag("msh-faserip", "cs_edged-attack", shift);
+              await actor.setFlag("msh-faserip", "lastEdgedShift", baseShift);
+              await actor.setFlag("msh-faserip", "cs_edged-attack", baseShift);
               await actor.setFlag("msh-faserip", "lastEdgedKarma", karma);
               await actor.setFlag("msh-faserip", "karma_edged-attack", karma);
               await actor.setFlag("msh-faserip", "lastEdgedMultiAttacks", multiAttacks);

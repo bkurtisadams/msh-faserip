@@ -495,13 +495,19 @@ export class BluntAttackAction extends AttackAction {
             }
 
             // Persist actor flags if remembering
+            // Strip sit tags (NOT talent chips) so remembered CS = manual + talents
+            let sitTagCS = 0;
+            html.find('.frp-sit-tag').each(function() {
+              sitTagCS += parseInt($(this).data('cs')) || 0;
+            });
+            const baseShift = shift - sitTagCS;
             if (rememberSettings) {
               await actor.setFlag("msh-faserip", "lastBluntSource", src);
               await actor.setFlag("msh-faserip", "lastBluntPullEnabled", pullEnabled);
               await actor.setFlag("msh-faserip", "lastBluntPulledDamage", pulledDamage);
               await actor.setFlag("msh-faserip", "lastBluntResultCap", resultCap);
-              await actor.setFlag("msh-faserip", "lastBluntShift", shift);
-              await actor.setFlag("msh-faserip", "cs_blunt-attack", shift);
+              await actor.setFlag("msh-faserip", "lastBluntShift", baseShift);
+              await actor.setFlag("msh-faserip", "cs_blunt-attack", baseShift);
               await actor.setFlag("msh-faserip", "lastBluntKarma", karma);
               await actor.setFlag("msh-faserip", "karma_blunt-attack", karma);
               await actor.setFlag("msh-faserip", "lastBluntMultiAttacks", multiAttacks);

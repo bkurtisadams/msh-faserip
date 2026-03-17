@@ -449,12 +449,17 @@ export class EnergyAction extends RangedAttackAction {
                 if (talent) activeChips[talent] = (activeChips[talent] || '') + ',flag';
               });
 
-              // Save settings
+              // Save settings — strip sit tags + range (NOT talent chips) so remembered CS = manual + talents
+              let sitTagCS = 0;
+              html.find('.frp-sit-tag').each(function() {
+                sitTagCS += parseInt($(this).data('cs')) || 0;
+              });
+              const baseShift = shift - sitTagCS;
               if (rememberSettings) {
                 await actor.setFlag("msh-faserip", "lastEnergyAdHoc", useAdHoc);
                 await actor.setFlag("msh-faserip", "lastEnergyUsePowerToHit", usePowerToHit);
-                await actor.setFlag("msh-faserip", "lastEnergyShift", shift);
-                await actor.setFlag("msh-faserip", "cs_energy", shift);
+                await actor.setFlag("msh-faserip", "lastEnergyShift", baseShift);
+                await actor.setFlag("msh-faserip", "cs_energy", baseShift);
                 await actor.setFlag("msh-faserip", "lastEnergyMultiAdjacent", multiAdjacent);
                 await actor.setFlag("msh-faserip", "lastEnergyAdHocName", powerName);
                 await actor.setFlag("msh-faserip", "lastEnergyAdHocDamage", powerDamage);
