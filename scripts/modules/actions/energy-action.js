@@ -1,4 +1,6 @@
-// scripts/modules/actions/energy-action.js v3.0.1 - 2026-03-16
+// scripts/modules/actions/energy-action.js v3.0.2 - 2026-03-16
+// v3.0.2: Move obstacle from range box checkbox to situational dropdown (matches shooting)
+//         Remove throughObstacle/obstacleModifier from resolve path
 // v3.0.1: Move target movement from range box to situational dropdown (matches shooting)
 //         Remove movementModifier from resolve path — baked into CS via sit tags
 // v3.0.0: Port to v3 compact dialog layout matching blunt/edged/shooting
@@ -106,7 +108,6 @@ export class EnergyAction extends RangedAttackAction {
 
     const savedItemId = passedItemId || (shouldRemember ? (await actor.getFlag("msh-faserip", "lastEnergyItemId") || "") : "");
     const savedRange = shouldRemember ? (await actor.getFlag("msh-faserip", "lastEnergyRange") || 1) : 1;
-    const savedObstacle = shouldRemember ? (await actor.getFlag("msh-faserip", "lastEnergyObstacle") || false) : false;
 
     let savedAdHoc = passedItem ? false : (shouldRemember ? (await actor.getFlag("msh-faserip", "lastEnergyAdHoc") || (!energyItems.length)) : (!energyItems.length));
     let savedAdHocName = shouldRemember ? (await actor.getFlag("msh-faserip", "lastEnergyAdHocName") || "Energy Blast") : "Energy Blast";
@@ -253,6 +254,7 @@ export class EnergyAction extends RangedAttackAction {
               <option value="1" data-label="Higher Ground" title="Elevated position">Higher Ground +1CS</option>
             </optgroup>
             <optgroup label="Penalties">
+              <option value="-2" data-label="Obstacle" title="Through window, curtain, etc.">Through Obstacle -2CS</option>
               <option value="-2" data-label="Shielding" title="Target using cover">Shielding -2CS</option>
               <option value="-2" data-label="Impaired" title="Lost Endurance ranks">Impaired -2CS</option>
             </optgroup>
@@ -304,7 +306,6 @@ export class EnergyAction extends RangedAttackAction {
           <span style="font-family:'Oswald',sans-serif;font-size:10px;color:#1565c0;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;">Range</span>
           <input type="number" name="range" value="${savedRange}" min="0" class="frp-pull-input" style="width:36px;">
           <span style="color:#777;">areas</span>
-          <label style="cursor:pointer;font-size:11px;"><input type="checkbox" name="throughObstacle" ${savedObstacle ? 'checked' : ''}> Obstacle (-2CS)</label>
           <span style="color:#999;font-size:11px;margin-left:auto;" id="range-hint"></span>
         </div>
       </div>
@@ -406,7 +407,6 @@ export class EnergyAction extends RangedAttackAction {
               const usePowerToHit = !!html.find('.frp-talent-chip[data-flag="use-power-rank"].active-flag').length;
 
               const range = Number($dlg('[name="range"]').val() || 1);
-              const throughObstacle = !!$dlg('[name="throughObstacle"]').is(':checked');
 
               const multiAdjacent = !!$dlg('#multi-enabled').is(':checked');
 
@@ -457,7 +457,6 @@ export class EnergyAction extends RangedAttackAction {
                 await actor.setFlag("msh-faserip", "lastEnergyAdHocRank", powerRank);
                 await actor.setFlag("msh-faserip", "lastEnergyItemId", powerId || "");
                 await actor.setFlag("msh-faserip", "lastEnergyRange", range);
-                await actor.setFlag("msh-faserip", "lastEnergyObstacle", throughObstacle);
                 await actor.setFlag("msh-faserip", "lastEnergyReduceDamage", reduceDamageEnabled);
                 await actor.setFlag("msh-faserip", "lastEnergyReducedAmount", reducedDamage);
                 await actor.setFlag("msh-faserip", "lastEnergyResultCap", resultCap);
@@ -465,9 +464,9 @@ export class EnergyAction extends RangedAttackAction {
               }
               await actor.setFlag("msh-faserip", "csNotes", csNotes);
 
-              // Range & obstacle modifiers
-              const { totalShift, impossible, rangeModifier, obstacleModifier } =
-                this._applyRangeModifiers(shift, range, throughObstacle, null, powerRank, null);
+              // Range modifiers (obstacle now handled via sit tags)
+              const { totalShift, impossible, rangeModifier } =
+                this._applyRangeModifiers(shift, range, false, null, powerRank, null);
 
               if (impossible) {
                 ui.notifications.error(`Target is beyond energy range (rank: ${powerRank}).`);
@@ -477,9 +476,9 @@ export class EnergyAction extends RangedAttackAction {
               resolve({
                 powerName, powerDamage, powerRank, powerId, prettyRange,
                 useAdHoc,
-                shift, karma, spendKarma, range, throughObstacle, skipDice, usePowerToHit,
+                shift, karma, spendKarma, range, skipDice, usePowerToHit,
                 totalShift,
-                rangeModifier, obstacleModifier,
+                rangeModifier,
                 powerDamageType, multiAdjacent,
                 reduceDamageEnabled, reducedDamage, resultCap,
                 csNotes, talentFlags
@@ -734,7 +733,6 @@ export class EnergyAction extends RangedAttackAction {
     const shiftBreakdown = {
       manual: choice.shift || 0,
       range: choice.rangeModifier || 0,
-      obstacle: choice.obstacleModifier || 0,
       csNotes: choice.csNotes || ""
     };
     if (choice.multiAdjacent) shiftBreakdown.adjacent = -4;
