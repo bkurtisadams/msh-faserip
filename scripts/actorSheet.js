@@ -704,7 +704,7 @@ export class FaseripActorSheet extends ActorSheet {
       const karmaDelta = effectiveKarma - baseKarma;
 
       const karmaSection = html.find('.sec-col.karma');
-      const karmaMaxInput = karmaSection.find('input[name="system.attributes.karma.max"]');
+      const karmaMaxInput = karmaSection.find('input[data-field="karma-max"]');
       const boostStyle = "background: #e3f2fd !important; border-color: #1565c0 !important; color: #1565c0 !important; font-weight: bold !important;";
       const penaltyStyle = "background: #fff3e0 !important; border-color: #ef6c00 !important; color: #ef6c00 !important; font-weight: bold !important;";
 

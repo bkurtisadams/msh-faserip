@@ -1,4 +1,5 @@
-// actor.js v1.2.1 - 2025-01-18
+// actor.js v1.3.0 - 2026-03-17
+// v1.3.0: Fix karma display — max = R+I+P (computed), value = available lifetime karma (derived)
 // v1.2.1: Remove dead disposition code (now handled in preCreateActor hook)
 // v1.2.0: Remove daily karma system - karma now uses lifetime only
 // v1.1.0: Initialize combatMods in prepareBaseData before Active Effects are applied
@@ -75,8 +76,10 @@ export class FaseripActor extends Actor {
     const karmaPool = system.karma.pool || 0;
     const availableLifetimeKarma = Math.max(0, system.karma.lifetime - lifetimeSpent - advancementFund - karmaPool);
 
-    // Set the attributes.karma.value to R+I+P (karmaMax) for display
-    system.attributes.karma.value = karmaMax;
+    // karma.max = R+I+P (base starting karma, for reference display)
+    // karma.value is persisted in DB — managed by karma.js, combat-handler, rolls.js, etc.
+    // Do NOT overwrite it here.
+    system.attributes.karma.max = karmaMax;
 
     // Store available lifetime karma separately for other uses
     system.karma.availableLifetime = availableLifetimeKarma;
