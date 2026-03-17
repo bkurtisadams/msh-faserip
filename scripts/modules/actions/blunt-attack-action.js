@@ -1,6 +1,7 @@
-// blunt-attack-action.js v3.3.0 - 2026-03-17
-// v3.3.0: Compact single-row footer — inline Roll/Cancel buttons in frp-foot,
-//         remove Foundry native dialog buttons, wire custom handlers
+// blunt-attack-action.js v3.4.0 - 2026-03-17
+// v3.4.0: Use shared cs-modifiers.js — detectModifiers + buildCSRow + wireCSPanel.
+//         Eliminates inline talent detection, chip HTML, sit tag handlers.
+//         All modifiers in one Mods dropdown panel.
 // v3.2.0: Move mode buttons to titlebar (injected during render), remove target/mode row,
 //         narrow dialog to 360px
 // v2.1.2: Simplify chip logic — one chip per talent, Ultimate replaces normal when
@@ -60,6 +61,7 @@ import { buildColorOutcome } from "../dice/color-results.js";
 import { applyColumnShifts } from "../dice/column-shifts.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
 import { RANK_ABBR } from "../../rules/rules-reference.js";
+import { detectModifiers, buildCSRow, wireCSPanel } from "./cs-modifiers.js";
 // NOTE: resolveCombatMode not imported here to avoid circular dependency
 
 
@@ -74,42 +76,8 @@ export class BluntAttackAction extends AttackAction {
     const strength = getStrengthInfo(actor);
     let attackItems = actor.items.filter(isBluntCapable);
 
-    // Detect combat talents that affect Fighting/blunt attacks
-    const combatTalents = [];
-    for (const item of actor.items) {
-      if (item.type !== "talent") continue;
-      const name = (item.name || "").toLowerCase();
-      const rankOverride = item.system?.rankOverride || "";
-      
-      // Determine if this talent has an Ultimate Skill override
-      // rankOverride set on the talent item means "use this rank instead of base + bonus"
-      let ultimateCS = 0;
-      if (rankOverride) {
-        const baseIdx = RANKS.indexOf(ability.rank);
-        const overIdx = RANKS.indexOf(rankOverride);
-        if (baseIdx >= 0 && overIdx >= 0) ultimateCS = overIdx - baseIdx;
-      }
-
-      if (name.includes("martial arts b") || name.includes("martial arts-b") || 
-          (name.includes("martial arts") && name.includes("(b)"))) {
-        combatTalents.push({ name: "MA-B", cs: 1, flag: null, note: "+1 CS", ultimateCS, rankOverride });
-      }
-      else if (name.includes("boxing")) {
-        combatTalents.push({ name: "Boxing", cs: 1, flag: null, note: "+1 CS", ultimateCS, rankOverride });
-      }
-      else if (name.includes("martial arts a") || name.includes("martial arts-a") ||
-               (name.includes("martial arts") && name.includes("(a)"))) {
-        combatTalents.push({ name: "MA-A", cs: 0, flag: "ignore-str-end", note: "ignore Str/End", ultimateCS, rankOverride });
-      }
-      else if (name.includes("martial arts d") || name.includes("martial arts-d") ||
-               (name.includes("martial arts") && name.includes("(d)"))) {
-        combatTalents.push({ name: "MA-D", cs: 0, flag: "ignore-armor-fx", note: "ignore armor (fx)", ultimateCS, rankOverride });
-      }
-      else if (name.includes("martial arts e") || name.includes("martial arts-e") ||
-               (name.includes("martial arts") && name.includes("(e)"))) {
-        combatTalents.push({ name: "MA-E", cs: 0, flag: "initiative", note: "+1 Initiative", ultimateCS, rankOverride });
-      }
-    }
+    // Detect combat talents via shared utility
+    const mods = detectModifiers("blunt-attack", actor, ability);
 
     // If a specific item was passed via opts, ensure it's in the list and pre-selected
     const passedItemId = this.opts?.itemId || this.opts?.item?.id || null;
@@ -148,7 +116,7 @@ export class BluntAttackAction extends AttackAction {
     const savedAttackCount = shouldRemember ? (await actor.getFlag("msh-faserip","lastBluntAttackCount") || 2) : 2;
     const savedMultiAdjacent = shouldRemember ? (await actor.getFlag("msh-faserip","lastBluntMultiAdjacent") || false) : false;
     const savedColumnShift  = shouldRemember ? (await actor.getFlag("msh-faserip","lastBluntShift") || 0) : 0;
-    const savedActiveChips  = shouldRemember ? (await actor.getFlag("msh-faserip","lastBluntActiveChips") || {}) : {};
+    const savedCheckedMods  = shouldRemember ? (await actor.getFlag("msh-faserip","lastBluntCheckedMods") || []) : [];
     
     const savedSkipDice = localStorage.getItem(lsSkipKey) === "1";
 
@@ -206,37 +174,15 @@ export class BluntAttackAction extends AttackAction {
 
     const savedCsNotes = (await actor.getFlag("msh-faserip", "csNotes")) || "";
 
-    // CS display classes
-    const csInputCls = savedColumnShift > 0 ? ' pos' : savedColumnShift < 0 ? ' neg' : '';
-    const csRankStyle = savedColumnShift > 0 ? 'color:#2e7d32;' : savedColumnShift < 0 ? 'color:#c62828;' : '';
+    const abilityShort = RANK_ABBR[ability.rank] || ability.rank;
 
-    // Build talent chips HTML (inline, no wrapper — goes directly inside frp-cs-line)
-    const talentChipsHtml = combatTalents.map(t => {
-      const savedState = savedActiveChips[t.name] || '';
-      const flagActive = savedState.includes('flag');
-
-      // CS-granting chip: either Ultimate override or normal bonus (never both)
-      if (t.rankOverride && t.ultimateCS > 0) {
-        const shortRank = RANK_ABBR[t.rankOverride] || t.rankOverride;
-        const ultActive = savedState === 'ultimate';
-        return `<span class="frp-talent-chip${ultActive ? ' active-ultimate' : ''}" data-cs="${t.ultimateCS}" data-talent="${t.name}" data-ultimate="1">
-          ★ ${t.name} <span class="chip-cs">&rarr;${shortRank}</span>
-        </span>`;
-      }
-      if (t.cs > 0) {
-        const csActive = savedState === 'cs';
-        return `<span class="frp-talent-chip${csActive ? ' active-cs' : ''}" data-cs="${t.cs}" data-talent="${t.name}">
-          ${t.name} <span class="chip-cs">+${t.cs}</span>
-        </span>`;
-      }
-      // Flag-only chip
-      if (t.flag) {
-        return `<span class="frp-talent-chip${flagActive ? ' active-flag' : ''}" data-flag="${t.flag}" data-talent="${t.name}">
-          ${t.name} <span class="chip-note">${t.note}</span>
-        </span>`;
-      }
-      return '';
-    }).join('');
+    // Build CS row via shared utility
+    const csRowHtml = buildCSRow({
+      mods,
+      savedManualCS: savedColumnShift,
+      savedChecked: savedCheckedMods,
+      abilityRank: ability.rank
+    });
 
     // Object material rank options
     const rankOpts = ["Feeble","Poor","Typical","Good","Excellent","Remarkable","Incredible","Amazing","Monstrous","Unearthly"]
@@ -264,8 +210,6 @@ export class BluntAttackAction extends AttackAction {
     if (savedSource === "weapon" && savedItemId) initDamageSrcVal = `weapon:${savedItemId}`;
     else if (savedSource === "object") initDamageSrcVal = "object";
 
-    const abilityShort = RANK_ABBR[ability.rank] || ability.rank;
-
     // ── Dialog HTML — v3 Ultra Compact Layout ──
     const multiEnabled = savedMultiAttacks || savedMultiAdjacent;
     const dialogHtml = `
@@ -285,42 +229,8 @@ export class BluntAttackAction extends AttackAction {
           : ''}
       </div>
 
-      <!-- CS box: chips + situational dropdown all in one flowing line -->
-      <div class="frp-box frp-cs-box">
-        <div class="frp-cs-line">
-          <span class="frp-cs-label">CS</span>
-          <input type="number" class="frp-cs-input${csInputCls}" name="shift" value="${savedColumnShift}" id="cs-blunt">
-          <span class="frp-cs-arrow">&rarr;</span>
-          <span class="frp-cs-rank" id="rank-blunt" style="${csRankStyle}">${shiftRank(ability.rank, savedColumnShift)}</span>
-          <button type="button" class="frp-cs-reset" style="visibility:${savedColumnShift !== 0 ? 'visible' : 'hidden'}">&times;</button>
-          ${combatTalents.length > 0 ? '<span class="chip-sep"></span>' : ''}
-          ${talentChipsHtml}
-          <span class="chip-sep"></span>
-          <select class="frp-sit-select" id="sit-select">
-            <option value="">+ situational&hellip;</option>
-            <optgroup label="Bonuses">
-              <option value="2" data-label="Blindside" title="Target unaware, from behind, distracted, or attacker playing possum">Blindside +2CS</option>
-              <option value="1" data-label="Ambush" title="Pre-set position, triggers when target enters area">Ambush +1CS</option>
-              <option value="1" data-label="Double Team" title="Ally has Hold on target, second attacker gets bonus">Double Team +1CS</option>
-              <option value="1" data-label="Combined" title="Two attackers within 1 rank damage, lower makes Agi FEAT">Combined Atk +1CS</option>
-              <option value="1" data-label="Higher Ground" title="Judge discretion — elevated position, terrain advantage">Higher Ground +1CS</option>
-            </optgroup>
-            <optgroup label="Penalties">
-              <option value="-2" data-label="Shielding" title="Using object as cover, -2CS all FEATs unless common item">Shielding -2CS</option>
-              <option value="-2" data-label="Impaired" title="Lost Endurance ranks, -2CS all actions until healed">Impaired -2CS</option>
-            </optgroup>
-            <optgroup label="Target Size">
-              <option value="1" data-label="Growth +1" title="Target is 12-18ft tall">Growth 12-18ft +1CS</option>
-              <option value="2" data-label="Growth +2" title="Target is 18-22ft tall">Growth 18-22ft +2CS</option>
-              <option value="3" data-label="Growth +3" title="Target is over 22ft tall">Growth 22ft+ +3CS</option>
-              <option value="-1" data-label="Shrink -1" title="Target shrunk to ~1 inch">Shrunk 1&Prime; -1CS</option>
-              <option value="-2" data-label="Shrink -2" title="Target shrunk to ~&frac14; inch">Shrunk &frac14;&Prime; -2CS</option>
-              <option value="-3" data-label="Shrink -3" title="Target smaller than &frac14; inch">Shrunk smaller -3CS</option>
-            </optgroup>
-          </select>
-        </div>
-        <div class="frp-sit-tags" id="sit-tags"></div>
-      </div>
+      <!-- CS row with Mods dropdown (from shared utility) -->
+      ${csRowHtml}
 
       <!-- Damage: select + numbers inline -->
       <div class="frp-box frp-dmg-box">
@@ -395,6 +305,7 @@ export class BluntAttackAction extends AttackAction {
 
     const choice = await new Promise((resolve) => {
       let _resolved = false;
+      let _csState = null;
       const dlg = new Dialog({
         title: actionName,
         content: dialogHtml,
@@ -403,42 +314,42 @@ export class BluntAttackAction extends AttackAction {
           setupKarmaControlHandlers(html);
           const $dialog = html.closest('.dialog');
 
-          // Hide Foundry's native button row
           $dialog.find('.dialog-buttons').hide();
           
-          // Inject mode buttons into the titlebar
           const $titlebar = $dialog.find('.window-title, .dialog-title').first();
           if ($titlebar.length) {
             const modeHtml = buildModeSelector({ mode: "semi" });
             const $modeWrap = $('<span class="frp-titlebar-mode"></span>').append(modeHtml);
             $titlebar.after($modeWrap);
           }
-          // Setup mode selector on the full dialog (buttons are now in titlebar)
           await setupModeSelector(actor, $dialog, this.opts || {}, "lastBluntMode");
 
-          // Set dialog width
           if ($dialog.length) {
             $dialog.css('width', '360px');
             $dialog[0].style.height = 'auto';
           }
 
+          const setLS = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
+
+          // ── Wire CS panel from shared utility ──
+          _csState = wireCSPanel(html, {
+            abilityRank: ability.rank,
+            onUpdate: () => {
+              if ($dialog.length) $dialog[0].style.height = 'auto';
+            }
+          });
+
           // ── Roll button handler ──
           html.find('#frp-roll').on('click', async () => {
-            const $content = $(html).find(".dialog-content").first();
             const $dlg = (sel) => html.find(sel);
 
-            const rememberSettings = $content.find("#msh-remember-settings").length
-              ? $content.find("#msh-remember-settings").prop("checked")
-              : !!$dlg('[name="remember"]').is(':checked');
-
-            const skipDice = $content.find("#msh-skip-dice").length
-              ? $content.find("#msh-skip-dice").prop("checked")
-              : !!$dlg('[name="skipDice"]').is(':checked');
+            const rememberSettings = !!$dlg('#msh-remember-settings').is(':checked');
+            const skipDice = !!$dlg('#msh-skip-dice').is(':checked');
 
             try {
               localStorage.setItem(lsRememberKey, rememberSettings ? "1" : "0");
               localStorage.setItem(lsSkipKey, skipDice ? "1" : "0");
-            } catch (e) { /* ignore */ }
+            } catch (e) {}
 
             // Parse unified damage source select
             const damageSourceVal = $dlg('#damage-source-select').val() || "hands";
@@ -456,7 +367,6 @@ export class BluntAttackAction extends AttackAction {
             const objectName   = $dlg('[name="objectName"]').val() || "";
             const objectRank   = $dlg('[name="objectRank"]').val() || "Excellent";
             const objectValue  = parseInt($dlg('[name="objectValue"]').val() || 20);
-            const shift        = parseInt($dlg('[name="shift"]').val() || 0);
             const { spendKarma, karmaToSpend } = extractKarmaFromDialog(html);
             const karma        = karmaToSpend;
             
@@ -470,33 +380,8 @@ export class BluntAttackAction extends AttackAction {
             const multiAttacks  = multiEnabled && !multiAdjacent;
             const attackCount   = multiCountVal === "3" ? 3 : 2;
 
-            // Build csNotes automatically from active situational tags
-            const sitParts = [];
-            html.find('.frp-sit-tag').each(function() {
-              const label = $(this).data('label') || '';
-              const cs = parseInt($(this).data('cs')) || 0;
-              if (label) sitParts.push(`${label} ${cs > 0 ? '+' : ''}${cs}`);
-            });
-            const csNotes = sitParts.join(', ');
-
-            // Collect active talent flags
-            const talentFlags = {};
-            html.find('.frp-talent-chip.active-flag').each(function() {
-              const flag = $(this).data('flag');
-              if (flag) talentFlags[flag] = true;
-            });
-
-            // Collect active chip states for persistence
-            const activeChips = {};
-            html.find('.frp-talent-chip.active-cs, .frp-talent-chip.active-ultimate').each(function() {
-              const talent = $(this).data('talent');
-              const isUlt = !!$(this).data('ultimate');
-              if (talent) activeChips[talent] = isUlt ? 'ultimate' : 'cs';
-            });
-            html.find('.frp-talent-chip.active-flag').each(function() {
-              const talent = $(this).data('talent');
-              if (talent) activeChips[talent] = (activeChips[talent] || '') + ',flag';
-            });
+            // Get CS state from shared utility
+            const cs = _csState.get();
 
             // Compute damage and notes
             let weaponMat = "", weaponName = "", damage = strength.value, note = "";
@@ -522,30 +407,23 @@ export class BluntAttackAction extends AttackAction {
               note   = "Bare Hands = Strength";
             }
 
-            // Persist actor flags if remembering
-            // Strip sit tags (NOT talent chips) so remembered CS = manual + talents
-            let sitTagCS = 0;
-            html.find('.frp-sit-tag').each(function() {
-              sitTagCS += parseInt($(this).data('cs')) || 0;
-            });
-            const baseShift = shift - sitTagCS;
+            // Save settings
             if (rememberSettings) {
               await actor.setFlag("msh-faserip", "lastBluntSource", src);
               await actor.setFlag("msh-faserip", "lastBluntPullEnabled", pullEnabled);
               await actor.setFlag("msh-faserip", "lastBluntPulledDamage", pulledDamage);
               await actor.setFlag("msh-faserip", "lastBluntResultCap", resultCap);
-              await actor.setFlag("msh-faserip", "lastBluntShift", baseShift);
-              await actor.setFlag("msh-faserip", "cs_blunt-attack", baseShift);
+              await actor.setFlag("msh-faserip", "lastBluntShift", cs.manualCS);
+              await actor.setFlag("msh-faserip", "cs_blunt-attack", cs.manualCS);
               await actor.setFlag("msh-faserip", "lastBluntKarma", karma);
               await actor.setFlag("msh-faserip", "karma_blunt-attack", karma);
               await actor.setFlag("msh-faserip", "lastBluntMultiAttacks", multiAttacks);
               await actor.setFlag("msh-faserip", "lastBluntAttackCount", attackCount);
               await actor.setFlag("msh-faserip", "lastBluntMultiAdjacent", multiAdjacent);
-              await actor.setFlag("msh-faserip", "lastBluntActiveChips", activeChips);
+              await actor.setFlag("msh-faserip", "lastBluntCheckedMods", cs.checkedKeys);
 
               if (src === "weapon") {
                 await actor.setFlag("msh-faserip", "lastBluntItemId", itemId);
-                await actor.setFlag("msh-faserip", "lastBluntColumnShift", shift); 
               } else if (src === "object") {
                 await actor.setFlag("msh-faserip", "lastBluntObjectName", objectName);
                 await actor.setFlag("msh-faserip", "lastBluntObjectRank", objectRank);
@@ -553,13 +431,15 @@ export class BluntAttackAction extends AttackAction {
               }
             }
             
-            await actor.setFlag("msh-faserip", "csNotes", csNotes);
+            await actor.setFlag("msh-faserip", "csNotes", cs.csNotes);
 
             _resolved = true;
             resolve({
-              src, itemId, objectName, objectRank, objectValue, shift, karma, spendKarma,
+              src, itemId, objectName, objectRank, objectValue,
+              shift: cs.totalShift, karma, spendKarma,
               pulledDamage, resultCap, skipDice, weaponMat, weaponName, damage, note,
-              multiAttacks, attackCount, multiAdjacent, csNotes, talentFlags
+              multiAttacks, attackCount, multiAdjacent,
+              csNotes: cs.csNotes, talentFlags: cs.talentFlags
             });
             dlg.close();
           });
@@ -571,42 +451,11 @@ export class BluntAttackAction extends AttackAction {
             dlg.close();
           });
 
-          const getLS = (k, d=null) => {
-            try { const v = localStorage.getItem(k); return v === null ? d : v; } catch { return d; }
-          };
-          const setLS = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
-
-          // ── Talent chip click handler ──
-          html.find('.frp-talent-chip').on('click', function() {
-            const $chip = $(this);
-            const cs = parseInt($chip.data('cs')) || 0;
-            const flag = $chip.data('flag') || null;
-            const isUltimate = !!$chip.data('ultimate');
-            const $csInput = html.find('[name="shift"]');
-
-            if (cs > 0) {
-              const wasActive = $chip.hasClass('active-cs') || $chip.hasClass('active-ultimate');
-              const activeClass = isUltimate ? 'active-ultimate' : 'active-cs';
-
-              if (wasActive) {
-                $chip.removeClass('active-cs active-ultimate');
-                $csInput.val(parseInt($csInput.val()) - cs);
-              } else {
-                $chip.addClass(activeClass);
-                $csInput.val(parseInt($csInput.val()) + cs);
-              }
-              $csInput.trigger('change');
-            } else if (flag) {
-              $chip.toggleClass('active-flag');
-            }
-          });
-
-          // ── Main update function ──
+          // ── Main update function (damage only — CS handled by csState) ──
           const update = () => {
             const damageSourceVal = html.find('#damage-source-select').val() || "hands";
             const $objectRow = html.find('#object-row');
             const $val  = html.find('#dmg-val');
-            const $note = html.find('#dmg-note');
             const $afterArmor = html.find('#after-armor-display');
             const $pulledDamage = html.find('[name="pulledDamage"]');
 
@@ -646,35 +495,12 @@ export class BluntAttackAction extends AttackAction {
             }
 
             $val.text(currentDamage);
-            $note.text("raw");
 
             const afterArmorDmg = Math.max(0, currentDamage - targetArmor);
             if (primaryTarget) {
               $afterArmor.text(`${afterArmorDmg} after armor`);
             } else {
               $afterArmor.text(`${currentDamage} damage`);
-            }
-
-            // CS display update
-            const cs = parseInt(html.find('[name="shift"]').val()) || 0;
-            const shiftedRankText = shiftRank(ability.rank, cs);
-            const $shiftedRank = html.find('#rank-blunt');
-            const $csInput = html.find('.frp-cs-input');
-            $shiftedRank.text(shiftedRankText);
-            
-            const $resetBtn = html.find('.frp-cs-reset');
-            $csInput.removeClass('pos neg');
-            if (cs > 0) {
-              $csInput.addClass('pos');
-              $shiftedRank.css('color', '#2e7d32');
-              $resetBtn.css('visibility', 'visible');
-            } else if (cs < 0) {
-              $csInput.addClass('neg');
-              $shiftedRank.css('color', '#c62828');
-              $resetBtn.css('visibility', 'visible');
-            } else {
-              $shiftedRank.css('color', '');
-              $resetBtn.css('visibility', 'hidden');
             }
 
             // Pull punch max update
@@ -689,9 +515,8 @@ export class BluntAttackAction extends AttackAction {
           
           update();
 
-          // ── Event bindings ──
+          // ── Event bindings (damage only — CS handled by csState) ──
           html.find('#damage-source-select').on('change', update);
-          html.find('[name="shift"]').on('input change', update);
           html.find('[name="objectRank"]').on('change', function() {
             const rank = $(this).val();
             const value = game.msh.getRankValue(rank) || 0;
@@ -700,54 +525,8 @@ export class BluntAttackAction extends AttackAction {
           });
           html.find('[name="objectValue"]').on('input change', update);
           html.find('[name="objectName"]').on('input', update);
-          
-          // CS reset — deactivates talent chips, ultimate chips, and removes situational tags
-          html.find('.frp-cs-reset').on('click', function(e) {
-            e.preventDefault();
-            html.find('[name="shift"]').val(0);
-            html.find('.frp-talent-chip.active-cs, .frp-talent-chip.active-ultimate').removeClass('active-cs active-ultimate');
-            html.find('#sit-tags').empty();
-            html.find('[name="shift"]').trigger('change');
-          });
 
-          // ── Situational modifier: apply on select change ──
-          html.find('#sit-select').on('change', function() {
-            const $sel = $(this);
-            const opt = $sel.find('option:selected');
-            const cs = parseInt(opt.val());
-            const label = opt.data('label') || '';
-            if (!cs || !label) return;
-
-            // Prevent duplicate
-            let exists = false;
-            html.find('.frp-sit-tag').each(function() {
-              if ($(this).data('label') === label) exists = true;
-            });
-            if (exists) { $sel.val(''); return; }
-
-            const sign = cs > 0 ? '+' : '';
-            const cls = cs < 0 ? ' penalty' : '';
-            const tag = $(`<span class="frp-sit-tag${cls}" data-cs="${cs}" data-label="${label}">
-              ${label} <span class="tag-cs">${sign}${cs}</span>
-              <span class="tag-x">&times;</span>
-            </span>`);
-            html.find('#sit-tags').append(tag);
-
-            const $csInput = html.find('[name="shift"]');
-            $csInput.val(parseInt($csInput.val()) + cs).trigger('change');
-            $sel.val('');
-          });
-
-          // ── Situational modifier: remove tag ──
-          html.find('#sit-tags').on('click', '.tag-x', function() {
-            const $tag = $(this).closest('.frp-sit-tag');
-            const cs = parseInt($tag.data('cs')) || 0;
-            const $csInput = html.find('[name="shift"]');
-            $csInput.val(parseInt($csInput.val()) - cs).trigger('change');
-            $tag.remove();
-          });
-          
-          // Pull punch toggle — enable/disable sub-controls + inactive styling
+          // Pull punch toggle
           html.find('#pull-punch-enabled').on('change', function() {
             const $row = $(this).closest('.frp-opt-row');
             const $pulledDamage = html.find('[name="pulledDamage"]');
@@ -763,14 +542,14 @@ export class BluntAttackAction extends AttackAction {
             }
           });
 
-          // Multi-attack toggle — inactive styling + disable radios
+          // Multi-attack toggle
           html.find('#multi-enabled').on('change', function() {
             const $row = $(this).closest('.frp-opt-row');
             $row.toggleClass('inactive', !this.checked);
             $row.find('[name="multiCount"]').prop('disabled', !this.checked);
           });
 
-          // Karma toggle — inactive styling
+          // Karma toggle
           html.find('#spend-karma').on('change', function() {
             $(this).closest('.frp-opt-row').toggleClass('inactive', !this.checked);
           });
@@ -785,6 +564,7 @@ export class BluntAttackAction extends AttackAction {
           });
         },
         close: () => {
+          if (_csState) _csState.destroy();
           if (!_resolved) resolve(null);
         }
       }).render(true);
