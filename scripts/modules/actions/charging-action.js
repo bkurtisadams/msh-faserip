@@ -1,4 +1,9 @@
-// scripts/modules/actions/charging-action.js v2.0.1 - 2026-03-15
+// scripts/modules/actions/charging-action.js v3.0.0 - 2026-03-17
+// v3.0.0: Port to v3 compact dialog layout matching blunt/edged/grappling
+//         - frp-dlg wrapper, frp-header-v3 banner, titlebar mode buttons, 360px
+//         - Movement box (orange), damage box (red), target type toggle (blue)
+//         - CS box with situational dropdown, sit tags auto-build csNotes
+//         - Pull/Karma in frp-opts-box, frp-fx-grid, frp-foot
 // v2.0.1: Fix damageType "physical-blunt" → "physical-charging" so blocking armor
 //         exclusion and other charging-specific rules apply correctly
 // v2.0.0: Refactor - dialog only, delegates character target resolution to _executeSingleAttack.
@@ -32,10 +37,12 @@ import {
   applyCapabilitiesToDialog,
   showDiceAnimation,
   getTargetData,
+  getBodyArmorValues,
   buildModeSelector,
   setupModeSelector,
   applyDamageToTargets
 } from "./action-utils.js";
+import { RANK_ABBR } from "../../rules/rules-reference.js";
 
 /**
  * ChargingAction - Endurance-based attack combining movement and combat
@@ -156,138 +163,173 @@ export class ChargingAction extends AttackAction {
   const setLS = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
 
   // ================================================================
-  // DIALOG
+  // DIALOG — v3 Compact Layout
   // ================================================================
+  const enduranceAbbr = RANK_ABBR[endurance.rank] || endurance.rank;
+
+  // Target info
+  const targetHealth = primaryTargetActor?.system?.attributes?.health;
+  const targetHealthStr = targetHealth ? `${targetHealth.value}/${targetHealth.max}` : "";
+  const targetBAabbr = targetBAvalue > 0 ? `BA: ${RANK_ABBR[targetBArank] || targetBArank}(${targetBAvalue})` : "BA: None";
+  const targetEffects = (primaryTargetActor?.effects?.filter(e => !e.disabled) ?? [])
+    .filter(e => {
+      const n = (e.name || e.label || '').toLowerCase();
+      return !n.includes('body armor') && !n.includes('force field');
+    });
+  const targetStatusStr = targetEffects.length > 0
+    ? targetEffects.map(e => e.name || e.label).join(", ")
+    : "";
+
   const dialogHtml = `
-    ${buildModeSelector({ mode: "semi" })}
+  <div class="frp-dlg">
 
-    <!-- Context: Target + Attack stats side by side -->
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
-      <div style="background:#f5f5f5;padding:8px;border-radius:3px;">
-        <div style="font-weight:600;color:#666;font-size:.8em;text-transform:uppercase;">Target</div>
-        <div style="font-weight:600;color:#d32f2f;">${targetDisplay || "(no target)"}</div>
-        <div style="color:#666;" id="target-armor-display">${autoPopulated && targetBAvalue > 0 ? `Body Armor: ${targetBArank} (${targetBAvalue})` : (autoPopulated ? 'No armor' : '')}</div>
+    <!-- Header: Actor (Base Endurance / Rank Value) charges Target -->
+    <div class="frp-header-v3">
+      <span class="h-actor" title="${actor.name}">${actor.name}</span>
+      <span class="h-paren">(</span>
+      <span class="h-stat">
+        <span class="h-stat-label">Base Endurance</span>
+        <span class="h-stat-rank">${enduranceAbbr} ${endurance.value}</span>
+      </span>
+      <span class="h-paren">)</span>
+      ${targetDisplay
+        ? `<span class="h-verb">charges</span><span class="h-target" title="${targetDisplay}">${targetDisplay}</span>`
+        : ''}
+    </div>
+
+    <!-- Target compact line -->
+    ${primaryTarget ? `
+    <div class="frp-target-compact">
+      <span class="t-name">${targetDisplay}</span>
+      ${targetHealthStr ? `<span class="t-hp">HP: ${targetHealthStr}</span>` : ''}
+      ${targetStatusStr ? `<span class="t-status" style="font-size:10px;color:#6a1b9a;font-style:italic;">${targetStatusStr}</span>` : ''}
+      <span class="t-armor">${targetBAabbr}</span>
+    </div>
+    ` : ''}
+
+    <!-- Movement box (orange) -->
+    <div class="frp-box" style="background:#fff3e0;border-color:#ff9800;padding:5px 10px;">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-family:'Oswald',sans-serif;font-weight:700;font-size:13px;color:#e65100;text-transform:uppercase;">Areas</span>
+        <input type="number" class="frp-cs-input" name="areas" value="${savedAreas}" min="1" max="20" style="border-color:#ff9800;">
+        <span class="frp-cs-arrow">&rarr;</span>
+        <span id="movement-bonus" style="font-family:'Oswald',sans-serif;font-weight:700;font-size:16px;color:#2e7d32;">+${initialMovementBonus} CS</span>
+        <span style="font-size:11px;color:#999;">(max +3)</span>
       </div>
-      <div style="background:#f5f5f5;padding:8px;border-radius:3px;">
-        <div style="font-weight:600;color:#666;font-size:.8em;text-transform:uppercase;">Charging</div>
-        <div style="font-weight:600;">Endurance: ${endurance.rank} (${endurance.value})</div>
-        <div style="color:#666;">Body Armor: ${bodyArmorRank} (${bodyArmorValue})</div>
-        <div style="color:#666;font-size:.85em;">Agility: ${agility.rank} (for miss recovery)</div>
+      <div style="font-size:11px;color:#777;margin-top:3px;">+1CS per area. Dmg = max(END, BA) + 2&times;areas.</div>
+    </div>
+
+    <!-- CS box -->
+    <div class="frp-box frp-cs-box">
+      <div class="frp-cs-line">
+        <span class="frp-cs-label">CS</span>
+        <input type="number" class="frp-cs-input" name="shift" value="${dialogShift}" id="cs-charging">
+        <span class="frp-cs-arrow">&rarr;</span>
+        <span class="frp-cs-rank" id="rank-charging">${shiftRank(endurance.rank, dialogShift + initialMovementBonus)}</span>
+        <button type="button" class="frp-cs-reset" style="visibility:${dialogShift !== 0 ? 'visible' : 'hidden'}">&times;</button>
+        <select class="frp-sit-select" id="sit-select">
+          <option value="">+ situational&hellip;</option>
+          <optgroup label="Bonuses">
+            <option value="2" data-label="Blindside" title="Target unaware or from behind">Blindside +2CS</option>
+            <option value="1" data-label="Higher Ground" title="Elevated position, terrain advantage">Higher Ground +1CS</option>
+          </optgroup>
+          <optgroup label="Penalties">
+            <option value="-2" data-label="Impaired" title="Lost Endurance ranks, -2CS all actions">Impaired -2CS</option>
+          </optgroup>
+          <optgroup label="Target Size">
+            <option value="1" data-label="Growth +1" title="Target 12-18ft">Growth 12-18ft +1CS</option>
+            <option value="2" data-label="Growth +2" title="Target 18-22ft">Growth 18-22ft +2CS</option>
+            <option value="3" data-label="Growth +3" title="Target 22ft+">Growth 22ft+ +3CS</option>
+            <option value="-1" data-label="Shrink -1" title="Target ~1 inch">Shrunk 1&Prime; -1CS</option>
+            <option value="-2" data-label="Shrink -2" title="Target ~1/4 inch">Shrunk &frac14;&Prime; -2CS</option>
+            <option value="-3" data-label="Shrink -3" title="Target smaller">Shrunk smaller -3CS</option>
+          </optgroup>
+        </select>
+      </div>
+      <div class="frp-sit-tags" id="sit-tags"></div>
+    </div>
+
+    <!-- Damage box (red) -->
+    <div class="frp-box frp-dmg-box" id="preview">
+      <div class="frp-dmg-inline">
+        <span class="frp-dmg-num" id="dmg-total">${initialTotalDamage}</span>
+        <span style="font-size:12px;color:#777;" id="dmg-note">${initialBaseRankValue} base + 2&times;${savedAreas} speed</span>
+        <span class="frp-dmg-after" id="after-armor-display">${primaryTarget ? `${Math.max(0, initialTotalDamage - targetBAvalue)} after armor` : `${initialTotalDamage} damage`}</span>
+      </div>
+      <div id="rebound-warning" style="display:none;margin-top:4px;padding:4px 6px;background:#fff;border:1px solid #f44336;border-radius:3px;font-size:11px;color:#d32f2f;font-weight:600;">
+        Target defense &gt; damage &mdash; rebounds to you!
       </div>
     </div>
 
-    <!-- Movement Row -->
-    <div class="movement-section" style="padding:8px;background:#fff3e0;border:1px solid #ff9800;border-radius:3px;margin-bottom:8px;">
-      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-        <label style="font-weight:600;color:#e65100;">Areas:</label>
-        <input type="number" name="areas" value="${savedAreas}" min="1" max="20" style="width:50px;padding:3px;text-align:center;">
-        <span style="color:#666;">→</span>
-        <strong id="movement-bonus" style="color:#2e7d32;">+${initialMovementBonus} CS</strong>
-        <span style="color:#999;font-size:.85em;">(max +3)</span>
+    <!-- Target type toggle (blue) -->
+    <div class="frp-box" style="background:#f0f4ff;border-color:#90caf9;padding:4px 10px;">
+      <div style="display:flex;align-items:center;gap:8px;font-size:13px;">
+        <span style="font-family:'Oswald',sans-serif;font-weight:600;font-size:13px;color:#1565c0;text-transform:uppercase;">Target</span>
+        <label style="cursor:pointer;display:flex;align-items:center;gap:3px;"><input type="radio" name="targetType" value="character" ${savedTargetType === 'character' ? 'checked' : ''}> Character</label>
+        <label style="cursor:pointer;display:flex;align-items:center;gap:3px;"><input type="radio" name="targetType" value="object" ${savedTargetType === 'object' ? 'checked' : ''}> Object</label>
       </div>
-      <div style="font-size:.8em;color:#777;margin-top:4px;">
-        Must move at least 1 area. +1CS per area (max +3CS). Damage = END/BA + 2×areas.
+
+      <!-- Character target sub-panel -->
+      <div id="character-target-panel" style="display:${savedTargetType === 'character' ? 'flex' : 'none'};align-items:center;gap:6px;padding:4px 0;font-size:12px;">
+        <span style="color:#777;">Body Armor:</span>
+        <select name="targetBodyArmorRank" style="font-size:12px;padding:2px 4px;border:1px solid #b8b8b8;border-radius:2px;">${rankOptions}</select>
+        <input type="number" name="targetBodyArmorValue" value="${savedTargetBAValue}" min="0" style="width:40px;padding:2px;text-align:center;border:1px solid #b8b8b8;border-radius:2px;font-size:12px;">
+      </div>
+
+      <!-- Object target sub-panel -->
+      <div id="object-target-panel" style="display:${savedTargetType === 'object' ? 'block' : 'none'};padding:4px 0;font-size:12px;">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+          <span style="color:#777;">Desc:</span>
+          <input type="text" name="objectDescription" value="${savedObjectDesc}" placeholder="Brick wall, Steel door..." style="flex:1;padding:2px 4px;border:1px solid #b8b8b8;border-radius:2px;font-size:12px;">
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span style="color:#777;">Material:</span>
+          <select name="objectMaterial" style="flex:1;font-size:12px;padding:2px 4px;border:1px solid #b8b8b8;border-radius:2px;">${materialOptions}</select>
+        </div>
       </div>
     </div>
 
-    <!-- Damage Preview -->
-    <div id="preview" style="background:#ffebee;border:1px solid #ef9a9a;border-radius:3px;padding:10px;margin-bottom:8px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;">
-        <span><strong>Damage:</strong> <span id="dmg-base">${initialBaseRankValue}</span> + <span id="dmg-speed">${initialSpeedDamage}</span> = <span id="dmg-total">${initialTotalDamage}</span></span>
-        <span style="font-size:.9em;color:#666;" id="dmg-note">(${initialBaseRankValue} base + 2×${savedAreas} speed)</span>
+    <!-- Options: Pull / Karma -->
+    <div class="frp-box frp-opts-box">
+      <div class="frp-opt-row inactive" style="border-bottom:1px solid #e8e0d0;">
+        <label><input type="checkbox" id="pull-punch-enabled"> <span class="frp-opt-label orange">Pull</span></label>
+        <span style="font-size:11px;color:#777;">to</span>
+        <input type="number" class="frp-pull-input" name="pulledDamage" value="${initialTotalDamage}" min="0" disabled>
+        <span style="font-size:11px;color:#777;">Cap:</span>
+        <select name="resultCap" style="font-size:11px;padding:1px 3px;border:1px solid #bbb;border-radius:2px;" disabled>
+          <option value="none">None</option>
+          <option value="yellow">Slam</option>
+          <option value="green">Hit</option>
+        </select>
       </div>
-      <div id="rebound-warning" style="display:none;margin-top:4px;padding:4px;background:#fff;border:1px solid #f44336;border-radius:3px;font-size:.85em;color:#d32f2f;font-weight:bold;">
-        Target defense > damage — rebounds to you!
-      </div>
-    </div>
-
-    <!-- Modifiers Row -->
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;font-size:.9em;">
-      <div class="cs-field" style="display:flex;align-items:center;gap:4px;padding:4px 6px;border-radius:3px;${dialogShift < 0 ? 'background:#ffebee;border:1px solid #ef5350;' : dialogShift > 0 ? 'background:#e8f5e9;border:1px solid #66bb6a;' : 'border:1px solid transparent;'}">
-        <label style="font-weight:600;">CS:</label>
-        <input type="number" name="shift" value="${Number(dialogShift)}" style="width:35px;padding:3px;text-align:center;box-sizing:border-box;">
-        <span style="color:#666;">→</span>
-        <strong id="shifted-rank-display" style="${dialogShift < 0 ? 'color:#c62828;' : dialogShift > 0 ? 'color:#2e7d32;' : ''}">${shiftRank(endurance.rank, dialogShift + initialMovementBonus)}</strong>
-        <button type="button" class="cs-reset" style="visibility:${dialogShift !== 0 ? 'visible' : 'hidden'};padding:1px 5px;font-size:.85em;cursor:pointer;border:1px solid #999;border-radius:2px;background:#eee;" title="Reset to 0">×</button>
-      </div>
-      <div class="karma-field" style="display:flex;align-items:center;gap:4px;padding:4px 6px;border-radius:3px;${hasKarma ? 'background:#e3f2fd;border:1px solid #90caf9;' : ''}">
+      <div class="frp-opt-row${!hasKarma ? ' inactive' : ' inactive'}">
         ${hasKarma ? `
-          <label style="display:flex;align-items:center;gap:4px;cursor:pointer;">
-            <input type="checkbox" id="spend-karma" name="spendKarma">
-            <span style="font-weight:600;">Karma:</span>
-          </label>
-          <span title="Available: ${availableKarma} | Min: ${minKarma}" style="padding:1px 4px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${availableKarma}</span>
-          <span style="color:#999;font-size:.8em;">(min ${minKarma})</span>
-        ` : `<span style="color:#999;">No karma</span>`}
+          <label><input type="checkbox" id="spend-karma" name="spendKarma"> <span class="frp-opt-label blue">Karma</span></label>
+          <span class="frp-karma-pool"><strong>${availableKarma}</strong> avail (min ${minKarma})</span>
+        ` : `<span style="font-size:12px;color:#999;">No karma available</span>`}
       </div>
     </div>
 
-    <!-- CS Notes Row -->
-    <div id="cs-notes-row" style="margin-bottom:6px;">
-      <input type="text" name="csNotes" id="cs-notes-input" placeholder="e.g., talent +1CS, situation -2CS" value="${savedCsNotes}" style="width:100%;padding:4px 8px;border:1px solid #ccc;border-radius:3px;font-size:.9em;box-sizing:border-box;">
-    </div>
-
-    <!-- Target Type Selection -->
-    <div class="target-type-section" style="padding:6px 8px;background:#e3f2fd;border:1px solid #90caf9;border-radius:3px;margin-bottom:6px;">
-      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-        <span style="font-weight:600;color:#1565c0;">Target:</span>
-        <label style="cursor:pointer;"><input type="radio" name="targetType" value="character" ${savedTargetType === 'character' ? 'checked' : ''}> Character</label>
-        <label style="cursor:pointer;"><input type="radio" name="targetType" value="object" ${savedTargetType === 'object' ? 'checked' : ''}> Object</label>
-        <span style="display:inline-block;width:16px;height:16px;line-height:16px;text-align:center;border-radius:50%;background:#2196F3;color:#fff;font-size:11px;font-weight:bold;cursor:help;margin-left:auto;" title="CHARGING RULES:
-• Damage = max(END, BA) + 2×areas moved
-• If target defense > damage, rebounds to you
-• Your BA absorbs rebound damage
-• Miss: continue half-speed in straight line">?</span>
-      </div>
-    </div>
-
-    <!-- Character Target Panel -->
-    <div id="character-target-panel" style="display:${savedTargetType === 'character' ? 'block' : 'none'};padding:6px 8px;background:#fff;border:1px solid #90caf9;border-radius:3px;margin-bottom:6px;">
-      <div style="display:grid;grid-template-columns:auto 1fr auto;gap:4px 8px;align-items:center;">
-        <label style="font-size:.9em;">Body Armor:</label>
-        <select name="targetBodyArmorRank" style="padding:3px;">${rankOptions}</select>
-        <input type="number" name="targetBodyArmorValue" value="${savedTargetBAValue}" min="0" style="width:50px;padding:3px;text-align:center;">
-      </div>
-    </div>
-
-    <!-- Object Target Panel -->
-    <div id="object-target-panel" style="display:${savedTargetType === 'object' ? 'block' : 'none'};padding:6px 8px;background:#fff;border:1px solid #ffcc80;border-radius:3px;margin-bottom:6px;">
-      <div style="display:grid;grid-template-columns:auto 1fr;gap:4px 8px;align-items:center;">
-        <label style="font-size:.9em;">Description:</label>
-        <input type="text" name="objectDescription" value="${savedObjectDesc}" placeholder="e.g., Brick wall, Steel door" style="padding:3px;">
-        <label style="font-size:.9em;">Material:</label>
-        <select name="objectMaterial" style="padding:3px;">${materialOptions}</select>
-      </div>
+    <!-- Effect preview grid -->
+    <div class="frp-fx-grid">
+      <div class="frp-fx-cell w">Miss<br><span style="font-size:9px;font-weight:400;opacity:0.7;">continue &frac12; spd</span></div>
+      <div class="frp-fx-cell g">Hit<br><span style="font-size:9px;font-weight:400;opacity:0.7;">damage only</span></div>
+      <div class="frp-fx-cell y">Slam<br><span style="font-size:9px;font-weight:400;opacity:0.7;">knockback</span></div>
+      <div class="frp-fx-cell r">Stun<br><span style="font-size:9px;font-weight:400;opacity:0.7;">unconscious</span></div>
     </div>
 
     <!-- Footer -->
-    <div class="frp-box frp-pull-box pull-punch-section" id="pull-box" style="padding:4px 8px;background:#fff8e1;border:1px solid #ffe082;border-radius:3px;margin-bottom:6px;">
-      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-        <label>
-          <input type="checkbox" id="pull-punch-enabled">
-          <span style="font-weight:600;color:#e65100;">Pull</span>
-        </label>
-        <span>damage to</span>
-        <input type="number" class="frp-pull-dmg" name="pulledDamage" value="0" min="0" style="width:45px;padding:2px;text-align:center;">
-        <span>Cap result at</span>
-        <select name="resultCap" style="padding:2px;">
-          <option value="none">None</option>
-          <option value="yellow">Yellow</option>
-          <option value="green">Green</option>
-        </select>
-      </div>
-    </div>
-    <div id="msh-bottom-controls" style="display:flex;justify-content:space-between;align-items:center;padding-top:8px;border-top:1px solid #ddd;">
+    <div class="frp-foot">
       <label><input type="checkbox" id="msh-remember-settings" name="remember" ${shouldRemember ? 'checked' : ''}> Remember</label>
       <label><input type="checkbox" id="msh-skip-dice" name="skipDice" ${savedSkipDice ? 'checked' : ''}> Skip dice</label>
     </div>
-    
-    ${autoPopulated ? `<div style="margin-top:8px;padding:4px;background:#e8f5e9;border:1px solid #4CAF50;border-radius:3px;font-size:.85em;color:#2e7d32;">Auto-populated from targeted token</div>` : ""}
+
+  </div>
   `;
 
   const choice = await new Promise(resolve => {
     new Dialog({
-      title: `${actionName}: ${actor.name}`,
+      title: "Charging",
       content: dialogHtml,
       buttons: {
         roll: {
@@ -296,12 +338,20 @@ export class ChargingAction extends AttackAction {
             const $ = (sel) => html.find(sel);
             const areas = Math.max(1, Number($('[name="areas"]').val() || 1));
             const shift = Number($('[name="shift"]').val() || 0);
-            const csNotes = String($('[name="csNotes"]').val() || "");
             const { spendKarma, karmaToSpend } = extractKarmaFromDialog(html);
             const karma = karmaToSpend;
             const targetType = String($('[name="targetType"]:checked').val() || "character");
             const skipDice = !!$('#msh-skip-dice').is(':checked');
             const remember = !!$('#msh-remember-settings').is(':checked');
+
+            // Build csNotes from sit tags
+            const sitParts = [];
+            html.find('.frp-sit-tag').each(function() {
+              const label = $(this).data('label') || '';
+              const cs = parseInt($(this).data('cs')) || 0;
+              if (label) sitParts.push(`${label} ${cs > 0 ? '+' : ''}${cs}`);
+            });
+            const csNotes = sitParts.join(', ');
 
             let targetBArank, targetBAvalue, objectMaterial, objectDesc;
 
@@ -320,9 +370,16 @@ export class ChargingAction extends AttackAction {
             setLS(lsRememberKey, remember ? "1" : "0");
             setLS(lsSkipKey, skipDice ? "1" : "0");
 
+            // Strip sit tags from saved shift
+            let sitTagCS = 0;
+            html.find('.frp-sit-tag').each(function() {
+              sitTagCS += parseInt($(this).data('cs')) || 0;
+            });
+            const baseShift = shift - sitTagCS;
+
             if (remember) {
               await actor.setFlag("msh-faserip", "lastChargingAreas", areas);
-              await actor.setFlag("msh-faserip", "lastChargingShift", shift);
+              await actor.setFlag("msh-faserip", "lastChargingShift", baseShift);
               await actor.setFlag("msh-faserip", "lastChargingCsNotes", csNotes);
               await actor.setFlag("msh-faserip", "lastChargingTargetType", targetType);
               if (targetType === "character") {
@@ -363,10 +420,25 @@ export class ChargingAction extends AttackAction {
         cancel: { label: "Cancel", callback: () => resolve(null) }
       },
       default: "roll",
-      render: (html) => {
+      render: async (html) => {
         setupKarmaControlHandlers(html);
-        setupModeSelector(actor, html, this.opts || {}, "lastChargingMode");
-        
+        const $dialog = html.closest('.dialog');
+
+        // Inject mode buttons into titlebar
+        const $titlebar = $dialog.find('.window-title, .dialog-title').first();
+        if ($titlebar.length) {
+          const modeHtml = buildModeSelector({ mode: "semi" });
+          const $modeWrap = $('<span class="frp-titlebar-mode"></span>').append(modeHtml);
+          $titlebar.after($modeWrap);
+        }
+        await setupModeSelector(actor, $dialog, this.opts || {}, "lastChargingMode");
+
+        // Set dialog width
+        if ($dialog.length) {
+          $dialog.css('width', '360px');
+          $dialog[0].style.height = 'auto';
+        }
+
         const $charPanel = html.find('#character-target-panel');
         const $objPanel = html.find('#object-target-panel');
 
@@ -393,34 +465,40 @@ export class ChargingAction extends AttackAction {
           const speedDamage = areas * 2;
           const totalDamage = baseRankValue + speedDamage;
 
-          html.find('#dmg-base').text(baseRankValue);
-          html.find('#dmg-speed').text(speedDamage);
           html.find('#dmg-total').text(totalDamage);
-          html.find('#dmg-note').text(`(${baseRankValue} base + 2×${areas} speed)`);
+          html.find('#dmg-note').text(`${baseRankValue} base + 2×${areas} speed`);
+
+          // Update pull punch max
+          const $pulledDamage = html.find('[name="pulledDamage"]');
+          $pulledDamage.attr('max', totalDamage);
+          if (!html.find('#pull-punch-enabled').is(':checked')) {
+            $pulledDamage.val(totalDamage);
+          }
 
           const effectiveRank = shiftRank(endurance.rank, cs + movementBonus);
-          const $shiftedRank = html.find('#shifted-rank-display');
+          const $shiftedRank = html.find('#rank-charging');
           $shiftedRank.text(effectiveRank);
 
-          const $csField = html.find('.cs-field');
-          const $resetBtn = html.find('.cs-reset');
-          if (cs < 0) {
-            $csField.css({ 'background': '#ffebee', 'border': '1px solid #ef5350' });
-            $shiftedRank.css('color', '#c62828');
-            $resetBtn.css('visibility', 'visible');
-          } else if (cs > 0) {
-            $csField.css({ 'background': '#e8f5e9', 'border': '1px solid #66bb6a' });
+          // CS display update
+          const $csInput = html.find('.frp-cs-input[name="shift"]');
+          const $resetBtn = html.find('.frp-cs-reset');
+          $csInput.removeClass('pos neg');
+          if (cs > 0) {
+            $csInput.addClass('pos');
             $shiftedRank.css('color', '#2e7d32');
             $resetBtn.css('visibility', 'visible');
+          } else if (cs < 0) {
+            $csInput.addClass('neg');
+            $shiftedRank.css('color', '#c62828');
+            $resetBtn.css('visibility', 'visible');
           } else {
-            $csField.css({ 'background': '', 'border': '1px solid transparent' });
             $shiftedRank.css('color', '');
             $resetBtn.css('visibility', 'hidden');
           }
 
+          // After-armor and rebound check
           const type = String(html.find('[name="targetType"]:checked').val() || "character");
           let targetDefense = 0;
-          
           if (type === 'character') {
             targetDefense = Number(html.find('[name="targetBodyArmorValue"]').val() || 0);
           } else {
@@ -428,16 +506,22 @@ export class ChargingAction extends AttackAction {
             targetDefense = game.msh.getRankValue(objectMat) || 20;
           }
 
+          const afterArmor = Math.max(0, totalDamage - targetDefense);
+          html.find('#after-armor-display').text(targetDefense > 0 ? `${afterArmor} after armor` : `${totalDamage} damage`);
+
           const $warn = html.find('#rebound-warning');
           if (targetDefense > totalDamage) {
             $warn.show();
           } else {
             $warn.hide();
           }
+
+          if ($dialog.length) $dialog[0].style.height = 'auto';
         };
 
-        html.find('[name="areas"]').on('input', updatePreview);
-        html.find('[name="shift"]').on('input', updatePreview);
+        // ── Event bindings ──
+        html.find('[name="areas"]').on('input change', updatePreview);
+        html.find('[name="shift"]').on('input change', updatePreview);
         html.find('[name="targetType"]').on('change', togglePanels);
         html.find('[name="targetBodyArmorRank"]').on('change', () => {
           const rank = html.find('[name="targetBodyArmorRank"]').val();
@@ -448,15 +532,69 @@ export class ChargingAction extends AttackAction {
         html.find('[name="targetBodyArmorValue"]').on('input', updatePreview);
         html.find('[name="objectMaterial"]').on('change', updatePreview);
 
-        html.find('.cs-reset').on('click', function(e) {
+        // CS reset — also remove sit tags
+        html.find('.frp-cs-reset').on('click', function(e) {
           e.preventDefault();
           html.find('[name="shift"]').val(0);
-          updatePreview();
+          html.find('#sit-tags').empty();
+          html.find('[name="shift"]').trigger('change');
         });
 
+        // ── Situational modifier: apply on select ──
+        html.find('#sit-select').on('change', function() {
+          const $sel = $(this);
+          const opt = $sel.find('option:selected');
+          const cs = parseInt(opt.val());
+          const label = opt.data('label') || '';
+          if (!cs || !label) return;
+
+          let exists = false;
+          html.find('.frp-sit-tag').each(function() {
+            if ($(this).data('label') === label) exists = true;
+          });
+          if (exists) { $sel.val(''); return; }
+
+          const sign = cs > 0 ? '+' : '';
+          const cls = cs < 0 ? ' penalty' : '';
+          const tag = $(`<span class="frp-sit-tag${cls}" data-cs="${cs}" data-label="${label}">
+            ${label} <span class="tag-cs">${sign}${cs}</span>
+            <span class="tag-x">&times;</span>
+          </span>`);
+          html.find('#sit-tags').append(tag);
+
+          const $csInput = html.find('[name="shift"]');
+          $csInput.val(parseInt($csInput.val()) + cs).trigger('change');
+          $sel.val('');
+        });
+
+        // ── Situational modifier: remove tag ──
+        html.find('#sit-tags').on('click', '.tag-x', function() {
+          const $tag = $(this).closest('.frp-sit-tag');
+          const cs = parseInt($tag.data('cs')) || 0;
+          const $csInput = html.find('[name="shift"]');
+          $csInput.val(parseInt($csInput.val()) - cs).trigger('change');
+          $tag.remove();
+        });
+
+        // Pull punch toggle
+        html.find('#pull-punch-enabled').on('change', function() {
+          const $row = $(this).closest('.frp-opt-row');
+          const $pulledDamage = html.find('[name="pulledDamage"]');
+          const $resultCap = html.find('[name="resultCap"]');
+          $row.toggleClass('inactive', !this.checked);
+          if (this.checked) {
+            $pulledDamage.prop('disabled', false);
+            $resultCap.prop('disabled', false);
+          } else {
+            $resultCap.val('none').prop('disabled', true);
+            $pulledDamage.prop('disabled', true);
+            updatePreview();
+          }
+        });
+
+        // Karma toggle
         html.find('#spend-karma').on('change', function() {
-          const $field = html.find('.karma-field');
-          $field.css('border-color', this.checked ? '#1565c0' : '#90caf9');
+          $(this).closest('.frp-opt-row').toggleClass('inactive', !this.checked);
         });
 
         togglePanels();
