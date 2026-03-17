@@ -1,8 +1,10 @@
-// shooting-action.js v3.0.1 - 2026-03-16
-// v3.0.1: Fix CS save/restore — strip sit tags + range (not talent chips) on save.
-//         Range penalty uses autoRangeCs data-attr for clean base/penalty tracking.
-//         Marksman no-range-penalty flag now suppresses range CS in dialog.
-//         Auto range tag no longer removable via × close.
+// shooting-action.js v3.2.0 - 2026-03-17
+// v3.2.0: Use shared cs-modifiers.js — detectModifiers + buildCSRow + wireCSPanel.
+//         Eliminates inline talent detection, chip HTML, sit tag handlers, CS drift bugs.
+//         All modifiers in one dropdown panel. Compact footer with inline buttons.
+// v3.1.0: Separate talent row from CS input — talents in own green box above CS,
+//         CS input is purely manual/situational. Eliminates CS drift across sessions.
+//         Net row shows combined breakdown. Compact single-row footer with inline buttons.
 // v3.0.0: Port to v3 compact layout — header-v3, CS box with talent chips + situational dropdown,
 //         inline damage row with weapon select, range info box, opts box (multi x2/x3 + karma)
 //         with greyed inactive rows, FX grid, titlebar mode injection, 360px width.
@@ -41,6 +43,7 @@ import { makeDamageBlock, computeAfterArmor, buildDamageFlags } from "./damage-u
 import { canEffectsApply } from "../../rules/effects-gate.js";
 import { playCombatSFX } from "./audio-utils.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
+import { detectModifiers, buildCSRow, wireCSPanel } from "./cs-modifiers.js";
 
 export class ShootingAction extends RangedAttackAction {
   async execute() {
@@ -94,57 +97,11 @@ export class ShootingAction extends RangedAttackAction {
     const savedMultiAttacks = shouldRemember ? ((await actor.getFlag("msh-faserip", "lastShootingMultiAttacks")) || false) : false;
     const savedAttackCount = shouldRemember ? ((await actor.getFlag("msh-faserip", "lastShootingAttackCount")) || 2) : 2;
     const savedVariantType = shouldRemember ? ((await actor.getFlag("msh-faserip", "lastShootingVariant")) || "") : "";
-    const savedActiveChips = shouldRemember ? (await actor.getFlag("msh-faserip", "lastShootingActiveChips") || {}) : {};
+    const savedCheckedMods = shouldRemember ? (await actor.getFlag("msh-faserip", "lastShootingCheckedMods") || []) : [];
     const savedSkipDice = localStorage.getItem(lsSkipKey) === "1";
 
-    // === Detect combat talents that affect Agility/shooting ===
-    const combatTalents = [];
-    for (const item of actor.items) {
-      if (item.type !== "talent") continue;
-      const name = (item.name || "").toLowerCase();
-      const rankOverride = item.system?.rankOverride || "";
-
-      let ultimateCS = 0;
-      if (rankOverride) {
-        const baseIdx = RANKS.indexOf(ability.rank);
-        const overIdx = RANKS.indexOf(rankOverride);
-        if (baseIdx >= 0 && overIdx >= 0) ultimateCS = overIdx - baseIdx;
-      }
-
-      if (name.includes("weapons specialist") || name.includes("weapon specialist") ||
-          name.includes("wpn specialist")) {
-        // Weapons Specialist: +2CS with single weapon of choice, +1 initiative
-        combatTalents.push({ name: "Wpn Spec", cs: 2, flag: "initiative", note: "+2CS +1 Init", ultimateCS, rankOverride });
-      }
-      else if (name.includes("marksman")) {
-        // Marksman: +1CS any line-of-sight weapon, no range penalties
-        combatTalents.push({ name: "Marksman", cs: 1, flag: "no-range-penalty", note: "+1CS no range pen", ultimateCS, rankOverride });
-      }
-      else if (/\bguns?\b/.test(name) || name === "guns" || name.includes("gun talent")) {
-        // Guns: +1CS Agility firing handguns, rifles, SMGs
-        combatTalents.push({ name: "Guns", cs: 1, flag: null, note: "+1 CS", ultimateCS, rankOverride });
-      }
-      else if (name.includes("bow") && !name.includes("elbow")) {
-        // Bows: +1CS bows/crossbows, fire+reload in 1 round
-        combatTalents.push({ name: "Bows", cs: 1, flag: null, note: "+1 CS", ultimateCS, rankOverride });
-      }
-      else if (name.includes("oriental weapon") || name.includes("oriental wpn")) {
-        // Oriental Weapons: +1CS Fighting or Agility with shuriken, crossbows, oriental swords
-        combatTalents.push({ name: "Oriental", cs: 1, flag: null, note: "+1 CS", ultimateCS, rankOverride });
-      }
-      else if (name.includes("law enforcement") || name.includes("law-enforcement")) {
-        // Law Enforcement: includes Gun talent (+1CS)
-        combatTalents.push({ name: "Law Enf", cs: 1, flag: null, note: "+1CS (Guns)", ultimateCS, rankOverride });
-      }
-      else if (name.includes("military") && !name.includes("martial")) {
-        // Military: +1CS military weapons (GM discretion)
-        combatTalents.push({ name: "Military", cs: 1, flag: null, note: "+1CS mil wpn", ultimateCS, rankOverride });
-      }
-      else if (name.includes("martial arts e") || name.includes("martial arts-e") ||
-               (name.includes("martial arts") && name.includes("(e)"))) {
-        combatTalents.push({ name: "MA-E", cs: 0, flag: "initiative", note: "+1 Initiative", ultimateCS, rankOverride });
-      }
-    }
+    // === Detect modifiers via shared utility ===
+    const mods = detectModifiers("shooting", actor, ability);
 
     // === Target info ===
     const { targets, primaryTarget, primaryTargetActor, targetDisplay } = getTargetData();
@@ -206,36 +163,7 @@ export class ShootingAction extends RangedAttackAction {
     const minKarma = getMinimumKarmaCommitment(actor);
     const hasKarma = availableKarma > 0;
 
-    // === CS display ===
-    const csInputCls = savedColumnShift > 0 ? ' pos' : savedColumnShift < 0 ? ' neg' : '';
-    const csRankStyle = savedColumnShift > 0 ? 'color:#2e7d32;' : savedColumnShift < 0 ? 'color:#c62828;' : '';
     const abilityShort = RANK_ABBR[ability.rank] || ability.rank;
-
-    // === Build talent chips HTML ===
-    const talentChipsHtml = combatTalents.map(t => {
-      const savedState = savedActiveChips[t.name] || '';
-      const flagActive = savedState.includes('flag');
-
-      if (t.rankOverride && t.ultimateCS > 0) {
-        const shortRank = RANK_ABBR[t.rankOverride] || t.rankOverride;
-        const ultActive = savedState === 'ultimate';
-        return `<span class="frp-talent-chip${ultActive ? ' active-ultimate' : ''}" data-cs="${t.ultimateCS}" data-talent="${t.name}" data-ultimate="1">
-          ★ ${t.name} <span class="chip-cs">&rarr;${shortRank}</span>
-        </span>`;
-      }
-      if (t.cs > 0) {
-        const csActive = savedState === 'cs';
-        return `<span class="frp-talent-chip${csActive ? ' active-cs' : ''}" data-cs="${t.cs}" data-talent="${t.name}">
-          ${t.name} <span class="chip-cs">+${t.cs}</span>
-        </span>`;
-      }
-      if (t.flag) {
-        return `<span class="frp-talent-chip${flagActive ? ' active-flag' : ''}" data-flag="${t.flag}" data-talent="${t.name}">
-          ${t.name} <span class="chip-note">${t.note}</span>
-        </span>`;
-      }
-      return '';
-    }).join('');
 
     // === Build weapon damage source <select> ===
     const damageSrcOptions = shootingWeapons.map(i => {
@@ -247,12 +175,28 @@ export class ShootingAction extends RangedAttackAction {
       return `<option value="${i.id}" ${sel}>${i.name} &mdash; ${dmg} dmg / ${rng} areas${apLabel}</option>`;
     }).join('');
 
-    // === Dialog HTML — v3 Compact Layout ===
+    // === Build initial range auto-mod ===
+    const initialRangePenalty = savedRange > 1 ? -(savedRange - 1) : 0;
+    const initialAutoMods = initialRangePenalty < 0
+      ? [{ key: "auto:range", label: `Range ${savedRange} (auto)`, cs: initialRangePenalty }]
+      : [];
+
+    // === Build CS row via shared utility ===
+    const csRowHtml = buildCSRow({
+      mods,
+      savedManualCS: savedColumnShift,
+      savedChecked: savedCheckedMods,
+      abilityRank: ability.rank,
+      autoMods: initialAutoMods
+    });
+
+    // === Dialog HTML — v3.2 Mods Panel Layout ===
     const multiEnabled = savedMultiAttacks;
+
     const dialogHtml = `
     <div class="frp-dlg">
 
-      <!-- Header: Actor (Base Agility / Rank Value) shoots Target -->
+      <!-- Header: Actor (Base Agility / Rank Value) attacks Target -->
       <div class="frp-header-v3">
         <span class="h-actor" title="${actor.name}">${actor.name}</span>
         <span class="h-paren">(</span>
@@ -266,51 +210,14 @@ export class ShootingAction extends RangedAttackAction {
           : ''}
       </div>
 
-      <!-- CS box: chips + situational dropdown -->
-      <div class="frp-box frp-cs-box">
-        <div class="frp-cs-line">
-          <span class="frp-cs-label">CS</span>
-          <input type="number" class="frp-cs-input${csInputCls}" name="shift" value="${savedColumnShift}" id="cs-shooting">
-          <span class="frp-cs-arrow">&rarr;</span>
-          <span class="frp-cs-rank" id="rank-shooting" style="${csRankStyle}">${shiftRank(ability.rank, savedColumnShift)}</span>
-          <button type="button" class="frp-cs-reset" style="visibility:${savedColumnShift !== 0 ? 'visible' : 'hidden'}">&times;</button>
-          ${combatTalents.length > 0 ? '<span class="chip-sep"></span>' : ''}
-          ${talentChipsHtml}
-          <span class="chip-sep"></span>
-          <select class="frp-sit-select" id="sit-select">
-            <option value="">+ situational&hellip;</option>
-            <optgroup label="Bonuses">
-              <option value="2" data-label="Blindside" title="Target unaware or distracted">Blindside +2CS</option>
-              <option value="1" data-label="Ambush" title="Pre-set position, triggers when target enters area">Ambush +1CS</option>
-              <option value="1" data-label="Aiming" title="Spend 1 turn not attacking = +1CS next round">Aiming +1CS</option>
-              <option value="1" data-label="Higher Ground" title="Elevated position, terrain advantage">Higher Ground +1CS</option>
-              <option value="3" data-label="Point Blank" title="Adjacent, not engaged in Slugfest/Wrestling">Point Blank +3CS</option>
-            </optgroup>
-            <optgroup label="Target Movement">
-              <option value="-1" data-label="Moving" title="Target moving &le;5 areas/round">Moving &le;5 areas -1CS</option>
-              <option value="-2" data-label="Fast" title="Target moving &le;10 areas/round">Moving &le;10 areas -2CS</option>
-              <option value="-4" data-label="Very Fast" title="Target moving &gt;10 areas/round">Moving &gt;10 areas -4CS</option>
-            </optgroup>
-            <optgroup label="Penalties">
-              <option value="-2" data-label="Obstacle" title="Through window, curtain, etc.">Through Obstacle -2CS</option>
-              <option value="-2" data-label="Shielding" title="Target using object as cover">Shielding -2CS</option>
-              <option value="-2" data-label="Impaired" title="Lost Endurance ranks, -2CS all actions">Impaired -2CS</option>
-              <option value="-2" data-label="One-handed" title="Two-handed weapon fired one-handed">One-handed -2CS</option>
-              <option value="-1" data-label="No Bow Talent" title="Bow/crossbow without Bow talent">No Bow Talent -1CS</option>
-              <option value="-3" data-label="Engaged" title="Adjacent and engaged in Slugfest/Wrestling">Engaged -3CS</option>
-            </optgroup>
-            <optgroup label="Target Size">
-              <option value="1" data-label="Growth +1" title="Target is 12-18ft tall">Growth 12-18ft +1CS</option>
-              <option value="2" data-label="Growth +2" title="Target is 18-22ft tall">Growth 18-22ft +2CS</option>
-              <option value="3" data-label="Growth +3" title="Target is over 22ft tall">Growth 22ft+ +3CS</option>
-              <option value="-1" data-label="Shrink -1" title="Target shrunk to ~1 inch">Shrunk 1&Prime; -1CS</option>
-              <option value="-2" data-label="Shrink -2" title="Target shrunk to ~&frac14; inch">Shrunk &frac14;&Prime; -2CS</option>
-              <option value="-3" data-label="Shrink -3" title="Target smaller than &frac14; inch">Shrunk smaller -3CS</option>
-            </optgroup>
-          </select>
-        </div>
-        <div class="frp-sit-tags" id="sit-tags"></div>
-      </div>
+      ${primaryTarget ? `
+      <div class="frp-target-compact">
+        <span class="t-name">${targetDisplay}</span>
+        ${targetArmorAbbr ? `<span class="t-armor">BA: ${targetArmorAbbr}(${targetArmor})</span>` : ''}
+      </div>` : ''}
+
+      <!-- CS row with Mods dropdown (from shared utility) -->
+      ${csRowHtml}
 
       <!-- Damage: weapon select + numbers inline -->
       <div class="frp-box frp-dmg-box">
@@ -347,14 +254,14 @@ export class ShootingAction extends RangedAttackAction {
         </div>
       </div>
 
-      <!-- Options: Multi / Karma — shooting can x2/x3 but NOT adjacent -->
+      <!-- Options: Multi / Karma -->
       <div class="frp-box frp-opts-box">
         <div class="frp-opt-row${!multiEnabled ? ' inactive' : ''}" style="border-bottom:1px solid #e8e0d0;">
           <label><input type="checkbox" id="multi-enabled" ${multiEnabled ? 'checked' : ''}> <span class="frp-opt-label green">Multi</span></label>
           <label style="margin-left:8px;"><input type="radio" name="multiCount" value="2" ${(!savedMultiAttacks || savedAttackCount === 2) ? 'checked' : ''} ${!multiEnabled ? 'disabled' : ''}> &times;2</label>
           <label><input type="radio" name="multiCount" value="3" ${savedAttackCount === 3 ? 'checked' : ''} ${!multiEnabled ? 'disabled' : ''}> &times;3</label>
         </div>
-        <div class="frp-opt-row${!hasKarma ? ' inactive' : hasKarma ? ' inactive' : ''}">
+        <div class="frp-opt-row${!hasKarma ? ' inactive' : ' inactive'}">
           ${hasKarma ? `
             <label><input type="checkbox" id="spend-karma" name="spendKarma"> <span class="frp-opt-label blue">Karma</span></label>
             <span class="frp-karma-pool"><strong>${availableKarma}</strong> avail (min ${minKarma})</span>
@@ -370,10 +277,14 @@ export class ShootingAction extends RangedAttackAction {
         <div class="frp-fx-cell r">${effects.red}</div>
       </div>
 
-      <!-- Footer -->
+      <!-- Footer: checkboxes + buttons on one row -->
       <div class="frp-foot">
         <label><input type="checkbox" id="msh-remember-settings" name="remember" ${shouldRemember ? 'checked' : ''}> Remember</label>
         <label><input type="checkbox" id="msh-skip-dice" name="skipDice" ${savedSkipDice ? 'checked' : ''}> Skip dice</label>
+        <div class="frp-foot-btns">
+          <button type="button" class="frp-btn-cancel" id="frp-cancel">Cancel</button>
+          <button type="button" class="frp-btn-roll" id="frp-roll">Roll</button>
+        </div>
       </div>
     </div>
     `;
@@ -381,139 +292,18 @@ export class ShootingAction extends RangedAttackAction {
     const setLS = (k, v) => { try { localStorage.setItem(k, v); } catch (_e) {} };
 
     const choice = await new Promise((resolve) => {
-      new Dialog({
+      let _resolved = false;
+      let _csState = null;
+      const dlg = new Dialog({
         title: actionName,
         content: dialogHtml,
-        buttons: {
-          roll: {
-            label: "Roll",
-            callback: async (html) => {
-              const $dlg = (sel) => html.find(sel);
-
-              const rememberSettings = $dlg("#msh-remember-settings").is(':checked');
-              const skipDice = $dlg("#msh-skip-dice").is(':checked');
-
-              try {
-                localStorage.setItem(lsRememberKey, rememberSettings ? "1" : "0");
-                localStorage.setItem(lsSkipKey, skipDice ? "1" : "0");
-              } catch (e) {}
-
-              const weaponId = String($dlg('[name="weapon"]').val() || "");
-              const weapon = shootingWeapons.find(i => i.id === weaponId);
-
-              if (!weapon) {
-                ui.notifications.error("No weapon selected!");
-                return resolve(null);
-              }
-
-              const shift = parseInt($dlg('[name="shift"]').val() || 0);
-              const { spendKarma, karmaToSpend } = extractKarmaFromDialog(html);
-              const karma = karmaToSpend;
-              const range = Number($dlg('[name="range"]').val() || 1);
-              const variantType = $dlg('[name="variantType"]').val() || weapon.system?.variantType || "standard";
-
-              const multiEnabled = $dlg('#multi-enabled').is(':checked');
-              const multiCountVal = $dlg('[name="multiCount"]:checked').val() || "2";
-              const multiAttacks = multiEnabled;
-              const attackCount = (multiCountVal === "3") ? 3 : 2;
-
-              // Build csNotes from active situational tags + talent chips
-              const sitParts = [];
-              html.find('.frp-talent-chip.active-cs, .frp-talent-chip.active-ultimate').each(function() {
-                const talent = $(this).data('talent') || '';
-                const cs = parseInt($(this).data('cs')) || 0;
-                if (talent && cs) sitParts.push(`${talent} ${cs > 0 ? '+' : ''}${cs}`);
-              });
-              html.find('.frp-sit-tag').each(function() {
-                const label = $(this).data('label') || '';
-                const cs = parseInt($(this).data('cs')) || 0;
-                if (label) sitParts.push(`${label} ${cs > 0 ? '+' : ''}${cs}`);
-              });
-              const csNotes = sitParts.join(', ');
-
-              // Collect active talent flags
-              const talentFlags = {};
-              html.find('.frp-talent-chip.active-flag').each(function() {
-                const flag = $(this).data('flag');
-                if (flag) talentFlags[flag] = true;
-              });
-
-              // Collect active chip states for persistence
-              const activeChips = {};
-              html.find('.frp-talent-chip.active-cs, .frp-talent-chip.active-ultimate').each(function() {
-                const talent = $(this).data('talent');
-                const isUlt = !!$(this).data('ultimate');
-                if (talent) activeChips[talent] = isUlt ? 'ultimate' : 'cs';
-              });
-              html.find('.frp-talent-chip.active-flag').each(function() {
-                const talent = $(this).data('talent');
-                if (talent) activeChips[talent] = (activeChips[talent] || '') + ',flag';
-              });
-
-              // Weapon stats + AP
-              const weaponRange = weapon.system?.range || 15;
-              const weaponDamage = weapon.system?.damage || 0;
-              const _apInfo = _getEffectiveAPForVariant(weapon, variantType);
-
-              // Range validation
-              if (range > weaponRange) {
-                ui.notifications.error(`Target is beyond weapon range (${weaponRange} areas)!`);
-                return resolve(null);
-              }
-
-              // Save settings — strip sit tags + range (NOT talent chips) so remembered CS = manual + talents
-              let sitTagCS = 0;
-              html.find('.frp-sit-tag').each(function() {
-                sitTagCS += parseInt($(this).data('cs')) || 0;
-              });
-              const baseShift = shift - sitTagCS;
-              if (rememberSettings) {
-                await actor.setFlag("msh-faserip", "lastShootingItemId", weaponId);
-                await actor.setFlag("msh-faserip", "lastShootingRange", range);
-                await actor.setFlag("msh-faserip", "lastShootingShift", baseShift);
-                await actor.setFlag("msh-faserip", "cs_shooting", baseShift);
-                await actor.setFlag("msh-faserip", "lastShootingMultiAttacks", multiAttacks);
-                await actor.setFlag("msh-faserip", "lastShootingAttackCount", attackCount);
-                await actor.setFlag("msh-faserip", "lastShootingVariant", variantType);
-                await actor.setFlag("msh-faserip", "lastShootingActiveChips", activeChips);
-              }
-
-              await actor.setFlag("msh-faserip", "csNotes", csNotes);
-
-              resolve({
-                weapon,
-                weaponDamage,
-                weaponRange,
-                shift,
-                karma,
-                spendKarma,
-                range,
-                skipDice,
-                totalShift: shift,
-                multiAttacks,
-                attackCount,
-                csNotes,
-                talentFlags,
-                armorPiercing: _apInfo.ap,
-                armorPiercingCS: _apInfo.apCS,
-                apMode: _apInfo.apMode,
-                bypassForceField: _apInfo.bypassFF,
-                shiftBreakdown: {
-                  manual: shift,
-                  multiAttack: 0,
-                  csNotes
-                }
-              });
-            }
-          },
-          cancel: { label: "Cancel", callback: () => resolve(null) }
-        },
-        default: "roll",
+        buttons: {},
         render: async (html) => {
           setupKarmaControlHandlers(html);
           const $dialog = html.closest('.dialog');
 
-          // Inject mode buttons into the titlebar
+          $dialog.find('.dialog-buttons').hide();
+
           const $titlebar = $dialog.find('.window-title, .dialog-title').first();
           if ($titlebar.length) {
             const modeHtml = buildModeSelector({ mode: "semi" });
@@ -522,7 +312,6 @@ export class ShootingAction extends RangedAttackAction {
           }
           await setupModeSelector(actor, $dialog, this.opts || {}, "lastShootingMode");
 
-          // Set dialog width
           if ($dialog.length) {
             $dialog.css('width', '360px');
             $dialog[0].style.height = 'auto';
@@ -530,32 +319,15 @@ export class ShootingAction extends RangedAttackAction {
 
           const setLS = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
 
-          // ── Talent chip click handler ──
-          html.find('.frp-talent-chip').on('click', function() {
-            const $chip = $(this);
-            const cs = parseInt($chip.data('cs')) || 0;
-            const flag = $chip.data('flag') || null;
-            const isUltimate = !!$chip.data('ultimate');
-            const $csInput = html.find('[name="shift"]');
-
-            if (cs > 0) {
-              const wasActive = $chip.hasClass('active-cs') || $chip.hasClass('active-ultimate');
-              const activeClass = isUltimate ? 'active-ultimate' : 'active-cs';
-
-              if (wasActive) {
-                $chip.removeClass('active-cs active-ultimate');
-                $csInput.val(parseInt($csInput.val()) - cs);
-              } else {
-                $chip.addClass(activeClass);
-                $csInput.val(parseInt($csInput.val()) + cs);
-              }
-              $csInput.trigger('change');
-            } else if (flag) {
-              $chip.toggleClass('active-flag');
+          // ── Wire CS panel from shared utility ──
+          _csState = wireCSPanel(html, {
+            abilityRank: ability.rank,
+            onUpdate: () => {
+              if ($dialog.length) $dialog[0].style.height = 'auto';
             }
           });
 
-          // ── Main update function ──
+          // ── Main update function (weapon/damage/range only — CS handled by csState) ──
           const update = () => {
             const weaponId = html.find('#damage-source-select').val() || "";
             const weapon = shootingWeapons.find(i => i.id === weaponId);
@@ -570,18 +342,11 @@ export class ShootingAction extends RangedAttackAction {
             const apInfo = _getEffectiveAPForVariant(weapon, variantType);
 
             $val.text(currentDamage);
-
-            // Update max range hint
             html.find('#max-range-hint').text(currentRange);
 
             // AP display
             const apLabel = (apInfo.apMode === "cs" && apInfo.apCS > 0) ? `${apInfo.apCS}CS` : (apInfo.ap > 0 ? String(apInfo.ap) : "");
-            if (apLabel) {
-              $apDisplay.show();
-              $apVal.text(apLabel);
-            } else {
-              $apDisplay.hide();
-            }
+            if (apLabel) { $apDisplay.show(); $apVal.text(apLabel); } else { $apDisplay.hide(); }
 
             // After-armor display
             const effArmor = _getEffectiveArmor(targetArmor, apInfo.ap, apInfo.apCS, apInfo.apMode);
@@ -592,66 +357,128 @@ export class ShootingAction extends RangedAttackAction {
               $afterArmor.text(`${currentDamage} damage`);
             }
 
-            // Range penalty — auto-sync sit tag (before CS display)
-            // Uses autoRangeCs data-attr on CS input to track current auto-applied range penalty
+            // Range penalty → update auto mods in CS panel
             const rangeVal = Number(html.find('[name="range"]').val() || 0);
             const $rangePenalty = html.find('#range-penalty-display');
-            const oldRangeTag = html.find('.frp-sit-tag[data-auto="range"]');
-            const $csI = html.find('[name="shift"]');
-            const prevAutoRangeCS = Number($csI.data('autoRangeCs') ?? 0) || 0;
-            const hasNoRangePenalty = html.find('.frp-talent-chip.active-flag[data-flag="no-range-penalty"]').length > 0;
-            const baseShift = (parseInt($csI.val()) || 0) - prevAutoRangeCS;
+
+            // Check if Marksman no-range-penalty flag is active
+            const noRangePenalty = _csState?.get().talentFlags?.["no-range-penalty"] || false;
 
             let penalty = 0;
             if (rangeVal > currentRange) {
               $rangePenalty.text('OUT OF RANGE').css('color', '#c62828');
             } else {
-              penalty = hasNoRangePenalty ? 0 : (rangeVal > 1 ? -(rangeVal - 1) : 0);
+              penalty = noRangePenalty ? 0 : (rangeVal > 1 ? -(rangeVal - 1) : 0);
               $rangePenalty.text(penalty < 0 ? `${penalty}CS` : '').css('color', '#e65100');
             }
 
-            oldRangeTag.remove();
-            if (penalty < 0) {
-              const tag = $(`<span class="frp-sit-tag penalty" data-cs="${penalty}" data-label="Range ${rangeVal}" data-auto="range">
-                Range ${rangeVal} <span class="tag-cs">${penalty}</span>
-              </span>`);
-              html.find('#sit-tags').append(tag);
-            }
-
-            const displayShift = baseShift + penalty;
-            $csI.val(displayShift);
-            $csI.data('autoRangeCs', penalty);
-
-            // CS display update (after range sync so shift value is current)
-            const cs = displayShift;
-            const shiftedRankText = shiftRank(ability.rank, cs);
-            const $shiftedRank = html.find('#rank-shooting');
-            const $csInput = html.find('.frp-cs-input');
-            $shiftedRank.text(shiftedRankText);
-
-            const $resetBtn = html.find('.frp-cs-reset');
-            $csInput.removeClass('pos neg');
-            if (cs > 0) {
-              $csInput.addClass('pos');
-              $shiftedRank.css('color', '#2e7d32');
-              $resetBtn.css('visibility', 'visible');
-            } else if (cs < 0) {
-              $csInput.addClass('neg');
-              $shiftedRank.css('color', '#c62828');
-              $resetBtn.css('visibility', 'visible');
-            } else {
-              $shiftedRank.css('color', '');
-              $resetBtn.css('visibility', 'hidden');
-            }
+            // Update auto mods in the CS panel
+            const autoMods = penalty < 0
+              ? [{ key: "auto:range", label: `Range ${rangeVal} (auto)`, cs: penalty }]
+              : [];
+            _csState.setAutoMods(autoMods);
 
             if ($dialog.length) $dialog[0].style.height = 'auto';
           };
 
           update();
 
-          // ── Event bindings ──
+          // ── Roll button handler ──
+          html.find('#frp-roll').on('click', async () => {
+            const $dlg = (sel) => html.find(sel);
+
+            const rememberSettings = $dlg("#msh-remember-settings").is(':checked');
+            const skipDice = $dlg("#msh-skip-dice").is(':checked');
+
+            try {
+              localStorage.setItem(lsRememberKey, rememberSettings ? "1" : "0");
+              localStorage.setItem(lsSkipKey, skipDice ? "1" : "0");
+            } catch (e) {}
+
+            const weaponId = String($dlg('[name="weapon"]').val() || "");
+            const weapon = shootingWeapons.find(i => i.id === weaponId);
+
+            if (!weapon) {
+              ui.notifications.error("No weapon selected!");
+              return;
+            }
+
+            // Get CS state from shared utility
+            const cs = _csState.get();
+
+            const { spendKarma, karmaToSpend } = extractKarmaFromDialog(html);
+            const karma = karmaToSpend;
+            const range = Number($dlg('[name="range"]').val() || 1);
+            const variantType = $dlg('[name="variantType"]').val() || weapon.system?.variantType || "standard";
+
+            const multiEnabled = $dlg('#multi-enabled').is(':checked');
+            const multiCountVal = $dlg('[name="multiCount"]:checked').val() || "2";
+            const multiAttacks = multiEnabled;
+            const attackCount = (multiCountVal === "3") ? 3 : 2;
+
+            // Weapon stats + AP
+            const weaponRange = weapon.system?.range || 15;
+            const weaponDamage = weapon.system?.damage || 0;
+            const _apInfo = _getEffectiveAPForVariant(weapon, variantType);
+
+            // Range validation
+            if (range > weaponRange) {
+              ui.notifications.error(`Target is beyond weapon range (${weaponRange} areas)!`);
+              return;
+            }
+
+            // Save settings
+            if (rememberSettings) {
+              await actor.setFlag("msh-faserip", "lastShootingItemId", weaponId);
+              await actor.setFlag("msh-faserip", "lastShootingRange", range);
+              await actor.setFlag("msh-faserip", "lastShootingShift", cs.manualCS);
+              await actor.setFlag("msh-faserip", "cs_shooting", cs.manualCS);
+              await actor.setFlag("msh-faserip", "lastShootingMultiAttacks", multiAttacks);
+              await actor.setFlag("msh-faserip", "lastShootingAttackCount", attackCount);
+              await actor.setFlag("msh-faserip", "lastShootingVariant", variantType);
+              await actor.setFlag("msh-faserip", "lastShootingCheckedMods", cs.checkedKeys);
+            }
+
+            await actor.setFlag("msh-faserip", "csNotes", cs.csNotes);
+
+            _resolved = true;
+            resolve({
+              weapon,
+              weaponDamage,
+              weaponRange,
+              shift: cs.totalShift,
+              karma,
+              spendKarma,
+              range,
+              skipDice,
+              totalShift: cs.totalShift,
+              multiAttacks,
+              attackCount,
+              csNotes: cs.csNotes,
+              talentFlags: cs.talentFlags,
+              armorPiercing: _apInfo.ap,
+              armorPiercingCS: _apInfo.apCS,
+              apMode: _apInfo.apMode,
+              bypassForceField: _apInfo.bypassFF,
+              shiftBreakdown: {
+                manual: cs.manualCS,
+                mods: cs.modsTotal,
+                multiAttack: 0,
+                csNotes: cs.csNotes
+              }
+            });
+            dlg.close();
+          });
+
+          // ── Cancel button handler ──
+          html.find('#frp-cancel').on('click', () => {
+            _resolved = true;
+            resolve(null);
+            dlg.close();
+          });
+
+          // ── Event bindings (weapon/variant/range only — CS handled by csState) ──
           html.find('#damage-source-select').on('change', () => {
-            // Rebuild variant selector for new weapon
             const wId = html.find('#damage-source-select').val();
             const w = shootingWeapons.find(i => i.id === wId);
             const newVariantOpts = _buildVariantOptions(w, "");
@@ -668,65 +495,17 @@ export class ShootingAction extends RangedAttackAction {
             }
             update();
           });
-          html.find('[name="shift"]').on('input change', update);
           html.find('[name="range"]').on('input change', update);
           html.on('change', '[name="variantType"]', update);
 
-          // CS reset — deactivates chips and removes situational tags
-          html.find('.frp-cs-reset').on('click', function(e) {
-            e.preventDefault();
-            html.find('[name="shift"]').val(0);
-            html.find('.frp-talent-chip.active-cs, .frp-talent-chip.active-ultimate').removeClass('active-cs active-ultimate');
-            html.find('#sit-tags').empty();
-            html.find('[name="shift"]').trigger('change');
-          });
-
-          // ── Situational modifier: apply on select change ──
-          html.find('#sit-select').on('change', function() {
-            const $sel = $(this);
-            const opt = $sel.find('option:selected');
-            const cs = parseInt(opt.val());
-            const label = opt.data('label') || '';
-            if (!cs || !label) return;
-
-            // Prevent duplicate
-            let exists = false;
-            html.find('.frp-sit-tag').each(function() {
-              if ($(this).data('label') === label) exists = true;
-            });
-            if (exists) { $sel.val(''); return; }
-
-            const sign = cs > 0 ? '+' : '';
-            const cls = cs < 0 ? ' penalty' : '';
-            const tag = $(`<span class="frp-sit-tag${cls}" data-cs="${cs}" data-label="${label}">
-              ${label} <span class="tag-cs">${sign}${cs}</span>
-              <span class="tag-x">&times;</span>
-            </span>`);
-            html.find('#sit-tags').append(tag);
-
-            const $csInput = html.find('[name="shift"]');
-            $csInput.val(parseInt($csInput.val()) + cs).trigger('change');
-            $sel.val('');
-          });
-
-          // ── Situational modifier: remove tag ──
-          html.find('#sit-tags').on('click', '.tag-x', function() {
-            const $tag = $(this).closest('.frp-sit-tag');
-            if ($tag.data('auto') === 'range') return;
-            const cs = parseInt($tag.data('cs')) || 0;
-            const $csInput = html.find('[name="shift"]');
-            $csInput.val(parseInt($csInput.val()) - cs).trigger('change');
-            $tag.remove();
-          });
-
-          // Multi-attack toggle — inactive styling + disable radios
+          // Multi-attack toggle
           html.find('#multi-enabled').on('change', function() {
             const $row = $(this).closest('.frp-opt-row');
             $row.toggleClass('inactive', !this.checked);
             $row.find('[name="multiCount"]').prop('disabled', !this.checked);
           });
 
-          // Karma toggle — inactive styling
+          // Karma toggle
           html.find('#spend-karma').on('change', function() {
             $(this).closest('.frp-opt-row').toggleClass('inactive', !this.checked);
           });
@@ -745,6 +524,8 @@ export class ShootingAction extends RangedAttackAction {
         },
         close: () => {
           if (this._disposeAutoFill) this._disposeAutoFill();
+          if (_csState) _csState.destroy();
+          if (!_resolved) resolve(null);
         }
       }).render(true);
     });

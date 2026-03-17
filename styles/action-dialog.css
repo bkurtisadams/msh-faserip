@@ -393,7 +393,7 @@
   box-sizing: border-box;
   /* Foundry v13 overrides */
   min-height: 0;
-  -moz-appearance: textfield;
+  appearance: textfield;
 }
 .frp-dlg .frp-cs-input::-webkit-inner-spin-button,
 .frp-dlg .frp-cs-input::-webkit-outer-spin-button {
@@ -535,6 +535,66 @@
 .frp-dlg .frp-talent-chip:hover {
   filter: brightness(0.95);
   transform: translateY(-1px);
+}
+
+/* ── Talent box (separate row above CS, green themed) ────────────────── */
+.frp-dlg .frp-talent-box {
+  background: #f1f8f1;
+  border-color: #a5d6a7;
+  padding: 5px 10px;
+}
+.frp-dlg .frp-talent-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+.frp-dlg .frp-talent-label {
+  font-family: 'Oswald', sans-serif;
+  font-size: 10px;
+  color: #2e7d32;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+.frp-dlg .frp-talent-total {
+  margin-left: auto;
+  font-family: 'Oswald', sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  color: #2e7d32;
+  flex-shrink: 0;
+}
+
+/* ── Net total row (breakdown below CS box) ──────────────────────────── */
+.frp-dlg .frp-net-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  font-size: 12px;
+  color: #777;
+  border-top: 1px solid #e8e0d0;
+  margin-top: 2px;
+}
+.frp-dlg .frp-net-label {
+  font-family: 'Oswald', sans-serif;
+  font-size: 10px;
+  color: #777;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+.frp-dlg .frp-net-rank {
+  font-family: 'Oswald', sans-serif;
+  font-weight: 700;
+  font-size: 15px;
+  color: #1a1a1a;
+}
+.frp-dlg .frp-net-breakdown {
+  font-size: 11px;
+  color: #777;
 }
 
 /* ── Chip row (separate line below CS controls) ─────────────────────── */
