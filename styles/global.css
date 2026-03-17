@@ -3948,7 +3948,7 @@ form.faserip-sheet .secondary-abilities .sec-col.resources > .sec-body.resources
 /* dot-mode hover portrait — fixed on body, positioned via clientCoordinatesFromCanvas */
 .faserip-dot-portrait {
   position: fixed;
-  z-index: 10000;
+  z-index: 70;
   pointer-events: none;
   background: #1a1a1a;
   border: 2px solid #c0a070;
