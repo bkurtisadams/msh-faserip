@@ -439,10 +439,14 @@ export class GrapplingAction extends AttackAction {
         <div class="frp-fx-cell r">Full Hold<br><span style="font-size:9px;font-weight:400;opacity:0.7;">restrained</span></div>
       </div>
 
-      <!-- Footer -->
+      <!-- Footer: checkboxes + buttons on one row -->
       <div class="frp-foot">
         <label><input type="checkbox" name="remember" ${savedRemember ? 'checked' : ''}> Remember</label>
         <label><input type="checkbox" name="skipDice" ${savedSkipDice ? 'checked' : ''}> Skip dice</label>
+        <div class="frp-foot-btns">
+          <button type="button" class="frp-btn-cancel" id="frp-cancel">Cancel</button>
+          <button type="button" class="frp-btn-roll" id="frp-roll">Roll</button>
+        </div>
       </div>
 
     </div>
@@ -452,78 +456,17 @@ export class GrapplingAction extends AttackAction {
     const resolvedTargetStr = targetStrRank || prefillTargetStr;
 
     return new Promise((resolve) => {
-      new Dialog({
+      let _resolved = false;
+      const dlg = new Dialog({
         title: dialogTitle,
         content: dialogHtml,
-        buttons: {
-          roll: {
-            label: "Roll",
-            callback: async (html) => {
-              const $dlg = (s) => html.find(s);
-
-              const { spendKarma } = extractKarmaFromDialog(html);
-
-              const shift = parseInt($dlg('[name="shift"]').val() || 0);
-
-              // Build csNotes from active chips + sit tags
-              const sitParts = [];
-              html.find('.frp-talent-chip.active-cs, .frp-talent-chip.active-ultimate').each(function() {
-                const talent = $(this).data('talent') || '';
-                const cs = parseInt($(this).data('cs')) || 0;
-                if (talent && cs) sitParts.push(`${talent} ${cs > 0 ? '+' : ''}${cs}`);
-              });
-              html.find('.frp-sit-tag').each(function() {
-                const label = $(this).data('label') || '';
-                const cs = parseInt($(this).data('cs')) || 0;
-                if (label) sitParts.push(`${label} ${cs > 0 ? '+' : ''}${cs}`);
-              });
-              const csNotes = sitParts.join(', ');
-
-              // Collect active chip states for persistence
-              const activeChips = {};
-              html.find('.frp-talent-chip.active-cs, .frp-talent-chip.active-ultimate').each(function() {
-                const talent = $(this).data('talent');
-                const isUlt = !!$(this).data('ultimate');
-                if (talent) activeChips[talent] = isUlt ? 'ultimate' : 'cs';
-              });
-              html.find('.frp-talent-chip.active-flag').each(function() {
-                const talent = $(this).data('talent');
-                if (talent) activeChips[talent] = (activeChips[talent] || '') + ',flag';
-              });
-
-              // Strip sit tags from saved shift (only persist manual + talent chips)
-              let sitTagCS = 0;
-              html.find('.frp-sit-tag').each(function() {
-                sitTagCS += parseInt($(this).data('cs')) || 0;
-              });
-              const baseShift = shift - sitTagCS;
-
-              const rememberSettings = !!$dlg('[name="remember"]').is(':checked');
-              const skipDice = !!$dlg('[name="skipDice"]').is(':checked');
-
-              if (rememberSettings) {
-                await actor.setFlag("msh-faserip", "lastGrappleShift", baseShift);
-                await actor.setFlag("msh-faserip", "lastGrappleActiveChips", activeChips);
-              }
-
-              resolve({
-                targetName:     primaryTarget?.name || String($dlg('[name="targetName"]').val() || prefillTargetName || "Target"),
-                targetStrength: resolvedTargetStr,
-                targetUuid:     primaryTargetActor?.uuid || prefillTargetUuid,
-                shift,
-                csNotes,
-                spendKarma,
-                remember: rememberSettings,
-                skipDice
-              });
-            }
-          },
-          cancel: { label: "Cancel", callback: () => resolve(null) }
-        },
-        default: "roll",
+        buttons: {},
         render: async (html) => {
           setupKarmaControlHandlers(html);
           const $dialog = html.closest('.dialog');
+
+          // Hide Foundry's native button row
+          $dialog.find('.dialog-buttons').hide();
 
           // Inject mode buttons into the titlebar
           const $titlebar = $dialog.find('.window-title, .dialog-title').first();
@@ -539,6 +482,75 @@ export class GrapplingAction extends AttackAction {
             $dialog.css('width', '360px');
             $dialog[0].style.height = 'auto';
           }
+
+          // ── Roll button handler ──
+          html.find('#frp-roll').on('click', async () => {
+            const $dlg = (s) => html.find(s);
+
+            const { spendKarma } = extractKarmaFromDialog(html);
+            const shift = parseInt($dlg('[name="shift"]').val() || 0);
+
+            // Build csNotes from active chips + sit tags
+            const sitParts = [];
+            html.find('.frp-talent-chip.active-cs, .frp-talent-chip.active-ultimate').each(function() {
+              const talent = $(this).data('talent') || '';
+              const cs = parseInt($(this).data('cs')) || 0;
+              if (talent && cs) sitParts.push(`${talent} ${cs > 0 ? '+' : ''}${cs}`);
+            });
+            html.find('.frp-sit-tag').each(function() {
+              const label = $(this).data('label') || '';
+              const cs = parseInt($(this).data('cs')) || 0;
+              if (label) sitParts.push(`${label} ${cs > 0 ? '+' : ''}${cs}`);
+            });
+            const csNotes = sitParts.join(', ');
+
+            // Collect active chip states for persistence
+            const activeChips = {};
+            html.find('.frp-talent-chip.active-cs, .frp-talent-chip.active-ultimate').each(function() {
+              const talent = $(this).data('talent');
+              const isUlt = !!$(this).data('ultimate');
+              if (talent) activeChips[talent] = isUlt ? 'ultimate' : 'cs';
+            });
+            html.find('.frp-talent-chip.active-flag').each(function() {
+              const talent = $(this).data('talent');
+              if (talent) activeChips[talent] = (activeChips[talent] || '') + ',flag';
+            });
+
+            // Strip sit tags from saved shift
+            let sitTagCS = 0;
+            html.find('.frp-sit-tag').each(function() {
+              sitTagCS += parseInt($(this).data('cs')) || 0;
+            });
+            const baseShift = shift - sitTagCS;
+
+            const rememberSettings = !!$dlg('[name="remember"]').is(':checked');
+            const skipDice = !!$dlg('[name="skipDice"]').is(':checked');
+
+            if (rememberSettings) {
+              await actor.setFlag("msh-faserip", "lastGrappleShift", baseShift);
+              await actor.setFlag("msh-faserip", "lastGrappleActiveChips", activeChips);
+            }
+
+            _resolved = true;
+            resolve({
+              targetName:     primaryTarget?.name || String($dlg('[name="targetName"]').val() || prefillTargetName || "Target"),
+              targetStrength: resolvedTargetStr,
+              targetUuid:     primaryTargetActor?.uuid || prefillTargetUuid,
+              shift,
+              csNotes,
+              spendKarma,
+              remember: rememberSettings,
+              skipDice
+            });
+            dlg.close();
+          });
+
+          // ── Cancel button handler ──
+          html.find('#frp-cancel').on('click', () => {
+            _resolved = true;
+            resolve(null);
+            dlg.close();
+          });
 
           // ── Talent chip click handler ──
           html.find('.frp-talent-chip').on('click', function() {
@@ -647,6 +659,9 @@ export class GrapplingAction extends AttackAction {
           });
 
           applyCapabilitiesToDialog(html, "grappling", { actor });
+        },
+        close: () => {
+          if (!_resolved) resolve(null);
         }
       }).render(true);
     });
