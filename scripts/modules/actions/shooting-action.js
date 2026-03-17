@@ -254,7 +254,7 @@ export class ShootingAction extends RangedAttackAction {
 
       <!-- Header: Actor (Base Agility / Rank Value) shoots Target -->
       <div class="frp-header-v3">
-        <span class="h-actor">${actor.name}</span>
+        <span class="h-actor" title="${actor.name}">${actor.name}</span>
         <span class="h-paren">(</span>
         <span class="h-stat">
           <span class="h-stat-label">Base Agility:</span>
@@ -262,7 +262,7 @@ export class ShootingAction extends RangedAttackAction {
         </span>
         <span class="h-paren">)</span>
         ${targetDisplay
-          ? `<span class="h-verb">attacks</span><span class="h-target">${targetDisplay}</span>`
+          ? `<span class="h-verb">attacks</span><span class="h-target" title="${targetDisplay}">${targetDisplay}</span>`
           : ''}
       </div>
 

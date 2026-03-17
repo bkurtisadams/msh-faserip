@@ -1,4 +1,6 @@
-/* action-dialog.css v3.2.0 - 2026-03-15 */
+/* action-dialog.css v3.3.0 - 2026-03-16 */
+/* v3.3.0: Header name ellipsis — max-width:120px + overflow on h-actor and h-target,
+           remove flex-wrap on header (nowrap + overflow:hidden), flex-shrink:0 on fixed elements */
 /* v3.2.0: Titlebar mode buttons (frp-titlebar-mode), remove mode+target row,
            tiny mode button overrides for titlebar context */
 /* v2.1.0: Add active-ultimate chip style (gold/amber) for Ultimate Skill rank overrides */
@@ -83,7 +85,8 @@
   margin: -6px -6px 4px;
   background: linear-gradient(90deg, var(--mred) 0%, var(--mred-dk) 100%);
   color: #fff;
-  flex-wrap: wrap;
+  overflow: hidden;
+  white-space: nowrap;
 }
 .frp-dlg .frp-header-v3 .h-action {
   font-family: 'Oswald', sans-serif;
@@ -97,17 +100,23 @@
   font-weight: 700;
   font-size: 15px;
   color: #fff;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .frp-dlg .frp-header-v3 .h-paren {
   font-size: 14px;
   opacity: 0.5;
   font-weight: 300;
+  flex-shrink: 0;
 }
 .frp-dlg .frp-header-v3 .h-stat {
   display: inline-flex;
   flex-direction: column;
   align-items: center;
   line-height: 1.1;
+  flex-shrink: 0;
 }
 .frp-dlg .frp-header-v3 .h-stat-label {
   font-family: 'Barlow Condensed', sans-serif;
@@ -126,17 +135,20 @@
   font-family: 'Barlow Condensed', sans-serif;
   font-size: 13px;
   opacity: 0.7;
+  flex-shrink: 0;
 }
 .frp-dlg .frp-header-v3 .h-arrow {
   color: var(--gold-lit);
   font-weight: 700;
   font-size: 14px;
+  flex-shrink: 0;
 }
 .frp-dlg .frp-header-v3 .h-target {
   font-family: 'Oswald', sans-serif;
   font-weight: 700;
   font-size: 15px;
   color: #ffcdd2;
+  max-width: 120px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

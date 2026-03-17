@@ -1,4 +1,6 @@
-// scripts/modules/actions/energy-action.js v3.0.0 - 2026-03-16
+// scripts/modules/actions/energy-action.js v3.0.1 - 2026-03-16
+// v3.0.1: Move target movement from range box to situational dropdown (matches shooting)
+//         Remove movementModifier from resolve path — baked into CS via sit tags
 // v3.0.0: Port to v3 compact dialog layout matching blunt/edged/shooting
 //         - frp-dlg wrapper, frp-header-v3 banner, frp-cs-box with chips + situational dropdown
 //         - Power select as frp-dmg-box inline (dropdown + ad-hoc sub-fields)
@@ -208,7 +210,7 @@ export class EnergyAction extends RangedAttackAction {
 
       <!-- Header -->
       <div class="frp-header-v3">
-        <span class="h-actor">${actor.name}</span>
+        <span class="h-actor" title="${actor.name}">${actor.name}</span>
         <span class="h-paren">(</span>
         <span class="h-stat">
           <span class="h-stat-label">Base ${ability.name}:</span>
@@ -216,7 +218,7 @@ export class EnergyAction extends RangedAttackAction {
         </span>
         <span class="h-paren">)</span>
         ${targetDisplay
-          ? `<span class="h-verb">attacks</span><span class="h-target">${targetDisplay}</span>`
+          ? `<span class="h-verb">attacks</span><span class="h-target" title="${targetDisplay}">${targetDisplay}</span>`
           : ''}
       </div>
 
@@ -253,6 +255,11 @@ export class EnergyAction extends RangedAttackAction {
             <optgroup label="Penalties">
               <option value="-2" data-label="Shielding" title="Target using cover">Shielding -2CS</option>
               <option value="-2" data-label="Impaired" title="Lost Endurance ranks">Impaired -2CS</option>
+            </optgroup>
+            <optgroup label="Target Movement">
+              <option value="-1" data-label="Moving" title="Target moving &le;5 areas/round">Moving &le;5 areas -1CS</option>
+              <option value="-2" data-label="Fast" title="Target moving &le;10 areas/round">Moving &le;10 areas -2CS</option>
+              <option value="-4" data-label="Very Fast" title="Target moving &gt;10 areas/round">Moving &gt;10 areas -4CS</option>
             </optgroup>
             <optgroup label="Target Size">
               <option value="1" data-label="Growth +1">Growth 12-18ft +1CS</option>
@@ -299,16 +306,6 @@ export class EnergyAction extends RangedAttackAction {
           <span style="color:#777;">areas</span>
           <label style="cursor:pointer;font-size:11px;"><input type="checkbox" name="throughObstacle" ${savedObstacle ? 'checked' : ''}> Obstacle (-2CS)</label>
           <span style="color:#999;font-size:11px;margin-left:auto;" id="range-hint"></span>
-        </div>
-        <div style="margin-top:3px;display:flex;align-items:center;gap:6px;font-size:12px;">
-          <span style="font-family:'Oswald',sans-serif;font-size:10px;color:#1565c0;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;">Target</span>
-          <select name="targetMovement" style="font-size:12px;padding:2px 3px;border:1px solid #b8b8b8;border-radius:2px;">
-            <option value="0">Standing</option>
-            <option value="0-charging">Charging attacker</option>
-            <option value="-1">Moving (&minus;1CS)</option>
-            <option value="-2">Fast (&minus;2CS)</option>
-            <option value="-4">Very Fast (&minus;4CS)</option>
-          </select>
         </div>
       </div>
 
@@ -410,8 +407,6 @@ export class EnergyAction extends RangedAttackAction {
 
               const range = Number($dlg('[name="range"]').val() || 1);
               const throughObstacle = !!$dlg('[name="throughObstacle"]').is(':checked');
-              const targetMovement = String($dlg('[name="targetMovement"]').val() || "0");
-              const movementModifier = targetMovement === "0-charging" ? 0 : Number(targetMovement);
 
               const multiAdjacent = !!$dlg('#multi-enabled').is(':checked');
 
@@ -473,7 +468,6 @@ export class EnergyAction extends RangedAttackAction {
               // Range & obstacle modifiers
               const { totalShift, impossible, rangeModifier, obstacleModifier } =
                 this._applyRangeModifiers(shift, range, throughObstacle, null, powerRank, null);
-              const finalShift = totalShift + movementModifier;
 
               if (impossible) {
                 ui.notifications.error(`Target is beyond energy range (rank: ${powerRank}).`);
@@ -484,9 +478,8 @@ export class EnergyAction extends RangedAttackAction {
                 powerName, powerDamage, powerRank, powerId, prettyRange,
                 useAdHoc,
                 shift, karma, spendKarma, range, throughObstacle, skipDice, usePowerToHit,
-                totalShift: finalShift,
+                totalShift,
                 rangeModifier, obstacleModifier,
-                targetMovement, movementModifier,
                 powerDamageType, multiAdjacent,
                 reduceDamageEnabled, reducedDamage, resultCap,
                 csNotes, talentFlags
@@ -742,7 +735,6 @@ export class EnergyAction extends RangedAttackAction {
       manual: choice.shift || 0,
       range: choice.rangeModifier || 0,
       obstacle: choice.obstacleModifier || 0,
-      movement: choice.movementModifier || 0,
       csNotes: choice.csNotes || ""
     };
     if (choice.multiAdjacent) shiftBreakdown.adjacent = -4;
