@@ -97,6 +97,71 @@
       </div>
     </fieldset>
 
+    <!-- Applies To (action types) -->
+    <fieldset class="talent-fieldset">
+      <legend>Applies To</legend>
+      <div class="talent-applies-grid">
+        <label class="talent-check" data-tooltip="Slugfest / melee blunt attacks (Fighting)">
+          <input type="checkbox" class="talent-applies-check" value="blunt-attack" {{#if (includes system.appliesTo "blunt-attack")}}checked{{/if}} /> Blunt
+        </label>
+        <label class="talent-check" data-tooltip="Edged melee attacks (Fighting)">
+          <input type="checkbox" class="talent-applies-check" value="edged-attack" {{#if (includes system.appliesTo "edged-attack")}}checked{{/if}} /> Edged
+        </label>
+        <label class="talent-check" data-tooltip="Ranged attacks — guns, bows, crossbows (Agility)">
+          <input type="checkbox" class="talent-applies-check" value="shooting" {{#if (includes system.appliesTo "shooting")}}checked{{/if}} /> Shooting
+        </label>
+        <label class="talent-check" data-tooltip="Energy power attacks (Power rank)">
+          <input type="checkbox" class="talent-applies-check" value="energy" {{#if (includes system.appliesTo "energy")}}checked{{/if}} /> Energy
+        </label>
+        <label class="talent-check" data-tooltip="Force power attacks (Power rank)">
+          <input type="checkbox" class="talent-applies-check" value="force" {{#if (includes system.appliesTo "force")}}checked{{/if}} /> Force
+        </label>
+        <label class="talent-check" data-tooltip="Thrown blunt objects/weapons (Agility)">
+          <input type="checkbox" class="talent-applies-check" value="throwing-blunt" {{#if (includes system.appliesTo "throwing-blunt")}}checked{{/if}} /> Throw B
+        </label>
+        <label class="talent-check" data-tooltip="Thrown edged weapons (Agility)">
+          <input type="checkbox" class="talent-applies-check" value="throwing-edged" {{#if (includes system.appliesTo "throwing-edged")}}checked{{/if}} /> Throw E
+        </label>
+        <label class="talent-check" data-tooltip="Grappling attacks (Strength)">
+          <input type="checkbox" class="talent-applies-check" value="grappling" {{#if (includes system.appliesTo "grappling")}}checked{{/if}} /> Grappling
+        </label>
+        <label class="talent-check" data-tooltip="Charging attacks (Endurance)">
+          <input type="checkbox" class="talent-applies-check" value="charging" {{#if (includes system.appliesTo "charging")}}checked{{/if}} /> Charging
+        </label>
+        <label class="talent-check" data-tooltip="Escaping from holds (Strength)">
+          <input type="checkbox" class="talent-applies-check" value="escaping" {{#if (includes system.appliesTo "escaping")}}checked{{/if}} /> Escaping
+        </label>
+        <label class="talent-check" data-tooltip="Dodging/evading attacks (Agility)">
+          <input type="checkbox" class="talent-applies-check" value="dodging" {{#if (includes system.appliesTo "dodging")}}checked{{/if}} /> Dodging
+        </label>
+      </div>
+    </fieldset>
+
+    <!-- Special Flags -->
+    <fieldset class="talent-fieldset">
+      <legend>Special Flags</legend>
+      <div class="talent-flags-grid">
+        <label class="talent-check" data-tooltip="No range penalties when using this talent (Marksman)">
+          <input type="checkbox" class="talent-flag-check" value="no-range-penalty" {{#if (includes system.flags "no-range-penalty")}}checked{{/if}} /> No Range Penalty
+        </label>
+        <label class="talent-check" data-tooltip="Slam/Stun results ignore comparative Strength/Endurance (MA-A)">
+          <input type="checkbox" class="talent-flag-check" value="ignore-str-end" {{#if (includes system.flags "ignore-str-end")}}checked{{/if}} /> Ignore Str/End
+        </label>
+        <label class="talent-check" data-tooltip="Ignore Body Armor for Stun/Slam effect checks, does not bypass Force Fields (MA-D)">
+          <input type="checkbox" class="talent-flag-check" value="ignore-armor-fx" {{#if (includes system.flags "ignore-armor-fx")}}checked{{/if}} /> Ignore Armor (fx)
+        </label>
+        <label class="talent-check" data-tooltip="No damage needed to trigger Stun/Slam check (MA-D)">
+          <input type="checkbox" class="talent-flag-check" value="no-damage-needed" {{#if (includes system.flags "no-damage-needed")}}checked{{/if}} /> No Dmg Needed
+        </label>
+        <label class="talent-check" data-tooltip="Must study target for 2 rounds before this talent's special effect applies (MA-D)">
+          <input type="checkbox" class="talent-flag-check" value="study-required" {{#if (includes system.flags "study-required")}}checked{{/if}} /> Study Required
+        </label>
+        <label class="talent-check" data-tooltip="+1 to initiative when using this talent (MA-E, Wpn Specialist)">
+          <input type="checkbox" class="talent-flag-check" value="initiative" {{#if (includes system.flags "initiative")}}checked{{/if}} /> +1 Initiative
+        </label>
+      </div>
+    </fieldset>
+
     <!-- Notes -->
     <fieldset class="talent-fieldset">
       <legend>Notes</legend>

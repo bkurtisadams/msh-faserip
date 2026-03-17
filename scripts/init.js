@@ -1798,6 +1798,11 @@ Hooks.once("init", async () => {
     if (typeof str !== 'string') return '';
     return str.charAt(0).toUpperCase() + str.slice(1);
   });
+
+  Handlebars.registerHelper('includes', function(array, value) {
+    if (!Array.isArray(array)) return false;
+    return array.includes(value);
+  });
   
   // Initialize rest system
   initRestSystem();
@@ -3514,4 +3519,4 @@ async function createUniversalActionMacro(data, slot) {
   
   game.user.assignHotbarMacro(macro, slot);
   return true;
-}
+}

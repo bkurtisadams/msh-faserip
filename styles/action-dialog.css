@@ -478,135 +478,68 @@
   gap: 3px;
   margin-top: 4px;
 }
-.frp-dlg .frp-talent-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  padding: 1px 6px;
-  border-radius: 3px;
-  font-family: 'Barlow Condensed', sans-serif;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  user-select: none;
-  transition: all 0.15s ease;
-  border: 1px solid #bbb;
-  background: #eee;
-  color: #888;
-  white-space: nowrap;
-  flex-shrink: 0;
-  line-height: 1.3;
+/* ── CS Help Button ─────────────────────────────────────────────────── */
+.frp-dlg .frp-cs-help {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; border-radius: 50%;
+  border: 1px solid #c0b8a0; background: #f5f3ee; color: #999;
+  font-family: 'Oswald', sans-serif; font-size: 11px; font-weight: 700;
+  cursor: pointer; user-select: none; padding: 0; line-height: 1;
+  margin-left: 4px; flex-shrink: 0;
 }
-.frp-dlg .frp-talent-chip .chip-cs {
-  font-family: 'Oswald', sans-serif;
-  font-weight: 700;
-  font-size: 12px;
-}
-.frp-dlg .frp-talent-chip .chip-note {
-  font-size: 10px;
-  font-weight: 400;
-  font-style: italic;
-}
-/* Active: CS-granting talent (green) */
-.frp-dlg .frp-talent-chip.active-cs {
-  background: #e8f5e9;
-  border-color: #66bb6a;
-  color: #2e7d32;
-}
-.frp-dlg .frp-talent-chip.active-cs .chip-cs {
-  color: #1b5e20;
-}
-/* Active: flag-only talent (purple) */
-.frp-dlg .frp-talent-chip.active-flag {
-  background: #f3e5f5;
-  border-color: #ba68c8;
-  color: #6a1b9a;
-}
-/* Active: Ultimate Skill override (gold — power-tier, overrides normal talent CS) */
-.frp-dlg .frp-talent-chip.active-ultimate {
-  background: #fff8e1;
-  border-color: var(--gold);
-  color: #7b6b00;
-}
-.frp-dlg .frp-talent-chip.active-ultimate .chip-cs {
-  color: #c8960c;
-  font-weight: 700;
-}
-.frp-dlg .frp-talent-chip:hover {
-  filter: brightness(0.95);
-  transform: translateY(-1px);
+.frp-dlg .frp-cs-help:hover { background: #ece8dd; color: #666; }
+
+/* ── Base Rank (before arrow) ──────────────────────────────────────── */
+.frp-dlg .frp-cs-base {
+  font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 13px;
+  color: #777; margin-left: 4px;
 }
 
-/* ── Talent box (separate row above CS, green themed) ────────────────── */
-.frp-dlg .frp-talent-box {
-  background: #f1f8f1;
-  border-color: #a5d6a7;
-  padding: 5px 10px;
-}
-.frp-dlg .frp-talent-row {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  flex-wrap: wrap;
-}
-.frp-dlg .frp-talent-label {
-  font-family: 'Oswald', sans-serif;
-  font-size: 10px;
-  color: #2e7d32;
-  font-weight: 600;
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
-  flex-shrink: 0;
-}
-.frp-dlg .frp-talent-total {
-  margin-left: auto;
-  font-family: 'Oswald', sans-serif;
-  font-weight: 700;
-  font-size: 14px;
-  color: #2e7d32;
-  flex-shrink: 0;
-}
-
-/* ── Net total row (breakdown below CS box) ──────────────────────────── */
-.frp-dlg .frp-net-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 3px 10px;
-  font-size: 12px;
-  color: #777;
-  border-top: 1px solid #e8e0d0;
-  margin-top: 2px;
-}
-.frp-dlg .frp-net-label {
-  font-family: 'Oswald', sans-serif;
-  font-size: 10px;
-  color: #777;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-}
-.frp-dlg .frp-net-rank {
-  font-family: 'Oswald', sans-serif;
-  font-weight: 700;
-  font-size: 15px;
-  color: #1a1a1a;
-}
-.frp-dlg .frp-net-breakdown {
-  font-size: 11px;
+/* ── Range Penalty (read-only, between CS input and base rank) ─────── */
+.frp-dlg .frp-cs-range {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-family: 'Oswald', sans-serif; font-size: 12px; font-weight: 600;
   color: #777;
 }
-
-/* ── Chip row (separate line below CS controls) ─────────────────────── */
-.frp-dlg .frp-chip-row {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  flex-wrap: wrap;
-  margin-top: 5px;
+.frp-dlg .frp-cs-range.neg { color: #c62828; }
+.frp-dlg .frp-range-label {
+  font-size: 9px; text-transform: uppercase; letter-spacing: 0.3px;
+  opacity: 0.7;
+}
+.frp-dlg .frp-range-num {
+  font-weight: 700; min-width: 16px; text-align: center;
 }
 
-/* ── Situational modifier dropdown (inline in CS line) ───────────────── */
+/* ── Reference Panel (read-only, toggled by ? button) ──────────────── */
+.frp-dlg .frp-ref-panel {
+  margin-top: 4px; padding: 4px 6px;
+  border: 1px solid #d8cfb8; border-radius: 3px;
+  background: #faf8f2;
+  max-height: 260px; overflow-y: auto;
+}
+.frp-dlg .frp-ref-group { margin-bottom: 4px; }
+.frp-dlg .frp-ref-group:last-child { margin-bottom: 0; }
+.frp-dlg .frp-ref-group-label {
+  font-family: 'Oswald', sans-serif; font-size: 9px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.3px; color: #999;
+  border-bottom: 1px solid #e8e0d0; margin-bottom: 2px; padding-bottom: 1px;
+}
+.frp-dlg .frp-ref-item {
+  display: flex; align-items: baseline; gap: 4px;
+  padding: 0 2px; font-size: 11px; line-height: 1.5;
+}
+.frp-dlg .frp-ref-cs {
+  font-family: 'Oswald', sans-serif; font-weight: 700; font-size: 11px;
+  flex-shrink: 0; min-width: 38px; text-align: right; color: #555;
+}
+.frp-dlg .frp-ref-name {
+  font-weight: 600; color: #333; white-space: nowrap;
+}
+.frp-dlg .frp-ref-note {
+  font-size: 10px; color: #999; font-style: italic;
+}
+
+/* ── Situational modifier dropdown (legacy, may still be referenced) ── */
 .frp-dlg .frp-sit-select {
   font-family: 'Barlow Condensed', sans-serif;
   font-size: 11px;

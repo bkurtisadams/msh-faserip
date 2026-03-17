@@ -1,7 +1,7 @@
-// shooting-action.js v3.2.0 - 2026-03-17
-// v3.2.0: Use shared cs-modifiers.js — detectModifiers + buildCSRow + wireCSPanel.
-//         Eliminates inline talent detection, chip HTML, sit tag handlers, CS drift bugs.
-//         All modifiers in one dropdown panel. Compact footer with inline buttons.
+// shooting-action.js v3.3.0 - 2026-03-17
+// v3.3.0: Manual CS only — remove talent/power auto-detection and auto-mods.
+//         CS row is a simple number input + ? reference panel.
+//         Range penalty still displayed in Range box (informational).
 // v3.1.0: Separate talent row from CS input — talents in own green box above CS,
 //         CS input is purely manual/situational. Eliminates CS drift across sessions.
 //         Net row shows combined breakdown. Compact single-row footer with inline buttons.
@@ -43,7 +43,7 @@ import { makeDamageBlock, computeAfterArmor, buildDamageFlags } from "./damage-u
 import { canEffectsApply } from "../../rules/effects-gate.js";
 import { playCombatSFX } from "./audio-utils.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
-import { detectModifiers, buildCSRow, wireCSPanel } from "./cs-modifiers.js";
+import { buildCSRow, wireCSPanel } from "./cs-modifiers.js";
 
 export class ShootingAction extends RangedAttackAction {
   async execute() {
@@ -97,11 +97,7 @@ export class ShootingAction extends RangedAttackAction {
     const savedMultiAttacks = shouldRemember ? ((await actor.getFlag("msh-faserip", "lastShootingMultiAttacks")) || false) : false;
     const savedAttackCount = shouldRemember ? ((await actor.getFlag("msh-faserip", "lastShootingAttackCount")) || 2) : 2;
     const savedVariantType = shouldRemember ? ((await actor.getFlag("msh-faserip", "lastShootingVariant")) || "") : "";
-    const savedCheckedMods = shouldRemember ? (await actor.getFlag("msh-faserip", "lastShootingCheckedMods") || []) : [];
     const savedSkipDice = localStorage.getItem(lsSkipKey) === "1";
-
-    // === Detect modifiers via shared utility ===
-    const mods = detectModifiers("shooting", actor, ability);
 
     // === Target info ===
     const { targets, primaryTarget, primaryTargetActor, targetDisplay } = getTargetData();
@@ -175,19 +171,13 @@ export class ShootingAction extends RangedAttackAction {
       return `<option value="${i.id}" ${sel}>${i.name} &mdash; ${dmg} dmg / ${rng} areas${apLabel}</option>`;
     }).join('');
 
-    // === Build initial range auto-mod ===
+    // === Build CS row via shared utility (manual input + range + ? reference) ===
     const initialRangePenalty = savedRange > 1 ? -(savedRange - 1) : 0;
-    const initialAutoMods = initialRangePenalty < 0
-      ? [{ key: "auto:range", label: `Range ${savedRange} (auto)`, cs: initialRangePenalty }]
-      : [];
-
-    // === Build CS row via shared utility ===
     const csRowHtml = buildCSRow({
-      mods,
-      savedManualCS: savedColumnShift,
-      savedChecked: savedCheckedMods,
+      savedCS: savedColumnShift,
       abilityRank: ability.rank,
-      autoMods: initialAutoMods
+      rangePenalty: initialRangePenalty,
+      showRange: true
     });
 
     // === Dialog HTML — v3.2 Mods Panel Layout ===
@@ -320,8 +310,18 @@ export class ShootingAction extends RangedAttackAction {
           const setLS = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
 
           // ── Wire CS panel from shared utility ──
+          // getRangePenalty reads live range from the dialog
+          const _getCurrentRangePenalty = () => {
+            const rangeVal = Number(html.find('[name="range"]').val() || 0);
+            const weaponId = html.find('#damage-source-select').val() || "";
+            const weapon = shootingWeapons.find(i => i.id === weaponId);
+            const maxRange = weapon?.system?.range || 15;
+            if (rangeVal > maxRange) return 0; // out of range — handled separately
+            return rangeVal > 1 ? -(rangeVal - 1) : 0;
+          };
           _csState = wireCSPanel(html, {
             abilityRank: ability.rank,
+            getRangePenalty: _getCurrentRangePenalty,
             onUpdate: () => {
               if ($dialog.length) $dialog[0].style.height = 'auto';
             }
@@ -357,26 +357,18 @@ export class ShootingAction extends RangedAttackAction {
               $afterArmor.text(`${currentDamage} damage`);
             }
 
-            // Range penalty → update auto mods in CS panel
+            // Range penalty — update CS panel and range info display
             const rangeVal = Number(html.find('[name="range"]').val() || 0);
             const $rangePenalty = html.find('#range-penalty-display');
 
-            // Check if Marksman no-range-penalty flag is active
-            const noRangePenalty = _csState?.get().talentFlags?.["no-range-penalty"] || false;
-
-            let penalty = 0;
             if (rangeVal > currentRange) {
               $rangePenalty.text('OUT OF RANGE').css('color', '#c62828');
+              _csState.setRange(0);
             } else {
-              penalty = noRangePenalty ? 0 : (rangeVal > 1 ? -(rangeVal - 1) : 0);
+              const penalty = rangeVal > 1 ? -(rangeVal - 1) : 0;
               $rangePenalty.text(penalty < 0 ? `${penalty}CS` : '').css('color', '#e65100');
+              _csState.setRange(penalty);
             }
-
-            // Update auto mods in the CS panel
-            const autoMods = penalty < 0
-              ? [{ key: "auto:range", label: `Range ${rangeVal} (auto)`, cs: penalty }]
-              : [];
-            _csState.setAutoMods(autoMods);
 
             if ($dialog.length) $dialog[0].style.height = 'auto';
           };
@@ -436,7 +428,6 @@ export class ShootingAction extends RangedAttackAction {
               await actor.setFlag("msh-faserip", "lastShootingMultiAttacks", multiAttacks);
               await actor.setFlag("msh-faserip", "lastShootingAttackCount", attackCount);
               await actor.setFlag("msh-faserip", "lastShootingVariant", variantType);
-              await actor.setFlag("msh-faserip", "lastShootingCheckedMods", cs.checkedKeys);
             }
 
             await actor.setFlag("msh-faserip", "csNotes", cs.csNotes);
@@ -455,14 +446,12 @@ export class ShootingAction extends RangedAttackAction {
               multiAttacks,
               attackCount,
               csNotes: cs.csNotes,
-              talentFlags: cs.talentFlags,
               armorPiercing: _apInfo.ap,
               armorPiercingCS: _apInfo.apCS,
               apMode: _apInfo.apMode,
               bypassForceField: _apInfo.bypassFF,
               shiftBreakdown: {
                 manual: cs.manualCS,
-                mods: cs.modsTotal,
                 multiAttack: 0,
                 csNotes: cs.csNotes
               }

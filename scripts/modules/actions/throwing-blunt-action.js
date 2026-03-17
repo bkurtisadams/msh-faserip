@@ -1,16 +1,6 @@
-// scripts/modules/actions/throwing-blunt-action.js v3.0.1 - 2026-03-16
-// v3.0.1: Fix CS save/restore — strip sit tags + range (not talent chips) on save.
-//         Range penalty uses autoRangeCs data-attr for clean base/penalty tracking.
-//         No-range-penalty flag support. Auto range tag not removable via × close.
-// v3.0.0: Port to v3 compact dialog layout matching blunt/edged/shooting/throwing-edged v3
-//         - frp-header-v3 banner, inline CS + chips + situational dropdown
-//         - Carried/Ad-hoc source toggle with weapon select in frp-dmg-box
-//         - Range info box (compact, penalty display only — CS via sit tags)
-//         - Greyed opt-rows (Pull with result cap + Karma), frp-fx-grid (Miss/Hit/Hit/Stun)
-//         - Titlebar mode buttons, 360px width
-//         - Talent chip detection (Thrown Objects, MA-E)
-//         - No AP (blunt objects don't pierce armor)
-// v2.0.0: Refactor - dialog only, delegates resolution to _executeSingleAttack
+// scripts/modules/actions/throwing-blunt-action.js v3.1.0 - 2026-03-17
+// v3.1.0: Manual CS only — remove talent/power auto-detection, chips, sit-tags.
+//         CS row is manual input + range penalty + ? reference panel via cs-modifiers.js.
 import { RangedAttackAction } from "./ranged-attack-action.js";
 import {
   setupKarmaControlHandlers,
@@ -33,6 +23,7 @@ import {
   debugLog
 } from "./action-utils.js";
 import { RANK_ABBR } from "../../rules/rules-reference.js";
+import { buildCSRow, wireCSPanel } from "./cs-modifiers.js";
 
 export class ThrowingBluntAction extends RangedAttackAction {
   async execute() {
@@ -76,29 +67,6 @@ export class ThrowingBluntAction extends RangedAttackAction {
     const strRank = actor?.system?.abilities?.strength?.rank || "Typical";
     const maxThrowRange = this._getThrowingRangeInAreas(strRank);
 
-    // Detect combat talents
-    const combatTalents = [];
-    for (const item of actor.items) {
-      if (item.type !== "talent") continue;
-      const name = (item.name || "").toLowerCase();
-      const rankOverride = item.system?.rankOverride || "";
-
-      let ultimateCS = 0;
-      if (rankOverride) {
-        const baseIdx = RANKS.indexOf(ability.rank);
-        const overIdx = RANKS.indexOf(rankOverride);
-        if (baseIdx >= 0 && overIdx >= 0) ultimateCS = overIdx - baseIdx;
-      }
-
-      if (name.includes("thrown object") || name.includes("throwing")) {
-        combatTalents.push({ name: "Thr.Obj", cs: 1, flag: null, note: "+1 CS", ultimateCS, rankOverride });
-      }
-      else if (name.includes("martial arts e") || name.includes("martial arts-e") ||
-               (name.includes("martial arts") && name.includes("(e)"))) {
-        combatTalents.push({ name: "MA-E", cs: 0, flag: "initiative", note: "+1 Initiative", ultimateCS, rankOverride });
-      }
-    }
-
     // --- INITIALIZATION & DEFAULTS ---
     const lsRememberKey = "msh.tb.remember";
     const lsSkipKey = "msh.tb.skipDice";
@@ -114,7 +82,6 @@ export class ThrowingBluntAction extends RangedAttackAction {
     const savedAdHocDmg = shouldRemember ? (Number(await actor.getFlag("msh-faserip", "lastThrowBluntAdHocDamage") || 6)) : 6;
     const savedRange = shouldRemember ? ((await actor.getFlag("msh-faserip", "lastThrowBluntRange")) || 1) : 1;
     const savedColumnShift = shouldRemember ? ((await actor.getFlag("msh-faserip", "lastThrowBluntShift")) ?? 0) : 0;
-    const savedActiveChips = shouldRemember ? ((await actor.getFlag("msh-faserip", "lastThrowBluntActiveChips")) || {}) : {};
     const savedPullEnabled = shouldRemember ? ((await actor.getFlag("msh-faserip", "lastThrowBluntPullEnabled")) || false) : false;
     const savedPulledDamage = shouldRemember ? ((await actor.getFlag("msh-faserip", "lastThrowBluntPulledDamage")) || 0) : 0;
     const savedResultCap = shouldRemember ? ((await actor.getFlag("msh-faserip", "lastThrowBluntResultCap")) || "none") : "none";
@@ -144,36 +111,16 @@ export class ThrowingBluntAction extends RangedAttackAction {
     const minKarma = getMinimumKarmaCommitment(actor);
     const hasKarma = availableKarma > 0;
 
-    // CS display
-    const csInputCls = savedColumnShift > 0 ? ' pos' : savedColumnShift < 0 ? ' neg' : '';
-    const csRankStyle = savedColumnShift > 0 ? 'color:#2e7d32;' : savedColumnShift < 0 ? 'color:#c62828;' : '';
     const abilityShort = RANK_ABBR[ability.rank] || ability.rank;
 
-    // Build talent chips HTML
-    const talentChipsHtml = combatTalents.map(t => {
-      const savedState = savedActiveChips[t.name] || '';
-      const flagActive = savedState.includes('flag');
-
-      if (t.rankOverride && t.ultimateCS > 0) {
-        const shortRank = RANK_ABBR[t.rankOverride] || t.rankOverride;
-        const ultActive = savedState === 'ultimate';
-        return `<span class="frp-talent-chip${ultActive ? ' active-ultimate' : ''}" data-cs="${t.ultimateCS}" data-talent="${t.name}" data-ultimate="1">
-          ★ ${t.name} <span class="chip-cs">&rarr;${shortRank}</span>
-        </span>`;
-      }
-      if (t.cs > 0) {
-        const csActive = savedState === 'cs';
-        return `<span class="frp-talent-chip${csActive ? ' active-cs' : ''}" data-cs="${t.cs}" data-talent="${t.name}">
-          ${t.name} <span class="chip-cs">+${t.cs}</span>
-        </span>`;
-      }
-      if (t.flag) {
-        return `<span class="frp-talent-chip${flagActive ? ' active-flag' : ''}" data-flag="${t.flag}" data-talent="${t.name}">
-          ${t.name} <span class="chip-note">${t.note}</span>
-        </span>`;
-      }
-      return '';
-    }).join('');
+    // Build CS row via shared utility (manual input + range + ? reference)
+    const initialRangePenalty = savedRange > 1 ? -(savedRange - 1) : 0;
+    const csRowHtml = buildCSRow({
+      savedCS: savedColumnShift,
+      abilityRank: ability.rank,
+      rangePenalty: initialRangePenalty,
+      showRange: true
+    });
 
     // ── Dialog HTML — v3 Compact Layout ──
     const dialogHtml = `
@@ -193,48 +140,8 @@ export class ThrowingBluntAction extends RangedAttackAction {
           : ''}
       </div>
 
-      <!-- CS box: chips + situational dropdown -->
-      <div class="frp-box frp-cs-box">
-        <div class="frp-cs-line">
-          <span class="frp-cs-label">CS</span>
-          <input type="number" class="frp-cs-input${csInputCls}" name="shift" value="${savedColumnShift}" id="cs-throwblunt">
-          <span class="frp-cs-arrow">&rarr;</span>
-          <span class="frp-cs-rank" id="rank-throwblunt" style="${csRankStyle}">${shiftRank(ability.rank, savedColumnShift)}</span>
-          <button type="button" class="frp-cs-reset" style="visibility:${savedColumnShift !== 0 ? 'visible' : 'hidden'}">&times;</button>
-          ${combatTalents.length > 0 ? '<span class="chip-sep"></span>' : ''}
-          ${talentChipsHtml}
-          <span class="chip-sep"></span>
-          <select class="frp-sit-select" id="sit-select">
-            <option value="">+ situational&hellip;</option>
-            <optgroup label="Bonuses">
-              <option value="2" data-label="Blindside" title="Target unaware or distracted">Blindside +2CS</option>
-              <option value="1" data-label="Ambush" title="Pre-set position, triggers when target enters area">Ambush +1CS</option>
-              <option value="1" data-label="Aiming" title="Spend 1 turn not attacking = +1CS next round">Aiming +1CS</option>
-              <option value="1" data-label="Higher Ground" title="Elevated position, terrain advantage">Higher Ground +1CS</option>
-            </optgroup>
-            <optgroup label="Target Movement">
-              <option value="0" data-label="Charging" title="Target charging at attacker (0 CS)">Charging at you 0CS</option>
-              <option value="-1" data-label="Moving" title="Target moving &le;5 areas/round">Moving &le;5 areas -1CS</option>
-              <option value="-2" data-label="Fast" title="Target moving &le;10 areas/round">Moving &le;10 areas -2CS</option>
-              <option value="-4" data-label="Very Fast" title="Target moving &gt;10 areas/round">Moving &gt;10 areas -4CS</option>
-            </optgroup>
-            <optgroup label="Penalties">
-              <option value="-2" data-label="Obstacle" title="Through window, curtain, etc.">Through Obstacle -2CS</option>
-              <option value="-2" data-label="Shielding" title="Target using object as cover">Shielding -2CS</option>
-              <option value="-2" data-label="Impaired" title="Lost Endurance ranks, -2CS all actions">Impaired -2CS</option>
-            </optgroup>
-            <optgroup label="Target Size">
-              <option value="1" data-label="Growth +1" title="Target is 12-18ft tall">Growth 12-18ft +1CS</option>
-              <option value="2" data-label="Growth +2" title="Target is 18-22ft tall">Growth 18-22ft +2CS</option>
-              <option value="3" data-label="Growth +3" title="Target is over 22ft tall">Growth 22ft+ +3CS</option>
-              <option value="-1" data-label="Shrink -1" title="Target shrunk to ~1 inch">Shrunk 1&Prime; -1CS</option>
-              <option value="-2" data-label="Shrink -2" title="Target shrunk to ~&frac14; inch">Shrunk &frac14;&Prime; -2CS</option>
-              <option value="-3" data-label="Shrink -3" title="Target smaller than &frac14; inch">Shrunk smaller -3CS</option>
-            </optgroup>
-          </select>
-        </div>
-        <div class="frp-sit-tags" id="sit-tags"></div>
-      </div>
+      <!-- CS row (manual input + range + ? reference) -->
+      ${csRowHtml}
 
       <!-- Damage: Carried/Ad-hoc source toggle + weapon select + damage inline -->
       <div class="frp-box frp-dmg-box">
@@ -320,6 +227,7 @@ export class ThrowingBluntAction extends RangedAttackAction {
     `;
 
     const choice = await new Promise(resolve => {
+      let _csState = null;
       new Dialog({
         title: actionName,
         content: dialogHtml,
@@ -360,7 +268,8 @@ export class ThrowingBluntAction extends RangedAttackAction {
                 weaponDamage = Number(weapon.system?.damage || 0);
               }
 
-              const shift = Number($dlg('[name="shift"]').val() || 0);
+              const cs = _csState.get();
+              const shift = cs.totalShift;
               const { spendKarma, karmaToSpend } = extractKarmaFromDialog(html);
               const range = Number($dlg('[name="range"]').val() || 1);
 
@@ -370,57 +279,20 @@ export class ThrowingBluntAction extends RangedAttackAction {
                 return resolve(null);
               }
 
-              // Build csNotes from active situational tags + talent chips
-              const sitParts = [];
-              html.find('.frp-talent-chip.active-cs, .frp-talent-chip.active-ultimate').each(function() {
-                const talent = $(this).data('talent') || '';
-                const cs = parseInt($(this).data('cs')) || 0;
-                if (talent && cs) sitParts.push(`${talent} ${cs > 0 ? '+' : ''}${cs}`);
-              });
-              html.find('.frp-sit-tag').each(function() {
-                const label = $(this).data('label') || '';
-                const cs = parseInt($(this).data('cs')) || 0;
-                if (label) sitParts.push(`${label} ${cs > 0 ? '+' : ''}${cs}`);
-              });
-              const csNotes = sitParts.join(', ');
-
-              // Collect active talent flags
-              const talentFlags = {};
-              html.find('.frp-talent-chip.active-flag').each(function() {
-                const flag = $(this).data('flag');
-                if (flag) talentFlags[flag] = true;
-              });
-
-              // Collect active chip states for persistence
-              const activeChips = {};
-              html.find('.frp-talent-chip.active-cs, .frp-talent-chip.active-ultimate').each(function() {
-                const talent = $(this).data('talent');
-                const isUlt = !!$(this).data('ultimate');
-                if (talent) activeChips[talent] = isUlt ? 'ultimate' : 'cs';
-              });
-              html.find('.frp-talent-chip.active-flag').each(function() {
-                const talent = $(this).data('talent');
-                if (talent) activeChips[talent] = (activeChips[talent] || '') + ',flag';
-              });
+              const csNotes = cs.csNotes;
 
               const pullEnabled = !!$dlg('#pull-punch-enabled').is(':checked');
               const pulledDamage = pullEnabled ? parseInt($dlg('[name="pulledDamage"]').val() || 0) : 0;
               const resultCap = pullEnabled ? ($dlg('[name="resultCap"]').val() || "none") : "none";
 
-              // Save settings — strip sit tags + range (NOT talent chips) so remembered CS = manual + talents
-              let sitTagCS = 0;
-              html.find('.frp-sit-tag').each(function() {
-                sitTagCS += parseInt($(this).data('cs')) || 0;
-              });
-              const baseShift = shift - sitTagCS;
+              // Save settings
               if (rememberSettings) {
-                await actor.setFlag("msh-faserip", "lastThrowBluntShift", baseShift);
+                await actor.setFlag("msh-faserip", "lastThrowBluntShift", cs.manualCS);
                 await actor.setFlag("msh-faserip", "lastThrowBluntAdHoc", useAdHoc);
                 await actor.setFlag("msh-faserip", "lastThrowBluntAdHocName", weaponName);
                 await actor.setFlag("msh-faserip", "lastThrowBluntAdHocDamage", weaponDamage);
                 await actor.setFlag("msh-faserip", "lastThrowBluntItemId", weaponId || "");
                 await actor.setFlag("msh-faserip", "lastThrowBluntRange", range);
-                await actor.setFlag("msh-faserip", "lastThrowBluntActiveChips", activeChips);
                 await actor.setFlag("msh-faserip", "lastThrowBluntPullEnabled", pullEnabled);
                 await actor.setFlag("msh-faserip", "lastThrowBluntPulledDamage", pulledDamage);
                 await actor.setFlag("msh-faserip", "lastThrowBluntResultCap", resultCap);
@@ -431,8 +303,7 @@ export class ThrowingBluntAction extends RangedAttackAction {
                 weaponId, weaponName, weaponDamage,
                 totalShift: shift, shift,
                 karma: karmaToSpend, spendKarma, skipDice,
-                shiftBreakdown: { manual: shift, csNotes },
-                talentFlags,
+                shiftBreakdown: { manual: cs.manualCS, csNotes },
                 pulledDamage, resultCap
               });
             }
@@ -459,7 +330,21 @@ export class ThrowingBluntAction extends RangedAttackAction {
             $dialog[0].style.height = 'auto';
           }
 
-          // ── Main update function ──
+          // ── Wire CS panel from shared utility ──
+          const _getCurrentRangePenalty = () => {
+            const rangeVal = Number(html.find('[name="range"]').val() || 0);
+            if (rangeVal > maxThrowRange) return 0;
+            return rangeVal > 1 ? -(rangeVal - 1) : 0;
+          };
+          _csState = wireCSPanel(html, {
+            abilityRank: ability.rank,
+            getRangePenalty: _getCurrentRangePenalty,
+            onUpdate: () => {
+              if ($dialog.length) $dialog[0].style.height = 'auto';
+            }
+          });
+
+          // ── Main update function (damage + range display only — CS handled by csState) ──
           const update = () => {
             const isAdHoc = html.find('[name="src"]:checked').val() === 'adhoc';
             let dmg;
@@ -483,54 +368,16 @@ export class ThrowingBluntAction extends RangedAttackAction {
             $pulledDmg.attr('max', dmg);
             if (Number($pulledDmg.val()) > dmg) $pulledDmg.val(dmg);
 
-            // Range penalty — auto-sync sit tag (before CS display)
-            // Uses autoRangeCs data-attr on CS input to track current auto-applied range penalty
+            // Range penalty — update CS panel and range info display
             const rangeVal = Number(html.find('[name="range"]').val() || 0);
             const $rangePenalty = html.find('#range-penalty-display');
-            const oldRangeTag = html.find('.frp-sit-tag[data-auto="range"]');
-            const $csI = html.find('[name="shift"]');
-            const prevAutoRangeCS = Number($csI.data('autoRangeCs') ?? 0) || 0;
-            const hasNoRangePenalty = html.find('.frp-talent-chip.active-flag[data-flag="no-range-penalty"]').length > 0;
-            const baseShift = (parseInt($csI.val()) || 0) - prevAutoRangeCS;
-
-            let penalty = 0;
             if (rangeVal > maxThrowRange) {
               $rangePenalty.text('OUT OF RANGE').css('color', '#c62828');
+              _csState.setRange(0);
             } else {
-              penalty = hasNoRangePenalty ? 0 : (rangeVal > 1 ? -(rangeVal - 1) : 0);
+              const penalty = rangeVal > 1 ? -(rangeVal - 1) : 0;
               $rangePenalty.text(penalty < 0 ? `${penalty}CS` : '').css('color', '#e65100');
-            }
-
-            oldRangeTag.remove();
-            if (penalty < 0) {
-              const tag = $(`<span class="frp-sit-tag penalty" data-cs="${penalty}" data-label="Range ${rangeVal}" data-auto="range">
-                Range ${rangeVal} <span class="tag-cs">${penalty}</span>
-              </span>`);
-              html.find('#sit-tags').append(tag);
-            }
-
-            const displayShift = baseShift + penalty;
-            $csI.val(displayShift);
-            $csI.data('autoRangeCs', penalty);
-
-            // CS display (after range sync so shift value is current)
-            const cs = displayShift;
-            const $csInput = html.find('.frp-cs-input');
-            const $rank = html.find('#rank-throwblunt');
-            const $reset = html.find('.frp-cs-reset');
-            $rank.text(shiftRank(ability.rank, cs));
-            $csInput.removeClass('pos neg');
-            if (cs > 0) {
-              $csInput.addClass('pos');
-              $rank.css('color', '#2e7d32');
-              $reset.css('visibility', 'visible');
-            } else if (cs < 0) {
-              $csInput.addClass('neg');
-              $rank.css('color', '#c62828');
-              $reset.css('visibility', 'visible');
-            } else {
-              $rank.css('color', '');
-              $reset.css('visibility', 'hidden');
+              _csState.setRange(penalty);
             }
 
             if ($dialog.length) $dialog[0].style.height = 'auto';
@@ -549,91 +396,7 @@ export class ThrowingBluntAction extends RangedAttackAction {
           // ── Event bindings ──
           html.find('#damage-source-select').on('change', update);
           html.find('[name="adhocDamage"]').on('input', update);
-          html.find('[name="shift"]').on('input change', update);
           html.find('[name="range"]').on('input change', update);
-
-          // ── Talent chip click handler ──
-          html.find('.frp-talent-chip').on('click', function() {
-            const $chip = $(this);
-            const cs = parseInt($chip.data('cs')) || 0;
-            const flag = $chip.data('flag') || null;
-            const isUltimate = !!$chip.data('ultimate');
-            const $csInput = html.find('[name="shift"]');
-
-            if (cs > 0) {
-              const wasActive = $chip.hasClass('active-cs') || $chip.hasClass('active-ultimate');
-              const activeClass = isUltimate ? 'active-ultimate' : 'active-cs';
-
-              if (wasActive) {
-                $chip.removeClass('active-cs active-ultimate');
-                $csInput.val(parseInt($csInput.val()) - cs);
-              } else {
-                $chip.addClass(activeClass);
-                $csInput.val(parseInt($csInput.val()) + cs);
-              }
-              $csInput.trigger('change');
-            } else if (flag) {
-              $chip.toggleClass('active-flag');
-            }
-          });
-
-          // CS reset — deactivates chips and removes situational tags
-          html.find('.frp-cs-reset').on('click', function(e) {
-            e.preventDefault();
-            html.find('[name="shift"]').val(0);
-            html.find('.frp-talent-chip.active-cs, .frp-talent-chip.active-ultimate').removeClass('active-cs active-ultimate');
-            html.find('#sit-tags').empty();
-            html.find('[name="shift"]').trigger('change');
-          });
-
-          // ── Situational modifier: apply on select change ──
-          html.find('#sit-select').on('change', function() {
-            const $sel = $(this);
-            const opt = $sel.find('option:selected');
-            const cs = parseInt(opt.val());
-            const label = opt.data('label') || '';
-            if (isNaN(cs) || !label) { $sel.val(''); return; }
-
-            // Prevent duplicate
-            let exists = false;
-            html.find('.frp-sit-tag').each(function() {
-              if ($(this).data('label') === label) exists = true;
-            });
-            if (exists) { $sel.val(''); return; }
-
-            // 0CS tags (like Charging) are informational only
-            if (cs === 0) {
-              const tag = $(`<span class="frp-sit-tag" style="background:#e3f2fd;border:1px solid #90caf9;color:#1565c0;" data-cs="0" data-label="${label}">
-                ${label} 0CS
-                <span class="tag-x">&times;</span>
-              </span>`);
-              html.find('#sit-tags').append(tag);
-              $sel.val('');
-              return;
-            }
-
-            const sign = cs > 0 ? '+' : '';
-            const cls = cs < 0 ? ' penalty' : '';
-            const tag = $(`<span class="frp-sit-tag${cls}" data-cs="${cs}" data-label="${label}">
-              ${label} <span class="tag-cs">${sign}${cs}</span>
-              <span class="tag-x">&times;</span>
-            </span>`);
-            html.find('#sit-tags').append(tag);
-
-            const $csInput = html.find('[name="shift"]');
-            $csInput.val(parseInt($csInput.val()) + cs).trigger('change');
-            $sel.val('');
-          });
-
-          // ── Situational modifier: remove tag ──
-          html.find('#sit-tags').on('click', '.tag-x', function() {
-            const $tag = $(this).closest('.frp-sit-tag');
-            if ($tag.data('auto') === 'range') return;
-            const cs = parseInt($tag.data('cs')) || 0;
-            const $csInput = html.find('[name="shift"]');
-            $csInput.val(parseInt($csInput.val()) - cs).trigger('change');
-            $tag.remove();
-          });
 
           // Pull punch toggle
           html.find('#pull-punch-enabled').on('change', function() {
@@ -669,6 +432,7 @@ export class ThrowingBluntAction extends RangedAttackAction {
           });
         },
         close: () => {
+          if (_csState) _csState.destroy();
           if (this._disposeAutoFill) this._disposeAutoFill();
         }
       }).render(true);

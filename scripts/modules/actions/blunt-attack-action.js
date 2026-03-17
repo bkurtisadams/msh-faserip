@@ -1,7 +1,7 @@
-// blunt-attack-action.js v3.4.0 - 2026-03-17
-// v3.4.0: Use shared cs-modifiers.js — detectModifiers + buildCSRow + wireCSPanel.
-//         Eliminates inline talent detection, chip HTML, sit tag handlers.
-//         All modifiers in one Mods dropdown panel.
+// blunt-attack-action.js v3.5.0 - 2026-03-17
+// v3.5.0: Manual CS only — remove talent/power auto-detection.
+//         CS row is a simple number input + ? reference panel.
+//         No talent chips, no savedCheckedMods, no talentFlags.
 // v3.2.0: Move mode buttons to titlebar (injected during render), remove target/mode row,
 //         narrow dialog to 360px
 // v2.1.2: Simplify chip logic — one chip per talent, Ultimate replaces normal when
@@ -61,7 +61,7 @@ import { buildColorOutcome } from "../dice/color-results.js";
 import { applyColumnShifts } from "../dice/column-shifts.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
 import { RANK_ABBR } from "../../rules/rules-reference.js";
-import { detectModifiers, buildCSRow, wireCSPanel } from "./cs-modifiers.js";
+import { buildCSRow, wireCSPanel } from "./cs-modifiers.js";
 // NOTE: resolveCombatMode not imported here to avoid circular dependency
 
 
@@ -75,9 +75,6 @@ export class BluntAttackAction extends AttackAction {
     const ability = getAbilityInfo(actor, this.abilityName);
     const strength = getStrengthInfo(actor);
     let attackItems = actor.items.filter(isBluntCapable);
-
-    // Detect combat talents via shared utility
-    const mods = detectModifiers("blunt-attack", actor, ability);
 
     // If a specific item was passed via opts, ensure it's in the list and pre-selected
     const passedItemId = this.opts?.itemId || this.opts?.item?.id || null;
@@ -116,7 +113,6 @@ export class BluntAttackAction extends AttackAction {
     const savedAttackCount = shouldRemember ? (await actor.getFlag("msh-faserip","lastBluntAttackCount") || 2) : 2;
     const savedMultiAdjacent = shouldRemember ? (await actor.getFlag("msh-faserip","lastBluntMultiAdjacent") || false) : false;
     const savedColumnShift  = shouldRemember ? (await actor.getFlag("msh-faserip","lastBluntShift") || 0) : 0;
-    const savedCheckedMods  = shouldRemember ? (await actor.getFlag("msh-faserip","lastBluntCheckedMods") || []) : [];
     
     const savedSkipDice = localStorage.getItem(lsSkipKey) === "1";
 
@@ -176,11 +172,9 @@ export class BluntAttackAction extends AttackAction {
 
     const abilityShort = RANK_ABBR[ability.rank] || ability.rank;
 
-    // Build CS row via shared utility
+    // Build CS row via shared utility (manual input + ? reference)
     const csRowHtml = buildCSRow({
-      mods,
-      savedManualCS: savedColumnShift,
-      savedChecked: savedCheckedMods,
+      savedCS: savedColumnShift,
       abilityRank: ability.rank
     });
 
@@ -229,7 +223,7 @@ export class BluntAttackAction extends AttackAction {
           : ''}
       </div>
 
-      <!-- CS row with Mods dropdown (from shared utility) -->
+      <!-- CS row (manual input + ? reference) -->
       ${csRowHtml}
 
       <!-- Damage: select + numbers inline -->
@@ -420,7 +414,6 @@ export class BluntAttackAction extends AttackAction {
               await actor.setFlag("msh-faserip", "lastBluntMultiAttacks", multiAttacks);
               await actor.setFlag("msh-faserip", "lastBluntAttackCount", attackCount);
               await actor.setFlag("msh-faserip", "lastBluntMultiAdjacent", multiAdjacent);
-              await actor.setFlag("msh-faserip", "lastBluntCheckedMods", cs.checkedKeys);
 
               if (src === "weapon") {
                 await actor.setFlag("msh-faserip", "lastBluntItemId", itemId);
@@ -439,7 +432,7 @@ export class BluntAttackAction extends AttackAction {
               shift: cs.totalShift, karma, spendKarma,
               pulledDamage, resultCap, skipDice, weaponMat, weaponName, damage, note,
               multiAttacks, attackCount, multiAdjacent,
-              csNotes: cs.csNotes, talentFlags: cs.talentFlags
+              csNotes: cs.csNotes
             });
             dlg.close();
           });

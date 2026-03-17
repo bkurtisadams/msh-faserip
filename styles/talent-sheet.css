@@ -1,4 +1,4 @@
-/* talent-sheet.css v1.2.0 - 2026-03-03 */
+/* talent-sheet.css v1.3.0 - 2026-03-17 */
 
 /* ── Layout ──────────────────────────── */
 .talent-dialog { max-height: 90vh; background: #f5f0e8; }
@@ -67,6 +67,22 @@
 }
 .talent-dialog .talent-rule-empty {
   font-size: 10px; color: #aaa; font-style: italic; padding: 4px 0;
+}
+
+/* ── Applies To grid ─────────────────── */
+.talent-dialog .talent-applies-grid {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px 6px;
+}
+.talent-dialog .talent-applies-grid .talent-check {
+  font-size: 9px; white-space: nowrap;
+}
+
+/* ── Flags grid ──────────────────────── */
+.talent-dialog .talent-flags-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 2px 8px;
+}
+.talent-dialog .talent-flags-grid .talent-check {
+  font-size: 9px; white-space: nowrap;
 }
 
 /* ── Notes textarea ──────────────────── */
