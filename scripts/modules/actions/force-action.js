@@ -1,4 +1,7 @@
-// scripts/modules/actions/force-action.js v3.0.2 - 2026-03-16
+// scripts/modules/actions/force-action.js v3.0.3 - 2026-03-16
+// v3.0.3: Live range penalty display + auto sit tag (matches shooting pattern)
+//         Remove _applyRangeModifiers — range penalty baked into CS via sit tags
+//         Range box shows (max N) with live update when power changes
 // v3.0.2: Move obstacle from range box checkbox to situational dropdown (matches shooting)
 //         Remove throughObstacle/obstacleModifier from resolve path
 // v3.0.1: Move target movement from range box to situational dropdown (matches shooting)
@@ -314,7 +317,8 @@ export class ForceAction extends RangedAttackAction {
           <span style="font-family:'Oswald',sans-serif;font-size:10px;color:#1565c0;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;">Range</span>
           <input type="number" name="range" value="${savedRange}" min="0" class="frp-pull-input" style="width:36px;">
           <span style="color:#777;">areas</span>
-          <span style="color:#999;font-size:11px;margin-left:auto;" id="range-hint"></span>
+          <span style="color:#999;font-size:11px;">(max <span id="max-range-hint">${this._getPowerRangeInAreas(initialPowerRank)}</span>)</span>
+          <span id="range-penalty-display" style="margin-left:auto;font-family:'Oswald',sans-serif;font-weight:600;font-size:12px;color:#c62828;"></span>
         </div>
       </div>
 
@@ -472,20 +476,10 @@ export class ForceAction extends RangedAttackAction {
               }
               await actor.setFlag("msh-faserip", "csNotes", csNotes);
 
-              // Range modifiers (obstacle now handled via sit tags)
-              const { totalShift, impossible, rangeModifier } =
-                this._applyRangeModifiers(shift, range, false, null, powerRank, null);
-
-              if (impossible) {
-                ui.notifications.error(`Target is beyond force range (rank: ${powerRank}).`);
-                return resolve(null);
-              }
-
               resolve({
                 powerName, powerDamage, powerRank, powerId, prettyRange,
                 shift, karma, spendKarma, range, skipDice, usePowerToHit,
-                totalShift,
-                rangeModifier,
+                totalShift: shift,
                 multiAdjacent,
                 pulledDamage, resultCap: "none",
                 csNotes, talentFlags
@@ -596,9 +590,37 @@ export class ForceAction extends RangedAttackAction {
               primaryTarget ? `${after} after armor` : `${currentDamage} damage`
             );
 
-            // Range hint
-            const rankValue = game.msh?.getRankValue?.(currentRank) || RANKS[currentRank] || 30;
-            html.find('#range-hint').text(`max ${rankValue} areas`);
+            // Update max range hint based on power rank
+            const powerMaxRange = this._getPowerRangeInAreas(currentRank);
+            html.find('#max-range-hint').text(powerMaxRange);
+
+            // Range penalty — auto-sync sit tag (powers: -1CS per area beyond rank range)
+            const rangeVal = Number(html.find('[name="range"]').val() || 0);
+            const $rangePenalty = html.find('#range-penalty-display');
+            const oldRangeTag = html.find('.frp-sit-tag[data-auto="range"]');
+            const $csI = html.find('[name="shift"]');
+            const prevAutoRangeCS = Number($csI.data('autoRangeCs') ?? 0) || 0;
+            const baseShift = (parseInt($csI.val()) || 0) - prevAutoRangeCS;
+
+            let penalty = 0;
+            if (rangeVal > powerMaxRange && powerMaxRange > 0) {
+              penalty = -(rangeVal - powerMaxRange);
+              $rangePenalty.text(`${penalty}CS`).css('color', '#e65100');
+            } else {
+              $rangePenalty.text('');
+            }
+
+            oldRangeTag.remove();
+            if (penalty < 0) {
+              const tag = $(`<span class="frp-sit-tag penalty" data-cs="${penalty}" data-label="Range ${rangeVal}" data-auto="range">
+                Range ${rangeVal} <span class="tag-cs">${penalty}</span>
+              </span>`);
+              html.find('#sit-tags').append(tag);
+            }
+
+            const displayShift = baseShift + penalty;
+            $csI.val(displayShift);
+            $csI.data('autoRangeCs', penalty);
 
             // Update reduce max
             const $pulledDamage = html.find('[name="pulledDamage"]');
@@ -644,6 +666,7 @@ export class ForceAction extends RangedAttackAction {
           html.find('#power-source-select').on('change', update);
           html.find('[name="adhocDamage"], [name="adhocRank"]').on('input change', update);
           html.find('[name="shift"]').on('input change', update);
+          html.find('[name="range"]').on('input change', update);
 
           // Pull punch toggle
           html.find('#pull-punch-enabled').on('change', function() {
@@ -707,10 +730,9 @@ export class ForceAction extends RangedAttackAction {
     else if (mode === "semi") { this.opts.autoApply = false; this.opts.showConfirm = true; }
     else { this.opts.autoApply = true; this.opts.showConfirm = false; }
 
-    // Build shift breakdown
+    // Build shift breakdown (range penalty baked into CS via auto sit tag)
     const shiftBreakdown = {
       manual: choice.shift || 0,
-      range: choice.rangeModifier || 0,
       csNotes: choice.csNotes || ""
     };
     if (choice.multiAdjacent) shiftBreakdown.adjacent = -4;
