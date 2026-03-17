@@ -1,5 +1,6 @@
-//--- START OF FILE blunt-attack-action.js ---
-// blunt-attack-action.js v3.2.0 - 2026-03-15
+// blunt-attack-action.js v3.3.0 - 2026-03-17
+// v3.3.0: Compact single-row footer — inline Roll/Cancel buttons in frp-foot,
+//         remove Foundry native dialog buttons, wire custom handlers
 // v3.2.0: Move mode buttons to titlebar (injected during render), remove target/mode row,
 //         narrow dialog to 360px
 // v2.1.2: Simplify chip logic — one chip per talent, Ultimate replaces normal when
@@ -380,22 +381,49 @@ export class BluntAttackAction extends AttackAction {
         <div class="frp-fx-cell r">Stun</div>
       </div>
 
-      <!-- Footer: checkboxes only (Roll/Cancel from Dialog buttons) -->
+      <!-- Footer: checkboxes + buttons on one row -->
       <div class="frp-foot">
         <label><input type="checkbox" id="msh-remember-settings" name="remember" ${shouldRemember ? 'checked' : ''}> Remember</label>
         <label><input type="checkbox" id="msh-skip-dice" name="skipDice" ${savedSkipDice ? 'checked' : ''}> Skip dice</label>
+        <div class="frp-foot-btns">
+          <button type="button" class="frp-btn-cancel" id="frp-cancel">Cancel</button>
+          <button type="button" class="frp-btn-roll" id="frp-roll">Roll</button>
+        </div>
       </div>
     </div>
     `;
 
     const choice = await new Promise((resolve) => {
-      new Dialog({
+      let _resolved = false;
+      const dlg = new Dialog({
         title: actionName,
         content: dialogHtml,
-        buttons: {
-          roll: {
-          label: "Roll",
-          callback: async (html) => {
+        buttons: {},
+        render: async (html) => {
+          setupKarmaControlHandlers(html);
+          const $dialog = html.closest('.dialog');
+
+          // Hide Foundry's native button row
+          $dialog.find('.dialog-buttons').hide();
+          
+          // Inject mode buttons into the titlebar
+          const $titlebar = $dialog.find('.window-title, .dialog-title').first();
+          if ($titlebar.length) {
+            const modeHtml = buildModeSelector({ mode: "semi" });
+            const $modeWrap = $('<span class="frp-titlebar-mode"></span>').append(modeHtml);
+            $titlebar.after($modeWrap);
+          }
+          // Setup mode selector on the full dialog (buttons are now in titlebar)
+          await setupModeSelector(actor, $dialog, this.opts || {}, "lastBluntMode");
+
+          // Set dialog width
+          if ($dialog.length) {
+            $dialog.css('width', '360px');
+            $dialog[0].style.height = 'auto';
+          }
+
+          // ── Roll button handler ──
+          html.find('#frp-roll').on('click', async () => {
             const $content = $(html).find(".dialog-content").first();
             const $dlg = (sel) => html.find(sel);
 
@@ -527,35 +555,21 @@ export class BluntAttackAction extends AttackAction {
             
             await actor.setFlag("msh-faserip", "csNotes", csNotes);
 
+            _resolved = true;
             resolve({
               src, itemId, objectName, objectRank, objectValue, shift, karma, spendKarma,
               pulledDamage, resultCap, skipDice, weaponMat, weaponName, damage, note,
               multiAttacks, attackCount, multiAdjacent, csNotes, talentFlags
             });
-          }
-        },
-          cancel: { label: "Cancel", callback: () => resolve(null) }
-        },
-        default: "roll",
-        render: async (html) => {
-          setupKarmaControlHandlers(html);
-          const $dialog = html.closest('.dialog');
-          
-          // Inject mode buttons into the titlebar
-          const $titlebar = $dialog.find('.window-title, .dialog-title').first();
-          if ($titlebar.length) {
-            const modeHtml = buildModeSelector({ mode: "semi" });
-            const $modeWrap = $('<span class="frp-titlebar-mode"></span>').append(modeHtml);
-            $titlebar.after($modeWrap);
-          }
-          // Setup mode selector on the full dialog (buttons are now in titlebar)
-          await setupModeSelector(actor, $dialog, this.opts || {}, "lastBluntMode");
+            dlg.close();
+          });
 
-          // Set dialog width
-          if ($dialog.length) {
-            $dialog.css('width', '360px');
-            $dialog[0].style.height = 'auto';
-          }
+          // ── Cancel button handler ──
+          html.find('#frp-cancel').on('click', () => {
+            _resolved = true;
+            resolve(null);
+            dlg.close();
+          });
 
           const getLS = (k, d=null) => {
             try { const v = localStorage.getItem(k); return v === null ? d : v; } catch { return d; }
@@ -769,6 +783,9 @@ export class BluntAttackAction extends AttackAction {
           html.find('#msh-remember-settings').on('change', function() {
             setLS(lsRememberKey, this.checked ? "1" : "0");
           });
+        },
+        close: () => {
+          if (!_resolved) resolve(null);
         }
       }).render(true);
     });
