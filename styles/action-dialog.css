@@ -537,6 +537,15 @@
   transform: translateY(-1px);
 }
 
+/* ── Chip row (separate line below CS controls) ─────────────────────── */
+.frp-dlg .frp-chip-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-top: 5px;
+}
+
 /* ── Situational modifier dropdown (inline in CS line) ───────────────── */
 .frp-dlg .frp-sit-select {
   font-family: 'Barlow Condensed', sans-serif;
