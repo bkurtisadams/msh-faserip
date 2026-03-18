@@ -229,105 +229,30 @@ export class ThrowingEdgedAction extends RangedAttackAction {
 
       <!-- Footer -->
       <div class="frp-foot">
-        <label><input type="checkbox" id="msh-remember-settings" name="remember" ${shouldRemember ? 'checked' : ''}> Remember</label>
-        <label><input type="checkbox" id="msh-skip-dice" name="skipDice" ${savedSkipDice ? 'checked' : ''}> Skip dice</label>
+        <div class="frp-foot-btns">
+          <button type="button" class="frp-btn-roll" id="frp-roll">Roll</button>
+          <button type="button" class="frp-btn-cancel" id="frp-cancel">Cancel</button>
+        </div>
+        <div class="frp-foot-checks">
+          <label><input type="checkbox" id="msh-remember-settings" name="remember" ${shouldRemember ? 'checked' : ''}> Remember</label>
+          <label><input type="checkbox" id="msh-skip-dice" name="skipDice" ${savedSkipDice ? 'checked' : ''}> Skip dice</label>
+        </div>
       </div>
     </div>
     `;
 
     const choice = await new Promise(resolve => {
       let _csState = null;
-      new Dialog({
+      let _resolved = false;
+      const dlg = new Dialog({
         title: actionName,
         content: dialogHtml,
-        buttons: {
-          roll: {
-            label: "Roll",
-            callback: async (html) => {
-              const $dlg = (sel) => html.find(sel);
-
-              const rememberSettings = !!$dlg('#msh-remember-settings').is(':checked');
-              const skipDice = !!$dlg('#msh-skip-dice').is(':checked');
-
-              try {
-                localStorage.setItem(lsRememberKey, rememberSettings ? "1" : "0");
-                localStorage.setItem(lsSkipKey, skipDice ? "1" : "0");
-              } catch (e) {}
-
-              const useAdHoc = html.find('[name="src"]:checked').val() === 'adhoc';
-
-              let weaponName, weaponDamage, weaponId = null;
-              let weaponAP = 0, weaponAPCS = 0, weaponAPMode = "value";
-              let weaponDamageType = "physical-edged";
-
-              if (useAdHoc) {
-                weaponName = String($dlg('[name="adhocName"]').val() || "Improvised Edged");
-                weaponDamage = Number($dlg('[name="adhocDamage"]').val() || 0);
-              } else {
-                const wid = String($dlg('[name="weapon"]').val() || "");
-                const weapon = thrownEdged.find(i => i.id === wid);
-                if (!weapon) {
-                  ui.notifications.error("Select a carried thrown-edged weapon or use ad-hoc.");
-                  return resolve(null);
-                }
-                weaponId = wid;
-                weaponName = weapon.name;
-                weaponDamage = Number(weapon.system?.damage || 0);
-                weaponAP = getArmorPiercing(weapon);
-                weaponAPCS = Number(weapon.system?.armorPiercingCS || 0) || 0;
-                weaponAPMode = weapon.system?.apMode || "value";
-              }
-
-              const cs = _csState.get();
-              const shift = cs.totalShift;
-              const { spendKarma, karmaToSpend } = extractKarmaFromDialog(html);
-              const range = Number($dlg('[name="range"]').val() || 1);
-
-              // Range validation
-              if (range > maxThrowRange) {
-                ui.notifications.error(`Target is beyond throwing range (${maxThrowRange} areas).`);
-                return resolve(null);
-              }
-
-              const csNotes = cs.csNotes;
-
-              const pullEnabled = !!$dlg('#pull-punch-enabled').is(':checked');
-              const pulledDamage = pullEnabled ? parseInt($dlg('[name="pulledDamage"]').val() || 0) : 0;
-
-              // Save settings
-              if (rememberSettings) {
-                await actor.setFlag("msh-faserip", "lastThrowEdgedShift", cs.manualCS);
-                await actor.setFlag("msh-faserip", "lastThrowEdgedAdHoc", useAdHoc);
-                await actor.setFlag("msh-faserip", "lastThrowEdgedAdHocName", weaponName);
-                await actor.setFlag("msh-faserip", "lastThrowEdgedAdHocDamage", weaponDamage);
-                await actor.setFlag("msh-faserip", "lastThrowEdgedItemId", weaponId || "");
-                await actor.setFlag("msh-faserip", "lastThrowEdgedRange", range);
-                await actor.setFlag("msh-faserip", "lastThrowEdgedPullEnabled", pullEnabled);
-                await actor.setFlag("msh-faserip", "lastThrowEdgedPulledDamage", pulledDamage);
-              }
-              await actor.setFlag("msh-faserip", "csNotes", csNotes);
-
-              resolve({
-                weaponId, weaponName, weaponDamage,
-                totalShift: shift, shift,
-                karma: karmaToSpend, spendKarma, skipDice,
-                shiftBreakdown: { manual: cs.manualCS, csNotes },
-                armorPiercing: weaponAP,
-                armorPiercingCS: weaponAPCS,
-                apMode: weaponAPMode,
-                damageType: weaponDamageType,
-                pulledDamage, resultCap: "none"
-              });
-            }
-          },
-          cancel: { label: "Cancel", callback: () => resolve(null) }
-        },
-        default: "roll",
+        buttons: {},
         render: async (html) => {
           setupKarmaControlHandlers(html);
           const $dialog = html.closest('.dialog');
 
-          // Inject mode buttons into titlebar
+          $dialog.find('.dialog-buttons').hide();
           const $titlebar = $dialog.find('.window-title, .dialog-title').first();
           if ($titlebar.length) {
             const modeHtml = buildModeSelector({ mode: "semi" });
@@ -448,10 +373,110 @@ export class ThrowingEdgedAction extends RangedAttackAction {
           html.find('#msh-remember-settings').on('change', function() {
             setLS(lsRememberKey, this.checked ? "1" : "0");
           });
+
+          // Auto-focus Roll button for keyboard Enter and focus ring
+          html.find('#frp-roll').focus();
+
+          // Intercept Enter key — trigger Roll instead of Foundry's native submit
+          $dialog.on('keydown', (e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              e.stopPropagation();
+              html.find('#frp-roll').trigger('click');
+            }
+          });
+
+          // ── Roll button handler ──
+          html.find('#frp-roll').on('click', async () => {
+            const $dlg = (sel) => html.find(sel);
+
+            const rememberSettings = !!$dlg('#msh-remember-settings').is(':checked');
+            const skipDice = !!$dlg('#msh-skip-dice').is(':checked');
+
+            try {
+              localStorage.setItem(lsRememberKey, rememberSettings ? "1" : "0");
+              localStorage.setItem(lsSkipKey, skipDice ? "1" : "0");
+            } catch (e) {}
+
+            const useAdHoc = html.find('[name="src"]:checked').val() === 'adhoc';
+
+            let weaponName, weaponDamage, weaponId = null;
+            let weaponAP = 0, weaponAPCS = 0, weaponAPMode = "value";
+            let weaponDamageType = "physical-edged";
+
+            if (useAdHoc) {
+              weaponName = String($dlg('[name="adhocName"]').val() || "Improvised Edged");
+              weaponDamage = Number($dlg('[name="adhocDamage"]').val() || 0);
+            } else {
+              const wid = String($dlg('[name="weapon"]').val() || "");
+              const weapon = thrownEdged.find(i => i.id === wid);
+              if (!weapon) {
+                ui.notifications.error("Select a carried thrown-edged weapon or use ad-hoc.");
+                return;
+              }
+              weaponId = wid;
+              weaponName = weapon.name;
+              weaponDamage = Number(weapon.system?.damage || 0);
+              weaponAP = getArmorPiercing(weapon);
+              weaponAPCS = Number(weapon.system?.armorPiercingCS || 0) || 0;
+              weaponAPMode = weapon.system?.apMode || "value";
+            }
+
+            const cs = _csState.get();
+            const shift = cs.totalShift;
+            const { spendKarma, karmaToSpend } = extractKarmaFromDialog(html);
+            const range = Number($dlg('[name="range"]').val() || 1);
+
+            // Range validation
+            if (range > maxThrowRange) {
+              ui.notifications.error(`Target is beyond throwing range (${maxThrowRange} areas).`);
+              return;
+            }
+
+            const csNotes = cs.csNotes;
+
+            const pullEnabled = !!$dlg('#pull-punch-enabled').is(':checked');
+            const pulledDamage = pullEnabled ? parseInt($dlg('[name="pulledDamage"]').val() || 0) : 0;
+
+            // Save settings
+            if (rememberSettings) {
+              await actor.setFlag("msh-faserip", "lastThrowEdgedShift", cs.manualCS);
+              await actor.setFlag("msh-faserip", "lastThrowEdgedAdHoc", useAdHoc);
+              await actor.setFlag("msh-faserip", "lastThrowEdgedAdHocName", weaponName);
+              await actor.setFlag("msh-faserip", "lastThrowEdgedAdHocDamage", weaponDamage);
+              await actor.setFlag("msh-faserip", "lastThrowEdgedItemId", weaponId || "");
+              await actor.setFlag("msh-faserip", "lastThrowEdgedRange", range);
+              await actor.setFlag("msh-faserip", "lastThrowEdgedPullEnabled", pullEnabled);
+              await actor.setFlag("msh-faserip", "lastThrowEdgedPulledDamage", pulledDamage);
+            }
+            await actor.setFlag("msh-faserip", "csNotes", csNotes);
+
+            _resolved = true;
+            resolve({
+              weaponId, weaponName, weaponDamage,
+              totalShift: shift, shift,
+              karma: karmaToSpend, spendKarma, skipDice,
+              shiftBreakdown: { manual: cs.manualCS, csNotes },
+              armorPiercing: weaponAP,
+              armorPiercingCS: weaponAPCS,
+              apMode: weaponAPMode,
+              damageType: weaponDamageType,
+              pulledDamage, resultCap: "none"
+            });
+            dlg.close();
+          });
+
+          // ── Cancel button handler ──
+          html.find('#frp-cancel').on('click', () => {
+            _resolved = true;
+            resolve(null);
+            dlg.close();
+          });
         },
         close: () => {
           if (_csState) _csState.destroy();
           if (this._disposeAutoFill) this._disposeAutoFill();
+          if (!_resolved) resolve(null);
         }
       }).render(true);
     });
