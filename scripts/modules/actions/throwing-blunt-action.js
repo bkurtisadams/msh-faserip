@@ -220,100 +220,32 @@ export class ThrowingBluntAction extends RangedAttackAction {
 
       <!-- Footer -->
       <div class="frp-foot">
-        <label><input type="checkbox" id="msh-remember-settings" name="remember" ${shouldRemember ? 'checked' : ''}> Remember</label>
-        <label><input type="checkbox" id="msh-skip-dice" name="skipDice" ${savedSkipDice ? 'checked' : ''}> Skip dice</label>
+        <div class="frp-foot-btns">
+          <button type="button" class="frp-btn-roll" id="frp-roll">Roll</button>
+          <button type="button" class="frp-btn-cancel" id="frp-cancel">Cancel</button>
+        </div>
+        <div class="frp-foot-checks">
+          <label><input type="checkbox" id="msh-remember-settings" name="remember" ${shouldRemember ? 'checked' : ''}> Remember</label>
+          <label><input type="checkbox" id="msh-skip-dice" name="skipDice" ${savedSkipDice ? 'checked' : ''}> Skip dice</label>
+        </div>
       </div>
     </div>
     `;
 
+
     const choice = await new Promise(resolve => {
       let _csState = null;
-      new Dialog({
+      let _resolved = false;
+      const dlg = new Dialog({
         title: actionName,
         content: dialogHtml,
-        buttons: {
-          roll: {
-            label: "Roll",
-            callback: async (html) => {
-              const $dlg = (sel) => html.find(sel);
-
-              const rememberSettings = !!$dlg('#msh-remember-settings').is(':checked');
-              const skipDice = !!$dlg('#msh-skip-dice').is(':checked');
-
-              try {
-                localStorage.setItem(lsRememberKey, rememberSettings ? "1" : "0");
-                localStorage.setItem(lsSkipKey, skipDice ? "1" : "0");
-              } catch (e) {}
-
-              const useAdHoc = html.find('[name="src"]:checked').val() === 'adhoc';
-
-              let weaponName, weaponDamage, weaponId = null;
-
-              if (useAdHoc) {
-                weaponName = String($dlg('[name="adhocName"]').val() || "Improvised Blunt");
-                weaponDamage = Number($dlg('[name="adhocDamage"]').val() || 0);
-                if (!Number.isFinite(weaponDamage) || weaponDamage < 0) {
-                  ui.notifications.error("Enter a valid non-negative damage value for the ad-hoc weapon.");
-                  return resolve(null);
-                }
-              } else {
-                const wid = String($dlg('[name="weapon"]').val() || "");
-                const weapon = thrownBlunt.find(i => i.id === wid);
-                if (!weapon) {
-                  ui.notifications.error("Select a carried thrown-blunt weapon or use ad-hoc.");
-                  return resolve(null);
-                }
-                weaponId = wid;
-                weaponName = weapon.name;
-                weaponDamage = Number(weapon.system?.damage || 0);
-              }
-
-              const cs = _csState.get();
-              const shift = cs.totalShift;
-              const { spendKarma, karmaToSpend } = extractKarmaFromDialog(html);
-              const range = Number($dlg('[name="range"]').val() || 1);
-
-              // Range validation
-              if (range > maxThrowRange) {
-                ui.notifications.error(`Target is beyond throwing range (${maxThrowRange} areas).`);
-                return resolve(null);
-              }
-
-              const csNotes = cs.csNotes;
-
-              const pullEnabled = !!$dlg('#pull-punch-enabled').is(':checked');
-              const pulledDamage = pullEnabled ? parseInt($dlg('[name="pulledDamage"]').val() || 0) : 0;
-              const resultCap = pullEnabled ? ($dlg('[name="resultCap"]').val() || "none") : "none";
-
-              // Save settings
-              if (rememberSettings) {
-                await actor.setFlag("msh-faserip", "lastThrowBluntShift", cs.manualCS);
-                await actor.setFlag("msh-faserip", "lastThrowBluntAdHoc", useAdHoc);
-                await actor.setFlag("msh-faserip", "lastThrowBluntAdHocName", weaponName);
-                await actor.setFlag("msh-faserip", "lastThrowBluntAdHocDamage", weaponDamage);
-                await actor.setFlag("msh-faserip", "lastThrowBluntItemId", weaponId || "");
-                await actor.setFlag("msh-faserip", "lastThrowBluntRange", range);
-                await actor.setFlag("msh-faserip", "lastThrowBluntPullEnabled", pullEnabled);
-                await actor.setFlag("msh-faserip", "lastThrowBluntPulledDamage", pulledDamage);
-                await actor.setFlag("msh-faserip", "lastThrowBluntResultCap", resultCap);
-              }
-              await actor.setFlag("msh-faserip", "csNotes", csNotes);
-
-              resolve({
-                weaponId, weaponName, weaponDamage,
-                totalShift: shift, shift,
-                karma: karmaToSpend, spendKarma, skipDice,
-                shiftBreakdown: { manual: cs.manualCS, csNotes },
-                pulledDamage, resultCap
-              });
-            }
-          },
-          cancel: { label: "Cancel", callback: () => resolve(null) }
-        },
-        default: "roll",
+        buttons: {},
         render: async (html) => {
           setupKarmaControlHandlers(html);
           const $dialog = html.closest('.dialog');
+
+          // Hide Foundry's native button row
+          $dialog.find('.dialog-buttons').hide();
 
           // Inject mode buttons into titlebar
           const $titlebar = $dialog.find('.window-title, .dialog-title').first();
@@ -324,11 +256,99 @@ export class ThrowingBluntAction extends RangedAttackAction {
           }
           await setupModeSelector(actor, $dialog, this.opts || {}, "lastThrowBluntMode");
 
-          // Set dialog width
           if ($dialog.length) {
             $dialog.css('width', '360px');
             $dialog[0].style.height = 'auto';
           }
+
+          // Auto-focus Roll button
+          html.find('#frp-roll').focus();
+
+          // Intercept Enter key
+          $dialog.on('keydown', (e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              e.stopPropagation();
+              html.find('#frp-roll').trigger('click');
+            }
+          });
+
+          // ── Roll button handler ──
+          html.find('#frp-roll').on('click', async () => {
+            const $dlg = (sel) => html.find(sel);
+
+            const rememberSettings = !!$dlg('#msh-remember-settings').is(':checked');
+            const skipDice = !!$dlg('#msh-skip-dice').is(':checked');
+            setLS(lsRememberKey, rememberSettings ? "1" : "0");
+            setLS(lsSkipKey, skipDice ? "1" : "0");
+
+            const useAdHoc = html.find('[name="src"]:checked').val() === 'adhoc';
+            let weaponName, weaponDamage, weaponId = null;
+
+            if (useAdHoc) {
+              weaponName = String($dlg('[name="adhocName"]').val() || "Improvised Blunt");
+              weaponDamage = Number($dlg('[name="adhocDamage"]').val() || 0);
+              if (!Number.isFinite(weaponDamage) || weaponDamage < 0) {
+                ui.notifications.error("Enter a valid non-negative damage value for the ad-hoc weapon.");
+                return;
+              }
+            } else {
+              const wid = String($dlg('[name="weapon"]').val() || "");
+              const weapon = thrownBlunt.find(i => i.id === wid);
+              if (!weapon) {
+                ui.notifications.error("Select a carried thrown-blunt weapon or use ad-hoc.");
+                return;
+              }
+              weaponId = wid;
+              weaponName = weapon.name;
+              weaponDamage = Number(weapon.system?.damage || 0);
+            }
+
+            const cs = _csState.get();
+            const shift = cs.totalShift;
+            const { spendKarma, karmaToSpend } = extractKarmaFromDialog(html);
+            const range = Number($dlg('[name="range"]').val() || 1);
+
+            if (range > maxThrowRange) {
+              ui.notifications.error(`Target is beyond throwing range (${maxThrowRange} areas).`);
+              return;
+            }
+
+            const csNotes = cs.csNotes;
+            const pullEnabled = !!$dlg('#pull-punch-enabled').is(':checked');
+            const pulledDamage = pullEnabled ? parseInt($dlg('[name="pulledDamage"]').val() || 0) : 0;
+            const resultCap = pullEnabled ? ($dlg('[name="resultCap"]').val() || "none") : "none";
+
+            if (rememberSettings) {
+              await actor.setFlag("msh-faserip", "lastThrowBluntShift", cs.manualCS);
+              await actor.setFlag("msh-faserip", "lastThrowBluntAdHoc", useAdHoc);
+              await actor.setFlag("msh-faserip", "lastThrowBluntAdHocName", weaponName);
+              await actor.setFlag("msh-faserip", "lastThrowBluntAdHocDamage", weaponDamage);
+              await actor.setFlag("msh-faserip", "lastThrowBluntItemId", weaponId || "");
+              await actor.setFlag("msh-faserip", "lastThrowBluntRange", range);
+              await actor.setFlag("msh-faserip", "lastThrowBluntPullEnabled", pullEnabled);
+              await actor.setFlag("msh-faserip", "lastThrowBluntPulledDamage", pulledDamage);
+              await actor.setFlag("msh-faserip", "lastThrowBluntResultCap", resultCap);
+            }
+            await actor.setFlag("msh-faserip", "csNotes", csNotes);
+
+            _resolved = true;
+            resolve({
+              weaponId, weaponName, weaponDamage,
+              totalShift: shift, shift,
+              karma: karmaToSpend, spendKarma, skipDice,
+              shiftBreakdown: { manual: cs.manualCS, csNotes },
+              pulledDamage, resultCap
+            });
+            dlg.close();
+          });
+
+          // ── Cancel button handler ──
+          html.find('#frp-cancel').on('click', () => {
+            _resolved = true;
+            resolve(null);
+            dlg.close();
+          });
 
           // ── Wire CS panel from shared utility ──
           const _getCurrentRangePenalty = () => {
@@ -430,10 +450,23 @@ export class ThrowingBluntAction extends RangedAttackAction {
           html.find('#msh-remember-settings').on('change', function() {
             setLS(lsRememberKey, this.checked ? "1" : "0");
           });
+
+          applyCapabilitiesToDialog(html, "throwing-blunt", { actor });
+
+          // Attach auto-fill range from token distance
+          this._disposeAutoFill = attachAutoFillRange(html, actor, () => update());
+
+          html.find('#msh-skip-dice').on('change', function() {
+            setLS(lsSkipKey, this.checked ? "1" : "0");
+          });
+          html.find('#msh-remember-settings').on('change', function() {
+            setLS(lsRememberKey, this.checked ? "1" : "0");
+          });
         },
         close: () => {
           if (_csState) _csState.destroy();
           if (this._disposeAutoFill) this._disposeAutoFill();
+          if (!_resolved) resolve(null);
         }
       }).render(true);
     });

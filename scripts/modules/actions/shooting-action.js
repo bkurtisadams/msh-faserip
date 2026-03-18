@@ -269,11 +269,13 @@ export class ShootingAction extends RangedAttackAction {
 
       <!-- Footer: checkboxes + buttons on one row -->
       <div class="frp-foot">
-        <label><input type="checkbox" id="msh-remember-settings" name="remember" ${shouldRemember ? 'checked' : ''}> Remember</label>
-        <label><input type="checkbox" id="msh-skip-dice" name="skipDice" ${savedSkipDice ? 'checked' : ''}> Skip dice</label>
         <div class="frp-foot-btns">
-          <button type="button" class="frp-btn-cancel" id="frp-cancel">Cancel</button>
           <button type="button" class="frp-btn-roll" id="frp-roll">Roll</button>
+          <button type="button" class="frp-btn-cancel" id="frp-cancel">Cancel</button>
+        </div>
+        <div class="frp-foot-checks">
+          <label><input type="checkbox" id="msh-remember-settings" name="remember" ${shouldRemember ? 'checked' : ''}> Remember</label>
+          <label><input type="checkbox" id="msh-skip-dice" name="skipDice" ${savedSkipDice ? 'checked' : ''}> Skip dice</label>
         </div>
       </div>
     </div>
@@ -374,6 +376,18 @@ export class ShootingAction extends RangedAttackAction {
           };
 
           update();
+
+          // Auto-focus Roll button for keyboard Enter and focus ring
+          html.find('#frp-roll').focus();
+
+          // Intercept Enter key — trigger Roll instead of Foundry's native submit
+          $dialog.on('keydown', (e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              e.stopPropagation();
+              html.find('#frp-roll').trigger('click');
+            }
+          });
 
           // ── Roll button handler ──
           html.find('#frp-roll').on('click', async () => {

@@ -320,109 +320,31 @@ export class ChargingAction extends AttackAction {
 
     <!-- Footer -->
     <div class="frp-foot">
-      <label><input type="checkbox" id="msh-remember-settings" name="remember" ${shouldRemember ? 'checked' : ''}> Remember</label>
-      <label><input type="checkbox" id="msh-skip-dice" name="skipDice" ${savedSkipDice ? 'checked' : ''}> Skip dice</label>
+      <div class="frp-foot-btns">
+        <button type="button" class="frp-btn-roll" id="frp-roll">Roll</button>
+        <button type="button" class="frp-btn-cancel" id="frp-cancel">Cancel</button>
+      </div>
+      <div class="frp-foot-checks">
+        <label><input type="checkbox" id="msh-remember-settings" name="remember" ${shouldRemember ? 'checked' : ''}> Remember</label>
+        <label><input type="checkbox" id="msh-skip-dice" name="skipDice" ${savedSkipDice ? 'checked' : ''}> Skip dice</label>
+      </div>
     </div>
 
   </div>
   `;
 
   const choice = await new Promise(resolve => {
-    new Dialog({
+    let _resolved = false;
+    const dlg = new Dialog({
       title: "Charging",
       content: dialogHtml,
-      buttons: {
-        roll: {
-          label: "Roll",
-          callback: async (html) => {
-            const $ = (sel) => html.find(sel);
-            const areas = Math.max(1, Number($('[name="areas"]').val() || 1));
-            const shift = Number($('[name="shift"]').val() || 0);
-            const { spendKarma, karmaToSpend } = extractKarmaFromDialog(html);
-            const karma = karmaToSpend;
-            const targetType = String($('[name="targetType"]:checked').val() || "character");
-            const skipDice = !!$('#msh-skip-dice').is(':checked');
-            const remember = !!$('#msh-remember-settings').is(':checked');
-
-            // Build csNotes from sit tags
-            const sitParts = [];
-            html.find('.frp-sit-tag').each(function() {
-              const label = $(this).data('label') || '';
-              const cs = parseInt($(this).data('cs')) || 0;
-              if (label) sitParts.push(`${label} ${cs > 0 ? '+' : ''}${cs}`);
-            });
-            const csNotes = sitParts.join(', ');
-
-            let targetBArank, targetBAvalue, objectMaterial, objectDesc;
-
-            if (targetType === "character") {
-              targetBArank = String($('[name="targetBodyArmorRank"]').val() || "Shift-0");
-              targetBAvalue = Number($('[name="targetBodyArmorValue"]').val() || 0);
-              objectMaterial = null;
-              objectDesc = null;
-            } else {
-              objectMaterial = String($('[name="objectMaterial"]').val() || "Excellent");
-              objectDesc = String($('[name="objectDescription"]').val() || "Object");
-              targetBArank = objectMaterial;
-              targetBAvalue = game.msh.getRankValue(objectMaterial) || 20;
-            }
-
-            setLS(lsRememberKey, remember ? "1" : "0");
-            setLS(lsSkipKey, skipDice ? "1" : "0");
-
-            // Strip sit tags from saved shift
-            let sitTagCS = 0;
-            html.find('.frp-sit-tag').each(function() {
-              sitTagCS += parseInt($(this).data('cs')) || 0;
-            });
-            const baseShift = shift - sitTagCS;
-
-            if (remember) {
-              await actor.setFlag("msh-faserip", "lastChargingAreas", areas);
-              await actor.setFlag("msh-faserip", "lastChargingShift", baseShift);
-              await actor.setFlag("msh-faserip", "lastChargingCsNotes", csNotes);
-              await actor.setFlag("msh-faserip", "lastChargingTargetType", targetType);
-              if (targetType === "character") {
-                await actor.setFlag("msh-faserip", "lastChargingTargetBA", targetBArank);
-                await actor.setFlag("msh-faserip", "lastChargingTargetBAValue", targetBAvalue);
-              } else {
-                await actor.setFlag("msh-faserip", "lastChargingObjectMaterial", objectMaterial);
-                await actor.setFlag("msh-faserip", "lastChargingObjectDesc", objectDesc);
-              }
-            }
-
-            const movementBonus = Math.min(3, areas);
-            const totalShift = shift + movementBonus;
-
-            const pullEnabled   = !!html.find('#pull-punch-enabled').is(':checked');
-            const pulledDamage  = pullEnabled ? parseInt(html.find('[name="pulledDamage"]').val() || 0) : 0;
-            const resultCap     = pullEnabled ? (html.find('[name="resultCap"]').val() || "none") : "none";
-
-            resolve({
-              areas,
-              shift,
-              karma,
-              spendKarma,
-              skipDice,
-              targetType,
-              targetBArank,
-              targetBAvalue,
-              objectMaterial,
-              objectDesc,
-              totalShift,
-              movementBonus,
-              csNotes,
-              pulledDamage,
-              resultCap
-            });
-          }
-        },
-        cancel: { label: "Cancel", callback: () => resolve(null) }
-      },
-      default: "roll",
+      buttons: {},
       render: async (html) => {
         setupKarmaControlHandlers(html);
         const $dialog = html.closest('.dialog');
+
+        // Hide Foundry's native button row
+        $dialog.find('.dialog-buttons').hide();
 
         // Inject mode buttons into titlebar
         const $titlebar = $dialog.find('.window-title, .dialog-title').first();
@@ -438,6 +360,99 @@ export class ChargingAction extends AttackAction {
           $dialog.css('width', '360px');
           $dialog[0].style.height = 'auto';
         }
+
+        // Auto-focus Roll button for keyboard Enter and focus ring
+        html.find('#frp-roll').focus();
+
+        // Intercept Enter key
+        $dialog.on('keydown', (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            e.stopPropagation();
+            html.find('#frp-roll').trigger('click');
+          }
+        });
+
+        // ── Roll button handler ──
+        html.find('#frp-roll').on('click', async () => {
+          const $ = (sel) => html.find(sel);
+          const areas = Math.max(1, Number($('[name="areas"]').val() || 1));
+          const shift = Number($('[name="shift"]').val() || 0);
+          const { spendKarma, karmaToSpend } = extractKarmaFromDialog(html);
+          const karma = karmaToSpend;
+          const targetType = String($('[name="targetType"]:checked').val() || "character");
+          const skipDice = !!$('#msh-skip-dice').is(':checked');
+          const remember = !!$('#msh-remember-settings').is(':checked');
+
+          const sitParts = [];
+          html.find('.frp-sit-tag').each(function() {
+            const label = $(this).data('label') || '';
+            const cs = parseInt($(this).data('cs')) || 0;
+            if (label) sitParts.push(`${label} ${cs > 0 ? '+' : ''}${cs}`);
+          });
+          const csNotes = sitParts.join(', ');
+
+          let targetBArank, targetBAvalue, objectMaterial, objectDesc;
+
+          if (targetType === "character") {
+            targetBArank = String($('[name="targetBodyArmorRank"]').val() || "Shift-0");
+            targetBAvalue = Number($('[name="targetBodyArmorValue"]').val() || 0);
+            objectMaterial = null;
+            objectDesc = null;
+          } else {
+            objectMaterial = String($('[name="objectMaterial"]').val() || "Excellent");
+            objectDesc = String($('[name="objectDescription"]').val() || "Object");
+            targetBArank = objectMaterial;
+            targetBAvalue = game.msh.getRankValue(objectMaterial) || 20;
+          }
+
+          setLS(lsRememberKey, remember ? "1" : "0");
+          setLS(lsSkipKey, skipDice ? "1" : "0");
+
+          let sitTagCS = 0;
+          html.find('.frp-sit-tag').each(function() {
+            sitTagCS += parseInt($(this).data('cs')) || 0;
+          });
+          const baseShift = shift - sitTagCS;
+
+          if (remember) {
+            await actor.setFlag("msh-faserip", "lastChargingAreas", areas);
+            await actor.setFlag("msh-faserip", "lastChargingShift", baseShift);
+            await actor.setFlag("msh-faserip", "lastChargingCsNotes", csNotes);
+            await actor.setFlag("msh-faserip", "lastChargingTargetType", targetType);
+            if (targetType === "character") {
+              await actor.setFlag("msh-faserip", "lastChargingTargetBA", targetBArank);
+              await actor.setFlag("msh-faserip", "lastChargingTargetBAValue", targetBAvalue);
+            } else {
+              await actor.setFlag("msh-faserip", "lastChargingObjectMaterial", objectMaterial);
+              await actor.setFlag("msh-faserip", "lastChargingObjectDesc", objectDesc);
+            }
+          }
+
+          const movementBonus = Math.min(3, areas);
+          const totalShift = shift + movementBonus;
+
+          const pullEnabled   = !!html.find('#pull-punch-enabled').is(':checked');
+          const pulledDamage  = pullEnabled ? parseInt(html.find('[name="pulledDamage"]').val() || 0) : 0;
+          const resultCap     = pullEnabled ? (html.find('[name="resultCap"]').val() || "none") : "none";
+
+          _resolved = true;
+          resolve({
+            areas, shift, karma, spendKarma, skipDice,
+            targetType, targetBArank, targetBAvalue,
+            objectMaterial, objectDesc,
+            totalShift, movementBonus, csNotes,
+            pulledDamage, resultCap
+          });
+          dlg.close();
+        });
+
+        // ── Cancel button handler ──
+        html.find('#frp-cancel').on('click', () => {
+          _resolved = true;
+          resolve(null);
+          dlg.close();
+        });
 
         const $charPanel = html.find('#character-target-panel');
         const $objPanel = html.find('#object-target-panel');
@@ -600,6 +615,9 @@ export class ChargingAction extends AttackAction {
         togglePanels();
         updatePreview();
         applyCapabilitiesToDialog(html, "charging", { actor });
+      },
+      close: () => {
+        if (!_resolved) resolve(null);
       }
     }).render(true);
   });

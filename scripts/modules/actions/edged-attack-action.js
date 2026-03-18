@@ -253,36 +253,77 @@ export class EdgedAttackAction extends AttackAction {
 
       <!-- Footer -->
       <div class="frp-foot">
-        <label><input type="checkbox" id="msh-remember-settings" name="remember" ${shouldRemember ? 'checked' : ''}> Remember</label>
-        <label><input type="checkbox" id="msh-skip-dice" name="skipDice" ${savedSkipDice ? 'checked' : ''}> Skip dice</label>
+        <div class="frp-foot-btns">
+          <button type="button" class="frp-btn-roll" id="frp-roll">Roll</button>
+          <button type="button" class="frp-btn-cancel" id="frp-cancel">Cancel</button>
+        </div>
+        <div class="frp-foot-checks">
+          <label><input type="checkbox" id="msh-remember-settings" name="remember" ${shouldRemember ? 'checked' : ''}> Remember</label>
+          <label><input type="checkbox" id="msh-skip-dice" name="skipDice" ${savedSkipDice ? 'checked' : ''}> Skip dice</label>
+        </div>
       </div>
     </div>
     `;
 
     const choice = await new Promise((resolve) => {
       let _csState = null;
-      new Dialog({
+      let _resolved = false;
+      const dlg = new Dialog({
         title: actionName,
         content: dialogHtml,
-        buttons: {
-          roll: {
-          label: "Roll",
-          callback: async (html) => {
-            const $content = $(html).find(".dialog-content").first();
+        buttons: {},
+        render: async (html) => {
+          setupKarmaControlHandlers(html);
+          const $dialog = html.closest('.dialog');
+
+          // Hide Foundry's native button row
+          $dialog.find('.dialog-buttons').hide();
+          
+          // Inject mode buttons into the titlebar
+          const $titlebar = $dialog.find('.window-title, .dialog-title').first();
+          if ($titlebar.length) {
+            const modeHtml = buildModeSelector({ mode: "semi" });
+            const $modeWrap = $('<span class="frp-titlebar-mode"></span>').append(modeHtml);
+            $titlebar.after($modeWrap);
+          }
+          await setupModeSelector(actor, $dialog, this.opts || {}, "lastEdgedMode");
+
+          // Set dialog width
+          if ($dialog.length) {
+            $dialog.css('width', '360px');
+            $dialog[0].style.height = 'auto';
+          }
+
+          const setLS = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
+
+          // ── Wire CS panel from shared utility ──
+          _csState = wireCSPanel(html, {
+            abilityRank: ability.rank,
+            onUpdate: () => {
+              if ($dialog.length) $dialog[0].style.height = 'auto';
+            }
+          });
+
+          // Auto-focus Roll button for keyboard Enter and focus ring
+          html.find('#frp-roll').focus();
+
+          // Intercept Enter key — trigger Roll instead of Foundry's native submit
+          $dialog.on('keydown', (e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              e.stopPropagation();
+              html.find('#frp-roll').trigger('click');
+            }
+          });
+
+          // ── Roll button handler ──
+          html.find('#frp-roll').on('click', async () => {
             const $dlg = (sel) => html.find(sel);
 
-            const rememberSettings = $content.find("#msh-remember-settings").length
-              ? $content.find("#msh-remember-settings").prop("checked")
-              : !!$dlg('[name="remember"]').is(':checked');
-
-            const skipDice = $content.find("#msh-skip-dice").length
-              ? $content.find("#msh-skip-dice").prop("checked")
-              : !!$dlg('[name="skipDice"]').is(':checked');
-
-            try {
-              localStorage.setItem(lsRememberKey, rememberSettings ? "1" : "0");
-              localStorage.setItem(lsSkipKey, skipDice ? "1" : "0");
-            } catch (e) { /* ignore */ }
+            const rememberSettings = $dlg("#msh-remember-settings").is(':checked');
+            const skipDice = $dlg("#msh-skip-dice").is(':checked');
+            setLS(lsRememberKey, rememberSettings ? "1" : "0");
+            setLS(lsSkipKey, skipDice ? "1" : "0");
 
             // Parse unified damage source select
             const damageSourceVal = $dlg('#damage-source-select').val() || "natural";
@@ -360,44 +401,21 @@ export class EdgedAttackAction extends AttackAction {
             
             await actor.setFlag("msh-faserip", "csNotes", csNotes);
 
+            _resolved = true;
             resolve({
               src, itemId, natRank, natDmg, shift, karma, spendKarma, skipDice,
               weaponMat, weaponName, damage, note,
               armorPiercing: ap, armorPiercingCS: apCS, apMode, bypassForceField: bypassFF,
               multiAttacks, attackCount, multiAdjacent, csNotes
             });
-          }
-        },
-          cancel: { label: "Cancel", callback: () => resolve(null) }
-        },
-        default: "roll",
-        render: async (html) => {
-          setupKarmaControlHandlers(html);
-          const $dialog = html.closest('.dialog');
-          
-          // Inject mode buttons into the titlebar
-          const $titlebar = $dialog.find('.window-title, .dialog-title').first();
-          if ($titlebar.length) {
-            const modeHtml = buildModeSelector({ mode: "semi" });
-            const $modeWrap = $('<span class="frp-titlebar-mode"></span>').append(modeHtml);
-            $titlebar.after($modeWrap);
-          }
-          await setupModeSelector(actor, $dialog, this.opts || {}, "lastEdgedMode");
+            dlg.close();
+          });
 
-          // Set dialog width
-          if ($dialog.length) {
-            $dialog.css('width', '360px');
-            $dialog[0].style.height = 'auto';
-          }
-
-          const setLS = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
-
-          // ── Wire CS panel from shared utility ──
-          _csState = wireCSPanel(html, {
-            abilityRank: ability.rank,
-            onUpdate: () => {
-              if ($dialog.length) $dialog[0].style.height = 'auto';
-            }
+          // ── Cancel button handler ──
+          html.find('#frp-cancel').on('click', () => {
+            _resolved = true;
+            resolve(null);
+            dlg.close();
           });
 
           // ── Main update function ──
@@ -509,6 +527,7 @@ export class EdgedAttackAction extends AttackAction {
         },
         close: () => {
           if (_csState) _csState.destroy();
+          if (!_resolved) resolve(null);
         }
       }).render(true);
     });

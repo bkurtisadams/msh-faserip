@@ -262,8 +262,14 @@ export class EnergyAction extends RangedAttackAction {
 
       <!-- Footer -->
       <div class="frp-foot">
-        <label><input type="checkbox" id="msh-remember-settings" name="remember" ${shouldRemember ? 'checked' : ''}> Remember</label>
-        <label><input type="checkbox" id="msh-skip-dice" name="skipDice" ${savedSkipDice ? 'checked' : ''}> Skip dice</label>
+        <div class="frp-foot-btns">
+          <button type="button" class="frp-btn-roll" id="frp-roll">Roll</button>
+          <button type="button" class="frp-btn-cancel" id="frp-cancel">Cancel</button>
+        </div>
+        <div class="frp-foot-checks">
+          <label><input type="checkbox" id="msh-remember-settings" name="remember" ${shouldRemember ? 'checked' : ''}> Remember</label>
+          <label><input type="checkbox" id="msh-skip-dice" name="skipDice" ${savedSkipDice ? 'checked' : ''}> Skip dice</label>
+        </div>
       </div>
     </div>
     `;
@@ -272,104 +278,17 @@ export class EnergyAction extends RangedAttackAction {
 
     const choice = await new Promise((resolve) => {
       let _csState = null;
-      new Dialog({
+      let _resolved = false;
+      const dlg = new Dialog({
         title: actionName,
         content: dialogHtml,
-        buttons: {
-          roll: {
-            label: "Roll",
-            callback: async (html) => {
-              const $dlg = (sel) => html.find(sel);
-
-              const rememberSettings = $dlg("#msh-remember-settings").is(':checked');
-              const skipDice = $dlg("#msh-skip-dice").is(':checked');
-              try {
-                localStorage.setItem(lsRememberKey, rememberSettings ? "1" : "0");
-                localStorage.setItem(lsSkipKey, skipDice ? "1" : "0");
-              } catch (e) {}
-
-              // Parse power source select
-              const srcVal = $dlg('#power-source-select').val() || "adhoc";
-              const useAdHoc = srcVal === "adhoc";
-
-              let powerName = "", powerDamage = 0, powerRank = "Remarkable", powerId = null, prettyRange = "";
-              let powerDamageType = "energy-generic";
-
-              if (useAdHoc) {
-                powerName = String($dlg('[name="adhocName"]').val() || "Energy Blast");
-                powerDamage = Number($dlg('[name="adhocDamage"]').val() || 0);
-                powerRank = String($dlg('[name="adhocRank"]').val() || "Remarkable");
-                if (!Number.isFinite(powerDamage) || powerDamage < 0) {
-                  ui.notifications.error("Enter a valid non-negative damage value.");
-                  return resolve(null);
-                }
-              } else {
-                const itemId = srcVal.replace("power:", "");
-                const item = energyItems.find(i => i.id === itemId);
-                if (!item) {
-                  ui.notifications.error("Select an energy power or use ad-hoc.");
-                  return resolve(null);
-                }
-                powerId = itemId;
-                const s = item.system || {};
-                powerName = item.name;
-                powerDamage = Number(s.damage && s.damage > 0 ? s.damage : s.value) || 0;
-                powerRank = String(s.rank ?? s.powerRank ?? "Remarkable");
-                prettyRange = String(s.calculatedRange || "");
-                powerDamageType = s.damageType || "energy-generic";
-              }
-
-              const cs = _csState.get();
-              const shift = cs.totalShift;
-              const { spendKarma, karmaToSpend } = extractKarmaFromDialog(html);
-              const karma = karmaToSpend;
-              const usePowerToHit = !!html.find('#pwr-hit-toggle').is(':checked');
-
-              const range = Number($dlg('[name="range"]').val() || 1);
-
-              const multiAdjacent = !!$dlg('#multi-enabled').is(':checked');
-
-              const reduceDamageEnabled = !!$dlg('#reduce-damage-enabled').is(':checked');
-              const reducedDamage = reduceDamageEnabled ? parseInt($dlg('[name="reducedDamage"]').val() || powerDamage) : powerDamage;
-              const resultCap = reduceDamageEnabled ? ($dlg('[name="resultCap"]:checked').val() || 'none') : 'none';
-
-              const csNotes = cs.csNotes;
-
-              // Save settings
-              if (rememberSettings) {
-                await actor.setFlag("msh-faserip", "lastEnergyAdHoc", useAdHoc);
-                await actor.setFlag("msh-faserip", "lastEnergyUsePowerToHit", usePowerToHit);
-                await actor.setFlag("msh-faserip", "lastEnergyShift", cs.manualCS);
-                await actor.setFlag("msh-faserip", "cs_energy", cs.manualCS);
-                await actor.setFlag("msh-faserip", "lastEnergyMultiAdjacent", multiAdjacent);
-                await actor.setFlag("msh-faserip", "lastEnergyAdHocName", powerName);
-                await actor.setFlag("msh-faserip", "lastEnergyAdHocDamage", powerDamage);
-                await actor.setFlag("msh-faserip", "lastEnergyAdHocRank", powerRank);
-                await actor.setFlag("msh-faserip", "lastEnergyItemId", powerId || "");
-                await actor.setFlag("msh-faserip", "lastEnergyRange", range);
-                await actor.setFlag("msh-faserip", "lastEnergyReduceDamage", reduceDamageEnabled);
-                await actor.setFlag("msh-faserip", "lastEnergyReducedAmount", reducedDamage);
-                await actor.setFlag("msh-faserip", "lastEnergyResultCap", resultCap);
-              }
-              await actor.setFlag("msh-faserip", "csNotes", csNotes);
-
-              resolve({
-                powerName, powerDamage, powerRank, powerId, prettyRange,
-                useAdHoc,
-                shift, karma, spendKarma, range, skipDice, usePowerToHit,
-                totalShift: shift,
-                powerDamageType, multiAdjacent,
-                reduceDamageEnabled, reducedDamage, resultCap,
-                csNotes
-              });
-            },
-          },
-          cancel: { label: "Cancel", callback: () => resolve(null) },
-        },
-        default: "roll",
+        buttons: {},
         render: async (html) => {
           setupKarmaControlHandlers(html);
           const $dialog = html.closest('.dialog');
+
+          // Hide Foundry's native button row
+          $dialog.find('.dialog-buttons').hide();
 
           // Inject mode buttons into titlebar
           const $titlebar = $dialog.find('.window-title, .dialog-title').first();
@@ -423,6 +342,106 @@ export class EnergyAction extends RangedAttackAction {
               if (item) currentRank = String(item.system?.rank ?? item.system?.powerRank ?? "Remarkable");
             }
             _csState.setAbilityRank(this.checked ? currentRank : ability.rank);
+          });
+
+          // Auto-focus Roll button for keyboard Enter and focus ring
+          html.find('#frp-roll').focus();
+
+          // Intercept Enter key — trigger Roll instead of Foundry's native submit
+          $dialog.on('keydown', (e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              e.stopPropagation();
+              html.find('#frp-roll').trigger('click');
+            }
+          });
+
+          // ── Roll button handler ──
+          html.find('#frp-roll').on('click', async () => {
+            const $dlg = (sel) => html.find(sel);
+
+            const rememberSettings = $dlg("#msh-remember-settings").is(':checked');
+            const skipDice = $dlg("#msh-skip-dice").is(':checked');
+            setLS(lsRememberKey, rememberSettings ? "1" : "0");
+            setLS(lsSkipKey, skipDice ? "1" : "0");
+
+            const srcVal = $dlg('#power-source-select').val() || "adhoc";
+            const useAdHoc = srcVal === "adhoc";
+
+            let powerName = "", powerDamage = 0, powerRank = "Remarkable", powerId = null, prettyRange = "";
+            let powerDamageType = "energy-generic";
+
+            if (useAdHoc) {
+              powerName = String($dlg('[name="adhocName"]').val() || "Energy Blast");
+              powerDamage = Number($dlg('[name="adhocDamage"]').val() || 0);
+              powerRank = String($dlg('[name="adhocRank"]').val() || "Remarkable");
+              if (!Number.isFinite(powerDamage) || powerDamage < 0) {
+                ui.notifications.error("Enter a valid non-negative damage value.");
+                return;
+              }
+            } else {
+              const itemId = srcVal.replace("power:", "");
+              const item = energyItems.find(i => i.id === itemId);
+              if (!item) {
+                ui.notifications.error("Select an energy power or use ad-hoc.");
+                return;
+              }
+              powerId = itemId;
+              const s = item.system || {};
+              powerName = item.name;
+              powerDamage = Number(s.damage && s.damage > 0 ? s.damage : s.value) || 0;
+              powerRank = String(s.rank ?? s.powerRank ?? "Remarkable");
+              prettyRange = String(s.calculatedRange || "");
+              powerDamageType = s.damageType || "energy-generic";
+            }
+
+            const cs = _csState.get();
+            const shift = cs.totalShift;
+            const { spendKarma, karmaToSpend } = extractKarmaFromDialog(html);
+            const karma = karmaToSpend;
+            const usePowerToHit = !!html.find('#pwr-hit-toggle').is(':checked');
+            const range = Number($dlg('[name="range"]').val() || 1);
+            const multiAdjacent = !!$dlg('#multi-enabled').is(':checked');
+            const reduceDamageEnabled = !!$dlg('#reduce-damage-enabled').is(':checked');
+            const reducedDamage = reduceDamageEnabled ? parseInt($dlg('[name="reducedDamage"]').val() || powerDamage) : powerDamage;
+            const resultCap = reduceDamageEnabled ? ($dlg('[name="resultCap"]:checked').val() || 'none') : 'none';
+            const csNotes = cs.csNotes;
+
+            if (rememberSettings) {
+              await actor.setFlag("msh-faserip", "lastEnergyAdHoc", useAdHoc);
+              await actor.setFlag("msh-faserip", "lastEnergyUsePowerToHit", usePowerToHit);
+              await actor.setFlag("msh-faserip", "lastEnergyShift", cs.manualCS);
+              await actor.setFlag("msh-faserip", "cs_energy", cs.manualCS);
+              await actor.setFlag("msh-faserip", "lastEnergyMultiAdjacent", multiAdjacent);
+              await actor.setFlag("msh-faserip", "lastEnergyAdHocName", powerName);
+              await actor.setFlag("msh-faserip", "lastEnergyAdHocDamage", powerDamage);
+              await actor.setFlag("msh-faserip", "lastEnergyAdHocRank", powerRank);
+              await actor.setFlag("msh-faserip", "lastEnergyItemId", powerId || "");
+              await actor.setFlag("msh-faserip", "lastEnergyRange", range);
+              await actor.setFlag("msh-faserip", "lastEnergyReduceDamage", reduceDamageEnabled);
+              await actor.setFlag("msh-faserip", "lastEnergyReducedAmount", reducedDamage);
+              await actor.setFlag("msh-faserip", "lastEnergyResultCap", resultCap);
+            }
+            await actor.setFlag("msh-faserip", "csNotes", csNotes);
+
+            _resolved = true;
+            resolve({
+              powerName, powerDamage, powerRank, powerId, prettyRange,
+              useAdHoc,
+              shift, karma, spendKarma, range, skipDice, usePowerToHit,
+              totalShift: shift,
+              powerDamageType, multiAdjacent,
+              reduceDamageEnabled, reducedDamage, resultCap,
+              csNotes
+            });
+            dlg.close();
+          });
+
+          // ── Cancel button handler ──
+          html.find('#frp-cancel').on('click', () => {
+            _resolved = true;
+            resolve(null);
+            dlg.close();
           });
 
           // ── Main update function (damage + range display only — CS handled by csState) ──
@@ -542,6 +561,7 @@ export class EnergyAction extends RangedAttackAction {
         close: () => {
           if (_csState) _csState.destroy();
           if (this._disposeAutoFill) this._disposeAutoFill();
+          if (!_resolved) resolve(null);
         }
       }).render(true);
     });
