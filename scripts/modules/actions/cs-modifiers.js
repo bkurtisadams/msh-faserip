@@ -1,12 +1,13 @@
-// scripts/modules/actions/cs-modifiers.js v3.1.0 - 2026-03-17
+// scripts/modules/actions/cs-modifiers.js v3.2.0 - 2026-03-17
 // Manual CS input with base rank, optional range penalty, and ? reference panel.
+// v3.2.0: Spell out full rank names: "Good → Remarkable" (not abbreviated).
+//         Footer CSS: frp-foot-checks wrapper for right-justified checkboxes.
 // v3.1.0: Show base rank abbreviation before arrow, effective rank after.
 //         Optional rangePenalty shown as read-only element between CS and arrow.
 //         wireCSPanel accepts getRangePenalty callback for live range updates.
 // v3.0.0: Strip all talent/power auto-detection. CS is fully manual.
 
 import { shiftRank } from "./action-utils.js";
-import { RANK_ABBR } from "../../rules/rules-reference.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Reference data — displayed in the help panel, never auto-applied
@@ -98,16 +99,16 @@ export const CS_REFERENCE = {
 // ─────────────────────────────────────────────────────────────────────────────
 // buildCSRow({ savedCS, abilityRank, rangePenalty })
 //
-// Layout:  CS [__] + Range [-2]  Gd → Rm  [?]
-//   or:    CS [__]               Gd → Rm  [?]   (when no range)
+// Layout:  CS [__] + Range [-2]  Good (10) → Remarkable (30)  [?]
+//   or:    CS [__]               Good (10) → Remarkable (30)  [?]   (when no range)
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function buildCSRow({ savedCS = 0, abilityRank, rangePenalty = 0, showRange = false }) {
   const csInputCls = savedCS > 0 ? ' pos' : savedCS < 0 ? ' neg' : '';
   const net = savedCS + rangePenalty;
   const effectiveRank = shiftRank(abilityRank, net);
-  const baseAbbr = RANK_ABBR[abilityRank] || abilityRank;
-  const effectiveAbbr = RANK_ABBR[effectiveRank] || effectiveRank;
+  const baseLabel = abilityRank;
+  const effectiveLabel = effectiveRank;
   const rankColor = net > 0 ? 'color:#2e7d32;' : net < 0 ? 'color:#c62828;' : '';
 
   const rangeHtml = showRange
@@ -139,9 +140,9 @@ export function buildCSRow({ savedCS = 0, abilityRank, rangePenalty = 0, showRan
         <span class="frp-cs-label">CS</span>
         <input type="number" class="frp-cs-input${csInputCls}" name="shift" value="${savedCS}" id="frp-cs-manual">
         ${rangeHtml}
-        <span class="frp-cs-base">${baseAbbr}</span>
+        <span class="frp-cs-base">${baseLabel}</span>
         <span class="frp-cs-arrow">&rarr;</span>
-        <span class="frp-cs-rank" id="frp-cs-rank" style="${rankColor}">${effectiveAbbr}</span>
+        <span class="frp-cs-rank" id="frp-cs-rank" style="${rankColor}">${effectiveLabel}</span>
         <button type="button" class="frp-cs-help" id="frp-cs-help" title="CS Reference">?</button>
       </div>
       <div class="frp-ref-panel" id="frp-ref-panel" style="display:none;">
@@ -196,13 +197,12 @@ export function wireCSPanel(html, { abilityRank, onUpdate, getRangePenalty } = {
     const net = cs + _rangePenalty;
 
     const effectiveRank = shiftRank(_abilityRank, net);
-    const effectiveAbbr = RANK_ABBR[effectiveRank] || effectiveRank;
 
     // Update base rank display
-    $base.text(RANK_ABBR[_abilityRank] || _abilityRank);
+    $base.text(_abilityRank);
 
     // Update effective rank
-    $rank.text(effectiveAbbr);
+    $rank.text(effectiveRank);
     if (net > 0) $rank.css('color', '#2e7d32');
     else if (net < 0) $rank.css('color', '#c62828');
     else $rank.css('color', '');

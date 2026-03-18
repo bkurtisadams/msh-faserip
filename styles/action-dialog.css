@@ -965,6 +965,11 @@
 .frp-dlg .frp-foot-btns {
   display: flex;
   gap: 5px;
+}
+.frp-dlg .frp-foot-checks {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin-left: auto;
 }
 .frp-dlg .frp-btn-roll {

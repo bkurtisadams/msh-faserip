@@ -1,4 +1,5 @@
-// scripts/modules/actions/grappling-action.js v3.1.0 - 2026-03-17
+// scripts/modules/actions/grappling-action.js v3.2.0 - 2026-03-17
+// v3.2.0: Footer reordered: [Roll] [Cancel] ... [Remember] [Skip dice].
 // v3.1.0: Manual CS only — remove talent chips, sit-tags, auto-detection.
 //         CS row is manual input + ? reference panel via cs-modifiers.js.
 //         Simpler dialog, no activeChips persistence, no talentFlags.
@@ -338,11 +339,13 @@ export class GrapplingAction extends AttackAction {
 
       <!-- Footer: checkboxes + buttons on one row -->
       <div class="frp-foot">
-        <label><input type="checkbox" name="remember" ${savedRemember ? 'checked' : ''}> Remember</label>
-        <label><input type="checkbox" name="skipDice" ${savedSkipDice ? 'checked' : ''}> Skip dice</label>
         <div class="frp-foot-btns">
-          <button type="button" class="frp-btn-cancel" id="frp-cancel">Cancel</button>
           <button type="button" class="frp-btn-roll" id="frp-roll">Roll</button>
+          <button type="button" class="frp-btn-cancel" id="frp-cancel">Cancel</button>
+        </div>
+        <div class="frp-foot-checks">
+          <label><input type="checkbox" name="remember" ${savedRemember ? 'checked' : ''}> Remember</label>
+          <label><input type="checkbox" name="skipDice" ${savedSkipDice ? 'checked' : ''}> Skip dice</label>
         </div>
       </div>
 

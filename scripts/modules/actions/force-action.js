@@ -1,4 +1,7 @@
-// scripts/modules/actions/force-action.js v3.1.0 - 2026-03-17
+// scripts/modules/actions/force-action.js v3.2.0 - 2026-03-17
+// v3.2.0: Custom Roll/Cancel buttons (Roll first, then Cancel).
+//         Footer reordered: [Roll] [Cancel] ... [Remember] [Skip dice].
+//         Hide Foundry native button row, use _resolved guard on close.
 // v3.1.0: Manual CS only — remove talent/power auto-detection, chips, sit-tags.
 //         CS row is manual input + range penalty + ? reference panel via cs-modifiers.js.
 //         PwrHit toggle moved to checkbox, uses setAbilityRank().
@@ -270,8 +273,14 @@ export class ForceAction extends RangedAttackAction {
 
       <!-- Footer -->
       <div class="frp-foot">
-        <label><input type="checkbox" id="msh-remember-settings" name="remember" ${shouldRemember ? 'checked' : ''}> Remember</label>
-        <label><input type="checkbox" id="msh-skip-dice" name="skipDice" ${savedSkipDice ? 'checked' : ''}> Skip dice</label>
+        <div class="frp-foot-btns">
+          <button type="button" class="frp-btn-roll" id="frp-roll">Roll</button>
+          <button type="button" class="frp-btn-cancel" id="frp-cancel">Cancel</button>
+        </div>
+        <div class="frp-foot-checks">
+          <label><input type="checkbox" id="msh-remember-settings" name="remember" ${shouldRemember ? 'checked' : ''}> Remember</label>
+          <label><input type="checkbox" id="msh-skip-dice" name="skipDice" ${savedSkipDice ? 'checked' : ''}> Skip dice</label>
+        </div>
       </div>
     </div>
     `;
@@ -280,111 +289,17 @@ export class ForceAction extends RangedAttackAction {
 
     const choice = await new Promise((resolve) => {
       let _csState = null;
-      new Dialog({
+      let _resolved = false;
+      const dlg = new Dialog({
         title: actionName,
         content: dialogHtml,
-        buttons: {
-          roll: {
-            label: "Roll",
-            callback: async (html) => {
-              const $dlg = (sel) => html.find(sel);
-
-              const rememberSettings = $dlg("#msh-remember-settings").is(':checked');
-              const skipDice = $dlg("#msh-skip-dice").is(':checked');
-              try {
-                localStorage.setItem(lsRememberKey, rememberSettings ? "1" : "0");
-                localStorage.setItem(lsSkipKey, skipDice ? "1" : "0");
-              } catch (e) {}
-
-              // Parse power source select
-              const srcVal = $dlg('#power-source-select').val() || "adhoc";
-              const useAdHoc = srcVal === "adhoc";
-
-              let powerName = "", powerDamage = 0, powerRank = "Remarkable", powerId = null, prettyRange = "";
-              let powerDamageType = "physical-force";
-
-              if (useAdHoc) {
-                powerName = String($dlg('[name="adhocName"]').val() || "Force Blast");
-                powerDamage = Number($dlg('[name="adhocDamage"]').val() || 0);
-                powerRank = String($dlg('[name="adhocRank"]').val() || "Remarkable");
-                if (!Number.isFinite(powerDamage) || powerDamage < 0) {
-                  ui.notifications.error("Enter a valid non-negative damage value.");
-                  return resolve(null);
-                }
-              } else {
-                const itemId = srcVal.replace("power:", "");
-                const item = forceItems.find(i => i.id === itemId);
-                if (!item) {
-                  ui.notifications.error("Select a force power or use ad-hoc.");
-                  return resolve(null);
-                }
-                powerId = itemId;
-                const s = item.system || {};
-                powerName = item.name;
-                powerDamage = Number(s.damage ?? s.value ?? 0);
-                powerRank = String(s.rank ?? s.powerRank ?? "Remarkable");
-                prettyRange = String(s.calculatedRange || "");
-                powerDamageType = "physical-force";
-              }
-
-              // Get CS from shared panel
-              const csData = _csState ? _csState.get() : { totalShift: 0, manualCS: 0, rangePenalty: 0, csNotes: "" };
-              const shift = csData.totalShift;
-              const manualCS = csData.manualCS;
-
-              const { spendKarma, karmaToSpend } = extractKarmaFromDialog(html);
-              const karma = karmaToSpend;
-              const usePowerToHit = !!$dlg('#pwr-hit-toggle').is(':checked');
-
-              const range = Number($dlg('[name="range"]').val() || 1);
-
-              const multiAdjacent = !!$dlg('#multi-enabled').is(':checked');
-
-              // Guard: multiple targets need Adjacent
-              const targetTokens = Array.from(game.user?.targets ?? []);
-              if (targetTokens.length > 1 && !multiAdjacent) {
-                ui.notifications.warn("Multiple targets selected. Enable Adjacent Multi-Attack or reduce to one target.");
-                return resolve(null);
-              }
-
-              const pullEnabled = !!$dlg('#pull-punch-enabled').is(':checked');
-              const pulledDamage = pullEnabled ? parseInt($dlg('[name="pulledDamage"]').val() || 0) : 0;
-
-              const csNotes = csData.rangePenalty !== 0 ? `Range ${csData.rangePenalty}` : "";
-
-              // Save settings
-              if (rememberSettings) {
-                await actor.setFlag("msh-faserip", "lastForceAdHoc", useAdHoc);
-                await actor.setFlag("msh-faserip", "lastForceAdHocName", powerName);
-                await actor.setFlag("msh-faserip", "lastForceAdHocDamage", powerDamage);
-                await actor.setFlag("msh-faserip", "lastForceAdHocRank", powerRank);
-                await actor.setFlag("msh-faserip", "lastForceItemId", powerId || "");
-                await actor.setFlag("msh-faserip", "lastForceRange", range);
-                await actor.setFlag("msh-faserip", "lastForceUsePowerToHit", usePowerToHit);
-                await actor.setFlag("msh-faserip", "lastForceShift", manualCS);
-                await actor.setFlag("msh-faserip", "cs_force", manualCS);
-                await actor.setFlag("msh-faserip", "lastForceMultiAdjacent", multiAdjacent);
-                await actor.setFlag("msh-faserip", "lastForcePullEnabled", pullEnabled);
-                await actor.setFlag("msh-faserip", "lastForcePulledDamage", pulledDamage);
-              }
-              await actor.setFlag("msh-faserip", "csNotes", csNotes);
-
-              resolve({
-                powerName, powerDamage, powerRank, powerId, prettyRange,
-                shift, karma, spendKarma, range, skipDice, usePowerToHit,
-                totalShift: shift,
-                multiAdjacent,
-                pulledDamage, resultCap: "none",
-                csNotes
-              });
-            },
-          },
-          cancel: { label: "Cancel", callback: () => resolve(null) },
-        },
-        default: "roll",
+        buttons: {},
         render: async (html) => {
           setupKarmaControlHandlers(html);
           const $dialog = html.closest('.dialog');
+
+          // Hide Foundry's native button row
+          $dialog.find('.dialog-buttons').hide();
 
           // Inject mode buttons into titlebar
           const $titlebar = $dialog.find('.window-title, .dialog-title').first();
@@ -438,6 +353,107 @@ export class ForceAction extends RangedAttackAction {
               if (item) currentRank = String(item.system?.rank ?? item.system?.powerRank ?? "Remarkable");
             }
             _csState.setAbilityRank(this.checked ? currentRank : ability.rank);
+          });
+
+          // ── Roll button handler ──
+          html.find('#frp-roll').on('click', async () => {
+            const $dlg = (sel) => html.find(sel);
+
+            const rememberSettings = $dlg("#msh-remember-settings").is(':checked');
+            const skipDice = $dlg("#msh-skip-dice").is(':checked');
+            setLS(lsRememberKey, rememberSettings ? "1" : "0");
+            setLS(lsSkipKey, skipDice ? "1" : "0");
+
+            // Parse power source select
+            const srcVal = $dlg('#power-source-select').val() || "adhoc";
+            const useAdHoc = srcVal === "adhoc";
+
+            let powerName = "", powerDamage = 0, powerRank = "Remarkable", powerId = null, prettyRange = "";
+            let powerDamageType = "physical-force";
+
+            if (useAdHoc) {
+              powerName = String($dlg('[name="adhocName"]').val() || "Force Blast");
+              powerDamage = Number($dlg('[name="adhocDamage"]').val() || 0);
+              powerRank = String($dlg('[name="adhocRank"]').val() || "Remarkable");
+              if (!Number.isFinite(powerDamage) || powerDamage < 0) {
+                ui.notifications.error("Enter a valid non-negative damage value.");
+                return;
+              }
+            } else {
+              const itemId = srcVal.replace("power:", "");
+              const item = forceItems.find(i => i.id === itemId);
+              if (!item) {
+                ui.notifications.error("Select a force power or use ad-hoc.");
+                return;
+              }
+              powerId = itemId;
+              const s = item.system || {};
+              powerName = item.name;
+              powerDamage = Number(s.damage ?? s.value ?? 0);
+              powerRank = String(s.rank ?? s.powerRank ?? "Remarkable");
+              prettyRange = String(s.calculatedRange || "");
+              powerDamageType = "physical-force";
+            }
+
+            // Get CS from shared panel
+            const csData = _csState ? _csState.get() : { totalShift: 0, manualCS: 0, rangePenalty: 0, csNotes: "" };
+            const shift = csData.totalShift;
+            const manualCS = csData.manualCS;
+
+            const { spendKarma, karmaToSpend } = extractKarmaFromDialog(html);
+            const karma = karmaToSpend;
+            const usePowerToHit = !!$dlg('#pwr-hit-toggle').is(':checked');
+
+            const range = Number($dlg('[name="range"]').val() || 1);
+
+            const multiAdjacent = !!$dlg('#multi-enabled').is(':checked');
+
+            // Guard: multiple targets need Adjacent
+            const targetTokens = Array.from(game.user?.targets ?? []);
+            if (targetTokens.length > 1 && !multiAdjacent) {
+              ui.notifications.warn("Multiple targets selected. Enable Adjacent Multi-Attack or reduce to one target.");
+              return;
+            }
+
+            const pullEnabled = !!$dlg('#pull-punch-enabled').is(':checked');
+            const pulledDamage = pullEnabled ? parseInt($dlg('[name="pulledDamage"]').val() || 0) : 0;
+
+            const csNotes = csData.rangePenalty !== 0 ? `Range ${csData.rangePenalty}` : "";
+
+            // Save settings
+            if (rememberSettings) {
+              await actor.setFlag("msh-faserip", "lastForceAdHoc", useAdHoc);
+              await actor.setFlag("msh-faserip", "lastForceAdHocName", powerName);
+              await actor.setFlag("msh-faserip", "lastForceAdHocDamage", powerDamage);
+              await actor.setFlag("msh-faserip", "lastForceAdHocRank", powerRank);
+              await actor.setFlag("msh-faserip", "lastForceItemId", powerId || "");
+              await actor.setFlag("msh-faserip", "lastForceRange", range);
+              await actor.setFlag("msh-faserip", "lastForceUsePowerToHit", usePowerToHit);
+              await actor.setFlag("msh-faserip", "lastForceShift", manualCS);
+              await actor.setFlag("msh-faserip", "cs_force", manualCS);
+              await actor.setFlag("msh-faserip", "lastForceMultiAdjacent", multiAdjacent);
+              await actor.setFlag("msh-faserip", "lastForcePullEnabled", pullEnabled);
+              await actor.setFlag("msh-faserip", "lastForcePulledDamage", pulledDamage);
+            }
+            await actor.setFlag("msh-faserip", "csNotes", csNotes);
+
+            _resolved = true;
+            resolve({
+              powerName, powerDamage, powerRank, powerId, prettyRange,
+              shift, karma, spendKarma, range, skipDice: skipDice, usePowerToHit,
+              totalShift: shift,
+              multiAdjacent,
+              pulledDamage, resultCap: "none",
+              csNotes
+            });
+            dlg.close();
+          });
+
+          // ── Cancel button handler ──
+          html.find('#frp-cancel').on('click', () => {
+            _resolved = true;
+            resolve(null);
+            dlg.close();
           });
 
           // ── Main update function (damage + range display only — CS handled by csState) ──
@@ -547,6 +563,7 @@ export class ForceAction extends RangedAttackAction {
         close: () => {
           if (_csState) _csState.destroy();
           if (this._disposeAutoFill) this._disposeAutoFill();
+          if (!_resolved) resolve(null);
         },
       }).render(true);
     });
