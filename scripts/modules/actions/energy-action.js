@@ -1,24 +1,7 @@
-// scripts/modules/actions/energy-action.js v3.0.3 - 2026-03-16
-// v3.0.3: Live range penalty display + auto sit tag (matches shooting pattern)
-//         Remove _applyRangeModifiers — range penalty baked into CS via sit tags
-//         Range box shows (max N) with live update when power changes
-// v3.0.2: Move obstacle from range box checkbox to situational dropdown (matches shooting)
-//         Remove throughObstacle/obstacleModifier from resolve path
-// v3.0.1: Move target movement from range box to situational dropdown (matches shooting)
-//         Remove movementModifier from resolve path — baked into CS via sit tags
-// v3.0.0: Port to v3 compact dialog layout matching blunt/edged/shooting
-//         - frp-dlg wrapper, frp-header-v3 banner, frp-cs-box with chips + situational dropdown
-//         - Power select as frp-dmg-box inline (dropdown + ad-hoc sub-fields)
-//         - Range box (blue), frp-opts-box with greyed opt-rows (Reduce/Multi/Karma)
-//         - frp-fx-grid (W/G/Y/R), frp-foot, titlebar mode buttons, 360px width
-//         - PwrHit chip toggle replaces old checkbox, talent chip detection
-//         - localStorage for remember/skip, flag persistence with activeChips
-// v2.0.0: Refactor - dialog only, delegates resolution to _executeSingleAttack
-// v1.8.0: Refactor chat card to use unified card builder utilities
-// v1.7.0: Add support for equipment items with Energy (E) damage type
-// v1.6.0: Fix CS persistence - decouple from global rememberSettings
-// v1.5.7: Add effect modifier system - read target status (Stunned +2CS, etc)
-// v1.5.6: Add CS breakdown tooltip showing Manual/Range/Obstacle/Movement/Adjacent
+// scripts/modules/actions/energy-action.js v3.1.0 - 2026-03-17
+// v3.1.0: Manual CS only — remove talent/power auto-detection, chips, sit-tags.
+//         CS row is manual input + range penalty + ? reference panel via cs-modifiers.js.
+//         PwrHit toggle moved to checkbox, uses setAbilityRank().
 import { RangedAttackAction } from "./ranged-attack-action.js";
 import { 
   setupKarmaControlHandlers, 
@@ -42,6 +25,7 @@ import {
 } from "./action-utils.js";
 
 import { RANK_ABBR } from "../../rules/rules-reference.js";
+import { buildCSRow, wireCSPanel } from "./cs-modifiers.js";
 import { isAuraMaintained } from "./nullify.js";
 
 export class EnergyAction extends RangedAttackAction {
@@ -81,28 +65,6 @@ export class EnergyAction extends RangedAttackAction {
       }
     }
 
-    // === Detect energy-relevant combat talents ===
-    const combatTalents = [];
-    const orderedRanks = ["Shift-0","Feeble","Poor","Typical","Good","Excellent","Remarkable","Incredible","Amazing","Monstrous","Unearthly","Shift X","Shift Y","Shift Z","Class 1000","Class 3000","Class 5000"];
-    for (const item of actor.items) {
-      if (item.type !== "talent") continue;
-      const name = (item.name || "").toLowerCase();
-      const rankOverride = item.system?.rankOverride || "";
-      let ultimateCS = 0;
-      if (rankOverride) {
-        const baseIdx = orderedRanks.indexOf(ability.rank);
-        const overIdx = orderedRanks.indexOf(rankOverride);
-        if (baseIdx >= 0 && overIdx >= 0) ultimateCS = overIdx - baseIdx;
-      }
-      if (name.includes("sharpshooting") || name.includes("sharp shooting") || name.includes("marksmanship")) {
-        combatTalents.push({ name: "Marksman", cs: 1, flag: "no-range-penalty", note: "+1CS / no range", ultimateCS, rankOverride });
-      }
-      else if (name.includes("martial arts e") || name.includes("martial arts-e") ||
-               (name.includes("martial arts") && name.includes("(e)"))) {
-        combatTalents.push({ name: "MA-E", cs: 0, flag: "initiative", note: "+1 Initiative", ultimateCS, rankOverride });
-      }
-    }
-
     // === Restore prefs ===
     const lsRememberKey = "msh.energy.remember";
     const lsSkipKey = "msh.energy.skipDice";
@@ -127,7 +89,6 @@ export class EnergyAction extends RangedAttackAction {
 
     const savedUsePowerToHit = shouldRemember ? ((await actor.getFlag("msh-faserip", "lastEnergyUsePowerToHit")) === true) : false;
     const savedColumnShift = shouldRemember ? (await actor.getFlag("msh-faserip", "lastEnergyShift") ?? 0) : 0;
-    const savedActiveChips = shouldRemember ? (await actor.getFlag("msh-faserip", "lastEnergyActiveChips") || {}) : {};
     const savedMultiAdjacent = shouldRemember ? (await actor.getFlag("msh-faserip", "lastEnergyMultiAdjacent") || false) : false;
     const savedReduceDamage = shouldRemember ? (await actor.getFlag("msh-faserip", "lastEnergyReduceDamage") || false) : false;
     const savedReducedAmount = shouldRemember ? (await actor.getFlag("msh-faserip", "lastEnergyReducedAmount") || 0) : 0;
@@ -166,34 +127,19 @@ export class EnergyAction extends RangedAttackAction {
     const minKarma = getMinimumKarmaCommitment(actor);
     const hasKarma = availableKarma > 0;
 
-    const csInputCls = savedColumnShift > 0 ? ' pos' : savedColumnShift < 0 ? ' neg' : '';
-    const csRankStyle = savedColumnShift > 0 ? 'color:#2e7d32;' : savedColumnShift < 0 ? 'color:#c62828;' : '';
     const abilityShort = RANK_ABBR[ability.rank] || ability.rank;
 
-    // Build talent chips HTML
-    const talentChipsHtml = combatTalents.map(t => {
-      const savedState = savedActiveChips[t.name] || '';
-      const flagActive = savedState.includes('flag');
-      if (t.rankOverride && t.ultimateCS > 0) {
-        const shortRank = RANK_ABBR[t.rankOverride] || t.rankOverride;
-        const ultActive = savedState === 'ultimate';
-        return `<span class="frp-talent-chip${ultActive ? ' active-ultimate' : ''}" data-cs="${t.ultimateCS}" data-talent="${t.name}" data-ultimate="1">
-          ★ ${t.name} <span class="chip-cs">&rarr;${shortRank}</span>
-        </span>`;
-      }
-      if (t.cs > 0) {
-        const csActive = savedState === 'cs';
-        return `<span class="frp-talent-chip${csActive ? ' active-cs' : ''}" data-cs="${t.cs}" data-talent="${t.name}">
-          ${t.name} <span class="chip-cs">+${t.cs}</span>
-        </span>`;
-      }
-      if (t.flag) {
-        return `<span class="frp-talent-chip${flagActive ? ' active-flag' : ''}" data-flag="${t.flag}" data-talent="${t.name}">
-          ${t.name} <span class="chip-note">${t.note}</span>
-        </span>`;
-      }
-      return '';
-    }).join('');
+    // Build CS row via shared utility (manual input + range + ? reference)
+    const initialRangePenalty = (() => {
+      const maxRange = this._getPowerRangeInAreas(initialPowerRank);
+      return (savedRange > maxRange && maxRange > 0) ? -(savedRange - maxRange) : 0;
+    })();
+    const csRowHtml = buildCSRow({
+      savedCS: savedColumnShift,
+      abilityRank: initialDisplayRank,
+      rangePenalty: initialRangePenalty,
+      showRange: true
+    });
 
     // Build power source <select> options
     const powerSrcOptions = [];
@@ -234,49 +180,16 @@ export class EnergyAction extends RangedAttackAction {
         ${targetStatusStr ? `<span class="t-status">${targetStatusStr}</span>` : ''}
       </div>` : ''}
 
-      <!-- CS box -->
-      <div class="frp-box frp-cs-box">
-        <div class="frp-cs-line">
-          <span class="frp-cs-label">CS</span>
-          <input type="number" class="frp-cs-input${csInputCls}" name="shift" value="${savedColumnShift}" id="cs-energy">
-          <span class="frp-cs-arrow">&rarr;</span>
-          <span class="frp-cs-rank" id="rank-energy" style="${csRankStyle}">${shiftRank(initialDisplayRank, savedColumnShift)}</span>
-          <button type="button" class="frp-cs-reset" style="visibility:${savedColumnShift !== 0 ? 'visible' : 'hidden'}">&times;</button>
-          <span class="frp-talent-chip${savedUsePowerToHit ? ' active-flag' : ''}" data-flag="use-power-rank" data-talent="PwrHit" title="Use power rank to hit instead of ${ability.name}">
-            PwrHit <span class="chip-note">pwr&rarr;hit</span>
-          </span>
-          ${combatTalents.length > 0 ? '<span class="chip-sep"></span>' : ''}
-          ${talentChipsHtml}
-          <span class="chip-sep"></span>
-          <select class="frp-sit-select" id="sit-select">
-            <option value="">+ situational&hellip;</option>
-            <optgroup label="Bonuses">
-              <option value="2" data-label="Blindside" title="Target unaware or distracted">Blindside +2CS</option>
-              <option value="1" data-label="Ambush" title="Pre-set position">Ambush +1CS</option>
-              <option value="1" data-label="Aiming" title="Spent 1 turn not attacking">Aiming +1CS</option>
-              <option value="1" data-label="Higher Ground" title="Elevated position">Higher Ground +1CS</option>
-            </optgroup>
-            <optgroup label="Penalties">
-              <option value="-2" data-label="Obstacle" title="Through window, curtain, etc.">Through Obstacle -2CS</option>
-              <option value="-2" data-label="Shielding" title="Target using cover">Shielding -2CS</option>
-              <option value="-2" data-label="Impaired" title="Lost Endurance ranks">Impaired -2CS</option>
-            </optgroup>
-            <optgroup label="Target Movement">
-              <option value="-1" data-label="Moving" title="Target moving &le;5 areas/round">Moving &le;5 areas -1CS</option>
-              <option value="-2" data-label="Fast" title="Target moving &le;10 areas/round">Moving &le;10 areas -2CS</option>
-              <option value="-4" data-label="Very Fast" title="Target moving &gt;10 areas/round">Moving &gt;10 areas -4CS</option>
-            </optgroup>
-            <optgroup label="Target Size">
-              <option value="1" data-label="Growth +1">Growth 12-18ft +1CS</option>
-              <option value="2" data-label="Growth +2">Growth 18-22ft +2CS</option>
-              <option value="3" data-label="Growth +3">Growth 22ft+ +3CS</option>
-              <option value="-1" data-label="Shrink -1">Shrunk 1&Prime; -1CS</option>
-              <option value="-2" data-label="Shrink -2">Shrunk &frac14;&Prime; -2CS</option>
-              <option value="-3" data-label="Shrink -3">Shrunk smaller -3CS</option>
-            </optgroup>
-          </select>
-        </div>
-        <div class="frp-sit-tags" id="sit-tags"></div>
+      <!-- CS row (manual input + range + ? reference) -->
+      ${csRowHtml}
+
+      <!-- PwrHit toggle: use power rank instead of ability rank for to-hit -->
+      <div style="padding:0 10px 2px;font-size:11px;">
+        <label style="cursor:pointer;display:inline-flex;align-items:center;gap:4px;">
+          <input type="checkbox" id="pwr-hit-toggle" ${savedUsePowerToHit ? 'checked' : ''}>
+          <span style="font-weight:600;color:#7b6b00;">PwrHit</span>
+          <span style="color:#999;">use power rank to hit</span>
+        </label>
       </div>
 
       <!-- Damage: power select + numbers inline -->
@@ -358,6 +271,7 @@ export class EnergyAction extends RangedAttackAction {
     const setLS = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
 
     const choice = await new Promise((resolve) => {
+      let _csState = null;
       new Dialog({
         title: actionName,
         content: dialogHtml,
@@ -405,10 +319,11 @@ export class EnergyAction extends RangedAttackAction {
                 powerDamageType = s.damageType || "energy-generic";
               }
 
-              const shift = parseInt($dlg('[name="shift"]').val() || 0);
+              const cs = _csState.get();
+              const shift = cs.totalShift;
               const { spendKarma, karmaToSpend } = extractKarmaFromDialog(html);
               const karma = karmaToSpend;
-              const usePowerToHit = !!html.find('.frp-talent-chip[data-flag="use-power-rank"].active-flag').length;
+              const usePowerToHit = !!html.find('#pwr-hit-toggle').is(':checked');
 
               const range = Number($dlg('[name="range"]').val() || 1);
 
@@ -418,48 +333,14 @@ export class EnergyAction extends RangedAttackAction {
               const reducedDamage = reduceDamageEnabled ? parseInt($dlg('[name="reducedDamage"]').val() || powerDamage) : powerDamage;
               const resultCap = reduceDamageEnabled ? ($dlg('[name="resultCap"]:checked').val() || 'none') : 'none';
 
-              // Build csNotes from active chips + sit tags
-              const sitParts = [];
-              html.find('.frp-talent-chip.active-cs, .frp-talent-chip.active-ultimate').each(function() {
-                const talent = $(this).data('talent') || '';
-                const cs = parseInt($(this).data('cs')) || 0;
-                if (talent && cs) sitParts.push(`${talent} ${cs > 0 ? '+' : ''}${cs}`);
-              });
-              html.find('.frp-sit-tag').each(function() {
-                const label = $(this).data('label') || '';
-                const cs = parseInt($(this).data('cs')) || 0;
-                if (label) sitParts.push(`${label} ${cs > 0 ? '+' : ''}${cs}`);
-              });
-              const csNotes = sitParts.join(', ');
+              const csNotes = cs.csNotes;
 
-              const talentFlags = {};
-              html.find('.frp-talent-chip.active-flag').each(function() {
-                const flag = $(this).data('flag');
-                if (flag) talentFlags[flag] = true;
-              });
-
-              const activeChips = {};
-              html.find('.frp-talent-chip.active-cs, .frp-talent-chip.active-ultimate').each(function() {
-                const talent = $(this).data('talent');
-                const isUlt = !!$(this).data('ultimate');
-                if (talent) activeChips[talent] = isUlt ? 'ultimate' : 'cs';
-              });
-              html.find('.frp-talent-chip.active-flag').each(function() {
-                const talent = $(this).data('talent');
-                if (talent) activeChips[talent] = (activeChips[talent] || '') + ',flag';
-              });
-
-              // Save settings — strip sit tags + range (NOT talent chips) so remembered CS = manual + talents
-              let sitTagCS = 0;
-              html.find('.frp-sit-tag').each(function() {
-                sitTagCS += parseInt($(this).data('cs')) || 0;
-              });
-              const baseShift = shift - sitTagCS;
+              // Save settings
               if (rememberSettings) {
                 await actor.setFlag("msh-faserip", "lastEnergyAdHoc", useAdHoc);
                 await actor.setFlag("msh-faserip", "lastEnergyUsePowerToHit", usePowerToHit);
-                await actor.setFlag("msh-faserip", "lastEnergyShift", baseShift);
-                await actor.setFlag("msh-faserip", "cs_energy", baseShift);
+                await actor.setFlag("msh-faserip", "lastEnergyShift", cs.manualCS);
+                await actor.setFlag("msh-faserip", "cs_energy", cs.manualCS);
                 await actor.setFlag("msh-faserip", "lastEnergyMultiAdjacent", multiAdjacent);
                 await actor.setFlag("msh-faserip", "lastEnergyAdHocName", powerName);
                 await actor.setFlag("msh-faserip", "lastEnergyAdHocDamage", powerDamage);
@@ -469,7 +350,6 @@ export class EnergyAction extends RangedAttackAction {
                 await actor.setFlag("msh-faserip", "lastEnergyReduceDamage", reduceDamageEnabled);
                 await actor.setFlag("msh-faserip", "lastEnergyReducedAmount", reducedDamage);
                 await actor.setFlag("msh-faserip", "lastEnergyResultCap", resultCap);
-                await actor.setFlag("msh-faserip", "lastEnergyActiveChips", activeChips);
               }
               await actor.setFlag("msh-faserip", "csNotes", csNotes);
 
@@ -480,7 +360,7 @@ export class EnergyAction extends RangedAttackAction {
                 totalShift: shift,
                 powerDamageType, multiAdjacent,
                 reduceDamageEnabled, reducedDamage, resultCap,
-                csNotes, talentFlags
+                csNotes
               });
             },
           },
@@ -505,57 +385,47 @@ export class EnergyAction extends RangedAttackAction {
             $dialog[0].style.height = 'auto';
           }
 
-          // ── Talent chip click handler ──
-          html.find('.frp-talent-chip').on('click', function() {
-            const $chip = $(this);
-            const cs = parseInt($chip.data('cs')) || 0;
-            const flag = $chip.data('flag') || null;
-            const isUltimate = !!$chip.data('ultimate');
-            const $csInput = html.find('[name="shift"]');
-
-            if (cs > 0) {
-              const wasActive = $chip.hasClass('active-cs') || $chip.hasClass('active-ultimate');
-              const activeClass = isUltimate ? 'active-ultimate' : 'active-cs';
-              if (wasActive) {
-                $chip.removeClass('active-cs active-ultimate');
-                $csInput.val(parseInt($csInput.val()) - cs);
-              } else {
-                $chip.addClass(activeClass);
-                $csInput.val(parseInt($csInput.val()) + cs);
-              }
-              $csInput.trigger('change');
-            } else if (flag) {
-              $chip.toggleClass('active-flag');
-              if (flag === 'use-power-rank') update();
+          // ── Wire CS panel from shared utility ──
+          const _getCurrentRangePenalty = () => {
+            const srcVal = html.find('#power-source-select').val() || "adhoc";
+            const isAdHoc = srcVal === "adhoc";
+            let currentRank = "Remarkable";
+            if (isAdHoc) {
+              currentRank = String(html.find('[name="adhocRank"]').val() || "Remarkable");
+            } else {
+              const itemId = srcVal.replace("power:", "");
+              const item = energyItems.find(i => i.id === itemId);
+              if (item) currentRank = String(item.system?.rank ?? item.system?.powerRank ?? "Remarkable");
+            }
+            const maxRange = this._getPowerRangeInAreas(currentRank);
+            const rangeVal = Number(html.find('[name="range"]').val() || 0);
+            if (rangeVal > maxRange && maxRange > 0) return -(rangeVal - maxRange);
+            return 0;
+          };
+          _csState = wireCSPanel(html, {
+            abilityRank: initialDisplayRank,
+            getRangePenalty: _getCurrentRangePenalty,
+            onUpdate: () => {
+              if ($dialog.length) $dialog[0].style.height = 'auto';
             }
           });
 
-          // ── Situational dropdown handler ──
-          html.find('#sit-select').on('change', function() {
-            const $sel = $(this);
-            const val = parseInt($sel.val());
-            const label = $sel.find(':selected').data('label') || '';
-            const title = $sel.find(':selected').attr('title') || '';
-            if (!val || !label) return;
-
-            const $csInput = html.find('[name="shift"]');
-            $csInput.val(parseInt($csInput.val()) + val).trigger('change');
-
-            const cls = val > 0 ? 'bonus' : 'penalty';
-            const tag = $(`<span class="frp-sit-tag ${cls}" data-cs="${val}" data-label="${label}" title="${title}">
-              ${label} <span class="tag-cs">${val > 0 ? '+' : ''}${val}</span>
-              <span class="tag-close">&times;</span>
-            </span>`);
-            html.find('#sit-tags').append(tag);
-            tag.find('.tag-close').on('click', function() {
-              const cs = parseInt(tag.data('cs')) || 0;
-              $csInput.val(parseInt($csInput.val()) - cs).trigger('change');
-              tag.remove();
-            });
-            $sel.val('');
+          // ── PwrHit toggle — switch base ability rank ──
+          html.find('#pwr-hit-toggle').on('change', function() {
+            const srcVal = html.find('#power-source-select').val() || "adhoc";
+            const isAdHoc = srcVal === "adhoc";
+            let currentRank = "Remarkable";
+            if (isAdHoc) {
+              currentRank = String(html.find('[name="adhocRank"]').val() || "Remarkable");
+            } else {
+              const itemId = srcVal.replace("power:", "");
+              const item = energyItems.find(i => i.id === itemId);
+              if (item) currentRank = String(item.system?.rank ?? item.system?.powerRank ?? "Remarkable");
+            }
+            _csState.setAbilityRank(this.checked ? currentRank : ability.rank);
           });
 
-          // ── Main update function ──
+          // ── Main update function (damage + range display only — CS handled by csState) ──
           const update = () => {
             const srcVal = html.find('#power-source-select').val() || "adhoc";
             const isAdHoc = srcVal === "adhoc";
@@ -601,33 +471,17 @@ export class EnergyAction extends RangedAttackAction {
             const powerMaxRange = this._getPowerRangeInAreas(currentRank);
             html.find('#max-range-hint').text(powerMaxRange);
 
-            // Range penalty — auto-sync sit tag (powers: -1CS per area beyond rank range)
+            // Range penalty — update CS panel and range info display
             const rangeVal = Number(html.find('[name="range"]').val() || 0);
             const $rangePenalty = html.find('#range-penalty-display');
-            const oldRangeTag = html.find('.frp-sit-tag[data-auto="range"]');
-            const $csI = html.find('[name="shift"]');
-            const prevAutoRangeCS = Number($csI.data('autoRangeCs') ?? 0) || 0;
-            const baseShift = (parseInt($csI.val()) || 0) - prevAutoRangeCS;
-
-            let penalty = 0;
             if (rangeVal > powerMaxRange && powerMaxRange > 0) {
-              penalty = -(rangeVal - powerMaxRange);
+              const penalty = -(rangeVal - powerMaxRange);
               $rangePenalty.text(`${penalty}CS`).css('color', '#e65100');
+              _csState.setRange(penalty);
             } else {
               $rangePenalty.text('');
+              _csState.setRange(0);
             }
-
-            oldRangeTag.remove();
-            if (penalty < 0) {
-              const tag = $(`<span class="frp-sit-tag penalty" data-cs="${penalty}" data-label="Range ${rangeVal}" data-auto="range">
-                Range ${rangeVal} <span class="tag-cs">${penalty}</span>
-              </span>`);
-              html.find('#sit-tags').append(tag);
-            }
-
-            const displayShift = baseShift + penalty;
-            $csI.val(displayShift);
-            $csI.data('autoRangeCs', penalty);
 
             // Update reduce damage max
             const $reducedDamage = html.find('[name="reducedDamage"]');
@@ -635,42 +489,16 @@ export class EnergyAction extends RangedAttackAction {
             $reducedDamage.attr('max', currentDamage);
             if (oldMax !== currentDamage) $reducedDamage.val(currentDamage);
 
-            // CS display
-            const cs = parseInt(html.find('[name="shift"]').val()) || 0;
-            const usePowerRank = !!html.find('.frp-talent-chip[data-flag="use-power-rank"].active-flag').length;
-            const baseRank = usePowerRank ? currentRank : ability.rank;
-            const $shiftedRank = html.find('#rank-energy');
-            const $csInput = html.find('.frp-cs-input');
-            $shiftedRank.text(shiftRank(baseRank, cs));
-
-            const $resetBtn = html.find('.frp-cs-reset');
-            $csInput.removeClass('pos neg');
-            if (cs > 0) {
-              $csInput.addClass('pos');
-              $shiftedRank.css('color', '#2e7d32');
-              $resetBtn.css('visibility', 'visible');
-            } else if (cs < 0) {
-              $csInput.addClass('neg');
-              $shiftedRank.css('color', '#c62828');
-              $resetBtn.css('visibility', 'visible');
-            } else {
-              $shiftedRank.css('color', '');
-              $resetBtn.css('visibility', 'hidden');
-            }
+            // Update PwrHit base rank if checked
+            const usePwrHit = html.find('#pwr-hit-toggle').is(':checked');
+            _csState.setAbilityRank(usePwrHit ? currentRank : ability.rank);
 
             if ($dialog.length) $dialog[0].style.height = 'auto';
           };
 
-          // ── CS reset ──
-          html.find('.frp-cs-reset').on('click', function(e) {
-            e.preventDefault();
-            html.find('[name="shift"]').val(0).trigger('change');
-          });
-
           // ── Event wiring ──
           html.find('#power-source-select').on('change', update);
           html.find('[name="adhocDamage"], [name="adhocRank"]').on('input change', update);
-          html.find('[name="shift"]').on('input change', update);
           html.find('[name="range"]').on('input change', update);
 
           // Reduce damage toggle
@@ -712,6 +540,7 @@ export class EnergyAction extends RangedAttackAction {
           update();
         },
         close: () => {
+          if (_csState) _csState.destroy();
           if (this._disposeAutoFill) this._disposeAutoFill();
         }
       }).render(true);

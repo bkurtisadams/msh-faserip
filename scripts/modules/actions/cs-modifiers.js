@@ -168,7 +168,7 @@ export function wireCSPanel(html, { abilityRank, onUpdate, getRangePenalty } = {
   const $refPanel = html.find('#frp-ref-panel');
   const $rangeNum = html.find('#frp-range-num');
 
-  const baseAbbr = RANK_ABBR[abilityRank] || abilityRank;
+  let _abilityRank = abilityRank;
 
   // Toggle reference panel
   $helpBtn.on('click', (e) => {
@@ -195,8 +195,11 @@ export function wireCSPanel(html, { abilityRank, onUpdate, getRangePenalty } = {
     if (getRangePenalty) _rangePenalty = getRangePenalty();
     const net = cs + _rangePenalty;
 
-    const effectiveRank = shiftRank(abilityRank, net);
+    const effectiveRank = shiftRank(_abilityRank, net);
     const effectiveAbbr = RANK_ABBR[effectiveRank] || effectiveRank;
+
+    // Update base rank display
+    $base.text(RANK_ABBR[_abilityRank] || _abilityRank);
 
     // Update effective rank
     $rank.text(effectiveAbbr);
@@ -234,6 +237,11 @@ export function wireCSPanel(html, { abilityRank, onUpdate, getRangePenalty } = {
     /** Update range penalty and recalc (called by shooting when range changes) */
     setRange(n) {
       _rangePenalty = n;
+      recalc();
+    },
+    /** Change the base ability rank (e.g. PwrHit toggle in energy/force) */
+    setAbilityRank(rank) {
+      _abilityRank = rank;
       recalc();
     },
     destroy() {
