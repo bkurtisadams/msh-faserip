@@ -1,24 +1,14 @@
-// scripts/modules/actions/grappling-action.js v3.0.0 - 2026-03-17
+// scripts/modules/actions/grappling-action.js v3.1.0 - 2026-03-17
+// v3.1.0: Manual CS only — remove talent chips, sit-tags, auto-detection.
+//         CS row is manual input + ? reference panel via cs-modifiers.js.
+//         Simpler dialog, no activeChips persistence, no talentFlags.
 // v3.0.0: Port to v3 compact dialog layout matching blunt/edged/shooting/energy/force
-//         - frp-dlg wrapper, frp-header-v3 banner, frp-cs-box with chips + situational dropdown
-//         - Talent chip detection: Wrestling (+2CS), MA-C (+1CS), MA-B (+1CS)
-//         - Grapple info box (blue) with strength/hold damage
-//         - frp-fx-grid (W/G/Y/R), frp-foot, titlebar mode buttons, 360px width
-//         - Auto-detect target status effects for sit tags
-// v2.4.0: Consistency fixes — replace local rankValues with game.msh.getRankValue,
-//         add mode selector (manual/semi/full), bump version
-// v2.3.0: Add support for weapon-based grappling (whips with GP damage type use material strength)
-// v2.2.3: Fix shift override - treat opts.shift=0 as "not set" to allow saved values
-// v2.2.2: Fix CS persistence - decouple from global rememberSettings, use only local lastGrappleRemember flag
-// v2.2.1: Fix CS modifier persistence - use localStorage for Remember Settings checkbox (matches blunt attack pattern)
+// v2.4.0: Consistency fixes — replace local rankValues with game.msh.getRankValue
+// v2.3.0: Add support for weapon-based grappling (whips with GP damage type)
 // v2.2.0: Add opts.prefill support for Grapple Back from escape reverse
 // v2.1.0: Add Deal Hold Damage chip on Full Hold (red) result
-// v2.0.0: Compact chat card format matching blunt attack (inline result badge, CS hover, no grid)
-// v1.5.0: Fix karma checkbox to always default unchecked (not persisted)
-// v1.4.0: Fix DiceSoNice animation in consolidated chat cards mode
-// v1.3.0: Fix escape button to pass holder info for dialog prefill
+// v2.0.0: Compact chat card format matching blunt attack
 // v1.2.0: Use effect-engine wrappers for Partial Hold/Full Hold effects
-// v1.1.0: Add inline rolls for consolidated chat cards
 import { AttackAction } from "./attack-action.js";
 import {
   RANKS,
@@ -40,6 +30,7 @@ import { setupKarmaControlHandlers, extractKarmaFromDialog, getAvailableKarma, g
 import { applyGrappled, applyHeld } from "../effects/effect-engine.js";
 import { getAttackShiftBreakdown, getDefenseShiftBreakdown } from "../effects/effect-modifiers.js";
 import { RANK_ABBR } from "../../rules/rules-reference.js";
+import { buildCSRow, wireCSPanel } from "./cs-modifiers.js";
 
 export class GrapplingAction extends AttackAction {
   constructor(args) {
@@ -73,20 +64,12 @@ export class GrapplingAction extends AttackAction {
       strengthSource = "Strength";
     }
 
-    // Load persisted defaults (karma checkbox never persisted - always starts unchecked)
+    // Load persisted defaults
     const savedShift = await actor.getFlag("msh-faserip", "lastGrappleShift") ?? 0;
-
-    // FIX: Decouple from global "rememberSettings" to avoid cross-action contamination.
-    // We default to false so persistence is opt-in or strictly follows the specific flag.
     const savedRemember = (await actor.getFlag("msh-faserip", "lastGrappleRemember")) ?? false;
     const savedSkipDice = (await actor.getFlag("msh-faserip", "lastGrappleSkipDice")) ?? false;
 
-    const savedSpendKarma = false; // Always default to unchecked
-    const savedCsNotes = (await actor.getFlag("msh-faserip", "lastGrappleCsNotes")) || "";
-
-    // Only apply the saved shift if Remember was explicitly checked last time
-    // Note: Use explicit undefined check - if caller passes shift:0, still use saved value
-    // (callers who want to override should pass a non-zero value or use prefill)
+    // Only apply saved shift if Remember was explicitly checked last time
     const optsShift = this.opts?.shift;
     const dialogShift = (optsShift !== undefined && optsShift !== null && optsShift !== 0) 
       ? optsShift 
@@ -94,24 +77,19 @@ export class GrapplingAction extends AttackAction {
 
     const choice = await this._showGrapplingDialog(actor, strength, { 
       savedShift: dialogShift, 
-      savedSpendKarma, 
       savedRemember, 
       savedSkipDice,
-      savedCsNotes,
       isWeaponGrapple,
       weaponName: isWeaponGrapple ? passedItem.name : null,
       strengthSource
     });
     if (!choice) return;
 
-    // Always save remember/skipDice preferences to specific flags only
+    // Save prefs
     await actor.setFlag("msh-faserip", "lastGrappleRemember", choice.remember);
     await actor.setFlag("msh-faserip", "lastGrappleSkipDice", choice.skipDice);
-
-    // Persist modifiers only if requested
     if (choice.remember) {
-      await actor.setFlag("msh-faserip", "lastGrappleShift", choice.shift);
-      await actor.setFlag("msh-faserip", "lastGrappleCsNotes", choice.csNotes || "");
+      await actor.setFlag("msh-faserip", "lastGrappleShift", choice.manualCS);
     }
 
     // Build shift breakdown for hover text
@@ -183,18 +161,16 @@ export class GrapplingAction extends AttackAction {
           
           // Apply appropriate hold effect using effect-engine
           if (colorLower === "yellow") {
-            // Partial Hold = Grappled
             await applyGrappled(tActor, { 
               holderUuid: actor.uuid, 
               holderName: actor.name,
-              rounds: null  // Until escaped
+              rounds: null
             });
           } else {
-            // Full Hold = Held
             await applyHeld(tActor, { 
               holderUuid: actor.uuid, 
               holderName: actor.name,
-              rounds: null  // Until escaped
+              rounds: null
             });
           }
         }
@@ -203,8 +179,7 @@ export class GrapplingAction extends AttackAction {
       }
     }
     
-    // For the escape button, the "defender" is the HOLDER (this actor), not the target
-    // This prefills the escape dialog with the holder's name and strength
+    // For the escape button, the "defender" is the HOLDER (this actor)
     const holderStrength = actor.system?.abilities?.strength?.rank || "Good";
     
     // Show Hold Damage button only on Full Hold (red)
@@ -217,7 +192,6 @@ export class GrapplingAction extends AttackAction {
       holdDamageRank: strength.rank,
       holdTargetUuid: choice.targetUuid || "",
       holdTargetName: choice.targetName || "Target",
-      // Escape chip uses targetUuid/Name/Strength for the holder (opponent to escape from)
       targetUuid: actor.uuid,
       targetName: actor.name,
       targetStrength: holderStrength,
@@ -249,7 +223,7 @@ export class GrapplingAction extends AttackAction {
     return { roll, color, effectiveRank, cappedTotal, totalKarmaUsed };
   }
 
-  async _showGrapplingDialog(actor, strength, { savedShift = 0, savedSpendKarma = false, savedRemember = false, savedSkipDice = false, savedCsNotes = "", isWeaponGrapple = false, weaponName = null, strengthSource = "Strength" } = {}) {
+  async _showGrapplingDialog(actor, strength, { savedShift = 0, savedRemember = false, savedSkipDice = false, isWeaponGrapple = false, weaponName = null, strengthSource = "Strength" } = {}) {
     // ── Target data ──
     let prefillTargetName = this.opts?.prefill?.targetName || "";
     let prefillTargetStr  = this.opts?.prefill?.targetStrength || "";
@@ -280,34 +254,6 @@ export class GrapplingAction extends AttackAction {
       ? targetEffects.map(e => e.name || e.label).join(", ")
       : "";
 
-    // ── Talent detection (grappling-relevant) ──
-    const combatTalents = [];
-    const savedActiveChips = (await actor.getFlag("msh-faserip", "lastGrappleActiveChips")) || {};
-
-    for (const item of actor.items) {
-      if (item.type !== "talent") continue;
-      const name = (item.name || "").toLowerCase();
-      const rankOverride = item.system?.rankOverride || "";
-      let ultimateCS = 0;
-      if (rankOverride) {
-        const baseIdx = RANKS.indexOf(strength.rank);
-        const overIdx = RANKS.indexOf(rankOverride);
-        if (baseIdx >= 0 && overIdx >= 0) ultimateCS = overIdx - baseIdx;
-      }
-
-      if (name.includes("wrestling")) {
-        combatTalents.push({ name: "Wrestling", cs: 2, flag: null, note: "+2CS grapple", ultimateCS, rankOverride });
-      }
-      else if (name.includes("martial arts c") || name.includes("martial arts-c") ||
-               (name.includes("martial arts") && name.includes("(c)"))) {
-        combatTalents.push({ name: "MA-C", cs: 1, flag: null, note: "+1CS grapple/escape/dodge", ultimateCS, rankOverride });
-      }
-      else if (name.includes("martial arts b") || name.includes("martial arts-b") ||
-               (name.includes("martial arts") && name.includes("(b)"))) {
-        combatTalents.push({ name: "MA-B", cs: 1, flag: null, note: "+1CS Fighting", ultimateCS, rankOverride });
-      }
-    }
-
     // ── Dialog title and ability ──
     const dialogTitle = "Grappling";
     const abilityLabel = isWeaponGrapple ? `${weaponName} (Material)` : "Base Strength";
@@ -318,36 +264,16 @@ export class GrapplingAction extends AttackAction {
     const minKarma = getMinimumKarmaCommitment(actor);
     const hasKarma = availableKarma > 0;
 
-    // ── CS display ──
-    const csInputCls = savedShift > 0 ? ' pos' : savedShift < 0 ? ' neg' : '';
-    const csRankStyle = savedShift > 0 ? 'color:#2e7d32;' : savedShift < 0 ? 'color:#c62828;' : '';
+    // Build CS row via shared utility (manual input + ? reference)
+    const csRowHtml = buildCSRow({
+      savedCS: savedShift,
+      abilityRank: strength.rank
+    });
 
-    // ── Build talent chips HTML ──
-    const talentChipsHtml = combatTalents.map(t => {
-      const savedState = savedActiveChips[t.name] || '';
-      if (t.rankOverride && t.ultimateCS > 0) {
-        const shortRank = RANK_ABBR[t.rankOverride] || t.rankOverride;
-        const ultActive = savedState === 'ultimate';
-        return `<span class="frp-talent-chip${ultActive ? ' active-ultimate' : ''}" data-cs="${t.ultimateCS}" data-talent="${t.name}" data-ultimate="1">
-          ★ ${t.name} <span class="chip-cs">&rarr;${shortRank}</span>
-        </span>`;
-      }
-      if (t.cs > 0) {
-        const csActive = savedState === 'cs';
-        return `<span class="frp-talent-chip${csActive ? ' active-cs' : ''}" data-cs="${t.cs}" data-talent="${t.name}">
-          ${t.name} <span class="chip-cs">+${t.cs}</span>
-        </span>`;
-      }
-      if (t.flag) {
-        const flagActive = savedState.includes('flag');
-        return `<span class="frp-talent-chip${flagActive ? ' active-flag' : ''}" data-flag="${t.flag}" data-talent="${t.name}">
-          ${t.name} <span class="chip-note">${t.note}</span>
-        </span>`;
-      }
-      return '';
-    }).join('');
+    // Store target str from token for resolve
+    const resolvedTargetStr = targetStrRank || prefillTargetStr;
 
-    // ── Dialog HTML — v3 Compact Layout ──
+    // ── Dialog HTML — v3.1 Compact Layout ──
     const dialogHtml = `
     <div class="frp-dlg">
 
@@ -356,19 +282,18 @@ export class GrapplingAction extends AttackAction {
         <span class="h-actor" title="${actor.name}">${actor.name}</span>
         <span class="h-paren">(</span>
         <span class="h-stat">
-          <span class="h-stat-label">${abilityLabel}</span>
+          <span class="h-stat-label">${abilityLabel}:</span>
           <span class="h-stat-rank">${strengthAbbr} ${strength.value}</span>
         </span>
         <span class="h-paren">)</span>
         ${targetDisplay
-          ? `<span class="h-verb">attacks</span><span class="h-target" title="${targetDisplay}">${targetDisplay}</span>`
+          ? `<span class="h-verb">grapples</span><span class="h-target" title="${targetDisplay}">${targetDisplay}</span>`
           : ''}
       </div>
 
       <!-- Target compact line -->
       ${primaryTarget ? `
       <div class="frp-target-compact">
-        <span class="t-name">${targetDisplay}</span>
         ${targetHealthStr ? `<span class="t-hp">HP: ${targetHealthStr}</span>` : ''}
         ${targetStatusStr ? `<span class="t-status">${targetStatusStr}</span>` : ''}
         ${targetStrRank ? `<span class="t-armor">STR: ${targetStrAbbr} ${targetStrVal}</span>` : ''}
@@ -380,36 +305,8 @@ export class GrapplingAction extends AttackAction {
       </div>
       `}
 
-      <!-- CS box: chips + situational dropdown -->
-      <div class="frp-box frp-cs-box">
-        <div class="frp-cs-line">
-          <span class="frp-cs-label">CS</span>
-          <input type="number" class="frp-cs-input${csInputCls}" name="shift" value="${savedShift}" id="cs-grapple">
-          <span class="frp-cs-arrow">&rarr;</span>
-          <span class="frp-cs-rank" id="rank-grapple" style="${csRankStyle}">${shiftRank(strength.rank, savedShift)}</span>
-          <button type="button" class="frp-cs-reset" style="visibility:${savedShift !== 0 ? 'visible' : 'hidden'}">&times;</button>
-          <select class="frp-sit-select" id="sit-select">
-            <option value="">+ situational&hellip;</option>
-            <optgroup label="Bonuses">
-              <option value="2" data-label="Blindside" title="Target unaware or from behind">Blindside +2CS</option>
-              <option value="1" data-label="Double Team" title="Ally has Hold on target">Double Team +1CS</option>
-            </optgroup>
-            <optgroup label="Penalties">
-              <option value="-2" data-label="Impaired" title="Lost Endurance ranks, -2CS all actions">Impaired -2CS</option>
-            </optgroup>
-            <optgroup label="Target Size">
-              <option value="1" data-label="Growth +1" title="Target 12-18ft">Growth 12-18ft +1CS</option>
-              <option value="2" data-label="Growth +2" title="Target 18-22ft">Growth 18-22ft +2CS</option>
-              <option value="3" data-label="Growth +3" title="Target 22ft+">Growth 22ft+ +3CS</option>
-              <option value="-1" data-label="Shrink -1" title="Target ~1 inch">Shrunk 1&Prime; -1CS</option>
-              <option value="-2" data-label="Shrink -2" title="Target ~1/4 inch">Shrunk &frac14;&Prime; -2CS</option>
-              <option value="-3" data-label="Shrink -3" title="Target smaller">Shrunk smaller -3CS</option>
-            </optgroup>
-          </select>
-        </div>
-        ${combatTalents.length > 0 ? `<div class="frp-chip-row">${talentChipsHtml}</div>` : ''}
-        <div class="frp-sit-tags" id="sit-tags"></div>
-      </div>
+      <!-- CS row (manual input + ? reference) -->
+      ${csRowHtml}
 
       <!-- Grapple info box (blue) -->
       <div class="frp-box" style="background:#f0f4ff;border-color:#90caf9;padding:3px 8px;">
@@ -452,11 +349,9 @@ export class GrapplingAction extends AttackAction {
     </div>
     `;
 
-    // Store target str from token for resolve
-    const resolvedTargetStr = targetStrRank || prefillTargetStr;
-
     return new Promise((resolve) => {
       let _resolved = false;
+      let _csState = null;
       const dlg = new Dialog({
         title: dialogTitle,
         content: dialogHtml,
@@ -483,53 +378,26 @@ export class GrapplingAction extends AttackAction {
             $dialog[0].style.height = 'auto';
           }
 
+          // ── Wire CS panel from shared utility ──
+          _csState = wireCSPanel(html, {
+            abilityRank: strength.rank,
+            onUpdate: () => {
+              if ($dialog.length) $dialog[0].style.height = 'auto';
+            }
+          });
+
           // ── Roll button handler ──
           html.find('#frp-roll').on('click', async () => {
             const $dlg = (s) => html.find(s);
-
             const { spendKarma } = extractKarmaFromDialog(html);
-            const shift = parseInt($dlg('[name="shift"]').val() || 0);
 
-            // Build csNotes from active chips + sit tags
-            const sitParts = [];
-            html.find('.frp-talent-chip.active-cs, .frp-talent-chip.active-ultimate').each(function() {
-              const talent = $(this).data('talent') || '';
-              const cs = parseInt($(this).data('cs')) || 0;
-              if (talent && cs) sitParts.push(`${talent} ${cs > 0 ? '+' : ''}${cs}`);
-            });
-            html.find('.frp-sit-tag').each(function() {
-              const label = $(this).data('label') || '';
-              const cs = parseInt($(this).data('cs')) || 0;
-              if (label) sitParts.push(`${label} ${cs > 0 ? '+' : ''}${cs}`);
-            });
-            const csNotes = sitParts.join(', ');
-
-            // Collect active chip states for persistence
-            const activeChips = {};
-            html.find('.frp-talent-chip.active-cs, .frp-talent-chip.active-ultimate').each(function() {
-              const talent = $(this).data('talent');
-              const isUlt = !!$(this).data('ultimate');
-              if (talent) activeChips[talent] = isUlt ? 'ultimate' : 'cs';
-            });
-            html.find('.frp-talent-chip.active-flag').each(function() {
-              const talent = $(this).data('talent');
-              if (talent) activeChips[talent] = (activeChips[talent] || '') + ',flag';
-            });
-
-            // Strip sit tags from saved shift
-            let sitTagCS = 0;
-            html.find('.frp-sit-tag').each(function() {
-              sitTagCS += parseInt($(this).data('cs')) || 0;
-            });
-            const baseShift = shift - sitTagCS;
+            // Get CS from shared panel
+            const csData = _csState ? _csState.get() : { totalShift: 0, manualCS: 0, rangePenalty: 0, csNotes: "" };
+            const shift = csData.totalShift;
+            const manualCS = csData.manualCS;
 
             const rememberSettings = !!$dlg('[name="remember"]').is(':checked');
             const skipDice = !!$dlg('[name="skipDice"]').is(':checked');
-
-            if (rememberSettings) {
-              await actor.setFlag("msh-faserip", "lastGrappleShift", baseShift);
-              await actor.setFlag("msh-faserip", "lastGrappleActiveChips", activeChips);
-            }
 
             _resolved = true;
             resolve({
@@ -537,7 +405,8 @@ export class GrapplingAction extends AttackAction {
               targetStrength: resolvedTargetStr,
               targetUuid:     primaryTargetActor?.uuid || prefillTargetUuid,
               shift,
-              csNotes,
+              manualCS,
+              csNotes: "",
               spendKarma,
               remember: rememberSettings,
               skipDice
@@ -552,107 +421,6 @@ export class GrapplingAction extends AttackAction {
             dlg.close();
           });
 
-          // ── Talent chip click handler ──
-          html.find('.frp-talent-chip').on('click', function() {
-            const $chip = $(this);
-            const cs = parseInt($chip.data('cs')) || 0;
-            const flag = $chip.data('flag') || null;
-            const isUltimate = !!$chip.data('ultimate');
-            const $csInput = html.find('[name="shift"]');
-
-            if (cs > 0) {
-              const wasActive = $chip.hasClass('active-cs') || $chip.hasClass('active-ultimate');
-              const activeClass = isUltimate ? 'active-ultimate' : 'active-cs';
-
-              if (wasActive) {
-                $chip.removeClass('active-cs active-ultimate');
-                $csInput.val(parseInt($csInput.val()) - cs);
-              } else {
-                $chip.addClass(activeClass);
-                $csInput.val(parseInt($csInput.val()) + cs);
-              }
-              $csInput.trigger('change');
-            } else if (flag) {
-              $chip.toggleClass('active-flag');
-            }
-          });
-
-          // ── CS update function ──
-          const update = () => {
-            const cs = parseInt(html.find('[name="shift"]').val()) || 0;
-            const shiftedRankText = shiftRank(strength.rank, cs);
-            const $shiftedRank = html.find('#rank-grapple');
-            const $csInput = html.find('.frp-cs-input');
-            $shiftedRank.text(shiftedRankText);
-
-            const $resetBtn = html.find('.frp-cs-reset');
-            $csInput.removeClass('pos neg');
-            if (cs > 0) {
-              $csInput.addClass('pos');
-              $shiftedRank.css('color', '#2e7d32');
-              $resetBtn.css('visibility', 'visible');
-            } else if (cs < 0) {
-              $csInput.addClass('neg');
-              $shiftedRank.css('color', '#c62828');
-              $resetBtn.css('visibility', 'visible');
-            } else {
-              $shiftedRank.css('color', '');
-              $resetBtn.css('visibility', 'hidden');
-            }
-
-            if ($dialog.length) $dialog[0].style.height = 'auto';
-          };
-
-          update();
-
-          // ── Event bindings ──
-          html.find('[name="shift"]').on('input change', update);
-
-          // CS reset — deactivate talent chips and remove situational tags
-          html.find('.frp-cs-reset').on('click', function(e) {
-            e.preventDefault();
-            html.find('[name="shift"]').val(0);
-            html.find('.frp-talent-chip.active-cs, .frp-talent-chip.active-ultimate').removeClass('active-cs active-ultimate');
-            html.find('#sit-tags').empty();
-            html.find('[name="shift"]').trigger('change');
-          });
-
-          // ── Situational modifier: apply on select change ──
-          html.find('#sit-select').on('change', function() {
-            const $sel = $(this);
-            const opt = $sel.find('option:selected');
-            const cs = parseInt(opt.val());
-            const label = opt.data('label') || '';
-            if (!cs || !label) return;
-
-            let exists = false;
-            html.find('.frp-sit-tag').each(function() {
-              if ($(this).data('label') === label) exists = true;
-            });
-            if (exists) { $sel.val(''); return; }
-
-            const sign = cs > 0 ? '+' : '';
-            const cls = cs < 0 ? ' penalty' : '';
-            const tag = $(`<span class="frp-sit-tag${cls}" data-cs="${cs}" data-label="${label}">
-              ${label} <span class="tag-cs">${sign}${cs}</span>
-              <span class="tag-x">&times;</span>
-            </span>`);
-            html.find('#sit-tags').append(tag);
-
-            const $csInput = html.find('[name="shift"]');
-            $csInput.val(parseInt($csInput.val()) + cs).trigger('change');
-            $sel.val('');
-          });
-
-          // ── Situational modifier: remove tag ──
-          html.find('#sit-tags').on('click', '.tag-x', function() {
-            const $tag = $(this).closest('.frp-sit-tag');
-            const cs = parseInt($tag.data('cs')) || 0;
-            const $csInput = html.find('[name="shift"]');
-            $csInput.val(parseInt($csInput.val()) - cs).trigger('change');
-            $tag.remove();
-          });
-
           // Karma toggle — inactive styling
           html.find('#spend-karma').on('change', function() {
             $(this).closest('.frp-opt-row').toggleClass('inactive', !this.checked);
@@ -661,6 +429,7 @@ export class GrapplingAction extends AttackAction {
           applyCapabilitiesToDialog(html, "grappling", { actor });
         },
         close: () => {
+          if (_csState) _csState.destroy();
           if (!_resolved) resolve(null);
         }
       }).render(true);
@@ -675,7 +444,6 @@ export class GrapplingAction extends AttackAction {
     if (totalShift !== 0) {
       const parts = [];
       
-      // Manual shift from dialog
       if (shiftBreakdown?.manual && shiftBreakdown.manual !== 0) {
         if (shiftBreakdown.csNotes) {
           parts.push(shiftBreakdown.csNotes);
@@ -683,14 +451,11 @@ export class GrapplingAction extends AttackAction {
           parts.push(`${shiftBreakdown.manual > 0 ? '+' : ''}${shiftBreakdown.manual}`);
         }
       }
-
       
-      // Attacker effects
       for (const eff of attackerEffects) {
         parts.push(`${eff.shift > 0 ? '+' : ''}${eff.shift} ${eff.name}`);
       }
       
-      // Defender effects (flip sign)
       for (const eff of defenderEffects) {
         parts.push(`${eff.shift > 0 ? '-' : '+'}${Math.abs(eff.shift)} ${eff.name}`);
       }
