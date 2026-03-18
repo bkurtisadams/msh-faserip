@@ -355,6 +355,18 @@ export class ForceAction extends RangedAttackAction {
             _csState.setAbilityRank(this.checked ? currentRank : ability.rank);
           });
 
+          // Auto-focus Roll button for keyboard Enter and focus ring
+          html.find('#frp-roll').focus();
+
+          // Intercept Enter key — trigger Roll instead of Foundry's native submit
+          $dialog.on('keydown', (e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              e.stopPropagation();
+              html.find('#frp-roll').trigger('click');
+            }
+          });
+
           // ── Roll button handler ──
           html.find('#frp-roll').on('click', async () => {
             const $dlg = (sel) => html.find(sel);
