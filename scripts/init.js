@@ -47,6 +47,7 @@ import { FaseripContactSheet } from './contactSheet.js';
 import { FaseripHeadquartersSheet } from './headquartersSheet.js';
 import { FaseripEquipmentSheet } from './equipment.js';
 import { FaseripRolls } from './rolls.js';
+import { rollTalent } from './modules/actions/talent-action.js';
 //import { rollUniversalTable } from './universalTable.js';  // deprecated
 import { rollUniversalTable } from './modules/dice/universal-table.js';
 import { openUniversalTableDialog } from './rolls.js';
@@ -1540,7 +1541,7 @@ Hooks.once("init", async () => {
   
   // Add the roll functions to the namespace
   game.msh.rollPower = FaseripRolls.rollPower;
-  game.msh.rollTalent = FaseripRolls.rollTalent;
+  game.msh.rollTalent = rollTalent;
   game.msh.rollContact = FaseripRolls.rollContact;
   game.msh.rollEquipment = FaseripRolls.rollEquipment;
 

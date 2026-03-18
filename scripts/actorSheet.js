@@ -2382,18 +2382,7 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
 
       if (!item) return;
 
-      // Talents might need special handling or use check-action
-      // For now, route through the old system OR create a TalentAction class
-      
-      // Option A: Keep using old system for talents (if they're special)
       await game.msh.rollTalent(actor, item);
-      
-      // Option B: Create new talent handler (future work)
-      // const { ActionDispatcher } = await import("./modules/actions/action-dispatcher.js");
-      // await ActionDispatcher.roll("talent", { 
-      //   actor: this.actor, 
-      //   opts: { item }
-      // });
     });
 
     ////////////////////////////////////////////////////////////////////////////////////////
