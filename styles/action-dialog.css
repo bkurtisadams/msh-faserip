@@ -982,10 +982,6 @@
   font-size: 12px;
   cursor: pointer;
 }
-.frp-dlg .frp-btn-roll:focus {
-  outline: 2px solid #f44336;
-  outline-offset: 1px;
-}
 .frp-dlg .frp-btn-roll:hover { filter: brightness(1.05); }
 .frp-dlg .frp-btn-cancel {
   padding: 4px 14px;
