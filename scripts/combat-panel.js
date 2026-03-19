@@ -498,13 +498,8 @@ export class FaseripCombatPanel extends HandlebarsApplicationMixin(ApplicationV2
   async _rollPower(actor, powerId) {
     const power = actor.items.get(powerId);
     if (!power) return;
-    try {
-      const { FaseripRolls } = await import("./rolls.js");
-      FaseripRolls.rollPower(actor, power);
-    } catch {
-      const name = (power.name || "").toLowerCase();
-      ActionDispatcher.roll(name.includes("force") ? "force" : "energy", { actor, opts: { powerName: power.name, powerRank: power.system.rank } });
-    }
+    const { rollPower } = await import("./modules/actions/power-router.js");
+    rollPower(actor, power);
   }
 
   // ── Context menu on right-click pip ──

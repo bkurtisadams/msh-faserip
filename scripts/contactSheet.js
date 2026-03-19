@@ -129,8 +129,8 @@ export class FaseripContactSheet extends ItemSheet {
         ui.notifications.warn("Contact must be owned by an actor to roll Pop FEAT.");
         return;
       }
-      const { FaseripRolls } = await import('./rolls.js');
-      FaseripRolls.rollContact(actor, this.item);
+      const { rollContact } = await import('./modules/actions/contact-action.js');
+      rollContact(actor, this.item);
     });
 
     // Initial population
