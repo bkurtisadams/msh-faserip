@@ -37,7 +37,6 @@
 
         "scripts/macros.js",
         "scripts/gm-utils.js",
-        "scripts/rolls.js",
         "scripts/combat-handler.js",
         "scripts/karma.js",
         "scripts/karmaAdvancement.js",
