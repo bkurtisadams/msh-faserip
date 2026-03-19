@@ -2010,6 +2010,7 @@ export function getBodyArmorValues(targetActor, damageType = "physical-blunt") {
   // Check Body Armor powers
   const bodyArmorPowers = targetActor.items.filter(i => {
     if (i.type !== "power") return false;
+    if (i.system?.isActive === false) return false; // suppressed (e.g., Nullified)
     if (i.system.isBodyArmor === true) return true;
     
     const name = i.name.toLowerCase();
@@ -2328,6 +2329,7 @@ export function getResistanceModifiers(targetActor, damageType = "physical-blunt
   // Find relevant resistance powers
   const resistances = targetActor.items.filter(i => {
     if (i.type !== "power") return false;
+    if (i.system?.isActive === false) return false; // suppressed (e.g., Nullified)
     
     // NEW WAY: Check explicit isResistance flag and match type
     if (i.system.isResistance === true) {

@@ -1,5 +1,7 @@
-// scripts/modules/actions/mental-power-action.js v2.1.0 - 2026-03-19
-// v2.1.0: Remove local rank helpers / scanMentalDefenses / scanForceField — import from action-utils.
+// scripts/modules/actions/mental-power-action.js v2.2.0 - 2026-03-19
+// v2.2.0: Nullifying Power auto-activates aura + self-suppresses caster's inborn powers.
+//         Adds Toggle Nullify Aura button to chat card. Sets isNullifyAura flag.
+//         Save ability defaults to Endurance for Nullifying Power.
 // v1.1.0: Unified chat card layout via buildCardShell/buildContentBox utilities
 import { BaseAction } from "./base-action.js";
 import { resolveCombatMode, ActionDispatcher } from "./action-dispatcher.js";
@@ -276,6 +278,20 @@ export class MentalPowerAction extends BaseAction {
          </div>`
       : "";
 
+    // Detect Nullifying Power early (before card build) for aura toggle button
+    const isNullifyAura = nameLc.includes("nullif");
+
+    // Nullify Aura toggle button (only for Nullifying Power)
+    const nullifyAuraBtn = isNullifyAura
+      ? `<div style="padding:4px 10px 6px;text-align:center;">
+           <a class="faserip-chip" data-action="toggle-nullify-aura"
+              style="display:inline-flex;align-items:center;justify-content:center;font-size:13px;padding:4px 12px;border:1px solid #6a1b9a;border-radius:4px;background:#f3e5f5;color:#6a1b9a;cursor:pointer;font-weight:600;"
+              title="Toggle Nullification Aura on/off (self-suppresses caster's inborn powers)">
+              Toggle Nullify Aura
+           </a>
+         </div>`
+      : "";
+
     const cardHtml = buildCardShell({
       actionLabel: powerName,
       headerRight: "Mental Power",
@@ -284,7 +300,8 @@ export class MentalPowerAction extends BaseAction {
         buildContentBox(infoGrid),
         buildContentBox(saveCallout),
         descSection,
-        `<div style="padding:4px 10px 10px;">${actionsHtml}</div>`
+        `<div style="padding:4px 10px 10px;">${actionsHtml}</div>`,
+        nullifyAuraBtn
       ]
     });
 
@@ -316,6 +333,16 @@ export class MentalPowerAction extends BaseAction {
       } else if (nameLc.includes("nullif")) {
         effectName   = "Nullified";
         failMessage  = "has powers nullified";
+        abilityLabel = "endurance";
+      }
+    }
+
+    // ── Nullifying Power: activate aura + self-suppress on caster ──
+    if (isNullifyAura) {
+      const { isAuraMaintained, startAura } = await import("./nullify.js");
+      if (!isAuraMaintained(actor)) {
+        await startAura(actor, item.uuid);
+        console.log(`[FASERIP] ${actor.name} activated Nullifying Power aura — self-suppressed inborn powers`);
       }
     }
 
@@ -345,6 +372,8 @@ export class MentalPowerAction extends BaseAction {
         effectName,
         failMessage,
         itemId: item.id,
+        isNullifyAura,
+        nullify: isNullifyAura ? { powerItemUuid: item.uuid } : undefined,
         saveConfig: item.system.save || {},
         // Mental defense info for the save resolver
         mentalDefense: mentalDef && mentalDef.source !== "Psyche" ? {
