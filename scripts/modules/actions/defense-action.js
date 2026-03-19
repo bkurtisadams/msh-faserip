@@ -1,4 +1,6 @@
-// scripts/modules/actions/defense-action.js v1.5.1 - 2026-03-15
+// scripts/modules/actions/defense-action.js v2.0.0 - 2026-03-18
+// v2.0.0: Restyle dialog to frp-dlg system — color-coded header (green),
+//         wireCSPanel, frp-fx-grid with hover tooltips, frp-foot, mode selector in titlebar
 // v1.5.1: Fix dodge — only write defenseShiftRanged (not defenseShift) so dodge has
 //         no effect on adjacent Slugfest/Wrestling per rules
 // v1.5.0: Redesign dialog to Style A (grid header, inline CS/karma, standardized footer)
@@ -17,7 +19,8 @@ import { BaseAction } from "./base-action.js";
 import { 
   extractKarmaFromDialog, 
   getAvailableKarma, 
-  getMinimumKarmaCommitment 
+  getMinimumKarmaCommitment,
+  setupKarmaControlHandlers
 } from "../dice/dice-roller.js";
 import {
   RANKS,
@@ -27,9 +30,11 @@ import {
   labelFor,
   rollWithKarmaAndHistory,
   bannerColors,
-  showDiceAnimation
+  showDiceAnimation,
+  buildModeSelector, setupModeSelector
 } from "./action-utils.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
+import { buildCSRow, wireCSPanel } from "./cs-modifiers.js";
 
 /**
  * Handles: "dodging" | "evading" | "blocking" | "catching"
@@ -91,9 +96,6 @@ export class DefenseAction extends BaseAction {
     const effects = effectsFor(actionType);
     const ability = getAbilityInfo(actor, this.abilityName);
 
-    // Per-action extra inputs
-    const extra = this._buildExtraInputs(actionType);
-
     // Karma data
     const availableKarma = getAvailableKarma(actor);
     const minKarma = getMinimumKarmaCommitment(actor);
@@ -101,82 +103,132 @@ export class DefenseAction extends BaseAction {
     const savedShift = Number(this.opts.shift ?? 0);
 
     // ------- Dialog -------
+    // Header gradient color per action category
+    const headerGrad = 'linear-gradient(90deg, #2e8b2e 0%, #1a6b1a 100%)';
+    const abilityLabel = { dodging: 'Agility', evading: 'Fighting', blocking: 'Strength', catching: 'Agility' }[actionType] || ability.name;
+
+    // Per-action extra HTML
+    const extraHtml = this._buildExtraHtml(actionType);
+
+    // Effect preview cells with hover tooltips
+    const fxCells = this._buildFxCells(actionType);
+
+    // CS row from shared utility
+    const csRowHtml = buildCSRow({ savedCS: savedShift, abilityRank: ability.rank });
+
     const dialogHtml = `
-      <!-- Context: Defender + Action stats side by side -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
-        <div style="background:#f5f5f5;padding:8px;border-radius:3px;">
-          <div style="font-weight:600;color:#666;font-size:.8em;text-transform:uppercase;">Defender</div>
-          <div style="font-weight:600;">${actor.name}</div>
-        </div>
-        <div style="background:#f5f5f5;padding:8px;border-radius:3px;">
-          <div style="font-weight:600;color:#666;font-size:.8em;text-transform:uppercase;">${actionName}</div>
-          <div style="font-weight:600;">${ability.name}: ${ability.rank}</div>
-          <div style="color:#666;">Rank Value: ${ability.value}</div>
-        </div>
+    <div class="frp-dlg">
+      <!-- Header banner -->
+      <div class="frp-header-v3" style="background: ${headerGrad};">
+        <span class="h-actor">${actor.name}</span>
+        <span class="h-paren">(</span>
+        <span class="h-stat">
+          <span class="h-stat-label">${abilityLabel}</span>
+          <span class="h-stat-rank">${ability.rank} ${ability.value}</span>
+        </span>
+        <span class="h-paren">)</span>
       </div>
 
-      <!-- Modifiers Row -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;font-size:.9em;">
-        <div class="cs-field" style="display:flex;align-items:center;gap:4px;padding:4px 6px;border-radius:3px;${savedShift < 0 ? 'background:#ffebee;border:1px solid #ef5350;' : savedShift > 0 ? 'background:#e8f5e9;border:1px solid #66bb6a;' : 'border:1px solid transparent;'}">
-          <label style="font-weight:600;">CS:</label>
-          <input type="number" name="shift" value="${savedShift}" style="width:35px;padding:3px;text-align:center;box-sizing:border-box;">
-          <span style="color:#666;">→</span>
-          <strong id="shifted-rank-display" style="${savedShift < 0 ? 'color:#c62828;' : savedShift > 0 ? 'color:#2e7d32;' : ''}">${shiftRank(ability.rank, savedShift)}</strong>
-          <button type="button" class="cs-reset" style="visibility:${savedShift !== 0 ? 'visible' : 'hidden'};padding:1px 5px;font-size:.85em;cursor:pointer;border:1px solid #999;border-radius:2px;background:#eee;" title="Reset to 0">×</button>
-        </div>
-        <div class="karma-field" style="display:flex;align-items:center;gap:4px;padding:4px 6px;border-radius:3px;${hasKarma ? 'background:#e3f2fd;border:1px solid #90caf9;' : ''}">
+      <!-- CS row -->
+      ${csRowHtml}
+
+      <!-- Per-action fields -->
+      ${extraHtml}
+
+      <!-- Karma -->
+      <div class="frp-box frp-opts-box">
+        <div class="frp-opt-row${hasKarma ? ' inactive' : ' inactive'}">
           ${hasKarma ? `
-            <label style="display:flex;align-items:center;gap:4px;cursor:pointer;">
-              <input type="checkbox" id="spend-karma" name="spendKarma">
-              <span style="font-weight:600;">Karma:</span>
-            </label>
-            <span title="Available: ${availableKarma} | Min commitment: ${minKarma} | Amount chosen after roll" style="padding:1px 4px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${availableKarma}</span>
-            <span style="color:#999;font-size:.8em;">(min ${minKarma})</span>
-          ` : `<span style="color:#999;">No karma</span>`}
+            <label><input type="checkbox" id="spend-karma" name="spendKarma"> <span class="frp-opt-label blue">Karma</span></label>
+            <span class="frp-karma-pool"><strong>${availableKarma}</strong> avail (min ${minKarma})</span>
+          ` : `<span style="font-size:12px;color:#999;">No karma available</span>`}
         </div>
       </div>
 
-      ${extra.html}
-
-      ${this._actionNotes(actionType)}
+      <!-- Effect preview -->
+      <div class="frp-fx-grid">
+        ${fxCells}
+      </div>
 
       <!-- Footer -->
-      <div id="msh-bottom-controls" style="display:flex;justify-content:space-between;align-items:center;padding-top:8px;border-top:1px solid #ddd;">
-        <label><input type="checkbox" name="skipDice" ${this.opts.skipDice ? "checked" : ""}> Skip dice</label>
+      <div class="frp-foot">
+        <div class="frp-foot-btns">
+          <button type="button" class="frp-btn-roll" id="frp-roll">Roll</button>
+          <button type="button" class="frp-btn-cancel" id="frp-cancel">Cancel</button>
+        </div>
+        <div class="frp-foot-checks">
+          <label><input type="checkbox" name="skipDice" ${this.opts.skipDice ? "checked" : ""}> Skip dice</label>
+        </div>
       </div>
+    </div>
     `;
 
     const choice = await new Promise((resolve) => {
-      new Dialog({
+      let _resolved = false;
+      let _csState = null;
+      const dlg = new Dialog({
         title: `${actionName}: ${actor.name}`,
         content: dialogHtml,
-        buttons: {
-          roll: {
-            label: "Roll",
-            callback: (html) => resolve(this._readDialog(actionType, html))
-          },
-          cancel: { label: "Cancel", callback: () => resolve(null) }
+        buttons: {},
+        render: async (html) => {
+          setupKarmaControlHandlers(html);
+          const $dialog = html.closest('.dialog');
+
+          $dialog.find('.dialog-buttons').hide();
+
+          // Mode selector in titlebar
+          const $titlebar = $dialog.find('.window-title, .dialog-title').first();
+          if ($titlebar.length) {
+            const modeHtml = buildModeSelector({ mode: "semi" });
+            const $modeWrap = $('<span class="frp-titlebar-mode"></span>').append(modeHtml);
+            $titlebar.after($modeWrap);
+          }
+          const modeKey = `last${actionType.charAt(0).toUpperCase() + actionType.slice(1)}Mode`;
+          await setupModeSelector(actor, $dialog, this.opts || {}, modeKey);
+
+          if ($dialog.length) {
+            $dialog.css('width', '360px');
+            $dialog[0].style.height = 'auto';
+          }
+
+          // Wire CS panel
+          _csState = wireCSPanel(html, {
+            abilityRank: ability.rank,
+            onUpdate: () => {
+              if ($dialog.length) $dialog[0].style.height = 'auto';
+            }
+          });
+
+          // Auto-focus Roll button
+          html.find('#frp-roll').focus();
+
+          // Enter key → Roll
+          $dialog.on('keydown', (e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              e.stopPropagation();
+              html.find('#frp-roll').trigger('click');
+            }
+          });
+
+          // Roll button
+          html.find('#frp-roll').on('click', () => {
+            if (_resolved) return;
+            _resolved = true;
+            const result = this._readDialog(actionType, html);
+            dlg.close();
+            resolve(result);
+          });
+
+          // Cancel button
+          html.find('#frp-cancel').on('click', () => {
+            if (_resolved) return;
+            _resolved = true;
+            dlg.close();
+            resolve(null);
+          });
         },
-        default: "roll",
-        render: (html) => {
-          // CS field handlers
-          const $shift = html.find('[name="shift"]');
-          const $csField = html.find('.cs-field');
-          const $rankDisplay = html.find('#shifted-rank-display');
-          const $csReset = html.find('.cs-reset');
-          const updateCS = () => {
-            const s = Number($shift.val()) || 0;
-            const shifted = shiftRank(ability.rank, s);
-            $rankDisplay.text(shifted);
-            $rankDisplay.css('color', s < 0 ? '#c62828' : s > 0 ? '#2e7d32' : '');
-            $csField.css('background', s < 0 ? '#ffebee' : s > 0 ? '#e8f5e9' : '');
-            $csField.css('border-color', s < 0 ? '#ef5350' : s > 0 ? '#66bb6a' : 'transparent');
-            $csReset.css('visibility', s !== 0 ? 'visible' : 'hidden');
-          };
-          $shift.on('input', updateCS);
-          $csReset.on('click', () => { $shift.val(0); updateCS(); });
-          extra.onRender?.(html);
-        }
+        close: () => { if (!_resolved) resolve(null); }
       }).render(true);
     });
     if (!choice) return;
@@ -219,8 +271,7 @@ export class DefenseAction extends BaseAction {
     // Action chips (light placeholders)
     const actionsHtml = this._actionsBox({ actionType, colorLower });
 
-    // Ability label for header context
-    const abilityLabel = { dodging: 'Agility', evading: 'Fighting', blocking: 'Strength', catching: 'Agility' }[actionType] || ability.name;
+    // Ability label for chat card
     const featLabel = `${abilityLabel} FEAT`;
 
     // Shift display (hover tooltip style)
@@ -271,43 +322,65 @@ export class DefenseAction extends BaseAction {
 
   // ------- Per-action UI bits -------
 
-  _buildExtraInputs(actionType) {
+  _buildExtraHtml(actionType) {
     if (actionType === "evading") {
-      return {
-        html: `
-          <div style="margin-top:8px;padding:6px;border:1px solid #ddd;background:#fafafa;border-radius:3px;">
-            <div style="font-weight:bold;margin-bottom:6px;">Evade Settings</div>
-            <div style="margin-bottom:6px;">
-              <label style="display:inline-block;width:160px;">Opponent (name or note):</label>
-              <input type="text" name="evadeTarget" style="width:220px;" placeholder="Who you’re evading">
-            </div>
-          </div>
-        `
-      };
+      let prefillTarget = "";
+      const targets = Array.from(game.user?.targets ?? []);
+      if (targets.length === 1) prefillTarget = targets[0].name || "";
+      return `
+        <div class="frp-box">
+          <div class="frp-box-label">Opponent</div>
+          <input type="text" name="evadeTarget" class="frp-cs-notes" style="margin-top:0;"
+                 placeholder="Who you're evading (single adjacent)" value="${prefillTarget}">
+        </div>`;
     }
     if (actionType === "catching") {
-      return {
-        html: `
-          <div style="margin-top:8px;padding:6px;border:1px solid #ddd;background:#fafafa;border-radius:3px;">
-            <div style="font-weight:bold;margin-bottom:6px;">Catching Settings</div>
-            <div style="margin-bottom:6px;">
-              <label style="display:inline-block;width:160px;">Scenario:</label>
-              <select name="catchScenario" style="width:220px;">
-                <option value="falling">Falling object / ally</option>
-                <option value="shooting-bullet">Shooting: bullet (needs Unearthly Agility)</option>
-                <option value="shooting-arrow">Shooting: arrow (needs Amazing Agility)</option>
-                <option value="throwing-other">Thrown projectile (needs Remarkable Agility)</option>
-              </select>
-            </div>
-            <div style="margin-bottom:6px;">
-              <label><input type="checkbox" name="catchVsYou"> Object/attack is directed at you (–3CS to catch)</label>
-            </div>
-          </div>
-        `
-      };
+      return `
+        <div class="frp-box">
+          <div class="frp-box-label">Catching</div>
+          <select name="catchScenario" class="frp-select" style="margin-bottom:4px;">
+            <option value="falling">Falling object / ally</option>
+            <option value="shooting-bullet">Bullet (needs Unearthly Agi)</option>
+            <option value="shooting-arrow">Arrow (needs Amazing Agi)</option>
+            <option value="throwing-other">Thrown projectile (needs Remarkable Agi)</option>
+          </select>
+          <label style="font-size:12px;display:flex;align-items:center;gap:4px;cursor:pointer;">
+            <input type="checkbox" name="catchVsYou"> Directed at you (\u20133CS)
+          </label>
+        </div>`;
     }
-    // dodging / blocking: no extras needed
-    return { html: "" };
+    return "";
+  }
+
+  _buildFxCells(actionType) {
+    const data = {
+      dodging: [
+        { cls: "w", label: "No Penalty", tip: "White: no CS penalty to attackers." },
+        { cls: "g", label: "-2CS",        tip: "Green: attackers at -2CS on attacks you're aware of. Half move; -2CS own FEATs." },
+        { cls: "y", label: "-4CS",        tip: "Yellow: attackers at -4CS. Half move; -2CS own FEATs. No effect vs adjacent Slugfest/Wrestling." },
+        { cls: "r", label: "-6CS",        tip: "Red: attackers at -6CS. Half move; -2CS own FEATs. No effect vs adjacent Slugfest/Wrestling." }
+      ],
+      evading: [
+        { cls: "w", label: "Auto-Hit",    tip: "White: opponent auto-hits (at least Green result). No attacks this round." },
+        { cls: "g", label: "Evasion",     tip: "Green: you avoid the blow. No attacks this round." },
+        { cls: "y", label: "Evasion +1",  tip: "Yellow: avoid blow + next round first attack vs that attacker at +1CS." },
+        { cls: "r", label: "Evasion +2",  tip: "Red: avoid blow + next round first attack vs that attacker at +2CS." }
+      ],
+      blocking: [
+        { cls: "w", label: "-6CS Armor",  tip: "White: Strength -6CS as Body Armor vs physical. No other actions." },
+        { cls: "g", label: "-4CS Armor",  tip: "Green: Strength -4CS as Body Armor vs physical. No other actions." },
+        { cls: "y", label: "-2CS Armor",  tip: "Yellow: Strength -2CS as Body Armor vs physical. No other actions." },
+        { cls: "r", label: "+1CS Armor",  tip: "Red: Strength +1CS as Body Armor vs physical. No other actions." }
+      ],
+      catching: [
+        { cls: "w", label: "Auto-Hit",    tip: "White: object/attack hits you normally." },
+        { cls: "g", label: "Miss",        tip: "Green: fail to catch. If it was an attack, attacker gets +1CS." },
+        { cls: "y", label: "Damage",      tip: "Yellow: catch it, but you may damage the caught object/ally." },
+        { cls: "r", label: "Catch",       tip: "Red: clean catch, no ill effects." }
+      ]
+    };
+    const cells = data[actionType] || [];
+    return cells.map(c => `<div class="frp-fx-cell ${c.cls}" title="${c.tip}">${c.label}</div>`).join("\n        ");
   }
 
   _readDialog(actionType, html) {
@@ -329,40 +402,6 @@ export class DefenseAction extends BaseAction {
     return { shift, karma, spendKarma, skipDice };
   }
 
-  _actionNotes(actionType) {
-    if (actionType === "dodging") {
-      return `
-        <div style="margin-top:10px;color:#555;font-size:.85em;">
-          <div>• Dodging is Agility. Reduces <em>attacker’s</em> CS on attacks you’re aware of this phase.</div>
-          <div>• While Dodging: half move; no Charge; only one other action; your FEATs this turn are at <strong>-2CS</strong>.</div>
-          <div>• Typically used vs ranged/charging; no effect vs adjacent Slugfest/Wrestling.</div>
-        </div>`;
-    }
-    if (actionType === "evading") {
-      return `
-        <div style="margin-top:10px;color:#555;font-size:.85em;">
-          <div>• Evading is Fighting vs a single adjacent attacker. You make no attack this round.</div>
-          <div>• Results: Auto-Hit; Evasion; Evasion +1CS; Evasion +2CS (next round attack bonus vs that attacker).</div>
-        </div>`;
-    }
-    if (actionType === "blocking") {
-      return `
-        <div style="margin-top:10px;color:#555;font-size:.85em;">
-          <div>• Blocking uses Strength as temporary Body Armor vs physical (Grappling, Slugfest, Edged/Blunt Throwing, Force, Wrestling). No effect vs Shooting/Energy; not Charging.</div>
-          <div>• You take no other action; can shield allies behind you. Normal Armor stacks (not Force Fields).</div>
-        </div>`;
-    }
-    if (actionType === "catching") {
-      return `
-        <div style="margin-top:10px;color:#555;font-size:.85em;">
-          <div>• Catching is Agility vs one item. Results: Auto-hit; Miss (+1CS to attacker if it was an attack); Damage (you might harm what you caught); Catch (clean).</div>
-          <div>• –3CS to catch items specifically directed at you.</div>
-          <div>• Min Agility: Unearthly (bullets), Amazing (arrows), Remarkable (other thrown). Any Agility for falling.</div>
-        </div>`;
-    }
-    return "";
-  }
-
   _contextLine(actionType, choice) {
     if (actionType === "evading") {
       return `<div>Targeting: ${choice.evadeTarget ? choice.evadeTarget : "(single adjacent attacker)"} </div>`;
@@ -374,7 +413,7 @@ export class DefenseAction extends BaseAction {
         "shooting-arrow": "Shooting (arrow)",
         "throwing-other": "Thrown projectile"
       };
-      return `<div>Catching: ${map[choice.catchScenario] || "Object"}${choice.catchVsYou ? " — vs you (–3CS)" : ""}</div>`;
+      return `<div>Catching: ${map[choice.catchScenario] || "Object"}${choice.catchVsYou ? " \u2014 vs you (\u20133CS)" : ""}</div>`;
     }
     return "";
   }
