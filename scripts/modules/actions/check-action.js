@@ -74,6 +74,12 @@ export class CheckAction extends BaseAction {
 
     // TDZ-safe flag computed early
     let isSaveNullify = false;
+    {
+      const _aid = String(
+        this?.actionId || this?.type || this?.opts?.actionId || this?.opts?.checkType || this?.actionType || ""
+      ).toLowerCase();
+      isSaveNullify = (_aid === "save-nullify" || _aid === "nullify-save" || _aid === "force-save-nullify");
+    }
 
     // ------------------------------
     // FULL AUTO FAST-PATH
@@ -346,10 +352,56 @@ export class CheckAction extends BaseAction {
         // Prefer the targeted Token's synthetic actor (handles unlinked tokens)
         const saveActor = await this._resolveTokenActor(defenderUuid || (this.opts?.prefill?.targetUuid || ""));
         if (saveActor) {
-          const endRank     = targetEndRank;
+          let endRank     = targetEndRank;
           let intensityRank = endRank;
           if (this?.opts?.powerRankName) intensityRank = this.opts.powerRankName;
           if (this?.opts?.intensity === "fixed-rank" && this?.opts?.fixedRank) intensityRank = this.opts.fixedRank;
+
+          // ── Mental defense substitution (Psi-Screen / Mental Powers replace Psyche) ──
+          const saveAbilityCheck = (this.abilityName || "psyche").toLowerCase();
+          if (saveAbilityCheck === "psyche" && saveActor.items) {
+            const activePowers = saveActor.items.filter(i => i.type === "power" && i.system?.isActive !== false);
+            const rv = CONFIG.FASERIP?.rankValues || {};
+            const psycheVal = saveActor.system?.abilities?.psyche?.value || 0;
+            let bestVal = psycheVal;
+            let bestRank = saveActor.system?.abilities?.psyche?.rank || endRank;
+            let bestSource = "Psyche";
+
+            // Psi-Screen first (RAW: use before any other)
+            const psiScreen = activePowers.find(p => {
+              const n = (p.name || "").toLowerCase();
+              return n.includes("psi-screen") || n.includes("psi screen") || n.includes("psiscreen");
+            });
+            if (psiScreen) {
+              const pv = psiScreen.system.value || rv[psiScreen.system.rank] || 0;
+              if (pv > bestVal) { bestVal = pv; bestRank = psiScreen.system.rank || bestRank; bestSource = psiScreen.name; }
+            }
+
+            // If no Psi-Screen, check Mental Powers (category = mentalPowers)
+            if (!psiScreen) {
+              const mentalRes = activePowers.find(p => {
+                const n = (p.name || "").toLowerCase();
+                return n.includes("mental resistance") || n.includes("resist mental");
+              });
+              if (mentalRes) {
+                const mv = mentalRes.system.value || rv[mentalRes.system.rank] || 0;
+                if (mv > bestVal) { bestVal = mv; bestRank = mentalRes.system.rank || bestRank; bestSource = mentalRes.name; }
+              }
+              const mentalPowers = activePowers.filter(p => {
+                const cat = (p.system.category || "").toLowerCase();
+                return cat === "mentalpowers" || cat === "mental powers" || cat === "mental";
+              });
+              for (const mp of mentalPowers) {
+                const mv = mp.system.value || rv[mp.system.rank] || 0;
+                if (mv > bestVal) { bestVal = mv; bestRank = mp.system.rank || bestRank; bestSource = mp.name; }
+              }
+            }
+
+            if (bestSource !== "Psyche") {
+              endRank = bestRank;
+              console.log(`[FASERIP] Mental save substitution: ${saveActor.name} uses ${bestSource} (${bestRank}) instead of Psyche`);
+            }
+          }
 
           // Check if this is a custom mental power (not nullification)
           const customEffectName = this?.opts?.effectName;
@@ -467,7 +519,8 @@ export class CheckAction extends BaseAction {
       const content = this._buildCheckCard({
         actor, actionType, effectiveEndRank, shiftDisplay,
         roll, colorLower, effectText, effectsSuppressed, extraHtml,
-        targetName
+        targetName,
+        saveAbility: isSaveNullify ? (this.abilityName || null) : null
       });
       if (!skipChatMessage) {
         await ChatMessage.create({
@@ -482,7 +535,9 @@ export class CheckAction extends BaseAction {
     // ------------------------------
     // MANUAL / SEMI: show a compact dialog
     // ------------------------------
-    const targetRanks = this._rankOptions(prefill.targetEndRank || actor?.system?.abilities?.endurance?.rank || "Good");
+    const _saveAbilityName = isSaveNullify ? (this.abilityName || "endurance") : "endurance";
+    const _saveAbilityLabel = _saveAbilityName.charAt(0).toUpperCase() + _saveAbilityName.slice(1);
+    const targetRanks = this._rankOptions(prefill.targetEndRank || actor?.system?.abilities?.[_saveAbilityName]?.rank || actor?.system?.abilities?.endurance?.rank || "Good");
     const preDmg = Number(prefill.dmgThrough ?? 0) || 0;
     const html = `
       <div class="frp-dialog" style="min-width:410px;">
@@ -491,7 +546,7 @@ export class CheckAction extends BaseAction {
           <input type="text" name="targetName" value="${prefill.targetName||"Target"}" style="width:220px;">
         </div>
         <div style="margin-bottom:8px;">
-          <label style="display:inline-block;width:140px;">Target Endurance:</label>
+          <label style="display:inline-block;width:140px;">Target ${_saveAbilityLabel}:</label>
           <select name="targetEndRank" style="width:220px;">${targetRanks}</select>
         </div>
         <div style="margin-bottom:8px;">
@@ -650,19 +705,66 @@ export class CheckAction extends BaseAction {
       }
     }
 
+    // ── Mental Power Save (save-nullify with custom effect, e.g. Psionic Attack → Unconscious) ──
+    let mentalPowerExtraHtml = "";
+    if (isSaveNullify && this?.opts?.effectName) {
+      const customEffectName  = this.opts.effectName;
+      const customFailMessage = this.opts.failMessage || "is affected";
+      const powerName         = this.opts.powerName || "Mental Power";
+      const saveAbilityLabel  = (this.abilityName || "psyche").charAt(0).toUpperCase() + (this.abilityName || "psyche").slice(1);
+
+      if (colorLower === "white") {
+        // Failed save — roll duration and apply effect
+        const d = new Roll("1d10");
+        await d.evaluate();
+        const duration = d.total;
+
+        // Apply the effect to the target
+        const targetUuid = this.opts?.prefill?.targetUuid || choice.targetUuid || "";
+        const saveActor = await this._resolveTokenActor(targetUuid);
+        if (saveActor) {
+          await Effects.applyEffect(saveActor, {
+            name: customEffectName,
+            img: "icons/svg/unconscious.svg",
+            rounds: duration,
+            originUuid: actor.uuid,
+            flags: {
+              "msh-faserip": {
+                type: "mental-power",
+                powerName: powerName,
+                sourceUuid: actor.uuid
+              },
+              meta: { unitLabel: "round", unitLabelPlural: "rounds" }
+            }
+          });
+        }
+
+        mentalPowerExtraHtml = `<div style="margin-top:6px;color:#c62828;font-weight:bold;">
+          ${choice.targetName || "Target"} ${customFailMessage} for ${duration} rounds (1d10 = ${duration})
+        </div>`;
+      } else {
+        // Resisted
+        mentalPowerExtraHtml = `<div style="margin-top:6px;color:#2e7d32;font-weight:bold;">
+          ${choice.targetName || "Target"} resists ${powerName}!
+        </div>`;
+      }
+    }
+
     const effectText = (actionType === "kill") ? (finalEffect?.label ?? "No Effect") : finalEffect;
-    const extraHtml  = this._extraExplanationHtml({
+    const baseExtraHtml = this._extraExplanationHtml({
       actionType, targetAbility, colorLower, finalEffect: effectText, effectsSuppressed,
       stunDuration: manualStunDuration,
       slamDetails: manualSlamDetails,
       targetIsRobot: (await this._resolveTokenActor(this.opts?.prefill?.targetUuid || ""))?.system?.origin === "Robot"
     });
+    const extraHtml = (baseExtraHtml || "") + mentalPowerExtraHtml;
     const shiftDisplay = choice.shift ? ` (${choice.shift > 0 ? '+' : ''}${choice.shift}CS)` : '';
 
     const content = this._buildCheckCard({
       actor, actionType, effectiveEndRank, shiftDisplay,
       roll, colorLower, effectText, effectsSuppressed, extraHtml,
-      targetName: choice.targetName || prefill.targetName || null
+      targetName: choice.targetName || prefill.targetName || null,
+      saveAbility: isSaveNullify ? (this.abilityName || null) : null
     });
     await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor }), content });
   }
@@ -732,11 +834,19 @@ export class CheckAction extends BaseAction {
     }, opts);
   }
 
-  _buildCheckCard({ actor, actionType, effectiveEndRank, shiftDisplay, roll, colorLower, effectText, effectsSuppressed, extraHtml, targetName = null }) {
+  _buildCheckCard({ actor, actionType, effectiveEndRank, shiftDisplay, roll, colorLower, effectText, effectsSuppressed, extraHtml, targetName = null, saveAbility = null }) {
     const { bg, fg } = bannerColors(colorLower);
-    const actionLabel = labelFor(actionType).toUpperCase();
     const rollBox = `<span title="d100 = ${roll.total}" style="padding:0 3px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${roll.total}</span>`;
     const displayName = targetName || actor.name;
+
+    // Use save ability for mental power saves, else default to Endurance
+    const abilityLabel = saveAbility
+      ? (saveAbility.charAt(0).toUpperCase() + saveAbility.slice(1))
+      : "Endurance";
+    const actionLabel = saveAbility && saveAbility !== "endurance"
+      ? `${abilityLabel} SAVE`
+      : labelFor(actionType).toUpperCase();
+    const headerRight = `${abilityLabel} FEAT`;
 
     const resultBox = (effectsSuppressed || extraHtml) ? `
       <div style="margin:0 10px 6px;padding:6px 8px;background:#fff;border:1px solid #ddd;border-radius:3px;font-size:.9em;">
@@ -748,11 +858,11 @@ export class CheckAction extends BaseAction {
       <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
         <div style="padding:6px 10px;border-bottom:1px solid #c0c0c0;display:flex;justify-content:space-between;align-items:center;">
           <strong style="color:#8b0000;">${actionLabel}</strong>
-          <span style="color:#666;font-weight:normal;font-size:.85em;">Endurance FEAT</span>
+          <span style="color:#666;font-weight:normal;font-size:.85em;">${headerRight}</span>
         </div>
         <div style="padding:4px 10px;font-size:.95em;"><strong>${displayName}</strong></div>
         <div style="padding:2px 10px 6px;font-size:.9em;color:#555;">
-          <div>Endurance: ${effectiveEndRank}${shiftDisplay}</div>
+          <div>${abilityLabel}: ${effectiveEndRank}${shiftDisplay}</div>
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:3px;">
             <span>Roll: ${rollBox}</span>
             <span style="padding:2px 8px;border-radius:3px;font-weight:bold;font-size:.9em;background:${bg};color:${fg};">

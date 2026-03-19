@@ -1,4 +1,5 @@
-// power-router.js v1.0.0 - 2026-03-18
+// power-router.js v1.1.0 - 2026-03-19
+// v1.1.0: Route "psionic attack" through mental-power action (was intensity).
 // Shared power routing logic extracted from actorSheet.js .power-roll handler.
 // Determines the correct action type for a power and dispatches through ActionDispatcher.
 
@@ -42,7 +43,8 @@ const GRAPPLING_TYPES      = ["ensnaring missile"];
 const MENTAL_TYPES = [
   "mind control", "emotion control",
   "possession", "transferral", "mental probe",
-  "telepathy", "image generation"
+  "telepathy", "image generation",
+  "psionic attack"
 ];
 
 const NON_ATTACK_CATEGORIES = ["resistances", "senses", "movement"];
@@ -149,15 +151,6 @@ export async function rollPower(actor, item) {
     else if (detectFromList(ptl, EDGED_ATTACK_TYPES))   actionType = "edged-attack";
     else if (detectFromList(ptl, GRAPPLING_TYPES))      actionType = "grappling";
     else if (detectFromList(ptl, MENTAL_TYPES))         actionType = "mental";
-
-    // Psionic Attack → intensity dialog
-    if (!actionType && ptl.includes("psionic attack")) {
-      return ActionDispatcher.roll("intensity", {
-        actor,
-        abilityName: "psyche",
-        opts: { itemId: item.id, item }
-      });
-    }
 
     // requiresSave + save.intensity → intensity dialog
     if (!actionType && requiresSave) {
