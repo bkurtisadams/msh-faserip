@@ -1,5 +1,6 @@
-// scripts/modules/actions/check-action.js v1.9.2 - 2026-03-15
-// v1.9.2: Fix _strengthToAreas fallback — use Speed rank table (Grand Slam rule) not walking speed
+// scripts/modules/actions/check-action.js v1.10.0 - 2026-03-19
+// v1.10.0: Replace inline mental defense scan with shared scanMentalDefenses() from action-utils.
+//          Accept "power-save" action type alongside legacy "save-nullify".
 // v1.7.0: Consolidate slam dual-card — _createSlamChatMessage replaced by _slamDetailHtml folded into check card result box
 // v1.6.2: Read Endurance rank from actor directly (actor IS the defender) - prefill.targetEndRank was stale/missing
 // v1.6.1: Fix check card showing literal 'Target' — actor IS the defender, drop targetName from card header
@@ -21,7 +22,8 @@ import {
   getAbilityInfo,
   universalColor,
   showDiceAnimation,
-  debugLog
+  debugLog,
+  scanMentalDefenses
 } from "./action-utils.js";
 import { resolveKillFeat, getKillContextFromAttackForm } from "../../rules/kill-resolver.js";
 import { canEffectsApply } from "../../rules/effects-gate.js";
@@ -78,7 +80,7 @@ export class CheckAction extends BaseAction {
       const _aid = String(
         this?.actionId || this?.type || this?.opts?.actionId || this?.opts?.checkType || this?.actionType || ""
       ).toLowerCase();
-      isSaveNullify = (_aid === "save-nullify" || _aid === "nullify-save" || _aid === "force-save-nullify");
+      isSaveNullify = (_aid === "save-nullify" || _aid === "nullify-save" || _aid === "force-save-nullify" || _aid === "power-save" || _aid === "force-power-save");
     }
 
     // ------------------------------
@@ -89,7 +91,7 @@ export class CheckAction extends BaseAction {
       const actionId = String(
         this?.actionId || this?.type || this?.opts?.actionId || this?.opts?.checkType || this?.actionType || ""
       ).toLowerCase();
-      isSaveNullify = (actionId === "save-nullify" || actionId === "nullify-save" || actionId === "force-save-nullify");
+      isSaveNullify = (actionId === "save-nullify" || actionId === "nullify-save" || actionId === "force-save-nullify" || actionId === "power-save" || actionId === "force-power-save");
 
       // Build choice (synthetic dialog result)
       const targetName    = prefill.targetName     || "Target";
@@ -359,48 +361,10 @@ export class CheckAction extends BaseAction {
 
           // ── Mental defense substitution (Psi-Screen / Mental Powers replace Psyche) ──
           const saveAbilityCheck = (this.abilityName || "psyche").toLowerCase();
-          if (saveAbilityCheck === "psyche" && saveActor.items) {
-            const activePowers = saveActor.items.filter(i => i.type === "power" && i.system?.isActive !== false);
-            const rv = CONFIG.FASERIP?.rankValues || {};
-            const psycheVal = saveActor.system?.abilities?.psyche?.value || 0;
-            let bestVal = psycheVal;
-            let bestRank = saveActor.system?.abilities?.psyche?.rank || endRank;
-            let bestSource = "Psyche";
-
-            // Psi-Screen first (RAW: use before any other)
-            const psiScreen = activePowers.find(p => {
-              const n = (p.name || "").toLowerCase();
-              return n.includes("psi-screen") || n.includes("psi screen") || n.includes("psiscreen");
-            });
-            if (psiScreen) {
-              const pv = psiScreen.system.value || rv[psiScreen.system.rank] || 0;
-              if (pv > bestVal) { bestVal = pv; bestRank = psiScreen.system.rank || bestRank; bestSource = psiScreen.name; }
-            }
-
-            // If no Psi-Screen, check Mental Powers (category = mentalPowers)
-            if (!psiScreen) {
-              const mentalRes = activePowers.find(p => {
-                const n = (p.name || "").toLowerCase();
-                return n.includes("mental resistance") || n.includes("resist mental");
-              });
-              if (mentalRes) {
-                const mv = mentalRes.system.value || rv[mentalRes.system.rank] || 0;
-                if (mv > bestVal) { bestVal = mv; bestRank = mentalRes.system.rank || bestRank; bestSource = mentalRes.name; }
-              }
-              const mentalPowers = activePowers.filter(p => {
-                const cat = (p.system.category || "").toLowerCase();
-                return cat === "mentalpowers" || cat === "mental powers" || cat === "mental";
-              });
-              for (const mp of mentalPowers) {
-                const mv = mp.system.value || rv[mp.system.rank] || 0;
-                if (mv > bestVal) { bestVal = mv; bestRank = mp.system.rank || bestRank; bestSource = mp.name; }
-              }
-            }
-
-            if (bestSource !== "Psyche") {
-              endRank = bestRank;
-              console.log(`[FASERIP] Mental save substitution: ${saveActor.name} uses ${bestSource} (${bestRank}) instead of Psyche`);
-            }
+          const mentalDef = scanMentalDefenses(saveActor, saveAbilityCheck);
+          if (mentalDef.source !== "Psyche") {
+            endRank = mentalDef.rank;
+            console.log(`[FASERIP] Mental save substitution: ${saveActor.name} uses ${mentalDef.source} (${mentalDef.rank}) instead of Psyche`);
           }
 
           // Check if this is a custom mental power (not nullification)

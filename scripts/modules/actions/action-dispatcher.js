@@ -110,6 +110,7 @@ const ACTION_ABILITIES = {
   "slam": "endurance",
   "kill": "endurance",
   "save-nullify": "endurance",
+  "power-save": "endurance",
   "death-save": "endurance",
   "grenade": "agility",
   "intensity": "endurance"
@@ -135,6 +136,7 @@ const registry = {
   "slam":           CheckAction,
   "kill":           CheckAction,
   "save-nullify":   CheckAction,
+  "power-save":     CheckAction,
   "death-save":     DeathSaveAction,
   "mental-power":   MentalPowerAction,
   "grenade":        GrenadeAction,

@@ -20,7 +20,8 @@ export const ACTION_LABELS = {
   'stun': 'Stun Check',
   'slam': 'Slam Check',
   'kill': 'Kill Check',
-  "save-nullify": "Saving Throw (Nullification)"
+  "power-save": "Power Save",
+  "save-nullify": "Power Save",
 };
 
 export const ACTION_EFFECTS = {
@@ -42,7 +43,8 @@ export const ACTION_EFFECTS = {
   'stun':           { white:'1-10 rounds', green:'1 round', yellow:'No effect', red:'No effect' },
   'slam':           { white:'Grand Slam',  green:'1 area', yellow:'Stagger',    red:'No Slam' },
   'kill':           { white:'Endurance Loss', green:'E/S', yellow:'No effect',  red:'No effect' },
-  "save-nullify":   { white:  "Fail — affected", green:  "Success — resisted", yellow: "Success — resisted", red: "Success — resisted"}
+  "save-nullify":   { white:  "Fail — affected", green:  "Success — resisted", yellow: "Success — resisted", red: "Success — resisted"},
+  "power-save":     { white:  "Fail — affected", green:  "Success — resisted", yellow: "Success — resisted", red: "Success — resisted"}
 };
 
 // config/action-info.js

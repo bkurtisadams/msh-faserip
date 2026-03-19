@@ -157,7 +157,7 @@ export function installActionChatHandlers() {
         const mode = resolveCombatMode(ownerActor);
         if (mode === "full") {
           const chips     = html.find('a.faserip-chip[data-check]');
-          const forceBtns = html.find('[data-action="force-save"], [data-action="force-save-nullify"]');
+          const forceBtns = html.find('[data-action="force-save"], [data-action="force-save-nullify"], [data-action="force-power-save"]');
           const deathBtns = html.find('[data-action="death-save"]');
 
           // Track which (checkType, defender) pairs we've already auto-run for this message
@@ -277,7 +277,7 @@ export function installActionChatHandlers() {
               saveActor = game.user.targets.first()?.actor ?? null;
             }
             if (saveActor && resolveCombatMode(saveActor) === "full") {
-              await game.msh.actions.roll("save-nullify", {
+              await game.msh.actions.roll("power-save", {
                 actor: saveActor,
                 abilityName: f.saveAbility || "endurance",
                 opts: {
@@ -953,8 +953,8 @@ export function installActionChatHandlers() {
       btn.style.opacity = "0.6";
     });
 
-    // 6) Force Save (Nullification / RAW: Endurance vs Power Rank)
-    html.on("click", '[data-action="force-save"], [data-action="force-save-nullify"]', async (ev) => {
+    // 6) Force Save (Power Save / Nullification — Psyche/Endurance vs Power Rank)
+    html.on("click", '[data-action="force-save"], [data-action="force-save-nullify"], [data-action="force-power-save"]', async (ev) => {
       // Respect disabled state
       const el = ev.currentTarget;
       if (el.getAttribute?.("aria-disabled") === "true" || el.dataset.autoDisabled === "1") {
@@ -996,7 +996,7 @@ export function installActionChatHandlers() {
         prefill.attackForm    = "mental";
       }
 
-      await ActionDispatcher.roll("save-nullify", {
+      await ActionDispatcher.roll("power-save", {
         actor: ownerActor,
         abilityName: ability,
         opts: {
@@ -1010,8 +1010,8 @@ export function installActionChatHandlers() {
         }
       });
 
-      // NOTE: Your CheckAction handles the actual FEAT + result. Make sure "save-nullify"
-      // has labels/effects configured in action-config (fail => nullified).
+      // NOTE: CheckAction handles the actual FEAT + result. "power-save"
+      // has labels/effects configured in action-config (fail => affected).
     });
 
     // While active, nullifier cannot use other inborn powers (guarded in energy-action.js)

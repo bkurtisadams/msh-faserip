@@ -436,6 +436,96 @@ export const RANKS = [
   "Shift-X","Shift-Y","Shift-Z","Class 1000","Class 3000","Class 5000","Beyond"
 ];
 
+const RANK_VALUES = {
+  "Shift-0":0,"Feeble":2,"Poor":4,"Typical":6,"Good":10,"Excellent":20,
+  "Remarkable":30,"Incredible":40,"Amazing":50,"Monstrous":75,"Unearthly":100,
+  "Shift-X":150,"Shift-Y":200,"Shift-Z":500,
+  "Class 1000":1000,"Class 3000":3000,"Class 5000":5000,"Beyond":9999
+};
+
+export function rankValue(rankName) {
+  return CONFIG.FASERIP?.rankValues?.[rankName] ?? RANK_VALUES[rankName] ?? 0;
+}
+
+export function valueToRank(val) {
+  if (val <= 0) return "Shift-0";
+  let best = "Shift-0";
+  for (const r of RANKS) {
+    if ((RANK_VALUES[r] ?? 0) <= val) best = r;
+    else break;
+  }
+  return best;
+}
+
+/**
+ * Scan target for best mental defense: Psi-Screen first, then Mental Powers, then Psyche.
+ * Returns { rank, value, source }.
+ */
+export function scanMentalDefenses(targetActor, baseSaveAbility) {
+  const psycheRank  = targetActor?.system?.abilities?.psyche?.rank  || "Typical";
+  const psycheValue = targetActor?.system?.abilities?.psyche?.value || rankValue(psycheRank);
+  let bestDef = { rank: psycheRank, value: psycheValue, source: "Psyche" };
+
+  if (!targetActor?.items) return bestDef;
+  if (baseSaveAbility !== "psyche") return bestDef;
+
+  const powers = targetActor.items.filter(i => i.type === "power" && i.system?.isActive !== false);
+
+  // 1) Psi-Screen — use before any other (RAW)
+  const psiScreen = powers.find(p => {
+    const n = (p.name || "").toLowerCase();
+    return n.includes("psi-screen") || n.includes("psi screen") || n.includes("psiscreen");
+  });
+  if (psiScreen) {
+    const pv = psiScreen.system.value || rankValue(psiScreen.system.rank || "Typical");
+    if (pv > bestDef.value) {
+      bestDef = { rank: psiScreen.system.rank || "Typical", value: pv, source: psiScreen.name };
+    }
+  }
+
+  // 2) Mental Powers — may use Power rank instead of Psyche (only if no Psi-Screen)
+  if (!psiScreen) {
+    const mentalRes = powers.find(p => {
+      const n = (p.name || "").toLowerCase();
+      return n.includes("mental resistance") || n.includes("resist mental");
+    });
+    if (mentalRes) {
+      const mv = mentalRes.system.value || rankValue(mentalRes.system.rank || "Typical");
+      if (mv > bestDef.value) {
+        bestDef = { rank: mentalRes.system.rank || "Typical", value: mv, source: mentalRes.name };
+      }
+    }
+    const mentalPowers = powers.filter(p => {
+      const cat = (p.system.category || "").toLowerCase();
+      return cat === "mentalpowers" || cat === "mental powers" || cat === "mental";
+    });
+    for (const mp of mentalPowers) {
+      const mv = mp.system.value || rankValue(mp.system.rank || "Typical");
+      if (mv > bestDef.value) {
+        bestDef = { rank: mp.system.rank || "Typical", value: mv, source: mp.name };
+      }
+    }
+  }
+
+  return bestDef;
+}
+
+/**
+ * Scan target for active Force Field power.
+ * Returns { rank, value, source } or null.
+ */
+export function scanForceField(targetActor) {
+  if (!targetActor?.items) return null;
+  const ff = targetActor.items.find(i =>
+    i.type === "power" &&
+    (i.name || "").toLowerCase().includes("force field") &&
+    i.system?.isActive !== false
+  );
+  if (!ff) return null;
+  const ffValue = ff.system.value || rankValue(ff.system.rank || "Typical");
+  return { rank: ff.system.rank || "Typical", value: ffValue, source: ff.name };
+}
+
 export function debugLog(...args) {
   try {
     if (game.settings.get("msh-faserip", "debugMode")) {
