@@ -625,7 +625,7 @@ export async function applyHeld(actor, { holderUuid = null, holderName = "", rou
 export async function applyEscaped(actor, opts = {}) {
   return applyEffect(actor, {
     name: "Just Escaped (half move, no actions)",
-    img: "icons/svg/running.svg",
+    img: "icons/svg/wing.svg",
     rounds: 1,
     changes: [
       { key: "system.combatMods.movementMult", mode: AE_MODE.OVERRIDE, value: "0.5", priority: 20 },

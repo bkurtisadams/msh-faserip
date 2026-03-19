@@ -1,4 +1,5 @@
-// scripts/modules/actions/escaping-action.js v2.3.0 - 2026-03-15
+// scripts/modules/actions/escaping-action.js v3.0.0 - 2026-03-18
+// v3.0.0: Restyle dialog to frp-dlg system — blue header, wireCSPanel, frp-fx-grid with tooltips
 // v2.3.0: Apply post-escape effects — Yellow: half move + no actions. Red: half move + -2CS.
 //         Exclude selfPenaltyCS from escape rolls (escape is wrestling, not "normal action")
 // v2.2.0: Consistency fixes — add mode selector, fix remember settings to localStorage pattern
@@ -25,7 +26,8 @@ import {
   buildModeSelector,
   setupModeSelector
 } from "./action-utils.js";
-import { extractKarmaFromDialog, getAvailableKarma, getMinimumKarmaCommitment } from "../dice/dice-roller.js";
+import { extractKarmaFromDialog, getAvailableKarma, getMinimumKarmaCommitment, setupKarmaControlHandlers } from "../dice/dice-roller.js";
+import { buildCSRow, wireCSPanel } from "./cs-modifiers.js";
 import { getAttackShiftBreakdown, getDefenseShiftBreakdown } from "../effects/effect-modifiers.js";
 import { applyEscaped, applyReversed } from "../effects/effect-engine.js";
 
@@ -213,137 +215,183 @@ export class EscapingAction extends AttackAction {
     const savedRemember = localStorage.getItem(lsRememberKey) === "1";
     const savedSkipDice = localStorage.getItem(lsSkipKey) === "1";
     const savedShift = savedRemember ? (await actor.getFlag("msh-faserip", "lastEscapeShift") ?? 0) : 0;
-    const savedSpendKarma = false; // Always default to unchecked
     const savedCsNotes = savedRemember ? ((await actor.getFlag("msh-faserip", "lastEscapeCsNotes")) || "") : "";
 
-    // Karma data for inline display
+    // Karma data
     const availableKarma = getAvailableKarma(actor);
     const minKarma = getMinimumKarmaCommitment(actor);
     const hasKarma = availableKarma > 0;
     const savedShiftVal = Number(this.opts?.shift ?? savedShift);
 
-    const dialogHtml = `
-      ${buildModeSelector({ mode: "semi" })}
+    // CS row from shared utility
+    const csRowHtml = buildCSRow({ savedCS: savedShiftVal, abilityRank: strength.rank });
 
-      <!-- Context: Opponent + Your stats side by side -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
-        <div style="background:#f5f5f5;padding:8px;border-radius:3px;">
-          <div style="font-weight:600;color:#666;font-size:.8em;text-transform:uppercase;">Holding You</div>
-          <input type="text" name="opponentName" style="width:100%;margin-top:4px;font-weight:600;" placeholder="Who is holding you?" value="${prefillOpp}">
-          <div style="margin-top:4px;">
-            <span style="color:#666;font-size:.85em;">STR:</span>
-            <input type="text" name="opponentStr" style="width:80px;" placeholder="Excellent" value="${prefillOppStr}">
+    // Blue header gradient for escape
+    const headerGrad = 'linear-gradient(90deg, #4682B4 0%, #2c5f8a 100%)';
+
+    const dialogHtml = `
+    <div class="frp-dlg">
+      <!-- Header banner -->
+      <div class="frp-header-v3" style="background: ${headerGrad};">
+        <span class="h-actor">${actor.name}</span>
+        <span class="h-paren">(</span>
+        <span class="h-stat">
+          <span class="h-stat-label">Strength</span>
+          <span class="h-stat-rank">${strength.rank} ${strength.value}</span>
+        </span>
+        <span class="h-paren">)</span>
+        ${prefillOpp ? `<span class="h-verb">escapes</span><span class="h-target">${prefillOpp}</span>` : ''}
+      </div>
+
+      <!-- Opponent context -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:5px;">
+        <div class="frp-box">
+          <div class="frp-box-label">Holding You</div>
+          <input type="text" name="opponentName" class="frp-cs-notes" style="margin-top:0;font-weight:600;"
+                 placeholder="Who is holding you?" value="${prefillOpp}">
+          <div style="margin-top:3px;display:flex;align-items:center;gap:4px;">
+            <span style="font-family:'Oswald',sans-serif;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.3px;color:#777;">STR:</span>
+            <input type="text" name="opponentStr" class="frp-cs-notes" style="margin-top:0;width:80px;"
+                   placeholder="Excellent" value="${prefillOppStr}">
           </div>
         </div>
-        <div style="background:#f5f5f5;padding:8px;border-radius:3px;">
-          <div style="font-weight:600;color:#666;font-size:.8em;text-transform:uppercase;">Escape</div>
-          <div style="font-weight:600;">Strength: ${strength.rank}</div>
-          <div style="color:#666;">Rank Value: ${strength.value}</div>
+        <div class="frp-box">
+          <div class="frp-box-label">Your Escape</div>
+          <div style="font-family:'Oswald',sans-serif;font-weight:700;font-size:14px;">${strength.rank}</div>
+          <div style="font-size:12px;color:#444;">Rank Value: ${strength.value}</div>
         </div>
       </div>
 
-      <!-- Modifiers Row -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;font-size:.9em;">
-        <div class="cs-field" style="display:flex;align-items:center;gap:4px;padding:4px 6px;border-radius:3px;${savedShiftVal < 0 ? 'background:#ffebee;border:1px solid #ef5350;' : savedShiftVal > 0 ? 'background:#e8f5e9;border:1px solid #66bb6a;' : 'border:1px solid transparent;'}">
-          <label style="font-weight:600;">CS:</label>
-          <input type="number" name="shift" value="${savedShiftVal}" style="width:35px;padding:3px;text-align:center;box-sizing:border-box;">
-          <span style="color:#666;">→</span>
-          <strong id="shifted-rank-display" style="${savedShiftVal < 0 ? 'color:#c62828;' : savedShiftVal > 0 ? 'color:#2e7d32;' : ''}">${shiftRank(strength.rank, savedShiftVal)}</strong>
-          <button type="button" class="cs-reset" style="visibility:${savedShiftVal !== 0 ? 'visible' : 'hidden'};padding:1px 5px;font-size:.85em;cursor:pointer;border:1px solid #999;border-radius:2px;background:#eee;" title="Reset to 0">×</button>
-        </div>
-        <div class="karma-field" style="display:flex;align-items:center;gap:4px;padding:4px 6px;border-radius:3px;${hasKarma ? 'background:#e3f2fd;border:1px solid #90caf9;' : ''}">
+      <!-- CS row -->
+      ${csRowHtml}
+
+      <!-- CS Notes -->
+      <input type="text" name="csNotes" class="frp-cs-notes" style="margin-bottom:5px;"
+             placeholder="e.g., Acrobatics +1CS, Slippery -2CS" value="${savedCsNotes}">
+
+      <!-- Karma -->
+      <div class="frp-box frp-opts-box">
+        <div class="frp-opt-row${hasKarma ? ' inactive' : ' inactive'}">
           ${hasKarma ? `
-            <label style="display:flex;align-items:center;gap:4px;cursor:pointer;">
-              <input type="checkbox" id="spend-karma" name="spendKarma">
-              <span style="font-weight:600;">Karma:</span>
-            </label>
-            <span title="Available: ${availableKarma} | Min commitment: ${minKarma} | Amount chosen after roll" style="padding:1px 4px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${availableKarma}</span>
-            <span style="color:#999;font-size:.8em;">(min ${minKarma})</span>
-          ` : `<span style="color:#999;">No karma</span>`}
+            <label><input type="checkbox" id="spend-karma" name="spendKarma"> <span class="frp-opt-label blue">Karma</span></label>
+            <span class="frp-karma-pool"><strong>${availableKarma}</strong> avail (min ${minKarma})</span>
+          ` : `<span style="font-size:12px;color:#999;">No karma available</span>`}
         </div>
       </div>
 
-      <!-- CS Notes Row -->
-      <div id="cs-notes-row" style="margin-bottom:6px;">
-        <input type="text" name="csNotes" id="cs-notes-input" placeholder="e.g., Acrobatics +1CS, Slippery -2CS" value="${savedCsNotes}" style="width:100%;padding:4px 8px;border:1px solid #ccc;border-radius:3px;font-size:.9em;box-sizing:border-box;">
-      </div>
-
-      <!-- Results Reference -->
-      <div style="padding:8px;background:#f5f5f5;border:1px solid #ddd;border-radius:3px;margin-bottom:8px;">
-        <div style="font-weight:bold;margin-bottom:4px;">Escaping Results</div>
-        <div style="font-size:.85em;color:#555;">
-          <strong>Miss (W):</strong> Still held; no actions this turn.<br>
-          <strong>Escape (G/Y):</strong> Free; half move; no other actions.<br>
-          <strong>Reverse (Red):</strong> Free + grapple back or act at -2CS.
-        </div>
+      <!-- Effect preview -->
+      <div class="frp-fx-grid">
+        <div class="frp-fx-cell w" title="White: still held; no actions this turn.">Miss</div>
+        <div class="frp-fx-cell g" title="Green: still held; no actions this turn.">Miss</div>
+        <div class="frp-fx-cell y" title="Yellow: free; half move; no other actions.">Escape</div>
+        <div class="frp-fx-cell r" title="Red: free + grapple back or act at -2CS.">Reverse</div>
       </div>
 
       <!-- Footer -->
-      <div id="msh-bottom-controls" style="display:flex;justify-content:space-between;align-items:center;padding-top:8px;border-top:1px solid #ddd;">
-        <label><input type="checkbox" name="remember" ${savedRemember ? 'checked' : ''}> Remember</label>
-        <label><input type="checkbox" name="skipDice" ${savedSkipDice ? 'checked' : ''}> Skip dice</label>
+      <div class="frp-foot">
+        <div class="frp-foot-btns">
+          <button type="button" class="frp-btn-roll" id="frp-roll">Roll</button>
+          <button type="button" class="frp-btn-cancel" id="frp-cancel">Cancel</button>
+        </div>
+        <div class="frp-foot-checks">
+          <label><input type="checkbox" name="remember" ${savedRemember ? 'checked' : ''}> Remember</label>
+          <label><input type="checkbox" name="skipDice" ${savedSkipDice ? 'checked' : ''}> Skip dice</label>
+        </div>
       </div>
+    </div>
     `;
 
     return new Promise((resolve) => {
-      new Dialog({
+      let _resolved = false;
+      let _csState = null;
+      const dlg = new Dialog({
         title: `Escape: ${actor.name}`,
         content: dialogHtml,
-        buttons: {
-          roll: {
-            label: "Roll",
-            callback: async (html) => {
-              const $ = (s) => html.find(s);
-              const { spendKarma } = extractKarmaFromDialog(html);
-              const result = {
-                opponentName: String($('[name="opponentName"]').val() || "Opponent"),
-                opponentStr: String($('[name="opponentStr"]').val() || ""),
-                opponentUuid: prefillOppUuid,
-                shift: Number($('[name="shift"]').val() || 0),
-                csNotes: String($('[name="csNotes"]').val() || ""),
-                spendKarma,
-                remember: !!$('[name="remember"]').is(':checked'),
-                skipDice: !!$('[name="skipDice"]').is(':checked')
-              };
-              
-              // Save remember/skipDice to localStorage
-              try {
-                localStorage.setItem(lsRememberKey, result.remember ? "1" : "0");
-                localStorage.setItem(lsSkipKey, result.skipDice ? "1" : "0");
-              } catch (_e) {}
-              
-              // Persist settings if requested (karma checkbox never persisted)
-              if (result.remember) {
-                await actor.setFlag("msh-faserip", "lastEscapeShift", result.shift);
-                await actor.setFlag("msh-faserip", "lastEscapeCsNotes", result.csNotes || "");
-              }
-              
-              resolve(result);
+        buttons: {},
+        render: async (html) => {
+          setupKarmaControlHandlers(html);
+          const $dialog = html.closest('.dialog');
+
+          $dialog.find('.dialog-buttons').hide();
+
+          // Mode selector in titlebar
+          const $titlebar = $dialog.find('.window-title, .dialog-title').first();
+          if ($titlebar.length) {
+            const modeHtml = buildModeSelector({ mode: "semi" });
+            const $modeWrap = $('<span class="frp-titlebar-mode"></span>').append(modeHtml);
+            $titlebar.after($modeWrap);
+          }
+          await setupModeSelector(actor, $dialog, this.opts || {}, "lastEscapingMode");
+
+          if ($dialog.length) {
+            $dialog.css('width', '360px');
+            $dialog[0].style.height = 'auto';
+          }
+
+          // Wire CS panel
+          _csState = wireCSPanel(html, {
+            abilityRank: strength.rank,
+            onUpdate: () => {
+              if ($dialog.length) $dialog[0].style.height = 'auto';
             }
-          },
-          cancel: { label: "Cancel", callback: () => resolve(null) }
-        },
-        default: "roll",
-        render: (html) => {
-          setupModeSelector(actor, html, this.opts || {}, "lastEscapingMode");
-          // CS field handlers
-          const $shift = html.find('[name="shift"]');
-          const $csField = html.find('.cs-field');
-          const $rankDisplay = html.find('#shifted-rank-display');
-          const $csReset = html.find('.cs-reset');
-          const updateCS = () => {
-            const s = Number($shift.val()) || 0;
-            const shifted = shiftRank(strength.rank, s);
-            $rankDisplay.text(shifted);
-            $rankDisplay.css('color', s < 0 ? '#c62828' : s > 0 ? '#2e7d32' : '');
-            $csField.css('background', s < 0 ? '#ffebee' : s > 0 ? '#e8f5e9' : '');
-            $csField.css('border-color', s < 0 ? '#ef5350' : s > 0 ? '#66bb6a' : 'transparent');
-            $csReset.css('visibility', s !== 0 ? 'visible' : 'hidden');
-          };
-          $shift.on('input', updateCS);
-          $csReset.on('click', () => { $shift.val(0); updateCS(); });
+          });
+
+          // Auto-focus Roll button
+          html.find('#frp-roll').focus();
+
+          // Enter key -> Roll
+          $dialog.on('keydown', (e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              e.stopPropagation();
+              html.find('#frp-roll').trigger('click');
+            }
+          });
+
+          // Roll button
+          html.find('#frp-roll').on('click', async () => {
+            if (_resolved) return;
+            _resolved = true;
+            const $ = (s) => html.find(s);
+            const { spendKarma } = extractKarmaFromDialog(html);
+            const result = {
+              opponentName: String($('[name="opponentName"]').val() || "Opponent"),
+              opponentStr: String($('[name="opponentStr"]').val() || ""),
+              opponentUuid: prefillOppUuid,
+              shift: Number($('[name="shift"]').val() || 0),
+              csNotes: String($('[name="csNotes"]').val() || ""),
+              spendKarma,
+              remember: !!$('[name="remember"]').is(':checked'),
+              skipDice: !!$('[name="skipDice"]').is(':checked')
+            };
+            
+            // Save remember/skipDice to localStorage
+            try {
+              localStorage.setItem(lsRememberKey, result.remember ? "1" : "0");
+              localStorage.setItem(lsSkipKey, result.skipDice ? "1" : "0");
+            } catch (_e) {}
+            
+            // Persist settings if requested
+            if (result.remember) {
+              await actor.setFlag("msh-faserip", "lastEscapeShift", result.shift);
+              await actor.setFlag("msh-faserip", "lastEscapeCsNotes", result.csNotes || "");
+            }
+            
+            dlg.close();
+            resolve(result);
+          });
+
+          // Cancel button
+          html.find('#frp-cancel').on('click', () => {
+            if (_resolved) return;
+            _resolved = true;
+            dlg.close();
+            resolve(null);
+          });
+
           applyCapabilitiesToDialog(html, "escaping", { actor });
-        }
+        },
+        close: () => { if (!_resolved) resolve(null); }
       }).render(true);
     });
   }
