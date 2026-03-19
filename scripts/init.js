@@ -51,8 +51,7 @@ import { rollPower } from './modules/actions/power-router.js';
 import { rollContact } from './modules/actions/contact-action.js';
 //import { rollUniversalTable } from './universalTable.js';  // deprecated
 import { rollUniversalTable } from './modules/dice/universal-table.js';
-import { openUniversalTableDialog } from './rolls.js';
-import { rollUniversalAction } from './rolls.js';
+import { openUniversalTableDialog } from './universal-table-dialog.js';
 import { FaseripInitiative } from './faserip-initiative.js';
 import { CombatHandler } from './combat-handler.js';
 import { initializeSlamHandlers } from './charge-damage.js';
