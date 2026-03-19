@@ -384,24 +384,33 @@ export class CheckAction extends BaseAction {
               flavor: `${targetName} ${customEffectName} Duration (1d10)`
             });
             
-            // Create custom effect
-            await Effects.applyEffect(saveActor, {
-              name: customEffectName,
-              img: "icons/svg/unconscious.svg",
-              rounds: duration,
-              originUuid: actor.uuid,
-              flags: {
-                "msh-faserip": {
-                  type: "mental-power",
-                  powerName: powerName,
-                  sourceUuid: actor.uuid
-                },
-                meta: {
-                  unitLabel: "round",
-                  unitLabelPlural: "rounds"
+            // Route Nullified through applyNullified for power suppression
+            if (customEffectName.toLowerCase() === "nullified") {
+              await Effects.applyNullified(saveActor, {
+                rounds: duration,
+                originUuid: actor.uuid,
+                selfNullify: false
+              });
+            } else {
+              // Create custom effect (Unconscious, Controlled, etc.)
+              await Effects.applyEffect(saveActor, {
+                name: customEffectName,
+                img: "icons/svg/unconscious.svg",
+                rounds: duration,
+                originUuid: actor.uuid,
+                flags: {
+                  "msh-faserip": {
+                    type: "mental-power",
+                    powerName: powerName,
+                    sourceUuid: actor.uuid
+                  },
+                  meta: {
+                    unitLabel: "round",
+                    unitLabelPlural: "rounds"
+                  }
                 }
-              }
-            });
+              });
+            }
             
             // Chat message
             // Chat message with color-coded result
@@ -687,20 +696,29 @@ export class CheckAction extends BaseAction {
         const targetUuid = this.opts?.prefill?.targetUuid || choice.targetUuid || "";
         const saveActor = await this._resolveTokenActor(targetUuid);
         if (saveActor) {
-          await Effects.applyEffect(saveActor, {
-            name: customEffectName,
-            img: "icons/svg/unconscious.svg",
-            rounds: duration,
-            originUuid: actor.uuid,
-            flags: {
-              "msh-faserip": {
-                type: "mental-power",
-                powerName: powerName,
-                sourceUuid: actor.uuid
-              },
-              meta: { unitLabel: "round", unitLabelPlural: "rounds" }
-            }
-          });
+          // Route Nullified through applyNullified for power suppression
+          if (customEffectName.toLowerCase() === "nullified") {
+            await Effects.applyNullified(saveActor, {
+              rounds: duration,
+              originUuid: actor.uuid,
+              selfNullify: false
+            });
+          } else {
+            await Effects.applyEffect(saveActor, {
+              name: customEffectName,
+              img: "icons/svg/unconscious.svg",
+              rounds: duration,
+              originUuid: actor.uuid,
+              flags: {
+                "msh-faserip": {
+                  type: "mental-power",
+                  powerName: powerName,
+                  sourceUuid: actor.uuid
+                },
+                meta: { unitLabel: "round", unitLabelPlural: "rounds" }
+              }
+            });
+          }
         }
 
         mentalPowerExtraHtml = `<div style="margin-top:6px;color:#c62828;font-weight:bold;">

@@ -987,6 +987,25 @@ export function installActionChatHandlers() {
       // Prefill every currently targeted token (area handling — RAW affects all within range; we use selection)
       const targets = Array.from(game.user?.targets ?? []);
       const prefill = {};
+
+      // Resolve save actor: prefer flagged defender, then targeted token, then fall back to attacker
+      let saveActor = null;
+      const defUuid = f?.defenderUuid || f?.targetUuid || "";
+      if (defUuid) {
+        try {
+          const doc = await fromUuid(defUuid);
+          saveActor = doc?.actor ?? doc ?? null;
+        } catch (_) {}
+      }
+      if (!saveActor && targets.length === 1) {
+        saveActor = targets[0]?.actor ?? null;
+      }
+      // If still no save actor, this is wrong but don't block — fall back to attacker with a warning
+      if (!saveActor) {
+        console.warn("[FASERIP WARN] Force Save: no target found, falling back to attacker. Select a target token.");
+        saveActor = ownerActor;
+      }
+
       if (targets.length === 1) {
         const t = targets[0];
         prefill.targetName    = t.name;
@@ -994,10 +1013,16 @@ export function installActionChatHandlers() {
         prefill.targetEndRank = t.actor?.system?.abilities?.[ability]?.rank || "Good";
         prefill.dmgThrough    = 0;      // saves don't require penetrating damage
         prefill.attackForm    = "mental";
+      } else if (saveActor && saveActor !== ownerActor) {
+        prefill.targetName    = saveActor.name;
+        prefill.targetUuid    = saveActor.uuid ?? "";
+        prefill.targetEndRank = saveActor.system?.abilities?.[ability]?.rank || "Good";
+        prefill.dmgThrough    = 0;
+        prefill.attackForm    = "mental";
       }
 
       await ActionDispatcher.roll("power-save", {
-        actor: ownerActor,
+        actor: saveActor,
         abilityName: ability,
         opts: {
           prefill,

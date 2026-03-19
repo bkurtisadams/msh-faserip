@@ -1,6 +1,6 @@
-// scripts/modules/effects/effect-engine.js v1.10.0 - 2026-03-15
-// v1.10.0: Add applyEscaped (half move, no actions) and applyReversed (half move, -2CS)
-//          for post-escape wrestling results
+// scripts/modules/effects/effect-engine.js v1.11.0 - 2026-03-19
+// v1.11.0: Add applyNullified / restoreNullifiedPowers — suppress inborn powers on nullification,
+//          restore on effect removal. Stores suppressed power IDs in effect flags.
 // v1.5.0: Fix applyEvade - add canAct:false, nest flags under SCOPE, create separate bonus effect
 //         Fix applyBlock - add canAct:false, nest flags under SCOPE, remove incorrect movementMult
 // v1.4.0: Fix applyEvade - properly track evadeSuccessful/autoHit flags, remove incorrect combat mod changes
@@ -908,5 +908,92 @@ export async function processRegeneration(worldTime, dt = 0) {
     await processOngoingEffects(worldTime, dt);
   } catch (e) {
     console.error("[FASERIP ERROR] Failed to delegate to ongoing engine:", e);
+  }
+}
+
+/**
+ * Apply Nullified effect — suppresses all inborn (source === "natural") powers.
+ * Stores suppressed power IDs in effect flags for restoration on removal.
+ * @param {Actor} actor - target actor
+ * @param {object} opts
+ * @param {number} [opts.rounds=10] - duration (1-10 rounds, or while in range)
+ * @param {string} [opts.originUuid=null] - UUID of the nullifier
+ * @param {boolean} [opts.selfNullify=false] - if true, this is self-suppression (nullifier's own powers)
+ */
+export async function applyNullified(actor, { rounds = 10, originUuid = null, selfNullify = false } = {}, opts = {}) {
+  const resolvedActor = actor?.actor ?? actor;
+  if (!resolvedActor) return null;
+
+  // Find all inborn powers to suppress
+  const powersToSuppress = resolvedActor.items.filter(i => {
+    if (i.type !== "power") return false;
+    if (i.system?.isActive === false) return false; // already off
+    const src = (i.system?.source || "").toLowerCase();
+    if (src !== "natural") return false;
+    if (src !== "natural") return false;
+    // Don't suppress the Nullifying Power itself on the caster
+    if (selfNullify) {
+      const n = (i.name || "").toLowerCase();
+      if (n.includes("nullif")) return false;
+    }
+    return true;
+  });
+
+  const suppressedIds = powersToSuppress.map(p => p.id);
+
+  // Disable the powers
+  if (suppressedIds.length > 0) {
+    const updates = suppressedIds.map(id => ({ _id: id, "system.isActive": false }));
+    await resolvedActor.updateEmbeddedDocuments("Item", updates);
+    console.log(`[FASERIP] Nullified: disabled ${suppressedIds.length} inborn powers on ${resolvedActor.name}:`,
+      powersToSuppress.map(p => p.name).join(", "));
+  }
+
+  const label = selfNullify ? "Nullifying (Self-Suppressed)" : "Nullified";
+
+  return applyEffect(resolvedActor, {
+    name: label,
+    img: "icons/svg/cancel.svg",
+    rounds,
+    originUuid,
+    changes: [],
+    flags: {
+      [SCOPE()]: {
+        effectType: "nullified",
+        selfNullify,
+        suppressedPowerIds: suppressedIds,
+        status: { isNullified: true }
+      }
+    },
+    statuses: ["nullified"]
+  }, opts);
+}
+
+/**
+ * Restore powers that were suppressed by a Nullified effect.
+ * Called from deleteActiveEffect hook when a nullified effect is removed.
+ * @param {ActiveEffect} effect - the deleted effect
+ * @param {Actor} actor - the actor whose effect was removed
+ */
+export async function restoreNullifiedPowers(effect, actor) {
+  if (!actor) return;
+  const scope = SCOPE();
+  const flags = effect?.flags?.[scope] || {};
+  if (flags.effectType !== "nullified") return;
+
+  const suppressedIds = flags.suppressedPowerIds || [];
+  if (suppressedIds.length === 0) return;
+
+  // Only re-enable powers that still exist and are still off
+  const toRestore = suppressedIds.filter(id => {
+    const item = actor.items.get(id);
+    return item && item.system?.isActive === false;
+  });
+
+  if (toRestore.length > 0) {
+    const updates = toRestore.map(id => ({ _id: id, "system.isActive": true }));
+    await actor.updateEmbeddedDocuments("Item", updates);
+    const names = toRestore.map(id => actor.items.get(id)?.name).filter(Boolean);
+    console.log(`[FASERIP] Nullification ended: restored ${toRestore.length} powers on ${actor.name}:`, names.join(", "));
   }
 }

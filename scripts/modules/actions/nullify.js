@@ -1,7 +1,10 @@
-// scripts/modules/actions/nullify.js
+// scripts/modules/actions/nullify.js v1.1.0 - 2026-03-19
+// v1.1.0: Use applyNullified from effect-engine for power suppression.
+//         startAura now self-suppresses caster's inborn powers.
+//         stopAura restores caster's powers via effect deletion hook.
 // Foundry v13 helpers for the Nullification power (ES module)
 
-import { applyEffect } from "../effects/effect-engine.js";
+import { applyEffect, applyNullified } from "../effects/effect-engine.js";
 
 export const RANKS = [
   "Shift-0","Feeble","Poor","Typical","Good","Excellent","Remarkable","Incredible","Amazing",
@@ -16,16 +19,30 @@ export const isAuraMaintained = (actor) =>
   !!actor?.effects?.some(e => e.getFlag?.(scope(), "aura.nullify.active") === true);
 
 export async function startAura(actor, originUuid=null) {
+  // Create the aura maintenance effect on the caster
   const f = {}; f[scope()] = { aura: { nullify: { active: true } } };
-  return actor?.createEmbeddedDocuments("ActiveEffect", [{
-    name: "Nullification (Maintaining)", icon: "icons/svg/silenced.svg",
+  const auraResult = await actor?.createEmbeddedDocuments("ActiveEffect", [{
+    name: "Nullification (Maintaining)", img: "icons/svg/silenced.svg",
     origin: originUuid, disabled: false, flags: f
   }]);
+
+  // Self-suppress: disable caster's own inborn powers (except Nullifying Power itself)
+  await applyNullified(actor, { rounds: null, originUuid, selfNullify: true });
+
+  return auraResult;
 }
 
 export async function stopAura(actor) {
+  // Remove the aura maintenance effect
   const eff = actor?.effects?.find(e => e.getFlag?.(scope(), "aura.nullify.active") === true);
-  if (eff) return eff.delete();
+  if (eff) await eff.delete();
+
+  // Remove the self-suppression effect (restoreNullifiedPowers fires via deleteActiveEffect hook)
+  const selfNull = actor?.effects?.find(e => {
+    const flags = e.flags?.[scope()] || {};
+    return flags.effectType === "nullified" && flags.selfNullify === true;
+  });
+  if (selfNull) await selfNull.delete();
 }
 
 export function requiredColorFromDelta(delta) {
@@ -43,30 +60,16 @@ export function meetsThreshold(rolledColor, requiredColor) {
 }
 
 export async function applyNullifiedEffect(targetActor, { maintained=false, originUuid=null, rounds=null } = {}) {
-  // Use effect-engine for proper duration handling
   if (maintained) {
     // Maintained aura = no duration (infinite until concentration broken)
-    const f = {}; f[scope()] = { status: { nullified: true } };
-    return applyEffect(targetActor, {
-      name: "Nullified (Maintained)",
-      img: "icons/svg/silenced.svg",
-      originUuid,
-      flags: f
-    });
+    return applyNullified(targetActor, { rounds: null, originUuid, selfNullify: false });
   }
   
   // Temporary nullification = roll 1d10 for rounds
   const roll = await (new Roll("1d10")).evaluate();
   const r = rounds ?? roll.total ?? 10;
   
-  const f = {}; f[scope()] = { status: { nullified: true } };
-  return applyEffect(targetActor, {
-    name: "Nullified",
-    img: "icons/svg/silenced.svg",
-    rounds: r,  // Let effect-engine handle conversion to proper duration
-    originUuid,
-    flags: f
-  });
+  return applyNullified(targetActor, { rounds: r, originUuid, selfNullify: false });
 }
 
 /** Resolve save & apply effect on failure for a single target. */

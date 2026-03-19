@@ -2118,16 +2118,29 @@ Hooks.on("createActiveEffect", (effect, options, userId) => {
 const _pendingDeleteActors = new Map();
 Hooks.on("preDeleteActiveEffect", (effect, options, userId) => {
   if (!game.user.isGM) return;
-  if (!effect.changes?.some(c => c.key?.startsWith("faserip.token."))) return;
+  const hasTokenChanges = effect.changes?.some(c => c.key?.startsWith("faserip.token."));
+  const scope = globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faserip";
+  const isNullified = effect.flags?.[scope]?.effectType === "nullified";
+  if (!hasTokenChanges && !isNullified) return;
   const actor = _resolveEffectActor(effect);
   if (actor) _pendingDeleteActors.set(effect.id, actor);
 });
 
-Hooks.on("deleteActiveEffect", (effect, options, userId) => {
+Hooks.on("deleteActiveEffect", async (effect, options, userId) => {
   if (!game.user.isGM) return;
   const actor = _pendingDeleteActors.get(effect.id) ?? _resolveEffectActor(effect);
   _pendingDeleteActors.delete(effect.id);
   if (actor) _scheduleReconcile(actor);
+
+  // Restore powers suppressed by Nullified effect
+  if (actor) {
+    try {
+      const { restoreNullifiedPowers } = await import("./modules/effects/effect-engine.js");
+      await restoreNullifiedPowers(effect, actor);
+    } catch (e) {
+      console.error("[FASERIP ERROR] Failed to restore nullified powers:", e);
+    }
+  }
 });
 
 // Item added/removed from actor (carries effects with it)
