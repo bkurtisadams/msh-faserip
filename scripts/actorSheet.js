@@ -1,4 +1,5 @@
-// actorSheet.js v2.2.3 - 2026-03-15
+// actorSheet.js v2.2.4 - 2026-03-18
+// v2.2.4: Add Ctrl+Wheel zoom on character sheet (shared sheet-zoom utility)
 // v2.2.3: Targeted _updateObject guard — only blocks formData values that exactly match
 //         what the shift display code would have injected (shifted rank name + standard
 //         rank number). Custom ability values within a rank range pass through normally.
@@ -27,6 +28,7 @@ import { ChargenUIManager } from './chargen.js';
 import { generateKarmaControlsHTML, showKarmaDecisionDialog, getAvailableKarma } from './modules/dice/dice-roller.js';
 import { MovementFeats } from './movement-feats.js';
 import { showAbilityFeatDialog, determineFeatRequirement, checkFeatSuccess } from './modules/actions/ability-feat-dialog.js';
+import { initSheetZoom } from './modules/ui/sheet-zoom.js';
 
 
 function getPopularityRankWithRange(value, context) {
@@ -839,6 +841,9 @@ export class FaseripActorSheet extends ActorSheet {
   // In actorSheet.js, add to the activateListeners function
   activateListeners(html) {
     super.activateListeners(html);
+
+    // ── Ctrl+Wheel zoom on sheet ──
+    initSheetZoom(this);
 
     // Inline item-field edits (e.g. shotsRemaining count on equipment rows)
     html.find('.item-field').change(async ev => {

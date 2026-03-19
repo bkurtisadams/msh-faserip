@@ -1,5 +1,6 @@
 // headquartersSheet.js v2.0.0 - 2026-03-06
 import { BUILDING_TYPES, BUILDING_TYPE_MAP, ROOM_PACKAGES, STAFF_ROLES, SIZE_ROOMS } from "./hq-constants.js";
+import { initSheetZoom } from './modules/ui/sheet-zoom.js';
 
 const RANKS = [
   "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent",
@@ -142,6 +143,7 @@ export class FaseripHeadquartersSheet extends ItemSheet {
 
   activateListeners(html) {
     super.activateListeners(html);
+    initSheetZoom(this);
 
     // Cancel button
     html.find('.cancel-button').click(() => this.close());
