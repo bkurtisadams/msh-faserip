@@ -204,6 +204,10 @@ export class BluntAttackAction extends AttackAction {
     if (savedSource === "weapon" && savedItemId) initDamageSrcVal = `weapon:${savedItemId}`;
     else if (savedSource === "object") initDamageSrcVal = "object";
 
+    // ── Fighting info for multi-attack FEAT panel ──
+    const fightingAbility = getAbilityInfo(actor, "fighting");
+    const fightingShort = RANK_ABBR[fightingAbility.rank] || fightingAbility.rank;
+
     // ── Dialog HTML — v3 Ultra Compact Layout ──
     const multiEnabled = savedMultiAttacks || savedMultiAdjacent;
     const dialogHtml = `
@@ -269,6 +273,12 @@ export class BluntAttackAction extends AttackAction {
           <label><input type="radio" name="multiCount" value="3" ${!savedMultiAdjacent && savedAttackCount === 3 ? 'checked' : ''} ${!multiEnabled ? 'disabled' : ''}> &times;3</label>
           <label><input type="radio" name="multiCount" value="adjacent" ${savedMultiAdjacent ? 'checked' : ''} ${!multiEnabled ? 'disabled' : ''}> Adj</label>
         </div>
+
+        <!-- Multi-Attack FEAT indicator (hidden unless Multi x2/x3 checked) -->
+        <div id="multi-feat-panel" style="display:none;padding:5px 8px;border-bottom:1px solid #e8e0d0;">
+          <div id="feat-result-bar" style="padding:4px 8px;border-radius:3px;font-size:12px;font-weight:600;text-align:center;"></div>
+        </div>
+
         <div class="frp-opt-row${!hasKarma ? ' inactive' : hasKarma ? ' inactive' : ''}">
           ${hasKarma ? `
             <label><input type="checkbox" id="spend-karma" name="spendKarma"> <span class="frp-opt-label blue">Karma</span></label>
@@ -328,9 +338,11 @@ export class BluntAttackAction extends AttackAction {
           const setLS = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
 
           // ── Wire CS panel from shared utility ──
+          let _updateFeatPanel = () => {};  // forward ref, set below
           _csState = wireCSPanel(html, {
             abilityRank: ability.rank,
             onUpdate: () => {
+              _updateFeatPanel();
               if ($dialog.length) $dialog[0].style.height = 'auto';
             }
           });
@@ -441,12 +453,16 @@ export class BluntAttackAction extends AttackAction {
             await actor.setFlag("msh-faserip", "csNotes", cs.csNotes);
 
             _resolved = true;
+            // For blunt, main CS IS the Fighting CS — use it for the FEAT
+            const effFightIdx = Math.max(0, Math.min(RANKS.indexOf(fightingAbility.rank) + cs.totalShift, RANKS.length - 1));
+            const effFightRank = RANKS[effFightIdx];
             resolve({
               src, itemId, objectName, objectRank, objectValue,
               shift: cs.totalShift, karma, spendKarma,
               pulledDamage, resultCap, skipDice, weaponMat, weaponName, damage, note,
               multiAttacks, attackCount, multiAdjacent,
-              csNotes: cs.csNotes
+              csNotes: cs.csNotes,
+              effectiveFightingRank: effFightRank
             });
             dlg.close();
           });
@@ -549,12 +565,52 @@ export class BluntAttackAction extends AttackAction {
             }
           });
 
+          // ── Multi-attack FEAT panel update ──
+          _updateFeatPanel = () => {
+            const enabled = html.find('#multi-enabled').is(':checked');
+            const countVal = html.find('[name="multiCount"]:checked').val() || "2";
+            const isMultiAttack = enabled && countVal !== "adjacent";
+            const $panel = html.find('#multi-feat-panel');
+
+            if (!isMultiAttack) { $panel.hide(); if ($dialog.length) $dialog[0].style.height = 'auto'; return; }
+            $panel.show();
+
+            const count = countVal === "3" ? 3 : 2;
+            const intensity = count >= 3 ? "Amazing" : "Remarkable";
+            // For blunt/edged the main CS applies to Fighting — use it for the FEAT too
+            const mainCS = _csState ? _csState.get().totalShift : 0;
+            const baseIdx = RANKS.indexOf(fightingAbility.rank);
+            const effIdx = Math.max(0, Math.min(baseIdx + mainCS, RANKS.length - 1));
+            const effRank = RANKS[effIdx];
+            const intIdx = RANKS.indexOf(intensity);
+            const diff = effIdx - intIdx;
+
+            const $bar = html.find('#feat-result-bar');
+            const effAbbr = RANK_ABBR[effRank] || effRank;
+            if (diff >= 3) {
+              $bar.css({ background: '#e8f5e9', color: '#2e7d32', border: '1px solid #a5d6a7' })
+                .text(`FEAT: Automatic — ${effAbbr} vs ${intensity}`);
+            } else if (diff <= -2) {
+              $bar.css({ background: '#ffebee', color: '#c62828', border: '1px solid #ef9a9a' })
+                .text(`FEAT: Impossible — ${effAbbr} vs ${intensity}`);
+            } else {
+              const need = diff > 0 ? "Green+" : diff === 0 ? "Yellow+" : "Red only";
+              $bar.css({ background: '#fff8e1', color: '#b8860b', border: '1px solid #ffe082' })
+                .text(`FEAT: ${need} — ${effAbbr} vs ${intensity}`);
+            }
+
+            if ($dialog.length) $dialog[0].style.height = 'auto';
+          };
+
           // Multi-attack toggle
           html.find('#multi-enabled').on('change', function() {
             const $row = $(this).closest('.frp-opt-row');
             $row.toggleClass('inactive', !this.checked);
             $row.find('[name="multiCount"]').prop('disabled', !this.checked);
+            _updateFeatPanel();
           });
+          html.find('[name="multiCount"]').on('change', _updateFeatPanel);
+          _updateFeatPanel();
 
           // Karma toggle
           html.find('#spend-karma').on('change', function() {
@@ -599,51 +655,61 @@ export class BluntAttackAction extends AttackAction {
     let multiAttackFeatResult = null;
     
     if (choice.multiAttacks) {
-      const fightingAbility = getAbilityInfo(actor, "fighting");
       const intensity = choice.attackCount === 2 ? "Remarkable" : "Amazing";
       
-      // Multi-attack FEAT uses raw Fighting rank — attack CS does not apply
-      const featResult = await this._rollFightingFeat(
-        actor, 
-        fightingAbility, 
-        intensity, 
-        choice.attackCount
-      );
+      // Use effective Fighting rank from dialog (includes auto-detected mods + manual FEAT CS)
+      const effFightRank = choice.effectiveFightingRank || fightingAbility.rank;
+      const featFightAbility = { ...fightingAbility, rank: effFightRank };
       
-      if (featResult?.cancelled) {
-        ui.notifications.info("Multi-attack cancelled.");
-        return;
-      }
-      
-      multiAttackFeatResult = { ...featResult, intensity, attackCount: choice.attackCount };
-      
-      let useConsolidated = false;
-      try {
-        useConsolidated = game.settings.get("msh-faserip", "consolidatedChatCards");
-      } catch (_e) { /* setting not registered yet */ }
-      
-      if (!useConsolidated) {
-        await ChatMessage.create({
-          speaker: ChatMessage.getSpeaker({ actor }),
-          content: `<div style="background:#eef6ff;border:1px solid #90caf9;border-radius:3px;padding:6px;margin:4px 0;">
-            <b>Multi-Attack FEAT:</b> ${intensity} — ${
-              featResult?.success ? "SUCCESS" : "FAIL"
-            } ${featResult?.auto ? "(Automatic)" : ""}</div>`
-        });
-      }
-
-      const featSuccess    = !!(featResult?.auto || featResult?.resultColor === "AUTO" || featResult?.success);
-      const featImpossible =  !!(featResult?.resultColor === "IMPOSSIBLE");
-      if (featSuccess && !featImpossible) {
-        actualAttackCount = choice.attackCount;
-        shiftBreakdown.multiAttack = -1;
-        choice.shift = (choice.shift || 0) - 1;
-        ui.notifications.info(`Multi-attack successful! Making ${actualAttackCount} attacks at -1CS each!`);
+      // Check if impossible — block without penalty
+      const effIdx = RANKS.indexOf(effFightRank);
+      const intIdx = RANKS.indexOf(intensity);
+      const diff = effIdx - intIdx;
+      if (diff <= -2) {
+        ui.notifications.warn(`Multi-attack impossible — ${effFightRank} Fighting vs ${intensity} intensity. Performing normal attack.`);
+        choice.multiAttacks = false;
       } else {
-        actualAttackCount = 1;
-        shiftBreakdown.multiAttack = -3;
-        choice.shift = (choice.shift || 0) - 3;
-        ui.notifications.warn(`Multi-attack FEAT failed! Only making 1 attack at -3CS.`);
+        const featResult = await this._rollFightingFeat(
+          actor, 
+          featFightAbility, 
+          intensity, 
+          choice.attackCount
+        );
+        
+        if (featResult?.cancelled) {
+          ui.notifications.info("Multi-attack cancelled.");
+          return;
+        }
+        
+        multiAttackFeatResult = { ...featResult, intensity, attackCount: choice.attackCount };
+        
+        let useConsolidated = false;
+        try {
+          useConsolidated = game.settings.get("msh-faserip", "consolidatedChatCards");
+        } catch (_e) {}
+        
+        if (!useConsolidated) {
+          await ChatMessage.create({
+            speaker: ChatMessage.getSpeaker({ actor }),
+            content: `<div style="background:#eef6ff;border:1px solid #90caf9;border-radius:3px;padding:6px;margin:4px 0;">
+              <b>Multi-Attack FEAT:</b> ${intensity} — ${
+                featResult?.success ? "SUCCESS" : "FAIL"
+              } ${featResult?.auto ? "(Automatic)" : ""}</div>`
+          });
+        }
+
+        const featSuccess = !!(featResult?.auto || featResult?.resultColor === "AUTO" || featResult?.success);
+        if (featSuccess) {
+          actualAttackCount = choice.attackCount;
+          shiftBreakdown.multiAttack = -1;
+          choice.shift = (choice.shift || 0) - 1;
+          ui.notifications.info(`Multi-attack successful! Making ${actualAttackCount} attacks at -1CS each!`);
+        } else {
+          actualAttackCount = 1;
+          shiftBreakdown.multiAttack = -3;
+          choice.shift = (choice.shift || 0) - 3;
+          ui.notifications.warn(`Multi-attack FEAT failed! Only making 1 attack at -3CS.`);
+        }
       }
     }
 

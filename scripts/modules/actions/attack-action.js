@@ -1132,6 +1132,8 @@ export class AttackAction extends BaseAction {
             <strong>${actor.name}</strong>${targetActor ? ` <span style="color:#666;">→</span> <strong style="color:#d32f2f;">${targetName}</strong>` : ''}
           </div>
           
+          ${multiAttackFeatHtml}
+          
           <!-- Ability + Roll + Result -->
           <div style="padding:2px 10px 6px;font-size:.9em;color:#555;">
             <div>${ability.name}: ${ability.rank}${shiftDisplay}</div>
@@ -1142,8 +1144,6 @@ export class AttackAction extends BaseAction {
               </span>
             </div>
           </div>
-          
-          ${multiAttackFeatHtml}
           
           ${evasionNote}
           ${killWarning}

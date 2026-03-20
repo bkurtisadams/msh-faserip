@@ -593,18 +593,8 @@ export class EnergyAction extends RangedAttackAction {
       ui.notifications.info(`Attacking ${game.user.targets.size} adjacent targets at -4CS!`);
     }
 
-    // Reload mode from flags
-    let globalMode = "semi";
-    try { globalMode = game.settings.get("msh-faserip", "defaultCombatMode") || "semi"; } catch (_) {}
-    const modeRank = { manual: 0, semi: 1, full: 2 };
-    const globalRank = modeRank[globalMode] ?? 1;
-    const savedMode = await actor.getFlag("msh-faserip", "lastEnergyMode") || "semi";
-    const savedRk = modeRank[savedMode] ?? 1;
-    this.opts.mode = savedRk <= globalRank ? savedMode : globalMode;
+    // Mode already set by setupModeSelector during dialog render
     const mode = this.opts.mode;
-    if (mode === "manual") { this.opts.autoApply = false; this.opts.showConfirm = false; }
-    else if (mode === "semi") { this.opts.autoApply = false; this.opts.showConfirm = true; }
-    else { this.opts.autoApply = true; this.opts.showConfirm = false; }
 
     // Build shift breakdown (range penalty baked into CS via auto sit tag)
     const shiftBreakdown = {

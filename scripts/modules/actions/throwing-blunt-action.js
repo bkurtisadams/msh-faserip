@@ -473,25 +473,8 @@ export class ThrowingBluntAction extends RangedAttackAction {
 
     if (!choice) return;
 
-    // Reload mode from flags — respect global mode ceiling
-    let globalMode = "semi";
-    try { globalMode = game.settings.get("msh-faserip", "defaultCombatMode") || "semi"; } catch (_) {}
-    const modeRank = { manual: 0, semi: 1, full: 2 };
-    const globalRank = modeRank[globalMode] ?? 1;
-    const savedMode = await actor.getFlag("msh-faserip", "lastThrowBluntMode") || "semi";
-    const savedRank = modeRank[savedMode] ?? 1;
-    this.opts.mode = savedRank <= globalRank ? savedMode : globalMode;
+    // Mode already set by setupModeSelector during dialog render
     const mode = this.opts.mode;
-    if (mode === "manual") {
-      this.opts.autoApply = false;
-      this.opts.showConfirm = false;
-    } else if (mode === "semi") {
-      this.opts.autoApply = false;
-      this.opts.showConfirm = true;
-    } else {
-      this.opts.autoApply = true;
-      this.opts.showConfirm = false;
-    }
 
     // Delegate to shared resolution pipeline
     const weaponItem = choice.weaponId ? actor.items.get(choice.weaponId) : null;
