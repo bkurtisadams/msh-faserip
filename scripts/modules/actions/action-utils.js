@@ -1,4 +1,7 @@
-// action-utils.js v1.7.2 - 2026-03-15
+// action-utils.js v1.7.3 - 2026-03-20
+// v1.7.3: Fix _applyFourColorKnockout: add canAct:false change, zeroHealth flag, export function.
+//         Pass mshReplacing on unconscious cleanup. Add fourColorRule check to hit-while-at-0-HP
+//         path (was always firing death save even for blunt attacks with four-color on).
 // v1.7.2: Fix measureAreasBetweenTokens — Math.round → Math.ceil so any fraction
 //         into the next area counts as that area for range penalty purposes
 // v1.7.1: Fix postKillSavePrompt E/S note to include throwing-edged,
@@ -1559,6 +1562,19 @@ export async function applyDamageToTargets({
 
       // ===== HANDLE DAMAGE TO ALREADY 0 HP TARGET =====
       if (before === 0 && netDamage > 0) {
+        const fourColor = game.settings.get("msh-faserip", "fourColorRule");
+        const isLethal = wasKillResult || forceKilling;
+
+        if (fourColor && !isLethal) {
+          // Four-Color Rule: blunt hit on unconscious target — no death save
+          console.log(`[FASERIP] Four-Color: hit on unconscious ${targetActor.name} (non-lethal) — no death save`);
+          await ChatMessage.create({
+            content: `<div style="background:#fff3e0;border:1px solid #ff9800;padding:8px;border-radius:3px;">
+              <strong>${targetActor.name}</strong> was hit while unconscious (non-lethal).
+              <div style="font-size:0.9em;color:#666;margin-top:4px;">Four-Color Rule: No death save from blunt/non-killing attack.</div>
+            </div>`
+          });
+        } else {
         console.log("⚠️ FASERIP | Hit on unconscious target:", targetActor.name, "- triggering death save");
         
         const mode = resolveCombatModeSafe(targetActor) || "manual";
@@ -1568,7 +1584,12 @@ export async function applyDamageToTargets({
           const { ActionDispatcher } = await import("./action-dispatcher.js");
           await ActionDispatcher.roll("death-save", { 
             actor: targetActor,
-            opts: { autoApply: true, showConfirm: false }
+            opts: { 
+              autoApply: true, 
+              showConfirm: false,
+              attackForm: attackForm,
+              fromZeroHealth: true
+            }
           });
         } else {
           // Manual/Semi mode - show button
@@ -1580,6 +1601,7 @@ export async function applyDamageToTargets({
             </div>`
           });
         }
+        } // end fourColor else
           
         results.push({
           actorUuid: targetActor?.uuid,
@@ -1805,17 +1827,20 @@ export async function postKillSavePrompt(actor, { attackForm = "edged", fromZero
  * Apply unconscious active effect for Four-Color Rule knockout.
  * Duration matches the normal stun mechanic (1d10 rounds).
  */
-async function _applyFourColorKnockout(actor, rounds) {
+export async function _applyFourColorKnockout(actor, rounds) {
   try {
     const existing = actor.effects.filter(e => e.statuses?.has?.("unconscious"));
-    for (const e of existing) await e.delete().catch(() => {});
+    for (const e of existing) await e.delete({ mshReplacing: true }).catch(() => {});
   } catch (_e) {}
   const inCombat = !!game.combat;
   const effectData = {
     name: `Unconscious (${rounds} rounds)`,
     icon: "icons/svg/unconscious.svg",
-    flags: { "msh-faserip": { isUnconscious: true, fromDeathSave: true, durationRounds: Number(rounds) } },
-    changes: [{ key: "system.status.unconscious", mode: CONST.ACTIVE_EFFECT_MODES.OVERRIDE, value: true }],
+    flags: { "msh-faserip": { isUnconscious: true, zeroHealth: true, fromDeathSave: true, durationRounds: Number(rounds) } },
+    changes: [
+      { key: "system.status.unconscious", mode: CONST.ACTIVE_EFFECT_MODES.OVERRIDE, value: true },
+      { key: "system.combatMods.canAct", mode: CONST.ACTIVE_EFFECT_MODES.OVERRIDE, value: "false" }
+    ],
     statuses: ["unconscious"],
     duration: inCombat
       ? { rounds: Math.max(1, Number(rounds)), startRound: game.combat?.round || 0 }

@@ -1,4 +1,6 @@
-// scripts/modules/actions/death-save-action.js v1.9.5 - 2026-03-15
+// scripts/modules/actions/death-save-action.js v1.9.6 - 2026-03-20
+// v1.9.6: Pass mshReplacing option when deleting existing unconscious effects in _createStunnedEffect
+//         so rest-system deleteActiveEffect hook doesn't trigger premature consciousness attempt.
 // v1.9.5: Fix _buildEnduranceLadder rank format: "Shift X" → "Shift-X" to match actor data
 // v1.9.4: Add canAct:false to Unconscious effect changes so existing canActorAct guard blocks attacks.
 // v1.7.0: Restyle card to match attack/check card layout (gray card, flex header, color badge, white result box)
@@ -326,10 +328,10 @@ export class DeathSaveAction extends BaseAction {
       const existing = actor.effects.filter(e => e.statuses?.has?.("unconscious"));
       if (existing.length) {
         if (game.user.isGM || actor.isOwner) {
-          await actor.deleteEmbeddedDocuments("ActiveEffect", existing.map(e => e.id));
+          await actor.deleteEmbeddedDocuments("ActiveEffect", existing.map(e => e.id), { mshReplacing: true });
         } else {
           const { runAsGM } = await import("../../gm-utils.js");
-          await runAsGM({ operation: "deleteEmbeddedDocuments", targetActorUuid: actor.uuid, args: ["ActiveEffect", existing.map(e => e.id)] });
+          await runAsGM({ operation: "deleteEmbeddedDocuments", targetActorUuid: actor.uuid, args: ["ActiveEffect", existing.map(e => e.id), { mshReplacing: true }] });
         }
       }
     } catch (err) {

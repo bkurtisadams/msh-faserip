@@ -1,4 +1,9 @@
-// init.js v1.11.0 - 2026-03-10
+// init.js v1.12.0 - 2026-03-20
+// v1.12.0: Fix death/dying/recovery bugs:
+//   - updateActor 0 HP handler now checks fourColorRule (was always firing death save)
+//   - updateCombat effect expiry no longer auto-restores health; delegates to rest-system
+//     attemptRegainConsciousness which rolls required Endurance FEAT per rules
+//   - updateWorldTime effect expiry now delegates wake-up to rest-system hook
 // v1.11.0: Fix light persistence bug — baseline flag storage now uses pipe-delimited keys
 //          to prevent Foundry flattenObject from corrupting dot-notation keys during setFlag.
 //          Per-actor debounce map replaces single global timer.
@@ -2773,6 +2778,28 @@ Hooks.on('updateActor', async (actor, updateData, options, userId) => {
       }
       console.log(`%cFASERIP | !!! ${actor.name} is at ${currentHealth} HP - triggering death save`, 'color: #ef5350; font-weight: bold');
 
+      // Four-Color Rule: skip death save unless the attack was lethal (kill result)
+      // Without attack context here, we can only check the setting — if fourColor is on
+      // and no kill result flag is pending, apply non-lethal knockout instead.
+      const fourColor = game.settings.get("msh-faserip", "fourColorRule");
+      const pendingKill = game.msh?._pendingKillResult?.[actor.id];
+      if (pendingKill) delete game.msh._pendingKillResult[actor.id];
+      const isLethal = !!pendingKill;
+
+      if (fourColor && !isLethal) {
+        console.log(`[FASERIP] Four-Color Rule active — non-lethal knockout for ${actor.name}`);
+        const stunDie = game.settings?.get?.("msh-faserip", "stunDurationDie") || "d10";
+        const durationRoll = await new Roll(`1${stunDie}`).evaluate();
+        const rounds = durationRoll.total;
+        const { _applyFourColorKnockout } = await import("./modules/actions/action-utils.js");
+        await _applyFourColorKnockout(actor, rounds);
+        await ChatMessage.create({
+          content: `<div style="background:#e3f2fd;border:1px solid #2196F3;padding:8px;border-radius:3px;">
+            <strong>${actor.name}</strong> is unconscious (0 Health) for ${rounds} round${rounds !== 1 ? "s" : ""}.
+            <div style="font-size:0.9em;color:#666;margin-top:4px;">Four-Color Rule: No death save (non-lethal).</div>
+          </div>`
+        });
+      } else {
       const mode = resolveCombatMode(actor) || "manual";
       console.log("FASERIP DEBUG | Combat mode resolved to:", mode);
 
@@ -2794,6 +2821,7 @@ Hooks.on('updateActor', async (actor, updateData, options, userId) => {
           </div>`
         });
       }
+      } // end fourColor else
 
       console.log("FASERIP | At 0 HP - death save will handle effects");
 
@@ -3026,39 +3054,11 @@ Hooks.on("updateCombat", async (combat, changed, diff, userId) => {
       }
       
       // Delete expired effects
+      // NOTE: Health restoration on wake-up is handled by the rest-system's
+      // deleteActiveEffect hook (attemptRegainConsciousness), which rolls the
+      // required Endurance FEAT per rules. Do NOT auto-restore health here.
       for (const { effect, reason } of toDelete) {
         console.log(`[FASERIP] Auto-expiring effect "${effect.name}" on ${a.name}: ${reason}`);
-        
-        // Check if this is an Unconscious effect from death save (0 HP knockout)
-        // If so, restore health to Endurance rank value when waking up
-        const scope = globalThis.MSH_FLAG_SCOPE || "msh-faserip";
-        const isFromDeathSave = effect.getFlag(scope, "fromDeathSave") || 
-                                (effect.getFlag(scope, "zeroHealth") && effect.getFlag(scope, "isUnconscious"));
-        const isDying = a.effects.some(e => e.getFlag(scope, "isDying"));
-        
-        if (isFromDeathSave && !isDying) {
-          // Character is waking up from 0 HP knockout (not dying)
-          // Restore health to Endurance rank value
-          const enduranceValue = a.system?.abilities?.endurance?.value || 8;
-          const currentHealth = a.system?.attributes?.health?.value || 0;
-          
-          console.log(`[FASERIP] ${a.name} waking up from knockout - restoring health to Endurance value (${enduranceValue})`);
-          
-          try {
-            await a.update({ "system.attributes.health.value": enduranceValue });
-            
-            // Post wake-up message
-            await ChatMessage.create({
-              speaker: ChatMessage.getSpeaker({ actor: a }),
-              content: `<div style="background:#e3f2fd;border:1px solid #90caf9;padding:8px;border-radius:3px;">
-                <strong>${a.name}</strong> regains consciousness!
-                <div style="margin-top:4px;font-size:.9em;color:#666;">Health restored to ${enduranceValue} (Endurance rank value).</div>
-              </div>`
-            });
-          } catch (err) {
-            console.error(`[FASERIP ERROR] Failed to restore health for ${a.name}:`, err);
-          }
-        }
         
         try { 
           await effect.delete(); 

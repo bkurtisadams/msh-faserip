@@ -1,4 +1,8 @@
-// scripts/modules/rest-system.js v1.3.0 - 2026-02-22
+// scripts/modules/rest-system.js v1.3.1 - 2026-03-20
+// v1.3.1: Fix attemptRegainConsciousness fail path: use seconds-based duration when out of combat
+//         so the retry unconscious effect properly expires via updateWorldTime handler.
+//         Add mshReplacing/mshIntentional guard to deleteActiveEffect hook to prevent
+//         premature consciousness attempts when unconscious effects are replaced (not expired).
 // v1.3.0: Add canAct:false + statuses:["unconscious"] to stabilization and consciousness-fail
 //         Unconscious effects so existing canActorAct guard blocks attacks.
 // Player-driven rest, recovery, and healing system for FASERIP
@@ -445,10 +449,9 @@ static async attemptRegainConsciousness(actor) {
           { key: "system.combatMods.canAct", mode: CONST.ACTIVE_EFFECT_MODES.OVERRIDE, value: "false" }
         ],
         statuses: ["unconscious"],
-        duration: {
-          rounds: rounds,
-          startRound: game.combat?.round || 0
-        }
+        duration: game.combat
+          ? { rounds: rounds, startRound: game.combat.round || 0 }
+          : { seconds: Math.max(1, rounds) * 6, startTime: game.time.worldTime }
       };
       
       await actor.createEmbeddedDocuments("ActiveEffect", [effectData]);
@@ -826,6 +829,11 @@ export function initRestSystem() {
     // Skip if this deletion is part of stabilizeDying — new unconscious timer
     // hasn't been created yet, so consciousness check would incorrectly pass
     if (options.mshStabilizing) return;
+    
+    // Skip if unconscious effect is being replaced (e.g. death-save-action creating
+    // a new unconscious effect, or a second hit triggering a new death save).
+    // The old effect is being cleaned up, not naturally expiring.
+    if (options.mshIntentional || options.mshReplacing) return;
     
     const actor = effect.parent;
     if (!actor || actor.documentName !== "Actor") return;
