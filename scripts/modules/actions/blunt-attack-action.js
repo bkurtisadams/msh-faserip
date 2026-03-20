@@ -602,11 +602,10 @@ export class BluntAttackAction extends AttackAction {
       const fightingAbility = getAbilityInfo(actor, "fighting");
       const intensity = choice.attackCount === 2 ? "Remarkable" : "Amazing";
       
-      const effectiveFightingRank = shiftRank(fightingAbility.rank, choice.shift || 0);
-      
+      // Multi-attack FEAT uses raw Fighting rank — attack CS does not apply
       const featResult = await this._rollFightingFeat(
         actor, 
-        { ...fightingAbility, rank: effectiveFightingRank }, 
+        fightingAbility, 
         intensity, 
         choice.attackCount
       );

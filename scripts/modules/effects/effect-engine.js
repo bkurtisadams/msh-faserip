@@ -930,7 +930,6 @@ export async function applyNullified(actor, { rounds = 10, originUuid = null, se
     if (i.system?.isActive === false) return false; // already off
     const src = (i.system?.source || "").toLowerCase();
     if (src !== "natural") return false;
-    if (src !== "natural") return false;
     // Don't suppress the Nullifying Power itself on the caster
     if (selfNullify) {
       const n = (i.name || "").toLowerCase();
@@ -949,6 +948,35 @@ export async function applyNullified(actor, { rounds = 10, originUuid = null, se
       powersToSuppress.map(p => p.name).join(", "));
   }
 
+  // Swap ability scores for powers with replacesAbility + depoweredRank
+  const rv = CONFIG.FASERIP?.rankValues || {};
+  const abilitySwaps = {}; // { ability: { originalRank, originalValue } }
+  const actorUpdates = {};
+
+  for (const power of powersToSuppress) {
+    const ability = (power.system?.replacesAbility || "").toLowerCase();
+    const depRank = power.system?.depoweredRank || "";
+    if (!ability || !depRank) continue;
+    if (abilitySwaps[ability]) continue; // already swapped by a prior power
+
+    const current = resolvedActor.system?.abilities?.[ability];
+    if (!current) continue;
+
+    abilitySwaps[ability] = {
+      originalRank: current.rank,
+      originalValue: current.value
+    };
+
+    const depValue = rv[depRank] || 0;
+    actorUpdates[`system.abilities.${ability}.rank`] = depRank;
+    actorUpdates[`system.abilities.${ability}.value`] = depValue;
+    console.log(`[FASERIP] Nullified: ${resolvedActor.name} ${ability} ${current.rank} (${current.value}) → ${depRank} (${depValue})`);
+  }
+
+  if (Object.keys(actorUpdates).length > 0) {
+    await resolvedActor.update(actorUpdates);
+  }
+
   const label = selfNullify ? "Nullifying (Self-Suppressed)" : "Nullified";
 
   return applyEffect(resolvedActor, {
@@ -962,6 +990,7 @@ export async function applyNullified(actor, { rounds = 10, originUuid = null, se
         effectType: "nullified",
         selfNullify,
         suppressedPowerIds: suppressedIds,
+        abilitySwaps,
         status: { isNullified: true }
       }
     },
@@ -982,9 +1011,9 @@ export async function restoreNullifiedPowers(effect, actor) {
   if (flags.effectType !== "nullified") return;
 
   const suppressedIds = flags.suppressedPowerIds || [];
-  if (suppressedIds.length === 0) return;
+  if (suppressedIds.length === 0 && !flags.abilitySwaps) return;
 
-  // Only re-enable powers that still exist and are still off
+  // Re-enable suppressed powers
   const toRestore = suppressedIds.filter(id => {
     const item = actor.items.get(id);
     return item && item.system?.isActive === false;
@@ -995,5 +1024,18 @@ export async function restoreNullifiedPowers(effect, actor) {
     await actor.updateEmbeddedDocuments("Item", updates);
     const names = toRestore.map(id => actor.items.get(id)?.name).filter(Boolean);
     console.log(`[FASERIP] Nullification ended: restored ${toRestore.length} powers on ${actor.name}:`, names.join(", "));
+  }
+
+  // Restore swapped ability scores
+  const abilitySwaps = flags.abilitySwaps || {};
+  const actorUpdates = {};
+  for (const [ability, original] of Object.entries(abilitySwaps)) {
+    actorUpdates[`system.abilities.${ability}.rank`] = original.originalRank;
+    actorUpdates[`system.abilities.${ability}.value`] = original.originalValue;
+    console.log(`[FASERIP] Nullification ended: ${actor.name} ${ability} restored to ${original.originalRank} (${original.originalValue})`);
+  }
+
+  if (Object.keys(actorUpdates).length > 0) {
+    await actor.update(actorUpdates);
   }
 }

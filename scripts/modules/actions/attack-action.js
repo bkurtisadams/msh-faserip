@@ -93,9 +93,9 @@ export class AttackAction extends BaseAction {
   _getStrength() { return getStrengthInfo(this.actor); }
 
   async _rollFightingFeat(actor, fightingAbility, intensity, attackCount) {
-    // RAW: Auto when Ability ≥ Intensity + 4 ranks (diff >= 4)
+    // RAW: Auto when Ability 3+ ranks above Intensity (diff >= 3)
     // Optional "Impossible": when Intensity ≥ Ability + 2 ranks (diff <= -2)
-    const AUTO_DIFF = 4;
+    const AUTO_DIFF = 3;
 
     // Toggle this to enable (RAW optional). If disabled, nothing is "impossible";
     // the required color rule applies (e.g., Red-only).
@@ -123,7 +123,7 @@ export class AttackAction extends BaseAction {
     });
 
     if (diff >= AUTO_DIFF) {
-      console.log("[FASERIP] Multi-attack FEAT: AUTOMATIC SUCCESS (diff >= 4)");
+      console.log("[FASERIP] Multi-attack FEAT: AUTOMATIC SUCCESS (diff >= 3)");
       // Full Auto: return immediately. Semi: fall through to dialog which shows "Automatic".
       if (this.opts?.autoApply === true) {
         return { success: true, intensity, roll: null, totalRoll: null, resultColor: "AUTO", cancelled: false, auto: true };
@@ -520,9 +520,10 @@ export class AttackAction extends BaseAction {
     const attackerEffects = [...attackerShiftData.breakdown];  // Copy so we can add to it
     
     // Get defender's defense shift (if single target)
+    // Prefer specificTarget (set during multi-attack loops) over live game.user.targets
     let defenderShift = 0;
     let defenderEffects = [];
-    const primaryTarget = this._selectPrimaryTarget();
+    const primaryTarget = choice?.specificTarget ?? this._selectPrimaryTarget();
     const defenderActor = primaryTarget?.actor ?? null;
     
     // Check for evasion bonus BEFORE calculating effective rank

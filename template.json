@@ -297,6 +297,8 @@
       "activationType": "activated",
       "isStarred": false,
       "source": "natural",
+      "replacesAbility": "",
+      "depoweredRank": "",
       "category": "",
       "isBonus": false,
       "bonusFrom": "",
