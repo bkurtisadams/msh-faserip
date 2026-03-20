@@ -801,7 +801,7 @@ export class AttackAction extends BaseAction {
       // Calculate breaking feat for this attack - include target material for auto-population
       // Show button when weapon material < target material (regardless of penetrating damage)
       let currentBreakingFeat = null;
-      if (targetIsHit && targetEffectColor !== "white" && breakingFeat && targetActor) {
+      if (targetIsHit && breakingFeat && targetActor) {
         const RANKS = [
           "Shift-0","Feeble","Poor","Typical","Good","Excellent",
           "Remarkable","Incredible","Amazing","Monstrous","Unearthly",
@@ -845,7 +845,7 @@ export class AttackAction extends BaseAction {
             targetMat: targetMatRank || ""
           };
         }
-      } else if (targetEffectColor !== "white") {
+      } else if (breakingFeat) {
         console.log("[FASERIP] Breaking FEAT skipped:", {
           hasBreakingFeat: !!breakingFeat,
           hasTargetActor: !!targetActor,

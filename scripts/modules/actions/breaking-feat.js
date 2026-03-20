@@ -1,4 +1,5 @@
-// breaking-feat.js v1.2.1 - 2025-12-23
+// breaking-feat.js v1.3.0 - 2026-03-20
+// v1.3.0: Fix inverted break result (success=breaks), auto-success/fail for 3+ rank gap
 // v1.2.1: Add debug logging
 // v1.2.0: Auto-populate target material from attack context
 // v1.1.0: Chat card styled to match attack action format
@@ -54,7 +55,9 @@ export function openBreakingFeatDialog({ weaponMatRank = "Excellent", targetMatR
             <li>Strength &gt; Weapon Mat: Green required</li>
             <li>Strength = Weapon Mat: Yellow required</li>
             <li>Strength &lt; Weapon Mat: Red required</li>
-            <li><strong>Failure = weapon breaks</strong></li>
+            <li><strong>Success = weapon breaks</strong></li>
+            <li>3+ ranks above = auto-break</li>
+            <li>3+ ranks below = auto-survive</li>
           </ul>
         </div>
       </div>
@@ -78,21 +81,46 @@ export function openBreakingFeatDialog({ weaponMatRank = "Excellent", targetMatR
           const comparatorRank = wielderStr;   // Roll on Strength column
           const intensityRank = weaponMatRank; // Against weapon material
 
-          // Compute required color
-          const reqColor = requiredColorForIntensity(comparatorRank, intensityRank);
-          const { bg: reqBg, fg: reqFg } = bannerColors(reqColor);
+          // Check rank distance for auto-success/fail
+          const strIdx = RANKS.indexOf(comparatorRank);
+          const matIdx = RANKS.indexOf(intensityRank);
+          const rankGap = strIdx - matIdx; // positive = Str outranks material
 
-          // Roll
-          const roll = new Roll("1d100");
-          await roll.evaluate();
+          let color, roll, autoResult = null, passed = false;
 
-          // Determine rolled color on Strength column
-          const color = game.msh.rollUniversalTable(comparatorRank, roll.total);
+          if (rankGap >= 3) {
+            // Auto-success: Strength 3+ ranks above weapon material
+            autoResult = "auto-break";
+            color = "green";
+            roll = null;
+          } else if (rankGap <= -3) {
+            // Auto-fail: Strength 3+ ranks below weapon material
+            autoResult = "auto-survive";
+            color = "white";
+            roll = null;
+          } else {
+            // Roll
+            roll = new Roll("1d100");
+            await roll.evaluate();
+
+            // Determine rolled color on Strength column
+            color = game.msh.rollUniversalTable(comparatorRank, roll.total);
+            
+            const reqColor = requiredColorForIntensity(comparatorRank, intensityRank);
+            passed = compareColors(color, reqColor);
+          }
+
           const colorLower = String(color).toLowerCase();
           const { bg, fg } = bannerColors(colorLower);
           
-          const passed = compareColors(color, reqColor);
-          const weaponBreaks = !passed;
+          // Success = wielder's strength overcomes weapon material = weapon breaks
+          const weaponBreaks = autoResult
+            ? autoResult === "auto-break"
+            : passed;
+
+          // Required color for display (only meaningful if rolled)
+          const reqColor = requiredColorForIntensity(comparatorRank, intensityRank);
+          const { bg: reqBg, fg: reqFg } = bannerColors(reqColor);
 
           // Build chat card matching attack action format
           const cardHtml = `
@@ -110,19 +138,25 @@ export function openBreakingFeatDialog({ weaponMatRank = "Excellent", targetMatR
               <!-- Ability + Roll + Result -->
               <div style="padding:2px 10px 6px;font-size:.9em;color:#555;">
                 <div>Strength: ${comparatorRank}</div>
+                ${autoResult ? `
+                <div style="font-weight:bold;color:#555;">
+                  ${autoResult === "auto-break" ? "Automatic (Str 3+ ranks above material)" : "Automatic (Str 3+ ranks below material)"}
+                </div>
+                ` : `
                 <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
                   <span>Roll: <span title="d100 = ${roll.total}" style="padding:0 3px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${roll.total}</span></span>
                   <span style="padding:2px 8px;border-radius:3px;font-weight:bold;font-size:.9em;background:${bg};color:${fg};">
                     ${String(color).toUpperCase()}
                   </span>
                 </div>
+                `}
               </div>
               
               <!-- Context -->
               <div style="margin:0 10px 6px;padding:6px 8px;background:#fff;border:1px solid #ddd;border-radius:3px;font-size:.9em;">
                 <div><strong>Weapon:</strong> ${weaponMatRank} material</div>
-                <div><strong>Target:</strong> ${targetRank}</div>
-                <div><strong>Required:</strong> <span style="padding:1px 6px;border-radius:2px;background:${reqBg};color:${reqFg};font-size:.85em;">${reqColor.toUpperCase()}</span> <span style="color:#666;">(Str ${comparatorRank} vs ${intensityRank} intensity)</span></div>
+                <div><strong>Target Armor:</strong> ${targetRank}</div>
+                ${!autoResult ? `<div><strong>To break:</strong> <span style="padding:1px 6px;border-radius:2px;background:${reqBg};color:${reqFg};font-size:.85em;">${reqColor.toUpperCase()}</span> <span style="color:#666;">(Str ${comparatorRank} vs ${intensityRank} intensity)</span></div>` : ''}
               </div>
               
               <!-- Result -->

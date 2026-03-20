@@ -1154,32 +1154,10 @@ export function computeBluntDamage(strRank, strVal, matRank, weaponBase = 0, RAN
   // of the object in damage, whichever is less."
   // "When attacking with a weapon designed for combat, the character will always 
   // inflict damage... always a minimum of the damage listed"
-  
-  if (mIdx > sIdx) {
-    // Material stronger than character - character limited by their strength
-    const nextIdx = Math.min(sIdx + 1, RANKS_LOCAL.length - 1);
-    const nextRank = RANKS_LOCAL[nextIdx];
-    
-    // Minimum value lookup for ranks (bottom of bracket)
-    const RANK_BOTTOM_VALUES = {
-       "Feeble": 2, "Poor": 3, "Typical": 5, "Good": 8, "Excellent": 16,
-       "Remarkable": 26, "Incredible": 36, "Amazing": 46, "Monstrous": 63,
-       "Unearthly": 88, "Shift-X": 126, "Shift-Y": 176, "Shift-Z": 351,
-       "Class 1000": 1000, "Class 3000": 3000, "Class 5000": 5000
-    };
-
-    // Use specific minimum if available, else standard value
-    const calcDmg = RANK_BOTTOM_VALUES[nextRank] ?? getVal(nextRank);
-    // Ensure weapon minimum damage is respected
-    const dmg = Math.max(calcDmg, weaponBase);
-    
-    return { damage: dmg, note: `${matRank} weapon > ${strRank}${weaponBase ? `, base ${weaponBase}` : ''} → ${dmg}` };
-  }
-  
-  // Normal case: min(Strength, Material) but never less than weapon base
-  const calcDmg = Math.min(getVal(strRank), getVal(matRank));
+  const matValue = getVal(matRank);
+  const calcDmg = Math.min(strVal, matValue);
   const dmg = Math.max(calcDmg, weaponBase);
-  return { damage: dmg, note: `Damage = max(min(STR ${getVal(strRank)}, MAT ${getVal(matRank)}), base ${weaponBase || 0}) = ${dmg}` };
+  return { damage: dmg, note: `min(STR ${strVal}, MAT ${matValue})${weaponBase ? `, floor ${weaponBase}` : ''} = ${dmg}` };
 }
 
 // Edged-capable item filter (damageType/attackType tags or "edged"/EA)
@@ -1198,11 +1176,10 @@ export function computeEdgedDamage(strRank, strVal, matRank, weaponBase = 0, RAN
   if (sIdx < 0 || mIdx < 0) {
     return { damage: Math.max(strVal, weaponBase), note: weaponBase ? `Using base ${weaponBase}` : "Using Strength value" };
   }
-  const strCap = getVal(strRank);
   const matVal = getVal(matRank);
-  const calc   = Math.min(strCap, matVal);
+  const calc   = Math.min(strVal, matVal);
   const final  = Math.max(calc, weaponBase);
-  return { damage: final, note: `Damage = max(min(STR ${strCap}, MAT ${matVal}), base ${weaponBase || 0})` };
+  return { damage: final, note: `min(STR ${strVal}, MAT ${matVal})${weaponBase ? `, floor ${weaponBase}` : ''} = ${final}` };
 }
 
 export function getUnitsPerArea() {
