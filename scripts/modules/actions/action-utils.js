@@ -1,4 +1,7 @@
-// action-utils.js v1.7.3 - 2026-03-20
+// action-utils.js v1.7.4 - 2026-03-20
+// v1.7.4: Four-color isLethal now checks isLethalAttackForm(attackForm) — edged/shooting/
+//         thrown-edged/energy attacks always trigger death save at 0 HP regardless of whether
+//         the specific roll was a Kill result. Add data-is-kill to apply-damage button.
 // v1.7.3: Fix _applyFourColorKnockout: add canAct:false change, zeroHealth flag, export function.
 //         Pass mshReplacing on unconscious cleanup. Add fourColorRule check to hit-while-at-0-HP
 //         path (was always firing death save even for blunt attacks with four-color on).
@@ -960,6 +963,7 @@ export function buildActionsBox({
         data-bypass-armor="${bypassArmor}"
         data-damage-type="${damageType || 'physical-blunt'}"
         data-attack-form="${attackForm || 'blunt'}"
+        data-is-kill="${showKill ? 'true' : 'false'}"
         data-armor-piercing="${Number(armorPiercing || 0)}"
         data-armor-piercing-cs="${Number(armorPiercingCS || 0)}"
         data-ap-mode="${apMode}"
@@ -1563,7 +1567,8 @@ export async function applyDamageToTargets({
       // ===== HANDLE DAMAGE TO ALREADY 0 HP TARGET =====
       if (before === 0 && netDamage > 0) {
         const fourColor = game.settings.get("msh-faserip", "fourColorRule");
-        const isLethal = wasKillResult || forceKilling;
+        const { isLethalAttackForm } = await import("../../rules/kill-resolver.js");
+        const isLethal = wasKillResult || forceKilling || isLethalAttackForm(attackForm);
 
         if (fourColor && !isLethal) {
           // Four-Color Rule: blunt hit on unconscious target — no death save
@@ -1660,10 +1665,11 @@ export async function applyDamageToTargets({
 
       // ===== HANDLE REDUCTION TO 0 HP =====
       if (after === 0 && before > 0 && netDamage > 0) {
-        console.log("💀 FASERIP | Target reduced to 0 HP:", targetName, { wasKillResult, forceKilling });
+        console.log("💀 FASERIP | Target reduced to 0 HP:", targetName, { wasKillResult, forceKilling, attackForm });
         
         const fourColor = game.settings.get("msh-faserip", "fourColorRule");
-        const isLethal = wasKillResult || forceKilling;
+        const { isLethalAttackForm } = await import("../../rules/kill-resolver.js");
+        const isLethal = wasKillResult || forceKilling || isLethalAttackForm(attackForm);
         
         // Determine if we need a death save
         // Per rules: Kill result triggers Endurance FEAT vs Kill column
@@ -2288,7 +2294,8 @@ export async function applyDamageNow({
         // 0-Health rule (supports Four-Color toggle)
         if (hpAfter === 0 && hpBefore > 0) {
           const fourColor = game.settings.get("msh-faserip", "fourColorRule");
-          const lethal = wasKillResult || forceKilling;
+          const { isLethalAttackForm } = await import("../../rules/kill-resolver.js");
+          const lethal = wasKillResult || forceKilling || isLethalAttackForm(attackForm);
           if (!fourColor || lethal) {
             await postDeathSavePrompt(targetActor);
           } else {

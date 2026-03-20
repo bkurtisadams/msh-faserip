@@ -1,4 +1,6 @@
-// scripts/modules/rest-system.js v1.3.1 - 2026-03-20
+// scripts/modules/rest-system.js v1.3.2 - 2026-03-20
+// v1.3.2: Semi mode auto-rolls consciousness FEAT (same as full auto). Regaining
+//         consciousness is a rules-mandated Endurance FEAT, not a player choice.
 // v1.3.1: Fix attemptRegainConsciousness fail path: use seconds-based duration when out of combat
 //         so the retry unconscious effect properly expires via updateWorldTime handler.
 //         Add mshReplacing/mshIntentional guard to deleteActiveEffect hook to prevent
@@ -882,29 +884,11 @@ export function initRestSystem() {
     const { resolveCombatMode } = await import("./actions/action-dispatcher.js");
     const mode = resolveCombatMode(actor) || "manual";
     
-    if (mode === "full") {
-      // Full auto: automatically attempt consciousness
-      console.log("FASERIP | Full auto mode - automatically attempting consciousness for", actor.name);
+    if (mode === "full" || mode === "semi") {
+      // Full auto / Semi: automatically attempt consciousness FEAT
+      // This is a rules-mandated roll, not a player choice
+      console.log(`[FASERIP] ${mode} mode - automatically attempting consciousness for`, actor.name);
       await RestSystem.attemptRegainConsciousness(actor);
-      
-    } else if (mode === "semi") {
-      // Semi mode: show button
-      await ChatMessage.create({
-        content: `<div style="background:#fff3e0;border:2px solid #ff9800;padding:10px;border-radius:5px;">
-          <div style="font-size:1.1em;font-weight:bold;color:#e65100;margin-bottom:8px;">
-            <i class="fas fa-exclamation-triangle"></i> ${actor.name} May Attempt to Regain Consciousness
-          </div>
-          <div style="margin-bottom:10px;color:#555;">
-            The unconscious period has ended. Attempt an Endurance FEAT to wake up.
-          </div>
-          <button class="regain-consciousness-button" 
-                  data-actor-id="${actor.id}"
-                  style="width:100%;background:#ff9800;color:white;border:none;padding:10px;border-radius:5px;cursor:pointer;font-weight:bold;font-size:1.1em;">
-            <i class="fas fa-dice-d20"></i> Attempt to Regain Consciousness
-          </button>
-        </div>`,
-        speaker: ChatMessage.getSpeaker({ actor })
-      });
       
     } else {
       // Manual mode: do nothing, GM/player handles it

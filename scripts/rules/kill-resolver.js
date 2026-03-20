@@ -1,4 +1,6 @@
-// scripts/rules/kill-resolver.js v1.2.0 - 2026-03-15
+// scripts/rules/kill-resolver.js v1.3.0 - 2026-03-20
+// v1.3.0: Add isLethalAttackForm() for four-color rule — edged/shooting/thrown-edged/energy
+//         are inherently lethal regardless of whether the specific roll was a Kill result.
 // v1.2.0: Add throwing-blunt to non-lethal attack forms (zero_health context on 0HP kill check)
 // v1.1.0: Include Thrown Edged in E/S group (Green = Endurance Loss)
 
@@ -88,6 +90,15 @@ export function resolveKillFeat(color, context) {
 export function isKillResultLethal(color, context) {
   const result = resolveKillFeat(color, context);
   return result.outcome === KILL_OUTCOMES.ENDURANCE_LOSS;
+}
+
+/**
+ * Returns true if the attack form is inherently lethal (edged, shooting, thrown edged, energy).
+ * Used by four-color rule: these attack forms always trigger death saves at 0 HP.
+ */
+export function isLethalAttackForm(attackForm) {
+  const ctx = getKillContextFromAttackForm(attackForm);
+  return ctx !== KILL_CONTEXTS.ZERO_HEALTH;
 }
 
 export function getKillContextFromAttackForm(attackForm) {

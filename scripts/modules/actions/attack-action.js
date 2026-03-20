@@ -1,4 +1,7 @@
-// attack-action.js v1.9.20 - 2026-03-15
+// attack-action.js v1.9.21 - 2026-03-20
+// v1.9.21: Semi mode now auto-triggers slam/stun/kill checks (not just full auto).
+//          These are mechanical consequences, not player choices — must resolve before
+//          next attack in multi-attack sequence. Damage application still full-auto only.
 // v1.9.20: Expand isRanged to include charging/throwing so dodge defenseShiftRanged applies correctly
 // v1.9.19: Semi mode always shows multi-attack FEAT dialog (auto/impossible shown as confirmation)
 // v1.9.18: Multi-attack FEAT - CS now correctly affects success determination
@@ -1261,9 +1264,12 @@ export class AttackAction extends BaseAction {
       }
 
       // ============================================================
-      // NEW v1.6.0: Auto-trigger status effect checks in full auto mode
+      // Auto-trigger status effect checks in full auto AND semi mode.
+      // Slam/stun/kill are mechanical consequences of the attack roll,
+      // not player choices — they should resolve before the next attack.
+      // Damage application (above) remains gated on autoApply (full auto only).
       // ============================================================
-      if (!isManualMode && this.opts?.autoApply && canEffectsApply(penetratingDamage, { borderline: isBorderline }) && targetActor && !targetIsVehicle) {
+      if (!isManualMode && canEffectsApply(penetratingDamage, { borderline: isBorderline }) && targetActor && !targetIsVehicle) {
         const { ActionDispatcher } = await import("./action-dispatcher.js");
         
         // Get attacker strength info for Slam checks
