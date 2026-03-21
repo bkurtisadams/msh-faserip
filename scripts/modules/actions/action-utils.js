@@ -1605,12 +1605,15 @@ export async function applyDamageToTargets({
 
       // In action-utils.js, replace lines 1127-1131:
       if (canDirectUpdate) {
-        game.msh._combatDamageInProgress = true;  // new 12-20-25
-        await targetActor?.update(
-          { [hpPath]: after },
-          { healthChange: { old: before, new: after } }
-        );
-        delete game.msh._combatDamageInProgress;  // new 12-20-25
+        game.msh._combatDamageInProgress = true;
+        try {
+          await targetActor?.update(
+            { [hpPath]: after },
+            { healthChange: { old: before, new: after } }
+          );
+        } finally {
+          delete game.msh._combatDamageInProgress;
+        }
 
         // Record damage timestamp for rest system
         if (before > after && typeof recordDamage === "function") {
