@@ -370,7 +370,8 @@ export function installActionChatHandlers() {
       const checkType    = el.dataset.check;                // "stun" | "slam" | "kill" | "escape"
       const attackForm   = el.dataset.attackForm || "blunt";
       const dmgThrough   = Number(el.dataset.dmg || 0);
-      if (dmgThrough <= 0 && checkType !== "escape") {
+      const borderline   = el.dataset.borderline === "1";
+      if (dmgThrough <= 0 && !borderline && checkType !== "escape") {
         // Re-enable if not applicable
         el.removeAttribute("aria-disabled");
         el.style.pointerEvents = "";

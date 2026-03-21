@@ -980,7 +980,7 @@ export function buildActionsBox({
         "Open Slam dialog using penetrating damage",
         true,
         
-        `data-check="slam" data-attack-form="${attackForm}" data-dmg="${dmgPen}" data-attacker-uuid="${actorUuid}" ${pulled ? 'data-pulled="true"' : ""} ${prefillAttr}`
+        `data-check="slam" data-attack-form="${attackForm}" data-dmg="${dmgPen}" data-borderline="${prefillData?.borderline ? '1' : ''}" data-attacker-uuid="${actorUuid}" ${pulled ? 'data-pulled="true"' : ""} ${prefillAttr}`
       )
     );
   }
@@ -996,6 +996,7 @@ export function buildActionsBox({
         data-attack-form="${attackForm}"
         data-damage-type="${damageType}"
         data-dmg="${dmgPen}"
+        data-borderline="${prefillData?.borderline ? '1' : ''}"
         data-attacker-uuid="${actorUuid}"
         ${pulled ? 'data-pulled="true"' : ""} ${prefillAttr}`
       )
@@ -1014,6 +1015,7 @@ export function buildActionsBox({
         data-attack-form="${attackForm}"
         data-damage-type="${damageType}"
         data-dmg="${dmgPen}"
+        data-borderline="${prefillData?.borderline ? '1' : ''}"
         data-attacker-uuid="${actorUuid}"
         ${prefillAttr}`
       )

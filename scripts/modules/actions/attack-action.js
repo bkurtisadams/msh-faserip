@@ -1230,7 +1230,7 @@ export class AttackAction extends BaseAction {
         targets: target ? [target] : []
       });
 
-      await ChatMessage.create({
+      const attackChatMsg = await ChatMessage.create({
         speaker: ChatMessage.getSpeaker({ actor }),
         content: cardHtml,
         flags: damageFlags
@@ -1368,6 +1368,22 @@ export class AttackAction extends BaseAction {
       // ============================================================
       // END v1.6.0 auto-trigger block
       // ============================================================
+
+      // Mark auto-triggered checks as resolved so chat chips grey out
+      if (attackChatMsg && !isManualMode) {
+        const resolved = [];
+        if (showSlam) resolved.push("slam");
+        if (showStun) resolved.push("stun");
+        if (showKill) resolved.push("kill");
+        if (resolved.length) {
+          try {
+            const SCOPE = game.system?.id || "msh-faserip";
+            await attackChatMsg.setFlag(SCOPE, "resolvedChecks", resolved);
+          } catch (e) {
+            console.warn("[FASERIP WARN] Could not set resolvedChecks flag:", e);
+          }
+        }
+      }
 
       // ============================================================
       // ENTANGLING WEAPON CHECK: If weapon has entangling flag and hit landed

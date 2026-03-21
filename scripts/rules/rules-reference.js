@@ -98,8 +98,8 @@ export const KILL_RESULTS = {
 
 // ── EFFECTS GATE ──
 // Slam/Stun/Kill only apply if attacker inflicts some damage.
-// Borderline (1pt needed to penetrate) still allows effects.
-// 0 damage = no effects.
+// Borderline: if damage equals armor (net 0 but real attack), effects still apply.
+// Effects negated only when armor strictly exceeds damage (no damage possible).
 
 // ── PULL PUNCH ──
 // Blunt attacks: can reduce damage AND effect (Stun→Slam→Hit).
