@@ -1004,26 +1004,29 @@ async rollEquipment() {
               const baseDamage = this._parseDamage(mode.damage ?? item.system.damage ?? 0);
               const damageType = this._normalizeDamageType(mode.damageType || item.system.damageType || "S");
 
+              // Derive attackForm from normalized damageType
+              const attackForm = damageType.includes("shooting") ? "shooting"
+                : damageType.includes("edged")   ? "edged"
+                : damageType.includes("energy")  ? "energy"
+                : damageType.includes("force")   ? "force"
+                : damageType.includes("throwing-edged") ? "throwing-edged"
+                : damageType.includes("throwing-blunt") ? "throwing-blunt"
+                : "blunt";
+              const wasKillResult = (color === "red" && (damageType.includes("edged") || damageType.includes("shooting") || damageType.includes("energy")));
+              const targetTokens = target ? [target] : [];
+
               // Multiple attacks (max 3)
               const attacks = Math.max(1, Math.min(3, Number(mode.multiAttacks || item.system.multiAttacks || 1)));
-              const { CombatHandler } = await import(`/systems/${game.system.id}/scripts/combat-handler.js`);
 
               for (let i = 1; i <= attacks; i++) {
-                const sourceName = attacks > 1 ? `${item.name} (${mode.name}) [${i}/${attacks}]` : `${item.name} (${mode.name})`;
-                await CombatHandler.processAttack({
-                  attacker: actor,
-                  target,
-                  baseDamage,
+                await applyDamageToTargets({
+                  damage: baseDamage,
                   damageType,
-                  sourceName,
-                  canBeStun: (color === "red" && damageType.includes("blunt")) || (color === "yellow" && damageType.includes("edged")),
-                  canBeSlam: (color === "yellow" && damageType.includes("blunt")),
-                  canBeKill: (color === "red" && damageType.includes("edged")),
-                  originalRollResult: color
-                }, {
-                  variantType: null,
-                  specialEffects: { heatSeeking: !!mode.heatSeeking },
-                  precomputedRangePenalty: mode.heatSeeking ? 0 : rangePenaltyCS
+                  attackForm,
+                  attackerUuid: actor.uuid,
+                  targets: targetTokens,
+                  wasKillResult,
+                  showNotification: true
                 });
               }
 

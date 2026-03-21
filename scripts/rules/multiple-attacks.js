@@ -1,8 +1,113 @@
 // scripts/rules/multiple-attacks.js
 import { rollWithKarmaAndHistory } from "../modules/actions/action-utils.js";
-//import { rollUniversalTable } from "../universalTable.js";  // deprecated
 import { rollUniversalTable } from "../modules/dice/universal-table.js";
 import { debugLog } from "../modules/actions/action-utils.js";
+
+/**
+ * Prompt dialog for a Fighting FEAT to attempt multiple attacks.
+ * Extracted from CombatHandler so combat-handler.js can be retired.
+ */
+export async function rollMultipleAttackFeat(actor, attackCount, options = {}) {
+  const intensity = attackCount === 2 ? "Remarkable" : "Amazing";
+  const fightingRank = options.effectiveFightingRank || actor.system.abilities.fighting.rank;
+  const fightingValue = options.effectiveFightingValue || actor.system.abilities.fighting.value;
+  const availableKarma = actor.system.attributes.karma.value || 0;
+
+  const dialogContent = `
+    <div style="text-align: center;">
+      <h2>${actor.name} - Multiple Attack FEAT</h2>
+      <p>Attempting <strong>${attackCount} attacks</strong> requires a Fighting FEAT roll.</p>
+      <div style="margin: 10px 0;">
+        <p>Fighting Rank: <strong>${fightingRank}</strong></p>
+        <p>Required Intensity: <strong>${intensity}</strong></p>
+        <hr style="margin: 10px 0;">
+        <div>
+          <label>Spend Karma Points:</label>
+          <input type="number" id="karma-points" min="0" max="${availableKarma}" value="0" style="width: 60px;">
+          <span style="margin-left: 5px; font-size: 0.9em; color: #666;">(Available: ${availableKarma})</span>
+        </div>
+      </div>
+    </div>
+  `;
+
+  return new Promise((resolve) => {
+    new Dialog({
+      title: `Multiple Attack FEAT (${attackCount} attacks)`,
+      content: dialogContent,
+      buttons: {
+        roll: {
+          icon: '<i class="fas fa-dice-d20"></i>',
+          label: "Roll FEAT",
+          callback: async (html) => {
+            const karmaSpent = Math.min(
+              parseInt(html.find('#karma-points').val()) || 0,
+              availableKarma
+            );
+
+            const roll = new Roll("1d100");
+            await roll.evaluate();
+            const totalRoll = Math.min(100, roll.total + karmaSpent);
+
+            console.log(`[FASERIP] Multiple Attack FEAT: count=${attackCount} intensity=${intensity} fighting=${fightingRank} total=${totalRoll}`);
+
+            const resultColor = game.msh.rollUniversalTable(fightingRank, totalRoll);
+
+            if (karmaSpent > 0) {
+              await game.msh.runAsGM({
+                operation: "update",
+                targetActorUuid: actor.uuid,
+                args: [{ "system.attributes.karma.value": availableKarma - karmaSpent }]
+              });
+              const history = foundry.utils.deepClone(actor.system.karma?.history || []);
+              history.push({
+                timestamp: new Date().toISOString(),
+                realDate: new Date().toLocaleDateString(),
+                gameDate: "",
+                amount: -karmaSpent,
+                type: "Multiple Attack FEAT",
+                description: `Fighting FEAT for ${attackCount} attacks`
+              });
+              await game.msh.runAsGM({
+                operation: "update",
+                targetActorUuid: actor.uuid,
+                args: [{ "system.karma.history": history }]
+              });
+            }
+
+            await ChatMessage.create({
+              speaker: ChatMessage.getSpeaker({ actor }),
+              content: `
+                <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
+                  <div style="padding: 5px 10px; border-bottom: 1px solid #c0c0c0; font-size: 1.1em; color: #8b0000;">
+                    <strong>${actor.name} - Multiple Attack FEAT</strong>
+                  </div>
+                  <div style="padding: 5px 10px; font-size: 0.9em;">
+                    <div>Attempting: ${attackCount} attacks</div>
+                    <div>Required Intensity: ${intensity}</div>
+                    <div>Fighting Rank: ${fightingRank} (${fightingValue})</div>
+                    <div>Roll: ${roll.total} + Karma: ${karmaSpent} = ${totalRoll}</div>
+                  </div>
+                  <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px;
+                    background-color: #4A90E2; color: white;">
+                    RESULT: ${resultColor.toUpperCase()}
+                  </div>
+                </div>
+              `
+            });
+
+            resolve({ intensity, roll, totalRoll, resultColor });
+          }
+        },
+        cancel: {
+          icon: '<i class="fas fa-times"></i>',
+          label: "Cancel",
+          callback: () => resolve({ success: false, intensity, cancelled: true })
+        }
+      },
+      default: "roll"
+    }).render(true);
+  });
+}
 
 // Anchor: local helper replaces classic rollPower calls
 async function rollSingleAttackRefactor({ actor, power, options = {} }) {
@@ -171,7 +276,7 @@ export async function processMultipleAttackSequence(actor, power, options) {
     console.log("Multiple attack FEAT auto-succeeds (3+ ranks above intensity).");
   } else {
     // Roll your existing Fighting FEAT function; treat color result against neededColor
-    const featResult = await game.msh.CombatHandler.rollMultipleAttackFeat(actorDoc, attackCount, { 
+    const featResult = await rollMultipleAttackFeat(actorDoc, attackCount, { 
         intensity: intensityName,
         effectiveFightingRank: attackerFight,
         effectiveFightingValue: CONFIG.FASERIP?.rankValues?.[attackerFight] || 0

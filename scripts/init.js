@@ -58,7 +58,6 @@ import { rollContact } from './modules/actions/contact-action.js';
 import { rollUniversalTable } from './modules/dice/universal-table.js';
 import { openUniversalTableDialog } from './universal-table-dialog.js';
 import { FaseripInitiative } from './faserip-initiative.js';
-import { CombatHandler } from './combat-handler.js';
 import { initializeSlamHandlers } from './charge-damage.js';
 import { installActionChatHandlers } from "./modules/actions/chat-hooks.js";
 import { openCollisionDamageDialog } from './modules/actions/collision-damage.js';
@@ -1552,12 +1551,6 @@ Hooks.once("init", async () => {
     const { openEquipmentActionDialog } = await import('./modules/actions/equipment-action-dialog.js');
     return openEquipmentActionDialog(actor, item);
   };
-
-  // Add the CombatHandler to the namespace
-  game.msh.CombatHandler = CombatHandler;
-  // Anchor: expose legacy handler only in classic mode (no longer a valid mode)
-  // CombatHandler is always available via namespace
-  
 
   // Add the Action HUD to the namespace
   game.msh.FaseripActionPanel = FaseripActionPanel;  // <-- ADD THIS LINE
