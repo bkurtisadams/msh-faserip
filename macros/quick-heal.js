@@ -1,5 +1,13 @@
-// quick-heal.js v1.1.1 - 2025-12-25
-// v1.1.1: Prioritize initialRank over actor flag, skip corrupted Shift-0 flags
+// quick-heal.js v1.4.0 - 2026-03-21
+// v1.4.0: Preserve non-standard ability rank values (e.g. Good 15) — resolve original
+//         endurance value from actor/base data instead of always deriving from rank name.
+// v1.3.0: Fix effects not deleting — pass mshIntentional option so preDeleteActiveEffect
+//         hook doesn't block dying/impaired/defense/regen effect removal.
+//         Restore HP BEFORE deleting effects so deleteActiveEffect hook doesn't
+//         trigger consciousness attempts while health is still 0.
+//         Clear rest-system flags (wasKnockedOut, lastDamageWorldTime, lastDamageTime).
+// v1.2.0: Fix Endurance restoration — use current rank unless dying/impaired effect
+//         stored an original. initialRank is last resort (pre-advancement chargen value).
 // v1.1.0: Fix restoration - check originalEndurance flag, better fallback chain, clear flags after heal
 // Restore selected tokens to full health, clear effects, restore Endurance
 // Usage: game.msh.macros.quickHeal()
@@ -88,64 +96,56 @@ export async function quickHeal() {
     const baseEndurance = baseActor?.system.abilities?.endurance;
     const baseOriginalFlag = baseActor?.getFlag(SCOPE, "originalEndurance");
     const baseInitialFull = normalizeRank(baseEndurance?.initialRank);
+    const hasDyingOrImpaired = !!(dyingEffect || impairedEffect);
     
     console.log(`[FASERIP] Quick Heal: Sources`, {
       effectOriginal,
       actorFlagOriginal,
       initialRankAbbrev,
       initialRankFull,
-      currentRank: actor.system.abilities?.endurance?.rank
+      currentRank: actor.system.abilities?.endurance?.rank,
+      currentValue: actor.system.abilities?.endurance?.value,
+      baseRank: baseEndurance?.rank,
+      baseValue: baseEndurance?.value,
+      hasDyingOrImpaired
     });
     
-    // Determine which to use - PRIORITIZE initialRank since it's from chargen and most reliable
+    // Resolve original rank
+    // Priority: stored original from dying/impaired effect > actor flag > current rank
+    // Only fall back to initialRank as absolute last resort (chargen value, pre-advancement)
     let originalRank = null;
     
-    if (initialRankFull && !isCorruptedOriginal(initialRankFull)) {
-      originalRank = initialRankFull;
-      console.log(`[FASERIP] Quick Heal: Using initialRank: ${originalRank}`);
-    } else if (effectOriginal && !isCorruptedOriginal(effectOriginal)) {
+    if (hasDyingOrImpaired && effectOriginal && !isCorruptedOriginal(effectOriginal)) {
       originalRank = effectOriginal;
-      console.log(`[FASERIP] Quick Heal: Using effect originalEndurance: ${originalRank}`);
-    } else if (actorFlagOriginal && !isCorruptedOriginal(actorFlagOriginal)) {
+    } else if (hasDyingOrImpaired && actorFlagOriginal && !isCorruptedOriginal(actorFlagOriginal)) {
       originalRank = actorFlagOriginal;
-      console.log(`[FASERIP] Quick Heal: Using actor flag originalEndurance: ${originalRank}`);
-    } else if (isUnlinked && baseInitialFull && !isCorruptedOriginal(baseInitialFull)) {
-      originalRank = baseInitialFull;
-      console.log(`[FASERIP] Quick Heal: Using base actor initialRank: ${originalRank}`);
-    } else if (isUnlinked && baseOriginalFlag && !isCorruptedOriginal(baseOriginalFlag)) {
-      originalRank = baseOriginalFlag;
-      console.log(`[FASERIP] Quick Heal: Using base actor originalEndurance: ${originalRank}`);
-    } else if (isUnlinked && baseEndurance?.rank && !isCorruptedOriginal(baseEndurance.rank)) {
-      originalRank = baseEndurance.rank;
-      console.log(`[FASERIP] Quick Heal: Using base actor current rank: ${originalRank}`);
     } else if (actor.system.abilities?.endurance?.rank && !isCorruptedOriginal(actor.system.abilities.endurance.rank)) {
       originalRank = actor.system.abilities.endurance.rank;
-      console.log(`[FASERIP] Quick Heal: Using current rank: ${originalRank}`);
+    } else if (isUnlinked && baseEndurance?.rank && !isCorruptedOriginal(baseEndurance.rank)) {
+      originalRank = baseEndurance.rank;
+    } else if (initialRankFull && !isCorruptedOriginal(initialRankFull)) {
+      originalRank = initialRankFull;
     } else {
       originalRank = "Good";
-      console.log(`[FASERIP] Quick Heal: No valid original found, defaulting to Good`);
     }
     
-    const originalValue = getRankValue(originalRank);
+    // Resolve original value — preserve non-standard rank numbers (e.g. Good 15)
+    // The dying system only stores rank name, not value, so we need to find the
+    // actual numeric value from the best available source.
+    let originalValue;
     
-    // Delete effects
-    const effects = actor.effects.contents;
-    if (effects.length) {
-      console.log(`[FASERIP] Quick Heal: Deleting ${effects.length} effects`);
-      await actor.deleteEmbeddedDocuments("ActiveEffect", effects.map(e => e.id));
-    }
-    
-    // Clear token status icons
-    if (isUnlinked) {
-      await token.document.update({"delta.statuses": []});
-    }
-    
-    try {
-      for (const statusId of [...(actor.statuses || [])]) {
-        await actor.toggleStatusEffect(statusId, { active: false });
-      }
-    } catch (e) {
-      console.warn(`[FASERIP] Quick Heal: Error clearing statuses`, e);
+    if (!hasDyingOrImpaired) {
+      // Not dying/impaired — current value IS the correct value
+      originalValue = Number(actor.system.abilities?.endurance?.value) || getRankValue(originalRank);
+    } else if (isUnlinked && baseEndurance?.value && baseEndurance.rank === originalRank) {
+      // Unlinked token dying — base actor has the pre-damage value
+      originalValue = Number(baseEndurance.value);
+    } else if (actor.system.abilities?.endurance?.initialValue && normalizeRank(initialRankAbbrev) === originalRank) {
+      // initialValue matches the original rank — use it (preserves GM adjustments if rank unchanged)
+      originalValue = Number(actor.system.abilities.endurance.initialValue);
+    } else {
+      // Last resort: derive from rank name (loses non-standard values)
+      originalValue = getRankValue(originalRank);
     }
     
     // Calculate max health with restored endurance
@@ -164,6 +164,9 @@ export async function quickHeal() {
       targetHealthMax
     });
     
+    // === RESTORE HP FIRST ===
+    // Must happen before effect deletion so the deleteActiveEffect hook
+    // in rest-system sees HP > 0 and doesn't trigger consciousness attempts
     if (isUnlinked) {
       const deltaUpdate = {
         "delta.system.abilities.endurance.rank": originalRank,
@@ -187,10 +190,43 @@ export async function quickHeal() {
       await actor.update(updateData);
     }
     
+    // === DELETE EFFECTS AFTER HP RESTORE ===
+    // Pass mshIntentional so preDeleteActiveEffect hook allows removal of
+    // protected effects (dying, impaired endurance, regeneration, defense)
+    const effects = actor.effects.contents;
+    if (effects.length) {
+      console.log(`[FASERIP] Quick Heal: Deleting ${effects.length} effects`);
+      await actor.deleteEmbeddedDocuments(
+        "ActiveEffect",
+        effects.map(e => e.id),
+        { mshIntentional: true }
+      );
+    }
+    
+    // Clear token status icons
+    if (isUnlinked) {
+      await token.document.update({"delta.statuses": []});
+    }
+    
+    try {
+      for (const statusId of [...(actor.statuses || [])]) {
+        await actor.toggleStatusEffect(statusId, { active: false });
+      }
+    } catch (e) {
+      console.warn(`[FASERIP] Quick Heal: Error clearing statuses`, e);
+    }
+    
     // Clear the originalEndurance flag
     try {
       await actor.unsetFlag(SCOPE, "originalEndurance");
       console.log(`[FASERIP] Quick Heal: Cleared originalEndurance flag`);
+    } catch (e) { /* may not exist */ }
+    
+    // Clear rest-system flags so healed character isn't treated as recently damaged/KO'd
+    try {
+      await actor.unsetFlag(SCOPE, "wasKnockedOut");
+      await actor.unsetFlag(SCOPE, "lastDamageWorldTime");
+      await actor.unsetFlag(SCOPE, "lastDamageTime");
     } catch (e) { /* may not exist */ }
     
     console.log(`[FASERIP] Quick Heal: Restored ${actor.name}`, {
