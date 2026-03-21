@@ -95,14 +95,16 @@ export class CheckAction extends BaseAction {
 
       // Build choice (synthetic dialog result)
       const targetName    = prefill.targetName     || "Target";
-      const targetEndRank = actor?.system?.abilities?.endurance?.rank || prefill.targetEndRank || "Good";
+      // For power-save / mental powers, use the correct save ability (e.g. psyche) not endurance
+      const saveAbilityKey = isSaveNullify ? (this.abilityName || "endurance") : "endurance";
+      const targetEndRank = actor?.system?.abilities?.[saveAbilityKey]?.rank || prefill.targetEndRank || "Good";
       const shift         = Number(prefill.shift ?? 0) || 0;
       const dmgThrough    = Number(prefill.dmgThrough ?? 0) || 0;
       const borderline    = !!prefill.borderline;
       const attackForm    = String(prefill.attackForm || this?.opts?.attackForm || "blunt").toLowerCase();
       const defenderUuid  = prefill.targetUuid || prefill.defenderUuid || "";
 
-      // Get effect-based ability shift for the defender's endurance
+      // Get effect-based ability shift for the defender
       // Also include selfPenaltyCS (e.g. Impaired Endurance -2CS on all FEATs)
       let effectAbilityShift = 0;
       if (defenderUuid) {
@@ -110,7 +112,7 @@ export class CheckAction extends BaseAction {
           const doc = await fromUuid(defenderUuid);
           const defenderActor = doc?.actor ?? doc ?? null;
           if (defenderActor) {
-            effectAbilityShift = getAbilityShift(defenderActor, "endurance");
+            effectAbilityShift = getAbilityShift(defenderActor, saveAbilityKey);
             effectAbilityShift += Number(defenderActor.system?.combatMods?.selfPenaltyCS) || 0;
           }
         } catch (_e) { /* uuid resolution failed */ }

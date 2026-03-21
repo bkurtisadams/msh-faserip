@@ -119,8 +119,10 @@ export function installActionChatHandlers() {
     // Bail if already auto-processed (prevents double-fire on rerender/notify)
     const alreadyHandled = await message.getFlag(SCOPE, "autoSaveHandled");
 
-    // Only a user who can edit this message should drive auto-save logic.
-    const canDriveAutoSaves = message.isOwner || game.user.isGM;
+    // Only ONE client should drive auto-save logic to prevent race conditions.
+    // GM always wins; if no GM is active, fall back to message owner.
+    const hasActiveGM = game.users?.some(u => u.isGM && u.active);
+    const canDriveAutoSaves = hasActiveGM ? game.user.isGM : message.isOwner;
 
     // Auto-save logic block — only runs for message owner/GM, only once per message
     if (canDriveAutoSaves && !alreadyHandled) {
@@ -289,6 +291,15 @@ export function installActionChatHandlers() {
                   powerName: f.powerName
                 }
               });
+              // Disable force-save buttons so manual click can't double-fire
+              for (const btn of forceBtns.toArray()) {
+                btn.setAttribute("aria-disabled", "true");
+                btn.dataset.autoDisabled = "1";
+                btn.style.pointerEvents = "none";
+                btn.style.opacity = "0.55";
+                btn.style.cursor = "not-allowed";
+                btn.style.filter = "grayscale(.3)";
+              }
               firedAnyCheck = true;
             }
           }
@@ -344,6 +355,18 @@ export function installActionChatHandlers() {
           chipEl.style.cursor = "not-allowed";
           chipEl.style.filter = "grayscale(.3)";
         }
+      });
+    }
+
+    // Disable force-save buttons if auto-save already handled this message
+    if (message.flags?.[SCOPE]?.autoSaveHandled) {
+      html.find('[data-action="force-save"], [data-action="force-save-nullify"], [data-action="force-power-save"]').each(function() {
+        this.setAttribute("aria-disabled", "true");
+        this.dataset.autoDisabled = "1";
+        this.style.pointerEvents = "none";
+        this.style.opacity = "0.55";
+        this.style.cursor = "not-allowed";
+        this.style.filter = "grayscale(.3)";
       });
     }
 
@@ -964,6 +987,12 @@ export function installActionChatHandlers() {
       }
 
       ev.preventDefault();
+      // Disable immediately to prevent double-clicks
+      el.setAttribute("aria-disabled", "true");
+      el.style.pointerEvents = "none";
+      el.style.opacity = "0.55";
+      el.style.cursor = "not-allowed";
+      el.style.filter = "grayscale(.3)";
       const btn = ev.currentTarget;
       const $msg = $(btn).closest(".message");
       const msg = game.messages.get($msg.data("messageId"));
@@ -1035,6 +1064,9 @@ export function installActionChatHandlers() {
           powerName: f.powerName
         }
       });
+
+      // Persist resolved state so button stays disabled across re-renders
+      try { await safeSetFlag(msg, SCOPE, "autoSaveHandled", true); } catch (_) {}
 
       // NOTE: CheckAction handles the actual FEAT + result. "power-save"
       // has labels/effects configured in action-config (fail => affected).
