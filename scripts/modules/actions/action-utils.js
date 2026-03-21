@@ -37,6 +37,7 @@ import { getAbilityShift } from "../effects/effect-modifiers.js";
 // NOTE: do NOT import resolveCombatMode here – that creates a circular dependency
 import { recordDamage } from "../rest-system.js";
 import { applyDamageToVehicle } from "./vehicle-damage.js";
+import { safeActorUpdate, safeActorCreateEffect, safeActorDeleteEffects } from "../../gm-utils.js";
 
 // Local helper to read the global combat mode without importing action-dispatcher
 function resolveCombatModeSafe(actor) {
@@ -1818,7 +1819,9 @@ export async function postKillSavePrompt(actor, { attackForm = "edged", fromZero
 export async function _applyFourColorKnockout(actor, rounds) {
   try {
     const existing = actor.effects.filter(e => e.statuses?.has?.("unconscious"));
-    for (const e of existing) await e.delete({ mshReplacing: true }).catch(() => {});
+    if (existing.length) {
+      await safeActorDeleteEffects(actor, existing.map(e => e.id), { mshReplacing: true });
+    }
   } catch (_e) {}
   const inCombat = !!game.combat;
   const effectData = {
@@ -1834,7 +1837,7 @@ export async function _applyFourColorKnockout(actor, rounds) {
       ? { rounds: Math.max(1, Number(rounds)), startRound: game.combat?.round || 0 }
       : { seconds: Math.max(1, Number(rounds)) * 6, startTime: game.time.worldTime }
   };
-  await actor.createEmbeddedDocuments("ActiveEffect", [effectData]);
+  await safeActorCreateEffect(actor, [effectData]);
   console.log(`[FASERIP] Four-Color knockout: ${actor.name} unconscious for ${rounds} rounds`);
 }
 

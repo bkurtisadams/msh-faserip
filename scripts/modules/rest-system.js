@@ -10,6 +10,7 @@
 // Player-driven rest, recovery, and healing system for FASERIP
 
 import { getFlagScope } from "./actions/flags.js";
+import { safeActorSetFlag } from "../gm-utils.js";
 
 const SCOPE = getFlagScope();
 
@@ -786,8 +787,8 @@ static async attemptRegainConsciousness(actor) {
 export async function recordDamage(actor) {
   const now = Date.now();
   const worldNow = game.time?.worldTime ?? 0;
-  await actor.setFlag(SCOPE, "lastDamageTime", now);
-  await actor.setFlag(SCOPE, "lastDamageWorldTime", worldNow);
+  await safeActorSetFlag(actor, SCOPE, "lastDamageTime", now);
+  await safeActorSetFlag(actor, SCOPE, "lastDamageWorldTime", worldNow);
 
   // Interrupt all ongoing effects that are damage-sensitive
   try {

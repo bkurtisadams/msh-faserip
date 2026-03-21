@@ -19,6 +19,7 @@
 // Corrosive damage, and any future timed effects via a declarative config schema.
 
 import { getAllTokenActors, applyEffect } from "./effect-engine.js";
+import { safeActorUpdate, safeActorSetFlag, safeActorCreateEffect } from "../../gm-utils.js";
 
 const SCOPE = () => (globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faserip");
 
@@ -825,7 +826,7 @@ export async function registerOngoingEffect(target, effectId, config, aeOverride
   };
 
   // Store config on actor
-  await actor.setFlag(scope, `ongoing.${effectId}`, fullConfig);
+  await safeActorSetFlag(actor, scope, `ongoing.${effectId}`, fullConfig);
 
   // Check for existing AE
   const existing = actor.effects.find(e => e.flags?.[scope]?.ongoingId === effectId);
@@ -965,7 +966,7 @@ export async function applyDyingOngoing(target, { skipImmediateLoss = false } = 
   const existingOriginal = actor.getFlag(scope, "originalEndurance");
   const originalEndurance = existingOriginal || currentEndurance;
   if (!existingOriginal) {
-    await actor.setFlag(scope, "originalEndurance", originalEndurance);
+    await safeActorSetFlag(actor, scope, "originalEndurance", originalEndurance);
   }
 
   // ── Immediate first rank loss (per rules: dying = immediate Endurance reduction) ──
@@ -982,7 +983,7 @@ export async function applyDyingOngoing(target, { skipImmediateLoss = false } = 
 
     // Apply immediate Endurance + Health loss (Health = F+A+S+E)
     try {
-      await actor.update({
+      await safeActorUpdate(actor, {
         "system.abilities.endurance.rank": nextRank,
         "system.abilities.endurance.value": nextValue,
         "system.attributes.health.value": newHealth,
@@ -995,7 +996,7 @@ export async function applyDyingOngoing(target, { skipImmediateLoss = false } = 
     // Create Impaired Endurance effect
     const impairedEffect = actor.effects.find(e => e.getFlag(scope, "isImpairedEndurance"));
     if (!impairedEffect) {
-      await actor.createEmbeddedDocuments("ActiveEffect", [{
+      await safeActorCreateEffect(actor, [{
         name: `Impaired Endurance (${nextRank} of ${originalEndurance})`,
         img: "icons/svg/blood.svg",
         origin: actor.uuid,

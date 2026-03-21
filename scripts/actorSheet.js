@@ -1209,7 +1209,7 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
         } else {
           // Hotbar macro drag - use format from older file that works
           dragData = {
-            type: "Item",
+            type: "FaseripItem",
             actorId: this.actor.id,
             itemId: item.id,
             uuid: item.uuid,
@@ -1287,7 +1287,7 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
         } else {
           // Hotbar macro drag - use format from older file that works
           dragData = {
-            type: "Item",
+            type: "FaseripItem",
             actorId: this.actor.id,
             itemId: item.id,
             uuid: item.uuid,
@@ -1362,9 +1362,9 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
             itemId: itemId
           };
         } else {
-          // Hotbar macro drag - use format from older file that works
+          // Hotbar macro drag
           dragData = {
-            type: "Item",
+            type: "FaseripItem",
             actorId: this.actor.id,
             itemId: item.id,
             uuid: item.uuid,
@@ -1441,7 +1441,7 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
         } else {
           // Hotbar macro drag
           dragData = {
-            type: "Item",
+            type: "FaseripItem",
             actorId: this.actor.id,
             itemId: item.id,
             uuid: item.uuid,
@@ -1514,9 +1514,9 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
             itemId: itemId
           };
         } else {
-          // Hotbar macro drag - use format from older file that works
+          // Hotbar macro drag
           dragData = {
-            type: "Item",
+            type: "FaseripItem",
             actorId: this.actor.id,
             itemId: item.id,
             uuid: item.uuid,
@@ -2822,8 +2822,11 @@ html.find('.headquarters-draggable').each((i, el) => {
     
     // Default to item drag (for macros/hotbar)
     let dragData = {
-      type: "Item",
-      uuid: item.uuid
+      type: "FaseripItem",
+      actorId: this.actor.id,
+      itemId: item.id,
+      uuid: item.uuid,
+      data: item
     };
     
     // If holding shift, do sorting instead
@@ -4471,8 +4474,8 @@ async _rollAction(actionType, abilityName) {
   }
   
   try {
-    // Perform the roll
-    const rollResult = await ActionDispatcher.roll(actionType, {
+    // Perform the roll — ActionDispatcher produces the chat card
+    await ActionDispatcher.roll(actionType, {
       actor,
       abilityName,
       opts: {
@@ -4482,10 +4485,6 @@ async _rollAction(actionType, abilityName) {
         source: "hands"
       }
     });
-    
-    // Create chat card with action info
-    await this._showActionInfo(actionInfo, actor, rollResult);
-    
   } catch (err) {
     console.error(err);
     ui.notifications.error(err.message ?? "Action failed.");

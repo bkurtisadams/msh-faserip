@@ -20,6 +20,7 @@ import {
 } from "./action-utils.js";
 import { resolveKillFeat, KILL_CONTEXTS, getKillContextFromAttackForm } from "../../rules/kill-resolver.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
+import { safeActorCreateEffect, safeActorDeleteEffects } from "../../gm-utils.js";
 
 export class DeathSaveAction extends BaseAction {
   constructor(a) {
@@ -327,12 +328,7 @@ export class DeathSaveAction extends BaseAction {
     try {
       const existing = actor.effects.filter(e => e.statuses?.has?.("unconscious"));
       if (existing.length) {
-        if (game.user.isGM || actor.isOwner) {
-          await actor.deleteEmbeddedDocuments("ActiveEffect", existing.map(e => e.id), { mshReplacing: true });
-        } else {
-          const { runAsGM } = await import("../../gm-utils.js");
-          await runAsGM({ operation: "deleteEmbeddedDocuments", targetActorUuid: actor.uuid, args: ["ActiveEffect", existing.map(e => e.id), { mshReplacing: true }] });
-        }
+        await safeActorDeleteEffects(actor, existing.map(e => e.id), { mshReplacing: true });
       }
     } catch (err) {
       console.error("[FASERIP ERROR] Error deleting existing unconscious effects:", err);
@@ -361,12 +357,7 @@ export class DeathSaveAction extends BaseAction {
         : { rounds: Math.max(1, Number(unconsciousRounds)), startRound: game.combat?.round || 0 }
     };
 
-    if (game.user.isGM || actor.isOwner) {
-      await actor.createEmbeddedDocuments("ActiveEffect", [effectData]);
-    } else {
-      const { runAsGM } = await import("../../gm-utils.js");
-      await runAsGM({ operation: "createEmbeddedDocuments", targetActorUuid: actor.uuid, args: ["ActiveEffect", [effectData]] });
-    }
+    await safeActorCreateEffect(actor, [effectData]);
     console.log(`[FASERIP] Unconscious effect created for ${actor.name} (${unconsciousRounds} rounds)`);
   }
 

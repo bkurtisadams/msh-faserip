@@ -3410,10 +3410,6 @@ function generateActionIcon(actionCode, label, bgColor, fgColor) {
 async function createUniversalActionMacro(data, slot) {
   const { actionCode, actionName, actorId, actorName, iconName } = data;
   
-  // CHECK THE SETTING!
-  const actor = game.actors.get(actorId);
-  const mode = game.msh.getCombatModeFor(actor);
-  
   // Define ability mapping
   const abilityMap = {
     "blunt-attack": "fighting", "edged-attack": "fighting", "shooting": "agility",
@@ -3432,17 +3428,14 @@ async function createUniversalActionMacro(data, slot) {
       const actor = game.user.character || canvas.tokens.controlled[0]?.actor || game.actors.get("${actorId}");
       if (!actor) return ui.notifications.warn("Select a token or assign a character first.");
 
-      const savedCS = await actor.getFlag("msh-faserip", "cs_${actionCode}") || 0;
-      const savedKarma = await actor.getFlag("msh-faserip", "karma_${actionCode}") || 0;
-
       if (game.msh?.actions?.roll) {
         await game.msh.actions.roll("${actionCode}", {
           actor,
           abilityName: "${abilityName}",
-          opts: { shift: savedCS, karma: savedKarma }
+          opts: {}
         });
       } else if (game.msh?.rollUniversalAction) {
-        game.msh.rollUniversalAction("${actionCode}", actor.id, savedCS, savedKarma);
+        game.msh.rollUniversalAction("${actionCode}", actor.id);
       } else {
         ui.notifications.error("No action entrypoint found.");
       }

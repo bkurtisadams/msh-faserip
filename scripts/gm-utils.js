@@ -407,3 +407,94 @@ async function createMacroForPlayer({ macroData, slot, userId }) {
   
   return { macroId: macro.id, macroUuid: macro.uuid };
 }
+
+/* ----------- Safe Actor Write Utilities ----------- */
+// These handle the v13 ActorDelta permission issue where a player may
+// own the base Actor but lack write permission on the unlinked Token's
+// ActorDelta. They pre-check canUserModify to avoid Foundry console
+// warnings, then delegate to GM socket when needed.
+
+/**
+ * Check if current user can modify this actor directly.
+ * For unlinked tokens (ActorDelta), checks the parent Token permission.
+ */
+function _canWriteActor(actor) {
+  if (game.user.isGM) return true;
+  try {
+    // v13 ActorDelta: check parent token
+    if (actor.parent?.documentName === "Token") {
+      return actor.parent.canUserModify?.(game.user, "update") ?? actor.parent.isOwner ?? false;
+    }
+    // Synthetic token actor
+    if (actor.token?.isLinked === false) {
+      return actor.token.canUserModify?.(game.user, "update") ?? actor.token.isOwner ?? false;
+    }
+    if (actor.isToken === true) {
+      const token = canvas.tokens?.placeables?.find(t => t.actor === actor);
+      if (token?.document) {
+        return token.document.canUserModify?.(game.user, "update") ?? token.document.isOwner ?? false;
+      }
+    }
+    // Regular linked actor
+    return actor.canUserModify?.(game.user, "update") ?? actor.isOwner ?? false;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Safe actor.update — delegates to GM socket when player lacks permission.
+ */
+export async function safeActorUpdate(actor, updateData, updateOpts = {}) {
+  if (!actor || !updateData) return;
+  if (_canWriteActor(actor)) {
+    return actor.update(updateData, updateOpts);
+  }
+  console.log(`[FASERIP] safeActorUpdate: delegating to GM for ${actor.name}`);
+  return runAsGM({ operation: "update", targetActorUuid: actor.uuid, args: [updateData] });
+}
+
+/**
+ * Safe actor.setFlag — delegates to GM socket when player lacks permission.
+ */
+export async function safeActorSetFlag(actor, scope, key, value) {
+  if (!actor) return;
+  if (_canWriteActor(actor)) {
+    return actor.setFlag(scope, key, value);
+  }
+  console.log(`[FASERIP] safeActorSetFlag: delegating to GM for ${actor.name}`);
+  const updateData = { [`flags.${scope}.${key}`]: value };
+  return runAsGM({ operation: "update", targetActorUuid: actor.uuid, args: [updateData] });
+}
+
+/**
+ * Safe actor.createEmbeddedDocuments("ActiveEffect", ...) — delegates to GM.
+ */
+export async function safeActorCreateEffect(actor, effectDataArray) {
+  if (!actor) return;
+  if (_canWriteActor(actor)) {
+    return actor.createEmbeddedDocuments("ActiveEffect", effectDataArray);
+  }
+  console.log(`[FASERIP] safeActorCreateEffect: delegating to GM for ${actor.name}`);
+  return runAsGM({
+    operation: "createEmbeddedDocuments",
+    targetActorUuid: actor.uuid,
+    args: ["ActiveEffect", effectDataArray]
+  });
+}
+
+/**
+ * Safe actor.deleteEmbeddedDocuments — delegates to GM.
+ */
+export async function safeActorDeleteEffects(actor, effectIds, opts = {}) {
+  if (!actor || !effectIds?.length) return;
+  if (_canWriteActor(actor)) {
+    return actor.deleteEmbeddedDocuments("ActiveEffect", effectIds, opts);
+  }
+  console.log(`[FASERIP] safeActorDeleteEffects: delegating to GM for ${actor.name}`);
+  return runAsGM({
+    operation: "deleteEmbeddedDocuments",
+    targetActorUuid: actor.uuid,
+    args: ["ActiveEffect", effectIds]
+  });
+}
