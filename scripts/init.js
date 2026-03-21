@@ -2215,6 +2215,32 @@ Hooks.once("ready", async () => {
     console.warn("MSH FASERIP | GM Tools registration failed:", e);
   }
 
+  // Migrate body armor powers: backfill armorPhysical/armorEnergy on old powers that used armorUseRankValue
+  if (game.user.isGM) {
+    try {
+      for (const actor of game.actors) {
+        for (const item of actor.items) {
+          if (item.type !== "power" || !item.system.isBodyArmor) continue;
+          const sys = item.system;
+          // Old powers with armorUseRankValue=true have armorPhysical/armorEnergy at 0
+          if (sys.armorUseRankValue === true || (sys.armorPhysical === 0 && sys.armorEnergy === 0)) {
+            const baseVal = typeof sys.value === "number" ? sys.value : (CONFIG.FASERIP?.rankValues?.[sys.rank] || 0);
+            const updates = {};
+            if (!sys.armorPhysical) updates["system.armorPhysical"] = baseVal;
+            if (!sys.armorEnergy) updates["system.armorEnergy"] = sys.isForceField ? baseVal : Math.max(0, baseVal - 20);
+            if (sys.armorUseRankValue !== undefined) updates["system.-=armorUseRankValue"] = null;
+            if (Object.keys(updates).length) {
+              await item.update(updates);
+              console.log(`[FASERIP] Migrated body armor fields: ${actor.name} / ${item.name}`);
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.warn("[FASERIP WARN] Body armor migration failed:", e);
+    }
+  }
+
   // Slam collision handlers (optional, safe)
   try {
     initializeSlamHandlers?.();
@@ -2587,9 +2613,9 @@ Hooks.on("updateItem", async (item, changes, options, userId) => {
     || changes.system?.isResistance !== undefined
     || changes.system?.bodyArmorType !== undefined
     || changes.system?.armorNature !== undefined
-    || changes.system?.armorUseRankValue !== undefined
     || changes.system?.armorPhysical !== undefined
     || changes.system?.armorEnergy !== undefined
+    || changes.system?.armorEnergyCustom !== undefined
     || changes.system?.resistanceType !== undefined
     || changes.system?.resistanceEffect !== undefined
     || changes.system?.resistanceIsInvulnerability !== undefined

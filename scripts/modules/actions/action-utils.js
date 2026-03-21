@@ -16,7 +16,7 @@
 // v1.4.1: Fix computeBluntDamage to respect weapon minimum base damage per FASERIP rules
 // v1.4.0: Add showGrappleBack chip for Reverse escape result
 // v1.3.0: Add showHoldDamage chip to buildActionsBox for Full Hold grappling damage
-// v1.2.1: getBodyArmorValues respects armorUseRankValue flag - uses power.value when checked
+// v1.3.0: getBodyArmorValues reads armorPhysical/armorEnergy directly, falls back to rank formula
 // v1.2.0: Add fromZeroHealth flag to death/kill save paths
 //         - 0 HP path: unconscious + potentially dying
 //         - Kill result path: conscious + potentially dying
@@ -2038,66 +2038,31 @@ export function getBodyArmorValues(targetActor, damageType = "physical-blunt") {
     let physVal;
     let energyVal;
     
-    // If "Use Rank Value" is checked, always use power.system.value
-    if (power.system.armorUseRankValue === true) {
-      const baseVal = typeof power.system.value === 'number'
-        ? power.system.value
-        : (CONFIG.FASERIP?.rankValues?.[power.system.rank] || 0);
-      
-      // Force Fields: full vs Energy, -10 vs physical. Body Armor: full vs physical, -20 vs energy.
-      if (power.system.isForceField) {
-        physVal = Math.max(0, baseVal - 10);
-        energyVal = baseVal;
-      } else {
-        physVal = baseVal;
-        energyVal = Math.max(0, baseVal - 20);
-      }
-      
-      // Store rank if available
-      if (power.system.rank && !physicalRank) {
-        physicalRank = power.system.rank;
-      }
-      if (power.system.rank && !energyRank) {
-        const rankIdx = RANKS.indexOf(power.system.rank);
-        if (rankIdx >= 0) {
-          const energyRankIdx = Math.max(0, rankIdx - 2);
-          energyRank = RANKS[energyRankIdx];
-        }
-      }
-    } else {
-      // Use explicit armorPhysical/armorEnergy if set, otherwise fall back to value
-      physVal = power.system.armorPhysical;
-      energyVal = power.system.armorEnergy;
-      
-      if (physVal === undefined || physVal === 0) {
-        physVal = typeof power.system.value === 'number'
-          ? power.system.value
-          : (CONFIG.FASERIP?.rankValues?.[power.system.rank] || 0);
-        
-        // Store rank if available
-        if (power.system.rank && !physicalRank) {
-          physicalRank = power.system.rank;
-        }
-      }
-      
-      if (energyVal === undefined || energyVal === 0) {
-        // Force Fields: full vs Energy, -10 vs physical. Body Armor: -20 vs energy.
-        if (power.system.isForceField) {
-          energyVal = physVal;
-          // Also adjust physVal for FF: -10 vs physical
-          physVal = Math.max(0, physVal - 10);
-        } else {
-          energyVal = Math.max(0, physVal - 20);
-        }
-        
-        if (power.system.rank && !energyRank) {
-          const rankIdx = RANKS.indexOf(power.system.rank);
-          if (rankIdx >= 0) {
-            // Energy rank is typically 2 CS lower than physical
-            const energyRankIdx = Math.max(0, rankIdx - 2);
-            energyRank = RANKS[energyRankIdx];
-          }
-        }
+    const baseVal = typeof power.system.value === 'number'
+      ? power.system.value
+      : (CONFIG.FASERIP?.rankValues?.[power.system.rank] || 0);
+    
+    // Read stored values, fall back to formula defaults
+    physVal = (power.system.armorPhysical !== undefined && power.system.armorPhysical !== 0)
+      ? power.system.armorPhysical : baseVal;
+    energyVal = (power.system.armorEnergy !== undefined && power.system.armorEnergy !== 0)
+      ? power.system.armorEnergy : (power.system.isForceField ? baseVal : Math.max(0, baseVal - 20));
+    
+    // Force Fields: full vs Energy, -10 vs physical
+    if (power.system.isForceField) {
+      if (!power.system.armorPhysical) physVal = Math.max(0, baseVal - 10);
+      if (!power.system.armorEnergy) energyVal = baseVal;
+    }
+    
+    // Store ranks
+    if (power.system.rank && !physicalRank) {
+      physicalRank = power.system.rank;
+    }
+    if (power.system.rank && !energyRank) {
+      const rankIdx = RANKS.indexOf(power.system.rank);
+      if (rankIdx >= 0) {
+        const energyRankIdx = Math.max(0, rankIdx - 2);
+        energyRank = RANKS[energyRankIdx];
       }
     }
     

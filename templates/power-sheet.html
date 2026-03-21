@@ -308,10 +308,9 @@
                 </select>
               </div>
             </div>
-            <label style="cursor:pointer;"><input type="checkbox" name="system.armorUseRankValue" {{checked system.armorUseRankValue}} data-dtype="Boolean" id="armor-use-rank" /> Use Power Rank Value</label>
-            <div class="form-row armor-manual-values" {{#if system.armorUseRankValue}}style="display:none;"{{/if}}>
-              <div class="form-group half"><label>Phys:</label><input type="number" name="system.armorPhysical" value="{{system.armorPhysical}}" data-dtype="Number" /></div>
-              <div class="form-group half"><label>Engy:</label><input type="number" name="system.armorEnergy"   value="{{system.armorEnergy}}"   data-dtype="Number" /></div>
+            <div class="form-row" style="margin-top:4px;">
+              <div class="form-group half"><label>Phys:</label><input type="number" name="system.armorPhysical" value="{{system.armorPhysical}}" data-dtype="Number" id="ps1-armor-phys" /></div>
+              <div class="form-group half" style="position:relative;"><label>Engy: {{#if system.armorEnergyCustom}}<span class="ps2-armor-custom-badge" title="Non-standard energy value (click to reset)" data-action="reset-armor-energy" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#e67e22;cursor:pointer;vertical-align:middle;margin-left:3px;"></span>{{/if}}</label><input type="number" name="system.armorEnergy" value="{{system.armorEnergy}}" data-dtype="Number" id="ps1-armor-energy" /></div>
             </div>
           </div>
           {{/if}}

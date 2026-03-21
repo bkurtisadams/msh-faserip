@@ -49,21 +49,12 @@ function resolveBodyArmorValues(item) {
   const sys = item.system || {};
   const rankValue = getRankValue(sys.rank);
   const armorType = sys.bodyArmorType || "both";
-  const useRankValue = sys.armorUseRankValue === true;
+  const baseVal = typeof sys.value === "number" ? sys.value : rankValue;
 
-  let physical, energy;
-
-  if (useRankValue) {
-    physical = typeof sys.value === "number" ? sys.value : rankValue;
-    energy = Math.max(0, physical - 20);
-  } else {
-    physical = (sys.armorPhysical !== undefined && sys.armorPhysical !== 0)
-      ? sys.armorPhysical
-      : (typeof sys.value === "number" ? sys.value : rankValue);
-    energy = (sys.armorEnergy !== undefined && sys.armorEnergy !== 0)
-      ? sys.armorEnergy
-      : Math.max(0, physical - 20);
-  }
+  let physical = (sys.armorPhysical !== undefined && sys.armorPhysical !== 0)
+    ? sys.armorPhysical : baseVal;
+  let energy = (sys.armorEnergy !== undefined && sys.armorEnergy !== 0)
+    ? sys.armorEnergy : Math.max(0, baseVal - 20);
 
   if (armorType === "physical") energy = 0;
   if (armorType === "energy") physical = 0;

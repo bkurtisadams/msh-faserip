@@ -176,8 +176,38 @@ export function ps2ActivateListeners(html, sheet) {
     const rank = ev.currentTarget.value;
     const val = (CONFIG.FASERIP?.rankValues?.[rank] ?? RANK_VALUES[rank]) ?? "";
     html.find('#ps2-value').val(val);
-    // Persist both so submitOnChange picks up the pair
-    await sheet.item.update({ "system.rank": rank, "system.value": Number(val) || 0 });
+    // Auto-fill armor fields if this is a body armor power
+    const updates = { "system.rank": rank, "system.value": Number(val) || 0 };
+    if (sheet.item.system.isBodyArmor) {
+      const numVal = Number(val) || 0;
+      updates["system.armorPhysical"] = numVal;
+      if (!sheet.item.system.armorEnergyCustom) {
+        updates["system.armorEnergy"] = Math.max(0, numVal - 20);
+      }
+    }
+    await sheet.item.update(updates);
+  });
+
+  // Body Armor: detect manual energy edit -> set custom flag
+  html.find('#ps2-armor-energy').on('change', async ev => {
+    const newEnergy = Number(ev.currentTarget.value) || 0;
+    const rankVal = sheet.item.system.value || 0;
+    const defaultEnergy = Math.max(0, rankVal - 20);
+    const isCustom = newEnergy !== defaultEnergy;
+    if (isCustom !== (sheet.item.system.armorEnergyCustom || false)) {
+      await sheet.item.update({ "system.armorEnergyCustom": isCustom });
+    }
+  });
+
+  // Body Armor: reset energy to default on badge click
+  html.find('[data-action="reset-armor-energy"]').on('click', async ev => {
+    ev.preventDefault();
+    ev.stopPropagation();
+    const rankVal = sheet.item.system.value || 0;
+    await sheet.item.update({
+      "system.armorEnergy": Math.max(0, rankVal - 20),
+      "system.armorEnergyCustom": false
+    });
   });
 
   // Special strength type change -> re-render to show correct sub-select
