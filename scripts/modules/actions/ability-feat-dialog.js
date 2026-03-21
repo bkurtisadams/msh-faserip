@@ -1,5 +1,5 @@
-// ability-feat-dialog.js v1.0.0 - 2026-03-06
-// Extracted from actorSheet.js — standalone ability FEAT dialog usable from sheet and combat panel.
+// ability-feat-dialog.js v1.1.0 - 2026-03-21
+// Standalone ability FEAT dialog. Fighting supports Multiple Combat Actions pre-action FEAT.
 
 import { generateKarmaControlsHTML, showKarmaDecisionDialog, getAvailableKarma } from '../dice/dice-roller.js';
 import { applyColumnShifts } from '../dice/column-shifts.js';
@@ -125,6 +125,7 @@ export async function showAbilityFeatDialog(actor, abilityName) {
   const abilityRank = ability.rank;
   const abilityValue = ability.value;
   const isStrength = key === "strength";
+  const isFighting = key === "fighting";
 
   // Saved settings
   const gf = (flag) => actor.getFlag("msh-faserip", flag);
@@ -135,6 +136,7 @@ export async function showAbilityFeatDialog(actor, abilityName) {
   const savedWeightIntensity = gf(`last${fullName}WeightIntensity`) || "Remarkable";
   const savedMaterial       = gf(`last${fullName}Material`) || "Steel";
   const savedThickness      = gf(`last${fullName}Thickness`) || "2-12";
+  const savedMultiAttackCount = gf(`last${fullName}MultiAttackCount`) || "2";
 
   // Build dropdown HTML
   const materialOptionsHTML = Object.entries(MATERIALS_BY_RANK).map(([rank, mats]) => {
@@ -195,6 +197,28 @@ export async function showAbilityFeatDialog(actor, abilityName) {
       </div>`;
   }
 
+  if (isFighting) {
+    dialogContent += `
+      <div style="margin-bottom: 10px;">
+        <label style="display: inline-block; width: 100px;">FEAT Type:</label>
+        <label><input type="radio" name="featType" value="standard" ${savedFeatType === 'standard' ? 'checked' : ''}> Standard</label>
+        <label style="margin-left: 10px;"><input type="radio" name="featType" value="multiattack" ${savedFeatType === 'multiattack' ? 'checked' : ''}> Multiple Attacks</label>
+      </div>
+      <div id="multiattack-section" style="display: none; padding: 8px; background-color: #f0f0f0; border-radius: 3px; margin-bottom: 10px;">
+        <div style="font-weight: bold; margin-bottom: 5px; text-align: center;">─── Multiple Combat Actions ───</div>
+        <div style="margin-bottom: 5px;">
+          <label style="display: inline-block; width: 60px;">Attacks:</label>
+          <label><input type="radio" name="multiAttackCount" value="2" ${savedMultiAttackCount === '2' ? 'checked' : ''}> 2 (Remarkable)</label>
+          <label style="margin-left: 10px;"><input type="radio" name="multiAttackCount" value="3" ${savedMultiAttackCount === '3' ? 'checked' : ''}> 3 (Amazing)</label>
+        </div>
+        <div style="font-size: 0.85em; color: #555; margin-top: 4px; padding: 4px 6px; border-left: 3px solid #c0a070;">
+          <div><strong>Success:</strong> All attacks at −1CS to hit</div>
+          <div><strong>Failure:</strong> 1 attack at −3CS to hit</div>
+          <div style="margin-top: 3px;">Slugfest and Shooting only. Powers may permit multiple attacks as Power Stunts.</div>
+        </div>
+      </div>`;
+  }
+
   dialogContent += `
     <div style="margin-bottom: 10px;">
       <label style="display: inline-block; width: 120px;">Intensity:</label>
@@ -244,12 +268,18 @@ export async function showAbilityFeatDialog(actor, abilityName) {
           let weightIntensity = '';
           let material = '';
           let thickness = '';
+          let multiAttackCount = '2';
 
           if (isStrength) {
             featType = html.find('[name="featType"]:checked').val();
             weightIntensity = html.find('[name="weightIntensity"]').val();
             material = html.find('[name="material"]').val();
             thickness = html.find('[name="thickness"]:checked').val();
+          }
+
+          if (isFighting) {
+            featType = html.find('[name="featType"]:checked').val();
+            multiAttackCount = html.find('[name="multiAttackCount"]:checked').val() || '2';
           }
 
           // Save settings
@@ -263,25 +293,36 @@ export async function showAbilityFeatDialog(actor, abilityName) {
               await actor.setFlag("msh-faserip", `last${fullName}Material`, material);
               await actor.setFlag("msh-faserip", `last${fullName}Thickness`, thickness);
             }
+            if (isFighting) {
+              await actor.setFlag("msh-faserip", `last${fullName}FeatType`, featType);
+              await actor.setFlag("msh-faserip", `last${fullName}MultiAttackCount`, multiAttackCount);
+            }
           }
 
           // Apply column shifts
           const effectiveRank = applyCS(abilityRank, columnShift);
+
+          // Fighting multi-attack: override intensity from attack count
+          let multiAttackIntensity = '';
+          if (isFighting && featType === 'multiattack') {
+            multiAttackIntensity = parseInt(multiAttackCount) >= 3 ? "Amazing" : "Remarkable";
+          }
+          const effectiveIntensity = (isFighting && featType === 'multiattack') ? multiAttackIntensity : intensity;
 
           // Determine FEAT requirement
           let featRequirement = "Any Color";
           let isImpossible = false;
           let isAutomatic = false;
 
-          if (intensity !== "None") {
-            const req = determineFeatRequirement(effectiveRank, intensity);
+          if (effectiveIntensity !== "None") {
+            const req = determineFeatRequirement(effectiveRank, effectiveIntensity);
             featRequirement = req.requirement;
             isImpossible = req.impossible;
             isAutomatic = req.automatic;
           }
 
           if (isImpossible) {
-            ui.notifications.warn(`FEAT is impossible: ${effectiveRank} ability vs ${intensity} intensity. Need ability to be within one rank of intensity.`);
+            ui.notifications.warn(`FEAT is impossible: ${effectiveRank} ability vs ${effectiveIntensity} intensity. Need ability to be within one rank of intensity.`);
             return;
           }
 
@@ -299,26 +340,37 @@ export async function showAbilityFeatDialog(actor, abilityName) {
             }
           }
 
+          // Fighting multi-attack context string
+          let fightingContext = '';
+          if (isFighting && featType === 'multiattack') {
+            const atkCount = parseInt(multiAttackCount);
+            fightingContext = `<div>Multiple Attacks: ${atkCount} (Intensity: ${multiAttackIntensity})</div>`;
+          }
+
           // Automatic success
           if (isAutomatic) {
+            const autoMultiMsg = (isFighting && featType === 'multiattack')
+              ? `<div style="margin-top:4px;">Proceed with ${multiAttackCount} attacks at −1CS to hit.</div>` : '';
             await ChatMessage.create({
               speaker: ChatMessage.getSpeaker({ actor }),
               content: `
                 <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
                   <div style="padding: 5px 10px; border-bottom: 1px solid #c0c0c0; font-size: 1.1em; color: #8b0000;">
-                    <strong>${actor.name} - ${fullName} FEAT Roll vs ${intensity}</strong>
+                    <strong>${actor.name} - ${fullName} FEAT Roll vs ${effectiveIntensity}</strong>
                   </div>
                   <div style="padding: 5px 10px; font-size: 0.9em;">
                     <div>Base Rank: ${abilityRank} (${abilityValue})</div>
                     ${columnShift !== 0 ? `<div>Column Shift: ${columnShift} → ${effectiveRank}</div>` : ''}
                     ${strengthContext}
-                    <div>Intensity: ${intensity}</div>
+                    ${fightingContext}
+                    <div>Intensity: ${effectiveIntensity}</div>
                     <div>Ability rank is 3+ ranks higher than intensity</div>
                   </div>
                   <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
                     background-color: #4CAF50; color: white;">
                     AUTOMATIC SUCCESS
                   </div>
+                  ${autoMultiMsg}
                 </div>`
             });
             return;
@@ -331,7 +383,7 @@ export async function showAbilityFeatDialog(actor, abilityName) {
           if (!skipDice) {
             await roll.toMessage({
               speaker: ChatMessage.getSpeaker({ actor }),
-              flavor: `${actor.name} makes a ${fullName} FEAT roll${intensity !== "None" ? ` vs ${intensity} intensity` : ""}`,
+              flavor: `${actor.name} makes a ${fullName} FEAT roll${effectiveIntensity !== "None" ? ` vs ${effectiveIntensity} intensity` : ""}`,
               rollMode: game.settings.get("core", "rollMode")
             });
           }
@@ -352,8 +404,25 @@ export async function showAbilityFeatDialog(actor, abilityName) {
           const resultColor = game.msh.rollUniversalTable(effectiveRank, cappedTotal);
 
           let featSuccess = true;
-          if (intensity !== "None") {
+          if (effectiveIntensity !== "None") {
             featSuccess = checkFeatSuccess(resultColor, featRequirement);
+          }
+
+          // Multi-attack consequence text
+          let multiAttackResult = '';
+          if (isFighting && featType === 'multiattack') {
+            const atkCount = parseInt(multiAttackCount);
+            if (featSuccess) {
+              multiAttackResult = `
+                <div style="padding: 5px 10px; font-size: 0.9em; background-color: #e8f5e9; border-top: 1px solid #c0c0c0;">
+                  Proceed with ${atkCount} attacks at −1CS to hit.
+                </div>`;
+            } else {
+              multiAttackResult = `
+                <div style="padding: 5px 10px; font-size: 0.9em; background-color: #ffebee; border-top: 1px solid #c0c0c0;">
+                  1 attack only, at −3CS to hit.
+                </div>`;
+            }
           }
 
           // Chat card
@@ -362,13 +431,14 @@ export async function showAbilityFeatDialog(actor, abilityName) {
             content: `
               <div style="background-color: #f5f5f0; border: 1px solid #c0c0c0; border-radius: 3px; margin-bottom: 5px;">
                 <div style="padding: 5px 10px; border-bottom: 1px solid #c0c0c0; font-size: 1.1em; color: #8b0000;">
-                  <strong>${actor.name} - ${fullName} FEAT Roll${intensity !== "None" ? ` vs ${intensity}` : ""}</strong>
+                  <strong>${actor.name} - ${fullName} FEAT Roll${effectiveIntensity !== "None" ? ` vs ${effectiveIntensity}` : ""}</strong>
                 </div>
                 <div style="padding: 5px 10px; font-size: 0.9em;">
                   <div>Base Rank: ${abilityRank} (${abilityValue})</div>
                   ${columnShift !== 0 ? `<div>Column Shift: ${columnShift} → ${effectiveRank}</div>` : ''}
                   ${strengthContext}
-                  ${intensity !== "None" ? `<div>Intensity: ${intensity} (Required: ${featRequirement})</div>` : ''}
+                  ${fightingContext}
+                  ${effectiveIntensity !== "None" ? `<div>Intensity: ${effectiveIntensity} (Required: ${featRequirement})</div>` : ''}
                   <div>Roll: ${roll.total} + Karma: ${karmaUsed} = ${cappedTotal}</div>
                 </div>
                 <div style="text-align: center; padding: 8px; margin: 5px; font-weight: bold; font-size: 1.1em; border-radius: 3px; 
@@ -376,11 +446,12 @@ export async function showAbilityFeatDialog(actor, abilityName) {
                   color: ${colorFg(resultColor)};">
                   ${resultColor.toUpperCase()} RESULT
                 </div>
-                ${intensity !== "None" ? `
+                ${effectiveIntensity !== "None" ? `
                   <div style="padding: 5px 10px; font-size: 1.1em; text-align: center; font-weight: bold; color: ${featSuccess ? '#4CAF50' : '#F44336'};">
                     ${featSuccess ? 'FEAT SUCCEEDED' : 'FEAT FAILED'}
                   </div>
                 ` : ''}
+                ${multiAttackResult}
               </div>`
           });
         }
@@ -413,9 +484,44 @@ export async function showAbilityFeatDialog(actor, abilityName) {
         }
       };
 
-      if (!isStrength) {
+      if (!isStrength && !isFighting) {
         html.find('#intensity, #shift').on('change', updateFeatRequirement);
         updateFeatRequirement();
+      } else if (isFighting) {
+        const dialogElement = html.closest('.dialog');
+
+        const updateMultiAttackIntensity = () => {
+          const count = html.find('[name="multiAttackCount"]:checked').val() || '2';
+          const intensity = parseInt(count) >= 3 ? "Amazing" : "Remarkable";
+          html.find('#intensity').val(intensity);
+          updateFeatRequirement();
+        };
+
+        const updateFightingFeatType = () => {
+          const ft = html.find('[name="featType"]:checked').val();
+          const multiSec = html.find('#multiattack-section');
+          const intensitySelect = html.find('#intensity');
+          const intensityRow = intensitySelect.closest('div');
+
+          if (ft === 'multiattack') {
+            multiSec.show(); intensityRow.hide();
+            updateMultiAttackIntensity();
+          } else {
+            multiSec.hide(); intensityRow.show();
+            intensitySelect.prop('disabled', false);
+            intensitySelect.val(savedIntensity);
+            updateFeatRequirement();
+          }
+
+          if (dialogElement.length > 0) {
+            dialogElement[0].style.height = 'auto';
+          }
+        };
+
+        html.find('[name="featType"]').on('change', updateFightingFeatType);
+        html.find('[name="multiAttackCount"]').on('change', updateMultiAttackIntensity);
+        html.find('#intensity, #shift').on('change', updateFeatRequirement);
+        updateFightingFeatType();
       } else {
         const dialogElement = html.closest('.dialog');
 
