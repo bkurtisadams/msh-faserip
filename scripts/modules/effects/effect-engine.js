@@ -513,7 +513,6 @@ export async function applySlam(actor, { kind = "No Slam", knockbackAreas = 0, p
     changes = [
       { key: "system.combatMods.defenseShift", mode: AE_MODE.ADD, value: "-2", priority: 20 },
       { key: "system.combatMods.defenseShiftRanged", mode: AE_MODE.ADD, value: "-2", priority: 20 },
-      { key: "system.combatMods.abilityShifts.agility", mode: AE_MODE.ADD, value: "-2", priority: 20 },
       { key: "system.combatMods.movementMult", mode: AE_MODE.OVERRIDE, value: "0", priority: 50 },
       { key: "system.combatMods.canAct", mode: AE_MODE.OVERRIDE, value: "false", priority: 50 },
       { key: "system.combatMods.canMove", mode: AE_MODE.OVERRIDE, value: "false", priority: 50 }
@@ -528,8 +527,7 @@ export async function applySlam(actor, { kind = "No Slam", knockbackAreas = 0, p
     changes = [
       { key: "system.combatMods.attackShift", mode: AE_MODE.ADD, value: "-1", priority: 20 },
       { key: "system.combatMods.defenseShift", mode: AE_MODE.ADD, value: "-1", priority: 20 },
-      { key: "system.combatMods.defenseShiftRanged", mode: AE_MODE.ADD, value: "1", priority: 20 },
-      { key: "system.combatMods.abilityShifts.agility", mode: AE_MODE.ADD, value: "-2", priority: 20 }
+      { key: "system.combatMods.defenseShiftRanged", mode: AE_MODE.ADD, value: "1", priority: 20 }
     ];
   }
   
@@ -561,7 +559,6 @@ export async function applyProne(actor, { rounds = 1, originUuid = null } = {}, 
       { key: "system.combatMods.attackShift", mode: AE_MODE.ADD, value: "-1", priority: 20 },
       { key: "system.combatMods.defenseShift", mode: AE_MODE.ADD, value: "-1", priority: 20 },
       { key: "system.combatMods.defenseShiftRanged", mode: AE_MODE.ADD, value: "1", priority: 20 },
-      { key: "system.combatMods.abilityShifts.agility", mode: AE_MODE.ADD, value: "-2", priority: 20 },
       { key: "system.combatMods.movementMult", mode: AE_MODE.MULTIPLY, value: "0.5", priority: 20 }
     ],
     flags: {
