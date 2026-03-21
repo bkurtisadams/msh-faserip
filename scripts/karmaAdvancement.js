@@ -184,7 +184,7 @@ export class KarmaAdvancementSheet extends DocumentSheet {
     }).render(true);
   }
 
-  _onPurchaseAdvancement(event) {
+  async _onPurchaseAdvancement(event) {
     event.preventDefault();
     
     const purpose = this.object.system.karma.advancementPurpose;
@@ -219,7 +219,7 @@ export class KarmaAdvancementSheet extends DocumentSheet {
         const nextNumber = abilityValue + 1;
         const isCresting = this._isCresting(abilityValue, nextNumber);
         
-        const baseCost = nextNumber;
+        const baseCost = 10 * abilityValue;
         const crestingCost = isCresting ? 400 : 0;
         cost = baseCost + crestingCost;
         
@@ -233,21 +233,19 @@ export class KarmaAdvancementSheet extends DocumentSheet {
         }
         break;
         
-      case "power":
-        // Simple power advancement - ask user for cost
-        this._askForCustomCost("Power Advancement", "Enter the karma cost for this power advancement:", (customCost) => {
-          if (customCost === null) return;
-          this._completePurchase(customCost, `Power advancement (${customCost} karma)`, {});
-        });
+      case "power": {
+        const customCost = await this._askForCustomCost("Power Advancement", "Enter the karma cost for this power advancement:");
+        if (customCost === null) return;
+        this._completePurchase(customCost, `Power advancement (${customCost} karma)`, {});
         return;
+      }
         
-      case "powerAdd":
-        // Simple power addition - ask user for cost
-        this._askForCustomCost("Power Addition", "Enter the karma cost for this power addition:", (customCost) => {
-          if (customCost === null) return;
-          this._completePurchase(customCost, `Power addition (${customCost} karma)`, {});
-        });
+      case "powerAdd": {
+        const customCost = await this._askForCustomCost("Power Addition", "Enter the karma cost for this power addition:");
+        if (customCost === null) return;
+        this._completePurchase(customCost, `Power addition (${customCost} karma)`, {});
         return;
+      }
         
       case "resource":
         const resourceRank = this.object.system.attributes.resources.rank || "Typical";
@@ -277,19 +275,19 @@ export class KarmaAdvancementSheet extends DocumentSheet {
         updateData["system.attributes.popularity.hero.value"] = nextPopularity;
         break;
         
-      case "talent":
-        this._askForCustomCost("Talent Addition", "Enter karma cost (1000 for NPC, 2000 for PC):", (customCost) => {
-          if (customCost === null) return;
-          this._completePurchase(customCost, `Talent addition (${customCost} karma)`, {});
-        });
+      case "talent": {
+        const customCost = await this._askForCustomCost("Talent Addition", "Enter karma cost (1000 for NPC, 2000 for PC):");
+        if (customCost === null) return;
+        this._completePurchase(customCost, `Talent addition (${customCost} karma)`, {});
         return;
+      }
         
-      case "contact":
-        this._askForCustomCost("Contact Addition", "Enter karma cost (500 + 10×Resource rank):", (customCost) => {
-          if (customCost === null) return;
-          this._completePurchase(customCost, `Contact addition (${customCost} karma)`, {});
-        });
+      case "contact": {
+        const customCost = await this._askForCustomCost("Contact Addition", "Enter karma cost (500 + 10×Resource rank):");
+        if (customCost === null) return;
+        this._completePurchase(customCost, `Contact addition (${customCost} karma)`, {});
         return;
+      }
         
       default:
         ui.notifications.error("Unknown advancement type.");
@@ -361,7 +359,7 @@ export class KarmaAdvancementSheet extends DocumentSheet {
         const nextNumber = abilityValue + 1;
         const isCresting = this._isCresting(abilityValue, nextNumber);
         
-        const baseCost = nextNumber;
+        const baseCost = 10 * abilityValue;
         const crestingCost = isCresting ? 400 : 0;
         const totalCost = baseCost + crestingCost;
         
@@ -619,4 +617,3 @@ async _getContactAdditionCost() {
   });
 }
 }
-

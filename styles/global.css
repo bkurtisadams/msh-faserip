@@ -3682,8 +3682,8 @@ form.faserip-sheet .secondary-abilities .stacked-values {
 }
 
 form.faserip-sheet .secondary-abilities .stacked-values input[type="number"] {
-  width: 50px;
-  min-width: 50px;
+  width: 64px;
+  min-width: 64px;
   flex-shrink: 0;
 }
 
