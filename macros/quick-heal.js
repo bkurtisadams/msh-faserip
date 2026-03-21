@@ -1,29 +1,21 @@
-// quick-heal.js v1.4.0 - 2026-03-21
-// v1.4.0: Preserve non-standard ability rank values (e.g. Good 15) — resolve original
-//         endurance value from actor/base data instead of always deriving from rank name.
-// v1.3.0: Fix effects not deleting — pass mshIntentional option so preDeleteActiveEffect
-//         hook doesn't block dying/impaired/defense/regen effect removal.
-//         Restore HP BEFORE deleting effects so deleteActiveEffect hook doesn't
-//         trigger consciousness attempts while health is still 0.
-//         Clear rest-system flags (wasKnockedOut, lastDamageWorldTime, lastDamageTime).
-// v1.2.0: Fix Endurance restoration — use current rank unless dying/impaired effect
-//         stored an original. initialRank is last resort (pre-advancement chargen value).
-// v1.1.0: Fix restoration - check originalEndurance flag, better fallback chain, clear flags after heal
-// Restore selected tokens to full health, clear effects, restore Endurance
+// quick-heal.js v2.0.0 - 2026-03-21
+// v2.0.0: Dialog with categorized effect checkboxes and persistent per-client prefs.
+//         Combat effects (dying/unconscious/stunned/slam/stagger) default ON (delete).
+//         Defense, power, and custom effects default OFF (keep). Prefs stored in client setting.
+// v1.4.0: Preserve non-standard ability rank values (e.g. Good 15).
+// v1.3.0: Fix effects not deleting — pass mshIntentional, restore HP before delete.
 // Usage: game.msh.macros.quickHeal()
+
+const SCOPE = "msh-faserip";
+const PREFS_KEY = "quickHealPrefs";
 
 const RANK_VALUES = {
   "Sh-0": 0, "Shift-0": 0, "Shift 0": 0, "Sh0": 0,
-  "Fe": 2, "Feeble": 2,
-  "Pr": 4, "Poor": 4,
-  "Ty": 6, "Typical": 6,
-  "Gd": 10, "Good": 10,
-  "Ex": 20, "Excellent": 20,
-  "Rm": 30, "Remarkable": 30,
-  "In": 40, "Incredible": 40,
-  "Am": 50, "Amazing": 50,
-  "Mn": 75, "Monstrous": 75,
-  "Un": 100, "Unearthly": 100,
+  "Fe": 2, "Feeble": 2, "Pr": 4, "Poor": 4,
+  "Ty": 6, "Typical": 6, "Gd": 10, "Good": 10,
+  "Ex": 20, "Excellent": 20, "Rm": 30, "Remarkable": 30,
+  "In": 40, "Incredible": 40, "Am": 50, "Amazing": 50,
+  "Mn": 75, "Monstrous": 75, "Un": 100, "Unearthly": 100,
   "Sh-X": 150, "Shift-X": 150, "ShX": 150,
   "Sh-Y": 200, "Shift-Y": 200, "ShY": 200,
   "Sh-Z": 500, "Shift-Z": 500, "ShZ": 500,
@@ -31,7 +23,6 @@ const RANK_VALUES = {
   "CL3000": 3000, "Class 3000": 3000,
   "CL5000": 5000, "Class 5000": 5000
 };
-
 const ABBREV_TO_FULL = {
   "Sh-0": "Shift-0", "Sh0": "Shift-0",
   "Fe": "Feeble", "Pr": "Poor", "Ty": "Typical",
@@ -43,208 +34,361 @@ const ABBREV_TO_FULL = {
   "CL1000": "Class 1000", "CL3000": "Class 3000", "CL5000": "Class 5000"
 };
 
-const SCOPE = "msh-faserip";
-
-function getRankValue(rankName) {
-  return RANK_VALUES[rankName] || game.msh?.getRankValue?.(rankName) || CONFIG.FASERIP?.rankValues?.[rankName] || 0;
+function getRankValue(r) {
+  return RANK_VALUES[r] || game.msh?.getRankValue?.(r) || CONFIG.FASERIP?.rankValues?.[r] || 0;
+}
+function normalizeRank(r) { return r ? (ABBREV_TO_FULL[r] || r) : null; }
+function isCorruptedOriginal(r) {
+  if (!r) return true;
+  return normalizeRank(r) === "Shift-0" || getRankValue(r) === 0;
 }
 
-function normalizeRank(rank) {
-  if (!rank) return null;
-  return ABBREV_TO_FULL[rank] || rank;
+// ── Effect classification ──
+
+const COMBAT_EFFECT_TYPES = new Set([
+  "dying", "stunned", "unconscious", "slammed", "grandSlam",
+  "staggered", "prone", "grappled", "held", "escaped", "reversed",
+  "entangled", "blinded", "deafened", "paralyzed", "weakened",
+  "charging", "evading", "evasionBonus", "blocking"
+]);
+
+function classifyEffect(e) {
+  const flags = e.flags?.[SCOPE] || {};
+  const effectType = flags.effectType || "";
+  if (flags.isDying || flags.ongoingId === "dying" || effectType === "dying") return "combat";
+  if (flags.isImpairedEndurance) return "combat";
+  if (flags.isStunned || flags.status?.isStunned) return "combat";
+  if (flags.status?.isUnconscious) return "combat";
+  if (flags.status?.isSlammed) return "combat";
+  if (flags.fromDeathSave || flags.fromConsciousnessFail) return "combat";
+  if (COMBAT_EFFECT_TYPES.has(effectType)) return "combat";
+  if (flags.effectCategory === "defense") return "defense";
+  if (flags.ongoingId === "regeneration" || flags.ongoingId === "solarRegen" ||
+      flags.ongoingId === "absorption" || effectType === "regeneration") return "power";
+  if (flags.effectType === "nullified") return "power";
+  if (flags.ongoingId) return "power";
+  return "other";
 }
 
-function isCorruptedOriginal(rank) {
-  if (!rank) return true;
-  const normalized = normalizeRank(rank);
-  return normalized === "Shift-0" || getRankValue(rank) === 0;
+function categoryLabel(cat) {
+  switch (cat) {
+    case "combat":  return "Combat Effects";
+    case "defense": return "Defense";
+    case "power":   return "Power Effects";
+    default:        return "Other";
+  }
 }
 
-/**
- * Restore selected tokens to full health, clear dying/impaired effects, restore Endurance
- * @returns {Promise<void>}
- */
+function categoryColor(cat) {
+  switch (cat) {
+    case "combat":  return "#c62828";
+    case "defense": return "#1565c0";
+    case "power":   return "#6a1b9a";
+    default:        return "#555";
+  }
+}
+
+// ── Persistent prefs ──
+
+function loadPrefs() {
+  try {
+    const raw = game.settings.get(SCOPE, PREFS_KEY);
+    return typeof raw === "object" && raw ? raw : {};
+  } catch { return {}; }
+}
+function savePrefs(prefs) {
+  try { game.settings.set(SCOPE, PREFS_KEY, prefs); } catch (e) {
+    console.warn("[FASERIP] Quick Heal: Could not save prefs", e);
+  }
+}
+
+// Default: combat ON, everything else OFF
+function defaultChecked(cat, prefs) {
+  if (prefs.categories?.[cat] !== undefined) return prefs.categories[cat];
+  return cat === "combat";
+}
+
+// ── Endurance resolution (unchanged from v1.4.0) ──
+
+function resolveEndurance(actor, token) {
+  const isUnlinked = token.document.actorLink === false;
+  const baseActor = isUnlinked ? game.actors.get(token.document.actorId) : null;
+  const baseEndurance = baseActor?.system.abilities?.endurance;
+
+  const dyingEffect = actor.effects.find(e => e.getFlag(SCOPE, "isDying"));
+  const impairedEffect = actor.effects.find(e => e.getFlag(SCOPE, "isImpairedEndurance"));
+  const effectOriginal = dyingEffect?.getFlag(SCOPE, "originalEndurance") ||
+                        impairedEffect?.getFlag(SCOPE, "originalEndurance");
+  const actorFlagOriginal = actor.getFlag(SCOPE, "originalEndurance");
+  const initialRankAbbrev = actor.system.abilities?.endurance?.initialRank;
+  const initialRankFull = normalizeRank(initialRankAbbrev);
+  const hasDyingOrImpaired = !!(dyingEffect || impairedEffect);
+
+  let originalRank = null;
+  if (hasDyingOrImpaired && effectOriginal && !isCorruptedOriginal(effectOriginal)) {
+    originalRank = effectOriginal;
+  } else if (hasDyingOrImpaired && actorFlagOriginal && !isCorruptedOriginal(actorFlagOriginal)) {
+    originalRank = actorFlagOriginal;
+  } else if (actor.system.abilities?.endurance?.rank && !isCorruptedOriginal(actor.system.abilities.endurance.rank)) {
+    originalRank = actor.system.abilities.endurance.rank;
+  } else if (isUnlinked && baseEndurance?.rank && !isCorruptedOriginal(baseEndurance.rank)) {
+    originalRank = baseEndurance.rank;
+  } else if (initialRankFull && !isCorruptedOriginal(initialRankFull)) {
+    originalRank = initialRankFull;
+  } else {
+    originalRank = "Good";
+  }
+
+  let originalValue;
+  if (!hasDyingOrImpaired) {
+    originalValue = Number(actor.system.abilities?.endurance?.value) || getRankValue(originalRank);
+  } else if (isUnlinked && baseEndurance?.value && baseEndurance.rank === originalRank) {
+    originalValue = Number(baseEndurance.value);
+  } else if (actor.system.abilities?.endurance?.initialValue && normalizeRank(initialRankAbbrev) === originalRank) {
+    originalValue = Number(actor.system.abilities.endurance.initialValue);
+  } else {
+    originalValue = getRankValue(originalRank);
+  }
+
+  const f = actor.system.abilities?.fighting?.value || 0;
+  const a = actor.system.abilities?.agility?.value || 0;
+  const s = actor.system.abilities?.strength?.value || 0;
+  const restoredHealthMax = f + a + s + originalValue;
+  const targetHealthMax = isUnlinked && baseActor
+    ? baseActor.system.attributes?.health?.max
+    : restoredHealthMax;
+
+  return { originalRank, originalValue, targetHealthMax, isUnlinked, baseActor };
+}
+
+// ── Apply heal to one token ──
+
+async function applyHeal(token, effectIdsToDelete) {
+  const actor = token.actor;
+  if (!actor) return;
+
+  const { originalRank, originalValue, targetHealthMax, isUnlinked } = resolveEndurance(actor, token);
+
+  // Restore HP first (before effect deletion)
+  if (isUnlinked) {
+    await token.document.update({
+      "delta.system.abilities.endurance.rank": originalRank,
+      "delta.system.abilities.endurance.value": originalValue,
+      "delta.system.attributes.health.value": targetHealthMax,
+      "delta.system.attributes.health.max": targetHealthMax,
+      "delta.system.details.isDead": false
+    });
+  } else {
+    await actor.update({
+      "system.abilities.endurance.rank": originalRank,
+      "system.abilities.endurance.value": originalValue,
+      "system.attributes.health.value": targetHealthMax,
+      "system.details.isDead": false
+    });
+  }
+
+  // Delete selected effects
+  if (effectIdsToDelete.length) {
+    await actor.deleteEmbeddedDocuments("ActiveEffect", effectIdsToDelete, { mshIntentional: true });
+  }
+
+  // Clear statuses
+  if (isUnlinked) {
+    await token.document.update({ "delta.statuses": [] });
+  }
+  try {
+    for (const sid of [...(actor.statuses || [])]) {
+      await actor.toggleStatusEffect(sid, { active: false });
+    }
+  } catch (e) { /* ignore */ }
+
+  // Clear flags
+  try { await actor.unsetFlag(SCOPE, "originalEndurance"); } catch {}
+  try { await actor.unsetFlag(SCOPE, "wasKnockedOut"); } catch {}
+  try { await actor.unsetFlag(SCOPE, "lastDamageWorldTime"); } catch {}
+  try { await actor.unsetFlag(SCOPE, "lastDamageTime"); } catch {}
+
+  token.renderFlags.set({ refreshBars: true });
+  if (actor.sheet?.rendered) actor.sheet.render(false);
+
+  console.log(`[FASERIP] Quick Heal: ${actor.name} restored`, {
+    originalRank, originalValue, targetHealthMax,
+    effectsDeleted: effectIdsToDelete.length
+  });
+}
+
+// ── Build dialog HTML ──
+
+function buildDialogContent(tokens, prefs) {
+  const sections = [];
+
+  for (const token of tokens) {
+    const actor = token.actor;
+    if (!actor) continue;
+    const effects = actor.effects.contents;
+    if (!effects.length) {
+      sections.push(`
+        <div style="margin-bottom:12px;">
+          <div style="font-weight:bold;font-size:1.05em;margin-bottom:4px;">${actor.name}</div>
+          <div style="color:#888;font-size:.85em;padding-left:8px;">No active effects</div>
+        </div>`);
+      continue;
+    }
+
+    // Group by category
+    const grouped = { combat: [], defense: [], power: [], other: [] };
+    for (const e of effects) {
+      const cat = classifyEffect(e);
+      grouped[cat].push(e);
+    }
+
+    let effectRows = "";
+    for (const cat of ["combat", "defense", "power", "other"]) {
+      const list = grouped[cat];
+      if (!list.length) continue;
+      const checked = defaultChecked(cat, prefs);
+      const color = categoryColor(cat);
+      const label = categoryLabel(cat);
+
+      effectRows += `
+        <div style="margin-top:6px;">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;">
+            <input type="checkbox" class="qh-cat-toggle" data-actor="${actor.id}" data-cat="${cat}"
+              ${checked ? "checked" : ""} style="margin:0;">
+            <span style="font-weight:600;font-size:.85em;color:${color};">${label}</span>
+          </div>
+          <div style="padding-left:20px;">`;
+
+      for (const e of list) {
+        const eName = e.name || "Unnamed Effect";
+        const dur = e.duration?.label || "";
+        effectRows += `
+            <div style="display:flex;align-items:center;gap:6px;margin:1px 0;">
+              <input type="checkbox" class="qh-effect" data-actor="${actor.id}" data-effect="${e.id}" data-cat="${cat}"
+                ${checked ? "checked" : ""} style="margin:0;">
+              <span style="font-size:.85em;" title="${eName}${dur ? ' — ' + dur : ''}">${eName}</span>
+              ${dur ? `<span style="font-size:.75em;color:#999;">${dur}</span>` : ""}
+            </div>`;
+      }
+      effectRows += `</div></div>`;
+    }
+
+    sections.push(`
+      <div style="margin-bottom:12px;border:1px solid #ccc;border-radius:4px;padding:8px;background:#faf8f2;">
+        <div style="font-weight:bold;font-size:1.05em;margin-bottom:4px;color:#8b0000;">${actor.name}</div>
+        <div style="font-size:.8em;color:#666;margin-bottom:6px;">
+          HP: ${actor.system.attributes?.health?.value ?? "?"}/${actor.system.attributes?.health?.max ?? "?"}
+          | End: ${actor.system.abilities?.endurance?.rank ?? "?"} ${actor.system.abilities?.endurance?.value ?? "?"}
+        </div>
+        ${effectRows}
+      </div>`);
+  }
+
+  return `
+    <div style="max-height:500px;overflow-y:auto;padding-right:4px;">
+      ${sections.join("")}
+      <div style="margin-top:8px;padding-top:6px;border-top:1px solid #ddd;">
+        <label style="display:flex;align-items:center;gap:6px;font-size:.85em;color:#666;">
+          <input type="checkbox" id="qh-save-prefs" checked style="margin:0;">
+          Remember category defaults
+        </label>
+      </div>
+    </div>`;
+}
+
+// ── Main entry point ──
+
 export async function quickHeal() {
   const tokens = canvas.tokens.controlled;
-  
   if (!tokens.length) {
     ui.notifications.warn("No tokens selected");
     return;
   }
-  
-  for (const token of tokens) {
-    const actor = token.actor;
-    if (!actor) continue;
-    
-    const isUnlinked = token.document.actorLink === false;
-    const baseActor = isUnlinked ? game.actors.get(token.document.actorId) : null;
-    
-    console.log(`[FASERIP] Quick Heal: Processing ${actor.name}`, {
-      isToken: !!token,
-      isUnlinked,
-      baseActorName: baseActor?.name
+
+  // Register prefs setting if not yet registered
+  try {
+    game.settings.get(SCOPE, PREFS_KEY);
+  } catch {
+    game.settings.register(SCOPE, PREFS_KEY, {
+      scope: "client", config: false, type: Object, default: {}
     });
-    
-    // Gather all possible sources BEFORE clearing effects
-    const dyingEffect = actor.effects.find(e => e.getFlag(SCOPE, "isDying"));
-    const impairedEffect = actor.effects.find(e => e.getFlag(SCOPE, "isImpairedEndurance"));
-    const effectOriginal = dyingEffect?.getFlag(SCOPE, "originalEndurance") || 
-                          impairedEffect?.getFlag(SCOPE, "originalEndurance");
-    const actorFlagOriginal = actor.getFlag(SCOPE, "originalEndurance");
-    const initialRankAbbrev = actor.system.abilities?.endurance?.initialRank;
-    const initialRankFull = normalizeRank(initialRankAbbrev);
-    const baseEndurance = baseActor?.system.abilities?.endurance;
-    const baseOriginalFlag = baseActor?.getFlag(SCOPE, "originalEndurance");
-    const baseInitialFull = normalizeRank(baseEndurance?.initialRank);
-    const hasDyingOrImpaired = !!(dyingEffect || impairedEffect);
-    
-    console.log(`[FASERIP] Quick Heal: Sources`, {
-      effectOriginal,
-      actorFlagOriginal,
-      initialRankAbbrev,
-      initialRankFull,
-      currentRank: actor.system.abilities?.endurance?.rank,
-      currentValue: actor.system.abilities?.endurance?.value,
-      baseRank: baseEndurance?.rank,
-      baseValue: baseEndurance?.value,
-      hasDyingOrImpaired
-    });
-    
-    // Resolve original rank
-    // Priority: stored original from dying/impaired effect > actor flag > current rank
-    // Only fall back to initialRank as absolute last resort (chargen value, pre-advancement)
-    let originalRank = null;
-    
-    if (hasDyingOrImpaired && effectOriginal && !isCorruptedOriginal(effectOriginal)) {
-      originalRank = effectOriginal;
-    } else if (hasDyingOrImpaired && actorFlagOriginal && !isCorruptedOriginal(actorFlagOriginal)) {
-      originalRank = actorFlagOriginal;
-    } else if (actor.system.abilities?.endurance?.rank && !isCorruptedOriginal(actor.system.abilities.endurance.rank)) {
-      originalRank = actor.system.abilities.endurance.rank;
-    } else if (isUnlinked && baseEndurance?.rank && !isCorruptedOriginal(baseEndurance.rank)) {
-      originalRank = baseEndurance.rank;
-    } else if (initialRankFull && !isCorruptedOriginal(initialRankFull)) {
-      originalRank = initialRankFull;
-    } else {
-      originalRank = "Good";
-    }
-    
-    // Resolve original value — preserve non-standard rank numbers (e.g. Good 15)
-    // The dying system only stores rank name, not value, so we need to find the
-    // actual numeric value from the best available source.
-    let originalValue;
-    
-    if (!hasDyingOrImpaired) {
-      // Not dying/impaired — current value IS the correct value
-      originalValue = Number(actor.system.abilities?.endurance?.value) || getRankValue(originalRank);
-    } else if (isUnlinked && baseEndurance?.value && baseEndurance.rank === originalRank) {
-      // Unlinked token dying — base actor has the pre-damage value
-      originalValue = Number(baseEndurance.value);
-    } else if (actor.system.abilities?.endurance?.initialValue && normalizeRank(initialRankAbbrev) === originalRank) {
-      // initialValue matches the original rank — use it (preserves GM adjustments if rank unchanged)
-      originalValue = Number(actor.system.abilities.endurance.initialValue);
-    } else {
-      // Last resort: derive from rank name (loses non-standard values)
-      originalValue = getRankValue(originalRank);
-    }
-    
-    // Calculate max health with restored endurance
-    const f = actor.system.abilities?.fighting?.value || 0;
-    const a = actor.system.abilities?.agility?.value || 0;
-    const s = actor.system.abilities?.strength?.value || 0;
-    const restoredHealthMax = f + a + s + originalValue;
-    
-    const targetHealthMax = isUnlinked && baseActor 
-      ? baseActor.system.attributes?.health?.max 
-      : restoredHealthMax;
-    
-    console.log(`[FASERIP] Quick Heal: Restoring`, {
-      originalRank,
-      originalValue,
-      targetHealthMax
-    });
-    
-    // === RESTORE HP FIRST ===
-    // Must happen before effect deletion so the deleteActiveEffect hook
-    // in rest-system sees HP > 0 and doesn't trigger consciousness attempts
-    if (isUnlinked) {
-      const deltaUpdate = {
-        "delta.system.abilities.endurance.rank": originalRank,
-        "delta.system.abilities.endurance.value": originalValue,
-        "delta.system.attributes.health.value": targetHealthMax,
-        "delta.system.attributes.health.max": targetHealthMax,
-        "delta.system.details.isDead": false
-      };
-      
-      console.log(`[FASERIP] Quick Heal: Applying delta update`, deltaUpdate);
-      await token.document.update(deltaUpdate);
-      
-    } else {
-      const updateData = {
-        "system.abilities.endurance.rank": originalRank,
-        "system.abilities.endurance.value": originalValue,
-        "system.attributes.health.value": targetHealthMax,
-        "system.details.isDead": false
-      };
-      
-      await actor.update(updateData);
-    }
-    
-    // === DELETE EFFECTS AFTER HP RESTORE ===
-    // Pass mshIntentional so preDeleteActiveEffect hook allows removal of
-    // protected effects (dying, impaired endurance, regeneration, defense)
-    const effects = actor.effects.contents;
-    if (effects.length) {
-      console.log(`[FASERIP] Quick Heal: Deleting ${effects.length} effects`);
-      await actor.deleteEmbeddedDocuments(
-        "ActiveEffect",
-        effects.map(e => e.id),
-        { mshIntentional: true }
-      );
-    }
-    
-    // Clear token status icons
-    if (isUnlinked) {
-      await token.document.update({"delta.statuses": []});
-    }
-    
-    try {
-      for (const statusId of [...(actor.statuses || [])]) {
-        await actor.toggleStatusEffect(statusId, { active: false });
-      }
-    } catch (e) {
-      console.warn(`[FASERIP] Quick Heal: Error clearing statuses`, e);
-    }
-    
-    // Clear the originalEndurance flag
-    try {
-      await actor.unsetFlag(SCOPE, "originalEndurance");
-      console.log(`[FASERIP] Quick Heal: Cleared originalEndurance flag`);
-    } catch (e) { /* may not exist */ }
-    
-    // Clear rest-system flags so healed character isn't treated as recently damaged/KO'd
-    try {
-      await actor.unsetFlag(SCOPE, "wasKnockedOut");
-      await actor.unsetFlag(SCOPE, "lastDamageWorldTime");
-      await actor.unsetFlag(SCOPE, "lastDamageTime");
-    } catch (e) { /* may not exist */ }
-    
-    console.log(`[FASERIP] Quick Heal: Restored ${actor.name}`, {
-      endurance: actor.system.abilities?.endurance,
-      health: actor.system.attributes?.health?.value
-    });
-    
-    token.renderFlags.set({refreshBars: true});
-    
-    if (actor.sheet?.rendered) {
-      actor.sheet.render(false);
-    }
   }
-  
-  ChatMessage.create({
-    content: `<div style="text-align:center;"><strong>Healed ${tokens.length} character(s) to full health</strong></div>`,
-    whisper: [game.user.id]
+
+  const prefs = loadPrefs();
+  const content = buildDialogContent(tokens, prefs);
+
+  return new Promise((resolve) => {
+    const dlg = new Dialog({
+      title: "Quick Heal",
+      content,
+      buttons: {
+        heal: {
+          icon: '<i class="fas fa-heart"></i>',
+          label: "Heal & Remove Selected",
+          callback: async (html) => {
+            // Gather checked effect IDs per actor
+            const toDelete = {};
+            html.find(".qh-effect:checked").each(function () {
+              const actorId = this.dataset.actor;
+              const effectId = this.dataset.effect;
+              (toDelete[actorId] ??= []).push(effectId);
+            });
+
+            // Save prefs if requested
+            if (html.find("#qh-save-prefs")[0]?.checked) {
+              const catPrefs = {};
+              const seen = new Set();
+              html.find(".qh-cat-toggle").each(function () {
+                const cat = this.dataset.cat;
+                if (!seen.has(cat)) {
+                  seen.add(cat);
+                  catPrefs[cat] = this.checked;
+                }
+              });
+              savePrefs({ categories: catPrefs });
+            }
+
+            // Apply heal to each token
+            for (const token of tokens) {
+              const actor = token.actor;
+              if (!actor) continue;
+              const ids = toDelete[actor.id] || [];
+              await applyHeal(token, ids);
+            }
+
+            ChatMessage.create({
+              content: `<div style="text-align:center;"><strong>Healed ${tokens.length} character(s) to full health</strong></div>`,
+              whisper: [game.user.id]
+            });
+            ui.notifications.info(`Healed ${tokens.length} token(s)`);
+            resolve();
+          }
+        },
+        cancel: {
+          icon: '<i class="fas fa-times"></i>',
+          label: "Cancel",
+          callback: () => resolve()
+        }
+      },
+      default: "heal",
+      render: (html) => {
+        // Category toggle → check/uncheck all effects in that category for that actor
+        html.find(".qh-cat-toggle").on("change", function () {
+          const actorId = this.dataset.actor;
+          const cat = this.dataset.cat;
+          const checked = this.checked;
+          html.find(`.qh-effect[data-actor="${actorId}"][data-cat="${cat}"]`).prop("checked", checked);
+        });
+        // Individual effect unchecked → uncheck category; all checked → check category
+        html.find(".qh-effect").on("change", function () {
+          const actorId = this.dataset.actor;
+          const cat = this.dataset.cat;
+          const all = html.find(`.qh-effect[data-actor="${actorId}"][data-cat="${cat}"]`);
+          const allChecked = all.toArray().every(cb => cb.checked);
+          html.find(`.qh-cat-toggle[data-actor="${actorId}"][data-cat="${cat}"]`).prop("checked", allChecked);
+        });
+      }
+    }, { width: 420 });
+    dlg.render(true);
   });
-  
-  ui.notifications.info(`Healed ${tokens.length} token(s)`);
 }
