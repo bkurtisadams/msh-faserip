@@ -1,6 +1,6 @@
-// teamSheet.js v4.0.0 - 2026-03-02
-// v4.0.0: Encounter-grouped defeated villains. Crime/rescue/losses are per-encounter,
-//         foe karma stacks per villain within encounter. Undo award support.
+// teamSheet.js v4.1.0 - 2026-03-21
+// v4.1.0: Add Event type (foe-less karma events) alongside encounters.
+//         GM Award field on both events and encounters. Missing karma types added.
 export class TeamSheet extends Application {
 
   static RANK_TABLE = [
@@ -136,20 +136,26 @@ export class TeamSheet extends Application {
     context.encounters = encounters.map((enc, idx) => {
       const expanded = this._expandedEncounters.has(idx);
       const villainRows = (enc.villains || []).map(v => {
+        const count = Math.max(1, v.count || 1);
         const eligible = v.rankValue >= 30;
-        return { ...v, eligible, subRemarkable: !eligible };
+        const foeKarma = eligible ? v.rankValue * count : 0;
+        return { ...v, count, eligible, subRemarkable: !eligible, foeKarma };
       });
-      const foeTotal = villainRows.reduce((sum, v) => sum + (v.eligible ? v.rankValue : 0), 0);
+      const hasFoes = villainRows.length > 0;
+      const hasName = !!(enc.name && enc.name.trim());
+      const foeTotal = villainRows.reduce((sum, v) => sum + v.foeKarma, 0);
 
       const crimeVals = enc.crimeType ? TeamSheet.CRIME_VALUES[enc.crimeType] : null;
       const stopValue = crimeVals && enc.stopped ? crimeVals.stop : 0;
       const arrestValue = crimeVals && enc.arrested ? crimeVals.arrest : 0;
       const rescueKarma = Math.min((enc.rescues || 0) * 20, 100);
+      const gmAward = Math.max(0, enc.gmAward || 0);
       const lossKarma = -Math.abs(enc.losses || 0);
 
-      const positiveTotal = foeTotal + stopValue + arrestValue + rescueKarma;
+      const positiveTotal = foeTotal + stopValue + arrestValue + rescueKarma + gmAward;
       const positiveMultiplied = positiveTotal * multiplier;
-      const heroCount = Math.max(1, (enc.presentHeroIds || []).length);
+      const presentIds = (enc.presentHeroIds || []).filter(id => game.actors.get(id));
+      const heroCount = Math.max(1, presentIds.length);
       const perHeroPositive = Math.floor(positiveMultiplied / heroCount);
       const perHeroLoss = lossKarma ? Math.floor(lossKarma / heroCount) : 0;
       const perHeroNet = perHeroPositive + perHeroLoss;
@@ -160,14 +166,15 @@ export class TeamSheet extends Application {
       }));
 
       const villainNames = villainRows.map(v => v.name).join(', ');
+      const displayName = hasName ? enc.name : (villainNames || "Encounter");
       const dateDisplay = [enc.gameDate, enc.gameTime].filter(Boolean).join(' ');
 
       return {
-        ...enc, expanded, villainRows, foeTotal,
-        stopValue, arrestValue, rescueKarma, lossKarma,
+        ...enc, expanded, hasFoes, hasName, villainRows, foeTotal,
+        stopValue, arrestValue, rescueKarma, gmAward, lossKarma,
         positiveTotal, positiveMultiplied, heroCount,
         perHeroPositive, perHeroLoss, perHeroNet,
-        heroChecks, villainNames, dateDisplay,
+        heroChecks, villainNames, displayName, dateDisplay,
         crimeType: enc.crimeType || "",
         hasPositive: positiveTotal > 0
       };
@@ -245,13 +252,18 @@ export class TeamSheet extends Application {
     html.find('.loss-amount').change(ev => this._onEncNumericChange(ev, 'losses'));
 
     // Actions
-    html.find('.add-encounter-manual').click(() => this._onAddEncounterManual());
+    html.find('.add-encounter-manual').click(() => this._onAddEncounter());
     html.find('.add-foe-to-encounter').click(ev => this._onAddFoeToEncounter(ev));
     html.find('.delete-foe').click(ev => this._onDeleteFoe(ev));
     html.find('.delete-encounter').click(ev => this._onDeleteEncounter(ev));
     html.find('.award-encounter-heroes').click(ev => this._onAwardEncounterToHeroes(ev));
     html.find('.award-encounter-pool').click(ev => this._onAwardEncounterToPool(ev));
     html.find('.undo-award').click(ev => this._onUndoAward(ev));
+    html.find('.gm-award-amount').change(ev => this._onEncNumericChange(ev, 'gmAward'));
+    html.find('.enc-name-input').change(ev => {
+      const idx = Number(ev.currentTarget.dataset.encIdx);
+      this._updateEncField(idx, 'name', ev.currentTarget.value.trim());
+    });
 
     // Team HQ
     html.find('.hq-toggle').click(ev => {
@@ -336,8 +348,11 @@ export class TeamSheet extends Application {
 
   // ===== ADD / DELETE =====
 
-  _onAddEncounterManual() {
+  _onAddEncounter() {
     if (!game.user.isGM) return;
+    const { gameDate, gameTime } = TeamSheet._getGameDateTimeStatic();
+    const foeList = [];
+
     const hostiles = game.actors.filter(a =>
       (a.type === "npc" || a.type === "villain" || a.type === "hero") &&
       a.prototypeToken.disposition < 0
@@ -350,38 +365,108 @@ export class TeamSheet extends Application {
     const rankOpts = TeamSheet.RANK_TABLE.map(r =>
       `<option value="${r.value}" data-label="${r.rank}">${r.rank} (${r.value})</option>`
     ).join('');
+    const crimeOpts = Object.entries({
+      "": "— None —",
+      violent: "Violent Crime (30/15)", destructive: "Destructive Crime (20/10)",
+      theft: "Theft (10/5)", robbery: "Robbery (20/10)",
+      misdemeanor: "Misdemeanor (5/5)", national: "National Offense (20/10)",
+      localConspiracy: "Local Conspiracy (30/15)", nationalConspiracy: "National Conspiracy (40/20)",
+      globalConspiracy: "Global Conspiracy (50/25)", other: "Other Crimes (15/5)"
+    }).map(([v, l]) => `<option value="${v}">${l}</option>`).join('');
+
+    const renderFoeList = (html) => {
+      const container = html.find('.enc-foe-list');
+      if (!foeList.length) {
+        container.html('<div style="font-size:11px;color:#888;font-style:italic;padding:2px 4px;">No foes added.</div>');
+        return;
+      }
+      container.html(foeList.map((f, i) =>
+        `<div style="display:flex;align-items:center;gap:4px;padding:3px 4px;${i ? 'border-top:1px solid #eee;' : ''}">
+          <i class="fas fa-skull" style="color:#8b0000;font-size:10px;flex-shrink:0;"></i>
+          <span style="flex:1;font-weight:600;font-size:12px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${f.name}</span>
+          <span style="font-size:11px;color:#666;white-space:nowrap;">${f.rankLabel}(${f.rankValue})</span>
+          <button type="button" class="enc-foe-dec" data-idx="${i}" style="width:18px;height:18px;padding:0;font-size:10px;border:1px solid #aaa;border-radius:2px;background:#f5f5f5;cursor:pointer;line-height:1;">−</button>
+          <span style="font-size:12px;font-weight:700;min-width:16px;text-align:center;">×${f.count}</span>
+          <button type="button" class="enc-foe-inc" data-idx="${i}" style="width:18px;height:18px;padding:0;font-size:10px;border:1px solid #aaa;border-radius:2px;background:#f5f5f5;cursor:pointer;line-height:1;">+</button>
+          <a class="enc-remove-foe" data-idx="${i}" style="color:#999;cursor:pointer;font-size:10px;flex-shrink:0;" title="Remove"><i class="fas fa-times"></i></a>
+        </div>`
+      ).join(''));
+      container.find('.enc-foe-inc').on('click', (ev) => {
+        foeList[Number(ev.currentTarget.dataset.idx)].count++;
+        renderFoeList(html);
+      });
+      container.find('.enc-foe-dec').on('click', (ev) => {
+        const idx = Number(ev.currentTarget.dataset.idx);
+        if (foeList[idx].count > 1) foeList[idx].count--;
+        renderFoeList(html);
+      });
+      container.find('.enc-remove-foe').on('click', (ev) => {
+        foeList.splice(Number(ev.currentTarget.dataset.idx), 1);
+        renderFoeList(html);
+      });
+    };
 
     new Dialog({
       title: "Add Encounter",
       content: `<form>
-        <div class="form-group"><label>Pick from actors:</label>
-          <select name="actorId" style="width:100%"><option value="">— Manual entry —</option>${hostileOpts}</select></div>
-        <hr/>
-        <div class="form-group"><label>Villain Name:</label>
-          <input type="text" name="name" placeholder="e.g., Rhino" /></div>
-        <div class="form-group"><label>Highest Rank:</label>
-          <select name="rank" style="width:100%">${rankOpts}</select></div>
-        <p class="notes" style="font-size:11px;color:#666;">Creates encounter with one foe. Add more after.</p>
+        <div class="form-group"><label>Name (optional):</label>
+          <input type="text" name="encName" placeholder="e.g., Castle Courtyard Battle" style="width:100%;" /></div>
+        <div class="form-group" style="display:flex;gap:12px;">
+          <label style="flex:1;">Game Date: <input type="text" name="gameDate" value="${gameDate}" placeholder="e.g., 10/28/1944" style="width:100%;" /></label>
+          <label style="flex:1;">Game Time: <input type="text" name="gameTime" value="${gameTime}" placeholder="e.g., 9:00pm" style="width:100%;" /></label>
+        </div>
+        <hr style="border:0;border-top:1px solid #ccc;margin:6px 0;" />
+        <label style="font-weight:700;font-size:12px;">Foes (optional)</label>
+        <div class="enc-foe-list" style="min-height:20px;margin:4px 0;padding:2px;background:#fafafa;border:1px solid #ddd;border-radius:3px;">
+          <div style="font-size:11px;color:#888;font-style:italic;padding:2px 4px;">No foes added.</div>
+        </div>
+        <div style="margin-bottom:2px;">
+          <div class="form-group" style="margin-bottom:4px;"><label style="font-size:11px;">Pick actor:</label>
+            <select name="actorId" style="width:100%;"><option value="">— Manual entry —</option>${hostileOpts}</select></div>
+          <div style="display:flex;gap:6px;align-items:end;">
+            <div style="flex:1;"><label style="font-size:11px;">Name:</label>
+              <input type="text" name="foeName" placeholder="e.g., Rhino" style="width:100%;" /></div>
+            <div style="width:140px;"><label style="font-size:11px;">Rank:</label>
+              <select name="rank" style="width:100%;">${rankOpts}</select></div>
+            <button type="button" class="enc-add-foe-btn" style="padding:4px 12px;font-size:12px;font-weight:700;color:#fff;background:#8b0000;border:0;border-radius:3px;cursor:pointer;white-space:nowrap;">+ Foe</button>
+          </div>
+        </div>
+        <hr style="border:0;border-top:1px solid #ccc;margin:6px 0;" />
+        <div class="form-group"><label>Crime Type:</label>
+          <select name="crimeType" style="width:100%;">${crimeOpts}</select></div>
+        <div class="form-group" style="display:flex;gap:12px;">
+          <label>Rescues: <input type="number" name="rescues" value="0" min="0" max="99" style="width:50px;" /></label>
+          <label>Losses: <input type="number" name="losses" value="0" min="0" max="9999" style="width:60px;" /></label>
+          <label>GM Award: <input type="number" name="gmAward" value="0" min="0" max="9999" style="width:60px;" /></label>
+        </div>
       </form>`,
       buttons: {
-        add: { icon: '<i class="fas fa-skull"></i>', label: "Add",
+        add: { icon: '<i class="fas fa-plus"></i>', label: "Create",
           callback: async (html) => {
-            const actorId = html.find('[name="actorId"]').val();
-            let name, img, rankValue, rankLabel;
-            if (actorId) {
-              const actor = game.actors.get(actorId);
-              if (!actor) return;
-              name = actor.name; img = actor.img || "icons/svg/mystery-man.svg";
-              ({ rankValue, rankLabel } = TeamSheet.getHighestRank(actor));
-            } else {
-              name = html.find('[name="name"]').val()?.trim();
-              if (!name) { ui.notifications.warn("Enter a villain name"); return; }
-              img = "icons/svg/mystery-man.svg";
-              rankValue = Number(html.find('[name="rank"]').val()) || 0;
-              rankLabel = html.find('[name="rank"] option:selected').data('label') || "Unknown";
-            }
+            const encName = html.find('[name="encName"]').val()?.trim() || "";
+            const evtDate = html.find('[name="gameDate"]').val()?.trim() || gameDate;
+            const evtTime = html.find('[name="gameTime"]').val()?.trim() || gameTime;
+            const crimeType = html.find('[name="crimeType"]').val() || "";
+            const rescues = Math.max(0, Number(html.find('[name="rescues"]').val()) || 0);
+            const losses = Math.max(0, Number(html.find('[name="losses"]').val()) || 0);
+            const gmAward = Math.max(0, Number(html.find('[name="gmAward"]').val()) || 0);
             const teamIds = game.settings.get("msh-faserip", "teamMembers") || [];
-            await this._addEncounter([{ name, img, actorId: actorId || null, rankValue, rankLabel }], [...teamIds]);
+
+            const encounters = game.settings.get("msh-faserip", "defeatedVillains") || [];
+            encounters.push({
+              id: `enc_${Date.now()}`,
+              name: encName,
+              villains: [...foeList],
+              presentHeroIds: [...teamIds],
+              crimeType, stopped: !!crimeType, arrested: false,
+              rescues, losses, gmAward,
+              awarded: false,
+              gameDate: evtDate, gameTime: evtTime,
+              timestamp: new Date().toISOString()
+            });
+            await game.settings.set("msh-faserip", "defeatedVillains", encounters);
+            this._expandedEncounters.add(encounters.length - 1);
+            this.render(true);
           }
         },
         cancel: { label: "Cancel" }
@@ -391,9 +476,32 @@ export class TeamSheet extends Application {
         html.find('[name="actorId"]').on('change', () => {
           const sel = html.find('[name="actorId"]');
           if (sel.val()) {
-            html.find('[name="name"]').val(sel.find(':selected').text().split(' — ')[0]);
+            html.find('[name="foeName"]').val(sel.find(':selected').text().split(' — ')[0]);
             html.find('[name="rank"]').val(Number(sel.find(':selected').data('rank')));
+          } else {
+            html.find('[name="foeName"]').val('');
           }
+        });
+        html.find('.enc-add-foe-btn').on('click', () => {
+          const actorId = html.find('[name="actorId"]').val();
+          let name, img, rankValue, rankLabel;
+          if (actorId) {
+            const actor = game.actors.get(actorId);
+            if (!actor) return;
+            name = actor.name;
+            img = actor.img || "icons/svg/mystery-man.svg";
+            ({ rankValue, rankLabel } = TeamSheet.getHighestRank(actor));
+          } else {
+            name = html.find('[name="foeName"]').val()?.trim();
+            if (!name) { ui.notifications.warn("Enter a villain name or pick an actor"); return; }
+            img = "icons/svg/mystery-man.svg";
+            rankValue = Number(html.find('[name="rank"]').val()) || 0;
+            rankLabel = html.find('[name="rank"] option:selected').data('label') || "Unknown";
+          }
+          foeList.push({ name, img, actorId: actorId || null, rankValue, rankLabel, count: 1 });
+          html.find('[name="actorId"]').val('');
+          html.find('[name="foeName"]').val('');
+          renderFoeList(html);
         });
       }
     }).render(true);
@@ -507,8 +615,9 @@ export class TeamSheet extends Application {
     const idx = Number(ev.currentTarget.dataset.encIdx);
     const encounters = game.settings.get("msh-faserip", "defeatedVillains") || [];
     if (!encounters[idx]) return;
-    const names = (encounters[idx].villains || []).map(v => v.name).join(', ') || encounters[idx].name || 'Unknown';
-    if (!await Dialog.confirm({ title: "Delete Encounter", content: `<p>Delete encounter (${names})?</p>` })) return;
+    const entry = encounters[idx];
+    const names = entry.type === "event" ? (entry.name || "Event") : (entry.villains || []).map(v => v.name).join(', ') || 'Unknown';
+    if (!await Dialog.confirm({ title: "Delete Encounter", content: `<p>Delete ${entry.type === "event" ? "event" : "encounter"} (${names})?</p>` })) return;
     encounters.splice(idx, 1);
     this._rebuildExpandedSet(idx);
     await game.settings.set("msh-faserip", "defeatedVillains", encounters);
@@ -544,40 +653,45 @@ export class TeamSheet extends Application {
     const net = perHeroPos + perHeroLoss;
 
     const breakdown = this._buildBreakdownText(enc, multiplier, heroes.length);
-    const villainNames = enc.villains.map(v => v.name).join(', ');
+    const encLabel = enc.name || enc.villains.map(v => v.name).join(', ') || "Encounter";
     if (!await Dialog.confirm({
-      title: `Award — ${villainNames}`,
+      title: `Award — ${encLabel}`,
       content: `<p>${breakdown}</p><p>Award <strong>+${perHeroPos}</strong>${perHeroLoss ? ` / <strong>${perHeroLoss}</strong> loss` : ''} (net <strong>${net}</strong>) to each of <strong>${heroes.length}</strong> heroes?</p>`
     })) return;
 
     const gameDate = enc.gameDate || TeamSheet._getGameDateTimeStatic().gameDate;
     const foeNames = enc.villains.filter(v => v.rankValue >= 30).map(v => `${v.name}(${v.rankValue})`).join('+');
     const descParts = [];
+    if (enc.name) descParts.push(enc.name);
     if (foeNames) descParts.push(`Foe: ${foeNames}`);
     if (enc.stopped) descParts.push(`Stop ${this._crimeLabel(enc.crimeType)}`);
     if (enc.arrested) descParts.push(`Arrest ${this._crimeLabel(enc.crimeType)}`);
     if (enc.rescues > 0) descParts.push(`Rescue ×${enc.rescues}`);
+    if (enc.gmAward > 0) descParts.push(`GM +${enc.gmAward}`);
     const desc = descParts.join(', ');
     const baseNote = `(base ${positiveTotal} ×${multiplier} ÷${heroes.length})`;
+
+    const awardType = "Encounter Award";
+    const lossType = "Encounter Loss";
 
     for (const hero of heroes) {
       if (perHeroPos > 0) {
         await this._addHeroKarmaEvent(hero, {
-          amount: perHeroPos, type: "Encounter Award",
+          amount: perHeroPos, type: awardType,
           description: `${desc} ${baseNote}`, gameDate, encounterId: enc.id
         });
       }
       if (perHeroLoss < 0) {
         await this._addHeroKarmaEvent(hero, {
-          amount: perHeroLoss, type: "Encounter Loss",
-          description: `Losses — ${villainNames}`, gameDate, encounterId: enc.id
+          amount: perHeroLoss, type: lossType,
+          description: `Losses — ${encLabel}`, gameDate, encounterId: enc.id
         });
       }
     }
 
     encounters[idx].awarded = true;
     await game.settings.set("msh-faserip", "defeatedVillains", encounters);
-    ui.notifications.info(`${villainNames}: ${net} net karma to each of ${heroes.length} heroes.`);
+    ui.notifications.info(`${encLabel}: ${net} net karma to each of ${heroes.length} heroes.`);
     this.render(true);
   }
 
@@ -592,10 +706,10 @@ export class TeamSheet extends Application {
     const multiplier = game.settings.get("msh-faserip", "karmaMultiplier") || 1;
     const { positiveTotal, lossKarma } = this._calcEncounterTotals(enc);
     const total = (positiveTotal * multiplier) + lossKarma;
-    const villainNames = enc.villains.map(v => v.name).join(', ');
+    const encLabel = enc.name || enc.villains.map(v => v.name).join(', ') || "Encounter";
 
     if (!await Dialog.confirm({
-      title: `Award to Pool — ${villainNames}`,
+      title: `Award to Pool — ${encLabel}`,
       content: `<p>Add <strong>${total}</strong> karma to team pool?</p>`
     })) return;
 
@@ -603,7 +717,7 @@ export class TeamSheet extends Application {
     await game.settings.set("msh-faserip", "teamKarmaPoolTotal", Math.max(0, pool + total));
     encounters[idx].awarded = true;
     await game.settings.set("msh-faserip", "defeatedVillains", encounters);
-    ui.notifications.info(`${total} karma added to pool for ${villainNames}.`);
+    ui.notifications.info(`${total} karma added to pool for ${encLabel}.`);
     this.render(true);
   }
 
@@ -615,9 +729,9 @@ export class TeamSheet extends Application {
     const enc = encounters[idx];
     if (!enc || !enc.awarded) return;
 
-    const villainNames = enc.villains.map(v => v.name).join(', ');
+    const encLabel = enc.name || enc.villains.map(v => v.name).join(', ') || "Encounter";
     if (!await Dialog.confirm({
-      title: `Undo Award — ${villainNames}`,
+      title: `Undo Award — ${encLabel}`,
       content: `<p>Remove karma history entries for this encounter from all participating heroes?</p>`
     })) return;
 
@@ -640,31 +754,39 @@ export class TeamSheet extends Application {
 
     encounters[idx].awarded = false;
     await game.settings.set("msh-faserip", "defeatedVillains", encounters);
-    ui.notifications.info(`Award undone for ${villainNames}.`);
+    ui.notifications.info(`Award undone for ${encLabel}.`);
     this.render(true);
   }
 
   // ===== KARMA HELPERS =====
 
   _calcEncounterTotals(enc) {
-    const foeTotal = (enc.villains || []).reduce((sum, v) => sum + (v.rankValue >= 30 ? v.rankValue : 0), 0);
+    const foeTotal = (enc.villains || []).reduce((sum, v) => {
+      const count = Math.max(1, v.count || 1);
+      return sum + (v.rankValue >= 30 ? v.rankValue * count : 0);
+    }, 0);
     const cv = enc.crimeType ? TeamSheet.CRIME_VALUES[enc.crimeType] : null;
     const stopValue = cv && enc.stopped ? cv.stop : 0;
     const arrestValue = cv && enc.arrested ? cv.arrest : 0;
     const rescueKarma = Math.min((enc.rescues || 0) * 20, 100);
+    const gmAward = Math.max(0, enc.gmAward || 0);
     const lossKarma = -Math.abs(enc.losses || 0);
-    const positiveTotal = foeTotal + stopValue + arrestValue + rescueKarma;
-    return { positiveTotal, lossKarma, foeTotal };
+    const positiveTotal = foeTotal + stopValue + arrestValue + rescueKarma + gmAward;
+    return { positiveTotal, lossKarma, foeTotal, gmAward };
   }
 
   _buildBreakdownText(enc, multiplier, heroCount) {
     const parts = [];
-    const foeTotal = (enc.villains || []).reduce((sum, v) => sum + (v.rankValue >= 30 ? v.rankValue : 0), 0);
+    const foeTotal = (enc.villains || []).reduce((sum, v) => {
+      const count = Math.max(1, v.count || 1);
+      return sum + (v.rankValue >= 30 ? v.rankValue * count : 0);
+    }, 0);
     if (foeTotal > 0) parts.push(`Foe +${foeTotal}`);
     const cv = enc.crimeType ? TeamSheet.CRIME_VALUES[enc.crimeType] : null;
     if (cv && enc.stopped) parts.push(`Stop +${cv.stop}`);
     if (cv && enc.arrested) parts.push(`Arrest +${cv.arrest}`);
     if (enc.rescues > 0) parts.push(`Rescue +${Math.min(enc.rescues * 20, 100)}`);
+    if (enc.gmAward > 0) parts.push(`GM +${enc.gmAward}`);
     if (enc.losses > 0) parts.push(`Loss -${enc.losses}`);
     return parts.join(', ') + ` (×${multiplier} ÷${heroCount})`;
   }

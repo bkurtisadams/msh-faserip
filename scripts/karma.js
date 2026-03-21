@@ -1,5 +1,5 @@
-// karma.js v1.5.0 - 2026-02-28
-// v1.5.0: Fix edit matching, timestamps, consistent karma calc, multiplier/split add dialog
+// karma.js v1.6.0 - 2026-03-21
+// v1.6.0: Add missing karma types: Failing Commitment, Leaving Early, Negative Popularity, Commit Robbery
 export class KarmaSheet extends DocumentSheet {
   sortNewestFirst = true;
   searchFilter = "";
@@ -275,11 +275,13 @@ export class KarmaSheet extends DocumentSheet {
       "Rescue": 20, "Multiple Rescues (5+)": 100,
       "Defeated Foe": 0,
       "Personal Commitment": 5, "Weekly Award": 10,
+      "Failing Commitment": -10, "Leaving Early": -5,
       "Charity - Appearance": 0, "Charity - Act": 0, "Charity - Donation": 0,
+      "Negative Popularity": 0,
       "Role-Playing": 10, "Stump the Judge": 15, "Humor Award": 5,
       "Session Award": 0,
       "Commit Violent Crime": -60, "Commit Destructive Crime": -40,
-      "Commit Theft": -20, "Commit Misdemeanor": -10,
+      "Commit Theft": -20, "Commit Robbery": -20, "Commit Misdemeanor": -10,
       "Commit National Offense": -40, "Commit Other Crime": -20,
       "Public Defeat": -40, "Private Defeat": -20,
       "Permit Violent Crime": -15, "Permit Destructive Crime": -10,
@@ -294,12 +296,14 @@ export class KarmaSheet extends DocumentSheet {
 
     // Events that are always individual (never split)
     const alwaysIndividual = [
-      "Personal Commitment", "Weekly Award", "Role-Playing", "Stump the Judge",
+      "Personal Commitment", "Weekly Award", "Failing Commitment", "Leaving Early",
+      "Role-Playing", "Stump the Judge",
       "Humor Award", "Charity - Appearance", "Charity - Act", "Charity - Donation",
+      "Negative Popularity",
       "Public Defeat", "Private Defeat", "Property Damage",
       "Noble Death", "Mysterious Death", "Self-Destruction", "Death - Kill",
       "Commit Violent Crime", "Commit Destructive Crime", "Commit Theft",
-      "Commit Misdemeanor", "Commit National Offense", "Commit Other Crime",
+      "Commit Robbery", "Commit Misdemeanor", "Commit National Offense", "Commit Other Crime",
       "Permit Violent Crime", "Permit Destructive Crime", "Permit Theft",
       "Permit Robbery", "Permit Misdemeanor", "Permit National Offense",
       "Permit Other Crime", "Custom"
@@ -337,10 +341,13 @@ export class KarmaSheet extends DocumentSheet {
       </optgroup>
       <optgroup label="Personal">
         <option value="Personal Commitment">Personal Commitment (+5)</option>
+        <option value="Failing Commitment">Failing Commitment (-10)</option>
+        <option value="Leaving Early">Leaving Early (-5)</option>
         <option value="Weekly Award">Weekly Award (+10)</option>
         <option value="Charity - Appearance">Charity Appearance (+Pop, max 20)</option>
         <option value="Charity - Act">Charity Act (+10-40)</option>
         <option value="Charity - Donation">Charity Donation (+Res rank#)</option>
+        <option value="Negative Popularity">Negative Popularity (-Pop rank#)</option>
       </optgroup>
       <optgroup label="Gaming Awards">
         <option value="Role-Playing">Role-Playing (+10)</option>
@@ -352,6 +359,7 @@ export class KarmaSheet extends DocumentSheet {
         <option value="Commit Violent Crime">Commit Violent Crime (-60)</option>
         <option value="Commit Destructive Crime">Commit Destructive Crime (-40)</option>
         <option value="Commit Theft">Commit Theft (-20)</option>
+        <option value="Commit Robbery">Commit Robbery (-20)</option>
         <option value="Commit Misdemeanor">Commit Misdemeanor (-10)</option>
         <option value="Commit National Offense">Commit National Offense (-40)</option>
         <option value="Commit Other Crime">Commit Other Crime (-20)</option>

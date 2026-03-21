@@ -112,7 +112,7 @@
       <div class="section-header">
         <h3>Encounters ({{encounterCount}})</h3>
         <div class="section-btns">
-          <button type="button" class="add-encounter-manual"><i class="fas fa-skull"></i> Add Foe</button>
+          <button type="button" class="add-encounter-manual"><i class="fas fa-plus"></i> Add Encounter</button>
         </div>
       </div>
 
@@ -121,12 +121,12 @@
         {{#each encounters as |enc|}}
         <div class="encounter-entry {{#if enc.awarded}}awarded{{/if}} {{#if enc.expanded}}expanded{{/if}}" data-enc-idx="{{@index}}">
 
-          <!-- Encounter header (collapsed row) -->
+          <!-- Header (collapsed row) -->
           <div class="encounter-header" data-enc-idx="{{@index}}">
             <span class="expand-toggle"><i class="fas fa-chevron-{{#if enc.expanded}}down{{else}}right{{/if}}"></i></span>
-            <span class="enc-label">ENCOUNTER</span>
+            <span class="enc-label">{{#if enc.hasName}}{{#unless enc.hasFoes}}EVENT{{else}}ENCOUNTER{{/unless}}{{else}}ENCOUNTER{{/if}}</span>
             {{#if enc.dateDisplay}}<span class="enc-date">{{enc.dateDisplay}}</span>{{/if}}
-            <span class="enc-villains-summary">{{enc.villainNames}}</span>
+            <span class="enc-villains-summary">{{enc.displayName}}</span>
             {{#if enc.hasPositive}}
             <span class="karma-val">+{{enc.positiveTotal}}</span>
             {{else}}
@@ -136,23 +136,30 @@
             <span class="awarded-badge" title="Awarded"><i class="fas fa-check-circle"></i></span>
             <button type="button" class="undo-award btn-undo" data-enc-idx="{{@index}}" title="Undo award"><i class="fas fa-undo"></i></button>
             {{/if}}
-            <a class="delete-encounter" data-enc-idx="{{@index}}" title="Delete encounter"><i class="fas fa-times"></i></a>
+            <a class="delete-encounter" data-enc-idx="{{@index}}" title="Delete"><i class="fas fa-times"></i></a>
           </div>
 
           <!-- Expanded detail -->
           {{#if enc.expanded}}
           <div class="encounter-detail">
 
-            <!-- Villain list -->
+            <!-- Name (editable) -->
+            <div class="detail-section">
+              <label>Name:</label>
+              <input type="text" class="enc-name-input" data-enc-idx="{{@index}}" value="{{enc.name}}" placeholder="Optional — e.g., Castle Courtyard Battle" />
+            </div>
+
+            <!-- Foes (always shown, may be empty) -->
             <div class="detail-section">
               <label>Foes:</label>
+              {{#if enc.hasFoes}}
               <div class="foe-list">
                 {{#each enc.villainRows as |v|}}
                 <div class="foe-row">
                   <img src="{{v.img}}" class="foe-portrait" />
-                  <span class="foe-name">{{v.name}}</span>
+                  <span class="foe-name">{{v.name}}{{#unless (eq v.count 1)}} <span class="foe-count">×{{v.count}}</span>{{/unless}}</span>
                   <span class="rank-badge {{#if v.subRemarkable}}sub-rm{{/if}}">{{v.rankLabel}}({{v.rankValue}})</span>
-                  {{#if v.eligible}}<span class="foe-karma">+{{v.rankValue}}</span>{{else}}<span class="foe-karma sub">--</span>{{/if}}
+                  {{#if v.eligible}}<span class="foe-karma">+{{v.foeKarma}}</span>{{else}}<span class="foe-karma sub">--</span>{{/if}}
                   <a class="delete-foe" data-enc-idx="{{@../index}}" data-foe-idx="{{@index}}" title="Remove foe"><i class="fas fa-times"></i></a>
                 </div>
                 {{/each}}
@@ -161,8 +168,11 @@
                   <span class="foe-total-val">+{{enc.foeTotal}}</span>
                 </div>
               </div>
+              {{else}}
+              <span class="no-foes-note">No foes. Add below or leave empty for event-only karma.</span>
+              {{/if}}
               {{#unless enc.awarded}}
-              <button type="button" class="add-foe-to-encounter btn-add-foe" data-enc-idx="{{@index}}"><i class="fas fa-plus"></i> Add Foe</button>
+              <button type="button" class="add-foe-to-encounter btn-add-foe" data-enc-idx="{{@index}}"><i class="fas fa-skull"></i> Add Foe</button>
               {{/unless}}
             </div>
 
@@ -205,11 +215,12 @@
               </div>
             </div>
 
-            <!-- Rescues & Losses -->
+            <!-- Rescues, Losses & GM Award -->
             <div class="detail-section">
               <div class="detail-row extras">
                 <label>Rescues: <input type="number" class="rescue-count" data-enc-idx="{{@index}}" value="{{enc.rescues}}" min="0" max="99" /></label>
                 <label>Losses: <input type="number" class="loss-amount" data-enc-idx="{{@index}}" value="{{enc.losses}}" min="0" max="9999" /></label>
+                <label class="gm-award-label" title="Custom karma added to total before split">GM Award: <input type="number" class="gm-award-amount" data-enc-idx="{{@index}}" value="{{enc.gmAward}}" min="0" max="9999" /></label>
               </div>
             </div>
 
@@ -220,6 +231,7 @@
                 {{#if enc.stopValue}}<span class="sum-pos">Stop +{{enc.stopValue}}</span>{{/if}}
                 {{#if enc.arrestValue}}<span class="sum-pos">Arrest +{{enc.arrestValue}}</span>{{/if}}
                 {{#if enc.rescueKarma}}<span class="sum-pos">Rescue +{{enc.rescueKarma}}</span>{{/if}}
+                {{#if enc.gmAward}}<span class="sum-pos">GM +{{enc.gmAward}}</span>{{/if}}
                 {{#if enc.lossKarma}}<span class="sum-neg">Loss {{enc.lossKarma}}</span>{{/if}}
               </div>
               <div class="sum-total">
