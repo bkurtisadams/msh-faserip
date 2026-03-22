@@ -48,31 +48,6 @@
           </select>
         </div>
         <div class="ps2-field">
-          <label>Enhances Ability</label>
-          <select name="system.replacesAbility">
-            <option value=""          {{#if (eq system.replacesAbility "")}}selected{{/if}}>—</option>
-            <option value="fighting"  {{#if (eq system.replacesAbility "fighting")}}selected{{/if}}>Fighting</option>
-            <option value="agility"   {{#if (eq system.replacesAbility "agility")}}selected{{/if}}>Agility</option>
-            <option value="strength"  {{#if (eq system.replacesAbility "strength")}}selected{{/if}}>Strength</option>
-            <option value="endurance" {{#if (eq system.replacesAbility "endurance")}}selected{{/if}}>Endurance</option>
-            <option value="reason"    {{#if (eq system.replacesAbility "reason")}}selected{{/if}}>Reason</option>
-            <option value="intuition" {{#if (eq system.replacesAbility "intuition")}}selected{{/if}}>Intuition</option>
-            <option value="psyche"    {{#if (eq system.replacesAbility "psyche")}}selected{{/if}}>Psyche</option>
-          </select>
-        </div>
-        <div class="ps2-field">
-          <label>Depowered Rank</label>
-          <select name="system.depoweredRank">
-            <option value=""           {{#if (eq system.depoweredRank "")}}selected{{/if}}>—</option>
-            <option value="Feeble"     {{#if (eq system.depoweredRank "Feeble")}}selected{{/if}}>Feeble</option>
-            <option value="Poor"       {{#if (eq system.depoweredRank "Poor")}}selected{{/if}}>Poor</option>
-            <option value="Typical"    {{#if (eq system.depoweredRank "Typical")}}selected{{/if}}>Typical</option>
-            <option value="Good"       {{#if (eq system.depoweredRank "Good")}}selected{{/if}}>Good</option>
-            <option value="Excellent"  {{#if (eq system.depoweredRank "Excellent")}}selected{{/if}}>Excellent</option>
-            <option value="Remarkable" {{#if (eq system.depoweredRank "Remarkable")}}selected{{/if}}>Remarkable</option>
-          </select>
-        </div>
-        <div class="ps2-field">
           <label>Rank</label>
           <select name="system.rank" id="ps2-rank">
             {{#each (array "Shift-0" "Feeble" "Poor" "Typical" "Good" "Excellent" "Remarkable" "Incredible" "Amazing" "Monstrous" "Unearthly" "Shift-X" "Shift-Y" "Shift-Z" "Class 1000" "Class 3000" "Class 5000" "Beyond") as |r|}}

@@ -945,29 +945,20 @@ export async function applyNullified(actor, { rounds = 10, originUuid = null, se
       powersToSuppress.map(p => p.name).join(", "));
   }
 
-  // Swap ability scores for powers with replacesAbility + depoweredRank
-  const rv = CONFIG.FASERIP?.rankValues || {};
-  const abilitySwaps = {}; // { ability: { originalRank, originalValue } }
+  // Drop any superhuman ability (value > 20) to Typical 6
+  const abilitySwaps = {};
   const actorUpdates = {};
+  const abilities = resolvedActor.system?.abilities || {};
 
-  for (const power of powersToSuppress) {
-    const ability = (power.system?.replacesAbility || "").toLowerCase();
-    const depRank = power.system?.depoweredRank || "";
-    if (!ability || !depRank) continue;
-    if (abilitySwaps[ability]) continue; // already swapped by a prior power
-
-    const current = resolvedActor.system?.abilities?.[ability];
-    if (!current) continue;
-
+  for (const [ability, data] of Object.entries(abilities)) {
+    if (!data || data.value <= 20) continue;
     abilitySwaps[ability] = {
-      originalRank: current.rank,
-      originalValue: current.value
+      originalRank: data.rank,
+      originalValue: data.value
     };
-
-    const depValue = rv[depRank] || 0;
-    actorUpdates[`system.abilities.${ability}.rank`] = depRank;
-    actorUpdates[`system.abilities.${ability}.value`] = depValue;
-    console.log(`[FASERIP] Nullified: ${resolvedActor.name} ${ability} ${current.rank} (${current.value}) → ${depRank} (${depValue})`);
+    actorUpdates[`system.abilities.${ability}.rank`] = "Typical";
+    actorUpdates[`system.abilities.${ability}.value`] = 6;
+    console.log(`[FASERIP] Nullified: ${resolvedActor.name} ${ability} ${data.rank} (${data.value}) → Typical (6)`);
   }
 
   if (Object.keys(actorUpdates).length > 0) {
