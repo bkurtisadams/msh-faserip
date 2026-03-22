@@ -1,4 +1,6 @@
-// scripts/modules/effects/effect-engine.js v1.11.0 - 2026-03-19
+// scripts/modules/effects/effect-engine.js v1.12.0 - 2026-03-22
+// v1.12.0: Fix nullify health bug — clamp current health to new max on nullification,
+//          preserve damage taken and restore health correctly when nullification ends.
 // v1.11.0: Add applyNullified / restoreNullifiedPowers — suppress inborn powers on nullification,
 //          restore on effect removal. Stores suppressed power IDs in effect flags.
 // v1.5.0: Fix applyEvade - add canAct:false, nest flags under SCOPE, create separate bonus effect
@@ -961,8 +963,27 @@ export async function applyNullified(actor, { rounds = 10, originUuid = null, se
     console.log(`[FASERIP] Nullified: ${resolvedActor.name} ${ability} ${data.rank} (${data.value}) → Typical (6)`);
   }
 
+  // Snapshot pre-nullify health so we can restore correctly later
+  const preNullifyHealth = resolvedActor.system?.attributes?.health?.value ?? 0;
+  const preNullifyHealthMax = resolvedActor.system?.attributes?.health?.max ?? 0;
+  const preNullifyDamage = Math.max(0, preNullifyHealthMax - preNullifyHealth);
+
   if (Object.keys(actorUpdates).length > 0) {
     await resolvedActor.update(actorUpdates);
+
+    // Recalc new health max from (possibly reduced) abilities
+    const abs = resolvedActor.system?.abilities || {};
+    const newHealthMax =
+      parseInt(abs.fighting?.value || 0) +
+      parseInt(abs.agility?.value || 0) +
+      parseInt(abs.strength?.value || 0) +
+      parseInt(abs.endurance?.value || 0);
+
+    // Scale health proportionally to new max
+    const healthPct = preNullifyHealthMax > 0 ? (preNullifyHealth / preNullifyHealthMax) : 1;
+    const newHealth = Math.max(0, Math.round(newHealthMax * healthPct));
+    await resolvedActor.update({ "system.attributes.health.value": newHealth });
+    console.log(`[FASERIP] Nullified: ${resolvedActor.name} health ${preNullifyHealth}/${preNullifyHealthMax} → ${newHealth}/${newHealthMax} (${preNullifyDamage} pre-existing damage stored)`);
   }
 
   const label = selfNullify ? "Nullifying (Self-Suppressed)" : "Nullified";
@@ -979,6 +1000,9 @@ export async function applyNullified(actor, { rounds = 10, originUuid = null, se
         selfNullify,
         suppressedPowerIds: suppressedIds,
         abilitySwaps,
+        preNullifyHealth,
+        preNullifyHealthMax,
+        preNullifyDamage,
         status: { isNullified: true }
       }
     },
@@ -1024,6 +1048,26 @@ export async function restoreNullifiedPowers(effect, actor) {
   }
 
   if (Object.keys(actorUpdates).length > 0) {
+    // Calculate damage taken while nullified (at reduced stats)
+    const currentHealth = actor.system?.attributes?.health?.value ?? 0;
+    const currentMax = actor.system?.attributes?.health?.max ?? 0;
+    const damageWhileNullified = Math.max(0, currentMax - currentHealth);
+
     await actor.update(actorUpdates);
+
+    // Recalc new health max from restored abilities
+    const abs = actor.system?.abilities || {};
+    const restoredMax =
+      parseInt(abs.fighting?.value || 0) +
+      parseInt(abs.agility?.value || 0) +
+      parseInt(abs.strength?.value || 0) +
+      parseInt(abs.endurance?.value || 0);
+
+    // Restore health: original max minus pre-existing damage minus damage taken while nullified
+    const preNullifyDamage = flags.preNullifyDamage ?? 0;
+    const totalDamage = preNullifyDamage + damageWhileNullified;
+    const restoredHealth = Math.max(0, restoredMax - totalDamage);
+    await actor.update({ "system.attributes.health.value": restoredHealth });
+    console.log(`[FASERIP] Nullification ended: ${actor.name} health ${currentHealth} → ${restoredHealth}/${restoredMax} (pre-existing dmg: ${preNullifyDamage}, nullified dmg: ${damageWhileNullified})`);
   }
 }
