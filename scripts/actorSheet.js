@@ -1879,6 +1879,18 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
       } catch (e) {
         console.error("[FASERIP ERROR] Failed to sync defense effects on toggle:", e);
       }
+      // If Nullifying Power toggled off, stop the aura and restore powers
+      if (!newState && (item.name || "").toLowerCase().includes("nullif")) {
+        try {
+          const { isAuraMaintained, stopAura } = await import("./modules/actions/nullify.js");
+          if (isAuraMaintained(this.actor)) {
+            await stopAura(this.actor);
+            ui.notifications.info(`${this.actor.name} stops maintaining Nullification.`);
+          }
+        } catch (e) {
+          console.error("[FASERIP ERROR] Failed to stop nullify aura on toggle:", e);
+        }
+      }
     });
 
     // Power info button
