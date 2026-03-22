@@ -1267,6 +1267,92 @@ export function installActionChatHandlers() {
       }
     });
 
+    // 13) FF Breach Psyche FEAT (projected force field overload)
+    html.on("click", ".ff-breach-psyche-feat", async (ev) => {
+      ev.preventDefault();
+      const btn = ev.currentTarget;
+      const actorId = btn.dataset.actorId;
+      const intensity = Number(btn.dataset.intensity) || 0;
+      const psycheRank = btn.dataset.psycheRank || "Typical";
+
+      const actor = game.actors.get(actorId)
+        || canvas.tokens.placeables.find(t => t.actor?.id === actorId)?.actor;
+      if (!actor) {
+        ui.notifications.warn("Could not find actor for Psyche FEAT.");
+        return;
+      }
+
+      try {
+        const { rollUniversalTable } = await import("../dice/universal-table.js");
+        const roll = new Roll("1d100");
+        await roll.evaluate();
+        const rollTotal = roll.total;
+        const color = rollUniversalTable(psycheRank, rollTotal);
+
+        // Need Green or better to stay conscious
+        const success = color !== "white";
+
+        if (success) {
+          await ChatMessage.create({
+            content: `<div style="background:#e8f5e9;border:1px solid #4caf50;padding:8px;border-radius:4px;">
+              <strong>${actor.name}</strong> Psyche FEAT (${psycheRank}) vs Intensity ${intensity}: <strong style="color:#2e7d32;">${color.toUpperCase()}</strong> (${rollTotal})
+              <div style="margin-top:4px;">Maintains consciousness despite force field collapse.</div>
+            </div>`
+          });
+        } else {
+          // Unconscious 1-10 rounds
+          const stunDie = game.settings?.get?.("msh-faserip", "stunDurationDie") || "d10";
+          const durationRoll = await new Roll(`1${stunDie}`).evaluate();
+          const rounds = durationRoll.total;
+
+          // Apply unconscious effect
+          const scope = globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faserip";
+          const existing = actor.effects.find(e =>
+            e.flags?.[scope]?.ongoingId === "ff-breach-unconscious" && !e.disabled
+          );
+          if (!existing) {
+            await actor.createEmbeddedDocuments("ActiveEffect", [{
+              name: "Unconscious (FF Breach)",
+              icon: "icons/svg/unconscious.svg",
+              statuses: ["unconscious"],
+              flags: {
+                [scope]: {
+                  ongoingId: "ff-breach-unconscious",
+                  effectCategory: "status",
+                  canAct: false,
+                  canMove: false,
+                  autoExpire: true,
+                  durationRounds: rounds
+                }
+              },
+              duration: game.combat ? { rounds: rounds, startRound: game.combat.round } : {},
+              disabled: false
+            }]);
+          }
+
+          await ChatMessage.create({
+            content: `<div style="background:#ffebee;border:1px solid #ef5350;padding:8px;border-radius:4px;">
+              <strong>${actor.name}</strong> Psyche FEAT (${psycheRank}) vs Intensity ${intensity}: <strong style="color:#c62828;">${color.toUpperCase()}</strong> (${rollTotal})
+              <div style="margin-top:4px;"><strong>${actor.name}</strong> is unconscious for ${rounds} round${rounds !== 1 ? "s" : ""}!</div>
+            </div>`
+          });
+
+          btn.disabled = true;
+          btn.textContent = `✗ Unconscious (${rounds}rd)`;
+          btn.style.opacity = "0.6";
+        }
+
+        if (success) {
+          btn.disabled = true;
+          btn.textContent = "✓ Conscious";
+          btn.style.opacity = "0.6";
+        }
+      } catch (err) {
+        console.error("[FASERIP ERROR] FF breach Psyche FEAT failed:", err);
+        ui.notifications.error("Failed to roll Psyche FEAT.");
+      }
+    });
+
   }); // End of single combined Hooks.on
 
   console.log("MSH FASERIP | Chat hooks installed (checks + breaking FEAT + grabbing break + collision damage + escape + apply damage)");

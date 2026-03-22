@@ -71,7 +71,6 @@ import { resolveCombatMode } from "./modules/actions/action-dispatcher.js";
 import { initRestSystem } from "./modules/rest-system.js";
 import { ACTIONS } from '../helpers/action-constants.js';
 import { playCombatSFX, classifyWeapon } from "./modules/actions/audio-utils.js";
-import { quickHeal } from "../macros/quick-heal.js";
 import { FaseripTokenRuler } from "./modules/canvas/faserip-token-ruler.js";
 import { initDotToken } from "./modules/canvas/faserip-dot-token.js";
 
@@ -94,6 +93,14 @@ Hooks.on("combatRound", async (combat, updateData, updateOptions, userId) => {
   
   // Trigger hook to update team sheet display
   Hooks.callAll("msh-faserip.timeUpdated");
+
+  // Reset force field cumulative absorption tracker for new round
+  try {
+    const { resetFFRoundTracker } = await import("./rules/mitigation.js");
+    resetFFRoundTracker();
+  } catch (e) {
+    console.error("[FASERIP ERROR] Failed to reset FF round tracker:", e);
+  }
 
   // ── Process dying for all actors in this combat (1 rank loss per round) ──
   // This is the ONLY place processDyingRound is called during combat.
@@ -2302,9 +2309,12 @@ Hooks.once("ready", async () => {
     }
   }
 
-  // Register macros
+  // Register macros (lazy-loaded — quick-heal.js is a self-executing macro, not an ES module)
   game.msh.macros = {
-    quickHeal
+    quickHeal: async () => {
+      const script = await fetch("systems/msh-faserip/macros/quick-heal.js").then(r => r.text());
+      new Function(script)();
+    }
   };
   console.log("[FASERIP] Macros registered");
 

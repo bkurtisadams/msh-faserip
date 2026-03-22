@@ -1452,6 +1452,67 @@ export const getTargetingContext = buildTargetingHTML;
  *   - apMode: Armor piercing mode ("value" or "cs")
  * @returns {Array} - Array of results for each target
  */
+// ─── Force Field Breach Handler ──────────────────────────────────────────────
+// Called when mitigation detects FF overload. Disables the FF AE and posts
+// appropriate consequences: personal FF shuts off (excess dmg already in netDamage),
+// projected FF: wielder rolls Psyche FEAT vs attack intensity or unconscious.
+async function handleFFBreach(targetActor, breach) {
+  const { isPersonal, aeId, excessDamage, attackIntensity, fullValue } = breach;
+  const scope = globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faserip";
+
+  // Disable the FF defense AE
+  if (aeId) {
+    const ffAe = targetActor.effects.get(aeId);
+    if (ffAe) {
+      await ffAe.update({ disabled: true });
+      console.log(`[FASERIP] FF breached on ${targetActor.name} — disabled AE ${aeId}`);
+    }
+  }
+
+  if (isPersonal) {
+    // Personal FF: shuts off, excess damage hits user (already in netDamage from mitigation).
+    // Effects (slam/stun/kill) from the excess are handled by the normal damage pipeline.
+    await ChatMessage.create({
+      content: `<div style="background:#fff3e0;border:2px solid #ff9800;padding:8px;border-radius:4px;">
+        <strong style="color:#e65100;">⚡ Force Field Overload!</strong>
+        <div style="margin-top:4px;"><strong>${targetActor.name}</strong>'s personal force field has shut down!</div>
+        <div style="font-size:0.9em;color:#666;margin-top:4px;">
+          Field capacity: ${fullValue} — Breached by attack.
+          ${excessDamage > 0 ? `${excessDamage} excess damage applied. Battle effects may apply.` : ""}
+        </div>
+      </div>`
+    });
+  } else {
+    // Projected FF: comes down, those inside unharmed by THIS attack.
+    // Wielder must make Psyche FEAT vs attack intensity or unconscious 1-10 rounds.
+    const psyche = targetActor.system?.abilities?.psyche?.rank || "Typical";
+    const psycheVal = CONFIG.FASERIP?.rankValues?.[psyche] || 6;
+    const intensity = attackIntensity || 0;
+
+    await ChatMessage.create({
+      content: `<div style="background:#e8eaf6;border:2px solid #5c6bc0;padding:8px;border-radius:4px;">
+        <strong style="color:#283593;">⚡ Projected Force Field Breached!</strong>
+        <div style="margin-top:4px;"><strong>${targetActor.name}</strong>'s projected force field has collapsed!</div>
+        <div style="font-size:0.9em;color:#666;margin-top:4px;">
+          Field capacity: ${fullValue} — Those inside are unharmed by this attack.
+        </div>
+        <div style="margin-top:6px;">
+          <strong>${targetActor.name}</strong> must make a <strong>Psyche FEAT</strong> (${psyche}) vs Intensity ${intensity} or become unconscious for 1-10 rounds.
+        </div>
+        <div style="margin-top:6px;">
+          <button class="ff-breach-psyche-feat" 
+                  data-actor-id="${targetActor.id}" 
+                  data-intensity="${intensity}"
+                  data-psyche-rank="${psyche}"
+                  style="background:#5c6bc0;color:white;border:none;padding:4px 12px;border-radius:3px;cursor:pointer;">
+            Roll Psyche FEAT
+          </button>
+        </div>
+      </div>`
+    });
+  }
+}
+
 // --- BEGIN PATCH: applyDamageToTargets ---
 export async function applyDamageToTargets({
   damage,
@@ -1465,7 +1526,8 @@ export async function applyDamageToTargets({
   forceKilling = false,
   armorPiercing = 0,
   armorPiercingCS = 0,
-  apMode = "value"
+  apMode = "value",
+  attackIntensity = 0
 } = {}) {
   const results = [];
   
@@ -1521,6 +1583,7 @@ export async function applyDamageToTargets({
       let netDamage = Number(damage) || 0;
 
       // Calculate mitigation (armor, resistances, etc.)
+      let ffBreachData = null;
       try {
         if (typeof calculateMitigation === "function" && targetActor) {
           const mit = calculateMitigation(netDamage, targetActor, {
@@ -1529,14 +1592,23 @@ export async function applyDamageToTargets({
             bypassArmor,
             armorPiercing,
             armorPiercingCS,
-            apMode
+            apMode,
+            attackIntensity
           });
           if (mit && Number.isFinite(mit.netDamage)) {
             netDamage = Math.max(0, mit.netDamage);
           }
+          if (mit?.ffBreach) {
+            ffBreachData = mit.ffBreach;
+          }
         }
       } catch (e) {
         console.warn("FASERIP | Mitigation calc failed; using raw damage.", e);
+      }
+
+      // ── Force Field breach consequences ──
+      if (ffBreachData) {
+        await handleFFBreach(targetActor, ffBreachData);
       }
 
       // Get health values
@@ -2200,7 +2272,8 @@ export async function applyDamageNow({
   armorPiercingCS = 0,
   apMode = "value",
   bypassForceField = false,
-  showNotification = true
+  showNotification = true,
+  attackIntensity = 0
 }) {
   try {
     const results = [];
@@ -2222,8 +2295,14 @@ export async function applyDamageNow({
         armorPiercing: apVal,
         armorPiercingCS: apCS,
         apMode,
-        bypassForceField: !!bypassForceField
+        bypassForceField: !!bypassForceField,
+        attackIntensity
       });
+
+      // FF breach consequences
+      if (m?.ffBreach) {
+        await handleFFBreach(targetActor, m.ffBreach);
+      }
 
       const net      = Math.max(0, m?.netDamage || 0);
       const absorbed = Math.max(0, m?.absorbed   || 0);
