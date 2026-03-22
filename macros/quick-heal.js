@@ -1,4 +1,6 @@
-// quick-heal.js v2.0.0 - 2026-03-21
+// quick-heal.js v2.0.1 - 2026-03-22
+// v2.0.1: Remove ES export — use self-executing async function for fetch/eval loader.
+//         Works with init.js lazy-load (AsyncFunction) and Foundry macro editor.
 // v2.0.0: Dialog with categorized effect checkboxes and persistent per-client prefs.
 //         Combat effects (dying/unconscious/stunned/slam/stagger) default ON (delete).
 //         Defense, power, and custom effects default OFF (keep). Prefs stored in client setting.
@@ -297,8 +299,10 @@ function buildDialogContent(tokens, prefs) {
 }
 
 // ── Main entry point ──
+// Works as: game.msh.macros.quickHeal() from hotbar macro
+// Works as: fetched + evaluated by init.js lazy loader
 
-export async function quickHeal() {
+async function _quickHealMain() {
   const tokens = canvas.tokens.controlled;
   if (!tokens.length) {
     ui.notifications.warn("No tokens selected");
@@ -392,3 +396,6 @@ export async function quickHeal() {
     dlg.render(true);
   });
 }
+
+// Self-execute when loaded via fetch/eval or Foundry macro editor
+_quickHealMain();

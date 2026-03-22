@@ -94,14 +94,6 @@ Hooks.on("combatRound", async (combat, updateData, updateOptions, userId) => {
   // Trigger hook to update team sheet display
   Hooks.callAll("msh-faserip.timeUpdated");
 
-  // Reset force field cumulative absorption tracker for new round
-  try {
-    const { resetFFRoundTracker } = await import("./rules/mitigation.js");
-    resetFFRoundTracker();
-  } catch (e) {
-    console.error("[FASERIP ERROR] Failed to reset FF round tracker:", e);
-  }
-
   // ── Process dying for all actors in this combat (1 rank loss per round) ──
   // This is the ONLY place processDyingRound is called during combat.
   // combatRound fires once per Foundry round = 1 FASERIP turn.
@@ -2309,11 +2301,12 @@ Hooks.once("ready", async () => {
     }
   }
 
-  // Register macros (lazy-loaded — quick-heal.js is a self-executing macro, not an ES module)
+  // Register macros (lazy-loaded — quick-heal.js is a self-executing script, not an ES module)
   game.msh.macros = {
     quickHeal: async () => {
       const script = await fetch("systems/msh-faserip/macros/quick-heal.js").then(r => r.text());
-      new Function(script)();
+      const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
+      await new AsyncFunction(script)();
     }
   };
   console.log("[FASERIP] Macros registered");
@@ -3420,6 +3413,10 @@ function generateActionIcon(actionCode, label, bgColor, fgColor) {
 async function createUniversalActionMacro(data, slot) {
   const { actionCode, actionName, actorId, actorName, iconName } = data;
   
+  // CHECK THE SETTING!
+  const actor = game.actors.get(actorId);
+  const mode = game.msh.getCombatModeFor(actor);
+  
   // Define ability mapping
   const abilityMap = {
     "blunt-attack": "fighting", "edged-attack": "fighting", "shooting": "agility",
@@ -3438,14 +3435,17 @@ async function createUniversalActionMacro(data, slot) {
       const actor = game.user.character || canvas.tokens.controlled[0]?.actor || game.actors.get("${actorId}");
       if (!actor) return ui.notifications.warn("Select a token or assign a character first.");
 
+      const savedCS = await actor.getFlag("msh-faserip", "cs_${actionCode}") || 0;
+      const savedKarma = await actor.getFlag("msh-faserip", "karma_${actionCode}") || 0;
+
       if (game.msh?.actions?.roll) {
         await game.msh.actions.roll("${actionCode}", {
           actor,
           abilityName: "${abilityName}",
-          opts: {}
+          opts: { shift: savedCS, karma: savedKarma }
         });
       } else if (game.msh?.rollUniversalAction) {
-        game.msh.rollUniversalAction("${actionCode}", actor.id);
+        game.msh.rollUniversalAction("${actionCode}", actor.id, savedCS, savedKarma);
       } else {
         ui.notifications.error("No action entrypoint found.");
       }
