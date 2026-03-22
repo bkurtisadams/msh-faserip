@@ -337,12 +337,12 @@ export class MentalPowerAction extends BaseAction {
       }
     }
 
-    // ── Nullifying Power: activate aura + self-suppress on caster ──
+    // ── Nullifying Power: area effect + aura + self-suppress on caster ──
     if (isNullifyAura) {
-      const { isAuraMaintained, startAura } = await import("./nullify.js");
+      const { isAuraMaintained, activateNullifyArea } = await import("./nullify.js");
       if (!isAuraMaintained(actor)) {
-        await startAura(actor, item.uuid);
-        console.log(`[FASERIP] ${actor.name} activated Nullifying Power aura — self-suppressed inborn powers`);
+        await activateNullifyArea(actor, powerRank, item.uuid);
+        console.log(`[FASERIP] ${actor.name} activated Nullifying Power aura — area effect resolved`);
       }
     }
 
