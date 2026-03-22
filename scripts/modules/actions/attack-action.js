@@ -785,7 +785,8 @@ export class AttackAction extends BaseAction {
          }
          penetratingDamage = Math.max(0, rd - armorValue);
          // Borderline: armor exactly equals damage (effects can still apply per rules)
-         isBorderline = (rd > 0 && rd === armorValue);
+         //isBorderline = (rd > 0 && rd === armorValue);
+         isBorderline = (rd > 0 && rd === armorValue && !armorData?.isForceField);
        } else {
          penetratingDamage = Number(rawDamage) || 0;
          }

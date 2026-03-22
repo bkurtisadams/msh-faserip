@@ -2095,16 +2095,19 @@ export function getBodyArmorValues(targetActor, damageType = "physical-blunt") {
     }
   }
 
-  // Check Body Armor powers
+  // Check Body Armor and Force Field powers
   const bodyArmorPowers = targetActor.items.filter(i => {
     if (i.type !== "power") return false;
-    if (i.system?.isActive === false) return false; // suppressed (e.g., Nullified)
+    if (i.system?.isActive === false) return false;
     if (i.system.isBodyArmor === true) return true;
+    if (i.system.isForceField === true) return true;
     
     const name = i.name.toLowerCase();
     return name.includes("body armor") || 
            name.includes("body armour") || 
-           i.system.type?.toLowerCase().includes("body armor");
+           name.includes("force field") ||
+           i.system.type?.toLowerCase().includes("body armor") ||
+           i.system.type?.toLowerCase().includes("force field");
   });
 
   bodyArmorPowers.forEach(power => {
