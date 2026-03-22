@@ -1855,6 +1855,7 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
 
     // Toggle power isActive from powers tab
     // Flips system.isActive AND enables/disables all transfer AEs on the power item
+    // Also syncs defense AEs (body armor, force field, resistance) on the actor
     // Passive powers are always on and cannot be toggled
     html.find('.power-active-toggle').click(async ev => {
       ev.preventDefault();
@@ -1870,6 +1871,13 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
       if (transferEffects.length) {
         const updates = transferEffects.map(e => ({ _id: e.id, disabled: !newState }));
         await item.updateEmbeddedDocuments("ActiveEffect", updates);
+      }
+      // Sync defense AEs (BA, FF, Resistance) — respects isActive
+      try {
+        const { syncDefenseEffects } = await import("./modules/effects/defense-effects.js");
+        await syncDefenseEffects(this.actor, item);
+      } catch (e) {
+        console.error("[FASERIP ERROR] Failed to sync defense effects on toggle:", e);
       }
     });
 

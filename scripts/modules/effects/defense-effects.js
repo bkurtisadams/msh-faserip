@@ -1,4 +1,5 @@
-// scripts/modules/effects/defense-effects.js v1.0.1 - 2026-02-21
+// scripts/modules/effects/defense-effects.js v1.1.0 - 2026-03-22
+// v1.1.0: syncDefenseEffects respects isActive — inactive powers remove defense AEs
 // v1.0.1: Strip token badge icons from passive defense AEs (body armor, force field, resistance)
 // Passive defense Active Effects for Body Armor, Force Field, and Resistance powers.
 // These are always-on (no timer/cycle), toggleable, and auto-sync from power items.
@@ -204,16 +205,17 @@ function buildResistanceAE(item, values) {
  * Register or update a defense AE for a power item.
  * If the AE already exists, updates its flags; otherwise creates it.
  */
-async function registerDefenseAE(actor, effectId, aeData) {
+async function registerDefenseAE(actor, effectId, aeData, disabled = false) {
   const scope = SCOPE();
   const existing = actor.effects.find(e => e.flags?.[scope]?.ongoingId === effectId);
 
   if (existing) {
-    // Update in place — preserve disabled state
+    // Update in place — set disabled state from power's isActive
     const updates = {
       name: aeData.name,
       img: aeData.img,
       statuses: aeData.statuses,
+      disabled: disabled,
     };
     // Merge flags
     const flagPath = `flags.${scope}`;
@@ -222,13 +224,14 @@ async function registerDefenseAE(actor, effectId, aeData) {
       updates[`${flagPath}.${k}`] = v;
     }
     await existing.update(updates);
-    console.log(`[FASERIP] Defense AE updated: ${aeData.name} on ${actor.name}`);
+    console.log(`[FASERIP] Defense AE updated: ${aeData.name} on ${actor.name} (disabled=${disabled})`);
     return existing;
   }
 
-  // Create new AE
+  // Create new AE with correct disabled state
+  aeData.disabled = disabled;
   const ae = await applyEffect(actor, aeData);
-  console.log(`[FASERIP] Defense AE created: ${aeData.name} on ${actor.name}`);
+  console.log(`[FASERIP] Defense AE created: ${aeData.name} on ${actor.name} (disabled=${disabled})`);
   return ae;
 }
 
@@ -257,32 +260,42 @@ export async function syncDefenseEffects(actor, item, removing = false) {
   if (!actor || !item || item.type !== "power") return;
   const sys = item.system || {};
 
+  // Determine if the power is currently inactive (toggled off).
+  // Passive powers (activationType === "passive") are always on.
+  const isInactive = !removing && sys.activationType !== "passive" && sys.isActive === false;
+
   // ── Body Armor ──
   const baId = defenseEffectId("bodyArmor", item.id);
-  if (!removing && sys.isBodyArmor) {
+  if (removing) {
+    await removeDefenseAE(actor, baId);
+  } else if (sys.isBodyArmor) {
     const values = resolveBodyArmorValues(item);
     const aeData = buildBodyArmorAE(item, values);
-    await registerDefenseAE(actor, baId, aeData);
+    await registerDefenseAE(actor, baId, aeData, isInactive);
   } else {
     await removeDefenseAE(actor, baId);
   }
 
   // ── Force Field ──
   const ffId = defenseEffectId("forceField", item.id);
-  if (!removing && sys.isForceField) {
+  if (removing) {
+    await removeDefenseAE(actor, ffId);
+  } else if (sys.isForceField) {
     const values = resolveForceFieldValues(item);
     const aeData = buildForceFieldAE(item, values);
-    await registerDefenseAE(actor, ffId, aeData);
+    await registerDefenseAE(actor, ffId, aeData, isInactive);
   } else {
     await removeDefenseAE(actor, ffId);
   }
 
   // ── Resistance ──
   const resId = defenseEffectId("resistance", item.id);
-  if (!removing && sys.isResistance && sys.resistanceType) {
+  if (removing) {
+    await removeDefenseAE(actor, resId);
+  } else if (sys.isResistance && sys.resistanceType) {
     const values = resolveResistanceValues(item);
     const aeData = buildResistanceAE(item, values);
-    await registerDefenseAE(actor, resId, aeData);
+    await registerDefenseAE(actor, resId, aeData, isInactive);
   } else {
     await removeDefenseAE(actor, resId);
   }
