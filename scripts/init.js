@@ -80,6 +80,23 @@ function getActions() {
   return CONFIG?.MSHF?.ACTIONS || globalThis?.ACTIONS || {};
 }
 
+// ── Player-color tint on chat cards ──
+Hooks.on('renderChatMessage', (message, html, data) => {
+  if (!game.settings.get('msh-faserip', 'chatCardPlayerColor')) return;
+  const user = game.users.get(message.author?.id ?? message.user?.id);
+  if (!user?.color) return;
+
+  const el = html[0] ?? html;
+  const header = el.querySelector?.('.message-header');
+  if (!header) return;
+
+  const color = user.color.css ?? String(user.color);
+  header.style.background = `linear-gradient(135deg, ${color}35, ${color}15)`;
+  header.style.borderLeft = `4px solid ${color}`;
+  header.style.paddingLeft = '8px';
+  header.style.borderRadius = '3px 3px 0 0';
+});
+
 // FASERIP Combat Sync - Use combatRound hook (fires once per round)
 Hooks.on("combatRound", async (combat, updateData, updateOptions, userId) => {
   // 🔒 GM-only – only the GM advances world time
@@ -436,6 +453,16 @@ Hooks.once("init", async () => {
       return "semi";
     }
   };
+
+  // Player color tint on chat cards
+  game.settings.register('msh-faserip', 'chatCardPlayerColor', {
+    name: "Player Color Chat Cards",
+    hint: "Tint chat card headers with each player's cursor color for easier identification of who did what.",
+    scope: "world",
+    config: true,
+    type: Boolean,
+    default: true
+  });
 
   // Four-Color: no death save at 0 Health, unless a 'Kill' action type used.
   game.settings.register('msh-faserip', 'fourColorRule', {
