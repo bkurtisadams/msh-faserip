@@ -47,9 +47,10 @@ import {
   rollWithKarmaAndHistory, buildActionsBox, bannerColors,
   getTargetingContext, getBodyArmorValues, applyDamageToTargets,
   debugLog, universalColor, buildInlineRollDisplay, buildInlineFeatDisplay,
-  buildCollapsibleSlamSection, buildCollapsibleStunSection
+  buildCollapsibleSlamSection, buildCollapsibleStunSection, buildCollapsibleBreakingSection
 } from "./action-utils.js";
 //import { rollUniversalTable } from "../dice/universal-table.js";
+import { executeBreakingFeat } from "./breaking-feat.js";
 import { buildDamageFlags } from "./damage-ui.js";
 import { canEffectsApply } from "../../rules/effects-gate.js";
 import { ACTION_LABELS } from "./action-config.js";
@@ -919,6 +920,25 @@ export class AttackAction extends BaseAction {
         ? (resolveCombatMode(targetActor) === "full")
         : false;
 
+      // Inline Breaking FEAT for full-auto consolidated cards
+      let inlineBreakingHtml = "";
+      if (useConsolidated && !isManualMode && this.opts?.autoApply && currentBreakingFeat) {
+        try {
+          const breakResult = await executeBreakingFeat({
+            weaponMatRank: currentBreakingFeat.weaponMat,
+            targetMatRank: currentBreakingFeat.targetMat,
+            actor,
+            postChat: false
+          });
+          if (breakResult) {
+            inlineBreakingHtml = buildCollapsibleBreakingSection(breakResult);
+            currentBreakingFeat = null;
+          }
+        } catch (e) {
+          console.error("[FASERIP ERROR] Inline Breaking FEAT failed:", e);
+        }
+      }
+
       // Show actions box if there are effects to apply OR a Breaking FEAT check is needed
       const hasEffects = canEffectsApply(penetratingDamage, { borderline: isBorderline });
       const needsActionsBox = !isManualMode && targetIsHit && targetActor && (hasEffects || currentBreakingFeat);
@@ -1215,6 +1235,7 @@ export class AttackAction extends BaseAction {
           
           ${inlineSlamHtml}
           ${inlineStunHtml}
+          ${inlineBreakingHtml}
           
           ${actions}
           ${manualModeNotice}

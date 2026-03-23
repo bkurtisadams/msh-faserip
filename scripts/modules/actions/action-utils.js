@@ -2940,6 +2940,69 @@ export function buildCollapsibleStunSection(result) {
     </details>`;
 }
 
+/**
+ * Build collapsible breaking FEAT section for inline display in attack cards.
+ * @param {Object} result - From executeBreakingFeat()
+ * @returns {string} HTML string
+ */
+export function buildCollapsibleBreakingSection(result) {
+  if (!result) return "";
+
+  const { weaponMatRank, targetMatRank, wielderStr, colorLower, reqColor, roll, autoResult, weaponBreaks, actorName } = result;
+
+  const colors = weaponBreaks
+    ? { bg: "#D32F2F", fg: "#fff", icon: "&#x1F4A5;" }
+    : { bg: "#388E3C", fg: "#fff", icon: "&#x1F6E1;" };
+
+  const summaryText = `Breaking FEAT - ${weaponBreaks ? "WEAPON BREAKS" : "Weapon Survives"}`;
+
+  const bannerColor = (c) => {
+    switch (String(c).toLowerCase()) {
+      case "white": return { bg: "#e0e0e0", fg: "#333" };
+      case "green": return { bg: "#4caf50", fg: "#fff" };
+      case "yellow": return { bg: "#ffeb3b", fg: "#333" };
+      case "red": return { bg: "#f44336", fg: "#fff" };
+      default: return { bg: "#9e9e9e", fg: "#fff" };
+    }
+  };
+  const { bg: reqBg, fg: reqFg } = bannerColor(reqColor);
+
+  let detailContent = "";
+  if (autoResult) {
+    detailContent = `
+      <div style="padding:8px;font-size:.9em;">
+        <div style="margin-bottom:4px;"><strong>${actorName}'s</strong> weapon (${weaponMatRank}) vs target armor (${targetMatRank})</div>
+        <div style="font-weight:bold;color:#555;">
+          ${autoResult === "auto-break" ? "Automatic break (Str 3+ ranks above material)" : "Automatic survive (Str 3+ ranks below material)"}
+        </div>
+      </div>`;
+  } else {
+    detailContent = `
+      <div style="padding:8px;font-size:.9em;">
+        <div style="margin-bottom:4px;"><strong>${actorName}'s</strong> weapon (${weaponMatRank}) vs target armor (${targetMatRank})</div>
+        <div>Required: <span style="padding:1px 6px;border-radius:2px;background:${reqBg};color:${reqFg};font-size:.85em;">${reqColor.toUpperCase()}</span> (Str ${wielderStr} vs ${weaponMatRank} intensity)</div>
+      </div>`;
+  }
+
+  const rollInfo = roll != null ? `
+    <div style="padding:4px 8px;font-size:.85em;color:#555;border-top:1px solid rgba(0,0,0,.1);">
+      Strength: ${wielderStr} | Roll: <span style="padding:0 3px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;">${roll}</span> | Result: <strong style="text-transform:capitalize;">${colorLower}</strong>
+    </div>` : "";
+
+  return `
+    <details class="faserip-check-section breaking-section" style="margin:6px 10px 8px;border:1px solid ${colors.bg};border-radius:4px;overflow:hidden;">
+      <summary style="padding:6px 10px;background:${colors.bg};color:${colors.fg};cursor:pointer;font-weight:600;font-size:.9em;list-style:none;display:flex;align-items:center;gap:6px;">
+        <span style="font-size:1.1em;">${colors.icon}</span>
+        <span>${summaryText}</span>
+        <span style="margin-left:auto;font-size:.8em;opacity:.8;">&#9660;</span>
+      </summary>
+      <div style="background:#fff;">
+        ${detailContent}
+        ${rollInfo}
+      </div>
+    </details>`;
+}
+
 // ============================================================================
 // UNIFIED CHAT CARD BUILDERS (v1.7.0)
 // Standard visual components for all action chat cards.

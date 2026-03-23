@@ -17,7 +17,7 @@
 import { ActionDispatcher } from "./action-dispatcher.js";
 import { resolveCombatMode } from "./action-dispatcher.js";
 
-import { openBreakingFeatDialog } from "./breaking-feat.js";
+import { openBreakingFeatDialog, executeBreakingFeat } from "./breaking-feat.js";
 import { openGrabbingBreakDialog } from "./grabbing-break.js";
 import { openCollisionDamageDialog } from "./collision-damage.js";
 import { 
@@ -497,13 +497,6 @@ export function installActionChatHandlers() {
       const weaponMat = btn.dataset.weaponMat || "Excellent";
       const targetMat = btn.dataset.targetMat || "";
       const actorUuid = btn.dataset.actorUuid;
-      
-      console.log("[FASERIP] Breaking FEAT button clicked:", {
-        weaponMat,
-        targetMat,
-        actorUuid,
-        allDataset: { ...btn.dataset }
-      });
 
       let actor = null;
       try {
@@ -513,7 +506,13 @@ export function installActionChatHandlers() {
         }
       } catch (_) {}
 
-      openBreakingFeatDialog({ weaponMatRank: weaponMat, targetMatRank: targetMat, actor });
+      // Semi mode (or any mode with known target mat): roll directly, post chat card
+      if (targetMat) {
+        await executeBreakingFeat({ weaponMatRank: weaponMat, targetMatRank: targetMat, actor, postChat: true });
+      } else {
+        // Fallback: open dialog to let user pick target material
+        openBreakingFeatDialog({ weaponMatRank: weaponMat, targetMatRank: targetMat, actor });
+      }
     });
 
     // 3) Grabbing Break Check chip
