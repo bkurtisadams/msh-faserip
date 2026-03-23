@@ -1,0 +1,362 @@
+/* compact-mode.css v1.1.0 - 2026-03-23 */
+/* Compact character sheet mode — toggled via Settings > Compact Character Sheet */
+/* or the compress/expand button on the sheet header.                            */
+
+/* ── Compact toggle button (always visible in both modes) ──────────────── */
+.msh-player-top-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.msh-player-top-row input[type="text"] {
+  flex: 1;
+  min-width: 0;
+}
+
+.compact-toggle {
+  background: transparent;
+  border: 1px solid #c0a070;
+  border-radius: 3px;
+  color: #8b4444;
+  cursor: pointer;
+  padding: 2px 5px;
+  font-size: 12px;
+  line-height: 1;
+  height: 22px;
+  width: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+
+.compact-toggle:hover {
+  background: #f5f0e8;
+  border-color: #8b0000;
+  color: #8b0000;
+}
+
+.compact-toggle.active {
+  background: #8b0000;
+  border-color: #8b0000;
+  color: #fff;
+}
+
+.compact-toggle.active:hover {
+  background: #a00000;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   COMPACT MODE — everything below only applies when .compact-mode is set
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Header: flatten to single row  [portrait] [name] [player] [toggle] ── */
+form.faserip-sheet.compact-mode .msh-compact-header {
+  grid-template-columns: 36px 1fr auto !important;
+  grid-template-rows: auto !important;
+  gap: 0 8px !important;
+  padding: 4px 6px !important;
+  align-items: center;
+}
+
+/* Portrait: small square, single row */
+form.faserip-sheet.compact-mode .msh-left {
+  grid-column: 1 !important;
+  grid-row: 1 !important;
+  gap: 0 !important;
+}
+
+form.faserip-sheet.compact-mode .msh-logo {
+  display: none !important;
+}
+
+form.faserip-sheet.compact-mode .msh-portrait {
+  width: 32px !important;
+  height: 32px !important;
+  min-width: 32px !important;
+}
+
+form.faserip-sheet.compact-mode .msh-portrait img {
+  width: 32px !important;
+  height: 32px !important;
+}
+
+/* Row1 middle: keep only the Name field, hide Identity + Age */
+form.faserip-sheet.compact-mode .msh-row1 {
+  grid-column: 2 !important;
+  grid-row: 1 !important;
+  grid-template-columns: 1fr !important;
+  align-items: center !important;
+}
+
+form.faserip-sheet.compact-mode .msh-row1 .msh-field:not(:first-child) {
+  display: none !important;
+}
+
+/* Name field: hide label, input fills the space */
+form.faserip-sheet.compact-mode .msh-row1 .msh-field:first-child label {
+  display: none !important;
+}
+
+form.faserip-sheet.compact-mode .msh-row1 .msh-field:first-child input {
+  height: 26px !important;
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  padding: 2px 6px !important;
+}
+
+/* Player top: single row, aligned */
+form.faserip-sheet.compact-mode .msh-player-top {
+  grid-column: 3 !important;
+  grid-row: 1 !important;
+  align-self: center !important;
+  min-width: 110px !important;
+}
+
+form.faserip-sheet.compact-mode .msh-player-top label {
+  display: none !important;
+}
+
+form.faserip-sheet.compact-mode .msh-player-top-row input[type="text"] {
+  height: 26px !important;
+  font-size: 12px !important;
+  padding: 2px 6px !important;
+}
+
+/* Hide everything else in the header grid */
+form.faserip-sheet.compact-mode .msh-row2 {
+  display: none !important;
+}
+
+form.faserip-sheet.compact-mode .msh-player-bottom {
+  display: none !important;
+}
+
+/* Hide biography panel */
+form.faserip-sheet.compact-mode .msh-bio {
+  display: none !important;
+}
+
+/* ── Abilities: single column, tighter ─────────────────────────────────── */
+form.faserip-sheet.compact-mode .abilities-section {
+  grid-template-columns: 1fr !important;
+  gap: 4px !important;
+  padding: 4px 6px !important;
+}
+
+/* Primary table: hide initial columns, tighter rows */
+form.faserip-sheet.compact-mode .primary-abilities .abilities-table th.initial,
+form.faserip-sheet.compact-mode .primary-abilities .abilities-table td:nth-child(2),
+form.faserip-sheet.compact-mode .primary-abilities .abilities-table td:nth-child(3),
+form.faserip-sheet.compact-mode .primary-abilities .abilities-table th:nth-child(2),
+form.faserip-sheet.compact-mode .primary-abilities .abilities-table th:nth-child(3) {
+  display: none !important;
+}
+
+form.faserip-sheet.compact-mode .primary-abilities .abilities-table {
+  table-layout: fixed !important;
+}
+
+form.faserip-sheet.compact-mode .primary-abilities .abilities-table thead th {
+  height: 26px !important;
+  min-height: 26px !important;
+  max-height: 26px !important;
+  padding: 2px 4px !important;
+  font-size: 10px !important;
+}
+
+form.faserip-sheet.compact-mode .primary-abilities .abilities-table td {
+  padding: 1px 3px !important;
+}
+
+form.faserip-sheet.compact-mode .primary-abilities .abilities-table input,
+form.faserip-sheet.compact-mode .primary-abilities .abilities-table select {
+  height: 20px !important;
+  font-size: 11px !important;
+  padding: 1px 3px !important;
+}
+
+form.faserip-sheet.compact-mode .primary-abilities .abilities-table td.ability-key {
+  font-size: 13px !important;
+  padding: 1px 2px !important;
+  width: 28px !important;
+  min-width: 28px !important;
+}
+
+/* Initial column toggle icon - hide in compact */
+form.faserip-sheet.compact-mode .initial-columns-toggle {
+  display: none !important;
+}
+
+/* ── Secondary abilities: tighter ──────────────────────────────────────── */
+form.faserip-sheet.compact-mode .secondary-abilities .sec-head {
+  height: 24px !important;
+  min-height: 24px !important;
+  max-height: 24px !important;
+  padding: 2px 4px !important;
+  font-size: 10px !important;
+}
+
+form.faserip-sheet.compact-mode .secondary-abilities .sec-head small {
+  display: none !important;
+}
+
+form.faserip-sheet.compact-mode .secondary-abilities .sec-body {
+  padding: 3px 4px !important;
+}
+
+form.faserip-sheet.compact-mode .secondary-abilities .stacked-values input[type="number"] {
+  width: 44px !important;
+  min-width: 44px !important;
+  height: 22px !important;
+  font-size: 14px !important;
+}
+
+form.faserip-sheet.compact-mode .secondary-abilities .stacked-values input[type="number"]:first-child {
+  font-size: 16px !important;
+  height: 24px !important;
+}
+
+form.faserip-sheet.compact-mode .secondary-abilities .stacked-values .divider {
+  font-size: 12px !important;
+}
+
+form.faserip-sheet.compact-mode .secondary-abilities .resources-row {
+  gap: 2px !important;
+}
+
+form.faserip-sheet.compact-mode .secondary-abilities .resources-row select {
+  height: 20px !important;
+  font-size: 10px !important;
+  max-width: 100px !important;
+}
+
+form.faserip-sheet.compact-mode .secondary-abilities .resources-row input[type="number"] {
+  height: 22px !important;
+  width: 44px !important;
+  min-width: 44px !important;
+  font-size: 14px !important;
+}
+
+form.faserip-sheet.compact-mode .secondary-abilities .popularity-values input[type="number"] {
+  width: 40px !important;
+  min-width: 40px !important;
+  height: 22px !important;
+  font-size: 14px !important;
+}
+
+/* ── Movement: tighter ─────────────────────────────────────────────────── */
+form.faserip-sheet.compact-mode .movement-inline {
+  gap: 2px !important;
+  padding: 2px 4px !important;
+}
+
+form.faserip-sheet.compact-mode .movement-inline .movement-label {
+  font-size: 9px !important;
+}
+
+form.faserip-sheet.compact-mode .movement-inline input[type="number"] {
+  height: 18px !important;
+  font-size: 11px !important;
+  padding: 0 2px !important;
+}
+
+/* ── Tab bar: smaller icons ────────────────────────────────────────────── */
+form.faserip-sheet.compact-mode .sheet-tabs-navigation .item {
+  padding: 3px 6px !important;
+}
+
+form.faserip-sheet.compact-mode .sheet-tabs-navigation .item i {
+  font-size: 12px !important;
+}
+
+/* ── Tab content: tighter tables, prevent overflow ─────────────────────── */
+form.faserip-sheet.compact-mode .sheet-tab-content {
+  padding: 6px !important;
+  overflow-x: hidden !important;
+}
+
+/* Powers table: override fixed colgroup widths, let columns shrink */
+form.faserip-sheet.compact-mode .powers-table {
+  table-layout: fixed !important;
+  width: 100% !important;
+}
+
+form.faserip-sheet.compact-mode .powers-table colgroup {
+  display: none !important;
+}
+
+form.faserip-sheet.compact-mode .powers-table th,
+form.faserip-sheet.compact-mode .powers-table td {
+  padding: 2px 3px !important;
+  font-size: 11px !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+/* Name column gets remaining space */
+form.faserip-sheet.compact-mode .powers-table th:first-child,
+form.faserip-sheet.compact-mode .powers-table td:first-child {
+  width: auto !important;
+  white-space: normal !important;
+}
+
+/* Rank column */
+form.faserip-sheet.compact-mode .powers-table th:nth-child(2),
+form.faserip-sheet.compact-mode .powers-table td:nth-child(2) {
+  width: 65px !important;
+}
+
+/* Value + Range columns */
+form.faserip-sheet.compact-mode .powers-table th:nth-child(3),
+form.faserip-sheet.compact-mode .powers-table td:nth-child(3),
+form.faserip-sheet.compact-mode .powers-table th:nth-child(4),
+form.faserip-sheet.compact-mode .powers-table td:nth-child(4) {
+  width: 36px !important;
+}
+
+/* Type column */
+form.faserip-sheet.compact-mode .powers-table th:nth-child(5),
+form.faserip-sheet.compact-mode .powers-table td:nth-child(5) {
+  width: 70px !important;
+}
+
+/* Controls column */
+form.faserip-sheet.compact-mode .powers-table th:nth-child(6),
+form.faserip-sheet.compact-mode .powers-table td:nth-child(6) {
+  width: 30px !important;
+}
+
+form.faserip-sheet.compact-mode .powers-table input,
+form.faserip-sheet.compact-mode .powers-table select {
+  height: 20px !important;
+  font-size: 11px !important;
+}
+
+/* Power name: tighter icon gap */
+form.faserip-sheet.compact-mode .power-name {
+  gap: 4px !important;
+}
+
+form.faserip-sheet.compact-mode .power-icon {
+  width: 18px !important;
+  height: 18px !important;
+}
+
+/* All other tab tables: prevent overflow */
+form.faserip-sheet.compact-mode .tab table {
+  max-width: 100% !important;
+  overflow: hidden !important;
+}
+
+/* ── General spacing reductions ────────────────────────────────────────── */
+form.faserip-sheet.compact-mode .sheet-body {
+  padding: 0 2px !important;
+}
+
+form.faserip-sheet.compact-mode .sheet-tabs {
+  margin-top: 2px !important;
+}

@@ -398,6 +398,9 @@ export class FaseripActorSheet extends ActorSheet {
     const charType = context.system.characterType || "player";
     context.isNPC = charType !== "player";
 
+    // Compact sheet mode (per-user setting)
+    context.compactSheet = game.settings.get("msh-faserip", "compactSheet") ?? false;
+
     return context;
   }
 
@@ -842,6 +845,11 @@ export class FaseripActorSheet extends ActorSheet {
   activateListeners(html) {
     super.activateListeners(html);
 
+    // Apply compact mode class from setting
+    const compact = game.settings.get("msh-faserip", "compactSheet") ?? false;
+    const form = html.closest('.faserip-sheet');
+    form.toggleClass('compact-mode', compact);
+
     // ── Ctrl+Wheel zoom on sheet ──
     initSheetZoom(this);
 
@@ -871,6 +879,14 @@ export class FaseripActorSheet extends ActorSheet {
       event.preventDefault();
       event.stopPropagation();
       await this._toggleSheetLock(html);
+    });
+
+    // Compact mode toggle button
+    html.find('.compact-toggle').click(async (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const current = game.settings.get("msh-faserip", "compactSheet") ?? false;
+      await game.settings.set("msh-faserip", "compactSheet", !current);
     });
 
     const isLocked = this.actor.getFlag('msh-faserip', 'sheetLocked') || false;

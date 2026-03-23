@@ -58,7 +58,8 @@
         "styles/combat-panel.css",
         "styles/gm-tools.css",
         "styles/action-dialog.css",
-        "styles/vehicle-sheet.css"
+        "styles/vehicle-sheet.css",
+        "styles/compact-mode.css"
     ],
     "packs": [
         {
@@ -167,6 +168,15 @@
             "config": false,
             "type": "Number",
             "default": 1
+        },
+        {
+            "key": "compactSheet",
+            "name": "Compact Character Sheet",
+            "hint": "Reduces character sheet size by hiding header details, collapsing abilities, and tightening spacing.",
+            "scope": "client",
+            "config": true,
+            "type": "Boolean",
+            "default": false
         }
         ]
 }

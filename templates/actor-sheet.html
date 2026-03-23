@@ -1,4 +1,4 @@
-<form class="faserip-sheet" autocomplete="off">
+<form class="faserip-sheet {{#if compactSheet}}compact-mode{{/if}}" autocomplete="off">
   <!-- COMPACT HEADER (merged — logo+portrait left, fields right, 2 rows) -->
 <div class="msh-compact-header">
   <!-- Left: Logo over Portrait -->
@@ -40,10 +40,16 @@
     </div>
   </div>
 
-  <!-- Row 1 right: Player -->
+  <!-- Row 1 right: Player + Compact toggle -->
   <div class="msh-player-top">
     <label>{{#if isNPC}}Judge{{else}}Player{{/if}}</label>
-    <input type="text" name="system.player" value="{{system.player}}" {{#if isNPC}}placeholder="GM"{{/if}} />
+    <div class="msh-player-top-row">
+      <input type="text" name="system.player" value="{{system.player}}" {{#if isNPC}}placeholder="GM"{{/if}} />
+      <button type="button" class="compact-toggle {{#if compactSheet}}active{{/if}}"
+              title="{{#if compactSheet}}Expand Sheet{{else}}Compact Sheet{{/if}}">
+        <i class="fas {{#if compactSheet}}fa-expand{{else}}fa-compress{{/if}}"></i>
+      </button>
+    </div>
   </div>
 
   <!-- Row 2 middle: Origin | Group | Base | Bio -->
