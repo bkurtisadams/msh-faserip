@@ -73,6 +73,7 @@ import { ACTIONS } from '../helpers/action-constants.js';
 import { playCombatSFX, classifyWeapon } from "./modules/actions/audio-utils.js";
 import { FaseripTokenRuler } from "./modules/canvas/faserip-token-ruler.js";
 import { initDotToken } from "./modules/canvas/faserip-dot-token.js";
+import { registerNullifyAuraHooks } from "./modules/actions/nullify-aura.js";
 
 // Helper to resolve ACTIONS from CONFIG (for macro compatibility)
 function getActions() {
@@ -862,6 +863,16 @@ Hooks.once("init", async () => {
     config: true,
     type: Number,
     default: 132
+  });
+
+  game.settings.register("msh-faserip", "nullifyMaxRange", {
+    name: "Nullifying Power — Max Aura Range (Areas)",
+    hint: "Cap the Nullifying Power aura radius in areas. 0 = full RAW range (rank-based). Any positive number caps the range (e.g. 4 means max 4 areas regardless of rank). Affects both the visual aura and the area template.",
+    scope: "world",
+    config: true,
+    type: Number,
+    default: 0,
+    range: { min: 0, max: 100, step: 1 }
   });
 
   game.settings.register("msh-faserip", "dotMode", {
@@ -2276,6 +2287,13 @@ Hooks.once("ready", async () => {
     installActionChatHandlers();
   } catch (e) {
     console.warn("MSH FASERIP | Failed to install chat hooks:", e);
+  }
+
+  // Nullify aura region hooks (token movement tracking, enter/exit)
+  try {
+    registerNullifyAuraHooks();
+  } catch (e) {
+    console.warn("MSH FASERIP | Failed to register nullify aura hooks:", e);
   }
 
   // Manual mode chat listeners

@@ -1000,8 +1000,9 @@ export function installActionChatHandlers() {
       if (!f.requiresSave) return;
 
       const ability    = btn.dataset.saveAbility || f.saveAbility || "endurance";
-      const intensity  = f.saveIntensity || "power-rank"; // "power-rank" | "fixed-rank" | "none"
-      const fixedRank  = f.saveFixedRank || "";
+      const btnIntensityRank = btn.dataset.intensityRank || "";
+      const intensity  = btnIntensityRank ? "fixed-rank" : (f.saveIntensity || "power-rank");
+      const fixedRank  = btnIntensityRank || f.saveFixedRank || "";
       const ignoreGate = (f.saveIgnoreGate !== false);
 
       // Attacker (for labels/origin)
@@ -1018,9 +1019,10 @@ export function installActionChatHandlers() {
       const targets = Array.from(game.user?.targets ?? []);
       const prefill = {};
 
-      // Resolve save actor: prefer flagged defender, then targeted token, then fall back to attacker
+      // Resolve save actor: prefer button data-target-uuid, then flagged defender, then targeted token, then fall back
       let saveActor = null;
-      const defUuid = f?.defenderUuid || f?.targetUuid || "";
+      const btnTargetUuid = btn.dataset.targetUuid || "";
+      const defUuid = btnTargetUuid || f?.defenderUuid || f?.targetUuid || "";
       if (defUuid) {
         try {
           const doc = await fromUuid(defUuid);
@@ -1036,7 +1038,14 @@ export function installActionChatHandlers() {
         saveActor = ownerActor;
       }
 
-      if (targets.length === 1) {
+      const btnTargetName = btn.dataset.targetName || "";
+      if (btnTargetUuid && saveActor && saveActor !== ownerActor) {
+        prefill.targetName    = btnTargetName || saveActor.name;
+        prefill.targetUuid    = saveActor.uuid ?? "";
+        prefill.targetEndRank = saveActor.system?.abilities?.[ability]?.rank || "Typical";
+        prefill.dmgThrough    = 0;
+        prefill.attackForm    = "mental";
+      } else if (targets.length === 1) {
         const t = targets[0];
         prefill.targetName    = t.name;
         prefill.targetUuid    = t.actor?.uuid ?? "";
@@ -1061,12 +1070,16 @@ export function installActionChatHandlers() {
           fixedRank,
           effectName: f.effectName,
           failMessage: f.failMessage,
-          powerName: f.powerName
+          powerName: f.powerName,
+          isNullifyAura: !!f.isNullifyAura
         }
       });
 
       // Persist resolved state so button stays disabled across re-renders
-      try { await safeSetFlag(msg, SCOPE, "autoSaveHandled", true); } catch (_) {}
+      // Skip for multi-target nullify cards — each button disables independently
+      if (!f.isNullifyAura) {
+        try { await safeSetFlag(msg, SCOPE, "autoSaveHandled", true); } catch (_) {}
+      }
 
       // NOTE: CheckAction handles the actual FEAT + result. "power-save"
       // has labels/effects configured in action-config (fail => affected).
@@ -1097,13 +1110,50 @@ export function installActionChatHandlers() {
           await stopAura(actor);
           ui.notifications.info(`${actor.name} stops maintaining Nullification.`);
         } else {
-          await startAura(actor, f.nullify?.powerItemUuid ?? null);
+          await startAura(actor, f.nullify?.powerItemUuid ?? null, f.powerRank ?? f.originalPowerRank ?? null);
           ui.notifications.info(`${actor.name} is now maintaining Nullification (while in range).`);
         }
       } catch (e) {
         console.warn("Nullify aura toggle failed:", e);
         ui.notifications.error("Failed to toggle Nullify aura (see console).");
       }
+    });
+
+    // 7b) Nullify Auto-Fail (Semi mode — 3+ ranks below, no roll needed)
+    html.on("click", '[data-action="nullify-auto-fail"]', async (ev) => {
+      ev.preventDefault();
+      const btn = ev.currentTarget;
+      btn.setAttribute("aria-disabled", "true");
+      btn.style.pointerEvents = "none";
+      btn.style.opacity = "0.55";
+
+      const targetUuid = btn.dataset.targetUuid;
+      const attackerUuid = btn.dataset.attackerUuid;
+      const powerItemUuid = btn.dataset.powerItemUuid;
+
+      let targetActor = null;
+      try {
+        const doc = await fromUuid(targetUuid);
+        targetActor = doc?.actor ?? doc ?? null;
+      } catch (_) {}
+      if (!targetActor) return;
+
+      let attackerActor = null;
+      try {
+        const doc = await fromUuid(attackerUuid);
+        attackerActor = doc?.actor ?? doc ?? null;
+      } catch (_) {}
+
+      await Effects.applyNullified(targetActor, { rounds: null, originUuid: powerItemUuid, selfNullify: false, auraCasterId: attackerActor?.id ?? null });
+
+      await ChatMessage.create({
+        content: `<div style="border:2px solid #7b1fa2;border-radius:4px;padding:6px;">
+          <div style="font-size:.9em;">
+            <b>${targetActor.name}</b> — automatic nullification (3+ ranks below intensity).
+            <span style="color:#b71c1c;font-weight:600;">NULLIFIED</span>
+          </div>
+        </div>`
+      });
     });
 
     // 8) Apply Defense Effect (dodging/evading/blocking/catching)

@@ -1,4 +1,7 @@
-// scripts/modules/actions/nullify.js v2.0.0 - 2026-03-22
+// scripts/modules/actions/nullify.js v3.0.0 - 2026-03-22
+// v3.0.0: Region-based aura. startAura/stopAura create/destroy a Scene Region
+//         that moves with the caster token. Tokens entering/exiting the region
+//         automatically roll saves and gain/lose the Nullified effect.
 // v2.0.0: Area-effect nullification via AreaTemplate with scroll-wheel resize.
 //         activateNullifyArea places AoE, rolls Endurance saves for all targets.
 // v1.1.0: Use applyNullified from effect-engine for power suppression.
@@ -9,23 +12,20 @@
 import { applyEffect, applyNullified } from "../effects/effect-engine.js";
 import { AreaTemplate } from "./area-template.js";
 import { universalColor } from "./action-utils.js";
-import { POWER_RANGE_VALUES } from "../dice/universal-table.js";
+import { removeAllAuraEffects, drawAuraVisual, refreshAllAuraVisuals } from "./nullify-aura.js";
+import { RANKS, rIdx, getNullifyRange, requiredColorFromDelta, meetsThreshold } from "./nullify-utils.js";
 
-export const RANKS = [
-  "Shift-0","Feeble","Poor","Typical","Good","Excellent","Remarkable","Incredible","Amazing",
-  "Monstrous","Unearthly","Shift-X","Shift-Y","Shift-Z","Class 1000","Class 3000","Class 5000","Beyond"
-];
-export const rIdx = (r) => Math.max(0, RANKS.findIndex(x => x.toLowerCase() === String(r||"").toLowerCase()));
-const order = { white:0, green:1, yellow:2, red:3 };
+// Re-export so existing consumers (check-action.js, etc.) don't break
+export { RANKS, rIdx, getNullifyRange, requiredColorFromDelta, meetsThreshold };
 
 const scope = () => (globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faserip");
 
 export const isAuraMaintained = (actor) =>
   !!actor?.effects?.some(e => e.getFlag?.(scope(), "aura.nullify.active") === true);
 
-export async function startAura(actor, originUuid=null) {
+export async function startAura(actor, originUuid=null, powerRank=null) {
   // Create the aura maintenance effect on the caster
-  const f = {}; f[scope()] = { aura: { nullify: { active: true } } };
+  const f = {}; f[scope()] = { aura: { nullify: { active: true, powerRank } } };
   const auraResult = await actor?.createEmbeddedDocuments("ActiveEffect", [{
     name: "Nullification (Maintaining)", img: "icons/svg/silenced.svg",
     origin: originUuid, disabled: false, flags: f
@@ -34,11 +34,30 @@ export async function startAura(actor, originUuid=null) {
   // Self-suppress: disable caster's own inborn powers (except Nullifying Power itself)
   await applyNullified(actor, { rounds: null, originUuid, selfNullify: true });
 
+  // Draw PIXI aura visual on the caster token (moves automatically with token)
+  if (powerRank) {
+    try {
+      const token = actor.getActiveTokens()?.[0];
+      if (token) {
+        drawAuraVisual(token, getNullifyRange(powerRank));
+      }
+    } catch (err) {
+      console.error("[FASERIP ERROR] Failed to draw nullify aura visual:", err);
+    }
+  }
+
   return auraResult;
 }
 
 export async function stopAura(actor) {
-  // Remove the aura maintenance effect
+  // Remove nullified effects from all tokens affected by this caster's aura
+  try {
+    await removeAllAuraEffects(actor.id);
+  } catch (err) {
+    console.error("[FASERIP ERROR] Failed to remove aura effects:", err);
+  }
+
+  // Remove the aura maintenance effect (triggers deleteActiveEffect hook → refreshes visuals)
   const eff = actor?.effects?.find(e => e.getFlag?.(scope(), "aura.nullify.active") === true);
   if (eff) await eff.delete();
 
@@ -48,33 +67,19 @@ export async function stopAura(actor) {
     return flags.effectType === "nullified" && flags.selfNullify === true;
   });
   if (selfNull) await selfNull.delete();
+
+  // Clean up the PIXI visual
+  refreshAllAuraVisuals();
 }
 
-export function requiredColorFromDelta(delta) {
-  if (delta <= -2) return "green-auto";
-  if (delta === -1) return "green";
-  if (delta === 0)  return "yellow";
-  if (delta === 1)  return "red";
-  return "impossible";
-}
-
-export function meetsThreshold(rolledColor, requiredColor) {
-  if (requiredColor === "green-auto") return true;
-  if (requiredColor === "impossible") return false;
-  return (order[String(rolledColor).toLowerCase()] >= order[String(requiredColor).toLowerCase()]);
-}
-
-export async function applyNullifiedEffect(targetActor, { maintained=false, originUuid=null, rounds=null } = {}) {
+export async function applyNullifiedEffect(targetActor, { maintained=false, originUuid=null, rounds=null, auraCasterId=null } = {}) {
   if (maintained) {
-    // Maintained aura = no duration (infinite until concentration broken)
-    return applyNullified(targetActor, { rounds: null, originUuid, selfNullify: false });
+    return applyNullified(targetActor, { rounds: null, originUuid, selfNullify: false, auraCasterId });
   }
   
-  // Temporary nullification = roll 1d10 for rounds
-  const roll = await (new Roll("1d10")).evaluate();
-  const r = rounds ?? roll.total ?? 10;
+  const r = rounds ?? (await (new Roll("1d10")).evaluate()).total ?? 10;
   
-  return applyNullified(targetActor, { rounds: r, originUuid, selfNullify: false });
+  return applyNullified(targetActor, { rounds: r, originUuid, selfNullify: false, auraCasterId });
 }
 
 /** Resolve save & apply effect on failure for a single target. */
@@ -83,11 +88,29 @@ export async function resolveAndApply(attacker, target, { endRank, intensityRank
   const req = requiredColorFromDelta(delta);
   const ok  = meetsThreshold(rolledColor, req);
   if (!ok) {
-    const maintained = isAuraMaintained(attacker);
-    await applyNullifiedEffect(target, { maintained, originUuid });
+    // Check if the attacker OR any actor on the scene is maintaining a nullify aura
+    let maintained = isAuraMaintained(attacker);
+    let auraCasterId = attacker.id;
+    if (!maintained && canvas?.tokens) {
+      for (const t of canvas.tokens.placeables) {
+        if (t.actor && isAuraMaintained(t.actor)) {
+          maintained = true;
+          auraCasterId = t.actor.id;
+          break;
+        }
+      }
+    }
+    await applyNullifiedEffect(target, { maintained, originUuid, auraCasterId });
+    const reqLabel = req === "auto-fail" ? "Impossible" : req === "auto-success" ? "Auto" : req.charAt(0).toUpperCase() + req.slice(1);
     await ChatMessage.create({
-      speaker: ChatMessage.getSpeaker({ actor: attacker }),
-      content: `<b>${target.name}</b> is <b>nullified</b>${maintained ? " (maintained aura)" : " (1–10 rounds)"}`
+      speaker: ChatMessage.getSpeaker({ actor: target }),
+      content: `<div style="border:2px solid #7b1fa2;border-radius:4px;padding:6px;">
+        <div style="font-weight:700;color:#7b1fa2;margin-bottom:4px;">${target.name} — Endurance FEAT vs Nullify</div>
+        <div style="font-size:.9em;">
+          Endurance: ${endRank} | Roll: ${rolledColor} — needed ${reqLabel}.
+          <span style="color:#b71c1c;font-weight:600;">NULLIFIED</span>${maintained ? " (while in range)" : " (1–10 rounds)"}
+        </div>
+      </div>`
     });
   }
   return { requiredColor: req, meets: ok, delta };
@@ -105,9 +128,7 @@ export async function resolveAndApply(attacker, target, { endRank, intensityRank
 export async function activateNullifyArea(caster, powerRank, powerItemUuid = null) {
   if (!caster || !powerRank) return;
 
-  const maxRange = POWER_RANGE_VALUES[powerRank] ?? POWER_RANGE_VALUES[
-    Object.keys(POWER_RANGE_VALUES).find(k => k.toLowerCase() === powerRank.toLowerCase())
-  ] ?? 4;
+  const maxRange = getNullifyRange(powerRank);
 
   // Place area template — GM can scroll-wheel to resize
   const casterToken = caster.getActiveTokens()?.[0];
@@ -147,37 +168,51 @@ export async function activateNullifyArea(caster, powerRank, powerItemUuid = nul
     });
     // Still self-suppress
     if (!isAuraMaintained(caster)) {
-      await startAura(caster, powerItemUuid);
+      await startAura(caster, powerItemUuid, powerRank);
     }
     await template.dismiss();
     return;
   }
 
+  // Self-suppress the caster BEFORE rolling saves — RAW: targets lose
+  // powers "as long as the hero is in range" when actively maintaining.
+  // The 1-10 round duration only applies after concentration is broken.
+  if (!isAuraMaintained(caster)) {
+    await startAura(caster, powerItemUuid, powerRank);
+  }
+
   // Roll Endurance FEAT for each target
   const results = [];
-  const maintained = isAuraMaintained(caster);
+  const maintained = true; // aura just started above
 
   for (const token of targets) {
     const target = token.actor;
     const endRank = target.system?.abilities?.endurance?.rank || "Typical";
-    const roll = await (new Roll("1d100")).evaluate();
-    const total = roll.total;
-    const color = universalColor(endRank, total);
-    const colorLower = String(color || "white").toLowerCase();
-
-    // Determine if the save succeeds
     const delta = rIdx(powerRank) - rIdx(endRank);
     const req = requiredColorFromDelta(delta);
-    const saved = meetsThreshold(colorLower, req);
+
+    let total = 0, colorLower = "—", saved = false;
+
+    if (req === "auto-fail") {
+      // 3+ ranks below intensity — automatic fail, no roll
+      saved = false;
+      colorLower = "auto-fail";
+    } else {
+      const roll = await (new Roll("1d100")).evaluate();
+      total = roll.total;
+      const color = universalColor(endRank, total);
+      colorLower = String(color || "white").toLowerCase();
+      saved = meetsThreshold(colorLower, req);
+    }
 
     let durationText = "";
     if (!saved) {
       if (maintained) {
-        await applyNullifiedEffect(target, { maintained: true, originUuid: caster.uuid });
+        await applyNullifiedEffect(target, { maintained: true, originUuid: caster.uuid, auraCasterId: caster.id });
         durationText = "while in range";
       } else {
         const dRoll = await (new Roll("1d10")).evaluate();
-        await applyNullifiedEffect(target, { maintained: false, originUuid: caster.uuid, rounds: dRoll.total });
+        await applyNullifiedEffect(target, { maintained: false, originUuid: caster.uuid, rounds: dRoll.total, auraCasterId: caster.id });
         durationText = `${dRoll.total} rounds`;
       }
     }
@@ -193,23 +228,20 @@ export async function activateNullifyArea(caster, powerRank, powerItemUuid = nul
     });
   }
 
-  // Self-suppress the caster if not already maintaining
-  if (!isAuraMaintained(caster)) {
-    await startAura(caster, powerItemUuid);
-  }
-
   // Build summary chat card
   const colorBg = { white: "#e0e0e0", green: "#c8e6c9", yellow: "#fff9c4", red: "#ffcdd2" };
   const rows = results.map(r => {
     const bg = colorBg[r.color] || "#e0e0e0";
+    const rollDisplay = r.color === "auto-fail" ? "—" : `${r.roll} (${r.color})`;
+    const reqDisplay = r.required === "auto-fail" ? "Auto" : r.required.charAt(0).toUpperCase() + r.required.slice(1);
     const status = r.saved
       ? `<span style="color:#2e7d32;font-weight:600;">Resisted</span>`
       : `<span style="color:#b71c1c;font-weight:600;">Nullified</span> (${r.durationText})`;
     return `<tr>
       <td style="padding:3px 6px;font-weight:600;">${r.name}</td>
       <td style="padding:3px 6px;text-align:center;">${r.endRank}</td>
-      <td style="padding:3px 6px;text-align:center;background:${bg};border-radius:3px;">${r.roll} (${r.color})</td>
-      <td style="padding:3px 6px;text-align:center;">${r.required}</td>
+      <td style="padding:3px 6px;text-align:center;background:${bg};border-radius:3px;">${rollDisplay}</td>
+      <td style="padding:3px 6px;text-align:center;">${reqDisplay}</td>
       <td style="padding:3px 6px;">${status}</td>
     </tr>`;
   }).join("");

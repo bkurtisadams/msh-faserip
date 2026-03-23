@@ -376,6 +376,17 @@ export class CheckAction extends BaseAction {
           const saveAbility = this.abilityName || "psyche";
           const saveAbilityUpper = saveAbility.toUpperCase();
 
+          // Nullify aura saves: always use intensity-based threshold via resolveAndApply
+          if (this?.opts?.isNullifyAura) {
+            await Nullify.resolveAndApply(actor, saveActor, {
+              endRank,
+              intensityRank,
+              rolledColor: colorLower,
+              originUuid: this?.opts?.originUuid ?? null
+            });
+            return;
+          }
+
           if (customEffectName && colorLower === "white") {
             // Custom mental power effect (e.g., Psionic Attack → Unconscious)
             const d = new Roll("1d10");
@@ -682,6 +693,43 @@ export class CheckAction extends BaseAction {
 
     // ── Mental Power Save (save-nullify with custom effect, e.g. Psionic Attack → Unconscious) ──
     let mentalPowerExtraHtml = "";
+
+    // Nullify aura saves: use intensity-based threshold via resolveAndApply
+    if (isSaveNullify && this?.opts?.isNullifyAura) {
+      const targetUuid = this.opts?.prefill?.targetUuid || "";
+      const saveActor = await this._resolveTokenActor(targetUuid);
+      if (saveActor) {
+        let endRank = choice.targetEndRank || saveActor.system?.abilities?.endurance?.rank || "Typical";
+        let intensityRank = endRank;
+        if (this?.opts?.intensity === "fixed-rank" && this?.opts?.fixedRank) intensityRank = this.opts.fixedRank;
+
+        const result = await Nullify.resolveAndApply(actor, saveActor, {
+          endRank,
+          intensityRank,
+          rolledColor: colorLower,
+          originUuid: this?.opts?.originUuid ?? null
+        });
+
+        // resolveAndApply posts a card on failure; post one on success too
+        if (result.meets) {
+          const reqLabel = result.requiredColor === "auto-fail" ? "Impossible" :
+                           result.requiredColor === "auto-success" ? "Auto" :
+                           result.requiredColor.charAt(0).toUpperCase() + result.requiredColor.slice(1);
+          await ChatMessage.create({
+            speaker: ChatMessage.getSpeaker({ actor: saveActor }),
+            content: `<div style="border:2px solid #4caf50;border-radius:4px;padding:6px;">
+              <div style="font-weight:700;color:#2e7d32;margin-bottom:4px;">${saveActor.name} — Endurance FEAT vs Nullify</div>
+              <div style="font-size:.9em;">
+                Roll: <b>${roll.total}</b> (${colorLower}) — needed ${reqLabel}.
+                <span style="color:#2e7d32;font-weight:600;">RESISTED</span>
+              </div>
+            </div>`
+          });
+        }
+      }
+      return;
+    }
+
     if (isSaveNullify && this?.opts?.effectName) {
       const customEffectName  = this.opts.effectName;
       const customFailMessage = this.opts.failMessage || "is affected";

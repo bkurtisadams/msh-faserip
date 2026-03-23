@@ -919,7 +919,7 @@ export async function processRegeneration(worldTime, dt = 0) {
  * @param {string} [opts.originUuid=null] - UUID of the nullifier
  * @param {boolean} [opts.selfNullify=false] - if true, this is self-suppression (nullifier's own powers)
  */
-export async function applyNullified(actor, { rounds = 10, originUuid = null, selfNullify = false } = {}, opts = {}) {
+export async function applyNullified(actor, { rounds = 10, originUuid = null, selfNullify = false, auraCasterId = null } = {}, opts = {}) {
   const resolvedActor = actor?.actor ?? actor;
   if (!resolvedActor) return null;
 
@@ -998,6 +998,7 @@ export async function applyNullified(actor, { rounds = 10, originUuid = null, se
       [SCOPE()]: {
         effectType: "nullified",
         selfNullify,
+        auraCasterId,
         suppressedPowerIds: suppressedIds,
         abilitySwaps,
         preNullifyHealth,

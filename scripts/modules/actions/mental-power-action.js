@@ -36,6 +36,231 @@ export class MentalPowerAction extends BaseAction {
     const powerRank = item.system.rank || "Typical";
     const powerValue = item.system.value || 6;
     const calculatedRange = item.system.calculatedRange || this._getRangeByRank(powerRank);
+
+    // ── Nullifying Power: toggle on/off, no target needed ──
+    const nameLc = (powerName || "").toLowerCase();
+    if (nameLc.includes("nullif")) {
+      const { isAuraMaintained, startAura, stopAura } = await import("./nullify.js");
+      const { getNullifyRange, rIdx, requiredColorFromDelta, meetsThreshold } = await import("./nullify-utils.js");
+      const { drawAuraVisual, refreshAllAuraVisuals, setActivationCooldown } = await import("./nullify-aura.js");
+
+      // ── Toggle OFF ──
+      if (isAuraMaintained(actor)) {
+        await stopAura(actor);
+        await ChatMessage.create({
+          speaker: ChatMessage.getSpeaker({ actor }),
+          content: `<div style="border:2px solid #7b1fa2;border-radius:4px;padding:6px;">
+            <div style="font-weight:700;color:#7b1fa2;">${actor.name} deactivates Nullifying Power</div>
+            <div style="font-size:.9em;">Aura dismissed. Affected targets' powers are restored.</div>
+          </div>`
+        });
+        return;
+      }
+
+      // ── Toggle ON ──
+      const mode = resolveCombatMode(actor);
+      const rangeInAreas = getNullifyRange(powerRank);
+
+      // Suppress the aura hook from duplicating the initial saves
+      setActivationCooldown(3000);
+
+      // Rank abbreviation helper
+      const { RANK_ABBR } = await import("../../rules/rules-reference.js");
+      const abbr = (rank) => RANK_ABBR[rank] || rank;
+
+      // Start aura (self-suppress + PIXI visual + maintenance effect)
+      await startAura(actor, item.uuid, powerRank);
+
+      // Find all tokens in range with inborn powers (excluding caster)
+      const casterToken = actor.getActiveTokens()?.[0];
+      const targets = [];
+      if (casterToken && canvas?.tokens) {
+        const dim = canvas.dimensions;
+        for (const t of canvas.tokens.placeables) {
+          if (!t.actor || t.actor.id === actor.id) continue;
+          if (!t.actor.items.some(i => i.type === "power" && i.system?.isActive !== false && (i.system?.source || "").toLowerCase() === "natural")) continue;
+          const dx = t.center.x - casterToken.center.x;
+          const dy = t.center.y - casterToken.center.y;
+          const distAreas = (Math.sqrt(dx * dx + dy * dy) / dim.size) * dim.distance;
+          if (distAreas <= rangeInAreas) targets.push(t);
+        }
+      }
+
+      if (mode === "full") {
+        // ── Full Auto: roll saves immediately for all targets ──
+        const { universalColor } = await import("./action-utils.js");
+        const { applyNullified } = await import("../effects/effect-engine.js");
+        const results = [];
+
+        for (const token of targets) {
+          const target = token.actor;
+          const endRank = target.system?.abilities?.endurance?.rank || "Typical";
+          const delta = rIdx(powerRank) - rIdx(endRank);
+          const req = requiredColorFromDelta(delta);
+
+          let total = 0, colorLower = "—", saved = false;
+          if (req === "auto-fail") {
+            saved = false;
+            colorLower = "auto-fail";
+          } else if (req === "auto-success") {
+            saved = true;
+            colorLower = "auto-success";
+          } else {
+            const roll = await (new Roll("1d100")).evaluate();
+            total = roll.total;
+            const color = universalColor(endRank, total);
+            colorLower = String(color || "white").toLowerCase();
+            saved = meetsThreshold(colorLower, req);
+          }
+
+          if (!saved) {
+            await applyNullified(target, { rounds: null, originUuid: item.uuid, selfNullify: false, auraCasterId: actor.id });
+          }
+
+          results.push({ name: target.name, endRank, roll: total, color: colorLower, required: req, saved });
+        }
+
+        // Build summary chat card
+        const colorBg = { white: "#e0e0e0", green: "#c8e6c9", yellow: "#fff9c4", red: "#ffcdd2" };
+        const rows = results.map(r => {
+          const bg = colorBg[r.color] || "#e0e0e0";
+          const rollDisplay = (r.color === "auto-fail" || r.color === "auto-success") ? "—" : `${r.roll} (${r.color})`;
+          const reqDisplay = r.required === "auto-fail" ? "Impossible" : r.required === "auto-success" ? "Auto" : r.required.charAt(0).toUpperCase() + r.required.slice(1);
+          const status = r.saved
+            ? `<span style="color:#2e7d32;font-weight:600;">Resisted</span>`
+            : `<span style="color:#b71c1c;font-weight:600;">Nullified</span>`;
+          return `<tr>
+            <td style="padding:3px 6px;font-weight:600;white-space:nowrap;">${r.name}</td>
+            <td style="padding:3px 6px;text-align:center;">${abbr(r.endRank)}</td>
+            <td style="padding:3px 6px;text-align:center;background:${bg};border-radius:3px;">${rollDisplay}</td>
+            <td style="padding:3px 6px;text-align:center;">${reqDisplay}</td>
+            <td style="padding:3px 6px;">${status}</td>
+          </tr>`;
+        }).join("");
+
+        const noTargetsNote = targets.length === 0
+          ? `<div style="padding:4px 6px;font-size:11px;color:#666;">No valid targets in range.</div>` : "";
+
+        await ChatMessage.create({
+          speaker: ChatMessage.getSpeaker({ actor }),
+          content: `<div style="border:2px solid #7b1fa2;border-radius:6px;overflow:hidden;">
+            <div style="background:#7b1fa2;color:#fff;padding:6px 10px;font-weight:700;font-size:13px;">
+              Nullifying Power — ${powerRank} (${actor.name}) ACTIVATED
+            </div>
+            <div style="padding:6px;">
+              ${targets.length > 0 ? `<table style="width:100%;border-collapse:collapse;font-size:12px;">
+                <tr style="border-bottom:1px solid #ccc;">
+                  <th style="padding:3px 6px;text-align:left;">Target</th>
+                  <th style="padding:3px 6px;text-align:center;">End</th>
+                  <th style="padding:3px 6px;text-align:center;">Roll</th>
+                  <th style="padding:3px 6px;text-align:center;">Needed</th>
+                  <th style="padding:3px 6px;text-align:left;">Result</th>
+                </tr>
+                ${rows}
+              </table>` : ""}
+              ${noTargetsNote}
+              <div style="padding:4px 6px 2px;font-size:11px;color:#666;">
+                Aura active — self-suppressed. Tokens entering range will be checked.
+              </div>
+            </div>
+          </div>`
+        });
+
+      } else {
+        // ── Semi mode: post save buttons for each target ──
+        const targetRows = targets.map(t => {
+          const target = t.actor;
+          const endRank = target.system?.abilities?.endurance?.rank || "Typical";
+          const delta = rIdx(powerRank) - rIdx(endRank);
+          const req = requiredColorFromDelta(delta);
+          const targetUuid = target.uuid || "";
+
+          if (req === "auto-success") {
+            return `<tr>
+              <td style="padding:4px 6px;font-weight:600;white-space:nowrap;">${target.name}</td>
+              <td style="padding:4px 6px;text-align:center;font-size:.85em;color:#666;">${abbr(endRank)}</td>
+              <td style="padding:4px 6px;text-align:center;font-size:.85em;color:#2e7d32;">Auto</td>
+              <td style="padding:4px 6px;text-align:center;">
+                <span style="font-size:11px;font-weight:600;color:#2e7d32;">Resisted</span>
+              </td>
+            </tr>`;
+          }
+
+          if (req === "auto-fail") {
+            return `<tr>
+              <td style="padding:4px 6px;font-weight:600;white-space:nowrap;">${target.name}</td>
+              <td style="padding:4px 6px;text-align:center;font-size:.85em;color:#666;">${abbr(endRank)}</td>
+              <td style="padding:4px 6px;text-align:center;font-size:.85em;color:#b71c1c;">Impossible</td>
+              <td style="padding:4px 6px;text-align:center;">
+                <a class="faserip-chip" data-action="nullify-auto-fail" data-target-uuid="${targetUuid}" data-attacker-uuid="${actor.uuid}" data-power-item-uuid="${item.uuid}"
+                   style="padding:2px 8px;border:1px solid #b71c1c;border-radius:3px;background:#ffebee;color:#b71c1c;cursor:pointer;font-size:11px;font-weight:600;white-space:nowrap;">
+                   Apply
+                </a>
+              </td>
+            </tr>`;
+          }
+
+          const reqDisplay = req.charAt(0).toUpperCase() + req.slice(1);
+          return `<tr>
+            <td style="padding:4px 6px;font-weight:600;white-space:nowrap;">${target.name}</td>
+            <td style="padding:4px 6px;text-align:center;font-size:.85em;color:#666;">${abbr(endRank)}</td>
+            <td style="padding:4px 6px;text-align:center;font-size:.85em;">${reqDisplay}</td>
+            <td style="padding:4px 6px;text-align:center;">
+              <a class="faserip-chip" data-action="force-save-nullify"
+                 data-attacker-uuid="${actor.uuid}" data-target-uuid="${targetUuid}" data-target-name="${target.name}"
+                 data-intensity-rank="${powerRank}" data-save-ability="endurance"
+                 style="padding:2px 8px;border:1px solid #6a1b9a;border-radius:3px;background:#f3e5f5;color:#6a1b9a;cursor:pointer;font-size:11px;font-weight:600;white-space:nowrap;">
+                 Save
+              </a>
+            </td>
+          </tr>`;
+        }).join("");
+
+        const noTargetsNote = targets.length === 0
+          ? `<div style="padding:6px;font-size:.9em;color:#666;">No valid targets in range.</div>` : "";
+
+        const tableHtml = targets.length > 0 ? `<table style="width:100%;border-collapse:collapse;font-size:12px;">
+          <tr style="border-bottom:1px solid #ccc;">
+            <th style="padding:3px 6px;text-align:left;">Target</th>
+            <th style="padding:3px 6px;text-align:center;">End</th>
+            <th style="padding:3px 6px;text-align:center;">Need</th>
+            <th style="padding:3px 6px;text-align:center;">Save</th>
+          </tr>
+          ${targetRows}
+        </table>` : "";
+
+        await ChatMessage.create({
+          speaker: ChatMessage.getSpeaker({ actor }),
+          content: `<div style="border:2px solid #7b1fa2;border-radius:6px;overflow:hidden;">
+            <div style="background:#7b1fa2;color:#fff;padding:6px 10px;font-weight:700;font-size:13px;">
+              Nullifying Power — ${powerRank} (${actor.name}) ACTIVATED
+            </div>
+            <div style="padding:6px;">
+              ${tableHtml}
+              ${noTargetsNote}
+              <div style="padding:4px 6px 2px;font-size:11px;color:#666;">
+                Aura active — self-suppressed. Click each target's save button to resolve.
+              </div>
+            </div>
+          </div>`,
+          flags: {
+            "msh-faserip": {
+              actionId: "mental-power",
+              powerName,
+              powerRank,
+              isNullifyAura: true,
+              requiresSave: true,
+              attackerUuid: actor.uuid,
+              saveAbility: "endurance",
+              saveIntensity: "fixed-rank",
+              saveFixedRank: powerRank,
+              nullify: { powerItemUuid: item.uuid }
+            }
+          }
+        });
+      }
+      return;
+    }
     
     // Determine save ability from power system or default to Psyche
     const saveAbility = item.system.save?.ability || this._getDefaultSaveAbility(item);
@@ -62,7 +287,6 @@ export class MentalPowerAction extends BaseAction {
     const targetName = targetActor?.name || "Unknown";
 
     // ── Psionic Attack: check for Force Field intensity reduction ──
-    const nameLc = (powerName || "").toLowerCase();
     const isPsionicAttack = nameLc.includes("psionic attack");
     let effectiveIntensityRank = powerRank;
     let effectiveIntensityValue = powerValue;
@@ -330,19 +554,6 @@ export class MentalPowerAction extends BaseAction {
         effectName   = "Mentally Fatigued";
         failMessage  = "suffers mental strain";
         abilityLabel = "psyche";
-      } else if (nameLc.includes("nullif")) {
-        effectName   = "Nullified";
-        failMessage  = "has powers nullified";
-        abilityLabel = "endurance";
-      }
-    }
-
-    // ── Nullifying Power: area effect + aura + self-suppress on caster ──
-    if (isNullifyAura) {
-      const { isAuraMaintained, activateNullifyArea } = await import("./nullify.js");
-      if (!isAuraMaintained(actor)) {
-        await activateNullifyArea(actor, powerRank, item.uuid);
-        console.log(`[FASERIP] ${actor.name} activated Nullifying Power aura — area effect resolved`);
       }
     }
 

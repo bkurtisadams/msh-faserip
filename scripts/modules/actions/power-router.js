@@ -44,7 +44,7 @@ const MENTAL_TYPES = [
   "mind control", "emotion control",
   "possession", "transferral", "mental probe",
   "telepathy", "image generation",
-  "psionic attack"
+  "psionic attack", "nullifying power", "nullification"
 ];
 
 const NON_ATTACK_CATEGORIES = ["resistances", "senses", "movement"];
@@ -120,6 +120,15 @@ export async function rollPower(actor, item) {
 
   // Determine attack type — explicit setting or auto-detect
   let actionType = item.system.attackType;
+
+  // Nullifying Power: always route to mental-power regardless of category/type settings
+  const nameLower = (item.name || "").toLowerCase();
+  if (nameLower.includes("nullif")) {
+    return ActionDispatcher.roll("mental-power", {
+      actor,
+      opts: { itemId: item.id, item }
+    });
+  }
 
   // Normalize legacy values
   if (actionType) {
