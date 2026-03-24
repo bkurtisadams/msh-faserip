@@ -337,6 +337,7 @@
 /* =====================
    DECLARATION BADGES
    ===================== */
+/* Legacy text badges (chat cards only) */
 .faserip-declared-badge {
   display: inline-block;
   padding: 1px 6px;
@@ -346,29 +347,6 @@
   background: rgba(0,0,0,0.08);
   border: 1px solid #999;
   color: #444;
-}
-
-.faserip-declared-badge-sm {
-  display: inline-block;
-  padding: 0 4px;
-  font-size: 0.75em;
-  font-weight: 600;
-  border-radius: 2px;
-  background: rgba(0,0,0,0.06);
-  border: 1px solid #bbb;
-  color: #555;
-  margin-right: 2px;
-}
-
-.faserip-declare-btn {
-  border-color: #1E90FF !important;
-  background: rgba(30, 144, 255, 0.08) !important;
-}
-
-.faserip-declare-btn:hover {
-  background: rgba(30, 144, 255, 0.2) !important;
-  border-color: #1E90FF !important;
-  color: #1E90FF !important;
 }
 
 /* =====================
@@ -383,55 +361,85 @@
 }
 
 /* =====================
-   TRACKER PRE-ACTION BUTTONS
+   TRACKER CONTROLS (Foundry-sized)
    ===================== */
 .faserip-tracker-actions {
   display: flex;
-  gap: 2px;
-  padding: 1px 0;
+  align-items: center;
+  gap: 1px;
+  padding: 0;
   flex-shrink: 0;
 }
 
-.faserip-tracker-btn {
-  width: 20px;
-  height: 20px;
-  line-height: 20px;
-  text-align: center;
-  border: 1px solid #999;
-  border-radius: 3px;
-  background: rgba(0, 0, 0, 0.05);
-  color: #555;
-  font-size: 10px;
+/* Compact icon-only declaration indicator */
+.faserip-declared-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  font-size: 9px;
+  border-radius: 2px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  opacity: 0.9;
+}
+.faserip-declared-icon:hover {
+  opacity: 1;
+  filter: brightness(1.2);
+}
+.faserip-declared-icon.faserip-decl-attack { color: #DC143C; border-color: rgba(220,20,60,0.4); background: rgba(220,20,60,0.1); }
+.faserip-declared-icon.faserip-decl-defend { color: #228B22; border-color: rgba(34,139,34,0.4); background: rgba(34,139,34,0.1); }
+.faserip-declared-icon.faserip-decl-multi  { color: #1E90FF; border-color: rgba(30,144,255,0.4); background: rgba(30,144,255,0.1); }
+.faserip-declared-icon.faserip-decl-other  { color: #888; border-color: rgba(0,0,0,0.2); background: rgba(0,0,0,0.05); }
+
+/* Foundry-sized control buttons */
+.faserip-tracker-ctrl {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  font-size: 9px;
+  border: none;
+  border-radius: 2px;
+  background: transparent;
+  color: #999;
   cursor: pointer;
   padding: 0;
 }
-
-.faserip-tracker-btn:hover {
-  background: rgba(0, 100, 0, 0.15);
-  border-color: #006400;
+.faserip-tracker-ctrl:hover {
   color: #006400;
+  background: rgba(0,100,0,0.15);
 }
-
-.faserip-tracker-btn.faserip-multi-btn {
-  border-color: #1E90FF;
-  background: rgba(30, 144, 255, 0.05);
-}
-
-.faserip-tracker-btn.faserip-multi-btn:hover {
-  background: rgba(30, 144, 255, 0.2);
-  border-color: #1E90FF;
+.faserip-tracker-ctrl.faserip-declare-btn {
   color: #1E90FF;
 }
-
-.faserip-tracker-btn.faserip-change-btn {
-  border-color: #DAA520;
-  background: rgba(255, 215, 0, 0.08);
+.faserip-tracker-ctrl.faserip-declare-btn:hover {
+  color: #1E90FF;
+  background: rgba(30,144,255,0.15);
+}
+.faserip-tracker-ctrl.faserip-change-ctrl {
+  color: #DAA520;
+}
+.faserip-tracker-ctrl.faserip-change-ctrl:hover {
+  color: #B8860B;
+  background: rgba(255,215,0,0.15);
 }
 
-.faserip-tracker-btn.faserip-change-btn:hover {
-  background: rgba(255, 215, 0, 0.25);
-  border-color: #B8860B;
-  color: #B8860B;
+/* Ensure combatant rows accommodate controls without clipping */
+.combatant:has(.faserip-tracker-actions) {
+  overflow: visible;
+}
+.combatant:has(.faserip-tracker-actions) .combatant-controls,
+.combatant:has(.faserip-tracker-actions) .token-resource {
+  flex-shrink: 0;
+}
+.combatant:has(.faserip-tracker-actions) .token-name,
+.combatant:has(.faserip-tracker-actions) .combatant-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* =====================

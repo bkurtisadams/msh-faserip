@@ -1847,12 +1847,28 @@ export const INITIATIVE_RULES = {
     note: "A roll of 1 is always 1 (modifier does not apply to natural 1)."
   },
   reroll: "Roll again each round as long as 2+ combatants have interfering actions.",
+  ties: "Tied initiative totals result in automatic reroll.",
   changingActions: {
     desc: "After initiative roll, may change declared action.",
     feat: "Yellow Agility FEAT (resolved in pre-action phase).",
     penalty: "-1CS on all FEATs after changing."
   },
-  negatedActions: "Losing initiative may negate actions (e.g., knocked out before acting). Lost actions cannot be performed that turn."
+  negatedActions: "Losing initiative may negate actions (e.g., knocked out before acting). Lost actions cannot be performed that turn.",
+  holdingFire: "Initiative winner may hold attack until opponent is in best range (acts when opponent about to strike).",
+  // Powers/talents that affect initiative
+  initiativeBonuses: {
+    martialArtsE: "+1 initiative in unarmed combat.",
+    weaponsSpecialist: "+1 initiative with weapon of specialty.",
+    combatSense: "Power rank replaces Intuition for initiative modifier if higher.",
+    enhancedSenses: "Power rank replaces Intuition for initiative modifier if higher.",
+    note: "Talent bonuses: highest bonus on each side applies to that side's roll. Power replacements: highest effective Intuition on each side determines modifier."
+  },
+  // RAW turn phases (optional structured play)
+  turnPhases: {
+    declare: "Declaration Phase: Judge notes NPC actions, players declare hero actions. Multiple actions declared here.",
+    preaction: "Pre-Action Phase: Defensive actions (dodge, block, evade) resolve. Changing Actions FEAT rolled. Planned events (explosions) trigger.",
+    actions: "Action Phase: Winning side acts, then losing side acts."
+  }
 };
 
 // ══════════════════════════════════════════════════════════════

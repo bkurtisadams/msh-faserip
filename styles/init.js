@@ -1617,18 +1617,6 @@ Hooks.once("init", async () => {
   // Initialize faserip initiative
   FaseripInitiative.init();
 
-  // Pan to active combatant on turn/round change
-  Hooks.on("updateCombat", (combat, updateData) => {
-    if (!("turn" in updateData) && !("round" in updateData)) return;
-    try {
-      if (!game.settings.get("msh-faserip", "panToCombatant")) return;
-    } catch (_) { return; }
-    const token = combat.combatant?.token?.object;
-    if (token) {
-      canvas.animatePan({ x: token.center.x, y: token.center.y, duration: 500 });
-    }
-  });
-
   game.msh.rollFaseripInitiative = () => {
     if (!game.combat) {
       ui.notifications.warn("No active combat encounter");
