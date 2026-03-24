@@ -735,12 +735,16 @@ export class BluntAttackAction extends AttackAction {
       const selected = Array.from(game.user?.targets ?? []);
       const count = Math.max(1, actualAttackCount);
 
+      debugLog(`Multi-attack target distribution: ${count} attacks, ${selected.length} targets: [${selected.map(t => t.name).join(", ")}]`);
+
       for (let i = 0; i < count; i++) {
         if (i > 0) await new Promise(r => setTimeout(r, 300));
 
         const tgt = (count === 1)
           ? (selected[0] ?? null)
           : (selected.length ? selected[i % selected.length] : null);
+        
+        debugLog(`Attack ${i+1}/${count}: target index=${i % selected.length} → ${tgt?.name ?? "null"}`);
 
         await this._executeSingleAttack({
           choice: { ...choice, specificTarget: tgt, multiAttackFeatResult: i === 0 ? multiAttackFeatResult : null },

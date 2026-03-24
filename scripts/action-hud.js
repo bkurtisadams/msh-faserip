@@ -170,19 +170,22 @@ export class FaseripActionPanel extends HandlebarsApplicationMixin(ApplicationV2
   };
 
   constructor(options = {}) {
+    // Restore saved position via options before super() so ApplicationV2 gets it during init
+    if (!options.position) {
+      try {
+        const remember = getSetting("actionHudRememberPosition", true);
+        if (remember) {
+          const pos = getSetting("actionHudPosition", {});
+          if (pos.left != null && pos.top != null) {
+            options.position = { left: pos.left, top: pos.top };
+          }
+        }
+      } catch (_) {}
+    }
     super(options);
     this.editMode = false;
     this.actions = applyLayout(ACTIONS, loadLayout());
     this._zoom = getSetting("actionHudZoom", 1.0);
-
-    // Restore saved position
-    if (getSetting("actionHudRememberPosition", true)) {
-      const pos = getSetting("actionHudPosition", {});
-      if (pos.left != null && pos.top != null) {
-        this.position.left = pos.left;
-        this.position.top = pos.top;
-      }
-    }
   }
 
   get actor() { return canvas.tokens?.controlled[0]?.actor || null; }

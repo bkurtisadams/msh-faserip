@@ -528,6 +528,7 @@ export class AttackAction extends BaseAction {
     let defenderShift = 0;
     let defenderEffects = [];
     const primaryTarget = choice?.specificTarget ?? this._selectPrimaryTarget();
+    debugLog(`_executeSingleAttack: specificTarget=${choice?.specificTarget?.name ?? "NONE"}, primaryTarget=${primaryTarget?.name ?? "NONE"}, attackNumber=${attackNumber ?? "?"}`);
     const defenderActor = primaryTarget?.actor ?? null;
     
     // Check for evasion bonus BEFORE calculating effective rank

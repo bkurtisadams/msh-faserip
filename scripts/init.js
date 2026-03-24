@@ -699,15 +699,15 @@ Hooks.once("init", async () => {
 
   // Register Action HUD keybinding
   game.keybindings.register("msh-faserip", "openActionHUD", {
-    name: "Open Action HUD",
-    hint: "Opens the Action HUD for quick access to combat actions",
+    name: "Toggle Action HUD",
+    hint: "Toggle the Action HUD open/closed",
     category: "FASERIP",
-    editable: [{ key: "KeyH", modifiers: ["Control"] }],  // Ctrl+H
+    editable: [{ key: "KeyH", modifiers: ["Alt"] }],  // Alt+H
     onDown: () => {
       if (ui.faseripHUD?.rendered) {
-        ui.faseripHUD.bringToFront();
+        ui.faseripHUD.close();
       } else {
-        ui.faseripHUD = new FaseripActionPanel();
+        if (!ui.faseripHUD) ui.faseripHUD = new FaseripActionPanel();
         ui.faseripHUD.render(true);
       }
       return true;
@@ -2235,6 +2235,17 @@ Hooks.on("canvasReady", async () => {
 Hooks.once("ready", async () => {
   game.msh ??= {};
 
+  // Auto-open Action HUD if enabled in settings
+  if (game.settings.get("msh-faserip", "actionHudEnabled")) {
+    try {
+      ui.faseripHUD = new FaseripActionPanel();
+      ui.faseripHUD.render(true);
+      console.log("MSH FASERIP | Action HUD auto-opened");
+    } catch (e) {
+      console.warn("MSH FASERIP | Failed to auto-open Action HUD:", e);
+    }
+  }
+
   // Register team tracker combat hook for auto-capturing defeated villains
   try {
     import('./teamSheet.js').then(module => {
@@ -2350,17 +2361,6 @@ Hooks.once("ready", async () => {
     });
   }
 
-
-  // Auto-open Action HUD if enabled in settings
-  if (game.settings.get("msh-faserip", "actionHudEnabled")) {
-    try {
-      ui.faseripHUD = new FaseripActionPanel();
-      ui.faseripHUD.render(true);
-      console.log("MSH FASERIP | Action HUD auto-opened");
-    } catch (e) {
-      console.warn("MSH FASERIP | Failed to auto-open Action HUD:", e);
-    }
-  }
 
   // Register macros (lazy-loaded — quick-heal.js is a self-executing script, not an ES module)
   game.msh.macros = {
