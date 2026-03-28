@@ -173,6 +173,7 @@ form.faserip-sheet.compact-mode .secondary-abilities .sec-grid {
   grid-template-columns: 1fr 1fr 1.2fr 1fr !important;
   align-items: stretch !important;
   flex: 1 !important;
+  position: relative !important;
 }
 
 /* sec-col: darker divider lines running full height */
@@ -185,9 +186,6 @@ form.faserip-sheet.compact-mode .secondary-abilities .sec-col:last-child {
 }
 
 /* Continuous red header bar overlay — covers the divider lines in the header zone */
-form.faserip-sheet.compact-mode .secondary-abilities .sec-grid {
-  position: relative !important;
-}
 form.faserip-sheet.compact-mode .secondary-abilities .sec-grid::before {
   content: "" !important;
   position: absolute !important;
@@ -349,6 +347,7 @@ form.faserip-sheet.compact-mode .sheet-tabs-navigation .item i {
 form.faserip-sheet.compact-mode .sheet-tab-content {
   padding: 6px !important;
   overflow-x: hidden !important;
+  min-height: 0 !important;
 }
 
 /* Powers table: override fixed colgroup widths, let columns shrink */
@@ -432,9 +431,4 @@ form.faserip-sheet.compact-mode .sheet-body {
 
 form.faserip-sheet.compact-mode .sheet-tabs {
   margin-top: 2px !important;
-}
-
-/* Eliminate blank space below tab content */
-form.faserip-sheet.compact-mode .sheet-tab-content {
-  min-height: 0 !important;
 }

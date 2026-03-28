@@ -398,8 +398,8 @@ export class FaseripActorSheet extends ActorSheet {
     const charType = context.system.characterType || "player";
     context.isNPC = charType !== "player";
 
-    // Compact sheet mode (per-user setting)
-    context.compactSheet = game.settings.get("msh-faserip", "compactSheet") ?? false;
+    // Compact sheet mode (per-actor flag)
+    context.compactSheet = this.actor.getFlag("msh-faserip", "compactSheet") ?? false;
 
     return context;
   }
@@ -845,8 +845,8 @@ export class FaseripActorSheet extends ActorSheet {
   activateListeners(html) {
     super.activateListeners(html);
 
-    // Apply compact mode class from setting
-    const compact = game.settings.get("msh-faserip", "compactSheet") ?? false;
+    // Apply compact mode class from actor flag
+    const compact = this.actor.getFlag("msh-faserip", "compactSheet") ?? false;
     const form = html.closest('.faserip-sheet');
     
     // Fix dark grey gap: match window-content background to form
@@ -854,10 +854,13 @@ export class FaseripActorSheet extends ActorSheet {
     
     form.toggleClass('compact-mode', compact);
 
-    // Apply compact sheet width
-    if (compact && this.position.width > 580) {
-      this.position.width = 580;
-      this.setPosition({ width: 580 });
+    // Apply compact sheet dimensions
+    if (compact) {
+      if (this.position.width > 580) {
+        this.position.width = 580;
+      }
+      this.position.height = "auto";
+      this.setPosition({ width: this.position.width, height: "auto" });
     }
 
     // ── Ctrl+Wheel zoom on sheet ──
@@ -895,12 +898,14 @@ export class FaseripActorSheet extends ActorSheet {
     html.find('.compact-toggle').click(async (event) => {
       event.preventDefault();
       event.stopPropagation();
-      const current = game.settings.get("msh-faserip", "compactSheet") ?? false;
-      await game.settings.set("msh-faserip", "compactSheet", !current);
+      const current = this.actor.getFlag("msh-faserip", "compactSheet") ?? false;
+      await this.actor.setFlag("msh-faserip", "compactSheet", !current);
       // Resize sheet for compact mode
       const newWidth = !current ? 580 : 700;
+      const newHeight = !current ? "auto" : 800;
       this.position.width = newWidth;
-      this.setPosition({ width: newWidth });
+      this.position.height = newHeight;
+      this.setPosition({ width: newWidth, height: newHeight });
     });
 
     const isLocked = this.actor.getFlag('msh-faserip', 'sheetLocked') || false;

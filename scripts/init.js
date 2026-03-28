@@ -332,22 +332,6 @@ Hooks.once("init", async () => {
     default: 0.8
   });
 
-  // Compact character sheet mode (per-user, player-accessible)
-  game.settings.register("msh-faserip", "compactSheet", {
-    name: "Compact Character Sheet",
-    hint: "Reduces character sheet size by hiding header details, collapsing the abilities section to a single column, and tightening spacing. Useful for smaller screens or when running multiple sheets.",
-    scope: "client",
-    config: true,
-    type: Boolean,
-    default: false,
-    onChange: () => {
-      // Re-render all open actor sheets
-      for (const app of Object.values(ui.windows)) {
-        if (app instanceof ActorSheet) app.render(false);
-      }
-    }
-  });
-
   // Register default combat mode setting
   game.settings.register("msh-faserip", "defaultCombatMode", {
     name: "Default Combat Mode",
