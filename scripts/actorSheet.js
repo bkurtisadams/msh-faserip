@@ -864,8 +864,8 @@ export class FaseripActorSheet extends ActorSheet {
 
     // Apply compact sheet dimensions
     if (compact) {
-      if (this.position.width > 580) {
-        this.position.width = 580;
+      if (this.position.width > 513) {
+        this.position.width = 513;
       }
       this.position.height = "auto";
       this.setPosition({ width: this.position.width, height: "auto" });
@@ -909,7 +909,7 @@ export class FaseripActorSheet extends ActorSheet {
       const current = this.actor.getFlag("msh-faserip", "compactSheet") ?? false;
       await this.actor.setFlag("msh-faserip", "compactSheet", !current);
       // Resize sheet for compact mode
-      const newWidth = !current ? 580 : 700;
+      const newWidth = !current ? 513 : 700;
       const newHeight = !current ? "auto" : 800;
       this.position.width = newWidth;
       this.position.height = newHeight;

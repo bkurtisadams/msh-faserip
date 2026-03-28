@@ -272,8 +272,8 @@ form.faserip-sheet.compact-mode .secondary-abilities .stacked-values {
 }
 
 form.faserip-sheet.compact-mode .secondary-abilities .stacked-values input[type="number"] {
-  width: 44px !important;
-  min-width: 44px !important;
+  width: 58px !important;
+  min-width: 58px !important;
   height: 22px !important;
   font-size: 14px !important;
 }
@@ -322,13 +322,18 @@ form.faserip-sheet.compact-mode .movement-inline input[type="number"] {
   padding: 0 2px !important;
 }
 
-/* ── Tab bar: smaller icons ────────────────────────────────────────────── */
+/* ── Tab bar: tighter for narrow compact sheet ────────────────────────── */
 form.faserip-sheet.compact-mode .sheet-tabs-navigation .item {
-  padding: 3px 6px !important;
+  padding: 3px 4px !important;
 }
 
 form.faserip-sheet.compact-mode .sheet-tabs-navigation .item i {
-  font-size: 12px !important;
+  font-size: 11px !important;
+}
+
+form.faserip-sheet.compact-mode .sheet-tabs-navigation .item::after {
+  font-size: 8px !important;
+  letter-spacing: 0 !important;
 }
 
 /* ── Tab content: tighter tables, prevent overflow ─────────────────────── */
