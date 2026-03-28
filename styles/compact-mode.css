@@ -146,13 +146,19 @@ form.faserip-sheet.compact-mode .abilities-section {
   grid-template-columns: auto minmax(0, 1fr) !important;
   gap: 0 !important;
   padding: 0 !important;
-  align-items: start !important;
+  align-items: stretch !important;
 }
 
-/* Primary container: no overflow, tight padding */
+/* Primary container: no overflow, flush top so thead aligns with sec-head */
 form.faserip-sheet.compact-mode .primary-abilities {
-  padding: 4px 4px 4px 6px !important;
+  padding: 0 4px 4px 6px !important;
   overflow: visible !important;
+  border: none !important;
+}
+
+/* Ability key column: grey divider instead of red in compact */
+form.faserip-sheet.compact-mode .primary-abilities .abilities-table td.ability-key {
+  border-right: 1px solid #999 !important;
 }
 
 /* Secondary container: left border, flex column so movement pins to bottom */
@@ -166,6 +172,7 @@ form.faserip-sheet.compact-mode .secondary-abilities {
   box-shadow: none !important;
   border-radius: 0 !important;
   margin: 0 !important;
+  align-self: stretch !important;
 }
 
 /* sec-grid: keep 4 columns, stretch columns for full-height dividers */
@@ -176,12 +183,19 @@ form.faserip-sheet.compact-mode .secondary-abilities .sec-grid {
   position: relative !important;
 }
 
-/* sec-col: darker divider lines running full height */
+/* sec-col: stretch for full-height layout, flex column */
 form.faserip-sheet.compact-mode .secondary-abilities .sec-col {
-  align-items: center !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  border-right: none !important;
+}
+
+/* sec-body: divider lines between columns, below the header bar */
+form.faserip-sheet.compact-mode .secondary-abilities .sec-col .sec-body {
   border-right: 1px solid #999 !important;
 }
-form.faserip-sheet.compact-mode .secondary-abilities .sec-col:last-child {
+form.faserip-sheet.compact-mode .secondary-abilities .sec-col:last-child .sec-body {
   border-right: none !important;
 }
 
@@ -192,8 +206,8 @@ form.faserip-sheet.compact-mode .secondary-abilities .sec-grid::before {
   top: 0 !important;
   left: 0 !important;
   right: 0 !important;
-  height: 26px !important;
-  background: #8b0000 !important;
+  height: 30px !important;
+  background: linear-gradient(180deg, var(--mred-lit, #a80000) 0%, var(--mred-dk, #660000) 100%) !important;
   z-index: 0 !important;
   pointer-events: none !important;
 }
@@ -201,9 +215,9 @@ form.faserip-sheet.compact-mode .secondary-abilities .sec-head {
   position: relative !important;
   z-index: 1 !important;
   border-bottom: none !important;
-  height: 26px !important;
-  min-height: 26px !important;
-  max-height: 26px !important;
+  height: 30px !important;
+  min-height: 30px !important;
+  max-height: 30px !important;
   padding: 2px 4px !important;
   font-size: 10px !important;
 }
@@ -229,15 +243,19 @@ form.faserip-sheet.compact-mode .movement-inline {
 
 /* Primary table: tighter rows (column hiding handled by initial-hidden class in JS) */
 form.faserip-sheet.compact-mode .primary-abilities .abilities-table thead th {
-  height: 26px !important;
-  min-height: 26px !important;
-  max-height: 26px !important;
+  height: 30px !important;
+  min-height: 30px !important;
+  max-height: 30px !important;
   padding: 2px 4px !important;
   font-size: 10px !important;
 }
 
 form.faserip-sheet.compact-mode .primary-abilities .abilities-table td {
   padding: 1px 3px !important;
+  border-right: 1px solid #ccc !important;
+}
+form.faserip-sheet.compact-mode .primary-abilities .abilities-table td:last-child {
+  border-right: none !important;
 }
 
 form.faserip-sheet.compact-mode .primary-abilities .abilities-table input,
@@ -272,8 +290,8 @@ form.faserip-sheet.compact-mode .secondary-abilities .stacked-values {
 }
 
 form.faserip-sheet.compact-mode .secondary-abilities .stacked-values input[type="number"] {
-  width: 58px !important;
-  min-width: 58px !important;
+  width: 48px !important;
+  min-width: 48px !important;
   height: 22px !important;
   font-size: 14px !important;
 }
