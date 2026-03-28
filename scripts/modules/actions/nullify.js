@@ -188,6 +188,7 @@ export async function activateNullifyArea(caster, powerRank, powerItemUuid = nul
   for (const token of targets) {
     const target = token.actor;
     const endRank = target.system?.abilities?.endurance?.rank || "Typical";
+    const endValue = target.system?.abilities?.endurance?.value ?? 0;
     const delta = rIdx(powerRank) - rIdx(endRank);
     const req = requiredColorFromDelta(delta);
 
@@ -220,6 +221,7 @@ export async function activateNullifyArea(caster, powerRank, powerItemUuid = nul
     results.push({
       name: target.name,
       endRank,
+      endValue,
       roll: total,
       color: colorLower,
       required: req,
@@ -233,16 +235,16 @@ export async function activateNullifyArea(caster, powerRank, powerItemUuid = nul
   const rows = results.map(r => {
     const bg = colorBg[r.color] || "#e0e0e0";
     const rollDisplay = r.color === "auto-fail" ? "—" : `${r.roll} (${r.color})`;
-    const reqDisplay = r.required === "auto-fail" ? "Auto" : r.required.charAt(0).toUpperCase() + r.required.slice(1);
-    const status = r.saved
-      ? `<span style="color:#2e7d32;font-weight:600;">Resisted</span>`
-      : `<span style="color:#b71c1c;font-weight:600;">Nullified</span> (${r.durationText})`;
-    return `<tr>
-      <td style="padding:3px 6px;font-weight:600;">${r.name}</td>
-      <td style="padding:3px 6px;text-align:center;">${r.endRank}</td>
-      <td style="padding:3px 6px;text-align:center;background:${bg};border-radius:3px;">${rollDisplay}</td>
-      <td style="padding:3px 6px;text-align:center;">${reqDisplay}</td>
-      <td style="padding:3px 6px;">${status}</td>
+    const reqDisplay = r.required === "auto-fail" ? "Impossible" : r.required.charAt(0).toUpperCase() + r.required.slice(1);
+    const statusLabel = r.saved ? "Resisted" : "Nullified";
+    const statusColor = r.saved ? "#2e7d32" : "#b71c1c";
+    const durationBit = r.saved ? "" : ` <span style="font-weight:400;color:#666;">${r.durationText}</span>`;
+    const status = `<span style="color:${statusColor};font-weight:600;">${statusLabel}</span>${durationBit}`;
+    return `<tr style="border-bottom:1px solid #eee;">
+      <td style="padding:3px 4px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="Endurance: ${r.endRank} ${r.endValue}">${r.name}</td>
+      <td style="padding:3px 2px;text-align:center;background:${bg};border-radius:3px;">${rollDisplay}</td>
+      <td style="padding:3px 2px;text-align:center;">${reqDisplay}</td>
+      <td style="padding:3px 4px;">${status}</td>
     </tr>`;
   }).join("");
 
@@ -257,13 +259,18 @@ export async function activateNullifyArea(caster, powerRank, powerItemUuid = nul
           Nullifying Power — ${powerRank} (${caster.name})
         </div>
         <div style="padding:6px;">
-          <table style="width:100%;border-collapse:collapse;font-size:12px;">
+          <table style="width:100%;border-collapse:collapse;font-size:11px;table-layout:fixed;">
+            <colgroup>
+              <col style="width:auto;" />
+              <col style="width:56px;" />
+              <col style="width:56px;" />
+              <col style="width:68px;" />
+            </colgroup>
             <tr style="border-bottom:1px solid #ccc;">
-              <th style="padding:3px 6px;text-align:left;">Target</th>
-              <th style="padding:3px 6px;text-align:center;">End</th>
-              <th style="padding:3px 6px;text-align:center;">Roll</th>
-              <th style="padding:3px 6px;text-align:center;">Needed</th>
-              <th style="padding:3px 6px;text-align:left;">Result</th>
+              <th style="padding:3px 4px;text-align:left;">Target</th>
+              <th style="padding:3px 2px;text-align:center;">Roll</th>
+              <th style="padding:3px 2px;text-align:center;">Needed</th>
+              <th style="padding:3px 4px;text-align:left;">Result</th>
             </tr>
             ${rows}
           </table>

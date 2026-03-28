@@ -95,6 +95,7 @@ export class MentalPowerAction extends BaseAction {
         for (const token of targets) {
           const target = token.actor;
           const endRank = target.system?.abilities?.endurance?.rank || "Typical";
+          const endValue = target.system?.abilities?.endurance?.value ?? 0;
           const delta = rIdx(powerRank) - rIdx(endRank);
           const req = requiredColorFromDelta(delta);
 
@@ -117,7 +118,7 @@ export class MentalPowerAction extends BaseAction {
             await applyNullified(target, { rounds: null, originUuid: item.uuid, selfNullify: false, auraCasterId: actor.id });
           }
 
-          results.push({ name: target.name, endRank, roll: total, color: colorLower, required: req, saved });
+          results.push({ name: target.name, endRank, endValue, roll: total, color: colorLower, required: req, saved });
         }
 
         // Build summary chat card
@@ -129,12 +130,11 @@ export class MentalPowerAction extends BaseAction {
           const status = r.saved
             ? `<span style="color:#2e7d32;font-weight:600;">Resisted</span>`
             : `<span style="color:#b71c1c;font-weight:600;">Nullified</span>`;
-          return `<tr>
-            <td style="padding:3px 6px;font-weight:600;white-space:nowrap;">${r.name}</td>
-            <td style="padding:3px 6px;text-align:center;">${abbr(r.endRank)}</td>
-            <td style="padding:3px 6px;text-align:center;background:${bg};border-radius:3px;">${rollDisplay}</td>
-            <td style="padding:3px 6px;text-align:center;">${reqDisplay}</td>
-            <td style="padding:3px 6px;">${status}</td>
+          return `<tr style="border-bottom:1px solid #eee;">
+            <td style="padding:3px 4px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="Endurance: ${r.endRank} ${r.endValue}">${r.name}</td>
+            <td style="padding:3px 2px;text-align:center;background:${bg};border-radius:3px;">${rollDisplay}</td>
+            <td style="padding:3px 2px;text-align:center;">${reqDisplay}</td>
+            <td style="padding:3px 4px;">${status}</td>
           </tr>`;
         }).join("");
 
@@ -148,13 +148,18 @@ export class MentalPowerAction extends BaseAction {
               Nullifying Power — ${powerRank} (${actor.name}) ACTIVATED
             </div>
             <div style="padding:6px;">
-              ${targets.length > 0 ? `<table style="width:100%;border-collapse:collapse;font-size:12px;">
+              ${targets.length > 0 ? `<table style="width:100%;border-collapse:collapse;font-size:11px;table-layout:fixed;">
+                <colgroup>
+                  <col style="width:auto;" />
+                  <col style="width:56px;" />
+                  <col style="width:56px;" />
+                  <col style="width:68px;" />
+                </colgroup>
                 <tr style="border-bottom:1px solid #ccc;">
-                  <th style="padding:3px 6px;text-align:left;">Target</th>
-                  <th style="padding:3px 6px;text-align:center;">End</th>
-                  <th style="padding:3px 6px;text-align:center;">Roll</th>
-                  <th style="padding:3px 6px;text-align:center;">Needed</th>
-                  <th style="padding:3px 6px;text-align:left;">Result</th>
+                  <th style="padding:3px 4px;text-align:left;">Target</th>
+                  <th style="padding:3px 2px;text-align:center;">Roll</th>
+                  <th style="padding:3px 2px;text-align:center;">Needed</th>
+                  <th style="padding:3px 4px;text-align:left;">Result</th>
                 </tr>
                 ${rows}
               </table>` : ""}
@@ -171,16 +176,17 @@ export class MentalPowerAction extends BaseAction {
         const targetRows = targets.map(t => {
           const target = t.actor;
           const endRank = target.system?.abilities?.endurance?.rank || "Typical";
+          const endValue = target.system?.abilities?.endurance?.value ?? 0;
           const delta = rIdx(powerRank) - rIdx(endRank);
           const req = requiredColorFromDelta(delta);
           const targetUuid = target.uuid || "";
+          const endHover = `Endurance: ${endRank} ${endValue}`;
 
           if (req === "auto-success") {
             return `<tr>
-              <td style="padding:4px 6px;font-weight:600;white-space:nowrap;">${target.name}</td>
-              <td style="padding:4px 6px;text-align:center;font-size:.85em;color:#666;">${abbr(endRank)}</td>
-              <td style="padding:4px 6px;text-align:center;font-size:.85em;color:#2e7d32;">Auto</td>
-              <td style="padding:4px 6px;text-align:center;">
+              <td style="padding:3px 4px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${endHover}">${target.name}</td>
+              <td style="padding:3px 2px;text-align:center;font-size:.85em;color:#2e7d32;">Auto</td>
+              <td style="padding:3px 2px;text-align:center;">
                 <span style="font-size:11px;font-weight:600;color:#2e7d32;">Resisted</span>
               </td>
             </tr>`;
@@ -188,10 +194,9 @@ export class MentalPowerAction extends BaseAction {
 
           if (req === "auto-fail") {
             return `<tr>
-              <td style="padding:4px 6px;font-weight:600;white-space:nowrap;">${target.name}</td>
-              <td style="padding:4px 6px;text-align:center;font-size:.85em;color:#666;">${abbr(endRank)}</td>
-              <td style="padding:4px 6px;text-align:center;font-size:.85em;color:#b71c1c;">Impossible</td>
-              <td style="padding:4px 6px;text-align:center;">
+              <td style="padding:3px 4px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${endHover}">${target.name}</td>
+              <td style="padding:3px 2px;text-align:center;font-size:.85em;color:#b71c1c;">Impossible</td>
+              <td style="padding:3px 2px;text-align:center;">
                 <a class="faserip-chip" data-action="nullify-auto-fail" data-target-uuid="${targetUuid}" data-attacker-uuid="${actor.uuid}" data-power-item-uuid="${item.uuid}"
                    style="padding:2px 8px;border:1px solid #b71c1c;border-radius:3px;background:#ffebee;color:#b71c1c;cursor:pointer;font-size:11px;font-weight:600;white-space:nowrap;">
                    Apply
@@ -202,10 +207,9 @@ export class MentalPowerAction extends BaseAction {
 
           const reqDisplay = req.charAt(0).toUpperCase() + req.slice(1);
           return `<tr>
-            <td style="padding:4px 6px;font-weight:600;white-space:nowrap;">${target.name}</td>
-            <td style="padding:4px 6px;text-align:center;font-size:.85em;color:#666;">${abbr(endRank)}</td>
-            <td style="padding:4px 6px;text-align:center;font-size:.85em;">${reqDisplay}</td>
-            <td style="padding:4px 6px;text-align:center;">
+            <td style="padding:3px 4px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${endHover}">${target.name}</td>
+            <td style="padding:3px 2px;text-align:center;font-size:.85em;">${reqDisplay}</td>
+            <td style="padding:3px 2px;text-align:center;">
               <a class="faserip-chip" data-action="force-save-nullify"
                  data-attacker-uuid="${actor.uuid}" data-target-uuid="${targetUuid}" data-target-name="${target.name}"
                  data-intensity-rank="${powerRank}" data-save-ability="endurance"
@@ -219,12 +223,16 @@ export class MentalPowerAction extends BaseAction {
         const noTargetsNote = targets.length === 0
           ? `<div style="padding:6px;font-size:.9em;color:#666;">No valid targets in range.</div>` : "";
 
-        const tableHtml = targets.length > 0 ? `<table style="width:100%;border-collapse:collapse;font-size:12px;">
+        const tableHtml = targets.length > 0 ? `<table style="width:100%;border-collapse:collapse;font-size:11px;table-layout:fixed;">
+          <colgroup>
+            <col style="width:auto;" />
+            <col style="width:56px;" />
+            <col style="width:56px;" />
+          </colgroup>
           <tr style="border-bottom:1px solid #ccc;">
-            <th style="padding:3px 6px;text-align:left;">Target</th>
-            <th style="padding:3px 6px;text-align:center;">End</th>
-            <th style="padding:3px 6px;text-align:center;">Need</th>
-            <th style="padding:3px 6px;text-align:center;">Save</th>
+            <th style="padding:3px 4px;text-align:left;">Target</th>
+            <th style="padding:3px 2px;text-align:center;">Need</th>
+            <th style="padding:3px 2px;text-align:center;">Save</th>
           </tr>
           ${targetRows}
         </table>` : "";
