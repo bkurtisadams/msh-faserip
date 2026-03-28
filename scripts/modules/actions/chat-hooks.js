@@ -1,5 +1,7 @@
 // chat-hooks.js v1.5.6 - 2026-02-21
 // v1.5.6: Fix Apply Damage and Resolve Slam buttons not working in semi mode - canDriveAutoSaves bail was blocking all button handler registration for non-owners
+// v1.5.7: Fix reload - prefer token actor over world actor (unlinked tokens have separate item copies)
+// v1.5.6: Fix reload handler - use pointerEvents/opacity disable for <a> tag (disabled prop is button-only)
 // v1.5.5: Fix reload handler - resolve synthetic token actors via canvas.tokens
 // v1.5.4: Add reload button handler for out-of-ammo chat card
 // v1.5.3: Fix dodge reapply - add movementMult and selfPenaltyCS to AE changes (was missing same as defense-action.js)
@@ -559,11 +561,10 @@ export function installActionChatHandlers() {
       const itemId   = btn.dataset.itemId;
       const tokenId  = btn.dataset.tokenId;
 
-      // Resolve actor: world actor first, then synthetic token actor
-      let actor = game.actors?.get(actorId);
-      if (!actor && tokenId) {
-        actor = canvas.tokens?.get(tokenId)?.actor;
-      }
+      // Resolve actor: token actor first (unlinked tokens have their own item copies),
+      // fall back to world actor only if no token
+      let actor = tokenId ? canvas.tokens?.get(tokenId)?.actor : null;
+      if (!actor) actor = game.actors?.get(actorId);
       if (!actor) {
         ui.notifications.warn("Could not find actor to reload.");
         return;
@@ -575,7 +576,9 @@ export function installActionChatHandlers() {
       const fullShots = item.system.shots || 0;
       await item.update({ "system.shotsRemaining": fullShots });
       btn.textContent = `✓ ${item.name} reloaded (${fullShots})`;
-      btn.disabled = true;
+      btn.style.pointerEvents = "none";
+      btn.style.opacity = "0.55";
+      btn.style.cursor = "not-allowed";
       btn.style.background = "#2e7d32";
     });
 

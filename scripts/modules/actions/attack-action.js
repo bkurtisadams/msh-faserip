@@ -6,6 +6,7 @@
 // v1.9.19: Semi mode always shows multi-attack FEAT dialog (auto/impossible shown as confirmation)
 // v1.9.18: Multi-attack FEAT - CS now correctly affects success determination
 // v1.9.17: Multi-attack FEAT dialog redesigned to match compact blunt-attack style
+// v1.9.17: Fix reload button - use <a> tag instead of <button> (Foundry v13 sanitizes buttons from chat content)
 // v1.9.16: Fix reload button - store token ID for synthetic actor lookup
 // v1.9.15: Add reload button to out-of-ammo chat card
 // v1.9.14: Evasion chat card shows real roll color instead of fake White; damage shows "evaded" not "miss"
@@ -464,13 +465,13 @@ export class AttackAction extends BaseAction {
               <div style="background:#fff;border:1px solid #bbb;border-radius:3px;padding:6px 8px;">
                 <b>${actor.name}</b> pulls the trigger — <i>click!</i> <span style="color:#888">(${weapon.name} empty)</span>
                 <div style="margin-top:6px;">
-                  <button class="faserip-reload-weapon"
+                  <a class="faserip-reload-weapon"
                           data-item-id="${weapon.id}"
                           data-actor-id="${actor.id}"
                           data-token-id="${actor.token?.id ?? actor.getActiveTokens?.()?.[0]?.id ?? ''}"
-                          style="background:#8b0000;color:#fff;border:none;border-radius:3px;padding:3px 10px;cursor:pointer;font-size:.85em;">
+                          style="display:inline-block;background:#8b0000;color:#fff;border:none;border-radius:3px;padding:3px 10px;cursor:pointer;font-size:.85em;text-decoration:none;">
                     ↺ Reload ${weapon.name}
-                  </button>
+                  </a>
                 </div>
               </div>
             `

@@ -848,6 +848,10 @@ export class FaseripActorSheet extends ActorSheet {
     // Apply compact mode class from setting
     const compact = game.settings.get("msh-faserip", "compactSheet") ?? false;
     const form = html.closest('.faserip-sheet');
+    
+    // Fix dark grey gap: match window-content background to form
+    html.closest('.window-content').css({ 'background-image': 'none', 'background-color': '#fcf8eb' });
+    
     form.toggleClass('compact-mode', compact);
 
     // ── Ctrl+Wheel zoom on sheet ──
