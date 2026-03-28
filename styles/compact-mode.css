@@ -340,6 +340,7 @@ form.faserip-sheet.compact-mode .sheet-tabs-navigation .item::after {
 form.faserip-sheet.compact-mode .sheet-tab-content {
   padding: 6px !important;
   overflow-x: hidden !important;
+  overflow-y: auto !important;
   min-height: 0 !important;
 }
 

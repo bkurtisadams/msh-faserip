@@ -862,13 +862,21 @@ export class FaseripActorSheet extends ActorSheet {
       $abilitiesSection.addClass('initial-hidden');
     }
 
-    // Apply compact sheet dimensions
+    // Apply compact sheet dimensions — only force auto-height on first
+    // compact render so that subsequent re-renders (e.g. toggling an
+    // equipment ActiveEffect) don't remeasure and balloon the window.
     if (compact) {
       if (this.position.width > 513) {
         this.position.width = 513;
+        this.setPosition({ width: 513 });
       }
-      this.position.height = "auto";
-      this.setPosition({ width: this.position.width, height: "auto" });
+      if (!this._compactSized) {
+        this._compactSized = true;
+        this.position.height = "auto";
+        this.setPosition({ width: this.position.width, height: "auto" });
+      }
+    } else {
+      this._compactSized = false;
     }
 
     // ── Ctrl+Wheel zoom on sheet ──
@@ -907,6 +915,7 @@ export class FaseripActorSheet extends ActorSheet {
       event.preventDefault();
       event.stopPropagation();
       const current = this.actor.getFlag("msh-faserip", "compactSheet") ?? false;
+      this._compactSized = false; // reset so next render re-applies auto height
       await this.actor.setFlag("msh-faserip", "compactSheet", !current);
       // Resize sheet for compact mode
       const newWidth = !current ? 513 : 700;
