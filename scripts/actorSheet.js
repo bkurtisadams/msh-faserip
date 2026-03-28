@@ -854,6 +854,14 @@ export class FaseripActorSheet extends ActorSheet {
     
     form.toggleClass('compact-mode', compact);
 
+    // In compact mode, force initial columns hidden (reuse existing initial-hidden CSS)
+    const $abilitiesTable = html.find('.primary-abilities .abilities-table');
+    const $abilitiesSection = html.find('.abilities-section');
+    if (compact) {
+      $abilitiesTable.addClass('initial-hidden');
+      $abilitiesSection.addClass('initial-hidden');
+    }
+
     // Apply compact sheet dimensions
     if (compact) {
       if (this.position.width > 580) {

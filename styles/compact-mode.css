@@ -227,19 +227,7 @@ form.faserip-sheet.compact-mode .movement-inline {
   padding: 2px 4px !important;
 }
 
-/* Primary table: hide initial columns, tighter rows */
-form.faserip-sheet.compact-mode .primary-abilities .abilities-table th.initial,
-form.faserip-sheet.compact-mode .primary-abilities .abilities-table td:nth-child(2),
-form.faserip-sheet.compact-mode .primary-abilities .abilities-table td:nth-child(3),
-form.faserip-sheet.compact-mode .primary-abilities .abilities-table th:nth-child(2),
-form.faserip-sheet.compact-mode .primary-abilities .abilities-table th:nth-child(3) {
-  display: none !important;
-}
-
-form.faserip-sheet.compact-mode .primary-abilities .abilities-table {
-  table-layout: fixed !important;
-}
-
+/* Primary table: tighter rows (column hiding handled by initial-hidden class in JS) */
 form.faserip-sheet.compact-mode .primary-abilities .abilities-table thead th {
   height: 26px !important;
   min-height: 26px !important;
