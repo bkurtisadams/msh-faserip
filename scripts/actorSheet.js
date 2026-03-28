@@ -854,6 +854,12 @@ export class FaseripActorSheet extends ActorSheet {
     
     form.toggleClass('compact-mode', compact);
 
+    // Apply compact sheet width
+    if (compact && this.position.width > 580) {
+      this.position.width = 580;
+      this.setPosition({ width: 580 });
+    }
+
     // ── Ctrl+Wheel zoom on sheet ──
     initSheetZoom(this);
 
@@ -891,6 +897,10 @@ export class FaseripActorSheet extends ActorSheet {
       event.stopPropagation();
       const current = game.settings.get("msh-faserip", "compactSheet") ?? false;
       await game.settings.set("msh-faserip", "compactSheet", !current);
+      // Resize sheet for compact mode
+      const newWidth = !current ? 580 : 700;
+      this.position.width = newWidth;
+      this.setPosition({ width: newWidth });
     });
 
     const isLocked = this.actor.getFlag('msh-faserip', 'sheetLocked') || false;

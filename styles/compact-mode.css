@@ -1,4 +1,6 @@
-/* compact-mode.css v1.1.0 - 2026-03-23 */
+/* compact-mode.css v1.3.0 - 2026-03-28 */
+/* v1.3.0: Full-height dividers, narrower sheet (580px), no blank space below tabs */
+/* v1.2.0: Side-by-side layout — FASERIP table left, stats+movement right */
 /* Compact character sheet mode — toggled via Settings > Compact Character Sheet */
 /* or the compress/expand button on the sheet header.                            */
 
@@ -139,11 +141,92 @@ form.faserip-sheet.compact-mode .msh-bio {
   display: none !important;
 }
 
-/* ── Abilities: single column, tighter ─────────────────────────────────── */
+/* ── Abilities: side-by-side — FASERIP table left, stats+movement right ── */
 form.faserip-sheet.compact-mode .abilities-section {
-  grid-template-columns: 1fr !important;
-  gap: 4px !important;
-  padding: 4px 6px !important;
+  grid-template-columns: auto minmax(0, 1fr) !important;
+  gap: 0 !important;
+  padding: 0 !important;
+  align-items: start !important;
+}
+
+/* Primary container: no overflow, tight padding */
+form.faserip-sheet.compact-mode .primary-abilities {
+  padding: 4px 4px 4px 6px !important;
+  overflow: visible !important;
+}
+
+/* Secondary container: left border, flex column so movement pins to bottom */
+form.faserip-sheet.compact-mode .secondary-abilities {
+  display: flex !important;
+  flex-direction: column !important;
+  border-left: 2px solid var(--ink, #222) !important;
+  border-top: none !important;
+  border-right: none !important;
+  border-bottom: none !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  margin: 0 !important;
+}
+
+/* sec-grid: keep 4 columns, stretch columns for full-height dividers */
+form.faserip-sheet.compact-mode .secondary-abilities .sec-grid {
+  grid-template-columns: 1fr 1fr 1.2fr 1fr !important;
+  align-items: stretch !important;
+  flex: 1 !important;
+}
+
+/* sec-col: darker divider lines running full height */
+form.faserip-sheet.compact-mode .secondary-abilities .sec-col {
+  align-items: center !important;
+  border-right: 1px solid #999 !important;
+}
+form.faserip-sheet.compact-mode .secondary-abilities .sec-col:last-child {
+  border-right: none !important;
+}
+
+/* Continuous red header bar overlay — covers the divider lines in the header zone */
+form.faserip-sheet.compact-mode .secondary-abilities .sec-grid {
+  position: relative !important;
+}
+form.faserip-sheet.compact-mode .secondary-abilities .sec-grid::before {
+  content: "" !important;
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  height: 26px !important;
+  background: #8b0000 !important;
+  z-index: 0 !important;
+  pointer-events: none !important;
+}
+form.faserip-sheet.compact-mode .secondary-abilities .sec-head {
+  position: relative !important;
+  z-index: 1 !important;
+  border-bottom: none !important;
+  height: 26px !important;
+  min-height: 26px !important;
+  max-height: 26px !important;
+  padding: 2px 4px !important;
+  font-size: 10px !important;
+}
+
+/* sec-body: top-align values, expand to fill column for full-height dividers */
+form.faserip-sheet.compact-mode .secondary-abilities .sec-body {
+  padding: 4px 4px 2px !important;
+  flex: 1 !important;
+  flex-direction: column !important;
+  justify-content: flex-start !important;
+  align-items: center !important;
+}
+
+/* Movement: pin to bottom of secondary column */
+form.faserip-sheet.compact-mode .movement-inline {
+  margin-top: auto !important;
+  border: none !important;
+  border-top: 1px solid #999 !important;
+  border-radius: 0 !important;
+  gap: 2px !important;
+  padding: 2px 4px !important;
 }
 
 /* Primary table: hide initial columns, tighter rows */
@@ -191,20 +274,15 @@ form.faserip-sheet.compact-mode .initial-columns-toggle {
 }
 
 /* ── Secondary abilities: tighter ──────────────────────────────────────── */
-form.faserip-sheet.compact-mode .secondary-abilities .sec-head {
-  height: 24px !important;
-  min-height: 24px !important;
-  max-height: 24px !important;
-  padding: 2px 4px !important;
-  font-size: 10px !important;
-}
-
 form.faserip-sheet.compact-mode .secondary-abilities .sec-head small {
   display: none !important;
 }
 
-form.faserip-sheet.compact-mode .secondary-abilities .sec-body {
-  padding: 3px 4px !important;
+form.faserip-sheet.compact-mode .secondary-abilities .stacked-values {
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 0 !important;
 }
 
 form.faserip-sheet.compact-mode .secondary-abilities .stacked-values input[type="number"] {
@@ -247,18 +325,13 @@ form.faserip-sheet.compact-mode .secondary-abilities .popularity-values input[ty
   font-size: 14px !important;
 }
 
-/* ── Movement: tighter ─────────────────────────────────────────────────── */
-form.faserip-sheet.compact-mode .movement-inline {
-  gap: 2px !important;
-  padding: 2px 4px !important;
-}
-
+/* ── Movement: tighter (inside secondary column) ─────────────────────── */
 form.faserip-sheet.compact-mode .movement-inline .movement-label {
-  font-size: 9px !important;
+  font-size: 8px !important;
 }
 
 form.faserip-sheet.compact-mode .movement-inline input[type="number"] {
-  height: 18px !important;
+  height: 16px !important;
   font-size: 11px !important;
   padding: 0 2px !important;
 }
@@ -359,4 +432,9 @@ form.faserip-sheet.compact-mode .sheet-body {
 
 form.faserip-sheet.compact-mode .sheet-tabs {
   margin-top: 2px !important;
+}
+
+/* Eliminate blank space below tab content */
+form.faserip-sheet.compact-mode .sheet-tab-content {
+  min-height: 0 !important;
 }
