@@ -303,6 +303,40 @@
   -webkit-appearance: none; margin: 0;
 }
 
+/* ===== BONUS LINE ITEMS ===== */
+.faserip.sheet.team-tracker .bonus-list {
+  display: flex; flex-direction: column; gap: 2px;
+  border: 1px solid #ccc; border-radius: 3px; padding: 4px; background: #fafafa;
+}
+.faserip.sheet.team-tracker .bonus-row {
+  display: flex; align-items: center; gap: 6px; padding: 2px 4px;
+}
+.faserip.sheet.team-tracker .bonus-label-input {
+  flex: 1; min-width: 0; padding: 3px 6px; font-size: 12px !important;
+  font-family: 'Barlow Condensed', sans-serif;
+  border: 1px solid #aaa !important; border-radius: 3px;
+  color: #000 !important; background: #fff !important;
+}
+.faserip.sheet.team-tracker .bonus-amount-input {
+  width: 60px; padding: 3px 5px; font-size: 13px !important;
+  font-family: 'Barlow Condensed', sans-serif;
+  border: 1px solid #aaa !important; border-radius: 3px;
+  text-align: center; color: #000 !important; background: #fff !important;
+  font-weight: 700;
+}
+.faserip.sheet.team-tracker .bonus-amount-input::-webkit-outer-spin-button,
+.faserip.sheet.team-tracker .bonus-amount-input::-webkit-inner-spin-button {
+  -webkit-appearance: none; margin: 0;
+}
+.faserip.sheet.team-tracker .delete-bonus {
+  color: #999; cursor: pointer; font-size: 10px; padding: 0 2px;
+}
+.faserip.sheet.team-tracker .delete-bonus:hover { color: #c62828; }
+.faserip.sheet.team-tracker .bonus-subtotal {
+  display: flex; justify-content: flex-end; padding: 2px 4px;
+  border-top: 1px solid #ddd; margin-top: 2px; font-size: 12px;
+}
+
 /* ===== ENCOUNTER SUMMARY ===== */
 .faserip.sheet.team-tracker .encounter-summary {
   background: #f5f5f5 !important; border: 2px solid #888;

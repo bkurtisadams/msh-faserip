@@ -2875,9 +2875,12 @@ Hooks.on('updateActor', async (actor, updateData, options, userId) => {
 
       console.log("FASERIP | Above 0 HP - recording damage for rest eligibility");
 
-      // Clear KO flag — new conscious damage cycle, Recovery is eligible again
+      // Clear KO flag only on new conscious damage (oldHealth > 0 means they were
+      // already conscious and took a hit). If oldHealth was 0, this is a consciousness
+      // recovery (health restored from 0), so the KO flag should stay — per rules p.32,
+      // Recovery is unavailable after being knocked unconscious; only hourly Healing applies.
       const scope = globalThis.MSH_FLAG_SCOPE || "msh-faserip";
-      if (actor.getFlag(scope, "wasKnockedOut")) {
+      if (oldHealth > 0 && actor.getFlag(scope, "wasKnockedOut")) {
         await actor.unsetFlag(scope, "wasKnockedOut");
       }
 

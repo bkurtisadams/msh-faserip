@@ -298,6 +298,84 @@ export class KarmaAdvancementSheet extends DocumentSheet {
     this._completePurchase(cost, description, updateData);
   }
 
+  async _completePurchase(cost, description, updateData) {
+    const availableKarma = this.object.system.karma.advancement || 0;
+
+    if (cost <= 0) {
+      ui.notifications.error("Invalid advancement cost.");
+      return;
+    }
+
+    if (availableKarma < cost) {
+      ui.notifications.warn(`Not enough karma in advancement fund. Need ${cost}, have ${availableKarma}.`);
+      return;
+    }
+
+    const confirm = await new Promise(resolve => {
+      new Dialog({
+        title: "Confirm Advancement",
+        content: `
+          <p><strong>${description}</strong></p>
+          <p>Cost: <strong>${cost} Karma</strong></p>
+          <p>Advancement Fund: ${availableKarma} → ${availableKarma - cost}</p>
+        `,
+        buttons: {
+          confirm: {
+            icon: '<i class="fas fa-check"></i>',
+            label: "Confirm",
+            callback: () => resolve(true)
+          },
+          cancel: {
+            icon: '<i class="fas fa-times"></i>',
+            label: "Cancel",
+            callback: () => resolve(false)
+          }
+        },
+        default: "confirm"
+      }).render(true);
+    });
+
+    if (!confirm) return;
+
+    // Deduct from advancement fund
+    const newAdvancement = availableKarma - cost;
+    const finalUpdate = {
+      "system.karma.advancement": newAdvancement,
+      ...updateData
+    };
+
+    // Clear advancement purpose if fund is empty
+    if (newAdvancement <= 0) {
+      finalUpdate["system.karma.advancementPurpose"] = "";
+      finalUpdate["system.karma.advancementDetail"] = "";
+    }
+
+    await this.object.update(finalUpdate);
+
+    // Log to karma history
+    const history = foundry.utils.deepClone(this.object.system.karma.history || []);
+    history.push({
+      amount: -cost,
+      reason: `Advancement: ${description}`,
+      date: new Date().toISOString()
+    });
+    await this.object.update({ "system.karma.history": history });
+
+    // Chat message
+    await ChatMessage.create({
+      content: `<div style="background:#e8f5e9;border:1px solid #4CAF50;padding:8px;border-radius:3px;">
+        <strong>${this.object.name}</strong> — ${description}
+        <div style="margin-top:4px;font-size:0.9em;color:#555;">
+          Cost: ${cost} Karma | Remaining Fund: ${newAdvancement}
+        </div>
+      </div>`,
+      speaker: ChatMessage.getSpeaker({ actor: this.object })
+    });
+
+    ui.notifications.info(`${description} — ${cost} Karma spent.`);
+    this.render();
+  }
+
   _askForCustomCost(title, message) {
     return new Promise((resolve) => {
       new Dialog({

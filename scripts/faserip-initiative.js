@@ -915,16 +915,25 @@ export class FaseripInitiative {
     const labels = { attack: "⚔ Attack", defend: "🛡 Defend", other: "… Other", multi: "⚔×2 Multi" };
     const label = labels[choice.type] || choice.type;
 
-    // Save last selection for auto-fill next round (persists across round clears)
-    await combatant.setFlag("msh-faserip", "lastDeclaredType", choice.type);
-    await combatant.setFlag("msh-faserip", "lastDeclaredNote", choice.note);
-
-    // Store declaration on combatant
-    await combatant.setFlag("msh-faserip", "declaredAction", {
-      type: choice.type,
-      label,
-      note: choice.note
-    });
+    // Save declaration on combatant — players can't modify Combatant docs directly
+    const flagData = {
+      lastDeclaredType: choice.type,
+      lastDeclaredNote: choice.note,
+      declaredAction: { type: choice.type, label, note: choice.note }
+    };
+    if (game.user.isGM) {
+      await combatant.setFlag("msh-faserip", "lastDeclaredType", choice.type);
+      await combatant.setFlag("msh-faserip", "lastDeclaredNote", choice.note);
+      await combatant.setFlag("msh-faserip", "declaredAction", { type: choice.type, label, note: choice.note });
+    } else if (game.msh?.runAsGM) {
+      await game.msh.runAsGM({
+        operation: "setCombatantFlags",
+        combatantId: combatant.id,
+        flags: flagData
+      });
+    } else {
+      ui.notifications.warn("Cannot save declaration — no GM connection available.");
+    }
 
     // Post to chat
     const noteStr = choice.note ? ` — <em>${choice.note}</em>` : "";

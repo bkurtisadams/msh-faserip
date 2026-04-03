@@ -899,11 +899,8 @@ export async function applyRegenerationOngoing(target, { healAmount, cycleTurns 
   }, {
     name: label,
     img: "icons/svg/regen.svg",
-    disabled: true,
-    changes: [
-      { key: "system.combatMods.canAct", mode: AE_MODES.OVERRIDE, value: "false", priority: 20 },
-      { key: "system.combatMods.canMove", mode: AE_MODES.OVERRIDE, value: "false", priority: 20 },
-    ],
+    disabled: false,
+    changes: [],
     statuses: ["regenerating"],
   });
 }
@@ -932,11 +929,8 @@ export async function applySolarRegenerationOngoing(target, { powerRank, powerIt
   }, {
     name: label,
     img: "icons/svg/sun.svg",
-    disabled: true,
-    changes: [
-      { key: "system.combatMods.canAct", mode: AE_MODES.OVERRIDE, value: "false", priority: 20 },
-      { key: "system.combatMods.canMove", mode: AE_MODES.OVERRIDE, value: "false", priority: 20 },
-    ],
+    disabled: false,
+    changes: [],
     statuses: ["regenerating"],
   });
 }

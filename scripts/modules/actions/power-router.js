@@ -1,4 +1,5 @@
-// power-router.js v1.1.0 - 2026-03-19
+// power-router.js v1.2.0 - 2026-04-03
+// v1.2.0: Wire battleEffectsColumn as explicit action type override.
 // v1.1.0: Route "psionic attack" through mental-power action (was intensity).
 // Shared power routing logic extracted from actorSheet.js .power-roll handler.
 // Determines the correct action type for a power and dispatches through ActionDispatcher.
@@ -17,6 +18,21 @@ const LEGACY_MAP = {
   "touch": "energy",
   "grapple": "grappling",
   "charging": "charging"
+};
+
+// Battle Effects Column (power sheet) → action type
+const BEC_TO_ACTION = {
+  "BA": "blunt-attack",
+  "EA": "edged-attack",
+  "S":  "shooting",
+  "TE": "throwing-edged",
+  "TB": "throwing-blunt",
+  "En": "energy",
+  "Fo": "force",
+  "Ch": "charging",
+  "Gp": "grappling",
+  "Gb": "grabbing",
+  "Me": "mental"
 };
 
 const FORCE_TYPES = [
@@ -119,7 +135,9 @@ export async function rollPower(actor, item) {
   const catLower     = category.toLowerCase();
 
   // Determine attack type — explicit setting or auto-detect
-  let actionType = item.system.attackType;
+  // battleEffectsColumn (power sheet UI) takes priority, then legacy attackType
+  const bec = item.system.battleEffectsColumn || "";
+  let actionType = BEC_TO_ACTION[bec] || item.system.attackType;
 
   // Nullifying Power: always route to mental-power regardless of category/type settings
   const nameLower = (item.name || "").toLowerCase();

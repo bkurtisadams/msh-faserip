@@ -244,6 +244,12 @@ async function runGMCommand(data = {}) {
         userId: data.userId
       });
 
+    case "setCombatantFlags":
+      return await setCombatantFlags({
+        combatantId: data.combatantId,
+        flags: data.flags
+      });
+
     default:
       throw new Error(`Unknown GM operation: ${operation}`);
   }
@@ -406,6 +412,24 @@ async function createMacroForPlayer({ macroData, slot, userId }) {
   }
   
   return { macroId: macro.id, macroUuid: macro.uuid };
+}
+
+/**
+ * Set flags on a combatant document (GM-only operation).
+ * Players cannot modify Combatant documents directly.
+ */
+async function setCombatantFlags({ combatantId, flags }) {
+  if (!combatantId || !flags || typeof flags !== "object") {
+    throw new Error("setCombatantFlags: combatantId and flags required");
+  }
+  const combat = game.combat;
+  if (!combat) throw new Error("setCombatantFlags: no active combat");
+  const combatant = combat.combatants.get(combatantId);
+  if (!combatant) throw new Error(`setCombatantFlags: combatant not found: ${combatantId}`);
+  for (const [key, value] of Object.entries(flags)) {
+    await combatant.setFlag("msh-faserip", key, value);
+  }
+  return true;
 }
 
 /* ----------- Safe Actor Write Utilities ----------- */

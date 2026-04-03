@@ -1,5 +1,5 @@
-// power-sheet-v2-logic.js v1.3.0 - 2026-03-12
-// v1.3.0: Persistent textarea resize heights (localStorage per item)
+// power-sheet-v2-logic.js v1.4.0 - 2026-04-03
+// v1.4.0: Attack section always visible so any power can opt into combat routing.
 // v1.2.0: Collapsible Active Effects, Healing/Absorption toggle, bigger textareas
 // v1.1.0: Rank→Value auto-fill, special strength type change handler, field reorder support
 // Drop-in: call ps2ActivateListeners(html, itemSheet) from activateListeners
@@ -55,7 +55,7 @@ const CATEGORY_AUTO_EXPAND = {
 };
 
 // Sections always shown regardless of category
-const ALWAYS_VISIBLE = ["limitation", "bonusPowers", "magic"];
+const ALWAYS_VISIBLE = ["attack", "limitation", "bonusPowers", "magic"];
 
 // All toggleable section keys
 const ALL_SECTIONS = [

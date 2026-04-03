@@ -224,6 +224,29 @@
               </div>
             </div>
 
+            <!-- Custom Award Line Items -->
+            <div class="detail-section">
+              <label>Award Line Items:</label>
+              {{#if enc.bonuses.length}}
+              <div class="bonus-list">
+                {{#each enc.bonuses as |b|}}
+                <div class="bonus-row">
+                  <input type="text" class="bonus-label-input" data-enc-idx="{{@../index}}" data-bonus-idx="{{@index}}" value="{{b.label}}" placeholder="e.g., Protecting Hargrove" />
+                  <input type="number" class="bonus-amount-input" data-enc-idx="{{@../index}}" data-bonus-idx="{{@index}}" value="{{b.amount}}" />
+                  <a class="delete-bonus" data-enc-idx="{{@../index}}" data-bonus-idx="{{@index}}" title="Remove"><i class="fas fa-times"></i></a>
+                </div>
+                {{/each}}
+                {{#if enc.bonusPositive}}<div class="bonus-subtotal"><span class="sum-pos">+{{enc.bonusPositive}}</span></div>{{/if}}
+                {{#if enc.bonusNegative}}<div class="bonus-subtotal"><span class="sum-neg">{{enc.bonusNegative}}</span></div>{{/if}}
+              </div>
+              {{else}}
+              <span class="no-foes-note">No custom awards. Use for task/milestone rewards.</span>
+              {{/if}}
+              {{#unless enc.awarded}}
+              <button type="button" class="add-bonus-item btn-add-foe" data-enc-idx="{{@index}}"><i class="fas fa-plus"></i> Add Award</button>
+              {{/unless}}
+            </div>
+
             <!-- Summary -->
             <div class="encounter-summary">
               <div class="sum-breakdown">
@@ -232,7 +255,9 @@
                 {{#if enc.arrestValue}}<span class="sum-pos">Arrest +{{enc.arrestValue}}</span>{{/if}}
                 {{#if enc.rescueKarma}}<span class="sum-pos">Rescue +{{enc.rescueKarma}}</span>{{/if}}
                 {{#if enc.gmAward}}<span class="sum-pos">GM +{{enc.gmAward}}</span>{{/if}}
+                {{#if enc.bonusPositive}}<span class="sum-pos">Awards +{{enc.bonusPositive}}</span>{{/if}}
                 {{#if enc.lossKarma}}<span class="sum-neg">Loss {{enc.lossKarma}}</span>{{/if}}
+                {{#if enc.bonusNegative}}<span class="sum-neg">Penalties {{enc.bonusNegative}}</span>{{/if}}
               </div>
               <div class="sum-total">
                 +{{enc.positiveTotal}} ×{{../karmaMultiplier}} = +{{enc.positiveMultiplied}} ÷{{enc.heroCount}} = <strong>+{{enc.perHeroPositive}}/ea</strong>
