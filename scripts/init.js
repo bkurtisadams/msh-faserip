@@ -54,9 +54,13 @@ import { FaseripEquipmentSheet } from './equipment.js';
 import { rollTalent } from './modules/actions/talent-action.js';
 import { rollPower } from './modules/actions/power-router.js';
 import { rollContact } from './modules/actions/contact-action.js';
-//import { rollUniversalTable } from './universalTable.js';  // deprecated
 import { rollUniversalTable } from './modules/dice/universal-table.js';
 import { openUniversalTableDialog } from './universal-table-dialog.js';
+import {
+  RANKS_ORDERED, RANK_VALUES, RANK_ABBR, RANK_ALIASES,
+  rankValue as _rankValue, valueToRank as _valueToRank,
+  shiftRank as _shiftRank, normalizeRank
+} from './rules/rules-reference.js';
 import { FaseripInitiative } from './faserip-initiative.js';
 import { initializeSlamHandlers } from './charge-damage.js';
 import { installActionChatHandlers } from "./modules/actions/chat-hooks.js";
@@ -74,11 +78,6 @@ import { playCombatSFX, classifyWeapon } from "./modules/actions/audio-utils.js"
 import { FaseripTokenRuler } from "./modules/canvas/faserip-token-ruler.js";
 import { initDotToken } from "./modules/canvas/faserip-dot-token.js";
 import { registerNullifyAuraHooks } from "./modules/actions/nullify-aura.js";
-
-// Helper to resolve ACTIONS from CONFIG (for macro compatibility)
-function getActions() {
-  return CONFIG?.MSHF?.ACTIONS || globalThis?.ACTIONS || {};
-}
 
 // ── Player-color tint on chat cards ──
 Hooks.on('renderChatMessage', (message, html, data) => {
@@ -371,11 +370,6 @@ Hooks.once("init", async () => {
   debugLog("init hook is running!");
   console.log("Marvel Super Heroes (FASERIP) system initializing...");
 
-  // Initialize the game.msh namespace early
-  game.msh = game.msh || {};
-
-  game.msh.playCombatSFX = playCombatSFX;
-
   game.msh.FaseripActorSheet = FaseripActorSheet;
 
   CONFIG.FASERIP = CONFIG.FASERIP || {};
@@ -606,17 +600,6 @@ Hooks.once("init", async () => {
   });
 
 
-
-
-  /* Hooks.on("updateCombat", async (combat, changes) => {
-    if (!("round" in changes) && !("turn" in changes)) return;
-    const a = combat?.combatant?.actor; if (!a) return;
-    for (const ef of a.effects) {
-      try { await FX.renameEffectWithRemaining(ef); } catch {}
-    }
-  }); */
-
-
   Hooks.on("preUpdateActiveEffect", function (effect, changes, options, userId) {
     // v12+: img is canonical, icon is deprecated - check property existence without triggering getter
     if (changes && Object.hasOwn(changes, 'icon') && !changes.img) changes.img = changes.icon;
@@ -729,7 +712,7 @@ Hooks.once("init", async () => {
   // Team control button
   // Add this after the keybinding registration and before the settings registration
   Hooks.on("getSceneControlButtons", function(controlsData) {
-    console.log("FASERIP | getSceneControlButtons fired:", controlsData);
+
 
     // 1. Normalize whatever Foundry passed in into an array of group-objects
     let groupsArray;
@@ -744,7 +727,7 @@ Hooks.once("init", async () => {
 
     // 2. Find the "tokens" group
     const tokenGroup = groupsArray.find(g => g.name === "tokens" || g.name === "token");
-    console.log("FASERIP | tokenGroup from hook:", tokenGroup);
+
     if (!tokenGroup) {
       console.error("FASERIP | Token controls not found");
       return;
@@ -780,9 +763,9 @@ Hooks.once("init", async () => {
           });
         }
       };
-      console.log("FASERIP | Added 'faserip-team' to tools object");
+
     } else {
-      console.log("FASERIP | 'faserip-team' already existed, skipping re-insert");
+
     }
 
     // 4b. Combat Panel (GM-only)
@@ -808,13 +791,13 @@ Hooks.once("init", async () => {
           });
         }
       };
-      console.log("FASERIP | Added 'faserip-combat-panel' to tools object");
+
     }
 
     // 5. Assign the reconstructed tools-object back onto tokenGroup.tools
     tokenGroup.tools = existingToolsObj;
 
-    console.log("FASERIP | tokenGroup.tools has been rebuilt:", tokenGroup.tools);
+
   });
 
   // <-- NEW/MODIFIED SECTION START -->
@@ -1269,67 +1252,32 @@ Hooks.once("init", async () => {
     }
   );
 
-  CONFIG.FASERIP.rankValues = {
-    "Shift-0": 0, 
-    "Feeble": 2, 
-    "Poor": 4, 
-    "Typical": 6, 
-    "Good": 10, 
-    "Excellent": 20,
-    "Remarkable": 30, 
-    "Incredible": 40, 
-    "Amazing": 50, 
-    "Monstrous": 75,
-    "Unearthly": 100, 
-    "Shift X": 150, 
-    "Shift Y": 200, 
-    "Shift Z": 500,
-    "Class 1000": 1000, 
-    "Class 3000": 3000, 
-    "Class 5000": 5000, 
-    "Beyond": 9999,
-    
-    // Add these alternative formats that might be generated:
-    "Shift-X": 150,
-    "Shift-Y": 200, 
-    "Shift-Z": 500,
-    "Class1000": 1000,
-    "Class3000": 3000,
-    "Class5000": 5000
-  };
+  // Populate CONFIG.FASERIP.rankValues from canonical source + alias variants
+  CONFIG.FASERIP.rankValues = Object.assign({}, RANK_VALUES);
+  for (const [alias, canonical] of Object.entries(RANK_ALIASES)) {
+    if (RANK_VALUES[canonical] !== undefined) CONFIG.FASERIP.rankValues[alias] = RANK_VALUES[canonical];
+  }
 
-  // Build an ordered rank ladder from your values
-  const _rankEntries = Object.entries(CONFIG.FASERIP.rankValues)
-    .filter(([n,v]) => typeof v === "number")
-    .sort((a,b) => a[1] - b[1]); // ascending by value
-
-  const RANK_ORDER = _rankEntries.map(([name]) => name);
-
-  // Return the next lower printed rank name, clamped at "Shift-0"
+  // Rank navigation helpers — delegate to canonical shiftRank
   game.msh.nextLowerRankName = function(name) {
-    const i = RANK_ORDER.indexOf(name);
+    const n = normalizeRank(name);
+    const i = RANKS_ORDERED.indexOf(n);
     if (i <= 0) return "Shift-0";
-    return RANK_ORDER[i - 1];
+    return RANKS_ORDERED[i - 1];
   };
 
   game.msh.nextHigherRankName = function(name) {
-    const i = RANK_ORDER.indexOf(name);
-    if (i < 0 || i >= RANK_ORDER.length - 1) return name;
-    return RANK_ORDER[i + 1];
+    const n = normalizeRank(name);
+    const i = RANKS_ORDERED.indexOf(n);
+    if (i < 0 || i >= RANKS_ORDERED.length - 1) return n;
+    return RANKS_ORDERED[i + 1];
   };
 
   // Convenience to get current printed rank name from an actor's Endurance
   game.msh.getEnduranceRankName = function(actor) {
     const r = actor.system?.abilities?.endurance?.rank ?? actor.system?.abilities?.endurance?.value;
-    // tolerate either printed rank name or numeric; resolve to printed name
     if (typeof r === "string") return r;
-    // if numeric, snap to the closest printed name by value
-    let best = "Shift-0", bestDiff = Infinity;
-    for (const [name, val] of _rankEntries) {
-      const d = Math.abs((r ?? 0) - val);
-      if (d < bestDiff) { best = name; bestDiff = d; }
-    }
-    return best;
+    return _valueToRank(r ?? 0);
   };
 
   CONFIG.FASERIP.damageTypes = {
@@ -1447,52 +1395,12 @@ Hooks.once("init", async () => {
     "systems/msh-faserip/templates/universal-rank-table.hbs"
   ]);
 
-  // Create game.msh namespace
-  game.msh = game.msh || {};
-
   game.msh.getRankValue = function(rankName) {
-    if (!rankName) return 0;
-    
-    // Normalize the rank name
-    let normalizedRank = rankName.toString().trim();
-    
-    // Handle "Class" ranks - remove spaces
-    if (normalizedRank.includes("Class ")) {
-      normalizedRank = normalizedRank.replace("Class ", "Class");
-    }
-    
-    // Try direct lookup first
-    if (CONFIG.FASERIP.rankValues[normalizedRank] !== undefined) {
-      return CONFIG.FASERIP.rankValues[normalizedRank];
-    }
-    
-    // Try common variations
-    const variations = [
-      normalizedRank,
-      normalizedRank.replace(/\s+/g, ""), // Remove all spaces
-      normalizedRank.replace(/\s+/g, " "), // Normalize spaces
-      normalizedRank.replace("-", " "),    // Replace hyphens with spaces
-      normalizedRank.replace(" ", "-")     // Replace spaces with hyphens
-    ];
-    
-    for (const variation of variations) {
-      if (CONFIG.FASERIP.rankValues[variation] !== undefined) {
-        return CONFIG.FASERIP.rankValues[variation];
-      }
-    }
-    
-    console.warn(`Rank "${rankName}" not found in CONFIG.FASERIP.rankValues`);
-    return 0;
+    return _rankValue(rankName);
   };
 
-  game.msh.getRankName = function(rankValue) {
-    // Find the rank name that corresponds to this value
-    for (const [name, value] of Object.entries(CONFIG.FASERIP.rankValues)) {
-      if (value === rankValue) {
-        return name;
-      }
-    }
-    return "Unknown";
+  game.msh.getRankName = function(value) {
+    return _valueToRank(value);
   };
   
   game.msh.getActorPowers = function(actor) {
@@ -1590,10 +1498,7 @@ Hooks.once("init", async () => {
   };
 
   // Add the Action HUD to the namespace
-  game.msh.FaseripActionPanel = FaseripActionPanel;  // <-- ADD THIS LINE
-
-  // Add the collision damage dialog
-  game.msh.openCollisionDamageDialog = openCollisionDamageDialog;
+  game.msh.FaseripActionPanel = FaseripActionPanel;
 
   // Add the collision damage dialog
   game.msh.openCollisionDamageDialog = openCollisionDamageDialog;
@@ -1685,27 +1590,7 @@ Hooks.once("init", async () => {
   });
 
   Handlebars.registerHelper('abbreviateRank', function(rank) {
-    const rankMap = {
-      "Shift-0": "Sh-0",
-      "Feeble": "Fe",
-      "Poor": "Pr",
-      "Typical": "Ty",
-      "Good": "Gd",
-      "Excellent": "Ex",
-      "Remarkable": "Rm",
-      "Incredible": "In",
-      "Amazing": "Am",
-      "Monstrous": "Mn",
-      "Unearthly": "Un",
-      "Shift-X": "Sh-X",
-      "Shift-Y": "Sh-Y",
-      "Shift-Z": "Sh-Z",
-      "Class 1000": "1000",
-      "Class 3000": "3000",
-      "Class 5000": "5000",
-      "Beyond": "B"
-    };
-    return rankMap[rank] || rank;
+    return RANK_ABBR[rank] ?? RANK_ABBR[normalizeRank(rank)] ?? rank;
   });
 
   Handlebars.registerHelper('some', function(array, property) {
@@ -2347,16 +2232,8 @@ Hooks.once("ready", async () => {
   }
 
   // Manual mode chat listeners
-  if (game?.ready) {
-    try { ManualModeDialog.setupChatListeners(); } 
-    catch (e) { console.warn("Manual toggle setup failed:", e); }
-  } else {
-    Hooks.on("ready", () => {
-      try { ManualModeDialog.setupChatListeners(); }
-      catch (e) { console.warn("Manual toggle setup failed:", e); }
-    });
-  }
-
+  try { ManualModeDialog.setupChatListeners(); }
+  catch (e) { console.warn("Manual toggle setup failed:", e); }
 
   // Register macros (lazy-loaded — quick-heal.js is a self-executing script, not an ES module)
   game.msh.macros = {
@@ -3437,37 +3314,6 @@ async function createUniversalTableMacro(data, slot) {
   // Assign to hotbar slot
   game.user.assignHotbarMacro(macro, slot);
   return true;
-}
-
-// Generate colored action button icon matching HUD appearance
-function generateActionIcon(actionCode, label, bgColor, fgColor) {
-  try {
-    const canvas = document.createElement('canvas');
-    canvas.width = 128;
-    canvas.height = 128;
-    const ctx = canvas.getContext('2d');
-    
-    // Background
-    ctx.fillStyle = bgColor;
-    ctx.fillRect(8, 8, 112, 112);
-    
-    // Border
-    ctx.strokeStyle = 'rgba(0,0,0,0.4)';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(8, 8, 112, 112);
-    
-    // Label text
-    ctx.fillStyle = fgColor;
-    ctx.font = 'bold 48px Arial';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(label, 64, 64);
-    
-    return canvas.toDataURL('image/png');
-  } catch (err) {
-    console.warn("Icon generation failed:", err);
-    return "icons/svg/combat.svg"; // Fallback
-  }
 }
 
 async function createUniversalActionMacro(data, slot) {
