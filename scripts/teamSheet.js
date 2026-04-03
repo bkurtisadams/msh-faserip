@@ -473,23 +473,21 @@ export class TeamSheet extends Application {
 
     new Dialog({
       title: "Add Encounter",
-      content: `<form style="display:flex;flex-direction:column;gap:0;">
+      content: `<form>
         <!-- Name -->
-        <div style="margin-bottom:6px;">
-          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;margin-bottom:2px;">Name</div>
-          <input type="text" name="encName" placeholder="e.g., Ch2: Wideawake Ambush" style="width:100%;box-sizing:border-box;padding:4px 6px;font-size:13px;" />
+        <div class="form-group">
+          <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;">Name</label>
+          <input type="text" name="encName" placeholder="e.g., Ch2: Wideawake Ambush" style="font-size:13px;" />
         </div>
 
-        <!-- Date / Time compact row -->
-        <div style="display:flex;gap:8px;margin-bottom:8px;">
-          <div style="flex:1;">
-            <div style="font-size:10px;color:#666;margin-bottom:1px;">Date</div>
-            <input type="text" name="gameDate" value="${gameDate}" style="width:100%;box-sizing:border-box;padding:3px 5px;font-size:12px;" />
-          </div>
-          <div style="flex:1;">
-            <div style="font-size:10px;color:#666;margin-bottom:1px;">Time</div>
-            <input type="text" name="gameTime" value="${gameTime}" style="width:100%;box-sizing:border-box;padding:3px 5px;font-size:12px;" />
-          </div>
+        <!-- Date / Time -->
+        <div class="form-group">
+          <label style="font-size:10px;color:#666;">Date</label>
+          <input type="text" name="gameDate" value="${gameDate}" style="font-size:12px;" />
+        </div>
+        <div class="form-group">
+          <label style="font-size:10px;color:#666;">Time</label>
+          <input type="text" name="gameTime" value="${gameTime}" style="font-size:12px;" />
         </div>
 
         <!-- Award Line Items (primary section) -->
@@ -498,17 +496,18 @@ export class TeamSheet extends Application {
           <div class="enc-bonus-list" style="min-height:24px;margin-bottom:6px;padding:3px;background:#fafafa;border:1px solid #ddd;border-radius:3px;">
             <div style="font-size:11px;color:#888;font-style:italic;padding:2px 4px;">No awards yet — add task rewards, milestone bonuses, or penalties below.</div>
           </div>
-          <div style="display:flex;gap:6px;align-items:flex-end;">
-            <div style="flex:1;min-width:0;">
-              <div style="font-size:10px;color:#666;margin-bottom:1px;">Label</div>
-              <input type="text" name="bonusLabel" placeholder="e.g., Protecting Hargrove" style="width:100%;box-sizing:border-box;padding:3px 5px;font-size:12px;" />
-            </div>
-            <div style="width:55px;">
-              <div style="font-size:10px;color:#666;margin-bottom:1px;">Amt</div>
-              <input type="number" name="bonusAmount" value="10" style="width:100%;box-sizing:border-box;padding:3px 4px;font-size:12px;text-align:center;" />
-            </div>
-            <button type="button" class="enc-add-bonus-btn" style="padding:4px 8px;font-size:11px;font-weight:700;color:#fff;background:#8b0000;border:0;border-radius:3px;cursor:pointer;white-space:nowrap;">+</button>
+          <div class="form-group" style="margin-bottom:0;">
+            <label style="flex:0 0 auto;font-size:10px;color:#666;">Label</label>
+            <input type="text" name="bonusLabel" placeholder="e.g., Protecting Hargrove" style="font-size:12px;" />
           </div>
+          <div class="form-group" style="margin-bottom:4px;">
+            <label style="flex:0 0 auto;font-size:10px;color:#666;">Amt</label>
+            <div style="display:flex;gap:6px;align-items:center;flex:1;">
+              <input type="number" name="bonusAmount" value="10" style="width:55px;font-size:12px;text-align:center;" />
+              <button type="button" class="enc-add-bonus-btn" style="padding:4px 12px;font-size:11px;font-weight:700;color:#fff;background:#8b0000;border:0;border-radius:3px;cursor:pointer;white-space:nowrap;">+</button>
+            </div>
+          </div>
+          <div style="font-size:10px;color:#888;font-style:italic;">Custom awards/penalties. Subject to multiplier &amp; hero split.</div>
         </div>
 
         <!-- Collapsible: Standard FASERIP Awards -->
