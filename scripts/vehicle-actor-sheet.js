@@ -6,27 +6,17 @@
 // v1.0.0: Initial vehicle actor sheet
 
 import { FaseripActorSheet } from "./actorSheet.js";
-
-const RANK_ORDER = [
-  "Shift-0","Feeble","Poor","Typical","Good","Excellent",
-  "Remarkable","Incredible","Amazing","Monstrous","Unearthly",
-  "Shift-X","Shift-Y","Shift-Z","Class 1000","Class 3000","Class 5000","Beyond"
-];
-
-const RANK_VALUES = {
-  "Shift-0":0,"Feeble":2,"Poor":4,"Typical":6,"Good":10,
-  "Excellent":20,"Remarkable":30,"Incredible":40,"Amazing":50,
-  "Monstrous":75,"Unearthly":100,"Shift-X":150,"Shift-Y":200,
-  "Shift-Z":500,"Class 1000":1000,"Class 3000":3000,"Class 5000":5000,"Beyond":9999
-};
+import {
+  RANKS_ORDERED as RANK_ORDER, RANK_VALUES,
+  shiftRank as _shiftRank, rankValue as rankVal
+} from "./rules/rules-reference.js";
 
 function shiftRank(name, steps) {
+  // Vehicle sheet needs unclamped shift (vehicles can have Class 1000+ speed)
   const idx = RANK_ORDER.indexOf(name);
   if (idx < 0) return name;
   return RANK_ORDER[Math.max(0, Math.min(RANK_ORDER.length - 1, idx + steps))];
 }
-
-function rankVal(name) { return RANK_VALUES[name] ?? 0; }
 
 function lesserRank(a, b) {
   return rankVal(a) <= rankVal(b) ? a : b;

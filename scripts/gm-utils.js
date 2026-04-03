@@ -1,8 +1,10 @@
-// gm-utils.js v1.2.0 - 2026-03-08
+// gm-utils.js v1.2.1 - 2026-04-03
+// v1.2.1: Replace local RANKS array with import from rules-reference.js
 // v1.2.0: Add updateActiveEffect and renameEffectWithRemaining GM socket handlers
 //         for player-initiated effect updates on unowned actors
 // v13-safe socketlib wiring for "msh-faserip"
 import { applyDamageToTargets, debugLog } from "./modules/actions/action-utils.js";
+import { RANKS_ORDERED as _RANKS_LIST } from "./rules/rules-reference.js";
 
 const SOCKET_NAME = "msh-faserip";
 let socket = null;
@@ -57,11 +59,7 @@ export function getItemMaterialRank(it) {
     if (byNumber) { console.groupEnd(); return byNumber; }
   }
 
-  const RANKS = [
-    "Shift-0","Feeble","Poor","Typical","Good","Excellent",
-    "Remarkable","Incredible","Amazing","Monstrous","Unearthly",
-    "Shift-X","Shift-Y","Shift-Z","Class 1000","Class 3000","Class 5000","Beyond"
-  ];
+  const RANKS = _RANKS_LIST;
   const asFull = RANKS.find(r => r.toLowerCase() === text.toLowerCase());
   if (asFull) { console.debug('full rank match →', asFull); console.groupEnd(); return asFull; }
 

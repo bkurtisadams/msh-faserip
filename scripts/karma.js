@@ -1,5 +1,8 @@
-// karma.js v1.6.0 - 2026-03-21
+// karma.js v1.6.1 - 2026-04-03
+// v1.6.1: Replace local RANK_MINS/RANK_ORDER with import from rules-reference.js
 // v1.6.0: Add missing karma types: Failing Commitment, Leaving Early, Negative Popularity, Commit Robbery
+import { RANKS_ORDERED, RANK_VALUES } from "./rules/rules-reference.js";
+
 export class KarmaSheet extends DocumentSheet {
   sortNewestFirst = true;
   searchFilter = "";
@@ -673,16 +676,8 @@ export class KarmaSheet extends DocumentSheet {
     const availableKarma = this._getCurrentKarma();
     const abilities = actor.system.abilities;
 
-    const RANK_MINS = {
-      "Shift-0":0,"Feeble":2,"Poor":4,"Typical":6,"Good":10,"Excellent":20,
-      "Remarkable":30,"Incredible":40,"Amazing":50,"Monstrous":75,"Unearthly":100,
-      "Shift-X":150,"Shift-Y":200,"Shift-Z":500,"Class 1000":1000,"Class 3000":3000,"Class 5000":5000
-    };
-    const RANK_ORDER = [
-      "Shift-0","Feeble","Poor","Typical","Good","Excellent",
-      "Remarkable","Incredible","Amazing","Monstrous","Unearthly",
-      "Shift-X","Shift-Y","Shift-Z","Class 1000","Class 3000","Class 5000","Beyond"
-    ];
+    const RANK_MINS = RANK_VALUES;
+    const RANK_ORDER = RANKS_ORDERED;
     const abilityKeys = ["fighting","agility","strength","endurance","reason","intuition","psyche"];
 
     const getRankNumber = (value) => {

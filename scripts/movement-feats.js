@@ -15,13 +15,7 @@
 // Extracted from actorSheet.js to reduce file size
 
 import { generateKarmaControlsHTML, showKarmaDecisionDialog, getAvailableKarma } from './modules/dice/dice-roller.js';
-
-// Rank list for column shifts
-const RANKS = [
-  "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent",
-  "Remarkable", "Incredible", "Amazing", "Monstrous", "Unearthly",
-  "Shift-X", "Shift-Y", "Shift-Z", "Class 1000", "Class 3000", "Class 5000", "Beyond"
-];
+import { RANKS_ORDERED as RANKS, RANK_ABBR } from './rules/rules-reference.js';
 
 // Exhaustion-immune ranks
 const EXHAUSTION_IMMUNE_RANKS = [
@@ -29,13 +23,8 @@ const EXHAUSTION_IMMUNE_RANKS = [
   "Shift-Z", "Shift Z", "Class 1000", "Class 3000", "Class 5000"
 ];
 
-// Rank abbreviations for compact display
-const RANK_ABBREV = {
-  "Shift-0": "Sh0", "Feeble": "Fe", "Poor": "Pr", "Typical": "Ty", "Good": "Gd", 
-  "Excellent": "Ex", "Remarkable": "Rm", "Incredible": "In", "Amazing": "Am", 
-  "Monstrous": "Mn", "Unearthly": "Un", "Shift-X": "ShX", "Shift-Y": "ShY", 
-  "Shift-Z": "ShZ", "Class 1000": "C1k", "Class 3000": "C3k", "Class 5000": "C5k", "Beyond": "Bey"
-};
+// Rank abbreviations — alias the canonical RANK_ABBR for local usage
+const RANK_ABBREV = RANK_ABBR;
 
 function abbrevRank(rank) {
   return RANK_ABBREV[rank] || rank.substring(0, 2);

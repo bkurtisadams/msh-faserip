@@ -2,6 +2,7 @@
 import { rollWithKarmaAndHistory } from "../modules/actions/action-utils.js";
 import { rollUniversalTable } from "../modules/dice/universal-table.js";
 import { debugLog } from "../modules/actions/action-utils.js";
+import { RANKS_ORDERED } from "./rules-reference.js";
 
 /**
  * Prompt dialog for a Fighting FEAT to attempt multiple attacks.
@@ -212,10 +213,7 @@ export async function processMultipleAttackSequence(actor, power, options) {
   }
 
   // ===== Rank + effective Fighting helpers =====
-  const RANKS = [
-    "Feeble","Poor","Typical","Good","Excellent","Remarkable",
-    "Incredible","Amazing","Monstrous","Unearthly","Shift-X","Shift-Y","Shift-Z","Class 1000","Class 3000","Class 5000"
-  ];
+  const RANKS = RANKS_ORDERED;
   const rIdx = (n) => {
     const i = RANKS.findIndex(r => r.toLowerCase() === String(n).toLowerCase());
     return i >= 0 ? i : 0;

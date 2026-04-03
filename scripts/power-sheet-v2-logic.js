@@ -1,17 +1,12 @@
-// power-sheet-v2-logic.js v1.4.0 - 2026-04-03
+// power-sheet-v2-logic.js v1.4.1 - 2026-04-03
+// v1.4.1: Replace local RANK_VALUES with import from rules-reference.js
 // v1.4.0: Attack section always visible so any power can opt into combat routing.
 // v1.2.0: Collapsible Active Effects, Healing/Absorption toggle, bigger textareas
 // v1.1.0: Rank→Value auto-fill, special strength type change handler, field reorder support
 // Drop-in: call ps2ActivateListeners(html, itemSheet) from activateListeners
 
-// Rank → value lookup (mirrors CONFIG.FASERIP.rankValues, available before init)
-const RANK_VALUES = {
-  "Shift-0": 0, "Feeble": 2, "Poor": 4, "Typical": 6, "Good": 10,
-  "Excellent": 20, "Remarkable": 30, "Incredible": 40, "Amazing": 50,
-  "Monstrous": 75, "Unearthly": 100, "Shift-X": 150, "Shift-Y": 200,
-  "Shift-Z": 500, "Class 1000": 1000, "Class 3000": 3000, "Class 5000": 5000,
-  "Beyond": 9999
-};
+// Rank → value lookup (canonical source: rules-reference.js)
+import { RANK_VALUES } from "./rules/rules-reference.js";
 
 const CATEGORY_SECTIONS = {
   resistances:              ["defense"],

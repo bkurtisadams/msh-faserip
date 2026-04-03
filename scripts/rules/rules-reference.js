@@ -1,36 +1,102 @@
-// rules-reference.js v1.0.1 - 2026-03-15
+// rules-reference.js v1.1.0 - 2026-04-03
+// v1.1.0: Canonical rank data — normalized to hyphen format (Shift-X not "Shift X"),
+//         added Beyond rank, exported RANK_VALUES/RANKS_ORDERED helpers,
+//         added rankValue/valueToRank/shiftRank/normalizeRank utility functions.
+//         All other files should import rank data from here instead of redeclaring.
 // v1.0.1: Fix WRESTLING.escaping.green (was "Escape", should be "Miss" per Es column),
 //         fix ATTACK_RESULTS.throwingBlunt.yellow (was "Bullseye", should be "Hit" per TB column)
 // Canonical FASERIP rules reference. All mechanics data in one place.
 // Source: Marvel Super Heroes (TSR) Advanced Set / Ultimate Powers Book.
 
-export const RANKS = {
+// ── Canonical rank order (low → high) ────────────────────────────────────────
+export const RANKS_ORDERED = [
+  "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent",
+  "Remarkable", "Incredible", "Amazing", "Monstrous", "Unearthly",
+  "Shift-X", "Shift-Y", "Shift-Z", "Class 1000", "Class 3000", "Class 5000", "Beyond"
+];
+
+// ── Rank → standard value ────────────────────────────────────────────────────
+export const RANK_VALUES = {
   "Shift-0": 0, "Feeble": 2, "Poor": 4, "Typical": 6, "Good": 10,
   "Excellent": 20, "Remarkable": 30, "Incredible": 40, "Amazing": 50,
-  "Monstrous": 75, "Unearthly": 100, "Shift X": 150, "Shift Y": 200,
-  "Shift Z": 500, "Class 1000": 1000, "Class 3000": 3000, "Class 5000": 5000
+  "Monstrous": 75, "Unearthly": 100, "Shift-X": 150, "Shift-Y": 200,
+  "Shift-Z": 500, "Class 1000": 1000, "Class 3000": 3000, "Class 5000": 5000, "Beyond": 9999
 };
 
+// Legacy alias — old code that imported RANKS as the values object
+export const RANKS = RANK_VALUES;
+
+// ── Rank ranges (for value → rank lookups) ───────────────────────────────────
 export const RANK_RANGES = {
   "Feeble": [1, 2], "Poor": [3, 4], "Typical": [5, 7], "Good": [8, 15],
   "Excellent": [16, 25], "Remarkable": [26, 35], "Incredible": [36, 45],
   "Amazing": [46, 62], "Monstrous": [63, 87], "Unearthly": [88, 125],
-  "Shift X": [126, 175], "Shift Y": [176, 350], "Shift Z": [351, Infinity]
+  "Shift-X": [126, 175], "Shift-Y": [176, 350], "Shift-Z": [351, Infinity]
 };
 
+// ── Rank abbreviations ───────────────────────────────────────────────────────
 export const RANK_ABBR = {
   "Shift-0": "Sh0", "Feeble": "Fe", "Poor": "Pr", "Typical": "Ty",
   "Good": "Gd", "Excellent": "Ex", "Remarkable": "Rm", "Incredible": "In",
   "Amazing": "Am", "Monstrous": "Mn", "Unearthly": "Un",
-  "Shift X": "ShX", "Shift Y": "ShY", "Shift Z": "ShZ",
-  "Class 1000": "CL1000", "Class 3000": "CL3000", "Class 5000": "CL5000"
+  "Shift-X": "ShX", "Shift-Y": "ShY", "Shift-Z": "ShZ",
+  "Class 1000": "CL1000", "Class 3000": "CL3000", "Class 5000": "CL5000", "Beyond": "Bey"
 };
 
-export const RANKS_ORDERED = [
-  "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent",
-  "Remarkable", "Incredible", "Amazing", "Monstrous", "Unearthly",
-  "Shift X", "Shift Y", "Shift Z", "Class 1000", "Class 3000", "Class 5000"
-];
+// ── Aliases: space/no-separator variants → canonical hyphen form ─────────────
+export const RANK_ALIASES = {
+  "Shift 0": "Shift-0", "Shift0": "Shift-0",
+  "Shift X": "Shift-X", "ShiftX": "Shift-X",
+  "Shift Y": "Shift-Y", "ShiftY": "Shift-Y",
+  "Shift Z": "Shift-Z", "ShiftZ": "Shift-Z",
+  "Class1000": "Class 1000", "Class3000": "Class 3000", "Class5000": "Class 5000"
+};
+
+// ── Utility functions ────────────────────────────────────────────────────────
+
+/** Normalize any rank name variant to canonical hyphen form. */
+export function normalizeRank(name) {
+  if (!name) return "Shift-0";
+  const s = String(name).trim();
+  return RANK_ALIASES[s] ?? (RANK_VALUES[s] !== undefined ? s : (RANK_ALIASES[s] ?? s));
+}
+
+/** Get the standard numeric value for a rank name. */
+export function rankValue(name) {
+  if (!name) return 0;
+  const n = normalizeRank(name);
+  return RANK_VALUES[n] ?? CONFIG?.FASERIP?.rankValues?.[n] ?? 0;
+}
+
+/** Get the rank name for a numeric value (highest rank whose value ≤ val). */
+export function valueToRank(val) {
+  if (val <= 0) return "Shift-0";
+  let best = "Shift-0";
+  for (const r of RANKS_ORDERED) {
+    if ((RANK_VALUES[r] ?? 0) <= val) best = r;
+    else break;
+  }
+  return best;
+}
+
+/** Shift a rank name up/down by delta steps. Class 1000+ ranks cannot be shifted. Clamps to Shift-Z. */
+export function shiftRank(name, delta) {
+  const n = normalizeRank(name);
+  const i = RANKS_ORDERED.indexOf(n);
+  if (i < 0) return n;
+  // Class 1000+ ranks (index 14+) cannot be column-shifted (rule pg. 15)
+  if (i >= 14) return n;
+  // Clamp between Shift-0 (0) and Shift-Z (13)
+  const newI = Math.min(Math.max(i + delta, 0), 13);
+  return RANKS_ORDERED[newI];
+}
+
+/** Get the ordinal index of a rank (0-based). Returns 0 for unknown ranks. */
+export function rankIndex(name) {
+  const n = normalizeRank(name);
+  const i = RANKS_ORDERED.indexOf(n);
+  return i >= 0 ? i : 0;
+}
 
 // Turn=6sec, 10 turns/min, 600 turns/hr
 export const TIME = { turnSeconds: 6, turnsPerMinute: 10, turnsPerHour: 600 };

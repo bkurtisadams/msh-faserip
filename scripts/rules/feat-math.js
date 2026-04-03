@@ -1,17 +1,9 @@
-export const RANK_ORDER = [
-  "Shift0", "Feeble", "Poor", "Typical", "Good", "Excellent",
-  "Remarkable", "Incredible", "Amazing", "Monstrous", "Unearthly",
-  "ShiftX", "ShiftY", "ShiftZ", "Class1000", "Class3000", "Class5000"
-];
-
-export function rankIndex(rankName) {
-  // Handle variants: "Shift0"/"Shift-0"/"Shift 0"
-  const normalized = String(rankName).replace(/[-\s]/g, '').toLowerCase();
-  const i = RANK_ORDER.findIndex(r => 
-    r.replace(/[-\s]/g, '').toLowerCase() === normalized
-  );
-  return i >= 0 ? i : 0;
-}
+// feat-math.js v1.1.0 - 2026-04-03
+// v1.1.0: Re-export from rules-reference.js instead of local rank data.
+//         NOTE: This file is currently unused — nothing imports it.
+//         Kept for potential future use; prefer importing directly from rules-reference.js.
+export { RANKS_ORDERED as RANK_ORDER, rankIndex } from "./rules-reference.js";
+import { rankIndex } from "./rules-reference.js";
 
 export function isAutoFeat(abilityRank, intensityRank) {
   const diff = rankIndex(abilityRank) - rankIndex(intensityRank);

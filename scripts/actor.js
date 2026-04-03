@@ -1,8 +1,11 @@
-// actor.js v1.3.0 - 2026-03-17
+// actor.js v1.3.1 - 2026-04-03
+// v1.3.1: Replace local RANK_ORDER with import from rules-reference.js
 // v1.3.0: Fix karma display — max = R+I+P (computed), value = available lifetime karma (derived)
 // v1.2.1: Remove dead disposition code (now handled in preCreateActor hook)
 // v1.2.0: Remove daily karma system - karma now uses lifetime only
 // v1.1.0: Initialize combatMods in prepareBaseData before Active Effects are applied
+
+import { RANKS_ORDERED, normalizeRank } from "./rules/rules-reference.js";
 
 export class FaseripActor extends Actor {
   prepareData() {
@@ -277,17 +280,13 @@ export class FaseripActor extends Actor {
     }
   };
 
-  // Rank order for calculating "2 ranks lower" cruising speed
-  static RANK_ORDER = [
-    "Feeble", "Poor", "Typical", "Good", "Excellent", "Remarkable", "Incredible",
-    "Amazing", "Monstrous", "Unearthly", "Shift-X", "Shift-Y", "Shift-Z",
-    "Class 1000", "Class 3000", "Class 5000"
-  ];
+  // Rank order for calculating "N ranks lower" cruising speed — uses canonical list
+  static RANK_ORDER = RANKS_ORDERED;
 
   // Get rank N levels lower (for cruising speed calculation)
   static getRankLower(rank, levels = 2) {
-    const normalizedRank = rank.replace("Shift X", "Shift-X").replace("Shift Y", "Shift-Y").replace("Shift Z", "Shift-Z");
-    const index = FaseripActor.RANK_ORDER.indexOf(normalizedRank);
+    const n = normalizeRank(rank);
+    const index = FaseripActor.RANK_ORDER.indexOf(n);
     if (index === -1) return "Feeble";
     const newIndex = Math.max(0, index - levels);
     return FaseripActor.RANK_ORDER[newIndex];

@@ -29,6 +29,10 @@ import { generateKarmaControlsHTML, showKarmaDecisionDialog, getAvailableKarma }
 import { MovementFeats } from './movement-feats.js';
 import { showAbilityFeatDialog, determineFeatRequirement, checkFeatSuccess } from './modules/actions/ability-feat-dialog.js';
 import { initSheetZoom } from './modules/ui/sheet-zoom.js';
+import {
+  RANKS_ORDERED as _RANKS, RANK_VALUES as _RANK_VALUES, RANK_ALIASES,
+  normalizeRank
+} from './rules/rules-reference.js';
 
 
 function getPopularityRankWithRange(value, context) {
@@ -533,18 +537,8 @@ export class FaseripActorSheet extends ActorSheet {
       psyche:    "P"
     };
 
-    const rankValues = {
-      "Shift-0": 0, "Feeble": 2, "Poor": 4, "Typical": 6, "Good": 10,
-      "Excellent": 20, "Remarkable": 30, "Incredible": 40, "Amazing": 50,
-      "Monstrous": 75, "Unearthly": 100, "Shift-X": 150, "Shift-Y": 200,
-      "Shift-Z": 500, "Class 1000": 1000, "Class 3000": 3000, "Class 5000": 5000, "Beyond": 10000
-    };
-
-    const RANKS = [
-      "Shift-0","Feeble","Poor","Typical","Good","Excellent",
-      "Remarkable","Incredible","Amazing","Monstrous","Unearthly",
-      "Shift-X","Shift-Y","Shift-Z","Class 1000","Class 3000","Class 5000","Beyond"
-    ];
+    const rankValues = _RANK_VALUES;
+    const RANKS = _RANKS;
 
     for (const [ability, letter] of Object.entries(abilityKeys)) {
       const cs = Number(mods[ability]) || 0;
@@ -748,17 +742,8 @@ export class FaseripActorSheet extends ActorSheet {
     // (the standard rank number for the shifted rank). Custom values pass through.
     const shifts = this.actor.system?.combatMods?.abilityShifts;
     if (shifts) {
-      const RANKS = [
-        "Shift-0","Feeble","Poor","Typical","Good","Excellent",
-        "Remarkable","Incredible","Amazing","Monstrous","Unearthly",
-        "Shift-X","Shift-Y","Shift-Z","Class 1000","Class 3000","Class 5000","Beyond"
-      ];
-      const rankValues = {
-        "Shift-0": 0, "Feeble": 2, "Poor": 4, "Typical": 6, "Good": 10,
-        "Excellent": 20, "Remarkable": 30, "Incredible": 40, "Amazing": 50,
-        "Monstrous": 75, "Unearthly": 100, "Shift-X": 150, "Shift-Y": 200,
-        "Shift-Z": 500, "Class 1000": 1000, "Class 3000": 3000, "Class 5000": 5000, "Beyond": 10000
-      };
+      const RANKS = _RANKS;
+      const rankValues = _RANK_VALUES;
       const abilities = ["fighting", "agility", "strength", "endurance", "reason", "intuition", "psyche"];
       for (const ab of abilities) {
         const cs = Number(shifts[ab]) || 0;
@@ -4887,20 +4872,11 @@ async _rollAction(actionType, abilityName) {
 }
 
 class UniversalTablePopout extends Application {
-  // Rank order matching the table columns (0-indexed)
-  static RANK_ORDER = [
-    "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent", "Remarkable", "Incredible",
-    "Amazing", "Monstrous", "Unearthly", "Shift-X", "Shift-Y", "Shift-Z",
-    "Class 1000", "Class 3000", "Class 5000", "Beyond"
-  ];
+  // Rank order matching the table columns (0-indexed) — from rules-reference.js
+  static RANK_ORDER = _RANKS;
 
-  // Alternate rank names mapping
-  static RANK_ALIASES = {
-    "Shift X": "Shift-X",
-    "Shift Y": "Shift-Y",
-    "Shift Z": "Shift-Z",
-    "Shift 0": "Shift-0"
-  };
+  // Alternate rank names mapping — from rules-reference.js
+  static RANK_ALIASES = RANK_ALIASES;
 
   static get defaultOptions() {
     return foundry.utils.mergeObject(super.defaultOptions, {

@@ -34,6 +34,10 @@ import { applyNullifiedEffect, isAuraMaintained } from "./nullify.js";
 import { calculateMitigation } from "../../rules/mitigation.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
 import { getAbilityShift } from "../effects/effect-modifiers.js";
+import {
+  RANKS_ORDERED as RANKS, RANK_VALUES,
+  rankValue, valueToRank, shiftRank, normalizeRank
+} from "../../rules/rules-reference.js";
 // NOTE: do NOT import resolveCombatMode here – that creates a circular dependency
 import { recordDamage } from "../rest-system.js";
 import { applyDamageToVehicle } from "./vehicle-damage.js";
@@ -437,32 +441,8 @@ export function attachModeSelectorHandlers($html, opts = {}, onChange) {
   });
 }
 
-export const RANKS = [
-  "Shift-0","Feeble","Poor","Typical","Good","Excellent",
-  "Remarkable","Incredible","Amazing","Monstrous","Unearthly",
-  "Shift-X","Shift-Y","Shift-Z","Class 1000","Class 3000","Class 5000","Beyond"
-];
-
-const RANK_VALUES = {
-  "Shift-0":0,"Feeble":2,"Poor":4,"Typical":6,"Good":10,"Excellent":20,
-  "Remarkable":30,"Incredible":40,"Amazing":50,"Monstrous":75,"Unearthly":100,
-  "Shift-X":150,"Shift-Y":200,"Shift-Z":500,
-  "Class 1000":1000,"Class 3000":3000,"Class 5000":5000,"Beyond":9999
-};
-
-export function rankValue(rankName) {
-  return CONFIG.FASERIP?.rankValues?.[rankName] ?? RANK_VALUES[rankName] ?? 0;
-}
-
-export function valueToRank(val) {
-  if (val <= 0) return "Shift-0";
-  let best = "Shift-0";
-  for (const r of RANKS) {
-    if ((RANK_VALUES[r] ?? 0) <= val) best = r;
-    else break;
-  }
-  return best;
-}
+// Re-exported from rules-reference.js — do not redefine here
+export { RANKS, RANK_VALUES, rankValue, valueToRank };
 
 /**
  * Scan target for best mental defense: Psi-Screen first, then Mental Powers, then Psyche.
@@ -544,17 +524,8 @@ export function debugLog(...args) {
   }
 }
 
-export function shiftRank(rankName, delta) {
-  const i = RANKS.indexOf(rankName);
-  if (i < 0) return rankName;
-  
-  // Class 1000+ ranks cannot be shifted (indices 14-17). see rule pg. 15
-  if (i >= 14) return rankName;
-  
-  // Apply shift, capped between Shift-0 (0) and Shift-Z (13)
-  const newIndex = Math.min(Math.max(i + delta, 0), 13);
-  return RANKS[newIndex];
-}
+// Re-exported from rules-reference.js
+export { shiftRank };
 
 export function labelFor(actionType) { return ACTION_LABELS[actionType] ?? actionType; }
 export function effectsFor(actionType) { return ACTION_EFFECTS[actionType] ?? {white:"White",green:"Green",yellow:"Yellow",red:"Red"}; }

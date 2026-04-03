@@ -1,12 +1,7 @@
-// headquartersSheet.js v2.0.0 - 2026-03-06
+// headquartersSheet.js v2.0.1 - 2026-04-03
 import { BUILDING_TYPES, BUILDING_TYPE_MAP, ROOM_PACKAGES, STAFF_ROLES, SIZE_ROOMS } from "./hq-constants.js";
 import { initSheetZoom } from './modules/ui/sheet-zoom.js';
-
-const RANKS = [
-  "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent",
-  "Remarkable", "Incredible", "Amazing", "Monstrous", "Unearthly",
-  "Shift-X", "Shift-Y", "Shift-Z", "Class 1000"
-];
+import { RANKS_ORDERED as RANKS } from './rules/rules-reference.js';
 
 function _getGameDate() {
   try {

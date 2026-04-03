@@ -1,4 +1,5 @@
-// scripts/modules/effects/defense-effects.js v1.1.0 - 2026-03-22
+// scripts/modules/effects/defense-effects.js v1.1.1 - 2026-04-03
+// v1.1.1: Replace local getRankValue with import from rules-reference.js
 // v1.1.0: syncDefenseEffects respects isActive — inactive powers remove defense AEs
 // v1.0.1: Strip token badge icons from passive defense AEs (body armor, force field, resistance)
 // Passive defense Active Effects for Body Armor, Force Field, and Resistance powers.
@@ -6,18 +7,10 @@
 // The mitigation pipeline reads protection values from AE flags.
 
 import { applyEffect } from "./effect-engine.js";
+import { rankValue as getRankValue, valueToRank } from "../../rules/rules-reference.js";
 
 const SCOPE = () => (globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faserip");
 const AE_MODES = { MULTIPLY: 1, ADD: 2, DOWNGRADE: 3, UPGRADE: 4, OVERRIDE: 5 };
-
-// ─── Rank helpers ────────────────────────────────────────────────────────────
-
-function getRankValue(rankName) {
-  if (typeof rankName === "number") return rankName;
-  return game.msh?.getRankValue?.(rankName)
-    ?? CONFIG.FASERIP?.rankValues?.[rankName]
-    ?? 0;
-}
 
 function getClosestRankName(value) {
   if (!CONFIG.FASERIP?.rankValues) return "";
