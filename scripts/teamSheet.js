@@ -523,43 +523,41 @@ export class TeamSheet extends Application {
               <div class="enc-foe-list" style="min-height:20px;padding:2px;background:#fff;border:1px solid #ddd;border-radius:3px;margin-bottom:4px;">
                 <div style="font-size:11px;color:#888;font-style:italic;padding:2px 4px;">No foes added.</div>
               </div>
-              <div style="margin-bottom:2px;">
-                <div style="font-size:10px;color:#666;margin-bottom:1px;">Pick actor</div>
-                <select name="actorId" style="width:100%;font-size:12px;padding:2px 4px;margin-bottom:4px;"><option value="">— Manual entry —</option>${hostileOpts}</select>
+              <div class="form-group" style="margin-bottom:4px;">
+                <label style="font-size:10px;color:#666;">Pick actor</label>
+                <select name="actorId" style="font-size:12px;"><option value="">— Manual entry —</option>${hostileOpts}</select>
               </div>
-              <div style="display:flex;gap:6px;align-items:flex-end;">
-                <div style="flex:1;min-width:0;">
-                  <div style="font-size:10px;color:#666;margin-bottom:1px;">Name</div>
-                  <input type="text" name="foeName" placeholder="e.g., Rhino" style="width:100%;box-sizing:border-box;padding:3px 5px;font-size:12px;" />
+              <div class="form-group" style="margin-bottom:2px;">
+                <label style="font-size:10px;color:#666;">Name</label>
+                <input type="text" name="foeName" placeholder="e.g., Rhino" style="font-size:12px;" />
+              </div>
+              <div class="form-group" style="margin-bottom:0;">
+                <label style="font-size:10px;color:#666;">Rank</label>
+                <div style="display:flex;gap:6px;align-items:center;flex:1;">
+                  <select name="rank" style="font-size:12px;flex:1;">${rankOpts}</select>
+                  <button type="button" class="enc-add-foe-btn" style="padding:4px 8px;font-size:11px;font-weight:700;color:#fff;background:#8b0000;border:0;border-radius:3px;cursor:pointer;white-space:nowrap;">+ Foe</button>
                 </div>
-                <div style="width:110px;">
-                  <div style="font-size:10px;color:#666;margin-bottom:1px;">Rank</div>
-                  <select name="rank" style="width:100%;font-size:12px;padding:2px 4px;">${rankOpts}</select>
-                </div>
-                <button type="button" class="enc-add-foe-btn" style="padding:4px 8px;font-size:11px;font-weight:700;color:#fff;background:#8b0000;border:0;border-radius:3px;cursor:pointer;white-space:nowrap;">+ Foe</button>
               </div>
             </div>
 
             <!-- Crime -->
-            <div>
-              <div style="font-size:10px;font-weight:700;color:#666;text-transform:uppercase;margin-bottom:2px;">Crime</div>
-              <select name="crimeType" style="width:100%;font-size:12px;padding:2px 4px;">${crimeOpts}</select>
+            <div class="form-group">
+              <label style="font-size:10px;font-weight:700;color:#666;text-transform:uppercase;">Crime</label>
+              <select name="crimeType" style="font-size:12px;">${crimeOpts}</select>
             </div>
 
             <!-- Rescues / Losses / GM Award -->
-            <div style="display:flex;gap:8px;">
-              <div style="flex:1;">
-                <div style="font-size:10px;color:#666;margin-bottom:1px;">Rescues</div>
-                <input type="number" name="rescues" value="0" min="0" max="99" style="width:100%;box-sizing:border-box;padding:3px 4px;font-size:12px;text-align:center;" />
-              </div>
-              <div style="flex:1;">
-                <div style="font-size:10px;color:#666;margin-bottom:1px;">Losses</div>
-                <input type="number" name="losses" value="0" min="0" max="9999" style="width:100%;box-sizing:border-box;padding:3px 4px;font-size:12px;text-align:center;" />
-              </div>
-              <div style="flex:1;">
-                <div style="font-size:10px;color:#666;margin-bottom:1px;">GM Award</div>
-                <input type="number" name="gmAward" value="0" min="0" max="9999" style="width:100%;box-sizing:border-box;padding:3px 4px;font-size:12px;text-align:center;" />
-              </div>
+            <div class="form-group" style="margin-bottom:2px;">
+              <label style="font-size:10px;color:#666;">Rescues</label>
+              <input type="number" name="rescues" value="0" min="0" max="99" style="width:55px;font-size:12px;text-align:center;" />
+            </div>
+            <div class="form-group" style="margin-bottom:2px;">
+              <label style="font-size:10px;color:#666;">Losses</label>
+              <input type="number" name="losses" value="0" min="0" max="9999" style="width:55px;font-size:12px;text-align:center;" />
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <label style="font-size:10px;color:#666;">GM Award</label>
+              <input type="number" name="gmAward" value="0" min="0" max="9999" style="width:55px;font-size:12px;text-align:center;" />
             </div>
 
           </div>
