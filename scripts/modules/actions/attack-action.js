@@ -1,4 +1,6 @@
-// attack-action.js v1.9.21 - 2026-03-20
+// attack-action.js v1.9.22 - 2026-04-03
+// v1.9.22: Ammo variant effects — rubber (blunt column, suppress slam), mercy (KO save),
+//          explosive (2x damage), heat-seeker (no range penalty), variant badge on chat card.
 // v1.9.21: Semi mode now auto-triggers slam/stun/kill checks (not just full auto).
 //          These are mechanical consequences, not player choices — must resolve before
 //          next attack in multi-attack sequence. Damage application still full-auto only.
@@ -912,6 +914,25 @@ export class AttackAction extends BaseAction {
         showKill = false;
       }
 
+      // Rubber shot: ignore Slam results per ammo rules
+      const ammoVariant = choice?.variantType || "standard";
+      if (ammoVariant === "rubber" && showSlam) {
+        showSlam = false;
+      }
+
+      // Build ammo variant note for chat card
+      const variantLabel = {
+        rubber: "Rubber Shot (blunt effects, no Slam)",
+        mercy: "Mercy Shot (Rm KO drug)",
+        explosive: "Explosive Shot (2× damage)",
+        heatSeeker: "Heat-Seeker (no range penalty)",
+        canister: "Canister Shot (area effect)",
+        ap: "AP Shot (−2CS armor)"
+      }[ammoVariant] || "";
+      const variantBadge = variantLabel
+        ? `<div style="padding:2px 8px;margin:2px 10px;font-size:.8em;color:#1565c0;"><i class="fas fa-crosshairs"></i> ${variantLabel}</div>`
+        : "";
+
       // Kill result karma warning for attack card
       const targetIsRobot = targetActor?.system?.origin === "Robot";
       const killWarning = (showKill && !targetIsRobot) ? `<div style="padding:4px 8px;margin:4px 10px;background:#fff3e0;border:1px solid #ff9800;border-radius:3px;font-size:.85em;color:#e65100;text-align:center;">Kill result — hero loses ALL Karma if target dies</div>` : (showKill && targetIsRobot) ? `<div style="padding:4px 8px;margin:4px 10px;background:#e3f2fd;border:1px solid #90caf9;border-radius:3px;font-size:.85em;color:#1565c0;text-align:center;">Kill result — target is a Robot/construct. No Karma loss for attacker.</div>` : "";
@@ -1159,6 +1180,7 @@ export class AttackAction extends BaseAction {
           </div>
           
           ${multiAttackFeatHtml}
+          ${variantBadge}
           
           <!-- Ability + Roll + Result -->
           <div style="padding:2px 10px 6px;font-size:.9em;color:#555;">
@@ -1406,6 +1428,53 @@ export class AttackAction extends BaseAction {
           } catch (e) {
             console.warn("[FASERIP WARN] Could not set resolvedChecks flag:", e);
           }
+        }
+      }
+
+      // ============================================================
+      // MERCY SHOT: KO drug save (Rm Intensity Endurance FEAT)
+      // Mercy bullets inflict no damage but spread a Remarkable
+      // Intensity KO drug. If the shot would have penetrated armor
+      // (standard damage > armor), the drug takes effect: Endurance
+      // FEAT vs Remarkable or KO 1-10 rounds.
+      // ============================================================
+      if (ammoVariant === "mercy" && targetIsHit && targetActor && !targetIsVehicle) {
+        // Check if the bullet would have penetrated with standard weapon damage
+        const stdDamage = choice?.weapon?.system?.damage || 0;
+        const wouldPenetrate = armorValue <= 0 || stdDamage > armorValue;
+        if (wouldPenetrate) {
+          try {
+            const { ActionDispatcher } = await import("./action-dispatcher.js");
+            await ActionDispatcher.roll("stun", {
+              actor: targetActor,
+              abilityName: "endurance",
+              opts: {
+                autoApply: !isManualMode && !!this.opts?.autoApply,
+                showConfirm: isManualMode,
+                attackForm: "mercy",
+                prefill: {
+                  dmgThrough: 0,
+                  targetName: targetName,
+                  targetEndRank: getAbilityInfo(targetActor, "endurance")?.rank || "Typical",
+                  defenderUuid: target?.document?.uuid ?? targetActor?.uuid,
+                  targetUuid: target?.document?.uuid ?? targetActor?.uuid,
+                  attackForm: "mercy",
+                  mercyKO: true,
+                  overrideIntensity: "Remarkable"
+                }
+              }
+            });
+          } catch (e) {
+            console.error("[FASERIP ERROR] Mercy shot KO save failed:", e);
+          }
+        } else {
+          // Bullet blocked by armor — drug has no effect
+          await ChatMessage.create({
+            speaker: ChatMessage.getSpeaker({ actor }),
+            content: `<div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;padding:6px 8px;font-size:.9em;">
+              <strong>Mercy Shot</strong> — ${targetName}'s armor blocked the bullet. KO drug has no effect.
+            </div>`
+          });
         }
       }
 

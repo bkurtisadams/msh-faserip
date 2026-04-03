@@ -1,4 +1,6 @@
-// shooting-action.js v3.3.0 - 2026-03-17
+// shooting-action.js v3.4.0 - 2026-04-03
+// v3.4.0: Wire ammo variant rules — variantType in resolve, heat-seeker no range penalty,
+//         explosive 2x damage, mercy 0 damage + KO, rubber blunt effects, preview updates.
 // v3.3.0: Manual CS only — remove talent/power auto-detection and auto-mods.
 //         CS row is a simple number input + ? reference panel.
 //         Range penalty still displayed in Range box (informational).
@@ -343,7 +345,18 @@ export class ShootingAction extends RangedAttackAction {
             const variantType = html.find('[name="variantType"]').val() || "standard";
             const apInfo = _getEffectiveAPForVariant(weapon, variantType);
 
-            $val.text(currentDamage);
+            // Ammo-modified damage for preview
+            let previewDamage = currentDamage;
+            let previewSuffix = "";
+            if (variantType === "explosive") {
+              previewDamage = currentDamage * 2;
+              previewSuffix = " (2× explosive)";
+            } else if (variantType === "mercy") {
+              previewDamage = 0;
+              previewSuffix = " (Rm KO drug)";
+            }
+
+            $val.text(previewDamage + previewSuffix);
             html.find('#max-range-hint').text(currentRange);
 
             // AP display
@@ -352,19 +365,25 @@ export class ShootingAction extends RangedAttackAction {
 
             // After-armor display
             const effArmor = _getEffectiveArmor(targetArmor, apInfo.ap, apInfo.apCS, apInfo.apMode);
-            const afterArmorDmg = Math.max(0, currentDamage - effArmor);
+            const afterArmorDmg = Math.max(0, previewDamage - effArmor);
             if (primaryTarget) {
               $afterArmor.text(`${afterArmorDmg} after armor`);
             } else {
-              $afterArmor.text(`${currentDamage} damage`);
+              $afterArmor.text(`${previewDamage} damage${previewSuffix}`);
             }
 
             // Range penalty — update CS panel and range info display
             const rangeVal = Number(html.find('[name="range"]').val() || 0);
             const $rangePenalty = html.find('#range-penalty-display');
 
+            // Heat-seeker ammo: no range penalty (tracks hottest source)
+            const isHeatSeeker = variantType === "heatSeeker";
+
             if (rangeVal > currentRange) {
               $rangePenalty.text('OUT OF RANGE').css('color', '#c62828');
+              _csState.setRange(0);
+            } else if (isHeatSeeker) {
+              $rangePenalty.text('Heat-Seeker (no penalty)').css('color', '#1565c0');
               _csState.setRange(0);
             } else {
               const penalty = rangeVal > 1 ? -(rangeVal - 1) : 0;
@@ -459,6 +478,7 @@ export class ShootingAction extends RangedAttackAction {
               totalShift: cs.totalShift,
               multiAttacks,
               attackCount,
+              variantType,
               csNotes: cs.csNotes,
               armorPiercing: _apInfo.ap,
               armorPiercingCS: _apInfo.apCS,
@@ -597,6 +617,38 @@ export class ShootingAction extends RangedAttackAction {
 
     choice.shiftBreakdown = shiftBreakdown;
 
+    // ── Ammo variant overrides ──────────────────────────────────
+    const vt = choice.variantType || "standard";
+    let effectiveActionType = actionType;
+    let effectiveEffects = effects;
+    let effectiveAttackForm = "shooting";
+    let effectiveDamageType = choice.weapon?.system?.damageType || "physical-ranged";
+    let effectiveDamage = choice.weaponDamage || 0;
+    let effectiveDamageNote = "";
+    let variantNote = "";
+
+    if (vt === "rubber") {
+      // Rubber: slugfest (blunt) effects column, suppress Slam results
+      const { ACTION_EFFECTS } = await import("./action-config.js");
+      effectiveEffects = ACTION_EFFECTS["blunt-attack"];
+      effectiveAttackForm = "blunt";
+      effectiveDamageType = "physical-blunt";
+      variantNote = "Rubber Shot — blunt effects, ignore Slam";
+    } else if (vt === "mercy") {
+      // Mercy: 0 damage, Rm Intensity KO drug if penetrates armor
+      effectiveDamage = 0;
+      variantNote = "Mercy Shot — Rm Intensity KO drug";
+    } else if (vt === "explosive") {
+      // Explosive: 2x weapon damage
+      effectiveDamage = (choice.weaponDamage || 0) * 2;
+      effectiveDamageNote = `${choice.weaponDamage}×2 explosive`;
+      variantNote = "Explosive Shot — double damage";
+    } else if (vt === "heatSeeker") {
+      variantNote = "Heat-Seeker — no range penalty";
+    } else if (vt === "canister") {
+      variantNote = "Canister Shot — area effect (GM adjudicates sub-type)";
+    }
+
     // Execute attack(s)
     for (let i = 1; i <= actualAttackCount; i++) {
       if (i > 1) await new Promise(resolve => setTimeout(resolve, 500));
@@ -608,14 +660,14 @@ export class ShootingAction extends RangedAttackAction {
         choice: { ...choice, specificTarget: targetForThisAttack, multiAttackFeatResult: i === 1 ? multiAttackFeatResult : null },
         actor: this.actor,
         ability,
-        actionType,
+        actionType: effectiveActionType,
         actionName: actionLabel,
-        effects,
-        damageType: choice.weapon?.system?.damageType || "physical-ranged",
-        rawDamage: choice.weaponDamage || 0,
-        damageNote: "",
+        effects: effectiveEffects,
+        damageType: effectiveDamageType,
+        rawDamage: effectiveDamage,
+        damageNote: effectiveDamageNote,
         sourceName: choice.weapon?.name || "Weapon",
-        attackForm: "shooting",
+        attackForm: effectiveAttackForm,
         breakingFeat: null,
         targetCount: 1,
         attackNumber: i,
