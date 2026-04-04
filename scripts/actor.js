@@ -114,6 +114,27 @@ export class FaseripActor extends Actor {
       if (!system.attributes.resources.value) {
         system.attributes.resources.value = rankRanges[resourcesRank]?.default || 6;
       }
+
+      // Resource Points derived values (for template display)
+      const rpTable = {
+        "Shift-0": { weekly: 0, max: 0 },
+        "Feeble": { weekly: 2, max: 10 }, "Poor": { weekly: 4, max: 20 },
+        "Typical": { weekly: 6, max: 50 }, "Good": { weekly: 10, max: 100 },
+        "Excellent": { weekly: 20, max: 500 }, "Remarkable": { weekly: 30, max: 1000 },
+        "Incredible": { weekly: 40, max: 5000 }, "Amazing": { weekly: 50, max: Infinity },
+        "Monstrous": { weekly: 75, max: Infinity }, "Unearthly": { weekly: 100, max: Infinity },
+        "Shift-X": { weekly: 150, max: Infinity }, "Shift-Y": { weekly: 200, max: Infinity },
+        "Shift-Z": { weekly: 500, max: Infinity }, "Class 1000": { weekly: 1000, max: Infinity },
+        "Class 3000": { weekly: 3000, max: Infinity }, "Class 5000": { weekly: 5000, max: Infinity },
+        "Beyond": { weekly: 10000, max: Infinity }
+      };
+      const rpData = rpTable[resourcesRank] || { weekly: 6, max: 50 };
+      system.attributes.resources.weeklyRate = rpData.weekly;
+      system.attributes.resources.maxPoints = rpData.max;
+      // Initialize points if missing
+      if (system.attributes.resources.points == null) {
+        system.attributes.resources.points = 0;
+      }
     }
 
     // Initialize resistances if not present

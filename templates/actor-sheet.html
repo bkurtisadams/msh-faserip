@@ -542,6 +542,17 @@
         </select>
         <input type="number" name="system.attributes.resources.value" value="{{system.attributes.resources.value}}" />
       </div>
+      {{#if useResourcePoints}}
+      <div class="rp-tracker">
+        <input type="number" name="system.attributes.resources.points"
+               value="{{system.attributes.resources.points}}"
+               class="rp-current"
+               title="Resource Points: {{system.attributes.resources.points}} / {{rpMaxLabel}} (Max)&#10;Click Resources header to buy items" />
+        <button type="button" class="rp-collect-btn" title="Collect weekly income (+{{rpWeekly}} RP)">
+          +{{rpWeekly}}
+        </button>
+      </div>
+      {{/if}}
     </div>
 
 <!-- POPULARITY -->

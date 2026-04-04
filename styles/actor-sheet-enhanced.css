@@ -595,6 +595,47 @@ form.faserip-sheet .sec-col.resources .sec-head small {
   color: #ffe082 !important;
 }
 
+/* ── Resource Points tracker row ─────────────────────────────────────── */
+form.faserip-sheet .rp-tracker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 4px 8px 6px;
+}
+form.faserip-sheet .rp-tracker .rp-current {
+  width: 64px !important;
+  font-family: 'Oswald', sans-serif !important;
+  font-size: 16px !important;
+  font-weight: 700 !important;
+  text-align: center !important;
+  background: #fff !important;
+  border: 1px solid #b8b8b8 !important;
+  border-radius: 2px !important;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.06) !important;
+  color: inherit !important;
+  padding: 2px 4px !important;
+  height: 28px !important;
+}
+form.faserip-sheet .rp-collect-btn {
+  font-family: 'Barlow Condensed', sans-serif !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  background: var(--cream-dk, #f0ece0) !important;
+  border: 1px solid #b8b8b8 !important;
+  border-radius: 3px !important;
+  color: #333 !important;
+  padding: 2px 8px !important;
+  cursor: pointer !important;
+  white-space: nowrap !important;
+  line-height: 1.4 !important;
+  height: 26px !important;
+}
+form.faserip-sheet .rp-collect-btn:hover {
+  background: #e8e4d8 !important;
+  border-color: #999 !important;
+}
+
 /* Popularity — magenta text */
 form.faserip-sheet .sec-col.popularity .sec-head,
 form.faserip-sheet .sec-col.popularity .sec-head > button,

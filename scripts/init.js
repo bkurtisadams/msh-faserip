@@ -468,6 +468,16 @@ Hooks.once("init", async () => {
     default: false
   });
 
+  // Resource Points: track weekly income, spending, and accumulation per the original rules.
+  game.settings.register('msh-faserip', 'useResourcePoints', {
+    name: "Resource Points (Original Rules)",
+    hint: "Track resource points with weekly income, accumulation caps, and spending. When off, Resources is just a rank on the sheet.",
+    scope: "world",
+    config: true,
+    type: Boolean,
+    default: false
+  });
+
   Actors.registerSheet("msh-faserip", MSHVehicleActorSheet, {
     types: ["vehicle"],
     makeDefault: true,
