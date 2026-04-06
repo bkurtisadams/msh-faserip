@@ -3030,6 +3030,15 @@ html.find('.headquarters-row').each((i, row) => {
         speaker: ChatMessage.getSpeaker({ actor: this.actor }),
         content: `<div class="faserip-chat-card"><strong>${this.actor.name}</strong> collects weekly income: <strong>+${gained} RP</strong> (${newPoints} total)</div>`
       });
+      const karmaSheet = await import('./karma.js').then(m => new m.KarmaSheet(this.actor));
+      await karmaSheet._addKarmaEvent({
+        timestamp: new Date().toISOString(),
+        realDate: new Date().toLocaleDateString(),
+        gameDate: "",
+        amount: 0,
+        type: "Resource Income",
+        description: `Weekly income: +${gained} RP (${newPoints} total)`
+      });
     });
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -3718,18 +3727,16 @@ html.find('.headquarters-row').each((i, row) => {
     const max = res.maxPoints;
     const maxLabel = (max === Infinity) ? "No Maximum" : max;
 
-    // Build flat price list for dropdown
-    const priceItems = [];
+    let priceOptions = "";
     for (const [category, items] of Object.entries(RESOURCE_PRICES)) {
-      for (const [name, cost] of Object.entries(items)) {
-        priceItems.push({ name, cost, category });
+      const label = category.charAt(0).toUpperCase() + category.slice(1);
+      const sorted = Object.entries(items).sort((a, b) => a[1] - b[1]);
+      priceOptions += `<optgroup label="${label}">`;
+      for (const [name, cost] of sorted) {
+        priceOptions += `<option value="${name}" data-cost="${cost}">${name} (${cost} RP)</option>`;
       }
+      priceOptions += `</optgroup>`;
     }
-    priceItems.sort((a, b) => a.cost - b.cost);
-
-    const priceOptions = priceItems.map(p =>
-      `<option value="${p.name}" data-cost="${p.cost}">${p.name} (${p.cost} RP)</option>`
-    ).join("");
 
     const content = `
       <div style="margin-bottom: 10px; padding: 6px 8px; background: #f5f5f0; border: 1px solid #d0d0d0; border-radius: 3px; font-size: 0.95em;">
@@ -3773,6 +3780,15 @@ html.find('.headquarters-row').each((i, row) => {
                 <div><strong>${desc}</strong> for <strong>${cost} RP</strong></div>
                 <div style="font-size: 0.9em; color: #666; margin-top: 4px;">Remaining: ${newPoints} RP</div>
               </div>`
+            });
+            const karmaSheet = await import('./karma.js').then(m => new m.KarmaSheet(this.actor));
+            await karmaSheet._addKarmaEvent({
+              timestamp: new Date().toISOString(),
+              realDate: new Date().toLocaleDateString(),
+              gameDate: "",
+              amount: 0,
+              type: "Resource Spending",
+              description: `Purchased ${desc} for ${cost} RP (${newPoints} RP remaining)`
             });
           }
         },

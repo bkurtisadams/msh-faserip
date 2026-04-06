@@ -541,33 +541,46 @@ export const RESOURCE_POINTS = {
 
 // 1 RP ≈ $50–75
 export const RESOURCE_PRICES = {
-  transportation: {
+  vehicles: {
+    "Bicycle": 4,
     "New Mini-Car": 60, "Used Mini-Car": 40,
     "New Mid-Size Car": 100, "Used Mid-Size Car": 80,
     "New Sports Car": 500, "Used Sports Car": 400,
     "New Luxury Car": 1000, "Used Luxury Car": 800,
-    "Small Airplane": 300, "Small Jet": 2000,
-    "Small Powerboat": 250, "Small Yacht": 500,
+    "Small Airplane": 400, "Small Jet": 2000,
+    "Small Powerboat": 250, "Small Yacht": 500
+  },
+  travel: {
     "Bus Ticket": 2, "Train Ticket": 4,
     "Airplane Ticket (Transcontinental)": 10,
-    "Airplane Ticket (Intercontinental)": 20,
-    "Bicycle": 4
+    "Airplane Ticket (Intercontinental)": 20
   },
-  property: {
-    "Rented Office (per month)": 20,
-    "Rented Office Floor (per month)": 50,
-    "Office Building (per floor)": 1000,
-    "House": 500, "Mansion": 3000,
-    "Empty Land (per acre)": 100,
-    "Construction": 75
+  "rent (per month)": {
+    "Efficiency Apartment": 4, "1 Bedroom Apartment": 8,
+    "2 Bedroom Apartment": 16, "Luxury Apartment": 24,
+    "One-Story House": 10, "Two-Story House": 20,
+    "Mansion (per floor)": 40,
+    "Office": 20, "Office Floor": 50,
+    "Office Building (per floor)": 1000
+  },
+  "buy property": {
+    "Efficiency Apartment": 600, "1 Bedroom Apartment": 900,
+    "2 Bedroom Apartment": 1200, "Luxury Apartment": 2000,
+    "One-Story House": 1300, "Two-Story House": 1800,
+    "Mansion": 3000,
+    "Empty Land (per acre)": 500,
+    "Construction (per room)": 50
+  },
+  weapons: {
+    "Knife": 1, "Handgun": 5, "Rifle": 8
   },
   equipment: {
+    "Camera": 7,
     "Office Equipment (per room)": 75,
-    "Factory Equipment (per area)": 1000,
     "Electronic Equipment (per room)": 100,
     "Electrical Generator": 500,
-    "Fence (per area)": 20,
-    "Camera": 7
+    "Factory Equipment (per area)": 1000,
+    "Fence (per area)": 20
   },
   personal: {
     "Clean Clothes": 2,
