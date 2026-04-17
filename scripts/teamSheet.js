@@ -1,4 +1,9 @@
-// teamSheet.js v4.3.0 - 2026-04-16
+// teamSheet.js v4.4.0 - 2026-04-17
+// v4.4.0: Encounter awards now route through karma-multipliers.js helper.
+//         Respects groupAwardMode setting (split | full | pool). In full mode
+//         each present hero receives the full gross award (house rule matching
+//         Graycloak's prior manual practice). Category multipliers apply per
+//         event type. Losses only multiplied if penalty category multiplier > 1.
 // v4.3.0: Tabbed UI (Team / Encounters / HQ). Tabs persist only for window
 //         lifetime; default is Encounters for GMs, Team for players.
 //         - Team tab: roster, karma pool (if enabled), team actions (Bio,
@@ -21,6 +26,8 @@
 //           sessionRIPBonus setting; button hidden when off.
 // v4.1.0: Add Event type (foe-less karma events) alongside encounters.
 //         GM Award field on both events and encounters. Missing karma types added.
+import { computeGroupAward, computeLossAmount, getGroupAwardMode, getCategoryMultiplier } from "./karma-multipliers.js";
+
 export class TeamSheet extends Application {
 
   static RANK_TABLE = [
@@ -873,19 +880,30 @@ export class TeamSheet extends Application {
     const enc = encounters[idx];
     if (!enc || enc.awarded) return;
 
-    const multiplier = game.settings.get("msh-faserip", "karmaMultiplier") || 1;
+    const mode = getGroupAwardMode();
+    // If GM has globally set mode to pool, redirect to pool award instead.
+    if (mode === "pool") return this._onAwardEncounterToPool(ev);
+
     const heroes = (enc.presentHeroIds || []).map(id => game.actors.get(id)).filter(Boolean);
     if (!heroes.length) { ui.notifications.warn("No heroes marked as present"); return; }
 
     const { positiveTotal, lossKarma } = this._calcEncounterTotals(enc);
-    const perHeroPos = Math.floor((positiveTotal * multiplier) / heroes.length);
-    const perHeroLoss = lossKarma ? Math.floor(lossKarma / heroes.length) : 0;
+    const awardResult = computeGroupAward({
+      eventType: "Encounter Award",
+      baseAmount: positiveTotal,
+      heroCount: heroes.length,
+      groupMode: mode
+    });
+    const perHeroPos = awardResult.perHero;
+    const perHeroLoss = lossKarma ? computeLossAmount(lossKarma, heroes.length, mode) : 0;
     const net = perHeroPos + perHeroLoss;
+    const multiplier = awardResult.multiplier;
 
-    const breakdown = this._buildBreakdownText(enc, multiplier, heroes.length);
+    const breakdown = this._buildBreakdownText(enc, multiplier, heroes.length, mode);
     const encLabel = enc.name || enc.villains.map(v => v.name).join(', ') || "Encounter";
+    const modeNote = mode === "full" ? " (full share)" : "";
     if (!await Dialog.confirm({
-      title: `Award — ${encLabel}`,
+      title: `Award — ${encLabel}${modeNote}`,
       content: `<p>${breakdown}</p><p>Award <strong>+${perHeroPos}</strong>${perHeroLoss ? ` / <strong>${perHeroLoss}</strong> loss` : ''} (net <strong>${net}</strong>) to each of <strong>${heroes.length}</strong> heroes?</p>`
     })) return;
 
@@ -903,7 +921,8 @@ export class TeamSheet extends Application {
       if (b.amount && b.label) descParts.push(`${b.label} ${b.amount > 0 ? '+' : ''}${b.amount}`);
     }
     const desc = descParts.join(', ');
-    const baseNote = `(base ${positiveTotal} ×${multiplier} ÷${heroes.length})`;
+    const divNote = mode === "full" ? "each" : `÷${heroes.length}`;
+    const baseNote = `(base ${positiveTotal} ×${multiplier} ${divNote})`;
 
     const awardType = "Encounter Award";
     const lossType = "Encounter Loss";
@@ -925,7 +944,7 @@ export class TeamSheet extends Application {
 
     encounters[idx].awarded = true;
     await game.settings.set("msh-faserip", "defeatedVillains", encounters);
-    ui.notifications.info(`${encLabel}: ${net} net karma to each of ${heroes.length} heroes.`);
+    ui.notifications.info(`${encLabel}: ${net} net karma to each of ${heroes.length} heroes${modeNote}.`);
     this.render(true);
   }
 
@@ -937,9 +956,15 @@ export class TeamSheet extends Application {
     const enc = encounters[idx];
     if (!enc || enc.awarded) return;
 
-    const multiplier = game.settings.get("msh-faserip", "karmaMultiplier") || 1;
     const { positiveTotal, lossKarma } = this._calcEncounterTotals(enc);
-    const total = (positiveTotal * multiplier) + lossKarma;
+    const awardResult = computeGroupAward({
+      eventType: "Encounter Award",
+      baseAmount: positiveTotal,
+      heroCount: 1,
+      groupMode: "pool"
+    });
+    const lossPortion = lossKarma ? computeLossAmount(lossKarma, 1, "pool") : 0;
+    const total = awardResult.groupTotal + lossPortion;
     const encLabel = enc.name || enc.villains.map(v => v.name).join(', ') || "Encounter";
 
     if (!await Dialog.confirm({
@@ -1013,7 +1038,7 @@ export class TeamSheet extends Application {
     return { positiveTotal, lossKarma: totalLoss, foeTotal, gmAward, bonusPositive, bonusNegative };
   }
 
-  _buildBreakdownText(enc, multiplier, heroCount) {
+  _buildBreakdownText(enc, multiplier, heroCount, mode = "split") {
     const parts = [];
     const foeTotal = (enc.villains || []).reduce((sum, v) => {
       const count = Math.max(1, v.count || 1);
@@ -1031,7 +1056,8 @@ export class TeamSheet extends Application {
       else if (b.amount < 0) parts.push(`${b.label || 'Penalty'} ${b.amount}`);
     }
     if (enc.losses > 0) parts.push(`Loss -${enc.losses}`);
-    return parts.join(', ') + ` (×${multiplier} ÷${heroCount})`;
+    const divNote = mode === "full" ? "each" : `÷${heroCount}`;
+    return parts.join(', ') + ` (×${multiplier} ${divNote})`;
   }
 
   _crimeLabel(crimeType) {

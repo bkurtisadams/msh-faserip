@@ -1,4 +1,9 @@
-// karma.js v1.6.4 - 2026-04-16
+// karma.js v1.7.0 - 2026-04-17
+// v1.7.0: Category-based karma multipliers (combat/rescue/personal/gaming/penalty)
+//         and group award mode (split/full/pool) via karma-multipliers.js helper.
+//         Legacy karmaMultiplier setting preserved as global fallback when a
+//         category multiplier is unset. Losses only multiplied if penalty
+//         category multiplier > 1. Calc display now shows category tag.
 // v1.6.4: Spend Karma dialog now closes when user picks Ability Advancement.
 //         Previously it lingered behind the advancement sub-dialog in a useless state.
 // v1.6.3: Fix Ability Advancement cost formula. Per RAW (Potato Salad Man example),
@@ -9,6 +14,7 @@
 // v1.6.1: Replace local RANK_MINS/RANK_ORDER with import from rules-reference.js
 // v1.6.0: Add missing karma types: Failing Commitment, Leaving Early, Negative Popularity, Commit Robbery
 import { RANKS_ORDERED } from "./rules/rules-reference.js";
+import { computeKarmaAward, getCategoryMultiplier, getGroupAwardMode, getCategoryForEvent } from "./karma-multipliers.js";
 
 export class KarmaSheet extends DocumentSheet {
   sortNewestFirst = true;
@@ -420,7 +426,7 @@ export class KarmaSheet extends DocumentSheet {
           </div>
           <div class="karma-calculation" style="background:#f5f5f0; padding:8px; border-radius:4px; margin:6px 0; font-size:0.9em;">
             <div>Base: <span class="calc-base">0</span></div>
-            <div>x<span class="calc-multiplier">${multiplier}</span> multiplier = <span class="calc-gross">0</span></div>
+            <div>x<span class="calc-multiplier">${multiplier}</span> <span class="calc-cat" style="color:#666;font-size:0.85em;"></span> = <span class="calc-gross">0</span></div>
             <div class="calc-split-line" style="display:none;">/ <span class="calc-split-count">2</span> heroes = <span class="calc-split-result">0</span></div>
           </div>
           <div class="form-group karma-pool-option" style="display:none;">
@@ -499,6 +505,7 @@ export class KarmaSheet extends DocumentSheet {
       },
       default: "add",
       render: (html) => {
+        const groupMode = getGroupAwardMode();
         const recalc = () => {
           const type = html.find('[name="eventType"]').val();
           const baseAmount = eventAmounts[type] || 0;
@@ -516,9 +523,9 @@ export class KarmaSheet extends DocumentSheet {
           } else {
             html.find('.karma-award-type').show();
             if (isGroup) {
-              html.find('.karma-split-section').show();
+              html.find('.karma-split-section').toggle(groupMode === "split");
               html.find('.karma-pool-option').show();
-              html.find('.calc-split-line').show();
+              html.find('.calc-split-line').toggle(groupMode === "split");
             } else {
               html.find('.karma-split-section').hide();
               html.find('.karma-pool-option').hide();
@@ -526,23 +533,23 @@ export class KarmaSheet extends DocumentSheet {
             }
           }
 
-          // Calculate
-          const gross = Math.floor(baseAmount * multiplier);
-          let finalAmount;
-          if (isGroup && !isIndividualOnly && !isLoss) {
-            finalAmount = Math.floor(gross / splitCount);
-          } else if (isLoss) {
-            finalAmount = baseAmount; // losses not multiplied
-          } else {
-            finalAmount = gross;
-          }
+          // Compute via helper
+          const result = computeKarmaAward({
+            eventType: type,
+            baseAmount,
+            isGroup: isGroup && !isIndividualOnly && !isLoss,
+            heroCount: splitCount,
+            groupMode
+          });
+          const catMult = result.multiplier;
 
           // Update display
           html.find('.calc-base').text(baseAmount);
-          html.find('.calc-multiplier').text(multiplier);
-          html.find('.calc-gross').text(gross);
+          html.find('.calc-multiplier').text(catMult);
+          html.find('.calc-cat').text(result.category ? `(${result.category})` : '');
+          html.find('.calc-gross').text(result.gross);
           html.find('.calc-split-count').text(splitCount);
-          html.find('.calc-split-result').text(Math.floor(gross / splitCount));
+          html.find('.calc-split-result').text(result.perHero);
 
           // Hide calculation for losses and custom
           if (isLoss || type === "Custom" || type === "Death - Kill") {
@@ -551,7 +558,7 @@ export class KarmaSheet extends DocumentSheet {
             html.find('.karma-calculation').show();
           }
 
-          html.find('[name="amount"]').val(finalAmount);
+          html.find('[name="amount"]').val(result.perHero);
         };
 
         html.find('[name="eventType"]').change(recalc);
