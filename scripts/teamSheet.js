@@ -1,4 +1,14 @@
-// teamSheet.js v4.10.0 - 2026-04-17
+// teamSheet.js v4.11.0 - 2026-04-17
+// v4.11.0: Encounter tracks a real-world session date (enc.realDate)
+//          independent of in-fiction gameDate and the internal
+//          timestamp. When an encounter is awarded, karma history
+//          entries inherit the encounter's realDate rather than
+//          "now" — so a session run on 4/2 but entered on 4/17 logs
+//          to the correct day. New real-date input appears next to
+//          the existing game date/time inputs. Import parser
+//          accepts REAL DATE: as a directive. Legacy encounters
+//          without realDate fall back to the internal timestamp's
+//          date, preserving current behavior.
 // v4.10.0: Parser accepts inline KARMA: directive for raw module-text
 //          award blocks. One KARMA: line can hold multiple "label:
 //          ±amount" pairs which each become a BONUS with scope=split
@@ -535,6 +545,14 @@ export class TeamSheet extends Application {
       this._updateEncField(idx, 'gameTime', ev.currentTarget.value.trim());
     });
     html.find('.enc-date-now').click(ev => this._onSetEncDateNow(ev));
+    html.find('.enc-realdate-input').change(ev => {
+      const idx = Number(ev.currentTarget.dataset.encIdx);
+      this._updateEncField(idx, 'realDate', ev.currentTarget.value.trim());
+    });
+    html.find('.enc-realdate-today').click(async ev => {
+      const idx = Number(ev.currentTarget.dataset.encIdx);
+      await this._updateEncField(idx, 'realDate', new Date().toLocaleDateString());
+    });
 
     // Team HQ
     html.find('.hq-toggle').click(ev => {
@@ -827,7 +845,7 @@ export class TeamSheet extends Application {
       gmAward: 0,
       bonuses: [],
       awarded: false,
-      gameDate: "", gameTime: "",
+      gameDate: "", gameTime: "", realDate: "",
       timestamp: new Date().toISOString()
     };
     const warnings = [];
@@ -877,6 +895,8 @@ export class TeamSheet extends Application {
           enc.gameDate = val;
         } else if (key === "TIME") {
           enc.gameTime = val;
+        } else if (key === "REAL DATE" || key === "REAL-DATE" || key === "REALDATE") {
+          enc.realDate = val;
         } else if (key === "FOE") {
           const parts = val.split(",").map(s => s.trim());
           const name = parts[0];
@@ -1024,6 +1044,7 @@ export class TeamSheet extends Application {
 # Encounter Name (or use NAME:)
 DATE: Fireseek 11, 570 CY
 TIME: 11:30 PM
+REAL DATE: 4/2/2026    (optional — when you ran this at the table)
 FOE: Werewolf, Incredible 40, teleported
 FOE: Batboys, Typical 6, count 4
 CRIME: destructive, stopped
@@ -1209,12 +1230,16 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
 
         <!-- Date / Time -->
         <div class="form-group">
-          <label style="font-size:10px;color:#666;">Date</label>
+          <label style="font-size:10px;color:#666;">Game Date</label>
           <input type="text" name="gameDate" value="${gameDate}" style="font-size:12px;" />
         </div>
         <div class="form-group">
           <label style="font-size:10px;color:#666;">Time</label>
           <input type="text" name="gameTime" value="${gameTime}" style="font-size:12px;" />
+        </div>
+        <div class="form-group">
+          <label style="font-size:10px;color:#666;" title="Real-world session date — when you actually ran this at the table. Used to sort karma history.">Real Date</label>
+          <input type="text" name="realDate" value="${new Date().toLocaleDateString()}" style="font-size:12px;" />
         </div>
 
         <!-- Award Line Items (primary section) -->
@@ -1296,6 +1321,7 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
             const encName = html.find('[name="encName"]').val()?.trim() || "";
             const evtDate = html.find('[name="gameDate"]').val()?.trim() || gameDate;
             const evtTime = html.find('[name="gameTime"]').val()?.trim() || gameTime;
+            const evtRealDate = html.find('[name="realDate"]').val()?.trim() || new Date().toLocaleDateString();
             const crimeType = html.find('[name="crimeType"]').val() || "";
             const rescues = Math.max(0, Number(html.find('[name="rescues"]').val()) || 0);
             const losses = Math.max(0, Number(html.find('[name="losses"]').val()) || 0);
@@ -1313,7 +1339,7 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
               crimes: crimeType ? [{ type: crimeType, stopped: false, arrested: false }] : [],
               rescues, losses, gmAward, bonuses: [...bonusList],
               awarded: false,
-              gameDate: evtDate, gameTime: evtTime,
+              gameDate: evtDate, gameTime: evtTime, realDate: evtRealDate,
               timestamp: new Date().toISOString()
             });
             await game.settings.set("msh-faserip", "defeatedVillains", encounters);
@@ -1450,7 +1476,7 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
       crimes: [],
       rescues: 0, losses: 0, bonuses: [],
       awarded: false,
-      gameDate, gameTime,
+      gameDate, gameTime, realDate: new Date().toLocaleDateString(),
       timestamp: new Date().toISOString()
     });
     await game.settings.set("msh-faserip", "defeatedVillains", encounters);
@@ -1540,6 +1566,7 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
 
     const encLabel = enc.name || enc.villains.map(v => v.name).join(', ') || "Encounter";
     const gameDate = enc.gameDate || TeamSheet._getGameDateTimeStatic().gameDate;
+    const realDate = enc.realDate || new Date().toLocaleDateString();
 
     // Build breakdown + confirmation summary
     const breakdown = this._buildBreakdownText(enc, multiplier, heroes.length);
@@ -1587,7 +1614,7 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
       if (perHeroFromSplit > 0) {
         await this._addHeroKarmaEvent(hero, {
           amount: perHeroFromSplit, type: "Encounter Award",
-          description: `${desc} ${baseNote}`, gameDate, encounterId: enc.id
+          description: `${desc} ${baseNote}`, gameDate, realDate, encounterId: enc.id
         });
       }
       // Per-hero scope positive
@@ -1596,14 +1623,14 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
         await this._addHeroKarmaEvent(hero, {
           amount: perHeroPosShown, type: "Encounter Award",
           description: `Per-hero: ${phLabels} (×${multiplier})`,
-          gameDate, encounterId: enc.id
+          gameDate, realDate, encounterId: enc.id
         });
       }
       // Split losses
       if (splitLossPerHero < 0) {
         await this._addHeroKarmaEvent(hero, {
           amount: splitLossPerHero, type: "Encounter Loss",
-          description: `Shared losses — ${encLabel}`, gameDate, encounterId: enc.id
+          description: `Shared losses — ${encLabel}`, gameDate, realDate, encounterId: enc.id
         });
       }
       // Per-hero scope losses (includes Property Damage when lossScope=per_hero)
@@ -1615,7 +1642,7 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
         ].filter(Boolean).join(', ') || `Per-hero losses — ${encLabel}`;
         await this._addHeroKarmaEvent(hero, {
           amount: perHeroLossShown, type: "Encounter Loss",
-          description: lossDesc, gameDate, encounterId: enc.id
+          description: lossDesc, gameDate, realDate, encounterId: enc.id
         });
       }
       // Individual bonuses for this hero
@@ -1630,7 +1657,7 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
           amount: indAmt,
           type: it.amount > 0 ? "Encounter Award" : "Encounter Loss",
           description: `${it.label || 'Individual'} (×${indMult})`,
-          gameDate, encounterId: enc.id
+          gameDate, realDate, encounterId: enc.id
         });
       }
     }
@@ -1697,6 +1724,7 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
 
     // Individual bonuses: apply directly to named heroes
     const gameDate = enc.gameDate || TeamSheet._getGameDateTimeStatic().gameDate;
+    const realDate = enc.realDate || new Date().toLocaleDateString();
     for (const [hid, items] of Object.entries(individualByHero)) {
       const h = game.actors.get(hid);
       if (!h) continue;
@@ -1710,7 +1738,7 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
           amount: indAmt,
           type: it.amount > 0 ? "Encounter Award" : "Encounter Loss",
           description: `${it.label || 'Individual'} (×${indMult})`,
-          gameDate, encounterId: enc.id
+          gameDate, realDate, encounterId: enc.id
         });
       }
     }
@@ -1944,11 +1972,11 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
     }, { width: 420 }).render(true);
   }
 
-  async _addHeroKarmaEvent(hero, { amount, type, description, gameDate, encounterId }) {
+  async _addHeroKarmaEvent(hero, { amount, type, description, gameDate, realDate, encounterId }) {
     const history = foundry.utils.deepClone(hero.system.karma?.history || []);
     history.push({
       timestamp: new Date().toISOString(),
-      realDate: new Date().toLocaleDateString(),
+      realDate: realDate || new Date().toLocaleDateString(),
       gameDate: gameDate || TeamSheet._getGameDateTimeStatic().gameDate,
       amount, type, description,
       encounterId: encounterId || null
@@ -2239,7 +2267,7 @@ Unrecognized lines become warnings. Amounts can be positive or negative.`;
       crimes: [],
       rescues: 0, losses: 0,
       awarded: false,
-      gameDate, gameTime,
+      gameDate, gameTime, realDate: new Date().toLocaleDateString(),
       timestamp: new Date().toISOString()
     });
     await game.settings.set("msh-faserip", "defeatedVillains", encounters);

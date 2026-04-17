@@ -202,6 +202,10 @@
                 <label>Time: <input type="text" class="enc-time-input" data-enc-idx="{{@index}}" value="{{enc.gameTime}}" placeholder="e.g., 14:30" /></label>
                 <button type="button" class="enc-date-now" data-enc-idx="{{@index}}" title="Set to current campaign date/time"><i class="fas fa-clock"></i> Now</button>
               </div>
+              <div class="detail-row enc-datetime-row">
+                <label title="Real-world session date — when you actually ran this at the table. Used to sort karma history.">Real Date: <input type="text" class="enc-realdate-input" data-enc-idx="{{@index}}" value="{{enc.realDate}}" placeholder="e.g., 4/2/2026" /></label>
+                <button type="button" class="enc-realdate-today" data-enc-idx="{{@index}}" title="Set to today"><i class="fas fa-calendar-day"></i> Today</button>
+              </div>
             </div>
 
             <!-- Foes (always shown, may be empty) -->

@@ -1,4 +1,12 @@
-// karma.js v1.7.0 - 2026-04-17
+// karma.js v1.8.0 - 2026-04-17
+// v1.8.0: History sort prefers user-editable realDate over internal
+//         timestamp. Previously `timestamp || realDate || 0` short-
+//         circuited on timestamp (always set at creation), so editing
+//         an entry's realDate changed the displayed string but not
+//         the sort position. New `_historyEntryDate` helper uses
+//         realDate first, falling back to timestamp only when realDate
+//         is empty/unparseable. Applied to all four sort call sites
+//         (getData, edit, delete, bulk delete).
 // v1.7.0: Category-based karma multipliers (combat/rescue/personal/gaming/penalty)
 //         and group award mode (split/full/pool) via karma-multipliers.js helper.
 //         Legacy karmaMultiplier setting preserved as global fallback when a
@@ -19,6 +27,21 @@ import { computeKarmaAward, getCategoryMultiplier, getGroupAwardMode, getCategor
 export class KarmaSheet extends DocumentSheet {
   sortNewestFirst = true;
   searchFilter = "";
+
+  // Return a Date for sorting: prefer the user-editable realDate,
+  // fall back to timestamp when realDate is missing or unparseable.
+  // Never returns null — callers subtract dates directly.
+  static _historyEntryDate(entry) {
+    if (entry?.realDate) {
+      const d = new Date(entry.realDate);
+      if (!isNaN(d.getTime())) return d;
+    }
+    if (entry?.timestamp) {
+      const d = new Date(entry.timestamp);
+      if (!isNaN(d.getTime())) return d;
+    }
+    return new Date(0);
+  }
 
   static get defaultOptions() {
     return foundry.utils.mergeObject(super.defaultOptions, {
@@ -60,8 +83,8 @@ export class KarmaSheet extends DocumentSheet {
     
     // Sort history
     context.system.karma.history.sort((a, b) => {
-      const dateA = new Date(a.timestamp || a.realDate || 0);
-      const dateB = new Date(b.timestamp || b.realDate || 0);
+      const dateA = KarmaSheet._historyEntryDate(a);
+      const dateB = KarmaSheet._historyEntryDate(b);
       return this.sortNewestFirst ? dateB - dateA : dateA - dateB;
     });
     
@@ -1191,8 +1214,8 @@ export class KarmaSheet extends DocumentSheet {
     const history = foundry.utils.deepClone(this.object.system.karma?.history || []);
     
     history.sort((a, b) => {
-      const dateA = new Date(a.timestamp || a.realDate || 0);
-      const dateB = new Date(b.timestamp || b.realDate || 0);
+      const dateA = KarmaSheet._historyEntryDate(a);
+      const dateB = KarmaSheet._historyEntryDate(b);
       return this.sortNewestFirst ? dateB - dateA : dateA - dateB;
     });
     
@@ -1275,8 +1298,8 @@ export class KarmaSheet extends DocumentSheet {
   _onDeleteKarma(index) {
     const history = foundry.utils.deepClone(this.object.system.karma?.history || []);
     history.sort((a, b) => {
-      const dateA = new Date(a.timestamp || a.realDate || 0);
-      const dateB = new Date(b.timestamp || b.realDate || 0);
+      const dateA = KarmaSheet._historyEntryDate(a);
+      const dateB = KarmaSheet._historyEntryDate(b);
       return this.sortNewestFirst ? dateB - dateA : dateA - dateB;
     });
     
@@ -1331,8 +1354,8 @@ export class KarmaSheet extends DocumentSheet {
           callback: () => {
             const history = foundry.utils.deepClone(this.object.system.karma?.history || []);
             history.sort((a, b) => {
-              const dateA = new Date(a.timestamp || a.realDate || 0);
-              const dateB = new Date(b.timestamp || b.realDate || 0);
+              const dateA = KarmaSheet._historyEntryDate(a);
+              const dateB = KarmaSheet._historyEntryDate(b);
               return this.sortNewestFirst ? dateB - dateA : dateA - dateB;
             });
             indices.sort((a, b) => b - a);
