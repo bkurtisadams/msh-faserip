@@ -55,7 +55,6 @@ import { rollTalent } from './modules/actions/talent-action.js';
 import { rollPower } from './modules/actions/power-router.js';
 import { rollContact } from './modules/actions/contact-action.js';
 import { rollUniversalTable } from './modules/dice/universal-table.js';
-import { openUniversalTableDialog } from './universal-table-dialog.js';
 import {
   RANKS_ORDERED, RANK_VALUES, RANK_ABBR, RANK_ALIASES,
   rankValue as _rankValue, valueToRank as _valueToRank,
@@ -693,31 +692,6 @@ Hooks.once("init", async () => {
     precedence: CONST.KEYBINDING_PRECEDENCE.NORMAL
   });
 
-  // keyboard control to open Universal Table dialog
-  game.keybindings.register("msh-faserip", "openUniversalTable", {
-    name: "Open Universal Table",
-    hint: "Opens the Universal Table using selected token, open sheet, or fallback actor",
-    category: "FASERIP",
-    editable: [{ key: "KeyU", modifiers: ["Control"] }],
-    onDown: () => {
-      const sheet = Object.values(ui.windows).find(w => w instanceof game.msh.FaseripActorSheet);
-      const actor =
-        sheet?.actor ??
-        canvas.tokens.controlled[0]?.actor ??
-        game.actors.find(a => a.type === "hero" || a.type === "npc") ??
-        game.actors.contents[0]; // fallback to any actor
-
-      if (actor) {
-        game.msh.openUniversalTableDialog?.(actor);
-      } else {
-        ui.notifications.warn("No actor found to use for Universal Table.");
-      }
-
-      return true;
-    },
-    restricted: false,
-    precedence: CONST.KEYBINDING_PRECEDENCE.NORMAL
-  });
 
   // Team control button
   // Add this after the keybinding registration and before the settings registration
@@ -1495,9 +1469,6 @@ Hooks.once("init", async () => {
     return await ActionDispatcher.roll(actionType, { actor, abilityName, opts });
   };
 
-   // Add the open dialog function safely inside the hook
-   game.msh.openUniversalTableDialog = openUniversalTableDialog;
-  
   // Add the roll functions to the namespace
   game.msh.rollPower = rollPower;
   game.msh.rollTalent = rollTalent;
@@ -3105,12 +3076,6 @@ Hooks.on('hotbarDrop', (bar, data, slot) => {  // Remove async
     });
     return false; // Returns immediately
   }
-  else if (data.type === "UniversalTable" && data.actorId) {
-    createUniversalTableMacro(data, slot).catch(err => {
-      console.error("Error creating UniversalTable macro:", err);
-    });
-    return false;
-  }
   else if (data.type === "UniversalAction" && data.actionCode) {
     createUniversalActionMacro(data, slot).catch(err => {
       console.error("Error creating UniversalAction macro:", err);
@@ -3279,52 +3244,6 @@ async function createFaseripItemMacro(data, slot) {
     return true;
   }
 
-
-// Define the function to create a Universal Table macro
-async function createUniversalTableMacro(data, slot) {
-  // Get reference to our Actor
-  const actor = game.actors.get(data.actorId);
-  if (!actor) return ui.notifications.warn("Actor not found");
-  
-  console.log(`Creating Universal Table macro for ${actor.name}`);
-  
-  // Create a command string that calls the openUniversalTableDialog function
-  const command = `game.msh.openUniversalTableDialog(game.actors.get("${data.actorId}"));`;
-  
-  // Create the macro
-  const macroName = `Universal Table (${actor.name})`;
-  let macro = game.macros.find(m => m.name === macroName && m.command === command);
-  
-  if (!macro) {
-    const macroData = {
-      name: macroName,
-      type: "script",
-      img: data.data?.img || "icons/svg/d20-grey.svg", 
-      command: command,
-      flags: {"faserip.universalTableMacro": true}
-    };
-    
-    // Use socket for non-GM users to create macro via GM
-    if (!game.user.isGM && game.msh?.runAsGM) {
-      await game.msh.runAsGM({
-        operation: "createMacro",
-        macroData,
-        slot,
-        userId: game.user.id
-      });
-      return true;
-    } else {
-      macro = await Macro.create({
-        ...macroData,
-        ownership: { [game.user.id]: CONST.DOCUMENT_OWNERSHIP_LEVELS.OWNER }
-      });
-    }
-  }
-  
-  // Assign to hotbar slot
-  game.user.assignHotbarMacro(macro, slot);
-  return true;
-}
 
 async function createUniversalActionMacro(data, slot) {
   const { actionCode, actionName, actorId, actorName, iconName } = data;

@@ -809,7 +809,6 @@ export class FaseripActorSheet extends ActorSheet {
     }
   }
   
-  // This is separate from the async close method on UniversalTablePopout at the bottom of the file; don’t touch that one.
   async close(options = {}) {
     // Unregister the in-sheet Universal Table hook when the sheet closes
     if (this._universalTableHookId) {
@@ -1034,22 +1033,6 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
   return false;
 });
 
-    // Universal Table tab - CTRL+click opens legacy dialog, SHIFT+click opens popout
-    html.find('a[data-tab="universal-table"]').on('click', (event) => {
-      if (event.ctrlKey || event.metaKey) {
-        event.preventDefault();
-        event.stopPropagation();
-        game.msh.openUniversalTableDialog?.(this.actor);
-        return false;
-      }
-      if (event.shiftKey) {
-        event.preventDefault();
-        event.stopPropagation();
-        this._openUniversalTablePopout();
-        return false;
-      }
-      // Normal click: let Foundry handle tab switching
-    });
 
     // Listen for universal table rolls so the in-sheet tab also highlights results
     if (!this._universalTableHookId) {
@@ -1208,12 +1191,6 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
         }
       }
     });
-
-    // universal roll trigger listener
-    /* html.find('.universal-roll-trigger').click(ev => {
-      ev.preventDefault();
-      game.msh.openUniversalTableDialog?.(this.actor);
-    }); */
 
     // Make the universal roll trigger draggable for macros
     html.find('.universal-roll-trigger').each((i, el) => {
@@ -4923,15 +4900,6 @@ async _rollAction(actionType, abilityName) {
     });
   }
 
-  _openUniversalTablePopout(rollData = null) {
-    // Use existing instance or create new one
-    if (!this._universalTablePopout) {
-      this._universalTablePopout = new UniversalTablePopout();
-    }
-    this._universalTablePopout.setRollData(rollData);
-    this._universalTablePopout.render(true);
-  }
-
   // Character Generation Tab Initialization
   _initChargenTab(html) {
     const chargenTab = html.find('.chargen-tab');
@@ -4953,8 +4921,7 @@ async _rollAction(actionType, abilityName) {
   
     /**
    * Handle universal table rolls for the in-sheet Universal Table tab.
-   * Mirrors the behavior of UniversalTablePopout._onUniversalTableRoll,
-   * but targets the actor sheet's table.
+   * Highlights the result cell in the in-sheet Universal Table tab after a roll.
    */
   _onSheetUniversalTableRoll(data) {
     // Only proceed if the sheet is actually rendered
@@ -4964,11 +4931,8 @@ async _rollAction(actionType, abilityName) {
     const html = this.element;
     if (!html || !html.length) return;
 
-    // Normalize rank name using the same mapping as the popout
-    let normalizedRank = UniversalTablePopout.RANK_ALIASES[rank] || rank;
-
-    // Find column index for this rank
-    const colIndex = UniversalTablePopout.RANK_ORDER.indexOf(normalizedRank);
+    const normalizedRank = RANK_ALIASES[rank] || rank;
+    const colIndex = _RANKS.indexOf(normalizedRank);
     if (colIndex === -1) return;
 
     // Find the matching row and highlight just that result cell
@@ -4996,151 +4960,4 @@ async _rollAction(actionType, abilityName) {
   }
 
   // other methods
-}
-
-class UniversalTablePopout extends Application {
-  // Rank order matching the table columns (0-indexed) — from rules-reference.js
-  static RANK_ORDER = _RANKS;
-
-  // Alternate rank names mapping — from rules-reference.js
-  static RANK_ALIASES = RANK_ALIASES;
-
-  static get defaultOptions() {
-    return foundry.utils.mergeObject(super.defaultOptions, {
-      id: "universal-table-popout",
-      title: "Universal Table",
-      template: "systems/msh-faserip/templates/universal-table-popout.html",
-      width: 750,
-      height: 500,
-      resizable: true,
-      popOut: true
-    });
-  }
-
-  constructor(options = {}) {
-    super(options);
-    this.rollData = null;
-    this._hookId = null;
-  }
-
-  setRollData(data) {
-    this.rollData = data;
-  }
-
-  getData() {
-    return { rollData: this.rollData };
-  }
-
-  render(force = false, options = {}) {
-    // Register hook to listen for universal table rolls
-    if (!this._hookId) {
-      this._hookId = Hooks.on('msh-faserip.universalTableRoll', (data) => {
-        this._onUniversalTableRoll(data);
-      });
-    }
-    return super.render(force, options);
-  }
-
-  async close(options = {}) {
-    // Unregister hook when window closes
-    if (this._hookId) {
-      Hooks.off('msh-faserip.universalTableRoll', this._hookId);
-      this._hookId = null;
-    }
-    return super.close(options);
-  }
-
-  _onUniversalTableRoll(data) {
-    if (!this.rendered) return;
-    
-    const { rank, roll, color } = data;
-    const html = this.element;
-    
-    // Normalize rank name
-    let normalizedRank = UniversalTablePopout.RANK_ALIASES[rank] || rank;
-    
-    // Find column index for this rank
-    const colIndex = UniversalTablePopout.RANK_ORDER.indexOf(normalizedRank);
-    if (colIndex === -1) return;
-    
-    // Find the matching row and highlight just that result cell
-    const rows = html.find('tbody tr');
-    rows.each((i, row) => {
-      const $row = $(row);
-      const label = $row.find('th').first().text().trim();
-
-      let match = false;
-      if (label.includes('–') || label.includes('-')) {
-        const [min, max] = label.split(/[–-]/).map(n => parseInt(n));
-        match = roll >= min && roll <= max;
-      } else {
-        match = roll === parseInt(label);
-      }
-
-      if (match) {
-        const cell = $row.find('td').eq(colIndex);
-        cell.addClass('roll-highlight');
-        setTimeout(() => cell.removeClass('roll-highlight'), 10000);
-      }
-    });
-  }
-
-  activateListeners(html) {
-    super.activateListeners(html);
-    
-    if (this.rollData) {
-      const { roll, rankIndex, color } = this.rollData;
-      
-      // Find the row matching the roll
-      const rows = html.find('tbody tr');
-      rows.each((i, row) => {
-        const $row = $(row);
-        const label = $row.find('th').first().text().trim();
-        
-        // Parse roll ranges like "02-03", "04-06", or single "01", "100"
-        let match = false;
-        if (label.includes('-')) {
-          const [min, max] = label.split('-').map(n => parseInt(n));
-          match = roll >= min && roll <= max;
-        } else {
-          match = roll === parseInt(label);
-        }
-        
-        if (match && rankIndex >= 0) {
-          // Highlight the cell at rankIndex (add 1 to skip the th)
-          const cell = $row.find('td').eq(rankIndex);
-          cell.addClass('highlighted');
-        }
-      });
-    }
-    
-    // Cell click highlighting
-    html.find('.rank-cell').click(ev => {
-      html.find('.rank-cell').removeClass('highlighted');
-      $(ev.currentTarget).addClass('highlighted');
-    });
-
-    // Action panel header click — post chat card with action type rules
-    html.find('.uat-head1 th:not(:first-child), .uat-head2 th:not(:first-child)').css('cursor', 'pointer').on('click', ev => {
-      const $th = $(ev.currentTarget);
-      const colIdx = $th.parent().find('th').index($th) - 1;
-      // Reuse the same info array defined on the sheet class
-      const info = FaseripActorSheet.UAT_ACTION_INFO?.[colIdx];
-      if (!info) return;
-      const content = `
-        <div class="faserip-chat-action-info">
-          <h3>${info.label} <span style="font-weight:normal;font-size:0.85em;">(${info.code})</span></h3>
-          <p><strong>Ability:</strong> ${info.ability}</p>
-          <p style="margin:4px 0;">${info.desc}</p>
-          <table style="width:100%;border-collapse:collapse;margin:6px 0;font-size:0.9em;">
-            <tr style="background:#fff;"><td style="border:1px solid #999;padding:2px 4px;width:12px;">&nbsp;</td><td style="border:1px solid #999;padding:2px 6px;"><strong>White:</strong> ${info.results.white}</td></tr>
-            <tr style="background:#00c000;"><td style="border:1px solid #999;padding:2px 4px;">&nbsp;</td><td style="border:1px solid #999;padding:2px 6px;"><strong>Green:</strong> ${info.results.green}</td></tr>
-            <tr style="background:#e8e000;"><td style="border:1px solid #999;padding:2px 4px;">&nbsp;</td><td style="border:1px solid #999;padding:2px 6px;"><strong>Yellow:</strong> ${info.results.yellow}</td></tr>
-            <tr style="background:#cc0000;color:#fff;"><td style="border:1px solid #999;padding:2px 4px;">&nbsp;</td><td style="border:1px solid #999;padding:2px 6px;"><strong>Red:</strong> ${info.results.red}</td></tr>
-          </table>
-          ${info.notes ? `<p style="font-size:0.85em;font-style:italic;margin-top:4px;">📌 ${info.notes}</p>` : ''}
-        </div>`;
-      ChatMessage.create({ content, flags: { 'msh-faserip': { type: 'action-info' } } });
-    });
-  }
 }

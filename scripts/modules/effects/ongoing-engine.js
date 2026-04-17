@@ -703,7 +703,7 @@ async function _processDyingRoundInner(actor, dyingAE, scope) {
   if (reFeat) {
     console.log(`[FASERIP:DYING] ${actor.name} gets re-FEAT on slip`);
     await dyingAE.setFlag(scope, "reFeatOnSlip", false);
-    game.msh?.openUniversalTableDialog?.(actor, { mode: "death-save" });
+    game.msh?.actions?.roll("endurance", { actor });
   }
 
   return "stepped";
