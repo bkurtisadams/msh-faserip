@@ -307,6 +307,43 @@
   -webkit-appearance: none; margin: 0;
 }
 
+/* ===== CRIME LIST ===== */
+.faserip.sheet.team-tracker .crime-list {
+  display: flex; flex-direction: column; gap: 2px;
+  border: 1px solid #ccc; border-radius: 3px; padding: 4px; background: #fafafa;
+  margin-bottom: 4px;
+}
+.faserip.sheet.team-tracker .crime-row {
+  display: flex; align-items: center; gap: 8px; padding: 3px 4px;
+  flex-wrap: wrap;
+}
+.faserip.sheet.team-tracker .crime-row + .crime-row {
+  border-top: 1px solid #eee;
+}
+.faserip.sheet.team-tracker .crime-type-row {
+  flex: 0 1 220px; min-width: 160px;
+  padding: 3px 6px; font-size: 12px !important;
+  font-family: 'Barlow Condensed', sans-serif;
+  border: 1px solid #aaa !important; border-radius: 3px;
+  color: #000 !important; background: #fff !important;
+}
+.faserip.sheet.team-tracker .crime-row .crime-flag {
+  display: flex; align-items: center; gap: 4px;
+  font-size: 11px; color: #333;
+  white-space: nowrap;
+}
+.faserip.sheet.team-tracker .crime-row .crime-flag input[type="checkbox"] {
+  margin: 0;
+}
+.faserip.sheet.team-tracker .crime-pick-note {
+  font-size: 11px; color: #888; font-style: italic;
+}
+.faserip.sheet.team-tracker .delete-crime {
+  color: #999; cursor: pointer; font-size: 11px; padding: 0 2px;
+  margin-left: auto;
+}
+.faserip.sheet.team-tracker .delete-crime:hover { color: #c62828; }
+
 /* ===== BONUS LINE ITEMS ===== */
 .faserip.sheet.team-tracker .bonus-list {
   display: flex; flex-direction: column; gap: 2px;
@@ -337,6 +374,23 @@
   font-family: 'Barlow Condensed', sans-serif;
   border: 1px solid #aaa !important; border-radius: 3px;
   color: #000 !important; background: #fff !important;
+}
+.faserip.sheet.team-tracker .bonus-rule-select {
+  width: 135px; padding: 2px 4px; font-size: 11px !important;
+  font-family: 'Barlow Condensed', sans-serif;
+  border: 1px solid #aaa !important; border-radius: 3px;
+  color: #000 !important; background: #fff !important;
+}
+.faserip.sheet.team-tracker .bonus-rule-select.bonus-rule-set {
+  border-color: #8b0000 !important;
+  background: #faf8f2 !important;
+}
+.faserip.sheet.team-tracker .bonus-cap-warn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 16px; height: 16px; border-radius: 50%;
+  background: #fff3cd; color: #856404;
+  font-size: 11px; font-weight: 700; cursor: help;
+  border: 1px solid #e0a800;
 }
 .faserip.sheet.team-tracker .bonus-hero-select {
   max-width: 120px; padding: 2px 4px; font-size: 11px !important;

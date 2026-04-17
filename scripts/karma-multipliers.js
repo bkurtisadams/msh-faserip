@@ -1,7 +1,12 @@
-// karma-multipliers.js v1.0.0 - 2026-04-17
-// Central helper for category-based karma multipliers and group-award mode.
-// All karma award sites should route through computeKarmaAward() so that
-// tuning happens in one place.
+// karma-multipliers.js v1.1.0 - 2026-04-17
+// v1.1.0: Full-share mode removed. groupMode is now only "split" (RAW) or
+//         "pool". Legacy "full" values in saved settings are silently
+//         migrated to "split" via getGroupAwardMode. GMs who want the
+//         full-share behavior should set karmaMultiplier to expected
+//         party size (e.g. 4 for a 4-hero table).
+// v1.0.0: Central helper for category-based karma multipliers and group-award mode.
+//         All karma award sites should route through computeKarmaAward() so that
+//         tuning happens in one place.
 
 const CATEGORY_BY_EVENT = {
   "Violent Crime - Stop": "combat", "Violent Crime - Arrest": "combat",
@@ -61,7 +66,7 @@ export function getCategoryMultiplier(category) {
 
 // Compute a single hero's final karma for an event.
 // opts: { eventType, baseAmount, isGroup, heroCount, groupMode }
-// groupMode: "split" | "full" | "pool" (pool is handled by caller)
+// groupMode: "split" | "pool" (pool is handled by caller)
 // Penalties: multiplied only if the penalty category multiplier > 1 AND
 // the event's category is "penalty". Otherwise kept at RAW.
 export function computeKarmaAward(opts) {
@@ -80,7 +85,7 @@ export function computeKarmaAward(opts) {
 
   if (!isGroup) return { category, multiplier: mult, gross, perHero: gross };
 
-  if (groupMode === "full" || groupMode === "pool") {
+  if (groupMode === "pool") {
     return { category, multiplier: mult, gross, perHero: gross };
   }
   // split mode (RAW)
@@ -95,7 +100,7 @@ export function computeGroupAward(opts) {
   const category = getCategoryForEvent(eventType);
   const mult = getCategoryMultiplier(category);
   const gross = Math.floor(baseAmount * mult);
-  if (groupMode === "full" || groupMode === "pool") {
+  if (groupMode === "pool") {
     return { category, multiplier: mult, groupTotal: gross, perHero: gross };
   }
   const perHero = Math.floor(gross / Math.max(1, heroCount));
@@ -106,12 +111,16 @@ export function computeLossAmount(baseAmount, heroCount = 1, groupMode = "split"
   const penMult = getCategoryMultiplier("penalty");
   const mult = penMult > 1 ? penMult : 1;
   const gross = Math.ceil(baseAmount * mult);
-  if (groupMode === "full" || groupMode === "pool") return gross;
+  if (groupMode === "pool") return gross;
   return Math.ceil(gross / Math.max(1, heroCount));
 }
 
 export function getGroupAwardMode() {
-  return game.settings.get("msh-faserip", "groupAwardMode") || "split";
+  const raw = game.settings.get("msh-faserip", "groupAwardMode") || "split";
+  // Migration: legacy "full" mode removed — fall back to split. Worlds that
+  // used full share should set multiplier = expected party size instead.
+  if (raw === "full") return "split";
+  return raw;
 }
 
 export const CATEGORY_LABELS = {
@@ -124,6 +133,5 @@ export const CATEGORY_LABELS = {
 
 export const GROUP_MODE_LABELS = {
   split: "Split (RAW)",
-  full: "Full share (each hero gets full award)",
   pool: "To karma pool"
 };

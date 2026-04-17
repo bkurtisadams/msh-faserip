@@ -929,13 +929,12 @@ Hooks.once("init", async () => {
 
     game.settings.register("msh-faserip", "groupAwardMode", {
       name: "Group Karma Award Mode",
-      hint: "How group karma awards are distributed: Split (RAW, divided by heroes), Full share (each hero gets full award), or To karma pool.",
+      hint: "How group karma awards are distributed. Split (RAW): divided among present heroes per the rulebook. Pool: awards go to the team karma pool. To reproduce 'full share' behavior (each hero gets the full amount), use Split and set Karma Multiplier to your expected party size.",
       scope: "world",
       config: true,
       type: String,
       choices: {
         split: "Split (RAW)",
-        full: "Full share (each hero gets full award)",
         pool: "To karma pool"
       },
       default: "split"

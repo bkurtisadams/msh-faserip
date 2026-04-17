@@ -1,4 +1,9 @@
-// shooting-action.js v3.5.0 - 2026-04-17
+// shooting-action.js v3.5.1 - 2026-04-17
+// v3.5.1: Mercy Shot armor-gate preserved per RAW. If the weapon's
+//         standard damage would not have penetrated armor, KO drug
+//         has no effect. Pairs with removal of legacy mercy stun-
+//         trigger in attack-action.js that was firing a duplicate
+//         (and incorrectly-labeled) Stun Check FEAT.
 // v3.5.0: T1/T2/T3 ammo variant follow-ups.
 //         T1: Mercy Shot now rolls Endurance FEAT vs Rm Intensity on hit,
 //             applies applyUnconscious with 1-10 round duration on failure.
@@ -805,16 +810,33 @@ export class ShootingAction extends RangedAttackAction {
   // on hit; on FEAT failure (white result), target is KO'd 1-10 rounds via
   // applyUnconscious. Per RAW Advanced Set Ammunition: "If the bullet inflicts
   // damage to the target, the drug takes effect, knocking those affected out
-  // for 1-10 rounds." We interpret "inflicts damage" as "hit lands" since
-  // mercy's own damage is 0 by design.
+  // for 1-10 rounds." Armor-gate: if the weapon's standard damage would not
+  // have penetrated the target's armor, the drug has no effect either — the
+  // bullet bounced off before it could deliver the drug.
   _mercyKnockoutCallback() {
-    return async ({ targetActor, isHit, color, actor }) => {
+    return async ({ targetActor, target, targetName, isHit, color, damageType, weapon, actor }) => {
       if (!isHit || !targetActor) return;
       if (color === "white") return;
 
-      const { getAbilityInfo } = await import("./action-utils.js");
+      const { getAbilityInfo, getBodyArmorValues } = await import("./action-utils.js");
       const { rollUniversalTable } = await import("../dice/universal-table.js");
       const { applyUnconscious } = await import("../effects/effect-engine.js");
+
+      // Armor gate: would a normal (non-mercy) shot have penetrated?
+      const stdDamage = Number(weapon?.system?.damage) || 0;
+      const armorData = getBodyArmorValues(targetActor, damageType);
+      const armorValue = Number(armorData?.applicable) || 0;
+      const wouldPenetrate = armorValue <= 0 || stdDamage > armorValue;
+
+      if (!wouldPenetrate) {
+        await ChatMessage.create({
+          speaker: ChatMessage.getSpeaker({ actor }),
+          content: `<div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;padding:6px 8px;font-size:.9em;">
+            <strong>Mercy Shot</strong> \u2014 ${targetName || targetActor.name}'s armor blocked the bullet. KO drug has no effect.
+          </div>`
+        });
+        return;
+      }
 
       const endInfo = getAbilityInfo(targetActor, "endurance");
       const endRank = endInfo?.rank || "Typical";
@@ -834,13 +856,13 @@ export class ShootingAction extends RangedAttackAction {
         } catch (e) {
           console.error("[FASERIP ERROR] Mercy KO applyUnconscious failed:", e);
         }
-        line = `<div style="color:#d32f2f;font-weight:bold;">${targetActor.name} succumbs to the KO drug — unconscious ${rounds} round${rounds !== 1 ? "s" : ""}.</div>`;
+        line = `<div style="color:#d32f2f;font-weight:bold;">${targetActor.name} succumbs to the KO drug \u2014 unconscious ${rounds} round${rounds !== 1 ? "s" : ""}.</div>`;
       }
 
       await ChatMessage.create({
         speaker: ChatMessage.getSpeaker({ actor }),
         content: `<div style="background:#f3e5f5;border:1px solid #8e24aa;border-radius:3px;padding:6px 8px;margin:4px 0;">
-          <div style="font-weight:bold;color:#6a1b9a;margin-bottom:3px;">Mercy Shot — KO Drug</div>
+          <div style="font-weight:bold;color:#6a1b9a;margin-bottom:3px;">Mercy Shot \u2014 KO Drug</div>
           <div style="font-size:.85em;">Endurance FEAT (${endRank}) vs Rm Intensity: rolled ${r.total} \u2192 <b>${featColorLower.toUpperCase()}</b></div>
           ${line}
         </div>`

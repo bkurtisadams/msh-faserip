@@ -1,4 +1,50 @@
-// teamSheet.js v4.5.1 - 2026-04-17
+// teamSheet.js v4.10.0 - 2026-04-17
+// v4.10.0: Parser accepts inline KARMA: directive for raw module-text
+//          award blocks. One KARMA: line can hold multiple "label:
+//          ±amount" pairs which each become a BONUS with scope=split
+//          and rule=custom. "-ALL" kill-penalty entries generate a
+//          warning instructing the GM to add a Death event manually
+//          rather than inventing a magic number. Supports the common
+//          case of pasting module text verbatim without reformatting
+//          into one-BONUS-per-line.
+// v4.9.0: Multi-crime support per encounter. The single crimeType +
+//         stopped/arrested trio is replaced with a crimes array, each
+//         entry carrying its own type/stopped/arrested flags. UI gains
+//         a repeatable crime-row list with Add Crime button matching
+//         the existing Foe/Bonus pattern. Legacy encounters with a
+//         single crimeType are lazily migrated to one-entry crimes
+//         array on first read. Parser accepts multiple CRIME: lines
+//         per encounter. Matches RAW Example 3 where a single fight
+//         awards Stop+Arrest for multiple overlapping crimes
+//         (theft, conspiracy, etc.).
+// v4.8.0: Rule category dropdown on bonus line items. Each bonus now
+//         carries a rule field tagging it as a RAW karma category
+//         (Personal Commitment, Role-Play Award, Rescue, etc.) or
+//         Custom for module-specific awards. Selecting a rule auto-sets
+//         the amount to the RAW base value (if blank or matching the
+//         previous rule's base) and filters scope choices to those RAW
+//         allows for that category — forbidden scopes show as disabled
+//         with a "RAW: no" annotation rather than being hidden. Parser
+//         accepts an optional 5th field for rule (BONUS: label, amount,
+//         scope, rule). Legacy bonuses without a rule default to
+//         "custom". Rule catalog lives in karma-rules.js.
+// v4.7.0: Import encounter from pasted text. GM clicks "Import" on the
+//         Encounter tab, pastes a structured markdown-like block describing
+//         a module chapter's karma awards, reviews the parsed preview, and
+//         commits. Parser is forgiving — unrecognized lines are logged as
+//         warnings rather than aborting. Designed so OCR'd module text can
+//         be cleaned up by a human (or AI assistant) into the format and
+//         imported in seconds. Format documented inline in the import
+//         dialog. New static method TeamSheet._parseEncounterText.
+// v4.6.0: Full-share groupAwardMode removed. Only "split" (RAW) and "pool"
+//         remain. Worlds with legacy groupAwardMode="full" are silently
+//         migrated to "split" via getGroupAwardMode. GMs who want the
+//         full-share behavior should set karmaMultiplier to expected
+//         party size (e.g. ×4 for a 4-hero table). Rationale: full share
+//         was mathematically equivalent to Split + multiplier=party size,
+//         and exposing both modes obscured what was actually happening.
+//         Community convention is to tune generosity via multiplier, not
+//         mode. _buildBreakdownText drops its now-unused mode parameter.
 // v4.5.1: Editable date/time on expanded encounter view. GM can backdate
 //         missed encounters, fix typos, or set dates for pre-loaded module
 //         encounters. "Now" button snaps to current campaign date/time.
@@ -15,18 +61,13 @@
 //         lossScope. Migration is non-destructive (persisted on next write).
 // v4.4.2: Encounter card preview strings (summaryLine / netLine) now built
 //         in getData() based on groupAwardMode. Template no longer hardcodes
-//         "÷heroCount" format. In "full" mode the card reads
-//         "+50 ×2 = +100/ea (full share)" instead of showing a division.
-//         Also pairs with templates/team-sheet.html using {{{summaryLine}}}.
+//         the division format.
 // v4.4.1: Encounter row preview math in getData() now routes through
 //         computeGroupAward/computeLossAmount so the inline per-hero totals
 //         shown on each encounter row match the award that will actually
-//         fire. Previously the preview always divided by hero count even
-//         when groupAwardMode was "full".
+//         fire. Previously the preview always divided by hero count.
 // v4.4.0: Encounter awards now route through karma-multipliers.js helper.
-//         Respects groupAwardMode setting (split | full | pool). In full mode
-//         each present hero receives the full gross award (house rule matching
-//         Graycloak's prior manual practice). Category multipliers apply per
+//         Respects groupAwardMode setting. Category multipliers apply per
 //         event type. Losses only multiplied if penalty category multiplier > 1.
 // v4.3.0: Tabbed UI (Team / Encounters / HQ). Tabs persist only for window
 //         lifetime; default is Encounters for GMs, Team for players.
@@ -51,6 +92,7 @@
 // v4.1.0: Add Event type (foe-less karma events) alongside encounters.
 //         GM Award field on both events and encounters. Missing karma types added.
 import { computeGroupAward, computeLossAmount, getGroupAwardMode, getCategoryMultiplier } from "./karma-multipliers.js";
+import { KARMA_RULES, getRuleOptionsGrouped, getScopeOptionsForRule, getBaseAmountForRule, getCapForRule, normalizeRuleKey } from "./karma-rules.js";
 
 export class TeamSheet extends Application {
 
@@ -78,6 +120,21 @@ export class TeamSheet extends Application {
     globalConspiracy:     { stop: 50, arrest: 25 },
     other:                { stop: 15, arrest: 5 }
   };
+
+  // Returns normalized crimes array. Lazy migration from legacy
+  // crimeType/stopped/arrested single-crime shape. Does not mutate
+  // the encounter — caller must write back to persist migration.
+  static _normalizeCrimes(enc) {
+    if (Array.isArray(enc.crimes)) return enc.crimes;
+    if (enc.crimeType) {
+      return [{
+        type: enc.crimeType,
+        stopped: !!enc.stopped,
+        arrested: !!enc.arrested
+      }];
+    }
+    return [];
+  }
 
   constructor(options = {}) {
     super(options);
@@ -214,9 +271,34 @@ export class TeamSheet extends Application {
       const hasName = !!(enc.name && enc.name.trim());
       const foeTotal = villainRows.reduce((sum, v) => sum + v.foeKarma, 0);
 
-      const crimeVals = enc.crimeType ? TeamSheet.CRIME_VALUES[enc.crimeType] : null;
-      const stopValue = crimeVals && enc.stopped ? crimeVals.stop : 0;
-      const arrestValue = crimeVals && enc.arrested ? crimeVals.arrest : 0;
+      const crimesRaw = TeamSheet._normalizeCrimes(enc);
+      let stopValue = 0, arrestValue = 0;
+      const crimes = crimesRaw.map((c, ci) => {
+        const cv = c.type ? TeamSheet.CRIME_VALUES[c.type] : null;
+        const sv = cv && c.stopped ? cv.stop : 0;
+        const av = cv && c.arrested ? cv.arrest : 0;
+        stopValue += sv;
+        arrestValue += av;
+        return {
+          ...c, ci,
+          label: this._crimeLabel(c.type),
+          stopValue: cv ? cv.stop : 0,
+          arrestValue: cv ? cv.arrest : 0,
+          typeOptions: [
+            { value: "",                   label: "— None —",                 selected: !c.type },
+            { value: "violent",            label: "Violent Crime (30/15)",    selected: c.type === "violent" },
+            { value: "destructive",        label: "Destructive Crime (20/10)", selected: c.type === "destructive" },
+            { value: "theft",              label: "Theft (10/5)",             selected: c.type === "theft" },
+            { value: "robbery",            label: "Robbery (20/10)",          selected: c.type === "robbery" },
+            { value: "misdemeanor",        label: "Misdemeanor (5/5)",        selected: c.type === "misdemeanor" },
+            { value: "national",           label: "National Offense (20/10)", selected: c.type === "national" },
+            { value: "localConspiracy",    label: "Local Conspiracy (30/15)", selected: c.type === "localConspiracy" },
+            { value: "nationalConspiracy", label: "National Conspiracy (40/20)", selected: c.type === "nationalConspiracy" },
+            { value: "globalConspiracy",   label: "Global Conspiracy (50/25)", selected: c.type === "globalConspiracy" },
+            { value: "other",              label: "Other Crimes (15/5)",      selected: c.type === "other" }
+          ]
+        };
+      });
       const rescueKarma = Math.min((enc.rescues || 0) * 20, 100);
       const gmAward = Math.max(0, enc.gmAward || 0);
 
@@ -274,21 +356,26 @@ export class TeamSheet extends Application {
       }).filter(Boolean);
       const bonusRows = (Array.isArray(enc.bonuses) ? enc.bonuses : []).map((b, bi) => {
         const scope = b.scope || "split";
+        const rule = b.rule || "custom";
+        const ruleBase = getBaseAmountForRule(rule);
+        const cap = getCapForRule(rule);
+        const overCap = cap !== null && Math.abs(b.amount || 0) > Math.abs(cap);
         return {
-          ...b, bi, scope,
+          ...b, bi, scope, rule,
           isSplit: scope === "split",
           isIndividual: scope === "individual",
           isPerHero: scope === "per_hero",
+          ruleGroups: getRuleOptionsGrouped(rule),
+          scopeOptions: getScopeOptionsForRule(rule, scope),
+          ruleBase, cap, overCap,
+          ruleIsCustom: rule === "custom",
+          ruleLabel: KARMA_RULES[rule]?.label || "Custom",
           heroOptions: presentHeroOpts.map(o => ({ ...o, selected: o.id === b.heroId }))
         };
       });
 
       let summaryLine, netLine;
-      if (groupMode === "full") {
-        summaryLine = `Split: +${splitPositive} ×${encMult} = <strong>+${perHeroFromSplit}/ea</strong> (full share)`;
-      } else {
-        summaryLine = `Split: +${splitPositive} ×${encMult} = +${splitMultiplied} ÷${heroCount} = <strong>+${perHeroFromSplit}/ea</strong>`;
-      }
+      summaryLine = `Split: +${splitPositive} ×${encMult} = +${splitMultiplied} ÷${heroCount} = <strong>+${perHeroFromSplit}/ea</strong>`;
       if (perHeroPosShown) summaryLine += ` &nbsp;|&nbsp; Per-hero: <strong>+${perHeroPosShown}/ea</strong>`;
       if (splitLossPerHero) summaryLine += ` &nbsp;|&nbsp; Loss: <strong>${splitLossPerHero}/ea</strong>`;
       if (perHeroLossShown) summaryLine += ` &nbsp;|&nbsp; Per-hero loss: <strong>${perHeroLossShown}/ea</strong>`;
@@ -327,7 +414,7 @@ export class TeamSheet extends Application {
         perHeroLoss: splitLossPerHero, perHeroLossExtra: perHeroLossShown,
         perHeroNet, summaryLine, netLine, encMult,
         heroChecks, villainNames, displayName, dateDisplay,
-        crimeType: enc.crimeType || "",
+        crimes, crimeType: enc.crimeType || "",
         headerKarma, hasPositive
       };
     });
@@ -409,14 +496,17 @@ export class TeamSheet extends Application {
 
     // Encounter controls
     html.find('.hero-present-toggle').change(ev => this._onToggleHeroPresent(ev));
-    html.find('.crime-type-select').change(ev => this._onEncFieldChange(ev, 'crimeType', ev.currentTarget.value, true));
-    html.find('.crime-stopped-toggle').change(ev => this._onEncFieldChange(ev, 'stopped', ev.currentTarget.checked));
-    html.find('.crime-arrested-toggle').change(ev => this._onEncFieldChange(ev, 'arrested', ev.currentTarget.checked));
+    html.find('.crime-type-row').change(ev => this._onCrimeFieldChange(ev, 'type', ev.currentTarget.value));
+    html.find('.crime-stopped-row').change(ev => this._onCrimeFieldChange(ev, 'stopped', ev.currentTarget.checked));
+    html.find('.crime-arrested-row').change(ev => this._onCrimeFieldChange(ev, 'arrested', ev.currentTarget.checked));
+    html.find('.add-crime').click(ev => this._onAddCrime(ev));
+    html.find('.delete-crime').click(ev => this._onDeleteCrime(ev));
     html.find('.rescue-count').change(ev => this._onEncNumericChange(ev, 'rescues'));
     html.find('.loss-amount').change(ev => this._onEncNumericChange(ev, 'losses'));
 
     // Actions
     html.find('.add-encounter-manual').click(() => this._onAddEncounter());
+    html.find('.import-encounter-text').click(() => this._onImportEncounterFromText());
     html.find('.add-foe-to-encounter').click(ev => this._onAddFoeToEncounter(ev));
     html.find('.delete-foe').click(ev => this._onDeleteFoe(ev));
     html.find('.delete-encounter').click(ev => this._onDeleteEncounter(ev));
@@ -430,6 +520,7 @@ export class TeamSheet extends Application {
     html.find('.bonus-amount-input').change(ev => this._onBonusFieldChange(ev, 'amount'));
     html.find('.bonus-scope-select').change(ev => this._onBonusScopeChange(ev));
     html.find('.bonus-hero-select').change(ev => this._onBonusFieldChange(ev, 'heroId'));
+    html.find('.bonus-rule-select').change(ev => this._onBonusRuleChange(ev));
     html.find('.loss-scope-select').change(ev => this._onLossScopeChange(ev));
     html.find('.enc-name-input').change(ev => {
       const idx = Number(ev.currentTarget.dataset.encIdx);
@@ -540,18 +631,8 @@ export class TeamSheet extends Application {
     this.render(false);
   }
 
-  _onEncFieldChange(ev, field, value, resetFlags) {
+  _onEncFieldChange(ev, field, value) {
     const idx = Number(ev.currentTarget.dataset.encIdx);
-    if (resetFlags && field === 'crimeType' && !value) {
-      const encounters = game.settings.get("msh-faserip", "defeatedVillains") || [];
-      if (encounters[idx]) {
-        encounters[idx].crimeType = "";
-        encounters[idx].stopped = false;
-        encounters[idx].arrested = false;
-        game.settings.set("msh-faserip", "defeatedVillains", encounters).then(() => this.render(false));
-      }
-      return;
-    }
     this._updateEncField(idx, field, value);
   }
 
@@ -566,7 +647,57 @@ export class TeamSheet extends Application {
     const encounters = game.settings.get("msh-faserip", "defeatedVillains") || [];
     if (!encounters[idx]) return;
     if (!Array.isArray(encounters[idx].bonuses)) encounters[idx].bonuses = [];
-    encounters[idx].bonuses.push({ label: "", amount: 10, scope: "split", heroId: null });
+    encounters[idx].bonuses.push({ label: "", amount: 10, scope: "split", heroId: null, rule: "custom" });
+    await game.settings.set("msh-faserip", "defeatedVillains", encounters);
+    this.render(false);
+  }
+
+  async _onAddCrime(ev) {
+    ev.stopPropagation();
+    const idx = Number(ev.currentTarget.dataset.encIdx);
+    const encounters = game.settings.get("msh-faserip", "defeatedVillains") || [];
+    if (!encounters[idx]) return;
+    // Migrate legacy single-crime fields lazily
+    if (!Array.isArray(encounters[idx].crimes)) {
+      encounters[idx].crimes = TeamSheet._normalizeCrimes(encounters[idx]);
+      delete encounters[idx].crimeType;
+      delete encounters[idx].stopped;
+      delete encounters[idx].arrested;
+    }
+    encounters[idx].crimes.push({ type: "", stopped: false, arrested: false });
+    await game.settings.set("msh-faserip", "defeatedVillains", encounters);
+    this.render(false);
+  }
+
+  async _onDeleteCrime(ev) {
+    ev.stopPropagation();
+    const encIdx = Number(ev.currentTarget.dataset.encIdx);
+    const crimeIdx = Number(ev.currentTarget.dataset.crimeIdx);
+    const encounters = game.settings.get("msh-faserip", "defeatedVillains") || [];
+    if (!Array.isArray(encounters[encIdx]?.crimes)) {
+      encounters[encIdx].crimes = TeamSheet._normalizeCrimes(encounters[encIdx]);
+      delete encounters[encIdx].crimeType;
+      delete encounters[encIdx].stopped;
+      delete encounters[encIdx].arrested;
+    }
+    encounters[encIdx].crimes.splice(crimeIdx, 1);
+    await game.settings.set("msh-faserip", "defeatedVillains", encounters);
+    this.render(false);
+  }
+
+  async _onCrimeFieldChange(ev, field, value) {
+    const encIdx = Number(ev.currentTarget.dataset.encIdx);
+    const crimeIdx = Number(ev.currentTarget.dataset.crimeIdx);
+    const encounters = game.settings.get("msh-faserip", "defeatedVillains") || [];
+    if (!Array.isArray(encounters[encIdx]?.crimes)) {
+      encounters[encIdx].crimes = TeamSheet._normalizeCrimes(encounters[encIdx]);
+      delete encounters[encIdx].crimeType;
+      delete encounters[encIdx].stopped;
+      delete encounters[encIdx].arrested;
+    }
+    const c = encounters[encIdx].crimes[crimeIdx];
+    if (!c) return;
+    c[field] = value;
     await game.settings.set("msh-faserip", "defeatedVillains", encounters);
     this.render(false);
   }
@@ -613,6 +744,41 @@ export class TeamSheet extends Application {
     this.render(false);
   }
 
+  async _onBonusRuleChange(ev) {
+    const encIdx = Number(ev.currentTarget.dataset.encIdx);
+    const bonusIdx = Number(ev.currentTarget.dataset.bonusIdx);
+    const encounters = game.settings.get("msh-faserip", "defeatedVillains") || [];
+    const b = encounters[encIdx]?.bonuses?.[bonusIdx];
+    if (!b) return;
+    const prevRule = b.rule || "custom";
+    const prevBase = getBaseAmountForRule(prevRule);
+    const newRule = ev.currentTarget.value || "custom";
+    const newBase = getBaseAmountForRule(newRule);
+
+    b.rule = newRule;
+
+    // Auto-set amount only if it's empty/zero or equals previous rule's base.
+    // Never overwrite a number the GM explicitly tuned.
+    const currentAmt = Number(b.amount) || 0;
+    if (newBase !== null && (currentAmt === 0 || currentAmt === prevBase)) {
+      b.amount = newBase;
+    }
+
+    // If current scope is no longer allowed by new rule, snap to first allowed
+    const allowed = (KARMA_RULES[newRule]?.allowedScopes) || ["split", "individual", "per_hero"];
+    if (!allowed.includes(b.scope || "split")) {
+      b.scope = allowed[0];
+      if (b.scope === "individual" && !b.heroId) {
+        const present = encounters[encIdx].presentHeroIds || [];
+        if (present.length) b.heroId = present[0];
+      }
+      if (b.scope !== "individual") b.heroId = null;
+    }
+
+    await game.settings.set("msh-faserip", "defeatedVillains", encounters);
+    this.render(false);
+  }
+
   async _onLossScopeChange(ev) {
     const idx = Number(ev.currentTarget.dataset.encIdx);
     const encounters = game.settings.get("msh-faserip", "defeatedVillains") || [];
@@ -642,6 +808,313 @@ export class TeamSheet extends Application {
     const ids = new Set(encounters[idx].presentHeroIds || []);
     if (ev.currentTarget.checked) ids.add(heroId); else ids.delete(heroId);
     this._updateEncField(idx, 'presentHeroIds', [...ids]);
+  }
+
+  // ===== IMPORT FROM TEXT =====
+
+  // Parses a structured text block into an encounter object.
+  // Returns { encounter, warnings }. Forgiving — unrecognized lines
+  // produce warnings rather than aborting.
+  static _parseEncounterText(text) {
+    const lines = (text || "").split(/\r?\n/);
+    const enc = {
+      id: `enc_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      name: "",
+      villains: [],
+      presentHeroIds: [],
+      crimes: [],
+      rescues: 0, losses: 0, lossScope: "split",
+      gmAward: 0,
+      bonuses: [],
+      awarded: false,
+      gameDate: "", gameTime: "",
+      timestamp: new Date().toISOString()
+    };
+    const warnings = [];
+
+    const parseScope = (raw) => {
+      if (!raw) return "split";
+      const s = String(raw).toLowerCase().replace(/[-\s]/g, "_");
+      if (s === "individual" || s === "ind") return "individual";
+      if (s === "per_hero" || s === "perhero" || s === "ea" || s === "each") return "per_hero";
+      return "split";
+    };
+
+    const crimeMap = {
+      "violent": "violent", "destructive": "destructive",
+      "theft": "theft", "robbery": "robbery",
+      "misdemeanor": "misdemeanor", "national": "national",
+      "national offense": "national",
+      "local conspiracy": "localConspiracy", "localconspiracy": "localConspiracy",
+      "national conspiracy": "nationalConspiracy", "nationalconspiracy": "nationalConspiracy",
+      "global conspiracy": "globalConspiracy", "globalconspiracy": "globalConspiracy",
+      "other": "other"
+    };
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line) continue;
+
+      if (line.startsWith("#")) {
+        const hashName = line.replace(/^#+\s*/, "").trim();
+        if (hashName && !enc.name) enc.name = hashName;
+        continue;
+      }
+
+      const colonIdx = line.indexOf(":");
+      if (colonIdx < 0) {
+        warnings.push(`Line ${i + 1}: no directive — skipped`);
+        continue;
+      }
+      const key = line.slice(0, colonIdx).trim().toUpperCase();
+      const val = line.slice(colonIdx + 1).trim();
+      if (!val) continue;
+
+      try {
+        if (key === "NAME") {
+          enc.name = val;
+        } else if (key === "DATE") {
+          enc.gameDate = val;
+        } else if (key === "TIME") {
+          enc.gameTime = val;
+        } else if (key === "FOE") {
+          const parts = val.split(",").map(s => s.trim());
+          const name = parts[0];
+          if (!name) { warnings.push(`Line ${i + 1}: FOE missing name`); continue; }
+          const rankPart = parts[1] || "";
+          const rankMatch = rankPart.match(/^([A-Za-z-]+)?\s*(-?\d+)?$/);
+          let rankLabel = "Typical", rankValue = 6;
+          if (rankMatch) {
+            if (rankMatch[1]) rankLabel = rankMatch[1];
+            if (rankMatch[2] !== undefined && rankMatch[2] !== "") rankValue = Number(rankMatch[2]);
+          }
+          const foe = { name, rankLabel, rankValue, count: 1, img: "icons/svg/mystery-man.svg", actorId: null };
+          for (let p = 2; p < parts.length; p++) {
+            const ext = parts[p].toLowerCase();
+            const nMatch = ext.match(/^(?:count|x)\s*(\d+)$/);
+            if (nMatch) foe.count = Math.max(1, parseInt(nMatch[1], 10));
+            else if (ext === "teleported" || ext === "teleport") foe.teleported = true;
+          }
+          enc.villains.push(foe);
+        } else if (key === "CRIME") {
+          const parts = val.split(",").map(s => s.trim().toLowerCase());
+          const type = parts[0];
+          const mappedType = crimeMap[type] || type;
+          enc.crimes.push({
+            type: mappedType,
+            stopped: parts.includes("stopped"),
+            arrested: parts.includes("arrested")
+          });
+        } else if (key === "RESCUES") {
+          const n = parseInt(val, 10);
+          if (!isNaN(n) && n > 0) enc.rescues = Math.min(n, 99);
+        } else if (key === "GM" || key === "GM AWARD") {
+          const n = parseInt(val, 10);
+          if (!isNaN(n) && n > 0) enc.gmAward = n;
+        } else if (key === "BONUS") {
+          const parts = val.split(",").map(s => s.trim());
+          const label = parts[0] || "";
+          const amt = parseInt(parts[1], 10);
+          if (isNaN(amt)) { warnings.push(`Line ${i + 1}: BONUS amount not a number`); continue; }
+          const scope = parseScope(parts[2]);
+          const rule = normalizeRuleKey(parts[3]);
+          enc.bonuses.push({ label, amount: amt, scope, heroId: null, rule });
+        } else if (key === "LOSS" || key === "LOSSES") {
+          const parts = val.split(",").map(s => s.trim());
+          if (parts.length === 1 && /^-?\d+$/.test(parts[0])) {
+            enc.losses = Math.abs(parseInt(parts[0], 10));
+            continue;
+          }
+          const label = parts[0] || "";
+          const amt = parseInt(parts[1], 10);
+          if (isNaN(amt)) { warnings.push(`Line ${i + 1}: LOSS amount not a number`); continue; }
+          const scope = parseScope(parts[2]);
+          const rule = normalizeRuleKey(parts[3]);
+          const finalAmt = amt > 0 ? -amt : amt;
+          if (scope === "per_hero" && /property|damage|area/i.test(label)) {
+            enc.losses = Math.abs(finalAmt);
+            enc.lossScope = "per_hero";
+          } else {
+            enc.bonuses.push({ label, amount: finalAmt, scope, heroId: null, rule });
+          }
+        } else if (key === "KARMA") {
+          // Inline block of "label: ±amount" pairs from raw module text.
+          // Example: KARMA: Capturing Mongoose: +100 Letting him go: -40
+          // Each pair becomes a BONUS with scope=split, rule=custom.
+          // -ALL is noted as a warning rather than given a magic number.
+          const pairs = [];
+          const rx = /([^:]+?):\s*([+-]?(?:\d+|ALL))/gi;
+          let m;
+          while ((m = rx.exec(val)) !== null) {
+            pairs.push({ label: m[1].trim().replace(/^[,;.\s]+|[,;.\s]+$/g, ""), raw: m[2].toUpperCase() });
+          }
+          if (!pairs.length) {
+            warnings.push(`Line ${i + 1}: KARMA block had no recognizable "label: ±amount" pairs`);
+            continue;
+          }
+          for (const p of pairs) {
+            if (p.raw.includes("ALL")) {
+              warnings.push(`Line ${i + 1}: "${p.label}" = -ALL (kill penalty) — add manually via a Death event; not imported`);
+              continue;
+            }
+            const amt = parseInt(p.raw, 10);
+            if (isNaN(amt) || amt === 0) continue;
+            enc.bonuses.push({ label: p.label, amount: amt, scope: "split", heroId: null, rule: "custom" });
+          }
+        } else {
+          warnings.push(`Line ${i + 1}: unknown directive "${key}"`);
+        }
+      } catch (err) {
+        warnings.push(`Line ${i + 1}: parse error — ${err.message}`);
+      }
+    }
+
+    if (!enc.name && enc.villains.length) {
+      enc.name = enc.villains.map(v => v.name).join(", ");
+    }
+
+    return { encounter: enc, warnings };
+  }
+
+  _renderImportPreview(enc, warnings) {
+    const foeRows = enc.villains.map(v =>
+      `<li>${v.name} — ${v.rankLabel}(${v.rankValue})${v.count > 1 ? ` ×${v.count}` : ""}${v.teleported ? " [teleported, half karma]" : ""}</li>`
+    ).join("");
+    const bonusRows = enc.bonuses.map(b => {
+      const sign = b.amount > 0 ? "+" : "";
+      const scopeTag = b.scope === "individual" ? " [individual]" : b.scope === "per_hero" ? " [per hero]" : "";
+      return `<li>${b.label || "(unlabeled)"}: ${sign}${b.amount}${scopeTag}</li>`;
+    }).join("");
+    const crimes = TeamSheet._normalizeCrimes(enc);
+    const crimeStr = crimes.length
+      ? crimes.map(c => `${c.type || '(no type)'}${c.stopped ? " stopped" : ""}${c.arrested ? " arrested" : ""}`).join("; ")
+      : "—";
+    const dateStr = [enc.gameDate, enc.gameTime].filter(Boolean).join(" ") || "—";
+    const lossStr = enc.losses
+      ? `${enc.losses}${enc.lossScope === "per_hero" ? " per hero" : " split"}`
+      : "—";
+    const warnBlock = warnings.length
+      ? `<div style="background:#fff3cd;border:1px solid #e0a800;padding:6px 8px;border-radius:3px;margin-top:8px;font-size:12px;">
+          <strong>${warnings.length} warning${warnings.length === 1 ? "" : "s"}:</strong>
+          <ul style="margin:4px 0 0 18px;padding:0;">${warnings.map(w => `<li>${w}</li>`).join("")}</ul>
+        </div>`
+      : "";
+    return `
+      <div style="font-size:12px;line-height:1.5;">
+        <div><strong>Name:</strong> ${enc.name || "(unnamed)"}</div>
+        <div><strong>Date:</strong> ${dateStr}</div>
+        <div><strong>Crime:</strong> ${crimeStr}</div>
+        <div><strong>Rescues:</strong> ${enc.rescues || 0}</div>
+        <div><strong>GM Award:</strong> ${enc.gmAward || 0}</div>
+        <div><strong>Losses:</strong> ${lossStr}</div>
+        <div style="margin-top:6px;"><strong>Foes (${enc.villains.length}):</strong></div>
+        ${foeRows ? `<ul style="margin:2px 0 0 18px;padding:0;">${foeRows}</ul>` : "<div style='color:#888;margin-left:8px;'>none</div>"}
+        <div style="margin-top:6px;"><strong>Bonuses (${enc.bonuses.length}):</strong></div>
+        ${bonusRows ? `<ul style="margin:2px 0 0 18px;padding:0;">${bonusRows}</ul>` : "<div style='color:#888;margin-left:8px;'>none</div>"}
+        ${warnBlock}
+      </div>
+    `;
+  }
+
+  _onImportEncounterFromText() {
+    if (!game.user.isGM) return;
+
+    const formatHelp = `Lines start with a directive followed by a colon. Blank lines and # comments are ignored.
+
+# Encounter Name (or use NAME:)
+DATE: Fireseek 11, 570 CY
+TIME: 11:30 PM
+FOE: Werewolf, Incredible 40, teleported
+FOE: Batboys, Typical 6, count 4
+CRIME: destructive, stopped
+CRIME: violent, stopped, arrested    (CRIME is repeatable per encounter)
+RESCUES: 3
+GM AWARD: 20
+BONUS: Keeping Werewolf from killing, +30, split
+BONUS: Getting Johnny out of gang, +25, individual, role-play-award
+BONUS: Clever plan, +15, split, stump-the-judge
+LOSS: Property damage, -5, per_hero    (→ sets losses field)
+LOSS: Allowing innocents to die, -15, split    (→ negative bonus)
+LOSS: 20    (→ plain number goes to losses field, split by default)
+KARMA: Capturing X: +100 Letting X escape: -40 Capturing thugs: +45
+    (→ inline block; each "label: ±amount" pair becomes a BONUS.
+       Use for pasting raw module karma text without reformatting.
+       "-ALL" entries warn rather than import — add Death events
+       manually.)
+
+Scopes: split (default), individual, per_hero (or "ea")
+Rules (optional 4th field on BONUS/LOSS): role-play-award, personal-
+commitment, rescue, stump-the-judge, humor-award, etc. See karma-rules.js
+for the full catalog. Defaults to "custom".
+Unrecognized lines become warnings. Amounts can be positive or negative.`;
+
+    const content = `
+      <form class="enc-import-form">
+        <div style="display:flex;gap:10px;align-items:flex-start;">
+          <div style="flex:1;min-width:0;">
+            <label style="font-weight:600;font-size:12px;">Paste encounter text:</label>
+            <textarea class="enc-import-text" rows="14" style="width:100%;font-family:monospace;font-size:12px;margin-top:3px;" placeholder="# My Encounter&#10;FOE: Werewolf, Incredible 40&#10;BONUS: Heroic stand, +30, split"></textarea>
+            <div style="margin-top:6px;">
+              <button type="button" class="enc-import-parse" style="width:100%;padding:4px;">Parse & preview</button>
+            </div>
+          </div>
+          <div style="flex:1;min-width:0;">
+            <label style="font-weight:600;font-size:12px;">Preview:</label>
+            <div class="enc-import-preview" style="margin-top:3px;padding:8px;background:#faf8f2;border:1px solid #ccc;border-radius:3px;min-height:260px;max-height:360px;overflow-y:auto;font-size:12px;color:#666;">
+              <em>Paste text and click Parse to preview.</em>
+            </div>
+          </div>
+        </div>
+        <details style="margin-top:8px;">
+          <summary style="cursor:pointer;font-size:12px;font-weight:600;">Format help</summary>
+          <pre style="font-size:11px;background:#f5f5f0;padding:8px;border-radius:3px;margin-top:4px;white-space:pre-wrap;">${formatHelp}</pre>
+        </details>
+      </form>
+    `;
+
+    let parsedEnc = null;
+
+    const dlg = new Dialog({
+      title: "Import Encounter from Text",
+      content,
+      buttons: {
+        create: {
+          icon: '<i class="fas fa-check"></i>',
+          label: "Create Encounter",
+          callback: async (html) => {
+            if (!parsedEnc) {
+              ui.notifications.warn("Parse the text first before creating.");
+              return false;
+            }
+            const encounters = game.settings.get("msh-faserip", "defeatedVillains") || [];
+            encounters.push(parsedEnc);
+            await game.settings.set("msh-faserip", "defeatedVillains", encounters);
+            // Auto-expand the new encounter so GM can review/edit
+            const newIdx = encounters.length - 1;
+            this._expandedEncounters.add(newIdx);
+            ui.notifications.info(`Imported encounter: ${parsedEnc.name || "(unnamed)"}`);
+            this.render(true);
+          }
+        },
+        cancel: { icon: '<i class="fas fa-times"></i>', label: "Cancel" }
+      },
+      default: "create",
+      render: (html) => {
+        html.find(".enc-import-parse").click(() => {
+          const text = html.find(".enc-import-text").val();
+          if (!text || !text.trim()) {
+            html.find(".enc-import-preview").html('<em style="color:#c00;">No text to parse.</em>');
+            parsedEnc = null;
+            return;
+          }
+          const { encounter, warnings } = TeamSheet._parseEncounterText(text);
+          parsedEnc = encounter;
+          html.find(".enc-import-preview").html(this._renderImportPreview(encounter, warnings));
+        });
+      }
+    }, { width: 760, height: 560, resizable: true });
+
+    dlg.render(true);
   }
 
   // ===== ADD / DELETE =====
@@ -837,7 +1310,7 @@ export class TeamSheet extends Application {
               presentHeroIds: [...teamIds],
               // Default crime flags to false — GM confirms stop/arrest explicitly
               // in the encounter detail UI. Auto-true inflated karma on creation.
-              crimeType, stopped: false, arrested: false,
+              crimes: crimeType ? [{ type: crimeType, stopped: false, arrested: false }] : [],
               rescues, losses, gmAward, bonuses: [...bonusList],
               awarded: false,
               gameDate: evtDate, gameTime: evtTime,
@@ -974,7 +1447,7 @@ export class TeamSheet extends Application {
       id: `enc_${Date.now()}`,
       villains,
       presentHeroIds: presentHeroIds || [],
-      crimeType: "", stopped: false, arrested: false,
+      crimes: [],
       rescues: 0, losses: 0, bonuses: [],
       awarded: false,
       gameDate, gameTime,
@@ -1069,7 +1542,7 @@ export class TeamSheet extends Application {
     const gameDate = enc.gameDate || TeamSheet._getGameDateTimeStatic().gameDate;
 
     // Build breakdown + confirmation summary
-    const breakdown = this._buildBreakdownText(enc, multiplier, heroes.length, mode);
+    const breakdown = this._buildBreakdownText(enc, multiplier, heroes.length);
     const perHeroCommon = perHeroFromSplit + perHeroPosShown + splitLossPerHero + perHeroLossShown;
     const indLines = [];
     for (const h of heroes) {
@@ -1078,7 +1551,6 @@ export class TeamSheet extends Application {
       const sum = items.reduce((s, it) => s + it.amount, 0);
       indLines.push(`${h.name}: ${sum > 0 ? '+' : ''}${sum}`);
     }
-    const modeNote = mode === "full" ? " (full share)" : "";
     const confirmBody = [
       `<p>${breakdown}</p>`,
       `<p>Base per hero (shared + per-hero scope): <strong>${perHeroCommon}</strong></p>`,
@@ -1086,7 +1558,7 @@ export class TeamSheet extends Application {
       `<p>Apply to <strong>${heroes.length}</strong> hero${heroes.length === 1 ? '' : 'es'}?</p>`
     ].join('');
     if (!await Dialog.confirm({
-      title: `Award — ${encLabel}${modeNote}`,
+      title: `Award — ${encLabel}`,
       content: confirmBody
     })) return;
 
@@ -1095,8 +1567,11 @@ export class TeamSheet extends Application {
     const sharedDescParts = [];
     if (enc.name) sharedDescParts.push(enc.name);
     if (foeNames) sharedDescParts.push(`Foe: ${foeNames}`);
-    if (enc.stopped) sharedDescParts.push(`Stop ${this._crimeLabel(enc.crimeType)}`);
-    if (enc.arrested) sharedDescParts.push(`Arrest ${this._crimeLabel(enc.crimeType)}`);
+    for (const c of TeamSheet._normalizeCrimes(enc)) {
+      if (!c.type) continue;
+      if (c.stopped) sharedDescParts.push(`Stop ${this._crimeLabel(c.type)}`);
+      if (c.arrested) sharedDescParts.push(`Arrest ${this._crimeLabel(c.type)}`);
+    }
     if (enc.rescues > 0) sharedDescParts.push(`Rescue ×${enc.rescues}`);
     if (enc.gmAward > 0) sharedDescParts.push(`GM +${enc.gmAward}`);
     const splitBonuses = (enc.bonuses || []).filter(b => (b.scope || "split") === "split" && b.amount);
@@ -1105,8 +1580,7 @@ export class TeamSheet extends Application {
     }
     const perHeroBonuses = (enc.bonuses || []).filter(b => b.scope === "per_hero" && b.amount);
     const desc = sharedDescParts.join(', ');
-    const divNote = mode === "full" ? "each" : `÷${heroes.length}`;
-    const baseNote = `(split base ${splitPositive} ×${multiplier} ${divNote})`;
+    const baseNote = `(split base ${splitPositive} ×${multiplier} ÷${heroes.length})`;
 
     for (const hero of heroes) {
       // Shared split award
@@ -1163,7 +1637,7 @@ export class TeamSheet extends Application {
 
     encounters[idx].awarded = true;
     await game.settings.set("msh-faserip", "defeatedVillains", encounters);
-    ui.notifications.info(`${encLabel}: awarded to ${heroes.length} hero${heroes.length === 1 ? '' : 'es'}${modeNote}.`);
+    ui.notifications.info(`${encLabel}: awarded to ${heroes.length} hero${heroes.length === 1 ? '' : 'es'}.`);
     this.render(true);
   }
 
@@ -1291,9 +1765,13 @@ export class TeamSheet extends Application {
       const count = Math.max(1, v.count || 1);
       return sum + (v.rankValue >= 30 ? v.rankValue * count : 0);
     }, 0);
-    const cv = enc.crimeType ? TeamSheet.CRIME_VALUES[enc.crimeType] : null;
-    const stopValue = cv && enc.stopped ? cv.stop : 0;
-    const arrestValue = cv && enc.arrested ? cv.arrest : 0;
+    let stopValue = 0, arrestValue = 0;
+    for (const c of TeamSheet._normalizeCrimes(enc)) {
+      const cv = c.type ? TeamSheet.CRIME_VALUES[c.type] : null;
+      if (!cv) continue;
+      if (c.stopped) stopValue += cv.stop;
+      if (c.arrested) arrestValue += cv.arrest;
+    }
     const rescueKarma = Math.min((enc.rescues || 0) * 20, 100);
     const gmAward = Math.max(0, enc.gmAward || 0);
     const rawLoss = -Math.abs(enc.losses || 0);
@@ -1354,16 +1832,20 @@ export class TeamSheet extends Application {
     };
   }
 
-  _buildBreakdownText(enc, multiplier, heroCount, mode = "split") {
+  _buildBreakdownText(enc, multiplier, heroCount) {
     const parts = [];
     const foeTotal = (enc.villains || []).reduce((sum, v) => {
       const count = Math.max(1, v.count || 1);
       return sum + (v.rankValue >= 30 ? v.rankValue * count : 0);
     }, 0);
     if (foeTotal > 0) parts.push(`Foe +${foeTotal}`);
-    const cv = enc.crimeType ? TeamSheet.CRIME_VALUES[enc.crimeType] : null;
-    if (cv && enc.stopped) parts.push(`Stop +${cv.stop}`);
-    if (cv && enc.arrested) parts.push(`Arrest +${cv.arrest}`);
+    for (const c of TeamSheet._normalizeCrimes(enc)) {
+      const cv = c.type ? TeamSheet.CRIME_VALUES[c.type] : null;
+      if (!cv) continue;
+      const label = this._crimeLabel(c.type);
+      if (c.stopped) parts.push(`Stop ${label} +${cv.stop}`);
+      if (c.arrested) parts.push(`Arrest ${label} +${cv.arrest}`);
+    }
     if (enc.rescues > 0) parts.push(`Rescue +${Math.min(enc.rescues * 20, 100)}`);
     if (enc.gmAward > 0) parts.push(`GM +${enc.gmAward}`);
 
@@ -1379,8 +1861,7 @@ export class TeamSheet extends Application {
       const lossScope = enc.lossScope || "split";
       parts.push(`Loss -${enc.losses}${lossScope === "per_hero" ? ' [ea]' : ''}`);
     }
-    const divNote = mode === "full" ? "each" : `÷${heroCount}`;
-    return parts.join(', ') + ` (×${multiplier} ${divNote} on split pool)`;
+    return parts.join(', ') + ` (×${multiplier} ÷${heroCount} on split pool)`;
   }
 
   _crimeLabel(crimeType) {
@@ -1755,7 +2236,7 @@ export class TeamSheet extends Application {
       id: `enc_${Date.now()}`,
       villains,
       presentHeroIds: [...heroCombatantIds],
-      crimeType: "", stopped: false, arrested: false,
+      crimes: [],
       rescues: 0, losses: 0,
       awarded: false,
       gameDate, gameTime,

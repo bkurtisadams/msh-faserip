@@ -161,6 +161,7 @@
       <div class="section-header">
         <h3>Encounters ({{encounterCount}})</h3>
         <div class="section-btns">
+          <button type="button" class="import-encounter-text" title="Import an encounter from pasted text (module karma awards)"><i class="fas fa-file-import"></i> Import</button>
           <button type="button" class="add-encounter-manual"><i class="fas fa-plus"></i> Add Encounter</button>
         </div>
       </div>
@@ -244,29 +245,34 @@
               </div>
             </div>
 
-            <!-- Crime -->
+            <!-- Crimes -->
             <div class="detail-section">
-              <div class="detail-row">
-                <label>Crime:
-                  <select class="crime-type-select" data-enc-idx="{{@index}}">
-                    <option value="">— None —</option>
-                    <option value="violent" {{#if (eq enc.crimeType "violent")}}selected{{/if}}>Violent Crime (30/15)</option>
-                    <option value="destructive" {{#if (eq enc.crimeType "destructive")}}selected{{/if}}>Destructive Crime (20/10)</option>
-                    <option value="theft" {{#if (eq enc.crimeType "theft")}}selected{{/if}}>Theft (10/5)</option>
-                    <option value="robbery" {{#if (eq enc.crimeType "robbery")}}selected{{/if}}>Robbery (20/10)</option>
-                    <option value="misdemeanor" {{#if (eq enc.crimeType "misdemeanor")}}selected{{/if}}>Misdemeanor (5/5)</option>
-                    <option value="national" {{#if (eq enc.crimeType "national")}}selected{{/if}}>National Offense (20/10)</option>
-                    <option value="localConspiracy" {{#if (eq enc.crimeType "localConspiracy")}}selected{{/if}}>Local Conspiracy (30/15)</option>
-                    <option value="nationalConspiracy" {{#if (eq enc.crimeType "nationalConspiracy")}}selected{{/if}}>National Conspiracy (40/20)</option>
-                    <option value="globalConspiracy" {{#if (eq enc.crimeType "globalConspiracy")}}selected{{/if}}>Global Conspiracy (50/25)</option>
-                    <option value="other" {{#if (eq enc.crimeType "other")}}selected{{/if}}>Other Crimes (15/5)</option>
+              <label>Crimes:</label>
+              {{#if enc.crimes.length}}
+              <div class="crime-list">
+                {{#each enc.crimes as |c|}}
+                <div class="crime-row">
+                  <select class="crime-type-row" data-enc-idx="{{@../index}}" data-crime-idx="{{@index}}">
+                    {{#each c.typeOptions as |o|}}
+                    <option value="{{o.value}}" {{#if o.selected}}selected{{/if}}>{{o.label}}</option>
+                    {{/each}}
                   </select>
-                </label>
-                {{#if enc.crimeType}}
-                <label class="crime-flag"><input type="checkbox" class="crime-stopped-toggle" data-enc-idx="{{@index}}" {{#if enc.stopped}}checked{{/if}} /> Stopped (+{{enc.stopValue}})</label>
-                <label class="crime-flag"><input type="checkbox" class="crime-arrested-toggle" data-enc-idx="{{@index}}" {{#if enc.arrested}}checked{{/if}} /> Arrested (+{{enc.arrestValue}})</label>
-                {{/if}}
+                  {{#if c.type}}
+                  <label class="crime-flag"><input type="checkbox" class="crime-stopped-row" data-enc-idx="{{@../index}}" data-crime-idx="{{@index}}" {{#if c.stopped}}checked{{/if}} /> Stopped (+{{c.stopValue}})</label>
+                  <label class="crime-flag"><input type="checkbox" class="crime-arrested-row" data-enc-idx="{{@../index}}" data-crime-idx="{{@index}}" {{#if c.arrested}}checked{{/if}} /> Arrested (+{{c.arrestValue}})</label>
+                  {{else}}
+                  <span class="crime-pick-note">Pick a crime type to enable Stop/Arrest flags.</span>
+                  {{/if}}
+                  <a class="delete-crime" data-enc-idx="{{@../index}}" data-crime-idx="{{@index}}" title="Remove this crime"><i class="fas fa-times"></i></a>
+                </div>
+                {{/each}}
               </div>
+              {{else}}
+              <span class="no-foes-note">No crimes attached. Add one or more to claim Stop/Arrest karma per RAW.</span>
+              {{/if}}
+              {{#unless enc.awarded}}
+              <button type="button" class="add-crime btn-add-foe" data-enc-idx="{{@index}}"><i class="fas fa-gavel"></i> Add Crime</button>
+              {{/unless}}
             </div>
 
             <!-- Rescues, Losses & GM Award -->
@@ -295,9 +301,18 @@
                   <input type="text" class="bonus-label-input" data-enc-idx="{{@../index}}" data-bonus-idx="{{@index}}" value="{{b.label}}" placeholder="e.g., Befriending Felicia" />
                   <input type="number" class="bonus-amount-input" data-enc-idx="{{@../index}}" data-bonus-idx="{{@index}}" value="{{b.amount}}" />
                   <select class="bonus-scope-select" data-enc-idx="{{@../index}}" data-bonus-idx="{{@index}}" title="Scope">
-                    <option value="split" {{#if b.isSplit}}selected{{/if}}>Split</option>
-                    <option value="individual" {{#if b.isIndividual}}selected{{/if}}>Ind.</option>
-                    <option value="per_hero" {{#if b.isPerHero}}selected{{/if}}>Per hero</option>
+                    {{#each b.scopeOptions as |s|}}
+                    <option value="{{s.value}}" {{#if s.selected}}selected{{/if}} {{#if s.disabled}}disabled{{/if}}>{{s.label}}{{#if s.disabled}} (RAW: no){{/if}}</option>
+                    {{/each}}
+                  </select>
+                  <select class="bonus-rule-select {{#unless b.ruleIsCustom}}bonus-rule-set{{/unless}}" data-enc-idx="{{@../index}}" data-bonus-idx="{{@index}}" title="RAW rule category">
+                    {{#each b.ruleGroups as |g|}}
+                    <optgroup label="{{g.group}}">
+                      {{#each g.options as |o|}}
+                      <option value="{{o.value}}" {{#if o.selected}}selected{{/if}}>{{o.label}}</option>
+                      {{/each}}
+                    </optgroup>
+                    {{/each}}
                   </select>
                   {{#if b.isIndividual}}
                   <select class="bonus-hero-select" data-enc-idx="{{@../index}}" data-bonus-idx="{{@index}}" title="Recipient (present heroes only)">
@@ -309,6 +324,9 @@
                       <option value="">— no present heroes —</option>
                     {{/if}}
                   </select>
+                  {{/if}}
+                  {{#if b.overCap}}
+                  <span class="bonus-cap-warn" title="RAW caps {{b.ruleLabel}} at {{b.cap}}">!</span>
                   {{/if}}
                   <a class="delete-bonus" data-enc-idx="{{@../index}}" data-bonus-idx="{{@index}}" title="Remove"><i class="fas fa-times"></i></a>
                 </div>
