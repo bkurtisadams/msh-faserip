@@ -1,4 +1,14 @@
-// teamSheet.js v4.2.0 - 2026-04-16
+// teamSheet.js v4.3.0 - 2026-04-16
+// v4.3.0: Tabbed UI (Team / Encounters / HQ). Tabs persist only for window
+//         lifetime; default is Encounters for GMs, Team for players.
+//         - Team tab: roster, karma pool (if enabled), team actions (Bio,
+//           R+I+P if enabled, Close Session placeholder).
+//         - Encounters tab: encounter list (existing workflow untouched).
+//         - HQ tab: headquarters list (promoted from collapsible section).
+//         - New teamName and teamBioJournalId settings seed future team-
+//           profile work. _onOpenTeamBio creates/opens a structured journal.
+//         Data model unchanged — existing settings and encounter format
+//         preserved so this is a pure UI refactor.
 // v4.2.0: Critical fixes.
 //         - getHighestRank read wrong path (system.abilities.abilities) so
 //           ability-only villains always registered as Shift-0(0) and awarded
@@ -42,6 +52,7 @@ export class TeamSheet extends Application {
     super(options);
     this._removeMode = false;
     this._expandedEncounters = new Set();
+    this._activeTab = null; // "team" | "encounters" | "hq" — defaulted in getData
     this._timeUpdateHook = Hooks.on("msh-faserip.timeUpdated", () => {
       if (this.rendered) this.render(false);
     });
@@ -86,6 +97,20 @@ export class TeamSheet extends Application {
     context.hqExpanded = this._hqExpanded ?? false;
     context.useKarmaPool = game.settings.get("msh-faserip", "useKarmaPool") ?? false;
     context.sessionRIPBonus = game.settings.get("msh-faserip", "sessionRIPBonus") ?? false;
+
+    // Tabs
+    // Default encounters for GMs (primary workflow); Team for players (who
+    // can't see encounters list anyway).
+    if (!this._activeTab) this._activeTab = context.isGM ? "encounters" : "team";
+    context.activeTab = this._activeTab;
+    context.isTeamTab = context.activeTab === "team";
+    context.isEncountersTab = context.activeTab === "encounters";
+    context.isHqTab = context.activeTab === "hq";
+
+    // Team identity (seed fields — filled in by later bio/profile work)
+    context.teamName = game.settings.get("msh-faserip", "teamName") || "Team Tracker";
+    context.teamBioJournalId = game.settings.get("msh-faserip", "teamBioJournalId") || "";
+    context.hasTeamBio = !!context.teamBioJournalId && !!game.journal?.get(context.teamBioJournalId);
 
     const teamMemberIds = game.settings.get("msh-faserip", "teamMembers") || [];
     context.teamMembers = teamMemberIds.map(id => {
@@ -220,6 +245,18 @@ export class TeamSheet extends Application {
   activateListeners(html) {
     super.activateListeners(html);
 
+    // Tabs
+    html.find('.tt-tab').click(ev => {
+      const tab = ev.currentTarget.dataset.tab;
+      if (!tab || tab === this._activeTab) return;
+      this._activeTab = tab;
+      this.render(false);
+    });
+
+    // Team tab: bio + placeholder session actions
+    html.find('.tt-open-bio').click(() => this._onOpenTeamBio());
+    html.find('.tt-close-session').click(() => this._onCloseSessionPlaceholder());
+
     // Roster
     html.find('.add-hero-to-team-btn').click(() => {
       const s = html.find('.add-hero-select'); const id = s.val();
@@ -302,6 +339,50 @@ export class TeamSheet extends Application {
   }
 
   // ===== TEAM =====
+
+  /**
+   * Open or create the team's bio journal entry.
+   * GM-only. Creates a blank journal with section-heading placeholders; the GM
+   * fills in narrative prose. No auto-sync from tracker state into the journal.
+   */
+  async _onOpenTeamBio() {
+    if (!game.user.isGM) {
+      ui.notifications.warn("Only the GM can edit the team bio.");
+      return;
+    }
+    const existingId = game.settings.get("msh-faserip", "teamBioJournalId");
+    let journal = existingId ? game.journal?.get(existingId) : null;
+    if (journal) return journal.sheet.render(true);
+
+    const teamName = game.settings.get("msh-faserip", "teamName") || "The Team";
+    const body = `<h2>Overview</h2><p></p>
+<h2>Founding</h2><p><em>Date, location, founding members, and the event that brought them together.</em></p>
+<h2>Members</h2><p><em>Current roster. Use @UUID[Actor.xxx]{Hero Name} to link to a hero.</em></p>
+<h2>Former Members</h2><p></p>
+<h2>History</h2><p></p>
+<h2>Base of Operations</h2><p></p>
+<h2>Allies &amp; Enemies</h2><p></p>`;
+
+    journal = await JournalEntry.create({
+      name: `${teamName} — Bio`,
+      pages: [{ name: "Team Bio", type: "text", text: { content: body, format: 1 } }]
+    });
+    if (!journal) {
+      ui.notifications.error("Failed to create team bio.");
+      return;
+    }
+    await game.settings.set("msh-faserip", "teamBioJournalId", journal.id);
+    journal.sheet.render(true);
+    this.render(false);
+  }
+
+  /**
+   * Placeholder for future "Close Session" action. The real implementation
+   * needs session-boundary data (archived encounters, session metadata).
+   */
+  _onCloseSessionPlaceholder() {
+    ui.notifications.info("Close Session: coming soon. Will archive awarded encounters into a session log.");
+  }
 
   async _onAddHeroToTeam(heroId) {
     const tm = game.settings.get("msh-faserip", "teamMembers") || [];

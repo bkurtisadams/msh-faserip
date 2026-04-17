@@ -927,6 +927,23 @@ Hooks.once("init", async () => {
       default: ""
     });
 
+    game.settings.register("msh-faserip", "teamName", {
+      name: "Team Name",
+      hint: "Name shown in the Team Tracker header. Used for the team bio journal entry.",
+      scope: "world",
+      config: true,
+      type: String,
+      default: ""
+    });
+
+    game.settings.register("msh-faserip", "teamBioJournalId", {
+      name: "Team Bio Journal ID",
+      scope: "world",
+      config: false,
+      type: String,
+      default: ""
+    });
+
     game.settings.register("msh-faserip", "useKarmaPool", {
       name: "Enable Team Karma Pool",
       hint: "Enable the shared team karma pool (RAW rules). When off, all group awards split directly to individual heroes.",

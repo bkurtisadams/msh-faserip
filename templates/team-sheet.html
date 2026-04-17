@@ -2,16 +2,10 @@
   <!-- Header -->
   <div class="team-header">
     <div class="header-left">
+      {{#if teamName}}<span class="team-name">{{teamName}}</span>{{/if}}
       {{#if campaignDateTime}}<span class="campaign-datetime">{{campaignDateTime}}</span>{{/if}}
     </div>
     <div class="header-right">
-      {{#if useKarmaPool}}
-      <div class="pool-display">
-        <label>Pool</label>
-        <div class="pool-value">{{teamKarmaPool}}</div>
-        <button type="button" class="open-pool-manager" title="Manage Pool"><i class="fas fa-cog"></i></button>
-      </div>
-      {{/if}}
       {{#if isGM}}
       <div class="multiplier-display">
         <label>Mult</label>
@@ -31,8 +25,28 @@
     </div>
   </div>
 
+  <!-- Tab bar -->
+  <div class="tt-tab-bar">
+    <button type="button" class="tt-tab {{#if isTeamTab}}active{{/if}}" data-tab="team">
+      <i class="fas fa-users"></i> Team
+      {{#if teamMembers.length}}<span class="tt-tab-count">{{teamMembers.length}}</span>{{/if}}
+    </button>
+    <button type="button" class="tt-tab {{#if isEncountersTab}}active{{/if}}" data-tab="encounters">
+      <i class="fas fa-skull"></i> Encounters
+      {{#if encounterCount}}<span class="tt-tab-count">{{encounterCount}}</span>{{/if}}
+    </button>
+    <button type="button" class="tt-tab {{#if isHqTab}}active{{/if}}" data-tab="hq">
+      <i class="fas fa-building"></i> HQ
+      {{#if teamHQs.length}}<span class="tt-tab-count">{{teamHQs.length}}</span>{{/if}}
+    </button>
+  </div>
+
   <!-- Body -->
   <div class="tracker-body">
+
+    <!-- ═══ TEAM TAB ═══ -->
+    {{#if isTeamTab}}
+    <div class="tt-panel tt-panel-team">
 
     <!-- Team Roster -->
     <div class="team-roster-section">
@@ -64,19 +78,49 @@
           <option value="{{actor.id}}">{{actor.name}}{{#if (eq actor.type "npc")}} (NPC){{/if}}</option>
           {{/each}}
         </select>
-        <button type="button" class="add-hero-to-team-btn"><i class="fas fa-plus"></i></button>
+        <button type="button" class="add-hero-to-team-btn" title="Add selected hero"><i class="fas fa-plus"></i></button>
         <button type="button" class="remove-member-toggle {{#if removeMode}}active{{/if}}" title="Toggle remove mode"><i class="fas fa-user-minus"></i></button>
-        {{#if sessionRIPBonus}}
-        <button type="button" class="award-session-bonus" title="Session R+I+P Bonus (house rule): each hero receives their Reason + Intuition + Psyche as bonus karma."><i class="fas fa-star"></i> R+I+P</button>
-        {{/if}}
       </div>
       {{/if}}
     </div>
 
-    <!-- Team Headquarters (collapsible) -->
+    <!-- Karma Pool panel (Team tab, only when enabled) -->
+    {{#if useKarmaPool}}
+    <div class="tt-pool-panel">
+      <div class="tt-panel-header">
+        <span class="tt-panel-label">Karma Pool</span>
+        <button type="button" class="open-pool-manager"><i class="fas fa-cog"></i> Manage</button>
+      </div>
+      <div class="tt-pool-value">{{teamKarmaPool}}</div>
+    </div>
+    {{/if}}
+
+    <!-- Session / Team Actions -->
+    {{#if isGM}}
+    <div class="tt-session-actions">
+      <div class="tt-panel-label">Team Actions</div>
+      <div class="tt-action-row">
+        <button type="button" class="tt-open-bio" title="Open the team bio journal entry.">
+          <i class="fas fa-book"></i> {{#if hasTeamBio}}Team Bio{{else}}Create Team Bio{{/if}}
+        </button>
+        {{#if sessionRIPBonus}}
+        <button type="button" class="award-session-bonus" title="Session R+I+P Bonus (house rule): each hero receives their Reason + Intuition + Psyche as bonus karma."><i class="fas fa-star"></i> R+I+P Bonus</button>
+        {{/if}}
+        <button type="button" class="tt-close-session" title="Close the current session (coming soon)."><i class="fas fa-flag-checkered"></i> Close Session</button>
+      </div>
+    </div>
+    {{/if}}
+
+    </div>
+    {{/if}}
+    <!-- ═══ END TEAM TAB ═══ -->
+
+    <!-- ═══ HQ TAB ═══ -->
+    {{#if isHqTab}}
+    <div class="tt-panel tt-panel-hq">
     <div class="team-hq-section">
-      <div class="section-header hq-toggle" title="Click to expand/collapse">
-        <h3><i class="fas fa-chevron-{{#if hqExpanded}}down{{else}}right{{/if}} hq-toggle-icon"></i> HQ ({{teamHQs.length}})</h3>
+      <div class="section-header">
+        <h3>Headquarters ({{teamHQs.length}})</h3>
         {{#if isGM}}
         <div class="section-btns">
           <button type="button" class="process-rent-btn" title="Send rent due notices for all rented HQs"><i class="fas fa-file-invoice-dollar"></i> Process Rent</button>
@@ -85,7 +129,6 @@
         {{/if}}
       </div>
 
-      <div class="team-hq-body" {{#unless hqExpanded}}style="display:none;"{{/unless}}>
       {{#if teamHQs.length}}
       <div class="team-hq-list">
         {{#each teamHQs}}
@@ -105,10 +148,14 @@
       {{else}}
       <p class="no-encounters">No team headquarters.</p>
       {{/if}}
-      </div>
     </div>
+    </div>
+    {{/if}}
+    <!-- ═══ END HQ TAB ═══ -->
 
-    <!-- Encounters -->
+    <!-- ═══ ENCOUNTERS TAB ═══ -->
+    {{#if isEncountersTab}}
+    <div class="tt-panel tt-panel-encounters">
     {{#if isGM}}
     <div class="encounters-section">
       <div class="section-header">
@@ -289,7 +336,13 @@
       <p class="no-encounters">No encounters yet. Foes auto-capture from combat.</p>
       {{/if}}
     </div>
+    {{else}}
+    <p class="no-encounters">Encounters are managed by the GM.</p>
     {{/if}}
+
+    </div>
+    {{/if}}
+    <!-- ═══ END ENCOUNTERS TAB ═══ -->
 
   </div>
 </form>
