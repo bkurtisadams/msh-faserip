@@ -1,4 +1,14 @@
-// teamSheet.js v4.4.0 - 2026-04-17
+// teamSheet.js v4.4.2 - 2026-04-17
+// v4.4.2: Encounter card preview strings (summaryLine / netLine) now built
+//         in getData() based on groupAwardMode. Template no longer hardcodes
+//         "÷heroCount" format. In "full" mode the card reads
+//         "+50 ×2 = +100/ea (full share)" instead of showing a division.
+//         Also pairs with templates/team-sheet.html using {{{summaryLine}}}.
+// v4.4.1: Encounter row preview math in getData() now routes through
+//         computeGroupAward/computeLossAmount so the inline per-hero totals
+//         shown on each encounter row match the award that will actually
+//         fire. Previously the preview always divided by hero count even
+//         when groupAwardMode was "full".
 // v4.4.0: Encounter awards now route through karma-multipliers.js helper.
 //         Respects groupAwardMode setting (split | full | pool). In full mode
 //         each present hero receives the full gross award (house rule matching
@@ -153,6 +163,8 @@ export class TeamSheet extends Application {
     const multiplier = game.settings.get("msh-faserip", "karmaMultiplier") || 1;
     context.karmaMultiplier = multiplier;
     context.multiplierOptions = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+    const groupMode = getGroupAwardMode();
+    context.groupAwardMode = groupMode;
 
     // Encounters — migrate v3 flat villains to v4 encounter format
     let encounters = game.settings.get("msh-faserip", "defeatedVillains") || [];
@@ -202,12 +214,30 @@ export class TeamSheet extends Application {
 
       const positiveTotal = foeTotal + stopValue + arrestValue + rescueKarma + gmAward + bonusPositive;
       const totalLoss = lossKarma + bonusNegative;
-      const positiveMultiplied = positiveTotal * multiplier;
       const presentIds = (enc.presentHeroIds || []).filter(id => game.actors.get(id));
       const heroCount = Math.max(1, presentIds.length);
-      const perHeroPositive = Math.floor(positiveMultiplied / heroCount);
-      const perHeroLoss = totalLoss ? Math.floor(totalLoss / heroCount) : 0;
+      const previewAward = computeGroupAward({
+        eventType: "Encounter Award",
+        baseAmount: positiveTotal,
+        heroCount,
+        groupMode
+      });
+      const positiveMultiplied = previewAward.groupTotal;
+      const perHeroPositive = previewAward.perHero;
+      const perHeroLoss = totalLoss ? computeLossAmount(totalLoss, heroCount, groupMode) : 0;
       const perHeroNet = perHeroPositive + perHeroLoss;
+      const encMult = previewAward.multiplier;
+
+      let summaryLine, netLine;
+      if (groupMode === "full") {
+        summaryLine = `+${positiveTotal} ×${encMult} = <strong>+${perHeroPositive}/ea</strong> (full share)`;
+        if (totalLoss) summaryLine += ` &nbsp;|&nbsp; <strong>${perHeroLoss}/ea</strong>`;
+        netLine = `Net: <strong>${perHeroNet}/ea</strong> to each of ${heroCount} heroes`;
+      } else {
+        summaryLine = `+${positiveTotal} ×${encMult} = +${positiveMultiplied} ÷${heroCount} = <strong>+${perHeroPositive}/ea</strong>`;
+        if (totalLoss) summaryLine += ` &nbsp;|&nbsp; ${totalLoss} ÷${heroCount} = <strong>${perHeroLoss}/ea</strong>`;
+        netLine = `Net: <strong>${perHeroNet}/ea</strong> to ${heroCount} heroes`;
+      }
 
       const heroChecks = (context.teamMembers || []).map(tm => ({
         id: tm.id, name: tm.name, img: tm.img,
@@ -224,6 +254,7 @@ export class TeamSheet extends Application {
         bonuses, bonusPositive, bonusNegative: bonusNegative || 0,
         positiveTotal, positiveMultiplied, heroCount,
         perHeroPositive, perHeroLoss, perHeroNet,
+        summaryLine, netLine, encMult,
         heroChecks, villainNames, displayName, dateDisplay,
         crimeType: enc.crimeType || "",
         hasPositive: positiveTotal > 0

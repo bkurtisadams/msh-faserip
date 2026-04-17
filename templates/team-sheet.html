@@ -309,11 +309,10 @@
                 {{#if enc.bonusNegative}}<span class="sum-neg">Penalties {{enc.bonusNegative}}</span>{{/if}}
               </div>
               <div class="sum-total">
-                +{{enc.positiveTotal}} ×{{../karmaMultiplier}} = +{{enc.positiveMultiplied}} ÷{{enc.heroCount}} = <strong>+{{enc.perHeroPositive}}/ea</strong>
-                {{#if enc.lossKarma}} &nbsp;|&nbsp; {{enc.lossKarma}} ÷{{enc.heroCount}} = <strong>{{enc.perHeroLoss}}/ea</strong>{{/if}}
+                {{{enc.summaryLine}}}
               </div>
               <div class="sum-net">
-                Net: <strong>{{enc.perHeroNet}}/ea</strong> to {{enc.heroCount}} heroes
+                {{{enc.netLine}}}
               </div>
             </div>
 

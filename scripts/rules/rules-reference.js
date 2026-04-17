@@ -2243,3 +2243,26 @@ export const HEALTH_AND_DEATH = {
 // Add Karma spent to die roll result. Can spend more than 10.
 // Cannot modify: Resource FEATs, Popularity FEATs, Blindsided/surprise FEATs.
 // Reduce combat effect by 1 color: 50 Karma (immediately after roll, before other rolls).
+
+// ── GRAND SLAM KNOCKBACK DISTANCE ──
+// Areas knocked back on a Grand Slam result (white), by attacker Strength rank.
+// Beyond treated as Class 5000 by callers (table stops there).
+export const GRAND_SLAM_AREAS = {
+  "Shift 0": 0,
+  "Feeble": 1,
+  "Poor": 1,
+  "Typical": 3,
+  "Good": 5,
+  "Excellent": 6,
+  "Remarkable": 7,
+  "Incredible": 8,
+  "Amazing": 10,
+  "Monstrous": 15,
+  "Unearthly": 20,
+  "Shift X": 25,
+  "Shift Y": 35,
+  "Shift Z": 50,
+  "Class 1000": 100,
+  "Class 3000": 200,
+  "Class 5000": 500
+};
