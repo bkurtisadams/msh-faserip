@@ -253,7 +253,9 @@ export class KarmaAdvancementSheet extends DocumentSheet {
         const nextResourceValue = resourceValue + 1;
         const resourceCresting = this._isCresting(resourceValue, nextResourceValue);
         
-        const resourceBaseCost = 10 * nextResourceValue;
+        // ADVANCEMENT.resource: 10× current rank number (matches ability formula).
+        // Previous code used nextResourceValue, making every purchase cost 10 karma too much.
+        const resourceBaseCost = 10 * resourceValue;
         const resourceCrestingCost = resourceCresting ? 200 : 0;
         cost = resourceBaseCost + resourceCrestingCost;
         
@@ -458,8 +460,11 @@ export class KarmaAdvancementSheet extends DocumentSheet {
   }
 
   _isCresting(currentValue, nextValue) {
-    // Define rank boundaries (minimum value for each rank)
-    const rankBoundaries = [0, 2, 4, 6, 10, 20, 30, 40, 50, 75, 100, 150, 200, 500, 1000, 3000, 5000, 10000];
+    // Rank Range MINIMUMS per Advanced Set rank table.
+    // NOTE: these are the range minimums (Typical starts at 5, Good at 8, etc.),
+    // NOT the Standard Rank Numbers (6, 10, 20...). Cresting triggers when
+    // nextValue crosses a range minimum — e.g. Typical(5-7) → Good(8-15) crests at 7→8.
+    const rankBoundaries = [0, 1, 3, 5, 8, 16, 26, 36, 46, 63, 88, 126, 176, 351, 1000, 3000, 5000, 10000];
     
     let currentRankIndex = 0;
     let nextRankIndex = 0;
@@ -484,23 +489,24 @@ export class KarmaAdvancementSheet extends DocumentSheet {
   }
 
   _getNewRank(value) {
+    // Rank Range thresholds per Advanced Set rank table.
     if (value >= 10000) return "Beyond";
     if (value >= 5000) return "Class 5000";
     if (value >= 3000) return "Class 3000";
     if (value >= 1000) return "Class 1000";
-    if (value >= 500) return "Shift-Z";
-    if (value >= 200) return "Shift-Y";
-    if (value >= 150) return "Shift-X";
-    if (value >= 100) return "Unearthly";
-    if (value >= 75) return "Monstrous";
-    if (value >= 50) return "Amazing";
-    if (value >= 40) return "Incredible";
-    if (value >= 30) return "Remarkable";
-    if (value >= 20) return "Excellent";
-    if (value >= 10) return "Good";
-    if (value >= 6) return "Typical";
-    if (value >= 4) return "Poor";
-    if (value >= 2) return "Feeble";
+    if (value >= 351) return "Shift-Z";
+    if (value >= 176) return "Shift-Y";
+    if (value >= 126) return "Shift-X";
+    if (value >= 88) return "Unearthly";
+    if (value >= 63) return "Monstrous";
+    if (value >= 46) return "Amazing";
+    if (value >= 36) return "Incredible";
+    if (value >= 26) return "Remarkable";
+    if (value >= 16) return "Excellent";
+    if (value >= 8) return "Good";
+    if (value >= 5) return "Typical";
+    if (value >= 3) return "Poor";
+    if (value >= 1) return "Feeble";
     return "Shift-0";
   }
 
