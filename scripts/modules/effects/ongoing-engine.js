@@ -1,4 +1,19 @@
-// scripts/modules/effects/ongoing-engine.js v1.6.0 - 2026-02-22
+// scripts/modules/effects/ongoing-engine.js v1.7.0 - 2026-04-17
+// v1.7.0: RAW rules fixes for impaired endurance and stat.loss/stat.gain health sync.
+//         - OE1: Impaired Endurance effect now uses selfPenaltyCS: -2 (applies
+//           to all FEATs per RAW "-2CS on all actions"). Previously used
+//           attackShift: -2 which only penalized attacks.
+//           Fixed in both applyDyingOngoing (initial rank loss) and
+//           processDyingRound (subsequent rank losses).
+//         - OE9: executeEnduranceLoss now drops current health alongside
+//           max health when a rank step happens. Also applies to the
+//           non-rank-step branch (clamp current HP to new max).
+//         - OE10: executeEnduranceGain now reads the canonical RANKS_ORDERED
+//           instead of an inline rank list (which had "Shift X" with space
+//           and no Class ranks). Clamps to originalEndurance per RAW
+//           "cannot heal above pre-damage rank." Restores max HP and adds
+//           the delta to current HP so Endurance healing actually restores
+//           Health (per Health = F+A+S+E).
 // v1.6.0: Dying updates pass { mshDyingTick: true } so init.js updateActor hook skips
 //         spurious DAMAGE DETECTED processing for endurance rank loss HP changes.
 //         Health reduction is correct per rules: Health = F+A+S+E, so both current and
@@ -481,22 +496,43 @@ async function executeEnduranceLoss(actor, ae, effectId, config, rawAmount, cycl
         );
         return;
       }
+      // Per RAW: Health = F+A+S+E. When Endurance rank drops, BOTH current
+      // and max health decrease by the rank-value delta. Mirrors the
+      // processDyingRound logic so non-combat stat.loss (poison, Fatigue,
+      // drain powers) affects HP consistently.
+      const currentValue = actor.system?.abilities?.endurance?.value ?? 0;
       const newRank = stepEnduranceRank(actor, "down");
       const newValue = game.msh?.getRankValue?.(newRank) ?? 0;
+      const enduranceDelta = Math.max(0, currentValue - newValue);
+      const currentHealth = actor.system?.attributes?.health?.value ?? 0;
+      const newHealth = Math.max(0, currentHealth - enduranceDelta);
       await actor.update({
         "system.abilities.endurance.rank": newRank,
         "system.abilities.endurance.value": newValue,
+        "system.attributes.health.value": newHealth,
         "system.attributes.health.max": _recalcMaxHealth(actor, newValue),
       });
       await sendOngoingChat(actor, effectName, "stat.loss",
-        `<strong>${actor.name}</strong> lost 1 Endurance rank: now <strong>${newRank} (${newValue})</strong>`
+        `<strong>${actor.name}</strong> lost 1 Endurance rank: now <strong>${newRank} (${newValue})</strong>
+         <div style="margin-top:4px;font-size:.9em;color:#666;">Health: ${currentHealth} → ${newHealth} (−${enduranceDelta})</div>`
       );
     }
   } else {
     const currentVal = actor.system?.abilities?.endurance?.value ?? 0;
     const loss = (typeof rawAmount === "number" ? rawAmount : 0) * cycles;
     const newVal = Math.max(0, currentVal - loss);
-    await actor.update({ "system.abilities.endurance.value": newVal });
+    // Health tracks Endurance value 1:1 when the Endurance value changes
+    // without crossing a rank boundary. Keep current HP within the new
+    // max so max drops but current doesn't end up orphaned above it.
+    const enduranceDelta = Math.max(0, currentVal - newVal);
+    const currentHealth = actor.system?.attributes?.health?.value ?? 0;
+    const newHealth = Math.max(0, currentHealth - enduranceDelta);
+    const newMaxHealth = _recalcMaxHealth(actor, newVal);
+    await actor.update({
+      "system.abilities.endurance.value": newVal,
+      "system.attributes.health.value": Math.min(newHealth, newMaxHealth),
+      "system.attributes.health.max": newMaxHealth,
+    });
   }
 
   const newStartedAt = startedAt + (cycles * cycleSeconds);
@@ -635,6 +671,11 @@ async function _processDyingRoundInner(actor, dyingAE, scope) {
   }
 
   // ── Create / update Impaired Endurance effect ────────────────────
+  // Per RAW: "-2CS on all actions until Endurance is restored to original."
+  // Uses selfPenaltyCS which is summed into every FEAT roll (attacks,
+  // defenses via check-action, ability FEATs). Setting attackShift alone
+  // would only penalize attacks, letting the character defend and roll
+  // ability FEATs at full rank — not RAW.
   let impairedEffect = actor.effects.find(e => e.getFlag(scope, "isImpairedEndurance"));
   if (!impairedEffect) {
     await actor.createEmbeddedDocuments("ActiveEffect", [{
@@ -653,7 +694,7 @@ async function _processDyingRoundInner(actor, dyingAE, scope) {
         core: { statusId: "impaired-endurance" },
       },
       changes: [{
-        key: "system.combatMods.attackShift",
+        key: "system.combatMods.selfPenaltyCS",
         mode: CONST.ACTIVE_EFFECT_MODES.ADD,
         value: "-2",
       }],
@@ -727,22 +768,36 @@ async function executeEnduranceGain(actor, ae, effectId, config, rawAmount, cycl
       return;
     }
 
-    // Step up 1 rank (reverse of stepDown)
-    // For now just use the RANK_ORDER to go up
-    const rankOrder = ["Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent",
-      "Remarkable", "Incredible", "Amazing", "Monstrous", "Unearthly",
-      "Shift X", "Shift Y", "Shift Z"];
-    const idx = rankOrder.findIndex(r => r === currentRank);
-    const newRank = idx >= 0 && idx < rankOrder.length - 1 ? rankOrder[idx + 1] : currentRank;
+    // Step up 1 rank. Use the canonical RANKS_ORDERED so Class-ranked
+    // characters (Class 1000+) can heal correctly and to avoid the legacy
+    // "Shift X" (space) inconsistency. Clamp to originalEnd so RAW's
+    // "cannot heal above pre-damage rank" is enforced.
+    const { RANKS_ORDERED } = await import("../../rules/rules-reference.js");
+    const curIdx = RANKS_ORDERED.findIndex(r => r === currentRank);
+    const capIdx = RANKS_ORDERED.findIndex(r => r === originalEnd);
+    const nextIdx = (curIdx >= 0 && curIdx < RANKS_ORDERED.length - 1) ? curIdx + 1 : curIdx;
+    const clampedIdx = capIdx >= 0 ? Math.min(nextIdx, capIdx) : nextIdx;
+    const newRank = RANKS_ORDERED[clampedIdx] ?? currentRank;
     const newValue = game.msh?.getRankValue?.(newRank) ?? 0;
+    const currentValue = actor.system?.abilities?.endurance?.value ?? 0;
+    const enduranceDelta = Math.max(0, newValue - currentValue);
+
+    // Restore max HP to match new Endurance, and add the delta to current HP
+    // so healing Endurance actually restores health (per Health = F+A+S+E).
+    const newMaxHealth = _recalcMaxHealth(actor, newValue);
+    const currentHealth = actor.system?.attributes?.health?.value ?? 0;
+    const newHealth = Math.min(newMaxHealth, currentHealth + enduranceDelta);
 
     await actor.update({
       "system.abilities.endurance.rank": newRank,
       "system.abilities.endurance.value": newValue,
+      "system.attributes.health.value": newHealth,
+      "system.attributes.health.max": newMaxHealth,
     });
 
     await sendOngoingChat(actor, effectName, "stat.gain",
-      `<strong>${actor.name}</strong> healed 1 Endurance rank: now <strong>${newRank} (${newValue})</strong>`
+      `<strong>${actor.name}</strong> healed 1 Endurance rank: now <strong>${newRank} (${newValue})</strong>
+       <div style="margin-top:4px;font-size:.9em;color:#666;">Health: ${currentHealth} → ${newHealth} / ${newMaxHealth}</div>`
     );
   }
 
@@ -987,7 +1042,9 @@ export async function applyDyingOngoing(target, { skipImmediateLoss = false } = 
       console.error(`[FASERIP ERROR] Failed to apply immediate Endurance loss for ${actor.name}:`, err);
     }
 
-    // Create Impaired Endurance effect
+    // Create Impaired Endurance effect. -2CS applies to ALL FEATs per RAW
+    // (attacks, defenses, ability FEATs). Uses selfPenaltyCS, summed into
+    // every FEAT roll. See the processDyingRound branch for the same fix.
     const impairedEffect = actor.effects.find(e => e.getFlag(scope, "isImpairedEndurance"));
     if (!impairedEffect) {
       await safeActorCreateEffect(actor, [{
@@ -1006,7 +1063,7 @@ export async function applyDyingOngoing(target, { skipImmediateLoss = false } = 
           core: { statusId: "impaired-endurance" },
         },
         changes: [{
-          key: "system.combatMods.attackShift",
+          key: "system.combatMods.selfPenaltyCS",
           mode: CONST.ACTIVE_EFFECT_MODES.ADD,
           value: "-2",
         }],

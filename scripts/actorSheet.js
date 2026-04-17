@@ -1,4 +1,9 @@
-// actorSheet.js v2.2.4 - 2026-03-18
+// actorSheet.js v2.2.5 - 2026-04-17
+// v2.2.5: Add inline Recovery button to Health cell — shows only when
+//         canAttemptRecovery returns eligible. One-click applies recovery
+//         and rerenders the sheet. Click bubbling stopped so the parent
+//         .health-recovery-link header (which opens the Recovery & Rest
+//         dialog) does not also fire.
 // v2.2.4: Add Ctrl+Wheel zoom on character sheet (shared sheet-zoom utility)
 // v2.2.3: Targeted _updateObject guard — only blocks formData values that exactly match
 //         what the shift display code would have injected (shifted rank name + standard
@@ -398,6 +403,17 @@ export class FaseripActorSheet extends ActorSheet {
     context.healthAtMax = hpMax > 0 && hpValue >= hpMax;
     context.healingUnavailable = context.healthAtMax || lastDamageWorldTime == null || healingCooldownRemaining > 0;
     context.healingCooldownRemaining = healingCooldownRemaining;
+
+    // Health-area Recovery button: show ONLY when eligible right now.
+    // Reuses rest-system.canAttemptRecovery so logic stays in one place.
+    try {
+      const check = game.msh?.rest?.canAttemptRecovery?.(this.actor);
+      context.recoveryEligible = !!check?.canRest;
+    } catch (_e) {
+      context.recoveryEligible = false;
+    }
+    const enduranceValue = context.system?.abilities?.endurance?.value ?? 0;
+    context.recoveryHealAmount = enduranceValue;
     
     // NPC detection for template labels
     const charType = context.system.characterType || "player";
@@ -1043,6 +1059,23 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
     }
 
     // Recovery & Rest Button Handlers
+    // Sheet-level inline Recovery button (shows only when eligible).
+    // One click → apply recovery, rerender sheet. No confirmation dialog.
+    // Stops propagation so the click doesn't bubble to the Health header
+    // (which opens the Recovery & Rest dialog).
+    html.find('.health-recovery-inline-btn').click(async (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (!game.msh?.rest) {
+        ui.notifications.error("Rest system not initialized!");
+        return;
+      }
+      const result = await game.msh.rest.attemptRecovery(this.actor);
+      if (result?.success) {
+        this.render(false);
+      }
+    });
+
     // Health header click -> Recovery & Rest dialog
     html.find('.health-recovery-link').click(async (event) => {
       event.preventDefault();

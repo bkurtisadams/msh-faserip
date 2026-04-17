@@ -1,4 +1,14 @@
-// scripts/modules/rest-system.js v1.3.2 - 2026-03-20
+// scripts/modules/rest-system.js v1.4.0 - 2026-04-17
+// v1.4.0: Add ensureHealingEffect — hourly Healing now registers as an ongoing
+//         effect via the engine when damage is recorded. Time-advance now
+//         heals HP automatically per RAW ("Endurance rank # per hour after
+//         last damage"). Gated by autoHealingEnabled world setting.
+//         Skips actively dying characters (dying effect owns their clock).
+//         Stabilized unconscious characters heal normally.
+// v1.3.3: stabilizeDying — use canonical RANKS_ORDERED instead of inline rank
+//         list. Previous list had "Shift 0" (space) instead of "Shift-0"
+//         (hyphen) and stopped at Unearthly, breaking the impaired effect
+//         creation path for Shift-X+ characters being stabilized.
 // v1.3.2: Semi mode auto-rolls consciousness FEAT (same as full auto). Regaining
 //         consciousness is a rules-mandated Endurance FEAT, not a player choice.
 // v1.3.1: Fix attemptRegainConsciousness fail path: use seconds-based duration when out of combat
@@ -11,6 +21,7 @@
 
 import { getFlagScope } from "./actions/flags.js";
 import { safeActorSetFlag } from "../gm-utils.js";
+import { RANKS_ORDERED } from "../rules/rules-reference.js";
 
 const SCOPE = getFlagScope();
 
@@ -575,13 +586,8 @@ static async attemptRegainConsciousness(actor) {
       }
     } else if (originalEndurance && currentEndurance !== originalEndurance) {
       // Effect doesn't exist yet (edge case - stabilized before losing a rank)
-      const rankNames = [
-        "Shift 0", "Feeble", "Poor", "Typical", "Good", "Excellent", 
-        "Remarkable", "Incredible", "Amazing", "Monstrous", "Unearthly"
-      ];
-      
-      const currentIndex = rankNames.indexOf(currentEndurance);
-      const originalIndex = rankNames.indexOf(originalEndurance);
+      const currentIndex = RANKS_ORDERED.indexOf(currentEndurance);
+      const originalIndex = RANKS_ORDERED.indexOf(originalEndurance);
       
       if (currentIndex >= 0 && originalIndex >= 0 && currentIndex < originalIndex) {
         const impairedEffectData = {
@@ -782,6 +788,9 @@ static async attemptRegainConsciousness(actor) {
 /**
  * Update damage timestamp when actor takes damage.
  * Also interrupts any ongoing effects flagged with interruptOnDamage.
+ * Also (re-)registers the hourly Healing ongoing-effect so HP heals
+ * automatically as worldTime advances, per RAW "Endurance rank number
+ * in HP per hour after last damage."
  * @param {Actor} actor - The actor taking damage
  */
 export async function recordDamage(actor) {
@@ -790,13 +799,12 @@ export async function recordDamage(actor) {
   await safeActorSetFlag(actor, SCOPE, "lastDamageTime", now);
   await safeActorSetFlag(actor, SCOPE, "lastDamageWorldTime", worldNow);
 
-  // Interrupt all ongoing effects that are damage-sensitive
+  // Interrupt all ongoing effects that are damage-sensitive (Regeneration etc.)
   try {
     const { interruptOngoingEffects } = await import("./effects/ongoing-engine.js");
     await interruptOngoingEffects(actor);
   } catch (e) {
     console.warn("[FASERIP WARN] interruptOngoingEffects failed, falling back to legacy:", e);
-    // Legacy fallback: interrupt regeneration AEs directly
     for (const ef of actor.effects) {
       if (ef.disabled) continue;
       const flags = ef.flags?.[SCOPE];
@@ -806,8 +814,104 @@ export async function recordDamage(actor) {
     }
   }
 
+  // (Re-)register hourly Healing per RAW. Setting autoHealingEnabled gates
+  // this so GMs can disable if they prefer fully-manual healing.
+  try {
+    const enabled = game.settings?.get?.(SCOPE, "autoHealingEnabled") ?? true;
+    if (enabled) await ensureHealingEffect(actor, worldNow);
+  } catch (e) {
+    console.warn("[FASERIP WARN] ensureHealingEffect failed:", e);
+  }
+
   if (game.settings.get(SCOPE, "debugMode")) {
     console.log(`FASERIP | Damage timestamp recorded for ${actor.name} (worldTime: ${worldNow})`);
+  }
+}
+
+/**
+ * Register or refresh the auto-Healing ongoing-effect config for an actor.
+ * Per RAW: heals Endurance rank number in HP per hour after last damage.
+ * Doubled by medicalCare flag. Interrupted by further damage (timer resets
+ * from that point). Auto-disables at max HP.
+ *
+ * Uses the ongoing engine's existing "heal" executor which handles:
+ *   - cycle accumulation (advance time 6h → 6 heal ticks)
+ *   - cap at max HP
+ *   - auto-disable when fully healed
+ *   - chat message per tick
+ *
+ * Skips actively-dying characters — the dying effect owns their Endurance
+ * clock; healing would conflict. Stabilized unconscious characters DO heal
+ * (their dying effect has already been removed).
+ *
+ * @param {Actor} actor - The actor to register healing for
+ * @param {number} worldNow - Current worldTime (for startedAt reset)
+ */
+export async function ensureHealingEffect(actor, worldNow = game.time?.worldTime ?? 0) {
+  if (!actor) return;
+
+  // Skip actively dying characters
+  const dyingEffect = actor.effects?.find(e =>
+    e.flags?.[SCOPE]?.ongoingId === "dying" ||
+    e.flags?.[SCOPE]?.isDying ||
+    e.statuses?.has?.("dying")
+  );
+  if (dyingEffect && !dyingEffect.disabled) {
+    if (game.settings.get(SCOPE, "debugMode")) {
+      console.log(`FASERIP | Skipping healing registration for ${actor.name} (dying)`);
+    }
+    return;
+  }
+
+  const hasMedicalCare = actor.getFlag(SCOPE, "medicalCare") ?? false;
+  const multiplier = hasMedicalCare ? 2 : 1;
+  const enduranceValue = actor.system?.abilities?.endurance?.value ?? 10;
+
+  const config = {
+    type: "heal",
+    stat: "health",
+    formula: enduranceValue * multiplier,
+    rate: 1,
+    cycle: "hour",
+    count: -1,
+    gate: "none",
+    interruptOnDamage: false,  // we re-register on damage instead
+    oncePerDay: false,
+    capAtMax: true,
+    autoDisable: true,
+    startedAt: worldNow,
+    lastTriggered: null,
+    triggerCount: 0,
+  };
+
+  await safeActorSetFlag(actor, SCOPE, "ongoing.healing", config);
+
+  // Create or refresh the AE used by the engine to track the effect
+  const existing = actor.effects?.find(e => e.flags?.[SCOPE]?.ongoingId === "healing");
+  if (existing) {
+    await existing.update({
+      disabled: false,
+      [`flags.${SCOPE}.medicalCare`]: hasMedicalCare,
+      name: `Healing (${enduranceValue * multiplier} HP/hour${hasMedicalCare ? ', medical' : ''})`
+    });
+  } else {
+    await actor.createEmbeddedDocuments("ActiveEffect", [{
+      name: `Healing (${enduranceValue * multiplier} HP/hour${hasMedicalCare ? ', medical' : ''})`,
+      icon: "icons/svg/regen.svg",
+      origin: actor.uuid,
+      disabled: false,
+      flags: {
+        [SCOPE]: {
+          ongoingId: "healing",
+          effectType: "ongoing",
+          medicalCare: hasMedicalCare
+        }
+      }
+    }]);
+  }
+
+  if (game.settings.get(SCOPE, "debugMode")) {
+    console.log(`FASERIP | Healing registered for ${actor.name}: ${enduranceValue * multiplier} HP/hour, start=${worldNow}`);
   }
 }
 

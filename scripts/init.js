@@ -477,6 +477,17 @@ Hooks.once("init", async () => {
     default: false
   });
 
+  // Auto-Healing: RAW hourly Healing fires automatically as worldTime advances.
+  // When off, players heal only by clicking the Attempt Healing button on the sheet.
+  game.settings.register('msh-faserip', 'autoHealingEnabled', {
+    name: "Automatic Hourly Healing",
+    hint: "When enabled, characters heal their Endurance rank number in HP per hour after last damage (doubled with medical care) automatically as you advance time. When disabled, healing is manual only.",
+    scope: "world",
+    config: true,
+    type: Boolean,
+    default: true
+  });
+
   Actors.registerSheet("msh-faserip", MSHVehicleActorSheet, {
     types: ["vehicle"],
     makeDefault: true,
@@ -895,31 +906,11 @@ Hooks.once("init", async () => {
     });
 
     game.settings.register("msh-faserip", "karmaMultiplier", {
-      name: "Karma Multiplier (global fallback)",
+      name: "Karma Multiplier",
       scope: "world",
       config: false,
       type: Number,
       default: 1
-    });
-
-    for (const cat of ["combat", "rescue", "personal", "gaming", "penalty"]) {
-      game.settings.register("msh-faserip", `karmaMultiplier_${cat}`, {
-        name: `Karma Multiplier — ${cat}`,
-        scope: "world",
-        config: false,
-        type: Number,
-        default: 0
-      });
-    }
-
-    game.settings.register("msh-faserip", "groupAwardMode", {
-      name: "Group Award Mode",
-      hint: "How group karma awards are distributed. Split = RAW (divided among heroes). Full = each hero gets the full award (house rule). Pool = sent to team karma pool.",
-      scope: "world",
-      config: true,
-      type: String,
-      choices: { split: "Split (RAW)", full: "Full share (each hero)", pool: "Team karma pool" },
-      default: "split"
     });
 
     // Add this new one:
