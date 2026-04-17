@@ -1195,14 +1195,41 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
                   ui.notifications.warn(`${actor.name} is not dying`);
                   return;
                 }
+                const _spendKarma = async (amount, description) => {
+                  const available = actor.availableKarma ?? 0;
+                  if (available < amount) {
+                    ui.notifications.warn(`${actor.name} has only ${available} Karma — need ${amount}.`);
+                    return false;
+                  }
+                  let gameDate = "";
+                  try {
+                    const d = game.msh?.getCampaignDateTime?.()?.date;
+                    if (d) gameDate = `${d.getMonth()+1}/${d.getDate()}/${d.getFullYear()}`;
+                  } catch (_e) { /* noop */ }
+                  const history = foundry.utils.deepClone(actor.system.karma?.history || []);
+                  history.push({
+                    timestamp: new Date().toISOString(),
+                    realDate: new Date().toLocaleDateString(),
+                    gameDate,
+                    amount: -amount,
+                    type: "Dying Stabilize",
+                    description
+                  });
+                  await actor.update({ "system.karma.history": history });
+                  return true;
+                };
                 dlg.close();
                 new Dialog({
                   title: `Stabilize ${actor.name}`,
-                  content: `<div style="padding:8px;"><p><strong>${actor.name}</strong> is dying!</p><p>Choose stabilization method:</p></div>`,
+                  content: `<div style="padding:8px;"><p><strong>${actor.name}</strong> is dying!</p>
+                    <p style="font-size:.9em;color:#555;">Available Karma: <strong>${actor.availableKarma ?? 0}</strong></p>
+                    <p>Choose stabilization method:</p></div>`,
                   buttons: {
                     karma50: {
                       label: "50 Karma (1 round pause)",
                       callback: async () => {
+                        const ok = await _spendKarma(50, "Stabilize Endurance for 1 round");
+                        if (!ok) return;
                         await dyingEffect.setFlag(scope, "stabilizedRounds", 1);
                         ChatMessage.create({ content: `<p style="color:#ff9800;"><strong>${actor.name}</strong> stabilized for 1 round (50 Karma spent)!</p>` });
                         ui.notifications.info(`${actor.name} stabilized for 1 round`);
@@ -1210,7 +1237,13 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
                     },
                     karma200: {
                       label: "200 Karma + FEAT",
-                      callback: async () => { ui.notifications.info("Roll Endurance FEAT manually - success = stabilized"); }
+                      callback: async () => {
+                        const ok = await _spendKarma(200, "Endurance re-FEAT on next rank slip");
+                        if (!ok) return;
+                        await dyingEffect.setFlag(scope, "reFeatOnSlip", true);
+                        ChatMessage.create({ content: `<p style="color:#2196f3;"><strong>${actor.name}</strong> will re-FEAT on next Endurance slip (200 Karma spent).</p>` });
+                        ui.notifications.info(`${actor.name} will re-FEAT on next slip`);
+                      }
                     },
                     aid: {
                       label: "Aid/First Aid (permanent)",
