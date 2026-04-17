@@ -504,16 +504,29 @@
         </div>
       </div>
       <div class="sec-msg">
-        {{#if recoveryEligible}}
-        <button type="button" class="health-recovery-inline-btn" data-action="sheet-recovery"
-                title="Take Recovery: +{{recoveryHealAmount}} HP (once per day, RAW p.31)">
+        <button type="button"
+                class="health-recovery-inline-btn{{#if recoveryDisabledReason}} is-disabled{{/if}}"
+                data-action="sheet-recovery"
+                {{#if recoveryDisabledReason}}disabled{{/if}}
+                title="{{#if recoveryDisabledReason}}{{recoveryDisabledReason}}{{else}}Take Recovery: +{{recoveryHealAmount}} HP (once per day, RAW p.31){{/if}}">
           Recovery +{{recoveryHealAmount}}
         </button>
-        {{/if}}
         {{#if healingEligible}}
         <button type="button" class="health-healing-inline-btn" data-action="sheet-healing"
                 title="Take Healing: +{{healingHealAmount}} HP (per hour since last damage{{#if healingMedicalCare}}, with medical care{{/if}}, RAW p.32)">
           Heal +{{healingHealAmount}}
+        </button>
+        {{/if}}
+        {{#if wakeUpEligible}}
+        <button type="button" class="health-wake-inline-btn" data-action="sheet-wake-up"
+                title="Attempt to regain consciousness (Endurance FEAT, RAW p.31)">
+          Wake Up
+        </button>
+        {{/if}}
+        {{#if stabilizeEligible}}
+        <button type="button" class="health-stabilize-inline-btn" data-action="sheet-stabilize"
+                title="Stabilize dying character — spend Karma, take aid, or open the Stabilize dialog">
+          Stabilize Dying
         </button>
         {{/if}}
       </div>

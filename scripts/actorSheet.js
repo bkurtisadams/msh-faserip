@@ -404,16 +404,23 @@ export class FaseripActorSheet extends ActorSheet {
     context.healingUnavailable = context.healthAtMax || lastDamageWorldTime == null || healingCooldownRemaining > 0;
     context.healingCooldownRemaining = healingCooldownRemaining;
 
-    // Health-area Recovery button: show ONLY when eligible right now.
+    // Health-area Recovery button: ALWAYS shown, greyed when not usable.
     // Reuses rest-system.canAttemptRecovery so logic stays in one place.
+    context.recoveryDisabledReason = null;
     try {
       const check = game.msh?.rest?.canAttemptRecovery?.(this.actor);
       context.recoveryEligible = !!check?.canRest;
+      if (!context.recoveryEligible) context.recoveryDisabledReason = check?.reason || "Not available";
     } catch (_e) {
       context.recoveryEligible = false;
+      context.recoveryDisabledReason = "Rest system not initialized";
     }
     const enduranceValue = context.system?.abilities?.endurance?.value ?? 0;
     context.recoveryHealAmount = enduranceValue;
+
+    // Crisis buttons — eligible-only (appear only when the character is in that state)
+    context.wakeUpEligible    = context.isInCrisis && !context.isDying;
+    context.stabilizeEligible = !!context.isDying;
 
     // Health-area Healing button: show ONLY when eligible right now.
     // Reuses rest-system.canAttemptHealing so logic stays in one place.
@@ -863,6 +870,69 @@ export class FaseripActorSheet extends ActorSheet {
     } catch { return null; }
   }
 
+  // Shared stabilize sub-dialog — opened from both the Recovery & Rest
+  // dialog's Stabilize Dying button and the inline Health-column button.
+  // Deducts karma via history entry + sets the appropriate dying flag.
+  _openStabilizeSubDialog(actor, dyingEffect, scope) {
+    const _spendKarma = async (amount, description) => {
+      const available = actor.availableKarma ?? 0;
+      if (available < amount) {
+        ui.notifications.warn(`${actor.name} has only ${available} Karma — need ${amount}.`);
+        return false;
+      }
+      let gameDate = "";
+      try {
+        const d = game.msh?.getCampaignDateTime?.()?.date;
+        if (d) gameDate = `${d.getMonth()+1}/${d.getDate()}/${d.getFullYear()}`;
+      } catch (_e) { /* noop */ }
+      const history = foundry.utils.deepClone(actor.system.karma?.history || []);
+      history.push({
+        timestamp: new Date().toISOString(),
+        realDate: new Date().toLocaleDateString(),
+        gameDate,
+        amount: -amount,
+        type: "Dying Stabilize",
+        description
+      });
+      await actor.update({ "system.karma.history": history });
+      return true;
+    };
+    new Dialog({
+      title: `Stabilize ${actor.name}`,
+      content: `<div style="padding:8px;"><p><strong>${actor.name}</strong> is dying!</p>
+        <p style="font-size:.9em;color:#555;">Available Karma: <strong>${actor.availableKarma ?? 0}</strong></p>
+        <p>Choose stabilization method:</p></div>`,
+      buttons: {
+        karma50: {
+          label: "50 Karma (1 round pause)",
+          callback: async () => {
+            const ok = await _spendKarma(50, "Stabilize Endurance for 1 round");
+            if (!ok) return;
+            await dyingEffect.setFlag(scope, "stabilizedRounds", 1);
+            ChatMessage.create({ content: `<p style="color:#ff9800;"><strong>${actor.name}</strong> stabilized for 1 round (50 Karma spent)!</p>` });
+            ui.notifications.info(`${actor.name} stabilized for 1 round`);
+          }
+        },
+        karma200: {
+          label: "200 Karma + FEAT",
+          callback: async () => {
+            const ok = await _spendKarma(200, "Endurance re-FEAT on next rank slip");
+            if (!ok) return;
+            await dyingEffect.setFlag(scope, "reFeatOnSlip", true);
+            ChatMessage.create({ content: `<p style="color:#2196f3;"><strong>${actor.name}</strong> will re-FEAT on next Endurance slip (200 Karma spent).</p>` });
+            ui.notifications.info(`${actor.name} will re-FEAT on next slip`);
+          }
+        },
+        aid: {
+          label: "Aid/First Aid (permanent)",
+          callback: async () => { await game.msh.rest.stabilizeDying(actor); }
+        },
+        cancel: { label: "Cancel", callback: () => {} }
+      },
+      default: "aid"
+    }).render(true);
+  }
+
   // In actorSheet.js, add to the activateListeners function
   activateListeners(html) {
     super.activateListeners(html);
@@ -1103,6 +1173,36 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
       }
     });
 
+    // Sheet-level inline Wake Up button (0 HP, not dying).
+    html.find('.health-wake-inline-btn').click(async (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (!game.msh?.rest) {
+        ui.notifications.error("Rest system not initialized!");
+        return;
+      }
+      const result = await game.msh.rest.attemptRegainConsciousness(this.actor);
+      if (result?.success) {
+        this.render(false);
+      }
+    });
+
+    // Sheet-level inline Stabilize Dying button (dying effect active).
+    // Opens the shared sub-dialog with 50/200/Aid options.
+    html.find('.health-stabilize-inline-btn').click(async (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const scope = "msh-faserip";
+      const dyingEffect = this.actor.effects.find(e =>
+        e.getFlag(scope, "isDying") || e.statuses?.has?.("dying")
+      );
+      if (!dyingEffect) {
+        ui.notifications.warn(`${this.actor.name} is not dying`);
+        return;
+      }
+      this._openStabilizeSubDialog(this.actor, dyingEffect, scope);
+    });
+
     // Health header click -> Recovery & Rest dialog
     html.find('.health-recovery-link').click(async (event) => {
       event.preventDefault();
@@ -1195,64 +1295,8 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
                   ui.notifications.warn(`${actor.name} is not dying`);
                   return;
                 }
-                const _spendKarma = async (amount, description) => {
-                  const available = actor.availableKarma ?? 0;
-                  if (available < amount) {
-                    ui.notifications.warn(`${actor.name} has only ${available} Karma — need ${amount}.`);
-                    return false;
-                  }
-                  let gameDate = "";
-                  try {
-                    const d = game.msh?.getCampaignDateTime?.()?.date;
-                    if (d) gameDate = `${d.getMonth()+1}/${d.getDate()}/${d.getFullYear()}`;
-                  } catch (_e) { /* noop */ }
-                  const history = foundry.utils.deepClone(actor.system.karma?.history || []);
-                  history.push({
-                    timestamp: new Date().toISOString(),
-                    realDate: new Date().toLocaleDateString(),
-                    gameDate,
-                    amount: -amount,
-                    type: "Dying Stabilize",
-                    description
-                  });
-                  await actor.update({ "system.karma.history": history });
-                  return true;
-                };
                 dlg.close();
-                new Dialog({
-                  title: `Stabilize ${actor.name}`,
-                  content: `<div style="padding:8px;"><p><strong>${actor.name}</strong> is dying!</p>
-                    <p style="font-size:.9em;color:#555;">Available Karma: <strong>${actor.availableKarma ?? 0}</strong></p>
-                    <p>Choose stabilization method:</p></div>`,
-                  buttons: {
-                    karma50: {
-                      label: "50 Karma (1 round pause)",
-                      callback: async () => {
-                        const ok = await _spendKarma(50, "Stabilize Endurance for 1 round");
-                        if (!ok) return;
-                        await dyingEffect.setFlag(scope, "stabilizedRounds", 1);
-                        ChatMessage.create({ content: `<p style="color:#ff9800;"><strong>${actor.name}</strong> stabilized for 1 round (50 Karma spent)!</p>` });
-                        ui.notifications.info(`${actor.name} stabilized for 1 round`);
-                      }
-                    },
-                    karma200: {
-                      label: "200 Karma + FEAT",
-                      callback: async () => {
-                        const ok = await _spendKarma(200, "Endurance re-FEAT on next rank slip");
-                        if (!ok) return;
-                        await dyingEffect.setFlag(scope, "reFeatOnSlip", true);
-                        ChatMessage.create({ content: `<p style="color:#2196f3;"><strong>${actor.name}</strong> will re-FEAT on next Endurance slip (200 Karma spent).</p>` });
-                        ui.notifications.info(`${actor.name} will re-FEAT on next slip`);
-                      }
-                    },
-                    aid: {
-                      label: "Aid/First Aid (permanent)",
-                      callback: async () => { await game.msh.rest.stabilizeDying(actor); }
-                    },
-                    cancel: { label: "Cancel", callback: () => {} }
-                  },
-                  default: "aid"
-                }).render(true);
+                this._openStabilizeSubDialog(actor, dyingEffect, scope);
                 break;
               }
             }
