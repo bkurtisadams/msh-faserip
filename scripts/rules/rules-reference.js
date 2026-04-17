@@ -131,9 +131,12 @@ export const ATTACK_EFFECTS = {
   charging:      { effects: ["Slam", "Stun"], pullDamage: true,  pullEffect: true }
 };
 
-// Blunt weapon dmg = Str or material strength (whichever less);
+// Blunt weapon dmg (Slugfest / melee only):
+//   = Str or material strength (whichever less);
 //   if material > Str, use next rank minimum.
-// Edged weapon always inflicts minimum listed dmg.
+// Edged weapon (melee and thrown): always inflicts minimum listed dmg;
+//   max of min(Str, material) for powerful wielders.
+// Blunt Throwing: plain min(Str, material). No bump rule.
 
 // ── SLAM (Endurance FEAT after Slam result) ──
 export const SLAM_RESULTS = {
@@ -2056,13 +2059,14 @@ export const RANGED_ATTACK_TYPES = {
   edgedThrowing: {
     desc: "Thrown sharp weapons (knife, shuriken)",
     results: { white: "Miss", green: "Hit", yellow: "Stun", red: "Kill" },
-    pullDamage: true, pullEffect: false
+    pullDamage: true, pullEffect: false,
+    damage: "Always minimum listed; max = min(Str, material strength) for powerful wielders"
   },
   bluntThrowing: {
     desc: "Thrown blunt objects (rock, bus, shield)",
     results: { white: "Miss", green: "Hit", yellow: "Bullseye", red: "Stun" },
     pullDamage: true, pullEffect: true,
-    damage: "Str or material strength (whichever less)"
+    damage: "Str or material strength (whichever less) — NO next-rank bump (melee only)"
   },
   energy: {
     desc: "Energy Powers (fire blast, lightning, radiation). No physical component.",

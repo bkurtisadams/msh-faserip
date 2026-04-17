@@ -1,4 +1,11 @@
-// shooting-action.js v3.4.0 - 2026-04-03
+// shooting-action.js v3.4.2 - 2026-04-17
+// v3.4.2: Rubber Shot now correctly ignores Slam per RAW (Advanced Set
+//         Ammunition: "Ignore Slam results in using rubber bullets").
+//         Downgrades yellow Slam → Hit on the cloned blunt-attack effect
+//         table. Green Hit and red Stun stand. Previous v3.4.1 "fix" was
+//         based on an incorrect review claim and has been reverted —
+//         RAW explicitly suppresses Slam for rubber rounds.
+// v3.4.1: (reverted) rubber shot comment changes
 // v3.4.0: Wire ammo variant rules — variantType in resolve, heat-seeker no range penalty,
 //         explosive 2x damage, mercy 0 damage + KO, rubber blunt effects, preview updates.
 // v3.3.0: Manual CS only — remove talent/power auto-detection and auto-mods.
@@ -628,12 +635,17 @@ export class ShootingAction extends RangedAttackAction {
     let variantNote = "";
 
     if (vt === "rubber") {
-      // Rubber: slugfest (blunt) effects column, suppress Slam results
+      // Rubber Shot per RAW (Advanced Set Ammunition): inflicts slugfest
+      // (blunt) damage, "Ignore Slam results in using rubber bullets."
+      // Clone blunt-attack config and downgrade yellow Slam → Hit;
+      // green Hit and red Stun stand.
       const { ACTION_EFFECTS } = await import("./action-config.js");
-      effectiveEffects = ACTION_EFFECTS["blunt-attack"];
+      const blunt = ACTION_EFFECTS["blunt-attack"];
+      const bluntArr = blunt.effects;
+      effectiveEffects = { ...blunt, effects: [bluntArr[0], bluntArr[1], "Hit", bluntArr[3]] };
       effectiveAttackForm = "blunt";
       effectiveDamageType = "physical-blunt";
-      variantNote = "Rubber Shot — blunt effects, ignore Slam";
+      variantNote = "Rubber Shot — blunt damage, ignore Slam";
     } else if (vt === "mercy") {
       // Mercy: 0 damage, Rm Intensity KO drug if penetrates armor
       effectiveDamage = 0;

@@ -1,4 +1,14 @@
-// scripts/modules/actions/throwing-blunt-action.js v3.1.0 - 2026-03-17
+// scripts/modules/actions/throwing-blunt-action.js v3.2.1 - 2026-04-17
+// v3.2.1: Correct thrown-blunt damage per RAW — plain min(STR, MAT) with
+//         weapon-base floor, no bump-to-next-rank rule. Bump is melee-blunt
+//         only per Advanced Set Combat section (Aunt May pipe example is
+//         a drawing-room melee, not a throw). Replaces v3.2.0 which
+//         incorrectly reused melee computeBluntDamage.
+// v3.2.0: T4 — carried-weapon damage now auto-computes via computeBluntDamage
+//         (STR vs material with bump-to-next-rank-minimum rule and weapon-base
+//         floor), matching melee blunt behavior. Ad-hoc path unchanged — GM
+//         entered damage still used verbatim. Preview, resolve, and initial
+//         calc all route through the new local helper.
 // v3.1.0: Manual CS only — remove talent/power auto-detection, chips, sit-tags.
 //         CS row is manual input + range penalty + ? reference panel via cs-modifiers.js.
 import { RangedAttackAction } from "./ranged-attack-action.js";
@@ -24,6 +34,22 @@ import {
 } from "./action-utils.js";
 import { RANK_ABBR } from "../../rules/rules-reference.js";
 import { buildCSRow, wireCSPanel } from "./cs-modifiers.js";
+import { getItemMaterialRank } from "../../gm-utils.js";
+
+// Thrown blunt damage per RAW (Advanced Set Combat, Blunt Throwing Attack):
+// "A blunt thrown weapon inflicts damage equal to the Strength of the thrower,
+//  or the material strength of the thrown item, whichever is less."
+// No bump-to-next-rank rule — that's melee-blunt only (Aunt May example is a
+// drawing-room pipe, not a throw). Weapon printed damage acts as a floor.
+function computeThrownBluntDamage(actor, weaponItem) {
+  if (!weaponItem) return 0;
+  const s = actor?.system?.abilities?.strength || {};
+  const strVal = Number(s.value || game.msh.getRankValue(s.rank) || 0);
+  const matRank = getItemMaterialRank(weaponItem) || "Typical";
+  const matVal = Number(game.msh.getRankValue(matRank) || 0);
+  const weaponBase = Number(weaponItem?.system?.damage || 0);
+  return Math.max(weaponBase, Math.min(strVal, matVal));
+}
 
 export class ThrowingBluntAction extends RangedAttackAction {
   async execute() {
@@ -103,7 +129,7 @@ export class ThrowingBluntAction extends RangedAttackAction {
     // Initial damage calc
     const isAdHocInit = savedAdHoc || !thrownBlunt.length;
     const initialWeapon = isAdHocInit ? null : thrownBlunt.find(i => i.id === savedItemId) || thrownBlunt[0];
-    const initialDamage = isAdHocInit ? savedAdHocDmg : Number(initialWeapon?.system?.damage || 0);
+    const initialDamage = isAdHocInit ? savedAdHocDmg : computeThrownBluntDamage(actor, initialWeapon);
     const initialAfterArmor = Math.max(0, initialDamage - targetArmor);
 
     // Karma info
@@ -377,7 +403,7 @@ export class ThrowingBluntAction extends RangedAttackAction {
             } else {
               const wid = html.find('[name="weapon"]').val();
               const w = thrownBlunt.find(i => i.id === wid);
-              dmg = Number(w?.system?.damage || 0);
+              dmg = computeThrownBluntDamage(actor, w);
               const after = Math.max(0, dmg - targetArmor);
               html.find('#dmg-val').text(dmg);
               html.find('#after-armor-display').text(primaryTarget ? `${after} after armor` : `${dmg} damage`);
@@ -478,7 +504,9 @@ export class ThrowingBluntAction extends RangedAttackAction {
 
     // Delegate to shared resolution pipeline
     const weaponItem = choice.weaponId ? actor.items.get(choice.weaponId) : null;
-    const rawDamage = choice.weaponId ? Number(weaponItem?.system?.damage || 0) : Number(choice.weaponDamage || 0);
+    const rawDamage = choice.weaponId
+      ? computeThrownBluntDamage(actor, weaponItem)
+      : Number(choice.weaponDamage || 0);
 
     await this._executeSingleAttack({
       choice: { ...choice, weapon: weaponItem },
