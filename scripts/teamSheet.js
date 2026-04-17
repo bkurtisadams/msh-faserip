@@ -1,4 +1,14 @@
-// teamSheet.js v4.1.0 - 2026-03-21
+// teamSheet.js v4.2.0 - 2026-04-16
+// v4.2.0: Critical fixes.
+//         - getHighestRank read wrong path (system.abilities.abilities) so
+//           ability-only villains always registered as Shift-0(0) and awarded
+//           zero karma. Path corrected to system.abilities.
+//         - _captureDefeatedFromCombat captured ALL hostiles regardless of
+//           outcome. Now only captures combatants flagged defeated or at 0 HP.
+//         - Add Encounter dialog no longer auto-flags stopped:true on
+//           crime type selection; GM confirms stop/arrest explicitly.
+//         - R+I+P session bonus (house rule) gated behind new
+//           sessionRIPBonus setting; button hidden when off.
 // v4.1.0: Add Event type (foe-less karma events) alongside encounters.
 //         GM Award field on both events and encounters. Missing karma types added.
 export class TeamSheet extends Application {
@@ -75,6 +85,7 @@ export class TeamSheet extends Application {
     context.removeMode = this._removeMode;
     context.hqExpanded = this._hqExpanded ?? false;
     context.useKarmaPool = game.settings.get("msh-faserip", "useKarmaPool") ?? false;
+    context.sessionRIPBonus = game.settings.get("msh-faserip", "sessionRIPBonus") ?? false;
 
     const teamMemberIds = game.settings.get("msh-faserip", "teamMembers") || [];
     context.teamMembers = teamMemberIds.map(id => {
@@ -581,7 +592,9 @@ export class TeamSheet extends Application {
               name: encName,
               villains: [...foeList],
               presentHeroIds: [...teamIds],
-              crimeType, stopped: !!crimeType, arrested: false,
+              // Default crime flags to false — GM confirms stop/arrest explicitly
+              // in the encounter detail UI. Auto-true inflated karma on creation.
+              crimeType, stopped: false, arrested: false,
               rescues, losses, gmAward, bonuses: [...bonusList],
               awarded: false,
               gameDate: evtDate, gameTime: evtTime,
@@ -948,10 +961,14 @@ export class TeamSheet extends Application {
     }[crimeType] || crimeType;
   }
 
-  // Session Bonus: award each hero their R+I+P as bonus karma
+  // Session Bonus: award each hero their R+I+P as bonus karma (house rule, gated by setting)
   async _onAwardSessionBonus(event) {
     event.preventDefault();
     if (!game.user.isGM) return;
+    if (!game.settings.get("msh-faserip", "sessionRIPBonus")) {
+      ui.notifications.warn("R+I+P session bonus is disabled. Enable it in system settings.");
+      return;
+    }
 
     const teamMemberIds = game.settings.get("msh-faserip", "teamMembers") || [];
     const heroes = game.actors.filter(a => teamMemberIds.includes(a.id));
@@ -1213,7 +1230,8 @@ export class TeamSheet extends Application {
 
   static getHighestRank(actor) {
     let highest = 0, highLabel = "Shift-0";
-    const abilities = actor.system.abilities?.abilities || {};
+    // Abilities live at system.abilities.<key>, not system.abilities.abilities.<key>.
+    const abilities = actor.system?.abilities || {};
     for (const key of Object.keys(abilities)) {
       const val = abilities[key]?.value || 0;
       if (val > highest) { highest = val; highLabel = abilities[key]?.rank || TeamSheet._rankLabelFromValue(val); }
@@ -1261,20 +1279,35 @@ export class TeamSheet extends Application {
       const tokenDisp = c.token?.disposition;
       const protoDisp = actor.prototypeToken?.disposition;
       const disp = tokenDisp ?? protoDisp ?? (actor.type === "villain" ? -1 : 0);
-      console.log(`[FASERIP] Combatant: ${actor.name}, tokenDisp=${tokenDisp}, protoDisp=${protoDisp}, resolved=${disp}, type=${actor.type}`);
+      console.log(`[FASERIP] Combatant: ${actor.name}, tokenDisp=${tokenDisp}, protoDisp=${protoDisp}, resolved=${disp}, type=${actor.type}, defeated=${c.defeated}`);
 
       if (teamMemberIds.includes(actor.id) || disp > 0) {
         heroCombatantIds.push(actor.id);
-      } else if (disp < 0 || actor.type === "villain") {
-        villainActors.push(actor);
-        console.log(`[FASERIP] Capturing villain: ${actor.name} (type=${actor.type}, disp=${disp})`);
-      } else {
-        console.log(`[FASERIP] Skipping neutral: ${actor.name} (type=${actor.type}, disp=${disp})`);
+        continue;
       }
+
+      const isHostile = disp < 0 || actor.type === "villain";
+      if (!isHostile) {
+        console.log(`[FASERIP] Skipping neutral: ${actor.name} (type=${actor.type}, disp=${disp})`);
+        continue;
+      }
+
+      // Only capture hostiles that were actually defeated.
+      // c.defeated is the Foundry "skull" flag. Fall back to HP<=0 for systems
+      // that don't set it reliably.
+      const hp = Number(actor.system?.attributes?.health?.value);
+      const wasDefeated = c.defeated === true || (Number.isFinite(hp) && hp <= 0);
+      if (!wasDefeated) {
+        console.log(`[FASERIP] Skipping undefeated hostile: ${actor.name} (hp=${hp}, defeated=${c.defeated})`);
+        continue;
+      }
+
+      villainActors.push(actor);
+      console.log(`[FASERIP] Capturing defeated villain: ${actor.name} (type=${actor.type}, disp=${disp})`);
     }
 
-    if (!villainActors.length) { console.log("[FASERIP] No hostile combatants found"); return; }
-    console.log(`[FASERIP] Found ${villainActors.length} villains, ${heroCombatantIds.length} heroes`);
+    if (!villainActors.length) { console.log("[FASERIP] No defeated hostiles found"); return; }
+    console.log(`[FASERIP] Found ${villainActors.length} defeated villains, ${heroCombatantIds.length} heroes`);
 
     const seen = new Set();
     const villains = [];

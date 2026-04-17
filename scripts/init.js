@@ -936,6 +936,15 @@ Hooks.once("init", async () => {
       default: false
     });
 
+    game.settings.register("msh-faserip", "sessionRIPBonus", {
+      name: "Session R+I+P Bonus (House Rule)",
+      hint: "Enable the Graycloak house rule: at session end, each hero may be awarded karma equal to Reason + Intuition + Psyche. Adds an R+I+P button to the Team Tracker. Not from the rulebook.",
+      scope: "world",
+      config: true,
+      type: Boolean,
+      default: false
+    });
+
     game.settings.register("msh-faserip", "pendingKarmaAwards", {
       name: "Pending Karma Awards",
       scope: "world",
