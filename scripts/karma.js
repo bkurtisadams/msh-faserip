@@ -1,7 +1,12 @@
-// karma.js v1.6.1 - 2026-04-03
+// karma.js v1.6.3 - 2026-04-16
+// v1.6.3: Fix Ability Advancement cost formula. Per RAW (Potato Salad Man example),
+//         each +1 point costs 10× the CURRENT numeric value, not 10× the Standard
+//         Rank Number. e.g. Good(14)→Good(15) = 140 karma, not 100. Cresting +400
+//         still triggers on crossing a rank's range boundary (e.g. 7→8, 15→16).
+// v1.6.2: Fix _getNewRank thresholds to use book Rank Ranges.
 // v1.6.1: Replace local RANK_MINS/RANK_ORDER with import from rules-reference.js
 // v1.6.0: Add missing karma types: Failing Commitment, Leaving Early, Negative Popularity, Commit Robbery
-import { RANKS_ORDERED, RANK_VALUES } from "./rules/rules-reference.js";
+import { RANKS_ORDERED } from "./rules/rules-reference.js";
 
 export class KarmaSheet extends DocumentSheet {
   sortNewestFirst = true;
@@ -676,19 +681,12 @@ export class KarmaSheet extends DocumentSheet {
     const availableKarma = this._getCurrentKarma();
     const abilities = actor.system.abilities;
 
-    const RANK_MINS = RANK_VALUES;
+    // Rank Range MINIMUMS per Advanced Set book table — used to identify
+    // which rank a numeric value falls into. (NOT the Standard Rank Numbers.)
+    // Rank identification uses Rank Range minimums — see _getNewRank below.
+    // Cost formula: 10 × current numeric value per point (RAW).
     const RANK_ORDER = RANKS_ORDERED;
     const abilityKeys = ["fighting","agility","strength","endurance","reason","intuition","psyche"];
-
-    const getRankNumber = (value) => {
-      let rankNum = 0;
-      for (const r of RANK_ORDER) {
-        const min = RANK_MINS[r] ?? 0;
-        if (min <= value) rankNum = min;
-        else break;
-      }
-      return rankNum;
-    };
 
     // Abbreviate rank for compact display
     const abbrevRank = (rank) => {
@@ -704,36 +702,45 @@ export class KarmaSheet extends DocumentSheet {
     const calcAdvancementCost = (startValue, targetValue) => {
       const points = targetValue - startValue;
       if (points <= 0) return { total: 0, points: 0, newValue: startValue, newRank: this._getNewRank(startValue), lines: [] };
+      // Per RAW: each +1 point costs 10× the CURRENT value (not the rank's Standard Rank Number).
+      // Book example: Good(14)→Good(15) costs 140. Good(15)→Excellent(16) costs 150+400=550.
+      // Cresting adds 400 the moment the value crosses into a new rank's range.
       let total = 0;
       let lines = [];
       let cv = startValue;
       let curRank = this._getNewRank(cv);
-      let curRankNum = getRankNumber(cv);
       let segStart = cv;
-      let segCost = 10 * curRankNum;
+      let segTotal = 0;
 
       for (let i = 0; i < points; i++) {
+        const pointCost = 10 * cv;
+        total += pointCost;
+        segTotal += pointCost;
         const nv = cv + 1;
         const nRank = this._getNewRank(nv);
-        total += 10 * curRankNum;
 
         if (nRank !== curRank) {
-          // Close current segment
+          // Close segment: show "X pts (start-end) at RankAbbrev"
           const segPts = nv - segStart;
-          lines.push({ label: `${segPts} pt${segPts > 1 ? "s" : ""} at ${abbrevRank(curRank)} (${curRankNum}) × 10`, cost: segPts * segCost });
+          lines.push({
+            label: `${segPts} pt${segPts > 1 ? "s" : ""} at ${abbrevRank(curRank)} (${segStart}→${nv-1 === segStart ? nv : nv})`,
+            cost: segTotal
+          });
           lines.push({ label: `Cresting: ${curRank} → ${nRank}`, cost: 400, cresting: true });
           total += 400;
           curRank = nRank;
-          curRankNum = getRankNumber(nv);
-          segCost = 10 * curRankNum;
           segStart = nv;
+          segTotal = 0;
         }
         cv = nv;
       }
       // Close final segment
       const segPts = cv - segStart;
       if (segPts > 0) {
-        lines.push({ label: `${segPts} pt${segPts > 1 ? "s" : ""} at ${abbrevRank(curRank)} (${curRankNum}) × 10`, cost: segPts * segCost });
+        lines.push({
+          label: `${segPts} pt${segPts > 1 ? "s" : ""} at ${abbrevRank(curRank)} (${segStart}→${cv})`,
+          cost: segTotal
+        });
       }
 
       return { total, points, newValue: targetValue, newRank: this._getNewRank(targetValue), lines };
@@ -937,23 +944,24 @@ export class KarmaSheet extends DocumentSheet {
   }
 
   _getNewRank(value) {
+    // Rank Range thresholds per Advanced Set book table (NOT Standard Rank Numbers).
     if (value >= 10000) return "Beyond";
     if (value >= 5000) return "Class 5000";
     if (value >= 3000) return "Class 3000";
     if (value >= 1000) return "Class 1000";
-    if (value >= 500) return "Shift-Z";
-    if (value >= 200) return "Shift-Y";
-    if (value >= 150) return "Shift-X";
-    if (value >= 100) return "Unearthly";
-    if (value >= 75) return "Monstrous";
-    if (value >= 50) return "Amazing";
-    if (value >= 40) return "Incredible";
-    if (value >= 30) return "Remarkable";
-    if (value >= 20) return "Excellent";
-    if (value >= 10) return "Good";
-    if (value >= 6) return "Typical";
-    if (value >= 4) return "Poor";
-    if (value >= 2) return "Feeble";
+    if (value >= 351) return "Shift-Z";
+    if (value >= 176) return "Shift-Y";
+    if (value >= 126) return "Shift-X";
+    if (value >= 88) return "Unearthly";
+    if (value >= 63) return "Monstrous";
+    if (value >= 46) return "Amazing";
+    if (value >= 36) return "Incredible";
+    if (value >= 26) return "Remarkable";
+    if (value >= 16) return "Excellent";
+    if (value >= 8) return "Good";
+    if (value >= 5) return "Typical";
+    if (value >= 3) return "Poor";
+    if (value >= 1) return "Feeble";
     return "Shift-0";
   }
 
