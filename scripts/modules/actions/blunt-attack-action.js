@@ -95,9 +95,12 @@ export class BluntAttackAction extends AttackAction {
 
     const defaultSource = (passedItemId && passedItem?.type === "equipment") ? "weapon" : "hands";
     
-    const savedSource = shouldRemember 
-      ? ((await actor.getFlag("msh-faserip","lastBluntSource")) || defaultSource)
-      : defaultSource;
+    // Explicit passed item (equipment attack / attack-mode click) always wins over lastBluntSource flag
+    const savedSource = passedItemId
+      ? "weapon"
+      : (shouldRemember
+          ? ((await actor.getFlag("msh-faserip","lastBluntSource")) || defaultSource)
+          : defaultSource);
 
     const savedItemId = passedItemId || (shouldRemember ? (await actor.getFlag("msh-faserip","lastBluntItemId")) : "") || "";
     

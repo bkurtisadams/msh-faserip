@@ -1,0 +1,2258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FASERIP — Character Sheet</title>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;600;700;900&family=Bitter:wght@400;700&family=Barlow+Condensed:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Cinzel:wght@500;700&family=Alegreya:ital,wght@0,400;0,700;1,400&family=Alegreya+SC:wght@700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="gcc-header.css">
+<link rel="stylesheet" href="gcc-auth.css">
+<link rel="stylesheet" href="mp-dialog.css">
+<style>
+/* ── FASERIP Theme Vars ── */
+:root {
+  --sky: #5ac8e8; --sky-dk: #3ea8cc; --sky-pale: #c8eef8;
+  --white: #ffffff; --paper: #f5f5f0;
+  --green: #22bb22; --green-dk: #158015;
+  --yellow: #f0d800; --yellow-dk: #c4b000;
+  --red: #cc1111; --red-dk: #8b0000;
+  --dark: #111; --mid: #444; --soft: #666; --mute: #999;
+  --rule: rgba(0,0,0,.18);
+  --fd: 'Oswald','Impact',sans-serif;
+  --fb: 'Bitter', serif;
+  --bg: #d6eaf8; --bg2: #c4dff0;
+  --hdr-bg: #1a2a3a; --accent: #c05a00;
+  --val: #b03000;
+  --cell-h: 24px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+input[type=number]{-moz-appearance:textfield}
+html{min-height:100%;background:var(--bg)}
+body{min-height:100vh;background:var(--bg);color:var(--dark);font-family:var(--fb);font-size:12px;display:flex;flex-direction:column}
+
+/* ── FASERIP Toolbar (Row 2) — uses shared gcc-mp theme vars ── */
+.fas-hdr{background:var(--gcc-mp-bg);border-bottom:3px solid var(--gcc-mp-brd);padding:0 12px;flex-shrink:0}
+.fas-hdr-in{max-width:780px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;min-height:40px;gap:8px;flex-wrap:wrap;padding:4px 0}
+.fas-logo-wrap{display:flex;align-items:center;gap:8px}
+.fas-logo-title{font-family:var(--fd);font-size:22px;color:var(--gcc-mp-tx);letter-spacing:2px;text-shadow:1px 1px 0 rgba(0,0,0,.15)}
+.fas-logo-sub{font-family:var(--fb);font-size:9px;color:var(--gcc-mp-sub);letter-spacing:1px}
+.fas-hdr-btns{display:flex;gap:3px;align-items:center;flex-wrap:wrap}
+.hdr-btn{padding:3px 7px;font-size:9px;background:var(--gcc-mp-btn-bg);border:1px solid var(--gcc-mp-btn-brd);color:var(--gcc-mp-btn-tx);border-radius:2px;cursor:pointer;font-family:var(--fb);font-weight:700}
+.hdr-btn:hover{border-color:var(--gcc-mp-btn-hover-brd);background:var(--gcc-mp-btn-hover-bg)}
+.hdr-btn.active{background:var(--accent);border-color:var(--accent);color:#fff}
+
+/* ── Footer ── */
+.fas-ftr{font-size:8px;color:#3a5a70;text-align:center;padding:6px;background:var(--bg2);border-top:1px solid #8ab4d0}
+
+/* ── Sheet Area ── */
+.sheet-wrap{flex:1;overflow-y:auto;overflow-x:auto;padding:10px;-webkit-overflow-scrolling:touch}
+.sheet{width:100%;max-width:720px;min-width:360px;margin:0 auto;background:#fff;border:2px solid #000;padding:14px 16px 10px;font-family:var(--fb);font-size:11px;color:#000;box-sizing:border-box}
+
+/* ── Shared Inputs ── */
+.si{border:none;border-bottom:1.5px solid #000;background:transparent;font-family:var(--fb);font-size:11px;color:#000;padding:0 2px;height:var(--cell-h);outline:none}
+.si:focus{border-bottom-color:var(--accent)}
+.si-box{border:1.5px solid #000;background:transparent;font-family:var(--fb);font-size:12px;font-weight:700;color:#000;padding:0 2px;height:26px;text-align:center;outline:none;width:50px}
+.si-box:focus{border-color:var(--accent)}
+.lbl{font-weight:700;font-size:10px;white-space:nowrap}
+.si-calc{border:none;border-bottom:1.5px solid #000;background:#f8f8f0;font-family:var(--fb);font-size:11px;color:var(--val);font-weight:700;padding:0 2px;height:var(--cell-h);outline:none;text-align:center}
+.si-calc-sel{border:none;border-bottom:1.5px solid #000;background:#f8f8f0;font-family:var(--fb);font-size:11px;color:var(--val);font-weight:700;padding:0 2px;height:var(--cell-h);outline:none;cursor:pointer;-webkit-appearance:none;appearance:none;border-radius:0}
+.si-calc-sel:focus{border-bottom-color:var(--accent)}
+
+/* ── Header Area: Portrait + Logo/Bio ── */
+.sheet-header{display:grid;grid-template-columns:130px 1fr;gap:10px;margin-bottom:8px}
+.portrait-col{grid-row:1/2}
+.portrait-box{
+  width:120px;height:160px;border:2px solid #000;border-radius:2px;
+  overflow:hidden;position:relative;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+}
+.portrait-box img{width:100%;height:100%;object-fit:contain;display:block}
+.portrait-placeholder{color:#bbb;font-size:9px;text-align:center}
+.portrait-placeholder svg{display:block;margin:0 auto 3px;opacity:.25}
+.portrait-del{
+  position:absolute;top:3px;right:3px;width:18px;height:18px;border-radius:2px;border:none;
+  cursor:pointer;padding:0;background:rgba(0,0,0,.5);color:rgba(255,255,255,.7);
+  display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .12s;font-size:11px;
+}
+.portrait-box:hover .portrait-del{opacity:1}
+.portrait-del:hover{background:rgba(0,0,0,.8);color:#ff4040}
+@media print{.portrait-del{display:none!important}}
+
+.header-right{display:flex;flex-direction:column;gap:2px;min-width:0}
+.logo-player-row{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:4px;min-width:0}
+.sheet-logo{font-family:var(--fd);line-height:1}
+.sheet-logo-main{font-size:22px;font-weight:900;letter-spacing:1px}
+.sheet-logo-sub{font-size:9px;font-weight:600;letter-spacing:2px}
+.sheet-title{font-family:var(--fd);font-size:13px;font-weight:700;letter-spacing:1px;color:var(--mid)}
+.player-field{display:flex;align-items:baseline;gap:3px;min-width:0;flex-shrink:1}
+.player-field .lbl{font-size:9px}
+
+/* ── Bio Grid (inside header-right) ── */
+.bio-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px 10px;min-width:0}
+.bio-row{display:flex;align-items:baseline;gap:3px;min-width:0}
+.bio-row .lbl{min-width:44px;text-align:right}
+.bio-row .si{flex:1;min-width:0}
+.bio-full{grid-column:1/-1}
+.id-checks{display:flex;gap:6px;align-items:center;font-size:9px;font-weight:700}
+.id-checks label{display:flex;align-items:center;gap:2px;cursor:pointer}
+.id-checks input[type=radio]{margin:0}
+
+/* ── Expanded Bio (collapsible) ── */
+.bio-expand{margin-bottom:6px;border-top:1px dotted #ccc;padding-top:4px;overflow:hidden}
+.bio-toggle{font-size:11px;cursor:pointer;color:var(--accent);font-weight:700;border:none;background:none;font-family:var(--fd);padding:0 3px;line-height:1}
+.bio-toggle:hover{color:#d06a10}
+.bio-detail-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1px 10px;max-width:100%;overflow:hidden}
+.bio-detail-grid .bio-row .lbl{min-width:44px}
+.bio-detail-grid .bio-row .si{min-width:0}
+.bio-history{margin-top:4px}
+.bio-history textarea{width:100%;border:1.5px solid #000;background:transparent;font-family:var(--fb);font-size:10px;padding:3px 4px;resize:vertical;min-height:36px;outline:none}
+.bio-history textarea:focus{border-color:var(--accent)}
+
+/* ── Movement Row ── */
+.movement-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:4px 0 0 4px;margin-top:auto;border-top:1px solid #ddd}
+.movement-item{display:flex;align-items:center;gap:2px}
+.movement-item .lbl{font-family:var(--fd);font-size:9px;font-weight:700;letter-spacing:.5px;cursor:pointer;min-width:auto}
+.movement-item .lbl:hover{color:var(--accent)}
+.movement-item input{width:32px;border:none;border-bottom:1px solid #999;background:transparent;text-align:center;font-family:var(--fb);font-size:11px;font-weight:700;outline:none;padding:0}
+.movement-item input:focus{border-bottom-color:var(--accent)}
+.movement-item input.si-calc{background:#f8f8f0;color:var(--val);border-bottom:1px solid #999}
+
+/* ── Abilities Tables ── */
+.abilities-wrap{display:flex;gap:12px;margin-bottom:8px;flex-wrap:wrap}
+.primary-block{flex:0 0 auto}
+.secondary-block{flex:1;min-width:200px;display:flex;flex-direction:column}
+.section-label{font-family:var(--fd);font-size:13px;font-weight:700;text-align:center;padding:2px 0;letter-spacing:1px;border-bottom:2px solid #000;margin-bottom:4px}
+.ab-table{border-collapse:collapse;width:100%}
+.ab-table th{font-family:var(--fd);font-size:9px;font-weight:700;letter-spacing:.5px;padding:2px 4px;text-align:center;border-bottom:1.5px solid #000}
+.ab-table td{padding:2px 4px;text-align:center;height:var(--cell-h);border-bottom:1px solid #ddd}
+.ab-table .ab-key{font-family:var(--fd);font-size:18px;font-weight:900;width:28px;background:#f4f4f0;cursor:default}
+.ab-table input{width:100%;border:none;background:transparent;text-align:center;font-family:var(--fb);font-size:11px;font-weight:700;outline:none;padding:0}
+.ab-table input:focus{border-bottom:1px solid var(--accent)}
+.ab-table select{width:100%;border:none;background:transparent;font-family:var(--fb);font-size:10px;font-weight:700;outline:none;cursor:pointer;text-align:center;-webkit-appearance:none;appearance:none;padding:0 2px}
+.ab-table select:focus{background:#fffde0}
+.ab-table .si-calc{width:100%;border:none;border-bottom:none;background:#f8f8f0;font-family:var(--fb);font-size:11px;font-weight:700;color:var(--val);text-align:center;outline:none;padding:0;height:auto}
+
+/* Secondary abilities */
+.sec-table{border-collapse:collapse;width:100%}
+.sec-table th{font-family:var(--fd);font-size:9px;font-weight:700;letter-spacing:.5px;padding:2px 4px;text-align:center;border-bottom:1.5px solid #000}
+.sec-table td{padding:4px;text-align:center;height:auto;border-bottom:1px solid #ddd}
+.sec-table input,.sec-table select{width:100%;border:none;background:transparent;text-align:center;font-family:var(--fb);font-size:12px;font-weight:700;outline:none;padding:0}
+.sec-table input:focus,.sec-table select:focus{border-bottom:1px solid var(--accent)}
+.sec-formula{font-size:8px;color:var(--soft);font-weight:400}
+
+/* ── Special Abilities ── */
+.special-section{margin-top:8px}
+.special-label{font-family:var(--fd);font-size:13px;font-weight:700;letter-spacing:1px;margin-bottom:4px;border-bottom:2px solid #000;padding-bottom:2px}
+.list-section{margin-bottom:8px}
+.list-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:2px}
+.list-title{font-family:var(--fd);font-size:11px;font-weight:700;letter-spacing:1px}
+.list-add{font-size:9px;cursor:pointer;color:var(--accent);font-weight:700;border:none;background:none;font-family:var(--fb)}
+.list-add:hover{text-decoration:underline}
+.item-list{list-style:none}
+.item-row{display:grid;align-items:center;gap:3px;padding:1px 0;border-bottom:1px dotted #ccc}
+.item-row.power-row{grid-template-columns:auto 80px 40px 1fr auto auto}
+.item-name-cell{display:flex;align-items:center;gap:2px;min-width:0}
+.item-name-cell .si{flex:1;min-width:0;width:100%}
+.item-row.talent-row{grid-template-columns:auto 1fr auto auto}
+.item-row.contact-row{grid-template-columns:auto 1fr auto auto}
+.item-row .si{font-size:11px;height:20px}
+.item-rank{font-size:9px!important}
+.item-value{text-align:center;font-size:10px!important}
+.item-del{cursor:pointer;color:#c00;font-size:11px;border:none;background:none;padding:0 2px;font-weight:700;opacity:.4}
+.item-del:hover{opacity:1}
+.item-star{color:#c8960c;font-size:9px;margin-right:2px}
+.item-info{cursor:pointer;color:#1a6aaa;font-size:10px;border:none;background:none;padding:0 2px;font-weight:700;opacity:.6}
+.item-info:hover{opacity:1;color:var(--accent)}
+.item-row.equip-row{grid-template-columns:auto 60px 40px 1fr auto auto}
+.item-row.stunt-row{grid-template-columns:auto 60px 40px 1fr auto 36px auto auto}
+.stunt-used{width:36px!important;text-align:center;font-size:10px!important}
+.item-row.hq-row{grid-template-columns:1fr 80px auto}
+.item-row.veh-row{grid-template-columns:1fr 80px 40px auto}
+.item-cat{font-size:8px;color:var(--soft);font-style:italic;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.difficulty-badge{font-size:8px;font-weight:700;padding:1px 4px;border-radius:2px;font-family:var(--fd)}
+.diff-red{background:#fde0e0;color:#8b0000}
+.diff-yellow{background:#fefad0;color:#6a5e00}
+.diff-green{background:#d0f2d0;color:#158015}
+.diff-mastered{background:#e0e0ff;color:#334}
+
+/* Detail modal field grid */
+
+.detail-grid .dv{font-size:11px}
+.feat-btn{
+  padding:1px 4px;font-family:var(--fd);font-size:8px;font-weight:700;letter-spacing:.5px;
+  border:1px solid #888;background:#e8e8e0;color:#444;border-radius:2px;cursor:pointer;
+  white-space:nowrap;line-height:1.4;
+}
+.feat-btn:hover{background:#ffd700;border-color:#c8960c;color:#000}
+.feat-btn:active{background:#c8960c;color:#fff}
+
+/* ── Bottom Section: Talents / Karma / Contacts ── */
+.bottom-grid{display:grid;grid-template-columns:1fr auto 1fr;gap:8px;margin-top:8px}
+.karma-wrap{display:flex;gap:6px;align-items:stretch}
+.karma-box{border:1.5px solid #000;padding:6px 8px;min-width:70px;flex:1;display:flex;flex-direction:column;align-items:center}
+.karma-label{font-family:var(--fd);font-size:9px;font-weight:700;text-align:center;letter-spacing:.5px;margin-bottom:3px;line-height:1.2}
+.karma-input{width:100%;border:none;border-bottom:1px solid #999;background:transparent;font-family:var(--fb);font-size:14px;font-weight:700;text-align:center;outline:none;padding:2px 0}
+.karma-input:focus{border-bottom-color:var(--accent)}
+.karma-pool-name{width:100%;margin-top:3px;font-size:9px;text-align:center;border:none;border-bottom:1px solid #ccc;background:transparent;font-family:var(--fb);outline:none;padding:1px 2px}
+.karma-pool-name:focus{border-bottom-color:var(--accent)}
+
+/* ── Karma Ledger ── */
+.karma-toggle{cursor:pointer;position:relative}
+.karma-toggle:hover{border-bottom-color:var(--accent)}
+.karma-toggle::after{content:" \u25BC";font-size:7px;color:#999;vertical-align:middle}
+.karma-ledger{display:none;border:1.5px solid #000;margin:8px 0;background:#faf8f2;max-height:300px;overflow-y:auto}
+.karma-ledger.open{display:block}
+.karma-ledger-hdr{display:flex;justify-content:space-between;align-items:center;padding:4px 8px;border-bottom:1px solid #ccc;background:#f0ede4}
+.karma-ledger-hdr span{font-family:var(--fd);font-size:9px;font-weight:700;letter-spacing:.5px}
+.karma-ledger-summary{display:flex;gap:12px;font-family:var(--fm);font-size:9px;color:#666}
+.karma-ledger table{width:100%;border-collapse:collapse;font-size:9px;font-family:var(--fb)}
+.karma-ledger th{font-family:var(--fd);font-size:8px;font-weight:700;letter-spacing:.5px;text-align:left;padding:3px 6px;border-bottom:1.5px solid #000;background:#f0ede4;position:sticky;top:0}
+.karma-ledger td{padding:2px 6px;border-bottom:1px dotted #ccc}
+.karma-ledger .kl-pos{color:#2a7a2a;font-weight:700}
+.karma-ledger .kl-neg{color:#8b0000;font-weight:700}
+.karma-ledger .kl-empty{text-align:center;padding:12px;color:#999;font-style:italic}
+
+/* ── Limitation ── */
+.limitation-row{margin:6px 0;display:flex;align-items:baseline;gap:4px}
+.limitation-row .si{flex:1}
+
+/* ── Sub-labels inside unified collapsible ── */
+.sub-label{font-family:var(--fd);font-size:10px;font-weight:700;letter-spacing:.5px;color:var(--soft);margin:6px 0 2px;display:flex;align-items:center;justify-content:space-between}
+
+/* ── Collapsible Sections ── */
+.collapsible-hdr{display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none;padding:4px 0;margin:4px 0 0}
+.collapsible-hdr:hover .collapsible-title{color:var(--accent)}
+.collapsible-caret{font-size:9px;color:#888;transition:transform 0.15s;display:inline-block;width:10px;text-align:center}
+.collapsible-hdr.open .collapsible-caret{transform:rotate(90deg)}
+.collapsible-title{font-family:var(--fd);font-size:11px;font-weight:700;letter-spacing:1px;color:#444}
+.collapsible-count{font-family:var(--fm);font-size:9px;color:#888;font-weight:400}
+.collapsible-body{display:none;padding-top:2px}
+.collapsible-hdr.open+.collapsible-body{display:block}
+
+/* ── Chargen Panel ── */
+.chargen-panel{display:none;background:#fff;border:2px solid var(--accent);border-radius:4px;padding:12px;margin:0 auto 10px;max-width:720px;width:100%}
+.chargen-panel.open{display:block}
+.chargen-title{font-family:var(--fd);font-size:16px;font-weight:700;color:var(--accent);margin-bottom:8px;letter-spacing:1px}
+.chargen-btn{padding:5px 12px;font-family:var(--fd);font-size:11px;font-weight:700;border:2px solid var(--accent);background:#fff;color:var(--accent);cursor:pointer;letter-spacing:1px;border-radius:2px}
+.chargen-btn:hover{background:var(--accent);color:#fff}
+.chargen-btn.primary{background:var(--accent);color:#fff}
+.chargen-btn.primary:hover{background:#d06a10}
+.chargen-btns{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.chargen-log{font-family:'Courier New',monospace;font-size:10px;background:#1a1a2e;color:#0f0;padding:8px;max-height:200px;overflow-y:auto;border-radius:2px;white-space:pre-wrap;margin-top:6px}
+.chargen-origin-btns{display:flex;gap:4px;flex-wrap:wrap;margin:6px 0}
+.chargen-origin-btns button{padding:4px 10px;font-family:var(--fd);font-size:10px;font-weight:700;border:1px solid #999;background:#f5f5f0;cursor:pointer;border-radius:2px}
+.chargen-origin-btns button:hover{border-color:var(--accent);background:#fff4e6}
+.chargen-origin-btns button.selected{background:var(--accent);color:#fff;border-color:var(--accent)}
+
+/* ── Step-by-step chargen wizard ── */
+.cg-step{margin-top:8px}
+.cg-step-title{font-family:var(--fd);font-size:13px;font-weight:700;color:var(--accent);letter-spacing:1px;margin-bottom:4px}
+.cg-step-desc{font-size:10px;color:#555;margin-bottom:6px;line-height:1.35}
+.cg-roll-row{display:flex;align-items:center;gap:6px;padding:2px 0;font-size:11px;font-family:var(--fb)}
+.cg-roll-label{font-weight:700;min-width:20px;font-family:var(--fd);font-size:12px}
+.cg-roll-result{font-weight:700;color:var(--accent)}
+.cg-roll-rank{font-weight:700}
+.cg-mod-note{font-size:10px;color:#158015;font-style:italic;margin-left:4px}
+.cg-pick-grid{display:flex;flex-wrap:wrap;gap:3px;margin:4px 0}
+.cg-pick-btn{padding:3px 8px;font-size:9px;font-family:var(--fb);font-weight:700;border:1px solid #999;background:#f5f5f0;cursor:pointer;border-radius:2px}
+.cg-pick-btn:hover{border-color:var(--accent);background:#fff4e6}
+.cg-pick-btn.selected{background:var(--accent);color:#fff;border-color:var(--accent)}
+.cg-pick-btn.disabled{opacity:.35;pointer-events:none}
+.cg-pick-btn.star{border-color:#8b0000;color:#8b0000}
+.cg-pick-btn.star.selected{background:#8b0000;color:#fff}
+.cg-cat-hdr{font-family:var(--fd);font-size:10px;font-weight:700;color:#444;margin:6px 0 2px;letter-spacing:.5px}
+.cg-summary{font-size:10px;background:#f0f8ff;border:1px solid #b0d0e8;border-radius:3px;padding:6px 8px;margin:6px 0;line-height:1.4}
+.cg-summary strong{font-family:var(--fd);letter-spacing:.5px}
+.cg-next-btn{padding:5px 14px;font-family:var(--fd);font-size:11px;font-weight:700;border:2px solid var(--accent);background:var(--accent);color:#fff;cursor:pointer;letter-spacing:1px;border-radius:2px;margin-top:6px}
+.cg-next-btn:hover{background:#d06a10}
+.cg-next-btn:disabled{opacity:.4;cursor:default}
+.cg-next-btn.secondary{background:#fff;color:var(--accent)}
+.cg-next-btn.secondary:hover{background:var(--accent);color:#fff}
+.cg-reroll-btn{padding:2px 8px;font-size:9px;font-family:var(--fb);font-weight:700;border:1px solid #999;background:#fff;cursor:pointer;border-radius:2px;color:#666}
+.cg-reroll-btn:hover{border-color:var(--accent);color:var(--accent)}
+
+/* ── View Mode ── */
+body.view-mode .fas-hdr-btns .hdr-btn:not(.hdr-btn-view-edit){ display:none }
+body.view-mode .chargen-panel{ display:none!important }
+body.view-mode .list-add,body.view-mode .item-del,body.view-mode .item-info,body.view-mode .feat-btn,body.view-mode .bio-toggle{ display:none!important }
+body.view-mode input,body.view-mode select,body.view-mode textarea{ pointer-events:none!important; user-select:text!important; -webkit-user-select:text!important; opacity:1!important }
+body.view-mode input:focus,body.view-mode select:focus,body.view-mode textarea:focus{ outline:none!important; border-color:inherit!important }
+.view-badge{display:none;font-family:var(--fd);font-size:9px;letter-spacing:2px;color:#5ac8e8;border:1px solid #5ac8e866;padding:2px 8px;border-radius:2px;margin-right:6px;pointer-events:none}
+body.view-mode .view-badge{display:inline-block}
+body.view-mode .sheet-wrap{overflow-x:hidden;overflow-y:visible;flex:none}
+body.view-mode .power-row{grid-template-columns:80px 40px 1fr}
+body.view-mode .equip-row{grid-template-columns:60px 40px 1fr}
+body.view-mode .stunt-row{grid-template-columns:60px 40px 1fr 36px}
+body.view-mode .talent-row{grid-template-columns:1fr}
+body.view-mode .contact-row{grid-template-columns:1fr}
+body.view-mode .item-name-cell .si{width:100%}
+body.view-mode .equip-row>input.si:last-of-type{width:100%}
+.hdr-btn-view-edit{display:none}
+body.view-mode .hdr-btn-view-edit{display:inline-block}
+
+/* ── Print ── */
+@media print{
+  .gcc-bar,.fas-hdr,.fas-ftr,.chargen-panel,.hdr-btn,
+  .list-add,.item-del,.item-info,.feat-btn,.mp-modal-overlay,.bio-toggle{display:none!important}
+  .sheet-wrap{padding:0}
+  .sheet{border:none;max-width:100%;box-shadow:none}
+  .si{border-bottom-color:#999!important}
+}
+
+/* ── Responsive ── */
+@media(max-width:600px){
+  .abilities-wrap{flex-direction:column}
+  .bottom-grid{grid-template-columns:1fr;gap:6px}
+  .bio-grid{grid-template-columns:1fr 1fr}
+  .sheet{padding:8px 10px 6px}
+}
+</style>
+</head>
+<body>
+
+<!-- GCC Site Bar -->
+<div id="gcc-bar" class="gcc-bar">
+  <div class="gcc-bar-in">
+    <a href="index.html" class="gcc-brand" title="Back to Dashboard">
+      <div class="gcc-title-wrap">
+        <div class="gcc-title">GRAYCLOAK'S</div>
+        <div class="gcc-subtitle">CAMPAIGN CORNER</div>
+      </div>
+    </a>
+    <div class="gcc-nav">
+      <div class="gcc-tools-wrap">
+        <button class="gcc-nav-btn" id="gcc-btn-tools">🎲 Tools ▾</button>
+        <div class="gcc-tools-dd" id="gcc-tools-dd"></div>
+      </div>
+      <span id="gcc-auth-slot"></span>
+      <button class="gcc-nav-btn" id="gcc-btn-theme" title="Toggle light/dark"><span id="gcc-theme-icon">◑</span></button>
+    </div>
+  </div>
+</div>
+<div class="gcc-tools-overlay" id="gcc-tools-overlay"></div>
+
+<!-- FASERIP Toolbar -->
+<div class="fas-hdr">
+  <div class="fas-hdr-in">
+    <div class="fas-logo-wrap">
+      <div>
+        <div class="fas-logo-title">FASERIP</div>
+        <div class="fas-logo-sub">CHARACTER SHEET</div>
+      </div>
+    </div>
+    <div class="fas-hdr-btns">
+      <span class="view-badge">VIEW MODE</span>
+      <button class="hdr-btn hdr-btn-view-edit" id="btn-view-edit" title="Switch to Edit Mode">Edit</button>
+      <button class="hdr-btn" id="btn-new" title="New Character">New</button>
+      <button class="hdr-btn" id="btn-chargen" title="Random Character Generator">Generate</button>
+      <button class="hdr-btn" id="btn-save" title="Save Character">Save</button>
+      <button class="hdr-btn" id="btn-load" title="Load Character">Load</button>
+      <button class="hdr-btn" id="btn-campaign" title="Add to or change campaign">Campaign</button>
+      <button class="hdr-btn" id="btn-export" title="Export to JSON">Export</button>
+      <button class="hdr-btn" id="btn-import" title="Import from JSON">Import</button>
+      <button class="hdr-btn" id="btn-print" title="Print Sheet">Print</button>
+      <button class="hdr-btn" id="btn-delete" title="Delete Character" style="color:#d04848;border-color:#d04848">Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- Chargen Panel -->
+<div class="chargen-panel" id="chargen-panel">
+  <div class="chargen-title">Random Character Generator</div>
+  <p style="font-size:11px;color:#666;margin-bottom:8px">Marvel Super Heroes Advanced Set Rules</p>
+  <div class="chargen-btns">
+    <button class="chargen-btn primary" id="cg-quick">Quick Random</button>
+    <button class="chargen-btn" id="cg-step">Step-by-Step</button>
+    <button class="chargen-btn" id="cg-close" style="margin-left:auto">Close</button>
+  </div>
+  <div id="cg-step-area"></div>
+  <div class="chargen-log" id="cg-log" style="display:none"></div>
+</div>
+
+<!-- Sheet -->
+<div class="sheet-wrap">
+<div class="sheet" id="sheet">
+
+  <!-- Header: Portrait + Logo + Bio -->
+  <div class="sheet-header">
+    <!-- Portrait -->
+    <div class="portrait-col">
+      <div class="portrait-box" id="portrait-box" title="Click to set portrait">
+        <img id="portrait-img" style="display:none">
+        <div class="portrait-placeholder" id="portrait-ph">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="1.5"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+          <div>Click to add<br>portrait</div>
+        </div>
+        <button class="portrait-del" id="portrait-del" title="Remove portrait">&times;</button>
+      </div>
+    </div>
+
+    <!-- Right side: logo + bio fields -->
+    <div class="header-right">
+      <div class="logo-player-row">
+        <div class="sheet-logo">
+          <div class="sheet-logo-main">MARVEL SUPER HEROES</div>
+          <div class="sheet-title">Character Sheet</div>
+        </div>
+        <div class="player-field">
+          <span class="lbl">Player Name</span>
+          <input class="si" style="width:130px;min-width:60px;flex:1" data-field="playerName">
+        </div>
+      </div>
+
+      <div class="bio-grid">
+        <div class="bio-row"><span class="lbl">Name</span><input class="si" data-field="heroName"></div>
+        <div class="bio-row"><span class="lbl">Group</span><input class="si" data-field="group"></div>
+
+        <div class="bio-row">
+          <span class="lbl">Identity</span><input class="si" data-field="identity">
+          <span class="id-checks">
+            <label><input type="radio" name="idType" value="secret" checked> S</label>
+            <label><input type="radio" name="idType" value="public"> P</label>
+          </span>
+        </div>
+        <div class="bio-row"><span class="lbl">Base</span><input class="si" data-field="base"></div>
+
+        <div class="bio-row">
+          <span class="lbl">Origin</span>
+          <select class="si-calc-sel" data-field="origin" style="flex:1;height:var(--cell-h)">
+            <option value=""></option>
+            <option>Altered Human</option><option>Mutant</option><option>Hi-Tech</option>
+            <option>Robot</option><option>Alien</option><option>Normal Human</option>
+          </select>
+          <span class="lbl" style="min-width:24px">Age</span><input class="si" data-field="age" style="width:36px">
+        </div>
+        <div class="bio-row"><span class="lbl">Bio</span><input class="si" data-field="biography"><button class="bio-toggle" id="bio-toggle" title="Expand biography details">▼</button></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Expanded Bio (toggle) -->
+  <div class="bio-expand" id="bio-expand" style="display:none">
+    <div class="bio-detail-grid">
+      <div class="bio-row"><span class="lbl">Race</span><input class="si" data-field="race"></div>
+      <div class="bio-row"><span class="lbl">Sex</span><input class="si" data-field="sex"></div>
+      <div class="bio-row"><span class="lbl">DOB</span><input class="si" data-field="dob"></div>
+      <div class="bio-row"><span class="lbl">Handed</span><input class="si" data-field="handedness"></div>
+      <div class="bio-row"><span class="lbl">Height</span><input class="si" data-field="height"></div>
+      <div class="bio-row"><span class="lbl">Weight</span><input class="si" data-field="weight"></div>
+      <div class="bio-row"><span class="lbl">Eyes</span><input class="si" data-field="eyeColor"></div>
+      <div class="bio-row"><span class="lbl">Hair</span><input class="si" data-field="hairColor"></div>
+      <div class="bio-row"><span class="lbl">Nation</span><input class="si" data-field="nationality"></div>
+      <div class="bio-row"><span class="lbl">Legal</span><input class="si" data-field="legalStatus"></div>
+      <div class="bio-row"><span class="lbl">Marital</span><input class="si" data-field="maritalStatus"></div>
+      <div class="bio-row"><span class="lbl">Occup.</span><input class="si" data-field="occupation"></div>
+    </div>
+    <div class="bio-history">
+      <span class="lbl">History</span>
+      <textarea data-field="history" rows="3"></textarea>
+    </div>
+  </div>
+
+  <!-- Primary + Secondary Abilities -->
+  <div class="abilities-wrap">
+    <!-- Primary -->
+    <div class="primary-block">
+      <div class="section-label">Primary Abilities</div>
+      <table class="ab-table">
+        <thead><tr>
+          <th></th>
+          <th style="width:50px">Initial<br>Roll</th>
+          <th style="width:60px">Initial<br>Rank</th>
+          <th style="width:90px">Current<br>Rank</th>
+          <th style="width:55px">Rank<br>Number</th>
+        </tr></thead>
+        <tbody id="ab-body"></tbody>
+      </table>
+    </div>
+
+    <!-- Secondary -->
+    <div class="secondary-block">
+      <div class="section-label">Secondary Abilities</div>
+      <table class="sec-table">
+        <thead><tr>
+          <th>Health<br><span class="sec-formula">F+A+S+E</span></th>
+          <th>Karma<br><span class="sec-formula">R+I+P</span></th>
+          <th>Resources</th>
+          <th>Popularity</th>
+        </tr></thead>
+        <tbody><tr>
+          <td><input class="si-calc" data-field="health" type="number" style="width:60px" readonly></td>
+          <td><input class="si-calc karma-toggle" data-field="karma" type="number" style="width:60px" readonly id="karma-value" title="Click to view karma history"></td>
+          <td>
+            <select data-field="resourcesRank" style="width:70px;border:none;font-family:var(--fb);font-size:10px;font-weight:700;text-align:center;outline:none;background:transparent" id="res-rank"></select>
+            <input class="si-box" data-field="resourcesValue" type="number" style="width:40px;margin-top:2px">
+          </td>
+          <td>
+            <input class="si-box" data-field="popularityHero" type="number" style="width:40px" title="Hero Identity">
+            <span style="font-size:9px;color:#999">/</span>
+            <input class="si-box" data-field="popularitySecret" type="number" style="width:40px" title="Secret Identity">
+          </td>
+        </tr></tbody>
+      </table>
+      <!-- Movement -->
+      <div class="movement-row">
+        <div class="movement-item"><span class="lbl">RUN</span><input class="si-calc" type="number" data-field="moveRun" placeholder="—"></div>
+        <div class="movement-item"><span class="lbl">LEAP</span><input class="si-calc" type="number" data-field="moveLeap" placeholder="—"></div>
+        <div class="movement-item"><span class="lbl">SWIM</span><input type="number" data-field="moveSwim" placeholder="—"></div>
+        <div class="movement-item"><span class="lbl">FLY</span><input type="number" data-field="moveFly" placeholder="0"></div>
+        <div class="movement-item"><span class="lbl">TELE</span><input type="number" data-field="moveTeleport" placeholder="0"></div>
+      </div>
+      <!-- Karma Ledger (expandable) -->
+      <div class="karma-ledger" id="karma-ledger">
+        <div class="karma-ledger-hdr">
+          <span>Karma History</span>
+          <div class="karma-ledger-summary" id="karma-ledger-summary"></div>
+        </div>
+        <table>
+          <thead><tr><th>Date</th><th>Game Date</th><th>Amount</th><th>Type</th><th>Description</th></tr></thead>
+          <tbody id="karma-ledger-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Special Abilities -->
+  <div class="special-section">
+    <div class="special-label">Special Abilities</div>
+
+    <!-- Powers -->
+    <div class="list-section">
+      <div class="list-header">
+        <span class="list-title">Powers:</span>
+        <button class="list-add" id="add-power">+ Add Power</button>
+      </div>
+      <ul class="item-list" id="powers-list"></ul>
+    </div>
+
+    <!-- Limitation -->
+    <div class="limitation-row">
+      <span class="lbl">Limitation:</span>
+      <input class="si" data-field="limitation" placeholder="">
+    </div>
+
+    <!-- Gear & Resources (unified collapsible) -->
+    <div class="collapsible-hdr" id="gear-toggle">
+      <span class="collapsible-caret">▶</span>
+      <span class="collapsible-title">GEAR &amp; RESOURCES</span>
+      <span class="collapsible-count" id="gear-count"></span>
+    </div>
+    <div class="collapsible-body" id="gear-body">
+      <!-- Equipment -->
+      <div class="sub-label">Equipment <button class="list-add" id="add-equipment" onclick="event.stopPropagation()">+ Add</button></div>
+      <ul class="item-list" id="equipment-list"></ul>
+
+      <!-- Power Stunts -->
+      <div class="sub-label">Power Stunts <button class="list-add" id="add-stunt" onclick="event.stopPropagation()">+ Add</button></div>
+      <ul class="item-list" id="stunts-list"></ul>
+
+      <!-- Headquarters -->
+      <div class="sub-label">Headquarters <button class="list-add" id="add-hq" onclick="event.stopPropagation()">+ Add</button></div>
+      <ul class="item-list" id="hq-list"></ul>
+
+      <!-- Vehicles -->
+      <div class="sub-label">Vehicles <button class="list-add" id="add-vehicle" onclick="event.stopPropagation()">+ Add</button></div>
+      <ul class="item-list" id="vehicles-list"></ul>
+    </div>
+
+    <!-- Bottom: Talents / Karma Tracking / Contacts -->
+    <div class="bottom-grid">
+      <!-- Talents -->
+      <div>
+        <div class="list-header">
+          <span class="list-title">Talents:</span>
+          <button class="list-add" id="add-talent">+ Add Talent</button>
+        </div>
+        <ul class="item-list" id="talents-list"></ul>
+      </div>
+
+      <!-- Karma Boxes — side by side -->
+      <div>
+        <div class="karma-wrap">
+          <div class="karma-box">
+            <div class="karma-label">Advancement<br>Karma</div>
+            <input class="karma-input" data-field="advancementKarma" type="number" value="0">
+          </div>
+          <div class="karma-box">
+            <div class="karma-label">Karma<br>Pool</div>
+            <input class="karma-input" data-field="karmaPool" type="number" value="0">
+            <input class="karma-pool-name" data-field="poolName" placeholder="Pool name">
+          </div>
+        </div>
+      </div>
+
+      <!-- Contacts -->
+      <div>
+        <div class="list-header">
+          <span class="list-title">Contacts:</span>
+          <button class="list-add" id="add-contact">+ Add Contact</button>
+        </div>
+        <ul class="item-list" id="contacts-list"></ul>
+      </div>
+    </div>
+
+  </div>
+
+</div><!-- /sheet -->
+</div><!-- /sheet-wrap -->
+
+<div class="fas-ftr">FASERIP Character Sheet v1.0 &mdash; Graycloak&rsquo;s Campaign Corner &mdash; Data stored locally in your browser</div>
+
+<input type="file" id="file-import" accept=".json" style="display:none">
+
+<script src="mp-dialog.js"></script>
+<script src="gcc-data.js"></script>
+<script src="gcc-header.js"></script>
+<script src="gcc-firebase-config.js"></script>
+<script src="gcc-auth.js"></script>
+<script src="gcc-sync.js"></script>
+<script>
+// ══════════════════════════════════════════════════════════════
+// FASERIP CHARACTER SHEET — fas-app.js (inline)
+// ══════════════════════════════════════════════════════════════
+
+const RANKS = [
+  { name:"Shift-0", min:0, standard:0 },
+  { name:"Feeble", min:1, standard:2 },
+  { name:"Poor", min:3, standard:4 },
+  { name:"Typical", min:5, standard:6 },
+  { name:"Good", min:8, standard:10 },
+  { name:"Excellent", min:16, standard:20 },
+  { name:"Remarkable", min:26, standard:30 },
+  { name:"Incredible", min:36, standard:40 },
+  { name:"Amazing", min:46, standard:50 },
+  { name:"Monstrous", min:63, standard:75 },
+  { name:"Unearthly", min:88, standard:100 },
+  { name:"Shift-X", min:126, standard:150 },
+  { name:"Shift-Y", min:176, standard:200 },
+  { name:"Shift-Z", min:351, standard:500 },
+  { name:"Class 1000", min:1000, standard:1000 },
+  { name:"Class 3000", min:3000, standard:3000 },
+  { name:"Class 5000", min:5000, standard:5000 },
+  { name:"Beyond", min:9999, standard:9999 }
+];
+
+const ABILITIES = ["fighting","agility","strength","endurance","reason","intuition","psyche"];
+const AB_LABELS = {fighting:"F",agility:"A",strength:"S",endurance:"E",reason:"R",intuition:"I",psyche:"P"};
+
+function getRankForValue(val) {
+  for (let i = RANKS.length - 1; i >= 0; i--) {
+    if (val >= RANKS[i].min) return RANKS[i].name;
+  }
+  return "Shift-0";
+}
+function getRankValue(name) {
+  const r = RANKS.find(x => x.name === name);
+  return r ? r.min : 0;
+}
+function getRankStandard(name) {
+  const r = RANKS.find(x => x.name === name);
+  return r ? r.standard : 0;
+}
+
+// ── Chargen Tables ──
+const ORIGIN_TABLE = [
+  {roll:[1,30],origin:"Altered Human"},{roll:[31,60],origin:"Mutant"},
+  {roll:[61,90],origin:"Hi-Tech"},{roll:[91,95],origin:"Robot"},{roll:[96,100],origin:"Alien"}
+];
+const COL1=[{roll:[1,5],rank:"Feeble"},{roll:[6,10],rank:"Poor"},{roll:[11,20],rank:"Typical"},{roll:[21,40],rank:"Good"},{roll:[41,60],rank:"Excellent"},{roll:[61,80],rank:"Remarkable"},{roll:[81,96],rank:"Incredible"},{roll:[97,100],rank:"Amazing"}];
+const COL3=[{roll:[1,5],rank:"Feeble"},{roll:[6,10],rank:"Poor"},{roll:[11,40],rank:"Typical"},{roll:[41,80],rank:"Good"},{roll:[81,95],rank:"Excellent"},{roll:[96,100],rank:"Remarkable"}];
+const COL4=[{roll:[1,5],rank:"Feeble"},{roll:[6,10],rank:"Poor"},{roll:[11,15],rank:"Typical"},{roll:[16,40],rank:"Good"},{roll:[41,50],rank:"Excellent"},{roll:[51,70],rank:"Remarkable"},{roll:[71,90],rank:"Incredible"},{roll:[91,98],rank:"Amazing"},{roll:[99,100],rank:"Monstrous"}];
+const COL5=[{roll:[1,10],rank:"Feeble"},{roll:[11,20],rank:"Poor"},{roll:[21,30],rank:"Typical"},{roll:[31,40],rank:"Good"},{roll:[41,60],rank:"Excellent"},{roll:[61,70],rank:"Remarkable"},{roll:[71,80],rank:"Incredible"},{roll:[81,95],rank:"Amazing"},{roll:[96,100],rank:"Monstrous"}];
+const ABILITY_MOD=[{roll:[1,15],mod:-1},{roll:[16,50],mod:0},{roll:[51,70],mod:1},{roll:[71,85],mod:2},{roll:[86,95],mod:3},{roll:[96,100],mod:4}];
+const POWERS_TBL=[{roll:[1,20],initial:2,max:4},{roll:[21,60],initial:3,max:4},{roll:[61,90],initial:4,max:4},{roll:[91,100],initial:5,max:5}];
+const TALENTS_TBL=[{roll:[1,20],initial:1,max:6},{roll:[21,60],initial:2,max:5},{roll:[61,90],initial:3,max:4},{roll:[91,100],initial:4,max:4}];
+const CONTACTS_TBL=[{roll:[1,20],initial:0,max:4},{roll:[21,60],initial:1,max:4},{roll:[61,90],initial:2,max:4},{roll:[91,100],initial:3,max:4}];
+const POWER_CATS=[{roll:[1,5],cat:"Resistances"},{roll:[6,10],cat:"Senses"},{roll:[11,15],cat:"Movement"},{roll:[16,25],cat:"Matter Control"},{roll:[26,40],cat:"Energy Control"},{roll:[41,55],cat:"Body Control"},{roll:[56,70],cat:"Distance Attacks"},{roll:[71,75],cat:"Mental Powers"},{roll:[76,90],cat:"Body Alterations/Offensive"},{roll:[91,100],cat:"Body Alterations/Defensive"}];
+const TALENT_CATS=[{roll:[1,20],cat:"Weapon Skills"},{roll:[21,45],cat:"Fighting Skills"},{roll:[46,65],cat:"Professional Skills"},{roll:[66,85],cat:"Scientific Skills"},{roll:[86,90],cat:"Mystic and Mental Skills"},{roll:[91,100],cat:"Other Skills"}];
+
+const POWER_LISTS={
+  "Resistances":["Resistance to Fire and Heat","Resistance to Cold","Resistance to Electricity","Resistance to Radiation","Resistance to Toxins","Resistance to Corrosives","Resistance to Emotion Attacks","Resistance to Mental Attacks","Resistance to Magical Attacks","Resistance to Disease","Invulnerability*"],
+  "Senses":["Protected Senses","Enhanced Senses","Infravision","Cosmic Awareness*","Combat Sense*","Computer Links","Emotion Detection","Energy Detection","Magic Detection","Magnetic Detection","Mutant Detection","Psionic Detection","Astral Detection","Tracking Ability"],
+  "Movement":["Flight","Gliding","Leaping","Wall-Crawling","Lightning Speed","Teleportation*","Levitation","Swimming","Climbing","Digging","Dimensional Travel*"],
+  "Matter Control":["Earth Control","Air Control","Fire Control","Water Control","Weather Control","Density Manipulation - Others","Body Transformation - Others","Animal Transformation - Others"],
+  "Energy Control":["Magnetic Manipulation","Electrical Manipulation","Light Manipulation","Sound Manipulation","Darkforce Manipulation","Gravity Manipulation","Probability Manipulation*","Nullifying Power*","Energy Reflection","Time Control*"],
+  "Body Control":["Growth","Shrinking","Density Manipulation - Self","Phasing","Invisibility","Plasticity","Elongation","Shape-Shifting","Imitation","Body Transformation - Self*","Animal Transformation - Self","Raise Lowest Ability","Blending","Power Absorption","Alter Ego"],
+  "Distance Attacks":["Projectile Missile","Ensnaring Missile","Ice Generation","Fire Generation","Energy Generation","Sound Generation","Stunning Missile","Corrosive Missile","Slashing Missile","Nullifier Missile","Darkforce Generation"],
+  "Mental Powers":["Telepathy","Image Generation*","Telekinesis","Mind Control*","Emotion Control*","Force Field Generation","Animal Communication and Control","Mechanical Intuition","Animal Empathy","Empathy","Psi-Screen","Mental Probe","Animate Drawings","Possession*","Transferral*","Astral Projection","Psionic Attack","Precognition*","Postcognition","Plant Control","Ultimate Skill"],
+  "Body Alterations/Offensive":["Extra Body Parts","Extra Attacks","Energy Touch","Paralyzing Touch","Claws","Rotting Touch","Corrosive Touch","Health-Drain Touch*","Blinding Touch"],
+  "Body Alterations/Defensive":["Body Armor","Water Breathing","Absorption","Regeneration","Solar Regeneration","Recovery","Life Support","Pheromones","Damage Transfer","Healing","Immortality*"]
+};
+
+const TALENT_LISTS={
+  "Weapon Skills":["Guns","Thrown Weapons","Bows","Blunt Weapons","Sharp Weapons","Oriental Weapons","Marksman*","Weapons Master*","Weapons Specialist*"],
+  "Fighting Skills":["Martial Arts A","Martial Arts B","Martial Arts C","Martial Arts D","Martial Arts E","Wrestling","Thrown Objects","Tumbling","Acrobatics"],
+  "Professional Skills":["Medicine*","Law","Law-Enforcement","Pilot","Military","Business/Finance","Journalism","Engineering","Crime","Psychiatry","Detective/Espionage"],
+  "Scientific Skills":["Chemistry","Biology","Geology","Genetics","Archeology","Physics","Computers","Electronics"],
+  "Mystic and Mental Skills":["Trance","Mesmerism and Hypnosis","Sleight of Hand","Resist Domination","Mystic Origin*","Occult Lore"],
+  "Other Skills":["Artist","Languages","First Aid","Repair/Tinkering","Trivia","Performer","Animal Training*","Heir to Fortune*","Student*","Leadership*"]
+};
+
+const CONTACT_TYPES=["Medicine","Law","Law-Enforcement","Military","Business World","Journalism","Crime","Engineering","Psychiatry","Detective/Espionage","Hero Group","Artist/Performer","Chemistry","Biology","Geology","Genetics","Archeology","Physics","Computers","Electronics","Local Political","State Political","National Political","International Political","Religion","Occult Lore","Mythology"];
+
+// ── Dice & Table Lookup ──
+function roll100(){ return Math.floor(Math.random()*100)+1; }
+function rollOn(table,r){
+  const rv=r||roll100();
+  for(const e of table) if(rv>=e.roll[0]&&rv<=e.roll[1]) return{roll:rv,result:e};
+  return{roll:rv,result:table[table.length-1]};
+}
+function getCol(origin){
+  switch(origin){
+    case "Altered Human":case "Mutant":return COL1;
+    case "Hi-Tech":return COL3;
+    case "Robot":return COL4;
+    case "Alien":return COL5;
+    default:return COL1;
+  }
+}
+function shiftRank(name,shifts){
+  const i=RANKS.findIndex(r=>r.name===name);
+  if(i===-1)return name;
+  return RANKS[Math.max(0,Math.min(RANKS.length-1,i+shifts))].name;
+}
+
+// ══════════════════════════════════════════════════════════════
+// CHARACTER STATE
+// ══════════════════════════════════════════════════════════════
+let CHAR = newChar();
+
+function newChar(){
+  return {
+    playerName:"", heroName:"", identity:"", idType:"secret",
+    group:"", base:"", origin:"", age:"", biography:"",
+    portraitData:"",
+    race:"", sex:"", dob:"", handedness:"",
+    height:"", weight:"", eyeColor:"", hairColor:"",
+    nationality:"", legalStatus:"", maritalStatus:"", occupation:"",
+    history:"",
+    characterType:"player", isMutant:false,
+    abilities:{
+      fighting:{initialRoll:"",initialRank:"",rank:"Typical",value:6},
+      agility:{initialRoll:"",initialRank:"",rank:"Typical",value:6},
+      strength:{initialRoll:"",initialRank:"",rank:"Typical",value:6},
+      endurance:{initialRoll:"",initialRank:"",rank:"Typical",value:6},
+      reason:{initialRoll:"",initialRank:"",rank:"Typical",value:6},
+      intuition:{initialRoll:"",initialRank:"",rank:"Typical",value:6},
+      psyche:{initialRoll:"",initialRank:"",rank:"Typical",value:6}
+    },
+    health:24, healthMax:24, karma:18, karmaMax:18,
+    resourcesRank:"Typical", resourcesValue:6,
+    popularityHero:10, popularitySecret:0,
+    moveRun:0, moveLeap:0, moveSwim:0, moveFly:0, moveTeleport:0,
+    powers:[], talents:[], contacts:[], equipment:[], stunts:[],
+    headquarters:[],
+    vehicles:[],
+    limitation:"",
+    advancementKarma:0, karmaPool:0, poolName:"",
+    karmaHistory:[]
+  };
+}
+
+// ══════════════════════════════════════════════════════════════
+// RENDER
+// ══════════════════════════════════════════════════════════════
+
+function buildRankOptions(selected){
+  return RANKS.map(r=>`<option value="${r.name}"${r.name===selected?" selected":""}>${r.name}</option>`).join("");
+}
+
+function renderAbilities(){
+  const tbody=document.getElementById("ab-body");
+  tbody.innerHTML="";
+  for(const key of ABILITIES){
+    const a=CHAR.abilities[key];
+    const tr=document.createElement("tr");
+    tr.innerHTML=`
+      <td class="ab-key" title="${key}">${AB_LABELS[key]}</td>
+      <td><input type="number" value="${a.initialRoll}" data-ab="${key}" data-abf="initialRoll"></td>
+      <td><input class="si-calc" type="text" value="${a.initialRank}" data-ab="${key}" data-abf="initialRank" style="font-size:9px" readonly></td>
+      <td><select data-ab="${key}" data-abf="rank">${buildRankOptions(a.rank)}</select></td>
+      <td><input class="si-calc" type="number" value="${a.value}" data-ab="${key}" data-abf="value"></td>`;
+    tbody.appendChild(tr);
+  }
+  // Attach listeners
+  tbody.querySelectorAll("input,select").forEach(el=>{
+    el.addEventListener("change",e=>{
+      const key=e.target.dataset.ab, field=e.target.dataset.abf;
+      if(field==="rank"){
+        CHAR.abilities[key].rank=e.target.value;
+        CHAR.abilities[key].value=getRankValue(e.target.value);
+        renderAbilities();
+      } else if(field==="value"){
+        CHAR.abilities[key].value=parseInt(e.target.value)||0;
+        CHAR.abilities[key].rank=getRankForValue(CHAR.abilities[key].value);
+        renderAbilities();
+      } else {
+        CHAR.abilities[key][field]=e.target.value;
+      }
+      recalcSecondary();
+      autosave();
+    });
+  });
+}
+
+function recalcSecondary(){
+  const a=CHAR.abilities;
+  const h=a.fighting.value+a.agility.value+a.strength.value+a.endurance.value;
+  const k=a.reason.value+a.intuition.value+a.psyche.value;
+  document.querySelector('[data-field="health"]').value=h;
+  document.querySelector('[data-field="karma"]').value=k;
+  CHAR.health=h; CHAR.karma=k;
+}
+
+function rollFeat(rankName, label){
+  const roll = roll100();
+  const rankIdx = RANKS.findIndex(r=>r.name===rankName);
+  // Universal Table thresholds (simplified for standalone)
+  // White < Green < Yellow < Red
+  const thresholds = [
+    {rank:"Shift-0",  g:66,y:95,r:100},
+    {rank:"Feeble",   g:61,y:91,r:100},
+    {rank:"Poor",     g:56,y:86,r:98},
+    {rank:"Typical",  g:51,y:81,r:97},
+    {rank:"Good",     g:46,y:76,r:95},
+    {rank:"Excellent",g:41,y:71,r:91},
+    {rank:"Remarkable",g:36,y:66,r:86},
+    {rank:"Incredible",g:31,y:61,r:81},
+    {rank:"Amazing",  g:26,y:56,r:76},
+    {rank:"Monstrous", g:21,y:46,r:66},
+    {rank:"Unearthly", g:16,y:36,r:56},
+    {rank:"Shift-X",  g:11,y:26,r:46},
+    {rank:"Shift-Y",  g:7, y:16,r:36},
+    {rank:"Shift-Z",  g:4, y:7, r:21},
+    {rank:"Class 1000",g:2, y:4, r:6},
+    {rank:"Class 3000",g:2, y:4, r:6},
+    {rank:"Class 5000",g:2, y:4, r:6},
+    {rank:"Beyond",   g:2, y:4, r:6}
+  ];
+  const t = thresholds[Math.min(rankIdx, thresholds.length-1)] || thresholds[3];
+  let color="White", colorHex="#ccc";
+  if(roll >= t.r){ color="Red"; colorHex="#cc1111"; }
+  else if(roll >= t.y){ color="Yellow"; colorHex="#e0c800"; }
+  else if(roll >= t.g){ color="Green"; colorHex="#22bb22"; }
+  const msg = `${label}: Roll ${roll} vs ${rankName} → <span style="color:${colorHex};font-weight:700">${color}</span>`;
+  MPDialog.alert('FEAT Result', msg);
+}
+
+// ── Movement calculation ──
+const GROUND_SPEED={"Feeble":1,"Poor":2,"Typical":2,"Good":2,"Excellent":2,"Remarkable":3,"Incredible":3,"Amazing":3,"Monstrous":4,"Unearthly":5};
+const LEAP_AREAS={"Feeble":0,"Poor":0,"Typical":0,"Good":0,"Excellent":0,"Remarkable":0,"Incredible":0,"Amazing":0,"Monstrous":0,"Unearthly":1,"Shift-X":1,"Shift-Y":2,"Shift-Z":4};
+function calcRun(endRank){ return GROUND_SPEED[endRank]||2; }
+function calcLeap(strRank){ return LEAP_AREAS[strRank]||0; }
+
+// ── Detail Modal ──
+function showDetail(title,fields){
+  let html='<div style="display:grid;grid-template-columns:auto 1fr;gap:2px 8px;font-size:11px">';
+  for(const[label,val] of fields){
+    if(val===undefined||val===null||val==="") continue;
+    html+='<span style="font-weight:700;color:#666">'+label+':</span><span>'+val+'</span>';
+  }
+  html+='</div>';
+  MPDialog.alert(title, html);
+}
+
+function showPowerDetail(p){
+  showDetail(p.name,[
+    ["Rank",p.rank],["Value",p.value],["Category",p.category],
+    ["Range",p.range],["Source",p.source],
+    ["Active",p.isActive===false?"No":"Yes"],
+    ["Attack Power",p.isAttackPower?"Yes":null],
+    ["Defense Power",p.isDefensePower?"Yes":null],
+    ["Body Armor",p.isBodyArmor?("Phys "+p.armorPhysical+" / Energy "+p.armorEnergy):null],
+    ["Limitation",p.limitationDetail],
+    ["Starred",p.isStarred?"\u2605 Counts as 2 powers":null],
+    ["Init Roll",p.initialRoll],["Init Rank",p.initialRank],
+    ["Description",p.description]
+  ]);
+}
+function showTalentDetail(t){
+  showDetail(t.name,[
+    ["Bonus",t.bonus],["Ability",t.abilityModified],["Category",t.category],
+    ["Type",t.type],["Notes",t.notes]
+  ]);
+}
+function showContactDetail(c){
+  showDetail(c.name,[
+    ["Type",c.type],["Disposition",c.disposition],["Location",c.location],
+    ["Resources",c.resourceRank],["Notes",c.notes]
+  ]);
+}
+function showEquipDetail(eq){
+  showDetail(eq.name,[
+    ["Category",eq.category],["Rank",eq.rank],["Value",eq.value],
+    ["Material",eq.materialStrength],["Damage",eq.damage],["Type",eq.damageType],
+    ["Range",eq.range],["Rate",eq.rate],["Shots",eq.shots?(eq.shotsRemaining||0)+"/"+eq.shots:null],
+    ["Description",eq.description],["Notes",eq.notes]
+  ]);
+}
+function showStuntDetail(st){
+  showDetail(st.name,[
+    ["Parent Power",st.parentPower],["Rank",st.rank],["Value",st.value],
+    ["Times Used",st.timesUsed],["Description",st.description]
+  ]);
+}
+
+function renderList(listId, items, type){
+  const ul=document.getElementById(listId);
+  ul.innerHTML="";
+  items.forEach((item,i)=>{
+    const li=document.createElement("li");
+    li.className="item-row " + (type==="power"?"power-row":type==="talent"?"talent-row":"contact-row");
+    if(type==="power"){
+      const star=item.isStarred?'<span class="item-star">\u2605</span>':"";
+      li.innerHTML='<button class="feat-btn" data-list="'+type+'" data-idx="'+i+'" title="Roll FEAT">d100</button>'+
+        '<select class="si item-rank" data-list="'+type+'" data-idx="'+i+'" data-lf="rank">'+buildRankOptions(item.rank||"Typical")+'</select>'+
+        '<input class="si item-value" type="number" value="'+(item.value||6)+'" data-list="'+type+'" data-idx="'+i+'" data-lf="value" style="width:40px">'+
+        '<span class="item-name-cell">'+star+'<input class="si" value="'+(item.name||"").replace(/\*$/,"")+'" data-list="'+type+'" data-idx="'+i+'" data-lf="name"></span>'+
+        '<button class="item-info" data-list="'+type+'" data-idx="'+i+'" title="Details">\u2139</button>'+
+        '<button class="item-del" data-list="'+type+'" data-idx="'+i+'">\u00d7</button>';
+    } else if(type==="talent"){
+      li.innerHTML='<button class="feat-btn" data-list="'+type+'" data-idx="'+i+'" title="Roll FEAT">d100</button>'+
+        '<input class="si" value="'+(item.name||"").replace(/\*$/,"")+'" data-list="'+type+'" data-idx="'+i+'" data-lf="name">'+
+        '<button class="item-info" data-list="'+type+'" data-idx="'+i+'" title="Details">\u2139</button>'+
+        '<button class="item-del" data-list="'+type+'" data-idx="'+i+'">\u00d7</button>';
+    } else {
+      li.innerHTML='<button class="feat-btn" data-list="'+type+'" data-idx="'+i+'" title="Roll Popularity FEAT">d100</button>'+
+        '<input class="si" value="'+(item.name||"")+'" data-list="'+type+'" data-idx="'+i+'" data-lf="name">'+
+        '<button class="item-info" data-list="'+type+'" data-idx="'+i+'" title="Details">\u2139</button>'+
+        '<button class="item-del" data-list="'+type+'" data-idx="'+i+'">\u00d7</button>';
+    }
+    ul.appendChild(li);
+  });
+  ul.querySelectorAll(".item-info").forEach(el=>{
+    el.addEventListener("click",e=>{
+      const t=e.target.dataset.list, idx=+e.target.dataset.idx;
+      const arr=t==="power"?CHAR.powers:t==="talent"?CHAR.talents:CHAR.contacts;
+      if(t==="power") showPowerDetail(arr[idx]);
+      else if(t==="talent") showTalentDetail(arr[idx]);
+      else showContactDetail(arr[idx]);
+    });
+  });
+  ul.querySelectorAll(".feat-btn").forEach(el=>{
+    el.addEventListener("click",e=>{
+      const t=e.target.dataset.list, idx=+e.target.dataset.idx;
+      const arr=t==="power"?CHAR.powers:t==="talent"?CHAR.talents:CHAR.contacts;
+      const item=arr[idx];
+      if(t==="power") rollFeat(item.rank||"Typical", item.name);
+      else if(t==="talent") rollFeat("Remarkable", item.name);
+      else{ const popRank=getRankForValue(Math.abs(CHAR.popularityHero)); rollFeat(popRank, item.name); }
+    });
+  });
+  ul.querySelectorAll("input,select").forEach(el=>{
+    if(el.classList.contains("feat-btn")) return;
+    el.addEventListener("change",e=>{
+      const t=e.target.dataset.list, idx=+e.target.dataset.idx, f=e.target.dataset.lf;
+      const arr=t==="power"?CHAR.powers:t==="talent"?CHAR.talents:CHAR.contacts;
+      if(f==="rank"&&t==="power"){ arr[idx].rank=e.target.value; arr[idx].value=getRankValue(e.target.value); renderList(listId,arr,type); }
+      else if(f==="value"&&t==="power"){ arr[idx].value=parseInt(e.target.value)||0; }
+      else{ arr[idx][f]=e.target.value; }
+      autosave();
+    });
+  });
+  ul.querySelectorAll(".item-del").forEach(el=>{
+    el.addEventListener("click",e=>{
+      const t=e.target.dataset.list, idx=+e.target.dataset.idx;
+      const arr=t==="power"?CHAR.powers:t==="talent"?CHAR.talents:CHAR.contacts;
+      arr.splice(idx,1); renderList(listId,arr,type); autosave();
+    });
+  });
+}
+
+function updateGearCount(){
+  const n=(CHAR.equipment||[]).length+(CHAR.stunts||[]).length+(CHAR.headquarters||[]).length+(CHAR.vehicles||[]).length;
+  return n?"("+n+")":"";
+}
+
+function renderEquipment(){
+  const arr=CHAR.equipment||[];
+  document.getElementById("gear-count").textContent=updateGearCount();
+  const ul=document.getElementById("equipment-list");
+  ul.innerHTML="";
+  arr.forEach((eq,i)=>{
+    const li=document.createElement("li");
+    li.className="item-row equip-row";
+    li.innerHTML='<button class="feat-btn" data-idx="'+i+'" title="Roll FEAT">d100</button>'+
+      '<span class="si item-rank" style="font-size:9px;border:none;text-align:center">'+(eq.rank||"")+'</span>'+
+      '<span class="si item-value" style="border:none;text-align:center">'+(eq.value||"")+'</span>'+
+      '<input class="si" value="'+(eq.name||"")+'" data-idx="'+i+'" data-lf="name">'+
+      '<button class="item-info" data-idx="'+i+'" title="Details">\u2139</button>'+
+      '<button class="item-del" data-idx="'+i+'">\u00d7</button>';
+    ul.appendChild(li);
+  });
+  ul.querySelectorAll(".item-info").forEach(el=>{
+    el.addEventListener("click",e=>showEquipDetail(arr[+e.target.dataset.idx]));
+  });
+  ul.querySelectorAll(".feat-btn").forEach(el=>{
+    el.addEventListener("click",e=>rollFeat(arr[+e.target.dataset.idx].rank||"Typical",arr[+e.target.dataset.idx].name));
+  });
+  ul.querySelectorAll(".item-del").forEach(el=>{
+    el.addEventListener("click",e=>{arr.splice(+e.target.dataset.idx,1);renderEquipment();autosave();});
+  });
+  ul.querySelectorAll("input").forEach(el=>{
+    el.addEventListener("change",e=>{arr[+e.target.dataset.idx].name=e.target.value;autosave();});
+  });
+}
+
+function renderStunts(){
+  const arr=CHAR.stunts||[];
+  document.getElementById("gear-count").textContent=updateGearCount();
+  const ul=document.getElementById("stunts-list");
+  ul.innerHTML="";
+  arr.forEach((st,i)=>{
+    const li=document.createElement("li");
+    li.className="item-row stunt-row";
+    const used=st.timesUsed||0;
+    const diffCls=used<1?"diff-red":used<4?"diff-yellow":used<10?"diff-green":"diff-mastered";
+    const diffLbl=used<1?"Red":used<4?"Yellow":used<10?"Green":"Mastered";
+    li.innerHTML='<button class="feat-btn" data-idx="'+i+'" title="Roll Stunt FEAT">d100</button>'+
+      '<span class="si item-rank" style="font-size:9px;border:none;text-align:center">'+(st.rank||"")+'</span>'+
+      '<span class="si item-value" style="border:none;text-align:center">'+(st.value||"")+'</span>'+
+      '<input class="si" value="'+(st.name||"")+'" data-idx="'+i+'" data-lf="name">'+
+      '<span class="difficulty-badge '+diffCls+'">'+diffLbl+'</span>'+
+      '<input class="si stunt-used" type="number" min="0" value="'+used+'" data-idx="'+i+'" title="Times Used">'+
+      '<button class="item-info" data-idx="'+i+'" title="Details">\u2139</button>'+
+      '<button class="item-del" data-idx="'+i+'">\u00d7</button>';
+    ul.appendChild(li);
+  });
+  ul.querySelectorAll(".item-info").forEach(el=>{
+    el.addEventListener("click",e=>showStuntDetail(arr[+e.target.dataset.idx]));
+  });
+  ul.querySelectorAll(".feat-btn").forEach(el=>{
+    el.addEventListener("click",e=>rollFeat(arr[+e.target.dataset.idx].rank||"Typical",arr[+e.target.dataset.idx].name));
+  });
+  ul.querySelectorAll(".item-del").forEach(el=>{
+    el.addEventListener("click",e=>{arr.splice(+e.target.dataset.idx,1);renderStunts();autosave();});
+  });
+  ul.querySelectorAll("input").forEach(el=>{
+    el.addEventListener("change",e=>{
+      const idx=+e.target.dataset.idx;
+      if(e.target.classList.contains("stunt-used")){
+        arr[idx].timesUsed=Math.max(0,parseInt(e.target.value)||0);
+        renderStunts();
+      } else {
+        arr[idx].name=e.target.value;
+      }
+      autosave();
+    });
+  });
+}
+
+
+function renderHQ(){
+  const arr=CHAR.headquarters||[];
+  document.getElementById("gear-count").textContent=updateGearCount();
+  const ul=document.getElementById("hq-list");
+  ul.innerHTML="";
+  arr.forEach((hq,i)=>{
+    const li=document.createElement("li");
+    li.className="item-row hq-row";
+    li.innerHTML='<input class="si" value="'+(hq.name||"")+'" data-idx="'+i+'" data-lf="name" placeholder="HQ Name">'+
+      '<span class="si item-rank" style="font-size:9px;border:none;text-align:center">'+(hq.materialStrength||"")+'</span>'+
+      '<button class="item-del" data-idx="'+i+'">\u00d7</button>';
+    ul.appendChild(li);
+  });
+  ul.querySelectorAll(".item-del").forEach(el=>{
+    el.addEventListener("click",e=>{arr.splice(+e.target.dataset.idx,1);renderHQ();autosave();});
+  });
+  ul.querySelectorAll("input").forEach(el=>{
+    el.addEventListener("change",e=>{arr[+e.target.dataset.idx][e.target.dataset.lf]=e.target.value;autosave();});
+  });
+}
+
+function renderVehicles(){
+  const arr=CHAR.vehicles||[];
+  document.getElementById("gear-count").textContent=updateGearCount();
+  const ul=document.getElementById("vehicles-list");
+  ul.innerHTML="";
+  arr.forEach((v,i)=>{
+    const li=document.createElement("li");
+    li.className="item-row veh-row";
+    li.innerHTML='<input class="si" value="'+(v.name||"")+'" data-idx="'+i+'" data-lf="name" placeholder="Vehicle Name">'+
+      '<span class="si item-rank" style="font-size:9px;border:none;text-align:center">'+(v.type||"")+'</span>'+
+      '<span class="si item-value" style="border:none;text-align:center">'+(v.speed||"")+'</span>'+
+      '<button class="item-del" data-idx="'+i+'">\u00d7</button>';
+    ul.appendChild(li);
+  });
+  ul.querySelectorAll(".item-del").forEach(el=>{
+    el.addEventListener("click",e=>{arr.splice(+e.target.dataset.idx,1);renderVehicles();autosave();});
+  });
+  ul.querySelectorAll("input").forEach(el=>{
+    el.addEventListener("change",e=>{arr[+e.target.dataset.idx][e.target.dataset.lf]=e.target.value;autosave();});
+  });
+}
+
+function renderAll(){
+  // Bio fields (inputs and selects)
+  document.querySelectorAll("[data-field]").forEach(el=>{
+    const f=el.dataset.field;
+    if(f in CHAR){
+      if(el.tagName==="TEXTAREA") el.value=CHAR[f]||"";
+      else el.value=CHAR[f]||"";
+    }
+  });
+  // Identity type
+  document.querySelectorAll('[name="idType"]').forEach(r=>{r.checked=r.value===CHAR.idType});
+  // Origin
+  const originSel=document.querySelector('[data-field="origin"]');
+  if(originSel) originSel.value=CHAR.origin||"";
+  // Resources rank
+  const resSel=document.getElementById("res-rank");
+  resSel.innerHTML=RANKS.slice(0,11).map(r=>`<option value="${r.name}"${r.name===CHAR.resourcesRank?" selected":""}>${r.name}</option>`).join("");
+  // Portrait
+  const pImg=document.getElementById("portrait-img");
+  const pPh=document.getElementById("portrait-ph");
+  if(CHAR.portraitData){pImg.src=CHAR.portraitData;pImg.style.display="block";pPh.style.display="none";}
+  else{pImg.style.display="none";pImg.src="";pPh.style.display="";}
+
+  renderAbilities();
+  renderList("powers-list",CHAR.powers,"power");
+  renderList("talents-list",CHAR.talents,"talent");
+  renderList("contacts-list",CHAR.contacts,"contact");
+  renderEquipment();
+  renderStunts();
+  renderHQ();
+  renderVehicles();
+  recalcSecondary();
+
+  // Auto-calc movement if not set
+  const runEl=document.querySelector('[data-field="moveRun"]');
+  const leapEl=document.querySelector('[data-field="moveLeap"]');
+  if(runEl && !CHAR.moveRun){
+    const calc=calcRun(CHAR.abilities.endurance.rank);
+    runEl.placeholder=calc;
+  }
+  if(leapEl && !CHAR.moveLeap){
+    const calc=calcLeap(CHAR.abilities.strength.rank);
+    leapEl.placeholder=calc;
+  }
+  renderKarmaLedger();
+}
+
+function renderKarmaLedger(){
+  const hist=CHAR.karmaHistory||[];
+  const body=document.getElementById('karma-ledger-body');
+  const summary=document.getElementById('karma-ledger-summary');
+  if(!hist.length){
+    body.innerHTML='<tr><td colspan="5" class="kl-empty">No karma history. Import from Foundry to populate.</td></tr>';
+    summary.textContent='';
+    return;
+  }
+  let earned=0,spent=0;
+  hist.forEach(e=>{if(e.amount>0)earned+=e.amount;else spent+=Math.abs(e.amount);});
+  summary.innerHTML='<span>Earned\u2009'+earned+'</span><span>Spent\u2009'+spent+'</span>';
+  body.innerHTML=hist.map(e=>{
+    const cls=e.amount<0?'kl-neg':'kl-pos';
+    const sign=e.amount>0?'+':'';
+    const rd=e.realDate||'\u2014';
+    const gd=e.gameDate||'\u2014';
+    return '<tr><td>'+rd+'</td><td>'+gd+'</td><td class="'+cls+'">'+sign+e.amount+'</td><td>'+(e.type||'')+'</td><td>'+(e.description||'')+'</td></tr>';
+  }).join('');
+}
+
+// ── Field Change Listeners ──
+function bindFields(){
+  document.querySelectorAll("[data-field]").forEach(el=>{
+    el.addEventListener("change",e=>{
+      const f=e.target.dataset.field;
+      if(f in CHAR){
+        CHAR[f]=e.target.type==="number"?parseInt(e.target.value)||0:e.target.value;
+      }
+      autosave();
+    });
+  });
+  document.querySelectorAll('[name="idType"]').forEach(r=>{
+    r.addEventListener("change",e=>{CHAR.idType=e.target.value;autosave();});
+  });
+  document.getElementById("res-rank").addEventListener("change",e=>{
+    CHAR.resourcesRank=e.target.value;
+    CHAR.resourcesValue=getRankValue(e.target.value);
+    document.querySelector('[data-field="resourcesValue"]').value=CHAR.resourcesValue;
+    autosave();
+  });
+}
+
+// ── Add Item Buttons ──
+function bindAddButtons(){
+  document.getElementById("add-power").addEventListener("click",()=>{
+    CHAR.powers.push({name:"New Power",rank:"Typical",value:6});
+    renderList("powers-list",CHAR.powers,"power");
+    autosave();
+  });
+  document.getElementById("add-talent").addEventListener("click",()=>{
+    CHAR.talents.push({name:"New Talent"});
+    renderList("talents-list",CHAR.talents,"talent");
+    autosave();
+  });
+  document.getElementById("add-contact").addEventListener("click",()=>{
+    CHAR.contacts.push({name:"New Contact"});
+    renderList("contacts-list",CHAR.contacts,"contact");
+    autosave();
+  });
+  document.getElementById("add-equipment").addEventListener("click",()=>{
+    if(!CHAR.equipment) CHAR.equipment=[];
+    CHAR.equipment.push({name:"New Item",category:"gear",rank:"Typical",value:6,materialStrength:"Typical"});
+    setCollapseState("gear-toggle",true);
+    renderEquipment();
+    autosave();
+  });
+  document.getElementById("add-stunt").addEventListener("click",()=>{
+    if(!CHAR.stunts) CHAR.stunts=[];
+    CHAR.stunts.push({name:"New Stunt",parentPower:"",rank:"Typical",value:6,difficulty:"Red",timesUsed:0,description:""});
+    setCollapseState("gear-toggle",true);
+    renderStunts();
+    autosave();
+  });
+  document.getElementById("add-hq").addEventListener("click",()=>{
+    if(!CHAR.headquarters) CHAR.headquarters=[];
+    CHAR.headquarters.push({name:"New HQ",materialStrength:"Good",rooms:"",features:"",rent:"",notes:""});
+    setCollapseState("gear-toggle",true);
+    renderHQ();
+    autosave();
+  });
+  document.getElementById("add-vehicle").addEventListener("click",()=>{
+    if(!CHAR.vehicles) CHAR.vehicles=[];
+    CHAR.vehicles.push({name:"New Vehicle",type:"Car",speed:"Typical",body:"Typical",protection:"Typical",control:"Typical",notes:""});
+    setCollapseState("gear-toggle",true);
+    renderVehicles();
+    autosave();
+  });
+
+  // Collapsible section toggle — persistent via localStorage
+  ["gear-toggle"].forEach(id=>{
+    const el=document.getElementById(id);
+    if(getCollapseState(id)) el.classList.add("open");
+    el.addEventListener("click",()=>{
+      el.classList.toggle("open");
+      setCollapseState(id, el.classList.contains("open"));
+    });
+  });
+}
+
+const COLLAPSE_KEY="gcc-faserip-collapse";
+function getCollapseStates(){
+  try{return JSON.parse(localStorage.getItem(COLLAPSE_KEY))||{};}catch(e){return{};}
+}
+function getCollapseState(id){return getCollapseStates()[id]||false;}
+function setCollapseState(id,open){
+  const states=getCollapseStates();
+  states[id]=open;
+  try{localStorage.setItem(COLLAPSE_KEY,JSON.stringify(states));}catch(e){}
+  const el=document.getElementById(id);
+  if(el) el.classList.toggle("open",open);
+}
+
+// ══════════════════════════════════════════════════════════════
+// CHARGEN
+// ══════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
+// STEP-BY-STEP CHARACTER GENERATION
+// ══════════════════════════════════════════════════════════════
+
+function stepByStep(){
+  const area=document.getElementById("cg-step-area");
+  const logEl=document.getElementById("cg-log");
+  logEl.style.display="none";
+  const log=[];
+  const L=m=>{log.push(m)};
+
+  // State
+  const S={origin:null,abs:{},health:0,karma:0,resRank:"Typical",pop:10,
+    pSlots:{initial:0,max:0},tSlots:{initial:0,max:0},cSlots:{initial:0,max:0},
+    powers:[],talents:[],contacts:[],raisedAbility:null};
+
+  step1_origin();
+
+  // ── STEP 1: Origin ──
+  function step1_origin(){
+    area.innerHTML=`
+      <div class="cg-step">
+        <div class="cg-step-title">STEP 1: ORIGIN</div>
+        <div class="cg-step-desc">Choose an origin or roll randomly.</div>
+        <div class="cg-pick-grid" id="cg-origin-pick">
+          <button class="cg-pick-btn" data-o="Altered Human">Altered Human</button>
+          <button class="cg-pick-btn" data-o="Mutant">Mutant</button>
+          <button class="cg-pick-btn" data-o="Hi-Tech">Hi-Tech</button>
+          <button class="cg-pick-btn" data-o="Robot">Robot</button>
+          <button class="cg-pick-btn" data-o="Alien">Alien</button>
+        </div>
+        <button class="cg-reroll-btn" id="cg-origin-roll">Roll Random</button>
+        <div id="cg-origin-note" style="font-size:10px;color:#555;margin-top:4px"></div>
+        <button class="cg-next-btn" id="cg-origin-next" disabled>NEXT →</button>
+      </div>`;
+    const btns=area.querySelectorAll("[data-o]");
+    btns.forEach(b=>b.addEventListener("click",()=>{
+      btns.forEach(x=>x.classList.remove("selected"));
+      b.classList.add("selected");
+      S.origin=b.dataset.o;
+      showOriginNote(S.origin);
+      area.querySelector("#cg-origin-next").disabled=false;
+    }));
+    area.querySelector("#cg-origin-roll").addEventListener("click",()=>{
+      const{roll,result}=rollOn(ORIGIN_TABLE);
+      S.origin=result.origin;
+      btns.forEach(x=>x.classList.toggle("selected",x.dataset.o===S.origin));
+      showOriginNote(S.origin,roll);
+      area.querySelector("#cg-origin-next").disabled=false;
+    });
+    area.querySelector("#cg-origin-next").addEventListener("click",()=>{
+      L(`Origin: ${S.origin}`);
+      step2_abilities();
+    });
+  }
+
+  function showOriginNote(o,roll){
+    const notes={
+      "Altered Human":"Roll on Column 1. May raise one primary ability by one rank.",
+      "Mutant":"Roll on Column 1. Endurance +1 rank. +1 Power. Resources -1 rank. Popularity starts at 0.",
+      "Hi-Tech":"Roll on Column 3. Reason +2 ranks. Resources start at Good. Must have 1 Contact and 1 scientific/professional Talent.",
+      "Robot":"Roll on Column 4. Popularity starts at 0. No Karma loss for killing robots.",
+      "Alien":"Roll on Column 5. -1 Power (min 2). Resources start at Poor. Max 1 initial Contact."
+    };
+    const el=document.getElementById("cg-origin-note");
+    el.textContent=(roll?`Roll: ${roll} → `:"") + (notes[o]||"");
+  }
+
+  // ── STEP 2: Primary Abilities ──
+  function step2_abilities(){
+    const col=getCol(S.origin);
+    for(const key of ABILITIES){
+      const{roll,result}=rollOn(col);
+      S.abs[key]={initialRoll:roll,initialRank:result.rank,rank:result.rank,value:getRankValue(result.rank)};
+    }
+    // Origin auto-mods
+    if(S.origin==="Mutant"){
+      S.abs.endurance.rank=shiftRank(S.abs.endurance.rank,1);
+      S.abs.endurance.value=getRankValue(S.abs.endurance.rank);
+    }
+    if(S.origin==="Hi-Tech"){
+      S.abs.reason.rank=shiftRank(S.abs.reason.rank,2);
+      S.abs.reason.value=getRankValue(S.abs.reason.rank);
+    }
+
+    renderStep2();
+  }
+
+  function renderStep2(){
+    let rows="";
+    for(const key of ABILITIES){
+      const a=S.abs[key];
+      let mod="";
+      if(S.origin==="Mutant"&&key==="endurance") mod='<span class="cg-mod-note">+1 rank (Mutant)</span>';
+      if(S.origin==="Hi-Tech"&&key==="reason") mod='<span class="cg-mod-note">+2 ranks (Hi-Tech)</span>';
+      if(S.raisedAbility===key) mod='<span class="cg-mod-note">+1 rank (chosen)</span>';
+      rows+=`<div class="cg-roll-row"><span class="cg-roll-label">${AB_LABELS[key]}</span>
+        <span>Roll <span class="cg-roll-result">${a.initialRoll}</span></span>
+        <span>→ <span class="cg-roll-rank">${a.rank}</span> (${a.value})</span>${mod}</div>`;
+    }
+
+    const needsRaise=S.origin==="Altered Human";
+    let raiseHtml="";
+    if(needsRaise){
+      raiseHtml=`<div class="cg-step-desc" style="margin-top:6px">Altered Human: Choose one ability to raise by one rank.</div>
+        <div class="cg-pick-grid" id="cg-raise-pick">
+        ${ABILITIES.map(k=>`<button class="cg-pick-btn${S.raisedAbility===k?" selected":""}" data-r="${k}">${AB_LABELS[k]} (${S.abs[k].rank}→${shiftRank(S.abs[k].rank,1)})</button>`).join("")}
+        </div>`;
+    }
+
+    area.innerHTML=`
+      <div class="cg-step">
+        <div class="cg-step-title">STEP 2: PRIMARY ABILITIES</div>
+        <div class="cg-step-desc">Rolled on ${S.origin==="Hi-Tech"?"Column 3":S.origin==="Robot"?"Column 4":S.origin==="Alien"?"Column 5":"Column 1"}.</div>
+        ${rows}
+        ${raiseHtml}
+        <button class="cg-reroll-btn" id="cg-ab-reroll" style="margin-top:6px">Reroll All</button>
+        <button class="cg-next-btn" id="cg-ab-next"${needsRaise&&!S.raisedAbility?" disabled":""}>NEXT →</button>
+      </div>`;
+
+    if(needsRaise){
+      area.querySelectorAll("[data-r]").forEach(b=>b.addEventListener("click",()=>{
+        // undo previous raise
+        if(S.raisedAbility){
+          const prev=S.raisedAbility;
+          S.abs[prev].rank=S.abs[prev].initialRank;
+          S.abs[prev].value=getRankValue(S.abs[prev].initialRank);
+        }
+        const k=b.dataset.r;
+        S.raisedAbility=k;
+        S.abs[k].rank=shiftRank(S.abs[k].initialRank,1);
+        S.abs[k].value=getRankValue(S.abs[k].rank);
+        renderStep2();
+      }));
+    }
+    area.querySelector("#cg-ab-reroll").addEventListener("click",()=>{
+      S.raisedAbility=null;
+      const col=getCol(S.origin);
+      for(const key of ABILITIES){
+        const{roll,result}=rollOn(col);
+        S.abs[key]={initialRoll:roll,initialRank:result.rank,rank:result.rank,value:getRankValue(result.rank)};
+      }
+      if(S.origin==="Mutant"){S.abs.endurance.rank=shiftRank(S.abs.endurance.rank,1);S.abs.endurance.value=getRankValue(S.abs.endurance.rank);}
+      if(S.origin==="Hi-Tech"){S.abs.reason.rank=shiftRank(S.abs.reason.rank,2);S.abs.reason.value=getRankValue(S.abs.reason.rank);}
+      renderStep2();
+    });
+    area.querySelector("#cg-ab-next").addEventListener("click",()=>{
+      for(const k of ABILITIES) L(`${AB_LABELS[k]}: Roll ${S.abs[k].initialRoll} → ${S.abs[k].rank} (${S.abs[k].value})`);
+      if(S.raisedAbility) L(`Altered Human: Raised ${S.raisedAbility} to ${S.abs[S.raisedAbility].rank}`);
+      step3_secondary();
+    });
+  }
+
+  // ── STEP 3: Secondary Abilities ──
+  function step3_secondary(){
+    S.health=S.abs.fighting.value+S.abs.agility.value+S.abs.strength.value+S.abs.endurance.value;
+    S.karma=S.abs.reason.value+S.abs.intuition.value+S.abs.psyche.value;
+
+    S.resRank=S.origin==="Alien"?"Poor":S.origin==="Hi-Tech"?"Good":"Typical";
+    const{roll:mRoll,result:mRes}=rollOn(ABILITY_MOD);
+    S.resRank=shiftRank(S.resRank,mRes.mod);
+    if(S.origin==="Mutant") S.resRank=shiftRank(S.resRank,-1);
+
+    S.pop=10;
+    if(S.origin==="Mutant"||S.origin==="Robot") S.pop=0;
+
+    L(`Health: ${S.health}  Karma: ${S.karma}`);
+    L(`Resources: ${S.resRank} (mod roll ${mRoll})`);
+    L(`Popularity: ${S.pop}`);
+
+    area.innerHTML=`
+      <div class="cg-step">
+        <div class="cg-step-title">STEP 3: SECONDARY ABILITIES</div>
+        <div class="cg-summary">
+          <strong>Health:</strong> ${S.health} (F+A+S+E)<br>
+          <strong>Karma:</strong> ${S.karma} (R+I+P)<br>
+          <strong>Resources:</strong> ${S.resRank} (roll ${mRoll}, mod ${mRes.mod>=0?"+":""}${mRes.mod})${S.origin==="Mutant"?" -1 rank (Mutant)":""}${S.origin==="Hi-Tech"?" (started at Good)":""}${S.origin==="Alien"?" (started at Poor)":""}<br>
+          <strong>Popularity:</strong> ${S.pop}${S.origin==="Mutant"||S.origin==="Robot"?" (0 for "+S.origin+")":""}
+        </div>
+        <button class="cg-next-btn" id="cg-sec-next">NEXT →</button>
+      </div>`;
+    area.querySelector("#cg-sec-next").addEventListener("click",step4_powerSlots);
+  }
+
+  // ── STEP 4: Power/Talent/Contact Slots ──
+  function step4_powerSlots(){
+    const{result:pR}=rollOn(POWERS_TBL);
+    const{result:tR}=rollOn(TALENTS_TBL);
+    const{result:cR}=rollOn(CONTACTS_TBL);
+    S.pSlots={initial:pR.initial,max:pR.max};
+    S.tSlots={initial:tR.initial,max:tR.max};
+    S.cSlots={initial:cR.initial,max:cR.max};
+    if(S.origin==="Mutant") S.pSlots.initial=Math.min(S.pSlots.initial+1,S.pSlots.max);
+    if(S.origin==="Alien") S.pSlots.initial=Math.max(2,S.pSlots.initial-1);
+    if(S.origin==="Hi-Tech"&&S.cSlots.initial<1) S.cSlots.initial=1;
+    if(S.origin==="Alien") S.cSlots.initial=Math.min(S.cSlots.initial,1);
+
+    L(`Powers: ${S.pSlots.initial}/${S.pSlots.max}  Talents: ${S.tSlots.initial}/${S.tSlots.max}  Contacts: ${S.cSlots.initial}/${S.cSlots.max}`);
+
+    area.innerHTML=`
+      <div class="cg-step">
+        <div class="cg-step-title">STEP 4: SLOTS</div>
+        <div class="cg-summary">
+          <strong>Powers:</strong> ${S.pSlots.initial} initial / ${S.pSlots.max} max${S.origin==="Mutant"?" (+1 Mutant)":""}${S.origin==="Alien"?" (-1 Alien)":""}<br>
+          <strong>Talents:</strong> ${S.tSlots.initial} initial / ${S.tSlots.max} max<br>
+          <strong>Contacts:</strong> ${S.cSlots.initial} initial / ${S.cSlots.max} max${S.origin==="Hi-Tech"?" (min 1 Hi-Tech)":""}${S.origin==="Alien"?" (max 1 Alien)":""}
+        </div>
+        <div class="cg-step-desc">You may purchase additional slots by reducing Resources (-2 ranks per Power, -1 per Talent/Contact).</div>
+        <button class="cg-next-btn" id="cg-slots-next">CHOOSE POWERS →</button>
+      </div>`;
+    area.querySelector("#cg-slots-next").addEventListener("click",()=>{S.powers=[];step5_pickPower(0);});
+  }
+
+  // ── STEP 5: Pick Powers one at a time ──
+  function step5_pickPower(idx){
+    if(idx>=S.pSlots.initial){step6_pickTalents();return;}
+
+    const{result:catRes}=rollOn(POWER_CATS);
+    const catName=catRes.cat;
+    const{roll:rkRoll,result:rkRes}=rollOn(COL4);
+    const pRank=rkRes.rank;
+
+    area.innerHTML=`
+      <div class="cg-step">
+        <div class="cg-step-title">STEP 5: POWER ${idx+1} OF ${S.pSlots.initial}</div>
+        <div class="cg-step-desc">Category rolled: <strong>${catName}</strong>. Power rank: <strong>${pRank}</strong> (roll ${rkRoll}). Choose a power from this category.</div>
+        <div class="cg-pick-grid" id="cg-power-pick"></div>
+        <button class="cg-reroll-btn" id="cg-power-recat">Reroll Category</button>
+      </div>`;
+
+    renderPowerPicks(catName, pRank, rkRoll, idx);
+
+    area.querySelector("#cg-power-recat").addEventListener("click",()=>{
+      step5_pickPower(idx);
+    });
+  }
+
+  function renderPowerPicks(catName, pRank, rkRoll, idx){
+    const grid=area.querySelector("#cg-power-pick");
+    const pList=POWER_LISTS[catName]||[];
+    const usedSlots=S.powers.reduce((n,p)=>n+(p.name.endsWith("*")?2:1),0);
+    const slotsLeft=S.pSlots.initial-usedSlots;
+
+    grid.innerHTML=pList.map(p=>{
+      const isStar=p.endsWith("*");
+      const already=S.powers.some(x=>x.name===p);
+      const canPick=!already&&(!isStar||slotsLeft>=2);
+      return `<button class="cg-pick-btn${isStar?" star":""}${!canPick?" disabled":""}" data-pw="${p}">${p}</button>`;
+    }).join("");
+
+    grid.querySelectorAll(".cg-pick-btn:not(.disabled)").forEach(b=>b.addEventListener("click",()=>{
+      const name=b.dataset.pw;
+      const isStar=name.endsWith("*");
+      S.powers.push({name,rank:pRank,value:getRankValue(pRank),category:catName});
+      L(`Power ${idx+1}: ${name} — ${pRank} (${catName})`);
+      const nextIdx=idx+(isStar?2:1);
+      step5_pickPower(nextIdx);
+    }));
+  }
+
+  // ── STEP 6: Pick Talents ──
+  function step6_pickTalents(){
+    S.talents=[];
+    step6_pickOneTalent(0);
+  }
+
+  function step6_pickOneTalent(idx){
+    if(idx>=S.tSlots.initial){step7_pickContacts();return;}
+
+    const{result:tcRes}=rollOn(TALENT_CATS);
+    const catName=tcRes.cat;
+
+    area.innerHTML=`
+      <div class="cg-step">
+        <div class="cg-step-title">STEP 6: TALENT ${idx+1} OF ${S.tSlots.initial}</div>
+        <div class="cg-step-desc">Category rolled: <strong>${catName}</strong>. Choose a talent.</div>
+        <div class="cg-pick-grid" id="cg-talent-pick"></div>
+        <button class="cg-reroll-btn" id="cg-talent-recat">Reroll Category</button>
+      </div>`;
+
+    const grid=area.querySelector("#cg-talent-pick");
+    const tList=TALENT_LISTS[catName]||[];
+    grid.innerHTML=tList.map(t=>{
+      const isStar=t.endsWith("*");
+      const already=S.talents.some(x=>x.name===t);
+      return `<button class="cg-pick-btn${isStar?" star":""}${already?" disabled":""}" data-tl="${t}">${t}</button>`;
+    }).join("");
+
+    grid.querySelectorAll(".cg-pick-btn:not(.disabled)").forEach(b=>b.addEventListener("click",()=>{
+      S.talents.push({name:b.dataset.tl});
+      L(`Talent ${idx+1}: ${b.dataset.tl} (${catName})`);
+      step6_pickOneTalent(idx+1);
+    }));
+
+    area.querySelector("#cg-talent-recat").addEventListener("click",()=>{step6_pickOneTalent(idx);});
+  }
+
+  // ── STEP 7: Pick Contacts ──
+  function step7_pickContacts(){
+    S.contacts=[];
+    step7_pickOneContact(0);
+  }
+
+  function step7_pickOneContact(idx){
+    if(idx>=S.cSlots.initial){step8_finish();return;}
+
+    area.innerHTML=`
+      <div class="cg-step">
+        <div class="cg-step-title">STEP 7: CONTACT ${idx+1} OF ${S.cSlots.initial}</div>
+        <div class="cg-step-desc">Choose a contact type.</div>
+        <div class="cg-pick-grid" id="cg-contact-pick"></div>
+      </div>`;
+
+    const grid=area.querySelector("#cg-contact-pick");
+    grid.innerHTML=CONTACT_TYPES.map(c=>{
+      const already=S.contacts.some(x=>x.name===c);
+      return `<button class="cg-pick-btn${already?" disabled":""}" data-ct="${c}">${c}</button>`;
+    }).join("");
+
+    grid.querySelectorAll(".cg-pick-btn:not(.disabled)").forEach(b=>b.addEventListener("click",()=>{
+      S.contacts.push({name:b.dataset.ct});
+      L(`Contact ${idx+1}: ${b.dataset.ct}`);
+      step7_pickOneContact(idx+1);
+    }));
+  }
+
+  // ── STEP 8: Finish ──
+  function step8_finish(){
+    area.innerHTML=`
+      <div class="cg-step">
+        <div class="cg-step-title">COMPLETE</div>
+        <div class="cg-summary">
+          <strong>Origin:</strong> ${S.origin}<br>
+          <strong>F:</strong> ${S.abs.fighting.rank} (${S.abs.fighting.value})
+          <strong>A:</strong> ${S.abs.agility.rank} (${S.abs.agility.value})
+          <strong>S:</strong> ${S.abs.strength.rank} (${S.abs.strength.value})
+          <strong>E:</strong> ${S.abs.endurance.rank} (${S.abs.endurance.value})<br>
+          <strong>R:</strong> ${S.abs.reason.rank} (${S.abs.reason.value})
+          <strong>I:</strong> ${S.abs.intuition.rank} (${S.abs.intuition.value})
+          <strong>P:</strong> ${S.abs.psyche.rank} (${S.abs.psyche.value})<br>
+          <strong>Health:</strong> ${S.health} <strong>Karma:</strong> ${S.karma} <strong>Resources:</strong> ${S.resRank} <strong>Pop:</strong> ${S.pop}<br>
+          <strong>Powers:</strong> ${S.powers.map(p=>p.name+" ("+p.rank+")").join(", ")||"None"}<br>
+          <strong>Talents:</strong> ${S.talents.map(t=>t.name).join(", ")||"None"}<br>
+          <strong>Contacts:</strong> ${S.contacts.map(c=>c.name).join(", ")||"None"}
+        </div>
+        <button class="cg-next-btn" id="cg-apply">APPLY TO SHEET</button>
+        <button class="cg-next-btn secondary" id="cg-restart" style="margin-left:6px">START OVER</button>
+      </div>`;
+
+    area.querySelector("#cg-apply").addEventListener("click",()=>{
+      CHAR=newChar();
+      CHAR.origin=S.origin;
+      CHAR.abilities=S.abs;
+      CHAR.health=S.health;CHAR.healthMax=S.health;
+      CHAR.karma=S.karma;CHAR.karmaMax=S.karma;
+      CHAR.resourcesRank=S.resRank;CHAR.resourcesValue=getRankValue(S.resRank);
+      CHAR.popularityHero=S.pop;CHAR.popularitySecret=0;
+      CHAR.powers=S.powers;CHAR.talents=S.talents;CHAR.contacts=S.contacts;
+      CHAR.chargen={origin:S.origin,method:"step-by-step",date:new Date().toISOString()};
+      renderAll();autosave();
+      area.innerHTML="";
+      logEl.style.display="block";
+      logEl.textContent=log.join("\n");
+    });
+    area.querySelector("#cg-restart").addEventListener("click",()=>{
+      step1_origin();
+    });
+  }
+}
+
+function quickRandom(){
+  const log=[];
+  const L=m=>{log.push(m)};
+
+  // Origin
+  const{roll:oRoll,result:oRes}=rollOn(ORIGIN_TABLE);
+  const origin=oRes.origin;
+  L(`Origin: Roll ${oRoll} → ${origin}`);
+
+  // Primary abilities
+  const col=getCol(origin);
+  const abs={};
+  for(const key of ABILITIES){
+    const{roll,result}=rollOn(col);
+    abs[key]={initialRoll:roll,initialRank:result.rank,rank:result.rank,value:getRankValue(result.rank)};
+    L(`${AB_LABELS[key]}: Roll ${roll} → ${result.rank} (${getRankValue(result.rank)})`);
+  }
+
+  // Origin mods
+  if(origin==="Altered Human"){
+    // raise lowest
+    let lowest=null,lowestVal=999;
+    for(const k of ABILITIES){if(abs[k].value<lowestVal){lowestVal=abs[k].value;lowest=k;}}
+    abs[lowest].rank=shiftRank(abs[lowest].rank,1);
+    abs[lowest].value=getRankValue(abs[lowest].rank);
+    L(`Altered Human: Raised ${lowest} to ${abs[lowest].rank}`);
+  }
+  if(origin==="Mutant"){
+    abs.endurance.rank=shiftRank(abs.endurance.rank,1);
+    abs.endurance.value=getRankValue(abs.endurance.rank);
+    L(`Mutant: Endurance raised to ${abs.endurance.rank}`);
+  }
+  if(origin==="Hi-Tech"){
+    abs.reason.rank=shiftRank(abs.reason.rank,2);
+    abs.reason.value=getRankValue(abs.reason.rank);
+    L(`Hi-Tech: Reason raised to ${abs.reason.rank}`);
+  }
+
+  // Secondary
+  const health=abs.fighting.value+abs.agility.value+abs.strength.value+abs.endurance.value;
+  const karma=abs.reason.value+abs.intuition.value+abs.psyche.value;
+  L(`Health: ${health}  Karma: ${karma}`);
+
+  let resRank=origin==="Alien"?"Poor":origin==="Hi-Tech"?"Good":"Typical";
+  const{roll:mRoll,result:mRes}=rollOn(ABILITY_MOD);
+  resRank=shiftRank(resRank,mRes.mod);
+  if(origin==="Mutant") resRank=shiftRank(resRank,-1);
+  L(`Resources: ${resRank} (mod roll ${mRoll})`);
+
+  let pop=10;
+  if(origin==="Mutant"||origin==="Robot") pop=0;
+  L(`Popularity: ${pop}`);
+
+  // Powers
+  const{result:pRes}=rollOn(POWERS_TBL);
+  let pInit=pRes.initial;
+  if(origin==="Mutant") pInit=Math.min(pInit+1,pRes.max);
+  if(origin==="Alien") pInit=Math.max(2,pInit-1);
+  const powers=[];
+  for(let i=0;i<pInit;i++){
+    const{result:catRes}=rollOn(POWER_CATS);
+    const catName=catRes.cat;
+    const pList=POWER_LISTS[catName];
+    const nonStar=pList.filter(p=>!p.endsWith("*"));
+    const pick=nonStar[Math.floor(Math.random()*nonStar.length)];
+    const{result:rRes}=rollOn(COL4);
+    powers.push({name:pick,rank:rRes.rank,value:getRankValue(rRes.rank),category:catName});
+    L(`Power: ${pick} — ${rRes.rank} (${catName})`);
+  }
+
+  // Talents
+  const{result:tRes}=rollOn(TALENTS_TBL);
+  const talents=[];
+  for(let i=0;i<tRes.initial;i++){
+    const{result:tcRes}=rollOn(TALENT_CATS);
+    const tList=TALENT_LISTS[tcRes.cat];
+    const nonStar=tList.filter(t=>!t.endsWith("*"));
+    const pick=nonStar[Math.floor(Math.random()*nonStar.length)];
+    talents.push({name:pick});
+    L(`Talent: ${pick} (${tcRes.cat})`);
+  }
+
+  // Contacts
+  const{result:cRes}=rollOn(CONTACTS_TBL);
+  let cInit=cRes.initial;
+  if(origin==="Hi-Tech"&&cInit<1) cInit=1;
+  if(origin==="Alien"){cInit=Math.min(cInit,1);}
+  const contacts=[];
+  for(let i=0;i<cInit;i++){
+    const pick=CONTACT_TYPES[Math.floor(Math.random()*CONTACT_TYPES.length)];
+    contacts.push({name:pick});
+    L(`Contact: ${pick}`);
+  }
+
+  // Apply to CHAR
+  CHAR=newChar();
+  CHAR.origin=origin;
+  CHAR.abilities=abs;
+  CHAR.health=health;
+  CHAR.karma=karma;
+  CHAR.resourcesRank=resRank;
+  CHAR.resourcesValue=getRankValue(resRank);
+  CHAR.popularityHero=pop;
+  CHAR.popularitySecret=0;
+  CHAR.powers=powers;
+  CHAR.talents=talents;
+  CHAR.contacts=contacts;
+  renderAll();
+  autosave();
+
+  // Show log
+  const logEl=document.getElementById("cg-log");
+  logEl.style.display="block";
+  logEl.textContent=log.join("\n");
+}
+
+// ══════════════════════════════════════════════════════════════
+// SAVE / LOAD / EXPORT / IMPORT
+// ══════════════════════════════════════════════════════════════
+const STORAGE_KEY=GCC.KEYS.faseripChars;
+const AUTOSAVE_KEY="gcc-faserip-current";
+let _saveTimer=null;
+
+function autosave(){
+  clearTimeout(_saveTimer);
+  _saveTimer=setTimeout(()=>{
+    try{localStorage.setItem(AUTOSAVE_KEY,JSON.stringify(CHAR));}catch(e){}
+  },300);
+}
+
+function loadAutosave(){
+  try{
+    const data=localStorage.getItem(AUTOSAVE_KEY);
+    if(data){
+      const parsed=JSON.parse(data);
+      CHAR={...newChar(),...parsed};
+      return true;
+    }
+  }catch(e){}
+  return false;
+}
+
+function getSavedChars(){
+  try{return JSON.parse(localStorage.getItem(STORAGE_KEY))||[];}catch(e){return[];}
+}
+function saveChar(){
+  const chars=getSavedChars();
+  const name=CHAR.heroName||"";
+  if(!name.trim()){MPDialog.alert("Cannot Save","Hero Name is empty.");return;}
+  if(!CHAR._id) CHAR._id = (typeof GCC!=='undefined' && GCC.genId) ? GCC.genId('fas') : 'fas_'+Date.now();
+  const existing=chars.findIndex(c=>c._id && c._id===CHAR._id);
+  const fallback=existing<0 ? chars.findIndex(c=>c.heroName===name) : -1;
+  const entry={...CHAR, _saved:new Date().toISOString()};
+  const idx = existing>=0 ? existing : fallback;
+  if(idx>=0) chars[idx]=entry; else chars.push(entry);
+  try{
+    localStorage.setItem(STORAGE_KEY,JSON.stringify(chars));
+  }catch(e){
+    MPDialog.alert("Save Failed","Browser storage is full.<br>Try removing unused characters or clearing portrait data.");
+    return;
+  }
+  if(typeof GCCSync!=='undefined' && GCCSync.notifySync) GCCSync.notifySync(STORAGE_KEY);
+  autosave();
+  MPDialog.alert("Saved","Character saved: <b>"+name+"</b>");
+}
+
+async function showLoadModal(){
+  const chars=getSavedChars();
+  const items=chars.map(c=>({
+    name:c.heroName||'Unnamed',
+    sub:[c.origin,c._saved?new Date(c._saved).toLocaleDateString():''].filter(Boolean).join(' — '),
+    image:c.portraitData||null,
+  }));
+  const idx=await MPDialog.listPick('Load Character',items,{emptyText:'No saved characters.'});
+  if(idx==null||idx<0||idx>=chars.length) return;
+  CHAR={...newChar(),...chars[idx]};
+  renderAll();
+  autosave();
+}
+
+function exportChar(){
+  const blob=new Blob([JSON.stringify(CHAR,null,2)],{type:"application/json"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  a.href=url; a.download=(CHAR.heroName||"faserip-character")+".json"; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function isFoundryActor(data){
+  return data.system && data.system.abilities && (data.type==="hero"||data.type==="villain"||data.type==="npc");
+}
+
+function importFoundryActor(data){
+  const s=data.system||{};
+  const a=s.abilities||{};
+  const attr=s.attributes||{};
+  const mov=s.movement||{};
+  const pop=attr.popularity||{};
+
+  const char=newChar();
+
+  // Bio
+  char.heroName=data.name||"";
+  char.playerName=s.player||"";
+  char.identity=s.identity||"";
+  char.idType=s.identityType||"secret";
+  char.group=s.group||"";
+  char.base=s.base||"";
+  char.origin=s.origin||s.powerOrigin||"";
+  char.age=s.age||"";
+  char.biography=s.description||"";
+  char.race=s.race||"";
+  char.sex=s.sex||"";
+  char.dob=s.dob||"";
+  char.handedness=s.handedness||"";
+  char.height=s.height||"";
+  char.weight=s.weight||"";
+  char.eyeColor=s.eyeColor||"";
+  char.hairColor=s.hairColor||"";
+  char.nationality=s.nationality||"";
+  char.legalStatus=s.legalStatus||"";
+  char.maritalStatus=s.maritalStatus||"";
+  char.occupation=s.occupation||"";
+  char.history=s.history||"";
+  char.characterType=s.characterType||data.type||"player";
+  char.isMutant=s.isMutant||false;
+
+  // Primary abilities
+  const abKeys=["fighting","agility","strength","endurance","reason","intuition","psyche"];
+  for(const key of abKeys){
+    const ab=a[key];
+    if(ab){
+      char.abilities[key]={
+        initialRoll:ab.initialRoll||"",
+        initialRank:ab.initialRank||"",
+        rank:ab.rank||"Typical",
+        value:ab.value||0
+      };
+    }
+  }
+
+  // Secondary
+  char.health=attr.health?attr.health.value:0;
+  char.healthMax=attr.health?attr.health.max:0;
+  char.karma=attr.karma?attr.karma.value:0;
+  char.karmaMax=attr.karma?attr.karma.max:0;
+  char.resourcesRank=attr.resources?attr.resources.rank:"Typical";
+  char.resourcesValue=attr.resources?attr.resources.value:0;
+  char.popularityHero=pop.hero?pop.hero.value:0;
+  char.popularitySecret=pop.secretId?pop.secretId.value:0;
+
+  // Movement
+  char.moveRun=mov.run||0;
+  char.moveLeap=mov.leap||0;
+  char.moveSwim=mov.swim||0;
+  char.moveFly=mov.fly||0;
+  char.moveTeleport=mov.teleport||0;
+
+  // Karma progress
+  const kp=s.karma||{};
+  char.advancementKarma=kp.advancement||0;
+  char.karmaPool=kp.pool||0;
+  char.poolName=kp.poolName||"";
+  if(Array.isArray(kp.history)){
+    char.karmaHistory=kp.history.map(e=>({
+      realDate:e.realDate||"",
+      gameDate:e.gameDate||"",
+      amount:e.amount||0,
+      type:e.type||"",
+      description:e.description||""
+    }));
+  }
+
+  // Stunts — fallback from system-level array if no item-based stunts were imported
+  if(!char.stunts.length && s.stunts && s.stunts.length){
+    char.stunts=s.stunts.map(st=>({
+      name:st.name||"",
+      parentPower:st.parentPower||"",
+      rank:st.rank||"",
+      value:st.value||0,
+      difficulty:st.difficulty||"",
+      timesUsed:st.timesUsed||0,
+      description:st.description||""
+    }));
+  }
+
+  // Chargen provenance
+  if(s.chargen){
+    char.chargen={...s.chargen};
+  }
+
+  // Items → powers, talents, contacts, equipment
+  char.powers=[];
+  char.talents=[];
+  char.contacts=[];
+  char.equipment=[];
+
+  const items=data.items||[];
+  for(const item of items){
+    const is=item.system||{};
+    switch(item.type){
+      case "power":
+        char.powers.push({
+          name:item.name||"",
+          rank:is.rank||"Typical",
+          value:is.value||0,
+          category:is.category||"",
+          description:is.description||"",
+          isActive:is.isActive!==false,
+          isStarred:is.isStarred||is.countsAsTwoPowers||false,
+          source:is.source||"natural",
+          range:is.range||"",
+          limitationDetail:is.limitationDetail||"",
+          isAttackPower:is.isAttackPower||false,
+          isDefensePower:is.isDefensePower||false,
+          isBodyArmor:is.isBodyArmor||false,
+          armorPhysical:is.armorPhysical||0,
+          armorEnergy:is.armorEnergy||0,
+          initialRoll:is.initialRoll||"",
+          initialRank:is.initialRank||""
+        });
+        break;
+      case "talent":
+        char.talents.push({
+          name:item.name||"",
+          bonus:is.bonus||"+1CS",
+          abilityModified:is.abilityModified||"",
+          category:is.category||"",
+          type:is.type||"",
+          notes:is.notes||""
+        });
+        break;
+      case "contact":
+        char.contacts.push({
+          name:item.name||"",
+          type:is.type||"",
+          disposition:is.disposition||"Friendly",
+          location:is.location||"",
+          notes:is.notes||"",
+          resourceRank:is.resourceRank||""
+        });
+        break;
+      case "stunt":
+        char.stunts.push({
+          name:item.name||"",
+          parentPower:is.parentPower||"",
+          rank:is.rank||"Typical",
+          value:is.value||0,
+          difficulty:is.difficulty||"",
+          timesUsed:is.timesUsed||0,
+          description:is.description||""
+        });
+        break;
+      case "equipment":
+        char.equipment=char.equipment||[];
+        char.equipment.push({
+          name:item.name||"",
+          category:is.category||"gear",
+          rank:is.rank||"Typical",
+          value:is.value||0,
+          materialStrength:is.materialStrength||"",
+          damage:is.damage||"",
+          damageType:is.damageType||"",
+          range:is.range||"",
+          rate:is.rate||"",
+          shots:is.shots||"",
+          shotsRemaining:is.shotsRemaining||"",
+          description:is.description||"",
+          notes:is.notes||""
+        });
+        break;
+      case "headquarters":
+        char.headquarters.push({
+          name:item.name||"",
+          materialStrength:is.materialStrength||"",
+          rooms:is.rooms||"",
+          features:is.features||"",
+          rent:is.rent||"",
+          notes:is.notes||is.description||""
+        });
+        break;
+      case "vehicle":
+        char.vehicles.push({
+          name:item.name||"",
+          type:is.type||is.vehicleType||"",
+          speed:is.speed||is.rank||"",
+          body:is.body||"",
+          protection:is.protection||"",
+          control:is.control||"",
+          notes:is.notes||is.description||""
+        });
+        break;
+    }
+  }
+
+  // Portrait — check for embedded base64 data first, then token texture, then file path
+  const imgSrc = data.img || '';
+  const tokenSrc = (data.prototypeToken?.texture?.src) || '';
+  if(imgSrc.startsWith('data:image/')){
+    char._rawPortrait = imgSrc;
+  } else if(tokenSrc.startsWith('data:image/')){
+    char._rawPortrait = tokenSrc;
+  } else if(imgSrc && !imgSrc.includes('mystery-man')){
+    char.foundryImg = imgSrc;
+  }
+
+  return char;
+}
+
+function compressPortrait(dataUrl){
+  return new Promise(resolve=>{
+    if(!dataUrl){resolve("");return;}
+    const img=new Image();
+    img.onload=()=>{
+      const maxW=120,maxH=160;
+      let w=img.width,h=img.height;
+      if(w>maxW){h*=maxW/w;w=maxW;}
+      if(h>maxH){w*=maxH/h;h=maxH;}
+      const c=document.createElement("canvas");
+      c.width=w;c.height=h;
+      const ctx=c.getContext("2d");
+      ctx.drawImage(img,0,0,w,h);
+      resolve(c.toDataURL("image/png"));
+    };
+    img.onerror=()=>resolve("");
+    img.src=dataUrl;
+  });
+}
+
+function importChar(file){
+  const reader=new FileReader();
+  reader.onload=async e=>{
+    try{
+      const data=JSON.parse(e.target.result);
+      if(isFoundryActor(data)){
+        CHAR=importFoundryActor(data);
+        // Compress portrait if raw base64 was found
+        if(CHAR._rawPortrait){
+          CHAR.portraitData=await compressPortrait(CHAR._rawPortrait);
+          delete CHAR._rawPortrait;
+        }
+        renderAll();
+        autosave();
+        const itemCount=(data.items||[]).length;
+        const portraitNote = CHAR.portraitData ? '<br>Portrait imported.' :
+          (CHAR.foundryImg ? '<br>Portrait path found (not embedded) — click portrait to set manually.' : '');
+        MPDialog.alert('Imported', 'Imported Foundry actor: <b>'+data.name+'</b><br>'+CHAR.powers.length+' powers, '+CHAR.talents.length+' talents, '+CHAR.contacts.length+' contacts' +
+          (CHAR.equipment&&CHAR.equipment.length?', '+CHAR.equipment.length+' equipment':'') +
+          (CHAR.stunts&&CHAR.stunts.length?', '+CHAR.stunts.length+' stunts':'') +
+          (CHAR.headquarters&&CHAR.headquarters.length?', '+CHAR.headquarters.length+' HQ':'') +
+          (CHAR.vehicles&&CHAR.vehicles.length?', '+CHAR.vehicles.length+' vehicles':'') + portraitNote);
+      } else {
+        CHAR={...newChar(),...data};
+        // Compress portrait from native GCC import too
+        if(CHAR.portraitData && CHAR.portraitData.length > 20000){
+          CHAR.portraitData=await compressPortrait(CHAR.portraitData);
+        }
+        renderAll();
+        autosave();
+      }
+    }catch(err){MPDialog.alert("Import Error","Invalid JSON file: "+err.message);}
+  };
+  reader.readAsText(file);
+}
+
+// ══════════════════════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════════════════════
+document.addEventListener("DOMContentLoaded",()=>{
+  // Check for ?id= or ?char= param to load a specific saved character
+  const urlParams = new URLSearchParams(window.location.search);
+  const charId = urlParams.get('id');
+  const charParam = urlParams.get('char');
+  if(charId || charParam){
+    const chars = getSavedChars();
+    const found = charId
+      ? chars.find(c => c._id === charId)
+      : chars.find(c => c.heroName === charParam);
+    if(found){ CHAR = {...newChar(), ...found}; }
+    else { loadAutosave(); }
+  } else {
+    loadAutosave();
+  }
+  renderAll();
+  bindFields();
+  bindAddButtons();
+
+  // Karma ledger toggle
+  document.getElementById('karma-value').addEventListener('click',()=>{
+    document.getElementById('karma-ledger').classList.toggle('open');
+  });
+
+  // Header buttons
+  document.getElementById("btn-new").addEventListener("click",async ()=>{
+    const ok=await MPDialog.confirm("New Character","Start a new character? Unsaved changes will be lost.",{okText:"Clear",danger:true});
+    if(ok){
+      CHAR=newChar(); renderAll(); autosave();
+    }
+  });
+  document.getElementById("btn-save").addEventListener("click",saveChar);
+  document.getElementById("btn-load").addEventListener("click",showLoadModal);
+  document.getElementById("btn-export").addEventListener("click",exportChar);
+  document.getElementById("btn-import").addEventListener("click",()=>document.getElementById("file-import").click());
+  document.getElementById("file-import").addEventListener("change",e=>{
+    if(e.target.files[0]) importChar(e.target.files[0]);
+    e.target.value="";
+  });
+  document.getElementById("btn-print").addEventListener("click",()=>window.print());
+  document.getElementById("btn-delete").addEventListener("click",async ()=>{
+    const name=CHAR.heroName||"Unnamed";
+    if(!CHAR._id){MPDialog.alert("Cannot Delete","This character has not been saved yet.");return;}
+    const ok=await MPDialog.confirm("Delete Character","Permanently delete <b>"+name+"</b>? This cannot be undone.",{okText:"Delete",danger:true});
+    if(!ok) return;
+    const chars=getSavedChars();
+    const idx=chars.findIndex(c=>c._id===CHAR._id);
+    if(idx>=0){
+      chars.splice(idx,1);
+      localStorage.setItem(STORAGE_KEY,JSON.stringify(chars));
+      if(typeof GCCSync!=='undefined' && GCCSync.notifySync) GCCSync.notifySync(STORAGE_KEY);
+    }
+    CHAR=newChar(); renderAll(); autosave();
+    MPDialog.alert("Deleted","Character deleted.");
+  });
+
+  // Campaign — assign character to a campaign
+  document.getElementById("btn-campaign").addEventListener("click", async () => {
+    const camps = (function(){try{return JSON.parse(localStorage.getItem(GCC.KEYS.campaigns))||[]}catch(e){return[]}})();
+    if (!camps.length) { await MPDialog.alert('No Campaigns', 'No campaigns found. Create one on the Campaigns page first.'); return; }
+    const current = CHAR._campaign || null;
+    const items = camps.map(c => ({
+      label: c.name,
+      desc: c.id === current ? '(current)' : '',
+    }));
+    if (current) items.push({ label: 'Remove from campaign', desc: 'Unlink this character' });
+    const pick = await MPDialog.choose('Assign to Campaign', items, { intro: 'Select a campaign for this character:' });
+    if (pick == null) return;
+    if (current && pick === items.length - 1) {
+      delete CHAR._campaign;
+      autosave(); saveChar();
+      await MPDialog.alert('Removed', 'Character removed from campaign.');
+    } else {
+      CHAR._campaign = camps[pick].id;
+      autosave(); saveChar();
+      await MPDialog.alert('Assigned', 'Character assigned to <b>' + camps[pick].name + '</b>.');
+    }
+  });
+
+
+  // Chargen
+  const cgPanel=document.getElementById("chargen-panel");
+  document.getElementById("btn-chargen").addEventListener("click",()=>cgPanel.classList.toggle("open"));
+  document.getElementById("cg-close").addEventListener("click",()=>cgPanel.classList.remove("open"));
+  document.getElementById("cg-quick").addEventListener("click",quickRandom);
+  document.getElementById("cg-step").addEventListener("click",()=>{
+    stepByStep();
+  });
+
+  // Bio toggle
+  const bioExpand=document.getElementById("bio-expand");
+  const bioToggle=document.getElementById("bio-toggle");
+  bioToggle.addEventListener("click",()=>{
+    const open=bioExpand.style.display!=="none";
+    bioExpand.style.display=open?"none":"block";
+    bioToggle.textContent=open?"\u25BC":"\u25B2";
+  });
+
+  // History textarea
+  const histTA=document.querySelector('[data-field="history"]');
+  if(histTA){
+    histTA.value=CHAR.history||"";
+    histTA.addEventListener("input",()=>{CHAR.history=histTA.value;autosave();});
+  }
+
+  // Portrait
+  const pBox=document.getElementById("portrait-box");
+  const pImg=document.getElementById("portrait-img");
+  const pPh=document.getElementById("portrait-ph");
+  const pDel=document.getElementById("portrait-del");
+  const pInput=document.createElement("input");
+  pInput.type="file"; pInput.accept="image/*"; pInput.style.display="none";
+  document.body.appendChild(pInput);
+
+  function showPortrait(dataUrl){
+    if(dataUrl){pImg.src=dataUrl;pImg.style.display="block";pPh.style.display="none";}
+    else{pImg.style.display="none";pImg.src="";pPh.style.display="";}
+  }
+  showPortrait(CHAR.portraitData);
+
+  pBox.addEventListener("click",e=>{
+    if(e.target===pDel||e.target.parentElement===pDel) return;
+    pInput.click();
+  });
+  pInput.addEventListener("change",e=>{
+    const file=e.target.files[0]; if(!file) return;
+    const reader=new FileReader();
+    reader.onload=ev=>{
+      const canvas=document.createElement("canvas");
+      const img=new Image();
+      img.onload=()=>{
+        const maxW=120,maxH=160;
+        let w=img.width,h=img.height;
+        if(w>maxW){h*=maxW/w;w=maxW;}
+        if(h>maxH){w*=maxH/h;h=maxH;}
+        canvas.width=w;canvas.height=h;
+        const ctx=canvas.getContext("2d");
+        ctx.drawImage(img,0,0,w,h);
+        CHAR.portraitData=canvas.toDataURL("image/png");
+        showPortrait(CHAR.portraitData);
+        autosave();
+      };
+      img.src=ev.target.result;
+    };
+    reader.readAsDataURL(file);
+    e.target.value="";
+  });
+  pDel.addEventListener("click",e=>{
+    e.stopPropagation();
+    CHAR.portraitData="";
+    showPortrait("");
+    autosave();
+  });
+
+  // Set current page in GCC header
+  if(window.GCC_HEADER && window.GCC_HEADER.setCurrentPage){
+    window.GCC_HEADER.setCurrentPage("fas-char");
+  }
+
+  // View mode
+  if(new URLSearchParams(window.location.search).get('mode')==='view'){
+    document.body.classList.add('view-mode');
+    document.title='FASERIP — View Character';
+    document.getElementById('btn-view-edit').addEventListener('click',()=>{
+      const u=new URL(window.location); u.searchParams.delete('mode'); window.location=u;
+    });
+  }
+});
+</script>
+</body>
+</html>

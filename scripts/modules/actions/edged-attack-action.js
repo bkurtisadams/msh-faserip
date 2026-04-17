@@ -93,9 +93,12 @@ export class EdgedAttackAction extends AttackAction {
 
     const defaultSource = (passedItemId && passedItem?.type === "equipment") ? "weapon" : "weapon";
     
-    const savedSource = shouldRemember 
-      ? ((await actor.getFlag("msh-faserip","lastEdgedSource")) || defaultSource)
-      : defaultSource;
+    // Explicit passed item (equipment attack / attack-mode click) always wins over lastEdgedSource flag
+    const savedSource = passedItemId
+      ? "weapon"
+      : (shouldRemember
+          ? ((await actor.getFlag("msh-faserip","lastEdgedSource")) || defaultSource)
+          : defaultSource);
 
     const savedItemId = passedItemId || (shouldRemember ? (await actor.getFlag("msh-faserip","lastEdgedItemId")) : "") || "";
     
