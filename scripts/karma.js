@@ -1,4 +1,6 @@
-// karma.js v1.6.3 - 2026-04-16
+// karma.js v1.6.4 - 2026-04-16
+// v1.6.4: Spend Karma dialog now closes when user picks Ability Advancement.
+//         Previously it lingered behind the advancement sub-dialog in a useless state.
 // v1.6.3: Fix Ability Advancement cost formula. Per RAW (Potato Salad Man example),
 //         each +1 point costs 10× the CURRENT numeric value, not 10× the Standard
 //         Rank Number. e.g. Good(14)→Good(15) = 140 karma, not 100. Cresting +400
@@ -564,7 +566,7 @@ export class KarmaSheet extends DocumentSheet {
     event.preventDefault();
     const availableKarma = this._getCurrentKarma();
     
-    new Dialog({
+    const dlg = new Dialog({
       title: "Spend Karma",
       content: `
         <form>
@@ -604,7 +606,8 @@ export class KarmaSheet extends DocumentSheet {
           callback: async (html) => {
             const spendType = html.find('[name="spendType"]').val();
 
-            // Ability Advancement uses its own sub-dialog
+            // Ability Advancement uses its own sub-dialog — parent already closed
+            // when dropdown selected it; this is just a safety guard.
             if (spendType === "Ability Advancement") return;
 
             const amount = Number(html.find('[name="amount"]').val());
@@ -643,8 +646,10 @@ export class KarmaSheet extends DocumentSheet {
         html.find('[name="spendType"]').change(ev => {
           const type = ev.currentTarget.value;
 
-          // Ability Advancement → open sub-dialog immediately
+          // Ability Advancement → hand off to sub-dialog and close this one.
+          // The remaining fields (Amount/Description) don't apply to advancement.
           if (type === "Ability Advancement") {
+            dlg.close();
             this._onAbilityAdvancement();
             return;
           }
@@ -668,7 +673,8 @@ export class KarmaSheet extends DocumentSheet {
           html.find('[name="description"]').attr('placeholder', placeholder);
         });
       }
-    }).render(true);
+    });
+    dlg.render(true);
   }
 
   /**
