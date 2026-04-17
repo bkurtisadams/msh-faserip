@@ -588,6 +588,7 @@
         }
       ],
       "burstScatter": "none",
+      "canisterSubType": "gas",
       "stunIntensity": "",
       "continuingDamage": "",
       "continuingDamageRounds": "",

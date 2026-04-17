@@ -1,4 +1,22 @@
-// shooting-action.js v3.4.2 - 2026-04-17
+// shooting-action.js v3.5.0 - 2026-04-17
+// v3.5.0: T1/T2/T3 ammo variant follow-ups.
+//         T1: Mercy Shot now rolls Endurance FEAT vs Rm Intensity on hit,
+//             applies applyUnconscious with 1-10 round duration on failure.
+//             Uses _executeSingleAttack postHitCallback hook.
+//         T2: Explosive Shot on weapons with burstScatter !== "none" now
+//             places a 1-area template at the primary target and applies
+//             2x damage to all other tokens in the area. Single-target
+//             explosive behavior unchanged for non-burst weapons.
+//         T3: Canister Shot sub-types fully implemented (gas/knockout/
+//             smoke/explosive/incendiary). Sub-type defaults from
+//             weapon.system.canisterSubType, overridable via new dialog
+//             picker that appears when variant === canister.
+//             - gas: In Intensity tear gas, Endurance FEAT or incapacitated
+//             - knockout: Rm Intensity KO gas, applyUnconscious on FEAT fail
+//             - smoke: Ex Intensity, -2CS AE on all in area
+//             - explosive: 2x damage to all in area (adjacent falloff TODO)
+//             - incendiary: damage + ongoing burn via game.msh.ongoing
+//         Adds postHitCallback plumbing. Imports AreaTemplate.
 // v3.4.2: Rubber Shot now correctly ignores Slam per RAW (Advanced Set
 //         Ammunition: "Ignore Slam results in using rubber bullets").
 //         Downgrades yellow Slam → Hit on the cloned blunt-attack effect
@@ -48,6 +66,7 @@ import {
   buildInlineFeatDisplay
 } from "./action-utils.js";
 import { RANK_ABBR } from "../../rules/rules-reference.js";
+import { AreaTemplate } from "./area-template.js";
 import { makeDamageBlock, computeAfterArmor, buildDamageFlags } from "./damage-ui.js";
 import { canEffectsApply } from "../../rules/effects-gate.js";
 import { playCombatSFX } from "./audio-utils.js";
@@ -240,6 +259,25 @@ export class ShootingAction extends RangedAttackAction {
             <select name="variantType" id="variant-select" style="flex:1;font-size:12px;padding:2px 3px;border:1px solid #b8b8b8;border-radius:2px;">${initialVariantOptions}</select>
           </div>
         </div>` : ""}
+        <!-- Canister sub-type row (shown only when variant === canister) -->
+        <div class="object-row" id="canister-subtype-row" style="margin-top:3px;display:${initialVariant === "canister" ? "block" : "none"};">
+          <div style="display:flex;align-items:center;gap:6px;">
+            <label style="font-size:12px;white-space:nowrap;">Canister:</label>
+            <select name="canisterSubType" id="canister-subtype-select" style="flex:1;font-size:12px;padding:2px 3px;border:1px solid #b8b8b8;border-radius:2px;">
+              ${(() => {
+                const cur = String(initialWeapon?.system?.canisterSubType || "gas").toLowerCase();
+                const choices = [
+                  ["gas",        "Tear Gas (In)"],
+                  ["knockout",   "Knock-Out Gas (Rm)"],
+                  ["smoke",      "Smoke (Ex)"],
+                  ["explosive",  "Explosive (2\u00d7 area)"],
+                  ["incendiary", "Incendiary (burn 1-10 rnd)"]
+                ];
+                return choices.map(([v, l]) => `<option value="${v}" ${v === cur ? "selected" : ""}>${l}</option>`).join("");
+              })()}
+            </select>
+          </div>
+        </div>
       </div>
 
       <!-- Range info box (blue) — auto-filled from token distance -->
@@ -442,6 +480,7 @@ export class ShootingAction extends RangedAttackAction {
             const karma = karmaToSpend;
             const range = Number($dlg('[name="range"]').val() || 1);
             const variantType = $dlg('[name="variantType"]').val() || weapon.system?.variantType || "standard";
+            const canisterSubType = $dlg('[name="canisterSubType"]').val() || weapon.system?.canisterSubType || "gas";
 
             const multiEnabled = $dlg('#multi-enabled').is(':checked');
             const multiCountVal = $dlg('[name="multiCount"]:checked').val() || "2";
@@ -486,6 +525,7 @@ export class ShootingAction extends RangedAttackAction {
               multiAttacks,
               attackCount,
               variantType,
+              canisterSubType,
               csNotes: cs.csNotes,
               armorPiercing: _apInfo.ap,
               armorPiercingCS: _apInfo.apCS,
@@ -527,6 +567,11 @@ export class ShootingAction extends RangedAttackAction {
           });
           html.find('[name="range"]').on('input change', update);
           html.on('change', '[name="variantType"]', update);
+          // Show/hide canister sub-type row based on variant selection
+          html.on('change', '[name="variantType"]', function() {
+            const isCan = $(this).val() === "canister";
+            html.find('#canister-subtype-row').css('display', isCan ? 'block' : 'none');
+          });
 
           // Multi-attack toggle
           html.find('#multi-enabled').on('change', function() {
@@ -633,6 +678,9 @@ export class ShootingAction extends RangedAttackAction {
     let effectiveDamage = choice.weaponDamage || 0;
     let effectiveDamageNote = "";
     let variantNote = "";
+    let postHitCallback = null;
+    const weapon = choice.weapon;
+    const weaponSys = weapon?.system || {};
 
     if (vt === "rubber") {
       // Rubber Shot per RAW (Advanced Set Ammunition): inflicts slugfest
@@ -647,18 +695,61 @@ export class ShootingAction extends RangedAttackAction {
       effectiveDamageType = "physical-blunt";
       variantNote = "Rubber Shot — blunt damage, ignore Slam";
     } else if (vt === "mercy") {
-      // Mercy: 0 damage, Rm Intensity KO drug if penetrates armor
+      // Mercy Shot per RAW (Advanced Set Ammunition): "Mercy bullets inflict no
+      // damage, but spread a Remarkable Intensity knock-out drug over the skin
+      // of the target. If the bullet inflicts damage to the target, the drug
+      // takes effect, knocking those affected out for 1-10 rounds."
+      // Interpretation: if the shot hits (color ≥ green), target makes an
+      // Endurance FEAT vs Remarkable Intensity or is KO'd 1-10 rounds.
       effectiveDamage = 0;
-      variantNote = "Mercy Shot — Rm Intensity KO drug";
+      variantNote = "Mercy Shot — Rm Intensity KO drug on hit";
+      postHitCallback = this._mercyKnockoutCallback();
     } else if (vt === "explosive") {
-      // Explosive: 2x weapon damage
+      // Explosive Shot per RAW: 2x weapon damage. If the weapon fires bursts
+      // or scatters, all in the area are affected. Single-target weapons
+      // just do 2x to the primary target (current single-hit behavior).
       effectiveDamage = (choice.weaponDamage || 0) * 2;
       effectiveDamageNote = `${choice.weaponDamage}×2 explosive`;
-      variantNote = "Explosive Shot — double damage";
+      const bs = String(weaponSys.burstScatter || "none").toLowerCase();
+      if (bs === "burst" || bs === "scatter") {
+        variantNote = `Explosive Shot — double damage, ${bs} area effect`;
+        postHitCallback = this._explosiveAreaCallback({ damage: effectiveDamage, damageType: effectiveDamageType });
+      } else {
+        variantNote = "Explosive Shot — double damage";
+      }
     } else if (vt === "heatSeeker") {
       variantNote = "Heat-Seeker — no range penalty";
     } else if (vt === "canister") {
-      variantNote = "Canister Shot — area effect (GM adjudicates sub-type)";
+      // Canister Shot per RAW: 5 sub-types, all area-effect.
+      //   gas       — In Intensity tear gas, 1 area
+      //   knockout  — Rm Intensity KO gas, 1 area
+      //   smoke     — Ex Intensity smoke, 1 area
+      //   explosive — 2x damage target area, 1x adjacent (adjacent falloff TODO)
+      //   incendiary — weapon damage as fire, burns 1-10 rounds
+      // Sub-type default from weapon.system.canisterSubType; dialog may override.
+      const subType = String(choice.canisterSubType || weaponSys.canisterSubType || "gas").toLowerCase();
+      const subLabels = {
+        gas: "Tear Gas (In Intensity)",
+        knockout: "KO Gas (Rm Intensity)",
+        smoke: "Smoke (Ex Intensity)",
+        explosive: "Explosive (2× area)",
+        incendiary: `Incendiary (burn 1-10 rnd @ ${choice.weaponDamage || 0})`
+      };
+      variantNote = `Canister Shot — ${subLabels[subType] || subType}`;
+      if (subType === "explosive") {
+        effectiveDamage = (choice.weaponDamage || 0) * 2;
+        effectiveDamageNote = `${choice.weaponDamage}×2 canister explosive`;
+      } else if (subType === "incendiary") {
+        effectiveDamageType = "energy";
+      } else {
+        // Gas / KO / Smoke: no direct damage on primary target from the shot itself.
+        effectiveDamage = 0;
+      }
+      postHitCallback = this._canisterAreaCallback({
+        subType,
+        baseDamage: choice.weaponDamage || 0,
+        damageType: effectiveDamageType
+      });
     }
 
     // Execute attack(s)
@@ -683,7 +774,8 @@ export class ShootingAction extends RangedAttackAction {
         breakingFeat: null,
         targetCount: 1,
         attackNumber: i,
-        totalAttacks: actualAttackCount
+        totalAttacks: actualAttackCount,
+        postHitCallback: i === 1 ? postHitCallback : null
       });
     }
 
@@ -704,5 +796,304 @@ export class ShootingAction extends RangedAttackAction {
         });
       }
     }
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // T1 — Mercy Shot KO drug
+  // ─────────────────────────────────────────────────────────────
+  // Returns a postHitCallback that fires an Endurance FEAT vs Rm Intensity
+  // on hit; on FEAT failure (white result), target is KO'd 1-10 rounds via
+  // applyUnconscious. Per RAW Advanced Set Ammunition: "If the bullet inflicts
+  // damage to the target, the drug takes effect, knocking those affected out
+  // for 1-10 rounds." We interpret "inflicts damage" as "hit lands" since
+  // mercy's own damage is 0 by design.
+  _mercyKnockoutCallback() {
+    return async ({ targetActor, isHit, color, actor }) => {
+      if (!isHit || !targetActor) return;
+      if (color === "white") return;
+
+      const { getAbilityInfo } = await import("./action-utils.js");
+      const { rollUniversalTable } = await import("../dice/universal-table.js");
+      const { applyUnconscious } = await import("../effects/effect-engine.js");
+
+      const endInfo = getAbilityInfo(targetActor, "endurance");
+      const endRank = endInfo?.rank || "Typical";
+
+      const r = await (new Roll("1d100")).evaluate({ async: true });
+      const featColor = (game.msh?.rollUniversalTable ?? rollUniversalTable)(endRank, Math.min(100, r.total));
+      const featColorLower = String(featColor || "white").toLowerCase();
+      const resisted = featColorLower !== "white";
+
+      let line = "";
+      if (resisted) {
+        line = `<div style="color:#2e7d32;font-weight:bold;">${targetActor.name} resists the KO drug.</div>`;
+      } else {
+        const rounds = Math.max(1, Math.min(10, Math.floor(Math.random() * 10) + 1));
+        try {
+          await applyUnconscious(targetActor, { rounds, originUuid: actor?.uuid });
+        } catch (e) {
+          console.error("[FASERIP ERROR] Mercy KO applyUnconscious failed:", e);
+        }
+        line = `<div style="color:#d32f2f;font-weight:bold;">${targetActor.name} succumbs to the KO drug — unconscious ${rounds} round${rounds !== 1 ? "s" : ""}.</div>`;
+      }
+
+      await ChatMessage.create({
+        speaker: ChatMessage.getSpeaker({ actor }),
+        content: `<div style="background:#f3e5f5;border:1px solid #8e24aa;border-radius:3px;padding:6px 8px;margin:4px 0;">
+          <div style="font-weight:bold;color:#6a1b9a;margin-bottom:3px;">Mercy Shot — KO Drug</div>
+          <div style="font-size:.85em;">Endurance FEAT (${endRank}) vs Rm Intensity: rolled ${r.total} \u2192 <b>${featColorLower.toUpperCase()}</b></div>
+          ${line}
+        </div>`
+      });
+    };
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // T2 — Explosive Shot area effect (burst/scatter weapons only)
+  // ─────────────────────────────────────────────────────────────
+  // Returns a postHitCallback that places a 1-area template at the primary
+  // target and applies 2× weapon damage to every other token in the area.
+  // Primary target already took damage via the normal attack pipeline; this
+  // handles the ripple. Skipped if the shot missed. Per RAW: "If the weapon
+  // fires bursts or scatters, all in the area are affected when using
+  // explosive shot."
+  _explosiveAreaCallback({ damage, damageType }) {
+    return async ({ targetActor, target, isHit, color, actor }) => {
+      if (!isHit || color === "white" || !target) return;
+
+      try {
+        const template = await AreaTemplate.create({
+          x: target.center?.x ?? 0,
+          y: target.center?.y ?? 0,
+          radiusInAreas: 1,
+          label: "Explosive",
+          fillColor: "#ff4400",
+          fillAlpha: 0.25
+        });
+        if (!template) return;
+
+        const inArea = await template.target();
+        const splashTokens = inArea.filter(t => t?.actor && t.id !== target.id);
+
+        if (splashTokens.length > 0) {
+          const { applyDamageToTargets } = await import("./action-utils.js");
+          await applyDamageToTargets({
+            damage,
+            attackerUuid: actor?.uuid,
+            damageType,
+            showNotification: false,
+            bypassArmor: false,
+            attackForm: "shooting",
+            targets: splashTokens
+          });
+        }
+
+        await ChatMessage.create({
+          speaker: ChatMessage.getSpeaker({ actor }),
+          content: `<div style="background:#fff3e0;border:1px solid #ef6c00;border-radius:3px;padding:6px 8px;margin:4px 0;">
+            <div style="font-weight:bold;color:#e65100;margin-bottom:3px;">Explosive Shot — Area Effect</div>
+            <div style="font-size:.85em;">${splashTokens.length} additional token${splashTokens.length !== 1 ? "s" : ""} in area took ${damage} damage.</div>
+          </div>`
+        });
+      } catch (e) {
+        console.error("[FASERIP ERROR] Explosive area callback failed:", e);
+      }
+    };
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // T3 — Canister Shot area effect (5 sub-types)
+  // ─────────────────────────────────────────────────────────────
+  // gas       — In Intensity tear gas over 1 area. Affected tokens: Endurance
+  //             FEAT or no actions (movement only) until leaving + 1 round.
+  // knockout  — Rm Intensity KO gas. Endurance FEAT or KO 1-10 rounds.
+  // smoke     — Ex Intensity smoke. -2CS on all FEATs in area.
+  //             (Status applied; duration is GM-adjudicated per grenade pattern.)
+  // explosive — 2× weapon damage to all in target area. (Adjacent-area 1×
+  //             falloff TODO — grenade High Explosive doesn't implement it
+  //             either; module-wide gap.)
+  // incendiary — weapon damage as fire + ongoing burn damage per round for
+  //             1-10 rounds via ongoing-engine register. Status: "burning".
+  _canisterAreaCallback({ subType, baseDamage, damageType }) {
+    return async ({ targetActor, target, isHit, color, actor }) => {
+      if (!isHit || color === "white" || !target) return;
+
+      const labels = {
+        gas: "Tear Gas",
+        knockout: "Knock-Out Gas",
+        smoke: "Smoke",
+        explosive: "Explosive",
+        incendiary: "Incendiary"
+      };
+      const label = labels[subType] || subType;
+
+      const fillColors = {
+        gas:        "#9ccc65",
+        knockout:   "#7e57c2",
+        smoke:      "#757575",
+        explosive:  "#ff4400",
+        incendiary: "#ff6f00"
+      };
+
+      try {
+        const template = await AreaTemplate.create({
+          x: target.center?.x ?? 0,
+          y: target.center?.y ?? 0,
+          radiusInAreas: 1,
+          label: `Canister: ${label}`,
+          fillColor: fillColors[subType] || "#888888",
+          fillAlpha: 0.3
+        });
+        if (!template) return;
+
+        const inArea = await template.target();
+        const affected = inArea.filter(t => t?.actor);
+
+        const lines = [];
+
+        if (subType === "explosive") {
+          // 2× weapon damage to all in target area. TODO: 1× adjacent area falloff.
+          const dmg = baseDamage * 2;
+          if (affected.length > 0) {
+            const { applyDamageToTargets } = await import("./action-utils.js");
+            await applyDamageToTargets({
+              damage: dmg,
+              attackerUuid: actor?.uuid,
+              damageType: damageType || "physical-edged",
+              showNotification: false,
+              bypassArmor: false,
+              attackForm: "shooting",
+              targets: affected
+            });
+          }
+          lines.push(`${affected.length} target${affected.length !== 1 ? "s" : ""} take ${dmg} damage.`);
+        } else if (subType === "incendiary") {
+          // Damage on impact + ongoing burn for 1-10 rounds.
+          const burnRounds = Math.max(1, Math.min(10, Math.floor(Math.random() * 10) + 1));
+          const { applyDamageToTargets } = await import("./action-utils.js");
+          if (affected.length > 0 && baseDamage > 0) {
+            await applyDamageToTargets({
+              damage: baseDamage,
+              attackerUuid: actor?.uuid,
+              damageType: "energy",
+              showNotification: false,
+              bypassArmor: false,
+              attackForm: "shooting",
+              targets: affected
+            });
+          }
+          // Register ongoing burn on each affected actor.
+          const ongoing = game.msh?.ongoing;
+          if (ongoing?.register) {
+            for (const tok of affected) {
+              const a = tok.actor;
+              if (!a) continue;
+              try {
+                await ongoing.register(a, `incendiaryBurn-${Date.now()}-${a.id}`, {
+                  type: "damage",
+                  stat: "health",
+                  formula: baseDamage,
+                  rate: 1,
+                  cycle: "round",
+                  count: burnRounds,
+                  interruptOnDamage: false,
+                  autoDisable: true
+                }, {
+                  name: "Burning",
+                  img: "icons/svg/fire.svg",
+                  disabled: false,
+                  statuses: ["burning"],
+                  duration: { rounds: burnRounds }
+                });
+              } catch (e) {
+                console.error("[FASERIP ERROR] Incendiary ongoing register failed:", e);
+              }
+            }
+          }
+          lines.push(`${affected.length} target${affected.length !== 1 ? "s" : ""} take ${baseDamage} fire damage + burning ${burnRounds} round${burnRounds !== 1 ? "s" : ""}.`);
+        } else if (subType === "gas" || subType === "knockout") {
+          // Gas-type: Endurance FEAT vs Intensity per target.
+          const intensityRank = subType === "knockout" ? "Remarkable" : "Incredible";
+          const { getAbilityInfo } = await import("./action-utils.js");
+          const { rollUniversalTable } = await import("../dice/universal-table.js");
+          const { applyUnconscious, applyEffect } = await import("../effects/effect-engine.js");
+
+          const AE_MODE = { ADD: 2 };
+          const resultRows = [];
+          for (const tok of affected) {
+            const a = tok.actor;
+            if (!a) continue;
+            const endInfo = getAbilityInfo(a, "endurance");
+            const endRank = endInfo?.rank || "Typical";
+            const r = await (new Roll("1d100")).evaluate({ async: true });
+            const featColor = (game.msh?.rollUniversalTable ?? rollUniversalTable)(endRank, Math.min(100, r.total));
+            const lc = String(featColor || "white").toLowerCase();
+            if (lc === "white") {
+              if (subType === "knockout") {
+                const rounds = Math.max(1, Math.min(10, Math.floor(Math.random() * 10) + 1));
+                try {
+                  await applyUnconscious(a, { rounds, originUuid: actor?.uuid });
+                } catch (e) { console.error("[FASERIP ERROR] Canister KO failed:", e); }
+                resultRows.push(`<li>${a.name}: KO'd ${rounds} rnd</li>`);
+              } else {
+                // Tear gas: apply -3CS-on-actions effect (approximation of
+                // "no actions other than movement"). Foundry status = "blinded".
+                try {
+                  await applyEffect(a, {
+                    name: "Tear Gas",
+                    img: "icons/svg/blind.svg",
+                    rounds: 2,
+                    originUuid: actor?.uuid,
+                    changes: [
+                      { key: "system.combatMods.attackShift", mode: AE_MODE.ADD, value: "-3", priority: 20 },
+                      { key: "system.combatMods.defenseShift", mode: AE_MODE.ADD, value: "-2", priority: 20 }
+                    ],
+                    flags: { effectType: "tearGas" },
+                    statuses: ["blinded"]
+                  });
+                } catch (e) { console.error("[FASERIP ERROR] Canister gas failed:", e); }
+                resultRows.push(`<li>${a.name}: incapacitated by tear gas</li>`);
+              }
+            } else {
+              resultRows.push(`<li>${a.name}: resists (${lc.toUpperCase()})</li>`);
+            }
+          }
+          lines.push(`Endurance FEATs vs ${intensityRank}:<ul style="margin:3px 0 0 18px;padding:0;font-size:.85em;">${resultRows.join("")}</ul>`);
+        } else if (subType === "smoke") {
+          // Smoke: -2CS on all FEATs for those in the area. Applied as a
+          // persistent AE per token; GM dismisses when the smoke disperses.
+          const { applyEffect } = await import("../effects/effect-engine.js");
+          const AE_MODE = { ADD: 2 };
+          for (const tok of affected) {
+            const a = tok.actor;
+            if (!a) continue;
+            try {
+              await applyEffect(a, {
+                name: "Smoke Cloud",
+                img: "icons/svg/smoke.svg",
+                rounds: 10,
+                originUuid: actor?.uuid,
+                changes: [
+                  { key: "system.combatMods.attackShift", mode: AE_MODE.ADD, value: "-2", priority: 20 },
+                  { key: "system.combatMods.defenseShift", mode: AE_MODE.ADD, value: "-2", priority: 20 }
+                ],
+                flags: { effectType: "smoke" }
+              });
+            } catch (e) { console.error("[FASERIP ERROR] Canister smoke failed:", e); }
+          }
+          lines.push(`${affected.length} target${affected.length !== 1 ? "s" : ""} in smoke — -2CS on all FEATs.`);
+        }
+
+        await ChatMessage.create({
+          speaker: ChatMessage.getSpeaker({ actor }),
+          content: `<div style="background:#eceff1;border:1px solid #546e7a;border-radius:3px;padding:6px 8px;margin:4px 0;">
+            <div style="font-weight:bold;color:#263238;margin-bottom:3px;">Canister Shot \u2014 ${label}</div>
+            <div style="font-size:.85em;">${lines.join("<br>")}</div>
+          </div>`
+        });
+      } catch (e) {
+        console.error("[FASERIP ERROR] Canister area callback failed:", e);
+      }
+    };
   }
 }

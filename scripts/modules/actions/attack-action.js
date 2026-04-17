@@ -408,7 +408,8 @@ export class AttackAction extends BaseAction {
     breakingFeat = null,
     targetCount = 1,
     attackNumber = 1,
-    totalAttacks = 1
+    totalAttacks = 1,
+    postHitCallback = null
   }) {
     // === EARLY WEAPON CHECK: Abort if firearm is empty ===
     const weapon = choice?.weapon
@@ -1494,6 +1495,33 @@ export class AttackAction extends BaseAction {
           });
         } catch (e) {
           console.error("[FASERIP ERROR] Entangling check failed:", e);
+        }
+      }
+
+      // ============================================================
+      // POST-HIT CALLBACK: variant-specific follow-ups (mercy KO drug,
+      // area-effect ripple, etc). Called once per resolved target with
+      // the attack outcome. Fire-and-forget — exceptions logged but do
+      // not interrupt the rest of the attack chain.
+      // ============================================================
+      if (postHitCallback && targetActor) {
+        try {
+          await postHitCallback({
+            targetActor,
+            target,
+            targetName,
+            isHit: targetIsHit,
+            color: colorLower,
+            rawDamage,
+            afterArmor,
+            penetratingDamage,
+            damageType,
+            attackForm,
+            weapon,
+            actor
+          });
+        } catch (e) {
+          console.error("[FASERIP ERROR] postHitCallback failed:", e);
         }
       }
     }
