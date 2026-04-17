@@ -613,15 +613,167 @@ export const MATERIAL_STRENGTH = {
 export const VEHICLES = {
   stats: ["Type", "Cost", "Control", "Speed", "Body", "Protection"],
   types: ["Road", "Off-Road", "Railed", "GEV", "Air", "Space", "Water", "Sub"],
-  controlFEAT: "Lesser of Agility or Control",
-  acceleration: "2 areas per round",
-  deceleration: { normal: "2 ranks per round", sudden: "3 (requires FEAT)" },
-  overSpeed: "+1 rank max, all FEATs +1 color",
+
+  // Control FEAT ability: use lesser of operator's Agility or vehicle's Control.
+  controlFEAT: {
+    ability: "Lesser of Agility or Control",
+    triggersByType: {
+      road:    ["sudden stop", "traveling off-road", "turn 90°+", "any action above listed Speed"],
+      offRoad: ["sudden stop", "turn 90°+", "any action above listed Speed"],
+      railed:  ["sudden stop"],
+      gev:     ["as off-road + as air vehicle"],
+      air:     ["sudden turn / dodge", "turn 45°+ (one-eighth circle)", "abnormal takeoff/landing (fog, damaged, etc.)"],
+      space:   ["takeoff", "landing", "sudden movement"],
+      water:   ["sudden course change"],
+      sub:     ["sudden course change"]
+    }
+  },
+
+  // Accel: 2 areas/round per round as if Ex Endurance. Current speed rank =
+  // rank equal to areas moved, or next highest on long-distance movement table.
+  acceleration: {
+    rate: "2 areas/round",
+    asEndurance: "Excellent",
+    column: "Land/Water (Air column used for GEV, Space, Air types)"
+  },
+
+  // Decel: 2 ranks/round normally; 3 ranks with a sudden-stop Control FEAT.
+  deceleration: {
+    normal: "2 ranks/round until Shift 0",
+    sudden: "3 ranks/round (Control FEAT)"
+  },
+
+  // Air vehicles must reach ground speed equal to listed air speed rank before
+  // takeoff. During runway roll they count as Ground vehicles for Control.
+  // Catapults (carriers, Avengers Mansion) fling craft at required speed.
+  airTakeoff: {
+    groundSpeedRequired: "Equal rank to listed air speed",
+    duringRunway: "Treated as Road vehicle for Control",
+    catapult: "Aircraft carriers, Avengers Mansion — launched at required speed"
+  },
+
+  // Air landing: must match ground equivalent of air speed rank for safe landing.
+  // Faster-than-safe landings require Control FEAT.
+  airLanding: {
+    safeSpeed: "Ground equivalent of air-rank speed",
+    faster: "Control FEAT required"
+  },
+
+  // If floors climbed or descended in a round > forward areas moved, Control
+  // FEAT required. Failure = falling spin from end of that round. For downward
+  // movement, falling speed = aircraft speed.
+  airAscentDescent: {
+    rule: "Floors changed > forward areas moved → Control FEAT",
+    failure: "Falling spin starts end of round; falling speed = aircraft speed"
+  },
+
+  // Speeding: up to +1 rank above safe speed.
+  // All actions and all turns require Control FEATs, and all FEATs shift +1
+  // color for success. Red remains red (no shift beyond).
+  speeding: {
+    max: "+1 rank above listed Speed",
+    allActionsNeedControlFEAT: true,
+    featShift: "green→yellow, yellow→red, red→red"
+  },
+
+  // Turns up to 90° cost 1 area of movement. Turns >90° are Vehicle Stunts.
+  turns: {
+    upTo90: "Costs 1 area of movement",
+    over90: "Vehicle Stunt (see stunts)"
+  },
+
+  // Vehicle Stunts: player-proposed, Judge adjudicates feasibility.
+  // Examples: bootleg turn (sports car), Immelman/loop (aircraft), barrel roll.
+  // Karma is NOT required to attempt; failed FEAT = automatic out-of-control.
+  stunts: {
+    proposal: "Player proposes; Judge decides if vehicle can do it and if character can attempt",
+    feat: {
+      withTalentOrPowerOrBackground: "green or yellow FEAT",
+      novice: "red FEAT"
+    },
+    karma: "No Karma required to attempt",
+    failure: "Automatic out-of-control"
+  },
+
+  // Out-of-Control behavior by vehicle type. Karma cannot be spent to regain
+  // control. Recovery = succeed the required Control FEAT in a later round.
+  outOfControl: {
+    karmaNotAllowed: true,
+    road:    "Continues forward at current speed. Retry next round. Failed recovery → -1 rank speed, retry again. Continues until stop, recovery, or crash.",
+    offRoad: "As road.",
+    railed:  "As road.",
+    gev:     "As road.",
+    water:   "Continues forward in straight line, no speed loss, until recovery or crash.",
+    sub:     "As water.",
+    airOnGround: "Treated as Road (takeoff/landing).",
+    airInFlight: "Straight line, no speed loss, + falling (3 floors round 1, 6 round 2, 10 round 3, 20/round thereafter). Recovery FEATs always yellow minimum. Continues until recovery or crash."
+  },
+
+  // Crash resolution: two-step.
+  // Step 1: break-through check (Strength FEAT, min(Body,Speed) vs material).
+  //   Success: vehicle continues, speed reduced by material rank.
+  //   Failure: vehicle stops; proceed to step 2.
+  // Step 2: damage to occupants.
+  //   Base damage = max(material strength, Speed) - Protection.
+  //   Attack rolled on max(material, Speed) rank column.
+  //   Belted passengers: Blunt Attack. Unbelted: Edged Attack.
+  //   Karma may not add to the attack roll; may spend Karma vs Stun/Slam/Kill.
   crash: {
-    feat: "Body vs material",
-    fail: "Full stop",
-    damage: "Higher of (material, Speed) - Protection",
-    type: "Blunt if belted, Edged if not"
+    stepOne: {
+      name: "Break-through check",
+      feat: "Strength FEAT: min(Body, Speed) vs object material strength",
+      success: "Vehicle continues; Speed reduced by material rank",
+      failure: "Vehicle stops; step 2 applies"
+    },
+    stepTwo: {
+      name: "Damage to occupants",
+      baseDamage: "max(material strength, Speed) - Protection",
+      attackColumn: "max(material, Speed) rank",
+      attackType: { belted: "Blunt Attack", unbelted: "Edged Attack" },
+      karma: "Not allowed on attack roll; may spend vs Stun/Slam/Kill effects"
+    }
+  },
+
+  // Damage-to-Vehicle table: separate from crash damage to occupants.
+  // Applies when vehicle takes damage from attacks OR survives a crash with
+  // damage. Compare damage-inflicted vs vehicle Body, roll FEAT vs Body.
+  // Penalties persist until repaired.
+  damageToVehicle: {
+    featVs: "Body rank",
+    greaterThanBody: {
+      red:    { statChange: "Body -1CS", extra: "damage to passengers" },
+      yellow: { statChange: "Speed -1CS", extra: "Control FEAT required" },
+      green:  { statChange: "Control -1CS", extra: "Control FEAT required" },
+      white:  { statChange: "All -1CS", extra: "Automatic out-of-control" }
+    },
+    equalToBody: {
+      red:    { statChange: "None", extra: "damage to passengers" },
+      yellow: { statChange: "Body -1CS", extra: "damage to passengers" },
+      green:  { statChange: "Speed -1CS", extra: "Control FEAT required" },
+      white:  { statChange: "Control -1CS", extra: "Control FEAT required" }
+    },
+    lessThanBody: {
+      red:    { statChange: "None", extra: "None" },
+      yellow: { statChange: "None", extra: "None" },
+      green:  { statChange: "Body -1CS", extra: "Control FEAT required" },
+      white:  { statChange: "Control -1CS", extra: "damage to passengers, Control FEAT required" }
+    },
+    collapse: {
+      controlBelowFeeble: "Vehicle out of control",
+      speedBelowFeeble:   "Vehicle stops (crash result for plane)",
+      bodyZero:           "No Protection to passengers. Water/Sub: begins sinking. Air: any action requires Control FEAT."
+    }
+  },
+
+  // Vehicles in combat: attacker chooses whether to target vehicle or passenger.
+  combat: {
+    targetVehicle:   "Normal attack vs vehicle Body.",
+    targetPassenger: "Bullseye result required to hit; Protection applies as Body Armor (unless attacker has negated it — e.g. ripped off the roof).",
+    vehicleAsCharge: {
+      attackRank: "Lesser of Body or Speed",
+      bonus: "+1CS (target is not fixed)",
+      resolvedAs: "Crash — may destroy vehicle while target survives"
+    }
   }
 };
 
