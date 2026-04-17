@@ -927,6 +927,31 @@ Hooks.once("init", async () => {
       default: 1
     });
 
+    game.settings.register("msh-faserip", "groupAwardMode", {
+      name: "Group Karma Award Mode",
+      hint: "How group karma awards are distributed: Split (RAW, divided by heroes), Full share (each hero gets full award), or To karma pool.",
+      scope: "world",
+      config: true,
+      type: String,
+      choices: {
+        split: "Split (RAW)",
+        full: "Full share (each hero gets full award)",
+        pool: "To karma pool"
+      },
+      default: "split"
+    });
+
+    for (const cat of ["combat", "rescue", "personal", "gaming", "penalty"]) {
+      game.settings.register("msh-faserip", `karmaMultiplier_${cat}`, {
+        name: `Karma Multiplier: ${cat.charAt(0).toUpperCase() + cat.slice(1)}`,
+        hint: "0 = use global Karma Multiplier. Otherwise overrides for this category.",
+        scope: "world",
+        config: true,
+        type: Number,
+        default: 0
+      });
+    }
+
     // Add this new one:
     game.settings.register("msh-faserip", "teamKarmaAwards", {
       name: "Team Karma Awards History",
