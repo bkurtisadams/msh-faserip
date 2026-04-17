@@ -777,6 +777,109 @@ export const VEHICLES = {
   }
 };
 
+// ── VEHICLE CATALOG ──
+// Stats: { cost, control, speed, body, protection, notes? }
+// Notes call out unique per-vehicle rules (armament, compartments, special
+// control quirks). "Re" in some source scans = Rm (OCR artifact).
+export const VEHICLE_CATALOG = {
+  // Road
+  sedan:          { type: "Road", cost: "Rm", control: "Ty", speed: "Gd",  body: "Gd", protection: "Pr", seats: 5 },
+  miniCar:        { type: "Road", cost: "Ex", control: "Gd", speed: "Gd",  body: "Pr", protection: "Fe", seats: 4 },
+  sportsCar:      { type: "Road", cost: "In", control: "Ex", speed: "Rm",  body: "Pr", protection: "Pr", seats: "2-4 (crowded)" },
+  luxuryCar:      { type: "Road", cost: "In", control: "Pr", speed: "Gd",  body: "Ex", protection: "Gd", seats: "5-10" },
+  securityLimo:   { type: "Road", cost: "Am", control: "Ty", speed: "Ex",  body: "Rm", protection: "Rm", seats: "5-10", notes: "Luxury car variant: thicker plating, bullet-proof glass" },
+  van:            { type: "Road", cost: "Rm", control: "Pr", speed: "Gd",  body: "Gd", protection: "Gd", seats: 8 },
+  convertible:    { type: "Road", cost: "Rm", control: "Ty", speed: "Gd",  body: "Gd", protection: "Fe", seats: 5, notes: "Includes T-tops; Protection as sedan with top up" },
+  taxi:           { type: "Road", cost: "Ex", control: "Ty", speed: "Gd",  body: "Ty", protection: "Pr", seats: 4 },
+  bus:            { type: "Road", cost: "In", control: "Pr", speed: "Gd",  body: "Ty", protection: "Ty", seats: 80 },
+  policeCar:      { type: "Road", cost: "Rm", control: "Gd", speed: "Ex",  body: "Ty", protection: "Ty", seats: 5, notes: "Often grilled between front and rear seats" },
+  policeVan:      { type: "Road", cost: "Rm", control: "Ty", speed: "Gd",  body: "Ty", protection: "Ty", notes: "Often carries riot guns and gas canisters; holds ~10 prisoners briefly" },
+  swatVan:        { type: "Road", cost: "In", control: "Ty", speed: "Gd",  body: "Rm", protection: "Ex", seats: 10, notes: "Portable armory: 10 riot guns, 10 sniper rifles, 10 flak jackets, smoke/tear/KO grenades (weapons separate)" },
+  semi:           { type: "Road", cost: "Rm", control: "Ty", speed: "Ex",  body: "Ex", protection: "Gd", seats: 3, notes: "Tractor detaches from trailer; various trailer types" },
+  sleeper:        { type: "Road", cost: "In", control: "Ty", speed: "Ex",  body: "Ex", protection: "Ex", notes: "Sleeper tractor; king-size sleeping compartment" },
+  armoredCar:     { type: "Road", cost: "In", control: "Ty", speed: "Ty",  body: "Rm", protection: "Rm", seats: "2 guards + optional 3rd" },
+  fireTruck:      { type: "Road", cost: "In", control: "Ty", speed: "Ex",  body: "Gd", protection: "Ty", seats: 12, notes: "Includes fire hoses, hook and ladder, nets, fireproof suits" },
+  ambulance:      { type: "Road", cost: "Rm", control: "Gd", speed: "Ex",  body: "Gd", protection: "Gd", notes: "Medical gear; right-of-way with top-lights flashing" },
+  rocketCar:      { type: "Road", cost: "Am", control: "Fe", speed: "ShZ", body: "Pr", protection: "Pr", notes: "Fastest land vehicle; only usable on open flats (Bonneville)" },
+
+  // Off-Road
+  bicycle:        { type: "Off-Road", cost: "Pr", control: "Gd", speed: "Ty",  body: "Fe", protection: 0, seats: 1 },
+  motorcycle:     { type: "Off-Road", cost: "Ex", control: "Ty", speed: "Ex",  body: "Pr", protection: 0, seats: 2, notes: "Out-of-control cannot be recovered until stopped. -1 rank damage with adequate headgear." },
+  motorTrike:     { type: "Off-Road", cost: "Rm", control: "Rm", speed: "Gd",  body: "Gd", protection: 0, notes: "More stable than motorcycle; CAN recover while moving" },
+  pickupTruck:    { type: "Off-Road", cost: "Rm", control: "Ty", speed: "Gd",  body: "Gd", protection: "Ty" },
+  jeep:           { type: "Off-Road", cost: "Rm", control: "Gd", speed: "Ex",  body: "Gd", protection: "Pr" },
+  atv:            { type: "Off-Road", cost: "Rm", control: "Rm", speed: "Gd",  body: "Gd", protection: "Ty" },
+  snowmobile:     { type: "Off-Road", cost: "Ex", control: "Gd", speed: "Gd",  body: "Ty", protection: "Rm", notes: "Control = Feeble on ice or non-snow terrain" },
+  heavyTruck:     { type: "Off-Road", cost: "In", control: "Pr", speed: "Ty",  body: "Ex", protection: "Gd", notes: "Dump trucks, heavy construction" },
+  tractor:        { type: "Off-Road", cost: "Rm", control: "Gd", speed: "Ty",  body: "Gd", protection: 0 },
+  bulldozer:      { type: "Off-Road", cost: "In", control: "Ty", speed: "Ty",  body: "Ex", protection: "Ty", notes: "Blade = Rm material; suitable as battering ram" },
+  tank:           { type: "Off-Road", cost: "Am", control: "Ex", speed: "Ty",  body: "In", protection: "Rm", notes: "1 Light Artillery + 1-2 Machine Guns (standard). Laser/Stun/Concussion Cannon variants exist." },
+  spg:            { type: "Off-Road", cost: "Mn", control: "Ty", speed: "Pr",  body: "Rm", protection: "Ex", notes: "Self-Propelled Gun: Heavy Artillery + Machine Gun, halftrack; less protection than tank, more range/firepower" },
+  armoredCarrier: { type: "Off-Road", cost: "Am", control: "Gd", speed: "Gd",  body: "In", protection: "Rm", seats: 20, notes: "2 Machine Guns (lasers in some versions)" },
+  walker:         { type: "Off-Road", cost: "In", control: "Gd", speed: "Gd",  body: "Rm", protection: "Rm", seats: "4-8", notes: "Legged vehicle; Stun Cannon (recoil weapons require Control FEAT to avoid tipping). Any attack on walker requires Control FEAT to stay upright." },
+  borer:          { type: "Off-Road", cost: "In", control: "Pr", speed: "Ty",  body: "Rm", protection: "Rm", notes: "Subterranean vehicle. At Poor speed leaves usable tunnel; otherwise churned earth. Forward screw makes Edged Attack for In (40) damage." },
+
+  // Railed
+  train:          { type: "Railed", cost: "In", control: "Fe", speed: "Ex",  body: "Gd", protection: "Gd", notes: "Crew 5 + 3+ passenger cars (100+ each). Track destruction = immediate out-of-control, no recovery." },
+  bulletTrain:    { type: "Railed", cost: "Am", control: "Pr", speed: "In",  body: "Gd", protection: "Gd", notes: "High-speed passenger only; France/Japan" },
+  el:             { type: "Railed", cost: "In", control: "Pr", speed: "Ty",  body: "Gd", protection: "Gd", notes: "Elevated/light rail. 80/car, Fe ticket cost" },
+  monorail:       { type: "Railed", cost: "In", control: "Pr", speed: "Ex",  body: "Ex", protection: "Gd", notes: "Power from track; breaking line = immediate halt" },
+
+  // GEV
+  hovercraft:     { type: "GEV", cost: "In", control: "Ex", speed: "Rm",  body: "Gd", protection: "Gd", notes: "Max Good speed off-road, broken ground, or stormy weather" },
+
+  // Air
+  privatePlane:   { type: "Air", cost: "In", control: "Ty", speed: "Am",  body: "Fe", protection: "Ty", seats: 5 },
+  corporateJet:   { type: "Air", cost: "Am", control: "Ty", speed: "Am",  body: "Pr", protection: "Ty", seats: "20 + 2 crew" },
+  militaryJet:    { type: "Air", cost: "Mn", control: "Ex", speed: "ShX", body: "Ty", protection: "Ty", notes: "4 missiles (separate purchase) + Machine Gun (or lasers)" },
+  commercialJet:  { type: "Air", cost: "Mn", control: "Gd", speed: "Mn",  body: "Ty", protection: "Ty", seats: "100+", notes: "DC-10, Tristar, 707/747 class. Gd domestic / Ex international fare" },
+  blimp:          { type: "Air", cost: "Am", control: "Fe", speed: "Pr",  body: "Fe", protection: 0, notes: "May hover at 0 speed. Susceptible to winds. Body=0 → not enough lift, crashes. Historic hydrogen = Am explosion." },
+  trafficCopter:  { type: "Air", cost: "In", control: "Gd", speed: "Ex",  body: "Fe", protection: "Fe", notes: "VTOL; includes private/medivac copters" },
+  battleCopter:   { type: "Air", cost: "Am", control: "Ex", speed: "Ex",  body: "Ty", protection: "Gd", seats: 15, notes: "VTOL; 15 + crew; Machine Guns (or lasers)" },
+  wwiiPlane:      { type: "Air", cost: "In", control: "Gd", speed: "Rm",  body: "Ty", protection: "Ty", notes: "Corsair/Spitfire/Zero class; Machine Gun + 2 bombs" },
+  wwiiBomber:     { type: "Air", cost: "In", control: "Ty", speed: "Ex",  body: "Gd", protection: "Gd", notes: "Flying Fortress/Junkers class; Machine Guns + 100 bombs" },
+  wwiFighter:     { type: "Air", cost: "In", control: "Rm", speed: "Gd",  body: "Pr", protection: 0, notes: "Spad/Neuport/Fokker/Sopwith; Machine Guns" },
+  vtolJet:        { type: "Air", cost: "Mn", control: "Rm", speed: "Un",  body: "Ty", protection: "Ty", notes: "Jet fighter + hover/vertical takeoff; 4 missiles" },
+  ultraLight:     { type: "Air", cost: "Ex", control: "Ex", speed: "Ty",  body: "Fe", protection: 0, notes: "Mylar wings; fragile, quiet, portable" },
+  gliders:        { type: "Air", cost: "Ex", control: "Ty", speed: "Ty",  body: "Fe", protection: 0, notes: "Hang gliders, paragliders. Fall 3 floors/round; travel 6 areas. Skilled: 1 floor/round rise via thermals (Control FEAT)." },
+  autogyro:       { type: "Air", cost: "Rm", control: "Ex", speed: "Ex",  body: "Pr", protection: "Pr", notes: "VTOL; one-man helicopter relative" },
+  airCar:         { type: "Air", cost: "In", control: "Ex", speed: "Pr",  body: "Gd", protection: "Gd", notes: "VTOL; rises 10 floors/round; better for vertical than linear" },
+  skymobile:      { type: "Air", cost: "Rm", control: "Ex", speed: "In",  body: "Ex", protection: 0, notes: "Airborne motorcycle, VTOL, half-ton lift (Hawkeye/WCA)" },
+  flyingCar:      { type: "Air", cost: "Am", control: "Rm", speed: "Am",  body: "Ex", protection: "Gd", notes: "S.H.I.E.L.D. standard. Ground stats apply while on ground. Forward Stun Cannon + rear LAW (in trunk)." },
+  quinjet:        { type: "Air", cost: "Am", control: "Rm", speed: "ShY", body: "Ex", protection: "Gd", seats: "7 (5 + 2 crew)", notes: "Wakanda/Stark design; VTOL; formerly catapult-launched" },
+  concorde:       { type: "Air", cost: "Mn", control: "Ty", speed: "ShX", body: "Gd", protection: "Gd", seats: "200+", notes: "SST; Rm cost Paris-NYC" },
+  omnijet:        { type: "Air", cost: "Am", control: "Ex", speed: "ShY", body: "Ex", protection: "Gd", seats: 7, notes: "Alpha Flight's Quinjet equivalent; VTOL + hover" },
+  pogoPlane:      { type: "Air", cost: "Am", control: "Ex", speed: "ShY", body: "Ex", protection: "Gd", seats: 4, notes: "Reed Richards design; takes off/lands vertical; CANNOT hover" },
+  fantasticar:    { type: "Air", cost: "In", control: "In", speed: "Ex",  body: "Ty", protection: "Ty", seats: 6, notes: "Side seats split off as miniplanes. Stats listed are for the main craft." },
+  src:            { type: "Air", cost: "In", control: "Gd", speed: "Rm",  body: "Ex", protection: "Ty", notes: "Short Range Carrier; anti-grav/air-cushion. Original FF 'Flying Bathtub'." },
+  blackbird:      { type: "Air", cost: "Am", control: "Rm", speed: "ShY", body: "Ex", protection: "Gd", seats: 10, notes: "X-Men RS-150 Lockheed + Shi'ar mods. VTOL (Shi'ar-enabled; standard RS-150 is not)." },
+
+  // Space
+  spaceShuttle:   { type: "Space", cost: "Am", control: "Ty", speed: "ShZ",    body: "Rm", protection: "Rm", notes: "Atmospheric: aircraft stats. Near-space only (can't reach moon)." },
+  lunarShuttle:   { type: "Space", cost: "Un", control: "Gd", speed: "Cl1000", body: "Rm", protection: "Rm", notes: "Earth-to-moon range; retroengines for landing" },
+  spaceShip:      { type: "Space", cost: "Un", control: "Ex", speed: "Cl3000", body: "Ex", protection: "Ex", notes: "Generic interstellar; 1-100 compartments; usually laser cannons", compartmented: true },
+
+  // Water
+  raft:           { type: "Water", cost: "Fe", control: "Ty", speed: "Fe", body: "Pr", protection: 0 },
+  rowboat:        { type: "Water", cost: "Ty", control: "Gd", speed: "Fe", body: "Ty", protection: "Fe", notes: "Oar-powered; includes canoes/liferafts; holds up to 20" },
+  sailboat:       { type: "Water", cost: "Gd", control: "Pr", speed: "Pr", body: "Fe", protection: 0, notes: "Sunfish/sailfish class. +1CS speed with wind; cannot exceed listed speed against wind." },
+  racingSloop:    { type: "Water", cost: "Rm", control: "Gd", speed: "Gd", body: "Pr", protection: "Pr", seats: 5, notes: "Ocean-going sailboat; may add motorboat engine" },
+  motorboat:      { type: "Water", cost: "Gd", control: "Ex", speed: "Ex", body: "Ty", protection: "Pr" },
+  yacht:          { type: "Water", cost: "In", control: "Ty", speed: "Gd", body: "Ty", protection: "Ty", seats: 10 },
+  speedboat:      { type: "Water", cost: "Rm", control: "Gd", speed: "In", body: "Ty", protection: "Pr", seats: 4 },
+  patrolBoat:     { type: "Water", cost: "Rm", control: "Gd", speed: "Rm", body: "Gd", protection: "Ty", seats: 10, notes: "1 Light Artillery + 1-3 Machine Guns" },
+  hydrofoil:      { type: "Water", cost: "In", control: "Ty", speed: "In", body: "Ty", protection: "Ty", notes: "Successful attack → Control FEAT. Lost control above Ex speed = crashes into water." },
+  jetskis:        { type: "Water", cost: "Rm", control: "Ex", speed: "Ex", body: "Gd", protection: 0, seats: 1, notes: "Sea snowmobile. Some carry weapons, flight, or underwater mods." },
+  oceanLiner:     { type: "Water", cost: "Am", control: "Gd", speed: "Ty", body: "Ty", protection: "Gd", seats: "300+", compartments: 40, notes: "Rm cruise cost, Ex tramp-steamer fare", compartmented: true },
+  destroyer:      { type: "Water", cost: "Mn", control: "Ty", speed: "Ty", body: "Gd", protection: "Ex", crew: 150, compartments: 20, notes: "0-3 Heavy Artillery + 1-4 Light Artillery (some missile-equipped)", compartmented: true },
+  battleship:     { type: "Water", cost: "Un", control: "Ty", speed: "Pr", body: "Rm", protection: "Ex", crew: 1000, compartments: 40, notes: "2-4 Super-Heavy Artillery + 4-6 Heavy Artillery. Reduced role in modern navy.", compartmented: true },
+  carrier:        { type: "Water", cost: "Un", control: "Ty", speed: "Pr", body: "Ex", protection: "Ex", crew: 100, compartments: 40, notes: "Aircraft not included. Missile-armed.", compartmented: true },
+
+  // Sub
+  submarine:      { type: "Sub", cost: "Am", control: "Gd", speed: "Pr", body: "Rm", protection: "Ex", crew: 50, compartments: 5, notes: "8 missiles + ~20 torpedoes (treat as undersea missiles)", compartmented: true },
+  miniSub:        { type: "Sub", cost: "In", control: "Ex", speed: "Gd", body: "Gd", protection: "Gd", seats: "1-2", notes: "Launched from parent ship; missile or laser-rifle armed" }
+};
+
 // ── UNIVERSAL TABLE ──
 // The core resolution mechanic. Roll d100, cross-reference with rank column.
 // Returns: "white", "green", "yellow", "red"
@@ -1073,8 +1176,430 @@ export const MISSILES = {
 // Stun: Endurance FEAT vs Intensity or KO 1-10 turns.
 
 // ══════════════════════════════════════════════════════════════
-// MAGIC
+// HEADQUARTERS & BASE OPERATIONS
 // ══════════════════════════════════════════════════════════════
+// Heroes may rent, buy, or build HQs. Buildings defined by size, cost
+// (rent/buy), and material strength. Room packages outfit the interior.
+
+// ── BUILDING TABLE ──
+// Cost format: "rent/buy" (rent is monthly). Size categories:
+//   Small (2-3 rooms/areas) — 1-2 heroes
+//   Mid-sized (up to 5 rooms) — 2-3 heroes or office space
+//   Large (10+ rooms, 2 floors) — team HQ
+//   Deluxe (20+ rooms, 3+ floors, vehicle bays, trophy rooms)
+//
+// Location modifiers: +1CS cost for Manhattan or rich suburbs; -1CS for
+// secluded locations (Colorado ranch, island). Floors support material
+// strength +2CS sustained load; higher peak for temporary loads.
+export const HQ_BUILDINGS = {
+  apartment1BR:    { size: "Small",     rent: "Fe", buy: "Ex", material: "Gd" },
+  apartment2BR:    { size: "Small",     rent: "Pr", buy: "Ex", material: "Gd" },
+  apartment3BR:    { size: "Small",     rent: "Gd", buy: "Rm", material: "Gd" },
+  cottage:         { size: "Small",     rent: "Pr", buy: "Gd", material: "Pr", rooms: 2 },
+  smallHouse:      { size: "Small",     rent: "Ty", buy: "Ex", material: "Ty", rooms: 4 },
+  mediumHouse:     { size: "Mid-sized", rent: "Ty", buy: "Rm", material: "Ty", rooms: 8 },
+  largeHouse:      { size: "Mid-sized", rent: "Ex", buy: "In", material: "Gd", rooms: 12 },
+  smallManor:      { size: "Large",     rent: "Rm", buy: "Am", material: "Ex", rooms: 18 },
+  largeManor:      { size: "Deluxe",    rent: "In", buy: "Mn", material: "Ex", rooms: 24 },
+  mansion:         { size: "Deluxe",    rent: "Am", buy: "Mn", material: "Ex", rooms: "30+" },
+  office:          { size: "Mid-sized", rent: "Gd", buy: "Rm", material: "Ex", rooms: 3 },
+  storefront:      { size: "Small",     rent: "Ty", buy: "Rm", material: "Gd", rooms: 4 },
+  officeSuite:     { size: "Mid-sized", rent: "Ex", buy: "In", material: "Ex", rooms: 6 },
+  officeFloor:     { size: "Mid-sized", rent: "Rm", buy: "Am", material: "Ex", rooms: 12 },
+  twoOfficeFloors: { size: "Large",     rent: "In", buy: "Mn", material: "Ex", rooms: 24 },
+  brownstone:      { size: "Mid-sized", rent: "Ex", buy: "Rm", material: "Gd" },
+  officeBldg4:     { size: "Large",     rent: "Rm", buy: "Am", material: "Ex", floors: 4 },
+  officeBldg8:     { size: "Deluxe",    rent: "In", buy: "Mn", material: "Rm", floors: 8 },
+  officeBldg12:    { size: "Deluxe",    rent: "Am", buy: "Un", material: "Rm", floors: 12 },
+  officeBldg20:    { size: "Deluxe",    rent: "Mn", buy: "ShX",material: "Rm", floors: 20 },
+  officeBldg30:    { size: "Deluxe",    rent: "Un", buy: "ShZ",material: "Rm", floors: "30+" },
+  smallWarehouse:  { size: "Mid-sized", rent: "Ty", buy: "Rm", material: "Ty" },
+  mediumWarehouse: { size: "Large",     rent: "Gd", buy: "In", material: "Ty" },
+  largeWarehouse:  { size: "Deluxe",    rent: "Ex", buy: "Am", material: "Gd" },
+  smallFactory:    { size: "Mid-sized", rent: "Gd", buy: "In", material: "Rm" },
+  mediumFactory:   { size: "Large",     rent: "Ex", buy: "Am", material: "Rm" },
+  largeFactory:    { size: "Deluxe",    rent: "Rm", buy: "Mn", material: "In" }
+};
+
+// ── ROOM PACKAGES ──
+// Costs come in tiers; each tier adds contents or capability.
+// "Rooms" = how many building rooms/areas the package occupies.
+// Same-type rooms must be purchased separately (back-ups allowed).
+export const HQ_ROOM_PACKAGES = {
+  livingRoom: {
+    rooms: 1,
+    tiers: {
+      Gd: "Sofa, 2 easy chairs, 2 end tables, coffee table, 2 lamps",
+      Ex: "As Gd + television, stereo, or piano",
+      Rm: "As Gd + all three"
+    }
+  },
+  diningRoom: {
+    rooms: 1,
+    tiers: {
+      Gd: "Table, 4 chairs, ceiling lamp",
+      Ex: "Large table, bureau, 4 more chairs",
+      Rm: "China cabinet, set of china and sterling tableware"
+    }
+  },
+  kitchen: {
+    rooms: 1,
+    tiers: {
+      Gd: "Sink, stove, 4 cabinets, dishware, stainless tableware, counterspace (standard residential)",
+      Ex: "Add refrigerator, dishwasher, or microwave + fire extinguisher",
+      Rm: "All three + freezer"
+    }
+  },
+  library: {
+    rooms: 1,
+    tiers: {
+      Ex: "2 easy chairs, table, desk, straight chair, up to 5 bookcases of general texts",
+      Rm: "Add globe, microfiche/microfilm reader, computer terminal (if computer room present or networked). Rare volumes separate."
+    }
+  },
+  computerRoom: {
+    rooms: 1,
+    tiers: {
+      Rm: "Computer + terminal OR terminal with comms to external computer. Ex ability at simple tasks (calculation, retrieval, monitoring).",
+      In: "Computer with Rm ability at those tasks. Higher-ability and AI machines are unique designs."
+    }
+  },
+  communications: {
+    rooms: 1,
+    tiers: {
+      Rm: "Chair, short-wave monitor, computer network tap-in, police band",
+      In: "National security alert equipment + visual display screens"
+    }
+  },
+  crimeFiles: {
+    rooms: 1,
+    tiers: {
+      Ex: "Specialized info-processing computer at Rm ability. Terminal, chairs, lights."
+    },
+    notes: "Hero groups on good terms often share crime files."
+  },
+  workshop: {
+    rooms: "1+",
+    tiers: {
+      Rm: "Lathes, drills, saws, metal/wood tools, fire extinguisher",
+      In: "Adds laser-guided instruments",
+      Am: "Automatic processing (effectively an automatic factory for simple goods)"
+    }
+  },
+  laboratory: {
+    rooms: "1+",
+    tiers: {
+      Rm: "Scales, sinks, common chemicals, microscope",
+      In: "Add computer with In analysis ability OR clean room",
+      Am: "Both + poison analysis and serum dispenser (Ex effects, known poisons only). Specialized instruments (electron microprobe, stellar mass detector) sold separately at In rank."
+    }
+  },
+  office: {
+    rooms: "1+",
+    tiers: {
+      Gd: "Desk, 3 chairs, 2 lamps",
+      Ex: "Double material + file cabinet, typewriter",
+      Rm: "Add computer terminal, double again, hanging plants, decorative art"
+    }
+  },
+  recRoom: {
+    rooms: "1+",
+    tiers: {
+      Ex: "Unmatched sofa, easy chairs, pool table OR ping pong OR TV",
+      Rm: "All of the above + video and/or pinball machines (hot tub optional, California only)",
+      Am: "All of the above + computer-assisted holographic entertainment projector"
+    }
+  },
+  gym: {
+    rooms: "1+",
+    tiers: {
+      Ex: "Typical weight-lifting equipment, universal gym, lockers",
+      Rm: "Add rings, parallel bars (even and uneven), short horse",
+      In: "Add separate locker and steam rooms (+2 rooms), diagnostic displays",
+      Am: "Add boxing area, robotic opponents, 100-ton electronic weights. Must occupy 3+ areas."
+    }
+  },
+  pool: {
+    rooms: "2+",
+    notes: "Extends 1 floor downward. Standard Olympic pool, diving boards, sun room (or retractable sun roof).",
+    tiers: {
+      Rm: "Outdoor",
+      In: "Indoor"
+    }
+  },
+  dangerRoom: {
+    rooms: "3+",
+    notes: "Duplicates Rm Gym package + active dangers and security systems.",
+    tiers: {
+      In: "Threats up to In strength/intensity/damage",
+      Am: "Threats up to Am + limited holographic illusion at Ex (original X-Men style; Hellions use this tier). Current X-Men room is unique Shi'ar hybrid."
+    }
+  },
+  conferenceRoom: {
+    rooms: 1,
+    tiers: {
+      Rm: "Large table + 10 chairs, OR platform/speaker/30 chairs (for news conferences)",
+      In: "Add wood paneling"
+    }
+  },
+  medical: {
+    rooms: 1,
+    tiers: {
+      Rm: "Emergency-room equivalent, no heavy equipment, standard antidotes and medication",
+      In: "Add X-ray, clean room, operating room, pathology (additional rooms)",
+      Am: "Add cryogenics. Auto-docs and similar life-saving devices are generally experimental (X-Men's is Shi'ar hybrid, Ex healing cap)."
+    }
+  },
+  powerRoom: {
+    rooms: 1,
+    tiers: {
+      Rm: "Back-up generator, 12-hour supply",
+      In: "24-hour supply + automatic cut-in 2 rounds after external power fails",
+      Am: "Solar cells, no external power needed in normal conditions"
+    },
+    notes: "Buildings normally draw from external power. Needed for Mn-strength ray-guns and similar high-draw equipment."
+  },
+  garage: {
+    rooms: 1,
+    tiers: {
+      Gd: "Service 1 ground vehicle + fire extinguisher + repair facilities",
+      Ex: "Up to 3 ground vehicles",
+      Rm: "Up to 12 ground vehicles"
+    }
+  },
+  hangar: {
+    rooms: "1 area per vehicle",
+    tiers: {
+      Ex: "Service 1 air vehicle + repair facilities. Each different vehicle needs its own hangar."
+    }
+  },
+  dock: {
+    rooms: "3 areas per vehicle",
+    tiers: {
+      Rm: "Service 1 sea or sub vehicle + drydock. Each vehicle needs its own dock."
+    }
+  },
+  trophyRoom: {
+    rooms: 1,
+    tiers: {
+      Ex: "Showcase, lighting, frames to display mementos; may double as reception hall/gallery",
+      Rm: "Add handling capability for potentially dangerous exhibits at In level"
+    }
+  },
+  imprisonment: {
+    rooms: 1,
+    tiers: {
+      Ex: "Standard restraints; bars of Rm material",
+      Rm: "Restraints of In strength",
+      In: "Am-strength restraints + Ex-strength inhibitor restraints"
+    }
+  },
+  fireProtection: {
+    rooms: 0,
+    tiers: {
+      Ex: "Sprinkler system, up to 10 rooms, Gd protection from fire",
+      Rm: "Foam projectors, Ex protection, 10 rooms"
+    },
+    notes: "Auto-activates on heat or smoke. MUST be modified to avoid extinguishing flaming heroes."
+  }
+};
+
+// ── SECURITY & DEFENSE PACKAGES ──
+// Security: alarms and detection. Defense: active countermeasures.
+export const HQ_SECURITY = {
+  tiers: {
+    Gd: "Hand-set burglar alarms on windows/doors + mechanical locks. One package per door or window.",
+    Ex: "Automatic alarms with computer-code or card identification",
+    Rm: "Automatic alarms with palm-print scan; can activate defense systems",
+    In: "Full-body scan with benign-identification program; can activate defense systems"
+  },
+  rooms: 0
+};
+
+export const HQ_DEFENSE = {
+  tiers: {
+    Ex: "Pre-set defenses (tentacles, nets, lasers, stun rifles, concussive rifles, or pit traps) — max Rm strength/intensity",
+    Rm: "Defenses activated by Security package — one type at In strength",
+    In: "As above, Am intensities"
+  },
+  notes: "Multiple defense mechanisms may protect the same installation. Custom/specialized packages designed on request."
+};
+
+// ══════════════════════════════════════════════════════════════
+// OTHER EQUIPMENT
+// ══════════════════════════════════════════════════════════════
+// Items not covered by weapons/vehicles/HQ. Rules-bearing items have
+// structured fields; pure cost items have cost + brief notes.
+export const OTHER_EQUIPMENT = {
+  // Fire & Flame
+  fireExtinguisher: { cost: "Ty", rule: "Gd Intensity vs fire. Green FEAT: extinguishes up to Ty Intensity in area. Yellow: up to Gd. Red: up to Ex. Vs flaming heroes (Human Torch): target makes FEAT vs Gd Intensity or loses flame." },
+  fireHose:         { cost: "Ex", rule: "10 pts Blunt Attack at 1 area range, fire-burst. Vs fire/flaming heroes: Rm Intensity." },
+
+  // Weapon accessories
+  silencer:     { cost: "Gd", rule: "Attaches to shooting-table pistol/rifle (not gyro-jet, laser, stun, or concussion). -1 rank max range. Listeners make Intuition FEAT to hear shot and locate it." },
+  sniperSight:  { cost: "Gd", rule: "Eliminates range penalty for missile weapons. User automatically has initiative roll of 10 (fires last). Illegal (Other Crime) except on sniper rifle and target pistol where built-in." },
+  infraRedSight:{ cost: "Gd", rule: "For any missile weapon. See up to 5 areas in dark." },
+  tripod:       { cost: "Ty", rule: "Steady rifle/automatic/assault/machine gun (incl. laser/stun/concussion variants). +1CS to hit when weapon rests on tripod on ground or steady surface." },
+
+  // Light & vision
+  flashlight:        { cost: "Fe", rule: "2 area range" },
+  halogenFlashlight: { cost: "Gd", rule: "3 area range, brighter bulb, more concentrated beam, stronger blinding" },
+  infraRedGoggles:   { cost: "Ex", rule: "Normal vision up to 5 areas in dimly lit conditions" },
+  polarizedLenses:   { cost: "Gd", rule: "Gd resistance to light attacks. Darken 1 round on bright light, then lighten." },
+
+  // Gas & close-range
+  mace:    { cost: "Ty", rule: "Single adjacent target. No Agility FEAT to hit. Target makes Endurance FEAT vs Ty Intensity tear gas or suffers effects." },
+  gasMask: { cost: "Ty", rule: "Breathe/act normally in smoke, tear gas, or KO gas. Vision not clear — movement only is normal." },
+
+  // Protective suits / armor
+  asbestosSuit:  { cost: "Ex", rule: "Rm protection from heat/fire. Gd material." },
+  flakJacket:    { cost: "Ex", rule: "Gd Body Armor vs physical damage" },
+  betaCloth:     { cost: "Rm", rule: "Ty Body Armor vs physical; Ex protection from heat and radiation. Light-weight (S.H.I.E.L.D. agent standard)." },
+  radiationSuit: { cost: "In", rule: "In protection against radiation. Gd material, lead-lined." },
+
+  // Misc devices
+  flarePistol:     { cost: "Gd", rule: "Lights sky (all areas within 3) OR signal (10 floors straight up). As weapon: 2 area range, Gd damage, incendiary (ignites flammables)." },
+  camera:          { cost: "Gd", rule: "Standard photographer tool. Film = Fe, flash = as flashlight, telephoto lens = Gd." },
+  personalComputer:{ cost: "Gd", rule: "Pr Reason for problem-solving/analysis (smart as its data). +Ex for modem." },
+  caltrops:        { cost: "Ty", rule: "Pr Edged Attack on those stepping on them (non-lethal, no Kill results). Vs tired vehicles: Ex Edged Attack + immediate forced Control FEAT." },
+  handcuffs:       { cost: "Ty", rule: "Ex material restraints; standard police gear" },
+
+  // Rules-bearing restraints / anti-power tech
+  inhibitorBands: {
+    cost: "Rm",
+    rule: "Suppress natural abilities (mutants, altered humans). -5CS on physical abilities (FASE); -7CS on Powers and mental abilities. Talents unaffected. No ability drops below Feeble. Tech and magical powers NOT affected."
+  },
+  nullifierBands: {
+    cost: "In",
+    rule: "Interfere with hi-tech power suits the way inhibitors affect mutants. When suit-wearer's Strength drops to Feeble, suit freezes and wearer is immobilized."
+  },
+  stasisRay: {
+    cost: "Mn",
+    rule: "Projects Mn Intensity stunning ray. Holds targets immobile as long as ray is maintained. Rarely portable — massive power drain. (Kang, Arcade-tier villain tech.)"
+  },
+  mutantAnalyzer: {
+    cost: "In",
+    rule: "Portable mutant-detection device. 1 area range. Detects presence only, NOT specific identity. X-Men's Cerebro is the large-scale version; portable attachments function as listed. Sentinels and Forge carry similar devices."
+  },
+  mutantNeutralizer: {
+    cost: "Un",
+    rule: "Removes inborn abilities. 3 area range. Target makes Endurance FEAT to avoid. Effect: 1-10 rounds without power (abilities drop to Ex, no superhuman powers). Talents and Contacts unaffected. Forge developed a potentially-permanent version; only prototype destroyed by Jim Rhodes (Iron Man II)."
+  },
+
+  // Sport/utility
+  spearGun:    { cost: "Gd", rule: "As crossbow. Fires bolts underwater at full distance without penalty." },
+  scubaGear:   { cost: "Gd", rule: "2 hours breathing. Hoses/mask Gd material, tanks Rm material. Punctured tanks explode for Rm damage to all in area." },
+  rollerSkates:{ cost: "Ty", rule: "Move as if Endurance were 3 ranks higher" },
+  rocketPack:  { cost: "Rm", rule: "Fly at Ex speed (belt or back-pack). All flight limitations apply. Agility FEATs at -1CS." }
+};
+
+// ── ROBOT TIERS ──
+// Preprogrammed, simplistic devices. Does not include robot PCs (Vision)
+// or free-willed AIs (Ultron). Custom robots: see Building Things.
+export const ROBOTS = {
+  standard: {
+    cost: "In",
+    allAbilities: "Typical",
+    rule: "Simple tasks only, no special abilities beyond recording and simple routines. H.E.R.B.I.E. was a modified standard."
+  },
+  sentry: {
+    cost: "In",
+    allAbilities: "Good",
+    armament: "Gd Strength lasers (may be additionally armed)",
+    rule: "Programmed to identify and open fire on hostile threats (anything not in its allow-list)."
+  },
+  talent: {
+    cost: "Am",
+    oneAbility: "Remarkable",
+    otherAbilities: "Excellent",
+    rule: "Specifically-designed for one purpose. One ability at Rm, rest at Ex. Examples: Avengers' fire-fighting robots, Black Knight's robotic sparring opponent."
+  }
+};
+
+// ── EXOTIC MATERIALS ──
+// Two-isotope substances with significant in-universe rules effects.
+export const EXOTIC_MATERIALS = {
+  vibraniumWakandan: {
+    cost: "Am (6 oz)",
+    material: "Incredible",
+    rule: "Sound absorber. 6 oz absorbs all sound in one area. Sonic attacks reduced by 5 ranks for effect. Gun silencer: totally silenced. Rarely available — Wakandan secret, controlled by T'Challa."
+  },
+  vibraniumAntarctic: {
+    cost: "Un (6 oz)",
+    material: "Incredible",
+    rule: "Weakens metal atomic bonds. 6 oz liquefies all metal in one area (material strength FEAT to avoid). Slightly less rare since Savage Land's destruction."
+  },
+  adamantiumTrue: {
+    cost: "ShX (1 lb)",
+    material: "Class 1000",
+    rule: "Chemical resin mixture; U.S. government secret. Resists atomic weapons."
+  },
+  adamantiumSecondary: {
+    cost: "Un (1 lb)",
+    material: "Unearthly",
+    rule: "Less expensive than true adamantium; destructible by high-end heroes."
+  },
+  capShield: {
+    material: "Stronger than true adamantium",
+    rule: "Adamantium/vibranium alloy, creation and exact consistency unknown"
+  },
+  unstableMolecules: {
+    cost: "In",
+    rule: "Reed Richards invention. Clothing/uniforms that adapt to wearer's abilities and size. No additional protection, but allows superpower use without destroying the garment. FF, Wasp, original New X-Men uniforms."
+  }
+};
+
+// ── SPECIALTY GEAR ──
+export const SPECIALTY_GEAR = {
+  translationDevice: {
+    cost: "In",
+    rule: "Handles most known international and galactic languages. Instant for known, 10+1-10 rounds for unknown. Advanced model (+1CS cost) analyzes unknown tongues."
+  },
+  mysticTexts: {
+    cost: "In",
+    rule: "Lesser magical books. Not the Darkhold or Book of the Vishanti, but may contain a usable spell. Found in old collections, wizards' effects — not commercial."
+  },
+  underwaterBreathingPills: {
+    cost: "In",
+    rule: "Reed Richards invention. Air-breathers breathe water for up to 4 hours. Allows inborn flame-users to flame underwater."
+  }
+};
+
+// ── SALARIES ──
+// Monthly cost of retaining support staff.
+export const SALARIES = {
+  butler:            "Ty",
+  housekeeper:       "Ty",
+  secretary:         "Ty",
+  pilot:             "Gd",
+  lawyer:            "Gd",
+  bodyguard:         "Ty",
+  mechanic:          "Ty",
+  computerSpecialist:"Ex",
+  scientist:         "Ex",
+  cook:              "Ty",
+  groundskeeper:     "Ty",
+  workers10:         "Ex",
+  workers50:         "Rm",
+  workers100:        "In",
+  workers150:        "Am"
+};
+
+// ── SUNDRIES (lifestyle costs) ──
+export const SUNDRIES = {
+  nightOnTheTown:      "Gd",
+  broadwayTickets:     "Ex",
+  dinnerAndMovie:      "Ty",
+  respectableClothing: "Pr",
+  rentedTux:           "Ty",
+  purchasedTux:        "Gd",
+  halstonOriginal:     "Rm",
+  furCoat:             "In",
+  twentyComics:        "Ty",
+  originalArt:         "Gd"
+};
+
+
 // Magic in FASERIP duplicates super-human Powers from a magical base.
 // Power ranks generated normally = Spell rank.
 // Casting uses Psyche to determine success; effects use Power rank.
