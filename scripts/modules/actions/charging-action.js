@@ -1,4 +1,7 @@
-// scripts/modules/actions/charging-action.js v3.0.0 - 2026-03-17
+// scripts/modules/actions/charging-action.js v3.0.1 - 2026-04-16
+// v3.0.1: Fix rebound calculation — rebound amount is the attacker's rejected
+//         damage (rawDamage), not the target's BA value. Previous formula
+//         dramatically over-rebounded against high-BA targets (Thing, Hulk).
 // v3.0.0: Port to v3 compact dialog layout matching blunt/edged/grappling
 //         - frp-dlg wrapper, frp-header-v3 banner, titlebar mode buttons, 360px
 //         - Movement box (orange), damage box (red), target type toggle (blue)
@@ -692,20 +695,21 @@ export class ChargingAction extends AttackAction {
     });
 
     // ============================================================
+    // ============================================================
     // REBOUND CHECK (post-pipeline)
-    // If dialog-entered target BA > rawDamage, damage reflects back.
-    // _executeSingleAttack used getBodyArmorValues() for its armor
-    // calc, which may differ from the dialog value. We use the
-    // dialog value for rebound since that's what the player entered.
+    // If the target's BA absorbs the charge (targetBA > rawDamage), the
+    // attacker's own damage rebounds back; the attacker's BA then applies.
+    // Per RAW: the rebound amount is the attacker's rejected damage,
+    // NOT the target's armor value.
     // ============================================================
     const dialogTargetBA = choice.targetBAvalue || 0;
-    
+
     if (dialogTargetBA > rawDamage) {
-      const reboundAmount = dialogTargetBA;
+      const reboundAmount = rawDamage;
       const damageToAttacker = Math.max(0, reboundAmount - bodyArmorValue);
       const isManualMode = this.opts?.mode === "manual";
       const autoApply = !!this.opts?.autoApply;
-      
+
       debugLog("Charging: Rebound triggered", {
         targetBA: dialogTargetBA,
         rawDamage,
