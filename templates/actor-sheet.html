@@ -491,7 +491,7 @@
       <div class="abilities-container secondary-abilities">
   <div class="sec-grid">
     <!-- HEALTH -->
-    <div class="sec-col health">
+    <div class="sec-col health{{#if recoveryEligible}} has-recovery-offer{{/if}}">
       <div class="sec-head health-recovery-link" title="Click to open Recovery & Rest">
         <span>Health</span>
         <small>F + A + S + E</small>
@@ -502,13 +502,13 @@
           <div class="divider">/</div>
           <input type="number" name="system.attributes.health.max" value="{{system.attributes.health.max}}" disabled />
         </div>
-        {{#if recoveryEligible}}
-        <button type="button" class="health-recovery-inline-btn" data-action="sheet-recovery"
-                title="Take Recovery: +{{recoveryHealAmount}} HP (once per day, RAW p.31)">
-          Recovery +{{recoveryHealAmount}}
-        </button>
-        {{/if}}
       </div>
+      {{#if recoveryEligible}}
+      <button type="button" class="health-recovery-inline-btn" data-action="sheet-recovery"
+              title="Take Recovery: +{{recoveryHealAmount}} HP (once per day, RAW p.31)">
+        Recovery +{{recoveryHealAmount}}
+      </button>
+      {{/if}}
     </div>
 
     <!-- KARMA -->
