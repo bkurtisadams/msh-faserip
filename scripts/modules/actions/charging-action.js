@@ -1,4 +1,11 @@
-// scripts/modules/actions/charging-action.js v3.0.1 - 2026-04-16
+// scripts/modules/actions/charging-action.js v3.0.2 - 2026-04-16
+// v3.0.2: Fix rebound to match RAW + book example.
+//         Rebound fires whenever target has BA > 0 (not only when target
+//         fully absorbs the charge). Rebound amount = min(damage, targetBA),
+//         the portion absorbed by the target's armor. Attacker takes
+//         max(0, rebound - attackerBA). Matches Advanced Set example:
+//         Gd End 10-speed (30 dmg) vs Ex BA (20) + Gd attacker BA → target
+//         takes 10, attacker takes 10.
 // v3.0.1: Fix rebound calculation — rebound amount is the attacker's rejected
 //         damage (rawDamage), not the target's BA value. Previous formula
 //         dramatically over-rebounded against high-BA targets (Thing, Hulk).
@@ -697,16 +704,21 @@ export class ChargingAction extends AttackAction {
     // ============================================================
     // ============================================================
     // REBOUND CHECK (post-pipeline)
-    // If the target's BA absorbs the charge (targetBA > rawDamage), the
-    // attacker's own damage rebounds back; the attacker's BA then applies.
-    // Per RAW: the rebound amount is the attacker's rejected damage,
-    // NOT the target's armor value.
+    // Per RAW (Advanced Set charging rule + book example):
+    //   - Target takes (damage - targetBA), normal post-armor subtraction.
+    //   - The absorbed portion, min(damage, targetBA), rebounds to attacker.
+    //   - Attacker takes max(0, rebound - attackerBA).
+    //
+    // Book example: End Gd(10), 10-speed charge = 30 damage, target Ex BA(20),
+    // attacker Gd BA(10). Target absorbs 20 (→ 10 through to HP). That same 20
+    // rebounds; attacker absorbs 10, takes 10. Matches published outcome.
     // ============================================================
     const dialogTargetBA = choice.targetBAvalue || 0;
 
-    if (dialogTargetBA > rawDamage) {
-      const reboundAmount = rawDamage;
+    if (dialogTargetBA > 0 && rawDamage > 0) {
+      const reboundAmount = Math.min(rawDamage, dialogTargetBA);
       const damageToAttacker = Math.max(0, reboundAmount - bodyArmorValue);
+      const targetFullyAbsorbed = dialogTargetBA >= rawDamage;
       const isManualMode = this.opts?.mode === "manual";
       const autoApply = !!this.opts?.autoApply;
 
@@ -715,17 +727,21 @@ export class ChargingAction extends AttackAction {
         rawDamage,
         reboundAmount,
         attackerBA: bodyArmorValue,
-        damageToAttacker
+        damageToAttacker,
+        targetFullyAbsorbed
       });
 
       const targetLabel = targetName || "Target";
+      const reboundCause = targetFullyAbsorbed
+        ? `${targetLabel}'s defense (${dialogTargetBA}) fully absorbed the ${rawDamage} charging damage.`
+        : `${targetLabel}'s defense (${dialogTargetBA}) absorbed ${reboundAmount} of ${rawDamage} charging damage.`;
       let reboundHtml = `
         <div style="background:#f5f5f0;border:1px solid #f44336;border-radius:3px;margin-bottom:5px;">
           <div style="padding:6px 10px;border-bottom:1px solid #f44336;background:#ffebee;">
             <strong style="color:#c62828;">CHARGING REBOUND</strong>
           </div>
           <div style="padding:8px 10px;font-size:.9em;">
-            ${targetLabel}'s defense (${dialogTargetBA}) exceeded charging damage (${rawDamage}).
+            ${reboundCause}
             Rebound: ${reboundAmount} - ${bodyArmorValue} attacker BA = <strong>${damageToAttacker} damage to ${actor.name}</strong>.
           </div>
       `;
