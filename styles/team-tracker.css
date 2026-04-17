@@ -332,6 +332,51 @@
 .faserip.sheet.team-tracker .bonus-amount-input::-webkit-inner-spin-button {
   -webkit-appearance: none; margin: 0;
 }
+.faserip.sheet.team-tracker .bonus-scope-select {
+  width: 78px; padding: 2px 4px; font-size: 11px !important;
+  font-family: 'Barlow Condensed', sans-serif;
+  border: 1px solid #aaa !important; border-radius: 3px;
+  color: #000 !important; background: #fff !important;
+}
+.faserip.sheet.team-tracker .bonus-hero-select {
+  max-width: 120px; padding: 2px 4px; font-size: 11px !important;
+  font-family: 'Barlow Condensed', sans-serif;
+  border: 1px solid #8b0000 !important; border-radius: 3px;
+  color: #000 !important; background: #fff8f0 !important;
+  font-weight: 600;
+}
+.faserip.sheet.team-tracker .loss-scope-label {
+  display: flex; align-items: center; gap: 4px; font-size: 11px;
+}
+.faserip.sheet.team-tracker .loss-scope-select {
+  width: 80px; padding: 2px 4px; font-size: 11px !important;
+  font-family: 'Barlow Condensed', sans-serif;
+  border: 1px solid #aaa !important; border-radius: 3px;
+  color: #000 !important; background: #fff !important;
+}
+.faserip.sheet.team-tracker .enc-datetime-row {
+  display: flex; align-items: center; gap: 8px; margin-top: 4px;
+  font-size: 11px;
+}
+.faserip.sheet.team-tracker .enc-date-input {
+  width: 180px; padding: 3px 6px; font-size: 12px !important;
+  font-family: 'Barlow Condensed', sans-serif;
+  border: 1px solid #aaa !important; border-radius: 3px;
+  color: #000 !important; background: #fff !important;
+}
+.faserip.sheet.team-tracker .enc-time-input {
+  width: 80px; padding: 3px 6px; font-size: 12px !important;
+  font-family: 'Barlow Condensed', sans-serif;
+  border: 1px solid #aaa !important; border-radius: 3px;
+  color: #000 !important; background: #fff !important;
+}
+.faserip.sheet.team-tracker .enc-date-now {
+  padding: 2px 8px; font-size: 11px;
+  border: 1px solid #8b0000; border-radius: 3px;
+  background: #faf8f2; color: #8b0000; cursor: pointer;
+  font-family: 'Barlow Condensed', sans-serif; font-weight: 600;
+}
+.faserip.sheet.team-tracker .enc-date-now:hover { background: #8b0000; color: #fff; }
 .faserip.sheet.team-tracker .delete-bonus {
   color: #999; cursor: pointer; font-size: 10px; padding: 0 2px;
 }

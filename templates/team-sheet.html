@@ -196,6 +196,11 @@
             <div class="detail-section">
               <label>Name:</label>
               <input type="text" class="enc-name-input" data-enc-idx="{{@index}}" value="{{enc.name}}" placeholder="Optional — e.g., Castle Courtyard Battle" />
+              <div class="detail-row enc-datetime-row">
+                <label>Date: <input type="text" class="enc-date-input" data-enc-idx="{{@index}}" value="{{enc.gameDate}}" placeholder="e.g., Fireseek 11, 570 CY" /></label>
+                <label>Time: <input type="text" class="enc-time-input" data-enc-idx="{{@index}}" value="{{enc.gameTime}}" placeholder="e.g., 14:30" /></label>
+                <button type="button" class="enc-date-now" data-enc-idx="{{@index}}" title="Set to current campaign date/time"><i class="fas fa-clock"></i> Now</button>
+              </div>
             </div>
 
             <!-- Foes (always shown, may be empty) -->
@@ -269,7 +274,14 @@
               <div class="detail-row extras">
                 <label>Rescues: <input type="number" class="rescue-count" data-enc-idx="{{@index}}" value="{{enc.rescues}}" min="0" max="99" /></label>
                 <label>Losses: <input type="number" class="loss-amount" data-enc-idx="{{@index}}" value="{{enc.losses}}" min="0" max="9999" /></label>
-                <label class="gm-award-label" title="Custom karma added to total before split">GM Award: <input type="number" class="gm-award-amount" data-enc-idx="{{@index}}" value="{{enc.gmAward}}" min="0" max="9999" /></label>
+                <label class="loss-scope-label" title="Split divides loss among present heroes (default). Per-hero applies full loss to each hero (RAW: Property Damage -5/area).">
+                  Loss Scope:
+                  <select class="loss-scope-select" data-enc-idx="{{@index}}">
+                    <option value="split" {{#if enc.lossScopeSplit}}selected{{/if}}>Split</option>
+                    <option value="per_hero" {{#if enc.lossScopePerHero}}selected{{/if}}>Per hero</option>
+                  </select>
+                </label>
+                <label class="gm-award-label" title="Custom karma added to split pool">GM Award: <input type="number" class="gm-award-amount" data-enc-idx="{{@index}}" value="{{enc.gmAward}}" min="0" max="9999" /></label>
               </div>
             </div>
 
@@ -280,8 +292,24 @@
               <div class="bonus-list">
                 {{#each enc.bonuses as |b|}}
                 <div class="bonus-row">
-                  <input type="text" class="bonus-label-input" data-enc-idx="{{@../index}}" data-bonus-idx="{{@index}}" value="{{b.label}}" placeholder="e.g., Protecting Hargrove" />
+                  <input type="text" class="bonus-label-input" data-enc-idx="{{@../index}}" data-bonus-idx="{{@index}}" value="{{b.label}}" placeholder="e.g., Befriending Felicia" />
                   <input type="number" class="bonus-amount-input" data-enc-idx="{{@../index}}" data-bonus-idx="{{@index}}" value="{{b.amount}}" />
+                  <select class="bonus-scope-select" data-enc-idx="{{@../index}}" data-bonus-idx="{{@index}}" title="Scope">
+                    <option value="split" {{#if b.isSplit}}selected{{/if}}>Split</option>
+                    <option value="individual" {{#if b.isIndividual}}selected{{/if}}>Ind.</option>
+                    <option value="per_hero" {{#if b.isPerHero}}selected{{/if}}>Per hero</option>
+                  </select>
+                  {{#if b.isIndividual}}
+                  <select class="bonus-hero-select" data-enc-idx="{{@../index}}" data-bonus-idx="{{@index}}" title="Recipient (present heroes only)">
+                    {{#if b.heroOptions.length}}
+                      {{#each b.heroOptions as |o|}}
+                      <option value="{{o.id}}" {{#if o.selected}}selected{{/if}}>{{o.name}}</option>
+                      {{/each}}
+                    {{else}}
+                      <option value="">— no present heroes —</option>
+                    {{/if}}
+                  </select>
+                  {{/if}}
                   <a class="delete-bonus" data-enc-idx="{{@../index}}" data-bonus-idx="{{@index}}" title="Remove"><i class="fas fa-times"></i></a>
                 </div>
                 {{/each}}
@@ -289,7 +317,7 @@
                 {{#if enc.bonusNegative}}<div class="bonus-subtotal"><span class="sum-neg">{{enc.bonusNegative}}</span></div>{{/if}}
               </div>
               {{else}}
-              <span class="no-foes-note">No custom awards. Use for task/milestone rewards.</span>
+              <span class="no-foes-note">No custom awards. Use for task/milestone rewards (Split / Individual / Per-hero).</span>
               {{/if}}
               {{#unless enc.awarded}}
               <button type="button" class="add-bonus-item btn-add-foe" data-enc-idx="{{@index}}"><i class="fas fa-plus"></i> Add Award</button>
