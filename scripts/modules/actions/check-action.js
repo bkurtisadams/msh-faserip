@@ -1,4 +1,16 @@
-// scripts/modules/actions/check-action.js v1.10.0 - 2026-03-19
+// scripts/modules/actions/check-action.js v1.11.0 - 2026-04-16
+// v1.11.0: Check-action rules fixes and cleanup.
+//          - CA2: _strengthToAreas now reads GRAND_SLAM_AREAS from rules-reference,
+//            with Beyond falling back to Class 5000. Removed inline duplicate table.
+//          - CA3: Slam-fallback text in _extraExplanationHtml now uses
+//            attackerStrengthRank (from prefill) instead of defender's Endurance
+//            rank for the Grand Slam distance preview. Added attackerStrengthRank
+//            parameter to _extraExplanationHtml and threaded through both call sites.
+//          - CA4: Manual/semi path now applies getAbilityShift to the effective
+//            rank — matches auto path. Previously only selfPenaltyCS was added
+//            in manual mode, so active-effect ability shifts (impaired, conditional
+//            boosts) silently didn't apply. Shift display now breaks out
+//            Manual / Effects / Self components.
 // v1.10.0: Replace inline mental defense scan with shared scanMentalDefenses() from action-utils.
 //          Accept "power-save" action type alongside legacy "save-nullify".
 // v1.7.0: Consolidate slam dual-card — _createSlamChatMessage replaced by _slamDetailHtml folded into check card result box
@@ -32,6 +44,7 @@ import * as Effects from "../effects/effect-engine.js";
 import * as Nullify from "./nullify.js";
 import { resolveSlamFeat, getGrandSlamDistance } from "../combat/damage-resolution.js";
 import { getAbilityShift } from "../effects/effect-modifiers.js";
+import { GRAND_SLAM_AREAS } from "../../rules/rules-reference.js";
 
 const SCOPE = () => (globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faserip");
 
@@ -490,6 +503,7 @@ export class CheckAction extends BaseAction {
       const extraHtml  = this._extraExplanationHtml({
         actionType, targetAbility, colorLower, finalEffect: effectText, effectsSuppressed,
         stunDuration, slamDetails,
+        attackerStrengthRank: prefill.attackerStrengthRank || null,
         targetIsRobot: (await this._resolveTokenActor(defenderUuid))?.system?.origin === "Robot"
       });
 
@@ -574,9 +588,14 @@ export class CheckAction extends BaseAction {
     });
     if (!choice) return;
 
-    // Include actor's own selfPenaltyCS (e.g. Impaired Endurance -2CS) in the shift
+    // Match auto-path shift computation: manual CS + active-effect ability
+    // shift + actor's selfPenaltyCS. The ability key follows the auto-path
+    // convention: save-nullify / power-save uses the declared save ability,
+    // everything else is Endurance.
+    const _saveAbilityKey = isSaveNullify ? (this.abilityName || "endurance") : "endurance";
+    const _effectShift = Number(getAbilityShift(actor, _saveAbilityKey)) || 0;
     const _selfPenalty = Number(actor?.system?.combatMods?.selfPenaltyCS) || 0;
-    const _totalShift  = choice.shift + _selfPenalty;
+    const _totalShift  = choice.shift + _effectShift + _selfPenalty;
     const effectiveEndRank = _totalShift ? shiftRank(choice.targetEndRank, _totalShift) : choice.targetEndRank;
     
     // Check consolidated chat card setting
@@ -787,10 +806,21 @@ export class CheckAction extends BaseAction {
       actionType, targetAbility, colorLower, finalEffect: effectText, effectsSuppressed,
       stunDuration: manualStunDuration,
       slamDetails: manualSlamDetails,
+      attackerStrengthRank: this.opts?.prefill?.attackerStrengthRank || null,
       targetIsRobot: (await this._resolveTokenActor(this.opts?.prefill?.targetUuid || ""))?.system?.origin === "Robot"
     });
     const extraHtml = (baseExtraHtml || "") + mentalPowerExtraHtml;
-    const shiftDisplay = choice.shift ? ` (${choice.shift > 0 ? '+' : ''}${choice.shift}CS)` : '';
+
+    // Shift display mirrors the auto-path breakdown so GMs can see which
+    // shifts composed the effective rank (manual input + active effects + self penalty).
+    let shiftDisplay = "";
+    if (_totalShift !== 0) {
+      const parts = [];
+      if (choice.shift !== 0) parts.push(`Manual ${choice.shift > 0 ? '+' : ''}${choice.shift}`);
+      if (_effectShift !== 0) parts.push(`Effects ${_effectShift > 0 ? '+' : ''}${_effectShift}`);
+      if (_selfPenalty !== 0) parts.push(`Self ${_selfPenalty > 0 ? '+' : ''}${_selfPenalty}`);
+      shiftDisplay = ` (${parts.join(', ')})`;
+    }
 
     const content = this._buildCheckCard({
       actor, actionType, effectiveEndRank, shiftDisplay,
@@ -841,15 +871,13 @@ export class CheckAction extends BaseAction {
   }
 
   _strengthToAreas(rankName) {
-    // Grand Slam: attacker Strength taken as ground speed (Speed rank table)
-    // Same mapping as getGrandSlamDistance but by rank name instead of value
-    const table = {
-      "Shift-0": 0, "Feeble": 1, "Poor": 2, "Typical": 3, "Good": 4,
-      "Excellent": 5, "Remarkable": 6, "Incredible": 7, "Amazing": 8,
-      "Monstrous": 9, "Unearthly": 10, "Shift-X": 12, "Shift-Y": 14,
-      "Shift-Z": 16, "Class 1000": 32, "Class 3000": 50, "Class 5000": 100
-    };
-    return table[rankName] || 3;
+    // Grand Slam distance by rank name. Canonical table lives in
+    // rules-reference.js (GRAND_SLAM_AREAS). Beyond is treated as
+    // Class 5000 since the published table stops there.
+    const v = GRAND_SLAM_AREAS[rankName];
+    if (typeof v === "number") return v;
+    if (rankName === "Beyond") return GRAND_SLAM_AREAS["Class 5000"];
+    return 3; // safe default (Typical) for unknown input
   }
 
   async _createSlamEffect(actor, options, opts = {}) {
@@ -907,7 +935,7 @@ export class CheckAction extends BaseAction {
     `;
   }
 
-  _extraExplanationHtml({ actionType, targetAbility, colorLower, finalEffect, effectsSuppressed, stunDuration=null, slamDetails=null, targetIsRobot=false }) {
+  _extraExplanationHtml({ actionType, targetAbility, colorLower, finalEffect, effectsSuppressed, stunDuration=null, slamDetails=null, targetIsRobot=false, attackerStrengthRank=null }) {
     if (actionType === "stun") {
       let stunText = "";
       if (colorLower === "white") {
@@ -933,11 +961,14 @@ export class CheckAction extends BaseAction {
       if (effectsSuppressed) {
         return `<div style="margin-top:8px;color:#b71c1c;">No damage penetrated — Slam does not apply.</div>`;
       }
-      // If full slam details available (from prefill), use rich HTML; else fall back to brief note
+      // If full slam details available (from prefill), use rich HTML; else fall back to brief note.
+      // Grand Slam distance depends on the ATTACKER's Strength rank, not the defender's
+      // Endurance. Use attackerStrengthRank from prefill; fall back to "Typical" only if
+      // we truly have no context.
       if (slamDetails) {
         return this._slamDetailHtml(slamDetails);
       }
-      const strRank = targetAbility?.rank || "Typical";
+      const strRank = attackerStrengthRank || "Typical";
       const areas   = this._strengthToAreas(strRank);
       const notes = {
         white: `Grand Slam — knocked away up to ~${areas} areas; prone.`,
