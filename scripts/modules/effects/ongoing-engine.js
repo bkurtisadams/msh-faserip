@@ -209,7 +209,11 @@ const TYPE_STYLES = {
 
 async function sendOngoingChat(actor, effectName, type, detail) {
   const style = TYPE_STYLES[type] || TYPE_STYLES.damage;
-  await ChatMessage.create({
+
+  // Auto-heal chat filter: apply only to healing-flavored events (heal + stat.gain)
+  // on NPCs. PCs always post public; damage/stat.loss always post public so
+  // combat consequences remain visible.
+  const messageData = {
     speaker: ChatMessage.getSpeaker({ actor }),
     content: `<div style="background:${style.bg};border:2px solid ${style.border};padding:10px;border-radius:5px;">
       <div style="font-size:1.1em;font-weight:bold;color:${style.color};margin-bottom:4px;">
@@ -217,7 +221,24 @@ async function sendOngoingChat(actor, effectName, type, detail) {
       </div>
       <div>${detail}</div>
     </div>`,
-  });
+  };
+
+  const isHealType = (type === "heal" || type === "stat.gain");
+  if (isHealType) {
+    const isPC = !!(actor?.hasPlayerOwner) ||
+                 (actor?.system?.characterType === "player");
+    if (!isPC) {
+      let mode = "gm-whisper-npcs";
+      try { mode = game.settings?.get?.("msh-faserip", "autoHealChatMode") || mode; }
+      catch (_e) { /* setting not registered yet */ }
+      if (mode === "silent-npcs") return;
+      if (mode === "gm-whisper-npcs") {
+        messageData.whisper = ChatMessage.getWhisperRecipients("GM").map(u => u.id);
+      }
+    }
+  }
+
+  await ChatMessage.create(messageData);
 }
 
 // ─── Stat loss/gain (Endurance rank stepping) ─────────────────────────────────

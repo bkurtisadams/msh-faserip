@@ -488,6 +488,20 @@ Hooks.once("init", async () => {
     default: true
   });
 
+  game.settings.register('msh-faserip', 'autoHealChatMode', {
+    name: "Auto-Heal Chat Output",
+    hint: "Controls chat messages when ongoing heal / Endurance-rank-gain effects tick. Applies only to NPCs (player characters always post public chat). Default: whisper to GM so scenes full of bruised NPCs don't spam the log.",
+    scope: "world",
+    config: true,
+    type: String,
+    choices: {
+      "public":         "Public — everyone sees every NPC heal tick",
+      "gm-whisper-npcs": "GM-only — NPC heals whisper to GM (recommended)",
+      "silent-npcs":    "Silent — NPC heals post no chat at all"
+    },
+    default: "gm-whisper-npcs"
+  });
+
   Actors.registerSheet("msh-faserip", MSHVehicleActorSheet, {
     types: ["vehicle"],
     makeDefault: true,

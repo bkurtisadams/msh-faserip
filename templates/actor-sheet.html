@@ -510,6 +510,12 @@
           Recovery +{{recoveryHealAmount}}
         </button>
         {{/if}}
+        {{#if healingEligible}}
+        <button type="button" class="health-healing-inline-btn" data-action="sheet-healing"
+                title="Take Healing: +{{healingHealAmount}} HP (per hour since last damage{{#if healingMedicalCare}}, with medical care{{/if}}, RAW p.32)">
+          Heal +{{healingHealAmount}}
+        </button>
+        {{/if}}
       </div>
     </div>
 

@@ -414,6 +414,18 @@ export class FaseripActorSheet extends ActorSheet {
     }
     const enduranceValue = context.system?.abilities?.endurance?.value ?? 0;
     context.recoveryHealAmount = enduranceValue;
+
+    // Health-area Healing button: show ONLY when eligible right now.
+    // Reuses rest-system.canAttemptHealing so logic stays in one place.
+    try {
+      const check = game.msh?.rest?.canAttemptHealing?.(this.actor);
+      context.healingEligible = !!check?.canHeal;
+    } catch (_e) {
+      context.healingEligible = false;
+    }
+    const hasMedicalCare = this.actor.getFlag(scope, "medicalCare") ?? false;
+    context.healingMedicalCare = hasMedicalCare;
+    context.healingHealAmount = enduranceValue * (hasMedicalCare ? 2 : 1);
     
     // NPC detection for template labels
     const charType = context.system.characterType || "player";
@@ -1071,6 +1083,21 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
         return;
       }
       const result = await game.msh.rest.attemptRecovery(this.actor);
+      if (result?.success) {
+        this.render(false);
+      }
+    });
+
+    // Sheet-level inline Healing button (shows only when eligible).
+    // Mirrors Recovery: one click → apply healing, rerender sheet.
+    html.find('.health-healing-inline-btn').click(async (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (!game.msh?.rest) {
+        ui.notifications.error("Rest system not initialized!");
+        return;
+      }
+      const result = await game.msh.rest.attemptHealing(this.actor);
       if (result?.success) {
         this.render(false);
       }
