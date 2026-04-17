@@ -3580,7 +3580,7 @@ form.faserip-sheet .secondary-abilities .sec-head small {
 
 form.faserip-sheet .secondary-abilities .sec-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr 1.2fr 1fr;
+  grid-template-columns: 1fr 1fr 1fr 1fr;
   grid-template-rows: 1fr;
   column-gap: 0;
   row-gap: 0;
@@ -3590,7 +3590,7 @@ form.faserip-sheet .secondary-abilities .sec-grid {
 
 @media (max-width: 1100px) {
   form.faserip-sheet .secondary-abilities .sec-grid {
-    grid-template-columns: 1fr 1fr 1.25fr 1fr;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
   }
 }
 
@@ -3686,28 +3686,28 @@ form.faserip-sheet .secondary-abilities input[type="number"]::-webkit-inner-spin
   margin: 0;
 }
 
-/* Health, Karma, Popularity: value / max inline side-by-side.
-   Overrides the generic .stacked-values column layout (~line 248). */
+/* Health, Karma: current value over max, stacked vertically.
+   Max is disabled and auto-dims via actor-sheet-enhanced.css. */
 form.faserip-sheet .secondary-abilities .stacked-values {
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: 2px;
   width: 100%;
   min-width: 0;
   flex-wrap: nowrap;
 }
 
-/* Inputs size to content with a sensible min/max so 4-digit numbers
-   (Karma 1373) still fit but narrow numbers don't create huge gaps.
-   flex: 1 1 auto so they shrink/grow within the column width. */
+/* Fixed-width inputs so column widths are predictable and children
+   always horizontally centered regardless of content length. */
 form.faserip-sheet .secondary-abilities .stacked-values input[type="number"] {
-  width: auto;
-  min-width: 0;
-  max-width: 60px;
-  flex: 1 1 auto;
+  width: 48px;
+  min-width: 48px;
+  max-width: 48px;
+  flex: 0 0 auto;
   padding: 2px 4px;
+  box-sizing: border-box;
 }
 
 form.faserip-sheet .secondary-abilities .stacked-values .divider {
@@ -3719,11 +3719,11 @@ form.faserip-sheet .secondary-abilities .stacked-values .divider {
   padding: 0 1px;
 }
 
-/* Resources: rank dropdown + value inline */
+/* Resources: rank dropdown stacked over value (vertical, saves horizontal space) */
 form.faserip-sheet .secondary-abilities .resources-row {
   display: flex;
-  flex-direction: row;
-  gap: 4px;
+  flex-direction: column;
+  gap: 3px;
   align-items: center;
   justify-content: center;
   width: 100%;
@@ -3732,41 +3732,45 @@ form.faserip-sheet .secondary-abilities .resources-row {
 }
 
 form.faserip-sheet .secondary-abilities .resources-row select {
-  width: auto;
-  min-width: 0;
-  max-width: none;
-  flex: 1 1 auto;
+  width: 48px !important;
+  min-width: 48px !important;
+  max-width: 48px !important;
+  flex: 0 0 auto !important;
   text-align: left;
   padding-left: 4px;
   font-size: 11px !important;
+  box-sizing: border-box;
 }
 
 form.faserip-sheet .secondary-abilities .resources-row input[type="number"] {
-  width: auto;
-  min-width: 0;
-  max-width: 40px;
-  flex: 0 1 auto;
+  width: 48px !important;
+  min-width: 48px !important;
+  max-width: 48px !important;
+  flex: 0 0 auto !important;
   padding: 2px 4px;
+  box-sizing: border-box;
 }
 
-/* Popularity: [hero] / [secret] (if exists) — inherits from .stacked-values */
+/* Popularity: hero over secret ID (if present), stacked vertically.
+   Hero stays primary (big/bold), secret dims via :nth-child(2). */
 form.faserip-sheet .secondary-abilities .popularity-values {
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: 2px;
   width: 100%;
   min-width: 0;
   flex-wrap: nowrap;
 }
 
 form.faserip-sheet .secondary-abilities .popularity-values input[type="number"] {
-  width: auto;
-  min-width: 0;
-  max-width: 50px;
-  flex: 1 1 auto;
+  width: 48px !important;
+  min-width: 48px !important;
+  max-width: 48px !important;
+  flex: 0 0 auto !important;
   padding: 2px 4px;
+  box-sizing: border-box;
 }
 
 form.faserip-sheet .secondary-abilities .popularity-values .divider {
@@ -3978,9 +3982,9 @@ form.faserip-sheet .recovery-btn.used-today:disabled:hover {
 /* Resources: pin contents to the top, don't let the body grow */
 form.faserip-sheet .secondary-abilities .sec-col.resources > .sec-body.resources-row {
   flex: 0 0 auto;            /* stop growing; height = content */
-  align-items: flex-start;   /* top (cross-axis) */
-  justify-content: flex-start; /* left (main axis) */
-  padding-top: 4;            /* keep it tight; !important if needed */
+  align-items: center;       /* horizontal center (cross-axis in column) */
+  justify-content: flex-start; /* top (main axis in column) */
+  padding-top: 4px;
 }
 
 /* ── Dot Mode: Hover Portrait Popup ── */

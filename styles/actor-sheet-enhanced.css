@@ -267,6 +267,16 @@ form.faserip-sheet .secondary-abilities .popularity-values input[type="number"] 
   font-weight: 700 !important;
 }
 
+/* Popularity secret ID (second input, when present): dim/smaller
+   mirroring the disabled max treatment for Health/Karma. */
+form.faserip-sheet .secondary-abilities .popularity-values input[type="number"]:nth-child(2) {
+  font-size: 12px !important;
+  font-weight: 400 !important;
+  color: var(--txt-muted) !important;
+  background: var(--cream-dk) !important;
+  height: 20px !important;
+}
+
 form.faserip-sheet .primary-abilities .abilities-table input:focus,
 form.faserip-sheet .primary-abilities .abilities-table select:focus,
 form.faserip-sheet .secondary-abilities input:focus,

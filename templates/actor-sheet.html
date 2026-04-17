@@ -499,7 +499,6 @@
       <div class="sec-body">
         <div class="stacked-values">
           <input type="number" name="system.attributes.health.value" value="{{system.attributes.health.value}}" />
-          <div class="divider">/</div>
           <input type="number" name="system.attributes.health.max" value="{{system.attributes.health.max}}" disabled />
         </div>
       </div>
@@ -541,7 +540,6 @@
       <div class="sec-body">
         <div class="stacked-values">
           <input type="number" name="system.attributes.karma.value" value="{{system.attributes.karma.value}}" title="Current Karma" />
-          <div class="divider">/</div>
           <input type="number" value="{{system.attributes.karma.max}}" disabled data-field="karma-max" title="Base Karma (R+I+P)" />
         </div>
       </div>
@@ -555,18 +553,18 @@
         <small>FEAT</small>
       </div>
       <div class="sec-body resources-row">
-        <select name="system.attributes.resources.rank">
-          <option value="Shift-0" {{#if (eq system.attributes.resources.rank "Shift-0")}}selected{{/if}}>Shift-0</option>
-          <option value="Feeble"   {{#if (eq system.attributes.resources.rank "Feeble")}}selected{{/if}}>Feeble</option>
-          <option value="Poor"     {{#if (eq system.attributes.resources.rank "Poor")}}selected{{/if}}>Poor</option>
-          <option value="Typical"  {{#if (eq system.attributes.resources.rank "Typical")}}selected{{/if}}>Typical</option>
-          <option value="Good"     {{#if (eq system.attributes.resources.rank "Good")}}selected{{/if}}>Good</option>
-          <option value="Excellent"{{#if (eq system.attributes.resources.rank "Excellent")}}selected{{/if}}>Excellent</option>
-          <option value="Remarkable"{{#if (eq system.attributes.resources.rank "Remarkable")}}selected{{/if}}>Remarkable</option>
-          <option value="Incredible"{{#if (eq system.attributes.resources.rank "Incredible")}}selected{{/if}}>Incredible</option>
-          <option value="Amazing"  {{#if (eq system.attributes.resources.rank "Amazing")}}selected{{/if}}>Amazing</option>
-          <option value="Monstrous"{{#if (eq system.attributes.resources.rank "Monstrous")}}selected{{/if}}>Monstrous</option>
-          <option value="Unearthly"{{#if (eq system.attributes.resources.rank "Unearthly")}}selected{{/if}}>Unearthly</option>
+        <select name="system.attributes.resources.rank" title="Resources rank">
+          <option value="Shift-0"   title="Shift-0"    {{#if (eq system.attributes.resources.rank "Shift-0")}}selected{{/if}}>Sh0</option>
+          <option value="Feeble"    title="Feeble"     {{#if (eq system.attributes.resources.rank "Feeble")}}selected{{/if}}>Fe</option>
+          <option value="Poor"      title="Poor"       {{#if (eq system.attributes.resources.rank "Poor")}}selected{{/if}}>Pr</option>
+          <option value="Typical"   title="Typical"    {{#if (eq system.attributes.resources.rank "Typical")}}selected{{/if}}>Ty</option>
+          <option value="Good"      title="Good"       {{#if (eq system.attributes.resources.rank "Good")}}selected{{/if}}>Gd</option>
+          <option value="Excellent" title="Excellent"  {{#if (eq system.attributes.resources.rank "Excellent")}}selected{{/if}}>Ex</option>
+          <option value="Remarkable" title="Remarkable" {{#if (eq system.attributes.resources.rank "Remarkable")}}selected{{/if}}>Rm</option>
+          <option value="Incredible" title="Incredible" {{#if (eq system.attributes.resources.rank "Incredible")}}selected{{/if}}>In</option>
+          <option value="Amazing"   title="Amazing"    {{#if (eq system.attributes.resources.rank "Amazing")}}selected{{/if}}>Am</option>
+          <option value="Monstrous" title="Monstrous"  {{#if (eq system.attributes.resources.rank "Monstrous")}}selected{{/if}}>Mn</option>
+          <option value="Unearthly" title="Unearthly"  {{#if (eq system.attributes.resources.rank "Unearthly")}}selected{{/if}}>Un</option>
         </select>
         <input type="number" name="system.attributes.resources.value" value="{{system.attributes.resources.value}}" />
       </div>
@@ -597,7 +595,6 @@
                  value="{{system.attributes.popularity.hero.value}}"
                  title="Hero Identity Popularity" />
           {{#if (eq system.identityType "secret")}}
-            <div class="divider">/</div>
             <input type="number"
                    name="system.attributes.popularity.secretId.value"
                    value="{{system.attributes.popularity.secretId.value}}"
