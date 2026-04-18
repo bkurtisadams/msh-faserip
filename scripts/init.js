@@ -468,6 +468,16 @@ Hooks.once("init", async () => {
     default: false
   });
 
+  // Resource Points: track weekly income, spending, and accumulation per the original rules.
+  game.settings.register('msh-faserip', 'useResourcePoints', {
+    name: "Resource Points (Original Rules)",
+    hint: "Track resource points with weekly income, accumulation caps, and spending. When off, Resources is just a rank on the sheet.",
+    scope: "world",
+    config: true,
+    type: Boolean,
+    default: false
+  });
+
   Actors.registerSheet("msh-faserip", MSHVehicleActorSheet, {
     types: ["vehicle"],
     makeDefault: true,
@@ -1194,63 +1204,28 @@ Hooks.once("init", async () => {
       Hooks.callAll("msh-faserip.timeUpdated");
     });
 
-  // Register custom grappling effects so they show token HUD icons and work with ActiveEffect.statuses
-  CONFIG.statusEffects.push(
-    {
-      id: "partial-hold",
-      label: "Partial Hold",
-      icon: "icons/svg/net.svg", // Use existing Foundry icon
-      flags: { "msh-faserip": { grappling: true } }
-    },
-    {
-      id: "full-hold", 
-      label: "Full Hold",
-      icon: "icons/svg/paralysis.svg", // Use existing Foundry icon
-      flags: { "msh-faserip": { grappling: true } }
+  // Register custom status effects — skip any IDs already registered by core (v14 proxy enforces uniqueness)
+  const _existingStatusIds = new Set(CONFIG.statusEffects.map(e => e.id));
+  const _mshStatusEffects = [
+    { id: "partial-hold", label: "Partial Hold", icon: "icons/svg/net.svg", flags: { "msh-faserip": { grappling: true } } },
+    { id: "full-hold", label: "Full Hold", icon: "icons/svg/paralysis.svg", flags: { "msh-faserip": { grappling: true } } },
+    { id: "dying", label: "Dying", icon: "icons/svg/skull.svg", flags: { "msh-faserip": { isDying: true } } },
+    { id: "impaired-endurance", label: "Impaired Endurance", icon: "icons/svg/blood.svg", flags: { "msh-faserip": { isImpairedEndurance: true } } },
+    { id: "dead", label: "Dead", icon: "icons/svg/skull.svg", flags: { "msh-faserip": { isDead: true } } },
+    { id: "dodging", label: "Dodging", icon: "icons/svg/windmill.svg", flags: { "msh-faserip": { isDodging: true } } },
+    { id: "evading", label: "Evading", icon: "icons/svg/combat.svg", flags: { "msh-faserip": { isEvading: true } } },
+    { id: "blocking", label: "Blocking", icon: "icons/svg/shield.svg", flags: { "msh-faserip": { isBlocking: true } } }
+  ];
+  for (const effect of _mshStatusEffects) {
+    if (_existingStatusIds.has(effect.id)) {
+      const existing = CONFIG.statusEffects.find(e => e.id === effect.id);
+      if (existing) foundry.utils.mergeObject(existing, { flags: effect.flags });
+      console.log(`[FASERIP] Status effect "${effect.id}" already registered by core — merging flags.`);
+    } else {
+      CONFIG.statusEffects.push(effect);
+      _existingStatusIds.add(effect.id);
     }
-  );
-
-  CONFIG.statusEffects.push({
-    id: "dying",
-    label: "Dying",
-    icon: "icons/svg/skull.svg",
-    flags: { "msh-faserip": { isDying: true } }  // ← Changed to isDying
-  });
-
-  CONFIG.statusEffects.push({
-    id: "impaired-endurance",
-    label: "Impaired Endurance",
-    icon: "icons/svg/blood.svg",
-    flags: { "msh-faserip": { isImpairedEndurance: true } }
-  });
-
-  CONFIG.statusEffects.push({
-    id: "dead",
-    label: "Dead",
-    icon: "icons/svg/skull.svg",
-    flags: { "msh-faserip": { isDead: true } }  // ← Also use isDead for consistency
-  });
-
-  CONFIG.statusEffects.push(
-    {
-      id: "dodging",
-      label: "Dodging",
-      icon: "icons/svg/windmill.svg",
-      flags: { "msh-faserip": { isDodging: true } }
-    },
-    {
-      id: "evading", 
-      label: "Evading",
-      icon: "icons/svg/combat.svg",
-      flags: { "msh-faserip": { isEvading: true } }
-    },
-    {
-      id: "blocking",
-      label: "Blocking",
-      icon: "icons/svg/shield.svg",
-      flags: { "msh-faserip": { isBlocking: true } }
-    }
-  );
+  }
 
   // Populate CONFIG.FASERIP.rankValues from canonical source + alias variants
   CONFIG.FASERIP.rankValues = Object.assign({}, RANK_VALUES);
@@ -1687,8 +1662,8 @@ Hooks.once("init", async () => {
   }
 
   // Register sheet application classes
-  Actors.unregisterSheet("core", ActorSheet);
-  Items.unregisterSheet("core", ItemSheet);
+  Actors.unregisterSheet("core", foundry.applications.sheets.ActorSheetV2);
+  Items.unregisterSheet("core", foundry.applications.sheets.ItemSheetV2);
 
   Actors.registerSheet("msh-faserip", FaseripActorSheet, {
     types: ["hero", "villain", "npc"],

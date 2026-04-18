@@ -5,7 +5,7 @@
 // Reads token.document.movementAction (V13 Token HUD selection)
 // Green = within normal movement, Yellow = Speed FEAT zone (+1 area), Red = over max
 
-const TokenRuler = foundry.canvas.placeables.tokens.TokenRuler;
+const TokenRuler = foundry.canvas.tokens.TokenRuler ?? CONFIG.Token.rulerClass;
 
 // Colors
 const COLOR_GREEN  = 0x00CC00;

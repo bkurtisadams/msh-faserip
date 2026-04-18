@@ -120,7 +120,8 @@
           },
           "resources": {
             "rank": "Typical",
-            "value": 6
+            "value": 6,
+            "points": 0
           },
           "popularity": {
             "hero": {

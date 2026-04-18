@@ -1,5 +1,6 @@
-// gm-tools.js v1.0.0 - 2026-03-06
+// gm-tools.js v1.1.0 - 2026-04-04
 // GM Tools dialog: character backup/restore, export/import
+// v1.1.0: embed actor portrait as base64 in snapshots for GCC import
 
 const SETTING_KEY = "gmBackups";
 const SCOPE = "msh-faserip";
@@ -76,9 +77,33 @@ export class GMToolsApp extends Application {
     return { actors: actorData, orphans, hasOrphans: orphans.length > 0 };
   }
 
+  // ── Portrait embedding ──
+
+  async _imgToBase64(imgPath) {
+    if (!imgPath || imgPath.includes("mystery-man")) return "";
+    if (imgPath.startsWith("data:image/")) return imgPath;
+    try {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+        img.src = imgPath;
+      });
+      const canvas = document.createElement("canvas");
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      canvas.getContext("2d").drawImage(img, 0, 0);
+      return canvas.toDataURL("image/png");
+    } catch (e) {
+      console.warn(`[FASERIP] GM Tools: could not embed portrait for ${imgPath}`, e);
+      return "";
+    }
+  }
+
   // ── Snapshot ──
 
-  _snapshotActor(actor) {
+  async _snapshotActor(actor) {
     const sys = foundry.utils.deepClone(actor.system);
     const items = actor.items.map(i => ({
       name: i.name,
@@ -96,10 +121,12 @@ export class GMToolsApp extends Application {
       flags: foundry.utils.deepClone(e.flags || {}),
       statuses: Array.from(e.statuses || [])
     }));
+    // Embed portrait as base64 for external tools (GCC import)
+    const portraitData = await this._imgToBase64(actor.img);
     return {
       name: actor.name,
       type: actor.type,
-      img: actor.img,
+      img: portraitData || actor.img,
       system: sys,
       items,
       effects,
@@ -128,7 +155,7 @@ export class GMToolsApp extends Application {
     const actorId = ev.currentTarget.dataset.actorId;
     const actor = game.actors.get(actorId);
     if (!actor) return;
-    const snap = this._snapshotActor(actor);
+    const snap = await this._snapshotActor(actor);
     const backups = this._getBackups();
     backups[actorId] = snap;
     await this._saveBackups(backups);
@@ -167,10 +194,12 @@ export class GMToolsApp extends Application {
     });
     if (!confirm) return;
 
+    // For restore, use original file path if img is base64 (Foundry stores files, not data URLs)
+    const restoreImg = snap._originalImg || snap.img || "icons/svg/mystery-man.svg";
     const newActor = await Actor.create({
       name: snap.name,
       type: snap.type,
-      img: snap.img || "icons/svg/mystery-man.svg"
+      img: restoreImg.startsWith("data:") ? "icons/svg/mystery-man.svg" : restoreImg
     });
     await this._applySnapshot(newActor, snap);
 
@@ -187,7 +216,9 @@ export class GMToolsApp extends Application {
     // Update system data
     const flatUpdates = {};
     flatUpdates["system"] = snap.system;
-    flatUpdates["img"] = snap.img || actor.img;
+    // Don't overwrite img with base64 — Foundry needs file paths
+    const imgVal = snap._originalImg || snap.img || actor.img;
+    flatUpdates["img"] = imgVal.startsWith("data:") ? actor.img : imgVal;
     if (snap.flags) flatUpdates["flags"] = snap.flags;
     if (snap.prototypeToken) flatUpdates["prototypeToken"] = snap.prototypeToken;
     await actor.update(flatUpdates);
@@ -226,8 +257,10 @@ export class GMToolsApp extends Application {
     const actor = game.actors.get(actorId);
     if (!actor) return;
 
-    // Always take a fresh snapshot for export
-    const snap = this._snapshotActor(actor);
+    // Fresh snapshot with embedded portrait
+    const snap = await this._snapshotActor(actor);
+    // Store original path so restore doesn't break Foundry
+    snap._originalImg = actor.img;
     const blob = new Blob([JSON.stringify(snap, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -242,7 +275,9 @@ export class GMToolsApp extends Application {
     const actors = game.actors.filter(a => ["hero", "villain", "npc"].includes(a.type));
     const allSnaps = {};
     for (const actor of actors) {
-      allSnaps[actor.id] = this._snapshotActor(actor);
+      const snap = await this._snapshotActor(actor);
+      snap._originalImg = actor.img;
+      allSnaps[actor.id] = snap;
     }
     const blob = new Blob([JSON.stringify(allSnaps, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -292,6 +327,8 @@ export class GMToolsApp extends Application {
     // Check if actor exists by name
     const existing = game.actors.find(a => a.name === snap.name);
     let target;
+    // Use original file path for Foundry, not base64
+    const actorImg = snap._originalImg || (snap.img?.startsWith("data:") ? "icons/svg/mystery-man.svg" : snap.img) || "icons/svg/mystery-man.svg";
 
     if (existing) {
       const choice = await Dialog.confirm({
@@ -304,14 +341,14 @@ export class GMToolsApp extends Application {
         target = await Actor.create({
           name: `${snap.name} (Imported)`,
           type: snap.type,
-          img: snap.img || "icons/svg/mystery-man.svg"
+          img: actorImg
         });
       }
     } else {
       target = await Actor.create({
         name: snap.name,
         type: snap.type,
-        img: snap.img || "icons/svg/mystery-man.svg"
+        img: actorImg
       });
     }
 
@@ -335,12 +372,13 @@ export class GMToolsApp extends Application {
 
     let count = 0;
     for (const snap of snapshots) {
+      const actorImg = snap._originalImg || (snap.img?.startsWith("data:") ? "icons/svg/mystery-man.svg" : snap.img) || "icons/svg/mystery-man.svg";
       let target = game.actors.find(a => a.name === snap.name);
       if (!target) {
         target = await Actor.create({
           name: snap.name,
           type: snap.type,
-          img: snap.img || "icons/svg/mystery-man.svg"
+          img: actorImg
         });
       }
       await this._applySnapshot(target, snap);
@@ -357,7 +395,7 @@ export class GMToolsApp extends Application {
     const actors = game.actors.filter(a => ["hero", "villain", "npc"].includes(a.type));
     const backups = this._getBackups();
     for (const actor of actors) {
-      backups[actor.id] = this._snapshotActor(actor);
+      backups[actor.id] = await this._snapshotActor(actor);
     }
     await this._saveBackups(backups);
     ui.notifications.info(`Backed up ${actors.length} actors`);

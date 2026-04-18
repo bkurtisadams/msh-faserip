@@ -28,6 +28,7 @@ import { ChargenUIManager } from './chargen.js';
 import { generateKarmaControlsHTML, showKarmaDecisionDialog, getAvailableKarma } from './modules/dice/dice-roller.js';
 import { MovementFeats } from './movement-feats.js';
 import { showAbilityFeatDialog, determineFeatRequirement, checkFeatSuccess } from './modules/actions/ability-feat-dialog.js';
+import { RESOURCE_PRICES } from './rules/rules-reference.js';
 import { initSheetZoom } from './modules/ui/sheet-zoom.js';
 import {
   RANKS_ORDERED as _RANKS, RANK_VALUES as _RANK_VALUES, RANK_ALIASES,
@@ -404,6 +405,15 @@ export class FaseripActorSheet extends ActorSheet {
 
     // Compact sheet mode (per-actor flag)
     context.compactSheet = this.actor.getFlag("msh-faserip", "compactSheet") ?? false;
+
+    // Resource Points setting
+    context.useResourcePoints = game.settings.get("msh-faserip", "useResourcePoints");
+    if (context.useResourcePoints) {
+      const res = context.system.attributes.resources;
+      const max = res.maxPoints;
+      context.rpMaxLabel = (max === Infinity || max == null) ? "\u221E" : String(max);
+      context.rpWeekly = res.weeklyRate || 0;
+    }
 
     return context;
   }
@@ -2992,14 +3002,43 @@ html.find('.headquarters-row').each((i, row) => {
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     html.find('.resources-header-link').click(ev => {
       ev.preventDefault();
+      const useRP = game.settings.get("msh-faserip", "useResourcePoints");
     
       // Ctrl+Click opens the info dialog
       if (ev.ctrlKey) {
         this._showResourceInfoDialog();
+      } else if (useRP) {
+        // RP mode: open buy dialog (no FEAT roll)
+        this._showBuyWithRPDialog();
       } else {
-        // Plain click rolls instantly
+        // Standard mode: Resource FEAT roll
         this._onResourceRoll();
       }
+    });
+
+    // Resource Points: Collect Weekly Income
+    html.find('.rp-collect-btn').click(async ev => {
+      ev.preventDefault();
+      const res = this.actor.system.attributes.resources;
+      const weekly = res.weeklyRate || 0;
+      const max = res.maxPoints;
+      const current = res.points || 0;
+      const newPoints = (max === Infinity) ? current + weekly : Math.min(current + weekly, max);
+      await this.actor.update({ "system.attributes.resources.points": newPoints });
+      const gained = newPoints - current;
+      ChatMessage.create({
+        speaker: ChatMessage.getSpeaker({ actor: this.actor }),
+        content: `<div class="faserip-chat-card"><strong>${this.actor.name}</strong> collects weekly income: <strong>+${gained} RP</strong> (${newPoints} total)</div>`
+      });
+      const karmaSheet = await import('./karma.js').then(m => new m.KarmaSheet(this.actor));
+      await karmaSheet._addKarmaEvent({
+        timestamp: new Date().toISOString(),
+        realDate: new Date().toLocaleDateString(),
+        gameDate: "",
+        amount: 0,
+        type: "Resource Income",
+        description: `Weekly income: +${gained} RP (${newPoints} total)`
+      });
     });
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -3537,7 +3576,7 @@ html.find('.headquarters-row').each((i, row) => {
     }).render(true);
   }
 
-  // Resource Roll method
+  // Resource FEAT Roll (standard mode, no RP)
   _onResourceRoll() {
     const resourceRank = this.actor.system.attributes.resources.rank;
     const resourceValue = this.actor.system.attributes.resources.value;
@@ -3547,7 +3586,6 @@ html.find('.headquarters-row').each((i, row) => {
       "Remarkable", "Incredible", "Amazing", "Monstrous", "Unearthly"
     ];
   
-    // Create dialog for roll options
     const dialogContent = `
       <div style="margin-bottom: 10px;">
         <label style="display: inline-block; width: 120px;">Resource Rank:</label>
@@ -3588,12 +3626,10 @@ html.find('.headquarters-row').each((i, row) => {
               return ui.notifications.error("Invalid rank selection");
             }
   
-            // Purchase validation
             if (itemIndex > resourceIndex + (bankLoan ? 1 : 0)) {
               return ui.notifications.warn("Item rank is too high for your resources.");
             }
   
-            // Determine required FEAT
             let featColorNeeded;
             const rankDifference = resourceIndex - itemIndex;
   
@@ -3605,7 +3641,6 @@ html.find('.headquarters-row').each((i, row) => {
               featColorNeeded = "Yellow";
             }
   
-            // Roll and evaluate
             const roll = new Roll("1d100");
             await roll.evaluate();
   
@@ -3618,12 +3653,8 @@ html.find('.headquarters-row').each((i, row) => {
             else if (featColorNeeded === "Yellow") success = ["yellow", "red"].includes(resultColorLower);
             else if (featColorNeeded === "Red") success = resultColorLower === "red";
   
-            // Format chat output
             const colorMap = {
-              white: "#f8f8f8",
-              green: "#4CAF50",
-              yellow: "#FFC107",
-              red: "#F44336"
+              white: "#f8f8f8", green: "#4CAF50", yellow: "#FFC107", red: "#F44336"
             };
             const textColor = (["white", "yellow"].includes(resultColorLower)) ? "#333" : "white";
   
@@ -3660,7 +3691,6 @@ html.find('.headquarters-row').each((i, row) => {
               content: chatContent
             });
 
-            // Log Resource FEAT to karma history
             const historyEntry = {
               timestamp: new Date().toISOString(),
               realDate: new Date().toLocaleDateString(),
@@ -3688,6 +3718,103 @@ html.find('.headquarters-row').each((i, row) => {
       },
       default: "roll"
     }).render(true);
+  }
+
+  // Buy with Resource Points (RP mode — no roll, just spend)
+  _showBuyWithRPDialog() {
+    const res = this.actor.system.attributes.resources;
+    const current = res.points || 0;
+    const max = res.maxPoints;
+    const maxLabel = (max === Infinity) ? "No Maximum" : max;
+
+    let priceOptions = "";
+    for (const [category, items] of Object.entries(RESOURCE_PRICES)) {
+      const label = category.charAt(0).toUpperCase() + category.slice(1);
+      const sorted = Object.entries(items).sort((a, b) => a[1] - b[1]);
+      priceOptions += `<optgroup label="${label}">`;
+      for (const [name, cost] of sorted) {
+        priceOptions += `<option value="${name}" data-cost="${cost}">${name} (${cost} RP)</option>`;
+      }
+      priceOptions += `</optgroup>`;
+    }
+
+    const content = `
+      <div style="margin-bottom: 10px; padding: 6px 8px; background: #f5f5f0; border: 1px solid #d0d0d0; border-radius: 3px; font-size: 0.95em;">
+        Current RP: <strong>${current}</strong> &nbsp;/&nbsp; ${maxLabel}
+      </div>
+      <div style="margin-bottom: 10px;">
+        <label style="display: inline-block; width: 100px;">Quick Pick:</label>
+        <select id="rp-price-list" style="width: 220px;">
+          <option value="">— Custom —</option>
+          ${priceOptions}
+        </select>
+      </div>
+      <div style="margin-bottom: 10px;">
+        <label style="display: inline-block; width: 100px;">Item:</label>
+        <input type="text" id="rp-buy-desc" style="width: 200px;" placeholder="e.g., Bus Ticket">
+      </div>
+      <div style="margin-bottom: 10px;">
+        <label style="display: inline-block; width: 100px;">Cost (RP):</label>
+        <input type="number" id="rp-buy-cost" min="0" value="0" style="width: 80px;">
+      </div>
+    `;
+
+    const dlg = new Dialog({
+      title: `Buy with Resource Points: ${this.actor.name}`,
+      content,
+      buttons: {
+        buy: {
+          icon: '<i class="fas fa-coins"></i>',
+          label: "Buy",
+          callback: async (html) => {
+            const cost = parseInt(html.find('#rp-buy-cost').val()) || 0;
+            const desc = html.find('#rp-buy-desc').val() || "purchase";
+            if (cost <= 0) return ui.notifications.warn("Enter an RP cost.");
+            if (cost > current) return ui.notifications.warn(`Not enough RP. You have ${current}, need ${cost}.`);
+            const newPoints = current - cost;
+            await this.actor.update({ "system.attributes.resources.points": newPoints });
+            ChatMessage.create({
+              speaker: ChatMessage.getSpeaker({ actor: this.actor }),
+              content: `<div class="faserip-chat-card">
+                <div style="color: #8b0000; font-weight: bold; margin-bottom: 4px;">${this.actor.name} — Purchase</div>
+                <div><strong>${desc}</strong> for <strong>${cost} RP</strong></div>
+                <div style="font-size: 0.9em; color: #666; margin-top: 4px;">Remaining: ${newPoints} RP</div>
+              </div>`
+            });
+            const karmaSheet = await import('./karma.js').then(m => new m.KarmaSheet(this.actor));
+            await karmaSheet._addKarmaEvent({
+              timestamp: new Date().toISOString(),
+              realDate: new Date().toLocaleDateString(),
+              gameDate: "",
+              amount: 0,
+              type: "Resource Spending",
+              description: `Purchased ${desc} for ${cost} RP (${newPoints} RP remaining)`
+            });
+          }
+        },
+        cancel: { label: "Cancel" }
+      },
+      default: "buy"
+    }, { width: 400 });
+
+    dlg.render(true);
+
+    // Wire up Quick Pick dropdown after render
+    setTimeout(() => {
+      const el = document.querySelector('.dialog #rp-price-list');
+      if (!el) return;
+      el.addEventListener('change', (ev) => {
+        const selected = ev.target.selectedOptions[0];
+        if (!selected || !selected.value) return;
+        const cost = parseInt(selected.dataset.cost) || 0;
+        const name = selected.value;
+        const form = el.closest('.dialog-content') || el.closest('form') || el.parentElement;
+        const descInput = form.querySelector('#rp-buy-desc');
+        const costInput = form.querySelector('#rp-buy-cost');
+        if (descInput) descInput.value = name;
+        if (costInput) costInput.value = cost;
+      });
+    }, 200);
   }
 
   // _onPopularityRoll method

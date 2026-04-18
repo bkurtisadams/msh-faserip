@@ -515,6 +515,80 @@ export const RESOURCES = {
   }
 };
 
+// ── RESOURCE POINTS (Original Rules) ──
+// Weekly rate = rank number of RP gained per week. Max = accumulation cap.
+// Amazing+ has no maximum (Infinity).
+export const RESOURCE_POINTS = {
+  "Shift-0":    { weekly: 0,   max: 0 },
+  "Feeble":     { weekly: 2,   max: 10 },
+  "Poor":       { weekly: 4,   max: 20 },
+  "Typical":    { weekly: 6,   max: 50 },
+  "Good":       { weekly: 10,  max: 100 },
+  "Excellent":  { weekly: 20,  max: 500 },
+  "Remarkable": { weekly: 30,  max: 1000 },
+  "Incredible": { weekly: 40,  max: 5000 },
+  "Amazing":    { weekly: 50,  max: Infinity },
+  "Monstrous":  { weekly: 75,  max: Infinity },
+  "Unearthly":  { weekly: 100, max: Infinity },
+  "Shift-X":    { weekly: 150, max: Infinity },
+  "Shift-Y":    { weekly: 200, max: Infinity },
+  "Shift-Z":    { weekly: 500, max: Infinity },
+  "Class 1000": { weekly: 1000, max: Infinity },
+  "Class 3000": { weekly: 3000, max: Infinity },
+  "Class 5000": { weekly: 5000, max: Infinity },
+  "Beyond":     { weekly: 10000, max: Infinity }
+};
+
+// 1 RP ≈ $50–75
+export const RESOURCE_PRICES = {
+  vehicles: {
+    "Bicycle": 4,
+    "New Mini-Car": 60, "Used Mini-Car": 40,
+    "New Mid-Size Car": 100, "Used Mid-Size Car": 80,
+    "New Sports Car": 500, "Used Sports Car": 400,
+    "New Luxury Car": 1000, "Used Luxury Car": 800,
+    "Small Airplane": 400, "Small Jet": 2000,
+    "Small Powerboat": 250, "Small Yacht": 500
+  },
+  travel: {
+    "Bus Ticket": 2, "Train Ticket": 4,
+    "Airplane Ticket (Transcontinental)": 10,
+    "Airplane Ticket (Intercontinental)": 20
+  },
+  "rent (per month)": {
+    "Efficiency Apartment": 4, "1 Bedroom Apartment": 8,
+    "2 Bedroom Apartment": 16, "Luxury Apartment": 24,
+    "One-Story House": 10, "Two-Story House": 20,
+    "Mansion (per floor)": 40,
+    "Office": 20, "Office Floor": 50,
+    "Office Building (per floor)": 1000
+  },
+  "buy property": {
+    "Efficiency Apartment": 600, "1 Bedroom Apartment": 900,
+    "2 Bedroom Apartment": 1200, "Luxury Apartment": 2000,
+    "One-Story House": 1300, "Two-Story House": 1800,
+    "Mansion": 3000,
+    "Empty Land (per acre)": 500,
+    "Construction (per room)": 50
+  },
+  weapons: {
+    "Knife": 1, "Handgun": 5, "Rifle": 8
+  },
+  equipment: {
+    "Camera": 7,
+    "Office Equipment (per room)": 75,
+    "Electronic Equipment (per room)": 100,
+    "Electrical Generator": 500,
+    "Factory Equipment (per area)": 1000,
+    "Fence (per area)": 20
+  },
+  personal: {
+    "Clean Clothes": 2,
+    "Formal Dress or Tuxedo": 6,
+    "Expensive Night Out": 2
+  }
+};
+
 // ── MATERIAL STRENGTH ──
 export const MATERIAL_STRENGTH = {
   "Feeble": "cloth, glass",

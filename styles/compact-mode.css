@@ -282,6 +282,23 @@ form.faserip-sheet.compact-mode .secondary-abilities .sec-head small {
   display: none !important;
 }
 
+/* RP tracker in compact mode */
+form.faserip-sheet.compact-mode .rp-tracker {
+  padding: 2px 4px !important;
+  gap: 5px !important;
+  border-right: 1px solid #999 !important;
+}
+form.faserip-sheet.compact-mode .rp-tracker .rp-current {
+  width: 48px !important;
+  font-size: 13px !important;
+  height: 22px !important;
+}
+form.faserip-sheet.compact-mode .rp-collect-btn {
+  font-size: 10px !important;
+  padding: 1px 5px !important;
+  height: 20px !important;
+}
+
 form.faserip-sheet.compact-mode .secondary-abilities .stacked-values {
   flex-direction: column !important;
   align-items: center !important;
