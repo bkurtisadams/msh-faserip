@@ -1,10 +1,10 @@
-// init.js v1.12.0 - 2026-03-20
+﻿// init.js v1.12.0 - 2026-03-20
 // v1.12.0: Fix death/dying/recovery bugs:
 //   - updateActor 0 HP handler now checks fourColorRule (was always firing death save)
 //   - updateCombat effect expiry no longer auto-restores health; delegates to rest-system
 //     attemptRegainConsciousness which rolls required Endurance FEAT per rules
 //   - updateWorldTime effect expiry now delegates wake-up to rest-system hook
-// v1.11.0: Fix light persistence bug — baseline flag storage now uses pipe-delimited keys
+// v1.11.0: Fix light persistence bug â€” baseline flag storage now uses pipe-delimited keys
 //          to prevent Foundry flattenObject from corrupting dot-notation keys during setFlag.
 //          Per-actor debounce map replaces single global timer.
 // v1.10.0: updateActiveEffect reconcile now filtered to faserip.token.* changes + disabled toggles only,
@@ -13,12 +13,12 @@
 //         _combatDamageInProgress guard. The await yielded event loop, letting combat system
 //         fire its own death save. Fix: move setFlag after guard, use fire-and-forget (no await).
 // v1.9.4: Dying now processes via worldTime (works with CTT advances and combat tracker).
-//         Removed ~30-line dying block from updateCombat hook — processOngoingEffects handles it.
+//         Removed ~30-line dying block from updateCombat hook â€” processOngoingEffects handles it.
 // v1.9.3: Dying delegated to ongoing-engine.js processDyingRound(). ~200-line dying
 //         block replaced with compact import call. game.msh.nextHigherRankName added.
-// v1.9.2: CTT↔FASERIP time sync — ctt.timeAuthority setting, getCampaignDateTime reads CTT API,
+// v1.9.2: CTTâ†”FASERIP time sync â€” ctt.timeAuthority setting, getCampaignDateTime reads CTT API,
 //         updateWorldTime fires timeUpdated, bridge hooks for timeTracker.timeSet/timeAdvanced
-// v1.9.1: Auto-sync power sheet → ongoing effects. Setting regenerationType on a power's
+// v1.9.1: Auto-sync power sheet â†’ ongoing effects. Setting regenerationType on a power's
 //         Functions tab auto-registers/removes ongoing AE on the actor. createItem,
 //         updateItem, deleteItem hooks replace old name-based matching.
 // v1.7.8: Replace single Fly movement action with three sub-modes (Full/Low Alt/Cruise) in Token HUD
@@ -78,7 +78,7 @@ import { FaseripTokenRuler } from "./modules/canvas/faserip-token-ruler.js";
 import { initDotToken } from "./modules/canvas/faserip-dot-token.js";
 import { registerNullifyAuraHooks } from "./modules/actions/nullify-aura.js";
 
-// ── Player-color tint on chat cards ──
+// â”€â”€ Player-color tint on chat cards â”€â”€
 Hooks.on('renderChatMessage', (message, html, data) => {
   if (!game.settings.get('msh-faserip', 'chatCardPlayerColor')) return;
   const user = game.users.get(message.author?.id ?? message.user?.id);
@@ -97,7 +97,7 @@ Hooks.on('renderChatMessage', (message, html, data) => {
 
 // FASERIP Combat Sync - Use combatRound hook (fires once per round)
 Hooks.on("combatRound", async (combat, updateData, updateOptions, userId) => {
-  // 🔒 GM-only – only the GM advances world time
+  // ðŸ”’ GM-only â€“ only the GM advances world time
   if (!game.user.isGM) return;
   
   const syncEnabled = game.settings.get("msh-faserip", "combatSyncEnabled");
@@ -110,7 +110,7 @@ Hooks.on("combatRound", async (combat, updateData, updateOptions, userId) => {
   // Trigger hook to update team sheet display
   Hooks.callAll("msh-faserip.timeUpdated");
 
-  // ── Process dying for all actors in this combat (1 rank loss per round) ──
+  // â”€â”€ Process dying for all actors in this combat (1 rank loss per round) â”€â”€
   // This is the ONLY place processDyingRound is called during combat.
   // combatRound fires once per Foundry round = 1 FASERIP turn.
   // Set global lock so CTT timeAdvanced (triggered by game.time.advance above) skips dying.
@@ -204,7 +204,7 @@ Hooks.on("updateWorldTime", async (worldTime, dt, options, userId) => {
                   <strong style="color:#8b0000;">EQUIPMENT EXPIRED</strong>
                 </div>
                 <div style="padding:6px 10px;">
-                  <div><strong>${actor.name}</strong>'s <strong>${equipItem.name}</strong> has expired — ${effect.name} deactivated.</div>
+                  <div><strong>${actor.name}</strong>'s <strong>${equipItem.name}</strong> has expired â€” ${effect.name} deactivated.</div>
                   <button class="faserip-recharge-btn" data-actor-id="${actor.id}" data-item-id="${equipItem.id}"
                     style="margin-top:6px;padding:4px 12px;border:1px solid #c0c0c0;border-radius:3px;background:#fff;cursor:pointer;font-size:0.85em;">
                     <i class="fas fa-sync-alt"></i> ${rechargeLabel}
@@ -250,7 +250,7 @@ Hooks.on("updateWorldTime", async (worldTime, dt, options, userId) => {
           if (!dyingAE) continue;
           console.log(`[FASERIP:DYING] worldTime advance: processing 1 dying round for ${actor.name} (dt=${dt}s)`);
           const result = await processDyingRound(actor);
-          console.log(`[FASERIP:DYING] worldTime: ${actor.name} → ${result}`);
+          console.log(`[FASERIP:DYING] worldTime: ${actor.name} â†’ ${result}`);
         }
       } catch (e) {
         console.error("[FASERIP ERROR] worldTime dying round processing failed:", e);
@@ -322,7 +322,7 @@ Hooks.once("init", async () => {
 
   game.settings.register("msh-faserip", "sfxVolume", {
     name: "SFX Volume",
-    hint: "Volume for system SFX (0.0–1.0).",
+    hint: "Volume for system SFX (0.0â€“1.0).",
     scope: "client",
     config: true,
     type: Number,
@@ -477,7 +477,6 @@ Hooks.once("init", async () => {
     default: false
   });
 
-
   // Auto-Healing: RAW hourly Healing fires automatically as worldTime advances.
   // When off, players heal only by clicking the Attempt Healing button on the sheet.
   game.settings.register('msh-faserip', 'autoHealingEnabled', {
@@ -496,13 +495,12 @@ Hooks.once("init", async () => {
     config: true,
     type: String,
     choices: {
-      "public":         "Public — everyone sees every NPC heal tick",
-      "gm-whisper-npcs": "GM-only — NPC heals whisper to GM (recommended)",
-      "silent-npcs":    "Silent — NPC heals post no chat at all"
+      "public":         "Public â€” everyone sees every NPC heal tick",
+      "gm-whisper-npcs": "GM-only â€” NPC heals whisper to GM (recommended)",
+      "silent-npcs":    "Silent â€” NPC heals post no chat at all"
     },
     default: "gm-whisper-npcs"
   });
-
 
   Actors.registerSheet("msh-faserip", MSHVehicleActorSheet, {
     types: ["vehicle"],
@@ -514,12 +512,12 @@ Hooks.once("init", async () => {
     const policy = game.settings?.get?.("msh-faserip", "effects.durationPolicy") || "rounds-in-combat";
     if (policy === "seconds-only") return true;
     if (game.combat && (policy === "rounds-in-combat" || policy === "auto")) return false;
-    return true; // out of combat → convert
+    return true; // out of combat â†’ convert
   }
 
   // Convert "duration.rounds" -> seconds (based on preset turn length: FASERIP: turn = 6s).
   Hooks.on("preCreateActiveEffect", function (effect, data, options, userId) {
-    // ── Duplicate status guard ──────────────────────────────────────────────
+    // â”€â”€ Duplicate status guard â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // If this AE has statuses (e.g. "fly" from token HUD), check whether
     // the actor already has a non-disabled AE providing the same status
     // (e.g. from a power item's transfer effect). Uses allApplicableEffects()
@@ -538,7 +536,7 @@ Hooks.once("init", async () => {
       }
     }
 
-    // KEEP ROUNDS DURING COMBAT — do not convert to seconds while combat is active.
+    // KEEP ROUNDS DURING COMBAT â€” do not convert to seconds while combat is active.
     if (game.combat && data?.duration?.rounds) {
       return;
     }
@@ -647,13 +645,13 @@ Hooks.once("init", async () => {
     // from the parent equipment item's duration/durationUnit fields.
     // The existing updateWorldTime expiration code handles auto-disable.
     if (changes?.disabled === false && effect.disabled === true) {
-      // Find the source equipment item — direct parent if on item sheet, or via origin if transferred to actor
+      // Find the source equipment item â€” direct parent if on item sheet, or via origin if transferred to actor
       let item = null;
       const parent = effect.parent;
       if (parent?.type === "equipment") {
         item = parent;
       } else if (parent?.items && effect.origin) {
-        // Transferred effect on actor — origin is "Actor.xxx.Item.yyy" or a UUID
+        // Transferred effect on actor â€” origin is "Actor.xxx.Item.yyy" or a UUID
         const originParts = effect.origin.split(".");
         const itemIdx = originParts.indexOf("Item");
         if (itemIdx >= 0 && originParts[itemIdx + 1]) {
@@ -665,7 +663,7 @@ Hooks.once("init", async () => {
       const unit = item.system?.durationUnit;
       if (!dur || dur <= 0 || !unit) return;
 
-      // Convert to seconds — try CTT first, then manual lookup
+      // Convert to seconds â€” try CTT first, then manual lookup
       let seconds = 0;
       const cttMod = game.modules.get("calendar-time-tracker");
       if (cttMod?.active && cttMod.api?.timeEngine) {
@@ -677,7 +675,7 @@ Hooks.once("init", async () => {
       }
       if (seconds > 0) {
         changes.duration = { seconds, startTime: game.time.worldTime };
-        console.log(`[FASERIP] Equipment duration stamped: "${effect.name}" on "${item.name}" — ${dur} ${unit} (${seconds}s), expires at worldTime ${game.time.worldTime + seconds}`);
+        console.log(`[FASERIP] Equipment duration stamped: "${effect.name}" on "${item.name}" â€” ${dur} ${unit} (${seconds}s), expires at worldTime ${game.time.worldTime + seconds}`);
       }
     }
 
@@ -887,7 +885,7 @@ Hooks.once("init", async () => {
   });
 
   game.settings.register("msh-faserip", "nullifyMaxRange", {
-    name: "Nullifying Power — Max Aura Range (Areas)",
+    name: "Nullifying Power â€” Max Aura Range (Areas)",
     hint: "Cap the Nullifying Power aura radius in areas. 0 = full RAW range (rank-based). Any positive number caps the range (e.g. 4 means max 4 areas regardless of rank). Affects both the visual aura and the area template.",
     scope: "world",
     config: true,
@@ -898,7 +896,7 @@ Hooks.once("init", async () => {
 
   game.settings.register("msh-faserip", "dotMode", {
     name: "Dot Mode (Theater of the Mind)",
-    hint: "Default dot mode for new scenes. Individual scenes can override this in Scene Config → Grid tab. Right-click tokens to override per-token. Ctrl+hover a dot for portrait.",
+    hint: "Default dot mode for new scenes. Individual scenes can override this in Scene Config â†’ Grid tab. Right-click tokens to override per-token. Ctrl+hover a dot for portrait.",
     scope: "world",
     config: true,
     type: Boolean,
@@ -1106,7 +1104,7 @@ Hooks.once("init", async () => {
 
     game.settings.register("msh-faserip", "actionHudZoom", {
       name: "Action HUD: Button Scale",
-      hint: "Zoom level for HUD buttons (0.5–2.0). Also adjustable with Ctrl+Wheel.",
+      hint: "Zoom level for HUD buttons (0.5â€“2.0). Also adjustable with Ctrl+Wheel.",
       scope: "client",
       config: true,
       type: Number,
@@ -1171,7 +1169,7 @@ Hooks.once("init", async () => {
 
     debugLog("FASERIP DEBUG: Team settings registered.");
 
-    // ========== CTT ↔ FASERIP Bridge Hooks ==========
+    // ========== CTT â†” FASERIP Bridge Hooks ==========
     // When CTT fires its own hooks, relay them to msh-faserip.timeUpdated
     // so the team sheet and any other FASERIP listeners refresh.
     Hooks.on("timeTracker.timeAdvanced", async (amount, unitId) => {
@@ -1205,7 +1203,7 @@ Hooks.once("init", async () => {
 
         // Process 1 dying round per character per CTT advance.
         // During combat, combatRound hook handles dying (1 per round).
-        // Out of combat, each manual CTT advance ticks dying once — GM controls pacing.
+        // Out of combat, each manual CTT advance ticks dying once â€” GM controls pacing.
         for (const actor of Effects.getAllTokenActors()) {
           if (!actor?.effects?.size) continue;
           const dyingAE = actor.effects.find(e =>
@@ -1214,9 +1212,9 @@ Hooks.once("init", async () => {
           );
           if (!dyingAE) continue;
 
-          console.log(`[FASERIP:DYING] CTT timeAdvanced: ${amount} ${unitId} = ${deltaSeconds}s — processing 1 dying round for ${actor.name}`);
+          console.log(`[FASERIP:DYING] CTT timeAdvanced: ${amount} ${unitId} = ${deltaSeconds}s â€” processing 1 dying round for ${actor.name}`);
           const result = await processDyingRound(actor);
-          console.log(`[FASERIP:DYING] CTT: ${actor.name} → ${result}`);
+          console.log(`[FASERIP:DYING] CTT: ${actor.name} â†’ ${result}`);
         }
       } catch (e) {
         console.error("[FASERIP ERROR] CTT dying processing failed:", e);
@@ -1242,7 +1240,7 @@ Hooks.once("init", async () => {
             if (elapsed >= required) {
               const result = await RestSystem.healImpairedEndurance(actor, medicalCare);
               if (result.success) {
-                console.log(`[FASERIP] Impaired Endurance healed: ${actor.name} — ${result.message}`);
+                console.log(`[FASERIP] Impaired Endurance healed: ${actor.name} â€” ${result.message}`);
               }
             }
           }
@@ -1255,23 +1253,23 @@ Hooks.once("init", async () => {
       Hooks.callAll("msh-faserip.timeUpdated");
     });
 
-  // Register custom status effects — skip any IDs already registered by core (v14 proxy enforces uniqueness)
+  // Register custom status effects â€” skip any IDs already registered by core (v14 proxy enforces uniqueness)
   const _existingStatusIds = new Set(CONFIG.statusEffects.map(e => e.id));
   const _mshStatusEffects = [
-    { id: "partial-hold", label: "Partial Hold", icon: "icons/svg/net.svg", flags: { "msh-faserip": { grappling: true } } },
-    { id: "full-hold", label: "Full Hold", icon: "icons/svg/paralysis.svg", flags: { "msh-faserip": { grappling: true } } },
-    { id: "dying", label: "Dying", icon: "icons/svg/skull.svg", flags: { "msh-faserip": { isDying: true } } },
-    { id: "impaired-endurance", label: "Impaired Endurance", icon: "icons/svg/blood.svg", flags: { "msh-faserip": { isImpairedEndurance: true } } },
-    { id: "dead", label: "Dead", icon: "icons/svg/skull.svg", flags: { "msh-faserip": { isDead: true } } },
-    { id: "dodging", label: "Dodging", icon: "icons/svg/windmill.svg", flags: { "msh-faserip": { isDodging: true } } },
-    { id: "evading", label: "Evading", icon: "icons/svg/combat.svg", flags: { "msh-faserip": { isEvading: true } } },
-    { id: "blocking", label: "Blocking", icon: "icons/svg/shield.svg", flags: { "msh-faserip": { isBlocking: true } } }
+    { id: "partial-hold", name: "Partial Hold", img: "icons/svg/net.svg", flags: { "msh-faserip": { grappling: true } } },
+    { id: "full-hold", name: "Full Hold", img: "icons/svg/paralysis.svg", flags: { "msh-faserip": { grappling: true } } },
+    { id: "dying", name: "Dying", img: "icons/svg/skull.svg", flags: { "msh-faserip": { isDying: true } } },
+    { id: "impaired-endurance", name: "Impaired Endurance", img: "icons/svg/blood.svg", flags: { "msh-faserip": { isImpairedEndurance: true } } },
+    { id: "dead", name: "Dead", img: "icons/svg/skull.svg", flags: { "msh-faserip": { isDead: true } } },
+    { id: "dodging", name: "Dodging", img: "icons/svg/windmill.svg", flags: { "msh-faserip": { isDodging: true } } },
+    { id: "evading", name: "Evading", img: "icons/svg/combat.svg", flags: { "msh-faserip": { isEvading: true } } },
+    { id: "blocking", name: "Blocking", img: "icons/svg/shield.svg", flags: { "msh-faserip": { isBlocking: true } } }
   ];
   for (const effect of _mshStatusEffects) {
     if (_existingStatusIds.has(effect.id)) {
       const existing = CONFIG.statusEffects.find(e => e.id === effect.id);
       if (existing) foundry.utils.mergeObject(existing, { flags: effect.flags });
-      console.log(`[FASERIP] Status effect "${effect.id}" already registered by core — merging flags.`);
+      console.log(`[FASERIP] Status effect "${effect.id}" already registered by core â€” merging flags.`);
     } else {
       CONFIG.statusEffects.push(effect);
       _existingStatusIds.add(effect.id);
@@ -1284,7 +1282,7 @@ Hooks.once("init", async () => {
     if (RANK_VALUES[canonical] !== undefined) CONFIG.FASERIP.rankValues[alias] = RANK_VALUES[canonical];
   }
 
-  // Rank navigation helpers — delegate to canonical shiftRank
+  // Rank navigation helpers â€” delegate to canonical shiftRank
   game.msh.nextLowerRankName = function(name) {
     const n = normalizeRank(name);
     const i = RANKS_ORDERED.indexOf(n);
@@ -1766,7 +1764,7 @@ Hooks.once("init", async () => {
   // Initialize rest system
   initRestSystem();
 
-  // ── Ongoing Effects Engine API ────────────────────────────────────────
+  // â”€â”€ Ongoing Effects Engine API â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // Generic periodic effects (Regeneration, Solar Regen, Dying, etc.)
   let OngoingEngine;
   try {
@@ -1940,7 +1938,7 @@ Hooks.on("preCreateActor", (document, data, options, userId) => {
 
 
 // CONSOLIDATED READY HOOK - All ready logic in one place
-// ─── Handle faserip.token.* ActiveEffect changes ────────────────────────────
+// â”€â”€â”€ Handle faserip.token.* ActiveEffect changes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Effects with change keys like "faserip.token.light.bright" are intercepted
 // by the applyActiveEffect hook (blocked from writing to actor system data)
 // and instead applied directly to the owning token(s).
@@ -1952,11 +1950,11 @@ Hooks.on("preCreateActor", (document, data, options, userId) => {
 const _TOKEN_FLAG_SCOPE = "msh-faserip";
 const _TOKEN_BASELINE_KEY = "tokenBaseline";
 
-// Encode/decode baseline keys: dots ↔ pipes
+// Encode/decode baseline keys: dots â†” pipes
 function _baselineEncode(dotKey) { return dotKey.replaceAll(".", "|"); }
 function _baselineDecode(pipeKey) { return pipeKey.replaceAll("|", "."); }
 
-// Collect all active faserip.token.* changes for an actor — returns Map<dotKey, value>
+// Collect all active faserip.token.* changes for an actor â€” returns Map<dotKey, value>
 function _collectTokenEffectState(actor) {
   const desired = new Map();
   for (const effect of actor.allApplicableEffects()) {
@@ -2013,7 +2011,7 @@ async function _reconcileTokenEffects(actor) {
       await tokenDoc.update(update);
 
     } else if (savedBaseline) {
-      // No active token effects — revert every key to its baseline value
+      // No active token effects â€” revert every key to its baseline value
       const revert = {};
       for (const [safeKey, val] of Object.entries(savedBaseline)) {
         const dotKey = _baselineDecode(safeKey);
@@ -2045,14 +2043,14 @@ function _resolveEffectActor(effect) {
   return null;
 }
 
-// ── Hook: block faserip.token.* from being written to actor system data ──
+// â”€â”€ Hook: block faserip.token.* from being written to actor system data â”€â”€
 Hooks.on("applyActiveEffect", (actor, change, current, delta, changes) => {
   if (change.mode !== CONST.ACTIVE_EFFECT_MODES.CUSTOM) return;
   if (!change.key.startsWith("faserip.token.")) return;
   return false;
 });
 
-// ── Hooks: reconcile when effects change ──
+// â”€â”€ Hooks: reconcile when effects change â”€â”€
 Hooks.on("updateActiveEffect", (effect, changes, options, userId) => {
   const hasTokenChanges = effect.changes?.some(c => c.key?.startsWith("faserip.token."));
   const disabledToggled = "disabled" in changes;
@@ -2119,12 +2117,12 @@ Hooks.on("canvasReady", async () => {
       const hasDotKeys = Object.keys(bl).some(k => k.includes("."));
       const hasNestedFromCorruption = !hasDotKeys && Object.values(bl).some(v => v && typeof v === "object");
       if (hasDotKeys) {
-        // Old format: { "light.bright": 0 } → { "light|bright": 0 }
+        // Old format: { "light.bright": 0 } â†’ { "light|bright": 0 }
         const migrated = {};
         for (const [k, v] of Object.entries(bl)) migrated[_baselineEncode(k)] = v;
         await tokenDoc.setFlag(_TOKEN_FLAG_SCOPE, _TOKEN_BASELINE_KEY, migrated);
       } else if (hasNestedFromCorruption) {
-        // Corrupted: { light: { bright: 0 } } → flatten and re-encode
+        // Corrupted: { light: { bright: 0 } } â†’ flatten and re-encode
         const flat = foundry.utils.flattenObject(bl);
         const migrated = {};
         for (const [k, v] of Object.entries(flat)) migrated[_baselineEncode(k)] = v;
@@ -2258,7 +2256,7 @@ Hooks.once("ready", async () => {
   try { ManualModeDialog.setupChatListeners(); }
   catch (e) { console.warn("Manual toggle setup failed:", e); }
 
-  // Register macros (lazy-loaded — quick-heal.js is a self-executing script, not an ES module)
+  // Register macros (lazy-loaded â€” quick-heal.js is a self-executing script, not an ES module)
   game.msh.macros = {
     quickHeal: async () => {
       const script = await fetch("systems/msh-faserip/macros/quick-heal.js").then(r => r.text());
@@ -2268,7 +2266,7 @@ Hooks.once("ready", async () => {
   };
   console.log("[FASERIP] Macros registered");
 
-  // ── Regeneration power auto-sync ──────────────────────────────
+  // â”€â”€ Regeneration power auto-sync â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // Clean up old/broken AEs, then create missing ones
   if (game.user.isGM) {
     try {
@@ -2321,7 +2319,7 @@ Hooks.once("ready", async () => {
       console.warn("[FASERIP WARN] Regeneration auto-sync failed:", e);
     }
 
-    // ── Defense power auto-sync ──────────────────────────────────
+    // â”€â”€ Defense power auto-sync â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // Create missing defense AEs for actors with body armor, force field, or resistance powers
     try {
       const { syncAllDefenseEffects } = await import("./modules/effects/defense-effects.js");
@@ -2354,7 +2352,7 @@ Hooks.once("ready", async () => {
   // Migration: strip legacy canAct/canMove/movementMult changes from existing Dying AEs.
   // These were incorrectly added; dying characters above 0 HP can still act (rules p.31).
   // Migration: fix Impaired Endurance AEs that used wrong key system.columnShift instead of
-  // system.combatMods.attackShift — the old key was never read during attack resolution.
+  // system.combatMods.attackShift â€” the old key was never read during attack resolution.
   if (game.user.isGM) {
     try {
       const DYING_STALE_KEYS = new Set([
@@ -2405,7 +2403,7 @@ Hooks.once("ready", async () => {
         }
       }
       if (dyingMigrated) console.log(`[FASERIP] Migrated ${dyingMigrated} Dying AE(s): removed stale canAct/canMove/movementMult changes`);
-      if (impairedMigrated) console.log(`[FASERIP] Migrated ${impairedMigrated} Impaired Endurance AE(s): fixed columnShift → combatMods.attackShift`);
+      if (impairedMigrated) console.log(`[FASERIP] Migrated ${impairedMigrated} Impaired Endurance AE(s): fixed columnShift â†’ combatMods.attackShift`);
     } catch (e) {
       console.warn("[FASERIP WARN] AE migration failed:", e);
     }
@@ -2413,11 +2411,11 @@ Hooks.once("ready", async () => {
 
 });
 
-// ── Block CTT/auto-expiry from deleting ongoing engine AEs ──
+// â”€â”€ Block CTT/auto-expiry from deleting ongoing engine AEs â”€â”€
 // CTT's effects-manager and the built-in duration system can try to expire AEs.
 // This hook prevents that for Regeneration while allowing intentional
 // deletions (stopRegeneration, GM removal, etc).
-// Dying AEs are NOT protected here — they have no duration so auto-expiry
+// Dying AEs are NOT protected here â€” they have no duration so auto-expiry
 // won't fire, and GMs need to be able to delete them from the sheet.
 Hooks.on("preDeleteActiveEffect", (effect, options, userId) => {
   const scope = globalThis.MSH_FLAG_SCOPE || "msh-faserip";
@@ -2438,31 +2436,31 @@ Hooks.on("preDeleteActiveEffect", (effect, options, userId) => {
     return false;
   }
 
-  // Protect impaired endurance — managed by rest system, not time expiry
+  // Protect impaired endurance â€” managed by rest system, not time expiry
   // But allow expiry on dead/deactivated actors (no point preserving it)
   if (effect.flags?.[scope]?.isImpairedEndurance) {
     const parentActor = effect.parent;
     if (parentActor?.system?.details?.isDead || parentActor?.system?.details?.isDeactivated) {
-      return; // allow — actor is dead, let it clean up
+      return; // allow â€” actor is dead, let it clean up
     }
     console.log(`[FASERIP] Blocked auto-expiration of Impaired Endurance AE on ${parentActor?.name}`);
     return false;
   }
 
-  // Protect dying AE — managed by processDyingRound, not time expiry
+  // Protect dying AE â€” managed by processDyingRound, not time expiry
   // But allow deletion if actor is already dead/deactivated (processDyingRound death path)
   if (effect.flags?.[scope]?.isDying || effect.flags?.[scope]?.ongoingId === "dying") {
     const parentActor = effect.parent;
     if (parentActor?.system?.details?.isDead || parentActor?.system?.details?.isDeactivated) {
-      return; // allow — actor already dead, clean up the AE
+      return; // allow â€” actor already dead, clean up the AE
     }
     console.log(`[FASERIP] Blocked auto-expiration of Dying AE on ${parentActor?.name}`);
     return false;
   }
 });
 
-// ── Regeneration: sync AEs with power items ──
-// ── Power → Ongoing Effect Auto-Sync ──────────────────────────────────────
+// â”€â”€ Regeneration: sync AEs with power items â”€â”€
+// â”€â”€ Power â†’ Ongoing Effect Auto-Sync â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // When a power item with regenerationType/absorptionType is added, edited,
 // or removed from an actor, automatically register/remove the corresponding
 // ongoing effect. The player sees the AE in their Effects tab and toggles it.
@@ -2480,7 +2478,7 @@ async function syncPowerOngoingEffects(actor, item, removing = false) {
     return;
   }
 
-  // ── Defense effects sync (body armor, force field, resistance) ──
+  // â”€â”€ Defense effects sync (body armor, force field, resistance) â”€â”€
   try {
     const { syncDefenseEffects } = await import("./modules/effects/defense-effects.js");
     await syncDefenseEffects(actor, item, removing);
@@ -2491,7 +2489,7 @@ async function syncPowerOngoingEffects(actor, item, removing = false) {
   const regenType = removing ? "" : (item.system?.regenerationType || "");
   const scope = globalThis.MSH_FLAG_SCOPE || "msh-faserip";
 
-  // ── Regeneration (Resting) ──────────────────────────────────────────
+  // â”€â”€ Regeneration (Resting) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   if (regenType === "rest") {
     // Remove solar if it was previously set
     const hasSolar = actor.effects.some(e => e.flags?.[scope]?.ongoingId === "solarRegeneration");
@@ -2510,7 +2508,7 @@ async function syncPowerOngoingEffects(actor, item, removing = false) {
       console.log(`[FASERIP] Regeneration (Resting) auto-registered on ${actor.name}`);
     }
 
-  // ── Regeneration (Solar) ────────────────────────────────────────────
+  // â”€â”€ Regeneration (Solar) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   } else if (regenType === "solar") {
     // Remove resting if it was previously set
     const hasRegen = actor.effects.some(e => e.flags?.[scope]?.ongoingId === "regeneration");
@@ -2526,7 +2524,7 @@ async function syncPowerOngoingEffects(actor, item, removing = false) {
       console.log(`[FASERIP] Solar Regeneration auto-registered on ${actor.name}`);
     }
 
-  // ── None / Removing ─────────────────────────────────────────────────
+  // â”€â”€ None / Removing â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   } else {
     // Clean up both types
     const hasRegen = actor.effects.some(e => e.flags?.[scope]?.ongoingId === "regeneration");
@@ -2634,7 +2632,7 @@ Hooks.on('updateActor', async (actor, updateData, options, userId) => {
 
     // --- DYING TICK GUARD -----------------------------------------
     // Dying only reduces Endurance ranks (not Health). If HP was capped
-    // at the new max Health, skip damage processing — this is not combat damage.
+    // at the new max Health, skip damage processing â€” this is not combat damage.
     if (options.mshDyingTick) return;
     // -----------------------------------------------------------
 
@@ -2683,7 +2681,7 @@ Hooks.on('updateActor', async (actor, updateData, options, userId) => {
 
     const currentHealth = Number(newHealth ?? 0);
 
-    // ===== 0 HP DEATH SAVE — runs BEFORE throttle so it is never swallowed =====
+    // ===== 0 HP DEATH SAVE â€” runs BEFORE throttle so it is never swallowed =====
     if (currentHealth <= 0) {
       // Skip if combat system already handling death save (applyDamageToTargets)
       if (game.msh?._combatDamageInProgress) {
@@ -2705,7 +2703,7 @@ Hooks.on('updateActor', async (actor, updateData, options, userId) => {
       console.log(`%cFASERIP | !!! ${actor.name} is at ${currentHealth} HP - triggering death save`, 'color: #ef5350; font-weight: bold');
 
       // Four-Color Rule: skip death save unless the attack was lethal (kill result)
-      // Without attack context here, we can only check the setting — if fourColor is on
+      // Without attack context here, we can only check the setting â€” if fourColor is on
       // and no kill result flag is pending, apply non-lethal knockout instead.
       const fourColor = game.settings.get("msh-faserip", "fourColorRule");
       const pendingKill = game.msh?._pendingKillResult?.[actor.id];
@@ -2713,7 +2711,7 @@ Hooks.on('updateActor', async (actor, updateData, options, userId) => {
       const isLethal = !!pendingKill;
 
       if (fourColor && !isLethal) {
-        console.log(`[FASERIP] Four-Color Rule active — non-lethal knockout for ${actor.name}`);
+        console.log(`[FASERIP] Four-Color Rule active â€” non-lethal knockout for ${actor.name}`);
         const stunDie = game.settings?.get?.("msh-faserip", "stunDurationDie") || "d10";
         const durationRoll = await new Roll(`1${stunDie}`).evaluate();
         const rounds = durationRoll.total;
@@ -2761,7 +2759,7 @@ Hooks.on('updateActor', async (actor, updateData, options, userId) => {
     } else {
       // === Above 0 HP: record damage for rest system (throttled) ===
 
-      // Throttle rest-system timer creation (1.5s per actor) — only for non-death damage
+      // Throttle rest-system timer creation (1.5s per actor) â€” only for non-death damage
       const now = Date.now();
       game.msh._lastDamageTimerAt ??= {};
       const lastAt = game.msh._lastDamageTimerAt[actor.id] || 0;
@@ -2777,7 +2775,7 @@ Hooks.on('updateActor', async (actor, updateData, options, userId) => {
 
       // Clear KO flag only on new conscious damage (oldHealth > 0 means they were
       // already conscious and took a hit). If oldHealth was 0, this is a consciousness
-      // recovery (health restored from 0), so the KO flag should stay — per rules p.32,
+      // recovery (health restored from 0), so the KO flag should stay â€” per rules p.32,
       // Recovery is unavailable after being knocked unconscious; only hourly Healing applies.
       const scope = globalThis.MSH_FLAG_SCOPE || "msh-faserip";
       if (oldHealth > 0 && actor.getFlag(scope, "wasKnockedOut")) {
@@ -2880,7 +2878,7 @@ Hooks.on('renderChatMessageHTML', (message, htmlEl) => {
       }
       
       ui.notifications.info(`Medical care ${newCare ? 'enabled' : 'disabled'} for ${actor.name}`);
-      // (Quiet mode) — no chat card spam on toggle
+      // (Quiet mode) â€” no chat card spam on toggle
             
             // Disable the button to prevent spam
             button.disabled = true;
@@ -2894,7 +2892,7 @@ Hooks.on('renderChatMessageHTML', (message, htmlEl) => {
 
 // Each turn, decrement Endurance one printed rank for actors who are Dying (RAW)
 Hooks.on("updateCombat", async (combat, changed, diff, userId) => {
-  // GM-only – players don't mutate actors/effects here
+  // GM-only â€“ players don't mutate actors/effects here
   if (!game.user.isGM) return;
 
   console.debug("[FASERIP DEBUG] updateCombat hook fired", { changed, round: combat.round, turn: combat.turn });
@@ -2909,7 +2907,7 @@ Hooks.on("updateCombat", async (combat, changed, diff, userId) => {
   // Individual combatant turn changes within a round do NOT advance time.
 
   // Dedup guard: track last processed round+turn to prevent duplicate effect processing
-  // NOTE: Dying is NOT processed here — it's handled exclusively by the combatRound hook.
+  // NOTE: Dying is NOT processed here â€” it's handled exclusively by the combatRound hook.
   const dyingKey = `${combat.round}-${combat.turn}`;
   const lastDyingKey = combat.getFlag("msh-faserip", "lastDyingProcessed");
   if (lastDyingKey === dyingKey) {
@@ -2948,7 +2946,7 @@ Hooks.on("updateCombat", async (combat, changed, diff, userId) => {
         const scope = globalThis.MSH_FLAG_SCOPE || "msh-faserip";
         const efFlags = ef.flags?.[scope] || {};
         
-        // Skip ongoing engine effects — they manage their own lifecycle
+        // Skip ongoing engine effects â€” they manage their own lifecycle
         // (dying, regeneration, etc. use CTT effectExpired or processDyingRound)
         if (efFlags.ongoingId || efFlags.isDying || efFlags.dyingTimer) continue;
         
@@ -3005,7 +3003,7 @@ Hooks.on("updateCombat", async (combat, changed, diff, userId) => {
     const a = c.actor;
     if (!a) continue;
     for (const eff of a.effects) {
-      if (eff?.duration?.rounds && eff?.id) {  // ← ADD: && eff?.id
+      if (eff?.duration?.rounds && eff?.id) {  // â† ADD: && eff?.id
         try {
           await Effects.renameEffectWithRemaining(eff);
         } catch (e) {
