@@ -73,7 +73,7 @@ export function computeDuration({ rounds = null, seconds = null } = {}) {
     // Preferred: keep rounds in combat, seconds out of combat
     if (inCombat && (policy === "rounds-in-combat" || policy === "auto")) {
       if (v14) {
-        return { value: rounds, units: "turns", expiry: "roundEnd" };
+        return { value: rounds, units: "rounds", expiry: "roundEnd" };
       }
       return {
         rounds,
