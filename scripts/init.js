@@ -196,7 +196,7 @@ Hooks.on("updateWorldTime", async (worldTime, dt, options, userId) => {
 
           if (equipItem) {
             // Equipment effect: disable (reusable) and clear duration stamp
-            await effect.update({ disabled: true, duration: { seconds: null, startTime: null } });
+            await effect.update({ disabled: true, duration: { value: 0, units: null } });
             const rechargeLabel = equipItem.system?.rechargeLabel || "Reload";
             ChatMessage.create({
               content: `<div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;">
@@ -693,7 +693,7 @@ Hooks.once("init", async () => {
         }
       }
       if (item?.type === "equipment" && Number(item.system?.duration) > 0) {
-        changes.duration = { seconds: null, startTime: null };
+        changes.duration = { value: 0, units: null };
       }
     }
   });

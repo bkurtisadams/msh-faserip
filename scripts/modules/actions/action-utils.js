@@ -1912,8 +1912,8 @@ export async function _applyFourColorKnockout(actor, rounds) {
     ],
     statuses: ["unconscious"],
     duration: inCombat
-      ? { rounds: Math.max(1, Number(rounds)), startRound: game.combat?.round || 0 }
-      : { seconds: Math.max(1, Number(rounds)) * 6, startTime: game.time.worldTime }
+      ? { value: Math.max(1, Number(rounds)), units: "rounds", expiry: "roundEnd" }
+      : { value: Math.max(1, Number(rounds)) * 6, units: "seconds" }
   };
   await safeActorCreateEffect(actor, [effectData]);
   console.log(`[FASERIP] Four-Color knockout: ${actor.name} unconscious for ${rounds} rounds`);

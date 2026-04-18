@@ -574,9 +574,9 @@ export class DefenseAction extends BaseAction {
           origin: this.actor.uuid,
           disabled: false,
           duration: {
-            rounds: 1,
-            startRound: game.combat?.round || 0,
-            startTurn: game.combat?.turn || 0
+            value: 1,
+            units: "rounds",
+            expiry: "roundEnd"
           },
           changes: [
             // Block: "may take no other action"
@@ -633,9 +633,9 @@ export class DefenseAction extends BaseAction {
         origin: this.actor.uuid,
         disabled: false,
         duration: {
-          rounds: 1,
-          startRound: game.combat?.round || 0,
-          startTurn: game.combat?.turn || 0
+          value: 1,
+          units: "rounds",
+          expiry: "roundEnd"
         },
         changes,
         flags: {
@@ -714,9 +714,9 @@ export class DefenseAction extends BaseAction {
         origin: this.actor.uuid,
         disabled: false,
         duration: {
-          rounds: 1,
-          startRound: game.combat?.round || 0,
-          startTurn: game.combat?.turn || 0
+          value: 1,
+          units: "rounds",
+          expiry: "roundEnd"
         },
         // Evading prevents actions this round (per rules: "makes no attacks that round")
         changes: [
@@ -756,9 +756,9 @@ export class DefenseAction extends BaseAction {
           origin: this.actor.uuid,
           disabled: false,
           duration: {
-            rounds: 2,  // Fallback duration; real expiry controlled by expiresAtRound flag
-            startRound: currentRound,
-            startTurn: game.combat?.turn || 0
+            value: 2,  // Fallback duration; real expiry controlled by expiresAtRound flag
+            units: "rounds",
+            expiry: "roundEnd"
           },
           flags: {
             "msh-faserip": {

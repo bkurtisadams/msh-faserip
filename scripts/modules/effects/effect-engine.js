@@ -41,10 +41,19 @@ export function toSeconds(turns = 1) {
   return Math.round(turns * getTurnSeconds());
 }
 
-/** Decide the duration block for an AE from rounds/seconds and policy */
+/** Decide the duration block for an AE from rounds/seconds and policy.
+ * Writes v14 schema: { value, units, expiry }.
+ * Falls back to v13 schema ({ seconds, startTime } or { rounds, startRound })
+ * if game.release.generation is < 14.
+ */
 export function computeDuration({ rounds = null, seconds = null } = {}) {
+  const v14 = (game.release?.generation ?? 13) >= 14;
+
   // If explicit seconds provided, honor it
   if (Number.isFinite(seconds) && seconds > 0) {
+    if (v14) {
+      return { value: seconds, units: "seconds" };
+    }
     return { seconds, startTime: game.time?.worldTime ?? undefined };
   }
 
@@ -55,6 +64,9 @@ export function computeDuration({ rounds = null, seconds = null } = {}) {
 
     // Preferred: keep rounds in combat, seconds out of combat
     if (inCombat && (policy === "rounds-in-combat" || policy === "auto")) {
+      if (v14) {
+        return { value: rounds, units: "rounds", expiry: "roundEnd" };
+      }
       return {
         rounds,
         startRound: game.combat?.round ?? 0,
@@ -62,8 +74,12 @@ export function computeDuration({ rounds = null, seconds = null } = {}) {
     }
 
     // Outside combat, convert to real time
+    const s = toSeconds(rounds);
+    if (v14) {
+      return { value: s, units: "seconds" };
+    }
     return {
-      seconds: toSeconds(rounds),
+      seconds: s,
       startTime: game.time?.worldTime ?? undefined
     };
   }
@@ -95,7 +111,21 @@ export async function renameEffectWithRemaining(effect) {
 /** Return remaining time as { rounds, seconds, text } */
 export function getRemaining(effect) {
   const d = effect?.duration || {};
-  // Round-based
+
+  // v14: Foundry computes remaining for us. Use it directly.
+  // d.units is "rounds"/"seconds"/"turns"; d.remaining is the live remaining count.
+  if (Number.isFinite(d.remaining) && d.units) {
+    const u = String(d.units).toLowerCase();
+    if (u === "rounds" || u === "turns") {
+      const unitLabel = d.remaining === 1 ? "turn" : "turns";
+      return { rounds: d.remaining, seconds: null, text: `${d.remaining} ${unitLabel}` };
+    }
+    if (u === "seconds") {
+      return { rounds: null, seconds: d.remaining, text: `${d.remaining}s` };
+    }
+  }
+
+  // v13 fallback: rounds-based
   if (Number.isFinite(d.rounds) && (Number.isFinite(d.startRound) || Number.isFinite(d.startTurn))) {
     const curR = game.combat?.round ?? 0;
     const startR = d.startRound ?? curR;
@@ -104,13 +134,16 @@ export function getRemaining(effect) {
     const unit = remain === 1 ? "turn" : "turns";
     return { rounds: remain, seconds: null, text: `${remain} ${unit}` };
   }
-  // Seconds-based
-  if (Number.isFinite(d.seconds) && Number.isFinite(d.startTime)) {
-    const now = game.time?.worldTime ?? 0;
-    const end = d.startTime + d.seconds;
-    const remain = Math.max(0, Math.floor(end - now));
-    const unit = "s";
-    return { rounds: null, seconds: remain, text: `${remain}${unit}` };
+  // v13 fallback: seconds-based. v14 also populates d.seconds via backward compat,
+  // and start time moved to effect.start.time (with d._worldTime as another alias).
+  if (Number.isFinite(d.seconds)) {
+    const startTime = effect?.start?.time ?? d.startTime ?? d._worldTime;
+    if (Number.isFinite(startTime)) {
+      const now = game.time?.worldTime ?? 0;
+      const end = startTime + d.seconds;
+      const remain = Math.max(0, Math.floor(end - now));
+      return { rounds: null, seconds: remain, text: `${remain}s` };
+    }
   }
   return { rounds: null, seconds: null, text: "" };
 }

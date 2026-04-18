@@ -353,8 +353,8 @@ export class DeathSaveAction extends BaseAction {
       ],
       statuses: ["unconscious"],
       duration: usesCTT
-        ? { seconds: Math.max(1, Number(unconsciousRounds)) * 6, startTime: game.time.worldTime }
-        : { rounds: Math.max(1, Number(unconsciousRounds)), startRound: game.combat?.round || 0 }
+        ? { value: Math.max(1, Number(unconsciousRounds)) * 6, units: "seconds" }
+        : { value: Math.max(1, Number(unconsciousRounds)), units: "rounds", expiry: "roundEnd" }
     };
 
     await safeActorCreateEffect(actor, [effectData]);

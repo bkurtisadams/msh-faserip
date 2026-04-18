@@ -1378,7 +1378,7 @@ export function installActionChatHandlers() {
                   durationRounds: rounds
                 }
               },
-              duration: game.combat ? { rounds: rounds, startRound: game.combat.round } : {},
+              duration: game.combat ? { value: rounds, units: "rounds", expiry: "roundEnd" } : {},
               disabled: false
             }]);
           }
@@ -1436,8 +1436,9 @@ async function createDodgingEffect(actor, data) {
     origin: actor.uuid,
     disabled: false,
     duration: {
-      rounds: 1,
-      startRound: game.combat?.round || 0
+      value: 1,
+      units: "rounds",
+      expiry: "roundEnd"
     },
     flags: {
       "msh-faserip": {

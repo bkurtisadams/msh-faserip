@@ -464,8 +464,8 @@ static async attemptRegainConsciousness(actor) {
         ],
         statuses: ["unconscious"],
         duration: game.combat
-          ? { rounds: rounds, startRound: game.combat.round || 0 }
-          : { seconds: Math.max(1, rounds) * 6, startTime: game.time.worldTime }
+          ? { value: rounds, units: "rounds", expiry: "roundEnd" }
+          : { value: Math.max(1, rounds) * 6, units: "seconds" }
       };
       
       await actor.createEmbeddedDocuments("ActiveEffect", [effectData]);
@@ -564,8 +564,9 @@ static async attemptRegainConsciousness(actor) {
         ],
         statuses: ["unconscious"],
         duration: {
-          rounds: hours * 600,
-          startRound: game.combat?.round || 0
+          value: hours * 600,
+          units: "rounds",
+          expiry: "roundEnd"
         }
       };
       await actor.createEmbeddedDocuments("ActiveEffect", [unconsciousEffect]);
