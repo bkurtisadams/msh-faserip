@@ -32,13 +32,21 @@ function durationPolicy() {
   return game.settings?.get?.("msh-faserip", "effects.durationPolicy") || "rounds-in-combat";
 }
 
-/** Convert N turns to seconds via CTT if possible, else fallback */
+/** Convert N turns to seconds via CTT if possible, else fallback.
+ * Returns a finite positive integer or 0 (never Infinity/NaN).
+ */
 export function toSeconds(turns = 1) {
+  if (!Number.isFinite(turns) || turns <= 0) return 0;
   const te = getCTT();
   if (te && typeof te.convertToSeconds === "function") {
-    try { return te.convertToSeconds(turns, "turn"); } catch (_) {}
+    try {
+      const s = te.convertToSeconds(turns, "turn");
+      if (Number.isFinite(s) && s > 0) return s;
+    } catch (_) {}
   }
-  return Math.round(turns * getTurnSeconds());
+  const ts = getTurnSeconds();
+  const result = Math.round(turns * ts);
+  return Number.isFinite(result) && result > 0 ? result : 0;
 }
 
 /** Decide the duration block for an AE from rounds/seconds and policy.
@@ -49,7 +57,7 @@ export function toSeconds(turns = 1) {
 export function computeDuration({ rounds = null, seconds = null } = {}) {
   const v14 = (game.release?.generation ?? 13) >= 14;
 
-  // If explicit seconds provided, honor it
+  // If explicit seconds provided, honor it (reject Infinity/NaN/<=0)
   if (Number.isFinite(seconds) && seconds > 0) {
     if (v14) {
       return { value: seconds, units: "seconds" };
@@ -57,7 +65,7 @@ export function computeDuration({ rounds = null, seconds = null } = {}) {
     return { seconds, startTime: game.time?.worldTime ?? undefined };
   }
 
-  // If rounds provided:
+  // If rounds provided (reject Infinity/NaN/<=0):
   if (Number.isFinite(rounds) && rounds > 0) {
     const policy = durationPolicy();
     const inCombat = !!game.combat?.active;
@@ -65,7 +73,7 @@ export function computeDuration({ rounds = null, seconds = null } = {}) {
     // Preferred: keep rounds in combat, seconds out of combat
     if (inCombat && (policy === "rounds-in-combat" || policy === "auto")) {
       if (v14) {
-        return { value: rounds, units: "rounds", expiry: "roundEnd" };
+        return { value: rounds, units: "turns", expiry: "roundEnd" };
       }
       return {
         rounds,
@@ -75,6 +83,7 @@ export function computeDuration({ rounds = null, seconds = null } = {}) {
 
     // Outside combat, convert to real time
     const s = toSeconds(rounds);
+    if (s <= 0) return {}; // toSeconds couldn't produce a valid count
     if (v14) {
       return { value: s, units: "seconds" };
     }

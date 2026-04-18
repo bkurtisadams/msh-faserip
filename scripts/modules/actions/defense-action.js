@@ -575,7 +575,7 @@ export class DefenseAction extends BaseAction {
           disabled: false,
           duration: {
             value: 1,
-            units: "rounds",
+            units: "turns",
             expiry: "roundEnd"
           },
           changes: [
@@ -634,7 +634,7 @@ export class DefenseAction extends BaseAction {
         disabled: false,
         duration: {
           value: 1,
-          units: "rounds",
+          units: "turns",
           expiry: "roundEnd"
         },
         changes,
@@ -715,7 +715,7 @@ export class DefenseAction extends BaseAction {
         disabled: false,
         duration: {
           value: 1,
-          units: "rounds",
+          units: "turns",
           expiry: "roundEnd"
         },
         // Evading prevents actions this round (per rules: "makes no attacks that round")
@@ -757,7 +757,7 @@ export class DefenseAction extends BaseAction {
           disabled: false,
           duration: {
             value: 2,  // Fallback duration; real expiry controlled by expiresAtRound flag
-            units: "rounds",
+            units: "turns",
             expiry: "roundEnd"
           },
           flags: {

@@ -464,7 +464,7 @@ static async attemptRegainConsciousness(actor) {
         ],
         statuses: ["unconscious"],
         duration: game.combat
-          ? { value: rounds, units: "rounds", expiry: "roundEnd" }
+          ? { value: rounds, units: "turns", expiry: "roundEnd" }
           : { value: Math.max(1, rounds) * 6, units: "seconds" }
       };
       
@@ -565,7 +565,7 @@ static async attemptRegainConsciousness(actor) {
         statuses: ["unconscious"],
         duration: {
           value: hours * 600,
-          units: "rounds",
+          units: "turns",
           expiry: "roundEnd"
         }
       };
