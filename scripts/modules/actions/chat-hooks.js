@@ -499,6 +499,7 @@ export function installActionChatHandlers() {
       const weaponMat = btn.dataset.weaponMat || "Excellent";
       const targetMat = btn.dataset.targetMat || "";
       const weaponName = btn.dataset.weaponName || "";
+      const itemUuid = btn.dataset.itemUuid || null;
       const actorUuid = btn.dataset.actorUuid;
 
       let actor = null;
@@ -511,7 +512,7 @@ export function installActionChatHandlers() {
 
       // Semi mode (or any mode with known target mat): roll directly, post chat card
       if (targetMat) {
-        await executeBreakingFeat({ weaponMatRank: weaponMat, targetMatRank: targetMat, weaponName, actor, postChat: true });
+        await executeBreakingFeat({ weaponMatRank: weaponMat, targetMatRank: targetMat, weaponName, itemUuid, actor, postChat: true });
       } else {
         // Fallback: open dialog to let user pick target material
         openBreakingFeatDialog({ weaponMatRank: weaponMat, targetMatRank: targetMat, actor });

@@ -197,8 +197,11 @@ export class BluntAttackAction extends AttackAction {
         base = Math.max(base, CONFIG.FASERIP?.rankValues?.[da.rank] || 0);
       }
       const res = computeBluntDamage(strength.rank, strength.value, mat, base, RANKS);
-      const sel = (savedSource === 'weapon' && savedItemId === i.id) ? 'selected' : '';
-      damageSrcOptions.push(`<option value="weapon:${i.id}" ${sel}>${i.name} &mdash; ${res.damage} dmg</option>`);
+      const isBroken = i.system?.broken === true;
+      const sel = (savedSource === 'weapon' && savedItemId === i.id && !isBroken) ? 'selected' : '';
+      const disabled = isBroken ? 'disabled' : '';
+      const label = isBroken ? `[BROKEN] ${i.name}` : i.name;
+      damageSrcOptions.push(`<option value="weapon:${i.id}" ${sel} ${disabled}>${label} &mdash; ${res.damage} dmg</option>`);
     }
     damageSrcOptions.push(`<option value="object" ${savedSource==='object'?'selected':''}>Improvised Object&hellip;</option>`);
 
@@ -731,7 +734,11 @@ export class BluntAttackAction extends AttackAction {
         damageNote: choice.note,
         sourceName: choice.weaponName || "Bare Hands",
         attackForm: "blunt",
-        breakingFeat: (choice.src === "weapon" || choice.src === "object") ? { weaponMat: choice.weaponMat, weaponName: choice.weaponName } : null,
+        breakingFeat: (choice.src === "weapon" || choice.src === "object") ? {
+          weaponMat: choice.weaponMat,
+          weaponName: choice.weaponName,
+          itemUuid: choice.src === "weapon" ? actor.items.get(choice.itemId)?.uuid : null
+        } : null,
         targetCount
       });
     } else {
@@ -758,7 +765,11 @@ export class BluntAttackAction extends AttackAction {
           damageNote: choice.note,
           sourceName: choice.weaponName || "Bare Hands",
           attackForm: "blunt",
-          breakingFeat: (choice.src === "weapon" || choice.src === "object") ? { weaponMat: choice.weaponMat, weaponName: choice.weaponName } : null,
+          breakingFeat: (choice.src === "weapon" || choice.src === "object") ? {
+            weaponMat: choice.weaponMat,
+            weaponName: choice.weaponName,
+            itemUuid: choice.src === "weapon" ? actor.items.get(choice.itemId)?.uuid : null
+          } : null,
           targetCount: 1,
           attackNumber: i + 1,
           totalAttacks: count

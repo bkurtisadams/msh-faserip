@@ -545,6 +545,7 @@
       "rate": "1",
       "shots": "",
       "shotsRemaining": "",
+      "broken": false,
       "noRangePenalty": false,
       "oneHandedUse": "normal",
       "throwable": false,

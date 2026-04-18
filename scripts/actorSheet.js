@@ -2646,6 +2646,18 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
       }
     });
 
+    // Equipment-tab broken indicator — click red X to repair
+    html.find('.equipment-repair').click(async ev => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const li = $(ev.currentTarget).closest(".equipment-row");
+      const itemId = li.data("itemId");
+      const item = this.actor.items.get(itemId);
+      if (!item) return;
+      await item.update({ "system.broken": false });
+      ui.notifications?.info(`${item.name} has been repaired.`);
+    });
+
     // Intensity roll button (gear rows) — also opens unified dialog
     html.find('.equipment-intensity-roll').click(async ev => {
       ev.preventDefault();

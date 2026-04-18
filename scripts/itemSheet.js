@@ -334,6 +334,13 @@ export class FaseripItemSheet extends ItemSheet {
   async activateListeners(html) {
     super.activateListeners(html);
 
+    // ── Repair button (equipment broken banner) ──
+    html.find('.faserip-repair-btn').on('click', async (ev) => {
+      ev.preventDefault();
+      await this.item.update({ "system.broken": false });
+      ui.notifications?.info(`${this.item.name} has been repaired.`);
+    });
+
     // ── Active Effect controls (all item types) ──
     html.find('.effect-control').click(ev => {
       onManageActiveEffect(ev, this.item);

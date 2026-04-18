@@ -952,6 +952,7 @@ export class AttackAction extends BaseAction {
             weaponMatRank: currentBreakingFeat.weaponMat,
             targetMatRank: currentBreakingFeat.targetMat,
             weaponName: currentBreakingFeat.weaponName,
+            itemUuid: currentBreakingFeat.itemUuid,
             actor,
             postChat: false
           });

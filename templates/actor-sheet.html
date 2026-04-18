@@ -825,6 +825,7 @@
                 <tr>
                   <th class="name-col">Name</th>
                   <th class="material-col">Mat.</th>
+                  <th class="broken-col" title="Broken status"><i class="fas fa-heart-crack"></i></th>
                   <th class="damage-col">Dmg</th>
                   <th class="type-col">Type</th>
                   <th class="range-col">Range</th>
@@ -843,6 +844,9 @@
                     <span class="equipment-name-text">{{item.name}}</span>
                   </td>
                   <td class="equipment-material">{{item.system.materialStrength}}</td>
+                  <td class="equipment-broken">
+                    {{#if item.system.broken}}<a class="equipment-repair" data-item-id="{{item._id}}" title="Broken — click to repair" style="color:#c62828;"><i class="fas fa-xmark"></i></a>{{/if}}
+                  </td>
                   <td class="equipment-damage">{{item.system.damage}}</td>
                   <td class="equipment-type equipment-type-badge" data-dtype="{{item.system.damageType}}">{{item.system.damageType}}</td>
                   <td class="equipment-range">{{item.system.range}}</td>
@@ -914,6 +918,7 @@
                 <tr>
                   <th class="name-col">Name</th>
                   <th class="material-col">Mat.</th>
+                  <th class="broken-col" title="Broken status"><i class="fas fa-heart-crack"></i></th>
                   <th class="damage-col">Protection</th>
                   <th class="type-col">Coverage</th>
                   <th class="range-col"></th>
@@ -931,6 +936,9 @@
                     <span class="equipment-name-text">{{item.name}}</span>
                   </td>
                   <td class="equipment-material">{{item.system.materialStrength}}</td>
+                  <td class="equipment-broken">
+                    {{#if item.system.broken}}<a class="equipment-repair" data-item-id="{{item._id}}" title="Broken — click to repair" style="color:#c62828;"><i class="fas fa-xmark"></i></a>{{/if}}
+                  </td>
                   <td class="equipment-damage">{{item.system.protection}}</td>
                   <td class="equipment-type">{{item.system.coverage}}</td>
                   <td></td><td></td><td></td>
@@ -953,6 +961,7 @@
                 <tr>
                   <th class="name-col">Name</th>
                   <th class="material-col">Mat.</th>
+                  <th class="broken-col" title="Broken status"><i class="fas fa-heart-crack"></i></th>
                   <th class="damage-col">Rank</th>
                   <th class="type-col">Power Type</th>
                   <th class="range-col">Range</th>
@@ -971,6 +980,9 @@
                     <span class="equipment-name-text">{{item.name}}</span>
                   </td>
                   <td class="equipment-material">{{item.system.materialStrength}}</td>
+                  <td class="equipment-broken">
+                    {{#if item.system.broken}}<a class="equipment-repair" data-item-id="{{item._id}}" title="Broken — click to repair" style="color:#c62828;"><i class="fas fa-xmark"></i></a>{{/if}}
+                  </td>
                   <td class="equipment-damage">{{item.system.powerRank}}</td>
                   <td class="equipment-type">{{item.system.powerType}}</td>
                   <td class="equipment-range">{{item.system.powerRange}}</td>
@@ -994,6 +1006,7 @@
                 <tr>
                   <th class="name-col">Name</th>
                   <th class="material-col">Mat.</th>
+                  <th class="broken-col" title="Broken status"><i class="fas fa-heart-crack"></i></th>
                   <th class="damage-col"></th>
                   <th class="type-col">Notes</th>
                   <th class="range-col"></th>
@@ -1012,6 +1025,9 @@
                     <span class="equipment-name-text">{{item.name}}</span>
                   </td>
                   <td class="equipment-material">{{item.system.materialStrength}}</td>
+                  <td class="equipment-broken">
+                    {{#if item.system.broken}}<a class="equipment-repair" data-item-id="{{item._id}}" title="Broken — click to repair" style="color:#c62828;"><i class="fas fa-xmark"></i></a>{{/if}}
+                  </td>
                   <td>{{#if item.system.intensityRank}}<span class="intensity-badge" title="Intensity">{{item.system.intensityRank}}</span>{{/if}}</td>
                   <td class="equipment-type">{{item.system.description}}</td>
                   <td></td><td></td><td></td>

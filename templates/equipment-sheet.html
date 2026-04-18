@@ -4,6 +4,17 @@
       <h1><input name="name" type="text" value="{{item.name}}" placeholder="Equipment Name"/></h1>
     </header>
 
+    {{#if system.broken}}
+    <div class="faserip-broken-banner" style="margin:4px 8px 8px;padding:6px 10px;background:#ffebee;border:1px solid #ef5350;border-radius:3px;display:flex;align-items:center;justify-content:space-between;gap:8px;">
+      <div style="color:#c62828;font-weight:bold;font-size:.95em;">
+        <i class="fas fa-triangle-exclamation"></i> BROKEN &mdash; unusable until repaired
+      </div>
+      <button type="button" class="faserip-repair-btn" style="padding:3px 10px;border:1px solid #c62828;border-radius:3px;background:#fff;color:#c62828;cursor:pointer;font-size:.85em;font-weight:600;">
+        <i class="fas fa-wrench"></i> Repair
+      </button>
+    </div>
+    {{/if}}
+
     <nav class="sheet-tabs tabs" data-group="primary">
       <a class="item active" data-tab="properties"><i class="fas fa-cog"></i> Properties</a>
       <a class="item" data-tab="effects"><i class="fas fa-bolt"></i> Effects</a>
@@ -43,6 +54,11 @@
         </select>
       </div>
   
+      <div class="form-group">
+        <label>Broken:</label>
+        <input type="checkbox" name="system.broken" {{#if system.broken}}checked{{/if}} title="If checked, this item is unusable in attack dialogs until repaired." />
+      </div>
+
       <div class="form-group">
         <label>Price (Resource Rank):</label>
         <select name="system.price">

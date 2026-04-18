@@ -1059,12 +1059,13 @@ export function buildActionsBox({
     const weaponMat = breakingFeat.weaponMat || "Excellent";
     const targetMat = breakingFeat.targetMat || "";
     const weaponName = breakingFeat.weaponName || "";
+    const itemUuid = breakingFeat.itemUuid || "";
     parts.push(
       chip(
         "Breaking FEAT",
         "Attempt a Breaking FEAT against intensity",
         true,
-        `data-action="breaking-feat" data-weapon-mat="${weaponMat}" data-target-mat="${targetMat}" data-weapon-name="${weaponName}" data-actor-uuid="${actorUuid || ''}" ${prefillAttr}`
+        `data-action="breaking-feat" data-weapon-mat="${weaponMat}" data-target-mat="${targetMat}" data-weapon-name="${weaponName}" data-item-uuid="${itemUuid}" data-actor-uuid="${actorUuid || ''}" ${prefillAttr}`
       )
     );
   }

@@ -35,7 +35,7 @@ function bannerColors(color) {
  * @param {boolean} [opts.postChat=false] - If true, post a standalone chat card
  * @returns {Promise<Object|null>} result object or null if no check needed
  */
-export async function executeBreakingFeat({ weaponMatRank = "Excellent", targetMatRank = "", weaponName = "", actor = null, postChat = false }) {
+export async function executeBreakingFeat({ weaponMatRank = "Excellent", targetMatRank = "", weaponName = "", itemUuid = null, actor = null, postChat = false }) {
   const weaponIdx = RANKS.indexOf(weaponMatRank);
   const targetIdx = RANKS.indexOf(targetMatRank);
 
@@ -72,10 +72,25 @@ export async function executeBreakingFeat({ weaponMatRank = "Excellent", targetM
   const weaponBreaks = autoResult ? autoResult === "auto-break" : passed;
   const reqColor = requiredColorForIntensity(comparatorRank, intensityRank);
 
+  // Auto-mark the item broken when the weapon breaks.
+  // Only applies to equipment items (not natural weapons, objects, etc.).
+  if (weaponBreaks && itemUuid) {
+    try {
+      const item = await fromUuid(itemUuid);
+      if (item && item.type === "equipment" && !item.system?.broken) {
+        await item.update({ "system.broken": true });
+        console.log(`[FASERIP] Broken flag set on ${item.name} (${itemUuid})`);
+      }
+    } catch (e) {
+      console.warn("[FASERIP] Could not mark item broken:", itemUuid, e);
+    }
+  }
+
   const result = {
     weaponMatRank,
     targetMatRank,
     weaponName,
+    itemUuid,
     wielderStr: comparatorRank,
     intensityRank,
     colorLower,

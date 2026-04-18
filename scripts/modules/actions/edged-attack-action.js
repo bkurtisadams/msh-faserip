@@ -172,8 +172,11 @@ export class EdgedAttackAction extends AttackAction {
       const res = computeEdgedDamage(strength.rank, strength.value, mat, base);
       const ap = getArmorPiercing(i);
       const apLabel = ap > 0 ? ` [AP ${ap}]` : "";
-      const sel = (savedSource === 'weapon' && savedItemId === i.id) ? 'selected' : '';
-      damageSrcOptions.push(`<option value="weapon:${i.id}" ${sel}>${i.name} &mdash; ${res.damage} dmg${apLabel}</option>`);
+      const isBroken = i.system?.broken === true;
+      const sel = (savedSource === 'weapon' && savedItemId === i.id && !isBroken) ? 'selected' : '';
+      const disabled = isBroken ? 'disabled' : '';
+      const label = isBroken ? `[BROKEN] ${i.name}` : i.name;
+      damageSrcOptions.push(`<option value="weapon:${i.id}" ${sel} ${disabled}>${label} &mdash; ${res.damage} dmg${apLabel}</option>`);
     }
 
     let initDamageSrcVal = "natural";
@@ -620,7 +623,11 @@ export class EdgedAttackAction extends AttackAction {
         damageNote: choice.note,
         sourceName: choice.weaponName || "Natural Weapon",
         attackForm: "edged",
-        breakingFeat: (choice.src === "weapon") ? { weaponMat: choice.weaponMat, weaponName: choice.weaponName } : null,
+        breakingFeat: (choice.src === "weapon") ? {
+          weaponMat: choice.weaponMat,
+          weaponName: choice.weaponName,
+          itemUuid: actor.items.get(choice.itemId)?.uuid
+        } : null,
         targetCount
       });
     } else {
@@ -643,7 +650,11 @@ export class EdgedAttackAction extends AttackAction {
           damageNote: choice.note,
           sourceName: choice.weaponName || "Natural Weapon",
           attackForm: "edged",
-          breakingFeat: (choice.src === "weapon") ? { weaponMat: choice.weaponMat, weaponName: choice.weaponName } : null,
+          breakingFeat: (choice.src === "weapon") ? {
+            weaponMat: choice.weaponMat,
+            weaponName: choice.weaponName,
+            itemUuid: actor.items.get(choice.itemId)?.uuid
+          } : null,
           targetCount: 1,
           attackNumber: i + 1,
           totalAttacks: count

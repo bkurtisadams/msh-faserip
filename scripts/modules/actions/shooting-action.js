@@ -200,8 +200,11 @@ export class ShootingAction extends RangedAttackAction {
       const rng = Number(i.system?.range || 0);
       const ap = Number(i.system?.armorPiercing || 0) || 0;
       const apLabel = ap > 0 ? ` [AP ${ap}]` : "";
-      const sel = (i.id === savedItemId || (!savedItemId && i.id === initialWeapon?.id)) ? 'selected' : '';
-      return `<option value="${i.id}" ${sel}>${i.name} &mdash; ${dmg} dmg / ${rng} areas${apLabel}</option>`;
+      const isBroken = i.system?.broken === true;
+      const sel = ((i.id === savedItemId || (!savedItemId && i.id === initialWeapon?.id)) && !isBroken) ? 'selected' : '';
+      const disabled = isBroken ? 'disabled' : '';
+      const label = isBroken ? `[BROKEN] ${i.name}` : i.name;
+      return `<option value="${i.id}" ${sel} ${disabled}>${label} &mdash; ${dmg} dmg / ${rng} areas${apLabel}</option>`;
     }).join('');
 
     // === Build CS row via shared utility (manual input + range + ? reference) ===
