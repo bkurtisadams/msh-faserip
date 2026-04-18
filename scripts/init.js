@@ -1957,10 +1957,11 @@ function _baselineDecode(pipeKey) { return pipeKey.replaceAll("|", "."); }
 // Collect all active faserip.token.* changes for an actor â€” returns Map<dotKey, value>
 function _collectTokenEffectState(actor) {
   const desired = new Map();
+  const CUSTOM = CONST.ACTIVE_EFFECT_CHANGE_TYPES?.CUSTOM ?? "custom";
   for (const effect of actor.allApplicableEffects()) {
     if (effect.disabled || effect.isSuppressed) continue;
     for (const change of effect.changes) {
-      if (change.mode !== CONST.ACTIVE_EFFECT_MODES.CUSTOM) continue;
+      if ((change.type ?? change.mode) !== CUSTOM) continue;
       if (!change.key.startsWith("faserip.token.")) continue;
       const tokenKey = change.key.replace("faserip.token.", "");
       let val = change.value;
@@ -2045,7 +2046,8 @@ function _resolveEffectActor(effect) {
 
 // â”€â”€ Hook: block faserip.token.* from being written to actor system data â”€â”€
 Hooks.on("applyActiveEffect", (actor, change, current, delta, changes) => {
-  if (change.mode !== CONST.ACTIVE_EFFECT_MODES.CUSTOM) return;
+  const CUSTOM = CONST.ACTIVE_EFFECT_CHANGE_TYPES?.CUSTOM ?? "custom";
+  if ((change.type ?? change.mode) !== CUSTOM) return;
   if (!change.key.startsWith("faserip.token.")) return;
   return false;
 });
