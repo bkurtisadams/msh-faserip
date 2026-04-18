@@ -97,10 +97,19 @@ export function computeDuration({ rounds = null, seconds = null } = {}) {
   return {};
 }
 
-/** Human-friendly label update: "Stunned (3 turns)" / "Stunned (10s)" */
+/** Human-friendly label update: "Stunned (3 rounds)" / "Stunned (10s)" */
 export async function renameEffectWithRemaining(effect) {
   try {
     if (!effect?.parent) return;
+
+    // Skip effects whose trailing "(...)" is semantic (kind/variant),
+    // not a remaining-time label. Slam markers bake the slam kind into
+    // the name — rewriting "Slam (Grand Slam)" to "Slam (1 round)"
+    // would destroy that info. Any future marker-style effect can opt
+    // out by setting flags.msh-faserip.preserveName = true.
+    const SCOPE = globalThis.MSH_FLAG_SCOPE || "msh-faserip";
+    const flags = effect.flags?.[SCOPE] || {};
+    if (flags.effectType === "slamMarker" || flags.preserveName === true) return;
 
     // Derive remaining
     const { text } = getRemaining(effect);
@@ -126,7 +135,12 @@ export function getRemaining(effect) {
   if (Number.isFinite(d.remaining) && d.units) {
     const u = String(d.units).toLowerCase();
     if (u === "rounds" || u === "turns") {
-      const unitLabel = d.remaining === 1 ? "turn" : "turns";
+      // Label matches Foundry's "round" UI vocabulary rather than FASERIP's
+      // "turn" rules vocabulary — the effect panel sits next to the combat
+      // tracker which counts in rounds, and a mixed-vocabulary UI reads as
+      // inconsistent. FASERIP "turn" language lives in rules text and chat
+      // cards, not in Foundry chrome.
+      const unitLabel = d.remaining === 1 ? "round" : "rounds";
       return { rounds: d.remaining, seconds: null, text: `${d.remaining} ${unitLabel}` };
     }
     if (u === "seconds") {
@@ -140,7 +154,7 @@ export function getRemaining(effect) {
     const startR = d.startRound ?? curR;
     const elapsed = Math.max(0, curR - startR);
     const remain = Math.max(0, Math.ceil(d.rounds - elapsed));
-    const unit = remain === 1 ? "turn" : "turns";
+    const unit = remain === 1 ? "round" : "rounds";
     return { rounds: remain, seconds: null, text: `${remain} ${unit}` };
   }
   // v13 fallback: seconds-based. v14 also populates d.seconds via backward compat,
@@ -546,9 +560,11 @@ export async function applySlam(actor, { kind = "No Slam", knockbackAreas = 0 } 
     rounds: 1,        // cosmetic marker; expires end of round
     changes: [],      // rules-faithful: no numerical debuffs
     flags: {
-      effectType: "slamMarker",
-      kind,
-      knockbackAreas
+      [SCOPE()]: {
+        effectType: "slamMarker",
+        kind,
+        knockbackAreas
+      }
     },
     statuses: knocksDown ? ["prone"] : []
   }, opts);
