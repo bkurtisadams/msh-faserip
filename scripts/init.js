@@ -811,7 +811,7 @@ Hooks.once("init", async () => {
       existingToolsObj["faserip-action-hud"] = {
         name: "faserip-action-hud",
         title: "Toggle Action HUD (H or Alt+H)",
-        icon: "fas fa-crosshairs",
+        icon: "fas fa-bolt",
         visible: true,
         toggle: true,
         active: !!ui.faseripHUD?.rendered,
