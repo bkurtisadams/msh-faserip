@@ -620,7 +620,7 @@ export class EdgedAttackAction extends AttackAction {
         damageNote: choice.note,
         sourceName: choice.weaponName || "Natural Weapon",
         attackForm: "edged",
-        breakingFeat: (choice.src === "weapon") ? { weaponMat: choice.weaponMat } : null,
+        breakingFeat: (choice.src === "weapon") ? { weaponMat: choice.weaponMat, weaponName: choice.weaponName } : null,
         targetCount
       });
     } else {
@@ -643,7 +643,7 @@ export class EdgedAttackAction extends AttackAction {
           damageNote: choice.note,
           sourceName: choice.weaponName || "Natural Weapon",
           attackForm: "edged",
-          breakingFeat: (choice.src === "weapon") ? { weaponMat: choice.weaponMat } : null,
+          breakingFeat: (choice.src === "weapon") ? { weaponMat: choice.weaponMat, weaponName: choice.weaponName } : null,
           targetCount: 1,
           attackNumber: i + 1,
           totalAttacks: count

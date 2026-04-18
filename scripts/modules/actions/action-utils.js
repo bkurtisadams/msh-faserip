@@ -1058,12 +1058,13 @@ export function buildActionsBox({
   if (breakingFeat) {
     const weaponMat = breakingFeat.weaponMat || "Excellent";
     const targetMat = breakingFeat.targetMat || "";
+    const weaponName = breakingFeat.weaponName || "";
     parts.push(
       chip(
         "Breaking FEAT",
         "Attempt a Breaking FEAT against intensity",
         true,
-        `data-action="breaking-feat" data-weapon-mat="${weaponMat}" data-target-mat="${targetMat}" data-actor-uuid="${actorUuid || ''}" ${prefillAttr}`
+        `data-action="breaking-feat" data-weapon-mat="${weaponMat}" data-target-mat="${targetMat}" data-weapon-name="${weaponName}" data-actor-uuid="${actorUuid || ''}" ${prefillAttr}`
       )
     );
   }
@@ -2961,7 +2962,7 @@ export function buildCollapsibleStunSection(result) {
 export function buildCollapsibleBreakingSection(result) {
   if (!result) return "";
 
-  const { weaponMatRank, targetMatRank, wielderStr, colorLower, reqColor, roll, autoResult, weaponBreaks, actorName } = result;
+  const { weaponMatRank, targetMatRank, weaponName, wielderStr, colorLower, reqColor, roll, autoResult, weaponBreaks, actorName } = result;
 
   const colors = weaponBreaks
     ? { bg: "#D32F2F", fg: "#fff", icon: "&#x1F4A5;" }
@@ -2984,7 +2985,7 @@ export function buildCollapsibleBreakingSection(result) {
   if (autoResult) {
     detailContent = `
       <div style="padding:8px;font-size:.9em;">
-        <div style="margin-bottom:4px;"><strong>${actorName}'s</strong> weapon (${weaponMatRank}) vs target armor (${targetMatRank})</div>
+        <div style="margin-bottom:4px;"><strong>${actorName}'s</strong> ${weaponName || "weapon"} (${weaponMatRank}) vs target armor (${targetMatRank})</div>
         <div style="font-weight:bold;color:#555;">
           ${autoResult === "auto-break" ? "Automatic break (Str 3+ ranks above material)" : "Automatic survive (Str 3+ ranks below material)"}
         </div>
@@ -2992,7 +2993,7 @@ export function buildCollapsibleBreakingSection(result) {
   } else {
     detailContent = `
       <div style="padding:8px;font-size:.9em;">
-        <div style="margin-bottom:4px;"><strong>${actorName}'s</strong> weapon (${weaponMatRank}) vs target armor (${targetMatRank})</div>
+        <div style="margin-bottom:4px;"><strong>${actorName}'s</strong> ${weaponName || "weapon"} (${weaponMatRank}) vs target armor (${targetMatRank})</div>
         <div>Required: <span style="padding:1px 6px;border-radius:2px;background:${reqBg};color:${reqFg};font-size:.85em;">${reqColor.toUpperCase()}</span> (Str ${wielderStr} vs ${weaponMatRank} intensity)</div>
       </div>`;
   }

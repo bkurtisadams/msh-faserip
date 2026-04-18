@@ -731,7 +731,7 @@ export class BluntAttackAction extends AttackAction {
         damageNote: choice.note,
         sourceName: choice.weaponName || "Bare Hands",
         attackForm: "blunt",
-        breakingFeat: (choice.src === "weapon" || choice.src === "object") ? { weaponMat: choice.weaponMat } : null,
+        breakingFeat: (choice.src === "weapon" || choice.src === "object") ? { weaponMat: choice.weaponMat, weaponName: choice.weaponName } : null,
         targetCount
       });
     } else {
@@ -758,7 +758,7 @@ export class BluntAttackAction extends AttackAction {
           damageNote: choice.note,
           sourceName: choice.weaponName || "Bare Hands",
           attackForm: "blunt",
-          breakingFeat: (choice.src === "weapon" || choice.src === "object") ? { weaponMat: choice.weaponMat } : null,
+          breakingFeat: (choice.src === "weapon" || choice.src === "object") ? { weaponMat: choice.weaponMat, weaponName: choice.weaponName } : null,
           targetCount: 1,
           attackNumber: i + 1,
           totalAttacks: count

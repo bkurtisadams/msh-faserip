@@ -35,7 +35,7 @@ function bannerColors(color) {
  * @param {boolean} [opts.postChat=false] - If true, post a standalone chat card
  * @returns {Promise<Object|null>} result object or null if no check needed
  */
-export async function executeBreakingFeat({ weaponMatRank = "Excellent", targetMatRank = "", actor = null, postChat = false }) {
+export async function executeBreakingFeat({ weaponMatRank = "Excellent", targetMatRank = "", weaponName = "", actor = null, postChat = false }) {
   const weaponIdx = RANKS.indexOf(weaponMatRank);
   const targetIdx = RANKS.indexOf(targetMatRank);
 
@@ -75,6 +75,7 @@ export async function executeBreakingFeat({ weaponMatRank = "Excellent", targetM
   const result = {
     weaponMatRank,
     targetMatRank,
+    weaponName,
     wielderStr: comparatorRank,
     intensityRank,
     colorLower,
@@ -100,9 +101,10 @@ export async function executeBreakingFeat({ weaponMatRank = "Excellent", targetM
  * Build a standalone Breaking FEAT chat card (used by dialog and semi-mode direct roll).
  */
 export function buildBreakingFeatCardHtml(result) {
-  const { weaponMatRank, targetMatRank, wielderStr, intensityRank, colorLower, reqColor, roll, autoResult, weaponBreaks, actorName } = result;
+  const { weaponMatRank, targetMatRank, weaponName, wielderStr, intensityRank, colorLower, reqColor, roll, autoResult, weaponBreaks, actorName } = result;
   const { bg, fg } = bannerColors(colorLower);
   const { bg: reqBg, fg: reqFg } = bannerColors(reqColor);
+  const weaponLabel = weaponName ? weaponName : "Weapon";
 
   return `
     <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
@@ -128,7 +130,7 @@ export function buildBreakingFeatCardHtml(result) {
         `}
       </div>
       <div style="margin:0 10px 6px;padding:6px 8px;background:#fff;border:1px solid #ddd;border-radius:3px;font-size:.9em;">
-        <div><strong>Weapon:</strong> ${weaponMatRank} material</div>
+        <div><strong>${weaponLabel}:</strong> ${weaponMatRank} material</div>
         <div><strong>Target Armor:</strong> ${targetMatRank}</div>
         ${!autoResult ? `<div><strong>To break:</strong> <span style="padding:1px 6px;border-radius:2px;background:${reqBg};color:${reqFg};font-size:.85em;">${reqColor.toUpperCase()}</span> <span style="color:#666;">(Str ${wielderStr} vs ${intensityRank} intensity)</span></div>` : ''}
       </div>

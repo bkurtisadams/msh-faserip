@@ -951,6 +951,7 @@ export class AttackAction extends BaseAction {
           const breakResult = await executeBreakingFeat({
             weaponMatRank: currentBreakingFeat.weaponMat,
             targetMatRank: currentBreakingFeat.targetMat,
+            weaponName: currentBreakingFeat.weaponName,
             actor,
             postChat: false
           });
