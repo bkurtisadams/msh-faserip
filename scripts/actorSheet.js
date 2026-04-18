@@ -444,10 +444,12 @@ export class FaseripActorSheet extends ActorSheet {
     // Resource Points setting
     context.useResourcePoints = game.settings.get("msh-faserip", "useResourcePoints");
     if (context.useResourcePoints) {
-      const res = context.system.attributes.resources;
-      const max = res.maxPoints;
-      context.rpMaxLabel = (max === Infinity || max == null) ? "\u221E" : String(max);
-      context.rpWeekly = res.weeklyRate || 0;
+      const res = context.system.attributes?.resources;
+      if (res) {
+        const max = res.maxPoints;
+        context.rpMaxLabel = (max === Infinity || max == null) ? "\u221E" : String(max);
+        context.rpWeekly = res.weeklyRate || 0;
+      }
     }
 
     return context;
