@@ -1,4 +1,24 @@
-// karma.js v1.8.0 - 2026-04-17
+// karma.js v1.11.0 - 2026-04-17
+// v1.11.0: Compact column layout for karma history. Real Date and
+//          Game Date columns merged into a single stacked "Date"
+//          cell (real-date bold on top, game-date subtle below).
+//          Event Type column removed; the label now renders as a
+//          compact color-coded pill at the start of the Description
+//          cell, reusing the row's existing event-type CSS class.
+//          Description column gains ~170px. CSV export unchanged —
+//          still emits Real Date and Game Date as separate columns
+//          for spreadsheet analysis. Edit dialog unchanged too.
+// v1.10.0: Replace v1.9.0 up/down arrows with a drag handle. Arrows
+//          required select → click → re-render flow that deselected
+//          checkboxes and felt clumsy. HTML5 drag-and-drop on a
+//          grip icon lets GM grab a row and drop it anywhere within
+//          the same realDate cluster. Cross-date drops are rejected
+//          with a notification (edit the realDate to move across
+//          days). Visual states: source row 50% opacity during drag,
+//          target row shows a red top-border indicating insertion
+//          point.
+// v1.9.0: (superseded) Up/down arrows in Actions column let GM reorder
+//         entries that share a realDate. Replaced by drag handle.
 // v1.8.0: History sort prefers user-editable realDate over internal
 //         timestamp. Previously `timestamp || realDate || 0` short-
 //         circuited on timestamp (always set at creation), so editing
@@ -41,6 +61,28 @@ export class KarmaSheet extends DocumentSheet {
       if (!isNaN(d.getTime())) return d;
     }
     return new Date(0);
+  }
+
+  // Compact uppercase label for the type pill. Known types get
+  // shortened forms; anything else falls back to uppercase.
+  static _pillLabel(type) {
+    if (!type) return "—";
+    const map = {
+      "Die Roll": "DIE ROLL",
+      "Power Stunt": "STUNT",
+      "Session Award": "SESSION",
+      "Resource FEAT": "RESOURCE",
+      "Popularity FEAT": "POP FEAT",
+      "Encounter Award": "ENCOUNTER",
+      "Encounter Loss": "ENC. LOSS",
+      "Ability Advancement": "ABILITY ADV",
+      "Power Advancement": "POWER ADV",
+      "Pool Contribution": "POOL +",
+      "Pool Withdrawal": "POOL −",
+      "Pool Refund": "POOL ↩",
+      "Custom": "CUSTOM"
+    };
+    return map[type] || type.toUpperCase();
   }
 
   static get defaultOptions() {
@@ -105,6 +147,10 @@ export class KarmaSheet extends DocumentSheet {
       else if (event.type === "Pool Contribution" || event.type === "Pool Withdrawal" || event.type === "Pool Refund") event.cssClass = "karma-pool-event";
       else if (event.amount < 0) event.cssClass = "karma-loss";
       else if (event.amount > 0) event.cssClass = "karma-gain";
+
+      // Compact uppercase label for the pill shown in Description cell.
+      // Full type is preserved in event.type for the edit dialog and CSV.
+      event.pillLabel = KarmaSheet._pillLabel(event.type);
     });
     
     context.totalSpent = this._calculateTotalSpent(context.system.karma.history);
@@ -174,7 +220,40 @@ export class KarmaSheet extends DocumentSheet {
       const index = Number(ev.currentTarget.dataset.index);
       this._onEditKarma(index);
     });
-    
+
+    // Drag-and-drop reordering within same realDate
+    html.find('.karma-drag-handle').on('dragstart', ev => {
+      const row = ev.currentTarget.closest('tr');
+      const idx = Number(row.dataset.index);
+      ev.originalEvent.dataTransfer.setData('text/plain', String(idx));
+      ev.originalEvent.dataTransfer.effectAllowed = 'move';
+      row.classList.add('karma-dragging');
+    });
+    html.find('.karma-drag-handle').on('dragend', ev => {
+      const row = ev.currentTarget.closest('tr');
+      if (row) row.classList.remove('karma-dragging');
+      html.find('.karma-drag-over').removeClass('karma-drag-over');
+    });
+    html.find('tr.karma-entry').on('dragover', ev => {
+      ev.preventDefault();
+      ev.originalEvent.dataTransfer.dropEffect = 'move';
+    });
+    html.find('tr.karma-entry').on('dragenter', ev => {
+      ev.currentTarget.classList.add('karma-drag-over');
+    });
+    html.find('tr.karma-entry').on('dragleave', ev => {
+      ev.currentTarget.classList.remove('karma-drag-over');
+    });
+    html.find('tr.karma-entry').on('drop', ev => {
+      ev.preventDefault();
+      const sourceIdx = Number(ev.originalEvent.dataTransfer.getData('text/plain'));
+      const targetIdx = Number(ev.currentTarget.dataset.index);
+      html.find('.karma-drag-over').removeClass('karma-drag-over');
+      if (!isNaN(sourceIdx) && !isNaN(targetIdx)) {
+        this._onDropKarmaRow(sourceIdx, targetIdx);
+      }
+    });
+
     html.find('.delete-karma').click(ev => {
       const index = Number(ev.currentTarget.dataset.index);
       this._onDeleteKarma(index);
@@ -1293,6 +1372,37 @@ export class KarmaSheet extends DocumentSheet {
       },
       default: "save"
     }).render(true);
+  }
+
+  _onDropKarmaRow(sourceIdx, targetIdx) {
+    if (sourceIdx === targetIdx) return;
+    const history = foundry.utils.deepClone(this.object.system.karma?.history || []);
+    history.sort((a, b) => {
+      const dateA = KarmaSheet._historyEntryDate(a);
+      const dateB = KarmaSheet._historyEntryDate(b);
+      return this.sortNewestFirst ? dateB - dateA : dateA - dateB;
+    });
+
+    if (sourceIdx < 0 || sourceIdx >= history.length) return;
+    if (targetIdx < 0 || targetIdx >= history.length) return;
+
+    const source = history[sourceIdx];
+    const target = history[targetIdx];
+
+    // Cross-date drops require editing the realDate, not reorder.
+    // This keeps the log readable: position always reflects date.
+    if ((source.realDate || "") !== (target.realDate || "")) {
+      ui.notifications.info("Entries can only be reordered within the same date. Edit the date to move across days.");
+      return;
+    }
+
+    // Insert-at-target semantics: remove source, re-insert at target's
+    // current position (adjusted if source was above target).
+    history.splice(sourceIdx, 1);
+    const adjustedTarget = sourceIdx < targetIdx ? targetIdx - 1 : targetIdx;
+    history.splice(adjustedTarget, 0, source);
+
+    this._updateKarmaHistory(history);
   }
 
   _onDeleteKarma(index) {
