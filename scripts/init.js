@@ -156,6 +156,16 @@ Hooks.on("updateWorldTime", async (worldTime, dt, options, userId) => {
       for (const ef of (actor.effects ?? [])) {
         if (ef.disabled) continue;
         const d = ef.duration ?? {};
+        const scope = globalThis.MSH_FLAG_SCOPE || "msh-faserip";
+        const efFlags = ef.flags?.[scope] || {};
+        // Skip ongoing-engine effects — they manage their own lifecycle
+        // (Body Armor, Force Field, Resistances, regeneration, dying, etc.)
+        if (efFlags.ongoingId || efFlags.isDying || efFlags.dyingTimer) continue;
+        // v14: trust core's computed expired flag for value+units durations
+        if (d.expired === true || (Number.isFinite(d.remaining) && d.remaining <= 0 && (Number.isFinite(d.value) ? d.value > 0 : false))) {
+          toExpire.push({ effect: ef, item: null, reason: `expired per core (value ${d.value} ${d.units}, remaining ${d.remaining})` });
+          continue;
+        }
         if (Number.isFinite(d.seconds) && d.seconds > 0 && Number.isFinite(d.startTime)) {
           if (d.startTime + d.seconds <= worldTime) {
             toExpire.push({ effect: ef, item: null, reason: `time expired (${d.seconds}s duration)` });
@@ -169,6 +179,15 @@ Hooks.on("updateWorldTime", async (worldTime, dt, options, userId) => {
         for (const ef of (item.effects ?? [])) {
           if (ef.disabled) continue;
           const d = ef.duration ?? {};
+          const scope = globalThis.MSH_FLAG_SCOPE || "msh-faserip";
+          const efFlags = ef.flags?.[scope] || {};
+          // Skip ongoing-engine effects — they manage their own lifecycle
+          if (efFlags.ongoingId || efFlags.isDying || efFlags.dyingTimer) continue;
+          // v14: trust core's computed expired flag for value+units durations
+          if (d.expired === true || (Number.isFinite(d.remaining) && d.remaining <= 0 && (Number.isFinite(d.value) ? d.value > 0 : false))) {
+            toExpire.push({ effect: ef, item, reason: `expired per core (value ${d.value} ${d.units}, remaining ${d.remaining})` });
+            continue;
+          }
           if (Number.isFinite(d.seconds) && d.seconds > 0 && Number.isFinite(d.startTime)) {
             if (d.startTime + d.seconds <= worldTime) {
               toExpire.push({ effect: ef, item, reason: `time expired (${d.seconds}s duration)` });
@@ -811,7 +830,7 @@ Hooks.once("init", async () => {
       existingToolsObj["faserip-action-hud"] = {
         name: "faserip-action-hud",
         title: "Toggle Action HUD (H or Alt+H)",
-        icon: "fas fa-bolt",
+        icon: "fas fa-crosshairs",
         visible: true,
         toggle: true,
         active: !!ui.faseripHUD?.rendered,
@@ -2984,6 +3003,15 @@ Hooks.on("updateCombat", async (combat, changed, diff, userId) => {
           continue;  // Skip duration-based check for effects with explicit expiry
         }
         
+        // v14: core already computes duration.expired / duration.remaining
+        // for value+units effects. Trust it and short-circuit before the
+        // legacy v13 shape checks (which only look at d.rounds / d.seconds
+        // and would otherwise miss every v14-shaped effect).
+        if (d.expired === true || (Number.isFinite(d.remaining) && d.remaining <= 0 && (Number.isFinite(d.value) ? d.value > 0 : false))) {
+          toDelete.push({ effect: ef, reason: `expired per core (value ${d.value} ${d.units}, remaining ${d.remaining})` });
+          continue;
+        }
+
         // Handle round-based effects
         if (Number.isFinite(d.rounds) && d.rounds > 0) {
           const startR = d.startRound ?? 0;

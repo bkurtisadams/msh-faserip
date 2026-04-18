@@ -1913,7 +1913,7 @@ export async function _applyFourColorKnockout(actor, rounds) {
     ],
     statuses: ["unconscious"],
     duration: inCombat
-      ? { value: Math.max(1, Number(rounds)), units: "turns", expiry: "roundEnd" }
+      ? { value: Math.max(1, Number(rounds)), units: "rounds", expiry: "roundEnd" }
       : { value: Math.max(1, Number(rounds)) * 6, units: "seconds" }
   };
   await safeActorCreateEffect(actor, [effectData]);

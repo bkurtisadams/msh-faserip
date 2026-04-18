@@ -1028,7 +1028,7 @@ export class ShootingAction extends RangedAttackAction {
                   img: "icons/svg/fire.svg",
                   disabled: false,
                   statuses: ["burning"],
-                  duration: { value: burnRounds, units: "turns", expiry: "roundEnd" }
+                  duration: { value: burnRounds, units: "rounds", expiry: "roundEnd" }
                 });
               } catch (e) {
                 console.error("[FASERIP ERROR] Incendiary ongoing register failed:", e);
