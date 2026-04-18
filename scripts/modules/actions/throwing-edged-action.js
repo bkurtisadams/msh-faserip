@@ -1,4 +1,8 @@
-// scripts/modules/actions/throwing-edged-action.js v3.1.0 - 2026-03-17
+// scripts/modules/actions/throwing-edged-action.js v3.2.0 - 2026-04-17
+// v3.2.0: T4 — carried-weapon damage now auto-computes via computeEdgedDamage
+//         (max(min(STR, MAT), weaponBase)), matching melee edged behavior.
+//         Ad-hoc path unchanged. Preview, resolve, and initial calc all
+//         route through the new local helper.
 // v3.1.0: Manual CS only — remove talent/power auto-detection, chips, sit-tags.
 //         CS row is manual input + range penalty + ? reference panel via cs-modifiers.js.
 import { RangedAttackAction } from "./ranged-attack-action.js";
@@ -20,10 +24,25 @@ import {
   attachAutoFillRange,
   getTargetData,
   getBodyArmorValues,
+  computeEdgedDamage,
   debugLog
 } from "./action-utils.js";
 import { RANK_ABBR } from "../../rules/rules-reference.js";
 import { buildCSRow, wireCSPanel } from "./cs-modifiers.js";
+import { getItemMaterialRank } from "../../gm-utils.js";
+
+// Compute thrown edged damage the same way melee edged does:
+// max(min(STR, MAT), weaponBase). Edged has no bump-to-next-rank rule.
+function computeThrownEdgedDamage(actor, weaponItem) {
+  if (!weaponItem) return 0;
+  const s = actor?.system?.abilities?.strength || {};
+  const strRank = s.rank || "Typical";
+  const strVal = Number(s.value || game.msh.getRankValue(strRank) || 0);
+  const matRank = getItemMaterialRank(weaponItem) || "Typical";
+  const weaponBase = Number(weaponItem?.system?.damage || 0);
+  const res = computeEdgedDamage(strRank, strVal, matRank, weaponBase, RANKS);
+  return res.damage;
+}
 
 export class ThrowingEdgedAction extends RangedAttackAction {
   async execute() {
@@ -111,7 +130,7 @@ export class ThrowingEdgedAction extends RangedAttackAction {
     // Initial damage calc
     const isAdHocInit = savedAdHoc || !thrownEdged.length;
     const initialWeapon = isAdHocInit ? null : thrownEdged.find(i => i.id === savedItemId) || thrownEdged[0];
-    const initialDamage = isAdHocInit ? savedAdHocDmg : Number(initialWeapon?.system?.damage || 0);
+    const initialDamage = isAdHocInit ? savedAdHocDmg : computeThrownEdgedDamage(actor, initialWeapon);
     const initialAP = initialWeapon ? getArmorPiercing(initialWeapon) : 0;
     const initialEffArmor = Math.max(0, targetArmor - initialAP);
     const initialAfterArmor = Math.max(0, initialDamage - initialEffArmor);
@@ -295,7 +314,7 @@ export class ThrowingEdgedAction extends RangedAttackAction {
             } else {
               const wid = html.find('[name="weapon"]').val();
               const w = thrownEdged.find(i => i.id === wid);
-              dmg = Number(w?.system?.damage || 0);
+              dmg = computeThrownEdgedDamage(actor, w);
               ap = w ? getArmorPiercing(w) : 0;
               const effArmor = Math.max(0, targetArmor - ap);
               const after = Math.max(0, dmg - effArmor);
@@ -488,7 +507,9 @@ export class ThrowingEdgedAction extends RangedAttackAction {
 
     // Delegate to shared resolution pipeline
     const weaponItem = choice.weaponId ? actor.items.get(choice.weaponId) : null;
-    const rawDamage = choice.weaponId ? Number(weaponItem?.system?.damage || 0) : Number(choice.weaponDamage || 0);
+    const rawDamage = choice.weaponId
+      ? computeThrownEdgedDamage(actor, weaponItem)
+      : Number(choice.weaponDamage || 0);
 
     await this._executeSingleAttack({
       choice: {

@@ -1,4 +1,7 @@
-// equipment-action-dialog.js v1.1.0 - 2026-03-14
+// equipment-action-dialog.js v1.2.0 - 2026-04-16
+// v1.2.0: Attack modes no longer replace the primary attack — they are additional buttons.
+//         Previously, a spear with Haft/Thrown modes lost its primary Edged Attack entirely.
+//         Primary button now labels by resolved attack type (e.g. "Edged") when modes exist.
 // v1.1.0: Route Device custom abilities through ActionDispatcher combat pipeline.
 //         Custom abilities with damageType resolve to proper attack actions (BA→blunt, EA→edged, E→energy, etc).
 //         Custom abilities without damageType use standalone FEAT roller (teleportation, utility, etc).
@@ -18,30 +21,28 @@ function getAvailableActions(item, actor) {
   const anyEffectActive = item.effects?.some(e => e.transfer && !e.disabled);
 
   // ── Attack (weapon categories route to ActionDispatcher) ──
+  // Primary attack is derived from top-level damageType/attackType/weaponType.
+  // Attack modes (below) are ADDITIONAL named alternatives, not replacements.
+  const modes = Array.isArray(sys.attackModes) ? sys.attackModes.filter(m => m?.name) : [];
   if (cat === "weapon" && (sys.attackType || sys.damageType || sys.weaponType)) {
+    const primaryLabel = modes.length ? _primaryAttackLabel(item) : "Attack";
     actions.push({
       id: "attack",
-      label: "Attack",
+      label: primaryLabel,
       icon: "fas fa-crosshairs",
       color: "#c62828"
     });
   }
 
-  // ── Attack Modes (multi-mode weapons) ──
-  const modes = Array.isArray(sys.attackModes) ? sys.attackModes.filter(m => m?.name) : [];
-  if (modes.length > 1) {
-    // Replace single attack with per-mode buttons
-    const atkIdx = actions.findIndex(a => a.id === "attack");
-    if (atkIdx >= 0) actions.splice(atkIdx, 1);
-    for (let i = 0; i < modes.length; i++) {
-      actions.push({
-        id: `attack-mode-${i}`,
-        label: modes[i].name,
-        icon: "fas fa-crosshairs",
-        color: "#c62828",
-        modeIndex: i
-      });
-    }
+  // ── Attack Modes (multi-mode weapons) — appended as additional attacks ──
+  for (let i = 0; i < modes.length; i++) {
+    actions.push({
+      id: `attack-mode-${i}`,
+      label: modes[i].name,
+      icon: "fas fa-crosshairs",
+      color: "#c62828",
+      modeIndex: i
+    });
   }
 
   // ── Grenade ──
@@ -649,6 +650,26 @@ async function _executeAction(actionId, actor, item, dataset) {
 }
 
 // Resolve attack type from item fields (same logic as actorSheet.js equipment-roll handler)
+// When attack modes are present, the primary attack needs a distinguishing label
+// (plain "Attack" alongside named modes like "Haft" / "Thrown" is ambiguous).
+function _primaryAttackLabel(item) {
+  const sys = item.system || {};
+  const actionType = _resolveAttackType(item);
+  const map = {
+    "blunt-attack": "Blunt",
+    "edged-attack": "Edged",
+    "shooting": "Shooting",
+    "throwing-edged": "Throw (Edged)",
+    "throwing-blunt": "Throw (Blunt)",
+    "energy": "Energy",
+    "force": "Force",
+    "grappling": "Grapple",
+    "grabbing": "Grab",
+    "charging": "Charge"
+  };
+  return map[actionType] || "Attack";
+}
+
 function _resolveAttackType(item) {
   const sys = item.system || {};
   const explicit = sys.attackType;

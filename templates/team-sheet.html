@@ -2,16 +2,10 @@
   <!-- Header -->
   <div class="team-header">
     <div class="header-left">
+      {{#if teamName}}<span class="team-name">{{teamName}}</span>{{/if}}
       {{#if campaignDateTime}}<span class="campaign-datetime">{{campaignDateTime}}</span>{{/if}}
     </div>
     <div class="header-right">
-      {{#if useKarmaPool}}
-      <div class="pool-display">
-        <label>Pool</label>
-        <div class="pool-value">{{teamKarmaPool}}</div>
-        <button type="button" class="open-pool-manager" title="Manage Pool"><i class="fas fa-cog"></i></button>
-      </div>
-      {{/if}}
       {{#if isGM}}
       <div class="multiplier-display">
         <label>Mult</label>
@@ -31,8 +25,28 @@
     </div>
   </div>
 
+  <!-- Tab bar -->
+  <div class="tt-tab-bar">
+    <button type="button" class="tt-tab {{#if isTeamTab}}active{{/if}}" data-tab="team">
+      <i class="fas fa-users"></i> Team
+      {{#if teamMembers.length}}<span class="tt-tab-count">{{teamMembers.length}}</span>{{/if}}
+    </button>
+    <button type="button" class="tt-tab {{#if isEncountersTab}}active{{/if}}" data-tab="encounters">
+      <i class="fas fa-skull"></i> Encounters
+      {{#if encounterCount}}<span class="tt-tab-count">{{encounterCount}}</span>{{/if}}
+    </button>
+    <button type="button" class="tt-tab {{#if isHqTab}}active{{/if}}" data-tab="hq">
+      <i class="fas fa-building"></i> HQ
+      {{#if teamHQs.length}}<span class="tt-tab-count">{{teamHQs.length}}</span>{{/if}}
+    </button>
+  </div>
+
   <!-- Body -->
   <div class="tracker-body">
+
+    <!-- ═══ TEAM TAB ═══ -->
+    {{#if isTeamTab}}
+    <div class="tt-panel tt-panel-team">
 
     <!-- Team Roster -->
     <div class="team-roster-section">
@@ -64,17 +78,49 @@
           <option value="{{actor.id}}">{{actor.name}}{{#if (eq actor.type "npc")}} (NPC){{/if}}</option>
           {{/each}}
         </select>
-        <button type="button" class="add-hero-to-team-btn"><i class="fas fa-plus"></i></button>
+        <button type="button" class="add-hero-to-team-btn" title="Add selected hero"><i class="fas fa-plus"></i></button>
         <button type="button" class="remove-member-toggle {{#if removeMode}}active{{/if}}" title="Toggle remove mode"><i class="fas fa-user-minus"></i></button>
-        <button type="button" class="award-session-bonus" title="Award Session Bonus: each hero receives their Reason + Intuition + Psyche as bonus karma"><i class="fas fa-star"></i> R+I+P</button>
       </div>
       {{/if}}
     </div>
 
-    <!-- Team Headquarters (collapsible) -->
+    <!-- Karma Pool panel (Team tab, only when enabled) -->
+    {{#if useKarmaPool}}
+    <div class="tt-pool-panel">
+      <div class="tt-panel-header">
+        <span class="tt-panel-label">Karma Pool</span>
+        <button type="button" class="open-pool-manager"><i class="fas fa-cog"></i> Manage</button>
+      </div>
+      <div class="tt-pool-value">{{teamKarmaPool}}</div>
+    </div>
+    {{/if}}
+
+    <!-- Session / Team Actions -->
+    {{#if isGM}}
+    <div class="tt-session-actions">
+      <div class="tt-panel-label">Team Actions</div>
+      <div class="tt-action-row">
+        <button type="button" class="tt-open-bio" title="Open the team bio journal entry.">
+          <i class="fas fa-book"></i> {{#if hasTeamBio}}Team Bio{{else}}Create Team Bio{{/if}}
+        </button>
+        {{#if sessionRIPBonus}}
+        <button type="button" class="award-session-bonus" title="Session R+I+P Bonus (house rule): each hero receives their Reason + Intuition + Psyche as bonus karma."><i class="fas fa-star"></i> R+I+P Bonus</button>
+        {{/if}}
+        <button type="button" class="tt-close-session" title="Close the current session (coming soon)."><i class="fas fa-flag-checkered"></i> Close Session</button>
+      </div>
+    </div>
+    {{/if}}
+
+    </div>
+    {{/if}}
+    <!-- ═══ END TEAM TAB ═══ -->
+
+    <!-- ═══ HQ TAB ═══ -->
+    {{#if isHqTab}}
+    <div class="tt-panel tt-panel-hq">
     <div class="team-hq-section">
-      <div class="section-header hq-toggle" title="Click to expand/collapse">
-        <h3><i class="fas fa-chevron-{{#if hqExpanded}}down{{else}}right{{/if}} hq-toggle-icon"></i> HQ ({{teamHQs.length}})</h3>
+      <div class="section-header">
+        <h3>Headquarters ({{teamHQs.length}})</h3>
         {{#if isGM}}
         <div class="section-btns">
           <button type="button" class="process-rent-btn" title="Send rent due notices for all rented HQs"><i class="fas fa-file-invoice-dollar"></i> Process Rent</button>
@@ -83,7 +129,6 @@
         {{/if}}
       </div>
 
-      <div class="team-hq-body" {{#unless hqExpanded}}style="display:none;"{{/unless}}>
       {{#if teamHQs.length}}
       <div class="team-hq-list">
         {{#each teamHQs}}
@@ -103,15 +148,20 @@
       {{else}}
       <p class="no-encounters">No team headquarters.</p>
       {{/if}}
-      </div>
     </div>
+    </div>
+    {{/if}}
+    <!-- ═══ END HQ TAB ═══ -->
 
-    <!-- Encounters -->
+    <!-- ═══ ENCOUNTERS TAB ═══ -->
+    {{#if isEncountersTab}}
+    <div class="tt-panel tt-panel-encounters">
     {{#if isGM}}
     <div class="encounters-section">
       <div class="section-header">
         <h3>Encounters ({{encounterCount}})</h3>
         <div class="section-btns">
+          <button type="button" class="import-encounter-text" title="Import an encounter from pasted text (module karma awards)"><i class="fas fa-file-import"></i> Import</button>
           <button type="button" class="add-encounter-manual"><i class="fas fa-plus"></i> Add Encounter</button>
         </div>
       </div>
@@ -147,6 +197,15 @@
             <div class="detail-section">
               <label>Name:</label>
               <input type="text" class="enc-name-input" data-enc-idx="{{@index}}" value="{{enc.name}}" placeholder="Optional — e.g., Castle Courtyard Battle" />
+              <div class="detail-row enc-datetime-row">
+                <label>Date: <input type="text" class="enc-date-input" data-enc-idx="{{@index}}" value="{{enc.gameDate}}" placeholder="e.g., Fireseek 11, 570 CY" /></label>
+                <label>Time: <input type="text" class="enc-time-input" data-enc-idx="{{@index}}" value="{{enc.gameTime}}" placeholder="e.g., 14:30" /></label>
+                <button type="button" class="enc-date-now" data-enc-idx="{{@index}}" title="Set to current campaign date/time"><i class="fas fa-clock"></i> Now</button>
+              </div>
+              <div class="detail-row enc-datetime-row">
+                <label title="Real-world session date — when you actually ran this at the table. Used to sort karma history.">Real Date: <input type="text" class="enc-realdate-input" data-enc-idx="{{@index}}" value="{{enc.realDate}}" placeholder="e.g., 4/2/2026" /></label>
+                <button type="button" class="enc-realdate-today" data-enc-idx="{{@index}}" title="Set to today"><i class="fas fa-calendar-day"></i> Today</button>
+              </div>
             </div>
 
             <!-- Foes (always shown, may be empty) -->
@@ -190,29 +249,34 @@
               </div>
             </div>
 
-            <!-- Crime -->
+            <!-- Crimes -->
             <div class="detail-section">
-              <div class="detail-row">
-                <label>Crime:
-                  <select class="crime-type-select" data-enc-idx="{{@index}}">
-                    <option value="">— None —</option>
-                    <option value="violent" {{#if (eq enc.crimeType "violent")}}selected{{/if}}>Violent Crime (30/15)</option>
-                    <option value="destructive" {{#if (eq enc.crimeType "destructive")}}selected{{/if}}>Destructive Crime (20/10)</option>
-                    <option value="theft" {{#if (eq enc.crimeType "theft")}}selected{{/if}}>Theft (10/5)</option>
-                    <option value="robbery" {{#if (eq enc.crimeType "robbery")}}selected{{/if}}>Robbery (20/10)</option>
-                    <option value="misdemeanor" {{#if (eq enc.crimeType "misdemeanor")}}selected{{/if}}>Misdemeanor (5/5)</option>
-                    <option value="national" {{#if (eq enc.crimeType "national")}}selected{{/if}}>National Offense (20/10)</option>
-                    <option value="localConspiracy" {{#if (eq enc.crimeType "localConspiracy")}}selected{{/if}}>Local Conspiracy (30/15)</option>
-                    <option value="nationalConspiracy" {{#if (eq enc.crimeType "nationalConspiracy")}}selected{{/if}}>National Conspiracy (40/20)</option>
-                    <option value="globalConspiracy" {{#if (eq enc.crimeType "globalConspiracy")}}selected{{/if}}>Global Conspiracy (50/25)</option>
-                    <option value="other" {{#if (eq enc.crimeType "other")}}selected{{/if}}>Other Crimes (15/5)</option>
+              <label>Crimes:</label>
+              {{#if enc.crimes.length}}
+              <div class="crime-list">
+                {{#each enc.crimes as |c|}}
+                <div class="crime-row">
+                  <select class="crime-type-row" data-enc-idx="{{@../index}}" data-crime-idx="{{@index}}">
+                    {{#each c.typeOptions as |o|}}
+                    <option value="{{o.value}}" {{#if o.selected}}selected{{/if}}>{{o.label}}</option>
+                    {{/each}}
                   </select>
-                </label>
-                {{#if enc.crimeType}}
-                <label class="crime-flag"><input type="checkbox" class="crime-stopped-toggle" data-enc-idx="{{@index}}" {{#if enc.stopped}}checked{{/if}} /> Stopped (+{{enc.stopValue}})</label>
-                <label class="crime-flag"><input type="checkbox" class="crime-arrested-toggle" data-enc-idx="{{@index}}" {{#if enc.arrested}}checked{{/if}} /> Arrested (+{{enc.arrestValue}})</label>
-                {{/if}}
+                  {{#if c.type}}
+                  <label class="crime-flag"><input type="checkbox" class="crime-stopped-row" data-enc-idx="{{@../index}}" data-crime-idx="{{@index}}" {{#if c.stopped}}checked{{/if}} /> Stopped (+{{c.stopValue}})</label>
+                  <label class="crime-flag"><input type="checkbox" class="crime-arrested-row" data-enc-idx="{{@../index}}" data-crime-idx="{{@index}}" {{#if c.arrested}}checked{{/if}} /> Arrested (+{{c.arrestValue}})</label>
+                  {{else}}
+                  <span class="crime-pick-note">Pick a crime type to enable Stop/Arrest flags.</span>
+                  {{/if}}
+                  <a class="delete-crime" data-enc-idx="{{@../index}}" data-crime-idx="{{@index}}" title="Remove this crime"><i class="fas fa-times"></i></a>
+                </div>
+                {{/each}}
               </div>
+              {{else}}
+              <span class="no-foes-note">No crimes attached. Add one or more to claim Stop/Arrest karma per RAW.</span>
+              {{/if}}
+              {{#unless enc.awarded}}
+              <button type="button" class="add-crime btn-add-foe" data-enc-idx="{{@index}}"><i class="fas fa-gavel"></i> Add Crime</button>
+              {{/unless}}
             </div>
 
             <!-- Rescues, Losses & GM Award -->
@@ -220,7 +284,14 @@
               <div class="detail-row extras">
                 <label>Rescues: <input type="number" class="rescue-count" data-enc-idx="{{@index}}" value="{{enc.rescues}}" min="0" max="99" /></label>
                 <label>Losses: <input type="number" class="loss-amount" data-enc-idx="{{@index}}" value="{{enc.losses}}" min="0" max="9999" /></label>
-                <label class="gm-award-label" title="Custom karma added to total before split">GM Award: <input type="number" class="gm-award-amount" data-enc-idx="{{@index}}" value="{{enc.gmAward}}" min="0" max="9999" /></label>
+                <label class="loss-scope-label" title="Split divides loss among present heroes (default). Per-hero applies full loss to each hero (RAW: Property Damage -5/area).">
+                  Loss Scope:
+                  <select class="loss-scope-select" data-enc-idx="{{@index}}">
+                    <option value="split" {{#if enc.lossScopeSplit}}selected{{/if}}>Split</option>
+                    <option value="per_hero" {{#if enc.lossScopePerHero}}selected{{/if}}>Per hero</option>
+                  </select>
+                </label>
+                <label class="gm-award-label" title="Custom karma added to split pool">GM Award: <input type="number" class="gm-award-amount" data-enc-idx="{{@index}}" value="{{enc.gmAward}}" min="0" max="9999" /></label>
               </div>
             </div>
 
@@ -231,8 +302,36 @@
               <div class="bonus-list">
                 {{#each enc.bonuses as |b|}}
                 <div class="bonus-row">
-                  <input type="text" class="bonus-label-input" data-enc-idx="{{@../index}}" data-bonus-idx="{{@index}}" value="{{b.label}}" placeholder="e.g., Protecting Hargrove" />
+                  <input type="text" class="bonus-label-input" data-enc-idx="{{@../index}}" data-bonus-idx="{{@index}}" value="{{b.label}}" placeholder="e.g., Befriending Felicia" />
                   <input type="number" class="bonus-amount-input" data-enc-idx="{{@../index}}" data-bonus-idx="{{@index}}" value="{{b.amount}}" />
+                  <select class="bonus-scope-select" data-enc-idx="{{@../index}}" data-bonus-idx="{{@index}}" title="Scope">
+                    {{#each b.scopeOptions as |s|}}
+                    <option value="{{s.value}}" {{#if s.selected}}selected{{/if}} {{#if s.disabled}}disabled{{/if}}>{{s.label}}{{#if s.disabled}} (RAW: no){{/if}}</option>
+                    {{/each}}
+                  </select>
+                  <select class="bonus-rule-select {{#unless b.ruleIsCustom}}bonus-rule-set{{/unless}}" data-enc-idx="{{@../index}}" data-bonus-idx="{{@index}}" title="RAW rule category">
+                    {{#each b.ruleGroups as |g|}}
+                    <optgroup label="{{g.group}}">
+                      {{#each g.options as |o|}}
+                      <option value="{{o.value}}" {{#if o.selected}}selected{{/if}}>{{o.label}}</option>
+                      {{/each}}
+                    </optgroup>
+                    {{/each}}
+                  </select>
+                  {{#if b.isIndividual}}
+                  <select class="bonus-hero-select" data-enc-idx="{{@../index}}" data-bonus-idx="{{@index}}" title="Recipient (present heroes only)">
+                    {{#if b.heroOptions.length}}
+                      {{#each b.heroOptions as |o|}}
+                      <option value="{{o.id}}" {{#if o.selected}}selected{{/if}}>{{o.name}}</option>
+                      {{/each}}
+                    {{else}}
+                      <option value="">— no present heroes —</option>
+                    {{/if}}
+                  </select>
+                  {{/if}}
+                  {{#if b.overCap}}
+                  <span class="bonus-cap-warn" title="RAW caps {{b.ruleLabel}} at {{b.cap}}">!</span>
+                  {{/if}}
                   <a class="delete-bonus" data-enc-idx="{{@../index}}" data-bonus-idx="{{@index}}" title="Remove"><i class="fas fa-times"></i></a>
                 </div>
                 {{/each}}
@@ -240,7 +339,7 @@
                 {{#if enc.bonusNegative}}<div class="bonus-subtotal"><span class="sum-neg">{{enc.bonusNegative}}</span></div>{{/if}}
               </div>
               {{else}}
-              <span class="no-foes-note">No custom awards. Use for task/milestone rewards.</span>
+              <span class="no-foes-note">No custom awards. Use for task/milestone rewards (Split / Individual / Per-hero).</span>
               {{/if}}
               {{#unless enc.awarded}}
               <button type="button" class="add-bonus-item btn-add-foe" data-enc-idx="{{@index}}"><i class="fas fa-plus"></i> Add Award</button>
@@ -260,11 +359,10 @@
                 {{#if enc.bonusNegative}}<span class="sum-neg">Penalties {{enc.bonusNegative}}</span>{{/if}}
               </div>
               <div class="sum-total">
-                +{{enc.positiveTotal}} ×{{../karmaMultiplier}} = +{{enc.positiveMultiplied}} ÷{{enc.heroCount}} = <strong>+{{enc.perHeroPositive}}/ea</strong>
-                {{#if enc.lossKarma}} &nbsp;|&nbsp; {{enc.lossKarma}} ÷{{enc.heroCount}} = <strong>{{enc.perHeroLoss}}/ea</strong>{{/if}}
+                {{{enc.summaryLine}}}
               </div>
               <div class="sum-net">
-                Net: <strong>{{enc.perHeroNet}}/ea</strong> to {{enc.heroCount}} heroes
+                {{{enc.netLine}}}
               </div>
             </div>
 
@@ -287,7 +385,13 @@
       <p class="no-encounters">No encounters yet. Foes auto-capture from combat.</p>
       {{/if}}
     </div>
+    {{else}}
+    <p class="no-encounters">Encounters are managed by the GM.</p>
     {{/if}}
+
+    </div>
+    {{/if}}
+    <!-- ═══ END ENCOUNTERS TAB ═══ -->
 
   </div>
 </form>

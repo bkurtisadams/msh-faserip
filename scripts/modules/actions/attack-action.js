@@ -408,7 +408,8 @@ export class AttackAction extends BaseAction {
     breakingFeat = null,
     targetCount = 1,
     attackNumber = 1,
-    totalAttacks = 1
+    totalAttacks = 1,
+    postHitCallback = null
   }) {
     // === EARLY WEAPON CHECK: Abort if firearm is empty ===
     const weapon = choice?.weapon
@@ -1432,53 +1433,6 @@ export class AttackAction extends BaseAction {
       }
 
       // ============================================================
-      // MERCY SHOT: KO drug save (Rm Intensity Endurance FEAT)
-      // Mercy bullets inflict no damage but spread a Remarkable
-      // Intensity KO drug. If the shot would have penetrated armor
-      // (standard damage > armor), the drug takes effect: Endurance
-      // FEAT vs Remarkable or KO 1-10 rounds.
-      // ============================================================
-      if (ammoVariant === "mercy" && targetIsHit && targetActor && !targetIsVehicle) {
-        // Check if the bullet would have penetrated with standard weapon damage
-        const stdDamage = choice?.weapon?.system?.damage || 0;
-        const wouldPenetrate = armorValue <= 0 || stdDamage > armorValue;
-        if (wouldPenetrate) {
-          try {
-            const { ActionDispatcher } = await import("./action-dispatcher.js");
-            await ActionDispatcher.roll("stun", {
-              actor: targetActor,
-              abilityName: "endurance",
-              opts: {
-                autoApply: !isManualMode && !!this.opts?.autoApply,
-                showConfirm: isManualMode,
-                attackForm: "mercy",
-                prefill: {
-                  dmgThrough: 0,
-                  targetName: targetName,
-                  targetEndRank: getAbilityInfo(targetActor, "endurance")?.rank || "Typical",
-                  defenderUuid: target?.document?.uuid ?? targetActor?.uuid,
-                  targetUuid: target?.document?.uuid ?? targetActor?.uuid,
-                  attackForm: "mercy",
-                  mercyKO: true,
-                  overrideIntensity: "Remarkable"
-                }
-              }
-            });
-          } catch (e) {
-            console.error("[FASERIP ERROR] Mercy shot KO save failed:", e);
-          }
-        } else {
-          // Bullet blocked by armor — drug has no effect
-          await ChatMessage.create({
-            speaker: ChatMessage.getSpeaker({ actor }),
-            content: `<div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;padding:6px 8px;font-size:.9em;">
-              <strong>Mercy Shot</strong> — ${targetName}'s armor blocked the bullet. KO drug has no effect.
-            </div>`
-          });
-        }
-      }
-
-      // ============================================================
       // ENTANGLING WEAPON CHECK: If weapon has entangling flag and hit landed
       // Rules: Agility FEAT to hit (already resolved), then target Agility FEAT
       // vs material strength or enmeshed. Handled by entangling-action.
@@ -1494,6 +1448,33 @@ export class AttackAction extends BaseAction {
           });
         } catch (e) {
           console.error("[FASERIP ERROR] Entangling check failed:", e);
+        }
+      }
+
+      // ============================================================
+      // POST-HIT CALLBACK: variant-specific follow-ups (mercy KO drug,
+      // area-effect ripple, etc). Called once per resolved target with
+      // the attack outcome. Fire-and-forget — exceptions logged but do
+      // not interrupt the rest of the attack chain.
+      // ============================================================
+      if (postHitCallback && targetActor) {
+        try {
+          await postHitCallback({
+            targetActor,
+            target,
+            targetName,
+            isHit: targetIsHit,
+            color: colorLower,
+            rawDamage,
+            afterArmor,
+            penetratingDamage,
+            damageType,
+            attackForm,
+            weapon,
+            actor
+          });
+        } catch (e) {
+          console.error("[FASERIP ERROR] postHitCallback failed:", e);
         }
       }
     }

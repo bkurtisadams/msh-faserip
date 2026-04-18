@@ -1,33 +1,55 @@
-// scripts/modules/combat/damage-resolution.js
+// scripts/modules/combat/damage-resolution.js v1.2.0 - 2026-04-17
+// v1.2.0: Fix getGrandSlamDistance thresholds — use rank RANGE MINIMUMS
+//         (Good=8, Excellent=16, Remarkable=26, ...) instead of rank-value
+//         midpoints (Good=10, Excellent=20, ...). Prior version reported
+//         one rank too low for any Strength value below its rank's midpoint:
+//         e.g. Str 8 (low Good) gave Typical's 3 instead of Good's 4,
+//         Str 16 (low Excellent) gave Good's 4 instead of Excellent's 5.
+// v1.1.0: getGrandSlamDistance reads GRAND_SLAM_AREAS canonical table from
+//         rules-reference.js. Adds Class 1000 (32), Class 3000 (50),
+//         Class 5000 (100), Beyond (100) — previously capped at Shift-Z (16).
 /**
  * Combat damage resolution for Slam, Stun, and Kill effects
  * Extracted from charge-damage.js and consolidated for reusability
  */
 
+import { rollUniversalTable } from "../dice/universal-table.js";
+import { GRAND_SLAM_AREAS, RANK_RANGES } from "../../rules/rules-reference.js";
+
 /**
- * Calculate Grand Slam knockback distance based on attacker's Strength
- * FASERIP Rule: Target is knocked away with speed equal to Strength as ground speed
+ * Calculate Grand Slam knockback distance based on attacker's Strength.
+ * Per RAW: "Target is knocked away with a speed equal to the Strength of
+ * the attacker taken as ground speed." Values from GRAND_SLAM_AREAS in
+ * rules-reference.js (expanded Strength-as-velocity scale, distinct from
+ * the basic MOVEMENT.groundSpeed table).
+ *
+ * Thresholds are the MINIMUM of each rank's range per RANK_RANGES, so a
+ * Strength of 8 (low end of Good) correctly reports Good's distance and
+ * not Typical's. Walked high-to-low so the first match wins.
+ *
  * @param {number} strengthValue - Attacker's Strength rank value
  * @returns {number} - Distance in areas
  */
-import { rollUniversalTable } from "../dice/universal-table.js";
 export function getGrandSlamDistance(strengthValue) {
-  // Grand Slam: target knocked away at attacker's Strength as ground speed
-  // Values from Land speed table (areas/round)
-  if (strengthValue >= 500) return 16; // Shift-Z
-  if (strengthValue >= 200) return 14; // Shift-Y
-  if (strengthValue >= 150) return 12; // Shift-X
-  if (strengthValue >= 100) return 10; // Unearthly
-  if (strengthValue >= 75) return 9;   // Monstrous
-  if (strengthValue >= 50) return 8;   // Amazing
-  if (strengthValue >= 40) return 7;   // Incredible
-  if (strengthValue >= 30) return 6;   // Remarkable
-  if (strengthValue >= 20) return 5;   // Excellent
-  if (strengthValue >= 10) return 4;   // Good
-  if (strengthValue >= 6) return 3;    // Typical
-  if (strengthValue >= 4) return 2;    // Poor
-  if (strengthValue >= 2) return 1;    // Feeble
-  return 0; // Shift-0
+  const v = Number(strengthValue) || 0;
+  if (v >= 10000)                       return GRAND_SLAM_AREAS["Beyond"];
+  if (v >= 5000)                        return GRAND_SLAM_AREAS["Class 5000"];
+  if (v >= 3000)                        return GRAND_SLAM_AREAS["Class 3000"];
+  if (v >= 1000)                        return GRAND_SLAM_AREAS["Class 1000"];
+  if (v >= RANK_RANGES["Shift-Z"][0])    return GRAND_SLAM_AREAS["Shift-Z"];     // 351
+  if (v >= RANK_RANGES["Shift-Y"][0])    return GRAND_SLAM_AREAS["Shift-Y"];     // 176
+  if (v >= RANK_RANGES["Shift-X"][0])    return GRAND_SLAM_AREAS["Shift-X"];     // 126
+  if (v >= RANK_RANGES["Unearthly"][0])  return GRAND_SLAM_AREAS["Unearthly"];   // 88
+  if (v >= RANK_RANGES["Monstrous"][0])  return GRAND_SLAM_AREAS["Monstrous"];   // 63
+  if (v >= RANK_RANGES["Amazing"][0])    return GRAND_SLAM_AREAS["Amazing"];     // 46
+  if (v >= RANK_RANGES["Incredible"][0]) return GRAND_SLAM_AREAS["Incredible"];  // 36
+  if (v >= RANK_RANGES["Remarkable"][0]) return GRAND_SLAM_AREAS["Remarkable"];  // 26
+  if (v >= RANK_RANGES["Excellent"][0])  return GRAND_SLAM_AREAS["Excellent"];   // 16
+  if (v >= RANK_RANGES["Good"][0])       return GRAND_SLAM_AREAS["Good"];        // 8
+  if (v >= RANK_RANGES["Typical"][0])    return GRAND_SLAM_AREAS["Typical"];     // 5
+  if (v >= RANK_RANGES["Poor"][0])       return GRAND_SLAM_AREAS["Poor"];        // 3
+  if (v >= RANK_RANGES["Feeble"][0])     return GRAND_SLAM_AREAS["Feeble"];      // 1
+  return GRAND_SLAM_AREAS["Shift-0"];
 }
 
 /**

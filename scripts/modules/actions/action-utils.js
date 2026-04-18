@@ -1,4 +1,15 @@
-// action-utils.js v1.7.4 - 2026-03-20
+// action-utils.js v1.7.5 - 2026-04-16
+// v1.7.5: Combat rules fixes.
+//         - computeBluntDamage now implements "bump to next rank minimum" rule
+//           when Strength rank < material strength rank (Aunt May / Daredevil
+//           examples from Advanced Set). Previously did plain min(STR, MAT)
+//           which undercharged blunt damage against low-Strength attackers
+//           wielding high-material weapons.
+//         - getBodyArmorValues equipment branch now honors armorPhysical /
+//           armorEnergy overrides, mirroring the power-armor branch.
+//           Previously equipment armor hardcoded energy = physical - 20 and
+//           ignored the v1.3.0 override fields (power body armor already honored them).
+//         - Import RANK_RANGES for the bump-rule lookup.
 // v1.7.4: Four-color isLethal now checks isLethalAttackForm(attackForm) — edged/shooting/
 //         thrown-edged/energy attacks always trigger death save at 0 HP regardless of whether
 //         the specific roll was a Kill result. Add data-is-kill to apply-damage button.
@@ -35,7 +46,7 @@ import { calculateMitigation } from "../../rules/mitigation.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
 import { getAbilityShift } from "../effects/effect-modifiers.js";
 import {
-  RANKS_ORDERED as RANKS, RANK_VALUES,
+  RANKS_ORDERED as RANKS, RANK_VALUES, RANK_RANGES,
   rankValue, valueToRank, shiftRank, normalizeRank
 } from "../../rules/rules-reference.js";
 // NOTE: do NOT import resolveCombatMode here – that creates a circular dependency
@@ -1113,7 +1124,18 @@ export function resultBannerColors(activeColorLower) {
   return { bg, fg };
 }
 
-// Blunt damage (Updated to use rule: "minimum value of the next rank")
+// Blunt damage: implements the "bump to next rank minimum" rule per FASERIP Advanced Set.
+// Rule: "A character using a blunt weapon inflicts up to that item's material strength;
+//        if the material strength of the item is greater than the Strength rank of the user,
+//        the user's Strength rank is increased to the lowest value of the next rank for damage."
+//
+// Examples from the book:
+//  - Aunt May (Feeble=2) with lead pipe (Excellent=20): damage = 3 (Poor's min).
+//  - Daredevil (Good=10) with lead pipe (Excellent=20): damage = 16 (Excellent's min).
+//  - Thing (Monstrous=75) with lead pipe (Excellent=20): damage = 20 (capped at MAT).
+//
+// The weaponBase floor handles combat weapons with printed damage
+// ("always a minimum of the damage listed").
 export function computeBluntDamage(strRank, strVal, matRank, weaponBase = 0, RANKS_LOCAL=RANKS) {
   const getVal = (r)=> game.msh.getRankValue(r) || 0;
   const sIdx = RANKS_LOCAL.indexOf(strRank);
@@ -1123,12 +1145,24 @@ export function computeBluntDamage(strRank, strVal, matRank, weaponBase = 0, RAN
     return { damage: dmg, note: weaponBase ? `Using max(STR ${strVal}, base ${weaponBase})` : "Using Strength value" };
   }
 
-  // Per FASERIP rules: damage = max(weaponBase, min(Strength, materialStrength))
-  // "A powerful character may inflict up to his Strength or the material strength 
-  // of the object in damage, whichever is less."
-  // "When attacking with a weapon designed for combat, the character will always 
-  // inflict damage... always a minimum of the damage listed"
   const matValue = getVal(matRank);
+
+  // Bump rule: when Strength rank is strictly below material strength rank,
+  // damage uses the minimum value of the rank ABOVE the attacker's Strength rank.
+  if (sIdx < mIdx) {
+    const nextRankName = RANKS_LOCAL[sIdx + 1] || strRank;
+    const nextRangeMin = RANK_RANGES[nextRankName]?.[0];
+    // If the next rank has a defined range minimum, use it; otherwise fall
+    // back to RANK_VALUES (e.g. Class 1000 has no range entry).
+    const bumped = (nextRangeMin ?? getVal(nextRankName));
+    const dmg = Math.max(bumped, weaponBase);
+    return {
+      damage: dmg,
+      note: `bump ${strRank}→${nextRankName} min (${bumped})${weaponBase ? `, floor ${weaponBase}` : ''} = ${dmg}`
+    };
+  }
+
+  // Strength rank is at or above material: damage capped at material strength.
   const calcDmg = Math.min(strVal, matValue);
   const dmg = Math.max(calcDmg, weaponBase);
   return { damage: dmg, note: `min(STR ${strVal}, MAT ${matValue})${weaponBase ? `, floor ${weaponBase}` : ''} = ${dmg}` };
@@ -2052,17 +2086,25 @@ export function getBodyArmorValues(targetActor, damageType = "physical-blunt") {
     const armorValue = typeof bestArmor.system.protection === 'number'
       ? bestArmor.system.protection
       : (CONFIG.FASERIP?.rankValues?.[bestArmor.system.protection] || 0);
-    
-    physicalArmor = armorValue;
-    energyArmor = Math.max(0, armorValue - 20);
-    
-    // Check for force field flag
+
+    // Check for force field flag up front so override defaults match.
     isForceField = bestArmor.system.isForceField === true;
-    
-    // Force Fields: full vs Energy, -10 vs physical (inverted from Body Armor)
+
+    // Honor explicit overrides first, falling back to standard formulas.
+    // Mirrors the power-armor branch so equipment armor items that carry
+    // custom armorPhysical / armorEnergy values are respected.
+    const sys = bestArmor.system || {};
+    const hasPhysOverride = sys.armorPhysical !== undefined && sys.armorPhysical !== 0;
+    const hasEnergyOverride = sys.armorEnergy !== undefined && sys.armorEnergy !== 0;
+
     if (isForceField) {
-      energyArmor = armorValue;
-      physicalArmor = Math.max(0, armorValue - 10);
+      // Force Fields: full vs Energy, -10 vs physical
+      physicalArmor = hasPhysOverride ? sys.armorPhysical : Math.max(0, armorValue - 10);
+      energyArmor = hasEnergyOverride ? sys.armorEnergy : armorValue;
+    } else {
+      // Body armor equipment: full vs Physical, -20 vs Energy
+      physicalArmor = hasPhysOverride ? sys.armorPhysical : armorValue;
+      energyArmor = hasEnergyOverride ? sys.armorEnergy : Math.max(0, armorValue - 20);
     }
   }
 

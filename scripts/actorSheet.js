@@ -1,4 +1,9 @@
-// actorSheet.js v2.2.4 - 2026-03-18
+// actorSheet.js v2.2.5 - 2026-04-17
+// v2.2.5: Add inline Recovery button to Health cell — shows only when
+//         canAttemptRecovery returns eligible. One-click applies recovery
+//         and rerenders the sheet. Click bubbling stopped so the parent
+//         .health-recovery-link header (which opens the Recovery & Rest
+//         dialog) does not also fire.
 // v2.2.4: Add Ctrl+Wheel zoom on character sheet (shared sheet-zoom utility)
 // v2.2.3: Targeted _updateObject guard — only blocks formData values that exactly match
 //         what the shift display code would have injected (shifted rank name + standard
@@ -398,6 +403,36 @@ export class FaseripActorSheet extends ActorSheet {
     context.healthAtMax = hpMax > 0 && hpValue >= hpMax;
     context.healingUnavailable = context.healthAtMax || lastDamageWorldTime == null || healingCooldownRemaining > 0;
     context.healingCooldownRemaining = healingCooldownRemaining;
+
+    // Health-area Recovery button: ALWAYS shown, greyed when not usable.
+    // Reuses rest-system.canAttemptRecovery so logic stays in one place.
+    context.recoveryDisabledReason = null;
+    try {
+      const check = game.msh?.rest?.canAttemptRecovery?.(this.actor);
+      context.recoveryEligible = !!check?.canRest;
+      if (!context.recoveryEligible) context.recoveryDisabledReason = check?.reason || "Not available";
+    } catch (_e) {
+      context.recoveryEligible = false;
+      context.recoveryDisabledReason = "Rest system not initialized";
+    }
+    const enduranceValue = context.system?.abilities?.endurance?.value ?? 0;
+    context.recoveryHealAmount = enduranceValue;
+
+    // Crisis buttons — eligible-only (appear only when the character is in that state)
+    context.wakeUpEligible    = context.isInCrisis && !context.isDying;
+    context.stabilizeEligible = !!context.isDying;
+
+    // Health-area Healing button: show ONLY when eligible right now.
+    // Reuses rest-system.canAttemptHealing so logic stays in one place.
+    try {
+      const check = game.msh?.rest?.canAttemptHealing?.(this.actor);
+      context.healingEligible = !!check?.canHeal;
+    } catch (_e) {
+      context.healingEligible = false;
+    }
+    const hasMedicalCare = this.actor.getFlag(scope, "medicalCare") ?? false;
+    context.healingMedicalCare = hasMedicalCare;
+    context.healingHealAmount = enduranceValue * (hasMedicalCare ? 2 : 1);
     
     // NPC detection for template labels
     const charType = context.system.characterType || "player";
@@ -809,7 +844,6 @@ export class FaseripActorSheet extends ActorSheet {
     }
   }
   
-  // This is separate from the async close method on UniversalTablePopout at the bottom of the file; don’t touch that one.
   async close(options = {}) {
     // Unregister the in-sheet Universal Table hook when the sheet closes
     if (this._universalTableHookId) {
@@ -834,6 +868,69 @@ export class FaseripActorSheet extends ActorSheet {
       if (monthsDiff === 1) return { status: "due", label: "DUE", cssClass: "rent-due" };
       return { status: "overdue", label: "OVERDUE", cssClass: "rent-overdue" };
     } catch { return null; }
+  }
+
+  // Shared stabilize sub-dialog — opened from both the Recovery & Rest
+  // dialog's Stabilize Dying button and the inline Health-column button.
+  // Deducts karma via history entry + sets the appropriate dying flag.
+  _openStabilizeSubDialog(actor, dyingEffect, scope) {
+    const _spendKarma = async (amount, description) => {
+      const available = actor.availableKarma ?? 0;
+      if (available < amount) {
+        ui.notifications.warn(`${actor.name} has only ${available} Karma — need ${amount}.`);
+        return false;
+      }
+      let gameDate = "";
+      try {
+        const d = game.msh?.getCampaignDateTime?.()?.date;
+        if (d) gameDate = `${d.getMonth()+1}/${d.getDate()}/${d.getFullYear()}`;
+      } catch (_e) { /* noop */ }
+      const history = foundry.utils.deepClone(actor.system.karma?.history || []);
+      history.push({
+        timestamp: new Date().toISOString(),
+        realDate: new Date().toLocaleDateString(),
+        gameDate,
+        amount: -amount,
+        type: "Dying Stabilize",
+        description
+      });
+      await actor.update({ "system.karma.history": history });
+      return true;
+    };
+    new Dialog({
+      title: `Stabilize ${actor.name}`,
+      content: `<div style="padding:8px;"><p><strong>${actor.name}</strong> is dying!</p>
+        <p style="font-size:.9em;color:#555;">Available Karma: <strong>${actor.availableKarma ?? 0}</strong></p>
+        <p>Choose stabilization method:</p></div>`,
+      buttons: {
+        karma50: {
+          label: "50 Karma (1 round pause)",
+          callback: async () => {
+            const ok = await _spendKarma(50, "Stabilize Endurance for 1 round");
+            if (!ok) return;
+            await dyingEffect.setFlag(scope, "stabilizedRounds", 1);
+            ChatMessage.create({ content: `<p style="color:#ff9800;"><strong>${actor.name}</strong> stabilized for 1 round (50 Karma spent)!</p>` });
+            ui.notifications.info(`${actor.name} stabilized for 1 round`);
+          }
+        },
+        karma200: {
+          label: "200 Karma + FEAT",
+          callback: async () => {
+            const ok = await _spendKarma(200, "Endurance re-FEAT on next rank slip");
+            if (!ok) return;
+            await dyingEffect.setFlag(scope, "reFeatOnSlip", true);
+            ChatMessage.create({ content: `<p style="color:#2196f3;"><strong>${actor.name}</strong> will re-FEAT on next Endurance slip (200 Karma spent).</p>` });
+            ui.notifications.info(`${actor.name} will re-FEAT on next slip`);
+          }
+        },
+        aid: {
+          label: "Aid/First Aid (permanent)",
+          callback: async () => { await game.msh.rest.stabilizeDying(actor); }
+        },
+        cancel: { label: "Cancel", callback: () => {} }
+      },
+      default: "aid"
+    }).render(true);
   }
 
   // In actorSheet.js, add to the activateListeners function
@@ -1034,22 +1131,6 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
   return false;
 });
 
-    // Universal Table tab - CTRL+click opens legacy dialog, SHIFT+click opens popout
-    html.find('a[data-tab="universal-table"]').on('click', (event) => {
-      if (event.ctrlKey || event.metaKey) {
-        event.preventDefault();
-        event.stopPropagation();
-        game.msh.openUniversalTableDialog?.(this.actor);
-        return false;
-      }
-      if (event.shiftKey) {
-        event.preventDefault();
-        event.stopPropagation();
-        this._openUniversalTablePopout();
-        return false;
-      }
-      // Normal click: let Foundry handle tab switching
-    });
 
     // Listen for universal table rolls so the in-sheet tab also highlights results
     if (!this._universalTableHookId) {
@@ -1060,6 +1141,68 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
     }
 
     // Recovery & Rest Button Handlers
+    // Sheet-level inline Recovery button (shows only when eligible).
+    // One click → apply recovery, rerender sheet. No confirmation dialog.
+    // Stops propagation so the click doesn't bubble to the Health header
+    // (which opens the Recovery & Rest dialog).
+    html.find('.health-recovery-inline-btn').click(async (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (!game.msh?.rest) {
+        ui.notifications.error("Rest system not initialized!");
+        return;
+      }
+      const result = await game.msh.rest.attemptRecovery(this.actor);
+      if (result?.success) {
+        this.render(false);
+      }
+    });
+
+    // Sheet-level inline Healing button (shows only when eligible).
+    // Mirrors Recovery: one click → apply healing, rerender sheet.
+    html.find('.health-healing-inline-btn').click(async (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (!game.msh?.rest) {
+        ui.notifications.error("Rest system not initialized!");
+        return;
+      }
+      const result = await game.msh.rest.attemptHealing(this.actor);
+      if (result?.success) {
+        this.render(false);
+      }
+    });
+
+    // Sheet-level inline Wake Up button (0 HP, not dying).
+    html.find('.health-wake-inline-btn').click(async (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (!game.msh?.rest) {
+        ui.notifications.error("Rest system not initialized!");
+        return;
+      }
+      const result = await game.msh.rest.attemptRegainConsciousness(this.actor);
+      if (result?.success) {
+        this.render(false);
+      }
+    });
+
+    // Sheet-level inline Stabilize Dying button (dying effect active).
+    // Opens the shared sub-dialog with 50/200/Aid options.
+    html.find('.health-stabilize-inline-btn').click(async (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const scope = "msh-faserip";
+      const dyingEffect = this.actor.effects.find(e =>
+        e.getFlag(scope, "isDying") || e.statuses?.has?.("dying")
+      );
+      if (!dyingEffect) {
+        ui.notifications.warn(`${this.actor.name} is not dying`);
+        return;
+      }
+      this._openStabilizeSubDialog(this.actor, dyingEffect, scope);
+    });
+
     // Health header click -> Recovery & Rest dialog
     html.find('.health-recovery-link').click(async (event) => {
       event.preventDefault();
@@ -1153,30 +1296,7 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
                   return;
                 }
                 dlg.close();
-                new Dialog({
-                  title: `Stabilize ${actor.name}`,
-                  content: `<div style="padding:8px;"><p><strong>${actor.name}</strong> is dying!</p><p>Choose stabilization method:</p></div>`,
-                  buttons: {
-                    karma50: {
-                      label: "50 Karma (1 round pause)",
-                      callback: async () => {
-                        await dyingEffect.setFlag(scope, "stabilizedRounds", 1);
-                        ChatMessage.create({ content: `<p style="color:#ff9800;"><strong>${actor.name}</strong> stabilized for 1 round (50 Karma spent)!</p>` });
-                        ui.notifications.info(`${actor.name} stabilized for 1 round`);
-                      }
-                    },
-                    karma200: {
-                      label: "200 Karma + FEAT",
-                      callback: async () => { ui.notifications.info("Roll Endurance FEAT manually - success = stabilized"); }
-                    },
-                    aid: {
-                      label: "Aid/First Aid (permanent)",
-                      callback: async () => { await game.msh.rest.stabilizeDying(actor); }
-                    },
-                    cancel: { label: "Cancel", callback: () => {} }
-                  },
-                  default: "aid"
-                }).render(true);
+                this._openStabilizeSubDialog(actor, dyingEffect, scope);
                 break;
               }
             }
@@ -1208,12 +1328,6 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
         }
       }
     });
-
-    // universal roll trigger listener
-    /* html.find('.universal-roll-trigger').click(ev => {
-      ev.preventDefault();
-      game.msh.openUniversalTableDialog?.(this.actor);
-    }); */
 
     // Make the universal roll trigger draggable for macros
     html.find('.universal-roll-trigger').each((i, el) => {
@@ -4923,15 +5037,6 @@ async _rollAction(actionType, abilityName) {
     });
   }
 
-  _openUniversalTablePopout(rollData = null) {
-    // Use existing instance or create new one
-    if (!this._universalTablePopout) {
-      this._universalTablePopout = new UniversalTablePopout();
-    }
-    this._universalTablePopout.setRollData(rollData);
-    this._universalTablePopout.render(true);
-  }
-
   // Character Generation Tab Initialization
   _initChargenTab(html) {
     const chargenTab = html.find('.chargen-tab');
@@ -4953,8 +5058,7 @@ async _rollAction(actionType, abilityName) {
   
     /**
    * Handle universal table rolls for the in-sheet Universal Table tab.
-   * Mirrors the behavior of UniversalTablePopout._onUniversalTableRoll,
-   * but targets the actor sheet's table.
+   * Highlights the result cell in the in-sheet Universal Table tab after a roll.
    */
   _onSheetUniversalTableRoll(data) {
     // Only proceed if the sheet is actually rendered
@@ -4964,11 +5068,8 @@ async _rollAction(actionType, abilityName) {
     const html = this.element;
     if (!html || !html.length) return;
 
-    // Normalize rank name using the same mapping as the popout
-    let normalizedRank = UniversalTablePopout.RANK_ALIASES[rank] || rank;
-
-    // Find column index for this rank
-    const colIndex = UniversalTablePopout.RANK_ORDER.indexOf(normalizedRank);
+    const normalizedRank = RANK_ALIASES[rank] || rank;
+    const colIndex = _RANKS.indexOf(normalizedRank);
     if (colIndex === -1) return;
 
     // Find the matching row and highlight just that result cell
@@ -4996,151 +5097,4 @@ async _rollAction(actionType, abilityName) {
   }
 
   // other methods
-}
-
-class UniversalTablePopout extends Application {
-  // Rank order matching the table columns (0-indexed) — from rules-reference.js
-  static RANK_ORDER = _RANKS;
-
-  // Alternate rank names mapping — from rules-reference.js
-  static RANK_ALIASES = RANK_ALIASES;
-
-  static get defaultOptions() {
-    return foundry.utils.mergeObject(super.defaultOptions, {
-      id: "universal-table-popout",
-      title: "Universal Table",
-      template: "systems/msh-faserip/templates/universal-table-popout.html",
-      width: 750,
-      height: 500,
-      resizable: true,
-      popOut: true
-    });
-  }
-
-  constructor(options = {}) {
-    super(options);
-    this.rollData = null;
-    this._hookId = null;
-  }
-
-  setRollData(data) {
-    this.rollData = data;
-  }
-
-  getData() {
-    return { rollData: this.rollData };
-  }
-
-  render(force = false, options = {}) {
-    // Register hook to listen for universal table rolls
-    if (!this._hookId) {
-      this._hookId = Hooks.on('msh-faserip.universalTableRoll', (data) => {
-        this._onUniversalTableRoll(data);
-      });
-    }
-    return super.render(force, options);
-  }
-
-  async close(options = {}) {
-    // Unregister hook when window closes
-    if (this._hookId) {
-      Hooks.off('msh-faserip.universalTableRoll', this._hookId);
-      this._hookId = null;
-    }
-    return super.close(options);
-  }
-
-  _onUniversalTableRoll(data) {
-    if (!this.rendered) return;
-    
-    const { rank, roll, color } = data;
-    const html = this.element;
-    
-    // Normalize rank name
-    let normalizedRank = UniversalTablePopout.RANK_ALIASES[rank] || rank;
-    
-    // Find column index for this rank
-    const colIndex = UniversalTablePopout.RANK_ORDER.indexOf(normalizedRank);
-    if (colIndex === -1) return;
-    
-    // Find the matching row and highlight just that result cell
-    const rows = html.find('tbody tr');
-    rows.each((i, row) => {
-      const $row = $(row);
-      const label = $row.find('th').first().text().trim();
-
-      let match = false;
-      if (label.includes('–') || label.includes('-')) {
-        const [min, max] = label.split(/[–-]/).map(n => parseInt(n));
-        match = roll >= min && roll <= max;
-      } else {
-        match = roll === parseInt(label);
-      }
-
-      if (match) {
-        const cell = $row.find('td').eq(colIndex);
-        cell.addClass('roll-highlight');
-        setTimeout(() => cell.removeClass('roll-highlight'), 10000);
-      }
-    });
-  }
-
-  activateListeners(html) {
-    super.activateListeners(html);
-    
-    if (this.rollData) {
-      const { roll, rankIndex, color } = this.rollData;
-      
-      // Find the row matching the roll
-      const rows = html.find('tbody tr');
-      rows.each((i, row) => {
-        const $row = $(row);
-        const label = $row.find('th').first().text().trim();
-        
-        // Parse roll ranges like "02-03", "04-06", or single "01", "100"
-        let match = false;
-        if (label.includes('-')) {
-          const [min, max] = label.split('-').map(n => parseInt(n));
-          match = roll >= min && roll <= max;
-        } else {
-          match = roll === parseInt(label);
-        }
-        
-        if (match && rankIndex >= 0) {
-          // Highlight the cell at rankIndex (add 1 to skip the th)
-          const cell = $row.find('td').eq(rankIndex);
-          cell.addClass('highlighted');
-        }
-      });
-    }
-    
-    // Cell click highlighting
-    html.find('.rank-cell').click(ev => {
-      html.find('.rank-cell').removeClass('highlighted');
-      $(ev.currentTarget).addClass('highlighted');
-    });
-
-    // Action panel header click — post chat card with action type rules
-    html.find('.uat-head1 th:not(:first-child), .uat-head2 th:not(:first-child)').css('cursor', 'pointer').on('click', ev => {
-      const $th = $(ev.currentTarget);
-      const colIdx = $th.parent().find('th').index($th) - 1;
-      // Reuse the same info array defined on the sheet class
-      const info = FaseripActorSheet.UAT_ACTION_INFO?.[colIdx];
-      if (!info) return;
-      const content = `
-        <div class="faserip-chat-action-info">
-          <h3>${info.label} <span style="font-weight:normal;font-size:0.85em;">(${info.code})</span></h3>
-          <p><strong>Ability:</strong> ${info.ability}</p>
-          <p style="margin:4px 0;">${info.desc}</p>
-          <table style="width:100%;border-collapse:collapse;margin:6px 0;font-size:0.9em;">
-            <tr style="background:#fff;"><td style="border:1px solid #999;padding:2px 4px;width:12px;">&nbsp;</td><td style="border:1px solid #999;padding:2px 6px;"><strong>White:</strong> ${info.results.white}</td></tr>
-            <tr style="background:#00c000;"><td style="border:1px solid #999;padding:2px 4px;">&nbsp;</td><td style="border:1px solid #999;padding:2px 6px;"><strong>Green:</strong> ${info.results.green}</td></tr>
-            <tr style="background:#e8e000;"><td style="border:1px solid #999;padding:2px 4px;">&nbsp;</td><td style="border:1px solid #999;padding:2px 6px;"><strong>Yellow:</strong> ${info.results.yellow}</td></tr>
-            <tr style="background:#cc0000;color:#fff;"><td style="border:1px solid #999;padding:2px 4px;">&nbsp;</td><td style="border:1px solid #999;padding:2px 6px;"><strong>Red:</strong> ${info.results.red}</td></tr>
-          </table>
-          ${info.notes ? `<p style="font-size:0.85em;font-style:italic;margin-top:4px;">📌 ${info.notes}</p>` : ''}
-        </div>`;
-      ChatMessage.create({ content, flags: { 'msh-faserip': { type: 'action-info' } } });
-    });
-  }
 }

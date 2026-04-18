@@ -1,4 +1,39 @@
 <form class="karma-sheet" autocomplete="off">
+  <style>
+    .karma-sheet .karma-drag-handle {
+      cursor: grab; padding: 0 4px; color: #888;
+      display: inline-block; vertical-align: middle;
+    }
+    .karma-sheet .karma-drag-handle:hover { color: #444; }
+    .karma-sheet .karma-drag-handle:active { cursor: grabbing; }
+    .karma-sheet tr.karma-dragging { opacity: 0.4; }
+    .karma-sheet tr.karma-drag-over > td { border-top: 2px solid #c62828; }
+
+    /* Stacked date cell */
+    .karma-sheet .karma-date-cell { line-height: 1.2; white-space: nowrap; }
+    .karma-sheet .karma-real-date { font-weight: 500; }
+    .karma-sheet .karma-game-date {
+      font-size: 10px; color: #888; margin-top: 1px;
+    }
+
+    /* Event-type pill in description cell */
+    .karma-sheet .karma-event-pill {
+      display: inline-block; vertical-align: middle;
+      font-size: 9px; font-weight: 600; letter-spacing: 0.3px;
+      padding: 1px 5px; border-radius: 3px; margin-right: 5px;
+      white-space: nowrap; max-width: 110px; overflow: hidden; text-overflow: ellipsis;
+      background: rgba(120, 120, 120, 0.15); color: #555;  /* default/grey for unknown types */
+    }
+    .karma-sheet tr.karma-die-roll .karma-event-pill { background: rgba(198, 40, 40, 0.15); color: #8a1e1e; }
+    .karma-sheet tr.karma-power-stunt .karma-event-pill { background: rgba(142, 68, 173, 0.18); color: #6a2a85; }
+    .karma-sheet tr.karma-session-award .karma-event-pill { background: rgba(45, 122, 60, 0.18); color: #1f5a2a; }
+    .karma-sheet tr.karma-resource-feat .karma-event-pill { background: rgba(21, 101, 192, 0.15); color: #0d4a8a; }
+    .karma-sheet tr.karma-popularity-feat .karma-event-pill { background: rgba(21, 101, 192, 0.15); color: #0d4a8a; }
+    .karma-sheet tr.karma-pool-event .karma-event-pill { background: rgba(180, 120, 30, 0.18); color: #7a5010; }
+    .karma-sheet tr.karma-gain .karma-event-pill { background: rgba(45, 122, 60, 0.18); color: #1f5a2a; }
+    .karma-sheet tr.karma-loss .karma-event-pill { background: rgba(198, 40, 40, 0.15); color: #8a1e1e; }
+    .karma-sheet .karma-desc-text { color: #333; }
+  </style>
   <!-- Summary Header -->
   <div class="karma-summary">
     <div class="summary-item">
@@ -51,10 +86,8 @@
         <thead>
           <tr>
             <th class="select-column"><input type="checkbox" class="select-all-karma" title="Select All"></th>
-            <th>Real Date</th>
-            <th>Game Date</th>
+            <th>Date</th>
             <th>Amount</th>
-            <th>Event Type</th>
             <th>Description</th>
             <th>Actions</th>
             <th class="sort-header">
@@ -67,16 +100,21 @@
         <tbody>
           {{#if system.karma.history.length}}
             {{#each system.karma.history as |event i|}}
-              <tr class="karma-entry {{event.cssClass}}">
+              <tr class="karma-entry {{event.cssClass}}" data-index="{{i}}">
                 <td class="select-column"><input type="checkbox" class="select-karma-entry" data-index="{{i}}"></td>
-                <td>{{event.realDate}}</td>
-                <td>{{event.gameDate}}</td>
+                <td class="karma-date-cell">
+                  <div class="karma-real-date">{{event.realDate}}</div>
+                  {{#if event.gameDate}}<div class="karma-game-date">{{event.gameDate}}</div>{{/if}}
+                </td>
                 <td class="karma-amount {{#if (lt event.amount 0)}}negative{{else}}positive{{/if}}">
                   {{#if (lt event.amount 0)}}{{event.amount}}{{else}}+{{event.amount}}{{/if}}
                 </td>
-                <td>{{event.type}}</td>
-                <td>{{event.description}}</td>
+                <td class="karma-desc-cell">
+                  <span class="karma-event-pill" title="{{event.type}}">{{event.pillLabel}}</span>
+                  <span class="karma-desc-text">{{event.description}}</span>
+                </td>
                 <td class="karma-actions">
+                  <span class="karma-drag-handle" draggable="true" title="Drag to reorder (within same date)"><i class="fas fa-grip-vertical"></i></span>
                   <a class="edit-karma" data-index="{{i}}"><i class="fas fa-edit"></i></a>
                   <a class="delete-karma" data-index="{{i}}"><i class="fas fa-trash"></i></a>
                 </td>
@@ -85,7 +123,7 @@
             {{/each}}
           {{else}}
             <tr>
-              <td colspan="8" class="empty-message">No karma history recorded yet.</td>
+              <td colspan="6" class="empty-message">No karma history recorded yet.</td>
             </tr>
           {{/if}}
         </tbody>

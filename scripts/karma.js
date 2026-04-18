@@ -1,11 +1,89 @@
-// karma.js v1.6.1 - 2026-04-03
+// karma.js v1.11.0 - 2026-04-17
+// v1.11.0: Compact column layout for karma history. Real Date and
+//          Game Date columns merged into a single stacked "Date"
+//          cell (real-date bold on top, game-date subtle below).
+//          Event Type column removed; the label now renders as a
+//          compact color-coded pill at the start of the Description
+//          cell, reusing the row's existing event-type CSS class.
+//          Description column gains ~170px. CSV export unchanged —
+//          still emits Real Date and Game Date as separate columns
+//          for spreadsheet analysis. Edit dialog unchanged too.
+// v1.10.0: Replace v1.9.0 up/down arrows with a drag handle. Arrows
+//          required select → click → re-render flow that deselected
+//          checkboxes and felt clumsy. HTML5 drag-and-drop on a
+//          grip icon lets GM grab a row and drop it anywhere within
+//          the same realDate cluster. Cross-date drops are rejected
+//          with a notification (edit the realDate to move across
+//          days). Visual states: source row 50% opacity during drag,
+//          target row shows a red top-border indicating insertion
+//          point.
+// v1.9.0: (superseded) Up/down arrows in Actions column let GM reorder
+//         entries that share a realDate. Replaced by drag handle.
+// v1.8.0: History sort prefers user-editable realDate over internal
+//         timestamp. Previously `timestamp || realDate || 0` short-
+//         circuited on timestamp (always set at creation), so editing
+//         an entry's realDate changed the displayed string but not
+//         the sort position. New `_historyEntryDate` helper uses
+//         realDate first, falling back to timestamp only when realDate
+//         is empty/unparseable. Applied to all four sort call sites
+//         (getData, edit, delete, bulk delete).
+// v1.7.0: Category-based karma multipliers (combat/rescue/personal/gaming/penalty)
+//         and group award mode (split/full/pool) via karma-multipliers.js helper.
+//         Legacy karmaMultiplier setting preserved as global fallback when a
+//         category multiplier is unset. Losses only multiplied if penalty
+//         category multiplier > 1. Calc display now shows category tag.
+// v1.6.4: Spend Karma dialog now closes when user picks Ability Advancement.
+//         Previously it lingered behind the advancement sub-dialog in a useless state.
+// v1.6.3: Fix Ability Advancement cost formula. Per RAW (Potato Salad Man example),
+//         each +1 point costs 10× the CURRENT numeric value, not 10× the Standard
+//         Rank Number. e.g. Good(14)→Good(15) = 140 karma, not 100. Cresting +400
+//         still triggers on crossing a rank's range boundary (e.g. 7→8, 15→16).
+// v1.6.2: Fix _getNewRank thresholds to use book Rank Ranges.
 // v1.6.1: Replace local RANK_MINS/RANK_ORDER with import from rules-reference.js
 // v1.6.0: Add missing karma types: Failing Commitment, Leaving Early, Negative Popularity, Commit Robbery
-import { RANKS_ORDERED, RANK_VALUES } from "./rules/rules-reference.js";
+import { RANKS_ORDERED } from "./rules/rules-reference.js";
+import { computeKarmaAward, getCategoryMultiplier, getGroupAwardMode, getCategoryForEvent } from "./karma-multipliers.js";
 
 export class KarmaSheet extends DocumentSheet {
   sortNewestFirst = true;
   searchFilter = "";
+
+  // Return a Date for sorting: prefer the user-editable realDate,
+  // fall back to timestamp when realDate is missing or unparseable.
+  // Never returns null — callers subtract dates directly.
+  static _historyEntryDate(entry) {
+    if (entry?.realDate) {
+      const d = new Date(entry.realDate);
+      if (!isNaN(d.getTime())) return d;
+    }
+    if (entry?.timestamp) {
+      const d = new Date(entry.timestamp);
+      if (!isNaN(d.getTime())) return d;
+    }
+    return new Date(0);
+  }
+
+  // Compact uppercase label for the type pill. Known types get
+  // shortened forms; anything else falls back to uppercase.
+  static _pillLabel(type) {
+    if (!type) return "—";
+    const map = {
+      "Die Roll": "DIE ROLL",
+      "Power Stunt": "STUNT",
+      "Session Award": "SESSION",
+      "Resource FEAT": "RESOURCE",
+      "Popularity FEAT": "POP FEAT",
+      "Encounter Award": "ENCOUNTER",
+      "Encounter Loss": "ENC. LOSS",
+      "Ability Advancement": "ABILITY ADV",
+      "Power Advancement": "POWER ADV",
+      "Pool Contribution": "POOL +",
+      "Pool Withdrawal": "POOL −",
+      "Pool Refund": "POOL ↩",
+      "Custom": "CUSTOM"
+    };
+    return map[type] || type.toUpperCase();
+  }
 
   static get defaultOptions() {
     return foundry.utils.mergeObject(super.defaultOptions, {
@@ -47,8 +125,8 @@ export class KarmaSheet extends DocumentSheet {
     
     // Sort history
     context.system.karma.history.sort((a, b) => {
-      const dateA = new Date(a.timestamp || a.realDate || 0);
-      const dateB = new Date(b.timestamp || b.realDate || 0);
+      const dateA = KarmaSheet._historyEntryDate(a);
+      const dateB = KarmaSheet._historyEntryDate(b);
       return this.sortNewestFirst ? dateB - dateA : dateA - dateB;
     });
     
@@ -69,6 +147,10 @@ export class KarmaSheet extends DocumentSheet {
       else if (event.type === "Pool Contribution" || event.type === "Pool Withdrawal" || event.type === "Pool Refund") event.cssClass = "karma-pool-event";
       else if (event.amount < 0) event.cssClass = "karma-loss";
       else if (event.amount > 0) event.cssClass = "karma-gain";
+
+      // Compact uppercase label for the pill shown in Description cell.
+      // Full type is preserved in event.type for the edit dialog and CSV.
+      event.pillLabel = KarmaSheet._pillLabel(event.type);
     });
     
     context.totalSpent = this._calculateTotalSpent(context.system.karma.history);
@@ -138,7 +220,40 @@ export class KarmaSheet extends DocumentSheet {
       const index = Number(ev.currentTarget.dataset.index);
       this._onEditKarma(index);
     });
-    
+
+    // Drag-and-drop reordering within same realDate
+    html.find('.karma-drag-handle').on('dragstart', ev => {
+      const row = ev.currentTarget.closest('tr');
+      const idx = Number(row.dataset.index);
+      ev.originalEvent.dataTransfer.setData('text/plain', String(idx));
+      ev.originalEvent.dataTransfer.effectAllowed = 'move';
+      row.classList.add('karma-dragging');
+    });
+    html.find('.karma-drag-handle').on('dragend', ev => {
+      const row = ev.currentTarget.closest('tr');
+      if (row) row.classList.remove('karma-dragging');
+      html.find('.karma-drag-over').removeClass('karma-drag-over');
+    });
+    html.find('tr.karma-entry').on('dragover', ev => {
+      ev.preventDefault();
+      ev.originalEvent.dataTransfer.dropEffect = 'move';
+    });
+    html.find('tr.karma-entry').on('dragenter', ev => {
+      ev.currentTarget.classList.add('karma-drag-over');
+    });
+    html.find('tr.karma-entry').on('dragleave', ev => {
+      ev.currentTarget.classList.remove('karma-drag-over');
+    });
+    html.find('tr.karma-entry').on('drop', ev => {
+      ev.preventDefault();
+      const sourceIdx = Number(ev.originalEvent.dataTransfer.getData('text/plain'));
+      const targetIdx = Number(ev.currentTarget.dataset.index);
+      html.find('.karma-drag-over').removeClass('karma-drag-over');
+      if (!isNaN(sourceIdx) && !isNaN(targetIdx)) {
+        this._onDropKarmaRow(sourceIdx, targetIdx);
+      }
+    });
+
     html.find('.delete-karma').click(ev => {
       const index = Number(ev.currentTarget.dataset.index);
       this._onDeleteKarma(index);
@@ -413,7 +528,7 @@ export class KarmaSheet extends DocumentSheet {
           </div>
           <div class="karma-calculation" style="background:#f5f5f0; padding:8px; border-radius:4px; margin:6px 0; font-size:0.9em;">
             <div>Base: <span class="calc-base">0</span></div>
-            <div>x<span class="calc-multiplier">${multiplier}</span> multiplier = <span class="calc-gross">0</span></div>
+            <div>x<span class="calc-multiplier">${multiplier}</span> <span class="calc-cat" style="color:#666;font-size:0.85em;"></span> = <span class="calc-gross">0</span></div>
             <div class="calc-split-line" style="display:none;">/ <span class="calc-split-count">2</span> heroes = <span class="calc-split-result">0</span></div>
           </div>
           <div class="form-group karma-pool-option" style="display:none;">
@@ -492,6 +607,7 @@ export class KarmaSheet extends DocumentSheet {
       },
       default: "add",
       render: (html) => {
+        const groupMode = getGroupAwardMode();
         const recalc = () => {
           const type = html.find('[name="eventType"]').val();
           const baseAmount = eventAmounts[type] || 0;
@@ -509,9 +625,9 @@ export class KarmaSheet extends DocumentSheet {
           } else {
             html.find('.karma-award-type').show();
             if (isGroup) {
-              html.find('.karma-split-section').show();
+              html.find('.karma-split-section').toggle(groupMode === "split");
               html.find('.karma-pool-option').show();
-              html.find('.calc-split-line').show();
+              html.find('.calc-split-line').toggle(groupMode === "split");
             } else {
               html.find('.karma-split-section').hide();
               html.find('.karma-pool-option').hide();
@@ -519,23 +635,23 @@ export class KarmaSheet extends DocumentSheet {
             }
           }
 
-          // Calculate
-          const gross = Math.floor(baseAmount * multiplier);
-          let finalAmount;
-          if (isGroup && !isIndividualOnly && !isLoss) {
-            finalAmount = Math.floor(gross / splitCount);
-          } else if (isLoss) {
-            finalAmount = baseAmount; // losses not multiplied
-          } else {
-            finalAmount = gross;
-          }
+          // Compute via helper
+          const result = computeKarmaAward({
+            eventType: type,
+            baseAmount,
+            isGroup: isGroup && !isIndividualOnly && !isLoss,
+            heroCount: splitCount,
+            groupMode
+          });
+          const catMult = result.multiplier;
 
           // Update display
           html.find('.calc-base').text(baseAmount);
-          html.find('.calc-multiplier').text(multiplier);
-          html.find('.calc-gross').text(gross);
+          html.find('.calc-multiplier').text(catMult);
+          html.find('.calc-cat').text(result.category ? `(${result.category})` : '');
+          html.find('.calc-gross').text(result.gross);
           html.find('.calc-split-count').text(splitCount);
-          html.find('.calc-split-result').text(Math.floor(gross / splitCount));
+          html.find('.calc-split-result').text(result.perHero);
 
           // Hide calculation for losses and custom
           if (isLoss || type === "Custom" || type === "Death - Kill") {
@@ -544,7 +660,7 @@ export class KarmaSheet extends DocumentSheet {
             html.find('.karma-calculation').show();
           }
 
-          html.find('[name="amount"]').val(finalAmount);
+          html.find('[name="amount"]').val(result.perHero);
         };
 
         html.find('[name="eventType"]').change(recalc);
@@ -559,7 +675,7 @@ export class KarmaSheet extends DocumentSheet {
     event.preventDefault();
     const availableKarma = this._getCurrentKarma();
     
-    new Dialog({
+    const dlg = new Dialog({
       title: "Spend Karma",
       content: `
         <form>
@@ -599,7 +715,8 @@ export class KarmaSheet extends DocumentSheet {
           callback: async (html) => {
             const spendType = html.find('[name="spendType"]').val();
 
-            // Ability Advancement uses its own sub-dialog
+            // Ability Advancement uses its own sub-dialog — parent already closed
+            // when dropdown selected it; this is just a safety guard.
             if (spendType === "Ability Advancement") return;
 
             const amount = Number(html.find('[name="amount"]').val());
@@ -638,8 +755,10 @@ export class KarmaSheet extends DocumentSheet {
         html.find('[name="spendType"]').change(ev => {
           const type = ev.currentTarget.value;
 
-          // Ability Advancement → open sub-dialog immediately
+          // Ability Advancement → hand off to sub-dialog and close this one.
+          // The remaining fields (Amount/Description) don't apply to advancement.
           if (type === "Ability Advancement") {
+            dlg.close();
             this._onAbilityAdvancement();
             return;
           }
@@ -663,7 +782,8 @@ export class KarmaSheet extends DocumentSheet {
           html.find('[name="description"]').attr('placeholder', placeholder);
         });
       }
-    }).render(true);
+    });
+    dlg.render(true);
   }
 
   /**
@@ -676,19 +796,12 @@ export class KarmaSheet extends DocumentSheet {
     const availableKarma = this._getCurrentKarma();
     const abilities = actor.system.abilities;
 
-    const RANK_MINS = RANK_VALUES;
+    // Rank Range MINIMUMS per Advanced Set book table — used to identify
+    // which rank a numeric value falls into. (NOT the Standard Rank Numbers.)
+    // Rank identification uses Rank Range minimums — see _getNewRank below.
+    // Cost formula: 10 × current numeric value per point (RAW).
     const RANK_ORDER = RANKS_ORDERED;
     const abilityKeys = ["fighting","agility","strength","endurance","reason","intuition","psyche"];
-
-    const getRankNumber = (value) => {
-      let rankNum = 0;
-      for (const r of RANK_ORDER) {
-        const min = RANK_MINS[r] ?? 0;
-        if (min <= value) rankNum = min;
-        else break;
-      }
-      return rankNum;
-    };
 
     // Abbreviate rank for compact display
     const abbrevRank = (rank) => {
@@ -704,36 +817,45 @@ export class KarmaSheet extends DocumentSheet {
     const calcAdvancementCost = (startValue, targetValue) => {
       const points = targetValue - startValue;
       if (points <= 0) return { total: 0, points: 0, newValue: startValue, newRank: this._getNewRank(startValue), lines: [] };
+      // Per RAW: each +1 point costs 10× the CURRENT value (not the rank's Standard Rank Number).
+      // Book example: Good(14)→Good(15) costs 140. Good(15)→Excellent(16) costs 150+400=550.
+      // Cresting adds 400 the moment the value crosses into a new rank's range.
       let total = 0;
       let lines = [];
       let cv = startValue;
       let curRank = this._getNewRank(cv);
-      let curRankNum = getRankNumber(cv);
       let segStart = cv;
-      let segCost = 10 * curRankNum;
+      let segTotal = 0;
 
       for (let i = 0; i < points; i++) {
+        const pointCost = 10 * cv;
+        total += pointCost;
+        segTotal += pointCost;
         const nv = cv + 1;
         const nRank = this._getNewRank(nv);
-        total += 10 * curRankNum;
 
         if (nRank !== curRank) {
-          // Close current segment
+          // Close segment: show "X pts (start-end) at RankAbbrev"
           const segPts = nv - segStart;
-          lines.push({ label: `${segPts} pt${segPts > 1 ? "s" : ""} at ${abbrevRank(curRank)} (${curRankNum}) × 10`, cost: segPts * segCost });
+          lines.push({
+            label: `${segPts} pt${segPts > 1 ? "s" : ""} at ${abbrevRank(curRank)} (${segStart}→${nv-1 === segStart ? nv : nv})`,
+            cost: segTotal
+          });
           lines.push({ label: `Cresting: ${curRank} → ${nRank}`, cost: 400, cresting: true });
           total += 400;
           curRank = nRank;
-          curRankNum = getRankNumber(nv);
-          segCost = 10 * curRankNum;
           segStart = nv;
+          segTotal = 0;
         }
         cv = nv;
       }
       // Close final segment
       const segPts = cv - segStart;
       if (segPts > 0) {
-        lines.push({ label: `${segPts} pt${segPts > 1 ? "s" : ""} at ${abbrevRank(curRank)} (${curRankNum}) × 10`, cost: segPts * segCost });
+        lines.push({
+          label: `${segPts} pt${segPts > 1 ? "s" : ""} at ${abbrevRank(curRank)} (${segStart}→${cv})`,
+          cost: segTotal
+        });
       }
 
       return { total, points, newValue: targetValue, newRank: this._getNewRank(targetValue), lines };
@@ -937,23 +1059,24 @@ export class KarmaSheet extends DocumentSheet {
   }
 
   _getNewRank(value) {
+    // Rank Range thresholds per Advanced Set book table (NOT Standard Rank Numbers).
     if (value >= 10000) return "Beyond";
     if (value >= 5000) return "Class 5000";
     if (value >= 3000) return "Class 3000";
     if (value >= 1000) return "Class 1000";
-    if (value >= 500) return "Shift-Z";
-    if (value >= 200) return "Shift-Y";
-    if (value >= 150) return "Shift-X";
-    if (value >= 100) return "Unearthly";
-    if (value >= 75) return "Monstrous";
-    if (value >= 50) return "Amazing";
-    if (value >= 40) return "Incredible";
-    if (value >= 30) return "Remarkable";
-    if (value >= 20) return "Excellent";
-    if (value >= 10) return "Good";
-    if (value >= 6) return "Typical";
-    if (value >= 4) return "Poor";
-    if (value >= 2) return "Feeble";
+    if (value >= 351) return "Shift-Z";
+    if (value >= 176) return "Shift-Y";
+    if (value >= 126) return "Shift-X";
+    if (value >= 88) return "Unearthly";
+    if (value >= 63) return "Monstrous";
+    if (value >= 46) return "Amazing";
+    if (value >= 36) return "Incredible";
+    if (value >= 26) return "Remarkable";
+    if (value >= 16) return "Excellent";
+    if (value >= 8) return "Good";
+    if (value >= 5) return "Typical";
+    if (value >= 3) return "Poor";
+    if (value >= 1) return "Feeble";
     return "Shift-0";
   }
 
@@ -1170,8 +1293,8 @@ export class KarmaSheet extends DocumentSheet {
     const history = foundry.utils.deepClone(this.object.system.karma?.history || []);
     
     history.sort((a, b) => {
-      const dateA = new Date(a.timestamp || a.realDate || 0);
-      const dateB = new Date(b.timestamp || b.realDate || 0);
+      const dateA = KarmaSheet._historyEntryDate(a);
+      const dateB = KarmaSheet._historyEntryDate(b);
       return this.sortNewestFirst ? dateB - dateA : dateA - dateB;
     });
     
@@ -1251,11 +1374,42 @@ export class KarmaSheet extends DocumentSheet {
     }).render(true);
   }
 
+  _onDropKarmaRow(sourceIdx, targetIdx) {
+    if (sourceIdx === targetIdx) return;
+    const history = foundry.utils.deepClone(this.object.system.karma?.history || []);
+    history.sort((a, b) => {
+      const dateA = KarmaSheet._historyEntryDate(a);
+      const dateB = KarmaSheet._historyEntryDate(b);
+      return this.sortNewestFirst ? dateB - dateA : dateA - dateB;
+    });
+
+    if (sourceIdx < 0 || sourceIdx >= history.length) return;
+    if (targetIdx < 0 || targetIdx >= history.length) return;
+
+    const source = history[sourceIdx];
+    const target = history[targetIdx];
+
+    // Cross-date drops require editing the realDate, not reorder.
+    // This keeps the log readable: position always reflects date.
+    if ((source.realDate || "") !== (target.realDate || "")) {
+      ui.notifications.info("Entries can only be reordered within the same date. Edit the date to move across days.");
+      return;
+    }
+
+    // Insert-at-target semantics: remove source, re-insert at target's
+    // current position (adjusted if source was above target).
+    history.splice(sourceIdx, 1);
+    const adjustedTarget = sourceIdx < targetIdx ? targetIdx - 1 : targetIdx;
+    history.splice(adjustedTarget, 0, source);
+
+    this._updateKarmaHistory(history);
+  }
+
   _onDeleteKarma(index) {
     const history = foundry.utils.deepClone(this.object.system.karma?.history || []);
     history.sort((a, b) => {
-      const dateA = new Date(a.timestamp || a.realDate || 0);
-      const dateB = new Date(b.timestamp || b.realDate || 0);
+      const dateA = KarmaSheet._historyEntryDate(a);
+      const dateB = KarmaSheet._historyEntryDate(b);
       return this.sortNewestFirst ? dateB - dateA : dateA - dateB;
     });
     
@@ -1310,8 +1464,8 @@ export class KarmaSheet extends DocumentSheet {
           callback: () => {
             const history = foundry.utils.deepClone(this.object.system.karma?.history || []);
             history.sort((a, b) => {
-              const dateA = new Date(a.timestamp || a.realDate || 0);
-              const dateB = new Date(b.timestamp || b.realDate || 0);
+              const dateA = KarmaSheet._historyEntryDate(a);
+              const dateB = KarmaSheet._historyEntryDate(b);
               return this.sortNewestFirst ? dateB - dateA : dateA - dateB;
             });
             indices.sort((a, b) => b - a);
