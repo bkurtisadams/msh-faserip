@@ -78,14 +78,13 @@ import { FaseripTokenRuler } from "./modules/canvas/faserip-token-ruler.js";
 import { initDotToken } from "./modules/canvas/faserip-dot-token.js";
 import { registerNullifyAuraHooks } from "./modules/actions/nullify-aura.js";
 
-// â”€â”€ Player-color tint on chat cards â”€â”€
-Hooks.on('renderChatMessage', (message, html, data) => {
+// ── Player-color tint on chat cards ──
+Hooks.on('renderChatMessageHTML', (message, htmlEl) => {
   if (!game.settings.get('msh-faserip', 'chatCardPlayerColor')) return;
   const user = game.users.get(message.author?.id ?? message.user?.id);
   if (!user?.color) return;
 
-  const el = html[0] ?? html;
-  const header = el.querySelector?.('.message-header');
+  const header = htmlEl.querySelector?.('.message-header');
   if (!header) return;
 
   const color = user.color.css ?? String(user.color);
@@ -534,7 +533,8 @@ Hooks.once("init", async () => {
     return true; // out of combat â†’ convert
   }
 
-  // Convert "duration.rounds" -> seconds (based on preset turn length: FASERIP: turn = 6s).
+  // preCreateActiveEffect: duplicate-status guard + icon→img remap.
+  // (Legacy v13 rounds→seconds conversion removed for v14 — see note below.)
   Hooks.on("preCreateActiveEffect", function (effect, data, options, userId) {
     // â”€â”€ Duplicate status guard â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // If this AE has statuses (e.g. "fly" from token HUD), check whether
@@ -555,11 +555,6 @@ Hooks.once("init", async () => {
       }
     }
 
-    // KEEP ROUNDS DURING COMBAT â€” do not convert to seconds while combat is active.
-    if (game.combat && data?.duration?.rounds) {
-      return;
-    }
-
     // v12+: img is canonical, icon is deprecated - check property existence without triggering getter
     if (data && Object.hasOwn(data, 'icon') && !data.img) data.img = data.icon;
 
@@ -569,87 +564,15 @@ Hooks.once("init", async () => {
     }
 
 
-    try {
-      // Ensure payload objects exist
-      if (!data) data = {};
-      if (!data.duration) data.duration = {};
-
-      // 1) Gather duration from payload and from the effect's source
-      var incomingHasSeconds = (data.duration.seconds !== undefined && data.duration.seconds !== null);
-      var incomingHasRounds  = (data.duration.rounds  !== undefined && data.duration.rounds  !== null);
-
-      var src = (effect && typeof effect.toObject === "function") ? effect.toObject() : {};
-      var srcDuration = (src && src.duration) ? src.duration : {};
-      var sourceHasRounds = (srcDuration.rounds !== undefined && srcDuration.rounds !== null);
-
-      // Prefer payload rounds; if missing, fall back to source rounds
-      var rounds = null;
-      if (incomingHasRounds) {
-        rounds = Number(data.duration.rounds);
-      } else if (!incomingHasSeconds && sourceHasRounds) {
-        rounds = Number(srcDuration.rounds);
-      }
-
-      // Nothing to do if:
-      //  - no rounds anywhere, or
-      //  - seconds already specified
-      if (rounds === null || isNaN(rounds) || incomingHasSeconds) return;
-
-      // 2) Determine seconds per turn from CTT preset (fallback to 6)
-      var ctt = game.modules.get("calendar-time-tracker");
-      var te  = (ctt && ctt.api) ? ctt.api.timeEngine : null;
-
-      var secPerTurn = 6;
-      if (te && typeof te.convertToSeconds === "function") {
-        try {
-          var v = Number(te.convertToSeconds(1, "turn"));
-          if (!isNaN(v) && v > 0) secPerTurn = v;
-        } catch (e1) { /* ignore */ }
-      }
-
-      // 3) Convert and sanitize
-      var safeRounds = Math.max(0, Math.floor(isNaN(rounds) ? 0 : rounds));
-      var seconds    = Math.max(0, Math.floor(safeRounds * secPerTurn));
-
-      // 4) Prefer worldTime-based startTime when timing in seconds
-      var startTime = (game.time && typeof game.time.worldTime === "number")
-        ? game.time.worldTime
-        : (srcDuration.startTime !== undefined ? srcDuration.startTime : undefined);
-
-      // 5) Update the document source (reliable in preCreate)
-      //    Also remove rounds/startRound/startTurn from the source
-      var newSrc = effect.toObject ? effect.toObject() : {};
-      if (!newSrc) newSrc = {};
-      if (!newSrc.duration) newSrc.duration = {};
-      newSrc.duration.seconds    = seconds;
-      newSrc.duration.startTime  = startTime;
-      newSrc.duration.rounds     = undefined;
-      newSrc.duration.startRound = undefined;
-      newSrc.duration.startTurn  = undefined;
-
-      if (!newSrc.flags) newSrc.flags = {};
-      if (!newSrc.flags["msh-faserip"]) newSrc.flags["msh-faserip"] = {};
-      newSrc.flags["msh-faserip"].unitLabel       = "turn";
-      newSrc.flags["msh-faserip"].unitLabelPlural = "turns";
-
-      if (typeof effect.updateSource === "function") {
-        effect.updateSource(newSrc);
-      }
-
-      // 6) Reflect the same in the incoming payload (some code reads `data`)
-      data.duration.seconds = seconds;
-      if (data.duration.rounds !== undefined)     delete data.duration.rounds;
-      if (data.duration.startRound !== undefined) delete data.duration.startRound;
-      if (data.duration.startTurn !== undefined)  delete data.duration.startTurn;
-
-      if (!data.flags) data.flags = {};
-      if (!data.flags["msh-faserip"]) data.flags["msh-faserip"] = {};
-      data.flags["msh-faserip"].unitLabel       = "turn";
-      data.flags["msh-faserip"].unitLabelPlural = "turns";
-
-    } catch (err) {
-      console.warn("FASERIP preCreateActiveEffect conversion failed:", err);
-    }
+    // v14 migration note: every effect create site in this system now
+    // writes the v14 duration shape directly ({value, units, expiry}).
+    // The legacy rounds→seconds conversion that used to live here was
+    // dead code in v14 and actively broken: it tripped
+    // BaseActiveEffect#rounds deprecation warnings on read, and
+    // duration.seconds became getter-only so the assignment threw
+    // "Cannot set property seconds of #<Object> which has only a getter".
+    // If a legacy v13-shaped effect ever slips in via import, leave it
+    // alone here — v14's own shim handles read-time conversion.
   });
 
 
