@@ -498,97 +498,59 @@ export async function applyCatch(actor, { scenario = "generic", vsYou = "", note
   });
 }
 
-/** Apply Slam note/prone/stagger. Optionally drive token displacement elsewhere. */
-export async function applySlam(actor, { kind = "No Slam", knockbackAreas = 0, prone = false, stagger = false } = {}, opts = {}) {
-  // Slam severity hierarchy: Grand Slam (3) > 1 Area (2) > Stagger (1) > No Slam (0)
-  const SLAM_SEVERITY = {
-    "Grand Slam": 3,
-    "1 Area": 2,
-    "Stagger": 1,
-    "No Slam": 0
-  };
-  
-  const newSeverity = SLAM_SEVERITY[kind] ?? 0;
-  
-  // Check for existing slam effects
-  const existingSlam = actor.effects.find(e => {
-    const effectType = e.flags?.[SCOPE()]?.effectType;
-    return effectType === "grandSlam" || effectType === "slammed" || effectType === "staggered" ||
-           e.statuses?.has("prone") || e.statuses?.has("staggered") ||
-           e.name?.toLowerCase().includes("slam");
-  });
-  
-  if (existingSlam) {
-    // Determine existing slam severity
-    const existingType = existingSlam.flags?.[SCOPE()]?.effectType;
-    const existingKind = existingSlam.flags?.[SCOPE()]?.kind;
-    let existingSeverity = 0;
-    
-    if (existingType === "grandSlam" || existingKind === "Grand Slam") {
-      existingSeverity = 3;
-    } else if (existingType === "slammed" || existingKind === "1 Area") {
-      existingSeverity = 2;
-    } else if (existingType === "staggered" || existingKind === "Stagger") {
-      existingSeverity = 1;
-    }
-    
-    if (newSeverity <= existingSeverity) {
-      // New slam is same or less severe - keep existing
-      console.log(`[FASERIP] Slam: Keeping existing (${existingKind || existingType}) over new (${kind})`);
-      return existingSlam;
-    } else {
-      // New slam is more severe - remove existing and apply new
-      console.log(`[FASERIP] Slam: Replacing existing (${existingKind || existingType}) with new (${kind})`);
-      await existingSlam.delete();
-    }
-  }
-  
-  // Don't create an effect for "No Slam"
-  if (kind === "No Slam" && !prone && !stagger) {
-    return null;
-  }
-  
-  // Determine effect type based on slam kind
-  let effectType = "slammed";
-  let changes = [];
-  
-  if (kind === "Grand Slam") {
-    effectType = "grandSlam";
-    changes = [
-      { key: "system.combatMods.defenseShift", mode: AE_MODE.ADD, value: "-2", priority: 20 },
-      { key: "system.combatMods.defenseShiftRanged", mode: AE_MODE.ADD, value: "-2", priority: 20 },
-      { key: "system.combatMods.movementMult", mode: AE_MODE.OVERRIDE, value: "0", priority: 50 },
-      { key: "system.combatMods.canAct", mode: AE_MODE.OVERRIDE, value: "false", priority: 50 },
-      { key: "system.combatMods.canMove", mode: AE_MODE.OVERRIDE, value: "false", priority: 50 }
-    ];
-  } else if (kind === "Stagger" || stagger) {
-    effectType = "staggered";
-    changes = [
-      { key: "system.combatMods.movementMult", mode: AE_MODE.MULTIPLY, value: "0.5", priority: 20 }
-    ];
-  } else if (kind === "1 Area" || prone) {
-    effectType = "slammed";
-    changes = [
-      { key: "system.combatMods.attackShift", mode: AE_MODE.ADD, value: "-1", priority: 20 },
-      { key: "system.combatMods.defenseShift", mode: AE_MODE.ADD, value: "-1", priority: 20 },
-      { key: "system.combatMods.defenseShiftRanged", mode: AE_MODE.ADD, value: "1", priority: 20 }
-    ];
-  }
-  
+/** Apply Slam result per MSH Advanced rules (p.27-28).
+ *
+ * Slam is fundamentally a positioning result — the target is either
+ * knocked down or knocked away (or both). The rules describe four
+ * outcomes; none assign numerical debuffs.
+ *
+ *   • No Slam   — no effect beyond normal hit damage.
+ *   • Stagger   — "knocked back a step or two, perhaps to one knee,
+ *                 but is fully capable of engaging in combat next
+ *                 round." No longer adjacent to attacker. No prone,
+ *                 no debuffs.
+ *   • 1 Area    — knocked one area away. Attacker chooses direction
+ *                 if any damage was dealt, defender otherwise. Lands
+ *                 prone (flung through the air, not landed upright).
+ *   • Grand Slam — knocked away at attacker's Strength rank as
+ *                  ground speed (e.g. Unearthly = 10 areas). Lands
+ *                  prone for the same physical reason.
+ *
+ * Prone status persists on the actor until manually cleared (via
+ * token HUD, a stand-up action, or GM call) — FASERIP has no
+ * automatic "stand up at round end" rule. The brief AE marker
+ * itself expires at round end; the prone status does not depend on
+ * the marker and survives it.
+ *
+ * Slammed into a building: charging attack damage on the building
+ * (handled elsewhere — not this function's concern).
+ */
+export async function applySlam(actor, { kind = "No Slam", knockbackAreas = 0 } = {}, opts = {}) {
+  if (kind === "No Slam") return null;
+
+  // If an earlier slam marker from the same round is still on the
+  // actor, replace it rather than stacking. (A character can only be
+  // freshly slammed once per discrete event; successive slams within
+  // a round in-fiction would be rare but the UI shouldn't duplicate
+  // markers either way.)
+  const existingMarker = actor.effects.find(e =>
+    e.flags?.[SCOPE()]?.effectType === "slamMarker"
+  );
+  if (existingMarker) await existingMarker.delete();
+
+  const knocksDown = (kind === "Grand Slam" || kind === "1 Area");
+
   return applyEffect(actor, {
     name: `Slam (${kind})`,
     img: "icons/svg/target.svg",
-    rounds: (stagger || prone) ? 1 : 0,
-    changes,
+    rounds: 1,        // cosmetic marker; expires end of round
+    changes: [],      // rules-faithful: no numerical debuffs
     flags: {
-      effectType,
-      status: { isSlammed: true },
+      effectType: "slamMarker",
       kind,
-      knockbackAreas,
-      prone,
-      stagger
+      knockbackAreas
     },
-    statuses: prone ? ["prone"] : (stagger ? ["staggered"] : [])
+    statuses: knocksDown ? ["prone"] : []
   }, opts);
 }
 

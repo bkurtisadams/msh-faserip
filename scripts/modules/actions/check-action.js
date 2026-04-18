@@ -885,12 +885,11 @@ export class CheckAction extends BaseAction {
     const targetActor = await this._resolveTokenActor(targetUuid);
     if (!targetActor) return;
     
-    // Use centralized applySlam which handles duplicate checking
+    // applySlam derives prone / no-prone from kind per MSH Advanced rules
+    // (Grand Slam and 1 Area land prone; Stagger does not).
     await Effects.applySlam(targetActor, {
       kind: slamEffect,
-      knockbackAreas: knockbackDistance || 0,
-      prone: (slamEffect === "Grand Slam" || slamEffect === "1 Area"),
-      stagger: (slamEffect === "Stagger")
+      knockbackAreas: knockbackDistance || 0
     }, opts);
   }
 
