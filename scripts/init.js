@@ -701,9 +701,12 @@ Hooks.once("init", async () => {
   // Register Action HUD keybinding
   game.keybindings.register("msh-faserip", "openActionHUD", {
     name: "Toggle Action HUD",
-    hint: "Toggle the Action HUD open/closed",
+    hint: "Toggle the Action HUD open/closed (press H, or Alt+H)",
     category: "FASERIP",
-    editable: [{ key: "KeyH", modifiers: ["Alt"] }],  // Alt+H
+    editable: [
+      { key: "KeyH", modifiers: [] },
+      { key: "KeyH", modifiers: ["Alt"] }
+    ],
     onDown: () => {
       if (ui.faseripHUD?.rendered) {
         ui.faseripHUD.close();
@@ -801,6 +804,26 @@ Hooks.once("init", async () => {
         }
       };
 
+    }
+
+    // 4c. Action HUD (all users)
+    if (!existingToolsObj["faserip-action-hud"]) {
+      existingToolsObj["faserip-action-hud"] = {
+        name: "faserip-action-hud",
+        title: "Toggle Action HUD (Alt+H)",
+        icon: "fas fa-crosshairs",
+        visible: true,
+        toggle: true,
+        active: !!ui.faseripHUD?.rendered,
+        onChange: (event, active) => {
+          if (active) {
+            if (!ui.faseripHUD) ui.faseripHUD = new FaseripActionPanel();
+            ui.faseripHUD.render(true);
+          } else {
+            ui.faseripHUD?.close();
+          }
+        }
+      };
     }
 
     // 5. Assign the reconstructed tools-object back onto tokenGroup.tools
