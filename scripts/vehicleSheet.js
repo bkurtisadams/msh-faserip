@@ -1,9 +1,10 @@
-// scripts/vehicleSheet.js v2.0.1 - 2026-04-19
+// scripts/vehicleSheet.js v2.0.2 - 2026-04-19
+// v2.0.2: v14 — extend foundry.appv1.sheets.ItemSheet (namespaced path)
 // v2.0.1: v14 — replace bare mergeObject with foundry.utils.mergeObject
 // v2.0.0: Stripped to stat card for compendium use — no tabs, no play-time fields
 // v1.0.0: Initial vehicle item sheet
 
-export class FaseripVehicleSheet extends ItemSheet {
+export class FaseripVehicleSheet extends foundry.appv1.sheets.ItemSheet {
   static get defaultOptions() {
     return foundry.utils.mergeObject(super.defaultOptions, {
       classes: ["faserip", "sheet", "item", "vehicle"],

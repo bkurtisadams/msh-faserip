@@ -520,7 +520,7 @@ Hooks.once("init", async () => {
     default: "gm-whisper-npcs"
   });
 
-  Actors.registerSheet("msh-faserip", MSHVehicleActorSheet, {
+  foundry.documents.collections.Actors.registerSheet("msh-faserip", MSHVehicleActorSheet, {
     types: ["vehicle"],
     makeDefault: true,
     label: "Vehicle Sheet"
@@ -1673,39 +1673,39 @@ Hooks.once("init", async () => {
   }
 
   // Register sheet application classes
-  Actors.unregisterSheet("core", foundry.applications.sheets.ActorSheetV2);
-  Items.unregisterSheet("core", foundry.applications.sheets.ItemSheetV2);
+  foundry.documents.collections.Actors.unregisterSheet("core", foundry.applications.sheets.ActorSheetV2);
+  foundry.documents.collections.Items.unregisterSheet("core", foundry.applications.sheets.ItemSheetV2);
 
-  Actors.registerSheet("msh-faserip", FaseripActorSheet, {
+  foundry.documents.collections.Actors.registerSheet("msh-faserip", FaseripActorSheet, {
     types: ["hero", "villain", "npc"],
     makeDefault: true
   });
   
   // Make sure to register vehicle items with FaseripItemSheet
-  Items.registerSheet("msh-faserip", FaseripItemSheet, { 
+  foundry.documents.collections.Items.registerSheet("msh-faserip", FaseripItemSheet, { 
     types: ["power", "vehicle"],
     makeDefault: true 
   });
 
   // Headquarters sheet - dedicated
-  Items.registerSheet("msh-faserip", FaseripHeadquartersSheet, {
+  foundry.documents.collections.Items.registerSheet("msh-faserip", FaseripHeadquartersSheet, {
     types: ["headquarters"],
     makeDefault: true
   });
   
   // Talent sheet - smaller dialog
-  Items.registerSheet("msh-faserip", FaseripTalentSheet, { 
+  foundry.documents.collections.Items.registerSheet("msh-faserip", FaseripTalentSheet, { 
     types: ["talent"],
     makeDefault: true 
   });
   
   // Contact sheet - smaller dialog
-  Items.registerSheet("msh-faserip", FaseripContactSheet, { 
+  foundry.documents.collections.Items.registerSheet("msh-faserip", FaseripContactSheet, { 
     types: ["contact"],
     makeDefault: true 
   });
   
-  Items.registerSheet("msh-faserip", FaseripEquipmentSheet, { 
+  foundry.documents.collections.Items.registerSheet("msh-faserip", FaseripEquipmentSheet, { 
     types: ["equipment"], 
     makeDefault: true 
   });

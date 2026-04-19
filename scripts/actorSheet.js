@@ -1,4 +1,5 @@
-// actorSheet.js v2.2.5 - 2026-04-17
+// actorSheet.js v2.2.6 - 2026-04-19
+// v2.2.6: v14 — extend foundry.appv1.sheets.ActorSheet (namespaced path)
 // v2.2.5: Add inline Recovery button to Health cell — shows only when
 //         canAttemptRecovery returns eligible. One-click applies recovery
 //         and rerenders the sheet. Click bubbling stopped so the parent
@@ -128,7 +129,7 @@ export function applyColumnShiftToRank(rankName, currentValue, csShift) {
 }
 
 
-export class FaseripActorSheet extends ActorSheet {
+export class FaseripActorSheet extends foundry.appv1.sheets.ActorSheet {
   // Add a property to track the biography toggle state
   _isBiographyOpen = false;
   
