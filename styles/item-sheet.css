@@ -1,0 +1,139 @@
+/* item-sheet.css v1.0.0 - 2026-04-18
+ * Base layout for FASERIP item sheets that use generic .sheet-header /
+ * .profile-img / .form-group markup. ApplicationV2's ItemSheetV2 does not
+ * carry over V1's default ItemSheet styling, so we supply it here.
+ * Scoped to .equipment-sheet to avoid bleeding into sheets that use their
+ * own design system (.contact-dialog, .talent-dialog, .headquarters-dialog,
+ * .vehicle-dialog, .power-sheet-v2).
+ */
+
+.equipment-sheet {
+  background: #f5f0e8;
+  color: #333;
+  font-size: 13px;
+}
+
+/* Header */
+.equipment-sheet .sheet-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px;
+  padding: 6px;
+  border: 2px solid #8b0000;
+  background: #fff;
+  border-radius: 3px;
+}
+.equipment-sheet .sheet-header .profile-img {
+  flex: 0 0 64px;
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+  border: 1px solid #8b0000;
+  border-radius: 3px;
+  background: #000;
+  cursor: pointer;
+}
+.equipment-sheet .sheet-header h1 {
+  flex: 1;
+  margin: 0;
+  padding: 0;
+  border: none;
+  line-height: 1;
+}
+.equipment-sheet .sheet-header h1 input[name="name"] {
+  width: 100%;
+  font-size: 18px;
+  font-weight: 700;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  padding: 6px 10px;
+  background: #fff;
+  box-sizing: border-box;
+}
+
+/* Body and tabs */
+.equipment-sheet .sheet-body {
+  padding: 0 6px 6px;
+}
+.equipment-sheet .sheet-body .tab { display: none; }
+.equipment-sheet .sheet-body .tab.active { display: block; }
+
+/* Form groups (label : input row) */
+.equipment-sheet .form-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 5px;
+}
+.equipment-sheet .form-group > label {
+  flex: 0 0 40%;
+  max-width: 180px;
+  font-weight: 700;
+  font-size: 12px;
+  color: #333;
+}
+.equipment-sheet .form-group > input[type="text"],
+.equipment-sheet .form-group > input[type="number"],
+.equipment-sheet .form-group > select,
+.equipment-sheet .form-group > textarea {
+  flex: 1;
+  min-width: 0;
+  height: 26px;
+  font-size: 12px;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  padding: 2px 6px;
+  background: #fff;
+  box-sizing: border-box;
+}
+.equipment-sheet .form-group > textarea {
+  height: auto;
+  min-height: 60px;
+  resize: vertical;
+  padding: 4px 6px;
+}
+.equipment-sheet .form-group > input[type="checkbox"] {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+}
+
+/* Stacked label-above-input variant (used inside specialized sub-sections) */
+.equipment-sheet .form-group.stacked {
+  flex-direction: column;
+  align-items: stretch;
+}
+.equipment-sheet .form-group.stacked > label {
+  flex: 0 0 auto;
+  max-width: none;
+  margin-bottom: 2px;
+}
+
+/* Generic textarea fallback */
+.equipment-sheet textarea {
+  font-family: inherit;
+  font-size: 12px;
+  color: #333;
+  box-sizing: border-box;
+}
+
+/* Buttons */
+.equipment-sheet button {
+  font-size: 12px;
+  padding: 3px 8px;
+  border: 1px solid #8b0000;
+  border-radius: 3px;
+  background: #fff;
+  color: #8b0000;
+  cursor: pointer;
+}
+.equipment-sheet button:hover {
+  background: #8b0000;
+  color: #fff;
+}
+
+.equipment-sheet .faserip-broken-banner {
+  box-sizing: border-box;
+}

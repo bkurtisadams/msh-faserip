@@ -309,7 +309,7 @@ export class FaseripEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV
 
     html.find(".add-granted-power").on("click", ev => {
       ev.preventDefault();
-      const powers = duplicate(this.object.system.powers || []);
+      const powers = duplicate(this.item.system.powers || []);
       powers.push({
         name: "",
         rank: "Typical",
@@ -318,15 +318,15 @@ export class FaseripEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV
         isPassiveArmor: false,
         grantedByEquipment: true
       });
-      this.object.update({ "system.powers": powers });
+      this.item.update({ "system.powers": powers });
     });
 
     html.find(".remove-granted-power").on("click", ev => {
       ev.preventDefault();
       const index = Number(ev.currentTarget.dataset.index);
-      const powers = duplicate(this.object.system.powers || []);
+      const powers = duplicate(this.item.system.powers || []);
       powers.splice(index, 1);
-      this.object.update({ "system.powers": powers });
+      this.item.update({ "system.powers": powers });
     });
 
     // grenade listeners
@@ -424,12 +424,12 @@ export class FaseripEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV
         content.style.display = "block";
         icon.classList.remove('fa-chevron-down');
         icon.classList.add('fa-chevron-up');
-        this.object.setFlag("msh-faserip", `section_${section}_open`, true);
+        this.item.setFlag("msh-faserip", `section_${section}_open`, true);
       } else {
         content.style.display = "none";
         icon.classList.remove('fa-chevron-up');
         icon.classList.add('fa-chevron-down');
-        this.object.setFlag("msh-faserip", `section_${section}_open`, false);
+        this.item.setFlag("msh-faserip", `section_${section}_open`, false);
       }
     });
 
@@ -440,7 +440,7 @@ export class FaseripEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV
       const content = header.nextElementSibling;
       const icon = header.querySelector('i');
 
-      const isOpen = this.object.getFlag("msh-faserip", `section_${section}_open`);
+      const isOpen = this.item.getFlag("msh-faserip", `section_${section}_open`);
       if (isOpen) {
         content.style.display = "block";
         icon.classList.remove('fa-chevron-down');
@@ -470,13 +470,13 @@ export class FaseripEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV
     // Category change — update data and re-render (template uses {{#if}} flags from getData)
     html.find('.equipment-category-select').change(async ev => {
       ev.preventDefault();
-      await this.object.update({"system.category": ev.currentTarget.value});
+      await this.item.update({"system.category": ev.currentTarget.value});
     });
 
     // Gear sub-type change — update and re-render
     html.find('.gear-type-select').change(async ev => {
       ev.preventDefault();
-      await this.object.update({"system.gearType": ev.currentTarget.value});
+      await this.item.update({"system.gearType": ev.currentTarget.value});
     });
 
 
@@ -491,45 +491,45 @@ export class FaseripEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV
     // Add resistance
     html.find('.add-resistance').click(async ev => {
       ev.preventDefault();
-      const resistances = foundry.utils.duplicate(this.object.system.resistances || []);
+      const resistances = foundry.utils.duplicate(this.item.system.resistances || []);
       resistances.push({ type: "fireHeat", rank: "Typical", value: 6, customLabel: "" });
-      await this.object.update({ "system.resistances": resistances }, {diff: false});
+      await this.item.update({ "system.resistances": resistances }, {diff: false});
     });
 
     // Remove resistance
     html.find('.remove-resistance').click(async ev => {
       ev.preventDefault();
       const index = parseInt(ev.currentTarget.dataset.index);
-      const resistances = foundry.utils.duplicate(this.object.system.resistances || []);
+      const resistances = foundry.utils.duplicate(this.item.system.resistances || []);
       if (resistances.length > index) {
         resistances.splice(index, 1);
-        await this.object.update({ "system.resistances": resistances }, {diff: false});
+        await this.item.update({ "system.resistances": resistances }, {diff: false});
       }
     });
 
     // Add ability modifier (restraint gear)
     html.find('.add-ability-modifier').click(async ev => {
       ev.preventDefault();
-      const mods = foundry.utils.duplicate(this.object.system.abilityModifiers || []);
+      const mods = foundry.utils.duplicate(this.item.system.abilityModifiers || []);
       mods.push({ ability: "fighting", shiftCS: -1 });
-      await this.object.update({ "system.abilityModifiers": mods }, {diff: false});
+      await this.item.update({ "system.abilityModifiers": mods }, {diff: false});
     });
 
     // Remove ability modifier
     html.find('.remove-ability-modifier').click(async ev => {
       ev.preventDefault();
       const index = parseInt(ev.currentTarget.dataset.index);
-      const mods = foundry.utils.duplicate(this.object.system.abilityModifiers || []);
+      const mods = foundry.utils.duplicate(this.item.system.abilityModifiers || []);
       if (mods.length > index) {
         mods.splice(index, 1);
-        await this.object.update({ "system.abilityModifiers": mods }, {diff: false});
+        await this.item.update({ "system.abilityModifiers": mods }, {diff: false});
       }
     });
 
 
     // Add custom ability handler
     html.find('.add-custom-ability').click(async ev => {
-      const stunts = this.object.system.customAbilities || [];
+      const stunts = this.item.system.customAbilities || [];
       stunts.push({
         name: "New Ability",
         description: "",
@@ -539,7 +539,7 @@ export class FaseripEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV
         isPassiveArmor: false, // Initialize new armor fields
         armorDamageType: ""
       });
-      await this.object.update({ "system.customAbilities": stunts }, {diff: false});
+      await this.item.update({ "system.customAbilities": stunts }, {diff: false});
       this.render(true); // Re-render to show the new row immediately
     });
 
@@ -547,7 +547,7 @@ export class FaseripEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV
     html.find('.remove-custom-ability').click(async ev => {
       const index = parseInt(ev.currentTarget.dataset.index);
 
-      let abilities = duplicate(this.object.system.customAbilities || []);
+      let abilities = duplicate(this.item.system.customAbilities || []);
       if (!Array.isArray(abilities)) {
         abilities = []; // Ensure it's an array for splice to work
         console.warn("customAbilities was not an array, creating empty array");
@@ -555,7 +555,7 @@ export class FaseripEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV
 
       if (abilities.length > index) {
         abilities.splice(index, 1);
-        await this.object.update({ "system.customAbilities": abilities }, {diff: false});
+        await this.item.update({ "system.customAbilities": abilities }, {diff: false});
         this.render(true); // Re-render to reflect the removal
       } else {
         console.error("Invalid ability index:", index, "length:", abilities.length);
@@ -595,7 +595,7 @@ export class FaseripEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV
         }
 
         // Update the item's data model with the reconstructed array
-        await this.object.update({ "system.customAbilities": newCustomAbilities }, { diff: false });
+        await this.item.update({ "system.customAbilities": newCustomAbilities }, { diff: false });
         // Re-render the sheet to ensure the UI reflects the saved state accurately
         // This is crucial for dropdowns to show their 'selected' state and for conditional displays (like armor type)
         this.render(true);
@@ -625,16 +625,16 @@ export class FaseripEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV
       ev.preventDefault();
       ev.stopPropagation();
       const index = parseInt(ev.currentTarget.dataset.fnIndex);
-      const fns = foundry.utils.duplicate(this.object.system.deviceFunctions || []);
+      const fns = foundry.utils.duplicate(this.item.system.deviceFunctions || []);
       if (index < fns.length) {
         const removed = fns[index];
         // If buff, also remove the managed Active Effect
         if (removed.type === "buff" && removed._effectId) {
-          const eff = this.object.effects.get(removed._effectId);
+          const eff = this.item.effects.get(removed._effectId);
           if (eff) await eff.delete();
         }
         fns.splice(index, 1);
-        await this.object.update({ "system.deviceFunctions": fns }, { diff: false });
+        await this.item.update({ "system.deviceFunctions": fns }, { diff: false });
         this.render(true);
       }
     });
@@ -650,7 +650,7 @@ export class FaseripEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV
       ev.preventDefault();
       ev.stopPropagation();
       const index = parseInt(ev.currentTarget.dataset.fnIndex);
-      const fns = foundry.utils.duplicate(this.object.system.deviceFunctions || []);
+      const fns = foundry.utils.duplicate(this.item.system.deviceFunctions || []);
       if (index >= fns.length) return;
       const fn = fns[index];
       const enabled = ev.currentTarget.checked;
@@ -658,17 +658,17 @@ export class FaseripEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV
 
       // Toggle the managed Active Effect
       if (fn._effectId) {
-        const eff = this.object.effects.get(fn._effectId);
+        const eff = this.item.effects.get(fn._effectId);
         if (eff) await eff.update({ disabled: !enabled });
       }
-      await this.object.update({ "system.deviceFunctions": fns }, { diff: false });
+      await this.item.update({ "system.deviceFunctions": fns }, { diff: false });
     });
 
     // Attack Modes listeners
     html.find('.add-attack-mode').click(async ev => {
       ev.preventDefault();
       
-      let modes = this.object.system.attackModes || [];
+      let modes = this.item.system.attackModes || [];
       if (!Array.isArray(modes)) {
         modes = Object.values(modes).filter(m => m);
       }
@@ -678,11 +678,11 @@ export class FaseripEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV
         name: "New Mode",
         actionType: "blunt-attack",
         damageType: "BA",
-        damage: this.object.system.damage || 10,
+        damage: this.item.system.damage || 10,
         ability: "fighting",
         description: ""
       });
-      await this.object.update({ "system.attackModes": modes });
+      await this.item.update({ "system.attackModes": modes });
     });
 
     html.find('.remove-attack-mode').click(async ev => {
@@ -690,7 +690,7 @@ export class FaseripEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV
       const index = parseInt(ev.currentTarget.dataset.index);
       
       // Ensure we're working with an array
-      let modes = this.object.system.attackModes || [];
+      let modes = this.item.system.attackModes || [];
       if (!Array.isArray(modes)) {
         modes = Object.values(modes).filter(m => m); // Convert object to array
       }
@@ -699,7 +699,7 @@ export class FaseripEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV
       // Remove the mode at index
       modes.splice(index, 1);
       
-      await this.object.update({ "system.attackModes": modes });
+      await this.item.update({ "system.attackModes": modes });
       this.render(true);
     });
 
@@ -887,7 +887,7 @@ export class FaseripEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV
   }
 
 async rollEquipment() {
-    const item = this.object;
+    const item = this.item;
     const actor = item.actor;
     if (!actor) return ui.notifications.error("No actor linked to item!");
 
@@ -1502,9 +1502,9 @@ async rollEquipment() {
     };
 
     const fn = defaults[type] || defaults.attack;
-    const fns = foundry.utils.duplicate(this.object.system.deviceFunctions || []);
+    const fns = foundry.utils.duplicate(this.item.system.deviceFunctions || []);
     fns.push(fn);
-    await this.object.update({ "system.deviceFunctions": fns }, { diff: false });
+    await this.item.update({ "system.deviceFunctions": fns }, { diff: false });
     this.render(true);
 
     // Open edit dialog for the new function
@@ -1512,7 +1512,7 @@ async rollEquipment() {
   }
 
   _openDeviceFunctionEditDialog(index) {
-    const fns = foundry.utils.duplicate(this.object.system.deviceFunctions || []);
+    const fns = foundry.utils.duplicate(this.item.system.deviceFunctions || []);
     if (index >= fns.length) return;
     const fn = fns[index];
     const C = this.constructor;
@@ -1632,16 +1632,16 @@ async rollEquipment() {
     const key = `system.combatMods.abilityShifts.${ability}`;
 
     const effectData = {
-      name: `${fn.name || "Buff"} (${this.object.name})`,
+      name: `${fn.name || "Buff"} (${this.item.name})`,
       icon: "icons/svg/upgrade.svg",
-      origin: this.object.uuid,
+      origin: this.item.uuid,
       disabled: !fn.enabled,
       changes: [{ key, mode: "add", value: String(cs) }]
     };
 
     if (fn._effectId) {
       // Update existing effect
-      const existing = this.object.effects.get(fn._effectId);
+      const existing = this.item.effects.get(fn._effectId);
       if (existing) {
         await existing.update(effectData);
         return;
@@ -1649,13 +1649,13 @@ async rollEquipment() {
     }
 
     // Create new effect
-    const created = await this.object.createEmbeddedDocuments("ActiveEffect", [effectData]);
+    const created = await this.item.createEmbeddedDocuments("ActiveEffect", [effectData]);
     if (created?.length) {
       // Store the effect ID back on the function
-      const fns = foundry.utils.duplicate(this.object.system.deviceFunctions || []);
+      const fns = foundry.utils.duplicate(this.item.system.deviceFunctions || []);
       if (fns[index]) {
         fns[index]._effectId = created[0].id;
-        await this.object.update({ "system.deviceFunctions": fns }, { diff: false });
+        await this.item.update({ "system.deviceFunctions": fns }, { diff: false });
       }
     }
   }

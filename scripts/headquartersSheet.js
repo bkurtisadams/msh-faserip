@@ -52,7 +52,8 @@ export class FaseripHeadquartersSheet extends HandlebarsApplicationMixin(ItemShe
 
   async _prepareContext(options) {
     const context = await super._prepareContext(options);
-    context.system = context.item.system;
+    context.item = this.item;
+    context.system = this.item.system;
     context.isGM = game.user.isGM;
 
     // Building type categories for the grouped select
