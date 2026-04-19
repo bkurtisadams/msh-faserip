@@ -1,77 +1,55 @@
-<form class="{{cssClass}} contact-sheet" autocomplete="off">
-    <header class="sheet-header">
-      <img class="profile-img" src="{{item.img}}" data-edit="img" title="{{item.name}}" />
-      <h1><input name="name" type="text" value="{{item.name}}" placeholder="Contact Type"/></h1>
-    </header>
-  
-    <section class="sheet-body">
-      <div class="form-group">
-        <label>Contact Type:</label>
-        <select name="system.type">
-          <option value="" {{#if (eq system.type "")}}selected{{/if}}>--Select Type--</option>
-          <option value="Professional" {{#if (eq system.type "Professional")}}selected{{/if}}>Professional</option>
-          <option value="Scientific" {{#if (eq system.type "Scientific")}}selected{{/if}}>Scientific</option>
-          <option value="Political" {{#if (eq system.type "Political")}}selected{{/if}}>Political</option>
-          <option value="Mystic" {{#if (eq system.type "Mystic")}}selected{{/if}}>Mystic</option>
-          <option value="Criminal" {{#if (eq system.type "Criminal")}}selected{{/if}}>Criminal</option>
-          <option value="Hero Group" {{#if (eq system.type "Hero Group")}}selected{{/if}}>Hero Group</option>
-          <option value="Other" {{#if (eq system.type "Other")}}selected{{/if}}>Other</option>
-        </select>
-      </div>
-  
-      <div class="form-group">
-        <label>Disposition:</label>
-        <select name="system.disposition">
-          <option value="Friendly" {{#if (eq system.disposition "Friendly")}}selected{{/if}}>Friendly</option>
-          <option value="Neutral" {{#if (eq system.disposition "Neutral")}}selected{{/if}}>Neutral</option>
-          <option value="Suspicious" {{#if (eq system.disposition "Suspicious")}}selected{{/if}}>Suspicious</option>
-          <option value="Hostile" {{#if (eq system.disposition "Hostile")}}selected{{/if}}>Hostile</option>
-        </select>
-      </div>
-  
-      <div class="form-group">
-        <label>Location:</label>
-        <input type="text" name="system.location" value="{{system.location}}" />
-      </div>
-  
-      <div class="form-group">
-        <label>Notes (Contact Name, etc.):</label>
-        <textarea name="system.notes" rows="3" placeholder="Enter contact's actual name and other important details here">{{system.notes}}</textarea>
-      </div>
-  
-      <div class="form-group">
-        <label>Description:</label>
-        <textarea name="system.description" rows="5" placeholder="Enter a general description of this type of contact">{{system.description}}</textarea>
-      </div>
-    </section>
-  </form>
+<form class="faserip-dialog contact-dialog" autocomplete="off">
+  <div class="contact-header">
+    <img class="contact-portrait" src="{{item.img}}" data-edit="img" width="40" height="40" title="{{item.name}}"/>
+    <input class="contact-name-input" type="text" name="name" value="{{item.name}}" placeholder="Contact Name"/>
+  </div>
 
-<style>
-  .contact-sheet .form-group {
-    margin-bottom: 10px;
-  }
-  .contact-sheet .form-group label {
-    display: block;
-    font-weight: bold;
-    margin-bottom: 4px;
-  }
-  .contact-sheet select,
-  .contact-sheet input[type="text"],
-  .contact-sheet textarea {
-    width: 100%;
-    padding: 6px 8px;
-    border: 1px solid #ccc;
-    border-radius: 3px;
-    font-size: 14px;
-    line-height: 1.4;
-    box-sizing: border-box;
-  }
-  .contact-sheet select {
-    height: auto;
-    min-height: 32px;
-  }
-  .contact-sheet textarea {
-    min-height: 80px;
-    resize: vertical;
-  }
-</style>
+  <div class="contact-body">
+
+    <fieldset class="contact-fieldset">
+      <legend>Classification</legend>
+      <div class="contact-grid-2col">
+        <div class="contact-field">
+          <label>Contact Type</label>
+          <select name="system.type" class="contact-type-select">
+            <option value="" {{#if (eq system.type "")}}selected{{/if}}>-- Select Type --</option>
+            <option value="Professional" {{#if (eq system.type "Professional")}}selected{{/if}}>Professional</option>
+            <option value="Scientific" {{#if (eq system.type "Scientific")}}selected{{/if}}>Scientific</option>
+            <option value="Political" {{#if (eq system.type "Political")}}selected{{/if}}>Political</option>
+            <option value="Mystic" {{#if (eq system.type "Mystic")}}selected{{/if}}>Mystic</option>
+            <option value="Criminal" {{#if (eq system.type "Criminal")}}selected{{/if}}>Criminal</option>
+            <option value="Hero Group" {{#if (eq system.type "Hero Group")}}selected{{/if}}>Hero Group</option>
+            <option value="Other" {{#if (eq system.type "Other")}}selected{{/if}}>Other</option>
+          </select>
+        </div>
+        <div class="contact-field">
+          <label>Disposition</label>
+          <select name="system.disposition" class="contact-disposition-select">
+            <option value="Friendly" {{#if (eq system.disposition "Friendly")}}selected{{/if}}>Friendly</option>
+            <option value="Neutral" {{#if (eq system.disposition "Neutral")}}selected{{/if}}>Neutral</option>
+            <option value="Suspicious" {{#if (eq system.disposition "Suspicious")}}selected{{/if}}>Suspicious</option>
+            <option value="Hostile" {{#if (eq system.disposition "Hostile")}}selected{{/if}}>Hostile</option>
+          </select>
+        </div>
+      </div>
+    </fieldset>
+
+    <fieldset class="contact-fieldset">
+      <legend>Location</legend>
+      <div class="contact-field">
+        <input type="text" name="system.location" value="{{system.location}}" placeholder="City / base of operations"/>
+      </div>
+    </fieldset>
+
+    <fieldset class="contact-fieldset">
+      <legend>Notes</legend>
+      <textarea name="system.notes" rows="3" placeholder="Contact's actual name and other important details">{{system.notes}}</textarea>
+    </fieldset>
+
+    <fieldset class="contact-fieldset">
+      <legend>Description</legend>
+      <textarea name="system.description" rows="5" placeholder="General description of this contact">{{system.description}}</textarea>
+    </fieldset>
+
+  </div>
+</form>
