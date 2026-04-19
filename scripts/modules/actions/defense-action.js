@@ -1,4 +1,8 @@
-// scripts/modules/actions/defense-action.js v2.0.0 - 2026-03-18
+// scripts/modules/actions/defense-action.js v2.0.1 - 2026-04-19
+// v2.0.1: Fix directed-catch — apply -3CS to effective rank when "Directed at you"
+//         is checked. Previously the chat card claimed -3CS was applied, but the
+//         roll was made at unshifted rank. Shift display now composes CS panel +
+//         directed penalty with a breakdown tooltip.
 // v2.0.0: Restyle dialog to frp-dlg system — color-coded header (green),
 //         wireCSPanel, frp-fx-grid with hover tooltips, frp-foot, mode selector in titlebar
 // v1.5.1: Fix dodge — only write defenseShiftRanged (not defenseShift) so dodge has
@@ -234,7 +238,9 @@ export class DefenseAction extends BaseAction {
     if (!choice) return;
 
     // Effective rank
-    const effectiveRank = shiftRank(ability.rank, choice.shift);
+    // Catching: -3CS if the object/attack is directed specifically at the catcher (RAW)
+    const directedPenalty = (actionType === "catching" && choice.catchVsYou) ? -3 : 0;
+    const effectiveRank = shiftRank(ability.rank, (choice.shift || 0) + directedPenalty);
 
     // Check consolidated chat card setting
     let useConsolidated = false;
@@ -274,10 +280,16 @@ export class DefenseAction extends BaseAction {
     // Ability label for chat card
     const featLabel = `${abilityLabel} FEAT`;
 
-    // Shift display (hover tooltip style)
+    // Shift display (hover tooltip style) — includes directed-catch -3CS when applicable
+    const totalShift = (choice.shift || 0) + directedPenalty;
     let shiftDisplay = "";
-    if (choice.shift) {
-      const csBox = `<span title="${choice.shift > 0 ? '+' : ''}${choice.shift}CS" style="padding:0 3px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${choice.shift > 0 ? '+' : ''}${choice.shift}CS</span>`;
+    if (totalShift) {
+      const label = `${totalShift > 0 ? '+' : ''}${totalShift}CS`;
+      const tipParts = [];
+      if (choice.shift) tipParts.push(`${choice.shift > 0 ? '+' : ''}${choice.shift} CS panel`);
+      if (directedPenalty) tipParts.push(`${directedPenalty} directed`);
+      const tip = tipParts.join(', ');
+      const csBox = `<span title="${tip}" style="padding:0 3px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${label}</span>`;
       shiftDisplay = ` (${csBox} → ${effectiveRank})`;
     }
 
