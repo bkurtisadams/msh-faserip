@@ -1,4 +1,11 @@
-// scripts/modules/actions/defense-action.js v2.0.2 - 2026-04-19
+// scripts/modules/actions/defense-action.js v2.0.3 - 2026-04-19
+// v2.0.3: Scope evading effect to attacks only. Removed canAct:false from
+//         the Evading effect's changes array. Attack blocking is handled by
+//         the existing isEvading flag check in attack-action.js (which also
+//         produces a more informative "cannot attack — currently evading X"
+//         chat card). Evaders can now freely move, use non-attack powers,
+//         roll FEATs, and defend against other opponents — matching RAW
+//         "makes no attacks that round" (narrower than "cannot act").
 // v2.0.2: Catch RAW eligibility gate — pre-roll confirm dialog when actor's
 //         Agility is below the RAW minimum for the scenario (bullet/Unearthly,
 //         arrow/Amazing, thrown/Remarkable). Falling objects have no gate.
@@ -775,10 +782,11 @@ export class DefenseAction extends BaseAction {
           units: "rounds",
           expiry: "roundEnd"
         },
-        // Evading prevents actions this round (per rules: "makes no attacks that round")
-        changes: [
-          { key: "system.combatMods.canAct", mode: "override", value: "false", priority: 50 }
-        ],
+        // Evading prohibits ATTACKS only (per RAW: "makes no attacks that round").
+        // Attack blocking is enforced by the explicit isEvading flag check in
+        // attack-action.js, not by canAct — evader must remain free to move,
+        // use non-attack powers, roll FEATs, and defend against OTHER opponents.
+        changes: [],
         flags: {
           "msh-faserip": {
             isEvading: true,
