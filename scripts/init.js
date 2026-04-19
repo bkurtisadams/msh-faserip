@@ -1221,8 +1221,8 @@ Hooks.once("init", async () => {
   // Register custom status effects â€” skip any IDs already registered by core (v14 proxy enforces uniqueness)
   const _existingStatusIds = new Set(CONFIG.statusEffects.map(e => e.id));
   const _mshStatusEffects = [
-    { id: "partial-hold", name: "Partial Hold", img: "icons/svg/net.svg", flags: { "msh-faserip": { grappling: true } } },
-    { id: "full-hold", name: "Full Hold", img: "icons/svg/paralysis.svg", flags: { "msh-faserip": { grappling: true } } },
+    { id: "grappled", name: "Grappled", img: "icons/svg/net.svg", flags: { "msh-faserip": { grappling: true } } },
+    { id: "held", name: "Held", img: "icons/svg/padlock.svg", flags: { "msh-faserip": { grappling: true } } },
     { id: "dying", name: "Dying", img: "icons/svg/skull.svg", flags: { "msh-faserip": { isDying: true } } },
     { id: "impaired-endurance", name: "Impaired Endurance", img: "icons/svg/blood.svg", flags: { "msh-faserip": { isImpairedEndurance: true } } },
     { id: "dead", name: "Dead", img: "icons/svg/skull.svg", flags: { "msh-faserip": { isDead: true } } },
