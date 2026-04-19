@@ -1,4 +1,5 @@
-// chat-hooks.js v1.5.6 - 2026-02-21
+// chat-hooks.js v1.5.8 - 2026-04-19
+// v1.5.8: Remove chat button click handlers and dead code
 // v1.5.6: Fix Apply Damage and Resolve Slam buttons not working in semi mode - canDriveAutoSaves bail was blocking all button handler registration for non-owners
 // v1.5.7: Fix reload - prefer token actor over world actor (unlinked tokens have separate item copies)
 // v1.5.6: Fix reload handler - use pointerEvents/opacity disable for <a> tag (disabled prop is button-only)
@@ -1160,7 +1161,7 @@ export function installActionChatHandlers() {
       });
     });
 
-    // 8) Apply Defense Effect (dodging/evading/blocking/catching)
+/*     // 8) Apply Defense Effect (dodging/evading/blocking/catching)
     html.on("click", '[data-action="apply-effect"]', async (ev) => {
       ev.preventDefault();
       const btn = ev.currentTarget;
@@ -1212,7 +1213,8 @@ export function installActionChatHandlers() {
       
       ui.notifications.info(`Defense effect applied to ${actor.name}`);
     });
-
+ */
+/* 
     // 9) Use Blocking Armor (separate button for blocking)
     html.on("click", '[data-action="use-armor"]', async (ev) => {
       ev.preventDefault();
@@ -1247,7 +1249,7 @@ export function installActionChatHandlers() {
       
       ui.notifications.info(`Blocking armor applied to ${actor.name}`);
     });
-
+ */
     // 10) Death Save
     html.on("click", '[data-action="death-save"]', async (ev) => {
       // Respect disabled state
@@ -1419,7 +1421,8 @@ export function installActionChatHandlers() {
 /**
  * Create a Dodging effect
  */
-async function createDodgingEffect(actor, data) {
+
+/* async function createDodgingEffect(actor, data) {
   const { attackerPenaltyCS, selfPenaltyCS, notes } = data;
   
   // Remove any existing dodging effects first
@@ -1495,7 +1498,7 @@ async function createCatchingEffect(actor, data) {
   const { scenario, vsYou, note } = data;
   await Effects.applyCatch(actor, { scenario, vsYou, note });
 }
-
+ */
 
 export async function postAttackChatCard({
   actor, actionId, label, ability, roll, resultColor,
