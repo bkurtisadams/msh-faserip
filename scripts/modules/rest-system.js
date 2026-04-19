@@ -564,9 +564,8 @@ static async attemptRegainConsciousness(actor) {
         ],
         statuses: ["unconscious"],
         duration: {
-          value: hours * 600,
-          units: "rounds",
-          expiry: "roundEnd"
+          value: hours * 3600,
+          units: "seconds"
         }
       };
       await actor.createEmbeddedDocuments("ActiveEffect", [unconsciousEffect]);
@@ -603,8 +602,7 @@ static async attemptRegainConsciousness(actor) {
               currentEndurance: currentEndurance,
               lastHealed: game.time.worldTime,
               medicalCare: actor.getFlag(SCOPE, "medicalCare") ?? false
-            },
-            core: { statusId: "impaired-endurance" }
+            }
           },
           changes: [{
             key: "system.combatMods.attackShift",

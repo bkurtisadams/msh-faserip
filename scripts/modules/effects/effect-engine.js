@@ -378,9 +378,11 @@ export async function applyStun(actor, { rounds = 1, originUuid = null } = {}, o
       { key: "system.combatMods.canMove", mode: AE_MODE.OVERRIDE, value: "false", priority: 50 }
     ],
     flags: {
-      effectType: "stunned",
-      status: { isStunned: true },
-      meta: { unitLabel: "turn", unitLabelPlural: "turns" }
+      [SCOPE()]: {
+        effectType: "stunned",
+        status: { isStunned: true },
+        meta: { unitLabel: "turn", unitLabelPlural: "turns" }
+      }
     },
     statuses: ["stunned"]
   }, opts);

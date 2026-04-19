@@ -712,7 +712,6 @@ async function _processDyingRoundInner(actor, dyingAE, scope) {
           lastHealed: Date.now(),
           medicalCare: actor.getFlag(scope, "medicalCare") ?? false,
         },
-        core: { statusId: "impaired-endurance" },
       },
       changes: [{
         key: "system.combatMods.selfPenaltyCS",
@@ -1081,7 +1080,6 @@ export async function applyDyingOngoing(target, { skipImmediateLoss = false } = 
             lastHealed: Date.now(),
             medicalCare: actor.getFlag(scope, "medicalCare") ?? false,
           },
-          core: { statusId: "impaired-endurance" },
         },
         changes: [{
           key: "system.combatMods.selfPenaltyCS",
