@@ -1,8 +1,13 @@
-// scripts/modules/actions/defense-action.js v2.0.1 - 2026-04-19
+// scripts/modules/actions/defense-action.js v2.0.2 - 2026-04-19
+// v2.0.2: Catch RAW eligibility gate — pre-roll confirm dialog when actor's
+//         Agility is below the RAW minimum for the scenario (bullet/Unearthly,
+//         arrow/Amazing, thrown/Remarkable). Falling objects have no gate.
+//         Cancel aborts the action; confirm proceeds, letting the GM override.
 // v2.0.1: Fix directed-catch — apply -3CS to effective rank when "Directed at you"
 //         is checked. Previously the chat card claimed -3CS was applied, but the
 //         roll was made at unshifted rank. Shift display now composes CS panel +
 //         directed penalty with a breakdown tooltip.
+// 
 // v2.0.0: Restyle dialog to frp-dlg system — color-coded header (green),
 //         wireCSPanel, frp-fx-grid with hover tooltips, frp-foot, mode selector in titlebar
 // v1.5.1: Fix dodge — only write defenseShiftRanged (not defenseShift) so dodge has
@@ -234,8 +239,48 @@ export class DefenseAction extends BaseAction {
         },
         close: () => { if (!_resolved) resolve(null); }
       }).render(true);
-    });
+   });
     if (!choice) return;
+
+    // Catching: RAW min-Agility eligibility gate. Falling has no minimum.
+    // Shooting/throwing require a minimum Agi rank per RAW. Gate is a soft
+    // confirm: GM can click through to allow a catch attempt below the RAW
+    // threshold, but the rule is surfaced before the roll.
+    if (actionType === "catching") {
+      const minRanks = {
+        "shooting-bullet": "Unearthly",
+        "shooting-arrow":  "Amazing",
+        "throwing-other":  "Remarkable"
+      };
+      const required = minRanks[choice.catchScenario];
+      if (required) {
+        const agiIdx  = RANKS.indexOf(ability.rank);
+        const needIdx = RANKS.indexOf(required);
+        if (agiIdx < needIdx) {
+          const labels = {
+            "shooting-bullet": "a bullet",
+            "shooting-arrow":  "an arrow",
+            "throwing-other":  "a thrown projectile"
+          };
+          const proceed = await Dialog.confirm({
+            title: "Catching Prerequisite Not Met",
+            content: `
+              <div style="padding:6px 0;font-size:13px;">
+                <p>Catching ${labels[choice.catchScenario]} requires at least
+                  <strong>${required}</strong> Agility per RAW.</p>
+                <p>${actor.name} has <strong>${ability.rank}</strong>
+                  (need ${required} or higher).</p>
+                <p>Attempt the catch anyway?</p>
+              </div>
+            `,
+            yes: () => true,
+            no:  () => false,
+            defaultYes: false
+          });
+          if (!proceed) return;
+        }
+      }
+    }
 
     // Effective rank
     // Catching: -3CS if the object/attack is directed specifically at the catcher (RAW)
