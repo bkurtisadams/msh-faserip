@@ -38,6 +38,9 @@ export class FaseripEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV
     main: { template: "systems/msh-faserip/templates/equipment-sheet.html" }
   };
 
+  /** Use item name alone as window title (drops V2's "TYPES.Item.equipment:" prefix) */
+  get title() { return this.item?.name ?? super.title; }
+
   async _prepareContext(options) {
     // Get base data
     const context = await super._prepareContext(options);

@@ -90,6 +90,9 @@ export class FaseripTalentSheet extends HandlebarsApplicationMixin(ItemSheetV2) 
     main: { template: "systems/msh-faserip/templates/talent-sheet.html" }
   };
 
+  /** Use item name alone as window title (drops V2's "TYPES.Item.talent:" prefix) */
+  get title() { return this.item?.name ?? super.title; }
+
   async _prepareContext(options) {
     const context = await super._prepareContext(options);
     context.item = this.item;

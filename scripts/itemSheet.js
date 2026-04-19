@@ -35,6 +35,9 @@ export class FaseripItemSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
     options.parts = [key];
   }
 
+  /** Use item name alone as window title (drops V2's "TYPES.Item.<type>:" prefix) */
+  get title() { return this.item?.name ?? super.title; }
+
   // In itemSheet.js - revised getData() function
   async _prepareContext(options) {
     // Keep this side-effect free

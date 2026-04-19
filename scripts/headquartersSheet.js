@@ -50,6 +50,9 @@ export class FaseripHeadquartersSheet extends HandlebarsApplicationMixin(ItemShe
     main: { template: "systems/msh-faserip/templates/hq-sheet.html", scrollable: [".hq-body"] }
   };
 
+  /** Use item name alone as window title (drops V2's "TYPES.Item.headquarters:" prefix) */
+  get title() { return this.item?.name ?? super.title; }
+
   async _prepareContext(options) {
     const context = await super._prepareContext(options);
     context.item = this.item;
