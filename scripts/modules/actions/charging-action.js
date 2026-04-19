@@ -1,4 +1,15 @@
-// scripts/modules/actions/charging-action.js v3.0.3 - 2026-04-19
+// scripts/modules/actions/charging-action.js v3.0.5 - 2026-04-19
+// v3.0.5: Gate character-target rebound on isHit && color !== "white". Move
+//         the rebound block into a postHitCallback so it only fires when the
+//         attack actually connects. Previously fired unconditionally after
+//         _executeSingleAttack returned — rebound was generating phantom
+//         damage cards on evaded/dodged/missed charges (e.g. Rhino charges
+//         Counter-Strike, Counter-Strike evades, rebound card still fires).
+//         No contact = no absorption = no rebound. Object path already
+//         gated correctly (line 844) — unchanged.
+// v3.0.4: Attacker BA lookup now honors armorPhysical override (mirrors v3.0.3
+//         target-side fix). Fixes attacker-side rebound absorption and
+//         charging damage base when attacker has armorPhysical ≠ value.
 // v3.0.3: Target BA auto-populate now honors armorPhysical override on the
 //         Body Armor power (mirrors getBodyArmorValues() fallback order).
 //         Previously read system.value only, causing a rebound-vs-mitigation
@@ -692,27 +703,8 @@ export class ChargingAction extends AttackAction {
       totalShift: choice.totalShift
     };
 
-    await this._executeSingleAttack({
-      choice: mergedChoice,
-      actor,
-      ability: endurance,
-      actionType,
-      actionName,
-      effects,
-      damageType: "physical-charging",
-      rawDamage,
-      damageNote: damageSourceHover,
-      sourceName: `Charging (${choice.areas} area${choice.areas > 1 ? 's' : ''})`,
-      attackForm: "charging",
-      breakingFeat: null,
-      targetCount: 1,
-      attackNumber: 1,
-      totalAttacks: 1
-    });
-
     // ============================================================
-    // ============================================================
-    // REBOUND CHECK (post-pipeline)
+    // REBOUND CALLBACK (post-hit)
     // Per RAW (Advanced Set charging rule + book example):
     //   - Target takes (damage - targetBA), normal post-armor subtraction.
     //   - The absorbed portion, min(damage, targetBA), rebounds to attacker.
@@ -721,19 +713,25 @@ export class ChargingAction extends AttackAction {
     // Book example: End Gd(10), 10-speed charge = 30 damage, target Ex BA(20),
     // attacker Gd BA(10). Target absorbs 20 (→ 10 through to HP). That same 20
     // rebounds; attacker absorbs 10, takes 10. Matches published outcome.
+    //
+    // Gated on isHit && color !== "white": no contact = no absorption = no
+    // rebound. Evaded/dodged/missed attacks never touch the target's BA.
     // ============================================================
+    const isManualMode = this.opts?.mode === "manual";
+    const autoApply = !!this.opts?.autoApply;
     const dialogTargetBA = choice.targetBAvalue || 0;
 
-    if (dialogTargetBA > 0 && rawDamage > 0) {
-      const reboundAmount = Math.min(rawDamage, dialogTargetBA);
+    const reboundCallback = async ({ isHit, color, rawDamage: cbRawDamage }) => {
+      if (!isHit || color === "white") return;
+      if (dialogTargetBA <= 0 || cbRawDamage <= 0) return;
+
+      const reboundAmount = Math.min(cbRawDamage, dialogTargetBA);
       const damageToAttacker = Math.max(0, reboundAmount - bodyArmorValue);
-      const targetFullyAbsorbed = dialogTargetBA >= rawDamage;
-      const isManualMode = this.opts?.mode === "manual";
-      const autoApply = !!this.opts?.autoApply;
+      const targetFullyAbsorbed = dialogTargetBA >= cbRawDamage;
 
       debugLog("Charging: Rebound triggered", {
         targetBA: dialogTargetBA,
-        rawDamage,
+        rawDamage: cbRawDamage,
         reboundAmount,
         attackerBA: bodyArmorValue,
         damageToAttacker,
@@ -742,8 +740,8 @@ export class ChargingAction extends AttackAction {
 
       const targetLabel = targetName || "Target";
       const reboundCause = targetFullyAbsorbed
-        ? `${targetLabel}'s defense (${dialogTargetBA}) fully absorbed the ${rawDamage} charging damage.`
-        : `${targetLabel}'s defense (${dialogTargetBA}) absorbed ${reboundAmount} of ${rawDamage} charging damage.`;
+        ? `${targetLabel}'s defense (${dialogTargetBA}) fully absorbed the ${cbRawDamage} charging damage.`
+        : `${targetLabel}'s defense (${dialogTargetBA}) absorbed ${reboundAmount} of ${cbRawDamage} charging damage.`;
       let reboundHtml = `
         <div style="background:#f5f5f0;border:1px solid #f44336;border-radius:3px;margin-bottom:5px;">
           <div style="padding:6px 10px;border-bottom:1px solid #f44336;background:#ffebee;">
@@ -801,7 +799,26 @@ export class ChargingAction extends AttackAction {
           });
         }
       }
-    }
+    };
+
+    await this._executeSingleAttack({
+      choice: mergedChoice,
+      actor,
+      ability: endurance,
+      actionType,
+      actionName,
+      effects,
+      damageType: "physical-charging",
+      rawDamage,
+      damageNote: damageSourceHover,
+      sourceName: `Charging (${choice.areas} area${choice.areas > 1 ? 's' : ''})`,
+      attackForm: "charging",
+      breakingFeat: null,
+      targetCount: 1,
+      attackNumber: 1,
+      totalAttacks: 1,
+      postHitCallback: reboundCallback
+    });
 
     return;
   }
