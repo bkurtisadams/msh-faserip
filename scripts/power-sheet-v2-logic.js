@@ -1,4 +1,7 @@
-// power-sheet-v2-logic.js v1.4.1 - 2026-04-03
+// power-sheet-v2-logic.js v1.5.0 - 2026-04-19
+// v1.5.0: Symmetric armorPhysicalCustom pattern — orange-dot badge + reset
+//         handler + manual-edit detection, mirroring armorEnergyCustom.
+//         Rank change no longer overwrites armorPhysical when custom flag set.
 // v1.4.1: Replace local RANK_VALUES with import from rules-reference.js
 // v1.4.0: Attack section always visible so any power can opt into combat routing.
 // v1.2.0: Collapsible Active Effects, Healing/Absorption toggle, bigger textareas
@@ -175,12 +178,35 @@ export function ps2ActivateListeners(html, sheet) {
     const updates = { "system.rank": rank, "system.value": Number(val) || 0 };
     if (sheet.item.system.isBodyArmor) {
       const numVal = Number(val) || 0;
-      updates["system.armorPhysical"] = numVal;
+      if (!sheet.item.system.armorPhysicalCustom) {
+        updates["system.armorPhysical"] = numVal;
+      }
       if (!sheet.item.system.armorEnergyCustom) {
         updates["system.armorEnergy"] = Math.max(0, numVal - 20);
       }
     }
     await sheet.item.update(updates);
+  });
+
+  // Body Armor: detect manual physical edit -> set custom flag
+  html.find('#ps2-armor-phys').on('change', async ev => {
+    const newPhys = Number(ev.currentTarget.value) || 0;
+    const rankVal = sheet.item.system.value || 0;
+    const isCustom = newPhys !== rankVal;
+    if (isCustom !== (sheet.item.system.armorPhysicalCustom || false)) {
+      await sheet.item.update({ "system.armorPhysicalCustom": isCustom });
+    }
+  });
+
+  // Body Armor: reset physical to default on badge click
+  html.find('[data-action="reset-armor-physical"]').on('click', async ev => {
+    ev.preventDefault();
+    ev.stopPropagation();
+    const rankVal = sheet.item.system.value || 0;
+    await sheet.item.update({
+      "system.armorPhysical": rankVal,
+      "system.armorPhysicalCustom": false
+    });
   });
 
   // Body Armor: detect manual energy edit -> set custom flag

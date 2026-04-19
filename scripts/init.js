@@ -2167,6 +2167,45 @@ Hooks.once("ready", async () => {
     }
   }
 
+  // Migrate body armor powers: flag existing overrides as custom so rank
+  // changes don't silently clobber them. An override is "custom" when the
+  // stored armor value differs from what the rank formula would produce
+  // (physical = value, energy = max(0, value - 20) for non-FF powers;
+  // for Force Fields: physical = max(0, value - 10), energy = value).
+  if (game.user.isGM) {
+    try {
+      let flaggedPhys = 0;
+      let flaggedEner = 0;
+      for (const actor of game.actors) {
+        for (const item of actor.items) {
+          if (item.type !== "power" || !item.system.isBodyArmor) continue;
+          const sys = item.system;
+          const baseVal = typeof sys.value === "number" ? sys.value : (CONFIG.FASERIP?.rankValues?.[sys.rank] || 0);
+          const defaultPhys = sys.isForceField ? Math.max(0, baseVal - 10) : baseVal;
+          const defaultEner = sys.isForceField ? baseVal : Math.max(0, baseVal - 20);
+          const updates = {};
+          if (!sys.armorPhysicalCustom && Number(sys.armorPhysical) !== defaultPhys) {
+            updates["system.armorPhysicalCustom"] = true;
+            flaggedPhys++;
+          }
+          if (!sys.armorEnergyCustom && Number(sys.armorEnergy) !== defaultEner) {
+            updates["system.armorEnergyCustom"] = true;
+            flaggedEner++;
+          }
+          if (Object.keys(updates).length) {
+            await item.update(updates);
+            console.log(`[FASERIP] Flagged custom armor override: ${actor.name} / ${item.name}`, updates);
+          }
+        }
+      }
+      if (flaggedPhys || flaggedEner) {
+        console.log(`[FASERIP] Armor override migration: ${flaggedPhys} physical, ${flaggedEner} energy flagged as custom`);
+      }
+    } catch (e) {
+      console.warn("[FASERIP WARN] Armor custom-flag migration failed:", e);
+    }
+  }
+
   // Slam collision handlers (optional, safe)
   try {
     initializeSlamHandlers?.();
@@ -2533,6 +2572,7 @@ Hooks.on("updateItem", async (item, changes, options, userId) => {
     || changes.system?.armorNature !== undefined
     || changes.system?.armorPhysical !== undefined
     || changes.system?.armorEnergy !== undefined
+    || changes.system?.armorPhysicalCustom !== undefined
     || changes.system?.armorEnergyCustom !== undefined
     || changes.system?.resistanceType !== undefined
     || changes.system?.resistanceEffect !== undefined

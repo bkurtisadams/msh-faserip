@@ -258,7 +258,10 @@
               </div>
             </div>
             <div class="ps2-grid-2col" style="margin-top:4px;">
-              <div class="ps2-field"><label>Physical</label><input type="number" name="system.armorPhysical" value="{{system.armorPhysical}}" data-dtype="Number" id="ps2-armor-phys" /></div>
+              <div class="ps2-field" style="position:relative;">
+                <label>Physical {{#if system.armorPhysicalCustom}}<span class="ps2-armor-custom-badge" title="Non-standard physical value (click to reset)" data-action="reset-armor-physical" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#e67e22;cursor:pointer;vertical-align:middle;margin-left:3px;"></span>{{/if}}</label>
+                <input type="number" name="system.armorPhysical" value="{{system.armorPhysical}}" data-dtype="Number" id="ps2-armor-phys" />
+              </div>
               <div class="ps2-field" style="position:relative;">
                 <label>Energy {{#if system.armorEnergyCustom}}<span class="ps2-armor-custom-badge" title="Non-standard energy value (click to reset)" data-action="reset-armor-energy" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#e67e22;cursor:pointer;vertical-align:middle;margin-left:3px;"></span>{{/if}}</label>
                 <input type="number" name="system.armorEnergy" value="{{system.armorEnergy}}" data-dtype="Number" id="ps2-armor-energy" />
