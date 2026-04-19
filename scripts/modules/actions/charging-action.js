@@ -90,7 +90,7 @@ export class ChargingAction extends AttackAction {
   );
   if (bodyArmorPower) {
     bodyArmorRank = bodyArmorPower.system?.rank || "Shift-0";
-    bodyArmorValue = bodyArmorPower.system?.value || 0;
+    bodyArmorValue = bodyArmorPower.system?.armorPhysical || bodyArmorPower.system?.value || 0;
   }
 
   // Material strength examples for each rank

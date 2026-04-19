@@ -1498,7 +1498,7 @@ async function createCatchingEffect(actor, data) {
   const { scenario, vsYou, note } = data;
   await Effects.applyCatch(actor, { scenario, vsYou, note });
 }
- */
+
 
 export async function postAttackChatCard({
   actor, actionId, label, ability, roll, resultColor,
