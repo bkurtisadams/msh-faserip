@@ -1,4 +1,9 @@
-// actorSheet.js v2.2.6 - 2026-04-19
+// actorSheet.js v2.2.7 - 2026-04-19
+// v2.2.7: Auto-populate ability value on rank change. If current value is
+//         out of the new rank's range, confirm dialog offers "update to
+//         standard" or "keep custom". In-range values preserved silently.
+//         Prevents silent drift (e.g. rank bumped to Unearthly but value
+//         still reads Remarkable's 30).
 // v2.2.6: v14 — extend foundry.appv1.sheets.ActorSheet (namespaced path)
 // v2.2.5: Add inline Recovery button to Health cell — shows only when
 //         canAttemptRecovery returns eligible. One-click applies recovery
@@ -37,8 +42,8 @@ import { showAbilityFeatDialog, determineFeatRequirement, checkFeatSuccess } fro
 import { RESOURCE_PRICES } from './rules/rules-reference.js';
 import { initSheetZoom } from './modules/ui/sheet-zoom.js';
 import {
-  RANKS_ORDERED as _RANKS, RANK_VALUES as _RANK_VALUES, RANK_ALIASES,
-  normalizeRank
+  RANKS_ORDERED as _RANKS, RANK_VALUES as _RANK_VALUES, RANK_RANGES as _RANK_RANGES,
+  RANK_ALIASES, normalizeRank
 } from './rules/rules-reference.js';
 
 
@@ -1084,6 +1089,54 @@ export class FaseripActorSheet extends foundry.appv1.sheets.ActorSheet {
         this.actor.update({ "system.attributes.resources.value": rank.min });
       }
     });
+
+    // Auto-populate ability value when rank changes — if current value is
+    // outside the new rank's range, confirm before snapping to standard value.
+    // Respects custom in-range values (e.g. Unearthly 95 stays 95 on re-select).
+    // Shift-0 always snaps to 0 (no range defined).
+    const ABILITY_KEYS = ["fighting","agility","strength","endurance","reason","intuition","psyche"];
+    for (const ability of ABILITY_KEYS) {
+      html.find(`select[name="system.abilities.${ability}.rank"]`).change(async (event) => {
+        const $sel = $(event.currentTarget);
+        const newRank = $sel.val();
+        const currentValue = Number(this.actor.system?.abilities?.[ability]?.value ?? 0);
+        const stdValue = _RANK_VALUES[newRank] ?? 0;
+        const range = _RANK_RANGES[newRank];
+
+        // Shift-0 or unknown ranks: snap to standard (no confirm — no meaningful value)
+        if (!range) {
+          await this.actor.update({ [`system.abilities.${ability}.value`]: stdValue });
+          return;
+        }
+
+        const [min, max] = range;
+        // In-range → preserve custom value, no prompt
+        if (currentValue >= min && currentValue <= max) return;
+
+        const abilityLabel = ability.charAt(0).toUpperCase() + ability.slice(1);
+        const rangeLabel = Number.isFinite(max) ? `${min}–${max}` : `${min}+`;
+        const proceed = await Dialog.confirm({
+          title: `Update ${abilityLabel} value?`,
+          content: `
+            <div style="padding:6px 0;font-size:13px;">
+              <p>Current ${abilityLabel} value <strong>${currentValue}</strong> is outside
+                the <strong>${newRank}</strong> range (${rangeLabel}).</p>
+              <p>Update to standard value <strong>${stdValue}</strong>?</p>
+              <p style="color:#888;font-size:12px;">Choose "Keep ${currentValue}" to preserve
+                a custom value (rank and value will be mismatched).</p>
+            </div>
+          `,
+          yes: () => true,
+          no:  () => false,
+          defaultYes: true,
+          options: { jQuery: false }
+        });
+        if (proceed) {
+          await this.actor.update({ [`system.abilities.${ability}.value`]: stdValue });
+        }
+        // proceed === false or null → keep current value, no update needed
+      });
+    }
 
     // Hide initial roll/rank columns functionality
     const $table = html.find('.primary-abilities .abilities-table');
