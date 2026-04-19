@@ -1043,7 +1043,6 @@ export class ShootingAction extends RangedAttackAction {
           const { rollUniversalTable } = await import("../dice/universal-table.js");
           const { applyUnconscious, applyEffect } = await import("../effects/effect-engine.js");
 
-          const AE_MODE = { ADD: 2 };
           const resultRows = [];
           for (const tok of affected) {
             const a = tok.actor;
@@ -1070,8 +1069,8 @@ export class ShootingAction extends RangedAttackAction {
                     rounds: 2,
                     originUuid: actor?.uuid,
                     changes: [
-                      { key: "system.combatMods.attackShift", mode: AE_MODE.ADD, value: "-3", priority: 20 },
-                      { key: "system.combatMods.defenseShift", mode: AE_MODE.ADD, value: "-2", priority: 20 }
+                      { key: "system.combatMods.attackShift", mode: "add", value: "-3", priority: 20 },
+                      { key: "system.combatMods.defenseShift", mode: "add", value: "-2", priority: 20 }
                     ],
                     flags: { effectType: "tearGas" },
                     statuses: ["blinded"]
@@ -1088,7 +1087,6 @@ export class ShootingAction extends RangedAttackAction {
           // Smoke: -2CS on all FEATs for those in the area. Applied as a
           // persistent AE per token; GM dismisses when the smoke disperses.
           const { applyEffect } = await import("../effects/effect-engine.js");
-          const AE_MODE = { ADD: 2 };
           for (const tok of affected) {
             const a = tok.actor;
             if (!a) continue;
@@ -1099,8 +1097,8 @@ export class ShootingAction extends RangedAttackAction {
                 rounds: 10,
                 originUuid: actor?.uuid,
                 changes: [
-                  { key: "system.combatMods.attackShift", mode: AE_MODE.ADD, value: "-2", priority: 20 },
-                  { key: "system.combatMods.defenseShift", mode: AE_MODE.ADD, value: "-2", priority: 20 }
+                  { key: "system.combatMods.attackShift", mode: "add", value: "-2", priority: 20 },
+                  { key: "system.combatMods.defenseShift", mode: "add", value: "-2", priority: 20 }
                 ],
                 flags: { effectType: "smoke" }
               });

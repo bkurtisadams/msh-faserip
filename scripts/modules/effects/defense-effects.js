@@ -10,7 +10,6 @@ import { applyEffect } from "./effect-engine.js";
 import { rankValue as getRankValue, valueToRank } from "../../rules/rules-reference.js";
 
 const SCOPE = () => (globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faserip");
-const AE_MODES = { MULTIPLY: 1, ADD: 2, DOWNGRADE: 3, UPGRADE: 4, OVERRIDE: 5 };
 
 function getClosestRankName(value) {
   if (!CONFIG.FASERIP?.rankValues) return "";

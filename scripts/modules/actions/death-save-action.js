@@ -348,8 +348,8 @@ export class DeathSaveAction extends BaseAction {
         }
       },
       changes: [
-        { key: "system.status.unconscious", mode: CONST.ACTIVE_EFFECT_MODES.OVERRIDE, value: true },
-        { key: "system.combatMods.canAct", mode: CONST.ACTIVE_EFFECT_MODES.OVERRIDE, value: "false" }
+        { key: "system.status.unconscious", mode: "override", value: true },
+        { key: "system.combatMods.canAct", mode: "override", value: "false" }
       ],
       statuses: ["unconscious"],
       duration: usesCTT

@@ -686,7 +686,6 @@ export class FaseripEquipmentSheet extends ItemSheet {
   // system.* keys are applied by Foundry's applyActiveEffects automatically.
   // faserip.token.* keys use CUSTOM mode and are handled by our applyActiveEffect hook.
   _buildPresetEffect(preset) {
-    const MODES = CONST.ACTIVE_EFFECT_MODES;
     const origin = this.item.uuid;
     const base = { origin, disabled: true, transfer: true };
 
@@ -698,14 +697,14 @@ export class FaseripEquipmentSheet extends ItemSheet {
           name: "Light Source",
           img: "icons/svg/light.svg",
           changes: [
-            { key: "faserip.token.light.bright", mode: MODES.CUSTOM, value: "0.5" },
-            { key: "faserip.token.light.dim", mode: MODES.CUSTOM, value: "1" },
-            { key: "faserip.token.light.color", mode: MODES.CUSTOM, value: "#ffdd88" },
-            { key: "faserip.token.light.alpha", mode: MODES.CUSTOM, value: "0.3" },
-            { key: "faserip.token.light.angle", mode: MODES.CUSTOM, value: "360" },
-            { key: "faserip.token.light.animation.type", mode: MODES.CUSTOM, value: "torch" },
-            { key: "faserip.token.light.animation.speed", mode: MODES.CUSTOM, value: "3" },
-            { key: "faserip.token.light.animation.intensity", mode: MODES.CUSTOM, value: "3" }
+            { key: "faserip.token.light.bright", mode: "custom", value: "0.5" },
+            { key: "faserip.token.light.dim", mode: "custom", value: "1" },
+            { key: "faserip.token.light.color", mode: "custom", value: "#ffdd88" },
+            { key: "faserip.token.light.alpha", mode: "custom", value: "0.3" },
+            { key: "faserip.token.light.angle", mode: "custom", value: "360" },
+            { key: "faserip.token.light.animation.type", mode: "custom", value: "torch" },
+            { key: "faserip.token.light.animation.speed", mode: "custom", value: "3" },
+            { key: "faserip.token.light.animation.intensity", mode: "custom", value: "3" }
           ]
         });
 
@@ -714,14 +713,14 @@ export class FaseripEquipmentSheet extends ItemSheet {
           name: "Flashlight Beam",
           img: "icons/svg/light.svg",
           changes: [
-            { key: "faserip.token.light.bright", mode: MODES.CUSTOM, value: "0.5" },
-            { key: "faserip.token.light.dim", mode: MODES.CUSTOM, value: "1" },
-            { key: "faserip.token.light.color", mode: MODES.CUSTOM, value: "#ffffcc" },
-            { key: "faserip.token.light.alpha", mode: MODES.CUSTOM, value: "0.5" },
-            { key: "faserip.token.light.angle", mode: MODES.CUSTOM, value: "60" },
-            { key: "faserip.token.light.animation.type", mode: MODES.CUSTOM, value: "" },
-            { key: "faserip.token.light.animation.speed", mode: MODES.CUSTOM, value: "0" },
-            { key: "faserip.token.light.animation.intensity", mode: MODES.CUSTOM, value: "0" }
+            { key: "faserip.token.light.bright", mode: "custom", value: "0.5" },
+            { key: "faserip.token.light.dim", mode: "custom", value: "1" },
+            { key: "faserip.token.light.color", mode: "custom", value: "#ffffcc" },
+            { key: "faserip.token.light.alpha", mode: "custom", value: "0.5" },
+            { key: "faserip.token.light.angle", mode: "custom", value: "60" },
+            { key: "faserip.token.light.animation.type", mode: "custom", value: "" },
+            { key: "faserip.token.light.animation.speed", mode: "custom", value: "0" },
+            { key: "faserip.token.light.animation.intensity", mode: "custom", value: "0" }
           ]
         });
 
@@ -730,8 +729,8 @@ export class FaseripEquipmentSheet extends ItemSheet {
           name: "Darkvision / Infravision",
           img: "icons/svg/eye.svg",
           changes: [
-            { key: "faserip.token.sight.range", mode: MODES.CUSTOM, value: "120" },
-            { key: "faserip.token.sight.visionMode", mode: MODES.CUSTOM, value: "darkvision" }
+            { key: "faserip.token.sight.range", mode: "custom", value: "120" },
+            { key: "faserip.token.sight.visionMode", mode: "custom", value: "darkvision" }
           ]
         });
 
@@ -740,7 +739,7 @@ export class FaseripEquipmentSheet extends ItemSheet {
           name: "Stealth Field",
           img: "icons/svg/invisible.svg",
           changes: [
-            { key: "faserip.token.alpha", mode: MODES.CUSTOM, value: "0.4" }
+            { key: "faserip.token.alpha", mode: "custom", value: "0.4" }
           ]
         });
 
@@ -749,13 +748,13 @@ export class FaseripEquipmentSheet extends ItemSheet {
           name: "Force Field Aura",
           img: "icons/svg/aura.svg",
           changes: [
-            { key: "faserip.token.light.bright", mode: MODES.CUSTOM, value: "0" },
-            { key: "faserip.token.light.dim", mode: MODES.CUSTOM, value: "0.15" },
-            { key: "faserip.token.light.color", mode: MODES.CUSTOM, value: "#4488ff" },
-            { key: "faserip.token.light.alpha", mode: MODES.CUSTOM, value: "0.15" },
-            { key: "faserip.token.light.animation.type", mode: MODES.CUSTOM, value: "pulse" },
-            { key: "faserip.token.light.animation.speed", mode: MODES.CUSTOM, value: "2" },
-            { key: "faserip.token.light.animation.intensity", mode: MODES.CUSTOM, value: "2" }
+            { key: "faserip.token.light.bright", mode: "custom", value: "0" },
+            { key: "faserip.token.light.dim", mode: "custom", value: "0.15" },
+            { key: "faserip.token.light.color", mode: "custom", value: "#4488ff" },
+            { key: "faserip.token.light.alpha", mode: "custom", value: "0.15" },
+            { key: "faserip.token.light.animation.type", mode: "custom", value: "pulse" },
+            { key: "faserip.token.light.animation.speed", mode: "custom", value: "2" },
+            { key: "faserip.token.light.animation.intensity", mode: "custom", value: "2" }
           ]
         });
 
@@ -765,12 +764,12 @@ export class FaseripEquipmentSheet extends ItemSheet {
           img: "icons/svg/wing.svg",
           statuses: ["fly"],
           changes: [
-            { key: "faserip.token.light.dim", mode: MODES.CUSTOM, value: "0.1" },
-            { key: "faserip.token.light.color", mode: MODES.CUSTOM, value: "#ff6600" },
-            { key: "faserip.token.light.alpha", mode: MODES.CUSTOM, value: "0.2" },
-            { key: "faserip.token.light.animation.type", mode: MODES.CUSTOM, value: "flame" },
-            { key: "faserip.token.light.animation.speed", mode: MODES.CUSTOM, value: "4" },
-            { key: "faserip.token.light.animation.intensity", mode: MODES.CUSTOM, value: "3" }
+            { key: "faserip.token.light.dim", mode: "custom", value: "0.1" },
+            { key: "faserip.token.light.color", mode: "custom", value: "#ff6600" },
+            { key: "faserip.token.light.alpha", mode: "custom", value: "0.2" },
+            { key: "faserip.token.light.animation.type", mode: "custom", value: "flame" },
+            { key: "faserip.token.light.animation.speed", mode: "custom", value: "4" },
+            { key: "faserip.token.light.animation.intensity", mode: "custom", value: "3" }
           ]
         });
 
@@ -781,7 +780,7 @@ export class FaseripEquipmentSheet extends ItemSheet {
           img: "icons/svg/shield.svg",
           disabled: false,
           changes: [
-            { key: "system.combatMods.defenseShift", mode: MODES.ADD, value: "0" }
+            { key: "system.combatMods.defenseShift", mode: "add", value: "0" }
           ]
         });
 
@@ -791,7 +790,7 @@ export class FaseripEquipmentSheet extends ItemSheet {
           img: "icons/svg/sword.svg",
           disabled: false,
           changes: [
-            { key: "system.combatMods.attackShift", mode: MODES.ADD, value: "1" }
+            { key: "system.combatMods.attackShift", mode: "add", value: "1" }
           ]
         });
 
@@ -801,7 +800,7 @@ export class FaseripEquipmentSheet extends ItemSheet {
           img: "icons/svg/shield.svg",
           disabled: false,
           changes: [
-            { key: "system.combatMods.defenseShift", mode: MODES.ADD, value: "1" }
+            { key: "system.combatMods.defenseShift", mode: "add", value: "1" }
           ]
         });
 
@@ -811,7 +810,7 @@ export class FaseripEquipmentSheet extends ItemSheet {
           img: "icons/svg/upgrade.svg",
           disabled: false,
           changes: [
-            { key: "system.combatMods.abilityShifts.strength", mode: MODES.ADD, value: "0" }
+            { key: "system.combatMods.abilityShifts.strength", mode: "add", value: "0" }
           ]
         });
 
@@ -820,7 +819,7 @@ export class FaseripEquipmentSheet extends ItemSheet {
           name: "Immobilized",
           img: "icons/svg/net.svg",
           changes: [
-            { key: "system.combatMods.canMove", mode: MODES.OVERRIDE, value: "false" }
+            { key: "system.combatMods.canMove", mode: "override", value: "false" }
           ]
         });
 
@@ -1598,7 +1597,6 @@ async rollEquipment() {
 
   // Create or update the Active Effect that backs a passive buff function
   async _syncBuffEffect(index, fn) {
-    const MODES = CONST.ACTIVE_EFFECT_MODES;
     const ability = fn.ability || "strength";
     const cs = parseInt(fn.csShift) || 0;
     const key = `system.combatMods.abilityShifts.${ability}`;
@@ -1608,7 +1606,7 @@ async rollEquipment() {
       icon: "icons/svg/upgrade.svg",
       origin: this.object.uuid,
       disabled: !fn.enabled,
-      changes: [{ key, mode: MODES.ADD, value: String(cs) }]
+      changes: [{ key, mode: "add", value: String(cs) }]
     };
 
     if (fn._effectId) {

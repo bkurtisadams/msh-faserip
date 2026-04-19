@@ -38,8 +38,6 @@ import { safeActorUpdate, safeActorSetFlag, safeActorCreateEffect } from "../../
 
 const SCOPE = () => (globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faserip");
 
-const AE_MODES = { MULTIPLY: 1, ADD: 2, DOWNGRADE: 3, UPGRADE: 4, OVERRIDE: 5 };
-
 // Synchronous in-memory lock to prevent concurrent processDyingRound calls per actor.
 // Solves race condition where combatRound + timeAdvanced hooks both call processDyingRound
 // before the async setFlag dedup can complete.
@@ -715,7 +713,7 @@ async function _processDyingRoundInner(actor, dyingAE, scope) {
       },
       changes: [{
         key: "system.combatMods.selfPenaltyCS",
-        mode: CONST.ACTIVE_EFFECT_MODES.ADD,
+        mode: "add",
         value: "-2",
       }],
     }]);
@@ -1083,7 +1081,7 @@ export async function applyDyingOngoing(target, { skipImmediateLoss = false } = 
         },
         changes: [{
           key: "system.combatMods.selfPenaltyCS",
-          mode: CONST.ACTIVE_EFFECT_MODES.ADD,
+          mode: "add",
           value: "-2",
         }],
       }]);
@@ -1122,8 +1120,8 @@ export async function applyDyingOngoing(target, { skipImmediateLoss = false } = 
     disabled: false,
     statuses: ["dying"],
     changes: [
-      { key: "system.combatMods.defenseShift", mode: AE_MODES.ADD, value: "-4", priority: 20 },
-      { key: "system.combatMods.defenseShiftRanged", mode: AE_MODES.ADD, value: "-4", priority: 20 },
+      { key: "system.combatMods.defenseShift", mode: "add", value: "-4", priority: 20 },
+      { key: "system.combatMods.defenseShiftRanged", mode: "add", value: "-4", priority: 20 },
     ],
     extraFlags: {
       isDying: true,

@@ -460,7 +460,7 @@ static async attemptRegainConsciousness(actor) {
           }
         },
         changes: [
-          { key: "system.combatMods.canAct", mode: CONST.ACTIVE_EFFECT_MODES.OVERRIDE, value: "false" }
+          { key: "system.combatMods.canAct", mode: "override", value: "false" }
         ],
         statuses: ["unconscious"],
         duration: game.combat
@@ -560,7 +560,7 @@ static async attemptRegainConsciousness(actor) {
           }
         },
         changes: [
-          { key: "system.combatMods.canAct", mode: CONST.ACTIVE_EFFECT_MODES.OVERRIDE, value: "false" }
+          { key: "system.combatMods.canAct", mode: "override", value: "false" }
         ],
         statuses: ["unconscious"],
         duration: {
@@ -606,7 +606,7 @@ static async attemptRegainConsciousness(actor) {
           },
           changes: [{
             key: "system.combatMods.attackShift",
-            mode: CONST.ACTIVE_EFFECT_MODES.ADD,
+            mode: "add",
             value: "-2"
           }]
         };

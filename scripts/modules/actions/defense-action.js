@@ -580,7 +580,7 @@ export class DefenseAction extends BaseAction {
           },
           changes: [
             // Block: "may take no other action"
-            { key: "system.combatMods.canAct", mode: 5, value: "false", priority: 50 }
+            { key: "system.combatMods.canAct", mode: "override", value: "false", priority: 50 }
           ],
           flags: {
             "msh-faserip": {
@@ -617,13 +617,13 @@ export class DefenseAction extends BaseAction {
       // defenseShiftRanged is read for ranged attacks; defenseShift (melee) is NOT set.
       const changes = [
         // Half movement while dodging (ruler reads this multiplier)
-        { key: "system.combatMods.movementMult", mode: 5, value: "0.5", priority: 20 },
+        { key: "system.combatMods.movementMult", mode: "override", value: "0.5", priority: 20 },
         // -2CS on all own FEATs while dodging
-        { key: "system.combatMods.selfPenaltyCS", mode: 2, value: "-2", priority: 20 }
+        { key: "system.combatMods.selfPenaltyCS", mode: "add", value: "-2", priority: 20 }
       ];
       if (defenseBonus > 0) {
         changes.push(
-          { key: "system.combatMods.defenseShiftRanged", mode: 2, value: String(defenseBonus), priority: 20 }
+          { key: "system.combatMods.defenseShiftRanged", mode: "add", value: String(defenseBonus), priority: 20 }
         );
       }
 
@@ -720,7 +720,7 @@ export class DefenseAction extends BaseAction {
         },
         // Evading prevents actions this round (per rules: "makes no attacks that round")
         changes: [
-          { key: "system.combatMods.canAct", mode: 5, value: "false", priority: 50 }
+          { key: "system.combatMods.canAct", mode: "override", value: "false", priority: 50 }
         ],
         flags: {
           "msh-faserip": {

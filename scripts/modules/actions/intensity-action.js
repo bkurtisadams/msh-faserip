@@ -272,10 +272,6 @@ export class IntensityAction extends BaseAction {
       applyEffect
     } = await import("../effects/effect-engine.js");
 
-    const AE_MODE = {
-      MULTIPLY: 1, ADD: 2, DOWNGRADE: 3, UPGRADE: 4, OVERRIDE: 5
-    };
-
     const durationLabel = rounds === 999 ? "scene/escape" : `${rounds} turn${rounds !== 1 ? "s" : ""}`;
 
     try {
@@ -302,10 +298,10 @@ export class IntensityAction extends BaseAction {
             img: "icons/svg/paralysis.svg",
             rounds, originUuid,
             changes: [
-              { key: "system.combatMods.attackShift", mode: AE_MODE.ADD, value: "-4", priority: 20 },
-              { key: "system.combatMods.defenseShift", mode: AE_MODE.ADD, value: "-2", priority: 20 },
-              { key: "system.combatMods.defenseShiftRanged", mode: AE_MODE.ADD, value: "-2", priority: 20 },
-              { key: "system.combatMods.movementMult", mode: AE_MODE.MULTIPLY, value: "0.5", priority: 20 }
+              { key: "system.combatMods.attackShift", mode: "add", value: "-4", priority: 20 },
+              { key: "system.combatMods.defenseShift", mode: "add", value: "-2", priority: 20 },
+              { key: "system.combatMods.defenseShiftRanged", mode: "add", value: "-2", priority: 20 },
+              { key: "system.combatMods.movementMult", mode: "multiply", value: "0.5", priority: 20 }
             ],
             flags: { effectType: "incapacitated", status: { isIncapacitated: true }, intensitySource: desc || "Intensity" },
             statuses: ["incapacitated"]
@@ -318,10 +314,10 @@ export class IntensityAction extends BaseAction {
             img: "icons/svg/frozen.svg",
             rounds, originUuid,
             changes: [
-              { key: "system.combatMods.movementMult", mode: AE_MODE.OVERRIDE, value: "0", priority: 50 },
-              { key: "system.combatMods.canMove", mode: AE_MODE.OVERRIDE, value: "false", priority: 50 },
-              { key: "system.combatMods.defenseShift", mode: AE_MODE.ADD, value: "-2", priority: 20 },
-              { key: "system.combatMods.defenseShiftRanged", mode: AE_MODE.ADD, value: "-2", priority: 20 }
+              { key: "system.combatMods.movementMult", mode: "override", value: "0", priority: 50 },
+              { key: "system.combatMods.canMove", mode: "override", value: "false", priority: 50 },
+              { key: "system.combatMods.defenseShift", mode: "add", value: "-2", priority: 20 },
+              { key: "system.combatMods.defenseShiftRanged", mode: "add", value: "-2", priority: 20 }
             ],
             flags: { effectType: "immobilized", status: { isImmobilized: true }, intensitySource: desc || "Intensity" },
             statuses: ["immobilized"]
@@ -349,7 +345,7 @@ export class IntensityAction extends BaseAction {
             img: "icons/svg/falling.svg",
             rounds: 1, originUuid,
             changes: [
-              { key: "system.combatMods.defenseShift", mode: AE_MODE.ADD, value: "-2", priority: 20 }
+              { key: "system.combatMods.defenseShift", mode: "add", value: "-2", priority: 20 }
             ],
             flags: { effectType: "slammed", status: { isSlammed: true }, intensitySource: desc || "Intensity" },
             statuses: ["prone"]
@@ -362,8 +358,8 @@ export class IntensityAction extends BaseAction {
             img: "icons/svg/net.svg",
             rounds, originUuid,
             changes: [
-              { key: "system.combatMods.attackShift", mode: AE_MODE.ADD, value: "-2", priority: 20 },
-              { key: "system.combatMods.movementMult", mode: AE_MODE.OVERRIDE, value: "0", priority: 50 }
+              { key: "system.combatMods.attackShift", mode: "add", value: "-2", priority: 20 },
+              { key: "system.combatMods.movementMult", mode: "override", value: "0", priority: 50 }
             ],
             flags: { effectType: "grabbed", status: { isGrabbed: true }, intensitySource: desc || "Intensity" },
             statuses: ["restrained"]

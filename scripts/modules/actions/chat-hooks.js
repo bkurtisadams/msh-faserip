@@ -1451,12 +1451,12 @@ async function createDodgingEffect(actor, data) {
     },
     changes: [
       // Half movement while dodging (ruler reads this multiplier)
-      { key: "system.combatMods.movementMult", mode: 5, value: "0.5", priority: 20 },
+      { key: "system.combatMods.movementMult", mode: "override", value: "0.5", priority: 20 },
       // -2CS on all own FEATs while dodging
-      { key: "system.combatMods.selfPenaltyCS", mode: 2, value: "-2", priority: 20 },
+      { key: "system.combatMods.selfPenaltyCS", mode: "add", value: "-2", priority: 20 },
       ...(defenseBonus > 0 ? [
-        { key: "system.combatMods.defenseShift", mode: 2, value: String(defenseBonus), priority: 20 },
-        { key: "system.combatMods.defenseShiftRanged", mode: 2, value: String(defenseBonus), priority: 20 }
+        { key: "system.combatMods.defenseShift", mode: "add", value: String(defenseBonus), priority: 20 },
+        { key: "system.combatMods.defenseShiftRanged", mode: "add", value: String(defenseBonus), priority: 20 }
       ] : [])
     ]
   };

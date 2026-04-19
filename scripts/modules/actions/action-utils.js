@@ -1908,8 +1908,8 @@ export async function _applyFourColorKnockout(actor, rounds) {
     icon: "icons/svg/unconscious.svg",
     flags: { "msh-faserip": { isUnconscious: true, zeroHealth: true, fromDeathSave: true, durationRounds: Number(rounds) } },
     changes: [
-      { key: "system.status.unconscious", mode: CONST.ACTIVE_EFFECT_MODES.OVERRIDE, value: true },
-      { key: "system.combatMods.canAct", mode: CONST.ACTIVE_EFFECT_MODES.OVERRIDE, value: "false" }
+      { key: "system.status.unconscious", mode: "override", value: true },
+      { key: "system.combatMods.canAct", mode: "override", value: "false" }
     ],
     statuses: ["unconscious"],
     duration: inCombat
