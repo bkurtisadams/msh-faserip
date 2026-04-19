@@ -1379,7 +1379,7 @@ Hooks.once("init", async () => {
     return armorPhysical || 0;
   };
 
-  await loadTemplates([
+  await foundry.applications.handlebars.loadTemplates([
     "systems/msh-faserip/templates/universal-table.html",
     "systems/msh-faserip/templates/universal-rank-table.hbs"
   ]);

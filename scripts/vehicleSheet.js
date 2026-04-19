@@ -1,10 +1,11 @@
-// scripts/vehicleSheet.js v2.0.0 - 2026-03-13
+// scripts/vehicleSheet.js v2.0.1 - 2026-04-19
+// v2.0.1: v14 — replace bare mergeObject with foundry.utils.mergeObject
 // v2.0.0: Stripped to stat card for compendium use — no tabs, no play-time fields
 // v1.0.0: Initial vehicle item sheet
 
 export class FaseripVehicleSheet extends ItemSheet {
   static get defaultOptions() {
-    return mergeObject(super.defaultOptions, {
+    return foundry.utils.mergeObject(super.defaultOptions, {
       classes: ["faserip", "sheet", "item", "vehicle"],
       width: 420,
       height: 480,
