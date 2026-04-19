@@ -1,4 +1,9 @@
-// scripts/modules/actions/charging-action.js v3.0.2 - 2026-04-16
+// scripts/modules/actions/charging-action.js v3.0.3 - 2026-04-19
+// v3.0.3: Target BA auto-populate now honors armorPhysical override on the
+//         Body Armor power (mirrors getBodyArmorValues() fallback order).
+//         Previously read system.value only, causing a rebound-vs-mitigation
+//         mismatch when armorPhysical ≠ value (e.g. Wartorn: value 14,
+//         armorPhysical 16 — rebound used 14, mitigation used 16).
 // v3.0.2: Fix rebound to match RAW + book example.
 //         Rebound fires whenever target has BA > 0 (not only when target
 //         fully absorbs the charge). Rebound amount = min(damage, targetBA),
@@ -125,7 +130,11 @@ export class ChargingAction extends AttackAction {
     );
     if (targetBApower) {
       targetBArank = targetBApower.system?.rank || "Shift-0";
-      targetBAvalue = targetBApower.system?.value || 0;
+      // Honor armorPhysical override first (matches getBodyArmorValues()
+      // fallback order), then fall back to the rank's base value. Fixes
+      // rebound-vs-mitigation mismatch when a Body Armor power has
+      // armorPhysical ≠ value (e.g. Wartorn: value 14, armorPhysical 16).
+      targetBAvalue = targetBApower.system?.armorPhysical || targetBApower.system?.value || 0;
     }
   }
 
