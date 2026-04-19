@@ -1,4 +1,7 @@
-// scripts/rules/mitigation.js v3.0.0 - 2026-03-22
+// scripts/rules/mitigation.js v3.0.1 - 2026-04-19
+// v3.0.1: Block armor now excluded vs physical-charging per RAW
+//         (Advanced Set Block action: "Not vs Shooting, Energy, or Charging").
+//         Previously charging damage was incorrectly absorbed by blocking armor.
 // v3.0.0: Force Field overload (breach) detection with round-cumulative tracking.
 //         BA+FF stacking enforcement: personal FF replaces BA (use one or other).
 //         Returns ffBreach object on result when FF is overloaded.
@@ -489,7 +492,8 @@ function applyBlockingArmor(damage, targetActor, options) {
   const { isEnergyDamage, dmgTypeLower, existingPhysical } = options;
   const noResult = { type: 'Block', absorbed: 0 };
 
-  if (isEnergyDamage || dmgTypeLower === "physical-ranged") return noResult;
+  // Block does not apply vs Shooting, Energy, or Charging (RAW Advanced Set).
+  if (isEnergyDamage || dmgTypeLower === "physical-ranged" || dmgTypeLower === "physical-charging") return noResult;
 
   const blockEffect = targetActor.effects?.find(e => {
     if (e.disabled) return false;
