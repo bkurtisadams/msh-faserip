@@ -294,7 +294,7 @@ export const CHARGING = {
   requirement: "Must move 1+ area",
   csBonus: "+1CS per area moved (max +3CS, cap ShZ)",
   damage: "Endurance or Body Armor (whichever higher) + 2pts per area",
-  rebound: "If defender BA > attacker dmg, damage rebounds to attacker (attacker BA then applies)",
+  rebound: "Damage absorbed by defender BA rebounds to attacker; attacker absorbs rebound with own BA. Formula: defender takes max(0, dmg - defBA); attacker takes max(0, min(dmg, defBA) - attBA). Stun/Slam effects still apply even when all damage is absorbed. Book example (Advanced Set): Gd End 10-speed (30 dmg) vs Ex BA (20) + Gd atk BA (10) → target takes 10 through + rebound 20 → attacker absorbs 10, takes 10.",
   inanimate: "Material strength = BA",
   missResult: "Continues half speed, may hit obstacle"
 };
