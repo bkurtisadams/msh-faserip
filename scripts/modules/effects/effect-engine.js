@@ -593,10 +593,18 @@ export async function applyGrappled(actor, { holderUuid = null, holderName = "",
   // Partial Hold: -2CS on all actions, cannot move if attacker Str >= target
   // Per rules: "The target may perform any normal actions, but at a -2 CS penalty"
   // This is a general action penalty, NOT individual ability reductions
+  //
+  // v14: when no finite rounds specified, set duration.expiry="roundEnd" so the
+  // effect registers as isTemporary (token badge renders, sheet lists under
+  // Temporary). Foundry's default value=Infinity means the effect never
+  // actually expires at round end — it persists until escape/release.
+  const hasRounds = Number.isFinite(rounds) && rounds > 0;
+  const durationOverride = hasRounds ? undefined : { expiry: "roundEnd" };
   return applyEffect(actor, {
     name: holderName ? `Grappled by ${holderName}` : "Grappled",
     img: "icons/svg/net.svg",
     rounds,
+    duration: durationOverride,
     changes: [
       { key: "system.combatMods.selfPenaltyCS", mode: "add", value: "-2", priority: 20 },
       { key: "system.combatMods.movementMult", mode: "override", value: "0", priority: 50 },
@@ -619,10 +627,15 @@ export async function applyHeld(actor, { holderUuid = null, holderName = "", rou
   // Full Hold: target fully restrained, cannot act (only escape attempts)
   // Per rules: "restrained, attacker +1 action, Str dmg"
   // Target cannot take any actions — canAct=false handles this
+  //
+  // v14 expiry-for-isTemporary: see applyGrappled note above.
+  const hasRounds = Number.isFinite(rounds) && rounds > 0;
+  const durationOverride = hasRounds ? undefined : { expiry: "roundEnd" };
   return applyEffect(actor, {
     name: holderName ? `Held by ${holderName}` : "Held",
     img: "icons/svg/padlock.svg",
     rounds,
+    duration: durationOverride,
     changes: [
       { key: "system.combatMods.canAct", mode: "override", value: "false", priority: 50 },
       { key: "system.combatMods.movementMult", mode: "override", value: "0", priority: 50 },
