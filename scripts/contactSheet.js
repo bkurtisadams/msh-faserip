@@ -1,5 +1,9 @@
-// contactSheet.js v1.0.0 - 2026-03-03
-// Standalone contact item sheet extending ItemSheet directly (like headquartersSheet.js, talentSheet.js)
+// contactSheet.js v2.0.0 - 2026-04-18
+// v2.0.0: Migrate to ApplicationV2 / ItemSheetV2 (v16 prep; v14 backward-compat shims gone in v16)
+// v1.0.0: Standalone contact item sheet extending ItemSheet directly (like headquartersSheet.js, talentSheet.js)
+
+const { HandlebarsApplicationMixin } = foundry.applications.api;
+const { ItemSheetV2 } = foundry.applications.sheets;
 
 const CONTACT_TYPES = {
   "Professional": {
@@ -48,23 +52,20 @@ for (const [category, types] of Object.entries(CONTACT_TYPES)) {
   }
 }
 
-export class FaseripContactSheet extends ItemSheet {
-  static get defaultOptions() {
-    return foundry.utils.mergeObject(super.defaultOptions, {
-      classes: ["faserip", "sheet", "item", "contact"],
-      width: 420,
-      height: 540,
-      resizable: true,
-      submitOnChange: true
-    });
-  }
+export class FaseripContactSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
+  static DEFAULT_OPTIONS = {
+    classes: ["faserip", "sheet", "item", "contact"],
+    position: { width: 420, height: 540 },
+    window: { resizable: true },
+    form: { submitOnChange: true, closeOnSubmit: false }
+  };
 
-  get template() {
-    return "systems/msh-faserip/templates/contact-sheet.html";
-  }
+  static PARTS = {
+    main: { template: "systems/msh-faserip/templates/contact-sheet.html" }
+  };
 
-  getData() {
-    const context = super.getData();
+  async _prepareContext(options) {
+    const context = await super._prepareContext(options);
     context.item = this.item;
     context.system = this.item.system;
     context.cssClass = "faserip-dialog contact-dialog";
@@ -72,8 +73,10 @@ export class FaseripContactSheet extends ItemSheet {
     return context;
   }
 
-  activateListeners(html) {
-    super.activateListeners(html);
+  _onRender(context, options) {
+    super._onRender(context, options);
+    if (!this.isEditable) return;
+    const html = $(this.element);
 
     const typeSelect = html.find('.contact-type-select');
     const dispositionSelect = html.find('.contact-disposition-select');

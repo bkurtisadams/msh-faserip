@@ -1,4 +1,6 @@
-// equipment.js v1.5.0 - 2026-03-10
+// equipment.js v2.0.0 - 2026-04-18
+// v2.0.0: Migrate to ApplicationV2 / ItemSheetV2 (v16 prep; v14 backward-compat shims gone in v16)
+//         _updateObject → _prepareSubmitData. Manual tab wiring for .sheet-tabs nav.
 // v1.5.0: Expanded categories (gear subtypes, device, armor resistances). Computed display flags
 //         in getData() — no duplicate form fields. Array reconstruction in _updateObject.
 // v1.4.0: Rewrite effects to use standard changes[] — system.* for mechanics, faserip.token.* for visuals
@@ -7,6 +9,9 @@ import { applyDamageToTargets } from "./modules/actions/action-utils.js";
 import { debugLog } from "./modules/actions/action-utils.js";
 import { rollUniversalTable } from "./modules/dice/universal-table.js";
 import { prepareActiveEffectCategories, onManageActiveEffect } from "../helpers/effects.mjs";
+
+const { HandlebarsApplicationMixin } = foundry.applications.api;
+const { ItemSheetV2 } = foundry.applications.sheets;
 
 // Power Rank Range Table (based on "Faserip Combat 02.txt")
 const POWER_RANGE_VALUES = {
@@ -21,20 +26,21 @@ const POWER_RANGE_VALUES = {
   "Beyond": Infinity      // Unlimited
 };
 
-export class FaseripEquipmentSheet extends ItemSheet {
-  static get defaultOptions() {
-    return foundry.utils.mergeObject(super.defaultOptions, {
-      classes: ["faserip", "sheet", "item", "equipment"],
-      template: "systems/msh-faserip/templates/equipment-sheet.html",
-      width: 530,
-      height: 680,
-      tabs: [{ navSelector: ".sheet-tabs", contentSelector: ".sheet-body", initial: "properties" }]
-    });
-  }
+export class FaseripEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
+  static DEFAULT_OPTIONS = {
+    classes: ["faserip", "sheet", "item", "equipment"],
+    position: { width: 530, height: 680 },
+    window: { resizable: true },
+    form: { submitOnChange: true, closeOnSubmit: false }
+  };
 
-  getData() {
+  static PARTS = {
+    main: { template: "systems/msh-faserip/templates/equipment-sheet.html" }
+  };
+
+  async _prepareContext(options) {
     // Get base data
-    const context = super.getData();
+    const context = await super._prepareContext(options);
     context.item = this.item;
     context.system = this.item.system;
 
@@ -121,10 +127,17 @@ export class FaseripEquipmentSheet extends ItemSheet {
   }
 
   /** @override */
-  async _updateObject(event, formData) {
-    const data = foundry.utils.expandObject(formData);
+  /**
+   * V2 replacement for V1 _updateObject. Transforms the flat formData into an
+   * expanded submit object: maps `_other*` synthetic inputs into real slots
+   * when category is "other", and rebuilds indexed arrays that expandObject
+   * turns into numeric-keyed objects. V2 then passes this to _processSubmitData
+   * which defaults to this.document.update(submitData).
+   */
+  _prepareSubmitData(event, form, formData) {
+    const data = foundry.utils.expandObject(formData.object);
     if (!data.system) data.system = {};
-    const category = (data.system.category !== undefined) ? data.system.category : this.object.system.category;
+    const category = (data.system.category !== undefined) ? data.system.category : this.item.system.category;
 
     // other-fields uses _-prefixed names to avoid form collision with weapon-fields.
     if (data.system._otherWeaponType !== undefined) {
@@ -196,11 +209,28 @@ export class FaseripEquipmentSheet extends ItemSheet {
       data.system.deviceFunctions = Object.values(data.system.deviceFunctions);
     }
 
-    return super._updateObject(event, foundry.utils.flattenObject(data));
+    return data;
   }
 
-  activateListeners(html) {
-    super.activateListeners(html);
+  _onRender(context, options) {
+    super._onRender(context, options);
+    if (!this.isEditable) return;
+    const html = $(this.element);
+
+    // Manual tab handling — replaces V1 `tabs: [...]` defaultOptions entry.
+    // Template has `data-tab="properties"` / `data-tab="effects"` elements.
+    const activateTab = (tabName) => {
+      this._activeTab = tabName;
+      html.find('.sheet-tabs .item').removeClass('active');
+      html.find(`.sheet-tabs .item[data-tab="${tabName}"]`).addClass('active');
+      html.find('.sheet-body > .tab[data-group="primary"]').removeClass('active');
+      html.find(`.sheet-body > .tab[data-tab="${tabName}"][data-group="primary"]`).addClass('active');
+    };
+    activateTab(this._activeTab || "properties");
+    html.find('.sheet-tabs .item[data-tab]').on('click', ev => {
+      ev.preventDefault();
+      activateTab(ev.currentTarget.dataset.tab);
+    });
 
     // ── Active Effect controls ──
     html.find('.effect-control').click(ev => {

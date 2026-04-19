@@ -1,6 +1,10 @@
-// talentSheet.js v2.0.0 - 2026-03-17
+// talentSheet.js v3.0.0 - 2026-04-18
+// v3.0.0: Migrate to ApplicationV2 / ItemSheetV2 (v16 prep; v14 backward-compat shims gone in v16)
 // v2.0.0: Add appliesTo (action types) and flags (special mechanics) fields.
 //         Auto-fill from specialty, save via checkbox change handlers.
+
+const { HandlebarsApplicationMixin } = foundry.applications.api;
+const { ItemSheetV2 } = foundry.applications.sheets;
 
 const TALENT_SPECIALTIES = {
   "Weapon Skill": ["Guns", "Thrown Weapons", "Bows", "Blunt Weapons", "Sharp Weapons",
@@ -74,31 +78,30 @@ export const TALENT_RULES = {
   "Leadership":         { bonus: "Special", ability: "",      summary: "+50 to Karma Pool if recognized team leader", desc: "Benefit to team cohesion. Only one recognized leader per pool. 50 points deducted when leader leaves (not returned to leader).", appliesTo: [], flags: [] }
 };
 
-export class FaseripTalentSheet extends ItemSheet {
-  static get defaultOptions() {
-    return foundry.utils.mergeObject(super.defaultOptions, {
-      classes: ["faserip", "sheet", "item", "talent"],
-      width: 420,
-      height: 640,
-      resizable: true,
-      submitOnChange: true
-    });
-  }
+export class FaseripTalentSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
+  static DEFAULT_OPTIONS = {
+    classes: ["faserip", "sheet", "item", "talent"],
+    position: { width: 420, height: 640 },
+    window: { resizable: true },
+    form: { submitOnChange: true, closeOnSubmit: false }
+  };
 
-  get template() {
-    return "systems/msh-faserip/templates/talent-sheet.html";
-  }
+  static PARTS = {
+    main: { template: "systems/msh-faserip/templates/talent-sheet.html" }
+  };
 
-  getData() {
-    const context = super.getData();
+  async _prepareContext(options) {
+    const context = await super._prepareContext(options);
     context.item = this.item;
     context.system = this.item.system;
     context.cssClass = "faserip-dialog talent-dialog";
     return context;
   }
 
-  activateListeners(html) {
-    super.activateListeners(html);
+  _onRender(context, options) {
+    super._onRender(context, options);
+    if (!this.isEditable) return;
+    const html = $(this.element);
 
     const categorySelect = html.find('.talent-category-select');
     const specialtySelect = html.find('.talent-specialty-select');

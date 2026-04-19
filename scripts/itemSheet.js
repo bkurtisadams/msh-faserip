@@ -1,4 +1,5 @@
-// itemSheet.js v1.14.0 - 2026-03-12
+// itemSheet.js v2.0.0 - 2026-04-18
+// v2.0.0: Migrate to ApplicationV2 / ItemSheetV2 (v16 prep; v14 backward-compat shims gone in v16)
 // v1.14.0: Power sheet v2 layout redesign — reorder fields, rank→value auto-fill, 520px width, conditional special strength
 // v1.13.0: Power sheet v2 — single scrollable form, HQ-style, category-driven sections
 // v1.12.0: Add Effects tab to power sheet with ActiveEffect presets and management
@@ -8,38 +9,36 @@
 // v1.7.0: Power Sheet layout reorganization
 import { prepareActiveEffectCategories, onManageActiveEffect } from "../helpers/effects.mjs";
 import { ps2ActivateListeners } from "./power-sheet-v2-logic.js";
-export class FaseripItemSheet extends ItemSheet {
-  static get defaultOptions() {
-    return foundry.utils.mergeObject(super.defaultOptions, {
-      classes: ["faserip", "sheet", "item"],
-      width: 580,
-      height: 600,
-      tabs: [{ navSelector: ".sheet-tabs", contentSelector: ".sheet-body", initial: "overview" }],
-      resizable: true,
-      submitOnChange: true
-    });
-  }
 
-  /** @override — power v2 uses 520x700, no tabs */
-  _getHeaderButtons() {
-    return super._getHeaderButtons();
-  }
+const { HandlebarsApplicationMixin } = foundry.applications.api;
+const { ItemSheetV2 } = foundry.applications.sheets;
 
-  get template() {
-    if (this.item.type === 'power') {
-      return `systems/msh-faserip/templates/power-sheet-v2.html`;
-    }
-    else if (this.item.type === 'vehicle') {
-      return `systems/msh-faserip/templates/vehicle-sheet.html`;
-    }
-    // Fall back to the default item sheet for other types
-    return `systems/msh-faserip/templates/item-sheet.html`;
+export class FaseripItemSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
+  static DEFAULT_OPTIONS = {
+    classes: ["faserip", "sheet", "item"],
+    position: { width: 580, height: 600 },
+    window: { resizable: true },
+    form: { submitOnChange: true, closeOnSubmit: false }
+  };
+
+  // Per-type templates. _configureRenderOptions selects exactly one.
+  static PARTS = {
+    power:   { template: "systems/msh-faserip/templates/power-sheet-v2.html" },
+    vehicle: { template: "systems/msh-faserip/templates/vehicle-sheet.html" },
+    default: { template: "systems/msh-faserip/templates/item-sheet.html" }
+  };
+
+  _configureRenderOptions(options) {
+    super._configureRenderOptions(options);
+    const type = this.item.type;
+    const key = (type === "power" || type === "vehicle") ? type : "default";
+    options.parts = [key];
   }
 
   // In itemSheet.js - revised getData() function
-  getData() {
-    // Keep this sync and side-effect free
-    const context = super.getData();
+  async _prepareContext(options) {
+    // Keep this side-effect free
+    const context = await super._prepareContext(options);
 
     // Preserve what your template expects
     context.item   = this.item;
@@ -330,8 +329,10 @@ export class FaseripItemSheet extends ItemSheet {
     return detected;
   }
 
-  async activateListeners(html) {
-    super.activateListeners(html);
+  async _onRender(context, options) {
+    await super._onRender(context, options);
+    if (!this.isEditable) return;
+    const html = $(this.element);
 
     // ── Repair button (equipment broken banner) ──
     html.find('.faserip-repair-btn').on('click', async (ev) => {

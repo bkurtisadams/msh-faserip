@@ -1,7 +1,12 @@
-// headquartersSheet.js v2.0.1 - 2026-04-03
+// headquartersSheet.js v3.0.0 - 2026-04-18
+// v3.0.0: Migrate to ApplicationV2 / ItemSheetV2 (v16 prep; v14 backward-compat shims gone in v16)
+// v2.0.1 - 2026-04-03
 import { BUILDING_TYPES, BUILDING_TYPE_MAP, ROOM_PACKAGES, STAFF_ROLES, SIZE_ROOMS } from "./hq-constants.js";
 import { initSheetZoom } from './modules/ui/sheet-zoom.js';
 import { RANKS_ORDERED as RANKS } from './rules/rules-reference.js';
+
+const { HandlebarsApplicationMixin } = foundry.applications.api;
+const { ItemSheetV2 } = foundry.applications.sheets;
 
 function _getGameDate() {
   try {
@@ -32,22 +37,21 @@ function _computeRentStatus(lastPaidStr) {
   return "overdue";
 }
 
-export class FaseripHeadquartersSheet extends ItemSheet {
+export class FaseripHeadquartersSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
 
-  static get defaultOptions() {
-    return foundry.utils.mergeObject(super.defaultOptions, {
-      classes: ["faserip", "sheet", "item", "headquarters"],
-      width: 520,
-      height: 580,
-      template: "systems/msh-faserip/templates/hq-sheet.html",
-      scrollY: [".hq-body"],
-      submitOnChange: true,
-      closeOnSubmit: false
-    });
-  }
+  static DEFAULT_OPTIONS = {
+    classes: ["faserip", "sheet", "item", "headquarters"],
+    position: { width: 520, height: 580 },
+    window: { resizable: true },
+    form: { submitOnChange: true, closeOnSubmit: false }
+  };
 
-  getData() {
-    const context = super.getData();
+  static PARTS = {
+    main: { template: "systems/msh-faserip/templates/hq-sheet.html", scrollable: [".hq-body"] }
+  };
+
+  async _prepareContext(options) {
+    const context = await super._prepareContext(options);
     context.system = context.item.system;
     context.isGM = game.user.isGM;
 
@@ -136,9 +140,11 @@ export class FaseripHeadquartersSheet extends ItemSheet {
     return context;
   }
 
-  activateListeners(html) {
-    super.activateListeners(html);
+  _onRender(context, options) {
+    super._onRender(context, options);
     initSheetZoom(this);
+    if (!this.isEditable) return;
+    const html = $(this.element);
 
     // Cancel button
     html.find('.cancel-button').click(() => this.close());

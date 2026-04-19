@@ -1,8 +1,9 @@
-// sheet-zoom.js v1.1.0 - 2026-03-18
+// sheet-zoom.js v1.2.0 - 2026-04-18
+// v1.2.0: Handle both V1 (.element is jQuery) and V2 (.element is HTMLElement)
 // v1.1.0: Show zoom % badge in window title bar
 // Ctrl+Wheel zoom for any Foundry Application sheet.
 // Usage: import { initSheetZoom } from './modules/ui/sheet-zoom.js';
-//        then call initSheetZoom(sheet) in activateListeners.
+//        then call initSheetZoom(sheet) in activateListeners or _onRender.
 
 function _updateBadge(titleEl, zoom) {
   let badge = titleEl.querySelector(".faserip-zoom-badge");
@@ -25,7 +26,8 @@ function _updateBadge(titleEl, zoom) {
 export function initSheetZoom(sheet) {
   const id = sheet.actor?.id ?? sheet.id ?? sheet.appId;
   const key = `faserip-sheet-zoom-${id}`;
-  const el = sheet.element?.[0];
+  // V1: sheet.element is jQuery, [0] extracts DOM. V2: sheet.element is already HTMLElement.
+  const el = sheet.element?.[0] ?? sheet.element;
   const content = el?.querySelector(".window-content");
   const titleEl = el?.querySelector(".window-title");
   if (!content) return;
