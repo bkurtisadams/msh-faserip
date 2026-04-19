@@ -1,15 +1,15 @@
 /* power-sheet-v2.css — HQ-style power dialog */
 
 /* ── Sheet container ──────────────────────── */
-.power-sheet-v2.sheet {
-  width: 580px;
-  height: 700px;
-}
-.power-sheet-v2 .window-content {
-  padding: 0;
+/* V2 (ApplicationV2) renders the <form> directly inside the window — there
+   is no .window-content wrapper. Put the flex-column + overflow rules on
+   the form itself so .ps2-body can scroll against a sized parent. */
+.power-sheet-v2 {
   display: flex;
   flex-direction: column;
+  height: 100%;
   overflow: hidden;
+  padding: 0;
 }
 
 /* ── Header ───────────────────────────────── */
