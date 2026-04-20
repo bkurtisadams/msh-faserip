@@ -1,4 +1,14 @@
-// scripts/modules/rest-system.js v1.4.0 - 2026-04-17
+// scripts/modules/rest-system.js v1.4.1 - 2026-04-19
+// v1.4.1: ensureHealingEffect now skips actors at 0 HP and dead actors.
+//         Previously the only guard was "currently has a dying AE" — but
+//         the standard 0-HP drop sequence registers Healing BEFORE the
+//         dying AE is applied (applyDamageToTargets and the 0-HP branch
+//         in init.js updateActor both call recordDamage before the death
+//         save fires). That produced a stale Healing AE that stayed
+//         enabled alongside the dying AE, with a startedAt accumulating
+//         elapsed time during unconsciousness. If HP went above 0 even
+//         briefly (e.g. First Aid), the accumulated cycles could burst-
+//         heal up to max. Guard now centralized so both call sites benefit.
 // v1.4.0: Add ensureHealingEffect — hourly Healing now registers as an ongoing
 //         effect via the engine when damage is recorded. Time-advance now
 //         heals HP automatically per RAW ("Endurance rank # per hour after
@@ -848,6 +858,31 @@ export async function recordDamage(actor) {
  */
 export async function ensureHealingEffect(actor, worldNow = game.time?.worldTime ?? 0) {
   if (!actor) return;
+
+  // Skip dead characters. Healing doesn't apply to the dead.
+  const deadEffect = actor.effects?.find(e =>
+    e.flags?.[SCOPE]?.isDead || e.statuses?.has?.("dead")
+  );
+  if (deadEffect && !deadEffect.disabled) {
+    if (game.settings.get(SCOPE, "debugMode")) {
+      console.log(`FASERIP | Skipping healing registration for ${actor.name} (dead)`);
+    }
+    return;
+  }
+
+  // Skip 0-HP characters. Dropping to 0 HP enters the dying pipeline;
+  // Healing does not apply during dying or stabilized-unconscious periods.
+  // On wake-up (attemptRegainConsciousness) HP is restored to End rank# and
+  // Healing can be re-registered via the normal damage path. Registering now
+  // would produce a Healing AE that sits enabled alongside the dying AE with
+  // a stale startedAt, risking burst-heal if HP briefly goes above 0.
+  const currentHp = actor.system?.attributes?.health?.value ?? 0;
+  if (currentHp <= 0) {
+    if (game.settings.get(SCOPE, "debugMode")) {
+      console.log(`FASERIP | Skipping healing registration for ${actor.name} (0 HP)`);
+    }
+    return;
+  }
 
   // Skip actively dying characters
   const dyingEffect = actor.effects?.find(e =>

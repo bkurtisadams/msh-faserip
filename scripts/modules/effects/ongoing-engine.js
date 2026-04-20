@@ -1,4 +1,13 @@
-// scripts/modules/effects/ongoing-engine.js v1.7.1 - 2026-04-19
+// scripts/modules/effects/ongoing-engine.js v1.7.2 - 2026-04-19
+// v1.7.2: applyDyingOngoing now disables any active Healing AE on the
+//         actor as it begins dying. Healing has interruptOnDamage:false
+//         (it's re-registered on each damage event rather than disabled)
+//         so interruptOngoingEffects leaves it alone — but a dying
+//         character should not have an active hourly Healing timer.
+//         Defensive safety net paired with rest-system.js v1.4.1 which
+//         prevents the registration at the source. Also clears the
+//         ongoing.healing.startedAt flag so a future re-registration
+//         starts its clock fresh.
 // v1.7.1: Fix Impaired Endurance `lastHealed` initialized with Date.now()
 //         (wall-clock ms) at AE creation in two spots: processDyingRound's
 //         missing-effect branch (~line 710) and applyDyingOngoing's
@@ -1033,6 +1042,25 @@ export async function applyDyingOngoing(target, { skipImmediateLoss = false } = 
   if (existingDying) {
     console.log(`[FASERIP:DYING] ${actor.name} already has dying effect, skipping applyDyingOngoing`);
     return existingDying;
+  }
+
+  // Disable any existing Healing AE. Healing has `interruptOnDamage: false`
+  // so interruptOngoingEffects leaves it alone — but a dying character must
+  // not have an active hourly Healing timer. Defensive even though
+  // ensureHealingEffect now refuses to register at 0 HP: handles the edge
+  // where a Healing AE was registered prior to this tick (stale state).
+  // Clearing startedAt forces a fresh timer when Healing is next re-registered.
+  try {
+    const healingAE = actor.effects.find(e =>
+      e.flags?.[scope]?.ongoingId === "healing" && !e.disabled
+    );
+    if (healingAE) {
+      await healingAE.update({ disabled: true });
+      await actor.setFlag(scope, "ongoing.healing.startedAt", null);
+      console.log(`[FASERIP:DYING] Disabled Healing AE on ${actor.name} (dying begins)`);
+    }
+  } catch (e) {
+    console.warn(`[FASERIP WARN] Failed to disable Healing AE on dying ${actor.name}:`, e);
   }
 
   // Get current endurance info
