@@ -1,4 +1,12 @@
-// scripts/modules/rest-system.js v1.4.4 - 2026-04-19
+// scripts/modules/rest-system.js v1.4.5 - 2026-04-19
+// v1.4.5: Migrate remaining legacy `icon:` fields to `img:` on four AE
+//         creation sites — consciousness-fail Unconscious (~519),
+//         stabilization Unconscious (~637), stabilization Impaired
+//         Endurance fallback (~679), and hourly Healing (~1014). v14
+//         renamed the AE field icon → img; token HUD reads img at
+//         creation time, and CTT's migration shim runs too late to
+//         affect the initial badge render. Hygiene fix to eliminate
+//         any future badge-missing regression.
 // v1.4.4: Fix wake-up loop never firing after a failed consciousness check.
 //         The consciousness-fail path in attemptRegainConsciousness was
 //         creating the follow-up Unconscious (N rounds) AE with
@@ -516,7 +524,7 @@ static async attemptRegainConsciousness(actor) {
       // purely display. rounds * 6 gives the correct wallclock equivalent.
       const effectData = {
         name: `Unconscious (${rounds} rounds)`,
-        icon: "icons/svg/unconscious.svg",
+        img: "icons/svg/unconscious.svg",
         origin: actor.uuid,
         flags: {
           [SCOPE]: {
@@ -634,7 +642,7 @@ static async attemptRegainConsciousness(actor) {
     if (currentHealth <= 0) {
       const unconsciousEffect = {
         name: `Unconscious (${hours} hours)`,
-        icon: "icons/svg/unconscious.svg",
+        img: "icons/svg/unconscious.svg",
         origin: actor.uuid,
         flags: {
           [SCOPE]: {
@@ -676,7 +684,7 @@ static async attemptRegainConsciousness(actor) {
       if (currentIndex >= 0 && originalIndex >= 0 && currentIndex < originalIndex) {
         const impairedEffectData = {
           name: `Impaired Endurance (${currentEndurance} of ${originalEndurance})`,
-          icon: "icons/svg/blood.svg",
+          img: "icons/svg/blood.svg",
           origin: actor.uuid,
           statuses: ["impaired-endurance"],
           // v14: timeless effect needs duration.expiry set for isTemporary
@@ -1011,7 +1019,7 @@ export async function ensureHealingEffect(actor, worldNow = game.time?.worldTime
   } else {
     await actor.createEmbeddedDocuments("ActiveEffect", [{
       name: `Healing (${enduranceValue * multiplier} HP/hour${hasMedicalCare ? ', medical' : ''})`,
-      icon: "icons/svg/regen.svg",
+      img: "icons/svg/regen.svg",
       origin: actor.uuid,
       disabled: false,
       flags: {

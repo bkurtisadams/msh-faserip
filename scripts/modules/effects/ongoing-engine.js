@@ -1,4 +1,13 @@
-// scripts/modules/effects/ongoing-engine.js v1.7.3 - 2026-04-19
+// scripts/modules/effects/ongoing-engine.js v1.7.4 - 2026-04-19
+// v1.7.4: Migrate legacy `icon:` to `img:` on the processDyingRound
+//         Impaired Endurance creation site (line ~731). The sibling
+//         applyDyingOngoing creation site (line ~1124) already used img.
+//         In v14 the AE field was renamed icon → img; token HUD reads
+//         img at creation time, and CTT's icon→img migration shim fires
+//         too late to affect the initial badge render. Rare in practice
+//         — applyDyingOngoing fires first and this branch only creates
+//         when no existing impaired effect is found on a dying round —
+//         but worth the hygiene fix.
 // v1.7.3: Add duration:{expiry:"roundEnd"} to Impaired Endurance AE
 //         creations (processDyingRound missing-effect branch + the
 //         applyDyingOngoing immediate-loss branch). Required for v14's
@@ -728,7 +737,7 @@ async function _processDyingRoundInner(actor, dyingAE, scope) {
   if (!impairedEffect) {
     await actor.createEmbeddedDocuments("ActiveEffect", [{
       name: `Impaired Endurance (${nextName} of ${originalRank})`,
-      icon: "icons/svg/blood.svg",
+      img: "icons/svg/blood.svg",
       origin: actor.uuid,
       statuses: ["impaired-endurance"],
       // v14: timeless effect needs duration.expiry set for the isTemporary
