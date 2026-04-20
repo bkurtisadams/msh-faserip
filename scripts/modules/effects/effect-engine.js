@@ -1,4 +1,15 @@
-// scripts/modules/effects/effect-engine.js v1.12.0 - 2026-03-22
+// scripts/modules/effects/effect-engine.js v1.13.0 - 2026-04-19
+// v1.13.0: computeDuration now converts rounds→seconds when CTT is active
+//          with sync enabled, regardless of combat state. The previous
+//          "rounds-in-combat, seconds out-of-combat" split assumed time
+//          was advancing via Foundry's combatRound hook, but when time is
+//          driven by CTT's worldTime (advanceTime), rounds-based
+//          durations have no countdown source and the AE persists
+//          indefinitely. Symptom: Slammed / Stunned / Grabbed / Blinded /
+//          etc. stuck on tokens long after combat ended, because
+//          intensity-action routes all of them through applyEffect →
+//          computeDuration. Narrow fix guards on !cttActive so users
+//          without CTT keep their rounds-based durations as before.
 // v1.12.0: Fix nullify health bug — clamp current health to new max on nullification,
 //          preserve damage taken and restore health correctly when nullification ends.
 // v1.11.0: Add applyNullified / restoreNullifiedPowers — suppress inborn powers on nullification,
@@ -69,9 +80,17 @@ export function computeDuration({ rounds = null, seconds = null } = {}) {
   if (Number.isFinite(rounds) && rounds > 0) {
     const policy = durationPolicy();
     const inCombat = !!game.combat?.active;
+    const cttActive = !!getCTT();
 
-    // Preferred: keep rounds in combat, seconds out of combat
-    if (inCombat && (policy === "rounds-in-combat" || policy === "auto")) {
+    // Preferred: keep rounds in combat, seconds out of combat —
+    // BUT only when time is actually advancing via combatRound events.
+    // When CTT is active with sync enabled, time flows through worldTime
+    // advances (CTT's advanceTime), which does NOT tick combat rounds. A
+    // rounds-based duration in that setup has no countdown source and the
+    // AE persists indefinitely. Symptom: Slammed/Stunned/Grabbed and the
+    // like stuck on tokens after combat ends. Convert to seconds under
+    // CTT regardless of combat state so the tracker can decrement them.
+    if (inCombat && !cttActive && (policy === "rounds-in-combat" || policy === "auto")) {
       if (v14) {
         return { value: rounds, units: "rounds", expiry: "roundEnd" };
       }
@@ -81,7 +100,7 @@ export function computeDuration({ rounds = null, seconds = null } = {}) {
       };
     }
 
-    // Outside combat, convert to real time
+    // Outside combat OR CTT-active: convert to real time
     const s = toSeconds(rounds);
     if (s <= 0) return {}; // toSeconds couldn't produce a valid count
     if (v14) {
