@@ -1,4 +1,10 @@
-// action-utils.js v1.7.5 - 2026-04-16
+// action-utils.js v1.7.6 - 2026-04-19
+// v1.7.6: Fix dead "Roll Death Save" button on hit-while-at-0-HP card in
+//         semi/manual mode. Emitter used class="death-save-button" with
+//         data-actor-id; chat-hooks.js handler listens on [data-action="death-save"]
+//         and reads dataset.actorUuid + dataset.attackForm. Switched to the
+//         correct attributes so the handler matches. Same root cause as
+//         init.js v1.12.1.
 // v1.7.5: Combat rules fixes.
 //         - computeBluntDamage now implements "bump to next rank minimum" rule
 //           when Strength rank < material strength rank (Aunt May / Daredevil
@@ -1661,7 +1667,7 @@ export async function applyDamageToTargets({
           ChatMessage.create({
             content: `<div style="background:#ffebee;border:1px solid #ef5350;padding:8px;border-radius:3px;">
               <strong>${targetActor.name}</strong> was hit while ${_isRobotUncon ? "offline" : "unconscious"}!
-              <button class="death-save-button" data-actor-id="${targetActor.id}">${_isRobotUncon ? "Roll Deactivation Save" : "Roll Death Save"}</button>
+              <button class="death-save-button" data-action="death-save" data-actor-uuid="${targetActor.uuid}" data-attack-form="${attackForm}">${_isRobotUncon ? "Roll Deactivation Save" : "Roll Death Save"}</button>
             </div>`
           });
         }

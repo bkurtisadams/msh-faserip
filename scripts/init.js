@@ -1,4 +1,9 @@
-﻿// init.js v1.12.0 - 2026-03-20
+﻿// init.js v1.12.1 - 2026-04-19
+// v1.12.1: Fix dead "Roll Death Save" button in semi/manual mode. The 0-HP
+//          emitter output class="death-save-button" data-actor-id="..." but
+//          the chat-hooks.js handler listens on [data-action="death-save"]
+//          and reads dataset.actorUuid. Selector/attribute mismatch meant
+//          the button never fired. Switched to data-action + data-actor-uuid.
 // v1.12.0: Fix death/dying/recovery bugs:
 //   - updateActor 0 HP handler now checks fourColorRule (was always firing death save)
 //   - updateCombat effect expiry no longer auto-restores health; delegates to rest-system
@@ -2748,7 +2753,7 @@ Hooks.on('updateActor', async (actor, updateData, options, userId) => {
         await ChatMessage.create({
           content: `<div style="background:#ffebee;border:1px solid #ef5350;padding:8px;border-radius:3px;">
             <strong>${actor.name}</strong> is at 0 HP!
-            <button class="death-save-button" data-actor-id="${actor.id}">Roll Death Save</button>
+            <button class="death-save-button" data-action="death-save" data-actor-uuid="${actor.uuid}">Roll Death Save</button>
           </div>`
         });
       }
