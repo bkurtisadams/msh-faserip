@@ -22,19 +22,18 @@ export function onManageActiveEffect(event, owner) {
   }
 
   switch (a.dataset.action) {
-    case 'create':
-      return owner.createEmbeddedDocuments('ActiveEffect', [
-        {
-          name: game.i18n.format('DOCUMENT.New', {
-            type: game.i18n.localize('DOCUMENT.ActiveEffect'),
-          }),
-          icon: 'icons/svg/aura.svg',
-          origin: owner.uuid,
-          'duration.seconds':
-            li.dataset.effectType === 'temporary' ? 6 : undefined,
-          disabled: li.dataset.effectType === 'inactive',
-        },
-      ]);
+    case 'create': {
+      const effectData = {
+        name: game.i18n.format('DOCUMENT.New', {
+          type: game.i18n.localize('DOCUMENT.ActiveEffect'),
+        }),
+        img: 'icons/svg/aura.svg',
+        origin: owner.uuid,
+        disabled: li.dataset.effectType === 'inactive',
+      };
+      if (li.dataset.effectType === 'temporary') effectData.duration = { seconds: 6 };
+      return owner.createEmbeddedDocuments('ActiveEffect', [effectData]);
+    }
     case 'edit':
       return effect?.sheet.render(true);
     case 'delete':
@@ -75,7 +74,7 @@ export function buildDyingEffect(actor, { rounds } = {}) {
   // Base effect data
   const data = {
     name: "Dying",
-    icon: "icons/svg/skull.svg",
+    img: "icons/svg/skull.svg",
     origin: actor?.uuid,
     changes: [],
     flags: {
