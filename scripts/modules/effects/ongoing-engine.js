@@ -1,4 +1,15 @@
-// scripts/modules/effects/ongoing-engine.js v1.7.0 - 2026-04-17
+// scripts/modules/effects/ongoing-engine.js v1.7.1 - 2026-04-19
+// v1.7.1: Fix Impaired Endurance `lastHealed` initialized with Date.now()
+//         (wall-clock ms) at AE creation in two spots: processDyingRound's
+//         missing-effect branch (~line 710) and applyDyingOngoing's
+//         immediate-loss branch (~line 1078). Every read and every other
+//         write uses game.time.worldTime (game seconds), so the mismatch
+//         made `game.time.worldTime - lastHealed` produce a huge negative
+//         number — `elapsed >= required` never true → rank never heals.
+//         In the normal dying → stabilize flow, rest-system.js overwrites
+//         `lastHealed` at stabilization, which papered over the bug; but
+//         any path that checked the heal before stabilization would fail.
+//         Both sites now use game.time.worldTime for consistency.
 // v1.7.0: RAW rules fixes for impaired endurance and stat.loss/stat.gain health sync.
 //         - OE1: Impaired Endurance effect now uses selfPenaltyCS: -2 (applies
 //           to all FEATs per RAW "-2CS on all actions"). Previously used
@@ -707,7 +718,7 @@ async function _processDyingRoundInner(actor, dyingAE, scope) {
           isImpairedEndurance: true,
           originalEndurance: originalRank,
           currentEndurance: nextName,
-          lastHealed: Date.now(),
+          lastHealed: game.time.worldTime,
           medicalCare: actor.getFlag(scope, "medicalCare") ?? false,
         },
       },
@@ -1075,7 +1086,7 @@ export async function applyDyingOngoing(target, { skipImmediateLoss = false } = 
             isImpairedEndurance: true,
             originalEndurance: originalEndurance,
             currentEndurance: nextRank,
-            lastHealed: Date.now(),
+            lastHealed: game.time.worldTime,
             medicalCare: actor.getFlag(scope, "medicalCare") ?? false,
           },
         },

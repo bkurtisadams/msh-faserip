@@ -1,4 +1,14 @@
-﻿// init.js v1.12.1 - 2026-04-19
+﻿// init.js v1.12.2 - 2026-04-19
+// v1.12.2: Fix Impaired Endurance never healing when GMs advance time in
+//          sub-day chunks. Removed the `deltaSeconds >= 86400` filter on
+//          the timeTracker.timeAdvanced impaired-heal loop. The filter
+//          was a perf shortcut that silently dropped cumulative progress:
+//          e.g. four 6-hour advances add up to 1 day of world time, but
+//          none of the individual events exceeded the 1-day threshold, so
+//          the check never ran. The per-actor `elapsed >= required`
+//          comparison against worldTime was always the real gate — it
+//          correctly accumulates across any advance granularity. Now runs
+//          on any forward advance; zero/negative deltas still skipped.
 // v1.12.1: Fix dead "Roll Death Save" button in semi/manual mode. The 0-HP
 //          emitter output class="death-save-button" data-actor-id="..." but
 //          the chat-hooks.js handler listens on [data-action="death-save"]
@@ -1192,8 +1202,12 @@ Hooks.once("init", async () => {
         game.msh._cttDyingInProgress = false;
       }
 
-      // Process impaired Endurance healing on day/week advance
-      if (deltaSeconds >= 86400) {
+      // Process impaired Endurance healing on any forward advance.
+      // The per-actor `elapsed >= required` check below is the real gate;
+      // removing the old `deltaSeconds >= 86400` filter lets cumulative
+      // sub-day advances (e.g. four 6-hour ticks → 1 day) correctly tick
+      // recovery. Skip zero/negative deltas (time rewinds, resyncs).
+      if (deltaSeconds > 0) {
         try {
           const { RestSystem } = await import("./modules/rest-system.js");
           for (const actor of Effects.getAllTokenActors()) {
