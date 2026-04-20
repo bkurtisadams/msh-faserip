@@ -730,8 +730,8 @@ export class FaseripEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV
           name: "Light Source",
           img: "icons/svg/light.svg",
           changes: [
-            { key: "faserip.token.light.bright", mode: "custom", value: "0.5" },
-            { key: "faserip.token.light.dim", mode: "custom", value: "1" },
+            { key: "faserip.token.light.bright", mode: "custom", value: "1" },
+            { key: "faserip.token.light.dim", mode: "custom", value: "3" },
             { key: "faserip.token.light.color", mode: "custom", value: "#ffdd88" },
             { key: "faserip.token.light.alpha", mode: "custom", value: "0.3" },
             { key: "faserip.token.light.angle", mode: "custom", value: "360" },
@@ -746,8 +746,8 @@ export class FaseripEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV
           name: "Flashlight Beam",
           img: "icons/svg/light.svg",
           changes: [
-            { key: "faserip.token.light.bright", mode: "custom", value: "0.5" },
-            { key: "faserip.token.light.dim", mode: "custom", value: "1" },
+            { key: "faserip.token.light.bright", mode: "custom", value: "1" },
+            { key: "faserip.token.light.dim", mode: "custom", value: "2" },
             { key: "faserip.token.light.color", mode: "custom", value: "#ffffcc" },
             { key: "faserip.token.light.alpha", mode: "custom", value: "0.5" },
             { key: "faserip.token.light.angle", mode: "custom", value: "60" },
