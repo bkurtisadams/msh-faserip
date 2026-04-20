@@ -982,7 +982,7 @@ export async function removeOngoingEffect(actor, effectId) {
   const scope = SCOPE();
 
   const ae = actor.effects.find(e => e.flags?.[scope]?.ongoingId === effectId);
-  if (ae) await ae.delete();
+  if (ae) await ae.delete({ mshIntentional: true });
 
   try {
     await actor.unsetFlag(scope, `ongoing.${effectId}`);

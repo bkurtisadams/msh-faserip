@@ -121,6 +121,31 @@ Hooks.on('renderChatMessageHTML', (message, htmlEl) => {
   header.style.borderRadius = '3px 3px 0 0';
 });
 
+// ── v14 screen shake on impact-effect chat cards ──
+// Grenades (and other area attacks) can set a "shake" flag on the chat message.
+// Every client rendering the card fires the shake locally, so the whole table
+// feels the boom. Dedupe per message id and skip historical messages so that
+// re-renders and page refreshes don't retro-shake the players.
+const _shookMessages = new Set();
+Hooks.on("renderChatMessageHTML", (message, htmlEl) => {
+  const shake = message.flags?.["msh-faserip"]?.shake;
+  if (!shake) return;
+  if (_shookMessages.has(message.id)) return;
+  _shookMessages.add(message.id);
+
+  const ts = Number(message.timestamp) || 0;
+  if (Date.now() - ts > 5000) return;   // stale render, don't shake
+
+  const Shake = foundry?.canvas?.animation?.CanvasShakeEffect;
+  if (!Shake) return;                   // pre-v14 or API moved
+
+  try {
+    new Shake(shake).play();
+  } catch (e) {
+    console.warn("[FASERIP WARN] CanvasShakeEffect failed:", e);
+  }
+});
+
 // FASERIP Combat Sync - Use combatRound hook (fires once per round)
 Hooks.on("combatRound", async (combat, updateData, updateOptions, userId) => {
   // ðŸ”’ GM-only â€“ only the GM advances world time
@@ -2456,13 +2481,13 @@ Hooks.once("ready", async () => {
 // won't fire, and GMs need to be able to delete them from the sheet.
 Hooks.on("preDeleteActiveEffect", (effect, options, userId) => {
   const scope = globalThis.MSH_FLAG_SCOPE || "msh-faserip";
-  const effectType = effect.flags?.[scope]?.effectType;
+  const ongoingId = effect.flags?.[scope]?.ongoingId;
 
   // Allow intentional deletions (from our own code)
   if (options?.mshIntentional) return;
 
   // Protect regeneration AEs
-  if (effectType === "regeneration") {
+  if (ongoingId === "regeneration") {
     console.log(`[FASERIP] Blocked auto-expiration of Regeneration AE on ${effect.parent?.name}`);
     return false;
   }
