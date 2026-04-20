@@ -1,4 +1,7 @@
-// scripts/modules/actions/area-template.js v7.0.0 - 2026-03-22
+// scripts/modules/actions/area-template.js v8.0.0 - 2026-04-20
+// v8.0.0: v14 port — MeasuredTemplate document and canvas.templates layer are
+//   gone in v14 (absorbed into Scene Regions). Persisted doc is now a Region
+//   with a single circle shape; preview overlay moved to canvas.controls.
 // v7.0.0: Scroll-wheel resize during Phase 1. New scrollResize option adds
 //   mouse-wheel scaling between minRadiusInAreas (default 1) and radiusInAreas (max).
 //   Step size = 1 grid unit. Returns final chosen radius in the AreaTemplate instance.
@@ -55,7 +58,8 @@ export class AreaTemplate {
 
     const snapped = canvas.grid.getSnappedPoint({ x, y }, { mode: CONST.GRID_SNAPPING_MODES.CENTER });
     preview.position.set(snapped.x, snapped.y);
-    canvas.templates.addChild(preview);
+    const overlayLayer = canvas.controls ?? canvas.interface ?? canvas.stage;
+    overlayLayer.addChild(preview);
 
     // ── Phase 1: follow mouse, scroll to resize, left-click locks, right-click cancels ──
     const lockResult = await new Promise((resolve) => {
@@ -144,19 +148,21 @@ export class AreaTemplate {
 
     if (!confirmed) return null;
 
-    // Persist the real template using the final chosen radius
+    // Persist the real region using the final chosen radius.
+    // v14: MeasuredTemplate document was absorbed into Scene Regions. We create
+    // a Region with a single circle shape; radius is in pixels (x/y already are).
     const finalRadius = lockResult.radius ?? currentRadius;
+    const finalRadiusPx = finalRadius * pxPerArea;
     try {
-      const [created] = await canvas.scene.createEmbeddedDocuments("MeasuredTemplate", [{
-        t: "circle",
-        distance: finalRadius,
-        direction: 0,
-        angle: 360,
-        x: lockResult.x,
-        y: lockResult.y,
-        fillColor,
-        fillAlpha,
-        borderColor: "#000000",
+      const [created] = await canvas.scene.createEmbeddedDocuments("Region", [{
+        name: label,
+        shapes: [{
+          type: "circle",
+          x: lockResult.x,
+          y: lockResult.y,
+          radius: finalRadiusPx,
+          hole: false
+        }],
         flags: { "msh-faserip": { areaTemplate: true, radiusInAreas: finalRadius, label } }
       }]);
       return new AreaTemplate(created, { chosenRadius: finalRadius });
@@ -179,11 +185,11 @@ export class AreaTemplate {
   /** Select all tokens whose center falls within this template as Foundry targets. */
   async target() {
     if (!this._doc) return [];
-    const gridDist = canvas.scene.grid.distance || 0.2;
-    const gridSize = canvas.scene.grid.size ?? 100;
-    const radiusPx = (this._doc.distance / gridDist) * gridSize;
-    const cx = this._doc.x;
-    const cy = this._doc.y;
+    const shape = this._doc.shapes?.[0];
+    if (!shape) return [];
+    const cx = shape.x;
+    const cy = shape.y;
+    const radiusPx = shape.radius;
 
     const tokens = canvas.tokens.placeables.filter(t => {
       const dx = t.center.x - cx;
@@ -198,17 +204,17 @@ export class AreaTemplate {
     return tokens;
   }
 
-  /** Remove the template from the canvas. */
+  /** Remove the region from the canvas. */
   async dismiss() {
     if (!this._doc?.id) return;
     try {
-      await canvas.scene.deleteEmbeddedDocuments("MeasuredTemplate", [this._doc.id]);
+      await canvas.scene.deleteEmbeddedDocuments("Region", [this._doc.id]);
     } catch (err) {
-      console.warn("[FASERIP WARN] Could not delete template", this._doc.id, err);
+      console.warn("[FASERIP WARN] Could not delete region", this._doc.id, err);
     }
   }
 
   get id() { return this._doc?.id; }
-  get x()  { return this._doc?.x; }
-  get y()  { return this._doc?.y; }
+  get x()  { return this._doc?.shapes?.[0]?.x; }
+  get y()  { return this._doc?.shapes?.[0]?.y; }
 }
