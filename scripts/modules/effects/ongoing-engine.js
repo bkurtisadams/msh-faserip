@@ -1,4 +1,13 @@
-// scripts/modules/effects/ongoing-engine.js v1.7.2 - 2026-04-19
+// scripts/modules/effects/ongoing-engine.js v1.7.3 - 2026-04-19
+// v1.7.3: Add duration:{expiry:"roundEnd"} to Impaired Endurance AE
+//         creations (processDyingRound missing-effect branch + the
+//         applyDyingOngoing immediate-loss branch). Required for v14's
+//         isTemporary rule `!!duration.expiry || Number.isFinite(
+//         duration.value)` — without it the token HUD badge does not
+//         render. No auto-expiration because there's no duration.value;
+//         our healImpairedEndurance path removes the AE rank-by-rank
+//         once Endurance is restored. Third site fixed in rest-system.js
+//         v1.4.3 at the same time.
 // v1.7.2: applyDyingOngoing now disables any active Healing AE on the
 //         actor as it begins dying. Healing has interruptOnDamage:false
 //         (it's re-registered on each damage event rather than disabled)
@@ -722,6 +731,12 @@ async function _processDyingRoundInner(actor, dyingAE, scope) {
       icon: "icons/svg/blood.svg",
       origin: actor.uuid,
       statuses: ["impaired-endurance"],
+      // v14: timeless effect needs duration.expiry set for the isTemporary
+      // rule `!!duration.expiry || Number.isFinite(duration.value)` to
+      // evaluate true; without it the token HUD badge does not render.
+      // Effect persists until our healImpairedEndurance path removes it
+      // rank-by-rank — no core auto-expiration.
+      duration: { expiry: "roundEnd" },
       flags: {
         [scope]: {
           isImpairedEndurance: true,
@@ -1109,6 +1124,8 @@ export async function applyDyingOngoing(target, { skipImmediateLoss = false } = 
         img: "icons/svg/blood.svg",
         origin: actor.uuid,
         statuses: ["impaired-endurance"],
+        // v14 isTemporary rule — see the processDyingRound creation site.
+        duration: { expiry: "roundEnd" },
         flags: {
           [scope]: {
             isImpairedEndurance: true,

@@ -1,4 +1,24 @@
-// scripts/modules/rest-system.js v1.4.2 - 2026-04-19
+// scripts/modules/rest-system.js v1.4.3 - 2026-04-19
+// v1.4.3: Two fixes:
+//   (1) Revert v1.4.2's update-in-place pattern for the stabilization
+//       Unconscious AE — it avoided Foundry core's expire-queue race but
+//       left CTT's effects-manager with a stale cached tracker pointing
+//       at the ORIGINAL duration (e.g. "Unconscious (10 rounds) / 60s"),
+//       causing CTT to fire a premature expiry at the old timestamp and
+//       delete the AE well before the stabilization duration (e.g. 2h or
+//       8h) should have elapsed. CTT has no onEffectUpdated hook, so
+//       in-place updates are invisible to it.
+//       Back to delete + create, but now clear the old AE's duration in
+//       a separate update FIRST. Foundry drops it from the expire queue
+//       on that update; the subsequent delete is clean; CTT's
+//       deleteActiveEffect hook tears down the tracker entry normally;
+//       createEmbeddedDocuments registers the new AE fresh with CTT.
+//   (2) Add duration:{expiry:"roundEnd"} to the Impaired Endurance AE
+//       creation in the stabilization fallback path. v14's isTemporary
+//       rule is `!!duration.expiry || Number.isFinite(duration.value)`;
+//       without expiry, the token HUD badge silently does not render.
+//       Same pattern applied to the other two Impaired Endurance
+//       creation sites in ongoing-engine.js v1.7.3.
 // v1.4.2: Fix "undefined id [...] does not exist in the EmbeddedCollection"
 //         error thrown after stabilization. Root cause: Foundry v14 core's
 //         `refresh() → #updateExpiredEffects()` schedules a batch-update
@@ -556,71 +576,62 @@ static async attemptRegainConsciousness(actor) {
     // Remove Dying effect
     await actor.deleteEmbeddedDocuments("ActiveEffect", [dyingEffect.id], { mshIntentional: true });
     
-    // Transition the original death-save Unconscious AE to the 8-hour
-    // stabilized variant. Update-in-place (vs delete + recreate) avoids a
-    // Foundry v14 core race: core's `refresh() → #updateExpiredEffects()`
-    // schedules a batch-update keyed to the original duration's expire
-    // time. Deleting the AE doesn't clear that scheduled update; when time
-    // advances past the original expire timestamp, core tries to update a
-    // document id that no longer exists and throws
-    // "undefined id [...] does not exist in the EmbeddedCollection".
-    // Keeping the same id with a refreshed duration lets the scheduled
-    // update no-op against live data. The mshStabilizing option is kept on
-    // the delete-branch path (conscious-stabilized) so the deleteActiveEffect
-    // hook doesn't trigger a premature consciousness attempt.
+    // Replace the original death-save Unconscious AE with the stabilized
+    // variant. Delete + recreate (not update-in-place) so CTT's tracker
+    // sees the new AE's duration at creation; updating in place leaves
+    // CTT's cached tracker on the ORIGINAL duration and fires a premature
+    // expiry at the old timestamp. But before deleting, we clear the
+    // duration fields on the old AE — this forces Foundry v14 core to
+    // re-evaluate its expired-effects queue and drop the stale reference,
+    // avoiding the "undefined id [...] does not exist in the
+    // EmbeddedCollection" error that otherwise fires on the next
+    // worldTime advance past the original expire timestamp.
+    // mshStabilizing flag on delete prevents the deleteActiveEffect hook
+    // from auto-attempting a premature consciousness check.
     const unconsciousFromDeathSave = actor.effects.find(e =>
       e.getFlag(SCOPE, "fromDeathSave")
     );
+    if (unconsciousFromDeathSave) {
+      // Clear the duration in a first update — Foundry drops the AE from
+      // its expire schedule when duration.value is null and no expiry
+      // event is pending.
+      await unconsciousFromDeathSave.update({
+        "duration.value": null,
+        "duration.units": null,
+        "duration.startTime": null,
+        "duration.rounds": null,
+        "duration.turns": null,
+        "duration.seconds": null,
+      });
+      await actor.deleteEmbeddedDocuments("ActiveEffect", [unconsciousFromDeathSave.id], { mshIntentional: true, mshStabilizing: true });
+    }
 
+    // Only apply unconscious if at 0 HP — conscious dying characters (health > 0)
+    // are stabilized but remain conscious (rules p.31: unconscious only at 0 HP).
     const currentHealth = actor.system?.attributes?.health?.value ?? 0;
     const hours = Math.floor(Math.random() * 10) + 1;
     if (currentHealth <= 0) {
-      if (unconsciousFromDeathSave) {
-        // Update existing AE in place. Duration is re-based on current
-        // worldTime so it counts forward from stabilization, not from the
-        // original death-save moment.
-        await unconsciousFromDeathSave.update({
-          name: `Unconscious (${hours} hours)`,
-          [`flags.${SCOPE}.fromStabilization`]: true,
-          "duration.value": hours * 3600,
-          "duration.units": "seconds",
-          "duration.startTime": game.time.worldTime,
-          "duration.rounds": null,
-          "duration.turns": null,
-        });
-      } else {
-        // No existing unconscious AE — create a fresh one (edge case: some
-        // other path cleared it, or stabilization fired without a prior
-        // death-save unconscious AE).
-        const unconsciousEffect = {
-          name: `Unconscious (${hours} hours)`,
-          icon: "icons/svg/unconscious.svg",
-          origin: actor.uuid,
-          flags: {
-            [SCOPE]: {
-              isStunned: true,
-              fromDeathSave: true,
-              fromStabilization: true
-            }
-          },
-          changes: [
-            { key: "system.combatMods.canAct", mode: "override", value: "false" }
-          ],
-          statuses: ["unconscious"],
-          duration: {
-            value: hours * 3600,
-            units: "seconds"
+      const unconsciousEffect = {
+        name: `Unconscious (${hours} hours)`,
+        icon: "icons/svg/unconscious.svg",
+        origin: actor.uuid,
+        flags: {
+          [SCOPE]: {
+            isStunned: true,
+            fromDeathSave: true,
+            fromStabilization: true
           }
-        };
-        await actor.createEmbeddedDocuments("ActiveEffect", [unconsciousEffect]);
-      }
-    } else {
-      // Conscious-stabilized: no new unconscious AE. Remove the stale
-      // death-save AE if one somehow lingered (should be rare since dying
-      // with HP > 0 is uncommon).
-      if (unconsciousFromDeathSave) {
-        await actor.deleteEmbeddedDocuments("ActiveEffect", [unconsciousFromDeathSave.id], { mshIntentional: true, mshStabilizing: true });
-      }
+        },
+        changes: [
+          { key: "system.combatMods.canAct", mode: "override", value: "false" }
+        ],
+        statuses: ["unconscious"],
+        duration: {
+          value: hours * 3600,
+          units: "seconds"
+        }
+      };
+      await actor.createEmbeddedDocuments("ActiveEffect", [unconsciousEffect]);
     }
     
     // Create or update Impaired Endurance effect if Endurance was reduced
@@ -647,6 +658,12 @@ static async attemptRegainConsciousness(actor) {
           icon: "icons/svg/blood.svg",
           origin: actor.uuid,
           statuses: ["impaired-endurance"],
+          // v14: timeless effect needs duration.expiry set for isTemporary
+          // rule `!!duration.expiry || Number.isFinite(duration.value)` to
+          // evaluate true, otherwise the token HUD badge does not render.
+          // No auto-expiration — our healImpairedEndurance path removes it
+          // rank-by-rank until Endurance is restored.
+          duration: { expiry: "roundEnd" },
           flags: {
             [SCOPE]: {
               isImpairedEndurance: true,
