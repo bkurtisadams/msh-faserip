@@ -1,4 +1,8 @@
-// headquartersSheet.js v3.0.0 - 2026-04-18
+// headquartersSheet.js v3.0.1 - 2026-04-19
+// v3.0.1: Drop deprecated CONST.CHAT_MESSAGE_TYPES.OTHER on two chat
+//         cards (the first card emitter and the rent-due whisper).
+//         Removed in v13 (replaced by CHAT_MESSAGE_STYLES). Default
+//         non-roll style is OTHER already.
 // v3.0.0: Migrate to ApplicationV2 / ItemSheetV2 (v16 prep; v14 backward-compat shims gone in v16)
 // v2.0.1 - 2026-04-03
 import { BUILDING_TYPES, BUILDING_TYPE_MAP, ROOM_PACKAGES, STAFF_ROLES, SIZE_ROOMS } from "./hq-constants.js";
@@ -396,8 +400,7 @@ export class FaseripHeadquartersSheet extends HandlebarsApplicationMixin(ItemShe
 
     ChatMessage.create({
       content,
-      speaker: ChatMessage.getSpeaker(),
-      type: CONST.CHAT_MESSAGE_TYPES.OTHER
+      speaker: ChatMessage.getSpeaker()
     });
   }
 
@@ -454,8 +457,7 @@ export class FaseripHeadquartersSheet extends HandlebarsApplicationMixin(ItemShe
     await ChatMessage.create({
       content,
       speaker: { alias: "HQ Management" },
-      whisper: whisperIds,
-      type: CONST.CHAT_MESSAGE_TYPES.OTHER
+      whisper: whisperIds
     });
   }
 

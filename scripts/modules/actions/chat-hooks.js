@@ -1,4 +1,7 @@
-// chat-hooks.js v1.5.8 - 2026-04-19
+// chat-hooks.js v1.5.9 - 2026-04-19
+// v1.5.9: Drop deprecated CONST.CHAT_MESSAGE_TYPES.OTHER on the damage
+//         chat card. Removed in v13 (replaced by CHAT_MESSAGE_STYLES).
+//         Default non-roll style is OTHER already.
 // v1.5.8: Remove chat button click handlers and dead code
 // v1.5.6: Fix Apply Damage and Resolve Slam buttons not working in semi mode - canDriveAutoSaves bail was blocking all button handler registration for non-owners
 // v1.5.7: Fix reload - prefer token actor over world actor (unlinked tokens have separate item copies)
@@ -1526,7 +1529,6 @@ export async function postAttackChatCard({
     user: game.user.id,
     speaker: ChatMessage.getSpeaker({ actor }),
     content,
-    type: CONST.CHAT_MESSAGE_TYPES.OTHER,
     flags: {
       "msh-faserip": { baseDamage, bonusDamage, finalDamage: dmg, targets: targets.map(t => t.id) }
     }

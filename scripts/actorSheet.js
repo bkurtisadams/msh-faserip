@@ -1,4 +1,11 @@
-// actorSheet.js v2.2.7 - 2026-04-19
+// actorSheet.js v2.2.8 - 2026-04-19
+// v2.2.8: Fix "Cannot read properties of undefined (reading 'OTHER')"
+//         crash on Power Info icon click (and the _action-info chat
+//         card). CONST.CHAT_MESSAGE_TYPES was removed in Foundry v13
+//         (replaced by CHAT_MESSAGE_STYLES, with the ChatMessage
+//         field renamed type→style). Dropped the explicit OTHER
+//         assignment at both sites; Foundry defaults non-roll
+//         messages to OTHER already, so behavior is unchanged.
 // v2.2.7: Auto-populate ability value on rank change. If current value is
 //         out of the new rank's range, confirm dialog offers "update to
 //         standard" or "keep custom". In-range values preserved silently.
@@ -2136,8 +2143,7 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
 
       await ChatMessage.create({
         speaker: ChatMessage.getSpeaker({ actor: this.actor }),
-        content: content,
-        type: CONST.CHAT_MESSAGE_TYPES.OTHER
+        content: content
       });
     });
 
@@ -4891,8 +4897,7 @@ async _rollAction(actionType, abilityName) {
     await ChatMessage.create({
       user: game.user.id,
       speaker: ChatMessage.getSpeaker({ actor: this.actor }),
-      content,
-      type: CONST.CHAT_MESSAGE_TYPES.OTHER
+      content
     });
   }
 
