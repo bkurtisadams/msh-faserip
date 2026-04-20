@@ -1,4 +1,7 @@
-// scripts/modules/actions/grenade-action.js v2.3.0 - 2026-03-15
+// scripts/modules/actions/grenade-action.js v2.4.0 - 2026-04-20
+// v2.4.0: v14 screen shake on hit. Concussive/frag/sonic carry shake profiles;
+//         smoke/gas/flash don't. Shake fires via chat-message flag so all
+//         clients rendering the card feel it (handler in init.js).
 // v2.3.0: Fix range penalty off-by-one (first area free). Fix Kill result logic —
 //         frag (edged) and energy grenades are killing attacks, others are not.
 //         Fix input focus (stopPropagation on mousedown). Fix range input layout.
@@ -30,11 +33,12 @@ import {
 } from "../dice/dice-roller.js";
 import { rollUniversalTable } from "../dice/universal-table.js";
 
-// Grenade type definitions — all RAW values
+// Grenade type definitions — all RAW values. `shake` is a v14 CanvasShakeEffect
+// profile applied on hit; omitted types (smoke/gas/flash) don't shake the map.
 const GRENADE_TYPES = {
-  fragmentation: { label: "Fragmentary",  damageType: "physical-edged", damage: 30,  rank: "Remarkable", effectType: "damage" },
-  concussive:    { label: "Concussive",   damageType: "physical-blunt", damage: 40,  rank: null,          effectType: "damage" },
-  sonic:         { label: "Sonic",        damageType: "energy",         damage: 20,  rank: null,          effectType: "damage+stun", stunIntensity: "Excellent" },
+  fragmentation: { label: "Fragmentary",  damageType: "physical-edged", damage: 30,  rank: "Remarkable", effectType: "damage",      shake: { intensity: 22, duration: 550 } },
+  concussive:    { label: "Concussive",   damageType: "physical-blunt", damage: 40,  rank: null,          effectType: "damage",      shake: { intensity: 30, duration: 700 } },
+  sonic:         { label: "Sonic",        damageType: "energy",         damage: 20,  rank: null,          effectType: "damage+stun", stunIntensity: "Excellent", shake: { intensity: 14, duration: 450 } },
   smoke:         { label: "Smoke",        damageType: null,             damage: 0,   rank: "Excellent",   effectType: "smoke" },
   tearGas:       { label: "Tear Gas",     damageType: null,             damage: 0,   rank: "Typical",     effectType: "gas" },
   knockout:      { label: "Knock-Out",    damageType: null,             damage: 0,   rank: null,          effectType: "gas" },
@@ -327,7 +331,12 @@ export class GrenadeAction extends RangedAttackAction {
       sections: [resultHtml, ammoNote]
     });
 
-    await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor }), content: cardHtml });
+    const shakeFlag = (isHit && typeDef.shake) ? { "msh-faserip": { shake: typeDef.shake } } : undefined;
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor }),
+      content: cardHtml,
+      ...(shakeFlag ? { flags: shakeFlag } : {})
+    });
 
     // Apply damage to all tokens in blast area (hit only)
     // Frag grenades are Edged Killing — shrapnel carries Kill potential on any hit.
