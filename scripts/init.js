@@ -1,4 +1,16 @@
-﻿// init.js v1.12.2 - 2026-04-19
+﻿// init.js v1.12.3 - 2026-04-19
+// v1.12.3: Fix Regeneration auto-sync churn on every world load. The
+//          cleanup loop's isCorrect check and the hasAE re-create
+//          guard both used effectType === "regeneration" — the
+//          pre-ongoing-engine legacy shape. registerOngoingEffect
+//          writes effectType: "ongoing" with ongoingId: "regeneration",
+//          so every canonical regen AE failed isCorrect, matched
+//          isOldBroken via the shared "regenerating" status, got
+//          deleted, and got recreated with the same shape — repeating
+//          on every boot (visible as "Removed old-style … / Auto-
+//          created …" pairs for the same actor). Switched both checks
+//          to ongoingId === "regeneration". Legacy-shape heuristic
+//          unchanged; it now short-circuits correctly on current AEs.
 // v1.12.2: Fix Impaired Endurance never healing when GMs advance time in
 //          sub-day chunks. Removed the `deltaSeconds >= 86400` filter on
 //          the timeTracker.timeAdvanced impaired-heal loop. The filter
@@ -2308,7 +2320,7 @@ Hooks.once("ready", async () => {
         // Clean up old/broken Regeneration AEs (flags at wrong level from earlier code)
         for (const ef of [...actor.effects]) {
           const scopeFlags = ef.flags?.[scope];
-          const isCorrect = scopeFlags?.effectType === "regeneration";
+          const isCorrect = scopeFlags?.ongoingId === "regeneration";
           const isOldBroken = !isCorrect && ef.name?.startsWith("Regeneration") &&
             (ef.statuses?.has?.("regenerating") || "effectType" in (ef.flags || {}));
           const isOrphan = !regenPower && isCorrect;
@@ -2323,7 +2335,7 @@ Hooks.once("ready", async () => {
 
         // Already has a correct Regeneration AE?
         const hasAE = actor.effects.some(e =>
-          e.flags?.[scope]?.effectType === "regeneration"
+          e.flags?.[scope]?.ongoingId === "regeneration"
         );
         if (hasAE) continue;
 

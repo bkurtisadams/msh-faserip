@@ -1,4 +1,13 @@
-// scripts/modules/rest-system.js v1.4.5 - 2026-04-19
+// scripts/modules/rest-system.js v1.4.6 - 2026-04-19
+// v1.4.6: Re-register hourly Healing on consciousness regain. The
+//         attemptRegainConsciousness success branch removed Dying, set
+//         HP to End rank value, and cleared lastDamageWorldTime, but
+//         never called ensureHealingEffect — so woken characters got
+//         no hourly regen until the next damage event restarted the
+//         timer. RAW: "End rank HP per hour after last damage, no
+//         further damage" — waking alive qualifies. Added one gated
+//         call after the Impaired-Endurance timestamp update, matching
+//         the recordDamage pattern.
 // v1.4.5: Migrate remaining legacy `icon:` fields to `img:` on four AE
 //         creation sites — consciousness-fail Unconscious (~519),
 //         stabilization Unconscious (~637), stabilization Impaired
@@ -507,6 +516,16 @@ static async attemptRegainConsciousness(actor) {
         await impairedEffect.update({
           [`flags.${SCOPE}.lastHealed`]: game.time.worldTime
         });
+      }
+
+      // Re-register hourly Healing per RAW: End rank HP/hour after last
+      // damage, no further damage. Waking alive qualifies. Gated by
+      // autoHealingEnabled; matches recordDamage pattern.
+      try {
+        const enabled = game.settings?.get?.(SCOPE, "autoHealingEnabled") ?? true;
+        if (enabled) await ensureHealingEffect(actor, game.time?.worldTime ?? 0);
+      } catch (e) {
+        console.warn("[FASERIP WARN] ensureHealingEffect failed on consciousness regain:", e);
       }
 
       return { success: true, message, rolled: roll, color };
