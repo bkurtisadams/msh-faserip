@@ -1,4 +1,21 @@
-// scripts/modules/rest-system.js v1.4.3 - 2026-04-19
+// scripts/modules/rest-system.js v1.4.4 - 2026-04-19
+// v1.4.4: Fix wake-up loop never firing after a failed consciousness check.
+//         The consciousness-fail path in attemptRegainConsciousness was
+//         creating the follow-up Unconscious (N rounds) AE with
+//         duration:{value:rounds, units:"rounds", expiry:"roundEnd"} when
+//         game.combat was truthy. But game.combat is truthy whenever a
+//         combat tracker exists, not whether rounds are being actively
+//         advanced; our time flow goes through CTT's worldTime-based
+//         advanceTime, not combatRound hooks. Result: v14 couldn't tick
+//         the rounds duration down (no round events), CTT's
+//         onEffectCreated bailed at durationInSeconds > 0 (the v14
+//         Duration shim won't convert "rounds" units cleanly outside
+//         active round tracking), and the AE became an orphan with no
+//         countdown anywhere. Character slept through a full in-game day
+//         while Impaired Endurance healed in the background.
+//         Mirror the sibling pattern in death-save-action.js:361: always
+//         use seconds-based duration. "N rounds" stays in the AE name
+//         as a display label; rounds * 6 seconds is the real countdown.
 // v1.4.3: Two fixes:
 //   (1) Revert v1.4.2's update-in-place pattern for the stabilization
 //       Unconscious AE — it avoided Foundry core's expire-queue race but
@@ -489,8 +506,14 @@ static async attemptRegainConsciousness(actor) {
     } else {
       // Failed - remain unconscious for 1-10 more rounds
       const rounds = Math.floor(Math.random() * 10) + 1;
-      
-      // Create new Unconscious effect
+
+      // Create new Unconscious effect. Always use seconds-based duration
+      // regardless of game.combat state — rounds-based durations only decrement
+      // on combatRound events, but time advancement in this system routes
+      // primarily through CTT's worldTime-based advanceTime, which won't tick
+      // a rounds duration. The parallel path at death-save-action.js:361 uses
+      // seconds unconditionally for the same reason; the "N rounds" label is
+      // purely display. rounds * 6 gives the correct wallclock equivalent.
       const effectData = {
         name: `Unconscious (${rounds} rounds)`,
         icon: "icons/svg/unconscious.svg",
@@ -505,9 +528,7 @@ static async attemptRegainConsciousness(actor) {
           { key: "system.combatMods.canAct", mode: "override", value: "false" }
         ],
         statuses: ["unconscious"],
-        duration: game.combat
-          ? { value: rounds, units: "rounds", expiry: "roundEnd" }
-          : { value: Math.max(1, rounds) * 6, units: "seconds" }
+        duration: { value: Math.max(1, rounds) * 6, units: "seconds", expiry: "turnStart" }
       };
       
       await actor.createEmbeddedDocuments("ActiveEffect", [effectData]);
