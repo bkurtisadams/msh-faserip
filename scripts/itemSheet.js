@@ -119,11 +119,23 @@ export class FaseripItemSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
     return context;
   }
 
+  // v14: AE changes live at system.changes, and change.mode is now change.type.
+  // _v14NormalizeAE rewrites the legacy shape on return so preset bodies stay readable.
+  _v14NormalizeAE(data) {
+    if (!data) return data;
+    if (Array.isArray(data.changes)) {
+      const changes = data.changes.map(c => ({ ...c, type: c.type ?? c.mode }));
+      data.system = Object.assign({}, data.system, { changes });
+      delete data.changes;
+    }
+    return data;
+  }
+
   _buildPowerPresetEffect(preset) {
     const origin = this.item.uuid;
     const base = { origin, disabled: true, transfer: true };
 
-    switch (preset) {
+    const raw = (() => { switch (preset) {
 
       // ── Defensive ──
       case "body-armor":
@@ -297,7 +309,8 @@ export class FaseripItemSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
       default:
         console.warn(`[FASERIP WARN] Unknown power effect preset: ${preset}`);
         return null;
-    }
+    } })();
+    return this._v14NormalizeAE(raw);
   }
 
   _detectActionButtons(system) {

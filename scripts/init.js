@@ -1981,15 +1981,13 @@ function _collectTokenEffectState(actor) {
   const CUSTOM = CONST.ACTIVE_EFFECT_CHANGE_TYPES?.CUSTOM ?? "custom";
   for (const effect of actor.allApplicableEffects()) {
     if (effect.disabled || effect.isSuppressed) continue;
-    for (const change of effect.changes) {
+    for (const change of (effect.system?.changes ?? effect.changes ?? [])) {
       if ((change.type ?? change.mode) !== CUSTOM) continue;
       if (!change.key.startsWith("faserip.token.")) continue;
       const tokenKey = change.key.replace("faserip.token.", "");
-      let val = change.value;
-      if (/^-?\d+(\.\d+)?$/.test(val)) val = Number(val);
-      else if (val === "true") val = true;
-      else if (val === "false") val = false;
-      desired.set(tokenKey, val);
+      // v14: change.value arrives pre-parsed (JSON parse of the entered value,
+      // or the raw string on parse failure), so no manual coercion needed.
+      desired.set(tokenKey, change.value);
     }
   }
   return desired;
@@ -2075,7 +2073,7 @@ Hooks.on("applyActiveEffect", (actor, change, current, delta, changes) => {
 
 // â”€â”€ Hooks: reconcile when effects change â”€â”€
 Hooks.on("updateActiveEffect", (effect, changes, options, userId) => {
-  const hasTokenChanges = effect.changes?.some(c => c.key?.startsWith("faserip.token."));
+  const hasTokenChanges = (effect.system?.changes ?? effect.changes)?.some(c => c.key?.startsWith("faserip.token."));
   const disabledToggled = "disabled" in changes;
   if (!hasTokenChanges && !disabledToggled) return;
   if (!game.user.isGM) return;
@@ -2085,7 +2083,7 @@ Hooks.on("updateActiveEffect", (effect, changes, options, userId) => {
 
 Hooks.on("createActiveEffect", (effect, options, userId) => {
   if (!game.user.isGM) return;
-  if (!effect.changes?.some(c => c.key.startsWith("faserip.token."))) return;
+  if (!(effect.system?.changes ?? effect.changes)?.some(c => c.key.startsWith("faserip.token."))) return;
   const actor = _resolveEffectActor(effect);
   if (actor) _scheduleReconcile(actor);
 });
@@ -2094,7 +2092,7 @@ Hooks.on("createActiveEffect", (effect, options, userId) => {
 const _pendingDeleteActors = new Map();
 Hooks.on("preDeleteActiveEffect", (effect, options, userId) => {
   if (!game.user.isGM) return;
-  const hasTokenChanges = effect.changes?.some(c => c.key?.startsWith("faserip.token."));
+  const hasTokenChanges = (effect.system?.changes ?? effect.changes)?.some(c => c.key?.startsWith("faserip.token."));
   const scope = globalThis.MSH_FLAG_SCOPE || game.system?.id || "msh-faserip";
   const isNullified = effect.flags?.[scope]?.effectType === "nullified";
   if (!hasTokenChanges && !isNullified) return;

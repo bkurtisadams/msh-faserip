@@ -718,11 +718,23 @@ export class FaseripEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV
   // ── Preset effect templates using standard Foundry changes[] ──
   // system.* keys are applied by Foundry's applyActiveEffects automatically.
   // faserip.token.* keys use CUSTOM mode and are handled by our applyActiveEffect hook.
+  // v14: AE changes live at system.changes, and change.mode is now change.type.
+  // _v14NormalizeAE rewrites the legacy shape on return so preset bodies stay readable.
+  _v14NormalizeAE(data) {
+    if (!data) return data;
+    if (Array.isArray(data.changes)) {
+      const changes = data.changes.map(c => ({ ...c, type: c.type ?? c.mode }));
+      data.system = Object.assign({}, data.system, { changes });
+      delete data.changes;
+    }
+    return data;
+  }
+
   _buildPresetEffect(preset) {
     const origin = this.item.uuid;
     const base = { origin, disabled: true, transfer: true };
 
-    switch (preset) {
+    const raw = (() => { switch (preset) {
 
       // ── Visual / Token presets ──
       case "light":
@@ -730,8 +742,8 @@ export class FaseripEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV
           name: "Light Source",
           img: "icons/svg/light.svg",
           changes: [
-            { key: "faserip.token.light.bright", mode: "custom", value: "1" },
-            { key: "faserip.token.light.dim", mode: "custom", value: "3" },
+            { key: "faserip.token.light.bright", mode: "custom", value: "0.5" },
+            { key: "faserip.token.light.dim", mode: "custom", value: "1" },
             { key: "faserip.token.light.color", mode: "custom", value: "#ffdd88" },
             { key: "faserip.token.light.alpha", mode: "custom", value: "0.3" },
             { key: "faserip.token.light.angle", mode: "custom", value: "360" },
@@ -746,8 +758,8 @@ export class FaseripEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV
           name: "Flashlight Beam",
           img: "icons/svg/light.svg",
           changes: [
-            { key: "faserip.token.light.bright", mode: "custom", value: "1" },
-            { key: "faserip.token.light.dim", mode: "custom", value: "2" },
+            { key: "faserip.token.light.bright", mode: "custom", value: "0.5" },
+            { key: "faserip.token.light.dim", mode: "custom", value: "1" },
             { key: "faserip.token.light.color", mode: "custom", value: "#ffffcc" },
             { key: "faserip.token.light.alpha", mode: "custom", value: "0.5" },
             { key: "faserip.token.light.angle", mode: "custom", value: "60" },
@@ -859,7 +871,8 @@ export class FaseripEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV
       default:
         ui.notifications.warn(`Unknown preset: ${preset}`);
         return null;
-    }
+    } })();
+    return this._v14NormalizeAE(raw);
   }
 
   // Method to handle equipment rolls
