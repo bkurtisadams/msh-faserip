@@ -591,15 +591,34 @@ export class KarmaSheet extends DocumentSheet {
               return;
             }
             
+            // Cap negative amounts at current available karma (RAW: karma may not
+            // drop below 0 from losses). Advancement fund stays protected because
+            // availableKarma already excludes it.
+            let finalAmount = amount;
+            if (amount < 0) {
+              const available = this._getCurrentKarma();
+              const cappedLoss = Math.min(Math.abs(amount), available);
+              finalAmount = -cappedLoss;
+              if (cappedLoss < Math.abs(amount)) {
+                ui.notifications.info(
+                  `${eventType} loss capped at ${cappedLoss} (would have been ${Math.abs(amount)}; available was ${available}).`
+                );
+              }
+              if (cappedLoss === 0) {
+                ui.notifications.info(`${eventType} not recorded — no karma available to lose.`);
+                return;
+              }
+            }
+
             const karmaEvent = {
               timestamp: new Date().toISOString(),
               realDate: formData.get("realDate"),
               gameDate: formData.get("gameDate"),
-              amount: amount,
+              amount: finalAmount,
               type: eventType,
               description: formData.get("description")
             };
-            
+
             this._addKarmaEvent(karmaEvent);
           }
         },

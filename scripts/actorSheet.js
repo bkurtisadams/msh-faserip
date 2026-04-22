@@ -54,6 +54,7 @@ import {
   resolveRange, getPowerDerivations
 } from './rules/rules-reference.js';
 
+const DialogV2 = foundry.applications.api.DialogV2;
 
 function getPopularityRankWithRange(value, context) {
   const rank = context._getPopularityRank(value);
@@ -3345,71 +3346,78 @@ html.find('.headquarters-row').each((i, row) => {
         "Remarkable", "Incredible", "Amazing", "Monstrous", "Unearthly",
         "Shift-X", "Shift-Y", "Shift-Z", "Class 1000", "Class 3000", "Class 5000", "Beyond"
       ];
-      
       const rankOptions = ranks.map(r => `<option value="${r}">${r}</option>`).join('');
-      
-      new Dialog({
-        title: "Add Power Stunt",
+
+      const powers = this.actor.items.filter(i => i.type === 'power');
+      const powerOptions = powers.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+
+      await DialogV2.wait({
+        window: { title: "Add Power Stunt" },
         content: `
           <form>
             <div class="form-group">
               <label>Stunt Name:</label>
-              <input type="text" name="name" placeholder="e.g., Triple Teleport" style="width: 100%;" />
+              <input type="text" name="name" placeholder="e.g., Triple Teleport" style="width:100%;">
             </div>
             <div class="form-group">
-              <label>Rank:</label>
-              <select name="rank" id="stunt-rank-select" style="width: 150px;">
-                ${rankOptions}
+              <label>Parent Power:</label>
+              <select name="parentPowerId" style="width:100%;">
+                <option value="">(None — general stunt)</option>
+                ${powerOptions}
               </select>
+              <small style="color:#666;">Links stunt to a power. Rank is read live from the power.</small>
+            </div>
+            <div class="form-group">
+              <label>Rank (if no parent power):</label>
+              <select name="rank" style="width:150px;">${rankOptions}</select>
             </div>
             <div class="form-group">
               <label>Rank Number:</label>
-              <input type="number" name="value" value="6" min="0" style="width: 100px;" />
+              <input type="number" name="value" value="6" min="0" style="width:100px;">
             </div>
             <div class="form-group">
               <label>Description:</label>
-              <textarea name="description" rows="4" placeholder="Describe what this stunt does..." style="width: 100%;"></textarea>
+              <textarea name="description" rows="4" placeholder="Describe what this stunt does..." style="width:100%;"></textarea>
             </div>
-            <p style="margin-top: 10px; color: #666; font-size: 0.9em;">
+            <p style="margin-top:10px;color:#666;font-size:0.9em;">
               <strong>Note:</strong> First use will require a Red FEAT and cost 100 Karma.
             </p>
           </form>
         `,
-        buttons: {
-          create: {
-            icon: '<i class="fas fa-plus"></i>',
+        buttons: [
+          {
+            action: "create",
             label: "Create Stunt",
-            callback: async html => {
-              const name = html.find('[name="name"]').val()?.trim();
-              
+            default: true,
+            callback: async (event, button, dialog) => {
+              const root = dialog.element;
+              const name = root.querySelector('[name="name"]').value?.trim();
               if (!name) {
                 ui.notifications.warn("Stunt name is required!");
                 return;
               }
-              
-              // add Power Stunt
+              const parentPowerId = root.querySelector('[name="parentPowerId"]').value || null;
+              const parentPower = parentPowerId ? (this.actor.items.get(parentPowerId)?.name || null) : null;
+
               const stunts = foundry.utils.deepClone(this.actor.system.stunts || []);
               stunts.push({
-                name: name,
-                parentPower: null, // ← Add this - will populate from power sheet
-                rank: html.find('[name="rank"]').val(),
-                value: parseInt(html.find('[name="value"]').val()) || 6,
-                description: html.find('[name="description"]').val() || "",
+                name,
+                parentPowerId,
+                parentPower,
+                rank: root.querySelector('[name="rank"]').value,
+                value: parseInt(root.querySelector('[name="value"]').value) || 6,
+                description: root.querySelector('[name="description"]').value || "",
                 timesUsed: 0
               });
-              
               await this.actor.update({ "system.stunts": stunts });
               ui.notifications.info(`Stunt "${name}" created!`);
               this.render(false);
             }
           },
-          cancel: {
-            icon: '<i class="fas fa-times"></i>',
-            label: "Cancel"
-          }
-        },
-        default: "create"
-      }).render(true);
+          { action: "cancel", icon: "fas fa-times", label: "Cancel" }
+        ],
+        rejectClose: false
+      });
     });
 
     // Stunts Tab
@@ -3426,82 +3434,88 @@ html.find('.headquarters-row').each((i, row) => {
       const stuntIndex = parseInt(ev.currentTarget.dataset.stuntIndex);
       const stunts = foundry.utils.deepClone(this.actor.system.stunts || []);
       const stunt = stunts[stuntIndex];
-      
       if (!stunt) return;
-      
+
       const ranks = [
         "Shift-0", "Feeble", "Poor", "Typical", "Good", "Excellent",
         "Remarkable", "Incredible", "Amazing", "Monstrous", "Unearthly",
         "Shift-X", "Shift-Y", "Shift-Z", "Class 1000", "Class 3000", "Class 5000", "Beyond"
       ];
-      
-      const rankOptions = ranks.map(r => 
+      const rankOptions = ranks.map(r =>
         `<option value="${r}" ${r === stunt.rank ? 'selected' : ''}>${r}</option>`
       ).join('');
-      
-      new Dialog({
-        title: `Edit Stunt: ${stunt.name}`,
+
+      const powers = this.actor.items.filter(i => i.type === 'power');
+      const powerOptions = powers.map(p =>
+        `<option value="${p.id}" ${p.id === stunt.parentPowerId ? 'selected' : ''}>${p.name}</option>`
+      ).join('');
+
+      const difficultyText = stunt.timesUsed < 1 ? 'Red FEAT (100 Karma)'
+        : stunt.timesUsed < 4 ? 'Yellow FEAT (100 Karma)'
+        : stunt.timesUsed < 10 ? 'Green FEAT (100 Karma)'
+        : 'Mastered (No Cost)';
+
+      await DialogV2.wait({
+        window: { title: `Edit Stunt: ${stunt.name}` },
         content: `
           <form>
             <div class="form-group">
               <label>Stunt Name:</label>
-              <input type="text" name="name" value="${stunt.name}" style="width: 100%;" />
+              <input type="text" name="name" value="${stunt.name}" style="width:100%;">
             </div>
             <div class="form-group">
-              <label>Parent Power (optional):</label>
-              <input type="text" name="parentPower" value="${stunt.parentPower || ''}" 
-                    placeholder="e.g., Teleportation" style="width: 100%;" />
-              <small style="color: #666;">Links this stunt to a specific power</small>
-            </div>
-              <label>Rank:</label>
-              <select name="rank" style="width: 150px;">
-                ${rankOptions}
+              <label>Parent Power:</label>
+              <select name="parentPowerId" style="width:100%;">
+                <option value="">(None — general stunt)</option>
+                ${powerOptions}
               </select>
+              <small style="color:#666;">Rank/value read live from linked power. Falls back to stored values below.</small>
             </div>
             <div class="form-group">
-              <label>Rank Number:</label>
-              <input type="number" name="value" value="${stunt.value}" min="0" style="width: 100px;" />
+              <label>Stored Rank (fallback):</label>
+              <select name="rank" style="width:150px;">${rankOptions}</select>
+            </div>
+            <div class="form-group">
+              <label>Stored Rank Number (fallback):</label>
+              <input type="number" name="value" value="${stunt.value}" min="0" style="width:100px;">
             </div>
             <div class="form-group">
               <label>Description:</label>
-              <textarea name="description" rows="4" style="width: 100%;">${stunt.description || ''}</textarea>
+              <textarea name="description" rows="4" style="width:100%;">${stunt.description || ''}</textarea>
             </div>
             <div class="form-group">
               <label>Times Used:</label>
-              <input type="number" name="timesUsed" value="${stunt.timesUsed || 0}" min="0" style="width: 100px;" />
-              <span style="margin-left: 10px; color: #666;">
-                ${stunt.timesUsed < 1 ? 'Red FEAT (100 Karma)' : 
-                  stunt.timesUsed < 4 ? 'Yellow FEAT (100 Karma)' : 
-                  stunt.timesUsed < 10 ? 'Green FEAT (100 Karma)' : 
-                  'Mastered (No Cost)'}
-              </span>
+              <input type="number" name="timesUsed" value="${stunt.timesUsed || 0}" min="0" style="width:100px;">
+              <span style="margin-left:10px;color:#666;">${difficultyText}</span>
             </div>
           </form>
         `,
-        buttons: {
-          save: {
-            icon: '<i class="fas fa-save"></i>',
+        buttons: [
+          {
+            action: "save",
             label: "Save",
-            callback: async html => {
+            default: true,
+            callback: async (event, button, dialog) => {
+              const root = dialog.element;
+              const parentPowerId = root.querySelector('[name="parentPowerId"]').value || null;
+              const parentPower = parentPowerId ? (this.actor.items.get(parentPowerId)?.name || null) : null;
               stunts[stuntIndex] = {
-                name: html.find('[name="name"]').val(),
-                parentPower: html.find('[name="parentPower"]').val() || null,
-                rank: html.find('[name="rank"]').val(),
-                value: parseInt(html.find('[name="value"]').val()) || 6,
-                description: html.find('[name="description"]').val(),
-                timesUsed: parseInt(html.find('[name="timesUsed"]').val()) || 0
+                name: root.querySelector('[name="name"]').value,
+                parentPowerId,
+                parentPower,
+                rank: root.querySelector('[name="rank"]').value,
+                value: parseInt(root.querySelector('[name="value"]').value) || 6,
+                description: root.querySelector('[name="description"]').value,
+                timesUsed: parseInt(root.querySelector('[name="timesUsed"]').value) || 0
               };
               await this.actor.update({ "system.stunts": stunts });
               this.render(false);
             }
           },
-          cancel: {
-            icon: '<i class="fas fa-times"></i>',
-            label: "Cancel"
-          }
-        },
-        default: "save"
-      }).render(true);
+          { action: "cancel", icon: "fas fa-times", label: "Cancel" }
+        ],
+        rejectClose: false
+      });
     });
 
     // Stunts Tab - Delete stunt
@@ -3509,14 +3523,14 @@ html.find('.headquarters-row').each((i, row) => {
       const stuntIndex = parseInt(ev.currentTarget.dataset.stuntIndex);
       const stunts = this.actor.system.stunts || [];
       const stunt = stunts[stuntIndex];
-      
-      const confirmed = await Dialog.confirm({
-        title: "Delete Stunt",
-        content: `<p>Are you sure you want to delete the stunt "<strong>${stunt?.name || 'Unknown'}</strong>"?</p>`
+
+      const confirmed = await DialogV2.confirm({
+        window: { title: "Delete Stunt" },
+        content: `<p>Are you sure you want to delete the stunt "<strong>${stunt?.name || 'Unknown'}</strong>"?</p>`,
+        rejectClose: false
       });
-      
       if (!confirmed) return;
-      
+
       const updatedStunts = foundry.utils.deepClone(stunts);
       updatedStunts.splice(stuntIndex, 1);
       await this.actor.update({ "system.stunts": updatedStunts });

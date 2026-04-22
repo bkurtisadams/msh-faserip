@@ -1,348 +1,395 @@
-// scripts/modules/stunts.js
+// scripts/stunts.js v1.1.0 - 2026-04-22
+// v1.1.0: v14 port — DialogV2 conversions; pre-roll karma declaration (RAW);
+//         min-10 karma commitment enforced; GM impossible refund button;
+//         parentPowerId link (dynamic rank from power item).
+// v1.0.0: Initial stunt roller.
 
-import { rollUniversalTable } from "./modules/dice/universal-table.js";
+const DialogV2 = foundry.applications.api.DialogV2;
+
 export class StuntRoller {
   constructor(actor) {
     this.actor = actor;
   }
 
   async rollStunt(stuntIndex) {
-    const stunt = this.actor.system.stunts[stuntIndex];
-    
+    const stunt = this.actor.system.stunts?.[stuntIndex];
     if (!stunt) {
-        ui.notifications.error("Stunt not found");
-        return;
-    }
-    
-    // Check if mastered (10+ uses)
-    if (stunt.timesUsed >= 10) {
-        ui.notifications.info(`${stunt.name} is mastered! Auto-success, no roll or Karma cost needed.`);
-        await this._incrementStuntUsage(stuntIndex);
-        return;
-    }
-    
-    // Determine FEAT difficulty
-    const { featColor, featDifficulty } = this._getFeatDifficulty(stunt.timesUsed);
-    
-    const baseCost = 100;
-    
-    // Calculate actual available karma (same logic as karma.js)
-    const availableKarma = this._calculateAvailableKarma();
-    
-    if (availableKarma < baseCost) {
-        ui.notifications.warn(`Insufficient Karma! Power stunts require ${baseCost} Karma. You have ${availableKarma}.`);
-        return;
-    }
-    
-    // Show initial dialog and roll
-    await this._showStuntDialog(stunt, stuntIndex, featColor, featDifficulty, baseCost, availableKarma);
+      ui.notifications.error("Stunt not found");
+      return;
     }
 
-    _calculateAvailableKarma() {
-    const totalEarned = this.actor.system.karma.lifetime || 0;
-    
-    // Calculate total spent
-    let totalSpent = 0;
-    const history = this.actor.system.karma?.history || [];
-    history.forEach(event => {
-        if (event.amount < 0) {
-        totalSpent += Math.abs(event.amount);
-        }
-    });
-    
-    const advancementFund = this.actor.system.karma.advancement || 0;
-    const karmaPool = this.actor.system.karma.pool || 0;
-    
-    return Math.max(0, totalEarned - totalSpent - advancementFund - karmaPool);
+    const resolved = this._resolveStuntRank(stunt);
+
+    if (stunt.timesUsed >= 10) {
+      ui.notifications.info(`${stunt.name} is mastered! Auto-success, no roll or Karma cost needed.`);
+      await this._incrementStuntUsage(stuntIndex);
+      return;
     }
+
+    const { featColor } = this._getFeatDifficulty(stunt.timesUsed);
+    const baseCost = 100;
+    const availableKarma = this._getAvailableKarma();
+
+    if (availableKarma < baseCost) {
+      ui.notifications.warn(`Insufficient Karma! Power stunts require ${baseCost} Karma. You have ${availableKarma}.`);
+      return;
+    }
+
+    await this._showStuntDialog(stunt, stuntIndex, resolved, featColor, baseCost, availableKarma);
+  }
+
+  _getAvailableKarma() {
+    const lifetime = this.actor.system.karma?.lifetime || 0;
+    const history = this.actor.system.karma?.history || [];
+    let spent = 0;
+    for (const e of history) if ((e.amount || 0) < 0) spent += Math.abs(e.amount);
+    const advancement = this.actor.system.karma?.advancement || 0;
+    const pool = this.actor.system.karma?.pool || 0;
+    return Math.max(0, lifetime - spent - advancement - pool);
+  }
+
+  _resolveStuntRank(stunt) {
+    if (stunt.parentPowerId) {
+      const power = this.actor.items.get(stunt.parentPowerId);
+      if (power?.system) {
+        return {
+          rank: power.system.rank ?? stunt.rank,
+          value: power.system.value ?? stunt.value,
+          powerName: power.name
+        };
+      }
+    }
+    return { rank: stunt.rank, value: stunt.value, powerName: stunt.parentPower || null };
+  }
 
   _getFeatDifficulty(timesUsed) {
-    if (timesUsed === 0) {
-      return { featColor: "Red", featDifficulty: 100 };
-    } else if (timesUsed <= 3) {
-      return { featColor: "Yellow", featDifficulty: 50 };
-    } else {
-      return { featColor: "Green", featDifficulty: 20 };
-    }
+    if (timesUsed === 0) return { featColor: "Red" };
+    if (timesUsed <= 3) return { featColor: "Yellow" };
+    return { featColor: "Green" };
   }
 
-  async _showStuntDialog(stunt, stuntIndex, featColor, featDifficulty, baseCost, availableKarma) {
-  // Determine difficulty description
-  let difficultyDesc;
-  if (featColor === 'Red') {
-    difficultyDesc = 'Need RED result on Universal Table';
-  } else if (featColor === 'Yellow') {
-    difficultyDesc = 'Need YELLOW or RED result';
-  } else {
-    difficultyDesc = 'Need GREEN, YELLOW, or RED result';
-  }
-  
-  new Dialog({
-    title: `Power Stunt: ${stunt.name}`,
-    content: `
+  async _showStuntDialog(stunt, stuntIndex, resolved, featColor, baseCost, availableKarma) {
+    const difficultyDesc = featColor === 'Red' ? 'Need RED result on Universal Table'
+      : featColor === 'Yellow' ? 'Need YELLOW or RED result'
+      : 'Need GREEN, YELLOW, or RED result';
+
+    const featColorHex = featColor === 'Red' ? '#F44336' : featColor === 'Yellow' ? '#FFC107' : '#4CAF50';
+    const remaining = 10 - stunt.timesUsed;
+    const masterHint = stunt.timesUsed >= 9
+      ? 'One more success and this stunt will be <strong>mastered</strong>!'
+      : `${remaining} more successes until mastered.`;
+
+    const canAffordBoost = availableKarma >= baseCost + 10;
+
+    const content = `
       <form>
-        <div class="stunt-info" style="margin-bottom: 15px; padding: 10px; background: #f5f5f5; border-radius: 4px;">
-          <h3 style="margin-top: 0;">${stunt.name}</h3>
-          ${stunt.parentPower ? `<p><strong>Based on Power:</strong> ${stunt.parentPower}</p>` : '<p><em>General power stunt</em></p>'}
-          <p><strong>Rank:</strong> ${stunt.rank} (${stunt.value})</p>
+        <div class="stunt-info" style="margin-bottom:15px;padding:10px;background:#f5f5f5;border-radius:4px;">
+          <h3 style="margin-top:0;">${stunt.name}</h3>
+          ${resolved.powerName ? `<p><strong>Based on Power:</strong> ${resolved.powerName}</p>` : '<p><em>General power stunt</em></p>'}
+          <p><strong>Rank:</strong> ${resolved.rank} (${resolved.value})</p>
           ${stunt.description ? `<p><strong>Description:</strong> ${stunt.description}</p>` : ''}
-          <p><strong>Times Attempted:</strong> ${stunt.timesUsed}</p>
-          <p><strong>Difficulty:</strong> <span style="color: ${featColor === 'Red' ? '#F44336' : featColor === 'Yellow' ? '#FFC107' : '#4CAF50'}; font-weight: bold;">${featColor} FEAT</span></p>
-          <p style="font-size: 0.9em; color: #666;">${difficultyDesc}</p>
+          <p><strong>Times Used:</strong> ${stunt.timesUsed}</p>
+          <p><strong>Difficulty:</strong> <span style="color:${featColorHex};font-weight:bold;">${featColor} FEAT</span></p>
+          <p style="font-size:0.9em;color:#666;">${difficultyDesc}</p>
         </div>
-        
-        <div class="karma-section" style="margin-bottom: 15px;">
+        <div class="karma-section" style="margin-bottom:15px;">
           <p><strong>Available Karma:</strong> ${availableKarma}</p>
-          <p><strong>Base Cost:</strong> ${baseCost} Karma (required to attempt)</p>
-          <p style="font-size: 0.9em; color: #666;">After rolling, you can spend additional Karma to improve your result (1 Karma = +1 to roll)</p>
+          <p><strong>Attempt Cost:</strong> ${baseCost} Karma</p>
+          <p style="font-size:0.9em;color:#666;">
+            Declaring Karma boost commits a minimum of 10 additional Karma (per rules),
+            spent after seeing the roll result.
+          </p>
         </div>
-        
-        <div class="rules-reminder" style="padding: 10px; background: #fff3e0; border-left: 4px solid #ff9800; font-size: 0.9em;">
-          <strong>Reminder:</strong> ${stunt.timesUsed >= 9 ? 'One more success and this stunt will be <strong>mastered</strong>!' : `${10 - stunt.timesUsed} more successes until mastered.`}
+        <div class="rules-reminder" style="padding:10px;background:#fff3e0;border-left:4px solid #ff9800;font-size:0.9em;">
+          <strong>Reminder:</strong> ${masterHint}
         </div>
       </form>
-    `,
-    buttons: {
-      roll: {
-        icon: '<i class="fas fa-dice-d20"></i>',
-        label: "Roll Stunt",
-        callback: async () => {
-          await this._makeStuntRoll(stunt, stuntIndex, featColor, featDifficulty, baseCost, availableKarma);
-        }
-      },
-      cancel: {
-        icon: '<i class="fas fa-times"></i>',
-        label: "Cancel"
-      }
-    },
-    default: "roll"
-  }).render(true);
-}
+    `;
 
-async _makeStuntRoll(stunt, stuntIndex, featColor, featDifficulty, baseCost, availableKarma) {
-    // Make the roll
+    const buttons = [
+      {
+        action: "attempt",
+        icon: "fas fa-dice-d20",
+        label: `Attempt (${baseCost} Karma)`,
+        default: !canAffordBoost,
+        callback: async () => {
+          await this._makeStuntRoll(stunt, stuntIndex, resolved, featColor, baseCost, availableKarma, false);
+        }
+      }
+    ];
+
+    if (canAffordBoost) {
+      buttons.push({
+        action: "attemptBoost",
+        icon: "fas fa-plus-circle",
+        label: `Attempt + Declare Karma Boost (${baseCost} + min 10)`,
+        default: true,
+        callback: async () => {
+          await this._makeStuntRoll(stunt, stuntIndex, resolved, featColor, baseCost, availableKarma, true);
+        }
+      });
+    }
+
+    buttons.push({
+      action: "impossible",
+      icon: "fas fa-ban",
+      label: `GM: Rule Impossible (No Karma)`,
+      callback: async () => {
+        await ChatMessage.create({
+          user: game.user.id,
+          speaker: ChatMessage.getSpeaker({ actor: this.actor }),
+          content: `<div style="padding:6px 10px;background:#fff3e0;border-left:4px solid #ff9800;">
+            <strong>${this.actor.name}</strong> — Power Stunt <em>${stunt.name}</em> ruled impossible by the Judge. No Karma spent.
+          </div>`
+        });
+      }
+    });
+
+    buttons.push({ action: "cancel", icon: "fas fa-times", label: "Cancel" });
+
+    await DialogV2.wait({
+      window: { title: `Power Stunt: ${stunt.name}` },
+      content,
+      buttons,
+      rejectClose: false
+    });
+  }
+
+  async _makeStuntRoll(stunt, stuntIndex, resolved, featColor, baseCost, availableKarma, declaredBoost) {
     const roll = new Roll("1d100");
     await roll.evaluate();
     const rollResult = roll.total;
 
-    // Show roll to chat
     await roll.toMessage({
-        speaker: ChatMessage.getSpeaker({ actor: this.actor }),
-        flavor: `${this.actor.name} attempts Power Stunt: ${stunt.name}`,
-        rollMode: game.settings.get("core", "rollMode")
+      speaker: ChatMessage.getSpeaker({ actor: this.actor }),
+      flavor: `${this.actor.name} attempts Power Stunt: ${stunt.name}${declaredBoost ? ' (Karma declared)' : ''}`,
+      rollMode: game.settings.get("core", "rollMode")
     });
 
-    // Get the color from the universal table
-    const color = game.msh.rollUniversalTable(stunt.rank, rollResult);
-    const colorLower = String(color || "").toLowerCase();
+    const initialColor = game.msh.rollUniversalTable(resolved.rank, rollResult);
+    const initialSuccess = this._checkFeatSuccess(String(initialColor || '').toLowerCase(), featColor);
 
-    // Determine if it's a natural success based on the FEAT requirement
-    let naturalSuccess = this._checkFeatSuccess(colorLower, featColor);
-
-    // Calculate how much Karma is needed to succeed
-    let karmaNeeded = 0;
-    if (!naturalSuccess) {
-        karmaNeeded = this._calculateKarmaNeeded(rollResult, stunt.rank, featColor);
+    // If no boost was declared, finalize directly with 0 extra karma.
+    if (!declaredBoost) {
+      await this._finalizeStuntRoll(stunt, stuntIndex, resolved, rollResult, featColor, 0, baseCost, initialSuccess, initialColor);
+      return;
     }
 
-    const maxKarmaAvailable = availableKarma - baseCost;
-    const canAffordSuccess = karmaNeeded > 0 && karmaNeeded <= maxKarmaAvailable;
+    // Karma was declared: minimum 10 is spent regardless of outcome.
+    // Player picks amount (min 10) AFTER seeing the roll.
+    const maxAfterBase = availableKarma - baseCost;
+    const minCommit = Math.min(10, maxAfterBase);
+    await this._showBoostAmountDialog(stunt, stuntIndex, resolved, rollResult, featColor, baseCost, minCommit, maxAfterBase, initialColor, initialSuccess);
+  }
 
-    // Ask if they want to spend Karma (if needed and possible)
-    if (!naturalSuccess && canAffordSuccess) {
-        await this._showKarmaSpendDialog(stunt, stuntIndex, rollResult, featColor, karmaNeeded, baseCost, availableKarma, roll, color);
-    } else {
-        await this._finalizeStuntRoll(stunt, stuntIndex, rollResult, featColor, 0, baseCost, naturalSuccess, roll, color);
-    }
-}
+  _checkFeatSuccess(colorRolled, featRequired) {
+    const h = { white: 0, green: 1, yellow: 2, red: 3 };
+    return (h[colorRolled] ?? 0) >= (h[featRequired.toLowerCase()] ?? 0);
+  }
 
-    _checkFeatSuccess(colorRolled, featRequired) {
-    const colorHierarchy = { 'white': 0, 'green': 1, 'yellow': 2, 'red': 3 };
-    const rolledLevel = colorHierarchy[colorRolled] || 0;
-    const requiredLevel = colorHierarchy[featRequired.toLowerCase()] || 0;
+  async _showBoostAmountDialog(stunt, stuntIndex, resolved, rollResult, featColor, baseCost, minCommit, maxAfterBase, initialColor, initialSuccess) {
+    // Compute breakpoints (informational; RAW doesn't require showing them, but useful UX).
+    const breakpoints = this._computeBreakpoints(rollResult, resolved.rank, featColor, minCommit, maxAfterBase);
 
-    return rolledLevel >= requiredLevel;
-    }
+    const initialSuccessText = initialSuccess
+      ? `<div style="padding:6px 10px;margin-bottom:10px;background:#e8f5e9;border:1px solid #66bb6a;border-radius:3px;">
+           <strong style="color:#2e7d32;">Natural success!</strong> Your roll already meets the ${featColor} FEAT. Per RAW, the declared Karma minimum (${minCommit}) is still spent.
+         </div>`
+      : '';
 
-    _calculateKarmaNeeded(rollResult, rank, featColor) {
-    // Try adding karma until we get the required color
-    for (let karma = 1; karma <= 100; karma++) {
-        const newResult = rollResult + karma;
-        if (newResult > 100) return 999; // Can't succeed even with max karma
-        
-        const newColor = game.msh.rollUniversalTable(rank, newResult);
-        const colorLower = String(newColor || "").toLowerCase();
-        
-        if (this._checkFeatSuccess(colorLower, featColor)) {
-        return karma;
-        }
+    let bpHtml = '';
+    for (const bp of breakpoints) {
+      bpHtml += `<div style="margin:4px 0;padding:4px;background:#f0f0f0;border-radius:3px;font-size:0.9em;">
+        <label><input type="radio" name="karmaChoice" value="${bp.amount}" ${bp.preferred ? 'checked' : ''}>
+          <strong>${bp.label} (+${bp.amount}):</strong> ${rollResult} + ${bp.amount} = ${rollResult + bp.amount} → <span style="color:${bp.color};font-weight:bold;">${bp.resultColor.toUpperCase()}</span>
+        </label>
+      </div>`;
     }
 
-    return 999; // Can't succeed
-    }
+    const content = `
+      <form>
+        ${initialSuccessText}
+        <div style="margin-bottom:10px;">
+          <strong>Initial roll:</strong> ${rollResult} → <strong>${String(initialColor).toUpperCase()}</strong>
+          (needed ${featColor} FEAT)
+        </div>
+        <div style="margin-bottom:10px;">
+          <strong>Available for boost:</strong> ${maxAfterBase} Karma (minimum ${minCommit} must be spent)
+        </div>
+        ${bpHtml}
+        <div style="margin-top:10px;padding:6px;border-top:1px solid #ccc;">
+          <label><input type="radio" name="karmaChoice" value="custom">
+            <strong>Custom amount:</strong>
+            <input type="number" name="customAmount" value="${minCommit}" min="${minCommit}" max="${maxAfterBase}" style="width:70px;margin-left:6px;" disabled>
+            <span style="font-size:0.85em;color:#666;">(${minCommit} - ${maxAfterBase})</span>
+          </label>
+        </div>
+      </form>
+    `;
 
-    async _showKarmaSpendDialog(stunt, stuntIndex, rollResult, featColor, karmaNeeded, baseCost, availableKarma, roll, initialColor) {
-        const maxKarmaAvailable = availableKarma - baseCost;
-        
-        // Calculate what the final result would be with karma
-        const finalRoll = rollResult + karmaNeeded;
-        const finalColor = game.msh.rollUniversalTable(stunt.rank, finalRoll);
-        
-        // Color styling helper
-        const getColorStyle = (color) => {
-            const colors = {
-            'white': { bg: '#f5f5f5', fg: '#666', border: '#ccc' },
-            'green': { bg: '#e8f5e9', fg: '#2e7d32', border: '#66bb6a' },
-            'yellow': { bg: '#fffde7', fg: '#f57f17', border: '#f9a825' },
-            'red': { bg: '#ffebee', fg: '#c62828', border: '#ef5350' }
-            };
-            return colors[color] || colors.white;
-        };
-        
-        const initialStyle = getColorStyle(initialColor);
-        const finalStyle = getColorStyle(finalColor);
-        
-        new Dialog({
-            title: "Spend Karma to Succeed?",
-            content: `
-            <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;">
-                <div style="padding:5px 10px;border-bottom:1px solid #c0c0c0;font-size:1.1em;color:#8b0000;">
-                <strong>Power Stunt Failed — Karma Decision</strong>
-                </div>
-                
-                <div style="padding:10px;">
-                <div style="padding:6px 10px;margin-bottom:10px;background:${initialStyle.bg};border:1px solid ${initialStyle.border};border-radius:3px;">
-                    <div style="font-weight:bold;color:${initialStyle.fg};">Initial Result</div>
-                    <div style="font-size:.9em;">
-                    Roll: ${rollResult} → <strong style="color:${initialStyle.fg};">${String(initialColor).toUpperCase()}</strong>
-                    </div>
-                    <div style="font-size:.85em;color:#666;">Required: <strong>${featColor} FEAT</strong> or better</div>
-                </div>
-
-                <div style="padding:6px 10px;margin-bottom:10px;background:${finalStyle.bg};border:1px solid ${finalStyle.border};border-radius:3px;">
-                    <div style="font-weight:bold;color:${finalStyle.fg};">With Karma</div>
-                    <div style="font-size:.9em;">
-                    Roll: ${rollResult} + ${karmaNeeded} Karma = ${finalRoll} → <strong style="color:${finalStyle.fg};">${String(finalColor).toUpperCase()}</strong>
-                    </div>
-                    <div style="font-size:.85em;color:#666;">
-                    Total Cost: ${baseCost} (base) + ${karmaNeeded} = <strong>${baseCost + karmaNeeded} Karma</strong>
-                    </div>
-                </div>
-
-                <div style="padding:8px;background:#fff3e0;border-left:4px solid #ff9800;font-size:.9em;">
-                    <strong>Available Karma (after base cost):</strong> ${maxKarmaAvailable}
-                </div>
-                </div>
-            </div>
-            `,
-            buttons: {
-            spend: {
-                icon: '<i class="fas fa-check"></i>',
-                label: `Spend ${karmaNeeded} Karma (Success)`,
-                callback: async () => {
-                await this._finalizeStuntRoll(stunt, stuntIndex, rollResult, featColor, karmaNeeded, baseCost, true, roll, initialColor);
-                }
-            },
-            decline: {
-                icon: '<i class="fas fa-times"></i>',
-                label: "Don't Spend (Failure)",
-                callback: async () => {
-                await this._finalizeStuntRoll(stunt, stuntIndex, rollResult, featColor, 0, baseCost, false, roll, initialColor);
-                }
+    await DialogV2.wait({
+      window: { title: "Commit Karma Boost" },
+      content,
+      render: (event, dialog) => {
+        const root = dialog.element;
+        const customRadio = root.querySelector('input[name="karmaChoice"][value="custom"]');
+        const customInput = root.querySelector('input[name="customAmount"]');
+        root.querySelectorAll('input[name="karmaChoice"]').forEach(r => {
+          r.addEventListener('change', () => {
+            customInput.disabled = !customRadio.checked;
+            if (customRadio.checked) customInput.focus();
+          });
+        });
+      },
+      buttons: [
+        {
+          action: "commit",
+          icon: "fas fa-check",
+          label: `Commit Karma`,
+          default: true,
+          callback: async (event, button, dialog) => {
+            const root = dialog.element;
+            const selected = root.querySelector('input[name="karmaChoice"]:checked');
+            let extra = minCommit;
+            if (selected) {
+              if (selected.value === 'custom') {
+                const customInput = root.querySelector('input[name="customAmount"]');
+                extra = Math.max(minCommit, Math.min(maxAfterBase, Number(customInput.value) || minCommit));
+              } else {
+                extra = Number(selected.value) || minCommit;
+              }
             }
-            },
-            default: "spend"
-        }).render(true);
-    }
+            const finalResult = rollResult + extra;
+            const finalColor = game.msh.rollUniversalTable(resolved.rank, finalResult);
+            const success = this._checkFeatSuccess(String(finalColor || '').toLowerCase(), featColor);
+            await this._finalizeStuntRoll(stunt, stuntIndex, resolved, rollResult, featColor, extra, baseCost, success, initialColor);
+          }
+        }
+      ],
+      rejectClose: false
+    });
+  }
 
-async _finalizeStuntRoll(stunt, stuntIndex, rollResult, featColor, extraKarma, baseCost, success, roll, initialColor) {
+  _computeBreakpoints(rollResult, rank, featColor, minCommit, maxAfterBase) {
+    const targets = [
+      { name: 'green',  label: 'Reach GREEN',  color: '#2e7d32' },
+      { name: 'yellow', label: 'Reach YELLOW', color: '#f57f17' },
+      { name: 'red',    label: 'Reach RED',    color: '#c62828' }
+    ];
+    const result = [];
+    const feat = featColor.toLowerCase();
+    // Always include minimum commitment.
+    const minRoll = Math.min(100, rollResult + minCommit);
+    const minColor = String(game.msh.rollUniversalTable(rank, minRoll) || '').toLowerCase();
+    result.push({
+      amount: minCommit,
+      label: `Minimum commitment`,
+      color: '#666',
+      resultColor: minColor,
+      preferred: true
+    });
+
+    for (const t of targets) {
+      const karma = this._karmaToReach(rollResult, rank, t.name);
+      if (karma === null) continue;
+      if (karma <= minCommit) continue;
+      if (karma > maxAfterBase) continue;
+      const rc = String(game.msh.rollUniversalTable(rank, rollResult + karma) || '').toLowerCase();
+      result.push({
+        amount: karma,
+        label: t.label,
+        color: t.color,
+        resultColor: rc,
+        preferred: false
+      });
+    }
+    return result;
+  }
+
+  _karmaToReach(rollResult, rank, targetColor) {
+    const target = targetColor.toLowerCase();
+    for (let k = 1; k + rollResult <= 100; k++) {
+      const c = String(game.msh.rollUniversalTable(rank, rollResult + k) || '').toLowerCase();
+      if (c === target) return k;
+      // Also count higher colors as "reaching" the lower target
+      const h = { white: 0, green: 1, yellow: 2, red: 3 };
+      if ((h[c] ?? 0) >= (h[target] ?? 0)) return k;
+    }
+    return null;
+  }
+
+  async _finalizeStuntRoll(stunt, stuntIndex, resolved, rollResult, featColor, extraKarma, baseCost, success, initialColor) {
     const totalKarma = baseCost + extraKarma;
-    const finalResult = rollResult + extraKarma; // ADD karma, don't subtract
-    
-    // Get final color if karma was spent
-    const finalColor = extraKarma > 0 
-        ? game.msh.rollUniversalTable(stunt.rank, finalResult)
-        : initialColor;
-    
-    // Determine banner colors
+    const finalResult = rollResult + extraKarma;
+    const finalColor = extraKarma > 0 ? game.msh.rollUniversalTable(resolved.rank, finalResult) : initialColor;
+
     const bg = success ? '#e8f5e9' : '#ffebee';
     const fg = success ? '#2e7d32' : '#c62828';
-    
-    // Create chat card
+
     const cardHtml = `
-        <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
+      <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
         <div style="padding:5px 10px;border-bottom:1px solid #c0c0c0;font-size:1.1em;color:#8b0000;">
-            <strong>${this.actor.name} — Power Stunt</strong>
+          <strong>${this.actor.name} — Power Stunt</strong>
         </div>
-        
         <div style="padding:5px 10px;border-bottom:1px solid #e0e0e0;font-size:.9em;">
-            <div><strong>Stunt:</strong> ${stunt.name}</div>
-            ${stunt.parentPower ? `<div><strong>Parent Power:</strong> ${stunt.parentPower}</div>` : ''}
+          <div><strong>Stunt:</strong> ${stunt.name}</div>
+          ${resolved.powerName ? `<div><strong>Parent Power:</strong> ${resolved.powerName}</div>` : ''}
         </div>
-
         <div style="padding:5px 10px;font-size:.9em;">
-            <div>Rank: ${stunt.rank} (${stunt.value})</div>
-            <div>Difficulty: ${featColor} FEAT</div>
-            <div>Roll: ${rollResult}${extraKarma > 0 ? ` + ${extraKarma} Karma = ${finalResult}` : ''}</div>
-            <div>Color: ${String(initialColor).toUpperCase()}${extraKarma > 0 ? ` → ${String(finalColor).toUpperCase()}` : ''}</div>
-            <div>Times Attempted: ${stunt.timesUsed} → ${stunt.timesUsed + 1}</div>
-            <div>Total Karma Spent: ${totalKarma}</div>
+          <div>Rank: ${resolved.rank} (${resolved.value})</div>
+          <div>Difficulty: ${featColor} FEAT</div>
+          <div>Roll: ${rollResult}${extraKarma > 0 ? ` + ${extraKarma} Karma = ${finalResult}` : ''}</div>
+          <div>Color: ${String(initialColor).toUpperCase()}${extraKarma > 0 ? ` → ${String(finalColor).toUpperCase()}` : ''}</div>
+          <div>Times Used: ${stunt.timesUsed}${success ? ` → ${stunt.timesUsed + 1}` : ' (no change — failed)'}</div>
+          <div>Total Karma Spent: ${totalKarma} (${baseCost} attempt${extraKarma > 0 ? ` + ${extraKarma} boost` : ''})</div>
         </div>
-
         <div style="text-align:center;padding:8px;margin:5px;font-weight:bold;font-size:1.05em;border-radius:3px;background:${bg};color:${fg};">
-            RESULT: ${success ? 'SUCCESS' : 'FAILURE'}
+          RESULT: ${success ? 'SUCCESS' : 'FAILURE'}
         </div>
-
         ${success ? `
-            <div style="padding:6px 10px;margin:6px 10px;background:#e8f5e9;border:1px solid #66bb6a;border-radius:3px;">
+          <div style="padding:6px 10px;margin:6px 10px;background:#e8f5e9;border:1px solid #66bb6a;border-radius:3px;">
             <div style="font-weight:bold;color:#2e7d32;">Power Stunt Successful</div>
-            <div style="font-size:.9em;">
-                ${stunt.description || 'The power stunt works as intended!'}
-            </div>
-            </div>
+            <div style="font-size:.9em;">${stunt.description || 'The power stunt works as intended!'}</div>
+          </div>
         ` : `
-            <div style="padding:6px 10px;margin:6px 10px;background:#ffebee;border:1px solid #ef5350;border-radius:3px;">
+          <div style="padding:6px 10px;margin:6px 10px;background:#ffebee;border:1px solid #ef5350;border-radius:3px;">
             <div style="font-weight:bold;color:#c62828;">Power Stunt Failed</div>
-            <div style="font-size:.9em;">
-                The stunt does not work as intended. The Judge will determine the specific effects of the failure.
-            </div>
-            </div>
+            <div style="font-size:.9em;">The stunt does not work as intended. The Judge will determine the specific effects of the failure.</div>
+          </div>
         `}
-        </div>
+      </div>
     `;
-    
+
     await ChatMessage.create({
-        user: game.user.id,
-        speaker: ChatMessage.getSpeaker({ actor: this.actor }),
-        content: cardHtml
+      user: game.user.id,
+      speaker: ChatMessage.getSpeaker({ actor: this.actor }),
+      content: cardHtml
     });
-    
-    // Create karma history entry
+
     const karmaEvent = {
-        timestamp: new Date().toISOString(),
-        realDate: new Date().toLocaleDateString(),
-        gameDate: "",
-        amount: -totalKarma,
-        type: "Power Stunt",
-        description: `${stunt.name}${stunt.parentPower ? ` (${stunt.parentPower})` : ''} - ${success ? 'Success' : 'Failed'}`
+      timestamp: new Date().toISOString(),
+      realDate: new Date().toLocaleDateString(),
+      gameDate: "",
+      amount: -totalKarma,
+      type: "Power Stunt",
+      description: `${stunt.name}${resolved.powerName ? ` (${resolved.powerName})` : ''} - ${success ? 'Success' : 'Failed'}${extraKarma > 0 ? ` (+${extraKarma} boost)` : ''}`
     };
-    
-    // Update actor
+
     const stunts = foundry.utils.deepClone(this.actor.system.stunts);
-    stunts[stuntIndex].timesUsed += 1;
-    
+    if (success) stunts[stuntIndex].timesUsed += 1;
+
     const history = foundry.utils.deepClone(this.actor.system.karma?.history || []);
     history.push(karmaEvent);
-    
+
     await this.actor.update({
-        "system.stunts": stunts,
-        "system.karma.history": history
+      "system.stunts": stunts,
+      "system.karma.history": history
     });
-    
+
     if (stunts[stuntIndex].timesUsed >= 10) {
-        ui.notifications.info(`${stunt.name} is now MASTERED! No future cost or roll required.`);
+      ui.notifications.info(`${stunt.name} is now MASTERED! No future cost or roll required.`);
     }
-}
+  }
 
   async _incrementStuntUsage(stuntIndex) {
     const stunts = foundry.utils.deepClone(this.actor.system.stunts);
