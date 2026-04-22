@@ -1,0 +1,138 @@
+/* power-chat-card.css v1.0.0 - 2026-04-21
+   Styles for the info chat card posted by the Power Info button (actorSheet.js).
+   Palette matches hq-sheet.css: #c0a070 border, #faf8f2 parchment, #8b0000 comic red. */
+
+.fpc-card {
+  background: #faf8f2;
+  border: 1px solid #c0a070;
+  border-left: 4px solid #b84040;
+  border-radius: 3px;
+  overflow: hidden;
+  font-family: "Source Sans 3", system-ui, -apple-system, sans-serif;
+  color: #2a2520;
+  font-size: 13.5px;
+  line-height: 1.45;
+  margin-bottom: 4px;
+}
+
+.fpc-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 12px 4px;
+}
+
+.fpc-power-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 3px;
+  border: 1px solid #c0a070;
+  flex-shrink: 0;
+  object-fit: cover;
+  background: #f2ede0;
+}
+
+.fpc-power-name {
+  flex: 1;
+  min-width: 0;
+  font-family: "Oswald", "Source Sans 3", sans-serif;
+  font-weight: 600;
+  font-size: 20px;
+  color: #8b0000;
+  letter-spacing: 0.01em;
+  line-height: 1.1;
+  text-transform: uppercase;
+}
+
+.fpc-pill {
+  font-family: "Oswald", "Source Sans 3", sans-serif;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-weight: 600;
+  padding: 3px 8px 2px;
+  border-radius: 10px;
+  color: #fff;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  line-height: 1;
+}
+.fpc-pill-active  { background: #5b7a3a; }
+.fpc-pill-dormant { background: #9a9185; }
+
+.fpc-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #d8f0b8;
+  box-shadow: 0 0 4px rgba(216, 240, 184, 0.9);
+}
+.fpc-pill-dormant .fpc-dot {
+  background: #d8d4cc;
+  box-shadow: none;
+}
+
+.fpc-dormant-note {
+  padding: 5px 12px;
+  background: rgba(154, 145, 133, 0.15);
+  border-top: 1px solid #e0d7c2;
+  font-size: 11px;
+  color: #7a6f62;
+  font-style: italic;
+  text-align: center;
+  letter-spacing: 0.02em;
+}
+
+.fpc-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding: 6px 12px 10px;
+}
+
+.fpc-stat {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 3px 9px 4px;
+  background: #f2ede0;
+  border: 1px solid #c0a070;
+  border-radius: 3px;
+  min-width: 58px;
+}
+
+.fpc-k {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #666;
+  text-transform: uppercase;
+}
+
+.fpc-v {
+  font-family: "Oswald", "Source Sans 3", sans-serif;
+  font-weight: 500;
+  font-size: 13px;
+  color: #2a2520;
+  line-height: 1.1;
+  margin-top: 1px;
+}
+
+.fpc-desc {
+  padding: 0 12px 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #2a2520;
+}
+.fpc-desc p:first-child { margin-top: 0; }
+.fpc-desc p:last-child  { margin-bottom: 0; }
+
+/* Dormant state — desaturate everything */
+.fpc-card.fpc-dormant               { border-left-color: #9a9185; }
+.fpc-card.fpc-dormant .fpc-power-name { color: #7a6f62; }
+.fpc-card.fpc-dormant .fpc-v          { color: #7a6f62; }
+.fpc-card.fpc-dormant .fpc-desc       { color: #7a6f62; }
+.fpc-card.fpc-dormant .fpc-power-icon { filter: grayscale(0.7) brightness(0.92); }

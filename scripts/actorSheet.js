@@ -50,7 +50,8 @@ import { RESOURCE_PRICES } from './rules/rules-reference.js';
 import { initSheetZoom } from './modules/ui/sheet-zoom.js';
 import {
   RANKS_ORDERED as _RANKS, RANK_VALUES as _RANK_VALUES, RANK_RANGES as _RANK_RANGES,
-  RANK_ALIASES, normalizeRank
+  RANK_ALIASES, normalizeRank,
+  resolveRange, getPowerDerivations
 } from './rules/rules-reference.js';
 
 
@@ -2125,19 +2126,46 @@ html.find('.primary-abilities thead').on('click', '.initial-columns-toggle', (ev
 
       if (!item) return;
 
-      // Create a compact chat card to show power information
+      const sys = item.system;
+      const rank = sys.rank || "—";
+      const value = sys.value ?? "";
+      const rangeDisplay = resolveRange(sys.range, rank);
+      const derivations = getPowerDerivations(sys.type, rank, value);
+      const isActive = !!sys.isActive;
+      const powerIcon = item.img || "icons/svg/mystery-man.svg";
+
+      const rankValueSuffix = value !== "" && value !== null && value !== undefined ? ` · ${value}` : "";
+      const stats = [
+        { label: "Rank",  value: `${rank}${rankValueSuffix}` },
+        { label: "Range", value: rangeDisplay },
+        ...derivations
+      ];
+      const statsHtml = stats.map(s =>
+        `<div class="fpc-stat"><span class="fpc-k">${s.label}</span><span class="fpc-v">${s.value}</span></div>`
+      ).join("");
+
+      const stateHtml = isActive
+        ? `<span class="fpc-pill fpc-pill-active"><span class="fpc-dot"></span>Active</span>`
+        : `<span class="fpc-pill fpc-pill-dormant"><span class="fpc-dot"></span>Dormant</span>`;
+
+      const dormantNote = isActive
+        ? ""
+        : `<div class="fpc-dormant-note">Power is not currently active</div>`;
+
+      const descHtml = sys.description
+        ? `<div class="fpc-desc">${sys.description}</div>`
+        : "";
+
       const content = `
-        <div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;margin-bottom:5px;">
-          <div style="padding:5px 10px;border-bottom:1px solid #c0c0c0;font-size:1.1em;color:#0d47a1;">
-            <strong>${item.name}</strong>
+        <div class="fpc-card${isActive ? "" : " fpc-dormant"}">
+          <div class="fpc-title-row">
+            <img class="fpc-power-icon" src="${powerIcon}" alt="">
+            <span class="fpc-power-name">${item.name}</span>
+            ${stateHtml}
           </div>
-          <div style="padding:5px 10px;font-size:.9em;">
-            <div><strong>Rank:</strong> ${item.system.rank} (${item.system.value})</div>
-            <div><strong>Type:</strong> ${item.system.type || 'None'}</div>
-            <div><strong>Range:</strong> ${item.system.range || 'None'}</div>
-            <div><strong>Active:</strong> ${item.system.isActive ? 'Yes' : 'No'}</div>
-            ${item.system.description ? `<div style="margin-top:8px;padding-top:8px;border-top:1px solid #ddd;">${item.system.description}</div>` : ''}
-          </div>
+          ${dormantNote}
+          <div class="fpc-stats">${statsHtml}</div>
+          ${descHtml}
         </div>
       `;
 

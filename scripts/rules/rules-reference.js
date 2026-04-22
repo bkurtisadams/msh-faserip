@@ -1,4 +1,6 @@
-// rules-reference.js v1.1.0 - 2026-04-03
+// rules-reference.js v1.2.0 - 2026-04-21
+// v1.2.0: Added POWER_DERIVATIONS table, resolveRange() and getPowerDerivations()
+//         helpers for the power chat card stat strip.
 // v1.1.0: Canonical rank data — normalized to hyphen format (Shift-X not "Shift X"),
 //         added Beyond rank, exported RANK_VALUES/RANKS_ORDERED helpers,
 //         added rankValue/valueToRank/shiftRank/normalizeRank utility functions.
@@ -2571,6 +2573,57 @@ export const POWER_RANGE = {
   "Class 5000":  "1,000,000 miles",
   "Beyond":      "Unlimited"
 };
+
+// ── POWER DERIVATIONS ────────────────────────────────────────────────────────
+// Key mechanical facts each power type surfaces on the power chat card,
+// beyond Rank and Range. Keyed by item.system.type. Each entry is an array
+// of { label, get(rank, value) }. Unknown types fall back to Rank + Range only.
+// Extend as needed — prose descriptions buried in item text belong here.
+export const POWER_DERIVATIONS = {
+  "Air Control":                 [{ label: "Missile Shield", get: (r) => r }, { label: "Wind Intensity", get: (r) => r }],
+  "Force Field":                 [{ label: "Protection",     get: (r) => r }],
+  "Force Field vs Energy":       [{ label: "Protection",     get: (r) => r }],
+  "Force Field vs Hostile Env.": [{ label: "Protection",     get: (r) => r }],
+  "Body Armor":                  [{ label: "Protection",     get: (r) => r }],
+  "Resistance to Physical":      [{ label: "Reduces By",     get: (r) => r }],
+  "Resistance to Energy":        [{ label: "Reduces By",     get: (r) => r }],
+  "Resistance to Fire & Heat":   [{ label: "Reduces By",     get: (r) => r }],
+  "Resistance to Cold":          [{ label: "Reduces By",     get: (r) => r }],
+  "Invulnerability to Physical": [{ label: "Reduces By",     get: (r) => r }],
+  "Healing":                     [{ label: "Recovered",      get: (_r, v) => `${v} pts` }],
+  "Regeneration":                [{ label: "Per Round",      get: (_r, v) => `${v} pts` }],
+  "Flight":                      [{ label: "Speed",          get: (r) => r }],
+  "Telepathy":                   [{ label: "Probe Intensity", get: (r) => r }],
+  "Telekinesis":                 [{ label: "Lift / Push",    get: (r) => r }],
+  "Mind Control":                [{ label: "Resist FEAT",    get: (r) => r }],
+  "Invisibility":                [{ label: "Detection FEAT", get: (r) => r }],
+  "Energy Emission":             [{ label: "Damage",         get: (r) => r }],
+  "Fire Control":                [{ label: "Damage",         get: (r) => r }, { label: "Intensity", get: (r) => r }],
+  "Ice Control":                 [{ label: "Damage",         get: (r) => r }, { label: "Intensity", get: (r) => r }],
+  "Water Control":               [{ label: "Damage",         get: (r) => r }, { label: "Intensity", get: (r) => r }],
+  "Earth Control":               [{ label: "Damage",         get: (r) => r }, { label: "Intensity", get: (r) => r }],
+  "Plasma Control":              [{ label: "Damage",         get: (r) => r }, { label: "Shield", get: (r) => r }],
+  "Growth":                      [{ label: "Size Shift",     get: (r) => r }],
+  "Shrinking":                   [{ label: "Size Shift",     get: (r) => r }]
+};
+
+/** Resolve a power's range field to display text.
+ *  "rank" → POWER_RANGE[rank]. Other values (touch/self/none/custom) pass through. */
+export function resolveRange(rangeField, rank) {
+  if (!rangeField) return "—";
+  const s = String(rangeField).trim();
+  if (!s) return "—";
+  if (s.toLowerCase() === "rank") return POWER_RANGE[rank] || rank || "—";
+  return s;
+}
+
+/** Derived stats for a power type at a given rank/value.
+ *  Returns [{ label, value }]; empty if type not in POWER_DERIVATIONS. */
+export function getPowerDerivations(type, rank, value) {
+  const specs = POWER_DERIVATIONS[type];
+  if (!Array.isArray(specs)) return [];
+  return specs.map(s => ({ label: s.label, value: s.get(rank, value) ?? "—" }));
+}
 
 // ── POWER STUNTS ──
 // Using a Power in a way not originally intended.
