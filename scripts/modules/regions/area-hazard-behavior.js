@@ -1,4 +1,14 @@
-// scripts/modules/regions/area-hazard-behavior.js v1.0.0 - 2026-04-22
+// scripts/modules/regions/area-hazard-behavior.js v1.1.0 - 2026-04-22
+// v1.1.0: Declare `static events` map so Foundry's Region event dispatcher
+//   actually routes TOKEN_ENTER / TOKEN_EXIT to this behavior. v14 gates
+//   dispatch on `eventName in behavior.system.constructor.events` BEFORE
+//   calling _handleRegionEvent — without an entry in the static map,
+//   overriding _handleRegionEvent has no effect because it's never called.
+//   Converted instance handlers _onTokenEnter/_onTokenExit to static methods
+//   _onRegionEnter/_onRegionExit invoked via handler.call(instance, event)
+//   by the base class dispatcher. Instance context (this.saveOnEntry,
+//   this.resolveForToken, etc.) still works inside static handlers.
+// v1.0.0: Initial Layer A — persistent intensity hazard Region behavior.
 // v14 Region Behavior: persistent intensity hazard (smoke, gas, flash, KO).
 //
 // Attaches to a Region created by a lingering grenade (or manual GM placement).
@@ -99,27 +109,37 @@ export class AreaHazardBehavior extends foundry.data.regionBehaviors.RegionBehav
     };
   }
 
-  // ── Event router ────────────────────────────────────────────────
-  async _handleRegionEvent(event) {
+  // ── Event handlers (static — called with instance as `this`) ────
+  // These must be declared BEFORE the `static events` map below, because
+  // class static methods and static field initializers are processed in
+  // source order. If the events map comes first, `this._onRegionEnter`
+  // resolves to undefined at initialization time.
+  static async _onRegionEnter(event) {
     if (!game.user?.isActiveGM) return;
-    switch (event.name) {
-      case CONST.REGION_EVENTS.TOKEN_ENTER: return this._onTokenEnter(event);
-      case CONST.REGION_EVENTS.TOKEN_EXIT:  return this._onTokenExit(event);
-    }
-  }
-
-  async _onTokenEnter(event) {
     if (!this.saveOnEntry) return;
     const tokenDoc = event.data?.token;
     if (!tokenDoc?.actor) return;
     await this.resolveForToken(tokenDoc);
   }
 
-  async _onTokenExit(event) {
+  static async _onRegionExit(event) {
+    if (!game.user?.isActiveGM) return;
     const tokenDoc = event.data?.token;
     if (!tokenDoc?.actor) return;
     await this._clearHazardEffect(tokenDoc.actor);
   }
+
+  // ── Event subscriptions (v14 idiom) ─────────────────────────────
+  // The base class's _handleRegionEvent dispatches via this static map.
+  // Foundry's event dispatcher gates on `eventName in constructor.events`
+  // BEFORE calling _handleRegionEvent — behaviors without the event declared
+  // here receive nothing, even if _handleRegionEvent is overridden. That was
+  // the v1.0.0 bug: we overrode _handleRegionEvent but never declared static
+  // events, so Foundry's gate blocked every dispatch.
+  static events = {
+    [CONST.REGION_EVENTS.TOKEN_ENTER]: this._onRegionEnter,
+    [CONST.REGION_EVENTS.TOKEN_EXIT]:  this._onRegionExit
+  };
 
   // ── Public: run save + apply for a single token ─────────────────
   // Called both by the entry event AND by grenade-action.js for tokens
