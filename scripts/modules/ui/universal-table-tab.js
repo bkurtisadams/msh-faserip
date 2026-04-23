@@ -1,10 +1,21 @@
-// scripts/modules/ui/universal-table-tab.js v1.0.0 - 2026-04-23
-// Data-driven Universal Table tab. Replaces 663 lines of hand-typed HTML
-// in actor-sheet.html with three tables built from canonical sources
-// (rankRows, ACTION_RESULT_LABELS, RANKS_ORDERED, RANK_VALUES, RANK_RANGES).
-// Features: crosshair hover with tooltip, persistent rank-column select,
-// action-header click → sheet._showActionInfo(id), external roll
-// highlighting via highlightRoll().
+// scripts/modules/ui/universal-table-tab.js v1.1.0 - 2026-04-23
+// v1.1.0: Add detach/popout feature via FaseripUniversalTableWindow
+//         (ApplicationV2). Detach icon in tab toolbar; click opens popout,
+//         in-tab content shows placeholder with "Return to tab" button.
+//         Roll highlights route to popout when detached, tab otherwise.
+//         Window position/size persisted per-actor via msh-faserip flag.
+//         Escape key closes popout. Popout auto-closes with sheet.
+//         Wiring methods (_wireHeaderClick, _wireCellHover,
+//         _wireColumnSelect, _clearColumnSelection, _paintColumnSelection,
+//         _highlightRollIn) now take plain DOM root elements instead of
+//         jQuery wrappers, so the same renderer drives both hosts.
+// v1.0.0: Data-driven Universal Table tab. Replaces 663 lines of
+//         hand-typed HTML in actor-sheet.html with three tables built
+//         from canonical sources (rankRows, ACTION_RESULT_LABELS,
+//         RANKS_ORDERED, RANK_VALUES, RANK_RANGES). Features: crosshair
+//         hover with tooltip, persistent rank-column select, action-header
+//         click → sheet._showActionInfo(id), external roll highlighting
+//         via highlightRoll().
 
 import {
   rankRows,
@@ -78,27 +89,90 @@ export class UniversalTableTab {
   constructor(sheet) {
     this.sheet = sheet;
     this._selectedCol = -1;
+    this._popout = null;  // FaseripUniversalTableWindow when detached
   }
 
   render(html) {
-    const root = html.find(".ut-tab-root");
-    if (!root.length) return;
+    const root = html.find(".ut-tab-root")[0];
+    if (!root) return;
 
-    root.html(`
+    // If detached, show placeholder and bail
+    if (this._popout?.rendered) {
+      this._renderPlaceholder(root);
+      return;
+    }
+
+    this._renderBody(root);
+  }
+
+  _renderPlaceholder(root) {
+    root.innerHTML = `
+      <div class="ut-placeholder">
+        <div class="ut-placeholder-icon"><i class="fas fa-up-right-from-square"></i></div>
+        <div class="ut-placeholder-text">Universal Table is open in its own window.</div>
+        <button type="button" class="ut-placeholder-btn" data-ut-action="reattach">Return to tab</button>
+      </div>
+    `;
+    root.querySelector("[data-ut-action='reattach']").addEventListener("click", () => {
+      this.reattach();
+    });
+  }
+
+  _renderBody(root) {
+    root.innerHTML = `
+      <div class="ut-toolbar">
+        <button type="button" class="ut-detach-btn" data-ut-action="detach"
+                data-tooltip="Open in its own window">
+          <i class="fas fa-up-right-from-square"></i>
+        </button>
+      </div>
       <div class="ut-inner">
         ${this._buildActionTable()}
         ${this._buildRankTable()}
         ${this._buildGrid()}
       </div>
-      <div class="ut-tip" id="ut-tip"></div>
-    `);
+      <div class="ut-tip" id="ut-tip-${this.sheet.id}"></div>
+    `;
 
-    this._wireHeaderClick(html);
-    this._wireCellHover(html);
-    this._wireColumnSelect(html);
+    root.querySelector("[data-ut-action='detach']").addEventListener("click", () => {
+      this.detach();
+    });
 
-    // Restore column selection visual if user had one picked before re-render
-    if (this._selectedCol >= 0) this._paintColumnSelection(html, this._selectedCol);
+    this._wireHeaderClick(root);
+    this._wireCellHover(root);
+    this._wireColumnSelect(root);
+
+    if (this._selectedCol >= 0) this._paintColumnSelection(root, this._selectedCol);
+  }
+
+  /** Wire the tab content into a generic root element (used by the popout too). */
+  renderIntoRoot(root) {
+    this._renderBody(root);
+  }
+
+  // ── Detach / reattach ────────────────────────────────────────────
+
+  async detach() {
+    if (this._popout?.rendered) { this._popout.bringToTop?.(); return; }
+    this._popout = new FaseripUniversalTableWindow(this);
+    await this._popout.render(true);
+    // Re-render the tab to swap in the placeholder
+    if (this.sheet.rendered) this.sheet.render(false);
+  }
+
+  async reattach() {
+    if (this._popout) {
+      const p = this._popout;
+      this._popout = null;
+      await p.close({ _reattach: true });
+    }
+    if (this.sheet.rendered) this.sheet.render(false);
+  }
+
+  /** Called by the popout when the user closes it directly (X button). */
+  _onPopoutClosed() {
+    this._popout = null;
+    if (this.sheet.rendered) this.sheet.render(false);
   }
 
   // ── Builders ────────────────────────────────────────────────────
@@ -196,20 +270,22 @@ export class UniversalTableTab {
     return `<table class="ut-grid">${cols}<tbody>${body}</tbody></table>`;
   }
 
-  // ── Wiring ──────────────────────────────────────────────────────
+  // ── Wiring (root is a plain DOM element) ────────────────────────
 
-  _wireHeaderClick(html) {
+  _wireHeaderClick(root) {
     const sheet = this.sheet;
-    html.find(".action-tbl thead .ut-action-head").on("click", async (ev) => {
-      const id = ev.currentTarget.dataset.actionId;
-      if (!id || !sheet?._showActionInfo) return;
-      await sheet._showActionInfo(id);
+    root.querySelectorAll(".action-tbl thead .ut-action-head").forEach(el => {
+      el.addEventListener("click", async (ev) => {
+        const id = ev.currentTarget.dataset.actionId;
+        if (!id || !sheet?._showActionInfo) return;
+        await sheet._showActionInfo(id);
+      });
     });
   }
 
-  _wireCellHover(html) {
-    const grid = html.find(".ut-grid")[0];
-    const tip = html.find("#ut-tip")[0];
+  _wireCellHover(root) {
+    const grid = root.querySelector(".ut-grid");
+    const tip = root.querySelector("[id^='ut-tip-']") || root.querySelector(".ut-tip");
     if (!grid || !tip) return;
 
     let curCell = null;
@@ -256,8 +332,8 @@ export class UniversalTableTab {
     });
   }
 
-  _wireColumnSelect(html) {
-    const rankThead = html.find(".rank-tbl thead")[0];
+  _wireColumnSelect(root) {
+    const rankThead = root.querySelector(".rank-tbl thead");
     if (!rankThead) return;
 
     rankThead.addEventListener("click", (e) => {
@@ -265,44 +341,56 @@ export class UniversalTableTab {
       if (!th) return;
       const col = parseInt(th.dataset.col);
       if (this._selectedCol === col) {
-        // Toggle off
-        this._clearColumnSelection(html);
+        this._clearColumnSelection(root);
         this._selectedCol = -1;
       } else {
-        this._clearColumnSelection(html);
+        this._clearColumnSelection(root);
         this._selectedCol = col;
-        this._paintColumnSelection(html, col);
+        this._paintColumnSelection(root, col);
       }
     });
   }
 
-  _clearColumnSelection(html) {
-    html.find(".rank-tbl .col-sel").removeClass("col-sel");
-    html.find(".ut-grid .col-sel-bg").removeClass("col-sel-bg");
-    html.find(".action-tbl .col-sel-bg").removeClass("col-sel-bg");
+  _clearColumnSelection(root) {
+    root.querySelectorAll(".rank-tbl .col-sel").forEach(el => el.classList.remove("col-sel"));
+    root.querySelectorAll(".ut-grid .col-sel-bg").forEach(el => el.classList.remove("col-sel-bg"));
+    root.querySelectorAll(".action-tbl .col-sel-bg").forEach(el => el.classList.remove("col-sel-bg"));
   }
 
-  _paintColumnSelection(html, col) {
-    html.find(`.rank-tbl th[data-col="${col}"]`).addClass("col-sel");
-    html.find(`.ut-grid td[data-col="${col}"]`).addClass("col-sel-bg");
-    // Highlight matching action column (+1 for the label col)
-    const actionCols = html.find(".action-tbl tr > *");
-    // The action table has header row + 4 result rows, each with th/td indexed by col+1
-    html.find(".action-tbl tr").each((_, tr) => {
-      const cells = tr.children;
-      if (cells[col + 1]) cells[col + 1].classList.add("col-sel-bg");
+  _paintColumnSelection(root, col) {
+    const rankTh = root.querySelector(`.rank-tbl th[data-col="${col}"]`);
+    if (rankTh) rankTh.classList.add("col-sel");
+    root.querySelectorAll(`.ut-grid td[data-col="${col}"]`).forEach(el => el.classList.add("col-sel-bg"));
+    // Action table: header row + 4 result rows, cells indexed by col+1 (first is label)
+    root.querySelectorAll(".action-tbl tr").forEach(tr => {
+      const cell = tr.children[col + 1];
+      if (cell) cell.classList.add("col-sel-bg");
     });
   }
 
   // ── External roll highlight ─────────────────────────────────────
 
   /**
-   * Pulse the cell corresponding to a d100 result on a specific rank column.
-   * Called from the actor sheet's msh-faserip.universalTableRoll hook.
-   * @param {string} rankName — canonical rank name (from RANKS_ORDERED)
-   * @param {number} roll — 1-100
+   * Pulse the cell matching a d100 roll on a specific rank column.
+   * Routes to whichever instance is currently visible: the popout if
+   * detached, otherwise the in-tab content on the sheet.
    */
   highlightRoll(html, rankName, roll) {
+    // Pick the live root: popout takes priority when detached
+    let root = null;
+    if (this._popout?.rendered && this._popout.element) {
+      root = this._popout.element.querySelector(".ut-tab-root");
+    } else if (html) {
+      // html is a jQuery wrapper from actorSheet; unwrap if so
+      const el = (html.jquery ? html[0] : html);
+      root = el?.querySelector?.(".ut-tab-root") ?? null;
+    }
+    if (!root) return;
+
+    this._highlightRollIn(root, rankName, roll);
+  }
+
+  _highlightRollIn(root, rankName, roll) {
     const col = RANKS_ORDERED.indexOf(rankName);
     if (col === -1) return;
 
@@ -313,7 +401,7 @@ export class UniversalTableTab {
     }
     if (row === -1) return;
 
-    const grid = html.find(".ut-grid")[0];
+    const grid = root.querySelector(".ut-grid");
     if (!grid) return;
 
     grid.querySelectorAll(".roll-highlight").forEach(el => el.classList.remove("roll-highlight"));
@@ -322,5 +410,99 @@ export class UniversalTableTab {
     cell.classList.add("roll-highlight");
     cell.scrollIntoView({ behavior: "smooth", block: "nearest" });
     setTimeout(() => cell.classList.remove("roll-highlight"), 10000);
+  }
+}
+
+// ── Detached popout window ────────────────────────────────────────
+
+const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
+
+export class FaseripUniversalTableWindow extends ApplicationV2 {
+  constructor(tab, options = {}) {
+    super(options);
+    this.tab = tab;  // UniversalTableTab instance
+  }
+
+  static DEFAULT_OPTIONS = {
+    id: "faserip-universal-table-{id}",  // templated per actor in _initializeApplicationOptions
+    classes: ["faserip-universal-table-window"],
+    tag: "div",
+    window: {
+      frame: true,
+      positioned: true,
+      title: "Universal Table",
+      icon: "fas fa-table",
+      minimizable: true,
+      resizable: true,
+    },
+    position: { width: 980, height: "auto" },
+  };
+
+  _initializeApplicationOptions(options) {
+    const opts = super._initializeApplicationOptions(options);
+    const actorId = this.tab?.sheet?.actor?.id ?? foundry.utils.randomID();
+    opts.id = `faserip-universal-table-${actorId}`;
+    // Restore saved position (per-actor flag)
+    const saved = this.tab?.sheet?.actor?.getFlag?.("msh-faserip", "utPopoutPos");
+    if (saved?.left != null && saved?.top != null) {
+      opts.position = { ...opts.position, left: saved.left, top: saved.top };
+    }
+    if (saved?.width)  opts.position.width  = saved.width;
+    if (saved?.height) opts.position.height = saved.height;
+    return opts;
+  }
+
+  get title() {
+    const name = this.tab?.sheet?.actor?.name;
+    return name ? `Universal Table — ${name}` : "Universal Table";
+  }
+
+  async _renderHTML(context, options) { return ""; }
+
+  _replaceHTML(result, content, options) {
+    // Build a root node we can hand to the shared renderer
+    if (!content.querySelector(".ut-tab-root")) {
+      const root = document.createElement("div");
+      root.className = "ut-tab-root ut-tab-root-popout";
+      content.appendChild(root);
+    }
+    const root = content.querySelector(".ut-tab-root");
+    this.tab.renderIntoRoot(root);
+    // The detach button in the popout becomes a "Return to tab" button
+    const btn = root.querySelector("[data-ut-action='detach']");
+    if (btn) {
+      btn.setAttribute("data-tooltip", "Return to tab");
+      btn.innerHTML = '<i class="fas fa-down-left-and-up-right-to-center"></i>';
+      btn.onclick = () => this.tab.reattach();
+    }
+  }
+
+  _onRender(context, options) {
+    super._onRender?.(context, options);
+    // Escape closes
+    this.element?.addEventListener("keydown", (ev) => {
+      if (ev.key === "Escape") this.close();
+    });
+    this.element?.setAttribute("tabindex", "-1");
+    this.element?.focus?.();
+  }
+
+  async close(options = {}) {
+    // Save position to the actor's flag for next detach
+    try {
+      const actor = this.tab?.sheet?.actor;
+      if (actor && this.position) {
+        await actor.setFlag("msh-faserip", "utPopoutPos", {
+          left: this.position.left,
+          top: this.position.top,
+          width: this.position.width,
+          height: this.position.height,
+        });
+      }
+    } catch (_) {}
+
+    const result = await super.close(options);
+    if (!options?._reattach) this.tab?._onPopoutClosed?.();
+    return result;
   }
 }

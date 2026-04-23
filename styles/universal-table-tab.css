@@ -1,4 +1,6 @@
-/* styles/universal-table-tab.css v1.2.0 — FASERIP Universal Table tab
+/* styles/universal-table-tab.css v1.3.0 — FASERIP Universal Table tab
+ * v1.3.0: Add styles for detach toolbar, detach icon button, placeholder
+ *         (shown in-tab when detached), and popout window frame.
  * v1.2.0: Kill Foundry core's body.game .app table thead text-shadow and
  *         color leak. Core sets `text-shadow: 1px 1px var(--color-shadow-dark)`
  *         and `color: var(--color-text-light-highlight)` on every thead
@@ -234,7 +236,7 @@
 
 /* ── Tooltip (follows cursor over grid cells) ── */
 .ut-tab-root .ut-tip,
-.ut-tab-root #ut-tip {
+.ut-tab-root [id^='ut-tip-'] {
   position: fixed;
   pointer-events: none;
   z-index: 500;
@@ -247,4 +249,70 @@
   border-radius: 3px;
   white-space: nowrap;
   display: none;
+}
+
+/* ── Toolbar with detach button ── */
+.ut-tab-root .ut-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 0 4px 0;
+}
+.ut-tab-root .ut-detach-btn {
+  background: transparent;
+  border: 1px solid var(--ut-soft);
+  border-radius: 3px;
+  padding: 2px 8px;
+  cursor: pointer;
+  color: var(--ut-dark);
+  font-size: 12px;
+  line-height: 1;
+  box-shadow: none;
+  text-shadow: none !important;
+}
+.ut-tab-root .ut-detach-btn:hover {
+  background: var(--ut-accent);
+  color: #fff;
+  border-color: var(--ut-accent);
+}
+.ut-tab-root .ut-detach-btn i { pointer-events: none; }
+
+/* ── Placeholder shown when detached ── */
+.ut-tab-root .ut-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 180px;
+  padding: 20px;
+  gap: 10px;
+  color: var(--ut-mid);
+  font-family: var(--ut-fb);
+}
+.ut-tab-root .ut-placeholder-icon {
+  font-size: 36px;
+  color: var(--ut-accent);
+}
+.ut-tab-root .ut-placeholder-text { font-size: 13px; }
+.ut-tab-root .ut-placeholder-btn {
+  background: var(--ut-accent);
+  color: #fff;
+  border: none;
+  border-radius: 3px;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: var(--ut-fb);
+  text-shadow: none !important;
+}
+.ut-tab-root .ut-placeholder-btn:hover { filter: brightness(1.1); }
+
+/* ── Popout window frame overrides ── */
+.faserip-universal-table-window .window-content {
+  background: var(--ut-bg, #d6eaf8);
+  padding: 0;
+  overflow: auto;
+}
+.faserip-universal-table-window .ut-tab-root-popout {
+  padding: 10px;
 }

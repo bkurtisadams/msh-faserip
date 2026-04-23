@@ -796,6 +796,11 @@ export class FaseripActorSheet extends foundry.appv1.sheets.ActorSheet {
       Hooks.off('msh-faserip.universalTableRoll', this._universalTableHookId);
       this._universalTableHookId = null;
     }
+    // Close the detached Universal Table popout if open
+    if (this._utTab?._popout?.rendered) {
+      try { await this._utTab._popout.close({ _reattach: true }); } catch (_) {}
+      this._utTab._popout = null;
+    }
     return super.close(options);
   }
 
