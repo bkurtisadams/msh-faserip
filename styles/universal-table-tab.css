@@ -1,11 +1,16 @@
-/* styles/universal-table-tab.css v1.3.0 — FASERIP Universal Table tab
+/* styles/universal-table-tab.css v1.5.0 — FASERIP Universal Table tab
+ * v1.5.0: Relocate detach button into the empty upper-left corner cell
+ *         of the action table header (the square above White/Green/
+ *         Yellow/Red, left of the action columns). Gets it out of the
+ *         table body entirely so it can never obscure an action cell.
+ *         Add explicit .ut-gap-row blue spacer div between action and
+ *         rank tables — 20px margin from v1.4 was invisible because the
+ *         tab background needed to paint through an element, not a void.
+ * v1.4.0: Float detach button in top-right corner (superseded by v1.5).
  * v1.3.0: Add styles for detach toolbar, detach icon button, placeholder
  *         (shown in-tab when detached), and popout window frame.
  * v1.2.0: Kill Foundry core's body.game .app table thead text-shadow and
- *         color leak. Core sets `text-shadow: 1px 1px var(--color-shadow-dark)`
- *         and `color: var(--color-text-light-highlight)` on every thead
- *         inside any app window; that drop-shadow at weight 900 Oswald
- *         reads as a stencil outline on the BA/EA/Sh/Fe/Pr/Ty abbrs.
+ *         color leak.
  * v1.1.0: Add @import for Oswald weights 400;600;700;900 and Barlow
  *         Condensed regular+italic 400;500;600;700.
  * v1.0.0: Initial data-driven port from GCC reference faserip-table.html.
@@ -92,7 +97,7 @@
   font-family: var(--ut-fb);
   font-size: 10px;
   table-layout: fixed;
-  margin-bottom: 10px;
+  margin-bottom: 0;
 }
 .ut-tab-root .action-tbl th,
 .ut-tab-root .action-tbl td {
@@ -251,23 +256,29 @@
   display: none;
 }
 
-/* ── Toolbar with detach button ── */
-.ut-tab-root .ut-toolbar {
-  display: flex;
-  justify-content: flex-end;
-  padding: 0 0 4px 0;
+/* ── Detach button (lives inside the empty upper-left corner cell) ── */
+.ut-tab-root .ut-corner-cell {
+  padding: 0 !important;
+  position: relative;
+  background: var(--ut-col-hdr) !important;
 }
 .ut-tab-root .ut-detach-btn {
-  background: transparent;
+  background: rgba(255,255,255,.85);
   border: 1px solid var(--ut-soft);
   border-radius: 3px;
-  padding: 2px 8px;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  margin: 0 auto;
   cursor: pointer;
   color: var(--ut-dark);
-  font-size: 12px;
+  font-size: 11px;
   line-height: 1;
-  box-shadow: none;
+  box-shadow: 0 1px 2px rgba(0,0,0,.15);
   text-shadow: none !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .ut-tab-root .ut-detach-btn:hover {
   background: var(--ut-accent);
@@ -275,6 +286,12 @@
   border-color: var(--ut-accent);
 }
 .ut-tab-root .ut-detach-btn i { pointer-events: none; }
+
+/* ── Visible gap row between action table and rank table (GCC reference) ── */
+.ut-tab-root .ut-gap-row {
+  height: 18px;
+  background: var(--ut-bg);
+}
 
 /* ── Placeholder shown when detached ── */
 .ut-tab-root .ut-placeholder {

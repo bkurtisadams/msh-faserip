@@ -1,4 +1,11 @@
-// scripts/modules/ui/universal-table-tab.js v1.1.0 - 2026-04-23
+// scripts/modules/ui/universal-table-tab.js v1.1.2 - 2026-04-23
+// v1.1.2: Move detach button from floating corner (v1.1.1) into the empty
+//         upper-left corner cell of the action table header. Add explicit
+//         .ut-gap-row blue spacer div between action and rank tables to
+//         match GCC reference (margin-bottom was transparent against tab
+//         background and didn't read visually).
+// v1.1.1: Detach button promoted out of .ut-toolbar wrapper; positioned
+//         absolutely in top-right corner (superseded by v1.1.2).
 // v1.1.0: Add detach/popout feature via FaseripUniversalTableWindow
 //         (ApplicationV2). Detach icon in tab toolbar; click opens popout,
 //         in-tab content shows placeholder with "Return to tab" button.
@@ -120,21 +127,16 @@ export class UniversalTableTab {
 
   _renderBody(root) {
     root.innerHTML = `
-      <div class="ut-toolbar">
-        <button type="button" class="ut-detach-btn" data-ut-action="detach"
-                data-tooltip="Open in its own window">
-          <i class="fas fa-up-right-from-square"></i>
-        </button>
-      </div>
       <div class="ut-inner">
         ${this._buildActionTable()}
+        <div class="ut-gap-row"></div>
         ${this._buildRankTable()}
         ${this._buildGrid()}
       </div>
       <div class="ut-tip" id="ut-tip-${this.sheet.id}"></div>
     `;
 
-    root.querySelector("[data-ut-action='detach']").addEventListener("click", () => {
+    root.querySelector("[data-ut-action='detach']")?.addEventListener("click", () => {
       this.detach();
     });
 
@@ -186,9 +188,15 @@ export class UniversalTableTab {
 
   _buildActionTable() {
     const cols = this._buildCols();
+    const detachIcon = this._popout?.rendered
+      ? "fa-down-left-and-up-right-to-center"
+      : "fa-up-right-from-square";
+    const detachTitle = this._popout?.rendered ? "Return to tab" : "Open in its own window";
 
-    // Header row: action name + abbr + ability, clickable for rules popup
-    let head = '<tr><th class="ut-col-roll"></th>';
+    // Header row: detach button in corner, then action name + abbr + ability (clickable for rules popup)
+    let head = `<tr><th class="ut-col-roll ut-corner-cell">`;
+    head += `<button type="button" class="ut-detach-btn" data-ut-action="detach" data-tooltip="${detachTitle}"><i class="fas ${detachIcon}"></i></button>`;
+    head += `</th>`;
     for (const at of actionTypes) {
       const name = ACTION_NAME_DISPLAY[at.code] ?? at.label;
       const abilityKey = ACTION_ABILITY_MAP[at.code];
