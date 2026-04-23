@@ -1117,7 +1117,7 @@ Hooks.once("init", async () => {
       name: "Action HUD: Remember Position",
       hint: "Persist the HUD window position between sessions.",
       scope: "client",
-      config: true,
+      config: false,
       type: Boolean,
       default: true
     });
@@ -1126,7 +1126,7 @@ Hooks.once("init", async () => {
       name: "Action HUD: Grid Columns",
       hint: "Number of button columns in the HUD grid.",
       scope: "client",
-      config: true,
+      config: false,
       type: Number,
       default: 6,
       choices: { 3: "3", 4: "4", 5: "5", 6: "6", 8: "8" }
@@ -1136,7 +1136,7 @@ Hooks.once("init", async () => {
       name: "Action HUD: Button Scale",
       hint: "Zoom level for HUD buttons (0.5â€“2.0). Also adjustable with Ctrl+Wheel.",
       scope: "client",
-      config: true,
+      config: false,
       type: Number,
       default: 1.0,
       range: { min: 0.5, max: 2.0, step: 0.1 }
@@ -1146,7 +1146,7 @@ Hooks.once("init", async () => {
       name: "Action HUD: Display Style",
       hint: "Show icon art or text labels on HUD buttons.",
       scope: "client",
-      config: true,
+      config: false,
       type: String,
       default: "icons",
       choices: { icons: "Icons Only", labels: "Labels Only" }
@@ -1156,27 +1156,18 @@ Hooks.once("init", async () => {
       name: "Action HUD: Lock Position",
       hint: "Prevent the HUD window from being dragged or moved.",
       scope: "client",
-      config: true,
+      config: false,
       type: Boolean,
       default: false
     });
 
-    game.settings.register("msh-faserip", "actionHudShowDefenses", {
-      name: "Action HUD: Show Defensive Actions",
-      hint: "Show Dodge, Evade, Block, and Catch buttons on the HUD.",
-      scope: "world",
-      config: true,
-      type: Boolean,
-      default: true
-    });
-
-    game.settings.register("msh-faserip", "actionHudShowEffects", {
-      name: "Action HUD: Show Effect Checks",
-      hint: "Show Slam, Stun, and Kill check buttons on the HUD.",
-      scope: "world",
-      config: true,
-      type: Boolean,
-      default: true
+    game.settings.register("msh-faserip", "actionHudHidden", {
+      name: "Action HUD: Hidden Buttons",
+      hint: "Per-button hide set (managed via right-click on HUD buttons).",
+      scope: "client",
+      config: false,
+      type: Array,
+      default: []
     });
 
     game.settings.register("msh-faserip", "actionHudLayout", {
