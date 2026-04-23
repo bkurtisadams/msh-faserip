@@ -1,4 +1,9 @@
-// action-utils.js v1.8.0 - 2026-04-22
+// action-utils.js v1.8.1 - 2026-04-22
+// v1.8.1: Fix getArea* helpers: `??` doesn't fall through on empty strings, and
+//         template.json initializes damage/damageType/areaRadius to "" rather than
+//         null. Use _blank() helper so "" falls through to grenade* legacy fields.
+//         Symptom: damage grenades (e.g. stick grenade with grenadeDamage:"40" and
+//         grenadeDamageType:"BA") were routed to the intensity path and warned.
 // v1.8.0: Add DAMAGE_TYPE_SHAKE map (v14 CanvasShakeEffect profiles keyed by damage type)
 //         and getAreaRadius(item) helper reading unified areaRadius with grenadeRadius fallback.
 //         Used by the grenade/area-attack refactor to decouple shake from hardcoded GRENADE_TYPES.
@@ -3277,10 +3282,16 @@ export function shakeProfileFor(damageType) {
  * Read the effective area radius of an item. Unified field is `system.areaRadius`;
  * falls back to the legacy `system.grenadeRadius` for pre-migration items.
  * Returns a positive number, or 0 if the item is not an area weapon.
+ *
+ * Note: template.json initializes these fields to "" (empty string) rather than
+ * null/undefined, so plain `??` doesn't fall through. _blank() treats "" as unset.
  */
+const _blank = (v) => v === undefined || v === null || v === "";
+
 export function getAreaRadius(item) {
   const sys = item?.system || {};
-  const r = Number(sys.areaRadius ?? sys.grenadeRadius ?? 0);
+  const raw = _blank(sys.areaRadius) ? sys.grenadeRadius : sys.areaRadius;
+  const r = Number(raw);
   return Number.isFinite(r) && r > 0 ? r : 0;
 }
 
@@ -3289,7 +3300,8 @@ export function getAreaRadius(item) {
  */
 export function getAreaDamage(item) {
   const sys = item?.system || {};
-  const raw = sys.damage ?? sys.grenadeDamage ?? 0;
+  const raw = _blank(sys.damage) ? sys.grenadeDamage : sys.damage;
+  if (_blank(raw)) return 0;
   const m = String(raw).match(/\d+/);
   return m ? parseInt(m[0], 10) : 0;
 }
@@ -3300,7 +3312,8 @@ export function getAreaDamage(item) {
  */
 export function getAreaDamageType(item) {
   const sys = item?.system || {};
-  return String(sys.damageType ?? sys.grenadeDamageType ?? "").toUpperCase();
+  const raw = _blank(sys.damageType) ? sys.grenadeDamageType : sys.damageType;
+  return _blank(raw) ? "" : String(raw).toUpperCase();
 }
 
 /**
@@ -3309,5 +3322,6 @@ export function getAreaDamageType(item) {
  */
 export function getAreaIntensityRank(item) {
   const sys = item?.system || {};
-  return String(sys.intensityRank ?? sys.grenadeIntensity ?? "");
+  const raw = _blank(sys.intensityRank) ? sys.grenadeIntensity : sys.intensityRank;
+  return _blank(raw) ? "" : String(raw);
 }
