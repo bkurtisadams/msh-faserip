@@ -104,6 +104,7 @@ import { playCombatSFX, classifyWeapon } from "./modules/actions/audio-utils.js"
 import { FaseripTokenRuler } from "./modules/canvas/faserip-token-ruler.js";
 import { initDotToken } from "./modules/canvas/faserip-dot-token.js";
 import { registerNullifyAuraHooks } from "./modules/actions/nullify-aura.js";
+import { AreaHazardBehavior } from "./modules/regions/area-hazard-behavior.js";
 
 // ── Player-color tint on chat cards ──
 Hooks.on('renderChatMessageHTML', (message, htmlEl) => {
@@ -450,6 +451,15 @@ Hooks.once("init", async () => {
   // Make ACTIONS available to macros via CONFIG
   CONFIG.MSHF = CONFIG.MSHF || {};
   CONFIG.MSHF.ACTIONS = ACTIONS;
+
+  // Register v14 Region Behaviors
+  // "msh-faserip.areaHazard" — persistent intensity hazard for grenades and GM-placed zones.
+  // See scripts/modules/regions/area-hazard-behavior.js for usage.
+  CONFIG.RegionBehavior ??= {};
+  CONFIG.RegionBehavior.dataModels ??= {};
+  CONFIG.RegionBehavior.dataModels["msh-faserip.areaHazard"] = AreaHazardBehavior;
+  CONFIG.RegionBehavior.typeIcons ??= {};
+  CONFIG.RegionBehavior.typeIcons["msh-faserip.areaHazard"] = "fas fa-smog";
 
   game.msh.getCampaignDateTime = function() {
     // When CTT is active and set as time authority, read directly from CTT API

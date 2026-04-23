@@ -130,6 +130,9 @@
             "equipment": {},
             "vehicle": {},
             "headquarters": {}
+        },
+        "RegionBehavior": {
+            "areaHazard": {}
         }
     },
     "relationships": {},

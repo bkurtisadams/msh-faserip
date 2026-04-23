@@ -1,14 +1,14 @@
-// scripts/modules/actions/grenade-action.js v3.1.0 - 2026-04-22
-// v3.1.0: Scatter on miss, per Judge's Book. White result rolls 1d10 on the
-//   Slam/Stagger direction table (reused for grenade scatter): 1-2 back toward
-//   thrower, 3-4 back-right, 5-6 back-left, 7 right, 8 left, 9 straight up (lost
-//   to the sky, no effect), 10 straight down (drops at thrower's feet). Horizontal
-//   scatters re-center the blast 1 area in the rolled direction and apply damage
-//   to whoever is in the new area. Shake fires on any explosion (hit or scatter
-//   landing). Replaces the prior "miss = grenade evaporates" behavior that had
-//   no RAW basis (Judge's Book: "A missile weapon that misses its intended target
-//   does not generally evaporate...").
-// v3.0.0: Major cleanup.
+// scripts/modules/actions/grenade-action.js v3.2.0 - 2026-04-22
+// v3.2.0: Intensity grenades now attach the "msh-faserip.areaHazard" Region
+//   behavior (v14) to the persistent Region they create. The behavior
+//   automatically rolls saves on token entry/exit and applies/removes status
+//   effects. The initial blast (tokens already inside when the Region is
+//   placed) is handled by calling behavior.resolveForToken on each caught
+//   token — tokenEnter doesn't fire retroactively for pre-existing tokens.
+//   Per-grenade-type config (smoke = blinded-while-inside, tear gas = 1-round
+//   residual on exit, KO gas = fixed-duration effect, flash = one-shot) is
+//   resolved in resolveHazardBehaviorConfig() below.
+// v3.1.0: Scatter on miss, per Judge's Book.
 //   - Read unified item fields (system.areaRadius/damage/damageType/intensityRank)
 //     with grenadeRadius/grenadeDamage/grenadeDamageType/grenadeIntensity fallback.
 //     Delete the GRENADE_TYPES hardcoded table — mechanics come from item data.
@@ -504,8 +504,9 @@ export class GrenadeAction extends RangedAttackAction {
 
   // ─────────────────────────────────────────────────────────────────────────
   // INTENSITY PATH — smoke, gas, flash, anything with intensityRank and no damage.
-  // Place a PERSISTENT Region (hazard lingers), target everyone inside, dispatch
-  // IntensityAction which already handles per-target FEAT resolution.
+  // Places a persistent Region, attaches an AreaHazard behavior (v14), then runs
+  // saves on every token currently inside via behavior.resolveForToken. Future
+  // token entries/exits are handled automatically by the Region behavior.
   // ─────────────────────────────────────────────────────────────────────────
   async _executeIntensityGrenade(actor, item) {
     const radiusInAreas = getAreaRadius(item) || 1;
@@ -531,7 +532,7 @@ export class GrenadeAction extends RangedAttackAction {
       return;
     }
 
-    // Persistent Region — the cloud/flash lingers on the scene
+    // Place the persistent Region — cloud/flash/gas lingers on the scene
     const template = await AreaTemplate.createAtTarget({
       radiusInAreas,
       label: item.name,
@@ -541,24 +542,112 @@ export class GrenadeAction extends RangedAttackAction {
     });
     if (!template) return;
 
+    // Decrement ammo
     const newShots = Math.max(0, Number(shotsRemaining) - 1);
     await item.update({ "system.shotsRemaining": newShots });
 
-    // Target everyone inside, then dispatch IntensityAction
-    await template.target();
+    // Attach the AreaHazard behavior to the Region.
+    const region = template._doc;
+    const config = resolveHazardBehaviorConfig(item);
+    // Strip the non-schema `_initialBlast` marker before sending to Foundry —
+    // DataModel validation would reject or silently drop unknown fields.
+    const { _initialBlast, ...systemConfig } = config;
+    let behaviorDoc = null;
+    try {
+      const [created] = await region.createEmbeddedDocuments("RegionBehavior", [{
+        name: config.label,
+        type: "msh-faserip.areaHazard",
+        system: systemConfig
+      }]);
+      behaviorDoc = created;
+    } catch (err) {
+      console.error("[FASERIP ERROR] Failed to attach area-hazard behavior:", err);
+    }
 
-    const { IntensityAction } = await import("./intensity-action.js");
-    const action = new IntensityAction({
-      actor,
-      actionType: "intensity",
-      abilityName: "endurance",
-      opts: {
-        itemId: item.id,
-        item,
-        sourceItem: item,
-        equipment: item
-      }
+    // Target everyone visually (red reticles), then fire initial saves.
+    // tokenEnter events DON'T fire for tokens already inside at creation time,
+    // so we have to resolve them manually via the behavior's public method.
+    await template.target();
+    const affected = Array.from(game.user.targets);
+
+    // Summary chat card before the per-token saves
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor }),
+      content: `<div style="background:#f5f5f0;border:1px solid #c0c0c0;border-radius:3px;padding:6px 10px;">
+        <div style="color:#8b0000;font-weight:bold;font-size:.85em;text-transform:uppercase;">Area Hazard Placed</div>
+        <div><strong>${actor.name}</strong> throws <strong>${item.name}</strong></div>
+        <div style="color:#555;font-size:.88em;margin-top:2px;">${config.intensityRank} Intensity · ${affected.length} token${affected.length !== 1 ? "s" : ""} caught in blast · ${newShots} remaining</div>
+      </div>`
     });
-    return action.execute();
+
+    // Fire save-on-entry for each token already inside. For flash grenades,
+    // saveOnEntry is false on the behavior (so later entries don't trigger),
+    // but _initialBlast tells us to save the caught-in-blast crowd regardless.
+    if (behaviorDoc?.system) {
+      const hazard = behaviorDoc.system;
+      const initialSaveAll = hazard.saveOnEntry || _initialBlast;
+      if (initialSaveAll) {
+        for (const tok of affected) {
+          await hazard.resolveForToken(tok.document);
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Map an intensity-grenade item onto an AreaHazard behavior config.
+ * Per-type defaults keep smoke/gas/KO/flash acting per RAW without the user
+ * having to set every flag manually on the item.
+ *
+ * Note: `_initialBlast` is a non-schema marker used only by _executeIntensityGrenade
+ * to decide whether to run the caught-in-blast saves (flash saves initial tokens
+ * even though its Region's saveOnEntry is false for later entries).
+ */
+function resolveHazardBehaviorConfig(item) {
+  const sys = item.system || {};
+  const grenadeType = String(sys.grenadeType || "").toLowerCase();
+  const intensityRank = getAreaIntensityRank(item) || "Typical";
+  const saveAbility = sys.intensitySaveAbility || sys.save?.ability || "endurance";
+
+  const base = {
+    intensityRank,
+    intensityEffect: sys.intensityEffect || "",
+    saveAbility,
+    saveOnEntry: true,
+    removeOnExit: true,
+    residualRounds: 0,
+    label: item.name,
+    _initialBlast: true
+  };
+
+  switch (grenadeType) {
+    case "smoke":
+      return { ...base,
+        intensityEffect: base.intensityEffect || "blinded",
+        removeOnExit: true
+      };
+    case "teargas":
+    case "tearGas".toLowerCase():
+      return { ...base,
+        intensityEffect: base.intensityEffect || "incapacitated",
+        removeOnExit: true,
+        residualRounds: 1  // "+1 round after leaving" per RAW
+      };
+    case "knockout":
+    case "ko":
+    case "kogas":
+      return { ...base,
+        intensityEffect: base.intensityEffect || "unconscious",
+        removeOnExit: false  // KO persists even after leaving the cloud
+      };
+    case "flash":
+      return { ...base,
+        intensityEffect: base.intensityEffect || "blinded",
+        saveOnEntry: false,  // flash fires once at detonation, not for late-comers
+        removeOnExit: false  // blindness persists on its own bounded timer
+      };
+    default:
+      return base;
   }
 }
