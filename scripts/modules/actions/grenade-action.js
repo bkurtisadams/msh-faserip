@@ -1,16 +1,22 @@
-// scripts/modules/actions/grenade-action.js v2.4.0 - 2026-04-20
-// v2.4.0: v14 screen shake on hit. Concussive/frag/sonic carry shake profiles;
-//         smoke/gas/flash don't. Shake fires via chat-message flag so all
-//         clients rendering the card feel it (handler in init.js).
-// v2.3.0: Fix range penalty off-by-one (first area free). Fix Kill result logic —
-//         frag (edged) and energy grenades are killing attacks, others are not.
-//         Fix input focus (stopPropagation on mousedown). Fix range input layout.
-// v2.2.0: Template placement happens BEFORE roll — user picks landing zone, then system rolls to hit
+// scripts/modules/actions/grenade-action.js v3.0.0 - 2026-04-22
+// v3.0.0: Major cleanup.
+//   - Read unified item fields (system.areaRadius/damage/damageType/intensityRank)
+//     with grenadeRadius/grenadeDamage/grenadeDamageType/grenadeIntensity fallback.
+//     Delete the GRENADE_TYPES hardcoded table — mechanics come from item data.
+//   - One-phase AreaTemplate placement (v9.0.0). Persistent Region only for lingering
+//     hazards (smoke/gas/flash); ephemeral for damage grenades (no stuck Region on hit).
+//   - Shake profile resolved via DAMAGE_TYPE_SHAKE map in action-utils; one line instead
+//     of per-grenade-type baked-in values.
+//   - Smoke/gas/flash (effectType === "intensity") delegate to IntensityAction — no more
+//     parallel effect pipeline in this file.
+// v2.4.0: v14 screen shake on hit via chat-message flag.
+// v2.3.0: Fix range penalty off-by-one. Fix Kill result logic for frag/energy.
+// v2.2.0: Template placement happens BEFORE roll.
+
 import { RangedAttackAction } from "./ranged-attack-action.js";
 import { AreaTemplate } from "./area-template.js";
 import {
   getAbilityInfo,
-  labelFor,
   shiftRank,
   rollWithKarmaAndHistory,
   buildShiftDisplay,
@@ -23,7 +29,12 @@ import {
   getTargetData,
   applyDamageToTargets,
   buildModeSelector,
-  setupModeSelector
+  setupModeSelector,
+  shakeProfileFor,
+  getAreaRadius,
+  getAreaDamage,
+  getAreaDamageType,
+  getAreaIntensityRank
 } from "./action-utils.js";
 import {
   setupKarmaControlHandlers,
@@ -31,33 +42,70 @@ import {
   getAvailableKarma,
   getMinimumKarmaCommitment
 } from "../dice/dice-roller.js";
-import { rollUniversalTable } from "../dice/universal-table.js";
 
-// Grenade type definitions — all RAW values. `shake` is a v14 CanvasShakeEffect
-// profile applied on hit; omitted types (smoke/gas/flash) don't shake the map.
-const GRENADE_TYPES = {
-  fragmentation: { label: "Fragmentary",  damageType: "physical-edged", damage: 30,  rank: "Remarkable", effectType: "damage",      shake: { intensity: 22, duration: 550 } },
-  concussive:    { label: "Concussive",   damageType: "physical-blunt", damage: 40,  rank: null,          effectType: "damage",      shake: { intensity: 30, duration: 700 } },
-  sonic:         { label: "Sonic",        damageType: "energy",         damage: 20,  rank: null,          effectType: "damage+stun", stunIntensity: "Excellent", shake: { intensity: 14, duration: 450 } },
-  smoke:         { label: "Smoke",        damageType: null,             damage: 0,   rank: "Excellent",   effectType: "smoke" },
-  tearGas:       { label: "Tear Gas",     damageType: null,             damage: 0,   rank: "Typical",     effectType: "gas" },
-  knockout:      { label: "Knock-Out",    damageType: null,             damage: 0,   rank: null,          effectType: "gas" },
-  flash:         { label: "Flash",        damageType: null,             damage: 0,   rank: "Amazing",     effectType: "flash" }
+// Map raw damageType code → normalized form + human label + attack form + killing flag.
+// Kept small and flat — anything else is read from the item fields.
+const DAMAGE_TYPE_META = {
+  "BA": { normalized: "physical-blunt", label: "blunt",  attackForm: "blunt",  killing: false },
+  "TB": { normalized: "physical-blunt", label: "blunt",  attackForm: "blunt",  killing: false },
+  "EA": { normalized: "physical-edged", label: "edged",  attackForm: "edged",  killing: true  },
+  "TE": { normalized: "physical-edged", label: "edged",  attackForm: "edged",  killing: true  },
+  "S":  { normalized: "physical-blunt", label: "impact", attackForm: "blunt",  killing: false },
+  "E":  { normalized: "energy",         label: "energy", attackForm: "energy", killing: true  },
+  "F":  { normalized: "force",          label: "force",  attackForm: "blunt",  killing: false }
 };
+
+/**
+ * Resolve the effect mode of a grenade item:
+ *   - "damage"    : rolls attack, applies damage to all in area on hit
+ *   - "intensity" : delegates to IntensityAction (smoke/gas/flash — no damage, saves only)
+ *
+ * Mode is inferred from item fields:
+ *   - has damage > 0 AND damageType    → damage
+ *   - has intensityRank (and no damage) → intensity
+ *   - otherwise fall back to damage (user misconfigured; show a warning)
+ */
+function resolveGrenadeMode(item) {
+  const damage = getAreaDamage(item);
+  const dt = getAreaDamageType(item);
+  const intensity = getAreaIntensityRank(item);
+  if (damage > 0 && dt) return "damage";
+  if (intensity) return "intensity";
+  return damage > 0 ? "damage" : "intensity";
+}
 
 export class GrenadeAction extends RangedAttackAction {
   async execute() {
-    const actor  = this.actor;
-    const item   = this.opts?.item ?? (this.opts?.itemId ? actor.items.get(this.opts.itemId) : null);
+    const actor = this.actor;
+    const item  = this.opts?.item ?? (this.opts?.itemId ? actor.items.get(this.opts.itemId) : null);
 
     if (!item) {
       ui.notifications.warn("No grenade item found.");
       return;
     }
 
-    // Check ammo
+    const mode = resolveGrenadeMode(item);
+
+    // Intensity grenades (smoke/gas/flash) → delegate to IntensityAction, which
+    // already supports single-target FEATs and will grow the area-template step.
+    // For now: place a persistent Region (the hazard lingers), target everyone
+    // inside it, then dispatch IntensityAction with the pre-set targets.
+    if (mode === "intensity") {
+      return this._executeIntensityGrenade(actor, item);
+    }
+
+    return this._executeDamageGrenade(actor, item);
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // DAMAGE PATH — frag, concussive, sonic, etc.
+  // ─────────────────────────────────────────────────────────────────────────
+  async _executeDamageGrenade(actor, item) {
+    // Ammo check
     const _sr = item.system.shotsRemaining;
-    const shotsRemaining = (_sr !== "" && _sr != null) ? _sr : (item.system.shots !== "" && item.system.shots != null ? item.system.shots : 1);
+    const shotsRemaining = (_sr !== "" && _sr != null)
+      ? _sr
+      : (item.system.shots !== "" && item.system.shots != null ? item.system.shots : 1);
     if (Number.isFinite(Number(shotsRemaining)) && Number(shotsRemaining) <= 0) {
       if (game.msh?.playCombatSFX) {
         await game.msh.playCombatSFX({ item, actionType: "grenade", outOfAmmo: true });
@@ -71,41 +119,28 @@ export class GrenadeAction extends RangedAttackAction {
       return;
     }
 
-    const grenadeType  = item.system.grenadeType || "fragmentation";
-    let typeDef        = GRENADE_TYPES[grenadeType] || GRENADE_TYPES.fragmentation;
-    const _dmgRaw = item.system.grenadeDamage ?? typeDef.damage ?? 0;
-    const _dmgMatch = String(_dmgRaw).match(/\d+/);
-    const damage = _dmgMatch ? parseInt(_dmgMatch[0], 10) : (typeDef.damage ?? 0);
-    const intensity    = item.system.grenadeIntensity || typeDef.rank || "";
+    // Resolve item data
+    const damage = getAreaDamage(item);
+    const dtCode = getAreaDamageType(item) || "BA";
+    const meta   = DAMAGE_TYPE_META[dtCode] ?? DAMAGE_TYPE_META.BA;
+    const damageTypeNormalized = meta.normalized;
+    const radiusInAreas = getAreaRadius(item) || 1;
 
-    // Normalize grenadeDamageType from item sheet
-    const _rawDt = String(item.system.grenadeDamageType || "").toUpperCase();
-    const _dtMap = { EA: "physical-edged", TE: "physical-edged", BA: "physical-blunt", TB: "physical-blunt", E: "energy", F: "force", S: "physical-blunt" };
-    const itemDamageType = _dtMap[_rawDt] || null;
-    if (itemDamageType) typeDef = { ...typeDef, damageType: itemDamageType };
-
-    const ability      = getAbilityInfo(actor, "agility");
-    const strRank      = actor?.system?.abilities?.strength?.rank || "Typical";
-    const maxRange     = this._getThrowingRangeInAreas(strRank);
+    const ability  = getAbilityInfo(actor, "agility");
+    const strRank  = actor?.system?.abilities?.strength?.rank || "Typical";
+    const maxRange = this._getThrowingRangeInAreas(strRank);
 
     const availableKarma = getAvailableKarma(actor);
     const minKarma       = getMinimumKarmaCommitment(actor);
     const hasKarma       = availableKarma > 0;
 
-    const savedRange  = await actor.getFlag("msh-faserip", "lastGrenadeRange")  || 1;
-    const savedShift  = await actor.getFlag("msh-faserip", "lastGrenadeShift")  || 0;
-    const savedSkip   = (await actor.getFlag("msh-faserip", "skipDiceRoll"))    ?? false;
+    const savedRange = await actor.getFlag("msh-faserip", "lastGrenadeRange") || 1;
+    const savedShift = await actor.getFlag("msh-faserip", "lastGrenadeShift") || 0;
+    const savedSkip  = (await actor.getFlag("msh-faserip", "skipDiceRoll")) ?? false;
 
-    const { targets, targetDisplay } = getTargetData();
+    const { targetDisplay } = getTargetData();
 
-    // Effect description for dialog
-    const effectDesc = {
-      damage:      `${damage} pts ${typeDef.damageType?.replace("physical-", "") ?? ""} damage to all in area`,
-      "damage+stun": `${damage} pts Energy damage + End FEAT vs ${typeDef.stunIntensity} Stunning to all in area`,
-      smoke:       `${intensity} Intensity smoke — all FEATs at -2CS in area`,
-      gas:         `${intensity} Intensity gas affects all in area`,
-      flash:       `${intensity} Intensity flash — affects all facing it in area`
-    }[typeDef.effectType] || "";
+    const effectDesc = `${damage} pts ${meta.label} damage to all in area`;
 
     const dialogHtml = `
       ${buildModeSelector({ mode: "semi" })}
@@ -113,7 +148,7 @@ export class GrenadeAction extends RangedAttackAction {
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
         <div style="background:#f5f5f5;padding:8px;border-radius:3px;">
           <div style="font-weight:600;color:#666;font-size:.8em;text-transform:uppercase;">Target Area</div>
-          <div style="font-weight:600;color:#d32f2f;">${targetDisplay || "Select target area"}</div>
+          <div style="font-weight:600;color:#d32f2f;">${targetDisplay || "Pick landing zone after Throw"}</div>
         </div>
         <div style="background:#f5f5f5;padding:8px;border-radius:3px;">
           <div style="font-weight:600;color:#666;font-size:.8em;text-transform:uppercase;">Throw</div>
@@ -123,19 +158,17 @@ export class GrenadeAction extends RangedAttackAction {
       </div>
 
       <div style="background:#fff8e1;border:1px solid #ffc107;border-radius:3px;padding:8px;margin-bottom:8px;">
-        <div style="font-weight:700;color:#e65100;">${item.name} — ${typeDef.label}</div>
+        <div style="font-weight:700;color:#e65100;">${item.name}</div>
         <div style="color:#555;font-size:.88em;margin-top:2px;">${effectDesc}</div>
         <div style="color:#888;font-size:.82em;margin-top:2px;">White = miss (grenade lost). Green+ = hits target area, affects all in it.</div>
       </div>
 
-      <!-- Range -->
       <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;padding:6px 8px;border:1px solid #ddd;border-radius:3px;background:#fafafa;">
         <label style="font-weight:600;">Range:</label>
         <input type="number" name="range" value="${savedRange}" min="1" max="${maxRange}" style="width:60px;padding:3px;text-align:center;box-sizing:border-box;">
         <span style="color:#666;font-size:.85em;">areas (max ${maxRange})</span>
       </div>
 
-      <!-- CS / Karma -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;font-size:.9em;">
         <div class="cs-field" style="display:flex;align-items:center;gap:4px;padding:4px 6px;border-radius:3px;border:1px solid transparent;">
           <label style="font-weight:600;">CS:</label>
@@ -150,7 +183,7 @@ export class GrenadeAction extends RangedAttackAction {
               <input type="checkbox" id="spend-karma" name="spendKarma">
               <span style="font-weight:600;">Karma:</span>
             </label>
-            <span title="Available: ${availableKarma} | Min commitment: ${minKarma} | Amount chosen after roll" style="padding:1px 4px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${availableKarma}</span>
+            <span title="Available: ${availableKarma} | Min commitment: ${minKarma}" style="padding:1px 4px;background:#fff8e1;border:1px solid #ffc107;border-radius:2px;cursor:help;">${availableKarma}</span>
             <span style="color:#999;font-size:.8em;">(min ${minKarma})</span>
           ` : `<span style="color:#999;">No karma</span>`}
         </div>
@@ -181,7 +214,6 @@ export class GrenadeAction extends RangedAttackAction {
                 return resolve(null);
               }
 
-              // -1CS per area beyond first (weapons rule)
               const rangeModifier = -(Math.max(0, range - 1));
               const totalShift = shift + rangeModifier;
 
@@ -198,7 +230,6 @@ export class GrenadeAction extends RangedAttackAction {
           setupKarmaControlHandlers(html);
           await setupModeSelector(actor, html, this.opts || {}, "lastGrenadeMode");
 
-          // Prevent Foundry drag handler from stealing first click on inputs
           html.find('input, select').on('mousedown', (e) => e.stopPropagation());
 
           const $dialog = html.closest('.dialog');
@@ -224,23 +255,21 @@ export class GrenadeAction extends RangedAttackAction {
 
     if (!choice) return;
 
-    // ── Step 1: Place template FIRST — user picks the landing zone ──
-    const radiusInAreas = item.system.grenadeRadius || 1;
+    // Ephemeral template — no Region persists; just geometry + affectedTokens
     const template = await AreaTemplate.createAtTarget({
       radiusInAreas,
       label: item.name,
       fillColor: "#ff4400",
-      fillAlpha: 0.25
+      fillAlpha: 0.25,
+      persistent: false
     });
-
-    // User cancelled placement — abort the throw entirely
     if (!template) return;
 
-    // Decrement shots
+    // Decrement ammo
     const newShots = Math.max(0, Number(shotsRemaining) - 1);
     await item.update({ "system.shotsRemaining": newShots });
 
-    // ── Step 2: Roll Agility FEAT (Blunt Throwing column per RAW) ──
+    // Roll Agility FEAT (range penalty applied)
     const effectiveRank = shiftRank(ability.rank, choice.totalShift);
     const roll = await (new Roll("1d100")).evaluate();
     if (!choice.skipDice) {
@@ -248,7 +277,7 @@ export class GrenadeAction extends RangedAttackAction {
     }
 
     const { cappedTotal, totalKarmaUsed } = await rollWithKarmaAndHistory(
-      actor, `Grenade: ${typeDef.label}`, choice.karma, roll,
+      actor, `Grenade: ${item.name}`, choice.karma, roll,
       { spendKarma: choice.spendKarma, rank: effectiveRank }
     );
 
@@ -256,69 +285,46 @@ export class GrenadeAction extends RangedAttackAction {
     const colorLower = String(color || "").toLowerCase();
     const isHit      = colorLower !== "white";
 
-    // Play SFX based on item-configured sounds or fallback
     if (game.msh?.playCombatSFX) {
       await game.msh.playCombatSFX({
         item,
         actionType: "grenade",
-        damageType: typeDef.damageType || "physical-blunt",
+        damageType: damageTypeNormalized,
         rollResult: colorLower,
         isHit
       });
     }
 
-    // Build roll display
     const shiftBreakdown = {};
     if (choice.shift) shiftBreakdown.manual = Number(choice.shift);
     if (choice.rangeModifier) shiftBreakdown.range = choice.rangeModifier;
     const shiftDisplay = buildShiftDisplay(choice.totalShift, effectiveRank, shiftBreakdown);
     const rollDisplay = buildRollDisplay(roll, totalKarmaUsed, cappedTotal);
-    const effectLabel = isHit ? "HIT" : "MISS";
-    const resultBadge = buildResultBadge(color, effectLabel);
+    const resultBadge = buildResultBadge(color, isHit ? "HIT" : "MISS");
 
     let resultHtml = "";
     let affectedTargets = [];
 
     if (!isHit) {
-      // ── MISS: remove template, grenade lost ──
-      await template.dismiss();
       resultHtml = `<div style="padding:6px 8px;margin:0 10px 6px;background:#fff;border:1px solid #ddd;border-radius:3px;font-size:.88em;">
         <div style="font-weight:700;color:#888;">MISS</div>
         <div style="color:#555;">Grenade fails to reach target area. No effect.</div>
       </div>`;
     } else {
-      // ── HIT: auto-target all tokens inside the template ──
       await template.target();
       affectedTargets = Array.from(game.user.targets);
 
-      // Build result HTML
-      if (typeDef.effectType === "damage" || typeDef.effectType === "damage+stun") {
-        const dmgLabel = typeDef.damageType?.replace("physical-", "") ?? "damage";
-        resultHtml = `<div style="padding:6px 8px;margin:0 10px 6px;background:#fff;border:1px solid #ddd;border-radius:3px;font-size:.88em;">
-          <div style="font-weight:700;color:#e65100;">HIT — ALL IN AREA AFFECTED</div>
-          <div style="color:#555;margin-top:2px;">${damage} pts ${dmgLabel} damage to every target in the area.</div>
-          ${typeDef.effectType === "damage+stun" ? `<div style="color:#555;margin-top:2px;">Each target makes Endurance FEAT vs <strong>${typeDef.stunIntensity}</strong> Intensity or is Stunned.</div>` : ""}
-        </div>`;
-      } else {
-        const effectLabels = {
-          smoke: `<b>SMOKE</b> fills the area — all FEATs at -2CS until dispersed.`,
-          gas:   `<b>${intensity} Intensity GAS</b> fills the area — all targets affected.`,
-          flash: `<b>${intensity} Intensity FLASH</b> — all targets facing the source are affected.`
-        };
-        resultHtml = `<div style="padding:6px 8px;margin:0 10px 6px;background:#fff;border:1px solid #ddd;border-radius:3px;font-size:.88em;">
-          <div style="font-weight:700;color:#2e7d32;">HIT — AREA EFFECT</div>
-          <div style="color:#555;margin-top:2px;">${effectLabels[typeDef.effectType] || effectDesc}</div>
-          <div style="color:#888;font-size:.85em;margin-top:4px;">Apply effect to all tokens in target area.</div>
-        </div>`;
-      }
+      resultHtml = `<div style="padding:6px 8px;margin:0 10px 6px;background:#fff;border:1px solid #ddd;border-radius:3px;font-size:.88em;">
+        <div style="font-weight:700;color:#e65100;">HIT — ALL IN AREA AFFECTED</div>
+        <div style="color:#555;margin-top:2px;">${damage} pts ${meta.label} damage to every target in the area.</div>
+      </div>`;
     }
 
-    // Ammo counter
     const ammoNote = buildContentBox(`<strong>${item.name}</strong> thrown — ${newShots} remaining`);
 
     const cardHtml = buildCardShell({
       actionLabel: "Grenade",
-      headerRight: `${typeDef.label} · Agility FEAT`,
+      headerRight: `${item.name} · Agility FEAT`,
       actorHtml: buildActorTargetHtml(actor.name),
       abilityHtml: buildAbilitySection({
         abilityLabel: "Agility",
@@ -331,34 +337,31 @@ export class GrenadeAction extends RangedAttackAction {
       sections: [resultHtml, ammoNote]
     });
 
-    const shakeFlag = (isHit && typeDef.shake) ? { "msh-faserip": { shake: typeDef.shake } } : undefined;
+    // Resolve shake from damage-type map (null for non-concussive types, but this is the damage path so usually set)
+    const shakeProfile = (isHit) ? shakeProfileFor(dtCode) : null;
+    const shakeFlag = shakeProfile ? { "msh-faserip": { shake: shakeProfile } } : undefined;
+
     await ChatMessage.create({
       speaker: ChatMessage.getSpeaker({ actor }),
       content: cardHtml,
       ...(shakeFlag ? { flags: shakeFlag } : {})
     });
 
-    // Apply damage to all tokens in blast area (hit only)
-    // Frag grenades are Edged Killing — shrapnel carries Kill potential on any hit.
-    // Energy grenades also carry Kill potential (Energy column red = Kill).
-    // Concussive/sonic/smoke/gas/flash are NOT killing attacks.
-    // wasKillResult triggers a Kill save on targets that take damage.
-    // forceKilling bypasses Four-Color knockout — appropriate for lethal weapons.
-    const isKillingDamage = ["physical-edged", "energy"].includes(typeDef.damageType);
+    // Apply damage to all affected tokens
+    const isKillingDamage = meta.killing;
     if (isHit && damage > 0 && affectedTargets.length > 0) {
       const dmgResults = await applyDamageToTargets({
         damage,
         targets: affectedTargets,
         attackerUuid: actor.uuid,
-        damageType: typeDef.damageType,
-        attackForm: typeDef.damageType?.includes("edged") ? "edged" : typeDef.damageType === "energy" ? "energy" : "blunt",
+        damageType: damageTypeNormalized,
+        attackForm: meta.attackForm,
         showNotification: false,
         wasKillResult: isKillingDamage,
         forceKilling: isKillingDamage
       });
 
       if (dmgResults?.length) {
-        const dmgLabel = typeDef.damageType?.replace("physical-", "") ?? "damage";
         const rows = dmgResults.map(r => {
           if (r.net === 0 && r.absorbed > 0) {
             return `<tr><td style="padding:2px 6px;">${r.name}</td><td style="padding:2px 6px;color:#888;">All absorbed by armor</td><td style="padding:2px 6px;color:#888;">${r.hpBefore} → ${r.hpAfter}</td></tr>`;
@@ -371,7 +374,7 @@ export class GrenadeAction extends RangedAttackAction {
           speaker: ChatMessage.getSpeaker({ actor }),
           content: buildCardShell({
             actionLabel: "Grenade Damage",
-            headerRight: `${damage} pts ${dmgLabel} — ${dmgResults.length} target${dmgResults.length !== 1 ? "s" : ""}`,
+            headerRight: `${damage} pts ${meta.label} — ${dmgResults.length} target${dmgResults.length !== 1 ? "s" : ""}`,
             sections: [`<table style="width:100%;border-collapse:collapse;font-size:.88em;padding:4px 10px;">
               <thead><tr style="border-bottom:1px solid #eee;color:#666;font-size:.82em;">
                 <th style="padding:2px 6px;text-align:left;">Target</th>
@@ -384,5 +387,65 @@ export class GrenadeAction extends RangedAttackAction {
         });
       }
     }
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // INTENSITY PATH — smoke, gas, flash, anything with intensityRank and no damage.
+  // Place a PERSISTENT Region (hazard lingers), target everyone inside, dispatch
+  // IntensityAction which already handles per-target FEAT resolution.
+  // ─────────────────────────────────────────────────────────────────────────
+  async _executeIntensityGrenade(actor, item) {
+    const radiusInAreas = getAreaRadius(item) || 1;
+    const intensityRank = getAreaIntensityRank(item);
+
+    if (!intensityRank) {
+      ui.notifications.warn(`${item.name} has no intensity rank or damage configured.`);
+      return;
+    }
+
+    // Ammo check
+    const _sr = item.system.shotsRemaining;
+    const shotsRemaining = (_sr !== "" && _sr != null)
+      ? _sr
+      : (item.system.shots !== "" && item.system.shots != null ? item.system.shots : 1);
+    if (Number.isFinite(Number(shotsRemaining)) && Number(shotsRemaining) <= 0) {
+      await ChatMessage.create({
+        speaker: ChatMessage.getSpeaker({ actor }),
+        content: `<div style="background:#fff;border:1px solid #bbb;border-radius:3px;padding:6px 8px;">
+          <b>${actor.name}</b> reaches for a <b>${item.name}</b> — none left.
+        </div>`
+      });
+      return;
+    }
+
+    // Persistent Region — the cloud/flash lingers on the scene
+    const template = await AreaTemplate.createAtTarget({
+      radiusInAreas,
+      label: item.name,
+      fillColor: "#9e9e9e",
+      fillAlpha: 0.35,
+      persistent: true
+    });
+    if (!template) return;
+
+    const newShots = Math.max(0, Number(shotsRemaining) - 1);
+    await item.update({ "system.shotsRemaining": newShots });
+
+    // Target everyone inside, then dispatch IntensityAction
+    await template.target();
+
+    const { IntensityAction } = await import("./intensity-action.js");
+    const action = new IntensityAction({
+      actor,
+      actionType: "intensity",
+      abilityName: "endurance",
+      opts: {
+        itemId: item.id,
+        item,
+        sourceItem: item,
+        equipment: item
+      }
+    });
+    return action.execute();
   }
 }

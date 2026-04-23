@@ -1,4 +1,7 @@
-// action-utils.js v1.7.6 - 2026-04-19
+// action-utils.js v1.8.0 - 2026-04-22
+// v1.8.0: Add DAMAGE_TYPE_SHAKE map (v14 CanvasShakeEffect profiles keyed by damage type)
+//         and getAreaRadius(item) helper reading unified areaRadius with grenadeRadius fallback.
+//         Used by the grenade/area-attack refactor to decouple shake from hardcoded GRENADE_TYPES.
 // v1.7.6: Fix dead "Roll Death Save" button on hit-while-at-0-HP card in
 //         semi/manual mode. Emitter used class="death-save-button" with
 //         data-actor-id; chat-hooks.js handler listens on [data-action="death-save"]
@@ -3236,4 +3239,75 @@ ${extraLine ? `<div>${extraLine}</div>` : ""}
   <span>Roll: ${rollDisplay}</span>
   ${resultBadge}
 </div>`;
+}
+
+/**
+ * v14 CanvasShakeEffect profiles keyed by damage type code.
+ * Used by area attacks (grenades, AoE) to shake the canvas on hit.
+ * Keys accept raw damageType codes (BA, EA, S, E, F, TE, TB) and also
+ * normalized "physical-*" / "energy" forms emitted by some pipelines.
+ * Null/undefined = no shake (gas, smoke, flash — non-concussive effects).
+ */
+export const DAMAGE_TYPE_SHAKE = {
+  // Raw codes
+  "BA": { intensity: 30, duration: 700 },  // concussive blunt
+  "EA": { intensity: 22, duration: 550 },  // frag/edged
+  "TB": { intensity: 30, duration: 700 },
+  "TE": { intensity: 22, duration: 550 },
+  "S":  { intensity: 18, duration: 500 },  // shooting (light explosive)
+  "E":  { intensity: 14, duration: 450 },  // energy / sonic
+  "F":  { intensity: 18, duration: 500 },  // force
+  // Normalized forms (applyDamageToTargets-facing)
+  "physical-blunt": { intensity: 30, duration: 700 },
+  "physical-edged": { intensity: 22, duration: 550 },
+  "energy":         { intensity: 14, duration: 450 },
+  "force":          { intensity: 18, duration: 500 }
+};
+
+/**
+ * Resolve the shake profile for a damage type, with sensible defaults.
+ * Returns null for non-concussive effect types (smoke, gas, flash, null).
+ */
+export function shakeProfileFor(damageType) {
+  if (!damageType) return null;
+  return DAMAGE_TYPE_SHAKE[damageType] ?? DAMAGE_TYPE_SHAKE[String(damageType).toUpperCase()] ?? null;
+}
+
+/**
+ * Read the effective area radius of an item. Unified field is `system.areaRadius`;
+ * falls back to the legacy `system.grenadeRadius` for pre-migration items.
+ * Returns a positive number, or 0 if the item is not an area weapon.
+ */
+export function getAreaRadius(item) {
+  const sys = item?.system || {};
+  const r = Number(sys.areaRadius ?? sys.grenadeRadius ?? 0);
+  return Number.isFinite(r) && r > 0 ? r : 0;
+}
+
+/**
+ * Read the effective area damage of an item, with grenade* fallback.
+ */
+export function getAreaDamage(item) {
+  const sys = item?.system || {};
+  const raw = sys.damage ?? sys.grenadeDamage ?? 0;
+  const m = String(raw).match(/\d+/);
+  return m ? parseInt(m[0], 10) : 0;
+}
+
+/**
+ * Read the effective area damage type of an item, with grenade* fallback.
+ * Returns raw code (BA/EA/S/E/F/TE/TB) uppercased, or empty string.
+ */
+export function getAreaDamageType(item) {
+  const sys = item?.system || {};
+  return String(sys.damageType ?? sys.grenadeDamageType ?? "").toUpperCase();
+}
+
+/**
+ * Read the effective intensity rank of an item, with grenade* fallback.
+ * Returns a rank string ("Typical", "Excellent", ...) or "".
+ */
+export function getAreaIntensityRank(item) {
+  const sys = item?.system || {};
+  return String(sys.intensityRank ?? sys.grenadeIntensity ?? "");
 }

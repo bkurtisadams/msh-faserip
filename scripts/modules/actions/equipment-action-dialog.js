@@ -1,4 +1,9 @@
-// equipment-action-dialog.js v1.2.0 - 2026-04-16
+// equipment-action-dialog.js v1.3.0 - 2026-04-22
+// v1.3.0: Skip hub when the item has exactly one rollable action and nothing else
+//         (no toggle, reload, or template). Items with multiple rollable actions —
+//         or any combination of rollable + state-change actions — still show the hub.
+//         Passing the single-action case through directly removes a wasted click for
+//         plain weapons (sword → click → attack dialog, no intermediate hub).
 // v1.2.0: Attack modes no longer replace the primary attack — they are additional buttons.
 //         Previously, a spear with Haft/Thrown modes lost its primary Edged Attack entirely.
 //         Primary button now labels by resolved attack type (e.g. "Edged") when modes exist.
@@ -299,6 +304,26 @@ export async function openEquipmentActionDialog(actor, item) {
   if (!actor || !item) return;
 
   const actions = getAvailableActions(item, actor);
+
+  // Skip-hub shortcut: if there is exactly one action AND it is a rollable one
+  // (not a pure state change like toggle/reload/template), dispatch straight to
+  // its handler. The hub earns its keep only when there is genuine ambiguity or
+  // a mix of rollable actions and state-change buttons that need to stay visible.
+  const STATE_CHANGE_IDS = new Set(["toggle", "reload", "template"]);
+  if (actions.length === 1 && !STATE_CHANGE_IDS.has(actions[0].id)) {
+    const only = actions[0];
+    // Key names below mirror DOMStringMap (data-foo-bar → fooBar), which is what
+    // _executeAction reads from btn.dataset on the real hub buttons.
+    const dataset = {
+      actionId: only.id,
+      modeIndex: only.modeIndex !== undefined ? String(only.modeIndex) : undefined,
+      customIndex: only.customIndex !== undefined ? String(only.customIndex) : undefined,
+      powerIndex: only.powerIndex !== undefined ? String(only.powerIndex) : undefined,
+      devfnIndex: only.devFnIndex !== undefined ? String(only.devFnIndex) : undefined
+    };
+    return _executeAction(only.id, actor, item, dataset);
+  }
+
   const statSummary = buildStatSummary(item);
   const actionButtons = buildActionButtons(actions);
 

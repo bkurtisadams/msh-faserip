@@ -88,7 +88,7 @@ export class StuntRoller {
           ${resolved.powerName ? `<p><strong>Based on Power:</strong> ${resolved.powerName}</p>` : '<p><em>General power stunt</em></p>'}
           <p><strong>Rank:</strong> ${resolved.rank} (${resolved.value})</p>
           ${stunt.description ? `<p><strong>Description:</strong> ${stunt.description}</p>` : ''}
-          <p><strong>Times Used:</strong> ${stunt.timesUsed}</p>
+          <p><strong>Times Attempted:</strong> ${stunt.timesUsed}</p>
           <p><strong>Difficulty:</strong> <span style="color:${featColorHex};font-weight:bold;">${featColor} FEAT</span></p>
           <p style="font-size:0.9em;color:#666;">${difficultyDesc}</p>
         </div>
@@ -122,7 +122,7 @@ export class StuntRoller {
       buttons.push({
         action: "attemptBoost",
         icon: "fas fa-plus-circle",
-        label: `Attempt + Declare Karma Boost (${baseCost} + min 10)`,
+        label: `Add Karma to Roll (${baseCost} + min 10)`,
         default: true,
         callback: async () => {
           await this._makeStuntRoll(stunt, stuntIndex, resolved, featColor, baseCost, availableKarma, true);
@@ -133,7 +133,7 @@ export class StuntRoller {
     buttons.push({
       action: "impossible",
       icon: "fas fa-ban",
-      label: `GM: Rule Impossible (No Karma)`,
+      label: `GM: Impossible`,
       callback: async () => {
         await ChatMessage.create({
           user: game.user.id,
@@ -149,6 +149,7 @@ export class StuntRoller {
 
     await DialogV2.wait({
       window: { title: `Power Stunt: ${stunt.name}` },
+      position: { width: 560 },
       content,
       buttons,
       rejectClose: false
@@ -340,7 +341,7 @@ export class StuntRoller {
           <div>Difficulty: ${featColor} FEAT</div>
           <div>Roll: ${rollResult}${extraKarma > 0 ? ` + ${extraKarma} Karma = ${finalResult}` : ''}</div>
           <div>Color: ${String(initialColor).toUpperCase()}${extraKarma > 0 ? ` → ${String(finalColor).toUpperCase()}` : ''}</div>
-          <div>Times Used: ${stunt.timesUsed}${success ? ` → ${stunt.timesUsed + 1}` : ' (no change — failed)'}</div>
+          <div>Times Attempted: ${stunt.timesUsed} → ${stunt.timesUsed + 1}</div>
           <div>Total Karma Spent: ${totalKarma} (${baseCost} attempt${extraKarma > 0 ? ` + ${extraKarma} boost` : ''})</div>
         </div>
         <div style="text-align:center;padding:8px;margin:5px;font-weight:bold;font-size:1.05em;border-radius:3px;background:${bg};color:${fg};">

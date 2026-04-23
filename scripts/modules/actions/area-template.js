@@ -1,18 +1,27 @@
-// scripts/modules/actions/area-template.js v8.0.0 - 2026-04-20
-// v8.0.0: v14 port — MeasuredTemplate document and canvas.templates layer are
-//   gone in v14 (absorbed into Scene Regions). Persisted doc is now a Region
-//   with a single circle shape; preview overlay moved to canvas.controls.
-// v7.0.0: Scroll-wheel resize during Phase 1. New scrollResize option adds
-//   mouse-wheel scaling between minRadiusInAreas (default 1) and radiusInAreas (max).
-//   Step size = 1 grid unit. Returns final chosen radius in the AreaTemplate instance.
+// scripts/modules/actions/area-template.js v9.0.0 - 2026-04-22
+// v9.0.0: One-phase placement. Cursor follows, left-click commits, right-click cancels.
+//   Live ghost reticles highlight affected tokens during aim (no double-click review step).
+//   New `persistent` option: when false, skip Region creation entirely and return
+//   { x, y, radius, affectedTokens } for ephemeral effects (frag/concussive grenades).
+//   When true (default, back-compat), create a Region as before for lingering hazards
+//   (smoke/gas/flash, GM markers).
+// v8.0.0: v14 port — MeasuredTemplate/canvas.templates gone in v14. Persisted doc is
+//   a Region with a single circle shape.
+// v7.0.0: Scroll-wheel resize during aim, scrollResize option.
 
 export class AreaTemplate {
-  constructor(templateDoc, { chosenRadius } = {}) {
+  constructor(templateDoc, { chosenRadius, x, y, radiusPx } = {}) {
     this._doc = templateDoc;
-    this._chosenRadius = chosenRadius ?? templateDoc?.distance;
+    this._chosenRadius = chosenRadius;
+    this._x = x ?? templateDoc?.shapes?.[0]?.x;
+    this._y = y ?? templateDoc?.shapes?.[0]?.y;
+    this._radiusPx = radiusPx ?? templateDoc?.shapes?.[0]?.radius;
   }
 
   get chosenRadius() { return this._chosenRadius; }
+  get id() { return this._doc?.id; }
+  get x()  { return this._x; }
+  get y()  { return this._y; }
 
   /** Redraw the PIXI preview circle at a new pixel radius. */
   static _redrawPreview(preview, radiusPx, colorNum, fillAlpha) {
@@ -23,23 +32,55 @@ export class AreaTemplate {
     preview.endFill();
   }
 
+  /** Draw ghost reticles around tokens whose center is inside (cx,cy,radiusPx). */
+  static _redrawGhostReticles(graphics, cx, cy, radiusPx) {
+    graphics.clear();
+    const r2 = radiusPx * radiusPx;
+    if (!canvas?.tokens?.placeables) return;
+    for (const t of canvas.tokens.placeables) {
+      if (!t?.center) continue;
+      const dx = t.center.x - cx;
+      const dy = t.center.y - cy;
+      if (dx * dx + dy * dy > r2) continue;
+      const tr = Math.max(t.w || 100, t.h || 100) * 0.58;
+      graphics.lineStyle(3, 0xff4400, 0.95);
+      graphics.drawCircle(t.center.x, t.center.y, tr);
+    }
+  }
+
+  /** Collect tokens whose center falls within (cx,cy,radiusPx). */
+  static _tokensInside(cx, cy, radiusPx) {
+    const r2 = radiusPx * radiusPx;
+    return (canvas?.tokens?.placeables ?? []).filter(t => {
+      if (!t?.center) return false;
+      const dx = t.center.x - cx;
+      const dy = t.center.y - cy;
+      return (dx * dx + dy * dy) <= r2;
+    });
+  }
+
   /**
-   * Two-phase measured template placement.
+   * One-phase interactive template placement.
    *
-   * Phase 1: translucent PIXI circle follows cursor, snapping to grid center.
-   *          Scroll wheel resizes if scrollResize is true.
-   *          Left-click locks position. Right-click cancels.
-   * Phase 2: circle stays put so user can review who is in the blast.
-   *          Left-click confirms → persists real MeasuredTemplate → resolves.
-   *          Right-click cancels → removes preview → resolves null.
+   * Cursor tracks a translucent PIXI circle; ghost reticles highlight affected tokens live.
+   * Scroll wheel resizes if scrollResize is true. Left-click commits. Right-click cancels.
    *
-   * @param {number} radiusInAreas - max (and initial) radius
-   * @param {boolean} scrollResize - enable mouse wheel sizing
-   * @param {number} minRadiusInAreas - minimum radius when resizing (default 1)
-   * @param {number} scrollStep - grid distance units per scroll tick (default gridDist)
+   * @param {boolean} persistent - when true (default), create a Region on commit;
+   *                                when false, skip Region creation and return geometry only
+   * @returns {Promise<AreaTemplate|Object|null>}
+   *   - persistent=true: AreaTemplate instance, or null on cancel
+   *   - persistent=false: { x, y, radius, radiusPx, affectedTokens, target, dismiss }, or null
    */
-  static async create({ x = 0, y = 0, radiusInAreas = 1, label = "AE", fillColor = "#ff0000", fillAlpha = 0.25,
-                         scrollResize = false, minRadiusInAreas = 1 } = {}) {
+  static async create({
+    x = 0, y = 0,
+    radiusInAreas = 1,
+    label = "AE",
+    fillColor = "#ff0000",
+    fillAlpha = 0.25,
+    scrollResize = false,
+    minRadiusInAreas = 1,
+    persistent = true
+  } = {}) {
     if (!canvas?.scene) {
       console.error("[FASERIP ERROR] AreaTemplate: No active scene.");
       return null;
@@ -52,17 +93,18 @@ export class AreaTemplate {
     let radiusPx = currentRadius * pxPerArea;
     const colorNum = PIXI.utils.string2hex?.(fillColor) ?? parseInt(fillColor.replace("#", ""), 16);
 
-    // Build PIXI preview graphic
     const preview = new PIXI.Graphics();
+    const reticles = new PIXI.Graphics();
     AreaTemplate._redrawPreview(preview, radiusPx, colorNum, fillAlpha);
 
     const snapped = canvas.grid.getSnappedPoint({ x, y }, { mode: CONST.GRID_SNAPPING_MODES.CENTER });
     preview.position.set(snapped.x, snapped.y);
     const overlayLayer = canvas.controls ?? canvas.interface ?? canvas.stage;
     overlayLayer.addChild(preview);
+    overlayLayer.addChild(reticles);
+    AreaTemplate._redrawGhostReticles(reticles, preview.position.x, preview.position.y, radiusPx);
 
-    // ── Phase 1: follow mouse, scroll to resize, left-click locks, right-click cancels ──
-    const lockResult = await new Promise((resolve) => {
+    const result = await new Promise((resolve) => {
       let done = false;
 
       const onMove = (event) => {
@@ -70,12 +112,17 @@ export class AreaTemplate {
         const pos = event.getLocalPosition(canvas.stage);
         const snap = canvas.grid.getSnappedPoint(pos, { mode: CONST.GRID_SNAPPING_MODES.CENTER });
         preview.position.set(snap.x, snap.y);
+        AreaTemplate._redrawGhostReticles(reticles, snap.x, snap.y, radiusPx);
       };
 
       const onClick = (event) => {
         if (done) return;
         if (event.button === 2) { done = true; cleanup(); resolve(null); return; }
-        if (event.button === 0) { done = true; cleanup(); resolve({ x: preview.position.x, y: preview.position.y, radius: currentRadius }); }
+        if (event.button === 0) {
+          done = true;
+          cleanup();
+          resolve({ x: preview.position.x, y: preview.position.y, radius: currentRadius });
+        }
       };
 
       const onWheel = (e) => {
@@ -89,6 +136,7 @@ export class AreaTemplate {
         currentRadius = next;
         radiusPx = currentRadius * pxPerArea;
         AreaTemplate._redrawPreview(preview, radiusPx, colorNum, fillAlpha);
+        AreaTemplate._redrawGhostReticles(reticles, preview.position.x, preview.position.y, radiusPx);
       };
 
       const onContext = (e) => { e.preventDefault(); e.stopPropagation(); };
@@ -102,70 +150,64 @@ export class AreaTemplate {
 
       canvas.stage.on("pointermove", onMove);
       canvas.stage.on("pointerdown", onClick);
-      if (scrollResize) {
-        canvas.app.view.addEventListener("wheel", onWheel, { capture: true });
-      }
+      if (scrollResize) canvas.app.view.addEventListener("wheel", onWheel, { capture: true });
       canvas.app.view.addEventListener("contextmenu", onContext, { capture: true });
 
       const hint = scrollResize
-        ? `Move to aim. Scroll to resize (${currentRadius}/${radiusInAreas} areas). Left-click to lock.`
-        : "Move to aim. Left-click to lock position.";
+        ? `Aim. Scroll to resize (${currentRadius}/${radiusInAreas} areas). Left-click to commit.`
+        : "Aim. Left-click to commit. Right-click to cancel.";
       ui.notifications.info(hint);
     });
 
-    if (!lockResult) {
-      if (preview.parent) preview.parent.removeChild(preview);
-      preview.destroy();
-      return null;
+    for (const g of [preview, reticles]) {
+      if (g.parent) g.parent.removeChild(g);
+      g.destroy();
     }
 
-    // ── Phase 2: locked — review targets, confirm or cancel ──
-    const confirmed = await new Promise((resolve) => {
-      let done = false;
+    if (!result) return null;
 
-      const onClick = (event) => {
-        if (done) return;
-        if (event.button === 2) { done = true; cleanup(); resolve(false); return; }
-        if (event.button === 0) { done = true; cleanup(); resolve(true); }
-      };
-
-      const onContext = (e) => { e.preventDefault(); e.stopPropagation(); };
-
-      const cleanup = () => {
-        canvas.stage.off("pointerdown", onClick);
-        canvas.app.view.removeEventListener("contextmenu", onContext, true);
-      };
-
-      canvas.stage.on("pointerdown", onClick);
-      canvas.app.view.addEventListener("contextmenu", onContext, { capture: true });
-
-      ui.notifications.info("Review targets. Left-click to confirm. Right-click to cancel.");
-    });
-
-    // Remove PIXI preview
-    if (preview.parent) preview.parent.removeChild(preview);
-    preview.destroy();
-
-    if (!confirmed) return null;
-
-    // Persist the real region using the final chosen radius.
-    // v14: MeasuredTemplate document was absorbed into Scene Regions. We create
-    // a Region with a single circle shape; radius is in pixels (x/y already are).
-    const finalRadius = lockResult.radius ?? currentRadius;
+    const finalRadius = result.radius ?? currentRadius;
     const finalRadiusPx = finalRadius * pxPerArea;
+    const affectedTokens = AreaTemplate._tokensInside(result.x, result.y, finalRadiusPx);
+
+    // Ephemeral path — no Region, geometry-only return
+    if (!persistent) {
+      return {
+        x: result.x,
+        y: result.y,
+        radius: finalRadius,
+        radiusPx: finalRadiusPx,
+        affectedTokens,
+        target: async () => {
+          const ids = new Set(affectedTokens.map(t => t.id));
+          canvas.tokens.placeables.forEach(t => {
+            t.setTarget(ids.has(t.id), { user: game.user, releaseOthers: false, groupSelection: true });
+          });
+          return affectedTokens;
+        },
+        dismiss: async () => {}
+      };
+    }
+
+    // Persistent path — create Region (v14 replacement for MeasuredTemplate)
     try {
       const [created] = await canvas.scene.createEmbeddedDocuments("Region", [{
         name: label,
         shapes: [{
           type: "circle",
-          x: lockResult.x,
-          y: lockResult.y,
+          x: result.x,
+          y: result.y,
           radius: finalRadiusPx,
           hole: false
         }],
         flags: { "msh-faserip": { areaTemplate: true, radiusInAreas: finalRadius, label } }
       }]);
-      return new AreaTemplate(created, { chosenRadius: finalRadius });
+      return new AreaTemplate(created, {
+        chosenRadius: finalRadius,
+        x: result.x,
+        y: result.y,
+        radiusPx: finalRadiusPx
+      });
     } catch (err) {
       console.error("[FASERIP ERROR] AreaTemplate creation failed:", err);
       return null;
@@ -173,38 +215,42 @@ export class AreaTemplate {
   }
 
   /**
-   * Convenience: create with interactive preview, starting near first targeted token.
+   * Create at first targeted token (or fallback point) with interactive preview.
    */
-  static async createAtTarget({ radiusInAreas = 1, label = "AE", fillColor = "#ff0000", fillAlpha = 0.25, fallbackX = 0, fallbackY = 0 } = {}) {
+  static async createAtTarget({
+    radiusInAreas = 1,
+    label = "AE",
+    fillColor = "#ff0000",
+    fillAlpha = 0.25,
+    fallbackX = 0,
+    fallbackY = 0,
+    persistent = true,
+    scrollResize = false,
+    minRadiusInAreas = 1
+  } = {}) {
     const targets = Array.from(game.user.targets);
     const x = targets[0]?.center?.x ?? fallbackX;
     const y = targets[0]?.center?.y ?? fallbackY;
-    return AreaTemplate.create({ x, y, radiusInAreas, label, fillColor, fillAlpha });
+    return AreaTemplate.create({
+      x, y, radiusInAreas, label, fillColor, fillAlpha,
+      persistent, scrollResize, minRadiusInAreas
+    });
   }
 
-  /** Select all tokens whose center falls within this template as Foundry targets. */
+  /** Select tokens inside this persisted template as Foundry targets. */
   async target() {
     if (!this._doc) return [];
     const shape = this._doc.shapes?.[0];
     if (!shape) return [];
-    const cx = shape.x;
-    const cy = shape.y;
-    const radiusPx = shape.radius;
-
-    const tokens = canvas.tokens.placeables.filter(t => {
-      const dx = t.center.x - cx;
-      const dy = t.center.y - cy;
-      return (dx * dx + dy * dy) <= (radiusPx * radiusPx);
-    });
-
-    const tokenIds = new Set(tokens.map(t => t.id));
+    const tokens = AreaTemplate._tokensInside(shape.x, shape.y, shape.radius);
+    const ids = new Set(tokens.map(t => t.id));
     canvas.tokens.placeables.forEach(t => {
-      t.setTarget(tokenIds.has(t.id), { user: game.user, releaseOthers: false, groupSelection: true });
+      t.setTarget(ids.has(t.id), { user: game.user, releaseOthers: false, groupSelection: true });
     });
     return tokens;
   }
 
-  /** Remove the region from the canvas. */
+  /** Remove the persisted Region from the canvas. */
   async dismiss() {
     if (!this._doc?.id) return;
     try {
@@ -213,8 +259,4 @@ export class AreaTemplate {
       console.warn("[FASERIP WARN] Could not delete region", this._doc.id, err);
     }
   }
-
-  get id() { return this._doc?.id; }
-  get x()  { return this._doc?.shapes?.[0]?.x; }
-  get y()  { return this._doc?.shapes?.[0]?.y; }
 }
