@@ -1,4 +1,13 @@
-// scripts/modules/actions/grenade-action.js v3.0.0 - 2026-04-22
+// scripts/modules/actions/grenade-action.js v3.1.0 - 2026-04-22
+// v3.1.0: Scatter on miss, per Judge's Book. White result rolls 1d10 on the
+//   Slam/Stagger direction table (reused for grenade scatter): 1-2 back toward
+//   thrower, 3-4 back-right, 5-6 back-left, 7 right, 8 left, 9 straight up (lost
+//   to the sky, no effect), 10 straight down (drops at thrower's feet). Horizontal
+//   scatters re-center the blast 1 area in the rolled direction and apply damage
+//   to whoever is in the new area. Shake fires on any explosion (hit or scatter
+//   landing). Replaces the prior "miss = grenade evaporates" behavior that had
+//   no RAW basis (Judge's Book: "A missile weapon that misses its intended target
+//   does not generally evaporate...").
 // v3.0.0: Major cleanup.
 //   - Read unified item fields (system.areaRadius/damage/damageType/intensityRank)
 //     with grenadeRadius/grenadeDamage/grenadeDamageType/grenadeIntensity fallback.
@@ -54,6 +63,76 @@ const DAMAGE_TYPE_META = {
   "E":  { normalized: "energy",         label: "energy", attackForm: "energy", killing: true  },
   "F":  { normalized: "force",          label: "force",  attackForm: "blunt",  killing: false }
 };
+
+// Judge's Book 1d10 Slam/Stagger direction table, repurposed for grenade scatter.
+// Directions are from TARGET's point of view (target facing AWAY from thrower).
+// 9 (straight up) and 10 (straight down) are interpreted for grenades:
+//   9 → grenade sails into the sky, no effect
+//   10 → grenade drops at thrower's feet
+const SCATTER_TABLE = {
+  1: "back", 2: "back",
+  3: "back-right", 4: "back-right",
+  5: "back-left",  6: "back-left",
+  7: "right",
+  8: "left",
+  9: "up",
+  10: "down"
+};
+
+const SCATTER_LABEL = {
+  "back":       "straight back — toward the thrower",
+  "back-right": "back and to the right",
+  "back-left":  "back and to the left",
+  "right":      "straight right of the target",
+  "left":       "straight left of the target",
+  "up":         "straight up — lost in the air",
+  "down":       "straight down — at the thrower's feet"
+};
+
+/**
+ * Resolve a missed grenade's scatter position.
+ * Horizontal scatters offset the blast by 1 area in the rolled direction.
+ * Returns { x, y, direction, dirLabel, roll }. For "up", x/y are null (no detonation).
+ */
+function resolveScatter(throwerPos, targetPos, pxPerArea) {
+  const roll = Math.ceil(Math.random() * 10);
+  const direction = SCATTER_TABLE[roll];
+  const dirLabel = SCATTER_LABEL[direction];
+
+  if (direction === "up") {
+    return { x: null, y: null, direction, dirLabel, roll };
+  }
+  if (direction === "down") {
+    return { x: throwerPos.x, y: throwerPos.y, direction, dirLabel, roll };
+  }
+
+  // Unit vector along throw direction (thrower → target)
+  const dx = targetPos.x - throwerPos.x;
+  const dy = targetPos.y - throwerPos.y;
+  const len = Math.sqrt(dx * dx + dy * dy);
+  const ux = len > 0 ? dx / len : 1;
+  const uy = len > 0 ? dy / len : 0;
+
+  // Target-relative basis (screen coords, y+ = down). Target faces +u (away from thrower).
+  // Their right is 90° clockwise from forward: (-uy, ux). Left is the negation.
+  const rightX = -uy, rightY = ux;
+  const leftX  =  uy, leftY  = -ux;
+  const backX  = -ux, backY  = -uy;
+
+  let offX, offY;
+  switch (direction) {
+    case "back":       offX = backX;                     offY = backY;                     break;
+    case "right":      offX = rightX;                    offY = rightY;                    break;
+    case "left":       offX = leftX;                     offY = leftY;                     break;
+    case "back-right": offX = (backX + rightX) / Math.SQRT2; offY = (backY + rightY) / Math.SQRT2; break;
+    case "back-left":  offX = (backX + leftX)  / Math.SQRT2; offY = (backY + leftY)  / Math.SQRT2; break;
+  }
+
+  const rawX = targetPos.x + offX * pxPerArea;
+  const rawY = targetPos.y + offY * pxPerArea;
+  const snap = canvas.grid.getSnappedPoint({ x: rawX, y: rawY }, { mode: CONST.GRID_SNAPPING_MODES.CENTER });
+  return { x: snap.x, y: snap.y, direction, dirLabel, roll };
+}
 
 /**
  * Resolve the effect mode of a grenade item:
@@ -304,20 +383,54 @@ export class GrenadeAction extends RangedAttackAction {
 
     let resultHtml = "";
     let affectedTargets = [];
+    let exploded = false;
 
-    if (!isHit) {
-      resultHtml = `<div style="padding:6px 8px;margin:0 10px 6px;background:#fff;border:1px solid #ddd;border-radius:3px;font-size:.88em;">
-        <div style="font-weight:700;color:#888;">MISS</div>
-        <div style="color:#555;">Grenade fails to reach target area. No effect.</div>
-      </div>`;
-    } else {
+    if (isHit) {
       await template.target();
       affectedTargets = Array.from(game.user.targets);
-
+      exploded = true;
       resultHtml = `<div style="padding:6px 8px;margin:0 10px 6px;background:#fff;border:1px solid #ddd;border-radius:3px;font-size:.88em;">
         <div style="font-weight:700;color:#e65100;">HIT — ALL IN AREA AFFECTED</div>
         <div style="color:#555;margin-top:2px;">${damage} pts ${meta.label} damage to every target in the area.</div>
       </div>`;
+    } else {
+      // White result → scatter per Judge's Book 1d10 direction table
+      const gridDist  = canvas.scene.grid.distance || 1;
+      const gridSize  = canvas.scene.grid.size ?? 100;
+      const pxPerArea = gridSize / gridDist;
+      const throwerToken = actor.getActiveTokens?.()[0] ?? canvas.tokens.controlled?.[0] ?? null;
+      const throwerPos = throwerToken
+        ? { x: throwerToken.center.x, y: throwerToken.center.y }
+        : { x: template.x, y: template.y };
+
+      const scatter = resolveScatter(throwerPos, { x: template.x, y: template.y }, pxPerArea);
+
+      if (scatter.x === null) {
+        // Straight up — lost, no detonation
+        resultHtml = `<div style="padding:6px 8px;margin:0 10px 6px;background:#fff;border:1px solid #ddd;border-radius:3px;font-size:.88em;">
+          <div style="font-weight:700;color:#888;">MISS — SCATTER (1d10 = ${scatter.roll})</div>
+          <div style="color:#555;margin-top:2px;">${item.name} sails ${scatter.dirLabel}. No effect.</div>
+        </div>`;
+      } else {
+        // Horizontal scatter or at-feet — re-target at new blast center
+        affectedTargets = AreaTemplate._tokensInside(scatter.x, scatter.y, template.radiusPx);
+        const ids = new Set(affectedTargets.map(t => t.id));
+        canvas.tokens.placeables.forEach(t => {
+          t.setTarget(ids.has(t.id), { user: game.user, releaseOthers: false, groupSelection: true });
+        });
+        exploded = true;
+
+        const n = affectedTargets.length;
+        const hitLine = n > 0
+          ? `${damage} pts ${meta.label} damage to ${n} target${n !== 1 ? "s" : ""} in blast area.`
+          : `No targets in blast area.`;
+
+        resultHtml = `<div style="padding:6px 8px;margin:0 10px 6px;background:#fff;border:1px solid #ddd;border-radius:3px;font-size:.88em;">
+          <div style="font-weight:700;color:#e65100;">MISS — SCATTER (1d10 = ${scatter.roll})</div>
+          <div style="color:#555;margin-top:2px;">${item.name} goes wide — lands ${scatter.dirLabel}.</div>
+          <div style="color:#555;margin-top:2px;">${hitLine}</div>
+        </div>`;
+      }
     }
 
     const ammoNote = buildContentBox(`<strong>${item.name}</strong> thrown — ${newShots} remaining`);
@@ -337,8 +450,8 @@ export class GrenadeAction extends RangedAttackAction {
       sections: [resultHtml, ammoNote]
     });
 
-    // Resolve shake from damage-type map (null for non-concussive types, but this is the damage path so usually set)
-    const shakeProfile = (isHit) ? shakeProfileFor(dtCode) : null;
+    // Shake fires on any detonation (hit OR scatter-landing); lost-to-sky = no shake
+    const shakeProfile = exploded ? shakeProfileFor(dtCode) : null;
     const shakeFlag = shakeProfile ? { "msh-faserip": { shake: shakeProfile } } : undefined;
 
     await ChatMessage.create({
@@ -347,9 +460,9 @@ export class GrenadeAction extends RangedAttackAction {
       ...(shakeFlag ? { flags: shakeFlag } : {})
     });
 
-    // Apply damage to all affected tokens
+    // Apply damage to all affected tokens (works for both hit and scatter-landing)
     const isKillingDamage = meta.killing;
-    if (isHit && damage > 0 && affectedTargets.length > 0) {
+    if (exploded && damage > 0 && affectedTargets.length > 0) {
       const dmgResults = await applyDamageToTargets({
         damage,
         targets: affectedTargets,
