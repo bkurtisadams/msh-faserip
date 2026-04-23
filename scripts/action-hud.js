@@ -5,6 +5,9 @@
 //         setting replaces actionHudShowDefenses/Effects group toggles with
 //         per-button hide. Shortcuts surfaced via title tooltip, control
 //         labels, context menu, and popover Help section. Reset uses DialogV2.
+//         Dropped Shift+R keybind (redundant with three other access paths
+//         for a destructive rare action). Added Esc to dismiss popover and
+//         context menu.
 // v3.0.0: Migrate localStorage to game.settings. Add configurable columns,
 //         display style, lock position, show/hide defense & effect buttons.
 //         Ctrl+Wheel zoom writes to game.settings.
@@ -40,7 +43,7 @@ const ACTIONS = [
 const SHORTCUTS = [
   ["Alt+H",        "Toggle HUD"],
   ["E",            "Reorder (edit) mode"],
-  ["Shift+R",      "Reset layout"],
+  ["Esc",          "Close menus"],
   ["Ctrl+Wheel",   "Zoom buttons"],
   ["Right-click",  "Per-button menu"],
   ["Drag → bar",   "Create hotbar macro"],
@@ -222,7 +225,7 @@ export class FaseripActionPanel extends HandlebarsApplicationMixin(ApplicationV2
       controls: [
         { icon: "fas fa-cog",         label: "Settings…",              action: "openSettings" },
         { icon: "fas fa-arrows-alt",  label: "Reorder (E)",            action: "toggleEdit" },
-        { icon: "fas fa-undo-alt",    label: "Reset layout (Shift+R)", action: "resetLayout" },
+        { icon: "fas fa-undo-alt",    label: "Reset layout",           action: "resetLayout" },
       ],
     },
     position: { width: 240, height: "auto" },
@@ -411,10 +414,6 @@ export class FaseripActionPanel extends HandlebarsApplicationMixin(ApplicationV2
         ev.preventDefault();
         this._toggleEdit();
       }
-      if (ev.key?.toLowerCase() === "r" && ev.shiftKey) {
-        ev.preventDefault();
-        this._confirmReset();
-      }
     });
     el.tabIndex = -1;
 
@@ -521,7 +520,7 @@ export class FaseripActionPanel extends HandlebarsApplicationMixin(ApplicationV2
       <button data-ctx="hide"><i class="fas fa-eye-slash"></i> Hide this button</button>
       <div class="fah-ctx-sep"></div>
       <button data-ctx="edit"><i class="fas fa-arrows-alt"></i> Reorder (E)</button>
-      <button data-ctx="reset"><i class="fas fa-undo-alt"></i> Reset layout (Shift+R)</button>
+      <button data-ctx="reset"><i class="fas fa-undo-alt"></i> Reset layout</button>
       <button data-ctx="settings"><i class="fas fa-cog"></i> Settings…</button>
     `;
     document.body.appendChild(menu);
@@ -549,7 +548,14 @@ export class FaseripActionPanel extends HandlebarsApplicationMixin(ApplicationV2
       this._ctxDismiss = (ev) => {
         if (!menu.contains(ev.target)) this._hideContextMenu();
       };
+      this._ctxKeyDismiss = (ev) => {
+        if (ev.key === "Escape") {
+          ev.preventDefault();
+          this._hideContextMenu();
+        }
+      };
       document.addEventListener("mousedown", this._ctxDismiss);
+      document.addEventListener("keydown", this._ctxKeyDismiss);
     }, 0);
   }
 
@@ -558,6 +564,10 @@ export class FaseripActionPanel extends HandlebarsApplicationMixin(ApplicationV2
     if (this._ctxDismiss) {
       document.removeEventListener("mousedown", this._ctxDismiss);
       this._ctxDismiss = null;
+    }
+    if (this._ctxKeyDismiss) {
+      document.removeEventListener("keydown", this._ctxKeyDismiss);
+      this._ctxKeyDismiss = null;
     }
   }
 
@@ -712,7 +722,14 @@ export class FaseripActionPanel extends HandlebarsApplicationMixin(ApplicationV2
         if (ev.target.closest("[data-action='openSettings']")) return;
         this._hideSettingsPopover();
       };
+      this._popKeyDismiss = (ev) => {
+        if (ev.key === "Escape") {
+          ev.preventDefault();
+          this._hideSettingsPopover();
+        }
+      };
       document.addEventListener("mousedown", this._popDismiss);
+      document.addEventListener("keydown", this._popKeyDismiss);
     }, 0);
   }
 
@@ -721,6 +738,10 @@ export class FaseripActionPanel extends HandlebarsApplicationMixin(ApplicationV2
     if (this._popDismiss) {
       document.removeEventListener("mousedown", this._popDismiss);
       this._popDismiss = null;
+    }
+    if (this._popKeyDismiss) {
+      document.removeEventListener("keydown", this._popKeyDismiss);
+      this._popKeyDismiss = null;
     }
   }
 
