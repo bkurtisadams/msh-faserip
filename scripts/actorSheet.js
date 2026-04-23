@@ -48,6 +48,7 @@ import { MovementFeats } from './movement-feats.js';
 import { showAbilityFeatDialog, determineFeatRequirement, checkFeatSuccess } from './modules/actions/ability-feat-dialog.js';
 import { RESOURCE_PRICES } from './rules/rules-reference.js';
 import { initSheetZoom } from './modules/ui/sheet-zoom.js';
+import { UniversalTableTab } from './modules/ui/universal-table-tab.js';
 import {
   RANKS_ORDERED as _RANKS, RANK_VALUES as _RANK_VALUES, RANK_RANGES as _RANK_RANGES,
   RANK_ALIASES, normalizeRank,
@@ -153,80 +154,8 @@ export class FaseripActorSheet extends foundry.appv1.sheets.ActorSheet {
     // Track the in-sheet Universal Table hook
   _universalTableHookId = null;
 
-  static UAT_ACTION_INFO = [
-      { code: 'BA', label: 'Blunt Attack', ability: 'Fighting',
-        desc: 'Hand-to-hand with bare fists, flat of a blade, or blunt weapon. Target must be adjacent. Attacker may pull punch to reduce damage or lower effect (Stun→Slam→Hit). Blunt weapon damage = max of user Strength or weapon material (raised to next rank minimum).',
-        results: { white: 'Miss — no damage.', green: 'Hit — Strength rank number in damage.', yellow: 'Slam — Strength damage + target makes Endurance FEAT for Slam result.', red: 'Stun — Strength damage + target makes Endurance FEAT for Stun result.' },
-        notes: 'Slam/Stun require damage to penetrate armor. Attacker loses all Karma on a Kill.' },
-      { code: 'EA', label: 'Edged Attack', ability: 'Fighting',
-        desc: 'Attack with claws, teeth, or edged weapons (knives, swords, hatchets). Must be adjacent. Inflicts minimum weapon damage; cannot reduce effect. Damage = attacker Strength or weapon material strength, whichever is lower.',
-        results: { white: 'Miss — no damage.', green: 'Hit — weapon/attack damage.', yellow: 'Stun — damage + Endurance FEAT for Stun result.', red: 'Kill — damage + Endurance FEAT for Kill result.' },
-        notes: 'Cannot reduce effect (Kill result stands). Attacker loses all Karma on a Kill.' },
-      { code: 'Sh', label: 'Shooting Attack', ability: 'Agility',
-        desc: 'Ranged attack with projectile weapons (guns, rifles, etc.). No adjacency required. Range in areas; each area beyond max = -1CS. Cannot be reduced in effect or damage by attacker.',
-        results: { white: 'Miss — shot may hit another target in path (Judge\'s call).', green: 'Hit — weapon damage.', yellow: 'Bullseye — hit + can target specific body part; effect determined by Judge.', red: 'Kill — damage + Endurance FEAT for Kill result.' },
-        notes: 'Intervening cover = -2CS. Point blank (adjacent, non-fighting) = +3CS. Moving target = -1CS to -4CS.' },
-      { code: 'TE', label: 'Throwing Edged', ability: 'Agility',
-        desc: 'Throwing a sharp edged weapon (knife, shuriken). Range based on Strength rank. Cannot reduce effect but may reduce damage.',
-        results: { white: 'Miss — weapon may hit another target in path.', green: 'Hit — weapon damage.', yellow: 'Stun — damage + Endurance FEAT for Stun result.', red: 'Kill — damage + Endurance FEAT for Kill result.' },
-        notes: 'Range (areas): Fe=1, Pr=1, Ty=1, Gd=2, Ex=3, Rm=4, In=5, Am=6, Mn=7, Un=8, X=10, Y=15, Z=20.' },
-      { code: 'TB', label: 'Throwing Blunt', ability: 'Agility',
-        desc: 'Throwing a blunt object (rock, bus, shield). Damage = thrower Strength or item material strength, whichever is lower. Can reduce effect or damage.',
-        results: { white: 'Miss — object may hit another target in path.', green: 'Hit — Strength or material damage.', yellow: 'Bullseye — hit + target specific location.', red: 'Stun — damage + Endurance FEAT for Stun result.' },
-        notes: 'Same range table as Throwing Edged (by Strength rank).' },
-      { code: 'En', label: 'Energy Attack', ability: 'Agility',
-        desc: 'Energy powers (fire blast, lightning, radiation, etc.). No physical component. Max damage set by power rank. Attacker may reduce damage but not effect. Body Armor = -20 points vs Energy.',
-        results: { white: 'Miss.', green: 'Hit — power damage.', yellow: 'Bullseye — hit + target specific location.', red: 'Kill — damage + Endurance FEAT for Kill result.' },
-        notes: 'Force Fields protect at full rank vs Energy. Body Armor rank reduced by 20 pts vs Energy.' },
-      { code: 'Fo', label: 'Force Attack', ability: 'Agility',
-        desc: 'Physical energy manifestation (repulsors, force bolts, ice rams). Attacker may reduce damage but not effect. Concussive rather than penetrating.',
-        results: { white: 'Miss.', green: 'Hit — power damage.', yellow: 'Bullseye — hit + target specific location.', red: 'Stun — damage + Endurance FEAT for Stun result.' },
-        notes: 'Force Fields take -10 vs physical attacks. Groundstrike variant: damage on Force column, affects area.' },
-      { code: 'Gp', label: 'Grappling', ability: 'Strength',
-        desc: 'Attempt to restrain or hold an opponent. Must be adjacent. Attacker may not make other attacks this round on a Miss. Body Armor has no effect on initial hold (no damage done).',
-        results: { white: 'Miss — attacker may make no other attack this round.', green: 'Miss — attacker may make no other attack this round.', yellow: 'Partial Hold — target at -2CS all actions; cannot move if attacker Strength ≥ target. No damage.', red: 'Full Hold — target fully restrained; attacker may inflict up to Strength damage per round + 1 extra action.' },
-        notes: 'Martial Arts C: +1CS on grapple. Martial Arts A: Stun/Slam ignores Strength/Endurance.' },
-      { code: 'Gb', label: 'Grabbing', ability: 'Strength',
-        desc: 'Attempt to take a possession from an opponent (weapon, object). Does not normally inflict damage. Must be adjacent.',
-        results: { white: 'Miss — item stays with owner or knocked loose up to 1 area.', green: 'Take — attacker gets item only if Strength ≥ target\'s; otherwise Miss.', yellow: 'Grab — attacker takes item regardless of relative Strength.', red: 'Break — take item and depart, or risk triggering it (roll vs material strength: non-white = safe use; white = item damaged/fires/explodes).' },
-        notes: 'Grabbing combat does not inflict damage normally.' },
-      { code: 'Es', label: 'Escaping', ability: 'Strength',
-        desc: 'Attempt to break free from a hold. Character must currently be held. A Miss means no other action that turn.',
-        results: { white: 'Miss — still held, no other action.', green: 'Escape — free; half movement, no other actions.', yellow: 'Escape — free; half movement, no other actions.', red: 'Reverse — free + either move half distance, attempt to Grapple former attacker, or any action at -2CS.' },
-        notes: 'Martial Arts C: +1CS on escape attempts.' },
-      { code: 'Ch', label: 'Charging', ability: 'Endurance',
-        desc: 'Full movement + attack. Must move at least 1 area. +1CS per area moved (max +3CS). Damage = Endurance or Body Armor (whichever higher) + 2 pts per area moved. If defender\'s armor > damage, rebound to attacker.',
-        results: { white: 'Miss — continues half speed in same direction; may hit obstacle instead.', green: 'Hit — Endurance/armor damage + 2 pts/area.', yellow: 'Slam — hit damage + Endurance FEAT for Slam result.', red: 'Stun — hit damage + Endurance FEAT for Stun result. Attacker may choose lesser effect.' },
-        notes: 'Flying character in power dive: +4CS (instead of +3CS max). Fastball Special uses this column.' },
-      { code: 'Do', label: 'Dodging', ability: 'Agility',
-        desc: 'Conscious defense vs ranged/charging attacks. Declared at start of turn. Half speed only, max 1 other action. All attacker column shifts reduced by result. No effect vs Slugfest or wrestling.',
-        results: { white: 'None — no reduction to attacker.', green: '-2CS — all attacks against character reduced by 2 column shifts.', yellow: '-4CS — all attacks reduced by 4 column shifts.', red: '-6CS — all attacks reduced by 6 column shifts.' },
-        notes: 'Dodger takes -2CS on all own FEATs. Cannot dodge unexpected/blindside attacks.' },
-      { code: 'Ev', label: 'Evading', ability: 'Fighting',
-        desc: 'Defensive tactic vs adjacent attackers only (Slugfest/wrestling). Declared in declaration phase. Evader makes no attacks. Only one opponent may be evaded. If both sides evade, no combat occurs.',
-        results: { white: 'Auto-hit — character is in line of fire; opponent gets at least Green result.', green: 'Evasion — attacker does no damage.', yellow: '+1CS — evaded + next round first attack on that foe gets +1CS to hit.', red: '+2CS — evaded + next round first attack on that foe gets +2CS to hit.' },
-        notes: '+1/+2CS bonus applies only to first attack next round vs same opponent; cannot be saved.' },
-      { code: 'Bl', label: 'Blocking', ability: 'Strength',
-        desc: 'Use Strength as Body Armor against physical attacks (Slugfest, Edged/Blunt Throwing, Force, Wrestling). Not vs Shooting, Energy, or Charging. Blocker takes no other action but may shield others behind them. Normal Body Armor still applies; Force Fields do not stack.',
-        results: { white: '-6CS — Strength rank reduced by 6 CS for Body Armor value.', green: '-4CS — Strength rank reduced by 4 CS for Body Armor value.', yellow: '-2CS — Strength rank reduced by 2 CS for Body Armor value.', red: '+1CS — Strength rank raised by 1 CS for Body Armor value.' },
-        notes: 'Cannot block fire or intangible attacks (common sense). Character with Monstrous Strength blocking = up to +1CS = Monstrous armor.' },
-      { code: 'Ca', label: 'Catching', ability: 'Agility',
-        desc: 'Catch a falling object, teammate, or weapon/projectile thrown or fired at character. -3CS if the object is directed specifically at the catcher. One object at a time.',
-        results: { white: 'Auto-hit — object hits catcher (charging damage if falling; auto-hit if weapon).', green: 'Miss — failed to catch. If directed attack, +1CS for attacker.', yellow: 'Damage — caught but may damage the object/character caught.', red: 'Catch — caught safely, no ill effects.' },
-        notes: 'Min Agility to catch bullets=Unearthly, arrows=Amazing, other projectiles=Remarkable, falling characters=any.' },
-      { code: 'St', label: 'Stun Result', ability: 'Endurance FEAT',
-        desc: 'Rolled by the TARGET after receiving a Stun-capable hit (Blunt, Charging, Force, Throwing attacks on Red result). Requires damage to penetrate armor to take effect.',
-        results: { white: '1-10 Rounds — roll a die; character knocked unconscious, no actions.', green: '1 Round — knocked down, conscious but no action next round (can play possum).', yellow: 'No Effect — character shrugs it off.', red: 'No Effect — character shrugs it off.' },
-        notes: 'Martial Arts A: Stun/Slam effects ignore target\'s Strength/Endurance for determining if they apply.' },
-      { code: 'Sl', label: 'Slam Result', ability: 'Endurance FEAT',
-        desc: 'Rolled by the TARGET after receiving a Slam-capable hit (Blunt Attacks, Charging on Red result). Requires damage to penetrate armor. Attacker chooses direction if damage was dealt.',
-        results: { white: 'Grand Slam — target launched at speed = attacker\'s Strength rank (areas). Attacker chooses direction.', green: '1 Area — target knocked 1 area in attacker-chosen direction. Hits obstacles as charging attack.', yellow: 'Stagger — knocked back a step; no longer adjacent. Still takes hit damage.', red: 'No Slam — not moved; takes normal hit damage.' },
-        notes: 'Characters in flight can be slammed regardless of Endurance. Slam into building = charging damage on building.' },
-      { code: 'Ki', label: 'Kill Result', ability: 'Endurance FEAT',
-        desc: 'Rolled by the TARGET after a Kill-capable hit (Edged Slugfest, Shooting, Energy on Red result) OR when Health drops to 0. Most dangerous result in the game.',
-        results: { white: 'Endurance Loss — character is dying; loses 1 Endurance rank/turn until Shift 0 (death). Stabilize: spend 50 Karma (1 round), 200 Karma + FEAT, or receive any aid.', green: 'E/S — Endurance Loss only if attack was Edged Slugfest or Shooting. Otherwise No Effect.', yellow: 'No Effect — character takes damage but is not dying.', red: 'No Effect — character takes damage but is not dying.' },
-        notes: 'ATTACKER loses ALL Karma if the Kill result actually kills a target. Impaired: -2CS on all actions while Endurance ranks are reduced.' }
-    ];
+  // Universal Table tab renderer (instantiated lazily in activateListeners)
+  _utTab = null;
 
 
   /** @override */
@@ -3574,57 +3503,9 @@ html.find('.headquarters-row').each((i, row) => {
       });
     });
 
-    // Universal Table cell click - highlight the cell
-    html.find('.rank-cell').click(ev => {
-      // Remove previous highlights
-      html.find('.rank-cell').removeClass('highlighted');
-      
-      // Highlight clicked cell
-      $(ev.currentTarget).addClass('highlighted');
-      
-      // Get the roll range and rank
-      const row = $(ev.currentTarget).closest('tr');
-      const rollLabel = row.data('roll-label');
-      const cellIndex = $(ev.currentTarget).index();
-      const headerRow = html.find('.universal-rank-table thead tr').eq(0);
-      const rankAbbr = headerRow.find('th').eq(cellIndex).text().trim();
-      const color = $(ev.currentTarget).data('color');
-      
-      // Optional: Show a notification
-      ui.notifications.info(`Roll ${rollLabel} on ${rankAbbr} = ${color.toUpperCase()}`);
-    });
-    
-    // Action panel header click — post chat card with action type rules
-    const UAT_ACTION_INFO = FaseripActorSheet.UAT_ACTION_INFO;
-
-
-    html.find('.universal-rank-table .uat-head1 th:not(:first-child), .universal-rank-table .uat-head2 th:not(:first-child)').css('cursor', 'pointer').on('click', ev => {
-      const $th = $(ev.currentTarget);
-      // Column index among siblings (skip blank first th → subtract 1)
-      const colIdx = $th.parent().find('th').index($th) - 1;
-      const info = UAT_ACTION_INFO[colIdx];
-      if (!info) return;
-
-      const content = `
-        <div class="faserip-chat-action-info">
-          <h3>${info.label} <span style="font-weight:normal;font-size:0.85em;">(${info.code})</span></h3>
-          <p><strong>Ability:</strong> ${info.ability}</p>
-          <p style="margin:4px 0;">${info.desc}</p>
-          <table style="width:100%;border-collapse:collapse;margin:6px 0;font-size:0.9em;">
-            <tr style="background:#fff;"><td style="border:1px solid #999;padding:2px 4px;width:12px;">&nbsp;</td><td style="border:1px solid #999;padding:2px 6px;"><strong>White:</strong> ${info.results.white}</td></tr>
-            <tr style="background:#00c000;"><td style="border:1px solid #999;padding:2px 4px;">&nbsp;</td><td style="border:1px solid #999;padding:2px 6px;"><strong>Green:</strong> ${info.results.green}</td></tr>
-            <tr style="background:#e8e000;"><td style="border:1px solid #999;padding:2px 4px;">&nbsp;</td><td style="border:1px solid #999;padding:2px 6px;"><strong>Yellow:</strong> ${info.results.yellow}</td></tr>
-            <tr style="background:#cc0000;color:#fff;"><td style="border:1px solid #999;padding:2px 4px;">&nbsp;</td><td style="border:1px solid #999;padding:2px 6px;"><strong>Red:</strong> ${info.results.red}</td></tr>
-          </table>
-          ${info.notes ? `<p style="font-size:0.85em;font-style:italic;margin-top:4px;">📌 ${info.notes}</p>` : ''}
-        </div>`;
-
-      ChatMessage.create({
-        speaker: ChatMessage.getSpeaker({ actor: this.actor }),
-        content,
-        flags: { 'msh-faserip': { type: 'action-info' } }
-      });
-    });
+    // Universal Table tab — render and wire (hover, column-select, header-click)
+    if (!this._utTab) this._utTab = new UniversalTableTab(this);
+    this._utTab.render(html);
 
     // This serves as a fallback to ensure all draggable items can create macros
     new foundry.applications.ux.DragDrop.implementation({
@@ -5173,42 +5054,14 @@ async _rollAction(actionType, abilityName) {
   
     /**
    * Handle universal table rolls for the in-sheet Universal Table tab.
-   * Highlights the result cell in the in-sheet Universal Table tab after a roll.
+   * Highlights the result cell via UniversalTableTab.highlightRoll.
    */
   _onSheetUniversalTableRoll(data) {
-    // Only proceed if the sheet is actually rendered
-    if (!this.rendered) return;
-
-    const { rank, roll } = data;
+    if (!this.rendered || !this._utTab) return;
     const html = this.element;
     if (!html || !html.length) return;
-
-    const normalizedRank = RANK_ALIASES[rank] || rank;
-    const colIndex = _RANKS.indexOf(normalizedRank);
-    if (colIndex === -1) return;
-
-    // Find the matching row and highlight just that result cell
-    const rows = html.find('tbody tr');
-    rows.each((i, row) => {
-      const $row = $(row);
-      const label = $row.find('th').first().text().trim();
-      if (!label) return;
-
-      let match = false;
-      if (label.includes('–') || label.includes('-')) {
-        const [min, max] = label.split(/[–-]/).map(n => parseInt(n));
-        if (!Number.isNaN(min) && !Number.isNaN(max)) match = roll >= min && roll <= max;
-      } else {
-        const numericLabel = parseInt(label);
-        if (!Number.isNaN(numericLabel)) match = roll === numericLabel;
-      }
-
-      if (match) {
-        const cell = $row.find('td').eq(colIndex);
-        cell.addClass('roll-highlight');
-        setTimeout(() => cell.removeClass('roll-highlight'), 10000);
-      }
-    });
+    const normalizedRank = RANK_ALIASES[data.rank] || data.rank;
+    this._utTab.highlightRoll(html, normalizedRank, data.roll);
   }
 
   // other methods

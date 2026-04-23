@@ -1440,8 +1440,7 @@ Hooks.once("init", async () => {
   };
 
   await foundry.applications.handlebars.loadTemplates([
-    "systems/msh-faserip/templates/universal-table.html",
-    "systems/msh-faserip/templates/universal-rank-table.hbs"
+    "systems/msh-faserip/templates/universal-table-tab.hbs"
   ]);
 
   game.msh.getRankValue = function(rankName) {

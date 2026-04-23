@@ -63,7 +63,8 @@
         "styles/gm-tools.css",
         "styles/action-dialog.css",
         "styles/vehicle-sheet.css",
-        "styles/compact-mode.css"
+        "styles/compact-mode.css",
+        "styles/universal-table-tab.css"
     ],
     "packs": [
         {

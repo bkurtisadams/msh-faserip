@@ -1,0 +1,211 @@
+/* styles/universal-table-tab.css v1.1.0 — FASERIP Universal Table tab
+ * v1.1.0: Add @import for Oswald weights 400;600;700;900 and Barlow
+ *         Condensed regular+italic 400;500;600;700. The parent sheet's
+ *         import only pulls Oswald 400;600;700 and Barlow italic 400 —
+ *         weight-900 and italic-700 in this file were being synthesized,
+ *         producing a stencil/embossed look on BA/EA/Sh rank abbrs and
+ *         on the Fighting/Agility subtitles.
+ * v1.0.0: Initial data-driven port from GCC reference faserip-table.html.
+ * Namespaced to .ut-tab-root to avoid collision with actor-sheet styles.
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;600;700;900&family=Barlow+Condensed:ital,wght@0,400;0,500;0,600;0,700;1,400;1,700&display=swap');
+
+.ut-tab-root {
+  --ut-white:  #ffffff;
+  --ut-green:  #22bb22;
+  --ut-yellow: #f0d800;
+  --ut-red:    #cc1111;
+  --ut-dark:   #111;
+  --ut-mid:    #444;
+  --ut-soft:   #666;
+  --ut-mute:   #999;
+  --ut-bg:     #d6eaf8;
+  --ut-bg2:    #c4dff0;
+  --ut-accent: #c05a00;
+  --ut-col-hdr:#e8e8e0;
+  --ut-rcw:    44px;
+  --ut-fd: "Oswald", "Impact", sans-serif;
+  --ut-fb: "Barlow Condensed", "Arial Narrow", sans-serif;
+
+  background: var(--ut-bg);
+  color: var(--ut-dark);
+  font-family: var(--ut-fb);
+  font-size: 12px;
+  padding: 8px;
+  overflow: auto;
+}
+
+.ut-tab-root .ut-inner {
+  margin: 0 auto;
+  width: fit-content;
+}
+
+/* ── Shared column sizing ── */
+.ut-tab-root .ut-col-roll { width: 48px; min-width: 48px; }
+.ut-tab-root .ut-col-rank { width: var(--ut-rcw); min-width: var(--ut-rcw); max-width: var(--ut-rcw); }
+
+/* ══ ACTION RESULTS TABLE ══ */
+.ut-tab-root table.action-tbl {
+  border-collapse: collapse;
+  font-family: var(--ut-fb);
+  font-size: 10px;
+  table-layout: fixed;
+  margin-bottom: 10px;
+}
+.ut-tab-root .action-tbl th,
+.ut-tab-root .action-tbl td {
+  border: 1px solid #000;
+  padding: 1px 2px;
+  text-align: center;
+  vertical-align: middle;
+  line-height: 1.15;
+  overflow: hidden;
+}
+.ut-tab-root .action-tbl thead th {
+  background: var(--ut-col-hdr);
+  font-family: var(--ut-fd);
+  font-weight: 700;
+  cursor: pointer;
+}
+.ut-tab-root .action-tbl thead th:hover { background: #d8d8cc; }
+.ut-tab-root .action-tbl .at-name    { font-size: 7px; font-weight: 600; line-height: 1.05; }
+.ut-tab-root .action-tbl .at-abbr    { font-size: 14px; font-weight: 900; font-family: var(--ut-fd); line-height: 1; }
+.ut-tab-root .action-tbl .at-ability { font-size: 7px; color: var(--ut-soft); font-style: italic; }
+.ut-tab-root .action-tbl .row-w { background: var(--ut-white); }
+.ut-tab-root .action-tbl .row-g { background: var(--ut-green); }
+.ut-tab-root .action-tbl .row-y { background: var(--ut-yellow); }
+.ut-tab-root .action-tbl .row-r { background: var(--ut-red); color: #fff; }
+.ut-tab-root .action-tbl .row-label {
+  font-weight: 900;
+  font-family: var(--ut-fd);
+  font-size: 10px;
+  text-align: left;
+  padding-left: 4px;
+}
+
+/* ══ RANK REFERENCE TABLE ══ */
+.ut-tab-root table.rank-tbl {
+  border-collapse: collapse;
+  font-family: var(--ut-fb);
+  font-size: 10px;
+  table-layout: fixed;
+  margin-bottom: 6px;
+}
+.ut-tab-root .rank-tbl th,
+.ut-tab-root .rank-tbl td {
+  border: 1px solid #000;
+  padding: 1px 2px;
+  text-align: center;
+  vertical-align: middle;
+  overflow: hidden;
+}
+.ut-tab-root .rank-tbl thead th {
+  background: var(--ut-col-hdr);
+  font-family: var(--ut-fd);
+  font-weight: 700;
+}
+.ut-tab-root .rank-tbl .rk-head { cursor: pointer; }
+.ut-tab-root .rank-tbl .rk-head:hover { background: #d8d8cc; }
+.ut-tab-root .rank-tbl .rk-abbr { font-size: 16px; font-weight: 900; font-family: var(--ut-fd); line-height: 1; }
+.ut-tab-root .rank-tbl .rk-name { font-size: 7px; font-weight: 600; line-height: 1.05; color: var(--ut-mid); }
+.ut-tab-root .rank-tbl .rk-val  { font-weight: 700; font-size: 10px; }
+.ut-tab-root .rank-tbl .rk-range{ font-size: 8px; color: var(--ut-mid); }
+.ut-tab-root .rank-tbl .rk-corner,
+.ut-tab-root .rank-tbl tbody th {
+  background: var(--ut-col-hdr);
+  font-size: 8px;
+  color: var(--ut-soft);
+  font-family: var(--ut-fb);
+  text-transform: uppercase;
+  letter-spacing: .5px;
+}
+.ut-tab-root .rank-tbl th.col-sel {
+  background: var(--ut-accent);
+  color: #fff;
+  outline: 2px solid #000;
+  outline-offset: -2px;
+}
+.ut-tab-root .rank-tbl th.col-sel .rk-name,
+.ut-tab-root .rank-tbl th.col-sel .rk-abbr { color: #fff; }
+
+/* ══ UNIVERSAL GRID ══ */
+.ut-tab-root table.ut-grid {
+  border-collapse: collapse;
+  font-family: var(--ut-fd);
+  font-size: 10px;
+  table-layout: fixed;
+}
+.ut-tab-root .ut-grid th,
+.ut-tab-root .ut-grid td {
+  border: 1px solid #888;
+  padding: 0;
+  text-align: center;
+  vertical-align: middle;
+  height: 18px;
+}
+.ut-tab-root .ut-grid .ut-roll {
+  font-weight: 700;
+  font-size: 10px;
+  background: #e0eff8;
+  color: #000;
+  text-align: right;
+  padding-right: 5px;
+  border-color: #789;
+  font-family: var(--ut-fb);
+}
+.ut-tab-root .ut-grid .c-w { background: var(--ut-white); }
+.ut-tab-root .ut-grid .c-g { background: var(--ut-green); }
+.ut-tab-root .ut-grid .c-y { background: var(--ut-yellow); }
+.ut-tab-root .ut-grid .c-r { background: var(--ut-red); }
+
+/* Crosshair highlight */
+.ut-tab-root .ut-grid td.cell-hl {
+  outline: 2px solid #000;
+  outline-offset: -1px;
+  z-index: 2;
+  position: relative;
+}
+.ut-tab-root .ut-grid td.col-hl,
+.ut-tab-root .ut-grid td.row-hl {
+  background-image: linear-gradient(rgba(0,0,0,.08), rgba(0,0,0,.08));
+}
+.ut-tab-root .ut-grid .ut-roll.row-hl { background: #c0dae8; }
+
+/* Persistent column selection */
+.ut-tab-root .ut-grid td.col-sel-bg,
+.ut-tab-root .action-tbl td.col-sel-bg,
+.ut-tab-root .action-tbl th.col-sel-bg {
+  background-image: linear-gradient(rgba(192,90,0,.18), rgba(192,90,0,.18));
+}
+
+/* Dice-driven roll pulse (from msh-faserip.universalTableRoll hook) */
+.ut-tab-root .ut-grid td.roll-highlight {
+  outline: 3px solid #000;
+  outline-offset: -2px;
+  box-shadow: 0 0 0 2px #c05a00 inset;
+  animation: ut-pulse 1s ease-out 3;
+  position: relative;
+  z-index: 3;
+}
+@keyframes ut-pulse {
+  0%, 100% { box-shadow: 0 0 0 2px #c05a00 inset; }
+  50%      { box-shadow: 0 0 0 4px #ff7a00 inset; }
+}
+
+/* ── Tooltip (follows cursor over grid cells) ── */
+.ut-tab-root .ut-tip,
+.ut-tab-root #ut-tip {
+  position: fixed;
+  pointer-events: none;
+  z-index: 500;
+  background: #1a1a2e;
+  color: #fff;
+  font-family: var(--ut-fb);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 3px;
+  white-space: nowrap;
+  display: none;
+}
