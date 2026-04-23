@@ -1,4 +1,10 @@
-// scripts/modules/actions/area-template.js v9.0.0 - 2026-04-22
+// scripts/modules/actions/area-template.js v9.1.0 - 2026-04-22
+// v9.1.0: Persistent Regions now get a paired Drawing overlay so the hazard
+//   is visible to all clients on any canvas layer (v14 Regions only render
+//   on the Regions layer). Drawing uses the same fillColor/fillAlpha we were
+//   already passing to the PIXI preview, so per-hazard-type colors
+//   (smoke/gas/KO/flash) flow through from the caller. dismiss() now deletes
+//   both documents. Ephemeral templates (persistent:false) unchanged.
 // v9.0.0: One-phase placement. Cursor follows, left-click commits, right-click cancels.
 //   Live ghost reticles highlight affected tokens during aim (no double-click review step).
 //   New `persistent` option: when false, skip Region creation entirely and return
@@ -10,18 +16,20 @@
 // v7.0.0: Scroll-wheel resize during aim, scrollResize option.
 
 export class AreaTemplate {
-  constructor(templateDoc, { chosenRadius, x, y, radiusPx } = {}) {
+  constructor(templateDoc, { chosenRadius, x, y, radiusPx, drawingId } = {}) {
     this._doc = templateDoc;
     this._chosenRadius = chosenRadius;
     this._x = x ?? templateDoc?.shapes?.[0]?.x;
     this._y = y ?? templateDoc?.shapes?.[0]?.y;
     this._radiusPx = radiusPx ?? templateDoc?.shapes?.[0]?.radius;
+    this._drawingId = drawingId ?? null;
   }
 
   get chosenRadius() { return this._chosenRadius; }
   get id() { return this._doc?.id; }
   get x()  { return this._x; }
   get y()  { return this._y; }
+  get drawingId() { return this._drawingId; }
 
   /** Redraw the PIXI preview circle at a new pixel radius. */
   static _redrawPreview(preview, radiusPx, colorNum, fillAlpha) {
@@ -190,6 +198,8 @@ export class AreaTemplate {
     }
 
     // Persistent path — create Region (v14 replacement for MeasuredTemplate)
+    // AND a Drawing overlay so the hazard is visible to all clients even when
+    // the Regions layer isn't active (Regions only render on their own layer).
     try {
       const [created] = await canvas.scene.createEmbeddedDocuments("Region", [{
         name: label,
@@ -202,11 +212,38 @@ export class AreaTemplate {
         }],
         flags: { "msh-faserip": { areaTemplate: true, radiusInAreas: finalRadius, label } }
       }]);
+
+      // Paired visible overlay — filled ellipse at the same spot.
+      // Failure here is non-fatal (hazard still works, just invisible).
+      let drawingId = null;
+      try {
+        const [drawing] = await canvas.scene.createEmbeddedDocuments("Drawing", [{
+          shape: {
+            type: CONST.DRAWING_TYPES?.ELLIPSE ?? "e",
+            width: finalRadiusPx * 2,
+            height: finalRadiusPx * 2
+          },
+          x: result.x - finalRadiusPx,
+          y: result.y - finalRadiusPx,
+          fillType: CONST.DRAWING_FILL_TYPES?.SOLID ?? 1,
+          fillColor,
+          fillAlpha,
+          strokeColor: "#000000",
+          strokeAlpha: 0.55,
+          strokeWidth: 2,
+          flags: { "msh-faserip": { areaTemplate: true, regionId: created.id, label } }
+        }]);
+        drawingId = drawing?.id ?? null;
+      } catch (err) {
+        console.warn("[FASERIP WARN] Drawing overlay creation failed:", err);
+      }
+
       return new AreaTemplate(created, {
         chosenRadius: finalRadius,
         x: result.x,
         y: result.y,
-        radiusPx: finalRadiusPx
+        radiusPx: finalRadiusPx,
+        drawingId
       });
     } catch (err) {
       console.error("[FASERIP ERROR] AreaTemplate creation failed:", err);
@@ -250,8 +287,19 @@ export class AreaTemplate {
     return tokens;
   }
 
-  /** Remove the persisted Region from the canvas. */
+  /** Remove the persisted Region (and paired Drawing overlay) from the canvas. */
   async dismiss() {
+    // Drawing first — if Region deletion triggers a cascade, the drawing
+    // might already be gone. Deleting in order handles both cases.
+    if (this._drawingId) {
+      try {
+        await canvas.scene.deleteEmbeddedDocuments("Drawing", [this._drawingId]);
+      } catch (err) {
+        // Already gone, or permission — non-fatal
+        console.warn("[FASERIP WARN] Could not delete drawing overlay", this._drawingId, err);
+      }
+      this._drawingId = null;
+    }
     if (!this._doc?.id) return;
     try {
       await canvas.scene.deleteEmbeddedDocuments("Region", [this._doc.id]);

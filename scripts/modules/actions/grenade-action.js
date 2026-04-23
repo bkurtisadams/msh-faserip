@@ -1,4 +1,10 @@
-// scripts/modules/actions/grenade-action.js v3.2.0 - 2026-04-22
+// scripts/modules/actions/grenade-action.js v3.3.0 - 2026-04-22
+// v3.3.0: Intensity grenades now place a visible Drawing overlay alongside the
+//   Region (v14 Regions are only visible on the Regions layer, so without
+//   an overlay the hazard was logically functional but invisible on canvas).
+//   Per-type fillColor via resolveHazardVisual: smoke=gray, tear gas=yellow-
+//   green, KO=violet, flash=bright yellow. AreaTemplate.create returns the
+//   drawing id in addition to the region; dismiss() cleans up both.
 // v3.2.0: Intensity grenades now attach the "msh-faserip.areaHazard" Region
 //   behavior (v14) to the persistent Region they create. The behavior
 //   automatically rolls saves on token entry/exit and applies/removes status
@@ -532,12 +538,16 @@ export class GrenadeAction extends RangedAttackAction {
       return;
     }
 
+    // Per-grenade-type visual — picks a distinct fillColor so smoke, gas,
+    // KO gas, and flash each look different on the canvas.
+    const visual = resolveHazardVisual(item);
+
     // Place the persistent Region — cloud/flash/gas lingers on the scene
     const template = await AreaTemplate.createAtTarget({
       radiusInAreas,
       label: item.name,
-      fillColor: "#9e9e9e",
-      fillAlpha: 0.35,
+      fillColor: visual.fillColor,
+      fillAlpha: visual.fillAlpha,
       persistent: true
     });
     if (!template) return;
@@ -592,6 +602,25 @@ export class GrenadeAction extends RangedAttackAction {
         }
       }
     }
+  }
+}
+
+/**
+ * Pick the visual fill for an intensity grenade's lingering Drawing overlay.
+ * Smoke = gray, tear gas = yellow-green, KO = violet, flash = bright yellow.
+ * Returns { fillColor (hex), fillAlpha (0..1) }.
+ */
+function resolveHazardVisual(item) {
+  const grenadeType = String(item?.system?.grenadeType || "").toLowerCase();
+  switch (grenadeType) {
+    case "smoke":     return { fillColor: "#9e9e9e", fillAlpha: 0.45 };
+    case "teargas":
+    case "tear-gas":  return { fillColor: "#aed581", fillAlpha: 0.42 };
+    case "knockout":
+    case "ko":
+    case "kogas":     return { fillColor: "#9575cd", fillAlpha: 0.42 };
+    case "flash":     return { fillColor: "#fff59d", fillAlpha: 0.55 };
+    default:          return { fillColor: "#9e9e9e", fillAlpha: 0.45 };
   }
 }
 
