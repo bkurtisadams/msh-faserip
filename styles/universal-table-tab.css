@@ -1,15 +1,54 @@
-/* styles/universal-table-tab.css v1.1.0 — FASERIP Universal Table tab
+/* styles/universal-table-tab.css v1.2.0 — FASERIP Universal Table tab
+ * v1.2.0: Kill Foundry core's body.game .app table thead text-shadow and
+ *         color leak. Core sets `text-shadow: 1px 1px var(--color-shadow-dark)`
+ *         and `color: var(--color-text-light-highlight)` on every thead
+ *         inside any app window; that drop-shadow at weight 900 Oswald
+ *         reads as a stencil outline on the BA/EA/Sh/Fe/Pr/Ty abbrs.
  * v1.1.0: Add @import for Oswald weights 400;600;700;900 and Barlow
- *         Condensed regular+italic 400;500;600;700. The parent sheet's
- *         import only pulls Oswald 400;600;700 and Barlow italic 400 —
- *         weight-900 and italic-700 in this file were being synthesized,
- *         producing a stencil/embossed look on BA/EA/Sh rank abbrs and
- *         on the Fighting/Agility subtitles.
+ *         Condensed regular+italic 400;500;600;700.
  * v1.0.0: Initial data-driven port from GCC reference faserip-table.html.
  * Namespaced to .ut-tab-root to avoid collision with actor-sheet styles.
  */
 
 @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;600;700;900&family=Barlow+Condensed:ital,wght@0,400;0,500;0,600;0,700;1,400;1,700&display=swap');
+
+/* ── Override Foundry core's thead drop-shadow + light-color leak ── */
+.ut-tab-root thead,
+.ut-tab-root thead th,
+.ut-tab-root tbody th,
+.ut-tab-root tbody td,
+.ut-tab-root .at-name,
+.ut-tab-root .at-abbr,
+.ut-tab-root .at-ability,
+.ut-tab-root .rk-abbr,
+.ut-tab-root .rk-name,
+.ut-tab-root .rk-val,
+.ut-tab-root .rk-range,
+.ut-tab-root .row-label {
+  text-shadow: none !important;
+  color: var(--ut-dark) !important;
+}
+.ut-tab-root .action-tbl .row-r td { color: #fff !important; }
+.ut-tab-root .rank-tbl th.col-sel,
+.ut-tab-root .rank-tbl th.col-sel .rk-name,
+.ut-tab-root .rank-tbl th.col-sel .rk-abbr { color: #fff !important; }
+
+/* Override Foundry core's dark thead background + table margin/bg */
+.ut-tab-root table {
+  background: transparent !important;
+  margin: 0 !important;
+  border-radius: 0 !important;
+}
+.ut-tab-root thead {
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  font-weight: normal;
+}
+.ut-tab-root thead th { background: var(--ut-col-hdr) !important; }
+.ut-tab-root .action-tbl thead th { background: var(--ut-col-hdr) !important; }
+.ut-tab-root .rank-tbl thead th { background: var(--ut-col-hdr) !important; }
+.ut-tab-root .rank-tbl th.col-sel { background: var(--ut-accent) !important; }
 
 .ut-tab-root {
   --ut-white:  #ffffff;
