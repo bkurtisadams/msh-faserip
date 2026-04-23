@@ -556,7 +556,7 @@ export class GrenadeAction extends RangedAttackAction {
     try {
       const [created] = await region.createEmbeddedDocuments("RegionBehavior", [{
         name: config.label,
-        type: "msh-faserip.areaHazard",
+        type: "areaHazard",
         system: systemConfig
       }]);
       behaviorDoc = created;

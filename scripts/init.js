@@ -453,13 +453,16 @@ Hooks.once("init", async () => {
   CONFIG.MSHF.ACTIONS = ACTIONS;
 
   // Register v14 Region Behaviors
-  // "msh-faserip.areaHazard" — persistent intensity hazard for grenades and GM-placed zones.
+  // "areaHazard" — persistent intensity hazard for grenades and GM-placed zones.
   // See scripts/modules/regions/area-hazard-behavior.js for usage.
+  // NOTE: System-declared RegionBehavior subtypes register under the BARE name
+  // (no "msh-faserip." prefix) because the system owns its own typeid namespace.
+  // Module-declared subtypes use the prefixed form; system-declared don't.
   CONFIG.RegionBehavior ??= {};
   CONFIG.RegionBehavior.dataModels ??= {};
-  CONFIG.RegionBehavior.dataModels["msh-faserip.areaHazard"] = AreaHazardBehavior;
+  CONFIG.RegionBehavior.dataModels["areaHazard"] = AreaHazardBehavior;
   CONFIG.RegionBehavior.typeIcons ??= {};
-  CONFIG.RegionBehavior.typeIcons["msh-faserip.areaHazard"] = "fas fa-smog";
+  CONFIG.RegionBehavior.typeIcons["areaHazard"] = "fas fa-smog";
 
   game.msh.getCampaignDateTime = function() {
     // When CTT is active and set as time authority, read directly from CTT API
