@@ -359,9 +359,13 @@ export async function applyStun(actor, { rounds = 1, originUuid = null } = {}, o
   );
   
   if (existingStun) {
-    // Get remaining duration of existing stun
-    const existingRounds = existingStun.duration?.remaining ?? 
-                          existingStun.duration?.rounds ?? 0;
+    // Get remaining duration of existing stun. Try v14 live remaining first,
+    // then v14 canonical value (when units==="rounds"), then v13 legacy.
+    const existingDur = existingStun.duration || {};
+    const existingRounds = existingDur.remaining
+      ?? (existingDur.units === "rounds" ? existingDur.value : null)
+      ?? existingDur.rounds
+      ?? 0;
     
     if (rounds <= existingRounds) {
       // New stun is shorter or equal - keep existing

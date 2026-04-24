@@ -342,8 +342,10 @@ export async function processOngoingEffects(worldTime, dt = 0) {
           await legacyDying.update({
             [`flags.${scope}.ongoingId`]: "dying",
             [`flags.${scope}.effectType`]: "ongoing",
-            "duration.rounds": null,
-            "duration.seconds": null,
+            // v14 canonical: clear value+units to make timeless. Legacy
+            // duration.rounds/duration.seconds are no-op writes on v14.
+            "duration.value": null,
+            "duration.units": null,
           });
         }
         // combatOnly: dying will be processed by processDyingRound on next round change
