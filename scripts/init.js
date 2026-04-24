@@ -70,6 +70,7 @@
 // v1.5.0: Consolidated updateCombat hooks, added dedup guard for dying checks
 import * as GMUtils from './gm-utils.js';
 import { registerGMTools } from './gm-tools.js';
+import { registerUnconsciousRosterControl } from './unconscious-roster.js';
 import { FaseripActor } from './actor.js';
 import { FaseripItem } from './item.js';
 import { FaseripActorSheet } from './actorSheet.js';
@@ -847,6 +848,9 @@ Hooks.once("init", async () => {
         }
       };
     }
+
+    // 4d. Unconscious Roster (GM-only) — lists KO'd/dying NPCs grouped by scene
+    registerUnconsciousRosterControl(existingToolsObj);
 
     // 5. Assign the reconstructed tools-object back onto tokenGroup.tools
     tokenGroup.tools = existingToolsObj;
