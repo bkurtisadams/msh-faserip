@@ -585,6 +585,21 @@ Hooks.once("init", async () => {
     default: "gm-whisper-npcs"
   });
 
+  game.settings.register('msh-faserip', 'offSceneRecoveryChat', {
+    name: "Off-Scene Recovery Chat Output",
+    hint: "Controls wake/stabilize/recovery chat cards for NPCs NOT on the active scene (typical: leftover thugs from earlier combats auto-rolling their wake attempts). Player characters always post public regardless. A per-actor ledger is always written; 'summary' mode emits one consolidated card on terminal events (wake-success, death, full recovery).",
+    scope: "world",
+    config: true,
+    type: String,
+    choices: {
+      "public":        "Public — full chat for every off-scene recovery event",
+      "whisper-each":  "Whisper GM — every event, GM-only",
+      "summary":       "Summary — ledger only, one consolidated card on wake/death/full-recovery (recommended)",
+      "silent":        "Silent — ledger only, no chat ever"
+    },
+    default: "summary"
+  });
+
   foundry.documents.collections.Actors.registerSheet("msh-faserip", MSHVehicleActorSheet, {
     types: ["vehicle"],
     makeDefault: true,

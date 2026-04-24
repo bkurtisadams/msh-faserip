@@ -116,6 +116,191 @@ const SCOPE = getFlagScope();
  *   - Timer resets if damaged again
  */
 
+// ─── Scene / ledger / chat-routing helpers ────────────────────────────────────
+// Rationale: Unconscious AE expiry fires scene-agnostically, so actors on other
+// scenes emit wake-fail/wake-success chat cards during unrelated combat. Route
+// all recovery-related cards through postRecoveryCard() which decides public /
+// GM-whisper / ledger-only per (isPC × onScene × offSceneRecoveryChat setting).
+// Terminal events (wake-success, dying-death, fully-recovered) emit a
+// consolidated summary card in "summary" mode so the Jimmy-the-thug narrative
+// ("dropped Mar 14, 3 wake attempts, woke Mar 16") survives without spam.
+
+function isOnActiveScene(actor) {
+  if (!actor) return false;
+  const scene = canvas?.scene;
+  if (!scene) return true; // no scene loaded — treat as visible (fallback)
+  for (const tokenDoc of (scene.tokens ?? [])) {
+    if (!tokenDoc.actor) continue;
+    if (tokenDoc.actorLink) {
+      if (tokenDoc.actor.id === actor.id) return true;
+    } else if (tokenDoc.actor === actor) {
+      return true;
+    }
+  }
+  // Combat scene fallback: if active combat is on a different scene but this
+  // actor is a combatant, the GM is logically still engaged with it.
+  const combat = game.combat;
+  if (combat?.scene?.id === scene.id) {
+    if (combat.combatants?.some(c => c.actor?.id === actor.id)) return true;
+  }
+  return false;
+}
+
+function _formatLedgerDate(worldTime) {
+  try {
+    const ctt = game.modules?.get?.("calendar-time-tracker")?.active && game.msh?.time?.formatDate;
+    if (typeof ctt === "function") return ctt(worldTime);
+  } catch (_e) { /* fall through */ }
+  try {
+    if (game.msh?.time?.formatDate) return game.msh.time.formatDate(worldTime);
+  } catch (_e) { /* fall through */ }
+  // Fallback: relative elapsed from worldTime=0
+  const days = Math.floor(worldTime / 86400);
+  const hours = Math.floor((worldTime % 86400) / 3600);
+  const mins = Math.floor((worldTime % 3600) / 60);
+  if (days > 0) return `T+${days}d ${hours}h`;
+  if (hours > 0) return `T+${hours}h ${mins}m`;
+  return `T+${mins}m`;
+}
+
+export async function appendRecoveryLog(actor, entry) {
+  if (!actor || !game.user.isGM) return;
+  const worldTime = game.time?.worldTime ?? 0;
+  const logEntry = {
+    t: worldTime,
+    dateStr: _formatLedgerDate(worldTime),
+    event: entry.event,
+    detail: entry.detail ?? null
+  };
+  const existing = actor.getFlag(SCOPE, "recoveryLog") || [];
+  // Cap at 200 entries to prevent unbounded flag growth on chronic NPCs
+  const updated = [...existing, logEntry].slice(-200);
+  try {
+    await actor.setFlag(SCOPE, "recoveryLog", updated);
+  } catch (e) {
+    console.warn("[FASERIP] appendRecoveryLog failed:", e);
+  }
+}
+
+const _TERMINAL_RECOVERY_EVENTS = new Set(["wake-success", "dying-death", "fully-recovered"]);
+const _EPISODE_START_EVENTS = new Set(["dying-start", "unconscious-start"]);
+
+async function emitRecoverySummary(actor) {
+  const log = actor.getFlag(SCOPE, "recoveryLog") || [];
+  if (!log.length) return;
+  // Episode = entries from the last terminal event (exclusive) through now.
+  // If no prior terminal, use entire log (first episode).
+  let startIdx = 0;
+  for (let i = log.length - 2; i >= 0; i--) {
+    if (_TERMINAL_RECOVERY_EVENTS.has(log[i].event)) { startIdx = i + 1; break; }
+  }
+  const episode = log.slice(startIdx);
+  if (!episode.length) return;
+
+  const firstT = episode[0].t;
+  const lastT = episode[episode.length - 1].t;
+  const dur = Math.max(0, lastT - firstT);
+  const days = Math.floor(dur / 86400);
+  const hours = Math.floor((dur % 86400) / 3600);
+  const mins = Math.floor((dur % 3600) / 60);
+  const durStr = days > 0 ? `${days}d ${hours}h`
+               : hours > 0 ? `${hours}h ${mins}m`
+               : `${Math.max(1, mins)}m`;
+
+  const wakeFails = episode.filter(e => e.event === "wake-fail").length;
+  const last = episode[episode.length - 1];
+  const outcome = last.event === "wake-success" ? "regained consciousness"
+                : last.event === "dying-death" ? "<strong style=\"color:#b71c1c;\">died</strong>"
+                : last.event === "fully-recovered" ? "fully recovered"
+                : "resolved";
+
+  const LABELS = {
+    "dying-start":      "Dropped at 0 HP — dying",
+    "unconscious-start":"Knocked unconscious",
+    "endurance-loss":   "Lost Endurance rank",
+    "stabilized":       "Stabilized",
+    "wake-fail":        "Wake attempt failed",
+    "wake-success":     "Woke up",
+    "dying-death":      "Died",
+    "endurance-healed": "Endurance rank healed",
+    "fully-recovered":  "Endurance fully restored"
+  };
+  const lines = episode.map(e => {
+    const label = LABELS[e.event] || e.event;
+    const detail = e.detail ? ` — ${e.detail}` : "";
+    return `<li style="margin:1px 0;">${e.dateStr}: ${label}${detail}</li>`;
+  }).join("");
+
+  const content = `<div style="background:#f3e5f5;border:2px solid #9c27b0;padding:10px;border-radius:5px;">
+    <div style="font-size:1.1em;font-weight:bold;color:#6a1b9a;margin-bottom:6px;">
+      <i class="fas fa-scroll"></i> ${actor.name} — Recovery Summary
+    </div>
+    <div style="margin-bottom:6px;">
+      <strong>Outcome:</strong> ${outcome} after ${durStr}${wakeFails > 0 ? ` (${wakeFails} failed wake attempt${wakeFails > 1 ? 's' : ''})` : ''}.
+    </div>
+    <ul style="margin:4px 0 0 0;padding-left:20px;font-size:0.9em;line-height:1.3;">${lines}</ul>
+  </div>`;
+
+  try {
+    await ChatMessage.create({
+      content,
+      speaker: ChatMessage.getSpeaker({ actor }),
+      whisper: ChatMessage.getWhisperRecipients("GM").map(u => u.id)
+    });
+  } catch (e) {
+    console.warn("[FASERIP] emitRecoverySummary failed:", e);
+  }
+}
+
+/**
+ * Route a recovery-related chat card based on scene/PC/setting.
+ * Always appends to ledger; chat output depends on context.
+ *
+ * @param {Actor} actor
+ * @param {object} opts
+ * @param {string} opts.content   - HTML content of the card
+ * @param {string} opts.eventType - one of: dying-start, unconscious-start,
+ *                                  endurance-loss, stabilized, wake-fail,
+ *                                  wake-success, dying-death, endurance-healed,
+ *                                  fully-recovered
+ * @param {string} [opts.detail]  - short detail string for ledger/summary
+ */
+export async function postRecoveryCard(actor, { content, eventType, detail } = {}) {
+  if (!actor) return;
+  await appendRecoveryLog(actor, { event: eventType, detail });
+
+  const isPC = !!actor?.hasPlayerOwner;
+  const onScene = isOnActiveScene(actor);
+
+  // PCs always public + ledger (preserves player visibility regardless of
+  // which scene is loaded — split-party safe).
+  // NPCs on-scene: public + ledger (current behavior).
+  // NPCs off-scene: respect offSceneRecoveryChat setting.
+  let mode = "public";
+  if (!isPC && !onScene) {
+    try { mode = game.settings.get(SCOPE, "offSceneRecoveryChat") || "summary"; }
+    catch (_e) { mode = "summary"; }
+  }
+
+  if (mode === "public") {
+    await ChatMessage.create({ content, speaker: ChatMessage.getSpeaker({ actor }) });
+    return;
+  }
+  if (mode === "whisper-each") {
+    await ChatMessage.create({
+      content,
+      speaker: ChatMessage.getSpeaker({ actor }),
+      whisper: ChatMessage.getWhisperRecipients("GM").map(u => u.id)
+    });
+    return;
+  }
+  // "summary" (default) — emit consolidated card only on terminal events.
+  // "silent" — never emit, ledger is the sole record.
+  if (mode === "summary" && _TERMINAL_RECOVERY_EVENTS.has(eventType)) {
+    await emitRecoverySummary(actor);
+  }
+}
+
 export class RestSystem {
   
   /**
@@ -468,8 +653,10 @@ static async attemptRegainConsciousness(actor) {
 
       const message = `${actor.name} regained consciousness with ${enduranceValue} Health!`;
       
-      // Chat message
-      await ChatMessage.create({
+      // Chat message (routed: on-scene→public, off-scene NPC→summary on terminal)
+      await postRecoveryCard(actor, {
+        eventType: "wake-success",
+        detail: `${color.toUpperCase()} FEAT, Health ${enduranceValue}`,
         content: `<div style="background:#e8f5e9;border:2px solid #4CAF50;padding:10px;border-radius:5px;">
           <div style="font-size:1.2em;font-weight:bold;color:#2e7d32;margin-bottom:8px;">
             <i class="fas fa-heart"></i> ${actor.name} Regained Consciousness!
@@ -483,11 +670,10 @@ static async attemptRegainConsciousness(actor) {
           <div style="background:#c8e6c9;padding:8px;margin-top:8px;border-radius:3px;text-align:center;">
             <strong>Health: 0 → ${enduranceValue}</strong>
           </div>
-        </div>`,
-        speaker: ChatMessage.getSpeaker({ actor })
+        </div>`
       });
 
-      ui.notifications.info(message);
+      if (isOnActiveScene(actor) || actor?.hasPlayerOwner) ui.notifications.info(message);
       
       if (game.settings.get(SCOPE, "debugMode")) {
         console.log("FASERIP | Consciousness regained:", {
@@ -562,8 +748,10 @@ static async attemptRegainConsciousness(actor) {
 
       const message = `${actor.name} failed to regain consciousness (unconscious ${rounds} more rounds)`;
       
-      // Chat message
-      await ChatMessage.create({
+      // Chat message (routed: on-scene→public, off-scene NPC→ledger-only by default)
+      await postRecoveryCard(actor, {
+        eventType: "wake-fail",
+        detail: `${color.toUpperCase()} FEAT, +${rounds} rounds`,
         content: `<div style="background:#ffebee;border:2px solid #ef5350;padding:10px;border-radius:5px;">
           <div style="font-size:1.2em;font-weight:bold;color:#c62828;margin-bottom:8px;">
             <i class="fas fa-times-circle"></i> ${actor.name} Failed to Wake
@@ -577,11 +765,10 @@ static async attemptRegainConsciousness(actor) {
           <div style="background:#ffcdd2;padding:8px;margin-top:8px;border-radius:3px;text-align:center;">
             <strong>Unconscious for ${rounds} more rounds</strong>
           </div>
-        </div>`,
-        speaker: ChatMessage.getSpeaker({ actor })
+        </div>`
       });
 
-      ui.notifications.warn(message);
+      if (isOnActiveScene(actor) || actor?.hasPlayerOwner) ui.notifications.warn(message);
       
       if (game.settings.get(SCOPE, "debugMode")) {
         console.log("FASERIP | Consciousness attempt failed:", {
@@ -743,18 +930,19 @@ static async attemptRegainConsciousness(actor) {
       ? `${actor.name} stabilized! Conscious. Endurance impaired (${currentEndurance} of ${originalEndurance}).`
       : `${actor.name} stabilized! Unconscious for ${hours} hours. Endurance impaired (${currentEndurance} of ${originalEndurance}).`;
 
-    await ChatMessage.create({
+    await postRecoveryCard(actor, {
+      eventType: "stabilized",
+      detail: currentHealth > 0 ? `conscious, End ${currentEndurance}/${originalEndurance}` : `unconscious ${hours}h, End ${currentEndurance}/${originalEndurance}`,
       content: `<div style="background:#e8f5e9;border:2px solid #4CAF50;padding:10px;border-radius:5px;">
         <div style="font-size:1.2em;font-weight:bold;color:#2e7d32;margin-bottom:8px;">
           <i class="fas fa-medkit"></i> ${actor.name} Stabilized!
         </div>
         <div>${consciousMsg}</div>
         <div>Endurance impaired: ${currentEndurance} of ${originalEndurance} (-2CS penalty)</div>
-      </div>`,
-      speaker: ChatMessage.getSpeaker({ actor })
+      </div>`
     });
     
-    ui.notifications.info(message);
+    if (isOnActiveScene(actor) || actor?.hasPlayerOwner) ui.notifications.info(message);
     
     return { success: true, message };
   }
@@ -841,17 +1029,18 @@ static async attemptRegainConsciousness(actor) {
       
       const message = `${actor.name}'s Endurance fully restored to ${originalEndurance}!`;
       
-      await ChatMessage.create({
+      await postRecoveryCard(actor, {
+        eventType: "fully-recovered",
+        detail: `Endurance → ${originalEndurance}`,
         content: `<div style="background:#e8f5e9;border:2px solid #4CAF50;padding:10px;border-radius:5px;">
           <div style="font-size:1.2em;font-weight:bold;color:#2e7d32;">
             <i class="fas fa-heart"></i> ${actor.name} Fully Recovered!
           </div>
           <div>Endurance restored to ${originalEndurance} - no more penalties!</div>
-        </div>`,
-        speaker: ChatMessage.getSpeaker({ actor })
+        </div>`
       });
       
-      ui.notifications.info(message);
+      if (isOnActiveScene(actor) || actor?.hasPlayerOwner) ui.notifications.info(message);
       
       if (game.settings.get(SCOPE, "debugMode")) {
         console.log("FASERIP | Endurance fully restored:", {
@@ -874,18 +1063,19 @@ static async attemptRegainConsciousness(actor) {
       const careNote = medicalCare ? " (with medical care)" : "";
       const message = `${actor.name} healed 1 Endurance rank${careNote}: ${currentEndurance} → ${newRank}`;
       
-      await ChatMessage.create({
+      await postRecoveryCard(actor, {
+        eventType: "endurance-healed",
+        detail: `${currentEndurance} → ${newRank}${careNote}`,
         content: `<div style="background:#fff3e0;border:2px solid #FF9800;padding:10px;border-radius:5px;">
           <div style="font-size:1.2em;font-weight:bold;color:#e65100;">
             <i class="fas fa-heart-pulse"></i> Endurance Healing
           </div>
           <div>${actor.name}: ${newRank} of ${originalEndurance}${careNote}</div>
           <div style="margin-top:6px;color:#555;">-2CS penalty continues until fully healed</div>
-        </div>`,
-        speaker: ChatMessage.getSpeaker({ actor })
+        </div>`
       });
       
-      ui.notifications.info(message);
+      if (isOnActiveScene(actor) || actor?.hasPlayerOwner) ui.notifications.info(message);
       
       if (game.settings.get(SCOPE, "debugMode")) {
         console.log("FASERIP | Endurance rank healed:", {
@@ -1066,6 +1256,11 @@ export function initRestSystem() {
   
   // Expose convenience functions for common operations
   game.msh.healEndurance = (actor, medicalCare = false) => RestSystem.healImpairedEndurance(actor, medicalCare);
+  
+  // Expose ledger helpers for ongoing-engine and external callers
+  game.msh.rest.appendRecoveryLog = appendRecoveryLog;
+  game.msh.rest.postRecoveryCard = postRecoveryCard;
+  game.msh.rest.isOnActiveScene = isOnActiveScene;
   
   console.log("FASERIP | Rest system initialized");
   

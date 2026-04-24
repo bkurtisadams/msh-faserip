@@ -691,6 +691,14 @@ async function _processDyingRoundInner(actor, dyingAE, scope) {
       `<strong style="color:#b71c1c;">💀 ${actor.name} has died.</strong>`
     );
 
+    // Ledger: terminal event — if off-scene thug dies, this closes the episode
+    // and the Recovery Summary card emits via postRecoveryCard's terminal path
+    // on the next rest-system routing call. Here we only log; no summary emit.
+    try { await game.msh?.rest?.appendRecoveryLog?.(actor, {
+      event: "dying-death",
+      detail: null
+    }); } catch (_e) { /* best-effort */ }
+
     return "dead";
   }
 
@@ -1159,6 +1167,12 @@ export async function applyDyingOngoing(target, { skipImmediateLoss = false } = 
        <div style="margin-top:4px;font-size:.85em;color:#c62828;">Will lose 1 Endurance rank per turn until stabilized.</div>
        <div style="margin-top:4px;font-size:.85em;color:#ff9800;">Impaired: -2CS to all actions until Endurance restored.</div>`
     );
+
+    // Ledger: episode-start event (feeds Recovery Summary on terminal resolution)
+    try { await game.msh?.rest?.appendRecoveryLog?.(actor, {
+      event: "dying-start",
+      detail: `${currentEndurance} → ${nextRank}, HP ${currentHealth}→${newHealth}`
+    }); } catch (_e) { /* ledger is best-effort */ }
 
     console.log(`[FASERIP:DYING] ${actor.name} immediate Endurance loss: ${currentEndurance} (${currentEnduranceValue}) → ${nextRank} (${nextValue})`);
   }
