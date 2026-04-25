@@ -1512,6 +1512,18 @@ export class AttackAction extends BaseAction {
           sourceName
         });
 
+        // Play matching visual FX (no-op if disabled or Sequencer absent)
+        if (game.msh?.fx?.playAttack) {
+          await game.msh.fx.playAttack({
+            actor: this.actor,
+            item: weapon,
+            actionType,
+            damageType: dmgType,
+            isHit: hit,
+            targets: Array.isArray(this?.targets) ? this.targets : null
+          });
+        }
+
         // --- Spend ammo for firearms (string/number tolerant; supports current template.json) ---
         try {
           if (String(actionType).toLowerCase() === "shooting" && weapon?.system) {

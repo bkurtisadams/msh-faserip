@@ -102,6 +102,7 @@ import { resolveCombatMode } from "./modules/actions/action-dispatcher.js";
 import { initRestSystem } from "./modules/rest-system.js";
 import { ACTIONS } from '../helpers/action-constants.js';
 import { playCombatSFX, classifyWeapon } from "./modules/actions/audio-utils.js";
+import { fxService } from "./modules/fx/fx-service.js";
 import { FaseripTokenRuler } from "./modules/canvas/faserip-token-ruler.js";
 import { initDotToken } from "./modules/canvas/faserip-dot-token.js";
 import { registerNullifyAuraHooks } from "./modules/actions/nullify-aura.js";
@@ -309,6 +310,7 @@ Hooks.once("init", async () => {
   game.msh = game.msh || {};
   game.msh.playCombatSFX = playCombatSFX;
   game.msh._classifyWeapon = classifyWeapon;
+  game.msh.fx = fxService;
 
   // Guard so we don't wrap twice if code reloads
   if (!ActiveEffect.prototype._mshFlagShimApplied) {
@@ -372,6 +374,25 @@ Hooks.once("init", async () => {
     type: Number,
     range: { min: 0, max: 1, step: 0.05 },
     default: 0.8
+  });
+
+  game.settings.register("msh-faserip", "fxEnabled", {
+    name: "Enable Power FX",
+    hint: "Play visual effects for attacks and powers (requires Sequencer + JB2A).",
+    scope: "client",
+    config: true,
+    type: Boolean,
+    default: true
+  });
+
+  game.settings.register("msh-faserip", "fxIntensity", {
+    name: "Power FX Intensity",
+    hint: "Scale factor for visual effects.",
+    scope: "client",
+    config: true,
+    type: String,
+    choices: { subtle: "Subtle", normal: "Normal", dramatic: "Dramatic" },
+    default: "normal"
   });
 
   // Register default combat mode setting

@@ -178,14 +178,16 @@ export function applyCapabilitiesToDialog(html, actionType, ctx = {}) {
 }
 
 /**
- * Play a visual effect from attacker to target(s) using Sequencer
- * @param {string} effectPath - JB2A file path (e.g., "jb2a.energy_beam.normal.blue.01")
- * @param {Token} sourceToken - Attacking token
- * @param {Token[]} targetTokens - Array of target tokens
- * @param {Object} options - Additional options (color, scale, duration, etc.)
+ * @deprecated Use game.msh.fx.playAttack() instead.
+ * Retained as a thin compatibility shim. Will be removed in a future commit
+ * once all call sites are migrated.
  */
+let _warnedAttackEffect = false;
 export async function playAttackEffect(effectPath, sourceToken, targetTokens = [], options = {}) {
-  // Check if Sequencer is available
+  if (!_warnedAttackEffect) {
+    console.warn("[FASERIP] playAttackEffect() is deprecated — use game.msh.fx.playAttack() instead.");
+    _warnedAttackEffect = true;
+  }
   if (!game.modules.get("sequencer")?.active) return;
   
   const targets = targetTokens.length ? targetTokens : Array.from(game.user.targets);
@@ -212,9 +214,14 @@ export async function playAttackEffect(effectPath, sourceToken, targetTokens = [
 }
 
 /**
- * Play an impact/explosion effect at target location(s)
+ * @deprecated Use game.msh.fx.playAttack() (handles impact internally) instead.
  */
+let _warnedImpactEffect = false;
 export async function playImpactEffect(effectPath, targetTokens = [], options = {}) {
+  if (!_warnedImpactEffect) {
+    console.warn("[FASERIP] playImpactEffect() is deprecated — use game.msh.fx.playAttack() instead.");
+    _warnedImpactEffect = true;
+  }
   if (!game.modules.get("sequencer")?.active) return;
   
   const targets = targetTokens.length ? targetTokens : Array.from(game.user.targets);
@@ -238,9 +245,15 @@ export async function playImpactEffect(effectPath, targetTokens = [], options = 
 }
 
 /**
- * Get JB2A effect path based on attack type and color
+ * @deprecated Asset resolution now lives inside fx-service.js.
+ * Item-level overrides via system.vfx.preset / system.vfx.asset are preferred.
  */
+let _warnedEffectPath = false;
 export function getAttackEffectPath(attackType, color = "blue", variant = "01") {
+  if (!_warnedEffectPath) {
+    console.warn("[FASERIP] getAttackEffectPath() is deprecated — fx-service handles asset resolution.");
+    _warnedEffectPath = true;
+  }
   const effectMap = {
     "energy": `jb2a.energy_beam.normal.${color}.${variant}`,
     "force": `jb2a.impact.010.${color}`,
