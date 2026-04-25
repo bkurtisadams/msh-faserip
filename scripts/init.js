@@ -300,7 +300,29 @@ Hooks.on("updateWorldTime", async (worldTime, dt, options, userId) => {
         console.error("[FASERIP ERROR] worldTime dying round processing failed:", e);
       }
     }
-  }});
+  }
+
+  // Refresh effect labels (e.g. "Stunned (12s)" countdown) on every
+  // worldTime advance, in OR out of combat. Required because CTT main-
+  // window advances fire updateWorldTime but NOT updateCombat, leaving
+  // the in-combat refresh loop in updateCombat unable to see the tick.
+  // renameEffectWithRemaining is no-op when the recomputed name equals
+  // the current name, so this is safe to run alongside the updateCombat
+  // path on combat-tracker advances that sync to CTT.
+  try {
+    for (const actor of Effects.getAllTokenActors()) {
+      if (!actor?.effects?.size) continue;
+      for (const eff of actor.effects) {
+        if (!eff?.id) continue;
+        const d = eff.duration;
+        if (!Number.isFinite(d?.remaining) && !Number.isFinite(d?.rounds)) continue;
+        await Effects.renameEffectWithRemaining(eff);
+      }
+    }
+  } catch (e) {
+    console.warn("[FASERIP] worldTime label refresh failed:", e);
+  }
+});
 
 Hooks.once("init", async () => {
   // --- Global flag scope & namespace ---
