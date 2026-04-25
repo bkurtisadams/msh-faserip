@@ -3017,17 +3017,21 @@ Hooks.on("updateCombat", async (combat, changed, diff, userId) => {
     }
   }
 
-  // Refresh labels for round-based effects on all combatants
+  // Refresh labels for duration-bound effects on all combatants.
+  // Gate matches v14 canonical (d.remaining) OR legacy v13 (d.rounds).
+  // Previously only checked d.rounds, so v14 seconds-based effects like
+  // "Stunned (18s)" never had their label refreshed while ticking down.
   for (const c of combat.combatants) {
     const a = c.actor;
     if (!a) continue;
     for (const eff of a.effects) {
-      if (eff?.duration?.rounds && eff?.id) {  // â† ADD: && eff?.id
-        try {
-          await Effects.renameEffectWithRemaining(eff);
-        } catch (e) {
-          console.warn("Failed to rename effect:", e);
-        }
+      if (!eff?.id) continue;
+      const d = eff.duration;
+      if (!Number.isFinite(d?.remaining) && !Number.isFinite(d?.rounds)) continue;
+      try {
+        await Effects.renameEffectWithRemaining(eff);
+      } catch (e) {
+        console.warn("Failed to rename effect:", e);
       }
     }
   }
