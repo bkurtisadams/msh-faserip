@@ -32,6 +32,32 @@ function hasSequencer() {
   return !!game.modules.get("sequencer")?.active && typeof Sequence !== "undefined";
 }
 
+// Database keys look like "jb2a.energy_beam.normal.blue.01" — dotted, no slashes,
+// no file extension. File paths look like "modules/foo/bar.webm". Pass file paths
+// straight through and let Sequencer/Foundry resolve them; only gate database keys.
+function looksLikeDatabaseKey(path) {
+  if (!path) return false;
+  if (path.includes("/")) return false;
+  if (/\.(webm|mp4|mov|webp|gif|png|jpg|jpeg|svg)$/i.test(path)) return false;
+  return true;
+}
+
+function assetExists(path) {
+  if (!path) return false;
+  if (!looksLikeDatabaseKey(path)) return true;
+  try {
+    const db = (typeof Sequencer !== "undefined") ? Sequencer.Database : null;
+    if (db?.entryExists) return !!db.entryExists(path);
+    // Older API name — fall through if neither is present.
+    if (db?.searchFor) {
+      const hit = db.searchFor(path);
+      return Array.isArray(hit) ? hit.length > 0 : !!hit;
+    }
+  } catch { /* noop */ }
+  // Can't verify — let Sequencer try and tolerate a warning.
+  return true;
+}
+
 // JB2A asset map. Conservative defaults — Sequencer no-ops silently if a key
 // isn't present in the user's installed JB2A pack. Per-item overrides via
 // system.vfx.preset / system.vfx.asset / system.vfx.color take precedence.
@@ -155,13 +181,18 @@ export const fxService = {
 
       const beam = resolveAsset(p);
       const impact = resolveImpact(p);
-      if (!beam && !impact) { dlog("skip: no asset", p); return; }
+      const beamOk = beam && assetExists(beam);
+      const impactOk = impact && assetExists(impact);
+      if (!beamOk && !impactOk) {
+        dlog("skip: no usable assets", { beam, impact });
+        return;
+      }
 
       const scale = (p.scale ?? 1) * intensityScale();
       const duration = p.duration ?? 1000;
 
       const seq = new Sequence();
-      if (beam) {
+      if (beamOk) {
         for (const t of targets) {
           seq.effect()
             .file(beam)
@@ -170,17 +201,21 @@ export const fxService = {
             .duration(duration)
             .scale(scale);
         }
+      } else if (beam) {
+        dlog("skip beam: not in DB", { beam });
       }
-      if (isHit && impact) {
+      if (isHit && impactOk) {
         for (const t of targets) {
           seq.effect()
             .file(impact)
             .atLocation(t)
             .scale(scale * 0.8);
         }
+      } else if (isHit && impact && !impactOk) {
+        dlog("skip impact: not in DB", { impact });
       }
 
-      dlog("play", { preset: p.preset, beam, impact, isHit, n: targets.length });
+      dlog("play", { preset: p.preset, beam: beamOk ? beam : null, impact: impactOk ? impact : null, isHit, n: targets.length });
       await seq.play();
     } catch (err) {
       console.warn("[FX] playAttack failed:", err);
@@ -223,16 +258,27 @@ export const fxService = {
 
       const beam = resolveAsset(p);
       const impact = resolveImpact(p);
-      if (!beam && !impact) {
-        ui.notifications?.warn("Pick a preset or asset path before previewing.");
+      const beamOk = beam && assetExists(beam);
+      const impactOk = impact && assetExists(impact);
+      if (!beamOk && !impactOk) {
+        const tried = [beam, impact].filter(Boolean).join(", ");
+        ui.notifications?.warn(tried
+          ? `Asset not in Sequencer database: ${tried}. Check JB2A install or use a direct file path.`
+          : "Pick a preset or asset path before previewing.");
         return;
+      }
+      if (beam && !beamOk) {
+        ui.notifications?.warn(`Beam asset not found: ${beam}. Showing impact only.`);
+      }
+      if (impact && !impactOk) {
+        ui.notifications?.info(`Impact asset not found: ${impact}. Showing beam only.`);
       }
 
       const scale = (p.scale ?? 1) * intensityScale();
       const duration = p.duration ?? 1000;
 
       const seq = new Sequence();
-      if (beam) {
+      if (beamOk) {
         seq.effect()
           .file(beam)
           .atLocation(sourceToken)
@@ -240,13 +286,13 @@ export const fxService = {
           .duration(duration)
           .scale(scale);
       }
-      if (impact) {
+      if (impactOk) {
         seq.effect()
           .file(impact)
           .atLocation(target)
           .scale(scale * 0.8);
       }
-      dlog("preview", { preset: p.preset, beam, impact });
+      dlog("preview", { preset: p.preset, beam: beamOk ? beam : null, impact: impactOk ? impact : null });
       await seq.play();
     } catch (err) {
       console.warn("[FX] preview failed:", err);
