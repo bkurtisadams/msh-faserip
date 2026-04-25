@@ -267,6 +267,22 @@ export function ps2ActivateListeners(html, sheet) {
     audio.play().catch(() => {});
   });
 
+  // VFX preview — reads form values (so unsaved edits preview correctly)
+  html.find('.vfx-preview').on('click', async ev => {
+    ev.preventDefault();
+    const preset   = html.find('select[name="system.vfx.preset"]').val() || "";
+    const color    = html.find('input[name="system.vfx.color"]').val() || "";
+    const asset    = html.find('input[name="system.vfx.asset"]').val() || "";
+    const impact   = html.find('input[name="system.vfx.impact"]').val() || "";
+    const scale    = Number(html.find('input[name="system.vfx.scale"]').val()) || 1;
+    const duration = Number(html.find('input[name="system.vfx.duration"]').val()) || 1000;
+    if (game.msh?.fx?.preview) {
+      await game.msh.fx.preview({ preset, color, asset, impact, scale, duration });
+    } else {
+      ui.notifications?.warn("FX service unavailable.");
+    }
+  });
+
   // Active Effects: auto-expand if effects exist, collapse if none
   const effectsFieldset = html.find('.ps2-effects-fieldset');
   const effectsBody = html.find('.ps2-effects-body');

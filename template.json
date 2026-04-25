@@ -492,6 +492,15 @@
         "hitVolume": 80,
         "missVolume": 80
       },
+      "vfx": {
+        "enabled": true,
+        "preset": "",
+        "color": "",
+        "asset": "",
+        "impact": "",
+        "scale": 1,
+        "duration": 1000
+      },
       "specialMechanics": ""
     },
     "talent": {

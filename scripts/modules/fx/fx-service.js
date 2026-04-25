@@ -189,7 +189,69 @@ export const fxService = {
 
   // Phase 4 stubs — call sites can be wired now, behavior added later.
   async playArea() { /* TODO Phase 4 */ },
-  async playPersistent() { /* TODO Phase 3 */ }
+  async playPersistent() { /* TODO Phase 3 */ },
+
+  // Sheet-driven preview. Reads raw config (not an item) so unsaved form
+  // values can be previewed. Uses controlled token as source, first target
+  // if any, otherwise a fake point 4 grid cells east of the source.
+  async preview(opts = {}) {
+    try {
+      if (!hasSequencer()) {
+        ui.notifications?.warn("Sequencer module is not active.");
+        return;
+      }
+      const sourceToken = canvas.tokens?.controlled?.[0];
+      if (!sourceToken) {
+        ui.notifications?.warn("Select a token on the canvas to preview the effect.");
+        return;
+      }
+      const targets = Array.from(game.user?.targets ?? []);
+      const grid = canvas.grid?.size ?? 100;
+      const target = targets[0] || {
+        x: (sourceToken.center?.x ?? sourceToken.x) + grid * 4,
+        y: (sourceToken.center?.y ?? sourceToken.y)
+      };
+
+      const p = {
+        preset:   opts.preset || "custom",
+        color:    opts.color || null,
+        asset:    opts.asset || null,
+        impact:   opts.impact || null,
+        scale:    Number(opts.scale ?? 1),
+        duration: Number(opts.duration ?? 1000)
+      };
+
+      const beam = resolveAsset(p);
+      const impact = resolveImpact(p);
+      if (!beam && !impact) {
+        ui.notifications?.warn("Pick a preset or asset path before previewing.");
+        return;
+      }
+
+      const scale = (p.scale ?? 1) * intensityScale();
+      const duration = p.duration ?? 1000;
+
+      const seq = new Sequence();
+      if (beam) {
+        seq.effect()
+          .file(beam)
+          .atLocation(sourceToken)
+          .stretchTo(target)
+          .duration(duration)
+          .scale(scale);
+      }
+      if (impact) {
+        seq.effect()
+          .file(impact)
+          .atLocation(target)
+          .scale(scale * 0.8);
+      }
+      dlog("preview", { preset: p.preset, beam, impact });
+      await seq.play();
+    } catch (err) {
+      console.warn("[FX] preview failed:", err);
+    }
+  }
 };
 
 export default fxService;

@@ -874,6 +874,64 @@
       </div>
     </fieldset>
 
+    <!-- ── VFX ──────────────────────────────────── -->
+    <fieldset class="ps2-fieldset">
+      <legend>
+        <label style="font-size:inherit;font-weight:inherit;cursor:pointer;">
+          <input type="checkbox" name="system.vfx.enabled" {{checked system.vfx.enabled}} data-dtype="Boolean" /> VFX
+        </label>
+      </legend>
+      <div class="ps2-grid-2col">
+        <div class="ps2-field">
+          <label>Preset</label>
+          <select name="system.vfx.preset" data-dtype="String">
+            <option value=""          {{#unless system.vfx.preset}}selected{{/unless}}>(none)</option>
+            <option value="energy"    {{#if (eq system.vfx.preset "energy")}}selected{{/if}}>Energy beam</option>
+            <option value="force"     {{#if (eq system.vfx.preset "force")}}selected{{/if}}>Force impact</option>
+            <option value="bullet"    {{#if (eq system.vfx.preset "bullet")}}selected{{/if}}>Bullet</option>
+            <option value="edged"     {{#if (eq system.vfx.preset "edged")}}selected{{/if}}>Edged melee</option>
+            <option value="blunt"     {{#if (eq system.vfx.preset "blunt")}}selected{{/if}}>Blunt melee</option>
+            <option value="lightning" {{#if (eq system.vfx.preset "lightning")}}selected{{/if}}>Lightning</option>
+            <option value="fire"      {{#if (eq system.vfx.preset "fire")}}selected{{/if}}>Fire bolt</option>
+            <option value="ice"       {{#if (eq system.vfx.preset "ice")}}selected{{/if}}>Ice spikes</option>
+            <option value="laser"     {{#if (eq system.vfx.preset "laser")}}selected{{/if}}>Laser</option>
+            <option value="magic"     {{#if (eq system.vfx.preset "magic")}}selected{{/if}}>Magic missile</option>
+            <option value="mental"    {{#if (eq system.vfx.preset "mental")}}selected{{/if}}>Mental</option>
+            <option value="throw"     {{#if (eq system.vfx.preset "throw")}}selected{{/if}}>Thrown</option>
+          </select>
+        </div>
+        <div class="ps2-field">
+          <label>Color</label>
+          <input type="text" name="system.vfx.color" value="{{system.vfx.color}}" placeholder="blue, red, white..." data-dtype="String" />
+        </div>
+      </div>
+      <div class="ps2-field" style="margin-top:6px;">
+        <label>Beam asset (overrides preset)</label>
+        <div class="ps2-sfx-row">
+          <input type="text" name="system.vfx.asset" value="{{system.vfx.asset}}" placeholder="jb2a.energy_beam.normal.blue.01" data-dtype="String" />
+          <button type="button" class="vfx-preview" title="Preview"><i class="fas fa-play"></i></button>
+          <button type="button" class="file-picker" data-type="video" data-target="system.vfx.asset" title="Browse"><i class="fas fa-file-import"></i></button>
+        </div>
+      </div>
+      <div class="ps2-field" style="margin-top:6px;">
+        <label>Impact asset (overrides default)</label>
+        <div class="ps2-sfx-row">
+          <input type="text" name="system.vfx.impact" value="{{system.vfx.impact}}" placeholder="jb2a.impact.010.blue" data-dtype="String" />
+          <button type="button" class="file-picker" data-type="video" data-target="system.vfx.impact" title="Browse"><i class="fas fa-file-import"></i></button>
+        </div>
+      </div>
+      <div class="ps2-grid-2col" style="margin-top:6px;">
+        <div class="ps2-field">
+          <label>Scale</label>
+          <input type="number" name="system.vfx.scale" value="{{system.vfx.scale}}" step="0.1" min="0.1" max="5" data-dtype="Number" />
+        </div>
+        <div class="ps2-field">
+          <label>Duration (ms)</label>
+          <input type="number" name="system.vfx.duration" value="{{system.vfx.duration}}" step="100" min="100" max="10000" data-dtype="Number" />
+        </div>
+      </div>
+    </fieldset>
+
     <!-- ── EFFECTS (collapsible) ──────────────────── -->
     <fieldset class="ps2-fieldset ps2-effects-fieldset">
       <legend>
