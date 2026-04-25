@@ -190,6 +190,75 @@ export function getRemaining(effect) {
   return { rounds: null, seconds: null, text: "" };
 }
 
+/**
+ * Decide whether an Active Effect should be auto-expired.
+ * Schema-aware single source of truth for expiration decisions:
+ *   - v14 (duration.remaining / duration.expired) is authoritative when present
+ *   - legacy v13 rounds/seconds paths run only when v14 fields are absent AND
+ *     their required start markers are present (startRound / startTime)
+ *
+ * Legacy paths explicitly reject missing start markers rather than defaulting
+ * to 0. Defaulting would incorrectly expire v14-shape effects where Foundry's
+ * backward-compat layer populates d.rounds/d.seconds but NOT d.startRound/
+ * d.startTime — producing `startT + d.seconds - worldTime` with a worldTime
+ * in the billions and trivially-negative result.
+ *
+ * @param {ActiveEffect} effect
+ * @param {object} ctx
+ * @param {number} [ctx.worldTime] - current worldTime for legacy seconds checks
+ * @param {number|null} [ctx.curRound] - current combat round, or null if out-of-combat
+ * @param {string} ctx.scope - system flag scope
+ * @returns {{ expired: boolean, reason: string | null }}
+ */
+export function classifyEffectExpiration(effect, { worldTime, curRound = null, scope } = {}) {
+  if (!effect || effect.disabled) return { expired: false, reason: null };
+
+  const d = effect.duration ?? {};
+  const efFlags = effect.flags?.[scope] || {};
+
+  // Ongoing-engine effects manage their own lifecycle — skip
+  if (efFlags.ongoingId || efFlags.isDying || efFlags.dyingTimer) {
+    return { expired: false, reason: null };
+  }
+
+  // Explicit expiresAtRound flag (e.g. Evasion Bonus) takes precedence over duration
+  if (Number.isFinite(efFlags.expiresAtRound) && Number.isFinite(curRound)) {
+    if (curRound >= efFlags.expiresAtRound) {
+      return { expired: true, reason: `expired at round ${efFlags.expiresAtRound} (current: ${curRound})` };
+    }
+    return { expired: false, reason: null };
+  }
+
+  // v14 canonical: core-computed remaining is authoritative. Do NOT fall through
+  // to legacy paths when this is present — legacy paths assume v13 start markers
+  // that v14 effects don't have and would misfire.
+  if (Number.isFinite(d.remaining)) {
+    if (d.expired === true || (d.remaining <= 0 && Number.isFinite(d.value) && d.value > 0)) {
+      return { expired: true, reason: `expired per core (value ${d.value} ${d.units}, remaining ${d.remaining})` };
+    }
+    return { expired: false, reason: null };
+  }
+
+  // Legacy v13 rounds — requires startRound (no default-to-zero)
+  if (Number.isFinite(curRound) && Number.isFinite(d.rounds) && d.rounds > 0 && Number.isFinite(d.startRound)) {
+    const elapsed = Math.max(0, curRound - d.startRound);
+    const remaining = Math.ceil(d.rounds - elapsed);
+    if (remaining <= 0) {
+      return { expired: true, reason: `0 rounds remaining (${d.rounds} rounds, started round ${d.startRound})` };
+    }
+    return { expired: false, reason: null };
+  }
+
+  // Legacy v13 seconds — requires startTime (no default-to-zero)
+  if (Number.isFinite(worldTime) && Number.isFinite(d.seconds) && d.seconds > 0 && Number.isFinite(d.startTime)) {
+    if (d.startTime + d.seconds <= worldTime) {
+      return { expired: true, reason: `time expired (${d.seconds}s duration)` };
+    }
+  }
+
+  return { expired: false, reason: null };
+}
+
 /** Remove first effect that matches predicate (flag path or function) */
 export async function removeEffectBy(predicate, actor) {
   if (!actor) return;

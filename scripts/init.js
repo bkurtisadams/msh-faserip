@@ -202,50 +202,22 @@ Hooks.on("updateWorldTime", async (worldTime, dt, options, userId) => {
 
   // Effect expiration: skip during active combat (updateCombat hook handles that)
   if (!game.combat?.active) {
+    const scope = globalThis.MSH_FLAG_SCOPE || "msh-faserip";
     for (const actor of Effects.getAllTokenActors()) {
       const toExpire = [];
-      
+
       // Check actor-level effects
       for (const ef of (actor.effects ?? [])) {
-        if (ef.disabled) continue;
-        const d = ef.duration ?? {};
-        const scope = globalThis.MSH_FLAG_SCOPE || "msh-faserip";
-        const efFlags = ef.flags?.[scope] || {};
-        // Skip ongoing-engine effects — they manage their own lifecycle
-        // (Body Armor, Force Field, Resistances, regeneration, dying, etc.)
-        if (efFlags.ongoingId || efFlags.isDying || efFlags.dyingTimer) continue;
-        // v14: trust core's computed expired flag for value+units durations
-        if (d.expired === true || (Number.isFinite(d.remaining) && d.remaining <= 0 && (Number.isFinite(d.value) ? d.value > 0 : false))) {
-          toExpire.push({ effect: ef, item: null, reason: `expired per core (value ${d.value} ${d.units}, remaining ${d.remaining})` });
-          continue;
-        }
-        if (Number.isFinite(d.seconds) && d.seconds > 0 && Number.isFinite(d.startTime)) {
-          if (d.startTime + d.seconds <= worldTime) {
-            toExpire.push({ effect: ef, item: null, reason: `time expired (${d.seconds}s duration)` });
-          }
-        }
+        const { expired, reason } = Effects.classifyEffectExpiration(ef, { worldTime, curRound: null, scope });
+        if (expired) toExpire.push({ effect: ef, item: null, reason });
       }
 
       // Check effects on owned equipment items (v13: transfer doesn't always put them on actor)
       for (const item of (actor.items ?? [])) {
         if (item.type !== "equipment") continue;
         for (const ef of (item.effects ?? [])) {
-          if (ef.disabled) continue;
-          const d = ef.duration ?? {};
-          const scope = globalThis.MSH_FLAG_SCOPE || "msh-faserip";
-          const efFlags = ef.flags?.[scope] || {};
-          // Skip ongoing-engine effects — they manage their own lifecycle
-          if (efFlags.ongoingId || efFlags.isDying || efFlags.dyingTimer) continue;
-          // v14: trust core's computed expired flag for value+units durations
-          if (d.expired === true || (Number.isFinite(d.remaining) && d.remaining <= 0 && (Number.isFinite(d.value) ? d.value > 0 : false))) {
-            toExpire.push({ effect: ef, item, reason: `expired per core (value ${d.value} ${d.units}, remaining ${d.remaining})` });
-            continue;
-          }
-          if (Number.isFinite(d.seconds) && d.seconds > 0 && Number.isFinite(d.startTime)) {
-            if (d.startTime + d.seconds <= worldTime) {
-              toExpire.push({ effect: ef, item, reason: `time expired (${d.seconds}s duration)` });
-            }
-          }
+          const { expired, reason } = Effects.classifyEffectExpiration(ef, { worldTime, curRound: null, scope });
+          if (expired) toExpire.push({ effect: ef, item, reason });
         }
       }
 
@@ -3015,65 +2987,20 @@ Hooks.on("updateCombat", async (combat, changed, diff, userId) => {
   if (combat?.active) {
     const curRound = combat.round ?? 1;
     const worldTime = game.time?.worldTime ?? 0;
-    
+    const scope = globalThis.MSH_FLAG_SCOPE || "msh-faserip";
+
     for (const c of combat.combatants) {
       const a = c?.actor;
       if (!a) continue;
-      
+
       // Collect effects to delete (avoid modifying collection while iterating)
       const toDelete = [];
-      
-      for (const ef of a.effects) {
-        if (ef.disabled) continue;
-        const d = ef.duration ?? {};
-        const scope = globalThis.MSH_FLAG_SCOPE || "msh-faserip";
-        const efFlags = ef.flags?.[scope] || {};
-        
-        // Skip ongoing engine effects â€” they manage their own lifecycle
-        // (dying, regeneration, etc. use CTT effectExpired or processDyingRound)
-        if (efFlags.ongoingId || efFlags.isDying || efFlags.dyingTimer) continue;
-        
-        // Check for explicit expiresAtRound flag (used by Evasion Bonus)
-        // This takes precedence over duration-based expiration
-        if (Number.isFinite(efFlags.expiresAtRound)) {
-          if (curRound >= efFlags.expiresAtRound) {
-            toDelete.push({ effect: ef, reason: `expired at round ${efFlags.expiresAtRound} (current: ${curRound})` });
-          }
-          continue;  // Skip duration-based check for effects with explicit expiry
-        }
-        
-        // v14: core already computes duration.expired / duration.remaining
-        // for value+units effects. Trust it and short-circuit before the
-        // legacy v13 shape checks (which only look at d.rounds / d.seconds
-        // and would otherwise miss every v14-shaped effect).
-        if (d.expired === true || (Number.isFinite(d.remaining) && d.remaining <= 0 && (Number.isFinite(d.value) ? d.value > 0 : false))) {
-          toDelete.push({ effect: ef, reason: `expired per core (value ${d.value} ${d.units}, remaining ${d.remaining})` });
-          continue;
-        }
 
-        // Handle round-based effects
-        if (Number.isFinite(d.rounds) && d.rounds > 0) {
-          const startR = d.startRound ?? 0;
-          const elapsed = Math.max(0, curRound - startR);
-          const remaining = Math.ceil(d.rounds - elapsed);
-          
-          if (remaining <= 0) {
-            toDelete.push({ effect: ef, reason: `0 rounds remaining (${d.rounds} rounds, started round ${startR})` });
-          }
-        }
-        
-        // Handle seconds-based effects (world time)
-        else if (Number.isFinite(d.seconds) && d.seconds > 0) {
-          const startT = d.startTime ?? 0;
-          const endTime = startT + d.seconds;
-          const remaining = endTime - worldTime;
-          
-          if (remaining <= 0) {
-            toDelete.push({ effect: ef, reason: `time expired (${d.seconds}s duration)` });
-          }
-        }
+      for (const ef of a.effects) {
+        const { expired, reason } = Effects.classifyEffectExpiration(ef, { worldTime, curRound, scope });
+        if (expired) toDelete.push({ effect: ef, reason });
       }
-      
+
       // Delete expired effects
       // NOTE: Health restoration on wake-up is handled by the rest-system's
       // deleteActiveEffect hook (attemptRegainConsciousness), which rolls the
