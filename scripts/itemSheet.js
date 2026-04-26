@@ -1,4 +1,23 @@
-// itemSheet.js v2.0.0 - 2026-04-18
+// itemSheet.js v2.1.0 - 2026-04-25
+// v2.1.0: V2 form-snapshot bug workaround
+//
+//   ItemSheetV2 passes _prepareSubmitData a `form` argument that is a
+//   different DOM node than the on-screen form — same input count, but
+//   all values are empty. Scanning that form yields {img: ...} only,
+//   silently dropping every other field on save.
+//
+//   Workaround: scan this.element.querySelector("form") instead. This
+//   reads the live DOM the user is interacting with.
+//
+//   Affected sheets: any FaseripItemSheet subtype (power, vehicle,
+//   generic items). Equipment has its own _prepareSubmitData that
+//   avoids the issue by trusting V2's formData.object — fragile, may
+//   need the same workaround if equipment grows late-rendered fields.
+//
+//   Re-test after each Foundry update. If V2 fixes the snapshot
+//   upstream, the live-form rescan becomes redundant overhead.
+//   See NOTES.md for the diagnostic trail.
+//
 // v2.0.0: Migrate to ApplicationV2 / ItemSheetV2 (v16 prep; v14 backward-compat shims gone in v16)
 // v1.14.0: Power sheet v2 layout redesign — reorder fields, rank→value auto-fill, 520px width, conditional special strength
 // v1.13.0: Power sheet v2 — single scrollable form, HQ-style, category-driven sections
