@@ -229,6 +229,14 @@ async function runGMCommand(data = {}) {
         ids: data.args?.[1] || []
       });
 
+    case "updateEmbeddedDocuments":
+      // Legacy signature: args: [collectionName, [updates]] where each update has _id
+      return await updateEmbeddedDocsOnActor({
+        targetActorUuid: data.targetActorUuid,
+        collection: data.args?.[0],
+        updates: data.args?.[1] || []
+      });
+
     case "createActorEffect":
       return await createActorEffect({
         targetActorUuid: data.targetActorUuid,
@@ -295,6 +303,14 @@ async function deleteEmbeddedDocsOnActor({ targetActorUuid, collection, ids }) {
   if (!collection) throw new Error("deleteEmbeddedDocsOnActor: missing collection name");
   if (!Array.isArray(ids)) throw new Error("deleteEmbeddedDocsOnActor: ids must be an array");
   return await actor.deleteEmbeddedDocuments(collection, ids);
+}
+
+async function updateEmbeddedDocsOnActor({ targetActorUuid, collection, updates }) {
+  const actor = await getActorFromUuid(targetActorUuid);
+  if (!actor) throw new Error(`updateEmbeddedDocsOnActor: actor not found: ${targetActorUuid}`);
+  if (!collection) throw new Error("updateEmbeddedDocsOnActor: missing collection name");
+  if (!Array.isArray(updates)) throw new Error("updateEmbeddedDocsOnActor: updates must be an array");
+  return await actor.updateEmbeddedDocuments(collection, updates);
 }
 
 async function deleteActiveEffects({ targetActorUuid, effectIds }) {
