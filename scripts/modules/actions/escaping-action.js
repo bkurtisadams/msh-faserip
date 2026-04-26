@@ -117,6 +117,16 @@ export class EscapingAction extends AttackAction {
       effectShift += entry.shift;
       filteredBreakdown.push(entry);
     }
+
+    // Re-add Impaired Endurance: per RAW, -2CS applies to ALL FEATs including
+    // escape ("Character at less than full Endurance: -2CS"). The selfPenaltyCS
+    // filter above (intended to exclude Partial Hold) also strips Impaired
+    // Endurance, so re-add it directly from the actor's effects.
+    const impairedEffect = actor.effects.find(e => e.getFlag("msh-faserip", "isImpairedEndurance"));
+    if (impairedEffect) {
+      effectShift += -2;
+      filteredBreakdown.push({ name: impairedEffect.name, shift: -2 });
+    }
     
     // Calculate total shift including effects (excluding selfPenaltyCS)
     const manualShift = choice.shift || 0;
