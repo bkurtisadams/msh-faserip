@@ -211,8 +211,7 @@ async function runGMCommand(data = {}) {
     case "update":
       return await updateActor({
         targetActorUuid: data.targetActorUuid,
-        updateData: data.args?.[0],
-        updateOptions: data.opts || {}
+        updateData: data.args?.[0]
       });
 
     case "createEmbeddedDocuments":
@@ -227,8 +226,7 @@ async function runGMCommand(data = {}) {
       return await deleteEmbeddedDocsOnActor({
         targetActorUuid: data.targetActorUuid,
         collection: data.args?.[0],
-        ids: data.args?.[1] || [],
-        opts: data.opts || {}
+        ids: data.args?.[1] || []
       });
 
     case "updateEmbeddedDocuments":
@@ -236,8 +234,7 @@ async function runGMCommand(data = {}) {
       return await updateEmbeddedDocsOnActor({
         targetActorUuid: data.targetActorUuid,
         collection: data.args?.[0],
-        updates: data.args?.[1] || [],
-        opts: data.opts || {}
+        updates: data.args?.[1] || []
       });
 
     case "createActorEffect":
@@ -300,20 +297,20 @@ async function createEmbeddedDocsOnActor({ targetActorUuid, collection, docs }) 
   return await actor.createEmbeddedDocuments(collection, docs);
 }
 
-async function deleteEmbeddedDocsOnActor({ targetActorUuid, collection, ids, opts = {} }) {
+async function deleteEmbeddedDocsOnActor({ targetActorUuid, collection, ids }) {
   const actor = await getActorFromUuid(targetActorUuid);
   if (!actor) throw new Error(`deleteEmbeddedDocsOnActor: actor not found: ${targetActorUuid}`);
   if (!collection) throw new Error("deleteEmbeddedDocsOnActor: missing collection name");
   if (!Array.isArray(ids)) throw new Error("deleteEmbeddedDocsOnActor: ids must be an array");
-  return await actor.deleteEmbeddedDocuments(collection, ids, opts);
+  return await actor.deleteEmbeddedDocuments(collection, ids);
 }
 
-async function updateEmbeddedDocsOnActor({ targetActorUuid, collection, updates, opts = {} }) {
+async function updateEmbeddedDocsOnActor({ targetActorUuid, collection, updates }) {
   const actor = await getActorFromUuid(targetActorUuid);
   if (!actor) throw new Error(`updateEmbeddedDocsOnActor: actor not found: ${targetActorUuid}`);
   if (!collection) throw new Error("updateEmbeddedDocsOnActor: missing collection name");
   if (!Array.isArray(updates)) throw new Error("updateEmbeddedDocsOnActor: updates must be an array");
-  return await actor.updateEmbeddedDocuments(collection, updates, opts);
+  return await actor.updateEmbeddedDocuments(collection, updates);
 }
 
 async function deleteActiveEffects({ targetActorUuid, effectIds }) {
@@ -347,10 +344,10 @@ async function gmRenameEffectWithRemaining({ targetActorUuid, effectId }) {
   }
 }
 
-async function updateActor({ targetActorUuid, updateData, updateOptions = {} }) {
+async function updateActor({ targetActorUuid, updateData }) {
   const actor = await getActorFromUuid(targetActorUuid);
   if (!actor || !updateData) return false;
-  await actor.update(updateData, updateOptions);
+  await actor.update(updateData);
   return true;
 }
 
@@ -492,7 +489,7 @@ export async function safeActorUpdate(actor, updateData, updateOpts = {}) {
     return actor.update(updateData, updateOpts);
   }
   console.log(`[FASERIP] safeActorUpdate: delegating to GM for ${actor.name}`);
-  return runAsGM({ operation: "update", targetActorUuid: actor.uuid, args: [updateData], opts: updateOpts });
+  return runAsGM({ operation: "update", targetActorUuid: actor.uuid, args: [updateData] });
 }
 
 /**
@@ -536,8 +533,7 @@ export async function safeActorDeleteEffects(actor, effectIds, opts = {}) {
   return runAsGM({
     operation: "deleteEmbeddedDocuments",
     targetActorUuid: actor.uuid,
-    args: ["ActiveEffect", effectIds],
-    opts
+    args: ["ActiveEffect", effectIds]
   });
 }
 
@@ -555,7 +551,6 @@ export async function safeActorUpdateEffect(actor, effectId, updateData, opts = 
   return runAsGM({
     operation: "updateEmbeddedDocuments",
     targetActorUuid: actor.uuid,
-    args: ["ActiveEffect", [{ _id: effectId, ...updateData }]],
-    opts
+    args: ["ActiveEffect", [{ _id: effectId, ...updateData }]]
   });
 }

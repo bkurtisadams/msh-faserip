@@ -2759,12 +2759,8 @@ Hooks.on('updateActor', async (actor, updateData, options, userId) => {
 
     // ===== 0 HP DEATH SAVE â€” runs BEFORE throttle so it is never swallowed =====
     if (currentHealth <= 0) {
-      // Skip if combat system already handling death save.
-      // Two equivalent guards:
-      //   - mshHpZeroHandled option marker on the update — set by applyDamageToTargets
-      //     and applyDamageNow, survives socket delegation (cross-client safe).
-      //   - _combatDamageInProgress per-client flag — legacy fallback for same-client GM path.
-      if (options?.mshHpZeroHandled || game.msh?._combatDamageInProgress) {
+      // Skip if combat system already handling death save (applyDamageToTargets)
+      if (game.msh?._combatDamageInProgress) {
         console.log(`FASERIP | Skipping init.js death save - combat system handling`);
         const scope = globalThis.MSH_FLAG_SCOPE || "msh-faserip";
         actor.setFlag(scope, "wasKnockedOut", true);

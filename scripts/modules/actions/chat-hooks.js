@@ -146,17 +146,6 @@ export function installActionChatHandlers() {
       console.error("FF Breach render substitution failed:", err);
     }
 
-    // Death Save (0 HP, no-effect outcome): GM sees the real round count; players see "?"
-    try {
-      const dsUnc = message?.flags?.[SCOPE]?.deathSaveUnconscious;
-      if (dsUnc && game.user.isGM) {
-        const roundsEl = htmlEl.querySelector(".msh-ds-rounds");
-        if (roundsEl) roundsEl.textContent = String(dsUnc.rounds);
-      }
-    } catch (err) {
-      console.error("Death Save render substitution failed:", err);
-    }
-
     // Bail if already auto-processed (prevents double-fire on rerender/notify)
     const alreadyHandled = await message.getFlag(SCOPE, "autoSaveHandled");
 
